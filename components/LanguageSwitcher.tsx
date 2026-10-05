@@ -3,10 +3,11 @@
 import Link from 'next/link'
 import { useEffect, useRef, useState } from 'react'
 import { usePathname } from 'next/navigation'
-import { Check, Languages } from 'lucide-react'
+import { Check, ChevronDown, Languages } from 'lucide-react'
 import { LOCALE_PREFIX, PUBLIC_LOCALES, type PublicLocale } from '@/lib/i18n/locales'
 import { getPublicDictionary } from '@/lib/i18n/getPublicDictionary'
 import { spanishSiteEnabled } from '@/lib/i18n/spanish-site'
+import { portugueseSiteEnabled } from '@/lib/i18n/portuguese-site'
 import { cn } from '@/lib/utils'
 
 /**
@@ -33,9 +34,15 @@ export function counterpartPath(pathname: string, from: PublicLocale, to: Public
   return `${toPrefix}${hebrewPath}`
 }
 
-/** The locales a visitor may switch to right now. Spanish only while its site is on. */
-export function availableLocales(spanishOn = spanishSiteEnabled()): PublicLocale[] {
-  return PUBLIC_LOCALES.filter((l) => l !== 'es' || spanishOn)
+/**
+ * The locales a visitor may switch to right now. A gated language appears only
+ * while its own site is on, so the switcher can never offer a tree that 404s.
+ */
+export function availableLocales(
+  spanishOn = spanishSiteEnabled(),
+  portugueseOn = portugueseSiteEnabled(),
+): PublicLocale[] {
+  return PUBLIC_LOCALES.filter((l) => (l === 'es' ? spanishOn : l === 'pt-BR' ? portugueseOn : true))
 }
 
 /**
@@ -102,6 +109,13 @@ export function LanguageSwitcher({ locale, className, inverse = false }: { local
       >
         <Languages className={cn('size-4', inverse ? 'text-contrast-ink/70' : 'text-muted')} aria-hidden="true" />
         {dict.languageSwitcher[locale]}
+        {/* The globe alone read as a label rather than a control: a visitor had no
+            reason to think the language could be changed (owner, 5 October 2026).
+            The chevron is what says "this opens", and it turns when it is open. */}
+        <ChevronDown
+          className={cn('size-3.5 transition-transform duration-150 ease-snappy', open && '-rotate-180', inverse ? 'text-contrast-ink/70' : 'text-muted')}
+          aria-hidden="true"
+        />
       </button>
       {open && (
         <div

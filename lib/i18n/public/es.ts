@@ -61,6 +61,7 @@ export const es = {
     pricing: 'Precios',
     articles: 'Artículos',
     about: 'Nosotros',
+    affiliates: 'Programa de afiliados',
     sitemap: 'Mapa del sitio',
     legal: 'Legal',
     privacy: 'Política de privacidad',
@@ -159,6 +160,7 @@ export const es = {
     he: 'עברית',
     en: 'English',
     es: 'Español',
+    'pt-BR': 'Português (Brasil)',
     aria: 'Cambiar el idioma del sitio',
   },
   cookie: {

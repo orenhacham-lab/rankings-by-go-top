@@ -179,8 +179,6 @@ export type NextArticle = {
   queueLength: number
   /** The board card it is, when it is an idea (so the card's own actions apply to it). */
   cardKey: string | null
-  /** How many other ideas could take its place ("swap"); 0 for a topic or the queue. */
-  alternatives: number
 }
 
 /**
@@ -432,12 +430,6 @@ export function buildStrategyBoard(input: {
   seed: SeedPlan
   /** Tracked keywords close to the top (rankingIdeas); none when they could not be read. */
   ranking?: readonly StrategyRanking[]
-  /**
-   * Idea cards the merchant swapped away ("swap topic"), oldest swap first. They go
-   * behind every other idea, so the next pending idea takes their place, in the
-   * column and as the next article. Nothing is rejected, so a swapped idea stays.
-   */
-  deferred?: readonly string[]
 }): StrategyBoard {
   const { data, seed } = input
   const queue = [...(input.queue ?? [])].sort((a, b) => a.position - b.position)
@@ -534,13 +526,13 @@ export function buildStrategyBoard(input: {
     })
   }
 
-  // Every idea card was added after every other card; the swapped ones go last.
-  // The other three columns are put in the order of the date each card shows.
+  // The ideas keep their own order (score first); the other three columns are put in
+  // the order of the date each card shows.
   const ordered = [
     ...byColumnDate(cards.filter((c) => c.column === 'planned')),
     ...byColumnDate(cards.filter((c) => c.column === 'written')),
     ...[...cards.filter((c) => c.column === 'published')].sort(newestFirst),
-    ...deferLast(cards.filter((c) => c.column === 'ideas'), input.deferred ?? []),
+    ...cards.filter((c) => c.column === 'ideas'),
   ]
 
   const counts: Record<StrategyColumn, number> = { ideas: 0, planned: 0, written: 0, published: 0 }
@@ -599,13 +591,6 @@ export function byColumnDate(cards: StrategyCard[]): StrategyCard[] {
   return [...dated.sort(soonestFirst), ...rest.sort(newestFirst)]
 }
 
-/** A stable order: the cards not swapped keep theirs, then the swapped ones, oldest swap first. */
-function deferLast(ideaCards: StrategyCard[], deferred: readonly string[]): StrategyCard[] {
-  if (deferred.length === 0) return ideaCards
-  const at = new Map(deferred.map((k, i) => [k, i]))
-  return [...ideaCards.filter((c) => !at.has(c.key)), ...ideaCards.filter((c) => at.has(c.key)).sort((a, b) => at.get(a.key)! - at.get(b.key)!)]
-}
-
 /**
  * The next article, in the order the product will actually write them:
  *   1. the first item still waiting in the publishing queue, on its projected slot;
@@ -639,7 +624,6 @@ function pickNextArticle(ctx: {
       queuePosition: 1,
       queueLength,
       cardKey: null,
-      alternatives: 0,
     }
   }
   const waiting = ctx.data.topics
@@ -649,7 +633,7 @@ function pickNextArticle(ctx: {
     return {
       kind: 'topic', title: waiting.title, keyword: waiting.primaryKeyword, date: null,
       reason: waiting.reason, source: waiting.source, topicId: waiting.id, articleId: null,
-      ideaId: null, queuePosition: null, queueLength, cardKey: null, alternatives: 0,
+      ideaId: null, queuePosition: null, queueLength, cardKey: null,
     }
   }
   const idea = ctx.ideaCards[0]
@@ -657,7 +641,7 @@ function pickNextArticle(ctx: {
     return {
       kind: 'idea', title: idea.title, keyword: idea.keyword, date: null, reason: idea.reason,
       source: null, topicId: null, articleId: null, ideaId: idea.ideaId ?? null, queuePosition: null, queueLength,
-      cardKey: idea.key, alternatives: ctx.ideaCards.length - 1,
+      cardKey: idea.key,
     }
   }
   const scan = ctx.scanIdeas[0]
@@ -665,7 +649,7 @@ function pickNextArticle(ctx: {
     return {
       kind: 'scan', title: scan.title, keyword: scan.keyword, date: null, reason: null,
       source: null, topicId: null, articleId: null, ideaId: null, queuePosition: null, queueLength,
-      cardKey: scan.key, alternatives: ctx.scanIdeas.length - 1,
+      cardKey: scan.key,
     }
   }
   return null

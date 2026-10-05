@@ -61,6 +61,11 @@ export type ConsentAction = (typeof CONSENT_ACTIONS)[number]
  * 'pt-BR'), then this list; lib/consent/__qa__/consent-locale-contract.qa.ts
  * holds the two together, so a language added here and not there fails in CI
  * rather than losing a visitor's proof in production.
+ *
+ * The Portuguese site's own flag is held to the same thing from the other side:
+ * lib/consent/__qa__/consent-locale-launch.qa.ts reads the CHECK out of the
+ * migrations and fails if a language is live that the log cannot store, so the
+ * flag cannot be turned on ahead of the constraint either.
  */
 export const CONSENT_LOCALES = ['he', 'en', 'es', 'pt-BR'] as const
 

@@ -163,6 +163,7 @@ export const CHECKS_EXPLAINER: Record<PublicLocale, string> = {
   en: 'A Google ranking check looks up where one keyword appears in Google or Google Maps. An AI visibility check asks one AI engine one question, for example ChatGPT, and sees whether your business is mentioned in the answer.',
   he: 'בדיקת מיקום בגוגל בודקת איפה מילת מפתח אחת מופיעה בגוגל או בגוגל מפות. בדיקת נראות ב-AI שואלת מנוע AI אחד שאלה אחת, למשל ChatGPT, ובודקת אם העסק שלכם מוזכר בתשובה.',
   es: 'Una comprobación de posición en Google mira en qué puesto aparece una palabra clave en Google o en Google Maps. Una comprobación de visibilidad en IA hace una pregunta a un motor de IA, por ejemplo ChatGPT, y comprueba si tu negocio se menciona en la respuesta.',
+  'pt-BR': 'Uma verificação de posição no Google olha em que lugar uma palavra-chave aparece no Google ou no Google Maps. Uma verificação de visibilidade em IA faz uma pergunta a um motor de IA, por exemplo o ChatGPT, e vê se o seu negócio é mencionado na resposta.',
 }
 
 /**
@@ -217,10 +218,10 @@ export function trialLimitLines(locale: PublicLocale): string[] {
  * persistence bought for nothing.
  */
 export const PLAN_AUDIENCE_LABEL: Record<PlanCode, Record<PublicLocale, string>> = {
-  regular: { en: 'One website', he: 'לאתר אחד', es: 'Para una web' },
-  advanced: { en: 'One website', he: 'לאתר אחד', es: 'Para una web' },
-  premium: { en: 'Multiple websites', he: 'למספר אתרים', es: 'Para varias webs' },
-  large_agency: { en: 'Agencies', he: 'לסוכנויות', es: 'Para agencias' },
+  regular: { en: 'One website', he: 'לאתר אחד', es: 'Para una web', 'pt-BR': 'Para um site' },
+  advanced: { en: 'One website', he: 'לאתר אחד', es: 'Para una web', 'pt-BR': 'Para um site' },
+  premium: { en: 'Multiple websites', he: 'למספר אתרים', es: 'Para varias webs', 'pt-BR': 'Para vários sites' },
+  large_agency: { en: 'Agencies', he: 'לסוכנויות', es: 'Para agencias', 'pt-BR': 'Para agências' },
 }
 
 /**
@@ -234,20 +235,24 @@ export const PLAN_AUDIENCE_DESCRIPTION: Record<PlanCode, Record<PublicLocale, st
     en: 'One website, a simple place to start',
     he: 'אתר אחד, התחלה פשוטה',
     es: 'Una web, un punto de partida sencillo',
+    'pt-BR': 'Um site, um começo simples',
   },
   advanced: {
     en: 'For one website that needs more articles and more tracking',
     he: 'לאתר אחד שצריך יותר מאמרים ויותר מעקב',
     es: 'Para una web que necesita más artículos y más seguimiento',
+    'pt-BR': 'Para um site que precisa de mais artigos e mais monitoramento',
   },
   premium: {
     en: 'For businesses and agencies running several websites',
     he: 'לעסקים ולסוכנויות שמנהלים כמה אתרים',
     es: 'Para empresas y agencias que gestionan varias webs',
+    'pt-BR': 'Para empresas e agências que cuidam de vários sites',
   },
   large_agency: {
     en: 'For agencies with many clients',
     he: 'לסוכנויות עם הרבה לקוחות',
     es: 'Para agencias con muchos clientes',
+    'pt-BR': 'Para agências com muitos clientes',
   },
 }

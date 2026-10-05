@@ -223,12 +223,12 @@ export default function ContentStrategyScreen({ proFirst = false }: { proFirst?:
     if (r.writingFirst) setStarting({ projectId, at: Date.now() })
   }, [projectId])
   const actions = useIdeaActions({ projectId, automation: automationEnabled, dict, toast, onChanged, onScheduled })
-  const { view: withActions, prune, deferred } = actions
+  const { view: withActions, prune } = actions
   // A fresh read retires what it already shows.
   useEffect(() => { if (strategy.data) prune(strategy.data) }, [strategy.data, prune])
   const board = useMemo(
-    () => (strategy.data ? buildStrategyBoard({ data: withActions(strategy.data), queue: strategy.queue, seed: strategy.seed, ranking, deferred }) : null),
-    [strategy.data, strategy.queue, strategy.seed, ranking, withActions, deferred],
+    () => (strategy.data ? buildStrategyBoard({ data: withActions(strategy.data), queue: strategy.queue, seed: strategy.seed, ranking }) : null),
+    [strategy.data, strategy.queue, strategy.seed, ranking, withActions],
   )
   const act: BoardIdeaActions = { actions, automation: automationEnabled }
 
@@ -380,7 +380,11 @@ export default function ContentStrategyScreen({ proFirst = false }: { proFirst?:
             <PlanBasis seed={strategy.seed} dict={dict} />
           </div>
           <div className="flex flex-wrap items-center gap-2">
-            {automationEnabled && view === 'board' && !!board && !planEmpty && <AddKeywordButton dict={dict} open={addOpen} onOpen={() => setAdding(true)} />}
+            {/* A topic of the customer's own is the main way to get a topic that is not on
+              the board: it costs nothing, asks no model and is immediate, so it is a
+              primary button and it is here in both views. It took the place of "swap",
+              which only reordered the ideas (owner's call, 5 October 2026). */}
+            {automationEnabled && !!board && !planEmpty && <AddKeywordButton dict={dict} open={addOpen} onOpen={() => setAdding(true)} />}
             <ViewSwitch view={view} onChange={setView} dict={dict} />
           </div>
         </div>

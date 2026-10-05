@@ -123,12 +123,16 @@ function main() {
     // One entry per language the form ships, derived from PUBLIC_LOCALES rather
     // than pinned at two — Spanish joined the form on 4 October 2026, and a
     // hard-coded 2 would have read that as a missing string.
-    const langs = PUBLIC_LOCALES.filter((l) => dict.includes(`  ${l}: {`)).length
+    // A locale whose name carries a hyphen is a QUOTED key ('pt-BR': {), so both
+    // spellings count: reading only the bare one made Portuguese invisible here
+    // and turned every key into a phantom missing string.
+    const langs = PUBLIC_LOCALES.filter((l) => dict.includes(`  ${l}: {`) || dict.includes(`  '${l}': {`)).length
     const keys = ['fullName', 'company', 'phone', 'confirmPassword', 'passwordMismatch', 'phoneInvalid', 'fullNameInvalid']
     const both = langs >= 2 && keys.every((k) => (dict.match(new RegExp(`\\b${k}:`, 'g')) ?? []).length === langs)
     check(`D4: every new string exists in all ${langs} of the form's dictionaries`, both,
       keys.filter((k) => (dict.match(new RegExp(`\\b${k}:`, 'g')) ?? []).length !== langs).join(', '))
-    check('MUT: a key missing from one language fails D4', !['fullName', 'company', 'phone', 'confirmPassword', 'passwordMismatch', 'phoneInvalid', 'fullNameInvalid'].every((k) => (dict.replace("phone: 'טלפון',", '').match(new RegExp(`\\b${k}:`, 'g')) ?? []).length === 2))
+    check('MUT: a key missing from one language fails D4',
+      !keys.every((k) => (dict.replace("phone: 'טלפון',", '').match(new RegExp(`\\b${k}:`, 'g')) ?? []).length === langs))
   }
 
   console.log('\nE) the cookie notice: the w9 shape, and the consent contract that replaced the accept-only flag')

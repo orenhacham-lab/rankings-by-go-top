@@ -50,6 +50,7 @@ export const en = {
     pricing: 'Pricing',
     articles: 'Articles',
     about: 'About',
+    affiliates: 'Affiliate program',
     sitemap: 'Sitemap',
     legal: 'Legal',
     privacy: 'Privacy Policy',
@@ -151,6 +152,7 @@ export const en = {
     he: 'עברית',
     en: 'English',
     es: 'Español',
+    'pt-BR': 'Português (Brasil)',
     aria: 'Change the site language',
   },
   cookie: {

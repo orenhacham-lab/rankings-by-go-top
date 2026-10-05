@@ -2,7 +2,13 @@
 
 /**
  * The download under "Your Google Search performance": the same 28 days of
- * Search Console figures as a file, in Excel or CSV.
+ * Search Console figures as a file — the two-page summary as a PDF, or every
+ * row in Excel or CSV.
+ *
+ * The summary leads because it is what a customer actually reads: four figures
+ * and the queries sitting just off the first page. The spreadsheet is the whole
+ * truth and can run to tens of thousands of rows, so it stays available but
+ * second.
  *
  * It appears only once there are figures to download, which is also what the
  * server answers: with nothing synced yet /api/gsc/export refuses with `no_sync`,
@@ -20,11 +26,11 @@ import Button from '@/components/ui/Button'
 import { useDashboardLanguage } from '@/lib/i18n/dashboard/useDashboardLanguage'
 import { getDashboardDictionary } from '@/lib/i18n/dashboard/getDashboardDictionary'
 
-type Format = 'xlsx' | 'csv'
+type Format = 'xlsx' | 'csv' | 'pdf'
 
 /** The browser's own name for the file when the server's header is unreadable. */
 function fallbackName(format: Format): string {
-  return `search-console-28d.${format}`
+  return format === 'pdf' ? 'search-console-summary-28d.pdf' : `search-console-28d.${format}`
 }
 
 function headerFileName(header: string | null): string | null {
@@ -67,8 +73,11 @@ export default function GscExportDownload({ projectId, windowDays = 28, classNam
   return (
     <div data-gsc-export="performance" className={className}>
       <div className="flex flex-wrap items-center gap-2">
-        <Button type="button" variant="secondary" size="sm" onClick={() => download('xlsx')} loading={busy === 'xlsx'} disabled={busy !== null} data-gsc-export-format="xlsx">
+        <Button type="button" variant="secondary" size="sm" onClick={() => download('pdf')} loading={busy === 'pdf'} disabled={busy !== null} data-gsc-export-format="pdf">
           <Download size={15} strokeWidth={2} aria-hidden="true" />
+          {t.summary}
+        </Button>
+        <Button type="button" variant="ghost" size="sm" onClick={() => download('xlsx')} loading={busy === 'xlsx'} disabled={busy !== null} data-gsc-export-format="xlsx">
           {`${t.label} · ${t.excel}`}
         </Button>
         <Button type="button" variant="ghost" size="sm" onClick={() => download('csv')} loading={busy === 'csv'} disabled={busy !== null} data-gsc-export-format="csv">
@@ -76,7 +85,8 @@ export default function GscExportDownload({ projectId, windowDays = 28, classNam
         </Button>
         {busy !== null && <span className="text-overline text-muted">{t.working}</span>}
       </div>
-      <p className="mt-2 text-overline text-muted">{t.about}</p>
+      <p className="mt-2 text-overline text-muted">{t.summaryAbout}</p>
+      <p className="text-overline text-muted">{t.about}</p>
       <p className="text-overline text-muted">{t.note}</p>
       {failed && <p className="mt-1 text-overline text-bad" data-gsc-export-error>{t.failed}</p>}
     </div>

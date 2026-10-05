@@ -22,16 +22,21 @@ export const REPORT_CONSENT_VERSION = 'report-email-v1'
 /** Spanish has its own id: a Spanish record must not be read as the other wording. */
 export const REPORT_CONSENT_VERSION_ES = 'report-email-es-v1'
 
+/** Portuguese likewise. The wording is the legal thread's, reviewed in PR #97. */
+export const REPORT_CONSENT_VERSION_PT = 'report-email-pt-v1'
+
 const CONSENT: Record<PublicLocale, string> = {
   he: 'אני מסכים/ה לקבל מ-Go Top בדוא״ל את דוח המחקר של האתר, וגם עדכונים ותוכן שיווקי. אפשר להסיר את ההסכמה בכל עת בקישור שבכל הודעה.',
   en: 'I agree to receive this site research report from Go Top by email, as well as updates and marketing content. I can withdraw consent at any time using the link in every email.',
   es: 'Acepto recibir de Go Top por correo electrónico el informe de investigación de este sitio, así como novedades y contenido comercial. Puedo retirar mi consentimiento en cualquier momento con el enlace que incluye cada correo.',
+  'pt-BR': 'Concordo em receber da Go Top, por e-mail, o relatório de pesquisa deste site, assim como novidades e conteúdo comercial. Posso retirar meu consentimento a qualquer momento pelo link que acompanha cada mensagem.',
 }
 
 const CONSENT_VERSION: Record<PublicLocale, string> = {
   he: REPORT_CONSENT_VERSION,
   en: REPORT_CONSENT_VERSION,
   es: REPORT_CONSENT_VERSION_ES,
+  'pt-BR': REPORT_CONSENT_VERSION_PT,
 }
 
 export function reportConsentText(locale: PublicLocale): string {
@@ -168,7 +173,44 @@ const es: ResearchScreenCopy = {
   },
 }
 
-const SCREEN: Record<PublicLocale, ResearchScreenCopy> = { he, en, es }
+const ptBR: ResearchScreenCopy = {
+  errors: {
+    not_found: 'A pesquisa completa não está disponível aqui.',
+    invalid_url: 'Esse endereço não parece correto. Tente de novo, por exemplo exemplo.com',
+    blocked_url: 'Só é possível pesquisar sites públicos. Endereços internos, IPs e redirecionamentos para outro site não são aceitos.',
+    unreachable: 'Não conseguimos acessar o site. Verifique o endereço e tente de novo.',
+    not_html: 'Este endereço não devolve uma página que possamos ler.',
+    forbidden: 'O site bloqueia leitores automáticos, e o Google também não mostra nenhuma de suas páginas. Tente outro endereço do site.',
+    rate_limited: 'Você iniciou várias pesquisas seguidas. Tente de novo em alguns minutos.',
+    daily_cap: 'A pesquisa gratuita está lotada hoje. Tente mais tarde, ou abra uma conta e a pesquisa roda no seu projeto.',
+    unavailable: 'A pesquisa completa não está disponível agora.',
+    internal: 'Algo travou do nosso lado. Tente de novo em um instante.',
+  },
+  unavailableTitle: 'A pesquisa completa não está disponível agora',
+  unavailableBody: 'Por enquanto, fizemos a análise rápida do seu site.',
+  report: {
+    link: 'Quero receber o relatório por e-mail',
+    title: 'Receber o relatório por e-mail',
+    body: 'Deixe um endereço e enviamos o relatório de pesquisa do site.',
+    emailLabel: 'Endereço de e-mail',
+    emailPlaceholder: 'voce@exemplo.com',
+    consent: CONSENT['pt-BR'],
+    privacy: 'Política de privacidade',
+    submit: 'Salvar minha solicitação',
+    sending: 'Salvando…',
+    saved: 'Recebido. O relatório de pesquisa será enviado para este endereço.',
+    errors: {
+      consent_required: 'Para enviar o relatório, marque a caixa de consentimento.',
+      invalid_email: 'Esse endereço de e-mail não parece correto.',
+      invalid_claim: 'Esta pesquisa já não pode ser enviada. Rode-a de novo.',
+      rate_limited: 'Você enviou várias solicitações seguidas. Tente de novo mais tarde.',
+      unavailable: 'Não conseguimos salvar sua solicitação agora. Tente de novo mais tarde.',
+      internal: 'Algo travou do nosso lado. Tente de novo em um instante.',
+    },
+  },
+}
+
+const SCREEN: Record<PublicLocale, ResearchScreenCopy> = { he, en, es, 'pt-BR': ptBR }
 
 export function researchScreenCopy(locale: PublicLocale): ResearchScreenCopy {
   return SCREEN[locale] ?? he

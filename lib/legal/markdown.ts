@@ -187,21 +187,31 @@ export type LegalSlug = 'terms' | 'privacy' | 'refund-policy' | 'accessibility' 
 export const LEGAL_SLUGS: readonly LegalSlug[] = ['terms', 'privacy', 'refund-policy', 'accessibility', 'affiliate-terms']
 
 /**
- * Read one Spanish legal document from the repository.
- *
- * Parsed once per process. The pages render per request (they have to, or the
- * document would declare the wrong <html lang>), and the file cannot change
- * under a running server: it is shipped, not uploaded. So the read and the
- * parse happen on the first request a server instance serves and never again,
- * which is what keeps a per-request render as cheap as a prerendered one.
+ * The languages whose legal documents are Markdown under content/legal/. Hebrew
+ * and English are hand-written JSX and are not here.
  */
-const cache = new Map<LegalSlug, LegalDocument>()
+export type LegalLanguage = 'es' | 'pt-BR'
 
-export function readLegalDocument(slug: LegalSlug): LegalDocument {
-  const cached = cache.get(slug)
+export const LEGAL_LANGUAGES: readonly LegalLanguage[] = ['es', 'pt-BR']
+
+/**
+ * Read one translated legal document from the repository.
+ *
+ * Parsed once per process, per language and slug. The pages render per request
+ * (they have to, or the document would declare the wrong <html lang>), and the
+ * file cannot change under a running server: it is shipped, not uploaded. So the
+ * read and the parse happen on the first request a server instance serves and
+ * never again, which is what keeps a per-request render as cheap as a
+ * prerendered one.
+ */
+const cache = new Map<string, LegalDocument>()
+
+export function readLegalDocument(slug: LegalSlug, language: LegalLanguage = 'es'): LegalDocument {
+  const key = `${language}/${slug}`
+  const cached = cache.get(key)
   if (cached) return cached
-  const path = join(process.cwd(), 'content', 'legal', 'es', `${slug}.md`)
-  const doc = parseLegalMarkdown(readFileSync(path, 'utf8'), `content/legal/es/${slug}.md`)
-  cache.set(slug, doc)
+  const rel = `content/legal/${language}/${slug}.md`
+  const doc = parseLegalMarkdown(readFileSync(join(process.cwd(), ...rel.split('/')), 'utf8'), rel)
+  cache.set(key, doc)
   return doc
 }

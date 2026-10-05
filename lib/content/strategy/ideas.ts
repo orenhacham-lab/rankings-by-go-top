@@ -21,9 +21,6 @@
  *   add a keyword
  *       POST /api/content/automation/topics/bulk  { status: 'approved', topics: [{ source: 'keyword', ... }] }
  *       the route's own `source: 'keyword'`; no model is asked, so it costs nothing.
- *   swap
- *       no request at all: the next pending idea takes its place (see buildStrategyBoard's
- *       `deferred`). Nothing is rejected, so a swapped idea is still there later.
  *
  * Everything here is PURE: the requests to send, how to read an answer, and how the
  * board looks while an answer is on its way (applyIdeaOverrides). Nothing a route or a
@@ -206,11 +203,6 @@ export function overrideSettled(data: StrategyData, o: IdeaOverride): boolean {
   const ideaGone = !('ideaId' in o) || !o.ideaId || !data.ideas.some((i) => i.id === o.ideaId)
   if (o.kind === 'reject') return ideaGone
   return ideaGone && hasTopic(data, o.title)
-}
-
-/** Swap: the idea goes behind every other one, most recently swapped last. */
-export function deferIdea(deferred: readonly string[], key: string): string[] {
-  return [...deferred.filter((k) => k !== key), key]
 }
 
 /**

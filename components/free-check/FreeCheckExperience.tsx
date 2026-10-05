@@ -40,9 +40,9 @@ const STEP_MS = 3_500
 
 /** A finding's tone: the start border and the badge. Never a tinted card. */
 const SEVERITY_STYLES: Record<string, { border: string; badge: 'danger' | 'warning' | 'neutral'; label: Record<PublicLocale, string> }> = {
-  blocker: { border: 'border-s-bad', badge: 'danger', label: { he: 'קריטי', en: 'Critical', es: 'Crítico' } },
-  warning: { border: 'border-s-warn', badge: 'warning', label: { he: 'אזהרה', en: 'Warning', es: 'Advertencia' } },
-  info: { border: 'border-s-line-strong', badge: 'neutral', label: { he: 'המלצה', en: 'Tip', es: 'Recomendación' } },
+  blocker: { border: 'border-s-bad', badge: 'danger', label: { he: 'קריטי', en: 'Critical', es: 'Crítico', 'pt-BR': 'Crítico' } },
+  warning: { border: 'border-s-warn', badge: 'warning', label: { he: 'אזהרה', en: 'Warning', es: 'Advertencia', 'pt-BR': 'Aviso' } },
+  info: { border: 'border-s-line-strong', badge: 'neutral', label: { he: 'המלצה', en: 'Tip', es: 'Recomendación', 'pt-BR': 'Recomendação' } },
 }
 
 export function FreeCheckExperience({ locale, initialUrl = '' }: { locale: PublicLocale; initialUrl?: string }) {

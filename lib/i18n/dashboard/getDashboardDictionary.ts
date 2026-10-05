@@ -1,6 +1,7 @@
 import { dashboardHe } from './he'
 import { dashboardEn } from './en'
 import { dashboardEs } from './es'
+import { dashboardPtBR } from './pt-BR'
 import { deepMergeDictionary } from './merge'
 import type { PublicLocale } from '../locales'
 import type { DashboardDictionary } from './he'
@@ -10,13 +11,20 @@ import type { DashboardDictionary } from './he'
  * rather than per render. Anything es.ts has not reached yet is therefore English
  * — see lib/i18n/dashboard/merge.ts for why that is the right fallback and
  * lib/i18n/dashboard/__qa__/spanish-dashboard.qa.ts for the coverage count.
+ *
+ * Brazilian Portuguese is the same arrangement one wave behind: pt-BR.ts carries
+ * the chrome and nothing else yet, so a Portuguese dashboard is Portuguese around
+ * the edges and English inside. That is deliberate and it is why the Portuguese
+ * site is still gated.
  */
 const dashboardEsMerged = deepMergeDictionary(dashboardEn as unknown as DashboardDictionary, dashboardEs)
+const dashboardPtMerged = deepMergeDictionary(dashboardEn as unknown as DashboardDictionary, dashboardPtBR)
 
 const DICTIONARIES = {
   he: dashboardHe,
   en: dashboardEn as unknown as DashboardDictionary,
   es: dashboardEsMerged,
+  'pt-BR': dashboardPtMerged,
 } satisfies Record<PublicLocale, DashboardDictionary>
 
 /**

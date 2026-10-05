@@ -244,9 +244,10 @@ async function main() {
     check('D4: the setup line mounts with the project (its status read runs beside the overview) and gets no platform until this project\'s overview', early(shell))
     check('D4 MUT: the old "platform ?? none" from any overview is caught', !early(shell.replace("platform={overview ? overview.platform?.platform ?? 'none' : null}", "platform={data?.platform?.platform ?? 'none'}")))
     const strategy = code('components/content-strategy/ContentStrategyScreen.tsx')
-    const addWaits = (src: string) => /view === 'board' && !!board && !planEmpty && <AddKeywordButton/.test(src)
+    // The button sits in the section header now, in both views, since it replaced "swap".
+    const addWaits = (src: string) => /automationEnabled && !!board && !planEmpty && <AddKeywordButton/.test(src)
     check('D5: the strategy screen offers "add keyword" only once the plan answered (not while it loads, then gone)', addWaits(strategy))
-    check('D5 MUT: the button drawn while the plan loads is caught', !addWaits(strategy.replace("view === 'board' && !!board && !planEmpty", "view === 'board' && !planEmpty")))
+    check('D5 MUT: the button drawn while the plan loads is caught', !addWaits(strategy.replace('automationEnabled && !!board && !planEmpty', 'automationEnabled && !planEmpty')))
   }
 
   console.log(`\n${pass} passed, ${fail} failed`)

@@ -61,6 +61,7 @@ const VISUAL_CAPTION: Record<PublicLocale, string> = {
   he: 'המחשה של המוצר. שמות ונתונים לדוגמה.',
   en: 'Product illustration. Names and figures are examples.',
   es: 'Ilustración del producto. Los nombres y las cifras son ejemplos.',
+  'pt-BR': 'Ilustração do produto. Os nomes e os números são exemplos.',
 }
 
 const GRID_3 = 'grid grid-cols-1 gap-4 sm:gap-5 md:grid-cols-3'

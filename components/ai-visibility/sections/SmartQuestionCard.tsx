@@ -135,10 +135,17 @@ export function SmartQuestionCard({
               </Link>
             </>
           ) : (
-            <Button size="sm" variant="secondary" onClick={article.onWrite} loading={article.busy} disabled={article.busy}>
-              {!article.busy && <PenLine aria-hidden="true" className="size-4" />}
-              {t('qa_write_article')}
-            </Button>
+            <>
+              {/* Say the gap, don't leave it to be inferred from a missing line: the
+                  covered case names the page, so this one names its absence. */}
+              <span className="min-w-0 flex-1 basis-40 text-caption text-muted" data-question-no-page="">
+                {t('qa_no_page_answers')}
+              </span>
+              <Button size="sm" variant="secondary" onClick={article.onWrite} loading={article.busy} disabled={article.busy}>
+                {!article.busy && <PenLine aria-hidden="true" className="size-4" />}
+                {t('qa_write_article')}
+              </Button>
+            </>
           )}
           {article.failed && <span role="alert" className="text-caption text-bad">{t('qa_write_failed')}</span>}
         </div>

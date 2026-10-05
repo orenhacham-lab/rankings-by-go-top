@@ -20,8 +20,7 @@
  *     in with the idea, so the merchant confirms the brief before anything is spent.
  *
  * When the next article is still an idea, it is acted on right here, with the board
- * card's own actions (useIdeaActions): approve it, swap it for the next pending idea
- * (no model call, nothing rejected), or say it is not a fit. Nothing on this card leads
+ * card's own actions (useIdeaActions): approve it, or say it is not a fit. Nothing on this card leads
  * to the list view to approve an idea. The link that remains leads to what only the
  * list view has: the publishing queue (and, without automation, the topics list).
  */
@@ -29,7 +28,7 @@
 import { useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { CalendarClock, Check, CircleCheck, ExternalLink, KeyRound, ListOrdered, Loader2, PauseCircle, PenLine, Plus, Send, Shuffle, Sparkles, X } from 'lucide-react'
+import { CalendarClock, Check, CircleCheck, ExternalLink, KeyRound, ListOrdered, Loader2, PauseCircle, PenLine, Plus, Send, Sparkles, X } from 'lucide-react'
 import { Card } from '@/components/ui/Card'
 import Button from '@/components/ui/Button'
 import type { NextArticle, StrategyOrigin } from '@/lib/content/strategy/board'
@@ -303,12 +302,6 @@ export default function NextArticleCard({
                   <button type="button" className={INK_ACTION} onClick={() => void ideaActs.act.actions.approve(ideaActs.idea)} disabled={!!busy}
                     aria-busy={busy === 'approve' || undefined} aria-label={fill(a.approveAria, { title: next.title })} data-idea-action="approve">
                     {busy === 'approve' ? SPINNER : <Check aria-hidden="true" className="size-4" />} {a.approve}
-                  </button>
-                )}
-                {next.alternatives > 0 && (
-                  <button type="button" className={INK_ACTION} onClick={() => ideaActs.act.actions.swap(ideaActs.idea)} disabled={!!busy}
-                    aria-label={fill(a.swapAria, { title: next.title })} data-idea-action="swap">
-                    <Shuffle aria-hidden="true" className="size-4" /> {a.swap}
                   </button>
                 )}
                 {canRejectIdea(ideaActs.idea, ideaActs.act.automation) && (

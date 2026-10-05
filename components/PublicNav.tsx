@@ -5,7 +5,7 @@ import { usePathname } from 'next/navigation'
 import { useState, useEffect } from 'react'
 import { BarChart3, ChevronDown, FileText, MapPin, Menu, Search, Sparkles, Telescope, X, type LucideIcon } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
-import { LOCALE_PREFIX, type PublicLocale } from '@/lib/i18n/locales'
+import { LOCALE_PREFIX, PUBLIC_LOCALES, localeHomeHref, type PublicLocale } from '@/lib/i18n/locales'
 import { getPublicDictionary } from '@/lib/i18n/getPublicDictionary'
 import GoTopMark from '@/components/brand/GoTopMark'
 import { buttonClasses } from '@/components/public/marketing'
@@ -72,7 +72,9 @@ export function PublicNav({ locale = 'he', tone = 'default' }: { locale?: Public
   }, [])
 
   const links = [
-    { href: `${prefix}/` === '/en/' ? '/en' : `${prefix}/`, label: dict.nav.home },
+    // localeHomeHref, never a hand-written prefix: the Spanish home is /es, and the
+    // two spellings here used to fall through to the Hebrew home (owner, 5 Oct 2026).
+    { href: localeHomeHref(locale), label: dict.nav.home },
     { href: `${prefix}/free-check`, label: dict.nav.freeCheck },
     { href: `${prefix}/pricing`, label: dict.nav.pricing },
     { href: `${prefix}/articles`, label: dict.nav.articles },
@@ -81,7 +83,10 @@ export function PublicNav({ locale = 'he', tone = 'default' }: { locale?: Public
 
   const homeLink = links[0]
   const restLinks = links.slice(1)
-  const isActive = (href: string) => (href === '/' || href === '/en' ? pathname === href : pathname === href || pathname.startsWith(`${href}/`))
+  // A locale's HOME matches exactly; every other link also matches its own subtree.
+  // Spelling the home hrefs out by hand left /es out, so /es/pricing lit up "home".
+  const homeHrefs = new Set(PUBLIC_LOCALES.map(localeHomeHref))
+  const isActive = (href: string) => (homeHrefs.has(href) ? pathname === href : pathname === href || pathname.startsWith(`${href}/`))
 
   const featureItems: { id: string; href: string; label: string; description: string; icon: LucideIcon }[] = [
     {
@@ -150,7 +155,7 @@ export function PublicNav({ locale = 'he', tone = 'default' }: { locale?: Public
         <div className="flex h-16 items-center justify-between gap-4 lg:h-[4.5rem]">
           {/* The lockup, as on the rail */}
           <Link
-            href={prefix === '/en' ? '/en' : '/'}
+            href={localeHomeHref(locale)}
             className="flex shrink-0 items-center gap-2.5 rounded-control focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-action/20"
             aria-label={dict.nav.homeAria}
           >

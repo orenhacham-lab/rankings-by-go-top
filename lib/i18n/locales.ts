@@ -20,16 +20,23 @@
  * site of it is a place a language could still be translated further.
  */
 import { spanishSiteEnabled } from './spanish-site'
+import { portugueseSiteEnabled } from './portuguese-site'
 
 export type Locale = 'he' | 'en'
-export type PublicLocale = Locale | 'es'
+export type PublicLocale = Locale | 'es' | 'pt-BR'
 
 export const LOCALES: Locale[] = ['he', 'en']
-export const PUBLIC_LOCALES: PublicLocale[] = ['he', 'en', 'es']
+export const PUBLIC_LOCALES: PublicLocale[] = ['he', 'en', 'es', 'pt-BR']
 export const DEFAULT_LOCALE: Locale = 'he'
 
-/** The URL prefix a public locale lives under. Hebrew is the bare root. */
-export const LOCALE_PREFIX: Record<PublicLocale, string> = { he: '', en: '/en', es: '/es' }
+/**
+ * The URL prefix a public locale lives under. Hebrew is the bare root.
+ *
+ * 'pt-BR' keeps its region in the URL deliberately: the documents are written to
+ * Brazilian law (the Consumer Code's seven-day withdrawal right, the LGPD), so a
+ * bare '/pt' would promise European Portuguese readers rules that are not theirs.
+ */
+export const LOCALE_PREFIX: Record<PublicLocale, string> = { he: '', en: '/en', es: '/es', 'pt-BR': '/pt-BR' }
 
 export const LOCALE_CONFIG: Record<PublicLocale, { dir: 'rtl' | 'ltr'; lang: string; ogLocale: string }> = {
   he: { dir: 'rtl', lang: 'he', ogLocale: 'he_IL' },
@@ -38,6 +45,7 @@ export const LOCALE_CONFIG: Record<PublicLocale, { dir: 'rtl' | 'ltr'; lang: str
   // written in neutral Spanish so Latin-American readers are not addressed in a
   // dialect that is not theirs.
   es: { dir: 'ltr', lang: 'es', ogLocale: 'es_ES' },
+  'pt-BR': { dir: 'ltr', lang: 'pt-BR', ogLocale: 'pt_BR' },
 }
 
 /**
@@ -50,10 +58,10 @@ export const LOCALE_CONFIG: Record<PublicLocale, { dir: 'rtl' | 'ltr'; lang: str
  * Spain is the first Spanish market, so es-ES; a Latin-American market gets its
  * own entry the day its currency is set, because that is the same decision.
  */
-export const INTL_LOCALE: Record<PublicLocale, string> = { he: 'he-IL', en: 'en-US', es: 'es-ES' }
+export const INTL_LOCALE: Record<PublicLocale, string> = { he: 'he-IL', en: 'en-US', es: 'es-ES', 'pt-BR': 'pt-BR' }
 
 /** PayPal's own locale spelling, which uses an underscore and no others. */
-export const PAYPAL_LOCALE: Record<PublicLocale, string> = { he: 'he_IL', en: 'en_US', es: 'es_ES' }
+export const PAYPAL_LOCALE: Record<PublicLocale, string> = { he: 'he_IL', en: 'en_US', es: 'es_ES', 'pt-BR': 'pt_BR' }
 
 /**
  * The `Intl` tag of a language that reached us as a plain string — a prop typed
@@ -69,9 +77,19 @@ export function getLocaleConfig(locale: PublicLocale) {
   return LOCALE_CONFIG[locale]
 }
 
-/** Validate an untrusted value to a public locale, or null. */
+/**
+ * Validate an untrusted value to a public locale, or null.
+ *
+ * Read from PUBLIC_LOCALES rather than listed by hand. The hand-written version
+ * said he/en/es, so adding Portuguese to the table was not enough: this function
+ * answered null for 'pt-BR', the proxy's locale header was discarded, and every
+ * /pt-BR page shipped `<html lang="en">` over Portuguese copy while the copy
+ * itself was perfect. A cast downstream hid it from the compiler.
+ */
 export function normalizePublicLocale(value: unknown): PublicLocale | null {
-  return value === 'he' || value === 'en' || value === 'es' ? value : null
+  return typeof value === 'string' && (PUBLIC_LOCALES as readonly string[]).includes(value)
+    ? (value as PublicLocale)
+    : null
 }
 
 /**
@@ -91,6 +109,7 @@ export function normalizePublicLocale(value: unknown): PublicLocale | null {
 export function normalizeStoredLocale(value: unknown): PublicLocale | null {
   const locale = normalizePublicLocale(value)
   if (locale === 'es' && !spanishSiteEnabled()) return null
+  if (locale === 'pt-BR' && !portugueseSiteEnabled()) return null
   return locale
 }
 

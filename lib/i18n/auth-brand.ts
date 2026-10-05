@@ -104,4 +104,32 @@ export const AUTH_BRAND: Record<PublicLocale, Record<AuthBrandVariant, AuthBrand
     glimpse: 'Palabras clave en seguimiento',
     mobileTrust: ['Sin tarjeta de crédito', 'Cancela cuando quieras'],
   },
+  'pt-BR': {
+    login: {
+      eyebrow: 'Bem-vindo de volta',
+      points: [
+        'Suas posições no Google e no Google Maps, em um só lugar',
+        'Seu plano de conteúdo e seus artigos, prontos para continuar',
+        'O que o ChatGPT e o Gemini dizem sobre o seu negócio',
+      ],
+    },
+    signup: {
+      eyebrow: 'O Google e os buscadores com IA em uma única plataforma',
+      points: [
+        'Uma análise completa do seu site em minutos',
+        'Um mês de conteúdo, planejado para o seu setor',
+        'Posições no Google e visibilidade em IA, com acompanhamento',
+      ],
+    },
+    recover: {
+      eyebrow: 'Volte para a sua conta',
+      points: [
+        'O link vai apenas para o e-mail da conta',
+        'Serve uma vez e por pouco tempo',
+        'Seus dados e seus projetos ficam como estão',
+      ],
+    },
+    glimpse: 'Palavras-chave em acompanhamento',
+    mobileTrust: ['Sem cartão de crédito', 'Cancele quando quiser'],
+  },
 }

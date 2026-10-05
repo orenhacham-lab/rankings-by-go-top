@@ -13,9 +13,11 @@
  * is worth writing (TopicFacts).
  *
  * Written and published cards open the article. An idea is acted on right here, on its
- * own card (useIdeaActions): approve it (it moves to "planned"), say it is not a fit, or
- * swap it for the next pending idea when the column has more than it shows. None of
- * them leads to the list view.
+ * own card (useIdeaActions): approve it, so it moves to "planned", or say it is not a
+ * fit. Neither leads to the list view. There used to be a third, "swap", which only
+ * moved the idea behind the others and created nothing; a customer who wants a
+ * different topic types their own keyword instead (AddKeywordForm), which is free and
+ * immediate. Removed 5 October 2026 at the owner's call.
  */
 
 import { useMemo, useState } from 'react'
@@ -57,7 +59,7 @@ export const ACCENT: Record<StrategyColumn, { dot: string; count: string }> = {
 /** What the board needs to act on an idea; absent, the cards only show. */
 export type BoardIdeaActions = { actions: IdeaActions; automation: boolean }
 
-export function IdeaButtons({ card, dict, act, canSwap, inline = false }: { card: StrategyCard; dict: Dict; act: BoardIdeaActions; canSwap: boolean; inline?: boolean }) {
+export function IdeaButtons({ card, dict, act, inline = false }: { card: StrategyCard; dict: Dict; act: BoardIdeaActions; inline?: boolean }) {
   const a = dict.contentStrategy.ideaActions
   const target = ideaTargetFromCard(card)
   if (!target) return null
@@ -70,12 +72,6 @@ export function IdeaButtons({ card, dict, act, canSwap, inline = false }: { card
         aria-label={fill(a.approveAria, { title: card.title })} data-idea-action="approve">
         {busy !== 'approve' && <Check aria-hidden="true" className="size-4" />} {a.approve}
       </Button>
-      {canSwap && (
-        <Button size="sm" variant="ghost" className="px-2.5" onClick={() => act.actions.swap(target)} disabled={!!busy}
-          aria-label={fill(a.swapAria, { title: card.title })} data-idea-action="swap">
-          {a.swapShort}
-        </Button>
-      )}
       {canRejectIdea(target, act.automation) && (
         <Button size="sm" variant="ghost" className="px-2.5" onClick={() => void act.actions.reject(target)} loading={busy === 'reject'} disabled={!!busy}
           aria-label={fill(a.rejectAria, { title: card.title })} data-idea-action="reject">
@@ -86,7 +82,7 @@ export function IdeaButtons({ card, dict, act, canSwap, inline = false }: { card
   )
 }
 
-function BoardCard({ card, lang, dict, act, canSwap, insight }: { card: StrategyCard; lang: PublicLocale; dict: Dict; act: BoardIdeaActions | null; canSwap: boolean; insight?: TopicInsight }) {
+function BoardCard({ card, lang, dict, act, insight }: { card: StrategyCard; lang: PublicLocale; dict: Dict; act: BoardIdeaActions | null; insight?: TopicInsight }) {
   const s = dict.contentStrategy
   const date = shortDate(card.date, lang)
   const approvedNow = card.column === 'planned' && !!act && act.actions.approvedNow.has(sameTopicKey(card.title))
@@ -126,7 +122,7 @@ function BoardCard({ card, lang, dict, act, canSwap, insight }: { card: Strategy
           <span data-approved-now className="inline-flex items-center gap-1 rounded-pill bg-ok-soft px-1.5 font-semibold text-ok"><Check aria-hidden="true" className="size-3" />{s.ideaActions.approvedNow}</span>
         )}
       </div>
-      {card.column === 'ideas' && act && <IdeaButtons card={card} dict={dict} act={act} canSwap={canSwap} />}
+      {card.column === 'ideas' && act && <IdeaButtons card={card} dict={dict} act={act} />}
     </>
   )
   const frame = 'block rounded-inset border border-line bg-surface p-3 transition-colors duration-150 ease-snappy'
@@ -152,15 +148,7 @@ function Column({ column, cards: raw, lang, dict, note, act, insights }: { colum
   const cards = column === 'ideas' ? [...raw].sort((a, b) => IDEA_GROUP_ORDER.indexOf(ideaGroupOf(a)) - IDEA_GROUP_ORDER.indexOf(ideaGroupOf(b))) : raw
   const shown = open ? cards : cards.slice(0, COLUMN_PREVIEW)
   const hidden = cards.length - shown.length
-  /**
-   * Swap is offered while the column holds another idea to swap for, which is what
-   * the action needs. It used to be offered only while the column held MORE than it
-   * shows, so it came and went for no reason the customer could see: absent with
-   * five ideas or fewer, and gone again the moment "show more" was open (owner
-   * report, 5 October 2026).
-   */
-  const canSwap = cards.length > 1
-  const swapped = column === 'ideas' && act ? act.actions.deferred.length : 0
+
   // The ideas column names each kind of card with its own count when there is more than one (the
   // dashboard's "N topics waiting" is the first group's number).
   const totals = column === 'ideas' ? ideaGroupCounts(cards) : null
@@ -182,14 +170,6 @@ function Column({ column, cards: raw, lang, dict, note, act, insights }: { colum
           {note}
         </p>
       )}
-      {swapped > 0 && (
-        <p data-idea-swapped={swapped} className="-mt-1 mb-3 flex flex-wrap items-center gap-x-2 gap-y-1 px-1 text-caption text-muted">
-          {s.ideaActions.swappedNote(swapped)}
-          <button type="button" onClick={() => act?.actions.undoSwap()} data-idea-action="undo-swap" className="font-semibold text-action underline-offset-2 hover:underline">
-            {s.ideaActions.undoSwap}
-          </button>
-        </p>
-      )}
       {cards.length === 0 ? (
         <p className="rounded-control border border-dashed border-line-strong/70 px-3 py-4 text-caption text-muted">{s.columnEmpty[column]}</p>
       ) : (
@@ -201,15 +181,14 @@ function Column({ column, cards: raw, lang, dict, note, act, insights }: { colum
                   {s.ideaGroups[g.kind]} <span className="tabular-nums text-muted">({g.total})</span>
                 </p>
                 <ul className="space-y-2">
-                  {g.cards.map((c) => <li key={c.key}><BoardCard card={c} lang={lang} dict={dict} act={act} canSwap={canSwap} insight={insights?.get(c.key)} /></li>)}
+                  {g.cards.map((c) => <li key={c.key}><BoardCard card={c} lang={lang} dict={dict} act={act} insight={insights?.get(c.key)} /></li>)}
                 </ul>
               </div>
             ))}
           </div>
         ) : (
           <ul className="space-y-2">
-            {/* Swap brings the next pending idea in, so it is offered while the column holds more than it shows. */}
-            {shown.map((c) => <li key={c.key}><BoardCard card={c} lang={lang} dict={dict} act={act} canSwap={canSwap} insight={insights?.get(c.key)} /></li>)}
+            {shown.map((c) => <li key={c.key}><BoardCard card={c} lang={lang} dict={dict} act={act} insight={insights?.get(c.key)} /></li>)}
           </ul>
         )
       )}

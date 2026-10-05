@@ -75,6 +75,7 @@ const COPY = {
   he: { label: 'המשך עם Google', or: 'או', failed: 'לא הצלחנו להתחיל את ההתחברות עם Google. נסו שוב, או המשיכו עם אימייל.', returnFailed: 'ההתחברות עם Google לא הושלמה. נסו שוב, או המשיכו עם אימייל.' },
   en: { label: 'Continue with Google', or: 'or', failed: "We couldn't start signing in with Google. Try again, or continue with email.", returnFailed: "Signing in with Google didn't complete. Try again, or continue with email." },
   es: { label: 'Continuar con Google', or: 'o', failed: 'No hemos podido iniciar el acceso con Google. Inténtalo de nuevo o continúa con tu correo electrónico.', returnFailed: 'El acceso con Google no se ha completado. Inténtalo de nuevo o continúa con tu correo electrónico.' },
+  'pt-BR': { label: 'Continuar com o Google', or: 'ou', failed: 'Não conseguimos iniciar o acesso com o Google. Tente novamente ou continue com seu e-mail.', returnFailed: 'O acesso com o Google não foi concluído. Tente novamente ou continue com seu e-mail.' },
 } as const
 
 export function googleSignInCopy(lang: PublicLocale): (typeof COPY)[PublicLocale] {

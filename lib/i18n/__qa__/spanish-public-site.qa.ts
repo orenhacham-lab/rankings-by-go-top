@@ -23,7 +23,7 @@
  */
 import { readFileSync, existsSync, readdirSync } from 'fs'
 import { join } from 'path'
-import { PUBLIC_LOCALES, LOCALE_PREFIX, getLocaleConfig, normalizePublicLocale, toBilingualLocale, type PublicLocale } from '../locales'
+import { PUBLIC_LOCALES, LOCALE_PREFIX, getLocaleConfig, localeHomeHref, normalizePublicLocale, toBilingualLocale, type PublicLocale } from '../locales'
 import { spanishSiteEnabled } from '../spanish-site'
 import { isSpanishPath, routeContentLocale } from '../request-locale'
 import { getPublicDictionary } from '../getPublicDictionary'
@@ -166,14 +166,14 @@ function main() {
       check(`3b2: …and the ${legal} text it renders`,
         existsSync(join(ROOT, 'content', 'legal', 'es', `${legal}.md`)))
     }
-    // A legal page says `slug="…"` and the locale lives once, in
-    // SpanishLegalPage; every other page carries `locale="es"` itself.
+    // A legal page states its language on the shared frame; every other page
+    // carries `locale="es"` itself.
     const sharedFrame = (rel: string) =>
-      /locale="es"/.test(strip(read(rel))) || /SpanishLegalPage slug="/.test(strip(read(rel)))
+      /locale="es"/.test(strip(read(rel))) || /TranslatedLegalPage slug="[a-z-]+" language="es"/.test(strip(read(rel)))
     check('3c: every /es page renders through the SHARED components, not a second design',
       pageFiles().every(sharedFrame), pageFiles().filter((rel) => !sharedFrame(rel)).join(', '))
-    check('3c2: and the legal frame itself renders as Spanish',
-      /locale="es"/.test(strip(read('components/public/SpanishLegalPage.tsx'))))
+    check('3c2: and the legal frame takes the language it is given, rather than pinning one',
+      /locale=\{language\}/.test(strip(read('components/public/TranslatedLegalPage.tsx'))))
     // MUTATION CONTROL
     check('3-MUT: a page list missing a file fails 3a', !existsSync(join(ES_DIR, 'pricing/nope.tsx')))
   }
@@ -443,6 +443,47 @@ function main() {
       `${origin}${lang === 'en' ? '/en' : ''}/login?error=google`
     check('7-MUT3: the two-way failure URL this replaced answers Hebrew for Spanish, failing 7d4',
       twoWayFailureUrl('https://a.example', 'es') !== 'https://a.example/es/login?error=google')
+  }
+
+  // ---- The switcher reads as a control, not a label -------------------------
+  // With three languages it became a menu behind a globe icon, and a visitor had
+  // no reason to think the language could be changed at all (owner, 5 October
+  // 2026). The chevron is the affordance.
+  {
+    console.log('\nThe language switcher looks like something you can open')
+    const src = strip(read('components/LanguageSwitcher.tsx'))
+    check('S1: the menu trigger carries a chevron beside the globe', /<ChevronDown/.test(src) && /import \{[^}]*ChevronDown[^}]*\} from 'lucide-react'/.test(src))
+    check('S2: the chevron turns while the menu is open, so its state is visible', /open && '-rotate-180'/.test(src))
+    check('S3: it is decoration, never announced twice to a screen reader', /<ChevronDown[\s\S]{0,260}aria-hidden="true"/.test(src))
+    check('S4: the trigger still says it opens a menu and whether it is open', /aria-haspopup="menu"/.test(src) && /aria-expanded=\{open\}/.test(src))
+    check('S1-MUT: a trigger with no chevron fails S1', !/<ChevronDown/.test(src.replace(/<ChevronDown[\s\S]*?\/>/, '')))
+    // The two-language link is a link to the other language by name; it needs no chevron.
+    check('S5: with two languages it is still one plain link, not a menu',
+      /if \(others\.length === 1\)/.test(src) && availableLocales(false).length === 2)
+  }
+
+  // ---- The logo goes home in the language you are reading -------------------
+  // The lockup and the "home" link each spelled their href out by hand, from the
+  // two-language era, so a Spanish visitor clicking the logo landed on the HEBREW
+  // home page (owner, 5 October 2026). localeHomeHref is the one answer.
+  {
+    console.log('\nThe nav goes home in the page\'s own language')
+    const nav = strip(read('components/PublicNav.tsx'))
+    const usesHelper = (src: string) => (src.match(/localeHomeHref\(locale\)/g) ?? []).length >= 2
+    check('N1: the lockup and the home link both use localeHomeHref', usesHelper(nav))
+    check('N2: no hand-written "English or Hebrew" home href is left', !/'\/en' \? '\/en' : '\/'/.test(nav) && !/'\/en\/' \? '\/en'/.test(nav))
+    check('N3: localeHomeHref answers each language\'s own home',
+      localeHomeHref('he') === '/' && localeHomeHref('en') === '/en' && localeHomeHref('es') === '/es')
+    // The home link matches its own page only; every other link also matches its subtree.
+    const active = (src: string) => /homeHrefs\.has\(href\) \? pathname === href/.test(src)
+      && /PUBLIC_LOCALES\.map\(localeHomeHref\)/.test(src)
+    check('N4: every language\'s home is an exact match, so /es/pricing does not light up "home"', active(nav))
+    check('N1-MUT: the old two-language lockup fails N1 and N2', (() => {
+      const old = nav.replace(/localeHomeHref\(locale\)/, "prefix === '/en' ? '/en' : '/'")
+      return !usesHelper(old) && /'\/en' \? '\/en' : '\/'/.test(old)
+    })())
+    check('N4-MUT: listing the home hrefs by hand again fails N4',
+      !active(nav.replace('PUBLIC_LOCALES.map(localeHomeHref)', "['/', '/en']")))
   }
 
   console.log(`\n${pass} passed, ${fail} failed`)

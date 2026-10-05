@@ -29,7 +29,7 @@
  */
 
 import type { PublicLocale } from './locales'
-import { isEnglishPath, isSpanishPath } from './request-locale'
+import { isEnglishPath, isPortuguesePath, isSpanishPath } from './request-locale'
 import { normalizeDashboardUiLocale } from './dashboard/locale'
 
 /**
@@ -40,6 +40,9 @@ import { normalizeDashboardUiLocale } from './dashboard/locale'
  * route and says so itself, exactly as `/en/login` does, and the Spanish tree's
  * own gate (app/(auth)/es/layout.tsx) keeps those URLs from existing while the
  * Spanish site is off — so this can never label a 404 'es'.
+ *
+ * Brazilian Portuguese joins it on the same terms: `/pt-BR/login` is the
+ * Portuguese route, gated by app/(auth)/pt-BR/layout.tsx.
  */
 export function resolveAuthLocale(input: {
   pathname?: string | null
@@ -48,5 +51,6 @@ export function resolveAuthLocale(input: {
 }): PublicLocale {
   if (isEnglishPath(input.pathname)) return 'en'
   if (isSpanishPath(input.pathname)) return 'es'
+  if (isPortuguesePath(input.pathname)) return 'pt-BR'
   return normalizeDashboardUiLocale(input.langParam) ?? input.serverLocale ?? 'he'
 }
