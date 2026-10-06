@@ -4654,8 +4654,12 @@ export const dashboardEn = {
     hideSteps: 'Hide instructions',
     openInShopify: 'Open in Shopify',
     inTheme: "The problem is not in this page's content but in the store's theme, menu or a product, so there is no automatic fix here. The steps below show how to fix it.",
-    inProduct: "These are the product's own photos. Their descriptions are set on the product (in its media), and we never change products, so there is no automatic fix here. The steps below show how to fix it.",
+    inProduct: "These are the product's own photos, so their descriptions are set on the product, in its media. Go Top's access to the store covers articles and pages, so this one is fixed in Shopify. The steps below show how.",
     inBuilder: "This page is built with a page builder (such as Elementor), which shows it from its own data. A change to the page's text would not show on the site, so there is no automatic fix here. You can fix it in the page builder with the steps below.",
+    // A store's product or collection row, and structured data on a store (lib/site-health/row-note.ts).
+    productPage: "This is a product page. Go Top's access to the store covers articles and pages, so this one is fixed in Shopify. The steps below show how.",
+    collectionPage: "This is a collection page. Go Top's access to the store covers articles and pages, so this one is fixed in Shopify. The steps below show how.",
+    schemaFromTheme: "On a Shopify store, structured data comes from its theme (or a theme app), so it is added in the store's theme settings or by its theme developer, not on this page.",
     themeAlt: (pages: number, images: number) =>
       `On ${pages === 1 ? '1 page' : `${pages} pages`}, images without a description are in the site's theme (header, footer, product cards), not in the page's text${images > 0 ? ` (up to ${images} per page)` : ''}. Fix them once in the theme editor and every page is fixed. The steps below show how.`,
     openPage: 'Open the page',

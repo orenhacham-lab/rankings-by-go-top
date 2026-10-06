@@ -3665,8 +3665,12 @@ export const dashboardEs: DeepPartial<DashboardDictionary> = {
     hideSteps: 'Ocultar las instrucciones',
     openInShopify: 'Abrir en Shopify',
     inTheme: 'El problema no está en el contenido de esta página, sino en el tema de la tienda, el menú o un producto, así que aquí no hay corrección automática. Los pasos de abajo explican cómo corregirlo.',
-    inProduct: 'Son las fotos del propio producto. Su descripción se define en el producto (en sus imágenes) y nunca cambiamos productos, así que aquí no hay corrección automática. Los pasos de abajo explican cómo corregirlo.',
+    inProduct: 'Son las fotos del propio producto, así que su descripción se define en el producto, en sus imágenes. El acceso de Go Top a la tienda cubre artículos y páginas, así que esto se corrige en Shopify. Los pasos de abajo explican cómo.',
     inBuilder: 'Esta página está hecha con un constructor de páginas (como Elementor), que la muestra a partir de sus propios datos. Un cambio en el texto de la página no se vería en el sitio, así que aquí no hay corrección automática. Puedes corregirlo en el constructor con los pasos de abajo.',
+    // A store's product or collection row, and structured data on a store (lib/site-health/row-note.ts).
+    productPage: 'Es una página de producto. El acceso de Go Top a la tienda cubre artículos y páginas, así que esto se corrige en Shopify. Los pasos de abajo explican cómo.',
+    collectionPage: 'Es una página de colección. El acceso de Go Top a la tienda cubre artículos y páginas, así que esto se corrige en Shopify. Los pasos de abajo explican cómo.',
+    schemaFromTheme: 'En una tienda Shopify, los datos estructurados vienen de su tema (o de una app del tema), así que se añaden en la configuración del tema de la tienda o con el desarrollador del tema, no en esta página.',
     themeAlt: (pages: number, images: number) =>
       `En ${pages === 1 ? '1 página' : `${pages} páginas`} hay imágenes sin descripción que están en el tema del sitio (cabecera, pie, tarjetas de producto), no en el texto de la página${images > 0 ? ` (hasta ${images} por página)` : ''}. Corrígelas una sola vez en el editor del tema y quedan corregidas en todas las páginas. Los pasos de abajo explican cómo.`,
     openPage: 'Abrir la página',

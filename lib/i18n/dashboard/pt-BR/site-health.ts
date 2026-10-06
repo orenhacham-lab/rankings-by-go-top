@@ -59,8 +59,12 @@ export const siteHealthPtBR: DeepPartial<DashboardDictionary> = {
     hideSteps: 'Ocultar as instruções',
     openInShopify: 'Abrir na Shopify',
     inTheme: 'O problema não está no conteúdo desta página, mas no tema da loja, no menu ou em um produto, então aqui não há correção automática. Os passos abaixo explicam como corrigir.',
-    inProduct: 'São as fotos do próprio produto. A descrição delas é definida no produto (nas imagens dele), e nunca alteramos produtos, então aqui não há correção automática. Os passos abaixo explicam como corrigir.',
+    inProduct: 'São as fotos do próprio produto, então a descrição delas é definida no produto, nas imagens dele. O acesso da Go Top à loja abrange artigos e páginas, então isto é corrigido na Shopify. Os passos abaixo explicam como.',
     inBuilder: 'Esta página foi feita com um construtor de páginas (como o Elementor), que a mostra a partir dos próprios dados. Uma alteração no texto da página não apareceria no site, então aqui não há correção automática. Você pode corrigir no construtor com os passos abaixo.',
+    // A store's product or collection row, and structured data on a store (lib/site-health/row-note.ts).
+    productPage: 'Esta é uma página de produto. O acesso da Go Top à loja abrange artigos e páginas, então isto é corrigido na Shopify. Os passos abaixo explicam como.',
+    collectionPage: 'Esta é uma página de coleção. O acesso da Go Top à loja abrange artigos e páginas, então isto é corrigido na Shopify. Os passos abaixo explicam como.',
+    schemaFromTheme: 'Em uma loja Shopify, os dados estruturados vêm do tema (ou de um app do tema), então são adicionados nas configurações do tema da loja ou pelo desenvolvedor do tema, não nesta página.',
     themeAlt: (pages: number, images: number) =>
       `Em ${pages === 1 ? '1 página' : `${pages} páginas`} há imagens sem descrição que estão no tema do site (cabeçalho, rodapé, cards de produto), não no texto da página${images > 0 ? ` (até ${images} por página)` : ''}. Corrija uma vez no editor do tema e todas as páginas ficam corrigidas. Os passos abaixo explicam como.`,
     openPage: 'Abrir a página',

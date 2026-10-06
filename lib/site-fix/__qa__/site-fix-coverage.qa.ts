@@ -442,7 +442,7 @@ echo json_encode($out);`)
     const broken = (l: string) => { const d = getDashboardDictionary(l); return l === 'es' ? { siteHealth: { ...d.siteHealth, inBuilder: '' } } as never : d }
     check('MUTATION CONTROL: a language without one of them is caught by I1', missingIn(broken).includes('es.inBuilder'))
     const card = strip(read('components/site-health/FindingCard.tsx'))
-    const shows = (src: string) => /copy\.themeAlt\(themeAlt\.pages, themeAlt\.images\)/.test(src) && /page\.outside === 'product' \? copy\.inProduct : copy\.inBuilder/.test(src) && /copy\.imagesInTheme\(theme\)/.test(src)
+    const shows = (src: string) => /copy\.themeAlt\(themeAlt\.pages, themeAlt\.images\)/.test(src) && /copy\[guidance\.note\]/.test(src) && /rowGuidance\(finding, page,/.test(src) && /copy\.imagesInTheme\(theme\)/.test(src)
     check('I3: the card shows the site-wide line once, and the product and builder notes on their rows', shows(card))
     check('MUTATION CONTROL: I3 fails on a card without the site-wide line', !shows(card.replace('copy.themeAlt(themeAlt.pages, themeAlt.images)', 'null')))
   }

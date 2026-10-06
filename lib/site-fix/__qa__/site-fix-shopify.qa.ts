@@ -443,7 +443,9 @@ async function main() {
       return typeof v !== 'string' || !v.trim()
     })
     check('U4: the "the problem is in the theme" note exists in every site language', noNote.length === 0, noNote.join(','))
-    check('U5: the card shows that note on such a page', /page\.outside === 'theme'[\s\S]{0,300}copy\.inTheme/.test(strip(read('components/site-health/FindingCard.tsx'))))
+    // The card renders the row's one note (lib/site-health/row-note.ts decides which one).
+    check('U5: the card shows that note on such a page', /page\.outside === 'theme'\) return \{ note: 'inTheme'/.test(strip(read('lib/site-health/row-note.ts')))
+      && /copy\[guidance\.note\]/.test(strip(read('components/site-health/FindingCard.tsx'))))
   }
 
   console.log(`\n${passed} passed, ${failed} failed`)

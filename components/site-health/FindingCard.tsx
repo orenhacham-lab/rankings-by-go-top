@@ -12,6 +12,7 @@ import Badge from '@/components/ui/Badge'
 import Button from '@/components/ui/Button'
 import { cn } from '@/lib/utils'
 import { pathOf } from '@/lib/site-health/rules'
+import { rowGuidance } from '@/lib/site-health/row-note'
 import type { Finding, FindingPage, Severity, SitePlatform } from '@/lib/site-health/types'
 import type { DashboardDictionary } from '@/lib/i18n/dashboard/he'
 import type { FixRowState } from '@/lib/site-fix/job-match'
@@ -74,11 +75,13 @@ export function GuideSteps({ steps, title, id }: { steps: readonly string[]; tit
 }
 
 export default function FindingCard({
-  finding, copy, platform, fixed, onFix, fixModeFor, jobStateFor, onInstall,
+  finding, copy, platform, storeConnected = false, fixed, onFix, fixModeFor, jobStateFor, onInstall,
 }: {
   finding: Finding
   copy: Copy
   platform: SitePlatform
+  /** The store is connected (its products and collections come from the store's own list). */
+  storeConnected?: boolean
   fixed: ReadonlySet<string>
   onFix: (finding: Finding, page: FindingPage) => void
   /**
@@ -131,6 +134,7 @@ export default function FindingCard({
               const queued = held === 'queued'
               const measure = measureOf(copy, finding, page)
               const mode = fixModeFor ? fixModeFor(finding, page) : page.fixable ? 'fix' : null
+              const guidance = rowGuidance(finding, page, { platform, storeConnected })
               return (
                 <li key={`${page.url}|${page.from ?? ''}`} className="flex flex-col gap-3 px-4 py-3 sm:flex-row sm:items-center sm:justify-between" data-page-row={done ? 'fixed' : queued ? 'queued' : mode === 'fix' ? 'fixable' : mode === 'install' ? 'install' : mode === 'update' ? 'update' : mode === 'copy' ? 'copy' : 'guide'}>
                   <div className="min-w-0">
@@ -143,12 +147,10 @@ export default function FindingCard({
                         {isLinks && page.from ? <>{copy.foundOn}: <span dir="ltr">{pageLabel(copy, { ...page, path: pathOf(page.from), kind: 'other' })}</span></> : measure}
                       </p>
                     )}
-                    {page.outside === 'theme' && !done && !queued && (
-                      <p className="mt-1 max-w-xl text-caption text-muted text-pretty" data-outside-content="">{copy.inTheme}</p>
-                    )}
-                    {(page.outside === 'product' || page.outside === 'builder') && !done && !queued && (
-                      <p className="mt-1 max-w-xl text-caption text-muted text-pretty" data-outside-content={page.outside}>
-                        {page.outside === 'product' ? copy.inProduct : copy.inBuilder}
+                    {/* Why this row has no fix: one line (lib/site-health/row-note.ts), never two. */}
+                    {guidance.note && !done && !queued && (
+                      <p className="mt-1 max-w-xl text-caption text-muted text-pretty" data-outside-content={page.outside} data-row-note={guidance.note}>
+                        {copy[guidance.note]}
                       </p>
                     )}
                   </div>
@@ -173,7 +175,7 @@ export default function FindingCard({
                       <Button variant="ghost" size="sm" onClick={onInstall} data-update-button={finding.fixType ?? ''}>
                         {copy.autofix.connection.update.action}
                       </Button>
-                    ) : page.adminUrl ? (
+                    ) : guidance.adminLink && page.adminUrl ? (
                       <a
                         href={page.adminUrl}
                         target="_blank"
