@@ -436,8 +436,8 @@ export default function EnglishTermsPage() {
           </li>
           <li>
             <strong>Pace and limits.</strong> The check runs once a day, automatic fixes are applied to a project
-            no more than once every seven days, and only a small number of fixes each time. If there has been no
-            activity in your account during the last thirty days, no automatic fixes are applied to the project.
+            no more than once every seven days, and only a small number of fixes each time. If you have not signed in
+            during the last thirty days, no automatic fixes are applied to the project.
           </li>
           <li>
             <strong>Log and undo.</strong> When it is turned on we record who turned it on, when, and the IP
