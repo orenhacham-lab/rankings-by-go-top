@@ -65,6 +65,7 @@ export const siteHealthPtBR: DeepPartial<DashboardDictionary> = {
     productPage: 'Esta é uma página de produto. O acesso da Go Top à loja abrange artigos e páginas, então isto é corrigido na Shopify. Os passos abaixo explicam como.',
     collectionPage: 'Esta é uma página de coleção. O acesso da Go Top à loja abrange artigos e páginas, então isto é corrigido na Shopify. Os passos abaixo explicam como.',
     schemaFromTheme: 'Em uma loja Shopify, os dados estruturados vêm do tema (ou de um app do tema), então são adicionados nas configurações do tema da loja ou pelo desenvolvedor do tema, não nesta página.',
+    themeAltMedia: 'Algumas dessas imagens estão na biblioteca de mídia do WordPress. Escrevemos a descrição delas lá, e isso as corrige em todas as páginas.',
     themeAlt: (pages: number, images: number) =>
       `Em ${pages === 1 ? '1 página' : `${pages} páginas`} há imagens sem descrição que estão no tema do site (cabeçalho, rodapé, cards de produto), não no texto da página${images > 0 ? ` (até ${images} por página)` : ''}. Corrija uma vez no editor do tema e todas as páginas ficam corrigidas. Os passos abaixo explicam como.`,
     openPage: 'Abrir a página',
@@ -329,6 +330,7 @@ export const siteHealthPtBR: DeepPartial<DashboardDictionary> = {
           llmsCopyWp: 'Com o plugin do Go Top (versão 2.1.0 ou posterior) podemos colocá-lo no seu site por você, e desfazer quando quiser.',
           llmsUpdate: 'Atualize o plugin e poderemos colocá-lo no seu site por você.',
         },
+        altNotInContent: 'As imagens sem texto alternativo desta página não estão no texto da própria página, então não há nada a mudar nela. Elas vêm do tema do site (logo, menu, rodapé) ou são a imagem principal que o tema mostra acima do texto. A descrição delas é escrita uma vez só, na biblioteca de mídia ou no tema, e isso corrige todas as páginas que as mostram. Os passos abaixo explicam como.',
         h1Reasons: {
           builder: 'Esta página foi feita com um construtor visual. O construtor tira os títulos dos próprios dados dele, então uma alteração no conteúdo não se manteria. Altere o título no próprio construtor.',
           markup: 'Os títulos do conteúdo desta página estão escritos de um jeito que não podemos alterar com segurança. Altere-os no editor.',
@@ -344,6 +346,7 @@ export const siteHealthPtBR: DeepPartial<DashboardDictionary> = {
           webhook: 'A alteração é enviada ao seu servidor e seu desenvolvedor a aplica no site.',
           manual: 'A correção aguarda na fila. Quando o plugin voltar a estar conectado você poderá aplicá-la com um clique, ou atualizar manualmente com as instruções.',
           shopify_seo: 'Salvamos isso na listagem em mecanismos de pesquisa do artigo ou da página na Shopify. O texto da página não muda.',
+          media: 'A descrição fica salva na própria imagem, na biblioteca de mídia do WordPress, e aparece em todas as páginas que a usam. O arquivo e o texto da página não mudam.',
         },
         result: {
           applied: { title: 'A correção está no seu site', body: 'O Google a verá na próxima vez que ler a página.' },

@@ -37,6 +37,7 @@ import { rendersFromBuilderData } from './builder'
 import { planH1Demotion } from './h1'
 import { bodyH1s, shopFailure, SHOPIFY_FIX_TYPES, type ShopCreds, type ShopifyFixClient, type ShopItemRef } from './shopify-admin'
 import { pluginInspect, pluginSearch, type PluginItem, type PluginLink, type PluginPost } from './plugin-client'
+import { previewMediaAlt } from './media-alt'
 import { buildLlmsTxt, pageLanguage, suggestFaq, suggestMetaDescription, suggestSeoTitle, thinContent, type Generate, type LlmsPage } from './suggest'
 import type { FaqItem, FixChannel, FixErrorCode, FixType, H1Ref } from './types'
 
@@ -51,6 +52,8 @@ export interface LivePage {
   h1s?: string[]
   /** Same-site links of the page (llms.txt without a site map). */
   links?: string[]
+  /** Each image without alt text by address, as the scan counts them (lib/free-check/html-signals.ts). */
+  missingAlt?: string[]
 }
 
 /** A small text file of the site as a visitor gets it (llms.txt), or null when it cannot be read. */
@@ -60,14 +63,16 @@ export type TextReader = (url: string) => Promise<{ status: number; text: string
 export type SitePages = () => Promise<{ url: string; title: string | null; kind: string | null }[]>
 
 /** How the value will reach the page, for the sentence under the preview. */
-export type Via = 'plugin_seo' | 'plugin_own' | 'seo_plugin' | 'wp_title' | 'content' | 'webhook' | 'manual' | 'shopify_seo'
+/** `media`: on the image's Media Library item, through the application password (./media-alt.ts). */
+export type Via = 'plugin_seo' | 'plugin_own' | 'seo_plugin' | 'wp_title' | 'content' | 'webhook' | 'manual' | 'shopify_seo' | 'media'
 
 type Limits = { min: number; max: number; target: number }
 export type FixPreview =
   | { ok: true; type: 'seo_title' | 'meta_description'; before: string; after: string; expected: string | null; via: Via; limits: Limits; serp: { title: string; description: string } }
   | { ok: true; type: 'focus_keyphrase' | 'canonical'; before: string; after: string; expected: string | null; via: Via }
   | { ok: true; type: 'schema_jsonld'; before: string[]; schema: Record<string, unknown>; expected: string | null; via: Via }
-  | { ok: true; type: 'image_alt'; images: { src: string; after: string }[]; expected: string | null; via: Via }
+  /** `media` on each image when `via` is 'media': its Media Library item. */
+  | { ok: true; type: 'image_alt'; images: { src: string; after: string; media?: number }[]; expected: string | null; via: Via }
   | { ok: true; type: 'faq_block'; items: FaqItem[]; heading: string; notice: 'thin_content' | 'no_valid_suggestion' | null; expected: string | null; via: Via }
   | { ok: true; type: 'h1_demote'; headings: H1Ref[]; keep: string; keepFrom: 'theme' | 'content'; expected: string | null; via: Via }
   | { ok: true; type: 'llms_txt'; text: string; pages: number; fileUrl: string; copyOnly: boolean; expected: string | null; via: Via }
@@ -104,6 +109,8 @@ export interface PreviewRequest {
   from?: string
   /** internal_link: the words to look for. */
   keyword?: string
+  /** image_alt: the page's images that are Media Library items, not the page's own text (./media-alt.ts). */
+  media?: boolean
 }
 
 const TITLE_LIMITS: Limits = { min: TITLE_MIN, max: TITLE_MAX, target: TITLE_TARGET }
@@ -124,7 +131,7 @@ export function liveReader(base: typeof fetch = fetch): (url: string) => Promise
       const s = extractSiteSignals(got.html, got.url, { robotsTxt: null, llmsTxt: false })
       return {
         title: s.title, description: s.metaDescription, h1: s.h1[0] ?? null, canonical: s.canonical, schemaTypes: s.schemaTypes, html: got.html,
-        h1s: s.h1, links: s.internalLinkUrls,
+        h1s: s.h1, links: s.internalLinkUrls, missingAlt: s.images.missing,
       }
     } catch {
       return null
@@ -245,8 +252,9 @@ const CONTENT_TYPES_ON_PAGE: readonly FixType[] = ['image_alt', 'broken_link', '
 export async function previewFixJob(req: PreviewRequest, ctx: PreviewContext, deps: PreviewDeps): Promise<FixPreview> {
   try {
     if (req.type === 'llms_txt') return await previewLlms(req, ctx, deps)
-    if (ctx.channel === 'plugin' && ctx.link) return await previewViaPlugin(req, ctx, ctx.link, deps)
-    if (ctx.channel === 'app_password' && ctx.creds) return await previewViaRest(req, ctx, ctx.creds, deps)
+    if (req.type === 'image_alt' && req.media) return await previewMedia(req, ctx, deps)
+    if (ctx.channel === 'plugin' && ctx.link) return await withMedia(req, ctx, deps, await previewViaPlugin(req, ctx, ctx.link, deps))
+    if (ctx.channel === 'app_password' && ctx.creds) return await withMedia(req, ctx, deps, await previewViaRest(req, ctx, ctx.creds, deps))
     if (ctx.channel === 'shopify') return ctx.shop ? await previewViaShopify(req, ctx, ctx.shop, deps) : fail('no_channel')
     if (ctx.channel === 'webhook' || ctx.channel === 'manual') return await previewPublic(req, ctx, CHANNEL_VIA[ctx.channel], deps)
     return fail('no_channel')
@@ -255,6 +263,29 @@ export async function previewFixJob(req: PreviewRequest, ctx: PreviewContext, de
     const code = wpFailure(err)
     return fail(code === 'wordpress_permission' ? 'wordpress_permission' : 'plugin_unreachable')
   }
+}
+
+/**
+ * Images without alt text the page shows but its own text does not hold (the logo, the footer's, the
+ * featured image the theme prints, an image a page builder places): the Media Library items they are,
+ * where the site's application password lets us write (./media-alt.ts). Nothing found there: the
+ * images are the theme's own files, and the answer stays "nothing to change in the page".
+ */
+async function previewMedia(req: PreviewRequest, ctx: PreviewContext, deps: PreviewDeps): Promise<FixPreview> {
+  if (!ctx.creds || !deps.wp.media) return fail('nothing_to_fix')
+  const live = await deps.readLive(req.url)
+  if (!live) return fail('plugin_unreachable')
+  const srcs = live.missingAlt ?? extractSiteSignals(live.html, req.url, { robotsTxt: null, llmsTxt: false }).images.missing
+  const items = await previewMediaAlt(ctx.creds, srcs, { pageTitle: plainTitle(live.h1 ?? live.title), siteName: plainTitle(ctx.siteName) || null }, deps.wp.media)
+  if (items.length === 0) return fail('nothing_to_fix')
+  return { ok: true, type: 'image_alt', images: items.map((i) => ({ src: i.src, after: i.after, media: i.media })), expected: null, via: 'media' }
+}
+
+/** The page's own text has no image to fix (or a page builder renders it): the Media Library may. */
+async function withMedia(req: PreviewRequest, ctx: PreviewContext, deps: PreviewDeps, got: FixPreview): Promise<FixPreview> {
+  if (req.type !== 'image_alt' || got.ok || (got.code !== 'nothing_to_fix' && got.code !== 'builder_page')) return got
+  const media = await previewMedia(req, ctx, deps).catch(() => null)
+  return media && media.ok ? media : got
 }
 
 /**

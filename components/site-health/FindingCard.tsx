@@ -75,7 +75,7 @@ export function GuideSteps({ steps, title, id }: { steps: readonly string[]; tit
 }
 
 export default function FindingCard({
-  finding, copy, platform, storeConnected = false, fixed, onFix, fixModeFor, jobStateFor, onInstall,
+  finding, copy, platform, storeConnected = false, fixed, onFix, themeFix = null, fixModeFor, jobStateFor, onInstall,
 }: {
   finding: Finding
   copy: Copy
@@ -84,6 +84,8 @@ export default function FindingCard({
   storeConnected?: boolean
   fixed: ReadonlySet<string>
   onFix: (finding: Finding, page: FindingPage) => void
+  /** The theme's repeated images are Media Library items without alt text: one fix for the site, on this page. */
+  themeFix?: FindingPage | null
   /**
    * With the fix queue live: whether this page can be fixed now, needs the plugin first, needs a newer
    * plugin (`update`), gets a text to copy and place by hand (`copy`, llms.txt), or none of these.
@@ -210,6 +212,25 @@ export default function FindingCard({
             {copy.themeAlt(themeAlt.pages, themeAlt.images)}
           </p>
         )}
+        {themeAlt && themeFix && (() => {
+          const held = jobStateFor ? jobStateFor(finding, themeFix) : null
+          return (
+            <div className="mt-3 flex flex-wrap items-center gap-3" data-theme-alt-fix={held ?? 'open'}>
+              {held === 'applied' ? (
+                <Badge variant="success"><Check size={14} strokeWidth={2.4} aria-hidden="true" />{copy.fixedBadge}</Badge>
+              ) : held === 'queued' ? (
+                <Badge variant="info"><Clock size={14} strokeWidth={2.2} aria-hidden="true" />{copy.queuedBadge}</Badge>
+              ) : (
+                <>
+                  <Button variant="secondary" size="sm" onClick={() => onFix(finding, themeFix)} data-fix-for-me="" data-fix-button="image_alt_media">
+                    {copy.fixForMe}
+                  </Button>
+                  <span className="text-caption text-muted text-pretty">{copy.themeAltMedia}</span>
+                </>
+              )}
+            </div>
+          )
+        })()}
 
         <div className="mt-4">
           <button

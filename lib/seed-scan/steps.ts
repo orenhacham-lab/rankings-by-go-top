@@ -648,7 +648,7 @@ export function signalsFromSearchIndex(pages: SearchPage[], finalUrl: string): S
     canonical: null,
     h1: [],
     h2: pages.filter((p) => p !== home).map((p) => p.title).filter(Boolean).slice(0, 20),
-    images: { total: 0, missingAlt: 0 },
+    images: { total: 0, missingAlt: 0, missing: [] },
     schemaTypes: [],
     hasOrganizationSchema: false,
     hasFaqSchema: false,

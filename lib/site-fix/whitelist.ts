@@ -9,7 +9,7 @@
  * app alone); the QA suite runs both against the same cases.
  */
 import { domainKey, normalizeCheckUrl } from '@/lib/free-check'
-import { FIX_TYPES, type FaqItem, type FixErrorCode, type FixPayload, type FixType } from './types'
+import { FIX_TYPES, MAX_MEDIA_ALT, type AltItem, type FaqItem, type FixErrorCode, type FixPayload, type FixType } from './types'
 
 export const LIMITS = {
   title: { min: 1, max: 120 },
@@ -163,18 +163,23 @@ export function validateFix(input: unknown, page: unknown, siteKeys: ReadonlySet
     }
     case 'image_alt': {
       if (!Array.isArray(b.images) || b.images.length === 0 || b.images.length > LIMITS.altImages) return bad('value_invalid')
-      const images: { src: string; alt: string }[] = []
+      const images: AltItem[] = []
       for (const i of b.images as unknown[]) {
         const x = (i ?? {}) as Record<string, unknown>
-        if (Object.keys(x).some((k) => k !== 'src' && k !== 'alt')) return bad('not_allowed')
+        if (Object.keys(x).some((k) => k !== 'src' && k !== 'alt' && k !== 'media')) return bad('not_allowed')
+        // A Media Library item's id (./media-alt.ts): a positive whole number, on every image or on none.
+        const media = x.media
+        if (media !== undefined && !(typeof media === 'number' && Number.isInteger(media) && media > 0 && media < 2 ** 31)) return bad('value_invalid')
         const src = typeof x.src === 'string' ? x.src.trim() : ''
         const rawAlt = typeof x.alt === 'string' ? x.alt : ''
         if (!src || src.length > LIMITS.url || /["<>\s]/.test(src) || /^(javascript|data|vbscript):/i.test(src)) return bad('value_invalid')
         if (hasMarkup(rawAlt) || rawAlt.includes('"')) return bad('value_invalid')
         const alt = plain(rawAlt)
         if (!within(alt, LIMITS.alt)) return bad('value_invalid')
-        images.push({ src, alt })
+        images.push(typeof media === 'number' ? { src, alt, media } : { src, alt })
       }
+      const onMedia = images.filter((i) => i.media !== undefined).length
+      if (onMedia !== 0 && (onMedia !== images.length || images.length > MAX_MEDIA_ALT)) return bad('value_invalid')
       return { ok: true, payload: { type, images } }
     }
     case 'faq_block': {
@@ -268,6 +273,11 @@ export function summaryOf(p: FixPayload): string {
     case 'llms_txt':
       return p.text.slice(0, 4000)
   }
+}
+
+/** Alt text for Media Library items (./media-alt.ts), not the page's own images. */
+export function isMediaAlt(p: FixPayload): boolean {
+  return p.type === 'image_alt' && p.images.length > 0 && p.images.every((i) => typeof i.media === 'number')
 }
 
 /** The payload without its type: what is stored in `site_fix_jobs.payload` and sent as `value`. */

@@ -23,7 +23,8 @@ import { markWordPressOutsideContent, type WpReader } from '@/lib/site-fix/wordp
 import { loadFixContext, resolveCapabilities } from '@/lib/site-fix/channel'
 import { pluginInspect } from '@/lib/site-fix/plugin-client'
 import { decryptCredential } from '@/lib/security/credentials-crypto'
-import { findItemByUrl, getItemForEdit } from '@/lib/wordpress/client'
+import { findItemByUrl, getItemForEdit, searchMedia } from '@/lib/wordpress/client'
+import { findMediaFor } from '@/lib/site-fix/media-alt'
 import { loadShopifyConnection } from '@/lib/shopify/api-auth'
 
 export const runtime = 'nodejs'
@@ -70,7 +71,10 @@ async function wordpressRefine(admin: ReturnType<typeof createAdminClient>, ...[
   if (!read) return
   let homeHost = ''
   try { homeHost = new URL(siteUrl).hostname } catch { return }
-  await markWordPressOutsideContent(findings, scan.pages, read, { platform: scan.platform, connections: scan.connections, homeHost })
+  // The Media Library, through the application password only (lib/site-fix/media-alt.ts), read-only here.
+  const creds = ctx.creds
+  const findMedia = creds ? (src: string) => findMediaFor(creds, src, { searchMedia }) : null
+  await markWordPressOutsideContent(findings, scan.pages, read, { platform: scan.platform, connections: scan.connections, homeHost, findMedia })
 }
 
 function refine(admin: ReturnType<typeof createAdminClient>): ScanApiDeps['refine'] {

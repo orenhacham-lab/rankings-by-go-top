@@ -5,7 +5,7 @@ import { createAdminClient } from '@/lib/supabase/admin'
 import { decryptCredential, encryptCredential } from '@/lib/security/credentials-crypto'
 import { clientIpFrom } from '@/lib/free-check/store'
 import {
-  detectSeoCapabilities, findItemByUrl, getItemForEdit, searchItems, updateItemFields, writeVerifiedSeoMeta,
+  detectSeoCapabilities, findItemByUrl, getItemForEdit, getMedia, searchItems, searchMedia, setMediaAlt, updateItemFields, writeVerifiedSeoMeta,
 } from '@/lib/wordpress/client'
 import { handleScan, linkStatusReader, liveReader as siteHealthLiveReader } from '@/lib/site-health/api'
 import type { SiteHealthReport } from '@/lib/site-health/types'
@@ -65,6 +65,7 @@ function baseDeps(userId: string | null, ip: string | null): FixesDeps {
     wp: {
       findItemByUrl, getItemForEdit, updateItemFields, searchItems, detectSeoCapabilities, writeVerifiedSeoMeta,
       readLivePage: siteHealthLiveReader(),
+      media: { searchMedia, getMedia, setMediaAlt },
     },
     readLive: liveReader(),
     readText: liveTextReader(),

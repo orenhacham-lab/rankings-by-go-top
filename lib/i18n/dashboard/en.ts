@@ -4660,6 +4660,7 @@ export const dashboardEn = {
     productPage: "This is a product page. Go Top's access to the store covers articles and pages, so this one is fixed in Shopify. The steps below show how.",
     collectionPage: "This is a collection page. Go Top's access to the store covers articles and pages, so this one is fixed in Shopify. The steps below show how.",
     schemaFromTheme: "On a Shopify store, structured data comes from its theme (or a theme app), so it is added in the store's theme settings or by its theme developer, not on this page.",
+    themeAltMedia: 'Some of these images are in the WordPress media library. We write their description there, and that fixes them on every page.',
     themeAlt: (pages: number, images: number) =>
       `On ${pages === 1 ? '1 page' : `${pages} pages`}, images without a description are in the site's theme (header, footer, product cards), not in the page's text${images > 0 ? ` (up to ${images} per page)` : ''}. Fix them once in the theme editor and every page is fixed. The steps below show how.`,
     openPage: 'Open the page',
@@ -4924,6 +4925,7 @@ export const dashboardEn = {
           llmsCopyWp: 'With the Go Top plugin (version 2.1.0 or later) we can put it on your site for you, and undo it at any time.',
           llmsUpdate: 'Update the plugin and we can put it on your site for you.',
         },
+        altNotInContent: 'The images without alt text on this page are not in the page\'s own text, so nothing in the page needs to change. They come from the site\'s theme (logo, menu, footer) or are the main image the theme shows above the text. Their description is set once, in the media library or the theme, and that fixes every page that shows them. The steps below explain how.',
         h1Reasons: {
           builder: 'This page is built with a page builder. The builder draws the headings from its own data, so a change in the content would not hold. Change the heading in the builder itself.',
           markup: 'The headings in this page\'s content are written in a way we cannot change safely. Change them in the editor.',
@@ -4939,6 +4941,7 @@ export const dashboardEn = {
           webhook: 'The change is sent to your server, and your developer applies it on the site.',
           manual: 'The fix waits in the queue. Once the plugin is connected again you can apply it in one click, or update it by hand with the instructions.',
           shopify_seo: 'We save this in the article\'s or page\'s search engine listing in Shopify. The text on the page does not change.',
+          media: 'The description is saved on the image itself, in the WordPress media library, and shows on every page that uses it. The file and the page\'s text stay as they are.',
         },
         result: {
           applied: { title: 'The fix is on your site', body: 'Google will see it the next time it reads the page.' },

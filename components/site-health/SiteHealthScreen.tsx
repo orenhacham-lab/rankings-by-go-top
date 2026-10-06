@@ -162,6 +162,8 @@ export default function SiteHealthScreen({ project }: { project: Project & { sit
     // A Shopify store: only its articles and pages are written; products, collections and llms.txt keep their instructions.
     // (A broken link is judged by the page it was found on, which the store's own check reads.)
     if (caps.shopify && (finding.fixType === 'llms_txt' || (finding.fixType !== 'broken_link' && page.kind !== 'article' && page.kind !== 'page'))) return null
+    // Images outside the page's text that are Media Library items: written there with the application password.
+    if (finding.fixType === 'image_alt' && page.media) return !caps.shopify && caps.appPassword ? 'fix' : null
     // The store's own check found the problem outside what the connection edits (theme, menu, a product).
     if (page.outside === 'theme') return null
     // A product's own photos, or a page a page builder renders from its own data: no text fix reaches them.
@@ -181,13 +183,24 @@ export default function SiteHealthScreen({ project }: { project: Project & { sit
     if (finding.fixType === 'internal_link' && (channel === 'webhook' || channel === 'manual')) return null
     return 'fix'
   }, [queueLive, caps])
+  /**
+   * The theme's repeated images that are Media Library items without alt text (lib/site-fix/media-alt.ts):
+   * one fix for the whole site, read from the home page, which shows them too.
+   */
+  const themeFixPage = useCallback((f: Finding): FindingPage | null => {
+    if (!queueLive || !caps || caps.shopify || !caps.appPassword || !report || f.fixType !== 'image_alt' || !f.themeAlt?.media) return null
+    return { url: report.siteUrl, path: '/', kind: 'home', value: null, measure: f.themeAlt.images, fixable: true, adminUrl: null, media: true }
+  }, [queueLive, caps, report])
   const findings = useMemo(() => {
     // A report kept from before the fix queue has no fix type on its findings: take it from the
     // same rules the scan uses, so the buttons show without a new scan.
     const list = (report?.findings ?? []).map((f) => (f.fixType ? f : { ...f, fixType: FIX_TYPE[f.id] ?? null }))
     if (!queueLive) return list
-    return list.map((f) => ({ ...f, fixable: f.pages.some((p) => fixModeFor(f, p) === 'fix' && !jobStateFor(f, p)) }))
-  }, [report, queueLive, fixModeFor, jobStateFor])
+    return list.map((f) => {
+      const theme = themeFixPage(f)
+      return { ...f, fixable: f.pages.some((p) => fixModeFor(f, p) === 'fix' && !jobStateFor(f, p)) || (!!theme && !jobStateFor(f, theme)) }
+    })
+  }, [report, queueLive, fixModeFor, jobStateFor, themeFixPage])
 
   const fixableCount = useMemo(() => findings.filter((f) => f.fixable).length, [findings])
   // The score counts what is already fixed (an applied or sent job, or the owner's own "I fixed it"),
@@ -325,6 +338,7 @@ export default function SiteHealthScreen({ project }: { project: Project & { sit
                     storeConnected={!!report.connections?.shopify}
                     fixed={fixed}
                     onFix={onFix}
+                    themeFix={themeFixPage(f)}
                     fixModeFor={queueLive ? fixModeFor : null}
                     jobStateFor={queueLive ? jobStateFor : null}
                     onInstall={openInstall}

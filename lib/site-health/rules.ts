@@ -229,6 +229,7 @@ export function buildFindings(site: SiteFacts, pages: readonly PageFacts[], ctx:
   if (site.homeReachable && site.llmsFound === false) add('llms_missing', home, null, null)
 
   const read = pages.filter((p) => p.ok)
+  const themeImages = repeatedAltImages(read)
   const titles = new Map<string, PageFacts[]>()
   const descriptions = new Map<string, PageFacts[]>()
   for (const p of read) {
@@ -244,7 +245,8 @@ export function buildFindings(site: SiteFacts, pages: readonly PageFacts[], ctx:
     if (description) descriptions.set(description.toLowerCase(), [...(descriptions.get(description.toLowerCase()) ?? []), p])
     if (p.h1.length === 0) add('h1_missing', p, null, 0)
     else if (p.h1.length > 1) add('h1_multiple', p, null, p.h1.length)
-    if (p.images.total > 0 && p.images.missingAlt / p.images.total > ALT_TOLERANCE) add('images_alt', p, null, p.images.missingAlt)
+    const alt = ownAltImages(p, themeImages)
+    if (alt.own > 0 && alt.own / alt.total > ALT_TOLERANCE) add('images_alt', p, null, alt.own)
     if (!p.viewport) add('no_viewport', p, null, null)
     // Read only by scans since these were added (a cached report has no such facts: nothing is claimed).
     if (p.canonical === null) add('canonical_missing', p, null, null)
@@ -264,6 +266,15 @@ export function buildFindings(site: SiteFacts, pages: readonly PageFacts[], ctx:
     add('orphan_page', { url: o.url, kind: known?.kind ?? 'article', adminUrl: null }, o.keyword || o.title || null, null)
   }
 
+  // The theme's images: on each listed page apart from its own, and the other pages once for the site.
+  const altRows = new Set((hits.get('images_alt') ?? []).map((row) => {
+    const p = read.find((x) => x.url === row.url)
+    const shared = p ? ownAltImages(p, themeImages).shared : 0
+    if (shared > 0) row.themeMissing = shared
+    return row.url
+  }))
+  const themeOnly = read.map((p) => ownAltImages(p, themeImages).shared).filter((n, i) => n > 0 && !altRows.has(read[i].url))
+
   const findings: Finding[] = []
   for (const [id, list] of hits) {
     const field = FIX_FIELD[id] ?? null
@@ -273,7 +284,38 @@ export function buildFindings(site: SiteFacts, pages: readonly PageFacts[], ctx:
       field, guide: GUIDE[id], fixable: list.some((p) => p.fixable), fixType: FIX_TYPE[id] ?? null,
     })
   }
+  if (themeOnly.length > 0) {
+    let f = findings.find((x) => x.id === 'images_alt')
+    if (!f) {
+      f = { id: 'images_alt', severity: SEVERITY.images_alt, pages: [], total: 0, field: FIX_FIELD.images_alt ?? null, guide: GUIDE.images_alt, fixable: false, fixType: FIX_TYPE.images_alt ?? null }
+      findings.push(f)
+    }
+    f.themeAlt = { pages: themeOnly.length, images: Math.max(...themeOnly) }
+  }
   return sortFindings(findings)
+}
+
+/**
+ * Images without alt text that the theme repeats: the same address on many of the pages read (the
+ * logo, a menu icon, a footer badge, an author photo on every article). They are not in any page's
+ * own text, so no page's fix reaches them, and one change in the theme fixes them all: they are
+ * reported once for the site, not as a problem of each page. An image counts when it is on at least
+ * a quarter of the pages that list their images, and on at least two of them (three from three pages
+ * on). An image with no address of its own ('' , a lazy-load placeholder) is never counted here.
+ */
+export function repeatedAltImages(pages: readonly Pick<PageFacts, 'images'>[]): Set<string> {
+  const known = pages.filter((p) => Array.isArray(p.images.missing))
+  const n = known.length
+  const need = Math.max(2, Math.min(3, n), Math.ceil(n * 0.25))
+  const seen = new Map<string, number>()
+  for (const p of known) for (const src of new Set(p.images.missing)) if (src) seen.set(src, (seen.get(src) ?? 0) + 1)
+  return new Set([...seen].filter(([, count]) => count >= need).map(([src]) => src))
+}
+
+/** A page's images without alt text, apart from the theme's repeated ones (`shared`). */
+export function ownAltImages(p: Pick<PageFacts, 'images'>, theme: ReadonlySet<string>): { own: number; total: number; shared: number } {
+  const shared = Math.min(p.images.missingAlt, (p.images.missing ?? []).filter((src) => src && theme.has(src)).length)
+  return { own: p.images.missingAlt - shared, total: Math.max(0, p.images.total - shared), shared }
 }
 
 /** Most serious first; within one severity, the one with the most pages first (in place, and returned). */

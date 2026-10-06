@@ -24,7 +24,12 @@ export type SiteSignals = {
   canonical: string | null
   h1: string[]
   h2: string[]
-  images: { total: number; missingAlt: number }
+  /**
+   * `missing`: the address of each image without alt text, in page order (at most MAX_MISSING_ALT;
+   * '' when the image has no address of its own, such as a lazy-load placeholder). The site's check
+   * uses it to tell the theme's images, the same ones on every page, from the page's own.
+   */
+  images: { total: number; missingAlt: number; missing: string[] }
   /**
    * Distinct schema.org types the page declares, however it declares them: JSON-LD @type values,
    * microdata (`itemscope itemtype="https://schema.org/Product"`) and RDFa (`typeof`, with the
@@ -246,6 +251,33 @@ function attrValues(html: string, tag: string, attr: string): string[] {
   for (const t of tags) {
     const m = t.match(attrRe)
     if (m) out.push((m[2] ?? m[3] ?? m[4] ?? '').trim())
+  }
+  return out
+}
+
+export const MAX_MISSING_ALT = 40
+
+/**
+ * The address of each <img> without alt text (none, or blank), resolved against the page. A lazy-load
+ * placeholder (a data: address) gives way to data-src or data-lazy-src; with neither, the image has no
+ * address of its own and is listed as ''.
+ */
+function imagesWithoutAlt(html: string, pageUrl: string): string[] {
+  const out: string[] = []
+  const val = (t: string, name: string) => {
+    const m = t.match(new RegExp(`\\s${name}\\s*=\\s*("([^"]*)"|'([^']*)'|([^\\s">]+))`, 'i'))
+    return m ? (m[2] ?? m[3] ?? m[4] ?? '').trim() : null
+  }
+  for (const t of openTags(html, 'img')) {
+    if ((val(t, 'alt') ?? '').length > 0) continue
+    let src = val(t, 'src') ?? ''
+    if (!src || /^data:/i.test(src)) src = val(t, 'data-src') ?? val(t, 'data-lazy-src') ?? ''
+    let abs = ''
+    if (src && !/^data:/i.test(src)) {
+      try { const u = new URL(decodeEntities(src), pageUrl); u.hash = ''; abs = u.toString() } catch { abs = '' }
+    }
+    out.push(abs)
+    if (out.length >= MAX_MISSING_ALT) break
   }
   return out
 }
@@ -507,6 +539,7 @@ export function extractSiteSignals(
   const imgAlts = attrValues(clean, 'img', 'alt')
   const imgTotal = (clean.match(/<img\b/gi) ?? []).length
   const missingAlt = Math.max(0, imgTotal - imgAlts.filter((a) => a.trim().length > 0).length)
+  const missingSrcs = imagesWithoutAlt(clean, finalUrl)
 
   const nodes = jsonLdNodes(html)
   const jsonLdTypes = typesOf(nodes)
@@ -555,7 +588,7 @@ export function extractSiteSignals(
     canonical,
     h1,
     h2,
-    images: { total: imgTotal, missingAlt },
+    images: { total: imgTotal, missingAlt, missing: missingSrcs },
     schemaTypes,
     jsonLdTypes,
     hasOrganizationSchema: schemaTypes.some((t) => ORGANIZATION_TYPES.has(t)),

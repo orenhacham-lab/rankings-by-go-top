@@ -238,7 +238,7 @@ const NO_SIGNALS: Omit<SiteSignals, 'finalUrl'> = {
   canonical: null,
   h1: [],
   h2: [],
-  images: { total: 0, missingAlt: 0 },
+  images: { total: 0, missingAlt: 0, missing: [] },
   schemaTypes: [],
   hasOrganizationSchema: false,
   hasFaqSchema: false,
