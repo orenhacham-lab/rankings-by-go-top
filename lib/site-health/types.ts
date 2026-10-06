@@ -113,6 +113,12 @@ export interface FindingPage {
    */
   outside?: 'theme' | 'product' | 'builder'
   /**
+   * images_alt on WordPress with the application password: the images without alt text here are not in
+   * the page's own text but are Media Library items without alt text, so the fix writes on the items
+   * (lib/site-fix/media-alt.ts) instead of the page.
+   */
+  media?: boolean
+  /**
    * images_alt, after the site's own check: images without alt text on the page that are NOT in what a
    * fix can reach (the theme's). `measure` then counts only the ones the fix can reach.
    */
@@ -132,9 +138,10 @@ export interface Finding {
   total: number
   /**
    * images_alt: pages whose images without alt text are all in the theme (not in the page's own text),
-   * reported once for the whole site instead of one row per page that no fix can reach.
+   * reported once for the whole site instead of one row per page that no fix can reach. `media`: some
+   * of them are Media Library items without alt text, which the fix can write (lib/site-fix/media-alt.ts).
    */
-  themeAlt?: { pages: number; images: number }
+  themeAlt?: { pages: number; images: number; media?: boolean }
   field: FixField | null
   guide: GuideTopic
   /** At least one page offers "fix it for me". */

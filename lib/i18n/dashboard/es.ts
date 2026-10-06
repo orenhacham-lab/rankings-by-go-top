@@ -3671,6 +3671,7 @@ export const dashboardEs: DeepPartial<DashboardDictionary> = {
     productPage: 'Es una página de producto. El acceso de Go Top a la tienda cubre artículos y páginas, así que esto se corrige en Shopify. Los pasos de abajo explican cómo.',
     collectionPage: 'Es una página de colección. El acceso de Go Top a la tienda cubre artículos y páginas, así que esto se corrige en Shopify. Los pasos de abajo explican cómo.',
     schemaFromTheme: 'En una tienda Shopify, los datos estructurados vienen de su tema (o de una app del tema), así que se añaden en la configuración del tema de la tienda o con el desarrollador del tema, no en esta página.',
+    themeAltMedia: 'Algunas de estas imágenes están en la biblioteca de medios de WordPress. Escribimos su descripción allí, y eso las corrige en todas las páginas.',
     themeAlt: (pages: number, images: number) =>
       `En ${pages === 1 ? '1 página' : `${pages} páginas`} hay imágenes sin descripción que están en el tema del sitio (cabecera, pie, tarjetas de producto), no en el texto de la página${images > 0 ? ` (hasta ${images} por página)` : ''}. Corrígelas una sola vez en el editor del tema y quedan corregidas en todas las páginas. Los pasos de abajo explican cómo.`,
     openPage: 'Abrir la página',
@@ -3951,6 +3952,7 @@ export const dashboardEs: DeepPartial<DashboardDictionary> = {
           webhook: 'El cambio se envía a tu servidor y tu desarrollador lo aplica en la web.',
           manual: 'El arreglo espera en la cola. Cuando el plugin vuelva a estar conectado podrás aplicarlo con un clic, o actualizarlo a mano con las instrucciones.',
           shopify_seo: 'Lo guardamos en la vista previa en buscadores del artículo o la página en Shopify. El texto de la página no cambia.',
+          media: 'La descripción se guarda en la propia imagen, en la biblioteca de medios de WordPress, y aparece en todas las páginas que la usan. El archivo y el texto de la página no cambian.',
         },
         result: {
           applied: { title: 'El arreglo está en tu web', body: 'Google lo verá la próxima vez que lea la página.' },

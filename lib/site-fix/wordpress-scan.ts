@@ -16,15 +16,18 @@
  *               theme's images kept it under the scan's threshold;
  *   broken link a dead link that is not in the content of the page it was found on (a menu, a
  *               footer) is marked `outside: 'theme'`;
- *   a builder   image alt, broken link and FAQ rows on such a page are marked `outside: 'builder'`.
+ *   a builder   image alt, broken link and FAQ rows on such a page are marked `outside: 'builder'`;
+ *   media       with the application password, an image outside the page's text that is a Media
+ *               Library item without alt text keeps its button: the fix writes on the item
+ *               (./media-alt.ts). The theme's repeated ones are offered once, on the site-wide line.
  * Read-only: nothing is written here, and nothing in the plugin changes.
  */
-import { allRows, canFix } from '@/lib/site-health/rules'
+import { allRows, canFix, repeatedAltImages } from '@/lib/site-health/rules'
 import type { ConnectionState, Finding, FindingPage, PageFacts, SitePlatform } from '@/lib/site-health/types'
 import { imagesMissingAlt } from '@/lib/site-health/wordpress-fix'
 import { rendersFromBuilderData } from './builder'
 import { brokenLinkWords } from './content'
-import { readAll } from './read-pool'
+import { MAX_MEDIA_LOOKUPS, MEDIA_CONCURRENCY, readAll } from './read-pool'
 import { refineImageAlt, type ReachableAlt } from './scan-refine'
 
 /** One page's own content as the fix would read it; 'not_ours' when it is no post or page WordPress has. */
@@ -42,7 +45,14 @@ export async function markWordPressOutsideContent(
   findings: Finding[],
   scanned: readonly PageFacts[],
   read: WpReader,
-  ctx: { platform: SitePlatform; connections: ConnectionState; homeHost: string },
+  ctx: {
+    platform: SitePlatform; connections: ConnectionState; homeHost: string
+    /**
+     * With the site's application password: the Media Library item an image is (./media-alt.ts), so an
+     * image outside the page's text that is such an item, still without alt text, keeps a fix button.
+     */
+    findMedia?: ((src: string) => Promise<{ alt: string } | null>) | null
+  },
 ): Promise<void> {
   const todo: { f: Finding; p: FindingPage; src: string }[] = []
   // Image rows first (the biggest share of dead buttons), then broken links, then FAQ.
@@ -60,12 +70,29 @@ export async function markWordPressOutsideContent(
   const urls = [...new Set([...todo.map((t) => t.src), ...others])]
   if (urls.length === 0) return
 
+  // Beside the reads: which images without alt text are Media Library items that have none either.
+  // The listed rows' images first, then the theme's repeated ones, then the rest.
+  const listed = new Set(findings.filter((f) => f.fixType === 'image_alt').flatMap((f) => allRows(f).map((p) => p.url)))
+  const srcs = [...new Set([
+    ...scanned.filter((s) => listed.has(s.url)).flatMap((s) => s.images.missing ?? []),
+    ...repeatedAltImages(scanned.filter((s) => s.ok)),
+    ...scanned.flatMap((s) => s.images.missing ?? []),
+  ].filter(Boolean))]
   const got = new Map<string, Exclude<WpRead, null>>()
-  await readAll(urls, async (url, deadline) => {
-    const r = await read(url)
-    if (r && Date.now() <= deadline) got.set(url, r)
-  })
+  const empty = new Set<string>()
+  const findMedia = ctx.findMedia
+  await Promise.all([
+    readAll(urls, async (url, deadline) => {
+      const r = await read(url)
+      if (r && Date.now() <= deadline) got.set(url, r)
+    }),
+    findMedia ? readAll(srcs, async (src, deadline) => {
+      const m = await findMedia(src)
+      if (m && m.alt.trim() === '' && Date.now() <= deadline) empty.add(src)
+    }, { max: MAX_MEDIA_LOOKUPS, concurrency: MEDIA_CONCURRENCY }) : null,
+  ])
   const answered = new Map(got)
+  const inMedia = new Set(empty)
 
   for (const { f, p, src } of todo) {
     const r = answered.get(src)
@@ -79,5 +106,5 @@ export async function markWordPressOutsideContent(
     if (r === 'not_ours') reach.set(url, 'not_ours')
     else if (!rendersFromBuilderData(r)) reach.set(url, imagesMissingAlt(r.content).length)
   }
-  refineImageAlt(findings, scanned, reach, { fixable: (page) => canFix('alt', page, ctx.platform, ctx.connections) })
+  refineImageAlt(findings, scanned, reach, { fixable: (page) => canFix('alt', page, ctx.platform, ctx.connections), inMedia })
 }

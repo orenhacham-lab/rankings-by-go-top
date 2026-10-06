@@ -67,7 +67,7 @@ import {
   type FixChannel, type FixErrorCode, type FixJobRow, type FixJobView, type FixPayload, type FixType,
 } from './types'
 import { buildFixPayload, sendFixWebhook, type FixWebhookDeps } from './webhook-fix'
-import { payloadFromJob, siteKeyOf, summaryOf, validateFix, valueOf } from './whitelist'
+import { isMediaAlt, payloadFromJob, siteKeyOf, summaryOf, validateFix, valueOf } from './whitelist'
 
 type Admin = ReturnType<typeof createAdminClient>
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
@@ -254,6 +254,8 @@ async function preview(b: Record<string, unknown>, l: Loaded, deps: FixesDeps): 
   const req: PreviewRequest = {
     type, url: String(b.url), kind, from: typeof b.from === 'string' ? b.from : undefined,
     keyword: typeof b.keyword === 'string' ? b.keyword.slice(0, 120) : undefined,
+    // The Media Library (./media-alt.ts): WordPress only, through the application password.
+    ...(type === 'image_alt' && b.media === true && !l.caps.shopify ? { media: true } : {}),
   }
   const p = await previewFixJob(req, {
     channel: channel === 'manual_copy' ? 'manual' : channel, creds: l.ctx.creds, link: channel === 'plugin' ? l.ctx.pluginLink : null,
@@ -269,6 +271,7 @@ async function preview(b: Record<string, unknown>, l: Loaded, deps: FixesDeps): 
   })
   if (!p.ok) return { status: fixStatusFor(p.code), body: p }
   // A copy-only llms.txt is never approved here: the merchant places it himself.
+  if (p.type === 'image_alt' && p.via === 'media') return { status: 200, body: { ...p, channel: 'app_password' } }
   return { status: 200, body: { ...p, channel: channel === 'manual_copy' ? 'manual' : channel } }
 }
 
@@ -304,11 +307,15 @@ async function approve(b: Record<string, unknown>, l: Loaded, deps: FixesDeps): 
   const checked = validateFix(b.fix, b.pageUrl, l.siteKeys)
   if (!checked.ok) return refuse(checked.code)
   const payload = checked.payload
-  let channel = channelOf(l, payload.type)
-  if (channel === 'needs_update') channel = await refreshPluginVersion(l, deps, payload.type)
-  if (channel === 'needs_plugin' || channel === 'no_channel' || channel === 'needs_update' || channel === 'manual_copy') return refuse(channel === 'manual_copy' ? 'needs_plugin' : channel)
   const expected = typeof b.expected === 'string' && b.expected.length <= 200_000 ? b.expected : null
   const via = typeof b.via === 'string' && /^[a-z_]{1,20}$/.test(b.via) ? b.via : null
+  // Alt text on Media Library items: the application password writes it, whatever writes the pages.
+  const onMedia = isMediaAlt(payload)
+  if (onMedia !== (via === 'media')) return refuse('value_invalid')
+  if (onMedia && (l.caps.shopify || !l.ctx.creds)) return refuse('no_channel')
+  let channel = onMedia ? 'app_password' as const : channelOf(l, payload.type)
+  if (channel === 'needs_update') channel = await refreshPluginVersion(l, deps, payload.type)
+  if (channel === 'needs_plugin' || channel === 'no_channel' || channel === 'needs_update' || channel === 'manual_copy') return refuse(channel === 'manual_copy' ? 'needs_plugin' : channel)
   const before = typeof b.before === 'string' ? b.before.slice(0, 60_000) : null
   // "Apply all safe fixes": the same one-fix path, only for what is safe without a second look.
   let batch: string | null = null
@@ -343,6 +350,8 @@ async function bulkRefusal(
   a: { type: FixType; channel: string; pageUrl: string; value: import('./types').FixPayload; before: string | null; batch: string },
 ): Promise<string | null> {
   if (!BULK_SAFE_TYPES.includes(a.type)) return 'type'
+  // A Media Library item shows on every page that uses it: one by one, with the merchant's eyes.
+  if (isMediaAlt(a.value)) return 'media'
   if (a.channel !== 'plugin') return 'channel'
   if (isHomeUrl(a.pageUrl)) return 'home'
   const valueProblem = bulkValueProblem(a.value, a.before)
@@ -545,7 +554,9 @@ async function retry(b: Record<string, unknown>, l: Loaded, deps: FixesDeps): Pr
   if (await heldElsewhere(deps, l, { type: job.fix_type, pageUrl: job.page_url, subject: subjectOf(job.fix_type, job.payload) }, job.id)) {
     return refuse('already_fixed')
   }
-  const channel = channelOf(l, job.fix_type) as FixChannel
+  // Alt text on Media Library items keeps its own way to the site (the application password).
+  const channel = (isMediaAlt(payloadFromJob(job.fix_type, job.payload)) ? (l.ctx.creds ? 'app_password' : 'no_channel') : channelOf(l, job.fix_type)) as FixChannel
+  if ((channel as string) === 'no_channel') return refuse('no_channel')
   const stored = (job.undo ?? {}) as { expected?: string | null; via?: string | null }
   const batch = batchOf(job)
   const auto = autoOf(job)

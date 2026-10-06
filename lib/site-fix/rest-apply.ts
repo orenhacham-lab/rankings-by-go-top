@@ -1,5 +1,6 @@
 /**
- * The application-password channel (WordPress REST, no plugin). The four fixes the existing engine
+ * The application-password channel (WordPress REST, no plugin). Also, whatever writes the pages, alt
+ * text on Media Library items (./media-alt.ts). The four fixes the existing engine
  * already writes (title, description, alt text, internal link) go through it unchanged
  * (lib/site-health/wordpress-fix.ts applyFix, with its compare-and-set and its undo request). The
  * two new content fixes, an FAQ block and a broken link, are written here with the same rules:
@@ -9,11 +10,15 @@
 import { applyFix, wpFailure, type ApplyRequest, type WpFixDeps } from '@/lib/site-health/wordpress-fix'
 import type { WordPressCredentials } from '@/lib/wordpress/types'
 import { appendBlock, faqBlockHtml, fixBrokenLink, removeBlock, sha256 } from './content'
+import { applyMediaAlt, revertMediaAlt, type MediaUndo } from './media-alt'
 import type { FixErrorCode, FixPayload } from './types'
+import { isMediaAlt } from './whitelist'
 
 export type RestUndo =
   | { kind: 'request'; request: ApplyRequest }
   | { kind: 'content'; pageUrl: string; previous: string; newSha: string; block: string | null }
+  /** Alt text on Media Library items (./media-alt.ts): each item's words before. */
+  | MediaUndo
 
 export type RestResult = { ok: true; status: 'applied' | 'already'; undo: RestUndo | null } | { ok: false; code: FixErrorCode }
 
@@ -30,6 +35,16 @@ export async function applyViaRest(
   wp: WpFixDeps,
 ): Promise<RestResult> {
   const p = job.payload
+  // Alt text on Media Library items: the REST media route, alt_text only (./media-alt.ts).
+  if (isMediaAlt(p) && p.type === 'image_alt') {
+    if (!wp.media) return { ok: false, code: 'no_channel' }
+    try {
+      const r = await applyMediaAlt(creds, p.images.map((i) => ({ media: i.media as number, alt: i.alt })), wp.media)
+      return r.ok ? { ok: true, status: r.status, undo: r.undo } : r
+    } catch (err) {
+      return { ok: false, code: mapLegacy(wpFailure(err)) }
+    }
+  }
   const expected = job.expected ?? ''
   let legacy: ApplyRequest | null = null
   if (p.type === 'seo_title' || p.type === 'meta_description') {
@@ -79,6 +94,10 @@ export async function revertViaRest(creds: WordPressCredentials, undo: RestUndo,
   if (undo.kind === 'request') {
     const r = await applyFix(creds, undo.request, wp)
     return r.ok ? { ok: true } : { ok: false, code: mapLegacy(r.code) }
+  }
+  if (undo.kind === 'media') {
+    if (!wp.media) return { ok: false, code: 'no_channel' }
+    try { return await revertMediaAlt(creds, undo, wp.media) } catch (err) { return { ok: false, code: mapLegacy(wpFailure(err)) } }
   }
   try {
     const item = await wp.findItemByUrl(creds, undo.pageUrl)

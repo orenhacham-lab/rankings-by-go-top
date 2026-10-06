@@ -689,6 +689,51 @@ async function wpGet<T>(creds: WordPressCredentials, path: string): Promise<T> {
   }
 }
 
+/** One Media Library item, as the site-fix media alt text needs it (lib/site-fix/media-alt.ts). */
+export interface WpMediaItem {
+  id: number
+  sourceUrl: string
+  /** Every size WordPress made of it (thumbnail, medium, …): the page may show any of them. */
+  sizeUrls: string[]
+  alt: string
+  title: string
+}
+
+function mediaOf(m: unknown): WpMediaItem | null {
+  const r = (m ?? {}) as { id?: unknown; source_url?: unknown; alt_text?: unknown; title?: { raw?: unknown; rendered?: unknown } | unknown; media_details?: { sizes?: Record<string, { source_url?: unknown }> } }
+  if (typeof r.id !== 'number' || typeof r.source_url !== 'string') return null
+  const t = (r.title ?? {}) as { raw?: unknown; rendered?: unknown }
+  const sizes = Object.values(r.media_details?.sizes ?? {}).map((x) => String(x?.source_url ?? '')).filter(Boolean)
+  return { id: r.id, sourceUrl: r.source_url, sizeUrls: sizes, alt: String(r.alt_text ?? ''), title: String(t.raw ?? t.rendered ?? '') }
+}
+
+/**
+ * Media Library images named like `name` (a file's name without its extension), at most 20: by their
+ * title (`by: 'title'`, WordPress titles an upload with its file name) or by their slug (also made from
+ * the file name, and kept when the title is renamed). Read-only.
+ */
+export async function searchMedia(creds: WordPressCredentials, name: string, by: 'title' | 'slug' = 'title'): Promise<WpMediaItem[]> {
+  const v = name.slice(0, 100)
+  const query = by === 'slug' ? `slug=${encodeURIComponent(v.toLowerCase())}` : `search=${encodeURIComponent(v)}`
+  const list = await wpGet<unknown[]>(creds, `/media?context=edit&per_page=20&media_type=image&${query}`)
+  return (Array.isArray(list) ? list : []).map(mediaOf).filter((m): m is WpMediaItem => !!m)
+}
+
+/** One Media Library item by id, or null when there is none. Read-only. */
+export async function getMedia(creds: WordPressCredentials, id: number): Promise<WpMediaItem | null> {
+  try {
+    return mediaOf(await wpGet<unknown>(creds, `/media/${Math.trunc(id)}?context=edit`))
+  } catch (err) {
+    if (err instanceof WordPressClientError && err.meta.status === 404) return null
+    throw err
+  }
+}
+
+/** Set one Media Library item's alt text (nothing else). Returns the item as WordPress now holds it. */
+export async function setMediaAlt(creds: WordPressCredentials, id: number, alt: string): Promise<WpMediaItem | null> {
+  return mediaOf(await wpPostJson<unknown>(creds, `/media/${Math.trunc(id)}`, { alt_text: alt }))
+}
+
 /**
  * Verify the credentials by fetching the authenticated user.
  * Never throws — returns a normalized result for the API route to relay.

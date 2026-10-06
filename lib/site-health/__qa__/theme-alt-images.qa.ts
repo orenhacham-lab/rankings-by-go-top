@@ -16,6 +16,16 @@
  *   C) The check after the scan reads EVERY page the scan read (not 12), a few at a time.
  *   D) A preview that finds no image without alt text in the page's own text says the images are the
  *      theme's, never "the page is already fine" (every dashboard language, lib/i18n/locales.ts).
+ *   E) THE MEDIA LIBRARY (lib/site-fix/media-alt.ts). With the site's application password, an image
+ *      outside the page's text that is a Media Library item without alt text gets it there: found by
+ *      its file (any size, a CDN host), offered only while empty (a logo gets the business's name),
+ *      written as alt_text only, checked before and read back, undone only while still ours.
+ *   G) THE SCREEN. The theme's line shows "fix it for me" when the Media Library holds those images; a
+ *      Media Library row asks the preview for the Media Library; the screen offers it only with the
+ *      application password and never on a store.
+ *   F) THE QUEUE. Approving it goes through the application password even where the plugin writes the
+ *      pages (nothing is sent to the plugin), only with via 'media', never in a batch; undo puts the
+ *      empty value back. The scan keeps a button on such a row and one on the theme's site-wide line.
  *
  * Each guard has a MUTATION CONTROL that breaks the code on purpose and shows the guard fails.
  *
@@ -29,6 +39,15 @@ import { extractSiteSignals } from '@/lib/free-check/html-signals'
 import * as RULES from '@/lib/site-health/rules'
 import type { Finding, PageFacts, SiteFacts } from '@/lib/site-health/types'
 import * as WP_SCAN from '@/lib/site-fix/wordpress-scan'
+import * as MEDIA from '@/lib/site-fix/media-alt'
+import * as API from '@/lib/site-fix/api'
+import { validateFix } from '@/lib/site-fix/whitelist'
+import { FIX_TYPES } from '@/lib/site-fix/types'
+import type { WpMediaItem } from '@/lib/wordpress/client'
+import { FakeAdmin } from '@/lib/__qa__/_fake-admin'
+import { createElement } from 'react'
+import { renderToStaticMarkup } from 'react-dom/server'
+import FindingCard from '@/components/site-health/FindingCard'
 import * as READ_POOL from '@/lib/site-fix/read-pool'
 import { getDashboardDictionary } from '@/lib/i18n/dashboard/getDashboardDictionary'
 import { PUBLIC_LOCALES } from '@/lib/i18n/locales'
@@ -171,7 +190,7 @@ async function main() {
     check('C3: a few at a time (at most READ_CONCURRENCY), never all at once', most > 1 && most <= READ_POOL.READ_CONCURRENCY, `${most} at once`)
     check('C4: MAX_READS covers a whole scan (lib/site-health/scan.ts MAX_PAGES = 25)', READ_POOL.MAX_READS >= 25)
 
-    const mut = mutant<typeof READ_POOL>('lib/site-fix/read-pool.ts', 'const queue = items.slice(0, MAX_READS)', 'const queue = items.slice(0, 12)')
+    const mut = mutant<typeof READ_POOL>('lib/site-fix/read-pool.ts', 'const queue = items.slice(0, opts.max ?? MAX_READS)', 'const queue = items.slice(0, 12)')
     let mutReads = 0
     if (mut.mod) await mut.mod.readAll(Array.from({ length: 25 }, (_, i) => i), async () => { mutReads++ })
     let realReads = 0
@@ -199,6 +218,174 @@ async function main() {
       const d = getDashboardDictionary(locale) as unknown as { siteHealth: { autofix: { approve: { altNotInContent?: string } ; errors: { nothing_to_fix: string } } } }
       const line = d.siteHealth.autofix.approve.altNotInContent ?? ''
       check(`D3 [${locale}]: the line is there, says the theme, and is not the "already fine" line`, line.length > 80 && line !== d.siteHealth.autofix.errors.nothing_to_fix)
+    }
+  }
+
+  console.log('\nE) The Media Library: alt text on the image itself')
+  const creds = { siteUrl: SITE, username: 'owner', applicationPassword: 'x' }
+  const library = (): { items: Map<number, WpMediaItem>; writes: { id: number; alt: string }[]; searches: string[]; deps: MEDIA.MediaDeps } => {
+    const items = new Map<number, WpMediaItem>([
+      [7, { id: 7, sourceUrl: `${SITE}/wp-content/uploads/2024/05/site-logo.png`, sizeUrls: [`${SITE}/wp-content/uploads/2024/05/site-logo-300x120.png`], alt: '', title: 'site-logo' }],
+      [8, { id: 8, sourceUrl: `${SITE}/wp-content/uploads/2024/05/office-team.jpg`, sizeUrls: [`${SITE}/wp-content/uploads/2024/05/office-team-1024x683.jpg`], alt: '', title: 'Our team at work' }],
+      [9, { id: 9, sourceUrl: `${SITE}/wp-content/uploads/2024/05/badge.png`, sizeUrls: [], alt: 'Already described', title: 'badge' }],
+    ])
+    const writes: { id: number; alt: string }[] = []
+    const searches: string[] = []
+    const deps: MEDIA.MediaDeps = {
+      // By title: the titles here were renamed for item 8 (found by slug only, as WordPress keeps it).
+      searchMedia: async (_c, term, by = 'title') => {
+        searches.push(`${by}:${term}`)
+        return [...items.values()].filter((m) => (by === 'slug' ? m.sourceUrl.includes(term) : m.title === term)).map((m) => ({ ...m }))
+      },
+      getMedia: async (_c, id) => { const m = items.get(id); return m ? { ...m } : null },
+      setMediaAlt: async (_c, id, alt) => { writes.push({ id, alt }); const m = items.get(id); if (!m) return null; m.alt = alt; return { ...m } },
+    }
+    return { items, writes, searches, deps }
+  }
+  {
+    check('E1: the file\'s own name, without the size WordPress added, -scaled or a WebP copy\'s extra extension',
+      MEDIA.mediaSearchTerm(`${SITE}/wp-content/uploads/2024/05/site-logo-300x120.png`) === 'site-logo'
+      && MEDIA.mediaSearchTerm(`${SITE}/wp-content/uploads/a/office-team-scaled.jpg`) === 'office-team'
+      && MEDIA.mediaSearchTerm(`${SITE}/wp-content/uploads/a/office-team.jpg.webp`) === 'office-team')
+    check('E2: the same file from a CDN host and with a query is the same file; another folder is not',
+      MEDIA.sameFile('https://cdn.example.net/wp-content/uploads/2024/05/x.jpg?ver=2', `${SITE}/wp-content/uploads/2024/05/x.jpg`)
+      && !MEDIA.sameFile(`${SITE}/wp-content/themes/t/x.jpg`, `${SITE}/wp-content/uploads/2024/05/x.jpg`))
+    const lib = library()
+    const offered = await MEDIA.previewMediaAlt(creds, [
+      `${SITE}/wp-content/uploads/2024/05/site-logo-300x120.png`,
+      `https://cdn.example.net/wp-content/uploads/2024/05/office-team-1024x683.jpg`,
+      `${SITE}/wp-content/uploads/2024/05/badge.png`,
+      `${SITE}/wp-content/themes/clean/img/arrow.svg`,
+    ], { pageTitle: 'ניקיון משרדים ברמת גן', siteName: 'הלהיט בניקיון' }, lib.deps)
+    check('E3: offered: the logo (in any size) and the photo (from the CDN); not the one already described, not a theme file',
+      JSON.stringify(offered.map((o) => o.media)) === '[7,8]', JSON.stringify(offered))
+    check('E4: the logo is offered the business\'s name', offered[0]?.after === 'הלהיט בניקיון', offered[0]?.after)
+    check('E5: reading for the preview writes nothing', lib.writes.length === 0)
+    check('E5b: an item whose title was renamed is found by its slug', lib.searches.includes('slug:office-team') && offered.some((o) => o.media === 8))
+    const mutSlug = mutant<typeof MEDIA>('lib/site-fix/media-alt.ts', " ?? match(await deps.searchMedia(creds, term, 'slug'))", '')
+    const mutOffered = mutSlug.mod ? await mutSlug.mod.previewMediaAlt(creds, [`${SITE}/wp-content/uploads/2024/05/office-team-1024x683.jpg`], { pageTitle: 'x', siteName: null }, library().deps) : []
+    check('MUTATION CONTROL: by title only, the renamed item is missed (E5b catches it)', mutSlug.found && mutOffered.length === 0)
+
+    const done = await MEDIA.applyMediaAlt(creds, [{ media: 7, alt: 'הלהיט בניקיון' }, { media: 8, alt: 'צוות ניקיון במשרד' }], lib.deps)
+    check('E6: written as alt text on each item, then read back', done.ok && done.status === 'applied' && lib.items.get(7)?.alt === 'הלהיט בניקיון' && lib.writes.length === 2)
+    const again = await MEDIA.applyMediaAlt(creds, [{ media: 7, alt: 'הלהיט בניקיון' }], lib.deps)
+    check('E7: the same words again: nothing written ("already")', again.ok && again.status === 'already' && lib.writes.length === 2)
+    lib.items.get(8)!.alt = 'The owner\'s own words'
+    const theirs = await MEDIA.applyMediaAlt(creds, [{ media: 8, alt: 'Other words' }], lib.deps)
+    check('E8: words someone wrote since the preview stay: refused, nothing written', !theirs.ok && theirs.code === 'changed_since_preview' && lib.writes.length === 2)
+    const mutCas = mutant<typeof MEDIA>('lib/site-fix/media-alt.ts', "if (now.some((m, n) => m!.alt.trim() !== '' && m!.alt !== items[n].alt)) return { ok: false, code: 'changed_since_preview' }", '')
+    const lib2 = library()
+    lib2.items.get(8)!.alt = 'The owner\'s own words'
+    const mutTheirs = mutCas.mod ? await mutCas.mod.applyMediaAlt(creds, [{ media: 8, alt: 'Other words' }], lib2.deps) : null
+    check('MUTATION CONTROL: without the check the owner\'s words are overwritten (E8 catches it)', mutCas.found && !!mutTheirs?.ok && lib2.items.get(8)?.alt === 'Other words')
+
+    if (done.ok && done.undo) {
+      const undone = await MEDIA.revertMediaAlt(creds, done.undo, lib.deps)
+      check('E9: undo puts back what was there (empty) only where our words still are; the owner\'s change refuses it',
+        !undone.ok && lib.items.get(7)?.alt === 'הלהיט בניקיון')
+      lib.items.get(8)!.alt = 'צוות ניקיון במשרד'
+      const undone2 = await MEDIA.revertMediaAlt(creds, done.undo, lib.deps)
+      check('E10: with our words still there, undo empties both', undone2.ok && lib.items.get(7)?.alt === '' && lib.items.get(8)?.alt === '')
+    } else check('E9: applied with an undo', false)
+
+    const v = (images: unknown) => validateFix({ type: 'image_alt', images }, `${SITE}/`, new Set(['cleaning.example.org']))
+    check('E11: the whitelist takes a Media Library id on every image', v([{ src: `${SITE}/a.png`, alt: 'A', media: 7 }]).ok)
+    check('E12: and refuses it on some images only, a non-whole id, or an unknown key',
+      !v([{ src: `${SITE}/a.png`, alt: 'A', media: 7 }, { src: `${SITE}/b.png`, alt: 'B' }]).ok && !v([{ src: `${SITE}/a.png`, alt: 'A', media: 1.5 }]).ok
+      && !v([{ src: `${SITE}/a.png`, alt: 'A', file: 'x' }]).ok)
+  }
+
+  console.log('\nF) The queue: through the application password, never the plugin, never in a batch')
+  {
+    const U = '11111111-1111-4111-8111-111111111111'
+    const P = 'a1111111-2222-4333-8444-555555555555'
+    let n = 0
+    const newId = () => `${String(++n).padStart(8, '0')}-aaaa-4bbb-8ccc-${String(n).padStart(12, '0')}`
+    const admin = new FakeAdmin({
+      projects: [{ id: P, user_id: U, target_domain: 'cleaning.example.org', business_name: 'הלהיט בניקיון', name: 'Cleaning' }],
+      project_profiles: [{ project_id: P, user_id: U, detected_platform: 'wordpress' }],
+      wordpress_connections: [{ project_id: P, user_id: U, site_url: SITE, wp_username: 'owner', wp_application_password_encrypted: 'enc:app', connection_status: 'connected' }],
+      site_fix_plugin_links: [{ project_id: P, user_id: U, site_url: SITE, key_id: 'gtk_0123456789abcdef', secret_encrypted: 'enc:secret', secret_hint: '••••abcd', status: 'connected', plugin_version: '2.1.0', seo_plugin: 'yoast', last_seen_at: null, last_error_code: null }],
+      site_fix_jobs: [], site_fix_audit: [],
+    })
+    const pluginCalls: string[] = []
+    const lib = library()
+    const deps: API.FixesDeps = {
+      userId: U, ip: '203.0.113.9', admin: admin as never,
+      decrypt: (s) => (s === 'enc:secret' ? 'A'.repeat(43) : 'app-pass'), encrypt: (s) => `enc:${s.length}`,
+      wp: { media: lib.deps } as unknown as API.FixesDeps['wp'],
+      readLive: async () => ({ title: 'Home', description: null, h1: 'ניקיון משרדים', canonical: null, schemaTypes: [], html: '', missingAlt: [`${SITE}/wp-content/uploads/2024/05/site-logo-300x120.png`] }),
+      pluginPost: (async (_s: string, route: string) => { pluginCalls.push(route); return { status: 200, body: JSON.stringify({ ok: true, version: '2.1.0', seo_plugin: 'yoast', fix_types: [...FIX_TYPES] }) } }) as unknown as API.FixesDeps['pluginPost'],
+      newId,
+    }
+    const pv = await API.handleFixesPost({ projectId: P, action: 'preview', type: 'image_alt', kind: 'images_alt', url: `${SITE}/`, media: true }, deps)
+    const body = pv.body as { ok?: boolean; via?: string; channel?: string; images?: { media?: number; after?: string }[] }
+    check('F1: the preview offers the logo\'s Media Library item, through the application password', pv.status === 200 && body.via === 'media' && body.channel === 'app_password' && body.images?.[0]?.media === 7,
+      JSON.stringify(pv.body))
+    const fix = { type: 'image_alt', images: [{ src: `${SITE}/wp-content/uploads/2024/05/site-logo-300x120.png`, alt: 'הלהיט בניקיון', media: 7 }] }
+    const base = { projectId: P, action: 'approve', approved: true, kind: 'images_alt', pageUrl: `${SITE}/`, fix, expected: null, before: null }
+    const noVia = await API.handleFixesPost({ ...base, via: null }, deps)
+    check('F2: a Media Library fix without via "media" is refused', noVia.status !== 200 && (noVia.body as { code?: string }).code === 'value_invalid')
+    const bulk = await API.handleFixesPost({ ...base, via: 'media', bulk: { batch: 'b1111111-2222-4333-8444-555555555555' } }, deps)
+    check('F3: never in an "apply all" batch', (bulk.body as { code?: string }).code === 'not_bulk_safe')
+    const ok = await API.handleFixesPost({ ...base, via: 'media' }, deps)
+    const job = (ok.body as { job?: { id: string; status: string; channel: string; canUndo: boolean } }).job
+    check('F4: approved and applied through the application password; nothing sent to the plugin', job?.status === 'applied' && job.channel === 'app_password' && !pluginCalls.includes('/fix') && lib.items.get(7)?.alt === 'הלהיט בניקיון',
+      JSON.stringify(ok.body))
+    const audit = (admin.tables.site_fix_audit ?? []) as { action?: string }[]
+    check('F5: on the record: approved, then applied', audit.some((a) => a.action === 'approved') && audit.some((a) => a.action === 'applied'))
+    const undo = job ? await API.handleFixesPost({ projectId: P, action: 'undo', jobId: job.id }, deps) : null
+    check('F6: undo empties it again', !!job?.canUndo && undo?.status === 200 && lib.items.get(7)?.alt === '', JSON.stringify(undo?.body))
+    const mutApi = mutant<typeof API>('lib/site-fix/api.ts', "if (onMedia !== (via === 'media')) return refuse('value_invalid')", '')
+    const mutNoVia = mutApi.mod ? await mutApi.mod.handleFixesPost({ ...base, via: null }, { ...deps, newId }) : null
+    check('MUTATION CONTROL: without the via check a Media Library fix goes through unmarked (F2 catches it)', mutApi.found && mutNoVia?.status === 200)
+
+    // The scan: a row whose images are Media Library items keeps its button; the theme's line gets one.
+    const pages = [page('/'), ...Array.from({ length: 6 }, (_, i) => page(`/p-${i}`))].map((p, i) => ({
+      ...p, images: { total: 4, missingAlt: 2, missing: [LOGO, `${SITE}/wp-content/uploads/feat-${i}.jpg`] },
+    }))
+    pages[3] = { ...pages[3], images: { total: 4, missingAlt: 2, missing: [LOGO, `${SITE}/wp-content/themes/t/deco.svg`] } }
+    const run = async (mod: typeof WP_SCAN) => {
+      const findings = RULES.buildFindings(site(), pages, WP)
+      await mod.markWordPressOutsideContent(findings, pages, async () => ({ content: '<p>Text only</p>', builder: false }), {
+        ...WP, homeHost: 'cleaning.example.org',
+        findMedia: async (src) => (src === LOGO || src.includes('/uploads/feat-') ? { alt: '' } : null),
+      })
+      return altOf(findings)
+    }
+    const alt = await run(WP_SCAN)
+    const rows = rowsOf(alt)
+    check('F7: rows whose featured image is a Media Library item keep their button (6 of 7; the theme file\'s row does not)',
+      rows.filter((r) => r.media && r.fixable && !r.outside).length === 6 && !rows.some((r) => r.path === '/p-2' && !r.outside), JSON.stringify(rows.map((r) => [r.path, r.media, r.outside])))
+    check('F8: each counts its own image (1), the logo apart', rows.filter((r) => r.media).every((r) => r.measure === 1 && r.themeMissing === 1))
+    check('F9: the logo (on every page) is offered once, on the site-wide line', alt?.themeAlt?.media === true)
+    const mutScan = mutant<typeof WP_SCAN>('lib/site-fix/wordpress-scan.ts', 'findMedia ? readAll(', 'false ? readAll(')
+    const mutAlt = mutScan.mod ? await run(mutScan.mod) : undefined
+    check('MUTATION CONTROL: without the Media Library lookup those rows go back to "theme" with no button (F7 catches it)',
+      mutScan.found && rowsOf(mutAlt).filter((r) => r.media).length === 0)
+  }
+
+  console.log('\nG) The screen')
+  {
+    const he = getDashboardDictionary('he').siteHealth
+    const finding: Finding = { id: 'images_alt', severity: 'important', pages: [], total: 0, field: 'alt', guide: 'alt', fixable: true, fixType: 'image_alt', themeAlt: { pages: 25, images: 2, media: true } }
+    const theme = { url: `${SITE}/`, path: '/', kind: 'home' as const, value: null, measure: 2, fixable: true, adminUrl: null, media: true }
+    const render = (themeFix: typeof theme | null, state: 'applied' | null = null) => renderToStaticMarkup(createElement(FindingCard, {
+      finding, copy: he, platform: 'wordpress', fixed: new Set<string>(), onFix: () => {}, themeFix, fixModeFor: () => 'fix' as const, jobStateFor: () => state, onInstall: () => {},
+    }))
+    check('G1: the theme\'s line has its "fix it for me" when the Media Library holds those images', /data-fix-button="image_alt_media"/.test(render(theme)) && render(theme).includes(he.themeAltMedia))
+    check('G2: none without it, and "fixed" once done', !/data-fix-button="image_alt_media"/.test(render(null)) && /data-theme-alt-fix="applied"/.test(render(theme, 'applied')))
+    const screen = strip(read('components/site-health/SiteHealthScreen.tsx'))
+    const gate = /if \(finding\.fixType === 'image_alt' && page\.media\) return !caps\.shopify && caps\.appPassword \? 'fix' : null/
+    check('G3: a Media Library row is fixable only with the application password, never on a store', gate.test(screen))
+    check('MUTATION CONTROL: G3 fails on a screen that offers it without the application password', !gate.test(screen.replace('&& caps.appPassword ', '')))
+    check('G4: the theme\'s line needs the application password and a WordPress site too', /caps\.shopify \|\| !caps\.appPassword/.test(screen))
+    const modal = strip(read('components/site-health/ApproveFixModal.tsx'))
+    check('G5: the approve window asks for the Media Library on such a row, keeps each item\'s id and sends via "media"',
+      /type === 'image_alt' && page\.media \? \{ media: true \}/.test(modal) && /media: i\.media/.test(modal) && /p\.via === 'media'/.test(modal))
+    for (const locale of PUBLIC_LOCALES) {
+      const d = getDashboardDictionary(locale) as unknown as { siteHealth: { themeAltMedia?: string; autofix: { approve: { via: { media?: string } } } } }
+      check(`G6 [${locale}]: the line under the button and the "where it is saved" sentence`, (d.siteHealth.themeAltMedia ?? '').length > 40 && (d.siteHealth.autofix.approve.via.media ?? '').length > 40)
     }
   }
 

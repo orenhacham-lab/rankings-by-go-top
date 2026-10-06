@@ -13,7 +13,7 @@
  *   - pages a fix can reach are listed first; every row stays (`pages`, then `morePages`).
  * Read-only: what is reported changes, nothing is written anywhere.
  */
-import { allRows, MAX_PAGES_SHOWN, pathOf, SEVERITY, sortFindings } from '@/lib/site-health/rules'
+import { allRows, repeatedAltImages, MAX_PAGES_SHOWN, pathOf, SEVERITY, sortFindings } from '@/lib/site-health/rules'
 import type { Finding, FindingPage, PageFacts } from '@/lib/site-health/types'
 
 /** What one page's own content holds: how many images without alt a fix reaches, or not ours to edit. */
@@ -23,17 +23,30 @@ export function refineImageAlt(
   findings: Finding[],
   scanned: readonly Pick<PageFacts, 'url' | 'kind' | 'ok' | 'images' | 'adminUrl'>[],
   reach: ReadonlyMap<string, ReachableAlt>,
-  opts: { fixable: (page: Pick<PageFacts, 'kind'>) => boolean },
+  opts: {
+    fixable: (page: Pick<PageFacts, 'kind'>) => boolean
+    /** WordPress with the application password: images that are Media Library items without alt text (./media-alt.ts). */
+    inMedia?: ReadonlySet<string>
+  },
 ): void {
   let f = findings.find((x) => x.id === 'images_alt' || x.fixType === 'image_alt')
   const rows = f ? allRows(f) : []
+  const facts = new Map(scanned.map((s) => [s.url, s]))
+  const repeated = repeatedAltImages(scanned.filter((s) => s.ok))
+  // A page's own images outside its text that the Media Library holds without alt text (not the theme's repeated ones).
+  const mediaOf = (url: string) => {
+    const inMedia = opts.inMedia
+    return inMedia ? [...new Set((facts.get(url)?.images.missing ?? []).filter((s) => s && inMedia.has(s) && !repeated.has(s)))].length : 0
+  }
   for (const p of rows) {
     const r = reach.get(p.url)
     if (r === undefined || p.outside) continue
-    if (r === 'not_ours') { p.outside = 'theme'; p.fixable = false; continue }
     // `themeMissing` may already hold the theme's repeated images (lib/site-health/rules.ts).
     const seen = p.measure ?? 0
     const before = p.themeMissing ?? 0
+    const media = r === 'not_ours' || r === 0 ? mediaOf(p.url) : 0
+    if (media > 0) { p.media = true; p.fixable = true; p.measure = media; p.themeMissing = before + Math.max(0, seen - media); continue }
+    if (r === 'not_ours') { p.outside = 'theme'; p.fixable = false; continue }
     if (r === 0) { p.outside = 'theme'; p.fixable = false; p.themeMissing = before + seen; continue }
     p.themeMissing = before + Math.max(0, seen - r)
     p.measure = r
@@ -51,7 +64,9 @@ export function refineImageAlt(
       themeMissing: Math.max(0, s.images.missingAlt - r),
     })
   }
-  if (!f && added.length === 0) return
+  // The theme's repeated images that are Media Library items without alt text: one fix for the site.
+  const repeatedInMedia = !!opts.inMedia && [...repeated].some((s) => opts.inMedia!.has(s))
+  if (!f && added.length === 0 && !repeatedInMedia) return
   if (!f) {
     f = { id: 'images_alt', severity: SEVERITY.images_alt, pages: [], total: 0, field: 'alt', guide: 'alt', fixable: false, fixType: 'image_alt' }
     findings.push(f)
@@ -67,7 +82,13 @@ export function refineImageAlt(
       images: Math.max(prev.images, ...themeOnly.map((p) => p.themeMissing ?? p.measure ?? 0)),
     }
   }
+  if (repeatedInMedia) {
+    const showing = scanned.filter((s) => s.ok && (s.images.missing ?? []).some((x) => repeated.has(x)))
+    const most = Math.max(0, ...showing.map((s) => (s.images.missing ?? []).filter((x) => repeated.has(x)).length))
+    f.themeAlt = { pages: f.themeAlt?.pages || showing.length, images: f.themeAlt?.images || most, media: true }
+  }
   setRows(f, rest)
+  if (repeatedInMedia) f.fixable = true
   sortFindings(findings)
 }
 

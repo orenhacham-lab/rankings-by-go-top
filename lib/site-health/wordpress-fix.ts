@@ -62,6 +62,8 @@ export interface WpFixDeps {
    * (pluginLinkLanding), and never in a post a page builder renders from its own data.
    */
   pluginLink?: { rendersFromBuilder: (id: number) => boolean }
+  /** The Media Library, through the application password (lib/site-fix/media-alt.ts). Absent: no media fix is offered. */
+  media?: import('@/lib/site-fix/media-alt').MediaDeps
 }
 
 export const sha = (s: string) => createHash('sha256').update(s, 'utf8').digest('hex')

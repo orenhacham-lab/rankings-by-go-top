@@ -45,7 +45,7 @@ type Preview =
   | { type: 'seo_title' | 'meta_description'; before: string; after: string; expected: string | null; via: Via; limits: Limits; serp: { title: string; description: string } }
   | { type: 'focus_keyphrase' | 'canonical'; before: string; after: string; expected: string | null; via: Via }
   | { type: 'schema_jsonld'; before: string[]; schema: Record<string, unknown>; expected: string | null; via: Via }
-  | { type: 'image_alt'; images: { src: string; after: string }[]; expected: string | null; via: Via }
+  | { type: 'image_alt'; images: { src: string; after: string; media?: number }[]; expected: string | null; via: Via }
   | { type: 'faq_block'; items: FaqItem[]; heading?: string; notice?: 'thin_content' | 'no_valid_suggestion' | null; expected: string | null; via: Via }
   | { type: 'h1_demote'; headings: H1Ref[]; keep: string; keepFrom: 'theme' | 'content'; expected: string | null; via: Via }
   | { type: 'llms_txt'; text: string; pages: number; fileUrl: string; copyOnly: boolean; expected: string | null; via: Via }
@@ -110,7 +110,7 @@ export default function ApproveFixModal({
   const { confirm, dialog } = useConfirm()
   const [phase, setPhase] = useState<Phase>({ kind: 'loading' })
   const [value, setValue] = useState('')
-  const [alts, setAlts] = useState<{ src: string; after: string }[]>([])
+  const [alts, setAlts] = useState<{ src: string; after: string; media?: number }[]>([])
   const [faqHeading, setFaqHeading] = useState<string>(t.labels.faqHeadingDefault)
   const [faq, setFaq] = useState<FaqItem[]>([{ q: '', a: '' }, { q: '', a: '' }, { q: '', a: '' }])
   const [brokenMode, setBrokenMode] = useState<'replace' | 'unlink'>('replace')
@@ -126,6 +126,8 @@ export default function ApproveFixModal({
       projectId, action: 'preview', type, kind: finding.id, url: page.url,
       ...(type === 'broken_link' && page.from ? { from: page.from } : {}),
       ...(type === 'internal_link' && page.value ? { keyword: page.value } : {}),
+      // Images that are Media Library items, not the page's own text (lib/site-fix/media-alt.ts).
+      ...(type === 'image_alt' && page.media ? { media: true } : {}),
     }).then((r) => {
       if (cancelled) return
       if (!r.ok) {
@@ -145,7 +147,7 @@ export default function ApproveFixModal({
       setPhase({ kind: 'ready', preview, channel })
     })
     return () => { cancelled = true }
-  }, [projectId, type, finding.id, page.url, page.from, page.value])
+  }, [projectId, type, finding.id, page.url, page.from, page.value, page.media])
 
   const trimmed = squash(value)
   const faqFilled = useMemo(() => faq.map((x) => ({ q: squash(x.q), a: squash(x.a) })).filter((x) => x.q || x.a), [faq])
@@ -158,7 +160,7 @@ export default function ApproveFixModal({
       case 'seo_title': case 'meta_description': case 'focus_keyphrase': case 'canonical':
         return trimmed ? { type: p.type, value: trimmed } : null
       case 'image_alt': {
-        const images = alts.map((i) => ({ src: i.src, alt: squash(i.after) })).filter((i) => i.alt)
+        const images = alts.map((i) => ({ src: i.src, alt: squash(i.after), ...(typeof i.media === 'number' ? { media: i.media } : {}) })).filter((i) => i.alt)
         return images.length ? { type: p.type, images } : null
       }
       case 'faq_block':
@@ -184,7 +186,7 @@ export default function ApproveFixModal({
       : p.type === 'schema_jsonld' ? p.before.join(' + ')
         : p.type === 'broken_link' ? p.href
           : p.type === 'internal_link' ? p.sentence : null
-    const via = 'via' in p && (p.via === 'seo_plugin' || p.via === 'wp_title') ? p.via : null
+    const via = 'via' in p && (p.via === 'seo_plugin' || p.via === 'wp_title' || p.via === 'media') ? p.via : null
     setBusy(true); setFormError(null)
     const r = await postFix<{ job: FixJobView }>('/api/site-health/fixes', {
       projectId, action: 'approve', approved: true, kind: finding.id, pageUrl, fix, expected: p.expected, via, before,

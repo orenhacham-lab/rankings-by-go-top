@@ -110,7 +110,13 @@ export type AuditAction = (typeof AUDIT_ACTIONS)[number]
 
 export type FaqItem = { q: string; a: string }
 export type H1Ref = { n: number; text: string }
-export type AltItem = { src: string; alt: string }
+/**
+ * `media`: the image's WordPress Media Library item (./media-alt.ts). Set, the words go on that item
+ * (every page showing the image gets them), through the application password; never sent to the plugin.
+ */
+export type AltItem = { src: string; alt: string; media?: number }
+/** At most this many Media Library images in one approval (./media-alt.ts). */
+export const MAX_MEDIA_ALT = 10
 
 /** The approved new value(s), per type. This is exactly what the approval sentence describes. */
 export type FixPayload =

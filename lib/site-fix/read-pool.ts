@@ -9,11 +9,21 @@
 export const MAX_READS = 30
 export const READ_CONCURRENCY = 6
 export const TIME_MS = 14_000
+/** Media Library lookups (./media-alt.ts), beside the page reads and inside the same time budget. */
+export const MAX_MEDIA_LOOKUPS = 40
+export const MEDIA_CONCURRENCY = 3
 
-/** Runs `read` on each item, READ_CONCURRENCY at a time; stops starting new ones after TIME_MS. */
-export async function readAll<T>(items: readonly T[], read: (item: T, deadline: number) => Promise<void>): Promise<void> {
+/**
+ * Runs `read` on each item, READ_CONCURRENCY at a time (at most MAX_READS items); stops starting new
+ * ones after TIME_MS. `opts` sets other limits for another kind of read (the Media Library lookups).
+ */
+export async function readAll<T>(
+  items: readonly T[],
+  read: (item: T, deadline: number) => Promise<void>,
+  opts: { max?: number; concurrency?: number } = {},
+): Promise<void> {
   const deadline = Date.now() + TIME_MS
-  const queue = items.slice(0, MAX_READS)
+  const queue = items.slice(0, opts.max ?? MAX_READS)
   let timer: ReturnType<typeof setTimeout> | undefined
   const outOfTime = new Promise<void>((resolve) => { timer = setTimeout(resolve, TIME_MS) })
   const worker = async () => {
@@ -22,6 +32,6 @@ export async function readAll<T>(items: readonly T[], read: (item: T, deadline: 
       try { await read(next, deadline) } catch { /* unreadable: left as the scan found it */ }
     }
   }
-  await Promise.race([Promise.all(Array.from({ length: READ_CONCURRENCY }, worker)), outOfTime])
+  await Promise.race([Promise.all(Array.from({ length: opts.concurrency ?? READ_CONCURRENCY }, worker)), outOfTime])
   clearTimeout(timer)
 }
