@@ -460,7 +460,6 @@ export const dashboardEn = {
       readOnly: 'These settings are not open for editing on your account yet. Until then, articles are created as they are today: minimal design and one opening image.',
       loadFailed: 'We could not load the design settings. Try again in a moment.',
       retry: 'Try again',
-      shopifyNote: 'On a Shopify store the article is published in the minimal design, so it takes on your store theme. The image style and image count apply there too.',
       wixNote: 'On Wix the article is published in the minimal design, in the Wix editor. The image style and image count apply there too.',
       colors: {
         label: 'Brand colours',
@@ -575,7 +574,7 @@ export const dashboardEn = {
         urlHint: 'A full address that starts with https://, for example your contact page.',
         suggested: 'We filled in a suggestion from your business details. Edit it and turn it on when you like.',
         readOnly: 'The call to action is not open for editing on your account yet. Until then articles go out without one.',
-        platformNote: 'On a Shopify store or a Wix site the article is published in the minimal design, without a call-to-action box.',
+        platformNote: 'On a Wix site the article is published in the minimal design, without a call-to-action box.',
         errors: {
           heading: 'Write a heading, up to 80 characters.',
           text: 'Up to 240 characters.',

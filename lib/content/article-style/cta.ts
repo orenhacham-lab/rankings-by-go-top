@@ -16,9 +16,9 @@
  * never repaired into a different address. The HTML the box is drawn in then
  * passes the design's sanitizer like every other part of the article.
  *
- * WHERE IT GOES: WordPress, a custom site's webhook, and the in-app view. A
- * Shopify store and a Wix site keep the minimal design without boxes, as
- * before (siteCta returns null for them).
+ * WHERE IT GOES: WordPress, a Shopify store, a custom site's webhook, and the
+ * in-app view. A Wix site keeps the minimal design without boxes (siteCta
+ * returns null for it).
  *
  * Pure: no I/O, safe in the browser and on the server.
  */
@@ -137,9 +137,9 @@ export function toCtaRow(cta: ArticleCta): Record<string, unknown> {
   return { enabled: cta.enabled, heading: cta.heading, text: cta.text, button_label: cta.buttonLabel, button_url: cta.buttonUrl }
 }
 
-/** The call to action a site receives: only a complete one that is on, and never on Shopify or Wix. */
+/** The call to action a site receives: only a complete one that is on, and never on Wix. */
 export function siteCta(cta: ArticleCta | null | undefined, platform: DesignPlatform): ArticleCta | null {
-  if (platform === 'shopify' || platform === 'wix') return null
+  if (platform === 'wix') return null
   return isCompleteCta(cta) ? cta : null
 }
 

@@ -142,15 +142,15 @@ export function toRow(style: ArticleStyle): Record<string, unknown> {
 }
 
 /**
- * Where the article goes decides what design reaches the site. Shopify's
- * publisher (lib/shopify/publish-article.ts, frozen for the app review) runs its
- * own sanitizer that keeps no inline style, so a Shopify store always receives
- * the minimal design; the article view says so rather than show a design the
- * store will not get. Wix converts HTML to its own rich content and would turn
- * styled boxes into embedded HTML blocks, so it stays minimal too.
+ * Where the article goes decides what design reaches the site. A Shopify store
+ * receives the design the project chose: the publisher (lib/shopify/publish-article.ts)
+ * applies it after its own sanitizer, as inline styles in the article body
+ * (write_content, no theme or app change). Wix converts HTML to its own rich
+ * content and would turn styled boxes into embedded HTML blocks, so it stays
+ * minimal; the article view says so rather than show a design Wix will not get.
  */
 export type DesignPlatform = 'wordpress' | 'webhook' | 'shopify' | 'wix' | 'none'
 export function effectiveDesign(style: Pick<ArticleStyle, 'design'>, platform: DesignPlatform): ArticleDesign {
-  if (platform === 'shopify' || platform === 'wix') return 'minimal'
+  if (platform === 'wix') return 'minimal'
   return style.design
 }

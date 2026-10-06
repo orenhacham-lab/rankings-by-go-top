@@ -5,8 +5,10 @@
  *   - WordPress (lib/content/wordpress-publish.ts), after the inline images
  *     are composed with their WordPress media URLs;
  *   - a custom site's webhook (lib/site-platforms/publish.ts), with the inline
- *     images composed from their stored public URLs.
- * Shopify and Wix are not called here (see effectiveDesign in ./types.ts).
+ *     images composed from their stored public URLs;
+ *   - a Shopify store (lib/shopify/publish-article.ts), after its sanitizer and
+ *     the inline images.
+ * Wix gets the body untouched (see effectiveDesign in ./types.ts).
  *
  * Never fails a publish: if the settings cannot be read, or the design throws,
  * the body goes out exactly as it did before this existed.
@@ -25,7 +27,7 @@ export async function applyArticleDesign(
 ): Promise<string> {
   if (!articleId) return html
   try {
-    if (platform === 'shopify' || platform === 'wix') return html
+    if (platform === 'wix') return html
     const { style, projectId } = await readArticleStyleForArticle(admin, articleId)
     const cta = await readArticleCtaForArticle(admin, projectId)
     // The same function the preview and the article view draw with (./render.ts).

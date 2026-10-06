@@ -16,8 +16,9 @@
  *      table is read-only defaults; invalid input is rejected; saving the
  *      profiles never touches the design and vice versa; the home-page reader
  *      admits the stored domain (normalizeCheckUrl) before any request;
- *   F) publishing: WordPress and the webhook get the design; Shopify and Wix
- *      stay minimal; lib/shopify/** is untouched;
+ *   F) publishing: WordPress, the webhook and a Shopify store get the design
+ *      (Oren 2026-10-06: the formatted design and the call to action on Shopify
+ *      too); Wix stays minimal; Shopify still sanitizes the stored body first;
  *   G) official profiles: per-network URL rules (https, the network's host, a
  *      profile path), detection from a home page, sameAs in the structured
  *      data (article and webhook).
@@ -26,7 +27,6 @@
  * broken copy of the code (written next to the module, imported, deleted)
  * must fail. Run: npx tsx lib/content/article-style/__qa__/article-style.qa.ts
  */
-import { execSync } from 'child_process'
 import { readFileSync, unlinkSync, writeFileSync } from 'fs'
 import { join } from 'path'
 import { FakeAdmin } from '@/lib/__qa__/_fake-admin'
@@ -333,37 +333,35 @@ async function main() {
     (await applyArticleDesign(pubDb({ design: 'minimal' }) as never, ART, body, 'wordpress')) === body &&
     (await applyArticleDesign(pubDb(null) as never, ART, body, 'wordpress')) === body &&
     (await applyArticleDesign(pubDb(null, true) as never, ART, body, 'wordpress')) === body)
-  check('F3: Shopify and Wix always get the minimal design', effectiveDesign({ design: 'formatted' }, 'shopify') === 'minimal' && effectiveDesign({ design: 'formatted' }, 'wix') === 'minimal' &&
-    (await applyArticleDesign(pubDb({ design: 'formatted' }) as never, ART, body, 'shopify')) === body)
+  const shop = await applyArticleDesign(pubDb({ design: 'formatted', brand_colors: ['#e11d48'] }) as never, ART, body, 'shopify')
+  check('F3: Wix always gets the minimal design; a Shopify store gets the design the project chose',
+    effectiveDesign({ design: 'formatted' }, 'wix') === 'minimal' && (await applyArticleDesign(pubDb({ design: 'formatted' }) as never, ART, body, 'wix')) === body &&
+    effectiveDesign({ design: 'formatted' }, 'shopify') === 'formatted' && /style="/.test(shop) && audit(shop).length === 0 &&
+    (await applyArticleDesign(pubDb({ design: 'minimal' }) as never, ART, body, 'shopify')) === body)
   const hook = await composeWebhookBody(pubDb({ design: 'formatted', brand_colors: ['#e11d48'] }) as never, ART, body)
   check('F4: the webhook body carries the ready inline image (https) and the design, never a failed one',
     hook.includes('https://cdn.example/1.jpg') && !hook.includes('img2') && /style="/.test(hook) && audit(hook).length === 0)
   const wpSrc = strip(read('lib/content/wordpress-publish.ts'))
   check('F5: WordPress applies the design after the inline images, in one place',
     (wpSrc.match(/applyArticleDesign\(/g) ?? []).length === 1 && wpSrc.indexOf("injectInlineImages(content, images, 'publish')") < wpSrc.indexOf('applyArticleDesign('))
-  // What this asks, and what it used to ask. It used to require that NOTHING
-  // under lib/shopify or app/api/shopify had changed since c2f5fc9, which also
-  // fires on any later, deliberate, unrelated Shopify change and then reports
-  // it as "the article-style feature touched Shopify" — which would be false.
-  // Narrowed to the real question: if a Shopify file changed, is everything it
-  // ADDED the shared country block (lib/sanctions), which is a legal refusal
-  // that has to sit on every payment entry point and shares nothing with
-  // article styling, or is it this feature leaking in?
-  const shopifyForeignLines = execSync('git diff -U0 c2f5fc9 -- lib/shopify app/api/shopify', { cwd: ROOT })
-    .toString().split('\n')
-    .filter((l) => l.startsWith('+') && !l.startsWith('+++'))
-    .map((l) => l.slice(1).trim())
-    .filter((l) => l.length > 0 && !l.startsWith('//') && !l.startsWith('*') && !l.startsWith('/*'))
-    .filter((l) => !/^[{}()\[\];,]+$/.test(l))
-    .filter((l) => !/sanctions|restrictionForRequest|logRestrictedAttempt|restricted|451/.test(l))
+  // Shopify (Oren 2026-10-06): the store gets the project's design and call to
+  // action, applied ONCE, after the publisher's own sanitizer and the inline
+  // images, so nothing from the stored body skips sanitizing and the design's
+  // own sanitizer is the last thing the HTML passes.
   const shopifySrc = strip(read('lib/shopify/publish-article.ts'))
-  check('F6: the article-style feature has not reached into Shopify code; Shopify publishing still sanitizes the stored body',
-    shopifyForeignLines.length === 0 && /sanitizeArticleHtml\(String\(article\.content_html \|\| ''\)\)/.test(shopifySrc) && !/article-style/.test(shopifySrc),
-    shopifyForeignLines.slice(0, 4).join(' | '))
-  check('MUTATION CONTROL: an article-style line added to Shopify code would be counted as foreign',
-    ["const styled = styleArticleHtml(article.content_html)"]
-      .filter((l) => !/sanctions|restrictionForRequest|logRestrictedAttempt|restricted|451/.test(l)).length === 1)
-  check('MUTATION CONTROL: a Shopify file importing the design is caught', /article-style/.test(shopifySrc + "\nimport { styleArticleHtml } from '@/lib/content/article-style/html'"))
+  const shopifyOrder = (src: string) => {
+    const san = src.indexOf("sanitizeArticleHtml(String(article.content_html || ''))")
+    const inj = src.indexOf("injectInlineImages(sanitized, images, 'preview')")
+    const des = src.indexOf('applyArticleDesign(')
+    return san >= 0 && inj > san && des > san && (src.match(/applyArticleDesign\(/g) ?? []).length === 1 &&
+      /applyArticleDesign\(admin[^,]*, article\.id, injectInlineImages\(sanitized, images, 'preview'\), 'shopify'\)/.test(src) &&
+      !/styleArticleHtml|designForSite/.test(src)
+  }
+  check('F6: Shopify sanitizes the stored body, adds the inline images, then applies the design once', shopifyOrder(shopifySrc))
+  check('MUTATION CONTROL: a Shopify publisher that styles the raw body is caught',
+    !shopifyOrder(shopifySrc.replace("injectInlineImages(sanitized, images, 'preview'), 'shopify')", "String(article.content_html || ''), 'shopify')")))
+  check('MUTATION CONTROL: a Shopify publisher that calls the styler directly is caught',
+    !shopifyOrder(shopifySrc + "\nconst x = styleArticleHtml(body)"))
 
   // ── G) official profiles ──────────────────────────────────────────────────
   console.log('\nG) official profiles')
