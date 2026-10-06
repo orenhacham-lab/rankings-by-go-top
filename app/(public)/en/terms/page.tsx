@@ -426,8 +426,9 @@ export default function EnglishTermsPage() {
             that one article or page only. The Service does not touch products, collections, the theme, the
             store&rsquo;s settings, prices, orders, redirects or any file of the store, does not delete content,
             and does not publish or unpublish anything. The FAQ block is visible questions and answers inside the
-            content: in a Shopify store the Service adds no JSON-LD schema and no markup or code of any kind to
-            the store&rsquo;s pages.
+            content. In a Shopify store the Service adds no JSON-LD schema, adds no scripts and does not touch the
+            code of the theme or of the store: everything it writes is content and formatting inside the body of
+            that one article or page.
           </li>
           <li>
             <strong>Log and undo.</strong> Every approval of yours is recorded together with who approved it,
