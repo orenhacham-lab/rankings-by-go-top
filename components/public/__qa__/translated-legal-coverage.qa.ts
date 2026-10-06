@@ -620,6 +620,69 @@ const NETWORK_DENIED = /אינו זמין לחנויות Shopify|אינה זמי
     !SHOPIFY_NETWORK.es.terms[3].test('La tienda también puede unirse a la red de enlaces de la sección 15A.'))
 }
 
+// ── 15) the featured image, and the one-confirmation batch ─────────────────
+/*
+ * Two things the terms did not cover, both now true of the live product.
+ *
+ * The featured image (PR #119): on a Shopify article the fix also writes the alt
+ * text of the article's featured image, and only while it has none. It writes
+ * `image: { altText }` with no url, so the image file is untouched, and the
+ * read-back checks that the url did not change. "An image inside that article"
+ * did not cover an image the theme prints above the body, so the closed list has
+ * to name it — and has to keep the narrowing ("that has none", articles only),
+ * because a closed list that reads wider than the code is worse than no list.
+ *
+ * The batch: "fix N safe items" has been live on WordPress for a while. It
+ * applies up to 25 pages on ONE confirmation (lib/site-fix/bulk.ts:
+ * BULK_SAFE_TYPES, BULK_MAX_PAGES, BATCH_UNDO_DAYS, never the home page), while
+ * the terms promised approval of each fix and said nothing about a group. One
+ * confirmation of a list shown first is still the merchant's approval, but only
+ * if the document says that is what it is.
+ */
+/*
+ * No schema on Shopify. JSON-LD reaches a site ONLY through the WordPress plugin
+ * (lib/site-fix: shopifyFaqBlockHtml writes a visible <div> with h2/h3/p and
+ * nothing else), so the Shopify list must not read as if the FAQ fix adds
+ * structured data. It says so in words now, and the only place either document
+ * may mention JSON-LD is a WordPress-scoped list.
+ */
+const SHOPIFY_NO_SCHEMA: Record<string, RegExp> = {
+  he: /בחנות\n?\s*Shopify השירות אינו מוסיף סכמת JSON-LD ואינו מוסיף שום סימון או קוד/,
+  en: /in a Shopify store the Service adds no JSON-LD schema and no markup or code of any kind/,
+  es: /en una tienda de Shopify el Servicio no a[ñn]ade esquema JSON-LD ni ning[úu]n marcado o c[óo]digo/,
+  'pt-BR': /em uma loja Shopify o Servi[çc]o n[ãa]o acrescenta esquema JSON-LD nem nenhuma marca[çc][ãa]o ou c[óo]digo/,
+}
+const FIX_SCOPE: Record<string, RegExp[]> = {
+  he: [/טקסט חלופי\s+לתמונה הראשית של מאמר שאין לה טקסט חלופי/, /איננו נוגעים בקובץ התמונה ואיננו מחליפים אותה/, /אישור אחד לקבוצת תיקונים/, /עד 25 עמודים בכל פעם, ולא עמוד הבית/, /בתוך 14 ימים/],
+  en: [/alt text of an article&rsquo;s featured image that has none/, /do not touch the image\s+file and do not replace the image/, /One approval for a group of fixes/, /up\s+to 25 pages at a time, and never the home page/, /within 14 days/],
+  es: [/texto alternativo de la imagen destacada de un art[íi]culo que no lo tiene/, /no tocamos el archivo de la imagen ni la sustituimos/, /Una sola aprobaci[óo]n para un grupo de correcciones/, /hasta 25 p[áa]ginas por vez, y nunca la p[áa]gina de inicio/, /dentro de 14 d[íi]as/],
+  'pt-BR': [/texto alternativo da imagem destacada de um artigo que n[ãa]o o tem/, /n[ãa]o tocamos no arquivo da imagem nem a substitu[íi]mos/, /Uma [úu]nica aprova[çc][ãa]o para um grupo de corre[çc][õo]es/, /at[ée] 25 p[áa]ginas por vez, e nunca a p[áa]gina inicial/, /dentro de 14 dias/],
+}
+{
+  const read = (path: string) => (existsSync(path) ? readFileSync(path, 'utf8') : '')
+  const enTerms = frontMatter(text[LOCALES[0]].terms).source
+  const docs: [string, string][] = [
+    ['he', read(HEBREW_TERMS)],
+    ['en', enTerms ? read(enTerms) : ''],
+    ...LOCALES.map((l): [string, string] => [l, text[l].terms]),
+  ]
+  for (const [name, terms] of docs) {
+    for (const must of FIX_SCOPE[name] ?? []) {
+      check(`${name}/terms: the fix list states ${must.source.slice(0, 44)}`, must.test(terms))
+    }
+  }
+  for (const [name, terms] of docs) {
+    const says = SHOPIFY_NO_SCHEMA[name]
+    if (says) check(`${name}/terms: the Shopify list says no schema and no code is added`, says.test(terms))
+  }
+  check('mutation control: a Shopify list that stays silent about schema is caught',
+    !SHOPIFY_NO_SCHEMA.en.test('an FAQ block added at its end, and turning an extra H1 heading inside it into an H2.'))
+  check('mutation control: a featured-image line without the "has none" narrowing is caught',
+    !FIX_SCOPE.en[0].test('the alt text of an article&rsquo;s featured image, and of every image on it'))
+  check('mutation control: a batch described without its page limit is caught',
+    !FIX_SCOPE.es[3].test('un grupo de correcciones seguras, sin límite de páginas'))
+}
+
 // ── MUTATION CONTROLS ───────────────────────────────────────────────────────
 console.log('\nmutation controls')
 {
