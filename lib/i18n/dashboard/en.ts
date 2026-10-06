@@ -4924,6 +4924,7 @@ export const dashboardEn = {
           llmsCopyWp: 'With the Go Top plugin (version 2.1.0 or later) we can put it on your site for you, and undo it at any time.',
           llmsUpdate: 'Update the plugin and we can put it on your site for you.',
         },
+        altNotInContent: 'The images without alt text on this page are not in the page\'s own text, so nothing in the page needs to change. They come from the site\'s theme (logo, menu, footer) or are the main image the theme shows above the text. Their description is set once, in the media library or the theme, and that fixes every page that shows them. The steps below explain how.',
         h1Reasons: {
           builder: 'This page is built with a page builder. The builder draws the headings from its own data, so a change in the content would not hold. Change the heading in the builder itself.',
           markup: 'The headings in this page\'s content are written in a way we cannot change safely. Change them in the editor.',

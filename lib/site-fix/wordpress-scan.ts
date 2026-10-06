@@ -9,8 +9,8 @@
  * So the pages are read the way the fix would read them, with what the existing connection already
  * answers and nothing new: the Go Top plugin's signed /inspect (the post's content and, from 2.1.0,
  * whether a builder renders it), or, without the plugin, the WordPress REST API through the
- * application password. At most MAX_READS pages, inside TIME_MS: what has not answered by then stays
- * as the scan found it. Then:
+ * application password. Every page the scan read, a few at a time inside one time budget
+ * (./read-pool.ts): what has not answered by then stays as the scan found it. Then:
  *   image alt   counted from the content (./scan-refine.ts): a theme-only page is said once for the
  *               whole site, a page whose own text has images without alt is listed even where the
  *               theme's images kept it under the scan's threshold;
@@ -24,10 +24,8 @@ import type { ConnectionState, Finding, FindingPage, PageFacts, SitePlatform } f
 import { imagesMissingAlt } from '@/lib/site-health/wordpress-fix'
 import { rendersFromBuilderData } from './builder'
 import { brokenLinkWords } from './content'
+import { readAll } from './read-pool'
 import { refineImageAlt, type ReachableAlt } from './scan-refine'
-
-export const MAX_READS = 12
-export const TIME_MS = 8_000
 
 /** One page's own content as the fix would read it; 'not_ours' when it is no post or page WordPress has. */
 export type WpRead = { content: string; builder: boolean | null } | 'not_ours' | null
@@ -59,21 +57,14 @@ export async function markWordPressOutsideContent(
   }
   // Then every other post and page the scan read, for alt text the scan's threshold hid.
   const others = scanned.filter((s) => s.ok && (s.kind === 'article' || s.kind === 'page')).map((s) => s.url)
-  const urls = [...new Set([...todo.map((t) => t.src), ...others])].slice(0, MAX_READS)
+  const urls = [...new Set([...todo.map((t) => t.src), ...others])]
   if (urls.length === 0) return
 
-  const deadline = Date.now() + TIME_MS
   const got = new Map<string, Exclude<WpRead, null>>()
-  let timer: ReturnType<typeof setTimeout> | undefined
-  const outOfTime = new Promise<void>((resolve) => { timer = setTimeout(resolve, TIME_MS) })
-  const work = Promise.all(urls.map(async (url) => {
-    try {
-      const r = await read(url)
-      if (r && Date.now() <= deadline) got.set(url, r)
-    } catch { /* unreadable: left as the scan found it */ }
-  }))
-  await Promise.race([work, outOfTime])
-  clearTimeout(timer)
+  await readAll(urls, async (url, deadline) => {
+    const r = await read(url)
+    if (r && Date.now() <= deadline) got.set(url, r)
+  })
   const answered = new Map(got)
 
   for (const { f, p, src } of todo) {

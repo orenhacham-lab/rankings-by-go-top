@@ -13,7 +13,7 @@
  *   - pages a fix can reach are listed first; every row stays (`pages`, then `morePages`).
  * Read-only: what is reported changes, nothing is written anywhere.
  */
-import { ALT_TOLERANCE, allRows, MAX_PAGES_SHOWN, pathOf, SEVERITY, sortFindings } from '@/lib/site-health/rules'
+import { allRows, MAX_PAGES_SHOWN, pathOf, SEVERITY, sortFindings } from '@/lib/site-health/rules'
 import type { Finding, FindingPage, PageFacts } from '@/lib/site-health/types'
 
 /** What one page's own content holds: how many images without alt a fix reaches, or not ours to edit. */
@@ -31,9 +31,11 @@ export function refineImageAlt(
     const r = reach.get(p.url)
     if (r === undefined || p.outside) continue
     if (r === 'not_ours') { p.outside = 'theme'; p.fixable = false; continue }
+    // `themeMissing` may already hold the theme's repeated images (lib/site-health/rules.ts).
     const seen = p.measure ?? 0
-    if (r === 0) { p.outside = 'theme'; p.fixable = false; p.themeMissing = seen; continue }
-    p.themeMissing = Math.max(0, seen - r)
+    const before = p.themeMissing ?? 0
+    if (r === 0) { p.outside = 'theme'; p.fixable = false; p.themeMissing = before + seen; continue }
+    p.themeMissing = before + Math.max(0, seen - r)
     p.measure = r
   }
   // A page whose own text has images without alt, hidden by the whole page's share of images with it.
@@ -41,9 +43,9 @@ export function refineImageAlt(
   const added: FindingPage[] = []
   for (const s of scanned) {
     const r = reach.get(s.url)
+    // Not listed by the scan (under its threshold, or its images taken for the theme's): the page's own
+    // text says otherwise, and the text is what a fix writes.
     if (!s.ok || listed.has(s.url) || typeof r !== 'number' || r <= 0) continue
-    // Pages already over the threshold are listed by the scan itself; this is for the ones under it.
-    if (s.images.total > 0 && s.images.missingAlt / s.images.total > ALT_TOLERANCE) continue
     added.push({
       url: s.url, path: pathOf(s.url), kind: s.kind, value: null, measure: r, fixable: opts.fixable(s), adminUrl: s.adminUrl,
       themeMissing: Math.max(0, s.images.missingAlt - r),

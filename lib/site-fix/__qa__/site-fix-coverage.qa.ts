@@ -27,6 +27,7 @@ import * as BULK from '../bulk'
 import * as NUDGES from '../../nudges/rows'
 import * as SHOP_SCAN from '../shopify-scan'
 import * as WP_SCAN from '../wordpress-scan'
+import * as READ_POOL from '../read-pool'
 import * as BUILDER from '../builder'
 import * as CHANNEL from '../channel'
 import * as PREVIEW from '../preview'
@@ -180,11 +181,11 @@ async function main() {
     // No images_alt finding at all on the scan: the store's text still has one.
     const quiet = await scanOf([page('/'), page('/blogs/news/a-1', { images: { total: 11, missingAlt: 1 } })], store(body))
     check('S6: with no finding from the scan, a text image without alt makes one', !!quiet && quiet.pages.length === 1 && quiet.fixType === 'image_alt')
-    // 14 listed rows: rows 11-14 are checked too, and the store is read at most 12 times.
+    // 14 listed rows: rows 11-14 are checked too, and each of the 14 pages is read once.
     const fourteen = [page('/'), ...Array.from({ length: 14 }, (_, n) => page(`/blogs/news/a-${n}`, { images: { total: 4, missingAlt: 3 } }))]
     const st14 = store((n) => (n >= 10 ? '<p><img src="t.jpg"></p>' : '<p>fine</p>'))
     const f14 = await scanOf(fourteen, st14)
-    check('S7: at most 12 reads of the store', st14.reads.length <= 12, String(st14.reads.length))
+    check('S7: every page the scan read is read, no more than MAX_READS (./read-pool.ts)', st14.reads.length === 14 && st14.reads.length <= READ_POOL.MAX_READS, String(st14.reads.length))
     check('S8: rows past the tenth are checked, and what a fix reaches is listed first', (f14?.pages ?? []).slice(0, 2).every((p) => p.measure === 1 && !p.outside),
       JSON.stringify(f14?.pages.slice(0, 3)))
     // The same, on the shared counting step alone: every row of the finding is counted, not the first ten.
@@ -207,7 +208,7 @@ async function main() {
     check('MUTATION CONTROL: a count that keeps the whole page\'s images is caught by S1', mutMeasure.found && !!mutMeasure.mod && refineOne(mutMeasure.mod).pages.find((p) => p.url === art(0))?.measure === 4)
     const mutTheme = mutant<typeof REFINE>('lib/site-fix/scan-refine.ts', "const rest = all.filter((p) => p.outside !== 'theme')", 'const rest = all')
     check('MUTATION CONTROL: theme-only pages listed one by one again are caught by S3', mutTheme.found && !!mutTheme.mod && refineOne(mutTheme.mod).pages.some((p) => p.url === art(2)))
-    const mutRows = mutant<typeof REFINE>('lib/site-fix/scan-refine.ts', 'const rows = f ? allRows(f) : []', 'const rows = f ? f.pages : []')
+    const mutRows = mutant<typeof REFINE>('lib/site-fix/scan-refine.ts', 'const all = [...rows, ...added]', 'const all = [...f.pages, ...added]')
     check('MUTATION CONTROL: counting only the first ten rows is caught by S8b', mutRows.found && !!mutRows.mod && countRows(mutRows.mod) !== 4)
     // A product page's photos: information only (write_products and the terms would be needed).
     const product = await scanOf([page('/'), page('/products/boot', { kind: 'product', images: { total: 3, missingAlt: 3 }, adminUrl: 'https://boots.myshopify.com/admin/products/1' })], store(body))
@@ -256,7 +257,7 @@ async function main() {
     const broken = fs.find((f) => f.id === 'broken_links')!
     check('W5: a dead link in the post\'s text keeps its button; one only in the menu is marked as the theme\'s',
       broken.pages.find((p) => p.url === `${SITE}/gone`)?.outside === undefined && broken.pages.find((p) => p.url === `${SITE}/menu-gone`)?.outside === 'theme')
-    check('W6: at most 12 reads, each a read of what is there (nothing written)', reads.length <= WP_SCAN.MAX_READS)
+    check('W6: at most MAX_READS reads, each a read of what is there (nothing written)', reads.length <= READ_POOL.MAX_READS)
     const mutB = mutant<typeof WP_SCAN>('lib/site-fix/wordpress-scan.ts', "if (rendersFromBuilderData(r)) { p.outside = 'builder'; p.fixable = false; continue }", '')
     const fsB = mutB.mod ? await runWp(mutB.mod) : null
     const altB = fsB?.find((f) => f.id === 'images_alt')

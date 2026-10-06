@@ -609,7 +609,12 @@ export default function ApproveFixModal({
 
         {phase.kind === 'error' && (
           <div className="space-y-4">
-            <Notice tone={phase.code === 'nothing_to_fix' ? 'ok' : 'warn'}>{phase.code === 'h1_not_safe' && phase.reason ? t.h1Reasons[phase.reason] : a.errors[phase.code]}</Notice>
+            <Notice tone={phase.code === 'nothing_to_fix' && type !== 'image_alt' ? 'ok' : 'warn'}>
+              {phase.code === 'h1_not_safe' && phase.reason ? t.h1Reasons[phase.reason]
+                // Images the scan saw on the page but not in its own text: the theme's, not "already fine".
+                : phase.code === 'nothing_to_fix' && type === 'image_alt' ? t.altNotInContent
+                  : a.errors[phase.code]}
+            </Notice>
             <GuideSteps steps={copy.guides[finding.guide][platform]} title={copy.stepsTitle} />
           </div>
         )}

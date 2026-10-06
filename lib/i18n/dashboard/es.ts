@@ -3935,6 +3935,7 @@ export const dashboardEs: DeepPartial<DashboardDictionary> = {
           llmsCopyWp: 'Con el plugin de Go Top (versión 2.1.0 o posterior) podemos ponerlo en tu web por ti, y deshacerlo cuando quieras.',
           llmsUpdate: 'Actualiza el plugin y podremos ponerlo en tu web por ti.',
         },
+        altNotInContent: 'Las imágenes sin texto alternativo de esta página no están en el texto de la propia página, así que no hay nada que cambiar en ella. Vienen de la plantilla del sitio (logo, menú, pie de página) o son la imagen principal que la plantilla muestra sobre el texto. Su descripción se escribe una sola vez, en la biblioteca de medios o en la plantilla, y eso corrige todas las páginas que las muestran. Los pasos de abajo explican cómo.',
         h1Reasons: {
           builder: 'Esta página está hecha con un maquetador visual. El maquetador saca los encabezados de sus propios datos, así que un cambio en el contenido no se mantendría. Cambia el encabezado en el propio maquetador.',
           markup: 'Los encabezados del contenido de esta página están escritos de una forma que no podemos cambiar con seguridad. Cámbialos en el editor.',

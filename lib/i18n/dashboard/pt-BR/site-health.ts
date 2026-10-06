@@ -329,6 +329,7 @@ export const siteHealthPtBR: DeepPartial<DashboardDictionary> = {
           llmsCopyWp: 'Com o plugin do Go Top (versão 2.1.0 ou posterior) podemos colocá-lo no seu site por você, e desfazer quando quiser.',
           llmsUpdate: 'Atualize o plugin e poderemos colocá-lo no seu site por você.',
         },
+        altNotInContent: 'As imagens sem texto alternativo desta página não estão no texto da própria página, então não há nada a mudar nela. Elas vêm do tema do site (logo, menu, rodapé) ou são a imagem principal que o tema mostra acima do texto. A descrição delas é escrita uma vez só, na biblioteca de mídia ou no tema, e isso corrige todas as páginas que as mostram. Os passos abaixo explicam como.',
         h1Reasons: {
           builder: 'Esta página foi feita com um construtor visual. O construtor tira os títulos dos próprios dados dele, então uma alteração no conteúdo não se manteria. Altere o título no próprio construtor.',
           markup: 'Os títulos do conteúdo desta página estão escritos de um jeito que não podemos alterar com segurança. Altere-os no editor.',

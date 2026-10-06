@@ -6,7 +6,7 @@
  * not in that content, and a "fix it for me" button there could only end in "nothing to change".
  * The same goes for a broken link found on a product or a collection.
  *
- * So, for each such page, the item is read through the store (at most MAX_READS, in a few seconds)
+ * So, for each such page, the item is read through the store (every one the scan read, inside a time budget: ./read-pool.ts)
  * and the page is marked `outside: 'theme'` when the problem is not in what we may edit: the screen
  * then shows where the problem is and the instructions, not a fix button. Anything that cannot be
  * read is left as the scan found it. Read-only: nothing is written here.
@@ -17,13 +17,12 @@ import type { Finding, FindingPage, PageFacts } from '@/lib/site-health/types'
 import { imagesMissingAlt } from '@/lib/site-health/wordpress-fix'
 import { brokenLinkWords } from './content'
 import { bodyH1s, findShopItem, type ShopCreds, type ShopifyFixClient, type ShopItem } from './shopify-admin'
+import { readAll, TIME_MS } from './read-pool'
 import { refineImageAlt, type ReachableAlt } from './scan-refine'
 import type { Scope } from './store'
 
 type Admin = ReturnType<typeof createAdminClient>
 
-const MAX_READS = 12
-const TIME_MS = 8_000
 const CHECKED: ReadonlySet<string> = new Set(['image_alt', 'broken_link', 'h1_demote'])
 
 /** The problem is in the item's own content (or, for alt text, its featured image). */
@@ -53,7 +52,7 @@ export function reachableAlt(item: Pick<ShopItem, 'body' | 'image'>): number {
  * `scanned`: every page the scan read. Each scanned article and page is read through the store (not
  * only the ones a finding lists), so an image without alt text in an article's own text is found even
  * where the theme's images (which have alt) kept the page under the scan's threshold, and the count on
- * each row is what a fix reaches (./scan-refine.ts). At most MAX_READS reads, inside TIME_MS.
+ * each row is what a fix reaches (./scan-refine.ts). Every one, inside TIME_MS (./read-pool.ts).
  */
 export async function markShopifyOutsideContent(
   findings: Finding[],
@@ -88,14 +87,11 @@ export async function markShopifyOutsideContent(
       if (ref === null) items.set(urls[i], 'not_ours')
       else if (ref) toRead.push({ url: urls[i], ref })
     })
-    // At most MAX_READS reads of the store, the listed rows first.
-    await Promise.all(toRead.slice(0, MAX_READS).map(async ({ url, ref }) => {
-      if (Date.now() > deadline) return
-      try {
-        const item = await deps.client.read(deps.creds, ref)
-        if (item && Date.now() <= deadline) items.set(url, item)
-      } catch { /* unreadable: left as the scan found it */ }
-    }))
+    // Every one of them, the listed rows first (./read-pool.ts).
+    await readAll(toRead, async ({ url, ref }) => {
+      const item = await deps.client.read(deps.creds, ref)
+      if (item && Date.now() <= deadline) items.set(url, item)
+    })
   })()
   // The report never waits on the store for long: what has not answered by then stays as scanned.
   await Promise.race([work.catch(() => undefined), outOfTime])

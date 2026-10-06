@@ -15,6 +15,7 @@
  * Every guard has a mutation control.
  */
 /* eslint-disable @typescript-eslint/no-require-imports */
+import { TIME_MS } from '../read-pool'
 import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'fs'
 import { tmpdir } from 'os'
 import { join } from 'path'
@@ -407,10 +408,10 @@ async function main() {
       check('S6: a second main heading that only the theme adds is marked outside', out[0].pages[0].outside === 'theme')
       const slow = fakeStore()
       const realRead = slow.client.read
-      slow.client.read = async (c, r) => { await new Promise((res) => setTimeout(res, 9_500)); return realRead(c, r) }
+      slow.client.read = async (c, r) => { await new Promise((res) => setTimeout(res, TIME_MS + 1_500)); return realRead(c, r) }
       const t0 = Date.now()
       const outSlow = await run(slow, [finding('h1_demote', [{ url: ARTICLE, kind: 'article' }])])
-      check('S7: a store that does not answer in time: the report does not wait for it, and nothing is marked', Date.now() - t0 < 9_000 && outSlow[0].pages[0].outside === undefined, String(Date.now() - t0))
+      check('S7: a store that does not answer in time: the report does not wait for it, and nothing is marked', Date.now() - t0 < TIME_MS + 1_000 && outSlow[0].pages[0].outside === undefined, String(Date.now() - t0))
       const failing = fakeStore()
       failing.client.read = async () => { throw new ShopFixError('store_unreachable') }
       const outFail = await run(failing, [finding('h1_demote', [{ url: ARTICLE, kind: 'article' }])])

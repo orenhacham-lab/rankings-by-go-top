@@ -56,7 +56,11 @@ export interface PageFacts {
   title: string | null
   description: string | null
   h1: string[]
-  images: { total: number; missingAlt: number }
+  /**
+   * `missing`: each image without alt text by address (lib/free-check/html-signals.ts), so the images the
+   * theme repeats on every page are told apart (absent in reports cached before it was read).
+   */
+  images: { total: number; missingAlt: number; missing?: string[] }
   noindex: boolean
   viewport: boolean
   /** Same-site links on the page (for the broken-link check). */
