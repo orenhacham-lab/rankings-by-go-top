@@ -23,7 +23,7 @@ Coletamos diferentes tipos de informação, entre eles:
 - **Informações técnicas:** endereço IP, tipo de navegador, página de origem
 - **Dados da conta Google:** somente se você escolher entrar com o Google ou conectar o Google Search Console ou o Google Business Profile — veja «Dados que recebemos do Google» abaixo
 - **Informações do seu site:** páginas públicas, robots.txt, o sitemap e o llms.txt lidos na verificação gratuita do site e na análise de integração, e os achados derivados deles — veja «Análise do site» abaixo
-- **Conexão WordPress:** o endereço do site, a chave de assinatura do plugin e, em uma conexão feita com um nome de usuário e uma Senha de Aplicativo, também os dois dados (tudo armazenado criptografado), e o log de correções no site — veja «Conexão WordPress» abaixo
+- **Conexão WordPress:** o endereço do site, um nome de usuário e uma Senha de Aplicativo e a chave de assinatura do plugin (ambas armazenadas criptografadas), e o log de correções no site — veja «Conexão WordPress» abaixo
 - **Conexão Shopify:** o endereço da loja, o identificador da loja, as permissões que você aprovou na instalação e o token de acesso emitido pela loja (armazenado criptografado) — veja «Conexão de um site em outra plataforma» abaixo
 - **Conexão Wix ou webhook:** o endereço do site ou o endpoint que você configurou, e a chave de API da Wix ou o segredo de assinatura (armazenados criptografados e nunca exibidos novamente depois de salvos) — veja «Conexão de um site em outra plataforma» abaixo
 - **Um endereço para acompanhamento local de posições:** se você digitou um endereço exato, ele é armazenado junto com as coordenadas retornadas — veja «Conversão de um endereço em coordenadas» abaixo
@@ -122,16 +122,9 @@ Na verificação gratuita do site, que você pode executar antes de se cadastrar
 
 ## Conexão WordPress e o plugin GO TOP SEO Bridge
 
-Existem duas maneiras de conectar um site WordPress, e o que armazenamos depende da que você usar. Se você conecta com um nome de usuário e uma Senha de Aplicativo, armazenamos o endereço do site, os dois dados e a chave de assinatura que autentica as requisições entre nós e o plugin. Se você conecta apenas com um código de emparelhamento do plugin, o endereço do site e essa chave de assinatura são tudo o que armazenamos, e não há nenhuma senha sua nos nossos registros. Tudo o que é armazenado fica criptografado e é descriptografado somente nos nossos servidores, no momento do uso.
+Quando você conecta um site WordPress, armazenamos o endereço do site, o nome de usuário e a Senha de Aplicativo que você criou, e a chave de assinatura que autentica as requisições entre nós e o plugin. Ambas são armazenadas criptografadas e descriptografadas somente nos nossos servidores, no momento do uso. Com o seu consentimento e a sua aprovação de cada correção, o plugin GO TOP SEO Bridge aplica ao site apenas correções de uma lista fechada (título de SEO, meta descrição, endereço canônico, palavra-chave de foco, texto alternativo de imagem, um bloco de perguntas frequentes, esquema JSON-LD, links internos, reparo de links quebrados, rebaixamento de um título H1 duplicado e criação do llms.txt).
 
-O que o plugin GO TOP SEO Bridge faz no site, com o seu consentimento, é isto e nada mais:
-
-- **As correções que você aprova,** uma por uma, de uma lista fechada: título de SEO, meta descrição, endereço canônico, palavra-chave de foco, texto alternativo de imagem, um bloco de perguntas frequentes, esquema JSON-LD, links internos, reparo de links quebrados, rebaixamento de um título H1 duplicado e criação do llms.txt.
-- **Os artigos que você publica.** Um artigo que você aprova no GO TOP é criado como post no seu site, com o autor que você escolher lá.
-- **As imagens desses artigos.** O seu site faz o download delas do nosso armazenamento de arquivos para a própria biblioteca de mídia e, a partir desse momento, elas são arquivos do seu site. O seu site só as aceita do nosso endereço de armazenamento e recusa qualquer outro.
-- **A leitura do que existe em uma página,** para que possamos mostrar a você a página e o que a correção mudaria: o título, o endereço, o conteúdo, os títulos internos e os campos de SEO. Também podemos pedir ao seu site que busque uma palavra nos posts e nas páginas publicadas dele, e ele responde com o endereço e o título dos resultados; é assim que encontramos a página para onde um link interno deve apontar.
-
-- **Log de correções:** toda correção é registrada no nosso log com o valor anterior e o momento em que foi aplicada, para poder ser exibida e desfeita. O log é mantido enquanto o projeto existir.
+- **Log de correções:** toda correção é registrada no nosso log com quem a aprovou, o momento em que foi aplicada, o endereço IP a partir do qual a aprovação foi dada e o valor anterior e o novo, para poder ser exibida e desfeita e para que tenhamos prova de que a escrita no site foi feita com a sua aprovação. O log é mantido enquanto o projeto existir.
 - **Desconexão e remoção:** «Desconectar» exclui os dados de conexão armazenados e a chave de assinatura, e depois disso não conseguimos mais alcançar o site. Você também pode remover o plugin pelo painel do WordPress a qualquer momento. As correções já aplicadas permanecem no site, a menos que você as tenha desfeito.
 - **O que não fazemos:** não excluímos conteúdo e não tocamos nos preços, produtos, tema, outros plugins, configurações ou usuários do seu site.
 

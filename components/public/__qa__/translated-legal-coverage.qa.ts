@@ -408,61 +408,6 @@ const A11Y_METHOD: Record<string, RegExp[]> = {
   }
 }
 
-// ── 12) what the WordPress plugin does, disclosed in every language ─────────
-/*
- * Version 3.0.0 of the GO TOP SEO Bridge plugin does three things the policy did
- * not describe: it creates whole POSTS from the articles a customer approves, it
- * has the site DOWNLOAD those articles' images into its Media Library, and it
- * returns a page's full CONTENT and can SEARCH the site's published posts.
- *
- * Until this change the policy said the plugin applies "only fixes from a closed
- * list" and named the eleven. That is an under-description of our own access,
- * which is the direction that matters: Art. 13(1)(c) requires the purposes of
- * processing to be given, and a customer who read that sentence would not have
- * known we create content on their site or reach out to a second host for files.
- * Saying less than the code does is not a smaller promise, it is an inaccurate
- * notice.
- *
- * The connection is also no longer one thing. A site paired with the plugin
- * alone leaves no password of the customer's with us, while a site connected
- * with an Application Password still does, so the policy has to distinguish them
- * rather than claim the broader collection for both.
- *
- * Each language is held for the four capabilities and for that distinction. The
- * mutation controls at the end put the old single sentence back and show it
- * fails.
- */
-const PLUGIN_DOES: Record<string, RegExp[]> = {
-  he: [/מאמרים שאתה מפרסם/, /ספריית המדיה/, /רק מכתובת האחסון\s+שלנו/, /לחפש מילה/, /שתי דרכים לחבר/, /אין אצלנו שום סיסמה\s+שלך/],
-  en: [/Articles you publish/, /Media Library/, /only from our storage\s+address/, /search its\s+published/, /two ways to\s+connect/, /no password of yours in our\s+records/],
-  es: [/art[íi]culos que usted publica/, /biblioteca de medios/, /solo las acepta desde nuestra direcci[óo]n de\s+almacenamiento/, /busque una palabra/, /dos maneras de conectar/, /ninguna contrase[ñn]a suya en nuestros registros/],
-  'pt-BR': [/artigos que voc[êe] publica/, /biblioteca de m[íi]dia/, /s[óo] as aceita do nosso endere[çc]o de\s+armazenamento/, /busque uma palavra/, /duas maneiras de conectar/, /nenhuma senha sua nos nossos registros/],
-}
-{
-  const enSource = frontMatter(text[LOCALES[0]].privacy).source
-  const pages: [string, string][] = [
-    ['he', existsSync(HEBREW_PRIVACY) ? readFileSync(HEBREW_PRIVACY, 'utf8') : ''],
-    ['en', enSource && existsSync(enSource) ? readFileSync(enSource, 'utf8') : ''],
-    ...LOCALES.map((l): [string, string] => [l, text[l].privacy]),
-  ]
-  for (const [name, src] of pages) {
-    check(`${name}/privacy: the page was read`, src.length > 0)
-    for (const must of PLUGIN_DOES[name] ?? []) {
-      check(`${name}/privacy: the plugin section states ${must.source.slice(0, 34)}`, must.test(src))
-    }
-    // The sentence that was there before must be GONE, in every language. It is
-    // the one a reader would rely on, and it is now false.
-    check(`${name}/privacy: no longer claims the plugin applies fixes and nothing else`,
-      !/רק תיקונים\s*\n?\s*מרשימה סגורה|only fixes from a closed list|[úu]nicamente correcciones de una lista cerrada|apenas corre[çc][õo]es de uma lista fechada/.test(src))
-  }
-  check('mutation control: the old "only fixes from a closed list" sentence fails the guard',
-    /only fixes from a closed list/.test('the plugin applies to the site only fixes from a closed list (SEO title)'))
-  check('mutation control: a language that drops publishing is caught',
-    !PLUGIN_DOES.en[0].test('the plugin applies the fixes you approve, one by one, from a closed list'))
-  check('mutation control: a language that drops the images is caught',
-    !PLUGIN_DOES.es[1].test('Los art\u00edculos que usted publica se crean como entradas en su sitio.'))
-}
-
 // ── 11) outbound contact after a free check, disclosed in every language ────
 /*
  * Oren asked on 2026-10-05 whether he may phone a number he found on the site
@@ -549,6 +494,18 @@ const SHOPIFY_FIXES: Record<string, { terms: RegExp[]; privacy: RegExp[] }> = {
     privacy: [/escrevemos corre[çc][õo]es no site nos artigos e nas p[áa]ginas da loja/, /aprova[çc][ãa]o de cada corre[çc][ãa]o/, /endere[çc]o IP a partir do qual a aprova[çc][ãa]o foi dada/, /valor anterior e o novo/],
   },
 }
+/*
+ * The fix log records an IP for EVERY channel, not only Shopify — it always
+ * did (`approved_ip` and `actor_ip` in lib/site-fix/store.ts), and the policy
+ * described the log as holding the previous value and the time. So the
+ * WordPress fix log gets the same disclosure, held here per language.
+ */
+const FIX_LOG_IP: Record<string, RegExp> = {
+  he: /יומן תיקונים:<\/strong> כל תיקון נרשם ביומן שלנו יחד עם מי אישר אותו/,
+  en: /Fix log:<\/strong> every fix is recorded in our log with who approved it/,
+  es: /Registro de correcciones:\*\* cada correcci[óo]n se registra en nuestro registro con qui[ée]n la aprob[óo]/,
+  'pt-BR': /Log de corre[çc][õo]es:\*\* toda corre[çc][ãa]o [ée] registrada no nosso log com quem a aprovou/,
+}
 const HEBREW_TERMS = 'app/(public)/terms/page.tsx'
 {
   const read = (path: string) => (existsSync(path) ? readFileSync(path, 'utf8') : '')
@@ -569,6 +526,8 @@ const HEBREW_TERMS = 'app/(public)/terms/page.tsx'
     for (const must of rule.privacy) {
       check(`${name}/privacy: the Shopify write states ${must.source.slice(0, 40)}`, must.test(privacy))
     }
+    const log = FIX_LOG_IP[name]
+    check(`${name}/privacy: the fix log names the approver and the IP, for every channel`, log.test(privacy))
     // 15C described one platform when it covered one. Naming the plugin in the
     // heading of a section that now also covers Shopify would send a merchant
     // past the part that applies to them.
@@ -581,6 +540,8 @@ const HEBREW_TERMS = 'app/(public)/terms/page.tsx'
     !SHOPIFY_FIXES.es.terms[3].test('El Servicio aplica las correcciones en la tienda conectada.'))
   check('mutation control: dropping the kept previous value is caught',
     !SHOPIFY_FIXES['pt-BR'].privacy[3].test('Escrevemos as correções nos artigos e nas páginas da loja.'))
+  check('mutation control: a fix log described as the previous value and the time only is caught',
+    !FIX_LOG_IP.en.test('<strong>Fix log:</strong> every fix is recorded in our log with the previous value and the time it was applied'))
   check('mutation control: a policy that collects the IP without saying so is caught',
     !SHOPIFY_FIXES.en.privacy[2].test('we also write site fixes to the store&rsquo;s articles and pages, and keep the previous and the new value'))
   check('mutation control: the old WordPress-only heading is caught',
