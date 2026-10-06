@@ -134,7 +134,7 @@ async function main() {
 
   // ── B) preview == publish, per platform ──────────────────────────────────
   console.log('\nB) the preview and the published article come from one function')
-  for (const platform of ['wordpress', 'webhook', 'none'] as const) {
+  for (const platform of ['wordpress', 'webhook', 'shopify', 'none'] as const) {
     const pv = previewHtml(STYLE, CTA, platform)
     const pub = await applyArticleDesign(pubDb(STYLE, CTA) as never, ART, sample, platform)
     check(`B1 ${platform}: preview HTML === published HTML, and it carries the call to action`, pv === pub && pub.includes('מתעניינים בטיול ליפן?') && pub.includes('href="https://japan4u.co.il/contact/"'),
@@ -143,7 +143,7 @@ async function main() {
     const pubMin = await applyArticleDesign(pubDb({ ...STYLE, design: 'minimal' }, CTA) as never, ART, sample, platform)
     check(`B2 ${platform}: minimal design: preview === publish, a plain call to action (no inline style)`, pvMin === pubMin && pubMin.includes('צרו קשר') && !/style=/.test(pubMin))
   }
-  for (const platform of ['shopify', 'wix'] as const) {
+  for (const platform of ['wix'] as const) {
     const pv = previewHtml(STYLE, CTA, platform)
     const pub = await applyArticleDesign(pubDb(STYLE, CTA) as never, ART, sample, platform)
     check(`B3 ${platform}: stays minimal with no call to action, in the preview and on the site alike`, pv === pub && pub === sample && !pub.includes('צרו קשר'))
@@ -155,8 +155,10 @@ async function main() {
   const noCtaPublish = await mutant<typeof import('../publish')>('lib/content/article-style/publish.ts', (s) => s.replace('return designForSite(html, { style, cta, platform })', 'return designForSite(html, { style, cta: null, platform })'))
   const brokenPub = await noCtaPublish.applyArticleDesign(pubDb(STYLE, CTA) as never, ART, sample, 'wordpress')
   check('MUTATION CONTROL: a publisher that drops the call to action no longer matches the preview (so B1 would fail)', brokenPub !== previewHtml(STYLE, CTA, 'wordpress'))
-  const noPlatformRule = await mutant<typeof import('../cta')>('lib/content/article-style/cta.ts', (s) => s.replace("  if (platform === 'shopify' || platform === 'wix') return null\n  return isCompleteCta", '  return isCompleteCta'))
-  check('MUTATION CONTROL: without the Shopify/Wix rule, a Shopify store would get the box (so B3 would fail)', noPlatformRule.siteCta(CTA, 'shopify') !== null)
+  const noPlatformRule = await mutant<typeof import('../cta')>('lib/content/article-style/cta.ts', (s) => s.replace("  if (platform === 'wix') return null\n  return isCompleteCta", '  return isCompleteCta'))
+  check('MUTATION CONTROL: without the Wix rule, a Wix site would get the box (so B3 would fail)', noPlatformRule.siteCta(CTA, 'wix') !== null)
+  const oldShopifyRule = await mutant<typeof import('../cta')>('lib/content/article-style/cta.ts', (s) => s.replace("  if (platform === 'wix') return null", "  if (platform === 'shopify' || platform === 'wix') return null"))
+  check('MUTATION CONTROL: the old rule that kept Shopify without the box is caught (so B1 shopify would fail)', oldShopifyRule.siteCta(CTA, 'shopify') === null)
 
   // ── C) default off ───────────────────────────────────────────────────────
   console.log('\nC) off by default: the body goes out exactly as before')

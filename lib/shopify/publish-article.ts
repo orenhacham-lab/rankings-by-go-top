@@ -10,7 +10,9 @@
  *   - detects a deleted remote article and refuses to silently recreate,
  *   - treats GraphQL userErrors as failures and never erases stored metadata on
  *     a transient failure.
- * Reuses the frozen inline-image composer + HTML sanitizer unchanged.
+ * Reuses the frozen inline-image composer + HTML sanitizer unchanged, then the
+ * project's article design and call to action (lib/content/article-style), the
+ * same output WordPress gets and the article preview shows.
  */
 
 import type { createAdminClient } from '@/lib/supabase/admin'
@@ -24,6 +26,7 @@ import { checkShopifyPublishEntitlement } from './billing-guard'
 import { resolvePublishBlogTarget } from './resolve-publish-blog'
 import { sanitizeArticleHtml } from '@/lib/content/article-html'
 import { injectInlineImages, type ComposableInlineImage } from '@/lib/content/inline-images-compose'
+import { applyArticleDesign } from '@/lib/content/article-style/publish'
 
 type Admin = ReturnType<typeof createAdminClient>
 
@@ -167,10 +170,13 @@ export async function publishArticleToShopify(
     article.shopify_blog_id = blogId
   }
 
-  // 3) Compose the body: sanitize + inject inline-image figures (stable URLs).
+  // 3) Compose the body: sanitize + inject inline-image figures (stable URLs),
+  //    then the project's design and call to action. Minimal with no call to
+  //    action leaves the body exactly as before; a failure there never fails
+  //    the publish (applyArticleDesign returns the body as it was).
   const sanitized = sanitizeArticleHtml(String(article.content_html || ''))
   const { images, warnings } = await loadStableInlineImages(admin, article.id)
-  const body = injectInlineImages(sanitized, images, 'preview')
+  const body = await applyArticleDesign(admin as never, article.id, injectInlineImages(sanitized, images, 'preview'), 'shopify')
   base.imageWarnings.push(...warnings)
 
   // Featured image — stable public URL only, else a visible warning (not fatal).

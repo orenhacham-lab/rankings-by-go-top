@@ -2842,7 +2842,6 @@ export const dashboardEs: DeepPartial<DashboardDictionary> = {
       readOnly: 'Estos ajustes todavía no están abiertos a edición en tu cuenta. Hasta entonces, los artículos se crean como hasta ahora: diseño mínimo y una imagen de apertura.',
       loadFailed: 'No hemos podido cargar los ajustes de diseño. Vuelve a intentarlo en un momento.',
       retry: 'Volver a intentarlo',
-      shopifyNote: 'En una tienda de Shopify el artículo se publica con el diseño mínimo, para que adopte el tema de tu tienda. El estilo y el número de imágenes también se aplican ahí.',
       wixNote: 'En Wix el artículo se publica con el diseño mínimo, dentro del editor de Wix. El estilo y el número de imágenes también se aplican ahí.',
       colors: {
         label: 'Colores de marca',
@@ -2956,7 +2955,7 @@ export const dashboardEs: DeepPartial<DashboardDictionary> = {
         urlHint: 'Una dirección completa que empiece por https://, por ejemplo tu página de contacto.',
         suggested: 'Hemos rellenado una sugerencia a partir de los datos de tu negocio. Edítala y actívala cuando quieras.',
         readOnly: 'La llamada a la acción todavía no está abierta a edición en tu cuenta. Hasta entonces los artículos salen sin ella.',
-        platformNote: 'En una tienda de Shopify o en una web de Wix el artículo se publica con el diseño mínimo, sin recuadro de llamada a la acción.',
+        platformNote: 'En una web de Wix el artículo se publica con el diseño mínimo, sin recuadro de llamada a la acción.',
         errors: {
           heading: 'Escribe un título, de hasta 80 caracteres.',
           text: 'Hasta 240 caracteres.',

@@ -218,7 +218,8 @@ async function main() {
     .filter((l) => !/^[{}()\[\];,]+$/.test(l))
   const foreignShopifyLines = (base: string) => shopifyAddedLines(base)
     .filter((l) => !/sanctions|restrictionForRequest|logRestrictedAttempt|restricted|451/.test(l))
-  const foreignWp = foreignShopifyLines('8b468a8')
+  // The article design on Shopify (Oren 2026-10-06, lib/content/article-style) is its own feature, not this one.
+  const foreignWp = foreignShopifyLines('8b468a8').filter((l) => !/applyArticleDesign/.test(l))
   check('W3: the WordPress schema feature has not reached into Shopify code', foreignWp.length === 0, foreignWp.slice(0, 4).join(' | '))
   check('MUTATION CONTROL: a WordPress-schema line added to Shopify code would be caught',
     ['publishArticleSchemaToWordPress(creds, article)'].filter((l) => !/sanctions|restrictionForRequest|logRestrictedAttempt|restricted|451/.test(l)).length === 1)

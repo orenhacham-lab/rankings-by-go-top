@@ -530,6 +530,16 @@ async function main() {
     // every other plan/price/quota/billing/entitlement/Shopify file must still be untouched.
     const W17 = /^(lib\/billing\/(market\.ts|server-market\.ts|billing-market-selection\.ts|__qa__\/(w17-billing-market|billing-market-selection|billing-market-select-route)\.qa\.ts)|lib\/plans\/__qa__\/pricing-copy-and-layout\.qa\.ts)$/
     untouched = untouched.split('\n').filter((f) => f && !W17.test(f)).join('\n')
+    // Oren 2026-10-06: a Shopify store gets the project's article design and call to action. The
+    // Shopify publisher may differ from 8b468a8 ONLY by that one design step (no billing, plan or quota line).
+    const designOnly = (file: string) => {
+      let d = ''
+      try { d = execSync(`git diff -U0 8b468a8 -- ${file}`, { cwd: ROOT }).toString() } catch { return false }
+      const added = d.split('\n').filter((l) => l.startsWith('+') && !l.startsWith('+++')).map((l) => l.slice(1).trim())
+        .filter((l) => l && !l.startsWith('//') && !l.startsWith('*') && !l.startsWith('/*'))
+      return added.length > 0 && added.every((l) => /applyArticleDesign/.test(l))
+    }
+    untouched = untouched.split('\n').filter((f) => f && !(f === 'lib/shopify/publish-article.ts' && designOnly(f))).join('\n')
     check('H4: plans, prices, quotas, billing, entitlement and Shopify files are untouched', untouched === '', untouched)
     // lib/subscription.ts may differ from 8b468a8 ONLY on the display-only trial line (PLAN_FEATURES.trial); nothing of entitlement moved.
     let subDiff = ''

@@ -171,7 +171,7 @@ export default function ArticleStyleCard({
     setState({ kind: 'saved' })
   }
 
-  const platformNote = view.platform === 'shopify' ? a.shopifyNote : view.platform === 'wix' ? a.wixNote : null
+  const platformNote = view.platform === 'wix' ? a.wixNote : null
   const sampled = signals.status === 'ready' ? signals.colors : []
 
   return (
@@ -415,7 +415,7 @@ export default function ArticleStyleCard({
                 </div>
               </div>
               {ctaLocked && !locked && <Notice tone="info">{a.cta.readOnly}</Notice>}
-              {(view.platform === 'shopify' || view.platform === 'wix') && <Notice tone="info">{a.cta.platformNote}</Notice>}
+              {view.platform === 'wix' && <Notice tone="info">{a.cta.platformNote}</Notice>}
               <div className="rounded-inset border border-line p-3 sm:p-4">
                 <Switch
                   checked={cta.enabled}
