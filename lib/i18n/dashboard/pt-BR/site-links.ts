@@ -158,7 +158,6 @@ export const siteLinksPtBR: DeepPartial<DashboardDictionary> = {
         unavailable: {
           badge: 'Indisponível',
           title: 'A rede de links não está disponível para este site',
-          shopify: 'A rede não funciona em sites conectados pelo Shopify: uma loja Shopify, ou uma conta cuja assinatura é cobrada pelo Shopify. Lá não temos uma forma segura de adicionar um link dentro de um artigo. Todo o resto desta página funciona.',
           off: 'Não foi possível carregar a rede de links neste momento. Tente novamente em instantes.',
         },
         connect: 'Conectar o site',

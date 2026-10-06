@@ -97,8 +97,9 @@ console.log('\nA) Links tab: the network\'s state first, in words')
   const enOn = text(draw(on, 'en'))
   check('A2 English: the same states in English', enOn.includes('The link network is on for your site') && enOn.includes('Waiting to go live') && !/[א-ת]/.test(enOn))
 
-  check('A2f: a hidden answer is read with its reason (shopify says so, anything else is "off")',
-    (readNetwork({ ok: true, available: false, reason: 'shopify' }) as any).reason === 'shopify' && (readNetwork({ ok: true, available: false }) as any).reason === 'off'
+  // Since 2026-10-06 a Shopify store is in the network too (Oren): no hidden answer names Shopify any more.
+  check('A2f: a hidden answer reads as "off", whatever reason it carries',
+    (readNetwork({ ok: true, available: false, reason: 'shopify' }) as any).reason === 'off' && (readNetwork({ ok: true, available: false }) as any).reason === 'off'
     && (readNetwork(null) as any).reason === 'off' && (readNetwork({ ...on }) as any).data?.available === true)
   // A2f, A3, A4 (wave 8: the outreach hero, the competitor caption, the outreach progress line) are
   // SUPERSEDED in wave 9 by the owner: the outreach list ("sites worth a link from", contacted / link
@@ -127,8 +128,8 @@ console.log('\nA) Links tab: the network\'s state first, in words')
 
   // Server logic untouched: the only change to the routes' module is the hidden answer's reason.
   const http = strip(read('lib/link-network/http.ts'))
-  check('A-server: consent, domain proof and Shopify refusals still in the routes', /if \(body\.consent !== true \|\| body\.consentVersion !== LINK_NETWORK_CONSENT_VERSION\) return refuse\(400, 'consent_required'\)/.test(http)
-    && /=== 'domain_unverified'\) return refuse\(409, 'domain_unverified'\)/.test(http) && /if \(!me \|\| me\.site\.shopify\) return refuse\(409, 'unavailable'\)/.test(http))
+  check('A-server: consent and domain proof refusals still in the routes (Shopify joins since 2026-10-06)', /if \(body\.consent !== true \|\| body\.consentVersion !== LINK_NETWORK_CONSENT_VERSION\) return refuse\(400, 'consent_required'\)/.test(http)
+    && /=== 'domain_unverified'\) return refuse\(409, 'domain_unverified'\)/.test(http) && /if \(!me\) return refuse\(409, 'unavailable'\)/.test(http))
 }
 
 // ── A7. existing content ───────────────────────────────────────────────────

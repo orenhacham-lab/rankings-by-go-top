@@ -140,8 +140,11 @@ function partA() {
   check('ten indexed pages are enough content', siteQualifies({ ...B, publishedArticles: 0, indexedPages: 10 }, NOW) === null)
   const thinMut = withMutant(RULES, (s) => s.replace('if (young || thin || !site.scanned', 'if (young || !site.scanned'), (m) => m.siteQualifies({ ...B, publishedArticles: 1, indexedPages: 4 }, NOW))
   check('MUTATION CONTROL: content bar removed → a thin site qualifies → caught', thinMut === null, String(thinMut))
-  check('never Shopify, as a target', exclusionFor(A, { ...B, shopify: true }, [], NOW) === 'shopify')
-  check('never Shopify, as a source', sourceExclusion({ ...A, shopify: true }, [], NOW) === 'shopify')
+  // Oren 2026-10-06: a Shopify store takes part like any other site (its links go into the articles we publish to its blog).
+  check('a Shopify store qualifies like any other site, as a target', exclusionFor(A, { ...B, shopify: true }, [], NOW) === null)
+  check('a Shopify store qualifies like any other site, as a source', sourceExclusion({ ...A, shopify: true }, [], NOW) === null)
+  const shopRuleMut = withMutant(RULES, (s) => s.replace("  if (!site.active) return 'not_member'\n", "  if (!site.active) return 'not_member'\n  if (site.shopify) return 'not_member'\n"), (m) => m.sourceExclusion({ ...A, shopify: true }, [], NOW))
+  check('MUTATION CONTROL: a Shopify exclusion put back → caught', shopRuleMut === 'not_member', String(shopRuleMut))
   check('never a site that left (not active)', exclusionFor(A, { ...B, active: false }, [], NOW) === 'not_member')
 
   // Domain control: typing a domain into a project proves nothing.
@@ -343,8 +346,8 @@ async function partD() {
   const r = await placeNetworkLink(db as any, input, deps)
   check('a member article gets one link to the complementary member', r.outcome === 'placed' && r.targetProjectId === P.OK, JSON.stringify(r))
   const prompt = deps.prompts[0] ?? ''
-  check('the model is shown only allowed members: not the same category, the competitor, Shopify, the already-linked or the new site',
-    prompt.includes('site1.co.il') && !['site2.co.il', 'site3.co.il', 'site4.co.il', 'site5.co.il', 'site6.co.il'].some((d) => prompt.includes(d)), prompt.slice(0, 200))
+  check('the model is shown only allowed members (the Shopify store among them): not the same category, the competitor, the already-linked or the new site',
+    prompt.includes('site1.co.il') && prompt.includes('site4.co.il') && !['site2.co.il', 'site3.co.il', 'site5.co.il', 'site6.co.il'].some((d) => prompt.includes(d)), prompt.slice(0, 200))
   const row = db.tables.link_network_placements[0] as any
   check('the log row: source article, target url, anchor, link type, anchor kind, relevance, time',
     row?.source_article_id === ART && row.target_url === 'https://site1.co.il/page-1/' && row.anchor_text === 'עיצוב פנים של אוהל האירוע'
@@ -495,49 +498,41 @@ async function partE() {
   check('leaving: switch off, the consent record kept', left.status === 200 && row.active === false && row.left_at === NOW.toISOString() && row.consent_version === LINK_NETWORK_CONSENT_VERSION)
   check('a form post (not JSON) is refused', (await handleMembershipPost(new Request('http://x/y', { method: 'POST', body: 'join=true' }), P.S, routeDeps(U_S, fresh))).status === 400)
 
-  // Hidden: Shopify, and no tables.
+  // A Shopify store: shown and joinable like any other site (Oren 2026-10-06).
   const shop = networkDb()
   const U_SHOP = (shop.tables.projects.find((p: any) => p.id === P.SHOP) as any).user_id
   const shopAns = await (await handleNetworkGet(P.SHOP, routeDeps(U_SHOP, shop))).json() as any
-  check('a Shopify project: the network does not exist (not shown)', shopAns.ok === true && shopAns.available === false && !('memberCount' in shopAns))
-  check('a Shopify project cannot join', (await handleMembershipPost(jsonReq({ join: true, consent: true, consentVersion: LINK_NETWORK_CONSENT_VERSION }), P.SHOP, routeDeps(U_SHOP, shop))).status === 409)
-  const shopMut = await withMutantAsync('lib/link-network/store.ts', (s) => s.replace("|| /shopify/i.test(profile?.detected_platform ?? '')", ''),
-    async (m) => (await m.loadSites(networkDb(), [P.SHOP])).get(P.SHOP).site.shopify)
-  check('MUTATION CONTROL: detected Shopify platform ignored → caught', shopMut === false)
+  check('a Shopify project: the network is shown', shopAns.ok === true && shopAns.available === true, JSON.stringify(shopAns).slice(0, 200))
+  check('a Shopify project can join', (await handleMembershipPost(jsonReq({ join: true, consent: true, consentVersion: LINK_NETWORK_CONSENT_VERSION }), P.SHOP, routeDeps(U_SHOP, shop))).status === 200)
   const billed = networkDb()
   billed.tables.billing_governance.push({ user_id: U_S, billing_authority: 'shopify' })
-  check('an account billed by Shopify is Shopify too', ((await (await handleNetworkGet(P.S, routeDeps(U_S, billed))).json()) as any).available === false)
-  // Wave 9: an administrator billed through Shopify is judged per project, by the project's own platform.
-  const avail = async (db: any) => ((await (await handleNetworkGet(P.S, routeDeps(U_S, db))).json()) as any).available
-  const billedAs = (role: string | null, shopConnected = false) => {
-    const db = networkDb()
-    db.tables.billing_governance.push({ user_id: U_S, billing_authority: 'shopify' })
-    if (role) db.tables.profiles = [{ id: U_S, role }]
-    if (shopConnected) db.tables.shopify_connections.push({ project_id: P.S, archived_at: null })
+  check('an account billed by Shopify: the network is shown too', ((await (await handleNetworkGet(P.S, routeDeps(U_S, billed))).json()) as any).available === true)
+  const httpMut = await withMutantAsync('lib/link-network/http.ts', (s) => s.replace("    if (!me) return Response.json({ ok: true, available: false, reason: 'off' }", "    if (!me || me.site.shopify) return Response.json({ ok: true, available: false, reason: 'off' }"),
+    async (m) => ((await (await m.handleNetworkGet(P.SHOP, routeDeps(U_SHOP, networkDb()))).json()) as any).available)
+  check('MUTATION CONTROL: a Shopify store hidden again → caught', httpMut === false, String(httpMut))
+  // Proof of domain control from the store itself: the connected store's own domains, as Shopify reported them.
+  const storeProof = (row: Record<string, unknown>) => {
+    const db = networkDb({ unconnected: [P.SHOP] })
+    db.tables.shopify_connections.push({ project_id: P.SHOP, user_id: U_SHOP, shop_domain: 'site4-store.myshopify.com', storefront_domain: 'www.site4.co.il', connection_status: 'connected', archived_at: null, ...row })
     return db
   }
-  check('an admin billed by Shopify, on a WordPress project: the network is available', (await avail(billedAs('admin'))) === true)
-  check('the same admin, on a Shopify-connected project: still unavailable', (await avail(billedAs('admin', true))) === false)
-  check('a non-admin billed by Shopify: still unavailable (a plain user row and no row alike)',
-    (await avail(billedAs('user'))) === false && (await avail(billedAs(null))) === false)
-  const adminMut = await withMutantAsync('lib/link-network/store.ts', (s) => s.replace('.filter((_, i) => !billedAdmins[i])', ''),
-    async (m) => (await m.loadSites(billedAs('admin'), [P.S])).get(P.S).site.shopify)
-  check('MUTATION CONTROL: admin exemption removed → the admin\'s WordPress project is Shopify again → caught', adminMut === true, String(adminMut))
-  const everyoneMut = await withMutantAsync('lib/link-network/store.ts', (s) => s.replace('!billedAdmins[i]', 'false'),
-    async (m) => (await m.loadSites(billedAs('user'), [P.S])).get(P.S).site.shopify)
-  check('MUTATION CONTROL: exemption given to every account → a non-admin billed by Shopify gets in → caught', everyoneMut === false, String(everyoneMut))
-  const connMut = await withMutantAsync('lib/link-network/store.ts', (s) => s.replace('shopify: shopifyIds.has(p.id) || ', 'shopify: '),
-    async (m) => (await m.loadSites(billedAs('admin', true), [P.S])).get(P.S).site.shopify)
-  check('MUTATION CONTROL: the Shopify connection ignored → the admin\'s connected store gets in → caught', connMut === false, String(connMut))
+  const proven = async (db: any) => (await loadSites(db, [P.SHOP])).get(P.SHOP)!.site.verifiedDomains
+  check('a connected store proves its own primary domain', (await proven(storeProof({}))).includes('site4.co.il'))
+  check('a store connection that is not connected proves nothing', (await proven(storeProof({ connection_status: 'failed' }))).length === 0)
+  check('an archived store connection proves nothing', (await proven(storeProof({ archived_at: '2026-10-01T00:00:00Z' }))).length === 0)
+  check('another owner\'s store connection under the same project proves nothing', (await proven(storeProof({ user_id: U_S }))).length === 0)
+  const proofMut = await withMutantAsync('lib/link-network/store.ts', (s) => s.replace('    if (!ownerOf.has(s.project_id) || s.user_id !== ownerOf.get(s.project_id)) continue\n', ''),
+    async (m) => (await m.loadSites(storeProof({ user_id: U_S }), [P.SHOP])).get(P.SHOP).site.verifiedDomains)
+  check('MUTATION CONTROL: the owner check on the store removed → another owner\'s store proves the domain → caught', Array.isArray(proofMut) && proofMut.length > 0, String(proofMut))
+  const shopArticles = networkDb({ unconnected: [P.SHOP] })
+  shopArticles.tables.shopify_connections.push({ project_id: P.SHOP, user_id: U_SHOP, shop_domain: 'site4-store.myshopify.com', storefront_domain: 'site4.co.il', connection_status: 'connected', archived_at: null })
+  for (const a of shopArticles.tables.generated_articles as any[]) if (a.project_id === P.SHOP && a.status === 'published') { a.shopify_article_url = a.wp_post_url.replace('/page-', '/blogs/news/page-'); a.wp_post_url = null }
+  const shopPages = (await loadSites(shopArticles, [P.SHOP])).get(P.SHOP)!.extras.pages.map((x) => x.url)
+  check('a store\'s published articles are pages others may link to', shopPages.some((u) => u.includes('/blogs/news/page-')), shopPages.join(','))
   const noTables = networkDb({ hooks: { link_network_settings: { select: () => ({ code: '42P01' }) } } })
   const nt = await handleNetworkGet(P.S, routeDeps(U_S, noTables))
   check('without the tables: 200 { available: false } (hidden, not an error)', nt.status === 200 && ((await nt.json()) as any).available === false)
-  // Wave 8 (UX A1): the screen is told why, to say so for a Shopify store and never mention the network otherwise.
-  check('the hidden answer says why: shopify for a store, off without the tables', shopAns.reason === 'shopify'
-    && ((await (await handleNetworkGet(P.S, routeDeps(U_S, noTables))).json()) as any).reason === 'off', `${shopAns.reason}`)
-  const reasonMut = await withMutantAsync('lib/link-network/http.ts', (s) => s.replace("reason: me?.site.shopify ? 'shopify' : 'off'", "reason: 'off'"),
-    async (m) => ((await (await m.handleNetworkGet(P.SHOP, routeDeps(U_SHOP, networkDb()))).json()) as any).reason)
-  check('MUTATION CONTROL: a Shopify store answered as "off" → caught', reasonMut === 'off', String(reasonMut))
+  check('the hidden answer says why: off without the tables', ((await (await handleNetworkGet(P.S, routeDeps(U_S, noTables))).json()) as any).reason === 'off')
   check('without the tables: joining is 409', (await handleMembershipPost(jsonReq({ join: true, consent: true, consentVersion: LINK_NETWORK_CONSENT_VERSION }), P.S, routeDeps(U_S, noTables))).status === 409)
   // The table itself: the receiving side cannot read the giver's ids through PostgREST
   // (executed proof: supabase/migrations/__qa__/link-network.probe.sql).
