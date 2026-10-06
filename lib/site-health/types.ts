@@ -99,6 +99,11 @@ export interface FindingPage {
   adminUrl: string | null
   /** For a broken link: the page it was found on. */
   from?: string | null
+  /**
+   * 'theme': the problem is not in the content the connection may edit (a Shopify store's theme,
+   * menu, or a product), so no fix button is offered here (lib/site-fix/shopify-scan.ts).
+   */
+  outside?: 'theme'
 }
 
 export interface Finding {

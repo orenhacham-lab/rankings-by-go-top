@@ -57,6 +57,7 @@ export const siteHealthPtBR: DeepPartial<DashboardDictionary> = {
     showSteps: 'Como corrigir',
     hideSteps: 'Ocultar as instruções',
     openInShopify: 'Abrir na Shopify',
+    inTheme: 'O problema não está no conteúdo desta página, mas no tema da loja, no menu ou em um produto, então aqui não há correção automática. Os passos abaixo explicam como corrigir.',
     openPage: 'Abrir a página',
     stepsTitle: 'Como corrigir',
     fixedBadge: 'Corrigido',

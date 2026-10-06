@@ -556,7 +556,7 @@ async function main() {
     check('S2: the Shopify llms.txt card says plainly it cannot be placed automatically', /אי אפשר להוסיף llms\.txt לחנות שופיפיי באופן אוטומטי/.test(he) && /cannot be added to a Shopify store automatically/.test(en))
     const m = mutant<typeof CHANNEL>('lib/site-fix/channel.ts', '    if (!ctx.shopifyWrite) return { ...base, shopify: true, readOnly: true, channelFor: {} }\n', '')
     check('MUTATION CONTROL: a Shopify store that gets a channel is caught by S1', m.found && !!m.mod && !m.mod.resolveCapabilities({ ...shop, wordpressDetected: true }, true).readOnly)
-    const touching = ['lib/site-fix/api.ts', 'lib/site-fix/channel.ts', 'lib/site-fix/preview.ts', 'lib/site-fix/suggest.ts', 'lib/site-fix/bulk.ts', 'lib/site-fix/h1.ts', 'lib/site-fix/shopify-admin.ts', 'lib/site-fix/shopify-apply.ts',
+    const touching = ['lib/site-fix/api.ts', 'lib/site-fix/channel.ts', 'lib/site-fix/preview.ts', 'lib/site-fix/suggest.ts', 'lib/site-fix/bulk.ts', 'lib/site-fix/h1.ts', 'lib/site-fix/shopify-admin.ts', 'lib/site-fix/shopify-apply.ts', 'lib/site-fix/shopify-scan.ts',
       'components/site-health/useSafeFixes.tsx', 'components/site-health/ApproveFixModal.tsx', 'components/site-health/AutoFixStrip.tsx']
       .filter((f) => /from '@\/lib\/shopify|from '\.\.\/shopify|app\/api\/shopify/.test(read(f)))
     check('S3: none of the site-fix code reaches into lib/shopify or the Shopify routes (the Shopify channel gets its credentials from the route)', touching.length === 0, touching.join(','))

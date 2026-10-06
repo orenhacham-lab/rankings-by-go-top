@@ -157,7 +157,10 @@ export default function SiteHealthScreen({ project }: { project: Project & { sit
     if (!queueLive || !caps || !finding.fixType) return null
     const channel = caps.channelFor[finding.fixType]
     // A Shopify store: only its articles and pages are written; products, collections and llms.txt keep their instructions.
-    if (caps.shopify && (finding.fixType === 'llms_txt' || (page.kind !== 'article' && page.kind !== 'page'))) return null
+    // (A broken link is judged by the page it was found on, which the store's own check reads.)
+    if (caps.shopify && (finding.fixType === 'llms_txt' || (finding.fixType !== 'broken_link' && page.kind !== 'article' && page.kind !== 'page'))) return null
+    // The store's own check found the problem outside what the connection edits (theme, menu, a product).
+    if (page.outside === 'theme') return null
     // llms.txt: the plugin (2.1.0) serves it; every other site gets the same text to copy and place.
     if (finding.fixType === 'llms_txt') return channel === 'plugin' ? 'fix' : 'copy'
     if (!channel) return null

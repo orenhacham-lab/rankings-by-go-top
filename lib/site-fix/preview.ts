@@ -265,9 +265,11 @@ async function previewViaShopify(req: PreviewRequest, ctx: PreviewContext, shop:
   const host = new URL(shop.ref.url).hostname
   switch (req.type) {
     case 'image_alt': {
-      const missing = imagesMissingAlt(it.body)
+      // The body's images, and an article's featured image (shown by the theme above the body).
+      const missing = imagesMissingAlt(it.body).map((i) => i.src)
+      if (it.image && !String(it.image.alt ?? '').trim() && !missing.includes(it.image.url)) missing.unshift(it.image.url)
       if (missing.length === 0) return fail('nothing_to_fix')
-      return { ok: true, type: 'image_alt', images: missing.slice(0, 20).map((i) => ({ src: i.src, after: suggestAlt(i.src, it.title) })), expected: sha(it.body), via: 'content' }
+      return { ok: true, type: 'image_alt', images: missing.slice(0, 20).map((src) => ({ src, after: suggestAlt(src, it.title) })), expected: sha(it.body), via: 'content' }
     }
     case 'broken_link': {
       const words = brokenLinkWords(it.body, req.url, host)

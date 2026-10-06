@@ -138,6 +138,9 @@ export default function FindingCard({
                         {isLinks && page.from ? <>{copy.foundOn}: <span dir="ltr">{pageLabel(copy, { ...page, path: pathOf(page.from), kind: 'other' })}</span></> : measure}
                       </p>
                     )}
+                    {page.outside === 'theme' && !done && !queued && (
+                      <p className="mt-1 max-w-xl text-caption text-muted text-pretty" data-outside-content="">{copy.inTheme}</p>
+                    )}
                   </div>
                   <div className="flex shrink-0 items-center gap-2">
                     {done ? (

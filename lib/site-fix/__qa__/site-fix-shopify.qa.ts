@@ -106,9 +106,9 @@ function fakeStore(opts: { ignoreWrites?: boolean; failWith?: ShopFixError } = {
     ['gid://shopify/Article/11', {
       kind: 'article', gid: 'gid://shopify/Article/11', url: ARTICLE, title: 'Caring for leather boots',
       body: '<h1>Caring for leather boots</h1><p>Clean them weekly. See <a href="/pages/old-guide">the old guide</a>.</p><p><img src="https://cdn.shopify.com/a.jpg"></p>',
-      titleTag: null, descriptionTag: 'Old description',
+      titleTag: null, descriptionTag: 'Old description', image: { url: 'https://cdn.shopify.com/featured.jpg', alt: null },
     }],
-    ['gid://shopify/Page/21', { kind: 'page', gid: 'gid://shopify/Page/21', url: PAGE, title: 'About us', body: '<p>We make boots by hand.</p>', titleTag: 'Old title', descriptionTag: null }],
+    ['gid://shopify/Page/21', { kind: 'page', gid: 'gid://shopify/Page/21', url: PAGE, title: 'About us', body: '<p>We make boots by hand.</p>', titleTag: 'Old title', descriptionTag: null, image: null }],
   ])
   const writes: { gid: string; patch: unknown }[] = []
   const clears: { gid: string; key: string }[] = []
@@ -122,6 +122,7 @@ function fakeStore(opts: { ignoreWrites?: boolean; failWith?: ShopFixError } = {
       if (!it) return
       if (patch.body !== undefined) it.body = patch.body
       if (patch.meta) it[patch.meta.key === 'title_tag' ? 'titleTag' : 'descriptionTag'] = patch.meta.value
+      if (patch.imageAlt !== undefined && it.image) it.image = { ...it.image, alt: patch.imageAlt }
     },
     async clearMeta(_c, ref, key) {
       clears.push({ gid: ref.gid, key })
@@ -250,6 +251,29 @@ async function main() {
       (r.body as JobBody).job?.status === 'applied' && /<a\s+href="https:\/\/boots\.example\.org\/pages\/about">the old guide<\/a>/.test(art.body), art.body)
     const a = await API.handleFixesPost(approve({ type: 'image_alt', images: [{ src: 'https://cdn.shopify.com/a.jpg', alt: 'Brown leather boots' }] }, ARTICLE, { expected: sha256(art.body), kind: 'images_alt' }), depsFor(admin, store))
     check('A11: an image without a description gets the approved one', (a.body as JobBody).job?.status === 'applied' && art.body.includes('alt="Brown leather boots"'), art.body)
+    {
+      // The featured image only (the body has no image left without alt): its alt is written, the image is not.
+      const fs = fakeStore()
+      const fa = fs.items.get('gid://shopify/Article/11')!
+      fa.body = '<p>No images in the text.</p>'
+      const fx = await API.handleFixesPost(approve({ type: 'image_alt', images: [{ src: 'https://cdn.shopify.com/featured.jpg', alt: 'Leather boots on a shelf' }] }, ARTICLE, { expected: sha256(fa.body), kind: 'images_alt' }), depsFor(new FakeAdmin(rows()), fs))
+      check('A11b: an article\'s featured image gets the approved alt text; the image and the body stay as they were',
+        (fx.body as JobBody).job?.status === 'applied' && fa.image?.alt === 'Leather boots on a shelf' && fa.image?.url === 'https://cdn.shopify.com/featured.jpg' && fa.body === '<p>No images in the text.</p>'
+        && fs.writes.every((w) => (w.patch as { body?: string }).body === undefined), JSON.stringify(fs.writes))
+    }
+    {
+      const fs = fakeStore()
+      const fadmin = new FakeAdmin(rows())
+      const fa = fs.items.get('gid://shopify/Article/11')!
+      fa.body = '<p>No images in the text.</p>'
+      const fx = await API.handleFixesPost(approve({ type: 'image_alt', images: [{ src: 'https://cdn.shopify.com/featured.jpg', alt: 'Leather boots on a shelf' }] }, ARTICLE, { expected: sha256(fa.body), kind: 'images_alt' }), depsFor(fadmin, fs))
+      const u = await API.handleFixesPost({ projectId: P, action: 'undo', jobId: (fx.body as JobBody).job?.id }, depsFor(fadmin, fs))
+      check('A11c: undo puts the featured image\'s empty alt back', (u.body as JobBody).job?.status === 'reverted' && fa.image?.alt === '', JSON.stringify(fa.image))
+      const fx2 = await API.handleFixesPost(approve({ type: 'image_alt', images: [{ src: 'https://cdn.shopify.com/featured.jpg', alt: 'Boots' }] }, ARTICLE, { expected: sha256(fa.body), kind: 'images_alt' }), depsFor(fadmin, fs))
+      fa.image = { url: 'https://cdn.shopify.com/featured.jpg', alt: 'Changed by the owner' }
+      const u2 = await API.handleFixesPost({ projectId: P, action: 'undo', jobId: (fx2.body as JobBody).job?.id }, depsFor(fadmin, fs))
+      check('A11d: the owner changed the featured alt after the fix: undo leaves it alone', (u2.body as JobBody).job?.status !== 'reverted' && fa.image?.alt === 'Changed by the owner', JSON.stringify(u2.body))
+    }
     const h = await API.handleFixesPost(approve({ type: 'h1_demote', headings: [{ n: 0, text: 'Caring for leather boots' }] }, ARTICLE, { expected: sha256(art.body), kind: 'h1_multiple' }), depsFor(admin, store))
     check('A12: the article body\'s extra main heading becomes a subheading, words unchanged',
       (h.body as JobBody).job?.status === 'applied' && art.body.startsWith('<h2>Caring for leather boots</h2>'), art.body)
@@ -275,8 +299,16 @@ async function main() {
     const art = store.items.get('gid://shopify/Article/11')!
     const p = await API.handleFixesPost({ projectId: P, action: 'preview', type: 'image_alt', url: ARTICLE, kind: 'images_alt' }, depsFor(admin, store))
     const b = p.body as { ok?: boolean; channel?: string; images?: { src: string }[]; expected?: string }
-    check('P1: an alt-text preview reads the article body through the store, with its hash to compare',
-      !!b.ok && b.channel === 'shopify' && b.images?.[0]?.src === 'https://cdn.shopify.com/a.jpg' && b.expected === sha256(art.body), JSON.stringify(b))
+    check('P1: an alt-text preview reads the article body through the store, with its hash to compare, and the featured image without alt comes first',
+      !!b.ok && b.channel === 'shopify' && b.images?.[0]?.src === 'https://cdn.shopify.com/featured.jpg' && b.images?.[1]?.src === 'https://cdn.shopify.com/a.jpg' && b.expected === sha256(art.body), JSON.stringify(b))
+    art.image = { url: 'https://cdn.shopify.com/featured.jpg', alt: 'Already described' }
+    const p2 = await API.handleFixesPost({ projectId: P, action: 'preview', type: 'image_alt', url: ARTICLE, kind: 'images_alt' }, depsFor(admin, store))
+    check('P1b: a featured image that already has alt text is not offered', ((p2.body as { images?: { src: string }[] }).images ?? []).every((i) => !i.src.includes('featured')), JSON.stringify(p2.body))
+    art.image = { url: 'https://cdn.shopify.com/featured.jpg', alt: null }
+    const noFeatured = mutant<typeof import('../preview')>('lib/site-fix/preview.ts', "if (it.image && !String(it.image.alt ?? '').trim() && !missing.includes(it.image.url)) missing.unshift(it.image.url)", '')
+    const shopCtx = { channel: 'shopify', creds: null, link: null, siteName: 'Boot Shop', shop: { creds: CREDS, client: store.client, ref: { kind: 'article', gid: 'gid://shopify/Article/11', url: ARTICLE } } } as never
+    const pm = noFeatured.mod ? await noFeatured.mod.previewFixJob({ type: 'image_alt', url: ARTICLE, kind: 'images_alt' }, shopCtx, { wp: {} as never, readLive: async () => null }) as { images?: { src: string }[] } : null
+    check('MUTATION CONTROL: a preview that skips the featured image is caught (it is no longer offered)', noFeatured.found && !!pm && (pm.images ?? []).every((i) => !i.src.includes('featured')), JSON.stringify(pm))
     const pr = await API.handleFixesPost({ projectId: P, action: 'preview', type: 'image_alt', url: PRODUCT, kind: 'images_alt' }, depsFor(admin, store))
     check('P2: a product preview: not_in_store', (pr.body as { code?: string }).code === 'not_in_store')
     const l = await API.handleFixesPost({ projectId: P, action: 'preview', type: 'llms_txt', url: `${SITE}/`, kind: 'llms_missing' }, depsFor(admin, store))
@@ -330,11 +362,63 @@ async function main() {
     check('H4: a heading whose words changed since the preview changes nothing', demoteBodyH1s('<h1>A</h1><h1>B2</h1>', [{ n: 1, text: 'B' }]).count === 0)
   }
 
+  // ── S) after a scan: is the problem in what we may edit? ───────────────
+  console.log('\nS) the scan\'s store check')
+  {
+    const SCAN = require('../shopify-scan') as typeof import('../shopify-scan')
+    const finding = (fixType: string, pages: Record<string, unknown>[]) => ({ id: 'x', severity: 'minor', pages: pages.map((p) => ({ path: '/', value: null, measure: null, fixable: true, adminUrl: null, ...p })), total: pages.length, field: null, guide: 'alt', fixable: true, fixType }) as never
+    const run = async (store: ReturnType<typeof fakeStore>, fs: never[], mod: typeof SCAN = SCAN) => {
+      await mod.markShopifyOutsideContent(fs, { admin: new FakeAdmin(rows()) as never, scope: { projectId: P, userId: U }, creds: CREDS, client: store.client })
+      return fs as unknown as { pages: { outside?: string; fixable: boolean }[] }[]
+    }
+    {
+      const store = fakeStore()
+      const art = store.items.get('gid://shopify/Article/11')!
+      art.image = { url: 'https://cdn.shopify.com/featured.jpg', alt: 'Described' }
+      art.body = '<p>Text only, <img src="x.jpg" alt="ok"></p>'
+      const out = await run(store, [finding('image_alt', [{ url: ARTICLE, kind: 'article' }])])
+      check('S1: images without alt only in the theme (body and featured image are fine): marked outside, no fix button', out[0].pages[0].outside === 'theme' && out[0].pages[0].fixable === false)
+      art.image = { url: 'https://cdn.shopify.com/featured.jpg', alt: null }
+      const out2 = await run(store, [finding('image_alt', [{ url: ARTICLE, kind: 'article' }])])
+      check('S2: the featured image has no alt: the fix stays offered', out2[0].pages[0].outside === undefined && out2[0].pages[0].fixable === true)
+      const mut = mutant<typeof SCAN>('lib/site-fix/shopify-scan.ts', "if (item === 'not_ours' || !inEditableContent(f.fixType, item, p)) { p.outside = 'theme'; p.fixable = false }", '')
+      art.image = { url: 'https://cdn.shopify.com/featured.jpg', alt: 'Described' }
+      const outM = mut.mod ? await run(store, [finding('image_alt', [{ url: ARTICLE, kind: 'article' }])], mut.mod) : null
+      check('MUTATION CONTROL: without the marking, S1 is caught (the button would stay)', mut.found && !!outM && outM[0].pages[0].outside === undefined)
+    }
+    {
+      const store = fakeStore()
+      const out = await run(store, [finding('broken_link', [{ url: `${SITE}/pages/old-guide`, kind: 'other', from: ARTICLE }, { url: `${SITE}/pages/gone`, kind: 'other', from: ARTICLE }, { url: `${SITE}/pages/old-guide`, kind: 'other', from: PRODUCT }])])
+      const [inBody, inTheme, onProduct] = out[0].pages
+      check('S3: a broken link in the article text stays fixable', inBody.outside === undefined && inBody.fixable)
+      check('S4: a broken link not in the text (menu, footer) is marked outside', inTheme.outside === 'theme' && !inTheme.fixable)
+      check('S5: a broken link found on a product is marked outside (products are not ours to edit)', onProduct.outside === 'theme' && !onProduct.fixable)
+    }
+    {
+      const store = fakeStore()
+      const art = store.items.get('gid://shopify/Article/11')!
+      art.body = '<p>No heading in the text.</p>'
+      const out = await run(store, [finding('h1_demote', [{ url: ARTICLE, kind: 'article' }])])
+      check('S6: a second main heading that only the theme adds is marked outside', out[0].pages[0].outside === 'theme')
+      const slow = fakeStore()
+      const realRead = slow.client.read
+      slow.client.read = async (c, r) => { await new Promise((res) => setTimeout(res, 9_500)); return realRead(c, r) }
+      const t0 = Date.now()
+      const outSlow = await run(slow, [finding('h1_demote', [{ url: ARTICLE, kind: 'article' }])])
+      check('S7: a store that does not answer in time: the report does not wait for it, and nothing is marked', Date.now() - t0 < 9_000 && outSlow[0].pages[0].outside === undefined, String(Date.now() - t0))
+      const failing = fakeStore()
+      failing.client.read = async () => { throw new ShopFixError('store_unreachable') }
+      const outFail = await run(failing, [finding('h1_demote', [{ url: ARTICLE, kind: 'article' }])])
+      check('S8: a store read that fails leaves the finding as scanned', outFail[0].pages[0].outside === undefined && outFail[0].pages[0].fixable === true)
+      check('S9: the store check never writes', slow.writes.length === 0 && failing.writes.length === 0 && store.writes.length === 0)
+    }
+  }
+
   // ── U) the screen ─────────────────────────────────────────────────────────
   console.log('\nU) the screen')
   {
     const screen = strip(read('components/site-health/SiteHealthScreen.tsx'))
-    const gate = /if \(caps\.shopify && \(finding\.fixType === 'llms_txt' \|\| \(page\.kind !== 'article' && page\.kind !== 'page'\)\)\) return null/
+    const gate = /if \(caps\.shopify && \(finding\.fixType === 'llms_txt' \|\| \(finding\.fixType !== 'broken_link' && page\.kind !== 'article' && page\.kind !== 'page'\)\)\) return null/
     check('U1: on a store, "fix it for me" shows only on articles and pages (products, collections, llms.txt keep their instructions)', gate.test(screen))
     check('MUTATION CONTROL: U1 fails on a screen without the gate', !gate.test(screen.replace(gate, '')))
     const dicts = ['he', 'en', 'es', 'pt-BR'] as const
@@ -345,6 +429,16 @@ async function main() {
         .map((v, i) => (typeof v === 'string' && v.trim() ? null : `${l}#${i}`)).filter(Boolean)
     })
     check('U2: every Shopify line of the screen exists in all four languages', missing.length === 0, missing.join(','))
+    const outsideGate = /if \(page\.outside === 'theme'\) return null/
+    check('U3: a page whose problem is outside the store\'s editable content gets no fix button', outsideGate.test(screen))
+    check('MUTATION CONTROL: U3 fails on a screen without that gate', !outsideGate.test(screen.replace(outsideGate, '')))
+    const { PUBLIC_LOCALES } = require('../../i18n/locales') as { PUBLIC_LOCALES: string[] }
+    const noNote = PUBLIC_LOCALES.filter((l) => {
+      const v = (getDashboardDictionary(l).siteHealth as unknown as { inTheme?: unknown }).inTheme
+      return typeof v !== 'string' || !v.trim()
+    })
+    check('U4: the "the problem is in the theme" note exists in every site language', noNote.length === 0, noNote.join(','))
+    check('U5: the card shows that note on such a page', /page\.outside === 'theme'[\s\S]{0,300}copy\.inTheme/.test(strip(read('components/site-health/FindingCard.tsx'))))
   }
 
   console.log(`\n${passed} passed, ${failed} failed`)
