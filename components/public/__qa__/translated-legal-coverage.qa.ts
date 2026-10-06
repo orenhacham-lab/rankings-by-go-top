@@ -451,6 +451,103 @@ const OUTBOUND_CONTACT: Record<string, RegExp[]> = {
   }
 }
 
+// ── 13) the Shopify site fixes, in the terms AND the policy, per language ───
+/*
+ * Oren decided on 2026-10-06 to apply site fixes inside Shopify stores too,
+ * within the scopes the app already has. A fix WRITES to the merchant's store,
+ * so three statements have to survive every future rewrite of this text, in
+ * every language, or we would be writing to a store on a description the
+ * merchant never read (GDPR Art. 13(1)(c); and, for an Israeli merchant, a
+ * description of the service that does less than the service does is the
+ * deception חוק הגנת הצרכן forbids):
+ *
+ *   1. that the fixes touch the store's ARTICLES AND PAGES ONLY, and that
+ *      products, collections and the theme are not touched. This is also the
+ *      sentence that keeps the text inside the scopes Shopify approved.
+ *   2. that each fix is approved by the merchant before it is applied.
+ *   3. that the previous value and the new one are both kept, so a fix can be
+ *      shown and undone.
+ *   4. that the approval record holds an IP ADDRESS. That is personal data
+ *      collected for its evidential value — it shows the write was approved —
+ *      and the policy that does not name it is processing nobody was told
+ *      about. The policy also has to say how long it is kept.
+ *
+ * The same statements are held in the privacy policy, because that is the
+ * document a merchant reads to learn what we WRITE to their store, not only
+ * what we read from it.
+ */
+const SHOPIFY_FIXES: Record<string, { terms: RegExp[]; privacy: RegExp[] }> = {
+  he: {
+    terms: [/בחנות Shopify מחוברת/, /המאמרים והעמודים של החנות בלבד/, /אינו נוגע במוצרים/, /באישור\s+שלכם לכל תיקון/, /הערך הקודם והערך החדש/],
+    privacy: [/תיקוני אתר אל המאמרים והעמודים של החנות/, /באישור שלך לכל תיקון/, /כתובת\s+ה-IP שממנה נעשה האישור/, /הערך הקודם והערך החדש/],
+  },
+  en: {
+    terms: [/In a connected Shopify store/, /articles and\s+pages only/, /does not touch products/, /your approval of each fix/, /previous and the new value/],
+    privacy: [/write site fixes to the store&rsquo;s articles and\s+pages/, /approval of each fix/, /IP address the approval was\s+given from/, /previous and the new value/],
+  },
+  es: {
+    terms: [/En una tienda de Shopify conectada/, /[úu]nicamente los art[íi]culos y las p[áa]ginas de la tienda/, /no toca los productos/, /aprobaci[óo]n de cada correcci[óo]n/, /valor anterior y el nuevo/],
+    privacy: [/escribimos correcciones del sitio en los art[íi]culos y las p[áa]ginas de la tienda/, /aprobaci[óo]n de cada correcci[óo]n/, /direcci[óo]n IP desde la que se dio la aprobaci[óo]n/, /valor anterior y el nuevo/],
+  },
+  'pt-BR': {
+    terms: [/Em uma loja Shopify conectada/, /somente os artigos e as p[áa]ginas da loja/, /n[ãa]o toca nos produtos/, /aprova[çc][ãa]o de cada corre[çc][ãa]o/, /valor anterior e o novo/],
+    privacy: [/escrevemos corre[çc][õo]es no site nos artigos e nas p[áa]ginas da loja/, /aprova[çc][ãa]o de cada corre[çc][ãa]o/, /endere[çc]o IP a partir do qual a aprova[çc][ãa]o foi dada/, /valor anterior e o novo/],
+  },
+}
+/*
+ * The fix log records an IP for EVERY channel, not only Shopify — it always
+ * did (`approved_ip` and `actor_ip` in lib/site-fix/store.ts), and the policy
+ * described the log as holding the previous value and the time. So the
+ * WordPress fix log gets the same disclosure, held here per language.
+ */
+const FIX_LOG_IP: Record<string, RegExp> = {
+  he: /יומן תיקונים:<\/strong> כל תיקון נרשם ביומן שלנו יחד עם מי אישר אותו/,
+  en: /Fix log:<\/strong> every fix is recorded in our log with who approved it/,
+  es: /Registro de correcciones:\*\* cada correcci[óo]n se registra en nuestro registro con qui[ée]n la aprob[óo]/,
+  'pt-BR': /Log de corre[çc][õo]es:\*\* toda corre[çc][ãa]o [ée] registrada no nosso log com quem a aprovou/,
+}
+const HEBREW_TERMS = 'app/(public)/terms/page.tsx'
+{
+  const read = (path: string) => (existsSync(path) ? readFileSync(path, 'utf8') : '')
+  const enTerms = frontMatter(text[LOCALES[0]].terms).source
+  const enPrivacy = frontMatter(text[LOCALES[0]].privacy).source
+  const docs: [string, string, string][] = [
+    ['he', read(HEBREW_TERMS), read(HEBREW_PRIVACY)],
+    ['en', enTerms ? read(enTerms) : '', enPrivacy ? read(enPrivacy) : ''],
+    ...LOCALES.map((l): [string, string, string] => [l, text[l].terms, text[l].privacy]),
+  ]
+  for (const [name, terms, privacy] of docs) {
+    check(`${name}: both documents were read`, terms.length > 0 && privacy.length > 0)
+    const rule = SHOPIFY_FIXES[name]
+    if (!rule) continue
+    for (const must of rule.terms) {
+      check(`${name}/terms: the Shopify fixes state ${must.source.slice(0, 40)}`, must.test(terms))
+    }
+    for (const must of rule.privacy) {
+      check(`${name}/privacy: the Shopify write states ${must.source.slice(0, 40)}`, must.test(privacy))
+    }
+    const log = FIX_LOG_IP[name]
+    check(`${name}/privacy: the fix log names the approver and the IP, for every channel`, log.test(privacy))
+    // 15C described one platform when it covered one. Naming the plugin in the
+    // heading of a section that now also covers Shopify would send a merchant
+    // past the part that applies to them.
+    check(`${name}/terms: the site-fixes heading is not WordPress-only`,
+      !/15[Cג]\.?\s*(Site Fixes and the GO TOP SEO Bridge|תיקוני אתר ותוסף|Correcciones del sitio y el plugin|Corre[çc][õo]es no site e o plugin)/.test(terms))
+  }
+  check('mutation control: text that lets the fixes reach products fails the guard',
+    !SHOPIFY_FIXES.en.terms[2].test('The Service may update the product, the collection and the theme.'))
+  check('mutation control: dropping the per-fix approval is caught',
+    !SHOPIFY_FIXES.es.terms[3].test('El Servicio aplica las correcciones en la tienda conectada.'))
+  check('mutation control: dropping the kept previous value is caught',
+    !SHOPIFY_FIXES['pt-BR'].privacy[3].test('Escrevemos as correções nos artigos e nas páginas da loja.'))
+  check('mutation control: a fix log described as the previous value and the time only is caught',
+    !FIX_LOG_IP.en.test('<strong>Fix log:</strong> every fix is recorded in our log with the previous value and the time it was applied'))
+  check('mutation control: a policy that collects the IP without saying so is caught',
+    !SHOPIFY_FIXES.en.privacy[2].test('we also write site fixes to the store&rsquo;s articles and pages, and keep the previous and the new value'))
+  check('mutation control: the old WordPress-only heading is caught',
+    /15C\.?\s*Site Fixes and the GO TOP SEO Bridge/.test('<h2>15C. Site Fixes and the GO TOP SEO Bridge Plugin</h2>'))
+}
+
 // ── MUTATION CONTROLS ───────────────────────────────────────────────────────
 console.log('\nmutation controls')
 {

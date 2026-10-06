@@ -3,7 +3,7 @@ title: Termos de Uso | Go Top SEO
 description: Termos de uso do Go Top SEO — as condições que regem o uso do nosso serviço.
 locale: pt-BR
 source: app/(public)/en/terms/page.tsx
-lastUpdated: 2026-10-04
+lastUpdated: 2026-10-06
 register: voce
 extraSections: 0
 extraReason: No extra section. What Brazilian law adds goes inside the sections it belongs to — the seven-day right of withdrawal as 7.5 in Refunds, and the Consumer Code's forum rule as 20.1 in Governing Law — so the heading structure stays identical to the English document.
@@ -125,20 +125,31 @@ Você pode conectar as seguintes contas e sites a um projeto. Cada conexão é o
 - **Google Search Console.** Conexão apenas de leitura. Não alteramos nada na sua conta do Search Console. Os dados são usados para mostrar o desempenho do seu site, em relatórios, e para sugerir temas de conteúdo.
 - **Google Business Profile.** Quando o recurso está habilitado no Serviço, a conexão permite publicar postagens no seu perfil da empresa. Uma postagem é criada somente quando você a aprovou e clicou em publicar, ou no horário que você agendou. Não alteramos as informações da sua empresa e não lemos nem respondemos avaliações.
 - **WordPress.** A conexão de um site WordPress é usada para ler o conteúdo do site, publicar artigos e para as correções no site da seção 15C.
-- **Shopify.** A instalação do aplicativo na sua loja permite que o Serviço leia o conteúdo, os produtos e as páginas da loja e publique artigos no blog da loja. O escopo é dado pelas permissões que você aprovou na instalação, e você pode remover o aplicativo da loja a qualquer momento. Se você é cobrado pela Shopify, as seções de cobrança destes Termos também se aplicam. A rede de links da seção 15A não está disponível para lojas Shopify.
+- **Shopify.** A instalação do aplicativo na sua loja permite que o Serviço leia o conteúdo, os produtos e as páginas da loja publique artigos no blog da loja e aplique a eles, com a sua aprovação, as correções no site da seção 15C. O escopo é dado pelas permissões que você aprovou na instalação, e você pode remover o aplicativo da loja a qualquer momento. Se você é cobrado pela Shopify, as seções de cobrança destes Termos também se aplicam. A rede de links da seção 15A não está disponível para lojas Shopify.
 - **Wix.** A conexão de um site Wix usa uma chave de API que você emite na sua própria conta e serve para ler o conteúdo do site e publicar artigos no seu blog. A chave é armazenada criptografada, nunca volta a ser exibida na tela depois de salva e é excluída quando você desfaz a conexão. Você também pode revogá-la do lado da Wix a qualquer momento.
 - **Um site em outra plataforma, por webhook.** Para um site que não seja WordPress, Shopify ou Wix, você pode conectar um endpoint que controla, e o Serviço envia o artigo a ele em uma requisição assinada. O segredo de assinatura é armazenado criptografado, nunca volta a ser exibido depois de salvo e é excluído quando você desfaz a conexão. O que acontece com o artigo depois que ele chega a esse endpoint, e a conformidade do seu próprio código com qualquer lei, são de sua responsabilidade.
 
 Esta lista é o conjunto de todos os tipos de conexão que o Serviço oferece. Uma conexão acrescentada no futuro aparecerá aqui e na Política de Privacidade antes de poder ser usada.
 
-## 15C. Correções no site e o plugin GO TOP SEO Bridge
+## 15C. Correções no site
 
-Em um site WordPress conectado, o Serviço pode sugerir correções no site e aplicá-las por meio do plugin Go Top SEO SEO Bridge, somente com o seu consentimento e com a sua aprovação de cada correção.
+### Sites WordPress
+
+Em um site WordPress conectado, o Serviço pode sugerir correções no site e aplicá-las por meio do plugin GO TOP SEO Bridge, somente com o seu consentimento e com a sua aprovação de cada correção.
 
 - **O que pode ser aplicado.** A lista é fechada: título de SEO, meta descrição, endereço canônico, palavra-chave de foco, texto alternativo de imagem, um bloco de perguntas frequentes, esquema JSON-LD, links internos, reparo de links quebrados, rebaixamento de um título H1 duplicado para um nível inferior e criação de um arquivo llms.txt. O Serviço não exclui conteúdo e não toca em preços, produtos, tema, outros plugins, configurações ou usuários, e não publica nem despublica páginas.
 - **Registro e desfazer.** Toda correção é registrada em um log junto com o valor anterior e pode ser desfeita para restaurar esse valor. Se o conteúdo do site mudou depois da correção, o desfazer automático pode não ser possível.
 - **Desconexão e remoção.** Você pode desfazer a conexão nas configurações e remover o plugin pelo painel do WordPress a qualquer momento. As correções já aplicadas permanecem no site, a menos que você as desfaça.
 - **Responsabilidade.** O site, seus backups e a compatibilidade das correções com o seu tema e seus plugins são de sua responsabilidade. Recomendamos manter um backup antes de aprovar correções e verificar se você está autorizado a fazer alterações no site.
+
+### Lojas Shopify
+
+Em uma loja Shopify conectada, o Serviço pode sugerir correções no site e aplicá-las por meio do aplicativo, somente com o seu consentimento e com a sua aprovação de cada correção.
+
+- **O que pode ser aplicado.** A lista é fechada e abrange somente os artigos e as páginas da loja: o título e a descrição que aparecem nos resultados de busca, o texto alternativo de uma imagem que está dentro daquele artigo ou página, o reparo de um link quebrado que está nele, um bloco de perguntas frequentes acrescentado ao final e transformar um título H1 adicional que está nele em um título H2. Cada correção é mostrada a você antes de ser aplicada e é escrita somente naquele artigo ou página. O Serviço não toca nos produtos, nas coleções, no tema, nas configurações da loja, nos preços, nos pedidos, nos redirecionamentos nem em nenhum arquivo da loja, não exclui conteúdo e não publica nem despublica nada.
+- **Registro e desfazer.** Toda aprovação sua é registrada junto com quem aprovou, quando, o endereço IP a partir do qual a aprovação foi dada e o valor anterior e o novo, para que possamos mostrar a você o que foi feito e para que uma correção possa ser desfeita e restaurar o valor anterior. Se o conteúdo da loja mudou depois da correção, o desfazer automático pode não ser possível.
+- **Remoção.** Você pode remover o aplicativo da sua loja a qualquer momento. As correções já aplicadas permanecem na loja, a menos que você as desfaça.
+- **Responsabilidade.** O conteúdo da loja e a adequação das correções ao seu tema são de sua responsabilidade, e você deve verificar se está autorizado a fazer alterações na loja.
 
 ## 15D. Verificação gratuita do site e análise de integração
 

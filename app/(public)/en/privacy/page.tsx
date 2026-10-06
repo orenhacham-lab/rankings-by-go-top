@@ -236,8 +236,10 @@ export default function EnglishPrivacyPage() {
           links, repair of broken links, demotion of a duplicate H1 heading, and creating llms.txt).
         </p>
         <ul>
-          <li><strong>Fix log:</strong> every fix is recorded in our log with the previous value and the time it was
-          applied, so it can be shown and undone. The log is kept as long as the project exists.</li>
+          <li><strong>Fix log:</strong> every fix is recorded in our log with who approved it, the time it was
+          applied, the IP address the approval was given from, and the previous and the new value, so that it can
+          be shown and undone and so that we have evidence that the write to the site was made with your
+          approval. The log is kept as long as the project exists.</li>
           <li><strong>Disconnecting and removal:</strong> &ldquo;Disconnect&rdquo; deletes the stored connection
           details and the signing key, after which we can no longer reach the site. You can also remove the plugin
           from your WordPress admin at any time. Fixes already applied stay on the site unless you undid them.</li>
@@ -255,8 +257,12 @@ export default function EnglishPrivacyPage() {
         <ul>
           <li><strong>Shopify:</strong> installing the app in your store lets us read the store&rsquo;s content,
           products and pages, and publish articles to the store blog, within the permissions you approved at
-          installation. The store&rsquo;s access token is stored encrypted. Removing the app from the store
-          revokes the access.</li>
+          installation. With your approval of each fix, we also write site fixes to the store&rsquo;s articles and
+          pages. The approval itself is recorded in a log: who approved it, when, the IP address the approval was
+          given from, and the previous and the new value — so that we can show you what was done, so that a fix
+          can be undone, and so that we have evidence that the write to your store was made with your approval.
+          The log is kept for as long as the project exists. The store&rsquo;s access token
+          is stored encrypted. Removing the app from the store revokes the access.</li>
           <li><strong>Wix:</strong> the connection uses an API key you issue in your own account, and is used
           to read the site&rsquo;s content and publish articles to its blog. We send Wix the article&rsquo;s
           content and its publishing details, and no other account data. The key is stored encrypted, is never
@@ -737,7 +743,7 @@ export default function EnglishPrivacyPage() {
 
       <section>
         <p className={LEGAL_FOOTNOTE}>
-          This policy was last updated on October 5, 2026
+          This policy was last updated on October 6, 2026
         </p>
       </section>
     </LegalDoc>

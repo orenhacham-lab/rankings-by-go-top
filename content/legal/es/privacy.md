@@ -3,7 +3,7 @@ title: Política de privacidad | Go Top SEO
 description: Política de privacidad de Go Top SEO: cómo recopilamos, utilizamos y protegemos sus datos.
 locale: es
 source: app/(public)/en/privacy/page.tsx
-lastUpdated: 2026-10-05
+lastUpdated: 2026-10-06
 register: usted
 ---
 
@@ -126,7 +126,7 @@ En la verificación gratuita del sitio, que usted puede ejecutar antes de regist
 
 Cuando usted conecta un sitio de WordPress, almacenamos la dirección del sitio, el nombre de usuario y la Application Password que usted creó, y la clave de firma que autentica las solicitudes entre nosotros y el complemento. Ambas se almacenan cifradas y se descifran únicamente en nuestros servidores en el momento de su uso. Con su consentimiento, y con su aprobación de cada corrección, el complemento GO TOP SEO Bridge aplica al sitio únicamente correcciones de una lista cerrada (título SEO, meta descripción, dirección canónica, frase clave principal, texto alternativo de imágenes, un bloque de preguntas frecuentes, esquema JSON-LD, enlaces internos, reparación de enlaces rotos, degradación de un encabezado H1 duplicado y creación de llms.txt).
 
-- **Registro de correcciones:** cada corrección se registra en nuestro registro con el valor anterior y la hora en que se aplicó, de modo que pueda mostrarse y deshacerse. El registro se conserva mientras exista el proyecto.
+- **Registro de correcciones:** cada corrección se registra en nuestro registro con quién la aprobó, la hora en que se aplicó, la dirección IP desde la que se dio la aprobación y el valor anterior y el nuevo, de modo que pueda mostrarse y deshacerse y que tengamos constancia de que la escritura en el sitio se hizo con su aprobación. El registro se conserva mientras exista el proyecto.
 - **Desconexión y eliminación:** «Desconectar» elimina los datos de conexión almacenados y la clave de firma, tras lo cual ya no podemos acceder al sitio. También puede eliminar el complemento desde el panel de administración de WordPress en cualquier momento. Las correcciones ya aplicadas permanecen en el sitio, salvo que usted las haya deshecho.
 - **Lo que no hacemos:** no eliminamos contenido, y no tocamos los precios, los productos, el tema, otros complementos, los ajustes ni los usuarios de su sitio.
 
@@ -134,7 +134,7 @@ Cuando usted conecta un sitio de WordPress, almacenamos la dirección del sitio,
 
 Además de WordPress, usted puede conectar una tienda de Shopify, un sitio de Wix o un sitio de cualquier otra plataforma mediante un endpoint que usted configure. Cada conexión es opcional y la realiza usted.
 
-- **Shopify:** al instalar la aplicación en su tienda, nos permite leer el contenido, los productos y las páginas de la tienda, y publicar artículos en el blog de la tienda, dentro de los permisos que usted aprobó en la instalación. El token de acceso de la tienda se almacena cifrado. Al eliminar la aplicación de la tienda se revoca el acceso.
+- **Shopify:** al instalar la aplicación en su tienda, nos permite leer el contenido, los productos y las páginas de la tienda, y publicar artículos en el blog de la tienda, dentro de los permisos que usted aprobó en la instalación. Con su aprobación de cada corrección, también escribimos correcciones del sitio en los artículos y las páginas de la tienda. La aprobación misma se registra en un historial: quién la aprobó, cuándo, la dirección IP desde la que se dio la aprobación y el valor anterior y el nuevo, para que podamos mostrarle lo que se hizo, para que una corrección pueda deshacerse y para que tengamos constancia de que la escritura en su tienda se hizo con su aprobación. El historial se conserva mientras exista el proyecto. El token de acceso de la tienda se almacena cifrado. Al eliminar la aplicación de la tienda se revoca el acceso.
 - **Wix:** la conexión utiliza una clave de API que usted emite en su propia cuenta, y se usa para leer el contenido del sitio y publicar artículos en su blog. Enviamos a Wix el contenido del artículo y sus detalles de publicación, y ningún otro dato de la cuenta. La clave se almacena cifrada, no se vuelve a mostrar después de guardarse y se elimina cuando usted se desconecta. Usted puede revocarla en Wix en cualquier momento.
 - **Webhook:** el Servicio envía el artículo al endpoint que usted configuró, en una solicitud firmada. El endpoint es suyo, por lo que lo que ocurra con el artículo una vez que llega queda bajo su control. El secreto de firma se almacena cifrado, no se vuelve a mostrar después de guardarse y se elimina cuando usted se desconecta.
 - **Errores:** si la publicación falla, almacenamos únicamente un código de error interno. No almacenamos ni mostramos el texto de error del propio proveedor ni de su servidor.

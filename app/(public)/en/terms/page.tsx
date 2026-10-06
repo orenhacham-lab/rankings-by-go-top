@@ -343,8 +343,9 @@ export default function EnglishTermsPage() {
           </li>
           <li>
             <strong>Shopify.</strong> Installing the app in your store lets the Service read the store&rsquo;s
-            content, products and pages, and publish articles to the store blog. The scope is set by the
-            permissions you approved at installation, and you can remove the app from the store at any time.
+            content, products and pages, and publish articles to the store blog, and to apply the site
+            fixes in section 15C to them with your approval. The scope is set by the permissions you approved at
+            installation, and you can remove the app from the store at any time.
             If you are billed through Shopify, the billing sections of these Terms apply as well. The link
             network in section 15A is not available for Shopify stores.
           </li>
@@ -369,10 +370,11 @@ export default function EnglishTermsPage() {
       </section>
 
       <section id="site-fixes">
-        <h2>15C. Site Fixes and the GO TOP SEO Bridge Plugin</h2>
+        <h2>15C. Site Fixes</h2>
+        <h3>WordPress sites</h3>
         <p>
-          On a connected WordPress site, the Service can suggest site fixes and apply them through the Go Top SEO
-          SEO Bridge plugin, only with your consent and your approval of each fix.
+          On a connected WordPress site, the Service can suggest site fixes and apply them through the GO TOP SEO
+          Bridge plugin, only with your consent and your approval of each fix.
         </p>
         <ul>
           <li>
@@ -395,6 +397,37 @@ export default function EnglishTermsPage() {
             <strong>Responsibility.</strong> The site, its backups and the compatibility of fixes with your theme
             and plugins are your responsibility. We recommend keeping a backup before approving fixes, and making
             sure you are authorized to make changes to the site.
+          </li>
+        </ul>
+        <h3>Shopify stores</h3>
+        <p>
+          In a connected Shopify store, the Service can suggest site fixes and apply them through the app, only
+          with your consent and your approval of each fix.
+        </p>
+        <ul>
+          <li>
+            <strong>What may be applied.</strong> The list is closed, and it covers the store&rsquo;s articles and
+            pages only: the title and description shown in search results, the alt text of an image inside that
+            article or page, repair of a broken link inside it, an FAQ block added at its end, and turning an
+            extra H1 heading inside it into an H2. Every fix is shown to you before it is applied, and writes to
+            that one article or page only. The Service does not touch products, collections, the theme, the
+            store&rsquo;s settings, prices, orders, redirects or any file of the store, does not delete content,
+            and does not publish or unpublish anything.
+          </li>
+          <li>
+            <strong>Log and undo.</strong> Every approval of yours is recorded together with who approved it,
+            when, the IP address the approval was given from, and the previous and the new value, so that we can
+            show you what was done and so that a fix can be undone to restore the previous value. If the content
+            in the store changed after the fix, automatic undo may not be possible.
+          </li>
+          <li>
+            <strong>Removal.</strong> You can remove the app from your store at any time. Fixes already applied
+            stay in the store unless you undo them.
+          </li>
+          <li>
+            <strong>Responsibility.</strong> The content of the store and the suitability of the fixes to your
+            theme are your responsibility, and you must make sure you are authorized to make changes to the
+            store.
           </li>
         </ul>
       </section>
@@ -563,7 +596,7 @@ export default function EnglishTermsPage() {
 
       <section>
         <p className={LEGAL_FOOTNOTE}>
-          Last updated: October 3, 2026
+          Last updated: October 6, 2026
         </p>
       </section>
     </LegalDoc>
