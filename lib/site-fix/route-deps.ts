@@ -7,10 +7,11 @@ import { clientIpFrom } from '@/lib/free-check/store'
 import {
   detectSeoCapabilities, findItemByUrl, getItemForEdit, searchItems, updateItemFields, writeVerifiedSeoMeta,
 } from '@/lib/wordpress/client'
-import { liveReader as siteHealthLiveReader } from '@/lib/site-health/api'
+import { handleScan, linkStatusReader, liveReader as siteHealthLiveReader } from '@/lib/site-health/api'
+import type { SiteHealthReport } from '@/lib/site-health/types'
 import { getRecoGenAiClient } from '@/lib/content/recommendations/genai-client'
 import { resolveAvailableRecommendationModel } from '@/lib/content/recommendations/model-availability'
-import type { FixesDeps } from './api'
+import type { AutoFixDeps, FixesDeps } from './api'
 import { makeSiteFixGenerate } from './model'
 import { liveReader, liveTextReader } from './preview'
 import type { Generate } from './suggest'
@@ -30,9 +31,34 @@ export const siteFixGenerate: Generate = makeSiteFixGenerate({
 
 export function routeDeps(userId: string | null, headers: Headers): FixesDeps {
   const ip = clientIpFrom(headers)
+  return baseDeps(userId, ip === 'unknown' ? null : ip.slice(0, 64))
+}
+
+/**
+ * The scheduler's dependencies for one grant (lib/site-fix/auto-run.ts): the same as routeDeps,
+ * but there is no request. The IP is the one recorded when the owner turned the switch on
+ * (site_fix_auto_grants.enabled_ip), never a header. The scan runs as the grant's owner, and only
+ * its report is kept; Shopify is never wired (automatic fixes are WordPress plugin only).
+ */
+export function cronDeps(userId: string, ip: string | null): AutoFixDeps {
+  const deps = baseDeps(userId, ip ? ip.slice(0, 64) : null)
+  return {
+    ...deps,
+    scanReport: async (scope) => {
+      let report: SiteHealthReport | null = null
+      await handleScan({ projectId: scope.projectId }, { userId: scope.userId, admin: deps.admin }, (line) => {
+        if (line.type === 'report') report = line.report
+      })
+      return report
+    },
+    checkLink: linkStatusReader(),
+  }
+}
+
+function baseDeps(userId: string | null, ip: string | null): FixesDeps {
   return {
     userId,
-    ip: ip === 'unknown' ? null : ip.slice(0, 64),
+    ip,
     admin: createAdminClient(),
     decrypt: decryptCredential,
     encrypt: encryptCredential,

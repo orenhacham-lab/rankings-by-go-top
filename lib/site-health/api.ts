@@ -230,3 +230,26 @@ export function liveReader(base: typeof fetch = fetch): WpFixDeps['readLivePage'
     }
   }
 }
+
+/**
+ * The status one same-site address answers now, through the scan's pinned, capped fetch (only the
+ * address's own host, every redirect hop on it): automatic fixes remove a dead link only when it
+ * still answers 404 or 410 (lib/site-fix/auto.ts). Null when it cannot be read at all.
+ */
+export function linkStatusReader(base: typeof fetch = fetch): (url: string) => Promise<number | null> {
+  return async (raw) => {
+    const u = normalizeCheckUrl(raw)
+    if (!u.ok) return null
+    const clock = new AbortController()
+    const timer = setTimeout(() => clock.abort(), PAGE_MS)
+    try {
+      const fetchImpl = hostPinnedFetch({ siteKey: domainKey(u.url), base, deadline: clock.signal, trace: [], offHost: { hit: false } })
+      const got = await fetchSiteHtml(u.url, { fetchImpl })
+      return got.ok ? got.status : got.status ?? null
+    } catch {
+      return null
+    } finally {
+      clearTimeout(timer)
+    }
+  }
+}

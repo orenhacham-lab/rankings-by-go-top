@@ -41,6 +41,7 @@ import ProfileCard from '@/components/settings/ProfileCard'
 import WeeklyEmailCard from '@/components/reports/monthly/WeeklyEmailCard'
 import ReminderEmailsCard from '@/components/reminders/ReminderEmailsCard'
 import ScanBand from '@/components/settings/ScanBand'
+import SiteAutoFixCard from '@/components/settings/SiteAutoFixCard'
 import SettingsIndex from '@/components/settings/SettingsIndex'
 import SettingsSkeleton from '@/components/settings/SettingsSkeleton'
 import { Skeleton } from '@/components/ui/Skeleton'
@@ -85,6 +86,7 @@ function ProjectSettings({ project, reload }: { project: Project; reload: () => 
   const [redetectChain, setRedetectChain] = useState<{ step: number; n: number } | null>(null)
   const [clients, setClients] = useState<Client[]>([])
   const [competitorsShown, setCompetitorsShown] = useState(true)
+  const [autoFixShown, setAutoFixShown] = useState(false)
   // A rename shows in the top bar's switcher too, so a save reloads its list.
   const { reloadProjects } = useActiveProject()
 
@@ -221,7 +223,10 @@ function ProjectSettings({ project, reload }: { project: Project; reload: () => 
   if (article.state.status !== 'loading') {
     index.push({ id: SECTION.articleDesign, label: t.articleStyle.title }, { id: SECTION.officialProfiles, label: t.officialProfiles.navLabel })
   }
-  index.push({ id: SECTION.connections, label: t.connectionsTitle }, { id: SECTION.danger, label: t.danger.title })
+  index.push({ id: SECTION.connections, label: t.connectionsTitle })
+  // The card hides itself while its table is not installed; the index follows it.
+  if (autoFixShown) index.push({ id: SECTION.siteAutoFix, label: dict.siteHealth.autofix.auto.title })
+  index.push({ id: SECTION.danger, label: t.danger.title })
 
   return (
     <div ref={rootRef}>
@@ -328,6 +333,9 @@ function ProjectSettings({ project, reload }: { project: Project; reload: () => 
                   search volumes, not a project connection) and "Google Analytics 4
                   is not available yet" were cards that led nowhere; they are gone. */}
             </section>
+
+            {/* Automatic site-health fixes: off by default, WordPress with the Go Top plugin only. */}
+            <SiteAutoFixCard projectId={project.id} onShown={setAutoFixShown} />
 
             {/* Monthly report: the weekly-email switch (off by default; nothing sends yet). */}
             <WeeklyEmailCard projectId={project.id} language={uiLocale} />

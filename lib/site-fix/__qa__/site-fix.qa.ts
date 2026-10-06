@@ -234,8 +234,18 @@ async function main() {
     // A read, update or delete filters by the owner; an insert writes the owner's id into the row.
     return chains.length > 0 && chains.every((c) => /\.eq\('user_id',/.test(c[2]) || /^\.insert\(\{[\s\S]*user_id: scope\.userId/.test(c[2]))
   }
-  const SOURCES = ['lib/site-fix/store.ts', 'lib/site-fix/channel.ts', 'lib/site-fix/api.ts']
-  check('O1: every table read or write in the site-fix modules carries the owner filter (source)', SOURCES.every((f) => ownerFiltered(read(f))), SOURCES.filter((f) => !ownerFiltered(read(f))).join(', '))
+  // The automatic-fix switch's store has ONE cross-project read on purpose, the scheduler's list of
+  // due grants (auto-run.ts re-proves each owner; site-fix-auto.qa.ts H6 pins its only caller). It
+  // is allow-listed by name, exactly once; everything else in that file is held to the owner rule.
+  const CROSS_PROJECT = /export async function listDueGrants\([\s\S]*?\n\}\n/g
+  const allowListed = (f: string, src: string) => (f === 'lib/site-fix/auto-store.ts' ? src.replace(CROSS_PROJECT, '') : src)
+  const SOURCES = ['lib/site-fix/store.ts', 'lib/site-fix/channel.ts', 'lib/site-fix/api.ts', 'lib/site-fix/auto-store.ts']
+  const src = (f: string) => allowListed(f, read(f))
+  check('O1: every table read or write in the site-fix modules carries the owner filter (source)', SOURCES.every((f) => ownerFiltered(src(f))), SOURCES.filter((f) => !ownerFiltered(src(f))).join(', '))
+  check('O1b: the automatic-fix store has exactly one allow-listed cross-project read', (read('lib/site-fix/auto-store.ts').match(CROSS_PROJECT) ?? []).length === 1)
+  check('MUTATION CONTROL: a switch read without .eq(\'user_id\') in the automatic-fix store is caught by O1',
+    !ownerFiltered(allowListed('lib/site-fix/auto-store.ts', read('lib/site-fix/auto-store.ts').replace(".eq('project_id', scope.projectId).eq('user_id', scope.userId).is('disabled_at', null).maybeSingle()", ".eq('project_id', scope.projectId).is('disabled_at', null).maybeSingle()"))))
+  check('MUTATION CONTROL: the cross-project read is not allow-listed outside the automatic-fix store', !ownerFiltered(allowListed('lib/site-fix/store.ts', `${read('lib/site-fix/store.ts')}\n${/export async function listDueGrants\([\s\S]*?\n\}\n/.exec(read('lib/site-fix/auto-store.ts'))?.[0] ?? ''}`)))
   check('MUTATION CONTROL: a store read without .eq(\'user_id\') is caught by O1', !ownerFiltered(read('lib/site-fix/store.ts').replace(".eq('project_id', scope.projectId).eq('user_id', scope.userId)\n    .order('created_at'", ".eq('project_id', scope.projectId)\n    .order('created_at'")))
   const otherJob = { id: newId(), project_id: P, user_id: OTHER, fix_type: 'seo_title', finding_kind: 'title_long', page_url: `${SITE}/x/`, payload: { value: 'Theirs' }, before_value: 'x', after_summary: 'Theirs', channel: 'plugin', status: 'applied', error_code: null, undo: { revert: { kind: 'plugin' } }, remote_ref: null, approved_by: OTHER, approved_at: '2026-09-01T00:00:00Z', approved_ip: '198.51.100.1', applied_at: null, reverted_at: null, created_at: '2026-09-01T00:00:00Z', updated_at: '2026-09-01T00:00:00Z' }
   const ownerRuntime = async (S: typeof STORE) => {
