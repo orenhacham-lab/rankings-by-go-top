@@ -21,7 +21,7 @@
  * The giver's account and article ids never leave the server.
  *
  * Hidden, not an error: without the network's tables (migration not applied),
- * and for a Shopify project, GET answers { available: false, reason } and the POSTs 409.
+ * GET answers { available: false, reason } and the POSTs 409.
  * Answers carry stable codes only, never database or provider text.
  * Guarded by lib/link-network/__qa__/link-network.qa.ts.
  */
@@ -71,11 +71,10 @@ export interface ReceivedItem {
 export type Readiness = 'ready' | 'domain_unverified' | 'thin_or_new' | 'category_unknown'
 
 /**
- * Why the network is not on the screen: 'shopify' (a Shopify store, where the network
- * does not exist and the screen says so), 'off' (the tables are missing, or the read
+ * Why the network is not on the screen: 'off' (the tables are missing, or the read
  * failed; the screen never mentions the network then). Presentation only.
  */
-export type UnavailableReason = 'shopify' | 'off'
+export type UnavailableReason = 'off'
 
 export type NetworkAnswer =
   | { ok: true; available: false; reason: UnavailableReason }
@@ -101,7 +100,7 @@ const refuse = (status: number, code: string) => Response.json({ ok: false, code
 export const LOG_READ_LIMIT = 100
 
 type ProjectRow = { id: string; user_id: string }
-type ArticleRow = { id: string; project_id: string; user_id: string; title: string | null; status: string | null; wp_post_url: string | null; content_html: string | null }
+type ArticleRow = { id: string; project_id: string; user_id: string; title: string | null; status: string | null; wp_post_url: string | null; shopify_article_url: string | null; content_html: string | null }
 
 type Gate =
   | { ok: false; response: Response }
@@ -137,7 +136,7 @@ async function gate(projectId: string, deps: NetworkDeps): Promise<Gate> {
 }
 
 const monthOf = (iso: string) => iso.slice(0, 7)
-const published = (a: Pick<ArticleRow, 'status' | 'wp_post_url'>) => !!a.wp_post_url || a.status === 'published' || a.status === 'publishing'
+const published = (a: Pick<ArticleRow, 'status' | 'wp_post_url' | 'shopify_article_url'>) => !!a.wp_post_url || !!a.shopify_article_url || a.status === 'published' || a.status === 'publishing'
 
 function stateOf(p: PlacementRow, article: ArticleRow | undefined): PlacementState {
   if (p.status === 'rejected') return 'rejected'
@@ -154,8 +153,7 @@ export async function handleNetworkGet(projectId: string, deps: NetworkDeps): Pr
   try {
     const sites = await loadSites(db, [project.id])
     const me = sites.get(project.id)
-    // Shopify: the network does not exist for this project. Not shown, not joinable.
-    if (!me || me.site.shopify) return Response.json({ ok: true, available: false, reason: me?.site.shopify ? 'shopify' : 'off' } satisfies NetworkAnswer, { status: 200, headers: NO_STORE })
+    if (!me) return Response.json({ ok: true, available: false, reason: 'off' } satisfies NetworkAnswer, { status: 200, headers: NO_STORE })
 
     const countQuery = await db.from('link_network_members').select('project_id', { count: 'exact', head: true }).eq('active', true)
     if (countQuery.error) throw countQuery.error
@@ -174,7 +172,7 @@ export async function handleNetworkGet(projectId: string, deps: NetworkDeps): Pr
     // The giving side's own articles: owner-filtered.
     const givenArticleIds = [...new Set(givenRows.map((p) => p.source_article_id).filter((id): id is string => !!id))]
     const ownArticles = givenArticleIds.length
-      ? await rows<ArticleRow>(db.from('generated_articles').select('id, project_id, user_id, title, status, wp_post_url, content_html')
+      ? await rows<ArticleRow>(db.from('generated_articles').select('id, project_id, user_id, title, status, wp_post_url, shopify_article_url, content_html')
         .in('id', givenArticleIds).eq('project_id', project.id).eq('user_id', userId))
       : []
     const ownById = new Map(ownArticles.filter((a) => a.project_id === project.id && a.user_id === userId).map((a) => [a.id, a]))
@@ -183,7 +181,7 @@ export async function handleNetworkGet(projectId: string, deps: NetworkDeps): Pr
     // source article (same id AND same source project), and only its live state.
     const recvArticleIds = [...new Set(receivedRows.map((p) => p.source_article_id).filter((id): id is string => !!id))]
     const recvArticles = recvArticleIds.length
-      ? await rows<ArticleRow>(db.from('generated_articles').select('id, project_id, user_id, title, status, wp_post_url, content_html').in('id', recvArticleIds))
+      ? await rows<ArticleRow>(db.from('generated_articles').select('id, project_id, user_id, title, status, wp_post_url, shopify_article_url, content_html').in('id', recvArticleIds))
       : []
     const recvById = new Map(recvArticles.map((a) => [a.id, a]))
 
@@ -199,7 +197,7 @@ export async function handleNetworkGet(projectId: string, deps: NetworkDeps): Pr
         anchor: p.anchor_text,
         placedAt: p.placed_at,
         state,
-        liveUrl: state === 'published' ? safeExternalUrl(a?.wp_post_url) : null,
+        liveUrl: state === 'published' ? safeExternalUrl(a?.wp_post_url || a?.shopify_article_url) : null,
         context: a && state !== 'rejected' ? linkContext(a.content_html, p.target_url) : null,
         canReject: state === 'waiting',
       }
@@ -217,7 +215,7 @@ export async function handleNetworkGet(projectId: string, deps: NetworkDeps): Pr
         anchor: p.anchor_text,
         placedAt: p.placed_at,
         state,
-        liveUrl: state === 'published' ? safeExternalUrl(a?.wp_post_url) : null,
+        liveUrl: state === 'published' ? safeExternalUrl(a?.wp_post_url || a?.shopify_article_url) : null,
         context: state === 'published' && a ? linkContext(a.content_html, p.target_url) : null,
       }
     })
@@ -275,7 +273,7 @@ export async function handleMembershipPost(request: Request, projectId: string, 
   const now = deps.now().toISOString()
   try {
     const me = (await loadSites(db, [project.id])).get(project.id)
-    if (!me || me.site.shopify) return refuse(409, 'unavailable')
+    if (!me) return refuse(409, 'unavailable')
     if (body.join) {
       if (body.consent !== true || body.consentVersion !== LINK_NETWORK_CONSENT_VERSION) return refuse(400, 'consent_required')
       // Only a site whose owner proved control of its domain may join (leaving is always allowed).
@@ -322,7 +320,7 @@ export async function handleRejectPost(request: Request, projectId: string, plac
     if (!placement || placement.source_project_id !== project.id) return refuse(404, 'not_found')
     if (placement.status !== 'placed') return refuse(409, 'already_rejected')
     const article = placement.source_article_id
-      ? (await rows<ArticleRow>(db.from('generated_articles').select('id, project_id, user_id, title, status, wp_post_url, content_html')
+      ? (await rows<ArticleRow>(db.from('generated_articles').select('id, project_id, user_id, title, status, wp_post_url, shopify_article_url, content_html')
         .eq('id', placement.source_article_id).eq('project_id', project.id).eq('user_id', userId).limit(1)))[0]
       : undefined
     if (article && published(article)) return refuse(409, 'already_published')

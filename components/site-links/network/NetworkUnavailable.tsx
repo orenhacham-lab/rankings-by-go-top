@@ -6,8 +6,6 @@
  * owner read that as "the network I asked for is not there". Now the network always
  * leads, and when it cannot run the hero says so and why:
  *
- *   'shopify'  the project is a Shopify store, or the account is billed through
- *              Shopify (lib/link-network/store.ts, unchanged): no switch, the reason;
  *   'off'      the network could not be read right now: the reason and a retry.
  *
  * The figures stay, as "—": nothing is counted for a site that is not in the network.
@@ -39,7 +37,7 @@ export default function NetworkUnavailable({ reason, onRetry }: { reason: Unavai
         </div>
         <h2 id="link-network-title" className="mt-5 max-w-[32ch] text-title font-bold tracking-tight text-balance">{u.title}</h2>
         <p className="mt-3 max-w-prose text-copy text-contrast-ink/80 text-pretty" data-link-network="unavailable-reason">
-          {reason === 'shopify' ? u.shopify : u.off}
+          {u.off}
         </p>
         <NetworkPromises label={h.promisesLabel} items={h.promises} />
         {reason === 'off' && (

@@ -2,7 +2,7 @@
 
 /**
  * Links ("קישורים לאתר"): the opt-in link network among our customers' sites
- * first (lib/link-network; for a Shopify project it says why it cannot run), then
+ * first (lib/link-network), then
  * free directories the owner adds the business to, the links between the site's
  * own pages (lib/site-links), and Search Console's Links report. Opening the tab
  * reads stored data only: it calls no provider and spends nothing.

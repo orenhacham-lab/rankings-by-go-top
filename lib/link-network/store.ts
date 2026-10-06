@@ -186,8 +186,8 @@ export async function loadSites(db: NetworkDb, projectIds: string[]): Promise<Ma
       db.from('project_seed_runs').select('project_id, status, summary, created_at').in('project_id', ids).order('created_at', { ascending: false }).limit(ids.length * 4)),
     rows<IndexRow>(db.from('site_crawl_index').select('project_id, targets, scan_status').in('project_id', ids).limit(ids.length)),
     rows<IndexRow>(db.from('wordpress_content_index').select('project_id, targets').in('project_id', ids).limit(ids.length)),
-    rows<{ project_id: string; title: string | null; wp_post_url: string | null }>(
-      db.from('generated_articles').select('project_id, title, wp_post_url').in('project_id', ids).eq('status', 'published').limit(ids.length * 30)),
+    rows<{ project_id: string; title: string | null; wp_post_url: string | null; shopify_article_url: string | null }>(
+      db.from('generated_articles').select('project_id, title, wp_post_url, shopify_article_url').in('project_id', ids).eq('status', 'published').limit(ids.length * 30)),
     readDomainProof(db, projects),
     // The full-site mapping (sitemaps + platform lists): counts only, never its entries.
     rows<PageMapRow>(db.from('site_page_map').select('project_id, user_id, status, counts').in('project_id', ids).limit(ids.length)),
@@ -230,7 +230,7 @@ export async function loadSites(db: NetworkDb, projectIds: string[]): Promise<Ma
       seen.add(u)
       pages.push({ url: u, title: t })
     }
-    for (const a of pubOf.get(p.id) ?? []) addPage(a.wp_post_url, a.title)
+    for (const a of pubOf.get(p.id) ?? []) addPage(a.wp_post_url || a.shopify_article_url, a.title)
     for (const t of index) {
       if (!t || typeof t !== 'object') continue
       const row = t as { targetUrl?: unknown; targetTitle?: unknown; eligibility?: unknown }
@@ -276,6 +276,9 @@ export async function loadSites(db: NetworkDb, projectIds: string[]): Promise<Ma
  *   site_fix_plugin_links      status 'connected' (the GO TOP plugin answered a signed call)
  *   project_gsc_properties     the assigned Search Console property, its Google
  *                              connection still 'connected' and the owner's own.
+ *   shopify_connections        connection_status 'connected', not archived: the store's
+ *                              myshopify.com domain and its primary domain, both as Shopify
+ *                              itself reported them at the authorized install (never typed).
  * NOT site_platform_connections: a Wix or custom-site (webhook) site_url is typed
  * by the owner and never checked against the site (a webhook is 'connected' on
  * save, untested), so it proves nothing.
@@ -286,10 +289,12 @@ export async function readDomainProof(db: NetworkDb, projects: { id: string; use
   if (!projects.length) return out
   const ids = projects.map((p) => p.id)
   const ownerOf = new Map(projects.map((p) => [p.id, p.user_id]))
-  const [wp, plugin, gsc] = await Promise.all([
+  const [wp, plugin, gsc, shops] = await Promise.all([
     rows<OwnedSiteRow>(db.from('wordpress_connections').select('project_id, user_id, site_url').in('project_id', ids).eq('connection_status', 'connected').limit(ids.length)),
     rows<OwnedSiteRow>(db.from('site_fix_plugin_links').select('project_id, user_id, site_url').in('project_id', ids).eq('status', 'connected').limit(ids.length)),
     rows<GscPropertyRow>(db.from('project_gsc_properties').select('project_id, connection_id, site_url, permission_level').in('project_id', ids).limit(ids.length)),
+    rows<{ project_id: string; user_id: string; shop_domain: string | null; storefront_domain: string | null }>(db.from('shopify_connections')
+      .select('project_id, user_id, shop_domain, storefront_domain').in('project_id', ids).eq('connection_status', 'connected').is('archived_at', null).limit(ids.length * 2)),
   ])
   const connIds = [...new Set(gsc.map((g) => g.connection_id).filter((id): id is string => !!id))]
   const liveConns = connIds.length
@@ -304,6 +309,10 @@ export async function readDomainProof(db: NetworkDb, projects: { id: string; use
   for (const r of [...wp, ...plugin]) {
     if (!r.site_url || !ownerOf.has(r.project_id) || r.user_id !== ownerOf.get(r.project_id)) continue
     entry(r.project_id).hosts.push(r.site_url)
+  }
+  for (const s of shops) {
+    if (!ownerOf.has(s.project_id) || s.user_id !== ownerOf.get(s.project_id)) continue
+    for (const host of [s.shop_domain, s.storefront_domain]) if (host) entry(s.project_id).hosts.push(host)
   }
   for (const g of gsc) {
     if (!g.site_url || !g.connection_id || !ownerOf.has(g.project_id) || connOwner.get(g.connection_id) !== ownerOf.get(g.project_id)) continue

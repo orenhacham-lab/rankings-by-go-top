@@ -52,16 +52,17 @@ async function main() {
 
     const NetworkUnavailable: any = require('../../components/site-links/network/NetworkUnavailable').default
     const draw = (reason: string, locale: Locale = 'he', mod: any = NetworkUnavailable) => render(locale, createElement(mod, { reason, onRetry() {} }))
-    const shop = text(draw('shopify'))
-    check('A2: Shopify: the title, the reason that names a Shopify store AND a Shopify-billed account, no switch, no retry',
-      shop.includes('רשת הקישורים לא זמינה לאתר הזה') && shop.includes('חנות Shopify, או חשבון שהמנוי שלו משולם דרך Shopify') && !/role="switch"/.test(draw('shopify')) && !shop.includes('נסו שוב'))
+    // Since 2026-10-06 a Shopify store is in the network (Oren): the screen has no Shopify state left.
+    const shopHtml = draw('shopify')
+    check('A2: no Shopify state: whatever reason arrives, the screen shows the plain "could not load" text, never Shopify',
+      !text(shopHtml).includes('Shopify') && !/u\.shopify/.test(strip(read('components/site-links/network/NetworkUnavailable.tsx'))))
     const off = text(draw('off'))
     check('A3: a failed read says so and offers a retry', off.includes('לא הצלחנו לטעון עכשיו את רשת הקישורים') && off.includes('נסו שוב') && !off.includes('Shopify'))
-    check('A4: the figures stay as "—" (nothing counted for a site outside the network)', (draw('shopify').match(/—/g) ?? []).length >= 3)
-    const mutUn = await withMutant<any, boolean>('components/site-links/network/NetworkUnavailable.tsx', [["{reason === 'shopify' ? u.shopify : u.off}", '{u.off}']], (m) => text(draw('shopify', 'he', m.default)).includes('משולם דרך Shopify'))
-    check('A2-MUT: the Shopify reason dropped → caught', !mutUn)
-    const enShop = text(draw('shopify', 'en'))
-    check('A2 English: the same, in English only', enShop.includes('The link network is not available for this site') && enShop.includes('billed through Shopify') && !/[א-ת]/.test(enShop))
+    check('A4: the figures stay as "—" (nothing counted for a site outside the network)', (draw('off').match(/—/g) ?? []).length >= 3)
+    const mutUn = await withMutant<any, boolean>('components/site-links/network/NetworkUnavailable.tsx', [['{u.off}', "{reason === 'off' ? u.off : 'Shopify'}"]], (m) => text(draw('shopify', 'he', m.default)).includes('Shopify'))
+    check('A2-MUT: a Shopify state put back → caught', mutUn)
+    const enOff = text(draw('off', 'en'))
+    check('A2 English: the same, in English only', enOff.includes('The link network is not available for this site') && !enOff.includes('Shopify') && !/[א-ת]/.test(enOff))
 
     // The hero's words: Go Top SEO customers, and the three promises in every state.
     check('A5: the figures say they are links between Go Top SEO customers (both languages)',
@@ -82,8 +83,8 @@ async function main() {
     const mutP = await withMutant<any, boolean>('components/site-links/network/NetworkPanel.tsx', [['<NetworkPromises label={h.promisesLabel} items={h.promises} />', '']], (m) => /data-link-network="promises"/.test(panel(base, m.default)))
     check('A7-MUT: the promises removed from the hero → caught', !mutP)
     // The network's server side is not part of this change.
-    const store = read('lib/link-network/store.ts')
-    check('A8: a Shopify-billed account is still outside the network (admins are judged per project, guarded in link-network.qa)', /shopifyBilled\.has\(p\.user_id\)/.test(store) && /billing_authority === 'shopify'/.test(store))
+    const rules = strip(read('lib/link-network/rules.ts'))
+    check('A8: a Shopify store or a Shopify-billed account is no longer refused by the rules (in the network since 2026-10-06; guarded in link-network.qa)', !/site\.shopify\)\s*return/.test(rules))
   }
 
   // ── B. free listings ──────────────────────────────────────────────────────

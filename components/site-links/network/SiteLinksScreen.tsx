@@ -6,8 +6,8 @@
  *   1. the link network among Go Top SEO customers, ALWAYS first: a hero that says in
  *      words whether it is on for this site, with the switch, what the site gave and
  *      received, what waits, and the network's promises (NetworkPanel); the consent
- *      panel right under it when it is opened. When the network cannot run here (a
- *      Shopify store or a Shopify-billed account, or the read failed) the same place
+ *      panel right under it when it is opened. When the network cannot run here (it
+ *      is switched off, or the read failed) the same place
  *      says so and why (NetworkUnavailable): it never disappears;
  *   2. only while the site is in the network: the placement log (PlacementLog),
  *      where a link given can be taken out before it is published;
@@ -37,7 +37,7 @@ type Load = { kind: 'loading' } | { kind: 'hidden'; reason: UnavailableReason } 
 export function readNetwork(body: unknown): { data: AvailableNetwork } | { reason: UnavailableReason } {
   if (!body || typeof body !== 'object') return { reason: 'off' }
   const b = body as Partial<AvailableNetwork> & { reason?: unknown }
-  if (b.ok === true && (b as { available?: unknown }).available === false) return { reason: b.reason === 'shopify' ? 'shopify' : 'off' }
+  if (b.ok === true && (b as { available?: unknown }).available === false) return { reason: 'off' }
   if (b.ok !== true || b.available !== true || !Array.isArray(b.received) || !Array.isArray(b.given) || !b.membership || !b.caps || !b.totals) return { reason: 'off' }
   return { data: b as AvailableNetwork }
 }

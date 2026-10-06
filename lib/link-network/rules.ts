@@ -16,8 +16,9 @@
  *     neither does a Wix or custom-site (webhook) connection, whose site
  *     address the owner types in and nothing checks; so a stranger's site can
  *     never enter the network;
- *   - never Shopify, never a site that is new or thin (too young, never scanned
- *     successfully, or with too little published content);
+ *   - never a site that is new or thin (too young, never scanned successfully,
+ *     or with too little published content). A Shopify store takes part like
+ *     any other site: its links go into the articles we publish to its blog;
  *   - never a project to itself, to another project of the same owner or of the
  *     same client, or to a site on the same server address;
  *   - never the same or a competing business: the same category (or one
@@ -76,7 +77,7 @@ export interface NetworkSite {
   competitors: string[]
   /** The server addresses its domain resolves to (empty when unresolved). */
   addresses: string[]
-  /** A Shopify store, by connection, detected platform or billing authority. */
+  /** A Shopify store, by connection, detected platform or billing authority (shown, never an exclusion). */
   shopify: boolean
   /** Member with consent, switch on. */
   active: boolean
@@ -101,7 +102,7 @@ export interface Edge {
 }
 
 export type Exclusion =
-  | 'not_member' | 'shopify' | 'domain_unverified' | 'thin_or_new'
+  | 'not_member' | 'domain_unverified' | 'thin_or_new'
   | 'self' | 'same_owner' | 'same_client' | 'same_address'
   | 'language' | 'category_unknown' | 'same_category' | 'competitor'
   | 'reciprocal' | 'already_linked' | 'loop'
@@ -153,10 +154,9 @@ export function provenDomains(domains: readonly string[], proof: DomainProof): s
   })
 }
 
-/** Not new, not thin, scanned, not Shopify, a member, its domain proven. The same bar for giving and receiving. */
+/** Not new, not thin, scanned, a member, its domain proven. The same bar for giving and receiving. */
 export function siteQualifies(site: NetworkSite, now: Date): Exclusion | null {
   if (!site.active) return 'not_member'
-  if (site.shopify) return 'shopify'
   // The site's own domain (the first one: the project's target domain) must be proven.
   if (site.domains.length > 0 && !site.verifiedDomains.includes(site.domains[0])) return 'domain_unverified'
   const created = new Date(site.createdAt).getTime()
@@ -243,7 +243,7 @@ export function exclusionFor(source: NetworkSite, target: NetworkSite, edges: re
   return null
 }
 
-/** The source's own bar: a member, not thin or new, not Shopify, under its monthly giving cap. */
+/** The source's own bar: a member, not thin or new, under its monthly giving cap. */
 export function sourceExclusion(source: NetworkSite, edges: readonly Edge[], now: Date): Exclusion | null {
   const own = siteQualifies(source, now)
   if (own) return own

@@ -3214,7 +3214,6 @@ export const dashboardEn = {
         unavailable: {
           badge: 'Not available',
           title: 'The link network is not available for this site',
-          shopify: 'The network does not run on sites connected through Shopify: a Shopify store, or an account whose subscription is billed through Shopify. There is no safe way for us to add a link inside an article there. Everything else on this page works.',
           off: 'We could not load the link network right now. Try again in a moment.',
         },
         connect: 'Connect the site',

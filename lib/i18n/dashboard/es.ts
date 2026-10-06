@@ -4346,7 +4346,6 @@ export const dashboardEs: DeepPartial<DashboardDictionary> = {
         unavailable: {
           badge: 'No disponible',
           title: 'La red de enlaces no está disponible para esta web',
-          shopify: 'La red no funciona en webs conectadas a través de Shopify: una tienda de Shopify, o una cuenta cuya suscripción se cobra a través de Shopify. Allí no tenemos una forma segura de añadir un enlace dentro de un artículo. Todo lo demás de esta página funciona.',
           off: 'No hemos podido cargar la red de enlaces ahora mismo. Inténtalo de nuevo en un momento.',
         },
         connect: 'Conectar la web',

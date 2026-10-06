@@ -5,7 +5,7 @@
  *
  *   1. The feature exists (tables), the source joined, the article is a fresh
  *      draft of this owner's project and carries no network link yet.
- *   2. The source qualifies (rules.sourceExclusion): not Shopify, not thin/new,
+ *   2. The source qualifies (rules.sourceExclusion): not thin/new,
  *      under its monthly giving cap.
  *   3. The candidates: every other active member, through the rules (no
  *      competitor, no same category, no reciprocal / loop / already linked, no
