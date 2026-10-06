@@ -147,7 +147,7 @@ Quando você pede para baixar um relatório em PDF, enviamos o conteúdo do rela
 
 ## Rede de links
 
-Entrar na rede de links é opcional, é feito para cada projeto separadamente, vem desativado por padrão e não está disponível para lojas Shopify. Quem entra concorda com os dois sentidos: que um link dos seus artigos possa apontar para o site de outro membro da rede e que links para o seu site possam ser inseridos em artigos de outros membros.
+Entrar na rede de links é opcional, é feito para cada projeto separadamente e vem desativado por padrão. Quem entra concorda com os dois sentidos: que um link dos seus artigos possa apontar para o site de outro membro da rede e que links para o seu site possam ser inseridos em artigos de outros membros. Uma loja Shopify conectada também pode entrar, e os links são inseridos somente dentro de artigos que o Serviço escreve e publica no blog da loja. Numa loja assim, a titularidade do domínio é obtida da própria conexão: o endereço myshopify da loja e o seu domínio principal, conforme a Shopify os informou na instalação.
 
 - **O que armazenamos:** quem aceitou a entrada, quando, o texto dos termos aceitos e o tipo de link, e cada inserção feita, dos dois lados.
 - **O que outro membro vê:** a Empresa não publica uma lista de membros. O lado que recebe vê o endereço do site que o linka e, após a publicação, a página em que o link apareceu. Um link publicado é um link público no site.

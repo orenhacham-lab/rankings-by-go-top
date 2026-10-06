@@ -149,7 +149,7 @@ Cuando usted solicita descargar un informe como PDF, enviamos el contenido del i
 
 ## Red de enlaces
 
-Unirse a la red de enlaces es opcional, se hace para cada proyecto por separado, está desactivado de forma predeterminada y no está disponible para las tiendas de Shopify. Quien se une acepta ambas direcciones: que un enlace de sus artículos pueda apuntar al sitio de otro miembro de la red, y que se puedan colocar enlaces a su sitio en los artículos de otros miembros.
+Unirse a la red de enlaces es opcional, se hace para cada proyecto por separado y está desactivado de forma predeterminada. Quien se une acepta ambas direcciones: que un enlace de sus artículos pueda apuntar al sitio de otro miembro de la red, y que se puedan colocar enlaces a su sitio en los artículos de otros miembros. Una tienda de Shopify conectada también puede unirse, y los enlaces se colocan únicamente dentro de los artículos que el Servicio redacta y publica en el blog de la tienda. En una tienda así, la titularidad del dominio se toma de la conexión misma: la dirección myshopify de la tienda y su dominio principal, tal como Shopify los comunicó en la instalación.
 
 - **Qué almacenamos:** quién aceptó la adhesión, cuándo, el texto de los términos aceptados y el tipo de enlace, y cada colocación realizada, en ambos lados.
 - **Qué ve otro miembro:** la Empresa no publica una lista de miembros. La parte receptora ve la dirección del sitio que la enlaza y, una vez publicado, la página donde apareció el enlace. Un enlace publicado es un enlace público en el sitio.

@@ -548,6 +548,78 @@ const HEBREW_TERMS = 'app/(public)/terms/page.tsx'
     /15C\.?\s*Site Fixes and the GO TOP SEO Bridge/.test('<h2>15C. Site Fixes and the GO TOP SEO Bridge Plugin</h2>'))
 }
 
+// ── 14) the link network inside a Shopify store, in both documents ─────────
+/*
+ * Oren opened the network to Shopify stores on 2026-10-06, after the risk was
+ * put to him: Shopify has no explicit prohibition, but App Store requirement
+ * 1.1 obliges a partner to act in good faith and in merchants' best interests,
+ * with review-team discretion, and Google's spam policy names excessive link
+ * exchanges and automated link-creation services, with a manual action as the
+ * remedy. 15A already carries the Google disclosure and the member's
+ * acceptance of that risk; what the Shopify sentences have to carry, in every
+ * language, is the three things that keep the practice defensible:
+ *
+ *   1. the links go ONLY inside articles the Service writes and publishes to
+ *      the store's blog — nothing already in the store is edited. This is also
+ *      what keeps it inside write_content.
+ *   2. joining is separate and voluntary, and a link can be removed before the
+ *      article is published.
+ *   3. the merchant confirms Shopify's own terms let them add such links. It
+ *      does not bind Shopify, whose duty runs to the merchant, but it is the
+ *      part we can hold.
+ *
+ * And the sentence that said the network was NOT available for Shopify stores
+ * has to be gone from both documents, in every language, or we would be
+ * running a service the text denies.
+ */
+const SHOPIFY_NETWORK: Record<string, { terms: RegExp[]; privacy: RegExp[] }> = {
+  he: {
+    terms: [/חנות Shopify מחוברת יכולה\s+להצטרף/, /מפרסמת לבלוג החנות/, /בהצטרפות נפרדת ומרצון/, /רשאים לפי התנאים של Shopify/],
+    privacy: [/חנות Shopify מחוברת יכולה להצטרף גם היא/, /כתובת\s+myshopify של החנות/],
+  },
+  en: {
+    terms: [/A connected Shopify store can join it/, /publishes to the store&rsquo;s blog/, /separate and voluntary joining/, /permitted under Shopify&rsquo;s own terms/],
+    privacy: [/connected Shopify store can join as well/, /myshopify address/],
+  },
+  es: {
+    terms: [/Una tienda de Shopify conectada puede unirse a ella/, /publica en el blog de la tienda/, /adhesi[óo]n separada y voluntaria/, /t[ée]rminos de Shopify le permiten/],
+    privacy: [/tienda de Shopify conectada tambi[ée]n puede unirse/, /direcci[óo]n myshopify de la tienda/],
+  },
+  'pt-BR': {
+    terms: [/Uma loja Shopify conectada pode entrar nela/, /publica no blog da loja/, /ades[ãa]o separada e volunt[áa]ria/, /termos da Shopify permitem/],
+    privacy: [/loja Shopify conectada tamb[ée]m pode entrar/, /endere[çc]o myshopify da loja/],
+  },
+}
+const NETWORK_DENIED = /אינו זמין לחנויות Shopify|אינה זמינה לחנויות Shopify|not\s+available for Shopify stores|no est[áa] disponible para las tiendas de Shopify|n[ãa]o est[áa] dispon[íi]vel para lojas Shopify/
+{
+  const read = (path: string) => (existsSync(path) ? readFileSync(path, 'utf8') : '')
+  const enTerms = frontMatter(text[LOCALES[0]].terms).source
+  const enPrivacy = frontMatter(text[LOCALES[0]].privacy).source
+  const docs: [string, string, string][] = [
+    ['he', read(HEBREW_TERMS), read(HEBREW_PRIVACY)],
+    ['en', enTerms ? read(enTerms) : '', enPrivacy ? read(enPrivacy) : ''],
+    ...LOCALES.map((l): [string, string, string] => [l, text[l].terms, text[l].privacy]),
+  ]
+  for (const [name, terms, privacy] of docs) {
+    const rule = SHOPIFY_NETWORK[name]
+    if (!rule) continue
+    for (const must of rule.terms) {
+      check(`${name}/terms: the Shopify network states ${must.source.slice(0, 40)}`, must.test(terms))
+    }
+    for (const must of rule.privacy) {
+      check(`${name}/privacy: the Shopify network states ${must.source.slice(0, 40)}`, must.test(privacy))
+    }
+    check(`${name}: neither document still says the network is closed to Shopify`,
+      !NETWORK_DENIED.test(terms) && !NETWORK_DENIED.test(privacy))
+  }
+  check('mutation control: a document that still denies the network to Shopify is caught',
+    NETWORK_DENIED.test('It is off by default and is not available for Shopify stores.'))
+  check('mutation control: text that lets the network touch an existing store article is caught',
+    !SHOPIFY_NETWORK.en.terms[1].test('the links are placed in the store&rsquo;s existing articles and pages'))
+  check('mutation control: dropping the merchant\'s own Shopify-terms confirmation is caught',
+    !SHOPIFY_NETWORK.es.terms[3].test('La tienda también puede unirse a la red de enlaces de la sección 15A.'))
+}
+
 // ── MUTATION CONTROLS ───────────────────────────────────────────────────────
 console.log('\nmutation controls')
 {

@@ -303,10 +303,13 @@ export default function EnglishPrivacyPage() {
       <section>
         <h2>Link Network</h2>
         <p>
-          Joining the link network is optional, is done for each project separately, is off by default, and is not
-          available for Shopify stores. Whoever joins agrees to both directions: that a link from their articles may
-          point to another network member&rsquo;s site, and that links to their site may be placed in other
-          members&rsquo; articles.
+          Joining the link network is optional, is done for each project separately, and is off by default.
+          Whoever joins agrees to both directions: that a link from their articles may point to another network
+          member&rsquo;s site, and that links to their site may be placed in other members&rsquo; articles. A
+          connected Shopify store can join as well, and the links are placed only inside articles the Service
+          writes and publishes to the store&rsquo;s blog. For such a store, ownership of the domain is taken from
+          the connection itself: the store&rsquo;s myshopify address and its primary domain, as Shopify reported
+          them at installation.
         </p>
         <ul>
           <li><strong>What we store:</strong> who accepted the joining, when, the wording of the terms accepted and
