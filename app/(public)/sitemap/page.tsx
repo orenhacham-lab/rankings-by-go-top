@@ -49,11 +49,21 @@ export default function SitemapPage() {
     {
       title: 'יכולות המערכת',
       links: [
+        { label: 'יצירה, תזמון ופרסום תוכן', href: '/features/seo-geo-content-publishing' },
         { label: 'בדיקת מיקום בגוגל אורגני', href: '/features/google-organic-rank-tracking' },
         { label: 'בדיקת מיקום בגוגל מפות', href: '/features/google-maps-rank-tracking' },
         { label: 'מעקב נראות AI', href: '/features/ai-visibility-tracking' },
         { label: 'דוחות SEO/GEO', href: '/features/seo-geo-reports' },
         { label: 'מחקר ביטויים', href: '/features/keyword-research' },
+        { label: 'תיקוני אתר', href: '/features/site-health-fixes' },
+      ],
+    },
+    {
+      title: 'למי זה מתאים',
+      links: [
+        { label: 'בעלי עסקים', href: '/solutions/businesses' },
+        { label: 'סוכנויות', href: '/solutions/agencies' },
+        { label: 'אתרי וורדפרס', href: '/solutions/wordpress' },
       ],
     },
     {

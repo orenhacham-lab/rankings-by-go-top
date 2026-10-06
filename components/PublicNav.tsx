@@ -3,7 +3,7 @@
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { useState, useEffect } from 'react'
-import { BarChart3, ChevronDown, FileText, MapPin, Menu, Search, Sparkles, Telescope, X, type LucideIcon } from 'lucide-react'
+import { BarChart3, Blocks, Briefcase, ChevronDown, FileText, MapPin, Menu, Search, ShoppingBag, Sparkles, Store, Telescope, Wrench, X, type LucideIcon } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { LOCALE_PREFIX, PUBLIC_LOCALES, localeHomeHref, type PublicLocale } from '@/lib/i18n/locales'
 import { getPublicDictionary } from '@/lib/i18n/getPublicDictionary'
@@ -13,6 +13,7 @@ import { cn } from '@/lib/utils'
 import { LanguageSwitcher } from './LanguageSwitcher'
 import { authHref } from '@/lib/i18n/auth-href'
 import { ContactMenu, ContactRows } from '@/components/public/ContactMenu'
+import { SHOPIFY_APP_STORE_URL } from '@/lib/shopify/app-store-listing'
 
 /**
  * The public site's top bar, in the app's own vocabulary: the Go Top mark and
@@ -32,6 +33,7 @@ export function PublicNav({ locale = 'he', tone = 'default' }: { locale?: Public
   const [isAuthed, setIsAuthed] = useState(false)
   const [authChecked, setAuthChecked] = useState(false)
   const [featuresOpen, setFeaturesOpen] = useState(false)
+  const [solutionsOpen, setSolutionsOpen] = useState(false)
 
   const dict = getPublicDictionary(locale)
   const prefix = LOCALE_PREFIX[locale]
@@ -88,50 +90,56 @@ export function PublicNav({ locale = 'he', tone = 'default' }: { locale?: Public
   const homeHrefs = new Set(PUBLIC_LOCALES.map(localeHomeHref))
   const isActive = (href: string) => (homeHrefs.has(href) ? pathname === href : pathname === href || pathname.startsWith(`${href}/`))
 
-  const featureItems: { id: string; href: string; label: string; description: string; icon: LucideIcon }[] = [
+  type MenuItem = NavMenuItem
+  const fm = dict.nav.featuresMenu
+  const feature = (id: keyof typeof fm, slug: string, icon: LucideIcon): MenuItem => ({
+    id, href: `${prefix}/features/${slug}`, label: fm[id].label, description: fm[id].description, icon,
+  })
+  // Three columns, in the order a customer meets the value (owner, 5 Oct 2026,
+  // after the competitor's menu): what we measure, the work the system does,
+  // and how the results are shown. Every item is a feature that works today.
+  const featureGroups: { id: string; title: string; items: MenuItem[] }[] = [
     {
-      id: 'contentPublishing',
-      href: `${prefix}/features/seo-geo-content-publishing`,
-      label: dict.nav.featuresMenu.contentPublishing.label,
-      description: dict.nav.featuresMenu.contentPublishing.description,
-      icon: FileText,
+      id: 'measure',
+      title: dict.nav.featureGroups.measure,
+      items: [
+        feature('googleOrganic', 'google-organic-rank-tracking', Search),
+        feature('googleMaps', 'google-maps-rank-tracking', MapPin),
+        feature('aiVisibility', 'ai-visibility-tracking', Sparkles),
+        feature('keywordResearch', 'keyword-research', Telescope),
+      ],
     },
     {
-      id: 'googleOrganic',
-      href: `${prefix}/features/google-organic-rank-tracking`,
-      label: dict.nav.featuresMenu.googleOrganic.label,
-      description: dict.nav.featuresMenu.googleOrganic.description,
-      icon: Search,
+      id: 'act',
+      title: dict.nav.featureGroups.act,
+      items: [
+        feature('contentPublishing', 'seo-geo-content-publishing', FileText),
+        feature('siteFixes', 'site-health-fixes', Wrench),
+      ],
     },
     {
-      id: 'googleMaps',
-      href: `${prefix}/features/google-maps-rank-tracking`,
-      label: dict.nav.featuresMenu.googleMaps.label,
-      description: dict.nav.featuresMenu.googleMaps.description,
-      icon: MapPin,
-    },
-    {
-      id: 'aiVisibility',
-      href: `${prefix}/features/ai-visibility-tracking`,
-      label: dict.nav.featuresMenu.aiVisibility.label,
-      description: dict.nav.featuresMenu.aiVisibility.description,
-      icon: Sparkles,
-    },
-    {
-      id: 'reports',
-      href: `${prefix}/features/seo-geo-reports`,
-      label: dict.nav.featuresMenu.reports.label,
-      description: dict.nav.featuresMenu.reports.description,
-      icon: BarChart3,
-    },
-    {
-      id: 'keywordResearch',
-      href: `${prefix}/features/keyword-research`,
-      label: dict.nav.featuresMenu.keywordResearch.label,
-      description: dict.nav.featuresMenu.keywordResearch.description,
-      icon: Telescope,
+      id: 'prove',
+      title: dict.nav.featureGroups.prove,
+      items: [feature('reports', 'seo-geo-reports', BarChart3)],
     },
   ]
+  const sm = dict.nav.solutionsMenu
+  // Shopify always means the App Store listing, never a page of ours; it is left
+  // out until the listing URL is confirmed (lib/shopify/app-store-listing.ts).
+  const solutionItems: MenuItem[] = [
+    { id: 'businesses', href: `${prefix}/solutions/businesses`, label: sm.businesses.label, description: sm.businesses.description, icon: Store },
+    { id: 'agencies', href: `${prefix}/solutions/agencies`, label: sm.agencies.label, description: sm.agencies.description, icon: Briefcase },
+    ...(SHOPIFY_APP_STORE_URL
+      ? [{ id: 'shopify', href: SHOPIFY_APP_STORE_URL, label: sm.shopify.label, description: sm.shopify.description, icon: ShoppingBag, external: true }]
+      : []),
+    { id: 'wordpress', href: `${prefix}/solutions/wordpress`, label: sm.wordpress.label, description: sm.wordpress.description, icon: Blocks },
+  ]
+  const solutionsActive = pathname.includes('/solutions/')
+  const closeMobile = () => {
+    setMobileOpen(false)
+    setFeaturesOpen(false)
+    setSolutionsOpen(false)
+  }
   const featuresActive = pathname.includes('/features/')
 
   const linkClass = (active: boolean) =>
@@ -171,29 +179,32 @@ export function PublicNav({ locale = 'he', tone = 'default' }: { locale?: Public
             <Link key={homeLink.href} href={homeLink.href} className={linkClass(isActive(homeLink.href))}>
               {homeLink.label}
             </Link>
-            {/* Features Dropdown */}
+            {/* Features: three columns, measure / do the work / show results */}
             <div className="group relative">
               <button type="button" className={linkClass(featuresActive)} aria-haspopup="true">
                 {dict.nav.features}
                 <ChevronDown className="size-4 transition-transform duration-150 ease-snappy group-focus-within:rotate-180 group-hover:rotate-180" aria-hidden="true" />
               </button>
-              <div className="invisible absolute start-0 top-full z-50 pt-2 opacity-0 transition-[opacity,visibility] duration-150 ease-snappy group-focus-within:visible group-focus-within:opacity-100 group-hover:visible group-hover:opacity-100">
-                <div data-features-panel className="grid w-[30rem] grid-cols-1 gap-0.5 whitespace-normal rounded-card border border-line bg-surface p-2 shadow-pop">
-                  {featureItems.map((item) => (
-                    <Link
-                      key={item.id}
-                      href={item.href}
-                      className="flex items-start gap-3 rounded-inset p-3 transition-[background-color] duration-150 ease-snappy hover:bg-sunk focus-visible:bg-sunk focus-visible:outline-none"
-                    >
-                      <span className="flex size-9 shrink-0 items-center justify-center rounded-inset bg-action-soft text-action" aria-hidden="true">
-                        <item.icon className="size-4" />
-                      </span>
-                      <span className="min-w-0">
-                        <span className="block text-copy font-semibold text-ink text-pretty">{item.label}</span>
-                        <span className="mt-0.5 block text-caption text-muted text-pretty">{item.description}</span>
-                      </span>
-                    </Link>
+              <div className={PANEL_WRAP}>
+                <div data-features-panel className="grid w-[54rem] grid-cols-3 gap-2 whitespace-normal rounded-card border border-line bg-surface p-3 shadow-pop">
+                  {featureGroups.map((group) => (
+                    <div key={group.id} data-feature-group={group.id} className="flex flex-col gap-0.5">
+                      <p className="px-3 pb-1 pt-2 text-overline font-semibold uppercase text-muted">{group.title}</p>
+                      {group.items.map((item) => <DesktopMenuLink key={item.id} item={item} />)}
+                    </div>
                   ))}
+                </div>
+              </div>
+            </div>
+            {/* Who it's for */}
+            <div className="group relative">
+              <button type="button" className={linkClass(solutionsActive)} aria-haspopup="true">
+                {dict.nav.solutions}
+                <ChevronDown className="size-4 transition-transform duration-150 ease-snappy group-focus-within:rotate-180 group-hover:rotate-180" aria-hidden="true" />
+              </button>
+              <div className={PANEL_WRAP}>
+                <div data-solutions-panel className="grid w-[26rem] grid-cols-1 gap-0.5 whitespace-normal rounded-card border border-line bg-surface p-2 shadow-pop">
+                  {solutionItems.map((item) => <DesktopMenuLink key={item.id} item={item} />)}
                 </div>
               </div>
             </div>
@@ -255,7 +266,7 @@ export function PublicNav({ locale = 'he', tone = 'default' }: { locale?: Public
               >
                 {homeLink.label}
               </Link>
-              {/* Features Dropdown Mobile */}
+              {/* Features, by group */}
               <button
                 type="button"
                 onClick={() => setFeaturesOpen(!featuresOpen)}
@@ -267,22 +278,26 @@ export function PublicNav({ locale = 'he', tone = 'default' }: { locale?: Public
               </button>
               {featuresOpen && (
                 <div className="mb-1 ms-3 space-y-0.5 border-s border-line ps-2">
-                  {featureItems.map((item) => (
-                    <Link
-                      key={item.id}
-                      href={item.href}
-                      onClick={() => {
-                        setMobileOpen(false)
-                        setFeaturesOpen(false)
-                      }}
-                      className="flex items-center gap-3 rounded-inset px-2 py-2 hover:bg-sunk"
-                    >
-                      <span className="flex size-8 shrink-0 items-center justify-center rounded-inset bg-action-soft text-action" aria-hidden="true">
-                        <item.icon className="size-4" />
-                      </span>
-                      <span className="text-copy font-medium text-ink">{item.label}</span>
-                    </Link>
+                  {featureGroups.map((group) => (
+                    <div key={group.id}>
+                      <p className="px-2 pb-1 pt-2 text-caption font-semibold text-muted">{group.title}</p>
+                      {group.items.map((item) => <MobileMenuLink key={item.id} item={item} onPick={closeMobile} />)}
+                    </div>
                   ))}
+                </div>
+              )}
+              <button
+                type="button"
+                onClick={() => setSolutionsOpen(!solutionsOpen)}
+                aria-expanded={solutionsOpen}
+                className={cn(linkClass(solutionsActive), 'h-11 w-full justify-between')}
+              >
+                {dict.nav.solutions}
+                <ChevronDown className={cn('size-4 transition-transform duration-150 ease-snappy', solutionsOpen && 'rotate-180')} aria-hidden="true" />
+              </button>
+              {solutionsOpen && (
+                <div className="mb-1 ms-3 space-y-0.5 border-s border-line ps-2">
+                  {solutionItems.map((item) => <MobileMenuLink key={item.id} item={item} onPick={closeMobile} />)}
                 </div>
               )}
               {restLinks.map((link) => (
@@ -322,5 +337,54 @@ export function PublicNav({ locale = 'he', tone = 'default' }: { locale?: Public
         </div>
       )}
     </header>
+  )
+}
+
+type NavMenuItem = { id: string; href: string; label: string; description: string; icon: LucideIcon; external?: boolean }
+
+const PANEL_WRAP =
+  'invisible absolute start-0 top-full z-50 pt-2 opacity-0 transition-[opacity,visibility] duration-150 ease-snappy group-focus-within:visible group-focus-within:opacity-100 group-hover:visible group-hover:opacity-100'
+
+/** An external item (the Shopify App Store listing) opens in a new tab. */
+function MenuAnchor({ item, className, onClick, children }: { item: NavMenuItem; className: string; onClick?: () => void; children: React.ReactNode }) {
+  if (item.external) {
+    return (
+      <a href={item.href} target="_blank" rel="nofollow noopener noreferrer" className={className} onClick={onClick}>
+        {children}
+      </a>
+    )
+  }
+  return (
+    <Link href={item.href} className={className} onClick={onClick}>
+      {children}
+    </Link>
+  )
+}
+
+function DesktopMenuLink({ item }: { item: NavMenuItem }) {
+  return (
+    <MenuAnchor
+      item={item}
+      className="flex items-start gap-3 rounded-inset p-3 transition-[background-color] duration-150 ease-snappy hover:bg-sunk focus-visible:bg-sunk focus-visible:outline-none"
+    >
+      <span className="flex size-9 shrink-0 items-center justify-center rounded-inset bg-action-soft text-action" aria-hidden="true">
+        <item.icon className="size-4" />
+      </span>
+      <span className="min-w-0">
+        <span className="block text-copy font-semibold text-ink text-pretty">{item.label}</span>
+        <span className="mt-0.5 block text-caption text-muted text-pretty">{item.description}</span>
+      </span>
+    </MenuAnchor>
+  )
+}
+
+function MobileMenuLink({ item, onPick }: { item: NavMenuItem; onPick: () => void }) {
+  return (
+    <MenuAnchor item={item} onClick={onPick} className="flex items-center gap-3 rounded-inset px-2 py-2 hover:bg-sunk">
+      <span className="flex size-8 shrink-0 items-center justify-center rounded-inset bg-action-soft text-action" aria-hidden="true">
+        <item.icon className="size-4" />
+      </span>
+      <span className="text-copy font-medium text-ink">{item.label}</span>
+    </MenuAnchor>
   )
 }

@@ -41,6 +41,34 @@ export const en = {
         label: 'Keyword Research',
         description: 'Discover keyword ideas, search volume, and competition before adding them to tracking',
       },
+      siteFixes: {
+        label: 'Site fixes',
+        description: 'We check your site and fix titles, descriptions, image alt text and links. On WordPress in one click, after you approve.',
+      },
+    },
+    featureGroups: {
+      measure: 'Measure',
+      act: 'Do the work',
+      prove: 'Show results',
+    },
+    solutions: 'Who it\'s for',
+    solutionsMenu: {
+      businesses: {
+        label: 'Business owners',
+        description: 'One system that writes, publishes and measures for you, with no vendors to manage.',
+      },
+      agencies: {
+        label: 'Agencies',
+        description: 'Every client site in one place, with PDF reports you can send to the client.',
+      },
+      shopify: {
+        label: 'Shopify stores',
+        description: 'Our app in the Shopify App Store.',
+      },
+      wordpress: {
+        label: 'WordPress sites',
+        description: 'Articles published straight to your site, and site fixes in one click.',
+      },
     },
   },
   footer: {

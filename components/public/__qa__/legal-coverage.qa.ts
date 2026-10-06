@@ -283,6 +283,7 @@ check('MUTATION — an English-only extra section is caught', pages.he.terms.h2 
     'www.youtube.com': 'a sameAs profile URL a customer may enter themselves',
     'www.tiktok.com': 'a sameAs profile URL a customer may enter themselves',
     'x.com': 'a sameAs profile URL a customer may enter themselves',
+    'apps.shopify.com': 'our own App Store listing, a plain nofollow link the visitor may follow; our code sends it nothing',
     'biz.yelp.com': 'a directory named in advice text; not contacted',
     'business.trustpilot.com': 'a directory named in advice text; not contacted',
     'businessconnect.apple.com': 'a directory named in advice text; not contacted',

@@ -52,6 +52,34 @@ export const es = {
         label: 'Investigación de palabras clave',
         description: 'Descubre ideas de palabras clave, volumen de búsqueda y competencia antes de añadirlas al seguimiento',
       },
+      siteFixes: {
+        label: 'Correcciones del sitio',
+        description: 'Revisamos tu sitio y corregimos títulos, descripciones, texto alternativo de imágenes y enlaces. En WordPress con un clic, después de que lo apruebes.',
+      },
+    },
+    featureGroups: {
+      measure: 'Medir',
+      act: 'Hacer el trabajo',
+      prove: 'Mostrar resultados',
+    },
+    solutions: 'Para quién',
+    solutionsMenu: {
+      businesses: {
+        label: 'Dueños de negocios',
+        description: 'Un solo sistema que escribe, publica y mide por ti, sin proveedores que gestionar.',
+      },
+      agencies: {
+        label: 'Agencias',
+        description: 'Todos los sitios de tus clientes en un solo lugar, con informes PDF para enviar al cliente.',
+      },
+      shopify: {
+        label: 'Tiendas Shopify',
+        description: 'Nuestra app en la Shopify App Store.',
+      },
+      wordpress: {
+        label: 'Sitios WordPress',
+        description: 'Artículos que se publican directamente en tu sitio y correcciones con un clic.',
+      },
     },
   },
   footer: {

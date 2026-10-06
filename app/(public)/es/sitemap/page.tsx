@@ -36,11 +36,21 @@ export default function SpanishSitemapPage() {
     {
       title: 'Funciones',
       links: [
+        { label: 'Creación y publicación de contenido', href: '/es/features/seo-geo-content-publishing' },
         { label: 'Seguimiento de posiciones en Google orgánico', href: '/es/features/google-organic-rank-tracking' },
         { label: 'Seguimiento de posiciones en Google Maps', href: '/es/features/google-maps-rank-tracking' },
         { label: 'Seguimiento de la visibilidad en IA', href: '/es/features/ai-visibility-tracking' },
         { label: 'Informes SEO y GEO', href: '/es/features/seo-geo-reports' },
         { label: 'Investigación de palabras clave', href: '/es/features/keyword-research' },
+        { label: 'Correcciones del sitio', href: '/es/features/site-health-fixes' },
+      ],
+    },
+    {
+      title: 'Para quién',
+      links: [
+        { label: 'Dueños de negocios', href: '/es/solutions/businesses' },
+        { label: 'Agencias', href: '/es/solutions/agencies' },
+        { label: 'Sitios WordPress', href: '/es/solutions/wordpress' },
       ],
     },
     {

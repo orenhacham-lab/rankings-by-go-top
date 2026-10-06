@@ -160,6 +160,10 @@ function main() {
       'features/ai-visibility-tracking/page.tsx',
       'features/seo-geo-reports/page.tsx',
       'features/keyword-research/page.tsx',
+      'features/site-health-fixes/page.tsx',
+      'solutions/businesses/page.tsx',
+      'solutions/agencies/page.tsx',
+      'solutions/wordpress/page.tsx',
     ]
     for (const rel of expected) {
       check(`3a: /es has ${rel}`, existsSync(join(ES_DIR, rel)))

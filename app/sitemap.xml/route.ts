@@ -126,6 +126,30 @@ export async function GET() {
       changefreq: 'monthly',
       priority: '0.8',
     },
+    {
+      url: `${baseUrl}/features/site-health-fixes`,
+      lastmod: today,
+      changefreq: 'monthly',
+      priority: '0.8',
+    },
+    {
+      url: `${baseUrl}/solutions/businesses`,
+      lastmod: today,
+      changefreq: 'monthly',
+      priority: '0.8',
+    },
+    {
+      url: `${baseUrl}/solutions/agencies`,
+      lastmod: today,
+      changefreq: 'monthly',
+      priority: '0.8',
+    },
+    {
+      url: `${baseUrl}/solutions/wordpress`,
+      lastmod: today,
+      changefreq: 'monthly',
+      priority: '0.8',
+    },
     // Hebrew legal pages
     // English site root and equivalents
     {
@@ -201,6 +225,30 @@ export async function GET() {
       changefreq: 'monthly',
       priority: '0.7',
     },
+    {
+      url: `${baseUrl}/en/features/site-health-fixes`,
+      lastmod: today,
+      changefreq: 'monthly',
+      priority: '0.8',
+    },
+    {
+      url: `${baseUrl}/en/solutions/businesses`,
+      lastmod: today,
+      changefreq: 'monthly',
+      priority: '0.8',
+    },
+    {
+      url: `${baseUrl}/en/solutions/agencies`,
+      lastmod: today,
+      changefreq: 'monthly',
+      priority: '0.8',
+    },
+    {
+      url: `${baseUrl}/en/solutions/wordpress`,
+      lastmod: today,
+      changefreq: 'monthly',
+      priority: '0.8',
+    },
     // English legal pages
   ]
 
@@ -226,6 +274,10 @@ export async function GET() {
     { path: '/features/ai-visibility-tracking', changefreq: 'monthly', priority: '0.7' },
     { path: '/features/seo-geo-reports', changefreq: 'monthly', priority: '0.7' },
     { path: '/features/keyword-research', changefreq: 'monthly', priority: '0.7' },
+    { path: '/features/site-health-fixes', changefreq: 'monthly', priority: '0.7' },
+    { path: '/solutions/businesses', changefreq: 'monthly', priority: '0.7' },
+    { path: '/solutions/agencies', changefreq: 'monthly', priority: '0.7' },
+    { path: '/solutions/wordpress', changefreq: 'monthly', priority: '0.7' },
   ]
 
   const treePages = (prefix: string) =>
