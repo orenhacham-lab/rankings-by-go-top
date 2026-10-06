@@ -89,8 +89,9 @@ export type PluginFixAnswer = {
 export const pluginStatus = (link: PluginLink, post?: PluginPost) => callPlugin<PluginStatus>(link, '/status', {}, post)
 export const pluginInspect = (link: PluginLink, url: string, post?: PluginPost) =>
   callPlugin<{ ok: true; item: PluginItem }>(link, '/inspect', { url }, post)
+/** The plugin answers at most 10 (its own cap); posts and pages alike. */
 export const pluginSearch = (link: PluginLink, term: string, post?: PluginPost) =>
-  callPlugin<{ ok: true; items: { post_id: number; link: string; title: string }[] }>(link, '/search', { term, limit: 5 }, post)
+  callPlugin<{ ok: true; items: { post_id: number; link: string; title: string }[] }>(link, '/search', { term, limit: 10 }, post)
 export const pluginFix = (
   link: PluginLink,
   fix: { jobId: string; type: FixType; url: string; value: Record<string, unknown>; expected: string | null },

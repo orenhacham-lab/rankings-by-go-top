@@ -33,6 +33,7 @@ import type { FindingKind } from '@/lib/site-health/types'
 import { imagesMissingAlt, previewFix, sha, wpFailure, type WpFixDeps } from '@/lib/site-health/wordpress-fix'
 import type { WordPressCredentials } from '@/lib/wordpress/types'
 import { brokenLinkWords } from './content'
+import { rendersFromBuilderData } from './builder'
 import { planH1Demotion } from './h1'
 import { bodyH1s, shopFailure, SHOPIFY_FIX_TYPES, type ShopCreds, type ShopifyFixClient, type ShopItemRef } from './shopify-admin'
 import { pluginInspect, pluginSearch, type PluginItem, type PluginLink, type PluginPost } from './plugin-client'
@@ -232,10 +233,14 @@ function pluginWp(link: PluginLink, base: WpFixDeps, post?: PluginPost): WpFixDe
       const r = await pluginSearch(link, term, post)
       return r.ok ? r.body.items.map((i) => ({ id: i.post_id, link: i.link, title: i.title })) : []
     },
+    // The plugin writes the link itself: the preview lands where it will, never on a builder page.
+    pluginLink: { rendersFromBuilder: (id) => { const it = byId.get(id); return !!it && rendersFromBuilderData(it) } },
   }
 }
 
 const CHANNEL_VIA: Record<'webhook' | 'manual', Via> = { webhook: 'webhook', manual: 'manual' }
+/** Fixes written into the page's own content (h1_demote has its own builder check, ./h1.ts). */
+const CONTENT_TYPES_ON_PAGE: readonly FixType[] = ['image_alt', 'broken_link', 'faq_block']
 
 export async function previewFixJob(req: PreviewRequest, ctx: PreviewContext, deps: PreviewDeps): Promise<FixPreview> {
   try {
@@ -313,6 +318,8 @@ async function previewViaPlugin(req: PreviewRequest, ctx: PreviewContext, link: 
   const it = await wp.item(pageUrl)
   if (typeof it === 'string') return fail(it)
   const seoVia: Via = it.seo_plugin === 'none' ? 'plugin_own' : 'plugin_seo'
+  // A page builder renders this page from its own data: a change to its content would not show.
+  if (CONTENT_TYPES_ON_PAGE.includes(req.type) && rendersFromBuilderData(it)) return fail('builder_page')
 
   switch (req.type) {
     case 'image_alt': {

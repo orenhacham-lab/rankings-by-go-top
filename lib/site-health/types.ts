@@ -100,10 +100,19 @@ export interface FindingPage {
   /** For a broken link: the page it was found on. */
   from?: string | null
   /**
-   * 'theme': the problem is not in the content the connection may edit (a Shopify store's theme,
-   * menu, or a product), so no fix button is offered here (lib/site-fix/shopify-scan.ts).
+   * Where the problem is when it is not in the content the connection may edit, so no fix button is
+   * offered here (lib/site-fix/shopify-scan.ts, lib/site-fix/wordpress-scan.ts):
+   *   theme    the store's or the site's theme, its menu, a widget (not the page's own text)
+   *   product  a product's own photos (a store's product or collection page): set on the product
+   *   builder  a page builder (Elementor and the like) renders the page from its own data, so a
+   *            change to the page's text would not show
    */
-  outside?: 'theme'
+  outside?: 'theme' | 'product' | 'builder'
+  /**
+   * images_alt, after the site's own check: images without alt text on the page that are NOT in what a
+   * fix can reach (the theme's). `measure` then counts only the ones the fix can reach.
+   */
+  themeMissing?: number
 }
 
 export interface Finding {
@@ -111,7 +120,17 @@ export interface Finding {
   severity: Severity
   /** The first pages (up to MAX_PAGES_SHOWN); `total` counts all of them. */
   pages: FindingPage[]
+  /**
+   * The rest of the rows, beyond `pages` (never listed on the screen, only counted): the one-click
+   * batch (lib/site-fix/bulk.ts) reaches every fixable row with them, not only the first ten.
+   */
+  morePages?: FindingPage[]
   total: number
+  /**
+   * images_alt: pages whose images without alt text are all in the theme (not in the page's own text),
+   * reported once for the whole site instead of one row per page that no fix can reach.
+   */
+  themeAlt?: { pages: number; images: number }
   field: FixField | null
   guide: GuideTopic
   /** At least one page offers "fix it for me". */

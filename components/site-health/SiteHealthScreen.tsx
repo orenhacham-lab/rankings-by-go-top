@@ -38,6 +38,8 @@ import { rowStateFrom, rowTarget, type FixRowState } from '@/lib/site-fix/job-ma
 import { FIX_TYPE, scoreWithFixes } from '@/lib/site-health/rules'
 
 type Copy = DashboardDictionary['siteHealth']
+/** Page kinds the WordPress plugin cannot resolve to a post or a page (WooCommerce products and categories). */
+const WP_NOT_POSTS: ReadonlySet<string> = new Set(['product', 'collection'])
 type Filter = 'all' | 'fixable' | 'guide'
 
 const cleanDomain = (d: string) => d.replace(/^https?:\/\//i, '').replace(/\/+$/, '')
@@ -162,6 +164,11 @@ export default function SiteHealthScreen({ project }: { project: Project & { sit
     if (caps.shopify && (finding.fixType === 'llms_txt' || (finding.fixType !== 'broken_link' && page.kind !== 'article' && page.kind !== 'page'))) return null
     // The store's own check found the problem outside what the connection edits (theme, menu, a product).
     if (page.outside === 'theme') return null
+    // A product's own photos, or a page a page builder renders from its own data: no text fix reaches them.
+    if (page.outside === 'product' || page.outside === 'builder') return null
+    // WordPress: the plugin edits posts and pages only, so a WooCommerce product or category row keeps
+    // its instructions (a broken link is judged by the page it was found on, not by this row).
+    if (!caps.shopify && (channel === 'plugin' || channel === 'manual') && finding.fixType !== 'broken_link' && WP_NOT_POSTS.has(page.kind)) return null
     // llms.txt: the plugin (2.1.0) serves it; every other site gets the same text to copy and place.
     if (finding.fixType === 'llms_txt') return channel === 'plugin' ? 'fix' : 'copy'
     if (!channel) return null

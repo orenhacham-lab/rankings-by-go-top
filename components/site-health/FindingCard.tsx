@@ -34,8 +34,12 @@ function measureOf(copy: Copy, f: Finding, page: FindingPage): string | null {
     case 'title_short':
     case 'description_length':
       return page.measure !== null ? copy.chars(page.measure) : null
-    case 'images_alt':
-      return page.measure !== null ? copy.imagesMissing(page.measure) : null
+    case 'images_alt': {
+      if (page.measure === null) return null
+      // After the site's own check: what a fix reaches, and apart from it what is in the theme.
+      const theme = page.themeMissing ?? 0
+      return theme > 0 && page.measure > 0 ? `${copy.imagesMissing(page.measure)} · ${copy.imagesInTheme(theme)}` : copy.imagesMissing(page.measure)
+    }
     case 'h1_multiple':
       return page.measure !== null ? copy.headings(page.measure) : null
     case 'title_duplicate':
@@ -92,7 +96,8 @@ export default function FindingCard({
   const text = copy.findings[finding.id]
   const steps = copy.guides[finding.guide][platform]
   const isLinks = finding.id === 'broken_links'
-  const count = isLinks ? copy.links(finding.total) : copy.pages(finding.total)
+  const themeAlt = finding.themeAlt && finding.themeAlt.pages > 0 ? finding.themeAlt : null
+  const count = isLinks ? copy.links(finding.total) : copy.pages(finding.total + (themeAlt?.pages ?? 0))
   const shown = allPages ? finding.pages : finding.pages.slice(0, FIRST_PAGES)
   const hiddenInList = finding.pages.length - shown.length
   const beyondList = finding.total - finding.pages.length
@@ -140,6 +145,11 @@ export default function FindingCard({
                     )}
                     {page.outside === 'theme' && !done && !queued && (
                       <p className="mt-1 max-w-xl text-caption text-muted text-pretty" data-outside-content="">{copy.inTheme}</p>
+                    )}
+                    {(page.outside === 'product' || page.outside === 'builder') && !done && !queued && (
+                      <p className="mt-1 max-w-xl text-caption text-muted text-pretty" data-outside-content={page.outside}>
+                        {page.outside === 'product' ? copy.inProduct : copy.inBuilder}
+                      </p>
                     )}
                   </div>
                   <div className="flex shrink-0 items-center gap-2">
@@ -190,6 +200,13 @@ export default function FindingCard({
               </li>
             )}
           </ul>
+        )}
+
+        {themeAlt && (
+          // Images in the theme repeat on every page that uses it: said once, for the whole site.
+          <p className="mt-4 max-w-3xl rounded-inset border border-line bg-sunk/60 px-4 py-3 text-copy text-body text-pretty" data-theme-alt={themeAlt.pages}>
+            {copy.themeAlt(themeAlt.pages, themeAlt.images)}
+          </p>
         )}
 
         <div className="mt-4">

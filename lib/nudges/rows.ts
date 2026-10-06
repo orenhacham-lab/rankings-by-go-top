@@ -103,7 +103,7 @@ export const pillText = (n: number): string => (n > 99 ? '99+' : String(n))
 
 interface CachedScan {
   v?: number
-  report?: { findings?: Array<{ id?: unknown; fixType?: unknown; pages?: Array<{ url?: unknown; kind?: unknown }> }> }
+  report?: { findings?: Array<{ id?: unknown; fixType?: unknown; pages?: Array<{ url?: unknown; kind?: unknown }>; morePages?: Array<{ url?: unknown; kind?: unknown }> }> }
 }
 
 /** What GET /api/site-health/fixes answers (the same read the health screen makes). */
@@ -130,13 +130,15 @@ export function safeFixCountFromScan(raw: string | null, fixes: FixesRead | null
   let parsed: CachedScan
   try { parsed = JSON.parse(raw) as CachedScan } catch { return 0 }
   if (!parsed || parsed.v !== 1 || !parsed.report || !Array.isArray(parsed.report.findings)) return 0
-  const findings: { id: string; fixType: FixType | null; pages: { url: string; kind: string }[] }[] = []
+  const findings: { id: string; fixType: FixType | null; pages: { url: string; kind: string }[]; morePages: { url: string; kind: string }[] }[] = []
   for (const f of parsed.report.findings) {
     if (typeof f.id !== 'string' || !Array.isArray(f.pages)) continue
     // A report kept from before the fix queue has no fix type: take it from the scan's own rules, as the screen does.
     const fixType = typeof f.fixType === 'string' ? f.fixType as FixType : FIX_TYPE[f.id as FindingKind] ?? null
-    const pages = f.pages.flatMap((p) => typeof p.url === 'string' ? [{ url: p.url, kind: typeof p.kind === 'string' ? p.kind : '' }] : [])
-    findings.push({ id: f.id, fixType, pages })
+    const rows = (list: unknown) => (Array.isArray(list) ? list as { url?: unknown; kind?: unknown }[] : [])
+      .flatMap((p) => p && typeof p.url === 'string' ? [{ url: p.url, kind: typeof p.kind === 'string' ? p.kind : '' }] : [])
+    // Every row the batch would see, the ones beyond the listed ten included (the same rule as the screen).
+    findings.push({ id: f.id, fixType, pages: rows(f.pages), morePages: rows(f.morePages) })
   }
   const typeOf = new Map(findings.map((f) => [f.id, f.fixType] as const))
   return bulkCandidates(findings, {

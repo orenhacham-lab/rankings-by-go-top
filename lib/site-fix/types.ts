@@ -166,6 +166,11 @@ export type FixErrorCode =
   | 'thin_content'
   /** The extra main heading is in the theme, a page builder or somewhere we cannot prove is safe. */
   | 'h1_not_safe'
+  /**
+   * A page builder (Elementor and the like) renders this page from its own data: a change to the
+   * page's own text would not show, so no content fix is written there.
+   */
+  | 'builder_page'
   /** The site already has an llms.txt file: it is never overwritten. */
   | 'llms_exists'
   /** "Apply all" was asked for a type or a value that is not in the safe list. */

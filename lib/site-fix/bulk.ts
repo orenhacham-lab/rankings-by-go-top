@@ -15,7 +15,7 @@
  *   - at most 25 pages per batch.
  * A batch can be undone as a whole for 14 days (each fix keeps its own undo as well).
  */
-import { sameText } from '@/lib/site-health/rules'
+import { allRows, sameText } from '@/lib/site-health/rules'
 import { rowStateFrom, rowTarget, urlKey } from './job-match'
 import { BULK_SAFE_TYPES, type FixCapabilities, type FixJobView, type FixPayload, type FixType } from './types'
 
@@ -98,12 +98,13 @@ export type BulkSkipReason = 'review' | 'home' | 'recent' | 'batch_full'
 export interface BulkSkip extends BulkRow { reason: BulkSkipReason }
 
 /**
- * The rows a batch would try, in the findings' order, at most BULK_MAX_PAGES pages, and every other
+ * The rows a batch would try, in the findings' order (every row of a finding, `morePages` included,
+ * not only the ones listed), at most BULK_MAX_PAGES pages, and every other
  * row that could be fixed with the reason it is not in the batch. `fixable` says whether this row
  * can be fixed now and no job holds it (the screen's own answer); a row that cannot is not listed.
  */
 export function bulkPlan(
-  findings: readonly { id: string; fixType?: FixType | null; pages: readonly { url: string; kind: string }[] }[],
+  findings: readonly { id: string; fixType?: FixType | null; pages: readonly { url: string; kind: string }[]; morePages?: readonly { url: string; kind: string }[] }[],
   opts: { fixable: (findingId: string, pageUrl: string) => boolean; jobs: Parameters<typeof pageBusy>[0]; now: number },
 ): { rows: BulkRow[]; skipped: BulkSkip[] } {
   const out: BulkRow[] = []
@@ -112,7 +113,8 @@ export function bulkPlan(
   for (const f of findings) {
     const type = f.fixType
     if (!type) continue
-    for (const p of f.pages) {
+    // Every row, not only the ten the screen lists (`morePages`): the 25-page cap is the only limit.
+    for (const p of allRows(f)) {
       if (!opts.fixable(f.id, p.url)) continue
       const row = { type, kind: f.id, url: p.url }
       if (!BULK_SAFE_TYPES.includes(type)) { skipped.push({ ...row, reason: 'review' }); continue }

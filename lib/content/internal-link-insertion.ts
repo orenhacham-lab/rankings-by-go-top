@@ -232,9 +232,13 @@ export function findNaturalAnchorPlacement(html: string, anchor: string, usedWor
   const blanked = blankForbidden(html)
   const ranges = proseRanges(html)
   const inProse = (i: number) => ranges.some((r) => i >= r.start && i < r.end)
-  const hay = blanked.toLowerCase()
-  const rawHay = html.toLowerCase()
-  const nl = needle.toLowerCase()
+  // Matching runs on a FOLDED view (case, Hebrew vowel marks, Hebrew geresh/gershayim) with a map back
+  // to the original html; what is linked is always the original words, unchanged.
+  const folded = foldForMatch(html, blanked)
+  const hay = folded.blanked
+  const rawHay = folded.raw
+  const nl = foldForMatch(needle).raw
+  if (!nl) return { found: false, skipReason: 'empty_anchor', occurrenceCount: 0, evaluatedOccurrences: [] }
 
   const evaluated: OccurrenceEval[] = []
   let occurrenceCount = 0
@@ -245,20 +249,28 @@ export function findNaturalAnchorPlacement(html: string, anchor: string, usedWor
   let from = 0
   for (;;) {
     // Iterate raw occurrences so forbidden ones are counted + classified too.
-    const k = rawHay.indexOf(nl, from)
-    if (k < 0) break
-    from = k + nl.length
+    const j = rawHay.indexOf(nl, from)
+    if (j < 0) break
+    from = j + nl.length
+    // WHOLE WORDS ONLY: "art" is not in "start", and "בלוג" is not in "הבלוג". A part of a word is
+    // never linked (the plugin's own apply matches whole words too: wordpress-plugin content.php).
+    if (isWordChar(rawHay[j - 1]) || isWordChar(rawHay[j + nl.length])) continue
+    const k = folded.map[j]
+    // The original span: from the first matched letter to the last one, with the vowel marks after it.
+    let end = folded.map[j + nl.length - 1] + 1
+    while (end < html.length && HEBREW_MARK.test(html[end])) end++
+    const matchLength = end - k
     occurrenceCount++
     occIdx++
 
     const snippet = () => {
       const s = Math.max(0, k - 30)
-      const htmlSnippet = html.slice(s, k + nl.length + 30)
+      const htmlSnippet = html.slice(s, k + matchLength + 30)
       return { htmlSnippet, textSnippet: plainText(htmlSnippet).trim().slice(0, 140) }
     }
 
     // Blanked at k ⇒ inside a forbidden region (heading/table/link/nav/button…).
-    if (!hay.startsWith(nl, k)) {
+    if (!hay.startsWith(nl, j)) {
       const reg = classifyRegion(html, k)
       evaluated.push({ index: k, inProse: false, wordOffset: null, result: 'skipped_forbidden', ...reg, ...snippet() })
       continue
@@ -280,7 +292,7 @@ export function findNaturalAnchorPlacement(html: string, anchor: string, usedWor
     if (usedWordOffsets.some((u) => Math.abs(wordOffset - u) < minWordGap)) { evaluated.push({ index: k, inProse: true, wordOffset, result: 'too_close' }); tooClose = true; continue }
 
     evaluated.push({ index: k, inProse: true, wordOffset, result: 'selected' })
-    return { found: true, index: k, matchLength: needle.length, wordOffset, sentence: sentencePreview(html, ranges, k, needle), occurrenceCount, evaluatedOccurrences: evaluated, selectedOccurrenceIndex: occIdx }
+    return { found: true, index: k, matchLength, wordOffset, sentence: sentencePreview(html, ranges, k, html.slice(k, k + matchLength)), occurrenceCount, evaluatedOccurrences: evaluated, selectedOccurrenceIndex: occIdx }
   }
 
   // No occurrence qualified — report the most actionable reason. A spacing block
@@ -290,6 +302,78 @@ export function findNaturalAnchorPlacement(html: string, anchor: string, usedWor
     ? 'anchor_not_found_in_safe_prose'
     : tooClose ? 'placement_too_close' : 'placement_too_early'
   return { found: false, skipReason, occurrenceCount, evaluatedOccurrences: evaluated }
+}
+
+/** Hebrew vowel and cantillation marks (niqqud, te'amim): not letters, never part of what is compared. */
+const HEBREW_MARK = /[\u0591-\u05BD\u05BF\u05C1\u05C2\u05C4\u05C5\u05C7]/
+const WORD_CHAR = /[\p{L}\p{N}]/u
+const isWordChar = (c: string | undefined) => !!c && WORD_CHAR.test(c)
+/** One character as it is compared: lower case (when that stays one character), Hebrew ״ ׳ as " '. */
+function foldChar(c: string): string {
+  if (c === '\u05F4') return '"'
+  if (c === '\u05F3') return "'"
+  const l = c.toLowerCase()
+  return l.length === 1 ? l : c
+}
+
+/**
+ * The folded view of `html` (and of `blanked`, the same text with forbidden regions blanked, which
+ * has the same length): vowel marks dropped, every other character folded one for one. `map[i]` is
+ * where folded character i is in the original.
+ */
+function foldForMatch(html: string, blanked: string = html): { raw: string; blanked: string; map: number[] } {
+  let raw = ''
+  let b = ''
+  const map: number[] = []
+  for (let i = 0; i < html.length; i++) {
+    if (HEBREW_MARK.test(html[i])) continue
+    raw += foldChar(html[i])
+    b += foldChar(blanked[i] ?? ' ')
+    map.push(i)
+  }
+  return { raw, blanked: b, map }
+}
+
+const escRe = (s: string) => s.replace(/[.*+?^${}()|[\]\\/]/g, '\\$&')
+
+/**
+ * Where the Go Top plugin's OWN apply (wordpress-plugin/gotop-seo-bridge/includes/content.php,
+ * gotop_seo_bridge_add_internal_link, which this mirrors step by step) would put a link with this
+ * anchor: the character index in `content`, or -1 when it would find no place (or would search for
+ * other words than these). The plugin checks the anchor (no < or >, 2-80 characters, whitespace
+ * collapsed), escapes &, < and >, then takes the FIRST whole-word, case-sensitive match in running
+ * text, outside a link, a heading, script, style, code, pre, a button, a textarea or a figcaption.
+ * The preview offers a sentence only where this lands on the very same occurrence, so the link the
+ * merchant approves is the link the plugin writes.
+ */
+export function pluginLinkLanding(content: string, anchor: string): number {
+  if (typeof anchor !== 'string' || /[<>]/.test(anchor)) return -1
+  const plainAnchor = anchor.replace(/[\x00-\x1f\x7f]/g, ' ').replace(/\s+/g, ' ').trim()
+  const chars = [...plainAnchor].length
+  if (plainAnchor !== anchor || chars < 2 || chars > 80) return -1
+  const needle = plainAnchor.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+  const pattern = new RegExp(`(?<![\\p{L}\\p{N}])${escRe(needle)}(?![\\p{L}\\p{N}])`, 'u')
+  const parts = content.split(/(<!--[\s\S]*?-->|<[^>]*>)/)
+  const skip: Record<string, number> = { a: 0, h1: 0, h2: 0, h3: 0, h4: 0, h5: 0, h6: 0, script: 0, style: 0, code: 0, pre: 0, button: 0, textarea: 0, figcaption: 0 }
+  let at = 0
+  for (const part of parts) {
+    const start = at
+    at += part.length
+    if (part === '') continue
+    if (part[0] === '<') {
+      if (part.startsWith('<!--')) continue
+      const t = /^<(\/?)([a-z0-9]+)/i.exec(part)
+      if (t) {
+        const name = t[2].toLowerCase()
+        if (name in skip && !part.endsWith('/>')) skip[name] = t[1] === '/' ? Math.max(0, skip[name] - 1) : skip[name] + 1
+      }
+      continue
+    }
+    if (Object.values(skip).some((n) => n > 0)) continue
+    const m = pattern.exec(part)
+    if (m) return start + m.index
+  }
+  return -1
 }
 
 function escAttr(s: string): string {

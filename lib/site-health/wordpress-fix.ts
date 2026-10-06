@@ -36,14 +36,14 @@
  * test (lib/site-health/__qa__/site-health-routes.qa.ts).
  */
 import { createHash } from 'crypto'
-import { applyNaturalAnchor, findNaturalAnchorPlacement } from '@/lib/content/internal-link-insertion'
+import { applyNaturalAnchor, findNaturalAnchorPlacement, pluginLinkLanding } from '@/lib/content/internal-link-insertion'
 import { isUrlAlreadyLinked } from '@/lib/content/internal-links'
 import { WordPressClientError } from '@/lib/wordpress/client'
 import type * as WpClient from '@/lib/wordpress/client'
 import type { WordPressCredentials } from '@/lib/wordpress/types'
 import {
   cleanAlt, cleanText, DESCRIPTION_MAX, DESCRIPTION_MIN, DESCRIPTION_TARGET, suggestAlt, suggestDescription, suggestTitle,
-  textOf, TITLE_MAX, TITLE_MIN, TITLE_TARGET,
+  textOf, TITLE_MAX, TITLE_MIN, TITLE_TARGET, withoutSuffix,
 } from './rules'
 import type { FindingKind, SiteHealthErrorCode } from './types'
 
@@ -56,6 +56,12 @@ export interface WpFixDeps {
   writeVerifiedSeoMeta: typeof WpClient.writeVerifiedSeoMeta
   /** The public page as a visitor gets it (the scan's safe fetch): its <title>, description and first h1. */
   readLivePage: (url: string) => Promise<{ title: string | null; description: string | null; h1: string | null } | null>
+  /**
+   * Set when the Go Top plugin writes the link (lib/site-fix/preview.ts): the plugin places it with
+   * its own matcher, so a sentence is offered only where that matcher lands on the same words
+   * (pluginLinkLanding), and never in a post a page builder renders from its own data.
+   */
+  pluginLink?: { rendersFromBuilder: (id: number) => boolean }
 }
 
 export const sha = (s: string) => createHash('sha256').update(s, 'utf8').digest('hex')
@@ -197,31 +203,86 @@ export async function previewFix(
   }
 }
 
+/** At most this many other posts and pages are read to find a sentence that already has the words. */
+export const LINK_MAX_CANDIDATES = 10
+
+/** The words of an address's last segment ("/japan-travel-guide/" → "japan travel guide"). */
+function slugWords(url: string): string {
+  try {
+    let last = new URL(url).pathname.split('/').filter(Boolean).pop() ?? ''
+    try { last = decodeURIComponent(last) } catch { /* keep */ }
+    return last.replace(/[-_]+/g, ' ').replace(/\s+/g, ' ').trim()
+  } catch {
+    return ''
+  }
+}
+
+/** A page title without the site's name ("Blog | Shop" → "Blog"); the whole title when nothing is left. */
+function titleCore(title: string): string {
+  const t = String(title).replace(/\s+/g, ' ').trim()
+  const head = t.split(/\s(?:[|–—·»-]|::)\s/u)[0].trim()
+  return (head.match(/\p{L}/gu) ?? []).length >= 3 ? head : withoutSuffix(t)
+}
+
+/**
+ * The words a link to the forgotten page may be made of, in order: the page's main keyword, its title
+ * without the site's name, the words of its address. Each is the page's own words (never a synonym),
+ * at least 3 letters and at most 80 characters (the plugin's own limit).
+ */
+export function linkPhrases(keyword: string | null | undefined, title: string | null | undefined, url: string): string[] {
+  const out: string[] = []
+  for (const raw of [keyword, title ? titleCore(title) : '', slugWords(url)]) {
+    const v = String(raw ?? '').replace(/\s+/g, ' ').trim()
+    if ((v.match(/\p{L}/gu) ?? []).length < 3 || v.length > 80 || /[<>]/.test(v)) continue
+    if (!out.some((x) => x.toLocaleLowerCase() === v.toLocaleLowerCase())) out.push(v)
+  }
+  return out
+}
+
 async function previewLink(
   creds: WordPressCredentials,
   req: { url: string; keyword?: string },
   deps: WpFixDeps,
 ): Promise<Preview> {
-  // `url` is the page nobody links to; the link goes INTO it, from another post.
+  // `url` is the page nobody links to; the link goes INTO it, from another post or page.
   const target = req.url
-  const phrase = String(req.keyword ?? '').replace(/\s+/g, ' ').trim()
-  if (phrase.length < 3) return fail('no_safe_place')
-  {
-    const hits = await deps.searchItems(creds, '/posts', phrase, 5)
-    for (const hit of hits) {
-      if (sameUrl(hit.link, target)) continue
-      const src = await deps.findItemByUrl(creds, hit.link)
-      if (!src) continue
-      const full = await deps.getItemForEdit(creds, src.endpoint, src.id)
-      if (isUrlAlreadyLinked(full.content, target)) continue
-      const placed = findNaturalAnchorPlacement(full.content, phrase)
-      const applied = applyNaturalAnchor(full.content, phrase, target)
-      if (!placed.found || !applied.ok || !applied.html || !applied.anchorText) continue
-      // The shared preview marks a cut with "…" even after a full stop: keep the stop only.
-      const sentence = (placed.sentence ?? '').replace(/([.!?])…$/u, '$1')
-      return {
-        ok: true, field: 'link', sourceUrl: src.link || hit.link, sourceTitle: hit.title, targetUrl: target,
-        anchor: applied.anchorText, sentenceBefore: sentence, sentenceAfter: sentence, expected: sha(full.content),
+  let targetTitle = ''
+  try {
+    const own = await deps.findItemByUrl(creds, target)
+    if (own) targetTitle = (await deps.getItemForEdit(creds, own.endpoint, own.id)).title
+  } catch { /* the keyword alone, then */ }
+  const phrases = linkPhrases(req.keyword, targetTitle, target)
+  if (phrases.length === 0) return fail('no_safe_place')
+  // The plugin searches every post type at once; the REST API asks posts and pages apart.
+  const endpoints: `/${string}`[] = deps.pluginLink ? ['/posts'] : ['/posts', '/pages']
+  const tried = new Set<string>()
+  for (const phrase of phrases) {
+    for (const endpoint of endpoints) {
+      if (tried.size >= LINK_MAX_CANDIDATES) break
+      const hits = await deps.searchItems(creds, endpoint, phrase, LINK_MAX_CANDIDATES)
+      for (const hit of hits) {
+        if (tried.size >= LINK_MAX_CANDIDATES) break
+        if (sameUrl(hit.link, target) || tried.has(hit.link)) continue
+        tried.add(hit.link)
+        const src = await deps.findItemByUrl(creds, hit.link)
+        if (!src) continue
+        // A page builder shows its own data, not this content: a link written here would not show.
+        if (deps.pluginLink?.rendersFromBuilder(src.id)) continue
+        const full = await deps.getItemForEdit(creds, src.endpoint, src.id)
+        if (isUrlAlreadyLinked(full.content, target)) continue
+        for (const words of phrases) {
+          const placed = findNaturalAnchorPlacement(full.content, words)
+          const applied = applyNaturalAnchor(full.content, words, target)
+          if (!placed.found || !applied.ok || !applied.html || !applied.anchorText || placed.index === undefined) continue
+          // The plugin writes the link with its own matcher: offered only where it lands on the same words.
+          if (deps.pluginLink && pluginLinkLanding(full.content, applied.anchorText) !== placed.index) continue
+          // The shared preview marks a cut with "…" even after a full stop: keep the stop only.
+          const sentence = (placed.sentence ?? '').replace(/([.!?])…$/u, '$1')
+          return {
+            ok: true, field: 'link', sourceUrl: src.link || hit.link, sourceTitle: hit.title, targetUrl: target,
+            anchor: applied.anchorText, sentenceBefore: sentence, sentenceAfter: sentence, expected: sha(full.content),
+          }
+        }
       }
     }
   }

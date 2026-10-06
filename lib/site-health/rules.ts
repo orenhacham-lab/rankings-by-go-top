@@ -181,6 +181,11 @@ export function canFix(field: FixField | null, page: Pick<PageFacts, 'kind'>, pl
   return WP_EDITABLE.has(page.kind)
 }
 
+/** Every row of a finding: the ones listed (`pages`) and the rest (`morePages`), in order. */
+export function allRows<P>(f: { pages: readonly P[]; morePages?: readonly P[] }): P[] {
+  return [...f.pages, ...(f.morePages ?? [])]
+}
+
 export function pathOf(url: string): string {
   try {
     const u = new URL(url)
@@ -250,7 +255,11 @@ export function buildFindings(site: SiteFacts, pages: readonly PageFacts[], ctx:
   for (const [, group] of descriptions) if (group.length > 1) for (const p of group) add('description_duplicate', p, norm(p.description), group.length)
 
   for (const b of site.brokenLinks) add('broken_links', { url: b.url, kind: 'other', adminUrl: null }, null, null, b.from)
+  // A page the home page links to (its menu included: the scan reads the home page as visitors get it)
+  // is not forgotten, whatever the content links count says: it is not reported as one.
+  const fromHome = new Set((pages.find((p) => p.kind === 'home' && p.ok)?.links ?? []).map(pathOf))
   for (const o of site.orphanPages) {
+    if (fromHome.has(pathOf(o.url))) continue
     const known = pages.find((p) => pathOf(p.url) === pathOf(o.url))
     add('orphan_page', { url: o.url, kind: known?.kind ?? 'article', adminUrl: null }, o.keyword || o.title || null, null)
   }
@@ -258,11 +267,17 @@ export function buildFindings(site: SiteFacts, pages: readonly PageFacts[], ctx:
   const findings: Finding[] = []
   for (const [id, list] of hits) {
     const field = FIX_FIELD[id] ?? null
+    const more = list.slice(MAX_PAGES_SHOWN)
     findings.push({
-      id, severity: SEVERITY[id], pages: list.slice(0, MAX_PAGES_SHOWN), total: list.length,
+      id, severity: SEVERITY[id], pages: list.slice(0, MAX_PAGES_SHOWN), ...(more.length > 0 ? { morePages: more } : {}), total: list.length,
       field, guide: GUIDE[id], fixable: list.some((p) => p.fixable), fixType: FIX_TYPE[id] ?? null,
     })
   }
+  return sortFindings(findings)
+}
+
+/** Most serious first; within one severity, the one with the most pages first (in place, and returned). */
+export function sortFindings<F extends Pick<Finding, 'severity' | 'total' | 'id'>>(findings: F[]): F[] {
   return findings.sort((a, b) => SEVERITY_ORDER[a.severity] - SEVERITY_ORDER[b.severity] || b.total - a.total || a.id.localeCompare(b.id))
 }
 
@@ -311,7 +326,7 @@ function cutAtClause(text: string, max: number, min: number): string | null {
 }
 
 /** "Title | Site name" → "Title" (the last segment after a separator), when what is left still says something. */
-function withoutSuffix(title: string): string {
+export function withoutSuffix(title: string): string {
   for (const sep of SEPARATORS) {
     const i = title.lastIndexOf(sep)
     if (i > 0) {
