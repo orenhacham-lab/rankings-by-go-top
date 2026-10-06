@@ -357,12 +357,12 @@ async function main() {
     const pl = fakePlugin()
     const r = await API.handleFixesPost(approveTitle(), depsFor(admin, { pluginPost: pl.post }))
     const g = await API.handleFixesGet(P, depsFor(admin))
-    check('Q16: Shopify is read-only: refused (shopify_readonly), nothing stored or sent, no channel offered',
+    check('Q16: a Shopify store whose connection cannot edit content is read-only: refused (shopify_readonly), nothing stored or sent, no channel offered',
       (r.body as { code?: string }).code === 'shopify_readonly' && admin.tables.site_fix_jobs.length === 0 && pl.calls.length === 0
       && Object.keys((g.body as { capabilities: { channelFor: object } }).capabilities.channelFor).length === 0)
-    const m = mutant<typeof import('../channel')>('lib/site-fix/channel.ts', "if (ctx.shopify) return { ...base, readOnly: true, channelFor: {} }", '')
+    const m = mutant<typeof import('../channel')>('lib/site-fix/channel.ts', "if (!ctx.shopifyWrite) return { ...base, shopify: true, readOnly: true, channelFor: {} }", '')
     const caps = m.mod ? m.mod.resolveCapabilities({ shopify: true, wordpressDetected: false, creds: null, plugin: null, pluginLink: null, webhook: { endpointUrl: 'https://h.example.com', secret: 's' }, siteUrls: [SITE] }, true) : null
-    check('MUTATION CONTROL: a channel resolver that forgets Shopify offers a channel (Q16 catches it)', m.found && !!caps && !caps.readOnly && Object.keys(caps.channelFor).length > 0)
+    check('MUTATION CONTROL: a channel resolver that forgets the write scope offers a channel (Q16 catches it)', m.found && !!caps && !caps.readOnly && Object.keys(caps.channelFor).length > 0)
   }
   {
     // WordPress detected, no plugin, no application password: the plugin is the way.

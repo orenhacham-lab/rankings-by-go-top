@@ -18,7 +18,7 @@
  *   B) "FIX {n} SAFE ITEMS". The server refuses anything outside the safe set (type, home page,
  *      equal/out-of-range values, a page fixed in the last 30 days, more than 25 pages) with
  *      not_bulk_safe and writes nothing; a batch is undone as a whole for 14 days, only its own jobs.
- *   S) SHOPIFY stays read-only; its llms.txt card says plainly it cannot be placed automatically.
+ *   S) SHOPIFY without the write scope stays read-only; llms.txt is never placed on a store, and its card says so.
  *   U) THE SCREEN. The row modes (update / copy), the strip's safe button, and both dictionaries.
  *
  * Every guard has a MUTATION CONTROL (a broken copy must fail it).
@@ -546,20 +546,20 @@ async function main() {
   }
 
   // ── S) Shopify ────────────────────────────────────────────────────────────
-  console.log('\nS) Shopify stays read-only')
+  console.log('\nS) Shopify without the write scope stays read-only')
   {
     const shop: CHANNEL.FixContext = { shopify: true, wordpressDetected: false, creds: null, plugin: null, pluginLink: null, webhook: null, siteUrls: ['https://store.example.com'] }
     const caps = CHANNEL.resolveCapabilities(shop, true)
-    check('S1: a Shopify store: read-only, no channel for any type (llms.txt included)', caps.readOnly && Object.keys(caps.channelFor).length === 0)
+    check('S1: a Shopify store whose connection cannot edit content: read-only, no channel for any type (llms.txt included)', caps.readOnly && Object.keys(caps.channelFor).length === 0)
     const he = getDashboardDictionary('he').siteHealth.guides.llms.shopify.join(' ')
     const en = getDashboardDictionary('en').siteHealth.guides.llms.shopify.join(' ')
     check('S2: the Shopify llms.txt card says plainly it cannot be placed automatically', /אי אפשר להוסיף llms\.txt לחנות שופיפיי באופן אוטומטי/.test(he) && /cannot be added to a Shopify store automatically/.test(en))
-    const m = mutant<typeof CHANNEL>('lib/site-fix/channel.ts', '  if (ctx.shopify) return { ...base, readOnly: true, channelFor: {} }\n', '')
+    const m = mutant<typeof CHANNEL>('lib/site-fix/channel.ts', '    if (!ctx.shopifyWrite) return { ...base, shopify: true, readOnly: true, channelFor: {} }\n', '')
     check('MUTATION CONTROL: a Shopify store that gets a channel is caught by S1', m.found && !!m.mod && !m.mod.resolveCapabilities({ ...shop, wordpressDetected: true }, true).readOnly)
-    const touching = ['lib/site-fix/api.ts', 'lib/site-fix/channel.ts', 'lib/site-fix/preview.ts', 'lib/site-fix/suggest.ts', 'lib/site-fix/bulk.ts', 'lib/site-fix/h1.ts',
+    const touching = ['lib/site-fix/api.ts', 'lib/site-fix/channel.ts', 'lib/site-fix/preview.ts', 'lib/site-fix/suggest.ts', 'lib/site-fix/bulk.ts', 'lib/site-fix/h1.ts', 'lib/site-fix/shopify-admin.ts', 'lib/site-fix/shopify-apply.ts',
       'components/site-health/useSafeFixes.tsx', 'components/site-health/ApproveFixModal.tsx', 'components/site-health/AutoFixStrip.tsx']
       .filter((f) => /from '@\/lib\/shopify|from '\.\.\/shopify|app\/api\/shopify/.test(read(f)))
-    check('S3: none of the site-fix code reaches into lib/shopify or the Shopify routes (report only, nothing built there)', touching.length === 0, touching.join(','))
+    check('S3: none of the site-fix code reaches into lib/shopify or the Shopify routes (the Shopify channel gets its credentials from the route)', touching.length === 0, touching.join(','))
   }
 
   // ── U) the screen ─────────────────────────────────────────────────────────

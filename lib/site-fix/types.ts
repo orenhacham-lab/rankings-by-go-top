@@ -81,7 +81,7 @@ export const pluginSupports = (version: string | null | undefined, type: FixType
 export const JOB_STATUSES = ['pending', 'applied', 'failed', 'cancelled', 'sent', 'manual', 'reverted'] as const
 export type JobStatus = (typeof JOB_STATUSES)[number]
 
-export const CHANNELS = ['plugin', 'app_password', 'webhook', 'manual'] as const
+export const CHANNELS = ['plugin', 'app_password', 'webhook', 'manual', 'shopify'] as const
 export type FixChannel = (typeof CHANNELS)[number]
 
 export const AUDIT_ACTIONS = [
@@ -151,6 +151,14 @@ export type FixErrorCode =
   | 'llms_exists'
   /** "Apply all" was asked for a type or a value that is not in the safe list. */
   | 'not_bulk_safe'
+  /** Shopify: the address is not an article or a page of this store (a product, a collection, unknown). */
+  | 'not_in_store'
+  /** Shopify: the store's connection does not allow editing articles and pages (reconnect it). */
+  | 'store_permission'
+  /** Shopify: the store did not answer. */
+  | 'store_unreachable'
+  /** Shopify: the store refused the change. */
+  | 'store_rejected'
 
 /** One row of `site_fix_jobs`, as the server reads it. */
 export interface FixJobRow {
@@ -219,8 +227,13 @@ export type PluginState =
 export interface FixCapabilities {
   /** The tables exist (the migration is applied). When false the screen hides the queue. */
   available: boolean
-  /** Shopify: nothing is written; findings keep their instructions. */
+  /**
+   * Nothing is written, findings keep their instructions: a Shopify store whose connection cannot
+   * edit articles and pages.
+   */
   readOnly: boolean
+  /** A Shopify store: only its articles and pages are fixed (products and collections keep their instructions). */
+  shopify?: boolean
   /**
    * The channel an approval of each type would take right now. `needs_update`: the plugin is
    * connected but older than the type needs (PLUGIN_MIN_VERSION).

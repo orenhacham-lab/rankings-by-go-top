@@ -5,6 +5,8 @@
  * Where the page is read from depends on the channel the fix would take:
  *   plugin        the plugin's signed /inspect (the post's content and its stored SEO fields)
  *   app_password  the WordPress REST API (the content; SEO fields as the public page shows them)
+ *   shopify       the store's article or page through the Admin API (its body and its search
+ *                 engine listing), resolved only from the store sync (./shopify-admin.ts)
  *   webhook, manual  the public page only (we will not write it ourselves; `expected` is null)
  *
  * Proposals come from the page's own words (lib/site-health/rules.ts) and, where those fall short,
@@ -32,6 +34,7 @@ import { imagesMissingAlt, previewFix, sha, wpFailure, type WpFixDeps } from '@/
 import type { WordPressCredentials } from '@/lib/wordpress/types'
 import { brokenLinkWords } from './content'
 import { planH1Demotion } from './h1'
+import { bodyH1s, shopFailure, SHOPIFY_FIX_TYPES, type ShopCreds, type ShopifyFixClient, type ShopItemRef } from './shopify-admin'
 import { pluginInspect, pluginSearch, type PluginItem, type PluginLink, type PluginPost } from './plugin-client'
 import { buildLlmsTxt, pageLanguage, suggestFaq, suggestMetaDescription, suggestSeoTitle, thinContent, type Generate, type LlmsPage } from './suggest'
 import type { FaqItem, FixChannel, FixErrorCode, FixType, H1Ref } from './types'
@@ -56,7 +59,7 @@ export type TextReader = (url: string) => Promise<{ status: number; text: string
 export type SitePages = () => Promise<{ url: string; title: string | null; kind: string | null }[]>
 
 /** How the value will reach the page, for the sentence under the preview. */
-export type Via = 'plugin_seo' | 'plugin_own' | 'seo_plugin' | 'wp_title' | 'content' | 'webhook' | 'manual'
+export type Via = 'plugin_seo' | 'plugin_own' | 'seo_plugin' | 'wp_title' | 'content' | 'webhook' | 'manual' | 'shopify_seo'
 
 type Limits = { min: number; max: number; target: number }
 export type FixPreview =
@@ -76,6 +79,8 @@ export interface PreviewContext {
   creds: WordPressCredentials | null
   link: PluginLink | null
   siteName: string | null
+  /** Shopify: the store's credentials, the client, and the article or page the address resolved to (null: not one). */
+  shop?: { creds: ShopCreds; client: ShopifyFixClient; ref: ShopItemRef | null } | null
 }
 
 export interface PreviewDeps {
@@ -237,11 +242,52 @@ export async function previewFixJob(req: PreviewRequest, ctx: PreviewContext, de
     if (req.type === 'llms_txt') return await previewLlms(req, ctx, deps)
     if (ctx.channel === 'plugin' && ctx.link) return await previewViaPlugin(req, ctx, ctx.link, deps)
     if (ctx.channel === 'app_password' && ctx.creds) return await previewViaRest(req, ctx, ctx.creds, deps)
+    if (ctx.channel === 'shopify') return ctx.shop ? await previewViaShopify(req, ctx, ctx.shop, deps) : fail('no_channel')
     if (ctx.channel === 'webhook' || ctx.channel === 'manual') return await previewPublic(req, ctx, CHANNEL_VIA[ctx.channel], deps)
     return fail('no_channel')
   } catch (err) {
+    if (ctx.channel === 'shopify') return fail(shopFailure(err))
     const code = wpFailure(err)
     return fail(code === 'wordpress_permission' ? 'wordpress_permission' : 'plugin_unreachable')
+  }
+}
+
+/**
+ * A Shopify article or page: its body for content fixes, its search engine listing (title_tag,
+ * description_tag) for the title and the description. `expected` is the stored listing value, or
+ * the body's hash, so a change made in the store in between is refused.
+ */
+async function previewViaShopify(req: PreviewRequest, ctx: PreviewContext, shop: NonNullable<PreviewContext['shop']>, deps: PreviewDeps): Promise<FixPreview> {
+  if (!SHOPIFY_FIX_TYPES.includes(req.type)) return fail('not_allowed')
+  if (!shop.ref) return fail('not_in_store')
+  const it = await shop.client.read(shop.creds, shop.ref)
+  if (!it) return fail('not_in_store')
+  const host = new URL(shop.ref.url).hostname
+  switch (req.type) {
+    case 'image_alt': {
+      const missing = imagesMissingAlt(it.body)
+      if (missing.length === 0) return fail('nothing_to_fix')
+      return { ok: true, type: 'image_alt', images: missing.slice(0, 20).map((i) => ({ src: i.src, after: suggestAlt(i.src, it.title) })), expected: sha(it.body), via: 'content' }
+    }
+    case 'broken_link': {
+      const words = brokenLinkWords(it.body, req.url, host)
+      if (words.length === 0) return fail('nothing_to_fix')
+      return { ok: true, type: 'broken_link', pageUrl: shop.ref.url, href: req.url, words, expected: sha(it.body), via: 'content' }
+    }
+    case 'faq_block':
+      return await previewFaq(await faqSourceText(textOf(it.body), req.url, deps), it.title, sha(it.body), 'content', deps)
+    case 'h1_demote': {
+      const live = await deps.readLive(req.url)
+      if (!live) return fail('store_unreachable')
+      const plan = planH1Demotion({ contentH1: bodyH1s(it.body), liveH1: live.h1s ?? (live.h1 ? [live.h1] : []), builder: false })
+      if (!plan.ok) return plan.reason === 'nothing' ? fail('nothing_to_fix') : fail('h1_not_safe', plan.reason)
+      return { ok: true, type: 'h1_demote', headings: plan.demote, keep: plan.keep, keepFrom: plan.keepFrom, expected: sha(it.body), via: 'content' }
+    }
+    default:
+      return previewMeta(req, ctx, deps, {
+        stored: { seo_title: it.titleTag ?? '', meta_description: it.descriptionTag ?? '', canonical: '', focus_keyphrase: '', schema_jsonld: '' },
+        title: it.title, text: textOf(it.body), postType: it.kind === 'article' ? 'post' : 'page', via: 'shopify_seo', siteUrl: shop.ref.url,
+      })
   }
 }
 
