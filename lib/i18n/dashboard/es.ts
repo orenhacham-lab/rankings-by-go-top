@@ -3670,7 +3670,7 @@ export const dashboardEs: DeepPartial<DashboardDictionary> = {
     queuedBadge: 'En la cola de arreglos',
     connectHint: {
       wordpress: 'Conecta tu web de WordPress en los ajustes y podremos arreglar títulos, descripciones, descripciones de imágenes y enlaces con un clic, después de que veas y apruebes cada cambio.',
-      shopify: 'En las tiendas de Shopify no cambiamos nunca nada en tu tienda. Cada hallazgo trae instrucciones, con un enlace directo a la página en el administrador de tu tienda.',
+      shopify: 'En tu tienda de Shopify arreglamos por ti los artículos y las páginas, solo después de que apruebes cada arreglo, y puedes deshacerlo. Nunca cambiamos productos ni colecciones: esos hallazgos traen instrucciones, con un enlace directo a la página en el administrador de tu tienda.',
       wix: 'En las webs de Wix los arreglos se hacen en el editor de Wix. Cada hallazgo trae instrucciones paso a paso.',
       other: 'Cada hallazgo trae instrucciones paso a paso. Si tu web funciona con WordPress, conéctala en los ajustes y podremos arreglar algunos por ti.',
     },

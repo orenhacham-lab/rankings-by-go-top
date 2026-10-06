@@ -63,7 +63,7 @@ export const siteHealthPtBR: DeepPartial<DashboardDictionary> = {
     queuedBadge: 'Na fila de correções',
     connectHint: {
       wordpress: 'Conecte o seu site WordPress nas configurações e poderemos corrigir títulos, descrições, descrições de imagens e links com um clique, depois que você vir e aprovar cada alteração.',
-      shopify: 'Em lojas Shopify nunca alteramos nada na sua loja. Cada achado traz instruções, com um link direto para a página no painel administrativo da sua loja.',
+      shopify: 'Na sua loja Shopify corrigimos para você artigos e páginas, somente depois que você aprova cada correção, e é possível desfazê-la. Nunca alteramos produtos ou coleções: esses achados trazem instruções, com um link direto para a página no painel administrativo da sua loja.',
       wix: 'Em sites Wix as correções são feitas no editor da Wix. Cada achado traz instruções passo a passo.',
       other: 'Cada achado traz instruções passo a passo. Se o seu site roda em WordPress, conecte-o nas configurações e poderemos corrigir alguns para você.',
     },

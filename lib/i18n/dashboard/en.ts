@@ -4660,7 +4660,7 @@ export const dashboardEn = {
     queuedBadge: 'In the fix queue',
     connectHint: {
       wordpress: 'Connect your WordPress site in settings and we can fix titles, descriptions, image descriptions and links in one click, after you see and approve every change.',
-      shopify: 'On Shopify stores we never change anything in your store. Every finding has instructions, with a direct link to the page in your store admin.',
+      shopify: 'In your Shopify store we fix articles and pages for you, only after you approve each fix, and you can undo it. We never change products or collections: each of those findings has instructions, with a direct link to the page in your store admin.',
       wix: 'On Wix sites fixes are made in the Wix editor. Every finding has step-by-step instructions.',
       other: 'Every finding has step-by-step instructions. If your site runs on WordPress, connect it in settings and we can fix some of them for you.',
     },
