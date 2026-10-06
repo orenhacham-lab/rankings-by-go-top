@@ -390,6 +390,12 @@ export default function EnglishTermsPage() {
             plugins, settings or users, and does not publish or unpublish pages.
           </li>
           <li>
+            <strong>One approval for a group of fixes.</strong> You can approve, in one approval, a group of safe
+            fixes that is shown to you before you approve it: SEO title, meta description and image alt text, up
+            to 25 pages at a time, and never the home page. Here too every fix is recorded in the log separately
+            and can be undone, and the whole group can be undone at once within 14 days.
+          </li>
+          <li>
             <strong>Log and undo.</strong> Every fix is recorded in a log together with the previous value, and
             can be undone to restore that value. If the content on the site changed after the fix, automatic undo
             may not be possible.
@@ -413,8 +419,10 @@ export default function EnglishTermsPage() {
           <li>
             <strong>What may be applied.</strong> The list is closed, and it covers the store&rsquo;s articles and
             pages only: the title and description shown in search results, the alt text of an image inside that
-            article or page, repair of a broken link inside it, an FAQ block added at its end, and turning an
-            extra H1 heading inside it into an H2. Every fix is shown to you before it is applied, and writes to
+            article or page, the alt text of an article&rsquo;s featured image that has none (a page has no
+            featured image), repair of a broken link inside it, an FAQ block added at its end, and turning an
+            extra H1 heading inside it into an H2. In alt text we write the text only: we do not touch the image
+            file and do not replace the image. Every fix is shown to you before it is applied, and writes to
             that one article or page only. The Service does not touch products, collections, the theme, the
             store&rsquo;s settings, prices, orders, redirects or any file of the store, does not delete content,
             and does not publish or unpublish anything.
