@@ -646,11 +646,26 @@ const NETWORK_DENIED = /אינו זמין לחנויות Shopify|אינה זמי
  * structured data. It says so in words now, and the only place either document
  * may mention JSON-LD is a WordPress-scoped list.
  */
+/*
+ * What the sentence may NOT say: "no markup of any kind". Every content fix
+ * writes markup (the FAQ block is a div with headings, a broken-link fix rewrites
+ * an anchor), and a published Shopify article carries our own formatting and the
+ * optional CTA box. What is true, and what a merchant actually needs to know, is
+ * narrower and sharper: no schema, no scripts, nothing in the theme's or the
+ * store's code, and whatever is written stays inside that item's own body.
+ */
 const SHOPIFY_NO_SCHEMA: Record<string, RegExp> = {
-  he: /בחנות\n?\s*Shopify השירות אינו מוסיף סכמת JSON-LD ואינו מוסיף שום סימון או קוד/,
-  en: /in a Shopify store the Service adds no JSON-LD schema and no markup or code of any kind/,
-  es: /en una tienda de Shopify el Servicio no a[ñn]ade esquema JSON-LD ni ning[úu]n marcado o c[óo]digo/,
-  'pt-BR': /em uma loja Shopify o Servi[çc]o n[ãa]o acrescenta esquema JSON-LD nem nenhuma marca[çc][ãa]o ou c[óo]digo/,
+  he: /בחנות\n?\s*Shopify השירות אינו מוסיף סכמת JSON-LD, אינו מוסיף סקריפטים ואינו נוגע בקוד של ערכת העיצוב/,
+  en: /In a Shopify store the Service adds no JSON-LD schema, adds no scripts and does not touch the\s+code of the theme/,
+  es: /En una tienda de Shopify el Servicio no a[ñn]ade esquema JSON-LD, no a[ñn]ade scripts y no toca el c[óo]digo del tema/,
+  'pt-BR': /Em uma loja Shopify o Servi[çc]o n[ãa]o acrescenta esquema JSON-LD, n[ãa]o acrescenta scripts e n[ãa]o toca no c[óo]digo do tema/,
+}
+/* And it must keep saying where what it writes lands: the item's own body. */
+const SHOPIFY_BODY_ONLY: Record<string, RegExp> = {
+  he: /כל מה שנכתב הוא תוכן ועיצוב בתוך גוף אותו מאמר או עמוד/,
+  en: /everything it writes is content and formatting inside the body of\s+that one article or page/,
+  es: /todo lo que escribe es contenido y formato dentro del cuerpo de ese art[íi]culo o esa p[áa]gina/,
+  'pt-BR': /tudo o que ele escreve [ée] conte[úu]do e formata[çc][ãa]o dentro do corpo daquele artigo ou daquela p[áa]gina/,
 }
 const FIX_SCOPE: Record<string, RegExp[]> = {
   he: [/טקסט חלופי\s+לתמונה הראשית של מאמר שאין לה טקסט חלופי/, /איננו נוגעים בקובץ התמונה ואיננו מחליפים אותה/, /אישור אחד לקבוצת תיקונים/, /עד 25 עמודים בכל פעם, ולא עמוד הבית/, /בתוך 14 ימים/],
@@ -673,10 +688,14 @@ const FIX_SCOPE: Record<string, RegExp[]> = {
   }
   for (const [name, terms] of docs) {
     const says = SHOPIFY_NO_SCHEMA[name]
-    if (says) check(`${name}/terms: the Shopify list says no schema and no code is added`, says.test(terms))
+    if (says) check(`${name}/terms: the Shopify list says no schema, no scripts and no theme code`, says.test(terms))
+    const body = SHOPIFY_BODY_ONLY[name]
+    if (body) check(`${name}/terms: ...and that what it writes stays inside that item's body`, body.test(terms))
   }
   check('mutation control: a Shopify list that stays silent about schema is caught',
     !SHOPIFY_NO_SCHEMA.en.test('an FAQ block added at its end, and turning an extra H1 heading inside it into an H2.'))
+  check('mutation control: a promise of no markup at all, which the FAQ block and our formatting break, is caught',
+    !SHOPIFY_NO_SCHEMA.en.test('in a Shopify store the Service adds no JSON-LD schema and no markup or code of any kind'))
   check('mutation control: a featured-image line without the "has none" narrowing is caught',
     !FIX_SCOPE.en[0].test('the alt text of an article&rsquo;s featured image, and of every image on it'))
   check('mutation control: a batch described without its page limit is caught',
