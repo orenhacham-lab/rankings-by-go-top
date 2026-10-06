@@ -379,8 +379,10 @@ export default function EnglishTermsPage() {
         <h3>WordPress sites</h3>
         <p>
           On a connected WordPress site, the Service can suggest site fixes and apply them through the GO TOP SEO
-          Bridge plugin, only with your consent and your approval of each fix, or within the scope of an
-          automatic approval you turned on as described later in this section.
+          Bridge plugin, or, on a site without the plugin, through the application password you created and
+          WordPress&rsquo;s own REST interface. The fixes that need the plugin are offered only once you have
+          installed it. Every fix is applied only with your consent and your approval of each fix, or within the
+          scope of an automatic approval you turned on as described later in this section.
         </p>
         <ul>
           <li>
@@ -389,6 +391,17 @@ export default function EnglishTermsPage() {
             broken links, demotion of a duplicate H1 heading to a lower heading level, and creating an llms.txt
             file. The Service does not delete content and does not touch prices, products, the theme, other
             plugins, settings or users, and does not publish or unpublish pages.
+          </li>
+          <li>
+            <strong>Alt text for an image outside the page&rsquo;s own text.</strong> A page also shows images that
+            are not inside its text, such as the logo, an image in the menu or the footer, and the featured image
+            the theme prints above the text. WordPress shows those with the alt text recorded on the image itself
+            in the media library, so that is where the fix is written, and only for an image that has no alt text
+            at all. That means one such write applies on every page of the site that shows that same image. We do
+            not touch the image file, its name or its caption. An image that is not in the media library, such as
+            one that came with the theme, is never offered for a fix. Each such fix is shown to you before it is
+            applied and approved on its own, never as part of a group of fixes and never under automatic approval,
+            and it can be undone to restore what was there.
           </li>
           <li>
             <strong>One approval for a group of fixes.</strong> You can approve, in one approval, a group of safe

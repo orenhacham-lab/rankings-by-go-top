@@ -234,7 +234,11 @@ export default function EnglishPrivacyPage() {
           each fix or an automatic approval you turned on, the GO TOP SEO Bridge plugin applies to the site only
           fixes from a closed list (SEO title, meta
           description, canonical address, focus keyphrase, image alt text, an FAQ block, JSON-LD schema, internal
-          links, repair of broken links, demotion of a duplicate H1 heading, and creating llms.txt).
+          links, repair of broken links, demotion of a duplicate H1 heading, and creating llms.txt). On a site
+          without the plugin, the fixes WordPress&rsquo;s REST interface allows are written with the application
+          password we stored, under the same approvals and into the same log. Alt text for an image a page shows
+          outside its own text is written on the image itself in the media library, so it applies on every page
+          that shows it; we do not touch the image file, its name or its caption.
         </p>
         <ul>
           <li><strong>Fix log:</strong> every fix is recorded in our log with who approved it, the time it was

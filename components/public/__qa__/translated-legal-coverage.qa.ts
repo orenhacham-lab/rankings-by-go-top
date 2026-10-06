@@ -830,6 +830,92 @@ const AUTO_APPROVE_PRIVACY: Record<string, RegExp[]> = {
     !SHOPIFY_STILL_PER_FIX.en.test('In a connected Shopify store, the Service can suggest site fixes and apply them through the app.'))
 }
 
+// ── 17) how a WordPress fix reaches the site, and where alt text lands ─────
+/*
+ * Two things the documents got wrong about WordPress.
+ *
+ * The channel. lib/site-fix/channel.ts writes APP_PASSWORD_TYPES (seo_title,
+ * meta_description, image_alt, internal_link, broken_link, faq_block) on a site
+ * with NO plugin, through the application password the merchant created and
+ * WordPress's own REST API; only canonical, focus keyphrase, schema, h1_demote
+ * and llms_txt need the plugin. Both documents said the plugin does the writing,
+ * which let a merchant believe that removing the plugin stops us writing. It
+ * does not, and the credential is theirs, so the route has to be named.
+ *
+ * Where alt text lands. lib/site-fix/media-alt.ts writes alt_text on the image's
+ * MEDIA LIBRARY item, for images a page shows outside its own text (a logo, a
+ * menu or footer image, the featured image the theme prints). WordPress renders
+ * those from the item, so one write changes that image's alt text on every page
+ * that shows it. The closed list said "alt text for images" and said nothing
+ * about where it is written: a merchant approving a fix on one page would not
+ * expect a site-wide change. The narrowings are the code's own — only an item
+ * whose alt is empty, never the file, its name or its caption, never an image
+ * the theme ships outside the library — and the fix is approved on its own,
+ * never in a batch and never under automatic approval.
+ */
+const WP_CHANNEL_TERMS: Record<string, RegExp> = {
+  he: /באתר\s+שאין בו התוסף, דרך סיסמת האפליקציה שיצרתם וממשק ה-REST של וורדפרס עצמה/,
+  en: /on a site without the plugin, through the application password you created and\s+WordPress&rsquo;s own REST interface/,
+  es: /en un sitio sin el plugin, mediante la Application Password que usted cre[óo] y la propia interfaz REST de WordPress/,
+  'pt-BR': /em um site sem o plugin, por meio da Senha de Aplicativo que você criou e da própria interface REST do WordPress/,
+}
+const WP_CHANNEL_PRIVACY: Record<string, RegExp> = {
+  he: /באתר\s+שאין בו התוסף, התיקונים שממשק ה-REST של וורדפרס מאפשר נכתבים דרך סיסמת האפליקציה ששמרנו/,
+  en: /On a site\s+without the plugin, the fixes WordPress&rsquo;s REST interface allows are written with the application\s+password we stored/,
+  es: /En un sitio sin el complemento, las correcciones que permite la interfaz REST de WordPress se escriben con la Application Password que hemos almacenado/,
+  'pt-BR': /Em um site sem o plugin, as corre[çc][õo]es que a interface REST do WordPress permite s[ãa]o escritas com a Senha de Aplicativo que armazenamos/,
+}
+/* The site-wide effect is the fact a merchant cannot guess; it may never be dropped. */
+const MEDIA_ALT_SITEWIDE: Record<string, RegExp> = {
+  he: /כתיבה אחת כזאת חלה על כל עמוד באתר שמציג את אותה תמונה/,
+  en: /one such write applies on every page of the site that shows that same image/,
+  es: /una sola escritura de este tipo se aplica en todas las p[áa]ginas del sitio que muestran esa misma imagen/,
+  'pt-BR': /uma [úu]nica escrita desse tipo vale para todas as p[áa]ginas do site que exibem aquela mesma imagem/,
+}
+/* And its narrowings: only an empty one, nothing else about the image, approved on its own. */
+const MEDIA_ALT_LIMITS: Record<string, RegExp[]> = {
+  he: [/ורק לתמונה שאין לה\s+טקסט חלופי כלל/, /איננו נוגעים\s+בקובץ התמונה, בשמה או בכיתוב שלה/, /לעולם לא כחלק מקבוצת תיקונים\s+ולא במסגרת אישור אוטומטי/],
+  en: [/only for an image that has no alt text\s+at all/, /We do\s+not touch the image file, its name or its caption/, /never as part of a group of fixes and never under automatic approval/],
+  es: [/solo para una imagen que no tiene ning[úu]n texto alternativo/, /No tocamos el archivo de la imagen, su nombre ni su leyenda/, /nunca como parte de un grupo de correcciones y nunca bajo aprobaci[óo]n autom[áa]tica/],
+  'pt-BR': [/somente para uma imagem que n[ãa]o tem nenhum texto alternativo/, /N[ãa]o tocamos no arquivo da imagem, no seu nome nem na sua legenda/, /nunca como parte de um grupo de corre[çc][õo]es e nunca sob aprova[çc][ãa]o autom[áa]tica/],
+}
+{
+  const read = (path: string) => (existsSync(path) ? readFileSync(path, 'utf8') : '')
+  const enTermsSource = frontMatter(text[LOCALES[0]].terms).source
+  const enPrivacySource = frontMatter(text[LOCALES[0]].privacy).source
+  const termsDocs: [string, string][] = [
+    ['he', read(HEBREW_TERMS)],
+    ['en', enTermsSource ? read(enTermsSource) : ''],
+    ...LOCALES.map((l): [string, string] => [l, text[l].terms]),
+  ]
+  const privacyDocs: [string, string][] = [
+    ['he', read(HEBREW_PRIVACY)],
+    ['en', enPrivacySource ? read(enPrivacySource) : ''],
+    ...LOCALES.map((l): [string, string] => [l, text[l].privacy]),
+  ]
+  for (const [name, terms] of termsDocs) {
+    const channel = WP_CHANNEL_TERMS[name]
+    if (channel) check(`${name}/terms: the WordPress opening names the application-password route`, channel.test(terms))
+    const wide = MEDIA_ALT_SITEWIDE[name]
+    if (wide) check(`${name}/terms: the media-library fix says it applies on every page showing the image`, wide.test(terms))
+    for (const must of MEDIA_ALT_LIMITS[name] ?? []) {
+      check(`${name}/terms: the media-library fix states ${must.source.slice(0, 40)}`, must.test(terms))
+    }
+  }
+  for (const [name, privacy] of privacyDocs) {
+    const channel = WP_CHANNEL_PRIVACY[name]
+    if (channel) check(`${name}/privacy: the application-password route is named`, channel.test(privacy))
+  }
+  check('mutation control: a WordPress opening that names only the plugin is caught',
+    !WP_CHANNEL_TERMS.en.test('the Service can suggest site fixes and apply them through the GO TOP SEO Bridge plugin, only with your consent.'))
+  check('mutation control: a policy that still credits every write to the plugin is caught',
+    !WP_CHANNEL_PRIVACY.en.test('the GO TOP SEO Bridge plugin applies to the site only fixes from a closed list.'))
+  check('mutation control: a media-library line that hides the site-wide effect is caught',
+    !MEDIA_ALT_SITEWIDE.en.test('the fix is written on the image itself in the media library, for images outside the text.'))
+  check('mutation control: a media-library line that lets the fix ride automatic approval is caught',
+    !MEDIA_ALT_LIMITS.en[2].test('Each such fix is shown to you before it is applied, and can be undone.'))
+}
+
 // ── MUTATION CONTROLS ───────────────────────────────────────────────────────
 console.log('\nmutation controls')
 {
