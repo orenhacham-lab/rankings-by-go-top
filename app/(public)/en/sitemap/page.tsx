@@ -35,11 +35,23 @@ export default function EnglishSitemapPage() {
     {
       title: 'Features',
       links: [
+        { label: 'Content Creation & Publishing', href: '/en/features/seo-geo-content-publishing' },
         { label: 'Google Organic Rank Tracking', href: '/en/features/google-organic-rank-tracking' },
         { label: 'Google Maps Rank Tracking', href: '/en/features/google-maps-rank-tracking' },
         { label: 'AI Visibility Tracking', href: '/en/features/ai-visibility-tracking' },
         { label: 'SEO/GEO Reports', href: '/en/features/seo-geo-reports' },
         { label: 'Keyword Research', href: '/en/features/keyword-research' },
+        { label: 'Site fixes', href: '/en/features/site-health-fixes' },
+        { label: 'You vs. competitors', href: '/en/features/competitor-tracking' },
+        { label: 'Search Console data', href: '/en/features/search-console' },
+      ],
+    },
+    {
+      title: "Who it's for",
+      links: [
+        { label: 'Business owners', href: '/en/solutions/businesses' },
+        { label: 'Agencies', href: '/en/solutions/agencies' },
+        { label: 'WordPress sites', href: '/en/solutions/wordpress' },
       ],
     },
     {

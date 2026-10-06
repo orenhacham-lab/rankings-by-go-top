@@ -52,6 +52,42 @@ export const ptBR = {
         label: 'Pesquisa de palavras-chave',
         description: 'Descubra ideias de palavras-chave, volume de busca e concorrência antes de colocá-las em acompanhamento',
       },
+      siteFixes: {
+        label: 'Correções no site',
+        description: 'Verificamos o seu site e corrigimos títulos, descrições, texto alternativo das imagens e links. No WordPress com um clique, depois que você aprovar.',
+      },
+      competitors: {
+        label: 'Você x concorrentes',
+        description: 'Em quantas palavras-chave cada concorrente aparece acima de você no Google, e quem os mecanismos de IA citam no seu lugar.',
+      },
+      searchConsole: {
+        label: 'Dados do Search Console',
+        description: 'Cliques, impressões e posição média do Google, com a variação em relação ao período anterior.',
+      },
+    },
+    featureGroups: {
+      measure: 'Medir',
+      act: 'Fazer o trabalho',
+      prove: 'Mostrar resultados',
+    },
+    solutions: 'Para quem',
+    solutionsMenu: {
+      businesses: {
+        label: 'Donos de negócios',
+        description: 'Um só sistema que escreve, publica e mede por você, sem fornecedores para gerenciar.',
+      },
+      agencies: {
+        label: 'Agências',
+        description: 'Todos os sites dos seus clientes em um só lugar, com relatórios em PDF para enviar ao cliente.',
+      },
+      shopify: {
+        label: 'Lojas Shopify',
+        description: 'Nosso app na Shopify App Store.',
+      },
+      wordpress: {
+        label: 'Sites WordPress',
+        description: 'Artigos publicados direto no seu site e correções com um clique.',
+      },
     },
   },
   footer: {

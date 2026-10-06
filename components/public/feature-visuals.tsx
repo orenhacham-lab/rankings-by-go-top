@@ -250,3 +250,49 @@ export function KeywordIdeasVisual({
     </ProductFrame>
   )
 }
+
+/**
+ * A work list: what the system found or did, one row each, with its state
+ * ("done" in ok green, "waiting" neutral). Used for site fixes, a WordPress
+ * site's publishing, and the solution pages' month at a glance.
+ */
+export function WorkListVisual({
+  heading, rows,
+}: {
+  heading: string
+  /** `url` is a path or a domain, always shown left-to-right so a Hebrew row keeps it whole. */
+  rows: { title: string; detail: string; url?: string; icon: LucideIcon; done: boolean; status: string }[]
+}) {
+  return (
+    <ProductFrame>
+      <h3 className="mb-4 text-section font-semibold text-ink">{heading}</h3>
+      <ul className="space-y-2.5">
+        {rows.map((row) => (
+          <li
+            key={row.title}
+            className={cn('flex items-center gap-3 rounded-inset border border-line border-s-[3px] bg-surface p-3 sm:p-4', row.done ? 'border-s-ok' : 'border-s-line')}
+          >
+            <IconSquircle icon={row.icon} />
+            <div className="min-w-0 flex-1">
+              <div className="text-copy font-semibold text-ink">{row.title}</div>
+              <div className="truncate text-caption text-muted">
+                {row.url && <span dir="ltr">{row.url}</span>}
+                {row.url && row.detail && ' · '}
+                {row.detail}
+              </div>
+            </div>
+            <span
+              className={cn(
+                'inline-flex h-7 shrink-0 items-center gap-1 rounded-pill px-2.5 text-caption font-semibold',
+                row.done ? 'bg-ok-soft text-ok' : 'bg-sunk text-muted',
+              )}
+            >
+              {row.done && <Check className="size-3.5" strokeWidth={3} aria-hidden="true" />}
+              {row.status}
+            </span>
+          </li>
+        ))}
+      </ul>
+    </ProductFrame>
+  )
+}
