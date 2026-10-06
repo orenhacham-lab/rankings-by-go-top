@@ -117,11 +117,11 @@ function main() {
     // A document that says when it was last updated has to be telling the truth
     // about the version the reader is looking at.
     // Per document, because they are no longer revised together: the privacy
-    // policy moved to 5 October 2026 with the partner-program section and the
-    // referral cookie, and the accessibility statement moved the same day with
-    // the section that says how it is verified.
+    // policy moved to 6 October 2026 with the site fixes inside a Shopify
+    // store, and the accessibility statement stayed at 5 October 2026, when the
+    // section that says how it is verified was added to it.
     check('D2: every document that was changed carries the new date',
-      /5 באוקטובר 2026/.test(read(HE_PRIVACY)) && /October 5, 2026/.test(read(EN_PRIVACY))
+      /6 באוקטובר 2026/.test(read(HE_PRIVACY)) && /October 6, 2026/.test(read(EN_PRIVACY))
       && /5 באוקטובר 2026/.test(read(HE_A11Y)) && /October 5, 2026/.test(read(EN_A11Y)))
   }
 

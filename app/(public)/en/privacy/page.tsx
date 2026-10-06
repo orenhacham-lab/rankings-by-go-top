@@ -272,8 +272,9 @@ export default function EnglishPrivacyPage() {
         <ul>
           <li><strong>Shopify:</strong> installing the app in your store lets us read the store&rsquo;s content,
           products and pages, and publish articles to the store blog, within the permissions you approved at
-          installation. The store&rsquo;s access token is stored encrypted. Removing the app from the store
-          revokes the access.</li>
+          installation. With your approval of each fix, we also write site fixes to the store&rsquo;s articles and
+          pages, and keep the previous value of each fix so that you can undo it. The store&rsquo;s access token
+          is stored encrypted. Removing the app from the store revokes the access.</li>
           <li><strong>Wix:</strong> the connection uses an API key you issue in your own account, and is used
           to read the site&rsquo;s content and publish articles to its blog. We send Wix the article&rsquo;s
           content and its publishing details, and no other account data. The key is stored encrypted, is never
@@ -754,7 +755,7 @@ export default function EnglishPrivacyPage() {
 
       <section>
         <p className={LEGAL_FOOTNOTE}>
-          This policy was last updated on October 5, 2026
+          This policy was last updated on October 6, 2026
         </p>
       </section>
     </LegalDoc>

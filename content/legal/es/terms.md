@@ -3,7 +3,7 @@ title: Términos de Uso | Go Top SEO
 description: Términos de uso de Go Top SEO: las condiciones que rigen el uso de nuestro servicio.
 locale: es
 source: app/(public)/en/terms/page.tsx
-lastUpdated: 2026-10-03
+lastUpdated: 2026-10-06
 register: usted
 ---
 
@@ -125,13 +125,15 @@ Usted puede conectar a un proyecto las siguientes cuentas y sitios. Cada conexi�
 - **Google Search Console.** Una conexión de solo lectura. No modificamos nada en su cuenta de Search Console. Los datos se utilizan para mostrar el rendimiento de su sitio, en informes, y para sugerir temas de contenido.
 - **Google Business Profile.** Cuando la función está habilitada en el Servicio, la conexión le permite publicar entradas en el perfil de su negocio. Una entrada se crea únicamente cuando usted la aprobó y pulsó publicar, o en el momento que usted programó. No modificamos la información de su negocio y no leemos ni respondemos reseñas.
 - **WordPress.** La conexión de un sitio de WordPress se utiliza para leer el contenido del sitio, publicar artículos y aplicar las correcciones del sitio descritas en la sección 15C.
-- **Shopify.** Instalar la aplicación en su tienda permite al Servicio leer el contenido, los productos y las páginas de la tienda, y publicar artículos en el blog de la tienda. El alcance lo determinan los permisos que usted aprobó en la instalación, y usted puede eliminar la aplicación de la tienda en cualquier momento. Si se le factura a través de Shopify, también se aplican las secciones de facturación de estos Términos. La red de enlaces de la sección 15A no está disponible para las tiendas de Shopify.
+- **Shopify.** Instalar la aplicación en su tienda permite al Servicio leer el contenido, los productos y las páginas de la tienda, publicar artículos en el blog de la tienda y aplicarles, con su aprobación, las correcciones del sitio de la sección 15C. El alcance lo determinan los permisos que usted aprobó en la instalación, y usted puede eliminar la aplicación de la tienda en cualquier momento. Si se le factura a través de Shopify, también se aplican las secciones de facturación de estos Términos. La red de enlaces de la sección 15A no está disponible para las tiendas de Shopify.
 - **Wix.** La conexión de un sitio de Wix utiliza una clave de API que usted emite en su propia cuenta, y se utiliza para leer el contenido del sitio y publicar artículos en su blog. La clave se almacena cifrada, no se vuelve a mostrar en pantalla después de guardarse y se elimina cuando usted se desconecta. También puede revocarla en cualquier momento desde Wix.
 - **Un sitio en otra plataforma, mediante un webhook.** Para un sitio que no sea WordPress, Shopify ni Wix, usted puede conectar un punto de conexión (endpoint) que usted controle, y el Servicio le envía el artículo en una solicitud firmada. El secreto de firma se almacena cifrado, no se vuelve a mostrar después de guardarse y se elimina cuando usted se desconecta. Lo que ocurra con el artículo una vez que llegue a ese punto de conexión, y el cumplimiento de cualquier ley por parte de su propio código, son responsabilidad suya.
 
 Esta lista comprende todos los tipos de conexión que ofrece el Servicio. Una conexión que se añada en el futuro aparecerá aquí y en la Política de Privacidad antes de que pueda utilizarse.
 
-## 15C. Correcciones del sitio y el plugin GO TOP SEO Bridge
+## 15C. Correcciones del sitio
+
+### Sitios de WordPress
 
 En un sitio de WordPress conectado, el Servicio puede sugerir correcciones del sitio y aplicarlas mediante el plugin GO TOP SEO Bridge, únicamente con su consentimiento y con su aprobación de cada corrección.
 
@@ -139,6 +141,15 @@ En un sitio de WordPress conectado, el Servicio puede sugerir correcciones del s
 - **Registro y deshacer.** Cada corrección se registra en un historial junto con el valor anterior, y puede deshacerse para restaurar ese valor. Si el contenido del sitio cambió después de la corrección, es posible que no pueda deshacerse automáticamente.
 - **Desconexión y eliminación.** Usted puede desconectarse desde la configuración, y eliminar el plugin desde su administración de WordPress, en cualquier momento. Las correcciones ya aplicadas permanecen en el sitio, salvo que usted las deshaga.
 - **Responsabilidad.** El sitio, sus copias de seguridad y la compatibilidad de las correcciones con su tema y sus plugins son responsabilidad suya. Recomendamos conservar una copia de seguridad antes de aprobar correcciones y asegurarse de que usted está autorizado para realizar cambios en el sitio.
+
+### Tiendas de Shopify
+
+En una tienda de Shopify conectada, el Servicio puede sugerir correcciones del sitio y aplicarlas mediante la aplicación, únicamente con su consentimiento y con su aprobación de cada corrección.
+
+- **Qué puede aplicarse.** La lista es cerrada y abarca únicamente los artículos y las páginas de la tienda: título SEO, meta descripción, texto alternativo de las imágenes que figuran dentro de ese artículo o página, reparación de enlaces rotos, enlaces internos, rebajar un encabezado H1 duplicado a un nivel de encabezado inferior y un bloque de preguntas frecuentes (FAQ). Cada corrección se le muestra antes de aplicarse y se escribe únicamente en ese artículo o página. El Servicio no toca los productos, las colecciones, el tema, los ajustes de la tienda, las redirecciones ni ningún archivo de la tienda, no elimina contenido y no publica ni despublica nada.
+- **Registro y deshacer.** Cada corrección se registra junto con el valor anterior y puede deshacerse para restaurar ese valor. Si el contenido de la tienda cambió después de la corrección, es posible que no pueda deshacerse automáticamente.
+- **Eliminación.** Usted puede eliminar la aplicación de su tienda en cualquier momento. Las correcciones ya aplicadas permanecen en la tienda, salvo que usted las deshaga.
+- **Responsabilidad.** El contenido de la tienda y la adecuación de las correcciones a su tema son responsabilidad suya, y debe asegurarse de que está autorizado para realizar cambios en la tienda.
 
 ## 15D. Revisión gratuita del sitio y análisis de incorporación
 

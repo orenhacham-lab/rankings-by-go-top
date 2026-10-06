@@ -3,7 +3,7 @@ title: Política de Privacidade | Go Top SEO
 description: Política de privacidade do Go Top SEO.
 locale: pt-BR
 source: app/(public)/en/privacy/page.tsx
-lastUpdated: 2026-10-05
+lastUpdated: 2026-10-06
 register: voce
 extraSections: 1
 extraReason: One extra section, "Direitos de residentes no Brasil (LGPD)", placed beside the existing EEA/UK and United States rights sections, because the LGPD gives a different set of rights with a different deadline and a different authority to complain to. What the LGPD adds elsewhere goes inside the sections it belongs to - the legal bases of Art. 7, the international-transfer rule of Art. 33, and the communication channel that stands in for an appointed officer.
@@ -139,7 +139,7 @@ O que o plugin GO TOP SEO Bridge faz no site, com o seu consentimento, é isto e
 
 Além do WordPress, você pode conectar uma loja Shopify, um site Wix ou um site em qualquer outra plataforma, por um endpoint que você configura. Cada conexão é opcional e é feita por você.
 
-- **Shopify:** instalar o aplicativo na sua loja permite que leiamos o conteúdo, os produtos e as páginas da loja e publiquemos artigos no blog dela, dentro das permissões que você aprovou na instalação. O token de acesso da loja é armazenado criptografado. Remover o aplicativo da loja revoga o acesso.
+- **Shopify:** instalar o aplicativo na sua loja permite que leiamos o conteúdo, os produtos e as páginas da loja e publiquemos artigos no blog dela, dentro das permissões que você aprovou na instalação. Com a sua aprovação de cada correção, também escrevemos correções no site nos artigos e nas páginas da loja e guardamos o valor anterior de cada correção para que você possa desfazê-la. O token de acesso da loja é armazenado criptografado. Remover o aplicativo da loja revoga o acesso.
 - **Wix:** a conexão usa uma chave de API que você emite na sua própria conta e serve para ler o conteúdo do site e publicar artigos no seu blog. Enviamos à Wix o conteúdo do artigo e seus dados de publicação, e nenhum outro dado da conta. A chave é armazenada criptografada, nunca é exibida novamente depois de salva e é excluída quando você desconecta. Você pode revogá-la do lado da Wix a qualquer momento.
 - **Webhook:** o Serviço envia o artigo ao endpoint que você configurou, em uma requisição assinada. O endpoint é seu, portanto o que acontece com o artigo depois que ele chega está sob o seu controle. O segredo de assinatura é armazenado criptografado, nunca é exibido novamente depois de salvo e é excluído quando você desconecta.
 - **Erros:** se a publicação falhar, armazenamos apenas um código de erro interno. Não armazenamos nem exibimos o texto de erro do provedor ou do seu próprio servidor.

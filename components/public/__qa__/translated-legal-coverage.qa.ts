@@ -506,6 +506,80 @@ const OUTBOUND_CONTACT: Record<string, RegExp[]> = {
   }
 }
 
+// ── 13) the Shopify site fixes, in the terms AND the policy, per language ───
+/*
+ * Oren decided on 2026-10-06 to apply site fixes inside Shopify stores too,
+ * within the scopes the app already has. A fix WRITES to the merchant's store,
+ * so three statements have to survive every future rewrite of this text, in
+ * every language, or we would be writing to a store on a description the
+ * merchant never read (GDPR Art. 13(1)(c); and, for an Israeli merchant, a
+ * description of the service that does less than the service does is the
+ * deception חוק הגנת הצרכן forbids):
+ *
+ *   1. that the fixes touch the store's ARTICLES AND PAGES ONLY, and that
+ *      products, collections and the theme are not touched. This is also the
+ *      sentence that keeps the text inside the scopes Shopify approved.
+ *   2. that each fix is approved by the merchant before it is applied.
+ *   3. that the previous value is kept, so a fix can be undone.
+ *
+ * The same three are held in the privacy policy, because that is the document
+ * a merchant reads to learn what we WRITE to their store, not only what we
+ * read from it.
+ */
+const SHOPIFY_FIXES: Record<string, { terms: RegExp[]; privacy: RegExp[] }> = {
+  he: {
+    terms: [/בחנות Shopify מחוברת/, /המאמרים והעמודים של החנות בלבד/, /אינו נוגע במוצרים/, /באישור\s+שלכם לכל תיקון/, /הערך\s*\n?\s*הקודם/],
+    privacy: [/תיקוני אתר אל המאמרים והעמודים של החנות/, /באישור שלך לכל תיקון/, /הערך הקודם/],
+  },
+  en: {
+    terms: [/In a connected Shopify store/, /articles and\s+pages only/, /does not touch products/, /your approval of each fix/, /previous value/],
+    privacy: [/write site fixes to the store&rsquo;s articles and\s+pages/, /approval of each fix/, /previous value/],
+  },
+  es: {
+    terms: [/En una tienda de Shopify conectada/, /[úu]nicamente los art[íi]culos y las p[áa]ginas de la tienda/, /no toca los productos/, /aprobaci[óo]n de cada correcci[óo]n/, /valor anterior/],
+    privacy: [/escribimos correcciones del sitio en los art[íi]culos y las p[áa]ginas de la tienda/, /aprobaci[óo]n de cada correcci[óo]n/, /valor anterior/],
+  },
+  'pt-BR': {
+    terms: [/Em uma loja Shopify conectada/, /somente os artigos e as p[áa]ginas da loja/, /n[ãa]o toca nos produtos/, /aprova[çc][ãa]o de cada corre[çc][ãa]o/, /valor anterior/],
+    privacy: [/escrevemos corre[çc][õo]es no site nos artigos e nas p[áa]ginas da loja/, /aprova[çc][ãa]o de cada corre[çc][ãa]o/, /valor anterior/],
+  },
+}
+const HEBREW_TERMS = 'app/(public)/terms/page.tsx'
+{
+  const read = (path: string) => (existsSync(path) ? readFileSync(path, 'utf8') : '')
+  const enTerms = frontMatter(text[LOCALES[0]].terms).source
+  const enPrivacy = frontMatter(text[LOCALES[0]].privacy).source
+  const docs: [string, string, string][] = [
+    ['he', read(HEBREW_TERMS), read(HEBREW_PRIVACY)],
+    ['en', enTerms ? read(enTerms) : '', enPrivacy ? read(enPrivacy) : ''],
+    ...LOCALES.map((l): [string, string, string] => [l, text[l].terms, text[l].privacy]),
+  ]
+  for (const [name, terms, privacy] of docs) {
+    check(`${name}: both documents were read`, terms.length > 0 && privacy.length > 0)
+    const rule = SHOPIFY_FIXES[name]
+    if (!rule) continue
+    for (const must of rule.terms) {
+      check(`${name}/terms: the Shopify fixes state ${must.source.slice(0, 40)}`, must.test(terms))
+    }
+    for (const must of rule.privacy) {
+      check(`${name}/privacy: the Shopify write states ${must.source.slice(0, 40)}`, must.test(privacy))
+    }
+    // 15C described one platform when it covered one. Naming the plugin in the
+    // heading of a section that now also covers Shopify would send a merchant
+    // past the part that applies to them.
+    check(`${name}/terms: the site-fixes heading is not WordPress-only`,
+      !/15[Cג]\.?\s*(Site Fixes and the GO TOP SEO Bridge|תיקוני אתר ותוסף|Correcciones del sitio y el plugin|Corre[çc][õo]es no site e o plugin)/.test(terms))
+  }
+  check('mutation control: text that lets the fixes reach products fails the guard',
+    !SHOPIFY_FIXES.en.terms[2].test('The Service may update the product, the collection and the theme.'))
+  check('mutation control: dropping the per-fix approval is caught',
+    !SHOPIFY_FIXES.es.terms[3].test('El Servicio aplica las correcciones en la tienda conectada.'))
+  check('mutation control: dropping the kept previous value is caught',
+    !SHOPIFY_FIXES['pt-BR'].privacy[2].test('Escrevemos as correções nos artigos e nas páginas da loja.'))
+  check('mutation control: the old WordPress-only heading is caught',
+    /15C\.?\s*Site Fixes and the GO TOP SEO Bridge/.test('<h2>15C. Site Fixes and the GO TOP SEO Bridge Plugin</h2>'))
+}
+
 // ── MUTATION CONTROLS ───────────────────────────────────────────────────────
 console.log('\nmutation controls')
 {

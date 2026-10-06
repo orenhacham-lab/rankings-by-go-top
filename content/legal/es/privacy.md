@@ -3,7 +3,7 @@ title: Política de privacidad | Go Top SEO
 description: Política de privacidad de Go Top SEO: cómo recopilamos, utilizamos y protegemos sus datos.
 locale: es
 source: app/(public)/en/privacy/page.tsx
-lastUpdated: 2026-10-05
+lastUpdated: 2026-10-06
 register: usted
 ---
 
@@ -141,7 +141,7 @@ Lo que el complemento GO TOP SEO Bridge hace en el sitio, con su consentimiento,
 
 Además de WordPress, usted puede conectar una tienda de Shopify, un sitio de Wix o un sitio de cualquier otra plataforma mediante un endpoint que usted configure. Cada conexión es opcional y la realiza usted.
 
-- **Shopify:** al instalar la aplicación en su tienda, nos permite leer el contenido, los productos y las páginas de la tienda, y publicar artículos en el blog de la tienda, dentro de los permisos que usted aprobó en la instalación. El token de acceso de la tienda se almacena cifrado. Al eliminar la aplicación de la tienda se revoca el acceso.
+- **Shopify:** al instalar la aplicación en su tienda, nos permite leer el contenido, los productos y las páginas de la tienda, y publicar artículos en el blog de la tienda, dentro de los permisos que usted aprobó en la instalación. Con su aprobación de cada corrección, también escribimos correcciones del sitio en los artículos y las páginas de la tienda, y conservamos el valor anterior de cada corrección para que usted pueda deshacerla. El token de acceso de la tienda se almacena cifrado. Al eliminar la aplicación de la tienda se revoca el acceso.
 - **Wix:** la conexión utiliza una clave de API que usted emite en su propia cuenta, y se usa para leer el contenido del sitio y publicar artículos en su blog. Enviamos a Wix el contenido del artículo y sus detalles de publicación, y ningún otro dato de la cuenta. La clave se almacena cifrada, no se vuelve a mostrar después de guardarse y se elimina cuando usted se desconecta. Usted puede revocarla en Wix en cualquier momento.
 - **Webhook:** el Servicio envía el artículo al endpoint que usted configuró, en una solicitud firmada. El endpoint es suyo, por lo que lo que ocurra con el artículo una vez que llega queda bajo su control. El secreto de firma se almacena cifrado, no se vuelve a mostrar después de guardarse y se elimina cuando usted se desconecta.
 - **Errores:** si la publicación falla, almacenamos únicamente un código de error interno. No almacenamos ni mostramos el texto de error del propio proveedor ni de su servidor.
