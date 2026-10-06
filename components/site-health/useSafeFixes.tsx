@@ -20,6 +20,7 @@ import type { useToasts } from '@/components/ui/Toast'
 import { cn } from '@/lib/utils'
 import type { DashboardDictionary } from '@/lib/i18n/dashboard/he'
 import type { Finding, FindingPage } from '@/lib/site-health/types'
+import { allRows } from '@/lib/site-health/rules'
 import { bulkPlan, bulkValueProblem, type BulkRow, type BulkSkipReason } from '@/lib/site-fix/bulk'
 import type { FixErrorCode, FixJobView, FixPayload } from '@/lib/site-fix/types'
 import { postFix } from './useSiteFixes'
@@ -195,7 +196,7 @@ export function useSafeFixes({
     return bulkPlan(findings, {
       fixable: (id, url) => {
         const f = byId.get(id as Finding['id'])
-        const page = f?.pages.find((p) => p.url === url)
+        const page = f ? allRows(f).find((p) => p.url === url) : undefined
         return !!f && !!page && fixable(f, page)
       },
       jobs,

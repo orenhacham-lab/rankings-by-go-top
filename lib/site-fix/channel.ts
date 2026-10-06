@@ -136,3 +136,21 @@ export function resolveCapabilities(ctx: FixContext, available: boolean): FixCap
   }
   return { ...base, readOnly: false, channelFor }
 }
+
+/**
+ * An application-password site writes a meta description only through an SEO plugin (Yoast or Rank
+ * Math) AND the 1.x bridge: WordPress itself has no such field. Where the site's own answer (its REST
+ * namespaces, read once with the queue) shows either is missing, the row offers "install the plugin"
+ * (the Go Top plugin writes the description itself) instead of a button whose preview can only refuse.
+ * Pure. `seo` null (not read, no answer, a permission error): nothing is changed.
+ */
+export function withAppPasswordSeo(
+  caps: FixCapabilities,
+  seo: { plugin: string; hasBridge: boolean } | null,
+): FixCapabilities {
+  if (caps.channelFor.meta_description !== 'app_password' || !seo) return caps
+  const known = seo.plugin === 'none' || seo.plugin === 'yoast' || seo.plugin === 'rankmath'
+  const canWrite = (seo.plugin === 'yoast' || seo.plugin === 'rankmath') && seo.hasBridge
+  if (!known || canWrite) return caps
+  return { ...caps, channelFor: { ...caps.channelFor, meta_description: 'needs_plugin' } }
+}

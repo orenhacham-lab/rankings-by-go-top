@@ -37,7 +37,7 @@ import crypto from 'crypto'
 import type { createAdminClient } from '@/lib/supabase/admin'
 import type { FindingKind } from '@/lib/site-health/types'
 import type { WpFixDeps } from '@/lib/site-health/wordpress-fix'
-import { loadFixContext, resolveCapabilities, type FixContext } from './channel'
+import { loadFixContext, resolveCapabilities, withAppPasswordSeo, type FixContext } from './channel'
 import { generatePluginKey, pairingCode } from './plugin-auth'
 import { pairOverAppPassword, pluginFix, pluginInspect, pluginStatus, pluginUndo, type PluginItem, type PluginPost } from './plugin-client'
 import { previewFixJob, type LivePage, type PreviewRequest } from './preview'
@@ -61,6 +61,7 @@ import {
 } from './auto'
 import { disableGrant, insertGrant, readActiveGrant, readLastRun, type AutoGrantRow } from './auto-store'
 import { brokenLinkWords } from './content'
+import { rendersFromBuilderData } from './builder'
 import {
   AUTO_SAFE_TYPES as AUTO_TYPES, BODY_FIX_TYPES, BULK_SAFE_TYPES, FIX_TYPES, pluginSupports, type AutoFixView, type FixCapabilities,
   type FixChannel, type FixErrorCode, type FixJobRow, type FixJobView, type FixPayload, type FixType,
@@ -169,12 +170,26 @@ export async function handleFixesGet(projectId: unknown, deps: FixesDeps): Promi
   try {
     const l = await load(projectId, deps)
     if (isAnswer(l)) return l
+    // An application-password site without an SEO plugin and its bridge: "install" for descriptions.
+    if (l.caps.channelFor.meta_description === 'app_password' && l.ctx.creds) l.caps = withAppPasswordSeo(l.caps, await seoOf(l.ctx.creds, deps))
     if (!l.caps.available) return { status: 200, body: { ok: true, capabilities: l.caps, jobs: [], auto: AUTO_UNAVAILABLE } }
     const [rows, auto] = await Promise.all([listJobs(deps.admin, l.scope), autoView(deps, l)])
     return { status: 200, body: { ok: true, capabilities: l.caps, jobs: rows.map((r) => jobView(r, l.caps)), auto } }
   } catch (e) {
     if (e instanceof FixStoreError) console.error('[site-fix] queue read failed')
     return refuse('store_failed')
+  }
+}
+
+/** The site's SEO plugin and bridge, as its REST API answers them, in a few seconds at most (else null). */
+export const SEO_READ_MS = 3_000
+async function seoOf(creds: NonNullable<FixContext['creds']>, deps: FixesDeps): Promise<{ plugin: string; hasBridge: boolean } | null> {
+  let timer: ReturnType<typeof setTimeout> | undefined
+  const late = new Promise<null>((resolve) => { timer = setTimeout(() => resolve(null), SEO_READ_MS) })
+  try {
+    return await Promise.race([deps.wp.detectSeoCapabilities(creds).catch(() => null), late])
+  } finally {
+    clearTimeout(timer)
   }
 }
 
@@ -731,6 +746,8 @@ async function autoValue(c: AutoCandidate, l: Loaded, deps: AutoFixDeps, pages: 
   }
   const it = pages.get(key)
   if (!it) return null
+  // A page builder renders this page from its own data: a content fix would not show (./builder.ts).
+  if ((c.type === 'image_alt' || c.type === 'broken_link') && rendersFromBuilderData(it)) return null
   switch (c.type) {
     case 'image_alt': {
       const images = autoAltImages(it.content, it.title)

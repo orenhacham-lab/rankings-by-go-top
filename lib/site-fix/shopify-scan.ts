@@ -12,10 +12,12 @@
  * read is left as the scan found it. Read-only: nothing is written here.
  */
 import type { createAdminClient } from '@/lib/supabase/admin'
-import type { Finding, FindingPage } from '@/lib/site-health/types'
+import { allRows } from '@/lib/site-health/rules'
+import type { Finding, FindingPage, PageFacts } from '@/lib/site-health/types'
 import { imagesMissingAlt } from '@/lib/site-health/wordpress-fix'
 import { brokenLinkWords } from './content'
 import { bodyH1s, findShopItem, type ShopCreds, type ShopifyFixClient, type ShopItem } from './shopify-admin'
+import { refineImageAlt, type ReachableAlt } from './scan-refine'
 import type { Scope } from './store'
 
 type Admin = ReturnType<typeof createAdminClient>
@@ -40,41 +42,73 @@ export function inEditableContent(fixType: string, item: Pick<ShopItem, 'body' |
 /** The page whose content holds the problem: the page itself, or, for a broken link, the page it was found on. */
 const sourceOf = (f: Finding, p: FindingPage) => (f.fixType === 'broken_link' ? p.from ?? null : p.url)
 
+/** Images without alt text a fix reaches in one article or page: its text's, and an article's featured image. */
+export function reachableAlt(item: Pick<ShopItem, 'body' | 'image'>): number {
+  const body = imagesMissingAlt(item.body).map((i) => i.src)
+  const featured = item.image && !String(item.image.alt ?? '').trim() && !body.includes(item.image.url) ? 1 : 0
+  return body.length + featured
+}
+
+/**
+ * `scanned`: every page the scan read. Each scanned article and page is read through the store (not
+ * only the ones a finding lists), so an image without alt text in an article's own text is found even
+ * where the theme's images (which have alt) kept the page under the scan's threshold, and the count on
+ * each row is what a fix reaches (./scan-refine.ts). At most MAX_READS reads, inside TIME_MS.
+ */
 export async function markShopifyOutsideContent(
   findings: Finding[],
   deps: { admin: Admin; scope: Scope; creds: ShopCreds; client: ShopifyFixClient },
+  scanned: readonly PageFacts[] = [],
 ): Promise<void> {
   const todo: { f: Finding; p: FindingPage; src: string }[] = []
   for (const f of findings) {
     if (!f.fixType || !CHECKED.has(f.fixType)) continue
-    for (const p of f.pages) {
+    // A product's or a collection's own photos: set on the product, which is never ours to change.
+    if (f.fixType === 'image_alt') for (const p of allRows(f)) if (p.kind === 'product' || p.kind === 'collection') { p.outside = 'product'; p.fixable = false }
+    for (const p of allRows(f)) {
+      if (p.outside) continue
       const src = sourceOf(f, p)
       if (src && (f.fixType === 'broken_link' || p.kind === 'article' || p.kind === 'page')) todo.push({ f, p, src })
     }
   }
-  const urls = [...new Set(todo.map((t) => t.src))].slice(0, MAX_READS)
+  // The listed rows first, then every other article and page the scan read (for alt text it hid).
+  const others = scanned.filter((s) => s.ok && (s.kind === 'article' || s.kind === 'page')).map((s) => s.url)
+  const urls = [...new Set([...todo.map((t) => t.src), ...others])]
   if (urls.length === 0) return
   const deadline = Date.now() + TIME_MS
   const items = new Map<string, ShopItem | 'not_ours'>()
   let timer: ReturnType<typeof setTimeout> | undefined
   const outOfTime = new Promise<void>((resolve) => { timer = setTimeout(resolve, TIME_MS) })
-  const reads = Promise.all(urls.map(async (url) => {
-    try {
-      const ref = await findShopItem(deps.admin, deps.scope, url)
+  const work = (async () => {
+    // Which addresses are the store's articles and pages: the store sync, no call to the store.
+    const refs = await Promise.all(urls.map((url) => findShopItem(deps.admin, deps.scope, url).catch(() => undefined)))
+    const toRead: { url: string; ref: NonNullable<Awaited<ReturnType<typeof findShopItem>>> }[] = []
+    refs.forEach((ref, i) => {
       // Not one of the store's articles or pages (a product, a collection, the home page): nothing there is ours to edit.
-      if (!ref) { items.set(url, 'not_ours'); return }
+      if (ref === null) items.set(urls[i], 'not_ours')
+      else if (ref) toRead.push({ url: urls[i], ref })
+    })
+    // At most MAX_READS reads of the store, the listed rows first.
+    await Promise.all(toRead.slice(0, MAX_READS).map(async ({ url, ref }) => {
       if (Date.now() > deadline) return
-      const item = await deps.client.read(deps.creds, ref)
-      if (item && Date.now() <= deadline) items.set(url, item)
-    } catch { /* unreadable: left as the scan found it */ }
-  }))
+      try {
+        const item = await deps.client.read(deps.creds, ref)
+        if (item && Date.now() <= deadline) items.set(url, item)
+      } catch { /* unreadable: left as the scan found it */ }
+    }))
+  })()
   // The report never waits on the store for long: what has not answered by then stays as scanned.
-  await Promise.race([reads, outOfTime])
+  await Promise.race([work.catch(() => undefined), outOfTime])
   clearTimeout(timer)
   const answered = new Map(items)
   for (const { f, p, src } of todo) {
     const item = answered.get(src)
-    if (!item || !f.fixType) continue
+    // Alt text is counted below, from what a fix reaches.
+    if (!item || !f.fixType || f.fixType === 'image_alt') continue
     if (item === 'not_ours' || !inEditableContent(f.fixType, item, p)) { p.outside = 'theme'; p.fixable = false }
   }
+  const reach = new Map<string, ReachableAlt>()
+  for (const [url, item] of answered) reach.set(url, item === 'not_ours' ? 'not_ours' : reachableAlt(item))
+  // On a store the scan's own rows carry no WordPress fix; the screen decides the button per row.
+  refineImageAlt(findings, scanned, reach, { fixable: () => false })
 }

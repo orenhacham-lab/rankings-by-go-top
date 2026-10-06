@@ -376,15 +376,20 @@ async function main() {
       const art = store.items.get('gid://shopify/Article/11')!
       art.image = { url: 'https://cdn.shopify.com/featured.jpg', alt: 'Described' }
       art.body = '<p>Text only, <img src="x.jpg" alt="ok"></p>'
-      const out = await run(store, [finding('image_alt', [{ url: ARTICLE, kind: 'article' }])])
-      check('S1: images without alt only in the theme (body and featured image are fine): marked outside, no fix button', out[0].pages[0].outside === 'theme' && out[0].pages[0].fixable === false)
+      const out = await run(store, [finding('image_alt', [{ url: ARTICLE, kind: 'article' }])]) as unknown as { pages: unknown[]; themeAlt?: { pages: number } }[]
+      // Theme-only pages are no longer one dead row each: they are said once, for the whole site.
+      check('S1: images without alt only in the theme (body and featured image are fine): no row with a fix button, said once for the site',
+        out[0].pages.length === 0 && out[0].themeAlt?.pages === 1, JSON.stringify(out[0]))
       art.image = { url: 'https://cdn.shopify.com/featured.jpg', alt: null }
       const out2 = await run(store, [finding('image_alt', [{ url: ARTICLE, kind: 'article' }])])
       check('S2: the featured image has no alt: the fix stays offered', out2[0].pages[0].outside === undefined && out2[0].pages[0].fixable === true)
-      const mut = mutant<typeof SCAN>('lib/site-fix/shopify-scan.ts', "if (item === 'not_ours' || !inEditableContent(f.fixType, item, p)) { p.outside = 'theme'; p.fixable = false }", '')
+      const mutAlt = mutant<typeof SCAN>('lib/site-fix/shopify-scan.ts', "reach.set(url, item === 'not_ours' ? 'not_ours' : reachableAlt(item))", '')
       art.image = { url: 'https://cdn.shopify.com/featured.jpg', alt: 'Described' }
-      const outM = mut.mod ? await run(store, [finding('image_alt', [{ url: ARTICLE, kind: 'article' }])], mut.mod) : null
-      check('MUTATION CONTROL: without the marking, S1 is caught (the button would stay)', mut.found && !!outM && outM[0].pages[0].outside === undefined)
+      const outA = mutAlt.mod ? await run(store, [finding('image_alt', [{ url: ARTICLE, kind: 'article' }])], mutAlt.mod) : null
+      check('MUTATION CONTROL: without counting what the store holds, S1 is caught (the dead row would stay)', mutAlt.found && !!outA && outA[0].pages.length === 1 && outA[0].pages[0].outside === undefined)
+      const mut = mutant<typeof SCAN>('lib/site-fix/shopify-scan.ts', "if (item === 'not_ours' || !inEditableContent(f.fixType, item, p)) { p.outside = 'theme'; p.fixable = false }", '')
+      const outM = mut.mod ? await run(store, [finding('broken_link', [{ url: `${SITE}/pages/gone`, kind: 'other', from: ARTICLE }])], mut.mod) : null
+      check('MUTATION CONTROL: without the marking, a broken link only in the theme (S4) keeps its button', mut.found && !!outM && outM[0].pages[0].outside === undefined)
     }
     {
       const store = fakeStore()

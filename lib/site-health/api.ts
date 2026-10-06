@@ -25,7 +25,9 @@ import type { WordPressCredentials } from '@/lib/wordpress/types'
 import { buildFindings, scoreOf } from './rules'
 import { scanSite, defaultScanDeps, PAGE_MS, type ScanDeps } from './scan'
 import { loadProjectSources, SourcesReadError } from './sources'
-import type { Finding, FindingKind, FixField, ScanStreamLine, SiteHealthErrorCode, SiteHealthReport } from './types'
+import type {
+  ConnectionState, Finding, FindingKind, FixField, PageFacts, ScanStreamLine, SiteHealthErrorCode, SiteHealthReport, SitePlatform,
+} from './types'
 import { queueAvailable } from '@/lib/site-fix/store'
 import { applyFix, previewFix, type ApplyRequest, type ApplyResult, type Preview, type WpFixDeps } from './wordpress-fix'
 
@@ -47,10 +49,15 @@ export interface ScanApiDeps {
   scan?: ScanDeps
   now?: () => Date
   /**
-   * A connected store's own check of where each problem is (lib/site-fix/shopify-scan.ts), wired by
-   * the route. Read-only; a failure leaves the findings as scanned.
+   * The connected site's own check of where each problem is (a store: lib/site-fix/shopify-scan.ts;
+   * WordPress: lib/site-fix/wordpress-scan.ts), wired by the route, with every page the scan read.
+   * Read-only; a failure leaves the findings as scanned.
    */
-  refine?: (findings: Finding[], scope: { projectId: string; userId: string }) => Promise<void>
+  refine?: (
+    findings: Finding[],
+    scope: { projectId: string; userId: string },
+    scan: { pages: readonly PageFacts[]; platform: SitePlatform; connections: ConnectionState },
+  ) => Promise<void>
 }
 
 /**
@@ -82,7 +89,9 @@ export async function handleScan(body: unknown, deps: ScanApiDeps, emit: (line: 
 
   const ctx = { platform: sources.platform, connections: sources.connections }
   const findings = buildFindings(outcome.site, outcome.pages, ctx)
-  if (deps.refine && sources.connections.shopify) await deps.refine(findings, { projectId, userId: deps.userId }).catch(() => undefined)
+  if (deps.refine && (sources.connections.shopify || sources.platform === 'wordpress')) {
+    await deps.refine(findings, { projectId, userId: deps.userId }, { pages: outcome.pages, platform: sources.platform, connections: sources.connections }).catch(() => undefined)
+  }
   const read = outcome.pages.filter((p) => p.ok).length
   const report: SiteHealthReport = {
     siteUrl: outcome.site.siteUrl,
