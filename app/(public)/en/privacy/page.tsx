@@ -273,7 +273,10 @@ export default function EnglishPrivacyPage() {
           <li><strong>Shopify:</strong> installing the app in your store lets us read the store&rsquo;s content,
           products and pages, and publish articles to the store blog, within the permissions you approved at
           installation. With your approval of each fix, we also write site fixes to the store&rsquo;s articles and
-          pages, and keep the previous value of each fix so that you can undo it. The store&rsquo;s access token
+          pages. The approval itself is recorded in a log: who approved it, when, the IP address the approval was
+          given from, and the previous and the new value — so that we can show you what was done, so that a fix
+          can be undone, and so that we have evidence that the write to your store was made with your approval.
+          The log is kept for as long as the project exists. The store&rsquo;s access token
           is stored encrypted. Removing the app from the store revokes the access.</li>
           <li><strong>Wix:</strong> the connection uses an API key you issue in your own account, and is used
           to read the site&rsquo;s content and publish articles to its blog. We send Wix the article&rsquo;s

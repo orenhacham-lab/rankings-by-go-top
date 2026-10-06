@@ -407,16 +407,18 @@ export default function EnglishTermsPage() {
         <ul>
           <li>
             <strong>What may be applied.</strong> The list is closed, and it covers the store&rsquo;s articles and
-            pages only: SEO title, meta description, alt text of images inside that article or page, repair of
-            broken links, internal links, demotion of a duplicate H1 heading to a lower heading level, and an FAQ
-            block. Every fix is shown to you before it is applied, and writes to that one article or page only.
-            The Service does not touch products, collections, the theme, the store&rsquo;s settings, redirects or
-            any file of the store, does not delete content, and does not publish or unpublish anything.
+            pages only: the title and description shown in search results, the alt text of an image inside that
+            article or page, repair of a broken link inside it, an FAQ block added at its end, and turning an
+            extra H1 heading inside it into an H2. Every fix is shown to you before it is applied, and writes to
+            that one article or page only. The Service does not touch products, collections, the theme, the
+            store&rsquo;s settings, prices, orders, redirects or any file of the store, does not delete content,
+            and does not publish or unpublish anything.
           </li>
           <li>
-            <strong>Log and undo.</strong> Every fix is recorded together with the previous value, and can be
-            undone to restore that value. If the content in the store changed after the fix, automatic undo may
-            not be possible.
+            <strong>Log and undo.</strong> Every approval of yours is recorded together with who approved it,
+            when, the IP address the approval was given from, and the previous and the new value, so that we can
+            show you what was done and so that a fix can be undone to restore the previous value. If the content
+            in the store changed after the fix, automatic undo may not be possible.
           </li>
           <li>
             <strong>Removal.</strong> You can remove the app from your store at any time. Fixes already applied

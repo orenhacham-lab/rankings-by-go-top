@@ -520,28 +520,33 @@ const OUTBOUND_CONTACT: Record<string, RegExp[]> = {
  *      products, collections and the theme are not touched. This is also the
  *      sentence that keeps the text inside the scopes Shopify approved.
  *   2. that each fix is approved by the merchant before it is applied.
- *   3. that the previous value is kept, so a fix can be undone.
+ *   3. that the previous value and the new one are both kept, so a fix can be
+ *      shown and undone.
+ *   4. that the approval record holds an IP ADDRESS. That is personal data
+ *      collected for its evidential value — it shows the write was approved —
+ *      and the policy that does not name it is processing nobody was told
+ *      about. The policy also has to say how long it is kept.
  *
- * The same three are held in the privacy policy, because that is the document
- * a merchant reads to learn what we WRITE to their store, not only what we
- * read from it.
+ * The same statements are held in the privacy policy, because that is the
+ * document a merchant reads to learn what we WRITE to their store, not only
+ * what we read from it.
  */
 const SHOPIFY_FIXES: Record<string, { terms: RegExp[]; privacy: RegExp[] }> = {
   he: {
-    terms: [/בחנות Shopify מחוברת/, /המאמרים והעמודים של החנות בלבד/, /אינו נוגע במוצרים/, /באישור\s+שלכם לכל תיקון/, /הערך\s*\n?\s*הקודם/],
-    privacy: [/תיקוני אתר אל המאמרים והעמודים של החנות/, /באישור שלך לכל תיקון/, /הערך הקודם/],
+    terms: [/בחנות Shopify מחוברת/, /המאמרים והעמודים של החנות בלבד/, /אינו נוגע במוצרים/, /באישור\s+שלכם לכל תיקון/, /הערך הקודם והערך החדש/],
+    privacy: [/תיקוני אתר אל המאמרים והעמודים של החנות/, /באישור שלך לכל תיקון/, /כתובת\s+ה-IP שממנה נעשה האישור/, /הערך הקודם והערך החדש/],
   },
   en: {
-    terms: [/In a connected Shopify store/, /articles and\s+pages only/, /does not touch products/, /your approval of each fix/, /previous value/],
-    privacy: [/write site fixes to the store&rsquo;s articles and\s+pages/, /approval of each fix/, /previous value/],
+    terms: [/In a connected Shopify store/, /articles and\s+pages only/, /does not touch products/, /your approval of each fix/, /previous and the new value/],
+    privacy: [/write site fixes to the store&rsquo;s articles and\s+pages/, /approval of each fix/, /IP address the approval was\s+given from/, /previous and the new value/],
   },
   es: {
-    terms: [/En una tienda de Shopify conectada/, /[úu]nicamente los art[íi]culos y las p[áa]ginas de la tienda/, /no toca los productos/, /aprobaci[óo]n de cada correcci[óo]n/, /valor anterior/],
-    privacy: [/escribimos correcciones del sitio en los art[íi]culos y las p[áa]ginas de la tienda/, /aprobaci[óo]n de cada correcci[óo]n/, /valor anterior/],
+    terms: [/En una tienda de Shopify conectada/, /[úu]nicamente los art[íi]culos y las p[áa]ginas de la tienda/, /no toca los productos/, /aprobaci[óo]n de cada correcci[óo]n/, /valor anterior y el nuevo/],
+    privacy: [/escribimos correcciones del sitio en los art[íi]culos y las p[áa]ginas de la tienda/, /aprobaci[óo]n de cada correcci[óo]n/, /direcci[óo]n IP desde la que se dio la aprobaci[óo]n/, /valor anterior y el nuevo/],
   },
   'pt-BR': {
-    terms: [/Em uma loja Shopify conectada/, /somente os artigos e as p[áa]ginas da loja/, /n[ãa]o toca nos produtos/, /aprova[çc][ãa]o de cada corre[çc][ãa]o/, /valor anterior/],
-    privacy: [/escrevemos corre[çc][õo]es no site nos artigos e nas p[áa]ginas da loja/, /aprova[çc][ãa]o de cada corre[çc][ãa]o/, /valor anterior/],
+    terms: [/Em uma loja Shopify conectada/, /somente os artigos e as p[áa]ginas da loja/, /n[ãa]o toca nos produtos/, /aprova[çc][ãa]o de cada corre[çc][ãa]o/, /valor anterior e o novo/],
+    privacy: [/escrevemos corre[çc][õo]es no site nos artigos e nas p[áa]ginas da loja/, /aprova[çc][ãa]o de cada corre[çc][ãa]o/, /endere[çc]o IP a partir do qual a aprova[çc][ãa]o foi dada/, /valor anterior e o novo/],
   },
 }
 const HEBREW_TERMS = 'app/(public)/terms/page.tsx'
@@ -575,7 +580,9 @@ const HEBREW_TERMS = 'app/(public)/terms/page.tsx'
   check('mutation control: dropping the per-fix approval is caught',
     !SHOPIFY_FIXES.es.terms[3].test('El Servicio aplica las correcciones en la tienda conectada.'))
   check('mutation control: dropping the kept previous value is caught',
-    !SHOPIFY_FIXES['pt-BR'].privacy[2].test('Escrevemos as correções nos artigos e nas páginas da loja.'))
+    !SHOPIFY_FIXES['pt-BR'].privacy[3].test('Escrevemos as correções nos artigos e nas páginas da loja.'))
+  check('mutation control: a policy that collects the IP without saying so is caught',
+    !SHOPIFY_FIXES.en.privacy[2].test('we also write site fixes to the store&rsquo;s articles and pages, and keep the previous and the new value'))
   check('mutation control: the old WordPress-only heading is caught',
     /15C\.?\s*Site Fixes and the GO TOP SEO Bridge/.test('<h2>15C. Site Fixes and the GO TOP SEO Bridge Plugin</h2>'))
 }
