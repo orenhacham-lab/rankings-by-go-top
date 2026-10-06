@@ -63,7 +63,7 @@ export interface PageFacts {
   links: string[]
   /** The page's rel=canonical, when it has one (absent in reports cached before it was read). */
   canonical?: string | null
-  /** Distinct JSON-LD @type values on the page. */
+  /** Distinct schema.org types on the page: JSON-LD, microdata or RDFa (lib/free-check/html-signals.ts). */
   schemaTypes?: string[]
   /** A visible questions-and-answers block (FAQ schema, or several question headings). */
   faq?: boolean

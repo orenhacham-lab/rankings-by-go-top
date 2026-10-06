@@ -359,14 +359,15 @@ async function b1(ctx: StageBContext): Promise<StepOutcome> {
       bucket,
       title: signals.title ?? '',
       h1: signals.h1,
-      schemaTypes: signals.schemaTypes,
+      // The page's kind is read from its JSON-LD only: a theme's microdata product cards are not a product page.
+      schemaTypes: signals.jsonLdTypes ?? signals.schemaTypes,
       internalLinkUrls: signals.internalLinkUrls,
       home: isHome,
     }
   }
 
   let homePage: CrawledPage | null = stored
-    ? { url: stored.finalUrl, bucket: 'other', title: stored.title ?? '', h1: stored.h1, schemaTypes: stored.schemaTypes, internalLinkUrls: stored.internalLinkUrls, home: true }
+    ? { url: stored.finalUrl, bucket: 'other', title: stored.title ?? '', h1: stored.h1, schemaTypes: stored.jsonLdTypes ?? stored.schemaTypes, internalLinkUrls: stored.internalLinkUrls, home: true }
     : null
   if (!homePage) {
     counts.pagesRead++

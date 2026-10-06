@@ -322,6 +322,7 @@ export default function SiteHealthScreen({ project }: { project: Project & { sit
                     finding={f}
                     copy={copy}
                     platform={report.platform}
+                    storeConnected={!!report.connections?.shopify}
                     fixed={fixed}
                     onFix={onFix}
                     fixModeFor={queueLive ? fixModeFor : null}
