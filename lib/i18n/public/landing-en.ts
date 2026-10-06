@@ -148,7 +148,7 @@ export const landingEn: LandingCopy = {
     steps: [
       { tag: 'Free, no signup', title: 'Check your site', desc: 'Enter an address. In under a minute we work out what the business does, who its customers are and what is holding you back in Google and AI.' },
       { tag: 'You approve', title: 'Get a plan', desc: 'Search phrases, the questions customers ask and a list of articles ready to write. You choose what goes in.' },
-      { tag: 'Automatic', title: 'Articles are written and published', desc: 'Each article comes with images, Q&A and structured data, and goes live on your site when you scheduled it.' },
+      { tag: 'Automatic', title: 'Articles are written and published', desc: 'Each article comes with images and Q&A, and goes live on your site when you scheduled it. On WordPress sites with the Go Top plugin, structured data is added too.' },
       { tag: 'Transparent', title: 'See the results', desc: 'Google and Maps positions, AI mentions and reports you can send to anyone.' },
     ],
     cta: 'Start with a free check',
@@ -162,7 +162,7 @@ export const landingEn: LandingCopy = {
     content: {
       overline: 'Content & publishing',
       title: 'Articles written to be found, not to fill a blog',
-      body: 'Every article is built around a real search: headings from what people ask, a Q&A section, structured data that Google and AI engines read, and internal links to the pages that sell. You review, tweak if needed, and the platform publishes.',
+      body: 'Every article is built around a real search: headings from what people ask, a Q&A section, internal links to the pages that sell, and, on WordPress sites with the Go Top plugin, structured data that Google and AI engines read. You review, tweak if needed, and the platform publishes.',
       points: ['A featured image and images in the text', 'A quality check before every publish', 'Scheduling and direct publishing to WordPress and Shopify'],
       href: '/features/seo-geo-content-publishing',
       visual: {

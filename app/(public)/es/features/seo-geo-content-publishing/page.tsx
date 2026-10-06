@@ -98,7 +98,7 @@ const CONTENT: FeaturePageContent = {
       items: [
         { icon: FileText, title: 'Un artículo entero', body: 'El tema que aprobaste se convierte en un artículo completo, no en un resumen ni en un esquema.' },
         { icon: ImageIcon, title: 'Imágenes', body: 'Una imagen destacada e imágenes en el texto, sin tener que buscarlas y subirlas tú.' },
-        { icon: ListChecks, title: 'Preguntas y datos estructurados', body: 'Una sección de preguntas y datos estructurados que Google y los motores de IA pueden leer.' },
+        { icon: ListChecks, title: 'Preguntas y datos estructurados', body: 'Una sección de preguntas en cada artículo. En sitios WordPress con el plugin de Go Top, también se añaden datos estructurados que Google y los motores de IA pueden leer.' },
         { icon: Link2, title: 'Enlaces internos', body: 'Enlaces propuestos a otras páginas de tu web, y tú apruebas cuáles entran.' },
         { icon: FileCheck2, title: 'Meta título y meta descripción', body: 'Escritos para la búsqueda, y editables como todo lo demás.' },
         { icon: ShieldCheck, title: 'Un control de calidad antes de publicar', body: 'Cada artículo se revisa antes de salir, así no se publica nada a medias.' },

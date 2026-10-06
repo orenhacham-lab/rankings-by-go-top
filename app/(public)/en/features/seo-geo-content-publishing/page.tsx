@@ -98,7 +98,7 @@ const CONTENT: FeaturePageContent = {
       items: [
         { icon: FileText, title: 'A full article', body: 'The topic you approved becomes a complete article, not a summary or an outline.' },
         { icon: ImageIcon, title: 'Images', body: 'A featured image and in-text images, without hunting for them and uploading them yourself.' },
-        { icon: ListChecks, title: 'Q&A and structured data', body: 'A Q&A section and structured data that Google and AI engines can read.' },
+        { icon: ListChecks, title: 'Q&A and structured data', body: 'A Q&A section in every article. On WordPress sites with the Go Top plugin, structured data that Google and AI engines can read is added too.' },
         { icon: Link2, title: 'Internal links', body: 'Suggested links to other pages on your site, and you approve which ones go in.' },
         { icon: FileCheck2, title: 'Meta title and description', body: 'Written for search, and editable like everything else.' },
         { icon: ShieldCheck, title: 'A quality check before publishing', body: 'Every article is checked before it goes live, so nothing half-finished gets published.' },
