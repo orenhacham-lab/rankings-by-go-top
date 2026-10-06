@@ -8,7 +8,8 @@
  *   2. a well-formed request                                  400 invalid_request
  *   3. the project is theirs: service role, filtered by id AND owner      404 not_found
  *   4. the queue tables exist (the migration is applied)      409 queue_unavailable
- *   5. Shopify projects are read-only                         409 shopify_readonly
+ *   5. Shopify projects whose connection cannot edit content are read-only     409 shopify_readonly
+ *      (with it: only the store's articles and pages, ./shopify-admin.ts; llms.txt never)  400 not_allowed / not_in_store
  *   6. approve: the fix passes the whitelist (./whitelist.ts) and every
  *      address is on THIS project's site                      400 not_allowed / value_invalid / off_site
  *   7. approve: `approved: true` (only the approval button sends it)      400 invalid_request
@@ -36,6 +37,8 @@ import { generatePluginKey, pairingCode } from './plugin-auth'
 import { pairOverAppPassword, pluginFix, pluginStatus, pluginUndo, type PluginPost } from './plugin-client'
 import { previewFixJob, type LivePage, type PreviewRequest } from './preview'
 import { applyViaRest, revertViaRest, type RestUndo } from './rest-apply'
+import { findShopItem, type ShopCreds, type ShopifyFixClient } from './shopify-admin'
+import { applyViaShopify, revertViaShopify, shopUndoOf } from './shopify-apply'
 import {
   appendAudit, deletePluginLink, FixStoreError, getJob, insertJob, listHoldingJobs, listJobs, listJobsSince, markPluginLink, queueAvailable,
   savePluginKey, updateJob, type Scope,
@@ -56,7 +59,7 @@ const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 
 export const FIX_HTTP_STATUS: Partial<Record<FixErrorCode, number>> = {
   unauthorized: 401, not_found: 404, invalid_request: 400, not_allowed: 400, value_invalid: 400, off_site: 400,
-  queue_unavailable: 409, shopify_readonly: 409, needs_plugin: 409, no_channel: 409, wrong_state: 409,
+  queue_unavailable: 409, shopify_readonly: 409, store_permission: 409, needs_plugin: 409, no_channel: 409, wrong_state: 409,
   changed_since_preview: 409, already_fixed: 409, store_failed: 500, needs_update: 409, not_bulk_safe: 409, llms_exists: 409,
 }
 export const fixStatusFor = (code: FixErrorCode) => FIX_HTTP_STATUS[code] ?? 422
@@ -78,6 +81,12 @@ export interface FixesDeps {
   /** llms.txt: the site's own /llms.txt as a visitor gets it. */
   readText?: TextReader
   now?: () => number
+  /**
+   * Shopify: the store's Admin API credentials for this project (resolved by the route with the
+   * existing connection loader, owner-checked there; null when the connection cannot be used) and
+   * the client that reads and writes one article or page. Absent: no Shopify writes.
+   */
+  shopify?: { creds: (scope: Scope) => Promise<ShopCreds | null>; client: ShopifyFixClient }
 }
 
 export type Answer = { status: number; body: Record<string, unknown> }
@@ -120,13 +129,13 @@ export function batchOf(row: Pick<FixJobRow, 'undo'>): string | null {
 
 export function jobView(row: FixJobRow, caps: FixCapabilities): FixJobView {
   const now = caps.channelFor[row.fix_type]
-  const liveChannel = now === 'plugin' || now === 'app_password' || now === 'webhook'
+  const liveChannel = now === 'plugin' || now === 'app_password' || now === 'webhook' || now === 'shopify'
   return {
     batchId: batchOf(row),
     id: row.id, type: row.fix_type, findingKind: row.finding_kind, pageUrl: row.page_url, status: row.status, channel: row.channel,
     before: row.before_value, after: row.after_summary, errorCode: row.error_code, approvedAt: row.approved_at,
     appliedAt: row.applied_at, revertedAt: row.reverted_at, subject: subjectOf(row.fix_type, row.payload),
-    canUndo: (row.status === 'applied' && (row.channel === 'plugin' || row.channel === 'app_password') && !!row.undo)
+    canUndo: (row.status === 'applied' && (row.channel === 'plugin' || row.channel === 'app_password' || row.channel === 'shopify') && !!row.undo)
       || (row.status === 'sent' && row.channel === 'webhook' && !!caps.webhook),
     canCancel: row.status === 'pending' || row.status === 'manual' || row.status === 'failed',
     canRetry: (row.status === 'failed' || row.status === 'manual') && liveChannel,
@@ -190,12 +199,22 @@ async function preview(b: Record<string, unknown>, l: Loaded, deps: FixesDeps): 
   if (!KINDS.includes(kind)) return refuse('invalid_request')
   const onSite = (u: unknown) => { const k = siteKeyOf(u); return !!k && l.siteKeys.has(k) }
   if (!onSite(b.url) || (type === 'broken_link' && !onSite(b.from))) return refuse('off_site')
+  // A Shopify store cannot serve a file at its root: llms.txt stays instructions there.
+  if (l.caps.shopify && type === 'llms_txt') return refuse('not_allowed')
   let channel = channelOf(l, type)
   if (channel === 'needs_update') channel = await refreshPluginVersion(l, deps, type)
   // llms.txt is offered to copy on every site we may read (it is text the merchant places himself).
   if (type === 'llms_txt' && (channel === 'needs_plugin' || channel === 'no_channel' || channel === 'needs_update' || channel === 'app_password' || channel === 'webhook')) channel = 'manual_copy'
   if (channel === 'needs_plugin' || channel === 'no_channel' || channel === 'needs_update') return refuse(channel)
-  if (channel !== 'plugin' && channel !== 'app_password' && channel !== 'webhook' && channel !== 'manual' && channel !== 'manual_copy') return refuse('no_channel')
+  if (channel !== 'plugin' && channel !== 'app_password' && channel !== 'webhook' && channel !== 'manual' && channel !== 'manual_copy' && channel !== 'shopify') return refuse('no_channel')
+  let shop: { creds: ShopCreds; client: ShopifyFixClient; ref: Awaited<ReturnType<typeof findShopItem>> } | null = null
+  if (channel === 'shopify') {
+    if (!deps.shopify) return refuse('no_channel')
+    const creds = await deps.shopify.creds(l.scope)
+    if (!creds) return refuse('store_permission')
+    const pageUrl = type === 'broken_link' ? String(b.from) : String(b.url)
+    shop = { creds, client: deps.shopify.client, ref: await findShopItem(deps.admin, l.scope, pageUrl) }
+  }
   const req: PreviewRequest = {
     type, url: String(b.url), kind, from: typeof b.from === 'string' ? b.from : undefined,
     keyword: typeof b.keyword === 'string' ? b.keyword.slice(0, 120) : undefined,
@@ -203,6 +222,7 @@ async function preview(b: Record<string, unknown>, l: Loaded, deps: FixesDeps): 
   const p = await previewFixJob(req, {
     channel: channel === 'manual_copy' ? 'manual' : channel, creds: l.ctx.creds, link: channel === 'plugin' ? l.ctx.pluginLink : null,
     siteName: (l.project.business_name || l.project.name || '').trim() || null,
+    shop,
   }, {
     wp: deps.wp, readLive: deps.readLive, pluginPost: deps.pluginPost, generate: deps.generate, readText: deps.readText,
     sitePages: async () => {
@@ -363,6 +383,23 @@ async function execute(job: FixJobRow, l: Loaded, deps: FixesDeps, ctx: { expect
     return next
   }
 
+  if (job.channel === 'shopify') {
+    const creds = deps.shopify ? await deps.shopify.creds(l.scope) : null
+    const failed = async (code: FixErrorCode) => {
+      const next = await set({ status: 'failed', errorCode: code })
+      await audit(deps, l, next, 'failed', { result: code })
+      return next
+    }
+    if (!deps.shopify || !creds) return failed('store_permission')
+    const ref = await findShopItem(deps.admin, l.scope, job.page_url)
+    if (!ref) return failed('not_in_store')
+    const r = await applyViaShopify(creds, deps.shopify.client, { id: job.id, ref, payload, expected: ctx.expected })
+    if (!r.ok) return failed(r.code)
+    const next = await set({ status: 'applied', errorCode: null, appliedAt: now, undo: { ...ctx, revert: r.undo } })
+    await audit(deps, l, next, 'applied', { previous: r.previous ?? job.before_value, next: summaryOf(payload), result: r.status })
+    return next
+  }
+
   // webhook: sent to the developer, who applies it.
   if (!l.ctx.webhook) return manual('no_channel')
   const sent = await sendFixWebhook(l.ctx.webhook, buildFixPayload({
@@ -399,7 +436,13 @@ async function undo(b: Record<string, unknown>, l: Loaded, deps: FixesDeps): Pro
     result = r.ok ? { ok: true } : { ok: false, code: r.code }
   } else if (job.channel === 'app_password') {
     if (!l.ctx.creds || !revert || revert.kind === 'plugin') return refuse('nothing_to_undo')
-    result = await revertViaRest(l.ctx.creds, revert, deps.wp)
+    result = await revertViaRest(l.ctx.creds, revert as RestUndo, deps.wp)
+  } else if (job.channel === 'shopify') {
+    const shopUndo = shopUndoOf(revert)
+    if (!shopUndo) return refuse('nothing_to_undo')
+    const creds = deps.shopify ? await deps.shopify.creds(l.scope) : null
+    if (!deps.shopify || !creds) return refuse('store_permission')
+    result = await revertViaShopify(creds, deps.shopify.client, shopUndo)
   } else {
     if (!l.ctx.webhook) return refuse('no_channel')
     const sent = await sendFixWebhook(l.ctx.webhook, buildFixPayload({

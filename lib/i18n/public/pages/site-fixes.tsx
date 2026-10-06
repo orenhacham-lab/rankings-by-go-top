@@ -2,7 +2,8 @@
  * /features/site-health-fixes in four languages. Every claim here maps to code:
  * the scan's finding kinds (lib/site-health/types.ts), the fix types and the
  * preview-then-approve flow with undo (lib/site-fix), WordPress as the only
- * platform we write to, and Shopify read-only (lib/site-fix/channel.ts).
+ * platform we write to in full, and on Shopify only the store's blog articles and pages
+ * (lib/site-fix/channel.ts, lib/site-fix/shopify-admin.ts).
  */
 import { Code2, FileSearch, Heading1, Image as ImageIcon, Info, Link2, RotateCcw, ScanSearch, ShieldCheck, Type, Wrench } from 'lucide-react'
 import { WorkListVisual } from '@/components/public/feature-visuals'
@@ -77,7 +78,7 @@ export const SITE_FIXES_PAGE: MarketingPage = {
           items: [
             { title: 'סורקים את האתר', body: 'המערכת עוברת על עמודי האתר ומחזירה רשימת בעיות לפי חומרה.' },
             { title: 'בודקים את ההצעה', body: 'לכל בעיה מוצג תיקון מוצע, עם הערך הנוכחי והערך החדש זה לצד זה.' },
-            { title: 'מאשרים', body: 'באתר וורדפרס מחובר התיקון נכתב לאתר. בשאר הפלטפורמות מקבלים הוראות צעד אחר צעד.' },
+            { title: 'מאשרים', body: 'באתר וורדפרס מחובר, ובמאמרים ובעמודים של חנות שופיפיי מחוברת, התיקון נכתב לאתר. בשאר המקרים מקבלים הוראות צעד אחר צעד.' },
           ],
         },
         {
@@ -98,7 +99,7 @@ export const SITE_FIXES_PAGE: MarketingPage = {
           icon: Info,
           title: 'בשופיפיי ובפלטפורמות אחרות',
           body: (
-            <p>הסריקה עובדת על כל אתר. בשופיפיי, בוויקס ובשאר הפלטפורמות המערכת לא כותבת לאתר, ומציגה לכל בעיה הוראות קצרות איך לתקן אותה בעצמכם.</p>
+            <p>הסריקה עובדת על כל אתר. בחנות שופיפיי מחוברת המערכת מתקנת את המאמרים והעמודים של החנות אחרי שאישרתם: כותרת ותיאור לגוגל, טקסט חלופי לתמונות, קישור שבור, שאלות נפוצות וכותרת ראשית כפולה. גם כאן אפשר לבטל כל תיקון. מוצרים, קטגוריות והגדרות החנות לא משתנים. בוויקס ובשאר הפלטפורמות המערכת לא כותבת לאתר, ומציגה לכל בעיה הוראות קצרות איך לתקן אותה בעצמכם.</p>
           ),
         },
       ],
@@ -146,7 +147,7 @@ export const SITE_FIXES_PAGE: MarketingPage = {
           items: [
             { title: 'Scan the site', body: 'The system goes through your pages and returns a list of issues by severity.' },
             { title: 'Review the suggestion', body: 'Each issue comes with a suggested fix, the current value and the new one side by side.' },
-            { title: 'Approve', body: 'On a connected WordPress site the fix is written to the site. On other platforms you get step-by-step instructions.' },
+            { title: 'Approve', body: 'On a connected WordPress site, and on the articles and pages of a connected Shopify store, the fix is written to the site. Otherwise you get step-by-step instructions.' },
           ],
         },
         {
@@ -167,7 +168,7 @@ export const SITE_FIXES_PAGE: MarketingPage = {
           icon: Info,
           title: 'On Shopify and other platforms',
           body: (
-            <p>The scan works on any site. On Shopify, Wix and other platforms the system does not write to the site; it shows short instructions for fixing each issue yourself.</p>
+            <p>The scan works on any site. On a connected Shopify store the system fixes the store&apos;s blog articles and pages after you approve: the title and description Google shows, image alt text, a broken link, an FAQ block and an extra main heading. Each fix can be undone here too. Products, collections and store settings are never changed. On Wix and other platforms the system does not write to the site; it shows short instructions for fixing each issue yourself.</p>
           ),
         },
       ],
@@ -215,7 +216,7 @@ export const SITE_FIXES_PAGE: MarketingPage = {
           items: [
             { title: 'Analiza el sitio', body: 'El sistema recorre tus páginas y devuelve una lista de problemas por gravedad.' },
             { title: 'Revisa la propuesta', body: 'Cada problema trae una corrección sugerida, con el valor actual y el nuevo uno al lado del otro.' },
-            { title: 'Aprueba', body: 'En un sitio WordPress conectado, la corrección se escribe en el sitio. En otras plataformas recibes instrucciones paso a paso.' },
+            { title: 'Aprueba', body: 'En un sitio WordPress conectado, y en los artículos y páginas de una tienda Shopify conectada, la corrección se escribe en el sitio. En los demás casos recibes instrucciones paso a paso.' },
           ],
         },
         {
@@ -236,7 +237,7 @@ export const SITE_FIXES_PAGE: MarketingPage = {
           icon: Info,
           title: 'En Shopify y otras plataformas',
           body: (
-            <p>El análisis funciona en cualquier sitio. En Shopify, Wix y otras plataformas el sistema no escribe en el sitio: muestra instrucciones breves para que corrijas cada problema tú mismo.</p>
+            <p>El análisis funciona en cualquier sitio. En una tienda Shopify conectada, el sistema corrige los artículos del blog y las páginas de la tienda después de que lo apruebas: el título y la descripción que muestra Google, el texto alternativo de las imágenes, un enlace roto, un bloque de preguntas frecuentes y un encabezado principal de más. También aquí cada corrección se puede deshacer. Los productos, las colecciones y la configuración de la tienda nunca se modifican. En Wix y otras plataformas el sistema no escribe en el sitio: muestra instrucciones breves para que corrijas cada problema tú mismo.</p>
           ),
         },
       ],
@@ -284,7 +285,7 @@ export const SITE_FIXES_PAGE: MarketingPage = {
           items: [
             { title: 'Analise o site', body: 'O sistema percorre as suas páginas e devolve uma lista de problemas por gravidade.' },
             { title: 'Confira a sugestão', body: 'Cada problema vem com uma correção sugerida, com o valor atual e o novo lado a lado.' },
-            { title: 'Aprove', body: 'Num site WordPress conectado, a correção é gravada no site. Nas outras plataformas você recebe instruções passo a passo.' },
+            { title: 'Aprove', body: 'Num site WordPress conectado, e nos artigos e páginas de uma loja Shopify conectada, a correção é gravada no site. Nos demais casos você recebe instruções passo a passo.' },
           ],
         },
         {
@@ -305,7 +306,7 @@ export const SITE_FIXES_PAGE: MarketingPage = {
           icon: Info,
           title: 'No Shopify e em outras plataformas',
           body: (
-            <p>A análise funciona em qualquer site. No Shopify, no Wix e em outras plataformas o sistema não grava no site: mostra instruções curtas para você corrigir cada problema.</p>
+            <p>A análise funciona em qualquer site. Numa loja Shopify conectada, o sistema corrige os artigos do blog e as páginas da loja depois que você aprova: o título e a descrição que o Google mostra, o texto alternativo das imagens, um link quebrado, um bloco de perguntas frequentes e um título principal a mais. Aqui também cada correção pode ser desfeita. Produtos, coleções e configurações da loja nunca são alterados. No Wix e em outras plataformas o sistema não grava no site: mostra instruções curtas para você corrigir cada problema.</p>
           ),
         },
       ],

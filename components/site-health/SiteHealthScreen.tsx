@@ -156,6 +156,8 @@ export default function SiteHealthScreen({ project }: { project: Project & { sit
   const fixModeFor = useCallback((finding: Finding, page: FindingPage): FixMode => {
     if (!queueLive || !caps || !finding.fixType) return null
     const channel = caps.channelFor[finding.fixType]
+    // A Shopify store: only its articles and pages are written; products, collections and llms.txt keep their instructions.
+    if (caps.shopify && (finding.fixType === 'llms_txt' || (page.kind !== 'article' && page.kind !== 'page'))) return null
     // llms.txt: the plugin (2.1.0) serves it; every other site gets the same text to copy and place.
     if (finding.fixType === 'llms_txt') return channel === 'plugin' ? 'fix' : 'copy'
     if (!channel) return null
@@ -164,7 +166,7 @@ export default function SiteHealthScreen({ project }: { project: Project & { sit
     // A type newer than the installed plugin: offer the update, never send it to the old plugin.
     if (channel === 'needs_update') return 'update'
     // An extra main heading is changed only where the plugin proves it safe; otherwise instructions.
-    if (finding.fixType === 'h1_demote' && channel !== 'plugin') return null
+    if (finding.fixType === 'h1_demote' && channel !== 'plugin' && channel !== 'shopify') return null
     if (finding.fixType === 'internal_link' && (channel === 'webhook' || channel === 'manual')) return null
     return 'fix'
   }, [queueLive, caps])

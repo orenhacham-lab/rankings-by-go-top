@@ -1,8 +1,10 @@
 /**
  * Which way an approved fix reaches the site, per project. Server-side only.
  *
- *   Shopify            read-only: nothing is written (the live Shopify app is not changed); the
- *                      findings keep their step-by-step instructions.
+ *   Shopify            the store's own articles and pages, through the store's existing connection
+ *                      when it may edit content (write_content, the scope publishing already uses):
+ *                      SHOPIFY_FIX_TYPES (./shopify-admin.ts). Products, collections and every other
+ *                      type keep their instructions. A connection without that scope: read-only.
  *   plugin connected   every fix type the installed plugin knows, through the Go Top plugin (signed).
  *                      A type newer than the plugin (PLUGIN_MIN_VERSION: h1_demote and llms_txt need
  *                      2.1.0) reads `needs_update`: it is never sent to an older plugin, and the
@@ -24,6 +26,7 @@
 import type { createAdminClient } from '@/lib/supabase/admin'
 import type { WordPressCredentials } from '@/lib/wordpress/types'
 import type { PluginLink } from './plugin-client'
+import { canWriteContent, SHOPIFY_FIX_TYPES } from './shopify-admin'
 import { readPluginLink, type PluginLinkRow, type Scope } from './store'
 import {
   FIX_TYPES, PLUGIN_LATEST_VERSION, PLUGIN_ONLY_TYPES, pluginSupports, type FixCapabilities, type FixChannel, type FixType,
@@ -37,6 +40,8 @@ export const APP_PASSWORD_TYPES: readonly FixType[] = ['seo_title', 'meta_descri
 
 export interface FixContext {
   shopify: boolean
+  /** The Shopify connection may edit articles and pages. */
+  shopifyWrite?: boolean
   wordpressDetected: boolean
   creds: WordPressCredentials | null
   plugin: PluginLinkRow | null
@@ -50,7 +55,7 @@ const missing = (e: unknown) => ['42P01', 'PGRST205'].includes(String((e as { co
 export async function loadFixContext(admin: Admin, scope: Scope, decrypt: (s: string) => string, targetDomain: string | null): Promise<FixContext> {
   const { projectId, userId } = scope
   const [shop, wp, site, profile, plugin] = await Promise.all([
-    admin.from('shopify_connections').select('connection_status, archived_at')
+    admin.from('shopify_connections').select('connection_status, archived_at, granted_scopes')
       .eq('project_id', projectId).eq('user_id', userId).is('archived_at', null).maybeSingle(),
     admin.from('wordpress_connections').select('site_url, wp_username, wp_application_password_encrypted, connection_status')
       .eq('project_id', projectId).eq('user_id', userId).maybeSingle(),
@@ -61,7 +66,7 @@ export async function loadFixContext(admin: Admin, scope: Scope, decrypt: (s: st
     // Independent of the four above: read with them, not after them.
     readPluginLink(admin, scope),
   ])
-  const shopRow = (shop.error ? null : shop.data) as { connection_status?: string } | null
+  const shopRow = (shop.error ? null : shop.data) as { connection_status?: string; granted_scopes?: unknown } | null
   const wpRow = (wp.error ? null : wp.data) as { site_url: string; wp_username: string; wp_application_password_encrypted: string; connection_status: string | null } | null
   const siteRow = (site.error && missing(site.error) ? null : site.data) as { platform?: string; endpoint_url?: string | null; secret_encrypted?: string; connection_status?: string } | null
   const detected = String((profile.data as { detected_platform?: string | null } | null)?.detected_platform ?? '').toLowerCase()
@@ -84,6 +89,7 @@ export async function loadFixContext(admin: Admin, scope: Scope, decrypt: (s: st
   const domain = String(targetDomain ?? '').trim()
   return {
     shopify: !!shopRow && shopRow.connection_status === 'connected',
+    shopifyWrite: !!shopRow && shopRow.connection_status === 'connected' && canWriteContent(shopRow.granted_scopes),
     wordpressDetected: !!wpRow || detected.includes('wordpress') || detected.includes('woocommerce') || !!plugin,
     creds,
     plugin,
@@ -110,7 +116,12 @@ export function pluginStateOf(row: PluginLinkRow | null, keyReadable = true): Pl
 export function resolveCapabilities(ctx: FixContext, available: boolean): FixCapabilities {
   const plugin = pluginStateOf(ctx.plugin, !ctx.plugin || !!ctx.pluginLink)
   const base = { available, plugin, appPassword: !!ctx.creds, webhook: !!ctx.webhook, wordpress: ctx.wordpressDetected, pluginLatest: PLUGIN_LATEST_VERSION }
-  if (ctx.shopify) return { ...base, readOnly: true, channelFor: {} }
+  if (ctx.shopify) {
+    if (!ctx.shopifyWrite) return { ...base, shopify: true, readOnly: true, channelFor: {} }
+    const shopFor: FixCapabilities['channelFor'] = {}
+    for (const type of SHOPIFY_FIX_TYPES) shopFor[type] = 'shopify'
+    return { ...base, shopify: true, readOnly: false, channelFor: shopFor }
+  }
   const channelFor: FixCapabilities['channelFor'] = {}
   const version = plugin.state === 'connected' ? plugin.version : ctx.plugin?.plugin_version ?? null
   for (const type of FIX_TYPES) {
