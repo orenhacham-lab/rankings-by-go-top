@@ -43,6 +43,8 @@ export default function SpanishSitemapPage() {
         { label: 'Informes SEO y GEO', href: '/es/features/seo-geo-reports' },
         { label: 'Investigación de palabras clave', href: '/es/features/keyword-research' },
         { label: 'Correcciones del sitio', href: '/es/features/site-health-fixes' },
+        { label: 'Tú frente a la competencia', href: '/es/features/competitor-tracking' },
+        { label: 'Datos de Search Console', href: '/es/features/search-console' },
       ],
     },
     {

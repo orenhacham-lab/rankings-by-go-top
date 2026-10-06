@@ -43,6 +43,8 @@ export default function PortugueseSitemapPage() {
         { label: 'Relatórios SEO e GEO', href: '/pt-BR/features/seo-geo-reports' },
         { label: 'Pesquisa de palavras-chave', href: '/pt-BR/features/keyword-research' },
         { label: 'Correções no site', href: '/pt-BR/features/site-health-fixes' },
+        { label: 'Você x concorrentes', href: '/pt-BR/features/competitor-tracking' },
+        { label: 'Dados do Search Console', href: '/pt-BR/features/search-console' },
       ],
     },
     {

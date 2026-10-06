@@ -3,7 +3,7 @@
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { useState, useEffect } from 'react'
-import { BarChart3, Blocks, Briefcase, ChevronDown, FileText, MapPin, Menu, Search, ShoppingBag, Sparkles, Store, Telescope, Wrench, X, type LucideIcon } from 'lucide-react'
+import { BarChart3, Blocks, Briefcase, ChevronDown, FileText, MapPin, Menu, LineChart, Search, ShoppingBag, Sparkles, Store, Users, Telescope, Wrench, X, type LucideIcon } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { LOCALE_PREFIX, PUBLIC_LOCALES, localeHomeHref, type PublicLocale } from '@/lib/i18n/locales'
 import { getPublicDictionary } from '@/lib/i18n/getPublicDictionary'
@@ -13,7 +13,7 @@ import { cn } from '@/lib/utils'
 import { LanguageSwitcher } from './LanguageSwitcher'
 import { authHref } from '@/lib/i18n/auth-href'
 import { ContactMenu, ContactRows } from '@/components/public/ContactMenu'
-import { SHOPIFY_APP_STORE_URL } from '@/lib/shopify/app-store-listing'
+import { SHOPIFY_APP_STORE_URL } from '@/lib/public-links/shopify-app-store'
 
 /**
  * The public site's top bar, in the app's own vocabulary: the Go Top mark and
@@ -97,7 +97,8 @@ export function PublicNav({ locale = 'he', tone = 'default' }: { locale?: Public
   })
   // Three columns, in the order a customer meets the value (owner, 5 Oct 2026,
   // after the competitor's menu): what we measure, the work the system does,
-  // and how the results are shown. Every item is a feature that works today.
+  // and how the results are shown, three items each (owner, 6 Oct 2026: the
+  // columns must balance). Every item is a feature that works today.
   const featureGroups: { id: string; title: string; items: MenuItem[] }[] = [
     {
       id: 'measure',
@@ -106,13 +107,13 @@ export function PublicNav({ locale = 'he', tone = 'default' }: { locale?: Public
         feature('googleOrganic', 'google-organic-rank-tracking', Search),
         feature('googleMaps', 'google-maps-rank-tracking', MapPin),
         feature('aiVisibility', 'ai-visibility-tracking', Sparkles),
-        feature('keywordResearch', 'keyword-research', Telescope),
       ],
     },
     {
       id: 'act',
       title: dict.nav.featureGroups.act,
       items: [
+        feature('keywordResearch', 'keyword-research', Telescope),
         feature('contentPublishing', 'seo-geo-content-publishing', FileText),
         feature('siteFixes', 'site-health-fixes', Wrench),
       ],
@@ -120,12 +121,16 @@ export function PublicNav({ locale = 'he', tone = 'default' }: { locale?: Public
     {
       id: 'prove',
       title: dict.nav.featureGroups.prove,
-      items: [feature('reports', 'seo-geo-reports', BarChart3)],
+      items: [
+        feature('competitors', 'competitor-tracking', Users),
+        feature('searchConsole', 'search-console', LineChart),
+        feature('reports', 'seo-geo-reports', BarChart3),
+      ],
     },
   ]
   const sm = dict.nav.solutionsMenu
   // Shopify always means the App Store listing, never a page of ours; it is left
-  // out until the listing URL is confirmed (lib/shopify/app-store-listing.ts).
+  // out until the listing URL is confirmed (lib/public-links/shopify-app-store.ts).
   const solutionItems: MenuItem[] = [
     { id: 'businesses', href: `${prefix}/solutions/businesses`, label: sm.businesses.label, description: sm.businesses.description, icon: Store },
     { id: 'agencies', href: `${prefix}/solutions/agencies`, label: sm.agencies.label, description: sm.agencies.description, icon: Briefcase },

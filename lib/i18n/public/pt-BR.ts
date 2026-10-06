@@ -56,6 +56,14 @@ export const ptBR = {
         label: 'Correções no site',
         description: 'Verificamos o seu site e corrigimos títulos, descrições, texto alternativo das imagens e links. No WordPress com um clique, depois que você aprovar.',
       },
+      competitors: {
+        label: 'Você x concorrentes',
+        description: 'Em quantas palavras-chave cada concorrente aparece acima de você no Google, e quem os mecanismos de IA citam no seu lugar.',
+      },
+      searchConsole: {
+        label: 'Dados do Search Console',
+        description: 'Cliques, impressões e posição média do Google, com a variação em relação ao período anterior.',
+      },
     },
     featureGroups: {
       measure: 'Medir',

@@ -56,6 +56,8 @@ export default function SitemapPage() {
         { label: 'דוחות SEO/GEO', href: '/features/seo-geo-reports' },
         { label: 'מחקר ביטויים', href: '/features/keyword-research' },
         { label: 'תיקוני אתר', href: '/features/site-health-fixes' },
+        { label: 'אתם מול המתחרים', href: '/features/competitor-tracking' },
+        { label: 'נתוני Search Console', href: '/features/search-console' },
       ],
     },
     {

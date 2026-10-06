@@ -45,6 +45,14 @@ export const en = {
         label: 'Site fixes',
         description: 'We check your site and fix titles, descriptions, image alt text and links. On WordPress in one click, after you approve.',
       },
+      competitors: {
+        label: 'You vs. competitors',
+        description: 'On how many keywords each competitor ranks above you in Google, and who AI engines mention instead of you.',
+      },
+      searchConsole: {
+        label: 'Search Console data',
+        description: 'Clicks, impressions and average position from Google, with the change against the previous period.',
+      },
     },
     featureGroups: {
       measure: 'Measure',

@@ -1,7 +1,7 @@
 /**
  * The "who it's for" pages, in four languages: business owners, agencies and
  * WordPress sites. Shopify has no page of ours: its menu item goes straight to
- * the App Store listing (lib/shopify/app-store-listing.ts).
+ * the App Store listing (lib/public-links/shopify-app-store.ts).
  *
  * Every claim maps to code: monthly automatic scans (manual anytime), the AI
  * check on ChatGPT, Gemini and Google AI, publishing to WordPress, Shopify and

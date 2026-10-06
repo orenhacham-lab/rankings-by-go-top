@@ -133,6 +133,18 @@ export async function GET() {
       priority: '0.8',
     },
     {
+      url: `${baseUrl}/features/competitor-tracking`,
+      lastmod: today,
+      changefreq: 'monthly',
+      priority: '0.8',
+    },
+    {
+      url: `${baseUrl}/features/search-console`,
+      lastmod: today,
+      changefreq: 'monthly',
+      priority: '0.8',
+    },
+    {
       url: `${baseUrl}/solutions/businesses`,
       lastmod: today,
       changefreq: 'monthly',
@@ -232,6 +244,18 @@ export async function GET() {
       priority: '0.8',
     },
     {
+      url: `${baseUrl}/en/features/competitor-tracking`,
+      lastmod: today,
+      changefreq: 'monthly',
+      priority: '0.8',
+    },
+    {
+      url: `${baseUrl}/en/features/search-console`,
+      lastmod: today,
+      changefreq: 'monthly',
+      priority: '0.8',
+    },
+    {
       url: `${baseUrl}/en/solutions/businesses`,
       lastmod: today,
       changefreq: 'monthly',
@@ -275,6 +299,8 @@ export async function GET() {
     { path: '/features/seo-geo-reports', changefreq: 'monthly', priority: '0.7' },
     { path: '/features/keyword-research', changefreq: 'monthly', priority: '0.7' },
     { path: '/features/site-health-fixes', changefreq: 'monthly', priority: '0.7' },
+    { path: '/features/competitor-tracking', changefreq: 'monthly', priority: '0.7' },
+    { path: '/features/search-console', changefreq: 'monthly', priority: '0.7' },
     { path: '/solutions/businesses', changefreq: 'monthly', priority: '0.7' },
     { path: '/solutions/agencies', changefreq: 'monthly', priority: '0.7' },
     { path: '/solutions/wordpress', changefreq: 'monthly', priority: '0.7' },

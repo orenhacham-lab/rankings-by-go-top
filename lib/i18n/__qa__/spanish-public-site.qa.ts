@@ -161,6 +161,8 @@ function main() {
       'features/seo-geo-reports/page.tsx',
       'features/keyword-research/page.tsx',
       'features/site-health-fixes/page.tsx',
+      'features/competitor-tracking/page.tsx',
+      'features/search-console/page.tsx',
       'solutions/businesses/page.tsx',
       'solutions/agencies/page.tsx',
       'solutions/wordpress/page.tsx',

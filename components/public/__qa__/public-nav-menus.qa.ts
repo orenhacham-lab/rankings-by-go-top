@@ -19,9 +19,10 @@ import { existsSync, readFileSync } from 'fs'
 import { join } from 'path'
 import { PUBLIC_LOCALES, LOCALE_PREFIX } from '@/lib/i18n/locales'
 import { getPublicDictionary } from '@/lib/i18n/getPublicDictionary'
-import { SHOPIFY_APP_STORE_URL } from '@/lib/shopify/app-store-listing'
+import { SHOPIFY_APP_STORE_URL } from '@/lib/public-links/shopify-app-store'
 import { SITE_FIXES_PAGE } from '@/lib/i18n/public/pages/site-fixes'
 import { AGENCIES_PAGE, BUSINESSES_PAGE, WORDPRESS_PAGE } from '@/lib/i18n/public/pages/solutions'
+import { COMPETITORS_PAGE, SEARCH_CONSOLE_PAGE } from '@/lib/i18n/public/pages/results'
 
 const ROOT = join(__dirname, '..', '..', '..')
 let passed = 0
@@ -47,7 +48,10 @@ function main() {
   console.log('\n1) every menu item is a real page in every language')
   {
     check('1a: the menu has the three feature groups', /id: 'measure'/.test(nav) && /id: 'act'/.test(nav) && /id: 'prove'/.test(nav))
-    check('1b: seven features and three solution pages are read from the menu', paths.length === 10, JSON.stringify(paths))
+    // Owner, 6 Oct 2026: the three columns must balance, three items each.
+    const groupSizes = Array.from(nav.matchAll(/id: '(measure|act|prove)',[\s\S]*?items: \[([\s\S]*?)\],/g), (m) => (m[2].match(/feature\(/g) ?? []).length)
+    check('1a2: …with three features in each column', groupSizes.length === 3 && groupSizes.every((n) => n === 3), JSON.stringify(groupSizes))
+    check('1b: nine features and three solution pages are read from the menu', paths.length === 12, JSON.stringify(paths))
     const missing = PUBLIC_LOCALES.flatMap((l) => paths.filter((p) => !existsSync(pageFile(LOCALE_PREFIX[l], p))).map((p) => `${l}${p}`))
     check('1c: …each with a page.tsx in he, en, es and pt-BR', missing.length === 0, missing.join(', '))
     const xml = read('app/sitemap.xml/route.ts')
@@ -59,7 +63,7 @@ function main() {
       return paths.filter((p) => !src.includes(`'${LOCALE_PREFIX[l]}${p}'`)).map((p) => `${l}${p}`)
     })
     check('1e: …and in the HTML sitemap of every language', htmlMissing.length === 0, htmlMissing.join(', '))
-    for (const page of [SITE_FIXES_PAGE, BUSINESSES_PAGE, AGENCIES_PAGE, WORDPRESS_PAGE]) {
+    for (const page of [SITE_FIXES_PAGE, BUSINESSES_PAGE, AGENCIES_PAGE, WORDPRESS_PAGE, COMPETITORS_PAGE, SEARCH_CONSOLE_PAGE]) {
       check(`1f: ${page.path} is a menu path`, paths.includes(page.path))
     }
     // MUTATION CONTROL
@@ -98,13 +102,13 @@ function main() {
 
   console.log('\n4) the new pages promise only what the code does')
   {
-    const sources = ['lib/i18n/public/pages/site-fixes.tsx', 'lib/i18n/public/pages/solutions.tsx'].map((f) => strip(read(f)))
+    const sources = ['lib/i18n/public/pages/site-fixes.tsx', 'lib/i18n/public/pages/solutions.tsx', 'lib/i18n/public/pages/results.tsx'].map((f) => strip(read(f)))
     const all = sources.join('\n')
     check('4a: no percentage claims', !/\d\s?%/.test(all))
     check('4b: no ROI claims', !/\bROI\b/.test(all))
     check('4c: no WordPress.org listing before the plugin is approved', !/wordpress\.org/i.test(all))
     check('4d: no Shopify App Store URL in page copy', !/apps\.shopify\.com/.test(all))
-    for (const page of [SITE_FIXES_PAGE, BUSINESSES_PAGE, AGENCIES_PAGE, WORDPRESS_PAGE]) {
+    for (const page of [SITE_FIXES_PAGE, BUSINESSES_PAGE, AGENCIES_PAGE, WORDPRESS_PAGE, COMPETITORS_PAGE, SEARCH_CONSOLE_PAGE]) {
       check(`4e: ${page.path} has content and a title in every language`,
         PUBLIC_LOCALES.every((l) => page.content[l]?.hero.title && page.meta[l]?.title && page.meta[l]?.description))
     }

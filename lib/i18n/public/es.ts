@@ -56,6 +56,14 @@ export const es = {
         label: 'Correcciones del sitio',
         description: 'Revisamos tu sitio y corregimos títulos, descripciones, texto alternativo de imágenes y enlaces. En WordPress con un clic, después de que lo apruebes.',
       },
+      competitors: {
+        label: 'Tú frente a la competencia',
+        description: 'En cuántas palabras clave cada competidor aparece por encima de ti en Google, y a quién mencionan los motores de IA en tu lugar.',
+      },
+      searchConsole: {
+        label: 'Datos de Search Console',
+        description: 'Clics, impresiones y posición media de Google, con el cambio respecto al periodo anterior.',
+      },
     },
     featureGroups: {
       measure: 'Medir',
