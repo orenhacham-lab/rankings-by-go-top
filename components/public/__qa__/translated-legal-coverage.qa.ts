@@ -738,6 +738,7 @@ const AUTO_APPROVE_TERMS: Record<string, RegExp[]> = {
     /איננו קוראים ואיננו שומרים כתובת IP חדשה/,
     /והכיבוי חל מיד/,
     /איננו שולחים על כך דואר אלקטרוני/,
+    /אם לא נכנסתם לחשבון בשלושים הימים האחרונים/,
   ],
   en: [
     /Automatic approval of fixes \(WordPress only\)/,
@@ -748,6 +749,7 @@ const AUTO_APPROVE_TERMS: Record<string, RegExp[]> = {
     /we do not\s+read and do not store a new IP address/,
     /that takes effect at once/,
     /We do not send an email about it/,
+    /If you have not signed in\s+during the last thirty days/,
   ],
   es: [
     /Aprobaci[óo]n autom[áa]tica de las correcciones \(solo WordPress\)/,
@@ -758,6 +760,7 @@ const AUTO_APPROVE_TERMS: Record<string, RegExp[]> = {
     /no leemos ni almacenamos ninguna direcci[óo]n IP nueva/,
     /surte efecto de inmediato/,
     /No enviamos ning[úu]n correo electr[óo]nico al respecto/,
+    /Si usted no ha iniciado sesi[óo]n en los [úu]ltimos treinta d[íi]as/,
   ],
   'pt-BR': [
     /Aprova[çc][ãa]o autom[áa]tica das corre[çc][õo]es \(somente WordPress\)/,
@@ -768,6 +771,7 @@ const AUTO_APPROVE_TERMS: Record<string, RegExp[]> = {
     /n[ãa]o lemos nem armazenamos nenhum endere[çc]o IP novo/,
     /vale de imediato/,
     /N[ãa]o enviamos nenhum e-mail sobre isso/,
+    /Se voc[êe] n[ãa]o entrou na conta nos [úu]ltimos trinta dias/,
   ],
 }
 /* The Shopify half of 15C must still promise a click for every single fix. */
@@ -818,6 +822,8 @@ const AUTO_APPROVE_PRIVACY: Record<string, RegExp[]> = {
     !AUTO_APPROVE_PRIVACY.en[2].test('we record the IP address the automatic fix was applied from'))
   check('mutation control: a text that lets the switch cover Shopify too is caught',
     !AUTO_APPROVE_TERMS.en[1].test('Automatic approval applies to a connected WordPress site and to a Shopify store.'))
+  check('mutation control: a thirty-day rule stated as account activity, which the code reads as a sign-in, is caught',
+    !AUTO_APPROVE_TERMS.en[8].test('If there has been no activity in your account during the last thirty days, nothing runs.'))
   check('mutation control: a promised weekly email is caught',
     !AUTO_APPROVE_TERMS.en[7].test('Once a week we send you a summary of the fixes applied automatically.'))
   check('mutation control: a Shopify half that drops the per-fix promise is caught',
