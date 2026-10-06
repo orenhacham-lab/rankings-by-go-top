@@ -249,7 +249,9 @@ export default function EnglishTermsPage() {
         <p>
           The link network is an optional service in which the Service may place a link between the
           sites of customers who joined it, inside articles the Service writes for them. It is off by
-          default and is not available for Shopify stores.
+          default. A connected Shopify store can join it, and the links are placed only inside articles
+          the Service writes and publishes to the store&rsquo;s blog; an article, page, product or
+          collection that already exists in the store is not edited.
         </p>
         <p className="mt-4">
           <strong>This section applies from the moment you choose to join the network for a given
@@ -347,7 +349,10 @@ export default function EnglishTermsPage() {
             fixes in section 15C to them with your approval. The scope is set by the permissions you approved at
             installation, and you can remove the app from the store at any time.
             If you are billed through Shopify, the billing sections of these Terms apply as well. The link
-            network in section 15A is not available for Shopify stores.
+            store can also join the link network in section 15A, by a separate and voluntary joining: the
+            links are placed only inside articles the Service writes and publishes to the store&rsquo;s blog,
+            and a link can be removed before the article is published. By joining you confirm that you are
+            permitted under Shopify&rsquo;s own terms to add such links to the store&rsquo;s content.
           </li>
           <li>
             <strong>Wix.</strong> Connecting a Wix site uses an API key you issue in your own account, and is
