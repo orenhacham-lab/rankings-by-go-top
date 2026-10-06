@@ -639,6 +639,19 @@ const NETWORK_DENIED = /אינו זמין לחנויות Shopify|אינה זמי
  * confirmation of a list shown first is still the merchant's approval, but only
  * if the document says that is what it is.
  */
+/*
+ * No schema on Shopify. JSON-LD reaches a site ONLY through the WordPress plugin
+ * (lib/site-fix: shopifyFaqBlockHtml writes a visible <div> with h2/h3/p and
+ * nothing else), so the Shopify list must not read as if the FAQ fix adds
+ * structured data. It says so in words now, and the only place either document
+ * may mention JSON-LD is a WordPress-scoped list.
+ */
+const SHOPIFY_NO_SCHEMA: Record<string, RegExp> = {
+  he: /בחנות\n?\s*Shopify השירות אינו מוסיף סכמת JSON-LD ואינו מוסיף שום סימון או קוד/,
+  en: /in a Shopify store the Service adds no JSON-LD schema and no markup or code of any kind/,
+  es: /en una tienda de Shopify el Servicio no a[ñn]ade esquema JSON-LD ni ning[úu]n marcado o c[óo]digo/,
+  'pt-BR': /em uma loja Shopify o Servi[çc]o n[ãa]o acrescenta esquema JSON-LD nem nenhuma marca[çc][ãa]o ou c[óo]digo/,
+}
 const FIX_SCOPE: Record<string, RegExp[]> = {
   he: [/טקסט חלופי\s+לתמונה הראשית של מאמר שאין לה טקסט חלופי/, /איננו נוגעים בקובץ התמונה ואיננו מחליפים אותה/, /אישור אחד לקבוצת תיקונים/, /עד 25 עמודים בכל פעם, ולא עמוד הבית/, /בתוך 14 ימים/],
   en: [/alt text of an article&rsquo;s featured image that has none/, /do not touch the image\s+file and do not replace the image/, /One approval for a group of fixes/, /up\s+to 25 pages at a time, and never the home page/, /within 14 days/],
@@ -658,6 +671,12 @@ const FIX_SCOPE: Record<string, RegExp[]> = {
       check(`${name}/terms: the fix list states ${must.source.slice(0, 44)}`, must.test(terms))
     }
   }
+  for (const [name, terms] of docs) {
+    const says = SHOPIFY_NO_SCHEMA[name]
+    if (says) check(`${name}/terms: the Shopify list says no schema and no code is added`, says.test(terms))
+  }
+  check('mutation control: a Shopify list that stays silent about schema is caught',
+    !SHOPIFY_NO_SCHEMA.en.test('an FAQ block added at its end, and turning an extra H1 heading inside it into an H2.'))
   check('mutation control: a featured-image line without the "has none" narrowing is caught',
     !FIX_SCOPE.en[0].test('the alt text of an article&rsquo;s featured image, and of every image on it'))
   check('mutation control: a batch described without its page limit is caught',
