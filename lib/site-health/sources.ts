@@ -32,6 +32,24 @@ export interface ProjectSources {
 
 const missingTable = (e: unknown) => ['42P01', 'PGRST205'].includes(String((e as { code?: unknown } | null)?.code ?? ''))
 
+/**
+ * The store's items, read per kind: the newest SHOPIFY_PER_KIND of each. One list of the newest items
+ * overall let products crowd out the rest: on a store with 616 products, 2 of its 22 articles and 1 of
+ * its 10 pages were among the newest 400, so the scan barely read the articles and pages a fix can edit.
+ * Articles and pages come first, so whatever is left after the quotas goes to what can be fixed.
+ */
+const SHOPIFY_PER_KIND = 50
+const SHOPIFY_READ_ORDER = ['article', 'page', 'product', 'collection'] as const
+async function shopifyEntities(admin: Admin, projectId: string, userId: string): Promise<{ data: unknown[] | null; error: unknown }> {
+  const parts = await Promise.all(SHOPIFY_READ_ORDER.map((type) =>
+    admin.from('shopify_entities').select('entity_type, canonical_url, shopify_gid')
+      .eq('project_id', projectId).eq('user_id', userId).eq('is_active', true).eq('entity_type', type)
+      .order('shopify_updated_at', { ascending: false }).limit(SHOPIFY_PER_KIND)))
+  const failed = parts.find((r) => r.error)
+  if (failed) return { data: null, error: failed.error }
+  return { data: parts.flatMap((r) => (r.data ?? []) as unknown[]), error: null }
+}
+
 /** Per-kind quotas for a store (the rest of MAX_PAGES - 1 filled in list order). */
 const SHOPIFY_QUOTA: Record<string, number> = { product: 8, page: 5, article: 6, collection: 4 }
 const SHOPIFY_KIND: Record<string, PageKind> = { product: 'product', page: 'page', article: 'article', collection: 'collection' }
@@ -90,9 +108,7 @@ export async function loadProjectSources(admin: Admin, scope: { projectId: strin
       .eq('project_id', projectId).eq('user_id', userId).maybeSingle(),
     admin.from('project_profiles').select('detected_platform')
       .eq('project_id', projectId).eq('user_id', userId).maybeSingle(),
-    admin.from('shopify_entities').select('entity_type, canonical_url, shopify_gid')
-      .eq('project_id', projectId).eq('user_id', userId).eq('is_active', true)
-      .order('shopify_updated_at', { ascending: false }).limit(400),
+    shopifyEntities(admin, projectId, userId),
     admin.from('wordpress_content_index').select('targets, scan_status')
       .eq('project_id', projectId).eq('user_id', userId).maybeSingle(),
     admin.from('site_crawl_index').select('targets, scan_status')
