@@ -23,6 +23,11 @@
  *  11. a type newer than the installed plugin (2.1.0) is never sent to it: the plugin's version is
  *      read again once, then                                     409 needs_update
  *
+ * AUTOMATIC FIXES (the project's own switch, `handleAutoSetting`; the scheduler, ./auto-run.ts) go
+ * through `autoFixProject`, which is NOT reachable from `handleFixesPost`: no request body can ask
+ * for an automatic fix. It reuses the same blocks (load, whitelist, one place one fix, insert, audit,
+ * execute) under the grant's own owner, and records the person and the IP of the switch-on.
+ *
  * One approval = one job = one element of one page. The approval is recorded (who, when, IP, the
  * previous and the new value) BEFORE anything is sent; every outcome is recorded after. Answers are
  * { ok, … } or { ok: false, code } with stable codes; nothing a site, WordPress or the database said
@@ -34,7 +39,7 @@ import type { FindingKind } from '@/lib/site-health/types'
 import type { WpFixDeps } from '@/lib/site-health/wordpress-fix'
 import { loadFixContext, resolveCapabilities, type FixContext } from './channel'
 import { generatePluginKey, pairingCode } from './plugin-auth'
-import { pairOverAppPassword, pluginFix, pluginStatus, pluginUndo, type PluginPost } from './plugin-client'
+import { pairOverAppPassword, pluginFix, pluginInspect, pluginStatus, pluginUndo, type PluginItem, type PluginPost } from './plugin-client'
 import { previewFixJob, type LivePage, type PreviewRequest } from './preview'
 import { applyViaRest, revertViaRest, type RestUndo } from './rest-apply'
 import { findShopItem, type ShopCreds, type ShopifyFixClient } from './shopify-admin'
@@ -46,10 +51,19 @@ import {
 import { HOLDING_STATUSES, sameTarget, subjectOf, urlKey, type FixTarget } from './job-match'
 import { BATCH_UNDO_DAYS, BULK_MAX_PAGES, BULK_RECENT_DAYS, bulkValueProblem, isHomeUrl } from './bulk'
 import { readSiteMap } from '@/lib/content/existing-content/site-map-store'
-import type { Generate } from './suggest'
+import { textOf } from '@/lib/site-health/rules'
+import type { SiteHealthReport } from '@/lib/site-health/types'
+import { suggestMetaDescription, type Generate } from './suggest'
 import type { TextReader } from './preview'
 import {
-  BULK_SAFE_TYPES, FIX_TYPES, type FixCapabilities, type FixChannel, type FixErrorCode, type FixJobRow, type FixJobView, type FixType,
+  AUTO_FAILED_DAYS, FIX_MIN_MS, autoAltImages, autoCandidates, autoDescriptionOk, autoQuotaLeft, descriptionIsEmpty, sameAutoTypes,
+  stillDead, type AutoCandidate,
+} from './auto'
+import { disableGrant, insertGrant, readActiveGrant, readLastRun, type AutoGrantRow } from './auto-store'
+import { brokenLinkWords } from './content'
+import {
+  AUTO_SAFE_TYPES as AUTO_TYPES, BODY_FIX_TYPES, BULK_SAFE_TYPES, FIX_TYPES, pluginSupports, type AutoFixView, type FixCapabilities,
+  type FixChannel, type FixErrorCode, type FixJobRow, type FixJobView, type FixPayload, type FixType,
 } from './types'
 import { buildFixPayload, sendFixWebhook, type FixWebhookDeps } from './webhook-fix'
 import { payloadFromJob, siteKeyOf, summaryOf, validateFix, valueOf } from './whitelist'
@@ -127,11 +141,18 @@ export function batchOf(row: Pick<FixJobRow, 'undo'>): string | null {
   return typeof b === 'string' && UUID.test(b) ? b : null
 }
 
+/** The automatic-fix grant a job was approved under, from the server-only undo record. */
+export function autoOf(row: Pick<FixJobRow, 'undo'>): string | null {
+  const a = (row.undo as { auto?: unknown } | null)?.auto
+  return typeof a === 'string' && UUID.test(a) ? a : null
+}
+
 export function jobView(row: FixJobRow, caps: FixCapabilities): FixJobView {
   const now = caps.channelFor[row.fix_type]
   const liveChannel = now === 'plugin' || now === 'app_password' || now === 'webhook' || now === 'shopify'
   return {
     batchId: batchOf(row),
+    auto: !!autoOf(row),
     id: row.id, type: row.fix_type, findingKind: row.finding_kind, pageUrl: row.page_url, status: row.status, channel: row.channel,
     before: row.before_value, after: row.after_summary, errorCode: row.error_code, approvedAt: row.approved_at,
     appliedAt: row.applied_at, revertedAt: row.reverted_at, subject: subjectOf(row.fix_type, row.payload),
@@ -148,9 +169,9 @@ export async function handleFixesGet(projectId: unknown, deps: FixesDeps): Promi
   try {
     const l = await load(projectId, deps)
     if (isAnswer(l)) return l
-    if (!l.caps.available) return { status: 200, body: { ok: true, capabilities: l.caps, jobs: [] } }
-    const rows = await listJobs(deps.admin, l.scope)
-    return { status: 200, body: { ok: true, capabilities: l.caps, jobs: rows.map((r) => jobView(r, l.caps)) } }
+    if (!l.caps.available) return { status: 200, body: { ok: true, capabilities: l.caps, jobs: [], auto: AUTO_UNAVAILABLE } }
+    const [rows, auto] = await Promise.all([listJobs(deps.admin, l.scope), autoView(deps, l)])
+    return { status: 200, body: { ok: true, capabilities: l.caps, jobs: rows.map((r) => jobView(r, l.caps)), auto } }
   } catch (e) {
     if (e instanceof FixStoreError) console.error('[site-fix] queue read failed')
     return refuse('store_failed')
@@ -315,14 +336,22 @@ async function bulkRefusal(
   const since = new Date(now - BULK_RECENT_DAYS * 86_400_000).toISOString()
   const recent = await listJobsSince(deps.admin, l.scope, since)
   const page = urlKey(a.pageUrl)
-  // Nothing of this same type pending or applied on this page in 30 days, except what this same
-  // batch just did (bulk.ts pageBusy: another field of the page is independent of this one).
-  const busy = recent.some((r) => urlKey(r.page_url) === page && r.fix_type === a.type && batchOf(r) !== a.batch
-    && (r.status === 'pending' || r.status === 'manual' || r.status === 'applied' || r.status === 'sent'))
-  if (busy) return 'recent'
+  if (recentSameType(recent, a)) return 'recent'
   const pages = new Set(recent.filter((r) => batchOf(r) === a.batch).map((r) => urlKey(r.page_url)))
   if (!pages.has(page) && pages.size >= BULK_MAX_PAGES) return 'batch_full'
   return null
+}
+
+/**
+ * The "recent" rule of a one-click batch and of an automatic run alike: a fix of this same type is
+ * pending, waiting for a manual update, applied or sent on this page within the rows given (the
+ * last BULK_RECENT_DAYS), except what this same batch just did (bulk.ts pageBusy: another field of
+ * the page is independent of this one).
+ */
+function recentSameType(recent: readonly FixJobRow[], a: { type: FixType; pageUrl: string; batch: string }): boolean {
+  const page = urlKey(a.pageUrl)
+  return recent.some((r) => urlKey(r.page_url) === page && r.fix_type === a.type && batchOf(r) !== a.batch
+    && (r.status === 'pending' || r.status === 'manual' || r.status === 'applied' || r.status === 'sent'))
 }
 
 /** Another job (not `self`) already holds this place: done, sent, queued or waiting for a manual update. */
@@ -332,7 +361,7 @@ async function heldElsewhere(deps: FixesDeps, l: Loaded, target: FixTarget, self
 }
 
 /** Apply one job through its channel; record the outcome on the job and in the trail. */
-async function execute(job: FixJobRow, l: Loaded, deps: FixesDeps, ctx: { expected: string | null; via: string | null; batch?: string }): Promise<FixJobRow> {
+async function execute(job: FixJobRow, l: Loaded, deps: FixesDeps, ctx: { expected: string | null; via: string | null; batch?: string; auto?: string }): Promise<FixJobRow> {
   const payload = payloadFromJob(job.fix_type, job.payload)
   const now = new Date().toISOString()
   const set = async (patch: Parameters<typeof updateJob>[3]) => {
@@ -355,7 +384,8 @@ async function execute(job: FixJobRow, l: Loaded, deps: FixesDeps, ctx: { expect
     if (!r.ok) {
       if (r.connectionLost) {
         await markPluginLink(deps.admin, l.scope, { status: 'disconnected', errorCode: r.code })
-        return manual(r.code)
+        // An automatic fix never waits for a manual update: it failed, and the run stops (autoFixProject).
+        if (!ctx.auto) return manual(r.code)
       }
       const next = await set({ status: 'failed', errorCode: r.code })
       await audit(deps, l, next, 'failed', { result: r.code })
@@ -503,9 +533,12 @@ async function retry(b: Record<string, unknown>, l: Loaded, deps: FixesDeps): Pr
   const channel = channelOf(l, job.fix_type) as FixChannel
   const stored = (job.undo ?? {}) as { expected?: string | null; via?: string | null }
   const batch = batchOf(job)
+  const auto = autoOf(job)
   // The preview's compare value belongs to the channel it was read through; another channel writes without it.
   const ctx = channel === job.channel ? { expected: stored.expected ?? null, via: stored.via ?? null } : { expected: null, via: null }
   if (batch) Object.assign(ctx, { batch })
+  // A retried automatic fix stays one: the queue keeps its label and its batch keeps its undo.
+  if (auto) Object.assign(ctx, { auto })
   await updateJob(deps.admin, l.scope, job.id, { status: 'pending', channel, errorCode: null })
   const pending = { ...job, status: 'pending' as const, channel }
   await audit(deps, l, pending, 'retried', { next: null })
@@ -566,4 +599,241 @@ async function check(l: Loaded, deps: FixesDeps): Promise<Answer> {
   const seo = r.body.seo_plugin === 'yoast' || r.body.seo_plugin === 'rankmath' ? r.body.seo_plugin : 'none'
   await markPluginLink(deps.admin, l.scope, { status: 'connected', version, seoPlugin: seo, errorCode: null, seen: true })
   return { status: 200, body: { ok: true, plugin: { state: 'connected', version, seoPlugin: seo } } }
+}
+
+// ── Automatic fixes ─────────────────────────────────────────────────────────
+
+const AUTO_UNAVAILABLE: AutoFixView = { state: 'unavailable', enabledAt: null, lastRunAt: null }
+
+/** The switch as the screens see it. A read that fails reads as unavailable (the card stays hidden). */
+async function autoView(deps: FixesDeps, l: Loaded): Promise<AutoFixView> {
+  try {
+    const { available, grant } = await readActiveGrant(deps.admin, l.scope)
+    if (!available) return AUTO_UNAVAILABLE
+    return { state: grant ? 'on' : 'off', enabledAt: grant?.enabled_at ?? null, lastRunAt: grant ? grant.last_run_at : await readLastRun(deps.admin, l.scope) }
+  } catch {
+    return AUTO_UNAVAILABLE
+  }
+}
+
+/** Why automatic fixes cannot be turned on for this project now. */
+export type AutoBlock = 'shopify' | 'read_only' | 'needs_plugin' | 'needs_update'
+
+/** WordPress with the Go Top plugin connected and able to write every covered type; never Shopify. */
+export function autoBlockOf(caps: FixCapabilities, hasLink: boolean): AutoBlock | null {
+  if (caps.shopify) return 'shopify'
+  if (caps.readOnly) return 'read_only'
+  if (caps.plugin.state !== 'connected' || !hasLink) return 'needs_plugin'
+  for (const t of AUTO_TYPES) {
+    const c = caps.channelFor[t]
+    if (c === 'needs_update' || !pluginSupports(caps.plugin.version, t)) return 'needs_update'
+    if (c !== 'plugin') return 'needs_plugin'
+  }
+  return null
+}
+
+/**
+ * GET the switch: on or off, since when, the last run, whether it can be turned on here (and why
+ * not), and the covered and never-covered types. `available: false` while the table is missing.
+ */
+export async function handleAutoGet(projectId: unknown, deps: FixesDeps): Promise<Answer> {
+  try {
+    const l = await load(projectId, deps)
+    if (isAnswer(l)) return l
+    const view = l.caps.available ? await autoView(deps, l) : AUTO_UNAVAILABLE
+    if (view.state === 'unavailable') return { status: 200, body: { ok: true, available: false } }
+    const block = autoBlockOf(l.caps, !!l.ctx.pluginLink)
+    return { status: 200, body: { ok: true, available: true, ...view, canEnable: !block, block, types: AUTO_TYPES, never: FIX_TYPES.filter((t) => !AUTO_TYPES.includes(t)) } }
+  } catch {
+    console.error('[site-fix] auto setting read failed')
+    return refuse('store_failed')
+  }
+}
+
+/**
+ * POST the switch, the owner's own (load proves it).
+ *   { projectId, enabled: true, acknowledged: true, types: [the covered list] }   on, after the dialog
+ *     listed what it covers; refused for Shopify and read-only stores (not_allowed) and without
+ *     the plugin (needs_plugin / needs_update). Records who, when and the request's IP.
+ *   { projectId, enabled: false }   off, at once: every automatic fix reads the switch again
+ *     right before it is written.
+ */
+export async function handleAutoSetting(body: unknown, deps: FixesDeps): Promise<Answer> {
+  const b = (body ?? {}) as Record<string, unknown>
+  try {
+    const l = await load(b.projectId, deps)
+    if (isAnswer(l)) return l
+    if (typeof b.enabled !== 'boolean') return refuse('invalid_request')
+    if (!l.caps.available) return refuse('queue_unavailable')
+    const current = await readActiveGrant(deps.admin, l.scope)
+    if (!current.available) return refuse('queue_unavailable')
+    if (!b.enabled) {
+      // Off is always allowed, whatever the site is connected to now.
+      if (current.grant) await disableGrant(deps.admin, l.scope)
+      return { status: 200, body: { ok: true, ...(await autoView(deps, l)) } }
+    }
+    if (b.acknowledged !== true || !sameAutoTypes(b.types)) return refuse('invalid_request')
+    const block = autoBlockOf(l.caps, !!l.ctx.pluginLink)
+    if (block === 'shopify' || block === 'read_only') return refuse('not_allowed')
+    if (block) return refuse(block)
+    if (!current.grant) await insertGrant(deps.admin, l.scope, { types: AUTO_TYPES, ip: deps.ip })
+    return { status: 200, body: { ok: true, ...(await autoView(deps, l)) } }
+  } catch {
+    console.error('[site-fix] auto setting write failed')
+    return refuse('store_failed')
+  }
+}
+
+export interface AutoFixDeps extends FixesDeps {
+  /** One scan of the project's site as its owner (lib/site-health/api.ts handleScan; nothing is stored). */
+  scanReport: (scope: Scope) => Promise<SiteHealthReport | null>
+  /** The status a dead link answers now, through the scan's pinned path; null when it cannot be read. */
+  checkLink: (url: string) => Promise<number | null>
+  /** The run's end: no fix starts with less than FIX_MIN_MS left. */
+  deadlineAt?: number
+  /** The run's id: the queue groups one project's automatic fixes of one run by it (its batch). */
+  runId?: string
+}
+
+export type AutoOutcome =
+  | { ok: true; applied: number; failed: number; skipped: number; stopped: 'off' | 'deadline' | 'plugin' | null }
+  | { ok: false; reason: 'not_found' | 'unavailable' | 'off' | 'not_plugin' | 'plugin_unreachable' | 'scan_failed' | 'store_failed' }
+
+/** The plugin answered as if it were gone: the run stops (execute marked the link disconnected). */
+const LOST: readonly string[] = ['plugin_unreachable', 'plugin_not_connected', 'plugin_outdated']
+
+/** The switch is still on (the same grant) and still covers `type`. */
+async function stillGranted(deps: FixesDeps, l: Loaded, grant: AutoGrantRow, type: FixType | null): Promise<boolean> {
+  const now = await readActiveGrant(deps.admin, l.scope)
+  return !!now.grant && now.grant.id === grant.id && (type === null || now.grant.fix_types.includes(type))
+}
+
+/**
+ * A place the owner took back (reverted) or removed from the queue (cancelled) is never fixed
+ * automatically again, and one whose automatic fix failed waits AUTO_FAILED_DAYS. HOLDING_STATUSES
+ * leaves these places free for a click; automatic mode does not.
+ */
+function neverAgain(rows: readonly FixJobRow[], target: FixTarget, failedSince: number): boolean {
+  return rows.some((r) => sameTarget({ type: r.fix_type, pageUrl: r.page_url, subject: subjectOf(r.fix_type, r.payload) }, target)
+    && (r.status === 'reverted' || r.status === 'cancelled' || (r.status === 'failed' && !!autoOf(r) && Date.parse(r.approved_at) >= failedSince)))
+}
+
+type AutoValue = { fix: Record<string, unknown>; expected: string; via: string; before: string | null }
+
+/** The value of one automatic fix, read from the page through the plugin now; null skips it. */
+async function autoValue(c: AutoCandidate, l: Loaded, deps: AutoFixDeps, pages: Map<string, PluginItem | null>): Promise<AutoValue | null> {
+  const link = l.ctx.pluginLink
+  if (!link) return null
+  const key = urlKey(c.pageUrl)
+  if (!pages.has(key)) {
+    const r = await pluginInspect(link, c.pageUrl, deps.pluginPost)
+    pages.set(key, r.ok ? r.body.item : null)
+  }
+  const it = pages.get(key)
+  if (!it) return null
+  switch (c.type) {
+    case 'image_alt': {
+      const images = autoAltImages(it.content, it.title)
+      return images.length > 0 ? { fix: { type: 'image_alt', images }, expected: it.content_sha, via: 'content', before: null } : null
+    }
+    case 'meta_description': {
+      // Both empty: what the plugin stores and what a visitor (and Google) gets. Compare-and-set on ''.
+      const live = await deps.readLive(c.pageUrl)
+      if (!live || !descriptionIsEmpty(it.seo?.description, live.description)) return null
+      const value = await suggestMetaDescription({ current: '', text: textOf(it.content), title: live.title || it.title }, deps.generate)
+      if (!autoDescriptionOk(value)) return null
+      return { fix: { type: 'meta_description', value }, expected: '', via: it.seo_plugin === 'none' ? 'plugin_own' : 'plugin_seo', before: '' }
+    }
+    case 'broken_link': {
+      const href = c.href
+      const k = siteKeyOf(href)
+      if (!href || !k || !l.siteKeys.has(k)) return null
+      // Dead now, not only at the scan: a link that came back is left alone.
+      if (!stillDead(await deps.checkLink(href).catch(() => null))) return null
+      if (brokenLinkWords(it.content, href, new URL(link.siteUrl).hostname).length === 0) return null
+      return { fix: { type: 'broken_link', href, replacement: null }, expected: it.content_sha, via: 'content', before: null }
+    }
+    default:
+      return null
+  }
+}
+
+/**
+ * One project's automatic run, for its grant. NOT part of handleFixesPost: only ./auto-run.ts calls
+ * it. In order:
+ *   1. the project is the grant's owner's (load, with the grant's user), its queue exists and the
+ *      grant is still the active one;
+ *   2. WordPress with the Go Top plugin connected and able to write every covered type, never
+ *      Shopify, and one signed /status answers; otherwise nothing is written at all (no job, no
+ *      manual row);
+ *   3. one scan; its findings mapped to candidates (./auto.ts autoCandidates);
+ *   4. per candidate: never the home page, nothing of the same type recent on the page, no other
+ *      job holding the place, never a place reverted or cancelled (or an automatic failure within
+ *      AUTO_FAILED_DAYS), a value read from the page now, the whitelist;
+ *   5. the grant read AGAIN right before each write: off is off at once;
+ *   6. the same block as approve: the job (approved by the grant's person, with the IP of the
+ *      switch-on), the audit row `approved` / `auto_approved`, then the write, compare-and-set.
+ * At most AUTO_CAPS fixes; no fix starts after the deadline.
+ */
+export async function autoFixProject(projectId: string, grant: AutoGrantRow, deps: AutoFixDeps): Promise<AutoOutcome> {
+  // The grant's own owner, and the person and the IP of the switch-on: no request carries them here.
+  const as: AutoFixDeps = { ...deps, userId: grant.user_id, ip: grant.enabled_ip }
+  try {
+    if (grant.project_id !== projectId || grant.enabled_by !== grant.user_id) return { ok: false, reason: 'not_found' }
+    const l = await load(projectId, as)
+    if (isAnswer(l)) return { ok: false, reason: l.body.code === 'not_found' || l.body.code === 'invalid_request' ? 'not_found' : 'store_failed' }
+    if (!l.caps.available) return { ok: false, reason: 'unavailable' }
+    if (!(await stillGranted(as, l, grant, null))) return { ok: false, reason: 'off' }
+    const types = grant.fix_types.filter((t) => AUTO_TYPES.includes(t))
+    const link = l.ctx.pluginLink
+    if (l.ctx.shopify || types.length === 0 || !link || autoBlockOf(l.caps, true)) return { ok: false, reason: 'not_plugin' }
+    const status = await pluginStatus(link, as.pluginPost)
+    if (!status.ok) return { ok: false, reason: 'plugin_unreachable' }
+    const report = await as.scanReport(l.scope).catch(() => null)
+    if (!report) return { ok: false, reason: 'scan_failed' }
+
+    const now = as.now ?? Date.now
+    const batch = as.runId ?? (as.newId ?? crypto.randomUUID)()
+    const recent = await listJobsSince(as.admin, l.scope, new Date(now() - BULK_RECENT_DAYS * 86_400_000).toISOString())
+    const closed = new Map<FixType, FixJobRow[]>()
+    for (const t of types) closed.set(t, await listHoldingJobs(as.admin, l.scope, t, ['reverted', 'cancelled', 'failed']))
+    const failedSince = now() - AUTO_FAILED_DAYS * 86_400_000
+    const done: Partial<Record<FixType, number>> = {}
+    const pages = new Map<string, PluginItem | null>()
+    const counts = { applied: 0, failed: 0, skipped: 0 }
+    for (const c of autoCandidates(report, types)) {
+      if (!autoQuotaLeft(done, c.type)) { counts.skipped++; continue }
+      if (as.deadlineAt !== undefined && now() + FIX_MIN_MS > as.deadlineAt) return { ok: true, ...counts, stopped: 'deadline' }
+      const target: FixTarget = { type: c.type, pageUrl: c.pageUrl, subject: c.type === 'broken_link' ? c.href ?? null : null }
+      if (isHomeUrl(c.pageUrl) || recentSameType(recent, { type: c.type, pageUrl: c.pageUrl, batch })
+        || neverAgain(closed.get(c.type) ?? [], target, failedSince) || await heldElsewhere(as, l, target, null)) { counts.skipped++; continue }
+      const value = await autoValue(c, l, as, pages)
+      const checked = value ? validateFix(value.fix, c.pageUrl, l.siteKeys) : null
+      if (!value || !checked || !checked.ok) { counts.skipped++; continue }
+      // Turned off (or narrowed) since the run started: nothing more is written.
+      if (!(await stillGranted(as, l, grant, c.type))) return { ok: true, ...counts, stopped: 'off' }
+      const payload: FixPayload = checked.payload
+      const ctx = { expected: value.expected, via: value.via, batch, auto: grant.id }
+      const job = await insertJob(as.admin, l.scope, {
+        id: (as.newId ?? crypto.randomUUID)(),
+        fixType: payload.type, findingKind: c.kind, pageUrl: c.pageUrl, payload: valueOf(payload),
+        before: value.before, after: summaryOf(payload).slice(0, 4000), channel: 'plugin',
+        undo: { ...ctx }, approvedBy: grant.enabled_by, approvedIp: grant.enabled_ip,
+      })
+      // The approval is on record before anything leaves, as with a click.
+      await audit(as, l, job, 'approved', { result: 'auto_approved' })
+      const out = await execute(job, l, as, ctx)
+      done[c.type] = (done[c.type] ?? 0) + 1
+      // The page's content changed: a later fix of the same page reads it again (its compare value).
+      if (BODY_FIX_TYPES.includes(c.type)) pages.delete(urlKey(c.pageUrl))
+      if (out.status === 'applied') counts.applied++
+      else counts.failed++
+      if (out.status === 'failed' && LOST.includes(String(out.error_code))) return { ok: true, ...counts, stopped: 'plugin' }
+    }
+    return { ok: true, ...counts, stopped: null }
+  } catch (e) {
+    if (e instanceof FixStoreError) console.error('[site-fix] automatic run store failed')
+    else console.error('[site-fix] automatic run failed')
+    return { ok: false, reason: 'store_failed' }
+  }
 }

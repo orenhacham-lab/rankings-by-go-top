@@ -26,6 +26,7 @@ import FindingCard, { type FixMode } from './FindingCard'
 import FixPreviewModal from './FixPreviewModal'
 import ApproveFixModal from './ApproveFixModal'
 import AutoFixStrip, { pluginUpdateFor } from './AutoFixStrip'
+import AutoFixPanel from './AutoFixPanel'
 import FixQueue from './FixQueue'
 import PluginInstallModal from './PluginInstallModal'
 import { fixKey, useSiteHealthScan, type ScanProgress } from './useSiteHealthScan'
@@ -280,6 +281,11 @@ export default function SiteHealthScreen({ project }: { project: Project & { sit
             lastSeen={when}
             safe={safeEnabled ? { count: safe.count, phase: safe.phase, start: () => void safe.start(), onRecheck: () => void scan(), onOpenQueue: openQueue } : null}
           />
+        )}
+
+        {/* The automatic-fix switch's summary: only where the switch exists, never on a Shopify store. */}
+        {loaded && queueLive && !caps?.shopify && fixes.auto && fixes.auto.state !== 'unavailable' && (
+          <AutoFixPanel projectId={project.id} auto={fixes.auto} jobs={fixes.jobs} copy={copy.autofix} when={when} />
         )}
 
         {loaded && queueLive && fixes.jobs.length > 0 && (

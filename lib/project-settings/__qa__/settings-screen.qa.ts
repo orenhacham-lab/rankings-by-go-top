@@ -169,7 +169,8 @@ function main() {
     const comp = render(locale, CompetitorsCard, { projectId: PROJECT_ID, projectDomain: 'x.co.il', scanCompetitors: [], seedFeatures: true, onScanLink: () => {}, t: copy(locale) })
     check('the three sections carry exactly those ids, from the first paint',
       /<section id="business"/.test(biz) && /<section id="audiences"/.test(aud) && /<section id="competitors"/.test(comp))
-    check('…and they are the screen\'s linked sections', JSON.stringify(LINKED_SECTIONS) === JSON.stringify(['business', 'audiences', 'competitors', 'writing-guidance']))
+    // The site-health screen's automatic-fix panel links to #site-auto-fix as well.
+    check('…and they are the screen\'s linked sections', JSON.stringify(LINKED_SECTIONS) === JSON.stringify(['business', 'audiences', 'competitors', 'writing-guidance', 'site-auto-fix']))
     const page = strip(read('app/(dashboard)/settings/page.tsx'))
     const scrolls = (src: string) =>
       /const id = window\.location\.hash\.slice\(1\)/.test(src) &&

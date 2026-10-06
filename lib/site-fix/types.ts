@@ -61,6 +61,25 @@ export const PLUGIN_ONLY_TYPES: readonly FixType[] = ['h1_demote', 'llms_txt']
  */
 export const BULK_SAFE_TYPES: readonly FixType[] = ['seo_title', 'meta_description', 'image_alt']
 
+/**
+ * Automatic fixes (the project's own switch, OFF until the owner turns it on in settings; WordPress
+ * with the Go Top plugin only, never Shopify) take ONLY these types. The database CHECK of
+ * site_fix_auto_grants (supabase/migrations/20261006140000_site_fix_auto_grants.sql) holds the same
+ * three names; a QA guard fails when they drift apart. Why each is safe without anyone looking:
+ *   image_alt         only images with NO alt attribute at all (an empty alt is a choice and stays);
+ *                     the file name's words, or the page title for at most one image per page
+ *   broken_link       only a link that answers 404 or 410 again right before the write; the link is
+ *                     removed and its words stay, nothing new is linked
+ *   meta_description  only where the page has no description at all, stored or live
+ * Every one keeps the value before it and its own undo. Separate from BULK_SAFE_TYPES on purpose:
+ * one click with the merchant's eyes on the list is not the same as no click.
+ */
+export const AUTO_SAFE_TYPES: readonly FixType[] = ['image_alt', 'broken_link', 'meta_description']
+/** The in-app summary of automatic fixes counts this far back (the screen; no email). */
+export const AUTO_SUMMARY_DAYS = 14
+/** Every other type: never applied automatically, each keeps its click. */
+export const AUTO_NEVER_TYPES: readonly FixType[] = FIX_TYPES.filter((t) => !AUTO_SAFE_TYPES.includes(t))
+
 /** a.b.c ≥ min.b.c (missing parts are 0; an unknown version is the oldest with signed routes, 2.0.0). */
 export function versionAtLeast(version: string | null | undefined, min: string): boolean {
   const parse = (v: string) => v.split('.').map((x) => Number.parseInt(x, 10) || 0)
@@ -210,6 +229,15 @@ export interface FixJobView {
   canRetry: boolean
   /** The "apply all safe fixes" batch this job was approved in, if any (the queue groups by it). */
   batchId?: string | null
+  /** Approved by the project's automatic-fix switch, not by a click (the queue labels its batch). */
+  auto?: boolean
+}
+
+/** The project's automatic-fix switch as the screens see it (`unavailable`: its table is not installed). */
+export interface AutoFixView {
+  state: 'on' | 'off' | 'unavailable'
+  enabledAt: string | null
+  lastRunAt: string | null
 }
 
 /** The plugin's pairing as the screen sees it. */

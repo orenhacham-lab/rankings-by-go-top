@@ -9,9 +9,12 @@
  * Fixes approved together ("Fix {n} safe items for me") are grouped as one batch, "Fix batch of
  * {date} ({n})", with "Undo the whole batch" for 14 days (every applied fix of it is undone through
  * the plugin, one by one; a page changed since is left alone). Each fix keeps its own undo.
+ *
+ * Fixes the project's automatic-fix switch made (one run = one batch) read "Fixed automatically on
+ * {date} ({n})" with an "Automatic" badge, and keep both undos: the whole run, and each fix.
  */
 import { useCallback, useMemo, useState } from 'react'
-import { Layers, RotateCcw, Undo2, X } from 'lucide-react'
+import { Layers, RotateCcw, Sparkles, Undo2, X } from 'lucide-react'
 import Badge from '@/components/ui/Badge'
 import Button from '@/components/ui/Button'
 import { useConfirm } from '@/components/ui/ConfirmDialog'
@@ -30,7 +33,7 @@ const STATUS_BADGE: Record<JobStatus, 'success' | 'warning' | 'danger' | 'info' 
 
 const errorOf = (copy: Copy, code: string | null) => (code && code in copy.errors ? copy.errors[code as FixErrorCode] : null)
 
-type Entry = { kind: 'job'; job: FixJobView } | { kind: 'batch'; id: string; approvedAt: string; jobs: FixJobView[]; canUndo: boolean }
+type Entry = { kind: 'job'; job: FixJobView } | { kind: 'batch'; id: string; approvedAt: string; jobs: FixJobView[]; canUndo: boolean; auto: boolean }
 
 /** The queue in its order, newest first, with a batch's fixes gathered where its newest one stands. */
 export function queueEntries(jobs: readonly FixJobView[], now: number): Entry[] {
@@ -42,7 +45,8 @@ export function queueEntries(jobs: readonly FixJobView[], now: number): Entry[] 
     if (!b) { out.push({ kind: 'job', job }); continue }
     if (seen.has(b.id)) continue
     seen.add(b.id)
-    out.push({ kind: 'batch', ...b })
+    // A batch the automatic switch made, not a click ("Fix {n} safe items for me").
+    out.push({ kind: 'batch', ...b, auto: b.jobs.some((j) => j.auto) })
   }
   return out
 }
@@ -163,9 +167,12 @@ export default function FixQueue({
           {shown.map((e) => (e.kind === 'job' ? row(e.job) : (
             <li key={e.id} className="px-5 py-4 sm:px-6" data-fix-batch={e.jobs.length}>
               <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-                <p className="flex items-center gap-2 text-copy font-semibold text-ink">
-                  <Layers size={16} strokeWidth={2} aria-hidden="true" className="text-action" />
-                  {copy.queue.batch(when(e.approvedAt), e.jobs.length)}
+                <p className="flex flex-wrap items-center gap-2 text-copy font-semibold text-ink" data-fix-batch-auto={e.auto ? '' : undefined}>
+                  {e.auto
+                    ? <Sparkles size={16} strokeWidth={2} aria-hidden="true" className="text-action" />
+                    : <Layers size={16} strokeWidth={2} aria-hidden="true" className="text-action" />}
+                  {e.auto ? copy.auto.batch(when(e.approvedAt), e.jobs.length) : copy.queue.batch(when(e.approvedAt), e.jobs.length)}
+                  {e.auto && <Badge variant="info">{copy.auto.badge}</Badge>}
                 </p>
                 {e.canUndo && (
                   <Button variant="secondary" size="sm" onClick={() => void undoBatch(e.id)} loading={busy === e.id} disabled={!!busy} data-fix-undo-batch="">

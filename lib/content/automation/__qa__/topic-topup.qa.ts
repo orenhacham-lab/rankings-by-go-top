@@ -308,7 +308,9 @@ function sourceGuards() {
   const everywhere = ['app', 'lib'].length && readSrc(CRON)
   check('S1b nothing else starts it (the cron route is its only caller)', !!everywhere && onlyCaller())
   const vercel = JSON.parse(readSrc('vercel.json')) as { crons: { path: string; schedule: string }[] }
-  const cronsOk = (v: typeof vercel) => v.crons.length === 4 && v.crons.some((c) => c.path === '/api/content/automation/cron' && c.schedule === '0 7 * * *') && !v.crons.some((c) => /topup|topic/i.test(c.path))
+  // Other features may add their own schedules (the site-health automatic fixes did): what this
+  // guards is that none of them is the top-up's, and the automation cron still carries it.
+  const cronsOk = (v: typeof vercel) => v.crons.some((c) => c.path === '/api/content/automation/cron' && c.schedule === '0 7 * * *') && !v.crons.some((c) => /topup|topic/i.test(c.path))
   check('S2 no new cron schedule: the automation cron at 07:00 carries it', cronsOk(vercel))
   check('S2 MUTATION CONTROL: a new cron is caught', !cronsOk({ crons: [...vercel.crons, { path: '/api/content/topics/topup', schedule: '0 7 * * *' }] }))
   const topup = code('lib/content/automation/topic-topup.ts')

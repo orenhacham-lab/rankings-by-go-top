@@ -9,7 +9,7 @@
  * existing behaviour, untouched.
  */
 import { useCallback, useEffect, useRef, useState } from 'react'
-import type { FixCapabilities, FixErrorCode, FixJobView } from '@/lib/site-fix/types'
+import type { AutoFixView, FixCapabilities, FixErrorCode, FixJobView } from '@/lib/site-fix/types'
 import { announceWaitingChanged } from '@/lib/nudges/events'
 
 export type FixAnswer<T> = ({ ok: true } & T) | { ok: false; code: FixErrorCode }
@@ -26,27 +26,30 @@ export async function postFix<T>(path: '/api/site-health/fixes' | '/api/site-hea
   }
 }
 
-type Loaded = { capabilities: FixCapabilities | null; jobs: FixJobView[] }
+type Loaded = { capabilities: FixCapabilities | null; jobs: FixJobView[]; auto: AutoFixView | null }
 
 /** The project's auto-fix state; `capabilities: null` on any failure (the screen keeps its older behaviour). */
 async function fetchFixes(projectId: string): Promise<Loaded> {
   try {
     const res = await fetch(`/api/site-health/fixes?projectId=${encodeURIComponent(projectId)}`, { cache: 'no-store' })
-    const json = (await res.json().catch(() => null)) as { ok?: boolean; capabilities?: FixCapabilities; jobs?: FixJobView[] } | null
-    if (json?.ok && json.capabilities) return { capabilities: json.capabilities, jobs: Array.isArray(json.jobs) ? json.jobs : [] }
+    const json = (await res.json().catch(() => null)) as { ok?: boolean; capabilities?: FixCapabilities; jobs?: FixJobView[]; auto?: AutoFixView } | null
+    if (json?.ok && json.capabilities) return { capabilities: json.capabilities, jobs: Array.isArray(json.jobs) ? json.jobs : [], auto: json.auto ?? null }
   } catch { /* the network: treated as unavailable */ }
-  return { capabilities: null, jobs: [] }
+  return { capabilities: null, jobs: [], auto: null }
 }
 
 export function useSiteFixes(projectId: string) {
   const [capabilities, setCapabilities] = useState<FixCapabilities | null>(null)
   const [jobs, setJobs] = useState<FixJobView[]>([])
+  // The automatic-fix switch (null or `unavailable`: not installed, the screen shows nothing of it).
+  const [auto, setAuto] = useState<AutoFixView | null>(null)
   const alive = useRef(true)
 
   const apply = useCallback((got: Loaded) => {
     if (!alive.current) return
     setCapabilities(got.capabilities)
     setJobs(got.jobs)
+    setAuto(got.auto)
   }, [])
 
   // After every re-read of the queue (a fix or a batch applied, undone, cancelled) the dashboard card and
@@ -74,5 +77,5 @@ export function useSiteFixes(projectId: string) {
   /** The queue is live for this project: tables present and not a Shopify store. */
   const active = !!capabilities && capabilities.available && !capabilities.readOnly
 
-  return { capabilities, jobs, active, reload, upsertJob }
+  return { capabilities, jobs, auto, active, reload, upsertJob }
 }

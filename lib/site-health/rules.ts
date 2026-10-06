@@ -508,11 +508,12 @@ export function suggestDescription(current: string | null, pageText: string): st
 const JUNK_NAME = /^(?:img|image|dsc|dscn|photo|pic|screenshot|screen shot|whatsapp image|untitled|scaled|\d+|[a-f0-9]{8,})(?:[\s_-]*\d+)*$/i
 
 /**
- * Alt text for one image: the words of its file name when they are words
- * ("red-running-shoes-1024x768.jpg" → "red running shoes"), otherwise the page's
- * title, which is at least what the image is there for.
+ * The words of an image's file name, when they are words ("red-running-shoes-1024x768.jpg" →
+ * "red running shoes") in the page's own script; null for a camera counter, a hash, a date or a
+ * number. Null is exactly when suggestAlt falls back to the page title, so a caller can tell the
+ * two apart (automatic fixes allow the title for one image per page only).
  */
-export function suggestAlt(src: string, pageTitle: string): string {
+export function altFromFileName(src: string, pageTitle = ''): string | null {
   let name = ''
   try {
     const u = new URL(src, 'https://x.invalid')
@@ -533,8 +534,16 @@ export function suggestAlt(src: string, pageTitle: string): string {
   const title = norm(pageTitle)
   const latinOnly = (v: string) => !/[^\p{Script=Latin}\d\s\p{P}]/u.test(v)
   const sameScript = !title || !latinOnly(words) || latinOnly(title)
-  if (words && letters >= 3 && !JUNK_NAME.test(words) && sameScript) return cutAtWord(words, 120)
-  return cutAtWord(title, 120)
+  return words && letters >= 3 && !JUNK_NAME.test(words) && sameScript ? cutAtWord(words, 120) : null
+}
+
+/**
+ * Alt text for one image: the words of its file name when they are words
+ * (altFromFileName), otherwise the page's title, which is at least what the image
+ * is there for.
+ */
+export function suggestAlt(src: string, pageTitle: string): string {
+  return altFromFileName(src, pageTitle) ?? cutAtWord(norm(pageTitle), 120)
 }
 
 /** An alt value the merchant typed: plain text, one line, without markup characters. */
