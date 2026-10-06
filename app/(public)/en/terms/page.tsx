@@ -379,7 +379,8 @@ export default function EnglishTermsPage() {
         <h3>WordPress sites</h3>
         <p>
           On a connected WordPress site, the Service can suggest site fixes and apply them through the GO TOP SEO
-          Bridge plugin, only with your consent and your approval of each fix.
+          Bridge plugin, only with your consent and your approval of each fix, or within the scope of an
+          automatic approval you turned on as described later in this section.
         </p>
         <ul>
           <li>
@@ -408,6 +409,51 @@ export default function EnglishTermsPage() {
             <strong>Responsibility.</strong> The site, its backups and the compatibility of fixes with your theme
             and plugins are your responsibility. We recommend keeping a backup before approving fixes, and making
             sure you are authorized to make changes to the site.
+          </li>
+        </ul>
+        <h3>Automatic approval of fixes (WordPress only)</h3>
+        <p>
+          By default every fix needs your approval. For each project separately, on a connected WordPress site
+          with the GO TOP SEO Bridge plugin, you can turn on automatic approval in the project settings, after the
+          three types of fix it covers are shown to you. It is off by default until you turn it on yourself. In a
+          Shopify store there is no automatic approval at all, and every fix there needs your approval each time.
+        </p>
+        <ul>
+          <li>
+            <strong>What it covers.</strong> The list is closed and limited to three types. (1) Alt text for an
+            image that has no alt attribute at all; an image whose alt text is empty is left as it is, because
+            empty can be a deliberate choice. The text is taken from the image file name, or from the page title
+            for at most one image per page. (2) A broken internal link: we check the link again at that moment,
+            and only if it returns 404 or 410 do we remove the link and keep its words in place. (3) A meta
+            description for a page that has none, and only when both the description stored with us and the
+            description on the page itself are empty.
+          </li>
+          <li>
+            <strong>What always needs your approval.</strong> Every other fix in this section: SEO title,
+            canonical address, focus keyphrase, an FAQ block, JSON-LD schema, internal links, demotion of an H1
+            heading and the llms.txt file. Automatic approval does not widen the closed list in this section, and
+            does not give us any permission you did not approve in the connection itself.
+          </li>
+          <li>
+            <strong>Pace and limits.</strong> The check runs once a day, automatic fixes are applied to a project
+            no more than once every seven days, and only a small number of fixes each time. If there has been no
+            activity in your account during the last thirty days, no automatic fixes are applied to the project.
+          </li>
+          <li>
+            <strong>Log and undo.</strong> When it is turned on we record who turned it on, when, and the IP
+            address it was turned on from; when it is turned off we record who turned it off and when. Every
+            automatic fix is recorded in the fix log like any other fix, together with the previous value, the
+            person who turned automatic approval on and the IP address recorded when it was turned on, and is
+            marked as a fix applied under automatic approval. At the moment the fix itself is applied we do not
+            read and do not store a new IP address, because no person acted at that moment. Every automatic fix
+            can be undone exactly like a fix you approved by hand, and the Site health screen shows a summary of
+            the fixes applied under automatic approval. We do not send an email about it.
+          </li>
+          <li>
+            <strong>Turning it off.</strong> You can turn it off at any time, and that takes effect at once:
+            before every fix we check again that the approval is still on, and at most a fix already being written
+            at that moment is completed. Turning it off is final for that approval, and turning it on again
+            creates a new approval and is recorded separately. Fixes already applied stay, unless you undo them.
           </li>
         </ul>
         <h3>Shopify stores</h3>

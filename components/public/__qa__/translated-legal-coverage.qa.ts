@@ -702,6 +702,128 @@ const FIX_SCOPE: Record<string, RegExp[]> = {
     !FIX_SCOPE.es[3].test('un grupo de correcciones seguras, sin límite de páginas'))
 }
 
+// ── 16) automatic approval of fixes, WordPress only ────────────────────────
+/*
+ * The switch gives us the merchant's approval in advance, so the document is the
+ * only thing standing between "a control you turned on" and "a write you never
+ * approved". Three things have to be in the text itself, in every language, or
+ * the advance approval is not an informed one:
+ *
+ *   1. the closed list, as narrow as the code: alt text only where an image has
+ *      NO alt attribute (an empty alt is a deliberate choice and is left alone),
+ *      a broken internal link only after a live re-check returns 404 or 410, and
+ *      a meta description only where there is none at all. A list that reads
+ *      wider than the DB CHECK allows is a promise we would be breaking in the
+ *      merchant's favour — and a licence we would be claiming in ours.
+ *   2. WordPress only. Shopify has no automatic approval at all (the API answers
+ *      not_allowed), and the Shopify part of 15C still promises a click per fix.
+ *      Shopify's App Store review reads the terms; a text that let the switch
+ *      look store-wide would be the problem, not the code.
+ *   3. the IP sentence. The log holds the IP of the moment the switch was turned
+ *      on, and NOT a new one at fix time, because no person acted then. Claiming
+ *      a fresh IP would be false, and keeping one would be data we do not need
+ *      (GDPR Art. 5(1)(c)). Off takes effect at once, and that has to be said.
+ *
+ * And no email: lib/reports/monthly/weekly-email.ts has
+ * WEEKLY_EMAIL_SENDING_ENABLED = false, so the summary is the Site health screen
+ * and the text may promise nothing else.
+ */
+const AUTO_APPROVE_TERMS: Record<string, RegExp[]> = {
+  he: [
+    /אישור אוטומטי לתיקונים \(וורדפרס בלבד\)/,
+    /בחנות Shopify אין אישור אוטומטי כלל/,
+    /טקסט חלופי לתמונה שאין לה כלל מאפיין\s+טקסט חלופי/,
+    /רק אם הוא מחזיר 404 או 410/,
+    /גם התיאור ששמור אצלנו וגם התיאור שבעמוד\s+עצמו ריקים/,
+    /איננו קוראים ואיננו שומרים כתובת IP חדשה/,
+    /והכיבוי חל מיד/,
+    /איננו שולחים על כך דואר אלקטרוני/,
+  ],
+  en: [
+    /Automatic approval of fixes \(WordPress only\)/,
+    /In a\s+Shopify store there is no automatic approval at all/,
+    /Alt text for an\s+image that has no alt attribute at all/,
+    /only if it returns 404 or 410/,
+    /both the description stored with us and the\s+description on the page itself are empty/,
+    /we do not\s+read and do not store a new IP address/,
+    /that takes effect at once/,
+    /We do not send an email about it/,
+  ],
+  es: [
+    /Aprobaci[óo]n autom[áa]tica de las correcciones \(solo WordPress\)/,
+    /En una tienda de Shopify no existe aprobaci[óo]n autom[áa]tica en absoluto/,
+    /texto alternativo de una imagen que no tiene ning[úu]n atributo alt/,
+    /solo si devuelve 404 o 410/,
+    /tanto la descripci[óo]n almacenada con nosotros como la descripci[óo]n de la propia p[áa]gina est[áa]n vac[íi]as/,
+    /no leemos ni almacenamos ninguna direcci[óo]n IP nueva/,
+    /surte efecto de inmediato/,
+    /No enviamos ning[úu]n correo electr[óo]nico al respecto/,
+  ],
+  'pt-BR': [
+    /Aprova[çc][ãa]o autom[áa]tica das corre[çc][õo]es \(somente WordPress\)/,
+    /Em uma loja Shopify n[ãa]o existe aprova[çc][ãa]o autom[áa]tica alguma/,
+    /texto alternativo de uma imagem que n[ãa]o tem nenhum atributo alt/,
+    /somente se ele retornar 404 ou 410/,
+    /tanto a descri[çc][ãa]o armazenada conosco quanto a descri[çc][ãa]o da pr[óo]pria p[áa]gina est[ãa]o vazias/,
+    /n[ãa]o lemos nem armazenamos nenhum endere[çc]o IP novo/,
+    /vale de imediato/,
+    /N[ãa]o enviamos nenhum e-mail sobre isso/,
+  ],
+}
+/* The Shopify half of 15C must still promise a click for every single fix. */
+const SHOPIFY_STILL_PER_FIX: Record<string, RegExp> = {
+  he: /בחנות Shopify מחוברת, השירות יכול להציע תיקוני אתר ולבצעם דרך האפליקציה, אך ורק בהסכמתכם ובאישור\s+שלכם לכל תיקון/,
+  en: /In a connected Shopify store, the Service can suggest site fixes and apply them through the app, only\s+with your consent and your approval of each fix/,
+  es: /En una tienda de Shopify conectada, el Servicio puede sugerir correcciones del sitio y aplicarlas mediante la aplicaci[óo]n, [úu]nicamente con su consentimiento y con su aprobaci[óo]n de cada correcci[óo]n/,
+  'pt-BR': /Em uma loja Shopify conectada, o Servi[çc]o pode sugerir corre[çc][õo]es no site e aplic[áa]-las por meio do aplicativo, somente com o seu consentimento e com a sua aprova[çc][ãa]o de cada corre[çc][ãa]o/,
+}
+/* And the privacy policy has to say what the act of switching on stores. */
+const AUTO_APPROVE_PRIVACY: Record<string, RegExp[]> = {
+  he: [/אישור אוטומטי לתיקונים:/, /כתובת ה-IP שממנה נעשתה\s+ההפעלה/, /איננו קוראים ואיננו שומרים כתובת IP חדשה/],
+  en: [/Automatic approval of fixes:/, /the IP address it was turned on from/, /we do not read and do not store a new IP address/],
+  es: [/Aprobaci[óo]n autom[áa]tica de las correcciones:/, /la direcci[óo]n IP desde la que se activ[óo]/, /no leemos ni almacenamos ninguna direcci[óo]n IP nueva/],
+  'pt-BR': [/Aprova[çc][ãa]o autom[áa]tica das corre[çc][õo]es:/, /o endere[çc]o IP a partir do qual ela foi ativada/, /n[ãa]o lemos nem armazenamos nenhum endere[çc]o IP novo/],
+}
+{
+  const read = (path: string) => (existsSync(path) ? readFileSync(path, 'utf8') : '')
+  const enTermsSource = frontMatter(text[LOCALES[0]].terms).source
+  const enPrivacySource = frontMatter(text[LOCALES[0]].privacy).source
+  const termsDocs: [string, string][] = [
+    ['he', read(HEBREW_TERMS)],
+    ['en', enTermsSource ? read(enTermsSource) : ''],
+    ...LOCALES.map((l): [string, string] => [l, text[l].terms]),
+  ]
+  const privacyDocs: [string, string][] = [
+    ['he', read(HEBREW_PRIVACY)],
+    ['en', enPrivacySource ? read(enPrivacySource) : ''],
+    ...LOCALES.map((l): [string, string] => [l, text[l].privacy]),
+  ]
+  for (const [name, terms] of termsDocs) {
+    for (const must of AUTO_APPROVE_TERMS[name] ?? []) {
+      check(`${name}/terms: automatic approval states ${must.source.slice(0, 40)}`, must.test(terms))
+    }
+    const perFix = SHOPIFY_STILL_PER_FIX[name]
+    if (perFix) check(`${name}/terms: the Shopify half still promises approval of each fix`, perFix.test(terms))
+  }
+  for (const [name, privacy] of privacyDocs) {
+    for (const must of AUTO_APPROVE_PRIVACY[name] ?? []) {
+      check(`${name}/privacy: automatic approval states ${must.source.slice(0, 40)}`, must.test(privacy))
+    }
+  }
+  check('mutation control: a covered-types list that drops the "no alt attribute" narrowing is caught',
+    !AUTO_APPROVE_TERMS.en[2].test('Alt text for any image on the page, replacing what is there'))
+  check('mutation control: a broken-link line without the live re-check is caught',
+    !AUTO_APPROVE_TERMS.en[3].test('A broken internal link: we remove the link and keep its words in place.'))
+  check('mutation control: a policy that claims a fresh IP for an automatic fix is caught',
+    !AUTO_APPROVE_PRIVACY.en[2].test('we record the IP address the automatic fix was applied from'))
+  check('mutation control: a text that lets the switch cover Shopify too is caught',
+    !AUTO_APPROVE_TERMS.en[1].test('Automatic approval applies to a connected WordPress site and to a Shopify store.'))
+  check('mutation control: a promised weekly email is caught',
+    !AUTO_APPROVE_TERMS.en[7].test('Once a week we send you a summary of the fixes applied automatically.'))
+  check('mutation control: a Shopify half that drops the per-fix promise is caught',
+    !SHOPIFY_STILL_PER_FIX.en.test('In a connected Shopify store, the Service can suggest site fixes and apply them through the app.'))
+}
+
 // ── MUTATION CONTROLS ───────────────────────────────────────────────────────
 console.log('\nmutation controls')
 {

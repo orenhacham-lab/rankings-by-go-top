@@ -231,7 +231,8 @@ export default function EnglishPrivacyPage() {
           When you connect a WordPress site, we store the site address, the username and Application Password you
           created, and the signing key that authenticates requests between us and the plugin. Both are stored
           encrypted and decrypted only on our servers at the moment of use. With your consent, and your approval of
-          each fix, the GO TOP SEO Bridge plugin applies to the site only fixes from a closed list (SEO title, meta
+          each fix or an automatic approval you turned on, the GO TOP SEO Bridge plugin applies to the site only
+          fixes from a closed list (SEO title, meta
           description, canonical address, focus keyphrase, image alt text, an FAQ block, JSON-LD schema, internal
           links, repair of broken links, demotion of a duplicate H1 heading, and creating llms.txt).
         </p>
@@ -240,6 +241,15 @@ export default function EnglishPrivacyPage() {
           applied, the IP address the approval was given from, and the previous and the new value, so that it can
           be shown and undone and so that we have evidence that the write to the site was made with your
           approval. The log is kept as long as the project exists.</li>
+          <li><strong>Automatic approval of fixes:</strong> if you turned on automatic approval in a project, for
+          the three types of fix described in the Terms of Use, we keep a separate record of that: who turned it
+          on, when, the IP address it was turned on from, and after it is turned off also who turned it off and
+          when. A fix applied under automatic approval is recorded in the fix log with the time it was applied, the
+          person who turned the approval on and the IP address recorded when it was turned on, and is marked as an
+          automatic fix. At the moment the fix itself is applied we do not read and do not store a new IP address,
+          because no person acted then and we do not need it. A summary of the automatic fixes is shown on the Site
+          health screen and we do not send an email about it. The records are kept as long as the project
+          exists.</li>
           <li><strong>Disconnecting and removal:</strong> &ldquo;Disconnect&rdquo; deletes the stored connection
           details and the signing key, after which we can no longer reach the site. You can also remove the plugin
           from your WordPress admin at any time. Fixes already applied stay on the site unless you undid them.</li>
