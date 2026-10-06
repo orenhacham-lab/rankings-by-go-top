@@ -7,7 +7,8 @@
  *   - the search engine listing of an article or a page (metafields global.title_tag and
  *     global.description_tag, the fields Shopify's own "Search engine listing" box edits);
  *   - the body HTML of an article or a page: image alt text, a broken link, an FAQ block at the end,
- *     an extra main heading turned into a subheading.
+ *     an extra main heading turned into a subheading;
+ *   - the alt text of an article's featured image (never the image itself).
  * Never a product, a collection, the theme, the store's settings, a price or an order: an address
  * is resolved ONLY to an article or a page the store sync recorded for THIS project and owner
  * (shopify_entities), never by guessing from the URL.
@@ -35,9 +36,13 @@ export function canWriteContent(scopes: unknown): boolean {
 
 export type ShopItemKind = 'article' | 'page'
 export interface ShopItemRef { kind: ShopItemKind; gid: string; url: string }
-export interface ShopItem extends ShopItemRef { title: string; body: string; titleTag: string | null; descriptionTag: string | null }
+export interface ShopItem extends ShopItemRef {
+  title: string; body: string; titleTag: string | null; descriptionTag: string | null
+  /** An article's featured image (pages have none). */
+  image: { url: string; alt: string | null } | null
+}
 export type SeoKey = 'title_tag' | 'description_tag'
-export interface ShopPatch { body?: string; meta?: { key: SeoKey; value: string } }
+export interface ShopPatch { body?: string; meta?: { key: SeoKey; value: string }; /** An article's featured image alt text. */ imageAlt?: string }
 
 export type ShopFailure = 'store_permission' | 'store_unreachable' | 'store_rejected'
 export class ShopFixError extends Error {
@@ -96,7 +101,7 @@ const VERSION = /^[0-9]{4}-[0-9]{2}$|^unstable$/
 const TIMEOUT_MS = 15_000
 
 const READ = {
-  article: 'query FixArticle($id: ID!) { node: article(id: $id) { id title body titleTag: metafield(namespace: "global", key: "title_tag") { value } descriptionTag: metafield(namespace: "global", key: "description_tag") { value } } }',
+  article: 'query FixArticle($id: ID!) { node: article(id: $id) { id title body image { url altText } titleTag: metafield(namespace: "global", key: "title_tag") { value } descriptionTag: metafield(namespace: "global", key: "description_tag") { value } } }',
   page: 'query FixPage($id: ID!) { node: page(id: $id) { id title body titleTag: metafield(namespace: "global", key: "title_tag") { value } descriptionTag: metafield(namespace: "global", key: "description_tag") { value } } }',
 }
 const WRITE = {
@@ -146,16 +151,22 @@ function userErrorsOf(data: { result?: { userErrors?: unknown[] } | null }): voi
 export function shopifyFixClient(base: GqlFetch = fetch): ShopifyFixClient {
   return {
     async read(creds, ref) {
-      type Node = { id: string; title: string | null; body: string | null; titleTag: { value: string } | null; descriptionTag: { value: string } | null }
+      type Node = {
+        id: string; title: string | null; body: string | null; image?: { url: string | null; altText: string | null } | null
+        titleTag: { value: string } | null; descriptionTag: { value: string } | null
+      }
       const data = await call<{ node: Node | null }>(creds, READ[ref.kind], { id: ref.gid }, base)
       const n = data.node
       if (!n || n.id !== ref.gid) return null
-      return { ...ref, title: String(n.title ?? ''), body: String(n.body ?? ''), titleTag: n.titleTag?.value ?? null, descriptionTag: n.descriptionTag?.value ?? null }
+      const image = ref.kind === 'article' && n.image?.url ? { url: String(n.image.url), alt: n.image.altText ?? null } : null
+      return { ...ref, title: String(n.title ?? ''), body: String(n.body ?? ''), titleTag: n.titleTag?.value ?? null, descriptionTag: n.descriptionTag?.value ?? null, image }
     },
     async write(creds, ref, patch) {
       const input: Record<string, unknown> = {}
       if (patch.body !== undefined) input.body = patch.body
       if (patch.meta) input.metafields = [{ namespace: 'global', key: patch.meta.key, type: 'single_line_text_field', value: patch.meta.value }]
+      // Only the alt text: no url, so the image itself stays as it is (shopify.dev: ArticleImageInput).
+      if (patch.imageAlt !== undefined && ref.kind === 'article') input.image = { altText: patch.imageAlt }
       if (Object.keys(input).length === 0) return
       userErrorsOf(await call<{ result: { userErrors: unknown[] } | null }>(creds, WRITE[ref.kind], { id: ref.gid, input }, base))
     },

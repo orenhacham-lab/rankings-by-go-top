@@ -4653,6 +4653,7 @@ export const dashboardEn = {
     showSteps: 'How to fix',
     hideSteps: 'Hide instructions',
     openInShopify: 'Open in Shopify',
+    inTheme: "The problem is not in this page's content but in the store's theme, menu or a product, so there is no automatic fix here. The steps below show how to fix it.",
     openPage: 'Open the page',
     stepsTitle: 'How to fix it',
     fixedBadge: 'Fixed',

@@ -156,7 +156,7 @@ export const landingPtBR: LandingCopy = {
     steps: [
       { tag: 'Grátis, sem cadastro', title: 'Analise o seu site', desc: 'Digite um endereço. Em menos de um minuto descobrimos a que a empresa se dedica, quem são os clientes dela e o que está te segurando no Google e na IA.' },
       { tag: 'Você aprova', title: 'Receba um plano', desc: 'Termos de busca, as perguntas que os clientes fazem e uma lista de artigos prontos para escrever. Você escolhe o que entra.' },
-      { tag: 'Automático', title: 'Os artigos são escritos e publicados', desc: 'Cada artigo chega com imagens, perguntas e respostas e dados estruturados, e vai ao ar no seu site na data em que você agendou.' },
+      { tag: 'Automático', title: 'Os artigos são escritos e publicados', desc: 'Cada artigo chega com imagens e perguntas e respostas, e vai ao ar no seu site na data em que você agendou. Em sites WordPress com o plugin da Go Top, também são adicionados dados estruturados.' },
       { tag: 'Transparente', title: 'Acompanhe os resultados', desc: 'Posições no Google e no Maps, menções em IA e relatórios que você pode enviar a quem quiser.' },
     ],
     cta: 'Comece com uma análise gratuita',
@@ -170,7 +170,7 @@ export const landingPtBR: LandingCopy = {
     content: {
       overline: 'Conteúdo e publicação',
       title: 'Artigos escritos para serem encontrados, não para encher um blog',
-      body: 'Cada artigo é construído em torno de uma busca real: títulos que vêm do que as pessoas perguntam, uma seção de perguntas e respostas, dados estruturados que o Google e os motores de IA leem, e links internos para as páginas que vendem. Você revisa, ajusta se precisar, e a plataforma publica.',
+      body: 'Cada artigo é construído em torno de uma busca real: títulos que vêm do que as pessoas perguntam, uma seção de perguntas e respostas, links internos para as páginas que vendem e, em sites WordPress com o plugin da Go Top, dados estruturados que o Google e os motores de IA leem. Você revisa, ajusta se precisar, e a plataforma publica.',
       points: ['Uma imagem de destaque e imagens no texto', 'Um controle de qualidade antes de cada publicação', 'Agendamento e publicação direta no WordPress e na Shopify'],
       href: '/features/seo-geo-content-publishing',
       visual: {

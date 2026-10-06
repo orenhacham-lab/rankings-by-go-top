@@ -4678,6 +4678,7 @@ export const dashboardHe = {
     showSteps: 'איך מתקנים',
     hideSteps: 'הסתרת ההוראות',
     openInShopify: 'פתיחה ב-Shopify',
+    inTheme: 'הבעיה לא בתוכן של העמוד אלא בתבנית החנות, בתפריט או במוצר, ולכן אין כאן תיקון אוטומטי. ההוראות למטה מסבירות איך לתקן.',
     openPage: 'פתיחת העמוד',
     stepsTitle: 'ככה מתקנים',
     fixedBadge: 'תוקן',

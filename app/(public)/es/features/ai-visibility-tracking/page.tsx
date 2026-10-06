@@ -74,7 +74,7 @@ const CONTENT: FeaturePageContent = {
       eyebrow: 'Preguntas',
       title: 'Lo que se pregunta sobre la visibilidad en IA',
       items: [
-        { q: '¿Qué diferencia hay entre SEO y GEO?', a: 'El SEO es aparecer en los resultados de Google. El GEO es aparecer en las respuestas de los motores de IA. La plataforma mide los dos, y los artículos que escribe están pensados para los dos: estructura clara, secciones de preguntas y datos estructurados.' },
+        { q: '¿Qué diferencia hay entre SEO y GEO?', a: 'El SEO es aparecer en los resultados de Google. El GEO es aparecer en las respuestas de los motores de IA. La plataforma mide los dos, y los artículos que escribe están pensados para los dos: estructura clara y secciones de preguntas, además de datos estructurados en sitios WordPress con el plugin de Go Top.' },
         { q: '¿Garantizáis que apareceremos en las respuestas?', a: 'No. Nadie controla lo que responde un motor de IA. Lo que sí hacemos: medir exactamente dónde estás, mostrar quién aparece en tu lugar y crear contenido que mejora tus posibilidades.' },
         { q: '¿Cómo se cuenta una comprobación de IA?', a: 'Una pregunta en un motor es una comprobación. La misma pregunta en los seis motores son seis comprobaciones. El cupo de cada plan está en la página de precios.' },
       ],

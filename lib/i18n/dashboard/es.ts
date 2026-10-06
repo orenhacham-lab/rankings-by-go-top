@@ -3664,6 +3664,7 @@ export const dashboardEs: DeepPartial<DashboardDictionary> = {
     showSteps: 'Cómo arreglarlo',
     hideSteps: 'Ocultar las instrucciones',
     openInShopify: 'Abrir en Shopify',
+    inTheme: 'El problema no está en el contenido de esta página, sino en el tema de la tienda, el menú o un producto, así que aquí no hay corrección automática. Los pasos de abajo explican cómo corregirlo.',
     openPage: 'Abrir la página',
     stepsTitle: 'Cómo arreglarlo',
     fixedBadge: 'Arreglado',

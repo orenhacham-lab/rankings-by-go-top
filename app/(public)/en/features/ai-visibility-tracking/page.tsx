@@ -74,7 +74,7 @@ const CONTENT: FeaturePageContent = {
       eyebrow: 'Questions',
       title: 'What people ask about AI visibility',
       items: [
-        { q: 'What\'s the difference between SEO and GEO?', a: 'SEO is showing up in Google\'s results. GEO is showing up in AI engines\' answers. The platform measures both, and the articles it writes are built for both: clear structure, Q&A sections and structured data.' },
+        { q: 'What\'s the difference between SEO and GEO?', a: 'SEO is showing up in Google\'s results. GEO is showing up in AI engines\' answers. The platform measures both, and the articles it writes are built for both: clear structure and Q&A sections, plus structured data on WordPress sites with the Go Top plugin.' },
         { q: 'Do you guarantee we\'ll appear in answers?', a: 'No. Nobody controls what an AI engine answers. What we do: measure exactly where you stand, show who appears instead of you, and build content that improves your odds.' },
         { q: 'How is an AI check counted?', a: 'One query in one engine is one check. The same query in all six engines is six checks. Each plan\'s allowance is on the pricing page.' },
       ],
