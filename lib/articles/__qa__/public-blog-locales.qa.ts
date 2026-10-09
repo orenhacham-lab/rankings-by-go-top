@@ -74,6 +74,7 @@ function main() {
   const indexSrc = stripComments(read('components/public/articles/ArticlesIndex.tsx'))
   const viewSrc = stripComments(read('components/public/articles/ArticleView.tsx'))
   const serverSrc = stripComments(read('lib/articles/server.ts'))
+  const authorBoxSrc = stripComments(read('components/public/articles/ArticleAuthorBox.tsx'))
   // MUTATION: drop `.eq('locale', locale)` from either component and every
   // language's blog shows every language's articles again.
   check('C1. the listing filters by locale', /\.eq\('locale',\s*locale\)/.test(indexSrc))
@@ -314,6 +315,19 @@ function main() {
   // the call to action before learning who is making the claim.
   check('O7. the box is rendered before the closing call to action',
     /const lastCta = blocks\.map\(/.test(viewSrc) && /i === authorBoxBefore && <ArticleAuthorBox/.test(viewSrc))
+  // MUTATION: point `photo` at a file that is not in public/ and O8 fails —
+  // a broken avatar is worse than the initial it replaced.
+  check('O8. the author has a real photograph and the file is committed',
+    articleAuthor('אורן חכם')?.photo === '/authors/oren-hacham.jpg'
+    && existsSync(join(ROOT, 'public/authors/oren-hacham.jpg')))
+  check('O9. the box shows the photograph and keeps the initial as the fallback',
+    /profile\.photo \? \(/.test(authorBoxSrc) && /src=\{profile\.photo\}/.test(authorBoxSrc)
+    && /authorInitial\(name\)/.test(authorBoxSrc))
+  // MUTATION: drop the image spread from the Person and O10 fails — Google is
+  // told who wrote it with no face to attach to the name.
+  check('O10. the Person in the schema carries the same photograph',
+    /articleAuthor\(article\.author\)\?\.photo/.test(serverSrc)
+    && /image: `\$\{SITE_URL\}\$\{articleAuthor\(article\.author\)\?\.photo\}`/.test(serverSrc))
 
   console.log('\nM. mutation controls — the behavioural guards fail on broken input')
   check('M1. a FAQ under the wrong language\'s heading yields nothing',
