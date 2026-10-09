@@ -26,6 +26,9 @@ import { join } from 'path'
 import { PUBLIC_LOCALES, LOCALE_PREFIX, type PublicLocale } from '@/lib/i18n/locales'
 import { ARTICLES_COPY, articleHref, articlesIndexHref } from '@/lib/articles/i18n'
 import { extractFaqSchema, FAQ_HEADING, buildArticleSchemas } from '@/lib/articles/server'
+import { splitArticleBlocks } from '@/lib/articles/widgets'
+import { withHeadingIds } from '@/lib/articles/headings'
+import { readingMinutes } from '@/lib/articles/reading-time'
 import { sanitizePublicArticleHtml } from '@/lib/content/public-article-html'
 
 const ROOT = join(__dirname, '..', '..', '..')
@@ -72,18 +75,27 @@ function main() {
   // MUTATION: drop `.eq('locale', locale)` from either component and every
   // language's blog shows every language's articles again.
   check('C1. the listing filters by locale', /\.eq\('locale',\s*locale\)/.test(indexSrc))
-  check('C2. the article page filters by locale', /\.eq\('locale',\s*locale\)/.test(viewSrc))
+  // The article page has no query of its own any more: it reads the row
+  // through getPublicArticle, the one locale-filtered read, which the layout's
+  // metadata and JSON-LD also use. A second query here is what let the body and
+  // the metadata disagree about which row they were describing.
+  check('C2. the article page reads the row through the one locale-filtered read',
+    /getPublicArticle\(slug,\s*locale\)/.test(viewSrc) && !/from\('articles'\)/.test(viewSrc))
   check('C3. the server-side metadata/schema read filters by locale', /\.eq\('locale',\s*locale\)/.test(serverSrc))
-  check('C4. both still read published rows only', /\.eq\('is_published',\s*true\)/.test(indexSrc)
-    && /\.eq\('is_published',\s*true\)/.test(viewSrc) && /\.eq\('is_published',\s*true\)/.test(serverSrc))
+  check('C4. both reads still take published rows only', /\.eq\('is_published',\s*true\)/.test(indexSrc)
+    && /\.eq\('is_published',\s*true\)/.test(serverSrc))
 
   console.log('\nD. copy exists for every language, and the compiler cannot be the only check')
   for (const locale of PUBLIC_LOCALES) {
     const copy = ARTICLES_COPY[locale]
     // MUTATION: blank any one string and this fails.
     const strings = [copy.index.title, copy.index.subtitle, copy.index.breadcrumb, copy.index.empty,
-      copy.index.loading, copy.index.readMore, copy.article.notFoundTitle, copy.article.notFoundBody,
-      copy.article.backToArticles, copy.article.backHome, copy.article.toc]
+      copy.index.readMore, copy.article.notFoundTitle, copy.article.notFoundBody,
+      copy.article.backToArticles, copy.article.backHome, copy.article.toc, copy.article.updated,
+      copy.article.readingTime(5),
+      copy.widgets.plans.perMonth, copy.widgets.plans.popular, copy.widgets.plans.cta,
+      copy.widgets.plans.noCard, copy.widgets.plans.allPlans,
+      copy.widgets.cta.title, copy.widgets.cta.body, copy.widgets.cta.primary, copy.widgets.cta.secondary]
     check(`D. ${locale}: every blog string is present and non-empty`,
       strings.every((s) => typeof s === 'string' && s.trim().length > 0))
     check(`D. ${locale}: the promo block points at this language's signup and pricing`,
@@ -181,6 +193,80 @@ function main() {
   check('I5. a table survives the shared sanitizer', /<table>/.test(withTable) && /<td>1<\/td>/.test(withTable))
   const withScript = sanitizePublicArticleHtml('<p onclick="x()">a</p><script>b()</script>')
   check('I6. script and handlers still do not', !/script/i.test(withScript) && !/onclick/i.test(withScript))
+
+  console.log('\nJ. the blog is rendered on the SERVER, so the body is in the HTML')
+  // A crawler that does not run JavaScript used to receive a loading skeleton
+  // where the article should be — verified on the live page. These two files
+  // must stay server components.
+  // MUTATION: put 'use client' back at the top of either and this fails.
+  for (const [name, src] of [['listing', indexSrc], ['article', viewSrc]] as const) {
+    check(`J. the ${name} is not a client component`, !/'use client'/.test(src))
+    check(`J. the ${name} does not assemble itself after load`,
+      !/useEffect|useState|DOMParser/.test(src))
+  }
+  check('J. the listing reads through the server Supabase client',
+    /@\/lib\/supabase\/server/.test(indexSrc) && !/@\/lib\/supabase\/client/.test(indexSrc))
+  for (const locale of PUBLIC_LOCALES) {
+    const article = stripComments(read(join(blogDir(locale), '[slug]/page.tsx')))
+    check(`J. ${locale}: the route awaits the server-rendered article`, /await params/.test(article))
+  }
+
+  console.log('\nK. an article can hold real components, and their numbers come from the catalog')
+  const plansSrc = stripComments(read('components/public/articles/ArticlePlans.tsx'))
+  // MUTATION: type a price into the widget and this fails. A price written
+  // here is a second place for it to be wrong, which is the whole reason the
+  // hand-typed table in the article body was replaced.
+  check('K1. the widget prices from the catalog, with no number of its own',
+    /planPriceIn\(plan,\s*market\)/.test(plansSrc) && !/\b(?:249|549|999|1999|79|179|329|649)\b/.test(plansSrc))
+  check('K2. the widget takes its allowance lines from the shared builder',
+    /planLimitLines\(code,\s*locale\)/.test(plansSrc))
+  check('K3. the widget names the plans from the shared table',
+    /PLAN_DISPLAY_NAME\[code\]\[locale\]/.test(plansSrc))
+  for (const locale of PUBLIC_LOCALES) {
+    const pricing = stripComments(read(`app/(public)${LOCALE_PREFIX[locale]}/pricing/page.tsx`))
+    // MUTATION: give any pricing page its own PLAN_NAME table again and this
+    // fails — four hand-written copies of four plan names is what it had.
+    check(`K4. ${locale}: the pricing page uses the shared plan names and highlight`,
+      /PLAN_DISPLAY_NAME\[code\]/.test(pricing) && !/const PLAN_NAME/.test(pricing)
+      && !/const HIGHLIGHTED_PLAN/.test(pricing))
+  }
+  const plansOnly = splitArticleBlocks('<p>a</p><div class="gt-plans"></div><p>b</p>')
+  check('K5. a marker splits the body and becomes a widget',
+    plansOnly.length === 3 && plansOnly[1].kind === 'widget'
+    && plansOnly[1].kind === 'widget' && plansOnly[1].widget === 'plans'
+    && plansOnly[0].kind === 'html' && plansOnly[0].html === '<p>a</p>')
+  check('K6. the call to action has its own marker',
+    splitArticleBlocks('<div class="gt-cta"></div>').some((b) => b.kind === 'widget' && b.widget === 'cta'))
+  // MUTATION: make widgetIn() match any gt- class and this fails: an unknown
+  // marker would swallow the markup around it instead of rendering as itself.
+  check('K7. an unknown marker stays ordinary markup',
+    splitArticleBlocks('<p>a</p><div class="gt-nope"></div>').every((b) => b.kind === 'html'))
+  check('K8. a div that is not a marker is untouched',
+    splitArticleBlocks('<div class="note">hi</div>').every((b) => b.kind === 'html'))
+  // MUTATION: render <ArticlesPromo> unconditionally and this fails: an article
+  // that ends with its own gt-cta band would close on two identical navy
+  // call-to-action bands, one directly under the other.
+  check('K9. the standing promo band yields to the article\'s own call to action',
+    /const hasCta = blocks\.some\(\(b\) => b\.kind === 'widget' && b\.widget === 'cta'\)/.test(viewSrc)
+    && /\{!hasCta && \(/.test(viewSrc))
+
+  console.log('\nL. headings get ids on the server, in every script')
+  const withIds = withHeadingIds('<h2>Índice de contenidos</h2><h3>שאלות</h3><h2>Índice de contenidos</h2>')
+  // MUTATION: narrow the character class to Hebrew and Latin without accents
+  // (what the client code did) and the Spanish id collapses or empties.
+  check('L1. an accented heading keeps its letters', withIds.headings[0]?.id === 'índice-de-contenidos')
+  check('L2. a Hebrew heading keeps its letters', withIds.headings[1]?.id === 'שאלות')
+  check('L3. two headings with the same text get different ids',
+    withIds.headings[2]?.id === 'índice-de-contenidos-2')
+  check('L4. the ids are written into the html', (withIds.html.match(/ id="/g) || []).length === 3)
+  check('L5. an id the article already set is kept',
+    withHeadingIds('<h2 id="mine">x</h2>').headings[0]?.id === 'mine')
+  check('L6. the level is carried, for the indent in the contents list',
+    withIds.headings[1]?.level === 3)
+  check('L7. markup inside a heading is not part of its text',
+    withHeadingIds('<h2><strong>GEO</strong> and SEO</h2>').headings[0]?.text === 'GEO and SEO')
+  check('L8. the reading time counts words, not tags',
+    readingMinutes(`<p>${'word '.repeat(400)}</p>`) === 2 && readingMinutes('<p>one</p>') === 1)
 
   console.log('\nM. mutation controls — the behavioural guards fail on broken input')
   check('M1. a FAQ under the wrong language\'s heading yields nothing',
