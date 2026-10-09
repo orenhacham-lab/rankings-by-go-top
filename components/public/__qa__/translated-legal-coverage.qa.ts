@@ -1458,6 +1458,109 @@ console.log('\nmutation controls')
       && /no recibe la direcci[óo]n de correo electr[óo]nico, el sitio web, el plan/.test(text.es.privacy))
 }
 
+// ── 22) what the WordPress plugin does, disclosed in every language ─────────
+/*
+ * Version 3.0.0 of the GO TOP SEO Bridge plugin does more than apply fixes: it
+ * creates whole POSTS from the articles a customer approves, it has the site
+ * DOWNLOAD those articles' images into its Media Library, and it returns a
+ * page's full CONTENT and can SEARCH the site's published posts. The policy
+ * said the plugin applies "only fixes from a closed list" and named eleven.
+ * Saying less than the code does is not a smaller promise, it is an inaccurate
+ * notice, and Art. 13(1)(c) wants the purposes of processing given.
+ *
+ * Two further things the earlier draft of this section did not have, and that
+ * this guard exists to keep:
+ *
+ * 1. Publishing writes that article's own JSON-LD through the same signed /fix
+ *    route, with no per-fix approval (lib/content/wordpress-publish.ts:209 →
+ *    lib/content/wordpress-schema.ts). A policy that frames every plugin write
+ *    as one the customer clicked is wrong about the thing that matters most:
+ *    when we act without asking. The SEO title and the meta description join
+ *    that same publish-time path with the change that sends them through the
+ *    plugin on a site with no SEO plugin; this sentence gains them in the same
+ *    commit as that change and not before, so the policy never describes a
+ *    write that is not happening yet.
+ * 2. Some operations still need the Application Password even when the plugin
+ *    is paired — forcing a new post, scheduled publishing, and the scan of
+ *    existing posts with its index refresh. A customer who paired the plugin
+ *    alone must know those will be refused rather than silently routed.
+ *
+ * The connection is also no longer one thing: paired with the plugin alone, no
+ * password of the customer's is with us; connected with an Application
+ * Password, it is. The policy distinguishes them instead of claiming the
+ * broader collection for both.
+ */
+const PLUGIN_DOES: Record<string, RegExp[]> = {
+  he: [
+    /מאמרים שאתה מפרסם/,
+    /ספריית המדיה/,
+    /רק מכתובת האחסון שלנו/,
+    /לחפש מילה/,
+    /שתי דרכים לחבר/,
+    /אין אצלנו שום סיסמה שלך/,
+    /בפרסום עצמו נכתבת גם סכמת ה-JSON-LD/,
+    /מה שדורש סיסמת אפליקציה גם כשהתוסף מחובר/,
+  ],
+  en: [
+    /Articles you publish/,
+    /Media Library/,
+    /only from our storage\s+address/,
+    /search its\s+published/,
+    /two ways to connect/,
+    /no password\s+of yours in our records/,
+    /The publish itself also writes that\s+article&rsquo;s own JSON-LD schema/,
+    /What still needs an Application Password even when the plugin is connected/,
+  ],
+  es: [
+    /art[íi]culos que usted publica/i,
+    /biblioteca de medios/,
+    /[úu]nicamente desde nuestra direcci[óo]n de almacenamiento/,
+    /busque una palabra/,
+    /dos formas de conectar/,
+    /ninguna contrase[ñn]a suya en nuestros registros/,
+    /La propia publicaci[óo]n escribe adem[áa]s el esquema JSON-LD/,
+    /sigue necesitando una Application Password aunque el complemento est[ée] conectado/,
+  ],
+  'pt-BR': [
+    /artigos que voc[êe] publica/i,
+    /biblioteca de m[íi]dia/,
+    /somente do nosso endere[çc]o de armazenamento/,
+    /busque uma palavra/,
+    /duas formas de conectar/,
+    /nenhuma senha sua nos nossos registros/,
+    /A pr[óo]pria publica[çc][ãa]o tamb[ée]m escreve o esquema JSON-LD/,
+    /ainda precisa de uma Senha de Aplicativo mesmo com o plugin conectado/,
+  ],
+}
+{
+  const enSource = frontMatter(text[LOCALES[0]].privacy).source
+  const pages: [string, string][] = [
+    ['he', existsSync(HEBREW_PRIVACY) ? readFileSync(HEBREW_PRIVACY, 'utf8') : ''],
+    ['en', enSource && existsSync(enSource) ? readFileSync(enSource, 'utf8') : ''],
+    ...LOCALES.map((l): [string, string] => [l, text[l].privacy]),
+  ]
+  for (const [name, src] of pages) {
+    check(`${name}/privacy: the plugin page was read`, src.length > 0)
+    for (const must of PLUGIN_DOES[name] ?? []) {
+      check(`${name}/privacy: the plugin section states ${must.source.slice(0, 34)}`, must.test(src))
+    }
+    // The sentence that was there before must be GONE, in every language. It is
+    // the one a reader would rely on, and it is now false.
+    check(`${name}/privacy: no longer claims the plugin applies fixes and nothing else`,
+      !/רק תיקונים\s*\n?\s*מרשימה סגורה|only fixes from a closed list|[úu]nicamente correcciones de una lista cerrada|apenas corre[çc][õo]es de uma lista fechada/.test(src))
+  }
+  check('mutation control: the old "only fixes from a closed list" sentence fails the guard',
+    /only fixes from a closed list/.test('the plugin applies to the site only fixes from a closed list (SEO title)'))
+  check('mutation control: a language that drops publishing is caught',
+    !PLUGIN_DOES.en[0].test('the plugin applies the fixes you approve, one by one, from a closed list'))
+  check('mutation control: a language that drops the images is caught',
+    !PLUGIN_DOES.es[1].test('Los artículos que usted publica se crean como entradas en su sitio.'))
+  check('mutation control: a policy where publishing writes nothing of its own is caught',
+    !PLUGIN_DOES.en[6].test('An article you approve is created as a post on your site, as the author you choose there.'))
+  check('mutation control: a policy that hides the Application Password requirement is caught',
+    !PLUGIN_DOES['pt-BR'][7].test('O plugin faz tudo sozinho, sem senha de aplicativo.'))
+}
+
 console.log(`\n${pass} passed, ${fail} failed`)
 if (fail > 0) process.exit(1)
 
