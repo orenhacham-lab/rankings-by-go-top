@@ -26,6 +26,7 @@ import { FakeAdmin } from '@/lib/__qa__/_fake-admin'
 import { generatePluginKey, pairingCode } from '@/lib/site-fix/plugin-auth'
 import { validSchema } from '@/lib/site-fix/whitelist'
 import { publishArticleSchemaToWordPress, schemaJobId, wordpressSchemaGraph } from '../wordpress-schema'
+import { pluginDrift } from '@/lib/site-fix/__qa__/approved-plugin'
 
 let passed = 0
 let failed = 0
@@ -258,10 +259,13 @@ async function main() {
   check('W3c: the files left out for the App Store connect carry no WordPress-schema line', appStoreLeak.length === 0, appStoreLeak.slice(0, 3).join(' | '))
   check('MUTATION CONTROL: a WordPress-schema line in one of those files would be caught',
     ['+  await publishArticleSchemaToWordPress(creds, article)'].filter((l) => WP_SCHEMA_LINE.test(l)).length === 1)
-  // Wave 8 merge: the plugin's only change is site health's 2.1.0 (w8-health, 2a1492b: h1 and
-  // llms.txt). The article schema rides the existing /fix schema_jsonld and adds nothing to it.
-  const pluginDiff = changed('2a1492b', 'wordpress-plugin')
-  check('W3b: the plugin is exactly site health\'s 2.1.0; the article work adds nothing to it', pluginDiff === '', pluginDiff)
+  // The article schema rides the existing /fix schema_jsonld and adds nothing to the plugin. Since
+  // the WordPress.org switch the plugin is exactly the approved 3.0.0 (lib/site-fix/__qa__/approved-plugin.ts),
+  // so "adds nothing" is: every plugin file is byte-for-byte that release.
+  const drift = pluginDrift(join(ROOT, 'wordpress-plugin/gotop-seo-bridge'))
+  check('W3b: the plugin is exactly the approved 3.0.0; the article work adds nothing to it', drift.length === 0, drift.join(', '))
+  check('MUTATION CONTROL: one changed byte in the plugin is caught',
+    pluginDrift(join(ROOT, 'wordpress-plugin/gotop-seo-bridge'), (f) => f.endsWith('output.php') ? Buffer.concat([readFileSync(f), Buffer.from(' ')]) : readFileSync(f)).join() === 'includes/output.php')
   // Mutation control without touching a file: against the pre-wave base the same check sees the
   // plugin's changed files, so a plugin change is caught.
   check('MUTATION CONTROL: a plugin change is caught', changed('8b468a8', 'wordpress-plugin').includes('wordpress-plugin/gotop-seo-bridge/'))

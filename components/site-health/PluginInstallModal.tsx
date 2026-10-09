@@ -1,19 +1,26 @@
 'use client'
 
 /**
- * Installing and pairing the Go Top WordPress plugin, in three numbered steps:
- * download the zip (served to signed-in users only), upload it in the site's own
- * wp-admin, and connect — in one click when the site is already connected by
- * application password, otherwise with a one-time code pasted in the plugin's
- * settings page. Every answer is our own sentence (`siteHealth.autofix.errors`).
+ * Installing and pairing the GO TOP SEO Bridge plugin (3.0.0, from WordPress.org, slug
+ * go-top-seo-bridge), in two numbered steps: install it from the site's own wp-admin (a search
+ * for the plugin, or its WordPress.org page; no file to download), and connect, in one click when
+ * the site is already connected by application password, otherwise with a one-time code pasted in
+ * the plugin's settings page. Every answer is our own sentence (`siteHealth.autofix.errors`).
  *
- * Connected with an older version (2.0.0 before 2.1.0): the same modal becomes "update the plugin" —
- * download the new zip, upload it over the current one ("Replace current with uploaded"; the
- * pairing is kept in the site's options, so there is nothing to pair again), and check the
- * connection, which reads the new version at once.
+ * Connected with an older version (2.x, installed from our zip in the folder gotop-seo-bridge/):
+ * the modal becomes "switch to the plugin from WordPress.org". WordPress.org installs into
+ * go-top-seo-bridge/, so the two are separate plugins with the same functions: both active is a
+ * PHP fatal that WordPress refuses to activate, and DELETING the old one runs its uninstall, which
+ * erases the shared options (the pairing key). So: deactivate the old one, install and activate the
+ * new one, connect again (3.0.0 also records which administrator connected it, the author of
+ * published articles). The steps stay on screen while the new code is pending.
+ *
+ * The zip (GET /api/site-health/plugin-zip) is no longer linked: it stays served, signed-in only,
+ * as the reviewed copy of the PHP the app talks to (a QA guard checks it is current) and as a
+ * fallback support can hand to a host that blocks installs from WordPress.org.
  */
 import { useCallback, useState } from 'react'
-import { ArrowUpRight, Check, Copy, Download, PlugZap, ShieldCheck, Unplug } from 'lucide-react'
+import { ArrowUpRight, Check, Copy, PlugZap, ShieldCheck, Unplug } from 'lucide-react'
 import Modal from '@/components/ui/Modal'
 import Button, { buttonClasses } from '@/components/ui/Button'
 import Notice from '@/components/ui/Notice'
@@ -27,6 +34,9 @@ import { postFix } from './useSiteFixes'
 import { pluginUpdateFor } from './AutoFixStrip'
 
 type Copy = DashboardDictionary['siteHealth']['autofix']
+
+/** The plugin's page on WordPress.org (approved 3.0.0). */
+export const PLUGIN_WPORG_URL = 'https://wordpress.org/plugins/go-top-seo-bridge/'
 
 function Step({ n, title, body, done, children, label }: { n: number; title: string; body: string; done?: boolean; children?: React.ReactNode; label: string }) {
   return (
@@ -70,9 +80,15 @@ export default function PluginInstallModal({
   const connected = plugin.state === 'connected'
   /** The stored key cannot be read: only a new pairing code helps, so "check" waits for one. */
   const rekey = plugin.state === 'disconnected' && !!plugin.rekey
-  const uploadUrl = `${siteUrl.replace(/\/+$/, '')}/wp-admin/plugin-install.php?tab=upload`
-  /** Connected with an older version: this modal walks through the update. */
+  const admin = `${siteUrl.replace(/\/+$/, '')}/wp-admin`
+  const searchUrl = `${admin}/plugin-install.php?s=${encodeURIComponent('GO TOP SEO Bridge')}&tab=search&type=term`
+  const pluginsUrl = `${admin}/plugins.php`
+  /** Connected with an older version: this modal walks through the switch to WordPress.org. */
   const update = pluginUpdateFor(capabilities)
+  /** Fixed when the modal opens, so the steps stay while the new pairing code is pending. */
+  const [switching] = useState<{ from: string; to: string } | null>(() =>
+    update && plugin.state === 'connected' ? { from: plugin.version ?? '2.0.0', to: update } : null)
+  const showSwitch = !!switching && !(connected && !update)
 
   const connectedNow = useCallback(async () => {
     await onChanged()
@@ -108,13 +124,14 @@ export default function PluginInstallModal({
     if (!r.ok) { setError(r.code); await onChanged(); return }
     setCode(null)
     const version = r.plugin?.version ?? null
-    if (update && version && versionAtLeast(version, update)) {
+    const target = switching?.to ?? update
+    if (target && version && versionAtLeast(version, target)) {
       await onChanged()
       toasts.success(copy.plugin.update.done(version))
       return
     }
     await connectedNow()
-  }, [busy, projectId, onChanged, connectedNow, update, toasts, copy.plugin.update])
+  }, [busy, projectId, onChanged, connectedNow, update, switching, toasts, copy.plugin.update])
 
   const disconnect = useCallback(async () => {
     if (busy) return
@@ -137,8 +154,51 @@ export default function PluginInstallModal({
     try { await navigator.clipboard.writeText(code); setCopied(true) } catch { setCopied(false) }
   }, [code])
 
+  /** Install from WordPress.org: the site's own plugin search, and the plugin's public page. */
+  const installLinks = (
+    <div className="flex flex-wrap items-center gap-2">
+      <a href={searchUrl} target="_blank" rel="noopener noreferrer" className={buttonClasses({ variant: 'secondary', size: 'md' })} data-plugin-install="">
+        {copy.plugin.install.action}
+        <ArrowUpRight size={16} strokeWidth={2} aria-hidden="true" className="rtl:-scale-x-100" />
+      </a>
+      <a href={PLUGIN_WPORG_URL} target="_blank" rel="noopener noreferrer" className={buttonClasses({ variant: 'ghost', size: 'md' })} data-plugin-wporg="">
+        {copy.plugin.install.page}
+        <ArrowUpRight size={16} strokeWidth={2} aria-hidden="true" className="rtl:-scale-x-100" />
+      </a>
+    </div>
+  )
+
+  const pairBlock = (
+    <>
+      <div className="flex flex-wrap items-center gap-2">
+        {capabilities.appPassword && (
+          <Button onClick={autoPair} loading={busy === 'auto'} disabled={!!busy} data-plugin-autopair="">
+            {busy !== 'auto' && <PlugZap size={16} strokeWidth={2} aria-hidden="true" />}
+            {copy.plugin.pair.autoAction}
+          </Button>
+        )}
+        <Button variant={capabilities.appPassword ? 'ghost' : 'primary'} onClick={makeCode} loading={busy === 'code'} disabled={!!busy} data-plugin-code="">
+          {code ? copy.plugin.pair.newCode : capabilities.appPassword ? copy.plugin.pair.orCode : copy.plugin.pair.makeCode}
+        </Button>
+      </div>
+      {code && (
+        <div className="mt-4 rounded-inset border border-action/30 bg-action-soft/40 p-4" data-plugin-pairing-code="">
+          <p className="text-overline font-semibold uppercase tracking-wide text-action">{copy.plugin.pair.codeLabel}</p>
+          <div className="mt-2 flex flex-col gap-2 sm:flex-row sm:items-center">
+            <code dir="ltr" className="min-w-0 flex-1 select-all break-all rounded-control bg-surface px-3 py-2 font-mono text-caption text-ink ring-1 ring-line">{code}</code>
+            <Button variant="secondary" size="sm" onClick={copyCode} aria-live="polite">
+              {copied ? <Check size={14} strokeWidth={2.4} aria-hidden="true" /> : <Copy size={14} strokeWidth={2} aria-hidden="true" />}
+              {copied ? copy.plugin.pair.copied : copy.plugin.pair.copy}
+            </Button>
+          </div>
+          <p className="mt-2 text-caption text-muted">{copy.plugin.pair.codeNote}</p>
+        </div>
+      )}
+    </>
+  )
+
   return (
-    <Modal open onClose={busy ? () => {} : onClose} title={update ? copy.plugin.update.title : copy.plugin.title} size="lg">
+    <Modal open onClose={busy ? () => {} : onClose} title={showSwitch ? copy.plugin.update.title : copy.plugin.title} size="lg">
       <div className="space-y-6" data-plugin-modal={plugin.state}>
         <div className="flex gap-3 rounded-inset border border-line bg-sunk/50 p-4">
           <ShieldCheck size={20} strokeWidth={1.75} aria-hidden="true" className="mt-0.5 shrink-0 text-action" />
@@ -147,23 +207,22 @@ export default function PluginInstallModal({
 
         {rekey && <Notice tone="warn">{copy.plugin.rekeyNotice}</Notice>}
 
-        {connected && update ? (
-          <div className="space-y-5" data-plugin-update={update}>
-            <Notice tone="info">{copy.plugin.update.notice(plugin.state === 'connected' ? plugin.version ?? '2.0.0' : '2.0.0', update)}</Notice>
+        {showSwitch && switching ? (
+          <div className="space-y-5" data-plugin-update={switching.to}>
+            <Notice tone="info">{copy.plugin.update.notice(switching.from, switching.to)}</Notice>
             <ol className="space-y-6" role="list">
-              <Step n={1} label={copy.plugin.step(1)} title={copy.plugin.update.download.title} body={copy.plugin.update.download.body}>
-                <a href="/api/site-health/plugin-zip" download className={buttonClasses({ variant: 'secondary', size: 'md' })} data-plugin-download="">
-                  <Download size={16} strokeWidth={2} aria-hidden="true" />
-                  {`${copy.plugin.update.download.action} ${update}`}
-                </a>
-              </Step>
-              <Step n={2} label={copy.plugin.step(2)} title={copy.plugin.update.upload.title} body={copy.plugin.update.upload.body}>
-                <a href={uploadUrl} target="_blank" rel="noopener noreferrer" className={buttonClasses({ variant: 'secondary', size: 'md' })} data-plugin-upload="">
-                  {copy.plugin.update.upload.action}
+              <Step n={1} label={copy.plugin.step(1)} title={copy.plugin.update.deactivate.title} body={copy.plugin.update.deactivate.body}>
+                <a href={pluginsUrl} target="_blank" rel="noopener noreferrer" className={buttonClasses({ variant: 'secondary', size: 'md' })} data-plugin-deactivate="">
+                  {copy.plugin.update.deactivate.action}
                   <ArrowUpRight size={16} strokeWidth={2} aria-hidden="true" className="rtl:-scale-x-100" />
                 </a>
               </Step>
-              <Step n={3} label={copy.plugin.step(3)} title={copy.plugin.update.check.title} body={copy.plugin.update.check.body} />
+              <Step n={2} label={copy.plugin.step(2)} title={copy.plugin.update.install.title} body={copy.plugin.update.install.body}>
+                {installLinks}
+              </Step>
+              <Step n={3} label={copy.plugin.step(3)} title={copy.plugin.update.pair.title} body={capabilities.appPassword ? copy.plugin.pair.auto : copy.plugin.pair.code}>
+                {pairBlock}
+              </Step>
             </ol>
           </div>
         ) : connected ? (
@@ -176,43 +235,11 @@ export default function PluginInstallModal({
           </div>
         ) : (
           <ol className="space-y-6" role="list">
-            <Step n={1} label={copy.plugin.step(1)} title={copy.plugin.download.title} body={copy.plugin.download.body}>
-              <a href="/api/site-health/plugin-zip" download className={buttonClasses({ variant: 'secondary', size: 'md' })} data-plugin-download="">
-                <Download size={16} strokeWidth={2} aria-hidden="true" />
-                {copy.plugin.download.action}
-              </a>
+            <Step n={1} label={copy.plugin.step(1)} title={copy.plugin.install.title} body={copy.plugin.install.body}>
+              {installLinks}
             </Step>
-            <Step n={2} label={copy.plugin.step(2)} title={copy.plugin.upload.title} body={copy.plugin.upload.body}>
-              <a href={uploadUrl} target="_blank" rel="noopener noreferrer" className={buttonClasses({ variant: 'secondary', size: 'md' })} data-plugin-upload="">
-                {copy.plugin.upload.action}
-                <ArrowUpRight size={16} strokeWidth={2} aria-hidden="true" className="rtl:-scale-x-100" />
-              </a>
-            </Step>
-            <Step n={3} label={copy.plugin.step(3)} title={copy.plugin.pair.title} body={capabilities.appPassword ? copy.plugin.pair.auto : copy.plugin.pair.code}>
-              <div className="flex flex-wrap items-center gap-2">
-                {capabilities.appPassword && (
-                  <Button onClick={autoPair} loading={busy === 'auto'} disabled={!!busy} data-plugin-autopair="">
-                    {busy !== 'auto' && <PlugZap size={16} strokeWidth={2} aria-hidden="true" />}
-                    {copy.plugin.pair.autoAction}
-                  </Button>
-                )}
-                <Button variant={capabilities.appPassword ? 'ghost' : 'primary'} onClick={makeCode} loading={busy === 'code'} disabled={!!busy} data-plugin-code="">
-                  {code ? copy.plugin.pair.newCode : capabilities.appPassword ? copy.plugin.pair.orCode : copy.plugin.pair.makeCode}
-                </Button>
-              </div>
-              {code && (
-                <div className="mt-4 rounded-inset border border-action/30 bg-action-soft/40 p-4" data-plugin-pairing-code="">
-                  <p className="text-overline font-semibold uppercase tracking-wide text-action">{copy.plugin.pair.codeLabel}</p>
-                  <div className="mt-2 flex flex-col gap-2 sm:flex-row sm:items-center">
-                    <code dir="ltr" className="min-w-0 flex-1 select-all break-all rounded-control bg-surface px-3 py-2 font-mono text-caption text-ink ring-1 ring-line">{code}</code>
-                    <Button variant="secondary" size="sm" onClick={copyCode} aria-live="polite">
-                      {copied ? <Check size={14} strokeWidth={2.4} aria-hidden="true" /> : <Copy size={14} strokeWidth={2} aria-hidden="true" />}
-                      {copied ? copy.plugin.pair.copied : copy.plugin.pair.copy}
-                    </Button>
-                  </div>
-                  <p className="mt-2 text-caption text-muted">{copy.plugin.pair.codeNote}</p>
-                </div>
-              )}
+            <Step n={2} label={copy.plugin.step(2)} title={copy.plugin.pair.title} body={capabilities.appPassword ? copy.plugin.pair.auto : copy.plugin.pair.code}>
+              {pairBlock}
             </Step>
           </ol>
         )}

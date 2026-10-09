@@ -42,8 +42,9 @@ export default function EnglishPrivacyPage() {
           <li><strong>Information from your site:</strong> public pages, robots.txt, the sitemap and llms.txt
           read in the free site check and the onboarding scan, and the findings derived from them — see
           &ldquo;Site Scanning&rdquo; below</li>
-          <li><strong>WordPress connection:</strong> the site address, a username and Application Password and the
-          plugin&rsquo;s signing key (both stored encrypted), and the log of fixes on the site — see &ldquo;WordPress
+          <li><strong>WordPress connection:</strong> the site address, the plugin&rsquo;s signing key, and, on a
+          connection made with a username and Application Password, those too (all stored encrypted), and the log
+          of fixes on the site — see &ldquo;WordPress
           Connection&rdquo; below</li>
           <li><strong>Shopify connection:</strong> the store address, the store identifier, the permissions you
           approved at installation, and the access token the store issues (stored encrypted) — see
@@ -231,17 +232,45 @@ export default function EnglishPrivacyPage() {
       <section>
         <h2>WordPress Connection and the GO TOP SEO Bridge Plugin</h2>
         <p>
-          When you connect a WordPress site, we store the site address, the username and Application Password you
-          created, and the signing key that authenticates requests between us and the plugin. Both are stored
-          encrypted and decrypted only on our servers at the moment of use. With your consent, and your approval of
-          each fix or an automatic approval you turned on, the GO TOP SEO Bridge plugin applies to the site only
-          fixes from a closed list (SEO title, meta
-          description, canonical address, focus keyphrase, image alt text, an FAQ block, JSON-LD schema, internal
-          links, repair of broken links, demotion of a duplicate H1 heading, and creating llms.txt). On a site
+          There are two ways to connect a WordPress site, and what we store depends on which you use. If you
+          connect with a username and Application Password, we store the site address, both of those, and the
+          signing key that authenticates requests between us and the plugin. If you connect with a pairing code
+          from the plugin alone, the site address and that signing key are all we store, and there is no password
+          of yours in our records. Anything stored is encrypted and decrypted only on our servers at the moment
+          of use.
+        </p>
+        <p className="mt-4">
+          What the GO TOP SEO Bridge plugin does on the site, with your consent, is this and nothing else:
+        </p>
+        <ul>
+          <li><strong>Fixes you approve,</strong> one by one, from a closed list: SEO title, meta description,
+          canonical address, focus keyphrase, image alt text, an FAQ block, JSON-LD schema, internal links,
+          repair of broken links, demotion of a duplicate H1 heading, and creating llms.txt. If you turned on
+          automatic approval for the three kinds of fix described in the Terms of Service, fixes of those kinds
+          are applied without asking you each time.</li>
+          <li><strong>Articles you publish.</strong> An article you approve in GO TOP is created as a post on
+          your site, as the author you choose there. <strong>The publish itself also writes that
+          article&rsquo;s own SEO title, meta description, focus keyphrase and JSON-LD schema</strong>, through the same signed
+          route and without a separate approval for each of them, because they are part of the publish you
+          approved.</li>
+          <li><strong>The images belonging to those articles.</strong> Your site downloads them from our file
+          storage into its own Media Library, and from that point they are files on your site. Your site accepts
+          them only from our storage address and refuses any other.</li>
+          <li><strong>Reading what is on a page,</strong> so we can show you the page and what a fix would
+          change: its title, address, content, headings and SEO fields. We can also ask your site to search its
+          published posts and pages for a word, which answers with the address and title of the matches; we use
+          this to find the page an internal link should point at.</li>
+          <li><strong>What still needs an Application Password even when the plugin is connected:</strong>
+          forcing a new post, scheduled publishing, and the scan of the site&rsquo;s existing posts and the
+          refresh of their index. If we hold no Application Password, those actions do not happen and you are
+          told so, rather than our trying another way.</li>
+        </ul>
+        <p>
+          On a site
           without the plugin, the fixes WordPress&rsquo;s REST interface allows are written with the application
-          password we stored, under the same approvals and into the same log. Alt text for an image a page shows
-          outside its own text is written on the image itself in the media library, so it applies on every page
-          that shows it; we do not touch the image file, its name or its caption.
+          password we stored, under the same approvals and into the same log. Alt text for an image a
+          page shows outside its own text is written on the image itself in the media library, so it applies on
+          every page that shows it; we do not touch the image file, its name or its caption.
         </p>
         <ul>
           <li><strong>Fix log:</strong> every fix is recorded in our log with who approved it, the time it was

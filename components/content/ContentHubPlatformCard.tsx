@@ -76,7 +76,8 @@ export default function ContentHubPlatformCard({ projectId, children }: { projec
     if (sh.state === 'ready' && wp.state === 'ready') {
       setShopify(sh.value.connection)
       setCounts((sh.value.body.counts as Counts | undefined) ?? ZERO)
-      setWpConnected(!!wp.value.connection)
+      // The GO TOP SEO Bridge plugin >= 3.0.0 publishes on its own (no application password needed).
+      setWpConnected(!!wp.value.connection || !!wp.value.body.publishingPlugin)
       setLoadFailed(false)
     } else {
       // A re-read that failed keeps what is on screen; a first read that failed says so.

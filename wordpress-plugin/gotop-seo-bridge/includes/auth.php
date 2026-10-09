@@ -27,8 +27,8 @@ function gotop_seo_bridge_get_key() {
     return $key;
 }
 
-function gotop_seo_bridge_store_key($key_id, $secret) {
-    $value = array('key_id' => $key_id, 'secret' => $secret, 'paired_at' => time());
+function gotop_seo_bridge_store_key($key_id, $secret, $user_id = 0) {
+    $value = array('key_id' => $key_id, 'secret' => $secret, 'paired_at' => time(), 'user_id' => (int) $user_id);
     if (get_option('gotop_seo_bridge_key') === false) {
         add_option('gotop_seo_bridge_key', $value, '', 'no');
     } else {

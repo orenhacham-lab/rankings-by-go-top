@@ -577,7 +577,7 @@ export default function ApproveFixModal({
     return (
       <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
         <Button variant="secondary" onClick={onClose}>{t.close}</Button>
-        {phase.kind === 'error' && phase.code === 'needs_plugin' && (
+        {phase.kind === 'error' && (phase.code === 'needs_plugin' || (phase.code === 'no_channel' && platform === 'wordpress')) && (
           <Button onClick={() => { onClose(); onInstall() }} data-install-from-fix="">{a.connection.install}</Button>
         )}
         {phase.kind === 'error' && phase.code === 'needs_update' && (

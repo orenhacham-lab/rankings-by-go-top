@@ -13,6 +13,7 @@
 
 import type { createAdminClient } from '@/lib/supabase/admin'
 import { loadWordPressCredentials } from '@/lib/content/api-auth'
+import { hasPublishPlugin } from '@/lib/content/wordpress-plugin-publish'
 import { scanWordPressSite } from '@/lib/content/wordpress-content-scan'
 import {
   getCachedIndex, claimRefresh, writeSuccess, writeFailure, isStale, isVersionStale,
@@ -43,6 +44,7 @@ export type IndexRefreshResult =
 export async function runProjectIndexRefresh(
   admin: Admin,
   opts: { projectId: string; userId: string; force?: boolean },
+  deps: { hasPlugin?: typeof hasPublishPlugin } = {},
 ): Promise<IndexRefreshResult> {
   const { projectId, userId } = opts
   const force = opts.force === true
@@ -56,6 +58,12 @@ export async function runProjectIndexRefresh(
   // WordPress credentials (decrypted transiently; never returned/logged).
   const wp = await loadWordPressCredentials(admin, projectId)
   if ('error' in wp) {
+    // Publishing through the GO TOP SEO Bridge plugin alone: the plugin has no route that lists
+    // every post, so the scan needs an application password. A typed answer the UI words, and no
+    // "failed" scan recorded over the project's index.
+    if (wp.status === 404 && await (deps.hasPlugin ?? hasPublishPlugin)(admin, projectId, userId)) {
+      return { refreshed: false, outcome: 'no_credentials', error: 'needs_app_password', httpStatus: 409, preservedPriorIndex: !!existing && existing.scan_status !== 'failed' }
+    }
     await writeFailure(admin, { projectId, userId, errorMessage: `wordpress_connection: ${wp.error}`, startedAtMs: Date.now(), durationMs: 0 })
     return { refreshed: false, outcome: 'no_credentials', error: wp.error, httpStatus: wp.status, preservedPriorIndex: !!existing && existing.scan_status !== 'failed' }
   }

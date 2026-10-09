@@ -36,7 +36,7 @@ export const META_FIX_TYPES: readonly FixType[] = ['seo_title', 'meta_descriptio
 export const SITE_FIX_TYPES: readonly FixType[] = ['llms_txt']
 
 /** The latest plugin this app ships (wordpress-plugin/gotop-seo-bridge; a guard pins it to the PHP). */
-export const PLUGIN_LATEST_VERSION = '2.1.0'
+export const PLUGIN_LATEST_VERSION = '3.0.0'
 /**
  * The first plugin version that knows a fix type. Anything not listed exists since 2.0.0. An older
  * plugin is never sent a type it does not know: the screen offers "update the plugin" instead.
