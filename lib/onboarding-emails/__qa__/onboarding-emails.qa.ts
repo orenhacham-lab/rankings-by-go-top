@@ -342,6 +342,14 @@ async function main() {
     check(`E2b: ${locale}'s setup email offers the narrow stop, not "unsubscribe from everything"`,
       String(d.onboardingEmails.unsubscribe) !== String(d.reminders.email.unsubscribe) && d.onboardingEmails.unsubscribe.length > 10)
   }
+  // A setup email is a service message, not an advert: the moment it offers, prices or
+  // upsells anything it becomes a "דבר פרסומת" under s. 30A of the Communications Law and
+  // needs a label, sender details and its own opt-out. This keeps it on the right side.
+  const OFFERS = /\u20aa|[$€]\s*\d|\d\s*%|שדרג|שדרוג|מבצע|הנחה|תוכנית פרימיום|upgrade|discount|special offer|free trial|descuento|oferta especial|mejora tu plan|desconto|oferta especial|atualize seu plano/i
+  for (const locale of PUBLIC_LOCALES) {
+    const words = JSON.stringify(getDashboardDictionary(locale).onboardingEmails)
+    check(`E2c: ${locale}'s setup email offers nothing and prices nothing`, !OFFERS.test(words), words.match(OFFERS)?.[0])
+  }
   check('E3: the email never promises anything about schema or a guide page that does not exist',
     !/schema|JSON-LD/i.test(JSON.stringify(getDashboardDictionary('en').onboardingEmails)))
 
