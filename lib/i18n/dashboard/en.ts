@@ -3400,6 +3400,10 @@ export const dashboardEn = {
     origin: { ours: 'Our article' },
     cannibal: 'Competes with another page',
     cannibalDetail: '{n} of your pages split the impressions for "{query}"',
+    cannibalMine: 'This page: {imp} impressions',
+    cannibalMineLeads: 'This page leads, with {imp} impressions',
+    cannibalOther: '— {imp} impressions',
+    cannibalMore: 'and {n} more pages',
     actions: {
       improve: 'Improve the article',
       improveWhy: 'Position {pos} on Google for "{query}", close to the first page',

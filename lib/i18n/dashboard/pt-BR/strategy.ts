@@ -295,6 +295,10 @@ export const strategyPtBR: DeepPartial<DashboardDictionary> = {
     origin: { ours: 'Nosso artigo' },
     cannibal: 'Compete com outra página',
     cannibalDetail: '{n} das suas páginas dividem as impressões de “{query}”',
+    cannibalMine: 'Esta página: {imp} impressões',
+    cannibalMineLeads: 'Esta página lidera, com {imp} impressões',
+    cannibalOther: '— {imp} impressões',
+    cannibalMore: 'e mais {n} páginas',
     actions: {
       improve: 'Melhorar o artigo',
       improveWhy: 'Posição {pos} no Google para “{query}”, perto da primeira página',

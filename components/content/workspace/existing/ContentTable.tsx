@@ -24,6 +24,9 @@ import type { ExistingContentItem, ExistingContentTab } from '@/lib/content/exis
 import { useDashboardLanguage } from '@/lib/i18n/dashboard/useDashboardLanguage'
 import { displayPath, fill, KIND_TONE, rowTitle } from './format'
 
+/** How many competing pages a row names before it counts the rest. */
+const CANNIBAL_SHOWN = 3
+
 type Copy = ReturnType<typeof getDashboardDictionary>['existingContent']
 
 export default function ContentTable({
@@ -171,7 +174,31 @@ function RowAction({ x, it, planned, creating, onSupport, pos, num }: {
       {it.cannibalization && (
         <>
           <Badge variant="warning" dot>{x.cannibal}</Badge>
-          <p className="basis-full text-caption text-muted">{fill(x.cannibalDetail, { n: num.format(it.cannibalization.pages), query: it.cannibalization.query })}</p>
+          <div className="basis-full text-caption text-muted">
+            <p>{fill(x.cannibalDetail, { n: num.format(it.cannibalization.pages), query: it.cannibalization.query })}</p>
+            {/* The pages themselves: a row that names no page leaves nothing to act on. */}
+            <p className="mt-0.5">
+              {fill(it.cannibalization.leading ? x.cannibalMineLeads : x.cannibalMine, { imp: num.format(it.cannibalization.mine) })}
+            </p>
+            <ul className="mt-0.5 space-y-0.5">
+              {it.cannibalization.others.slice(0, CANNIBAL_SHOWN).map((o) => (
+                <li key={o.path}>
+                  <Link
+                    href={o.url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="rounded-control font-semibold text-action hover:underline focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-action/20"
+                  >
+                    {o.title || displayPath(o.path)}
+                  </Link>
+                  <span>{' '}{fill(x.cannibalOther, { imp: num.format(o.impressions) })}</span>
+                </li>
+              ))}
+            </ul>
+            {it.cannibalization.others.length > CANNIBAL_SHOWN && (
+              <p className="mt-0.5">{fill(x.cannibalMore, { n: num.format(it.cannibalization.others.length - CANNIBAL_SHOWN) })}</p>
+            )}
+          </div>
         </>
       )}
     </div>
