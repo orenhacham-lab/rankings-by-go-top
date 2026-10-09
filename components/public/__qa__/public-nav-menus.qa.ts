@@ -133,24 +133,86 @@ function main() {
     check('4b: no ROI claims', !/\bROI\b/.test(all))
     check('4c: no WordPress.org listing before the plugin is approved', !/wordpress\.org/i.test(all))
     check('4d: no Shopify App Store URL in page copy', !/apps\.shopify\.com/.test(all))
-    // The links page must not read as an offer of links from other people's
-    // sites, and must not advertise the opt-in network between customers: that
-    // is a Google spam-policy call for the owner, not a copy decision.
+    // The links page leads on the opt-in link network between customers (the
+    // owner asked for that on 9 Oct 2026). It must never read as an offer of
+    // links for sale, and it must keep saying, in every language, that joining
+    // is optional and off by default, that nothing about rankings or a number
+    // of links is promised, and that Google may treat such links as a link
+    // scheme: those three are what makes advertising the network honest.
     const linksSrc = strip(read('lib/i18n/public/pages/site-links.tsx'))
+    const flat = linksSrc.replace(/\s+/g, ' ')
     // Positive, not a word blocklist: the page SAYS, in each language, that we
     // neither sell nor buy links and promise none from other people's sites.
     const disclaimers = [
-      /לא מוכרים קישורים, לא קונים קישורים/,
+      /\u05dc\u05d0 \u05de\u05d5\u05db\u05e8\u05d9\u05dd \u05e7\u05d9\u05e9\u05d5\u05e8\u05d9\u05dd, \u05dc\u05d0 \u05e7\u05d5\u05e0\u05d9\u05dd \u05e7\u05d9\u05e9\u05d5\u05e8\u05d9\u05dd/,
       /do not sell links, buy links, or promise links/i,
       /No vendemos enlaces, no compramos enlaces/i,
-      /não vende links, não compra links/i,
+      /n\u00e3o vende links, n\u00e3o compra links/i,
     ]
     check('4f: the links page says in all four languages that we neither sell nor buy links',
       disclaimers.every((re) => re.test(linksSrc)))
     check('4f-MUT: dropping the Hebrew disclaimer is caught',
-      !disclaimers.every((re) => re.test(linksSrc.replace('לא מוכרים קישורים, לא קונים קישורים', ''))))
-    check('4g: the links page does not advertise the customer link network',
-      !/רשת קישורים/.test(linksSrc) && !/\blink network\b/i.test(linksSrc.replace(/advertising a link network[\s\S]*?file\./, '')))
+      !disclaimers.every((re) => re.test(linksSrc.replace('\u05dc\u05d0 \u05de\u05d5\u05db\u05e8\u05d9\u05dd \u05e7\u05d9\u05e9\u05d5\u05e8\u05d9\u05dd, \u05dc\u05d0 \u05e7\u05d5\u05e0\u05d9\u05dd \u05e7\u05d9\u05e9\u05d5\u05e8\u05d9\u05dd', ''))))
+    // Joining is optional and off by default — the one sentence that keeps the
+    // page in line with clause 15A of the terms.
+    const optIn = [
+      /\u05db\u05d1\u05d5\u05d9\u05d4 \u05db\u05d1\u05e8\u05d9\u05e8\u05ea \u05de\u05d7\u05d3\u05dc/,
+      /off by default/i,
+      /desactivad[oa] por defecto/i,
+      /vem desligad[oa]/i,
+    ]
+    check('4g: the links page says in all four languages that the network is opt-in and off by default',
+      optIn.every((re) => re.test(flat)))
+    check('4g-MUT: dropping the English opt-in sentence is caught',
+      !optIn.every((re) => re.test(flat.replace(/off by default/gi, ''))))
+    // No ranking promise and no promised number of links, in every language.
+    const noPromise = [
+      /\u05d0\u05d9\u05df \u05d4\u05ea\u05d7\u05d9\u05d9\u05d1\u05d5\u05ea \u05dc\u05d3\u05d9\u05e8\u05d5\u05d2/,
+      /no ranking promise/i,
+      /ni promesa de posicionamiento/i,
+      /nem promessa de posicionamento/i,
+    ]
+    check('4h: the links page promises no ranking in any language', noPromise.every((re) => re.test(flat)))
+    check('4h-MUT: dropping the Hebrew no-ranking sentence is caught',
+      !noPromise.every((re) => re.test(flat.replace(/\u05d0\u05d9\u05df \u05d4\u05ea\u05d7\u05d9\u05d9\u05d1\u05d5\u05ea \u05dc\u05d3\u05d9\u05e8\u05d5\u05d2/g, ''))))
+    // Oren, 9 Oct 2026: no wording that could get us flagged as spam by Google.
+    // So the vocabulary of link schemes, link building and backlinks, and any
+    // framing of the feature as a way to influence ranking, stay off the public
+    // page. The Google risk itself is disclosed in clause 15A of the terms and
+    // on the opt-in screen in the app, where the owner accepts it.
+    const spamVocabulary = [
+      /\u05ea\u05db\u05e0\u05d9\u05ea \u05e7\u05d9\u05e9\u05d5\u05e8\u05d9\u05dd/,
+      /link scheme/i,
+      /esquema de (enlaces|links)/i,
+      /backlinks?/i,
+      /link building/i,
+      /\u05dc\u05d4\u05e9\u05e4\u05d9\u05e2 \u05e2\u05dc \u05d3\u05d9\u05e8\u05d5\u05d2/,
+      /influence ranking/i,
+    ]
+    check('4i: the links page uses none of the link-scheme vocabulary', spamVocabulary.every((re) => !re.test(flat)))
+    check('4i-MUT: a "link scheme" line would be caught', !spamVocabulary.every((re) => !re.test(`${flat} link scheme`)))
+    // Asked for by the legal session: responsibility for search engine
+    // compliance stays with the site owner, and the service can be paused.
+    const ownerDuty = [
+      /\u05d4\u05d0\u05d7\u05e8\u05d9\u05d5\u05ea \u05dc\u05ea\u05d5\u05db\u05df \u05d4\u05d0\u05ea\u05e8 \u05d5\u05dc\u05e2\u05de\u05d9\u05d3\u05d4 \u05d1\u05d4\u05e0\u05d7\u05d9\u05d5\u05ea \u05de\u05e0\u05d5\u05e2\u05d9 \u05d4\u05d7\u05d9\u05e4\u05d5\u05e9/,
+      /complying with search engine guidelines/i,
+      /cumplir las directrices de los buscadores/i,
+      /cumprimento das diretrizes dos buscadores/i,
+    ]
+    check('4j: the links page leaves search engine compliance with the site owner, in all four languages',
+      ownerDuty.every((re) => re.test(flat)))
+    check('4j-MUT: dropping the English owner-duty sentence is caught',
+      !ownerDuty.every((re) => re.test(flat.replace(/complying with search engine guidelines/gi, ''))))
+    const mayStop = [
+      /\u05dc\u05d4\u05e9\u05d4\u05d5\u05ea \u05d0\u05d5 \u05dc\u05d4\u05e4\u05e1\u05d9\u05e7/,
+      /pause or stop the service/i,
+      /pausar o interrumpir el servicio/i,
+      /pausar ou interromper o servi\u00e7o/i,
+    ]
+    check('4k: the links page says the service may be paused or stopped, in all four languages',
+      mayStop.every((re) => re.test(flat)))
+    check('4k-MUT: dropping the Hebrew pause sentence is caught',
+      !mayStop.every((re) => re.test(flat.replace(/\u05dc\u05d4\u05e9\u05d4\u05d5\u05ea \u05d0\u05d5 \u05dc\u05d4\u05e4\u05e1\u05d9\u05e7/g, ''))))
     for (const page of [SITE_FIXES_PAGE, BUSINESSES_PAGE, AGENCIES_PAGE, WORDPRESS_PAGE, SHOPIFY_PAGE, SITE_LINKS_PAGE, COMPETITORS_PAGE, SEARCH_CONSOLE_PAGE]) {
       check(`4e: ${page.path} has content and a title in every language`,
         PUBLIC_LOCALES.every((l) => page.content[l]?.hero.title && page.meta[l]?.title && page.meta[l]?.description))
