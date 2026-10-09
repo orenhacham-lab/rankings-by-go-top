@@ -10,11 +10,13 @@
  * Four copies of it would have been four places to forget a fix, so the layouts
  * are now four thin files that pass their locale in.
  */
+import { cache } from 'react'
 import type { Metadata } from 'next'
 import { createClient } from '@/lib/supabase/server'
 import { ARTICLES_COPY, articleHref, articlesIndexHref } from '@/lib/articles/i18n'
 import { localeHomeHref, LOCALE_CONFIG, type PublicLocale } from '@/lib/i18n/locales'
 import { getPublicDictionary } from '@/lib/i18n/getPublicDictionary'
+import { articleAuthor } from '@/lib/articles/authors'
 
 export const SITE_URL = 'https://www.gotopseo.com'
 
@@ -42,8 +44,12 @@ export interface PublicArticle {
  * The `locale` filter is the same one the page body applies: a layout that
  * resolved the row by slug alone would emit English metadata for a Hebrew
  * article whose slug was typed under /en.
+ *
+ * `cache()` because three callers in one request want the same row — the
+ * layout's metadata, its JSON-LD, and the page body, which is rendered on the
+ * server now rather than fetched again from the browser.
  */
-export async function getPublicArticle(slug: string, locale: PublicLocale): Promise<PublicArticle | null> {
+export const getPublicArticle = cache(async (slug: string, locale: PublicLocale): Promise<PublicArticle | null> => {
   const supabase = await createClient()
   const { data } = await supabase
     .from('articles')
@@ -54,7 +60,7 @@ export async function getPublicArticle(slug: string, locale: PublicLocale): Prom
     .single()
 
   return (data as PublicArticle | null) ?? null
-}
+})
 
 /**
  * The FAQ block of an article, as schema.org Questions.
@@ -189,8 +195,15 @@ export function buildArticleSchemas(article: PublicArticle | null, slug: string,
         description: article.meta_description || article.excerpt,
         inLanguage: LOCALE_CONFIG[locale].lang,
         ...(article.featured_image_url && { image: article.featured_image_url }),
+        // A Person whose url is the site root says nothing about who wrote
+        // this. When the byline resolves to a profile, the url is the page
+        // that actually describes them.
         ...(article.author && {
-          author: { '@type': 'Person', name: article.author, url: SITE_URL },
+          author: {
+            '@type': 'Person',
+            name: articleAuthor(article.author)?.name[locale] ?? article.author,
+            url: `${SITE_URL}${articleAuthor(article.author)?.href[locale] ?? ''}`,
+          },
         }),
         ...(article.published_at && { datePublished: article.published_at }),
         ...(article.updated_at && { dateModified: article.updated_at }),

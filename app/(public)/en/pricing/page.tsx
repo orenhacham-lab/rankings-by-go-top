@@ -9,27 +9,13 @@ import {
   PricingChecksNote, PricingClose, PricingFaq, PricingIncluded, PricingUnsure, PricingUsage, PricingValue,
 } from '@/components/public/pricing/PricingSections'
 import { PLAN_CATALOG, type PlanCode } from '@/lib/plans/catalog'
-import { planLimitLines, PLAN_AUDIENCE_LABEL, PLAN_AUDIENCE_DESCRIPTION } from '@/lib/plans/features'
+import { planLimitLines, PLAN_AUDIENCE_LABEL, PLAN_AUDIENCE_DESCRIPTION, PLAN_DISPLAY_NAME, HIGHLIGHTED_PLAN } from '@/lib/plans/features'
 import { pricingEn as copy } from '@/lib/i18n/public/pricing-en'
 import { cn } from '@/lib/utils'
 import { formatPlanPrice, planPriceIn } from '@/lib/billing/market'
 import { resolveBillingMarket } from '@/lib/billing/server-market'
 
 const PLAN_ORDER: PlanCode[] = ['regular', 'advanced', 'premium', 'large_agency']
-
-/** Card display NAMES. The audience label and description live in
- *  lib/plans/features.ts so they cannot drift from the catalog again —
- *  Advanced was still sold here as a multi-site plan after it became a
- *  one-project plan. */
-const PLAN_NAME: Record<PlanCode, string> = {
-  regular: 'Basic',
-  advanced: 'Advanced',
-  premium: 'Premium',
-  large_agency: 'Agency',
-}
-
-/** Highlighted / "most popular" plan — a UI choice, currently pinned to Advanced. */
-const HIGHLIGHTED_PLAN: PlanCode = 'advanced'
 
 /**
  * The words around the grid (hero, what every plan includes, why it pays, how
@@ -102,7 +88,7 @@ export default async function EnglishPricingPage() {
                       {PLAN_AUDIENCE_LABEL[code]['en']}
                     </p>
                     <h3 className={cn('text-title font-bold tracking-tight', highlighted ? 'text-contrast-ink' : 'text-ink')}>
-                      {PLAN_NAME[code]}
+                      {PLAN_DISPLAY_NAME[code]['en']}
                     </h3>
                     <p className={cn('mt-1 text-copy md:min-h-12', highlighted ? 'text-contrast-ink/75' : 'text-body')}>
                       {PLAN_AUDIENCE_DESCRIPTION[code]['en']}
