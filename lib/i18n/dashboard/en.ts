@@ -6410,7 +6410,7 @@ export const dashboardEn = {
   },
   reminders: {
     settingsTitle: 'Email reminders',
-    settingsDescription: "When articles are waiting for your OK we send a short reminder: after 48 hours, after 5 days, then weekly (up to 3 reminders for the same articles). Never more than one email in 3 days, and only Sunday to Thursday mornings.",
+    settingsDescription: "When articles are waiting for your OK we send a short reminder: after 48 hours, after 5 days, then weekly (up to 3 reminders for the same articles). Never more than one email in 3 days, and only Sunday to Thursday mornings. This switch also covers the setup emails: when the site is not connected yet, or when nothing has been published from it.",
     settingsLabel: 'Email me when articles are waiting for approval',
     on: 'On',
     off: 'Off',
@@ -6435,10 +6435,68 @@ export const dashboardEn = {
     },
     unsubscribePage: {
       title: "You're unsubscribed",
-      body: "We won't email you reminders about articles waiting for your OK any more. You can turn them back on any time in the project settings.",
+      body: "We won't email you about this project any more: no reminders about articles waiting for your OK, no setup emails and no weekly summary. You can turn them back on any time in the project settings.",
+      setupTitle: 'The setup emails have stopped',
+      setupBody: "We won't send any more setup emails about this project. The reminders about articles waiting for your OK keep coming, and so does the weekly summary if you turned it on.",
+      stopAll: 'Stop every email about this project',
       invalidTitle: 'This link is not valid',
       invalidBody: 'The link is not valid or has expired. You can turn the reminders off in the project settings.',
       back: 'Go to the site',
     },
+  },
+  onboardingEmails: {
+    greeting: (name: string | null) => (name ? `Hi ${name},` : 'Hi,'),
+    guide: 'There is a full guide inside the app, under the "Guide" button at the top of the screen.',
+    help: 'Need a hand? Message us on WhatsApp: +972 54-9489377',
+    team: 'The Go Top SEO team',
+    footer: 'You get this because you opened a project on Go Top SEO and have not finished setting it up. Don\'t want these emails?',
+    unsubscribe: 'Stop the setup emails, in one click and with no login',
+    company: 'Go Top SEO · oren@gotop.co.il',
+    connect: {
+      subject: (domain: string) => `${domain} is not connected yet`,
+      preheader: 'One connection, and the system runs on its own from here.',
+      intro: (domain: string) => `You opened a project for ${domain}, but the site itself is not connected yet. Until it is, we can research and write, but we cannot publish to the site or fix anything on it. Once it is connected:`,
+      bullets: [
+        'Articles publish to the site on their own, at your plan\'s pace',
+        'Site health shows what is broken, and one click fixes it',
+        'Tracking keeps running on the pages you already have',
+      ],
+      outro: 'Connecting takes a few minutes. On WordPress you install one plugin, and it connects both the publishing and site health.',
+      button: 'Connect the site',
+    },
+    publish: {
+      subject: (domain: string) => `Nothing has been published to ${domain} yet`,
+      preheader: 'The content is written and waiting for your OK.',
+      intro: (domain: string) => `${domain} is connected, but nothing has been published from it yet. What you can do now:`,
+      bullets: [
+        'Approve an article that is waiting, and it goes up on its planned date',
+        'Ask for a different topic, and we write it again',
+        'Edit the text before it is published, as much as you like',
+      ],
+      outro: 'Until you approve it, nothing is published.',
+      button: 'Open the content screen',
+    },
+  },
+  weeklySummaryEmail: {
+    subject: (domain: string) => `This week on ${domain}`,
+    preheader: 'What happened on the site over the past week, in a few lines.',
+    greeting: (name: string | null) => (name ? `Hi ${name},` : 'Hi,'),
+    intro: (domain: string) => `Here is what happened on ${domain} over the past week:`,
+    published: (n: number) => (n === 1 ? 'One article was published:' : `${n} articles were published:`),
+    more: (k: number) => `(and ${k} more)`,
+    waiting: (n: number) => (n === 1 ? 'One article is waiting for your OK.' : `${n} articles are waiting for your OK.`),
+    rank: (checked: number, improved: number, dropped: number) =>
+      `${checked} keywords checked: ${improved} up, ${dropped} down.`,
+    gsc: (clicks: number, change: number) =>
+      change > 0
+        ? `Search Console: ${clicks} clicks over the last 28 days, ${change} more than a week ago.`
+        : `Search Console: ${clicks} clicks over the last 28 days, ${Math.abs(change)} fewer than a week ago.`,
+    next: (date: string, title: string | null) => (title ? `Next in the plan: ${title}, on ${date}.` : `The next article in the plan goes up on ${date}.`),
+    button: 'Open the reports screen',
+    help: 'Need a hand? Message us on WhatsApp: +972 54-9489377',
+    team: 'The Go Top SEO team',
+    footer: 'You get this because you turned the weekly summary on in the project settings. Don\'t want it any more?',
+    unsubscribe: 'Unsubscribe in one click, no login',
+    company: 'Go Top SEO · oren@gotop.co.il',
   },
 } as const
