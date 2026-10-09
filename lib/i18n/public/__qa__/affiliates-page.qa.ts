@@ -15,8 +15,6 @@ import { readFileSync, existsSync } from 'fs'
 import { join } from 'path'
 import { AFFILIATES_COPY, AFFILIATE_TERMS } from '../affiliates'
 import { LOCALE_PREFIX } from '../../locales'
-import { REFERRAL_WINDOW_DAYS } from '../../../affiliate/referral'
-import { affiliateTrackingEnabled } from '../../../affiliate/tracking-flag'
 import { getPublicDictionary } from '../../getPublicDictionary'
 
 let pass = 0, fail = 0
@@ -37,8 +35,12 @@ const PAGES: Record<(typeof LANGS)[number], string> = {
 console.log('A) one offer, in every language')
 {
   const T = AFFILIATE_TERMS
-  check('A1: the program\u2019s intended window is the one the referral rules carry',
-    T.windowDays === REFERRAL_WINDOW_DAYS)
+  // One source for the numbers. The page, the partner's dashboard, the commission
+  // engine and the table's defaults all read lib/affiliate/terms.ts, so a rate can
+  // never be raised on the page without the engine paying it.
+  check('A1: the numbers are read from lib/affiliate/terms.ts, not retyped here',
+    strip(read('lib/i18n/public/affiliates.ts')).includes("import { AFFILIATE_TERMS } from '@/lib/affiliate/terms'")
+    && !/baseRate: \d+/.test(strip(read('lib/i18n/public/affiliates.ts'))))
   // Each language must name the rate and the higher rate in its own text.
   const names = (lang: (typeof LANGS)[number]) => {
     const text = JSON.stringify(AFFILIATES_COPY[lang])
@@ -47,24 +49,23 @@ console.log('A) one offer, in every language')
   check('A2: every language names the rate and the higher rate', LANGS.every(names))
 
   /**
-   * A2b IS THE PROMISE GUARD, and it is the reason A2 no longer asks for the
-   * window. Honouring "remembered for 90 days" means remembering a click for 90
-   * days; the attribution decided on 5 October 2026 stores nothing on the
-   * visitor's device, so while that is true a day count on this page is an offer
-   * to partners we cannot keep. The flag is the single fact both sides read: put
-   * storage behind it and the window may be promised again, in every language at
-   * once.
+   * A2b IS THE PROMISE GUARD. Attribution is the last click on the way to signing
+   * up and NOTHING is stored on the visitor's device (lib/affiliate/referral.ts
+   * says why). So the page may not offer a remembered period or a cookie: that
+   * would be a memory we do not keep. A day count for the HOLD is a different
+   * thing and is allowed, which is why this looks for the words of remembering
+   * rather than for digits.
    */
-  const statesWindow = (lang: (typeof LANGS)[number]) =>
-    JSON.stringify(AFFILIATES_COPY[lang]).includes(String(T.windowDays))
-  check('A2b: no language promises an attribution window while nothing is remembered',
-    affiliateTrackingEnabled() ? LANGS.every(statesWindow) : !LANGS.some(statesWindow),
-    LANGS.filter(statesWindow).join(', '))
-  /* A2b-MUT: put the day count back into one language and show A2b fails. */
-  check('A2b-MUT: a day count put back into the copy is caught', (() => {
-    const withWindow = `${JSON.stringify(AFFILIATES_COPY.he)} remembered for ${T.windowDays} days`
-    return !affiliateTrackingEnabled() && withWindow.includes(String(T.windowDays))
-  })())
+  const REMEMBERS = [/cookie/i, /קוקי|עוגיי?ה/, /נזכר|נשמר למשך/, /remembered for/i, /recordad[oa] durante/i, /lembrad[oa] por/i, /ventana de atribución/i, /janela de atribuição/i, /attribution window/i, /חלון ייחוס/]
+  const promisesMemory = (lang: (typeof LANGS)[number]) =>
+    REMEMBERS.some((re) => re.test(JSON.stringify(AFFILIATES_COPY[lang])))
+  check('A2b: no language offers a remembered period or a cookie',
+    !LANGS.some(promisesMemory), LANGS.filter(promisesMemory).join(', '))
+  check('A2c: the terms hold no attribution window for a page to pick up',
+    !Object.keys(T).some((k) => /window|days/i.test(k) && k !== 'holdDays'), Object.keys(T).join(' '))
+  /* A2b-MUT: put a remembered period back into one language and show A2b fails. */
+  check('A2b-MUT: a remembered period put back into the copy is caught',
+    REMEMBERS.some((re) => re.test(`${JSON.stringify(AFFILIATES_COPY.en)} your click is remembered for 90 days`)))
   // No language may carry a number that looks like a rate but is not one of ours.
   const strayRate = (lang: (typeof LANGS)[number]) => {
     const found = [...JSON.stringify(AFFILIATES_COPY[lang]).matchAll(/(\d{1,3})\s?%/g)].map((m) => Number(m[1]))
@@ -77,7 +78,8 @@ console.log('A) one offer, in every language')
     && !/minPayoutUsd: \d+[\s\S]*minPayoutUsd: \d+/.test(strip(read('lib/i18n/public/affiliates.ts'))))
   check('A5: every language has every field filled (no empty string anywhere)',
     LANGS.every((l) => !JSON.stringify(AFFILIATES_COPY[l]).includes('""')))
-  check('A1-MUT: a page window that drifts from the cookie fails A1', (T.windowDays + 1) !== REFERRAL_WINDOW_DAYS)
+  check('A1-MUT: a rate retyped into the copy module fails A1',
+    /baseRate: \d+/.test('export const X = { baseRate: 25 }'))
   check('A3-MUT: a stray "25%" in a language fails A3',
     [...'gana el 25% de cada pago'.matchAll(/(\d{1,3})\s?%/g)].map((m) => Number(m[1])).some((n) => n !== T.baseRate && n !== T.topRate))
 }
@@ -143,10 +145,20 @@ console.log('\nD) what the page must say')
     check(`D1 (${lang}): it states manual approval, the self-referral rule and the invoice rule`,
       must[lang].every((re) => re.test(text)), must[lang].filter((re) => !re.test(text)).map(String).join(' '))
   }
-  check('D2: the page opens a conversation, not a form (approval is by a person)', (() => {
+  check('D2: the page takes an application, and still leaves a way to talk', (() => {
     const page = strip(read('components/public/AffiliatesPage.tsx'))
-    return /mailto:\$\{EMAIL\}/.test(page) && /whatsappHelpUrl\(c\.whatsappMessage\)/.test(page) && !/<form/.test(page)
+    return /<AffiliateApplicationForm locale=\{locale\} \/>/.test(page)
+      && /href: '#affiliate-apply'/.test(page)
+      && /whatsappHelpUrl\(c\.whatsappMessage\)/.test(page)
   })())
+  // A code exists only after a person decided, so the form may never create one.
+  check('D3: the form only records an application; no code, no approval', (() => {
+    const route = strip(read('app/api/affiliate/apply/route.ts'))
+    return /status: 'pending'/.test(route) && !/\bcode\s*:/.test(route)
+  })())
+  check('D2-MUT: a page without the form fails D2',
+    !/<AffiliateApplicationForm locale=\{locale\} \/>/
+      .test(strip(read('components/public/AffiliatesPage.tsx')).replace('<AffiliateApplicationForm locale={locale} />', '<div />')))
   check('D1-MUT: copy with the self-referral rule removed fails D1',
     !must.en.every((re) => re.test(JSON.stringify(AFFILIATES_COPY.en).replace(/your own account/gi, 'a nice account'))))
 }

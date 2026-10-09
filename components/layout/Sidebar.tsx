@@ -18,6 +18,7 @@ import { pillText, railCounts } from '@/lib/nudges/rows'
 import { NAV_DRAWER_EVENT, type NavDrawerRequest } from '@/lib/shell/nav-drawer'
 import type { LucideIcon } from 'lucide-react'
 import {
+  Handshake,
   LayoutGrid,
   Telescope,
   TrendingUp,
@@ -175,6 +176,12 @@ const navGroupKeys: readonly NavGroup[] = [
     items: [
       { href: '/settings', labelKey: 'projectSettings', icon: Settings2 },
       { href: '/billing', labelKey: 'billing', icon: CreditCard },
+      // The partner program, for every signed-in account rather than for
+      // partners only: the screen itself explains the program to someone who is
+      // not one yet, which is how a customer becomes one. It is deliberately
+      // NOT behind the trial/plan wall in proxy.ts — a partner whose own trial
+      // ran out is still owed money.
+      { href: '/affiliate', labelKey: 'affiliate', icon: Handshake },
     ],
   },
 ]
@@ -186,6 +193,7 @@ const adminItemKeys: readonly NavItem[] = [
   { href: '/admin/articles', labelKey: 'articleManagement', icon: Newspaper },
   { href: '/setup', labelKey: 'connectionStatus', icon: Plug },
   { href: '/admin/logs', labelKey: 'errorLogs', icon: ClipboardList },
+  { href: '/admin/affiliates', labelKey: 'affiliateAdmin', icon: Handshake },
 ]
 
 /** The administrator's entries, for the tab title (components/layout/DocumentTitle.tsx). */

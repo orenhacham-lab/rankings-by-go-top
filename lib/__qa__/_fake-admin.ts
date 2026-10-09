@@ -271,6 +271,23 @@ export class FakeAdmin {
      * two Node requests interleaving at every `await`. `Promise.all` over two
      * route invocations exercises that faithfully.
      */
+    /**
+     * `affiliate_count_click`, mirroring the INSERT ... ON CONFLICT DO UPDATE in
+     * 20261009190000_affiliate_program.sql. It proves the CONTRACT the click
+     * route depends on: one row per (partner, day), the count rising, and NOTHING
+     * about the visitor recorded. Atomicity under real concurrent backends comes
+     * from the single ON CONFLICT statement in the SQL, not from this fake.
+     */
+    if (name === 'affiliate_count_click') {
+      const days = (this.tables.affiliate_click_days ??= [])
+      const affiliateId = params.p_affiliate_id as string
+      const day = params.p_day as string
+      const existing = days.find((r) => r.affiliate_id === affiliateId && r.day === day)
+      if (existing) existing.clicks = (existing.clicks as number) + 1
+      else days.push({ affiliate_id: affiliateId, day, clicks: 1, updated_at: nowIso() })
+      return { data: null, error: null }
+    }
+
     if (name === 'claim_operation') {
       const claims = (this.tables.operation_claims ??= [])
       const key = `${params.p_user_id}:${params.p_operation}:${params.p_scope}`

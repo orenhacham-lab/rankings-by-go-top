@@ -12,16 +12,20 @@
  * guard in lib/i18n/public/__qa__/affiliates-page.qa.ts fails if any language
  * loses that link or points at another language's copy of it.
  *
- * The two calls to action open a CONVERSATION (email, WhatsApp), not a form. That is
- * deliberate: every affiliate is approved by a person before they get a link, which is
- * the program's real defence against someone signing up to refer themselves. A form
- * arrives with the attribution table.
+ * The page's own APPLICATION FORM sits after the rules, and WhatsApp and email
+ * stay in the hero and the closing call for a partner who would rather talk
+ * first. The form asks the one thing a free email always leaves out — where
+ * their audience is — and sending it grants nothing: the row is `pending`, a
+ * pending partner has no code (a CHECK constraint, not a convention), so no link
+ * exists until a person has read it. That manual approval is the program's real
+ * defence against someone joining to refer themselves.
  */
 import { BadgePercent, FileText, Handshake, Infinity as InfinityIcon, Megaphone, Receipt, RotateCcw, ShieldCheck, TicketPercent, Users } from 'lucide-react'
 import { FeaturePage, type FeaturePageContent } from '@/components/public/FeaturePage'
+import AffiliateApplicationForm from '@/components/public/AffiliateApplicationForm'
 import { AFFILIATES_COPY } from '@/lib/i18n/public/affiliates'
 import { LOCALE_PREFIX } from '@/lib/i18n/locales'
-import { EMAIL, whatsappHelpUrl } from '@/components/public/contact'
+import { whatsappHelpUrl } from '@/components/public/contact'
 import type { PublicLocale } from '@/lib/i18n/locales'
 
 const WHY_ICONS = [InfinityIcon, BadgePercent, Users] as const
@@ -29,7 +33,12 @@ const RULE_ICONS = [ShieldCheck, Megaphone, TicketPercent, Megaphone, RotateCcw,
 
 export function affiliatesContent(locale: PublicLocale): FeaturePageContent {
   const c = AFFILIATES_COPY[locale]
-  const apply = { label: c.apply, href: `mailto:${EMAIL}?subject=${encodeURIComponent(c.eyebrow)}` }
+  // The hero's primary button scrolls to the form on this page rather than
+  // opening a mail client: the form is the thing we want filled in, and a
+  // mailto from a phone is where an application goes to die. Email stays as the
+  // address in the footer, and WhatsApp is the secondary button, for a partner
+  // who would rather ask something first.
+  const apply = { label: c.apply, href: '#affiliate-apply' }
   const talk = { label: c.talk, href: whatsappHelpUrl(c.whatsappMessage) }
   return {
     hero: {
@@ -72,6 +81,10 @@ export function affiliatesContent(locale: PublicLocale): FeaturePageContent {
           </p>
         ),
       },
+      // The form comes after the rules and the agreement, so an applicant has
+      // read what they are joining before they type — and right before the FAQ,
+      // which is where someone who is nearly convinced looks next.
+      { kind: 'custom', node: <AffiliateApplicationForm locale={locale} /> },
       { kind: 'faq', title: c.faqTitle, items: c.faq },
     ],
     cta: { title: c.closeTitle, body: c.closeBody, primary: apply, secondary: talk },
