@@ -3,7 +3,7 @@ title: Contrato do Programa de Parceiros | Go Top SEO
 description: As condições que regem a participação no programa de parceiros da Go Top SEO: comissões, atribuição, pagamentos e deveres do parceiro.
 locale: pt-BR
 source: app/(public)/en/affiliate-terms/page.tsx
-lastUpdated: 2026-10-05
+lastUpdated: 2026-10-09
 register: voce
 ---
 
@@ -39,6 +39,8 @@ A atribuição é pelo último clique no seu link de indicação no caminho até
 
 O seu código viaja no próprio link de indicação. Não colocamos nenhum cookie para o Programa de Parceiros nem guardamos nada no dispositivo do visitante, de modo que o que o visitante escolhe no nosso aviso de cookies não afeta a sua atribuição nem para um lado nem para o outro. O que decorre disso: um visitante que sai e volta mais tarde sem o seu link, no mesmo dispositivo ou em outro, pode não ser atribuído a você. Não garantimos que toda visita pelo seu link de indicação resulte em atribuição, e não respondemos por uma indicação que não conseguimos registrar. Se em algum momento estendermos o crédito a uma visita que volta mais tarde, o que exigiria guardar algo, avisaremos os parceiros por escrito antes de começar e diremos o que é guardado.
 
+Um clique no seu link é contado, e o que é contado é um número: somamos um ao seu total diário, e esse é todo o registro daquele clique. Não guardamos o endereço IP do visitante, o navegador dele, o site de onde veio nem qualquer identificador, de modo que o número que você vê no seu painel é uma contagem e não uma lista de visitantes. A atribuição em si é feita com o código que viaja no endereço da página, lido uma única vez no momento em que a conta é aberta.
+
 Agimos conforme os nossos registros. Se você considerar que uma indicação foi registrada de forma incorreta, escreva para nós dentro de 60 dias da abertura da conta: vamos revisar o registro e dizer o que encontramos.
 
 ## 5. A comissão
@@ -48,6 +50,8 @@ Você recebe **30%** de cada pagamento válido de um cliente indicado, enquanto 
 A comissão é calculada sobre o valor que efetivamente recebemos, sem impostos sobre o consumo e sem qualquer outro tributo, e depois de qualquer desconto, crédito ou cupom aplicado àquele pagamento. A comissão é calculada na moeda em que o cliente pagou e é paga nessa moeda ou na moeda do seu método de pagamento, pela taxa que o nosso provedor de pagamentos aplicar no dia do pagamento.
 
 Não há comissão sobre um período de teste, sobre um pagamento que nunca foi recebido, sobre um pagamento feito por você ou por uma conta no sentido da seção 8, nem sobre um pagamento previsto em plano ou acordo negociado direta e separadamente com aquele cliente.
+
+**Um cliente cobrado pela Shopify é registrado manualmente.** A Shopify informa ao aplicativo que um plano está ativo e não que uma cobrança foi feita, então não temos um evento de pagamento automático do qual calcular. Essa indicação fica marcada como tal do nosso lado e a comissão dela é registrada manualmente contra o comprovante da cobrança na Shopify, com o mesmo percentual, o mesmo período de retenção e a mesma aprovação. Se você indicou um cliente assim e passou tempo sem comissão registrada, escreva para nós.
 
 ## 6. Aprovação, período de retenção e pagamento
 
@@ -117,7 +121,7 @@ Se você está fora de Israel, é responsável pelas suas próprias obrigações
 
 ## 14. Proteção de dados
 
-Tratamos os seus dados de parceiro — os dados da inscrição, os seus dados de pagamento e o registro das suas indicações e comissões — para operar o Programa e para pagar você, e os guardamos pelo prazo em que a lei nos obriga a guardar registros contábeis. O que fazemos com eles, e os provedores que usamos para o pagamento, estão na nossa [Política de Privacidade](/pt-BR/privacy).
+Tratamos os seus dados de parceiro — os dados da inscrição, os seus dados de pagamento e o registro das suas indicações e comissões — para operar o Programa e para pagar você, e os guardamos pelo prazo em que a lei nos obriga a guardar registros contábeis. Na inscrição registramos também o endereço IP de onde ela veio, para detectar fraude e limitar a frequência de inscrições e para nada mais; **uma inscrição recusada é excluída por completo após 12 meses e, em qualquer outro caso, o endereço IP é excluído após 12 meses**. A sua indicação pode receber uma marca que pede revisão humana antes de aprovar uma comissão, e essa marca por si só não desqualifica nada. O que fazemos com eles, e os provedores que usamos para o pagamento, estão na nossa [Política de Privacidade](/pt-BR/privacy).
 
 Você não recebe dados pessoais dos clientes que indica. Mostramos a você o número de indicações, a situação de cada assinatura para fins da sua comissão e os valores; não informamos o nome de um cliente, o endereço de e-mail, o site nem qualquer outro dado identificável, e você não pode pedir a um cliente que repasse esses dados nossos.
 
@@ -143,7 +147,9 @@ Você nos indenizará por qualquer dano, perda, multa ou despesa, incluídos hon
 
 Qualquer das partes pode rescindir este contrato a qualquer momento por comunicação escrita, sem necessidade de motivo e sem prazo de aviso prévio. Também podemos suspender o seu link de indicação ou reter uma comissão enquanto apuramos suspeita de violação, e avisaremos você de que fizemos isso.
 
-Quando este contrato terminar de forma ordinária, o seu link de indicação para de funcionar e nenhuma nova comissão é gerada, mas as comissões já ganhas e não canceladas conforme a seção 7 ou a seção 8 são pagas do mesmo jeito: vamos pagá-las no primeiro pagamento posterior ao fim do período de retenção, e o valor mínimo da seção 6 não se aplicará a esse pagamento final.
+Enquanto você estiver suspenso, e também depois de este contrato terminar, **o link que você publicou continua levando ao nosso site e os cliques nele continuam sendo contados**: o link está no mundo, em um post ou um vídeo que não estão nas nossas mãos, e um visitante que clicar nele não deve encontrar um erro. O que cessa é o direito: uma conta aberta depois disso não gera nada para você, mesmo que tenha chegado pelo seu link. Se você quiser que o link pare de funcionar, remova-o do lugar onde o publicou.
+
+Quando este contrato terminar de forma ordinária nenhuma nova comissão é gerada, mas as comissões já ganhas e não canceladas conforme a seção 7 ou a seção 8 são pagas do mesmo jeito: vamos pagá-las no primeiro pagamento posterior ao fim do período de retenção, e o valor mínimo da seção 6 não se aplicará a esse pagamento final.
 
 Quando rescindirmos este contrato porque você violou a seção 8, a seção 9 ou a seção 10, ou por fraude, podemos cancelar as comissões decorrentes da conduta envolvida e reter o pagamento delas.
 

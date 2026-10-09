@@ -1221,6 +1221,151 @@ const EMAIL_NO_TRACKING: Record<string, RegExp> = {
     !EMAIL_NO_TRACKING.en.test('Our messages report when they are opened so that we can measure delivery.'))
 }
 
+// ── 21) the partner program as it is actually built ───────────────────────
+/*
+ * UNTIL TODAY THE POLICY PROMISED TO DESCRIBE THIS BEFORE IT RAN.
+ *
+ * The live text said, in all four languages, that referral tracking, the
+ * commission record and the payout "have not been built yet" and that "each of
+ * them will be described here before it starts running". The partner system
+ * builds exactly those three, so the promise is what makes this text a
+ * precondition for the migration rather than a follow-up to it.
+ *
+ * What the code does that nothing disclosed, each pinned below because it was
+ * read out of the code and not out of a feature description:
+ *
+ *   - The application is a FORM on the site, not an email, and it records the
+ *     applicant's IP address (`applied_ip`, immutable by a database trigger)
+ *     for fraud detection and a three-an-hour rate limit. An identifier
+ *     collected for a purpose has to be disclosed with that purpose, and with
+ *     a retention: a rejected application is deleted in full after 12 months,
+ *     and in every other case the IP alone goes after 12 months.
+ *   - A click is COUNTED, not recorded: `affiliate_count_click` increments one
+ *     row per partner per day and the table has no column about the visitor.
+ *     The policy already promised no cookie and nothing on the device; it said
+ *     nothing about what a click does store, and a partner dashboard showing a
+ *     click figure invites exactly that question. The four nothings (no IP, no
+ *     user agent, no referrer, no identifier) are pinned per language.
+ *   - A referral may carry a REVIEW FLAG (the application's email is the one
+ *     that signed up; the new account is on the partner's own domain). It asks
+ *     a person to look and blocks nothing, which is worth saying because the
+ *     partner we most want — an agency signing up its own client — is the one
+ *     the signal fires on.
+ *   - A customer billed through SHOPIFY earns no automatic commission, because
+ *     Shopify reports an active plan and never a charge. The agreement promises
+ *     30% of every qualifying payment, so the way such a referral is actually
+ *     recorded (by hand, same rate, same hold, same approval) has to be in the
+ *     agreement or the promise outruns the code.
+ *   - A SUSPENDED OR ENDED partner's link keeps resolving and keeps being
+ *     counted; only entitlement stops. The agreement said the link "stops
+ *     working", which was simply untrue: the route accepts a suspended
+ *     partner's code on purpose, so that a visitor clicking a two-year-old blog
+ *     post does not meet an error.
+ */
+const PARTNER_FORM: Record<string, RegExp> = {
+  he: /הבקשה נשלחת בטופס באתר/,
+  en: /the application is a form on this site/,
+  es: /la solicitud es un formulario en este sitio/,
+  'pt-BR': /a candidatura é um formulário neste site/,
+}
+const PARTNER_IP_PURPOSE: Record<string, RegExp> = {
+  he: /לזהות גל של בקשות מזויפות,\s*ולהגביל שלוש בקשות לשעה מאותה כתובת/,
+  en: /telling a ring of fake applications from a\s*real agency, and limiting three applications an hour from one address/,
+  es: /distinguir una oleada de solicitudes falsas de una agencia real, y limitar a tres solicitudes por hora/,
+  'pt-BR': /distinguir uma onda de candidaturas falsas de uma agência real e limitar a três candidaturas por hora/,
+}
+const PARTNER_IP_RETENTION: Record<string, RegExp> = {
+  he: /בקשה שנדחתה נמחקת כולה כעבור 12\s*חודשים/,
+  en: /A rejected application is deleted in full after 12 months/,
+  es: /Una solicitud rechazada se elimina por completo al cabo de 12 meses/,
+  'pt-BR': /Uma candidatura recusada é excluída por completo após 12 meses/,
+}
+/* A click is a number. The four nothings are the whole point of the sentence. */
+const PARTNER_CLICK_COUNT: Record<string, RegExp> = {
+  he: /אחד למונה היומי של אותו\s*שותף/,
+  en: /one added to that partner&rsquo;s daily\s*total/,
+  es: /uno más en el total diario de ese socio/,
+  'pt-BR': /mais um no total diário daquele parceiro/,
+}
+const PARTNER_CLICK_NOTHING: Record<string, RegExp> = {
+  he: /בלי כתובת IP, בלי סוג דפדפן, בלי האתר שממנו הגעת ובלי\s*מזהה כלשהו/,
+  en: /no IP address, no browser, no site you came from,\s*no identifier of any kind/,
+  es: /sin dirección IP, sin navegador, sin el sitio del que llegó y sin ningún identificador/,
+  'pt-BR': /sem endereço IP, sem navegador, sem o site de onde você veio e sem nenhum identificador/,
+}
+const PARTNER_REVIEW_FLAG: Record<string, RegExp> = {
+  he: /סימון כזה מבקש מאדם להסתכל לפני אישור עמלה, ואינו חוסם\s*דבר מעצמו/,
+  en: /Such a flag asks a person to look\s*before any commission is approved; it blocks nothing by itself/,
+  es: /Esa marca pide que una persona lo revise antes de aprobar cualquier comisión; por sí sola no bloquea nada/,
+  'pt-BR': /Essa marca pede que uma pessoa verifique antes de aprovar qualquer comissão; por si só não bloqueia nada/,
+}
+const PARTNER_SHOPIFY: Record<string, RegExp> = {
+  he: /לקוח שמחויב דרך Shopify אינו מייצר עמלה אוטומטית/,
+  en: /A customer billed through Shopify produces no automatic commission/,
+  es: /Un cliente facturado a través de Shopify no genera comisión automática/,
+  'pt-BR': /Um cliente cobrado pela Shopify não gera comissão automática/,
+}
+/* The sentence the policy may no longer carry: the three things now exist. */
+const PARTNER_NOT_BUILT: Record<string, RegExp> = {
+  he: /עדיין לא\s*נבנו מעקב הפניות/,
+  en: /no referral tracking, commission record or payout has been built yet/,
+  es: /todavía no se han construido el seguimiento de referencias/,
+  'pt-BR': /ainda não foram construídos o rastreamento de indicações/,
+}
+/* In the AGREEMENT: how a Shopify referral is recorded, and what suspension does not stop. */
+const AGREEMENT_SHOPIFY_MANUAL: Record<string, RegExp> = {
+  he: /לקוח שמחויב דרך Shopify נרשם ידנית/,
+  en: /A customer billed through Shopify is recorded by hand/,
+  es: /Un cliente facturado a través de Shopify se registra a mano/,
+  'pt-BR': /Um cliente cobrado pela Shopify é registrado manualmente/,
+}
+const AGREEMENT_LINK_LIVES: Record<string, RegExp> = {
+  he: /הקישור שפרסמת ממשיך להוביל לאתר שלנו והקליקים עליו ממשיכים\s*להיספר/,
+  en: /the link you published keeps leading\s*to our site and clicks on it keep being counted/,
+  es: /el enlace que publicó sigue llevando a nuestro sitio y los clics en él siguen contándose/,
+  'pt-BR': /o link que você publicou continua levando ao nosso site e os cliques nele continuam sendo contados/,
+}
+/* And the claim it replaced may not come back: it was never true of the code. */
+const AGREEMENT_LINK_DIES: Record<string, RegExp> = {
+  he: /קישור ההפניה שלך מפסיק לעבוד/,
+  en: /your Referral Link stops working/,
+  es: /su enlace de referido deja de funcionar/,
+  'pt-BR': /o seu link de indicação para de funcionar/,
+}
+{
+  const read = (path: string) => (existsSync(path) ? readFileSync(path, 'utf8') : '')
+  const HEBREW_AFFILIATE = 'app/(legal)/affiliate-terms/page.tsx'
+  const enPrivacy = frontMatter(text[LOCALES[0]].privacy).source
+  const enAffiliate = frontMatter(text[LOCALES[0]]['affiliate-terms']).source
+  const privacyDocs: [string, string][] = [
+    ['he', read(HEBREW_PRIVACY)],
+    ['en', enPrivacy ? read(enPrivacy) : ''],
+    ...LOCALES.map((l): [string, string] => [l, text[l].privacy]),
+  ]
+  const agreementDocs: [string, string][] = [
+    ['he', read(HEBREW_AFFILIATE)],
+    ['en', enAffiliate ? read(enAffiliate) : ''],
+    ...LOCALES.map((l): [string, string] => [l, text[l]['affiliate-terms']]),
+  ]
+  for (const [name, privacy] of privacyDocs) {
+    check(`${name}/privacy: the application is a form on the site`, (PARTNER_FORM[name] ?? /$^/).test(privacy))
+    check(`${name}/privacy: the IP is disclosed with both of its purposes`, (PARTNER_IP_PURPOSE[name] ?? /$^/).test(privacy))
+    check(`${name}/privacy: a rejected application is deleted after 12 months`, (PARTNER_IP_RETENTION[name] ?? /$^/).test(privacy))
+    check(`${name}/privacy: a click is one on a daily counter`, (PARTNER_CLICK_COUNT[name] ?? /$^/).test(privacy))
+    check(`${name}/privacy: and nothing about the visitor is kept with it`, (PARTNER_CLICK_NOTHING[name] ?? /$^/).test(privacy))
+    check(`${name}/privacy: the review flag asks and does not block`, (PARTNER_REVIEW_FLAG[name] ?? /$^/).test(privacy))
+    check(`${name}/privacy: a Shopify-billed customer earns no automatic commission`, (PARTNER_SHOPIFY[name] ?? /$^/).test(privacy))
+    // The promise to describe before running has been kept, so the sentence that
+    // made it may not survive: it would now be false in the other direction.
+    check(`${name}/privacy: no longer says the three were never built`, !(PARTNER_NOT_BUILT[name] ?? /$^/).test(privacy))
+  }
+  for (const [name, agreement] of agreementDocs) {
+    check(`${name}/agreement: how a Shopify referral is recorded`, (AGREEMENT_SHOPIFY_MANUAL[name] ?? /$^/).test(agreement))
+    check(`${name}/agreement: a published link keeps working and keeps counting`, (AGREEMENT_LINK_LIVES[name] ?? /$^/).test(agreement))
+    check(`${name}/agreement: no longer claims the link stops working`, !(AGREEMENT_LINK_DIES[name] ?? /$^/).test(agreement))
+  }
+}
+
 // ── MUTATION CONTROLS ───────────────────────────────────────────────────────
 console.log('\nmutation controls')
 {
@@ -1269,6 +1414,21 @@ console.log('\nmutation controls')
     /\b90 d[íi]as\b/.test('conserva el código de ese socio durante 90 días'))
   check('a policy that stops saying no cookie is set is caught',
     !/sets no cookie at all/.test('The partner program: if you reach the site through a partner link'))
+  check('a policy that drops the IP disclosure is caught',
+    !PARTNER_IP_PURPOSE.es.test(text.es.privacy.replace(/distinguir una oleada de solicitudes falsas de una agencia real, y limitar a tres solicitudes por hora/g, ''))
+      && PARTNER_IP_PURPOSE.es.test(text.es.privacy))
+  check('a policy that keeps the IP with no retention is caught',
+    !PARTNER_IP_RETENTION['pt-BR'].test('Também registramos o endereço IP de onde veio a candidatura.'))
+  check('a click record that gains a visitor detail is caught',
+    !PARTNER_CLICK_NOTHING.es.test('un recuento: uno más en el total diario de ese socio, con la dirección IP del visitante'))
+  check('a review flag described as a block is caught',
+    !PARTNER_REVIEW_FLAG['pt-BR'].test('Essa marca bloqueia a indicação até que uma pessoa a aprove.'))
+  check('a policy that still says tracking was never built is caught',
+    PARTNER_NOT_BUILT.en.test('and no referral tracking, commission record or payout has been built yet'))
+  check('an agreement that promises every payment with no Shopify carve-out is caught',
+    !AGREEMENT_SHOPIFY_MANUAL.en.test('You earn 30% of each Qualifying Payment of a Referred Customer.'))
+  check('an agreement that still says a suspended link stops working is caught',
+    AGREEMENT_LINK_DIES.es.test('Cuando este acuerdo termine, su enlace de referido deja de funcionar.'))
   check('a footer date that drifts from the written date is caught',
     writtenRevisionDate('es', text.es.terms)
       !== frontMatter(text.es.terms.replace('lastUpdated: 2026-10-09', 'lastUpdated: 2026-10-06')).lastUpdated
