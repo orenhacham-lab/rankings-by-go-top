@@ -117,6 +117,8 @@ function main() {
       'components/PublicNav.tsx',
       'lib/i18n/public/pages/solutions.tsx',
       'components/content/ShopifyConnectionPanel.tsx',
+      // The billing page's "billed through Shopify" notice (owner, 9 Oct 2026).
+      'app/(dashboard)/billing/BillingView.tsx',
       'lib/public-links/shopify-app-store.ts',
     ])
     const users: string[] = []
@@ -141,6 +143,13 @@ function main() {
     // MUTATION CONTROLS
     check('2f-MUT: a new file using the constant is caught', outsiders([...users, 'components/Other.tsx']).length === 1)
     check('2g-MUT: the panel losing nofollow is caught', !panelOk(panel.replace('rel="nofollow noopener noreferrer"', 'rel="noopener"')))
+    const billing = strip(read('app/(dashboard)/billing/BillingView.tsx'))
+    const billingOk = (src: string) => /href=\{SHOPIFY_APP_STORE_URL\}/.test(src)
+      && /rel="nofollow noopener noreferrer"/.test(src)
+      && /if \(!SHOPIFY_APP_STORE_URL\) return null/.test(src)
+      && !/apps\.shopify\.com/.test(src)
+    check('2h: the billing page links out through the constant, nofollow, and drops the link when null', billingOk(billing))
+    check('2h-MUT: the billing link losing nofollow is caught', !billingOk(billing.replace('rel="nofollow noopener noreferrer"', 'rel="noopener"')))
   }
 
   console.log('\n3) the menu words exist in all four languages')

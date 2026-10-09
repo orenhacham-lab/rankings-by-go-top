@@ -45,6 +45,7 @@
 import { isAdminUser } from '@/lib/auth/admin-role'
 import { resolveBillingAuthority } from '@/lib/billing/governance'
 import { getActiveMigrationResult } from '@/lib/shopify/paypal-migration'
+import { readMigrationPaidPeriod } from '@/lib/shopify/paypal-paid-period'
 import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
@@ -157,6 +158,24 @@ export async function GET(request: Request) {
     return isApiCall
       ? Response.json({ error: 'shopify_billing_not_applicable' }, { status: 403 })
       : NextResponse.redirect(new URL('/billing?shopify=error&reason=shopify_billing_not_applicable', request.url))
+  }
+  // THE PAID PAYPAL PERIOD (owner decision, 9 Oct 2026). A migrating account
+  // still inside the PayPal period it already paid for is not sent to Shopify's
+  // pricing page: choosing a plan now would start a Shopify charge for days
+  // PayPal was already paid for. Billing moves after that period ends
+  // (lib/shopify/paypal-paid-period.ts). Unreadable → nothing is minted.
+  if (authority.authority !== 'shopify' && migration.migration) {
+    const paid = await readMigrationPaidPeriod(admin, connection.user_id, migration.migration)
+    if (!paid.ok) {
+      return isApiCall
+        ? Response.json({ error: 'entitlement_unavailable' }, { status: 503 })
+        : NextResponse.redirect(new URL('/billing?shopify=error&reason=entitlement_unavailable', request.url))
+    }
+    if (paid.period.inPaidPeriod) {
+      return isApiCall
+        ? Response.json({ error: 'website_paid_period_active', paidUntil: paid.period.paidUntil }, { status: 409 })
+        : NextResponse.redirect(new URL('/billing?shopify=info&reason=website_paid_period_active', request.url))
+    }
   }
   if (!connection.shop_gid) {
     return isApiCall

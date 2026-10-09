@@ -32,6 +32,7 @@ import { isAdminUser } from '@/app/api/shopify/billing/start-intent/route'
 import { resolveBillingAuthority } from '@/lib/billing/governance'
 import { getActiveMigrationResult } from '@/lib/shopify/paypal-migration'
 import { advancePayPalMigrationOnAppLoad } from '@/lib/shopify/app-load-billing-sync'
+import { readMigrationPaidPeriod, stopPayPalRenewalForMigration } from '@/lib/shopify/paypal-paid-period'
 import { embeddedPublishErrorMessage } from '@/lib/shopify/publish-error-display'
 import { scheduleShopifySeedScan } from '@/lib/seed-scan/shopify-install'
 
@@ -137,8 +138,33 @@ export async function GET(request: Request) {
   // Shopify plan button, and must NOT call the Partner billing API at all.
   const authority = await resolveBillingAuthority(admin, connection.user_id)
   const migrationResult = await getActiveMigrationResult(admin, connection.user_id)
-  const billingStateUnavailable = !authority.ok || !migrationResult.ok
-  const shopifyBills = !billingStateUnavailable
+  // THE PAID PAYPAL PERIOD (owner decision, 9 Oct 2026). A migrating account
+  // whose PayPal period is still paid for stays website-billed until it ends:
+  // no Shopify plan control, no Partner billing call, and the merchant is told
+  // the date after which they choose a Shopify plan here. An unreadable period
+  // is reported as unavailable, never guessed.
+  let websitePaidPeriodActive = false
+  let websitePaidUntil: string | null = null
+  let websiteRenewalStopped = false
+  let paidPeriodUnavailable = false
+  if (!isAdmin && migrationResult.ok && migrationResult.migration && authority.ok && authority.authority !== 'shopify') {
+    const paid = await readMigrationPaidPeriod(admin, connection.user_id, migrationResult.migration)
+    if (!paid.ok) paidPeriodUnavailable = true
+    else if (paid.period.inPaidPeriod) {
+      websitePaidPeriodActive = true
+      websitePaidUntil = paid.period.paidUntil
+      websiteRenewalStopped = paid.period.renewalStopped
+      // PayPal auto-renewal still on (e.g. the link-time attempt failed):
+      // stop it after this response. Idempotent; the daily cron also retries.
+      if (!paid.period.renewalStopped) {
+        try {
+          after(() => stopPayPalRenewalForMigration(admin, connection.user_id).then(() => undefined, () => undefined))
+        } catch { /* outside a request scope */ }
+      }
+    }
+  }
+  const billingStateUnavailable = !authority.ok || !migrationResult.ok || paidPeriodUnavailable
+  const shopifyBills = !billingStateUnavailable && !websitePaidPeriodActive
     && ((authority.ok && authority.authority === 'shopify') || !!migrationResult.migration)
 
   let billing: {
@@ -263,6 +289,12 @@ export async function GET(request: Request) {
     // Which provider bills this store, so the embedded client never offers a
     // Shopify plan to a website-billed merchant.
     billingProvider: billingStateUnavailable ? 'unavailable' : (shopifyBills ? 'shopify' : 'website'),
+    // True while a migrating account is inside its paid PayPal period: the
+    // client says the plan is paid via the website until websitePaidUntil
+    // (null = date not known yet) and offers no Shopify plan before then.
+    websitePaidPeriodActive,
+    websitePaidUntil,
+    websiteRenewalStopped,
     lastPublish: lastArticle
       ? { status: lastArticle.shopify_status, lastError: embeddedPublishErrorMessage(lastArticle.shopify_last_error), lastSyncedAt: lastArticle.shopify_last_synced_at }
       : null,

@@ -550,6 +550,17 @@ async function main() {
       'lib/shopify/__qa__/app-store-connect.qa.ts', 'lib/shopify/__qa__/billing-reconciliation-incident.qa.ts',
     ])
     untouched = untouched.split('\n').filter((f) => f && !APP_STORE_CONNECT.has(f)).join('\n')
+    // Owner 2026-10-09: no double billing (PayPal + Shopify). A connected store
+    // blocks a NEW PayPal subscription, a migrating PayPal subscriber keeps the
+    // paid period, and failed PayPal cancels are retried and alerted. No plan,
+    // price or quota file changes; only these billing-flow files may differ.
+    const NO_DOUBLE_BILLING = new Set([
+      'lib/shopify/paypal-block.ts', 'lib/shopify/paypal-paid-period.ts', 'lib/shopify/paypal-migration-retry.ts',
+      'lib/shopify/__qa__/no-double-billing.qa.ts', 'lib/shopify/__qa__/phase2-billing.qa.ts',
+      'lib/shopify/__qa__/phase2-billing-intent.qa.ts', 'lib/shopify/__qa__/phase2-blockers.qa.ts',
+      'lib/billing/__qa__/provider-matrix.qa.ts', 'lib/shopify/__qa__/phase3-reconnect-after-uninstall.qa.ts',
+    ])
+    untouched = untouched.split('\n').filter((f) => f && !NO_DOUBLE_BILLING.has(f)).join('\n')
     check('H4: plans, prices, quotas, billing, entitlement and Shopify files are untouched', untouched === '', untouched)
     // lib/subscription.ts may differ from 8b468a8 ONLY on the display-only trial line (PLAN_FEATURES.trial); nothing of entitlement moved.
     let subDiff = ''

@@ -5,6 +5,8 @@ import { cookies } from 'next/headers'
 import { getUserEntitlement } from '@/lib/subscription'
 import { resolveBillingAuthority } from '@/lib/billing/governance'
 import { getActiveMigrationResult } from '@/lib/shopify/paypal-migration'
+import { readMigrationPaidPeriod } from '@/lib/shopify/paypal-paid-period'
+import { hasAnyShopifyConnectionResult } from '@/lib/shopify/paypal-block'
 import { PENDING_LINK_COOKIE, verifyPendingLinkCookieValue } from '@/lib/shopify/pending-link'
 import { getShopifyOAuthConfig } from '@/lib/shopify/oauth'
 import { resolveBillingMarket } from '@/lib/billing/server-market'
@@ -76,10 +78,22 @@ export default async function BillingPage() {
 
   const authority = await resolveBillingAuthority(admin, user.id)
   const migrationResult = await getActiveMigrationResult(admin, user.id)
-  const governanceUnavailable = !authority.ok || !migrationResult.ok
+  // OWNER DECISION, 9 Oct 2026: any Shopify store connected to this account
+  // (any status, any of its projects) means it is billed through Shopify, so
+  // no PayPal checkout is offered — the same rule /api/paypal/activate enforces
+  // (isShopifyBillingRequiredForUser). Admins never reach this point.
+  const storeResult = await hasAnyShopifyConnectionResult(admin, user.id)
+  // A migrating account still inside the PayPal period it already paid for
+  // keeps that plan; no Shopify plan is offered before the period ends.
+  const paidPeriod = migrationResult.ok && migrationResult.migration && authority.ok && authority.authority !== 'shopify'
+    ? await readMigrationPaidPeriod(admin, user.id, migrationResult.migration)
+    : null
+  const governanceUnavailable = !authority.ok || !migrationResult.ok || !storeResult.ok || (paidPeriod !== null && !paidPeriod.ok)
   const shopifyConnected = governanceUnavailable
     ? false
     : (authority.ok && authority.authority === 'shopify') || !!migrationResult.migration || hasPendingLink
+  const shopifyStoreConnected = !governanceUnavailable && storeResult.ok && storeResult.connected
+  const websitePaidPeriod = paidPeriod && paidPeriod.ok && paidPeriod.period.inPaidPeriod ? paidPeriod.period : null
 
   const shopifyMigrationStatus =
     (migrationResult.ok && migrationResult.migration?.status as 'pending' | 'shopify_confirmed' | 'paypal_cancel_failed' | undefined) || null
@@ -103,6 +117,8 @@ export default async function BillingPage() {
       shopifyConnected={shopifyConnected}
       billingStateUnavailable={governanceUnavailable}
       shopifyMigrationStatus={shopifyMigrationStatus}
+      shopifyStoreConnected={shopifyStoreConnected}
+      websitePaidPeriod={websitePaidPeriod ? { paidUntil: websitePaidPeriod.paidUntil, renewalStopped: websitePaidPeriod.renewalStopped } : null}
       market={market}
       marketLocked={marketLocked}
       planPrices={{

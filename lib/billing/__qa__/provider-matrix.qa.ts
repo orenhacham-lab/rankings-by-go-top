@@ -131,7 +131,9 @@ async function main() {
         break
       case 'C':
         check('C: a connected store does NOT change authority', authority.ok && authority.authority === 'website')
-        check('C: PayPal/website billing stays available', paypalBlocked === false)
+        // Owner decision, 9 Oct 2026: a connected Shopify store blocks a NEW
+        // PayPal subscription (the account is billed through Shopify).
+        check('C: a new PayPal subscription is BLOCKED by the connected store', paypalBlocked === true)
         check('C: a direct start-intent request is DENIED', intent === 'shopify_billing_not_applicable')
         check('C: article creation is not blocked by Shopify billing', gate.allowed === true)
         check('C: the UI is told the website bills this account', (props.C as { billingProvider: string }).billingProvider === 'website')

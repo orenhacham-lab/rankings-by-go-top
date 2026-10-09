@@ -49,6 +49,8 @@ export type AppLoadMigrationOutcome =
   | 'in_flight_elsewhere'
   | 'admin_api_not_active'
   | 'completed'
+  /** Still inside the paid PayPal period: nothing moved, PayPal not contacted. */
+  | 'deferred_paid_period'
   | 'incomplete'
 
 export interface AppLoadMigrationResult {
@@ -125,6 +127,7 @@ export async function advancePayPalMigrationOnAppLoad(
 
   const advanced = await confirmShopifyActiveAndAdvance(admin, args.userId, deps.fetchImpl ?? fetch)
   if (!advanced) return { outcome: 'no_migration', migrationStatus: null }
+  if (advanced.deferred) return { outcome: 'deferred_paid_period', migrationStatus: advanced.status }
   if (advanced.status === 'completed' && !advanced.cancelFailed && !advanced.dbWriteUnconfirmed) {
     return { outcome: 'completed', migrationStatus: 'completed' }
   }

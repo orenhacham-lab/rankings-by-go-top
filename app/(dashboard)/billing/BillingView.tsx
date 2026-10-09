@@ -15,6 +15,7 @@ import { useConfirm } from '@/components/ui/ConfirmDialog'
 import { cn } from '@/lib/utils'
 import BillingClient from './client'
 import { INTL_LOCALE } from '@/lib/i18n/locales'
+import { SHOPIFY_APP_STORE_URL } from '@/lib/public-links/shopify-app-store'
 
 /** The 5 plans this view actually has cards/labels for. */
 type PlanKey = 'trial' | 'regular' | 'advanced' | 'premium' | 'large_agency'
@@ -43,6 +44,14 @@ interface BillingViewProps {
    *  mutations, and say so, rather than guessing a billing provider. */
   billingStateUnavailable?: boolean
   shopifyMigrationStatus: 'pending' | 'shopify_confirmed' | 'paypal_cancel_failed' | null
+  /** Owner decision, 9 Oct 2026 — ANY Shopify store is connected to this
+   *  account (any status, any project). Such an account is billed through
+   *  Shopify: no PayPal checkout is offered (and /api/paypal/activate refuses
+   *  one); the page says so and links to the Shopify App Store listing. */
+  shopifyStoreConnected?: boolean
+  /** A migrating account still inside the PayPal period it already paid for:
+   *  the date it ends (null = not known yet) and whether PayPal renewal is off. */
+  websitePaidPeriod?: { paidUntil: string | null; renewalStopped: boolean } | null
   /** w17 — decided on the server (lib/billing/server-market.ts): the stored
    *  market, else the pre-w17 market of an account that already paid, else
    *  the visitor's country. Never chosen here: there is no switcher. */
@@ -64,6 +73,8 @@ export default function BillingView({
   shopifyConnected,
   billingStateUnavailable = false,
   shopifyMigrationStatus,
+  shopifyStoreConnected = false,
+  websitePaidPeriod = null,
   market,
   marketLocked,
   planPrices,
@@ -141,7 +152,7 @@ export default function BillingView({
             {t.onPlanPrefix} <span className="font-semibold">{plan in t.planLabels ? t.planLabels[plan as PlanKey] : plan}</span>.
             {subscriptionEndsAt && (
               <span>
-                {' '}{t.renewalPrefix}{new Date(subscriptionEndsAt).toLocaleDateString(dateLocale)}
+                {' '}{renewalCancelled ? `${t.validUntilPrefix} ` : t.renewalPrefix}{new Date(subscriptionEndsAt).toLocaleDateString(dateLocale)}
               </span>
             )}
           </p>
@@ -169,9 +180,26 @@ export default function BillingView({
             </span>
             <div className="min-w-0 flex-1 space-y-4">
               <div>
-                <h2 className="text-section font-semibold text-ink">{t.shopify.title}</h2>
-                <p className="mt-1.5 max-w-prose text-copy text-muted">{t.shopify.description}</p>
+                <h2 className="text-section font-semibold text-ink">{websitePaidPeriod ? t.shopify.storeConnectedTitle : t.shopify.title}</h2>
+                <p className="mt-1.5 max-w-prose text-copy text-muted">{websitePaidPeriod ? t.shopify.storeConnectedDescription : t.shopify.description}</p>
               </div>
+              {websitePaidPeriod ? (
+                /* The paid PayPal period runs to its end; no Shopify plan before
+                   then (start-intent refuses it too), so no manage button. */
+                <>
+                  <Notice tone="info">
+                    <span data-billing-paid-until={websitePaidPeriod.paidUntil ?? ''}>
+                      {websitePaidPeriod.paidUntil
+                        ? t.shopify.paidUntil(new Date(websitePaidPeriod.paidUntil).toLocaleDateString(dateLocale))
+                        : t.shopify.paidCurrentPeriod}
+                      {' '}{websitePaidPeriod.renewalStopped ? t.shopify.renewalOff : t.shopify.renewalStopping}
+                      {' '}{t.shopify.afterPaidPeriod}
+                    </span>
+                  </Notice>
+                  <ShopifyAppStoreLink label={t.shopify.appStoreLink} />
+                </>
+              ) : (
+              <>
               {shopifyMigrationStatus === 'pending' && (
                 <Notice tone="wait">{t.shopify.migrationPending}</Notice>
               )}
@@ -189,6 +217,8 @@ export default function BillingView({
               >
                 {t.shopify.manageButton}
               </a>
+              </>
+              )}
             </div>
           </div>
         </Card>
@@ -226,6 +256,23 @@ export default function BillingView({
             </div>
           )}
 
+          {shopifyStoreConnected ? (
+            <Card className="mb-8 p-5 sm:p-6">
+              <div className="flex items-start gap-3" data-billing-shopify-store="">
+                <span aria-hidden="true" className="flex size-10 shrink-0 items-center justify-center rounded-inset bg-action-soft text-action">
+                  <ShoppingBag className="size-5" />
+                </span>
+                <div className="min-w-0 flex-1 space-y-4">
+                  <div>
+                    <h2 className="text-section font-semibold text-ink">{t.shopify.storeConnectedTitle}</h2>
+                    <p className="mt-1.5 max-w-prose text-copy text-muted">{t.shopify.storeConnectedDescription}</p>
+                  </div>
+                  <ShopifyAppStoreLink label={t.shopify.appStoreLink} />
+                </div>
+              </div>
+            </Card>
+          ) : (
+          <>
           {/* w17 — one quiet line: which currency applies, and why. No switcher. */}
           <p className="mb-4 text-caption text-muted" data-billing-market={market} data-billing-market-locked={marketLocked ? 'true' : 'false'}>
             {marketLocked ? t.marketPrompt.locked(t.marketPrompt.currencyName[market]) : t.marketPrompt.byLocation(t.marketPrompt.currencyName[market])}
@@ -313,10 +360,22 @@ export default function BillingView({
           <p className="mt-6 max-w-4xl text-caption text-muted">
             {t.keywordCheckNote}
           </p>
+          </>
+          )}
         </>
       )}
       {confirmDialog}
     </div>
+  )
+}
+
+/** The Shopify App Store listing, nofollow like every Shopify link on the site. */
+function ShopifyAppStoreLink({ label }: { label: string }) {
+  if (!SHOPIFY_APP_STORE_URL) return null
+  return (
+    <a href={SHOPIFY_APP_STORE_URL} target="_blank" rel="nofollow noopener noreferrer" className={buttonClasses({ variant: 'secondary' })} data-billing-app-store-link="">
+      {label}
+    </a>
   )
 }
 

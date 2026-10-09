@@ -206,6 +206,19 @@ async function main() {
     'lib/shopify/paypal-migration.ts',
     'lib/shopify/__qa__/app-store-connect.qa.ts',
     'lib/shopify/__qa__/billing-reconciliation-incident.qa.ts',
+    // No double billing (owner, 9 Oct 2026): the PayPal gate, the paid-period
+    // deferral and the daily PayPal retry. Its own feature; held to W3c too.
+    'app/api/shopify/billing/start-intent/route.ts',
+    'app/api/shopify/billing/return/route.ts',
+    'app/api/shopify/link/complete/route.ts',
+    'lib/shopify/paypal-block.ts',
+    'lib/shopify/paypal-paid-period.ts',
+    'lib/shopify/paypal-migration-retry.ts',
+    'lib/shopify/__qa__/no-double-billing.qa.ts',
+    'lib/shopify/__qa__/phase2-billing.qa.ts',
+    'lib/shopify/__qa__/phase2-billing-intent.qa.ts',
+    'lib/shopify/__qa__/phase2-blockers.qa.ts',
+    'lib/shopify/__qa__/phase3-reconnect-after-uninstall.qa.ts',
   ]
   const WP_SCHEMA_LINE = /publishArticleSchema|ld\+json|wordpress/i
 

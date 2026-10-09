@@ -52,7 +52,7 @@ const migrationRow = (over: Record<string, unknown> = {}) => ({
 })
 const seed = (over: Record<string, unknown> = {}) => new FakeAdmin({
   shopify_billing_migrations: [migrationRow(over)],
-  subscriptions: [{ id: 's1', user_id: USER, status: 'active', paypal_subscription_id: SUB, created_at: '2026-01-01T00:00:00Z' }],
+  subscriptions: [{ id: 's1', user_id: USER, status: 'active', paypal_subscription_id: SUB, created_at: '2026-01-01T00:00:00Z', current_period_end: '2026-09-01T00:00:00Z' }], // the paid PayPal period is over: billing may move (paypal-paid-period.ts),
   billing_governance: [{ user_id: USER, signup_origin: 'website', billing_authority: 'website', authority_reason: 'shopify_app_store_install_deferred_paypal_migration' }],
 })
 /** The caller's snapshot of the row, as app-home's getActiveMigrationResult read it. */

@@ -20,6 +20,7 @@ import { completeShopifyAppStoreLink } from '@/lib/shopify/app-store-link'
 import { missingScopes } from '@/lib/shopify/constants'
 import { buildShopifyAdminAppUrl } from '@/lib/shopify/billing-urls'
 import { scheduleShopifySeedScan } from '@/lib/seed-scan/shopify-install'
+import { stopPayPalRenewalForMigration } from '@/lib/shopify/paypal-paid-period'
 
 // The store's first seeding scan may run in after(), once linked.
 export const maxDuration = 300
@@ -102,6 +103,21 @@ export async function POST(request: Request) {
     // the one-time token is still unconsumed and can be retried.
     const httpStatus = linked.reason === 'save_failed' ? 500 : linked.reason === 'pending_invalid' ? 400 : 409
     return clearCookie(NextResponse.json({ error: linked.reason }, { status: httpStatus }))
+  }
+
+  // A PAYPAL SUBSCRIBER WHO JUST CONNECTED A STORE (owner decision, 9 Oct
+  // 2026): the paid PayPal period is kept, but PayPal's auto-renewal is
+  // stopped now so PayPal never charges again; billing moves to Shopify only
+  // after that period (lib/shopify/paypal-paid-period.ts). After this response,
+  // never in its way; a failure is retried and alerted by the daily cron.
+  // Only when this link created the migration; a re-link of an account
+  // already migrating is covered by the app home and the daily retry.
+  if (linked.migrationCreated) {
+    try {
+      after(() => stopPayPalRenewalForMigration(admin, user.id).then(() => undefined, () => undefined))
+    } catch {
+      // after() outside a request scope: the daily retry picks it up.
+    }
   }
 
   // The store's first seeding scan, after this response (lib/seed-scan/

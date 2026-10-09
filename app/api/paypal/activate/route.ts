@@ -8,6 +8,7 @@ import { marketForPayPalPlanId } from '@/lib/paypal/checkout-plans'
 import { lockBillingMarket } from '@/lib/billing/billing-market-selection'
 import { resolveBillingMarket, storedMarketOf, STORED_MARKET_KEY } from '@/lib/billing/server-market'
 import { logRestrictedAttempt, restrictionForRequest } from '@/lib/sanctions/guard'
+import { notifyRefusedPayPalActivation } from '@/lib/shopify/paypal-migration-retry'
 
 /**
  * Phase 1 hardening (goal E): activation is NEVER granted on client-submitted
@@ -64,14 +65,31 @@ export async function POST(request: Request) {
     // Shopify install who opens /billing in another tab, before any
     // project/user link exists yet, must not be able to slip through here).
     // Never decided by referrer, UTM, or any other client-supplied signal.
+    //
+    // Owner decision, 9 Oct 2026: ANY Shopify store connected to this account
+    // (any status, any of its projects) blocks a PayPal subscription here too —
+    // see lib/shopify/paypal-block.ts. Administrators are exempt from that rule.
+    //
+    // PayPal has already APPROVED this subscription by the time the browser
+    // calls us (the JS SDK creates it), so a refusal here may leave a payment
+    // with no plan behind it. The operator is told, so it can be cancelled and
+    // refunded by hand; the subscription is never cancelled from here, because
+    // its id is client-supplied and not provably this account's. The alert is
+    // sent only when PayPal itself confirms that subscription id exists and was
+    // approved, so a made-up id cannot be used to flood the operator's inbox;
+    // nothing is ever written either way.
     const admin = createAdminClient()
+    const refuse = async (reason: 'shopify_store_connected' | 'shopify_link_pending') => {
+      await notifyRefusedPayPalActivation({ userId: user.id, subscriptionId: String(subscriptionId), plan, reason })
+      return Response.json({ error: 'Shopify billing required', reason }, { status: 403 })
+    }
     if (await isShopifyBillingRequiredForUser(admin, user.id)) {
-      console.warn('[paypal-activate] blocked: user is Shopify-governed', { userId: user.id })
-      return Response.json({ error: 'Shopify billing required', reason: 'shopify_store_connected' }, { status: 403 })
+      console.warn('[paypal-activate] blocked: account is billed through Shopify', { userId: user.id })
+      return refuse('shopify_store_connected')
     }
     if (hasPendingShopifyLinkCookie(request)) {
       console.warn('[paypal-activate] blocked: pending Shopify install/link in this browser', { userId: user.id })
-      return Response.json({ error: 'Shopify billing required', reason: 'shopify_link_pending' }, { status: 403 })
+      return refuse('shopify_link_pending')
     }
 
     // Mandatory server-side verification — no env-gated skip, no "continue
