@@ -42,6 +42,7 @@ export default function EnglishSitemapPage() {
         { label: 'SEO/GEO Reports', href: '/en/features/seo-geo-reports' },
         { label: 'Keyword Research', href: '/en/features/keyword-research' },
         { label: 'Site fixes', href: '/en/features/site-health-fixes' },
+        { label: 'Links to your site', href: '/en/features/site-links' },
         { label: 'You vs. competitors', href: '/en/features/competitor-tracking' },
         { label: 'Search Console data', href: '/en/features/search-console' },
       ],
@@ -52,6 +53,7 @@ export default function EnglishSitemapPage() {
         { label: 'Business owners', href: '/en/solutions/businesses' },
         { label: 'Agencies', href: '/en/solutions/agencies' },
         { label: 'WordPress sites', href: '/en/solutions/wordpress' },
+        { label: 'Shopify stores', href: '/en/solutions/shopify' },
       ],
     },
     {

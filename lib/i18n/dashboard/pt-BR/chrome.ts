@@ -85,6 +85,10 @@ export const chromePtBR: DeepPartial<DashboardDictionary> = {
     phone: (number: string) => `Ligar para ${number}`,
     email: (address: string) => `Escrever para ${address}`,
     opensNewTab: '(abre em uma nova aba)',
+    // The floating "free demo" button (w11).
+    demo: 'Demo gratis',
+    demoAria: 'Peça uma demonstração gratuita no WhatsApp',
+    demoMessage: (domain: string) => (domain ? `Olá, quero uma demonstração gratuita do Go Top SEO para ${domain}` : 'Olá, quero uma demonstração gratuita do Go Top SEO'),
   },
   common: {
     close: 'Fechar',

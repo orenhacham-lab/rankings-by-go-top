@@ -85,8 +85,8 @@ const TOPICS: Record<string, Record<Lang, Rule>> = {
     he: { terms: [/תוכן שנוצר באמצעות AI/, /נושאים למאמרים, שאלות ומאמרים/, /משלימה נושאים\s+למאמרים באופן אוטומטי/, /תוכנית בתשלום/, /קישורים פנימיים/, /קריאה לפעולה/, /לאישורכם/, /היא שלכם/], privacy: [/נושאים, שאלות ומאמרים/, /שאלות, מאמרים, תמונות/] },
   },
   '7 emails': {
-    en: { terms: [/Email Messages/, /reminder email/i, /one-click unsubscribe/, /Monthly progress report/, /Account and service messages/], privacy: [/Email Messages/, /Resend/, /one-click unsubscribe/, /Monthly progress report/, /Account and service messages/] },
-    he: { terms: [/הודעות דוא”ל/, /הודעת תזכורת/, /הסרה בלחיצה אחת/, /דוח התקדמות חודשי/, /הודעות חשבון ושירות/], privacy: [/הודעות דוא”ל/, /Resend/, /הסרה\s+בלחיצה אחת/, /דוח התקדמות חודשי/, /הודעות חשבון ושירות/] },
+    en: { terms: [/Email Messages/, /reminder email/i, /one-click unsubscribe/, /Weekly progress summary/, /Setup emails/, /Account and service messages/], privacy: [/Email Messages/, /Resend/, /one-click unsubscribe/, /Weekly summary/, /Setup emails/, /Account and service messages/] },
+    he: { terms: [/הודעות דוא”ל/, /הודעת תזכורת/, /הסרה בלחיצה אחת/, /סיכום התקדמות שבועי/, /מיילי הקמה/, /הודעות חשבון ושירות/], privacy: [/הודעות דוא”ל/, /Resend/, /הסרה\s+בלחיצה אחת/, /סיכום שבועי/, /מיילי הקמה/, /הודעות חשבון ושירות/] },
   },
   '8 sub-processors': {
     en: { terms: [/Serper/, /ScrapeLLM/, /Resend/, /Vercel/, /Supabase/, /PayPal/, /Shopify/], privacy: [/Supabase:/, /Vercel:/, /Google \(Gemini API, Search Console, Business Profile, Google Ads API\):/, /ScrapeLLM:/, /Serper:/, /Resend:/, /PayPal:/, /Shopify:/, /PDFShift:/, /OpenStreetMap \(Nominatim\):/, /Wix:/] },
@@ -149,17 +149,18 @@ for (const [topic, byLang] of Object.entries(TOPICS)) {
 // The product name and the last-updated line.
 const OLD_NAME = /Rankings by Go Top/i
 const LAST_UPDATED: Record<Doc, Record<Lang, RegExp>> = {
-  terms: { he: /6 באוקטובר 2026/, en: /October 6, 2026/ },
-  privacy: { he: /6 באוקטובר 2026/, en: /October 6, 2026/ },
+  terms: { he: /9 באוקטובר 2026/, en: /October 9, 2026/ },
+  privacy: { he: /9 באוקטובר 2026/, en: /October 9, 2026/ },
   a11y: { he: /5 באוקטובר 2026/, en: /October 5, 2026/ },
 }
 for (const lang of ['he', 'en'] as Lang[]) for (const doc of ['terms', 'privacy', 'a11y'] as Doc[]) {
   const p = pages[lang][doc]
   // The page body runs from its title to its last-updated line; the site shell (header, footer) around it is not these pages.
   // The date is per document, not one date for all three: the terms and the
-  // privacy policy were last revised on 6 October 2026, when the site fixes
-  // inside a Shopify store were added to both, and the accessibility statement
-  // on 5 October 2026. A page that is changed without its date
+  // privacy policy were last revised on 9 October 2026 — the policy for the
+  // conversion report sent to Meta from our server, and both of them for the
+  // weekly summary that replaced a monthly one and for the setup emails — and
+  // the accessibility statement on 5 October 2026. A page that is changed without its date
   // being moved is the failure this catches, which is why the expected date
   // lives here and has to be edited deliberately.
   const dated = LAST_UPDATED[doc][lang]
@@ -170,7 +171,7 @@ for (const lang of ['he', 'en'] as Lang[]) for (const doc of ['terms', 'privacy'
   check(`${lang} ${doc}: carries its own last-updated date (${dated.source})`, dated.test(p.text))
 }
 check('MUTATION — the old name put back into a page is caught', OLD_NAME.test(pages.en.terms.src + ' Rankings by Go Top') && !OLD_NAME.test(pages.en.terms.src))
-check('MUTATION — an old last-updated date is caught', !/October 6, 2026/.test(pages.en.terms.text.replace('October 6, 2026', 'September 29, 2026')))
+check('MUTATION — an old last-updated date is caught', !/October 9, 2026/.test(pages.en.terms.text.replace('October 9, 2026', 'September 29, 2026')))
 
 // Hebrew and English stay in step.
 for (const doc of ['terms', 'privacy', 'a11y'] as Doc[]) {
@@ -255,6 +256,7 @@ check('MUTATION — an English-only extra section is caught', pages.he.terms.h2 
     'cdn.shopify.com': { en: /Shopify/, he: /Shopify/ },
     'partners.shopify.com': { en: /Shopify/, he: /Shopify/ },
     'supabase.com': { en: /Supabase/, he: /Supabase/ },
+    'graph.facebook.com': { en: /Conversions API/, he: /Conversions API/ },
   }
   /**
    * Hosts that receive nothing about a customer, each with the reason it is

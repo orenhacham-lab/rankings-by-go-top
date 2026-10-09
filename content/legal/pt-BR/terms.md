@@ -186,7 +186,8 @@ O Serviço usa IA para produzir temas de artigos, perguntas e artigos. Esse cont
 
 - **Mensagens de conta e de serviço**, como cadastro, verificação, cobrança e avisos sobre o uso do Serviço, são enviadas como parte do Serviço.
 - **Lembretes.** Quando há conteúdo aguardando a sua aprovação, um e-mail de lembrete pode ser enviado a você. Todo lembrete inclui um link de cancelamento em um clique que não exige login.
-- **Relatório mensal de progresso.** Um resumo mensal do progresso do projeto, para os projetos em que você o ativou nas configurações.
+- **E-mails de início.** Até dois e-mails sobre um projeto sem site conectado, ou com um conectado e nada publicado, explicando como concluir a etapa. Sem oferta e sem preço, com um link de cancelamento que interrompe somente esses e-mails.
+- **Resumo semanal de progresso.** Um resumo do progresso do projeto, para os projetos em que você o ativou nas configurações, no domingo pela manhã e somente quando há algo a contar. Uma semana em que nada aconteceu não recebe e-mail.
 
 ## 16. Privacidade
 
@@ -224,4 +225,4 @@ Para qualquer dúvida sobre estes termos ou sobre o Serviço, fale com a gente:
 Número da sociedade: 517274346  
 E-mail: [oren@gotop.co.il](mailto:oren@gotop.co.il)
 
-Última atualização: 4 de outubro de 2026
+Última atualização: 9 de outubro de 2026

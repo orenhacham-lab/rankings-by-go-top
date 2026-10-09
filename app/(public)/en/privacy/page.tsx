@@ -98,7 +98,10 @@ export default function EnglishPrivacyPage() {
           <li><strong>OpenStreetMap (Nominatim):</strong> to turn an address into coordinates, and only when you typed an exact address for local rank tracking. The address you typed and the country name are sent, never account details</li>
           <li><strong>ScrapeLLM:</strong> for AI visibility tracking — see &ldquo;AI Providers&rdquo; below</li>
           <li><strong>Other sites in the link network:</strong> only if you joined the network — see &ldquo;Link Network&rdquo; below</li>
-          <li><strong>Meta (Facebook / Instagram):</strong> for targeted advertising — see the Meta Advertising section below.
+          <li><strong>Meta (Facebook / Instagram):</strong> for targeted advertising, and for a report of a
+          completed signup sent from our server — see the Meta Advertising section below. For those conversion
+          events Meta does not process data on our behalf: it is a joint controller with us, as that section
+          explains.
           Data we receive from Google APIs is never shared with Meta or used for advertising</li>
           <li>When required by law</li>
         </ul>
@@ -398,9 +401,27 @@ export default function EnglishPrivacyPage() {
           <li><strong>Reminders:</strong> when content is waiting for your approval, a reminder may be sent. Every
           reminder has a one-click unsubscribe link, with no sign-in needed, and unsubscribing stops these reminders.
           Your preference is stored with us.</li>
-          <li><strong>Monthly progress report:</strong> a monthly summary of the project, for projects where you turned it
-          on in the settings.</li>
+          <li><strong>Setup emails:</strong> if you opened a project and have not connected a site to it, or connected
+          one and nothing has been published on it, we may send up to two emails explaining how to finish the step and
+          linking to the matching screen in the app. <strong>They carry no offer, no price, no discount and no
+          upgrade</strong> &mdash; they carry a link to the in-app guide, the WhatsApp number and an unsubscribe link.
+          No third one is sent, and we send no more than one email about the same project within 72 hours.</li>
+          <li><strong>Weekly summary:</strong> a summary of the project, for projects where you turned it on in the
+          settings. The summary goes out on Sunday morning, <strong>and only when there is something to say; a week
+          with nothing in it gets no email.</strong> A section we could not read is left out of the email rather than
+          reported as a zero, so the email never states a number we did not measure.</li>
         </ul>
+        <p className="mt-4">
+          <strong>Unsubscribing, as narrowly as you asked.</strong> The unsubscribe link in a setup email stops the
+          setup emails only, and the page it leads to tells you plainly that the reminders and the weekly summary keep
+          coming, and offers one click to stop those too. The unsubscribe link in a reminder or in the weekly summary
+          stops every email about that project. Turning the project&rsquo;s email switch back on in the settings clears
+          any such stop, so the switch you see in the settings is the whole picture.
+        </p>
+        <p className="mt-4">
+          <strong>We do not measure what you did with the email.</strong> Our messages carry no pixel that reports an
+          open, we do not track clicks, and we do not rewrite the links inside them to route you through us.
+        </p>
       </section>
 
       <section>
@@ -466,7 +487,9 @@ export default function EnglishPrivacyPage() {
           <li><strong>Measurement:</strong> how many people visited, which pages they read and what
           did not work. Loaded only if you allow it.</li>
           <li><strong>Marketing:</strong> measuring how our ads perform and showing relevant ads on
-          the Google and Meta networks. Loaded only if you allow it.</li>
+          the Google and Meta networks. Loaded only if you allow it. Allowing this category also covers
+          a conversion report we send to Meta from our server with no cookie at all — see the Meta
+          Advertising section.</li>
         </ul>
         <p className="mt-4">
           <strong>Before you choose, no measurement or marketing cookie is set and no request is
@@ -512,6 +535,8 @@ export default function EnglishPrivacyPage() {
         <p className="mt-4">
           Which tools are active changes from time to time. What does not change: none of them loads
           before you have allowed its category, and withdrawing your consent stops the collection.
+          Besides these tools, which run in the browser, we send Meta a conversion report from our
+          server; it too is subject to marketing consent and stops when that consent is withdrawn.
         </p>
         <p className="mt-4">
           We declare your consent state to Google through the Consent Mode v2 protocol, so the tools
@@ -540,6 +565,44 @@ export default function EnglishPrivacyPage() {
           </a>
           {'. '}
           You can opt out of personalised advertising through your Facebook account&rsquo;s privacy settings.
+        </p>
+
+        <h3>A conversion report from our server (Conversions API)</h3>
+        <p>
+          Besides the Pixel that runs in the browser, we report a completed signup to Meta from our
+          server, through an interface called the Conversions API. The report is sent{' '}
+          <strong>only</strong> if you allowed the marketing category on the cookie notice. If you
+          refused, or have not chosen yet, nothing is sent.
+        </p>
+        <p className="mt-4">What that report contains:</p>
+        <ul>
+          <li>the name of the event (a completed signup) and the time it happened</li>
+          <li>a one-time event identifier, so that Meta does not count the same signup twice</li>
+          <li>a one-way hash (SHA-256) of the email address you signed up with</li>
+          <li>a one-way hash, by the same method, of your account identifier with us</li>
+          <li>the address of the page you signed up from, without anything after the question mark</li>
+        </ul>
+        <p className="mt-4">
+          We do not send the email address itself, but the hash does not make the information
+          anonymous: if the same address is also on your Meta account, Meta can match the two and
+          identify you, so we treat this report as personal data in every respect.{' '}
+          <strong>In this report we do not send your IP address, your browser details or any Meta
+          cookie, nor your name or your phone number, and it is sent on a completed signup only,
+          never on a page view.</strong>
+        </p>
+        <p className="mt-4">
+          Withdrawing marketing consent stops future reports immediately. A report already sent we
+          cannot recall, and you can require Meta to delete it directly, through its own rights
+          channel.
+        </p>
+        <p className="mt-4">
+          <strong>Who is responsible for this data:</strong> for the collection and transmission of
+          these conversion events, we and Meta are joint controllers: Meta Platforms Ireland Limited
+          for visitors in the European Economic Area and the United Kingdom, and Meta Platforms, Inc.
+          for everyone else. From
+          the moment the data reaches Meta, Meta is an independent controller for the use it makes of
+          it for its own purposes. You may exercise your rights over this data directly against Meta,
+          and if you come to us we will pass your request on to Meta.
         </p>
       </section>
 
@@ -681,7 +744,7 @@ export default function EnglishPrivacyPage() {
         <p className="mt-4">
           <strong>We do not sell personal information and we do not transfer it for
           consideration.</strong> We do share identifiers and usage events with the Google and Meta
-          advertising networks for targeted advertising, which may count as &ldquo;sharing&rdquo;
+          advertising networks for targeted advertising, in the browser and from our server, which may count as &ldquo;sharing&rdquo;
           under California law. That sharing happens <strong>only</strong> if you allowed the
           marketing category, and it stops the moment you withdraw.
         </p>
@@ -760,7 +823,7 @@ export default function EnglishPrivacyPage() {
 
       <section>
         <p className={LEGAL_FOOTNOTE}>
-          This policy was last updated on October 6, 2026
+          This policy was last updated on October 9, 2026
         </p>
       </section>
     </LegalDoc>

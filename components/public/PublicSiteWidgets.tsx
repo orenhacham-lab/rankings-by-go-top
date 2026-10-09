@@ -4,6 +4,7 @@ import { useState } from 'react'
 import { usePathname } from 'next/navigation'
 import { CookieConsent } from '@/components/CookieConsent'
 import { WhatsAppFloat } from './WhatsAppFloat'
+import { PublicDemoFloat } from './DemoFloat'
 import { MobileContactBar } from './MobileContactBar'
 import { AccessibilityWidget } from './AccessibilityWidget'
 
@@ -108,6 +109,7 @@ export function PublicSiteWidgets({ isAuthenticated = false }: { isAuthenticated
   return (
     <>
       <AccessibilityWidget />
+      <PublicDemoFloat />
       <WhatsAppFloat />
       <MobileContactBar />
     </>

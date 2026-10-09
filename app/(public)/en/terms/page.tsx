@@ -575,8 +575,14 @@ export default function EnglishTermsPage() {
             to you. Every reminder includes a one-click unsubscribe link that does not require signing in.
           </li>
           <li>
-            <strong>Monthly progress report.</strong> A monthly summary of the project&rsquo;s progress, for
-            projects where you turned it on in the settings.
+            <strong>Setup emails.</strong> Up to two emails about a project with no site connected, or with one
+            connected and nothing published, explaining how to finish the step. No offer and no price, with an
+            unsubscribe link that stops those emails only.
+          </li>
+          <li>
+            <strong>Weekly progress summary.</strong> A summary of the project&rsquo;s progress, for projects where
+            you turned it on in the settings, on Sunday morning and only when there is something to say. A week
+            with nothing in it gets no email.
           </li>
         </ul>
       </section>
@@ -671,7 +677,7 @@ export default function EnglishTermsPage() {
 
       <section>
         <p className={LEGAL_FOOTNOTE}>
-          Last updated: October 6, 2026
+          Last updated: October 9, 2026
         </p>
       </section>
     </LegalDoc>

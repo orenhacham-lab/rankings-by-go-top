@@ -72,9 +72,19 @@ function main() {
   check('JSON-LD cannot close its <script> tag', !/<\/script/i.test(ld) && !/</.test(ld), ld)
   check('JSON-LD still parses to the same value', JSON.parse(ld).headline === 'x</script><script>alert(1)</script>')
   check('MUTATION CONTROL: plain JSON.stringify does break out', /<\/script/.test(JSON.stringify({ h: '</script>' })))
-  const layout = strip(read('app/(public)/articles/[slug]/layout.tsx'))
-  check('article layout emits JSON-LD only through jsonForScriptTag', /jsonForScriptTag\(/.test(layout) && !/__html:\s*JSON\.stringify/.test(layout))
-  const pageSrc = strip(read('app/(public)/articles/[slug]/page.tsx'))
+  // Every language's blog, not only the Hebrew one: the article page is now
+  // one component (components/public/articles/ArticleView) behind four thin
+  // routes, and a layout that emitted raw JSON.stringify in ONE of the four
+  // would be an injection point the Hebrew-only check could not see.
+  for (const dir of ['articles', 'en/articles', 'es/articles', 'pt-BR/articles']) {
+    const layout = strip(read(`app/(public)/${dir}/[slug]/layout.tsx`))
+    check(`${dir}: article layout emits JSON-LD only through jsonForScriptTag`,
+      /jsonForScriptTag\(/.test(layout) && !/__html:\s*JSON\.stringify/.test(layout))
+    const indexLayout = strip(read(`app/(public)/${dir}/layout.tsx`))
+    check(`${dir}: listing layout emits JSON-LD only through jsonForScriptTag`,
+      /jsonForScriptTag\(/.test(indexLayout) && !/__html:\s*JSON\.stringify/.test(indexLayout))
+  }
+  const pageSrc = strip(read('components/public/articles/ArticleView.tsx'))
   check('article page sanitizes before rendering and never parses with innerHTML =',
     /sanitizePublicArticleHtml\(article\.content\)/.test(pageSrc) && !/\.innerHTML\s*=\s*article\.content/.test(pageSrc))
   const publish = strip(read('app/api/publish-article/route.ts'))

@@ -1,7 +1,10 @@
 /**
- * The "who it's for" pages, in four languages: business owners, agencies and
- * WordPress sites. Shopify has no page of ours: its menu item goes straight to
- * the App Store listing (lib/public-links/shopify-app-store.ts).
+ * The "who it's for" pages, in four languages: business owners, agencies,
+ * WordPress sites and Shopify stores. Shopify had no page of ours until w11 —
+ * its menu item went straight to the App Store — and the owner asked for one
+ * with real content; the listing is still the only way in, so every link out to
+ * Shopify from here goes through SHOPIFY_APP_STORE_URL with rel="nofollow"
+ * (lib/public-links/shopify-app-store.ts).
  *
  * Every claim maps to code: monthly automatic scans (manual anytime), the AI
  * check on ChatGPT, Gemini and Google AI, publishing to WordPress, Shopify and
@@ -15,6 +18,7 @@ import {
   Search, ShieldCheck, Sparkles, Store, Tags, Type, Wrench, Blocks,
 } from 'lucide-react'
 import { WorkListVisual } from '@/components/public/feature-visuals'
+import { SHOPIFY_APP_STORE_URL } from '@/lib/public-links/shopify-app-store'
 import { FEATURE_COMMON } from '@/lib/i18n/public/feature-common'
 import type { MarketingPage } from './marketing-page'
 
@@ -765,3 +769,384 @@ export const WORDPRESS_PAGE: MarketingPage = {
   },
 }
 
+// ── Shopify stores ────────────────────────────────────────────────────────────
+
+/**
+ * The Shopify page (w11). Until now Shopify had no page of ours and its menu
+ * item went straight to the App Store; the owner asked on 9 Oct 2026 for a page
+ * with real content that links to the listing, so the menu item now points here
+ * and every link out to Shopify from this page carries rel="nofollow" through
+ * SHOPIFY_APP_STORE_URL, as every Shopify link on the site does.
+ *
+ * What it may and may not claim, read from the code rather than remembered:
+ *   - the app's granted scopes are read_products, read_content, write_content
+ *     (shopify.app.toml), so it writes ONLY the store's own articles and pages;
+ *   - the fixes it can write are SHOPIFY_FIX_TYPES — the search engine listing
+ *     (title and description), image alt text, a broken link, an FAQ block and
+ *     an extra main heading demoted (lib/site-fix/shopify-admin.ts), each
+ *     previewed, approved one at a time, and undoable;
+ *   - products, collections, the theme, prices, orders and settings are never
+ *     touched, and llms.txt is refused outright on a store (lib/site-fix/api.ts);
+ *   - automatic approval of fixes is WordPress only: a Shopify store approves
+ *     every fix itself, which is what the App Store requires;
+ *   - NO structured-data promise for Shopify anywhere, in any language;
+ *   - the automatic monthly AI check runs ChatGPT, Gemini and Google AI
+ *     (MONTHLY_CORE_ENGINES); the other three are a click.
+ */
+const shopifyAppStoreLink = (label: string) =>
+  SHOPIFY_APP_STORE_URL
+    ? (
+        <a
+          href={SHOPIFY_APP_STORE_URL}
+          target="_blank"
+          rel="nofollow noopener noreferrer"
+          className="font-semibold text-action underline decoration-action/40 underline-offset-4 hover:decoration-action"
+        >
+          {label}
+        </a>
+      )
+    : label
+
+export const SHOPIFY_PAGE: MarketingPage = {
+  path: '/solutions/shopify',
+  meta: {
+    he: {
+      title: 'לחנויות שופיפיי | Go Top SEO',
+      description: 'מתקינים את האפליקציה מחנות האפליקציות של Shopify, והמאמרים נכתבים ומתפרסמים לבלוג של החנות. סריקת החנות מוצאת בעיות במאמרים ובעמודים, ואתם מאשרים כל תיקון.',
+    },
+    en: {
+      title: 'For Shopify Stores | Go Top SEO',
+      description: 'Install the app from the Shopify App Store and articles are written and published to your store blog. The store scan finds issues in articles and pages, and you approve every fix.',
+    },
+    es: {
+      title: 'Para tiendas Shopify | Go Top SEO',
+      description: 'Instala la app desde la Shopify App Store y los artículos se escriben y se publican en el blog de tu tienda. El análisis encuentra problemas en artículos y páginas, y tú apruebas cada corrección.',
+    },
+    'pt-BR': {
+      title: 'Para lojas Shopify | Go Top SEO',
+      description: 'Instale o app na Shopify App Store e os artigos são escritos e publicados no blog da sua loja. A análise encontra problemas em artigos e páginas, e você aprova cada correção.',
+    },
+  },
+  content: {
+    he: {
+      hero: {
+        eyebrow: 'לחנויות שופיפיי',
+        eyebrowIcon: Store,
+        title: 'התוכן של החנות נכתב,',
+        accent: 'מתפרסם ונמדד',
+        subtitle: 'מתקינים את האפליקציה מחנות האפליקציות של Shopify, ומאותו רגע המערכת כותבת מאמרים על מה שהלקוחות שלכם מחפשים ומפרסמת אותם לבלוג של החנות, ומראה לכם איפה החנות מופיעה בגוגל, בגוגל מפות ובתשובות של ChatGPT, Gemini ו-Google AI.',
+        trust: he.trust,
+        primary: he.trial,
+        secondary: he.check,
+        visual: (
+          <WorkListVisual
+            heading="החנות שלכם ב-Shopify"
+            rows={[
+              { title: 'מאמר פורסם לבלוג', detail: 'מדריך בחירה · עם תמונות', icon: FileText, done: true, status: 'פורסם' },
+              { title: 'כותרת וחיפוש בגוגל תוקנו', detail: '', url: '/pages/about', icon: Type, done: true, status: 'אושר' },
+              { title: 'טקסט חלופי לתמונות במאמר', detail: '', url: '/blogs/news', icon: ImageIcon, done: true, status: 'אושר' },
+              { title: 'המאמר הבא', detail: 'ביום שני ב-09:00', icon: CalendarClock, done: false, status: 'מתוזמן' },
+            ]}
+          />
+        ),
+      },
+      sections: [
+        {
+          kind: 'callout',
+          icon: Store,
+          title: 'ההתקנה היא דרך חנות האפליקציות של Shopify',
+          body: (
+            <>
+              {'כל חנות מתקינה את המערכת מהרישום הרשמי: '}
+              {shopifyAppStoreLink('Go Top SEO ב-Shopify App Store')}
+              {'. ההתקנה היא בלחיצה, החיוב עובר דרך Shopify, ואין מה להעתיק או להדביק בקוד של החנות.'}
+            </>
+          ),
+        },
+        {
+          kind: 'cards',
+          tone: 'contrast',
+          eyebrow: 'מה המערכת עושה בחנות',
+          title: 'כתיבה, פרסום ותיקונים, בלי לגעת בתבנית',
+          items: [
+            { icon: Tags, title: 'מאמרים לבלוג של החנות', body: 'כל מאמר נכתב סביב חיפוש אמיתי, עם תמונות, מקטע שאלות ותשובות וקישורים פנימיים, ועולה לבלוג בתאריך שקבעתם.' },
+            { icon: Wrench, title: 'תיקונים שאתם מאשרים', body: 'כותרת ותיאור לחיפוש בגוגל, טקסט חלופי לתמונות, קישור שבור ומקטע שאלות ותשובות, במאמרים ובעמודים של החנות. כל תיקון מוצג לפני הכתיבה, מאושר בנפרד, ואפשר לבטל אותו.' },
+            { icon: BarChart3, title: 'מעקב על גוגל ועל ה-AI', body: 'מיקומים בגוגל ובגוגל מפות, ובדיקה אוטומטית חודשית אם ChatGPT, Gemini ו-Google AI מזכירים את החנות. שלושה מנועים נוספים בלחיצה.' },
+          ],
+        },
+        {
+          kind: 'steps',
+          eyebrow: 'איך מתחילים',
+          title: 'שלושה צעדים, בלי מתכנת',
+          items: [
+            { title: 'מתקינים מחנות האפליקציות', body: <>{'פותחים את '}{shopifyAppStoreLink('הרישום של Go Top SEO')}{' ומאשרים את ההתקנה בחנות.'}</> },
+            { title: 'המערכת סורקת את החנות', body: 'המאמרים והעמודים נקראים, והמערכת מציגה מה חסר ומה כדאי לתקן, לפי סדר חשיבות.' },
+            { title: 'מאשרים תוכן ותיקונים', body: 'בוחרים על מה נכתב, מאשרים כל תיקון בנפרד, והפרסום לבלוג קורה לפי לוח הזמנים שקבעתם.' },
+          ],
+        },
+        {
+          kind: 'cards',
+          columns: 2,
+          eyebrow: 'הגבולות, בלי אותיות קטנות',
+          title: 'במה המערכת לא נוגעת בחנות שלכם',
+          items: [
+            { icon: ShieldCheck, title: 'לא בתבנית ולא בקוד', body: 'המערכת כותבת רק בתוך המאמרים והעמודים של החנות. היא לא נוגעת בתבנית, בקוד, בהגדרות, במחירים ובהזמנות.' },
+            { icon: Info, title: 'מוצרים וקטגוריות: מראים, לא כותבים', body: 'ההרשאות של האפליקציה לקריאת מוצרים וקטגוריות הן לקריאה בלבד, אז המערכת מראה לכם מה לתקן בעמוד המוצר ואתם מתקנים בשופיפיי. פתיחה של תיקון אוטומטי שם דורשת גרסה חדשה של האפליקציה.' },
+          ],
+        },
+        {
+          kind: 'faq',
+          eyebrow: 'שאלות נפוצות',
+          title: 'מה שואלים לפני שמתקינים',
+          items: [
+            { q: 'האם המערכת תשנה לי דברים בחנות בלי שאאשר?', a: 'לא. בחנות שופיפיי כל תיקון מוצג לפני הכתיבה ומאושר בנפרד, וגם אחרי שאושר אפשר לבטל אותו. אישור אוטומטי של תיקונים קיים באתרי וורדפרס בלבד.' },
+            { q: 'איפה המאמרים מתפרסמים?', a: 'בבלוג של החנות, כמו כל מאמר אחר שלכם. אתם יכולים לפתוח, לערוך ולתזמן מחדש כל מאמר לפני הפרסום.' },
+            { q: 'צריך להוסיף קוד או תוסף לחנות?', a: 'לא. ההתקנה היא דרך חנות האפליקציות של Shopify, והמערכת עובדת מול החנות בלי שינוי בתבנית.' },
+            { q: 'מה עם נתונים מובנים בחנות?', a: 'התבנית של Shopify כבר מדפיסה חלק מהנתונים המובנים, והמערכת לא מוסיפה שם נתונים מובנים משלה. נתונים מובנים שאנחנו כותבים קיימים רק באתרי וורדפרס עם התוסף של Go Top. בעמוד בריאות האתר אנחנו מסתירים את השורות שהתבנית כבר מכסה.' },
+          ],
+        },
+      ],
+      cta: { title: 'התחילו עם החנות שלכם', body: he.closeBody, primary: he.trial, secondary: he.check },
+    },
+    en: {
+      hero: {
+        eyebrow: 'For Shopify stores',
+        eyebrowIcon: Store,
+        title: 'Your store content written,',
+        accent: 'published and measured',
+        subtitle: 'Install the app from the Shopify App Store, and from then on the system writes articles about what your customers are searching for, publishes them to your store blog, and shows you where the store appears in Google, Google Maps and the answers of ChatGPT, Gemini and Google AI.',
+        trust: en.trust,
+        primary: en.trial,
+        secondary: en.check,
+        visual: (
+          <WorkListVisual
+            heading="Your Shopify store"
+            rows={[
+              { title: 'Article published to the blog', detail: 'Buying guide · with images', icon: FileText, done: true, status: 'Published' },
+              { title: 'Search engine listing fixed', detail: '', url: '/pages/about', icon: Type, done: true, status: 'Approved' },
+              { title: 'Alt text for article images', detail: '', url: '/blogs/news', icon: ImageIcon, done: true, status: 'Approved' },
+              { title: 'Next article', detail: 'Monday at 09:00', icon: CalendarClock, done: false, status: 'Scheduled' },
+            ]}
+          />
+        ),
+      },
+      sections: [
+        {
+          kind: 'callout',
+          icon: Store,
+          title: 'Installation goes through the Shopify App Store',
+          body: (
+            <>
+              {'Every store installs from the official listing: '}
+              {shopifyAppStoreLink('Go Top SEO on the Shopify App Store')}
+              {'. It is one click, billing runs through Shopify, and there is nothing to paste into your store code.'}
+            </>
+          ),
+        },
+        {
+          kind: 'cards',
+          tone: 'contrast',
+          eyebrow: 'What the system does in your store',
+          title: 'Writing, publishing and fixes, without touching the theme',
+          items: [
+            { icon: Tags, title: 'Articles on your store blog', body: 'Each article is built around a real search, with images, an FAQ section and internal links, and goes live on the blog on the date you set.' },
+            { icon: Wrench, title: 'Fixes you approve', body: 'The search engine listing title and description, image alt text, a broken link and an FAQ section, in your store articles and pages. Every fix is shown before it is written, approved on its own, and can be undone.' },
+            { icon: BarChart3, title: 'Tracking in Google and in AI', body: 'Positions in Google and Google Maps, and an automatic monthly check of whether ChatGPT, Gemini and Google AI mention the store. Three more engines are one click.' },
+          ],
+        },
+        {
+          kind: 'steps',
+          eyebrow: 'Getting started',
+          title: 'Three steps, no developer',
+          items: [
+            { title: 'Install from the App Store', body: <>{'Open '}{shopifyAppStoreLink('the Go Top SEO listing')}{' and approve the installation in your store.'}</> },
+            { title: 'The system scans the store', body: 'Your articles and pages are read, and the system shows what is missing and what is worth fixing, in order of importance.' },
+            { title: 'Approve content and fixes', body: 'Choose what gets written, approve each fix on its own, and publishing to the blog follows the schedule you set.' },
+          ],
+        },
+        {
+          kind: 'cards',
+          columns: 2,
+          eyebrow: 'The limits, no small print',
+          title: 'What the system never touches in your store',
+          items: [
+            { icon: ShieldCheck, title: 'Not the theme, not the code', body: 'The system writes only inside your store articles and pages. It does not touch the theme, the code, your settings, your prices or your orders.' },
+            { icon: Info, title: 'Products and collections: shown, not written', body: 'The app’s access to products and collections is read-only, so the system shows you what to fix on a product page and you fix it in Shopify. Fixing those automatically would need a new version of the app.' },
+          ],
+        },
+        {
+          kind: 'faq',
+          eyebrow: 'Common questions',
+          title: 'What stores ask before installing',
+          items: [
+            { q: 'Will it change things in my store without my approval?', a: 'No. In a Shopify store every fix is shown before it is written and approved on its own, and even after approval it can be undone. Automatic approval of fixes exists on WordPress sites only.' },
+            { q: 'Where are the articles published?', a: 'On your store blog, like any other article of yours. You can open, edit and reschedule any article before it is published.' },
+            { q: 'Do I need to add code or an app embed?', a: 'No. Installation goes through the Shopify App Store, and the system works with your store without changing the theme.' },
+            { q: 'What about structured data in the store?', a: 'A Shopify theme already prints some structured data, and the system does not add structured data of its own there. Structured data we write exists only on WordPress sites with the Go Top plugin. On the Site health page we hide the rows your theme already covers.' },
+          ],
+        },
+      ],
+      cta: { title: 'Start with your store', body: en.closeBody, primary: en.trial, secondary: en.check },
+    },
+    es: {
+      hero: {
+        eyebrow: 'Para tiendas Shopify',
+        eyebrowIcon: Store,
+        title: 'El contenido de tu tienda se escribe,',
+        accent: 'se publica y se mide',
+        subtitle: 'Instala la app desde la Shopify App Store y, a partir de ese momento, el sistema escribe artículos sobre lo que buscan tus clientes, los publica en el blog de tu tienda y te muestra dónde aparece la tienda en Google, en Google Maps y en las respuestas de ChatGPT, Gemini y Google AI.',
+        trust: es.trust,
+        primary: es.trial,
+        secondary: es.check,
+        visual: (
+          <WorkListVisual
+            heading="Tu tienda en Shopify"
+            rows={[
+              { title: 'Artículo publicado en el blog', detail: 'Guía de compra · con imágenes', icon: FileText, done: true, status: 'Publicado' },
+              { title: 'Listado de Google corregido', detail: '', url: '/pages/about', icon: Type, done: true, status: 'Aprobado' },
+              { title: 'Texto alternativo de las imágenes', detail: '', url: '/blogs/news', icon: ImageIcon, done: true, status: 'Aprobado' },
+              { title: 'Próximo artículo', detail: 'El lunes a las 09:00', icon: CalendarClock, done: false, status: 'Programado' },
+            ]}
+          />
+        ),
+      },
+      sections: [
+        {
+          kind: 'callout',
+          icon: Store,
+          title: 'La instalación se hace desde la Shopify App Store',
+          body: (
+            <>
+              {'Cada tienda instala desde la ficha oficial: '}
+              {shopifyAppStoreLink('Go Top SEO en la Shopify App Store')}
+              {'. Es un clic, el cobro va por Shopify y no hay nada que pegar en el código de la tienda.'}
+            </>
+          ),
+        },
+        {
+          kind: 'cards',
+          tone: 'contrast',
+          eyebrow: 'Qué hace el sistema en tu tienda',
+          title: 'Escribir, publicar y corregir, sin tocar la plantilla',
+          items: [
+            { icon: Tags, title: 'Artículos en el blog de tu tienda', body: 'Cada artículo se construye alrededor de una búsqueda real, con imágenes, una sección de preguntas frecuentes y enlaces internos, y se publica en el blog en la fecha que elijas.' },
+            { icon: Wrench, title: 'Correcciones que tú apruebas', body: 'El título y la descripción para Google, el texto alternativo de las imágenes, un enlace roto y una sección de preguntas frecuentes, en los artículos y las páginas de tu tienda. Cada corrección se muestra antes de escribirla, se aprueba por separado y se puede deshacer.' },
+            { icon: BarChart3, title: 'Seguimiento en Google y en la IA', body: 'Posiciones en Google y en Google Maps, y una comprobación automática mensual de si ChatGPT, Gemini y Google AI mencionan la tienda. Otros tres motores, con un clic.' },
+          ],
+        },
+        {
+          kind: 'steps',
+          eyebrow: 'Cómo empezar',
+          title: 'Tres pasos, sin programador',
+          items: [
+            { title: 'Instala desde la App Store', body: <>{'Abre '}{shopifyAppStoreLink('la ficha de Go Top SEO')}{' y aprueba la instalación en tu tienda.'}</> },
+            { title: 'El sistema analiza la tienda', body: 'Se leen tus artículos y páginas, y el sistema muestra qué falta y qué conviene corregir, por orden de importancia.' },
+            { title: 'Apruebas contenido y correcciones', body: 'Eliges sobre qué se escribe, apruebas cada corrección por separado y la publicación en el blog sigue el calendario que fijaste.' },
+          ],
+        },
+        {
+          kind: 'cards',
+          columns: 2,
+          eyebrow: 'Los límites, sin letra pequeña',
+          title: 'Qué no toca el sistema en tu tienda',
+          items: [
+            { icon: ShieldCheck, title: 'Ni la plantilla ni el código', body: 'El sistema escribe solo dentro de los artículos y las páginas de tu tienda. No toca la plantilla, el código, tus ajustes, tus precios ni tus pedidos.' },
+            { icon: Info, title: 'Productos y colecciones: se muestran, no se escriben', body: 'El acceso de la app a productos y colecciones es de solo lectura, así que el sistema te muestra qué corregir en la página de producto y tú lo corriges en Shopify. Corregirlo automáticamente requeriría una nueva versión de la app.' },
+          ],
+        },
+        {
+          kind: 'faq',
+          eyebrow: 'Preguntas frecuentes',
+          title: 'Lo que preguntan las tiendas antes de instalar',
+          items: [
+            { q: '¿Va a cambiar cosas en mi tienda sin que yo lo apruebe?', a: 'No. En una tienda Shopify cada corrección se muestra antes de escribirla y se aprueba por separado, y aun después de aprobarla se puede deshacer. La aprobación automática de correcciones existe solo en sitios WordPress.' },
+            { q: '¿Dónde se publican los artículos?', a: 'En el blog de tu tienda, como cualquier otro artículo tuyo. Puedes abrir, editar y reprogramar cualquier artículo antes de publicarlo.' },
+            { q: '¿Hay que añadir código o una extensión?', a: 'No. La instalación se hace desde la Shopify App Store y el sistema trabaja con tu tienda sin cambiar la plantilla.' },
+            { q: '¿Y los datos estructurados de la tienda?', a: 'Una plantilla de Shopify ya imprime parte de los datos estructurados, y el sistema no añade datos estructurados propios ahí. Los datos estructurados que escribimos existen solo en sitios WordPress con el plugin de Go Top. En la página de salud del sitio ocultamos las filas que tu plantilla ya cubre.' },
+          ],
+        },
+      ],
+      cta: { title: 'Empieza con tu tienda', body: es.closeBody, primary: es.trial, secondary: es.check },
+    },
+    'pt-BR': {
+      hero: {
+        eyebrow: 'Para lojas Shopify',
+        eyebrowIcon: Store,
+        title: 'O conteúdo da sua loja é escrito,',
+        accent: 'publicado e medido',
+        subtitle: 'Instale o app na Shopify App Store e, a partir daí, o sistema escreve artigos sobre o que os seus clientes procuram, publica no blog da sua loja e mostra onde a loja aparece no Google, no Google Maps e nas respostas do ChatGPT, do Gemini e do Google AI.',
+        trust: pt.trust,
+        primary: pt.trial,
+        secondary: pt.check,
+        visual: (
+          <WorkListVisual
+            heading="Sua loja na Shopify"
+            rows={[
+              { title: 'Artigo publicado no blog', detail: 'Guia de compra · com imagens', icon: FileText, done: true, status: 'Publicado' },
+              { title: 'Listagem do Google corrigida', detail: '', url: '/pages/about', icon: Type, done: true, status: 'Aprovado' },
+              { title: 'Texto alternativo das imagens', detail: '', url: '/blogs/news', icon: ImageIcon, done: true, status: 'Aprovado' },
+              { title: 'Próximo artigo', detail: 'Segunda-feira às 09:00', icon: CalendarClock, done: false, status: 'Agendado' },
+            ]}
+          />
+        ),
+      },
+      sections: [
+        {
+          kind: 'callout',
+          icon: Store,
+          title: 'A instalação é feita pela Shopify App Store',
+          body: (
+            <>
+              {'Toda loja instala pela listagem oficial: '}
+              {shopifyAppStoreLink('Go Top SEO na Shopify App Store')}
+              {'. É um clique, a cobrança passa pela Shopify e não há nada para colar no código da loja.'}
+            </>
+          ),
+        },
+        {
+          kind: 'cards',
+          tone: 'contrast',
+          eyebrow: 'O que o sistema faz na sua loja',
+          title: 'Escrever, publicar e corrigir, sem tocar no tema',
+          items: [
+            { icon: Tags, title: 'Artigos no blog da sua loja', body: 'Cada artigo é construído em torno de uma busca real, com imagens, uma seção de perguntas frequentes e links internos, e vai ao ar no blog na data que você definir.' },
+            { icon: Wrench, title: 'Correções que você aprova', body: 'O título e a descrição para o Google, o texto alternativo das imagens, um link quebrado e uma seção de perguntas frequentes, nos artigos e nas páginas da sua loja. Cada correção é mostrada antes de ser escrita, aprovada separadamente, e pode ser desfeita.' },
+            { icon: BarChart3, title: 'Acompanhamento no Google e na IA', body: 'Posições no Google e no Google Maps, e uma verificação automática mensal de o ChatGPT, o Gemini e o Google AI mencionam a loja. Outros três motores, com um clique.' },
+          ],
+        },
+        {
+          kind: 'steps',
+          eyebrow: 'Como começar',
+          title: 'Três passos, sem programador',
+          items: [
+            { title: 'Instale pela App Store', body: <>{'Abra '}{shopifyAppStoreLink('a listagem do Go Top SEO')}{' e aprove a instalação na sua loja.'}</> },
+            { title: 'O sistema analisa a loja', body: 'Seus artigos e páginas são lidos, e o sistema mostra o que falta e o que vale corrigir, por ordem de importância.' },
+            { title: 'Você aprova conteúdo e correções', body: 'Escolhe sobre o que será escrito, aprova cada correção separadamente, e a publicação no blog segue o calendário que você definiu.' },
+          ],
+        },
+        {
+          kind: 'cards',
+          columns: 2,
+          eyebrow: 'Os limites, sem letras miúdas',
+          title: 'No que o sistema nunca mexe na sua loja',
+          items: [
+            { icon: ShieldCheck, title: 'Nem no tema, nem no código', body: 'O sistema escreve apenas dentro dos artigos e das páginas da sua loja. Não mexe no tema, no código, nas suas configurações, nos seus preços nem nos seus pedidos.' },
+            { icon: Info, title: 'Produtos e coleções: mostrados, não escritos', body: 'O acesso do app a produtos e coleções é somente de leitura, então o sistema mostra o que corrigir na página do produto e você corrige na Shopify. Corrigir isso automaticamente exigiria uma nova versão do app.' },
+          ],
+        },
+        {
+          kind: 'faq',
+          eyebrow: 'Perguntas frequentes',
+          title: 'O que as lojas perguntam antes de instalar',
+          items: [
+            { q: 'O sistema vai mudar coisas na minha loja sem a minha aprovação?', a: 'Não. Em uma loja Shopify cada correção é mostrada antes de ser escrita e aprovada separadamente, e mesmo depois de aprovada pode ser desfeita. A aprovação automática de correções existe só em sites WordPress.' },
+            { q: 'Onde os artigos são publicados?', a: 'No blog da sua loja, como qualquer outro artigo seu. Você pode abrir, editar e reagendar qualquer artigo antes da publicação.' },
+            { q: 'Preciso adicionar código ou uma extensão?', a: 'Não. A instalação é feita pela Shopify App Store, e o sistema funciona com a sua loja sem alterar o tema.' },
+            { q: 'E os dados estruturados da loja?', a: 'Um tema da Shopify já imprime parte dos dados estruturados, e o sistema não adiciona dados estruturados próprios ali. Os dados estruturados que escrevemos existem apenas em sites WordPress com o plugin do Go Top. Na página de saúde do site escondemos as linhas que o seu tema já cobre.' },
+          ],
+        },
+      ],
+      cta: { title: 'Comece com a sua loja', body: pt.closeBody, primary: pt.trial, secondary: pt.check },
+    },
+  },
+}

@@ -3,7 +3,7 @@
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { useState, useEffect } from 'react'
-import { BarChart3, Blocks, Briefcase, ChevronDown, FileText, MapPin, Menu, LineChart, Search, ShoppingBag, Sparkles, Store, Users, Telescope, Wrench, X, type LucideIcon } from 'lucide-react'
+import { BarChart3, Blocks, Briefcase, ChevronDown, FileText, MapPin, Menu, LineChart, Search, ShoppingBag, Sparkles, Store, Users, Telescope, Waypoints, Wrench, X, type LucideIcon } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { LOCALE_PREFIX, PUBLIC_LOCALES, localeHomeHref, type PublicLocale } from '@/lib/i18n/locales'
 import { getPublicDictionary } from '@/lib/i18n/getPublicDictionary'
@@ -97,8 +97,11 @@ export function PublicNav({ locale = 'he', tone = 'default' }: { locale?: Public
   })
   // Three columns, in the order a customer meets the value (owner, 5 Oct 2026,
   // after the competitor's menu): what we measure, the work the system does,
-  // and how the results are shown, three items each (owner, 6 Oct 2026: the
-  // columns must balance). Every item is a feature that works today.
+  // and how the results are shown. The columns balanced at three each (owner,
+  // 6 Oct 2026) until the owner asked on 9 Oct 2026 whether links belonged
+  // here; they do — "Links" is a shipped, ungated tab — so the middle column,
+  // which is the work itself, carries four. Every item is a feature that works
+  // today.
   const featureGroups: { id: string; title: string; items: MenuItem[] }[] = [
     {
       id: 'measure',
@@ -116,6 +119,7 @@ export function PublicNav({ locale = 'he', tone = 'default' }: { locale?: Public
         feature('keywordResearch', 'keyword-research', Telescope),
         feature('contentPublishing', 'seo-geo-content-publishing', FileText),
         feature('siteFixes', 'site-health-fixes', Wrench),
+        feature('links', 'site-links', Waypoints),
       ],
     },
     {
@@ -129,13 +133,17 @@ export function PublicNav({ locale = 'he', tone = 'default' }: { locale?: Public
     },
   ]
   const sm = dict.nav.solutionsMenu
-  // Shopify always means the App Store listing, never a page of ours; it is left
-  // out until the listing URL is confirmed (lib/public-links/shopify-app-store.ts).
+  // Shopify used to be the App Store listing itself. From w11 the menu goes to
+  // our own page (owner, 9 Oct 2026: "a page with content, and a link to the app
+  // in it"), and that page is the one that links out to the listing, still
+  // through SHOPIFY_APP_STORE_URL and still rel="nofollow". A store can only
+  // install from the listing, so when the constant is null there is nothing to
+  // send anyone to and the item is left out, exactly as before.
   const solutionItems: MenuItem[] = [
     { id: 'businesses', href: `${prefix}/solutions/businesses`, label: sm.businesses.label, description: sm.businesses.description, icon: Store },
     { id: 'agencies', href: `${prefix}/solutions/agencies`, label: sm.agencies.label, description: sm.agencies.description, icon: Briefcase },
     ...(SHOPIFY_APP_STORE_URL
-      ? [{ id: 'shopify', href: SHOPIFY_APP_STORE_URL, label: sm.shopify.label, description: sm.shopify.description, icon: ShoppingBag, external: true }]
+      ? [{ id: 'shopify', href: `${prefix}/solutions/shopify`, label: sm.shopify.label, description: sm.shopify.description, icon: ShoppingBag }]
       : []),
     { id: 'wordpress', href: `${prefix}/solutions/wordpress`, label: sm.wordpress.label, description: sm.wordpress.description, icon: Blocks },
   ]

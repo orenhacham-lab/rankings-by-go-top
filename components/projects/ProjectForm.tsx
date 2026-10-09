@@ -50,7 +50,10 @@ export default function ProjectForm({
   const onlyClient = implicitClientId(clients)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
-  const [autoScan, setAutoScan] = useState(project?.auto_scan_enabled ?? false)
+  // A NEW project starts with automatic monthly tracking ON: the public site
+  // promises automatic rank tracking, and an off-by-default switch left every
+  // new owner tracking by hand without knowing it. Editing keeps what is stored.
+  const [autoScan, setAutoScan] = useState(project?.auto_scan_enabled ?? true)
   // Turning automatic scans on starts them monthly; the frequency shows only while they are on.
   const toggleAutoScan = (on: boolean) => {
     setAutoScan(on)
@@ -58,7 +61,7 @@ export default function ProjectForm({
   }
   // Phase 3 — weekly and monthly_first_day removed; only manual/monthly remain.
   const [scanFreq, setScanFreq] = useState<'manual' | 'monthly'>(
-    project?.scan_frequency || 'manual'
+    project?.scan_frequency || 'monthly'
   )
   // The values the form opened with stay selectable even when they are not in
   // the short lists below (a scan can store any country and language).

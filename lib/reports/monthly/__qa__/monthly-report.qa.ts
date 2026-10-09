@@ -10,7 +10,8 @@
  *  C) the cron fails closed without CRON_SECRET and is wired and scheduled
  *     away from the other crons;
  *  E) an empty month still renders, and every section says why it is empty;
- *  M) the weekly email switch defaults OFF and nothing sends;
+ *  M) the weekly email switch defaults OFF, and the monthly report itself still
+ *     reaches no provider (the weekly sender lives in lib/reports/weekly);
  *  P) no provider or model is reached, and nothing Shopify is touched.
  *
  * Every check has a mutation control. Handlers run against FakeAdmin (real filter
@@ -36,7 +37,6 @@ import { lastCompleteMonth, monthRange, nextReportAt, periodMonthOf } from '../p
 import { insertReport, loadMonthInputs, readPreferences, type OwnedProject } from '../store'
 import type { MonthlyReportData } from '../types'
 import { generateMonthlyReportHTML, monthlyReportFileName } from '../pdf'
-import { sendWeeklySummary, WEEKLY_EMAIL_SENDING_ENABLED } from '../weekly-email'
 import MonthlyReportView from '../../../../components/reports/monthly/MonthlyReportView'
 import { MonthlyReportsBody } from '../../../../components/reports/monthly/MonthlyReports'
 import { MonthlyTeaserBody } from '../../../../components/reports/monthly/MonthlyReportTeaser'
@@ -524,7 +524,7 @@ async function main() {
   }
 
   // ── M) the weekly email ────────────────────────────────────────────────────
-  console.log('\nM) the weekly email switch defaults off and nothing sends')
+  console.log('\nM) the weekly email switch defaults off, and the report reaches no provider')
   {
     const admin = new FakeAdmin(tables())
     check('M1: no preference row reads as OFF', (await readPreferences(admin as never, OWNED)).weeklyEmailSummary === false)
@@ -535,9 +535,9 @@ async function main() {
     const bad = await handlePreferencesPut(post('/api/reports/monthly/preferences', { projectId: P, weeklyEmailSummary: 'yes' }, 'PUT'), routeDeps(admin))
     check('M4: a non-boolean is refused (400)', bad.status === 400)
     const off = render(createElement(WeeklyEmailSwitch, { on: false, busy: false, onChange: () => {}, language: 'he', note: null }))
-    check('M5: the switch renders OFF, and says sending is not live yet', off.includes('aria-checked="false"') && textOf(off).includes(monthlyCopy('he').email.notLive))
-    const res = await sendWeeklySummary({ projectId: P, ownerUserId: OWNER })
-    check('M6: the sender hook refuses and the flag is false', res.sent === false && WEEKLY_EMAIL_SENDING_ENABLED === false)
+    check('M5: the switch renders OFF, and says when the summary goes out', off.includes('aria-checked="false"') && textOf(off).includes(monthlyCopy('he').email.cadence))
+    check('M6: the switch no longer claims sending is off, in any language',
+      (['he', 'en', 'es', 'pt-BR'] as const).every((l) => !/not switched on|todavía no está activado|ainda não está ativado|עוד לא הופעלה/.test(monthlyCopy(l).email.cadence)))
 
     const files: string[] = []
     const walk = (dir: string) => {
@@ -549,14 +549,22 @@ async function main() {
       }
     }
     for (const d of ['app', 'lib', 'components']) walk(d)
-    const importers = (list: { f: string; s: string }[]) => list.filter(({ f, s }) => !f.endsWith('weekly-email.ts') && /from ['"][^'"]*weekly-email['"]/.test(s)).map(({ f }) => f)
+    // The sender lives in lib/reports/weekly and is reached ONLY through its isolated
+    // wrapper: nothing else in the app may import its run or its live dependencies.
+    const importers = (list: { f: string; s: string }[]) => list
+      .filter(({ f, s }) => !f.replace(/\\/g, '/').startsWith('lib/reports/weekly/') && /from ['"][^'"]*reports\/weekly\/(run|live|store|email)['"]/.test(s))
+      .map(({ f }) => f)
     const sources = files.map((f) => ({ f, s: strip(read(f)) }))
-    check('M7: nothing in the app imports the sender hook', importers(sources).length === 0, importers(sources).join())
-    check('M-MUT: a cron that imports it fails M7', importers([...sources, { f: 'app/api/x/route.ts', s: "import { sendWeeklySummary } from '@/lib/reports/monthly/weekly-email'" }]).length === 1)
+    // lib/reminders/http.ts is the one exception, and only for the unsubscribe write.
+    const outside = importers(sources).filter((f) => !f.replace(/\\/g, '/').endsWith('lib/reminders/http.ts'))
+    check('M7: only the weekly module and the unsubscribe route reach the weekly sender', outside.length === 0, outside.join())
+    check('M-MUT: a cron that imports the run fails M7',
+      importers([...sources, { f: 'app/api/x/route.ts', s: "import { runWeeklySummaries } from '@/lib/reports/weekly/run'" }])
+        .filter((f) => !f.replace(/\\/g, '/').endsWith('lib/reminders/http.ts')).length === 1)
     const own = files.filter((f) => /lib\/reports\/monthly\/|components\/reports\/monthly\/|app\/api\/reports\/monthly\//.test(f.replace(/\\/g, '/')))
     const mails = (s: string) => /resend|nodemailer|sendgrid|postmark|mailgun|smtp|signup-email/i.test(s)
     check(`M8: none of the report's ${own.length} files reaches an email provider`, own.length >= 12 && own.every((f) => !mails(strip(read(f)))), own.filter((f) => mails(strip(read(f)))).join())
-    check('M-MUT2: a hook that loads resend fails M8', mails(strip(read('lib/reports/monthly/weekly-email.ts')) + "\nconst { Resend } = await import('resend')"))
+    check('M-MUT2: a monthly file that loads resend fails M8', mails(strip(read('lib/reports/monthly/store.ts')) + "\nconst { Resend } = await import('resend')"))
   }
 
   // ── R) THE DOWNLOAD (owner, 4 October 2026: "can the monthly report be
