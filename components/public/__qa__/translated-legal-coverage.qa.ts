@@ -916,6 +916,128 @@ const MEDIA_ALT_LIMITS: Record<string, RegExp[]> = {
     !MEDIA_ALT_LIMITS.en[2].test('Each such fix is shown to you before it is applied, and can be undone.'))
 }
 
+// ── 18) the conversion report sent to Meta from our server ────────────────
+/*
+ * What the documents said before this section existed: the Meta half of the
+ * policy described the Pixel, cookies and the browser, and the marketing
+ * category promised that "none of them loads before you have allowed its
+ * category, and withdrawing your consent stops the collection". A conversion
+ * event sent server-to-server is not a tag and sets no cookie, so none of that
+ * text covered it, and the California half promised the sharing "happens only
+ * if you allowed the marketing category" — a promise the server has to keep.
+ *
+ * Three facts a reader cannot guess and therefore may never be dropped.
+ *
+ * The gate. The report goes only on a granted marketing consent. A refusal and
+ * a visitor who has not answered the notice are both "no", and withdrawal stops
+ * future reports. Anything else turns four live documents into a false
+ * statement, which is why the gate is pinned per language.
+ *
+ * What leaves us. The event name and time, a one-time event id for Meta's
+ * deduplication, and a SHA-256 hash of the signup email — and NOT the IP
+ * address, the browser details or any Meta cookie. The hash is pinned together
+ * with the sentence that it does not make the data anonymous: Meta holds the
+ * same addresses, so it can match and identify, and a policy that called a
+ * hash anonymous would be claiming a protection the code does not deliver.
+ *
+ * Who answers for it. Under Meta's own Business Tools Terms and the Controller
+ * Addendum, the collection and transmission of these events is JOINT
+ * controllership with Meta Platforms Ireland Limited, which is independent
+ * controller for what it does afterwards; the Addendum puts the Art. 13/14
+ * duty to say so on us, and obliges us to pass a rights request on. So the
+ * documents must name Meta as joint controller rather than as one more
+ * processor acting on our behalf, and must point the reader at Meta directly.
+ */
+const CAPI_GATE: Record<string, RegExp> = {
+  he: /הדיווח נשלח <strong>רק<\/strong> אם אישרת את קטגוריית השיווק[\s\S]{0,120}אם סירבת, או אם עדיין לא בחרת, לא נשלח דבר/,
+  en: /The report is sent\{' '\}\s*<strong>only<\/strong> if you allowed the marketing category[\s\S]{0,140}If you\s*refused, or have not chosen yet, nothing is sent/,
+  es: /El informe se envía \*\*únicamente\*\* si usted permitió la categoría de marketing[\s\S]{0,140}Si lo rechazó, o si todavía no ha elegido, no se envía nada/,
+  'pt-BR': /O relatório é enviado \*\*somente\*\* se você permitiu a categoria de marketing[\s\S]{0,140}Se você recusou, ou ainda não escolheu, nada é enviado/,
+}
+const CAPI_WITHDRAW: Record<string, RegExp> = {
+  he: /ביטול ההסכמה לשיווק מפסיק מיד דיווחים עתידיים/,
+  en: /Withdrawing marketing consent stops future reports immediately/,
+  es: /Retirar el consentimiento de marketing detiene de inmediato los informes futuros/,
+  'pt-BR': /Retirar o consentimento de marketing interrompe imediatamente os relatórios futuros/,
+}
+const CAPI_HASH: Record<string, RegExp[]> = {
+  he: [/תמצית חד-כיוונית \(hash בשיטת SHA-256\) של כתובת הדוא&rdquo;ל/, /התמצית אינה הופכת את המידע לאנונימי/],
+  en: [/a one-way hash \(SHA-256\) of the email address you signed up with/, /the hash does not make the information\s*anonymous/],
+  es: [/un resumen unidireccional \(hash SHA-256\) de la dirección de correo electrónico/, /el hash no convierte la información en anónima/],
+  'pt-BR': [/um resumo unidirecional \(hash SHA-256\) do endereço de e-mail/, /o hash não torna a informação anônima/],
+}
+/* The code also sends a hash of the account id and the signup page's address, and those are
+ * identifiers too: a list that stops at the email understates what leaves us. */
+const CAPI_IDS: Record<string, RegExp[]> = {
+  he: [/תמצית חד-כיוונית באותה שיטה של מזהה החשבון שלך אצלנו/, /כתובת העמוד שממנו נרשמת, בלי הפרמטרים שאחרי סימן השאלה/],
+  en: [/a one-way hash, by the same method, of your account identifier with us/, /the address of the page you signed up from, without anything after the question mark/],
+  es: [/un resumen unidireccional, por el mismo método, del identificador de su cuenta con nosotros/, /la dirección de la página desde la que usted se registró, sin nada de lo que va después del signo de interrogación/],
+  'pt-BR': [/um resumo unidirecional, pelo mesmo método, do identificador da sua conta com a gente/, /o endereço da página de onde você se cadastrou, sem nada do que vem depois do sinal de interrogação/],
+}
+const CAPI_NOT_SENT: Record<string, RegExp> = {
+  he: /איננו שולחים את כתובת ה-IP שלך, את פרטי\s*הדפדפן שלך או עוגייה של Meta/,
+  en: /we do not send your IP address, your browser details or any Meta\s*cookie/,
+  es: /no enviamos su dirección IP, ni los datos de su navegador, ni ninguna cookie de Meta/,
+  'pt-BR': /não enviamos o seu endereço IP, nem os dados do seu navegador, nem qualquer cookie da Meta/,
+}
+const CAPI_JOINT: Record<string, RegExp> = {
+  he: /אנחנו\s*ו-Meta בעלי שליטה משותפים \(joint controllers\)[\s\S]{0,160}Meta Platforms Ireland Limited[\s\S]{0,120}Meta Platforms, Inc\./,
+  en: /we and Meta are joint controllers: Meta Platforms Ireland Limited[\s\S]{0,140}Meta Platforms, Inc\./,
+  es: /nosotros y Meta somos corresponsables del tratamiento \(joint controllers\): Meta Platforms Ireland Limited[\s\S]{0,140}Meta Platforms, Inc\./,
+  'pt-BR': /nós e a Meta somos controladores conjuntos \(joint controllers\): a Meta Platforms Ireland Limited[\s\S]{0,140}Meta Platforms, Inc\./,
+}
+/* The marketing category has to say the consent covers a cookieless server report, or the
+ * consent is not specific to what we then do with it (Art. 4(11)). */
+const CAPI_CATEGORY: Record<string, RegExp> = {
+  he: /האישור בקטגוריה הזאת חל גם על דיווח המרה שאנו שולחים\s*ל-Meta מהשרת שלנו בלי עוגייה כלל/,
+  en: /Allowing this category also covers\s*a conversion report we send to Meta from our server with no cookie at all/,
+  es: /Permitir esta categoría cubre también un informe de\s*conversión que enviamos a Meta desde nuestro servidor, sin ninguna cookie/,
+  'pt-BR': /Permitir esta categoria vale também para um relatório de conversão que enviamos à Meta do nosso\s*servidor, sem cookie nenhum/,
+}
+{
+  const read = (path: string) => (existsSync(path) ? readFileSync(path, 'utf8') : '')
+  const enPrivacySource = frontMatter(text[LOCALES[0]].privacy).source
+  const privacyDocs: [string, string][] = [
+    ['he', read(HEBREW_PRIVACY)],
+    ['en', enPrivacySource ? read(enPrivacySource) : ''],
+    ...LOCALES.map((l): [string, string] => [l, text[l].privacy]),
+  ]
+  for (const [name, privacy] of privacyDocs) {
+    const gate = CAPI_GATE[name]
+    if (gate) check(`${name}/privacy: the server report goes only on a granted marketing consent`, gate.test(privacy))
+    const withdrawn = CAPI_WITHDRAW[name]
+    if (withdrawn) check(`${name}/privacy: withdrawing marketing consent stops future reports`, withdrawn.test(privacy))
+    for (const must of CAPI_HASH[name] ?? []) {
+      check(`${name}/privacy: the hashed email is named and not called anonymous (${must.source.slice(0, 40)})`, must.test(privacy))
+    }
+    for (const must of CAPI_IDS[name] ?? []) {
+      check(`${name}/privacy: the report's other identifiers are named (${must.source.slice(0, 40)})`, must.test(privacy))
+    }
+    const absent = CAPI_NOT_SENT[name]
+    if (absent) check(`${name}/privacy: the report says no IP, no browser details, no Meta cookie`, absent.test(privacy))
+    const joint = CAPI_JOINT[name]
+    if (joint) check(`${name}/privacy: Meta Ireland is named as joint controller for these events`, joint.test(privacy))
+    const category = CAPI_CATEGORY[name]
+    if (category) check(`${name}/privacy: the marketing category says it covers the cookieless server report`, category.test(privacy))
+  }
+  check('mutation control: a report described without its consent gate is caught',
+    !CAPI_GATE.en.test("We report a completed signup to Meta from our server, through an interface called the Conversions API."))
+  check('mutation control: a hash presented as anonymous is caught',
+    !CAPI_HASH.en[1].test('We send only a one-way hash of your email address, so the report carries nothing that identifies you.'))
+  check('mutation control: a report that also carries the IP address is caught',
+    !CAPI_NOT_SENT.en.test('In this report we send your IP address and your browser details so that Meta can match the event.'))
+  check('mutation control: Meta described as acting on our behalf is caught',
+    !CAPI_JOINT.en.test('Meta processes these conversion events on our behalf and under our instructions.'))
+  check('mutation control: a joint-controller sentence that names only the Irish entity is caught',
+    !CAPI_JOINT.en.test('we and Meta are joint controllers: Meta Platforms Ireland Limited, for every visitor.'))
+  check('mutation control: an identifier list that stops at the email is caught',
+    !CAPI_IDS.en[0].test('a one-way hash (SHA-256) of the email address you signed up with'))
+  check('mutation control: a marketing category that still speaks only of cookies is caught',
+    !CAPI_CATEGORY.en.test('<strong>Marketing:</strong> measuring how our ads perform. Loaded only if you allow it.'))
+  check('mutation control: a withdrawal that only stops the tags is caught',
+    !CAPI_WITHDRAW.en.test('Withdrawing your consent stops the tags in your browser from collecting.'))
+}
+
 // ── MUTATION CONTROLS ───────────────────────────────────────────────────────
 console.log('\nmutation controls')
 {
