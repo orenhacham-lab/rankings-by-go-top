@@ -3,7 +3,7 @@ title: Términos de Uso | Go Top SEO
 description: Términos de uso de Go Top SEO: las condiciones que rigen el uso de nuestro servicio.
 locale: es
 source: app/(public)/en/terms/page.tsx
-lastUpdated: 2026-10-06
+lastUpdated: 2026-10-09
 register: usted
 ---
 

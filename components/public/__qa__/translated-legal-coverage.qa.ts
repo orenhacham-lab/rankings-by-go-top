@@ -153,6 +153,51 @@ for (const locale of LOCALES) {
   }
 }
 
+// ── 1a) the rendered date and the written date are the same date ────────────
+/*
+ * THE FOOTER IS THE FRONT MATTER, AND THE READER SEES BOTH.
+ *
+ * A translated document carries its revision date twice: `lastUpdated` in the
+ * front matter, which is what the page renders in its footer, and the
+ * document's own closing sentence, which is what a reader quoting the policy
+ * would cite. On 9 October 2026 the Spanish and Brazilian privacy policies and
+ * terms went live saying "9 de octubre" in the body under a footer that said
+ * "6 de octubre", because the email revision moved the sentence and not the
+ * field. Two different revision dates on one live legal page is the kind of
+ * contradiction that is read against us, so neither may move without the other.
+ *
+ * DERIVED, not pinned: the date is parsed out of the document's own closing
+ * sentence in its own language and compared with the field. A document with no
+ * such sentence is not failed here — section 7 and the per-language law cover
+ * what each document must say — but one that has it must agree with its footer.
+ */
+const MONTHS: Record<string, string[]> = {
+  es: ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre'],
+  'pt-BR': ['janeiro', 'fevereiro', 'março', 'abril', 'maio', 'junho', 'julho', 'agosto', 'setembro', 'outubro', 'novembro', 'dezembro'],
+}
+
+/** The date in the document's own closing revision sentence, as YYYY-MM-DD, or null. */
+function writtenRevisionDate(locale: string, src: string): string | null {
+  const months = MONTHS[locale]
+  if (!months) return null
+  // Only a line that is about updating: a date inside the text of a statute
+  // ("in force since 14 August 2025") is not this document's revision date.
+  const line = /[^\n]*(actualiz|atualiza)[^\n]*\b(\d{1,2}) de ([A-Za-zçãéíóú]+) de (\d{4})/gi
+  let found: RegExpExecArray | null = null
+  for (let m = line.exec(src); m; m = line.exec(src)) found = m
+  if (!found) return null
+  const month = months.indexOf(found[3].toLowerCase())
+  if (month < 0) return null
+  return `${found[4]}-${String(month + 1).padStart(2, '0')}-${String(Number(found[2])).padStart(2, '0')}`
+}
+
+for (const locale of LOCALES) for (const doc of DOCS) {
+  const fm = frontMatter(text[locale][doc])
+  const written = writtenRevisionDate(locale, text[locale][doc])
+  if (!written) continue
+  check(`${locale} ${doc}: the footer date and the written date agree (${fm.lastUpdated} / ${written})`, fm.lastUpdated === written)
+}
+
 // ── 2) the register each document declares, kept throughout it ──────────────
 for (const locale of LOCALES) {
   for (const doc of DOCS) {
@@ -1224,6 +1269,12 @@ console.log('\nmutation controls')
     /\b90 d[íi]as\b/.test('conserva el código de ese socio durante 90 días'))
   check('a policy that stops saying no cookie is set is caught',
     !/sets no cookie at all/.test('The partner program: if you reach the site through a partner link'))
+  check('a footer date that drifts from the written date is caught',
+    writtenRevisionDate('es', text.es.terms)
+      !== frontMatter(text.es.terms.replace('lastUpdated: 2026-10-09', 'lastUpdated: 2026-10-06')).lastUpdated
+      && writtenRevisionDate('es', text.es.terms) === frontMatter(text.es.terms).lastUpdated)
+  check('a revision date read out of a statute sentence instead of the footer is caught',
+    writtenRevisionDate('es', 'La Enmienda 13 entró en vigor el 14 de agosto de 2025.') === null)
   check('a translation that drops the promise about a referred customer\'s details is caught',
     !/no recibe la direcci[óo]n de correo electr[óo]nico, el sitio web, el plan/
       .test(text.es.privacy.replace(/no recibe la direcci[óo]n de correo electr[óo]nico, el sitio web, el plan/g, ''))
