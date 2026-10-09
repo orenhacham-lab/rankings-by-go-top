@@ -390,7 +390,7 @@ export async function publishSeoFor(
   admin: Admin,
   publisher: WordPressPublisher,
   created: { wpPostId: number; wpPostUrl: string | null; via: 'plugin' | 'app_password' },
-  opts: { articleId: string; metaTitle: string; metaDescription: string | null; topicId: string | null | undefined },
+  opts: { articleId: string; metaTitle: string; metaDescription: string | null; topicId: string | null | undefined; postUrl?: string | null },
   deps: PluginPublishDeps = {},
 ): Promise<SeoPublishResult> {
   if (created.via === 'plugin' && publisher.via === 'plugin') return publishArticleSeoViaPlugin(admin, publisher.plugin, created.wpPostUrl, opts, deps)
