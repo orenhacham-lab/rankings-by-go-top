@@ -1471,15 +1471,13 @@ console.log('\nmutation controls')
  * Two further things the earlier draft of this section did not have, and that
  * this guard exists to keep:
  *
- * 1. Publishing writes that article's own JSON-LD through the same signed /fix
- *    route, with no per-fix approval (lib/content/wordpress-publish.ts:209 →
- *    lib/content/wordpress-schema.ts). A policy that frames every plugin write
- *    as one the customer clicked is wrong about the thing that matters most:
- *    when we act without asking. The SEO title and the meta description join
- *    that same publish-time path with the change that sends them through the
- *    plugin on a site with no SEO plugin; this sentence gains them in the same
- *    commit as that change and not before, so the policy never describes a
- *    write that is not happening yet.
+ * 1. Publishing writes that article's own SEO title, meta description and
+ *    JSON-LD through the same signed /fix route, with no per-fix approval
+ *    (lib/content/wordpress-publish.ts:209 → lib/content/wordpress-schema.ts,
+ *    and lib/content/seo-publish.ts for the title and the description on a
+ *    site with no SEO plugin). A policy that frames every plugin write as one
+ *    the customer clicked is wrong about the thing that matters most: when we
+ *    act without asking.
  * 2. Some operations still need the Application Password even when the plugin
  *    is paired — forcing a new post, scheduled publishing, and the scan of
  *    existing posts with its index refresh. A customer who paired the plugin
@@ -1498,7 +1496,7 @@ const PLUGIN_DOES: Record<string, RegExp[]> = {
     /לחפש מילה/,
     /שתי דרכים לחבר/,
     /אין אצלנו שום סיסמה שלך/,
-    /בפרסום עצמו נכתבת גם סכמת ה-JSON-LD/,
+    /בפרסום עצמו נכתבים גם כותרת ה-SEO, תיאור המטא וסכמת ה-JSON-LD/,
     /מה שדורש סיסמת אפליקציה גם כשהתוסף מחובר/,
   ],
   en: [
@@ -1508,7 +1506,7 @@ const PLUGIN_DOES: Record<string, RegExp[]> = {
     /search its\s+published/,
     /two ways to connect/,
     /no password\s+of yours in our records/,
-    /The publish itself also writes that\s+article&rsquo;s own JSON-LD schema/,
+    /The publish itself also writes that\s+article&rsquo;s own SEO title, meta description and JSON-LD schema/,
     /What still needs an Application Password even when the plugin is connected/,
   ],
   es: [
@@ -1518,7 +1516,7 @@ const PLUGIN_DOES: Record<string, RegExp[]> = {
     /busque una palabra/,
     /dos formas de conectar/,
     /ninguna contrase[ñn]a suya en nuestros registros/,
-    /La propia publicaci[óo]n escribe adem[áa]s el esquema JSON-LD/,
+    /La propia publicaci[óo]n escribe adem[áa]s el t[íi]tulo SEO, la meta descripci[óo]n y el esquema JSON-LD/,
     /sigue necesitando una Application Password aunque el complemento est[ée] conectado/,
   ],
   'pt-BR': [
@@ -1528,7 +1526,7 @@ const PLUGIN_DOES: Record<string, RegExp[]> = {
     /busque uma palavra/,
     /duas formas de conectar/,
     /nenhuma senha sua nos nossos registros/,
-    /A pr[óo]pria publica[çc][ãa]o tamb[ée]m escreve o esquema JSON-LD/,
+    /A pr[óo]pria publica[çc][ãa]o tamb[ée]m escreve o t[íi]tulo de SEO, a meta descri[çc][ãa]o e o esquema JSON-LD/,
     /ainda precisa de uma Senha de Aplicativo mesmo com o plugin conectado/,
   ],
 }

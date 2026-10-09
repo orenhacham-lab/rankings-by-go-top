@@ -250,8 +250,9 @@ export default function EnglishPrivacyPage() {
           are applied without asking you each time.</li>
           <li><strong>Articles you publish.</strong> An article you approve in GO TOP is created as a post on
           your site, as the author you choose there. <strong>The publish itself also writes that
-          article&rsquo;s own JSON-LD schema</strong>, through the same signed route and without a separate
-          approval, because it is part of the publish you approved.</li>
+          article&rsquo;s own SEO title, meta description and JSON-LD schema</strong>, through the same signed
+          route and without a separate approval for each of them, because they are part of the publish you
+          approved.</li>
           <li><strong>The images belonging to those articles.</strong> Your site downloads them from our file
           storage into its own Media Library, and from that point they are files on your site. Your site accepts
           them only from our storage address and refuses any other.</li>
