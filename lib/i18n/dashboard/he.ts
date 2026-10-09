@@ -3410,6 +3410,10 @@ export const dashboardHe = {
     origin: { ours: 'מאמר שלנו' },
     cannibal: 'מתחרה בעמוד אחר',
     cannibalDetail: '{n} עמודים שלכם מתחלקים בחשיפות על "{query}"',
+    cannibalMine: 'העמוד הזה: {imp} חשיפות',
+    cannibalMineLeads: 'העמוד הזה מוביל, עם {imp} חשיפות',
+    cannibalOther: '— {imp} חשיפות',
+    cannibalMore: 'ועוד {n} עמודים',
     actions: {
       improve: 'שיפור המאמר',
       improveWhy: 'במקום {pos} בגוגל על "{query}", קרוב לעמוד הראשון',
