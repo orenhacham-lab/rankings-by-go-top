@@ -122,6 +122,7 @@ function main() {
     // when the section that says how it is verified was added to it.
     check('D2: every document that was changed carries the new date',
       /9 באוקטובר 2026/.test(read(HE_PRIVACY)) && /October 9, 2026/.test(read(EN_PRIVACY))
+      && /9 באוקטובר 2026/.test(read(HE_TERMS)) && /October 9, 2026/.test(read(EN_TERMS))
       && /5 באוקטובר 2026/.test(read(HE_A11Y)) && /October 5, 2026/.test(read(EN_A11Y)))
   }
 

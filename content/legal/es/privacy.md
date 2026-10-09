@@ -181,7 +181,12 @@ Enviamos correo electrónico a través del proveedor de envío Resend, que recib
 
 - **Mensajes de la cuenta y del servicio:** registro, verificación, facturación y novedades sobre el uso del Servicio.
 - **Recordatorios:** cuando hay contenido pendiente de su aprobación, puede enviarse un recordatorio. Cada recordatorio incluye un enlace de cancelación de suscripción con un solo clic, sin necesidad de iniciar sesión, y al cancelar la suscripción se detienen estos recordatorios. Su preferencia se almacena con nosotros.
-- **Informe mensual de progreso:** un resumen mensual del proyecto, para los proyectos en los que usted lo activó en los ajustes.
+- **Correos de puesta en marcha:** si usted abrió un proyecto y no le ha conectado un sitio, o lo conectó y no se ha publicado nada en él, podemos enviar hasta dos correos que explican cómo completar el paso y enlazan a la pantalla correspondiente de la aplicación. **No llevan oferta, ni precio, ni descuento, ni mejora de plan**: llevan un enlace a la guía dentro de la aplicación, el número de WhatsApp y un enlace de baja. No se envía un tercero, y no enviamos más de un correo sobre el mismo proyecto en 72 horas.
+- **Resumen semanal:** un resumen del proyecto, para los proyectos en los que usted lo activó en los ajustes. El resumen se envía los domingos por la mañana, **y solo cuando hay algo que contar; una semana en la que no pasó nada no recibe correo.** Una sección que no pudimos leer se omite del correo en lugar de informarse como un cero, de modo que el correo nunca indica una cifra que no medimos.
+
+**Darse de baja, con el alcance que usted pidió.** El enlace de baja de un correo de puesta en marcha detiene solo esos correos, y la página a la que lleva le dice claramente que los recordatorios y el resumen semanal siguen llegando, y ofrece un solo clic para detenerlos también. El enlace de baja de un recordatorio o del resumen semanal detiene todos los correos sobre ese proyecto. Volver a activar el interruptor de correo del proyecto en los ajustes anula cualquiera de esas bajas, de modo que el interruptor que usted ve en los ajustes es el panorama completo.
+
+**No medimos qué hizo usted con el correo.** Nuestros mensajes no llevan ningún píxel que informe de una apertura, no seguimos los clics y no reescribimos los enlaces que contienen para encaminarle a través de nosotros.
 
 ## Cómo podemos contactar con usted a raíz de una comprobación gratuita
 

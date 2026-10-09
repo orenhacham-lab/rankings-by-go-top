@@ -401,9 +401,27 @@ export default function EnglishPrivacyPage() {
           <li><strong>Reminders:</strong> when content is waiting for your approval, a reminder may be sent. Every
           reminder has a one-click unsubscribe link, with no sign-in needed, and unsubscribing stops these reminders.
           Your preference is stored with us.</li>
-          <li><strong>Monthly progress report:</strong> a monthly summary of the project, for projects where you turned it
-          on in the settings.</li>
+          <li><strong>Setup emails:</strong> if you opened a project and have not connected a site to it, or connected
+          one and nothing has been published on it, we may send up to two emails explaining how to finish the step and
+          linking to the matching screen in the app. <strong>They carry no offer, no price, no discount and no
+          upgrade</strong> &mdash; they carry a link to the in-app guide, the WhatsApp number and an unsubscribe link.
+          No third one is sent, and we send no more than one email about the same project within 72 hours.</li>
+          <li><strong>Weekly summary:</strong> a summary of the project, for projects where you turned it on in the
+          settings. The summary goes out on Sunday morning, <strong>and only when there is something to say; a week
+          with nothing in it gets no email.</strong> A section we could not read is left out of the email rather than
+          reported as a zero, so the email never states a number we did not measure.</li>
         </ul>
+        <p className="mt-4">
+          <strong>Unsubscribing, as narrowly as you asked.</strong> The unsubscribe link in a setup email stops the
+          setup emails only, and the page it leads to tells you plainly that the reminders and the weekly summary keep
+          coming, and offers one click to stop those too. The unsubscribe link in a reminder or in the weekly summary
+          stops every email about that project. Turning the project&rsquo;s email switch back on in the settings clears
+          any such stop, so the switch you see in the settings is the whole picture.
+        </p>
+        <p className="mt-4">
+          <strong>We do not measure what you did with the email.</strong> Our messages carry no pixel that reports an
+          open, we do not track clicks, and we do not rewrite the links inside them to route you through us.
+        </p>
       </section>
 
       <section>
