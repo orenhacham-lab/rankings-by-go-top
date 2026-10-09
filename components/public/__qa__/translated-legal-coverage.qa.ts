@@ -1496,7 +1496,7 @@ const PLUGIN_DOES: Record<string, RegExp[]> = {
     /לחפש מילה/,
     /שתי דרכים לחבר/,
     /אין אצלנו שום סיסמה שלך/,
-    /בפרסום עצמו נכתבים גם כותרת ה-SEO, תיאור המטא וסכמת ה-JSON-LD/,
+    /בפרסום עצמו נכתבים גם כותרת ה-SEO, תיאור המטא, ביטוי המפתח וסכמת ה-JSON-LD/,
     /מה שדורש סיסמת אפליקציה גם כשהתוסף מחובר/,
   ],
   en: [
@@ -1506,7 +1506,7 @@ const PLUGIN_DOES: Record<string, RegExp[]> = {
     /search its\s+published/,
     /two ways to connect/,
     /no password\s+of yours in our records/,
-    /The publish itself also writes that\s+article&rsquo;s own SEO title, meta description and JSON-LD schema/,
+    /The publish itself also writes that\s+article&rsquo;s own SEO title, meta description, focus keyphrase and JSON-LD schema/,
     /What still needs an Application Password even when the plugin is connected/,
   ],
   es: [
@@ -1516,7 +1516,7 @@ const PLUGIN_DOES: Record<string, RegExp[]> = {
     /busque una palabra/,
     /dos formas de conectar/,
     /ninguna contrase[ñn]a suya en nuestros registros/,
-    /La propia publicaci[óo]n escribe adem[áa]s el t[íi]tulo SEO, la meta descripci[óo]n y el esquema JSON-LD/,
+    /La propia publicaci[óo]n escribe adem[áa]s el t[íi]tulo SEO, la meta descripci[óo]n, la frase clave principal y el esquema JSON-LD/,
     /sigue necesitando una Application Password aunque el complemento est[ée] conectado/,
   ],
   'pt-BR': [
@@ -1526,7 +1526,7 @@ const PLUGIN_DOES: Record<string, RegExp[]> = {
     /busque uma palavra/,
     /duas formas de conectar/,
     /nenhuma senha sua nos nossos registros/,
-    /A pr[óo]pria publica[çc][ãa]o tamb[ée]m escreve o t[íi]tulo de SEO, a meta descri[çc][ãa]o e o esquema JSON-LD/,
+    /A pr[óo]pria publica[çc][ãa]o tamb[ée]m escreve o t[íi]tulo de SEO, a meta descri[çc][ãa]o, a palavra-chave de foco e o esquema JSON-LD/,
     /ainda precisa de uma Senha de Aplicativo mesmo com o plugin conectado/,
   ],
 }
