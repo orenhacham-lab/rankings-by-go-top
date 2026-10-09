@@ -1262,11 +1262,23 @@ const EMAIL_NO_TRACKING: Record<string, RegExp> = {
  *     partner's code on purpose, so that a visitor clicking a two-year-old blog
  *     post does not meet an error.
  */
+// The application reaches us from the site by email or in the form, and the
+// policy may not name only the form: the form ships after this wording, and a
+// policy that describes a mechanism that is not live yet is as wrong as one
+// that hides a mechanism that is.
 const PARTNER_FORM: Record<string, RegExp> = {
-  he: /הבקשה נשלחת בטופס באתר/,
-  en: /the application is a form on this site/,
-  es: /la solicitud es un formulario en este sitio/,
-  'pt-BR': /a candidatura é um formulário neste site/,
+  he: /הבקשה מגיעה אלינו מהאתר[\s\S]{0,20}ל או בטופס ההרשמה/,
+  en: /the application reaches us from this site, by email or through the application\s*form/,
+  es: /la solicitud nos llega desde este sitio, por correo electrónico o a través del formulario/,
+  'pt-BR': /a candidatura chega a nós deste site, por e-mail ou pelo formulário/,
+}
+// And the IP is taken only on the form path, so the sentence that discloses it
+// has to say so.
+const PARTNER_IP_ON_FORM: Record<string, RegExp> = {
+  he: /כשהבקשה מגיעה בטופס נרשמת גם כתובת ה-IP/,
+  en: /When the application comes through the form we also record the\s*IP address/,
+  es: /Cuando la solicitud llega por el formulario registramos además la dirección IP/,
+  'pt-BR': /Quando a candidatura chega pelo formulário, registramos também o endereço IP/,
 }
 const PARTNER_IP_PURPOSE: Record<string, RegExp> = {
   he: /לזהות גל של בקשות מזויפות,\s*ולהגביל שלוש בקשות לשעה מאותה כתובת/,
@@ -1348,7 +1360,8 @@ const AGREEMENT_LINK_DIES: Record<string, RegExp> = {
     ...LOCALES.map((l): [string, string] => [l, text[l]['affiliate-terms']]),
   ]
   for (const [name, privacy] of privacyDocs) {
-    check(`${name}/privacy: the application is a form on the site`, (PARTNER_FORM[name] ?? /$^/).test(privacy))
+    check(`${name}/privacy: the application arrives by email or in the form`, (PARTNER_FORM[name] ?? /$^/).test(privacy))
+    check(`${name}/privacy: the IP is taken on the form path only`, (PARTNER_IP_ON_FORM[name] ?? /$^/).test(privacy))
     check(`${name}/privacy: the IP is disclosed with both of its purposes`, (PARTNER_IP_PURPOSE[name] ?? /$^/).test(privacy))
     check(`${name}/privacy: a rejected application is deleted after 12 months`, (PARTNER_IP_RETENTION[name] ?? /$^/).test(privacy))
     check(`${name}/privacy: a click is one on a daily counter`, (PARTNER_CLICK_COUNT[name] ?? /$^/).test(privacy))
@@ -1417,6 +1430,10 @@ console.log('\nmutation controls')
   check('a policy that drops the IP disclosure is caught',
     !PARTNER_IP_PURPOSE.es.test(text.es.privacy.replace(/distinguir una oleada de solicitudes falsas de una agencia real, y limitar a tres solicitudes por hora/g, ''))
       && PARTNER_IP_PURPOSE.es.test(text.es.privacy))
+  check('a policy that names only the form is caught',
+    !PARTNER_FORM.en.test('the application is a form on this site, and what we receive is'))
+  check('an IP disclosed unconditionally, as if every application recorded one, is caught',
+    !PARTNER_IP_ON_FORM.es.test('Además registramos la dirección IP desde la que llegó la solicitud.'))
   check('a policy that keeps the IP with no retention is caught',
     !PARTNER_IP_RETENTION['pt-BR'].test('Também registramos o endereço IP de onde veio a candidatura.'))
   check('a click record that gains a visitor detail is caught',

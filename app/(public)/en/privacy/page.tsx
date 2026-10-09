@@ -347,11 +347,11 @@ export default function EnglishPrivacyPage() {
           applies to you unless you apply.
         </p>
         <ul>
-          <li><strong>When you apply:</strong> the application is a form on this site, and what we receive is
+          <li><strong>When you apply:</strong> the application reaches us from this site, by email or through the application form, and what we receive is
           what you filled in: your name, your email address, a description of the audience you intend to promote
           to, and optionally a phone number, a website and a country. We ask for no payout details at this stage,
-          because we do not want to hold the bank details of someone we may refuse. We also record the IP address
-          the application came from, for two purposes and no others: telling a ring of fake applications from a
+          because we do not want to hold the bank details of someone we may refuse. When the application comes through the form we also record the
+          IP address it was sent from, for two purposes and no others: telling a ring of fake applications from a
           real agency, and limiting three applications an hour from one address. It cannot be changed once
           recorded. <strong>A rejected application is deleted in full after 12 months, and in every other case the
           IP address is deleted after 12 months</strong> while the record itself stays.</li>
@@ -378,7 +378,7 @@ export default function EnglishPrivacyPage() {
           once at the moment the account is created.</li>
         </ul>
         <p className="mt-4">
-          As of the date of this policy the program runs like this: an application is a form on this site and is
+          As of the date of this policy the program runs like this: an application is sent from this site, by email or in the form, and is
           approved by a person; an approved partner has a code and a link; clicks are counted as a daily total per
           partner; a new account that signs up with a code is credited to that partner once and for ever; a
           commission is recorded on each payment actually received, held for 30 days, which is the refund window,
