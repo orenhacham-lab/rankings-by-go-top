@@ -64,7 +64,7 @@ No compartimos su información personal con terceros, salvo con:
 - **OpenStreetMap (Nominatim):** para convertir una dirección en coordenadas, y solo cuando usted haya escrito una dirección exacta para el seguimiento de posicionamiento local. Se envían la dirección que usted escribió y el nombre del país, nunca datos de la cuenta
 - **ScrapeLLM:** para el seguimiento de visibilidad en IA; véase «Proveedores de IA» más abajo
 - **Otros sitios de la red de enlaces:** únicamente si usted se unió a la red; véase «Red de enlaces» más abajo
-- **Meta (Facebook / Instagram):** para publicidad segmentada; véase la sección Publicidad en Meta más abajo. Los datos que recibimos de las API de Google nunca se comparten con Meta ni se usan para publicidad
+- **Meta (Facebook / Instagram):** para publicidad segmentada y para un informe de registro completado que se envía desde nuestro servidor; véase la sección Publicidad en Meta más abajo. Respecto de esos eventos de conversión, Meta no trata los datos por cuenta nuestra, sino que es corresponsable del tratamiento junto con nosotros, como se explica en esa sección. Los datos que recibimos de las API de Google nunca se comparten con Meta ni se usan para publicidad
 - Cuando lo exija la ley
 
 ## Datos que recibimos de Google
@@ -217,7 +217,7 @@ Clasificamos las cookies en tres categorías, y le consultamos sobre dos de ella
 
 - **Estrictamente necesarias:** inicio de sesión, recordar el idioma de su interfaz, seguridad y prevención de abusos. El servicio no puede funcionar sin ellas, por lo que no requieren consentimiento.
 - **Medición:** cuántas personas visitaron el sitio, qué páginas leyeron y qué no funcionó. Se cargan solo si usted lo permite.
-- **Marketing:** medir el rendimiento de nuestros anuncios y mostrar anuncios relevantes en las redes de Google y Meta. Se cargan solo si usted lo permite.
+- **Marketing:** medir el rendimiento de nuestros anuncios y mostrar anuncios relevantes en las redes de Google y Meta. Se cargan solo si usted lo permite. Permitir esta categoría cubre también un informe de conversión que enviamos a Meta desde nuestro servidor, sin ninguna cookie; véase la sección Publicidad en Meta.
 
 **Antes de que usted elija, no se instala ninguna cookie de medición ni de marketing y no se realiza ninguna solicitud a los servidores de Google.** Aceptar y rechazar son dos botones iguales en el aviso, y cada categoría puede permitirse por separado.
 
@@ -237,7 +237,7 @@ Nuestras herramientas de medición y marketing se gestionan a través de Google 
 - **Google Ads:** medición de conversiones y publicidad personalizada (sujeto al consentimiento de marketing)
 - **Meta Pixel:** medición de conversiones y publicidad en Facebook e Instagram (sujeto al consentimiento de marketing)
 
-Las herramientas activas cambian de vez en cuando. Lo que no cambia: ninguna se carga antes de que usted haya permitido su categoría, y retirar su consentimiento detiene la recopilación.
+Las herramientas activas cambian de vez en cuando. Lo que no cambia: ninguna se carga antes de que usted haya permitido su categoría, y retirar su consentimiento detiene la recopilación. Además de estas herramientas, que funcionan en el navegador, enviamos a Meta un informe de conversión desde nuestro servidor; también está sujeto al consentimiento de marketing y se detiene cuando usted lo retira.
 
 Declaramos su estado de consentimiento a Google mediante el protocolo Consent Mode v2, de modo que las herramientas quedan sujetas a su elección incluso si en el futuro añadimos una etiqueta nueva.
 
@@ -253,6 +253,22 @@ La información que puede recopilarse y enviarse a Meta incluye:
 - Información recopilada mediante las cookies de Meta
 
 Este uso está sujeto a la política de privacidad de Meta Platforms, Inc., disponible en [facebook.com/privacy/policy](https://www.facebook.com/privacy/policy/). Usted puede optar por no recibir publicidad personalizada mediante los ajustes de privacidad de su cuenta de Facebook.
+
+### Un informe de conversión desde nuestro servidor (Conversions API)
+
+Además del Pixel que funciona en el navegador, informamos a Meta de un registro completado desde nuestro servidor, mediante una interfaz llamada Conversions API. El informe se envía **únicamente** si usted permitió la categoría de marketing en el aviso de cookies. Si lo rechazó, o si todavía no ha elegido, no se envía nada.
+
+Qué contiene ese informe:
+
+- el nombre del evento (un registro completado) y la hora en que ocurrió
+- un identificador único del evento, para que Meta no cuente dos veces el mismo registro
+- un resumen unidireccional (hash SHA-256) de la dirección de correo electrónico con la que usted se registró
+
+No enviamos la dirección de correo electrónico en sí, pero el hash no convierte la información en anónima: si esa misma dirección está también en su cuenta de Meta, Meta puede relacionarlas e identificarle, de modo que tratamos ese informe como datos personales a todos los efectos. **En ese informe no enviamos su dirección IP, ni los datos de su navegador, ni ninguna cookie de Meta, y se envía solo por un registro completado, nunca por ver una página.**
+
+Retirar el consentimiento de marketing detiene de inmediato los informes futuros. Un informe ya enviado no podemos recuperarlo, y usted puede exigir su supresión directamente a Meta, a través de su propio canal de derechos.
+
+**Quién responde por estos datos:** respecto de la recogida y la transmisión de esos eventos de conversión, nosotros y Meta Platforms Ireland Limited somos corresponsables del tratamiento (joint controllers). Desde el momento en que los datos llegan a Meta, Meta es responsable independiente del uso que haga de ellos para sus propias finalidades. Usted puede ejercer sus derechos sobre estos datos directamente ante Meta, y si se dirige a nosotros trasladaremos su solicitud a Meta.
 
 ## Contacto por WhatsApp
 
@@ -313,7 +329,7 @@ Respondemos en un plazo de 30 días. No le cobraremos ni degradaremos su servici
 
 Si usted es residente de California, o de otro estado que haya promulgado una ley estatal de privacidad, tiene derecho a saber qué categorías de datos se recopilaron sobre usted, a obtener una copia, a solicitar la eliminación, a corregir datos inexactos y a no ser discriminado por ejercer un derecho.
 
-**No vendemos información personal y no la transferimos a cambio de una contraprestación.** Sí compartimos identificadores y eventos de uso con las redes publicitarias de Google y Meta para publicidad segmentada, lo cual puede considerarse «compartir» conforme a la ley de California. Ese intercambio ocurre **únicamente** si usted permitió la categoría de marketing, y se detiene en el momento en que usted la retira.
+**No vendemos información personal y no la transferimos a cambio de una contraprestación.** Sí compartimos identificadores y eventos de uso con las redes publicitarias de Google y Meta para publicidad segmentada, en el navegador y desde nuestro servidor, lo cual puede considerarse «compartir» conforme a la ley de California. Ese intercambio ocurre **únicamente** si usted permitió la categoría de marketing, y se detiene en el momento en que usted la retira.
 
 Respetamos la señal Global Privacy Control del navegador como una solicitud de «no vender ni compartir mi información personal», y la registramos. No se necesita ningún formulario: la señal por sí sola es suficiente.
 
@@ -347,4 +363,4 @@ Si tiene preguntas sobre esta política de privacidad, contacte con:
 
 **Teléfono:** 054-9489377
 
-Esta política se actualizó por última vez el 5 de octubre de 2026
+Esta política se actualizó por última vez el 9 de octubre de 2026

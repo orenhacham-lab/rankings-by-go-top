@@ -150,16 +150,16 @@ for (const [topic, byLang] of Object.entries(TOPICS)) {
 const OLD_NAME = /Rankings by Go Top/i
 const LAST_UPDATED: Record<Doc, Record<Lang, RegExp>> = {
   terms: { he: /6 באוקטובר 2026/, en: /October 6, 2026/ },
-  privacy: { he: /6 באוקטובר 2026/, en: /October 6, 2026/ },
+  privacy: { he: /9 באוקטובר 2026/, en: /October 9, 2026/ },
   a11y: { he: /5 באוקטובר 2026/, en: /October 5, 2026/ },
 }
 for (const lang of ['he', 'en'] as Lang[]) for (const doc of ['terms', 'privacy', 'a11y'] as Doc[]) {
   const p = pages[lang][doc]
   // The page body runs from its title to its last-updated line; the site shell (header, footer) around it is not these pages.
-  // The date is per document, not one date for all three: the terms and the
-  // privacy policy were last revised on 6 October 2026, when the site fixes
-  // inside a Shopify store were added to both, and the accessibility statement
-  // on 5 October 2026. A page that is changed without its date
+  // The date is per document, not one date for all three: the terms were last
+  // revised on 6 October 2026, the privacy policy on 9 October 2026, when the
+  // conversion report sent to Meta from our server was added to it, and the
+  // accessibility statement on 5 October 2026. A page that is changed without its date
   // being moved is the failure this catches, which is why the expected date
   // lives here and has to be edited deliberately.
   const dated = LAST_UPDATED[doc][lang]
