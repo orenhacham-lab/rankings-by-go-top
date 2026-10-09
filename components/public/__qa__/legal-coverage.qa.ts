@@ -255,6 +255,7 @@ check('MUTATION — an English-only extra section is caught', pages.he.terms.h2 
     'cdn.shopify.com': { en: /Shopify/, he: /Shopify/ },
     'partners.shopify.com': { en: /Shopify/, he: /Shopify/ },
     'supabase.com': { en: /Supabase/, he: /Supabase/ },
+    'graph.facebook.com': { en: /Conversions API/, he: /Conversions API/ },
   }
   /**
    * Hosts that receive nothing about a customer, each with the reason it is

@@ -966,6 +966,14 @@ const CAPI_HASH: Record<string, RegExp[]> = {
   es: [/un resumen unidireccional \(hash SHA-256\) de la dirección de correo electrónico/, /el hash no convierte la información en anónima/],
   'pt-BR': [/um resumo unidirecional \(hash SHA-256\) do endereço de e-mail/, /o hash não torna a informação anônima/],
 }
+/* The code also sends a hash of the account id and the signup page's address, and those are
+ * identifiers too: a list that stops at the email understates what leaves us. */
+const CAPI_IDS: Record<string, RegExp[]> = {
+  he: [/תמצית חד-כיוונית באותה שיטה של מזהה החשבון שלך אצלנו/, /כתובת העמוד שממנו נרשמת, בלי הפרמטרים שאחרי סימן השאלה/],
+  en: [/a one-way hash, by the same method, of your account identifier with us/, /the address of the page you signed up from, without anything after the question mark/],
+  es: [/un resumen unidireccional, por el mismo método, del identificador de su cuenta con nosotros/, /la dirección de la página desde la que usted se registró, sin nada de lo que va después del signo de interrogación/],
+  'pt-BR': [/um resumo unidirecional, pelo mesmo método, do identificador da sua conta com a gente/, /o endereço da página de onde você se cadastrou, sem nada do que vem depois do sinal de interrogação/],
+}
 const CAPI_NOT_SENT: Record<string, RegExp> = {
   he: /איננו שולחים את כתובת ה-IP שלך, את פרטי\s*הדפדפן שלך או עוגייה של Meta/,
   en: /we do not send your IP address, your browser details or any Meta\s*cookie/,
@@ -973,10 +981,10 @@ const CAPI_NOT_SENT: Record<string, RegExp> = {
   'pt-BR': /não enviamos o seu endereço IP, nem os dados do seu navegador, nem qualquer cookie da Meta/,
 }
 const CAPI_JOINT: Record<string, RegExp> = {
-  he: /ו-Meta Platforms Ireland Limited הם בעלי שליטה משותפים \(joint controllers\)/,
-  en: /we and Meta Platforms Ireland Limited are joint controllers/,
-  es: /nosotros y Meta Platforms Ireland Limited somos corresponsables del tratamiento \(joint controllers\)/,
-  'pt-BR': /nós e a Meta Platforms Ireland Limited somos controladores conjuntos \(joint controllers\)/,
+  he: /אנחנו\s*ו-Meta בעלי שליטה משותפים \(joint controllers\)[\s\S]{0,160}Meta Platforms Ireland Limited[\s\S]{0,120}Meta Platforms, Inc\./,
+  en: /we and Meta are joint controllers: Meta Platforms Ireland Limited[\s\S]{0,140}Meta Platforms, Inc\./,
+  es: /nosotros y Meta somos corresponsables del tratamiento \(joint controllers\): Meta Platforms Ireland Limited[\s\S]{0,140}Meta Platforms, Inc\./,
+  'pt-BR': /nós e a Meta somos controladores conjuntos \(joint controllers\): a Meta Platforms Ireland Limited[\s\S]{0,140}Meta Platforms, Inc\./,
 }
 /* The marketing category has to say the consent covers a cookieless server report, or the
  * consent is not specific to what we then do with it (Art. 4(11)). */
@@ -1002,6 +1010,9 @@ const CAPI_CATEGORY: Record<string, RegExp> = {
     for (const must of CAPI_HASH[name] ?? []) {
       check(`${name}/privacy: the hashed email is named and not called anonymous (${must.source.slice(0, 40)})`, must.test(privacy))
     }
+    for (const must of CAPI_IDS[name] ?? []) {
+      check(`${name}/privacy: the report's other identifiers are named (${must.source.slice(0, 40)})`, must.test(privacy))
+    }
     const absent = CAPI_NOT_SENT[name]
     if (absent) check(`${name}/privacy: the report says no IP, no browser details, no Meta cookie`, absent.test(privacy))
     const joint = CAPI_JOINT[name]
@@ -1017,6 +1028,10 @@ const CAPI_CATEGORY: Record<string, RegExp> = {
     !CAPI_NOT_SENT.en.test('In this report we send your IP address and your browser details so that Meta can match the event.'))
   check('mutation control: Meta described as acting on our behalf is caught',
     !CAPI_JOINT.en.test('Meta processes these conversion events on our behalf and under our instructions.'))
+  check('mutation control: a joint-controller sentence that names only the Irish entity is caught',
+    !CAPI_JOINT.en.test('we and Meta are joint controllers: Meta Platforms Ireland Limited, for every visitor.'))
+  check('mutation control: an identifier list that stops at the email is caught',
+    !CAPI_IDS.en[0].test('a one-way hash (SHA-256) of the email address you signed up with'))
   check('mutation control: a marketing category that still speaks only of cookies is caught',
     !CAPI_CATEGORY.en.test('<strong>Marketing:</strong> measuring how our ads perform. Loaded only if you allow it.'))
   check('mutation control: a withdrawal that only stops the tags is caught',

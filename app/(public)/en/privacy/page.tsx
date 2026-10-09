@@ -561,13 +561,16 @@ export default function EnglishPrivacyPage() {
           <li>the name of the event (a completed signup) and the time it happened</li>
           <li>a one-time event identifier, so that Meta does not count the same signup twice</li>
           <li>a one-way hash (SHA-256) of the email address you signed up with</li>
+          <li>a one-way hash, by the same method, of your account identifier with us</li>
+          <li>the address of the page you signed up from, without anything after the question mark</li>
         </ul>
         <p className="mt-4">
           We do not send the email address itself, but the hash does not make the information
           anonymous: if the same address is also on your Meta account, Meta can match the two and
           identify you, so we treat this report as personal data in every respect.{' '}
           <strong>In this report we do not send your IP address, your browser details or any Meta
-          cookie, and it is sent on a completed signup only, never on a page view.</strong>
+          cookie, nor your name or your phone number, and it is sent on a completed signup only,
+          never on a page view.</strong>
         </p>
         <p className="mt-4">
           Withdrawing marketing consent stops future reports immediately. A report already sent we
@@ -576,7 +579,9 @@ export default function EnglishPrivacyPage() {
         </p>
         <p className="mt-4">
           <strong>Who is responsible for this data:</strong> for the collection and transmission of
-          these conversion events, we and Meta Platforms Ireland Limited are joint controllers. From
+          these conversion events, we and Meta are joint controllers: Meta Platforms Ireland Limited
+          for visitors in the European Economic Area and the United Kingdom, and Meta Platforms, Inc.
+          for everyone else. From
           the moment the data reaches Meta, Meta is an independent controller for the use it makes of
           it for its own purposes. You may exercise your rights over this data directly against Meta,
           and if you come to us we will pass your request on to Meta.

@@ -261,12 +261,14 @@ O que esse relatório contém:
 - o nome do evento (um cadastro concluído) e a hora em que aconteceu
 - um identificador único do evento, para que a Meta não conte o mesmo cadastro duas vezes
 - um resumo unidirecional (hash SHA-256) do endereço de e-mail com o qual você se cadastrou
+- um resumo unidirecional, pelo mesmo método, do identificador da sua conta com a gente
+- o endereço da página de onde você se cadastrou, sem nada do que vem depois do sinal de interrogação
 
-Não enviamos o endereço de e-mail em si, mas o hash não torna a informação anônima: se esse mesmo endereço também estiver na sua conta da Meta, a Meta pode relacionar os dois e identificar você, e por isso tratamos esse relatório como dado pessoal para todos os efeitos. **Nesse relatório não enviamos o seu endereço IP, nem os dados do seu navegador, nem qualquer cookie da Meta, e ele é enviado somente por um cadastro concluído, nunca por uma visualização de página.**
+Não enviamos o endereço de e-mail em si, mas o hash não torna a informação anônima: se esse mesmo endereço também estiver na sua conta da Meta, a Meta pode relacionar os dois e identificar você, e por isso tratamos esse relatório como dado pessoal para todos os efeitos. **Nesse relatório não enviamos o seu endereço IP, nem os dados do seu navegador, nem qualquer cookie da Meta, nem o seu nome nem o seu telefone, e ele é enviado somente por um cadastro concluído, nunca por uma visualização de página.**
 
 Retirar o consentimento de marketing interrompe imediatamente os relatórios futuros. Um relatório já enviado não podemos recuperar, e você pode exigir a sua exclusão diretamente da Meta, pelo canal de direitos dela.
 
-**Quem responde por esses dados:** quanto à coleta e à transmissão desses eventos de conversão, nós e a Meta Platforms Ireland Limited somos controladores conjuntos (joint controllers). A partir do momento em que os dados chegam à Meta, a Meta é controladora independente do uso que faz deles para as suas próprias finalidades. Você pode exercer os seus direitos sobre esses dados diretamente perante a Meta, e se você se dirigir a nós encaminharemos o seu pedido à Meta.
+**Quem responde por esses dados:** quanto à coleta e à transmissão desses eventos de conversão, nós e a Meta somos controladores conjuntos (joint controllers): a Meta Platforms Ireland Limited para visitantes do Espaço Econômico Europeu e do Reino Unido, e a Meta Platforms, Inc. para os demais. A partir do momento em que os dados chegam à Meta, a Meta é controladora independente do uso que faz deles para as suas próprias finalidades. Você pode exercer os seus direitos sobre esses dados diretamente perante a Meta, e se você se dirigir a nós encaminharemos o seu pedido à Meta.
 
 ## Contato pelo WhatsApp
 

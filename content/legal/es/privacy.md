@@ -263,12 +263,14 @@ Qué contiene ese informe:
 - el nombre del evento (un registro completado) y la hora en que ocurrió
 - un identificador único del evento, para que Meta no cuente dos veces el mismo registro
 - un resumen unidireccional (hash SHA-256) de la dirección de correo electrónico con la que usted se registró
+- un resumen unidireccional, por el mismo método, del identificador de su cuenta con nosotros
+- la dirección de la página desde la que usted se registró, sin nada de lo que va después del signo de interrogación
 
-No enviamos la dirección de correo electrónico en sí, pero el hash no convierte la información en anónima: si esa misma dirección está también en su cuenta de Meta, Meta puede relacionarlas e identificarle, de modo que tratamos ese informe como datos personales a todos los efectos. **En ese informe no enviamos su dirección IP, ni los datos de su navegador, ni ninguna cookie de Meta, y se envía solo por un registro completado, nunca por ver una página.**
+No enviamos la dirección de correo electrónico en sí, pero el hash no convierte la información en anónima: si esa misma dirección está también en su cuenta de Meta, Meta puede relacionarlas e identificarle, de modo que tratamos ese informe como datos personales a todos los efectos. **En ese informe no enviamos su dirección IP, ni los datos de su navegador, ni ninguna cookie de Meta, ni su nombre ni su número de teléfono, y se envía solo por un registro completado, nunca por ver una página.**
 
 Retirar el consentimiento de marketing detiene de inmediato los informes futuros. Un informe ya enviado no podemos recuperarlo, y usted puede exigir su supresión directamente a Meta, a través de su propio canal de derechos.
 
-**Quién responde por estos datos:** respecto de la recogida y la transmisión de esos eventos de conversión, nosotros y Meta Platforms Ireland Limited somos corresponsables del tratamiento (joint controllers). Desde el momento en que los datos llegan a Meta, Meta es responsable independiente del uso que haga de ellos para sus propias finalidades. Usted puede ejercer sus derechos sobre estos datos directamente ante Meta, y si se dirige a nosotros trasladaremos su solicitud a Meta.
+**Quién responde por estos datos:** respecto de la recogida y la transmisión de esos eventos de conversión, nosotros y Meta somos corresponsables del tratamiento (joint controllers): Meta Platforms Ireland Limited para los visitantes del Espacio Económico Europeo y del Reino Unido, y Meta Platforms, Inc. para el resto. Desde el momento en que los datos llegan a Meta, Meta es responsable independiente del uso que haga de ellos para sus propias finalidades. Usted puede ejercer sus derechos sobre estos datos directamente ante Meta, y si se dirige a nosotros trasladaremos su solicitud a Meta.
 
 ## Contacto por WhatsApp
 
