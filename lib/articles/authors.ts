@@ -24,6 +24,13 @@ export interface ArticleAuthor {
   bio: Record<PublicLocale, string>
   /** The page that backs the claim, used by the box and by the JSON-LD. */
   href: Record<PublicLocale, string>
+  /**
+   * A real photograph of the person, square, served from /public. A face is
+   * part of what makes authorship checkable — an initial in a circle is a
+   * placeholder — so the box shows it and the JSON-LD points Google at it.
+   * Null falls back to the initial rather than to a stock avatar.
+   */
+  photo: string | null
 }
 
 const OREN: ArticleAuthor = {
@@ -46,6 +53,7 @@ const OREN: ArticleAuthor = {
     'pt-BR': 'Por trás da Go Top, agência digital com mais de 11 anos em busca orgânica e mídia paga, e por trás da plataforma Go Top SEO. O que está escrito aqui vem do trabalho diário em sites de clientes, não da teoria.',
   },
   href: { he: '/about', en: '/en/about', es: '/es/about', 'pt-BR': '/pt-BR/about' },
+  photo: '/authors/oren-hacham.jpg',
 }
 
 /** Every spelling an article row may carry, lower-cased. */
