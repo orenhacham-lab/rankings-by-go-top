@@ -14,6 +14,7 @@
 import { readFileSync, existsSync } from 'fs'
 import { join } from 'path'
 import { AFFILIATES_COPY, AFFILIATE_TERMS } from '../affiliates'
+import { AFFILIATE_FORM_COPY } from '../affiliate-form'
 import { LOCALE_PREFIX } from '../../locales'
 import { getPublicDictionary } from '../../getPublicDictionary'
 
@@ -208,6 +209,135 @@ console.log('F) the offer points at the terms that bind it')
   /* F1-MUT: the same page with the link taken out — F1 must fail on it. */
   check('F1-MUT: a page that drops the link is caught',
     !PAGE.replace('${LOCALE_PREFIX[locale]}/affiliate-terms', '#').includes('${LOCALE_PREFIX[locale]}/affiliate-terms'))
+}
+
+console.log('G) who can be paid: the invoicing rule is not Israel-only')
+{
+  /**
+   * The agreement pays a partner anywhere: PayPal, Wise, bank transfer or credit
+   * against their own subscription, and it has a clause for a partner outside
+   * Israel (their own tax reporting). The page's invoicing card, though, named
+   * only the Israeli case in Hebrew, English and Spanish, so a reader abroad
+   * concluded the program could not pay them — Oren read it that way himself on
+   * 9 October 2026. A rule that names one country's paperwork and not the other's
+   * is how a page refuses an audience the agreement accepts.
+   */
+  const ISRAEL: Record<(typeof LANGS)[number], string> = { he: 'ישראל', en: 'Israel', es: 'Israel', 'pt-BR': 'Israel' }
+  const OUTSIDE: Record<(typeof LANGS)[number], string> = { he: 'מחוץ לישראל', en: 'Outside Israel', es: 'Fuera de Israel', 'pt-BR': 'Fora de Israel' }
+  // The cards this rule is about: the ones that talk about invoicing or credit.
+  const PAPERWORK: Record<(typeof LANGS)[number], RegExp> = {
+    he: /חשבונית|קרדיט/,
+    en: /invoic|account credit/i,
+    es: /factura|crédito/i,
+    'pt-BR': /nota fiscal|crédito/i,
+  }
+  const paperworkCards = (lang: (typeof LANGS)[number]) =>
+    AFFILIATES_COPY[lang].rules.filter((r) => PAPERWORK[lang].test(`${r.title} ${r.body}`))
+  check('G1: every language has an invoicing card', LANGS.every((l) => paperworkCards(l).length > 0))
+  check('G2: a card that names Israel’s paperwork also says what happens outside Israel',
+    LANGS.every((l) => paperworkCards(l).every((r) => {
+      const text = `${r.title} ${r.body}`
+      return !text.includes(ISRAEL[l]) || text.includes(OUTSIDE[l])
+    })),
+    LANGS.filter((l) => paperworkCards(l).some((r) => {
+      const text = `${r.title} ${r.body}`
+      return text.includes(ISRAEL[l]) && !text.includes(OUTSIDE[l])
+    })).join(', '))
+  /**
+   * The commission is stated gross, and clause 13 has us withhold tax at source
+   * from an Israeli partner unless they hold a valid exemption certificate and a
+   * certificate of proper bookkeeping. The difference between the 30% on the page
+   * and the money that arrives is the most consequential thing on this card, so
+   * the condition is stated in every language — it depends on where the partner
+   * is, not on which page they read — and the card points at clause 13 rather
+   * than reciting it.
+   */
+  const WITHHOLDING: Record<(typeof LANGS)[number], RegExp> = {
+    he: /מנכים מס/,
+    en: /withhold tax/i,
+    es: /retenemos impuesto/i,
+    'pt-BR': /retemos imposto/i,
+  }
+  const CLAUSE: Record<(typeof LANGS)[number], RegExp> = {
+    he: /סעיף 13/,
+    en: /Clause 13/i,
+    es: /cláusula 13/i,
+    'pt-BR': /cláusula 13/i,
+  }
+  check('G4: every language says we withhold tax at source, and on what condition',
+    LANGS.every((l) => paperworkCards(l).some((r) => WITHHOLDING[l].test(r.body))),
+    LANGS.filter((l) => !paperworkCards(l).some((r) => WITHHOLDING[l].test(r.body))).join(', '))
+  check('G5: the card points at the agreement’s clause 13 instead of reciting it',
+    LANGS.every((l) => paperworkCards(l).some((r) => CLAUSE[l].test(r.body))))
+  /* G4-MUT: the card as it read before the withholding condition was added —
+     G4 must fail on it, in every language. */
+  check('G4-MUT: a card that states the commission without the deduction is caught', LANGS.every((l) => {
+    const previous = {
+      he: 'שותף ישראלי מוציא לנו חשבונית. שותף מחוץ לישראל מתחשבן לפי הכללים של המדינה שלו.',
+      en: 'Israeli affiliates invoice us. Outside Israel, invoicing follows the rules of your own country.',
+      es: 'Los afiliados en Israel nos emiten factura. Fuera de Israel, la factura sigue las reglas de tu país.',
+      'pt-BR': 'Afiliados em Israel emitem nota fiscal para nós. Fora de Israel, a nota fiscal segue a regra do seu país.',
+    }[l]
+    return !WITHHOLDING[l].test(previous)
+  }))
+  /**
+   * Account credit sits immediately after the withholding sentence, where it
+   * reads as the way out of invoicing and tax. It is not: clause 13 puts the tax
+   * on the partner with no exception for how they are paid, and credit against a
+   * subscription is consideration like any other. A card that offers credit as
+   * the alternative for someone with no registered business, right after the
+   * deduction, invites a conclusion with a tax authority at the end of it, so
+   * each language says in one clause that credit is another way to be paid and
+   * not a different tax position.
+   */
+  const CREDIT_IS_NOT_A_TAX_ROUTE: Record<(typeof LANGS)[number], RegExp> = {
+    he: /ולא מצב מס אחר/,
+    en: /not a different tax position/i,
+    es: /no una situación fiscal distinta/i,
+    'pt-BR': /não uma situação fiscal diferente/i,
+  }
+  const CREDIT: Record<(typeof LANGS)[number], RegExp> = {
+    he: /קרדיט בחשבון/,
+    en: /account credit/i,
+    es: /crédito en su cuenta/i,
+    'pt-BR': /crédito na conta/i,
+  }
+  check('G6: a card that offers credit says it is not a different tax position',
+    LANGS.every((l) => paperworkCards(l).every((r) =>
+      !CREDIT[l].test(r.body) || CREDIT_IS_NOT_A_TAX_ROUTE[l].test(r.body))),
+    LANGS.filter((l) => paperworkCards(l).some((r) =>
+      CREDIT[l].test(r.body) && !CREDIT_IS_NOT_A_TAX_ROUTE[l].test(r.body))).join(', '))
+  /* G6-MUT: credit offered bare, as the card read before this clause — G6 must
+     fail on it in every language. */
+  check('G6-MUT: credit offered with no word on its tax is caught', LANGS.every((l) => {
+    const bare = {
+      he: 'מי שאין לו עוסק יכול לקבל במקום זה קרדיט בחשבון.',
+      en: 'Anyone without a registered business can take account credit instead.',
+      es: 'Quien no tenga actividad dada de alta puede recibir crédito en su cuenta.',
+      'pt-BR': 'Quem não tem atividade registrada pode receber crédito na conta.',
+    }[l]
+    return CREDIT[l].test(bare) && !CREDIT_IS_NOT_A_TAX_ROUTE[l].test(bare)
+  }))
+  // The premise of the rule: the form expects applicants from anywhere, so it
+  // asks the country rather than assuming one.
+  check('G3: the application form asks the applicant’s country',
+    /country: ''/.test(strip(read('components/public/AffiliateApplicationForm.tsx')))
+    && LANGS.every((l) => AFFILIATE_FORM_COPY[l].country.length > 1))
+  /* G2-MUT: the wording this page actually carried until 9 October 2026, run
+     through G2's own predicate. Each of the three must be rejected. */
+  const israelOnly = (lang: (typeof LANGS)[number], title: string, body: string) => {
+    const text = `${title} ${body}`
+    return text.includes(ISRAEL[lang]) && !text.includes(OUTSIDE[lang])
+  }
+  check('G2-MUT: the three Israel-only cards the page used to carry are caught',
+    israelOnly('he', 'חשבונית בישראל', 'שותף ישראלי מוציא לנו חשבונית. מי שאין לו עוסק יכול לקבל במקום זה קרדיט בחשבון.')
+    && israelOnly('en', 'Invoices in Israel', 'Israeli affiliates invoice us. Anyone without a registered business can take account credit instead.')
+    && israelOnly('es', 'Factura en Israel', 'Los afiliados en Israel nos emiten factura. Quien no tenga actividad dada de alta puede recibir crédito en su cuenta.'))
+  check('G2-MUT2: the wording now on the page passes that same predicate',
+    LANGS.every((l) => paperworkCards(l).every((r) => !israelOnly(l, r.title, r.body))))
+  /* G3-MUT: a form that dropped the country field — G3 must fail on it. */
+  check('G3-MUT: a form with no country field is caught',
+    !/country: ''/.test(strip(read('components/public/AffiliateApplicationForm.tsx')).replace("country: ''", "")))
 }
 
 console.log(`\n${pass} passed, ${fail} failed`)
