@@ -1,7 +1,7 @@
 'use client'
 
 import { usePathname } from 'next/navigation'
-import { Phone } from 'lucide-react'
+import { MonitorPlay, Phone } from 'lucide-react'
 import WhatsAppGlyph from '@/components/brand/WhatsAppGlyph'
 import { getPublicDictionary } from '@/lib/i18n/getPublicDictionary'
 import { publicUiLocale } from '@/lib/i18n/request-locale'
@@ -11,12 +11,15 @@ import { whatsappHelpUrl, PHONE_TEL } from './contact'
 /**
  * Sticky bottom contact bar — public site only, mobile.
  *
- * Two actions on a paper strip fixed to the bottom of the viewport on small
- * screens: WhatsApp (a bordered button, the glyph in WhatsApp green) and Call
- * (the one primary). Hidden from `md` upward, where the floating WhatsApp
- * button takes over. The start slot of the strip stays free: the accessibility
- * button docks there (AccessibilityWidget). The privacy notice, while open, is
- * a sheet laid over this bar that keeps the same slot free (CookieConsent).
+ * Three actions on a paper strip fixed to the bottom of the viewport on small
+ * screens: WhatsApp and Call keep their glyphs only, and "free demo" (w11) is
+ * the one primary and the only one that carries words. On a phone this is where
+ * the demo offer lives, because DemoFloat's pill would land on the privacy
+ * sheet (CookieConsent's compact card sits at left-3.5, bottom 76px). Hidden
+ * from `md` upward, where the floating WhatsApp button and DemoFloat take over.
+ * The start slot of the strip stays free: the accessibility button docks there
+ * (AccessibilityWidget). The privacy notice, while open, is a sheet laid over
+ * this bar that keeps the same slot free (CookieConsent).
  *
  * Labels follow the active locale, inferred from the `/en` route prefix.
  */
@@ -39,14 +42,23 @@ export function MobileContactBar() {
           target="_blank"
           rel="noopener noreferrer"
           aria-label={t.whatsappAria}
-          className={buttonClasses('secondary', 'lg', 'flex-1')}
+          className={buttonClasses('secondary', 'lg', 'shrink-0 px-0 w-11')}
         >
           <WhatsAppGlyph size={18} className="text-whatsapp" />
-          {t.whatsapp}
         </a>
-        <a href={PHONE_TEL} aria-label={t.callAria} className={buttonClasses('primary', 'lg', 'flex-1')}>
+        <a href={PHONE_TEL} aria-label={t.callAria} className={buttonClasses('secondary', 'lg', 'shrink-0 px-0 w-11')}>
           <Phone className="size-4" aria-hidden="true" />
-          {t.call}
+        </a>
+        <a
+          href={whatsappHelpUrl(t.demoMessage)}
+          target="_blank"
+          rel="noopener noreferrer"
+          aria-label={t.demoAria}
+          data-mobile-demo
+          className={buttonClasses('primary', 'lg', 'min-w-0 flex-1')}
+        >
+          <MonitorPlay className="size-4 shrink-0" aria-hidden="true" />
+          {t.demo}
         </a>
       </div>
     </div>

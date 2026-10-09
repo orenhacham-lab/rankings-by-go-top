@@ -145,6 +145,44 @@
   }
 }
 
+/* ── The hero's primary action announces itself once (w11): the same light
+      sweep as the hover state, played twice shortly after load, so a visitor
+      who landed from an ad sees where to click without anything looping for
+      the rest of the visit. Transform and opacity only, and it never runs
+      under prefers-reduced-motion. ── */
+.ctaSheen::before {
+  content: '';
+  position: absolute;
+  inset-block: 0;
+  inset-inline-start: -60%;
+  width: 45%;
+  z-index: -1;
+  background: linear-gradient(100deg, transparent, rgb(255 255 255 / 0.4), transparent);
+  transform: translateX(0) skewX(-18deg);
+  opacity: 0;
+  pointer-events: none;
+}
+@keyframes cta-sheen {
+  0% { opacity: 0; transform: translateX(0) skewX(-18deg); }
+  12% { opacity: 1; }
+  60%, 100% { opacity: 0; transform: translateX(-420%) skewX(-18deg); }
+}
+@keyframes cta-sheen-ltr {
+  0% { opacity: 0; transform: translateX(0) skewX(-18deg); }
+  12% { opacity: 1; }
+  60%, 100% { opacity: 0; transform: translateX(420%) skewX(-18deg); }
+}
+@media (prefers-reduced-motion: no-preference) {
+  .ctaSheen::before {
+    animation: cta-sheen 2600ms var(--ease-snappy) 900ms 2 backwards;
+  }
+  :global([dir='ltr']) .ctaSheen::before {
+    inset-inline-start: auto;
+    inset-inline-end: -60%;
+    animation-name: cta-sheen-ltr;
+  }
+}
+
 /* A typing caret in the demo. Shown only while the demo is typing. */
 .caret {
   display: inline-block;

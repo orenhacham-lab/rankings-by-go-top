@@ -52,10 +52,29 @@ function main() {
       && /border-contrast-ink bg-contrast-ink text-contrast/.test(m) && /<Eyebrow icon=\{Sparkles\} inverse prominent>\{copy\.hero\.eyebrow\}/.test(l)
     check('A2: the hero badge is a prominent solid pill (bigger, light on navy, bold)', badgeOk(marketing, landing))
     check('MUT: the small translucent badge back fails A2', !badgeOk(marketing, landing.replace('inverse prominent>', 'inverse>')))
-    const ctaOk = (l: string, f: string) => /variant="inverse" size="lg" arrow className="h-14 border-2 border-white\/60/.test(l) && /h-16 border-transparent/.test(f) && /h-16 px-8/.test(f) && /max-w-2xl/.test(f)
-    check('A3: the check form is 64px tall and the trial link a 56px outlined button', ctaOk(landing, form))
-    check('MUT: the trial as a bare link fails A3', !ctaOk(landing.replace('variant="inverse" size="lg" arrow', 'variant="ghost-inverse" arrow'), form))
-    check('MUT: the small field fails A3', !ctaOk(landing, form.replace('h-16 border-transparent', 'h-14 border-transparent')))
+    // A3 was the other way round until w11: a lit, ring-2, 64px check field held the
+    // hero while the trial sat behind an "or" as a 56px outlined button. Five days of
+    // Meta traffic produced one signup, so the trial is now the one filled primary and
+    // the check is the compact second. What this pins is the ORDER and the weight.
+    const primaryAt = (l: string) => l.indexOf('data-hero-primary')
+    const secondaryAt = (l: string) => l.indexOf('data-hero-secondary')
+    const ctaOk = (l: string, f: string) => primaryAt(l) > 0 && secondaryAt(l) > 0
+      && primaryAt(l) < secondaryAt(l)
+      && /data-hero-primary[\s\S]{0,200}h-16 px-9 text-section font-bold/.test(l)
+      && /ctaSheen/.test(l)
+      && !/variant="inverse" size="lg" arrow className="h-14 border-2 border-white\/60/.test(l)
+      && /<FreeCheckHeroForm locale=\{locale\} tone="inverse" compact \/>/.test(l)
+      && /inverse && compact && 'h-12 border-transparent/.test(f) && /max-w-2xl/.test(f)
+    check('A3: the trial is the hero\'s one filled primary, the free check the compact second', ctaOk(landing, form))
+    check('MUT: the check field first fails A3', !ctaOk(
+      landing.replace('data-hero-primary', 'data-hero-zz-primary').replace('data-hero-secondary', 'data-hero-primary').replace('data-hero-zz-primary', 'data-hero-secondary'),
+      form,
+    ))
+    check('MUT: the old outlined trial button behind an "or" fails A3', !ctaOk(
+      landing.replace('data-hero-primary', 'variant="inverse" size="lg" arrow className="h-14 border-2 border-white/60'),
+      form,
+    ))
+    check('MUT: a full-size check field in the second slot fails A3', !ctaOk(landing, form.replace("inverse && compact && 'h-12 border-transparent", "inverse && compact && 'h-16 border-transparent")))
     check('A4: the badge reads "automatic" in both languages', landingHe.hero.eyebrow === 'קידום אוטומטי בגוגל ובמנועי AI, במערכת אחת' && /Automatic promotion/.test(landingEn.hero.eyebrow))
     const gapOk = (l: string) => /relative z-10 pt-12 sm:pt-16 lg:pt-20/.test(l) && !/-mt-(?:12|\[7\.5rem\])/.test(l)
     check('A5: the box after the hero has air above it (no overlap into the hero)', gapOk(landing))

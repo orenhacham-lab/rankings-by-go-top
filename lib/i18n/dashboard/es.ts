@@ -92,6 +92,10 @@ export const dashboardEs: DeepPartial<DashboardDictionary> = {
     phone: (number: string) => `Llamar al ${number}`,
     email: (address: string) => `Escribir a ${address}`,
     opensNewTab: '(se abre en una pestaña nueva)',
+    // The floating "free demo" button (w11).
+    demo: 'Demo gratis',
+    demoAria: 'Pide una demo gratis por WhatsApp',
+    demoMessage: (domain: string) => (domain ? `Hola, quiero una demo gratis de Go Top SEO para ${domain}` : 'Hola, quiero una demo gratis de Go Top SEO'),
   },
   // Only the three rail entries and the line under each of those screens. The
   // rest of contentHub is the content workspace itself, which is its own wave;

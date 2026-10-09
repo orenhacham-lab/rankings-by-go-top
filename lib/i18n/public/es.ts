@@ -56,6 +56,10 @@ export const es = {
         label: 'Correcciones del sitio',
         description: 'Revisamos tu sitio y corregimos títulos, descripciones, texto alternativo de imágenes y enlaces. En WordPress con un clic, después de que lo apruebes.',
       },
+      links: {
+        label: 'Enlaces a tu sitio',
+        description: 'Enlaces internos entre tus propias páginas, páginas huérfanas a las que nadie enlaza y sitios gratuitos donde conviene que aparezca tu negocio.',
+      },
       competitors: {
         label: 'Tú frente a la competencia',
         description: 'En cuántas palabras clave cada competidor aparece por encima de ti en Google, y a quién mencionan los motores de IA en tu lugar.',
@@ -247,6 +251,10 @@ export const es = {
     phoneLabel: 'Llamar',
     emailLabel: 'Correo',
     emailAria: 'Escríbenos un correo',
+    // The floating "free demo" button (w11), on the public site and in the app.
+    demo: 'Demo gratis',
+    demoAria: 'Pide una demo gratis por WhatsApp',
+    demoMessage: 'Hola, quiero una demo gratis de Go Top SEO',
   },
   a11y: {
     open: 'Abrir el menú de accesibilidad',

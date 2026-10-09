@@ -8,7 +8,11 @@
  * so the stack and the demo can never tell two stories. Illustrative, like the
  * demo, whose caption says so; decoration for assistive tech (aria-hidden),
  * because the demo right under it describes the same three scenes in words.
- * A server component: still, complete at rest. Hidden below lg.
+ * A server component, complete at rest. Hidden below lg. The three cards drift
+ * on the global `.float-y` loop (app/globals.css), staggered, which is the hero's
+ * motion (w11): it animates `transform` while Tailwind v4's `rotate-*` sets the
+ * `rotate` property, so the tilts survive, and the whole loop is inside
+ * `prefers-reduced-motion: no-preference`.
  */
 import { ArrowRight, Bot, Check, Sparkles, TrendingUp } from 'lucide-react'
 import type { HeroDemoCopy } from './HeroDemo'
@@ -18,7 +22,7 @@ export function HeroSignals({ demo, published }: { demo: HeroDemoCopy; published
   return (
     <div aria-hidden="true" className="relative mx-auto h-[26rem] w-full max-w-md" data-hero-signals>
       {/* 1. The climb */}
-      <div className="absolute start-0 top-0 w-[19rem] -rotate-3 rounded-card bg-surface p-5 text-start shadow-pop ring-1 ring-white/10">
+      <div className="float-y absolute start-0 top-0 w-[19rem] -rotate-3 rounded-card bg-surface p-5 text-start shadow-pop ring-1 ring-white/10" style={{ '--float-delay': '0ms' } as React.CSSProperties}>
         <div className="flex items-center justify-between gap-3">
           <span className="text-caption font-semibold text-muted">{demo.rank.positionLabel}</span>
           <span className="inline-flex h-6 items-center gap-1 rounded-pill bg-ok-soft px-2 text-caption font-semibold tabular-nums text-ok">
@@ -35,7 +39,7 @@ export function HeroSignals({ demo, published }: { demo: HeroDemoCopy; published
       </div>
 
       {/* 2. The AI answer */}
-      <div className="absolute end-0 top-[8.5rem] w-[21rem] rotate-2 rounded-card bg-surface p-5 text-start shadow-pop ring-1 ring-white/10">
+      <div className="float-y absolute end-0 top-[8.5rem] w-[21rem] rotate-2 rounded-card bg-surface p-5 text-start shadow-pop ring-1 ring-white/10" style={{ '--float-delay': '800ms' } as React.CSSProperties}>
         <div className="flex items-center gap-2">
           <span className="flex size-7 items-center justify-center rounded-pill bg-contrast text-contrast-ink">
             <Bot className="size-4" />
@@ -56,7 +60,7 @@ export function HeroSignals({ demo, published }: { demo: HeroDemoCopy; published
       </div>
 
       {/* 3. Published */}
-      <div className="absolute bottom-0 start-6 flex w-[20rem] -rotate-[1.5deg] items-center gap-3 rounded-card bg-surface px-4 py-3.5 text-start shadow-pop ring-1 ring-white/10">
+      <div className="float-y absolute bottom-0 start-6 flex w-[20rem] -rotate-[1.5deg] items-center gap-3 rounded-card bg-surface px-4 py-3.5 text-start shadow-pop ring-1 ring-white/10" style={{ '--float-delay': '1600ms' } as React.CSSProperties}>
         <span className="flex size-9 shrink-0 items-center justify-center rounded-pill bg-ok-soft text-ok">
           <Check className="size-4" strokeWidth={3} />
         </span>

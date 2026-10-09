@@ -162,6 +162,18 @@ export async function GET() {
       changefreq: 'monthly',
       priority: '0.8',
     },
+    {
+      url: `${baseUrl}/solutions/shopify`,
+      lastmod: today,
+      changefreq: 'monthly',
+      priority: '0.8',
+    },
+    {
+      url: `${baseUrl}/features/site-links`,
+      lastmod: today,
+      changefreq: 'monthly',
+      priority: '0.8',
+    },
     // Hebrew legal pages
     // English site root and equivalents
     {
@@ -273,6 +285,18 @@ export async function GET() {
       changefreq: 'monthly',
       priority: '0.8',
     },
+    {
+      url: `${baseUrl}/en/solutions/shopify`,
+      lastmod: today,
+      changefreq: 'monthly',
+      priority: '0.8',
+    },
+    {
+      url: `${baseUrl}/en/features/site-links`,
+      lastmod: today,
+      changefreq: 'monthly',
+      priority: '0.8',
+    },
     // English legal pages
   ]
 
@@ -304,6 +328,8 @@ export async function GET() {
     { path: '/solutions/businesses', changefreq: 'monthly', priority: '0.7' },
     { path: '/solutions/agencies', changefreq: 'monthly', priority: '0.7' },
     { path: '/solutions/wordpress', changefreq: 'monthly', priority: '0.7' },
+    { path: '/solutions/shopify', changefreq: 'monthly', priority: '0.7' },
+    { path: '/features/site-links', changefreq: 'monthly', priority: '0.7' },
   ]
 
   const treePages = (prefix: string) =>

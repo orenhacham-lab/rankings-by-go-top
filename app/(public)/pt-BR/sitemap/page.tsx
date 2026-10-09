@@ -43,6 +43,7 @@ export default function PortugueseSitemapPage() {
         { label: 'Relatórios SEO e GEO', href: '/pt-BR/features/seo-geo-reports' },
         { label: 'Pesquisa de palavras-chave', href: '/pt-BR/features/keyword-research' },
         { label: 'Correções no site', href: '/pt-BR/features/site-health-fixes' },
+        { label: 'Links para o seu site', href: '/pt-BR/features/site-links' },
         { label: 'Você x concorrentes', href: '/pt-BR/features/competitor-tracking' },
         { label: 'Dados do Search Console', href: '/pt-BR/features/search-console' },
       ],
@@ -53,6 +54,7 @@ export default function PortugueseSitemapPage() {
         { label: 'Donos de negócios', href: '/pt-BR/solutions/businesses' },
         { label: 'Agências', href: '/pt-BR/solutions/agencies' },
         { label: 'Sites WordPress', href: '/pt-BR/solutions/wordpress' },
+        { label: 'Lojas Shopify', href: '/pt-BR/solutions/shopify' },
       ],
     },
     {

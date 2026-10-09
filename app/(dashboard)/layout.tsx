@@ -5,6 +5,7 @@ import { MAIN_CONTENT_ID } from '@/components/layout/main-content'
 import WorkspaceSwitcher from '@/components/layout/WorkspaceSwitcher'
 import GuideMenu from '@/components/guide/GuideMenu'
 import ContactMenu from '@/components/guide/ContactMenu'
+import DemoFloatApp from '@/components/guide/DemoFloatApp'
 import TopBarActions from '@/components/layout/TopBarActions'
 import TrialBar from '@/components/layout/TrialBar'
 import { TRIAL_BAR_HIDE_COOKIE, trialBarDismissed } from '@/lib/billing/trial-bar-dismissal'
@@ -120,6 +121,9 @@ export default async function DashboardLayout({
                   {/* At the bar's end: the project's settings and the notifications bell (wave 9). */}
                   <TopBarActions />
                 </div>
+                {/* The floating "free demo" offer (w11): customers only, like the
+                    contact pill above and the rail's support row. */}
+                {!isAdmin && <DemoFloatApp />}
                 <Suspense fallback={null}>
                   <TrialBarSlot userId={user.id} />
                 </Suspense>

@@ -45,6 +45,10 @@ export const en = {
         label: 'Site fixes',
         description: 'We check your site and fix titles, descriptions, image alt text and links. On WordPress in one click, after you approve.',
       },
+      links: {
+        label: 'Links to your site',
+        description: 'Internal links between your own pages, orphan pages nothing links to, and free places your business should be listed in.',
+      },
       competitors: {
         label: 'You vs. competitors',
         description: 'On how many keywords each competitor ranks above you in Google, and who AI engines mention instead of you.',
@@ -240,6 +244,10 @@ export const en = {
     phoneLabel: 'Call',
     emailLabel: 'Email',
     emailAria: 'Email us',
+    // The floating "free demo" button (w11), on the public site and in the app.
+    demo: 'Free demo',
+    demoAria: 'Get a free demo on WhatsApp',
+    demoMessage: 'Hi, I would like a free demo of Go Top SEO',
   },
   a11y: {
     open: 'Open accessibility menu',
