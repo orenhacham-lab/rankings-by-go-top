@@ -14,6 +14,8 @@
  */
 import { firstScanDate, calculateNextScanDate, FIRST_SCAN_DELAY_DAYS, isValidScanFrequency } from '../utils'
 import { code } from '../content/cannibalization/__qa__/_strip'
+import { MONTHLY_CORE_ENGINES } from '../ai-visibility/monthly-check/config'
+import { SCORED_ENGINES } from '../ai-visibility/score'
 
 let pass = 0, fail = 0
 function check(name: string, cond: boolean, detail?: string) {
@@ -98,6 +100,30 @@ async function main() {
       check(`${lang}: if the site promises automatic tracking, the default is on`, !claimsAuto || defaultOn)
     }
     check('the promise was actually found (the guard is not vacuously passing)', claimed === CLAIM.length, `${claimed}/${CLAIM.length} languages`)
+  }
+
+  console.log('E) the AI-engine claim matches the automatic monthly check, in every language')
+  {
+    // The same comparison table used to promise a "regular check" of six AI
+    // engines. The automatic monthly check runs MONTHLY_CORE_ENGINES (three);
+    // the other three are manual. The count is DERIVED from the code here, so
+    // adding an engine to the automatic check does not silently falsify the copy
+    // (or leave it understated) — this fails until the wording is updated too.
+    check('the automatic monthly check runs 3 engines', MONTHLY_CORE_ENGINES.length === 3)
+    check('the other engines exist but are manual', SCORED_ENGINES.length > MONTHLY_CORE_ENGINES.length)
+    const manualCount = SCORED_ENGINES.length - MONTHLY_CORE_ENGINES.length
+    const NUMBER_WORD: Record<string, Record<number, RegExp>> = {
+      he: { 3: /שלושה/ }, en: { 3: /three/i }, es: { 3: /tres/i }, 'pt-BR': { 3: /três|tres/i },
+    }
+    const STALE = [/four more engines/i, /cuatro motores más/i, /mais quatro motores/i, /ועוד ארבעה מנועים/]
+    for (const lang of ['he', 'en', 'es', 'pt-BR']) {
+      const landing = code(`lib/i18n/public/landing-${lang}.ts`)
+      check(`${lang}: the overstated "four more engines" wording is gone`, !STALE.some((re) => re.test(landing)))
+      const word = NUMBER_WORD[lang][manualCount]
+      check(`${lang}: the on-demand engines are described as ${manualCount}`, !!word && word.test(landing), `no match for ${manualCount}`)
+      // "periodic/regular" implied all six ran on a schedule; the claim is now explicitly automatic.
+      check(`${lang}: the scheduled part names Google AI, the third automatic engine`, /Google AI/.test(landing))
+    }
   }
 
   console.log(`\n${pass} passed, ${fail} failed`)
