@@ -63,7 +63,7 @@ Country: IL
   if (articles && articles.length > 0) {
     articles.forEach((article: Article) => {
       // Under the tree of the language it is written in: `articles.locale`
-      // (migration 20261009180000). The Hebrew path was right while the blog
+      // (migration 20261009180750). The Hebrew path was right while the blog
       // was Hebrew-only and became a 404 for every other language.
       const prefix = LOCALE_PREFIX[normalizePublicLocale(article.locale) ?? 'he']
       content += `- ${article.title}: ${baseUrl}${prefix}/articles/${article.slug}\n`
