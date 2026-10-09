@@ -272,6 +272,7 @@ export async function publishPoolItem(admin: Admin, itemId: string): Promise<Pub
     try {
       const seo = await publishArticleSeo(admin, loaded.creds, created.wpPostId, {
         articleId: article.id, metaTitle: article.meta_title || String(article.title || ''), metaDescription: article.meta_description || null, topicId: article.topic_id,
+        postUrl: created.wpPostUrl,
       })
       if (seo.status !== 'verified') console.warn('[automation-publish] seo_not_verified', { itemId, articleId: article.id, plugin: seo.plugin, status: seo.status })
     } catch (e) { console.warn('[automation-publish] seo write failed', { itemId, message: (e as Error)?.message?.slice(0, 120) }) }

@@ -327,6 +327,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
       metaTitle: (a.meta_title as string) || title,
       metaDescription: (a.meta_description as string) || null,
       topicId: (a.topic_id as string | null) ?? null,
+      postUrl: status === 'publish' ? created.wpPostUrl : null,
     })
     seoPlugin = seo.plugin
     seoStatus = seo.status
