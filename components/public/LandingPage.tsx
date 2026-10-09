@@ -44,9 +44,11 @@ export type LandingCopy = {
     title: string
     accent: string
     subtitle: string
-    /** The words before the secondary action, e.g. "or". */
-    or: string
     signup: string
+    /** Under the primary action: what the trial costs and commits to. */
+    trialNote: string
+    /** The line that introduces the free check, now the hero's secondary action. */
+    checkLead: string
     dashboard: string
     trust: string[]
     /** The chip at the end of the rank climb, e.g. "#3 on Google". */
@@ -128,19 +130,29 @@ export function LandingPage({
                   {copy.hero.title}
                   <span className="block text-rail-tagline">{copy.hero.accent}</span>
                 </h1>
-                <p className="mt-6 max-w-[58ch] text-lead-mkt text-contrast-ink/80 text-pretty">{copy.hero.subtitle}</p>
+                <p className="mt-6 max-w-[54ch] text-lead-mkt text-contrast-ink/80 text-pretty">{copy.hero.subtitle}</p>
 
-                {/* Free site check: the hero's primary action, one field, no signup. */}
+                {/* The trial is the hero's primary action (w11). It was the outline button behind
+                    an "or" while the free check held a lit, ring-2 field, so the page asked a cold
+                    visitor for a URL before it offered them the product. Flipped: one filled button,
+                    its own line, with what it costs right under it. */}
                 <div className="mt-9">
-                  <FreeCheckHeroForm locale={locale} tone="inverse" />
-                </div>
-
-                {/* The trial: a real secondary button (outline on navy), as tall as the check's field. */}
-                <div className="mt-5 flex flex-wrap items-center gap-x-4 gap-y-3">
-                  <span className="text-lead text-contrast-ink/80">{copy.hero.or}</span>
-                  <ButtonLink href={startHref} variant="inverse" size="lg" arrow className="h-14 border-2 border-white/60 bg-white/10 px-7 text-lead hover:border-white/90 hover:bg-white/20">
+                  <ButtonLink
+                    href={startHref}
+                    size="lg"
+                    arrow
+                    data-hero-primary
+                    className={cn(styles.cta, styles.ctaSheen, 'h-16 px-9 text-section font-bold shadow-pop focus-visible:ring-white/50')}
+                  >
                     {signedIn ? copy.hero.dashboard : copy.hero.signup}
                   </ButtonLink>
+                  <p className="mt-3 text-copy text-contrast-ink/80">{copy.hero.trialNote}</p>
+                </div>
+
+                {/* The free check, second: the same funnel, as one quiet line and a compact field. */}
+                <div className="mt-8 border-t border-white/15 pt-6" data-hero-secondary>
+                  <p className="mb-3 text-copy text-contrast-ink/75">{copy.hero.checkLead}</p>
+                  <FreeCheckHeroForm locale={locale} tone="inverse" compact />
                 </div>
 
                 <ul className="mt-7 flex flex-wrap items-center gap-x-5 gap-y-2 text-copy text-contrast-ink/85">

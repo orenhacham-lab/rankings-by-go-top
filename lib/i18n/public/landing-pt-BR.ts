@@ -30,10 +30,11 @@ export const landingPtBR: LandingCopy = {
     accent: 'Nós fazemos com que eles encontrem você.',
     subtitle:
       'O Go Top SEO escreve e publica artigos que respondem ao que os seus clientes procuram, e depois mostra onde você aparece no Google, no Google Maps, no ChatGPT e no Gemini. Sem equipe de conteúdo. Sem achismo.',
-    or: 'ou',
     signup: `Teste grátis por ${TRIAL_DAYS} dias`,
+    trialNote: 'Sem cartão de crédito, sem compromisso. Cancele quando quiser.',
+    checkLead: 'Ainda na dúvida? Faça uma análise gratuita do seu site, sem cadastro:',
     dashboard: 'Ir para o meu painel',
-    trust: ['Sem cartão de crédito', 'Cancele quando quiser', 'Publica no WordPress e na Shopify', 'Suporte feito por pessoas de verdade'],
+    trust: ['Publica no WordPress e na Shopify', 'Suporte feito por pessoas de verdade'],
     climbChip: '3º lugar no Google',
     published: 'Artigo publicado no seu site',
   },
