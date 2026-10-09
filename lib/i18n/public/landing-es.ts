@@ -146,7 +146,7 @@ export const landingEs: LandingCopy = {
       'Un calendario de contenido estable que publica cuando tú decides',
       'Temas elegidos a partir de lo que de verdad buscan tus clientes',
       'Seguimiento automático de tus posiciones en Google y en Google Maps',
-      'Comprobaciones periódicas de lo que dicen de ti ChatGPT, Gemini y cuatro motores más',
+      'Comprobaciones automáticas de lo que dicen de ti ChatGPT, Gemini y Google AI, y tres motores más con un clic',
     ],
   },
   flow: {

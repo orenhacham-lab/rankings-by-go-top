@@ -139,7 +139,7 @@ export const landingEn: LandingCopy = {
       'A steady content calendar that publishes on your schedule',
       'Topics chosen from what your customers actually search for',
       'Automatic tracking of your Google and Google Maps positions',
-      'Regular checks of what ChatGPT, Gemini and four more engines say about you',
+      'Automatic checks of what ChatGPT, Gemini and Google AI say about you, plus three more engines on demand',
     ],
   },
   flow: {

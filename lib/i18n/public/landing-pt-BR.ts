@@ -147,7 +147,7 @@ export const landingPtBR: LandingCopy = {
       'Um calendário de conteúdo constante que publica quando você decide',
       'Temas escolhidos a partir do que os seus clientes realmente procuram',
       'Acompanhamento automático das suas posições no Google e no Google Maps',
-      'Verificações periódicas do que o ChatGPT, o Gemini e mais quatro motores dizem sobre você',
+      'Verificações automáticas do que o ChatGPT, o Gemini e o Google AI dizem sobre você, e mais três motores com um clique',
     ],
   },
   flow: {
