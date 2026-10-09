@@ -19,6 +19,7 @@ import { formatCount } from '@/components/gsc/format'
 import { formatDateTime } from '@/lib/utils'
 import { displayUrl } from '@/lib/format/display-url'
 import { useDashboardLanguage } from '@/lib/i18n/dashboard/useDashboardLanguage'
+import { useItemProject } from '@/lib/active-project/useItemProject'
 import { getDashboardDictionary } from '@/lib/i18n/dashboard/getDashboardDictionary'
 
 export default function KeywordHistoryPage({ params }: { params: Promise<{ id: string }> }) {
@@ -30,6 +31,9 @@ export default function KeywordHistoryPage({ params }: { params: Promise<{ id: s
   const [target, setTarget] = useState<TrackingTarget & { projects?: { name: string; id: string } } | null>(null)
   const [results, setResults] = useState<ScanResult[]>([])
   const [loading, setLoading] = useState(true)
+  // Opening a keyword's history adopts its project; switching the workspace
+  // while it is open leaves for the new project's Keywords screen.
+  useItemProject(target?.projects?.id ?? null, (pid) => `/keywords?projectId=${encodeURIComponent(pid)}`)
   // The check rows rise in once, when they first arrive.
   const rowsEnter = useFirstEntrance(!loading && results.length > 0)
 
