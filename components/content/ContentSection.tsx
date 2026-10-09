@@ -89,6 +89,8 @@ export default function ContentSection({ projectId, platformHint }: { projectId:
   const [loadState, setLoadState] = useState<'loading' | 'error' | 'ready'>(initial.state)
   const loading = loadState === 'loading'
   const [wpConnected, setWpConnected] = useState(!!known0?.wordpress)
+  // The GO TOP SEO Bridge plugin (>= 3.0.0) publishing with no application password.
+  const [wpPlugin, setWpPlugin] = useState<{ siteUrl: string; version: string } | null>(known0?.wordpressPlugin ?? null)
   const [shopifyConnected, setShopifyConnected] = useState(!!known0?.shopify)
   // Wix / custom-site connection (sanitized: never a key or secret).
   const [site, setSite] = useState<SanitizedSiteConnection | null>(known0?.site ?? null)
@@ -114,12 +116,13 @@ export default function ContentSection({ projectId, platformHint }: { projectId:
     const wpc = !!known.value.wordpress
     const shc = !!known.value.shopify
     setWpConnected(wpc)
+    setWpPlugin(known.value.wordpressPlugin)
     setShopifyConnected(shc)
     setSite(known.value.site)
     setSwitchLocked(known.value.switchLocked)
     // Returning to the neither-connected state (a disconnect) resets to the
     // platform choice; a choice the merchant just confirmed is kept.
-    if (!wpc && !shc && !keepChoice) setChoice(null)
+    if (!wpc && !shc && !known.value.wordpressPlugin && !keepChoice) setChoice(null)
     setLoadState('ready')
   }, [])
 
@@ -145,6 +148,18 @@ export default function ContentSection({ projectId, platformHint }: { projectId:
   }, [])
 
   const both = wpConnected && shopifyConnected
+  // WordPress through the plugin alone (no application-password row, no other platform): connected
+  // for publishing, never "not connected". The panel below offers the application password for
+  // what only it can do (the existing-posts scan, a scheduled post, a second post for an article).
+  const wpViaPlugin = !wpConnected && !shopifyConnected && !site && choice !== 'shopify' && !!wpPlugin
+  const wpAny = wpConnected || wpViaPlugin
+  const pluginOnlyNotice = wpViaPlugin && wpPlugin ? (
+    <div data-wp-plugin-only="">
+      <Notice tone="info">
+        <span className="font-semibold">{t.pluginOnlyTitle}</span> {t.pluginOnlyBody.replace('{version}', wpPlugin.version)}
+      </Notice>
+    </div>
+  ) : null
 
   // K2 — when a platform is connected, explain what the Content Hub offers and link
   // to it. This is a pointer to the hub, NOT a second Content Hub inside the project.
@@ -174,10 +189,11 @@ export default function ContentSection({ projectId, platformHint }: { projectId:
           <WordPressConnectionPanel projectId={projectId} onChanged={onPanelChanged} />
           <ShopifyConnectionPanel projectId={projectId} onChanged={onPanelChanged} />
         </div>
-      ) : wpConnected ? (
+      ) : wpAny ? (
         <div className="space-y-3">
           {connectedBanner}
-          <WordPressConnectionPanel projectId={projectId} onChanged={onPanelChanged} />
+          {pluginOnlyNotice}
+          <WordPressConnectionPanel projectId={projectId} onChanged={onPanelChanged} startWithForm={wpViaPlugin} />
         </div>
       ) : shopifyConnected ? (
         <div className="space-y-3">
@@ -225,11 +241,11 @@ export default function ContentSection({ projectId, platformHint }: { projectId:
   if (loading || switchLocked) return legacy
 
   // ── Web projects: the platform card, the switch modal, and the current panel ──
-  const current: ChoosablePlatform | null = wpConnected ? 'wordpress' : shopifyConnected ? 'shopify' : site ? site.platform : null
+  const current: ChoosablePlatform | null = wpAny ? 'wordpress' : shopifyConnected ? 'shopify' : site ? site.platform : null
   const connectedCount = [wpConnected, shopifyConnected, !!site].filter(Boolean).length
   const conflict = connectedCount > 1
   const onSwitched = (p: ChoosablePlatform, saved?: SanitizedSiteConnection | null) => {
-    if (p === 'wordpress' || p === 'shopify') { setWpConnected(false); setShopifyConnected(false); setSite(null); setChoice(p) }
+    if (p === 'wordpress' || p === 'shopify') { setWpConnected(false); setWpPlugin(null); setShopifyConnected(false); setSite(null); setChoice(p) }
     else setSite(saved ?? null)
     void refresh({ keepChoice: true })
   }
@@ -283,11 +299,12 @@ export default function ContentSection({ projectId, platformHint }: { projectId:
         // the panel: its answer (a failed test, say) stays on screen.
         <div className="space-y-3 motion-safe:animate-pop-in" data-wp-section>
           {current === 'wordpress' && connectedBanner}
+          {pluginOnlyNotice}
           <WordPressConnectionPanel
             projectId={projectId}
             onChanged={onPanelChanged}
             onConnected={current === 'wordpress' ? undefined : goToContentHub}
-            startWithForm={current !== 'wordpress'}
+            startWithForm={current !== 'wordpress' || wpViaPlugin}
           />
         </div>
       ) : current === 'shopify' ? (

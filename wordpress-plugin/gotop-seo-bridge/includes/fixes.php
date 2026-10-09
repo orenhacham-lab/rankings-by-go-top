@@ -65,7 +65,7 @@ function gotop_seo_bridge_meta_key($type, $seo_plugin) {
 }
 
 function gotop_seo_bridge_home_host() {
-    $host = parse_url(home_url('/'), PHP_URL_HOST);
+    $host = wp_parse_url(home_url('/'), PHP_URL_HOST);
     return preg_replace('/^www\./', '', strtolower((string) $host));
 }
 
@@ -73,7 +73,7 @@ function gotop_seo_bridge_home_host() {
 function gotop_seo_bridge_on_site($url) {
     if (!is_string($url) || strlen($url) > 2048 || !preg_match('#^https?://#i', $url)) { return null; }
     if (preg_match('/["\'<>\s\\\\]/', $url)) { return null; }
-    $host = parse_url($url, PHP_URL_HOST);
+    $host = wp_parse_url($url, PHP_URL_HOST);
     if (!$host || preg_replace('/^www\./', '', strtolower($host)) !== gotop_seo_bridge_home_host()) { return null; }
     return $url;
 }
@@ -174,6 +174,10 @@ function gotop_seo_bridge_validate_fix($type, $value) {
             $nodes = isset($schema['@graph']) && is_array($schema['@graph']) ? $schema['@graph'] : array($schema);
             if (count($nodes) < 1) { return 'value_invalid'; }
             foreach ($nodes as $n) { if (!is_array($n) || !isset($n['@type'])) { return 'value_invalid'; } }
+            if (gotop_seo_bridge_site_prints_schema()) {
+                // The SEO plugin describes the page and the business; only our FAQ block is ours to mark up.
+                foreach ($nodes as $n) { if (!in_array('FAQPage', (array) $n['@type'], true)) { return 'seo_plugin_schema'; } }
+            }
             $budget = 0;
             if (!gotop_seo_bridge_schema_ok($schema, 0, $budget)) { return 'value_invalid'; }
             $json = wp_json_encode($schema, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
@@ -221,7 +225,7 @@ function gotop_seo_bridge_validate_fix($type, $value) {
 /** The post behind an address on this site (posts and pages only), or a string code. */
 function gotop_seo_bridge_resolve_post($url) {
     if (gotop_seo_bridge_on_site($url) === null) { return 'off_site'; }
-    $path = (string) parse_url($url, PHP_URL_PATH);
+    $path = (string) wp_parse_url($url, PHP_URL_PATH);
     $id = 0;
     if (trim($path, '/') === '' && get_option('show_on_front') === 'page') {
         $id = (int) get_option('page_on_front');

@@ -21,6 +21,8 @@ import { isMissingRelation, SITE_TABLE } from '@/lib/site-platforms/store'
 import { loadActiveAlerts } from '@/lib/content/automation/load-active-alerts'
 import type { ActiveAlert } from '@/lib/content/automation/alert-read-model'
 import { queueItemsNotYetCounted } from '@/lib/content/overview-counts'
+import { versionAtLeast } from '@/lib/site-fix/types'
+import { PUBLISH_PLUGIN_MIN_VERSION } from '@/lib/content/wordpress-plugin-publish'
 
 const EMPTY_COUNTS = {
   total: 0,
@@ -198,6 +200,20 @@ export async function GET(request: Request) {
     }
   }
 
+  // No application-password row: the GO TOP SEO Bridge plugin >= 3.0.0, when connected, publishes
+  // on its own (lib/content/wordpress-plugin-publish.ts). Safe columns only, through the caller's
+  // own RLS client (owner policy), filtered by this project and this user.
+  let wpPresent = !!wpData
+  if (!wpData && !wpError) {
+    const { data: pl } = await supabase.from('site_fix_plugin_links').select('site_url, status, plugin_version')
+      .eq('project_id', projectId).eq('user_id', user.id).maybeSingle()
+    const row = pl as { site_url?: string; status?: string; plugin_version?: string | null } | null
+    if (row?.status === 'connected' && row.plugin_version && versionAtLeast(row.plugin_version, PUBLISH_PLUGIN_MIN_VERSION)) {
+      wordpress = { connected: true, siteUrl: row.site_url ?? null, status: 'connected', lastTestedAt: null }
+      wpPresent = true
+    }
+  }
+
   // Shopify connection status — SAFE FIELDS ONLY (never the encrypted token). Lets
   // ContentHub route by the ACTIVE platform instead of hard-coding WordPress.
   let shopify: { connected: boolean; shopDomain: string | null; status: string | null; canPublish: boolean; defaultBlogId: string | null } = {
@@ -227,7 +243,7 @@ export async function GET(request: Request) {
   const site = siteConnectionState(siteError ? null : siteData as { platform?: unknown; connection_status?: unknown } | null)
 
   const platform = resolveActivePlatform({
-    wordpress: { present: !!wpData, connectionStatus: wordpress.status },
+    wordpress: { present: wpPresent, connectionStatus: wordpress.status },
     shopify: { present: !!shData, connectionStatus: shopify.status, canPublish: shopify.canPublish },
     site,
   })

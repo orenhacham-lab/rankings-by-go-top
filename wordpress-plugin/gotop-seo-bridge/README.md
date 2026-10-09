@@ -1,12 +1,27 @@
-# GO TOP SEO Bridge 2.1 (companion WordPress plugin)
+# GO TOP SEO Bridge 3.0 (companion WordPress plugin)
 
-Two jobs, both authenticated, both narrow:
+**3.0.0 is the release approved on WordPress.org** (slug `go-top-seo-bridge`,
+https://wordpress.org/plugins/go-top-seo-bridge/). The files here are byte-for-byte the submitted
+zip (`lib/site-fix/__qa__/approved-plugin.ts` pins every file's SHA-256); a PHP change is a new
+WordPress.org release first. WordPress.org installs it into the folder `go-top-seo-bridge/`; our
+older zips used `gotop-seo-bridge/`. Both active is a PHP redeclare fatal (WordPress refuses to
+activate), and deleting the old copy runs its uninstall, which deletes the shared options (the
+pairing key). Sites on 2.x: deactivate the old one, install from WordPress.org, activate, connect
+again (the app's plugin modal walks through it).
+
+Three jobs, all authenticated, all narrow:
 
 1. **1.x, unchanged:** `POST /wp-json/gotop/v1/seo-meta` writes allowlisted Yoast / Rank Math
    keys when WordPress core REST silently drops protected SEO meta while publishing an article.
    Auth: the WordPress application password of a user who can edit the post.
 2. **2.0, site-health fixes:** applies ONE fix the merchant approved in the GO TOP app, per
    request, and can undo it.
+3. **3.0, publishing** (`includes/publish.php`, signed like 2.0): `POST /terms` (categories or
+   tags), `POST /media` (one image, from GO TOP's public storage only, once per address),
+   `POST /publish` (one article: a new post, or an update of the post made for the same article
+   id, `_gotop_article_id`; any other post is `not_ours`). The app publishes through these when
+   the link is connected and reports >= 3.0.0 (`lib/content/wordpress-plugin-publish.ts`),
+   otherwise over the application password as before.
 
 ## 2.0 routes (namespace `gotop/v1`)
 
@@ -55,6 +70,8 @@ users, and never publishes or unpublishes anything (only `ID` and `post_content`
 node scripts/build-wordpress-plugin.mjs --out gotop-seo-bridge.zip
 ```
 
-The app serves the same zip to signed-in users at `/api/site-health/plugin-zip` (built into
-`lib/site-fix/plugin-zip.generated.ts`; `--check` fails when it is stale). Install through
-**Plugins → Add New → Upload Plugin**, then pair.
+The app still serves the same zip to signed-in users at `/api/site-health/plugin-zip` (built into
+`lib/site-fix/plugin-zip.generated.ts`; `--check` fails when it is stale), but no screen links it
+any more: merchants install from WordPress.org (**Plugins → Add New**, search "GO TOP SEO
+Bridge"), then pair. The zip stays as a fallback support can hand to a host that blocks
+installs from WordPress.org.

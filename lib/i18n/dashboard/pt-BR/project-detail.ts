@@ -31,6 +31,8 @@ export const projectDetailPtBR: DeepPartial<DashboardDictionary> = {
       conflictBody: 'Este projeto tem uma conexão com WordPress e outra com Shopify. Um projeto deve usar uma única plataforma. Desconecte uma delas abaixo para resolver. Nada é excluído automaticamente.',
       platformAlreadyConnected: 'Este projeto já usa outra plataforma. Desconecte-a primeiro para trocar.',
       connectedTitle: 'Plataforma conectada. Já é possível publicar artigos',
+      pluginOnlyTitle: 'O WordPress está conectado pelo plugin GO TOP SEO Bridge',
+      pluginOnlyBody: 'Os artigos são publicados pelo plugin (versão {version}), sem senha de aplicativo. Para analisar também os posts existentes e criar links internos, você pode adicionar uma senha de aplicativo aqui embaixo.',
       connectedBody: 'Nas telas de conteúdo você cria temas, revisa ideias, agenda a publicação e publica artigos.',
       goToContentHub: 'Ir para os artigos',
       shopify: {

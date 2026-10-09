@@ -27,6 +27,19 @@ export interface ProjectConnections<W = unknown, S = unknown, X = unknown> {
   switchLocked: boolean
   /** The Shopify route's per-type entity counts, when it sent them. */
   shopifyCounts: Record<string, number> | null
+  /**
+   * The GO TOP SEO Bridge plugin (>= 3.0.0) the WordPress route reports as publishing for this
+   * project (its `publishingPlugin`), or null. A project can publish through it with no
+   * application password (lib/content/wordpress-plugin-publish.ts).
+   */
+  wordpressPlugin: { siteUrl: string; version: string } | null
+}
+
+/** The WordPress route's `publishingPlugin`, when it is well formed. */
+export function publishingPluginFrom(body: Record<string, unknown> | null | undefined): { siteUrl: string; version: string } | null {
+  const p = body?.publishingPlugin as { siteUrl?: unknown; version?: unknown } | null | undefined
+  if (!p || typeof p !== 'object' || typeof p.siteUrl !== 'string' || typeof p.version !== 'string' || !p.siteUrl || !p.version) return null
+  return { siteUrl: p.siteUrl, version: p.version }
 }
 
 export function projectConnectionsFrom<W = unknown, S = unknown, X = unknown>(r: {
@@ -48,5 +61,6 @@ export function projectConnectionsFrom<W = unknown, S = unknown, X = unknown>(r:
     site: st.connection,
     switchLocked: st.body.switchLocked === true,
     shopifyCounts: counts && typeof counts === 'object' ? (counts as Record<string, number>) : null,
+    wordpressPlugin: publishingPluginFrom(wp.body),
   })
 }

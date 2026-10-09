@@ -13,9 +13,13 @@
  *   {"head": 11, "seo": "none"}         -> what wp_head / the title filter print for post 11
  *   {"setpost": 41, "content": "...", "url": "https://...", "meta": {...}} -> put a post in place (2.1.0 tests)
  *   {"llms": "/llms.txt", "method": "GET"} -> what a public request for that path answers (null: WordPress carries on)
+ *   {"remote": "https://...", "base64": "..."} -> an image download_url() answers (3.0.0 /media tests)
+ *   {"postfull": 100}                  -> the whole post object, its meta, every address downloaded so far
  * It prints one JSON array: the result of every step.
  *
  * GOTOP_HARNESS_ROOT (environment) sets the site's root folder (ABSPATH), where a real llms.txt may sit.
+ * The 3.0.0 /media route require_once's ABSPATH/wp-admin/includes/{file,media,image}.php: a test
+ * that calls it points GOTOP_HARNESS_ROOT at a folder with those three (empty) files.
  */
 
 define('ABSPATH', getenv('GOTOP_HARNESS_ROOT') ? rtrim(getenv('GOTOP_HARNESS_ROOT'), '/') . '/' : __DIR__ . '/');
@@ -114,6 +118,15 @@ function admin_url($p = '') { return 'https://www.shop.example.org/wp-admin/' . 
 function is_singular() { return $GLOBALS['__queried'] > 0; }
 function is_front_page() { return false; }
 function get_queried_object_id() { return $GLOBALS['__queried']; }
+function get_current_user_id() { return 1; }
+function user_can($user, $cap) { return (int) $user === 1; }
+function wp_parse_url($url, $component = -1) { return parse_url($url, $component); }
+function esc_url_raw($u) { return (string) $u; }
+function wp_print_inline_script_tag($data, $attributes = array()) {
+    $attrs = '';
+    foreach ($attributes as $k => $v) { $attrs .= ' ' . $k . '="' . esc_attr($v) . '"'; }
+    echo '<script' . $attrs . '>' . $data . "</script>\n";
+}
 function wp_update_post($arr, $wp_error = false) {
     $id = $arr['ID'];
     if (!isset($GLOBALS['__posts'][$id])) { return 0; }
@@ -121,7 +134,78 @@ function wp_update_post($arr, $wp_error = false) {
     // What WordPress does without a signed-in user when kses is on: embeds are stripped.
     if ($GLOBALS['__kses']) { $content = preg_replace('/<iframe\b[^>]*>.*?<\/iframe>/is', '', $content); }
     $GLOBALS['__posts'][$id]->post_content = $content;
+    // 3.0.0 publishing updates the other fields of its own post too (title, status, terms...).
+    foreach ($arr as $k => $v) {
+        if ($k !== 'ID' && $k !== 'post_content') { $GLOBALS['__posts'][$id]->$k = wp_unslash($v); }
+    }
     $GLOBALS['__updates'][] = array_keys($arr);
+    return $id;
+}
+
+// ── 3.0.0 publishing (includes/publish.php): posts, terms, media ────────────
+$GLOBALS['__terms'] = array(
+    'category' => array(3 => array('name' => 'News', 'slug' => 'news', 'parent' => 0), 4 => array('name' => 'Guides', 'slug' => 'guides', 'parent' => 3)),
+    'post_tag' => array(7 => array('name' => 'boots', 'slug' => 'boots', 'parent' => 0)),
+);
+$GLOBALS['__remote'] = array();
+$GLOBALS['__downloads'] = array();
+function get_posts($args) {
+    $out = array();
+    foreach ($GLOBALS['__posts'] as $p) {
+        if ($p->post_type !== $args['post_type']) { continue; }
+        if (!in_array($p->post_status, (array) $args['post_status'], true)) { continue; }
+        if (isset($args['meta_key']) && get_post_meta($p->ID, $args['meta_key'], true) !== $args['meta_value']) { continue; }
+        $out[] = $p->ID;
+    }
+    return array_slice($out, 0, $args['posts_per_page']);
+}
+function get_term($id, $tax) {
+    if (!isset($GLOBALS['__terms'][$tax][$id])) { return null; }
+    $t = $GLOBALS['__terms'][$tax][$id];
+    return (object) array('term_id' => $id, 'name' => $t['name'], 'slug' => $t['slug'], 'parent' => $t['parent']);
+}
+function get_terms($args) {
+    $out = array();
+    foreach (array_keys(isset($GLOBALS['__terms'][$args['taxonomy']]) ? $GLOBALS['__terms'][$args['taxonomy']] : array()) as $id) { $out[] = get_term($id, $args['taxonomy']); }
+    return $out;
+}
+function sanitize_title($v) { return trim(preg_replace('/[^a-z0-9]+/', '-', strtolower((string) $v)), '-'); }
+/** The parts of wp_kses_post the tests look at: no script-capable tags, no on* handlers, no javascript: links. */
+function wp_kses_post($html) {
+    $html = preg_replace('#</?(script|style|iframe|object|embed|form|input)\b[^>]*>#i', '', (string) $html);
+    $html = preg_replace('/\son\w+\s*=\s*("[^"]*"|\'[^\']*\'|[^\s>]+)/i', '', $html);
+    return preg_replace('/(href|src)\s*=\s*(["\'])\s*javascript:[^"\']*\2/i', '$1=$2#$2', $html);
+}
+function wp_insert_post($arr, $wp_error = false) {
+    $id = max(array_merge(array(99), array_keys($GLOBALS['__posts']))) + 1;
+    $p = (object) array('ID' => $id);
+    foreach ($arr as $k => $v) { $p->$k = wp_unslash($v); }
+    $GLOBALS['__posts'][$id] = $p;
+    $slug = isset($arr['post_name']) ? $arr['post_name'] : sanitize_title(wp_unslash($arr['post_title']));
+    $GLOBALS['__urls']['https://shop.example.org/blog/' . $slug . '/'] = $id;
+    return $id;
+}
+function set_post_thumbnail($post, $media) { update_post_meta($post, '_thumbnail_id', (int) $media); return true; }
+function wp_attachment_is_image($id) { return isset($GLOBALS['__posts'][$id]) && $GLOBALS['__posts'][$id]->post_type === 'attachment'; }
+function wp_get_attachment_url($id) { return isset($GLOBALS['__posts'][$id]->guid) ? $GLOBALS['__posts'][$id]->guid : false; }
+function wp_basename($p) { return basename((string) $p); }
+function sanitize_file_name($n) { return preg_replace('/[^A-Za-z0-9._-]/', '-', (string) $n); }
+/** Only the addresses a test put in place answer; the plugin's own source check runs first. */
+function download_url($url, $timeout = 300) {
+    $GLOBALS['__downloads'][] = $url;
+    if (!isset($GLOBALS['__remote'][$url])) { return new WP_Error('http_404', 'Not found'); }
+    $tmp = tempnam(sys_get_temp_dir(), 'gtimg');
+    file_put_contents($tmp, $GLOBALS['__remote'][$url]);
+    return $tmp;
+}
+function wp_get_image_mime($file) { $i = @getimagesize($file); return $i ? $i['mime'] : false; }
+function wp_check_filetype_and_ext($file, $name) { return array('type' => wp_get_image_mime($file), 'ext' => pathinfo($name, PATHINFO_EXTENSION)); }
+function wp_delete_file($f) { if (is_file($f)) { unlink($f); } }
+function media_handle_sideload($file, $post = 0, $desc = null) {
+    $id = max(array_merge(array(499), array_keys($GLOBALS['__posts']))) + 1;
+    $GLOBALS['__posts'][$id] = (object) array('ID' => $id, 'post_type' => 'attachment', 'post_status' => 'inherit', 'post_title' => (string) $desc,
+        'post_content' => '', 'guid' => 'https://shop.example.org/wp-content/uploads/' . $file['name']);
+    wp_delete_file($file['tmp_name']);
     return $id;
 }
 
@@ -168,6 +252,15 @@ foreach ($calls as $step) {
         $out[] = array('value' => $id);
     } elseif (isset($step['llms'])) {
         $out[] = array('value' => gotop_seo_bridge_llms_response(isset($step['method']) ? $step['method'] : 'GET', $step['llms']));
+    } elseif (isset($step['remote'])) {
+        // An image the "storage" serves: {"remote": "https://...", "base64": "..."}
+        $GLOBALS['__remote'][$step['remote']] = base64_decode($step['base64']);
+        $out[] = array('value' => strlen($GLOBALS['__remote'][$step['remote']]));
+    } elseif (isset($step['postfull'])) {
+        $id = (int) $step['postfull'];
+        $out[] = array('post' => isset($GLOBALS['__posts'][$id]) ? $GLOBALS['__posts'][$id] : null,
+            'meta' => isset($GLOBALS['__meta'][$id]) ? $GLOBALS['__meta'][$id] : new stdClass(), 'downloads' => $GLOBALS['__downloads'],
+            'count' => count($GLOBALS['__posts']));
     } elseif (isset($step['define'])) {
         if (!defined($step['define'])) { define($step['define'], '1.0'); }
         $out[] = array('defined' => $step['define']);
