@@ -96,7 +96,7 @@ export const AFFILIATES_COPY: Record<PublicLocale, AffiliateCopy> = {
       { title: 'בלי אתרי קופונים', body: 'ולא הצעות מהסוג של "תירשמו דרכי ואחזיר לכם חלק".' },
       { title: 'אומרים שאתם מקבלים עמלה', body: 'זו דרישת חוק בחלק מהמדינות, ובכל מקרה זה הוגן כלפי מי שסומך עליכם.' },
       { title: 'ביטול מבטל עמלה', body: 'עמלה על לקוח שקיבל החזר או עשה ביטול חיוב מתבטלת ומנוכה מהתשלום הבא.' },
-      { title: 'חשבונית ומס', body: 'שותף ישראלי מוציא לנו חשבונית, ואנחנו מנכים מס במקור אלא אם יש לו אישור פטור מניכוי במקור ואישור ניהול ספרים, שניהם בתוקף ביום התשלום. שותף מחוץ לישראל מתחשבן לפי הכללים של המדינה שלו, ולפני התשלום הראשון אנחנו עשויים לבקש את פרטי המס הנדרשים שם ומנכים מס היכן שהחוק מחייב. מי שאין לו עוסק יכול לקבל במקום זה קרדיט בחשבון. הפירוט בסעיף 13 בהסכם.' },
+      { title: 'חשבונית ומס', body: 'שותף ישראלי מוציא לנו חשבונית, ואנחנו מנכים מס במקור אלא אם יש לו אישור פטור מניכוי במקור ואישור ניהול ספרים, שניהם בתוקף ביום התשלום. שותף מחוץ לישראל מתחשבן לפי הכללים של המדינה שלו, ולפני התשלום הראשון אנחנו עשויים לבקש את פרטי המס הנדרשים שם ומנכים מס היכן שהחוק מחייב. מי שאין לו עוסק יכול לקבל במקום זה קרדיט בחשבון, וזו דרך תשלום אחרת ולא מצב מס אחר. הפירוט בסעיף 13 בהסכם.' },
     ],
     faqTitle: 'שאלות',
     faq: [
@@ -143,7 +143,7 @@ export const AFFILIATES_COPY: Record<PublicLocale, AffiliateCopy> = {
       { title: 'No coupon sites', body: 'And no "sign up through me and I will refund you" offers.' },
       { title: 'Say that you earn', body: 'Tell your audience you get a commission. It is the law in some countries and fair to the people trusting you everywhere.' },
       { title: 'A refund reverses it', body: 'Commission on a customer who refunds or charges back is reversed and deducted from your next payout.' },
-      { title: 'Invoicing and tax', body: 'Israeli affiliates invoice us, and we withhold tax at source unless you give us a valid certificate of exemption from withholding and a certificate of proper bookkeeping, both in force when we pay. Outside Israel, invoicing follows the rules of your own country, and before the first payment we may ask for the tax details required where you live and deduct tax where the law requires it. Anyone without a registered business can take account credit instead. Clause 13 of the agreement has the detail.' },
+      { title: 'Invoicing and tax', body: 'Israeli affiliates invoice us, and we withhold tax at source unless you give us a valid certificate of exemption from withholding and a certificate of proper bookkeeping, both in force when we pay. Outside Israel, invoicing follows the rules of your own country, and before the first payment we may ask for the tax details required where you live and deduct tax where the law requires it. Anyone without a registered business can take account credit instead, which is another way to be paid and not a different tax position. Clause 13 of the agreement has the detail.' },
     ],
     faqTitle: 'Questions',
     faq: [
@@ -190,7 +190,7 @@ export const AFFILIATES_COPY: Record<PublicLocale, AffiliateCopy> = {
       { title: 'Sin webs de cupones', body: 'Ni ofertas del tipo «regístrate conmigo y te devuelvo parte».' },
       { title: 'Di que cobras comisión', body: 'En algunos países es obligatorio, y con quien confía en ti es lo justo en todos.' },
       { title: 'Un reembolso la revierte', body: 'La comisión de un cliente que pide reembolso o hace un contracargo se revierte y se descuenta del siguiente pago.' },
-      { title: 'Factura e impuestos', body: 'Los afiliados en Israel nos emiten factura, y retenemos impuesto en origen salvo que nos entreguen un certificado de exención de retención y un certificado de contabilidad en regla, ambos vigentes el día del pago. Fuera de Israel, la factura sigue las reglas de tu país, y antes del primer pago podemos pedirte los datos fiscales que exija tu lugar de residencia y retenemos cuando la ley lo exige. Quien no tenga actividad dada de alta puede recibir crédito en su cuenta. El detalle está en la cláusula 13 del contrato.' },
+      { title: 'Factura e impuestos', body: 'Los afiliados en Israel nos emiten factura, y retenemos impuesto en origen salvo que nos entreguen un certificado de exención de retención y un certificado de contabilidad en regla, ambos vigentes el día del pago. Fuera de Israel, la factura sigue las reglas de tu país, y antes del primer pago podemos pedirte los datos fiscales que exija tu lugar de residencia y retenemos cuando la ley lo exige. Quien no tenga actividad dada de alta puede recibir crédito en su cuenta, que es otra forma de pago y no una situación fiscal distinta. El detalle está en la cláusula 13 del contrato.' },
     ],
     faqTitle: 'Preguntas',
     faq: [
@@ -237,7 +237,7 @@ export const AFFILIATES_COPY: Record<PublicLocale, AffiliateCopy> = {
       { title: 'Sem sites de cupom', body: 'Nem ofertas do tipo «cadastre-se comigo e eu devolvo uma parte».' },
       { title: 'Diga que você recebe comissão', body: 'Em alguns países é obrigatório, e com quem confia em você é o justo em todos.' },
       { title: 'Um reembolso reverte', body: 'A comissão de um cliente que pede reembolso ou faz um chargeback é revertida e descontada do pagamento seguinte.' },
-      { title: 'Nota fiscal e tributos', body: 'Afiliados em Israel emitem nota fiscal para nós, e retemos imposto na fonte a menos que apresentem um certificado de isenção de retenção e um certificado de regularidade contábil, ambos válidos na data do pagamento. Fora de Israel, a nota fiscal segue a regra do seu país, e antes do primeiro pagamento podemos pedir os dados fiscais exigidos onde você mora e retemos imposto quando a lei exige. Quem não tem atividade registrada pode receber crédito na conta. O detalhe está na cláusula 13 do contrato.' },
+      { title: 'Nota fiscal e tributos', body: 'Afiliados em Israel emitem nota fiscal para nós, e retemos imposto na fonte a menos que apresentem um certificado de isenção de retenção e um certificado de regularidade contábil, ambos válidos na data do pagamento. Fora de Israel, a nota fiscal segue a regra do seu país, e antes do primeiro pagamento podemos pedir os dados fiscais exigidos onde você mora e retemos imposto quando a lei exige. Quem não tem atividade registrada pode receber crédito na conta, que é outra forma de pagamento e não uma situação fiscal diferente. O detalhe está na cláusula 13 do contrato.' },
     ],
     faqTitle: 'Perguntas',
     faq: [

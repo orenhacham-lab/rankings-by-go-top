@@ -280,6 +280,44 @@ console.log('G) who can be paid: the invoicing rule is not Israel-only')
     }[l]
     return !WITHHOLDING[l].test(previous)
   }))
+  /**
+   * Account credit sits immediately after the withholding sentence, where it
+   * reads as the way out of invoicing and tax. It is not: clause 13 puts the tax
+   * on the partner with no exception for how they are paid, and credit against a
+   * subscription is consideration like any other. A card that offers credit as
+   * the alternative for someone with no registered business, right after the
+   * deduction, invites a conclusion with a tax authority at the end of it, so
+   * each language says in one clause that credit is another way to be paid and
+   * not a different tax position.
+   */
+  const CREDIT_IS_NOT_A_TAX_ROUTE: Record<(typeof LANGS)[number], RegExp> = {
+    he: /ולא מצב מס אחר/,
+    en: /not a different tax position/i,
+    es: /no una situación fiscal distinta/i,
+    'pt-BR': /não uma situação fiscal diferente/i,
+  }
+  const CREDIT: Record<(typeof LANGS)[number], RegExp> = {
+    he: /קרדיט בחשבון/,
+    en: /account credit/i,
+    es: /crédito en su cuenta/i,
+    'pt-BR': /crédito na conta/i,
+  }
+  check('G6: a card that offers credit says it is not a different tax position',
+    LANGS.every((l) => paperworkCards(l).every((r) =>
+      !CREDIT[l].test(r.body) || CREDIT_IS_NOT_A_TAX_ROUTE[l].test(r.body))),
+    LANGS.filter((l) => paperworkCards(l).some((r) =>
+      CREDIT[l].test(r.body) && !CREDIT_IS_NOT_A_TAX_ROUTE[l].test(r.body))).join(', '))
+  /* G6-MUT: credit offered bare, as the card read before this clause — G6 must
+     fail on it in every language. */
+  check('G6-MUT: credit offered with no word on its tax is caught', LANGS.every((l) => {
+    const bare = {
+      he: 'מי שאין לו עוסק יכול לקבל במקום זה קרדיט בחשבון.',
+      en: 'Anyone without a registered business can take account credit instead.',
+      es: 'Quien no tenga actividad dada de alta puede recibir crédito en su cuenta.',
+      'pt-BR': 'Quem não tem atividade registrada pode receber crédito na conta.',
+    }[l]
+    return CREDIT[l].test(bare) && !CREDIT_IS_NOT_A_TAX_ROUTE[l].test(bare)
+  }))
   // The premise of the rule: the form expects applicants from anywhere, so it
   // asks the country rather than assuming one.
   check('G3: the application form asks the applicant’s country',
