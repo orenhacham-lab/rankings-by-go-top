@@ -41,6 +41,9 @@ export interface ArticlesCopy {
     /** "5 min read", under the title. */
     readingTime: (minutes: number) => string
     updated: string
+    /** The author box under the article. */
+    aboutAuthor: string
+    aboutAuthorLink: string
   }
   /** The components an article embeds with `<div class="gt-plans|gt-cta">`
    *  (lib/articles/widgets.ts). */
@@ -91,6 +94,8 @@ export const ARTICLES_COPY: Record<PublicLocale, ArticlesCopy> = {
       toc: 'תוכן עניינים',
       readingTime: (m) => `${m} דקות קריאה`,
       updated: 'עודכן',
+      aboutAuthor: 'על הכותב',
+      aboutAuthorLink: 'עוד על Go Top',
     },
     widgets: {
       plans: {
@@ -142,6 +147,8 @@ export const ARTICLES_COPY: Record<PublicLocale, ArticlesCopy> = {
       toc: 'Table of contents',
       readingTime: (m) => `${m} min read`,
       updated: 'Updated',
+      aboutAuthor: 'About the author',
+      aboutAuthorLink: 'More about Go Top',
     },
     widgets: {
       plans: {
@@ -193,6 +200,8 @@ export const ARTICLES_COPY: Record<PublicLocale, ArticlesCopy> = {
       toc: 'Índice',
       readingTime: (m) => `${m} min de lectura`,
       updated: 'Actualizado',
+      aboutAuthor: 'Sobre el autor',
+      aboutAuthorLink: 'Más sobre Go Top',
     },
     widgets: {
       plans: {
@@ -244,6 +253,8 @@ export const ARTICLES_COPY: Record<PublicLocale, ArticlesCopy> = {
       toc: 'Índice',
       readingTime: (m) => `${m} min de leitura`,
       updated: 'Atualizado',
+      aboutAuthor: 'Sobre o autor',
+      aboutAuthorLink: 'Mais sobre a Go Top',
     },
     widgets: {
       plans: {

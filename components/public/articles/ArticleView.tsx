@@ -1,3 +1,4 @@
+import { Fragment } from 'react'
 import Image from 'next/image'
 import { CalendarDays, Clock, FileQuestion, ListTree, RefreshCw } from 'lucide-react'
 import { createClient } from '@/lib/supabase/server'
@@ -9,6 +10,7 @@ import { CONTAINER } from '@/components/public/marketing'
 import { ArticlesPromo } from '@/components/public/ArticlesPromo'
 import { ArticlePlans } from '@/components/public/articles/ArticlePlans'
 import { ArticleCta } from '@/components/public/articles/ArticleCta'
+import { ArticleAuthorBox } from '@/components/public/articles/ArticleAuthorBox'
 import { sanitizePublicArticleHtml } from '@/lib/content/public-article-html'
 import { ARTICLES_COPY, articlesIndexHref } from '@/lib/articles/i18n'
 import { getPublicArticle } from '@/lib/articles/server'
@@ -86,6 +88,10 @@ export async function ArticleView({ locale, slug }: { locale: PublicLocale; slug
   const { html, headings } = withHeadingIds(sanitizePublicArticleHtml(article.content))
   const blocks = splitArticleBlocks(html)
   const hasCta = blocks.some((b) => b.kind === 'widget' && b.widget === 'cta')
+  // The index the author box is rendered at: just before a closing call to
+  // action when the article has one, otherwise at the very end of the body.
+  const lastCta = blocks.map((b) => b.kind === 'widget' && b.widget === 'cta').lastIndexOf(true)
+  const authorBoxBefore = lastCta === -1 ? blocks.length : lastCta
   const minutes = readingMinutes(html)
 
   // The plan cards need the visitor's currency, which is a server decision
@@ -203,15 +209,21 @@ export async function ArticleView({ locale, slug }: { locale: PublicLocale; slug
             )}
 
             <article className="min-w-0 max-w-3xl">
-              {blocks.map((block, i) =>
-                block.kind === 'html' ? (
-                  <div key={i} className="gt-article" dangerouslySetInnerHTML={{ __html: block.html }} />
-                ) : block.widget === 'plans' ? (
-                  <ArticlePlans key={i} locale={locale} market={market} signedIn={signedIn} />
-                ) : (
-                  <ArticleCta key={i} locale={locale} signedIn={signedIn} />
-                ),
-              )}
+              {blocks.map((block, i) => (
+                <Fragment key={i}>
+                  {/* Who wrote this comes BEFORE the closing call to action: a
+                      reader weighs the claim, then decides what to do about it. */}
+                  {i === authorBoxBefore && <ArticleAuthorBox locale={locale} author={article.author} />}
+                  {block.kind === 'html' ? (
+                    <div className="gt-article" dangerouslySetInnerHTML={{ __html: block.html }} />
+                  ) : block.widget === 'plans' ? (
+                    <ArticlePlans locale={locale} market={market} signedIn={signedIn} />
+                  ) : (
+                    <ArticleCta locale={locale} signedIn={signedIn} />
+                  )}
+                </Fragment>
+              ))}
+              {authorBoxBefore === blocks.length && <ArticleAuthorBox locale={locale} author={article.author} />}
             </article>
           </div>
 

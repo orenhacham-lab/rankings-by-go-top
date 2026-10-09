@@ -30,6 +30,7 @@ import { splitArticleBlocks } from '@/lib/articles/widgets'
 import { withHeadingIds } from '@/lib/articles/headings'
 import { readingMinutes } from '@/lib/articles/reading-time'
 import { articlePublishBlockReason } from '@/lib/articles/publish-rules'
+import { articleAuthor } from '@/lib/articles/authors'
 import { sanitizePublicArticleHtml } from '@/lib/content/public-article-html'
 
 const ROOT = join(__dirname, '..', '..', '..')
@@ -288,6 +289,31 @@ function main() {
   }
   check('N6. the admin form says it in Hebrew before the API says it in English',
     /articlePublishBlockReason\(form\)/.test(readFileSync(join(ROOT, 'components/admin/ArticleForm.tsx'), 'utf8')))
+
+  console.log('\nO. the article says who wrote it, in every language')
+  for (const locale of PUBLIC_LOCALES) {
+    const profile = articleAuthor('אורן חכם')
+    check(`O1. ${locale}: the Hebrew byline resolves to a profile with a name, role, bio and link`,
+      !!profile?.name[locale] && !!profile?.role[locale] && !!profile?.bio[locale] && !!profile?.href[locale])
+    check(`O2. ${locale}: the author link points inside that language's tree`,
+      locale === 'he'
+        ? profile?.href[locale] === '/about'
+        : profile?.href[locale] === `/${locale}/about`)
+    check(`O3. ${locale}: the box has its own heading and link copy`,
+      !!ARTICLES_COPY[locale].article.aboutAuthor && !!ARTICLES_COPY[locale].article.aboutAuthorLink)
+  }
+  check('O4. the English spelling of the byline resolves to the same person',
+    articleAuthor('Oren Hacham') === articleAuthor('אורן חכם'))
+  // MUTATION: return a default profile for an unknown name and this fails —
+  // an article by someone else would carry Oren's biography.
+  check('O5. an unknown byline gets no box rather than the wrong biography',
+    articleAuthor('Someone Else') === null && articleAuthor(null) === null)
+  check('O6. the Person in the schema links to the author page, not the site root',
+    /articleAuthor\(article\.author\)\?\.href\[locale\]/.test(serverSrc))
+  // MUTATION: render the box after the blocks and this fails: the reader meets
+  // the call to action before learning who is making the claim.
+  check('O7. the box is rendered before the closing call to action',
+    /const lastCta = blocks\.map\(/.test(viewSrc) && /i === authorBoxBefore && <ArticleAuthorBox/.test(viewSrc))
 
   console.log('\nM. mutation controls — the behavioural guards fail on broken input')
   check('M1. a FAQ under the wrong language\'s heading yields nothing',
