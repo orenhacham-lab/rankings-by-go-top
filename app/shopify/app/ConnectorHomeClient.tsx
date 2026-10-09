@@ -28,6 +28,12 @@ interface AppHomeData {
    *  exchange) is required before anything works again. */
   /** Which provider bills this store: 'shopify' | 'website' | 'unavailable'. */
   billingProvider?: 'shopify' | 'website' | 'unavailable'
+  /** A migrating account still inside the PayPal period it already paid for. */
+  websitePaidPeriodActive?: boolean
+  /** That period's end (ISO), or null when it is not known yet. */
+  websitePaidUntil?: string | null
+  /** PayPal auto-renewal is confirmed off for that subscription. */
+  websiteRenewalStopped?: boolean
   needsInstall?: boolean
   needsInstallReason?: string
   billing?: {
@@ -279,6 +285,20 @@ export default function ConnectorHomeClient() {
         <Card title="Access">
           <p style={{ color: '#202223', fontSize: 14 }}>
             Admin account — full access. This account has full access to the system and does not require a billing plan.
+          </p>
+        </Card>
+      ) : data.billingProvider === 'website' && data.websitePaidPeriodActive ? (
+        /* A PayPal subscriber who connected this store: the period they already
+           paid for on the website runs to its end, PayPal will not renew, and
+           no Shopify plan is offered before that date (start-intent refuses it
+           too). English only, like every embedded surface. */
+        <Card title="Billing">
+          <p style={{ color: '#202223', fontSize: 14 }} data-website-paid-until={data.websitePaidUntil ?? ''}>
+            {data.websitePaidUntil
+              ? `Your plan is paid through the Go Top SEO website until ${new Date(data.websitePaidUntil).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}.`
+              : 'Your plan is paid through the Go Top SEO website for the current billing period.'}
+            {data.websiteRenewalStopped ? ' It will not renew through PayPal.' : ' We are turning off its PayPal renewal.'}
+            {data.websitePaidUntil ? ' After that date, choose a Shopify plan here to keep publishing.' : ' When that period ends, choose a Shopify plan here to keep publishing.'}
           </p>
         </Card>
       ) : data.billingProvider === 'website' ? (

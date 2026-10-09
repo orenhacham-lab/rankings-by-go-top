@@ -385,18 +385,28 @@ async function main() {
         r?.end.toISOString() === new Date(TRIAL_ENDS_AT).toISOString())
     }
 
-    // D. Shopify authority can never fall back to PayPal.
+    // D. Shopify authority never falls back to an ENDED PayPal period. (Owner
+    // decision, 9 Oct 2026: a PayPal period still PAID FOR keeps the account
+    // website-billed until it ends — see D1b.)
     {
       const shopifyWithPaypal = new FakeAdmin({
         // Shopify-governed, but the Shopify billing fields are empty.
         shopify_connections: [shopifyConn({ shopify_subscription_status: 'none', shopify_plan_handle: null, shopify_trial_ends_at: null })],
         billing_governance: [SHOPIFY_AUTHORITY],
         shopify_billing_migrations: [],
-        // A PayPal row that MUST NOT be consulted.
-        subscriptions: [paypalSub],
+        // An ENDED PayPal row that MUST NOT be consulted.
+        subscriptions: [{ ...paypalSub, current_period_end: '2026-08-30T00:00:00Z' }],
       }, {}, () => NOW.getTime())
       const r = await resolveCurrentUsagePeriod(shopifyWithPaypal as never, USER, now)
-      check('A3B-D1: a Shopify-governed account NEVER falls back to PayPal', r === null)
+      check('A3B-D1: a Shopify-governed account NEVER falls back to an ENDED PayPal period', r === null)
+      const paidWorld = new FakeAdmin({
+        shopify_connections: [shopifyConn({ shopify_subscription_status: 'none', shopify_plan_handle: null, shopify_trial_ends_at: null })],
+        billing_governance: [SHOPIFY_AUTHORITY],
+        shopify_billing_migrations: [],
+        subscriptions: [paypalSub],
+      }, {}, () => NOW.getTime())
+      const paid = await resolveCurrentUsagePeriod(paidWorld as never, USER, now)
+      check('A3B-D1b: …but a PayPal period still PAID FOR is the usage period until it ends (owner, 9 Oct 2026)', paid?.source === 'paypal')
       // Nor to a website trial, nor when it has no connection row at all.
       const noConn = new FakeAdmin({
         shopify_connections: [], billing_governance: [SHOPIFY_AUTHORITY], shopify_billing_migrations: [],

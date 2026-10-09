@@ -24,13 +24,23 @@
  *                         can never end up billed by both providers with
  *                         Shopify publishing already unlocked.
  *
+ * PAID PERIOD FIRST (owner decision, 9 Oct 2026). A 'pending' migration whose
+ * PayPal period is still paid for does not advance at all: the account stays
+ * website-billed until that period ends, PayPal's auto-renewal is stopped
+ * separately (lib/shopify/paypal-paid-period.ts), and only then does a Shopify
+ * plan confirmation complete the migration. 'paypal_cancel_failed' rows are
+ * retried and alerted daily by lib/shopify/paypal-migration-retry.ts.
+ *
  * Every state transition here is idempotent and safe to call repeatedly —
  * see confirmShopifyActiveAndAdvance, the function the billing-return route
- * calls on every return from Shopify's hosted pricing page.
+ * calls on every return from Shopify's hosted pricing page, and that the
+ * embedded app home calls on load once the plan is live
+ * (lib/shopify/app-load-billing-sync.ts).
  */
 
 import type { createAdminClient } from '@/lib/supabase/admin'
 import { cancelPayPalSubscription } from '@/lib/paypal/client'
+import { readMigrationPaidPeriod } from './paypal-paid-period'
 
 
 type Admin = ReturnType<typeof createAdminClient>
@@ -151,10 +161,18 @@ export interface AdvanceMigrationResult {
   // re-cancelling an already-cancelled PayPal subscription is itself
   // idempotent (lib/paypal/client.ts treats 404/422 as success).
   dbWriteUnconfirmed?: boolean
+  /**
+   * The account is still inside the PayPal period it already paid for
+   * (lib/shopify/paypal-paid-period.ts). NOTHING was written and PayPal was not
+   * contacted: billing moves only after that period ends. paidUntil is null when
+   * the end date is not stored yet.
+   */
+  deferred?: { paidUntil: string | null }
 }
 
 /**
- * Called on every return from Shopify's hosted pricing page, AFTER the
+ * Called on every return from Shopify's hosted pricing page (and on an
+ * embedded app load that found the plan live, app-load-billing-sync.ts), AFTER the
  * Partner API has independently confirmed an active plan (the caller passes
  * that fact in — this function never re-verifies Shopify billing itself, it
  * only advances the migration once Shopify is already confirmed active).
@@ -169,6 +187,7 @@ export async function confirmShopifyActiveAndAdvance(
   admin: Admin,
   userId: string,
   fetchImpl: typeof fetch = fetch,
+  now: () => Date = () => new Date(),
 ): Promise<AdvanceMigrationResult | null> {
   // CRITICAL PATH — reading this wrong decides whether a PayPal subscription
   // gets cancelled. A lookup FAILURE is reported as such and stops here, before
@@ -180,6 +199,19 @@ export async function confirmShopifyActiveAndAdvance(
   }
   const migration = migrationResult.migration
   if (!migration) return null // not a migrating account — nothing to do
+
+  // THE PAID PAYPAL PERIOD COMES FIRST (owner decision, 9 Oct 2026). While the
+  // merchant is inside the period PayPal already charged for, a Shopify plan
+  // confirmation moves nothing: no status change, no PayPal call, no billing
+  // authority change. An unreadable period fails closed the same way.
+  const paid = await readMigrationPaidPeriod(admin, userId, migration, now())
+  if (!paid.ok) {
+    console.error('[shopify-migration] paid-period lookup failed; PayPal was NOT contacted', { userId, reason: paid.reason })
+    return { status: migration.status, cancelFailed: false, dbWriteUnconfirmed: true, lookupFailed: true }
+  }
+  if (paid.period.inPaidPeriod) {
+    return { status: migration.status, cancelFailed: false, deferred: { paidUntil: paid.period.paidUntil } }
+  }
 
   if (migration.status === 'pending') {
     await admin
@@ -199,6 +231,22 @@ export async function confirmShopifyActiveAndAdvance(
     return { status: 'paypal_cancel_failed', cancelFailed: true }
   }
 
+  return cancelPayPalAndCompleteMigration(admin, userId, migration, fetchImpl)
+}
+
+/**
+ * Cancel PayPal and atomically complete a migration whose Shopify plan was
+ * ALREADY confirmed (by confirmShopifyActiveAndAdvance, or — for a row left in
+ * 'paypal_cancel_failed' — by the confirmation that put it there). Shared by
+ * the confirmation path and the scheduled retry (lib/shopify/paypal-migration-retry.ts).
+ */
+export async function cancelPayPalAndCompleteMigration(
+  admin: Admin,
+  userId: string,
+  migration: MigrationRow,
+  fetchImpl: typeof fetch = fetch,
+): Promise<AdvanceMigrationResult> {
+  if (!migration.paypal_subscription_id) return { status: migration.status, cancelFailed: true }
   const cancel = await cancelPayPalSubscription(migration.paypal_subscription_id, 'Migrated to Shopify App Pricing', fetchImpl)
   if (cancel.ok) {
     // Blocker fix — PayPal cancellation is a completed, irreversible

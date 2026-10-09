@@ -32,7 +32,7 @@ import { getActiveShopifySubscription } from './partner-client'
 import { recordShopifyBillingCache } from './billing-cache'
 import { isSupportedShopifyPlanHandle, type ShopifyPlanHandle } from './constants'
 import { getActiveMigrationResult } from './paypal-migration'
-import { resolveBillingAuthority } from '@/lib/billing/governance'
+import { resolveEffectiveBillingAuthority } from './paypal-paid-period'
 import { Deadline } from '@/lib/ops/deadline'
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -162,7 +162,12 @@ export async function resolveShopifyGovernedEntitlement(
   // is not a Shopify billing question at all, however many stores it connects.
   // A governance READ FAILURE is not "website": it is an outage, and it stops
   // the resolution here rather than falling through to trial/PayPal data.
-  const authority = await resolveBillingAuthority(admin, userId)
+  //
+  // A PAID PAYPAL PERIOD COMES FIRST (owner decision, 9 Oct 2026): a
+  // Shopify-authority account still inside a PayPal period it already paid for
+  // is website-billed until that period ends (resolveEffectiveBillingAuthority),
+  // so it keeps that plan and is never asked to pay Shopify for the same days.
+  const authority = await resolveEffectiveBillingAuthority(admin, userId, nowFn())
   if (!authority.ok) return { kind: 'unavailable', reason: authority.reason }
   if (authority.authority !== 'shopify') return { kind: 'not_governed' }
 
@@ -320,7 +325,10 @@ export async function isShopifyGovernedAndActive(
   // regardless of what their billing actually says. That was the production
   // incident — the middleware was passing its anon-key session client. See
   // proxy.ts, which now builds a service-role client for this decision.
-  const authority = await resolveBillingAuthority(admin, userId)
+  // A paid PayPal period makes a Shopify-authority account website-billed
+  // until it ends (resolveEffectiveBillingAuthority); its read failure is
+  // reported like an unreadable governance record — fail closed.
+  const authority = await resolveEffectiveBillingAuthority(admin, userId, nowFn())
   if (!authority.ok) {
     return { governed: true, active: false, unavailable: true, reason: 'governance_unreadable', authority: 'unreadable' }
   }
@@ -329,7 +337,7 @@ export async function isShopifyGovernedAndActive(
       governed: false, active: false, authority: authority.authority,
       // An ABSENT governance row also resolves to website authority, but the
       // two are different operational facts and must not be reported alike.
-      reason: authority.governance ? 'authority_not_shopify' : 'governance_missing',
+      reason: authority.websitePaidPeriod ? 'website_paid_period' : authority.governance ? 'authority_not_shopify' : 'governance_missing',
     }
   }
 
@@ -426,6 +434,8 @@ export type ShopifyRouteAccessReason =
   | 'governance_missing'
   | 'governance_unreadable'
   | 'authority_not_shopify'
+  /** Shopify authority, but inside a paid PayPal period: the website bills it until that ends. */
+  | 'website_paid_period'
   | 'connection_missing'
   | 'connection_not_connected'
   | 'connection_unreadable'

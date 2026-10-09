@@ -24,7 +24,7 @@ import type { createAdminClient } from '@/lib/supabase/admin'
 import type { ShopifyConnectionRow } from './api-auth'
 import { getActiveShopifySubscription } from './partner-client'
 import { getActiveMigrationResult } from './paypal-migration'
-import { resolveBillingAuthority } from '@/lib/billing/governance'
+import { resolveEffectiveBillingAuthority } from './paypal-paid-period'
 import { getUserEntitlement } from '@/lib/subscription'
 import { recordShopifyBillingCache } from './billing-cache'
 import type { ShopifyPlanHandle } from './constants'
@@ -94,7 +94,9 @@ export async function checkShopifyPublishEntitlement(
     return { ok: true, governedBy: 'admin' }
   }
 
-  const authority = await resolveBillingAuthority(admin, connection.user_id)
+  // A Shopify-authority account inside a paid PayPal period is website-billed
+  // until it ends (owner decision, 9 Oct 2026): it publishes on that plan.
+  const authority = await resolveEffectiveBillingAuthority(admin, connection.user_id)
   if (!authority.ok) {
     return { ok: false, reason: 'billing_authority_unavailable', detail: authority.reason }
   }

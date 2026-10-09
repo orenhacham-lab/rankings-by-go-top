@@ -1,23 +1,32 @@
 'use client'
 
 /**
- * Phase 4F.1 — Shopify connection panel (merchant OAuth).
+ * Phase 4F.1 — Shopify connection panel.
  *
- * Disconnected: the merchant enters only the *.myshopify.com domain and clicks
- * Connect → we redirect to Shopify to approve READ-ONLY scopes; the callback
- * exchanges the code for an offline token server-side. No token/secret is ever
- * entered or shown here. Connected: shop, granted scopes, Test, Sync, Disconnect.
+ * Disconnected: a link to the Go Top SEO listing in the Shopify App Store
+ * (SHOPIFY_APP_STORE_URL, rel="nofollow", new tab) and a note telling the
+ * merchant to sign in with this same account after installing. Owner, 5 Oct
+ * 2026: a store always installs through the App Store. The App Store install
+ * then links the store to the account that signs in on /shopify/link, and the
+ * plan the merchant picks in Shopify governs that account. There is NO typed-in
+ * shop-domain field any more — that path started a direct OAuth with no App
+ * Store provenance, so the store stayed website-billed. (The OAuth start route
+ * itself is kept: ShopifyPublishSettings and the publish CTA use it to
+ * re-authorize an ALREADY-connected store.)
+ *
+ * Connected: shop, granted scopes, Test, Sync, Disconnect. No token/secret is
+ * ever entered or shown here.
  */
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import Button from '@/components/ui/Button'
-import Input from '@/components/ui/Input'
+import Button, { buttonClasses } from '@/components/ui/Button'
 import Badge from '@/components/ui/Badge'
 import Modal from '@/components/ui/Modal'
 import { Card } from '@/components/ui/Card'
 import { useDashboardLanguage } from '@/lib/i18n/dashboard/useDashboardLanguage'
 import { getDashboardDictionary } from '@/lib/i18n/dashboard/getDashboardDictionary'
 import { formatDateTime } from '@/lib/utils'
+import { SHOPIFY_APP_STORE_URL } from '@/lib/public-links/shopify-app-store'
 import ShopifyDestinationSection from './ShopifyDestinationSection'
 
 type SanitizedConnection = {
@@ -46,9 +55,6 @@ export default function ShopifyConnectionPanel({ projectId, onChanged }: { proje
   const [loading, setLoading] = useState(true)
   const [connection, setConnection] = useState<SanitizedConnection | null>(null)
   const [counts, setCounts] = useState<Counts>(ZERO)
-  const [showConnect, setShowConnect] = useState(false)
-  const [shopDomain, setShopDomain] = useState('')
-  const [connecting, setConnecting] = useState(false)
   const [testing, setTesting] = useState(false)
   const [syncing, setSyncing] = useState(false)
   const [disconnecting, setDisconnecting] = useState(false)
@@ -89,15 +95,6 @@ export default function ShopifyConnectionPanel({ projectId, onChanged }: { proje
     onChanged?.()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
-
-  function connect() {
-    const shop = shopDomain.trim()
-    if (!shop) { setMessage({ text: t.needDomain, ok: false }); return }
-    setConnecting(true)
-    // Full-page redirect into Shopify's authorization flow (server builds the
-    // authorize URL with state; the token is exchanged server-side).
-    window.location.href = `/api/shopify/oauth/start?projectId=${encodeURIComponent(projectId)}&shop=${encodeURIComponent(shop)}`
-  }
 
   async function test() {
     setTesting(true); setMessage(null)
@@ -157,21 +154,18 @@ export default function ShopifyConnectionPanel({ projectId, onChanged }: { proje
 
       {!connection && (
         <div className="space-y-2">
-          <p className="text-xs text-slate-500 dark:text-slate-400">{t.oauthExplain}</p>
-          {!showConnect ? (
-            <Button size="sm" onClick={() => setShowConnect(true)}>{t.connect}</Button>
+          <p className="text-xs text-slate-500 dark:text-slate-400">{t.appStoreExplain}</p>
+          {SHOPIFY_APP_STORE_URL ? (
+            <a
+              href={SHOPIFY_APP_STORE_URL}
+              target="_blank"
+              rel="nofollow noopener noreferrer"
+              className={buttonClasses({ size: 'sm' })}
+            >
+              {t.installFromAppStore}
+            </a>
           ) : (
-            <div className="space-y-2">
-              <div>
-                <Input label={t.shopDomain} placeholder="acme.myshopify.com" value={shopDomain} onChange={(e) => setShopDomain(e.target.value)} />
-                <button type="button" onClick={() => setGuideOpen(true)} className="text-[11px] text-indigo-600 dark:text-indigo-400 hover:underline">{g.whereToFind}</button>
-              </div>
-              <p className="text-[11px] text-slate-400">{t.scopesHint}</p>
-              <div className="flex gap-2">
-                <Button size="sm" onClick={connect} loading={connecting} disabled={connecting}>{t.connect}</Button>
-                <Button size="sm" variant="outline" onClick={() => setShowConnect(false)} disabled={connecting}>{t.cancel}</Button>
-              </div>
-            </div>
+            <p className="text-xs text-slate-500 dark:text-slate-400">{t.appStoreUnavailable}</p>
           )}
         </div>
       )}

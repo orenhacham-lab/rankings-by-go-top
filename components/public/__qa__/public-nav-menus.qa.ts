@@ -11,7 +11,10 @@
  *      to /solutions/shopify and THAT page carries the one outbound link, still
  *      rel="nofollow", still from the constant, still dropped when it is null —
  *      a store can only install from the listing, so with no listing there is
- *      nowhere to send anyone;
+ *      nowhere to send anyone. The one other user of the constant is the in-app
+ *      Shopify connect (ShopifyConnectionPanel, owner 5 Oct 2026: the store
+ *      installs from the App Store, not by typing a shop domain) — same rules:
+ *      the constant, nofollow, dropped when null. No other file may use it;
  *   3. the menu words exist, non-empty, in all four dictionaries;
  *   4. the new pages promise nothing the code cannot keep: no percentages, no
  *      ROI, no WordPress.org listing (the plugin is not approved yet).
@@ -19,7 +22,7 @@
  *
  * Run: npx tsx components/public/__qa__/public-nav-menus.qa.ts
  */
-import { existsSync, readFileSync } from 'fs'
+import { existsSync, readFileSync, readdirSync, statSync } from 'fs'
 import { join } from 'path'
 import { PUBLIC_LOCALES, LOCALE_PREFIX } from '@/lib/i18n/locales'
 import { getPublicDictionary } from '@/lib/i18n/getPublicDictionary'
@@ -106,6 +109,47 @@ function main() {
     // MUTATION CONTROL
     const mutated = nav.replace('`${prefix}/solutions/shopify`', "'https://apps.shopify.com/x'")
     check('2-MUT: a hard-coded store URL in the menu fails 2a', /apps\.shopify\.com/.test(mutated))
+
+    // 2f — WHO uses the constant, read from the tree (never a hand-written
+    // claim): the public menu, the public Shopify page, the in-app connect
+    // panel, and the constant's own module. Anything else fails.
+    const ALLOWED = new Set([
+      'components/PublicNav.tsx',
+      'lib/i18n/public/pages/solutions.tsx',
+      'components/content/ShopifyConnectionPanel.tsx',
+      // The billing page's "billed through Shopify" notice (owner, 9 Oct 2026).
+      'app/(dashboard)/billing/BillingView.tsx',
+      'lib/public-links/shopify-app-store.ts',
+    ])
+    const users: string[] = []
+    const walk = (rel: string) => {
+      for (const name of readdirSync(join(ROOT, rel))) {
+        if (name === 'node_modules' || name === '__qa__' || name.startsWith('.')) continue
+        const child = `${rel}/${name}`
+        if (statSync(join(ROOT, child)).isDirectory()) walk(child)
+        else if (/\.(ts|tsx)$/.test(name) && /SHOPIFY_APP_STORE_URL/.test(strip(read(child)))) users.push(child)
+      }
+    }
+    for (const top of ['app', 'components', 'lib']) walk(top)
+    const outsiders = (list: string[]) => list.filter((f) => !ALLOWED.has(f))
+    check('2f: only the menu, the Shopify page and the in-app connect panel use the constant', outsiders(users).length === 0, outsiders(users).join(', '))
+    const panel = strip(read('components/content/ShopifyConnectionPanel.tsx'))
+    const panelOk = (src: string) => /href=\{SHOPIFY_APP_STORE_URL\}/.test(src)
+      && /rel="nofollow noopener noreferrer"/.test(src)
+      && /target="_blank"/.test(src)
+      && /SHOPIFY_APP_STORE_URL\s*\?/.test(src)
+      && !/apps\.shopify\.com/.test(src)
+    check('2g: the in-app panel links out through the constant, nofollow, in a new tab, and drops the link when null', panelOk(panel))
+    // MUTATION CONTROLS
+    check('2f-MUT: a new file using the constant is caught', outsiders([...users, 'components/Other.tsx']).length === 1)
+    check('2g-MUT: the panel losing nofollow is caught', !panelOk(panel.replace('rel="nofollow noopener noreferrer"', 'rel="noopener"')))
+    const billing = strip(read('app/(dashboard)/billing/BillingView.tsx'))
+    const billingOk = (src: string) => /href=\{SHOPIFY_APP_STORE_URL\}/.test(src)
+      && /rel="nofollow noopener noreferrer"/.test(src)
+      && /if \(!SHOPIFY_APP_STORE_URL\) return null/.test(src)
+      && !/apps\.shopify\.com/.test(src)
+    check('2h: the billing page links out through the constant, nofollow, and drops the link when null', billingOk(billing))
+    check('2h-MUT: the billing link losing nofollow is caught', !billingOk(billing.replace('rel="nofollow noopener noreferrer"', 'rel="noopener"')))
   }
 
   console.log('\n3) the menu words exist in all four languages')

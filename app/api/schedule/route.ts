@@ -26,6 +26,7 @@ import { authorizeCronRequest } from '@/lib/auth/cron'
 import { processScheduledScanForProject } from '@/lib/scan-scheduler/process-scheduled-scan'
 import { after } from 'next/server'
 import { runMonthlyAiChecks, startIsolatedMonthlyAiChecks } from '@/lib/ai-visibility/monthly-check/runner'
+import { retryPayPalMigrations } from '@/lib/shopify/paypal-migration-retry'
 
 // The rank schedule below is unchanged; the budget is for the automatic monthly
 // AI check that runs after it (platform clamps to the plan's max).
@@ -47,6 +48,17 @@ export async function GET(request: Request) {
       (deadlineAt) => runMonthlyAiChecks(createAdminClient(), { deadlineAt }),
       { startedAtMs, maxDurationMs: maxDuration * 1000 },
     ))
+  } catch {
+    // after() outside a request scope (a direct call in a test): nothing to schedule.
+  }
+
+  // THE DAILY PAYPAL→SHOPIFY MIGRATION RETRY (lib/shopify/paypal-migration-retry.ts):
+  // stops PayPal auto-renewal that is still on for a migrating account, retries
+  // a failed PayPal cancellation, and emails the operator about every row that
+  // still fails. Same isolation as the AI check: after(), its own try, never
+  // part of the rank answer below. It never throws.
+  try {
+    after(() => retryPayPalMigrations(createAdminClient()).then(() => undefined, () => undefined))
   } catch {
     // after() outside a request scope (a direct call in a test): nothing to schedule.
   }

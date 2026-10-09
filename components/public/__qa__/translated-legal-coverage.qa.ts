@@ -1559,6 +1559,121 @@ const PLUGIN_DOES: Record<string, RegExp[]> = {
     !PLUGIN_DOES['pt-BR'][7].test('O plugin faz tudo sozinho, sem senha de aplicativo.'))
 }
 
+// ── 23) no double billing when a Shopify store joins a PayPal account ───────
+/*
+ * Oren decided on 2026-10-09 that double billing must be impossible, and
+ * chose the narrow rule: PayPal checkout is closed while a Shopify store
+ * with the app installed is connected to the account. Nothing else about
+ * when a plan can be bought changes. The code that
+ * carries the decision (PR #152) does three things a merchant pays money on,
+ * so the terms have to state all three or we are charging — and stopping a
+ * charge — on a description nobody read:
+ *
+ *   1. While the app is installed on a connected store, PayPal checkout is
+ *      closed and plans are bought through Shopify only
+ *      (isShopifyBillingRequiredForUser, lib/shopify/paypal-block.ts); it
+ *      reopens after the app is removed from every store, unless the account
+ *      is already Shopify-billed or mid-migration.
+ *   2. A PayPal period already paid for runs to its end: the website plan
+ *      keeps working, no Shopify plan is offered or charged before that date
+ *      (resolveEffectiveBillingAuthority, lib/shopify/paypal-paid-period.ts),
+ *      the automatic renewal is stopped so PayPal charges nothing more
+ *      (stopPayPalRenewalForMigration), and there is NO REFUND and no early
+ *      end of access. The renewal stop is not absolute — a period whose end
+ *      date is unknown is left renewing on purpose, rather than risk ending
+ *      access at once — so the text says a renewed period is honoured too,
+ *      instead of promising a renewal that never happens.
+ *   3. From that date paid use needs a plan chosen in Shopify.
+ *
+ * And the one path we cannot block: a merchant who picks a plan in Shopify's
+ * own billing screens during the paid period is charged by Shopify. Our app
+ * never sends them there, and we cannot refund a Shopify charge, so the terms
+ * say so rather than leave the merchant to discover it.
+ */
+const NO_DOUBLE_BILLING: Record<string, RegExp[]> = {
+  he: [
+    /כל עוד האפליקציה מותקנת בחנות המחוברת, אי אפשר לרכוש או לשנות תוכנית ב-PayPal/,
+    /לאחר הסרת האפליקציה מכל החנויות הרכישה ב-PayPal נפתחת מחדש/,
+    /התוכנית שנרכשה באתר ממשיכה לפעול עד תום אותה תקופה, לא מוצעת ולא נגבית תוכנית ב-Shopify לפני כן/,
+    /עוצרים את החידוש האוטומטי ב-PayPal/,
+    /גם התקופה הזאת תכובד במלואה/,
+    /אין החזר כספי על תקופה ששולמה ואין קטיעה של הגישה לפני תומה/,
+    /המשך השימוש בתוכנית מחייב בחירת תוכנית ב-Shopify/,
+    /אם תבחרו תוכנית ישירות במסכי החיוב של Shopify בתוך תקופה ששולמה באתר, Shopify תגבה עליה/,
+  ],
+  en: [
+    /While the app is installed on the connected store, a plan cannot be bought or changed with PayPal/,
+    /Once the app is removed from every store, PayPal checkout is available again/,
+    /keeps working until that period ends, no Shopify plan is offered or charged before then/,
+    /we stop the automatic renewal at PayPal/,
+    /that period is honoured in full as well/,
+    /There is no refund for a period already paid for and no access is cut short before it ends/,
+    /continuing on a paid plan requires choosing a plan in Shopify/,
+    /If you choose a plan directly in Shopify&rsquo;s own billing screens during a period already paid for on the website, Shopify will charge you for it/,
+  ],
+  es: [
+    /Mientras la aplicaci[óo]n est[ée] instalada en la tienda conectada, no es posible comprar ni cambiar un plan con PayPal/,
+    /el pago con PayPal vuelve a estar disponible/,
+    /sigue funcionando hasta que ese periodo termine, antes de esa fecha no se ofrece ni se cobra ning[úu]n plan de Shopify/,
+    /detenemos la renovaci[óo]n autom[áa]tica en PayPal/,
+    /ese periodo tambi[ée]n se respeta [íi]ntegramente/,
+    /No hay reembolso por un periodo ya pagado ni se interrumpe el acceso antes de que termine/,
+    /continuar con un plan de pago requiere elegir un plan en Shopify/,
+    /Shopify le cobrar[áa] por [ée]l/,
+  ],
+  'pt-BR': [
+    /Enquanto o aplicativo estiver instalado na loja conectada, n[ãa]o [ée] poss[íi]vel comprar nem alterar um plano pelo PayPal/,
+    /o pagamento pelo PayPal volta a estar dispon[íi]vel/,
+    /continua funcionando at[ée] o fim desse per[íi]odo, nenhum plano da Shopify [ée] oferecido ou cobrado antes dessa data/,
+    /interrompemos a renova[çc][ãa]o autom[áa]tica no PayPal/,
+    /esse per[íi]odo tamb[ée]m [ée] respeitado integralmente/,
+    /N[ãa]o h[áa] reembolso de um per[íi]odo j[áa] pago e o acesso n[ãa]o [ée] interrompido antes do seu fim/,
+    /continuar em um plano pago exige escolher um plano na Shopify/,
+    /a Shopify cobrar[áa] por ele/,
+  ],
+}
+const NO_DOUBLE_BILLING_NAMES = [
+  'PayPal is closed while the app is installed',
+  'PayPal reopens once the app is removed from every store',
+  'the paid website period runs on, with no Shopify plan before it ends',
+  'the automatic PayPal renewal is stopped',
+  'a period that renewed once more is honoured too',
+  'no refund for a paid period, and no access cut short',
+  'a Shopify plan is what continues paid use afterwards',
+  'a plan picked in Shopify’s own screens is charged by Shopify',
+]
+{
+  const readDoc = (path: string) => (existsSync(path) ? readFileSync(path, 'utf8') : '')
+  const flat = (s: string) => s.replace(/\s+/g, ' ')
+  const enTermsPath = frontMatter(text[LOCALES[0]].terms).source
+  const sources: [string, string][] = [
+    ['he', readDoc(HEBREW_TERMS)],
+    ['en', readDoc(enTermsPath)],
+  ]
+  for (const locale of LOCALES) sources.push([locale, text[locale].terms])
+  for (const [name, raw] of sources) {
+    const body = flat(raw)
+    check(`${name}/terms: the document was read`, body.length > 0)
+    const patterns = NO_DOUBLE_BILLING[name]
+    check(`${name}/terms: the language has its own double-billing table`, Array.isArray(patterns))
+    ;(patterns ?? []).forEach((re, i) => {
+      check(`${name}/terms: ${NO_DOUBLE_BILLING_NAMES[i]}`, re.test(body))
+    })
+  }
+
+  // Mutation controls: each error direction a future rewrite could take.
+  check('mutation control: terms that leave PayPal open while a store is connected are caught',
+    !NO_DOUBLE_BILLING.en[0].test(flat('Connecting a Shopify store does not change how you pay: PayPal stays available.')))
+  check('mutation control: terms that offer a Shopify plan during the paid period are caught',
+    !NO_DOUBLE_BILLING.en[2].test(flat('The plan keeps working until that period ends, and you may pick a Shopify plan at any time.')))
+  check('mutation control: terms that promise a refund for the paid period are caught',
+    !NO_DOUBLE_BILLING['pt-BR'][5].test(flat('Reembolsamos a parte não usada do período já pago quando você muda para a Shopify.')))
+  check('mutation control: terms that hide the Shopify-screens charge are caught',
+    !NO_DOUBLE_BILLING.es[7].test(flat('Durante ese periodo no se le cobra nada en ningún canal.')))
+  check('mutation control: terms that promise the renewal never happens are caught',
+    !NO_DOUBLE_BILLING.he[4].test(flat('החידוש נעצר תמיד ולעולם לא תיגבה תקופה נוספת.')))
+}
+
 console.log(`\n${pass} passed, ${fail} failed`)
 if (fail > 0) process.exit(1)
 
