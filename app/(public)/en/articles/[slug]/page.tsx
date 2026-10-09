@@ -3,5 +3,5 @@ import { ArticleView } from '@/components/public/articles/ArticleView'
 
 export default function ArticlePage({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = use(params)
-  return <ArticleView locale="he" slug={slug} />
+  return <ArticleView locale="en" slug={slug} />
 }

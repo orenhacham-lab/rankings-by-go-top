@@ -1,8 +1,10 @@
 import { createClient } from '@/lib/supabase/server'
+import { LOCALE_PREFIX, normalizePublicLocale } from '@/lib/i18n/locales'
 
 interface Article {
   slug: string
   title: string
+  locale: string
 }
 
 export async function GET() {
@@ -11,7 +13,7 @@ export async function GET() {
   // Fetch all published articles
   const { data: articles } = await supabase
     .from('articles')
-    .select('slug, title')
+    .select('slug, title, locale')
     .eq('is_published', true)
     .order('title', { ascending: true })
 
@@ -60,7 +62,11 @@ Country: IL
   // Add all published articles
   if (articles && articles.length > 0) {
     articles.forEach((article: Article) => {
-      content += `- ${article.title}: ${baseUrl}/articles/${article.slug}\n`
+      // Under the tree of the language it is written in: `articles.locale`
+      // (migration 20261009180000). The Hebrew path was right while the blog
+      // was Hebrew-only and became a 404 for every other language.
+      const prefix = LOCALE_PREFIX[normalizePublicLocale(article.locale) ?? 'he']
+      content += `- ${article.title}: ${baseUrl}${prefix}/articles/${article.slug}\n`
     })
   }
 
