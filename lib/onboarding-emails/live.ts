@@ -13,6 +13,10 @@ async function send({ to, email }: OutgoingOnboarding): Promise<{ ok: boolean }>
   const resend = new Resend(process.env.RESEND_API_KEY)
   const result = await resend.emails.send({
     from: process.env.RESEND_FROM_EMAIL as string,
+    // A customer who hits reply must reach a person. The sending subdomain has no inbox,
+    // so the answer goes wherever RESEND_REPLY_TO points; without it the email simply
+    // carries no Reply-To, exactly as before.
+    ...(process.env.RESEND_REPLY_TO ? { replyTo: process.env.RESEND_REPLY_TO } : {}),
     to,
     subject: email.subject,
     html: email.html,
