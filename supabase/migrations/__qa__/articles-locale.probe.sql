@@ -1,5 +1,5 @@
 -- ============================================================================
--- EXECUTED PROBE — 20261009180000_articles_locale.sql
+-- EXECUTED PROBE — 20261009180750_articles_locale.sql
 --
 -- Applies, in a DISPOSABLE PostgreSQL cluster, a stand-in for the `articles`
 -- table as production holds it today (the real one predates this repo's
@@ -48,7 +48,7 @@ SELECT chk('before', 'there is no language on an article', NOT EXISTS (
   SELECT 1 FROM information_schema.columns
   WHERE table_schema = 'public' AND table_name = 'articles' AND column_name = 'locale'));
 
-\i supabase/migrations/20261009180000_articles_locale.sql
+\i supabase/migrations/20261009180750_articles_locale.sql
 
 -- Can an article in this language be written? Always rolled back, so one
 -- answer never affects the next.
@@ -93,7 +93,7 @@ SELECT chk('closed', 'exactly one CHECK governs locale',
       AND pg_get_constraintdef(con.oid) LIKE '%locale%') = 1);
 
 -- ── idempotent ─────────────────────────────────────────────────────────────
-\i supabase/migrations/20261009180000_articles_locale.sql
+\i supabase/migrations/20261009180750_articles_locale.sql
 
 SELECT chk('idempotent', 'a second run leaves the Hebrew backfill alone',
   (SELECT locale FROM public.articles WHERE slug = 'existing-hebrew-article') = 'he');

@@ -3,7 +3,7 @@ title: Termos de Uso | Go Top SEO
 description: Termos de uso do Go Top SEO — as condições que regem o uso do nosso serviço.
 locale: pt-BR
 source: app/(public)/en/terms/page.tsx
-lastUpdated: 2026-10-06
+lastUpdated: 2026-10-09
 register: voce
 extraSections: 0
 extraReason: No extra section. What Brazilian law adds goes inside the sections it belongs to — the seven-day right of withdrawal as 7.5 in Refunds, and the Consumer Code's forum rule as 20.1 in Governing Law — so the heading structure stays identical to the English document.

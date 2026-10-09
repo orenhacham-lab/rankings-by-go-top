@@ -343,7 +343,7 @@ export async function GET() {
   // Build article entries.
   //
   // An article lives under the tree of the language it is written in
-  // (`articles.locale`, migration 20261009180000): a Spanish article is at
+  // (`articles.locale`, migration 20261009180750): a Spanish article is at
   // /es/articles/<slug>, and listing every article under the Hebrew path — as
   // this did while the blog was Hebrew-only — would advertise URLs that 404
   // and leave every translated article out of the sitemap entirely. A language
