@@ -766,6 +766,23 @@ async function partI() {
 }
 
 // ── J. one count, and the free tab first (review P2-8) ──────────────────────
+function partK() {
+  console.log('\nK. the joining screen carries the Google risk, in every language')
+  // The public links page leaves the Google risk off on one condition set by
+  // the legal session (9 Oct 2026): the screen where the owner actually
+  // consents states it. So it is pinned here, with the link type beside it.
+  const { getDashboardDictionary } = require('../../i18n/dashboard/getDashboardDictionary') as typeof import('../../i18n/dashboard/getDashboardDictionary')
+  const locales = ['he', 'en', 'es', 'pt-BR'] as const
+  const risks = locales.map((l) => getDashboardDictionary(l).siteLinks.network.consent.risk)
+  check('every language states the risk on the joining screen', risks.every((r) => typeof r === 'string' && r.trim().length > 80))
+  check('the languages are not copies of each other', new Set(risks).size === locales.length)
+  const panel = readFileSync(join(ROOT, 'components/site-links/network/NetworkPanel.tsx'), 'utf8')
+  check('the joining dialog renders it, next to the link type',
+    /copy\.consent\.risk/.test(panel) && /copy\.linkType\[data\.linkRel\]/.test(panel))
+  // MUTATION CONTROL
+  check('K-MUT: a dialog without the risk line is caught', !/copy\.consent\.risk/.test(panel.replace(/copy\.consent\.risk/g, '')))
+}
+
 async function partJ() {
   console.log('\nJ. one definition of a link; opportunities first')
   const { linkCount, countsAsLink } = require('../counting') as typeof import('../counting')
@@ -809,6 +826,7 @@ async function main() {
   await partH()
   await partI()
   await partJ()
+  partK()
   console.log(`\n${pass} passed, ${fail} failed`)
   process.exit(fail ? 1 : 0)
 }

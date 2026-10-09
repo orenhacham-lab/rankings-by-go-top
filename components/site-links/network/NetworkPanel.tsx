@@ -257,6 +257,7 @@ export default function NetworkPanel({ projectId, data, onChanged }: { projectId
             ))}
           </ul>
           <p className="mt-4 text-copy font-medium text-ink">{copy.linkType[data.linkRel]}</p>
+          <p className="mt-3 text-caption text-muted">{copy.consent.risk}</p>
           <div className="mt-5 flex flex-wrap items-center justify-between gap-4">
             <div className="space-y-1.5">
               <Checkbox checked={agreed} onChange={setAgreed} label={copy.consent.checkbox} />

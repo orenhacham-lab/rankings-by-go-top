@@ -213,6 +213,29 @@ function main() {
       mayStop.every((re) => re.test(flat)))
     check('4k-MUT: dropping the Hebrew pause sentence is caught',
       !mayStop.every((re) => re.test(flat.replace(/\u05dc\u05d4\u05e9\u05d4\u05d5\u05ea \u05d0\u05d5 \u05dc\u05d4\u05e4\u05e1\u05d9\u05e7/g, ''))))
+    // Required on the public page by the legal session (9 Oct 2026): that a
+    // link type exists and is shown before joining, and that section 15A
+    // carries the risks, so the pointer to it reads as a warning.
+    const linkTypeShown = [
+      /\u05e1\u05d5\u05d2 \u05d4\u05e7\u05d9\u05e9\u05d5\u05e8 \u05e0\u05e7\u05d1\u05e2 \u05dc\u05db\u05dc \u05d4\u05e8\u05e9\u05ea/,
+      /The kind of link is set for the whole network/i,
+      /El tipo de enlace se define para toda la red/i,
+      /O tipo de link \u00e9 definido para toda a rede/i,
+    ]
+    check('4l: the links page says a link type exists and is shown before joining, in all four languages',
+      linkTypeShown.every((re) => re.test(flat)))
+    check('4l-MUT: dropping the Hebrew link-type sentence is caught',
+      !linkTypeShown.every((re) => re.test(flat.replace(/\u05e1\u05d5\u05d2 \u05d4\u05e7\u05d9\u05e9\u05d5\u05e8 \u05e0\u05e7\u05d1\u05e2 \u05dc\u05db\u05dc \u05d4\u05e8\u05e9\u05ea/g, ''))))
+    const risksArePointedAt = [
+      /\u05d9\u05d7\u05d3 \u05e2\u05dd \u05d4\u05e1\u05d9\u05db\u05d5\u05e0\u05d9\u05dd \u05e9\u05d1\u05d4\u05e6\u05d8\u05e8\u05e4\u05d5\u05ea/,
+      /together with the risks of joining/i,
+      /junto con los riesgos de la incorporaci\u00f3n/i,
+      /junto com os riscos da ades\u00e3o/i,
+    ]
+    check('4m: the pointer to section 15A says the risks of joining are there, in all four languages',
+      risksArePointedAt.every((re) => re.test(flat)))
+    check('4m-MUT: dropping the English risks pointer is caught',
+      !risksArePointedAt.every((re) => re.test(flat.replace(/together with the risks of joining/gi, ''))))
     for (const page of [SITE_FIXES_PAGE, BUSINESSES_PAGE, AGENCIES_PAGE, WORDPRESS_PAGE, SHOPIFY_PAGE, SITE_LINKS_PAGE, COMPETITORS_PAGE, SEARCH_CONSOLE_PAGE]) {
       check(`4e: ${page.path} has content and a title in every language`,
         PUBLIC_LOCALES.every((l) => page.content[l]?.hero.title && page.meta[l]?.title && page.meta[l]?.description))

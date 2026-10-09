@@ -4456,6 +4456,7 @@ export const dashboardEs: DeepPartial<DashboardDictionary> = {
           'Cada enlace queda registrado para las dos partes. Un enlace que has dado aparece aquí antes de que se publique el artículo, y puedes quitarlo.',
           'Puedes darte de baja cuando quieras. Darse de baja detiene los enlaces nuevos; los ya publicados se quedan en las webs y en el registro.',
         ],
+        risk: 'Conviene saberlo: Google puede considerar los enlaces destinados a influir en el posicionamiento como un esquema de enlaces, y sus directrices pueden cambiar. Eso puede restar visibilidad al sitio e incluso provocar una acción manual de Google. Al apuntarte confirmas que entiendes este riesgo y lo asumes.',
         checkbox: 'Hemos leído y aceptamos las condiciones de la red de enlaces',
         terms: 'El texto completo está en las condiciones de uso',
         join: 'Apuntarme a la red',

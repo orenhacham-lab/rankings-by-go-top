@@ -41,7 +41,13 @@
  * mention that earns its place in a paragraph, and the restraint around it.
  * The Google risk itself is disclosed where it legally belongs and where the
  * owner accepts it: clause 15A of the terms and the joining screen in the app.
- * Guard 4j below keeps that vocabulary off the page.
+ * Guard 4i below keeps that vocabulary off the page.
+ *
+ * TWO SENTENCES THE LEGAL SESSION REQUIRES HERE (9 Oct 2026), because leaving
+ * the rest off the page is conditional on the page creating no opposite
+ * impression: that a link type exists and is shown before joining (no SEO
+ * claim about it), and that section 15A carries the risks of joining, so the
+ * pointer to it reads as something to be careful about. Guards 4l and 4m.
  *
  * The rest of the page (internal links while an article is written, orphan
  * pages, the hand-checked free listings, the Search Console links report) is
@@ -140,9 +146,11 @@ export const SITE_LINKS_PAGE: MarketingPage = {
                 קישורים ואין התחייבות לדירוג.
               </p>
               <p>
-                ההשתתפות אופציונלית, כבויה כברירת מחדל, אפשר לצאת בכל רגע, והיא תוספת ולא חלק מההתחייבות של
-                התוכנית. בתנאי השימוש היא מפורטת במלואה ב<a className="underline" href="/terms#link-network">סעיף 15א</a>,
-                וכדאי לקרוא אותו לפני שמפעילים.
+                ההשתתפות אופציונלית, כבויה כברירת מחדל ואפשר לצאת בכל רגע. היא אינה חלק מהתמורה שאתם משלמים
+                עליה ואינה נכללת בתוכנית כהתחייבות. סוג הקישור נקבע לכל הרשת, מוצג לפניכם במסך ההצטרפות, ויכול
+                להשתנות לגבי קישורים חדשים. הנוסח המלא נמצא ב
+                <a className="underline" href="/terms#link-network">סעיף 15א בתנאי השימוש</a>, יחד עם הסיכונים
+                שבהצטרפות, וכדאי לקרוא אותו לפני שמדליקים.
               </p>
               <p>
                 אנחנו לא מפרסמים רשימה של האתרים המשתתפים. הצד שמקבל אזכור רואה את כתובת האתר שקישר אליו.
@@ -246,10 +254,11 @@ export const SITE_LINKS_PAGE: MarketingPage = {
                 number of links and no ranking promise.
               </p>
               <p>
-                Taking part is optional, off by default, you can leave at any moment, and it is an extra rather than
-                part of what a plan commits to. It is set out in full in{' '}
-                <a className="underline" href="/en/terms#link-network">section 15A of the terms</a>, worth reading
-                before you switch it on.
+                Taking part is optional, off by default, and you can leave at any moment. It is not part of what you
+                pay for and is not included in a plan as a commitment. The kind of link is set for the whole network,
+                shown to you on the joining screen, and can change for future links. The full wording is in{' '}
+                <a className="underline" href="/en/terms#link-network">section 15A of the Terms of Service</a>,
+                together with the risks of joining, and it is worth reading before you switch this on.
               </p>
               <p>
                 We publish no list of participating sites. The receiving side sees the address of the site that linked
@@ -353,9 +362,12 @@ export const SITE_LINKS_PAGE: MarketingPage = {
                 número de enlaces comprometido ni promesa de posicionamiento.
               </p>
               <p>
-                Participar es opcional, está desactivado por defecto, puedes salir en cualquier momento y es un extra,
-                no parte de lo que compromete un plan. Está explicado por completo en la sección 15A de los{' '}
-                <a className="underline" href="/es/terms">términos de uso</a>, que conviene leer antes de activarlo.
+                Participar es opcional, está desactivado por defecto y puedes salir en cualquier momento. No forma
+                parte de lo que pagas ni se incluye en un plan como compromiso. El tipo de enlace se define para toda
+                la red, se le muestra en la pantalla de incorporación y puede cambiar para los enlaces futuros. El
+                texto completo está en la sección 15A de los{' '}
+                <a className="underline" href="/es/terms">Términos de Servicio</a>, junto con los riesgos de la
+                incorporación, y conviene leerlo antes de activarlo.
               </p>
               <p>
                 No publicamos ninguna lista de los sitios participantes. Quien recibe una mención ve la dirección del
@@ -459,9 +471,11 @@ export const SITE_LINKS_PAGE: MarketingPage = {
                 de links garantido nem promessa de posicionamento.
               </p>
               <p>
-                Participar é opcional, vem desligado, você pode sair a qualquer momento e é um extra, não parte do que
-                um plano compromete. Está descrito por inteiro na seção 15A dos{' '}
-                <a className="underline" href="/pt-BR/terms">termos de uso</a>, que vale ler antes de ativar.
+                Participar é opcional, vem desligado e você pode sair a qualquer momento. Não faz parte do que você
+                paga nem é incluído em um plano como compromisso. O tipo de link é definido para toda a rede, é
+                mostrado a você na tela de adesão e pode mudar para links futuros. O texto completo está na seção 15A
+                dos <a className="underline" href="/pt-BR/terms">Termos de Serviço</a>, junto com os riscos da adesão,
+                e vale a pena ler antes de ativar.
               </p>
               <p>
                 Não publicamos nenhuma lista dos sites participantes. Quem recebe uma menção vê o endereço do site que
