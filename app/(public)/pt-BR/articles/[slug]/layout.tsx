@@ -6,7 +6,7 @@ export async function generateMetadata(
   { params }: { params: Promise<{ slug: string }> }
 ): Promise<Metadata> {
   const { slug } = await params
-  return buildArticleMetadata(slug, 'he')
+  return buildArticleMetadata(slug, 'pt-BR')
 }
 
 export default async function ArticleLayout({
@@ -17,8 +17,8 @@ export default async function ArticleLayout({
   params: Promise<{ slug: string }>
 }) {
   const { slug } = await params
-  const article = await getPublicArticle(slug, 'he')
-  const { breadcrumbSchema, articleSchema, faqSchema } = buildArticleSchemas(article, slug, 'he')
+  const article = await getPublicArticle(slug, 'pt-BR')
+  const { breadcrumbSchema, articleSchema, faqSchema } = buildArticleSchemas(article, slug, 'pt-BR')
 
   return (
     <>
