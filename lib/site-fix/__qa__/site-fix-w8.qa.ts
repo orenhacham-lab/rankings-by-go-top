@@ -42,7 +42,7 @@ import { llmsTextOk } from '../whitelist'
 import { pairingCode } from '../plugin-auth'
 import type { PluginPost } from '../plugin-client'
 import type { LivePage } from '../preview'
-import { FIX_TYPES, type FixCapabilities, type FixJobView } from '../types'
+import { FIX_TYPES, PLUGIN_LATEST_VERSION, type FixCapabilities, type FixJobView } from '../types'
 import AutoFixStrip from '../../../components/site-health/AutoFixStrip'
 import FindingCard from '../../../components/site-health/FindingCard'
 import { getDashboardDictionary } from '../../i18n/dashboard/getDashboardDictionary'
@@ -415,7 +415,7 @@ async function main() {
     check('C1: with 2.0.0 every 2.0.0 type still goes through the plugin', old.every((t) => c200.channelFor[t] === 'plugin'), JSON.stringify(c200.channelFor))
     check('C2: …and h1_demote / llms_txt read needs_update (never sent to the old plugin)', c200.channelFor.h1_demote === 'needs_update' && c200.channelFor.llms_txt === 'needs_update')
     const c210 = CHANNEL.resolveCapabilities(ctx('2.1.0'), true)
-    check('C3: with 2.1.0 they go through the plugin', c210.channelFor.h1_demote === 'plugin' && c210.channelFor.llms_txt === 'plugin' && c210.pluginLatest === '2.1.0')
+    check('C3: with 2.1.0 they go through the plugin', c210.channelFor.h1_demote === 'plugin' && c210.channelFor.llms_txt === 'plugin' && c210.pluginLatest === PLUGIN_LATEST_VERSION)
     const m = mutant<typeof CHANNEL>('lib/site-fix/channel.ts', "pluginSupports(version, type) ? 'plugin' : 'needs_update'", "'plugin'")
     check('MUTATION CONTROL: sending the new types to a 2.0.0 plugin is caught by C2', m.found && !!m.mod && m.mod.resolveCapabilities(ctx('2.0.0'), true).channelFor.h1_demote === 'plugin')
 

@@ -4779,7 +4779,7 @@ export const dashboardEn = {
         reconnect: 'Connect again',
         update: {
           title: 'A new version of the plugin is ready',
-          body: (v: string) => `Version ${v} adds two fixes: turning an extra main heading into a subheading, and an llms.txt for AI assistants. Everything you use today keeps working as it is.`,
+          body: (v: string) => `Version ${v} is available on WordPress.org: it publishes your articles without an application password and updates from there. Everything you use today keeps working until you switch.`,
           action: 'Update the plugin',
         },
         webhook: {
@@ -4795,11 +4795,10 @@ export const dashboardEn = {
       },
       plugin: {
         title: 'The Go Top plugin',
-        intro: 'The plugin lets us write to your site only the fixes you approved, one at a time. It never deletes content, never touches prices or products, your theme, plugins, settings or users, and never publishes or hides a page.',
-        rekeyNotice: 'The plugin connection needs renewing. If the plugin is already installed, skip to step 3 and create a new pairing code.',
+        intro: 'The plugin publishes on your site the articles you send from GO TOP, and writes only the fixes you approved, one at a time. It never deletes content, and never touches prices or products, your theme, plugins, settings or users.',
+        rekeyNotice: 'The plugin connection needs renewing. If the plugin is already installed, skip to step 2 and create a new pairing code.',
         step: (n: number) => `Step ${n}`,
-        download: { title: 'Download the plugin', body: 'One zip file. No need to open it.', action: 'Download the plugin' },
-        upload: { title: 'Install it on WordPress', body: 'In the dashboard: Plugins, Add New, Upload Plugin. Choose the file, click "Install Now" and then "Activate".', action: 'Open the upload page' },
+        install: { title: 'Install the plugin from WordPress.org', body: 'In the dashboard: Plugins, Add New. Search for "GO TOP SEO Bridge", click "Install Now" and then "Activate". No file to download.', action: 'Find the plugin in WordPress', page: 'The plugin on WordPress.org' },
         pair: {
           title: 'Connect the plugin',
           auto: 'Your site is already connected to us with an application password, so the plugin connects in one click.',
@@ -4823,12 +4822,12 @@ export const dashboardEn = {
         },
         disconnected: 'The plugin was disconnected',
         update: {
-          title: 'Update the Go Top plugin',
-          notice: (installed: string, latest: string) => `Version ${installed} is installed on your site. Version ${latest} adds new fixes. The connection stays as it is, so there is no need to pair again.`,
-          download: { title: 'Download the new version', body: 'One zip file, the same plugin in a newer version.', action: 'Download version' },
-          upload: { title: 'Upload it over the current one', body: 'In the dashboard: Plugins, Add New, Upload Plugin. Choose the file, click "Install Now", then "Replace current with uploaded".', action: 'Open the upload page' },
-          check: { title: 'Check the connection', body: 'Click "Check connection" here and we will see the new version at once.' },
-          done: (v: string) => `Version ${v} is installed. The new fixes are available.`,
+          title: 'Switch to the plugin from WordPress.org',
+          notice: (installed: string, latest: string) => `Version ${installed}, which you downloaded from us, is installed on your site. Version ${latest} comes from WordPress.org: it publishes your articles without an application password and updates from there. It installs as a new plugin, so switch in three steps and connect again. Until then everything keeps working as it does today.`,
+          deactivate: { title: 'Deactivate the old plugin', body: 'In the dashboard: Plugins. Next to GO TOP SEO Bridge in the old version, click "Deactivate". WordPress will not activate the new one while the old one is active. Do not delete the old one now: deleting it also deletes the connection. If you want to delete it, do it before you connect again, not after.', action: 'Open the plugins page' },
+          install: { title: 'Install and activate the new one', body: 'Plugins, Add New. Search for "GO TOP SEO Bridge", click "Install Now" and then "Activate".', action: 'Find the plugin in WordPress' },
+          pair: { title: 'Connect again' },
+          done: (v: string) => `Version ${v} is connected. From now on the plugin publishes your articles and applies your fixes.`,
         },
         close: 'Close',
       },

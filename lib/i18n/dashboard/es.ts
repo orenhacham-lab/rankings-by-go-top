@@ -3788,7 +3788,7 @@ export const dashboardEs: DeepPartial<DashboardDictionary> = {
         reconnect: 'Volver a conectar',
         update: {
           title: 'Hay una versión nueva del plugin',
-          body: (v: string) => `La versión ${v} añade dos arreglos: convertir un encabezado principal de más en subtítulo y un llms.txt para los asistentes de IA. Todo lo que usas hoy sigue funcionando igual.`,
+          body: (v: string) => `La versión ${v} está disponible en WordPress.org: publica tus artículos sin contraseña de aplicación y se actualiza desde allí. Todo lo que usas hoy sigue funcionando hasta que te cambies.`,
           action: 'Actualizar el plugin',
         },
         webhook: {
@@ -3804,11 +3804,10 @@ export const dashboardEs: DeepPartial<DashboardDictionary> = {
       },
       plugin: {
         title: 'El plugin de Go Top',
-        intro: 'El plugin nos permite escribir en tu web solo los arreglos que has aprobado, uno a uno. Nunca borra contenido, nunca toca precios ni productos, ni tu plantilla, plugins, ajustes o usuarios, y nunca publica ni oculta una página.',
-        rekeyNotice: 'La conexión del plugin necesita renovarse. Si el plugin ya está instalado, salta al paso 3 y crea un código de emparejamiento nuevo.',
+        intro: 'El plugin publica en tu web los artículos que envías desde GO TOP y escribe solo los arreglos que has aprobado, uno a uno. Nunca borra contenido ni toca precios o productos, tu plantilla, plugins, ajustes o usuarios.',
+        rekeyNotice: 'La conexión del plugin necesita renovarse. Si el plugin ya está instalado, salta al paso 2 y crea un código de emparejamiento nuevo.',
         step: (n: number) => `Paso ${n}`,
-        download: { title: 'Descarga el plugin', body: 'Un solo archivo zip. No hace falta abrirlo.', action: 'Descargar el plugin' },
-        upload: { title: 'Instálalo en WordPress', body: 'En el panel: Plugins, Añadir nuevo, Subir plugin. Elige el archivo, pulsa «Instalar ahora» y luego «Activar».', action: 'Abrir la página de subida' },
+        install: { title: 'Instala el plugin desde WordPress.org', body: 'En el panel: Plugins, Añadir nuevo. Busca «GO TOP SEO Bridge», pulsa «Instalar ahora» y luego «Activar». No hay que descargar ningún archivo.', action: 'Buscar el plugin en WordPress', page: 'El plugin en WordPress.org' },
         pair: {
           title: 'Conecta el plugin',
           auto: 'Tu web ya está conectada con nosotros con una contraseña de aplicación, así que el plugin se conecta con un clic.',
@@ -3832,12 +3831,12 @@ export const dashboardEs: DeepPartial<DashboardDictionary> = {
         },
         disconnected: 'El plugin se ha desconectado',
         update: {
-          title: 'Actualiza el plugin de Go Top',
-          notice: (installed: string, latest: string) => `En tu web está instalada la versión ${installed}. La versión ${latest} añade arreglos nuevos. La conexión se queda como está, así que no hace falta volver a emparejarlo.`,
-          download: { title: 'Descarga la versión nueva', body: 'Un solo archivo zip, el mismo plugin en una versión más nueva.', action: 'Descargar la versión' },
-          upload: { title: 'Súbela sobre la actual', body: 'En el panel: Plugins, Añadir nuevo, Subir plugin. Elige el archivo, pulsa «Instalar ahora» y luego «Reemplazar la actual por la subida».', action: 'Abrir la página de subida' },
-          check: { title: 'Comprueba la conexión', body: 'Pulsa «Comprobar la conexión» aquí y veremos la versión nueva al momento.' },
-          done: (v: string) => `La versión ${v} está instalada. Los arreglos nuevos ya están disponibles.`,
+          title: 'Pásate al plugin de WordPress.org',
+          notice: (installed: string, latest: string) => `En tu web está instalada la versión ${installed}, que descargaste de nosotros. La versión ${latest} viene de WordPress.org: publica tus artículos sin contraseña de aplicación y se actualiza desde allí. Se instala como un plugin nuevo, así que el cambio son tres pasos y volver a conectar. Hasta entonces todo sigue funcionando como hoy.`,
+          deactivate: { title: 'Desactiva el plugin antiguo', body: 'En el panel: Plugins. Junto a GO TOP SEO Bridge en la versión antigua, pulsa «Desactivar». WordPress no activará el nuevo mientras el antiguo esté activo. No borres el antiguo ahora: al borrarlo se borra también la conexión. Si quieres borrarlo, hazlo antes de volver a conectar, no después.', action: 'Abrir la página de plugins' },
+          install: { title: 'Instala y activa el nuevo', body: 'Plugins, Añadir nuevo. Busca «GO TOP SEO Bridge», pulsa «Instalar ahora» y luego «Activar».', action: 'Buscar el plugin en WordPress' },
+          pair: { title: 'Vuelve a conectar' },
+          done: (v: string) => `La versión ${v} está conectada. A partir de ahora el plugin publica tus artículos y aplica tus arreglos.`,
         },
         close: 'Cerrar',
       },
