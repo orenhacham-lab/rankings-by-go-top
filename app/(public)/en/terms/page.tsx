@@ -86,9 +86,26 @@ export default function EnglishTermsPage() {
             is not Shopify, pay through a third-party payment provider (PayPal).
           </li>
           <li>
-            Connecting a Shopify store in order to publish content, by a customer who is already
-            billed through the website, does not create double billing: an account is billed through
-            one channel only at any given time.
+            <strong>Connecting a Shopify store to an account already billed through the website does
+            not create double billing.</strong> While the app is installed on the connected store, a
+            plan cannot be bought or changed with PayPal and plans are bought through Shopify only.
+            Once the app is removed from every store, PayPal checkout is available again, unless the
+            account&rsquo;s billing authority is already Shopify or the move to it has not finished.
+          </li>
+          <li>
+            <strong>A period already paid for on the website runs to its end.</strong> If the account
+            has a billing period it has already paid for when the store is connected, the plan bought
+            on the website keeps working until that period ends, no Shopify plan is offered or charged
+            before then, and we stop the automatic renewal at PayPal so that no further period is
+            charged. If the renewal was already on its way and the period renewed once more, that
+            period is honoured in full as well. There is no refund for a period already paid for and
+            no access is cut short before it ends. From that date on, continuing on a paid plan
+            requires choosing a plan in Shopify, and billing is through Shopify from then.
+          </li>
+          <li>
+            If you choose a plan directly in Shopify&rsquo;s own billing screens during a period
+            already paid for on the website, Shopify will charge you for it: our app does not send
+            you to those screens, and a charge made by Shopify is not one we can refund.
           </li>
         </ul>
       </section>
