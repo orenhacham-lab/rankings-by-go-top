@@ -1,5 +1,5 @@
 -- ============================================================================
--- EXECUTED PROBE — 20261009180000_project_report_preferences_weekly_sent.sql
+-- EXECUTED PROBE — 20261009184500_project_report_preferences_weekly_sent.sql
 --
 -- Builds the table as 20260928000000 left it (with rows in it), then applies the
 -- new migration (via \i, twice, for idempotency) to a disposable PostgreSQL
@@ -63,9 +63,9 @@ INSERT INTO public.project_report_preferences (project_id, user_id, weekly_email
   ('a2222222-2222-2222-2222-222222222222', '22222222-2222-2222-2222-222222222222', false);
 RESET ROLE;
 
-\i supabase/migrations/20261009180000_project_report_preferences_weekly_sent.sql
+\i supabase/migrations/20261009184500_project_report_preferences_weekly_sent.sql
 -- Idempotency: applying twice must not error.
-\i supabase/migrations/20261009180000_project_report_preferences_weekly_sent.sql
+\i supabase/migrations/20261009184500_project_report_preferences_weekly_sent.sql
 
 CREATE TABLE results (phase text, name text, ok boolean);
 CREATE FUNCTION chk(ph text, n text, c boolean) RETURNS void LANGUAGE plpgsql AS $$

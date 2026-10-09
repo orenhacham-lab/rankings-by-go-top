@@ -8,7 +8,7 @@
  * A SECTION THAT CANNOT BE READ COMES BACK NULL, never zero: lib/reports/weekly/aggregate.ts
  * leaves a null section out of the email instead of reporting that nothing happened.
  *
- * THE SENT-LOG is the two columns 20261009180000 adds to the row that already holds the
+ * THE SENT-LOG is the two columns 20261009184500 adds to the row that already holds the
  * owner's switch. A database without them is reported as `unavailable`, and nothing is sent.
  */
 import type { ServiceRoleClient } from '@/lib/supabase/admin'
