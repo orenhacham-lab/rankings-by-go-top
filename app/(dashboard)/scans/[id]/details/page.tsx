@@ -15,6 +15,7 @@ import { ChevronDown, SearchX } from 'lucide-react'
 import { formatDateTime } from '@/lib/utils'
 import Badge from '@/components/ui/Badge'
 import { useDashboardLanguage } from '@/lib/i18n/dashboard/useDashboardLanguage'
+import { useItemProject } from '@/lib/active-project/useItemProject'
 import { getDashboardDictionary } from '@/lib/i18n/dashboard/getDashboardDictionary'
 import { TableSkeleton } from '@/components/ui/Skeleton'
 import { EngineChip } from '@/components/scans/ScanHistory'
@@ -40,6 +41,9 @@ function ScanDetailsContent({ params }: { params: Promise<{ id: string }> }) {
   const [results, setResults] = useState<ScanResult[]>([])
   const [projectId, setProjectId] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
+  // Opening a check's details adopts its project; switching the workspace while
+  // it is open leaves for the new project's check history.
+  useItemProject(projectId, (pid) => scanHistoryHref(pid))
   const [expandedRawId, setExpandedRawId] = useState<string | null>(null)
   // The row whose technical breakdown is open; one opened by a link (?resultId=) starts open.
   const [openId, setOpenId] = useState<string | null>(resultId)
