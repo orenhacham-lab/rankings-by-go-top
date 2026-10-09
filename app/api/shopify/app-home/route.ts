@@ -31,6 +31,7 @@ import { getShopifyOAuthConfig } from '@/lib/shopify/oauth'
 import { isAdminUser } from '@/app/api/shopify/billing/start-intent/route'
 import { resolveBillingAuthority } from '@/lib/billing/governance'
 import { getActiveMigrationResult } from '@/lib/shopify/paypal-migration'
+import { advancePayPalMigrationOnAppLoad } from '@/lib/shopify/app-load-billing-sync'
 import { embeddedPublishErrorMessage } from '@/lib/shopify/publish-error-display'
 import { scheduleShopifySeedScan } from '@/lib/seed-scan/shopify-install'
 
@@ -196,6 +197,26 @@ export async function GET(request: Request) {
     }
   }
 
+  // FINISH A PENDING PAYPAL→SHOPIFY MIGRATION once the plan is live. The
+  // billing return rarely carries its intent (Shopify frames it, so our
+  // SameSite=Lax cookie is not sent), and a plan chosen on Shopify's own
+  // pricing page never reaches the return at all — this load is where the
+  // active plan is next observed. Fail-closed preconditions (admin first, the
+  // same store's migration, a CAS claim, an independent Admin API ACTIVE
+  // confirmation) live in lib/shopify/app-load-billing-sync.ts.
+  let migrationStatus = migrationResult.ok ? (migrationResult.migration?.status ?? null) : null
+  if (migrationResult.ok && migrationResult.migration && billing?.status === 'active') {
+    const advanced = await advancePayPalMigrationOnAppLoad(admin, {
+      isAdmin,
+      userId: connection.user_id,
+      connectionId: connection.id,
+      projectId: connection.project_id,
+      migration: migrationResult.migration,
+      shopifyPlanActive: true,
+    })
+    migrationStatus = advanced.migrationStatus
+  }
+
   // A newly installed store's first seeding scan, after this response and never
   // in its way (lib/seed-scan/shopify-install.ts): nothing at all while the
   // scan is off for this merchant, whose role is already known here.
@@ -238,7 +259,7 @@ export async function GET(request: Request) {
     // client. The "Manage plan" button in ConnectorHomeClient fetches
     // /api/shopify/billing/start-intent (with this same session token) to
     // mint a billing intent and get a fresh redirect URL just-in-time.
-    migrationStatus: migrationResult.ok ? (migrationResult.migration?.status ?? null) : null,
+    migrationStatus,
     // Which provider bills this store, so the embedded client never offers a
     // Shopify plan to a website-billed merchant.
     billingProvider: billingStateUnavailable ? 'unavailable' : (shopifyBills ? 'shopify' : 'website'),

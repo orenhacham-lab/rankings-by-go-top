@@ -96,8 +96,10 @@ export interface BillingReturnResult {
  *
  * What this path deliberately does NOT do: consume an intent (there is none),
  * advance a PayPal→Shopify migration, or cancel a PayPal subscription. Those
- * stay behind the intent-authorized path, so a replayed callback can never
- * repeat an irreversible billing transition. Re-running this is safe: the only
+ * stay behind the intent-authorized path below and the embedded app's
+ * session-token-authenticated load (lib/shopify/app-load-billing-sync.ts, which
+ * also requires an Admin API ACTIVE confirmation and a CAS claim), so a
+ * replayed callback can never trigger an irreversible billing transition. Re-running this is safe: the only
  * write is the billing-cache upsert, which is idempotent.
  */
 async function reconcileFromVerifiedShopifyCallback(

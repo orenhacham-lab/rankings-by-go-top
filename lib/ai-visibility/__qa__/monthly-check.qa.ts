@@ -540,6 +540,16 @@ async function main() {
       return added.length > 0 && added.every((l) => /applyArticleDesign/.test(l))
     }
     untouched = untouched.split('\n').filter((f) => f && !(f === 'lib/shopify/publish-article.ts' && designOnly(f))).join('\n')
+    // Owner 2026-10-05: the Shopify App Store connect deliberately finishes a
+    // PayPal→Shopify migration on app load (lib/shopify/app-load-billing-sync.ts).
+    // It changes no plan, price or quota; only these files, and none of the
+    // catalog/quota files above, may differ for it.
+    const APP_STORE_CONNECT = new Set([
+      'lib/shopify/app-load-billing-sync.ts', 'lib/shopify/client.ts',
+      'lib/shopify/billing-return-processing.ts', 'lib/shopify/paypal-migration.ts',
+      'lib/shopify/__qa__/app-store-connect.qa.ts', 'lib/shopify/__qa__/billing-reconciliation-incident.qa.ts',
+    ])
+    untouched = untouched.split('\n').filter((f) => f && !APP_STORE_CONNECT.has(f)).join('\n')
     check('H4: plans, prices, quotas, billing, entitlement and Shopify files are untouched', untouched === '', untouched)
     // lib/subscription.ts may differ from 8b468a8 ONLY on the display-only trial line (PLAN_FEATURES.trial); nothing of entitlement moved.
     let subDiff = ''

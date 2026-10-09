@@ -26,7 +26,9 @@
  *
  * Every state transition here is idempotent and safe to call repeatedly —
  * see confirmShopifyActiveAndAdvance, the function the billing-return route
- * calls on every return from Shopify's hosted pricing page.
+ * calls on every return from Shopify's hosted pricing page, and that the
+ * embedded app home calls on load once the plan is live
+ * (lib/shopify/app-load-billing-sync.ts).
  */
 
 import type { createAdminClient } from '@/lib/supabase/admin'
@@ -154,7 +156,8 @@ export interface AdvanceMigrationResult {
 }
 
 /**
- * Called on every return from Shopify's hosted pricing page, AFTER the
+ * Called on every return from Shopify's hosted pricing page (and on an
+ * embedded app load that found the plan live, app-load-billing-sync.ts), AFTER the
  * Partner API has independently confirmed an active plan (the caller passes
  * that fact in — this function never re-verifies Shopify billing itself, it
  * only advances the migration once Shopify is already confirmed active).

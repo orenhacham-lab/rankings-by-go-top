@@ -301,6 +301,31 @@ export async function getGrantedScopes(creds: ShopifyCredentials): Promise<{
 }
 
 /**
+ * The app's OWN subscriptions on this store, straight from the Admin API
+ * (`currentAppInstallation.activeSubscriptions`, which needs no access scope —
+ * it is the app reading its own installation). Shopify documents this query as
+ * the way to confirm a managed-pricing plan.
+ *
+ * Used as a SECOND, independent confirmation before an irreversible billing
+ * step (cancelling a PayPal subscription on app load — see
+ * lib/shopify/app-load-billing-sync.ts). Never throws: any failure is
+ * `{ ok: false }`, which every caller must treat as "not confirmed".
+ */
+export async function getActiveAppSubscriptionStatuses(
+  creds: ShopifyCredentials,
+): Promise<{ ok: true; statuses: string[] } | { ok: false; reason: ShopifyErrorKind | 'malformed' }> {
+  const query = `{ currentAppInstallation { activeSubscriptions { status } } }`
+  try {
+    const { data } = await graphql<{ currentAppInstallation?: { activeSubscriptions?: { status?: string | null }[] | null } | null }>(creds, query)
+    const list = data.currentAppInstallation?.activeSubscriptions
+    if (!Array.isArray(list)) return { ok: false, reason: 'malformed' }
+    return { ok: true, statuses: list.map((s) => String(s?.status || '').toUpperCase()).filter(Boolean) }
+  } catch (err) {
+    return { ok: false, reason: err instanceof ShopifyClientError ? err.kind : 'api_error' }
+  }
+}
+
+/**
  * Verify credentials, resolve the storefront host, VERIFY the granted read
  * scopes against SHOPIFY_REQUIRED_SCOPES, and validate the served API version
  * against the pinned request. Never throws — returns a precise `status`

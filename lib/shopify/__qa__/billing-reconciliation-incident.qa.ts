@@ -430,9 +430,19 @@ async function main() {
       /'shopify_billing_not_applicable'/.test(startIntent))
     check('G8: admin accounts still bypass Shopify billing entirely',
       /'admin_not_applicable'/.test(startIntent) && /if \(isAdmin\) \{/.test(appHome))
-    check('G9: the PayPal migration still advances ONLY on the intent-authorized path',
+    // The return module advances a migration ONLY on its intent-authorized path;
+    // the one other caller is the embedded app load (app-load-billing-sync.ts),
+    // reached from app-home ONLY after its own live check returned active.
+    check('G9: in the return module the PayPal migration advances ONLY on the intent-authorized path',
       /confirmShopifyActiveAndAdvance\(/.test(processingSrc)
       && processingSrc.indexOf('confirmShopifyActiveAndAdvance(') > processingSrc.indexOf('export async function processShopifyBillingReturn('))
+    const g9b = (src: string) => /advancePayPalMigrationOnAppLoad\(/.test(src)
+      && src.indexOf('advancePayPalMigrationOnAppLoad(') > src.indexOf("billing = { status: 'active'")
+      && /billing\?\.status === 'active'/.test(src)
+      && !/confirmShopifyActiveAndAdvance\(/.test(src)
+    check('G9b: app-home advances a migration only after its live check reported active', g9b(appHome))
+    check('G9b-MUT: app-home advancing without the active gate is caught',
+      !g9b(appHome.replace("billing?.status === 'active'", 'true')))
     check('G10: embedded start-intent still returns a signed handoff and no redirect URL',
       /handoff: signBillingIntentHandoff\(nonce, config\.clientSecret\)/.test(startIntent) && !/redirectUrl/.test(startIntent))
     check('G11: resume is still POST-only and sets the scoped cookie first-party',

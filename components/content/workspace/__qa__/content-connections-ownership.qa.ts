@@ -56,8 +56,18 @@ function main() {
 
   // ── 3. The panels still own the flow — nothing was reimplemented. ──
   const shopifyPanel = strip(read(join('components', 'content', 'ShopifyConnectionPanel.tsx')))
-  check('Shopify connect reuses the existing OAuth start route (no duplicated OAuth)',
-    /\/api\/shopify\/oauth\/start\?projectId=/.test(shopifyPanel))
+  // Owner, 5 Oct 2026: a store connects ONLY by installing from the Shopify App
+  // Store, so the panel links to the listing and runs no OAuth of its own — no
+  // typed-in shop domain, no authorize URL, no direct /oauth/start redirect.
+  const shopifyPanelNoOAuth = (src: string) =>
+    /href=\{SHOPIFY_APP_STORE_URL\}/.test(src)
+    && !/\/api\/shopify\/oauth\/start/.test(src)
+    && !/admin\/oauth\/authorize/.test(src)
+    && !/myshopify\.com/.test(src)
+  check('Shopify connect goes through the App Store listing, with no OAuth or domain field of its own',
+    shopifyPanelNoOAuth(shopifyPanel))
+  check('…MUTATION: a reinstated direct OAuth redirect is caught',
+    !shopifyPanelNoOAuth(shopifyPanel + "\nwindow.location.href = `/api/shopify/oauth/start?projectId=${projectId}`"))
 
   // ── 4. A merchant on the articles screen can still SEE and REACH the connection. ──
   check('the articles screen shows the platform-aware destination card',

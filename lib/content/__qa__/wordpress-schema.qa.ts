@@ -198,6 +198,16 @@ async function main() {
   check('W2: nothing script-like is added to the post content', !/content\s*(\+?=)[^\n]*ld\+json|<script/i.test(wp))
   check('MUTATION CONTROL: the step moved before the post is created is caught', !wired(wp.replace("if (status === 'publish' && article.id)", "if (article.id)")))
   const changed = (base: string, ...paths: string[]) => spawnSync('git', ['diff', '--name-only', base, '--', ...paths], { cwd: ROOT, encoding: 'utf8' }).stdout.trim()
+  const APP_STORE_CONNECT_FILES = [
+    'app/api/shopify/app-home/route.ts',
+    'lib/shopify/app-load-billing-sync.ts',
+    'lib/shopify/client.ts',
+    'lib/shopify/billing-return-processing.ts',
+    'lib/shopify/paypal-migration.ts',
+    'lib/shopify/__qa__/app-store-connect.qa.ts',
+    'lib/shopify/__qa__/billing-reconciliation-incident.qa.ts',
+  ]
+  const WP_SCHEMA_LINE = /publishArticleSchema|ld\+json|wordpress/i
 
   // What this guard is FOR: proving this feature did not quietly reach into the
   // Shopify code path. It used to assert that nothing under lib/shopify or
@@ -209,7 +219,12 @@ async function main() {
   //
   // The country block is a legal refusal that has to sit on every path where a
   // payment can start, Shopify billing included; it shares nothing with the WordPress schema step.
-  const shopifyAddedLines = (base: string) => execSync(`git diff -U0 ${base} -- lib/shopify app/api/shopify`, { cwd: ROOT })
+  // The Shopify App Store connect (owner, 5 Oct 2026: a website account installs
+  // from the App Store and a plan chosen in Shopify finishes its PayPal
+  // migration on app load, lib/shopify/app-load-billing-sync.ts) is its own
+  // feature too. Its files are left out of this diff and checked separately
+  // (W3c) to carry no WordPress-schema line.
+  const shopifyAddedLines = (base: string) => execSync(`git diff -U0 ${base} -- lib/shopify app/api/shopify ${APP_STORE_CONNECT_FILES.map((f) => `':!${f}'`).join(' ')}`, { cwd: ROOT })
     .toString().split('\n')
     .filter((l) => l.startsWith('+') && !l.startsWith('+++'))
     .map((l) => l.slice(1).trim())
@@ -223,6 +238,11 @@ async function main() {
   check('W3: the WordPress schema feature has not reached into Shopify code', foreignWp.length === 0, foreignWp.slice(0, 4).join(' | '))
   check('MUTATION CONTROL: a WordPress-schema line added to Shopify code would be caught',
     ['publishArticleSchemaToWordPress(creds, article)'].filter((l) => !/sanctions|restrictionForRequest|logRestrictedAttempt|restricted|451/.test(l)).length === 1)
+  const appStoreLeak = execSync(`git diff -U0 8b468a8 -- ${APP_STORE_CONNECT_FILES.join(' ')}`, { cwd: ROOT }).toString()
+    .split('\n').filter((l) => l.startsWith('+') && !l.startsWith('+++') && WP_SCHEMA_LINE.test(l))
+  check('W3c: the files left out for the App Store connect carry no WordPress-schema line', appStoreLeak.length === 0, appStoreLeak.slice(0, 3).join(' | '))
+  check('MUTATION CONTROL: a WordPress-schema line in one of those files would be caught',
+    ['+  await publishArticleSchemaToWordPress(creds, article)'].filter((l) => WP_SCHEMA_LINE.test(l)).length === 1)
   // Wave 8 merge: the plugin's only change is site health's 2.1.0 (w8-health, 2a1492b: h1 and
   // llms.txt). The article schema rides the existing /fix schema_jsonld and adds nothing to it.
   const pluginDiff = changed('2a1492b', 'wordpress-plugin')
