@@ -21,6 +21,7 @@ import type { ArticleTopicAnchor } from '@/lib/supabase/types'
 import type { SuggestionLanguage } from '@/lib/content/topic-suggestions'
 import { contentDirection, languageNameInEnglish } from '@/lib/content/language'
 import { businessContextLines, guidancePromptLines, type BusinessContext, type WritingGuidance } from '@/lib/content/writing-guidance/guidance'
+import { indexOfCaseInsensitive } from '@/lib/text/ci-index'
 
 export interface ArticleBrief {
   language: SuggestionLanguage
@@ -492,13 +493,17 @@ function buildCasingTerms(brief: ArticleBrief): CasingTerm[] {
 }
 
 /** Restore brand casing + remove the artifact hyphenated definite article "ה-". */
-function polishText(s: string, terms: CasingTerm[]): string {
+/** Exported for the article-text integrity guard (lib/content/__qa__/article-text-integrity.qa.ts). */
+export function polishText(s: string, terms: CasingTerm[]): string {
   if (!s) return s
   let out = s
   for (const t of terms) out = out.replace(t.re, t.replacement)
   // "ה-Kingsmith" → "Kingsmith", "ה-הליכון" → "הליכון" (only the hyphenated form;
   // a normal attached definite article like "המכשיר" is never touched).
-  out = out.replace(/ה-(?=[A-Za-zא-ת])/g, '')
+  // The ה must START a word: without the left guard this also ate the ה of a
+  // hyphenated compound and welded the two halves into a nonsense word
+  // ("חברה-בת" → "חברבת", "שאלה-תשובה" → "שאלתשובה").
+  out = out.replace(/(?<![א-ת])ה-(?=[A-Za-zא-ת])/g, '')
   return out
 }
 
@@ -603,7 +608,7 @@ function insertAnchors(html: string, missing: { anchorText: string; targetUrl: s
     let placed = false
     for (const p of paras) {
       if (!farEnough(p.wordStart)) continue
-      const idx = p.inner.toLowerCase().indexOf(text.toLowerCase())
+      const idx = indexOfCaseInsensitive(p.inner, text)
       if (idx < 0 || p.inner.slice(0, idx).includes('<')) continue // keep it out of any tag
       const newInner = `${p.inner.slice(0, idx)}<a href="${escAttr(url)}">${p.inner.slice(idx, idx + text.length)}</a>${p.inner.slice(idx + text.length)}`
       out = out.slice(0, p.start) + `<p>${newInner}</p>` + out.slice(p.end)
@@ -824,8 +829,11 @@ export function cleanMarkdown(input: string): string {
   // Bold/italic: **text**, __text__, then leftover markers; *text*, _text_.
   t = t.replace(/\*\*([^*]+)\*\*/g, '$1').replace(/__([^_]+)__/g, '$1')
   t = t.replace(/\*\*/g, '').replace(/(?<!_)__(?!_)/g, '')
-  t = t.replace(/(?<![\w*])\*([^*\n]+)\*(?![\w*])/g, '$1')
-  t = t.replace(/(?<![\w_])_([^_\n]+)_(?![\w_])/g, '$1')
+  // The "not mid-word" guards must be Unicode-aware: \w is ASCII-only, so in
+  // Hebrew (and any non-Latin script) they matched nothing and a word holding
+  // two underscores lost them and fused ("מילה_אחת_בלבד" → "מילהאחתבלבד").
+  t = t.replace(/(?<![\p{L}\p{N}*])\*([^*\n]+)\*(?![\p{L}\p{N}*])/gu, '$1')
+  t = t.replace(/(?<![\p{L}\p{N}_])_([^_\n]+)_(?![\p{L}\p{N}_])/gu, '$1')
   // Inline code `text` → text (no code in marketing/SEO articles).
   t = t.replace(/`+([^`]*)`+/g, '$1').replace(/`/g, '')
   // Heading + blockquote line markers → drop the marker, keep the text.
