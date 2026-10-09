@@ -3,7 +3,7 @@ title: Política de Privacidade | Go Top SEO
 description: Política de privacidade do Go Top SEO.
 locale: pt-BR
 source: app/(public)/en/privacy/page.tsx
-lastUpdated: 2026-10-09
+lastUpdated: 2026-10-10
 register: voce
 extraSections: 1
 extraReason: One extra section, "Direitos de residentes no Brasil (LGPD)", placed beside the existing EEA/UK and United States rights sections, because the LGPD gives a different set of rights with a different deadline and a different authority to complain to. What the LGPD adds elsewhere goes inside the sections it belongs to - the legal bases of Art. 7, the international-transfer rule of Art. 33, and the communication channel that stands in for an appointed officer.
@@ -363,6 +363,24 @@ Respondemos aos pedidos em até 15 dias, prazo do art. 19, I, da LGPD, e sem cus
 
 **Reclamação.** Se a nossa resposta não resolver, você pode reclamar à Autoridade Nacional de Proteção de Dados ([ANPD](https://www.gov.br/anpd/pt-br)), e também procurar um órgão de defesa do consumidor ou o Ministério Público. Falar com a gente primeiro não é condição para nada disso.
 
+## Contato comercial por e-mail
+
+Esta seção trata de alguém que recebeu um e-mail nosso e não é nosso cliente. Se for o seu caso, você não nos forneceu nada e não se cadastrou em nada: obtivemos o endereço da sua empresa de fontes públicas, e aqui dizemos exatamente de quais, o que guardamos e como se descadastrar com um único clique.
+
+**O que coletamos e de onde.** O nome da empresa, o endereço do seu site, um endereço de e-mail de contato exibido no próprio site da empresa ou em um registro público de empresas, o país em que a empresa atua, e um único achado de uma verificação automática das páginas públicas do site, com a data em que foi verificado. **Não compramos listas de endereços e não usamos intermediários de dados.** Não coletamos número de telefone, não coletamos dados sobre uma pessoa privada e não entramos em nenhuma parte de um site que não esteja aberta a qualquer visitante.
+
+**Com qual finalidade.** Procurar a empresa uma vez, com uma oferta do nosso serviço, e explicar o que encontramos no site dela. É um contato comercial e dizemos isso na própria mensagem.
+
+**Para quais países.** Guardamos endereços para essa finalidade somente de empresas que verificamos, a partir de duas fontes independentes, que atuam nos Estados Unidos. **Não guardamos endereços para essa finalidade de empresas em Israel, no Espaço Econômico Europeu ou no Reino Unido**, e uma empresa cujo país não conseguimos verificar nunca entra na lista.
+
+**Quantas mensagens.** Duas no máximo: uma mensagem e, se não vier resposta, um acompanhamento uma semana depois. Depois disso a empresa sai da lista mesmo sem ter pedido.
+
+**Como interromper.** Cada mensagem traz um link de descadastro que funciona com um único clique, sem login e sem explicações. Ele é atendido imediatamente e de forma permanente. Para que a remoção se mantenha, o endereço é guardado em uma lista de exclusão **com a única finalidade de garantir que não entraremos em contato com você de novo**, não é usado para mais nada, e vale para todos os nossos canais, não só para aquele em que você pediu. Uma resposta pedindo para não escrevermos mais é tratada do mesmo modo.
+
+**Se você está na Califórnia.** O endereço de um contato de empresa é informação pessoal conforme a lei de privacidade da Califórnia, portanto você tem o direito de saber o que guardamos sobre você, de receber uma cópia, de solicitar a exclusão, de corrigir informação incorreta e de não ser discriminado por exercer um direito. **Não vendemos essa informação e não a compartilhamos para publicidade comportamental entre contextos.** Como não coletamos a informação de você diretamente, esta seção é o aviso de coleta, e um link para ela aparece em cada mensagem que enviamos. Os pedidos vão para o endereço indicado em «Contato de privacidade e representantes», e respondemos por escrito.
+
+Os mesmos pedidos — acesso, exclusão e correção — são atendidos também para quem não está na Califórnia, no mesmo endereço e do mesmo modo. O controlador é a GO TOP MARKETING GRUO LTD, empresa 517274346, em Israel.
+
 ## Direitos de residentes dos Estados Unidos
 
 Se você reside na Califórnia, ou em outro estado que aprovou uma lei estadual de privacidade, tem o direito de saber quais categorias de dados foram coletadas sobre você, de obter uma cópia, de pedir a exclusão, de corrigir dados inexatos e de não sofrer discriminação por exercer um direito.
@@ -401,4 +419,4 @@ Se você tiver dúvidas sobre esta política de privacidade, fale com a gente:
 
 **Telefone:** [054-9489377](tel:0549489377)
 
-Esta política foi atualizada pela última vez em 9 de outubro de 2026
+Esta política foi atualizada pela última vez em 10 de outubro de 2026

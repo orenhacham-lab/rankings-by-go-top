@@ -3,7 +3,7 @@ title: Política de privacidad | Go Top SEO
 description: Política de privacidad de Go Top SEO: cómo recopilamos, utilizamos y protegemos sus datos.
 locale: es
 source: app/(public)/en/privacy/page.tsx
-lastUpdated: 2026-10-09
+lastUpdated: 2026-10-10
 register: usted
 ---
 
@@ -344,6 +344,24 @@ Respondemos en un plazo de 30 días. No le cobraremos ni degradaremos su servici
 
 **Derecho a presentar una reclamación:** si no está satisfecho con nuestra respuesta, puede presentar una reclamación ante la autoridad de control de su país de residencia, o ante la Autoridad de Protección de la Privacidad de Israel ([Privacy Protection Authority](https://www.gov.il/en/departments/the_privacy_protection_authority)). Contactarnos primero no es una condición para presentar una reclamación, aunque agradeceríamos la oportunidad de corregirlo.
 
+## Contacto comercial por correo electrónico
+
+Esta sección trata de alguien que ha recibido un correo nuestro y no es cliente nuestro. Si es su caso, usted no nos facilitó nada y no se registró en nada: obtuvimos la dirección de su empresa de fuentes públicas, y aquí decimos exactamente de cuáles, qué conservamos y cómo darse de baja con un solo clic.
+
+**Qué recogemos y de dónde.** El nombre de la empresa, la dirección de su sitio web, una dirección de correo de contacto que aparece en el propio sitio de la empresa o en un registro público de empresas, el país en el que opera la empresa, y un solo hallazgo de una comprobación automática de las páginas públicas del sitio, con la fecha en que se comprobó. **No compramos listas de direcciones y no usamos intermediarios de datos.** No recogemos números de teléfono, no recogemos datos sobre una persona privada y no entramos en ninguna parte de un sitio que no esté abierta a cualquier visitante.
+
+**Con qué finalidad.** Dirigirnos a la empresa una vez, con una oferta de nuestro servicio, y explicar qué encontramos en su sitio. Es un contacto comercial y lo decimos en el propio mensaje.
+
+**Para qué países.** Conservamos direcciones con esta finalidad solo de empresas que hemos verificado, a partir de dos fuentes independientes, que operan en los Estados Unidos. **No conservamos direcciones con esta finalidad de empresas en Israel, en el Espacio Económico Europeo ni en el Reino Unido**, y una empresa cuyo país no hayamos podido verificar nunca entra en la lista.
+
+**Cuántos mensajes.** Dos como máximo: un mensaje y, si no llega respuesta, un seguimiento una semana después. Después de eso la empresa sale de la lista aunque no lo haya pedido.
+
+**Cómo detenerlo.** Cada mensaje lleva un enlace de baja que funciona con un solo clic, sin iniciar sesión y sin dar explicaciones. Se atiende de inmediato y de forma permanente. Para que la baja se mantenga, la dirección se conserva en una lista de exclusión **con la única finalidad de asegurarnos de no volver a contactarle**, no se usa para nada más, y se aplica a todos nuestros canales, no solo a aquel en el que usted lo pidió. Una respuesta que pida no volver a escribir se trata igual.
+
+**Si usted está en California.** La dirección de un contacto de empresa es información personal conforme a la ley de privacidad de California, por lo que usted tiene derecho a saber qué conservamos sobre usted, a recibir una copia, a solicitar la supresión, a corregir información inexacta y a no ser discriminado por ejercer un derecho. **No vendemos esta información y no la compartimos para publicidad conductual entre contextos.** Como no recogimos la información de usted directamente, esta sección es el aviso de recogida, y un enlace a ella aparece en cada mensaje que enviamos. Las solicitudes se dirigen a la dirección indicada en «Contacto en materia de privacidad y representantes», y respondemos por escrito.
+
+Las mismas solicitudes —acceso, supresión y rectificación— se atienden también para quienes no están en California, en la misma dirección y del mismo modo. El responsable es GO TOP MARKETING GRUO LTD, n.º de empresa 517274346, en Israel.
+
 ## Derechos de los residentes de Estados Unidos
 
 Si usted es residente de California, o de otro estado que haya promulgado una ley estatal de privacidad, tiene derecho a saber qué categorías de datos se recopilaron sobre usted, a obtener una copia, a solicitar la eliminación, a corregir datos inexactos y a no ser discriminado por ejercer un derecho.
@@ -382,4 +400,4 @@ Si tiene preguntas sobre esta política de privacidad, contacte con:
 
 **Teléfono:** 054-9489377
 
-Esta política se actualizó por última vez el 9 de octubre de 2026
+Esta política se actualizó por última vez el 10 de octubre de 2026
