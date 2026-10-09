@@ -7,7 +7,7 @@
  * route, no way to publish. `articles` had no language column, so there was
  * nothing to separate one blog from another even if the routes had existed.
  *
- * AFTER: `articles.locale` (migration 20261009180000) files each row under one
+ * AFTER: `articles.locale` (migration 20261009180750) files each row under one
  * language, each locale has the same four route files, and both pages filter by
  * their own locale. The sitemap and llms.txt put an article under the tree of
  * its language instead of always under the Hebrew one.
@@ -21,7 +21,7 @@
  *
  *   npx tsx lib/articles/__qa__/public-blog-locales.qa.ts
  */
-import { readFileSync, existsSync } from 'fs'
+import { readFileSync, readdirSync, existsSync } from 'fs'
 import { join } from 'path'
 import { PUBLIC_LOCALES, LOCALE_PREFIX, type PublicLocale } from '@/lib/i18n/locales'
 import { ARTICLES_COPY, articleHref, articlesIndexHref } from '@/lib/articles/i18n'
@@ -109,7 +109,7 @@ function main() {
   check('E3. the sitemap still reads the locale column', /select\('slug, published_at, locale'\)/.test(sitemapSrc))
 
   console.log('\nF. the database agrees with the code about the list of languages')
-  const migration = read('supabase/migrations/20261009180000_articles_locale.sql')
+  const migration = read('supabase/migrations/20261009180750_articles_locale.sql')
   const checkList = migration.match(/CHECK \(locale IN \(([^)]*)\)\)/)
   const inCheck = (checkList?.[1] || '').split(',').map((v) => v.trim().replace(/^'|'$/g, ''))
   // MUTATION: add a language to PUBLIC_LOCALES without touching the migration
@@ -120,6 +120,21 @@ function main() {
   check('F2. the column is additive: NOT NULL with a Hebrew default',
     /ADD COLUMN IF NOT EXISTS locale text NOT NULL DEFAULT 'he'/.test(migration))
   check('F3. the listing query has an index', /CREATE INDEX IF NOT EXISTS articles_locale_published_idx/.test(migration))
+
+  // A version Supabase has already recorded is never applied again, and it
+  // reports no error for the file it skipped. This one was first committed as
+  // 20261009180000, which production had already recorded for
+  // email_suppressions, so the column existed in production (it was applied by
+  // hand) while every fresh environment — a preview branch, a local stack, a
+  // restore — would have skipped the file in silence and served a blog whose
+  // locale column did not exist.
+  // MUTATION: give any second migration the same version prefix and this fails.
+  const migrationVersions = readdirSync(join(ROOT, 'supabase/migrations'))
+    .filter((f) => /^\d{14}_.*\.sql$/.test(f))
+    .map((f) => f.slice(0, 14))
+  const duplicated = migrationVersions.filter((v, i) => migrationVersions.indexOf(v) !== i)
+  check('F4. no two migrations in the repo share a version', duplicated.length === 0,
+    `duplicated: ${[...new Set(duplicated)].join(', ')}`)
 
   console.log('\nG. the FAQ block becomes schema in every language')
   for (const locale of PUBLIC_LOCALES) {

@@ -12,7 +12,7 @@
  * differ by live here, one entry per `PublicLocale`, so a new language is a new
  * entry and the compiler asks for it.
  *
- * `articles.locale` (migration 20261009180000) is what ties a row to an entry:
+ * `articles.locale` (migration 20261009180750) is what ties a row to an entry:
  * each locale's blog lists only rows written in that language.
  */
 import type { PublicLocale } from '@/lib/i18n/locales'
