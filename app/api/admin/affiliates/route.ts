@@ -103,7 +103,15 @@ export async function POST(request: Request) {
           rate: num(body.rate) ?? 0,
         })
       case 'create_payout':
-        return createPayout(admin, { affiliateId, currency: str(body.currency), createdBy: gate.userId, note: str(body.note) || undefined })
+        return createPayout(admin, {
+          affiliateId,
+          currency: str(body.currency),
+          createdBy: gate.userId,
+          note: str(body.note) || undefined,
+          // The published minimum is refused by default; an operator chooses to
+          // pay under it, which is a real case when a partner leaves.
+          allowBelowMinimum: body.allowBelowMinimum === true,
+        })
       case 'mark_payout_paid':
         return markPayoutPaid(admin, { payoutId: str(body.payoutId), reference: str(body.reference) })
       case 'cancel_payout':

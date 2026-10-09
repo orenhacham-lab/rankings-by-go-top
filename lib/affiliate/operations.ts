@@ -24,6 +24,8 @@
  */
 import { normalizeReferralCode } from './referral'
 import { recordManualCommission, type CommissionCurrency } from './commissions'
+import { AFFILIATE_TERMS } from './terms'
+import { payable as meetsMinimum } from './rates'
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type Admin = any
@@ -278,11 +280,18 @@ export async function addManualCommission(
  */
 export async function createPayout(
   admin: Admin,
-  { affiliateId, currency, createdBy, note, now = new Date() }: {
+  { affiliateId, currency, createdBy, note, allowBelowMinimum = false, now = new Date() }: {
     affiliateId: string
     currency: string
     createdBy: string
     note?: string
+    /**
+     * Pay a balance under the published minimum anyway. The agreement says a
+     * balance below the minimum CARRIES OVER, so this is refused by default and
+     * an operator has to choose it — which they legitimately do when a partner
+     * leaves the program and there is nothing left to carry over into.
+     */
+    allowBelowMinimum?: boolean
     now?: Date
   },
 ): Promise<OperationOutcome> {
@@ -299,6 +308,13 @@ export async function createPayout(
   if (!rows.length) return { kind: 'conflict', reason: 'nothing_approved' }
 
   const amount = Math.round(rows.reduce((sum, row) => sum + Number(row.amount ?? 0), 0) * 100) / 100
+  // The published minimum, in four languages: below it the balance carries over
+  // to the next payment rather than being paid. Refused here rather than left to
+  // an operator to remember, because a statement under the minimum is a payment
+  // the agreement says we do not make.
+  if (!allowBelowMinimum && !meetsMinimum(amount, currency, AFFILIATE_TERMS)) {
+    return { kind: 'conflict', reason: 'below_minimum' }
+  }
   const days = rows.map((row) => row.earned_at).sort()
   const payout = await admin
     .from('affiliate_payouts')

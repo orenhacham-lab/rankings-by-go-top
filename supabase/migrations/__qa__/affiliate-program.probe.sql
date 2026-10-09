@@ -1,5 +1,5 @@
 -- ============================================================================
--- EXECUTED PROBE — 20261009180000_affiliate_program.sql
+-- EXECUTED PROBE — 20261009190000_affiliate_program.sql
 --
 -- Applies the migration file itself (via \i, twice, for idempotency) to a
 -- disposable PostgreSQL cluster carrying Supabase's roles and the default
@@ -52,9 +52,9 @@ INSERT INTO public.profiles (id, role) VALUES
   ('33333333-3333-3333-3333-333333333333', 'admin'),
   ('44444444-4444-4444-4444-444444444444', 'user');
 
-\i supabase/migrations/20261009180000_affiliate_program.sql
+\i supabase/migrations/20261009190000_affiliate_program.sql
 -- Idempotency: applying twice must not error.
-\i supabase/migrations/20261009180000_affiliate_program.sql
+\i supabase/migrations/20261009190000_affiliate_program.sql
 
 SET ROLE service_role;
 INSERT INTO public.affiliates (id, code, user_id, status, name, email, website, applied_at, applied_ip, decided_at, decided_by) VALUES
@@ -159,6 +159,29 @@ BEGIN
   r := try_as('service_role', NULL, $q$ WITH u AS (UPDATE public.affiliates SET applied_ip = '10.0.0.1' WHERE id = 'a0000000-0000-0000-0000-000000000001' RETURNING 1) SELECT count(*)::text FROM u $q$);
   PERFORM chk(ph, 'the server rewrites where an application came from -> ' || r, (r = 'denied:42501') <> broken);
 
+  -- RETENTION. An applicant's address may be FORGOTTEN and nothing else. The
+  -- guard's condition is "a new value that is not NULL", so clearing it is the
+  -- only write that passes: rewriting it and restoring it are the same refusal.
+  r := try_as('service_role', NULL, $q$ WITH u AS (UPDATE public.affiliates SET applied_ip = NULL WHERE id = 'a0000000-0000-0000-0000-000000000002' RETURNING 1) SELECT count(*)::text FROM u $q$);
+  PERFORM chk(ph, 'the server forgets an applicant''s address -> ' || r, r = 'ok:1');
+  r := try_as('service_role', NULL, $q$ WITH u AS (UPDATE public.affiliates SET applied_ip = '10.0.0.2' WHERE id = 'a0000000-0000-0000-0000-000000000002' RETURNING 1) SELECT count(*)::text FROM u $q$);
+  PERFORM chk(ph, 'the server writes any other address over it -> ' || r, (r = 'denied:42501') <> broken);
+
+  -- DELETE lives on the applications table alone, and only so a refused
+  -- application can be purged a year later. The books are never deleted from,
+  -- by anybody: a commission, a referral and a payout are what a partner is
+  -- owed and what we paid.
+  r := try_as('service_role', NULL, $q$ WITH d AS (DELETE FROM public.affiliates WHERE id = 'a0000000-0000-0000-0000-000000000002' RETURNING 1) SELECT count(*)::text FROM d $q$);
+  PERFORM chk(ph, 'the server purges an application -> ' || r, r = 'ok:1');
+  r := try_as('service_role', NULL, $q$ WITH d AS (DELETE FROM public.affiliate_commissions WHERE id = 'c0000000-0000-0000-0000-000000000001' RETURNING 1) SELECT count(*)::text FROM d $q$);
+  PERFORM chk(ph, 'the server deletes a commission -> ' || r, (r LIKE 'denied:%') <> broken);
+  r := try_as('service_role', NULL, $q$ WITH d AS (DELETE FROM public.affiliate_referrals WHERE id = 'b0000000-0000-0000-0000-000000000001' RETURNING 1) SELECT count(*)::text FROM d $q$);
+  PERFORM chk(ph, 'the server deletes a referral -> ' || r, (r LIKE 'denied:%') <> broken);
+  r := try_as('service_role', NULL, $q$ WITH d AS (DELETE FROM public.affiliate_payouts WHERE id = 'd0000000-0000-0000-0000-000000000001' RETURNING 1) SELECT count(*)::text FROM d $q$);
+  PERFORM chk(ph, 'the server deletes a payout statement -> ' || r, (r LIKE 'denied:%') <> broken);
+  r := try_as('authenticated', P, $q$ WITH d AS (DELETE FROM public.affiliates RETURNING 1) SELECT count(*)::text FROM d $q$);
+  PERFORM chk(ph, 'a partner deletes applications -> ' || r, (r LIKE 'denied:%') <> broken);
+
   -- What the server IS allowed to do: decide, release, pay.
   r := try_as('service_role', NULL, $q$ WITH u AS (UPDATE public.affiliate_commissions SET status = 'approved', approved_at = now() WHERE id = 'c0000000-0000-0000-0000-000000000001' RETURNING 1) SELECT count(*)::text FROM u $q$);
   PERFORM chk(ph, 'the server approves a commission -> ' || r, r = 'ok:1');
@@ -186,7 +209,7 @@ SELECT run_checks('mutated');
 -- The migration again, over the broken state. The permissive policies above are
 -- deliberately LEFT IN PLACE: every check that passes now proves the revoked
 -- grants alone keep a partner out.
-\i supabase/migrations/20261009180000_affiliate_program.sql
+\i supabase/migrations/20261009190000_affiliate_program.sql
 SELECT run_checks('restored');
 
 -- ── The program's rules, as constraints ─────────────────────────────────────

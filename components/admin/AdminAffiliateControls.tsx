@@ -19,6 +19,7 @@ import { useRouter } from 'next/navigation'
 import Button from '@/components/ui/Button'
 import Input from '@/components/ui/Input'
 import Select from '@/components/ui/Select'
+import Checkbox from '@/components/ui/Checkbox'
 
 const REASONS: Record<string, string> = {
   code_shape: 'הקוד יכול להכיל אותיות אנגליות קטנות, ספרות, מקף וקו תחתון בלבד.',
@@ -26,6 +27,7 @@ const REASONS: Record<string, string> = {
   already_decided: 'הבקשה הזו כבר טופלה. רעננו את העמוד.',
   still_held: 'העמלה עדיין בתוך תקופת ההחזקה. אפשר לאשר אותה אחרי שהיא משתחררת.',
   nothing_approved: 'אין עמלות מאושרות שממתינות לתשלום במטבע הזה.',
+  below_minimum: 'היתרה מתחת לרף התשלום, ולפי ההסכם היא נגררת לתשלום הבא. סמנו "לשלם מתחת לרף" כדי לשלם בכל זאת.',
   already_paid: 'התשלום הזה כבר סומן כשולם.',
   already_reversed: 'העמלה הזו כבר בוטלה.',
   reason_required: 'צריך לכתוב סיבה.',
@@ -231,16 +233,25 @@ export function ManualCommissionControl({ affiliateId, referralId, defaultRate }
 export function CreatePayoutControl({ affiliateId }: { affiliateId: string }) {
   const { call, busy, message } = useAction()
   const [currency, setCurrency] = useState('ILS')
+  // Below the published minimum the balance carries over, so paying under it is
+  // a deliberate choice an operator makes — usually when a partner is leaving.
+  const [allowBelowMinimum, setAllowBelowMinimum] = useState(false)
   return (
     <div className="space-y-2">
       <div className="flex flex-wrap items-end gap-2">
         <div className="w-28">
           <Select label="מטבע" value={currency} onChange={(event) => setCurrency(event.target.value)} options={[{ value: 'ILS', label: 'ILS' }, { value: 'USD', label: 'USD' }]} />
         </div>
-        <Button size="sm" variant="secondary" loading={busy} onClick={() => call({ action: 'create_payout', affiliateId, currency })}>
+        <Button size="sm" variant="secondary" loading={busy} onClick={() => call({ action: 'create_payout', affiliateId, currency, allowBelowMinimum })}>
           הכנת דוח תשלום
         </Button>
       </div>
+      <Checkbox
+        checked={allowBelowMinimum}
+        onChange={(next) => setAllowBelowMinimum(next)}
+        label="לשלם מתחת לרף התשלום"
+        description="לפי ההסכם יתרה מתחת לרף נגררת לתשלום הבא. סמנו רק כשיש סיבה, למשל שותף שמסיים."
+      />
       <Message text={message} />
     </div>
   )

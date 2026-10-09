@@ -4,7 +4,7 @@
  * Every surface reads them from here: the public page in four languages
  * (lib/i18n/public/affiliates.ts), the partner's own dashboard, the commission
  * engine (lib/affiliate/commissions.ts) and the defaults of the `affiliates`
- * table (20261009180000_affiliate_program.sql). They are the published offer, so
+ * table (20261009190000_affiliate_program.sql). They are the published offer, so
  * two places holding two values would mean a page promising a rate the engine
  * does not pay.
  *

@@ -273,7 +273,7 @@ export class FakeAdmin {
      */
     /**
      * `affiliate_count_click`, mirroring the INSERT ... ON CONFLICT DO UPDATE in
-     * 20261009180000_affiliate_program.sql. It proves the CONTRACT the click
+     * 20261009190000_affiliate_program.sql. It proves the CONTRACT the click
      * route depends on: one row per (partner, day), the count rising, and NOTHING
      * about the visitor recorded. Atomicity under real concurrent backends comes
      * from the single ON CONFLICT statement in the SQL, not from this fake.

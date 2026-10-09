@@ -73,6 +73,17 @@
 -- referred. A SELECT policy on affiliate_referrals would hand them
 -- referred_user_id, which is exactly the promise we would be breaking.
 --
+-- VERSION. 20261009180000 is already registered in production as
+-- email_suppressions, and a registered version is never run again, so this file
+-- carries 190000. A clash would have created nothing and raised nothing.
+--
+-- RETENTION. applied_ip exists to recognise a flood of applications at the
+-- moment they are made, so it is kept for a year and then forgotten:
+-- lib/affiliate/retention.ts clears it and deletes a rejected application
+-- outright, run daily by /api/affiliate/retention/cron. The guard below lets
+-- applied_ip be cleared to NULL and nothing else, so forgetting is possible and
+-- rewriting is not, and service_role holds DELETE on this table alone.
+--
 -- Additive: five new tables and two functions. Nothing existing changes.
 -- Idempotent: every statement can be re-run.
 -- Rollback (reverse order — the later tables reference the earlier):
@@ -312,9 +323,14 @@ CREATE OR REPLACE FUNCTION public.affiliates_guard() RETURNS trigger
 LANGUAGE plpgsql SET search_path TO 'public' AS $$
 BEGIN
   IF NEW.applied_at IS DISTINCT FROM OLD.applied_at
-     OR NEW.applied_ip IS DISTINCT FROM OLD.applied_ip
      OR NEW.created_at IS DISTINCT FROM OLD.created_at THEN
     RAISE EXCEPTION 'affiliates: the application''s own record never changes' USING ERRCODE = '42501';
+  END IF;
+  -- The applicant's IP may be FORGOTTEN (set to NULL) and nothing else. That is
+  -- what retention needs and all it needs: a changed IP would be a rewritten
+  -- record, and a restored one would be a year-old address coming back.
+  IF NEW.applied_ip IS DISTINCT FROM OLD.applied_ip AND NEW.applied_ip IS NOT NULL THEN
+    RAISE EXCEPTION 'affiliates: an applicant''s IP may be cleared, never changed' USING ERRCODE = '42501';
   END IF;
   -- A code is a published link. Once a partner has posted it, re-pointing it at
   -- someone else would credit their audience to another partner.
@@ -346,7 +362,10 @@ REVOKE ALL ON TABLE public.affiliate_referrals   FROM PUBLIC, anon, authenticate
 REVOKE ALL ON TABLE public.affiliate_commissions FROM PUBLIC, anon, authenticated, service_role;
 REVOKE ALL ON TABLE public.affiliate_payouts     FROM PUBLIC, anon, authenticated, service_role;
 
-GRANT SELECT, INSERT, UPDATE ON TABLE public.affiliates            TO service_role;
+-- DELETE on this table alone, and only so a rejected application can be purged
+-- a year later (lib/affiliate/retention.ts). No other affiliate table may be
+-- deleted from: a commission, a referral and a payout are the books.
+GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE public.affiliates TO service_role;
 GRANT SELECT, INSERT, UPDATE ON TABLE public.affiliate_click_days  TO service_role;
 GRANT SELECT, INSERT, UPDATE ON TABLE public.affiliate_referrals   TO service_role;
 GRANT SELECT, INSERT, UPDATE ON TABLE public.affiliate_commissions TO service_role;

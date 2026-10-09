@@ -13,7 +13,7 @@
  *
  * Every guard has a MUTATION CONTROL.
  */
-import { readFileSync, existsSync } from 'fs'
+import { readFileSync, existsSync, readdirSync } from 'fs'
 import { join } from 'path'
 import { PUBLIC_LOCALES } from '../../i18n/locales'
 import { AFFILIATE_FORM_COPY } from '../../i18n/public/affiliate-form'
@@ -134,7 +134,7 @@ async function main() {
 
   console.log('\nC) the click counter keeps nothing')
   {
-    const sql = stripSql(read('supabase/migrations/20261009180000_affiliate_program.sql'))
+    const sql = stripSql(read('supabase/migrations/20261009190000_affiliate_program.sql'))
     const table = tableSql(sql, 'affiliate_click_days')
     // Not "we do not show it": the columns do not exist, so there is nothing to
     // leak, subpoena or have to disclose.
@@ -182,7 +182,7 @@ async function main() {
 
   console.log('\nE) the numbers on the screen are the numbers in the table')
   {
-    const sql = strip(read('supabase/migrations/20261009180000_affiliate_program.sql'))
+    const sql = strip(read('supabase/migrations/20261009190000_affiliate_program.sql'))
     check('E1: the table’s defaults are the published rates',
       new RegExp(`base_rate\\s+numeric[^\\n]*DEFAULT ${AFFILIATE_TERMS.baseRate}`).test(sql)
       && new RegExp(`top_rate\\s+numeric[^\\n]*DEFAULT ${AFFILIATE_TERMS.topRate}`).test(sql)
@@ -202,6 +202,31 @@ async function main() {
       && shape.test(suggestCode({}))
       && suggestCode({ website: 'https://www.dana-digital.co.il' }) === 'danadigital',
       [suggestCode({ name: '\u05d3\u05e0\u05d4' }), suggestCode({ website: 'https://www.dana-digital.co.il' })].join(' '))
+    // A VERSION ALREADY REGISTERED IS NEVER RUN AGAIN, and Supabase says nothing
+    // when it skips one: the first version of this file carried 20261009180000,
+    // which production already holds as email_suppressions, and the five tables
+    // would simply not have been created. No two migrations may share a version.
+    check('E4: no two migrations in the repo share a version', (() => {
+      const versions = readdirSync(join(ROOT, 'supabase/migrations'))
+        .filter((f) => /^\d{14}_.+\.sql$/.test(f))
+        .map((f) => f.slice(0, 14))
+      const seen = new Set<string>()
+      const dupes = versions.filter((v) => (seen.has(v) ? true : (seen.add(v), false)))
+      return dupes.length === 0
+    })())
+    check('E5: this migration\u2019s version is not one production already holds', (() => {
+      // The versions registered in production on 2026-10-09, read with the
+      // Supabase tooling rather than remembered. A file carrying one of these
+      // would be skipped in silence.
+      const REGISTERED = ['20261009180000', '20261009180750', '20261006093836', '20261005212508']
+      return !REGISTERED.includes('20261009190000')
+        && existsSync(join(ROOT, 'supabase/migrations/20261009190000_affiliate_program.sql'))
+    })())
+    check('E4-MUT: a duplicated version is caught', (() => {
+      const versions = ['20261009180000', '20261009180000', '20261009190000']
+      const seen = new Set<string>()
+      return versions.filter((v) => (seen.has(v) ? true : (seen.add(v), false))).length === 1
+    })())
     check('E1-MUT: a default drifting from the published rate is caught',
       !new RegExp(`base_rate\\s+numeric[^\\n]*DEFAULT ${AFFILIATE_TERMS.baseRate + 1}`).test(sql))
   }

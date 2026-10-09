@@ -53,7 +53,7 @@ console.log('A) the code')
   check('A6: a non-string is refused', [null, undefined, 42, {}, ['oren']].every((v) => normalizeReferralCode(v) === null))
   // The shape is also a CHECK constraint on affiliates.code; a code this function
   // accepts must be one the database can hold.
-  const sql = read('supabase/migrations/20261009180000_affiliate_program.sql')
+  const sql = read('supabase/migrations/20261009190000_affiliate_program.sql')
   check('A7: the shape here is the shape the database enforces',
     sql.includes("code ~ '^[a-z0-9][a-z0-9_-]{0,31}$'") && REFERRAL_CODE_MAX === 32)
 }
