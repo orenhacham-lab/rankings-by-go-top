@@ -243,6 +243,43 @@ console.log('G) who can be paid: the invoicing rule is not Israel-only')
       const text = `${r.title} ${r.body}`
       return text.includes(ISRAEL[l]) && !text.includes(OUTSIDE[l])
     })).join(', '))
+  /**
+   * The commission is stated gross, and clause 13 has us withhold tax at source
+   * from an Israeli partner unless they hold a valid exemption certificate and a
+   * certificate of proper bookkeeping. The difference between the 30% on the page
+   * and the money that arrives is the most consequential thing on this card, so
+   * the condition is stated in every language — it depends on where the partner
+   * is, not on which page they read — and the card points at clause 13 rather
+   * than reciting it.
+   */
+  const WITHHOLDING: Record<(typeof LANGS)[number], RegExp> = {
+    he: /מנכים מס/,
+    en: /withhold tax/i,
+    es: /retenemos impuesto/i,
+    'pt-BR': /retemos imposto/i,
+  }
+  const CLAUSE: Record<(typeof LANGS)[number], RegExp> = {
+    he: /סעיף 13/,
+    en: /Clause 13/i,
+    es: /cláusula 13/i,
+    'pt-BR': /cláusula 13/i,
+  }
+  check('G4: every language says we withhold tax at source, and on what condition',
+    LANGS.every((l) => paperworkCards(l).some((r) => WITHHOLDING[l].test(r.body))),
+    LANGS.filter((l) => !paperworkCards(l).some((r) => WITHHOLDING[l].test(r.body))).join(', '))
+  check('G5: the card points at the agreement’s clause 13 instead of reciting it',
+    LANGS.every((l) => paperworkCards(l).some((r) => CLAUSE[l].test(r.body))))
+  /* G4-MUT: the card as it read before the withholding condition was added —
+     G4 must fail on it, in every language. */
+  check('G4-MUT: a card that states the commission without the deduction is caught', LANGS.every((l) => {
+    const previous = {
+      he: 'שותף ישראלי מוציא לנו חשבונית. שותף מחוץ לישראל מתחשבן לפי הכללים של המדינה שלו.',
+      en: 'Israeli affiliates invoice us. Outside Israel, invoicing follows the rules of your own country.',
+      es: 'Los afiliados en Israel nos emiten factura. Fuera de Israel, la factura sigue las reglas de tu país.',
+      'pt-BR': 'Afiliados em Israel emitem nota fiscal para nós. Fora de Israel, a nota fiscal segue a regra do seu país.',
+    }[l]
+    return !WITHHOLDING[l].test(previous)
+  }))
   // The premise of the rule: the form expects applicants from anywhere, so it
   // asks the country rather than assuming one.
   check('G3: the application form asks the applicant’s country',
