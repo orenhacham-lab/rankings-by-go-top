@@ -4,4 +4,4 @@
  * substance and this version changes too, so the membership row says which
  * text each owner agreed to. The join route accepts only the current version.
  */
-export const LINK_NETWORK_CONSENT_VERSION = 'link-network-2026-09'
+export const LINK_NETWORK_CONSENT_VERSION = 'link-network-2026-10'
