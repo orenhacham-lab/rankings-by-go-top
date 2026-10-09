@@ -24,9 +24,15 @@
  * the application password is used when the project still has one; otherwise the update fails
  * with a code, and no second post is ever created for the article.
  *
- * ONE POST PER ARTICLE. The plugin keeps one post per GO TOP article, so the publish route's
- * legacy `force` (a NEW separate post) updates that post when the plugin made it; and a retry after
- * a crash before wp_post_id was saved updates the same post instead of creating a duplicate.
+ * ONE POST PER ARTICLE. The plugin keeps one post per GO TOP article, so a retry after a crash
+ * before wp_post_id was saved updates the same post instead of creating a duplicate. The plugin
+ * therefore cannot do what the application password can do in two cases, and NEVER quietly does
+ * something else instead (publishArticleToWordPress):
+ *   forceNew   a NEW separate post for an article already sent (the route's legacy `force`)
+ *   a status   other than publish / draft (the plugin never schedules)
+ * Both use the application password when the project still has one; plugin-only, they fail with a
+ * typed code (`unsupported`: plugin_new_post_unsupported / plugin_schedule_unsupported) that the UI
+ * words in every language, and nothing is written.
  *
  * The service role bypasses RLS: the plugin link is read by project AND its owner, and a caller
  * that knows the signed-in user passes it so a mismatch reads as "no plugin".
@@ -275,6 +281,24 @@ export async function pluginCreatePost(
   }
 }
 
+export type PluginUnsupported = 'plugin_new_post_unsupported' | 'plugin_schedule_unsupported'
+
+export interface PublishOptions {
+  status: WordPressPostStatus
+  blockOnImageFailure?: boolean
+  existing?: { postId: number; featuredMediaId?: number | null }
+  /** A NEW separate post although the article was sent before (the route's `force`). */
+  forceNew?: boolean
+}
+
+/** What the request needs that the plugin cannot do (one post per article; publish or draft only). */
+export function pluginUnsupported(opts: PublishOptions): PluginUnsupported | null {
+  if (opts.forceNew) return 'plugin_new_post_unsupported'
+  const status: string = opts.status
+  if (status !== 'publish' && status !== 'draft') return 'plugin_schedule_unsupported'
+  return null
+}
+
 /**
  * The one entry the publish route and the automation call: the plugin when the project
  * publishes through it, otherwise wpCreatePost exactly as before.
@@ -283,19 +307,30 @@ export async function publishArticleToWordPress(
   admin: Admin,
   publisher: WordPressPublisher,
   article: WpArticleForExport,
-  opts: { status: WordPressPostStatus; blockOnImageFailure?: boolean; existing?: { postId: number; featuredMediaId?: number | null } },
+  opts: PublishOptions,
   deps: PluginPublishDeps = {},
-): Promise<(WpCreateResult & { via: 'plugin' | 'app_password' }) | WpCreateError> {
+): Promise<(WpCreateResult & { via: 'plugin' | 'app_password' }) | (WpCreateError & { unsupported?: PluginUnsupported })> {
   const viaAppPassword = deps.appPassword ?? wpCreatePost
+  const { forceNew: _forceNew, ...wpOpts } = opts
+  void _forceNew
   if (publisher.via === 'app_password') {
-    const r = await viaAppPassword(admin, publisher.creds, article, opts)
+    const r = await viaAppPassword(admin, publisher.creds, article, wpOpts)
     return r.ok ? { ...r, via: 'app_password' } : r
   }
-  const r = await pluginCreatePost(admin, publisher.plugin, article, opts, deps)
+  // What only the application password can do: there, when the project has one; else a typed refusal.
+  const unsupported = pluginUnsupported(opts)
+  if (unsupported) {
+    if (publisher.creds) {
+      const r = await viaAppPassword(admin, publisher.creds, article, wpOpts)
+      return r.ok ? { ...r, via: 'app_password' } : r
+    }
+    return { ok: false, kind: 'post_failed', stage: 'post_creation', detail: unsupported, unsupported }
+  }
+  const r = await pluginCreatePost(admin, publisher.plugin, article, wpOpts, deps)
   if (r.ok) return { ...r, via: 'plugin' }
   // The post was made over the application password before: the plugin refused before writing.
   if (r.pluginCode === 'not_ours' && publisher.creds) {
-    const again = await viaAppPassword(admin, publisher.creds, article, opts)
+    const again = await viaAppPassword(admin, publisher.creds, article, wpOpts)
     return again.ok ? { ...again, via: 'app_password' } : again
   }
   const { pluginCode: _code, ...rest } = r

@@ -1201,6 +1201,7 @@ export const dashboardHe = {
       techDetails: 'פרטים טכניים',
       errorPrefix: 'שגיאה',
       failedHint: 'לא הצלחנו לסרוק את האתר. בדקו שהאתר זמין ונסו לרענן שוב.',
+      needsAppPassword: 'האתר מחובר דרך תוסף GO TOP SEO Bridge, שמפרסם מאמרים אבל לא מאפשר לסרוק את כל הפוסטים. כדי לסרוק את התוכן הקיים ולבנות קישורים פנימיים, חברו גם סיסמת אפליקציה של WordPress בהגדרות הפרויקט.',
       cUnique: 'יעדים',
       cEligible: 'כשירים',
       cAnchors: 'יעדים עם עוגנים',
@@ -1421,6 +1422,7 @@ export const dashboardHe = {
       markBlocked: 'יש חוסמים שצריך לתקן. פתחו את העורך.',
       errImage: 'הפרסום נכשל בגלל בעיה בתמונה הראשית. נסו ליצור תמונה מחדש או שלחו כטיוטה.',
       errNoConn: 'אין חיבור WordPress פעיל לפרויקט הזה.',
+      errPluginNewPost: 'המאמר כבר נשלח לאתר דרך תוסף GO TOP SEO Bridge, שמנהל פוסט אחד לכל מאמר. כדי ליצור פוסט חדש נוסף, חברו גם סיסמת אפליקציה בהגדרות הפרויקט, או עדכנו את הפוסט הקיים.',
       errGeneric: 'הפעולה מול WordPress נכשלה. נסו שוב.',
       seoNotVerified: 'הפוסט פורסם, אך נתוני ה-SEO (תיאור ומילת מפתח) לא אומתו. יש לבדוק בעורך ולהתקין את חיבור GO TOP SEO אם צריך.',
       seoBridgeRequired: 'הפוסט פורסם, אך כדי לשמור את נתוני ה-Yoast/Rank Math יש להתקין את תוסף GO TOP SEO באתר ולנסות שוב.',
@@ -2057,6 +2059,8 @@ export const dashboardHe = {
         wordpress_media_upload_failed: 'העלאת התמונה נכשלה. כדי לפרסם, נסו ליצור תמונה מחדש או שלחו כטיוטה.',
         wordpress_post_failed: 'יצירת הפוסט ב-WordPress נכשלה.',
         already_exported: 'המאמר כבר יוצא ל-WordPress.',
+        plugin_new_post_unsupported: 'המאמר כבר נשלח לאתר דרך תוסף GO TOP SEO Bridge, שמנהל פוסט אחד לכל מאמר. כדי ליצור פוסט חדש נוסף, חברו גם סיסמת אפליקציה בהגדרות הפרויקט, או עדכנו את הפוסט הקיים.',
+        plugin_schedule_unsupported: 'תוסף GO TOP SEO Bridge מפרסם מאמרים או שולח אותם כטיוטה, אבל לא מתזמן. כדי לתזמן, חברו גם סיסמת אפליקציה בהגדרות הפרויקט, או פרסמו עכשיו.',
         unknown: 'הפעולה מול WordPress נכשלה. נסו שוב.',
       },
       faqTitle: 'שאלות נפוצות',
@@ -3682,6 +3686,8 @@ export const dashboardHe = {
       platformAlreadyConnected: 'הפרויקט כבר משתמש בפלטפורמה אחרת. נתקו אותה תחילה כדי להחליף.',
       // K2 — connected-state explainer + link to the Content Hub (no duplicate hub here).
       connectedTitle: 'הפלטפורמה מחוברת. אפשר לפרסם מאמרים',
+      pluginOnlyTitle: 'WordPress מחובר דרך תוסף GO TOP SEO Bridge',
+      pluginOnlyBody: 'מאמרים מתפרסמים דרך התוסף (גרסה {version}), בלי סיסמת אפליקציה. כדי לסרוק גם את הפוסטים הקיימים ולבנות קישורים פנימיים, אפשר להוסיף סיסמת אפליקציה כאן למטה.',
       connectedBody: 'במסכי התוכן יוצרים נושאים, עוברים על רעיונות, מתזמנים פרסום ומפרסמים מאמרים.',
       goToContentHub: 'מעבר למאמרים',
       // Phase 4F.1 — Shopify connection panel.

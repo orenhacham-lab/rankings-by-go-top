@@ -299,7 +299,13 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     // post). `existing` → update the same post in place (idempotent re-export).
     stage = 'post_creation'
     logStage('wp_create_post_started')
-    const created = await publishArticleToWordPress(auth.admin, loaded, a as never, { status, existing })
+    // forceNew: a NEW post for an article already sent. The plugin keeps one post per article, so a
+    // plugin-only project gets a typed refusal (worded by the UI), never a silent update instead.
+    const created = await publishArticleToWordPress(auth.admin, loaded, a as never, { status, existing, forceNew: force && !!a.wp_post_id })
+    if (!created.ok && created.unsupported) {
+      console.warn('[content-wp-export] plugin cannot do this', { ...logBase, reason: created.unsupported })
+      return Response.json({ ok: false, error: created.unsupported, reason: created.unsupported, diagnosticId }, { status: 409 })
+    }
     if (!created.ok) {
       // Preserve the safe upstream signal (remote status / WP code / response
       // format / timeout) instead of flattening every failure to one code.

@@ -1198,6 +1198,7 @@ export const dashboardEn = {
       techDetails: 'Technical details',
       errorPrefix: 'Error',
       failedHint: "We couldn't scan the site. Check that it is reachable and refresh again.",
+      needsAppPassword: 'This site is connected through the GO TOP SEO Bridge plugin, which publishes articles but cannot list every post for a scan. To scan existing content and build internal links, also connect a WordPress application password in the project settings.',
       cUnique: 'targets',
       cEligible: 'eligible',
       cAnchors: 'targets with anchors',
@@ -1415,6 +1416,7 @@ export const dashboardEn = {
       markBlocked: 'There are blockers to fix. Open the editor.',
       errImage: 'Publishing failed due to a featured-image problem. Regenerate the image or send as a draft.',
       errNoConn: 'No active WordPress connection for this project.',
+      errPluginNewPost: 'This article was already sent through the GO TOP SEO Bridge plugin, which keeps one post per article. To create another new post, also connect an application password in the project settings, or update the existing post.',
       errGeneric: 'The WordPress action failed. Please try again.',
       seoNotVerified: 'The post was published, but the SEO data (description and focus keyword) could not be verified. Check it in the editor and install the GO TOP SEO bridge if needed.',
       seoBridgeRequired: 'The post was published, but saving the Yoast/Rank Math data requires installing the GO TOP SEO plugin on the site — then retry.',
@@ -2053,6 +2055,8 @@ export const dashboardEn = {
         wordpress_media_upload_failed: 'The image upload failed. To publish, regenerate the image or send as a draft.',
         wordpress_post_failed: 'Creating the WordPress post failed.',
         already_exported: 'This article was already exported to WordPress.',
+        plugin_new_post_unsupported: 'This article was already sent through the GO TOP SEO Bridge plugin, which keeps one post per article. To create another new post, also connect an application password in the project settings, or update the existing post.',
+        plugin_schedule_unsupported: 'The GO TOP SEO Bridge plugin publishes articles or sends them as drafts, but it does not schedule them. To schedule, also connect an application password in the project settings, or publish now.',
         unknown: 'The WordPress action failed. Please try again.',
       },
       faqTitle: 'FAQ',
@@ -3670,6 +3674,8 @@ export const dashboardEn = {
       platformAlreadyConnected: 'This project already uses another platform. Disconnect it first to switch.',
       // K2 — connected-state explainer + link to the Content Hub (no duplicate hub here).
       connectedTitle: 'Platform connected. Articles can be published',
+      pluginOnlyTitle: 'WordPress is connected through the GO TOP SEO Bridge plugin',
+      pluginOnlyBody: 'Articles publish through the plugin (version {version}), with no application password. To also scan your existing posts and build internal links, you can add an application password below.',
       connectedBody: 'The content screens are where you create topics, review ideas, schedule publishing and publish articles.',
       goToContentHub: 'Go to articles',
       // Phase 4F.1 — Shopify connection panel.
