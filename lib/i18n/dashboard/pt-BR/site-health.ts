@@ -417,7 +417,7 @@ export const siteHealthPtBR: DeepPartial<DashboardDictionary> = {
         value_invalid: 'Um dos valores está vazio, é longo demais ou tem caracteres que não gravamos em um site. Corrija e tente de novo.',
         off_site: 'Só é possível corrigir páginas e endereços do site deste projeto.',
         shopify_readonly: 'A conexão da sua loja não nos permite editar artigos e páginas, então nada mudou na sua loja. Conecte a loja de novo, ou corrija com as instruções.',
-        no_channel: 'Seu site não está conectado de um jeito que nos permita gravar nele. Você pode corrigir com as instruções.',
+        no_channel: 'Para corrigirmos por você, primeiro é preciso conectar o seu site. Até lá, você pode corrigir sozinho com as instruções.',
         needs_plugin: 'Esta correção precisa do plugin do Go Top. Instale-o em “Correções no seu site” ou corrija com as instruções.',
         plugin_not_connected: 'O plugin não está conectado no momento, então a correção foi marcada para atualização manual.',
         plugin_unreachable: 'Não conseguimos falar com o seu site agora. Tente de novo em instantes.',

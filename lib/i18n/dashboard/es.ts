@@ -4038,7 +4038,7 @@ export const dashboardEs: DeepPartial<DashboardDictionary> = {
         value_invalid: 'Uno de los valores está vacío, es demasiado largo o tiene caracteres que no escribimos en una web. Corrígelo y vuelve a intentarlo.',
         off_site: 'Solo se pueden arreglar páginas y direcciones de la web de este proyecto.',
         shopify_readonly: 'La conexión de tu tienda no nos permite editar artículos ni páginas, así que no hemos cambiado nada en tu tienda. Vuelve a conectar la tienda o arréglalo con las instrucciones.',
-        no_channel: 'Tu web no está conectada de una forma que nos permita escribir en ella. Puedes arreglarlo con las instrucciones.',
+        no_channel: 'Para arreglarlo por ti, primero hay que conectar tu web. Mientras tanto, puedes arreglarlo tú con las instrucciones.',
         needs_plugin: 'Este arreglo necesita el plugin de Go Top. Instálalo desde «Arreglos en tu web» o arréglalo con las instrucciones.',
         plugin_not_connected: 'El plugin no está conectado ahora mismo, así que el arreglo se ha marcado para actualización manual.',
         plugin_unreachable: 'No hemos podido contactar con tu web ahora mismo. Inténtalo de nuevo en un momento.',

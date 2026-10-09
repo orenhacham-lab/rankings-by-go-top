@@ -5030,7 +5030,7 @@ export const dashboardEn = {
         value_invalid: 'One of the values is empty, too long or has characters we do not write to a site. Correct it and try again.',
         off_site: 'Only pages and addresses on this project\'s site can be fixed.',
         shopify_readonly: 'Your store\'s connection does not let us edit articles and pages, so nothing in your store changed. Reconnect the store, or fix it with the instructions.',
-        no_channel: 'Your site is not connected in a way that lets us write to it. You can fix it with the instructions.',
+        no_channel: 'To fix this for you, we first need your site connected. Until then, you can fix it yourself with the instructions.',
         needs_plugin: 'This fix needs the Go Top plugin. Install it from "Fixes on your site", or fix it with the instructions.',
         plugin_not_connected: 'The plugin is not connected right now, so the fix was marked for manual update.',
         plugin_unreachable: 'We could not reach your site right now. Try again in a moment.',

@@ -30,7 +30,7 @@ import type {
   WordPressListOptions,
   SeoKeywordSource,
 } from './types'
-import { seoPluginFromNamespaces, seoMetaKeys, verifySeoMeta, verifySeoMetaPerField, hasSeoBridgeNamespace, type SeoPlugin, type SeoMetaStatus } from '@/lib/content/wordpress-taxonomy'
+import { seoPluginFromNamespaces, otherSeoPluginInNamespaces, seoMetaKeys, verifySeoMeta, verifySeoMetaPerField, hasSeoBridgeNamespace, type SeoPlugin, type SeoMetaStatus } from '@/lib/content/wordpress-taxonomy'
 
 const REQUEST_TIMEOUT_MS = 15_000
 const MAX_RESPONSE_BYTES = 2_000_000
@@ -520,7 +520,7 @@ export async function detectSeoPlugin(creds: WordPressCredentials): Promise<SeoP
  * (namespace gotop/v1) — from a single REST-root namespaces probe. The bridge is what makes
  * protected Yoast/Rank Math meta actually writable+verifiable when core REST cannot.
  */
-export async function detectSeoCapabilities(creds: WordPressCredentials): Promise<{ plugin: SeoPlugin; hasBridge: boolean }> {
+export async function detectSeoCapabilities(creds: WordPressCredentials): Promise<{ plugin: SeoPlugin; hasBridge: boolean; otherSeo?: boolean }> {
   try {
     const origin = await assertSafeSiteUrl(creds.siteUrl)
     const target = new URL(`${origin}/wp-json/?_fields=namespaces`)
@@ -529,7 +529,7 @@ export async function detectSeoCapabilities(creds: WordPressCredentials): Promis
     if (status < 200 || status >= 300) return { plugin: 'unknown', hasBridge: false }
     let parsed: { namespaces?: unknown }
     try { parsed = JSON.parse(body) } catch { return { plugin: 'unknown', hasBridge: false } }
-    return { plugin: seoPluginFromNamespaces(parsed?.namespaces), hasBridge: hasSeoBridgeNamespace(parsed?.namespaces) }
+    return { plugin: seoPluginFromNamespaces(parsed?.namespaces), hasBridge: hasSeoBridgeNamespace(parsed?.namespaces), otherSeo: otherSeoPluginInNamespaces(parsed?.namespaces) }
   } catch {
     return { plugin: 'unknown', hasBridge: false }
   }
@@ -605,10 +605,12 @@ export async function writeVerifiedSeoMeta(
 ): Promise<{ plugin: SeoPlugin; status: SeoMetaStatus; detail?: string }> {
   // ONE capability probe → plugin + whether the GO TOP SEO bridge is installed.
   const caps = knownPlugin && knownPlugin !== 'unknown'
-    ? { plugin: knownPlugin, hasBridge: false as boolean, probed: false }
+    ? { plugin: knownPlugin, hasBridge: false as boolean, otherSeo: false as boolean | undefined, probed: false }
     : { ...(await detectSeoCapabilities(creds)), probed: true }
   const plugin = caps.plugin
   if (plugin === 'permission_error') return { plugin, status: 'permission_error' }
+  // `other_seo_plugin`: All in One SEO or SEOPress prints the meta, so nobody may add a second one.
+  if (plugin === 'none' && caps.otherSeo) return { plugin, status: 'plugin_unavailable', detail: 'other_seo_plugin' }
   if (plugin === 'none' || plugin === 'unknown') return { plugin, status: 'plugin_unavailable' }
 
   const meta = seoMetaKeys(plugin, seo)

@@ -98,6 +98,16 @@ export function seoPluginFromNamespaces(namespaces: unknown): SeoPlugin {
   return 'none'
 }
 
+/**
+ * Another SEO plugin we do not write for (All in One SEO, SEOPress) is active: it prints its own
+ * meta description and title, so ours through the Go Top plugin would be a second one.
+ */
+export function otherSeoPluginInNamespaces(namespaces: unknown): boolean {
+  if (!Array.isArray(namespaces)) return false
+  const set = new Set(namespaces.map((n) => String(n).toLowerCase()))
+  return set.has('aioseo/v1') || set.has('seopress/v1')
+}
+
 /** The post-meta keys to write for a plugin (ONLY that plugin's keys). */
 export function seoMetaKeys(
   plugin: SeoPlugin,
