@@ -347,12 +347,21 @@ export default function EnglishPrivacyPage() {
           applies to you unless you apply.
         </p>
         <ul>
-          <li><strong>When you apply:</strong> we receive what you send us by email or WhatsApp &mdash; your name,
-          your contact details, the site, channel or audience you intend to promote to and, after approval, the
-          payout method you choose. We use them to decide on the application and to run the agreement with you.</li>
+          <li><strong>When you apply:</strong> the application is a form on this site, and what we receive is
+          what you filled in: your name, your email address, a description of the audience you intend to promote
+          to, and optionally a phone number, a website and a country. We ask for no payout details at this stage,
+          because we do not want to hold the bank details of someone we may refuse. We also record the IP address
+          the application came from, for two purposes and no others: telling a ring of fake applications from a
+          real agency, and limiting three applications an hour from one address. It cannot be changed once
+          recorded. <strong>A rejected application is deleted in full after 12 months, and in every other case the
+          IP address is deleted after 12 months</strong> while the record itself stays.</li>
           <li><strong>While you are a partner:</strong> we store your contact details, your referral code, the
+          payout details you give us, the number of clicks on your link as one daily total, the
           accounts that opened through it, the qualifying payments and the commission calculated on them, the
-          payouts made to you, and the invoices and tax certificates the law requires us to keep.</li>
+          payouts made to you, and the invoices and tax certificates the law requires us to keep. A referral may
+          carry a flag for human review &mdash; when the email address on your application is the one that signed
+          up, or when the new account is on your own website&rsquo;s domain. Such a flag asks a person to look
+          before any commission is approved; it blocks nothing by itself.</li>
           <li><strong>What a partner sees about the people they referred:</strong> nothing personal. A partner sees
           counts and amounts. A partner does not receive the email address, the website, the plan or the identity of
           any customer they referred.</li>
@@ -362,12 +371,21 @@ export default function EnglishPrivacyPage() {
           <li><strong>Crediting a referral:</strong> the partner&rsquo;s code travels in the link itself. We
           set no cookie for the program and store nothing on your device, so what you choose about cookies does
           not affect it in either direction. If we ever credit a visit that comes back later, which would mean
-          storing something, this policy will say so and your consent will be asked first.</li>
+          storing something, this policy will say so and your consent will be asked first. <strong>What is
+          recorded when a visitor follows a partner link is a count: one added to that partner&rsquo;s daily
+          total, and that is the whole record</strong> &mdash; no IP address, no browser, no site you came from,
+          no identifier of any kind. The crediting itself is done from the code carried in the page address, read
+          once at the moment the account is created.</li>
         </ul>
         <p className="mt-4">
-          As of the date of this policy the program runs by application only: we receive applications and approve
-          partners by hand, and no referral tracking, commission record or payout has been built yet. Each of them
-          will be described here before it starts running. The terms themselves are in the{' '}
+          As of the date of this policy the program runs like this: an application is a form on this site and is
+          approved by a person; an approved partner has a code and a link; clicks are counted as a daily total per
+          partner; a new account that signs up with a code is credited to that partner once and for ever; a
+          commission is recorded on each payment actually received, held for 30 days, which is the refund window,
+          and approved by a person; and the payout itself is made by hand against a reference.{' '}
+          <strong>A customer billed through Shopify produces no automatic commission</strong>, because Shopify
+          tells us a plan is active rather than that a charge was taken; such a commission is recorded by hand, at
+          the same rate. The terms themselves are in the{' '}
           <a href="/en/affiliate-terms">Partner Program Agreement</a>, which also requires a partner to say openly
           that they are paid.
         </p>
@@ -508,6 +526,8 @@ export default function EnglishPrivacyPage() {
           device, which is why the program does not appear among the categories above and why your choice on
           this notice neither helps nor hinders it. A cookie that keeps a partner&rsquo;s code is not strictly
           necessary for the site to work, so we would have needed your consent for one; we chose not to need it.
+          What is recorded on the click is a count: one added to that partner&rsquo;s daily total, with nothing
+          about you in it.
         </p>
         <p className="mt-4">
           If your browser sends a Global Privacy Control signal, we treat it as a refusal: no
