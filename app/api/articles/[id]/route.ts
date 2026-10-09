@@ -3,6 +3,7 @@ import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { sanitizePublicArticleHtml } from '@/lib/content/public-article-html'
 import { normalizePublicLocale } from '@/lib/i18n/locales'
+import { articlePublishBlockReason } from '@/lib/articles/publish-rules'
 
 /**
  * ONE allow-list for the public blog, the same one the article page renders
@@ -48,6 +49,10 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
   if (!title || !slug || !content) {
     return NextResponse.json({ error: 'title, slug, content are required' }, { status: 400 })
   }
+
+  // A draft may be saved without a cover; a PUBLISHED article may not.
+  const blocked = articlePublishBlockReason({ is_published, featured_image_url })
+  if (blocked) return NextResponse.json({ error: blocked }, { status: 400 })
 
   const admin = createAdminClient()
 

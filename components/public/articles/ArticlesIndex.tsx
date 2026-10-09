@@ -1,12 +1,8 @@
-'use client'
-
-import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import Image from 'next/image'
 import { ArrowLeft, FileText, Newspaper } from 'lucide-react'
-import { createClient } from '@/lib/supabase/client'
+import { createClient } from '@/lib/supabase/server'
 import EmptyState from '@/components/ui/EmptyState'
-import { Skeleton } from '@/components/ui/Skeleton'
 import { Footer } from '@/components/Footer'
 import { Breadcrumbs } from '@/components/Breadcrumbs'
 import { PublicNav } from '@/components/PublicNav'
@@ -27,35 +23,27 @@ interface Article {
 }
 
 /**
- * The blog index of ONE language.
+ * The blog index of ONE language, rendered on the SERVER.
  *
  * `.eq('locale', locale)` is the whole multilingual contract on this screen: a
  * Spanish reader never sees the Hebrew library, and a language with nothing
  * published yet shows its own empty state rather than someone else's articles.
+ *
+ * The list used to be fetched in the browser, so the HTML served for the blog
+ * index held three skeleton cards and no article titles or links — nothing for
+ * a crawler that does not run JavaScript to follow into the articles. The query
+ * is unchanged and still runs under RLS with the anon key.
  */
-export function ArticlesIndex({ locale }: { locale: PublicLocale }) {
+export async function ArticlesIndex({ locale }: { locale: PublicLocale }) {
   const copy = ARTICLES_COPY[locale]
-  const [articles, setArticles] = useState<Article[]>([])
-  const [loading, setLoading] = useState(true)
-
-  useEffect(() => {
-    async function loadArticles() {
-      const supabase = createClient()
-      const { data, error } = await supabase
-        .from('articles')
-        .select('id, slug, title, excerpt, author, published_at, featured_image_url, featured_image_alt')
-        .eq('is_published', true)
-        .eq('locale', locale)
-        .order('published_at', { ascending: false })
-
-      if (!error && data) {
-        setArticles(data)
-      }
-      setLoading(false)
-    }
-
-    loadArticles()
-  }, [locale])
+  const supabase = await createClient()
+  const { data } = await supabase
+    .from('articles')
+    .select('id, slug, title, excerpt, author, published_at, featured_image_url, featured_image_alt')
+    .eq('is_published', true)
+    .eq('locale', locale)
+    .order('published_at', { ascending: false })
+  const articles: Article[] = data ?? []
 
   return (
     <div className="flex min-h-screen flex-col bg-canvas">
@@ -72,21 +60,7 @@ export function ArticlesIndex({ locale }: { locale: PublicLocale }) {
         />
 
         <Section className="pt-10 sm:pt-12 lg:pt-14">
-          {loading ? (
-            <div role="status" aria-busy="true" className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3">
-              <span className="sr-only">{copy.index.loading}</span>
-              {[0, 1, 2].map((i) => (
-                <div key={i} aria-hidden="true" className="overflow-hidden rounded-card border border-line bg-surface shadow-card">
-                  <Skeleton className="aspect-[16/9] w-full rounded-none" />
-                  <div className="space-y-3 p-5">
-                    <Skeleton className="h-4 w-4/5" />
-                    <Skeleton className="h-3 w-full" />
-                    <Skeleton className="h-3 w-2/3" />
-                  </div>
-                </div>
-              ))}
-            </div>
-          ) : articles.length === 0 ? (
+          {articles.length === 0 ? (
             <div className="rounded-card border border-line bg-surface shadow-card">
               <EmptyState icon={<Newspaper />} title={copy.index.empty} />
             </div>

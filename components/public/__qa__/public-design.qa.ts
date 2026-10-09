@@ -120,11 +120,17 @@ function main() {
   }
 
   console.log('\nC) pricing: one primary button, on the recommended plan')
+  // The highlighted plan moved OUT of the four pricing pages and into
+  // lib/plans/features.ts, so the in-article plan widget cannot recommend a
+  // different plan than the pricing page. The page therefore proves it USES the
+  // shared constant, and the shared module proves the constant is still Advanced.
+  const SHARED_HIGHLIGHT = /export const HIGHLIGHTED_PLAN: PlanCode = 'advanced'/.test(strip(read('lib/plans/features.ts')))
   const pricingOk = (src: string) => {
     const s = strip(src)
     return (s.match(/variant=\{highlighted \? 'primary' : 'secondary'\}/g) ?? []).length === 1
       && !/\bscale-\d|lg:scale-/.test(s)
-      && /const HIGHLIGHTED_PLAN: PlanCode = 'advanced'/.test(s)
+      && /HIGHLIGHTED_PLAN/.test(s) && !/const HIGHLIGHTED_PLAN/.test(s)
+      && SHARED_HIGHLIGHT
   }
   {
     for (const p of ['app/(public)/pricing/page.tsx', 'app/(public)/en/pricing/page.tsx']) {

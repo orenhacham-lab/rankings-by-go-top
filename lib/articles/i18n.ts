@@ -29,17 +29,38 @@ export interface ArticlesCopy {
     subtitle: string
     breadcrumb: string
     empty: string
-    loading: string
     readMore: string
   }
   /** One article. */
   article: {
-    loading: string
     notFoundTitle: string
     notFoundBody: string
     backToArticles: string
     backHome: string
     toc: string
+    /** "5 min read", under the title. */
+    readingTime: (minutes: number) => string
+    updated: string
+    /** The author box under the article. */
+    aboutAuthor: string
+    aboutAuthorLink: string
+  }
+  /** The components an article embeds with `<div class="gt-plans|gt-cta">`
+   *  (lib/articles/widgets.ts). */
+  widgets: {
+    plans: {
+      perMonth: string
+      popular: string
+      cta: string
+      noCard: string
+      allPlans: string
+    }
+    cta: {
+      title: string
+      body: string
+      primary: string
+      secondary: string
+    }
   }
   /** The software block under both pages. */
   promo: ArticlesPromoCopy
@@ -63,16 +84,33 @@ export const ARTICLES_COPY: Record<PublicLocale, ArticlesCopy> = {
       subtitle: 'תכנים מקצועיים בנושאי קידום אתרים, נראות ב-AI, שיווק דיגיטלי וטכנולוגיה — מהצוות של Go Top.',
       breadcrumb: 'מאמרים',
       empty: 'בקרוב יפורסמו כאן מאמרים חדשים.',
-      loading: 'טוען מאמרים...',
       readMore: 'לקריאת המאמר',
     },
     article: {
-      loading: 'טוען...',
       notFoundTitle: 'מאמר לא נמצא',
       notFoundBody: 'המאמר שחיפשת אינו קיים או הוסר',
       backToArticles: 'חזור למאמרים',
       backHome: 'חזור לעמוד הבית',
       toc: 'תוכן עניינים',
+      readingTime: (m) => `${m} דקות קריאה`,
+      updated: 'עודכן',
+      aboutAuthor: 'על הכותב',
+      aboutAuthorLink: 'עוד על Go Top',
+    },
+    widgets: {
+      plans: {
+        perMonth: 'לחודש',
+        popular: 'הנבחרת',
+        cta: 'התחילו 7 ימי ניסיון בחינם',
+        noCard: 'בלי כרטיס אשראי. אפשר לבטל בכל רגע.',
+        allPlans: 'לכל הפרטים בעמוד המחירים',
+      },
+      cta: {
+        title: 'רוצים לראות את זה על האתר שלכם?',
+        body: 'שבעה ימי ניסיון חינם, בלי כרטיס אשראי: חיבור האתר, מחקר מילות מפתח, בדיקת נראות ב-AI, ומאמר ראשון שנכתב ומתפרסם.',
+        primary: 'התחילו 7 ימי ניסיון בחינם',
+        secondary: 'או הריצו בדיקה חינמית לאתר',
+      },
     },
     promo: {
       badge: 'Go Top SEO',
@@ -99,16 +137,33 @@ export const ARTICLES_COPY: Record<PublicLocale, ArticlesCopy> = {
       subtitle: 'Guides and insights on Google rank tracking, SEO and AI visibility',
       breadcrumb: 'Articles',
       empty: 'New articles are on the way.',
-      loading: 'Loading articles...',
       readMore: 'Read the article',
     },
     article: {
-      loading: 'Loading...',
       notFoundTitle: 'Article not found',
       notFoundBody: 'The article you were looking for does not exist or was removed',
       backToArticles: 'Back to articles',
       backHome: 'Back to home',
       toc: 'Table of contents',
+      readingTime: (m) => `${m} min read`,
+      updated: 'Updated',
+      aboutAuthor: 'About the author',
+      aboutAuthorLink: 'More about Go Top',
+    },
+    widgets: {
+      plans: {
+        perMonth: 'per month',
+        popular: 'Most chosen',
+        cta: 'Start a 7-day free trial',
+        noCard: 'No credit card. Cancel any time.',
+        allPlans: 'See everything on the pricing page',
+      },
+      cta: {
+        title: 'Want to see this on your own site?',
+        body: 'Seven days free, no card: connect the site, get the keyword research, run the AI visibility check, and have the first article written and published.',
+        primary: 'Start a 7-day free trial',
+        secondary: 'Or run a free check on your site',
+      },
     },
     promo: {
       badge: 'Go Top SEO',
@@ -135,16 +190,33 @@ export const ARTICLES_COPY: Record<PublicLocale, ArticlesCopy> = {
       subtitle: 'Guías y análisis sobre el seguimiento de posiciones en Google, SEO y visibilidad en IA',
       breadcrumb: 'Artículos',
       empty: 'Pronto publicaremos artículos aquí.',
-      loading: 'Cargando artículos...',
       readMore: 'Leer el artículo',
     },
     article: {
-      loading: 'Cargando...',
       notFoundTitle: 'Artículo no encontrado',
       notFoundBody: 'El artículo que buscas no existe o fue retirado',
       backToArticles: 'Volver a los artículos',
       backHome: 'Volver al inicio',
       toc: 'Índice',
+      readingTime: (m) => `${m} min de lectura`,
+      updated: 'Actualizado',
+      aboutAuthor: 'Sobre el autor',
+      aboutAuthorLink: 'Más sobre Go Top',
+    },
+    widgets: {
+      plans: {
+        perMonth: 'al mes',
+        popular: 'El más elegido',
+        cta: 'Empieza 7 días gratis',
+        noCard: 'Sin tarjeta. Puedes cancelar cuando quieras.',
+        allPlans: 'Todos los detalles en la página de precios',
+      },
+      cta: {
+        title: '¿Quieres verlo en tu propia web?',
+        body: 'Siete días gratis, sin tarjeta: conecta la web, recibe la investigación de palabras clave, haz la comprobación de visibilidad en IA y publica el primer artículo.',
+        primary: 'Empieza 7 días gratis',
+        secondary: 'O haz una comprobación gratuita de tu web',
+      },
     },
     promo: {
       badge: 'Go Top SEO',
@@ -171,16 +243,33 @@ export const ARTICLES_COPY: Record<PublicLocale, ArticlesCopy> = {
       subtitle: 'Guias e análises sobre o acompanhamento de posições no Google, SEO e visibilidade em IA',
       breadcrumb: 'Artigos',
       empty: 'Em breve publicaremos artigos aqui.',
-      loading: 'Carregando artigos...',
       readMore: 'Ler o artigo',
     },
     article: {
-      loading: 'Carregando...',
       notFoundTitle: 'Artigo não encontrado',
       notFoundBody: 'O artigo que você procura não existe ou foi removido',
       backToArticles: 'Voltar aos artigos',
       backHome: 'Voltar ao início',
       toc: 'Índice',
+      readingTime: (m) => `${m} min de leitura`,
+      updated: 'Atualizado',
+      aboutAuthor: 'Sobre o autor',
+      aboutAuthorLink: 'Mais sobre a Go Top',
+    },
+    widgets: {
+      plans: {
+        perMonth: 'por mês',
+        popular: 'O mais escolhido',
+        cta: 'Comece 7 dias grátis',
+        noCard: 'Sem cartão de crédito. Cancele quando quiser.',
+        allPlans: 'Todos os detalhes na página de preços',
+      },
+      cta: {
+        title: 'Quer ver isso no seu próprio site?',
+        body: 'Sete dias grátis, sem cartão: conecte o site, receba a pesquisa de palavras-chave, rode a verificação de visibilidade em IA e publique o primeiro artigo.',
+        primary: 'Comece 7 dias grátis',
+        secondary: 'Ou rode uma verificação gratuita do seu site',
+      },
     },
     promo: {
       badge: 'Go Top SEO',

@@ -3270,6 +3270,7 @@ export const dashboardEn = {
           'Every link is logged for both sides. A link you gave shows here before the article is published, and you can remove it.',
           'You can leave at any time. Leaving stops new links; links already published stay on the sites and in the log.',
         ],
+        risk: 'Worth knowing: Google may treat links meant to influence ranking as a link scheme, and its guidance may change. That can cost the site visibility and can even bring a manual action from Google. By joining you confirm that you understand this risk and accept it.',
         checkbox: 'We have read and accept the link network terms',
         terms: 'Full wording in the terms of use',
         join: 'Join the network',

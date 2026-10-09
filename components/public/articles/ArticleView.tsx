@@ -1,117 +1,61 @@
-'use client'
-
-import { useState, useEffect } from 'react'
+import { Fragment } from 'react'
 import Image from 'next/image'
-import { CalendarDays, FileQuestion, ListTree } from 'lucide-react'
-import { createClient } from '@/lib/supabase/client'
+import { CalendarDays, Clock, FileQuestion, ListTree, RefreshCw } from 'lucide-react'
+import { createClient } from '@/lib/supabase/server'
 import BackLink from '@/components/ui/BackLink'
-import { Skeleton } from '@/components/ui/Skeleton'
 import { Footer } from '@/components/Footer'
 import { Breadcrumbs } from '@/components/Breadcrumbs'
 import { PublicNav } from '@/components/PublicNav'
 import { CONTAINER } from '@/components/public/marketing'
 import { ArticlesPromo } from '@/components/public/ArticlesPromo'
+import { ArticlePlans } from '@/components/public/articles/ArticlePlans'
+import { ArticleCta } from '@/components/public/articles/ArticleCta'
+import { ArticleAuthorBox } from '@/components/public/articles/ArticleAuthorBox'
 import { sanitizePublicArticleHtml } from '@/lib/content/public-article-html'
 import { ARTICLES_COPY, articlesIndexHref } from '@/lib/articles/i18n'
+import { getPublicArticle } from '@/lib/articles/server'
+import { withHeadingIds } from '@/lib/articles/headings'
+import { splitArticleBlocks } from '@/lib/articles/widgets'
+import { readingMinutes } from '@/lib/articles/reading-time'
+import { resolveBillingMarket } from '@/lib/billing/server-market'
 import { INTL_LOCALE, localeHomeHref, type PublicLocale } from '@/lib/i18n/locales'
 
 // ============================================================
 // ARTICLE ACCESS CONTROL NOTE
 // ============================================================
-// Articles are accessible via direct URL /<locale>/articles/[slug]
-// SECURITY: RLS ensures only published articles (is_published=true) are readable
-// DISCOVERY: Articles are ONLY linked from the matching /articles listing page
-// LIMITATION: Direct URL access is technically possible if user knows the slug
-//   This is standard web app behavior - cannot be prevented without:
-//   - Token-based access (overkill for public content)
-//   - Infrastructure-level reverse proxy rules
-// MITIGATION: No internal links point directly to article URLs
-//   Articles are only discoverable via the /articles page of their language
-
-interface Article {
-  id: string
-  slug: string
-  title: string
-  content: string
-  author: string | null
-  published_at: string | null
-  featured_image_url: string | null
-  featured_image_alt: string | null
-  meta_title: string | null
-  meta_description: string | null
-}
+// Articles are reachable by direct URL /<locale>/articles/[slug].
+// SECURITY: only published rows are selected (is_published=true), and the row
+//   is read with the anon key under RLS, as before — moving the read to the
+//   server did not give this page the service role.
+// DISCOVERY: an article is linked only from the /articles listing of its own
+//   language; a slug from another language is a 404 here.
 
 /**
- * One article, in the language of the tree it is served from.
+ * ONE ARTICLE, RENDERED ON THE SERVER.
+ *
+ * This was a client component: it fetched the row in `useEffect`, parsed the
+ * HTML with DOMParser to add heading ids, and rendered. So the HTML a crawler
+ * received carried the title, the metadata and the JSON-LD, and in place of the
+ * article a loading skeleton — verified on the live page, where a sentence from
+ * the middle of the article could not be found in the response. Google runs
+ * JavaScript; several of the AI engines' crawlers do not, and these articles
+ * exist to be read by those engines.
+ *
+ * Rendering here also makes two things possible that flat HTML could not give:
+ * the body can hold REAL components (`lib/articles/widgets.ts` — the plan cards
+ * priced in the visitor's own currency, the trial call to action), and the
+ * table of contents is in the markup rather than assembled after load.
  *
  * The `locale` filter is not decoration: without it `/en/articles/<hebrew-slug>`
  * would render Hebrew copy inside the English shell, and two languages could
- * never reuse a slug. With it, a slug that belongs to another language is a 404
- * here, which is what it is.
+ * never reuse a slug.
  */
-export function ArticleView({ locale, slug }: { locale: PublicLocale; slug: string }) {
+export async function ArticleView({ locale, slug }: { locale: PublicLocale; slug: string }) {
   const copy = ARTICLES_COPY[locale]
   const indexHref = articlesIndexHref(locale)
-  const [article, setArticle] = useState<Article | null>(null)
-  const [loading, setLoading] = useState(true)
-  const [notFound, setNotFound] = useState(false)
+  const article = await getPublicArticle(slug, locale)
 
-  useEffect(() => {
-    async function loadArticle() {
-      if (!slug) {
-        setNotFound(true)
-        setLoading(false)
-        return
-      }
-
-      const supabase = createClient()
-
-      // CRITICAL: Only fetch published articles
-      // This prevents unauthorized access to unpublished articles
-      const { data, error } = await supabase
-        .from('articles')
-        .select('id, slug, title, content, author, published_at, featured_image_url, featured_image_alt, meta_title, meta_description')
-        .eq('slug', slug)
-        .eq('is_published', true)
-        .eq('locale', locale)
-        .single()
-
-      if (error || !data) {
-        // Not found OR not published - both show 404
-        setNotFound(true)
-      } else {
-        setArticle(data)
-      }
-      setLoading(false)
-    }
-
-    loadArticle()
-  }, [slug, locale])
-
-  if (loading) {
-    return (
-      <div className="flex min-h-screen flex-col bg-canvas">
-        <PublicNav locale={locale} />
-        <div className={`${CONTAINER} max-w-4xl flex-1 pt-28 pb-20 lg:pt-32`}>
-          <div role="status" aria-busy="true" className="rounded-card border border-line bg-surface p-6 shadow-card sm:p-10">
-            <span className="sr-only">{copy.article.loading}</span>
-            <div aria-hidden="true" className="space-y-4">
-              <Skeleton className="h-8 w-3/4" />
-              <Skeleton className="h-4 w-1/3" />
-              <div className="space-y-3 pt-6">
-                <Skeleton className="h-3.5 w-full" />
-                <Skeleton className="h-3.5 w-full" />
-                <Skeleton className="h-3.5 w-5/6" />
-                <Skeleton className="h-3.5 w-2/3" />
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-    )
-  }
-
-  if (notFound || !article) {
+  if (!article) {
     return (
       <div className="flex min-h-screen flex-col bg-canvas">
         <PublicNav locale={locale} />
@@ -139,116 +83,121 @@ export function ArticleView({ locale, slug }: { locale: PublicLocale; slug: stri
     )
   }
 
-  // Extract headings for TOC and add IDs
-  const headings: Array<{ text: string; id: string; level: number }> = []
   // Sanitized at render as well as on write (lib/content/public-article-html):
   // this HTML is injected on the app's own origin.
-  const safeContent = sanitizePublicArticleHtml(article.content)
-  let contentWithIds = safeContent
+  const { html, headings } = withHeadingIds(sanitizePublicArticleHtml(article.content))
+  const blocks = splitArticleBlocks(html)
+  const hasCta = blocks.some((b) => b.kind === 'widget' && b.widget === 'cta')
+  // The index the author box is rendered at: just before a closing call to
+  // action when the article has one, otherwise at the very end of the body.
+  const lastCta = blocks.map((b) => b.kind === 'widget' && b.widget === 'cta').lastIndexOf(true)
+  const authorBoxBefore = lastCta === -1 ? blocks.length : lastCta
+  const minutes = readingMinutes(html)
 
-  if (typeof document !== 'undefined') {
-    // DOMParser, not innerHTML on a detached element: an inert document never
-    // loads images or fires handlers while the headings are being read.
-    const tempDiv = new DOMParser().parseFromString(safeContent, 'text/html').body
+  // The plan cards need the visitor's currency, which is a server decision
+  // (the account's stored market, else the country header) — the same one the
+  // pricing page makes, so an article cannot quote a different price.
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  const { market } = await resolveBillingMarket(supabase, user)
+  const signedIn = !!user
 
-    Array.from(tempDiv.querySelectorAll('h2, h3')).forEach((heading, index) => {
-      const text = heading.textContent || ''
-      // Any letter, in any script: the Hebrew-only character class this
-      // replaces stripped every accented Spanish and Portuguese letter, so
-      // "Índice de contenidos" collapsed to "ndice-de-contenidos" and a
-      // heading written entirely in accented words got no id at all.
-      const baseId = text.toLowerCase().replace(/\s+/g, '-').replace(/[^\p{L}\p{N}_-]/gu, '')
-      const id = baseId || `heading-${index}`
-      heading.id = id
-
-      headings.push({
-        text,
-        id,
-        level: parseInt(heading.tagName[1]),
-      })
-    })
-
-    contentWithIds = tempDiv.innerHTML
-  }
+  const dateFormat = { year: 'numeric', month: 'long', day: 'numeric' } as const
+  const published = article.published_at
+    ? new Date(article.published_at).toLocaleDateString(INTL_LOCALE[locale], dateFormat)
+    : null
+  // Shown only when it is a real revision, not the row's own creation.
+  const updated = article.updated_at && article.published_at
+    && new Date(article.updated_at).getTime() - new Date(article.published_at).getTime() > 36e5
+    ? new Date(article.updated_at).toLocaleDateString(INTL_LOCALE[locale], dateFormat)
+    : null
 
   return (
     <div className="flex min-h-screen flex-col bg-canvas">
       <PublicNav locale={locale} />
       <main className="flex-1">
-        <div className={`${CONTAINER} max-w-4xl pt-28 pb-16 lg:pt-32 lg:pb-20`}>
-          <Breadcrumbs
-            locale={locale}
-            items={[{ label: copy.index.breadcrumb, href: indexHref }, { label: article.title, href: '#' }]}
-          />
+        {/* ── The opening: everything a reader decides on before scrolling ── */}
+        <header className="border-b border-line bg-surface">
+          <div className={`${CONTAINER} max-w-5xl pt-28 pb-10 lg:pt-32 lg:pb-12`}>
+            <Breadcrumbs
+              locale={locale}
+              items={[{ label: copy.index.breadcrumb, href: indexHref }, { label: article.title, href: '#' }]}
+            />
 
-          <article className="mt-6 overflow-hidden rounded-card border border-line bg-surface shadow-card">
-            {/* Article Header with Image */}
-            <div className="flex flex-col items-start gap-8 p-6 sm:p-10 lg:flex-row">
-              <div className="min-w-0 flex-1">
-                <h1 className="mb-6 text-title font-bold tracking-tight text-ink text-balance sm:text-display">
-                  {article.title}
-                </h1>
+            <h1 className="mt-6 max-w-3xl text-display font-bold tracking-tight text-ink text-balance">
+              {article.title}
+            </h1>
 
-                <div className="flex flex-wrap items-center gap-4 border-b border-line pb-6">
-                  {article.author && (
-                    <div className="flex items-center gap-2">
-                      <span className="flex size-9 items-center justify-center rounded-pill bg-action-soft text-caption font-bold text-action" aria-hidden="true">
-                        {article.author.charAt(0)}
-                      </span>
-                      <span className="text-copy font-medium text-ink">
-                        {article.author}
-                      </span>
-                    </div>
-                  )}
-                  {article.published_at && (
-                    <span className="flex items-center gap-1.5 text-copy text-muted">
-                      <CalendarDays className="size-4" aria-hidden="true" />
-                      {new Date(article.published_at).toLocaleDateString(INTL_LOCALE[locale], {
-                        year: 'numeric',
-                        month: 'long',
-                        day: 'numeric',
-                      })}
-                    </span>
-                  )}
-                </div>
-              </div>
+            {article.excerpt && (
+              <p className="mt-4 max-w-3xl text-section text-body text-pretty">{article.excerpt}</p>
+            )}
 
-              {/* Article Image */}
-              {article.featured_image_url && (
-                <div className="relative shrink-0 lg:size-64">
-                  <Image
-                    src={article.featured_image_url}
-                    alt={article.featured_image_alt || article.title}
-                    width={256}
-                    height={256}
-                    className="size-full rounded-inset border border-line object-cover"
-                  />
+            <div className="mt-7 flex flex-wrap items-center gap-x-5 gap-y-3 border-t border-line pt-5">
+              {article.author && (
+                <div className="flex items-center gap-2.5">
+                  <span
+                    className="flex size-9 items-center justify-center rounded-pill bg-action-soft text-caption font-bold text-action"
+                    aria-hidden="true"
+                  >
+                    {article.author.charAt(0)}
+                  </span>
+                  <span className="text-copy font-semibold text-ink">{article.author}</span>
                 </div>
               )}
+              {published && (
+                <span className="flex items-center gap-1.5 text-copy text-muted">
+                  <CalendarDays className="size-4" aria-hidden="true" />
+                  {published}
+                </span>
+              )}
+              {updated && (
+                <span className="flex items-center gap-1.5 text-copy text-muted">
+                  <RefreshCw className="size-4" aria-hidden="true" />
+                  {copy.article.updated} {updated}
+                </span>
+              )}
+              <span className="flex items-center gap-1.5 text-copy text-muted">
+                <Clock className="size-4" aria-hidden="true" />
+                {copy.article.readingTime(minutes)}
+              </span>
             </div>
+          </div>
+        </header>
 
-            {/* Article Content */}
-            <div className="px-6 pb-10 sm:px-10">
-              <div
-                className="article-content max-w-none text-section font-normal leading-8 text-body [&_h2]:scroll-mt-24 [&_h3]:scroll-mt-24 [&_h2]:mt-10 [&_h2]:mb-4 [&_h2]:text-title [&_h2]:font-bold [&_h2]:tracking-tight [&_h2]:text-ink [&_h3]:mt-8 [&_h3]:mb-3 [&_h3]:text-section [&_h3]:font-semibold [&_h3]:text-ink [&_p]:mb-5 [&_ul]:mb-5 [&_ul]:list-disc [&_ul]:space-y-2 [&_ul]:ps-6 [&_ol]:mb-5 [&_ol]:list-decimal [&_ol]:space-y-2 [&_ol]:ps-6 [&_a]:font-medium [&_a]:text-action [&_a]:underline-offset-4 [&_a:hover]:underline [&_strong]:font-semibold [&_strong]:text-ink [&_img]:rounded-inset [&_blockquote]:border-s-[3px] [&_blockquote]:border-line-strong [&_blockquote]:ps-4 [&_blockquote]:text-muted"
-                dangerouslySetInnerHTML={{ __html: contentWithIds }}
+        <div className={`${CONTAINER} max-w-5xl pb-16 lg:pb-20`}>
+          {article.featured_image_url && (
+            <div className="relative -mt-px aspect-[2/1] w-full overflow-hidden rounded-b-card border-x border-b border-line bg-sunk shadow-card">
+              <Image
+                src={article.featured_image_url}
+                alt={article.featured_image_alt || article.title}
+                fill
+                priority
+                sizes="(max-width: 1024px) 100vw, 1024px"
+                className="object-cover"
               />
             </div>
+          )}
 
-            {/* Table of Contents at the end */}
-            {headings.length > 0 && (
-              <nav aria-labelledby="article-toc" className="border-t border-line bg-sunk px-6 py-8 sm:px-10">
-                <div className="rounded-card border border-line bg-surface p-5 shadow-card sm:p-6">
-                  <h3 id="article-toc" className="mb-4 flex items-center gap-2 border-b border-line pb-3 text-section font-semibold text-ink">
-                    <ListTree className="size-5 text-action" aria-hidden="true" />
+          {/* The contents list is a sticky column from the large breakpoint up
+              and a plain box above the text below it — one nav either way, so
+              there is never a second copy of the same anchors. */}
+          <div className="mt-10 lg:mt-12 lg:grid lg:grid-cols-[16rem_minmax(0,1fr)] lg:gap-10">
+            {headings.length > 1 && (
+              <nav aria-labelledby="article-toc" className="mb-8 lg:mb-0 lg:sticky lg:top-28 lg:self-start">
+                <div className="rounded-card border border-line bg-surface p-5 shadow-card">
+                  <h2
+                    id="article-toc"
+                    className="mb-3 flex items-center gap-2 border-b border-line pb-3 text-copy font-semibold text-ink"
+                  >
+                    <ListTree className="size-4 text-action" aria-hidden="true" />
                     {copy.article.toc}
-                  </h3>
+                  </h2>
                   <ul className="space-y-2">
-                    {headings.map((heading, index) => (
-                      <li key={index} style={{ paddingInlineStart: (heading.level - 2) * 16 }}>
+                    {headings.map((heading) => (
+                      <li key={heading.id} style={{ paddingInlineStart: (heading.level - 2) * 12 }}>
                         <a
                           href={`#${heading.id}`}
-                          className="rounded-control text-copy text-action underline-offset-4 transition-colors duration-150 ease-snappy hover:text-action-hover hover:underline"
+                          className="rounded-control text-caption text-body underline-offset-4 transition-colors duration-150 ease-snappy hover:text-action hover:underline"
                         >
                           {heading.text}
                         </a>
@@ -258,12 +207,34 @@ export function ArticleView({ locale, slug }: { locale: PublicLocale; slug: stri
                 </div>
               </nav>
             )}
-          </article>
 
-          {/* Software promotion section */}
-          <div className="mt-12">
-            <ArticlesPromo copy={copy.promo} />
+            <article className="min-w-0 max-w-3xl">
+              {blocks.map((block, i) => (
+                <Fragment key={i}>
+                  {/* Who wrote this comes BEFORE the closing call to action: a
+                      reader weighs the claim, then decides what to do about it. */}
+                  {i === authorBoxBefore && <ArticleAuthorBox locale={locale} author={article.author} />}
+                  {block.kind === 'html' ? (
+                    <div className="gt-article" dangerouslySetInnerHTML={{ __html: block.html }} />
+                  ) : block.widget === 'plans' ? (
+                    <ArticlePlans locale={locale} market={market} signedIn={signedIn} />
+                  ) : (
+                    <ArticleCta locale={locale} signedIn={signedIn} />
+                  )}
+                </Fragment>
+              ))}
+              {authorBoxBefore === blocks.length && <ArticleAuthorBox locale={locale} author={article.author} />}
+            </article>
           </div>
+
+          {/* The standing promo band is the article's call to action ONLY when the
+              body does not carry its own: an article that ends with <div class="gt-cta">
+              would otherwise close on two identical navy bands, one under the other. */}
+          {!hasCta && (
+            <div className="mt-14 sm:mt-16">
+              <ArticlesPromo copy={copy.promo} />
+            </div>
+          )}
         </div>
       </main>
       <Footer locale={locale} />
