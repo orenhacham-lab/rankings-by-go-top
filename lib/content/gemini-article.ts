@@ -79,6 +79,10 @@ export interface StructuredArticle {
   title: string; slug: string; metaTitle: string; metaDescription: string; excerpt: string
   directAnswer: string; intro: string[]; sections: Section[]; comparisonTables: ArticleTable[]
   faq: GeneratedArticleFaq[]; imagePrompt: string; warnings: string[]
+  /** What the article gives the reader to check, ask for or compare, as the
+   *  model itself lists it. The quality gate reads it instead of guessing from
+   *  wording; it is never rendered into the article. */
+  readerChecks: string[]
 }
 
 const TONE_HINT: Record<string, string> = {
@@ -132,7 +136,7 @@ export const FAILURE_HINT: Record<string, string> = {
   markdown_artifacts_absent: 'do NOT use any Markdown (**bold**, ## headings, [text](url), backticks) — plain text only',
   has_early_answer: 'add a clear direct answer in the first paragraph',
   not_generic: 'add practical value: examples, common mistakes, a checklist, or decision criteria',
-  reader_can_verify: 'give the reader concrete things to CHECK, ASK FOR or COMPARE before deciding (what to look for, what to request, what to compare) — imperative, specific, and never an invented fact',
+  reader_can_verify: 'give the reader concrete things to CHECK, ASK FOR or COMPARE before deciding (what to look for, what to request, what to compare) — imperative, specific, and never an invented fact — and list those same items in "readerChecks", copied from the body',
   anchor_too_early: 'move the required link OUT of the direct answer / first paragraph — place it only after the article has established context',
   anchor_spacing_too_close: 'spread the links across different sections (>=2 paragraphs apart), never two in the same paragraph',
   anchor_inserted_mechanically: 'integrate each link into a genuinely relevant sentence — no "read more", "click here", "אתר כמו", "למידע נוסף"',
@@ -272,6 +276,7 @@ export function buildPrompt(brief: ArticleBrief, opts: GenOpts): string {
     `- Do not start many sentences with the same word.`,
     `- Relevant entities; practical specifics. Include at least 3 of: examples, common mistakes, a checklist, comparison, tips by situation, budget/price considerations, steps, when-to / when-not-to, what to check before deciding.`,
     `- EXPERIENCE (E-E-A-T): the reader must come away with things to CHECK, ASK FOR or COMPARE themselves before they decide — what to look for, what to request from a supplier, what to compare between two options. Write them as imperatives in a list or a short paragraph, grounded in how this field actually works; never invent a fact, a price, a standard or a law to make one.`,
+    `- Then LIST those same items in "readerChecks", copying each one as it appears in the article body. It is a declaration for the quality check and is never shown to the reader, so it must contain nothing the article itself does not say.`,
     `- For any list-worthy section (tips, common mistakes, a checklist, steps, how-to-choose, what-to-check, pros/cons), put the items in the section's "bullets" array — NOT as dash lines inside a paragraph. At least one real list in the article.`,
     `- Weave the most important user questions into the BODY as <h2>/<h3> question-style section headings where natural — do NOT leave all questions only for the FAQ section at the end.`,
     `- FAQ section (end of article): ${th.minFaq}-${th.minFaq + 2} concise pairs; real, specific questions (no generic filler like "what is X?"); answers 40-90 words; never repeat earlier paragraphs word-for-word.`,
@@ -292,7 +297,7 @@ export function buildPrompt(brief: ArticleBrief, opts: GenOpts): string {
     `Return ONLY valid JSON (no markdown, no text outside the JSON), as STRUCTURED DATA (NOT html), plain-text fields:`,
     `{"title":"...","slug":"...","metaTitle":"...","metaDescription":"...","excerpt":"...","searchIntent":"...","directAnswer":"...","intro":["...","..."],`,
     `"sections":[{"heading":"...","answerFirst":"...","paragraphs":["...","..."],"bullets":["..."],"table":{"caption":"...","columns":["...","..."],"rows":[["...","..."]]},"subsections":[{"heading":"...","paragraphs":["..."]}]}],`,
-    `"comparisonTables":[{"caption":"...","columns":["...","..."],"rows":[["...","..."]]}],"faq":[{"question":"...","answer":"..."}],"imagePrompt":"...","warnings":[]}`,
+    `"comparisonTables":[{"caption":"...","columns":["...","..."],"rows":[["...","..."]]}],"faq":[{"question":"...","answer":"..."}],"readerChecks":["...","..."],"imagePrompt":"...","warnings":[]}`,
     `- Every paragraph/answerFirst/directAnswer is PLAIN TEXT (no HTML). "table"/"bullets"/"subsections" are optional per section.`,
     `- Do NOT use Markdown syntax in ANY field: no **bold**, no __bold__, no ##/### headings, no [text](url) links, no backticks. Return plain readable text only — the server builds all HTML and structure.`,
     `- faq answers: 40-90 words, concise, no duplicates. slug: MUST be English (translate, never transliterate Hebrew), lowercase, hyphens. metaTitle <= 60 chars; metaDescription 120-160 chars. imagePrompt in ${lang}.`,
@@ -867,6 +872,7 @@ function parseStructured(parsed: Record<string, unknown>): StructuredArticle {
     title: cstr(parsed.title), slug: cstr(parsed.slug), metaTitle: cstr(parsed.metaTitle),
     metaDescription: cstr(parsed.metaDescription), excerpt: cstr(parsed.excerpt),
     directAnswer: cstr(parsed.directAnswer), intro: cstrArr(parsed.intro), sections, comparisonTables, faq,
+    readerChecks: cstrArr(parsed.readerChecks).slice(0, 12),
     imagePrompt: cstr(parsed.imagePrompt), warnings: Array.isArray(parsed.warnings) ? (parsed.warnings as unknown[]).filter((w): w is string => typeof w === 'string') : [],
   }
 }
@@ -1018,6 +1024,7 @@ function auditFor(brief: ArticleBrief, structured: StructuredArticle, safeHtml: 
     brandName: brief.brandNameToInclude, businessName: brief.businessName,
     title: structured.title, metaTitle: structured.metaTitle, metaDescription: structured.metaDescription,
     slug, excerpt: structured.excerpt, contentHtml: safeHtml, faq: structured.faq, anchors: brief.anchors,
+    readerChecks: structured.readerChecks,
   })
 }
 

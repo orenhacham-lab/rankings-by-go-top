@@ -13,7 +13,7 @@
  * Groups: A the measure, B the gate and the repair loop, C the label the
  * merchant reads, in every language. Each ends with a MUTATION CONTROL.
  */
-import { readerVerifyCount, runArticleAudit } from '../article-audit'
+import { readerVerifyCount, readerChecksSatisfied, runArticleAudit } from '../article-audit'
 import { FAILURE_HINT } from '../gemini-article'
 import { getDashboardDictionary } from '../../i18n/dashboard/getDashboardDictionary'
 import { code } from '../cannibalization/__qa__/_strip'
@@ -75,6 +75,36 @@ async function main() {
     // a single aside rather than guidance.
     check('MUTATION: a threshold of one passes an article with a single aside (guard is real)',
       readerVerifyCount('בדקו את הציוד', 'he') >= 1 && runArticleAudit({ ...AUDIT, contentHtml: body('בדקו את הציוד') }).warnings.includes('reader_can_verify'))
+  }
+
+  console.log('D) the model declares what it gave, so odd wording is not flagged by mistake')
+  {
+    // The one risk of judging by words: an article that DID give guidance, in
+    // wording the cue list does not hold, was flagged. The declaration removes it.
+    const oddWording = 'מומלץ להצטייד בחוזה מפורט ולעמוד על קבלת אישור ביטוח מהספק לפני תחילת העבודה'
+    check('an article in unusual wording scores below the cue threshold', readerVerifyCount(oddWording, 'he') < 2)
+    check('but its declared items pass once the body backs them up',
+      readerChecksSatisfied(oddWording, 'he', ['מומלץ להצטייד בחוזה מפורט']))
+    check('a declaration the body does NOT contain is not trusted',
+      !readerChecksSatisfied(oddWording, 'he', ['בקשו תעודת הסמכה של המנקה']))
+    check('an empty declaration falls back to the words', readerChecksSatisfied('בדקו את הרצפה ובקשו הצעת מחיר', 'he', []))
+    check('no declaration at all still falls back to the words, never goes blind',
+      readerChecksSatisfied('בדקו את הרצפה ובקשו הצעת מחיר', 'he', undefined) && !readerChecksSatisfied(oddWording, 'he', undefined))
+    check('a one-word declaration is too short to count', !readerChecksSatisfied(oddWording, 'he', ['בדקו']))
+    check('punctuation and quotes do not break the match',
+      readerChecksSatisfied('מומלץ להצטייד בחוזה מפורט — ולדרוש אישור', 'he', ['"מומלץ להצטייד בחוזה מפורט"']))
+    // The declaration reaches the audit from the model's own output.
+    const src = code('lib/content/gemini-article.ts')
+    check('the model is asked for the declaration', /"readerChecks":\["\.\.\."/.test(src))
+    check('the declaration is parsed, capped, and never rendered', /readerChecks: cstrArr\(parsed\.readerChecks\)\.slice\(0, 12\)/.test(src) && !/readerChecks/.test(src.slice(src.indexOf('function buildHtml'), src.indexOf('export const buildArticleHtml'))))
+    check('the audit receives it', /readerChecks: structured\.readerChecks/.test(src))
+    check('the prompt says it must contain nothing the article does not say', /nothing the article itself does not say/.test(src))
+
+    // MUTATION CONTROL — trusting the declaration without checking the body lets
+    // a model pass by listing items it never wrote.
+    const blind = (declared: readonly string[]) => declared.length > 0
+    check('MUTATION: an unchecked declaration passes an article that never wrote it (guard is real)',
+      blind(['בקשו תעודת הסמכה של המנקה']) && !readerChecksSatisfied(oddWording, 'he', ['בקשו תעודת הסמכה של המנקה']))
   }
 
   console.log('C) the merchant can read why it was flagged')
