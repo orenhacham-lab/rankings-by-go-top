@@ -233,6 +233,8 @@ async function main() {
   const wPub = world({ article: { status: 'published' } })
   const rPub = await runAutoInternalLinksStep(wPub as never, { projectId: PROJECT, userId: OWNER, articleId: ART }, deps)
   const rFailed = await runAutoInternalLinksStep(world({ map: { status: 'failed' } }) as never, { projectId: PROJECT, userId: OWNER, articleId: ART }, deps)
+  const rFailedEmpty = await runAutoInternalLinksStep(world({ map: { status: 'failed', entries: [] } }) as never, { projectId: PROJECT, userId: OWNER, articleId: ART }, deps)
+  const rFailedStale = await runAutoInternalLinksStep(world({ map: { status: 'failed', finished_at: '2026-07-01T00:00:00Z' } }) as never, { projectId: PROJECT, userId: OWNER, articleId: ART }, deps)
   const rRunning = await runAutoInternalLinksStep(world({ map: { status: 'running' } }) as never, { projectId: PROJECT, userId: OWNER, articleId: ART }, deps)
   const rStale = await runAutoInternalLinksStep(world({ map: { finished_at: '2026-07-01T00:00:00Z' } }) as never, { projectId: PROJECT, userId: OWNER, articleId: ART }, deps)
   const rNoMap = await runAutoInternalLinksStep(world({ map: null }) as never, { projectId: PROJECT, userId: OWNER, articleId: ART }, deps)
@@ -245,7 +247,16 @@ async function main() {
     && row1.internal_links_json.filter((e) => e.source === 'auto').every((e) => typeof e.anchor === 'string' && typeof e.title === 'string' && e.at === NOW.toISOString()), JSON.stringify(r1))
   check('B2: another owner\'s project is never read or written (owner filter under the service role)', rOther.outcome === 'skipped' && rOther.reason === 'not_found' && !/<a /.test(String(wOther.tables.generated_articles[0].content_html)))
   check('B3: a published article is never changed (drafts only)', rPub.outcome === 'skipped' && rPub.reason === 'not_draft' && !/<a /.test(String(wPub.tables.generated_articles[0].content_html)))
-  check('B4: a failed or running mapping, or one older than 30 days, is not used', [rFailed, rRunning].every((r) => r.outcome === 'skipped' && r.reason === 'no_map') && rStale.outcome === 'skipped' && rStale.reason === 'stale_map')
+  // B4 CHANGED on purpose: finishSiteMap keeps the previous run's good entries
+  // when a run fails, so rejecting a failed row on its status alone threw usable
+  // pages away and cost every article its links until the next successful map.
+  // A failed row is now used WHEN IT CARRIES ENTRIES; freshness is still judged
+  // the same way, so nothing stale slips in, and an empty failed row is still
+  // nothing to link against.
+  check('B4: a failed mapping that still carries entries IS used (its pages are good)', rFailed.outcome === 'linked' && rFailed.links === 3, JSON.stringify(rFailed))
+  check('B4b: a failed mapping with NO entries is not used', rFailedEmpty.outcome === 'skipped' && rFailedEmpty.reason === 'no_map', JSON.stringify(rFailedEmpty))
+  check('B4c: a failed mapping older than 30 days is still refused on freshness', rFailedStale.outcome === 'skipped' && rFailedStale.reason === 'stale_map', JSON.stringify(rFailedStale))
+  check('B4d: a RUNNING mapping is not used (nothing finished yet), and a mapping older than 30 days is not used', rRunning.outcome === 'skipped' && rRunning.reason === 'no_map' && rStale.outcome === 'skipped' && rStale.reason === 'stale_map')
   check('B5: no mapping: nothing happens', rNoMap.outcome === 'skipped' && rNoMap.reason === 'no_map')
   check('B6: kill switch AUTO_INTERNAL_LINKS_DISABLED=true', rOff.outcome === 'skipped' && rOff.reason === 'disabled')
   check('B7: a failing read never throws into generation', rBroken.outcome === 'skipped' && rBroken.reason === 'error')

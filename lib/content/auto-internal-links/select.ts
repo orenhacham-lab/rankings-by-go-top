@@ -156,7 +156,7 @@ const pathKey = (u: string) => (pathSegments(u) ?? []).join('/')
  */
 export function autoLinkCandidates(
   entries: readonly SiteMapEntry[] | null | undefined,
-  site: { host: string },
+  site: { host: string; allowHttp?: boolean },
   article: { title: string; slug: string | null },
 ): AutoLinkTarget[] {
   const host = site.host.toLowerCase().replace(/^www\./, '')
@@ -168,7 +168,10 @@ export function autoLinkCandidates(
     if (out.length >= AUTO_LINK_LIMITS.maxCandidates) break
     if (!e || typeof e.u !== 'string') continue
     const url = e.u.trim()
-    if (!/^https:\/\//i.test(url) || hostOf(url) !== host) continue
+    // https only, unless the mapped site itself is http — an http-only site used
+    // to yield zero candidates, so zero links, for every article.
+    const schemeOk = site.allowHttp ? /^https?:\/\//i.test(url) : /^https:\/\//i.test(url)
+    if (!schemeOk || hostOf(url) !== host) continue
     if (!isContentUrl(url) || isBlogListing(url)) continue
     const segs = pathSegments(url) ?? []
     if (segs.length === 0) continue
