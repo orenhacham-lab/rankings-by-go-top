@@ -62,7 +62,7 @@ Não compartilhamos as suas informações pessoais com terceiros, exceto:
 - **OpenStreetMap (Nominatim):** para converter um endereço em coordenadas, e somente quando você digitou um endereço exato para acompanhamento local de posições. São enviados o endereço digitado e o nome do país, nunca dados da conta
 - **ScrapeLLM:** para o acompanhamento de visibilidade em IA — veja «Provedores de IA» abaixo
 - **Outros sites da rede de links:** somente se você entrou na rede — veja «Rede de links» abaixo
-- **Meta (Facebook / Instagram):** para publicidade direcionada — veja a seção «Publicidade na Meta» abaixo. Os dados que recebemos das APIs do Google nunca são compartilhados com a Meta nem usados para publicidade
+- **Meta (Facebook / Instagram):** para publicidade direcionada e para um relatório de cadastro concluído enviado do nosso servidor — veja a seção «Publicidade na Meta» abaixo. Quanto a esses eventos de conversão, a Meta não trata os dados em nosso nome: ela é controladora conjunta junto com a gente, como aquela seção explica. Os dados que recebemos das APIs do Google nunca são compartilhados com a Meta nem usados para publicidade
 - Quando exigido por lei
 
 ## Dados que recebemos do Google
@@ -215,7 +215,7 @@ Dividimos os cookies em três categorias, e perguntamos a você sobre duas delas
 
 - **Estritamente necessários:** login, memória do idioma da interface, segurança e prevenção de abusos. O serviço não funciona sem eles, portanto não exigem consentimento.
 - **Medição:** quantas pessoas visitaram, quais páginas leram e o que não funcionou. Carregados somente se você permitir.
-- **Marketing:** medição do desempenho dos nossos anúncios e exibição de anúncios relevantes nas redes do Google e da Meta. Carregados somente se você permitir.
+- **Marketing:** medição do desempenho dos nossos anúncios e exibição de anúncios relevantes nas redes do Google e da Meta. Carregados somente se você permitir. Permitir esta categoria vale também para um relatório de conversão que enviamos à Meta do nosso servidor, sem cookie nenhum — veja a seção «Publicidade na Meta».
 
 **Antes da sua escolha, nenhum cookie de medição ou de marketing é gravado e nenhuma requisição é feita aos servidores do Google.** Aceitar e recusar são dois botões equivalentes no aviso, e cada categoria pode ser permitida separadamente.
 
@@ -235,7 +235,7 @@ As nossas ferramentas de medição e marketing são gerenciadas pelo Google Tag 
 - **Google Ads:** medição de conversões e publicidade personalizada (sujeito ao consentimento de marketing)
 - **Meta Pixel:** medição de conversões e publicidade no Facebook e no Instagram (sujeito ao consentimento de marketing)
 
-Quais ferramentas estão ativas muda de tempo em tempo. O que não muda: nenhuma delas é carregada antes de você permitir a sua categoria, e retirar o consentimento interrompe a coleta.
+Quais ferramentas estão ativas muda de tempo em tempo. O que não muda: nenhuma delas é carregada antes de você permitir a sua categoria, e retirar o consentimento interrompe a coleta. Além dessas ferramentas, que funcionam no navegador, enviamos à Meta um relatório de conversão do nosso servidor; ele também depende do consentimento de marketing e cessa quando você o retira.
 
 Declaramos o seu estado de consentimento ao Google pelo protocolo Consent Mode v2, para que as ferramentas fiquem vinculadas à sua escolha mesmo se acrescentarmos uma nova tag no futuro.
 
@@ -251,6 +251,24 @@ As informações que podem ser coletadas e enviadas à Meta incluem:
 - Informações coletadas por cookies da Meta
 
 Esse uso está sujeito à política de privacidade da Meta Platforms, Inc., disponível em [facebook.com/privacy/policy](https://www.facebook.com/privacy/policy/). Você pode recusar a publicidade personalizada nas configurações de privacidade da sua conta no Facebook.
+
+### Um relatório de conversão do nosso servidor (Conversions API)
+
+Além do Pixel que funciona no navegador, informamos à Meta um cadastro concluído a partir do nosso servidor, por uma interface chamada Conversions API. O relatório é enviado **somente** se você permitiu a categoria de marketing no aviso de cookies. Se você recusou, ou ainda não escolheu, nada é enviado.
+
+O que esse relatório contém:
+
+- o nome do evento (um cadastro concluído) e a hora em que aconteceu
+- um identificador único do evento, para que a Meta não conte o mesmo cadastro duas vezes
+- um resumo unidirecional (hash SHA-256) do endereço de e-mail com o qual você se cadastrou
+- um resumo unidirecional, pelo mesmo método, do identificador da sua conta com a gente
+- o endereço da página de onde você se cadastrou, sem nada do que vem depois do sinal de interrogação
+
+Não enviamos o endereço de e-mail em si, mas o hash não torna a informação anônima: se esse mesmo endereço também estiver na sua conta da Meta, a Meta pode relacionar os dois e identificar você, e por isso tratamos esse relatório como dado pessoal para todos os efeitos. **Nesse relatório não enviamos o seu endereço IP, nem os dados do seu navegador, nem qualquer cookie da Meta, nem o seu nome nem o seu telefone, e ele é enviado somente por um cadastro concluído, nunca por uma visualização de página.**
+
+Retirar o consentimento de marketing interrompe imediatamente os relatórios futuros. Um relatório já enviado não podemos recuperar, e você pode exigir a sua exclusão diretamente da Meta, pelo canal de direitos dela.
+
+**Quem responde por esses dados:** quanto à coleta e à transmissão desses eventos de conversão, nós e a Meta somos controladores conjuntos (joint controllers): a Meta Platforms Ireland Limited para visitantes do Espaço Econômico Europeu e do Reino Unido, e a Meta Platforms, Inc. para os demais. A partir do momento em que os dados chegam à Meta, a Meta é controladora independente do uso que faz deles para as suas próprias finalidades. Você pode exercer os seus direitos sobre esses dados diretamente perante a Meta, e se você se dirigir a nós encaminharemos o seu pedido à Meta.
 
 ## Contato pelo WhatsApp
 
@@ -332,7 +350,7 @@ Respondemos aos pedidos em até 15 dias, prazo do art. 19, I, da LGPD, e sem cus
 
 Se você reside na Califórnia, ou em outro estado que aprovou uma lei estadual de privacidade, tem o direito de saber quais categorias de dados foram coletadas sobre você, de obter uma cópia, de pedir a exclusão, de corrigir dados inexatos e de não sofrer discriminação por exercer um direito.
 
-**Não vendemos informações pessoais e não as transferimos por contrapartida.** Compartilhamos identificadores e eventos de uso com as redes de publicidade do Google e da Meta para publicidade direcionada, o que pode ser considerado «compartilhamento» na lei da Califórnia. Esse compartilhamento acontece **somente** se você permitiu a categoria de marketing, e cessa no momento em que você retira a permissão.
+**Não vendemos informações pessoais e não as transferimos por contrapartida.** Compartilhamos identificadores e eventos de uso com as redes de publicidade do Google e da Meta para publicidade direcionada, no navegador e do nosso servidor, o que pode ser considerado «compartilhamento» na lei da Califórnia. Esse compartilhamento acontece **somente** se você permitiu a categoria de marketing, e cessa no momento em que você retira a permissão.
 
 Respeitamos o sinal Global Privacy Control do navegador como um pedido de «não vender nem compartilhar minhas informações pessoais», e o registramos. Nenhum formulário é necessário: o sinal basta.
 
@@ -366,4 +384,4 @@ Se você tiver dúvidas sobre esta política de privacidade, fale com a gente:
 
 **Telefone:** [054-9489377](tel:0549489377)
 
-Esta política foi atualizada pela última vez em 5 de outubro de 2026
+Esta política foi atualizada pela última vez em 9 de outubro de 2026
