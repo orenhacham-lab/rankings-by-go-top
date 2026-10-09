@@ -96,7 +96,7 @@ export const AFFILIATES_COPY: Record<PublicLocale, AffiliateCopy> = {
       { title: 'בלי אתרי קופונים', body: 'ולא הצעות מהסוג של "תירשמו דרכי ואחזיר לכם חלק".' },
       { title: 'אומרים שאתם מקבלים עמלה', body: 'זו דרישת חוק בחלק מהמדינות, ובכל מקרה זה הוגן כלפי מי שסומך עליכם.' },
       { title: 'ביטול מבטל עמלה', body: 'עמלה על לקוח שקיבל החזר או עשה ביטול חיוב מתבטלת ומנוכה מהתשלום הבא.' },
-      { title: 'חשבונית בישראל', body: 'שותף ישראלי מוציא לנו חשבונית. מי שאין לו עוסק יכול לקבל במקום זה קרדיט בחשבון.' },
+      { title: 'חשבונית', body: 'שותף ישראלי מוציא לנו חשבונית. שותף מחוץ לישראל מתחשבן לפי הכללים של המדינה שלו, ומי שאין לו עוסק יכול לקבל במקום זה קרדיט בחשבון.' },
     ],
     faqTitle: 'שאלות',
     faq: [
@@ -143,7 +143,7 @@ export const AFFILIATES_COPY: Record<PublicLocale, AffiliateCopy> = {
       { title: 'No coupon sites', body: 'And no "sign up through me and I will refund you" offers.' },
       { title: 'Say that you earn', body: 'Tell your audience you get a commission. It is the law in some countries and fair to the people trusting you everywhere.' },
       { title: 'A refund reverses it', body: 'Commission on a customer who refunds or charges back is reversed and deducted from your next payout.' },
-      { title: 'Invoices in Israel', body: 'Israeli affiliates invoice us. Anyone without a registered business can take account credit instead.' },
+      { title: 'Invoicing', body: 'Israeli affiliates invoice us. Outside Israel, invoicing follows the rules of your own country, and anyone without a registered business can take account credit instead.' },
     ],
     faqTitle: 'Questions',
     faq: [
@@ -190,7 +190,7 @@ export const AFFILIATES_COPY: Record<PublicLocale, AffiliateCopy> = {
       { title: 'Sin webs de cupones', body: 'Ni ofertas del tipo «regístrate conmigo y te devuelvo parte».' },
       { title: 'Di que cobras comisión', body: 'En algunos países es obligatorio, y con quien confía en ti es lo justo en todos.' },
       { title: 'Un reembolso la revierte', body: 'La comisión de un cliente que pide reembolso o hace un contracargo se revierte y se descuenta del siguiente pago.' },
-      { title: 'Factura en Israel', body: 'Los afiliados en Israel nos emiten factura. Quien no tenga actividad dada de alta puede recibir crédito en su cuenta.' },
+      { title: 'Factura', body: 'Los afiliados en Israel nos emiten factura. Fuera de Israel, la factura sigue las reglas de tu país, y quien no tenga actividad dada de alta puede recibir crédito en su cuenta.' },
     ],
     faqTitle: 'Preguntas',
     faq: [

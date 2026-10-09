@@ -14,6 +14,7 @@
 import { readFileSync, existsSync } from 'fs'
 import { join } from 'path'
 import { AFFILIATES_COPY, AFFILIATE_TERMS } from '../affiliates'
+import { AFFILIATE_FORM_COPY } from '../affiliate-form'
 import { LOCALE_PREFIX } from '../../locales'
 import { getPublicDictionary } from '../../getPublicDictionary'
 
@@ -208,6 +209,60 @@ console.log('F) the offer points at the terms that bind it')
   /* F1-MUT: the same page with the link taken out — F1 must fail on it. */
   check('F1-MUT: a page that drops the link is caught',
     !PAGE.replace('${LOCALE_PREFIX[locale]}/affiliate-terms', '#').includes('${LOCALE_PREFIX[locale]}/affiliate-terms'))
+}
+
+console.log('G) who can be paid: the invoicing rule is not Israel-only')
+{
+  /**
+   * The agreement pays a partner anywhere: PayPal, Wise, bank transfer or credit
+   * against their own subscription, and it has a clause for a partner outside
+   * Israel (their own tax reporting). The page's invoicing card, though, named
+   * only the Israeli case in Hebrew, English and Spanish, so a reader abroad
+   * concluded the program could not pay them — Oren read it that way himself on
+   * 9 October 2026. A rule that names one country's paperwork and not the other's
+   * is how a page refuses an audience the agreement accepts.
+   */
+  const ISRAEL: Record<(typeof LANGS)[number], string> = { he: 'ישראל', en: 'Israel', es: 'Israel', 'pt-BR': 'Israel' }
+  const OUTSIDE: Record<(typeof LANGS)[number], string> = { he: 'מחוץ לישראל', en: 'Outside Israel', es: 'Fuera de Israel', 'pt-BR': 'Fora de Israel' }
+  // The cards this rule is about: the ones that talk about invoicing or credit.
+  const PAPERWORK: Record<(typeof LANGS)[number], RegExp> = {
+    he: /חשבונית|קרדיט/,
+    en: /invoic|account credit/i,
+    es: /factura|crédito/i,
+    'pt-BR': /nota fiscal|crédito/i,
+  }
+  const paperworkCards = (lang: (typeof LANGS)[number]) =>
+    AFFILIATES_COPY[lang].rules.filter((r) => PAPERWORK[lang].test(`${r.title} ${r.body}`))
+  check('G1: every language has an invoicing card', LANGS.every((l) => paperworkCards(l).length > 0))
+  check('G2: a card that names Israel’s paperwork also says what happens outside Israel',
+    LANGS.every((l) => paperworkCards(l).every((r) => {
+      const text = `${r.title} ${r.body}`
+      return !text.includes(ISRAEL[l]) || text.includes(OUTSIDE[l])
+    })),
+    LANGS.filter((l) => paperworkCards(l).some((r) => {
+      const text = `${r.title} ${r.body}`
+      return text.includes(ISRAEL[l]) && !text.includes(OUTSIDE[l])
+    })).join(', '))
+  // The premise of the rule: the form expects applicants from anywhere, so it
+  // asks the country rather than assuming one.
+  check('G3: the application form asks the applicant’s country',
+    /country: ''/.test(strip(read('components/public/AffiliateApplicationForm.tsx')))
+    && LANGS.every((l) => AFFILIATE_FORM_COPY[l].country.length > 1))
+  /* G2-MUT: the wording this page actually carried until 9 October 2026, run
+     through G2's own predicate. Each of the three must be rejected. */
+  const israelOnly = (lang: (typeof LANGS)[number], title: string, body: string) => {
+    const text = `${title} ${body}`
+    return text.includes(ISRAEL[lang]) && !text.includes(OUTSIDE[lang])
+  }
+  check('G2-MUT: the three Israel-only cards the page used to carry are caught',
+    israelOnly('he', 'חשבונית בישראל', 'שותף ישראלי מוציא לנו חשבונית. מי שאין לו עוסק יכול לקבל במקום זה קרדיט בחשבון.')
+    && israelOnly('en', 'Invoices in Israel', 'Israeli affiliates invoice us. Anyone without a registered business can take account credit instead.')
+    && israelOnly('es', 'Factura en Israel', 'Los afiliados en Israel nos emiten factura. Quien no tenga actividad dada de alta puede recibir crédito en su cuenta.'))
+  check('G2-MUT2: the wording now on the page passes that same predicate',
+    LANGS.every((l) => paperworkCards(l).every((r) => !israelOnly(l, r.title, r.body))))
+  /* G3-MUT: a form that dropped the country field — G3 must fail on it. */
+  check('G3-MUT: a form with no country field is caught',
+    !/country: ''/.test(strip(read('components/public/AffiliateApplicationForm.tsx')).replace("country: ''", "")))
 }
 
 console.log(`\n${pass} passed, ${fail} failed`)
