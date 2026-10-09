@@ -294,7 +294,8 @@ async function main() {
       check(`F8: ${rel} adds NO state, URL parameter, cookie or persistence for it`,
         !/useState|searchParams|document\.cookie|localStorage/.test(src))
       check(`F9: ${rel} keeps the "most popular" treatment pinned to Advanced`,
-        /const HIGHLIGHTED_PLAN: PlanCode = 'advanced'/.test(src))
+        /HIGHLIGHTED_PLAN/.test(src) && !/const HIGHLIGHTED_PLAN/.test(src)
+        && /export const HIGHLIGHTED_PLAN: PlanCode = 'advanced'/.test(read('lib/plans/features.ts')))
     }
   }
 

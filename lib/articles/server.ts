@@ -10,6 +10,7 @@
  * Four copies of it would have been four places to forget a fix, so the layouts
  * are now four thin files that pass their locale in.
  */
+import { cache } from 'react'
 import type { Metadata } from 'next'
 import { createClient } from '@/lib/supabase/server'
 import { ARTICLES_COPY, articleHref, articlesIndexHref } from '@/lib/articles/i18n'
@@ -42,8 +43,12 @@ export interface PublicArticle {
  * The `locale` filter is the same one the page body applies: a layout that
  * resolved the row by slug alone would emit English metadata for a Hebrew
  * article whose slug was typed under /en.
+ *
+ * `cache()` because three callers in one request want the same row — the
+ * layout's metadata, its JSON-LD, and the page body, which is rendered on the
+ * server now rather than fetched again from the browser.
  */
-export async function getPublicArticle(slug: string, locale: PublicLocale): Promise<PublicArticle | null> {
+export const getPublicArticle = cache(async (slug: string, locale: PublicLocale): Promise<PublicArticle | null> => {
   const supabase = await createClient()
   const { data } = await supabase
     .from('articles')
@@ -54,7 +59,7 @@ export async function getPublicArticle(slug: string, locale: PublicLocale): Prom
     .single()
 
   return (data as PublicArticle | null) ?? null
-}
+})
 
 /**
  * The FAQ block of an article, as schema.org Questions.

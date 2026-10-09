@@ -1,7 +1,6 @@
-import { use } from 'react'
 import { ArticleView } from '@/components/public/articles/ArticleView'
 
-export default function ArticlePage({ params }: { params: Promise<{ slug: string }> }) {
-  const { slug } = use(params)
+export default async function ArticlePage({ params }: { params: Promise<{ slug: string }> }) {
+  const { slug } = await params
   return <ArticleView locale="he" slug={slug} />
 }
