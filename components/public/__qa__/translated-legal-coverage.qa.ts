@@ -1038,6 +1038,144 @@ const CAPI_CATEGORY: Record<string, RegExp> = {
     !CAPI_WITHDRAW.en.test('Withdrawing your consent stops the tags in your browser from collecting.'))
 }
 
+// ── 20) the emails we send a customer, and what each unsubscribe stops ────
+/*
+ * Until today the product sent no customer email at all, and the documents
+ * described a MONTHLY progress report while the in-app switch has always said
+ * weekly — with four projects already switched on. The switch is what the
+ * customer relied on, so the documents moved to weekly, in the product's own
+ * words, rather than the sender moving to monthly.
+ *
+ * The setup emails are new, and they sit on a line worth naming. Under s.30A of
+ * the Communications Law a "דבר פרסומת" is a message whose content is
+ * commercial advertising or encouragement to spend money. A nudge to a customer
+ * about the service they opened themselves, carrying no offer, no price, no
+ * discount and no upgrade, is a service message and needs no `פרסומת` label,
+ * sender block or statutory opt-out. One sentence offering anything would turn
+ * it into advertising and all three would be owed at once, which is why the
+ * four no-offer words are pinned here and why the email thread pinned the same
+ * boundary against its own dictionaries.
+ *
+ * The unsubscribe is pinned per SCOPE, which is the part a reader cannot guess
+ * and the part that can quietly harm them: the link in a setup email stops the
+ * setup emails only and says so, while the link in a reminder or in the weekly
+ * summary stops everything about that project. A single link that silently
+ * killed the approval reminder would leave an owner paying for a service that
+ * had stopped telling them anything, so a text that described one undifferentiated
+ * stop is caught below.
+ *
+ * Two accuracy promises ride along because they are cheap to keep and cheap to
+ * break: a section that could not be read is left out rather than reported as a
+ * zero, so no email states a number we did not measure; and we read nothing
+ * about what the recipient did with the message — no open pixel, no click
+ * tracking, no rewritten links.
+ */
+const EMAIL_WEEKLY: Record<string, RegExp[]> = {
+  he: [/<strong>סיכום שבועי:<\/strong>/, /ורק כשיש מה לספר; בשבוע שבו לא קרה כלום לא יישלח מייל/],
+  en: [/<strong>Weekly summary:<\/strong>/, /and only when there is something to say; a week\s*with nothing in it gets no email/],
+  es: [/\*\*Resumen semanal:\*\*/, /y solo cuando hay algo que contar; una semana en la que no pasó nada no recibe correo/],
+  'pt-BR': [/\*\*Resumo semanal:\*\*/, /e somente quando há algo a contar; uma semana em que nada aconteceu não recebe e-mail/],
+}
+/* No monthly report may survive anywhere in either document: the switch says weekly. */
+const EMAIL_NO_MONTHLY: Record<string, RegExp> = {
+  // Narrow on purpose: a bare /חודשי/ also matches "מנוי חודשי", the monthly
+  // subscription, which is true and stays.
+  he: /(דוח התקדמות חודשי|סיכום חודשי)/,
+  en: /[Mm]onthly (progress )?(report|summary)/,
+  es: /[Ii]nforme mensual/,
+  'pt-BR': /[Rr]elatório mensal/,
+}
+const EMAIL_SETUP_NO_OFFER: Record<string, RegExp> = {
+  he: /אין בהם הצעה, אין מחיר, אין הנחה ואין שדרוג/,
+  en: /They carry no offer, no price, no discount and no\s*upgrade/,
+  es: /No llevan oferta, ni precio, ni descuento, ni mejora de plan/,
+  'pt-BR': /Eles não trazem oferta, nem preço, nem desconto, nem upgrade/,
+}
+const EMAIL_SCOPE_NARROW: Record<string, RegExp> = {
+  he: /קישור ההסרה במייל הקמה מפסיק את מיילי ההקמה בלבד/,
+  en: /The unsubscribe link in a setup email stops the\s*setup emails only/,
+  es: /El enlace de baja de un correo de puesta en marcha detiene solo esos correos/,
+  'pt-BR': /O link de cancelamento de um e-mail de início interrompe somente esses e-mails/,
+}
+const EMAIL_SCOPE_WIDE: Record<string, RegExp> = {
+  he: /קישור ההסרה בתזכורת או בסיכום השבועי מפסיק כל מייל על אותו פרויקט/,
+  en: /The unsubscribe link in a reminder or in the weekly summary\s*stops every email about that project/,
+  es: /El enlace de baja de un recordatorio o del resumen semanal detiene todos los correos sobre ese proyecto/,
+  'pt-BR': /O link de cancelamento de um lembrete ou do resumo semanal interrompe todos os e-mails sobre aquele projeto/,
+}
+const EMAIL_SWITCH_TRUTH: Record<string, RegExp> = {
+  he: /המתג שאתה רואה בהגדרות הוא התמונה\s*המלאה/,
+  en: /the switch you see in the settings is the whole picture/,
+  es: /el interruptor que usted ve en los ajustes es el panorama completo/,
+  'pt-BR': /a chave que você vê nas configurações é o quadro completo/,
+}
+const EMAIL_NO_FAKE_ZERO: Record<string, RegExp> = {
+  he: /סעיף שלא הצלחנו לקרוא מושמט מהמייל ואינו מדווח כאפס/,
+  en: /A section we could not read is left out of the email rather than\s*reported as a zero/,
+  es: /Una sección que no pudimos leer se omite del correo en lugar de informarse como un cero/,
+  'pt-BR': /Uma seção que não conseguimos ler é omitida do e-mail em vez de ser informada como zero/,
+}
+const EMAIL_NO_TRACKING: Record<string, RegExp> = {
+  he: /אין בהודעות שלנו פיקסל שמדווח על פתיחה, איננו\s*עוקבים אחרי לחיצות/,
+  en: /Our messages carry no pixel that reports an\s*open, we do not track clicks/,
+  es: /Nuestros mensajes no llevan ningún píxel que informe de una apertura, no seguimos los clics/,
+  'pt-BR': /As nossas mensagens não trazem nenhum pixel que informe uma abertura, não rastreamos cliques/,
+}
+{
+  const read = (path: string) => (existsSync(path) ? readFileSync(path, 'utf8') : '')
+  const enPrivacySource = frontMatter(text[LOCALES[0]].privacy).source
+  const enTermsSource = frontMatter(text[LOCALES[0]].terms).source
+  const privacyDocs: [string, string][] = [
+    ['he', read(HEBREW_PRIVACY)],
+    ['en', enPrivacySource ? read(enPrivacySource) : ''],
+    ...LOCALES.map((l): [string, string] => [l, text[l].privacy]),
+  ]
+  const termsDocs: [string, string][] = [
+    ['he', read(HEBREW_TERMS)],
+    ['en', enTermsSource ? read(enTermsSource) : ''],
+    ...LOCALES.map((l): [string, string] => [l, text[l].terms]),
+  ]
+  for (const [name, privacy] of privacyDocs) {
+    for (const must of EMAIL_WEEKLY[name] ?? []) {
+      check(`${name}/privacy: the summary is weekly and only when there is something (${must.source.slice(0, 40)})`, must.test(privacy))
+    }
+    const offer = EMAIL_SETUP_NO_OFFER[name]
+    if (offer) check(`${name}/privacy: the setup emails carry no offer, price, discount or upgrade`, offer.test(privacy))
+    const narrow = EMAIL_SCOPE_NARROW[name]
+    if (narrow) check(`${name}/privacy: a setup-email unsubscribe stops the setup emails ONLY`, narrow.test(privacy))
+    const wide = EMAIL_SCOPE_WIDE[name]
+    if (wide) check(`${name}/privacy: a reminder or summary unsubscribe stops every email about the project`, wide.test(privacy))
+    const truth = EMAIL_SWITCH_TRUTH[name]
+    if (truth) check(`${name}/privacy: the settings switch is stated to be the whole picture`, truth.test(privacy))
+    const zero = EMAIL_NO_FAKE_ZERO[name]
+    if (zero) check(`${name}/privacy: an unreadable section is omitted, never reported as a zero`, zero.test(privacy))
+    const tracked = EMAIL_NO_TRACKING[name]
+    if (tracked) check(`${name}/privacy: no open pixel, no click tracking, no rewritten links`, tracked.test(privacy))
+  }
+  /* The monthly promise is gone from BOTH documents, in every language. */
+  for (const [name, doc] of [...privacyDocs, ...termsDocs]) {
+    const monthly = EMAIL_NO_MONTHLY[name]
+    if (!monthly || !doc) continue
+    const emailHalf = doc.split(/Email Messages|הודעות דוא|Mensajes de correo|Mensagens de e-mail/)[1] ?? ''
+    const half = emailHalf.slice(0, 3000)
+    check(`${name}: the email section no longer promises a monthly report`, !monthly.test(half))
+  }
+  check('mutation control: a weekly summary promised every week is caught',
+    !EMAIL_WEEKLY.en[1].test('The summary goes out on Sunday morning, every week.'))
+  check('mutation control: a monthly report left in the email section is caught',
+    EMAIL_NO_MONTHLY.en.test('<strong>Monthly progress report:</strong> a monthly summary of the project.'))
+  check('mutation control: a setup email that offers an upgrade is caught',
+    !EMAIL_SETUP_NO_OFFER.en.test('They carry a link to the in-app guide, the WhatsApp number and an offer to upgrade.'))
+  check('mutation control: one undifferentiated unsubscribe is caught',
+    !EMAIL_SCOPE_NARROW.en.test('The unsubscribe link stops every email about the project.'))
+  check('mutation control: a wide link described as narrow is caught',
+    !EMAIL_SCOPE_WIDE.en.test('The unsubscribe link in a reminder stops the reminders.'))
+  check('mutation control: an email that reports an unread section as zero is caught',
+    !EMAIL_NO_FAKE_ZERO.en.test('A section we could not read is reported as zero so the email stays complete.'))
+  check('mutation control: open tracking put back is caught',
+    !EMAIL_NO_TRACKING.en.test('Our messages report when they are opened so that we can measure delivery.'))
+}
+
 // ── MUTATION CONTROLS ───────────────────────────────────────────────────────
 console.log('\nmutation controls')
 {

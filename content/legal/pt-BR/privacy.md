@@ -179,7 +179,12 @@ Enviamos e-mail por meio do provedor de envio Resend, que recebe o seu endereço
 
 - **Mensagens de conta e de serviço:** cadastro, verificação, cobrança e avisos sobre o uso do Serviço.
 - **Lembretes:** quando há conteúdo aguardando a sua aprovação, um lembrete pode ser enviado. Todo lembrete tem um link de cancelamento em um clique, sem necessidade de login, e o cancelamento interrompe esses lembretes. A sua preferência é armazenada conosco.
-- **Relatório mensal de progresso:** um resumo mensal do projeto, para os projetos em que você o ativou nas configurações.
+- **E-mails de início:** se você abriu um projeto e não conectou um site a ele, ou conectou e nada foi publicado nele, podemos enviar até dois e-mails que explicam como concluir a etapa e levam à tela correspondente no aplicativo. **Eles não trazem oferta, nem preço, nem desconto, nem upgrade**: trazem um link para o guia dentro do aplicativo, o número do WhatsApp e um link de cancelamento. Um terceiro não é enviado, e não enviamos mais de um e-mail sobre o mesmo projeto em 72 horas.
+- **Resumo semanal:** um resumo do projeto, para os projetos em que você o ativou nas configurações. O resumo é enviado no domingo pela manhã, **e somente quando há algo a contar; uma semana em que nada aconteceu não recebe e-mail.** Uma seção que não conseguimos ler é omitida do e-mail em vez de ser informada como zero, para que o e-mail nunca apresente um número que não medimos.
+
+**Cancelar, no alcance que você pediu.** O link de cancelamento de um e-mail de início interrompe somente esses e-mails, e a página a que ele leva diz a você claramente que os lembretes e o resumo semanal continuam chegando, e oferece um clique para interromper esses também. O link de cancelamento de um lembrete ou do resumo semanal interrompe todos os e-mails sobre aquele projeto. Reativar a chave de e-mail do projeto nas configurações anula qualquer um desses cancelamentos, de modo que a chave que você vê nas configurações é o quadro completo.
+
+**Não medimos o que você fez com o e-mail.** As nossas mensagens não trazem nenhum pixel que informe uma abertura, não rastreamos cliques e não reescrevemos os links dentro delas para encaminhar você por nós.
 
 ## Como podemos entrar em contato com você por causa de uma verificação gratuita
 
