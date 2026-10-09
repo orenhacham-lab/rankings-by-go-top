@@ -22,10 +22,16 @@
  *  D) NEVER BREAKS A SIGNUP. A rejecting or throwing Graph API returns a
  *     result, never an exception.
  *
- *  E) THE CALL SITES. Both are inside a fresh-signup gate: /api/auth/callback
- *     for Google and email confirmation, /api/send-notification-email for
- *     email+password. A conversion that fired for an ordinary sign-in would
- *     report one account many times.
+ *  E) CONSENT, AND NOTHING ELSE, OPENS THE DOOR. Legal review made marketing
+ *     consent the basis in all three regions, with no regional split, so the
+ *     one route that may send must refuse on anything short of an explicit
+ *     yes: a missing body, a malformed body, a `marketing` that is not literal
+ *     `true`, and an unanswered banner all count as a refusal (GDPR Art.
+ *     4(11): silence is not consent). It must also refuse an account that is
+ *     not new, or one visit to the dashboard would report the same person
+ *     again and again. E6 pins the other half of that promise: the free
+ *     check's email-marketing consent is a different purpose and must never
+ *     be read here. E7 keeps every other module out of the sender.
  *
  * Every group has a mutation control.
  */
@@ -158,27 +164,49 @@ async function main() {
     check('MUT: dropping the abort signal fails D3', !/signal: controller\.signal/.test(source.replace('signal: controller.signal', '')))
   }
 
-  console.log('E) both call sites, each behind a fresh-signup gate')
+  console.log('E) consent, and a new account, are what let an event out')
   {
-    const callback = strip(read('app/api/auth/callback/route.ts'))
-    const emailRoute = strip(read('app/api/send-notification-email/route.ts'))
+    const route = strip(read('app/api/analytics/signup-conversion/route.ts'))
+    const reporter = strip(read('components/analytics/SignupConversionReporter.tsx'))
 
-    const gatedIn = (src: string) => {
-      const at = src.indexOf('reportSignupConversion({')
-      if (at === -1) return false
-      // Walk back to the enclosing `if (...isFreshSignup...)` without leaving the function.
-      const before = src.slice(0, at)
-      const lastGate = before.lastIndexOf('isFreshSignup(')
-      if (lastGate === -1) return false
-      // Nothing may close that block between the gate and the call.
-      return !/\n  \}\n/.test(before.slice(lastGate))
+    check('E1: the route refuses a visitor with no session', /if \(!user\) return NextResponse\.json\(\{ error: 'Unauthorized' \}/.test(route))
+    check('E2: the route refuses an account that is not brand new', /if \(!isFreshSignup\(user\)\) return/.test(route))
+    check('MUT: dropping the freshness gate fails E2', !/if \(!isFreshSignup\(user\)\) return/.test(route.replace('if (!isFreshSignup(user)) return', 'if (false) return')))
+
+    // The consent test itself: literal `true`, reached through a try/catch so
+    // a body that is absent or not JSON cannot throw its way past the gate.
+    check('E3: only literal true counts as consent', /\.marketing === true/.test(route))
+    check('E4: a body that cannot be parsed is a refusal, not an error',
+      /catch \{\s*return false/.test(route) && /if \(!\(await marketingConsented\(request\)\)\) \{/.test(route))
+    check('MUT: a truthy test instead of === true fails E3', !/\.marketing === true/.test(route.replace('.marketing === true', '.marketing')))
+    check('MUT: a consent check that throws past the gate fails E4', !/catch \{\s*return false/.test(route.replace('catch {\n    return false', 'catch {\n    return true')))
+
+    // The route must take only the one boolean from the body. Everything that
+    // identifies the person comes from the verified session.
+    check('E5: identity comes from the session, never from the request body',
+      /user\.id/.test(route) && /user\.email/.test(route) && !/body.*email/i.test(route))
+
+    // Consent to receive marketing email is not consent to send an identifier
+    // to an ad network: the free check's version string must not appear.
+    for (const file of ['app/api/analytics/signup-conversion/route.ts', 'components/analytics/SignupConversionReporter.tsx', 'lib/analytics/meta-capi.ts']) {
+      check(`E6 (${file.split('/').pop()}): the free check's email consent is never reused`,
+        !strip(read(file)).includes('marketing-email-v1'))
     }
-    check('E1: the auth callback reports only a fresh signup', gatedIn(callback))
-    check('E2: the email+password route reports only a fresh signup', gatedIn(emailRoute))
-    check('MUT: an ungated call fails the gate check',
-      !gatedIn(emailRoute.replace(/if \(isFreshSignup\(user\)\) \{/, 'if (true) {').replace('isFreshSignup', 'xx')))
-    check('E3: neither call site is given a raw email to send on',
-      /email: user\.email/.test(callback) && /email: user\.email/.test(emailRoute))
+
+    // One sender, one caller. A second call site could bypass the gate.
+    const callers = ['app/api/auth/callback/route.ts', 'app/api/send-notification-email/route.ts']
+    for (const file of callers) {
+      check(`E7 (${file.split('/').slice(-2)[0]}): the old ungated call site is gone`,
+        !strip(read(file)).includes('reportSignupConversion'))
+    }
+
+    // The browser side: it reports the live choice, and no decision is a no.
+    check('E8: the reporter sends the current marketing choice and nothing else',
+      /currentChoices\(\)\.marketing === true/.test(reporter) && /JSON\.stringify\(\{ marketing:/.test(reporter))
+    check('MUT: a reporter that hard-codes consent fails E8',
+      !/currentChoices\(\)\.marketing === true/.test(reporter.replace('currentChoices().marketing === true', 'true')))
+    check('E9: a storage failure does not stop the post, because the server deduplicates',
+      /catch \{/.test(reporter) && reporter.indexOf('catch {') < reporter.indexOf('void fetch('))
   }
 
   console.log(`\n${pass} passed, ${fail} failed`)

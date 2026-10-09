@@ -7,7 +7,6 @@ import { createAdminClient } from '@/lib/supabase/admin'
 import { ensureDefaultClient } from '@/lib/clients/ensure-default-client'
 import { sanitizeNextPath } from '@/lib/i18n/request-locale'
 import { isFreshSignup, sendSignupNotification } from '@/lib/notifications/signup-email'
-import { reportSignupConversion } from '@/lib/analytics/meta-capi'
 import { resolveSignupSite } from '@/lib/notifications/signup-site'
 import { RESET_PASSWORD_PATH, recoveryFailureUrl } from '@/lib/auth/password-reset'
 import { SEED_CLAIM_COOKIE } from '@/lib/onboarding/claim-cookie'
@@ -119,19 +118,6 @@ async function signedIn(
       console.error('[Signup] Failed to send notification email:', emailError instanceof Error ? emailError.name : 'unknown')
       // Don't fail the signup if email fails
     }
-
-    // The same new account, reported to Meta from here instead of from a tag in
-    // the browser: the pixel only loads once a visitor accepts analytics or
-    // marketing, so most signups were never measured. Hashed email and hashed
-    // user id only, deduplicated on a per-account event id, and inert until the
-    // deployment is given META_CAPI_PIXEL_ID and META_CAPI_ACCESS_TOKEN
-    // (lib/analytics/meta-capi.ts). Never allowed to affect the sign-in.
-    await reportSignupConversion({
-      userId: user.id,
-      email: user.email,
-      createdAt: user.created_at,
-      sourceUrl: origin ? `${origin}/signup` : null,
-    })
   }
 
   // Area G — preserve the signup-origin language through the hop. The durable

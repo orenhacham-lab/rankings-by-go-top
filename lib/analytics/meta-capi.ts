@@ -10,8 +10,9 @@
  * signal does not depend on a tag loading in the browser.
  *
  * WHAT IT SENDS, AND WHAT IT DELIBERATELY DOES NOT.
- *   sends    one CompleteRegistration per account, with the email and the
- *            Supabase user id SHA-256 hashed (Meta's required normalisation:
+ *   sends    one CompleteRegistration per account — that event and no other;
+ *            a page view or a lead event would need its own disclosure — with
+ *            the email and the Supabase user id SHA-256 hashed (Meta's required normalisation:
  *            trimmed, lower-cased), the event time, and the page the signup
  *            finished on.
  *   never    the raw email, a name, a phone number, the visitor's IP address
@@ -27,11 +28,17 @@
  * which is the step to take after the privacy policy names Meta for this
  * purpose. META_CAPI_DISABLED=true is the kill switch once they do.
  *
- * SENT TWICE IS COUNTED ONCE. Both signup doors (the auth callback, and
- * /api/send-notification-email for email+password) fire on a 30-minute
- * freshness window, so one account can reach here more than once. The event id
- * is derived from the user id, and Meta deduplicates on it, so a repeat is
- * collapsed rather than inflating the count.
+ * CONSENT IS THE DOOR, AND IT IS NOT IN THIS FILE. Legal review (2026-10-09)
+ * made the visitor's marketing consent the basis in all three regions we sell
+ * in, with no regional split: no consent, no event. That decision lives in
+ * localStorage, so only the browser can report it, and the one caller is
+ * app/api/analytics/signup-conversion/route.ts, which refuses anything that is
+ * not an explicit yes. Nothing else may call `sendSignupConversion`.
+ *
+ * SENT TWICE IS COUNTED ONCE. The dashboard is reached again and again, and a
+ * new account stays "fresh" for thirty minutes, so the reporter can fire more
+ * than once for one person. The event id is derived from the user id, and Meta
+ * deduplicates on it, so a repeat is collapsed rather than inflating the count.
  *
  * BEST EFFORT. A failure is logged by name and swallowed: measurement never
  * breaks a signup.

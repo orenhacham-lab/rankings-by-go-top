@@ -6,6 +6,7 @@ import WorkspaceSwitcher from '@/components/layout/WorkspaceSwitcher'
 import GuideMenu from '@/components/guide/GuideMenu'
 import ContactMenu from '@/components/guide/ContactMenu'
 import DemoFloatApp from '@/components/guide/DemoFloatApp'
+import SignupConversionReporter from '@/components/analytics/SignupConversionReporter'
 import TopBarActions from '@/components/layout/TopBarActions'
 import TrialBar from '@/components/layout/TrialBar'
 import { TRIAL_BAR_HIDE_COOKIE, trialBarDismissed } from '@/lib/billing/trial-bar-dismissal'
@@ -124,6 +125,9 @@ export default async function DashboardLayout({
                 {/* The floating "free demo" offer (w11): customers only, like the
                     contact pill above and the rail's support row. */}
                 {!isAdmin && <DemoFloatApp />}
+                {/* Carries the banner's marketing choice to the server once, so a
+                    brand new account can be reported to Meta. Renders nothing. */}
+                {!isAdmin && <SignupConversionReporter />}
                 <Suspense fallback={null}>
                   <TrialBarSlot userId={user.id} />
                 </Suspense>
