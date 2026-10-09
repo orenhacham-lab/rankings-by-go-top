@@ -1561,8 +1561,10 @@ const PLUGIN_DOES: Record<string, RegExp[]> = {
 
 // ── 23) no double billing when a Shopify store joins a PayPal account ───────
 /*
- * Oren decided on 2026-10-09 that a paid plan can be bought only after a site
- * is connected, and that double billing must be impossible. The code that
+ * Oren decided on 2026-10-09 that double billing must be impossible, and
+ * chose the narrow rule: PayPal checkout is closed while a Shopify store
+ * with the app installed is connected to the account. Nothing else about
+ * when a plan can be bought changes. The code that
  * carries the decision (PR #152) does three things a merchant pays money on,
  * so the terms have to state all three or we are charging — and stopping a
  * charge — on a description nobody read:
