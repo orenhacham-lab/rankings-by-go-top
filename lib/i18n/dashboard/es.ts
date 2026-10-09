@@ -2625,7 +2625,7 @@ export const dashboardEs: DeepPartial<DashboardDictionary> = {
   },
   reminders: {
     settingsTitle: 'Recordatorios por correo',
-    settingsDescription: 'Cuando haya artículos esperando tu aprobación te enviamos un recordatorio breve: a las 48 horas, a los 5 días y después una vez por semana (hasta 3 recordatorios por los mismos artículos). Nunca más de un correo cada 3 días, y solo por las mañanas de lunes a viernes.',
+    settingsDescription: 'Cuando haya artículos esperando tu aprobación te enviamos un recordatorio breve: a las 48 horas, a los 5 días y después una vez por semana (hasta 3 recordatorios por los mismos artículos). Nunca más de un correo cada 3 días, y solo por las mañanas de lunes a viernes. Este interruptor cubre también los correos de puesta en marcha: cuando la web todavía no está conectada, o cuando aún no se ha publicado nada en ella.',
     settingsLabel: 'Avísame por correo cuando haya artículos esperando aprobación',
     on: 'Activado',
     off: 'Desactivado',
@@ -2650,7 +2650,7 @@ export const dashboardEs: DeepPartial<DashboardDictionary> = {
     },
     unsubscribePage: {
       title: 'Te has dado de baja',
-      body: 'Ya no te enviaremos recordatorios por correo sobre los artículos que esperan tu aprobación. Puedes volver a activarlos cuando quieras en los ajustes de la web.',
+      body: 'Ya no te enviaremos correos sobre esta web: ni recordatorios de los artículos que esperan tu aprobación, ni correos de puesta en marcha. Puedes volver a activarlos cuando quieras en los ajustes de la web.',
       invalidTitle: 'Este enlace no es válido',
       invalidBody: 'El enlace no es válido o ha caducado. Puedes desactivar los recordatorios en los ajustes de la web.',
       back: 'Ir a la web',
@@ -6221,4 +6221,37 @@ export const dashboardEs: DeepPartial<DashboardDictionary> = {
     },
   },
   researchCompetitive: researchCompetitiveEs,
+  onboardingEmails: {
+    greeting: (name: string | null) => (name ? `Hola ${name}:` : 'Hola:'),
+    guide: 'Hay una guía completa dentro de la aplicación, en el botón «Guía» de la parte superior de la pantalla.',
+    help: '¿Necesitas ayuda? Escríbenos por WhatsApp: +972 54-9489377',
+    team: 'El equipo de Go Top SEO',
+    footer: 'Recibes este mensaje porque abriste un proyecto en Go Top SEO. ¿No quieres estos correos?',
+    unsubscribe: 'Darse de baja con un clic, sin iniciar sesión',
+    company: 'Go Top SEO · oren@gotop.co.il',
+    connect: {
+      subject: (domain: string) => `${domain} aún no está conectado`,
+      preheader: 'Una conexión, y a partir de ahí el sistema trabaja solo.',
+      intro: (domain: string) => `Abriste un proyecto para ${domain}, pero el sitio todavía no está conectado. Hasta que lo esté podemos investigar y escribir, pero no publicar en el sitio ni corregir nada en él. Una vez conectado:`,
+      bullets: [
+        'Los artículos se publican solos, al ritmo de tu plan',
+        'La salud del sitio muestra lo que está roto, y se corrige con un clic',
+        'El seguimiento sigue funcionando en las páginas que ya tienes',
+      ],
+      outro: 'Conectarlo lleva unos minutos. En WordPress se instala un solo plugin, y conecta tanto la publicación como la salud del sitio.',
+      button: 'Conectar el sitio',
+    },
+    publish: {
+      subject: (domain: string) => `Todavía no se ha publicado nada en ${domain}`,
+      preheader: 'El contenido está escrito y espera tu aprobación.',
+      intro: (domain: string) => `${domain} está conectado, pero todavía no se ha publicado nada desde él. Lo que puedes hacer ahora:`,
+      bullets: [
+        'Aprobar un artículo que espera, y se publicará en la fecha prevista',
+        'Pedir otro tema, y lo escribimos de nuevo',
+        'Editar el texto antes de publicarlo, todo lo que quieras',
+      ],
+      outro: 'Hasta que lo apruebes, no se publica nada.',
+      button: 'Abrir la pantalla de contenido',
+    },
+  },
 }

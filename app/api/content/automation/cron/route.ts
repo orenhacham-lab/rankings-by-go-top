@@ -45,6 +45,7 @@ import { authorizeCronRequest } from '@/lib/auth/cron'
 import { resumeStalledSeedRuns, startIsolatedSeedResume } from '@/lib/seed-scan/resume'
 import { runTopicTopUp, startIsolatedTopUp } from '@/lib/content/automation/topic-topup'
 import { runIsolatedReminders } from '@/lib/reminders/isolated'
+import { runIsolatedOnboardingEmails } from '@/lib/onboarding-emails/isolated'
 
 // Generation can take a while; request a generous budget (platform clamps to the
 // plan's max — e.g. 60s on Hobby, up to 300s on Pro).
@@ -83,6 +84,11 @@ async function handle(request: Request): Promise<Response> {
     // Last of all, and off unless REMINDER_EMAILS_ENABLED is "true": the reminder email for
     // articles waiting for approval (lib/reminders). Isolated; it never throws or rejects.
     await runIsolatedReminders()
+    // Then, off unless ONBOARDING_EMAILS_ENABLED is "true": the setup emails for a project
+    // whose site is not connected, or that has never published (lib/onboarding-emails). It
+    // runs AFTER the reminder so that one email a morning per project is the reminder, not
+    // both. Isolated; it never throws or rejects.
+    await runIsolatedOnboardingEmails()
   })
   return Response.json({ ok: true, accepted: true, startedAt }, { status: 202 })
 }
