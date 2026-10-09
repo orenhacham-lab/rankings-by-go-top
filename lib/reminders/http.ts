@@ -12,22 +12,34 @@
  * UNSUBSCRIBE has no session, so the token IS the credential (lib/reminders/token.ts): the
  * project it names is looked up, its CURRENT owner read from the database, and the signature
  * must match that owner, or nothing changes. It only ever turns emails OFF, for that one
- * project, and turning off twice is the same as once. One click stops EVERY email about that
- * project, which is what the emails promise: the approval reminder and the setup emails
- * (project_reminder_state) and the weekly summary (project_report_preferences). The weekly
- * switch is also a settings control, so failing to reach it does not fail the unsubscribe:
- * the reminder switch is what the answer reports. GET (the link) shows a small page in
- * the language the email was in; POST is RFC 8058 one-click from a mail client. There is no
- * redirect anywhere, so there is no `next` and no way off the site.
+ * project, and turning off twice is the same as once.
+ *
+ * TWO SCOPES, because the emails are not all the same thing. Without `s` (the link in an
+ * approval reminder or a weekly summary) one click stops EVERY email about that project: the
+ * approval reminder and the setup emails (project_reminder_state) and the weekly summary
+ * (project_report_preferences). The weekly switch is also a settings control, so failing to
+ * reach it does not fail the unsubscribe: the reminder switch is what the answer reports.
+ * With `s=setup` (the link in a setup email, which says so in its own words) it stops the
+ * SETUP emails alone, so an owner who is tired of being nudged does not silently lose the
+ * reminder that asks him to approve the article he is paying for. The page then says exactly
+ * what stopped and offers one click to stop the rest. `s` is not signed, and it does not
+ * need to be: it can only ever narrow what is turned off, and the owner can always come back
+ * to the page or to the settings screen for the rest.
+ *
+ * GET (the link) shows a small page in the language the email was in; POST is RFC 8058
+ * one-click from a mail client. There is no redirect anywhere, so there is no `next` and no
+ * way off the site.
  *
  * No database or provider text reaches an answer or a log line.
  */
 import type { ServiceRoleClient } from '@/lib/supabase/admin'
 import { escapeEmailHtml } from '@/lib/notifications/signup-email'
+import { UNSUBSCRIBE_PATH } from './email'
 import { getDashboardDictionary } from '@/lib/i18n/dashboard/getDashboardDictionary'
 import { normalizeLocale } from '@/lib/i18n/dashboard/locale'
 import type { Locale } from '@/lib/i18n/locales'
 import { readState, writeEnabled } from './state'
+import { clearOnboardingOptOut, writeOnboardingOptOut } from '@/lib/onboarding-emails/state'
 import { writeWeeklyOff } from '@/lib/reports/weekly/store'
 import { tokenProjectId, verifyUnsubscribeToken } from './token'
 
@@ -76,7 +88,11 @@ export async function handlePreferencesPut(request: Request, deps: ReminderRoute
   try {
     const admin = deps.admin()
     if (!(await ownedProject(admin, body.projectId, userId))) return json(404, { ok: false, code: 'not_found' })
-    const result = await writeEnabled(admin, body.projectId, userId, body.enabled, deps.now().toISOString())
+    const at = deps.now().toISOString()
+    const result = await writeEnabled(admin, body.projectId, userId, body.enabled, at)
+    // Turning the switch back on is the whole switch: it also undoes a "stop the setup
+    // emails" click. Best effort, so a database without that column leaves the switch working.
+    if (result === 'ok' && body.enabled) await clearOnboardingOptOut(admin, body.projectId, userId, at).catch(() => undefined)
     if (result === 'unavailable') return json(503, { ok: false, code: 'unavailable' })
     if (result === 'failed') return json(500, { ok: false, code: 'internal' })
     return json(200, { ok: true, enabled: body.enabled })
@@ -89,8 +105,18 @@ export async function handlePreferencesPut(request: Request, deps: ReminderRoute
 
 export type UnsubscribeOutcome = 'done' | 'invalid' | 'unavailable'
 
-/** Verify the token against the project's current owner, then turn that project's reminders off. */
-export async function unsubscribeByToken(token: unknown, deps: Pick<ReminderRouteDeps, 'admin' | 'now' | 'env'>): Promise<UnsubscribeOutcome> {
+/** What the link asks to stop: every email about the project, or the setup emails alone. */
+export type UnsubscribeScope = 'all' | 'setup'
+
+/** The scope a link carries. Anything but the one known narrowing means "all". */
+export function unsubscribeScope(raw: unknown): UnsubscribeScope {
+  return raw === 'setup' ? 'setup' : 'all'
+}
+
+/** Verify the token against the project's current owner, then turn that project's emails off. */
+export async function unsubscribeByToken(
+  token: unknown, deps: Pick<ReminderRouteDeps, 'admin' | 'now' | 'env'>, scope: UnsubscribeScope = 'all',
+): Promise<UnsubscribeOutcome> {
   const projectId = tokenProjectId(token)
   if (!projectId) return 'invalid'
   try {
@@ -100,6 +126,10 @@ export async function unsubscribeByToken(token: unknown, deps: Pick<ReminderRout
     if (error || !row || row.id !== projectId || typeof row.user_id !== 'string') return 'invalid'
     if (!verifyUnsubscribeToken(token, projectId, row.user_id, deps.env)) return 'invalid'
     const at = deps.now().toISOString()
+    if (scope === 'setup') {
+      const only = await writeOnboardingOptOut(admin, projectId, row.user_id, at)
+      return only === 'ok' ? 'done' : 'unavailable'
+    }
     const result = await writeEnabled(admin, projectId, row.user_id, false, at)
     await writeWeeklyOff(admin, projectId, row.user_id, at).catch(() => undefined)
     return result === 'ok' ? 'done' : 'unavailable'
@@ -115,18 +145,30 @@ const HEADERS = {
   'x-robots-tag': 'noindex, nofollow',
 }
 
-export function unsubscribePage(locale: Locale, ok: boolean): string {
+/**
+ * The page the link shows. It never claims more than happened: the `setup` scope says the
+ * setup emails stopped and that the rest keeps coming, with one link to stop the rest too.
+ * `stopAllHref` is built from the same request's own token, so the page can offer that
+ * click without a login.
+ */
+export function unsubscribePage(locale: Locale, ok: boolean, opts: { scope?: UnsubscribeScope; stopAllHref?: string } = {}): string {
   const t = getDashboardDictionary(locale).reminders.unsubscribePage
   const e = escapeEmailHtml
   const rtl = locale === 'he'
+  const setup = ok && opts.scope === 'setup'
+  const title = ok ? (setup ? t.setupTitle : t.title) : t.invalidTitle
+  const body = ok ? (setup ? t.setupBody : t.body) : t.invalidBody
+  const more = setup && opts.stopAllHref
+    ? `<p style="margin:0 0 20px;font-size:15px;line-height:1.6;"><a href="${e(opts.stopAllHref)}" style="color:#0070d6;">${e(t.stopAll)}</a></p>`
+    : ''
   return `<!doctype html>
-<html lang="${locale}" dir="${rtl ? 'rtl' : 'ltr'}"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex,nofollow"><title>${e(ok ? t.title : t.invalidTitle)}</title></head>
+<html lang="${locale}" dir="${rtl ? 'rtl' : 'ltr'}"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex,nofollow"><title>${e(title)}</title></head>
 <body style="margin:0;background:#f4f7fb;font-family:Arial,Helvetica,sans-serif;color:#0a1b3d;">
 <main style="max-width:480px;margin:12vh auto 0;padding:0 16px;">
 <div style="background:#fff;border:1px solid #e3e9f2;border-radius:14px;padding:28px 24px;">
-<h1 style="margin:0 0 12px;font-size:22px;">${e(ok ? t.title : t.invalidTitle)}</h1>
-<p style="margin:0 0 20px;font-size:16px;line-height:1.6;">${e(ok ? t.body : t.invalidBody)}</p>
-<a href="/" style="display:inline-block;background:#0070d6;color:#fff;text-decoration:none;font-weight:700;padding:10px 20px;border-radius:10px;">${e(t.back)}</a>
+<h1 style="margin:0 0 12px;font-size:22px;">${e(title)}</h1>
+<p style="margin:0 0 20px;font-size:16px;line-height:1.6;">${e(body)}</p>
+${more}<a href="/" style="display:inline-block;background:#0070d6;color:#fff;text-decoration:none;font-weight:700;padding:10px 20px;border-radius:10px;">${e(t.back)}</a>
 </div></main></body></html>`
 }
 
@@ -134,10 +176,15 @@ export async function handleUnsubscribe(request: Request, deps: Pick<ReminderRou
   const url = new URL(request.url)
   const post = request.method === 'POST'
   const locale: Locale = normalizeLocale(url.searchParams.get('lang')) ?? 'he'
-  const outcome = await unsubscribeByToken(url.searchParams.get('t'), deps)
+  const token = url.searchParams.get('t')
+  const scope = unsubscribeScope(url.searchParams.get('s'))
+  const outcome = await unsubscribeByToken(token, deps, scope)
   if (post) {
     // RFC 8058: a mail client posts here, and reads only the status.
     return json(outcome === 'done' ? 200 : outcome === 'invalid' ? 400 : 503, { ok: outcome === 'done' })
   }
-  return new Response(unsubscribePage(locale, outcome === 'done'), { status: outcome === 'done' ? 200 : outcome === 'invalid' ? 400 : 503, headers: HEADERS })
+  // The same link without `s`: one click from the page stops every email about the project.
+  const stopAllHref = token ? `${UNSUBSCRIBE_PATH}?t=${encodeURIComponent(token)}&lang=${locale}` : undefined
+  const page = unsubscribePage(locale, outcome === 'done', { scope, stopAllHref })
+  return new Response(page, { status: outcome === 'done' ? 200 : outcome === 'invalid' ? 400 : 503, headers: HEADERS })
 }

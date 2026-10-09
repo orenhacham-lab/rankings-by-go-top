@@ -115,6 +115,15 @@ BEGIN
   r := try_as('service_role', NULL, $q$ UPDATE public.project_reminder_state SET onboarding_sent_count = 3
     WHERE project_id = 'a1111111-1111-1111-1111-111111111111' RETURNING 'updated' $q$);
   PERFORM chk(ph, 'a third setup email for one stage -> ' || r, (r = 'denied:23514') <> broken);
+  r := try_as('service_role', NULL, $q$ UPDATE public.project_reminder_state SET onboarding_opt_out = true
+      WHERE project_id = 'a1111111-1111-1111-1111-111111111111' $q$, 'updated');
+  PERFORM chk(ph, 'service_role records the narrow stop -> ' || r, r = 'ok:updated');
+  r := try_as('authenticated', '00000000-0000-0000-0000-00000000aaaa', $q$ UPDATE public.project_reminder_state SET onboarding_opt_out = true
+      WHERE project_id = 'a1111111-1111-1111-1111-111111111111' $q$, 'updated');
+  PERFORM chk(ph, 'the owner''s own browser session cannot write it -> ' || r, (r = 'denied:42501') <> broken);
+  r := try_as('service_role', NULL, $q$ UPDATE public.project_reminder_state SET onboarding_opt_out = false
+      WHERE project_id = 'a1111111-1111-1111-1111-111111111111' $q$, 'updated');
+  PERFORM chk(ph, 'and clears it again when the switch goes back on -> ' || r, r = 'ok:updated');
   r := try_as('service_role', NULL, $q$ UPDATE public.project_reminder_state SET onboarding_stage = 'publish', onboarding_sent_count = 2
     WHERE project_id = 'a1111111-1111-1111-1111-111111111111' RETURNING 'updated' $q$);
   PERFORM chk(ph, 'the second one, on a real stage -> ' || r, r = 'ok:updated');
@@ -138,6 +147,15 @@ BEGIN
   PERFORM chk('defaults', 'a row nothing was sent for has no stage and no date',
     (SELECT onboarding_stage IS NULL AND onboarding_sent_count = 0 AND onboarding_last_sent_at IS NULL
      FROM public.project_reminder_state WHERE project_id = 'a2222222-2222-2222-2222-222222222222'));
+  -- The narrow stop ("stop the setup emails, keep the reminder"): nobody is stopped unless
+  -- they asked, and asking never reaches the switch the owner pays for.
+  PERFORM chk('defaults', 'nobody is opted out of the setup emails by default',
+    (SELECT column_default FROM information_schema.columns
+     WHERE table_name = 'project_reminder_state' AND column_name = 'onboarding_opt_out') = 'false'
+    AND (SELECT bool_and(onboarding_opt_out = false) FROM public.project_reminder_state));
+  PERFORM chk('defaults', 'the opt-out column can never be null',
+    (SELECT is_nullable FROM information_schema.columns
+     WHERE table_name = 'project_reminder_state' AND column_name = 'onboarding_opt_out') = 'NO');
 END $$;
 
 SELECT run_checks('after');

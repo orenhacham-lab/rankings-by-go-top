@@ -15,6 +15,10 @@
  *   E) the copy: the switch and the unsubscribe page say these emails are covered too
  *   F) the cron: the setup step is last, after the reminder, isolated (throwing / hanging
  *      cannot reach the cron)
+ *   G) the two scopes: the link in a setup email stops THESE emails alone and leaves the
+ *      approval reminder and the weekly summary in place, says so, and offers one click for
+ *      the rest; the link in a reminder still stops everything; the settings switch turning
+ *      back on clears the narrow stop
  *
  * Every guard runs against the real code and again against a deliberately broken copy.
  * Nothing here talks to Resend or Supabase.
@@ -27,6 +31,8 @@ import type { ServiceRoleClient } from '@/lib/supabase/admin'
 import { getDashboardDictionary } from '@/lib/i18n/dashboard/getDashboardDictionary'
 import { PUBLIC_LOCALES } from '@/lib/i18n/locales'
 import { makeUnsubscribeToken, verifyUnsubscribeToken } from '@/lib/reminders/token'
+import { SETUP_UNSUBSCRIBE_SCOPE, unsubscribeUrlFor } from '@/lib/reminders/email'
+import { handlePreferencesPut, handleUnsubscribe, unsubscribeScope } from '@/lib/reminders/http'
 import { withMutant } from '@/lib/reminders/__qa__/_mutant'
 import { decideOnboardingEmail, stageOf, type OnboardingState } from '../cadence'
 import { actionPathFor, buildOnboardingEmail } from '../email'
@@ -66,7 +72,7 @@ async function main() {
   // ── A) cadence ────────────────────────────────────────────────────────────
   console.log('\nA) Cadence')
   const st = (over: Partial<OnboardingState> = {}): OnboardingState =>
-    ({ stage: null, sentCount: 0, lastSentAt: null, lastAnyAt: null, enabled: true, ...over })
+    ({ stage: null, sentCount: 0, lastSentAt: null, lastAnyAt: null, enabled: true, optedOut: false, ...over })
   const facts = (over: Partial<{ createdAt: string; connected: boolean; published: boolean }> = {}) =>
     ({ createdAt: before(10 * D), connected: false, published: false, ...over })
   const dec = (mod: { decideOnboardingEmail: typeof decideOnboardingEmail }, f = facts(), s: OnboardingState | null = null) =>
@@ -331,6 +337,11 @@ async function main() {
     check(`E2: ${locale} says the one switch and the one link cover the setup emails too`,
       text.toLowerCase().includes(marker.toLowerCase()), marker)
   }
+  for (const locale of PUBLIC_LOCALES) {
+    const d = getDashboardDictionary(locale)
+    check(`E2b: ${locale}'s setup email offers the narrow stop, not "unsubscribe from everything"`,
+      String(d.onboardingEmails.unsubscribe) !== String(d.reminders.email.unsubscribe) && d.onboardingEmails.unsubscribe.length > 10)
+  }
   check('E3: the email never promises anything about schema or a guide page that does not exist',
     !/schema|JSON-LD/i.test(JSON.stringify(getDashboardDictionary('en').onboardingEmails)))
 
@@ -365,6 +376,95 @@ async function main() {
       check('F-MUT: without the catch the cron would see the failure', threw)
     },
   )
+
+  // ── G) the two scopes ─────────────────────────────────────────────────────
+  console.log('\nG) The two scopes')
+  {
+    const env = { CRON_SECRET: SECRET }
+    const tok = makeUnsubscribeToken(P1, OWNER, env)!
+    const scopedWorld = () => new FakeAdmin({
+      projects: [{ id: P1, user_id: OWNER }],
+      project_reminder_state: [{ project_id: P1, user_id: OWNER, reminders_enabled: true, onboarding_opt_out: false, updated_at: before(30 * D) }],
+      project_report_preferences: [{ project_id: P1, user_id: OWNER, weekly_email_summary: true }],
+    })
+    const deps = (admin: FakeAdmin, user: string | null = null) =>
+      ({ userId: async () => user, admin: () => admin as unknown as ServiceRoleClient, now: () => now, env })
+    const link = (extra = '') => `https://app.example.com/api/reminders/unsubscribe?t=${encodeURIComponent(tok)}${extra}`
+    const state = (a: FakeAdmin) => (a.tables.project_reminder_state ?? []).find((r) => r.project_id === P1)
+    const weekly = (a: FakeAdmin) => (a.tables.project_report_preferences ?? []).find((r) => r.project_id === P1)
+
+    const setupMail = buildOnboardingEmail({ stage: 'connect', locale: 'he', firstName: null, domain: 'x.co', projectId: P1, origin: 'https://app.example.com', token: tok })
+    check('G1: a setup email asks for the narrow stop, a reminder asks for all of it',
+      setupMail.unsubscribeUrl.includes(`&s=${SETUP_UNSUBSCRIBE_SCOPE}`)
+      && !unsubscribeUrlFor('https://app.example.com', tok, 'he').includes('&s='), setupMail.unsubscribeUrl)
+    check('G2: only the one known value narrows anything',
+      unsubscribeScope('setup') === 'setup'
+      && (['all', 'SETUP', '', 'weekly', null, undefined, 1, {}] as unknown[]).every((v) => unsubscribeScope(v) === 'all'))
+
+    const narrow = scopedWorld()
+    const rNarrow = await handleUnsubscribe(new Request(link('&lang=he&s=setup')), deps(narrow))
+    const narrowPage = await rNarrow.text()
+    check('G3: the narrow click stops the setup emails and NOTHING else',
+      rNarrow.status === 200 && state(narrow)?.onboarding_opt_out === true
+      && state(narrow)?.reminders_enabled === true && weekly(narrow)?.weekly_email_summary === true,
+      { optOut: state(narrow)?.onboarding_opt_out, reminders: state(narrow)?.reminders_enabled })
+    check('G4: its page says what stopped and offers one click for the rest',
+      narrowPage.includes(getDashboardDictionary('he').reminders.unsubscribePage.setupTitle)
+      && narrowPage.includes(`?t=${encodeURIComponent(tok)}&amp;lang=he`) && !/s=setup/.test(narrowPage))
+
+    const all = scopedWorld()
+    const rAll = await handleUnsubscribe(new Request(link('&lang=he')), deps(all))
+    check('G5: the wide click still stops everything',
+      rAll.status === 200 && state(all)?.reminders_enabled === false && weekly(all)?.weekly_email_summary === false)
+
+    const posted = scopedWorld()
+    const rPost = await handleUnsubscribe(new Request(link('&s=setup'), { method: 'POST', body: 'List-Unsubscribe=One-Click', headers: { 'content-type': 'application/x-www-form-urlencoded' } }), deps(posted))
+    check('G6: a mail client\'s one-click on a setup email works and stays narrow',
+      rPost.status === 200 && state(posted)?.onboarding_opt_out === true && state(posted)?.reminders_enabled === true)
+
+    check('G7: an owner who stopped the setup emails gets none, whatever the stage',
+      dec(real, facts(), st({ optedOut: true })).send === false
+      && dec(real, facts({ connected: true }), st({ optedOut: true })).send === false)
+
+    const stopped = scopedWorld()
+    await handleUnsubscribe(new Request(link('&s=setup')), deps(stopped))
+    const back = await handlePreferencesPut(new Request('https://x', { method: 'PUT', body: JSON.stringify({ projectId: P1, enabled: true }) }), deps(stopped, OWNER))
+    check('G8: turning the switch back on in settings undoes the narrow stop, so the one switch is the whole truth',
+      back.status === 200 && state(stopped)?.onboarding_opt_out === false && state(stopped)?.reminders_enabled === true)
+
+    const runOptedOut = new FakeAdmin({
+      projects: [{ id: P1, user_id: OWNER, created_at: before(10 * D), target_domain: 'x.co', is_active: true }],
+      project_reminder_state: [{ project_id: P1, user_id: OWNER, reminders_enabled: true, onboarding_opt_out: true, updated_at: before(30 * D) }],
+    })
+    const outbox: OutgoingOnboarding[] = []
+    const runRes = await runOnboardingEmails({
+      admin: runOptedOut as unknown as ServiceRoleClient, env: fullEnv, now: () => now,
+      owner: async () => ({ email: 'owner@example.com', locale: 'he', firstName: null, shopify: false }),
+      send: async (m) => { outbox.push(m); return { ok: true } },
+    })
+    check('G9: the run itself sends nothing to that owner', runRes.status === 'done' && outbox.length === 0, runRes)
+
+    for (const locale of ['he', 'en'] as const) {
+      const d = getDashboardDictionary(locale).reminders.unsubscribePage
+      check(`G10: ${locale} has the narrow page\'s own words, and they do not claim everything stopped`,
+        d.setupTitle.length > 5 && d.setupBody.length > 30 && d.stopAll.length > 5 && String(d.setupBody) !== String(d.body))
+    }
+
+    await withMutant<{ handleUnsubscribe: typeof handleUnsubscribe }, void>(
+      'lib/reminders/http.ts', [["if (scope === 'setup') {", 'if (false) {']],
+      async (mod) => {
+        const broken = scopedWorld()
+        await mod.handleUnsubscribe(new Request(link('&s=setup')), deps(broken))
+        check('G-MUT: ignoring the scope turns the paid-for reminder off behind the owner\'s back (G3 would fail)',
+          (broken.tables.project_reminder_state ?? []).find((r) => r.project_id === P1)?.reminders_enabled === false)
+      },
+    )
+    await withMutant<{ decideOnboardingEmail: typeof decideOnboardingEmail }, void>(
+      'lib/onboarding-emails/cadence.ts', [['if (!state.enabled || state.optedOut)', 'if (!state.enabled)']],
+      async (mod) => check('G-MUT2: ignoring the stop keeps nudging an owner who asked us not to (G7 would fail)',
+        mod.decideOnboardingEmail({ now, facts: facts(), state: st({ optedOut: true }) }).send === true),
+    )
+  }
 
   console.log(`\n${pass} passed, ${fail} failed`)
   if (fail > 0) process.exitCode = 1

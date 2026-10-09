@@ -2650,7 +2650,10 @@ export const dashboardEs: DeepPartial<DashboardDictionary> = {
     },
     unsubscribePage: {
       title: 'Te has dado de baja',
-      body: 'Ya no te enviaremos correos sobre esta web: ni recordatorios de los artículos que esperan tu aprobación, ni correos de puesta en marcha. Puedes volver a activarlos cuando quieras en los ajustes de la web.',
+      body: 'Ya no te enviaremos correos sobre esta web: ni recordatorios de los artículos que esperan tu aprobación, ni correos de puesta en marcha, ni el resumen semanal. Puedes volver a activarlos cuando quieras en los ajustes de la web.',
+      setupTitle: 'Los correos de puesta en marcha se han detenido',
+      setupBody: 'No te enviaremos más correos de puesta en marcha sobre esta web. Los recordatorios de los artículos que esperan tu aprobación siguen llegando, y también el resumen semanal si lo has activado.',
+      stopAll: 'Dejar de recibir todos los correos sobre esta web',
       invalidTitle: 'Este enlace no es válido',
       invalidBody: 'El enlace no es válido o ha caducado. Puedes desactivar los recordatorios en los ajustes de la web.',
       back: 'Ir a la web',
@@ -6226,8 +6229,8 @@ export const dashboardEs: DeepPartial<DashboardDictionary> = {
     guide: 'Hay una guía completa dentro de la aplicación, en el botón «Guía» de la parte superior de la pantalla.',
     help: '¿Necesitas ayuda? Escríbenos por WhatsApp: +972 54-9489377',
     team: 'El equipo de Go Top SEO',
-    footer: 'Recibes este mensaje porque abriste un proyecto en Go Top SEO. ¿No quieres estos correos?',
-    unsubscribe: 'Darse de baja con un clic, sin iniciar sesión',
+    footer: 'Recibes este mensaje porque abriste un proyecto en Go Top SEO y aún no has terminado de ponerlo en marcha. ¿No quieres estos correos?',
+    unsubscribe: 'Dejar de recibir los correos de puesta en marcha, con un clic y sin iniciar sesión',
     company: 'Go Top SEO · oren@gotop.co.il',
     connect: {
       subject: (domain: string) => `${domain} aún no está conectado`,

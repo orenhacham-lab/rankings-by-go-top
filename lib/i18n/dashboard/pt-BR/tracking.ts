@@ -214,7 +214,10 @@ export const trackingPtBR: DeepPartial<DashboardDictionary> = {
     },
     unsubscribePage: {
       title: 'Você cancelou a inscrição',
-      body: 'Não enviaremos mais e-mails sobre este site: nem lembretes dos artigos que aguardam a sua aprovação, nem e-mails de início. Você pode reativá-los quando quiser nas configurações do site.',
+      body: 'Não enviaremos mais e-mails sobre este site: nem lembretes dos artigos que aguardam a sua aprovação, nem e-mails de início, nem o resumo semanal. Você pode reativá-los quando quiser nas configurações do site.',
+      setupTitle: 'Os e-mails de início foram interrompidos',
+      setupBody: 'Não enviaremos mais e-mails de início sobre este site. Os lembretes dos artigos que aguardam a sua aprovação continuam chegando, e também o resumo semanal, se você o ativou.',
+      stopAll: 'Parar todos os e-mails sobre este site',
       invalidTitle: 'Este link não é válido',
       invalidBody: 'O link não é válido ou expirou. Você pode desativar os lembretes nas configurações do site.',
       back: 'Ir para o site',
@@ -225,8 +228,8 @@ export const trackingPtBR: DeepPartial<DashboardDictionary> = {
     guide: 'Há um guia completo dentro do sistema, no botão «Guia» no topo da tela.',
     help: 'Precisa de ajuda? Fale com a gente no WhatsApp: +972 54-9489377',
     team: 'Equipe Go Top SEO',
-    footer: 'Você recebeu este e-mail porque abriu um site no Go Top SEO. Não quer estes e-mails?',
-    unsubscribe: 'Cancelar com um clique, sem fazer login',
+    footer: 'Você recebeu este e-mail porque abriu um site no Go Top SEO e ainda não terminou de configurá-lo. Não quer estes e-mails?',
+    unsubscribe: 'Parar os e-mails de início, com um clique e sem fazer login',
     company: 'Go Top SEO · oren@gotop.co.il',
     connect: {
       subject: (domain: string) => `O site ${domain} ainda não está conectado`,

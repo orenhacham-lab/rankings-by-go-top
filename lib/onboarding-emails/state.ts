@@ -42,7 +42,7 @@ const later = (a: string | null, b: string | null): string | null => {
 
 export async function readOnboardingState(admin: ServiceRoleClient, projectId: string, ownerId: string): Promise<OnboardingRead> {
   const { data, error } = await admin.from(STATE_TABLE)
-    .select('reminders_enabled, last_sent_at, onboarding_stage, onboarding_sent_count, onboarding_last_sent_at, updated_at')
+    .select('reminders_enabled, last_sent_at, onboarding_stage, onboarding_sent_count, onboarding_last_sent_at, onboarding_opt_out, updated_at')
     .eq('project_id', projectId).eq('user_id', ownerId).maybeSingle()
   if (error) return MISSING.has(String((error as { code?: unknown }).code ?? '')) ? { status: 'unavailable' } : { status: 'failed' }
   if (!data) return { status: 'ok', state: null }
@@ -52,6 +52,7 @@ export async function readOnboardingState(admin: ServiceRoleClient, projectId: s
     status: 'ok',
     state: {
       enabled: r.reminders_enabled !== false,
+      optedOut: r.onboarding_opt_out === true,
       stage: isStage(r.onboarding_stage) ? r.onboarding_stage : null,
       sentCount: typeof r.onboarding_sent_count === 'number' ? r.onboarding_sent_count : 0,
       lastSentAt: setupAt,
@@ -88,12 +89,40 @@ export async function claimOnboardingSend(
   return !error && Array.isArray(data) && data.length === 1
 }
 
+/**
+ * Stop the SETUP emails for one project, and nothing else: the link inside a setup email
+ * says that is what it does, so the approval reminder the owner is paying for keeps coming
+ * and the weekly summary he asked for is left alone. Idempotent, and it never turns
+ * anything back on. A database without the column is "not installed", not an error.
+ */
+export async function writeOnboardingOptOut(
+  admin: ServiceRoleClient, projectId: string, ownerId: string, nowIso: string,
+): Promise<'ok' | 'unavailable' | 'failed'> {
+  const { error } = await admin.from(STATE_TABLE).upsert(
+    { project_id: projectId, user_id: ownerId, onboarding_opt_out: true, updated_at: nowIso },
+    { onConflict: 'project_id' },
+  )
+  if (!error) return 'ok'
+  return MISSING.has(String((error as { code?: unknown }).code ?? '')) ? 'unavailable' : 'failed'
+}
+
+/**
+ * Clear that opt-out, because the owner turned this project's emails back on in settings.
+ * Only ever called alongside writeEnabled(true), and only ever on a row that already exists:
+ * best effort, so a database without the column leaves the switch itself working.
+ */
+export async function clearOnboardingOptOut(admin: ServiceRoleClient, projectId: string, ownerId: string, nowIso: string): Promise<void> {
+  await admin.from(STATE_TABLE)
+    .update({ onboarding_opt_out: false, updated_at: nowIso })
+    .eq('project_id', projectId).eq('user_id', ownerId)
+}
+
 /** Undo a claim whose email was not accepted, so a later tick may try again. */
 export async function releaseOnboardingClaim(
   admin: ServiceRoleClient, projectId: string, ownerId: string, prior: StoredOnboardingState | null, claimedAt: string,
 ): Promise<void> {
   const back: StoredOnboardingState = prior
-    ?? { stage: null, sentCount: 0, lastSentAt: null, lastAnyAt: null, enabled: true, version: null, sharedLastSentAt: null }
+    ?? { stage: null, sentCount: 0, lastSentAt: null, lastAnyAt: null, enabled: true, optedOut: false, version: null, sharedLastSentAt: null }
   await admin.from(STATE_TABLE)
     .update({
       onboarding_stage: back.stage,

@@ -6431,7 +6431,10 @@ export const dashboardEn = {
     },
     unsubscribePage: {
       title: "You're unsubscribed",
-      body: "We won't email you about this project any more: no reminders about articles waiting for your OK, and no setup emails. You can turn them back on any time in the project settings.",
+      body: "We won't email you about this project any more: no reminders about articles waiting for your OK, no setup emails and no weekly summary. You can turn them back on any time in the project settings.",
+      setupTitle: 'The setup emails have stopped',
+      setupBody: "We won't send any more setup emails about this project. The reminders about articles waiting for your OK keep coming, and so does the weekly summary if you turned it on.",
+      stopAll: 'Stop every email about this project',
       invalidTitle: 'This link is not valid',
       invalidBody: 'The link is not valid or has expired. You can turn the reminders off in the project settings.',
       back: 'Go to the site',
@@ -6442,8 +6445,8 @@ export const dashboardEn = {
     guide: 'There is a full guide inside the app, under the "Guide" button at the top of the screen.',
     help: 'Need a hand? Message us on WhatsApp: +972 54-9489377',
     team: 'The Go Top SEO team',
-    footer: 'You get this because you opened a project on Go Top SEO. Don\'t want these emails?',
-    unsubscribe: 'Unsubscribe in one click, no login',
+    footer: 'You get this because you opened a project on Go Top SEO and have not finished setting it up. Don\'t want these emails?',
+    unsubscribe: 'Stop the setup emails, in one click and with no login',
     company: 'Go Top SEO · oren@gotop.co.il',
     connect: {
       subject: (domain: string) => `${domain} is not connected yet`,

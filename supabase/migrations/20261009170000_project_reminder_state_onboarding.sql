@@ -9,8 +9,13 @@
 --  (reminders_enabled) and single unsubscribe link govern both kinds.
 --
 --  Nothing reads or writes these columns unless ONBOARDING_EMAILS_ENABLED is
---  exactly "true". A database that has not got them yet is reported as "not
---  installed" and nothing is sent (the code treats 42703 as a missing table).
+--  exactly "true", with one exception: onboarding_opt_out is written by the public
+--  unsubscribe route, because the link in a setup email offers to stop the setup
+--  emails ALONE and leave the approval reminder, which is about work the owner is
+--  paying for, in place. Turning the project's switch back on in settings clears it,
+--  so the one switch the settings screen shows is still the whole truth.
+--  A database that has not got these columns yet is reported as "not installed" and
+--  nothing is sent (the code treats 42703 as a missing table).
 -- ============================================================================
 
 BEGIN;
@@ -18,7 +23,8 @@ BEGIN;
 ALTER TABLE public.project_reminder_state
   ADD COLUMN IF NOT EXISTS onboarding_stage        text,
   ADD COLUMN IF NOT EXISTS onboarding_sent_count   integer NOT NULL DEFAULT 0,
-  ADD COLUMN IF NOT EXISTS onboarding_last_sent_at timestamptz;
+  ADD COLUMN IF NOT EXISTS onboarding_last_sent_at timestamptz,
+  ADD COLUMN IF NOT EXISTS onboarding_opt_out      boolean NOT NULL DEFAULT false;
 
 DO $$
 BEGIN
@@ -49,5 +55,8 @@ COMMENT ON COLUMN public.project_reminder_state.onboarding_sent_count IS
   'How many setup emails went out for the CURRENT stage (at most 2). Reset to 1 when the stage changes.';
 COMMENT ON COLUMN public.project_reminder_state.onboarding_last_sent_at IS
   'When the last setup email was accepted by the provider. With last_sent_at it caps this project at one email per 72 hours, whatever its kind.';
+
+COMMENT ON COLUMN public.project_reminder_state.onboarding_opt_out IS
+  'The owner asked to stop the SETUP emails only, from the link in one of them. The approval reminder keeps going; turning reminders back on in settings clears this.';
 
 COMMIT;

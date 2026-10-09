@@ -15,7 +15,8 @@
  *   - never more than one email of ANY kind per project in 72 hours (the approval reminder
  *     shares the same counter: lib/onboarding-emails/state.ts writes `last_sent_at` too);
  *   - only at 09:00 Asia/Jerusalem, Sunday to Thursday (lib/reminders/cadence.ts' window);
- *   - nothing once the stage is done, and nothing for an owner who turned emails off.
+ *   - nothing once the stage is done, nothing for an owner who turned emails off, and
+ *     nothing for one who stopped the setup emails alone from the link inside one.
  * Reaching a stage resets the count, so a project that connects and then never publishes
  * gets the `publish` emails on their own schedule.
  */
@@ -45,6 +46,8 @@ export interface OnboardingState {
   /** When the last email of any kind went out for this project. */
   lastAnyAt: string | null
   enabled: boolean
+  /** The owner stopped the SETUP emails alone, from the link in one of them. */
+  optedOut: boolean
 }
 
 export type OnboardingDecision =
@@ -65,8 +68,8 @@ const ms = (iso: string | null): number => {
 
 export function decideOnboardingEmail(input: { now: Date; facts: ProjectFacts; state: OnboardingState | null }): OnboardingDecision {
   const { now, facts } = input
-  const state = input.state ?? { stage: null, sentCount: 0, lastSentAt: null, lastAnyAt: null, enabled: true }
-  if (!state.enabled) return { send: false, reason: 'disabled' }
+  const state = input.state ?? { stage: null, sentCount: 0, lastSentAt: null, lastAnyAt: null, enabled: true, optedOut: false }
+  if (!state.enabled || state.optedOut) return { send: false, reason: 'disabled' }
 
   const stage = stageOf(facts)
   if (!stage) return { send: false, reason: 'nothing_to_do' }
