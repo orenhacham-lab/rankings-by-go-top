@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
+import { articlePublishBlockReason } from '@/lib/articles/publish-rules'
 import dynamic from 'next/dynamic'
 import { CalendarClock, RotateCcw, Upload, X } from 'lucide-react'
 import Button from '@/components/ui/Button'
@@ -141,6 +142,14 @@ export default function ArticleForm({ initial, defaultAuthor = '' }: Props) {
     e.preventDefault()
     setSaving(true)
     setError('')
+
+    // Say it here, in Hebrew, instead of letting the API's English 400 come
+    // back as a generic save error. The API enforces the same rule.
+    if (articlePublishBlockReason(form)) {
+      setError('מאמר שמתפרסם חייב תמונה ראשית. העלו תמונה או הזינו כתובת, או שמרו כטיוטה.')
+      setSaving(false)
+      return
+    }
 
     const payload = {
       ...form,
@@ -285,7 +294,7 @@ export default function ArticleForm({ initial, defaultAuthor = '' }: Props) {
           <Input id="article-author" label="כותב/ת" value={form.author} onChange={e => set('author', e.target.value)} required placeholder="שם הכותב/ת" />
           <DateTimeField id="article-published-at" label="תאריך ושעת פרסום" value={form.published_at} onChange={v => set('published_at', v)} />
         </div>
-        <Switch checked={form.is_published} onChange={(next) => set('is_published', next)} label="פרסום המאמר" description="מאמר מפורסם מופיע באתר הציבורי" />
+        <Switch checked={form.is_published} onChange={(next) => set('is_published', next)} label="פרסום המאמר" description="מאמר מפורסם מופיע באתר הציבורי. תמונה ראשית היא חובה לפרסום." />
       </Card>
 
       <div className="flex flex-wrap items-center gap-3">
