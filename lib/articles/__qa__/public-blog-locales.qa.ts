@@ -29,6 +29,7 @@ import { extractFaqSchema, FAQ_HEADING, buildArticleSchemas } from '@/lib/articl
 import { splitArticleBlocks } from '@/lib/articles/widgets'
 import { withHeadingIds } from '@/lib/articles/headings'
 import { readingMinutes } from '@/lib/articles/reading-time'
+import { articlePublishBlockReason } from '@/lib/articles/publish-rules'
 import { sanitizePublicArticleHtml } from '@/lib/content/public-article-html'
 
 const ROOT = join(__dirname, '..', '..', '..')
@@ -267,6 +268,26 @@ function main() {
     withHeadingIds('<h2><strong>GEO</strong> and SEO</h2>').headings[0]?.text === 'GEO and SEO')
   check('L8. the reading time counts words, not tags',
     readingMinutes(`<p>${'word '.repeat(400)}</p>`) === 2 && readingMinutes('<p>one</p>') === 1)
+
+  console.log('\nN. a published article cannot go up without a cover image')
+  check('N1. publishing with no image is refused',
+    articlePublishBlockReason({ is_published: true, featured_image_url: null }) !== null)
+  check('N2. a blank string is not an image',
+    articlePublishBlockReason({ is_published: true, featured_image_url: '   ' }) !== null)
+  check('N3. publishing with an image is allowed',
+    articlePublishBlockReason({ is_published: true, featured_image_url: '/articles/x.png' }) === null)
+  // A draft is never blocked: an article is written before its cover exists,
+  // and refusing the draft would mean losing the text.
+  check('N4. a draft with no image is still saveable',
+    articlePublishBlockReason({ is_published: false, featured_image_url: null }) === null)
+  for (const route of ['app/api/articles/route.ts', 'app/api/articles/[id]/route.ts', 'app/api/publish-article/route.ts']) {
+    // MUTATION: drop the call from one route and that route publishes a bare
+    // post again, which is exactly how the four GEO articles went up coverless.
+    check(`N5. ${route} applies the rule`,
+      /articlePublishBlockReason\(/.test(readFileSync(join(ROOT, route), 'utf8')))
+  }
+  check('N6. the admin form says it in Hebrew before the API says it in English',
+    /articlePublishBlockReason\(form\)/.test(readFileSync(join(ROOT, 'components/admin/ArticleForm.tsx'), 'utf8')))
 
   console.log('\nM. mutation controls — the behavioural guards fail on broken input')
   check('M1. a FAQ under the wrong language\'s heading yields nothing',
