@@ -272,6 +272,7 @@ export const contentHubPtBR: DeepPartial<DashboardDictionary> = {
         has_table: 'O artigo não tem nenhuma tabela',
         faq_present: 'O artigo não tem perguntas frequentes',
         not_generic: 'O artigo está genérico demais: sem listas, tabelas ou perguntas',
+        reader_can_verify: 'O leitor não recebe nada para conferir por conta própria antes de decidir',
         table_structure_valid: 'A tabela não é uma tabela válida (são necessárias no mínimo 2 colunas e 2 linhas)',
         table_recommended: 'Este tema combina com uma tabela de comparação ou de preços: inclua uma tabela de verdade',
         too_short: 'O artigo está curto demais',
