@@ -152,7 +152,7 @@ export default function ArticlesScreen() {
         return
       }
       const reason = typeof d.reason === 'string' ? d.reason : 'unknown'
-      toast.error(reason === 'wordpress_media_upload_failed' ? t.rowWp.errImage : reason === 'no_wordpress_connection' ? t.rowWp.errNoConn : t.rowWp.errGeneric)
+      toast.error(reason === 'wordpress_media_upload_failed' ? t.rowWp.errImage : reason === 'no_wordpress_connection' ? t.rowWp.errNoConn : reason === 'plugin_new_post_unsupported' ? t.rowWp.errPluginNewPost : t.rowWp.errGeneric)
     } catch {
       toast.error(t.rowWp.errGeneric)
     } finally {

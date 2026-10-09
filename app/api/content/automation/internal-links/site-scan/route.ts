@@ -19,6 +19,7 @@
  */
 
 import { authContentProject, isInternalLinkPlanningEnabled, loadWordPressCredentials } from '@/lib/content/api-auth'
+import { hasPublishPlugin } from '@/lib/content/wordpress-plugin-publish'
 import { scanWordPressSite, type SiteScanReport } from '@/lib/content/wordpress-content-scan'
 import { renderScanReportHtml } from '@/lib/content/wordpress-scan-report-html'
 
@@ -42,7 +43,11 @@ export async function GET(request: Request) {
 
   // Load the saved WordPress credentials (decrypted at call time; never returned).
   const wp = await loadWordPressCredentials(admin, project.id)
-  if ('error' in wp) return Response.json({ error: wp.error }, { status: wp.status })
+  if ('error' in wp) {
+    // Plugin-only publishing: the plugin cannot list every post, so the scan needs an application password.
+    if (wp.status === 404 && await hasPublishPlugin(admin, project.id, auth.user.id)) return Response.json({ error: 'needs_app_password', reason: 'needs_app_password' }, { status: 409 })
+    return Response.json({ error: wp.error }, { status: wp.status })
+  }
 
   // Read-only: our own published articles, for target↔generated_article matching
   // (+ their topic's primary_keyword as a high-priority keyword signal).

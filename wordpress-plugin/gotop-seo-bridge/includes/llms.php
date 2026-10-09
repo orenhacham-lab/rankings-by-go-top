@@ -25,7 +25,8 @@ function gotop_seo_bridge_llms_get() {
 /** The site's root llms.txt as a file on disk (placed by the host, another plugin or by hand). */
 function gotop_seo_bridge_llms_file_exists() {
     $roots = array(ABSPATH);
-    if (!empty($_SERVER['DOCUMENT_ROOT']) && is_string($_SERVER['DOCUMENT_ROOT'])) { $roots[] = $_SERVER['DOCUMENT_ROOT']; }
+    $document_root = isset($_SERVER['DOCUMENT_ROOT']) && is_string($_SERVER['DOCUMENT_ROOT']) ? sanitize_text_field(wp_unslash($_SERVER['DOCUMENT_ROOT'])) : '';
+    if ($document_root !== '') { $roots[] = $document_root; }
     foreach ($roots as $root) {
         if (file_exists(rtrim($root, '/\\') . '/llms.txt')) { return true; }
     }
@@ -127,8 +128,8 @@ function gotop_seo_bridge_llms_undo($job_id) {
  */
 function gotop_seo_bridge_llms_response($method, $request_uri) {
     if ($method !== 'GET' && $method !== 'HEAD') { return null; }
-    $path = parse_url((string) $request_uri, PHP_URL_PATH);
-    $home = parse_url(home_url('/'), PHP_URL_PATH);
+    $path = wp_parse_url((string) $request_uri, PHP_URL_PATH);
+    $home = wp_parse_url(home_url('/'), PHP_URL_PATH);
     $want = rtrim(is_string($home) ? $home : '', '/') . '/llms.txt';
     if (!is_string($path) || $path !== $want) { return null; }
     $text = gotop_seo_bridge_llms_get();
@@ -138,8 +139,8 @@ function gotop_seo_bridge_llms_response($method, $request_uri) {
 
 add_action('init', 'gotop_seo_bridge_llms_serve', 0);
 function gotop_seo_bridge_llms_serve() {
-    $method = isset($_SERVER['REQUEST_METHOD']) ? strtoupper((string) $_SERVER['REQUEST_METHOD']) : 'GET';
-    $uri = isset($_SERVER['REQUEST_URI']) ? (string) $_SERVER['REQUEST_URI'] : '';
+    $method = isset($_SERVER['REQUEST_METHOD']) ? strtoupper(sanitize_key(wp_unslash($_SERVER['REQUEST_METHOD']))) : 'GET';
+    $uri = isset($_SERVER['REQUEST_URI']) ? esc_url_raw(wp_unslash($_SERVER['REQUEST_URI'])) : '';
     $text = gotop_seo_bridge_llms_response($method, $uri);
     if ($text === null) { return; }
     if (!headers_sent()) {
@@ -147,6 +148,7 @@ function gotop_seo_bridge_llms_serve() {
         header('Content-Type: text/plain; charset=utf-8');
         header('X-Content-Type-Options: nosniff');
     }
-    if ($method === 'GET') { echo $text; }
+    // Plain text (text/plain, nosniff), validated on save to hold no "<" at all; HTML escaping would change the Markdown.
+    if ($method === 'GET') { echo $text; } // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped
     exit;
 }

@@ -16,6 +16,7 @@ import { createClient } from '@/lib/supabase/server'
 import { ARTICLES_COPY, articleHref, articlesIndexHref } from '@/lib/articles/i18n'
 import { localeHomeHref, LOCALE_CONFIG, type PublicLocale } from '@/lib/i18n/locales'
 import { getPublicDictionary } from '@/lib/i18n/getPublicDictionary'
+import { articleAuthor } from '@/lib/articles/authors'
 
 export const SITE_URL = 'https://www.gotopseo.com'
 
@@ -194,8 +195,20 @@ export function buildArticleSchemas(article: PublicArticle | null, slug: string,
         description: article.meta_description || article.excerpt,
         inLanguage: LOCALE_CONFIG[locale].lang,
         ...(article.featured_image_url && { image: article.featured_image_url }),
+        // A Person whose url is the site root says nothing about who wrote
+        // this. When the byline resolves to a profile, the url is the page
+        // that actually describes them.
         ...(article.author && {
-          author: { '@type': 'Person', name: article.author, url: SITE_URL },
+          author: {
+            '@type': 'Person',
+            name: articleAuthor(article.author)?.name[locale] ?? article.author,
+            url: `${SITE_URL}${articleAuthor(article.author)?.href[locale] ?? ''}`,
+            // A photograph is part of what makes an author checkable, so the
+            // same file the box shows is the one Google is pointed at.
+            ...(articleAuthor(article.author)?.photo && {
+              image: `${SITE_URL}${articleAuthor(article.author)?.photo}`,
+            }),
+          },
         }),
         ...(article.published_at && { datePublished: article.published_at }),
         ...(article.updated_at && { dateModified: article.updated_at }),

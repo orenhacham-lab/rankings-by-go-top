@@ -62,13 +62,15 @@ async function main() {
     check('ONE shared SEO service loads the focus keyword + persists the outcome',
       /loadFocusKeyword\(/.test(shared) && /writeVerifiedSeoMeta\(/.test(shared) && /persistSeoOutcome\(/.test(shared) && /seo_status: seo\.status/.test(shared))
     const auto = read('../automation/publish-item.ts')
+    const viaPlugin = read('../wordpress-plugin-publish.ts')
     check('E. automated publishing sends the focus keyword via the shared service (no longer omitted/swallowed)',
-      /publishArticleSeo\(admin, loaded\.creds, created\.wpPostId/.test(auto) && /topicId: article\.topic_id/.test(auto) && !/updatePostSeoMeta\(/.test(auto))
+      // Plugin 3.0.0: publishSeoFor picks the path the post went; the application password keeps publishArticleSeo.
+      /publishSeoFor\(admin, loaded, created/.test(auto) && /topicId: article\.topic_id/.test(auto) && !/updatePostSeoMeta\(/.test(auto) && /publishArticleSeo\(admin, publisher\.creds, created\.wpPostId/.test(viaPlugin))
     const manual = read('../../../app/api/content/articles/[id]/wordpress/route.ts')
     check('F. manual + automated use the SAME shared service (publishArticleSeo)',
-      /publishArticleSeo\(auth\.admin, loaded\.creds, created\.wpPostId/.test(manual))
+      /publishSeoFor\(auth\.admin, loaded, created/.test(manual))
     check('G. update-in-place / retry targets the SAME wp_post_id (idempotent — created.wpPostId; never a new post to retry SEO)',
-      /publishArticleSeo\([^)]*created\.wpPostId/.test(manual) && /publishArticleSeo\([^)]*created\.wpPostId/.test(auto))
+      /publishSeoFor\([^)]*created,/.test(manual) && /publishSeoFor\([^)]*created,/.test(auto) && /publishArticleSeo\([^)]*created\.wpPostId/.test(viaPlugin))
     const plugin = read('../../../wordpress-plugin/gotop-seo-bridge/gotop-seo-bridge.php')
     check('companion plugin: edit_post permission + SEO allowlist only + read-back verification (no arbitrary meta)',
       /current_user_can\('edit_post', \$post_id\)/.test(plugin) && /_yoast_wpseo_focuskw/.test(plugin) && /rank_math_focus_keyword/.test(plugin) && /in_array\(\$key, \$allowed, true\)/.test(plugin) && /get_post_meta\(\$post_id, \$key, true\)/.test(plugin))

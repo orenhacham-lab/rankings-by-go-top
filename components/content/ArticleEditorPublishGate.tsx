@@ -62,7 +62,10 @@ export function usePublishPlatform(projectId: string | null, enabled = true): Pu
         const st = siteRes.ok ? await siteRes.json().catch(() => ({})) : {}
         const shConn = (sh.connection ?? null) as { connection_status?: string; can_publish?: boolean; shop_domain?: string } | null
         const resolved = resolveActivePlatform({
-          wordpress: { present: !!wp.connection, connectionStatus: (wp.connection as { connection_status?: string } | null)?.connection_status ?? null },
+          // No application-password row but the GO TOP SEO Bridge plugin >= 3.0.0: it publishes on its own.
+          wordpress: wp.connection
+            ? { present: true, connectionStatus: (wp.connection as { connection_status?: string } | null)?.connection_status ?? null }
+            : { present: !!wp.publishingPlugin, connectionStatus: wp.publishingPlugin ? 'connected' : null },
           shopify: { present: !!shConn, connectionStatus: shConn?.connection_status ?? null, canPublish: !!shConn?.can_publish },
           site: siteConnectionState(st.connection ?? null),
         })

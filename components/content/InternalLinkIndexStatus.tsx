@@ -66,6 +66,8 @@ export default function InternalLinkIndexStatus({ projectId, uiLocale }: { proje
   const [status, setStatus] = useState<IndexStatus | null>(null)
   const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
+  // The project publishes through the GO TOP SEO Bridge plugin alone: the scan needs an application password.
+  const [needsAppPassword, setNeedsAppPassword] = useState(false)
   const pollRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const mountedRef = useRef(true)
 
@@ -131,10 +133,12 @@ export default function InternalLinkIndexStatus({ projectId, uiLocale }: { proje
     setRefreshing(true)
     try {
       // Synchronous scan; resolves when done (or 202 if another run is in flight).
-      await fetch('/api/content/automation/internal-links/index/refresh', {
+      const res = await fetch('/api/content/automation/internal-links/index/refresh', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ projectId, force: true }),
-      }).catch(() => {})
+      }).catch(() => null)
+      const answer = res && res.status === 409 ? await res.json().catch(() => null) as { error?: unknown } | null : null
+      if (mountedRef.current) setNeedsAppPassword(answer?.error === 'needs_app_password')
     } finally {
       const s = await fetchStatus()
       if (s && s.scanStatus === 'running') startPolling()
@@ -184,6 +188,9 @@ export default function InternalLinkIndexStatus({ projectId, uiLocale }: { proje
             <Notice tone="warn" className="mt-3">
               {status?.stale ? t.stale : ''}{status?.stale && status?.versionStale ? ' · ' : ''}{status?.versionStale ? t.versionStale : ''}
             </Notice>
+          )}
+          {!refreshing && needsAppPassword && (
+            <div className="mt-3" data-needs-app-password=""><Notice tone="info">{t.needsAppPassword}</Notice></div>
           )}
           {/* The scanner's own error text is never shown (design contract §8):
               the merchant gets what happened and what to do about it. */}

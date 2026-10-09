@@ -85,7 +85,7 @@ function gotop_seo_bridge_same_link($written, $href, $home_host) {
     $norm = function ($u) { return rtrim(preg_replace('/#.*$/', '', $u), '/'); };
     if ($norm($w) === $norm($href)) { return true; }
     if ($w[0] === '/' && (strlen($w) < 2 || $w[1] !== '/')) {
-        $parts = parse_url($href);
+        $parts = wp_parse_url($href);
         if (!$parts || empty($parts['host'])) { return false; }
         $host = preg_replace('/^www\./', '', strtolower($parts['host']));
         if ($host !== preg_replace('/^www\./', '', strtolower((string) $home_host))) { return false; }
