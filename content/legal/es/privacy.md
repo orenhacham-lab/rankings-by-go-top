@@ -3,7 +3,7 @@ title: Política de privacidad | Go Top SEO
 description: Política de privacidad de Go Top SEO: cómo recopilamos, utilizamos y protegemos sus datos.
 locale: es
 source: app/(public)/en/privacy/page.tsx
-lastUpdated: 2026-10-06
+lastUpdated: 2026-10-09
 register: usted
 ---
 
@@ -64,7 +64,7 @@ No compartimos su información personal con terceros, salvo con:
 - **OpenStreetMap (Nominatim):** para convertir una dirección en coordenadas, y solo cuando usted haya escrito una dirección exacta para el seguimiento de posicionamiento local. Se envían la dirección que usted escribió y el nombre del país, nunca datos de la cuenta
 - **ScrapeLLM:** para el seguimiento de visibilidad en IA; véase «Proveedores de IA» más abajo
 - **Otros sitios de la red de enlaces:** únicamente si usted se unió a la red; véase «Red de enlaces» más abajo
-- **Meta (Facebook / Instagram):** para publicidad segmentada; véase la sección Publicidad en Meta más abajo. Los datos que recibimos de las API de Google nunca se comparten con Meta ni se usan para publicidad
+- **Meta (Facebook / Instagram):** para publicidad segmentada y para un informe de registro completado que se envía desde nuestro servidor; véase la sección Publicidad en Meta más abajo. Respecto de esos eventos de conversión, Meta no trata los datos por cuenta nuestra, sino que es corresponsable del tratamiento junto con nosotros, como se explica en esa sección. Los datos que recibimos de las API de Google nunca se comparten con Meta ni se usan para publicidad
 - Cuando lo exija la ley
 
 ## Datos que recibimos de Google
@@ -160,13 +160,13 @@ Unirse a la red de enlaces es opcional, se hace para cada proyecto por separado 
 
 El programa de socios está dirigido a quienes recomiendan el Servicio y reciben una comisión por los clientes que se suman a través de ellos. La participación es voluntaria, cada solicitud la revisa una persona, y nada de lo descrito aquí se le aplica salvo que usted presente una solicitud.
 
-- **Cuando usted presenta una solicitud:** recibimos lo que nos envía por correo electrónico o WhatsApp: su nombre, sus datos de contacto, el sitio, el canal o el público al que piensa promocionar y, tras la aprobación, el método de pago que elija. Los usamos para resolver la solicitud y para ejecutar el acuerdo con usted.
-- **Mientras usted es socio:** almacenamos sus datos de contacto, su código de referencia, las cuentas abiertas a través de él, los pagos que generan derecho a comisión y la comisión calculada sobre ellos, los pagos que le realizamos, y las facturas y los certificados fiscales que la ley nos obliga a conservar.
+- **Cuando usted presenta una solicitud:** la solicitud es un formulario en este sitio, y lo que recibimos es lo que usted rellenó en él: su nombre, su dirección de correo electrónico, una descripción del público al que piensa promocionar y, de forma opcional, un teléfono, un sitio web y un país. En esta fase no pedimos ningún dato de pago, porque no queremos conservar los datos bancarios de alguien a quien quizá rechacemos. Además registramos la dirección IP desde la que llegó la solicitud, con dos finalidades y ninguna más: distinguir una oleada de solicitudes falsas de una agencia real, y limitar a tres solicitudes por hora desde una misma dirección. No puede modificarse una vez registrada. **Una solicitud rechazada se elimina por completo al cabo de 12 meses y, en cualquier otro caso, la dirección IP se elimina al cabo de 12 meses** y el registro en sí se conserva.
+- **Mientras usted es socio:** almacenamos sus datos de contacto, su código de referencia, los datos de pago que nos facilita, el número de clics en su enlace como un único total diario, las cuentas abiertas a través de él, los pagos que generan derecho a comisión y la comisión calculada sobre ellos, los pagos que le realizamos, y las facturas y los certificados fiscales que la ley nos obliga a conservar. Una referencia puede llevar una marca de revisión humana: cuando la dirección de correo electrónico de su solicitud es la misma que abrió la cuenta, o cuando la cuenta nueva está en el dominio de su propio sitio web. Esa marca pide que una persona lo revise antes de aprobar cualquier comisión; por sí sola no bloquea nada.
 - **Qué ve un socio sobre las personas que refirió:** nada personal. Un socio ve cantidades e importes. Un socio no recibe la dirección de correo electrónico, el sitio web, el plan ni la identidad de ningún cliente que haya referido.
 - **Pago de la comisión:** el proveedor que elija el socio (PayPal, Wise o transferencia bancaria) recibe los datos que necesita para pagar. Las facturas y los certificados de retención se conservan siete años, como exigen las normas de contabilidad israelíes.
-- **Atribución de una referencia:** el código del socio viaja en el propio enlace. No instalamos ninguna cookie para el programa ni guardamos nada en su dispositivo, de modo que lo que usted elija sobre las cookies no influye ni en un sentido ni en el otro. Si en algún momento acreditamos una visita que vuelve más tarde, lo que implicaría guardar algo, esta política lo dirá y se le pedirá su consentimiento antes.
+- **Atribución de una referencia:** el código del socio viaja en el propio enlace. No instalamos ninguna cookie para el programa ni guardamos nada en su dispositivo, de modo que lo que usted elija sobre las cookies no influye ni en un sentido ni en el otro. Si en algún momento acreditamos una visita que vuelve más tarde, lo que implicaría guardar algo, esta política lo dirá y se le pedirá su consentimiento antes. **Lo que se registra cuando un visitante sigue el enlace de un socio es un recuento: uno más en el total diario de ese socio, y ese es todo el registro**: sin dirección IP, sin navegador, sin el sitio del que llegó y sin ningún identificador. La atribución en sí se hace con el código que viaja en la dirección de la página, leído una sola vez en el momento en que se crea la cuenta.
 
-En la fecha de esta política el programa funciona únicamente por solicitud: recibimos solicitudes y aprobamos socios manualmente, y todavía no se han construido el seguimiento de referencias, el registro de comisiones ni el pago. Cada uno de ellos se describirá aquí antes de empezar a funcionar. Los términos están en el [Acuerdo del Programa de Socios](/es/affiliate-terms), que además obliga al socio a declarar abiertamente que está remunerado.
+En la fecha de esta política el programa funciona así: la solicitud es un formulario en este sitio y la aprueba una persona; un socio aprobado tiene un código y un enlace; los clics se cuentan como un total diario por socio; una cuenta nueva que se registra con un código se atribuye a ese socio una vez y para siempre; la comisión se registra sobre cada pago efectivamente recibido, se retiene 30 días, que es la ventana de reembolso, y la aprueba una persona; y el pago en sí se realiza a mano contra un comprobante. **Un cliente facturado a través de Shopify no genera comisión automática**, porque Shopify nos informa de que un plan está activo y no de que se haya cobrado un cargo; esa comisión se registra a mano, al mismo porcentaje. Los términos están en el [Acuerdo del Programa de Socios](/es/affiliate-terms), que además obliga al socio a declarar abiertamente que está remunerado.
 
 ## Proveedores de IA
 
@@ -181,7 +181,12 @@ Enviamos correo electrónico a través del proveedor de envío Resend, que recib
 
 - **Mensajes de la cuenta y del servicio:** registro, verificación, facturación y novedades sobre el uso del Servicio.
 - **Recordatorios:** cuando hay contenido pendiente de su aprobación, puede enviarse un recordatorio. Cada recordatorio incluye un enlace de cancelación de suscripción con un solo clic, sin necesidad de iniciar sesión, y al cancelar la suscripción se detienen estos recordatorios. Su preferencia se almacena con nosotros.
-- **Informe mensual de progreso:** un resumen mensual del proyecto, para los proyectos en los que usted lo activó en los ajustes.
+- **Correos de puesta en marcha:** si usted abrió un proyecto y no le ha conectado un sitio, o lo conectó y no se ha publicado nada en él, podemos enviar hasta dos correos que explican cómo completar el paso y enlazan a la pantalla correspondiente de la aplicación. **No llevan oferta, ni precio, ni descuento, ni mejora de plan**: llevan un enlace a la guía dentro de la aplicación, el número de WhatsApp y un enlace de baja. No se envía un tercero, y no enviamos más de un correo sobre el mismo proyecto en 72 horas.
+- **Resumen semanal:** un resumen del proyecto, para los proyectos en los que usted lo activó en los ajustes. El resumen se envía los domingos por la mañana, **y solo cuando hay algo que contar; una semana en la que no pasó nada no recibe correo.** Una sección que no pudimos leer se omite del correo en lugar de informarse como un cero, de modo que el correo nunca indica una cifra que no medimos.
+
+**Darse de baja, con el alcance que usted pidió.** El enlace de baja de un correo de puesta en marcha detiene solo esos correos, y la página a la que lleva le dice claramente que los recordatorios y el resumen semanal siguen llegando, y ofrece un solo clic para detenerlos también. El enlace de baja de un recordatorio o del resumen semanal detiene todos los correos sobre ese proyecto. Volver a activar el interruptor de correo del proyecto en los ajustes anula cualquiera de esas bajas, de modo que el interruptor que usted ve en los ajustes es el panorama completo.
+
+**No medimos qué hizo usted con el correo.** Nuestros mensajes no llevan ningún píxel que informe de una apertura, no seguimos los clics y no reescribimos los enlaces que contienen para encaminarle a través de nosotros.
 
 ## Cómo podemos contactar con usted a raíz de una comprobación gratuita
 
@@ -217,13 +222,13 @@ Clasificamos las cookies en tres categorías, y le consultamos sobre dos de ella
 
 - **Estrictamente necesarias:** inicio de sesión, recordar el idioma de su interfaz, seguridad y prevención de abusos. El servicio no puede funcionar sin ellas, por lo que no requieren consentimiento.
 - **Medición:** cuántas personas visitaron el sitio, qué páginas leyeron y qué no funcionó. Se cargan solo si usted lo permite.
-- **Marketing:** medir el rendimiento de nuestros anuncios y mostrar anuncios relevantes en las redes de Google y Meta. Se cargan solo si usted lo permite.
+- **Marketing:** medir el rendimiento de nuestros anuncios y mostrar anuncios relevantes en las redes de Google y Meta. Se cargan solo si usted lo permite. Permitir esta categoría cubre también un informe de conversión que enviamos a Meta desde nuestro servidor, sin ninguna cookie; véase la sección Publicidad en Meta.
 
 **Antes de que usted elija, no se instala ninguna cookie de medición ni de marketing y no se realiza ninguna solicitud a los servidores de Google.** Aceptar y rechazar son dos botones iguales en el aviso, y cada categoría puede permitirse por separado.
 
 **Cambiar o retirar su consentimiento:** en cualquier momento, mediante el enlace «Configuración de cookies» al pie de cada página. Retirar el consentimiento es exactamente tan fácil como darlo, y no le supone ningún costo en el servicio.
 
-**El programa de socios:** no instala ninguna cookie. Si usted llega al sitio a través del enlace de un socio, el código de ese socio va en el propio enlace y nada se escribe en su dispositivo. Por eso el programa no figura entre las categorías anteriores, y por eso lo que usted elija en este aviso ni lo ayuda ni lo estorba. Una cookie que conserve el código de un socio no es estrictamente necesaria para que el sitio funcione, así que habríamos necesitado su consentimiento para instalarla: elegimos no necesitarla.
+**El programa de socios:** no instala ninguna cookie. Si usted llega al sitio a través del enlace de un socio, el código de ese socio va en el propio enlace y nada se escribe en su dispositivo. Por eso el programa no figura entre las categorías anteriores, y por eso lo que usted elija en este aviso ni lo ayuda ni lo estorba. Una cookie que conserve el código de un socio no es estrictamente necesaria para que el sitio funcione, así que habríamos necesitado su consentimiento para instalarla: elegimos no necesitarla. Lo que sí se registra con el clic es un recuento: uno más en el total diario de ese socio, sin ningún dato sobre usted.
 
 Si su navegador envía una señal Global Privacy Control, la tratamos como un rechazo: no se cargan cookies de medición ni de marketing, y no le mostramos el aviso.
 
@@ -237,7 +242,7 @@ Nuestras herramientas de medición y marketing se gestionan a través de Google 
 - **Google Ads:** medición de conversiones y publicidad personalizada (sujeto al consentimiento de marketing)
 - **Meta Pixel:** medición de conversiones y publicidad en Facebook e Instagram (sujeto al consentimiento de marketing)
 
-Las herramientas activas cambian de vez en cuando. Lo que no cambia: ninguna se carga antes de que usted haya permitido su categoría, y retirar su consentimiento detiene la recopilación.
+Las herramientas activas cambian de vez en cuando. Lo que no cambia: ninguna se carga antes de que usted haya permitido su categoría, y retirar su consentimiento detiene la recopilación. Además de estas herramientas, que funcionan en el navegador, enviamos a Meta un informe de conversión desde nuestro servidor; también está sujeto al consentimiento de marketing y se detiene cuando usted lo retira.
 
 Declaramos su estado de consentimiento a Google mediante el protocolo Consent Mode v2, de modo que las herramientas quedan sujetas a su elección incluso si en el futuro añadimos una etiqueta nueva.
 
@@ -253,6 +258,24 @@ La información que puede recopilarse y enviarse a Meta incluye:
 - Información recopilada mediante las cookies de Meta
 
 Este uso está sujeto a la política de privacidad de Meta Platforms, Inc., disponible en [facebook.com/privacy/policy](https://www.facebook.com/privacy/policy/). Usted puede optar por no recibir publicidad personalizada mediante los ajustes de privacidad de su cuenta de Facebook.
+
+### Un informe de conversión desde nuestro servidor (Conversions API)
+
+Además del Pixel que funciona en el navegador, informamos a Meta de un registro completado desde nuestro servidor, mediante una interfaz llamada Conversions API. El informe se envía **únicamente** si usted permitió la categoría de marketing en el aviso de cookies. Si lo rechazó, o si todavía no ha elegido, no se envía nada.
+
+Qué contiene ese informe:
+
+- el nombre del evento (un registro completado) y la hora en que ocurrió
+- un identificador único del evento, para que Meta no cuente dos veces el mismo registro
+- un resumen unidireccional (hash SHA-256) de la dirección de correo electrónico con la que usted se registró
+- un resumen unidireccional, por el mismo método, del identificador de su cuenta con nosotros
+- la dirección de la página desde la que usted se registró, sin nada de lo que va después del signo de interrogación
+
+No enviamos la dirección de correo electrónico en sí, pero el hash no convierte la información en anónima: si esa misma dirección está también en su cuenta de Meta, Meta puede relacionarlas e identificarle, de modo que tratamos ese informe como datos personales a todos los efectos. **En ese informe no enviamos su dirección IP, ni los datos de su navegador, ni ninguna cookie de Meta, ni su nombre ni su número de teléfono, y se envía solo por un registro completado, nunca por ver una página.**
+
+Retirar el consentimiento de marketing detiene de inmediato los informes futuros. Un informe ya enviado no podemos recuperarlo, y usted puede exigir su supresión directamente a Meta, a través de su propio canal de derechos.
+
+**Quién responde por estos datos:** respecto de la recogida y la transmisión de esos eventos de conversión, nosotros y Meta somos corresponsables del tratamiento (joint controllers): Meta Platforms Ireland Limited para los visitantes del Espacio Económico Europeo y del Reino Unido, y Meta Platforms, Inc. para el resto. Desde el momento en que los datos llegan a Meta, Meta es responsable independiente del uso que haga de ellos para sus propias finalidades. Usted puede ejercer sus derechos sobre estos datos directamente ante Meta, y si se dirige a nosotros trasladaremos su solicitud a Meta.
 
 ## Contacto por WhatsApp
 
@@ -313,7 +336,7 @@ Respondemos en un plazo de 30 días. No le cobraremos ni degradaremos su servici
 
 Si usted es residente de California, o de otro estado que haya promulgado una ley estatal de privacidad, tiene derecho a saber qué categorías de datos se recopilaron sobre usted, a obtener una copia, a solicitar la eliminación, a corregir datos inexactos y a no ser discriminado por ejercer un derecho.
 
-**No vendemos información personal y no la transferimos a cambio de una contraprestación.** Sí compartimos identificadores y eventos de uso con las redes publicitarias de Google y Meta para publicidad segmentada, lo cual puede considerarse «compartir» conforme a la ley de California. Ese intercambio ocurre **únicamente** si usted permitió la categoría de marketing, y se detiene en el momento en que usted la retira.
+**No vendemos información personal y no la transferimos a cambio de una contraprestación.** Sí compartimos identificadores y eventos de uso con las redes publicitarias de Google y Meta para publicidad segmentada, en el navegador y desde nuestro servidor, lo cual puede considerarse «compartir» conforme a la ley de California. Ese intercambio ocurre **únicamente** si usted permitió la categoría de marketing, y se detiene en el momento en que usted la retira.
 
 Respetamos la señal Global Privacy Control del navegador como una solicitud de «no vender ni compartir mi información personal», y la registramos. No se necesita ningún formulario: la señal por sí sola es suficiente.
 
@@ -347,4 +370,4 @@ Si tiene preguntas sobre esta política de privacidad, contacte con:
 
 **Teléfono:** 054-9489377
 
-Esta política se actualizó por última vez el 5 de octubre de 2026
+Esta política se actualizó por última vez el 9 de octubre de 2026

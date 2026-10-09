@@ -1,10 +1,12 @@
 import { createClient } from '@/lib/supabase/server'
 import { spanishSiteEnabled } from '@/lib/i18n/spanish-site'
 import { portugueseSiteEnabled } from '@/lib/i18n/portuguese-site'
+import { LOCALE_PREFIX, normalizePublicLocale } from '@/lib/i18n/locales'
 
 interface Article {
   slug: string
   published_at: string
+  locale: string
 }
 
 /**
@@ -38,7 +40,7 @@ export async function GET() {
   // Fetch all published articles
   const { data: articles } = await supabase
     .from('articles')
-    .select('slug, published_at')
+    .select('slug, published_at, locale')
     .eq('is_published', true)
     .order('published_at', { ascending: false })
 
@@ -162,6 +164,18 @@ export async function GET() {
       changefreq: 'monthly',
       priority: '0.8',
     },
+    {
+      url: `${baseUrl}/solutions/shopify`,
+      lastmod: today,
+      changefreq: 'monthly',
+      priority: '0.8',
+    },
+    {
+      url: `${baseUrl}/features/site-links`,
+      lastmod: today,
+      changefreq: 'monthly',
+      priority: '0.8',
+    },
     // Hebrew legal pages
     // English site root and equivalents
     {
@@ -273,6 +287,18 @@ export async function GET() {
       changefreq: 'monthly',
       priority: '0.8',
     },
+    {
+      url: `${baseUrl}/en/solutions/shopify`,
+      lastmod: today,
+      changefreq: 'monthly',
+      priority: '0.8',
+    },
+    {
+      url: `${baseUrl}/en/features/site-links`,
+      lastmod: today,
+      changefreq: 'monthly',
+      priority: '0.8',
+    },
     // English legal pages
   ]
 
@@ -304,6 +330,8 @@ export async function GET() {
     { path: '/solutions/businesses', changefreq: 'monthly', priority: '0.7' },
     { path: '/solutions/agencies', changefreq: 'monthly', priority: '0.7' },
     { path: '/solutions/wordpress', changefreq: 'monthly', priority: '0.7' },
+    { path: '/solutions/shopify', changefreq: 'monthly', priority: '0.7' },
+    { path: '/features/site-links', changefreq: 'monthly', priority: '0.7' },
   ]
 
   const treePages = (prefix: string) =>
@@ -312,13 +340,26 @@ export async function GET() {
   const spanishPages = spanishSiteEnabled() ? treePages('/es') : []
   const portuguesePages = portugueseSiteEnabled() ? treePages('/pt-BR') : []
 
-  // Build article entries
-  const articleEntries = (articles || []).map((article: Article) => ({
-    url: `${baseUrl}/articles/${article.slug}`,
-    lastmod: article.published_at?.split('T')[0] || today,
-    changefreq: 'monthly',
-    priority: '0.7',
-  }))
+  // Build article entries.
+  //
+  // An article lives under the tree of the language it is written in
+  // (`articles.locale`, migration 20261009180750): a Spanish article is at
+  // /es/articles/<slug>, and listing every article under the Hebrew path — as
+  // this did while the blog was Hebrew-only — would advertise URLs that 404
+  // and leave every translated article out of the sitemap entirely. A language
+  // whose tree is behind an off flag contributes nothing, exactly as its static
+  // pages do.
+  const articleLocaleEnabled = (locale: string) =>
+    locale === 'es' ? spanishSiteEnabled() : locale === 'pt-BR' ? portugueseSiteEnabled() : true
+
+  const articleEntries = (articles || [])
+    .filter((article: Article) => articleLocaleEnabled(article.locale))
+    .map((article: Article) => ({
+      url: `${baseUrl}${LOCALE_PREFIX[normalizePublicLocale(article.locale) ?? 'he']}/articles/${article.slug}`,
+      lastmod: article.published_at?.split('T')[0] || today,
+      changefreq: 'monthly',
+      priority: '0.7',
+    }))
 
   // Combine all entries
   const allEntries = [...staticPages, ...spanishPages, ...portuguesePages, ...articleEntries]

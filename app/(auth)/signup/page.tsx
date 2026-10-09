@@ -18,6 +18,7 @@ import Badge from '@/components/ui/Badge'
 import { NoticeBox } from '@/components/ui/Notice'
 import PasswordField from '@/components/auth/PasswordField'
 import { authHref, withLocaleParam } from '@/lib/i18n/auth-href'
+import { REFERRAL_PARAM, normalizeReferralCode, withReferral } from '@/lib/affiliate/referral'
 
 const SIGNUP_UI = {
   he: {
@@ -281,6 +282,13 @@ export function SignupForm() {
   // W4 onboarding: the free check's claim token (?claim=) goes to the server,
   // which keeps it in an httpOnly cookie for the first project, and then leaves
   // the address. The page never shows it or sends it anywhere else.
+  // An affiliate link's code arrives on the URL and is never stored anywhere:
+  // lib/affiliate/referral.ts says why (ePrivacy art. 5(3), and a consent record
+  // the middleware cannot read), and the live agreement promises partners
+  // exactly that. It is read here, sent to the server once the account exists,
+  // and that is the end of it.
+  const referralCode = normalizeReferralCode(searchParams.get(REFERRAL_PARAM))
+
   const claimParam = searchParams.get('claim')
   useEffect(() => {
     if (!claimParam) return
@@ -385,7 +393,10 @@ export function SignupForm() {
             locale: lang,
           },
           // Carry the choice through the email-confirmation callback so it survives that hop.
-          emailRedirectTo: `${appUrl}/api/auth/callback?next=${encodeURIComponent('/dashboard')}&lang=${lang}`,
+          // The affiliate code rides on `next` here too: a visitor whose project
+          // requires email confirmation reaches the dashboard through the
+          // callback, which credits the partner there.
+          emailRedirectTo: `${appUrl}/api/auth/callback?next=${encodeURIComponent(withReferral('/dashboard', referralCode))}&lang=${lang}`,
         },
       })
 
@@ -487,6 +498,21 @@ export function SignupForm() {
       // field from the session + metadata). Best-effort — never block signup on its outcome.
       try { await fetch('/api/clients/ensure-default', { method: 'POST' }) } catch { /* non-blocking */ }
 
+      // The partner who sent this visitor, credited now that the account exists
+      // and the session is live. The route decides everything (the account must
+      // be new, one account belongs to one partner for ever, the code must be an
+      // approved partner's); the answer is ignored on purpose, because a
+      // referral that cannot be created must never be the reason a signup fails.
+      if (referralCode) {
+        try {
+          await fetch('/api/affiliate/attach', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ code: referralCode }),
+          })
+        } catch { /* non-blocking */ }
+      }
+
       // Where the new account opens: with a free-check claim kept, the new-project
       // screen that creates the project from that scan and opens it
       // (lib/onboarding/claim-start.ts); otherwise the dashboard. Only the server
@@ -574,7 +600,10 @@ export function SignupForm() {
 
         {/* Off unless NEXT_PUBLIC_GOOGLE_SIGNIN_ENABLED. Held while a free-check claim is still being
             kept (it leaves the address once its cookie is set), so the claim survives the trip to Google. */}
-        <GoogleSignInButton lang={lang} nextPath="/dashboard" disabled={searchParams.has('claim')} />
+        {/* Google's round trip keeps nothing of ours but the `next` path, so the
+            affiliate code rides on it and app/api/auth/callback credits it there
+            with the same function this form's own route calls. */}
+        <GoogleSignInButton lang={lang} nextPath={withReferral('/dashboard', referralCode)} disabled={searchParams.has('claim')} />
 
         <form onSubmit={handleSubmit} className="space-y-4" noValidate data-signup-form>
           <Input

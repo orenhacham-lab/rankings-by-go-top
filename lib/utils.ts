@@ -101,6 +101,23 @@ export function calculateNextScanDate(frequency: string, fromDate: Date = new Da
   return null
 }
 
+/** Days until a new project's FIRST automatic scan. */
+export const FIRST_SCAN_DELAY_DAYS = 7
+
+/** When a project's FIRST automatic scan is due.
+ *
+ *  Scheduling the first one a month out (what calculateNextScanDate gives)
+ *  left a project's first month with no automatic scan at all, so the owner
+ *  saw a tracking screen and no second data point to compare against. The
+ *  first scan lands a week in; every scan after it is monthly, through
+ *  calculateNextScanDate. 'manual' still means no schedule. */
+export function firstScanDate(frequency: string, fromDate: Date = new Date()): Date | null {
+  if (!isValidScanFrequency(frequency) || frequency === 'manual') return null
+  const d = new Date(fromDate)
+  d.setDate(d.getDate() + FIRST_SCAN_DELAY_DAYS)
+  return d
+}
+
 
 export function getEngineDisplayLabel(engine: string, device?: string | null): string {
   return getSearchTypeLabel(engine, device)

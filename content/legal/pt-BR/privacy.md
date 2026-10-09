@@ -3,7 +3,7 @@ title: Política de Privacidade | Go Top SEO
 description: Política de privacidade do Go Top SEO.
 locale: pt-BR
 source: app/(public)/en/privacy/page.tsx
-lastUpdated: 2026-10-06
+lastUpdated: 2026-10-09
 register: voce
 extraSections: 1
 extraReason: One extra section, "Direitos de residentes no Brasil (LGPD)", placed beside the existing EEA/UK and United States rights sections, because the LGPD gives a different set of rights with a different deadline and a different authority to complain to. What the LGPD adds elsewhere goes inside the sections it belongs to - the legal bases of Art. 7, the international-transfer rule of Art. 33, and the communication channel that stands in for an appointed officer.
@@ -62,7 +62,7 @@ Não compartilhamos as suas informações pessoais com terceiros, exceto:
 - **OpenStreetMap (Nominatim):** para converter um endereço em coordenadas, e somente quando você digitou um endereço exato para acompanhamento local de posições. São enviados o endereço digitado e o nome do país, nunca dados da conta
 - **ScrapeLLM:** para o acompanhamento de visibilidade em IA — veja «Provedores de IA» abaixo
 - **Outros sites da rede de links:** somente se você entrou na rede — veja «Rede de links» abaixo
-- **Meta (Facebook / Instagram):** para publicidade direcionada — veja a seção «Publicidade na Meta» abaixo. Os dados que recebemos das APIs do Google nunca são compartilhados com a Meta nem usados para publicidade
+- **Meta (Facebook / Instagram):** para publicidade direcionada e para um relatório de cadastro concluído enviado do nosso servidor — veja a seção «Publicidade na Meta» abaixo. Quanto a esses eventos de conversão, a Meta não trata os dados em nosso nome: ela é controladora conjunta junto com a gente, como aquela seção explica. Os dados que recebemos das APIs do Google nunca são compartilhados com a Meta nem usados para publicidade
 - Quando exigido por lei
 
 ## Dados que recebemos do Google
@@ -158,13 +158,13 @@ Entrar na rede de links é opcional, é feito para cada projeto separadamente e 
 
 O programa de parceiros é para quem recomenda o Serviço e recebe uma comissão pelos clientes que entram por meio dele. A participação é voluntária, cada candidatura é analisada por uma pessoa, e nada do que está aqui se aplica a você, a menos que você se candidate.
 
-- **Quando você se candidata:** recebemos o que você nos envia por e-mail ou WhatsApp: seu nome, seus dados de contato, o site, o canal ou o público para o qual pretende divulgar e, após a aprovação, a forma de pagamento que você escolher. Usamos esses dados para decidir sobre a candidatura e para executar o contrato com você.
-- **Enquanto você é parceiro:** armazenamos seus dados de contato, seu código de indicação, as contas abertas por meio dele, os pagamentos que geram comissão e a comissão calculada sobre eles, os pagamentos feitos a você, e as notas fiscais e as certidões fiscais que a lei nos obriga a guardar.
+- **Quando você se candidata:** a candidatura é um formulário neste site, e o que recebemos é o que você preencheu nele: seu nome, seu endereço de e-mail, uma descrição do público para o qual pretende divulgar e, opcionalmente, um telefone, um site e um país. Nesta etapa não pedimos nenhum dado de pagamento, porque não queremos guardar os dados bancários de alguém que talvez recusemos. Também registramos o endereço IP de onde veio a candidatura, com duas finalidades e nenhuma outra: distinguir uma onda de candidaturas falsas de uma agência real e limitar a três candidaturas por hora do mesmo endereço. Ele não pode ser alterado depois de registrado. **Uma candidatura recusada é excluída por completo após 12 meses e, em qualquer outro caso, o endereço IP é excluído após 12 meses** e o próprio registro permanece.
+- **Enquanto você é parceiro:** armazenamos seus dados de contato, seu código de indicação, os dados de pagamento que você nos informa, o número de cliques no seu link como um único total diário, as contas abertas por meio dele, os pagamentos que geram comissão e a comissão calculada sobre eles, os pagamentos feitos a você, e as notas fiscais e as certidões fiscais que a lei nos obriga a guardar. Uma indicação pode receber uma marca de revisão humana: quando o e-mail da sua candidatura é o mesmo que abriu a conta, ou quando a conta nova está no domínio do seu próprio site. Essa marca pede que uma pessoa verifique antes de aprovar qualquer comissão; por si só não bloqueia nada.
 - **O que um parceiro vê sobre as pessoas que indicou:** nada pessoal. Um parceiro vê quantidades e valores. Um parceiro não recebe o endereço de e-mail, o site, o plano nem a identidade de nenhum cliente que tenha indicado.
 - **Pagamento da comissão:** o provedor escolhido pelo parceiro (PayPal, Wise ou transferência bancária) recebe os dados de que precisa para pagar. As notas fiscais e as certidões de retenção são mantidas por sete anos, conforme as regras de contabilidade israelenses.
-- **Atribuição de uma indicação:** o código do parceiro viaja no próprio link. Não gravamos nenhum cookie para o programa nem guardamos nada no seu dispositivo, de modo que o que você escolher sobre cookies não influencia nem para um lado nem para o outro. Se em algum momento creditarmos uma visita que volta mais tarde, o que implicaria guardar algo, esta política dirá isso e o seu consentimento será pedido antes.
+- **Atribuição de uma indicação:** o código do parceiro viaja no próprio link. Não gravamos nenhum cookie para o programa nem guardamos nada no seu dispositivo, de modo que o que você escolher sobre cookies não influencia nem para um lado nem para o outro. Se em algum momento creditarmos uma visita que volta mais tarde, o que implicaria guardar algo, esta política dirá isso e o seu consentimento será pedido antes. **O que é registrado quando um visitante segue o link de um parceiro é uma contagem: mais um no total diário daquele parceiro, e esse é todo o registro**: sem endereço IP, sem navegador, sem o site de onde você veio e sem nenhum identificador. A atribuição em si é feita com o código que viaja no endereço da página, lido uma única vez no momento em que a conta é criada.
 
-Na data desta política o programa funciona apenas por candidatura: recebemos candidaturas e aprovamos parceiros manualmente, e ainda não foram construídos o rastreamento de indicações, o registro de comissões nem o pagamento. Cada um deles será descrito aqui antes de entrar em funcionamento. Os termos estão no [Contrato do Programa de Parceiros](/pt-BR/affiliate-terms), que também obriga o parceiro a declarar abertamente que é remunerado.
+Na data desta política o programa funciona assim: a candidatura é um formulário neste site e é aprovada por uma pessoa; um parceiro aprovado tem um código e um link; os cliques são contados como um total diário por parceiro; uma conta nova que se cadastra com um código é atribuída àquele parceiro uma vez e para sempre; a comissão é registrada sobre cada pagamento efetivamente recebido, fica retida por 30 dias, que é a janela de reembolso, e é aprovada por uma pessoa; e o pagamento em si é feito manualmente contra um comprovante. **Um cliente cobrado pela Shopify não gera comissão automática**, porque a Shopify nos informa que um plano está ativo e não que uma cobrança foi feita; essa comissão é registrada manualmente, com o mesmo percentual. Os termos estão no [Contrato do Programa de Parceiros](/pt-BR/affiliate-terms), que também obriga o parceiro a declarar abertamente que é remunerado.
 
 ## Provedores de IA
 
@@ -179,7 +179,12 @@ Enviamos e-mail por meio do provedor de envio Resend, que recebe o seu endereço
 
 - **Mensagens de conta e de serviço:** cadastro, verificação, cobrança e avisos sobre o uso do Serviço.
 - **Lembretes:** quando há conteúdo aguardando a sua aprovação, um lembrete pode ser enviado. Todo lembrete tem um link de cancelamento em um clique, sem necessidade de login, e o cancelamento interrompe esses lembretes. A sua preferência é armazenada conosco.
-- **Relatório mensal de progresso:** um resumo mensal do projeto, para os projetos em que você o ativou nas configurações.
+- **E-mails de início:** se você abriu um projeto e não conectou um site a ele, ou conectou e nada foi publicado nele, podemos enviar até dois e-mails que explicam como concluir a etapa e levam à tela correspondente no aplicativo. **Eles não trazem oferta, nem preço, nem desconto, nem upgrade**: trazem um link para o guia dentro do aplicativo, o número do WhatsApp e um link de cancelamento. Um terceiro não é enviado, e não enviamos mais de um e-mail sobre o mesmo projeto em 72 horas.
+- **Resumo semanal:** um resumo do projeto, para os projetos em que você o ativou nas configurações. O resumo é enviado no domingo pela manhã, **e somente quando há algo a contar; uma semana em que nada aconteceu não recebe e-mail.** Uma seção que não conseguimos ler é omitida do e-mail em vez de ser informada como zero, para que o e-mail nunca apresente um número que não medimos.
+
+**Cancelar, no alcance que você pediu.** O link de cancelamento de um e-mail de início interrompe somente esses e-mails, e a página a que ele leva diz a você claramente que os lembretes e o resumo semanal continuam chegando, e oferece um clique para interromper esses também. O link de cancelamento de um lembrete ou do resumo semanal interrompe todos os e-mails sobre aquele projeto. Reativar a chave de e-mail do projeto nas configurações anula qualquer um desses cancelamentos, de modo que a chave que você vê nas configurações é o quadro completo.
+
+**Não medimos o que você fez com o e-mail.** As nossas mensagens não trazem nenhum pixel que informe uma abertura, não rastreamos cliques e não reescrevemos os links dentro delas para encaminhar você por nós.
 
 ## Como podemos entrar em contato com você por causa de uma verificação gratuita
 
@@ -215,13 +220,13 @@ Dividimos os cookies em três categorias, e perguntamos a você sobre duas delas
 
 - **Estritamente necessários:** login, memória do idioma da interface, segurança e prevenção de abusos. O serviço não funciona sem eles, portanto não exigem consentimento.
 - **Medição:** quantas pessoas visitaram, quais páginas leram e o que não funcionou. Carregados somente se você permitir.
-- **Marketing:** medição do desempenho dos nossos anúncios e exibição de anúncios relevantes nas redes do Google e da Meta. Carregados somente se você permitir.
+- **Marketing:** medição do desempenho dos nossos anúncios e exibição de anúncios relevantes nas redes do Google e da Meta. Carregados somente se você permitir. Permitir esta categoria vale também para um relatório de conversão que enviamos à Meta do nosso servidor, sem cookie nenhum — veja a seção «Publicidade na Meta».
 
 **Antes da sua escolha, nenhum cookie de medição ou de marketing é gravado e nenhuma requisição é feita aos servidores do Google.** Aceitar e recusar são dois botões equivalentes no aviso, e cada categoria pode ser permitida separadamente.
 
 **Alterar ou retirar o consentimento:** a qualquer momento, pelo link «Configurações de cookies» no final de cada página. Retirar é exatamente tão fácil quanto consentir e não lhe custa nada no serviço.
 
-**O programa de parceiros:** não grava nenhum cookie. Se você chegar ao site pelo link de um parceiro, o código desse parceiro vai no próprio link e nada é escrito no seu dispositivo. É por isso que o programa não aparece entre as categorias acima, e é por isso que o que você escolhe neste aviso nem o ajuda nem o atrapalha. Um cookie que guarde o código de um parceiro não é estritamente necessário para o site funcionar, então teríamos precisado do seu consentimento para gravá-lo: escolhemos não precisar dele.
+**O programa de parceiros:** não grava nenhum cookie. Se você chegar ao site pelo link de um parceiro, o código desse parceiro vai no próprio link e nada é escrito no seu dispositivo. É por isso que o programa não aparece entre as categorias acima, e é por isso que o que você escolhe neste aviso nem o ajuda nem o atrapalha. Um cookie que guarde o código de um parceiro não é estritamente necessário para o site funcionar, então teríamos precisado do seu consentimento para gravá-lo: escolhemos não precisar dele. O que é registrado no clique é uma contagem: mais um no total diário daquele parceiro, sem nenhum dado sobre você.
 
 Se o seu navegador enviar o sinal Global Privacy Control, nós o tratamos como recusa: nenhum cookie de medição ou de marketing é carregado, e não exibimos o aviso.
 
@@ -235,7 +240,7 @@ As nossas ferramentas de medição e marketing são gerenciadas pelo Google Tag 
 - **Google Ads:** medição de conversões e publicidade personalizada (sujeito ao consentimento de marketing)
 - **Meta Pixel:** medição de conversões e publicidade no Facebook e no Instagram (sujeito ao consentimento de marketing)
 
-Quais ferramentas estão ativas muda de tempo em tempo. O que não muda: nenhuma delas é carregada antes de você permitir a sua categoria, e retirar o consentimento interrompe a coleta.
+Quais ferramentas estão ativas muda de tempo em tempo. O que não muda: nenhuma delas é carregada antes de você permitir a sua categoria, e retirar o consentimento interrompe a coleta. Além dessas ferramentas, que funcionam no navegador, enviamos à Meta um relatório de conversão do nosso servidor; ele também depende do consentimento de marketing e cessa quando você o retira.
 
 Declaramos o seu estado de consentimento ao Google pelo protocolo Consent Mode v2, para que as ferramentas fiquem vinculadas à sua escolha mesmo se acrescentarmos uma nova tag no futuro.
 
@@ -251,6 +256,24 @@ As informações que podem ser coletadas e enviadas à Meta incluem:
 - Informações coletadas por cookies da Meta
 
 Esse uso está sujeito à política de privacidade da Meta Platforms, Inc., disponível em [facebook.com/privacy/policy](https://www.facebook.com/privacy/policy/). Você pode recusar a publicidade personalizada nas configurações de privacidade da sua conta no Facebook.
+
+### Um relatório de conversão do nosso servidor (Conversions API)
+
+Além do Pixel que funciona no navegador, informamos à Meta um cadastro concluído a partir do nosso servidor, por uma interface chamada Conversions API. O relatório é enviado **somente** se você permitiu a categoria de marketing no aviso de cookies. Se você recusou, ou ainda não escolheu, nada é enviado.
+
+O que esse relatório contém:
+
+- o nome do evento (um cadastro concluído) e a hora em que aconteceu
+- um identificador único do evento, para que a Meta não conte o mesmo cadastro duas vezes
+- um resumo unidirecional (hash SHA-256) do endereço de e-mail com o qual você se cadastrou
+- um resumo unidirecional, pelo mesmo método, do identificador da sua conta com a gente
+- o endereço da página de onde você se cadastrou, sem nada do que vem depois do sinal de interrogação
+
+Não enviamos o endereço de e-mail em si, mas o hash não torna a informação anônima: se esse mesmo endereço também estiver na sua conta da Meta, a Meta pode relacionar os dois e identificar você, e por isso tratamos esse relatório como dado pessoal para todos os efeitos. **Nesse relatório não enviamos o seu endereço IP, nem os dados do seu navegador, nem qualquer cookie da Meta, nem o seu nome nem o seu telefone, e ele é enviado somente por um cadastro concluído, nunca por uma visualização de página.**
+
+Retirar o consentimento de marketing interrompe imediatamente os relatórios futuros. Um relatório já enviado não podemos recuperar, e você pode exigir a sua exclusão diretamente da Meta, pelo canal de direitos dela.
+
+**Quem responde por esses dados:** quanto à coleta e à transmissão desses eventos de conversão, nós e a Meta somos controladores conjuntos (joint controllers): a Meta Platforms Ireland Limited para visitantes do Espaço Econômico Europeu e do Reino Unido, e a Meta Platforms, Inc. para os demais. A partir do momento em que os dados chegam à Meta, a Meta é controladora independente do uso que faz deles para as suas próprias finalidades. Você pode exercer os seus direitos sobre esses dados diretamente perante a Meta, e se você se dirigir a nós encaminharemos o seu pedido à Meta.
 
 ## Contato pelo WhatsApp
 
@@ -332,7 +355,7 @@ Respondemos aos pedidos em até 15 dias, prazo do art. 19, I, da LGPD, e sem cus
 
 Se você reside na Califórnia, ou em outro estado que aprovou uma lei estadual de privacidade, tem o direito de saber quais categorias de dados foram coletadas sobre você, de obter uma cópia, de pedir a exclusão, de corrigir dados inexatos e de não sofrer discriminação por exercer um direito.
 
-**Não vendemos informações pessoais e não as transferimos por contrapartida.** Compartilhamos identificadores e eventos de uso com as redes de publicidade do Google e da Meta para publicidade direcionada, o que pode ser considerado «compartilhamento» na lei da Califórnia. Esse compartilhamento acontece **somente** se você permitiu a categoria de marketing, e cessa no momento em que você retira a permissão.
+**Não vendemos informações pessoais e não as transferimos por contrapartida.** Compartilhamos identificadores e eventos de uso com as redes de publicidade do Google e da Meta para publicidade direcionada, no navegador e do nosso servidor, o que pode ser considerado «compartilhamento» na lei da Califórnia. Esse compartilhamento acontece **somente** se você permitiu a categoria de marketing, e cessa no momento em que você retira a permissão.
 
 Respeitamos o sinal Global Privacy Control do navegador como um pedido de «não vender nem compartilhar minhas informações pessoais», e o registramos. Nenhum formulário é necessário: o sinal basta.
 
@@ -366,4 +389,4 @@ Se você tiver dúvidas sobre esta política de privacidade, fale com a gente:
 
 **Telefone:** [054-9489377](tel:0549489377)
 
-Esta política foi atualizada pela última vez em 5 de outubro de 2026
+Esta política foi atualizada pela última vez em 9 de outubro de 2026

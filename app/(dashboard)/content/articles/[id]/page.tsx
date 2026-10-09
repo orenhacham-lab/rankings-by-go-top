@@ -40,6 +40,7 @@ import { useConfirm } from '@/components/ui/ConfirmDialog'
 import { insertInternalLink, anchorExistsInBody, isUrlAlreadyLinked } from '@/lib/content/internal-links'
 import type { PlannedInternalLink } from '@/lib/content/brief-notes'
 import { useDashboardLanguage } from '@/lib/i18n/dashboard/useDashboardLanguage'
+import { useItemProject } from '@/lib/active-project/useItemProject'
 import { getDashboardDictionary } from '@/lib/i18n/dashboard/getDashboardDictionary'
 import { AlertCircle, Check, FileQuestion, TriangleAlert } from 'lucide-react'
 
@@ -71,6 +72,9 @@ export default function ArticleEditorPage({ params }: { params: Promise<{ id: st
 
   // Back link returns to the Content Hub for THIS article's project.
   const backHref = projectId ? `/content?projectId=${projectId}` : '/content'
+  // Opening an article adopts its project; switching the workspace while it is
+  // open leaves for the new project's Content Hub (lib/active-project/item-project.ts).
+  useItemProject(projectId, (pid) => `/content?projectId=${pid}`)
 
   const [title, setTitle] = useState('')
   const [slug, setSlug] = useState('')

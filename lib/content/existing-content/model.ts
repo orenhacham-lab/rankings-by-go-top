@@ -79,8 +79,19 @@ export interface ExistingContentItem {
   articleId: string | null
   /** Null when Search Console has no rows for this page (or is not connected). */
   metrics: ExistingContentMetrics | null
-  /** Set when two or more of the site's pages get impressions for the same query. */
-  cannibalization: { query: string; pages: number } | null
+  /** Set when two or more of the site's pages get impressions for the same query.
+   *  `others` names the OTHER pages splitting it, strongest first, because a row
+   *  that says "competes with another page" without naming the page leaves the
+   *  merchant nothing to act on (owner, 9 October 2026). */
+  cannibalization: {
+    query: string
+    pages: number
+    /** This page's impressions on that query. */
+    mine: number
+    /** True when this page takes the most of the query among the competing pages. */
+    leading: boolean
+    others: Array<{ url: string; title: string | null; path: string; impressions: number }>
+  } | null
   /** A topic that links to this page as a required internal link already exists. */
   supportTopicPlanned: boolean
   action: RowAction | null
@@ -394,7 +405,16 @@ export function pageMetrics(rows: readonly GscRowLite[]): Map<string, ExistingCo
  * It is a risk, not a verdict: two pages can rightly answer one query. That is why the
  * screen names the query and the count, and leaves the judgement to the merchant.
  */
-export function cannibalizationByPage(rows: readonly GscRowLite[]): Map<string, { query: string; pages: number }> {
+export interface CannibalizationRisk {
+  query: string
+  pages: number
+  /** This page's impressions on the query. */
+  mine: number
+  /** The OTHER pages that split the query with it, strongest first. */
+  others: Array<{ path: string; impressions: number }>
+}
+
+export function cannibalizationByPage(rows: readonly GscRowLite[]): Map<string, CannibalizationRisk> {
   const byQuery = new Map<string, { pages: Map<string, number>; impressions: number }>()
   for (const r of rows) {
     // No zero-impression early-out: a page with no impressions has a zero share and
@@ -408,20 +428,26 @@ export function cannibalizationByPage(rows: readonly GscRowLite[]): Map<string, 
     e.impressions += impressions
     byQuery.set(q, e)
   }
-  // Per page, the shared query THIS page draws the most impressions from.
-  const out = new Map<string, { query: string; pages: number; mine: number }>()
+  // Per page, the shared query THIS page draws the most impressions from, and the
+  // other pages that split that query with it — the competing pages were already
+  // computed here and were thrown away before the screen could name them.
+  const out = new Map<string, CannibalizationRisk>()
   for (const [query, e] of byQuery) {
     if (e.impressions < COMPETING_MIN_IMPRESSIONS) continue
     const real = [...e.pages].filter(([, imp]) => imp / e.impressions >= COMPETING_MIN_SHARE)
     if (real.length < 2) continue
     for (const [page, mine] of real) {
       const cur = out.get(page)
-      if (!cur || mine > cur.mine || (mine === cur.mine && query < cur.query)) {
-        out.set(page, { query, pages: real.length, mine })
-      }
+      if (cur && !(mine > cur.mine || (mine === cur.mine && query < cur.query))) continue
+      const others = real
+        .filter(([other]) => other !== page)
+        .map(([path, impressions]) => ({ path, impressions }))
+        // Strongest first; the path breaks a tie so the order never wobbles.
+        .sort((a, b) => (b.impressions - a.impressions) || (a.path < b.path ? -1 : a.path > b.path ? 1 : 0))
+      out.set(page, { query, pages: real.length, mine, others })
     }
   }
-  return new Map([...out].map(([k, v]) => [k, { query: v.query, pages: v.pages }]))
+  return out
 }
 
 // ── Our own articles and topics ──────────────────────────────────────────────
@@ -503,6 +529,21 @@ export function rowAction(item: Pick<ExistingContentItem, 'origin' | 'articleId'
 
 // ── Putting it together ──────────────────────────────────────────────────────
 
+/** Name the competing pages: a title where the site gave one, else the path. */
+function resolveRisk(
+  risk: CannibalizationRisk | null,
+  byKey: Map<string, ExistingContentItem>,
+): ExistingContentItem['cannibalization'] {
+  if (!risk) return null
+  const others = risk.others.map((o) => {
+    const hit = byKey.get(o.path)
+    return { url: hit?.url ?? o.path, title: hit?.title ?? null, path: o.path, impressions: o.impressions }
+  })
+  // "Leading" is about the query, not the site: this page takes the most of it.
+  const leading = others.every((o) => risk.mine >= o.impressions)
+  return { query: risk.query, pages: risk.pages, mine: risk.mine, leading, others }
+}
+
 export function annotate(
   items: readonly ExistingContentItem[],
   opts: {
@@ -513,6 +554,13 @@ export function annotate(
 ): ExistingContentItem[] {
   const metrics = opts.gscRows ? pageMetrics(opts.gscRows) : null
   const risks = opts.gscRows ? cannibalizationByPage(opts.gscRows) : null
+  // Search Console gives paths; the merchant knows pages by their titles, so the
+  // competing paths are resolved against the merged list before they are shown.
+  const byKey = new Map<string, ExistingContentItem>()
+  for (const it of items) {
+    const k = pageKey(it.url)
+    if (k && !byKey.has(k)) byKey.set(k, it)
+  }
   return items.map((it) => {
     const key = pageKey(it.url)
     const own = opts.ownership
@@ -525,7 +573,7 @@ export function annotate(
       origin: commerce ? 'site' : ours ? 'ours' : own ? 'site' : null,
       articleId: commerce || !ours ? null : (it.articleId ?? own?.pageKeys.get(key) ?? byGid ?? null),
       metrics: metrics?.get(key) ?? null,
-      cannibalization: risks?.get(key) ?? null,
+      cannibalization: resolveRisk(risks?.get(key) ?? null, byKey),
       supportTopicPlanned: !!opts.plannedKeys?.has(key),
       action: null,
     }

@@ -3,7 +3,7 @@ title: Términos de Uso | Go Top SEO
 description: Términos de uso de Go Top SEO: las condiciones que rigen el uso de nuestro servicio.
 locale: es
 source: app/(public)/en/terms/page.tsx
-lastUpdated: 2026-10-06
+lastUpdated: 2026-10-09
 register: usted
 ---
 
@@ -186,7 +186,8 @@ El Servicio utiliza IA para producir temas de artículos, preguntas y artículos
 
 - **Los mensajes de cuenta y de servicio**, como los de registro, verificación, facturación y novedades sobre el uso del Servicio, se envían como parte del Servicio.
 - **Recordatorios.** Cuando haya contenido pendiente de su aprobación, es posible que se le envíe un correo electrónico de recordatorio. Cada recordatorio incluye un enlace para darse de baja con un solo clic que no requiere iniciar sesión.
-- **Informe mensual de progreso.** Un resumen mensual del progreso del proyecto, para los proyectos en los que usted lo activó en la configuración.
+- **Correos de puesta en marcha.** Hasta dos correos sobre un proyecto sin sitio conectado, o con uno conectado y nada publicado, que explican cómo completar el paso. Sin oferta y sin precio, con un enlace de baja que detiene solo esos correos.
+- **Resumen semanal de progreso.** Un resumen del progreso del proyecto, para los proyectos en los que usted lo activó en la configuración, los domingos por la mañana y solo cuando hay algo que contar. Una semana en la que no pasó nada no recibe correo.
 
 ## 16. Privacidad
 
@@ -224,4 +225,4 @@ Para cualquier consulta sobre estos términos o sobre el Servicio, póngase en c
 Número de sociedad: 517274346
 Correo electrónico: [oren@gotop.co.il](mailto:oren@gotop.co.il)
 
-Última actualización: 3 de octubre de 2026
+Última actualización: 9 de octubre de 2026

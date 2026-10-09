@@ -18,6 +18,8 @@
  *   removeLink        the reverse, for a placement the giving side rejects.
  */
 
+import { indexOfCaseInsensitive } from '@/lib/text/ci-index'
+
 export type LinkRel = 'follow' | 'nofollow'
 
 export interface BodyParagraph {
@@ -147,7 +149,7 @@ export function insertLink(html: string, paragraph: BodyParagraph, anchor: strin
     const segStart = m.index + m[1].length
     let from = 0
     for (;;) {
-      const k = text.toLowerCase().indexOf(needle.toLowerCase(), from)
+      const k = indexOfCaseInsensitive(text, needle, from)
       if (k < 0) break
       from = k + 1
       const before = text[k - 1] ?? ''

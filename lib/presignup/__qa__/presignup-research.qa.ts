@@ -682,7 +682,13 @@ async function main() {
     const login = code(read('app/(auth)/login/page.tsx'))
     const signup = code(read('app/(auth)/signup/page.tsx'))
     check('on sign-in (with its own next) and sign-up (held while a claim is still in the address)',
-      login.includes('<GoogleSignInButton lang={lang} nextPath={nextPath} />') && signup.includes(`<GoogleSignInButton lang={lang} nextPath="/dashboard" disabled={searchParams.has('claim')} />`))
+      login.includes('<GoogleSignInButton lang={lang} nextPath={nextPath} />')
+      // Sign-up still lands on the dashboard; an affiliate code rides on that
+      // path because Google is a round trip through our own callback and there
+      // is nowhere else to carry it. googleRedirectTo sanitises it as a
+      // same-origin next, and the callback takes the code off the path.
+      && signup.includes(`<GoogleSignInButton lang={lang} nextPath={withReferral('/dashboard', referralCode)} disabled={searchParams.has('claim')} />`)
+      && back(`/dashboard?ref=dana`).searchParams.get('next') === '/dashboard?ref=dana')
   }
 
   check(`${SECRET} appears in no log line of the whole suite`, !allLogs.includes(SECRET) && allLogs.includes('[presignup] research ended'))

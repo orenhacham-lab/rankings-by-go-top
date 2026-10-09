@@ -112,8 +112,20 @@ export function CookieConsent({ onOpenChange }: { onOpenChange?: (open: boolean)
     return () => window.removeEventListener(CONSENT_CHANGED_EVENT, sync)
   }, [])
 
+  // While the card is on screen it also marks the document, which is how the
+  // demo pill gets out of its way (w11). The card is tall in Hebrew — it reaches
+  // roughly 12rem up from the bottom — so there is no slot above it to stack
+  // into, and a pill that merely sat higher would still land on it on a short
+  // viewport. The rule lives in app/globals.css beside the one for the open nav
+  // menu; an attribute, not React state, because the notice and the floats are
+  // rendered on opposite sides of `children` in the root layout and cannot
+  // share state. Cleared on unmount so a route change never leaves it stuck.
   useEffect(() => {
     onOpenChange?.(isClient && isVisible)
+    const open = isClient && isVisible
+    if (open) document.documentElement.dataset.cookieNotice = 'open'
+    else delete document.documentElement.dataset.cookieNotice
+    return () => { delete document.documentElement.dataset.cookieNotice }
   }, [isClient, isVisible, onOpenChange])
 
   const decide = useCallback(

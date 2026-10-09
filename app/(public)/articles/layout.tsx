@@ -1,13 +1,17 @@
 import { buildHreflangAlternates } from '@/lib/seo/hreflang'
+import { buildArticlesIndexSchema } from '@/lib/articles/server'
+import { jsonForScriptTag } from '@/lib/content/public-article-html'
+import { LOCALE_CONFIG } from '@/lib/i18n/locales'
 
 export const metadata = {
   title: 'מאמרים בנושאי קידום אתרים ושיווק דיגיטלי | Go Top SEO',
-  description: 'מאמרים בנושאי קידום אתרים ושיווק דיגיטלי של מומחי השיווק מהגדולים בישראל. להמשך קריאה כנסו עכשיו >>',
+  description: 'מאמרים בנושאי קידום אתרים, נראות ב-AI ושיווק דיגיטלי, מהצוות של Go Top SEO. להמשך קריאה כנסו עכשיו >>',
   openGraph: {
     title: 'מאמרים בנושאי קידום אתרים ושיווק דיגיטלי',
-    description: 'מאמרים בנושאי קידום אתרים ושיווק דיגיטלי של מומחי השיווק מהגדולים בישראל',
+    description: 'מאמרים בנושאי קידום אתרים, נראות ב-AI ושיווק דיגיטלי מהצוות של Go Top SEO',
     url: 'https://www.gotopseo.com/articles',
     type: 'website',
+    locale: LOCALE_CONFIG['he'].ogLocale,
   },
   alternates: {
     canonical: 'https://www.gotopseo.com/articles',
@@ -15,31 +19,12 @@ export const metadata = {
   },
 }
 
-const breadcrumbSchema = {
-  '@context': 'https://schema.org',
-  '@type': 'BreadcrumbList',
-  itemListElement: [
-    {
-      '@type': 'ListItem',
-      position: 1,
-      name: 'דף הבית',
-      item: 'https://www.gotopseo.com',
-    },
-    {
-      '@type': 'ListItem',
-      position: 2,
-      name: 'מאמרים',
-      item: 'https://www.gotopseo.com/articles',
-    },
-  ],
-}
-
 export default function ArticlesLayout({ children }: { children: React.ReactNode }) {
   return (
     <>
       <script
         type="application/ld+json"
-        dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumbSchema) }}
+        dangerouslySetInnerHTML={{ __html: jsonForScriptTag(buildArticlesIndexSchema('he')) }}
       />
       {children}
     </>

@@ -43,6 +43,10 @@ export const he = {
         label: 'תיקוני אתר',
         description: 'בודקים את האתר ומתקנים כותרות, תיאורים, טקסט חלופי לתמונות וקישורים. בוורדפרס בלחיצה, אחרי שאישרתם.',
       },
+      links: {
+        label: 'קישורים לאתר',
+        description: 'קישורים פנימיים בין העמודים שלכם, עמודים יתומים שאף אחד לא מקשר אליהם, ומקומות חינמיים שבהם כדאי שהעסק יופיע.',
+      },
       competitors: {
         label: 'אתם מול המתחרים',
         description: 'על כמה ביטויים כל מתחרה מופיע מעליכם בגוגל, ואת מי מנועי AI מזכירים במקומכם.',
@@ -238,6 +242,10 @@ export const he = {
     phoneLabel: 'טלפון',
     emailLabel: 'מייל',
     emailAria: 'כתבו לנו במייל',
+    // The floating "free demo" button (w11), on the public site and in the app.
+    demo: 'דמו חינם',
+    demoAria: 'קבלת דמו חינם בוואטסאפ',
+    demoMessage: 'היי, אני רוצה דמו חינם של Go Top SEO',
   },
   a11y: {
     open: 'פתיחת תפריט נגישות',

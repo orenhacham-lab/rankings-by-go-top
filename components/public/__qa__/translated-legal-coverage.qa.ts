@@ -153,6 +153,51 @@ for (const locale of LOCALES) {
   }
 }
 
+// ── 1a) the rendered date and the written date are the same date ────────────
+/*
+ * THE FOOTER IS THE FRONT MATTER, AND THE READER SEES BOTH.
+ *
+ * A translated document carries its revision date twice: `lastUpdated` in the
+ * front matter, which is what the page renders in its footer, and the
+ * document's own closing sentence, which is what a reader quoting the policy
+ * would cite. On 9 October 2026 the Spanish and Brazilian privacy policies and
+ * terms went live saying "9 de octubre" in the body under a footer that said
+ * "6 de octubre", because the email revision moved the sentence and not the
+ * field. Two different revision dates on one live legal page is the kind of
+ * contradiction that is read against us, so neither may move without the other.
+ *
+ * DERIVED, not pinned: the date is parsed out of the document's own closing
+ * sentence in its own language and compared with the field. A document with no
+ * such sentence is not failed here — section 7 and the per-language law cover
+ * what each document must say — but one that has it must agree with its footer.
+ */
+const MONTHS: Record<string, string[]> = {
+  es: ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre'],
+  'pt-BR': ['janeiro', 'fevereiro', 'março', 'abril', 'maio', 'junho', 'julho', 'agosto', 'setembro', 'outubro', 'novembro', 'dezembro'],
+}
+
+/** The date in the document's own closing revision sentence, as YYYY-MM-DD, or null. */
+function writtenRevisionDate(locale: string, src: string): string | null {
+  const months = MONTHS[locale]
+  if (!months) return null
+  // Only a line that is about updating: a date inside the text of a statute
+  // ("in force since 14 August 2025") is not this document's revision date.
+  const line = /[^\n]*(actualiz|atualiza)[^\n]*\b(\d{1,2}) de ([A-Za-zçãéíóú]+) de (\d{4})/gi
+  let found: RegExpExecArray | null = null
+  for (let m = line.exec(src); m; m = line.exec(src)) found = m
+  if (!found) return null
+  const month = months.indexOf(found[3].toLowerCase())
+  if (month < 0) return null
+  return `${found[4]}-${String(month + 1).padStart(2, '0')}-${String(Number(found[2])).padStart(2, '0')}`
+}
+
+for (const locale of LOCALES) for (const doc of DOCS) {
+  const fm = frontMatter(text[locale][doc])
+  const written = writtenRevisionDate(locale, text[locale][doc])
+  if (!written) continue
+  check(`${locale} ${doc}: the footer date and the written date agree (${fm.lastUpdated} / ${written})`, fm.lastUpdated === written)
+}
+
 // ── 2) the register each document declares, kept throughout it ──────────────
 for (const locale of LOCALES) {
   for (const doc of DOCS) {
@@ -916,6 +961,411 @@ const MEDIA_ALT_LIMITS: Record<string, RegExp[]> = {
     !MEDIA_ALT_LIMITS.en[2].test('Each such fix is shown to you before it is applied, and can be undone.'))
 }
 
+// ── 18) the conversion report sent to Meta from our server ────────────────
+/*
+ * What the documents said before this section existed: the Meta half of the
+ * policy described the Pixel, cookies and the browser, and the marketing
+ * category promised that "none of them loads before you have allowed its
+ * category, and withdrawing your consent stops the collection". A conversion
+ * event sent server-to-server is not a tag and sets no cookie, so none of that
+ * text covered it, and the California half promised the sharing "happens only
+ * if you allowed the marketing category" — a promise the server has to keep.
+ *
+ * Three facts a reader cannot guess and therefore may never be dropped.
+ *
+ * The gate. The report goes only on a granted marketing consent. A refusal and
+ * a visitor who has not answered the notice are both "no", and withdrawal stops
+ * future reports. Anything else turns four live documents into a false
+ * statement, which is why the gate is pinned per language.
+ *
+ * What leaves us. The event name and time, a one-time event id for Meta's
+ * deduplication, and a SHA-256 hash of the signup email — and NOT the IP
+ * address, the browser details or any Meta cookie. The hash is pinned together
+ * with the sentence that it does not make the data anonymous: Meta holds the
+ * same addresses, so it can match and identify, and a policy that called a
+ * hash anonymous would be claiming a protection the code does not deliver.
+ *
+ * Who answers for it. Under Meta's own Business Tools Terms and the Controller
+ * Addendum, the collection and transmission of these events is JOINT
+ * controllership with Meta Platforms Ireland Limited, which is independent
+ * controller for what it does afterwards; the Addendum puts the Art. 13/14
+ * duty to say so on us, and obliges us to pass a rights request on. So the
+ * documents must name Meta as joint controller rather than as one more
+ * processor acting on our behalf, and must point the reader at Meta directly.
+ */
+const CAPI_GATE: Record<string, RegExp> = {
+  he: /הדיווח נשלח <strong>רק<\/strong> אם אישרת את קטגוריית השיווק[\s\S]{0,120}אם סירבת, או אם עדיין לא בחרת, לא נשלח דבר/,
+  en: /The report is sent\{' '\}\s*<strong>only<\/strong> if you allowed the marketing category[\s\S]{0,140}If you\s*refused, or have not chosen yet, nothing is sent/,
+  es: /El informe se envía \*\*únicamente\*\* si usted permitió la categoría de marketing[\s\S]{0,140}Si lo rechazó, o si todavía no ha elegido, no se envía nada/,
+  'pt-BR': /O relatório é enviado \*\*somente\*\* se você permitiu a categoria de marketing[\s\S]{0,140}Se você recusou, ou ainda não escolheu, nada é enviado/,
+}
+const CAPI_WITHDRAW: Record<string, RegExp> = {
+  he: /ביטול ההסכמה לשיווק מפסיק מיד דיווחים עתידיים/,
+  en: /Withdrawing marketing consent stops future reports immediately/,
+  es: /Retirar el consentimiento de marketing detiene de inmediato los informes futuros/,
+  'pt-BR': /Retirar o consentimento de marketing interrompe imediatamente os relatórios futuros/,
+}
+const CAPI_HASH: Record<string, RegExp[]> = {
+  he: [/תמצית חד-כיוונית \(hash בשיטת SHA-256\) של כתובת הדוא&rdquo;ל/, /התמצית אינה הופכת את המידע לאנונימי/],
+  en: [/a one-way hash \(SHA-256\) of the email address you signed up with/, /the hash does not make the information\s*anonymous/],
+  es: [/un resumen unidireccional \(hash SHA-256\) de la dirección de correo electrónico/, /el hash no convierte la información en anónima/],
+  'pt-BR': [/um resumo unidirecional \(hash SHA-256\) do endereço de e-mail/, /o hash não torna a informação anônima/],
+}
+/* The code also sends a hash of the account id and the signup page's address, and those are
+ * identifiers too: a list that stops at the email understates what leaves us. */
+const CAPI_IDS: Record<string, RegExp[]> = {
+  he: [/תמצית חד-כיוונית באותה שיטה של מזהה החשבון שלך אצלנו/, /כתובת העמוד שממנו נרשמת, בלי הפרמטרים שאחרי סימן השאלה/],
+  en: [/a one-way hash, by the same method, of your account identifier with us/, /the address of the page you signed up from, without anything after the question mark/],
+  es: [/un resumen unidireccional, por el mismo método, del identificador de su cuenta con nosotros/, /la dirección de la página desde la que usted se registró, sin nada de lo que va después del signo de interrogación/],
+  'pt-BR': [/um resumo unidirecional, pelo mesmo método, do identificador da sua conta com a gente/, /o endereço da página de onde você se cadastrou, sem nada do que vem depois do sinal de interrogação/],
+}
+const CAPI_NOT_SENT: Record<string, RegExp> = {
+  he: /איננו שולחים את כתובת ה-IP שלך, את פרטי\s*הדפדפן שלך או עוגייה של Meta/,
+  en: /we do not send your IP address, your browser details or any Meta\s*cookie/,
+  es: /no enviamos su dirección IP, ni los datos de su navegador, ni ninguna cookie de Meta/,
+  'pt-BR': /não enviamos o seu endereço IP, nem os dados do seu navegador, nem qualquer cookie da Meta/,
+}
+const CAPI_JOINT: Record<string, RegExp> = {
+  he: /אנחנו\s*ו-Meta בעלי שליטה משותפים \(joint controllers\)[\s\S]{0,160}Meta Platforms Ireland Limited[\s\S]{0,120}Meta Platforms, Inc\./,
+  en: /we and Meta are joint controllers: Meta Platforms Ireland Limited[\s\S]{0,140}Meta Platforms, Inc\./,
+  es: /nosotros y Meta somos corresponsables del tratamiento \(joint controllers\): Meta Platforms Ireland Limited[\s\S]{0,140}Meta Platforms, Inc\./,
+  'pt-BR': /nós e a Meta somos controladores conjuntos \(joint controllers\): a Meta Platforms Ireland Limited[\s\S]{0,140}Meta Platforms, Inc\./,
+}
+/* The marketing category has to say the consent covers a cookieless server report, or the
+ * consent is not specific to what we then do with it (Art. 4(11)). */
+const CAPI_CATEGORY: Record<string, RegExp> = {
+  he: /האישור בקטגוריה הזאת חל גם על דיווח המרה שאנו שולחים\s*ל-Meta מהשרת שלנו בלי עוגייה כלל/,
+  en: /Allowing this category also covers\s*a conversion report we send to Meta from our server with no cookie at all/,
+  es: /Permitir esta categoría cubre también un informe de\s*conversión que enviamos a Meta desde nuestro servidor, sin ninguna cookie/,
+  'pt-BR': /Permitir esta categoria vale também para um relatório de conversão que enviamos à Meta do nosso\s*servidor, sem cookie nenhum/,
+}
+{
+  const read = (path: string) => (existsSync(path) ? readFileSync(path, 'utf8') : '')
+  const enPrivacySource = frontMatter(text[LOCALES[0]].privacy).source
+  const privacyDocs: [string, string][] = [
+    ['he', read(HEBREW_PRIVACY)],
+    ['en', enPrivacySource ? read(enPrivacySource) : ''],
+    ...LOCALES.map((l): [string, string] => [l, text[l].privacy]),
+  ]
+  for (const [name, privacy] of privacyDocs) {
+    const gate = CAPI_GATE[name]
+    if (gate) check(`${name}/privacy: the server report goes only on a granted marketing consent`, gate.test(privacy))
+    const withdrawn = CAPI_WITHDRAW[name]
+    if (withdrawn) check(`${name}/privacy: withdrawing marketing consent stops future reports`, withdrawn.test(privacy))
+    for (const must of CAPI_HASH[name] ?? []) {
+      check(`${name}/privacy: the hashed email is named and not called anonymous (${must.source.slice(0, 40)})`, must.test(privacy))
+    }
+    for (const must of CAPI_IDS[name] ?? []) {
+      check(`${name}/privacy: the report's other identifiers are named (${must.source.slice(0, 40)})`, must.test(privacy))
+    }
+    const absent = CAPI_NOT_SENT[name]
+    if (absent) check(`${name}/privacy: the report says no IP, no browser details, no Meta cookie`, absent.test(privacy))
+    const joint = CAPI_JOINT[name]
+    if (joint) check(`${name}/privacy: Meta Ireland is named as joint controller for these events`, joint.test(privacy))
+    const category = CAPI_CATEGORY[name]
+    if (category) check(`${name}/privacy: the marketing category says it covers the cookieless server report`, category.test(privacy))
+  }
+  check('mutation control: a report described without its consent gate is caught',
+    !CAPI_GATE.en.test("We report a completed signup to Meta from our server, through an interface called the Conversions API."))
+  check('mutation control: a hash presented as anonymous is caught',
+    !CAPI_HASH.en[1].test('We send only a one-way hash of your email address, so the report carries nothing that identifies you.'))
+  check('mutation control: a report that also carries the IP address is caught',
+    !CAPI_NOT_SENT.en.test('In this report we send your IP address and your browser details so that Meta can match the event.'))
+  check('mutation control: Meta described as acting on our behalf is caught',
+    !CAPI_JOINT.en.test('Meta processes these conversion events on our behalf and under our instructions.'))
+  check('mutation control: a joint-controller sentence that names only the Irish entity is caught',
+    !CAPI_JOINT.en.test('we and Meta are joint controllers: Meta Platforms Ireland Limited, for every visitor.'))
+  check('mutation control: an identifier list that stops at the email is caught',
+    !CAPI_IDS.en[0].test('a one-way hash (SHA-256) of the email address you signed up with'))
+  check('mutation control: a marketing category that still speaks only of cookies is caught',
+    !CAPI_CATEGORY.en.test('<strong>Marketing:</strong> measuring how our ads perform. Loaded only if you allow it.'))
+  check('mutation control: a withdrawal that only stops the tags is caught',
+    !CAPI_WITHDRAW.en.test('Withdrawing your consent stops the tags in your browser from collecting.'))
+}
+
+// ── 20) the emails we send a customer, and what each unsubscribe stops ────
+/*
+ * Until today the product sent no customer email at all, and the documents
+ * described a MONTHLY progress report while the in-app switch has always said
+ * weekly — with four projects already switched on. The switch is what the
+ * customer relied on, so the documents moved to weekly, in the product's own
+ * words, rather than the sender moving to monthly.
+ *
+ * The setup emails are new, and they sit on a line worth naming. Under s.30A of
+ * the Communications Law a "דבר פרסומת" is a message whose content is
+ * commercial advertising or encouragement to spend money. A nudge to a customer
+ * about the service they opened themselves, carrying no offer, no price, no
+ * discount and no upgrade, is a service message and needs no `פרסומת` label,
+ * sender block or statutory opt-out. One sentence offering anything would turn
+ * it into advertising and all three would be owed at once, which is why the
+ * four no-offer words are pinned here and why the email thread pinned the same
+ * boundary against its own dictionaries.
+ *
+ * The unsubscribe is pinned per SCOPE, which is the part a reader cannot guess
+ * and the part that can quietly harm them: the link in a setup email stops the
+ * setup emails only and says so, while the link in a reminder or in the weekly
+ * summary stops everything about that project. A single link that silently
+ * killed the approval reminder would leave an owner paying for a service that
+ * had stopped telling them anything, so a text that described one undifferentiated
+ * stop is caught below.
+ *
+ * Two accuracy promises ride along because they are cheap to keep and cheap to
+ * break: a section that could not be read is left out rather than reported as a
+ * zero, so no email states a number we did not measure; and we read nothing
+ * about what the recipient did with the message — no open pixel, no click
+ * tracking, no rewritten links.
+ */
+const EMAIL_WEEKLY: Record<string, RegExp[]> = {
+  he: [/<strong>סיכום שבועי:<\/strong>/, /ורק כשיש מה לספר; בשבוע שבו לא קרה כלום לא יישלח מייל/],
+  en: [/<strong>Weekly summary:<\/strong>/, /and only when there is something to say; a week\s*with nothing in it gets no email/],
+  es: [/\*\*Resumen semanal:\*\*/, /y solo cuando hay algo que contar; una semana en la que no pasó nada no recibe correo/],
+  'pt-BR': [/\*\*Resumo semanal:\*\*/, /e somente quando há algo a contar; uma semana em que nada aconteceu não recebe e-mail/],
+}
+/* No monthly report may survive anywhere in either document: the switch says weekly. */
+const EMAIL_NO_MONTHLY: Record<string, RegExp> = {
+  // Narrow on purpose: a bare /חודשי/ also matches "מנוי חודשי", the monthly
+  // subscription, which is true and stays.
+  he: /(דוח התקדמות חודשי|סיכום חודשי)/,
+  en: /[Mm]onthly (progress )?(report|summary)/,
+  es: /[Ii]nforme mensual/,
+  'pt-BR': /[Rr]elatório mensal/,
+}
+const EMAIL_SETUP_NO_OFFER: Record<string, RegExp> = {
+  he: /אין בהם הצעה, אין מחיר, אין הנחה ואין שדרוג/,
+  en: /They carry no offer, no price, no discount and no\s*upgrade/,
+  es: /No llevan oferta, ni precio, ni descuento, ni mejora de plan/,
+  'pt-BR': /Eles não trazem oferta, nem preço, nem desconto, nem upgrade/,
+}
+const EMAIL_SCOPE_NARROW: Record<string, RegExp> = {
+  he: /קישור ההסרה במייל הקמה מפסיק את מיילי ההקמה בלבד/,
+  en: /The unsubscribe link in a setup email stops the\s*setup emails only/,
+  es: /El enlace de baja de un correo de puesta en marcha detiene solo esos correos/,
+  'pt-BR': /O link de cancelamento de um e-mail de início interrompe somente esses e-mails/,
+}
+const EMAIL_SCOPE_WIDE: Record<string, RegExp> = {
+  he: /קישור ההסרה בתזכורת או בסיכום השבועי מפסיק כל מייל על אותו פרויקט/,
+  en: /The unsubscribe link in a reminder or in the weekly summary\s*stops every email about that project/,
+  es: /El enlace de baja de un recordatorio o del resumen semanal detiene todos los correos sobre ese proyecto/,
+  'pt-BR': /O link de cancelamento de um lembrete ou do resumo semanal interrompe todos os e-mails sobre aquele projeto/,
+}
+const EMAIL_SWITCH_TRUTH: Record<string, RegExp> = {
+  he: /המתג שאתה רואה בהגדרות הוא התמונה\s*המלאה/,
+  en: /the switch you see in the settings is the whole picture/,
+  es: /el interruptor que usted ve en los ajustes es el panorama completo/,
+  'pt-BR': /a chave que você vê nas configurações é o quadro completo/,
+}
+const EMAIL_NO_FAKE_ZERO: Record<string, RegExp> = {
+  he: /סעיף שלא הצלחנו לקרוא מושמט מהמייל ואינו מדווח כאפס/,
+  en: /A section we could not read is left out of the email rather than\s*reported as a zero/,
+  es: /Una sección que no pudimos leer se omite del correo en lugar de informarse como un cero/,
+  'pt-BR': /Uma seção que não conseguimos ler é omitida do e-mail em vez de ser informada como zero/,
+}
+const EMAIL_NO_TRACKING: Record<string, RegExp> = {
+  he: /אין בהודעות שלנו פיקסל שמדווח על פתיחה, איננו\s*עוקבים אחרי לחיצות/,
+  en: /Our messages carry no pixel that reports an\s*open, we do not track clicks/,
+  es: /Nuestros mensajes no llevan ningún píxel que informe de una apertura, no seguimos los clics/,
+  'pt-BR': /As nossas mensagens não trazem nenhum pixel que informe uma abertura, não rastreamos cliques/,
+}
+{
+  const read = (path: string) => (existsSync(path) ? readFileSync(path, 'utf8') : '')
+  const enPrivacySource = frontMatter(text[LOCALES[0]].privacy).source
+  const enTermsSource = frontMatter(text[LOCALES[0]].terms).source
+  const privacyDocs: [string, string][] = [
+    ['he', read(HEBREW_PRIVACY)],
+    ['en', enPrivacySource ? read(enPrivacySource) : ''],
+    ...LOCALES.map((l): [string, string] => [l, text[l].privacy]),
+  ]
+  const termsDocs: [string, string][] = [
+    ['he', read(HEBREW_TERMS)],
+    ['en', enTermsSource ? read(enTermsSource) : ''],
+    ...LOCALES.map((l): [string, string] => [l, text[l].terms]),
+  ]
+  for (const [name, privacy] of privacyDocs) {
+    for (const must of EMAIL_WEEKLY[name] ?? []) {
+      check(`${name}/privacy: the summary is weekly and only when there is something (${must.source.slice(0, 40)})`, must.test(privacy))
+    }
+    const offer = EMAIL_SETUP_NO_OFFER[name]
+    if (offer) check(`${name}/privacy: the setup emails carry no offer, price, discount or upgrade`, offer.test(privacy))
+    const narrow = EMAIL_SCOPE_NARROW[name]
+    if (narrow) check(`${name}/privacy: a setup-email unsubscribe stops the setup emails ONLY`, narrow.test(privacy))
+    const wide = EMAIL_SCOPE_WIDE[name]
+    if (wide) check(`${name}/privacy: a reminder or summary unsubscribe stops every email about the project`, wide.test(privacy))
+    const truth = EMAIL_SWITCH_TRUTH[name]
+    if (truth) check(`${name}/privacy: the settings switch is stated to be the whole picture`, truth.test(privacy))
+    const zero = EMAIL_NO_FAKE_ZERO[name]
+    if (zero) check(`${name}/privacy: an unreadable section is omitted, never reported as a zero`, zero.test(privacy))
+    const tracked = EMAIL_NO_TRACKING[name]
+    if (tracked) check(`${name}/privacy: no open pixel, no click tracking, no rewritten links`, tracked.test(privacy))
+  }
+  /* The monthly promise is gone from BOTH documents, in every language. */
+  for (const [name, doc] of [...privacyDocs, ...termsDocs]) {
+    const monthly = EMAIL_NO_MONTHLY[name]
+    if (!monthly || !doc) continue
+    const emailHalf = doc.split(/Email Messages|הודעות דוא|Mensajes de correo|Mensagens de e-mail/)[1] ?? ''
+    const half = emailHalf.slice(0, 3000)
+    check(`${name}: the email section no longer promises a monthly report`, !monthly.test(half))
+  }
+  check('mutation control: a weekly summary promised every week is caught',
+    !EMAIL_WEEKLY.en[1].test('The summary goes out on Sunday morning, every week.'))
+  check('mutation control: a monthly report left in the email section is caught',
+    EMAIL_NO_MONTHLY.en.test('<strong>Monthly progress report:</strong> a monthly summary of the project.'))
+  check('mutation control: a setup email that offers an upgrade is caught',
+    !EMAIL_SETUP_NO_OFFER.en.test('They carry a link to the in-app guide, the WhatsApp number and an offer to upgrade.'))
+  check('mutation control: one undifferentiated unsubscribe is caught',
+    !EMAIL_SCOPE_NARROW.en.test('The unsubscribe link stops every email about the project.'))
+  check('mutation control: a wide link described as narrow is caught',
+    !EMAIL_SCOPE_WIDE.en.test('The unsubscribe link in a reminder stops the reminders.'))
+  check('mutation control: an email that reports an unread section as zero is caught',
+    !EMAIL_NO_FAKE_ZERO.en.test('A section we could not read is reported as zero so the email stays complete.'))
+  check('mutation control: open tracking put back is caught',
+    !EMAIL_NO_TRACKING.en.test('Our messages report when they are opened so that we can measure delivery.'))
+}
+
+// ── 21) the partner program as it is actually built ───────────────────────
+/*
+ * UNTIL TODAY THE POLICY PROMISED TO DESCRIBE THIS BEFORE IT RAN.
+ *
+ * The live text said, in all four languages, that referral tracking, the
+ * commission record and the payout "have not been built yet" and that "each of
+ * them will be described here before it starts running". The partner system
+ * builds exactly those three, so the promise is what makes this text a
+ * precondition for the migration rather than a follow-up to it.
+ *
+ * What the code does that nothing disclosed, each pinned below because it was
+ * read out of the code and not out of a feature description:
+ *
+ *   - The application is a FORM on the site, not an email, and it records the
+ *     applicant's IP address (`applied_ip`, immutable by a database trigger)
+ *     for fraud detection and a three-an-hour rate limit. An identifier
+ *     collected for a purpose has to be disclosed with that purpose, and with
+ *     a retention: a rejected application is deleted in full after 12 months,
+ *     and in every other case the IP alone goes after 12 months.
+ *   - A click is COUNTED, not recorded: `affiliate_count_click` increments one
+ *     row per partner per day and the table has no column about the visitor.
+ *     The policy already promised no cookie and nothing on the device; it said
+ *     nothing about what a click does store, and a partner dashboard showing a
+ *     click figure invites exactly that question. The four nothings (no IP, no
+ *     user agent, no referrer, no identifier) are pinned per language.
+ *   - A referral may carry a REVIEW FLAG (the application's email is the one
+ *     that signed up; the new account is on the partner's own domain). It asks
+ *     a person to look and blocks nothing, which is worth saying because the
+ *     partner we most want — an agency signing up its own client — is the one
+ *     the signal fires on.
+ *   - A customer billed through SHOPIFY earns no automatic commission, because
+ *     Shopify reports an active plan and never a charge. The agreement promises
+ *     30% of every qualifying payment, so the way such a referral is actually
+ *     recorded (by hand, same rate, same hold, same approval) has to be in the
+ *     agreement or the promise outruns the code.
+ *   - A SUSPENDED OR ENDED partner's link keeps resolving and keeps being
+ *     counted; only entitlement stops. The agreement said the link "stops
+ *     working", which was simply untrue: the route accepts a suspended
+ *     partner's code on purpose, so that a visitor clicking a two-year-old blog
+ *     post does not meet an error.
+ */
+const PARTNER_FORM: Record<string, RegExp> = {
+  he: /הבקשה נשלחת בטופס באתר/,
+  en: /the application is a form on this site/,
+  es: /la solicitud es un formulario en este sitio/,
+  'pt-BR': /a candidatura é um formulário neste site/,
+}
+const PARTNER_IP_PURPOSE: Record<string, RegExp> = {
+  he: /לזהות גל של בקשות מזויפות,\s*ולהגביל שלוש בקשות לשעה מאותה כתובת/,
+  en: /telling a ring of fake applications from a\s*real agency, and limiting three applications an hour from one address/,
+  es: /distinguir una oleada de solicitudes falsas de una agencia real, y limitar a tres solicitudes por hora/,
+  'pt-BR': /distinguir uma onda de candidaturas falsas de uma agência real e limitar a três candidaturas por hora/,
+}
+const PARTNER_IP_RETENTION: Record<string, RegExp> = {
+  he: /בקשה שנדחתה נמחקת כולה כעבור 12\s*חודשים/,
+  en: /A rejected application is deleted in full after 12 months/,
+  es: /Una solicitud rechazada se elimina por completo al cabo de 12 meses/,
+  'pt-BR': /Uma candidatura recusada é excluída por completo após 12 meses/,
+}
+/* A click is a number. The four nothings are the whole point of the sentence. */
+const PARTNER_CLICK_COUNT: Record<string, RegExp> = {
+  he: /אחד למונה היומי של אותו\s*שותף/,
+  en: /one added to that partner&rsquo;s daily\s*total/,
+  es: /uno más en el total diario de ese socio/,
+  'pt-BR': /mais um no total diário daquele parceiro/,
+}
+const PARTNER_CLICK_NOTHING: Record<string, RegExp> = {
+  he: /בלי כתובת IP, בלי סוג דפדפן, בלי האתר שממנו הגעת ובלי\s*מזהה כלשהו/,
+  en: /no IP address, no browser, no site you came from,\s*no identifier of any kind/,
+  es: /sin dirección IP, sin navegador, sin el sitio del que llegó y sin ningún identificador/,
+  'pt-BR': /sem endereço IP, sem navegador, sem o site de onde você veio e sem nenhum identificador/,
+}
+const PARTNER_REVIEW_FLAG: Record<string, RegExp> = {
+  he: /סימון כזה מבקש מאדם להסתכל לפני אישור עמלה, ואינו חוסם\s*דבר מעצמו/,
+  en: /Such a flag asks a person to look\s*before any commission is approved; it blocks nothing by itself/,
+  es: /Esa marca pide que una persona lo revise antes de aprobar cualquier comisión; por sí sola no bloquea nada/,
+  'pt-BR': /Essa marca pede que uma pessoa verifique antes de aprovar qualquer comissão; por si só não bloqueia nada/,
+}
+const PARTNER_SHOPIFY: Record<string, RegExp> = {
+  he: /לקוח שמחויב דרך Shopify אינו מייצר עמלה אוטומטית/,
+  en: /A customer billed through Shopify produces no automatic commission/,
+  es: /Un cliente facturado a través de Shopify no genera comisión automática/,
+  'pt-BR': /Um cliente cobrado pela Shopify não gera comissão automática/,
+}
+/* The sentence the policy may no longer carry: the three things now exist. */
+const PARTNER_NOT_BUILT: Record<string, RegExp> = {
+  he: /עדיין לא\s*נבנו מעקב הפניות/,
+  en: /no referral tracking, commission record or payout has been built yet/,
+  es: /todavía no se han construido el seguimiento de referencias/,
+  'pt-BR': /ainda não foram construídos o rastreamento de indicações/,
+}
+/* In the AGREEMENT: how a Shopify referral is recorded, and what suspension does not stop. */
+const AGREEMENT_SHOPIFY_MANUAL: Record<string, RegExp> = {
+  he: /לקוח שמחויב דרך Shopify נרשם ידנית/,
+  en: /A customer billed through Shopify is recorded by hand/,
+  es: /Un cliente facturado a través de Shopify se registra a mano/,
+  'pt-BR': /Um cliente cobrado pela Shopify é registrado manualmente/,
+}
+const AGREEMENT_LINK_LIVES: Record<string, RegExp> = {
+  he: /הקישור שפרסמת ממשיך להוביל לאתר שלנו והקליקים עליו ממשיכים\s*להיספר/,
+  en: /the link you published keeps leading\s*to our site and clicks on it keep being counted/,
+  es: /el enlace que publicó sigue llevando a nuestro sitio y los clics en él siguen contándose/,
+  'pt-BR': /o link que você publicou continua levando ao nosso site e os cliques nele continuam sendo contados/,
+}
+/* And the claim it replaced may not come back: it was never true of the code. */
+const AGREEMENT_LINK_DIES: Record<string, RegExp> = {
+  he: /קישור ההפניה שלך מפסיק לעבוד/,
+  en: /your Referral Link stops working/,
+  es: /su enlace de referido deja de funcionar/,
+  'pt-BR': /o seu link de indicação para de funcionar/,
+}
+{
+  const read = (path: string) => (existsSync(path) ? readFileSync(path, 'utf8') : '')
+  const HEBREW_AFFILIATE = 'app/(legal)/affiliate-terms/page.tsx'
+  const enPrivacy = frontMatter(text[LOCALES[0]].privacy).source
+  const enAffiliate = frontMatter(text[LOCALES[0]]['affiliate-terms']).source
+  const privacyDocs: [string, string][] = [
+    ['he', read(HEBREW_PRIVACY)],
+    ['en', enPrivacy ? read(enPrivacy) : ''],
+    ...LOCALES.map((l): [string, string] => [l, text[l].privacy]),
+  ]
+  const agreementDocs: [string, string][] = [
+    ['he', read(HEBREW_AFFILIATE)],
+    ['en', enAffiliate ? read(enAffiliate) : ''],
+    ...LOCALES.map((l): [string, string] => [l, text[l]['affiliate-terms']]),
+  ]
+  for (const [name, privacy] of privacyDocs) {
+    check(`${name}/privacy: the application is a form on the site`, (PARTNER_FORM[name] ?? /$^/).test(privacy))
+    check(`${name}/privacy: the IP is disclosed with both of its purposes`, (PARTNER_IP_PURPOSE[name] ?? /$^/).test(privacy))
+    check(`${name}/privacy: a rejected application is deleted after 12 months`, (PARTNER_IP_RETENTION[name] ?? /$^/).test(privacy))
+    check(`${name}/privacy: a click is one on a daily counter`, (PARTNER_CLICK_COUNT[name] ?? /$^/).test(privacy))
+    check(`${name}/privacy: and nothing about the visitor is kept with it`, (PARTNER_CLICK_NOTHING[name] ?? /$^/).test(privacy))
+    check(`${name}/privacy: the review flag asks and does not block`, (PARTNER_REVIEW_FLAG[name] ?? /$^/).test(privacy))
+    check(`${name}/privacy: a Shopify-billed customer earns no automatic commission`, (PARTNER_SHOPIFY[name] ?? /$^/).test(privacy))
+    // The promise to describe before running has been kept, so the sentence that
+    // made it may not survive: it would now be false in the other direction.
+    check(`${name}/privacy: no longer says the three were never built`, !(PARTNER_NOT_BUILT[name] ?? /$^/).test(privacy))
+  }
+  for (const [name, agreement] of agreementDocs) {
+    check(`${name}/agreement: how a Shopify referral is recorded`, (AGREEMENT_SHOPIFY_MANUAL[name] ?? /$^/).test(agreement))
+    check(`${name}/agreement: a published link keeps working and keeps counting`, (AGREEMENT_LINK_LIVES[name] ?? /$^/).test(agreement))
+    check(`${name}/agreement: no longer claims the link stops working`, !(AGREEMENT_LINK_DIES[name] ?? /$^/).test(agreement))
+  }
+}
+
 // ── MUTATION CONTROLS ───────────────────────────────────────────────────────
 console.log('\nmutation controls')
 {
@@ -964,6 +1414,27 @@ console.log('\nmutation controls')
     /\b90 d[íi]as\b/.test('conserva el código de ese socio durante 90 días'))
   check('a policy that stops saying no cookie is set is caught',
     !/sets no cookie at all/.test('The partner program: if you reach the site through a partner link'))
+  check('a policy that drops the IP disclosure is caught',
+    !PARTNER_IP_PURPOSE.es.test(text.es.privacy.replace(/distinguir una oleada de solicitudes falsas de una agencia real, y limitar a tres solicitudes por hora/g, ''))
+      && PARTNER_IP_PURPOSE.es.test(text.es.privacy))
+  check('a policy that keeps the IP with no retention is caught',
+    !PARTNER_IP_RETENTION['pt-BR'].test('Também registramos o endereço IP de onde veio a candidatura.'))
+  check('a click record that gains a visitor detail is caught',
+    !PARTNER_CLICK_NOTHING.es.test('un recuento: uno más en el total diario de ese socio, con la dirección IP del visitante'))
+  check('a review flag described as a block is caught',
+    !PARTNER_REVIEW_FLAG['pt-BR'].test('Essa marca bloqueia a indicação até que uma pessoa a aprove.'))
+  check('a policy that still says tracking was never built is caught',
+    PARTNER_NOT_BUILT.en.test('and no referral tracking, commission record or payout has been built yet'))
+  check('an agreement that promises every payment with no Shopify carve-out is caught',
+    !AGREEMENT_SHOPIFY_MANUAL.en.test('You earn 30% of each Qualifying Payment of a Referred Customer.'))
+  check('an agreement that still says a suspended link stops working is caught',
+    AGREEMENT_LINK_DIES.es.test('Cuando este acuerdo termine, su enlace de referido deja de funcionar.'))
+  check('a footer date that drifts from the written date is caught',
+    writtenRevisionDate('es', text.es.terms)
+      !== frontMatter(text.es.terms.replace('lastUpdated: 2026-10-09', 'lastUpdated: 2026-10-06')).lastUpdated
+      && writtenRevisionDate('es', text.es.terms) === frontMatter(text.es.terms).lastUpdated)
+  check('a revision date read out of a statute sentence instead of the footer is caught',
+    writtenRevisionDate('es', 'La Enmienda 13 entró en vigor el 14 de agosto de 2025.') === null)
   check('a translation that drops the promise about a referred customer\'s details is caught',
     !/no recibe la direcci[óo]n de correo electr[óo]nico, el sitio web, el plan/
       .test(text.es.privacy.replace(/no recibe la direcci[óo]n de correo electr[óo]nico, el sitio web, el plan/g, ''))

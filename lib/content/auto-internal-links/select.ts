@@ -52,6 +52,7 @@ import { analyzeAnchorQuality } from '@/lib/content/anchors-check'
 import { bodyParagraphs, linkTag, plainText, type BodyParagraph } from '@/lib/link-network/anchor'
 import { isUrlAlreadyLinked } from '@/lib/content/internal-links'
 import { type ContentLanguage } from '@/lib/content/language'
+import { indexOfCaseInsensitive } from '@/lib/text/ci-index'
 
 export const AUTO_LINK_LIMITS = { max: 5, maxAnchorWords: 6, minParagraphGap: 2, maxCandidates: 2000 } as const
 
@@ -155,7 +156,7 @@ const pathKey = (u: string) => (pathSegments(u) ?? []).join('/')
  */
 export function autoLinkCandidates(
   entries: readonly SiteMapEntry[] | null | undefined,
-  site: { host: string },
+  site: { host: string; allowHttp?: boolean },
   article: { title: string; slug: string | null },
 ): AutoLinkTarget[] {
   const host = site.host.toLowerCase().replace(/^www\./, '')
@@ -167,7 +168,10 @@ export function autoLinkCandidates(
     if (out.length >= AUTO_LINK_LIMITS.maxCandidates) break
     if (!e || typeof e.u !== 'string') continue
     const url = e.u.trim()
-    if (!/^https:\/\//i.test(url) || hostOf(url) !== host) continue
+    // https only, unless the mapped site itself is http — an http-only site used
+    // to yield zero candidates, so zero links, for every article.
+    const schemeOk = site.allowHttp ? /^https?:\/\//i.test(url) : /^https:\/\//i.test(url)
+    if (!schemeOk || hostOf(url) !== host) continue
     if (!isContentUrl(url) || isBlogListing(url)) continue
     const segs = pathSegments(url) ?? []
     if (segs.length === 0) continue
@@ -337,7 +341,7 @@ export function wrapAnchor(html: string, p: BodyParagraph, anchor: string, url: 
     const segStart = m.index + m[1].length
     let from = 0
     for (;;) {
-      const k = text.toLowerCase().indexOf(needle.toLowerCase(), from)
+      const k = indexOfCaseInsensitive(text, needle, from)
       if (k < 0) break
       from = k + 1
       const before = text[k - 1] ?? ''

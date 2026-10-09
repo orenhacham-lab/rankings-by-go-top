@@ -286,7 +286,8 @@ function main() {
       check(`C6: ${rel} builds its limit lines from the shared builder`,
         /\.\.\.planLimitLines\(code, '(he|en)'\)/.test(src))
       check(`C7: ${rel} keeps "most popular" pinned to Advanced`,
-        /const HIGHLIGHTED_PLAN: PlanCode = 'advanced'/.test(src))
+        /HIGHLIGHTED_PLAN/.test(src) && !/const HIGHLIGHTED_PLAN/.test(src)
+        && /export const HIGHLIGHTED_PLAN: PlanCode = 'advanced'/.test(read('lib/plans/features.ts')))
       check(`C8: ${rel} introduces NO toggle, cookie, storage, URL parameter or client state`,
         !/useState|useEffect|'use client'|searchParams|document\.cookie|localStorage|sessionStorage/.test(src))
       check(`C9: ${rel} hard-codes no plan limit of its own`,

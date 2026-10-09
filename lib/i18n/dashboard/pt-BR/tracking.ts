@@ -1,8 +1,8 @@
 /**
  * The TRACKING screens in Brazilian Portuguese: the keyword add/edit form, the
  * site mapping banner and keyword research, the position-check history and its
- * details, the article editor toolbar, and the approval reminders (settings,
- * email and unsubscribe page).
+ * details, the article editor toolbar, the approval reminders (settings,
+ * email and unsubscribe page) and the two setup emails.
  *
  * Register as set out in chrome.ts.
  */
@@ -189,7 +189,7 @@ export const trackingPtBR: DeepPartial<DashboardDictionary> = {
   },
   reminders: {
     settingsTitle: 'Lembretes por e-mail',
-    settingsDescription: 'Quando houver artigos aguardando a sua aprovação, enviamos um lembrete breve: após 48 horas, após 5 dias e depois uma vez por semana (até 3 lembretes para os mesmos artigos). Nunca mais de um e-mail a cada 3 dias, e somente nas manhãs de segunda a sexta.',
+    settingsDescription: 'Quando houver artigos aguardando a sua aprovação, enviamos um lembrete breve: após 48 horas, após 5 dias e depois uma vez por semana (até 3 lembretes para os mesmos artigos). Nunca mais de um e-mail a cada 3 dias, e somente nas manhãs de segunda a sexta. Esta chave cobre também os e-mails de início: quando o site ainda não está conectado, ou quando ainda não foi publicado nada nele.',
     settingsLabel: 'Avise-me por e-mail quando houver artigos aguardando aprovação',
     on: 'Ativado',
     off: 'Desativado',
@@ -214,11 +214,69 @@ export const trackingPtBR: DeepPartial<DashboardDictionary> = {
     },
     unsubscribePage: {
       title: 'Você cancelou a inscrição',
-      body: 'Não enviaremos mais lembretes por e-mail sobre os artigos que aguardam a sua aprovação. Você pode reativá-los quando quiser nas configurações do site.',
+      body: 'Não enviaremos mais e-mails sobre este site: nem lembretes dos artigos que aguardam a sua aprovação, nem e-mails de início, nem o resumo semanal. Você pode reativá-los quando quiser nas configurações do site.',
+      setupTitle: 'Os e-mails de início foram interrompidos',
+      setupBody: 'Não enviaremos mais e-mails de início sobre este site. Os lembretes dos artigos que aguardam a sua aprovação continuam chegando, e também o resumo semanal, se você o ativou.',
+      stopAll: 'Parar todos os e-mails sobre este site',
       invalidTitle: 'Este link não é válido',
       invalidBody: 'O link não é válido ou expirou. Você pode desativar os lembretes nas configurações do site.',
       back: 'Ir para o site',
     },
+  },
+  onboardingEmails: {
+    greeting: (name: string | null) => (name ? `Olá, ${name},` : 'Olá,'),
+    guide: 'Há um guia completo dentro do sistema, no botão «Guia» no topo da tela.',
+    help: 'Precisa de ajuda? Fale com a gente no WhatsApp: +972 54-9489377',
+    team: 'Equipe Go Top SEO',
+    footer: 'Você recebeu este e-mail porque abriu um site no Go Top SEO e ainda não terminou de configurá-lo. Não quer estes e-mails?',
+    unsubscribe: 'Parar os e-mails de início, com um clique e sem fazer login',
+    company: 'Go Top SEO · oren@gotop.co.il',
+    connect: {
+      subject: (domain: string) => `O site ${domain} ainda não está conectado`,
+      preheader: 'Uma conexão, e a partir daí o sistema trabalha sozinho.',
+      intro: (domain: string) => `Você abriu um site para ${domain}, mas ele ainda não está conectado. Até estar, podemos pesquisar e escrever, mas não publicar no site nem corrigir nada nele. Depois de conectar:`,
+      bullets: [
+        'Os artigos são publicados sozinhos, no ritmo do seu plano',
+        'A saúde do site mostra o que está quebrado, e um clique corrige',
+        'O acompanhamento continua rodando nas páginas que você já tem',
+      ],
+      outro: 'Conectar leva alguns minutos. No WordPress você instala um único plugin, e ele conecta tanto a publicação quanto a saúde do site.',
+      button: 'Conectar o site',
+    },
+    publish: {
+      subject: (domain: string) => `Ainda não foi publicado nada no site ${domain}`,
+      preheader: 'O conteúdo está escrito e aguarda a sua aprovação.',
+      intro: (domain: string) => `O site ${domain} está conectado, mas ainda não foi publicado nada nele. O que você pode fazer agora:`,
+      bullets: [
+        'Aprovar um artigo que aguarda, e ele vai ao ar na data prevista',
+        'Pedir outro tema, e escrevemos de novo',
+        'Editar o texto antes da publicação, quanto quiser',
+      ],
+      outro: 'Até você aprovar, nada é publicado.',
+      button: 'Abrir a tela de conteúdo',
+    },
+  },
+  weeklySummaryEmail: {
+    subject: (domain: string) => `Esta semana no ${domain}`,
+    preheader: 'O que aconteceu no site na última semana, em poucas linhas.',
+    greeting: (name: string | null) => (name ? `Olá, ${name},` : 'Olá,'),
+    intro: (domain: string) => `Veja o que aconteceu no ${domain} na última semana:`,
+    published: (n: number) => (n === 1 ? 'Foi publicado um artigo:' : `Foram publicados ${n} artigos:`),
+    more: (k: number) => `(e mais ${k})`,
+    waiting: (n: number) => (n === 1 ? 'Um artigo aguarda a sua aprovação.' : `${n} artigos aguardam a sua aprovação.`),
+    rank: (checked: number, improved: number, dropped: number) =>
+      `${checked} palavras-chave verificadas: ${improved} subiram, ${dropped} caíram.`,
+    gsc: (clicks: number, change: number) =>
+      change > 0
+        ? `Search Console: ${clicks} cliques nos últimos 28 dias, ${change} mais do que uma semana atrás.`
+        : `Search Console: ${clicks} cliques nos últimos 28 dias, ${Math.abs(change)} menos do que uma semana atrás.`,
+    next: (date: string, title: string | null) => (title ? `O próximo do plano: ${title}, em ${date}.` : `O próximo artigo do plano vai ao ar em ${date}.`),
+    button: 'Abrir a tela de relatórios',
+    help: 'Precisa de ajuda? Fale com a gente no WhatsApp: +972 54-9489377',
+    team: 'Equipe Go Top SEO',
+    footer: 'Você recebeu este e-mail porque ativou o resumo semanal nas configurações do site. Não quer mais?',
+    unsubscribe: 'Cancelar com um clique, sem fazer login',
+    company: 'Go Top SEO · oren@gotop.co.il',
   },
 }
 

@@ -105,6 +105,13 @@ export default function EnglishAffiliateTermsPage() {
           partners in writing before it starts and say what is stored.
         </p>
         <p>
+          A click on your link is counted, and what is counted is a number: we add one to your daily total,
+          and that is the whole record of that click. We do not keep the visitor&rsquo;s IP address, their
+          browser, the site they came from or any identifier, so the figure you see in your dashboard is a
+          count and not a list of visitors. The attribution itself is done from the code carried in the page
+          address, read once at the moment the account is opened.
+        </p>
+        <p>
           Our records are what we act on. If you believe a referral was recorded incorrectly, write to us
           within 60 days of the account being opened and we will review the record and tell you what we
           find.
@@ -129,6 +136,14 @@ export default function EnglishAffiliateTermsPage() {
           No commission is payable on a trial, on a payment that was never received, on a payment made by
           you or by an account within the meaning of section 8, or on a payment under a plan or agreement
           we negotiated directly and separately with that customer.
+        </p>
+        <p>
+          <strong>A customer billed through Shopify is recorded by hand.</strong> Shopify tells the app that a
+          plan is active rather than that a charge was taken, so we have no automatic payment event to
+          calculate from. Such a referral is marked as one on our side and its commission is recorded by hand
+          against the Shopify charge reference &mdash; at the same rate, with the same holding period and the
+          same approval. If you referred such a customer and time has passed with no commission recorded,
+          write to us.
         </p>
       </section>
 
@@ -317,7 +332,12 @@ export default function EnglishAffiliateTermsPage() {
         <p>
           We process your partner details — the details in your application, your payout details and the
           record of your referrals and Commissions — in order to run the Program and to pay you, and we
-          keep them for as long as the law requires us to keep accounting records. What we do with them, and
+          keep them for as long as the law requires us to keep accounting records. When you apply we also
+          record the IP address the application came from, for fraud detection and rate limiting and for
+          nothing else; <strong>a rejected application is deleted in full after 12 months, and in every
+          other case the IP address is deleted after 12 months</strong>. Your referral may carry a flag
+          asking for human review before a commission is approved, and such a flag disqualifies nothing by
+          itself. What we do with them, and
           the providers we use for the payout, is set out in our{' '}
           <Link href="/en/privacy">Privacy Policy</Link>.
         </p>
@@ -383,7 +403,14 @@ export default function EnglishAffiliateTermsPage() {
           into a suspected breach, and we will tell you that we have done so.
         </p>
         <p>
-          When this agreement ends in the ordinary way, your Referral Link stops working and no further
+          While you are suspended, and after this agreement ends, <strong>the link you published keeps leading
+          to our site and clicks on it keep being counted</strong>: the link is out in the world, in a post or
+          a video that is not ours to change, and a visitor who clicks it should not meet an error. What stops
+          is entitlement &mdash; an account opened after that earns you nothing, even if it came through your
+          link. If you want the link to stop working, remove it from wherever you published it.
+        </p>
+        <p>
+          When this agreement ends in the ordinary way no further
           Commission accrues, but Commissions you have already earned and that have not been cancelled under
           section 7 or section 8 are still paid: we will pay them at the next payout run after the holding
           period ends, and the minimum payout in section 6 does not apply to that final payment.
@@ -453,7 +480,7 @@ export default function EnglishAffiliateTermsPage() {
       </section>
 
       <section>
-        <p className={LEGAL_FOOTNOTE}>Last updated: 5 October 2026</p>
+        <p className={LEGAL_FOOTNOTE}>Last updated: 9 October 2026</p>
       </section>
     </LegalDoc>
   )

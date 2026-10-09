@@ -20,10 +20,12 @@ export const dashboardHe = {
     reports: 'דוחות',
     siteHealth: 'בריאות האתר',
     billing: 'מנוי ותשלום',
+    affiliate: 'תוכנית שותפים',
     system: 'מערכת',
     articleManagement: 'מאמרי האתר',
     connectionStatus: 'סטטוס חיבור',
     errorLogs: 'לוג שגיאות',
+    affiliateAdmin: 'ניהול שותפים',
     support: 'תמיכה ב-WhatsApp',
     supportAria: 'תמיכה ב-WhatsApp (נפתח בחלון חדש)',
     accessibility: 'הצהרת נגישות',
@@ -78,6 +80,10 @@ export const dashboardHe = {
     phone: (number: string) => `טלפון ${number}`,
     email: (address: string) => `מייל ${address}`,
     opensNewTab: '(נפתח בחלון חדש)',
+    // The floating "free demo" button (w11).
+    demo: 'דמו חינם',
+    demoAria: 'קבלת דמו חינם בוואטסאפ',
+    demoMessage: (domain: string) => (domain ? `היי, אני רוצה דמו חינם של Go Top SEO עבור ${domain}` : 'היי, אני רוצה דמו חינם של Go Top SEO'),
   },
   guide: {
     label: 'מדריך',
@@ -2317,6 +2323,7 @@ export const dashboardHe = {
         has_table: 'אין טבלה במאמר',
         faq_present: 'אין שאלות נפוצות',
         not_generic: 'המאמר כללי מדי: אין רשימה, טבלה או שאלות',
+        reader_can_verify: 'אין לקורא מה לבדוק בעצמו לפני שהוא מחליט',
         table_structure_valid: 'הטבלה אינה טבלה תקינה (צריך לפחות 2 עמודות ו-2 שורות)',
         table_recommended: 'הנושא מתאים לטבלת השוואה/מחירים — כדאי להוסיף טבלה אמיתית',
         too_short: 'המאמר קצר מדי',
@@ -3267,6 +3274,10 @@ export const dashboardHe = {
           'כל קישור נרשם אצל שני הצדדים. קישור שנתתם מופיע כאן לפני פרסום המאמר, ואפשר להסיר אותו.',
           'אפשר לצאת בכל רגע. היציאה עוצרת קישורים חדשים; קישורים שכבר פורסמו נשארים באתרים וביומן.',
         ],
+        // The Google risk, in the words of clause 15A: the joining screen is
+        // where the owner actually accepts it, so it is stated here and not on
+        // the public page (the legal session's condition, 9 Oct 2026).
+        risk: 'חשוב לדעת: גוגל עשוי להתייחס לקישורים שנועדו להשפיע על דירוג כ\'תכנית קישורים\', וההנחיות שלו עשויות להשתנות. הדבר עלול להביא לירידה בנראות האתר ואף לפעולה ידנית מצד גוגל. בהצטרפות אתם מאשרים שאתם מבינים את הסיכון הזה ומקבלים אותו על עצמכם.',
         checkbox: 'קראנו ואנחנו מסכימים לתנאי רשת הקישורים',
         terms: 'לנוסח המלא בתנאי השימוש',
         join: 'הצטרפות לרשת',
@@ -3404,6 +3415,10 @@ export const dashboardHe = {
     origin: { ours: 'מאמר שלנו' },
     cannibal: 'מתחרה בעמוד אחר',
     cannibalDetail: '{n} עמודים שלכם מתחלקים בחשיפות על "{query}"',
+    cannibalMine: 'העמוד הזה: {imp} חשיפות',
+    cannibalMineLeads: 'העמוד הזה מוביל, עם {imp} חשיפות',
+    cannibalOther: '— {imp} חשיפות',
+    cannibalMore: 'ועוד {n} עמודים',
     actions: {
       improve: 'שיפור המאמר',
       improveWhy: 'במקום {pos} בגוגל על "{query}", קרוב לעמוד הראשון',
@@ -6434,7 +6449,7 @@ export const dashboardHe = {
   },
   reminders: {
     settingsTitle: 'תזכורות במייל',
-    settingsDescription: 'כשמאמרים מחכים לאישור שלכם, נשלח תזכורת קצרה: אחרי 48 שעות, אחרי 5 ימים, ואז פעם בשבוע (עד 3 תזכורות לאותם מאמרים). לא יותר ממייל אחד ב-3 ימים, ורק בימים א׳–ה׳ בבוקר.',
+    settingsDescription: 'כשמאמרים מחכים לאישור שלכם, נשלח תזכורת קצרה: אחרי 48 שעות, אחרי 5 ימים, ואז פעם בשבוע (עד 3 תזכורות לאותם מאמרים). לא יותר ממייל אחד ב-3 ימים, ורק בימים א׳–ה׳ בבוקר. המתג הזה מכסה גם את מיילי ההתחלה: אם האתר עוד לא מחובר, או שעוד לא פורסם ממנו מאמר.',
     settingsLabel: 'תזכורת במייל כשמאמרים מחכים לאישור',
     on: 'פעיל',
     off: 'כבוי',
@@ -6459,11 +6474,69 @@ export const dashboardHe = {
     },
     unsubscribePage: {
       title: 'הוסרתם מהתזכורות',
-      body: 'לא נשלח לכם עוד תזכורות במייל על מאמרים שמחכים לאישור. אפשר להחזיר אותן בכל רגע בהגדרות הפרויקט.',
+      body: 'לא נשלח לכם עוד מיילים על הפרויקט הזה: לא תזכורות על מאמרים שמחכים לאישור, לא מיילי התחלה ולא הסיכום השבועי. אפשר להחזיר אותם בכל רגע בהגדרות הפרויקט.',
+      setupTitle: 'מיילי ההתחלה הופסקו',
+      setupBody: 'לא נשלח לכם עוד מיילי התחלה על הפרויקט הזה. התזכורות על מאמרים שמחכים לאישור שלכם ממשיכות להגיע, וגם הסיכום השבועי אם הדלקתם אותו.',
+      stopAll: 'להפסיק כל מייל על הפרויקט הזה',
       invalidTitle: 'הקישור לא תקין',
       invalidBody: 'הקישור לא תקין או שפג תוקפו. אפשר לכבות את התזכורות בהגדרות הפרויקט.',
       back: 'לאתר',
     },
+  },
+  onboardingEmails: {
+    greeting: (name: string | null) => (name ? `שלום ${name},` : 'שלום,'),
+    guide: 'יש מדריך מלא בתוך המערכת, בכפתור "מדריך" שבראש המסך.',
+    help: 'צריכים עזרה? כתבו לנו ב-WhatsApp: 054-9489377',
+    team: 'צוות Go Top SEO',
+    footer: 'קיבלתם את המייל כי פתחתם פרויקט ב-Go Top SEO ועוד לא סיימתם להקים אותו. לא רוצים מיילים כאלה?',
+    unsubscribe: 'להפסיק את מיילי ההתחלה, בלחיצה אחת ובלי להתחבר',
+    company: 'Go Top SEO · oren@gotop.co.il',
+    connect: {
+      subject: (domain: string) => `האתר ${domain} עוד לא מחובר למערכת`,
+      preheader: 'חיבור אחד, ומכאן המערכת עובדת לבד.',
+      intro: (domain: string) => `פתחתם פרויקט לאתר ${domain}, אבל האתר עצמו עוד לא מחובר. עד שהוא מחובר אנחנו יכולים לחקור ולכתוב, אבל לא לפרסם באתר ולא לתקן בו דבר. אחרי החיבור:`,
+      bullets: [
+        'המאמרים מתפרסמים באתר לבד, בקצב שבתוכנית',
+        'מסך בריאות האתר מראה מה שבור, ואפשר לתקן בלחיצה',
+        'המעקב ממשיך לרוץ על העמודים שכבר קיימים',
+      ],
+      outro: 'החיבור לוקח כמה דקות. בוורדפרס מתקינים תוסף אחד, והוא מחבר גם את הפרסום וגם את בריאות האתר.',
+      button: 'לחיבור האתר',
+    },
+    publish: {
+      subject: (domain: string) => `עוד לא פורסם מאמר באתר ${domain}`,
+      preheader: 'התוכן כתוב ומחכה לאישור שלכם.',
+      intro: (domain: string) => `האתר ${domain} מחובר, אבל עוד לא עלה ממנו מאמר. מה שאפשר לעשות עכשיו:`,
+      bullets: [
+        'לאשר מאמר שמחכה, והוא יעלה בתאריך שבתוכנית',
+        'לבקש נושא אחר, ונכתוב אותו מחדש',
+        'לערוך את הטקסט לפני הפרסום, כמה שתרצו',
+      ],
+      outro: 'עד שתאשרו, שום דבר לא מתפרסם.',
+      button: 'למסך התוכן',
+    },
+  },
+  weeklySummaryEmail: {
+    subject: (domain: string) => `הסיכום השבועי של ${domain}`,
+    preheader: 'מה קרה באתר בשבוע האחרון, בכמה שורות.',
+    greeting: (name: string | null) => (name ? `שלום ${name},` : 'שלום,'),
+    intro: (domain: string) => `זה מה שקרה ב-${domain} בשבוע האחרון:`,
+    published: (n: number) => (n === 1 ? 'פורסם מאמר אחד:' : `פורסמו ${n} מאמרים:`),
+    more: (k: number) => `(ועוד ${k})`,
+    waiting: (n: number) => (n === 1 ? 'מאמר אחד מחכה לאישור שלכם.' : `${n} מאמרים מחכים לאישור שלכם.`),
+    rank: (checked: number, improved: number, dropped: number) =>
+      `נבדקו ${checked} ביטויים: ${improved} עלו, ${dropped} ירדו.`,
+    gsc: (clicks: number, change: number) =>
+      change > 0
+        ? `ב-Search Console: ${clicks} קליקים ב-28 הימים האחרונים, ${change} יותר מלפני שבוע.`
+        : `ב-Search Console: ${clicks} קליקים ב-28 הימים האחרונים, ${Math.abs(change)} פחות מלפני שבוע.`,
+    next: (date: string, title: string | null) => (title ? `המאמר הבא בתוכנית: ${title}, ב-${date}.` : `המאמר הבא בתוכנית יעלה ב-${date}.`),
+    button: 'למסך הדוחות',
+    help: 'צריכים עזרה? כתבו לנו ב-WhatsApp: 054-9489377',
+    team: 'צוות Go Top SEO',
+    footer: 'קיבלתם את המייל כי הדלקתם את הסיכום השבועי בהגדרות הפרויקט. לא רוצים יותר?',
+    unsubscribe: 'הסרה בלחיצה אחת, בלי להתחבר',
+    company: 'Go Top SEO · oren@gotop.co.il',
   },
 } as const
 

@@ -22,10 +22,11 @@ export const landingEn: LandingCopy = {
     accent: 'We make sure they find you.',
     subtitle:
       'Go Top SEO writes and publishes articles that answer what your customers are searching for, then shows you where you appear in Google, Google Maps, ChatGPT and Gemini. No content team. No guesswork.',
-    or: 'or',
     signup: `Start a free ${TRIAL_DAYS}-day trial`,
+    trialNote: 'No credit card, no commitment. Cancel anytime.',
+    checkLead: 'Not ready to sign up? Get a free site check, no signup:',
     dashboard: 'Go to my dashboard',
-    trust: ['No credit card', 'Cancel anytime', 'Publishes to WordPress and Shopify', 'Support from real people'],
+    trust: ['Publishes to WordPress and Shopify', 'Support from real people'],
     climbChip: '#3 on Google',
     published: 'Article published on your site',
   },
@@ -138,7 +139,7 @@ export const landingEn: LandingCopy = {
       'A steady content calendar that publishes on your schedule',
       'Topics chosen from what your customers actually search for',
       'Automatic tracking of your Google and Google Maps positions',
-      'Regular checks of what ChatGPT, Gemini and four more engines say about you',
+      'Automatic checks of what ChatGPT, Gemini and Google AI say about you, plus three more engines on demand',
     ],
   },
   flow: {

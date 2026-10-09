@@ -14,6 +14,9 @@ import { afterSignupPath } from '@/lib/onboarding/claim-start'
 import { GOOGLE_FLOW_COOKIE, completeGoogleSignIn, googleDirectConfig, googleFlowCookieOptions, matchGoogleState } from '@/lib/auth/google-direct'
 import { googleSignInFailureUrl } from '@/lib/auth/google-signin'
 import { statedAuthUrl } from '@/lib/i18n/auth-href'
+import { splitReferralFromPath } from '@/lib/affiliate/referral'
+import { attachReferral } from '@/lib/affiliate/attribution'
+import { notifyOperatorOfFlaggedReferral } from '@/lib/affiliate/notify'
 
 /**
  * Supabase auth callback (email confirmation and Supabase-hosted OAuth, PKCE).
@@ -96,8 +99,36 @@ type CookieStore = Awaited<ReturnType<typeof cookies>>
 async function signedIn(
   supabase: SupabaseClient,
   user: User | null,
-  { cookieStore, next, lang, origin }: { cookieStore: CookieStore; next: string; lang: string | null; origin: string },
+  { cookieStore, next: requestedNext, lang, origin }: { cookieStore: CookieStore; next: string; lang: string | null; origin: string },
 ): Promise<NextResponse> {
+  let next = requestedNext
+  // An affiliate link's code rides on `next` through this hop, because it is the
+  // only thing that survives Google's round trip and the email-confirmation
+  // link. It is credited here and then taken OFF the path: the code belongs to
+  // the signup, not to the dashboard URL the new customer is about to bookmark.
+  //
+  // The same function the signup form's own route calls
+  // (lib/affiliate/attribution.ts) decides it, so the two doors cannot drift:
+  // the account must be new, one account belongs to one partner for ever, the
+  // code must be an approved partner's, and a partner never earns on their own
+  // account. Never fails the sign-in.
+  const referral = splitReferralFromPath(next)
+  next = referral.path
+  if (user && referral.code) {
+    try {
+      const outcome = await attachReferral(createAdminClient(), {
+        account: { id: user.id, email: user.email ?? null, created_at: user.created_at ?? null },
+        code: referral.code,
+      })
+      if (outcome.kind === 'attached' && outcome.flags.length) {
+        await notifyOperatorOfFlaggedReferral({ affiliateCode: outcome.code, flags: outcome.flags })
+      }
+      if (outcome.kind === 'failed') console.error('[auth-callback] referral not attached:', outcome.reason)
+    } catch (referralError) {
+      console.error('[auth-callback] referral attach threw:', referralError instanceof Error ? referralError.name : 'unknown')
+    }
+  }
+
   // Area C — auto-create the default client from signup metadata now that the
   // session exists. Server-authoritative + best-effort; `supabase` carries the
   // just-established session (runs under RLS). Runs BEFORE the redirect below

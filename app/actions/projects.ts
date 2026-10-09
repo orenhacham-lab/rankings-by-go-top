@@ -3,7 +3,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { revalidatePath } from 'next/cache'
-import { calculateNextScanDate, isValidScanFrequency } from '@/lib/utils'
+import { firstScanDate, isValidScanFrequency } from '@/lib/utils'
 import { getUserEntitlement } from '@/lib/subscription'
 import { buildQuotaError, EntitlementUnavailableError, isEntitlementUnknown } from '@/lib/quota'
 import { actionMessages, asActionResult, type ActionResult } from '@/lib/i18n/action-messages'
@@ -51,9 +51,8 @@ export async function createProjectAction(formData: FormData) {
   }
   const scanFrequency = rawScanFrequency
   const autoScanEnabled = formData.get('auto_scan_enabled') === 'true'
-  const nextScanAt = autoScanEnabled && scanFrequency !== 'manual'
-    ? calculateNextScanDate(scanFrequency)
-    : null
+  // A NEW project's first automatic scan is a week out, not a month (firstScanDate).
+  const nextScanAt = autoScanEnabled ? firstScanDate(scanFrequency) : null
 
   const data = {
     user_id: user.id,

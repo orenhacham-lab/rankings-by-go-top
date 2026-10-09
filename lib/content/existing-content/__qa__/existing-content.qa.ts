@@ -138,7 +138,7 @@ async function main() {
     check('MUTATION CONTROL: a copy that flags any shared impression is caught by A9', m4.found && !!m4.mod && !cannibalChecks(m4.mod).A9)
     const m5 = mutant<Model>('lib/content/existing-content/model.ts', 'if (e.impressions < COMPETING_MIN_IMPRESSIONS) continue', '')
     check('MUTATION CONTROL: a copy with no impressions floor is caught by A10', m5.found && !!m5.mod && !cannibalChecks(m5.mod).A10)
-    const m6 = mutant<Model>('lib/content/existing-content/model.ts', 'out.set(page, { query, pages: real.length, mine })', 'out.set(page, { query, pages: real.length, mine: e.impressions })')
+    const m6 = mutant<Model>('lib/content/existing-content/model.ts', 'out.set(page, { query, pages: real.length, mine, others })', 'out.set(page, { query, pages: real.length, mine: e.impressions, others })')
     check('MUTATION CONTROL: a copy that ranks by the site-wide total is caught by A11', m6.found && !!m6.mod && !cannibalChecks(m6.mod).A11)
     const m2 = mutant<Model>('lib/content/existing-content/model.ts', 'imp / e.impressions >= COMPETING_MIN_SHARE', 'imp / e.impressions >= 0')
     check('MUTATION CONTROL: a copy that counts zero-impression pages is caught by A3', m2.found && !!m2.mod && !cannibalChecks(m2.mod).A3)

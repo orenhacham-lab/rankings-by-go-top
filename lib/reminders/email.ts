@@ -58,8 +58,16 @@ export function safeOrigin(raw: string | undefined): string | null {
 export function reviewUrlFor(origin: string, locale: Locale): string {
   return `${origin}/login?next=${encodeURIComponent(REVIEW_PATH)}${locale === 'en' ? '&lang=en' : ''}`
 }
-export function unsubscribeUrlFor(origin: string, token: string, locale: Locale): string {
-  return `${origin}${UNSUBSCRIBE_PATH}?t=${encodeURIComponent(token)}&lang=${locale}`
+/**
+ * The scope a setup email's link carries (lib/reminders/http.ts): it stops the setup emails
+ * alone. A link without it stops every email about the project, which is what the approval
+ * reminder and the weekly summary say they do.
+ */
+export const SETUP_UNSUBSCRIBE_SCOPE = 'setup'
+
+export function unsubscribeUrlFor(origin: string, token: string, locale: Locale, scope?: string): string {
+  const narrow = scope ? `&s=${encodeURIComponent(scope)}` : ''
+  return `${origin}${UNSUBSCRIBE_PATH}?t=${encodeURIComponent(token)}&lang=${locale}${narrow}`
 }
 
 const BRAND = '#0070d6'

@@ -286,3 +286,23 @@ export const PLAN_AUDIENCE_DESCRIPTION: Record<PlanCode, Record<PublicLocale, st
     'pt-BR': 'Para agências com muitos clientes',
   },
 }
+
+/**
+ * THE PLAN'S DISPLAY NAME, for the same reason as everything else in this file.
+ *
+ * Each pricing page carried its own `PLAN_NAME` table — four copies of the same
+ * four words, one of which (Hebrew) is translated and three of which are not.
+ * That is a fifth place to rename a plan and forget one, and the plans widget
+ * inside a blog article would have been the sixth. The names themselves are
+ * unchanged: Basic / Advanced / Premium / Agency, Hebrew in Hebrew.
+ */
+export const PLAN_DISPLAY_NAME: Record<PlanCode, Record<PublicLocale, string>> = {
+  regular: { en: 'Basic', he: 'בייסיק', es: 'Basic', 'pt-BR': 'Basic' },
+  advanced: { en: 'Advanced', he: 'מתקדם', es: 'Advanced', 'pt-BR': 'Advanced' },
+  premium: { en: 'Premium', he: 'פרימיום', es: 'Premium', 'pt-BR': 'Premium' },
+  large_agency: { en: 'Agency', he: 'סוכנות', es: 'Agency', 'pt-BR': 'Agency' },
+}
+
+/** The plan the pricing grid and the article widget both highlight. A UI
+ *  choice, in one place so the two cannot recommend different plans. */
+export const HIGHLIGHTED_PLAN: PlanCode = 'advanced'

@@ -33,6 +33,13 @@ export type ScheduleRouteDeps = {
   schedule: (admin: ServiceRoleClient, input: { projectId: string; ownerId: string; approveNow: string[] }) => Promise<ScheduleResult>
   /** Runs after the answer is sent (next/server after()). */
   later: (task: () => Promise<unknown>) => void
+  /**
+   * Maps the project's site so the first article can carry automatic internal
+   * links. Awaited BEFORE writeFirst, because the link step reads the stored
+   * mapping and a project has none yet at its first approval. Best-effort: a
+   * failure here only costs the links, never the article.
+   */
+  prepareLinks?: (admin: ServiceRoleClient, scope: { projectId: string; userId: string }) => Promise<unknown>
   writeFirst: (admin: ServiceRoleClient, itemId: string) => Promise<unknown>
 }
 
@@ -78,6 +85,17 @@ export async function handleSchedulePost(request: Request, deps: ScheduleRouteDe
   const firstItemId = res.firstItemId
   if (firstItemId) {
     deps.later(async () => {
+      // The mapping first, then the article: the automatic internal links read
+      // the stored mapping, and at a project's FIRST approval there is none, so
+      // the first article used to come out with no links at all. Its own
+      // try/catch, so a mapping failure never costs the article.
+      if (deps.prepareLinks) {
+        try {
+          await deps.prepareLinks(auth.admin, { projectId: auth.project.id, userId: auth.user.id })
+        } catch (e) {
+          console.error('[strategy-schedule] site mapping before first article failed', { projectId: auth.project.id, message: e instanceof Error ? e.message.slice(0, 120) : 'unknown' })
+        }
+      }
       try {
         await deps.writeFirst(auth.admin, firstItemId)
       } catch (e) {

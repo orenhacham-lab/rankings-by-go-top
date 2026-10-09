@@ -3,7 +3,7 @@ title: Acuerdo del Programa de Socios | Go Top SEO
 description: Las condiciones que rigen la participación en el programa de socios de Go Top SEO: comisiones, atribución, pagos y deberes del socio.
 locale: es
 source: app/(public)/en/affiliate-terms/page.tsx
-lastUpdated: 2026-10-05
+lastUpdated: 2026-10-09
 register: usted
 ---
 
@@ -39,6 +39,8 @@ La atribución es por el último clic en su enlace de referido camino al registr
 
 Su código viaja en el propio enlace de referido. No colocamos ninguna cookie para el Programa de Socios ni guardamos nada en el dispositivo del visitante, de modo que lo que el visitante elija en nuestro aviso de cookies no afecta su atribución ni en un sentido ni en el otro. Lo que sí se desprende de ello: un visitante que se marcha y vuelve más tarde sin su enlace, en el mismo dispositivo o en otro, puede no quedar atribuido a usted. No garantizamos que toda visita a través de su enlace de referido dé lugar a una atribución, y no respondemos por una referencia que no hayamos podido registrar. Si en algún momento ampliamos el reconocimiento a una visita que vuelve más tarde, lo que exigiría guardar algo, se lo comunicaremos por escrito a los socios antes de que empiece y diremos qué se guarda.
 
+Un clic en su enlace se cuenta, y lo que se cuenta es un número: añadimos uno a su total diario, y ese es todo el registro de ese clic. No guardamos la dirección IP del visitante, su navegador, el sitio del que llegó ni ningún identificador, de modo que la cifra que ve en su panel es un recuento y no una lista de visitantes. La atribución en sí se hace con el código que viaja en la dirección de la página, leído una sola vez en el momento en que se abre la cuenta.
+
 Actuamos conforme a nuestros registros. Si considera que una referencia se registró de forma incorrecta, escríbanos dentro de los 60 días siguientes a la apertura de la cuenta y revisaremos el registro y le comunicaremos lo que encontremos.
 
 ## 5. La comisión
@@ -48,6 +50,8 @@ Le corresponde el **30%** de cada pago válido de un cliente referido, mientras 
 La comisión se calcula sobre el importe que hayamos recibido efectivamente, excluido el impuesto sobre el valor añadido y cualquier otro impuesto, y después de cualquier descuento, crédito o cupón aplicado a ese pago. La comisión se calcula en la moneda en que pagó el cliente y se abona en esa moneda o en la de su método de pago, al tipo que aplique nuestro proveedor de pagos el día del abono.
 
 No se devenga comisión por un periodo de prueba, por un pago que nunca se recibió, por un pago realizado por usted o por una cuenta en el sentido de la sección 8, ni por un pago conforme a un plan o acuerdo negociado directa y separadamente con ese cliente.
+
+**Un cliente facturado a través de Shopify se registra a mano.** Shopify informa a la aplicación de que un plan está activo y no de que se haya cobrado un cargo, así que no tenemos un evento de pago automático del que calcular. Esa referencia queda marcada como tal en nuestro lado y su comisión se registra a mano contra el comprobante del cargo en Shopify, con el mismo porcentaje, el mismo periodo de retención y la misma aprobación. Si refirió a un cliente así y ha pasado tiempo sin que se registre comisión, escríbanos.
 
 ## 6. Aprobación, periodo de retención y pago
 
@@ -117,7 +121,7 @@ Si se encuentra fuera de Israel, es responsable de sus propias obligaciones fisc
 
 ## 14. Protección de datos
 
-Tratamos sus datos de socio —los datos de la solicitud, sus datos de pago y el registro de sus referencias y comisiones— para gestionar el Programa y para pagarle, y los conservamos durante el plazo que la ley nos obliga a conservar los registros contables. Lo que hacemos con ellos, y los proveedores que utilizamos para el pago, se detallan en nuestra [Política de Privacidad](/es/privacy).
+Tratamos sus datos de socio —los datos de la solicitud, sus datos de pago y el registro de sus referencias y comisiones— para gestionar el Programa y para pagarle, y los conservamos durante el plazo que la ley nos obliga a conservar los registros contables. Al presentar la solicitud registramos además la dirección IP desde la que llegó, para detectar fraude y limitar la frecuencia de solicitudes y para nada más; **una solicitud rechazada se elimina por completo al cabo de 12 meses y, en cualquier otro caso, la dirección IP se elimina al cabo de 12 meses**. Su referencia puede llevar una marca que pide una revisión humana antes de aprobar una comisión, y esa marca por sí sola no descalifica nada. Lo que hacemos con ellos, y los proveedores que utilizamos para el pago, se detallan en nuestra [Política de Privacidad](/es/privacy).
 
 No recibe datos personales de los clientes que refiere. Le mostramos el número de referencias, el estado de cada suscripción a efectos de su comisión y los importes; no le facilitamos el nombre de un cliente, su dirección de correo electrónico, su sitio web ni ningún otro dato identificativo, y no puede pedir a un cliente que le traslade los nuestros.
 
@@ -143,7 +147,9 @@ Nos mantendrá indemnes frente a cualquier daño, pérdida, sanción o gasto, in
 
 Cualquiera de las partes puede resolver este acuerdo en cualquier momento mediante comunicación por escrito, sin necesidad de motivo y sin plazo de preaviso. También podremos suspender su enlace de referido o retener una comisión mientras investigamos un posible incumplimiento, y le comunicaremos que lo hemos hecho.
 
-Cuando este acuerdo termine de forma ordinaria, su enlace de referido deja de funcionar y no se devengan nuevas comisiones, pero las comisiones ya devengadas y no anuladas conforme a la sección 7 o a la sección 8 se abonan igualmente: las pagaremos en el siguiente abono posterior al fin del periodo de retención, y el importe mínimo de la sección 6 no se aplicará a ese pago final.
+Mientras esté suspendido, y también después de que este acuerdo termine, **el enlace que publicó sigue llevando a nuestro sitio y los clics en él siguen contándose**: el enlace está en el mundo, en una publicación o un vídeo que no están en nuestras manos, y un visitante que lo pulse no debería encontrarse con un error. Lo que cesa es el derecho: una cuenta abierta después de ese momento no le genera nada, aunque haya llegado por su enlace. Si quiere que el enlace deje de funcionar, retírelo del lugar donde lo publicó.
+
+Cuando este acuerdo termine de forma ordinaria no se devengan nuevas comisiones, pero las comisiones ya devengadas y no anuladas conforme a la sección 7 o a la sección 8 se abonan igualmente: las pagaremos en el siguiente abono posterior al fin del periodo de retención, y el importe mínimo de la sección 6 no se aplicará a ese pago final.
 
 Cuando resolvamos este acuerdo por haber incumplido la sección 8, la sección 9 o la sección 10, o por fraude, podremos anular las comisiones derivadas de la conducta en cuestión y retener su pago.
 

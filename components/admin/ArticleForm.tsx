@@ -2,22 +2,27 @@
 
 import { useState, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
+import { articlePublishBlockReason } from '@/lib/articles/publish-rules'
 import dynamic from 'next/dynamic'
 import { CalendarClock, RotateCcw, Upload, X } from 'lucide-react'
 import Button from '@/components/ui/Button'
 import { Card } from '@/components/ui/Card'
 import Input, { FIELD_LABEL_CLASSES } from '@/components/ui/Input'
 import Textarea from '@/components/ui/Textarea'
+import Select from '@/components/ui/Select'
 import Switch from '@/components/ui/Switch'
 import { NoticeBox } from '@/components/ui/Notice'
 import { useConfirm } from '@/components/ui/ConfirmDialog'
 import { FIELD_CLASSES } from '@/components/ui/Input'
 import { cn } from '@/lib/utils'
+import { PUBLIC_LOCALES, type PublicLocale } from '@/lib/i18n/locales'
 
 const ArticleEditor = dynamic(() => import('./ArticleEditor'), { ssr: false })
 
 interface ArticleData {
   id?: string
+  /** Which language's blog this article belongs to. */
+  locale: PublicLocale
   title: string
   slug: string
   excerpt: string
@@ -35,6 +40,14 @@ interface Props {
   initial?: Partial<ArticleData>
   /** A new article's author: the signed-in admin's own name, never an email. */
   defaultAuthor?: string
+}
+
+/** The admin's own language names, and the path each language's blog lives at. */
+const LOCALE_LABEL: Record<PublicLocale, string> = {
+  he: 'עברית', en: 'אנגלית', es: 'ספרדית', 'pt-BR': 'פורטוגזית (ברזיל)',
+}
+const ARTICLE_PATH_PREFIX: Record<PublicLocale, string> = {
+  he: '/articles', en: '/en/articles', es: '/es/articles', 'pt-BR': '/pt-BR/articles',
 }
 
 /** Our words for a failed save; the route's own `error` text is never shown. */
@@ -70,6 +83,7 @@ export default function ArticleForm({ initial, defaultAuthor = '' }: Props) {
 
   const [form, setForm] = useState<ArticleData>({
     id: initial?.id,
+    locale: initial?.locale ?? 'he',
     title: initial?.title ?? '',
     slug: initial?.slug ?? '',
     excerpt: initial?.excerpt ?? '',
@@ -128,6 +142,14 @@ export default function ArticleForm({ initial, defaultAuthor = '' }: Props) {
     e.preventDefault()
     setSaving(true)
     setError('')
+
+    // Say it here, in Hebrew, instead of letting the API's English 400 come
+    // back as a generic save error. The API enforces the same rule.
+    if (articlePublishBlockReason(form)) {
+      setError('מאמר שמתפרסם חייב תמונה ראשית. העלו תמונה או הזינו כתובת, או שמרו כטיוטה.')
+      setSaving(false)
+      return
+    }
 
     const payload = {
       ...form,
@@ -201,8 +223,19 @@ export default function ArticleForm({ initial, defaultAuthor = '' }: Props) {
               </Button>
             )}
           </div>
-          <p className="text-caption text-muted">יופיע בכתובת <span dir="ltr">/articles/{form.slug || '...'}</span></p>
+          <p className="text-caption text-muted">יופיע בכתובת <span dir="ltr">{ARTICLE_PATH_PREFIX[form.locale]}/{form.slug || '...'}</span></p>
         </div>
+
+        {/* The language decides which blog the article appears on, and under
+            which path. Hebrew stays the default, so nothing changes for an
+            article written the way every existing one was. */}
+        <Select
+          id="article-locale"
+          label="שפת המאמר"
+          value={form.locale}
+          onChange={e => set('locale', e.target.value as PublicLocale)}
+          options={PUBLIC_LOCALES.map(l => ({ value: l, label: LOCALE_LABEL[l] }))}
+        />
 
         <Textarea id="article-excerpt" label="תקציר" value={form.excerpt} onChange={e => set('excerpt', e.target.value)} rows={2} placeholder="תיאור קצר שיופיע ברשימת המאמרים" />
 
@@ -261,7 +294,7 @@ export default function ArticleForm({ initial, defaultAuthor = '' }: Props) {
           <Input id="article-author" label="כותב/ת" value={form.author} onChange={e => set('author', e.target.value)} required placeholder="שם הכותב/ת" />
           <DateTimeField id="article-published-at" label="תאריך ושעת פרסום" value={form.published_at} onChange={v => set('published_at', v)} />
         </div>
-        <Switch checked={form.is_published} onChange={(next) => set('is_published', next)} label="פרסום המאמר" description="מאמר מפורסם מופיע באתר הציבורי" />
+        <Switch checked={form.is_published} onChange={(next) => set('is_published', next)} label="פרסום המאמר" description="מאמר מפורסם מופיע באתר הציבורי. תמונה ראשית היא חובה לפרסום." />
       </Card>
 
       <div className="flex flex-wrap items-center gap-3">

@@ -19,10 +19,14 @@ import type { PublicLocale } from '@/lib/i18n/locales'
 import { cn } from '@/lib/utils'
 
 /**
- * `inverse` is the home hero's navy variant (wave 8): a white 56px field and
- * the action button on a frosted plate, start-aligned under the headline.
+ * `inverse` is the home hero's navy variant (wave 8): a white field and the
+ * action button on a frosted plate, start-aligned under the headline.
+ *
+ * `compact` (w11) is that same field after the trial became the hero's primary
+ * action: the lit ring and the drop shadow are gone and the field is 48px, so it
+ * reads as the second option it now is. The form still behaves identically.
  */
-export function FreeCheckHeroForm({ locale, tone = 'default' }: { locale: PublicLocale; tone?: 'default' | 'inverse' }) {
+export function FreeCheckHeroForm({ locale, tone = 'default', compact = false }: { locale: PublicLocale; tone?: 'default' | 'inverse'; compact?: boolean }) {
   const inverse = tone === 'inverse'
   const copy = freeCheckCopy(locale)
   const router = useRouter()
@@ -44,7 +48,9 @@ export function FreeCheckHeroForm({ locale, tone = 'default' }: { locale: Public
       <div
         className={cn(
           'flex flex-col gap-2 rounded-card p-2 sm:flex-row',
-          inverse ? 'bg-white/15 p-2.5 ring-2 ring-white/40 shadow-[0_12px_40px_rgb(0_0_0/0.3)] backdrop-blur-sm' : 'border border-line bg-surface shadow-card',
+          inverse && !compact && 'bg-white/15 p-2.5 ring-2 ring-white/40 shadow-[0_12px_40px_rgb(0_0_0/0.3)] backdrop-blur-sm',
+          inverse && compact && 'bg-white/10 p-2 ring-1 ring-white/25 backdrop-blur-sm',
+          !inverse && 'border border-line bg-surface shadow-card',
         )}
       >
         <div className="min-w-0 flex-1">
@@ -59,18 +65,20 @@ export function FreeCheckHeroForm({ locale, tone = 'default' }: { locale: Public
             placeholder={copy.form.placeholder}
             className={cn(
               'text-start',
-              inverse
-                ? 'h-16 border-transparent bg-surface text-section focus:ring-white/40'
-                : 'h-11 border-transparent bg-sunk/60 shadow-none hover:border-line focus:bg-surface',
+              inverse && !compact && 'h-16 border-transparent bg-surface text-section focus:ring-white/40',
+              inverse && compact && 'h-12 border-transparent bg-surface focus:ring-white/40',
+              !inverse && 'h-11 border-transparent bg-sunk/60 shadow-none hover:border-line focus:bg-surface',
             )}
           />
         </div>
-        <Button type="submit" size="lg" className={cn('shrink-0', inverse && 'h-16 px-8 text-section focus-visible:ring-white/50')}>
+        <Button type="submit" size="lg" variant={compact ? 'secondary' : 'primary'} className={cn('shrink-0', inverse && !compact && 'h-16 px-8 text-section focus-visible:ring-white/50', inverse && compact && 'h-12 px-6 focus-visible:ring-white/50')}>
           {copy.form.submit}
           <ArrowRight className="size-4 rtl:-scale-x-100" aria-hidden="true" />
         </Button>
       </div>
-      <p className={cn('mt-2.5 text-caption', inverse ? 'text-start text-copy text-contrast-ink/80' : 'text-center text-muted')}>{copy.page.badge}</p>
+      {!compact && (
+        <p className={cn('mt-2.5 text-caption', inverse ? 'text-start text-copy text-contrast-ink/80' : 'text-center text-muted')}>{copy.page.badge}</p>
+      )}
     </form>
   )
 }

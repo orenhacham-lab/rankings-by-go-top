@@ -204,6 +204,7 @@ export const siteLinksPtBR: DeepPartial<DashboardDictionary> = {
           'Cada link fica registrado para as duas partes. Um link que você deu aparece aqui antes de o artigo ser publicado, e você pode removê-lo.',
           'Você pode sair quando quiser. Sair interrompe os novos links; os já publicados permanecem nos sites e no registro.',
         ],
+        risk: 'Vale saber: o Google pode tratar links feitos para influenciar o posicionamento como um esquema de links, e as diretrizes dele podem mudar. Isso pode reduzir a visibilidade do site e até levar a uma ação manual do Google. Ao entrar, você confirma que entende esse risco e o assume.',
         checkbox: 'Li e aceito os termos da rede de links',
         terms: 'O texto completo está nos termos de uso',
         join: 'Entrar na rede',

@@ -4,7 +4,7 @@ import { revalidatePath } from 'next/cache'
 import { NextRequest, NextResponse } from 'next/server'
 import { getUserEntitlement, PLAN_LIMITS } from '@/lib/subscription'
 import { buildQuotaError, buildEntitlementUnavailableError, isEntitlementUnknown } from '@/lib/quota'
-import { calculateNextScanDate, isValidScanFrequency } from '@/lib/utils'
+import { firstScanDate, isValidScanFrequency } from '@/lib/utils'
 import { markScanOwnedFields, type SeedProjectField } from '@/lib/seed-scan/settings'
 import { bilingualError } from '@/lib/i18n/action-messages'
 import { isAdminUser } from '@/lib/auth/admin-role'
@@ -119,9 +119,8 @@ export async function POST(request: NextRequest) {
     }
     const scanFrequency = rawScanFrequency
     const autoScanEnabled = formData.get('auto_scan_enabled') === 'true'
-    const nextScanAt = autoScanEnabled && scanFrequency !== 'manual'
-      ? calculateNextScanDate(scanFrequency)
-      : null
+    // A NEW project's first automatic scan is a week out, not a month (firstScanDate).
+    const nextScanAt = autoScanEnabled ? firstScanDate(scanFrequency) : null
 
     // Placeholders, not choices: a project created without a country or a
     // language gets IL / he, and the seed scan may replace them (see below).
