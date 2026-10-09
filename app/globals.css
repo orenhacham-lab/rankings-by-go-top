@@ -1044,3 +1044,6 @@ html.a11y-image-descriptions img[data-a11y-noalt='true'] {
    privacy notice) step aside so none of them covers the menu's "start free" button. PublicNav
    sets the attribute on <html> while its menu is open. */
 html[data-public-menu='open'] [data-public-float] { display: none !important; }
+/* The privacy card is tall and sits in the same corner as the demo pill, so the
+   pill steps aside until the visitor has answered it (w11, CookieConsent). */
+html[data-cookie-notice='open'] [data-demo-float] { display: none !important; }

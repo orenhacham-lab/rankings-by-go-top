@@ -56,6 +56,10 @@ export const ptBR = {
         label: 'Correções no site',
         description: 'Verificamos o seu site e corrigimos títulos, descrições, texto alternativo das imagens e links. No WordPress com um clique, depois que você aprovar.',
       },
+      links: {
+        label: 'Links para o seu site',
+        description: 'Links internos entre as suas próprias páginas, páginas órfãs que ninguém referencia e lugares gratuitos onde vale a pena o seu negócio aparecer.',
+      },
       competitors: {
         label: 'Você x concorrentes',
         description: 'Em quantas palavras-chave cada concorrente aparece acima de você no Google, e quem os mecanismos de IA citam no seu lugar.',
@@ -244,6 +248,10 @@ export const ptBR = {
     phoneLabel: 'Ligar',
     emailLabel: 'E-mail',
     emailAria: 'Escreva um e-mail para nós',
+    // The floating "free demo" button (w11), on the public site and in the app.
+    demo: 'Demo gratis',
+    demoAria: 'Peça uma demonstração gratuita no WhatsApp',
+    demoMessage: 'Olá, quero uma demonstração gratuita do Go Top SEO',
   },
   a11y: {
     open: 'Abrir o menu de acessibilidade',

@@ -78,6 +78,10 @@ export const dashboardHe = {
     phone: (number: string) => `טלפון ${number}`,
     email: (address: string) => `מייל ${address}`,
     opensNewTab: '(נפתח בחלון חדש)',
+    // The floating "free demo" button (w11).
+    demo: 'דמו חינם',
+    demoAria: 'קבלת דמו חינם בוואטסאפ',
+    demoMessage: (domain: string) => (domain ? `היי, אני רוצה דמו חינם של Go Top SEO עבור ${domain}` : 'היי, אני רוצה דמו חינם של Go Top SEO'),
   },
   guide: {
     label: 'מדריך',

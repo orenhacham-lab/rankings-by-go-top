@@ -80,6 +80,10 @@ export const dashboardEn = {
     phone: (number: string) => `Call ${number}`,
     email: (address: string) => `Email ${address}`,
     opensNewTab: '(opens in a new tab)',
+    // The floating "free demo" button (w11).
+    demo: 'Free demo',
+    demoAria: 'Get a free demo on WhatsApp',
+    demoMessage: (domain: string) => (domain ? `Hi, I would like a free demo of Go Top SEO for ${domain}` : 'Hi, I would like a free demo of Go Top SEO'),
   },
   guide: {
     label: 'Guide',

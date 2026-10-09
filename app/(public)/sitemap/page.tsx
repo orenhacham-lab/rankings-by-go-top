@@ -56,6 +56,7 @@ export default function SitemapPage() {
         { label: 'דוחות SEO/GEO', href: '/features/seo-geo-reports' },
         { label: 'מחקר ביטויים', href: '/features/keyword-research' },
         { label: 'תיקוני אתר', href: '/features/site-health-fixes' },
+        { label: 'קישורים לאתר', href: '/features/site-links' },
         { label: 'אתם מול המתחרים', href: '/features/competitor-tracking' },
         { label: 'נתוני Search Console', href: '/features/search-console' },
       ],
@@ -66,6 +67,7 @@ export default function SitemapPage() {
         { label: 'בעלי עסקים', href: '/solutions/businesses' },
         { label: 'סוכנויות', href: '/solutions/agencies' },
         { label: 'אתרי וורדפרס', href: '/solutions/wordpress' },
+        { label: 'חנויות שופיפיי', href: '/solutions/shopify' },
       ],
     },
     {
