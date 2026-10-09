@@ -11,8 +11,12 @@
  *
  * UNSUBSCRIBE has no session, so the token IS the credential (lib/reminders/token.ts): the
  * project it names is looked up, its CURRENT owner read from the database, and the signature
- * must match that owner, or nothing changes. It only ever turns reminders OFF, for that one
- * project, and turning off twice is the same as once. GET (the link) shows a small page in
+ * must match that owner, or nothing changes. It only ever turns emails OFF, for that one
+ * project, and turning off twice is the same as once. One click stops EVERY email about that
+ * project, which is what the emails promise: the approval reminder and the setup emails
+ * (project_reminder_state) and the weekly summary (project_report_preferences). The weekly
+ * switch is also a settings control, so failing to reach it does not fail the unsubscribe:
+ * the reminder switch is what the answer reports. GET (the link) shows a small page in
  * the language the email was in; POST is RFC 8058 one-click from a mail client. There is no
  * redirect anywhere, so there is no `next` and no way off the site.
  *
@@ -24,6 +28,7 @@ import { getDashboardDictionary } from '@/lib/i18n/dashboard/getDashboardDiction
 import { normalizeLocale } from '@/lib/i18n/dashboard/locale'
 import type { Locale } from '@/lib/i18n/locales'
 import { readState, writeEnabled } from './state'
+import { writeWeeklyOff } from '@/lib/reports/weekly/store'
 import { tokenProjectId, verifyUnsubscribeToken } from './token'
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
@@ -94,7 +99,9 @@ export async function unsubscribeByToken(token: unknown, deps: Pick<ReminderRout
     const row = data as { id?: string; user_id?: string } | null
     if (error || !row || row.id !== projectId || typeof row.user_id !== 'string') return 'invalid'
     if (!verifyUnsubscribeToken(token, projectId, row.user_id, deps.env)) return 'invalid'
-    const result = await writeEnabled(admin, projectId, row.user_id, false, deps.now().toISOString())
+    const at = deps.now().toISOString()
+    const result = await writeEnabled(admin, projectId, row.user_id, false, at)
+    await writeWeeklyOff(admin, projectId, row.user_id, at).catch(() => undefined)
     return result === 'ok' ? 'done' : 'unavailable'
   } catch {
     return 'unavailable'

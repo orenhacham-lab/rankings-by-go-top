@@ -46,6 +46,7 @@ import { resumeStalledSeedRuns, startIsolatedSeedResume } from '@/lib/seed-scan/
 import { runTopicTopUp, startIsolatedTopUp } from '@/lib/content/automation/topic-topup'
 import { runIsolatedReminders } from '@/lib/reminders/isolated'
 import { runIsolatedOnboardingEmails } from '@/lib/onboarding-emails/isolated'
+import { runIsolatedWeeklySummaries } from '@/lib/reports/weekly/isolated'
 
 // Generation can take a while; request a generous budget (platform clamps to the
 // plan's max — e.g. 60s on Hobby, up to 300s on Pro).
@@ -89,6 +90,10 @@ async function handle(request: Request): Promise<Response> {
     // runs AFTER the reminder so that one email a morning per project is the reminder, not
     // both. Isolated; it never throws or rejects.
     await runIsolatedOnboardingEmails()
+    // Then, off unless WEEKLY_SUMMARY_EMAIL_ENABLED is "true" and it is Sunday morning: the
+    // weekly summary, for the projects whose owner asked for it (lib/reports/weekly).
+    // Isolated; it never throws or rejects.
+    await runIsolatedWeeklySummaries()
   })
   return Response.json({ ok: true, accepted: true, startedAt }, { status: 202 })
 }

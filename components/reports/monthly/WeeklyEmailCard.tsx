@@ -50,7 +50,7 @@ export function WeeklyEmailSwitch({ on, busy, onChange, language, note }: {
           </button>
         </span>
       </label>
-      <p className="rounded-control bg-info-soft px-3 py-2 text-caption text-info">{t.notLive}</p>
+      <p className="rounded-control bg-info-soft px-3 py-2 text-caption text-info">{t.cadence}</p>
       {note && (
         <p role="status" className={cn('text-caption font-medium', note === 'saved' ? 'text-ok' : 'text-bad')}>
           {note === 'saved' ? t.saved : t.failed}

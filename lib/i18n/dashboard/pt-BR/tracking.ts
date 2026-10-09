@@ -253,6 +253,28 @@ export const trackingPtBR: DeepPartial<DashboardDictionary> = {
       button: 'Abrir a tela de conteúdo',
     },
   },
+  weeklySummaryEmail: {
+    subject: (domain: string) => `Esta semana no ${domain}`,
+    preheader: 'O que aconteceu no site na última semana, em poucas linhas.',
+    greeting: (name: string | null) => (name ? `Olá, ${name},` : 'Olá,'),
+    intro: (domain: string) => `Veja o que aconteceu no ${domain} na última semana:`,
+    published: (n: number) => (n === 1 ? 'Foi publicado um artigo:' : `Foram publicados ${n} artigos:`),
+    more: (k: number) => `(e mais ${k})`,
+    waiting: (n: number) => (n === 1 ? 'Um artigo aguarda a sua aprovação.' : `${n} artigos aguardam a sua aprovação.`),
+    rank: (checked: number, improved: number, dropped: number) =>
+      `${checked} palavras-chave verificadas: ${improved} subiram, ${dropped} caíram.`,
+    gsc: (clicks: number, change: number) =>
+      change > 0
+        ? `Search Console: ${clicks} cliques nos últimos 28 dias, ${change} mais do que uma semana atrás.`
+        : `Search Console: ${clicks} cliques nos últimos 28 dias, ${Math.abs(change)} menos do que uma semana atrás.`,
+    next: (date: string, title: string | null) => (title ? `O próximo do plano: ${title}, em ${date}.` : `O próximo artigo do plano vai ao ar em ${date}.`),
+    button: 'Abrir a tela de relatórios',
+    help: 'Precisa de ajuda? Fale com a gente no WhatsApp: +972 54-9489377',
+    team: 'Equipe Go Top SEO',
+    footer: 'Você recebeu este e-mail porque ativou o resumo semanal nas configurações do site. Não quer mais?',
+    unsubscribe: 'Cancelar com um clique, sem fazer login',
+    company: 'Go Top SEO · oren@gotop.co.il',
+  },
 }
 
 export {}

@@ -6498,6 +6498,28 @@ export const dashboardHe = {
       button: 'למסך התוכן',
     },
   },
+  weeklySummaryEmail: {
+    subject: (domain: string) => `הסיכום השבועי של ${domain}`,
+    preheader: 'מה קרה באתר בשבוע האחרון, בכמה שורות.',
+    greeting: (name: string | null) => (name ? `שלום ${name},` : 'שלום,'),
+    intro: (domain: string) => `זה מה שקרה ב-${domain} בשבוע האחרון:`,
+    published: (n: number) => (n === 1 ? 'פורסם מאמר אחד:' : `פורסמו ${n} מאמרים:`),
+    more: (k: number) => `(ועוד ${k})`,
+    waiting: (n: number) => (n === 1 ? 'מאמר אחד מחכה לאישור שלכם.' : `${n} מאמרים מחכים לאישור שלכם.`),
+    rank: (checked: number, improved: number, dropped: number) =>
+      `נבדקו ${checked} ביטויים: ${improved} עלו, ${dropped} ירדו.`,
+    gsc: (clicks: number, change: number) =>
+      change > 0
+        ? `ב-Search Console: ${clicks} קליקים ב-28 הימים האחרונים, ${change} יותר מלפני שבוע.`
+        : `ב-Search Console: ${clicks} קליקים ב-28 הימים האחרונים, ${Math.abs(change)} פחות מלפני שבוע.`,
+    next: (date: string, title: string | null) => (title ? `המאמר הבא בתוכנית: ${title}, ב-${date}.` : `המאמר הבא בתוכנית יעלה ב-${date}.`),
+    button: 'למסך הדוחות',
+    help: 'צריכים עזרה? כתבו לנו ב-WhatsApp: 054-9489377',
+    team: 'צוות Go Top SEO',
+    footer: 'קיבלתם את המייל כי הדלקתם את הסיכום השבועי בהגדרות הפרויקט. לא רוצים יותר?',
+    unsubscribe: 'הסרה בלחיצה אחת, בלי להתחבר',
+    company: 'Go Top SEO · oren@gotop.co.il',
+  },
 } as const
 
 export type DashboardDictionary = typeof dashboardHe

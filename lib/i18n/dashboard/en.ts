@@ -6470,4 +6470,26 @@ export const dashboardEn = {
       button: 'Open the content screen',
     },
   },
+  weeklySummaryEmail: {
+    subject: (domain: string) => `This week on ${domain}`,
+    preheader: 'What happened on the site over the past week, in a few lines.',
+    greeting: (name: string | null) => (name ? `Hi ${name},` : 'Hi,'),
+    intro: (domain: string) => `Here is what happened on ${domain} over the past week:`,
+    published: (n: number) => (n === 1 ? 'One article was published:' : `${n} articles were published:`),
+    more: (k: number) => `(and ${k} more)`,
+    waiting: (n: number) => (n === 1 ? 'One article is waiting for your OK.' : `${n} articles are waiting for your OK.`),
+    rank: (checked: number, improved: number, dropped: number) =>
+      `${checked} keywords checked: ${improved} up, ${dropped} down.`,
+    gsc: (clicks: number, change: number) =>
+      change > 0
+        ? `Search Console: ${clicks} clicks over the last 28 days, ${change} more than a week ago.`
+        : `Search Console: ${clicks} clicks over the last 28 days, ${Math.abs(change)} fewer than a week ago.`,
+    next: (date: string, title: string | null) => (title ? `Next in the plan: ${title}, on ${date}.` : `The next article in the plan goes up on ${date}.`),
+    button: 'Open the reports screen',
+    help: 'Need a hand? Message us on WhatsApp: +972 54-9489377',
+    team: 'The Go Top SEO team',
+    footer: 'You get this because you turned the weekly summary on in the project settings. Don\'t want it any more?',
+    unsubscribe: 'Unsubscribe in one click, no login',
+    company: 'Go Top SEO · oren@gotop.co.il',
+  },
 } as const

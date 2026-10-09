@@ -6254,4 +6254,26 @@ export const dashboardEs: DeepPartial<DashboardDictionary> = {
       button: 'Abrir la pantalla de contenido',
     },
   },
+  weeklySummaryEmail: {
+    subject: (domain: string) => `Esta semana en ${domain}`,
+    preheader: 'Lo que pasó en la web durante la última semana, en unas líneas.',
+    greeting: (name: string | null) => (name ? `Hola ${name}:` : 'Hola:'),
+    intro: (domain: string) => `Esto es lo que pasó en ${domain} durante la última semana:`,
+    published: (n: number) => (n === 1 ? 'Se publicó un artículo:' : `Se publicaron ${n} artículos:`),
+    more: (k: number) => `(y ${k} más)`,
+    waiting: (n: number) => (n === 1 ? 'Un artículo espera tu aprobación.' : `${n} artículos esperan tu aprobación.`),
+    rank: (checked: number, improved: number, dropped: number) =>
+      `${checked} palabras clave verificadas: ${improved} subieron, ${dropped} bajaron.`,
+    gsc: (clicks: number, change: number) =>
+      change > 0
+        ? `Search Console: ${clicks} clics en los últimos 28 días, ${change} más que hace una semana.`
+        : `Search Console: ${clicks} clics en los últimos 28 días, ${Math.abs(change)} menos que hace una semana.`,
+    next: (date: string, title: string | null) => (title ? `Lo siguiente del plan: ${title}, el ${date}.` : `El próximo artículo del plan se publica el ${date}.`),
+    button: 'Abrir la pantalla de informes',
+    help: '¿Necesitas ayuda? Escríbenos por WhatsApp: +972 54-9489377',
+    team: 'El equipo de Go Top SEO',
+    footer: 'Recibes este correo porque activaste el resumen semanal en los ajustes de la web. ¿Ya no lo quieres?',
+    unsubscribe: 'Darse de baja con un clic, sin iniciar sesión',
+    company: 'Go Top SEO · oren@gotop.co.il',
+  },
 }
