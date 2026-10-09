@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
-import { sendSignupNotification } from '@/lib/notifications/signup-email'
+import { isFreshSignup, sendSignupNotification } from '@/lib/notifications/signup-email'
+import { reportSignupConversion } from '@/lib/analytics/meta-capi'
 
 /**
  * POST /api/send-notification-email — tell the operator a new account opened.
@@ -14,6 +15,15 @@ export async function POST() {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  }
+
+  // Email+password signup never passes through the auth callback, so this is
+  // its one server-side moment. Gated on the same 30-minute freshness window as
+  // the operator email, because this endpoint answers any signed-in session and
+  // a conversion must mean a new account. The event id is per account, so one
+  // that also reaches the callback is counted once. See lib/analytics/meta-capi.ts.
+  if (isFreshSignup(user)) {
+    await reportSignupConversion({ userId: user.id, email: user.email, createdAt: user.created_at })
   }
 
   try {
