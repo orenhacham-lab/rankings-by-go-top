@@ -372,20 +372,26 @@ async function main() {
     // integration record; billing authority is what decides the provider.
     check('14: app/(dashboard)/billing/page.tsx does not read shopify_connections itself',
       !/from\('shopify_connections'\)/.test(read('app/(dashboard)/billing/page.tsx')))
-    // Owner decision, 9 Oct 2026: ANY store row (archived and uninstalled
-    // included) blocks a NEW PayPal subscription. paypal-block.ts therefore
-    // reads the table in exactly one helper, deliberately with NO archived or
-    // status filter, and authority is still never derived from it.
+    // Owner decision, 9 Oct 2026: a store with the app still INSTALLED blocks
+    // a NEW PayPal subscription; an uninstalled one does not. paypal-block.ts
+    // reads the table in exactly one helper, with NO archived/status filter in
+    // SQL — every row is read and the one shared predicate,
+    // isUninstalledShopifyConnection, decides — and authority is still never
+    // derived from it.
     const blockOk = (src: string) => {
-      const helper = src.slice(src.indexOf('export async function hasAnyShopifyConnectionResult'), src.indexOf('export async function isShopifyBillingRequiredForUser'))
+      const helper = src.slice(src.indexOf('export async function hasLiveShopifyConnectionResult'), src.indexOf('export async function isShopifyBillingRequiredForUser'))
+      const code = helper.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/[^\n]*/g, '')
       const outside = src.replace(helper, '')
       return /from\('shopify_connections'\)/.test(helper) && !/from\('shopify_connections'\)/.test(outside)
-        && !/archived_at|connection_status/.test(helper.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/[^\n]*/g, ''))
+        && !/\.is\('archived_at'|\.eq\('connection_status'/.test(code)
+        && /\.some\(\(r\) => !isUninstalledShopifyConnection\(r\)\)/.test(code)
     }
     const block = read('lib/shopify/paypal-block.ts')
-    check('14: paypal-block.ts reads shopify_connections only in hasAnyShopifyConnectionResult, with no archived/status filter', blockOk(block))
+    check('14: paypal-block.ts reads shopify_connections only in hasLiveShopifyConnectionResult, deciding uninstall in code, never by an SQL filter', blockOk(block))
     check('14-MUT: an archived filter in that helper is caught',
-      !blockOk(block.replace(".select('id').eq('user_id', userId).limit(1)", ".select('id').eq('user_id', userId).is('archived_at', null).limit(1)")))
+      !blockOk(block.replace(".select(UNINSTALL_FACTS).eq('user_id', userId)", ".select(UNINSTALL_FACTS).eq('user_id', userId).is('archived_at', null)")))
+    check('14-MUT: dropping the uninstall predicate is caught',
+      !blockOk(block.replace('.some((r) => !isUninstalledShopifyConnection(r))', '.length > 0')))
     for (const rel of FILES) {
       check(`14: ${rel} filters archived rows out of its live lookup(s)`,
         /\.is\('archived_at', null\)/.test(read(rel)))

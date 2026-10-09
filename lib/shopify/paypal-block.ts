@@ -9,10 +9,11 @@
  *
  * `isShopifyBillingRequiredForUser` — the authoritative per-user check —
  * covers Shopify billing authority, an unresolved PayPal→Shopify migration,
- * and (owner decision, 9 Oct 2026) ANY shopify_connections row for the account
- * or its projects, whatever its status — so an uninstall no longer returns the
- * account to PayPal checkout. Administrators are exempt from the connection
- * rule only. The pending-install/link window (before any user/project exists —
+ * and (owner decision, 9 Oct 2026) any shopify_connections row for the account
+ * or its projects whose app is still INSTALLED, whatever its status — an
+ * uninstalled store (isUninstalledShopifyConnection) bills nothing through
+ * Shopify, so it no longer blocks PayPal. Administrators are exempt from the
+ * connection rule only. The pending-install/link window (before any user/project exists —
  * see lib/shopify/pending-link.ts) is a SEPARATE, cookie-scoped check
  * (hasPendingShopifyLinkCookie) performed directly by callers that have the
  * request, since there is no user_id to key it by yet.
@@ -25,30 +26,70 @@ import { isAdminUser } from '@/lib/auth/admin-role'
 
 type Admin = ReturnType<typeof createAdminClient>
 
+/** The connection columns the uninstall decision reads. */
+export interface ConnectionUninstallFacts {
+  connection_status: string | null
+  last_error: string | null
+  granted_scopes: string[] | null
+  shopify_subscription_status: string | null
+  archived_at: string | null
+  archived_reason: string | null
+}
+
 /**
- * Does this account have ANY Shopify store connected — a shopify_connections
- * row of ANY status (connected, failed, an uninstall tombstone, archived) on
- * the account itself or on any of its projects? (Owner decision, 9 Oct 2026:
- * an account with a store connected to Shopify is billed through Shopify, so it
- * can never also start a PayPal subscription.) A failed read is reported as
- * such; the PayPal gate treats it as "connected" (fail closed).
+ * PURE. Has the app been UNINSTALLED from this store? Uninstalling ends every
+ * Shopify app charge for it, so such a store can no longer cause double
+ * billing. True for exactly two states, both written only by the uninstall
+ * path:
+ *   * the uninstall TOMBSTONE that lib/shopify/shop-cleanup.ts
+ *     applyAppUninstalled writes — connection_status 'failed', last_error
+ *     'app_uninstalled', no granted scopes, no active Shopify subscription.
+ *     This is the SAME predicate the database uses to decide a store is
+ *     reclaimable (claim_shopify_connection, 20260901010000), and nothing on
+ *     a failure path overwrites the marker (lib/shopify/connection-health.ts
+ *     nextConnectionLastError);
+ *   * a row ARCHIVED as 'superseded_after_uninstall' — only a tombstone can be
+ *     archived.
+ * Anything else — connected, failed for another reason, a marker overwritten
+ * by older code — counts as INSTALLED, so doubt keeps PayPal blocked.
  */
-export async function hasAnyShopifyConnectionResult(
+export function isUninstalledShopifyConnection(row: ConnectionUninstallFacts): boolean {
+  if (row.archived_at) return row.archived_reason === 'superseded_after_uninstall'
+  return row.connection_status === 'failed'
+    && row.last_error === 'app_uninstalled'
+    && (row.granted_scopes ?? []).length === 0
+    && row.shopify_subscription_status !== 'active'
+}
+
+const UNINSTALL_FACTS = 'id, connection_status, last_error, granted_scopes, shopify_subscription_status, archived_at, archived_reason'
+
+/**
+ * Does this account have a Shopify store with the app still INSTALLED — a
+ * shopify_connections row on the account itself or on any of its projects
+ * that is not uninstalled (isUninstalledShopifyConnection)? (Owner decision,
+ * 9 Oct 2026: a store connected to Shopify is billed through Shopify, so the
+ * account can never also start a PayPal subscription; once the app is
+ * uninstalled Shopify bills nothing, so PayPal is available again.) A failed
+ * read is reported as such; the PayPal gate treats it as "connected" (fail
+ * closed).
+ */
+export async function hasLiveShopifyConnectionResult(
   admin: Admin,
   userId: string,
 ): Promise<{ ok: true; connected: boolean } | { ok: false; reason: string }> {
   try {
-    const byUser = await admin.from('shopify_connections').select('id').eq('user_id', userId).limit(1)
+    const live = (rows: unknown) => ((rows as ConnectionUninstallFacts[] | null) ?? []).some((r) => !isUninstalledShopifyConnection(r))
+    const byUser = await admin.from('shopify_connections').select(UNINSTALL_FACTS).eq('user_id', userId)
     if (byUser.error) return { ok: false, reason: 'connection_query_failed' }
-    if (((byUser.data as unknown[] | null) ?? []).length > 0) return { ok: true, connected: true }
+    if (live(byUser.data)) return { ok: true, connected: true }
 
     const projects = await admin.from('projects').select('id').eq('user_id', userId)
     if (projects.error) return { ok: false, reason: 'project_query_failed' }
     const ids = ((projects.data as { id: string }[] | null) ?? []).map((p) => p.id)
     if (ids.length === 0) return { ok: true, connected: false }
-    const byProject = await admin.from('shopify_connections').select('id').in('project_id', ids).limit(1)
+    const byProject = await admin.from('shopify_connections').select(UNINSTALL_FACTS).in('project_id', ids)
     if (byProject.error) return { ok: false, reason: 'connection_query_failed' }
-    return { ok: true, connected: ((byProject.data as unknown[] | null) ?? []).length > 0 }
+    return { ok: true, connected: live(byProject.data) }
   } catch {
     return { ok: false, reason: 'connection_query_threw' }
   }
@@ -63,8 +104,12 @@ export async function hasAnyShopifyConnectionResult(
  *     install, or a completed migration);
  *   * an explicit PayPal→Shopify migration is in flight, during which the old
  *     PayPal subscription must not be changed;
- *   * (owner decision, 9 Oct 2026) the account has ANY Shopify store
- *     connected, of any status, on the account or any of its projects. This
+ *   * (owner decision, 9 Oct 2026) the account has a Shopify store with the
+ *     app still INSTALLED (hasLiveShopifyConnectionResult), of any connection
+ *     status, on the account or any of its projects. An uninstalled store no
+ *     longer counts: Shopify stops billing at uninstall. (Shopify AUTHORITY,
+ *     above, is not lifted by an uninstall: entitlement for such an account
+ *     still reads Shopify, so a PayPal payment would buy nothing.) This
  *     reverses the earlier "a connection is only a publishing destination"
  *     rule: a store connected to Shopify is billed through Shopify, so a second
  *     (PayPal) subscription for the same account can never start. An account
@@ -85,7 +130,7 @@ export async function isShopifyBillingRequiredForUser(admin: Admin, userId: stri
   if (migration.migration) return true
 
   if (await isAdminUser(admin, userId)) return false
-  const store = await hasAnyShopifyConnectionResult(admin, userId)
+  const store = await hasLiveShopifyConnectionResult(admin, userId)
   if (!store.ok) return true
   return store.connected
 }

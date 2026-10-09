@@ -325,11 +325,16 @@ async function main() {
   console.log('\n7) Source contracts — authority is never inferred or client-supplied')
   {
     const resolver = strip(read('lib/shopify/entitlement-resolver.ts'))
-    const authIdx = resolver.indexOf('resolveBillingAuthority(admin, userId)')
+    // Owner decision, 9 Oct 2026: the resolver reads the EFFECTIVE authority —
+    // resolveBillingAuthority, except that a paid PayPal period keeps a
+    // Shopify-authority account website-billed until it ends
+    // (lib/shopify/paypal-paid-period.ts). Still resolved before any connection.
+    const authIdx = resolver.indexOf('resolveEffectiveBillingAuthority(admin, userId, nowFn())')
     const connIdx = resolver.indexOf(".from('shopify_connections')")
     check('7a: authority is resolved BEFORE any connection lookup', authIdx !== -1 && connIdx !== -1 && authIdx < connIdx)
     check('7b: both resolver entry points are gated',
-      (resolver.match(/resolveBillingAuthority\(admin, userId\)/g) || []).length === 2)
+      (resolver.match(/resolveEffectiveBillingAuthority\(admin, userId, nowFn\(\)\)/g) || []).length === 2
+      && /const authority = await resolveBillingAuthority\(admin, userId\)/.test(strip(read('lib/shopify/paypal-paid-period.ts'))))
     const gov = strip(read('lib/billing/governance.ts'))
     check('7c: the governance module reads nothing from a request',
       !/request|headers|searchParams|cookie|body/i.test(gov))

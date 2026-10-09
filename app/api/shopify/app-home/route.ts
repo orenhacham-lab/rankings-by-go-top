@@ -32,7 +32,7 @@ import { isAdminUser } from '@/app/api/shopify/billing/start-intent/route'
 import { resolveBillingAuthority } from '@/lib/billing/governance'
 import { getActiveMigrationResult } from '@/lib/shopify/paypal-migration'
 import { advancePayPalMigrationOnAppLoad } from '@/lib/shopify/app-load-billing-sync'
-import { readMigrationPaidPeriod, stopPayPalRenewalForMigration } from '@/lib/shopify/paypal-paid-period'
+import { readWebsitePaidPeriod, stopPayPalRenewalForMigration } from '@/lib/shopify/paypal-paid-period'
 import { embeddedPublishErrorMessage } from '@/lib/shopify/publish-error-display'
 import { scheduleShopifySeedScan } from '@/lib/seed-scan/shopify-install'
 
@@ -138,25 +138,29 @@ export async function GET(request: Request) {
   // Shopify plan button, and must NOT call the Partner billing API at all.
   const authority = await resolveBillingAuthority(admin, connection.user_id)
   const migrationResult = await getActiveMigrationResult(admin, connection.user_id)
-  // THE PAID PAYPAL PERIOD (owner decision, 9 Oct 2026). A migrating account
-  // whose PayPal period is still paid for stays website-billed until it ends:
-  // no Shopify plan control, no Partner billing call, and the merchant is told
-  // the date after which they choose a Shopify plan here. An unreadable period
-  // is reported as unavailable, never guessed.
+  // THE PAID PAYPAL PERIOD (owner decision, 9 Oct 2026). An account with ANY
+  // PayPal subscription row ('active' or 'cancelled') whose paid period has
+  // not ended stays website-billed until it ends — whether or not a migration
+  // row exists and whatever the stored authority (a renewal cancelled BEFORE
+  // the store connected creates no migration). No Shopify plan control, no
+  // Partner billing call, and the merchant is told the date after which they
+  // choose a Shopify plan here. An unreadable period is reported as
+  // unavailable, never guessed.
   let websitePaidPeriodActive = false
   let websitePaidUntil: string | null = null
   let websiteRenewalStopped = false
   let paidPeriodUnavailable = false
-  if (!isAdmin && migrationResult.ok && migrationResult.migration && authority.ok && authority.authority !== 'shopify') {
-    const paid = await readMigrationPaidPeriod(admin, connection.user_id, migrationResult.migration)
+  if (!isAdmin && authority.ok) {
+    const paid = await readWebsitePaidPeriod(admin, connection.user_id)
     if (!paid.ok) paidPeriodUnavailable = true
     else if (paid.period.inPaidPeriod) {
       websitePaidPeriodActive = true
       websitePaidUntil = paid.period.paidUntil
       websiteRenewalStopped = paid.period.renewalStopped
-      // PayPal auto-renewal still on (e.g. the link-time attempt failed):
-      // stop it after this response. Idempotent; the daily cron also retries.
-      if (!paid.period.renewalStopped) {
+      // PayPal auto-renewal still on for a migrating account (e.g. the
+      // link-time attempt failed): stop it after this response. Idempotent and
+      // a no-op without a 'pending' migration; the daily cron also retries.
+      if (!paid.period.renewalStopped && migrationResult.ok && migrationResult.migration) {
         try {
           after(() => stopPayPalRenewalForMigration(admin, connection.user_id).then(() => undefined, () => undefined))
         } catch { /* outside a request scope */ }

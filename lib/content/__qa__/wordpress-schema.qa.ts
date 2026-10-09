@@ -219,6 +219,8 @@ async function main() {
     'lib/shopify/__qa__/phase2-billing-intent.qa.ts',
     'lib/shopify/__qa__/phase2-blockers.qa.ts',
     'lib/shopify/__qa__/phase3-reconnect-after-uninstall.qa.ts',
+    'lib/shopify/entitlement-resolver.ts',
+    'lib/shopify/billing-guard.ts',
   ]
   const WP_SCHEMA_LINE = /publishArticleSchema|ld\+json|wordpress/i
 

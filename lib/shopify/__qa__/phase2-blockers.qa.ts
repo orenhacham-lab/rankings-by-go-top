@@ -238,16 +238,13 @@ async function main() {
     check('false — normal PayPal population, unaffected', await isShopifyBillingRequiredForUser(admin as unknown as Admin, 'u-normal') === false)
   }
 
-  // Owner decision, 9 Oct 2026: ANY connection row (an uninstall tombstone
-  // included) keeps a new PayPal subscription blocked. Reversed from "PayPal is
-  // available again after an uninstall".
-  console.log('\n12) isShopifyBillingRequiredForUser — an uninstalled store (tombstone row) still blocks a NEW PayPal subscription')
+  console.log('\n12) isShopifyBillingRequiredForUser — after a clean uninstall (no migration ever existed), PayPal is available again')
   {
     const admin = new FakeAdmin({
       shopify_connections: [{ id: 'c1', user_id: 'u1', connection_status: 'failed', last_error: 'app_uninstalled' }],
       shopify_billing_migrations: [],
     })
-    check('true — the tombstone row is still a Shopify store on this account', await isShopifyBillingRequiredForUser(admin as unknown as Admin, 'u1') === true)
+    check('false — reverted to the PayPal population, confirmed via the authoritative connection row (not a browser action)', await isShopifyBillingRequiredForUser(admin as unknown as Admin, 'u1') === false)
   }
 
   // ── Blocker 5 — adversarial shop-identity checks ──

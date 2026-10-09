@@ -5,8 +5,8 @@ import { cookies } from 'next/headers'
 import { getUserEntitlement } from '@/lib/subscription'
 import { resolveBillingAuthority } from '@/lib/billing/governance'
 import { getActiveMigrationResult } from '@/lib/shopify/paypal-migration'
-import { readMigrationPaidPeriod } from '@/lib/shopify/paypal-paid-period'
-import { hasAnyShopifyConnectionResult } from '@/lib/shopify/paypal-block'
+import { readWebsitePaidPeriod } from '@/lib/shopify/paypal-paid-period'
+import { hasLiveShopifyConnectionResult } from '@/lib/shopify/paypal-block'
 import { PENDING_LINK_COOKIE, verifyPendingLinkCookieValue } from '@/lib/shopify/pending-link'
 import { getShopifyOAuthConfig } from '@/lib/shopify/oauth'
 import { resolveBillingMarket } from '@/lib/billing/server-market'
@@ -78,16 +78,21 @@ export default async function BillingPage() {
 
   const authority = await resolveBillingAuthority(admin, user.id)
   const migrationResult = await getActiveMigrationResult(admin, user.id)
-  // OWNER DECISION, 9 Oct 2026: any Shopify store connected to this account
-  // (any status, any of its projects) means it is billed through Shopify, so
+  // OWNER DECISION, 9 Oct 2026: a Shopify store with the app still installed
+  // (any connection status, any of its projects; an uninstalled store does not
+  // count) means this account is billed through Shopify, so
   // no PayPal checkout is offered — the same rule /api/paypal/activate enforces
   // (isShopifyBillingRequiredForUser). Admins never reach this point.
-  const storeResult = await hasAnyShopifyConnectionResult(admin, user.id)
-  // A migrating account still inside the PayPal period it already paid for
-  // keeps that plan; no Shopify plan is offered before the period ends.
-  const paidPeriod = migrationResult.ok && migrationResult.migration && authority.ok && authority.authority !== 'shopify'
-    ? await readMigrationPaidPeriod(admin, user.id, migrationResult.migration)
-    : null
+  const storeResult = await hasLiveShopifyConnectionResult(admin, user.id)
+  // An account still inside a PayPal period it already paid for ('active' or
+  // 'cancelled' PayPal row, period end in the future) keeps that plan; no
+  // Shopify plan is offered before the period ends — with or without a
+  // migration row, whatever the stored authority (the same rule as
+  // start-intent and the embedded app home). Read only when the Shopify card
+  // would be shown.
+  const shopifySide = authority.ok && migrationResult.ok
+    && (authority.authority === 'shopify' || !!migrationResult.migration || hasPendingLink)
+  const paidPeriod = shopifySide ? await readWebsitePaidPeriod(admin, user.id) : null
   const governanceUnavailable = !authority.ok || !migrationResult.ok || !storeResult.ok || (paidPeriod !== null && !paidPeriod.ok)
   const shopifyConnected = governanceUnavailable
     ? false

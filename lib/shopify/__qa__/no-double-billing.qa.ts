@@ -28,12 +28,14 @@ import { join } from 'path'
 import { FakeAdmin } from '../../__qa__/_fake-admin'
 import { getDashboardDictionary } from '../../i18n/dashboard/getDashboardDictionary'
 import { PUBLIC_LOCALES } from '../../i18n/locales'
-import { isShopifyBillingRequiredForUser, hasAnyShopifyConnectionResult } from '../paypal-block'
+import { isShopifyBillingRequiredForUser, hasLiveShopifyConnectionResult, isUninstalledShopifyConnection } from '../paypal-block'
 import { resolveBillingAuthority } from '../../billing/governance'
 import { getActiveMigrationResult, confirmShopifyActiveAndAdvance, cancelPayPalAndCompleteMigration, type MigrationRow } from '../paypal-migration'
-import { paidPeriodOf, readMigrationPaidPeriod, stopPayPalRenewalForMigration } from '../paypal-paid-period'
+import { paidPeriodOf, readMigrationPaidPeriod, stopPayPalRenewalForMigration, readWebsitePaidPeriod, resolveEffectiveBillingAuthority } from '../paypal-paid-period'
+import { checkShopifyPublishEntitlement } from '../billing-guard'
+import { resolveCurrentUsagePeriod } from '../../billing/usage-period'
 import { retryPayPalMigrations, notifyRefusedPayPalActivation } from '../paypal-migration-retry'
-import { getUserEntitlement } from '../../subscription'
+import { getUserEntitlement, explainAccess } from '../../subscription'
 
 let pass = 0, fail = 0
 function check(name: string, cond: boolean, detail?: string) {
@@ -102,8 +104,30 @@ async function main() {
     check('A2: a connected store on the account → blocked', await isShopifyBillingRequiredForUser(own as Admin, 'u') === true)
     const viaProject = base({ projects: [{ id: 'p', user_id: 'u' }], shopify_connections: [{ id: 'c', user_id: 'someone-else', project_id: 'p', connection_status: 'connected', archived_at: null }] })
     check('A3: a store row on one of the account\'s PROJECTS → blocked', await isShopifyBillingRequiredForUser(viaProject as Admin, 'u') === true)
-    const tombstone = base({ shopify_connections: [{ id: 'c', user_id: 'u', project_id: 'p', connection_status: 'failed', last_error: 'app_uninstalled', archived_at: '2026-10-01T00:00:00Z' }] })
-    check('A4: any status, archived/uninstalled included → blocked', await isShopifyBillingRequiredForUser(tombstone as Admin, 'u') === true)
+    // UNINSTALL ENDS THE BLOCK (owner, 9 Oct 2026): Shopify bills nothing for
+    // a store the app is uninstalled from. The tombstone is the exact one
+    // applyAppUninstalled writes; an archived row is one superseded after it.
+    const TOMB = { connection_status: 'failed', last_error: 'app_uninstalled', granted_scopes: [], shopify_subscription_status: null, archived_at: null, archived_reason: null }
+    const tombstone = base({ shopify_connections: [{ id: 'c', user_id: 'u', project_id: 'p', ...TOMB }] })
+    check('A4: an uninstalled store (the uninstall tombstone) no longer blocks PayPal', await isShopifyBillingRequiredForUser(tombstone as Admin, 'u') === false)
+    const archived = base({ shopify_connections: [{ id: 'c', user_id: 'u', project_id: 'p', ...TOMB, archived_at: '2026-10-01T00:00:00Z', archived_reason: 'superseded_after_uninstall' }] })
+    check('A4b: a store archived after its uninstall no longer blocks PayPal', await isShopifyBillingRequiredForUser(archived as Admin, 'u') === false)
+    const failedOther = base({ shopify_connections: [{ id: 'c', user_id: 'u', project_id: 'p', ...TOMB, last_error: 'invalid_token' }] })
+    check('A4c: a store failed for another reason (app still installed) → blocked', await isShopifyBillingRequiredForUser(failedOther as Admin, 'u') === true)
+    const overwritten = base({ shopify_connections: [{ id: 'c', user_id: 'u', project_id: 'p', ...TOMB, last_error: 'Authentication failed. Check the Admin API access token.' }] })
+    check('A4d: an uninstall marker overwritten by prose counts as INSTALLED (doubt keeps PayPal blocked)', await isShopifyBillingRequiredForUser(overwritten as Admin, 'u') === true)
+    const scoped = base({ shopify_connections: [{ id: 'c', user_id: 'u', project_id: 'p', ...TOMB, granted_scopes: ['write_content'] }] })
+    check('A4e: the marker with scopes still granted is not the tombstone → blocked', await isShopifyBillingRequiredForUser(scoped as Admin, 'u') === true)
+    const mixed = base({ projects: [{ id: 'p2', user_id: 'u' }], shopify_connections: [{ id: 'c', user_id: 'u', project_id: 'p', ...TOMB }, { id: 'c2', user_id: 'x', project_id: 'p2', connection_status: 'connected', last_error: null, granted_scopes: ['write_content'], archived_at: null }] })
+    check('A4f: one uninstalled store does not hide another installed one on a project → blocked', await isShopifyBillingRequiredForUser(mixed as Admin, 'u') === true)
+    const archivedOther = base({ shopify_connections: [{ id: 'c', user_id: 'u', project_id: 'p', connection_status: 'connected', archived_at: '2026-10-01T00:00:00Z', archived_reason: null }] })
+    check('A4g: an archived row without the uninstall reason → blocked', await isShopifyBillingRequiredForUser(archivedOther as Admin, 'u') === true)
+    // MUTATION CONTROL — "every row is a live store" (the previous rule) would
+    // keep the uninstalled account blocked; the predicate is what lifts it.
+    const tombRow = tombstone.tables.shopify_connections[0] as never
+    const previousRule = (rows: unknown[]) => rows.length > 0
+    check('A4-MUT: without the uninstall predicate the tombstone would still block', isUninstalledShopifyConnection(tombRow) === true && previousRule(tombstone.tables.shopify_connections) === true)
+    check('A4-MUT2: the predicate is not a constant: a connected row is not uninstalled', isUninstalledShopifyConnection({ ...TOMB, connection_status: 'connected' } as never) === false)
     const otherAccount = base({ projects: [{ id: 'p', user_id: 'u' }], shopify_connections: [{ id: 'c', user_id: 'x', project_id: 'p-x', connection_status: 'connected', archived_at: null }] })
     check('A5: another account\'s store never blocks this one', await isShopifyBillingRequiredForUser(otherAccount as Admin, 'u') === false)
     const admin = base({ profiles: [{ id: 'u', role: 'admin' }], shopify_connections: [{ id: 'c', user_id: 'u', project_id: 'p', connection_status: 'connected', archived_at: null }] })
@@ -112,7 +136,7 @@ async function main() {
     check('A7: …but an administrator billed by Shopify is still blocked, as before', await isShopifyBillingRequiredForUser(adminShopify as Admin, 'u') === true)
     const down = base({}, { shopify_connections: { select: dbDown } })
     check('A8: an unreadable connection lookup fails CLOSED', await isShopifyBillingRequiredForUser(down as Admin, 'u') === true)
-    const lookup = await hasAnyShopifyConnectionResult(down as Admin, 'u')
+    const lookup = await hasLiveShopifyConnectionResult(down as Admin, 'u')
     check('A9: …and is reported as a failed read, not "no store"', lookup.ok === false)
     // MUTATION CONTROL — the rule before this change (authority + migration
     // only) lets the website account with a connected store through.
@@ -251,6 +275,62 @@ async function main() {
     check('D-MUT2: a verifier that throws sends nothing', threw === 'not_sent' && sent.length === 3)
   }
 
+  console.log('\nF) ANY paid PayPal period — renewal cancelled BEFORE connecting, no migration row')
+  {
+    // A Shopify-authority account (direct App Store link) whose PayPal renewal
+    // was cancelled before it connected: complete_shopify_app_store_link made
+    // NO migration, and moved authority to Shopify at once.
+    const conn = { id: 'conn-f', user_id: 'uf', project_id: 'pf', shop_domain: 'f.myshopify.com', shop_gid: 'gid://shopify/Shop/1', connection_status: 'connected', archived_at: null, last_error: null, granted_scopes: ['write_content'], shopify_subscription_status: null, shopify_plan_handle: null, shopify_billing_verified_at: null }
+    const shopifyBilled = (subRow: Record<string, unknown> | null, hooks: Record<string, Record<string, () => unknown>> = {}) => new FakeAdmin({
+      profiles: [{ id: 'uf', role: 'user' }],
+      billing_governance: [{ user_id: 'uf', signup_origin: 'shopify_app_store', billing_authority: 'shopify', authority_reason: 'shopify_app_store_install' }],
+      shopify_connections: [{ ...conn }],
+      projects: [{ id: 'pf', user_id: 'uf' }],
+      shopify_billing_migrations: [],
+      subscriptions: subRow ? [{ id: 'sf', user_id: 'uf', plan_code: 'advanced', paypal_subscription_id: 'I-F', created_at: '2026-09-01T00:00:00Z', ...subRow }] : [],
+    }, hooks as never)
+    const cancelled = shopifyBilled({ status: 'cancelled', current_period_end: FUTURE })
+    const p1 = await readWebsitePaidPeriod(cancelled as Admin, 'uf', NOW)
+    check('F1: a cancelled PayPal row with a future end is a paid period, with no migration row', p1.ok && p1.period.inPaidPeriod && p1.period.paidUntil === FUTURE && p1.period.renewalStopped === true)
+    const e1 = await resolveEffectiveBillingAuthority(cancelled as Admin, 'uf', NOW)
+    check('F2: …so the account is WEBSITE-billed until then (stored authority untouched)', e1.ok && e1.authority === 'website' && gov(cancelled).billing_authority === 'shopify')
+    const ent = await getUserEntitlement('uf', cancelled as never, () => NOW)
+    check('F3: …and keeps the plan it paid for (not the zero Shopify floor)', ent.plan === 'advanced' && ent.hasActiveSubscription === true, ent.plan)
+    const pub = await checkShopifyPublishEntitlement(cancelled as never, { ...conn } as never, (async () => { throw new Error('no Partner API call expected') }) as never)
+    check('F4: …and can publish, on the website plan, with no Partner billing call', pub.ok === true && (pub as { governedBy?: string }).governedBy === 'website', JSON.stringify(pub))
+    const acc = await explainAccess('uf', cancelled as never, () => NOW)
+    check('F5: …and the dashboard stays open', acc.allowed === true, acc.reason)
+    const usage = await resolveCurrentUsagePeriod(cancelled as never, 'uf', () => NOW)
+    check('F5b: …with the PayPal period as its usage period', usage !== null && usage.source === 'paypal', JSON.stringify(usage))
+    const active = shopifyBilled({ status: 'active', current_period_end: FUTURE })
+    const p2 = await readWebsitePaidPeriod(active as Admin, 'uf', NOW)
+    check('F6: an ACTIVE PayPal row with a future end counts too', p2.ok && p2.period.inPaidPeriod && p2.period.renewalStopped === false)
+    const over = shopifyBilled({ status: 'cancelled', current_period_end: PAST })
+    // No verified shop id: the Shopify side answers from local state alone (no Partner call).
+    ;(over.tables.shopify_connections[0] as Record<string, unknown>).shop_gid = null
+    const e3 = await resolveEffectiveBillingAuthority(over as Admin, 'uf', NOW)
+    const ent3 = await getUserEntitlement('uf', over as never, () => NOW)
+    check('F7: after the period ends the account is Shopify-billed again and needs a Shopify plan', e3.ok && e3.authority === 'shopify' && ent3.plan === 'shopify_billing_required', ent3.plan)
+    const trialOnly = shopifyBilled({ status: 'trial', paypal_subscription_id: null, current_period_end: null, trial_ends_at: FUTURE })
+    const e4 = await resolveEffectiveBillingAuthority(trialOnly as Admin, 'uf', NOW)
+    check('F8: a never-paid (trial) Shopify account is unaffected: Shopify-billed', e4.ok && e4.authority === 'shopify')
+    const down = shopifyBilled({ status: 'cancelled', current_period_end: FUTURE }, { subscriptions: { select: dbDown } })
+    const e5 = await resolveEffectiveBillingAuthority(down as Admin, 'uf', NOW)
+    check('F9: an unreadable subscriptions table fails CLOSED (no verdict)', e5.ok === false)
+    // MUTATION CONTROL — the stored authority alone (the rule before this
+    // change) gives the same paid account the zero Shopify floor.
+    const stored = await resolveBillingAuthority(cancelled as Admin, 'uf')
+    check('F-MUT: without the paid-period rule the account is Shopify-billed with no plan mid-period', stored.ok && stored.authority === 'shopify')
+    const nonPayPal = shopifyBilled({ status: 'cancelled', paypal_subscription_id: null, current_period_end: FUTURE })
+    const p6 = await readWebsitePaidPeriod(nonPayPal as Admin, 'uf', NOW)
+    check('F-MUT2: only a PAYPAL row counts (a manual row without a PayPal id does not)', p6.ok && !p6.period.inPaidPeriod)
+
+    const sources = ['lib/shopify/entitlement-resolver.ts', 'lib/shopify/billing-guard.ts', 'lib/billing/usage-period.ts']
+    const effOk = (src: string) => /resolveEffectiveBillingAuthority\(/.test(src) && !/resolveBillingAuthority\(/.test(src)
+    check('F10: entitlement, the publish guard and the usage period all read the effective authority', sources.every((f) => effOk(strip(read(f)))))
+    check('F10-MUT: going back to the stored authority is caught', !effOk(strip(read(sources[1])).replace('resolveEffectiveBillingAuthority(', 'resolveBillingAuthority(')))
+  }
+
   console.log('\nE) wiring')
   {
     const activate = strip(read('app/api/paypal/activate/route.ts'))
@@ -265,13 +345,17 @@ async function main() {
 
     const start = strip(read('app/api/shopify/billing/start-intent/route.ts'))
     const startOk = (src: string) => {
-      const paid = src.indexOf('readMigrationPaidPeriod(admin, connection.user_id, migration.migration)')
+      const paid = src.indexOf('readWebsitePaidPeriod(admin, connection.user_id)')
       const pricing = src.indexOf('buildShopifyPricingUrl(')
       const mint = src.indexOf('createBillingIntent(')
-      return paid > 0 && pricing > paid && mint > paid && /website_paid_period_active/.test(src)
+      // Unconditional: no `if (` between the authority gate and the read, so
+      // it applies with or without a migration row and whatever the authority.
+      const between = paid > 0 ? src.slice(src.lastIndexOf('shopify_billing_not_applicable', paid), paid) : 'if ('
+      return paid > 0 && pricing > paid && mint > paid && /website_paid_period_active/.test(src) && !/if \(/.test(between)
     }
-    check('E2: start-intent refuses the Shopify pricing page inside the paid period, before any intent is minted', startOk(start))
-    check('E2-MUT: dropping the check is caught', !startOk(start.replace('readMigrationPaidPeriod(admin, connection.user_id, migration.migration)', 'null')))
+    check('E2: start-intent refuses the Shopify pricing page inside ANY paid PayPal period, before any intent is minted', startOk(start))
+    check('E2-MUT: dropping the check is caught', !startOk(start.replace('readWebsitePaidPeriod(admin, connection.user_id)', 'null')))
+    check('E2-MUT2: limiting it to a migrating account again is caught', !startOk(start.replace('  {\n    const paid = await readWebsitePaidPeriod(', '  if (migration.migration) {\n    const paid = await readWebsitePaidPeriod(')))
 
     const ret = strip(read('lib/shopify/billing-return-processing.ts'))
     check('E3: the billing return reports a deferral, never success/cancel', /if \(advanced\?\.deferred\) return result\('migration_deferred'/.test(ret))
@@ -280,8 +364,10 @@ async function main() {
 
     const home = strip(read('app/api/shopify/app-home/route.ts'))
     const homeOk = (src: string) => /const shopifyBills = !billingStateUnavailable && !websitePaidPeriodActive/.test(src) && /websitePaidUntil,/.test(src)
-    check('E4: the app home offers no Shopify plan (and makes no Partner billing call) inside the paid period', homeOk(home))
+      && /if \(!isAdmin && authority\.ok\) \{\s*const paid = await readWebsitePaidPeriod\(admin, connection\.user_id\)/.test(src)
+    check('E4: the app home offers no Shopify plan (and makes no Partner billing call) inside ANY paid PayPal period', homeOk(home))
     check('E4-MUT: dropping the paid-period term is caught', !homeOk(home.replace('&& !websitePaidPeriodActive', '')))
+    check('E4-MUT2: limiting it to a migrating account again is caught', !homeOk(home.replace('if (!isAdmin && authority.ok) {', 'if (!isAdmin && authority.ok && migrationResult.ok && migrationResult.migration) {')))
 
     const client = read('app/shopify/app/ConnectorHomeClient.tsx')
     const card = client.slice(client.indexOf('data.websitePaidPeriodActive ?'), client.indexOf("data.billingProvider === 'website' ? ("))
@@ -306,7 +392,7 @@ async function main() {
     check('E8: the billing page shows the Shopify notice with a nofollow App Store link, and the PayPal plans only in the other branch', viewOk(view, storeBranch))
     check('E8-MUT: a followed link is caught', !viewOk(view.replace('rel="nofollow noopener noreferrer"', 'rel="noopener"'), storeBranch))
     const page = strip(read('app/(dashboard)/billing/page.tsx'))
-    check('E9: the page passes the store flag from the same server-side lookup the PayPal gate uses', /hasAnyShopifyConnectionResult\(admin, user\.id\)/.test(page) && /shopifyStoreConnected=\{shopifyStoreConnected\}/.test(page))
+    check('E9: the page passes the store flag from the same server-side lookup the PayPal gate uses', /hasLiveShopifyConnectionResult\(admin, user\.id\)/.test(page) && /shopifyStoreConnected=\{shopifyStoreConnected\}/.test(page))
 
     const rows = PUBLIC_LOCALES.map((l) => {
       const s = getDashboardDictionary(l).billing.shopify

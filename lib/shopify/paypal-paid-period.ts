@@ -32,6 +32,7 @@
 import type { createAdminClient } from '@/lib/supabase/admin'
 import { cancelPayPalSubscription, fetchAuthoritativeBillingPeriod } from '@/lib/paypal/client'
 import { getActiveMigrationResult, type MigrationRow } from './paypal-migration'
+import { resolveBillingAuthority, type AuthorityDecision } from '@/lib/billing/governance'
 
 type Admin = ReturnType<typeof createAdminClient>
 
@@ -202,4 +203,73 @@ export async function stopPayPalRenewalForMigration(
     console.error('[shopify-migration] stopping PayPal renewal threw', { userId, name: err instanceof Error ? err.name : 'unknown' })
     return 'failed'
   }
+}
+
+/**
+ * ANY PAID PAYPAL PERIOD ON THE ACCOUNT (owner decision, 9 Oct 2026, second
+ * part). Not only a 'pending' migration: an account whose PayPal renewal was
+ * already cancelled before it connected a store gets NO migration row
+ * (complete_shopify_app_store_link looks for an ACTIVE PayPal row only) and
+ * becomes Shopify-billed at once — while the PayPal period it paid for is
+ * still running. So the rule is read from the subscriptions table itself: a
+ * PayPal row (paypal_subscription_id set), 'active' or 'cancelled', whose
+ * current_period_end is still in the future, is a paid website period. An
+ * 'active' PayPal row with no end date yet counts too (it is still renewing),
+ * with paidUntil null. A read failure is reported as such — callers fail closed.
+ */
+export async function readWebsitePaidPeriod(
+  admin: Admin,
+  userId: string,
+  now: Date = new Date(),
+): Promise<{ ok: true; period: PaidPeriod } | { ok: false; reason: string }> {
+  try {
+    const { data, error } = await admin
+      .from('subscriptions')
+      .select('id, status, current_period_end')
+      .eq('user_id', userId)
+      .not('paypal_subscription_id', 'is', null)
+      .in('status', ['active', 'cancelled'])
+    if (error) return { ok: false, reason: (error.code || error.message || 'subscription_query_failed').slice(0, 120) }
+    let best: PaidPeriod = { inPaidPeriod: false }
+    for (const row of ((data as PaidPeriodRow[] | null) ?? [])) {
+      const p = paidPeriodOf(row, now)
+      if (!p.inPaidPeriod) continue
+      if (!best.inPaidPeriod) { best = p; continue }
+      // An end date not known yet outranks any known date; otherwise the later end wins.
+      if (p.paidUntil === null) best = p
+      else if (best.paidUntil !== null && Date.parse(p.paidUntil) > Date.parse(best.paidUntil)) best = p
+    }
+    return { ok: true, period: best }
+  } catch (err) {
+    return { ok: false, reason: err instanceof Error ? err.message.slice(0, 120) : 'subscription_query_threw' }
+  }
+}
+
+/**
+ * WHO BILLS THIS ACCOUNT RIGHT NOW, for entitlement and for the Shopify plan
+ * offer. The stored authority (resolveBillingAuthority), except that a
+ * Shopify-authority account still inside a paid PayPal period
+ * (readWebsitePaidPeriod) is treated as WEBSITE-billed until that period ends:
+ * it keeps the plan it paid for on the website, can publish, and is offered no
+ * Shopify plan before then. Nothing is written; the stored authority is
+ * untouched. A paid-period read failure is an outage (ok: false), never a
+ * verdict.
+ */
+export type EffectiveAuthorityDecision =
+  | (Extract<AuthorityDecision, { ok: true }> & { websitePaidPeriod: Extract<PaidPeriod, { inPaidPeriod: true }> | null })
+  | Extract<AuthorityDecision, { ok: false }>
+  | { ok: false; reason: 'paid_period_unavailable'; detail: string }
+
+export async function resolveEffectiveBillingAuthority(
+  admin: Admin,
+  userId: string,
+  now: Date = new Date(),
+): Promise<EffectiveAuthorityDecision> {
+  const authority = await resolveBillingAuthority(admin, userId)
+  if (!authority.ok) return authority
+  if (authority.authority !== 'shopify') return { ...authority, websitePaidPeriod: null }
+  const paid = await readWebsitePaidPeriod(admin, userId, now)
+  if (!paid.ok) return { ok: false, reason: 'paid_period_unavailable', detail: paid.reason }
+  if (paid.period.inPaidPeriod) return { ...authority, authority: 'website', websitePaidPeriod: paid.period }
+  return { ...authority, websitePaidPeriod: null }
 }

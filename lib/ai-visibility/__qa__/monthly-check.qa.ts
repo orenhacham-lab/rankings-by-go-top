@@ -559,6 +559,11 @@ async function main() {
       'lib/shopify/__qa__/no-double-billing.qa.ts', 'lib/shopify/__qa__/phase2-billing.qa.ts',
       'lib/shopify/__qa__/phase2-billing-intent.qa.ts', 'lib/shopify/__qa__/phase2-blockers.qa.ts',
       'lib/billing/__qa__/provider-matrix.qa.ts', 'lib/shopify/__qa__/phase3-reconnect-after-uninstall.qa.ts',
+      // …and (same decision) a paid PayPal period keeps a Shopify-authority
+      // account website-billed until it ends: the three readers of authority
+      // read the effective one. No plan, price or quota value changes.
+      'lib/shopify/entitlement-resolver.ts', 'lib/shopify/billing-guard.ts', 'lib/billing/usage-period.ts',
+      'lib/billing/__qa__/billing-authority.qa.ts', 'lib/billing/__qa__/shopify-trial-usage-period.qa.ts',
     ])
     untouched = untouched.split('\n').filter((f) => f && !NO_DOUBLE_BILLING.has(f)).join('\n')
     check('H4: plans, prices, quotas, billing, entitlement and Shopify files are untouched', untouched === '', untouched)
