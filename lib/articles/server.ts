@@ -203,6 +203,11 @@ export function buildArticleSchemas(article: PublicArticle | null, slug: string,
             '@type': 'Person',
             name: articleAuthor(article.author)?.name[locale] ?? article.author,
             url: `${SITE_URL}${articleAuthor(article.author)?.href[locale] ?? ''}`,
+            // A photograph is part of what makes an author checkable, so the
+            // same file the box shows is the one Google is pointed at.
+            ...(articleAuthor(article.author)?.photo && {
+              image: `${SITE_URL}${articleAuthor(article.author)?.photo}`,
+            }),
           },
         }),
         ...(article.published_at && { datePublished: article.published_at }),
