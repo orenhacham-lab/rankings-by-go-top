@@ -1,42 +1,32 @@
 /**
  * The affiliate program's public page, in every language the site speaks.
  *
- * The NUMBERS live here once (AFFILIATE_TERMS) and every language reads them, so
- * no two languages can ever promise different rates — a page that said
- * 30% in one language and 25% in another would be an offer we could not honour.
- * lib/affiliate/referral.ts owns the same window in code, and the guard
- * __qa__/affiliates-page.qa.ts holds the two to the same number.
+ * The NUMBERS come from lib/affiliate/terms.ts and every language reads them
+ * from there, so no two languages can ever promise different rates — a page that
+ * said 30% in one language and 25% in another would be an offer we could not
+ * honour — and the commission engine pays what the page states.
  *
- * The page does NOT take an application through a form: applications are read and
- * approved by a person (that manual approval is the program's main defence against
- * someone referring themselves), so the page opens WhatsApp or email. The form, the
- * affiliate dashboard and the payouts come once the attribution table exists.
+ * The page now takes an APPLICATION through a form (components/public/
+ * AffiliateApplicationForm.tsx), and WhatsApp and email stay beside it for a
+ * partner who would rather talk. Every application is still read and approved by
+ * a person before a code exists, which is the program's main defence against
+ * someone referring themselves.
  */
-import { REFERRAL_WINDOW_DAYS } from '@/lib/affiliate/referral'
+import { AFFILIATE_TERMS } from '@/lib/affiliate/terms'
 import type { PublicLocale } from '@/lib/i18n/locales'
 
-export const AFFILIATE_TERMS = {
-  /** Commission on every payment, for as long as the customer keeps paying. */
-  baseRate: 30,
-  /** The higher rate, from this many active paying referrals onwards. */
-  topRate: 40,
-  topRateFrom: 10,
-  /**
-   * The program's INTENDED last-click window, and the number the referral rules
-   * in lib/affiliate/referral.ts carry. It is deliberately NOT promised on the
-   * page: honouring a window means remembering a click for that long, and the
-   * attribution decided on 5 October 2026 stores nothing on the visitor's
-   * device at all (lib/affiliate/tracking-flag.ts). A page that promised 90
-   * days while nothing is remembered would be an offer to partners we could not
-   * keep, which is why __qa__/affiliates-page.qa.ts fails if any language puts a
-   * day count back into the copy while there is no storage to support it.
-   */
-  windowDays: REFERRAL_WINDOW_DAYS,
-  /** Paid once the balance passes this, 30 days after the customer's payment settles. */
-  minPayoutUsd: 100,
-  minPayoutIls: 350,
-  holdDays: 30,
-} as const
+/**
+ * The numbers are NOT defined here any more: lib/affiliate/terms.ts holds them
+ * once for the page, the partner's dashboard, the commission engine and the
+ * `affiliates` table's defaults. They are re-exported because this is the import
+ * every language's copy and the page's guard already use.
+ *
+ * Note what is absent: a day count. Attribution is the last click on the way to
+ * signing up and nothing is stored on the visitor's device, so an "attribution
+ * window" would be a memory we do not keep. __qa__/affiliates-page.qa.ts fails
+ * if any language puts one back into the copy.
+ */
+export { AFFILIATE_TERMS }
 
 export type AffiliateCopy = {
   metaTitle: string

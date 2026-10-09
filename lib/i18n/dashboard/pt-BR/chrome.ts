@@ -35,6 +35,7 @@ export const chromePtBR: DeepPartial<DashboardDictionary> = {
     projectSettings: 'Configurações do site',
     reports: 'Relatórios',
     siteHealth: 'Saúde do site',
+    affiliate: 'Programa de parceiros',
     billing: 'Pagamentos',
     system: 'Sistema',
     articleManagement: 'Artigos do site',

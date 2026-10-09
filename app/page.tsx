@@ -5,6 +5,7 @@ import { landingHe } from '@/lib/i18n/public/landing-he'
 import { isContentModuleEnabled } from '@/lib/content/api-auth'
 import { getShopifyOAuthConfig, detectSignedShopifyLaunch } from '@/lib/shopify/oauth'
 import { authHref } from '@/lib/i18n/auth-href'
+import { REFERRAL_PARAM, withReferral } from '@/lib/affiliate/referral'
 
 export default async function HomePage({
   searchParams,
@@ -49,5 +50,6 @@ export default async function HomePage({
 
   // Hero Section and the rest of the marketing page (components/public/LandingPage.tsx)
   // render only from here, after the signed-launch check above.
-  return <LandingPage locale="he" copy={landingHe} signedIn={!!user} signupHref={authHref('signup', 'he')} pricingHref="/pricing" />
+  const referral = typeof sp[REFERRAL_PARAM] === 'string' ? sp[REFERRAL_PARAM] : null
+  return <LandingPage locale="he" copy={landingHe} signedIn={!!user} signupHref={withReferral(authHref('signup', 'he'), referral)} pricingHref="/pricing" />
 }

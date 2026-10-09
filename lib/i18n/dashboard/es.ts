@@ -43,6 +43,7 @@ export const dashboardEs: DeepPartial<DashboardDictionary> = {
     projectSettings: 'Ajustes de la web',
     reports: 'Informes',
     siteHealth: 'Salud de la web',
+    affiliate: 'Programa de socios',
     billing: 'Facturación',
     system: 'Sistema',
     articleManagement: 'Artículos de la web',

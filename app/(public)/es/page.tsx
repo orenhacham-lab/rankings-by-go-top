@@ -2,6 +2,7 @@ import { createClient } from '@/lib/supabase/server'
 import { LandingPage } from '@/components/public/LandingPage'
 import { landingEs } from '@/lib/i18n/public/landing-es'
 import { authHref } from '@/lib/i18n/auth-href'
+import { REFERRAL_PARAM, withReferral } from '@/lib/affiliate/referral'
 
 /**
  * The Spanish home page. The call to action goes to the SPANISH sign-up form
@@ -10,9 +11,22 @@ import { authHref } from '@/lib/i18n/auth-href'
  * Spanish, with no language change along the way. It used to point at the
  * English form, from when the auth surface knew only two languages.
  */
-export default async function SpanishHomePage() {
+/**
+ * A visitor who arrived on an affiliate link carries the code on the URL, and
+ * the page's own "start free" button carries it into the signup form. Nothing is
+ * stored: lib/affiliate/referral.ts says why, and the live agreement promises
+ * partners attribution by the last click on the way to signing up. A visitor who
+ * wanders to another page loses it, which is also what the agreement says.
+ */
+export default async function SpanishHomePage({
+  searchParams,
+}: {
+  searchParams: Promise<Record<string, string | string[] | undefined>>
+}) {
+  const sp = await searchParams
+  const referral = typeof sp[REFERRAL_PARAM] === 'string' ? sp[REFERRAL_PARAM] : null
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
 
-  return <LandingPage locale="es" copy={landingEs} signedIn={!!user} signupHref={authHref('signup', 'es')} pricingHref="/es/pricing" />
+  return <LandingPage locale="es" copy={landingEs} signedIn={!!user} signupHref={withReferral(authHref('signup', 'es'), referral)} pricingHref="/es/pricing" />
 }

@@ -2,8 +2,6 @@ import { createServerClient } from '@supabase/ssr'
 import { createClient } from '@supabase/supabase-js'
 import type { ServiceRoleClient } from '@/lib/supabase/admin'
 import { NextResponse, type NextRequest } from 'next/server'
-import { REFERRAL_COOKIE, referralCookieString, referralToPersist } from '@/lib/affiliate/referral'
-import { affiliateTrackingEnabled } from '@/lib/affiliate/tracking-flag'
 import { explainAccess, type AccessDiagnostics } from '@/lib/subscription'
 import {
   LANGUAGE_COOKIE, LANGUAGE_PARAM, LOCALE_HEADER,
@@ -113,29 +111,17 @@ export async function proxy(request: NextRequest) {
     request.cookies.get(LANGUAGE_COOKIE)?.value ?? null,
     normalizedLangParam(langParam),
   )
-  // An affiliate link is a `?ref=` on ANY public URL, so it is remembered here rather
-  // than on one landing page: the visitor may arrive on a feature page, read three
-  // more and sign up a week later. Last click wins (lib/affiliate/referral.ts), which
-  // is what the program's published terms say. The cookie holds only the code the
-  // affiliate chose for themselves; it attributes nothing on its own, because a
-  // commission is approved by a person.
-  //
-  // OFF UNLESS THE FLAG IS ON, and it is off everywhere. This cookie is not
-  // strictly necessary under ePrivacy art. 5(3), so it needs consent and a named
-  // category in the cookie policy, and the consent record is in localStorage
-  // where this middleware cannot see it. lib/affiliate/tracking-flag.ts has the
-  // three things that have to be true before it goes on.
-  const referralToSet = affiliateTrackingEnabled()
-    ? referralToPersist(request.cookies.get(REFERRAL_COOKIE)?.value ?? null, request.nextUrl)
-    : null
-
+  // An affiliate link carries its code in the URL and NOTHING is written here for
+  // it: no cookie, no header, no storage of any kind. lib/affiliate/referral.ts
+  // says why (ePrivacy art. 5(3), and a consent record this middleware cannot
+  // read), and the live agreement promises partners exactly that in four
+  // languages. The code is read on the way to signing up, and the partner's own
+  // link is /r/<code>, which counts the click server-side and lands the visitor
+  // on the site with the code on the URL.
   const persistLocale = (res: NextResponse): NextResponse => {
     const secure = request.nextUrl.protocol === 'https:'
     if (localeToPersist) {
       res.headers.append('set-cookie', languageCookieString(localeToPersist, secure))
-    }
-    if (referralToSet) {
-      res.headers.append('set-cookie', referralCookieString(referralToSet, secure))
     }
     return res
   }

@@ -166,7 +166,21 @@ async function main() {
       && /router\.replace\(withLocaleParam\(destination, lang\)\)/.test(x)
     check('sign-up with a session opens the claim path when the server says a claim is kept, else the dashboard', leads(page))
     check('MUT: a page that always goes to the dashboard is caught', !leads(page.replace('router.replace(withLocaleParam(destination, lang))', "router.replace(withLocaleParam('/dashboard', lang))")))
-    check('…the confirmation link still asks for next=/dashboard (the callback replaces it)', /next=\$\{encodeURIComponent\('\/dashboard'\)\}/.test(page))
+    // The confirmation link still asks for /dashboard and the callback replaces
+    // it with the claim path. An affiliate code rides along on that same `next`
+    // (there is nowhere else to carry it through an email link); the callback
+    // takes it off the path before deciding where to land — see
+    // splitReferralFromPath in lib/affiliate/referral.ts.
+    check('…the confirmation link still asks for /dashboard (the callback replaces it)',
+      /next=\$\{encodeURIComponent\(withReferral\('\/dashboard', referralCode\)\)\}/.test(page))
+    check('…and a referral code riding on it is taken off the path before the landing is chosen', (() => {
+      const cbSrc = strip(read('app/api/auth/callback/route.ts'))
+      return cbSrc.indexOf('splitReferralFromPath(next)') > -1
+        && cbSrc.indexOf('splitReferralFromPath(next)') < cbSrc.indexOf('afterSignupPath({ next')
+    })())
+    check('MUT: a confirmation link pointing somewhere else is caught',
+      !/next=\$\{encodeURIComponent\(withReferral\('\/dashboard', referralCode\)\)\}/
+        .test(page.replace("withReferral('/dashboard', referralCode)", "'/welcome'")))
     const cb = strip(read('app/api/auth/callback/route.ts'))
     const cbLeads = (x: string) => /const landing = afterSignupPath\(\{ next, claimCookie: cookieStore\.get\(SEED_CLAIM_COOKIE\)\?\.value, env: process\.env \}\)/.test(x)
       && /const dest = new URL\(landing, origin\)/.test(x) && /const next = sanitizeNextPath\(searchParams\.get\('next'\)\)/.test(x)
