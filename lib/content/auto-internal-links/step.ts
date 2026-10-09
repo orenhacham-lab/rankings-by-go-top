@@ -39,7 +39,10 @@ export async function runAutoInternalLinksStep(
   const env = deps.env ?? process.env
   const now = (deps.now ?? (() => new Date()))()
   const result = await run(admin, input, env, now).catch((): AutoLinkStepOutcome => ({ outcome: 'skipped', reason: 'error' }))
-  if (result.outcome === 'linked' || !['disabled', 'no_map', 'none_relevant'].includes(result.reason)) {
+  // Everything but the kill switch is logged. 'no_map' and 'none_relevant' used
+  // to be suppressed here, and they are the two COMMON outcomes, so the one
+  // thing nobody could see was why an article came out with no links at all.
+  if (result.outcome === 'linked' || result.reason !== 'disabled') {
     console.log('[auto-internal-links]', { articleId: input.articleId, ...result })
   }
   return result
@@ -61,7 +64,15 @@ async function run(admin: Admin, input: AutoLinkStepInput, env: Record<string, s
   const read = await readSiteMap(admin, { projectId, userId }, { entries: true })
   if (!read.available || !read.row) return { outcome: 'skipped', reason: 'no_map' }
   const row = read.row
-  if (row.status !== 'completed' && row.status !== 'partial') return { outcome: 'skipped', reason: 'no_map' }
+  // A FAILED run keeps the previous run's good entries (finishSiteMap), so
+  // rejecting it on status alone threw away usable pages and cost every article
+  // its links until the next successful mapping. A failed row is accepted only
+  // when it actually carries entries; freshness is still judged below, the same
+  // way, so nothing older than the window is ever used. A run still 'running'
+  // has nothing to offer yet.
+  const usableStatus = row.status === 'completed' || row.status === 'partial'
+    || (row.status === 'failed' && (row.entries?.length ?? 0) > 0)
+  if (!usableStatus) return { outcome: 'skipped', reason: 'no_map' }
   const finished = row.finished_at ? Date.parse(row.finished_at) : NaN
   if (!Number.isFinite(finished) || now.getTime() - finished > AUTO_LINK_MAP_MAX_AGE_MS) return { outcome: 'skipped', reason: 'stale_map' }
 
@@ -82,7 +93,7 @@ async function run(admin: Admin, input: AutoLinkStepInput, env: Record<string, s
   }
 
   const articleIn = { title: String(article.title ?? ''), slug: article.slug, primaryKeyword, secondaryKeywords, html: article.content_html, language }
-  const candidates = autoLinkCandidates(row.entries, { host }, articleIn)
+  const candidates = autoLinkCandidates(row.entries, { host, allowHttp: /^http:\/\//i.test(row.site_url || '') }, articleIn)
   if (!candidates.length) return { outcome: 'skipped', reason: 'no_candidates' }
   const chosen = selectAutoLinks(articleIn, candidates)
   if (!chosen.links.length) return { outcome: 'skipped', reason: 'none_relevant' }
