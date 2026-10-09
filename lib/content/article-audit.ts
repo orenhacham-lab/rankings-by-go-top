@@ -300,6 +300,28 @@ const QUESTION_WORDS_HE = ['מה ', 'מהו', 'מהי', 'איך', 'כיצד', '�
 const QUESTION_WORDS_ES = ['qué ', 'que ', 'cómo ', 'como ', 'cuánto', 'cuanto', 'por qué', 'por que', 'cuál', 'cual', 'cuándo', 'cuando', 'dónde', 'donde', 'quién', 'quien', 'es ', 'son ', 'conviene', 'debo ', 'hay que', '¿']
 const QUESTION_WORDS_EN = ['how ', 'what ', 'why ', 'when ', 'which ', 'where ', 'who ', 'is ', 'are ', 'should ', 'can ', 'do ']
 const QUESTION_WORDS: Record<SuggestionLanguage, string[]> = { he: QUESTION_WORDS_HE, en: QUESTION_WORDS_EN, es: QUESTION_WORDS_ES }
+
+/**
+ * E-E-A-T, the part a generated article can honestly carry: something the
+ * READER can check, ask for or compare for themselves. Google's "Experience"
+ * dimension is first-hand usefulness, and the one thing an article about a
+ * trade can always give without inventing a fact is what to verify before
+ * deciding. The audit looked only at structure (lists, tables, FAQ), so an
+ * article could be perfectly shaped and still tell the reader nothing to do.
+ *
+ * Imperative and infinitive forms only — a noun like "בדיקה" appears in
+ * ordinary prose and would pass the check without giving the reader anything.
+ */
+const VERIFY_CUES_HE = ['בדקו', 'לבדוק', 'תבדקו', 'שאלו', 'לשאול', 'תשאלו', 'בקשו', 'לבקש', 'תבקשו', 'השוו', 'להשוות', 'ודאו', 'לוודא', 'דרשו', 'לדרוש']
+const VERIFY_CUES_EN = ['check ', 'check the', 'ask for', 'ask the', 'ask your', 'compare ', 'make sure', 'verify ', 'request ', 'confirm ', 'look for']
+const VERIFY_CUES_ES = ['comprueba', 'compruebe', 'verifica', 'verifique', 'pregunta', 'pregunte', 'compara', 'compare ', 'asegúrate', 'asegúrese', 'solicita', 'solicite', 'confirma', 'fíjate']
+const VERIFY_CUES: Record<SuggestionLanguage, string[]> = { he: VERIFY_CUES_HE, en: VERIFY_CUES_EN, es: VERIFY_CUES_ES }
+
+/** How many of the cues the body uses, counted once per cue. */
+export function readerVerifyCount(bodyText: string, lang: SuggestionLanguage): number {
+  const hay = bodyText.toLowerCase()
+  return VERIFY_CUES[lang].filter((w) => hay.includes(w)).length
+}
 function looksLikeQuestion(text: string, lang: SuggestionLanguage): boolean {
   const t = (text || '').trim().toLowerCase()
   if (!t) return false
@@ -466,6 +488,9 @@ export function runArticleAudit(input: AuditInput): AuditResult {
   // direct answer early + entities/practicality are approximated by structure.
   add('has_early_answer', 'geo', 'warning', pCount > 0 && words(paras[0]).length >= 20)
   add('not_generic', 'geo', 'info', tables >= 1 || lists >= 1 || faqCount >= 2 || h3 >= 1)
+  // E-E-A-T: the article has to give the reader something to check, ask for or
+  // compare themselves — a warning, so the repair attempt gets a chance at it.
+  add('reader_can_verify', 'geo', 'warning', readerVerifyCount(bodyText, lang) >= 2)
 
   // --- language ---
   // The article must actually be written in its own script. Hebrew content is

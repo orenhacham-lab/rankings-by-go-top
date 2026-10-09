@@ -361,6 +361,7 @@ export const dashboardEs: DeepPartial<DashboardDictionary> = {
         has_table: 'El artículo no tiene ninguna tabla',
         faq_present: 'El artículo no tiene preguntas frecuentes',
         not_generic: 'El artículo es demasiado genérico: sin listas, tablas ni preguntas',
+        reader_can_verify: 'No se le da al lector nada que comprobar por su cuenta antes de decidir',
         table_structure_valid: 'La tabla no es una tabla válida (hacen falta 2 columnas y 2 filas como mínimo)',
         table_recommended: 'Este tema encaja con una tabla comparativa o de precios: añade una tabla real',
         too_short: 'El artículo es demasiado corto',

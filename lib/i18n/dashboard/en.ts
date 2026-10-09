@@ -2316,6 +2316,7 @@ export const dashboardEn = {
         has_table: 'The article has no table',
         faq_present: 'The article has no FAQ',
         not_generic: 'The article is too generic: no list, table or questions',
+        reader_can_verify: 'The reader is given nothing to check for themselves before deciding',
         table_structure_valid: 'Table is not a valid table (needs ≥2 columns and ≥2 rows)',
         table_recommended: 'This topic suits a comparison/price table — add a real table',
         too_short: 'Article is too short',

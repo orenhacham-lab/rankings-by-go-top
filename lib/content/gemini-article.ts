@@ -100,7 +100,8 @@ export function articleModel(): { model: string; fellBack: boolean } {
 
 interface GenOpts { repairFailures?: string[] }
 
-const FAILURE_HINT: Record<string, string> = {
+/** Exported for the quality guard: lib/content/__qa__/article-reader-verify.qa.ts. */
+export const FAILURE_HINT: Record<string, string> = {
   primary_keyword_in_title: 'include the primary keyword naturally in the title AND the metaTitle',
   meta_description_exists: 'write a metaDescription of 120-160 characters that includes the primary keyword',
   too_few_h2: 'add more distinct <h2> sections',
@@ -131,6 +132,7 @@ const FAILURE_HINT: Record<string, string> = {
   markdown_artifacts_absent: 'do NOT use any Markdown (**bold**, ## headings, [text](url), backticks) — plain text only',
   has_early_answer: 'add a clear direct answer in the first paragraph',
   not_generic: 'add practical value: examples, common mistakes, a checklist, or decision criteria',
+  reader_can_verify: 'give the reader concrete things to CHECK, ASK FOR or COMPARE before deciding (what to look for, what to request, what to compare) — imperative, specific, and never an invented fact',
   anchor_too_early: 'move the required link OUT of the direct answer / first paragraph — place it only after the article has established context',
   anchor_spacing_too_close: 'spread the links across different sections (>=2 paragraphs apart), never two in the same paragraph',
   anchor_inserted_mechanically: 'integrate each link into a genuinely relevant sentence — no "read more", "click here", "אתר כמו", "למידע נוסף"',
@@ -269,6 +271,7 @@ export function buildPrompt(brief: ArticleBrief, opts: GenOpts): string {
     `- Use natural transition words (${TRANSITION_HINT[brief.language]}).`,
     `- Do not start many sentences with the same word.`,
     `- Relevant entities; practical specifics. Include at least 3 of: examples, common mistakes, a checklist, comparison, tips by situation, budget/price considerations, steps, when-to / when-not-to, what to check before deciding.`,
+    `- EXPERIENCE (E-E-A-T): the reader must come away with things to CHECK, ASK FOR or COMPARE themselves before they decide — what to look for, what to request from a supplier, what to compare between two options. Write them as imperatives in a list or a short paragraph, grounded in how this field actually works; never invent a fact, a price, a standard or a law to make one.`,
     `- For any list-worthy section (tips, common mistakes, a checklist, steps, how-to-choose, what-to-check, pros/cons), put the items in the section's "bullets" array — NOT as dash lines inside a paragraph. At least one real list in the article.`,
     `- Weave the most important user questions into the BODY as <h2>/<h3> question-style section headings where natural — do NOT leave all questions only for the FAQ section at the end.`,
     `- FAQ section (end of article): ${th.minFaq}-${th.minFaq + 2} concise pairs; real, specific questions (no generic filler like "what is X?"); answers 40-90 words; never repeat earlier paragraphs word-for-word.`,
