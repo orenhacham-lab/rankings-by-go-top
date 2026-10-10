@@ -271,6 +271,11 @@ check('MUTATION — an English-only extra section is caught', pages.he.terms.h2 
     'www.w3.org': 'XML and sitemap namespaces written into markup; not fetched',
     'llmstxt.org': 'the llms.txt specification, named in generated files; not fetched',
     'developers.google.com': 'a documentation link shown to the owner',
+    // When Creem actually becomes a payment provider, api.creem.io appears in
+    // shipped code and this guard will demand that both privacy policies name
+    // Creem before that can merge. That is the intended order: the disclosure
+    // lands with the integration, not after it.
+    'docs.creem.io': 'a documentation link cited in a code comment; not fetched',
     'help.shopify.com': 'a documentation link shown to a merchant',
     'search.google.com': 'a link a customer clicks to their own Search Console',
     'google.com': 'the search engine whose public results are read, with no customer data attached',
