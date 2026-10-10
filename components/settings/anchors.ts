@@ -14,6 +14,8 @@ export const SECTION = {
   articleDesign: 'article-design',
   officialProfiles: 'official-profiles',
   connections: 'connections',
+  /** The connections not made yet, at the top of the screen (lib/project-settings/connect-first.ts). */
+  connectFirst: 'connect-first',
   siteAutoFix: 'site-auto-fix',
   googleAds: 'google-ads',
   danger: 'danger',

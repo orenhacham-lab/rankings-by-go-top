@@ -77,7 +77,9 @@ export default function StartHere({ t, steps, domain, hrefs, mapping, locale }: 
 
       <ol className={cn('grid gap-px bg-line', steps.length === 3 ? 'lg:grid-cols-3' : steps.length === 2 ? 'md:grid-cols-2' : '')}>
         {steps.map((step, i) => (
-          <li key={step.key} className="bg-surface">
+          // The step the main button is for stands out from the others: an action-coloured
+          // frame and "Next step", so "what do I do now" has one answer (owner's report, 10 October 2026).
+          <li key={step.key} className={cn('bg-surface', next?.key === step.key && 'relative z-[1] ring-2 ring-inset ring-action/45')} data-start-next={next?.key === step.key ? '' : undefined}>
             <Reveal index={i} data-start-step={step.key} data-state={step.state} className="flex h-full flex-col gap-3 p-5 sm:p-6">
               <StepBody t={t} step={step} n={i + 1} primary={next?.key === step.key} hrefs={hrefs} mapping={mapping} locale={locale} />
             </Reveal>
@@ -120,6 +122,7 @@ function StepBody({ t, step, n, primary, hrefs, mapping, locale }: {
         </div>
         {step.state === 'done' && <span className="ms-auto shrink-0 rounded-pill bg-ok-soft px-2.5 py-0.5 text-caption font-semibold text-ok">{t.done}</span>}
         {running && <span className="ms-auto shrink-0 rounded-pill bg-action-soft px-2.5 py-0.5 text-caption font-semibold text-action">{t.running}</span>}
+        {primary && step.state === 'open' && <span className="ms-auto shrink-0 rounded-pill bg-action px-2.5 py-0.5 text-caption font-semibold text-action-ink">{t.next}</span>}
       </div>
 
       <p className="text-copy text-body text-pretty" aria-live={isScan ? 'polite' : undefined}>

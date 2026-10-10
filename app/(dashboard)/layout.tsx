@@ -6,6 +6,7 @@ import WorkspaceSwitcher from '@/components/layout/WorkspaceSwitcher'
 import GuideMenu from '@/components/guide/GuideMenu'
 import ContactMenu from '@/components/guide/ContactMenu'
 import DemoFloatApp from '@/components/guide/DemoFloatApp'
+import ConnectSiteBanner from '@/components/layout/ConnectSiteBanner'
 import SignupConversionReporter from '@/components/analytics/SignupConversionReporter'
 import TopBarActions from '@/components/layout/TopBarActions'
 import TrialBar from '@/components/layout/TrialBar'
@@ -131,7 +132,11 @@ export default async function DashboardLayout({
                 <Suspense fallback={null}>
                   <TrialBarSlot userId={user.id} />
                 </Suspense>
-                <div id={MAIN_CONTENT_ID} tabIndex={-1} className="mx-auto w-full max-w-[1280px] min-w-0 px-4 py-6 focus:outline-none md:px-8 md:py-8">{children}</div>
+                <div id={MAIN_CONTENT_ID} tabIndex={-1} className="mx-auto w-full max-w-[1280px] min-w-0 px-4 py-6 focus:outline-none md:px-8 md:py-8">
+                  {/* Until the project's site is connected, every screen of it says so first. */}
+                  <ConnectSiteBanner />
+                  {children}
+                </div>
               </DashboardDirectionWrapper>
             </main>
           </div>

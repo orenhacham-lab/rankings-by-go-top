@@ -286,6 +286,11 @@ export const dashboardEn = {
     saved: 'Saved',
     connectionsTitle: 'Connections',
     connectionsBody: 'The site platform articles publish to, and Search Console for real search data.',
+    // Connections not set up yet lead the screen (owner's report, 10 October 2026).
+    connectFirst: {
+      title: 'Start by connecting',
+      body: 'Whatever is not connected yet shows here, at the top of the page. Once it is connected it moves to its usual place, under "Connections".',
+    },
     // The sections the site scan fills (W5): each card saves on its own, a
     // field the scan filled carries a "from the scan" chip until the owner
     // edits it, and "detect again with AI" only ever suggests.
@@ -6227,6 +6232,13 @@ export const dashboardEn = {
     stepLabel: (n: number) => `Step ${n}`,
     done: 'Done',
     running: 'Running now',
+    // The step the card's main button is for (owner's report, 10 October 2026).
+    next: 'Next step',
+    // On every screen of a project whose site is not connected yet (components/layout/ConnectSiteBanner.tsx).
+    connectBanner: {
+      title: 'Your site isn\'t connected yet',
+      body: 'This is the first step. Until the site is connected you can research and write, but articles can\'t be published to it. You only connect it once.',
+    },
     steps: {
       scan: {
         title: 'Scan your site',
