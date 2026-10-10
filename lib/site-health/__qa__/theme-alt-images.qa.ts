@@ -376,10 +376,12 @@ async function main() {
     check('G1: the theme\'s line has its "fix it for me" when the Media Library holds those images', /data-fix-button="image_alt_media"/.test(render(theme)) && render(theme).includes(he.themeAltMedia))
     check('G2: none without it, and "fixed" once done', !/data-fix-button="image_alt_media"/.test(render(null)) && /data-theme-alt-fix="applied"/.test(render(theme, 'applied')))
     const screen = strip(read('components/site-health/SiteHealthScreen.tsx'))
-    const gate = /if \(finding\.fixType === 'image_alt' && page\.media\) return !caps\.shopify && caps\.appPassword \? 'fix' : null/
-    check('G3: a Media Library row is fixable only with the application password, never on a store', gate.test(screen))
-    check('MUTATION CONTROL: G3 fails on a screen that offers it without the application password', !gate.test(screen.replace('&& caps.appPassword ', '')))
-    check('G4: the theme\'s line needs the application password and a WordPress site too', /caps\.shopify \|\| !caps\.appPassword/.test(screen))
+    // 3.1.0: the GO TOP plugin writes Media Library alt text too (caps.mediaAlt, lib/site-fix/channel.ts); an
+    // answer from before it has no mediaAlt and falls back to the application password.
+    const gate = /if \(finding\.fixType === 'image_alt' && page\.media\) return !caps\.shopify && \(caps\.mediaAlt \?\? caps\.appPassword\) \? 'fix' : null/
+    check('G3: a Media Library row is fixable only where the Media Library can be written (plugin 3.1 or the application password), never on a store', gate.test(screen))
+    check('MUTATION CONTROL: G3 fails on a screen that offers it with no way to write it', !gate.test(screen.replace('&& (caps.mediaAlt ?? caps.appPassword) ', '')))
+    check('G4: the theme\'s line needs the same and a WordPress site too', /caps\.shopify \|\| !\(caps\.mediaAlt \?\? caps\.appPassword\)/.test(screen))
     const modal = strip(read('components/site-health/ApproveFixModal.tsx'))
     check('G5: the approve window asks for the Media Library on such a row, keeps each item\'s id and sends via "media"',
       /type === 'image_alt' && page\.media \? \{ media: true \}/.test(modal) && /media: i\.media/.test(modal) && /p\.via === 'media'/.test(modal))

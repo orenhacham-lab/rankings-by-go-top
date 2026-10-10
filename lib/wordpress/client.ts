@@ -818,19 +818,20 @@ async function rawJsonArray(origin: string, path: string, authHeader?: string): 
   }
 }
 
-export async function discoverStoreEntities(creds: WordPressCredentials): Promise<StoreDiscoveryResult> {
+export async function discoverStoreEntities(creds: WordPressCredentials | { siteUrl: string }): Promise<StoreDiscoveryResult> {
   const origin = await assertSafeSiteUrl(creds.siteUrl).catch(() => null)
   if (!origin) return { products: [], categories: [], source: 'none', lastHttpStatus: null }
-  const auth = buildAuthHeader(creds)
+  // Without an application password (a site connected by the GO TOP plugin only) the public tries alone.
+  const auth = 'applicationPassword' in creds ? buildAuthHeader(creds) : undefined
   let lastStatus: number | null = null
 
   // 1+2) Store API — resolve a WORKING (namespace, auth) variant on products
   // page 1, then reuse it for pagination + categories.
   const variants: { ns: string; source: 'store_api' | 'store_api_legacy'; authHeader?: string }[] = [
     { ns: '/wp-json/wc/store/v1', source: 'store_api' },
-    { ns: '/wp-json/wc/store/v1', source: 'store_api', authHeader: auth },
+    ...(auth ? [{ ns: '/wp-json/wc/store/v1', source: 'store_api' as const, authHeader: auth }] : []),
     { ns: '/wp-json/wc/store', source: 'store_api_legacy' },
-    { ns: '/wp-json/wc/store', source: 'store_api_legacy', authHeader: auth },
+    ...(auth ? [{ ns: '/wp-json/wc/store', source: 'store_api_legacy' as const, authHeader: auth }] : []),
   ]
   for (const v of variants) {
     const first = await rawJsonArray(origin, `${v.ns}/products?per_page=100&page=1&orderby=popularity`, v.authHeader)
@@ -847,7 +848,7 @@ export async function discoverStoreEntities(creds: WordPressCredentials): Promis
   }
 
   // 3) Core REST product CPT fallback (title.rendered + link).
-  for (const authHeader of [undefined, auth]) {
+  for (const authHeader of auth ? [undefined, auth] : [undefined]) {
     const res = await rawJsonArray(origin, `/wp-json/wp/v2/product?per_page=50&_fields=title,link`, authHeader)
     if (res.status) lastStatus = res.status
     if (res.rows === null) continue

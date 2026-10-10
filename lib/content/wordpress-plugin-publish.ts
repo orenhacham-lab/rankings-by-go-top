@@ -19,20 +19,27 @@
  *   schema          the existing /fix schema_jsonld step (publishArticleSchemaToWordPress)
  *   SEO meta        /fix seo_title, meta_description, focus_keyphrase (publishArticleSeoViaPlugin)
  *
- * A POST MADE OVER THE APPLICATION PASSWORD BEFORE. The plugin does not know it (no
- * _gotop_article_id), so an update of it is refused with not_ours BEFORE anything is written. Then
- * the application password is used when the project still has one; otherwise the update fails
- * with a code, and no second post is ever created for the article.
+ * A POST MADE OVER THE APPLICATION PASSWORD BEFORE. 3.0.0 does not know it (no
+ * _gotop_article_id), so an update of it is refused with not_ours BEFORE anything is written.
+ * 3.1.0 takes it over (`adopt`), but ONLY the post the app recorded for this same article
+ * (generated_articles.wp_post_id, sent as post_id), only a post no other article owns, never a
+ * page. When the plugin still refuses, the application password is used when the project has one;
+ * otherwise the update fails with a code, and no second post is ever created for the article.
  *
  * ONE POST PER ARTICLE. The plugin keeps one post per GO TOP article, so a retry after a crash
- * before wp_post_id was saved updates the same post instead of creating a duplicate. The plugin
- * therefore cannot do what the application password can do in two cases, and NEVER quietly does
- * something else instead (publishArticleToWordPress):
- *   forceNew   a NEW separate post for an article already sent (the route's legacy `force`)
- *   a status   other than publish / draft (the plugin never schedules)
- * Both use the application password when the project still has one; plugin-only, they fail with a
- * typed code (`unsupported`: plugin_new_post_unsupported / plugin_schedule_unsupported) that the UI
- * words in every language, and nothing is written.
+ * before wp_post_id was saved updates the same post instead of creating a duplicate. Three requests
+ * need plugin 3.1.0 (lib/site-fix/plugin-capabilities.ts), and are NEVER quietly turned into
+ * something else (publishArticleToWordPress):
+ *   forceNew     a NEW separate post for an article already sent (the route's legacy `force`):
+ *                3.1.0 new_post; 3.0.0 uses the application password when the project has one,
+ *                else plugin_new_post_unsupported
+ *   scheduleAt   a post that goes live at a set time (status future + date_gmt): 3.1.0 only. The
+ *                application password never scheduled (wpCreatePost sends publish or draft), so
+ *                anything else is plugin_schedule_unsupported
+ *   authorId     the WordPress user the post is published as (3.1.0 checks they may publish posts):
+ *                3.1.0 only, else plugin_author_unsupported
+ * A refusal is a typed code (`unsupported`) the UI words in every language, and nothing is written.
+ * A stored version older than 3.1.0 is checked again with one signed /status first.
  *
  * The service role bypasses RLS: the plugin link is read by project AND its owner, and a caller
  * that knows the signed-in user passes it so a mismatch reads as "no plugin".
@@ -43,8 +50,9 @@ import type { WordPressCredentials } from '@/lib/wordpress/types'
 import type { WordPressErrorMeta, WordPressPostStatus } from '@/lib/wordpress/client'
 import { loadWordPressCredentials } from '@/lib/content/api-auth'
 import { decryptCredential } from '@/lib/security/credentials-crypto'
-import { readPluginLink } from '@/lib/site-fix/store'
+import type { Scope } from '@/lib/site-fix/store'
 import { versionAtLeast } from '@/lib/site-fix/types'
+import { loadConnectedPlugin, pluginCan, refreshedPlugin, type PluginCapability } from '@/lib/site-fix/plugin-capabilities'
 import {
   pluginFix, pluginMedia, pluginPublish, pluginTerms,
   type PluginAnswer, type PluginLink, type PluginPost, type PluginPublishRequest,
@@ -66,6 +74,8 @@ export interface PublishPlugin {
   link: PluginLink
   version: string
   seoPlugin: 'yoast' | 'rankmath' | 'none' | null
+  /** The link's project and owner (to store a newer version after /status). */
+  scope?: Scope
 }
 
 export interface PluginPublishDeps {
@@ -83,19 +93,9 @@ export interface PluginPublishDeps {
 export async function loadPublishPlugin(
   admin: Admin, projectId: string, opts: { ownerId?: string | null; decrypt?: (s: string) => string } = {},
 ): Promise<PublishPlugin | null> {
-  try {
-    const { data: proj } = await admin.from('projects').select('id, user_id').eq('id', projectId).maybeSingle()
-    const owner = (proj as { user_id?: string | null } | null)?.user_id ?? null
-    if (!owner) return null
-    if (opts.ownerId !== undefined && opts.ownerId !== owner) return null
-    const row = await readPluginLink(admin, { projectId, userId: owner })
-    if (!row || row.status !== 'connected' || !row.plugin_version) return null
-    if (!versionAtLeast(row.plugin_version, PUBLISH_PLUGIN_MIN_VERSION)) return null
-    const secret = (opts.decrypt ?? decryptCredential)(row.secret_encrypted)
-    return { link: { siteUrl: row.site_url, keyId: row.key_id, secret }, version: row.plugin_version, seoPlugin: row.seo_plugin ?? null }
-  } catch {
-    return null
-  }
+  const plugin = await loadConnectedPlugin(admin, projectId, opts)
+  if (!plugin || !versionAtLeast(plugin.version, PUBLISH_PLUGIN_MIN_VERSION)) return null
+  return plugin
 }
 
 /** How this project publishes to WordPress. */
@@ -193,13 +193,23 @@ export async function pluginCreatePost(
   admin: Admin,
   plugin: PublishPlugin,
   article: WpArticleForExport,
-  opts: { status: WordPressPostStatus; blockOnImageFailure?: boolean; existing?: { postId: number; featuredMediaId?: number | null } },
+  opts: {
+    status: WordPressPostStatus
+    blockOnImageFailure?: boolean
+    existing?: { postId: number; featuredMediaId?: number | null }
+    /** 3.1.0 (the caller checked the plugin can): see PublishOptions. */
+    scheduleAt?: string
+    forceNew?: boolean
+    authorId?: number
+  },
   deps: PluginPublishDeps = {},
 ): Promise<WpCreateResult | (WpCreateError & { pluginCode?: string })> {
   const link = plugin.link
   const status = opts.status
-  // The plugin publishes or drafts; it never schedules.
+  // The plugin publishes or drafts (3.1.0 also schedules, below); any other status is refused.
   if (status !== 'publish' && status !== 'draft') return { ok: false, kind: 'post_failed', detail: 'plugin_status_unsupported', stage: 'post_creation' }
+  const dateGmt = opts.scheduleAt !== undefined ? gmtDate(opts.scheduleAt) : null
+  if (opts.scheduleAt !== undefined && (!dateGmt || status !== 'publish')) return { ok: false, kind: 'post_failed', detail: 'plugin_schedule_invalid', stage: 'post_creation' }
   const articleId = typeof article.id === 'string' ? article.id.toLowerCase() : ''
   if (!UUID.test(articleId)) return { ok: false, kind: 'post_failed', detail: 'plugin_needs_article_id', stage: 'post_creation' }
   const block = opts.blockOnImageFailure ?? status === 'publish'
@@ -248,16 +258,22 @@ export async function pluginCreatePost(
   }
 
   const excerpt = pluginText(article.excerpt || article.meta_description || '', 1000)
+  const adopt = !!opts.existing && pluginCan(plugin.version, 'adopt')
   const req: PluginPublishRequest = {
     article_id: articleId,
     title,
     content,
-    status,
+    status: dateGmt ? 'future' : status,
+    ...(dateGmt ? { date_gmt: dateGmt } : {}),
+    ...(opts.forceNew && !opts.existing ? { new_post: true } : {}),
+    ...(typeof opts.authorId === 'number' ? { author_id: opts.authorId } : {}),
     slug,
     ...(excerpt ? { excerpt } : {}),
     ...(taxonomy && taxonomy.hasSelection ? { categories: taxonomy.categories, tags: taxonomy.tags } : {}),
     ...(typeof featuredMedia === 'number' ? { featured_media: featuredMedia } : {}),
     ...(opts.existing ? { post_id: opts.existing.postId } : {}),
+    // Only the post the app recorded for THIS article (existing), never any other.
+    ...(adopt ? { adopt: true } : {}),
   }
   const answer = await pluginPublish(link, req, deps.post)
   if (!answer.ok) return failure('post_failed', 'post_creation', answer)
@@ -281,7 +297,7 @@ export async function pluginCreatePost(
   }
 }
 
-export type PluginUnsupported = 'plugin_new_post_unsupported' | 'plugin_schedule_unsupported'
+export type PluginUnsupported = 'plugin_new_post_unsupported' | 'plugin_schedule_unsupported' | 'plugin_author_unsupported'
 
 export interface PublishOptions {
   status: WordPressPostStatus
@@ -289,11 +305,33 @@ export interface PublishOptions {
   existing?: { postId: number; featuredMediaId?: number | null }
   /** A NEW separate post although the article was sent before (the route's `force`). */
   forceNew?: boolean
+  /** An ISO time (with its zone) the post goes live at; with status publish. Plugin 3.1.0 only. */
+  scheduleAt?: string
+  /** The WordPress user the post is published as. Plugin 3.1.0 only (it checks publish_posts). */
+  authorId?: number
 }
 
-/** What the request needs that the plugin cannot do (one post per article; publish or draft only). */
-export function pluginUnsupported(opts: PublishOptions): PluginUnsupported | null {
-  if (opts.forceNew) return 'plugin_new_post_unsupported'
+/** 'YYYY-MM-DD HH:MM:SS' UTC of an ISO time that carries its zone, or null. */
+export function gmtDate(iso: string): string | null {
+  if (typeof iso !== 'string' || !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(:\d{2}(\.\d{1,6})?)?(Z|[+-]\d{2}:\d{2})$/.test(iso)) return null
+  const t = Date.parse(iso)
+  return Number.isFinite(t) ? new Date(t).toISOString().slice(0, 19).replace('T', ' ') : null
+}
+
+/** The 3.1.0 capabilities a request needs (none: 3.0.0 does it). */
+export function capabilitiesNeeded(opts: PublishOptions): PluginCapability[] {
+  const caps: PluginCapability[] = []
+  if (opts.forceNew) caps.push('new_post')
+  if (opts.scheduleAt !== undefined) caps.push('schedule')
+  if (opts.authorId !== undefined) caps.push('author')
+  return caps
+}
+
+/** What the request needs that this plugin version cannot do; null when it can do all of it. */
+export function pluginUnsupported(opts: PublishOptions, version: string | null = null): PluginUnsupported | null {
+  if (opts.scheduleAt !== undefined && !pluginCan(version, 'schedule')) return 'plugin_schedule_unsupported'
+  if (opts.authorId !== undefined && !pluginCan(version, 'author')) return 'plugin_author_unsupported'
+  if (opts.forceNew && !pluginCan(version, 'new_post')) return 'plugin_new_post_unsupported'
   const status: string = opts.status
   if (status !== 'publish' && status !== 'draft') return 'plugin_schedule_unsupported'
   return null
@@ -311,25 +349,40 @@ export async function publishArticleToWordPress(
   deps: PluginPublishDeps = {},
 ): Promise<(WpCreateResult & { via: 'plugin' | 'app_password' }) | (WpCreateError & { unsupported?: PluginUnsupported })> {
   const viaAppPassword = deps.appPassword ?? wpCreatePost
-  const { forceNew: _forceNew, ...wpOpts } = opts
-  void _forceNew
+  const { forceNew: _forceNew, scheduleAt: _at, authorId: _author, ...wpOpts } = opts
+  void _forceNew; void _at; void _author
+  const refuse = (unsupported: PluginUnsupported) => ({ ok: false as const, kind: 'post_failed' as const, stage: 'post_creation' as const, detail: unsupported, unsupported })
+  // The application password never scheduled or chose an author: only the plugin does (3.1.0).
+  const pluginOnly: PluginUnsupported | null = opts.scheduleAt !== undefined ? 'plugin_schedule_unsupported'
+    : opts.authorId !== undefined ? 'plugin_author_unsupported' : null
   if (publisher.via === 'app_password') {
+    if (pluginOnly) return refuse(pluginOnly)
     const r = await viaAppPassword(admin, publisher.creds, article, wpOpts)
     return r.ok ? { ...r, via: 'app_password' } : r
   }
-  // What only the application password can do: there, when the project has one; else a typed refusal.
-  const unsupported = pluginUnsupported(opts)
+  // A stored version older than 3.1.0 is asked again once, when the request needs 3.1.0.
+  let plugin = publisher.plugin
+  const needed = capabilitiesNeeded(opts)
+  if (opts.existing && !pluginCan(plugin.version, 'adopt')) needed.push('adopt')
+  if (needed.length > 0 && !needed.every((c) => pluginCan(plugin.version, c)) && plugin.scope) {
+    const fresh = await refreshedPlugin(admin, { ...plugin, scope: plugin.scope }, needed.find((c) => !pluginCan(plugin.version, c)) ?? needed[0], { post: deps.post })
+    if (fresh) plugin = fresh
+  }
+  // What this plugin cannot do: the application password as before (a second post on 3.0.0), unless the
+  // request needs what only the plugin does (a time, an author); else a typed refusal.
+  const unsupported = pluginUnsupported(opts, plugin.version)
   if (unsupported) {
-    if (publisher.creds) {
+    if (publisher.creds && !pluginOnly) {
       const r = await viaAppPassword(admin, publisher.creds, article, wpOpts)
       return r.ok ? { ...r, via: 'app_password' } : r
     }
-    return { ok: false, kind: 'post_failed', stage: 'post_creation', detail: unsupported, unsupported }
+    return refuse(unsupported)
   }
-  const r = await pluginCreatePost(admin, publisher.plugin, article, wpOpts, deps)
+  const r = await pluginCreatePost(admin, plugin, article, { ...wpOpts, scheduleAt: opts.scheduleAt, forceNew: opts.forceNew, authorId: opts.authorId }, deps)
   if (r.ok) return { ...r, via: 'plugin' }
   // The post was made over the application password before: the plugin refused before writing.
-  if (r.pluginCode === 'not_ours' && publisher.creds) {
+  // Never with a time or an author: the application password would publish without them.
+  if (r.pluginCode === 'not_ours' && publisher.creds && !pluginOnly) {
     const again = await viaAppPassword(admin, publisher.creds, article, wpOpts)
     return again.ok ? { ...again, via: 'app_password' } : again
   }

@@ -4,9 +4,11 @@
  * ORDER (the task's, and the order of trust in a list of URLs):
  *   1. the site's sitemaps (sitemap-walk.ts): the whole site, filed by type;
  *   2. the platform, where one is connected, through the code paths that exist
- *      already: WordPress's REST lists of posts and pages and its store lists
- *      (lib/wordpress/client.ts, read-only, with the stored application
- *      password). Shopify is NOT called here: its entities come from the
+ *      already: WordPress's lists of posts and pages, through the GO TOP SEO
+ *      Bridge plugin >= 3.1.0 when it is connected (its signed /content route)
+ *      or the WordPress REST API with the stored application password, and the
+ *      store's public lists (lib/content/wordpress-read-source.ts, read-only).
+ *      Shopify is NOT called here: its entities come from the
  *      existing sync (shopify_entities) and are merged when the screen reads,
  *      so no new scope or request is added to the Shopify app;
  *   3. Search Console's pages are merged when the screen reads, from the
@@ -24,7 +26,8 @@ import type { createAdminClient } from '@/lib/supabase/admin'
 import { domainKey, fetchSiteHtml, fetchSiteText, normalizeCheckUrl } from '@/lib/free-check'
 import { hostPinnedFetch } from '@/lib/seed-scan/site-access'
 import { loadWordPressCredentials } from '@/lib/content/api-auth'
-import { discoverStoreEntities, getPages, getPosts } from '@/lib/wordpress/client'
+import { credsReadSource, pluginReadSource, type WordPressReadSource } from '@/lib/content/wordpress-read-source'
+import { loadPluginFor } from '@/lib/site-fix/plugin-capabilities'
 import { countTabs, mergeSources, pageKey, sourceFromMap, type SiteMapEntry } from './model'
 import { MAP_LIMITS, walkSitemaps, type DocFetch, type RobotsFetch, type WalkResult } from './sitemap-walk'
 import { finishSiteMap, progressSiteMap } from './site-map-store'
@@ -80,22 +83,31 @@ export function liveWalk(origin: URL, onProgress: (p: { docsRead: number; docsSe
   return walkSitemaps(origin, { fetchDoc, fetchRobots, now: Date.now, onProgress }, { ...MAP_LIMITS, BUDGET_MS: budgetMs })
 }
 
-/** WordPress's own lists, read-only, through the existing client. */
-export function liveWordPress(admin: Admin, projectId: string, now: () => number) {
+/** WordPress's source: the plugin >= 3.1.0 (project AND owner), else the application password; null when neither. */
+async function wordPressSource(admin: Admin, projectId: string, ownerId: string | undefined, load: typeof loadPluginFor): Promise<WordPressReadSource | null> {
+  const plugin = await load(admin, projectId, 'content', ownerId !== undefined ? { ownerId } : {}).catch(() => null)
+  if (plugin) return pluginReadSource(plugin.link)
+  const wp = await loadWordPressCredentials(admin, projectId).catch(() => null)
+  if (!wp || 'error' in wp || wp.connection.connection_status === 'failed') return null
+  return credsReadSource(wp.creds)
+}
+
+/** WordPress's own lists, read-only, through the existing client (or the plugin's read routes). */
+export function liveWordPress(admin: Admin, projectId: string, now: () => number, ownerId?: string, load: typeof loadPluginFor = loadPluginFor) {
   return async (deadlineAt: number): Promise<SiteMapEntry[]> => {
-    const wp = await loadWordPressCredentials(admin, projectId).catch(() => null)
-    if (!wp || 'error' in wp || wp.connection.connection_status === 'failed') return []
+    const src = await wordPressSource(admin, projectId, ownerId, load)
+    if (!src) return []
     const out: SiteMapEntry[] = []
-    for (const [list, type] of [[getPosts, 'post'], [getPages, 'page']] as const) {
+    for (const [list, type] of [[src.getPosts, 'post'], [src.getPages, 'page']] as const) {
       for (let page = 1; page <= WP_MAX_REQUESTS && now() < deadlineAt; page++) {
-        const items = await list(wp.creds, { perPage: WP_PER_PAGE, page }).catch(() => null)
+        const items = await list({ perPage: WP_PER_PAGE, page }).catch(() => null)
         if (!items) break
         for (const it of items) if (it.link) out.push({ u: it.link, p: type, t: it.title || null, m: it.modified ?? null })
         if (items.length < WP_PER_PAGE) break
       }
     }
     if (now() < deadlineAt) {
-      const store = await discoverStoreEntities(wp.creds).catch(() => null)
+      const store = await src.discoverStoreEntities().catch(() => null)
       for (const e of store?.products ?? []) out.push({ u: e.link, p: 'product', t: e.name })
       for (const e of store?.categories ?? []) out.push({ u: e.link, p: 'product_cat', t: e.name })
     }

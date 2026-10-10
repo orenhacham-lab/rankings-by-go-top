@@ -364,7 +364,7 @@ async function main() {
         const script = join(dir, 'run.php')
         writeFileSync(script, `<?php define('ABSPATH', '/'); require $argv[1];
 $cases = json_decode(file_get_contents($argv[2]), true); $out = array();
-foreach ($cases as $c) { $r = gotop_seo_bridge_add_internal_link($c['content'], 'https://t.example/x', $c['anchor']);
+foreach ($cases as $c) { $r = \\GoTopSeoBridge\\gotop_seo_bridge_add_internal_link($c['content'], 'https://t.example/x', $c['anchor']);
   $out[] = $r === null ? null : substr($r, 0, strpos($r, '<a href="https://t.example/x">')); }
 echo json_encode($out);`)
         writeFileSync(join(dir, 'cases.json'), JSON.stringify(cases))

@@ -20,7 +20,7 @@ import { randomUUID } from 'crypto'
 import { authContentProject, isContentModuleEnabled } from '@/lib/content/api-auth'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { WordPressClientError, type WordPressPostStatus, type WordPressErrorMeta } from '@/lib/wordpress/client'
-import { loadWordPressPublisher, publishArticleToWordPress, publishSeoFor } from '@/lib/content/wordpress-plugin-publish'
+import { gmtDate, loadWordPressPublisher, publishArticleToWordPress, publishSeoFor } from '@/lib/content/wordpress-plugin-publish'
 import { ensureProjectKeywordFromPublishedArticle } from '@/lib/content/keyword-from-article'
 import { classifyWordPressError, hebrewMessageFor, httpStatusFor, safeRemoteDiagnostics, type WpFailureStage, type WpPublishErrorCode } from '@/lib/content/wordpress-error'
 import { currentGitSha, isPreviewEnv } from '@/lib/runtime-info'
@@ -187,7 +187,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
       throw new Error('forced diagnostic throw (preview)')
     }
 
-    let body: { status?: string; force?: boolean; update?: boolean; unpublish?: boolean }
+    let body: { status?: string; force?: boolean; update?: boolean; unpublish?: boolean; scheduled_at?: unknown; author_id?: unknown }
     try {
       body = await request.json()
     } catch {
@@ -199,6 +199,23 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
       return Response.json({ error: 'invalid_status', reason: 'invalid_status' }, { status: 400 })
     }
     const status: WordPressPostStatus = raw
+    // Plugin 3.1.0 (lib/content/wordpress-plugin-publish.ts): a time to go live (with publish) and the
+    // WordPress author, each checked here for shape and again by the plugin (a future time; a user
+    // who may publish posts).
+    let scheduleAt: string | undefined
+    if (body.scheduled_at !== undefined && body.scheduled_at !== null) {
+      if (status !== 'publish' || typeof body.scheduled_at !== 'string' || !gmtDate(body.scheduled_at)) {
+        return Response.json({ error: 'invalid_schedule', reason: 'invalid_schedule' }, { status: 400 })
+      }
+      scheduleAt = body.scheduled_at
+    }
+    let authorId: number | undefined
+    if (body.author_id !== undefined && body.author_id !== null) {
+      if (typeof body.author_id !== 'number' || !Number.isInteger(body.author_id) || body.author_id <= 0 || body.author_id > 2_147_483_647) {
+        return Response.json({ error: 'invalid_author', reason: 'invalid_author' }, { status: 400 })
+      }
+      authorId = body.author_id
+    }
     const force = body.force === true
     const wantUpdate = body.update === true
     postStatusForLog = status
@@ -299,9 +316,13 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     // post). `existing` → update the same post in place (idempotent re-export).
     stage = 'post_creation'
     logStage('wp_create_post_started')
-    // forceNew: a NEW post for an article already sent. The plugin keeps one post per article, so a
-    // plugin-only project gets a typed refusal (worded by the UI), never a silent update instead.
-    const created = await publishArticleToWordPress(auth.admin, loaded, a as never, { status, existing, forceNew: force && !!a.wp_post_id })
+    // forceNew: a NEW post for an article already sent (plugin 3.1.0 new_post; 3.0.0 only over the
+    // application password). Scheduling and an author need plugin 3.1.0. Anything the connection
+    // cannot do is a typed refusal (worded by the UI), never a silent something-else.
+    const created = await publishArticleToWordPress(auth.admin, loaded, a as never, {
+      status, existing, forceNew: force && !!a.wp_post_id,
+      ...(scheduleAt ? { scheduleAt } : {}), ...(authorId !== undefined ? { authorId } : {}),
+    })
     if (!created.ok && created.unsupported) {
       console.warn('[content-wp-export] plugin cannot do this', { ...logBase, reason: created.unsupported })
       return Response.json({ ok: false, error: created.unsupported, reason: created.unsupported, diagnosticId }, { status: 409 })
@@ -355,7 +376,9 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     updated_at: new Date().toISOString(),
   }
   if (typeof featuredMedia === 'number') update.wp_featured_media_id = featuredMedia
-  if (status === 'publish') { update.status = 'published'; update.published_at = new Date().toISOString() }
+  // A post scheduled in WordPress (plugin 3.1.0) is not live yet: like a draft, the local status stays.
+  const goesLive = status === 'publish' && !scheduleAt
+  if (goesLive) { update.status = 'published'; update.published_at = new Date().toISOString() }
   stage = 'local_status_update'
   logStage('local_status_update_started')
   await auth.admin.from('generated_articles').update(update).eq('id', id)
@@ -365,7 +388,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   // mark that queue item published so it leaves the actionable queue. Matched EXACTLY
   // by article_id (each pool item points at one article), so unrelated/future items
   // for the same topic are never touched. Best-effort; never fails the export.
-  if (status === 'publish') {
+  if (goesLive) {
     try {
       await auth.admin.from('article_pool_items')
         .update({ status: 'published', published_at: new Date().toISOString(), last_error: null, locked_at: null, updated_at: new Date().toISOString() })
@@ -382,7 +405,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   // or blocks the publish.
   let keywordAdded = false
   let keywordAddedText: string | null = null
-  if (status === 'publish') {
+  if (goesLive) {
     const kw = await ensureProjectKeywordFromPublishedArticle(auth.admin, id)
     keywordAdded = kw.added
     keywordAddedText = kw.added ? (kw.keyword ?? null) : null
@@ -395,7 +418,8 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     wp_post_id: created.wpPostId,
     wp_post_url: created.wpPostUrl,
     wp_featured_media_id: featuredMedia ?? null,
-    wp_status: status,
+    wp_status: scheduleAt ? 'future' : status,
+    ...(scheduleAt ? { scheduled_at: scheduleAt } : {}),
     updated: created.updated ?? false,
     imageWarning: created.imageWarning,
     // Phase 4E — taxonomy + SEO outcome (never a silent partial success).

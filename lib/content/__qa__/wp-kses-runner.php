@@ -15,14 +15,14 @@
  * as sent, so the caller compares against the body itself.
  */
 $root = rtrim($argv[1], '/');
-$plugin = rtrim($argv[2], '/');
+$gotop_qa_plugin_dir = rtrim($argv[2], "/"); // not $plugin: wp-settings.php reuses that name while it loads plugins
 $bodies = json_decode(file_get_contents($argv[3]), true);
 define('WP_USE_THEMES', false);
 require $root . '/wp-load.php';
 wp_set_current_user(0);
 // 3.1.0 keeps its functions in the GoTopSeoBridge namespace; read the given copy's publish.php
 // unless WordPress already loaded it (an active copy of the plugin).
-if (!function_exists('GoTopSeoBridge\\gotop_seo_bridge_drop_code_blocks')) { require $plugin . '/includes/publish.php'; }
+if (!function_exists('GoTopSeoBridge\\gotop_seo_bridge_drop_code_blocks')) { require $gotop_qa_plugin_dir . "/includes/publish.php"; }
 $drop = function_exists('GoTopSeoBridge\\gotop_seo_bridge_drop_code_blocks') ? 'GoTopSeoBridge\\gotop_seo_bridge_drop_code_blocks' : 'gotop_seo_bridge_drop_code_blocks';
 kses_init();
 $out = array();

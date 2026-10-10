@@ -29,7 +29,7 @@ import type { PluginLink } from './plugin-client'
 import { canWriteContent, SHOPIFY_FIX_TYPES } from './shopify-admin'
 import { readPluginLink, type PluginLinkRow, type Scope } from './store'
 import {
-  FIX_TYPES, PLUGIN_LATEST_VERSION, PLUGIN_ONLY_TYPES, pluginSupports, type FixCapabilities, type FixChannel, type FixType,
+  FIX_TYPES, PLUGIN_LATEST_VERSION, PLUGIN_ONLY_TYPES, READ_PLUGIN_MIN_VERSION, pluginSupports, versionAtLeast, type FixCapabilities, type FixChannel, type FixType,
   type PluginState,
 } from './types'
 
@@ -115,7 +115,8 @@ export function pluginStateOf(row: PluginLinkRow | null, keyReadable = true): Pl
 /** Pure: the channel each fix type would take right now. */
 export function resolveCapabilities(ctx: FixContext, available: boolean): FixCapabilities {
   const plugin = pluginStateOf(ctx.plugin, !ctx.plugin || !!ctx.pluginLink)
-  const base = { available, plugin, appPassword: !!ctx.creds, webhook: !!ctx.webhook, wordpress: ctx.wordpressDetected, pluginLatest: PLUGIN_LATEST_VERSION }
+  const mediaAlt = !ctx.shopify && ((plugin.state === 'connected' && !!ctx.pluginLink && versionAtLeast(plugin.version, READ_PLUGIN_MIN_VERSION)) || !!ctx.creds)
+  const base = { available, plugin, appPassword: !!ctx.creds, mediaAlt, webhook: !!ctx.webhook, wordpress: ctx.wordpressDetected, pluginLatest: PLUGIN_LATEST_VERSION }
   if (ctx.shopify) {
     if (!ctx.shopifyWrite) return { ...base, shopify: true, readOnly: true, channelFor: {} }
     const shopFor: FixCapabilities['channelFor'] = {}

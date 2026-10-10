@@ -133,13 +133,15 @@ export async function runOnboardingEmails(deps: OnboardingDeps): Promise<Onboard
     const ids = projects.map((r) => String(r.id))
 
     // The app's own definition of "the site is connected" (lib/nudges/waiting.ts), set-based.
-    const [wp, platform, shopify] = await Promise.all([
+    const [wp, platform, shopify, plugin] = await Promise.all([
       idsWithRow(admin, 'wordpress_connections', ids),
       idsWithRow(admin, 'site_platform_connections', ids),
       idsWithRow(admin, 'shopify_connections', ids, { isNull: 'archived_at' }),
+      // A WordPress site connected by the GO TOP SEO Bridge plugin alone is connected too.
+      idsWithRow(admin, 'site_fix_plugin_links', ids, { equals: ['status', 'connected'] }),
     ])
     // An absence we cannot verify is not an absence: say nothing rather than the wrong thing.
-    if (!wp || !platform || !shopify) return { status: 'failed' }
+    if (!wp || !platform || !shopify || !plugin) return { status: 'failed' }
 
     let considered = 0, sent = 0, failed = 0
     let installed = true
@@ -148,7 +150,7 @@ export async function runOnboardingEmails(deps: OnboardingDeps): Promise<Onboard
       const projectId = String(row.id)
       const ownerId = String(row.user_id)
       const createdAt = String(row.created_at)
-      const connected = wp.has(projectId) || platform.has(projectId) || shopify.has(projectId)
+      const connected = wp.has(projectId) || platform.has(projectId) || shopify.has(projectId) || plugin.has(projectId)
       // A connected project can only ever get the `publish` email, so one too young for it
       // is past both stages and is not read again.
       if (connected && now.getTime() - Date.parse(createdAt) < PUBLISH_AFTER_MS) continue

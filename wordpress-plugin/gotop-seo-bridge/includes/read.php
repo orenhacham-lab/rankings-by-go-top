@@ -24,7 +24,8 @@ namespace GoTopSeoBridge;
 
 if (!defined('ABSPATH')) { exit; }
 
-define('GOTOP_SEO_BRIDGE_ITEM_MAX', 2000000);
+// Under the app's 2 MB answer cap once the HTML is JSON-escaped.
+define('GOTOP_SEO_BRIDGE_ITEM_MAX', 1500000);
 
 /** What this copy of the plugin can do (POST /status, `capabilities`). */
 function gotop_seo_bridge_capabilities() {

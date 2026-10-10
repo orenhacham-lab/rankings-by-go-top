@@ -25,7 +25,7 @@ function liveDeps(): MapRouteDeps {
     runDeps: (admin, scope) => ({
       now: () => Date.now(),
       walk: liveWalk,
-      platform: liveWordPress(admin, scope.projectId, () => Date.now()),
+      platform: liveWordPress(admin, scope.projectId, () => Date.now(), scope.userId),
     }),
   }
 }

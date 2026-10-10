@@ -25,7 +25,7 @@ export async function POST(request: Request) {
     later: (task) => after(task),
     prepareLinks: (admin, scope) => ensureSiteMapForProject(admin, scope, {
       now: () => Date.now(),
-      runDeps: (a, sc) => ({ now: () => Date.now(), walk: liveWalk, platform: liveWordPress(a, sc.projectId, () => Date.now()) }),
+      runDeps: (a, sc) => ({ now: () => Date.now(), walk: liveWalk, platform: liveWordPress(a, sc.projectId, () => Date.now(), sc.userId) }),
     }),
     writeFirst: (admin, itemId) => writeFirstArticle(admin, itemId),
   })

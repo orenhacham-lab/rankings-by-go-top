@@ -37,7 +37,7 @@ import { rendersFromBuilderData } from './builder'
 import { planH1Demotion } from './h1'
 import { bodyH1s, shopFailure, SHOPIFY_FIX_TYPES, type ShopCreds, type ShopifyFixClient, type ShopItemRef } from './shopify-admin'
 import { pluginInspect, pluginSearch, type PluginItem, type PluginLink, type PluginPost } from './plugin-client'
-import { previewMediaAlt } from './media-alt'
+import { pluginMediaDeps, previewMediaAlt } from './media-alt'
 import { buildLlmsTxt, pageLanguage, suggestFaq, suggestMetaDescription, suggestSeoTitle, thinContent, type Generate, type LlmsPage } from './suggest'
 import type { FaqItem, FixChannel, FixErrorCode, FixType, H1Ref } from './types'
 
@@ -84,6 +84,8 @@ export interface PreviewContext {
   channel: FixChannel
   creds: WordPressCredentials | null
   link: PluginLink | null
+  /** The plugin link when it is >= 3.1.0 (its /media-alt): Media Library alt text goes through it, whatever writes the pages. */
+  mediaLink?: PluginLink | null
   siteName: string | null
   /** Shopify: the store's credentials, the client, and the article or page the address resolved to (null: not one). */
   shop?: { creds: ShopCreds; client: ShopifyFixClient; ref: ShopItemRef | null } | null
@@ -272,11 +274,15 @@ export async function previewFixJob(req: PreviewRequest, ctx: PreviewContext, de
  * images are the theme's own files, and the answer stays "nothing to change in the page".
  */
 async function previewMedia(req: PreviewRequest, ctx: PreviewContext, deps: PreviewDeps): Promise<FixPreview> {
-  if (!ctx.creds || !deps.wp.media) return fail('nothing_to_fix')
+  const viaPlugin = !!ctx.mediaLink
+  if (!viaPlugin && (!ctx.creds || !deps.wp.media)) return fail('nothing_to_fix')
   const live = await deps.readLive(req.url)
   if (!live) return fail('plugin_unreachable')
   const srcs = live.missingAlt ?? extractSiteSignals(live.html, req.url, { robotsTxt: null, llmsTxt: false }).images.missing
-  const items = await previewMediaAlt(ctx.creds, srcs, { pageTitle: plainTitle(live.h1 ?? live.title), siteName: plainTitle(ctx.siteName) || null }, deps.wp.media)
+  const words = { pageTitle: plainTitle(live.h1 ?? live.title), siteName: plainTitle(ctx.siteName) || null }
+  const items = ctx.mediaLink
+    ? await previewMediaAlt(ctx.mediaLink, srcs, words, pluginMediaDeps(deps.pluginPost))
+    : await previewMediaAlt(ctx.creds as WordPressCredentials, srcs, words, deps.wp.media!)
   if (items.length === 0) return fail('nothing_to_fix')
   return { ok: true, type: 'image_alt', images: items.map((i) => ({ src: i.src, after: i.after, media: i.media })), expected: null, via: 'media' }
 }

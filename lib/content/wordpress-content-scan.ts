@@ -13,7 +13,8 @@
  */
 
 import type { WordPressCredentials, WordPressContentItem } from '@/lib/wordpress/types'
-import { getPosts, getPages, getItemContentHtml, getCategories, getTags, getTaxonomyTerms, discoverStoreEntities, WordPressClientError, type WpContentEndpoint } from '@/lib/wordpress/client'
+import { WordPressClientError, type WpContentEndpoint } from '@/lib/wordpress/client'
+import { credsReadSource, type WordPressReadSource } from '@/lib/content/wordpress-read-source'
 import {
   extractLinkAnchorsFromHtml,
   isInternalUrl,
@@ -749,16 +750,16 @@ const taxKey = (u: string) => u.replace(/[?#].*$/, '').replace(/\/+$/, '').toLow
  * excludes anything the existing classifier marks ineligible (cart/checkout/
  * search/filters/noise). The category NAME is the (usable) anchor + keyword.
  */
-async function buildTaxonomyTargets(creds: WordPressCredentials, existing: Set<string>, note: (m: string) => void): Promise<ScannedTarget[]> {
+async function buildTaxonomyTargets(src: WordPressReadSource, existing: Set<string>, note: (m: string) => void): Promise<ScannedTarget[]> {
   const out: ScannedTarget[] = []
   const seen = new Set(existing)
-  const bases: { base: string; wpType: string }[] = [
+  const bases: { base: 'product_cat' | 'categories'; wpType: string }[] = [
     { base: 'product_cat', wpType: 'product_cat' },
     { base: 'categories', wpType: 'category' },
   ]
   for (const { base, wpType } of bases) {
     let terms: { name: string; link: string; count: number }[] = []
-    try { terms = await getTaxonomyTerms(creds, base) } catch { terms = [] }
+    try { terms = await src.getTaxonomyTerms(base) } catch { terms = [] }
     for (const term of terms) {
       if (out.length >= MAX_TAXONOMY_TARGETS) break
       const key = taxKey(term.link)
@@ -822,7 +823,7 @@ export interface StoreEntityDiscoverySummary {
 }
 
 async function buildStoreEntityTargets(
-  creds: WordPressCredentials,
+  src: WordPressReadSource,
   existing: Set<string>,
   note: (m: string) => void,
 ): Promise<{ targets: ScannedTarget[]; summary: StoreEntityDiscoverySummary }> {
@@ -847,7 +848,7 @@ async function buildStoreEntityTargets(
     })
   }
 
-  const d = await discoverStoreEntities(creds)
+  const d = await src.discoverStoreEntities()
   const pc = { n: 0 }
   for (const e of d.categories) push(e.name, e.link, 'product_cat', MAX_STORE_CATEGORY_TARGETS, pc)
   const pp = { n: 0 }
@@ -869,7 +870,12 @@ async function buildStoreEntityTargets(
   }
 }
 
-export async function scanWordPressSite(creds: WordPressCredentials, opts: ScanOptions = {}): Promise<SiteScanReport> {
+/**
+ * `source`: the application-password credentials as before, or a read source
+ * (./wordpress-read-source.ts: the GO TOP plugin 3.1.0 for a site connected by it).
+ */
+export async function scanWordPressSite(source: WordPressCredentials | WordPressReadSource, opts: ScanOptions = {}): Promise<SiteScanReport> {
+  const src: WordPressReadSource = 'via' in source ? source : credsReadSource(source)
   const startedAt = Date.now()
   const notes: string[] = []
   const errors: string[] = []
@@ -882,10 +888,10 @@ export async function scanWordPressSite(creds: WordPressCredentials, opts: ScanO
 
   // 1) METADATA-FIRST fetch (NO content.rendered) with adaptive pagination, so
   // even huge Elementor/WooCommerce sites still return the item list.
-  const postsMeta = await fetchMetadataAll((o) => getPosts(creds, o), perPage, maxPages, maxItems, opts.modifiedAfter, (m) => errors.push(`posts: ${m}`), (m) => notes.push(`posts: ${m}`))
+  const postsMeta = await fetchMetadataAll((o) => src.getPosts(o), perPage, maxPages, maxItems, opts.modifiedAfter, (m) => errors.push(`posts: ${m}`), (m) => notes.push(`posts: ${m}`))
   const remainingForPages = Math.max(0, maxItems - postsMeta.items.length)
   const pagesMeta = includePages && remainingForPages > 0
-    ? await fetchMetadataAll((o) => getPages(creds, o), perPage, maxPages, remainingForPages, opts.modifiedAfter, (m) => errors.push(`pages: ${m}`), (m) => notes.push(`pages: ${m}`))
+    ? await fetchMetadataAll((o) => src.getPages(o), perPage, maxPages, remainingForPages, opts.modifiedAfter, (m) => errors.push(`pages: ${m}`), (m) => notes.push(`pages: ${m}`))
     : { items: [] as WordPressContentItem[], hitLimit: false }
 
   // Tag each item with its content endpoint for per-item content fetching.
@@ -908,13 +914,13 @@ export async function scanWordPressSite(creds: WordPressCredentials, opts: ScanO
   // 2) Category/tag id→name (best-effort; failure is non-fatal).
   let catMap = new Map<number, string>()
   let tagMap = new Map<number, string>()
-  try { catMap = new Map((await getCategories(creds)).map((c) => [c.id, c.name])) } catch { notes.push('Categories could not be read (non-fatal).') }
-  try { tagMap = new Map((await getTags(creds)).map((t) => [t.id, t.name])) } catch { notes.push('Tags could not be read (non-fatal).') }
+  try { catMap = new Map((await src.getCategories()).map((c) => [c.id, c.name])) } catch { notes.push('Categories could not be read (non-fatal).') }
+  try { tagMap = new Map((await src.getTags()).map((t) => [t.id, t.name])) } catch { notes.push('Tags could not be read (non-fatal).') }
   void catMap; void tagMap // reserved for later relevance signals; not needed for the link report
 
   // 3) Known hosts = connected site host + every fetched item host.
   const hostSet = new Set<string>()
-  const siteHost = extractUrlHost(creds.siteUrl)
+  const siteHost = extractUrlHost(src.siteUrl)
   if (siteHost) hostSet.add(siteHost)
   for (const it of items) { const h = extractUrlHost(it.link); if (h) hostSet.add(h) }
   const hosts = Array.from(hostSet)
@@ -1010,7 +1016,7 @@ export async function scanWordPressSite(creds: WordPressCredentials, opts: ScanO
 
     let html = ''
     try {
-      html = await getItemContentHtml(creds, endpoint, item.id)
+      html = await src.getItemContentHtml(endpoint, item.id)
       contentItemsFetched++
       consecutiveFailures = 0
       if (endpoint === '/posts') postsContentFetched++
@@ -1178,7 +1184,7 @@ export async function scanWordPressSite(creds: WordPressCredentials, opts: ScanO
 
   // Phase 3F.3.4 — augment with taxonomy (category / product-category) targets,
   // reserving cap slots so these high-value hubs are never dropped by TOP_TARGETS.
-  const taxTargets = await buildTaxonomyTargets(creds, new Set(targetList.map((t) => taxKey(t.targetUrl))), (m) => notes.push(m))
+  const taxTargets = await buildTaxonomyTargets(src, new Set(targetList.map((t) => taxKey(t.targetUrl))), (m) => notes.push(m))
   const contentCap = Math.max(0, TOP_TARGETS - taxTargets.length)
   // Phase 3H.2 — ECOMMERCE REPRESENTATION under the cap: products typically have
   // few inbound links, so a pure inbound sort crowded them all out. Reserve up
@@ -1198,11 +1204,11 @@ export async function scanWordPressSite(creds: WordPressCredentials, opts: ScanO
   // against everything already discovered. Appended like taxonomy targets so
   // ecommerce entities are never crowded out by the content cap.
   const storeSeen = new Set<string>([...contentSlice.map((t) => taxKey(t.targetUrl)), ...taxTargets.map((t) => taxKey(t.targetUrl))])
-  const store = await buildStoreEntityTargets(creds, storeSeen, (m) => notes.push(m))
+  const store = await buildStoreEntityTargets(src, storeSeen, (m) => notes.push(m))
   const finalTargets = [...contentSlice, ...taxTargets, ...store.targets]
 
   return {
-    siteUrl: creds.siteUrl,
+    siteUrl: src.siteUrl,
     hosts,
     postsFetched: postsMeta.items.length,
     pagesFetched: pagesMeta.items.length,
