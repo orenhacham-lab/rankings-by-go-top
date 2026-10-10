@@ -32,10 +32,10 @@
 import { readdirSync, readFileSync } from 'fs'
 import { join } from 'path'
 import {
-  FULL_TOUR, SCREEN_TOURS, autoTour, fullTourKey, isNewAccount, readFullTourState, screenForPath,
+  FULL_TOUR, SCREEN_TOURS, arrivedAtSection, autoTour, fullTourKey, isNewAccount, readFullTourState, screenForPath,
   screenTourKey, showGuideDot, tourSteps, type FullTourState, type ScreenKey, type TourStep,
 } from '../tours'
-import { placeBubble, BUBBLE_WIDTH, type Box } from '../placement'
+import { placeBubble, BUBBLE_WIDTH, clippedBy, type Box } from '../placement'
 import { dashboardHe } from '../../i18n/dashboard/he'
 import { dashboardEn } from '../../i18n/dashboard/en'
 import { dashboardEs } from '../../i18n/dashboard/es'
@@ -332,6 +332,41 @@ console.log('\nF) every answer names something this build has')
   check('F6: both languages answer the same questions',
     Object.keys(dashboardHe.guide.faqItems).join(',') === Object.keys(dashboardEn.guide.faqItems).join(',')
     && Object.keys(dashboardHe.guide.steps).join(',') === Object.keys(dashboardEn.guide.steps).join(','))
+}
+
+// ── H) owner's report, 10 October 2026 ───────────────────────────────────────
+console.log('\nH) the tour never spotlights a hidden entry, and never jumps ahead of a section link')
+{
+  // H1-H3: step 6 ("connect the site") ringed the WhatsApp row. On a short screen
+  // the sidebar's nav scrolls, the settings entry sits under the rail's foot, and
+  // its box is inside the window, so the runner never scrolled it into view.
+  const nav: Box = { left: 1184, top: 64, width: 256, height: 520 }
+  const settingsEntry: Box = { left: 1196, top: 600, width: 232, height: 36 }
+  const shown: Box = { left: 1196, top: 300, width: 232, height: 36 }
+  check('H1: an entry below the nav\'s visible part is clipped', clippedBy(settingsEntry, [nav]))
+  check('H1-MUT: the same entry with no clipping box is not', !clippedBy(settingsEntry, []))
+  check('H2: an entry inside the nav is not clipped', !clippedBy(shown, [nav]) && !clippedBy({ ...nav }, [nav]))
+  const runner = code('components/onboarding/DashboardOnboardingTour.tsx')
+  const scrollsClipped = (src: string) =>
+    /\|\| clippedBy\(toBox\(r\), clipBoxes\(target\)\)\) \{\s*target\.scrollIntoView\(/.test(src)
+    && /overflowY !== 'visible' \|\| s\.overflowX !== 'visible'/.test(src)
+  check('H3: the runner scrolls a clipped target into view before spotlighting it', scrollsClipped(runner))
+  check('H3-MUT: the viewport-only test (main before the fix) fails H3',
+    !scrollsClipped(runner.replace(' || clippedBy(toBox(r), clipBoxes(target))', '')))
+
+  // H4-H7: "connect the site" opened /settings#platform and the settings tour
+  // started first, scrolling back to the title.
+  const base = { pathname: '/settings', newAccount: true, projectsResolved: true, fullTour: 'dismissed' as FullTourState, screenSeen: () => false }
+  check('H4: a plain first visit to settings still gets its tour', autoTour(base)?.kind === 'screen')
+  check('H5: arriving at #platform, #search-console or #business starts no tour',
+    ['#platform', '#search-console', 'business'].every((hash) => autoTour({ ...base, hash }) === null))
+  check('H5-MUT: an empty hash is not a section', !arrivedAtSection('') && !arrivedAtSection('#') && !arrivedAtSection(null) && autoTour({ ...base, hash: '#' })?.kind === 'screen')
+  check('H6: …nor the full tour, on a dashboard link with a section', autoTour({ ...base, pathname: '/dashboard', fullTour: 'new', hash: '#fixes' }) === null)
+  const guide = code('components/guide/GuideMenu.tsx')
+  const passesHash = (src: string) => /const hash = window\.location\.hash\s*if \(arrivedAtSection\(hash\)\) return\s*const pick = autoTour\(\{\s*pathname,\s*hash,/.test(src)
+  check('H7: the pill reads the address\'s hash before it picks a tour, and does not mark the screen as tried', passesHash(guide)
+    && guide.indexOf('if (arrivedAtSection(hash)) return') < guide.indexOf('autoTried.current.add(pathname)'))
+  check('H7-MUT: a pill that ignores the hash fails H7', !passesHash(guide.replace('if (arrivedAtSection(hash)) return', '')))
 }
 
 console.log(`\n${pass} passed, ${fail} failed`)

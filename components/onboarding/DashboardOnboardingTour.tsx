@@ -31,7 +31,7 @@ import { ChevronLeft, X } from 'lucide-react'
 import { getDashboardDictionary } from '@/lib/i18n/dashboard/getDashboardDictionary'
 import { useDashboardLanguage } from '@/lib/i18n/dashboard/useDashboardLanguage'
 import type { TourStep } from '@/lib/guide/tours'
-import { BUBBLE_WIDTH, placeBubble, type Box, type Placement } from '@/lib/guide/placement'
+import { BUBBLE_WIDTH, clippedBy, placeBubble, type Box, type Placement } from '@/lib/guide/placement'
 import { cn } from '@/lib/utils'
 import { navIsDrawer, requestNavDrawer } from '@/lib/shell/nav-drawer'
 
@@ -75,6 +75,16 @@ function findTarget(selector: string): { el: HTMLElement | null; exists: boolean
 }
 
 const toBox = (r: DOMRect): Box => ({ left: r.left, top: r.top, width: r.width, height: r.height })
+
+/** The boxes of the ancestors that clip `el`: every one that scrolls or hides its overflow. */
+function clipBoxes(el: HTMLElement): Box[] {
+  const boxes: Box[] = []
+  for (let p = el.parentElement; p && p !== document.body; p = p.parentElement) {
+    const s = getComputedStyle(p)
+    if (s.overflowY !== 'visible' || s.overflowX !== 'visible') boxes.push(toBox(p.getBoundingClientRect()))
+  }
+  return boxes
+}
 const sameBox = (a: Box | null, b: Box | null) =>
   !!a && !!b && a.left === b.left && a.top === b.top && a.width === b.width && a.height === b.height
 
@@ -192,7 +202,9 @@ function TourRunner({ run, onEnd }: { run: TourRun; onEnd: (how: TourEnd) => voi
   useEffect(() => {
     if (target) {
       const r = target.getBoundingClientRect()
-      if (r.top < 64 || r.bottom > window.innerHeight - 16) {
+      // Off the screen, or inside it but cut off by a box that scrolls (the sidebar's
+      // nav on a short screen, whose last entries sit under the rail's foot).
+      if (r.top < 64 || r.bottom > window.innerHeight - 16 || clippedBy(toBox(r), clipBoxes(target))) {
         target.scrollIntoView({ block: 'center', behavior: reducedMotion() ? 'auto' : 'smooth' })
       }
     }
