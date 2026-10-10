@@ -2369,6 +2369,7 @@ export const dashboardEn = {
     // (lib/content/strategy/first-article.ts). "Publish now" is offered for it only.
     first: {
       approveHint: 'Approving writes your first article right away (counts toward your allowance)',
+      approveHintTrial: 'Your first article is included in the trial. Approve a topic and we start writing it now.',
       writingTitle: 'Writing your first article…',
       writingBody: 'This takes a few minutes. You can leave the page; the writing carries on without you.',
       readyTitle: 'Your first article is ready',

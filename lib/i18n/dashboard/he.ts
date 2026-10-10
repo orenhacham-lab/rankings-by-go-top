@@ -2374,6 +2374,7 @@ export const dashboardHe = {
     // (lib/content/strategy/first-article.ts). "Publish now" is offered for it only.
     first: {
       approveHint: 'האישור כותב מיד את המאמר הראשון (נספר במכסת המאמרים)',
+      approveHintTrial: 'המאמר הראשון כלול בניסיון. אשרו נושא ונתחיל לכתוב אותו עכשיו.',
       writingTitle: 'כותבים את המאמר הראשון…',
       writingBody: 'זה לוקח כמה דקות. אפשר לצאת מהדף, הכתיבה ממשיכה גם בלעדיכם.',
       readyTitle: 'המאמר הראשון מוכן',

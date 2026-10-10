@@ -352,6 +352,7 @@ export default function ContentStrategyScreen({ proFirst = false }: { proFirst?:
           automation={automationEnabled}
           first={first}
           queuePaused={strategy.queueActive === false}
+          onTrial={strategy.onTrial}
           hasSite={hasSite}
           connectHref={platformSetupHref(projectId)}
           publishing={publishing}

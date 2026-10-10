@@ -15,6 +15,7 @@ export const strategyPtBR: DeepPartial<DashboardDictionary> = {
     nextPaused: 'A publicação automática está pausada',
     first: {
       approveHint: 'Ao aprovar, escrevemos seu primeiro artigo na hora (conta na sua cota)',
+      approveHintTrial: 'Seu primeiro artigo está incluído no teste. Aprove um tema e começamos a escrevê-lo agora.',
       writingTitle: 'Escrevendo seu primeiro artigo…',
       writingBody: 'Isso leva alguns minutos. Você pode sair da página; a redação continua sem você.',
       readyTitle: 'Seu primeiro artigo está pronto',

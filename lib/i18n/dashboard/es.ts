@@ -4604,6 +4604,7 @@ export const dashboardEs: DeepPartial<DashboardDictionary> = {
     nextPaused: 'La publicación automática está en pausa',
     first: {
       approveHint: 'Al aprobarlo escribimos tu primer artículo al momento (cuenta en tu cupo)',
+      approveHintTrial: 'Tu primer artículo está incluido en la prueba. Aprueba un tema y empezamos a escribirlo ahora.',
       writingTitle: 'Escribiendo tu primer artículo…',
       writingBody: 'Esto tarda unos minutos. Puedes salir de la página; la redacción sigue sin ti.',
       readyTitle: 'Tu primer artículo está listo',
