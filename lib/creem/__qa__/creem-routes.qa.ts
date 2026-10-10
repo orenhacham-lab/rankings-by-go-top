@@ -157,6 +157,33 @@ console.log('\nD) nothing a caller sends becomes a price or a redirect')
   check('D8: the account reference sent to Creem is the session user, not a body field',
     /requestId: user\.id/.test(checkout))
 
+  // WHAT LEAVES FOR CREEM IS WHAT THE PRIVACY POLICY SAYS LEAVES. Both
+  // policies name Creem and state exactly this: the account's e-mail
+  // address, the identifier of the plan chosen, and our own reference for
+  // the request. A key added to this payload — a name, a site address, a
+  // phone number — makes that sentence false in four languages, so the
+  // payload is pinned here rather than left to a reviewer's eye. Widening it
+  // means changing the policy text first.
+  const payload = checkout.slice(checkout.indexOf('createCreemCheckout({'))
+  const payloadBody = payload.slice(0, payload.indexOf('\n    })'))
+  const OUTBOUND_KEYS = ['productId', 'successUrl', 'requestId', 'customerEmail', 'metadata']
+  // `[:,]` so a shorthand property (`productId,`) counts like a written one.
+  const keysOf = (src: string) => [...src.matchAll(/^\s{6}([A-Za-z_][A-Za-z0-9_]*)[:,]/gm)].map((m) => m[1])
+  const payloadKeys = keysOf(payloadBody)
+  check('D10: the outbound checkout payload carries exactly the fields the privacy policy declares',
+    payloadKeys.length === OUTBOUND_KEYS.length && OUTBOUND_KEYS.every((k) => payloadKeys.includes(k)),
+    payloadKeys.join(','))
+  check('D10-MUT: a sixth field would be caught',
+    keysOf(`${payloadBody}\n      phone: user.phone,`).length !== OUTBOUND_KEYS.length)
+
+  // The metadata object is the easy place for customer data to slip in,
+  // because it is free-form (Record<string, string>) and Creem stores it.
+  const metadata = payloadBody.slice(payloadBody.indexOf('metadata: {'))
+  check('D11: metadata carries our own account id and the plan code, and nothing about the customer',
+    /^metadata: \{ user_id: user\.id, plan \}/.test(metadata), metadata.split('\n')[0])
+  check('D11-MUT: putting a customer\'s details in metadata would be caught',
+    !/^metadata: \{ user_id: user\.id, plan \}/.test('metadata: { user_id: user.id, plan, site: project.url }'))
+
   check('D9: Creem\'s own error text is never returned to the merchant',
     /provider_unavailable/.test(checkout) && !/checkout\.reason \}, \{ status: 502/.test(checkout))
 }
