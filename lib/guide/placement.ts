@@ -62,3 +62,20 @@ export function placeBubble(target: Box | null, bubbleHeight: number, vp: Viewpo
   // Nothing fits cleanly (a very tall target): under it, pulled back into view.
   return { mode: 'anchored', width, side: 'below', left: alignedLeft, top: clamp(bottom + GAP, EDGE, vp.height - bubbleHeight - EDGE) }
 }
+
+/**
+ * Whether `target` is cut off by one of the boxes that clip it: the boxes of its
+ * ancestors that scroll or hide their overflow (the sidebar's nav scrolls). A
+ * target can be inside the viewport and still hidden: on a short screen the
+ * sidebar's last entries sit under the rail's foot, and a spotlight drawn on
+ * their box lands on whatever the foot shows there (the WhatsApp support row,
+ * owner's report of 10 October 2026). Such a target is scrolled into view
+ * before it is spotlit.
+ */
+export function clippedBy(target: Box, clips: readonly Box[], tolerance = 1): boolean {
+  return clips.some((c) =>
+    target.top < c.top - tolerance
+    || target.top + target.height > c.top + c.height + tolerance
+    || target.left < c.left - tolerance
+    || target.left + target.width > c.left + c.width + tolerance)
+}
