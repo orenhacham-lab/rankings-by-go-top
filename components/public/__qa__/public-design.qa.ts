@@ -97,7 +97,11 @@ function main() {
   const featurePages = FEATURES.flatMap((f) => [`app/(public)/features/${f}/page.tsx`, `app/(public)/en/features/${f}/page.tsx`])
   const usesTemplate = (src: string, locale: string) => {
     const s = strip(src)
-    return /export const metadata/.test(s) && new RegExp(`<FeaturePage locale="${locale}" content=\\{CONTENT\\} />`).test(s)
+    // `path` is the route the page serves, which the template needs for the
+    // breadcrumb (lib/seo/page-schema.ts); the point of this check is still
+    // that the page is the template plus its metadata and nothing else.
+    return /export const metadata/.test(s)
+      && new RegExp(`<FeaturePage locale="${locale}" content=\\{CONTENT\\} path="/features/[a-z-]+" />`).test(s)
       && !/<section\b/.test(s)
   }
   {

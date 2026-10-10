@@ -16,7 +16,7 @@ export const metadata: Metadata = {
 }
 
 export default function GoogleOrganicFeaturePage() {
-  return <FeaturePage locale="he" content={CONTENT} />
+  return <FeaturePage locale="he" content={CONTENT} path="/features/google-organic-rank-tracking" />
 }
 
 const C = FEATURE_COMMON.he

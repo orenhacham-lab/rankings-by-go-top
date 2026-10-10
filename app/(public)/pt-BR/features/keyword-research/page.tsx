@@ -15,7 +15,7 @@ export const metadata: Metadata = {
 }
 
 export default function KeywordResearchFeaturePage() {
-  return <FeaturePage locale="pt-BR" content={CONTENT} />
+  return <FeaturePage locale="pt-BR" content={CONTENT} path="/features/keyword-research" />
 }
 
 const C = FEATURE_COMMON['pt-BR']

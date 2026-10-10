@@ -5,5 +5,5 @@ import { BUSINESSES_PAGE } from '@/lib/i18n/public/pages/solutions'
 export const metadata = marketingPageMetadata(BUSINESSES_PAGE, 'pt-BR')
 
 export default function BusinessesSolutionPage() {
-  return <FeaturePage locale="pt-BR" content={BUSINESSES_PAGE.content['pt-BR']} />
+  return <FeaturePage locale="pt-BR" content={BUSINESSES_PAGE.content['pt-BR']} path="/solutions/businesses" />
 }

@@ -5,5 +5,5 @@ import { SITE_FIXES_PAGE } from '@/lib/i18n/public/pages/site-fixes'
 export const metadata = marketingPageMetadata(SITE_FIXES_PAGE, 'he')
 
 export default function SiteFixesFeaturePage() {
-  return <FeaturePage locale="he" content={SITE_FIXES_PAGE.content['he']} />
+  return <FeaturePage locale="he" content={SITE_FIXES_PAGE.content['he']} path="/features/site-health-fixes" />
 }

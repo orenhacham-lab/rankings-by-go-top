@@ -18,7 +18,7 @@ export const metadata: Metadata = {
 }
 
 export default function SeoGeoContentPublishingFeaturePage() {
-  return <FeaturePage locale="he" content={CONTENT} />
+  return <FeaturePage locale="he" content={CONTENT} path="/features/seo-geo-content-publishing" />
 }
 
 const C = FEATURE_COMMON.he

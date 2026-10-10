@@ -7,7 +7,9 @@ import { buildHreflangAlternates } from '@/lib/seo/hreflang'
 import { documentLocaleAttributes } from '@/lib/i18n/document-locale'
 import { getRootRequestContext } from '@/lib/i18n/root-request'
 import { getSiteMetadata } from '@/lib/i18n/site-metadata'
-import { SOFTWARE_OFFER } from '@/lib/seo/software-offer'
+import { softwareOffer } from '@/lib/seo/software-offer'
+import { websiteSchema } from '@/lib/seo/page-schema'
+import { localeHomeHref } from '@/lib/i18n/locales'
 import { GOOGLE_CONSENT_DEFAULT_SCRIPT } from '@/lib/consent/google-consent-mode'
 import { GoogleTags } from '@/components/consent/GoogleTags'
 import { DocumentLocaleSync } from '@/components/DocumentLocaleSync'
@@ -84,6 +86,9 @@ export default async function RootLayout({
   const { isAuthenticated, locale } = await getRootRequestContext()
   const { lang, dir } = documentLocaleAttributes(locale)
   const schema = getSiteMetadata(locale)
+  // The page the reader is on, not always the Hebrew root: the markup used to
+  // point every language's `url` at https://www.gotopseo.com.
+  const localeHome = `https://www.gotopseo.com${localeHomeHref(locale) === '/' ? '' : localeHomeHref(locale)}`
 
   return (
     <html lang={lang} dir={dir} className={`h-full ${inter.variable} ${heebo.variable}`} suppressHydrationWarning>
@@ -112,9 +117,14 @@ export default async function RootLayout({
           type="application/ld+json"
           dangerouslySetInnerHTML={{
             __html: JSON.stringify([
+              websiteSchema(locale, schema.description),
               {
                 '@context': 'https://schema.org',
                 '@type': 'Organization',
+                // The id the WebSite above names as its publisher, so the two
+                // are one graph rather than two unrelated nodes repeated on
+                // every URL.
+                '@id': 'https://www.gotopseo.com/#organization',
                 name: 'Go Top SEO',
                 alternateName: ['Rankings by Go Top'],
                 url: 'https://www.gotopseo.com',
@@ -141,16 +151,16 @@ export default async function RootLayout({
                 publisher: { '@type': 'Organization', name: 'GO TOP', url: 'https://www.gotop.co.il' },
                 brand: { '@type': 'Organization', name: 'GO TOP', url: 'https://www.gotop.co.il' },
                 description: schema.description,
-                url: 'https://www.gotopseo.com',
+                url: localeHome,
                 applicationCategory: 'BusinessApplication',
                 operatingSystem: 'Web',
                 // No aggregateRating: a rating may only describe real, collected
                 // reviews (Google's review-snippet policy; FTC fake-review rule).
                 // The offer is the real plan range from the catalog.
-                offers: SOFTWARE_OFFER,
+                offers: softwareOffer(locale),
                 author: {
                   '@type': 'Organization',
-                  name: 'Go Top',
+                  name: 'GO TOP',
                   url: 'https://www.gotop.co.il',
                 },
               },

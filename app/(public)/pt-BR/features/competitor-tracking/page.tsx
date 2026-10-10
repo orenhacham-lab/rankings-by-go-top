@@ -5,5 +5,5 @@ import { COMPETITORS_PAGE } from '@/lib/i18n/public/pages/results'
 export const metadata = marketingPageMetadata(COMPETITORS_PAGE, 'pt-BR')
 
 export default function CompetitorsFeaturePage() {
-  return <FeaturePage locale="pt-BR" content={COMPETITORS_PAGE.content['pt-BR']} />
+  return <FeaturePage locale="pt-BR" content={COMPETITORS_PAGE.content['pt-BR']} path="/features/competitor-tracking" />
 }
