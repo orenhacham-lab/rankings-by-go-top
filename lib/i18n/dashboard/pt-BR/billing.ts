@@ -166,6 +166,9 @@ export const billingPtBR: DeepPartial<DashboardDictionary> = {
       starting: 'Abrindo a página de pagamento segura...',
       error: 'Não conseguimos abrir a página de pagamento. Tente novamente em instantes ou fale com a gente que ajudamos você.',
       changePlanNote: 'Para mudar de plano, fale com a gente que resolvemos para você.',
+      disclosure:
+        'O pagamento com cartão é feito pela Creem (Armitage Labs OÜ), a comerciante registrada: a Creem emite a fatura, acrescenta o imposto conforme o seu endereço de cobrança e a cobrança aparece na sua fatura em nome da Creem. O serviço em si continua sendo nosso.',
+      buyerTermsLabel: 'Termos de compra da Creem',
     },
     shopify: {
       title: 'A cobrança é gerenciada pela Shopify',

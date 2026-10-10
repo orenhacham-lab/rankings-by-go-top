@@ -228,6 +228,38 @@ console.log('\nD) nothing a caller sends becomes a price or a redirect')
 
   check('D9: Creem\'s own error text is never returned to the merchant',
     /provider_unavailable/.test(checkout) && !/checkout\.reason \}, \{ status: 502/.test(checkout))
+
+  /*
+   * D12 — what comes BACK, which the privacy policy also states.
+   *
+   * Creem's Data Sharing Agreement 2.1.2 makes the buyer's name, country and
+   * e-mail address available to us, alongside the ids. The published policy
+   * says we take only a customer id, a plan id, the subscription's status and
+   * its period dates, and that sentence stays true only while no one reaches
+   * into the provider's body for the rest. Agreed with the legal thread on
+   * 2026-10-10: this guard holds a sentence that is already published.
+   */
+  const INBOUND_FIELDS = ['id', 'status', 'productId', 'customerId', 'currentPeriodStart', 'currentPeriodEnd', 'metadata']
+  const client = read('lib/creem/client.ts')
+  const parsed = client.slice(client.lastIndexOf('    value: {'))
+  // `[:,]` so a shorthand property (`status,`) counts like a written one.
+  const parsedKeys = [...parsed.slice(0, parsed.indexOf('\n    },')).matchAll(/^\s{6}([A-Za-z_][A-Za-z0-9_]*)[:,]/gm)].map((m) => m[1])
+  check('D12: the subscription we read back carries exactly the fields the privacy policy declares',
+    parsedKeys.length === INBOUND_FIELDS.length && INBOUND_FIELDS.every((k) => parsedKeys.includes(k)),
+    parsedKeys.join(','))
+  check('D12-MUT: reading the buyer\'s e-mail out of the response would be caught',
+    [...`${parsed.slice(0, parsed.indexOf('\n    },'))}\n      email: stringOf(body.customer_email),`
+      .matchAll(/^\s{6}([A-Za-z_][A-Za-z0-9_]*)[:,]/gm)].length !== INBOUND_FIELDS.length)
+
+  // And nothing on the Creem path persists a buyer field, including the
+  // customer id the client parses: it is read so a response can be matched,
+  // never stored.
+  const BUYER_WORDS = /customer_email|customerEmail|customer_name|buyer_email|\bcustomer\.(email|name|country)\b/
+  const persisting = ['app/api/creem/webhook/route.ts', 'lib/creem/webhook-processing.ts', 'lib/billing/entitlement-write.ts']
+  check('D13: no buyer name, country or e-mail is written anywhere on the webhook path',
+    persisting.every((file) => !BUYER_WORDS.test(read(file)) && !/customerId/.test(read(file))))
+  check('D13-MUT: storing the buyer\'s e-mail on the subscription row would be caught',
+    BUYER_WORDS.test("await admin.from('subscriptions').update({ customer_email: sub.customerEmail })"))
 }
 
 console.log('\nE) the switch and the mode')

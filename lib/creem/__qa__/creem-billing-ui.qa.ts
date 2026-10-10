@@ -179,14 +179,32 @@ console.log('\nD) what the button sends, and what it follows')
   check('D4: the shown message comes from the dictionary', /\{t\.error\}/.test(button) && /\{starting \? t\.starting : t\.payButton\}/.test(button))
   check('D4-MUT: showing the response body is caught',
     !/\{t\.error\}/.test(button.replace('{t.error}', '{payload?.error}')))
-  // The component's own name and the route path say "creem"; no STRING the
-  // merchant could read does. The dictionary is checked in section E.
+  // The component's own name, the route path and the buyer-terms URL say
+  // "creem"; no SENTENCE the merchant reads is written here. The disclosure
+  // Merchant Terms 3.7 requires is the legal thread's wording and lives in the
+  // dictionaries, checked in section E. The URL is the one exception, because
+  // an href cannot come from a translation that a language might omit.
+  const BUYER_TERMS_URL = 'https://www.creem.io/buyer-terms'
+  const allowed = (text: string) =>
+    !/creem/i.test(text) || text.startsWith('/api/') || text.startsWith('[creem-') || text === BUYER_TERMS_URL
   const literals = (src: string) => [...src.replace(/^import[^\n]*\n/gm, '').matchAll(/'([^']*)'|"([^"]*)"/g)]
     .map((m) => m[1] ?? m[2] ?? '')
-  check('D5: no string in the component names the provider',
-    literals(button).every((text) => !/creem/i.test(text) || text.startsWith('/api/') || text.startsWith('[creem-')))
+  check('D5: no string in the component names the provider', literals(button).every(allowed))
   check('D5-MUT: a provider name in a shown string is caught',
-    !literals(button.replace('t.payButton}', "'Pay with Creem'}")).every((text) => !/creem/i.test(text) || text.startsWith('/api/') || text.startsWith('[creem-')))
+    !literals(button.replace('t.payButton}', "'Pay with Creem'}")).every(allowed))
+  check('D5-MUT2: another creem.io URL smuggled in is caught',
+    !literals(button.replace(BUYER_TERMS_URL, 'https://www.creem.io/anything-else')).every(allowed))
+
+  // 3.8: the buyer must be SHOWN Creem's buyer terms. Text they cannot click
+  // shows them nothing, so this is a real anchor, opened safely.
+  check('D6: the buyer terms are a real link, and the label comes from the dictionary',
+    new RegExp(`const CREEM_BUYER_TERMS_URL = '${BUYER_TERMS_URL}'`).test(button)
+    && /href=\{CREEM_BUYER_TERMS_URL\}/.test(button)
+    && /rel="noopener noreferrer"/.test(button)
+    && /\{t\.buyerTermsLabel\}/.test(button)
+    && /\{t\.disclosure\}/.test(button))
+  check('D6-MUT: turning the link back into plain text is caught',
+    !/href=\{CREEM_BUYER_TERMS_URL\}/.test(button.replace('href={CREEM_BUYER_TERMS_URL}', 'title="buyer terms"')))
 }
 
 console.log('\nE) every dashboard language has the strings')
@@ -207,6 +225,28 @@ console.log('\nE) every dashboard language has the strings')
       check(`E2: ${lang} has ${key}`, new RegExp(`${key}: '[^']+'`).test(section))
     }
     check(`E2-MUT: an empty ${lang} string is caught`, !new RegExp("payButton: ''").test(section))
+
+    // The disclosure is the one string in this product that a contract
+    // dictates. Merchant Terms 3.7 is satisfied only if the buyer is told WHO
+    // charges and in WHAT ROLE, so "payment processed by Creem" on its own is
+    // not enough and must fail here. Both quote styles and a wrapped line are
+    // accepted, because the sentence is long enough to wrap in every language.
+    const valueOf = (key: string) => {
+      const at = section.indexOf(`${key}:`)
+      if (at < 0) return ''
+      const quote = section.slice(at).search(/['"]/)
+      const rest = section.slice(at + quote)
+      const closing = rest.indexOf(rest[0], 1)
+      return closing > 0 ? rest.slice(1, closing) : ''
+    }
+    const namesTheRole = (text: string) =>
+      /Creem/.test(text)
+      && /Armitage Labs/.test(text)
+      && /merchant of record|מוכר הרשום|comerciante registrado|comerciante registrada/.test(text)
+    check(`E3: ${lang} discloses Creem as the merchant of record`, namesTheRole(valueOf('disclosure')))
+    check(`E3-MUT: a ${lang} sentence that only names the processor is caught`,
+      !namesTheRole('Payment is processed by Creem.'))
+    check(`E4: ${lang} has a label for the buyer terms`, valueOf('buyerTermsLabel').includes('Creem'))
   }
 }
 
@@ -252,6 +292,18 @@ console.log('\nF) what the screen actually renders')
     check(`F5 (${locale}): a Creem-billed account sees no checkout at all`,
       !governed.includes('paypal-button-') && !governed.includes('data-creem-checkout'))
     check(`F6 (${locale}): and is told how to change plan`, governed.includes(t.changePlanNote))
+
+    // Merchant Terms 3.7 and 3.8 are satisfied by what the browser receives,
+    // not by what the source says, so this reads the markup: the disclosure in
+    // this language beside every card button, and a buyer-terms link that
+    // actually opens.
+    const escaped = (text: string) => text.replace(/&/g, '&amp;').replace(/'/g, '&#x27;')
+    check(`F7 (${locale}): the merchant-of-record disclosure is on the card path`,
+      card.includes(escaped(t.disclosure)) && !paypal.includes(escaped(t.disclosure)))
+    check(`F8 (${locale}): and the buyer terms are a link that opens`,
+      card.includes('href="https://www.creem.io/buyer-terms"')
+      && card.includes('rel="noopener noreferrer"')
+      && card.includes(escaped(t.buyerTermsLabel)))
   }
 }
 

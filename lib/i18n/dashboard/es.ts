@@ -2398,6 +2398,9 @@ export const dashboardEs: DeepPartial<DashboardDictionary> = {
       starting: 'Abriendo la página de pago segura...',
       error: 'No hemos podido abrir la página de pago. Vuelve a intentarlo en un momento o escríbenos y te ayudamos.',
       changePlanNote: 'Para cambiar de plan, escríbenos y lo gestionamos por ti.',
+      disclosure:
+        'El pago con tarjeta se realiza a través de Creem (Armitage Labs OÜ), el comerciante registrado: Creem emite la factura, añade el impuesto según tu dirección de facturación y el cargo aparece en tu extracto a nombre de Creem. El servicio en sí sigue siendo nuestro.',
+      buyerTermsLabel: 'Términos de compra de Creem',
     },
     shopify: {
       title: 'La facturación se gestiona a través de Shopify',
