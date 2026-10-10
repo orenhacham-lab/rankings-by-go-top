@@ -1,12 +1,13 @@
 import { AboutPage, type AboutCopy } from '@/components/public/AboutPage'
 import { FEATURE_COMMON } from '@/lib/i18n/public/feature-common'
+import { ABOUT_BREADCRUMB } from '@/lib/i18n/public/pages/breadcrumb-labels'
 
 export default function EnglishAboutPage() {
   return <AboutPage locale="en" copy={COPY} />
 }
 
 const COPY: AboutCopy = {
-  breadcrumb: { label: 'About', href: '/en/about' },
+  breadcrumb: { label: ABOUT_BREADCRUMB['en'], href: '/en/about' },
   title: '11 years of SEO,',
   accent: 'in one platform that works for you.',
   subtitle: 'One platform that writes and publishes articles on your site, tracks where you rank in Google and Google Maps, and checks whether AI engines recommend you. Built by Go Top, a digital agency with more than 11 years of experience in SEO and paid advertising.',

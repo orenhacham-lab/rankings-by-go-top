@@ -14,6 +14,8 @@ import { pricingEn as copy } from '@/lib/i18n/public/pricing-en'
 import { cn } from '@/lib/utils'
 import { formatPlanPrice, planPriceIn } from '@/lib/billing/market'
 import { resolveBillingMarket } from '@/lib/billing/server-market'
+import { Breadcrumbs } from '@/components/Breadcrumbs'
+import { getPublicDictionary } from '@/lib/i18n/getPublicDictionary'
 
 const PLAN_ORDER: PlanCode[] = ['regular', 'advanced', 'premium', 'large_agency']
 
@@ -39,6 +41,10 @@ export default async function EnglishPricingPage() {
       <main className="flex-1">
         <MarketingHero
           compact
+          /* The trail the page's BreadcrumbList describes, on the page.
+             Same component and same dictionary label as the markup in
+             this route's layout. */
+          before={<Breadcrumbs items={[{ label: getPublicDictionary('en').nav.pricing, href: '/en/pricing' }]} locale="en" />}
           eyebrow={copy.hero.eyebrow}
           title={copy.hero.title}
           accent={copy.hero.accent}

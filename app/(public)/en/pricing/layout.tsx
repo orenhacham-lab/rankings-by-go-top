@@ -1,4 +1,6 @@
 import { buildHreflangAlternates } from '@/lib/seo/hreflang'
+import { marketingBreadcrumbSchema } from '@/lib/seo/page-schema'
+import { getPublicDictionary } from '@/lib/i18n/getPublicDictionary'
 
 export const metadata = {
   title: 'Pricing - Go Top SEO',
@@ -15,24 +17,9 @@ export const metadata = {
   },
 }
 
-const breadcrumbSchema = {
-  '@context': 'https://schema.org',
-  '@type': 'BreadcrumbList',
-  itemListElement: [
-    {
-      '@type': 'ListItem',
-      position: 1,
-      name: 'Home',
-      item: 'https://www.gotopseo.com/en',
-    },
-    {
-      '@type': 'ListItem',
-      position: 2,
-      name: 'Pricing',
-      item: 'https://www.gotopseo.com/en/pricing',
-    },
-  ],
-}
+// One source for the trail and its markup (lib/seo/page-schema.ts),
+// so the two cannot drift apart.
+const breadcrumbSchema = marketingBreadcrumbSchema('en', '/pricing', getPublicDictionary('en').nav.pricing)
 
 export default function EnglishPricingLayout({ children }: { children: React.ReactNode }) {
   return (

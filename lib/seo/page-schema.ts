@@ -55,7 +55,10 @@ export function marketingBreadcrumbSchema(locale: PublicLocale, path: string, na
     '@context': 'https://schema.org',
     '@type': 'BreadcrumbList',
     itemListElement: [
-      { '@type': 'ListItem', position: 1, name: dict.nav.home, item: absolute(localeHomeHref(locale)) },
+      // `breadcrumbs.home`, not `nav.home`: this is the label the visible
+      // trail prints (components/Breadcrumbs.tsx), and in Hebrew the two
+      // differ — דף הבית on screen against עמוד הבית in the markup.
+      { '@type': 'ListItem', position: 1, name: dict.breadcrumbs.home, item: absolute(localeHomeHref(locale)) },
       { '@type': 'ListItem', position: 2, name, item: absolute(`${LOCALE_PREFIX[locale]}${path}`) },
     ],
   }

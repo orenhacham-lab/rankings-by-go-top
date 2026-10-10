@@ -12,7 +12,7 @@
  * Guarded by lib/seo/__qa__/honest-structured-data.qa.ts.
  */
 import { PLAN_CATALOG, PLAN_CODES } from '@/lib/plans/catalog'
-import type { PublicLocale } from '@/lib/i18n/locales'
+import type { BillingMarket } from '@/lib/billing/market'
 
 function offerFor(currency: 'ILS' | 'USD', prices: number[]) {
   return {
@@ -33,7 +33,7 @@ const USD_OFFER = offerFor('USD', PLAN_CODES.map((code) => PLAN_CATALOG[code].pr
  */
 export const SOFTWARE_OFFER = ILS_OFFER
 
-/** The offer a reader of this language is actually quoted. */
-export function softwareOffer(locale: PublicLocale) {
-  return locale === 'he' ? ILS_OFFER : USD_OFFER
+/** The offer this request is actually quoted, by its billing market. */
+export function softwareOffer(market: BillingMarket) {
+  return market === 'ILS' ? ILS_OFFER : USD_OFFER
 }

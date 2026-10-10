@@ -17,6 +17,7 @@
  */
 import type { LucideIcon } from 'lucide-react'
 import { PublicNav } from '@/components/PublicNav'
+import { Breadcrumbs } from '@/components/Breadcrumbs'
 import { Footer } from '@/components/Footer'
 import type { PublicLocale } from '@/lib/i18n/locales'
 import { cn } from '@/lib/utils'
@@ -24,6 +25,7 @@ import {
   ButtonLink, Callout, CheckList, CONTAINER, CtaBand, FaqList, FeatureCard, Section, SectionIntro, StepCard,
 } from './marketing'
 import { faqPageSchema, marketingBreadcrumbSchema } from '@/lib/seo/page-schema'
+import { LOCALE_PREFIX } from '@/lib/i18n/locales'
 import { jsonForScriptTag } from '@/lib/content/public-article-html'
 import { MarketingHero } from './landing/MarketingHero'
 import { Rise } from './landing/motion'
@@ -195,9 +197,8 @@ export function FeaturePage({
 
   // Both are built from copy that is already rendered below: the trail from the
   // hero's label, the questions from the `faq` section's own items.
-  const breadcrumb = path
-    ? marketingBreadcrumbSchema(locale, path, content.breadcrumbName ?? hero.eyebrow)
-    : null
+  const crumbName = content.breadcrumbName ?? hero.eyebrow
+  const breadcrumb = path ? marketingBreadcrumbSchema(locale, path, crumbName) : null
   const faq = faqPageSchema(
     sections.flatMap((section) => (section.kind === 'faq' ? section.items : []))
   )
@@ -214,6 +215,13 @@ export function FeaturePage({
 
       <main className="flex-1">
         <MarketingHero
+          /* THE TRAIL THE MARKUP DESCRIBES, on the page. Google's structured
+             data guidelines say not to mark up content that is not visible to
+             the reader, and the articles, the about page and the legal
+             documents have shown a trail here all along — these were the only
+             pages carrying a BreadcrumbList nobody could see. Same component,
+             same labels, so the two cannot drift. */
+          before={path ? <Breadcrumbs items={[{ label: crumbName, href: `${LOCALE_PREFIX[locale]}${path}` }]} locale={locale} /> : undefined}
           eyebrow={hero.eyebrow}
           eyebrowIcon={hero.eyebrowIcon}
           title={hero.title}

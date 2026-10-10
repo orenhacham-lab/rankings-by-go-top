@@ -37,7 +37,7 @@ check(`no hard-coded aggregateRating anywhere (found: ${offenders.map((f) => f.s
 
 const layout = stripComments(readFileSync(join(ROOT, 'app/layout.tsx'), 'utf8'))
 const schemaRoute = stripComments(readFileSync(join(ROOT, 'app/api/schema/route.ts'), 'utf8'))
-check('layout uses the catalog offer, in the reader\'s currency', /offers:\s*softwareOffer\(locale\)/.test(layout))
+check('layout uses the catalog offer, in the visitor\'s currency', /offers:\s*softwareOffer\(market\)/.test(layout))
 check('/api/schema uses the catalog offer', /offers:\s*SOFTWARE_OFFER/.test(schemaRoute))
 check('no "free" price claim in the layout markup', !/price:\s*['"]0['"]/.test(layout))
 check('no invalid "varies" price in /api/schema', !/['"]varies['"]/.test(schemaRoute))
@@ -46,10 +46,10 @@ const prices = PLAN_CODES.map((c) => PLAN_CATALOG[c].priceILS)
 check('offer low price = cheapest plan', SOFTWARE_OFFER.lowPrice === String(Math.min(...prices)))
 check('offer high price = dearest plan', SOFTWARE_OFFER.highPrice === String(Math.max(...prices)))
 check('the shekel offer is ILS (the catalog field it reads)', SOFTWARE_OFFER.priceCurrency === 'ILS')
-// Every other country pays in dollars, so the offer a non-Hebrew page shows
-// must be the dollar range, not a shekel figure the page never displays.
+// Every market but Israel pays in dollars, so the offer such a visitor is
+// shown must be the dollar range, not a shekel figure the page never displays.
 const usd = PLAN_CODES.map((c) => PLAN_CATALOG[c].priceUSD)
-check('the dollar offer is the real dollar range', softwareOffer('en').priceCurrency === 'USD' && softwareOffer('en').lowPrice === String(Math.min(...usd)) && softwareOffer('en').highPrice === String(Math.max(...usd)))
+check('the dollar offer is the real dollar range', softwareOffer('USD').priceCurrency === 'USD' && softwareOffer('USD').lowPrice === String(Math.min(...usd)) && softwareOffer('USD').highPrice === String(Math.max(...usd)))
 
 // MUTATION CONTROLS: the detector must catch the exact shapes that were live.
 check('MUTATION CONTROL: the old layout rating is caught', hasHardcodedRating("aggregateRating: { '@type': 'AggregateRating', ratingValue: '4.8', ratingCount: '156' },"))
