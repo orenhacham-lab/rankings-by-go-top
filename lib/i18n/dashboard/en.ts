@@ -6023,6 +6023,9 @@ export const dashboardEn = {
       starting: 'Opening the secure payment page...',
       error: 'We couldn’t open the payment page. Try again in a moment, or write to us and we’ll help.',
       changePlanNote: 'To move to another plan, contact us and we’ll arrange it for you.',
+      disclosure:
+        "A card payment is made through Creem (Armitage Labs OÜ), the merchant of record: Creem issues the invoice, adds tax by your billing address, and the charge appears on your statement in Creem's name. The service itself stays ours.",
+      buyerTermsLabel: "Creem's buyer terms",
     },
     shopify: {
       title: 'Billing is managed through Shopify',
