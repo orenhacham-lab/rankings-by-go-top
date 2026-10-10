@@ -29,9 +29,12 @@
  *                                         plugin has nowhere to keep them (needs the plugin)
  *   3. Persist the truthful outcome (persistSeoOutcome) — only with --apply.
  *
- * Safety beyond that: the post's address must be on the connected site's own host, and when the
- * page names its post id (body class postid-N) it must be the article's wp_post_id; otherwise the
- * article is skipped. A dry run (the default) reads pages and the database only: no WordPress
+ * ONLY POSTS WE PUBLISHED. Candidates are generated_articles rows with our own wp_post_id and
+ * wp_post_url. The post's address must be on the connected site's own host, the page must not
+ * redirect elsewhere, and the page must NAME ITS POST ID (body class postid-N, WordPress's
+ * shortlink ?p=N, or its REST alternate link /wp/v2/posts/N): every id it names must be the
+ * article's wp_post_id, and a page that names none is skipped (post_id_unconfirmed), so the
+ * plugin path, which writes to the post at that address, can only reach our own post. A dry run (the default) reads pages and the database only: no WordPress
  * call, no plugin call, no database write. Idempotent: a second run finds the fields `ours`.
  *
  * The service role bypasses RLS: the plugin link is read by project AND its owner, and an article
@@ -80,8 +83,8 @@ export interface BackfillArticle {
 export interface HeadReading {
   title: string | null
   description: string | null
-  /** The page's own post id (body class postid-N), when it says. */
-  postId: number | null
+  /** Every post id the page names for itself: body class postid-N, shortlink ?p=N, REST alternate link. */
+  postIds: number[]
   seoPluginHint: 'yoast' | 'rankmath' | null
 }
 
@@ -91,7 +94,7 @@ export interface ArticleReport {
   url: string
   channel: Channel['kind']
   seoPluginHint: string | null
-  skip: null | 'not_owner' | 'no_url' | 'no_channel' | 'site_mismatch' | 'page_unreadable' | 'redirected' | 'post_id_mismatch' | 'no_post_id' | 'nothing_to_write'
+  skip: null | 'not_owner' | 'no_url' | 'no_channel' | 'site_mismatch' | 'page_unreadable' | 'redirected' | 'post_id_mismatch' | 'post_id_unconfirmed' | 'no_post_id' | 'nothing_to_write'
   head: { title: FieldState; description: FieldState; pageTitle: string | null; pageDescription: string | null }
   title: FieldOutcome
   description: FieldOutcome
@@ -127,9 +130,16 @@ const host = (u: string) => { try { return new URL(u).hostname.toLowerCase().rep
 export function readHead(html: string, url: string): HeadReading {
   const s = extractSiteSignals(html, url, { robotsTxt: null, llmsTxt: false })
   const body = html.match(/<body\b[^>]*\bclass\s*=\s*["']([^"']*)["']/i)?.[1] ?? ''
+  const ids = new Set<number>()
   const pid = body.match(/(?:^|\s)postid-(\d+)(?:\s|$)/)?.[1]
+  if (pid) ids.add(Number(pid))
+  for (const tag of html.match(/<link\b[^>]*>/gi) ?? []) {
+    const href = tag.match(/\bhref\s*=\s*["']([^"']+)["']/i)?.[1] ?? ''
+    if (/\brel\s*=\s*["']?shortlink/i.test(tag)) { const n = href.match(/[?&](?:amp;)?p=(\d+)/)?.[1]; if (n) ids.add(Number(n)) }
+    if (/\brel\s*=\s*["']?alternate/i.test(tag)) { const n = href.match(/\/wp\/v2\/posts\/(\d+)/)?.[1]; if (n) ids.add(Number(n)) }
+  }
   const hint = /yoast seo plugin|yoast-schema-graph/i.test(html) ? 'yoast' : /rank math|rank-math-schema/i.test(html) ? 'rankmath' : null
-  return { title: s.title, description: s.metaDescription, postId: pid ? Number(pid) : null, seoPluginHint: hint }
+  return { title: s.title, description: s.metaDescription, postIds: [...ids], seoPluginHint: hint }
 }
 
 /** Which fields are missing on the page (pure). Anything not clearly missing is left alone. */
@@ -195,6 +205,7 @@ export async function backfillArticle(
   const skip = (why: NonNullable<ArticleReport['skip']>, detail?: string) => { report.skip = why; if (detail) report.detail = detail; return report }
   if (a.articleUserId && a.ownerId && a.articleUserId !== a.ownerId) return skip('not_owner')
   if (!/^https:\/\//i.test(a.wpPostUrl)) return skip('no_url')
+  if (!a.wpPostId) return skip('no_post_id')
   if (channel.kind === 'none') return skip('no_channel')
   if (host(channel.siteUrl) !== host(a.wpPostUrl)) return skip('site_mismatch', `${host(a.wpPostUrl)}|${host(channel.siteUrl)}`)
 
@@ -208,7 +219,8 @@ export async function backfillArticle(
   report.seoPluginHint = head.seoPluginHint
   const state = classifyHead(head, a)
   report.head = { ...state, pageTitle: head.title, pageDescription: head.description }
-  if (head.postId !== null && a.wpPostId !== null && head.postId !== a.wpPostId) return skip('post_id_mismatch', `page ${head.postId} vs article ${a.wpPostId}`)
+  if (head.postIds.length === 0) return skip('post_id_unconfirmed')
+  if (head.postIds.some((id) => id !== a.wpPostId)) return skip('post_id_mismatch', `page:${head.postIds.join(',')}|article:${a.wpPostId}`)
 
   const wantTitle = state.title === 'missing' && !!a.metaTitle
   const wantDesc = state.description === 'missing' && !!a.metaDescription
@@ -227,7 +239,6 @@ export async function backfillArticle(
     }
     return report
   }
-  if (channel.kind === 'app_password' && !a.wpPostId) return skip('no_post_id')
   if (!opts.apply) return report
 
   let seo: SeoPublishResult

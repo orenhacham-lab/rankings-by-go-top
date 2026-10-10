@@ -114,7 +114,7 @@ async function main() {
   })
   const writes = { n: 0 }
   const deps: BackfillDeps = {
-    fetchHtml: async (u) => ({ ok: true, url: u.toString(), status: 200, html: `<html><head><title>Post - Shop</title></head><body></body></html>`, truncated: false }),
+    fetchHtml: async (u) => ({ ok: true, url: u.toString(), status: 200, html: `<html><head><title>Post - Shop</title></head><body class="postid-${10 + Number(u.pathname.match(/p-(\d+)/)?.[1] ?? -1)}"></body></html>`, truncated: false }),
     writeViaPlugin: (async () => { writes.n++; return { plugin: 'none', status: 'verified' } }) as never,
     writeViaAppPassword: (async () => { writes.n++; return { plugin: 'yoast', status: 'verified' } }) as never,
     loadCreds: async () => { writes.n++; return { error: 'x' } },

@@ -23,6 +23,7 @@ import { generatePluginKey, pairingCode } from '@/lib/site-fix/plugin-auth'
 import { writeSeoViaGoTopPlugin } from '../seo-publish'
 import { backfillArticle, classifyHead, readHead, runBackfill, type BackfillArticle, type BackfillDeps, type Channel } from '../seo-backfill'
 import { parseArgs } from '../../../scripts/backfill-article-seo-meta'
+import { seoMetaKeys } from '../wordpress-taxonomy'
 
 let passed = 0
 let failed = 0
@@ -30,6 +31,8 @@ function check(name: string, cond: boolean, detail?: string) {
   if (cond) { passed++; console.log(`  ✓ ${name}`) } else { failed++; console.log(`  ✗ ${name}${detail ? ` — ${detail}` : ''}`) }
 }
 const ROOT = process.cwd()
+const read = (p: string) => readFileSync(join(ROOT, p), 'utf8')
+const strip = (src: string) => src.replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[^:'"`])\/\/.*$/gm, '$1')
 
 async function mutant<T>(rel: string, edit: (src: string) => string): Promise<T> {
   const file = join(ROOT, rel)
@@ -84,7 +87,7 @@ async function main() {
     const h = readHead(page({ desc: null }), URL_)
     const c = classifyHead(h, article)
     check('H1: no meta description → missing; the template title "Post title - Site" → missing', c.description === 'missing' && c.title === 'missing', JSON.stringify(c))
-    check('H2: the page says it runs Yoast, and which post it is', h.seoPluginHint === 'yoast' && h.postId === 21)
+    check('H2: the page says it runs Yoast, and which post it is', h.seoPluginHint === 'yoast' && h.postIds.join() === '21')
     const ours = classifyHead(readHead(page({ title: `${META_TITLE} | Shop`, desc: META_DESC }), URL_), article)
     check('H3: the article\'s own words → ours', ours.title === 'ours' && ours.description === 'ours', JSON.stringify(ours))
     const kept = classifyHead(readHead(page({ title: 'Best boots in Haifa', desc: 'The merchant wrote this.' }), URL_), article)
@@ -214,6 +217,48 @@ async function main() {
     const mc = deps(page({ desc: null, postId: 99 }))
     await m.backfillArticle(noAdmin, article, appChannel, { apply: true }, mc.d)
     check('MUTATION CONTROL: dropping the post-id check is caught', mc.calls.app.length > 0)
+  }
+
+  console.log('\nO) only the post we published')
+  {
+    const bare = `<html><head><title>${POST_TITLE} - Shop</title></head><body class="single"></body></html>`
+    for (const ch of [pluginChannel, appChannel]) {
+      const dd = deps(bare)
+      const r = await backfillArticle(noAdmin, article, ch, { apply: true }, dd.d)
+      check(`O1: ${ch.kind}: a page that does not name its post id → post_id_unconfirmed, nothing written`, r.skip === 'post_id_unconfirmed' && wrote(dd.calls) === 0, JSON.stringify(r.skip))
+    }
+    const short = `<html><head><title>${POST_TITLE} - Shop</title><link rel='shortlink' href='${SITE}/?p=21' /><link rel="alternate" type="application/json" href="${SITE}/wp-json/wp/v2/posts/21" /></head><body></body></html>`
+    check('O2: the shortlink and the REST alternate link name the post too', readHead(short, URL_).postIds.join() === '21')
+    const mixed = deps(`<html><head><link rel="shortlink" href="${SITE}/?p=99" /></head><body class="postid-21"></body></html>`)
+    const rm = await backfillArticle(noAdmin, article, pluginChannel, { apply: true }, mixed.d)
+    check('O3: any id that is not ours → post_id_mismatch, nothing written', rm.skip === 'post_id_mismatch' && wrote(mixed.calls) === 0)
+    const noId = deps(page({ desc: null }))
+    const rn = await backfillArticle(noAdmin, { ...article, wpPostId: null }, pluginChannel, { apply: true }, noId.d)
+    check('O4: an article without our wp_post_id is never touched, on the plugin path too', rn.skip === 'no_post_id' && wrote(noId.calls) === 0)
+    const m = await mutant<typeof import('../seo-backfill')>('lib/content/seo-backfill.ts', (s2) => s2.replace("if (head.postIds.length === 0) return skip('post_id_unconfirmed')", ''))
+    const mc = deps(bare)
+    await m.backfillArticle(noAdmin, article, pluginChannel, { apply: true }, mc.d)
+    check('MUTATION CONTROL: writing to a page that does not name our post is caught by O1', mc.calls.plugin.length > 0)
+  }
+
+  console.log('\nK) no focus keyphrase on either path')
+  {
+    const back = strip(read('lib/content/seo-backfill.ts'))
+    const appOnly = (s2: string) => /metaTitle: wantTitle \? a\.metaTitle : null, metaDescription: wantDesc \? a\.metaDescription : null, focusKeyword: null,/.test(s2) && !/focus_keyphrase|loadFocusKeyword|publishArticleSeo/.test(s2)
+    check('K1: the backfill passes focusKeyword: null and never loads or sends a focus keyphrase', appOnly(back))
+    check('MUTATION CONTROL: a backfill that loads the focus keyphrase is caught', !appOnly(back.replace('focusKeyword: null,', 'focusKeyword: await loadFocusKeyword(admin, null),')))
+    const client = strip(read('lib/wordpress/client.ts'))
+    const body = client.slice(client.indexOf('export async function writeVerifiedSeoMeta'), client.indexOf('export async function readSeoMetaVerification'))
+    check('K2: writeVerifiedSeoMeta writes only seoMetaKeys(plugin, seo) (core REST and Bridge alike) and adds no keyword of its own',
+      /const meta = seoMetaKeys\(plugin, seo\)/.test(body) && (body.match(/\{ meta \}/g) ?? []).length === 1 && /writeSeoViaBridge\(creds, postId, plugin, meta\)/.test(body) && !/focusKeyword|loadFocusKeyword|focuskw/.test(body.replace('focusKeyword?: string | null', '')))
+    check('K3: with focusKeyword null, the Yoast and Rank Math keys are only the missing field',
+      JSON.stringify(seoMetaKeys('yoast', { metaTitle: null, metaDescription: META_DESC, focusKeyword: null })) === JSON.stringify({ _yoast_wpseo_metadesc: META_DESC }) &&
+      JSON.stringify(Object.keys(seoMetaKeys('rankmath', { metaTitle: META_TITLE, metaDescription: null, focusKeyword: null }))) === '["rank_math_title"]')
+    const pub = strip(read('lib/content/seo-publish.ts'))
+    const fn = pub.slice(pub.indexOf('export async function writeSeoViaGoTopPlugin'), pub.indexOf('export async function publishArticleSeo('))
+    const pluginOnly = (s2: string) => /const fields: \['seo_title' \| 'meta_description', string\]\[\] = \[\]/.test(s2) && !/focus_keyphrase/.test(s2)
+    check('K4: the plugin path (writeSeoViaGoTopPlugin) sends only seo_title and meta_description', pluginOnly(fn))
+    check('MUTATION CONTROL: a plugin path that adds focus_keyphrase is caught', !pluginOnly(fn.replace("if (description) fields.push(['meta_description', description])", "if (description) fields.push(['meta_description', description]); fields.push(['focus_keyphrase' as never, 'x'])")))
   }
 
   console.log('\nI/P) idempotent, and persisted only with --apply')

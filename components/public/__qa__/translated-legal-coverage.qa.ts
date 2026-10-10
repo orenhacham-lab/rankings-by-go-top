@@ -1674,6 +1674,49 @@ const NO_DOUBLE_BILLING_NAMES = [
     !NO_DOUBLE_BILLING.he[4].test(flat('החידוש נעצר תמיד ולעולם לא תיגבה תקופה נוספת.')))
 }
 
+// ── 24) completing a missing SEO field on an article we published ─────────
+/*
+ * Articles published before the Go Top plugin or its Bridge was on the site
+ * were left without their SEO title or meta description (Yoast / Rank Math
+ * keep them where core REST cannot write). The backfill
+ * (lib/content/seo-backfill.ts, run from the admin screen) fills ONLY a field
+ * that is missing on the live page, never replaces a value that is there (the
+ * plugin's own compare-and-set, expected: ''), and only on articles we
+ * published ourselves (generated_articles rows with our wp_post_id, the post
+ * on the connected host, the page naming that post id). It writes without a
+ * new approval, as the completion of the publish the customer approved, so
+ * both documents must say that it happens, that it never replaces, and that
+ * it is limited to our own articles — three separate promises per language.
+ */
+const SEO_COMPLETION: Record<string, RegExp[]> = {
+  he: [/נוכל להשלים לאחר מכן את השדה החסר/, /לעולם אינה מחליפה ערך קיים/, /וחלה רק על מאמרים שהשירות עצמו פרסם/],
+  en: [/we may fill in the missing field on that same article later/, /never replaces a value that exists/, /applies only to articles the Service itself published/],
+  es: [/podemos completar despu[ée]s el campo que falta/, /nunca sustituye un valor existente/, /se aplica solo a los art[íi]culos que el propio Servicio public[óo]/],
+  'pt-BR': [/podemos preencher depois o campo que falta/, /nunca substitui um valor existente/, /se aplica somente aos artigos que o pr[óo]prio Servi[çc]o publicou/],
+}
+const SEO_COMPLETION_NAMES = ['a missing SEO field may be completed later', 'an existing value is never replaced', 'only on articles the Service itself published']
+{
+  const readDoc = (path: string) => (existsSync(path) ? readFileSync(path, 'utf8') : '')
+  const flat = (s: string) => s.replace(/\s+/g, ' ')
+  const enPrivacy = frontMatter(text[LOCALES[0]].privacy).source
+  const enTerms = frontMatter(text[LOCALES[0]].terms).source
+  const docs: [string, string][] = [
+    ['he', readDoc(HEBREW_PRIVACY) + '\n' + readDoc(HEBREW_TERMS)],
+    ['en', readDoc(enPrivacy) + '\n' + readDoc(enTerms)],
+    ...LOCALES.map((l): [string, string] => [l, text[l].privacy + '\n' + text[l].terms]),
+  ]
+  for (const [name, raw] of docs) {
+    const body = flat(raw)
+    const patterns = SEO_COMPLETION[name]
+    check(`${name}/privacy+terms: the language has its own SEO-completion table`, Array.isArray(patterns))
+    ;(patterns ?? []).forEach((re, i) => check(`${name}/privacy+terms: ${SEO_COMPLETION_NAMES[i]}`, re.test(body)))
+  }
+  check('mutation control: a text that permits replacing an existing value is caught',
+    !SEO_COMPLETION.en[1].test(flat('Such a completion fills a missing field and may replace a value that exists, and applies only to articles the Service itself published.')))
+  check('mutation control: a text that drops the limit to our own articles is caught',
+    !SEO_COMPLETION.en[2].test(flat('Such a completion fills only a missing field, never replaces a value that exists, and applies to any page on your site.')))
+}
+
 console.log(`\n${pass} passed, ${fail} failed`)
 if (fail > 0) process.exit(1)
 
