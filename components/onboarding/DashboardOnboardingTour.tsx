@@ -76,14 +76,28 @@ function findTarget(selector: string): { el: HTMLElement | null; exists: boolean
 
 const toBox = (r: DOMRect): Box => ({ left: r.left, top: r.top, width: r.width, height: r.height })
 
-/** The boxes of the ancestors that clip `el`: every one that scrolls or hides its overflow. */
-function clipBoxes(el: HTMLElement): Box[] {
-  const boxes: Box[] = []
+/** The ancestors that clip `el`: every one that scrolls or hides its overflow. */
+function clippers(el: HTMLElement): HTMLElement[] {
+  const out: HTMLElement[] = []
   for (let p = el.parentElement; p && p !== document.body; p = p.parentElement) {
     const s = getComputedStyle(p)
-    if (s.overflowY !== 'visible' || s.overflowX !== 'visible') boxes.push(toBox(p.getBoundingClientRect()))
+    if (s.overflowY !== 'visible' || s.overflowX !== 'visible') out.push(p)
   }
-  return boxes
+  return out
+}
+const clipBoxes = (el: HTMLElement): Box[] => clippers(el).map((p) => toBox(p.getBoundingClientRect()))
+
+/**
+ * Scrolls the boxes that cut `el` off, and only them, so it is centred in each:
+ * the sidebar's nav moves, the page under it does not.
+ */
+function revealInClippers(el: HTMLElement) {
+  for (const p of clippers(el)) {
+    if (p.scrollHeight <= p.clientHeight) continue
+    const r = el.getBoundingClientRect(), pr = p.getBoundingClientRect()
+    if (!clippedBy(toBox(r), [toBox(pr)])) continue
+    p.scrollTop += (r.top - pr.top) - (pr.height - r.height) / 2
+  }
 }
 const sameBox = (a: Box | null, b: Box | null) =>
   !!a && !!b && a.left === b.left && a.top === b.top && a.width === b.width && a.height === b.height
@@ -201,10 +215,11 @@ function TourRunner({ run, onEnd }: { run: TourRun; onEnd: (how: TourEnd) => voi
   const target = shown?.target ?? null
   useEffect(() => {
     if (target) {
+      // Cut off by a box that scrolls (the sidebar's nav on a short screen, whose last
+      // entries sit under the rail's foot): that box scrolls, not the page.
+      if (clippedBy(toBox(target.getBoundingClientRect()), clipBoxes(target))) revealInClippers(target)
       const r = target.getBoundingClientRect()
-      // Off the screen, or inside it but cut off by a box that scrolls (the sidebar's
-      // nav on a short screen, whose last entries sit under the rail's foot).
-      if (r.top < 64 || r.bottom > window.innerHeight - 16 || clippedBy(toBox(r), clipBoxes(target))) {
+      if (r.top < 64 || r.bottom > window.innerHeight - 16) {
         target.scrollIntoView({ block: 'center', behavior: reducedMotion() ? 'auto' : 'smooth' })
       }
     }
