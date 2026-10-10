@@ -111,13 +111,19 @@ console.log('\nB) an existing PayPal payer is never moved')
 console.log('\nC) one plan card, one way to pay')
 {
   const PLANS = ['regular', 'advanced', 'premium', 'large_agency'] as const
+  // Every paid card asks the SAME helper what to offer, so no card can be
+  // given a button the other three are not.
   for (const plan of PLANS) {
-    check(`C1: the ${plan} card draws the card button only when the server said so`,
-      view.includes(`action={creemCheckout ? <CreemCheckoutButton plan="${plan}" /> : undefined}`))
+    check(`C1: the ${plan} card takes its action from the one helper`,
+      view.includes(`action={checkoutActionFor("${plan}")}`))
   }
-  check('C1-MUT: an unconditional card button is caught',
-    !view.replace('action={creemCheckout ? <CreemCheckoutButton plan="regular" /> : undefined}', 'action={<CreemCheckoutButton plan="regular" />}')
-      .includes('action={creemCheckout ? <CreemCheckoutButton plan="regular" /> : undefined}'))
+  check('C1-MUT: a card wired straight to the button is caught',
+    !view.replace('action={checkoutActionFor("regular")}', 'action={<CreemCheckoutButton plan="regular" />}')
+      .includes('action={checkoutActionFor("regular")}'))
+  check('C1b: the helper hands out the card button only when the server said so',
+    /if \(creemCheckout\) return <CreemCheckoutButton plan=\{plan\} \/>/.test(view))
+  check('C1b-MUT: an unconditional button in the helper is caught',
+    !/if \(creemCheckout\) return <CreemCheckoutButton/.test(view.replace('if (creemCheckout) return <CreemCheckoutButton plan={plan} />', 'return <CreemCheckoutButton plan={plan} />')))
 
   // PlanCard renders `action` INSTEAD of the PayPal container, so a card that
   // has one cannot show both.
@@ -126,9 +132,29 @@ console.log('\nC) one plan card, one way to pay')
   check('C2-MUT: rendering the container regardless is caught',
     !/\) : action \? \(\s*action\s*\) : \(/.test(view.replace(') : action ? (\n        action\n      ) : (', ') : (')))
 
-  check('C3: the PayPal SDK is not loaded on the card path', /\{!creemCheckout && <BillingClient market=\{market\} \/>\}/.test(view))
+  check('C3: the PayPal SDK is not loaded on either Creem path',
+    /\{!creemCheckout && !creemGoverned && <BillingClient market=\{market\} \/>\}/.test(view))
   check('C3-MUT: loading it anyway is caught',
-    !/\{!creemCheckout && <BillingClient/.test(view.replace('{!creemCheckout && <BillingClient market={market} />}', '<BillingClient market={market} />')))
+    !/!creemCheckout && !creemGoverned && <BillingClient/.test(view.replace('{!creemCheckout && !creemGoverned && <BillingClient market={market} />}', '<BillingClient market={market} />')))
+  check('C3-MUT2: dropping only the governed half is caught',
+    !/!creemCheckout && !creemGoverned && <BillingClient/.test(view.replace('!creemCheckout && !creemGoverned &&', '!creemCheckout &&')))
+
+  // An account Creem already bills is offered NOTHING to click: the card
+  // button is for a first payment, and the PayPal container underneath would
+  // open a second subscription at a second provider.
+  const governedAction = /if \(creemGoverned\) return <p[^>]*>\{t\.creem\.changePlanNote\}<\/p>/.test(view)
+    && view.indexOf('if (creemCheckout) return <CreemCheckoutButton') < view.indexOf('if (creemGoverned) return')
+  check('C4: a Creem-billed account gets the contact line instead of a button', governedAction)
+  check('C4-MUT: falling through to the PayPal container is caught',
+    !/if \(creemGoverned\) return <p/.test(view.replace('if (creemGoverned) return <p className="text-caption text-muted">{t.creem.changePlanNote}</p>', '')))
+
+  check('C5: the server decides it, from the subscription row itself',
+    /const creemGoverned = entitlement\.hasActiveSubscription && !!activeSub\?\.creem_subscription_id/.test(page)
+    && /\.select\('status, paypal_subscription_id, creem_subscription_id'\)/.test(page)
+    && /creemGoverned=\{creemGoverned\}/.test(page))
+  check('C5-MUT: not reading the Creem id is caught',
+    !/\.select\('status, paypal_subscription_id, creem_subscription_id'\)/.test(
+      page.replace(".select('status, paypal_subscription_id, creem_subscription_id')", ".select('status, paypal_subscription_id')")))
 }
 
 console.log('\nD) what the button sends, and what it follows')
@@ -165,7 +191,7 @@ console.log('\nD) what the button sends, and what it follows')
 
 console.log('\nE) every dashboard language has the strings')
 {
-  const KEYS = ['payButton', 'starting', 'error'] as const
+  const KEYS = ['payButton', 'starting', 'error', 'changePlanNote'] as const
   const DICTS = {
     he: 'lib/i18n/dashboard/he.ts',
     en: 'lib/i18n/dashboard/en.ts',
@@ -221,6 +247,11 @@ console.log('\nF) what the screen actually renders')
     check(`F3 (${locale}): the button is in this language`, card.includes(t.payButton))
     check(`F4 (${locale}): the PayPal path is untouched — containers, no pay button`,
       PLANS.every((plan) => paypal.includes(`paypal-button-${plan}`)) && !paypal.includes('data-creem-checkout'))
+
+    const governed = render(locale, { creemCheckout: false, creemGoverned: true, hasActiveSubscription: true, trialActive: false, plan: 'regular' })
+    check(`F5 (${locale}): a Creem-billed account sees no checkout at all`,
+      !governed.includes('paypal-button-') && !governed.includes('data-creem-checkout'))
+    check(`F6 (${locale}): and is told how to change plan`, governed.includes(t.changePlanNote))
   }
 }
 

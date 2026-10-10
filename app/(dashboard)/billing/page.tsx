@@ -44,7 +44,7 @@ export default async function BillingPage() {
 
   const { data: activeSub } = await supabase
     .from('subscriptions')
-    .select('status, paypal_subscription_id')
+    .select('status, paypal_subscription_id, creem_subscription_id')
     .eq('user_id', user.id)
     .in('status', ['active', 'cancelled'])
     .order('created_at', { ascending: false })
@@ -134,6 +134,13 @@ export default async function BillingPage() {
   //     mode never shows a real visitor a checkout that grants nothing.
   //
   // The checkout route re-checks all of this; this only decides what is drawn.
+  // Creem already bills this account. Then no checkout is offered on any
+  // other plan: the card button is gated to a first payment, and without this
+  // the screen would fall back to the PayPal buttons underneath — handing a
+  // Creem payer a second subscription at a second provider, which is the one
+  // outcome the gate below exists to prevent.
+  const creemGoverned = entitlement.hasActiveSubscription && !!activeSub?.creem_subscription_id
+
   let creemCheckout = false
   if (
     isCreemEnabled()
@@ -177,6 +184,7 @@ export default async function BillingPage() {
       market={market}
       marketLocked={marketLocked}
       creemCheckout={creemCheckout}
+      creemGoverned={creemGoverned}
       planPrices={{
         trial: 0,
         regular: planPriceIn(PLAN_CATALOG.regular, market),
