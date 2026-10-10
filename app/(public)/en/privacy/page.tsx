@@ -88,6 +88,11 @@ export default function EnglishPrivacyPage() {
         <ul>
           <li><strong>Shopify:</strong> for payment processing for accounts billed through Shopify App Pricing, and for publishing content to a connected store</li>
           <li><strong>PayPal:</strong> for payment processing for website-billed customers only</li>
+          <li><strong>Creem:</strong> for payment processing, where an account&rsquo;s payment goes through it. To
+          open a payment we send the e-mail address of the account, the identifier of the plan chosen and our
+          own reference for that request, and we receive back a customer identifier held by them, a plan
+          identifier, the subscription status and the dates of the billing period. Card details, and any other
+          payment instrument, never reach us at any point</li>
           <li><strong>Supabase:</strong> for secure data storage</li>
           <li><strong>Serper:</strong> for Google search queries and rank checks</li>
           <li><strong>Resend:</strong> for sending email — see &ldquo;Email Messages&rdquo; below</li>
