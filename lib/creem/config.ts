@@ -80,3 +80,30 @@ export function creemReadiness(): CreemReadiness {
   const enabled = isCreemEnabled()
   return { enabled, mode: creemMode(), ready: enabled && missing.length === 0, missing }
 }
+
+/**
+ * Where Creem sends the payer back after paying.
+ *
+ * Built from OUR OWN canonical origin and a fixed path — never from a
+ * request header, a query parameter, or anything else a caller supplies. A
+ * checkout whose return URL came from the request would be a redirect an
+ * attacker chooses (CLAUDE.md: never allow an external `next` URL), and it
+ * would be a redirect the payer reaches immediately after entering card
+ * details.
+ *
+ * The origin is overridable by env for the sandbox only, and only to another
+ * absolute https URL; anything else falls back to the canonical origin.
+ */
+const CANONICAL_ORIGIN = 'https://www.gotopseo.com'
+
+export function creemReturnOrigin(): string {
+  const configured = process.env.CREEM_RETURN_ORIGIN?.trim()
+  if (configured && /^https:\/\/[^/\s]+$/.test(configured)) return configured.replace(/\/+$/, '')
+  return CANONICAL_ORIGIN
+}
+
+export const CREEM_SUCCESS_PATH = '/billing?checkout=creem'
+
+export function creemSuccessUrl(): string {
+  return `${creemReturnOrigin()}${CREEM_SUCCESS_PATH}`
+}
