@@ -228,7 +228,7 @@ async function main() {
   console.log('\nB) every query is filtered by the project and its owner')
   {
     const r = await call(P)
-    const OWNED = new Set(['generated_articles', 'article_pool_items', 'article_topics', 'project_profiles', 'wordpress_connections', 'shopify_connections', 'ai_scan_runs'])
+    const OWNED = new Set(['generated_articles', 'article_pool_items', 'article_topics', 'project_profiles', 'wordpress_connections', 'shopify_connections', 'ai_scan_runs', 'site_fix_plugin_links'])
     const rest = r.log.filter((q) => q.table !== 'projects')
     check('B1: the handler reads the expected tables', ['generated_articles', 'article_pool_items', 'article_topics', 'project_profiles', 'wordpress_connections', 'shopify_connections', 'scans', 'ai_scan_runs', 'ai_scan_results', 'tracking_targets']
       .every((t) => rest.some((q) => q.table === t)), [...new Set(rest.map((q) => q.table))])
@@ -237,8 +237,11 @@ async function main() {
     const noOwner = rest.filter((q) => OWNED.has(q.table) && eqOf(q, 'user_id')[0] !== USER)
     check('B3: every query of a table with an owner column is filtered to the signed-in owner', noOwner.length === 0, noOwner.map((q) => `${q.client}:${q.table}`))
     const adminTables = [...new Set(rest.filter((q) => q.client === 'admin').map((q) => q.table))].sort()
-    check('B4: the service role reads only the AI-visibility tables (billing goes through the injected entitlement)',
-      JSON.stringify(adminTables) === JSON.stringify(['ai_citations', 'ai_scan_results', 'ai_scan_runs']), adminTables)
+    check('B4: the service role reads only the AI-visibility tables and the plugin link\'s status (billing goes through the injected entitlement)',
+      JSON.stringify(adminTables) === JSON.stringify(['ai_citations', 'ai_scan_results', 'ai_scan_runs', 'site_fix_plugin_links']), adminTables)
+    const linkReads = rest.filter((q) => q.table === 'site_fix_plugin_links')
+    check('B4b: the plugin link is read for its status only (never its key), by the service role',
+      linkReads.length > 0 && linkReads.every((q) => q.client === 'admin' && q.calls.some((c) => c.op === 'select' && c.args[0] === 'status')), linkReads.map((q) => JSON.stringify(q.calls[0])))
     const cites = rest.filter((q) => q.table === 'ai_citations')
     // The counted answers now (r1's four) and in the picture before the newest check (r0's two).
     check('B5b: sources are read only for this project\'s counted answers of those runs',
@@ -355,6 +358,16 @@ async function main() {
     check('E2: no description, no business name and no platform are all open', s2?.business === false && s2.platform === false, s2)
     const pending = await call(P, { tables: (t) => { t.wordpress_connections = [{ id: 'wp1', user_id: USER, project_id: P, connection_status: 'untested' }] } })
     check('E3: a WordPress row that is not connected is not a connected platform', ready<SetupData>(pending.body.setup)?.platform === false)
+    const pluginOnly = await call(P, { tables: (t) => {
+      t.wordpress_connections = []
+      t.site_fix_plugin_links = [{ project_id: P, user_id: USER, status: 'connected', secret_encrypted: 'x' }]
+    } })
+    check('E3b: a WordPress site connected by the GO TOP plugin alone is a connected platform', ready<SetupData>(pluginOnly.body.setup)?.platform === true, pluginOnly.body.setup)
+    const otherOwner = await call(P, { tables: (t) => {
+      t.wordpress_connections = []
+      t.site_fix_plugin_links = [{ project_id: P, user_id: 'someone-else', status: 'connected', secret_encrypted: 'x' }]
+    } })
+    check('E3c: ... never another owner\'s plugin link (so E3b is not vacuous)', ready<SetupData>(otherOwner.body.setup)?.platform === false)
     const named = await call(P, { tables: (t) => { t.project_profiles = [] } })
     check('E4: a business name alone describes the business', ready<SetupData>(named.body.setup)?.business === true)
     const events = ready<ActivityEvent[]>(r.body.activity) ?? []

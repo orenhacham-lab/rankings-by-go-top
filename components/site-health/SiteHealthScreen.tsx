@@ -163,7 +163,7 @@ export default function SiteHealthScreen({ project }: { project: Project & { sit
     // (A broken link is judged by the page it was found on, which the store's own check reads.)
     if (caps.shopify && (finding.fixType === 'llms_txt' || (finding.fixType !== 'broken_link' && page.kind !== 'article' && page.kind !== 'page'))) return null
     // Images outside the page's text that are Media Library items: written there with the application password.
-    if (finding.fixType === 'image_alt' && page.media) return !caps.shopify && caps.appPassword ? 'fix' : null
+    if (finding.fixType === 'image_alt' && page.media) return !caps.shopify && (caps.mediaAlt ?? caps.appPassword) ? 'fix' : null
     // The store's own check found the problem outside what the connection edits (theme, menu, a product).
     if (page.outside === 'theme') return null
     // A product's own photos, or a page a page builder renders from its own data: no text fix reaches them.
@@ -188,7 +188,7 @@ export default function SiteHealthScreen({ project }: { project: Project & { sit
    * one fix for the whole site, read from the home page, which shows them too.
    */
   const themeFixPage = useCallback((f: Finding): FindingPage | null => {
-    if (!queueLive || !caps || caps.shopify || !caps.appPassword || !report || f.fixType !== 'image_alt' || !f.themeAlt?.media) return null
+    if (!queueLive || !caps || caps.shopify || !(caps.mediaAlt ?? caps.appPassword) || !report || f.fixType !== 'image_alt' || !f.themeAlt?.media) return null
     return { url: report.siteUrl, path: '/', kind: 'home', value: null, measure: f.themeAlt.images, fixable: true, adminUrl: null, media: true }
   }, [queueLive, caps, report])
   const findings = useMemo(() => {

@@ -43,6 +43,7 @@ import { encryptCredential } from '@/lib/security/credentials-crypto'
 import { generatePluginKey, pairingCode } from '@/lib/site-fix/plugin-auth'
 import { pluginMedia } from '@/lib/site-fix/plugin-client'
 import type * as PublishModule from '../wordpress-plugin-publish'
+import type * as CapModule from '@/lib/site-fix/plugin-capabilities'
 import type * as PlatformModule from '../platform/load-active-platform'
 
 let passed = 0
@@ -207,13 +208,14 @@ async function main() {
     check('R17: SEO job ids are UUID-shaped and stable (a republish is the plugin\'s "already")', fixes.every((f) => /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-8[0-9a-f]{3}-[0-9a-f]{12}$/.test(f.job_id)) && fixes[0]!.job_id === M.seoJobId(ART, 'seo_title', 'Waterproof boots'))
   }
 
-  const noVersion = await mutant<typeof PublishModule>('lib/content/wordpress-plugin-publish.ts', (s) => s.replace('    if (!versionAtLeast(row.plugin_version, PUBLISH_PLUGIN_MIN_VERSION)) return null\n', ''))
+  const noVersion = await mutant<typeof PublishModule>('lib/content/wordpress-plugin-publish.ts', (s) => s.replace('  if (!plugin || !versionAtLeast(plugin.version, PUBLISH_PLUGIN_MIN_VERSION)) return null\n', '  if (!plugin) return null\n'))
   const mPub = await noVersion.loadWordPressPublisher(db({ plugin: { plugin_version: '2.1.0' } }) as never, PROJECT)
   check('MUTATION CONTROL: without the version check a 2.1.0 plugin is sent articles (so R5 would fail)', !('error' in mPub) && mPub.via === 'plugin')
-  const noConnected = await mutant<typeof PublishModule>('lib/content/wordpress-plugin-publish.ts', (s) => s.replace("row.status !== 'connected' || ", ''))
-  const mPend = await noConnected.loadWordPressPublisher(db({ plugin: { status: 'pending' } }) as never, PROJECT)
-  check('MUTATION CONTROL: without the connected check a pending plugin is used (so R5 pending would fail)', !('error' in mPend) && mPend.via === 'plugin')
-  const noFallback = await mutant<typeof PublishModule>('lib/content/wordpress-plugin-publish.ts', (s) => s.replace("if (r.pluginCode === 'not_ours' && publisher.creds) {", 'if (false) {'))
+  // The link is read in lib/site-fix/plugin-capabilities.ts (loadConnectedPlugin), which loadPublishPlugin calls.
+  const noConnected = await mutant<typeof CapModule>('lib/site-fix/plugin-capabilities.ts', (s) => s.replace("row.status !== 'connected' || ", ''))
+  const mPend = await noConnected.loadConnectedPlugin(db({ plugin: { status: 'pending' } }) as never, PROJECT)
+  check('MUTATION CONTROL: without the connected check a pending plugin is used (so R5 pending would fail)', mPend !== null)
+  const noFallback = await mutant<typeof PublishModule>('lib/content/wordpress-plugin-publish.ts', (s) => s.replace("if (r.pluginCode === 'not_ours' && publisher.creds && !pluginOnly) {", 'if (false) {'))
   {
     const admin = db()
     const pub = await noFallback.loadWordPressPublisher(admin as never, PROJECT)
@@ -231,12 +233,14 @@ async function main() {
     if ('error' in both || 'error' in only) throw new Error('expected publishers')
     const t1 = canned(); const ap1 = appPassword()
     const f1 = await M.publishArticleToWordPress(db() as never, both, ARTICLE() as never, { status: 'publish', forceNew: true }, { post: t1.post, appPassword: ap1.fn })
-    check('F1: a NEW separate post (force) with an application password: created over it, the plugin is not called',
-      f1.ok && f1.via === 'app_password' && ap1.calls.length === 1 && t1.sent.length === 0)
+    // 3.0.0 stored: one signed /status asks whether it was updated (the canned 3.0.0 site has no 3.1 answer), nothing is written.
+    const onlyStatus = (sent: Sent[]) => sent.every((x) => x.route === '/status')
+    check('F1: plugin 3.0.0: a NEW separate post (force) with an application password: created over it, the plugin writes nothing',
+      f1.ok && f1.via === 'app_password' && ap1.calls.length === 1 && onlyStatus(t1.sent))
     const t2 = canned(); const ap2 = appPassword()
     const f2 = await M.publishArticleToWordPress(db({ wp: false }) as never, only, ARTICLE() as never, { status: 'publish', forceNew: true }, { post: t2.post, appPassword: ap2.fn })
     check('F2: ... plugin-only: the typed refusal plugin_new_post_unsupported, nothing sent, never a quiet update of the existing post',
-      !f2.ok && f2.unsupported === 'plugin_new_post_unsupported' && f2.detail === 'plugin_new_post_unsupported' && t2.sent.length === 0 && ap2.calls.length === 0)
+      !f2.ok && f2.unsupported === 'plugin_new_post_unsupported' && f2.detail === 'plugin_new_post_unsupported' && onlyStatus(t2.sent) && ap2.calls.length === 0)
     const t3 = canned(); const ap3 = appPassword()
     const f3 = await M.publishArticleToWordPress(db() as never, both, ARTICLE() as never, { status: 'future' as never }, { post: t3.post, appPassword: ap3.fn })
     check('F3: a scheduled status with an application password: over it (the status it was asked), the plugin is not called',
@@ -252,7 +256,7 @@ async function main() {
     const f6 = 'error' in appOnly ? null : await M.publishArticleToWordPress(db({ plugin: null }) as never, appOnly, ARTICLE() as never, { status: 'publish', forceNew: true }, { appPassword: ap6.fn })
     check('F6: application password only: force is the legacy new post, unchanged', !!f6 && f6.ok && f6.via === 'app_password' && ap6.calls.length === 1)
   }
-  const noRoute = await mutant<typeof PublishModule>('lib/content/wordpress-plugin-publish.ts', (s) => s.replace('  const unsupported = pluginUnsupported(opts)\n', '  const unsupported = null as PluginUnsupported | null\n'))
+  const noRoute = await mutant<typeof PublishModule>('lib/content/wordpress-plugin-publish.ts', (s) => s.replace('  const unsupported = pluginUnsupported(opts, plugin.version)\n', '  const unsupported = null as PluginUnsupported | null\n'))
   {
     const both = await noRoute.loadWordPressPublisher(db() as never, PROJECT)
     const only = await noRoute.loadWordPressPublisher(db({ wp: false }) as never, PROJECT)
@@ -264,7 +268,7 @@ async function main() {
     const m2 = await noRoute.publishArticleToWordPress(db({ wp: false }) as never, only, ARTICLE() as never, { status: 'publish', forceNew: true }, { post: t2.post, appPassword: appPassword().fn })
     check('MUTATION CONTROL: ... and plugin-only it is a quiet update instead of the typed refusal (so F2 would fail)', m2.ok && t2.sent.some((x) => x.route === '/publish'))
   }
-  const noCredsBranch = await mutant<typeof PublishModule>('lib/content/wordpress-plugin-publish.ts', (s) => s.replace('  if (unsupported) {\n    if (publisher.creds) {', '  if (unsupported) {\n    if (false) {'))
+  const noCredsBranch = await mutant<typeof PublishModule>('lib/content/wordpress-plugin-publish.ts', (s) => s.replace('  if (unsupported) {\n    if (publisher.creds && !pluginOnly) {', '  if (unsupported) {\n    if (false) {'))
   {
     const both = await noCredsBranch.loadWordPressPublisher(db() as never, PROJECT)
     if ('error' in both) throw new Error('expected publisher')
@@ -304,12 +308,14 @@ async function main() {
     const badKey = await M.loadPublishPlugin(db({ plugin: { secret_encrypted: 'not-a-ciphertext' } }) as never, PROJECT)
     check('O5: a key that cannot be decrypted is "no plugin", never thrown', badKey === null)
   }
-  const noOwnerCheck = await mutant<typeof PublishModule>('lib/content/wordpress-plugin-publish.ts', (s) => s.replace('    if (opts.ownerId !== undefined && opts.ownerId !== owner) return null\n', ''))
-  check('MUTATION CONTROL: without the owner check a non-owner gets the plugin (so O3 would fail)', !!(await noOwnerCheck.loadPublishPlugin(db() as never, PROJECT, { ownerId: 'intruder' })))
+  const noOwnerCheck = await mutant<typeof CapModule>('lib/site-fix/plugin-capabilities.ts', (s) => s.replace('    if (opts.ownerId !== undefined && opts.ownerId !== owner) return null\n', ''))
+  check('MUTATION CONTROL: without the owner check a non-owner gets the plugin (so O3 would fail)', !!(await noOwnerCheck.loadConnectedPlugin(db() as never, PROJECT, { ownerId: 'intruder' })))
   const pubSrc = strip(read('lib/content/wordpress-plugin-publish.ts'))
-  const ownerScoped = (src: string) => /readPluginLink\(admin, \{ projectId, userId: owner \}\)/.test(src) && !/from\('site_fix_plugin_links'\)/.test(src)
-  check('O6: the link is read only through readPluginLink (project + owner filter), never by a raw query', ownerScoped(pubSrc))
-  check('MUTATION CONTROL: a raw unfiltered read of the links is caught', !ownerScoped(pubSrc + "\nadmin.from('site_fix_plugin_links').select('*')"))
+  const capSrc = strip(read('lib/site-fix/plugin-capabilities.ts'))
+  const ownerScoped = (pub: string, cap: string) => /loadConnectedPlugin\(admin, projectId, opts\)/.test(pub) && !/from\('site_fix_plugin_links'\)/.test(pub) &&
+    /const scope = \{ projectId, userId: owner \}\s*const row = await readPluginLink\(admin, scope\)/.test(cap) && !/from\('site_fix_plugin_links'\)/.test(cap)
+  check('O6: the link is read only through readPluginLink (project + owner filter), never by a raw query', ownerScoped(pubSrc, capSrc))
+  check('MUTATION CONTROL: a raw unfiltered read of the links is caught', !ownerScoped(pubSrc + "\nadmin.from('site_fix_plugin_links').select('*')", capSrc) && !ownerScoped(pubSrc, capSrc + "\nadmin.from('site_fix_plugin_links').select('*')"))
 
   // ── A) the active platform ────────────────────────────────────────────────
   console.log('\nA) the active platform')
@@ -392,14 +398,24 @@ async function main() {
       const upd = L.postfull(id)
       check('P9: an update is idempotent: the same post, updated in place, no new post', again.ok && again.wpPostId === id && again.updated === true && upd.count === made.count &&
         (upd.post as Row).post_title === 'Waterproof boots: the guide, updated')
-      const wrong = await M.publishArticleToWordPress(admin as never, pub, ARTICLE() as never, { status: 'publish', existing: { postId: 21 } }, { post: L.post })
+      // 3.1.0 adopt: the post the app RECORDED for this article (wp_post_id, made over the application
+      // password before, so no article id on it) is taken over in place. Another article's post never is (P10b).
+      const taken = await M.publishArticleToWordPress(admin as never, pub, ARTICLE({ title: 'Waterproof boots, taken over' }) as never, { status: 'publish', existing: { postId: 21 } }, { post: L.post })
       const after = L.postfull(21)
-      check('P10: another post\'s id is refused by the plugin (not_ours) and nothing is written or created', !wrong.ok && wrong.detail === 'plugin_not_ours' && (after.post as Row).post_title === 'Waterproof boots' && after.count === upd.count, JSON.stringify(wrong))
+      check('P10: 3.1.0: the recorded post of an application-password publish is updated in place and tied to the article, no new post',
+        taken.ok && taken.via === 'plugin' && taken.wpPostId === 21 && (after.post as Row).post_title === 'Waterproof boots, taken over' && after.meta._gotop_article_id === ART && after.count === upd.count, JSON.stringify(taken).slice(0, 200))
+      check('P10a: the stored version followed the plugin\'s /status (3.0.0 -> 3.1.0) before it was asked to take over',
+        admin.tables.site_fix_plugin_links![0]!.plugin_version === '3.1.0', String(admin.tables.site_fix_plugin_links![0]!.plugin_version))
       const off = await pluginMedia(pub.plugin.link, { url: 'https://evil.example.org/x.png', alt: 'x' }, L.post)
       check('P11: an image address outside GO TOP storage is refused (off_site) and never downloaded', !off.ok && off.pluginCode === 'off_site' && !L.postfull(id).downloads.includes('https://evil.example.org/x.png'))
       const draft = await M.publishArticleToWordPress(admin as never, pub, ARTICLE({ id: '1c2d3e4f-5a6b-4c7d-8e9f-0a1b2c3d4e5f', slug: 'second' }) as never, { status: 'draft' }, { post: L.post })
       check('P12: a second article is its own post, a draft; the same image address is not downloaded twice', draft.ok && draft.wpPostId !== id && (L.postfull(draft.ok ? draft.wpPostId : 0).post as Row)?.post_status === 'draft' &&
         L.postfull(id).downloads.filter((u) => u === `${STORAGE}feat/boots.png`).length === 1)
+      const before = L.postfull(draft.ok ? draft.wpPostId : 0)
+      const wrong = await M.publishArticleToWordPress(admin as never, pub, ARTICLE() as never, { status: 'publish', existing: { postId: draft.ok ? draft.wpPostId : 0 } }, { post: L.post })
+      const after2 = L.postfull(draft.ok ? draft.wpPostId : 0)
+      check('P10b: another article\'s post is refused by the plugin (not_ours), even with adopt, and nothing is written or created',
+        !wrong.ok && wrong.detail === 'plugin_not_ours' && (after2.post as Row).post_title === (before.post as Row).post_title && after2.meta._gotop_article_id === '1c2d3e4f-5a6b-4c7d-8e9f-0a1b2c3d4e5f' && after2.count === before.count, JSON.stringify(wrong).slice(0, 200))
 
       // Mutation controls, executed against the same PHP.
       const noPostId = await mutant<typeof PublishModule>('lib/content/wordpress-plugin-publish.ts', (s) => s.replace('    ...(opts.existing ? { post_id: opts.existing.postId } : {}),\n', ''))
@@ -407,8 +423,9 @@ async function main() {
       const pub2 = await noPostId.loadWordPressPublisher(db({ wp: false }) as never, PROJECT)
       if ('error' in pub2) throw new Error('expected the plugin publisher')
       await noPostId.publishArticleToWordPress(db({ wp: false }) as never, pub2, ARTICLE() as never, { status: 'publish' }, { post: L2.post })
-      const mWrong = await noPostId.publishArticleToWordPress(db({ wp: false }) as never, pub2, ARTICLE() as never, { status: 'publish', existing: { postId: 21 } }, { post: L2.post })
-      check('MUTATION CONTROL: without post_id an update of another post is not refused, the plugin quietly writes the article\'s post (so P10 would fail)', mWrong.ok)
+      const other = await noPostId.publishArticleToWordPress(db({ wp: false }) as never, pub2, ARTICLE({ id: '1c2d3e4f-5a6b-4c7d-8e9f-0a1b2c3d4e5f', slug: 'second' }) as never, { status: 'draft' }, { post: L2.post })
+      const mWrong = await noPostId.publishArticleToWordPress(db({ wp: false }) as never, pub2, ARTICLE() as never, { status: 'publish', existing: { postId: other.ok ? other.wpPostId : 0 } }, { post: L2.post })
+      check('MUTATION CONTROL: without post_id an update of another article\'s post is not refused, the plugin quietly writes the article\'s post (so P10b would fail)', mWrong.ok)
       const noScrub = await mutant<typeof PublishModule>('lib/content/wordpress-plugin-publish.ts', (s) => s.replace(".replace(/[<>]/g, ' ')", ''))
       const L3 = live()
       const pub3 = await noScrub.loadWordPressPublisher(db({ wp: false }) as never, PROJECT)
@@ -481,13 +498,14 @@ async function main() {
       /const wpViaPlugin = !wpConnected && !shopifyConnected && !site && choice !== 'shopify' && !!wpPlugin/.test(src) &&
       /const current: ChoosablePlatform \| null = wpAny \? 'wordpress'/.test(src) && /\) : wpAny \? \(/.test(src) &&
       (src.match(/\{pluginOnlyNotice\}/g) ?? []).length === 2 && /t\.pluginOnlyBody\.replace\('\{version\}', wpPlugin\.version\)/.test(src) &&
-      /startWithForm=\{current !== 'wordpress' \|\| wpViaPlugin\}/.test(src)
-    check('C2: project settings show a plugin-only project as WordPress connected through the plugin (both layouts), with the application-password form to add, never "not connected"', csOk(cs))
+      /t\.pluginUpdateBody\.replace\('\{version\}', wpPlugin\.version\)/.test(src) &&
+      (src.match(/plugin=\{wpViaPlugin \? wpPlugin : null\}/g) ?? []).length === 2
+    check('C2: project settings show a plugin-only project as WordPress connected through the plugin (both layouts), never "not connected"; the application password only as the optional extra', csOk(cs))
     check('MUTATION CONTROL: settings that ignore the plugin again ("not connected") are caught', !csOk(cs.replace("wpAny ? 'wordpress'", "wpConnected ? 'wordpress'")))
     const strings: [string, string][] = [['he', 'lib/i18n/dashboard/he.ts'], ['en', 'lib/i18n/dashboard/en.ts'], ['es', 'lib/i18n/dashboard/es.ts'], ['pt-BR', 'lib/i18n/dashboard/pt-BR/project-detail.ts']]
     const csWorded = (src: string) => /pluginOnlyTitle: '[^']*GO TOP SEO Bridge[^']*'/.test(src) && /pluginOnlyBody: '[^']*\{version\}[^']*'/.test(src)
     for (const [lang, f] of strings) check(`C3 ${lang}: the plugin-only settings notice is worded (title, body with the version)`, csWorded(read(f)))
-    check('MUTATION CONTROL: a body without the version placeholder is caught', !csWorded(read('lib/i18n/dashboard/en.ts').replace('(version {version})', '(version)')))
+    check('MUTATION CONTROL: a body without the version placeholder is caught', !csWorded(read('lib/i18n/dashboard/en.ts').replace('Version {version}. Publishing', 'Version. Publishing')))
 
     const R = await import('../wordpress-index-refresh')
     const onlyDb = db({ wp: false })
@@ -547,7 +565,7 @@ async function main() {
   }
   check('MUTATION CONTROL: copy that still says "download the zip" is caught', !copyOk(pluginBlock(read('lib/i18n/dashboard/en.ts')).replace('install: {', 'download: {')))
   const types = read('lib/site-fix/types.ts')
-  check('W7: the latest plugin is 3.0.0, so a 2.x link is offered the switch (update available)', /PLUGIN_LATEST_VERSION = '3\.0\.0'/.test(types) && read('lib/site-fix/plugin-zip.generated.ts').includes("PLUGIN_VERSION = '3.0.0'"))
+  check('W7: the latest plugin is 3.1.0, so a 2.x or 3.0 link is offered the update', /PLUGIN_LATEST_VERSION = '3\.1\.0'/.test(types) && read('lib/site-fix/plugin-zip.generated.ts').includes("PLUGIN_VERSION = '3.1.0'"))
 
   console.log(`\n${passed} passed, ${failed} failed`)
   if (failed) process.exitCode = 1

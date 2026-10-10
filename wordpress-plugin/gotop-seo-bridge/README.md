@@ -1,15 +1,17 @@
-# GO TOP SEO Bridge 3.0 (companion WordPress plugin)
+# GO TOP SEO Bridge 3.1 (companion WordPress plugin)
 
 **3.0.0 is the release approved on WordPress.org** (slug `go-top-seo-bridge`,
-https://wordpress.org/plugins/go-top-seo-bridge/). The files here are byte-for-byte the submitted
-zip (`lib/site-fix/__qa__/approved-plugin.ts` pins every file's SHA-256); a PHP change is a new
-WordPress.org release first. WordPress.org installs it into the folder `go-top-seo-bridge/`; our
-older zips used `gotop-seo-bridge/`. Both active is a PHP redeclare fatal (WordPress refuses to
-activate), and deleting the old copy runs its uninstall, which deletes the shared options (the
-pairing key). Sites on 2.x: deactivate the old one, install from WordPress.org, activate, connect
-again (the app's plugin modal walks through it).
+https://wordpress.org/plugins/go-top-seo-bridge/). **3.1.0 is in this folder and is not yet
+submitted**; `lib/site-fix/__qa__/approved-plugin.ts` pins every file's SHA-256 of the build in
+`lib/site-fix/plugin-zip.generated.ts`. WordPress.org installs it into the folder
+`go-top-seo-bridge/`; our older zips used `gotop-seo-bridge/`. Up to 3.0.0 both copies active was
+a PHP redeclare fatal. From 3.1.0 every function is in the `GoTopSeoBridge` namespace and the copy
+starts on `plugins_loaded` only if no other copy defined `GOTOP_SEO_BRIDGE_VERSION`; otherwise it
+stays off and shows an admin notice (suite N23). Deleting an OLD copy still runs that copy's own
+uninstall, which deletes the shared options (the pairing key): connect again afterwards. 3.1.0's
+`uninstall.php` keeps the options while another copy is installed.
 
-Three jobs, all authenticated, all narrow:
+Four jobs, all authenticated, all narrow:
 
 1. **1.x, unchanged:** `POST /wp-json/gotop/v1/seo-meta` writes allowlisted Yoast / Rank Math
    keys when WordPress core REST silently drops protected SEO meta while publishing an article.
@@ -22,6 +24,15 @@ Three jobs, all authenticated, all narrow:
    id, `_gotop_article_id`; any other post is `not_ours`). The app publishes through these when
    the link is connected and reports >= 3.0.0 (`lib/content/wordpress-plugin-publish.ts`),
    otherwise over the application password as before.
+4. **3.1, everything else without an application password** (`includes/read.php`, signed):
+   `POST /content` (a page of published posts or pages: id, type, address, slug, title, dates,
+   focus keyphrase), `POST /content-item` (one published item's displayed HTML), `POST /authors`
+   (users who may publish posts: id and display name), `POST /media-alt` (find a Media Library
+   image by file name, read it, set or undo its alt text). `/publish` gains `status: future` +
+   `date_gmt`, `new_post`, `author_id` (must be able to `publish_posts`) and `adopt` (take over
+   the untied post the app recorded for this article; never a page or another article's post).
+   `/terms` adds each term's `link` and `count`, and `product_cat` when WooCommerce has it.
+   `/status` answers `capabilities`; the app gates on them (`lib/site-fix/plugin-capabilities.ts`).
 
 ## 2.0 routes (namespace `gotop/v1`)
 

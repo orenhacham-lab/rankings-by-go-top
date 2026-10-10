@@ -55,6 +55,7 @@ import { projectConnectionsFrom, projectConnectionUrls, type ProjectConnections 
 import type { Known } from '@/lib/connection-status/known'
 import { useDashboardLanguage } from '@/lib/i18n/dashboard/useDashboardLanguage'
 import { getDashboardDictionary } from '@/lib/i18n/dashboard/getDashboardDictionary'
+import { READ_PLUGIN_MIN_VERSION, versionAtLeast } from '@/lib/site-fix/types'
 
 /**
  * What the site scan read off the site, as a hint on the platform choice: its
@@ -148,16 +149,24 @@ export default function ContentSection({ projectId, platformHint }: { projectId:
   }, [])
 
   const both = wpConnected && shopifyConnected
-  // WordPress through the plugin alone (no application-password row, no other platform): connected
-  // for publishing, never "not connected". The panel below offers the application password for
-  // what only it can do (the existing-posts scan, a scheduled post, a second post for an article).
+  // WordPress through the plugin alone (no application-password row, no other platform): connected,
+  // never "not connected". From 3.1.0 the plugin does everything the application password did, so
+  // nothing is asked of the merchant; an older plugin is asked to update (one clear action). The
+  // panel below keeps the application password as the optional, advanced extra.
   const wpViaPlugin = !wpConnected && !shopifyConnected && !site && choice !== 'shopify' && !!wpPlugin
   const wpAny = wpConnected || wpViaPlugin
+  const pluginFull = !!wpPlugin && versionAtLeast(wpPlugin.version, READ_PLUGIN_MIN_VERSION)
   const pluginOnlyNotice = wpViaPlugin && wpPlugin ? (
-    <div data-wp-plugin-only="">
-      <Notice tone="info">
-        <span className="font-semibold">{t.pluginOnlyTitle}</span> {t.pluginOnlyBody.replace('{version}', wpPlugin.version)}
-      </Notice>
+    <div data-wp-plugin-only={pluginFull ? 'full' : 'update'}>
+      {pluginFull ? (
+        <Notice tone="ok">
+          <span className="font-semibold">{t.pluginOnlyTitle}</span> {t.pluginOnlyBody.replace('{version}', wpPlugin.version)}
+        </Notice>
+      ) : (
+        <Notice tone="info">
+          <span className="font-semibold">{t.pluginUpdateTitle}</span> {t.pluginUpdateBody.replace('{version}', wpPlugin.version)}
+        </Notice>
+      )}
     </div>
   ) : null
 
@@ -193,7 +202,7 @@ export default function ContentSection({ projectId, platformHint }: { projectId:
         <div className="space-y-3">
           {connectedBanner}
           {pluginOnlyNotice}
-          <WordPressConnectionPanel projectId={projectId} onChanged={onPanelChanged} startWithForm={wpViaPlugin} />
+          <WordPressConnectionPanel projectId={projectId} onChanged={onPanelChanged} plugin={wpViaPlugin ? wpPlugin : null} />
         </div>
       ) : shopifyConnected ? (
         <div className="space-y-3">
@@ -304,7 +313,8 @@ export default function ContentSection({ projectId, platformHint }: { projectId:
             projectId={projectId}
             onChanged={onPanelChanged}
             onConnected={current === 'wordpress' ? undefined : goToContentHub}
-            startWithForm={current !== 'wordpress' || wpViaPlugin}
+            startWithForm={current !== 'wordpress'}
+            plugin={wpViaPlugin ? wpPlugin : null}
           />
         </div>
       ) : current === 'shopify' ? (

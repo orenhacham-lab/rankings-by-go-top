@@ -9,12 +9,20 @@
  * Concurrency-safe: claimRefresh gives one runner per project (10-min stale
  * lock), and a fresh cache short-circuits unless force=true — so an automatic
  * trigger can never create duplicate scan jobs.
+ *
+ * WHERE IT READS. The GO TOP SEO Bridge plugin >= 3.1.0 when it is connected (its signed /content
+ * and /content-item routes, lib/content/wordpress-read-source.ts), otherwise the application
+ * password as before. A 3.0.0 plugin alone cannot list the site: needs_app_password, as before
+ * (the UI asks for the plugin update, or an application password).
  */
 
 import type { createAdminClient } from '@/lib/supabase/admin'
 import { loadWordPressCredentials } from '@/lib/content/api-auth'
 import { hasPublishPlugin } from '@/lib/content/wordpress-plugin-publish'
 import { scanWordPressSite } from '@/lib/content/wordpress-content-scan'
+import { credsReadSource, pluginReadSource, type WordPressReadSource } from '@/lib/content/wordpress-read-source'
+import { loadPluginFor } from '@/lib/site-fix/plugin-capabilities'
+import type { PluginPost } from '@/lib/site-fix/plugin-client'
 import {
   getCachedIndex, claimRefresh, writeSuccess, writeFailure, isStale, isVersionStale,
 } from '@/lib/content/wordpress-content-index'
@@ -44,7 +52,7 @@ export type IndexRefreshResult =
 export async function runProjectIndexRefresh(
   admin: Admin,
   opts: { projectId: string; userId: string; force?: boolean },
-  deps: { hasPlugin?: typeof hasPublishPlugin } = {},
+  deps: { hasPlugin?: typeof hasPublishPlugin; loadPlugin?: typeof loadPluginFor; post?: PluginPost } = {},
 ): Promise<IndexRefreshResult> {
   const { projectId, userId } = opts
   const force = opts.force === true
@@ -55,21 +63,28 @@ export async function runProjectIndexRefresh(
     return { refreshed: false, outcome: 'fresh', status: existing.scan_status, scanCompletedAt: existing.scan_completed_at, expiresAt: existing.expires_at }
   }
 
-  // WordPress credentials (decrypted transiently; never returned/logged).
-  const wp = await loadWordPressCredentials(admin, projectId)
-  if ('error' in wp) {
-    // Publishing through the GO TOP SEO Bridge plugin alone: the plugin has no route that lists
-    // every post, so the scan needs an application password. A typed answer the UI words, and no
-    // "failed" scan recorded over the project's index.
-    if (wp.status === 404 && await (deps.hasPlugin ?? hasPublishPlugin)(admin, projectId, userId)) {
-      return { refreshed: false, outcome: 'no_credentials', error: 'needs_app_password', httpStatus: 409, preservedPriorIndex: !!existing && existing.scan_status !== 'failed' }
+  // The plugin >= 3.1.0 (read by project AND owner), else the application password (decrypted
+  // transiently; never returned/logged).
+  let source: WordPressReadSource
+  const plugin = await (deps.loadPlugin ?? loadPluginFor)(admin, projectId, 'content', { ownerId: userId, post: deps.post })
+  if (plugin) {
+    source = pluginReadSource(plugin.link, deps.post)
+  } else {
+    const wp = await loadWordPressCredentials(admin, projectId)
+    if ('error' in wp) {
+      // A 3.0.0 plugin alone has no route that lists every post: a typed answer the UI words
+      // (update the plugin), and no "failed" scan recorded over the project's index.
+      if (wp.status === 404 && await (deps.hasPlugin ?? hasPublishPlugin)(admin, projectId, userId)) {
+        return { refreshed: false, outcome: 'no_credentials', error: 'needs_app_password', httpStatus: 409, preservedPriorIndex: !!existing && existing.scan_status !== 'failed' }
+      }
+      await writeFailure(admin, { projectId, userId, errorMessage: `wordpress_connection: ${wp.error}`, startedAtMs: Date.now(), durationMs: 0 })
+      return { refreshed: false, outcome: 'no_credentials', error: wp.error, httpStatus: wp.status, preservedPriorIndex: !!existing && existing.scan_status !== 'failed' }
     }
-    await writeFailure(admin, { projectId, userId, errorMessage: `wordpress_connection: ${wp.error}`, startedAtMs: Date.now(), durationMs: 0 })
-    return { refreshed: false, outcome: 'no_credentials', error: wp.error, httpStatus: wp.status, preservedPriorIndex: !!existing && existing.scan_status !== 'failed' }
+    source = credsReadSource(wp.creds)
   }
 
   // Claim a refresh slot (10-min stale-lock recovery). Preserves prior blobs.
-  const claim = await claimRefresh(admin, projectId, userId, wp.creds.siteUrl)
+  const claim = await claimRefresh(admin, projectId, userId, source.siteUrl)
   if (!claim.ok && claim.inProgress) return { refreshed: false, outcome: 'running' }
 
   // Read-only: our own published articles, for target↔generated_article matching.
@@ -93,7 +108,7 @@ export async function runProjectIndexRefresh(
   const scanParams = { includePages: true, maxItems: 200 }
   const startedAtMs = Date.now()
   try {
-    const report = await scanWordPressSite(wp.creds, { ...scanParams, generatedArticles })
+    const report = await scanWordPressSite(source, { ...scanParams, generatedArticles })
     const status = await writeSuccess(admin, { projectId, userId, report, scanParams, startedAtMs, durationMs: Date.now() - startedAtMs })
     return {
       refreshed: true,
@@ -109,7 +124,7 @@ export async function runProjectIndexRefresh(
       },
     }
   } catch (e) {
-    await writeFailure(admin, { projectId, userId, errorMessage: e instanceof Error ? e.message : 'scan_failed', startedAtMs, durationMs: Date.now() - startedAtMs, siteUrl: wp.creds.siteUrl })
+    await writeFailure(admin, { projectId, userId, errorMessage: e instanceof Error ? e.message : 'scan_failed', startedAtMs, durationMs: Date.now() - startedAtMs, siteUrl: source.siteUrl })
     console.error('[wp-index-refresh] scan failed', { projectId, message: e instanceof Error ? e.message : String(e) })
     return { refreshed: false, outcome: 'scan_failed', preservedPriorIndex: !!existing && existing.scan_status !== 'failed' }
   }

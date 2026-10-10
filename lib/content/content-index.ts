@@ -37,6 +37,7 @@
 import type { createAdminClient } from '@/lib/supabase/admin'
 import type { WordPressContentIndexRow } from '@/lib/supabase/types'
 import { getCachedIndex } from '@/lib/content/wordpress-content-index'
+import { pluginLinkConnected } from '@/lib/site-fix/plugin-capabilities'
 
 type Admin = ReturnType<typeof createAdminClient>
 
@@ -47,16 +48,22 @@ function hasTargets(row: ContentIndexRow | null): row is ContentIndexRow {
   return !!row && Array.isArray(row.targets) && row.targets.length > 0
 }
 
-/** Known to be missing or failed. A read that fails is not knowledge: false. */
-async function wordpressDisconnected(admin: Admin, projectId: string): Promise<boolean> {
+/**
+ * Known to be missing or failed. A read that fails is not knowledge: false. A site connected by the
+ * GO TOP SEO Bridge plugin >= 3.1.0 alone (the index is built through it) is not disconnected.
+ */
+async function wordpressDisconnected(admin: Admin, projectId: string, owner: () => Promise<string | null>): Promise<boolean> {
+  let missing: boolean
   try {
     const { data, error } = await admin.from('wordpress_connections').select('connection_status').eq('project_id', projectId).maybeSingle()
     if (error) return false
-    if (!data) return true
-    return (data as { connection_status?: string | null }).connection_status === 'failed'
+    missing = !data || (data as { connection_status?: string | null }).connection_status === 'failed'
   } catch {
     return false
   }
+  if (!missing) return false
+  const userId = await owner()
+  return !(userId && await pluginLinkConnected(admin, { projectId, userId }))
 }
 
 /** Any Shopify entity of the project, active or not. A read that fails counts as yes: it only withholds the crawl. */
@@ -104,9 +111,11 @@ export async function getCrawlIndex(admin: Admin, projectId: string, userId: str
  */
 export async function getContentIndex(projectId: string, userId: string | null | undefined, admin: Admin): Promise<ContentIndexRow | null> {
   const wordpress = await getCachedIndex(admin, projectId)
-  if (hasTargets(wordpress) && !(await wordpressDisconnected(admin, projectId))) return wordpress
+  let ownerRead: Promise<string | null> | null = null
+  const ownerOf = () => (ownerRead ??= userId ? Promise.resolve(userId) : projectOwner(admin, projectId))
+  if (hasTargets(wordpress) && !(await wordpressDisconnected(admin, projectId, ownerOf))) return wordpress
   if (await hasShopifyEntities(admin, projectId)) return wordpress
-  const owner = userId || (await projectOwner(admin, projectId))
+  const owner = await ownerOf()
   const crawl = owner ? await getCrawlIndex(admin, projectId, owner) : null
   return hasTargets(crawl) ? crawl : wordpress
 }

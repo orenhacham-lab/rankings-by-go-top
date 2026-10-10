@@ -12,6 +12,8 @@
  * users, or a post's status (wp_update_post is called with the ID and the content only).
  */
 
+namespace GoTopSeoBridge;
+
 if (!defined('ABSPATH')) { exit; }
 
 function gotop_seo_bridge_fix_types() {

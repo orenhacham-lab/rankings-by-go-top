@@ -17,6 +17,8 @@
  * The nonce is recorded only after the signature verified, so a forgery cannot burn a real one.
  */
 
+namespace GoTopSeoBridge;
+
 if (!defined('ABSPATH')) { exit; }
 
 define('GOTOP_SEO_BRIDGE_WINDOW', 300);
@@ -91,7 +93,7 @@ function gotop_seo_bridge_verify($method, $route, $headers, $body, $stored_key, 
 }
 
 /** permission_callback of every signed route. */
-function gotop_seo_bridge_signed_permission(WP_REST_Request $request) {
+function gotop_seo_bridge_signed_permission(\WP_REST_Request $request) {
     $headers = array();
     foreach (array('x-gotop-key', 'x-gotop-timestamp', 'x-gotop-nonce', 'x-gotop-signature') as $name) {
         $headers[$name] = (string) $request->get_header($name);
@@ -107,5 +109,5 @@ function gotop_seo_bridge_signed_permission(WP_REST_Request $request) {
         function ($k) { set_transient($k, 1, 2 * GOTOP_SEO_BRIDGE_WINDOW); }
     );
     if ($result === true) { return true; }
-    return new WP_Error('gotop_' . $result, 'Request not authorized.', array('status' => 401));
+    return new \WP_Error('gotop_' . $result, 'Request not authorized.', array('status' => 401));
 }

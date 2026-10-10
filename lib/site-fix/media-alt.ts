@@ -4,8 +4,11 @@
  * prints above the text. WordPress prints those with the alt text of their Media Library item, so the
  * item is where the fix goes, and one write fixes every page that shows the image.
  *
- * Through the application password the site already gave (the REST API's own media route, alt_text
- * only): nothing in the Go Top plugin changes. Never the file, its title, caption or anything else.
+ * Through the GO TOP SEO Bridge plugin >= 3.1.0 when it is connected (its signed /media-alt route,
+ * the alt text only; pluginMediaDeps), otherwise the application password the site already gave
+ * (the REST API's own media route, alt_text only). Never the file, its title, caption or anything else.
+ * The compare-before-write and the undo below are the same either way: `C` is what reaches the site
+ * (the credentials, or the plugin link).
  * Only an item whose alt text is EMPTY gets one; an image the theme ships in its own folder (not in
  * the Media Library) is not ours to change and is never offered. Before the write the item must still
  * be empty (or already hold exactly the approved words); the previous value is kept for undo, and undo
@@ -14,12 +17,38 @@
 import { altFromFileName, cutAtWord } from '@/lib/site-health/rules'
 import type { WordPressCredentials } from '@/lib/wordpress/types'
 import type { WpMediaItem } from '@/lib/wordpress/client'
+import { pluginMediaGet, pluginMediaSearch, pluginMediaSetAlt, type PluginLink, type PluginMediaItem, type PluginPost } from './plugin-client'
 import { MAX_MEDIA_ALT, type FixErrorCode } from './types'
 
-export interface MediaDeps {
-  searchMedia: (creds: WordPressCredentials, name: string, by?: 'title' | 'slug') => Promise<WpMediaItem[]>
-  getMedia: (creds: WordPressCredentials, id: number) => Promise<WpMediaItem | null>
-  setMediaAlt: (creds: WordPressCredentials, id: number, alt: string) => Promise<WpMediaItem | null>
+export interface MediaDeps<C = WordPressCredentials> {
+  searchMedia: (creds: C, name: string, by?: 'title' | 'slug') => Promise<WpMediaItem[]>
+  getMedia: (creds: C, id: number) => Promise<WpMediaItem | null>
+  setMediaAlt: (creds: C, id: number, alt: string) => Promise<WpMediaItem | null>
+}
+
+const fromPlugin = (m: PluginMediaItem): WpMediaItem => ({
+  id: m.id, sourceUrl: String(m.source_url || ''), sizeUrls: Array.isArray(m.size_urls) ? m.size_urls.map(String) : [], alt: String(m.alt ?? ''), title: String(m.title ?? ''),
+})
+
+/**
+ * The Media Library through the plugin's /media-alt (3.1.0). A refusal of a read is "not found"
+ * (null / none); a refusal of a write is null, which the callers answer as write_not_confirmed.
+ */
+export function pluginMediaDeps(post?: PluginPost): MediaDeps<PluginLink> {
+  return {
+    searchMedia: async (link, name, by = 'title') => {
+      const r = await pluginMediaSearch(link, name, by, post)
+      return r.ok ? r.body.items.map(fromPlugin) : []
+    },
+    getMedia: async (link, id) => {
+      const r = await pluginMediaGet(link, id, post)
+      return r.ok ? fromPlugin(r.body.item) : null
+    },
+    setMediaAlt: async (link, id, alt) => {
+      const r = await pluginMediaSetAlt(link, id, alt, post)
+      return r.ok ? fromPlugin(r.body.item) : null
+    },
+  }
 }
 
 
@@ -55,7 +84,7 @@ export function sameFile(a: string, b: string): boolean {
 }
 
 /** The Media Library item a page's image is, or null (a theme file, another site's, not found). */
-export async function findMediaFor(creds: WordPressCredentials, src: string, deps: Pick<MediaDeps, 'searchMedia'>): Promise<WpMediaItem | null> {
+export async function findMediaFor<C>(creds: C, src: string, deps: Pick<MediaDeps<C>, 'searchMedia'>): Promise<WpMediaItem | null> {
   const term = mediaSearchTerm(src)
   if (!term) return null
   const match = (list: WpMediaItem[]) => list.find((m) => sameFile(m.sourceUrl, src) || m.sizeUrls.some((u) => sameFile(u, src))) ?? null
@@ -74,11 +103,11 @@ export function suggestMediaAlt(item: Pick<WpMediaItem, 'sourceUrl' | 'title'>, 
 }
 
 /** The page's images without alt text that are Media Library items with no alt text yet, each once. */
-export async function previewMediaAlt(
-  creds: WordPressCredentials,
+export async function previewMediaAlt<C>(
+  creds: C,
   srcs: readonly string[],
   ctx: { pageTitle: string; siteName: string | null },
-  deps: MediaDeps,
+  deps: MediaDeps<C>,
 ): Promise<MediaAltItem[]> {
   const out: MediaAltItem[] = []
   const seen = new Set<number>()
@@ -95,7 +124,7 @@ export async function previewMediaAlt(
 type Result = { ok: true; status: 'applied' | 'already'; undo: MediaUndo | null } | { ok: false; code: FixErrorCode }
 
 /** Write the approved words: every item checked first, then written, then read back. */
-export async function applyMediaAlt(creds: WordPressCredentials, items: readonly { media: number; alt: string }[], deps: MediaDeps): Promise<Result> {
+export async function applyMediaAlt<C>(creds: C, items: readonly { media: number; alt: string }[], deps: MediaDeps<C>): Promise<Result> {
   const now = await Promise.all(items.map((i) => deps.getMedia(creds, i.media)))
   if (now.some((m) => !m)) return { ok: false, code: 'not_in_wordpress' }
   // Someone wrote other words since the preview: theirs stay.
@@ -113,7 +142,7 @@ export async function applyMediaAlt(creds: WordPressCredentials, items: readonly
 }
 
 /** Put the previous words back, only where the item still holds what we wrote. */
-export async function revertMediaAlt(creds: WordPressCredentials, undo: MediaUndo, deps: MediaDeps): Promise<{ ok: true } | { ok: false; code: FixErrorCode }> {
+export async function revertMediaAlt<C>(creds: C, undo: MediaUndo, deps: MediaDeps<C>): Promise<{ ok: true } | { ok: false; code: FixErrorCode }> {
   const now = await Promise.all(undo.items.map((i) => deps.getMedia(creds, i.media)))
   if (now.some((m, n) => !m || m.alt !== undo.items[n].written)) return { ok: false, code: 'changed_since_preview' }
   for (const i of undo.items) {

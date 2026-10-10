@@ -53,12 +53,14 @@ function main() {
     check('a confirmed switch re-reads with keepChoice', confirmKeeps(src))
     check('MUT: a confirmed switch that re-reads plainly is caught', !confirmKeeps(src.replace('void refresh({ keepChoice: true })', 'void refresh()')))
     check('the chosen WordPress panel opens with its form out; a connected one does not', opensForm(src))
-    check('MUT: a panel that waits for a second click is caught', !opensForm(src.replace("startWithForm={current !== 'wordpress' || wpViaPlugin}", '')))
+    check('MUT: a panel that waits for a second click is caught', !opensForm(src.replace("startWithForm={current !== 'wordpress'}", '')))
     check('a disconnect from a panel still returns to the platform choice (a plain re-read)', /const onPanelChanged = useCallback\(\(\) => \{ void refresh\(\) \}, \[refresh\]\)/.test(src)
       && !/onChanged=\{refresh\}/.test(src))
     const panel = strip(read('components/content/WordPressConnectionPanel.tsx'))
-    const formFirst = (x: string) => /const \[showForm, setShowForm\] = useState\(startWithForm\)/.test(x)
-    check('the WordPress panel starts with the form when asked', formFirst(panel))
+    // 3.1.0: the connection steps that open are the plugin's (components/content/WordPressPluginConnect.tsx);
+    // the application-password form is the advanced way, one link away (components/content/__qa__/wordpress-plugin-first.qa.ts).
+    const formFirst = (x: string) => /const \[stepsOpen, setStepsOpen\] = useState\(startWithForm\)/.test(x)
+    check('the WordPress panel starts with its connection steps out when asked', formFirst(panel))
     check('MUT: a panel that ignores startWithForm is caught', !formFirst(panel.replace('useState(startWithForm)', 'useState(false)')))
     check('the Shopify App Store merchant keeps the section as it was (the legacy branch is returned first)', /if \(loading \|\| switchLocked\) return legacy/.test(src))
   }

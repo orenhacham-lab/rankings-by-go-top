@@ -398,7 +398,7 @@ async function main() {
         '# Shop\n\n> > nested quote is fine\n',
         '# Shop\n\nA bell \u0007 character inside the text\n',
       ]
-      const php = spawnSync('php', ['-r', `define('ABSPATH', sys_get_temp_dir() . '/gotop-w8-none/'); function add_action() {} require '${join(PLUGIN, 'includes', 'llms.php')}'; echo json_encode(array_map('gotop_seo_bridge_llms_text_ok', json_decode(stream_get_contents(STDIN), true)), JSON_UNESCAPED_UNICODE);`], { input: JSON.stringify(samples), encoding: 'utf8' })
+      const php = spawnSync('php', ['-r', `define('ABSPATH', sys_get_temp_dir() . '/gotop-w8-none/'); function add_action() {} require '${join(PLUGIN, 'includes', 'llms.php')}'; echo json_encode(array_map('GoTopSeoBridge\\\\gotop_seo_bridge_llms_text_ok', json_decode(stream_get_contents(STDIN), true)), JSON_UNESCAPED_UNICODE);`], { input: JSON.stringify(samples), encoding: 'utf8' })
       const phpOut = JSON.parse(php.stdout || '[]') as (string | null)[]
       const tsOut = samples.map((s) => llmsTextOk(s))
       check('P16: the llms.txt text check is the same in the plugin and the app (10 samples)', JSON.stringify(phpOut) === JSON.stringify(tsOut), `${JSON.stringify(phpOut)}\n${JSON.stringify(tsOut)}`)

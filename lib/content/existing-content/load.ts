@@ -25,6 +25,7 @@ import {
   type ExistingContentIndex, type ExistingContentSource, type GscRowLite, type GscState, type OwnershipEvidence,
   type PartialReason, type ShopifyEntityLite,
 } from './model'
+import { pluginLinkConnected } from '@/lib/site-fix/plugin-capabilities'
 import { mapStatus, readSiteMap, SiteMapReadError } from './site-map-store'
 import type { ScannedTarget } from '@/lib/content/wordpress-content-scan'
 
@@ -91,7 +92,8 @@ async function readWordPress(admin: Admin, projectId: string, userId: string) {
     .maybeSingle()
   if (failed(connErr)) throw new ExistingContentLoadError()
   const status = (conn as { connection_status?: string | null } | null)?.connection_status ?? null
-  const connected = !!conn && status !== 'failed'
+  // The GO TOP SEO Bridge plugin >= 3.1.0 reads the site's content on its own: connected too.
+  const connected = (!!conn && status !== 'failed') || await pluginLinkConnected(admin, { projectId, userId })
   const { data: idx, error: idxErr } = await admin
     .from('wordpress_content_index')
     .select('targets, scan_status, scan_completed_at')

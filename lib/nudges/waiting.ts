@@ -217,7 +217,8 @@ export async function handleWaitingGet(projectId: string, deps: WaitingDeps): Pr
       queued: queue.queued,
       queueEndsAt: queue.endsAt,
       pluginConnected: connection.pluginConnected,
-      siteConnected,
+      // A site connected by the GO TOP SEO Bridge plugin alone is connected: no "connect your site" row.
+      siteConnected: connection.pluginConnected ? true : siteConnected,
       gscConnected,
     }
     return Response.json(answer, { status: 200, headers: NO_STORE })

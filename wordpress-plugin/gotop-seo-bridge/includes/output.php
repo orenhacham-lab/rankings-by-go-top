@@ -10,6 +10,8 @@
  * printed: the questions and answers are this plugin's own block, which that plugin does not mark up.
  */
 
+namespace GoTopSeoBridge;
+
 if (!defined('ABSPATH')) { exit; }
 
 function gotop_seo_bridge_current_post_id() {
@@ -18,7 +20,7 @@ function gotop_seo_bridge_current_post_id() {
     return 0;
 }
 
-add_filter('pre_get_document_title', 'gotop_seo_bridge_document_title', 20);
+add_filter('pre_get_document_title', __NAMESPACE__ . '\\gotop_seo_bridge_document_title', 20);
 function gotop_seo_bridge_document_title($title) {
     if (gotop_seo_bridge_seo_plugin() !== 'none') { return $title; }
     $id = gotop_seo_bridge_current_post_id();
@@ -27,14 +29,14 @@ function gotop_seo_bridge_document_title($title) {
     return $ours !== '' ? $ours : $title;
 }
 
-add_filter('get_canonical_url', 'gotop_seo_bridge_canonical_url', 20, 2);
+add_filter('get_canonical_url', __NAMESPACE__ . '\\gotop_seo_bridge_canonical_url', 20, 2);
 function gotop_seo_bridge_canonical_url($url, $post) {
     if (gotop_seo_bridge_seo_plugin() !== 'none' || !$post) { return $url; }
     $ours = (string) get_post_meta($post->ID, '_gotop_canonical', true);
     return $ours !== '' ? $ours : $url;
 }
 
-add_action('wp_head', 'gotop_seo_bridge_head', 5);
+add_action('wp_head', __NAMESPACE__ . '\\gotop_seo_bridge_head', 5);
 function gotop_seo_bridge_head() {
     $id = gotop_seo_bridge_current_post_id();
     if (!$id) { return; }

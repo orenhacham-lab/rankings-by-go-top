@@ -71,7 +71,7 @@ async function main() {
       /publishSeoFor\(auth\.admin, loaded, created/.test(manual))
     check('G. update-in-place / retry targets the SAME wp_post_id (idempotent — created.wpPostId; never a new post to retry SEO)',
       /publishSeoFor\([^)]*created,/.test(manual) && /publishSeoFor\([^)]*created,/.test(auto) && /publishArticleSeo\([^)]*created\.wpPostId/.test(viaPlugin))
-    const plugin = read('../../../wordpress-plugin/gotop-seo-bridge/gotop-seo-bridge.php')
+    const plugin = read('../../../wordpress-plugin/gotop-seo-bridge/includes/routes.php')
     check('companion plugin: edit_post permission + SEO allowlist only + read-back verification (no arbitrary meta)',
       /current_user_can\('edit_post', \$post_id\)/.test(plugin) && /_yoast_wpseo_focuskw/.test(plugin) && /rank_math_focus_keyword/.test(plugin) && /in_array\(\$key, \$allowed, true\)/.test(plugin) && /get_post_meta\(\$post_id, \$key, true\)/.test(plugin))
     const hub = read('../../../components/content/workspace/ArticlesScreen.tsx')

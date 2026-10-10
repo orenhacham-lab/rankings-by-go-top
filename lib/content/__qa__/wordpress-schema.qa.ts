@@ -260,10 +260,10 @@ async function main() {
   check('MUTATION CONTROL: a WordPress-schema line in one of those files would be caught',
     ['+  await publishArticleSchemaToWordPress(creds, article)'].filter((l) => WP_SCHEMA_LINE.test(l)).length === 1)
   // The article schema rides the existing /fix schema_jsonld and adds nothing to the plugin. Since
-  // the WordPress.org switch the plugin is exactly the approved 3.0.0 (lib/site-fix/__qa__/approved-plugin.ts),
+  // the WordPress.org switch the plugin is exactly the pinned release (lib/site-fix/__qa__/approved-plugin.ts),
   // so "adds nothing" is: every plugin file is byte-for-byte that release.
   const drift = pluginDrift(join(ROOT, 'wordpress-plugin/gotop-seo-bridge'))
-  check('W3b: the plugin is exactly the approved 3.0.0; the article work adds nothing to it', drift.length === 0, drift.join(', '))
+  check('W3b: the plugin is exactly the pinned release (approved-plugin.ts, 3.1.0); the article work adds nothing to it', drift.length === 0, drift.join(', '))
   check('MUTATION CONTROL: one changed byte in the plugin is caught',
     pluginDrift(join(ROOT, 'wordpress-plugin/gotop-seo-bridge'), (f) => f.endsWith('output.php') ? Buffer.concat([readFileSync(f), Buffer.from(' ')]) : readFileSync(f)).join() === 'includes/output.php')
   // Mutation control without touching a file: against the pre-wave base the same check sees the

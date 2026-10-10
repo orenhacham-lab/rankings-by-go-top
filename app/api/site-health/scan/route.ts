@@ -24,7 +24,8 @@ import { loadFixContext, resolveCapabilities } from '@/lib/site-fix/channel'
 import { pluginInspect } from '@/lib/site-fix/plugin-client'
 import { decryptCredential } from '@/lib/security/credentials-crypto'
 import { findItemByUrl, getItemForEdit, searchMedia } from '@/lib/wordpress/client'
-import { findMediaFor } from '@/lib/site-fix/media-alt'
+import { findMediaFor, pluginMediaDeps } from '@/lib/site-fix/media-alt'
+import { pluginCan } from '@/lib/site-fix/plugin-capabilities'
 import { loadShopifyConnection } from '@/lib/shopify/api-auth'
 
 export const runtime = 'nodejs'
@@ -71,9 +72,12 @@ async function wordpressRefine(admin: ReturnType<typeof createAdminClient>, ...[
   if (!read) return
   let homeHost = ''
   try { homeHost = new URL(siteUrl).hostname } catch { return }
-  // The Media Library, through the application password only (lib/site-fix/media-alt.ts), read-only here.
+  // The Media Library (lib/site-fix/media-alt.ts), read-only here: the plugin >= 3.1.0 (its /media-alt
+  // search), else the application password.
   const creds = ctx.creds
-  const findMedia = creds ? (src: string) => findMediaFor(creds, src, { searchMedia }) : null
+  const mediaLink = ctx.pluginLink && ctx.plugin?.status === 'connected' && pluginCan(ctx.plugin.plugin_version, 'media_alt') ? ctx.pluginLink : null
+  const findMedia = mediaLink ? (src: string) => findMediaFor(mediaLink, src, pluginMediaDeps())
+    : creds ? (src: string) => findMediaFor(creds, src, { searchMedia }) : null
   await markWordPressOutsideContent(findings, scan.pages, read, { platform: scan.platform, connections: scan.connections, homeHost, findMedia })
 }
 

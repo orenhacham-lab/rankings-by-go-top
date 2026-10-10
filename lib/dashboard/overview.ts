@@ -396,14 +396,19 @@ async function readAi(admin: ServiceRoleClient, projectId: string, userId: strin
   }
 }
 
-async function readSetup({ projectId, userId, db }: Scope, project: { business_name: string | null }): Promise<Section<SetupData>> {
-  const [profileRes, wpRes, shopifyRes, siteRes] = await Promise.all([
+async function readSetup({ projectId, userId, db }: Scope, project: { business_name: string | null }, admin: () => ServiceRoleClient): Promise<Section<SetupData>> {
+  const [profileRes, wpRes, shopifyRes, siteRes, pluginRes] = await Promise.all([
     db.from('project_profiles').select('description').eq('project_id', projectId).eq('user_id', userId).maybeSingle(),
     db.from('wordpress_connections').select('connection_status').eq('project_id', projectId).eq('user_id', userId).maybeSingle(),
     db.from('shopify_connections').select('connection_status, granted_scopes').eq('project_id', projectId).eq('user_id', userId).is('archived_at', null).maybeSingle(),
     db.from('site_platform_connections').select('platform, connection_status').eq('project_id', projectId).eq('user_id', userId).maybeSingle(),
+    // The GO TOP SEO Bridge plugin connects a WordPress site on its own. Its row holds a secret browser
+    // roles never read: the status only, by the service role, filtered by project AND owner.
+    Promise.resolve().then(() => admin().from('site_fix_plugin_links').select('status').eq('project_id', projectId).eq('user_id', userId).maybeSingle())
+      .then((r) => r, () => ({ data: null, error: true })),
   ])
   if (profileRes.error || wpRes.error || shopifyRes.error) return { state: 'error' }
+  const pluginConnected = !pluginRes.error && (pluginRes.data as { status?: string } | null)?.status === 'connected'
   const wp = wpRes.data as { connection_status?: string } | null
   const shop = shopifyRes.data as { connection_status?: string; granted_scopes?: string[] } | null
   // Wix / webhook: an unreadable (or not yet migrated) table is "not connected",
@@ -419,7 +424,7 @@ async function readSetup({ projectId, userId, db }: Scope, project: { business_n
     state: 'ready',
     data: {
       business: !!description || !!str(project.business_name),
-      platform: platform.wordpressActive || platform.shopifyActive || platform.siteActive,
+      platform: platform.wordpressActive || platform.shopifyActive || platform.siteActive || pluginConnected,
     },
   }
 }
@@ -530,7 +535,7 @@ export async function handleDashboardGet(projectId: string, deps: DashboardDeps)
       flags.content ? section('articles', projectId, () => readArticles(scope, now)) : Promise.resolve({ state: 'disabled' } as const),
       flags.content ? section('board', projectId, () => readBoard(scope)) : Promise.resolve({ state: 'disabled' } as const),
       flags.ai ? section('ai', projectId, () => readAi(adminClient(), project.id, userId, project)) : Promise.resolve({ state: 'disabled' } as const),
-      section('setup', projectId, () => readSetup(scope, project)),
+      section('setup', projectId, () => readSetup(scope, project, adminClient)),
       section('activity', projectId, () => readActivity(scope, adminClient(), flags)),
       section('account', projectId, () => readAccount(scope, adminClient(), deps, now)),
     ])

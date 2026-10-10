@@ -42,6 +42,8 @@ import { generatePluginKey, pairingCode } from './plugin-auth'
 import { pairOverAppPassword, pluginFix, pluginInspect, pluginStatus, pluginUndo, type PluginItem, type PluginPost } from './plugin-client'
 import { previewFixJob, type LivePage, type PreviewRequest } from './preview'
 import { applyViaRest, revertViaRest, type RestUndo } from './rest-apply'
+import { applyMediaAlt, pluginMediaDeps, revertMediaAlt } from './media-alt'
+import { pluginCan } from './plugin-capabilities'
 import { findShopItem, type ShopCreds, type ShopifyFixClient } from './shopify-admin'
 import { applyViaShopify, revertViaShopify, shopUndoOf } from './shopify-apply'
 import {
@@ -254,11 +256,12 @@ async function preview(b: Record<string, unknown>, l: Loaded, deps: FixesDeps): 
   const req: PreviewRequest = {
     type, url: String(b.url), kind, from: typeof b.from === 'string' ? b.from : undefined,
     keyword: typeof b.keyword === 'string' ? b.keyword.slice(0, 120) : undefined,
-    // The Media Library (./media-alt.ts): WordPress only, through the application password.
+    // The Media Library (./media-alt.ts): WordPress only, through the plugin >= 3.1.0 or the application password.
     ...(type === 'image_alt' && b.media === true && !l.caps.shopify ? { media: true } : {}),
   }
   const p = await previewFixJob(req, {
     channel: channel === 'manual_copy' ? 'manual' : channel, creds: l.ctx.creds, link: channel === 'plugin' ? l.ctx.pluginLink : null,
+    mediaLink: mediaLinkOf(l),
     siteName: (l.project.business_name || l.project.name || '').trim() || null,
     shop,
   }, {
@@ -271,7 +274,7 @@ async function preview(b: Record<string, unknown>, l: Loaded, deps: FixesDeps): 
   })
   if (!p.ok) return { status: fixStatusFor(p.code), body: p }
   // A copy-only llms.txt is never approved here: the merchant places it himself.
-  if (p.type === 'image_alt' && p.via === 'media') return { status: 200, body: { ...p, channel: 'app_password' } }
+  if (p.type === 'image_alt' && p.via === 'media') return { status: 200, body: { ...p, channel: mediaChannel(l) === 'plugin' ? 'plugin' : 'app_password' } }
   return { status: 200, body: { ...p, channel: channel === 'manual_copy' ? 'manual' : channel } }
 }
 
@@ -300,6 +303,17 @@ async function audit(deps: FixesDeps, l: Loaded, job: FixJobRow, action: Paramet
   })
 }
 
+/**
+ * Alt text on Media Library items (./media-alt.ts): the plugin when it is >= 3.1.0 (its /media-alt),
+ * otherwise the application password, whatever writes the pages. Never Shopify.
+ */
+function mediaChannel(l: Loaded): 'plugin' | 'app_password' | 'no_channel' {
+  if (l.caps.shopify) return 'no_channel'
+  if (l.ctx.pluginLink && l.ctx.plugin?.status === 'connected' && pluginCan(l.ctx.plugin.plugin_version, 'media_alt')) return 'plugin'
+  return l.ctx.creds ? 'app_password' : 'no_channel'
+}
+const mediaLinkOf = (l: Loaded) => (mediaChannel(l) === 'plugin' ? l.ctx.pluginLink : null)
+
 async function approve(b: Record<string, unknown>, l: Loaded, deps: FixesDeps): Promise<Answer> {
   if (b.approved !== true) return refuse('invalid_request')
   const kind = b.kind as FindingKind
@@ -309,11 +323,12 @@ async function approve(b: Record<string, unknown>, l: Loaded, deps: FixesDeps): 
   const payload = checked.payload
   const expected = typeof b.expected === 'string' && b.expected.length <= 200_000 ? b.expected : null
   const via = typeof b.via === 'string' && /^[a-z_]{1,20}$/.test(b.via) ? b.via : null
-  // Alt text on Media Library items: the application password writes it, whatever writes the pages.
+  // Alt text on Media Library items: the plugin >= 3.1.0 or the application password, whatever writes the pages.
   const onMedia = isMediaAlt(payload)
   if (onMedia !== (via === 'media')) return refuse('value_invalid')
-  if (onMedia && (l.caps.shopify || !l.ctx.creds)) return refuse('no_channel')
-  let channel = onMedia ? 'app_password' as const : channelOf(l, payload.type)
+  const media = mediaChannel(l)
+  if (onMedia && media === 'no_channel') return refuse('no_channel')
+  let channel = onMedia ? media as 'plugin' | 'app_password' : channelOf(l, payload.type)
   if (channel === 'needs_update') channel = await refreshPluginVersion(l, deps, payload.type)
   if (channel === 'needs_plugin' || channel === 'no_channel' || channel === 'needs_update' || channel === 'manual_copy') return refuse(channel === 'manual_copy' ? 'needs_plugin' : channel)
   const before = typeof b.before === 'string' ? b.before.slice(0, 60_000) : null
@@ -402,6 +417,20 @@ async function execute(job: FixJobRow, l: Loaded, deps: FixesDeps, ctx: { expect
 
   if (job.channel === 'manual') return manual('plugin_not_connected')
 
+  if (job.channel === 'plugin' && isMediaAlt(payload) && payload.type === 'image_alt') {
+    // Media Library alt text through the plugin's /media-alt (3.1.0): compared, written, read back (./media-alt.ts).
+    if (!l.ctx.pluginLink) return manual('plugin_not_connected')
+    const r = await applyMediaAlt(l.ctx.pluginLink, payload.images.map((i) => ({ media: i.media as number, alt: i.alt })), pluginMediaDeps(deps.pluginPost))
+    if (!r.ok) {
+      const next = await set({ status: 'failed', errorCode: r.code })
+      await audit(deps, l, next, 'failed', { result: r.code })
+      return next
+    }
+    const next = await set({ status: 'applied', errorCode: null, appliedAt: now, undo: { ...ctx, revert: r.undo } })
+    await audit(deps, l, next, 'applied', { previous: job.before_value, next: summaryOf(payload), result: r.status })
+    return next
+  }
+
   if (job.channel === 'plugin') {
     if (!l.ctx.pluginLink) return manual('plugin_not_connected')
     const r = await pluginFix(l.ctx.pluginLink, { jobId: job.id, type: job.fix_type, url: job.page_url, value: job.payload, expected: ctx.expected }, deps.pluginPost)
@@ -483,7 +512,10 @@ async function undo(b: Record<string, unknown>, l: Loaded, deps: FixesDeps): Pro
   const revert = (job.undo as { revert?: unknown } | null)?.revert as ({ kind: 'plugin' } | RestUndo | null | undefined)
   const payload = payloadFromJob(job.fix_type, job.payload)
   let result: { ok: true } | { ok: false; code: FixErrorCode }
-  if (job.channel === 'plugin') {
+  if (job.channel === 'plugin' && revert && revert.kind === 'media') {
+    if (!l.ctx.pluginLink) return refuse('plugin_not_connected')
+    result = await revertMediaAlt(l.ctx.pluginLink, revert, pluginMediaDeps(deps.pluginPost))
+  } else if (job.channel === 'plugin') {
     if (!l.ctx.pluginLink) return refuse('plugin_not_connected')
     const r = await pluginUndo(l.ctx.pluginLink, { jobId: job.id, url: job.page_url }, deps.pluginPost)
     if (!r.ok && r.connectionLost) await markPluginLink(deps.admin, l.scope, { status: 'disconnected', errorCode: r.code })
@@ -554,8 +586,8 @@ async function retry(b: Record<string, unknown>, l: Loaded, deps: FixesDeps): Pr
   if (await heldElsewhere(deps, l, { type: job.fix_type, pageUrl: job.page_url, subject: subjectOf(job.fix_type, job.payload) }, job.id)) {
     return refuse('already_fixed')
   }
-  // Alt text on Media Library items keeps its own way to the site (the application password).
-  const channel = (isMediaAlt(payloadFromJob(job.fix_type, job.payload)) ? (l.ctx.creds ? 'app_password' : 'no_channel') : channelOf(l, job.fix_type)) as FixChannel
+  // Alt text on Media Library items keeps its own way to the site (the plugin >= 3.1.0, or the application password).
+  const channel = (isMediaAlt(payloadFromJob(job.fix_type, job.payload)) ? mediaChannel(l) : channelOf(l, job.fix_type)) as FixChannel
   if ((channel as string) === 'no_channel') return refuse('no_channel')
   const stored = (job.undo ?? {}) as { expected?: string | null; via?: string | null }
   const batch = batchOf(job)

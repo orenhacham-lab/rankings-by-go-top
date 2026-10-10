@@ -13,6 +13,8 @@
  * what /undo restores; undo refuses when the text was changed after the fix.
  */
 
+namespace GoTopSeoBridge;
+
 if (!defined('ABSPATH')) { exit; }
 
 define('GOTOP_SEO_BRIDGE_LLMS_MAX', 20000);
@@ -137,7 +139,7 @@ function gotop_seo_bridge_llms_response($method, $request_uri) {
     return $text;
 }
 
-add_action('init', 'gotop_seo_bridge_llms_serve', 0);
+add_action('init', __NAMESPACE__ . '\\gotop_seo_bridge_llms_serve', 0);
 function gotop_seo_bridge_llms_serve() {
     $method = isset($_SERVER['REQUEST_METHOD']) ? strtoupper(sanitize_key(wp_unslash($_SERVER['REQUEST_METHOD']))) : 'GET';
     $uri = isset($_SERVER['REQUEST_URI']) ? esc_url_raw(wp_unslash($_SERVER['REQUEST_URI'])) : '';

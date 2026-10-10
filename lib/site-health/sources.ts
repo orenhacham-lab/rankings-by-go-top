@@ -17,6 +17,7 @@ import type { createAdminClient } from '@/lib/supabase/admin'
 import type { ScannedTarget } from '@/lib/content/wordpress-content-scan'
 import { MAX_PAGES, type CandidatePage } from './scan'
 import type { ConnectionState, PageKind, SiteFacts, SitePlatform } from './types'
+import { pluginLinkConnected } from '@/lib/site-fix/plugin-capabilities'
 
 type Admin = ReturnType<typeof createAdminClient>
 
@@ -123,7 +124,8 @@ export async function loadProjectSources(admin: Admin, scope: { projectId: strin
   const other = (sitePlatform.error ? null : sitePlatform.data) as { platform?: string | null; connection_status?: string | null } | null
   const connections: ConnectionState = {
     shopify: !!shop && shop.connection_status === 'connected',
-    wordpress: !!wp && wp.connection_status !== 'failed',
+    // The GO TOP SEO Bridge plugin (any version) connects a WordPress site on its own.
+    wordpress: (!!wp && wp.connection_status !== 'failed') || await pluginLinkConnected(admin, { projectId, userId }, '2.0.0'),
     wix: !!other && other.platform === 'wix' && other.connection_status === 'connected',
   }
   const detected = platformFrom((profile.data as { detected_platform?: string | null } | null)?.detected_platform)

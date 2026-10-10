@@ -23,7 +23,7 @@
  * Run: npx tsx lib/site-fix/__qa__/site-fix-plugin.qa.ts
  */
 import { execFileSync, spawnSync } from 'child_process'
-import { cpSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'fs'
+import { cpSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'fs'
 import { tmpdir } from 'os'
 import { join } from 'path'
 import { generatePluginKey, pairingCode, signPluginRequest, signedHeaders } from '../plugin-auth'
@@ -84,7 +84,7 @@ function main() {
   }
 
   console.log('L) php -l')
-  const phpFiles = [join(PLUGIN, 'gotop-seo-bridge.php'), ...readdirSync(join(PLUGIN, 'includes')).map((f) => join(PLUGIN, 'includes', f))]
+  const phpFiles = [join(PLUGIN, 'gotop-seo-bridge.php'), join(PLUGIN, 'uninstall.php'), ...readdirSync(join(PLUGIN, 'includes')).map((f) => join(PLUGIN, 'includes', f))]
   for (const f of phpFiles) {
     let ok = true
     try { execFileSync('php', ['-l', f], { encoding: 'utf8', stdio: 'pipe' }) } catch { ok = false }
@@ -93,7 +93,7 @@ function main() {
 
   console.log('\nA) authentication')
   const src = readFileSync(join(PLUGIN, 'gotop-seo-bridge.php'), 'utf8')
-  check('the plugin version is 3.0.0 (header and constant)', /Version:\s+3\.0\.0/.test(src) && /GOTOP_SEO_BRIDGE_VERSION', '3\.0\.0'/.test(src))
+  check('the plugin version is 3.1.0 (header, constant and readme Stable tag)', /Version:\s+3\.1\.0/.test(src) && /GOTOP_SEO_BRIDGE_VERSION', '3\.1\.0'/.test(src) && /Stable tag: 3\.1\.0/.test(readFileSync(join(PLUGIN, 'readme.txt'), 'utf8')))
   const allPhp = phpFiles.map((f) => readFileSync(f, 'utf8')).join('\n')
   check('no route is open (__return_true never used as a permission_callback)', !/permission_callback'\s*=>\s*'__return_true'/.test(allPhp))
   check('the signature compare is constant time (hash_equals)', /hash_equals\(\$expected, \$sig\)/.test(allPhp))
@@ -132,7 +132,7 @@ function main() {
   check('a malformed pairing code is refused', r[0].status === 400 && r[0].body?.code === 'invalid_code')
   check('an administrator pairs with the code the app issued', r[1].status === 200 && r[1].body?.key_id === key.keyId, JSON.stringify(r[1]))
   const fixTypes = (r[2].body?.fix_types ?? []) as string[]
-  check('a signed status call answers with the version', r[2].status === 200 && r[2].body?.version === '3.0.0', JSON.stringify(r[2]))
+  check('a signed status call answers with the version', r[2].status === 200 && r[2].body?.version === '3.1.0', JSON.stringify(r[2]))
   check('the plugin whitelist is exactly the app whitelist (no drift)', JSON.stringify(fixTypes) === JSON.stringify([...FIX_TYPES]), fixTypes.join(','))
   check('an unsigned /fix is refused', r[3].status === 401 && r[3].body?.code === 'gotop_bad_headers', JSON.stringify(r[3]))
   check('a request signed with another secret is refused', r[4].body?.code === 'gotop_bad_signature', JSON.stringify(r[4]))
@@ -172,7 +172,7 @@ function main() {
     m.done()
   }
   {
-    const m = mutantPlugin('gotop-seo-bridge.php', "'permission_callback' => 'gotop_seo_bridge_admin_permission',", "'permission_callback' => '__return_true',")
+    const m = mutantPlugin('includes/routes.php', "'permission_callback' => __NAMESPACE__ . '\\\\gotop_seo_bridge_admin_permission',", "'permission_callback' => '__return_true',")
     const got = m.found ? run([{ rest: '/gotop/v1/pair', body: JSON.stringify({ code: pairingCode(key) }), can: [] }], m.dir) : []
     check('MUTATION (open pairing route): anyone pairs', m.found && got[0]?.status === 200, JSON.stringify(got[0]))
     m.done()
@@ -321,6 +321,264 @@ function main() {
   const ym = y[6].meta ?? {}
   check('title, description, focus and canonical go to Yoast\'s own keys', ym._yoast_wpseo_title === 'Yoast title' && ym._yoast_wpseo_metadesc === 'A description stored in Yoast.' && ym._yoast_wpseo_focuskw === 'boots' && ym._yoast_wpseo_canonical === about, JSON.stringify(ym))
   check('with Yoast active the plugin prints no second description or title', !(y[7].head ?? '').includes('name="description"') && y[7].title === 'Theme title')
+
+  console.log('\nN) 3.1.0: everything without an application password (content list, one item, authors, Media Library alt, publish options)')
+  {
+    const ART1 = '0b6f3a52-7d1e-4c55-9a43-2f8d7e6a1b90'
+    const ART2 = '1c2d3e4f-5a6b-4c7d-8e9f-0a1b2c3d4e5f'
+    const soon = new Date(Date.now() + 3 * 86_400_000).toISOString().slice(0, 19).replace('T', ' ')
+    const past = new Date(Date.now() - 86_400_000).toISOString().slice(0, 19).replace('T', ' ')
+    const art = (o: Record<string, unknown> = {}) => ({ article_id: ART1, title: 'Waterproof boots', content: '<p>Dry boots last.</p>', status: 'publish', slug: 'waterproof', ...o })
+    const setup: Step[] = [
+      pair,
+      { setpost: 21, type: 'post', title: 'Waterproof boots', content: '<p>Orphan page.</p>', slug: 'waterproof-boots', url: `${SITE}/blog/waterproof-boots/`, modified: '2026-03-01 00:00:00', meta: { _yoast_wpseo_focuskw: 'waterproof boots' } },
+      { setpost: 22, type: 'post', status: 'draft', title: 'Unfinished', content: '<p>draft</p>', url: `${SITE}/blog/unfinished/` },
+      { setpost: 23, type: 'post', title: 'Members only', content: '<p>secret</p>', password: 'pw', url: `${SITE}/blog/members/` },
+      { setpost: 24, type: 'post', title: 'Older post', content: '<p>old <a href="/about/">about</a></p>', url: `${SITE}/blog/older/`, modified: '2025-01-01 00:00:00' },
+      { setpost: 25, type: 'post', title: 'Another article', content: '<p>x</p>', url: `${SITE}/blog/another/`, meta: { _gotop_article_id: ART2 } },
+      { media: 600, file: 'red-boots.jpg', sizes: ['red-boots-300x200.jpg'], alt: '' },
+    ]
+    const n = run([
+      ...setup,
+      signed('/gotop/v1/content', { type: 'post', page: 1, per_page: 2 }),     // 7
+      signed('/gotop/v1/content', { type: 'post', page: 2, per_page: 2 }),     // 8
+      signed('/gotop/v1/content', { type: 'product', page: 1, per_page: 2 }),  // 9
+      signed('/gotop/v1/content', { type: 'post', page: 1, per_page: 51 }),    // 10
+      signed('/gotop/v1/content-item', { type: 'post', id: 24 }),              // 11
+      signed('/gotop/v1/content-item', { type: 'post', id: 22 }),              // 12
+      signed('/gotop/v1/content-item', { type: 'post', id: 23 }),              // 13
+      signed('/gotop/v1/content-item', { type: 'post', id: 31 }),              // 14
+      signed('/gotop/v1/authors', {}),                                         // 15
+      signed('/gotop/v1/media-alt', { action: 'search', term: 'red-boots', by: 'title' }), // 16
+      signed('/gotop/v1/media-alt', { action: 'set', id: 600, alt: 'Red leather boots' }), // 17
+      signed('/gotop/v1/media-alt', { action: 'set', id: 600, alt: '<b>x</b>' }),         // 18
+      signed('/gotop/v1/media-alt', { action: 'set', id: 21, alt: 'Not an image' }),      // 19
+      { post: 21 },                                                             // 20
+      { post: 600 },                                                            // 21
+      signed('/gotop/v1/media-alt', { action: 'set', id: 600, alt: '' }),      // 22
+      { post: 600 },                                                            // 23
+      signed('/gotop/v1/terms', { taxonomy: 'category' }),                     // 24
+      signed('/gotop/v1/terms', { taxonomy: 'product_cat' }),                  // 25
+      { rest: '/gotop/v1/content', body: JSON.stringify({ type: 'post' }) },   // 26 unsigned
+      { rest: '/gotop/v1/authors', body: '{}' },                               // 27 unsigned
+    ])
+    const items = (n[7].body?.items ?? []) as Record<string, unknown>[]
+    const ids = [...items, ...((n[8].body?.items ?? []) as Record<string, unknown>[])].map((i) => i.id)
+    check('N1: /content lists published posts only (no draft, no password-protected), newest change first, one page at a time',
+      JSON.stringify(ids.slice(0, 2)) === '[21,25]' && ids.includes(24) && !ids.includes(22) && !ids.includes(23), JSON.stringify(ids))
+    check('N2: each item carries only id, type, address, slug, title, dates and the focus keyphrase (no content, no author)',
+      items.length > 0 && items.every((i) => JSON.stringify(Object.keys(i).sort()) === JSON.stringify(['date', 'focus_keyword', 'focus_source', 'id', 'link', 'modified', 'slug', 'title', 'type'])), JSON.stringify(items[0]))
+    check('N3: the Yoast focus keyphrase comes with it', items[0]?.focus_keyword === 'waterproof boots' && items[0]?.focus_source === 'yoast_focus_keyword')
+    check('N4: products are never listed; an oversized page is refused', n[9].body?.code === 'invalid_request' && n[10].body?.code === 'invalid_request')
+    check('N5: /content-item answers the displayed HTML of one published post', n[11].status === 200 && String(n[11].body?.content).includes('href="/about/"'))
+    check('N6: ... never a draft, a password-protected post, or a product', [12, 13, 14].every((i) => n[i].status === 404 && n[i].body?.code === 'not_in_wordpress'))
+    const authors = (n[15].body?.items ?? []) as Record<string, unknown>[]
+    check('N7: /authors lists the users who may publish posts, id and display name only (no e-mail)',
+      JSON.stringify(authors) === JSON.stringify([{ id: 1, name: 'Site Admin' }, { id: 2, name: 'Dana Editor' }]) && !JSON.stringify(n[15]).includes('@'), JSON.stringify(n[15]))
+    const found = ((n[16].body?.items ?? []) as { id: number; source_url: string; size_urls: string[]; alt: string }[])[0]
+    check('N8: /media-alt finds the Media Library image by its file name, with its sizes and its (empty) alt',
+      found?.id === 600 && /red-boots\.jpg$/.test(found.source_url) && found.size_urls.some((u) => /red-boots-300x200\.jpg$/.test(u)) && found.alt === '', JSON.stringify(n[16]))
+    check('N9: set writes the alt text and answers it back', n[17].status === 200 && (n[17].body?.item as { alt?: string })?.alt === 'Red leather boots' && (n[21].meta ?? {})._wp_attachment_image_alt === 'Red leather boots')
+    check('N10: markup in the words is refused; a post that is not an image is refused, nothing written',
+      n[18].body?.code === 'value_invalid' && n[19].body?.code === 'not_in_wordpress' && !('_wp_attachment_image_alt' in (n[20].meta ?? {})))
+    check('N11: undo (empty words) removes the alt again', n[22].status === 200 && !('_wp_attachment_image_alt' in (n[23].meta ?? {})))
+    const cats = (n[24].body?.items ?? []) as { link?: string; count?: number }[]
+    check('N12: /terms answers each term\'s address and count; product_cat only when WooCommerce has it', cats.length === 2 && cats.every((c) => /^https:\/\//.test(String(c.link)) && typeof c.count === 'number') && n[25].body?.code === 'invalid_request')
+    check('N13: the new routes are signed like every other (unsigned: refused)', n[26].status === 401 && n[27].status === 401)
+
+    const pub = run([
+      ...setup,
+      signed('/gotop/v1/publish', art({ status: 'future', date_gmt: soon })),                     // 7
+      signed('/gotop/v1/publish', art({ article_id: ART2, status: 'future' })),                   // 8
+      signed('/gotop/v1/publish', art({ article_id: ART2, status: 'future', date_gmt: past })),   // 9
+      signed('/gotop/v1/publish', art({ article_id: ART2, status: 'publish', date_gmt: soon })),  // 10
+      signed('/gotop/v1/publish', art({ new_post: true })),                                       // 11
+      signed('/gotop/v1/publish', art({ author_id: 2, slug: 'by-dana', new_post: true })),        // 12
+      signed('/gotop/v1/publish', art({ author_id: 3, new_post: true })),                         // 13
+      signed('/gotop/v1/publish', art({ post_id: 21 })),                                          // 14 not ours
+      signed('/gotop/v1/publish', art({ post_id: 21, adopt: true, title: 'Waterproof boots, adopted' })), // 15
+      signed('/gotop/v1/publish', art({ post_id: 11, adopt: true })),                             // 16 a page
+      signed('/gotop/v1/publish', art({ post_id: 25, adopt: true })),                             // 17 another article's
+      signed('/gotop/v1/publish', art({ new_post: true, post_id: 21 })),                          // 18
+    ])
+    const fut = pub[7].body as { post_id?: number; post_status?: string } | undefined
+    // The same steps again with the created post read back (ids are deterministic for the same steps).
+    const futPost = run([...setup, signed('/gotop/v1/publish', art({ status: 'future', date_gmt: soon })), { postfull: Number(fut?.post_id) }])
+    const fp = (futPost[8] as unknown as { post: Record<string, unknown> }).post
+    check('N14: a scheduled post: status future with its GMT date', pub[7].status === 200 && !!fut && fp?.post_status === 'future' && fp?.post_date_gmt === soon, JSON.stringify(fp).slice(0, 200))
+    check('N15: future without a date, with a past date, or a date on a non-future status: date_invalid, nothing created',
+      [8, 9, 10].every((i) => pub[i].body?.code === 'date_invalid'), JSON.stringify([pub[8], pub[9], pub[10]].map((x) => x.body)))
+    const first = pub[7].body?.post_id as number
+    const second = pub[11].body?.post_id as number
+    check('N16: new_post makes a second, separate post for the same article', pub[11].status === 200 && pub[11].body?.status === 'created' && second !== first, JSON.stringify(pub[11]))
+    const danaId = run([...setup, signed('/gotop/v1/publish', art({ author_id: 2, slug: 'by-dana' }))])[7].body?.post_id
+    const byDana = run([...setup, signed('/gotop/v1/publish', art({ author_id: 2, slug: 'by-dana' })), { postfull: Number(danaId) }])
+    check('N17: author_id of a user who may publish: the post is theirs', (byDana[8] as unknown as { post: Record<string, unknown> }).post?.post_author === 2 && pub[12].status === 200,
+      JSON.stringify((byDana[8] as unknown as { post: Record<string, unknown> }).post ?? null).slice(0, 160))
+    check('N18: author_id of a user who may not publish: author_invalid', pub[13].status === 400 && pub[13].body?.code === 'author_invalid')
+    check('N19: a post the plugin did not make is not updated without adopt (not_ours)', pub[14].body?.code === 'not_ours')
+    const adopted = run([...setup, signed('/gotop/v1/publish', art({ post_id: 21, adopt: true, title: 'Waterproof boots, adopted' })), { post: 21 }, { postfull: 21 }])
+    check('N20: adopt: the post GO TOP recorded for this article is updated in place and tied to it',
+      adopted[7].body?.status === 'updated' && adopted[7].body?.post_id === 21 && (adopted[9] as unknown as { post: Record<string, unknown>; meta: Record<string, string> }).meta._gotop_article_id === ART1 &&
+      (adopted[9] as unknown as { post: Record<string, unknown> }).post.post_title === 'Waterproof boots, adopted', JSON.stringify(adopted[7]))
+    check('N21: adopt never takes a page, or a post tied to another article', pub[16].body?.code === 'not_ours' && pub[17].body?.code === 'not_ours')
+    check('N22: new_post together with a post id is refused', pub[18].body?.code === 'invalid_request')
+
+    // Two copies active at once: no fatal error, one runs, the other stays off and says so.
+    // "Old style" = what 3.0.0 and older do: global functions, the version defined as the file is read,
+    // no check for another copy. Built from this copy so the function names are exactly the same.
+    const oldStyle = (): string => {
+      const dir = mkdtempSync(join(tmpdir(), 'site-fix-old-copy-'))
+      cpSync(PLUGIN, dir, { recursive: true })
+      for (const name of readdirSync(join(dir, 'includes'))) {
+        const p = join(dir, 'includes', name)
+        writeFileSync(p, readFileSync(p, 'utf8').replace('namespace GoTopSeoBridge;', '').split("__NAMESPACE__ . '\\\\").join("'"))
+      }
+      const main = join(dir, 'gotop-seo-bridge.php')
+      writeFileSync(main, readFileSync(main, 'utf8')
+        .replace("add_action('plugins_loaded', function () {", '(function () {').replace(/\}, 0\);\s*$/, '})();\n')
+        .replace("if (defined('GOTOP_SEO_BRIDGE_VERSION')) {", 'if (false) {')
+        .replace("define('GOTOP_SEO_BRIDGE_VERSION', '3.1.0');", "define('GOTOP_SEO_BRIDGE_VERSION', '3.0.0');")
+        // 3.0.0 declared its route functions in the main file itself (PHP binds those as the file is read).
+        .replace("    require_once GOTOP_SEO_BRIDGE_DIR . '/includes/routes.php';\n", '')
+        + readFileSync(join(dir, 'includes', 'routes.php'), 'utf8').replace('<?php', '').replace("if (!defined('ABSPATH')) { exit; }", ''))
+      return dir
+    }
+    const dupRun = (first: string, second: string, can: string[] = ['activate_plugins']) => {
+      const tmp = mkdtempSync(join(tmpdir(), 'site-fix-harness-'))
+      try {
+        writeFileSync(join(tmp, 'calls.json'), JSON.stringify([pair, { notices: true, can }, signed('/gotop/v1/status', {})]))
+        const r = spawnSync('php', [HARNESS, first, join(tmp, 'calls.json')], { encoding: 'utf8', env: { ...process.env, GOTOP_HARNESS_SECOND: second } })
+        let out: (Res & { version?: string })[] = []
+        try { out = JSON.parse(r.stdout) } catch { out = [] }
+        return { status: r.status, raw: (r.stderr + r.stdout).slice(0, 4000), out }
+      } finally { rmSync(tmp, { recursive: true, force: true }) }
+    }
+    const NOTICE = /Two copies of GO TOP SEO Bridge/
+    const runsOne = (d: ReturnType<typeof dupRun>, version: string) =>
+      d.status === 0 && NOTICE.test(String(d.out[1]?.value)) && d.out[1]?.version === version && d.out[2]?.status === 200
+    const old = oldStyle()
+    const copy31 = mkdtempSync(join(tmpdir(), 'site-fix-second-copy-'))
+    cpSync(PLUGIN, copy31, { recursive: true })
+    const newFirst = dupRun(PLUGIN, old)
+    const oldFirst = dupRun(old, PLUGIN)
+    const both31 = dupRun(PLUGIN, copy31)
+    check('N23: 3.1 read first (go-top-seo-bridge/), an old copy after it: no fatal error, the old copy runs, 3.1 stays off with a notice',
+      runsOne(newFirst, '3.0.0'), newFirst.raw)
+    check('N23b: the old copy read first: the same, no fatal error', runsOne(oldFirst, '3.0.0'), oldFirst.raw)
+    check('N23c: two copies of 3.1: one runs, the other shows the notice', runsOne(both31, '3.1.0'), both31.raw)
+    const quiet = dupRun(PLUGIN, old, [])
+    check('N23d: the notice is only for users who may manage plugins', quiet.status === 0 && String(quiet.out[1]?.value) === '', quiet.raw)
+    {
+      // Without the wait for plugins_loaded, 3.1 starts before the old copy is read: both run.
+      const m = mutantPlugin('gotop-seo-bridge.php', "add_action('plugins_loaded', function () {", '(function () {')
+      if (m.found) { const p = join(m.dir, 'gotop-seo-bridge.php'); writeFileSync(p, readFileSync(p, 'utf8').replace(/\}, 0\);\s*$/, '})();\n')) }
+      const d = m.found ? dupRun(m.dir, old) : null
+      check('MUTATION (no wait for plugins_loaded): both copies start, no notice (so N23 would fail)', m.found && !!d && !runsOne(d, '3.0.0'), d?.raw)
+      m.done()
+    }
+    {
+      // Without the namespace AND the wait, the two copies declare the same functions: a fatal error.
+      const m = mutantPlugin('gotop-seo-bridge.php', "add_action('plugins_loaded', function () {", '(function () {')
+      if (m.found) {
+        const p = join(m.dir, 'gotop-seo-bridge.php'); writeFileSync(p, readFileSync(p, 'utf8').replace(/\}, 0\);\s*$/, '})();\n'))
+        for (const name of readdirSync(join(m.dir, 'includes'))) {
+          const q = join(m.dir, 'includes', name)
+          writeFileSync(q, readFileSync(q, 'utf8').replace('namespace GoTopSeoBridge;', '').split("__NAMESPACE__ . '\\\\").join("'"))
+        }
+      }
+      const d = m.found ? dupRun(m.dir, old) : null
+      check('MUTATION (no namespace, no wait): two copies are a fatal error', m.found && !!d && d.status !== 0 && /Cannot redeclare/i.test(d.raw), `${d?.status} ${d?.raw.slice(-400)}`)
+      m.done()
+    }
+    {
+      const m = mutantPlugin('gotop-seo-bridge.php', "if (defined('GOTOP_SEO_BRIDGE_VERSION')) {", 'if (false) {')
+      const d = m.found ? dupRun(m.dir, old) : null
+      check('MUTATION (duplicate check removed): no notice, both copies run (so N23 would fail)', m.found && !!d && !runsOne(d, '3.0.0'), d?.raw)
+      m.done()
+    }
+    rmSync(old, { recursive: true, force: true })
+    rmSync(copy31, { recursive: true, force: true })
+
+    {
+      // Namespaced files: a callback passed as a bare name ('gotop_seo_bridge_admin_page') resolves to a
+      // global function that does not exist, and WordPress only fails when it calls it (the settings page
+      // with the pairing form would not open).
+      const c = run([{ callables: true }])
+      const cb = c[0] as unknown as { value: string[]; seen: number; pages: string[] }
+      check('N23e: every hook, the settings page (go-top-seo-bridge) and every route callback resolves', Array.isArray(cb.value) && cb.value.length === 0 && cb.seen > 30 && cb.pages.includes('go-top-seo-bridge'), JSON.stringify(cb))
+      const m = mutantPlugin('includes/admin.php', "__NAMESPACE__ . '\\\\gotop_seo_bridge_admin_page'", "'gotop_seo_bridge_admin_page'")
+      const mc = m.found ? (run([{ callables: true }], m.dir)[0] as unknown as { value: string[] }) : null
+      check('MUTATION CONTROL: the settings page callback as a bare name is caught', m.found && !!mc && mc.value.some((x) => x.includes('page go-top-seo-bridge')), JSON.stringify(mc))
+      m.done()
+    }
+
+    // uninstall.php: the key stays while another copy is installed.
+    const uninstall = (dir: string, plugins: string[]) => {
+      const root = mkdtempSync(join(tmpdir(), 'site-fix-uninstall-'))
+      try {
+        mkdirSync(join(root, 'wp-admin/includes'), { recursive: true })
+        writeFileSync(join(root, 'wp-admin/includes/plugin.php'), `<?php function get_plugins() { return json_decode('${JSON.stringify(Object.fromEntries(plugins.map((p) => [p, { Name: 'x' }])))}', true); }\n`)
+        const script = `<?php define('ABSPATH', '${root}/'); define('WP_UNINSTALL_PLUGIN', 'go-top-seo-bridge/gotop-seo-bridge.php'); $o = array('gotop_seo_bridge_key' => 1, 'gotop_seo_bridge_log' => 1);
+function delete_option($k) { global $o; unset($o[$k]); return true; }
+include '${dir}/uninstall.php'; echo json_encode(array_keys($o));`
+        writeFileSync(join(root, 'run.php'), script)
+        const r = spawnSync('php', [join(root, 'run.php')], { encoding: 'utf8' })
+        return r.stdout.trim()
+      } finally { rmSync(root, { recursive: true, force: true }) }
+    }
+    const kept = uninstall(PLUGIN, ['go-top-seo-bridge/gotop-seo-bridge.php', 'gotop-seo-bridge/gotop-seo-bridge.php'])
+    const gone = uninstall(PLUGIN, ['go-top-seo-bridge/gotop-seo-bridge.php', 'akismet/akismet.php'])
+    check('N24: deleting one copy while the other is installed keeps the connection key; the last copy removes it', kept.includes('gotop_seo_bridge_key') && gone === '[]', `${kept} | ${gone}`)
+    {
+      const m = mutantPlugin('uninstall.php', 'if (!$gotop_seo_bridge_other_copy) {', 'if (true) {')
+      const got = m.found ? uninstall(m.dir, ['go-top-seo-bridge/gotop-seo-bridge.php', 'gotop-seo-bridge/gotop-seo-bridge.php']) : ''
+      check('MUTATION (other-copy check removed): the key of the remaining copy is wiped', m.found && got === '[]', got)
+      m.done()
+    }
+    check('N25: the uninstall hook is no longer registered from the plugin file (uninstall.php runs instead)', !/register_uninstall_hook\(/.test(allPhp))
+
+    // Mutation controls of the new routes.
+    {
+      const m = mutantPlugin('includes/read.php', "        'has_password'   => false,\n", '')
+      const got = m.found ? run([...setup, signed('/gotop/v1/content', { type: 'post', page: 1, per_page: 10 })], m.dir) : []
+      check('MUTATION (password filter removed): a protected post is listed (so N1 would fail)', m.found && ((got[7]?.body?.items ?? []) as { id: number }[]).some((i) => i.id === 23))
+      m.done()
+    }
+    {
+      const m = mutantPlugin('includes/publish.php', " || !user_can($body['author_id'], 'publish_posts')", '')
+      const got = m.found ? run([...setup, signed('/gotop/v1/publish', art({ author_id: 3, new_post: true }))], m.dir) : []
+      check('MUTATION (author capability check removed): a reader becomes an author (so N18 would fail)', m.found && got[7]?.status === 200)
+      m.done()
+    }
+    {
+      const m = mutantPlugin('includes/publish.php', "    return (string) get_post_meta($post_id, gotop_seo_bridge_article_meta(), true) === '';\n}", '    return true;\n}')
+      const got = m.found ? run([...setup, signed('/gotop/v1/publish', art({ post_id: 25, adopt: true }))], m.dir) : []
+      check('MUTATION (adopt ownership check removed): another article\'s post is taken over (so N21 would fail)', m.found && got[7]?.status === 200)
+      m.done()
+    }
+    {
+      const m = mutantPlugin('includes/read.php', "if ($id <= 0 || !wp_attachment_is_image($id)) {", 'if ($id <= 0) {')
+      const got = m.found ? run([...setup, signed('/gotop/v1/media-alt', { action: 'set', id: 21, alt: 'Not an image' })], m.dir) : []
+      check('MUTATION (image check removed): a post gets an alt (so N10 would fail)', m.found && got[7]?.status === 200)
+      m.done()
+    }
+    {
+      const m = mutantPlugin('includes/publish.php', 'if (!$at || $at < time() + 60 || $at > time() + 2 * 366 * 86400) { return null; }', 'if (!$at) { return null; }')
+      const got = m.found ? run([...setup, signed('/gotop/v1/publish', art({ article_id: ART2, status: 'future', date_gmt: past }))], m.dir) : []
+      check('MUTATION (date window removed): a past "scheduled" date is accepted (so N15 would fail)', m.found && got[7]?.status === 200)
+      m.done()
+    }
+    {
+      const m = mutantPlugin('includes/read.php', "'capability' => array('publish_posts'),", "'capability' => array(),")
+      const p = join(m.dir, 'includes/read.php')
+      const both = m.found && readFileSync(p, 'utf8').includes(" && user_can($id, 'publish_posts')")
+      if (both) { writeFileSync(p, readFileSync(p, 'utf8').replace(" && user_can($id, 'publish_posts')", '')) }
+      const got = both ? run([pair, signed('/gotop/v1/authors', {})], m.dir) : []
+      check('MUTATION (capability filter and check removed): a user who cannot publish is listed (so N7 would fail)', both && JSON.stringify(got[1] ?? {}).includes('Sam Reader'), JSON.stringify(got[1] ?? {}).slice(0, 160))
+      m.done()
+    }
+  }
 
   console.log('\nB) 1.x /seo-meta is unchanged')
   const b = run([

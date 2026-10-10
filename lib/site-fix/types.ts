@@ -36,7 +36,9 @@ export const META_FIX_TYPES: readonly FixType[] = ['seo_title', 'meta_descriptio
 export const SITE_FIX_TYPES: readonly FixType[] = ['llms_txt']
 
 /** The latest plugin this app ships (wordpress-plugin/gotop-seo-bridge; a guard pins it to the PHP). */
-export const PLUGIN_LATEST_VERSION = '3.0.0'
+export const PLUGIN_LATEST_VERSION = '3.1.0'
+/** The first plugin that needs no application password for anything (./plugin-capabilities.ts). */
+export const READ_PLUGIN_MIN_VERSION = '3.1.0'
 /**
  * The first plugin version that knows a fix type. Anything not listed exists since 2.0.0. An older
  * plugin is never sent a type it does not know: the screen offers "update the plugin" instead.
@@ -283,6 +285,11 @@ export interface FixCapabilities {
   plugin: PluginState
   /** The site is connected by application password (WordPress REST). */
   appPassword: boolean
+  /**
+   * Alt text can be written on Media Library items (lib/site-fix/media-alt.ts): the plugin >= 3.1.0
+   * is connected, or an application password. Absent on answers from before 3.1.0: read appPassword.
+   */
+  mediaAlt?: boolean
   /** A custom site (webhook) connection is live. */
   webhook: boolean
   /** The site is WordPress (connected or detected), so the plugin applies. */
