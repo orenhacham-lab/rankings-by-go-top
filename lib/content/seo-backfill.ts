@@ -161,7 +161,7 @@ export async function loadBackfillCandidates(admin: Admin, filter: { projectId?:
     .not('wp_post_url', 'is', null)
   if (filter.projectId) q = q.eq('project_id', filter.projectId)
   if (filter.articleId) q = q.eq('id', filter.articleId)
-  const { data, error } = await q.order('project_id', { ascending: true }).limit(5000)
+  const { data, error } = await q.order('project_id', { ascending: true }).order('id', { ascending: true }).limit(5000)
   if (error) throw new Error('could not read generated_articles')
   const rows = (data ?? []) as Record<string, unknown>[]
   const projectIds = [...new Set(rows.map((r) => String(r.project_id)))]
@@ -196,7 +196,7 @@ export async function backfillArticle(
   if (a.articleUserId && a.ownerId && a.articleUserId !== a.ownerId) return skip('not_owner')
   if (!/^https:\/\//i.test(a.wpPostUrl)) return skip('no_url')
   if (channel.kind === 'none') return skip('no_channel')
-  if (host(channel.siteUrl) !== host(a.wpPostUrl)) return skip('site_mismatch', `${host(a.wpPostUrl)} vs ${host(channel.siteUrl)}`)
+  if (host(channel.siteUrl) !== host(a.wpPostUrl)) return skip('site_mismatch', `${host(a.wpPostUrl)}|${host(channel.siteUrl)}`)
 
   let page: FetchResult<FetchedPage>
   try { page = await deps.fetchHtml(new URL(a.wpPostUrl)) } catch { page = { ok: false, reason: 'network' } }
@@ -287,4 +287,41 @@ export async function runBackfill(
     onReport(r)
   }
   return out
+}
+
+/**
+ * One bounded page of a project's backfill, for the admin route (app/api/admin/seo-backfill):
+ * at most `limit` articles from `offset`, in a stable order, and no new article is started once
+ * `deadlineAt` has passed, so one call stays inside the function's time limit. `nextOffset` is
+ * where the next call starts (null: the project is done).
+ */
+export async function runBackfillPage(
+  admin: Admin,
+  opts: { apply: boolean; projectId: string; limit: number; offset: number; deadlineAt?: number; now?: () => number },
+  deps: BackfillDeps = defaultBackfillDeps,
+): Promise<{ total: number; offset: number; nextOffset: number | null; reports: ArticleReport[] }> {
+  const now = opts.now ?? Date.now
+  const all = await loadBackfillCandidates(admin, { projectId: opts.projectId })
+  const page = all.slice(opts.offset, opts.offset + opts.limit)
+  const reports: ArticleReport[] = []
+  let channel: Channel | null = null
+  for (const a of page) {
+    if (opts.deadlineAt !== undefined && now() >= opts.deadlineAt) break
+    channel = channel ?? await channelFor(admin, a.projectId, a.ownerId)
+    reports.push(await backfillArticle(admin, a, channel, { apply: opts.apply }, deps))
+  }
+  const next = opts.offset + reports.length
+  return { total: all.length, offset: opts.offset, nextOffset: next < all.length ? next : null, reports }
+}
+
+/** The projects that have articles on WordPress, with how many (for the admin picker). */
+export async function listBackfillProjects(admin: Admin): Promise<{ id: string; name: string; articles: number }[]> {
+  const all = await loadBackfillCandidates(admin)
+  const by = new Map<string, { id: string; name: string; articles: number }>()
+  for (const a of all) {
+    const p = by.get(a.projectId) ?? { id: a.projectId, name: a.projectName, articles: 0 }
+    p.articles++
+    by.set(a.projectId, p)
+  }
+  return [...by.values()].sort((x, y) => y.articles - x.articles)
 }
