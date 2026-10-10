@@ -2,6 +2,10 @@ import { createAdminClient } from '@/lib/supabase/admin'
 import { creemWebhookSecret, isCreemEnabled } from '@/lib/creem/config'
 import { CREEM_SIGNATURE_HEADER, verifyCreemSignature } from '@/lib/creem/signature'
 import { fetchCreemSubscription } from '@/lib/creem/client'
+import { lockBillingMarket } from '@/lib/billing/billing-market-selection'
+import { storedMarketOf, STORED_MARKET_KEY } from '@/lib/billing/server-market'
+import { isShopifyBillingRequiredForUser } from '@/lib/shopify/paypal-block'
+import { CREEM_MARKET } from '@/lib/creem/checkout-products'
 import {
   httpStatusForCreemOutcome,
   processVerifiedCreemEvent,
@@ -83,6 +87,21 @@ async function handle(request: Request): Promise<Response> {
     fetchSubscription: (subscriptionId) => fetchCreemSubscription(subscriptionId),
   })
 
+  // The market locks at the first paid checkout, exactly as it does on the
+  // PayPal path (app/api/paypal/activate). Until this, a Creem payer's
+  // market was never written at all, because that lock lived only in
+  // PayPal's route — the account would keep resolving its market from its
+  // country on every later request, and could be shown ILS prices after
+  // paying in USD. Creem is the USD path by construction
+  // (lib/creem/checkout-products.ts), so USD is what is stored.
+  //
+  // Deliberately AFTER the entitlement is saved and unable to change this
+  // route's answer: the customer has paid, and a failed lock must never cost
+  // them the plan or make Creem retry an event whose real work succeeded.
+  if (outcome.kind === 'activated') {
+    await lockMarketForCreemPayer(admin, outcome.userId)
+  }
+
   const status = httpStatusForCreemOutcome(outcome)
   if (status >= 500) console.error('[creem-webhook] processing failed', outcome)
   else if (status >= 400) console.warn('[creem-webhook] nothing granted', outcome)
@@ -90,4 +109,52 @@ async function handle(request: Request): Promise<Response> {
   else if (outcome.kind === 'activated') console.log('[creem-webhook] plan granted', outcome)
 
   return Response.json(status >= 400 ? { error: outcome.kind } : { status: 'received' }, { status })
+}
+
+/**
+ * Locks the account's billing market to USD after a Creem activation.
+ *
+ * Same rules as the PayPal path, enforced by the same function
+ * (lib/billing/billing-market-selection.ts): a market already stored is
+ * never overwritten, a Shopify-governed account is refused, and the first
+ * write is won atomically by exactly one caller. Every failure is logged
+ * and swallowed — see the call site for why it must not change the
+ * response.
+ */
+async function lockMarketForCreemPayer(admin: ReturnType<typeof createAdminClient>, userId: string): Promise<void> {
+  try {
+    const { data: existing, error } = await admin.auth.admin.getUserById(userId)
+    if (error) {
+      console.error('[creem-webhook] could not read the account to lock its market', { userId, message: error.message })
+      return
+    }
+    const lock = await lockBillingMarket(storedMarketOf(existing?.user ?? null), CREEM_MARKET, {
+      isShopifyGoverned: () => isShopifyBillingRequiredForUser(admin, userId),
+      claimSelectionSlot: async () => {
+        const { data, error: claimError } = await admin
+          .from('profiles')
+          .update({ billing_market_claimed_at: new Date().toISOString() })
+          .eq('id', userId)
+          .is('billing_market_claimed_at', null)
+          .select('id')
+        if (claimError) return { ok: false, message: claimError.message }
+        return { ok: true, wonClaim: !!data && data.length > 0 }
+      },
+      releaseSelectionSlot: async () => {
+        await admin.from('profiles').update({ billing_market_claimed_at: null }).eq('id', userId)
+      },
+      persistMarket: async (market) => {
+        const { error: persistError } = await admin.auth.admin.updateUserById(userId, {
+          app_metadata: { [STORED_MARKET_KEY]: market },
+        })
+        if (persistError) return { ok: false, message: persistError.message }
+        return { ok: true }
+      },
+    })
+    if (lock.kind === 'claim_failed' || lock.kind === 'persist_failed') {
+      console.error('[creem-webhook] could not lock the billing market', { userId, kind: lock.kind, message: lock.message })
+    }
+  } catch (error) {
+    console.error('[creem-webhook] market lock threw', { userId, name: error instanceof Error ? error.name : 'unknown' })
+  }
 }

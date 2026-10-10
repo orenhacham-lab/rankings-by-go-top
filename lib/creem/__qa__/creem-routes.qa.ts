@@ -88,6 +88,35 @@ console.log('\nB) the webhook is inert while the switch is off')
     !/verifyCreemSignature\([\s\S]*?secret: null/.test(noSecretPath))
 }
 
+console.log('\nB\u2032) the market locks at the first Creem payment')
+{
+  // Until this existed the lock lived only in PayPal's activation route, so
+  // a Creem payer's market was never written: the account would keep
+  // resolving its market from its country and could be shown ILS prices
+  // after paying in USD.
+  const locked = (src: string) => {
+    const activated = src.indexOf("outcome.kind === 'activated'")
+    const process_ = src.indexOf('processVerifiedCreemEvent(')
+    const lock = src.indexOf('lockMarketForCreemPayer(')
+    const status = src.indexOf('httpStatusForCreemOutcome(outcome)')
+    return process_ > 0 && activated > process_ && lock > activated && status > lock
+  }
+  check('B1: a successful activation locks the market, after the entitlement is saved',
+    locked(webhook))
+  check('B1-MUT: dropping the lock is caught',
+    !locked(webhook.replace('await lockMarketForCreemPayer(admin, outcome.userId)', '')))
+
+  check('B2: the market stored is USD, by construction, never a request value',
+    /lockBillingMarket\(storedMarketOf\([^)]*\), CREEM_MARKET,/.test(webhook))
+  check('B3: it is written to app_metadata, never user_metadata',
+    /app_metadata: \{ \[STORED_MARKET_KEY\]: market \}/.test(webhook) && !/user_metadata/.test(webhook))
+  check('B4: a Shopify-governed account is refused the lock',
+    /isShopifyGoverned: \(\) => isShopifyBillingRequiredForUser\(admin, userId\)/.test(webhook))
+  check('B5: a failed lock is logged and cannot change the response',
+    /\[creem-webhook\] could not lock the billing market/.test(webhook)
+    && !/return Response[\s\S]{0,200}lock\.kind/.test(webhook))
+}
+
 console.log('\nC) the checkout route refuses in the right order')
 {
   const ordered = (src: string) => {

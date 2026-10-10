@@ -346,7 +346,7 @@ async function run() {
       nonSuccess.every((o) => httpStatusForCreemOutcome(o) >= 400))
 
     const success: CreemWebhookOutcome[] = [
-      { kind: 'activated', creemSubscriptionId: 'sub_1', plan: 'advanced' },
+      { kind: 'activated', creemSubscriptionId: 'sub_1', plan: 'advanced', userId: USER },
       { kind: 'activation_already_applied', creemSubscriptionId: 'sub_1' },
       { kind: 'processed', eventType: 'subscription.active' },
       { kind: 'ignored_malformed_event' },

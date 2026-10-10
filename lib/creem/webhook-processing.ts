@@ -106,7 +106,7 @@ export type CreemWebhookOutcome =
   | { kind: 'activation_write_failed'; message: string }
   /** The subscription id is already on a row — a redelivered checkout. */
   | { kind: 'activation_already_applied'; creemSubscriptionId: string }
-  | { kind: 'activated'; creemSubscriptionId: string; plan: PlanCode }
+  | { kind: 'activated'; creemSubscriptionId: string; plan: PlanCode; userId: string }
   /** The period could not be advanced, and was therefore left alone. */
   | { kind: 'renewal_date_unavailable'; eventType: string; reason: string }
   | { kind: 'renewal_duplicate'; eventType: string; periodEnd: string }
@@ -271,7 +271,7 @@ async function activateFromCheckout(
     // row; surfaced so a human does it.
     return { kind: 'activation_write_failed', message: `multiple current entitlement rows: ${result.count}` }
   }
-  return { kind: 'activated', creemSubscriptionId: subscriptionId, plan }
+  return { kind: 'activated', creemSubscriptionId: subscriptionId, plan, userId: accountReference }
 }
 
 /**
