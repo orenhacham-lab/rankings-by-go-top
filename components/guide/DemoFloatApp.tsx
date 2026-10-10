@@ -14,12 +14,28 @@
  * row stay where they are. The dashboard has no other floating element, so this
  * owns the end corner at z-[59] on every size. Admins never see it, exactly as
  * they never see the contact pill or the rail's support row.
+ *
+ * The corner is not empty, though: the app's bottom bars end there too, and the
+ * pill covered the summary's "Start" button (owner's report of 10 October 2026).
+ * Every such bar carries `data-float-clear` and the pill rises above the one
+ * under it (lib/shell/float-clearance.ts), by its own `bottom`, so the shared
+ * DemoFloat and the public site's pill are untouched: same link, same words,
+ * same place whenever nothing is under it.
  */
+import { useEffect, useRef } from 'react'
 import { DemoFloat } from '@/components/public/DemoFloat'
 import { whatsappHelpUrl } from '@/components/public/contact'
 import { useActiveProject } from '@/lib/active-project/ActiveProjectProvider'
 import { getDashboardDictionary } from '@/lib/i18n/dashboard/getDashboardDictionary'
 import { useDashboardLanguage } from '@/lib/i18n/dashboard/useDashboardLanguage'
+import { FLOAT_CLEAR_SELECTOR, floatLift, type FloatBox } from '@/lib/shell/float-clearance'
+
+/** How often the bars are looked for again: a bar can appear without a scroll (a save row on an edit). */
+const RECHECK_MS = 400
+/** The pill's resting `bottom` in the app (DemoFloat's `bottom-6`). */
+const REST_BOTTOM = '1.5rem'
+
+const boxOf = (r: DOMRect): FloatBox => ({ left: r.left, top: r.top, width: r.width, height: r.height })
 
 export default function DemoFloatApp() {
   const { uiLocale } = useDashboardLanguage()
@@ -27,12 +43,52 @@ export default function DemoFloatApp() {
   const { activeProjectId, projects } = useActiveProject()
   const domain = projects.find((p) => p.id === activeProjectId)?.target_domain?.trim() ?? ''
 
+  // Keeps the pill (the holder's one child) above every bottom bar under it.
+  const holder = useRef<HTMLSpanElement>(null)
+  useEffect(() => {
+    const pill = holder.current?.firstElementChild
+    if (!(pill instanceof HTMLElement)) return
+    let lift = 0
+    let frame = 0
+    const place = () => {
+      cancelAnimationFrame(frame)
+      frame = requestAnimationFrame(() => {
+        const now = pill.getBoundingClientRect()
+        // Where the pill rests: its box now, less the lift it carries now.
+        const rest: FloatBox = { ...boxOf(now), top: now.top + lift }
+        const bars = Array.from(document.querySelectorAll<HTMLElement>(FLOAT_CLEAR_SELECTOR))
+          .filter((el) => !el.hidden && el.getClientRects().length > 0)
+          .map((el) => boxOf(el.getBoundingClientRect()))
+        const next = floatLift(rest, bars)
+        if (next === lift) return
+        lift = next
+        pill.style.bottom = next > 0 ? `calc(${REST_BOTTOM} + ${next}px)` : ''
+      })
+    }
+    pill.style.transition = 'bottom 200ms var(--ease-snappy, ease-out), background-color 150ms, box-shadow 150ms'
+    place()
+    window.addEventListener('scroll', place, true)
+    window.addEventListener('resize', place)
+    const timer = window.setInterval(place, RECHECK_MS)
+    return () => {
+      cancelAnimationFrame(frame)
+      window.removeEventListener('scroll', place, true)
+      window.removeEventListener('resize', place)
+      window.clearInterval(timer)
+      pill.style.bottom = ''
+      pill.style.transition = ''
+    }
+  }, [])
+
   return (
-    <DemoFloat
-      href={whatsappHelpUrl(t.demoMessage(domain))}
-      label={t.demo}
-      ariaLabel={t.demoAria}
-      tone="app"
-    />
+    // `display: contents`: no box of its own, so the pill stays fixed to the screen.
+    <span ref={holder} className="contents">
+      <DemoFloat
+        href={whatsappHelpUrl(t.demoMessage(domain))}
+        label={t.demo}
+        ariaLabel={t.demoAria}
+        tone="app"
+      />
+    </span>
   )
 }

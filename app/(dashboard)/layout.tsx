@@ -106,7 +106,9 @@ export default async function DashboardLayout({
             <DocumentTitle />
             <SkipLink />
             <Sidebar isAdmin={isAdmin} />
-            <main className="flex-1 min-w-0 min-h-screen bg-no-repeat bg-[radial-gradient(64rem_26rem_at_50%_-8rem,rgb(0_112_214/0.06),transparent_70%)]">
+            {/* main's bottom padding (with the content's own) keeps a screen's last controls
+                clear of the floating demo pill in the end corner once scrolled to the end. */}
+            <main className="flex-1 min-w-0 min-h-screen pb-16 bg-no-repeat bg-[radial-gradient(64rem_26rem_at_50%_-8rem,rgb(0_112_214/0.06),transparent_70%)]">
               <DashboardDirectionWrapper>
                 {/* The top bar. Every screen shows the SAME workspace control, because
                     "which site am I looking at" is a question about the app, not about
