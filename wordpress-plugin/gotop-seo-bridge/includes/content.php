@@ -10,6 +10,8 @@
  *     heading block's level change, its attributes and every word stay exactly as they were.
  */
 
+namespace GoTopSeoBridge;
+
 if (!defined('ABSPATH')) { exit; }
 
 function gotop_seo_bridge_esc($s) {

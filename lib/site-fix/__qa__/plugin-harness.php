@@ -15,6 +15,12 @@
  *   {"llms": "/llms.txt", "method": "GET"} -> what a public request for that path answers (null: WordPress carries on)
  *   {"remote": "https://...", "base64": "..."} -> an image download_url() answers (3.0.0 /media tests)
  *   {"postfull": 100}                  -> the whole post object, its meta, every address downloaded so far
+ *   {"notices": true}                  -> what the admin_notices hooks print (3.1.0: two copies active)
+ *   {"media": 600, "file": "a.jpg", "sizes": ["a-300x200.jpg"], "alt": ""} -> a Media Library image (3.1.0 /media-alt)
+ *   {"setpost": 41, ..., "type": "post", "status": "draft", "password": "x"} -> post type, status, password (3.1.0 /content)
+ *
+ * GOTOP_HARNESS_SECOND (environment): a second copy of the plugin, loaded after the first (3.1.0 duplicate guard).
+ * Users: 1 (administrator) may do anything; 2 "Dana Editor" may publish posts; 3 "Sam Reader" may not.
  * It prints one JSON array: the result of every step.
  *
  * GOTOP_HARNESS_ROOT (environment) sets the site's root folder (ABSPATH), where a real llms.txt may sit.
@@ -69,12 +75,46 @@ class WP_REST_Request {
 class WP_Query {
     public $posts = array();
     function __construct($args) {
+        $GLOBALS['__queries'][] = $args;
         foreach ($GLOBALS['__posts'] as $p) {
-            if (in_array($p->post_type, (array) $args['post_type'], true) && stripos($p->post_content, $args['s']) !== false) { $this->posts[] = $p; }
+            if (!in_array($p->post_type, (array) $args['post_type'], true)) { continue; }
+            if (isset($args['s'])) { if (stripos($p->post_content, $args['s']) !== false) { $this->posts[] = $p; } continue; }
+            // 3.1.0 /content: published, no password, newest change first, one page.
+            if (isset($args['post_status']) && $p->post_status !== $args['post_status']) { continue; }
+            if (isset($args['has_password']) && $args['has_password'] === false && !empty($p->post_password)) { continue; }
+            $this->posts[] = $p;
+        }
+        if (!isset($args['s'])) {
+            usort($this->posts, function ($a, $b) { return strcmp((string) $b->post_modified_gmt, (string) $a->post_modified_gmt) ?: $a->ID - $b->ID; });
+            $page = isset($args['paged']) ? (int) $args['paged'] : 1;
+            $this->posts = array_slice($this->posts, ($page - 1) * $args['posts_per_page'], $args['posts_per_page']);
+            return;
         }
         $this->posts = array_slice($this->posts, 0, $args['posts_per_page']);
     }
 }
+$GLOBALS['__queries'] = array();
+$GLOBALS['__users'] = array(
+    1 => array('display_name' => 'Site Admin', 'user_email' => 'admin@shop.example.org', 'publish' => true),
+    2 => array('display_name' => 'Dana Editor', 'user_email' => 'dana@shop.example.org', 'publish' => true),
+    3 => array('display_name' => 'Sam Reader', 'user_email' => 'sam@shop.example.org', 'publish' => false),
+);
+function get_users($args) {
+    $out = array();
+    foreach ($GLOBALS['__users'] as $id => $u) {
+        if (in_array('publish_posts', (array) $args['capability'], true) && !$u['publish']) { continue; }
+        $row = array('ID' => $id, 'display_name' => $u['display_name'], 'user_email' => $u['user_email']);
+        $out[] = (object) (isset($args['fields']) && is_array($args['fields']) ? array_intersect_key($row, array_flip($args['fields'])) : $row);
+    }
+    return $out;
+}
+function setup_postdata($p) { $GLOBALS['__setup'][] = is_object($p) ? $p->ID : $p; return true; }
+function wp_reset_postdata() {}
+function wp_strip_all_tags($s) { return trim(strip_tags((string) $s)); }
+function taxonomy_exists($t) { return isset($GLOBALS['__terms'][$t]); }
+function get_term_link($term) { return 'https://shop.example.org/category/' . $term->slug . '/'; }
+function get_date_from_gmt($d) { return $d; }
+function wp_get_attachment_metadata($id) { return isset($GLOBALS['__posts'][$id]->sizes) ? array('sizes' => array_map(function ($f) { return array('file' => $f); }, $GLOBALS['__posts'][$id]->sizes)) : array(); }
 function add_action($hook, $cb, $prio = 10, $n = 1) { $GLOBALS['__filters'][$hook][] = $cb; }
 function add_filter($hook, $cb, $prio = 10, $n = 1) { $GLOBALS['__filters'][$hook][] = $cb; }
 function apply_filters($hook, $value) { return $value; }
@@ -119,7 +159,7 @@ function is_singular() { return $GLOBALS['__queried'] > 0; }
 function is_front_page() { return false; }
 function get_queried_object_id() { return $GLOBALS['__queried']; }
 function get_current_user_id() { return 1; }
-function user_can($user, $cap) { return (int) $user === 1; }
+function user_can($user, $cap) { $id = (int) $user; if ($id === 1) { return true; } return $cap === 'publish_posts' && isset($GLOBALS['__users'][$id]) && $GLOBALS['__users'][$id]['publish']; }
 function wp_parse_url($url, $component = -1) { return parse_url($url, $component); }
 function esc_url_raw($u) { return (string) $u; }
 function wp_print_inline_script_tag($data, $attributes = array()) {
@@ -153,6 +193,8 @@ function get_posts($args) {
     $out = array();
     foreach ($GLOBALS['__posts'] as $p) {
         if ($p->post_type !== $args['post_type']) { continue; }
+        if (isset($args['s']) && stripos((string) $p->post_title, $args['s']) === false) { continue; }
+        if (isset($args['name']) && (isset($p->post_name) ? $p->post_name : '') !== $args['name']) { continue; }
         if (!in_array($p->post_status, (array) $args['post_status'], true)) { continue; }
         if (isset($args['meta_key']) && get_post_meta($p->ID, $args['meta_key'], true) !== $args['meta_value']) { continue; }
         $out[] = $p->ID;
@@ -214,7 +256,12 @@ if (defined('GOTOP_HARNESS_SEO')) {}
 $plugin_dir = $argv[1];
 $calls = json_decode(file_get_contents($argv[2]), true);
 require $plugin_dir . '/gotop-seo-bridge.php';
+if (getenv('GOTOP_HARNESS_SECOND')) { require rtrim(getenv('GOTOP_HARNESS_SECOND'), '/') . '/gotop-seo-bridge.php'; }
+// WordPress fires plugins_loaded once every active plugin file is read; 3.1.0 starts there.
+foreach (isset($GLOBALS['__filters']['plugins_loaded']) ? $GLOBALS['__filters']['plugins_loaded'] : array() as $cb) { call_user_func($cb); }
 foreach ($GLOBALS['__filters']['rest_api_init'] as $cb) { call_user_func($cb); }
+/** A plugin function by name: 3.1.0 keeps them in the GoTopSeoBridge namespace, 3.0.0 and older are global. */
+function gtp_fn($name) { return function_exists('GoTopSeoBridge\\' . $name) ? 'GoTopSeoBridge\\' . $name : $name; }
 
 $out = array();
 foreach ($calls as $step) {
@@ -239,19 +286,23 @@ foreach ($calls as $step) {
     } elseif (isset($step['head'])) {
         $GLOBALS['__queried'] = $step['head'];
         ob_start();
-        gotop_seo_bridge_head();
+        call_user_func(gtp_fn('gotop_seo_bridge_head'));
         $head = ob_get_clean();
-        $out[] = array('head' => $head, 'title' => gotop_seo_bridge_document_title('Theme title'));
+        $out[] = array('head' => $head, 'title' => call_user_func(gtp_fn('gotop_seo_bridge_document_title'), 'Theme title'));
         $GLOBALS['__queried'] = 0;
     } elseif (isset($step['setpost'])) {
         $id = (int) $step['setpost'];
-        $GLOBALS['__posts'][$id] = (object) array('ID' => $id, 'post_type' => 'page', 'post_status' => 'publish',
-            'post_title' => isset($step['title']) ? $step['title'] : 'Page ' . $id, 'post_content' => (string) $step['content']);
+        $GLOBALS['__posts'][$id] = (object) array('ID' => $id, 'post_type' => isset($step['type']) ? $step['type'] : 'page',
+            'post_status' => isset($step['status']) ? $step['status'] : 'publish',
+            'post_title' => isset($step['title']) ? $step['title'] : 'Page ' . $id, 'post_content' => (string) $step['content'],
+            'post_name' => isset($step['slug']) ? $step['slug'] : 'page-' . $id, 'post_password' => isset($step['password']) ? $step['password'] : '',
+            'post_date_gmt' => '2026-01-01 00:00:00', 'post_modified_gmt' => isset($step['modified']) ? $step['modified'] : '2026-01-01 00:00:00',
+            'post_author' => 1);
         if (isset($step['url'])) { $GLOBALS['__urls'][$step['url']] = $id; }
         if (isset($step['meta']) && is_array($step['meta'])) { foreach ($step['meta'] as $k => $v) { $GLOBALS['__meta'][$id][$k] = $v; } }
         $out[] = array('value' => $id);
     } elseif (isset($step['llms'])) {
-        $out[] = array('value' => gotop_seo_bridge_llms_response(isset($step['method']) ? $step['method'] : 'GET', $step['llms']));
+        $out[] = array('value' => call_user_func(gtp_fn('gotop_seo_bridge_llms_response'), isset($step['method']) ? $step['method'] : 'GET', $step['llms']));
     } elseif (isset($step['remote'])) {
         // An image the "storage" serves: {"remote": "https://...", "base64": "..."}
         $GLOBALS['__remote'][$step['remote']] = base64_decode($step['base64']);
@@ -261,6 +312,20 @@ foreach ($calls as $step) {
         $out[] = array('post' => isset($GLOBALS['__posts'][$id]) ? $GLOBALS['__posts'][$id] : null,
             'meta' => isset($GLOBALS['__meta'][$id]) ? $GLOBALS['__meta'][$id] : new stdClass(), 'downloads' => $GLOBALS['__downloads'],
             'count' => count($GLOBALS['__posts']));
+    } elseif (isset($step['notices'])) {
+        $GLOBALS['__caps'] = isset($step['can']) ? $step['can'] : array();
+        ob_start();
+        foreach (isset($GLOBALS['__filters']['admin_notices']) ? $GLOBALS['__filters']['admin_notices'] : array() as $cb) { call_user_func($cb); }
+        $out[] = array('value' => ob_get_clean(), 'routes' => count($GLOBALS['__routes']), 'route_names' => array_keys($GLOBALS['__routes']), 'version' => defined('GOTOP_SEO_BRIDGE_VERSION') ? GOTOP_SEO_BRIDGE_VERSION : null);
+    } elseif (isset($step['media'])) {
+        $id = (int) $step['media'];
+        $GLOBALS['__posts'][$id] = (object) array('ID' => $id, 'post_type' => 'attachment', 'post_status' => 'inherit', 'post_title' => preg_replace('/\.[a-z]+$/', '', $step['file']),
+            'post_name' => preg_replace('/\.[a-z]+$/', '', $step['file']), 'post_content' => '', 'guid' => 'https://shop.example.org/wp-content/uploads/2026/01/' . $step['file'],
+            'sizes' => isset($step['sizes']) ? $step['sizes'] : array());
+        if (isset($step['alt'])) { $GLOBALS['__meta'][$id]['_wp_attachment_image_alt'] = $step['alt']; }
+        $out[] = array('value' => $id);
+    } elseif (isset($step['queries'])) {
+        $out[] = array('value' => $GLOBALS['__queries']);
     } elseif (isset($step['define'])) {
         if (!defined($step['define'])) { define($step['define'], '1.0'); }
         $out[] = array('defined' => $step['define']);

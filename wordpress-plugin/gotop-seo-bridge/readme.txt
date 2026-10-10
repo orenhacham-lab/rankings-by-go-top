@@ -4,7 +4,7 @@ Tags: seo, schema, publishing, content, ai
 Requires at least: 6.0
 Tested up to: 7.1
 Requires PHP: 7.4
-Stable tag: 3.0.0
+Stable tag: 3.1.0
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -133,6 +133,13 @@ Settings > GO TOP SEO > Disconnect. GO TOP can no longer reach the site. Deletin
 
 == Changelog ==
 
+= 3.1.0 =
+* Everything GO TOP does now works with this plugin alone, without an application password: new signed routes list your published posts and pages (for the index of your existing content), read the links in one published post or page, list the users who may publish posts, and set the alt text of a Media Library image.
+* Publishing: schedule a post for a date, publish a second separate post for an article when you ask for it, choose the author of each article (only users who may publish posts), and update the post GO TOP published for the same article before the plugin was installed.
+* Categories, tags and WooCommerce product categories are listed with their address and post count.
+* Two copies of the plugin active at once (the older one and the WordPress.org one) no longer stop the site: the second one stays off and shows a notice. Deleting one copy keeps the connection while the other copy is installed.
+* The Settings link and the messages after Connect, Save and Disconnect open the right settings page.
+
 = 3.0.0 =
 * Publishing: new signed routes publish an article as a post (or update the post made for it), add its images to the Media Library, and read the site's categories and tags. No application password is needed.
 * Settings > GO TOP SEO: choose the user articles are published as.
@@ -150,6 +157,9 @@ Settings > GO TOP SEO > Disconnect. GO TOP can no longer reach the site. Deletin
 * First release.
 
 == Upgrade Notice ==
+
+= 3.1.0 =
+GO TOP no longer needs an application password for anything once the plugin is connected. The connection is kept.
 
 = 3.0.0 =
 Adds publishing articles from GO TOP without an application password. The connection is kept.

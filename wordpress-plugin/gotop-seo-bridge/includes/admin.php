@@ -6,20 +6,22 @@
  * Administrators only (manage_options); every form is nonce-protected; everything printed is escaped.
  */
 
+namespace GoTopSeoBridge;
+
 if (!defined('ABSPATH')) { exit; }
 
-add_action('admin_menu', 'gotop_seo_bridge_admin_menu');
+add_action('admin_menu', __NAMESPACE__ . '\\gotop_seo_bridge_admin_menu');
 function gotop_seo_bridge_admin_menu() {
     add_options_page('GO TOP SEO', 'GO TOP SEO', 'manage_options', 'go-top-seo-bridge', 'gotop_seo_bridge_admin_page');
 }
 
-add_filter('plugin_action_links_' . plugin_basename(GOTOP_SEO_BRIDGE_DIR . '/gotop-seo-bridge.php'), 'gotop_seo_bridge_action_links');
+add_filter('plugin_action_links_' . plugin_basename(GOTOP_SEO_BRIDGE_DIR . '/gotop-seo-bridge.php'), __NAMESPACE__ . '\\gotop_seo_bridge_action_links');
 function gotop_seo_bridge_action_links($links) {
-    array_unshift($links, '<a href="' . esc_url(admin_url('options-general.php?page=gotop-seo-bridge')) . '">' . esc_html__('Settings', 'go-top-seo-bridge') . '</a>');
+    array_unshift($links, '<a href="' . esc_url(admin_url('options-general.php?page=go-top-seo-bridge')) . '">' . esc_html__('Settings', 'go-top-seo-bridge') . '</a>');
     return $links;
 }
 
-add_action('admin_post_gotop_seo_bridge_pair', 'gotop_seo_bridge_admin_pair');
+add_action('admin_post_gotop_seo_bridge_pair', __NAMESPACE__ . '\\gotop_seo_bridge_admin_pair');
 function gotop_seo_bridge_admin_pair() {
     if (!current_user_can('manage_options')) { wp_die(esc_html__('Not allowed.', 'go-top-seo-bridge'), 403); }
     check_admin_referer('gotop_seo_bridge_pair');
@@ -30,11 +32,11 @@ function gotop_seo_bridge_admin_pair() {
         gotop_seo_bridge_store_key($parsed['key_id'], $parsed['secret'], get_current_user_id());
         $status = 'paired';
     }
-    wp_safe_redirect(add_query_arg('gotop', $status, admin_url('options-general.php?page=gotop-seo-bridge')));
+    wp_safe_redirect(add_query_arg('gotop', $status, admin_url('options-general.php?page=go-top-seo-bridge')));
     exit;
 }
 
-add_action('admin_post_gotop_seo_bridge_author', 'gotop_seo_bridge_admin_author');
+add_action('admin_post_gotop_seo_bridge_author', __NAMESPACE__ . '\\gotop_seo_bridge_admin_author');
 function gotop_seo_bridge_admin_author() {
     if (!current_user_can('manage_options')) { wp_die(esc_html__('Not allowed.', 'go-top-seo-bridge'), 403); }
     check_admin_referer('gotop_seo_bridge_author');
@@ -44,16 +46,16 @@ function gotop_seo_bridge_admin_author() {
         update_option('gotop_seo_bridge_author', $id, false);
         $status = 'author_saved';
     }
-    wp_safe_redirect(add_query_arg('gotop', $status, admin_url('options-general.php?page=gotop-seo-bridge')));
+    wp_safe_redirect(add_query_arg('gotop', $status, admin_url('options-general.php?page=go-top-seo-bridge')));
     exit;
 }
 
-add_action('admin_post_gotop_seo_bridge_forget', 'gotop_seo_bridge_admin_forget');
+add_action('admin_post_gotop_seo_bridge_forget', __NAMESPACE__ . '\\gotop_seo_bridge_admin_forget');
 function gotop_seo_bridge_admin_forget() {
     if (!current_user_can('manage_options')) { wp_die(esc_html__('Not allowed.', 'go-top-seo-bridge'), 403); }
     check_admin_referer('gotop_seo_bridge_forget');
     gotop_seo_bridge_forget_key();
-    wp_safe_redirect(add_query_arg('gotop', 'forgotten', admin_url('options-general.php?page=gotop-seo-bridge')));
+    wp_safe_redirect(add_query_arg('gotop', 'forgotten', admin_url('options-general.php?page=go-top-seo-bridge')));
     exit;
 }
 
