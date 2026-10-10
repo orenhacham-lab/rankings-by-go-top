@@ -50,6 +50,10 @@ ENV.CREEM_PRODUCT_ID_USD_REGULAR = 'prod_regular'
 ENV.CREEM_PRODUCT_ID_USD_ADVANCED = 'prod_advanced'
 ENV.CREEM_PRODUCT_ID_USD_PREMIUM = 'prod_premium'
 ENV.CREEM_PRODUCT_ID_USD_LARGE_AGENCY = 'prod_large_agency'
+// Sandbox mode writes only to accounts named here. Every scenario below uses
+// USER, so the suite declares it as the test account; section H proves the
+// restriction itself by taking it away.
+ENV.CREEM_TEST_ACCOUNT_IDS = '11111111-1111-1111-1111-111111111111'
 
 const USER = '11111111-1111-1111-1111-111111111111'
 const PERIOD_END = '2026-11-10T00:00:00.000Z'
@@ -391,6 +395,61 @@ async function run() {
     }
     check('G4-MUT: replaying a renewal three times lands on one date, not three months later',
       (converge.tables.subscriptions[0] as Record<string, unknown>).current_period_end === NEXT_PERIOD_END)
+  }
+
+  console.log('\nH) sandbox mode cannot reach an account it was not pointed at')
+  {
+    // The preview shares the PRODUCTION database, so this is the guard that
+    // stops a sandbox event changing a real customer's entitlement.
+    const stranger = '99999999-9999-9999-9999-999999999999'
+    const admin = new FakeAdmin({ subscriptions: [], profiles: [{ id: stranger }] })
+    const r = await processVerifiedCreemEvent(
+      admin,
+      { eventType: 'checkout.completed', object: { id: 'ch_9', request_id: stranger, subscription: 'sub_9' } },
+      fakeCreem({ ok: true, value: snapshot({ id: 'sub_9' }) }),
+    )
+    check('H1: a checkout for an account outside the test list grants nothing',
+      r.kind === 'refused_outside_test_accounts', r.kind)
+    check('H1b: and writes no row', admin.tables.subscriptions.length === 0)
+    check('H1c: and answers non-2xx, so it never reads as handled', httpStatusForCreemOutcome(r) === 422)
+
+    const strangerRow = new FakeAdmin({
+      subscriptions: [{ id: 'row-x', user_id: stranger, status: 'active', creem_subscription_id: 'sub_1', current_period_end: PERIOD_END }],
+      profiles: [{ id: stranger }],
+    })
+    const r2 = await processVerifiedCreemEvent(strangerRow, subscriptionEvent('subscription.canceled'), fakeCreem({ ok: true, value: snapshot() }))
+    check('H2: a lifecycle event for another account\'s row changes nothing',
+      r2.kind === 'refused_outside_test_accounts')
+    check('H2b: that row is untouched',
+      (strangerRow.tables.subscriptions[0] as Record<string, unknown>).status === 'active')
+
+    const r3 = await processVerifiedCreemEvent(strangerRow, subscriptionEvent('subscription.paid'), fakeCreem({ ok: true, value: snapshot({ currentPeriodEnd: NEXT_PERIOD_END }) }))
+    check('H3: a renewal for another account\'s row does not move its period',
+      r3.kind === 'refused_outside_test_accounts'
+      && (strangerRow.tables.subscriptions[0] as Record<string, unknown>).current_period_end === PERIOD_END)
+
+    // MUTATION CONTROL — an empty list in sandbox mode must refuse
+    // EVERYTHING, not allow everything. That is the difference between a
+    // misconfigured test doing nothing and a misconfigured test writing to
+    // whoever the event names.
+    ENV.CREEM_TEST_ACCOUNT_IDS = ''
+    const empty = adminWith()
+    const r4 = await processVerifiedCreemEvent(empty, checkoutEvent(), fakeCreem({ ok: true, value: snapshot() }))
+    check('H4-MUT: with no test account configured, sandbox mode writes to nobody',
+      r4.kind === 'refused_outside_test_accounts' && empty.tables.subscriptions.length === 0)
+
+    // And in LIVE mode the restriction is inert: every account is real.
+    ENV.CREEM_MODE = 'live'
+    const live = new FakeAdmin({ subscriptions: [], profiles: [{ id: stranger }] })
+    const r5 = await processVerifiedCreemEvent(
+      live,
+      { eventType: 'checkout.completed', object: { id: 'ch_9', request_id: stranger, subscription: 'sub_9' } },
+      fakeCreem({ ok: true, value: snapshot({ id: 'sub_9' }) }),
+    )
+    check('H5: in live mode the list means nothing and a real account is granted',
+      r5.kind === 'activated', r5.kind)
+    ENV.CREEM_MODE = undefined
+    ENV.CREEM_TEST_ACCOUNT_IDS = '11111111-1111-1111-1111-111111111111'
   }
 
   console.log(`\n${pass} passed, ${fail} failed`)

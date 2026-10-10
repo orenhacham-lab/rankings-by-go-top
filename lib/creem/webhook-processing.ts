@@ -33,6 +33,13 @@
  *     the exact value this handler read, so two interleaved deliveries can
  *     never skip a period boundary between them.
  *
+ * SANDBOX MODE CANNOT REACH A REAL ACCOUNT. This project's Vercel preview
+ * shares the production database, so a sandbox webhook landing on a preview
+ * deployment writes into real data. In test mode, therefore, nothing here
+ * writes to any account but the ones configured in CREEM_TEST_ACCOUNT_IDS,
+ * and an empty list refuses everything (lib/creem/config.ts). The guard is a
+ * restriction only — it is inert in live mode and can never grant anything.
+ *
  * WHAT A `request_id` IS AND IS NOT. We set it when we create the checkout
  * (the account id) and Creem echoes it back. It is a LOOKUP KEY — it says
  * which account this payment was started for, and nothing else. It is not a
@@ -42,6 +49,7 @@
 
 import { effectForCreemEvent, type EntitlementStatus } from './events'
 import { planForCreemProductId } from './checkout-products'
+import { creemMayWriteToAccount } from './config'
 import { normalizeInstant, parseInstantMs } from '@/lib/paypal/timestamp'
 import { transitionSubscriptionToActivePlan } from '@/lib/billing/entitlement-write'
 import type { CreemFailure, CreemResult, CreemSubscriptionSnapshot } from './client'
@@ -85,6 +93,12 @@ export type CreemWebhookOutcome =
   | { kind: 'ignored_unknown_subscription'; creemSubscriptionId: string }
   | { kind: 'processed'; eventType: string }
   | { kind: 'update_failed'; eventType: string; message: string }
+  /** Sandbox mode, and the account this event would write to is not one of
+   *  the configured test accounts. Nothing is read further and nothing is
+   *  written. See lib/creem/config.ts::creemMayWriteToAccount — the preview
+   *  shares the production database, so a test event must not be able to
+   *  reach a real customer's entitlement. */
+  | { kind: 'refused_outside_test_accounts'; accountId: string | null }
   /** Creem could not be read back, so nothing was granted. Retryable. */
   | { kind: 'activation_unverifiable'; reason: CreemFailure }
   /** Creem answered, and its answer does not support granting a plan. */
@@ -199,6 +213,12 @@ async function activateFromCheckout(
   const accountReference = accountReferenceOf(checkout)
   if (!accountReference) return { kind: 'activation_refused', reason: 'no_account_reference' }
 
+  // In sandbox mode, only the configured test accounts may be written to.
+  // Checked before any read, so a stray test event costs nothing at all.
+  if (!creemMayWriteToAccount(accountReference)) {
+    return { kind: 'refused_outside_test_accounts', accountId: accountReference }
+  }
+
   // Already applied? Creem redelivers a checkout.completed on its retry
   // schedule, and the FIRST thing a redelivery must not do is grant a second
   // time. Checked before the account read so a retry costs one query.
@@ -281,6 +301,13 @@ async function applyStatus(
     .maybeSingle()
   if (lookupError) return { kind: 'lookup_failed', message: lookupError.message }
   if (!row) return { kind: 'ignored_unknown_subscription', creemSubscriptionId: subscriptionId }
+
+  // Sandbox mode may only change the configured test accounts' rows. The row
+  // has to be read first to know whose it is, but nothing is written.
+  const owner = (row as { user_id?: string | null }).user_id ?? null
+  if (!creemMayWriteToAccount(owner)) {
+    return { kind: 'refused_outside_test_accounts', accountId: owner }
+  }
 
   if (eventType !== 'subscription.paid') {
     const { error } = await admin.from('subscriptions').update({ status }).eq('id', row.id)
@@ -368,6 +395,7 @@ export function httpStatusForCreemOutcome(outcome: CreemWebhookOutcome): number 
     case 'activation_unverifiable':
       return 502
     case 'activation_refused':
+    case 'refused_outside_test_accounts':
     case 'unmappable_subscription_reference':
     case 'renewal_date_unavailable':
       return 422

@@ -107,3 +107,39 @@ export const CREEM_SUCCESS_PATH = '/billing?checkout=creem'
 export function creemSuccessUrl(): string {
   return `${creemReturnOrigin()}${CREEM_SUCCESS_PATH}`
 }
+
+/**
+ * WHICH ACCOUNTS SANDBOX MODE MAY TOUCH.
+ *
+ * This project's Vercel preview shares the PRODUCTION Supabase database, so
+ * a sandbox webhook landing on a preview deployment writes into real data.
+ * A test event could therefore create or change a real customer's
+ * entitlement, which is exactly what this project's standing rule forbids.
+ *
+ * So in test mode the Creem webhook may only write to accounts named here,
+ * by id, in `CREEM_TEST_ACCOUNT_IDS` (comma-separated). An empty or unset
+ * list in test mode means NO account may be written to — the failure
+ * direction is "the test does nothing", never "the test touches a customer".
+ *
+ * This is a RESTRICTION, never a grant: it can only refuse writes that would
+ * otherwise happen, and it is inert in live mode, where every account is a
+ * real one and the list means nothing. It is not a bypass and carries no
+ * hard-coded id — the ids live in configuration and change without a deploy.
+ */
+export function creemTestAccountIds(): string[] {
+  return (process.env.CREEM_TEST_ACCOUNT_IDS ?? '')
+    .split(',')
+    .map((id) => id.trim())
+    .filter(Boolean)
+}
+
+/**
+ * Whether `accountId` may be written to under the CURRENT mode. Live mode
+ * allows every account; test mode allows only the configured test accounts.
+ */
+export function creemMayWriteToAccount(accountId: string | null | undefined): boolean {
+  if (creemMode() === 'live') return true
+  const id = accountId?.trim()
+  if (!id) return false
+  return creemTestAccountIds().includes(id)
+}
