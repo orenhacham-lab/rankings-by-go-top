@@ -29,6 +29,8 @@ O Serviço oferece um período de teste de 7 dias para novos clientes. Os limite
 
 O Serviço funciona em um modelo de assinatura mensal. Enquanto a assinatura estiver ativa, a cobrança é renovada automaticamente a cada mês conforme o plano escolhido. Preços, planos e limites podem mudar de tempo em tempo, e as atualizações são refletidas no Serviço e na página de preços.
 
+**O que o preço inclui.** Um preço indicado em séqueis inclui o IVA israelense exigido por lei, e é o valor que você paga. Um preço indicado em dólares não inclui imposto indireto; em um pagamento com cartão esse imposto é calculado e cobrado pela Creem conforme o seu endereço de cobrança e mostrado a você antes do pagamento, conforme a seção 5A.
+
 **A forma de cobrança depende de como a sua conta foi aberta:**
 
 - **Comerciantes que instalaram o aplicativo pela Shopify** (e qualquer conta cuja autoridade de cobrança seja a Shopify) são cobrados exclusivamente pelo Shopify App Pricing, como parte da sua fatura da Shopify. Esses comerciantes nunca são direcionados ao PayPal nem a qualquer outro checkout fora da Shopify, e não os cobramos por um segundo canal.
