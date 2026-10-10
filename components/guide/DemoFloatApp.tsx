@@ -22,13 +22,13 @@
  * DemoFloat and the public site's pill are untouched: same link, same words,
  * same place whenever nothing is under it.
  */
-import { useEffect, useRef, type RefObject } from 'react'
+import { useEffect, useRef } from 'react'
 import { DemoFloat } from '@/components/public/DemoFloat'
 import { whatsappHelpUrl } from '@/components/public/contact'
 import { useActiveProject } from '@/lib/active-project/ActiveProjectProvider'
 import { getDashboardDictionary } from '@/lib/i18n/dashboard/getDashboardDictionary'
 import { useDashboardLanguage } from '@/lib/i18n/dashboard/useDashboardLanguage'
-import { FLOAT_CLEAR_ATTR, floatLift, type FloatBox } from '@/lib/shell/float-clearance'
+import { FLOAT_CLEAR_SELECTOR, floatLift, type FloatBox } from '@/lib/shell/float-clearance'
 
 /** How often the bars are looked for again: a bar can appear without a scroll (a save row on an edit). */
 const RECHECK_MS = 400
@@ -37,11 +37,17 @@ const REST_BOTTOM = '1.5rem'
 
 const boxOf = (r: DOMRect): FloatBox => ({ left: r.left, top: r.top, width: r.width, height: r.height })
 
-/** Keeps the pill (the first child of `holder`) above every bar marked `data-float-clear`. */
-function useFloatClearance(holder: RefObject<HTMLSpanElement | null>) {
+export default function DemoFloatApp() {
+  const { uiLocale } = useDashboardLanguage()
+  const t = getDashboardDictionary(uiLocale).contact
+  const { activeProjectId, projects } = useActiveProject()
+  const domain = projects.find((p) => p.id === activeProjectId)?.target_domain?.trim() ?? ''
+
+  // Keeps the pill (the holder's one child) above every bottom bar under it.
+  const holder = useRef<HTMLSpanElement>(null)
   useEffect(() => {
-    const pill = holder.current?.firstElementChild as HTMLElement | null
-    if (!pill) return
+    const pill = holder.current?.firstElementChild
+    if (!(pill instanceof HTMLElement)) return
     let lift = 0
     let frame = 0
     const place = () => {
@@ -50,7 +56,7 @@ function useFloatClearance(holder: RefObject<HTMLSpanElement | null>) {
         const now = pill.getBoundingClientRect()
         // Where the pill rests: its box now, less the lift it carries now.
         const rest: FloatBox = { ...boxOf(now), top: now.top + lift }
-        const bars = Array.from(document.querySelectorAll<HTMLElement>(`[${FLOAT_CLEAR_ATTR}]`))
+        const bars = Array.from(document.querySelectorAll<HTMLElement>(FLOAT_CLEAR_SELECTOR))
           .filter((el) => !el.hidden && el.getClientRects().length > 0)
           .map((el) => boxOf(el.getBoundingClientRect()))
         const next = floatLift(rest, bars)
@@ -72,17 +78,7 @@ function useFloatClearance(holder: RefObject<HTMLSpanElement | null>) {
       pill.style.bottom = ''
       pill.style.transition = ''
     }
-  }, [holder])
-}
-
-export default function DemoFloatApp() {
-  const { uiLocale } = useDashboardLanguage()
-  const t = getDashboardDictionary(uiLocale).contact
-  const { activeProjectId, projects } = useActiveProject()
-  const domain = projects.find((p) => p.id === activeProjectId)?.target_domain?.trim() ?? ''
-
-  const holder = useRef<HTMLSpanElement>(null)
-  useFloatClearance(holder)
+  }, [])
 
   return (
     // `display: contents`: no box of its own, so the pill stays fixed to the screen.

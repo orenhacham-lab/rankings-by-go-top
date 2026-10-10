@@ -10,7 +10,7 @@
  */
 import { readFileSync } from 'fs'
 import { join } from 'path'
-import { FLOAT_GAP, floatLift, type FloatBox } from '../float-clearance'
+import { FLOAT_CLEAR_SELECTOR, FLOAT_GAP, floatLift, type FloatBox } from '../float-clearance'
 
 let pass = 0, fail = 0
 function check(name: string, cond: boolean, detail?: string) {
@@ -43,7 +43,7 @@ console.log('\nB) the app pill applies it')
   const app = code('components/guide/DemoFloatApp.tsx')
   const applies = (src: string) => /const next = floatLift\(rest, bars\)/.test(src)
     && /pill\.style\.bottom = next > 0 \? `calc\(\$\{REST_BOTTOM\} \+ \$\{next\}px\)` : ''/.test(src)
-    && /querySelectorAll<HTMLElement>\(`\[\$\{FLOAT_CLEAR_ATTR\}\]`\)/.test(src)
+    && /querySelectorAll<HTMLElement>\(FLOAT_CLEAR_SELECTOR\)/.test(src)
   check('B1: the pill measures the marked bars and rises by its own bottom', applies(app))
   check('B1-MUT: a pill that never moves fails B1', !applies(app.replace("pill.style.bottom = next > 0 ? `calc(${REST_BOTTOM} + ${next}px)` : ''", '')))
   check('B2: it follows scrolling (inner scrollers too) and resizing, and lets go on unmount',
@@ -59,9 +59,10 @@ console.log('\nC) the bars, and the public pill')
     ['components/onboarding/ResearchSummary.tsx', /data-summary-block="start"\s*data-float-clear=""/],
     ['components/settings/SettingsCard.tsx', /<footer\s*data-float-clear=""\s*className=\{cn\(\s*'sticky bottom-0/],
     ['app/(dashboard)/content/articles/[id]/page.tsx', /data-article-save-bar="" data-float-clear="" className="sticky/],
-    ['app/(dashboard)/keyword-research/page.tsx', /data-bulk-bar="" data-float-clear="" className="sticky/],
   ]
   for (const [file, re] of marked) check(`C1: ${file} marks its bottom bar`, re.test(code(file)))
+  check('C1b: keyword research\'s bulk bar is found by its own name (its screen is golden-locked)',
+    /data-bulk-bar="" className="sticky/.test(code('app/(dashboard)/keyword-research/page.tsx')) && FLOAT_CLEAR_SELECTOR.includes('[data-bulk-bar]'))
   check('C1-MUT: an unmarked summary bar fails C1', !marked[0][1].test(code(marked[0][0]).replace('data-float-clear=""', '')))
   const shared = code('components/public/DemoFloat.tsx')
   check('C2: the shared pill (and so the public site) is unchanged: no clearance logic in it', !/floatLift|float-clear|style\.bottom/.test(shared)
