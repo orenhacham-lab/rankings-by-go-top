@@ -30,7 +30,7 @@ import { splitArticleBlocks } from '@/lib/articles/widgets'
 import { withHeadingIds } from '@/lib/articles/headings'
 import { readingMinutes } from '@/lib/articles/reading-time'
 import { articlePublishBlockReason } from '@/lib/articles/publish-rules'
-import { articleAuthor } from '@/lib/articles/authors'
+import { articleAuthor, authorPersonSchema } from '@/lib/articles/authors'
 import { sanitizePublicArticleHtml } from '@/lib/content/public-article-html'
 
 const ROOT = join(__dirname, '..', '..', '..')
@@ -75,6 +75,7 @@ function main() {
   const viewSrc = stripComments(read('components/public/articles/ArticleView.tsx'))
   const serverSrc = stripComments(read('lib/articles/server.ts'))
   const authorBoxSrc = stripComments(read('components/public/articles/ArticleAuthorBox.tsx'))
+  const adminEditorSrc = stripComments(read('components/admin/ArticleEditor.tsx'))
   // MUTATION: drop `.eq('locale', locale)` from either component and every
   // language's blog shows every language's articles again.
   check('C1. the listing filters by locale', /\.eq\('locale',\s*locale\)/.test(indexSrc))
@@ -328,6 +329,55 @@ function main() {
   check('O10. the Person in the schema carries the same photograph',
     /articleAuthor\(article\.author\)\?\.photo/.test(serverSrc)
     && /image: `\$\{SITE_URL\}\$\{articleAuthor\(article\.author\)\?\.photo\}`/.test(serverSrc))
+
+  // The blog editor keeps only what TipTap's schema knows. Registered against
+  // a measured loss: with StarterKit and Link alone, loading an article with a
+  // table returned every cell as its own paragraph and dropped images, and the
+  // save wrote that back — three tables on /articles/seo-keywords-planning-tool
+  // were destroyed that way by a one-word edit to a link.
+  // MUTATION: remove TableCell from the extensions list and P1 fails.
+  console.log('\nP. the admin article editor cannot destroy what it cannot edit')
+  for (const node of ['Table.configure({ resizable: false })', 'TableRow', 'TableHeader', 'TableCell', 'Image']) {
+    check(`P1. the editor registers ${node.replace(/\..*/, '')}`,
+      new RegExp(`\\n\\s*${node.replace(/[.(){}:,\s]/g, '\\$&')},`).test(adminEditorSrc))
+  }
+  check('P2. the public sanitizer still allows what the editor now keeps',
+    /'table', 'thead', 'tbody'/.test(stripComments(read('lib/content/public-article-html.ts')))
+    && /'img'/.test(stripComments(read('lib/content/public-article-html.ts'))))
+
+  // The articles' Person points at /about with `url`. That page has to carry
+  // the same person, or the link lands where nothing says who wrote anything.
+  console.log('\nQ. the about page is the other half of the author claim')
+  const aboutSrc = stripComments(read('components/public/AboutPage.tsx'))
+  for (const locale of PUBLIC_LOCALES) {
+    const schema = authorPersonSchema('אורן חכם', locale)
+    check(`Q1. ${locale}: the about page's Person carries name, job, bio, url and photo`,
+      schema?.['@type'] === 'Person' && !!schema.name && !!schema.jobTitle
+      && !!schema.description && !!schema.url && !!schema.image)
+    check(`Q2. ${locale}: its url is this language's about page`,
+      schema?.url === `https://www.gotopseo.com${articleAuthor('אורן חכם')?.href[locale]}`)
+  }
+  check('Q3. an author with no profile gets no empty Person',
+    authorPersonSchema('Someone Else', 'he') === null)
+  // MUTATION: render copy.founderEyebrow alone, with no articleAuthor() read,
+  // and Q4 fails: the card goes back to being a plate with no person on it.
+  check('Q4. the card is built from the shared profile, not retyped copy',
+    /articleAuthor\('אורן חכם'\)/.test(aboutSrc)
+    && /founder\?\.name\[locale\]/.test(aboutSrc) && /founder\?\.bio\[locale\]/.test(aboutSrc)
+    && /src=\{founder\.photo\}/.test(aboutSrc))
+  check('Q5. all four about pages declare the Person',
+    ['app/(public)/about/layout.tsx', 'app/(public)/en/about/layout.tsx',
+     'app/(public)/es/about/layout.tsx', 'app/(public)/pt-BR/about/layout.tsx']
+      .every((f) => /authorPersonSchema\('אורן חכם'/.test(stripComments(read(f)))))
+  // The "what is written here" sentence belongs at the foot of an article; on
+  // the about page there is no "here".
+  check('Q6. the article-only sentence is kept out of the shared bio',
+    PUBLIC_LOCALES.every((l) => {
+      const p = articleAuthor('אורן חכם')!
+      return !!p.articleNote[l] && !p.bio[l].includes(p.articleNote[l])
+    })
+    && /\{profile\.bio\[locale\]\} \{profile\.articleNote\[locale\]\}/.test(authorBoxSrc)
+    && !/articleNote/.test(aboutSrc))
 
   console.log('\nM. mutation controls — the behavioural guards fail on broken input')
   check('M1. a FAQ under the wrong language\'s heading yields nothing',

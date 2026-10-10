@@ -23,7 +23,7 @@ const COPY: AboutCopy = {
       'La plataforma salió de nuestro trabajo diario con clientes: vimos qué informes entiende la gente de verdad, qué datos les ayudan a decidir y por dónde se va el tiempo. Así que construimos un solo lugar donde el contenido se escribe, se publica y se mide, en Google y en los motores de IA.',
     ],
   },
-  stat: { value: '11+', label: 'años de experiencia', sub: 'en SEO y marketing digital' },
+  founderEyebrow: 'Quién está detrás',
   gaps: {
     title: 'Qué faltaba, y qué construimos en su lugar',
     body: 'Queríamos que un negocio pudiera hacer todo lo necesario para que lo encuentren, en un solo sitio, sin tener que aprender SEO.',

@@ -3,6 +3,8 @@
 import { useEditor, useEditorState, EditorContent } from '@tiptap/react'
 import StarterKit from '@tiptap/starter-kit'
 import Link from '@tiptap/extension-link'
+import { Table, TableRow, TableHeader, TableCell } from '@tiptap/extension-table'
+import { Image } from '@tiptap/extension-image'
 import { useCallback, useEffect, useState } from 'react'
 import { Bold, Heading2, Heading3, Italic, Link2, List, ListOrdered, RemoveFormatting, Unlink } from 'lucide-react'
 import Button from '@/components/ui/Button'
@@ -20,6 +22,21 @@ export default function ArticleEditor({ value, onChange }: ArticleEditorProps) {
     immediatelyRender: false,
     extensions: [
       StarterKit,
+      // WITHOUT THESE, OPENING AN ARTICLE DESTROYS ITS TABLES AND IMAGES.
+      //
+      // TipTap keeps only what its schema knows. With StarterKit and Link
+      // alone there is no table node and no image node, so loading an article
+      // that contains either turns every cell into its own paragraph and drops
+      // the image — and the next save writes that back over the real article.
+      // That is what happened to /articles/seo-keywords-planning-tool: three
+      // tables came back as runs of one-line paragraphs after a one-word edit
+      // to a link. The public sanitizer allows tables and images
+      // (lib/content/public-article-html.ts), so the loss is the editor's.
+      Table.configure({ resizable: false }),
+      TableRow,
+      TableHeader,
+      TableCell,
+      Image,
       Link.configure({
         openOnClick: false,
         autolink: true,

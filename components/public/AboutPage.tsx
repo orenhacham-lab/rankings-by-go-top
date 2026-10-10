@@ -6,7 +6,8 @@
  *
  * The rhythm (wave 8, UX decision D; D = navy, L = light, B = cobalt):
  *   1. hero (D)      the home hero's navy, centred, the free check then the trial;
- *   2. who (L)       text and the navy "11+ years" plate;
+ *   2. who (L)       text and the navy founder card: his photograph, name,
+ *                    role, bio and the "11+ years" line;
  *   3. gaps (D)      what was missing → what we built, four pain/answer rows;
  *   4. approach (L)  four principles in a strip, 01–04 numerals, hairlines;
  *   5. choose (B)    four short statements on the cobalt band, in white;
@@ -15,11 +16,13 @@
  * No two adjacent bands share a tone, and no block is an icon-card grid. The
  * rise-in blocks and the CTA sweep are the landing page's, complete at rest.
  */
-import { BookOpen, Check, Mail, Phone, X } from 'lucide-react'
+import Image from 'next/image'
+import { Check, Mail, Phone, X } from 'lucide-react'
 import { PublicNav } from '@/components/PublicNav'
 import { Footer } from '@/components/Footer'
 import { Breadcrumbs } from '@/components/Breadcrumbs'
 import WhatsAppGlyph from '@/components/brand/WhatsAppGlyph'
+import { articleAuthor } from '@/lib/articles/authors'
 import type { PublicLocale } from '@/lib/i18n/locales'
 import { getPublicDictionary } from '@/lib/i18n/getPublicDictionary'
 import { FEATURE_COMMON } from '@/lib/i18n/public/feature-common'
@@ -37,7 +40,8 @@ export type AboutCopy = {
   accent: string
   subtitle: string
   who: { title: string; paragraphs: string[] }
-  stat: { value: string; label: string; sub: string }
+  /** The line above the founder's name on the card, in this language. */
+  founderEyebrow: string
   /** "What was missing, and what we built instead": four pain → answer rows. */
   gaps: { title: string; body: string; missingLabel: string; builtLabel: string; rows: { pain: Item; answer: Item }[] }
   approach: { title: string; items: Item[] }
@@ -48,6 +52,7 @@ export type AboutCopy = {
 export function AboutPage({ locale, copy }: { locale: PublicLocale; copy: AboutCopy }) {
   const c = FEATURE_COMMON[locale]
   const t = getPublicDictionary(locale).contact
+  const founder = articleAuthor('אורן חכם')
   // The close's three buttons: WhatsApp, call, email (UX decision C).
   const contactButtons = contactChannels(t).map((ch) => ({
     ...ch,
@@ -89,18 +94,40 @@ export function AboutPage({ locale, copy }: { locale: PublicLocale; copy: AboutC
               </div>
             </div>
 
+            {/* The person, not a book icon. This is the page the articles'
+                Person schema points at, so the claim "11 years" has to come
+                with a face and a name a reader can check. Name, role, bio and
+                photograph come from lib/articles/authors.ts — the same profile
+                the article author box uses, so the two can never disagree. */}
             <Rise>
-              <div className={cn(styles.stage, 'relative overflow-hidden rounded-card px-8 py-12 text-center shadow-pop sm:py-14')}>
+              <figure className={cn(styles.stage, 'relative overflow-hidden rounded-card p-8 shadow-pop sm:p-10')}>
                 <div aria-hidden="true" className={cn(styles.stageGrid, 'pointer-events-none absolute inset-0')} />
                 <div className="relative">
-                  <span className="mx-auto mb-6 flex size-14 items-center justify-center rounded-card bg-white/10 text-contrast-ink" aria-hidden="true">
-                    <BookOpen className="size-7" />
-                  </span>
-                  <div className="text-display font-bold tracking-tight tabular-nums text-contrast-ink" dir="ltr">{copy.stat.value}</div>
-                  <p className="mt-2 text-section font-semibold text-contrast-ink">{copy.stat.label}</p>
-                  <p className="mt-1 text-copy text-contrast-ink/70">{copy.stat.sub}</p>
+                  <div className="flex items-center gap-5">
+                    {founder?.photo && (
+                      <Image
+                        src={founder.photo}
+                        alt={founder.name[locale]}
+                        width={224}
+                        height={224}
+                        sizes="112px"
+                        className="size-28 shrink-0 rounded-card object-cover shadow-card ring-1 ring-white/20"
+                      />
+                    )}
+                    <div className="min-w-0">
+                      <p className="text-eyebrow text-rail-tagline">{copy.founderEyebrow}</p>
+                      <p className="mt-1.5 text-title font-bold tracking-tight text-contrast-ink">{founder?.name[locale]}</p>
+                      <p className="mt-1 text-copy text-contrast-ink/70">{founder?.role[locale]}</p>
+                    </div>
+                  </div>
+                  {/* The years are stated once, in the sentence. A "11+" plate
+                      under a bio that already says "over 11 years" is the same
+                      fact twice in one card. */}
+                  <figcaption className="mt-7 border-t border-white/20 pt-6 text-section font-normal text-contrast-ink/85 text-pretty">
+                    {founder?.bio[locale]}
+                  </figcaption>
                 </div>
-              </div>
+              </figure>
             </Rise>
           </div>
         </Section>

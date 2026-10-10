@@ -23,7 +23,7 @@ const COPY: AboutCopy = {
       'A plataforma nasceu do nosso trabalho diário com clientes: vimos quais relatórios as pessoas realmente entendem, quais dados ajudam a decidir e onde o tempo se perde. Por isso construímos um só lugar onde o conteúdo é escrito, publicado e medido, no Google e nos mecanismos de IA.',
     ],
   },
-  stat: { value: '11+', label: 'anos de experiência', sub: 'em SEO e marketing digital' },
+  founderEyebrow: 'Quem está por trás',
   gaps: {
     title: 'O que faltava, e o que construímos no lugar',
     body: 'Queríamos que uma empresa pudesse fazer tudo o que é preciso para ser encontrada, em um só lugar, sem ter que aprender SEO.',
