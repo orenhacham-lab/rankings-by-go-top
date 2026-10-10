@@ -10,6 +10,8 @@ import { PageHero, Section } from '@/components/public/marketing'
 import { ArticlesPromo } from '@/components/public/ArticlesPromo'
 import { ARTICLES_COPY, articleHref, articlesIndexHref } from '@/lib/articles/i18n'
 import { INTL_LOCALE, type PublicLocale } from '@/lib/i18n/locales'
+import { buildArticlesIndexSchema } from '@/lib/articles/server'
+import { jsonForScriptTag } from '@/lib/content/public-article-html'
 
 interface Article {
   id: string
@@ -47,6 +49,12 @@ export async function ArticlesIndex({ locale }: { locale: PublicLocale }) {
 
   return (
     <div className="flex min-h-screen flex-col bg-canvas">
+      {/* The index's own trail lives HERE, not in the articles layout.
+          A layout wraps its whole segment, so from there this two-step trail was
+          also rendered on every /articles/<slug> page, next to that page's own
+          three-step trail — two BreadcrumbLists for one page, and the article's
+          title in only one of them. Google picks one. */}
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: jsonForScriptTag(buildArticlesIndexSchema(locale)) }} />
       <PublicNav locale={locale} />
 
       <main className="flex-1">

@@ -1,6 +1,4 @@
 import { buildHreflangAlternates } from '@/lib/seo/hreflang'
-import { buildArticlesIndexSchema } from '@/lib/articles/server'
-import { jsonForScriptTag } from '@/lib/content/public-article-html'
 import { LOCALE_CONFIG } from '@/lib/i18n/locales'
 
 export const metadata = {
@@ -20,13 +18,5 @@ export const metadata = {
 }
 
 export default function ArticlesLayout({ children }: { children: React.ReactNode }) {
-  return (
-    <>
-      <script
-        type="application/ld+json"
-        dangerouslySetInnerHTML={{ __html: jsonForScriptTag(buildArticlesIndexSchema('pt-BR')) }}
-      />
-      {children}
-    </>
-  )
+  return children
 }

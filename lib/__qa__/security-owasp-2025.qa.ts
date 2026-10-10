@@ -80,10 +80,16 @@ function main() {
     const layout = strip(read(`app/(public)/${dir}/[slug]/layout.tsx`))
     check(`${dir}: article layout emits JSON-LD only through jsonForScriptTag`,
       /jsonForScriptTag\(/.test(layout) && !/__html:\s*JSON\.stringify/.test(layout))
+    // The listing's own JSON-LD moved out of this layout and into the index
+    // component: a layout wraps its whole segment, so from here it was also
+    // rendered on every article page. What matters for injection is unchanged
+    // and checked below — a layout that emits no __html cannot be the hole.
     const indexLayout = strip(read(`app/(public)/${dir}/layout.tsx`))
-    check(`${dir}: listing layout emits JSON-LD only through jsonForScriptTag`,
-      /jsonForScriptTag\(/.test(indexLayout) && !/__html:\s*JSON\.stringify/.test(indexLayout))
+    check(`${dir}: listing layout emits no raw JSON-LD`, !/__html:/.test(indexLayout))
   }
+  const indexSrc = strip(read('components/public/articles/ArticlesIndex.tsx'))
+  check('articles index emits JSON-LD only through jsonForScriptTag',
+    /jsonForScriptTag\(/.test(indexSrc) && !/__html:\s*JSON\.stringify/.test(indexSrc))
   const pageSrc = strip(read('components/public/articles/ArticleView.tsx'))
   check('article page sanitizes before rendering and never parses with innerHTML =',
     /sanitizePublicArticleHtml\(article\.content\)/.test(pageSrc) && !/\.innerHTML\s*=\s*article\.content/.test(pageSrc))

@@ -5,5 +5,5 @@ import { SHOPIFY_PAGE } from '@/lib/i18n/public/pages/solutions'
 export const metadata = marketingPageMetadata(SHOPIFY_PAGE, 'en')
 
 export default function ShopifySolutionPage() {
-  return <FeaturePage locale="en" content={SHOPIFY_PAGE.content['en']} />
+  return <FeaturePage locale="en" content={SHOPIFY_PAGE.content['en']} path="/solutions/shopify" />
 }

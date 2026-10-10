@@ -15,6 +15,8 @@
  * fold rise in, with prefers-reduced-motion respected.
  */
 import type { LucideIcon } from 'lucide-react'
+import { faqPageSchema } from '@/lib/seo/page-schema'
+import { jsonForScriptTag } from '@/lib/content/public-article-html'
 import {
   ChartColumn, FileText, Layers, LifeBuoy, LineChart, MapPin, Search, ShieldCheck, Sparkles, Unlock,
 } from 'lucide-react'
@@ -169,8 +171,14 @@ export function PricingUsage({ copy }: { copy: PricingCopy }) {
 
 export function PricingFaq({ copy }: { copy: PricingCopy }) {
   const c = copy.faq
+  // The answer TEXT only: the "read the policy" link some answers carry is a
+  // link, not part of the answer a crawler or an AI engine should quote.
+  const faq = faqPageSchema(c.items.map((item) => ({ q: item.q, a: item.a })))
   return (
     <Section tone="surface">
+      {faq && (
+        <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: jsonForScriptTag(faq) }} />
+      )}
       <div className="mx-auto max-w-3xl">
         <SectionIntro eyebrow={c.eyebrow} title={c.title} description={c.body} />
         <FaqList
