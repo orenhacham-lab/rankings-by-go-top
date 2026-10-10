@@ -367,6 +367,11 @@ console.log('\nH) the tour never spotlights a hidden entry, and never jumps ahea
   check('H7: the pill reads the address\'s hash before it picks a tour, and does not mark the screen as tried', passesHash(guide)
     && guide.indexOf('if (arrivedAtSection(hash)) return') < guide.indexOf('autoTried.current.add(pathname)'))
   check('H7-MUT: a pill that ignores the hash fails H7', !passesHash(guide.replace('if (arrivedAtSection(hash)) return', '')))
+  // H8: the same short screen hid the open screen's own entry (the settings) under the foot.
+  const sidebar = code('components/layout/Sidebar.tsx')
+  const revealsActive = (src: string) => /if \(nav && nav\.scrollHeight > nav\.clientHeight\) \{/.test(src) && /nav\.scrollTop = bottom - nav\.clientHeight \+ 8/.test(src)
+  check('H8: the rail scrolls its own nav so the open screen\'s entry is visible', revealsActive(sidebar))
+  check('H8-MUT: a rail that never scrolls its nav (main) fails H8', !revealsActive(sidebar.replace('nav.scrollTop = bottom - nav.clientHeight + 8', '')))
 }
 
 console.log(`\n${pass} passed, ${fail} failed`)
