@@ -33,6 +33,7 @@ import { PUBLIC_LOCALES } from '@/lib/i18n/locales'
 import { makeUnsubscribeToken, verifyUnsubscribeToken } from '@/lib/reminders/token'
 import { SETUP_UNSUBSCRIBE_SCOPE, unsubscribeUrlFor } from '@/lib/reminders/email'
 import { handlePreferencesPut, handleUnsubscribe, unsubscribeScope } from '@/lib/reminders/http'
+import { hashEmail } from '@/lib/email-suppression'
 import { withMutant } from '@/lib/reminders/__qa__/_mutant'
 import { decideOnboardingEmail, stageOf, type OnboardingState } from '../cadence'
 import { actionPathFor, buildOnboardingEmail } from '../email'
@@ -227,6 +228,29 @@ async function main() {
   })
   const r11 = await runOnboardingEmails(deps(a11, { send: async () => { offSwitch++; return { ok: true } } }))
   check('C12: an owner who unsubscribed gets nothing', r11.status === 'done' && offSwitch === 0)
+
+  let listedSends = 0
+  const aSup = new FakeAdmin({ projects: [project()], email_suppressions: [{ email_hash: hashEmail('owner@example.com'), source: 'hard_bounce', channel: 'system' }] })
+  const rSup = await runOnboardingEmails(deps(aSup, { send: async () => { listedSends++; return { ok: true } } }))
+  check('C13a: an address on the removal list gets no setup email and no stage recorded',
+    rSup.status === 'done' && listedSends === 0 && (aSup.tables.project_reminder_state ?? []).length === 0, rSup)
+
+  let unreadableSends = 0
+  const aUnread = new FakeAdmin({ projects: [project()] }, { email_suppressions: { select: () => ({ code: '08006', message: 'connection lost' }) } })
+  const rUnread = await runOnboardingEmails(deps(aUnread, { send: async () => { unreadableSends++; return { ok: true } } }))
+  check('C13b: a removal list we cannot read holds the setup email for the next tick',
+    rUnread.status === 'done' && unreadableSends === 0 && (aUnread.tables.project_reminder_state ?? []).length === 0)
+
+  const supMut = await withMutant<{ runOnboardingEmails: typeof runOnboardingEmails }, boolean>(
+    'lib/onboarding-emails/run.ts', [['if ((await isSuppressed(admin, who.email)).suppressed) { suppressed++; continue }', 'void suppressed']],
+    async (m) => {
+      let n = 0
+      const w = new FakeAdmin({ projects: [project()], email_suppressions: [{ email_hash: hashEmail('owner@example.com'), source: 'hard_bounce', channel: 'system' }] })
+      await m.runOnboardingEmails(deps(w, { send: async () => { n++; return { ok: true } } }))
+      return n === 1
+    },
+  )
+  check('C13-MUT: without the gate the setup email reaches a removed address (C13a would fail)', supMut)
 
   let noAddress = 0
   const a12 = new FakeAdmin({ projects: [project()] })
