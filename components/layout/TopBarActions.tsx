@@ -29,6 +29,7 @@ import { settingsHref } from '@/lib/onboarding/links'
 import { allWaitingRows, bellCount, pillText, type WaitingRowKind } from '@/lib/nudges/rows'
 import { waitingAction, waitingSentence } from '@/components/dashboard/WaitingCard'
 import { useWaiting } from '@/components/nudges/useWaiting'
+import { followSectionLink } from '@/components/layout/section-link'
 import { cn } from '@/lib/utils'
 
 const ICONS: Record<WaitingRowKind, LucideIcon> = { connection: AlertTriangle, site: Plug, gsc: LineChart, articles: FileCheck2, topics: Lightbulb, fixes: Wrench }
@@ -158,7 +159,9 @@ export default function TopBarActions() {
                       role="menuitem"
                       href={row.href as `/${string}`}
                       data-top-bar-row={row.kind}
-                      onClick={() => setOpen(false)}
+                      // A row for a section of THIS screen (the settings' #platform, opened from
+                      // the settings) scrolls there in place: the router would do nothing.
+                      onClick={(e) => { followSectionLink(e, row.href); setOpen(false) }}
                       className="flex w-full items-start gap-3 rounded-control px-3 py-2.5 text-start transition-colors duration-150 hover:bg-sunk focus-visible:bg-sunk focus-visible:outline-none"
                     >
                       <span

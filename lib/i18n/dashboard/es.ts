@@ -2441,6 +2441,13 @@ export const dashboardEs: DeepPartial<DashboardDictionary> = {
     stepLabel: (n: number) => `Paso ${n}`,
     done: 'Hecho',
     running: 'En curso ahora',
+    // The step the card's main button is for (owner's report, 10 October 2026).
+    next: 'Siguiente paso',
+    // On every screen of a project whose site is not connected yet (components/layout/ConnectSiteBanner.tsx).
+    connectBanner: {
+      title: 'Tu web aún no está conectada',
+      body: 'Es el primer paso. Hasta que la web esté conectada puedes investigar y escribir, pero los artículos no se pueden publicar en ella. Solo se conecta una vez.',
+    },
     steps: {
       scan: {
         title: 'Analiza tu web',
@@ -2699,6 +2706,11 @@ export const dashboardEs: DeepPartial<DashboardDictionary> = {
     saved: 'Guardado',
     connectionsTitle: 'Conexiones',
     connectionsBody: 'La plataforma en la que se publican los artículos y Search Console para los datos reales de búsqueda.',
+    // Connections not set up yet lead the screen (owner's report, 10 October 2026).
+    connectFirst: {
+      title: 'Empieza por conectar',
+      body: 'Lo que aún no está conectado aparece aquí, arriba de la página. Una vez conectado, pasa a su lugar habitual, en "Conexiones".',
+    },
     onThisPage: 'En esta página',
     loadFailed: 'Ahora mismo no hemos podido cargar algunos ajustes.',
     retry: 'Volver a intentarlo',

@@ -284,6 +284,11 @@ export const dashboardHe = {
     saved: 'נשמר',
     connectionsTitle: 'חיבורים',
     connectionsBody: 'פלטפורמת האתר לפרסום מאמרים, ו-Search Console לנתוני חיפוש אמיתיים.',
+    // Connections not set up yet lead the screen (owner's report, 10 October 2026).
+    connectFirst: {
+      title: 'מתחילים בחיבור',
+      body: 'מה שעוד לא מחובר מופיע כאן, בראש העמוד. אחרי החיבור הוא יעבור למקומו הקבוע, תחת "חיבורים".',
+    },
     // The sections the site scan fills (W5): each card saves on its own, a
     // field the scan filled carries a "from the scan" chip until the owner
     // edits it, and "detect again with AI" only ever suggests.
@@ -6265,6 +6270,13 @@ export const dashboardHe = {
     stepLabel: (n: number) => `שלב ${n}`,
     done: 'הושלם',
     running: 'רץ עכשיו',
+    // The step the card's main button is for (owner's report, 10 October 2026).
+    next: 'הצעד הבא',
+    // On every screen of a project whose site is not connected yet (components/layout/ConnectSiteBanner.tsx).
+    connectBanner: {
+      title: 'האתר עוד לא מחובר',
+      body: 'זה הצעד הראשון. עד שהאתר מחובר אפשר לחקור ולכתוב, אבל המאמרים לא יתפרסמו באתר. מחברים פעם אחת, וזהו.',
+    },
     steps: {
       scan: {
         title: 'סורקים את האתר',

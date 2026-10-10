@@ -18,6 +18,11 @@ export const projectSettingsPtBR: DeepPartial<DashboardDictionary> = {
     saved: 'Salvo',
     connectionsTitle: 'Conexões',
     connectionsBody: 'A plataforma em que os artigos são publicados e o Google Search Console, para os dados reais de busca.',
+    // Connections not set up yet lead the screen (owner's report, 10 October 2026).
+    connectFirst: {
+      title: 'Comece pela conexão',
+      body: 'O que ainda não está conectado aparece aqui, no topo da página. Depois de conectado, vai para o lugar de sempre, em "Conexões".',
+    },
     onThisPage: 'Nesta página',
     loadFailed: 'Não foi possível carregar algumas configurações agora.',
     retry: 'Tentar novamente',

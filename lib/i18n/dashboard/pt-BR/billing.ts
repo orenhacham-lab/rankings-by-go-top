@@ -209,6 +209,13 @@ export const billingPtBR: DeepPartial<DashboardDictionary> = {
     stepLabel: (n: number) => `Passo ${n}`,
     done: 'Concluído',
     running: 'Em andamento agora',
+    // The step the card's main button is for (owner's report, 10 October 2026).
+    next: 'Próximo passo',
+    // On every screen of a project whose site is not connected yet (components/layout/ConnectSiteBanner.tsx).
+    connectBanner: {
+      title: 'Seu site ainda não está conectado',
+      body: 'Este é o primeiro passo. Até o site estar conectado, você pode pesquisar e escrever, mas os artigos não podem ser publicados nele. A conexão é feita uma única vez.',
+    },
     steps: {
       scan: {
         title: 'Analise o seu site',
