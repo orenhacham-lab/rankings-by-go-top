@@ -27,6 +27,7 @@ import { getDashboardDictionary } from '@/lib/i18n/dashboard/getDashboardDiction
 import { PUBLIC_LOCALES } from '@/lib/i18n/locales'
 import { makeUnsubscribeToken } from '@/lib/reminders/token'
 import { unsubscribeByToken } from '@/lib/reminders/http'
+import { hashEmail } from '@/lib/email-suppression'
 import { withMutant } from '@/lib/reminders/__qa__/_mutant'
 import { aggregateWeek, type WeeklyInputs } from '../aggregate'
 import { inWeeklyWindow, weekKeyOf, weekWindow } from '../period'
@@ -200,6 +201,28 @@ async function main() {
   const a11 = new FakeAdmin(tables(), { generated_articles: { select: () => ({ code: '08006', message: 'reset' }) } })
   const r11 = await runWeeklySummaries(deps(a11, { send: async () => { unreadable++; return { ok: true } } }))
   check('D13: a week whose articles could not be read sends nothing', r11.status === 'done' && unreadable === 0, r11)
+
+  let listedSends = 0
+  const aSup = new FakeAdmin(tables({ email_suppressions: [{ email_hash: hashEmail('owner@example.com'), source: 'deletion_request', channel: 'system' }] }))
+  const rSup = await runWeeklySummaries(deps(aSup, { send: async () => { listedSends++; return { ok: true } } }))
+  check('D13a: an address on the removal list gets no summary and the week is not marked covered',
+    rSup.status === 'done' && listedSends === 0 && aSup.tables.project_report_preferences[0]?.weekly_last_week === null, rSup)
+
+  let unreadableList = 0
+  const aUnread = new FakeAdmin(tables(), { email_suppressions: { select: () => ({ code: '08006', message: 'reset' }) } })
+  const rUnread = await runWeeklySummaries(deps(aUnread, { send: async () => { unreadableList++; return { ok: true } } }))
+  check('D13b: a removal list we cannot read holds the summary for next week',
+    rUnread.status === 'done' && unreadableList === 0 && aUnread.tables.project_report_preferences[0]?.weekly_last_week === null)
+
+  await withMutant<{ runWeeklySummaries: typeof runWeeklySummaries }, void>(
+    'lib/reports/weekly/run.ts', [['if ((await isSuppressed(admin, who.email)).suppressed) { skipped++; continue }', 'void skipped']],
+    async (mod) => {
+      let n = 0
+      const w = new FakeAdmin(tables({ email_suppressions: [{ email_hash: hashEmail('owner@example.com'), source: 'deletion_request', channel: 'system' }] }))
+      await mod.runWeeklySummaries(deps(w, { send: async () => { n++; return { ok: true } } }))
+      check('D13-MUT: without the gate the summary reaches a removed address (D13a would fail)', n === 1)
+    },
+  )
 
   let noAddress = 0
   const a12 = new FakeAdmin(tables())

@@ -13,6 +13,11 @@
  * an article counts only when its owner is the project's owner. A bounded number of projects
  * is taken per run, and the wording, the cadence and the link are decided by lib/reminders/*.
  *
+ * THE REMOVAL LIST IS THE LAST WORD. Past every other check, the owner's address goes
+ * through lib/email-suppression: an address on the list, or a list we cannot read, means
+ * nothing is sent and the claim is never taken. This is service email and it stops too,
+ * because a removal has to hold across every sender.
+ *
  * LOGS. One line when something was sent or a send failed: counts and stable codes only,
  * never an address, a title or a provider's words.
  */
@@ -20,6 +25,7 @@ import type { ServiceRoleClient } from '@/lib/supabase/admin'
 import type { Locale } from '@/lib/i18n/locales'
 import { FIRST_AFTER_MS, decideReminder, inSendWindow } from './cadence'
 import { buildReminderEmail, safeOrigin, type ReminderEmail } from './email'
+import { isSuppressed } from '@/lib/email-suppression'
 import { claimSend, readState, releaseClaim } from './state'
 import { makeUnsubscribeToken } from './token'
 
@@ -81,7 +87,7 @@ export async function runArticleReminders(deps: ReminderDeps): Promise<ReminderR
       if (!oldestOf.has(pid)) oldestOf.set(pid, r)
     }
 
-    let considered = 0, sent = 0, failed = 0
+    let considered = 0, sent = 0, failed = 0, suppressed = 0
     for (const [projectId, oldestRow] of oldestOf) {
       if (sent + failed >= PROJECTS_PER_RUN) break
       const ownerId = str(oldestRow.user_id)!
@@ -117,6 +123,10 @@ export async function runArticleReminders(deps: ReminderDeps): Promise<ReminderR
       const domain = str(p.target_domain) ?? str(p.business_name)
       if (!token || !domain) continue
 
+      // The removal list, last and before the claim: a suppressed owner must not have a
+      // send recorded against them, and an unreadable list waits for the next run.
+      if ((await isSuppressed(admin, facts.email)).suppressed) { suppressed++; continue }
+
       const at = now.toISOString()
       const won = await claimSend(admin, projectId, ownerId, read.state, { batchKey, sentCount: decision.sentCount, at })
       if (!won) continue
@@ -130,7 +140,7 @@ export async function runArticleReminders(deps: ReminderDeps): Promise<ReminderR
       if (ok) sent++
       else { failed++; await releaseClaim(admin, projectId, ownerId, read.state, at).catch(() => undefined) }
     }
-    if (sent > 0 || failed > 0) console.log('[reminders] run complete', { considered, sent, failed })
+    if (sent > 0 || failed > 0 || suppressed > 0) console.log('[reminders] run complete', { considered, sent, failed, suppressed })
     return { status: 'done', considered, sent, failed }
   } catch {
     console.error('[reminders] run failed')

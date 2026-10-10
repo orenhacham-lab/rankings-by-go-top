@@ -19,6 +19,10 @@
  * RLS). A bounded number of projects is read per run and a bounded number of emails goes
  * out per run; the wording, the cadence and the links are decided by lib/onboarding-emails/*.
  *
+ * THE REMOVAL LIST IS THE LAST WORD. Past every other check, the owner's address goes
+ * through lib/email-suppression: an address on the list, or a list we cannot read, means
+ * nothing is sent and the claim is never taken.
+ *
  * LOGS. One line when something was sent or a send failed: counts and stable codes only,
  * never an address, a domain or a provider's words.
  */
@@ -29,6 +33,7 @@ import { safeOrigin } from '@/lib/reminders/email'
 import { makeUnsubscribeToken } from '@/lib/reminders/token'
 import { CONNECT_AFTER_MS, PUBLISH_AFTER_MS, decideOnboardingEmail, type Stage } from './cadence'
 import { buildOnboardingEmail, type OnboardingEmail } from './email'
+import { isSuppressed } from '@/lib/email-suppression'
 import { claimOnboardingSend, readOnboardingState, releaseOnboardingClaim } from './state'
 
 export const ONBOARDING_FLAG = 'ONBOARDING_EMAILS_ENABLED'
@@ -143,7 +148,7 @@ export async function runOnboardingEmails(deps: OnboardingDeps): Promise<Onboard
     // An absence we cannot verify is not an absence: say nothing rather than the wrong thing.
     if (!wp || !platform || !shopify || !plugin) return { status: 'failed' }
 
-    let considered = 0, sent = 0, failed = 0
+    let considered = 0, sent = 0, failed = 0, suppressed = 0
     let installed = true
     for (const row of projects) {
       if (sent + failed >= PROJECTS_PER_RUN) break
@@ -179,6 +184,10 @@ export async function runOnboardingEmails(deps: OnboardingDeps): Promise<Onboard
       const domain = str(row.target_domain) ?? str(row.business_name)
       if (!token || !domain) continue
 
+      // The removal list, last and before the claim: a suppressed owner must not have a
+      // stage recorded as sent, and an unreadable list waits for the next run.
+      if ((await isSuppressed(admin, who.email)).suppressed) { suppressed++; continue }
+
       const at = now.toISOString()
       const won = await claimOnboardingSend(admin, projectId, ownerId, read.state, { stage: decision.stage, sentCount: decision.sentCount, at })
       if (!won) continue
@@ -189,7 +198,7 @@ export async function runOnboardingEmails(deps: OnboardingDeps): Promise<Onboard
       else { failed++; await releaseOnboardingClaim(admin, projectId, ownerId, read.state, at).catch(() => undefined) }
     }
     if (!installed) return { status: 'not_installed' }
-    if (sent > 0 || failed > 0) console.log('[onboarding-emails] run complete', { considered, sent, failed })
+    if (sent > 0 || failed > 0 || suppressed > 0) console.log('[onboarding-emails] run complete', { considered, sent, failed, suppressed })
     return { status: 'done', considered, sent, failed }
   } catch {
     console.error('[onboarding-emails] run failed')
