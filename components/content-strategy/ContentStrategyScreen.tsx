@@ -410,7 +410,15 @@ export default function ContentStrategyScreen({ proFirst = false }: { proFirst?:
         <>
           <PlanOverview cards={board.cards} counts={board.counts} searches={searches} lang={uiLocale} dict={dict} />
           <TopicClusters cards={board.cards} insights={insights} lang={uiLocale} dict={dict} />
-          <WhatHappensNext counts={board.counts} next={board.next} lang={uiLocale} dict={dict} />
+          <WhatHappensNext
+            counts={board.counts}
+            next={board.next}
+            lang={uiLocale}
+            dict={dict}
+            // Prepared by us only when the top-up covers this owner AND the queue it
+            // puts the topics in is running; otherwise the merchant really approves.
+            autoApproves={strategy.autoTopics && strategy.queueActive === true}
+          />
         </>
       )}
     </div>
