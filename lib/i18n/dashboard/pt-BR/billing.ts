@@ -165,6 +165,7 @@ export const billingPtBR: DeepPartial<DashboardDictionary> = {
       payButton: 'Pagar com cartão',
       starting: 'Abrindo a página de pagamento segura...',
       error: 'Não conseguimos abrir a página de pagamento. Tente novamente em instantes ou fale com a gente que ajudamos você.',
+      changePlanNote: 'Para mudar de plano, fale com a gente que resolvemos para você.',
     },
     shopify: {
       title: 'A cobrança é gerenciada pela Shopify',

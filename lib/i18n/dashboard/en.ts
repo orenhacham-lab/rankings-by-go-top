@@ -6022,6 +6022,7 @@ export const dashboardEn = {
       payButton: 'Pay by card',
       starting: 'Opening the secure payment page...',
       error: 'We couldn’t open the payment page. Try again in a moment, or write to us and we’ll help.',
+      changePlanNote: 'To move to another plan, contact us and we’ll arrange it for you.',
     },
     shopify: {
       title: 'Billing is managed through Shopify',

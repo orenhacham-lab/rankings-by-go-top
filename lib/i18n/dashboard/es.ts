@@ -2397,6 +2397,7 @@ export const dashboardEs: DeepPartial<DashboardDictionary> = {
       payButton: 'Pagar con tarjeta',
       starting: 'Abriendo la página de pago segura...',
       error: 'No hemos podido abrir la página de pago. Vuelve a intentarlo en un momento o escríbenos y te ayudamos.',
+      changePlanNote: 'Para cambiar de plan, escríbenos y lo gestionamos por ti.',
     },
     shopify: {
       title: 'La facturación se gestiona a través de Shopify',
