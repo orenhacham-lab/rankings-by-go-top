@@ -91,11 +91,13 @@ const clipBoxes = (el: HTMLElement): Box[] => clippers(el).map((p) => toBox(p.ge
  * Scrolls the boxes that cut `el` off, and only them, so it is centred in each:
  * the sidebar's nav moves, the page under it does not.
  */
-function revealInClippers(el: HTMLElement) {
+function revealInClippers(el: HTMLElement, moved: Map<HTMLElement, number>) {
   for (const p of clippers(el)) {
     if (p.scrollHeight <= p.clientHeight) continue
     const r = el.getBoundingClientRect(), pr = p.getBoundingClientRect()
     if (!clippedBy(toBox(r), [toBox(pr)])) continue
+    // Where it was, so the tour puts it back when it ends (the rail shows the open screen's entry).
+    if (!moved.has(p)) moved.set(p, p.scrollTop)
     p.scrollTop += (r.top - pr.top) - (pr.height - r.height) / 2
   }
 }
@@ -143,6 +145,12 @@ function TourRunner({ run, onEnd }: { run: TourRun; onEnd: (how: TourEnd) => voi
     requestNavDrawer(false, { restoreFocus: false })
   }, [])
   useEffect(() => closeDrawer, [closeDrawer])
+  // The boxes the tour scrolled (the sidebar's nav), and where they were.
+  const moved = useRef(new Map<HTMLElement, number>())
+  useEffect(() => {
+    const boxes = moved.current
+    return () => { for (const [box, top] of boxes) box.scrollTop = top }
+  }, [])
   const bubbleRef = useRef<HTMLDivElement>(null)
   const primaryRef = useRef<HTMLButtonElement>(null)
 
@@ -217,7 +225,7 @@ function TourRunner({ run, onEnd }: { run: TourRun; onEnd: (how: TourEnd) => voi
     if (target) {
       // Cut off by a box that scrolls (the sidebar's nav on a short screen, whose last
       // entries sit under the rail's foot): that box scrolls, not the page.
-      if (clippedBy(toBox(target.getBoundingClientRect()), clipBoxes(target))) revealInClippers(target)
+      if (clippedBy(toBox(target.getBoundingClientRect()), clipBoxes(target))) revealInClippers(target, moved.current)
       const r = target.getBoundingClientRect()
       if (r.top < 64 || r.bottom > window.innerHeight - 16) {
         target.scrollIntoView({ block: 'center', behavior: reducedMotion() ? 'auto' : 'smooth' })

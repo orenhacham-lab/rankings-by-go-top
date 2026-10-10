@@ -348,12 +348,13 @@ console.log('\nH) the tour never spotlights a hidden entry, and never jumps ahea
   check('H2: an entry inside the nav is not clipped', !clippedBy(shown, [nav]) && !clippedBy({ ...nav }, [nav]))
   const runner = code('components/onboarding/DashboardOnboardingTour.tsx')
   const scrollsClipped = (src: string) =>
-    /if \(clippedBy\(toBox\(target\.getBoundingClientRect\(\)\), clipBoxes\(target\)\)\) revealInClippers\(target\)/.test(src)
+    /if \(clippedBy\(toBox\(target\.getBoundingClientRect\(\)\), clipBoxes\(target\)\)\) revealInClippers\(target, moved\.current\)/.test(src)
+    && /for \(const \[box, top\] of boxes\) box\.scrollTop = top/.test(src)
     && /p\.scrollTop \+= \(r\.top - pr\.top\) - \(pr\.height - r\.height\) \/ 2/.test(src)
     && /overflowY !== 'visible' \|\| s\.overflowX !== 'visible'/.test(src)
   check('H3: the runner scrolls the box that clips a target (not the page) before spotlighting it', scrollsClipped(runner))
   check('H3-MUT: the viewport-only test (main before the fix) fails H3',
-    !scrollsClipped(runner.replace('if (clippedBy(toBox(target.getBoundingClientRect()), clipBoxes(target))) revealInClippers(target)', '')))
+    !scrollsClipped(runner.replace('if (clippedBy(toBox(target.getBoundingClientRect()), clipBoxes(target))) revealInClippers(target, moved.current)', '')))
 
   // H4-H7: "connect the site" opened /settings#platform and the settings tour
   // started first, scrolling back to the title.
