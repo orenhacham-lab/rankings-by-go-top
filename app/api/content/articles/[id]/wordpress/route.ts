@@ -327,6 +327,12 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
       console.warn('[content-wp-export] plugin cannot do this', { ...logBase, reason: created.unsupported })
       return Response.json({ ok: false, error: created.unsupported, reason: created.unsupported, diagnosticId }, { status: 409 })
     }
+    // The chosen author may not publish posts on the site (plugin 3.1.0 author_invalid): nothing was
+    // written, and the post is never published as anyone else. A typed refusal the editor words.
+    if (!created.ok && authorId !== undefined && created.detail === 'plugin_author_invalid') {
+      console.warn('[content-wp-export] chosen author refused', { ...logBase, reason: 'plugin_author_invalid' })
+      return Response.json({ ok: false, error: 'plugin_author_invalid', reason: 'plugin_author_invalid', diagnosticId }, { status: 409 })
+    }
     if (!created.ok) {
       // Preserve the safe upstream signal (remote status / WP code / response
       // format / timeout) instead of flattening every failure to one code.

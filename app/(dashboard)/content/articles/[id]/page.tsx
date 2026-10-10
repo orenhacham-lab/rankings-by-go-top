@@ -22,6 +22,8 @@ import ArticleInlineImagesPanel from '@/components/content/ArticleInlineImagesPa
 import ArticleBodyPreview from '@/components/content/ArticleBodyPreview'
 import ArticleReadView from '@/components/content/ArticleReadView'
 import WordPressPublishSettings, { type WpExportStatus } from '@/components/content/WordPressPublishSettings'
+import WordPressAuthorPicker from '@/components/content/WordPressAuthorPicker'
+import { withAuthorChoice, type WordPressAuthorOption } from '@/lib/content/wordpress-author-choice'
 import ArticleEditorPublishGate, { usePublishPlatform } from '@/components/content/ArticleEditorPublishGate'
 import ArticleTopBar, { type ArticleViewerTab } from '@/components/content/ArticleTopBar'
 import ArticleSchemaPanel from '@/components/content/ArticleSchemaPanel'
@@ -93,6 +95,14 @@ export default function ArticleEditorPage({ params }: { params: Promise<{ id: st
   const [wpPostUrl, setWpPostUrl] = useState<string | null>(null)
   const [wpStatus, setWpStatus] = useState<'draft' | 'publish' | null>(null)
   const [wpBusy, setWpBusy] = useState<'draft' | 'publish' | null>(null)
+  // Optional WordPress author for THIS publish action only (never stored, never pre-filled): null =
+  // the site's own default author, exactly the behaviour before the picker existed.
+  const [wpAuthorId, setWpAuthorId] = useState<number | null>(null)
+  const [wpAuthorOptions, setWpAuthorOptions] = useState<WordPressAuthorOption[] | null>(null)
+  const onWpAuthorOptions = useCallback((list: WordPressAuthorOption[] | null) => {
+    setWpAuthorOptions(list)
+    setWpAuthorId((cur) => (cur != null && list?.some((o) => o.id === cur) ? cur : null))
+  }, [])
   /** The article is a live post on the WordPress site (not a draft there). */
   const wpLive = !!wpPostId && wpStatus === 'publish'
   // Phase 4D — current inline-image rows (emitted by the panel) so the body
@@ -358,7 +368,7 @@ export default function ArticleEditorPage({ params }: { params: Promise<{ id: st
       const res = await fetch(`/api/content/articles/${id}/wordpress`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ status, ...(isUpdate ? { update: true } : {}), ...(wasLive && status === 'draft' ? { unpublish: true } : {}) }),
+        body: JSON.stringify(withAuthorChoice({ status, ...(isUpdate ? { update: true } : {}), ...(wasLive && status === 'draft' ? { unpublish: true } : {}) }, wpAuthorId, wpAuthorOptions)),
       })
       // F — read content-type + parse the JSON body EVEN on a non-ok response, so a
       // typed { error, message, diagnosticId } is surfaced instead of a generic 500.
@@ -817,6 +827,16 @@ export default function ArticleEditorPage({ params }: { params: Promise<{ id: st
             <h3 className="text-section font-semibold text-ink mb-2">{e.wpTitle}</h3>
             {!featuredImageUrl && <Notice tone="warn" className="mb-3">{e.wpNoImageWarn}</Notice>}
             {wpLive && <p className="mb-3 text-caption text-muted" data-wp-live-note="">{e.wpLiveNote}</p>}
+            {projectId && (
+              <WordPressAuthorPicker
+                projectId={projectId}
+                value={wpAuthorId}
+                onChange={setWpAuthorId}
+                onOptions={onWpAuthorOptions}
+                disabled={!!wpBusy}
+                dict={e.wpAuthor}
+              />
+            )}
             <div className="flex flex-wrap items-center gap-2">
               {/* Bordered: the top bar's publish call is the page's one primary, and it leads here.
                   A live post gets ONE action, "update the live post": sending a live post as a
