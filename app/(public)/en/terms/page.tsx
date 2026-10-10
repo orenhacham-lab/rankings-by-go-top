@@ -427,6 +427,9 @@ export default function EnglishTermsPage() {
             and can be undone, and the whole group can be undone at once within 14 days.
           </li>
           <li>
+            <strong>Completing a missing field on an article we published.</strong> An article the Service published on your site with your approval is written with an SEO title and a meta description. If one of them is left missing, the Service may complete it later on that same article, as the completion of that publish and not as a site fix needing a separate approval. Such a completion fills only a missing field, never replaces a value that exists, and applies only to articles the Service itself published.
+          </li>
+          <li>
             <strong>Log and undo.</strong> Every fix is recorded in a log together with the previous value, and
             can be undone to restore that value. If the content on the site changed after the fix, automatic undo
             may not be possible.

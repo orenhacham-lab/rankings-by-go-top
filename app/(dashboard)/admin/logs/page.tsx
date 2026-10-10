@@ -10,6 +10,7 @@ import Segmented from '@/components/ui/Segmented'
 import StatTile from '@/components/ui/StatTile'
 import { NoticeBox } from '@/components/ui/Notice'
 import { Skeleton } from '@/components/ui/Skeleton'
+import SeoBackfillPanel from '@/components/admin/SeoBackfillPanel'
 
 interface LogEntry {
   id: string
@@ -73,6 +74,8 @@ export default function AdminLogsPage() {
           רענון
         </Button>
       </div>
+
+      <SeoBackfillPanel />
 
       {!loading && logs.length > 0 && (
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-3 sm:gap-5">

@@ -252,7 +252,7 @@ export default function EnglishPrivacyPage() {
           your site, as the author you choose there. <strong>The publish itself also writes that
           article&rsquo;s own SEO title, meta description, focus keyphrase and JSON-LD schema</strong>, through the same signed
           route and without a separate approval for each of them, because they are part of the publish you
-          approved.</li>
+          approved. If an article we published for you is left without an SEO title or without a meta description, we may fill in the missing field on that same article later, through the same signed route and without a further approval, as the completion of that publish. We never replace a value that already exists, and we do not touch other pages or other fields.</li>
           <li><strong>The images belonging to those articles.</strong> Your site downloads them from our file
           storage into its own Media Library, and from that point they are files on your site. Your site accepts
           them only from our storage address and refuses any other.</li>

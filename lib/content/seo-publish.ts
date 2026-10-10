@@ -64,7 +64,10 @@ export function seoJobId(articleId: string, type: 'seo_title' | 'meta_descriptio
  */
 export async function writeSeoViaGoTopPlugin(
   admin: Admin,
-  input: { articleId: string; postUrl: string; metaTitle: string; metaDescription: string | null },
+  // onlyIfEmpty: the plugin writes a field only while its stored value is still empty (its own
+  // compare-and-set, `expected: ''`), so a value the merchant set is never replaced; it answers
+  // changed_since_preview instead. Used by the backfill (scripts/backfill-article-seo-meta.ts).
+  input: { articleId: string; postUrl: string; metaTitle: string; metaDescription: string | null; onlyIfEmpty?: boolean },
   deps: SeoPluginDeps = {},
 ): Promise<SeoPublishResult | null> {
   try {
@@ -90,7 +93,7 @@ export async function writeSeoViaGoTopPlugin(
     if (description) fields.push(['meta_description', description])
     if (!fields.length) return null
     for (const [type, value] of fields) {
-      const answer = await pluginFix(link, { jobId: seoJobId(input.articleId, type, value), type, url: input.postUrl, value: { value }, expected: null }, deps.post)
+      const answer = await pluginFix(link, { jobId: seoJobId(input.articleId, type, value), type, url: input.postUrl, value: { value }, expected: input.onlyIfEmpty ? '' : null }, deps.post)
       if (!answer.ok) return { plugin: 'none', status: answer.connectionLost ? 'seo_bridge_required' : 'exact_failure', detail: `gotop_plugin_${answer.code}` }
     }
     return { plugin: 'none', status: 'verified' }
