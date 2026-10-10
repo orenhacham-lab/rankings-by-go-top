@@ -47,6 +47,7 @@ export const dashboardEs: DeepPartial<DashboardDictionary> = {
     billing: 'Facturación',
     system: 'Sistema',
     articleManagement: 'Artículos de la web',
+    blogPlan: 'Cola de artículos',
     connectionStatus: 'Estado de la conexión',
     errorLogs: 'Registro de errores',
     support: 'Soporte por WhatsApp',

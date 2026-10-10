@@ -25,6 +25,7 @@ export const dashboardEn = {
     affiliate: 'Partner program',
     system: 'System',
     articleManagement: 'Site Articles',
+    blogPlan: 'Article Queue',
     connectionStatus: 'Connection Status',
     errorLogs: 'Error Logs',
     affiliateAdmin: 'Partners (admin)',

@@ -23,6 +23,7 @@ export const dashboardHe = {
     affiliate: 'תוכנית שותפים',
     system: 'מערכת',
     articleManagement: 'מאמרי האתר',
+    blogPlan: 'תור המאמרים',
     connectionStatus: 'סטטוס חיבור',
     errorLogs: 'לוג שגיאות',
     affiliateAdmin: 'ניהול שותפים',
