@@ -28,6 +28,7 @@ import { hostPinnedFetch } from '@/lib/seed-scan/site-access'
 import { loadWordPressCredentials } from '@/lib/content/api-auth'
 import { credsReadSource, pluginReadSource, type WordPressReadSource } from '@/lib/content/wordpress-read-source'
 import { loadPluginFor } from '@/lib/site-fix/plugin-capabilities'
+import type { PluginPost } from '@/lib/site-fix/plugin-client'
 import { countTabs, mergeSources, pageKey, sourceFromMap, type SiteMapEntry } from './model'
 import { MAP_LIMITS, walkSitemaps, type DocFetch, type RobotsFetch, type WalkResult } from './sitemap-walk'
 import { finishSiteMap, progressSiteMap } from './site-map-store'
@@ -84,18 +85,18 @@ export function liveWalk(origin: URL, onProgress: (p: { docsRead: number; docsSe
 }
 
 /** WordPress's source: the plugin >= 3.1.0 (project AND owner), else the application password; null when neither. */
-async function wordPressSource(admin: Admin, projectId: string, ownerId: string | undefined, load: typeof loadPluginFor): Promise<WordPressReadSource | null> {
+async function wordPressSource(admin: Admin, projectId: string, ownerId: string | undefined, load: typeof loadPluginFor, post?: PluginPost): Promise<WordPressReadSource | null> {
   const plugin = await load(admin, projectId, 'content', ownerId !== undefined ? { ownerId } : {}).catch(() => null)
-  if (plugin) return pluginReadSource(plugin.link)
+  if (plugin) return pluginReadSource(plugin.link, post)
   const wp = await loadWordPressCredentials(admin, projectId).catch(() => null)
   if (!wp || 'error' in wp || wp.connection.connection_status === 'failed') return null
   return credsReadSource(wp.creds)
 }
 
 /** WordPress's own lists, read-only, through the existing client (or the plugin's read routes). */
-export function liveWordPress(admin: Admin, projectId: string, now: () => number, ownerId?: string, load: typeof loadPluginFor = loadPluginFor) {
+export function liveWordPress(admin: Admin, projectId: string, now: () => number, ownerId?: string, load: typeof loadPluginFor = loadPluginFor, post?: PluginPost) {
   return async (deadlineAt: number): Promise<SiteMapEntry[]> => {
-    const src = await wordPressSource(admin, projectId, ownerId, load)
+    const src = await wordPressSource(admin, projectId, ownerId, load, post)
     if (!src) return []
     const out: SiteMapEntry[] = []
     for (const [list, type] of [[src.getPosts, 'post'], [src.getPages, 'page']] as const) {

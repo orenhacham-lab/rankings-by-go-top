@@ -500,6 +500,19 @@ function main() {
     rmSync(old, { recursive: true, force: true })
     rmSync(copy31, { recursive: true, force: true })
 
+    {
+      // Namespaced files: a callback passed as a bare name ('gotop_seo_bridge_admin_page') resolves to a
+      // global function that does not exist, and WordPress only fails when it calls it (the settings page
+      // with the pairing form would not open).
+      const c = run([{ callables: true }])
+      const cb = c[0] as unknown as { value: string[]; seen: number; pages: string[] }
+      check('N23e: every hook, the settings page (go-top-seo-bridge) and every route callback resolves', Array.isArray(cb.value) && cb.value.length === 0 && cb.seen > 30 && cb.pages.includes('go-top-seo-bridge'), JSON.stringify(cb))
+      const m = mutantPlugin('includes/admin.php', "__NAMESPACE__ . '\\\\gotop_seo_bridge_admin_page'", "'gotop_seo_bridge_admin_page'")
+      const mc = m.found ? (run([{ callables: true }], m.dir)[0] as unknown as { value: string[] }) : null
+      check('MUTATION CONTROL: the settings page callback as a bare name is caught', m.found && !!mc && mc.value.some((x) => x.includes('page go-top-seo-bridge')), JSON.stringify(mc))
+      m.done()
+    }
+
     // uninstall.php: the key stays while another copy is installed.
     const uninstall = (dir: string, plugins: string[]) => {
       const root = mkdtempSync(join(tmpdir(), 'site-fix-uninstall-'))

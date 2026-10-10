@@ -498,13 +498,14 @@ async function main() {
       /const wpViaPlugin = !wpConnected && !shopifyConnected && !site && choice !== 'shopify' && !!wpPlugin/.test(src) &&
       /const current: ChoosablePlatform \| null = wpAny \? 'wordpress'/.test(src) && /\) : wpAny \? \(/.test(src) &&
       (src.match(/\{pluginOnlyNotice\}/g) ?? []).length === 2 && /t\.pluginOnlyBody\.replace\('\{version\}', wpPlugin\.version\)/.test(src) &&
-      /startWithForm=\{current !== 'wordpress' \|\| wpViaPlugin\}/.test(src)
-    check('C2: project settings show a plugin-only project as WordPress connected through the plugin (both layouts), with the application-password form to add, never "not connected"', csOk(cs))
+      /t\.pluginUpdateBody\.replace\('\{version\}', wpPlugin\.version\)/.test(src) &&
+      (src.match(/plugin=\{wpViaPlugin \? wpPlugin : null\}/g) ?? []).length === 2
+    check('C2: project settings show a plugin-only project as WordPress connected through the plugin (both layouts), never "not connected"; the application password only as the optional extra', csOk(cs))
     check('MUTATION CONTROL: settings that ignore the plugin again ("not connected") are caught', !csOk(cs.replace("wpAny ? 'wordpress'", "wpConnected ? 'wordpress'")))
     const strings: [string, string][] = [['he', 'lib/i18n/dashboard/he.ts'], ['en', 'lib/i18n/dashboard/en.ts'], ['es', 'lib/i18n/dashboard/es.ts'], ['pt-BR', 'lib/i18n/dashboard/pt-BR/project-detail.ts']]
     const csWorded = (src: string) => /pluginOnlyTitle: '[^']*GO TOP SEO Bridge[^']*'/.test(src) && /pluginOnlyBody: '[^']*\{version\}[^']*'/.test(src)
     for (const [lang, f] of strings) check(`C3 ${lang}: the plugin-only settings notice is worded (title, body with the version)`, csWorded(read(f)))
-    check('MUTATION CONTROL: a body without the version placeholder is caught', !csWorded(read('lib/i18n/dashboard/en.ts').replace('(version {version})', '(version)')))
+    check('MUTATION CONTROL: a body without the version placeholder is caught', !csWorded(read('lib/i18n/dashboard/en.ts').replace('Version {version}. Publishing', 'Version. Publishing')))
 
     const R = await import('../wordpress-index-refresh')
     const onlyDb = db({ wp: false })

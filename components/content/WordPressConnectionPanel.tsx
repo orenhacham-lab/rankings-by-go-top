@@ -3,15 +3,21 @@
 /**
  * WordPress connection panel — Content module Phase 1.
  *
- * Connect a WordPress site to the project via Application Password:
- * URL + username + password → test → save (encrypted server-side).
- * The password is write-only: it is never returned or displayed again.
+ * Plugin first (3.1.0): a site connects with the GO TOP SEO Bridge plugin from
+ * WordPress.org and a one-time pairing code (./WordPressPluginConnect.tsx); the
+ * plugin does everything the application password did. The application password
+ * stays, as the advanced alternative behind one link: URL + username + password
+ * → test → save (encrypted server-side). The password is write-only: it is
+ * never returned or displayed again.
  *
- * `startWithForm`: the settings screen's "Choose platform" promises the form
- * (site address, username, application password) once WordPress is confirmed,
- * so it opens this panel with the form already out, and the three short steps
- * that say where in wp-admin the application password is created. The settings
- * screen passes it only while nothing is connected.
+ * `startWithForm`: the settings screen's "Choose platform" promises the
+ * connection steps once WordPress is confirmed, so it opens this panel with
+ * them already out (no second "connect" click). The settings screen passes it
+ * only while nothing is connected.
+ *
+ * `plugin`: the site already publishes through the plugin, with no application
+ * password. Nothing to connect then; the application password is offered only
+ * as the optional, advanced extra.
  */
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
@@ -32,6 +38,7 @@ import ConnectionLoadFailed from '@/components/shared/ConnectionLoadFailed'
 import { connectionAnswer } from '@/lib/connection-status/known'
 import { peekKnownRead, readKnown } from '@/lib/connection-status/useKnownRead'
 import { projectConnectionUrls } from '@/lib/connection-status/project-connections'
+import WordPressPluginConnect from './WordPressPluginConnect'
 
 type SanitizedConnection = {
   id: string
@@ -46,11 +53,13 @@ export default function WordPressConnectionPanel({
   onChanged,
   onConnected,
   startWithForm = false,
+  plugin = null,
 }: {
   projectId: string
   onChanged?: () => void
   onConnected?: () => void
   startWithForm?: boolean
+  plugin?: { siteUrl: string; version: string } | null
 }) {
   const { uiLocale } = useDashboardLanguage()
   const t = useMemo(() => getDashboardDictionary(uiLocale).projectDetail.contentSection, [uiLocale])
@@ -63,7 +72,9 @@ export default function WordPressConnectionPanel({
   // The connection could not be read: said as that, never as "not connected".
   const [loadFailed, setLoadFailed] = useState(initial.state === 'error')
   const [connection, setConnection] = useState<SanitizedConnection | null>(initial.state === 'ready' ? initial.value.connection : null)
-  const [showForm, setShowForm] = useState(startWithForm)
+  // The connection steps (the plugin first) are out; the application-password form is the advanced way.
+  const [stepsOpen, setStepsOpen] = useState(startWithForm)
+  const [showForm, setShowForm] = useState(false)
   const { confirm, dialog } = useConfirm()
   const [guideOpen, setGuideOpen] = useState(false)
 
@@ -183,6 +194,12 @@ export default function WordPressConnectionPanel({
     }
   }
 
+  // The plugin was paired (its "check" step succeeded): a clean connect, like the form's.
+  function handlePluginPaired() {
+    onChanged?.()
+    onConnected?.()
+  }
+
   async function handleDisconnect() {
     const ok = await confirm({
       title: t.confirmDisconnectTitle,
@@ -235,12 +252,11 @@ export default function WordPressConnectionPanel({
         <div aria-busy="true" data-connection-loading="wordpress"><Skeleton className="h-12 w-full rounded-inset" /></div>
       ) : loadFailed && !showForm ? (
         <ConnectionLoadFailed onRetry={() => { loadingRef.current = true; setLoading(true); void loadConnection() }} />
-      ) : !connection && !showForm ? (
+      ) : !connection && !plugin && !stepsOpen && !showForm ? (
         <div className="py-6 text-center">
           <p className="mb-3 text-copy text-body">{t.notConnected}</p>
           <div className="flex flex-wrap items-center justify-center gap-2">
-            <Button size="sm" onClick={openForm} data-wp-connect-button>{t.connectButton}</Button>
-            <Button size="sm" variant="secondary" onClick={() => setGuideOpen(true)}>{t.guideButton}</Button>
+            <Button size="sm" onClick={() => setStepsOpen(true)} data-wp-connect-button>{t.connectButton}</Button>
           </div>
         </div>
       ) : (
@@ -294,6 +310,24 @@ export default function WordPressConnectionPanel({
             </div>
           )}
 
+          {!connection && !plugin && !showForm && (
+            <WordPressPluginConnect
+              projectId={projectId}
+              t={t.pluginConnect}
+              onPaired={handlePluginPaired}
+            />
+          )}
+
+          {!connection && !showForm && (
+            // The application password: the advanced alternative, one link away.
+            <div className="text-center sm:text-start" data-wp-advanced="">
+              <button type="button" onClick={openForm} className="text-caption font-medium text-action hover:underline" data-wp-advanced-toggle="">
+                {plugin ? t.pluginConnect.advancedAdd : t.pluginConnect.advancedToggle}
+              </button>
+              {!plugin && <p className="mt-0.5 text-caption text-muted">{t.pluginConnect.advancedNote}</p>}
+            </div>
+          )}
+
           {showForm && (
             <div className="space-y-4" data-wp-form>
               {!connection && <WpPasswordSteps t={t} siteUrl={siteUrl} />}
@@ -338,6 +372,12 @@ export default function WordPressConnectionPanel({
                 >
                   {saving ? t.saving : t.saveConnection}
                 </Button>
+                <Button size="sm" variant="ghost" onClick={() => setGuideOpen(true)}>{t.guideButton}</Button>
+                {!connection && (
+                  <Button size="sm" variant="ghost" onClick={() => { setShowForm(false); setMessage(null) }} data-wp-action="back">
+                    {plugin ? t.pluginConnect.cancelForm : t.pluginConnect.backToPlugin}
+                  </Button>
+                )}
               </div>
             </div>
           )}

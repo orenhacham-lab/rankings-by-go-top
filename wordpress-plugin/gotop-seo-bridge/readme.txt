@@ -134,7 +134,7 @@ Settings > GO TOP SEO > Disconnect. GO TOP can no longer reach the site. Deletin
 == Changelog ==
 
 = 3.1.0 =
-* Everything GO TOP does now works with this plugin alone, without an application password: new signed routes list your published posts and pages (for the index of your existing content), read the links in one published post or page, list the users who may publish posts, and set the alt text of a Media Library image.
+* Everything GO TOP does now works with this plugin alone, without an application password: new signed routes list your published posts and pages (for the index of your existing content), read one published post or page as it is displayed (its HTML), list the users who may publish posts (id and display name), and find, read and set the alt text of Media Library images.
 * Publishing: schedule a post for a date, publish a second separate post for an article when you ask for it, choose the author of each article (only users who may publish posts), and update the post GO TOP published for the same article before the plugin was installed.
 * Categories, tags and WooCommerce product categories are listed with their address and post count.
 * Two copies of the plugin active at once (the older one and the WordPress.org one) no longer stop the site: the second one stays off and shows a notice. Deleting one copy keeps the connection while the other copy is installed.

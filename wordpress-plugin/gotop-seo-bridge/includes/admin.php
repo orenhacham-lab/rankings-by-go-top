@@ -12,7 +12,7 @@ if (!defined('ABSPATH')) { exit; }
 
 add_action('admin_menu', __NAMESPACE__ . '\\gotop_seo_bridge_admin_menu');
 function gotop_seo_bridge_admin_menu() {
-    add_options_page('GO TOP SEO', 'GO TOP SEO', 'manage_options', 'go-top-seo-bridge', 'gotop_seo_bridge_admin_page');
+    add_options_page('GO TOP SEO', 'GO TOP SEO', 'manage_options', 'go-top-seo-bridge', __NAMESPACE__ . '\\gotop_seo_bridge_admin_page');
 }
 
 add_filter('plugin_action_links_' . plugin_basename(GOTOP_SEO_BRIDGE_DIR . '/gotop-seo-bridge.php'), __NAMESPACE__ . '\\gotop_seo_bridge_action_links');
@@ -70,7 +70,7 @@ function gotop_seo_bridge_admin_page() {
     if ($notice === 'paired') {
         echo '<div class="notice notice-success"><p>' . esc_html__('This site is now connected. Go back to GO TOP and press "Check connection".', 'go-top-seo-bridge') . '</p></div>';
     } elseif ($notice === 'invalid') {
-        echo '<div class="notice notice-error"><p>' . esc_html__('That code is not valid. Copy it again from GO TOP (Site health > Install the plugin).', 'go-top-seo-bridge') . '</p></div>';
+        echo '<div class="notice notice-error"><p>' . esc_html__('That code is not valid. Copy it again from GO TOP and paste it here.', 'go-top-seo-bridge') . '</p></div>';
     } elseif ($notice === 'forgotten') {
         echo '<div class="notice notice-info"><p>' . esc_html__('Disconnected. GO TOP can no longer publish articles or apply fixes on this site.', 'go-top-seo-bridge') . '</p></div>';
     } elseif ($notice === 'author_saved') {

@@ -156,7 +156,7 @@ export const aiVisibilityPtBR: DeepPartial<DashboardDictionary> = {
     status: { connected: 'Conectada', failed: 'Precisa de revisão', untested: 'Ainda não testada' },
     names: { wordpress: 'WordPress', shopify: 'Shopify', wix: 'Wix', webhook: 'Site personalizado' },
     blurbs: {
-      wordpress: 'Conecta com o endereço do seu site e uma senha de aplicativo do WordPress',
+      wordpress: 'Conecta com o plugin gratuito da GO TOP e um código (ou com uma senha de aplicativo)',
       shopify: 'Conecte sua loja autorizando o acesso dentro da Shopify',
       wix: 'Conecta com o ID do seu site na Wix e uma chave de API',
       webhook: 'Enviamos cada artigo, assinado, para um endereço que você escolher',
@@ -169,7 +169,7 @@ export const aiVisibilityPtBR: DeepPartial<DashboardDictionary> = {
       currentBadge: 'Em uso',
       pickFirst: 'Escolha uma plataforma para continuar.',
       detectedNote: 'Escolhida com base no que a análise encontrou no seu site. Você pode escolher outra.',
-      wordpressNext: 'Ao confirmar, será aberto o formulário de conexão com o WordPress: endereço do site, usuário e senha de aplicativo.',
+      wordpressNext: 'Ao confirmar, aparecem três passos curtos: instale o plugin da GO TOP no WordPress, cole nele um código e verifique a conexão. Você também pode conectar com uma senha de aplicativo.',
       shopifyNext: 'Ao confirmar, digite o endereço myshopify.com da sua loja e autorize a conexão dentro da Shopify.',
       cancel: 'Cancelar',
       confirmSwitch: 'Confirmar e trocar',

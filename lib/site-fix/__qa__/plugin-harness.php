@@ -123,6 +123,7 @@ function kses_remove_filters() { $GLOBALS['__kses'] = false; }
 function kses_init_filters() { $GLOBALS['__kses'] = true; }
 function register_rest_route($ns, $route, $args) { $GLOBALS['__routes']['/' . $ns . $route] = $args; }
 function register_uninstall_hook($file, $cb) {}
+function add_options_page($t, $m, $cap, $slug, $cb) { $GLOBALS['__pages'][$slug] = $cb; return $slug; }
 function plugin_basename($f) { return basename(dirname($f)) . '/' . basename($f); }
 function current_user_can($cap, $id = null) { return in_array($cap, $GLOBALS['__caps'], true); }
 function get_option($k, $d = false) { return array_key_exists($k, $GLOBALS['__options']) ? $GLOBALS['__options'][$k] : $d; }
@@ -312,6 +313,19 @@ foreach ($calls as $step) {
         $out[] = array('post' => isset($GLOBALS['__posts'][$id]) ? $GLOBALS['__posts'][$id] : null,
             'meta' => isset($GLOBALS['__meta'][$id]) ? $GLOBALS['__meta'][$id] : new stdClass(), 'downloads' => $GLOBALS['__downloads'],
             'count' => count($GLOBALS['__posts']));
+    } elseif (isset($step['callables'])) {
+        // Every callback the plugin hands WordPress, by name: a hook, the settings page, a route and its
+        // permission check. A name that does not resolve (a namespaced file passing a bare function name)
+        // is listed; WordPress would only find out when it calls it.
+        foreach (isset($GLOBALS['__filters']['admin_menu']) ? $GLOBALS['__filters']['admin_menu'] : array() as $cb) { if (is_callable($cb)) { call_user_func($cb); } }
+        foreach (isset($GLOBALS['__filters']['rest_api_init']) ? $GLOBALS['__filters']['rest_api_init'] : array() as $cb) { if (is_callable($cb)) { call_user_func($cb); } }
+        $bad = array(); $seen = 0;
+        foreach ($GLOBALS['__filters'] as $hook => $cbs) { foreach ($cbs as $cb) { $seen++; if (!is_callable($cb)) { $bad[] = $hook . ': ' . (is_string($cb) ? $cb : gettype($cb)); } } }
+        foreach (isset($GLOBALS['__pages']) ? $GLOBALS['__pages'] : array() as $slug => $cb) { $seen++; if (!is_callable($cb)) { $bad[] = 'page ' . $slug . ': ' . (is_string($cb) ? $cb : gettype($cb)); } }
+        foreach ($GLOBALS['__routes'] as $route => $args) {
+            foreach (array('callback', 'permission_callback') as $k) { $seen++; if (!isset($args[$k]) || !is_callable($args[$k])) { $bad[] = $route . ' ' . $k; } }
+        }
+        $out[] = array('value' => $bad, 'seen' => $seen, 'pages' => array_keys(isset($GLOBALS['__pages']) ? $GLOBALS['__pages'] : array()));
     } elseif (isset($step['notices'])) {
         $GLOBALS['__caps'] = isset($step['can']) ? $step['can'] : array();
         ob_start();
