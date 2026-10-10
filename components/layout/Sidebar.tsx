@@ -18,6 +18,7 @@ import { pillText, railCounts } from '@/lib/nudges/rows'
 import { NAV_DRAWER_EVENT, type NavDrawerRequest } from '@/lib/shell/nav-drawer'
 import type { LucideIcon } from 'lucide-react'
 import {
+  CalendarClock,
   Handshake,
   LayoutGrid,
   Telescope,
@@ -191,6 +192,7 @@ export const navItemKeys = navGroupKeys.flatMap((g) => g.items)
 
 const adminItemKeys: readonly NavItem[] = [
   { href: '/admin/articles', labelKey: 'articleManagement', icon: Newspaper },
+  { href: '/admin/blog-plan', labelKey: 'blogPlan', icon: CalendarClock },
   { href: '/setup', labelKey: 'connectionStatus', icon: Plug },
   { href: '/admin/logs', labelKey: 'errorLogs', icon: ClipboardList },
   { href: '/admin/affiliates', labelKey: 'affiliateAdmin', icon: Handshake },

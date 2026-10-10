@@ -39,6 +39,7 @@ export const chromePtBR: DeepPartial<DashboardDictionary> = {
     billing: 'Pagamentos',
     system: 'Sistema',
     articleManagement: 'Artigos do site',
+    blogPlan: 'Fila de artigos',
     connectionStatus: 'Status da conexão',
     errorLogs: 'Registro de erros',
     support: 'Suporte pelo WhatsApp',
