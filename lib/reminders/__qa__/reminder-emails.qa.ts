@@ -28,6 +28,7 @@ import { buildReminderEmail, safeOrigin } from '../email'
 import { reminderGate, runArticleReminders, type OutgoingReminder, type ReminderDeps } from '../run'
 import { runIsolatedReminders } from '../isolated'
 import { handlePreferencesGet, handlePreferencesPut, handleUnsubscribe, unsubscribeByToken } from '../http'
+import { hashEmail } from '@/lib/email-suppression'
 import { withMutant } from './_mutant'
 
 let pass = 0
@@ -341,6 +342,35 @@ async function main() {
       async (m) => { try { await m.runIsolatedReminders(async () => { throw new Error('boom') }, { env: fullEnv, now: () => now }); return false } catch { return true } },
     )
     check('G-MUT: a hook that rethrows would reach the cron (G2 would fail)', mutHook)
+  }
+
+  // ── H) the removal list ───────────────────────────────────────────────────
+  console.log('\nH) The removal list stops this email too')
+  {
+    const listed = world()
+    listed.tables.email_suppressions = [{ email_hash: hashEmail('OWNER@Example.com '), source: 'unsubscribe_link', channel: 'outbound_prospect' }]
+    const hSent: OutgoingReminder[] = []
+    const stopped = await runArticleReminders(deps(listed, { sent: hSent }))
+    check('H1: an address on the list gets no approval reminder, however it got there',
+      stopped.status === 'done' && hSent.length === 0 && (stopped as { sent: number }).sent === 0)
+    check('H2: and no send is recorded against them, so nothing is silently burned',
+      !(listed.tables.project_reminder_state ?? []).some((r) => r.last_sent_at))
+    const unreadable = new FakeAdmin(world().tables, { email_suppressions: { select: () => ({ code: '08006', message: 'connection lost' }) } })
+    const uSent: OutgoingReminder[] = []
+    const held = await runArticleReminders(deps(unreadable, { sent: uSent }))
+    check('H3: a list we cannot read holds the email back rather than sending it',
+      held.status === 'done' && uSent.length === 0)
+    const gateMut = await withMutant<{ runArticleReminders: typeof runArticleReminders }, boolean>(
+      'lib/reminders/run.ts', [['if ((await isSuppressed(admin, facts.email)).suppressed) { suppressed++; continue }', 'void suppressed']],
+      async (m) => {
+        const s: OutgoingReminder[] = []
+        const w = world()
+        w.tables.email_suppressions = [{ email_hash: hashEmail('owner@example.com'), source: 'spam_complaint', channel: 'marketing' }]
+        await m.runArticleReminders(deps(w, { sent: s }))
+        return s.length === 1
+      },
+    )
+    check('H-MUT: without the gate we email someone who asked us to stop (H1 would fail)', gateMut)
   }
 
   console.log(`\n${pass} passed, ${fail} failed`)

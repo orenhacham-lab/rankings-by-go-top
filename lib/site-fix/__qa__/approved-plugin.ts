@@ -32,7 +32,7 @@ export const APPROVED_PLUGIN_SHA256: Readonly<Record<string, string>> = {
   'includes/publish.php': '982c394fa3e669de7cae6a2bfe731aed976d16ef0f1c6c9c85a0b3efbaad03de',
   'includes/read.php': 'dead168a3ebcc214645d1778022ba3d9d1502caf18ed20ea72a4ed058fce5fa0',
   'includes/routes.php': 'd990b59fdff6b005adb16c75cd76da61739ca83d282fc0e4c2fa674b9befe4e2',
-  'readme.txt': '318f6c13ec2bc41294f6117bd7d3cbf24718616951cc6e8181c3ff2220b2dce0',
+  'readme.txt': '4d132fb54e67b655f532c753310a3e4ffa67d4c005eb53ae12666eef3a5c6965',
   'uninstall.php': 'f938ecab70d2dbab268a2350bc7940db67f9054d0e3e497164b8cd2081e6cee1',
 }
 

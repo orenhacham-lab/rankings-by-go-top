@@ -88,6 +88,11 @@ export default function EnglishPrivacyPage() {
         <ul>
           <li><strong>Shopify:</strong> for payment processing for accounts billed through Shopify App Pricing, and for publishing content to a connected store</li>
           <li><strong>PayPal:</strong> for payment processing for website-billed customers only</li>
+          <li><strong>Creem:</strong> for payment processing, where an account&rsquo;s payment goes through it. To
+          open a payment we send the e-mail address of the account, the identifier of the plan chosen and our
+          own reference for that request, and we receive back a customer identifier held by them, a plan
+          identifier, the subscription status and the dates of the billing period. Card details, and any other
+          payment instrument, never reach us at any point</li>
           <li><strong>Supabase:</strong> for secure data storage</li>
           <li><strong>Serper:</strong> for Google search queries and rank checks</li>
           <li><strong>Resend:</strong> for sending email — see &ldquo;Email Messages&rdquo; below</li>
@@ -814,6 +819,64 @@ export default function EnglishPrivacyPage() {
       </section>
 
       <section>
+        <h2>Business Outreach by Email</h2>
+        <p>
+          This section is about someone who received an email from us and is not a customer of
+          ours. If that is you, you gave us nothing and signed up for nothing: we obtained your
+          business&rsquo;s address from public sources, and this section says exactly which, what we
+          hold, and how to take yourself out in one click.
+        </p>
+        <p className="mt-4">
+          <strong>What we collect and from where.</strong> The business&rsquo;s name, its website
+          address, a contact email address shown on the business&rsquo;s own site or in a public
+          business registry, the country the business operates in, and one finding from an automated
+          check of the site&rsquo;s public pages, with the date it was checked. <strong>We do not buy
+          contact lists and we do not use data brokers.</strong> We do not collect a phone number, we
+          do not collect details about a private individual, and we do not enter any part of a site
+          that is not open to every visitor.
+        </p>
+        <p className="mt-4">
+          <strong>For what purpose.</strong> To approach the business once, with an offer of our
+          service, and to explain what we found on its site. It is a marketing approach and we say
+          so in the message itself.
+        </p>
+        <p className="mt-4">
+          <strong>For which countries.</strong> We hold addresses for this purpose only for
+          businesses we have verified, from two independent sources, to be operating in the United
+          States. <strong>We do not hold addresses for this purpose for businesses in Israel, the
+          European Economic Area or the United Kingdom</strong>, and a business whose country we
+          could not verify never enters the list at all.
+        </p>
+        <p className="mt-4">
+          <strong>How many messages.</strong> Two at most: one message, and, if no reply comes, one
+          follow-up a week later. After that the business leaves the list even without asking.
+        </p>
+        <p className="mt-4">
+          <strong>How to stop it.</strong> Every message carries an unsubscribe link that works in
+          one click, with no signing in and no explanation. It is honoured immediately and
+          permanently. So that the removal holds, the address is kept on a removal list
+          <strong> for the single purpose of making sure we do not contact you again</strong>, it is
+          used for nothing else, and it applies across every channel of ours, not only the one you
+          asked in. A reply saying not to write again is treated the same way.
+        </p>
+        <p className="mt-4">
+          <strong>If you are in California.</strong> A business contact&rsquo;s address is personal
+          information under California privacy law, so you have the right to know what we hold about
+          you, to receive a copy, to request deletion, to correct inaccurate information, and not to
+          be discriminated against for exercising a right. <strong>We do not sell this information
+          and we do not share it for cross-context behavioural advertising.</strong> Because we did
+          not collect the information from you directly, this section is the notice of collection,
+          and a link to it appears in every message we send. A request goes to the address in
+          &ldquo;Privacy Contact and Representatives&rdquo;, and we answer in writing.
+        </p>
+        <p className="mt-4">
+          The same requests &mdash; access, deletion and correction &mdash; are answered for people
+          who are not in California, at the same address and in the same way. The controller is
+          GO TOP MARKETING GRUO LTD, company 517274346, in Israel.
+        </p>
+      </section>
+
+      <section>
         <h2>Rights of United States Residents</h2>
         <p>
           If you are a resident of California, or of another state that has enacted a state privacy
@@ -903,7 +966,7 @@ export default function EnglishPrivacyPage() {
 
       <section>
         <p className={LEGAL_FOOTNOTE}>
-          This policy was last updated on October 9, 2026
+          This policy was last updated on October 10, 2026
         </p>
       </section>
     </LegalDoc>

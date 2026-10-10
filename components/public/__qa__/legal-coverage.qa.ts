@@ -150,17 +150,17 @@ for (const [topic, byLang] of Object.entries(TOPICS)) {
 const OLD_NAME = /Rankings by Go Top/i
 const LAST_UPDATED: Record<Doc, Record<Lang, RegExp>> = {
   terms: { he: /9 באוקטובר 2026/, en: /October 9, 2026/ },
-  privacy: { he: /9 באוקטובר 2026/, en: /October 9, 2026/ },
+  privacy: { he: /10 באוקטובר 2026/, en: /October 10, 2026/ },
   a11y: { he: /5 באוקטובר 2026/, en: /October 5, 2026/ },
 }
 for (const lang of ['he', 'en'] as Lang[]) for (const doc of ['terms', 'privacy', 'a11y'] as Doc[]) {
   const p = pages[lang][doc]
   // The page body runs from its title to its last-updated line; the site shell (header, footer) around it is not these pages.
-  // The date is per document, not one date for all three: the terms and the
-  // privacy policy were last revised on 9 October 2026 — the policy for the
-  // conversion report sent to Meta from our server, and both of them for the
-  // weekly summary that replaced a monthly one and for the setup emails — and
-  // the accessibility statement on 5 October 2026. A page that is changed without its date
+  // The date is per document, not one date for all three: the privacy policy
+  // was last revised on 10 October 2026, for the business-outreach section that
+  // describes the addresses we collect from a business's own public pages; the
+  // terms on 9 October 2026, for the weekly summary that replaced a monthly one
+  // and for the setup emails; and the accessibility statement on 5 October 2026. A page that is changed without its date
   // being moved is the failure this catches, which is why the expected date
   // lives here and has to be edited deliberately.
   const dated = LAST_UPDATED[doc][lang]
@@ -257,6 +257,12 @@ check('MUTATION — an English-only extra section is caught', pages.he.terms.h2 
     'partners.shopify.com': { en: /Shopify/, he: /Shopify/ },
     'supabase.com': { en: /Supabase/, he: /Supabase/ },
     'graph.facebook.com': { en: /Conversions API/, he: /Conversions API/ },
+    // Creem is a payment provider, so it is a recipient whatever the state of its
+    // off switch: the sharing list says what we send it when a payment goes through
+    // it. Both hosts are listed because the mode is an explicit variable
+    // (lib/creem/config.ts), and the sandbox host receives the same shape.
+    'api.creem.io': { en: /Creem/, he: /Creem/ },
+    'test-api.creem.io': { en: /Creem/, he: /Creem/ },
   }
   /**
    * Hosts that receive nothing about a customer, each with the reason it is

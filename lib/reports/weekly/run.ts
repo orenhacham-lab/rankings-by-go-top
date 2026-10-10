@@ -20,6 +20,10 @@
  * next week rather than mailed twice in a day. This run does not write that date itself: an
  * opt-in summary must not silence the reminder that asks the owner to do something.
  *
+ * THE REMOVAL LIST IS THE LAST WORD. Past every other check, the owner's address goes
+ * through lib/email-suppression: an address on the list, or a list we cannot read, means
+ * nothing is sent and the week is never marked as covered.
+ *
  * LOGS. One line when something was sent or a send failed: counts only, never an address, a
  * domain or a provider's words.
  */
@@ -28,6 +32,7 @@ import type { PublicLocale } from '@/lib/i18n/locales'
 import { safeOrigin } from '@/lib/reminders/email'
 import { makeUnsubscribeToken } from '@/lib/reminders/token'
 import { readState } from '@/lib/reminders/state'
+import { isSuppressed } from '@/lib/email-suppression'
 import { aggregateWeek } from './aggregate'
 import { buildWeeklyEmail, type WeeklyEmail } from './email'
 import { inWeeklyWindow, weekKeyOf, weekWindow } from './period'
@@ -128,6 +133,10 @@ export async function runWeeklySummaries(deps: WeeklyDeps): Promise<WeeklyRun> {
       const locale: PublicLocale = who.locale ?? (who.shopify ? 'en' : 'he')
       const token = makeUnsubscribeToken(projectId, ownerId, deps.env)
       if (!token) continue
+
+      // The removal list, last and before the claim: a suppressed owner must not have the
+      // week marked as covered, and an unreadable list waits for next week's run.
+      if ((await isSuppressed(admin, who.email)).suppressed) { skipped++; continue }
 
       const at = now.toISOString()
       const won = await claimWeeklySend(admin, projectId, ownerId, prefs.prefs, { week, at })

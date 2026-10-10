@@ -152,6 +152,12 @@ Yes. Every fix can be undone from GO TOP, and WordPress keeps a revision of ever
 
 Settings > GO TOP SEO > Disconnect. GO TOP can no longer reach the site. Deleting the plugin also removes its settings; from 3.1.0 the connection key is kept while another copy of the plugin is still installed on the site, so that deleting one copy does not disconnect the other. Deleting an older copy still removes the shared key.
 
+== Screenshots ==
+
+1. Settings > GO TOP SEO after pairing: the connection, the user articles are published as, and recent activity.
+2. Connecting in GO TOP: install the plugin, get a one-time connection code, and check the connection.
+3. Site health in GO TOP with the plugin connected: findings that can be fixed in one click through the plugin.
+
 == Changelog ==
 
 = 3.1.0 =

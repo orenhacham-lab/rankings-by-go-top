@@ -1083,6 +1083,113 @@ const CAPI_CATEGORY: Record<string, RegExp> = {
     !CAPI_WITHDRAW.en.test('Withdrawing your consent stops the tags in your browser from collecting.'))
 }
 
+// ── 19) the business outreach section, and the promises inside it ─────────
+/*
+ * The cold outbound channel sends a marketing email to a business that never
+ * asked for it, from an address found on that business's own site. Three
+ * things make that lawful rather than spam, and each of them is a promise the
+ * documents now carry, so each is pinned.
+ *
+ * The country rule. The channel is lawful because CAN-SPAM is an opt-out
+ * regime; Israel's own anti-spam rule is opt-in and covers a business too, and
+ * the EU and UK are stricter still. So the geography is not list hygiene, it is
+ * the condition of the channel: the list may hold only businesses verified from
+ * two independent sources to be in the United States, and MUST NOT hold an
+ * Israeli, EEA or UK address at all. A text that softened this into "we do not
+ * send to" rather than "we do not hold" would describe a different, unlawful
+ * practice, so the pin is on holding.
+ *
+ * California. The CCPA's exemption for business-to-business contact data
+ * expired on 1 January 2023, so a business contact's address is personal
+ * information with the rights that come with it. Because the address was not
+ * collected from the person, this section IS the notice at collection, which is
+ * why it has to say so and why the email has to link it.
+ *
+ * The removal list. A one-click unsubscribe is only durable if the address is
+ * kept, which is itself processing and needs its own purpose limit. The text
+ * says the kept address is used for nothing but not contacting them again, and
+ * that it applies across every channel: a removal honoured in one channel and
+ * not the other is the breach that turns the lawful channel unlawful.
+ *
+ * What we do NOT do is pinned too, because it is cheap to promise and cheap to
+ * break: no bought lists, no data brokers, no phone numbers, nothing about a
+ * private individual, and nothing from a part of a site that is not public.
+ */
+const OUTREACH_COUNTRIES: Record<string, RegExp> = {
+  he: /איננו מחזיקים למטרה הזאת\s*כתובות של עסקים בישראל, באזור הכלכלי האירופי או בבריטניה/,
+  en: /We do not hold addresses for this purpose for businesses in Israel, the\s*European Economic Area or the United Kingdom/,
+  es: /No conservamos direcciones con esta finalidad de empresas en Israel, en el Espacio Económico Europeo ni en el Reino Unido/,
+  'pt-BR': /Não guardamos endereços para essa finalidade de empresas em Israel, no Espaço Econômico Europeu ou no Reino Unido/,
+}
+const OUTREACH_VERIFIED: Record<string, RegExp> = {
+  he: /אימתנו,\s*משני מקורות בלתי תלויים, שהם פועלים בארצות הברית/,
+  en: /we have verified, from two independent sources, to be operating in the United\s*States/,
+  es: /hemos verificado, a partir de dos fuentes independientes, que operan en los Estados Unidos/,
+  'pt-BR': /verificamos, a partir de duas fontes independentes, que atuam nos Estados Unidos/,
+}
+const OUTREACH_NOT_DONE: Record<string, RegExp[]> = {
+  he: [/איננו קונים\s*רשימות כתובות ואיננו משתמשים בסוחרי מידע/, /איננו נכנסים לשום חלק באתר שאינו פתוח לכל מבקר/],
+  en: [/We do not buy\s*contact lists and we do not use data brokers/, /we do not enter any part of a site\s*that is not open to every visitor/],
+  es: [/No compramos listas de direcciones y no usamos intermediarios de datos/, /no entramos en ninguna parte de un sitio que no esté abierta a cualquier visitante/],
+  'pt-BR': [/Não compramos listas de endereços e não usamos intermediários de dados/, /não entramos em nenhuma parte de um site que não esteja aberta a qualquer visitante/],
+}
+const OUTREACH_REMOVAL: Record<string, RegExp[]> = {
+  he: [/למטרה היחידה של לוודא שלא ניצור איתך קשר שוב/, /היא חלה על כל ערוץ שלנו ולא רק על זה שבו ביקשת/],
+  en: [/for the single purpose of making sure we do not contact you again/, /it applies across every channel of ours, not only the one you\s*asked in/],
+  es: [/con la única finalidad de asegurarnos de no volver a contactarle/, /se aplica a todos nuestros canales, no solo a aquel en el que usted lo pidió/],
+  'pt-BR': [/com a única finalidade de garantir que não entraremos em contato com você de novo/, /vale para todos os nossos canais, não só para aquele em que você pediu/],
+}
+const OUTREACH_NOTICE: Record<string, RegExp> = {
+  he: /מכיוון שלא\s*אספנו את המידע ממך עצמך, הסעיף הזה הוא ההודעה על האיסוף, והקישור אליו מופיע בכל\s*הודעה שאנו שולחים/,
+  en: /Because we did\s*not collect the information from you directly, this section is the notice of collection,\s*and a link to it appears in every message we send/,
+  es: /Como no recogimos la información de usted directamente, esta sección es el aviso de recogida, y un enlace a ella aparece en cada mensaje que enviamos/,
+  'pt-BR': /Como não coletamos a informação de você diretamente, esta seção é o aviso de coleta, e um link para ela aparece em cada mensagem que enviamos/,
+}
+const OUTREACH_NO_SALE: Record<string, RegExp> = {
+  he: /איננו מוכרים\s*את המידע הזה ואיננו משתפים אותו לפרסום התנהגותי חוצה-אתרים/,
+  en: /We do not sell this information\s*and we do not share it for cross-context behavioural advertising/,
+  es: /No vendemos esta información y no la compartimos para publicidad conductual entre contextos/,
+  'pt-BR': /Não vendemos essa informação e não a compartilhamos para publicidade comportamental entre contextos/,
+}
+{
+  const read = (path: string) => (existsSync(path) ? readFileSync(path, 'utf8') : '')
+  const enPrivacySource = frontMatter(text[LOCALES[0]].privacy).source
+  const privacyDocs: [string, string][] = [
+    ['he', read(HEBREW_PRIVACY)],
+    ['en', enPrivacySource ? read(enPrivacySource) : ''],
+    ...LOCALES.map((l): [string, string] => [l, text[l].privacy]),
+  ]
+  for (const [name, privacy] of privacyDocs) {
+    const countries = OUTREACH_COUNTRIES[name]
+    if (countries) check(`${name}/privacy: the list may not HOLD an Israeli, EEA or UK business address`, countries.test(privacy))
+    const verified = OUTREACH_VERIFIED[name]
+    if (verified) check(`${name}/privacy: the United States is verified from two independent sources`, verified.test(privacy))
+    for (const must of OUTREACH_NOT_DONE[name] ?? []) {
+      check(`${name}/privacy: outreach states what we never do (${must.source.slice(0, 40)})`, must.test(privacy))
+    }
+    for (const must of OUTREACH_REMOVAL[name] ?? []) {
+      check(`${name}/privacy: the removal list is purpose-limited and cross-channel (${must.source.slice(0, 40)})`, must.test(privacy))
+    }
+    const notice = OUTREACH_NOTICE[name]
+    if (notice) check(`${name}/privacy: the section says it IS the notice at collection, linked from every message`, notice.test(privacy))
+    const noSale = OUTREACH_NO_SALE[name]
+    if (noSale) check(`${name}/privacy: no sale and no cross-context sharing of the outreach data`, noSale.test(privacy))
+  }
+  check('mutation control: "we do not send to" in place of "we do not hold" is caught',
+    !OUTREACH_COUNTRIES.en.test('We do not send messages to businesses in Israel, the European Economic Area or the United Kingdom.'))
+  check('mutation control: one source of country verification is caught',
+    !OUTREACH_VERIFIED.en.test('we have verified, from the website address, to be operating in the United States'))
+  check('mutation control: a removal list with no purpose limit is caught',
+    !OUTREACH_REMOVAL.en[0].test('the address is kept on a removal list so that the removal holds.'))
+  check('mutation control: a removal that stops at this one channel is caught',
+    !OUTREACH_REMOVAL.en[1].test('it applies to the messages in this channel.'))
+  check('mutation control: a California half that omits the notice at collection is caught',
+    !OUTREACH_NOTICE.en.test('You have the right to know, to delete and to correct. A request goes to our privacy address.'))
+  check('mutation control: a bought list is caught',
+    !OUTREACH_NOT_DONE.en[0].test('We obtain addresses from public sources and from list providers.'))
+}
+
+
 // ── 20) the emails we send a customer, and what each unsubscribe stops ────
 /*
  * Until today the product sent no customer email at all, and the documents
@@ -1786,6 +1893,63 @@ const SEO_COMPLETION_NAMES = ['a missing SEO field may be completed later', 'an 
   check('mutation control: a text that drops the limit to our own articles is caught',
     !SEO_COMPLETION.en[2].test(flat('Such a completion fills only a missing field, never replaces a value that exists, and applies to any page on your site.')))
 }
+
+// ── 25) Creem, the payment provider, in every language ─────────────────────
+/*
+ * lib/creem/config.ts ships two hosts, so legal-coverage.qa.ts requires the
+ * provider to be named in the he and en policies. That guard knows nothing
+ * about es and pt-BR, and a provider disclosed in two languages out of four is
+ * undisclosed to the customers reading the other two.
+ *
+ * The sentence is derived from the code, not from what Creem is for: the
+ * checkout call in lib/creem/client.ts sends the product id, our request id
+ * and, when there is one, the customer's e-mail, and the subscription read
+ * returns an id, a status, a product, a customer id and the period dates. So
+ * the policy names the e-mail address and says card details never reach us,
+ * and it must keep saying that only while the code sends nothing more. A
+ * caller that puts anything about a customer into `metadata` makes this
+ * paragraph wrong, which is why the metadata is named here and not only in
+ * the thread that built it.
+ */
+const CREEM_SHARED: Record<string, RegExp> = {
+  he: /Creem:<\/strong> לעיבוד תשלומים, כאשר התשלום של החשבון עובר דרכו/,
+  en: /Creem:<\/strong> for payment processing, where an account&rsquo;s payment goes through it/,
+  es: /\*\*Creem:\*\* para el procesamiento de pagos, cuando el pago de una cuenta pasa por él/,
+  'pt-BR': /\*\*Creem:\*\* para processar pagamentos, quando o pagamento de uma conta passa por ele/,
+}
+const CREEM_NO_CARD: Record<string, RegExp> = {
+  he: /פרטי כרטיס,\s+וכל אמצעי תשלום אחר, אינם מגיעים אלינו בשום שלב/,
+  en: /Card details, and any other\s+payment instrument, never reach us at any point/,
+  es: /Los datos de la tarjeta, y cualquier otro instrumento de pago, no llegan a nosotros en ningún momento/,
+  'pt-BR': /Os dados do cartão, e qualquer outro meio de pagamento, nunca chegam a nós em nenhum momento/,
+}
+const CREEM_EMAIL: Record<string, RegExp> = {
+  he: /כתובת הדוא&rdquo;ל של החשבון/,
+  en: /the e-mail address of the account/,
+  es: /la dirección de correo electrónico de la cuenta/,
+  'pt-BR': /o endereço de e-mail da conta/,
+}
+{
+  const enSource = frontMatter(text[LOCALES[0]].privacy).source
+  const pages: [string, string][] = [
+    ['he', existsSync(HEBREW_PRIVACY) ? readFileSync(HEBREW_PRIVACY, 'utf8') : ''],
+    ['en', enSource && existsSync(enSource) ? readFileSync(enSource, 'utf8') : ''],
+    ...LOCALES.map((l): [string, string] => [l, text[l].privacy]),
+  ]
+  for (const [name, src] of pages) {
+    check(`${name}/privacy: the page was read`, src.length > 0)
+    check(`${name}/privacy: Creem is named as a payment recipient`, (CREEM_SHARED[name] ?? /$^/).test(src))
+    check(`${name}/privacy: it says what we send, starting with the account e-mail`, (CREEM_EMAIL[name] ?? /$^/).test(src))
+    check(`${name}/privacy: it says no payment instrument reaches us`, (CREEM_NO_CARD[name] ?? /$^/).test(src))
+  }
+  check('mutation control: a policy that names Creem without saying what we send it is caught',
+    !CREEM_EMAIL.en.test('Creem: for payment processing, where an account&rsquo;s payment goes through it.'))
+  check('mutation control: a policy that drops the no-card-details sentence is caught',
+    !CREEM_NO_CARD.es.test('**Creem:** para el procesamiento de pagos. Recibimos el estado de la suscripción.'))
+  check('mutation control: a policy that claims we store the payment instrument is caught',
+    !CREEM_NO_CARD['pt-BR'].test('Os dados do cartão são guardados por nós para a próxima cobrança.'))
+}
+
 
 console.log(`\n${pass} passed, ${fail} failed`)
 if (fail > 0) process.exit(1)
