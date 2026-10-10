@@ -207,10 +207,19 @@ function main() {
     // took both out of the connections: nothing there may name Google Ads or a
     // connection that does not exist.
     const page = strip(read('app/(dashboard)/settings/page.tsx'))
-    const section = (src: string) => src.slice(src.indexOf('<section id={SECTION.connections}'), src.indexOf('</section>', src.indexOf('<section id={SECTION.connections}')))
+    // Since 10 October 2026 the two connection blocks are built once (platformBlock,
+    // gscBlock) and placed either in the section at the top (not connected yet) or in
+    // the usual one, so the check covers both sections and the two blocks.
+    const between = (src: string, from: string, to: string) => { const i = src.indexOf(from); return i < 0 ? '' : src.slice(i, src.indexOf(to, i)) }
     const clean = (src: string) => {
-      const c = section(src)
-      return c.length > 0 && !/GoogleAds|googleAds|moreConnectionsSoon/.test(c) && /<ContentSection projectId=\{project\.id\}/.test(c) && /<GscPanel projectId=\{project\.id\} \/>/.test(c)
+      const blocks = between(src, 'const platformBlock = (', 'const index:')
+      const usual = between(src, '<section id={SECTION.connections}', '</section>')
+      const first = between(src, '<section id={topId} data-connect-first=""', '</section>')
+      const all = blocks + usual + first
+      return usual.length > 0 && first.length > 0 && !/GoogleAds|googleAds|moreConnectionsSoon/.test(all)
+        && /<ContentSection projectId=\{project\.id\}/.test(blocks) && /<GscPanel projectId=\{project\.id\} \/>/.test(blocks)
+        && /\{!topPlatform && platformBlock\}/.test(usual) && /\{!topGsc && gscBlock\}/.test(usual)
+        && /\{topPlatform && platformBlock\}/.test(first) && /\{topGsc && gscBlock\}/.test(first)
     }
     check('the connections hold the site platform and Search Console, and no card that leads nowhere', clean(page))
     check('MUT: the Google Ads card put back fails it', !clean(page.replace('<GscPanel projectId={project.id} />', '<GscPanel projectId={project.id} />\n<GoogleAdsCard t={t} />')))
