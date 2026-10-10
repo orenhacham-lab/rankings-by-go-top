@@ -36,7 +36,10 @@ export const pricingPtBR: PricingCopy = {
     dashboard: 'Ir para o meu painel',
     noCard: 'Sem cartão de crédito',
     checksNote: CHECKS_EXPLAINER['pt-BR'],
-    taxNote: 'Em um pagamento com cartão quem vende é a Creem, como comerciante registrada: ela calcula o imposto pelo seu endereço de cobrança e mostra o valor final antes do pagamento. Os preços aqui não o incluem.',
+    taxNote: {
+      ILS: 'Os preços incluem o IVA israelense. É o valor que você paga, sem acréscimos.',
+      USD: 'Em um pagamento com cartão quem vende é a Creem, como comerciante registrada: ela calcula o imposto pelo seu endereço de cobrança e mostra o valor final antes do pagamento. Os preços aqui não o incluem.',
+    },
     everyPlanLabel: 'Em todos os planos',
     everyPlan: [
       'Publicação agendada automática no WordPress, na Shopify e no Wix',

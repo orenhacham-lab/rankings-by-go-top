@@ -156,14 +156,18 @@ function main() {
     // The definition is VISIBLE text on both pages (no tooltip: it must work on a phone and with a keyboard).
     const ssr = (lang: 'he' | 'en') => {
       const { PricingChecksNote } = require(join(ROOT, 'components/public/pricing/PricingSections.tsx'))
-      return renderToStaticMarkup(createElement(PricingChecksNote, { copy: lang === 'he' ? pricingHe : pricingEn }))
+      // The component now also renders the market's tax note (guarded in
+      // components/public/__qa__/pricing-page.qa.ts section F), so it needs a
+      // market; which one it is does not matter to the definition checked here.
+      return renderToStaticMarkup(createElement(PricingChecksNote, { copy: lang === 'he' ? pricingHe : pricingEn, market: 'ILS' }))
     }
     for (const lang of LOCALES) {
       const html = ssr(lang)
       check(`B9-${lang}: the definition renders as plain visible text`, html.includes('data-checks-note') && html.includes(CHECKS_EXPLAINER[lang]) && !/title=|tooltip|aria-hidden/.test(html), html.slice(0, 160))
     }
-    const noteUnderGrid = (raw: string) => { const src = strip(raw); return /<PricingChecksNote copy=\{copy\} \/>/.test(src) && src.indexOf('<PricingChecksNote') < src.indexOf('<PricingUnsure') }
-    const breakPage = (src: string) => src.replace('<PricingChecksNote copy={copy} />', '')
+    const NOTE_JSX = '<PricingChecksNote copy={copy} market={market} />'
+    const noteUnderGrid = (raw: string) => { const src = strip(raw); return /<PricingChecksNote copy=\{copy\} market=\{market\} \/>/.test(src) && src.indexOf('<PricingChecksNote') < src.indexOf('<PricingUnsure') }
+    const breakPage = (src: string) => src.replace(NOTE_JSX, '')
     for (const { rel } of PAGES) {
       const src = strip(read(rel))
       check(`B10: ${rel} puts the definition right under the plan grid`, noteUnderGrid(read(rel)))
@@ -173,7 +177,7 @@ function main() {
     // MUTATION CONTROLS
     check('B12-MUT: a page that drops the definition fails B10', !noteUnderGrid(breakPage(read(PAGES[0].rel))))
     check('B12b-MUT: a page that moves the definition below the "not sure yet" block fails B10',
-      !noteUnderGrid(read(PAGES[0].rel).replace('<PricingChecksNote copy={copy} />', '').replace('<PricingUnsure', '<PricingUnsure copy={copy} checkHref="/x" />\n<PricingChecksNote copy={copy} />\n<PricingUnsure')))
+      !noteUnderGrid(read(PAGES[0].rel).replace(NOTE_JSX, '').replace('<PricingUnsure', `<PricingUnsure copy={copy} checkHref="/x" />\n${NOTE_JSX}\n<PricingUnsure`)))
     check('B13-MUT: the old usage titles back fail B8',
       !usageNamed([{ title: 'בדיקת גוגל' }, { title: 'בדיקת AI' }], [{ title: 'Google check' }, { title: 'AI check' }]))
     check('B14-MUT: "billing period" back in a pricing sentence fails B1', [...strings(pricingEn.usage), 'resets every billing period'].some((x) => JARGON.test(x)))

@@ -2055,6 +2055,56 @@ const MOR_BUYER_TERMS: Record<string, RegExp> = {
     !MOR_SERVICE_OURS.en.test('Creem provides support for the service and warrants that it works as described.'))
 }
 
+// ── 27) What the displayed price includes, per currency ─────────────────
+/*
+ * Until 10 October 2026 the terms said nothing about whether a price includes
+ * tax, which is the one thing a consumer reading a price needs to know. The
+ * owner settled it that day: a shekel price includes Israeli VAT, and he
+ * reports that VAT himself. So the terms now state it per currency, and the
+ * two halves are checked separately because each protects against a different
+ * mistake — claiming a dollar price is tax-inclusive when Creem adds tax on
+ * top of it (Merchant Terms 9.1), and claiming a shekel price has tax added
+ * when it does not, which would read as an undisclosed surcharge.
+ *
+ * The sentence is keyed to the CURRENCY, not to the language, because the
+ * market is resolved per visitor: a Hebrew reader outside Israel sees dollars
+ * and a Spanish reader in Israel sees shekels. components/public/pricing has
+ * the same split, guarded in pricing-page.qa.ts section F.
+ */
+const PRICE_VAT_ILS: Record<string, RegExp> = {
+  he: /מחיר הנקוב בשקלים כולל מע&rdquo;מ כדין בישראל/,
+  en: /A price stated in shekels includes Israeli VAT as\s+required by law/,
+  es: /Un precio indicado en s[ée]queles incluye el IVA israel[í i]/,
+  'pt-BR': /Um pre[çc]o indicado em s[ée]queis inclui o IVA israelense/,
+}
+const PRICE_TAX_USD: Record<string, RegExp> = {
+  he: /מחיר הנקוב בדולרים אינו כולל מס עקיף/,
+  en: /A price stated in dollars does not include\s+indirect tax/,
+  es: /Un precio indicado en d[óo]lares no incluye impuesto indirecto/,
+  'pt-BR': /Um pre[çc]o indicado em d[óo]lares n[ãa]o inclui imposto indireto/,
+}
+{
+  const read = (path: string) => (existsSync(path) ? readFileSync(path, 'utf8') : '')
+  const enTermsSource = frontMatter(text[LOCALES[0]].terms).source
+  const docs: [string, string][] = [
+    ['he', read(HEBREW_TERMS)],
+    ['en', enTermsSource ? read(enTermsSource) : ''],
+    ...LOCALES.map((l): [string, string] => [l, text[l].terms]),
+  ]
+  for (const [name, terms] of docs) {
+    check(`${name}/terms: the page was read`, terms.length > 0)
+    check(`${name}/terms: a shekel price is stated to include Israeli VAT`, (PRICE_VAT_ILS[name] ?? /$^/).test(terms))
+    check(`${name}/terms: a dollar price is stated NOT to include indirect tax`, (PRICE_TAX_USD[name] ?? /$^/).test(terms))
+  }
+  check('mutation control: a blanket "all prices include tax" is caught',
+    !PRICE_TAX_USD.en.test('All prices stated in the Service include every applicable tax.'))
+  check('mutation control: a shekel price presented as tax-exclusive is caught',
+    !PRICE_VAT_ILS.es.test('Un precio indicado en séqueles no incluye el IVA, que se añade en el pago.'))
+  check('mutation control: a text that settles neither currency is caught',
+    !PRICE_VAT_ILS.en.test('Prices, plans and limits may change from time to time.')
+    && !PRICE_TAX_USD.en.test('Prices, plans and limits may change from time to time.'))
+}
+
 console.log(`\n${pass} passed, ${fail} failed`)
 if (fail > 0) process.exit(1)
 

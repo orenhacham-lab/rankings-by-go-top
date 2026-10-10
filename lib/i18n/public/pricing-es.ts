@@ -36,7 +36,10 @@ export const pricingEs: PricingCopy = {
     dashboard: 'Ir a mi panel',
     noCard: 'Sin tarjeta de crédito',
     checksNote: CHECKS_EXPLAINER.es,
-    taxNote: 'En un pago con tarjeta el comerciante registrado es Creem, que calcula el impuesto según su dirección de facturación y muestra el importe final antes de pagar. Los precios de aquí no lo incluyen.',
+    taxNote: {
+      ILS: 'Los precios incluyen el IVA israelí. Es el importe que paga, sin añadidos.',
+      USD: 'En un pago con tarjeta el comerciante registrado es Creem, que calcula el impuesto según su dirección de facturación y muestra el importe final antes de pagar. Los precios de aquí no lo incluyen.',
+    },
     everyPlanLabel: 'En todos los planes',
     everyPlan: [
       'Publicación programada automática en WordPress, Shopify y Wix',

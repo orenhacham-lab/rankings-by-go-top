@@ -145,7 +145,7 @@ export default async function PortuguesePricingPage() {
             })}
           </div>
 
-          <PricingChecksNote copy={copy} />
+          <PricingChecksNote copy={copy} market={market} />
           <PricingUnsure copy={copy} checkHref="/pt-BR/free-check" />
         </Section>
 

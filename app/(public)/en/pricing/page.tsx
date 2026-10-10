@@ -139,7 +139,7 @@ export default async function EnglishPricingPage() {
             })}
           </div>
 
-          <PricingChecksNote copy={copy} />
+          <PricingChecksNote copy={copy} market={market} />
           <PricingUnsure copy={copy} checkHref="/en/free-check" />
         </Section>
 

@@ -72,6 +72,12 @@ export default function EnglishTermsPage() {
           and on the pricing page.
         </p>
         <p className="mt-3">
+          <strong>What the price includes.</strong> A price stated in shekels includes Israeli VAT as
+          required by law, and is the amount you pay. A price stated in dollars does not include
+          indirect tax; on a card payment such tax is calculated and collected by Creem on your
+          billing address and shown to you before you pay, as set out in section 5A.
+        </p>
+        <p className="mt-3">
           <strong>How you are billed depends on how your account was opened:</strong>
         </p>
         <ul>
