@@ -111,6 +111,58 @@ export default function EnglishTermsPage() {
       </section>
 
       <section>
+        <h2>5A. Card payment: Creem as the merchant of record</h2>
+        <p>
+          An account that is not billed through Shopify may pay by card. In such a payment the sale
+          is not made with us but with Creem, which is the company Armitage Labs O&Uuml; (Estonian
+          registry code 16977866, Rotermanni 14, Tallinn 10111, Estonia). Creem acts as the merchant
+          of record and contractual reseller, and executes the sale with you in its own name. We sell
+          to Creem, and Creem sells to you.
+        </p>
+        <p className="mt-3">What that means in practice:</p>
+        <ul>
+          <li>
+            <strong>The invoice.</strong> Creem issues the invoice in its own name. We issue no
+            invoice or receipt for that transaction and collect no payment from you for it by any
+            other route.
+          </li>
+          <li>
+            <strong>Tax.</strong> VAT, sales tax and any other indirect tax are calculated, collected
+            and remitted by Creem according to your billing address, and the final amount is shown to
+            you before you pay. The price shown on the pricing page does not include such tax.
+          </li>
+          <li>
+            <strong>The service itself stays our responsibility.</strong> Providing the service, its
+            quality, its support and its compliance with the law are ours alone. Creem takes no
+            responsibility for those.
+          </li>
+          <li>
+            <strong>Refunds.</strong> A refund or a chargeback on such a transaction is carried out by
+            Creem alone, according to the eligibility terms in these terms &mdash; that is, section 7
+            &mdash; and applicable law. A refund request goes to us first, at the address in section 21
+            or through the details on the receipt sent to you.
+          </li>
+          <li>
+            <strong>The 14-day withdrawal right.</strong> In such a payment, the express consent that
+            immediate commencement of a digital service ends the withdrawal right is given in
+            Creem&rsquo;s checkout. The effect is the same as described in section 7.2.
+          </li>
+          <li>
+            <strong>Creem&rsquo;s Buyer Terms.</strong> In addition to these terms, Creem&rsquo;s Buyer
+            Terms apply to you, available at{' '}
+            <a href="https://www.creem.io/buyer-terms" rel="nofollow noopener" target="_blank">
+              creem.io/buyer-terms
+            </a>
+            . They govern the sale it executes, not the service we provide.
+          </li>
+        </ul>
+        <p className="mt-3">
+          Payment through PayPal and payment through Shopify do not change: there the seller is the
+          Company, as described in section 5.
+        </p>
+      </section>
+
+      <section>
         <h2>6. Cancellation</h2>
         <p>
           You may cancel renewal of your subscription at any time through your account settings.
@@ -152,6 +204,11 @@ export default function EnglishTermsPage() {
         <p className="mt-4">
           <strong>7.4</strong> Sections 7.1 to 7.3 apply to private consumers only. For business
           customers, the refund policy in section 7 applies unchanged.
+        </p>
+        <p className="mt-4">
+          <strong>7.5 A payment made by card.</strong> On a transaction carried out through Creem, the
+          refund is carried out by Creem and not by us, according to the eligibility terms in this
+          section and to the law. See section 5A.
         </p>
       </section>
 
@@ -697,7 +754,7 @@ export default function EnglishTermsPage() {
 
       <section>
         <p className={LEGAL_FOOTNOTE}>
-          Last updated: October 9, 2026
+          Last updated: October 10, 2026
         </p>
       </section>
     </LegalDoc>

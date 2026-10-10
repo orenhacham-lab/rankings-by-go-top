@@ -3,7 +3,7 @@ title: Termos de Uso | Go Top SEO
 description: Termos de uso do Go Top SEO — as condições que regem o uso do nosso serviço.
 locale: pt-BR
 source: app/(public)/en/terms/page.tsx
-lastUpdated: 2026-10-09
+lastUpdated: 2026-10-10
 register: voce
 extraSections: 0
 extraReason: No extra section. What Brazilian law adds goes inside the sections it belongs to — the seven-day right of withdrawal as 7.5 in Refunds, and the Consumer Code's forum rule as 20.1 in Governing Law — so the heading structure stays identical to the English document.
@@ -37,6 +37,21 @@ O Serviço funciona em um modelo de assinatura mensal. Enquanto a assinatura est
 - **Um período já pago no site segue até o fim.** Se, no momento em que a loja é conectada, a conta tiver um período de cobrança já pago, o plano comprado no site continua funcionando até o fim desse período, nenhum plano da Shopify é oferecido ou cobrado antes dessa data, e interrompemos a renovação automática no PayPal para que outro período não seja cobrado. Se a renovação já estava em curso e o período foi renovado mais uma vez, esse período também é respeitado integralmente. Não há reembolso de um período já pago e o acesso não é interrompido antes do seu fim. A partir dessa data, continuar em um plano pago exige escolher um plano na Shopify, e desde então a cobrança é feita pela Shopify.
 - Se você escolher um plano diretamente nas telas de cobrança da própria Shopify durante um período já pago no site, a Shopify cobrará por ele: nosso aplicativo não o direciona a essas telas, e uma cobrança feita pela Shopify não é uma cobrança que possamos reembolsar.
 
+## 5A. Pagamento com cartão: a Creem como comerciante registrada (merchant of record)
+
+Uma conta que não é cobrada pela Shopify pode pagar com cartão. Nesse pagamento a venda não é feita com a gente, e sim com a Creem, que é a sociedade Armitage Labs OÜ (código de registro estoniano 16977866, Rotermanni 14, Tallinn 10111, Estônia). A Creem atua como comerciante registrada e revendedora contratual, e executa a venda com você em nome próprio. A gente vende para a Creem, e a Creem vende para você.
+
+O que isso significa na prática:
+
+- **A nota fiscal.** A Creem emite a fatura em nome próprio. A gente não emite nenhuma fatura ou recibo daquela transação e não cobra você por ela por nenhum outro caminho.
+- **O imposto.** IVA, imposto sobre vendas e qualquer outro imposto indireto são calculados, recolhidos e declarados pela Creem conforme o seu endereço de cobrança, e o valor final é mostrado a você antes do pagamento. O preço que aparece na página de preços não inclui esse imposto.
+- **O Serviço em si continua sendo responsabilidade nossa.** A prestação do Serviço, a sua qualidade, o seu suporte e a sua conformidade com a lei são só nossos. A Creem não assume responsabilidade por nada disso.
+- **Reembolsos.** Um reembolso ou um chargeback daquela transação é executado somente pela Creem, conforme as condições de elegibilidade destes termos, ou seja a seção 7, e a lei aplicável. O pedido de reembolso vai primeiro para a gente, no endereço da seção 21 ou pelos dados do recibo enviado a você.
+- **O direito de arrependimento.** Nesse pagamento, o consentimento expresso de que o início imediato de um serviço digital extingue o direito de arrependimento de 14 dias é dado na tela de pagamento da Creem. Esse consentimento é regra europeia, e o efeito é o mesmo descrito na seção 7.2. Ele **não** alcança o prazo de sete dias do art. 49 do Código de Defesa do Consumidor: o direito descrito na seção 7.5 continua inteiro, qualquer que seja a forma de pagamento, e nenhuma tela de pagamento o afasta.
+- **Os Termos de Comprador da Creem.** Além destes termos, aplicam-se a você os Termos de Comprador da Creem, disponíveis em [creem.io/buyer-terms](https://www.creem.io/buyer-terms). Eles regem a venda que ela executa, não o Serviço que a gente presta.
+
+O pagamento pelo PayPal e o pagamento pela Shopify não mudam: ali quem vende é a Empresa, como descrito na seção 5.
+
 ## 6. Cancelamento
 
 Você pode cancelar a renovação da sua assinatura a qualquer momento nas configurações da conta. O acesso ao Serviço é mantido até o fim do período de cobrança já pago. Não há cancelamento retroativo de um período já pago, exceto quando a lei aplicável exigir.
@@ -54,6 +69,8 @@ As taxas de assinatura não são reembolsáveis quanto a um período já iniciad
 **7.4** As seções 7.1 a 7.3 aplicam-se somente a consumidores pessoas físicas. Para clientes empresariais, a política de reembolso da seção 7 aplica-se sem alteração.
 
 **7.5 Consumidores no Brasil.** Se você contratou do Brasil como consumidor, o art. 49 do Código de Defesa do Consumidor (Lei nº 8.078/1990) lhe dá o direito de desistir da contratação, feita fora do estabelecimento comercial, no prazo de 7 dias corridos contados da aceitação destes termos ou do início do acesso, o que ocorrer primeiro, sem necessidade de justificar. Exercido o direito no prazo, os valores pagos são devolvidos integralmente e de imediato, monetariamente atualizados, sem nenhum custo pelo exercício do direito. A renúncia descrita na seção 7.2 é regra da legislação europeia e **não** se aplica a esse prazo de sete dias: no Brasil, iniciar o uso do Serviço não faz você perder o direito de arrependimento. Um pedido apresentado dentro dos sete dias é atendido, sem discussão sobre a sua condição de consumidor. Os detalhes estão na nossa Política de Cancelamento e Reembolso.
+
+**7.6 Um pagamento feito com cartão.** Em uma transação executada pela Creem, o reembolso é executado por ela e não pela gente, conforme as condições de elegibilidade desta seção e a lei. São estes termos que dizem quem tem direito a reembolso, e é por eles que a Creem decide. O prazo de sete dias da seção 7.5 é uma dessas condições: um pedido apresentado dentro dele é atendido, e a gente continua responsável por honrá-lo mesmo que o reembolso tenha de passar pela Creem. Veja a seção 5A.
 
 ## 8. Limites de uso
 
@@ -228,4 +245,4 @@ Para qualquer dúvida sobre estes termos ou sobre o Serviço, fale com a gente:
 Número da sociedade: 517274346  
 E-mail: [oren@gotop.co.il](mailto:oren@gotop.co.il)
 
-Última atualização: 9 de outubro de 2026
+Última atualização: 10 de outubro de 2026

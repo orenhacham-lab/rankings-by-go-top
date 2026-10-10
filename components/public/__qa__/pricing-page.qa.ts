@@ -141,7 +141,7 @@ async function main() {
 
   console.log('\nD) one language per page')
   // Brand and product names stay in Latin script on the Hebrew page.
-  const LATIN_OK = /^(ChatGPT|Gemini|Perplexity|Copilot|Grok|Google|AI|PDF|Excel|SSL|TLS|Go|Top|WordPress|Shopify)$/
+  const LATIN_OK = /^(ChatGPT|Gemini|Perplexity|Copilot|Grok|Google|AI|PDF|Excel|SSL|TLS|Go|Top|WordPress|Shopify|Creem)$/
   const words = (copy: any) => leaves(copy).filter((s) => !s.startsWith('/'))
   const hebrewOk = (copy: any) => words(copy).every((s) => (s.match(/[A-Za-z]+/g) ?? []).every((w) => LATIN_OK.test(w)) && (/[֐-׿]/.test(s) || !/[A-Za-z]{3}/.test(s)))
   const englishOk = (copy: any) => leaves(copy).every((s) => !/[֐-׿]/.test(s))
@@ -166,6 +166,48 @@ async function main() {
   check('MUTATION CONTROL: a 4-column "included" grid is caught', !soleGrid(sectionsSrc.replace('lg:grid-cols-3" data-included-grid', 'lg:grid-cols-4" data-included-grid'), heroSrc))
   check('MUTATION CONTROL: a link above a card\'s button is caught',
     !ctaFirst(read(HE_PAGE).replace('<h3 className=', '<a href="/features" className="sr-only">x</a><h3 className=')))
+
+  console.log('\nF) the price in the grid is not presented as the final price')
+  /*
+   * On a card payment Creem is the merchant of record and calculates indirect
+   * tax on the buyer's billing address (Merchant Terms 9.1, 3.3.4), so the
+   * figure in the grid is not what the buyer pays. An EU consumer has to see a
+   * tax-inclusive final price before paying; Creem's checkout is where that
+   * happens, and this sentence is what stops the grid from reading as the whole
+   * price. It is checked in all four dictionaries, not just the two pages this
+   * suite renders, because a missing sentence in one language is a price claim
+   * we cannot keep in that language.
+   *
+   * The sentence deliberately says nothing about the shekel prices: whether
+   * those include Israeli VAT is not settled anywhere in the code or the terms,
+   * so a guard that demanded a statement about them would be demanding a guess.
+   */
+  {
+    const { pricingEs } = require(join(ROOT, 'lib/i18n/public/pricing-es.ts'))
+    const { pricingPtBR } = require(join(ROOT, 'lib/i18n/public/pricing-pt-BR.ts'))
+    const NOT_INCLUDED: Record<string, RegExp> = {
+      he: /המחירים כאן אינם כוללים אותו/,
+      en: /The prices here do not include it/,
+      es: /Los precios de aquí no lo incluyen/,
+      'pt-BR': /Os preços aqui não o incluem/,
+    }
+    const dicts: [string, any][] = [['he', pricingHe], ['en', pricingEn], ['es', pricingEs], ['pt-BR', pricingPtBR]]
+    for (const [l, copy] of dicts) {
+      const note = copy.plans.taxNote as string | undefined
+      check(`F1 (${l}): the grid carries a tax note`, typeof note === 'string' && note.length > 0)
+      check(`F2 (${l}): it names Creem as the one that adds the tax`, /Creem/.test(note ?? ''))
+      check(`F3 (${l}): it says the price shown does not include that tax`, (NOT_INCLUDED[l] ?? /$^/).test(note ?? ''))
+    }
+    const noteMarkup = renderToStaticMarkup(createElement(S.PricingChecksNote, { copy: pricingHe }))
+    check('F4: the note is rendered under the grid, not only stored',
+      noteMarkup.includes('data-tax-note') && noteMarkup.includes(pricingHe.plans.taxNote))
+    check('MUTATION CONTROL: a note that stops at naming Creem is caught',
+      !NOT_INCLUDED.en.test('On a card payment the merchant of record is Creem.'))
+    check('MUTATION CONTROL: a note claiming the price is tax inclusive is caught',
+      !NOT_INCLUDED.es.test('Los precios de aquí incluyen todos los impuestos aplicables.'))
+    check('MUTATION CONTROL: a dictionary with no tax note at all is caught',
+      !(typeof ({ ...pricingHe.plans, taxNote: undefined }).taxNote === 'string'))
+  }
 
   console.log(`\n${pass} passed, ${fail} failed`)
   if (fail > 0) process.exitCode = 1

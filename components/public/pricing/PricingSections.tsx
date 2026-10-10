@@ -36,6 +36,16 @@ export type PricingCopy = {
     noCard: string
     /** One plain sentence under the grid saying what a Google check and an AI check are. */
     checksNote: string
+    /**
+     * Under the grid: on a card payment Creem is the merchant of record and adds
+     * tax by the buyer's billing address, so the figure in the grid is not the
+     * final one. An EU consumer has to be shown a tax-inclusive final price
+     * before paying, and Creem's checkout is where that happens; this sentence is
+     * what keeps the grid from reading as the whole price. It says nothing about
+     * the shekel prices, because whether those include Israeli VAT is not settled
+     * in code or in the terms — do not widen it until it is.
+     */
+    taxNote: string
     everyPlanLabel: string
     everyPlan: string[]
   }
@@ -63,7 +73,10 @@ const USAGE_ICONS: LucideIcon[] = [FileText, Search, Sparkles]
  *  (no tooltip, so it works on a phone and with a keyboard). */
 export function PricingChecksNote({ copy }: { copy: PricingCopy }) {
   return (
-    <p className="mx-auto mt-8 max-w-3xl text-center text-caption text-muted" data-checks-note>{copy.plans.checksNote}</p>
+    <>
+      <p className="mx-auto mt-8 max-w-3xl text-center text-caption text-muted" data-checks-note>{copy.plans.checksNote}</p>
+      <p className="mx-auto mt-3 max-w-3xl text-center text-caption text-muted" data-tax-note>{copy.plans.taxNote}</p>
+    </>
   )
 }
 

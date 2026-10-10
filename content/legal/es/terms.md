@@ -3,7 +3,7 @@ title: Términos de Uso | Go Top SEO
 description: Términos de uso de Go Top SEO: las condiciones que rigen el uso de nuestro servicio.
 locale: es
 source: app/(public)/en/terms/page.tsx
-lastUpdated: 2026-10-09
+lastUpdated: 2026-10-10
 register: usted
 ---
 
@@ -39,6 +39,21 @@ El Servicio funciona con un modelo de suscripción mensual. Mientras la suscripc
 - **Un periodo ya pagado en el sitio web se mantiene hasta su fin.** Si en el momento de conectar la tienda la cuenta tiene un periodo de facturación ya pagado, el plan comprado en el sitio web sigue funcionando hasta que ese periodo termine, antes de esa fecha no se ofrece ni se cobra ningún plan de Shopify, y detenemos la renovación automática en PayPal para que no se cobre otro periodo. Si la renovación ya estaba en curso y el periodo se renovó una vez más, ese periodo también se respeta íntegramente. No hay reembolso por un periodo ya pagado ni se interrumpe el acceso antes de que termine. A partir de esa fecha, continuar con un plan de pago requiere elegir un plan en Shopify, y desde entonces la facturación se realiza a través de Shopify.
 - Si usted elige un plan directamente en las pantallas de facturación de Shopify durante un periodo ya pagado en el sitio web, Shopify le cobrará por él: nuestra aplicación no lo dirige a esas pantallas, y un cobro realizado por Shopify no es un cobro que podamos reembolsar.
 
+## 5A. Pago con tarjeta: Creem como comerciante registrado (merchant of record)
+
+Una cuenta que no se factura a través de Shopify puede pagar con tarjeta. En ese pago la venta no se realiza con nosotros, sino con Creem, que es la sociedad Armitage Labs OÜ (código de registro estonio 16977866, Rotermanni 14, Tallin 10111, Estonia). Creem actúa como comerciante registrado y revendedor contractual, y ejecuta la venta con usted en su propio nombre. Nosotros vendemos a Creem, y Creem le vende a usted.
+
+Lo que eso significa en la práctica:
+
+- **La factura.** Creem emite la factura en su propio nombre. Nosotros no emitimos ninguna factura ni recibo por esa transacción y no le cobramos por ella por ninguna otra vía.
+- **El impuesto.** El IVA, el impuesto sobre las ventas y cualquier otro impuesto indirecto son calculados, recaudados y declarados por Creem según su dirección de facturación, y el importe final se le muestra antes de pagar. El precio que figura en la página de precios no incluye ese impuesto.
+- **El Servicio en sí sigue siendo nuestra responsabilidad.** La prestación del Servicio, su calidad, su soporte y su conformidad con la ley son únicamente nuestras. Creem no asume responsabilidad alguna por ellas.
+- **Reembolsos.** Un reembolso o un contracargo sobre esa transacción los ejecuta únicamente Creem, conforme a las condiciones de elegibilidad de estos términos, es decir la sección 7, y a la ley aplicable. La solicitud de reembolso se dirige primero a nosotros, a la dirección de la sección 21 o mediante los datos del recibo que se le envió.
+- **El derecho de desistimiento de 14 días.** En ese pago, el consentimiento expreso de que el inicio inmediato de un servicio digital extingue el derecho de desistimiento se presta en la pantalla de pago de Creem. El efecto es el mismo que se describe en la sección 7.2.
+- **Los Términos de Comprador de Creem.** Además de estos términos, a usted le resultan aplicables los Términos de Comprador de Creem, disponibles en [creem.io/buyer-terms](https://www.creem.io/buyer-terms). Rigen la venta que ella ejecuta, no el Servicio que nosotros prestamos.
+
+El pago a través de PayPal y el pago a través de Shopify no cambian: allí el vendedor es la Empresa, como se describe en la sección 5.
+
 ## 6. Cancelación
 
 Usted puede cancelar la renovación de su suscripción en cualquier momento desde la configuración de su cuenta. El acceso al Servicio se mantendrá hasta el final del período de facturación que ya haya sido pagado. No se concederá la cancelación retroactiva de un período que ya haya sido pagado, salvo en los casos exigidos por la ley aplicable.
@@ -54,6 +69,8 @@ Las tarifas de suscripción no son reembolsables respecto de un período que ya 
 **7.3 Consumidores en Israel.** La Ley de Protección al Consumidor de Israel, 5741-1981 (Consumer Protection Law, 5741-1981), y los reglamentos dictados en virtud de ella confieren al consumidor —quien compra sin fines comerciales— derechos de cancelación en una venta a distancia y en una transacción continuada. Nada de lo dispuesto en estos términos menoscaba esos derechos.
 
 **7.4** Las secciones 7.1 a 7.3 se aplican únicamente a los consumidores particulares. Para los clientes empresariales, la política de reembolso de la sección 7 se aplica sin modificaciones.
+
+**7.5 Un pago realizado con tarjeta.** En una transacción ejecutada a través de Creem, el reembolso lo realiza Creem y no nosotros, conforme a las condiciones de elegibilidad de esta sección y a la ley. Véase la sección 5A.
 
 ## 8. Límites de uso
 
@@ -228,4 +245,4 @@ Para cualquier consulta sobre estos términos o sobre el Servicio, póngase en c
 Número de sociedad: 517274346
 Correo electrónico: [oren@gotop.co.il](mailto:oren@gotop.co.il)
 
-Última actualización: 9 de octubre de 2026
+Última actualización: 10 de octubre de 2026
