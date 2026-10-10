@@ -7,6 +7,13 @@
 -- until the Creem routes are turned on, and they are behind CREEM_ENABLED,
 -- which is off.
 --
+-- APPLIED to the production Supabase project (pmzicbtulloeynsosseh) on
+-- 10 Oct 2026, on Oren's explicit word, and recorded there as version
+-- 20261010150044 — which is why this file carries that number rather than
+-- the one it was written under. Verified afterwards: the column exists with
+-- its comment, the partial unique index exists (1), the CHECK exists (1),
+-- and of the 30 rows none carries a Creem id.
+--
 -- NOTE FOR WHOEVER APPLIES IT: this project's Vercel preview shares the
 -- production Supabase database, so there is no such thing as applying this
 -- "to preview" — it is production either way.

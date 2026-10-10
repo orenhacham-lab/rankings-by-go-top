@@ -11,7 +11,7 @@
  * so a caller supplies exactly one provider's subscription id and cannot
  * supply both — which is also what the database refuses
  * (subscriptions_one_provider_per_row, added in
- * 20261010150000_creem_subscription_id.sql). A row carrying two providers'
+ * 20261010150044_creem_subscription_id.sql). A row carrying two providers'
  * ids would be an account billed twice for one entitlement.
  *
  * The original header, which is still the whole point of the function:

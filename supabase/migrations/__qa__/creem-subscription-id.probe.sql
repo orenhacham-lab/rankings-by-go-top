@@ -1,5 +1,5 @@
 -- ============================================================================
--- EXECUTED PROBE — 20261010150000_creem_subscription_id.sql
+-- EXECUTED PROBE — 20261010150044_creem_subscription_id.sql
 --
 -- Applies, in a DISPOSABLE PostgreSQL cluster, a stand-in for the
 -- `subscriptions` table as production holds it (including the PayPal unique
@@ -73,7 +73,7 @@ $$;
 SELECT chk('before', 'there is nowhere to record a Creem subscription', NOT has_column('creem_subscription_id'));
 
 -- ── the migration ──────────────────────────────────────────────────────────
-\i supabase/migrations/20261010150000_creem_subscription_id.sql
+\i supabase/migrations/20261010150044_creem_subscription_id.sql
 
 -- ── after ──────────────────────────────────────────────────────────────────
 SELECT chk('after', 'the column exists', has_column('creem_subscription_id'));
@@ -115,7 +115,7 @@ SELECT chk('exclusive', 'a row with neither provider is still fine',
     WHERE paypal_subscription_id IS NULL AND creem_subscription_id IS NULL) > 0);
 
 -- ── idempotent ─────────────────────────────────────────────────────────────
-\i supabase/migrations/20261010150000_creem_subscription_id.sql
+\i supabase/migrations/20261010150044_creem_subscription_id.sql
 
 SELECT chk('idempotent', 'a second run leaves the Creem row alone',
   (SELECT creem_subscription_id FROM public.subscriptions
