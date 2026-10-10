@@ -7,6 +7,7 @@
  */
 import { authContentProject, isContentModuleEnabled } from '@/lib/content/api-auth'
 import { handleStrategyGet } from '@/lib/content/strategy/http'
+import { getUserEntitlement } from '@/lib/subscription'
 
 export const dynamic = 'force-dynamic'
 
@@ -14,5 +15,10 @@ export async function GET(request: Request) {
   return handleStrategyGet(request, {
     enabled: () => isContentModuleEnabled(),
     auth: (projectId) => authContentProject(projectId),
+    // The top-up's own condition, read from the same place it reads it.
+    entitled: async (userId, admin) => {
+      const e = await getUserEntitlement(userId, admin)
+      return e.isAdmin || e.hasActiveSubscription
+    },
   })
 }

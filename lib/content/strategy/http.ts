@@ -32,9 +32,16 @@ export type StrategyAuth =
 export type StrategyRouteDeps = {
   enabled: () => boolean
   auth: (projectId: string | null) => Promise<StrategyAuth>
+  /**
+   * Does the monthly top-up approve this owner's ideas by itself? The SAME condition
+   * topic-topup.ts applies (an admin, or an active subscription), so the screen cannot
+   * promise an automation that skips this account. Unreadable reads as false: the
+   * screen then asks the merchant to approve, which is what it did before this field.
+   */
+  entitled: (userId: string, admin: ServiceRoleClient) => Promise<boolean>
 }
 
-export type StrategyGetResponse = ({ ok: true } & StrategyData) | { ok: false; code: 'not_found' | 'internal' | 'unauthorized' | 'forbidden' | 'invalid_request' }
+export type StrategyGetResponse = ({ ok: true; autoTopics: boolean } & StrategyData) | { ok: false; code: 'not_found' | 'internal' | 'unauthorized' | 'forbidden' | 'invalid_request' }
 
 const NO_STORE = { 'cache-control': 'no-store' }
 /** PostgREST / Postgres "relation does not exist". */
@@ -86,13 +93,14 @@ export async function handleStrategyGet(request: Request, deps: StrategyRouteDep
   const owned = (table: string, cols: string) => admin.from(table).select(cols).eq('project_id', project.id).eq('user_id', user.id)
 
   try {
-    const [ideaRows, approvedRows, topicRows, articleRows] = await Promise.all([
+    const [ideaRows, approvedRows, topicRows, articleRows, autoTopics] = await Promise.all([
       rows(owned('content_topic_ideas', 'id, title, primary_keyword, suggestion_reason, score, source, created_at').eq('status', 'pending')),
       // An approved idea became a topic: its reason is that topic's "why".
       // source_context 'auto_topup' marks the topics the monthly top-up prepared.
       rows(owned('content_topic_ideas', 'approved_topic_id, suggestion_reason, source, source_context, approved_at').eq('status', 'approved')),
       rows(owned('article_topics', 'id, topic, primary_keyword, status, source, suggestion_reason, created_at').neq('status', 'rejected')),
       rows(owned('generated_articles', 'id, topic_id, title, status, scheduled_at, published_at, created_at')),
+      Promise.resolve().then(() => deps.entitled(user.id, admin)).catch(() => false),
     ])
 
     const approvedReason = new Map<string, string>()
@@ -135,7 +143,7 @@ export async function handleStrategyGet(request: Request, deps: StrategyRouteDep
       })
     }
 
-    return Response.json({ ok: true, ideas, topics, articles } satisfies StrategyGetResponse, { status: 200, headers: NO_STORE })
+    return Response.json({ ok: true, ideas, topics, articles, autoTopics } satisfies StrategyGetResponse, { status: 200, headers: NO_STORE })
   } catch {
     return refuse(500, 'internal')
   }

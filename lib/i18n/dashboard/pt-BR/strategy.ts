@@ -15,6 +15,7 @@ export const strategyPtBR: DeepPartial<DashboardDictionary> = {
     nextPaused: 'A publicação automática está pausada',
     first: {
       approveHint: 'Ao aprovar, escrevemos seu primeiro artigo na hora (conta na sua cota)',
+      approveHintTrial: 'Seu primeiro artigo está incluído no teste. Aprove um tema e começamos a escrevê-lo agora.',
       writingTitle: 'Escrevendo seu primeiro artigo…',
       writingBody: 'Isso leva alguns minutos. Você pode sair da página; a redação continua sem você.',
       readyTitle: 'Seu primeiro artigo está pronto',
@@ -187,6 +188,9 @@ export const strategyPtBR: DeepPartial<DashboardDictionary> = {
       approve: 'Você aprova as ideias',
       approveBody: (n: string) => `${n} ideias aguardam sua aprovação.`,
       approveNone: 'Neste momento não há nenhuma ideia aguardando sua aprovação.',
+      prepared: 'Nós preparamos os temas',
+      preparedBody: (n: string) => `${n} temas estão prontos para os próximos meses. O que o próximo mês precisa já está na fila.`,
+      preparedNone: 'Os temas do próximo mês já estão na fila. Preparamos mais antes que acabem.',
       write: 'Os artigos são escritos na ordem da fila',
       writeBody: (date: string) => `O próximo artigo da fila está previsto para ${date}.`,
       writeNone: 'Um tema aprovado entra na fila de publicação e é escrito quando chega a sua vez.',

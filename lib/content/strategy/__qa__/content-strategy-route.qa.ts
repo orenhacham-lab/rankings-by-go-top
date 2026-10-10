@@ -62,6 +62,7 @@ function deps(admin: FakeAdmin, over: Partial<StrategyRouteDeps> = {}, seen: { a
       if (projectId !== P) return { error: 'Project not found', status: 404 }
       return { user: { id: OWNER }, admin: admin as never, project: { id: P, user_id: OWNER } } satisfies StrategyAuth
     },
+    entitled: async () => true,
     ...over,
   }
 }
@@ -100,6 +101,30 @@ async function main() {
     check('G6: the route wires the content module flag and the content auth, and answers GET only', wired(src))
     check('G-MUT: a route that skips the content auth fails G6', !wired(src.replace('authContentProject(projectId)', "({ user: { id: 'x' } } as never)")))
     check('G-MUT2: a route that also answers POST fails G6', !wired(src + '\nexport async function POST() {}'))
+  }
+
+  // ── A) the top-up's own condition reaches the screen ──────────────────────
+  console.log("\nA) autoTopics: whether the top-up approves this owner's ideas")
+  {
+    const on = await call(new FakeAdmin(tables()), P, { entitled: async () => true })
+    check('A1: an entitled owner is told the topics are prepared for them', on.body.autoTopics === true)
+    const off = await call(new FakeAdmin(tables()), P, { entitled: async () => false })
+    check('A2: an owner the top-up skips is not: the screen asks them to approve', off.body.autoTopics === false)
+    let sawUser = ''
+    await call(new FakeAdmin(tables()), P, { entitled: async (userId) => { sawUser = userId; return true } })
+    check("A3: the entitlement is read for the project's owner", sawUser === OWNER)
+    const broken = await call(new FakeAdmin(tables()), P, { entitled: async () => { throw new Error('billing read down: secret') } })
+    const missing = await call(new FakeAdmin(tables()), P, { entitled: undefined as never })
+    check('A4b: a caller that wired no entitlement at all still gets the board, without the claim',
+      missing.status === 200 && missing.body.ok === true && missing.body.autoTopics === false)
+    check('A4: an unreadable entitlement fails closed and leaks nothing, the rest of the board still answers',
+      broken.status === 200 && broken.body.ok === true && broken.body.autoTopics === false && !/secret/.test(broken.text))
+    const routeSrc = strip(read('app/api/content/strategy/route.ts'))
+    const sameCondition = (x: string) => /getUserEntitlement\(userId, admin\)/.test(x) && /e\.isAdmin \|\| e\.hasActiveSubscription/.test(x)
+    check('A5: the route reads the SAME condition the monthly top-up applies', sameCondition(routeSrc))
+    const topup = strip(read('lib/content/automation/topic-topup.ts'))
+    check('A6: and the top-up still applies it', /e\.isAdmin \|\| e\.hasActiveSubscription/.test(topup))
+    check('A-MUT: a route that calls every signed-in owner entitled fails A5', !sameCondition(routeSrc.replace('e.isAdmin || e.hasActiveSubscription', 'true')))
   }
 
   // ── O) owner filters ──────────────────────────────────────────────────────

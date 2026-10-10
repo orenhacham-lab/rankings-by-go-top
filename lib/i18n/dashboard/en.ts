@@ -2369,6 +2369,7 @@ export const dashboardEn = {
     // (lib/content/strategy/first-article.ts). "Publish now" is offered for it only.
     first: {
       approveHint: 'Approving writes your first article right away (counts toward your allowance)',
+      approveHintTrial: 'Your first article is included in the trial. Approve a topic and we start writing it now.',
       writingTitle: 'Writing your first article…',
       writingBody: 'This takes a few minutes. You can leave the page; the writing carries on without you.',
       readyTitle: 'Your first article is ready',
@@ -2546,6 +2547,9 @@ export const dashboardEn = {
       approve: 'You approve ideas',
       approveBody: (n: string) => `${n} ideas are waiting for your approval.`,
       approveNone: 'No idea is waiting for your approval right now.',
+      prepared: 'We prepare the topics',
+      preparedBody: (n: string) => `${n} topics are ready for the coming months. What the next month needs is already in the queue.`,
+      preparedNone: 'The next month\u2019s topics are already in the queue. We prepare more before they run out.',
       write: 'Articles are written in queue order',
       writeBody: (date: string) => `The next article in the queue is planned for ${date}.`,
       writeNone: 'An approved topic joins the publishing queue and is written in its turn.',

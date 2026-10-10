@@ -133,6 +133,20 @@ function main() {
     }
     check('S3: row 0 (the scan), row 1 (the next article), row 2 (the board) in that order', order(screen))
     check('S3-MUT: the board above the next article fails S3', !order(screen.replace('<NextArticleCard', '<XNext').replace('<StrategyBoard', '<NextArticleCard').replace('<XNext', '<StrategyBoard')))
+
+    // The trial's first article is included, so the hint under "approve" says that
+    // instead of naming an allowance the trial user has not bought.
+    const nextCard = src['NextArticleCard.tsx']
+    const trialHint = (s: string) => /\{onTrial \? s\.first\.approveHintTrial : s\.first\.approveHint\}/.test(s)
+      && /\{automation && !hasArticles && \(/.test(s)
+    check('S4: the first-article hint has a trial wording, shown only before the project has an article', trialHint(nextCard))
+    check('S4-MUT: one hint for everyone fails S4', !trialHint(nextCard.replace('{onTrial ? s.first.approveHintTrial : s.first.approveHint}', '{s.first.approveHint}')))
+    const trialWired = (s: string) => /onTrial=\{strategy\.onTrial\}/.test(s)
+    check('S5: the screen takes the trial flag from the data it already reads', trialWired(screen))
+    check('S5-MUT: a hard-coded trial fails S5', !trialWired(screen.replace('onTrial={strategy.onTrial}', 'onTrial={true}')))
+    const fromRhythm = (s: string) => /\(rhythm as \{ source\?: unknown \}\)\.source === 'trial'/.test(s)
+    check("S6: and the flag is the queue route's own trial rhythm, not a guess", fromRhythm(src['useStrategyData.ts']))
+    check('S6-MUT: reading it from anything else fails S6', !fromRhythm(src['useStrategyData.ts'].replace("(rhythm as { source?: unknown }).source === 'trial'", 'true')))
   }
 
   // ── I) copy ───────────────────────────────────────────────────────────────

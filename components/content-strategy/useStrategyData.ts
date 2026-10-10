@@ -38,6 +38,17 @@ export type StrategyLoad = {
   seed: SeedPlan
   /** The scan's route answered: the mapping can be offered for this project (its flag, or an admin). */
   mappingAvailable: boolean
+  /**
+   * The publishing queue's route says this owner is on the free trial (its rhythm has
+   * no plan behind it). False when it is a paid plan, an admin, or it could not be read.
+   */
+  onTrial: boolean
+  /**
+   * The board's route says the monthly top-up approves this owner's ideas by itself.
+   * It still needs an active publishing queue to reach an article, so the screen
+   * reads it together with queueActive. False whenever the route did not say so.
+   */
+  autoTopics: boolean
   reload: () => void
 }
 
@@ -74,6 +85,14 @@ function readQueueActive(ok: boolean, body: unknown): boolean | null {
   return typeof active === 'boolean' ? active : null
 }
 
+/** `rhythm.source` from the queue's route: 'trial' is the free trial's own flag. */
+function readOnTrial(ok: boolean, body: unknown): boolean {
+  if (!ok || !body || typeof body !== 'object') return false
+  const rhythm = (body as { rhythm?: unknown }).rhythm
+  if (!rhythm || typeof rhythm !== 'object') return false
+  return (rhythm as { source?: unknown }).source === 'trial'
+}
+
 function readSeed(ok: boolean, body: unknown): SeedPlan {
   if (!ok || !body || typeof body !== 'object') return NO_SEED_PLAN
   const run = (body as { run?: unknown }).run
@@ -87,6 +106,11 @@ function readBoard(ok: boolean, body: unknown): StrategyData | null {
   return { ideas: b.ideas, topics: b.topics, articles: b.articles }
 }
 
+function readAutoTopics(ok: boolean, body: unknown): boolean {
+  if (!ok || !body || typeof body !== 'object') return false
+  return (body as { autoTopics?: unknown }).autoTopics === true
+}
+
 /**
  * @param refreshKey changes whenever the workspace reloads its topics, articles or
  *   queue (an approval, a generation, a publish), so the board follows every control
@@ -95,7 +119,7 @@ function readBoard(ok: boolean, body: unknown): StrategyData | null {
 export function useStrategyData(projectId: string, refreshKey: unknown): StrategyLoad {
   // Tagged with the project it belongs to: a new project reads as loading until its own
   // answer lands, so the previous project's plan is never shown under the new one.
-  const [state, setState] = useState<Omit<StrategyLoad, 'reload'> & { projectId: string }>({ projectId: '', status: 'loading', data: null, queue: null, queueActive: null, seed: NO_SEED_PLAN, mappingAvailable: false })
+  const [state, setState] = useState<Omit<StrategyLoad, 'reload'> & { projectId: string }>({ projectId: '', status: 'loading', data: null, queue: null, queueActive: null, seed: NO_SEED_PLAN, mappingAvailable: false, autoTopics: false, onTrial: false })
   const request = useRef(0)
   const [tick, setTick] = useState(0)
   const reload = useCallback(() => setTick((n) => n + 1), [])
@@ -122,12 +146,14 @@ export function useStrategyData(projectId: string, refreshKey: unknown): Strateg
           queueActive: readQueueActive(queue.ok, queue.body),
           seed: readSeed(seed.ok, seed.body),
           mappingAvailable: seed.ok && !!seed.body && typeof seed.body === 'object' && (seed.body as { ok?: unknown }).ok === true,
+          autoTopics: readAutoTopics(board.ok, board.body),
+          onTrial: readOnTrial(queue.ok, queue.body),
         }))
       } catch {
         if (mine === request.current) {
           setState((prev) => (prev.projectId === projectId && prev.data
             ? { ...prev, status: 'ready' }
-            : { projectId, status: 'error', data: null, queue: null, queueActive: null, seed: NO_SEED_PLAN, mappingAvailable: false }))
+            : { projectId, status: 'error', data: null, queue: null, queueActive: null, seed: NO_SEED_PLAN, mappingAvailable: false, autoTopics: false, onTrial: false }))
         }
       }
     }, 120)
@@ -150,6 +176,6 @@ export function useStrategyData(projectId: string, refreshKey: unknown): Strateg
     return () => window.clearInterval(id)
   }, [projectId, building, reload])
 
-  if (!current) return { status: 'loading', data: null, queue: null, queueActive: null, seed: NO_SEED_PLAN, mappingAvailable: false, reload }
-  return { status: state.status, data: state.data, queue: state.queue, queueActive: state.queueActive, seed: state.seed, mappingAvailable: state.mappingAvailable, reload }
+  if (!current) return { status: 'loading', data: null, queue: null, queueActive: null, seed: NO_SEED_PLAN, mappingAvailable: false, autoTopics: false, onTrial: false, reload }
+  return { status: state.status, data: state.data, queue: state.queue, queueActive: state.queueActive, seed: state.seed, mappingAvailable: state.mappingAvailable, autoTopics: state.autoTopics, onTrial: state.onTrial, reload }
 }
