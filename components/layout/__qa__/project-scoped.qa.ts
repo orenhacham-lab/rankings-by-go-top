@@ -101,6 +101,7 @@ const NESTED_EXEMPT: Record<string, string> = {
   'admin/articles/page.tsx': 'an internal admin list, across projects',
   'admin/articles/new/page.tsx': 'an internal admin editor',
   'admin/articles/[id]/page.tsx': 'an internal admin editor',
+  'admin/affiliates/page.tsx': 'the operator screen for the partner program, which has no project',
   'admin/logs/page.tsx': 'internal logs, across projects',
   'clients/[id]/page.tsx': 'one client and the projects under it',
   'projects/new/page.tsx': 'creating a project, before one is active',
