@@ -138,7 +138,7 @@ Yes. The plugin only carries out what you do in GO TOP.
 
 = Do I still need an application password? =
 
-No. Once the plugin is connected, GO TOP publishes and applies fixes through it.
+No. Once the plugin is connected, GO TOP publishes and applies fixes through it. A password you gave us earlier stays stored and is used in one case only: when the plugin refuses to update the post GO TOP recorded for an article.
 
 = Does it work with Yoast SEO or Rank Math? =
 
