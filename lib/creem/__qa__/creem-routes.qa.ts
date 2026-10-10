@@ -112,6 +112,19 @@ console.log('\nC) the checkout route refuses in the right order')
   check('C1-MUT4: dropping the ILS refusal is caught',
     !ordered(checkout.replace("if (market === 'ILS') {", 'if (false) {')))
 
+  // Sandbox mode must not hand a real visitor a sandbox checkout: they would
+  // enter card details against Creem's test environment and believe they had
+  // paid. This is also what makes it safe to point Creem's test environment
+  // at a real domain, rather than weakening the deployment protection that
+  // covers everything else.
+  const sandboxGated = (src: string) =>
+    src.indexOf('creemMayWriteToAccount(user.id)') > src.indexOf('auth.getUser()')
+    && src.indexOf('creemMayWriteToAccount(user.id)') < src.indexOf('createCreemCheckout(')
+  check('C1b: in sandbox mode the route serves only the configured test accounts, before any checkout exists',
+    sandboxGated(checkout))
+  check('C1b-MUT: dropping the sandbox restriction is caught',
+    !sandboxGated(checkout.replace('creemMayWriteToAccount(user.id)', 'true')))
+
   check('C2: the payer is never told which country is restricted',
     /restricted_country/.test(checkout) && !/restricted\.country/.test(checkout))
 

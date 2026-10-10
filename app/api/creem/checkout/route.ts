@@ -7,7 +7,7 @@ import { resolveBillingMarket, storedMarketOf } from '@/lib/billing/server-marke
 import { logRestrictedAttempt, restrictionForRequest } from '@/lib/sanctions/guard'
 import { createCreemCheckout } from '@/lib/creem/client'
 import { creemProductIdFor } from '@/lib/creem/checkout-products'
-import { creemReadiness, creemSuccessUrl, isCreemEnabled } from '@/lib/creem/config'
+import { creemMayWriteToAccount, creemReadiness, creemSuccessUrl, isCreemEnabled } from '@/lib/creem/config'
 
 /**
  * Opens a Creem checkout for one plan and hands the browser the URL to pay
@@ -80,6 +80,17 @@ export async function POST(request: Request) {
     if (market === 'ILS') {
       console.warn('[creem-checkout] refused: this account bills in ILS, which is the PayPal path', { userId: user.id })
       return Response.json({ error: 'Not available', reason: 'market_not_supported' }, { status: 409 })
+    }
+
+    // In sandbox mode this route serves ONLY the configured test accounts
+    // (lib/creem/config.ts), so a real visitor can never be handed a sandbox
+    // checkout and be left thinking they have paid. Inert in live mode. This
+    // is what makes it safe to point Creem's test environment at a real
+    // domain for an end-to-end run, instead of weakening the deployment
+    // protection that covers everything else.
+    if (!creemMayWriteToAccount(user.id)) {
+      console.warn('[creem-checkout] refused: sandbox mode serves only the configured test accounts', { userId: user.id })
+      return Response.json({ error: 'Not available', reason: 'sandbox_mode' }, { status: 503 })
     }
 
     const productId = creemProductIdFor(plan)
