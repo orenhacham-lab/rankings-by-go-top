@@ -257,6 +257,12 @@ check('MUTATION — an English-only extra section is caught', pages.he.terms.h2 
     'partners.shopify.com': { en: /Shopify/, he: /Shopify/ },
     'supabase.com': { en: /Supabase/, he: /Supabase/ },
     'graph.facebook.com': { en: /Conversions API/, he: /Conversions API/ },
+    // Creem is a payment provider, so it is a recipient whatever the state of its
+    // off switch: the sharing list says what we send it when a payment goes through
+    // it. Both hosts are listed because the mode is an explicit variable
+    // (lib/creem/config.ts), and the sandbox host receives the same shape.
+    'api.creem.io': { en: /Creem/, he: /Creem/ },
+    'test-api.creem.io': { en: /Creem/, he: /Creem/ },
   }
   /**
    * Hosts that receive nothing about a customer, each with the reason it is

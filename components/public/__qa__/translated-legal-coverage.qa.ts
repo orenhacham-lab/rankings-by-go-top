@@ -1894,6 +1894,63 @@ const SEO_COMPLETION_NAMES = ['a missing SEO field may be completed later', 'an 
     !SEO_COMPLETION.en[2].test(flat('Such a completion fills only a missing field, never replaces a value that exists, and applies to any page on your site.')))
 }
 
+// ── 25) Creem, the payment provider, in every language ─────────────────────
+/*
+ * lib/creem/config.ts ships two hosts, so legal-coverage.qa.ts requires the
+ * provider to be named in the he and en policies. That guard knows nothing
+ * about es and pt-BR, and a provider disclosed in two languages out of four is
+ * undisclosed to the customers reading the other two.
+ *
+ * The sentence is derived from the code, not from what Creem is for: the
+ * checkout call in lib/creem/client.ts sends the product id, our request id
+ * and, when there is one, the customer's e-mail, and the subscription read
+ * returns an id, a status, a product, a customer id and the period dates. So
+ * the policy names the e-mail address and says card details never reach us,
+ * and it must keep saying that only while the code sends nothing more. A
+ * caller that puts anything about a customer into `metadata` makes this
+ * paragraph wrong, which is why the metadata is named here and not only in
+ * the thread that built it.
+ */
+const CREEM_SHARED: Record<string, RegExp> = {
+  he: /Creem:<\/strong> לעיבוד תשלומים, כאשר התשלום של החשבון עובר דרכו/,
+  en: /Creem:<\/strong> for payment processing, where an account&rsquo;s payment goes through it/,
+  es: /\*\*Creem:\*\* para el procesamiento de pagos, cuando el pago de una cuenta pasa por él/,
+  'pt-BR': /\*\*Creem:\*\* para processar pagamentos, quando o pagamento de uma conta passa por ele/,
+}
+const CREEM_NO_CARD: Record<string, RegExp> = {
+  he: /פרטי כרטיס,\s+וכל אמצעי תשלום אחר, אינם מגיעים אלינו בשום שלב/,
+  en: /Card details, and any other\s+payment instrument, never reach us at any point/,
+  es: /Los datos de la tarjeta, y cualquier otro instrumento de pago, no llegan a nosotros en ningún momento/,
+  'pt-BR': /Os dados do cartão, e qualquer outro meio de pagamento, nunca chegam a nós em nenhum momento/,
+}
+const CREEM_EMAIL: Record<string, RegExp> = {
+  he: /כתובת הדוא&rdquo;ל של החשבון/,
+  en: /the e-mail address of the account/,
+  es: /la dirección de correo electrónico de la cuenta/,
+  'pt-BR': /o endereço de e-mail da conta/,
+}
+{
+  const enSource = frontMatter(text[LOCALES[0]].privacy).source
+  const pages: [string, string][] = [
+    ['he', existsSync(HEBREW_PRIVACY) ? readFileSync(HEBREW_PRIVACY, 'utf8') : ''],
+    ['en', enSource && existsSync(enSource) ? readFileSync(enSource, 'utf8') : ''],
+    ...LOCALES.map((l): [string, string] => [l, text[l].privacy]),
+  ]
+  for (const [name, src] of pages) {
+    check(`${name}/privacy: the page was read`, src.length > 0)
+    check(`${name}/privacy: Creem is named as a payment recipient`, (CREEM_SHARED[name] ?? /$^/).test(src))
+    check(`${name}/privacy: it says what we send, starting with the account e-mail`, (CREEM_EMAIL[name] ?? /$^/).test(src))
+    check(`${name}/privacy: it says no payment instrument reaches us`, (CREEM_NO_CARD[name] ?? /$^/).test(src))
+  }
+  check('mutation control: a policy that names Creem without saying what we send it is caught',
+    !CREEM_EMAIL.en.test('Creem: for payment processing, where an account&rsquo;s payment goes through it.'))
+  check('mutation control: a policy that drops the no-card-details sentence is caught',
+    !CREEM_NO_CARD.es.test('**Creem:** para el procesamiento de pagos. Recibimos el estado de la suscripción.'))
+  check('mutation control: a policy that claims we store the payment instrument is caught',
+    !CREEM_NO_CARD['pt-BR'].test('Os dados do cartão são guardados por nós para a próxima cobrança.'))
+}
+
+
 console.log(`\n${pass} passed, ${fail} failed`)
 if (fail > 0) process.exit(1)
 

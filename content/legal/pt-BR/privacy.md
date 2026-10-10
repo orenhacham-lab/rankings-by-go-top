@@ -51,6 +51,7 @@ Não compartilhamos as suas informações pessoais com terceiros, exceto:
 
 - **Shopify:** para processar o pagamento de contas cobradas pelo Shopify App Pricing e para publicar conteúdo em uma loja conectada
 - **PayPal:** para processar o pagamento somente de clientes cobrados pelo site
+- **Creem:** para processar pagamentos, quando o pagamento de uma conta passa por ele. Ao abrir um pagamento enviamos o endereço de e-mail da conta, o identificador do plano escolhido e a nossa própria referência daquela solicitação, e recebemos de volta um identificador de cliente no sistema deles, um identificador de plano, o status da assinatura e as datas do período de cobrança. Os dados do cartão, e qualquer outro meio de pagamento, nunca chegam a nós em nenhum momento
 - **Supabase:** para armazenamento seguro de dados
 - **Serper:** para consultas na busca do Google e verificações de posição
 - **Resend:** para o envio de e-mail — veja «Mensagens de e-mail» abaixo
