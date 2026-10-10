@@ -1,3 +1,4 @@
+import { authorPersonSchema } from '@/lib/articles/authors'
 import { buildHreflangAlternates } from '@/lib/seo/hreflang'
 
 export const metadata = {
@@ -34,6 +35,10 @@ const breadcrumbSchema = {
   ],
 }
 
+// The Person the articles' JSON-LD points here with `url`. Without it the
+// link lands on a page that never says who the author is.
+const personSchema = authorPersonSchema('אורן חכם', 'es')
+
 export default function SpanishAboutLayout({ children }: { children: React.ReactNode }) {
   return (
     <>
@@ -41,6 +46,12 @@ export default function SpanishAboutLayout({ children }: { children: React.React
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumbSchema) }}
       />
+      {personSchema && (
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{ __html: JSON.stringify(personSchema) }}
+        />
+      )}
       {children}
     </>
   )

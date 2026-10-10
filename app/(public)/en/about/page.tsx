@@ -17,7 +17,7 @@ const COPY: AboutCopy = {
       'The platform grew out of our day-to-day work with clients: we saw which reports people actually understand, which data helps them decide, and where the time goes. So we built one place where content gets written, published and measured, in Google and in AI engines.',
     ],
   },
-  stat: { value: '11+', label: 'years of experience', sub: 'in SEO and digital marketing' },
+  founderEyebrow: 'The person behind it',
   gaps: {
     title: 'What was missing, and what we built instead',
     body: 'We wanted a business to be able to do everything it takes to get found, in one place, without having to learn SEO.',

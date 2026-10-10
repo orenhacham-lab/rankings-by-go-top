@@ -51,7 +51,9 @@ export function ArticleAuthorBox({ locale, author }: { locale: PublicLocale; aut
         <div className="min-w-0">
           <p className="text-section font-semibold text-ink">{name}</p>
           <p className="mt-0.5 text-copy text-muted">{profile.role[locale]}</p>
-          <p className="mt-3 text-copy text-body text-pretty">{profile.bio[locale]}</p>
+          <p className="mt-3 text-copy text-body text-pretty">
+            {profile.bio[locale]} {profile.articleNote[locale]}
+          </p>
           <Link
             href={profile.href[locale]}
             className="mt-4 inline-flex items-center gap-1.5 text-copy font-semibold text-action underline-offset-4 hover:underline"
