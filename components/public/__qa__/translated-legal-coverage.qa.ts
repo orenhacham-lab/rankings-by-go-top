@@ -1555,7 +1555,7 @@ console.log('\nmutation controls')
     AGREEMENT_LINK_DIES.es.test('Cuando este acuerdo termine, su enlace de referido deja de funcionar.'))
   check('a footer date that drifts from the written date is caught',
     writtenRevisionDate('es', text.es.terms)
-      !== frontMatter(text.es.terms.replace('lastUpdated: 2026-10-09', 'lastUpdated: 2026-10-06')).lastUpdated
+      !== frontMatter(text.es.terms.replace('lastUpdated: 2026-10-10', 'lastUpdated: 2026-10-06')).lastUpdated
       && writtenRevisionDate('es', text.es.terms) === frontMatter(text.es.terms).lastUpdated)
   check('a revision date read out of a statute sentence instead of the footer is caught',
     writtenRevisionDate('es', 'La Enmienda 13 entró en vigor el 14 de agosto de 2025.') === null)
@@ -1950,6 +1950,110 @@ const CREEM_EMAIL: Record<string, RegExp> = {
     !CREEM_NO_CARD['pt-BR'].test('Os dados do cartão são guardados por nós para a próxima cobrança.'))
 }
 
+
+// ── 26) Creem as the merchant of record, in every language ─────────────────
+/*
+ * Creem's Merchant Terms 3.7 is an obligation on us, not an option: the
+ * Merchant "shall ensure that Buyers are clearly informed, before completing a
+ * transaction through the Service, that the payment will be processed by Creem
+ * as the merchant of record", and it names the terms of sale as an acceptable
+ * place. 3.8 adds that Creem's Buyer Terms must be put in front of the buyer in
+ * the same way. So this text is contractually required before the first real
+ * charge, and a language missing it is a language in which we are in breach.
+ *
+ * Every line below is a clause, not a description of what Creem is for:
+ *   - the seller is Armitage Labs OÜ, registry code 16977866 (Merchant Terms
+ *     2.1.5), selling in its own name as merchant of record and contractual
+ *     reseller (3.2, 17.1). The entity and the number are pinned because
+ *     "Creem" alone does not tell a customer who they bought from.
+ *   - Creem invoices the buyer in its own name (9.2) and we may not issue any
+ *     invoice or receipt, demand payment, or account for tax (9.3.1-9.3.3).
+ *   - indirect tax is calculated, collected and remitted by Creem on the
+ *     buyer's billing address (9.1, 3.3.4), which is why the price shown is
+ *     stated NOT to include it; an EU consumer must see a tax-inclusive final
+ *     price before paying, and Creem's checkout is where that happens.
+ *   - refunds and chargebacks are executed exclusively by Creem (Buyer Terms
+ *     9.3) — but on the eligibility criteria in the product's own terms, which
+ *     means section 7 of ours. That is why the text says refunds run through
+ *     Creem WITHOUT softening section 7 into a promise we do not make.
+ *   - the service itself stays ours (17.1.1, 17.1.2), so no reader can conclude
+ *     that Creem supports, delivers or warrants it.
+ *
+ * The mutation controls below catch the two failures that would matter: a text
+ * that names Creem as a payment processor rather than the seller, and a text
+ * that implies the displayed price is the final one.
+ */
+const MOR_SELLER: Record<string, RegExp> = {
+  he: /Creem פועלת כמוכר הרשום וכמשווק מחדש/,
+  en: /Creem acts as the merchant\s+of record and contractual reseller/,
+  es: /Creem act[úu]a como comerciante registrado y revendedor contractual/,
+  'pt-BR': /A Creem atua como comerciante registrada e revendedora contratual/,
+}
+const MOR_ENTITY: Record<string, RegExp> = {
+  he: /Armitage Labs O&Uuml;[\s\S]{0,60}16977866/,
+  en: /Armitage Labs O&Uuml;[\s\S]{0,80}16977866/,
+  es: /Armitage Labs OÜ[\s\S]{0,60}16977866/,
+  'pt-BR': /Armitage Labs OÜ[\s\S]{0,60}16977866/,
+}
+const MOR_INVOICE: Record<string, RegExp> = {
+  he: /Creem מוציאה את החשבונית בשמה שלה/,
+  en: /Creem issues the invoice in its own name/,
+  es: /Creem emite la factura en su propio nombre/,
+  'pt-BR': /A Creem emite a fatura em nome pr[óo]prio/,
+}
+const MOR_TAX: Record<string, RegExp> = {
+  he: /המחיר שמופיע[\s\S]{0,40}אינו כולל מס כזה/,
+  en: /The price shown on the pricing page does not include such tax/,
+  es: /El precio que figura en la p[áa]gina de precios no incluye ese impuesto/,
+  'pt-BR': /O pre[çc]o que aparece na p[áa]gina de pre[çc]os n[ãa]o inclui esse imposto/,
+}
+const MOR_REFUND: Record<string, RegExp> = {
+  he: /מבוצעים על ידי Creem בלבד[\s\S]{0,80}סעיף 7/,
+  en: /carried out by\s+Creem alone[\s\S]{0,120}section 7/,
+  es: /los ejecuta [úu]nicamente Creem[\s\S]{0,120}secci[óo]n 7/,
+  'pt-BR': /executado somente pela Creem[\s\S]{0,120}se[çc][ãa]o 7/,
+}
+const MOR_SERVICE_OURS: Record<string, RegExp> = {
+  he: /Creem אינה נוטלת אחריות על אלה/,
+  en: /Creem takes no\s+responsibility for those/,
+  es: /Creem no asume responsabilidad alguna por ellas/,
+  'pt-BR': /A Creem n[ãa]o assume responsabilidade por nada disso/,
+}
+const MOR_BUYER_TERMS: Record<string, RegExp> = {
+  he: /creem\.io\/buyer-terms/,
+  en: /creem\.io\/buyer-terms/,
+  es: /creem\.io\/buyer-terms/,
+  'pt-BR': /creem\.io\/buyer-terms/,
+}
+{
+  const read = (path: string) => (existsSync(path) ? readFileSync(path, 'utf8') : '')
+  const enTermsSource = frontMatter(text[LOCALES[0]].terms).source
+  const docs: [string, string][] = [
+    ['he', read(HEBREW_TERMS)],
+    ['en', enTermsSource ? read(enTermsSource) : ''],
+    ...LOCALES.map((l): [string, string] => [l, text[l].terms]),
+  ]
+  for (const [name, terms] of docs) {
+    check(`${name}/terms: the page was read`, terms.length > 0)
+    check(`${name}/terms: Creem is named as merchant of record and reseller, not a processor`, (MOR_SELLER[name] ?? /$^/).test(terms))
+    check(`${name}/terms: the selling entity and its registry code are named`, (MOR_ENTITY[name] ?? /$^/).test(terms))
+    check(`${name}/terms: Creem invoices the buyer in its own name`, (MOR_INVOICE[name] ?? /$^/).test(terms))
+    check(`${name}/terms: the displayed price is stated not to include that tax`, (MOR_TAX[name] ?? /$^/).test(terms))
+    check(`${name}/terms: refunds run through Creem on section 7's criteria`, (MOR_REFUND[name] ?? /$^/).test(terms))
+    check(`${name}/terms: the service itself stays ours and Creem warrants none of it`, (MOR_SERVICE_OURS[name] ?? /$^/).test(terms))
+    check(`${name}/terms: Creem's own Buyer Terms are linked for the buyer (3.8)`, (MOR_BUYER_TERMS[name] ?? /$^/).test(terms))
+  }
+  check('mutation control: Creem described as a payment processor rather than the seller is caught',
+    !MOR_SELLER.en.test('Payments by card are processed for us by Creem, our payment provider, which handles the transaction.'))
+  check('mutation control: a text that leaves out the selling entity is caught',
+    !MOR_ENTITY.en.test('In such a payment the sale is made with Creem, which acts as the merchant of record.'))
+  check('mutation control: a price presented as the final one is caught',
+    !MOR_TAX.es.test('El precio que figura en la página de precios es el precio final, impuestos incluidos.'))
+  check('mutation control: a refund promise detached from section 7 is caught',
+    !MOR_REFUND.en.test('A refund on such a transaction is carried out by Creem alone, which decides it at its own discretion.'))
+  check('mutation control: Creem presented as responsible for the service is caught',
+    !MOR_SERVICE_OURS.en.test('Creem provides support for the service and warrants that it works as described.'))
+}
 
 console.log(`\n${pass} passed, ${fail} failed`)
 if (fail > 0) process.exit(1)

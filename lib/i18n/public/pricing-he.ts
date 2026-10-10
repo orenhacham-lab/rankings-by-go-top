@@ -30,6 +30,7 @@ export const pricingHe: PricingCopy = {
     dashboard: 'לדאשבורד שלי',
     noCard: 'בלי כרטיס אשראי',
     checksNote: CHECKS_EXPLAINER.he,
+    taxNote: 'בתשלום בכרטיס אשראי המוכר הרשום הוא Creem, והיא מחשבת מס לפי כתובת החיוב שלכם ומציגה את הסכום הסופי לפני התשלום. המחירים כאן אינם כוללים אותו.',
     everyPlanLabel: 'בכל תוכנית',
     everyPlan: [
       'פרסום אוטומטי לפי לוח זמנים, לוורדפרס, לשופיפיי ולוויקס',

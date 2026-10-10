@@ -149,18 +149,17 @@ for (const [topic, byLang] of Object.entries(TOPICS)) {
 // The product name and the last-updated line.
 const OLD_NAME = /Rankings by Go Top/i
 const LAST_UPDATED: Record<Doc, Record<Lang, RegExp>> = {
-  terms: { he: /9 באוקטובר 2026/, en: /October 9, 2026/ },
+  terms: { he: /10 באוקטובר 2026/, en: /October 10, 2026/ },
   privacy: { he: /10 באוקטובר 2026/, en: /October 10, 2026/ },
   a11y: { he: /5 באוקטובר 2026/, en: /October 5, 2026/ },
 }
 for (const lang of ['he', 'en'] as Lang[]) for (const doc of ['terms', 'privacy', 'a11y'] as Doc[]) {
   const p = pages[lang][doc]
   // The page body runs from its title to its last-updated line; the site shell (header, footer) around it is not these pages.
-  // The date is per document, not one date for all three: the privacy policy
-  // was last revised on 10 October 2026, for the business-outreach section that
-  // describes the addresses we collect from a business's own public pages; the
-  // terms on 9 October 2026, for the weekly summary that replaced a monthly one
-  // and for the setup emails; and the accessibility statement on 5 October 2026. A page that is changed without its date
+  // The date is per document, not one date for all three: the privacy policy and
+  // the terms were both last revised on 10 October 2026 — the policy for the
+  // business-outreach section, the terms for Creem as the merchant of record on a
+  // card payment — and the accessibility statement on 5 October 2026. A page that is changed without its date
   // being moved is the failure this catches, which is why the expected date
   // lives here and has to be edited deliberately.
   const dated = LAST_UPDATED[doc][lang]
@@ -277,11 +276,15 @@ check('MUTATION — an English-only extra section is caught', pages.he.terms.h2 
     'www.w3.org': 'XML and sitemap namespaces written into markup; not fetched',
     'llmstxt.org': 'the llms.txt specification, named in generated files; not fetched',
     'developers.google.com': 'a documentation link shown to the owner',
-    // When Creem actually becomes a payment provider, api.creem.io appears in
-    // shipped code and this guard will demand that both privacy policies name
-    // Creem before that can merge. That is the intended order: the disclosure
-    // lands with the integration, not after it.
+    // Creem is now a payment provider and api.creem.io is in RECIPIENTS above,
+    // which is what made this guard demand the disclosure before the integration
+    // could merge. These two hosts are the other kind: text a reader is pointed
+    // at. docs.creem.io is cited in a code comment. www.creem.io is Creem's own
+    // Buyer Terms, which Merchant Terms 3.8 obliges us to put in front of a buyer
+    // before a transaction, so the terms link it; the reader clicks it, and we
+    // send nothing of theirs to it.
     'docs.creem.io': 'a documentation link cited in a code comment; not fetched',
+    'www.creem.io': 'Creem\u2019s own Buyer Terms, linked for the customer to read; not fetched',
     'help.shopify.com': 'a documentation link shown to a merchant',
     'search.google.com': 'a link a customer clicks to their own Search Console',
     'google.com': 'the search engine whose public results are read, with no customer data attached',
