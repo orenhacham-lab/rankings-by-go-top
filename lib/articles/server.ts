@@ -181,7 +181,7 @@ export function buildArticleSchemas(article: PublicArticle | null, slug: string,
     '@context': 'https://schema.org',
     '@type': 'BreadcrumbList',
     itemListElement: [
-      { '@type': 'ListItem', position: 1, name: dict.nav.home, item: absoluteUrl(localeHomeHref(locale)) },
+      { '@type': 'ListItem', position: 1, name: dict.breadcrumbs.home, item: absoluteUrl(localeHomeHref(locale)) },
       { '@type': 'ListItem', position: 2, name: copy.index.breadcrumb, item: absoluteUrl(articlesIndexHref(locale)) },
       { '@type': 'ListItem', position: 3, name: article?.title || copy.index.breadcrumb, item: articleUrl },
     ],
@@ -238,7 +238,7 @@ export function buildArticlesIndexSchema(locale: PublicLocale) {
     '@context': 'https://schema.org',
     '@type': 'BreadcrumbList',
     itemListElement: [
-      { '@type': 'ListItem', position: 1, name: dict.nav.home, item: absoluteUrl(localeHomeHref(locale)) },
+      { '@type': 'ListItem', position: 1, name: dict.breadcrumbs.home, item: absoluteUrl(localeHomeHref(locale)) },
       { '@type': 'ListItem', position: 2, name: copy.index.breadcrumb, item: absoluteUrl(articlesIndexHref(locale)) },
     ],
   }

@@ -10,6 +10,8 @@ import { getSiteMetadata } from '@/lib/i18n/site-metadata'
 import { softwareOffer } from '@/lib/seo/software-offer'
 import { websiteSchema } from '@/lib/seo/page-schema'
 import { localeHomeHref } from '@/lib/i18n/locales'
+import { marketForCountry } from '@/lib/billing/market'
+import { requestCountry } from '@/lib/billing/server-market'
 import { GOOGLE_CONSENT_DEFAULT_SCRIPT } from '@/lib/consent/google-consent-mode'
 import { GoogleTags } from '@/components/consent/GoogleTags'
 import { DocumentLocaleSync } from '@/components/DocumentLocaleSync'
@@ -89,6 +91,12 @@ export default async function RootLayout({
   // The page the reader is on, not always the Hebrew root: the markup used to
   // point every language's `url` at https://www.gotopseo.com.
   const localeHome = `https://www.gotopseo.com${localeHomeHref(locale) === '/' ? '' : localeHomeHref(locale)}`
+  // The SAME basis the pricing page prices by: the visitor's country, not the
+  // page's language (lib/billing/server-market.ts). By language the markup
+  // would still contradict the page for an Israeli reading the English one.
+  // Header-only, so no auth read and no query: a crawler and an anonymous
+  // visitor get exactly what the pricing page would show them.
+  const market = marketForCountry(await requestCountry())
 
   return (
     <html lang={lang} dir={dir} className={`h-full ${inter.variable} ${heebo.variable}`} suppressHydrationWarning>
@@ -157,7 +165,7 @@ export default async function RootLayout({
                 // No aggregateRating: a rating may only describe real, collected
                 // reviews (Google's review-snippet policy; FTC fake-review rule).
                 // The offer is the real plan range from the catalog.
-                offers: softwareOffer(locale),
+                offers: softwareOffer(market),
                 author: {
                   '@type': 'Organization',
                   name: 'GO TOP',

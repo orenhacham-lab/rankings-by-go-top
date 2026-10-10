@@ -45,6 +45,7 @@ check('faqPageSchema is null with no questions', faqPageSchema([]) === null)
 const crumbHe = marketingBreadcrumbSchema('he', '/features/keyword-research', 'מחקר ביטויים')
 check('breadcrumb has exactly the two pages that exist', crumbHe.itemListElement.length === 2)
 check('breadcrumb step 1 is the Hebrew home', crumbHe.itemListElement[0].item === 'https://www.gotopseo.com')
+check('breadcrumb step 1 is named as the visible trail names it', crumbHe.itemListElement[0].name === 'דף הבית')
 check('breadcrumb step 2 is the page', crumbHe.itemListElement[1].item === 'https://www.gotopseo.com/features/keyword-research')
 check('breadcrumb step 2 is named', crumbHe.itemListElement[1].name === 'מחקר ביטויים')
 
@@ -69,16 +70,16 @@ check('the layout emits the WebSite', /websiteSchema\(locale, schema\.descriptio
 
 const ils = PLAN_CODES.map((c) => PLAN_CATALOG[c].priceILS)
 const usd = PLAN_CODES.map((c) => PLAN_CATALOG[c].priceUSD)
-check('Hebrew is quoted in shekels', softwareOffer('he').priceCurrency === 'ILS')
-check('Hebrew low price = cheapest shekel plan', softwareOffer('he').lowPrice === String(Math.min(...ils)))
-check('Hebrew high price = dearest shekel plan', softwareOffer('he').highPrice === String(Math.max(...ils)))
-for (const locale of ['en', 'es', 'pt-BR'] as PublicLocale[]) {
-  const offer = softwareOffer(locale)
-  check(`${locale} is quoted in dollars, like its pricing page`, offer.priceCurrency === 'USD')
-  check(`${locale} low price = cheapest dollar plan`, offer.lowPrice === String(Math.min(...usd)))
-  check(`${locale} high price = dearest dollar plan`, offer.highPrice === String(Math.max(...usd)))
-}
-check('the layout offer follows the language', /offers:\s*softwareOffer\(locale\)/.test(layout))
+check('the shekel market is quoted in shekels', softwareOffer('ILS').priceCurrency === 'ILS')
+check('shekel low price = cheapest shekel plan', softwareOffer('ILS').lowPrice === String(Math.min(...ils)))
+check('shekel high price = dearest shekel plan', softwareOffer('ILS').highPrice === String(Math.max(...ils)))
+check('the dollar market is quoted in dollars', softwareOffer('USD').priceCurrency === 'USD')
+check('dollar low price = cheapest dollar plan', softwareOffer('USD').lowPrice === String(Math.min(...usd)))
+check('dollar high price = dearest dollar plan', softwareOffer('USD').highPrice === String(Math.max(...usd)))
+// By LANGUAGE the markup would still contradict the page for an Israeli
+// reading the English one: the pricing page prices by country.
+check('the layout offer follows the visitor\'s market, not the language', /offers:\s*softwareOffer\(market\)/.test(layout))
+check('the market comes from the same country basis the pricing page uses', /marketForCountry\(await requestCountry\(\)\)/.test(layout))
 check('the layout url follows the language', /url:\s*localeHome,/.test(layout))
 
 // ------------------------------------------------- every marketing page is placed
@@ -106,6 +107,43 @@ const feature = stripComments(read('components/public/FeaturePage.tsx'))
 check('FeaturePage emits the breadcrumb', /marketingBreadcrumbSchema\(locale, path,/.test(feature))
 check('FeaturePage builds the FAQ from its own faq sections', /section\.kind === 'faq' \? section\.items/.test(feature))
 check('a page with no path carries no trail rather than a wrong one', /path\s*\?\s*marketingBreadcrumbSchema/.test(feature))
+
+// ------------------------------- a marked-up trail is a trail on the page
+
+// Google's structured-data guidelines: don't mark up content that is not
+// visible to the reader. These pages carried a BreadcrumbList nobody could see.
+check('the feature template renders the trail it marks up', /before=\{path \? <Breadcrumbs/.test(feature))
+check('the visible trail is named by the same value as the markup', /items=\{\[\{ label: crumbName,/.test(feature))
+for (const locale of ['he', 'en', 'es', 'pt-BR'] as PublicLocale[]) {
+  const dir = LOCALE_PREFIX[locale]
+  const pricingPage = stripComments(read(`app/(public)${dir}/pricing/page.tsx`))
+  check(`${locale} pricing shows the trail it marks up`, /<Breadcrumbs items=/.test(pricingPage))
+  // One builder, and for the about page one shared label, so the trail and its
+  // markup cannot drift: each carried its own literal before.
+  for (const page of ['pricing', 'about']) {
+    const layoutSrc = stripComments(read(`app/(public)${dir}/${page}/layout.tsx`))
+    check(`${locale} ${page} builds its trail with the shared builder, not a literal`,
+      /marketingBreadcrumbSchema\(/.test(layoutSrc) && !/'@type': 'BreadcrumbList'/.test(layoutSrc))
+  }
+  // The about page's visible trail and its markup read the SAME constant.
+  check(`${locale} about names itself from the one shared label`, (() => {
+    const pageSrc = stripComments(read(`app/(public)${dir}/about/page.tsx`))
+    const layoutSrc = stripComments(read(`app/(public)${dir}/about/layout.tsx`))
+    return pageSrc.includes(`ABOUT_BREADCRUMB['${locale}']`) && layoutSrc.includes(`ABOUT_BREADCRUMB['${locale}']`)
+  })())
+}
+// The label the trail PRINTS is the one the markup carries: in Hebrew
+// `breadcrumbs.home` is "דף הבית" while `nav.home` is "עמוד הבית".
+const pageSchemaSrc = stripComments(read('lib/seo/page-schema.ts'))
+check('the markup names home the way the visible trail does', /name: dict\.breadcrumbs\.home/.test(pageSchemaSrc))
+check('the articles trails name home the same way', !/name: dict\.nav\.home/.test(stripComments(read('lib/articles/server.ts'))))
+check('the breadcrumb builder agrees with the Breadcrumbs component', (() => {
+  const component = stripComments(read('components/Breadcrumbs.tsx'))
+  return /dict\.breadcrumbs\.home/.test(component) && /name: dict\.breadcrumbs\.home/.test(pageSchemaSrc)
+})())
+check('MUTATION CONTROL: a trail marked up but not rendered is caught', !/before=\{path \? <Breadcrumbs/.test('const breadcrumb = path ? marketingBreadcrumbSchema(locale, path, crumbName) : null'))
+check('MUTATION CONTROL: an about page back on its own literal is caught', !"breadcrumb: { label: 'Quiénes somos', href: '/es/about' },".includes("ABOUT_BREADCRUMB['es']"))
+check('MUTATION CONTROL: a hard-coded BreadcrumbList in a layout is caught', /'@type': 'BreadcrumbList'/.test("const breadcrumbSchema = { '@type': 'BreadcrumbList', itemListElement: [] }"))
 
 check('the landing page declares its questions', /faqPageSchema\(copy\.faq\.items\)/.test(stripComments(read('components/public/LandingPage.tsx'))))
 check('the pricing page declares its questions', /faqPageSchema\(c\.items\.map/.test(stripComments(read('components/public/pricing/PricingSections.tsx'))))
