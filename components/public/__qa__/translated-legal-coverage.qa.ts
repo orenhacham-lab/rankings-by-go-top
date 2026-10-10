@@ -1524,6 +1524,7 @@ const PLUGIN_DOES: Record<string, RegExp[]> = {
     /התוסף\s+כותב אותו על התמונה עצמה בספריית המדיה/,
     /ולא על פוסט שמשויך למאמר אחר/,
     /הפוסט הזה הוא תמיד פוסט שהמערכת עצמה פרסמה/,
+    /סיסמת אפליקציה ששמורה אצלנו[\s\S]{0,80}גם כשהתוסף מותקן/,
   ],
   en: [
     /Articles you publish/,
@@ -1541,6 +1542,7 @@ const PLUGIN_DOES: Record<string, RegExp[]> = {
     /the plugin writes it on the image itself in the Media Library/,
     /or a post belonging to a\s+different article/,
     /That post is always\s+one GO TOP published itself/,
+    /application password we still hold from an earlier connection is used although the plugin is\s+installed/,
   ],
   es: [
     /art[íi]culos que usted publica/i,
@@ -1558,6 +1560,7 @@ const PLUGIN_DOES: Record<string, RegExp[]> = {
     /el complemento lo escribe en la propia imagen en la biblioteca de medios/,
     /ni a una entrada que pertenezca a otro art[íi]culo/,
     /Esa entrada es siempre una que GO TOP public[óo]/,
+    /Application Password que conservamos de una conexi[óo]n anterior sigue us[áa]ndose aunque el complemento est[ée] instalado/,
   ],
   'pt-BR': [
     /artigos que voc[êe] publica/i,
@@ -1575,6 +1578,7 @@ const PLUGIN_DOES: Record<string, RegExp[]> = {
     /o plugin o escreve na pr[óo]pria imagem na biblioteca de m[íi]dia/,
     /nem para um post que perten[çc]a a outro artigo/,
     /Aquele post [ée] sempre um que o GO TOP publicou/,
+    /Senha de Aplicativo que ainda guardamos de uma conex[ãa]o anterior continua sendo usada mesmo com o plugin instalado/,
   ],
 }
 {
@@ -1619,6 +1623,8 @@ const PLUGIN_DOES: Record<string, RegExp[]> = {
     !PLUGIN_DOES['pt-BR'][11].test('N\u00e3o recebemos nada sobre os usu\u00e1rios do site.'))
   check('mutation control: a policy where only the application password writes media alt text is caught',
     !PLUGIN_DOES.en[12].test('Alt text is written on the image itself in the media library with the application password.'))
+  check('mutation control: a policy claiming the password is never used once the plugin is installed is caught',
+    !PLUGIN_DOES.en[15].test('From version 3.1.0 of the plugin onwards, nothing does: everything described here goes through the plugin, and a password we hold is never used again.'))
   check('mutation control: an adopt sentence with no limits is caught',
     !PLUGIN_DOES.he[13].test('\u05d4\u05de\u05e2\u05e8\u05db\u05ea \u05d9\u05db\u05d5\u05dc\u05d4 \u05dc\u05e2\u05d3\u05db\u05df \u05db\u05dc \u05e4\u05d5\u05e1\u05d8 \u05d1\u05d0\u05ea\u05e8.'))
 }

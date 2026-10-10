@@ -286,7 +286,11 @@ export default function EnglishPrivacyPage() {
           the plugin writes it on the image itself in the Media Library, and undoing the fix deletes what was
           written. We do not touch the image file, its name or its caption.</li>
           <li><strong>What needs an Application Password.</strong> From version 3.1.0 of the plugin onwards,
-          nothing does: everything described here goes through the plugin. On a site running an earlier version
+          nothing does: everything described here goes through the plugin. There is one case in which an
+          application password we still hold from an earlier connection is used although the plugin is
+          installed: when the plugin refuses to update the post recorded for an article because it is not a
+          post it may take over, we update that post with the application password, and if we hold no such
+          password the update does not happen. On a site running an earlier version
           of the plugin, forcing a new post, scheduled publishing, and the scan of the site&rsquo;s existing
           posts and the refresh of their index still go through the application password, and if we hold no such
           password those actions do not happen and you are told so, rather than our trying another way.</li>
