@@ -14,6 +14,7 @@ import Notice from '@/components/ui/Notice'
 import { useConfirm } from '@/components/ui/ConfirmDialog'
 import { cn } from '@/lib/utils'
 import BillingClient from './client'
+import CreemCheckoutButton from './CreemCheckoutButton'
 import { INTL_LOCALE } from '@/lib/i18n/locales'
 import { SHOPIFY_APP_STORE_URL } from '@/lib/public-links/shopify-app-store'
 
@@ -60,6 +61,13 @@ interface BillingViewProps {
   marketLocked: boolean
   /** The plans' prices in `market`, from the plan catalog. */
   planPrices: Record<PlanKey, number>
+  /** Owner decision, 10 Oct 2026 — pay by card instead of PayPal, decided on
+   *  the server (app/(dashboard)/billing/page.tsx): only while CREEM_ENABLED
+   *  is on, only in USD, and only for an account that has never paid through
+   *  PayPal. An existing PayPal payer keeps the PayPal buttons exactly as they
+   *  are. When this is true the PayPal SDK is not loaded at all, so a plan
+   *  card has one way to pay and never two. */
+  creemCheckout?: boolean
 }
 
 export default function BillingView({
@@ -78,6 +86,7 @@ export default function BillingView({
   market,
   marketLocked,
   planPrices,
+  creemCheckout = false,
 }: BillingViewProps) {
   const { language, uiLocale } = useDashboardLanguage()
   const dict = getDashboardDictionary(uiLocale)
@@ -300,6 +309,7 @@ export default function BillingView({
               isPopular={false}
               isCurrent={plan === 'regular' && hasActiveSubscription}
               plan="regular"
+              action={creemCheckout ? <CreemCheckoutButton plan="regular" /> : undefined}
               audience={PLAN_AUDIENCE_LABEL.regular[language]}
               description={PLAN_AUDIENCE_DESCRIPTION.regular[language]}
               numberLocale={numberLocale}
@@ -315,6 +325,7 @@ export default function BillingView({
               isPopular={true}
               isCurrent={plan === 'advanced' && hasActiveSubscription}
               plan="advanced"
+              action={creemCheckout ? <CreemCheckoutButton plan="advanced" /> : undefined}
               audience={PLAN_AUDIENCE_LABEL.advanced[language]}
               description={PLAN_AUDIENCE_DESCRIPTION.advanced[language]}
               numberLocale={numberLocale}
@@ -330,6 +341,7 @@ export default function BillingView({
               isPopular={false}
               isCurrent={plan === 'premium' && hasActiveSubscription}
               plan="premium"
+              action={creemCheckout ? <CreemCheckoutButton plan="premium" /> : undefined}
               audience={PLAN_AUDIENCE_LABEL.premium[language]}
               description={PLAN_AUDIENCE_DESCRIPTION.premium[language]}
               numberLocale={numberLocale}
@@ -346,6 +358,7 @@ export default function BillingView({
                 isPopular={false}
                 isCurrent={plan === 'large_agency' && hasActiveSubscription}
                 plan="large_agency"
+                action={creemCheckout ? <CreemCheckoutButton plan="large_agency" /> : undefined}
                 audience={PLAN_AUDIENCE_LABEL.large_agency[language]}
                 description={PLAN_AUDIENCE_DESCRIPTION.large_agency[language]}
                 numberLocale={numberLocale}
@@ -355,7 +368,9 @@ export default function BillingView({
             )}
           </div>
 
-          <BillingClient market={market} />
+          {/* The PayPal buttons, and the SDK behind them, only on the PayPal
+              path: a card never offers two ways to pay the same plan. */}
+          {!creemCheckout && <BillingClient market={market} />}
 
           <p className="mt-6 max-w-4xl text-caption text-muted">
             {t.keywordCheckNote}

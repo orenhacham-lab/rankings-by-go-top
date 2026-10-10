@@ -208,7 +208,12 @@ console.log('\nC) Billing: same plans, prices and PayPal containers; Shopify pan
     !s.includes('/api/billing-market/select')
     && (s.match(/fetch\(/g) || []).length === 1 // /api/paypal/cancel, nothing else
     && !/setPickedMarket|shownMarket|selectMarket|useState<BillingMarket/.test(s)
-    && /\n\s*<BillingClient market=\{market\} \/>/.test(s)
+    // 10 Oct 2026 — the card path (Creem) does not load the PayPal SDK at
+    // all, so this component may sit behind the server-decided
+    // `creemCheckout` flag. What C7 pins is unchanged: when PayPal IS
+    // drawn it is handed the SERVER's market, and the only condition
+    // allowed around it is that server-side flag — never a choice made here.
+    && /\n\s*(\{!creemCheckout && )?<BillingClient market=\{market\} \/>\}?/.test(s)
     && !/language === 'en' \? 'USD'|=== 'he' \? 'ILS'/.test(s)
   check('C7: the view never sends or picks a currency; PayPal gets the server market', serverMarketOk(code))
   check('C7-MUT: the old select request fails C7', !serverMarketOk(code + "\nfetch('/api/billing-market/select', {})"))
