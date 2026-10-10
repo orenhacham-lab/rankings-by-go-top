@@ -18,11 +18,15 @@ GO TOP (https://gotopseo.com) plans and writes articles for your business and fi
 
 When you publish an article from GO TOP, the plugin:
 
-* creates the post (or updates the post it created earlier for the same article), as a draft or published, as you chose in GO TOP;
+* creates the post (or updates the post GO TOP recorded earlier for the same article), as a draft, published, or scheduled for a date you chose in GO TOP;
 * adds the article's images to your Media Library, with their alt text, and sets the featured image;
 * sets the categories and tags you chose from your site's own list.
 
-Posts are published as the user you choose in Settings > GO TOP SEO (by default the administrator who connected the site). The content passes through WordPress's own filter for post HTML. The plugin never changes a post it did not publish, other than the fixes below.
+You can also publish a second, separate post for the same article, and publish a given article as another user who may publish, chosen in GO TOP from your site's own list.
+
+Posts are published as the user you choose in Settings > GO TOP SEO (by default the administrator who connected the site), or as another user who may publish, chosen per article in GO TOP. The content passes through WordPress's own filter for post HTML.
+
+Other than the fixes below, the plugin changes only the post GO TOP recorded for an article. That is normally a post this plugin created; it can also be one GO TOP published on your site before the plugin was installed, using an application password. In that case the plugin takes that post over for the article, and only that one post: never a page, never a post in the trash, and never a post already tied to another GO TOP article.
 
 = SEO fixes you approve =
 
@@ -31,7 +35,7 @@ When you approve a fix in GO TOP, the plugin writes exactly that one element on 
 * SEO title and meta description (in Yoast SEO or Rank Math when one is active, otherwise printed by this plugin)
 * Canonical address
 * Focus keyphrase
-* Image alt text (only for images in the content that have none)
+* Image alt text: for an image in the content that has none, and for an image in your Media Library, where the text is written on the image itself and so applies on every page that shows it (undoing the fix removes it again)
 * An FAQ block at the end of a page
 * JSON-LD structured data (Organization, WebSite, WebPage, Article, FAQPage and similar; never Product). When Yoast SEO, Rank Math, All in One SEO, SEOPress or The SEO Framework is active, that plugin's structured data is kept and only the FAQPage part for the FAQ block is added
 * A broken link inside existing content (new address, or the link removed and its words kept)
@@ -59,23 +63,40 @@ connect it yourself with a pairing code from your GO TOP account.
 What GO TOP asks your site for, once it is connected. Every request is signed with the key
 created at pairing, and your site refuses anything it cannot verify:
 
-* Publishing: the articles you choose to publish in GO TOP, which your site saves as posts.
+* Publishing: the articles you choose to publish in GO TOP, which your site saves as posts. A publish may
+  name a date in the future, another user who may publish, a second post for the same article, or the post
+  GO TOP recorded for that article.
 * Fixes: the changes you approve in GO TOP, from a closed list (SEO title, meta description,
   canonical address, focus keyword, image alternative text, FAQ block, JSON-LD schema,
   internal links, broken-link repair, duplicate H1 demotion, llms.txt).
-* Reading a post or page by its address, so GO TOP can show you what is there now and what a
-  fix would change: its title, address, content, headings and SEO fields.
+* Reading a post or page, by its address or by its id, so GO TOP can show you what is there now and what a
+  fix would change: its title, address, content as WordPress displays it, headings and SEO fields.
+* Listing your published posts and pages, which answers for each one with its id, type, address, slug,
+  title, publication date, last modified date, and the focus keyphrase recorded for it in your SEO plugin.
+  A post or page that is not published, or that is password protected, is not listed, and products are
+  never listed. GO TOP uses this for its content index, its internal-link scan and its site map.
+* Listing the users who may publish posts, which answers with each one's WordPress user id and display
+  name, and the id of the user set for publishing. No e-mail address, login name, role or anything else
+  about them is sent. GO TOP uses this only so you can choose whose name an article is published under.
+* Finding, reading and setting Media Library alt text: a search by a word in a file name, title or slug
+  answers with each image's id, the address of the file and of its resized copies, its alt text and its
+  title; setting writes only the alt-text field, and an empty value removes it, which is how undo works.
+* Your categories, tags and WooCommerce product categories, which answer with each term's id, name, slug,
+  address and post count.
 * Searching your published posts and pages by a word GO TOP sends, which answers with the id,
   address and title of up to ten matches. GO TOP uses this to find the page an internal link
   should point at.
-* A status check, which answers with the plugin's version, which SEO plugin your site uses,
-  and whether an author is set for publishing.
+* A status check, which answers with the plugin's version, which SEO plugin your site uses, whether an
+  author is set for publishing, and which of the features above this copy of the plugin supports.
 
 What leaves your site. Your site replies to each of those requests, and the reply is what is
-sent to GO TOP: the new post's id, address and status, or the details of the post or page GO
-TOP asked to read, which includes its content. Nothing else is sent. The plugin starts no
-request of its own, with one exception described next: downloading the images of an article
-you publish. It reports nothing in the background.
+sent to GO TOP: the new post's id, address and status; the details of a post or page GO TOP
+asked to read, which includes its content; the list of your published posts and pages with the
+fields named above; the ids and display names of the users who may publish; the Media Library
+items a search matched; and your terms with their addresses and counts. Nothing beyond the
+replies to those requests is sent. The plugin starts no request of its own, with one exception
+described next: downloading the images of an article you publish. It reports nothing in the
+background.
 
 The one address your site contacts by itself: GO TOP's file storage, hosted on Supabase.
 
@@ -105,7 +126,7 @@ GO TOP privacy policy: https://gotopseo.com/en/privacy
 == Installation ==
 
 1. Install and activate the plugin (Plugins > Add New, search for "GO TOP SEO Bridge").
-2. In GO TOP, open your project's Site health and choose "Install the plugin". Copy the connection code shown there.
+2. In GO TOP, open your project's settings, go to Connections and choose WordPress. Click "Get a connection code" and copy it.
 3. In WordPress, open Settings > GO TOP SEO, paste the code and press "Connect".
 4. Optional: in the same screen, choose the user articles are published as.
 
@@ -129,7 +150,7 @@ Yes. Every fix can be undone from GO TOP, and WordPress keeps a revision of ever
 
 = How do I disconnect? =
 
-Settings > GO TOP SEO > Disconnect. GO TOP can no longer reach the site. Deleting the plugin also removes its settings.
+Settings > GO TOP SEO > Disconnect. GO TOP can no longer reach the site. Deleting the plugin also removes its settings; from 3.1.0 the connection key is kept while another copy of the plugin is still installed on the site, so that deleting one copy does not disconnect the other. Deleting an older copy still removes the shared key.
 
 == Changelog ==
 
