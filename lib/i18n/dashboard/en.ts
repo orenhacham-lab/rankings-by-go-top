@@ -6018,6 +6018,11 @@ export const dashboardEn = {
       activatedSuccess: 'Your plan is active. This page will refresh in a moment.',
       buttonError: 'Something went wrong with PayPal. Try again in a moment, or write to us and we’ll help.',
     },
+    creem: {
+      payButton: 'Pay by card',
+      starting: 'Opening the secure payment page...',
+      error: 'We couldn’t open the payment page. Try again in a moment, or write to us and we’ll help.',
+    },
     shopify: {
       title: 'Billing is managed through Shopify',
       description: 'This account is billed through Shopify App Pricing, not PayPal. Connecting a store for publishing does not change that on its own.',

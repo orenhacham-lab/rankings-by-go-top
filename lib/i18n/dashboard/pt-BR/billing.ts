@@ -161,6 +161,11 @@ export const billingPtBR: DeepPartial<DashboardDictionary> = {
       activatedSuccess: 'Seu plano está ativo. Esta página será atualizada em instantes.',
       buttonError: 'Algo deu errado com o PayPal. Tente novamente em instantes ou fale com a gente que ajudamos você.',
     },
+    creem: {
+      payButton: 'Pagar com cartão',
+      starting: 'Abrindo a página de pagamento segura...',
+      error: 'Não conseguimos abrir a página de pagamento. Tente novamente em instantes ou fale com a gente que ajudamos você.',
+    },
     shopify: {
       title: 'A cobrança é gerenciada pela Shopify',
       description: 'Esta conta é cobrada pelo Shopify App Pricing, não pelo PayPal. Conectar uma loja para publicar não muda isso por si só.',

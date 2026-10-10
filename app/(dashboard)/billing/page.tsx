@@ -12,6 +12,7 @@ import { getShopifyOAuthConfig } from '@/lib/shopify/oauth'
 import { resolveBillingMarket } from '@/lib/billing/server-market'
 import { planPriceIn } from '@/lib/billing/market'
 import { PLAN_CATALOG } from '@/lib/plans/catalog'
+import { creemMayWriteToAccount, isCreemEnabled } from '@/lib/creem/config'
 import BillingView from './BillingView'
 import AdminBillingView from './AdminBillingView'
 
@@ -110,6 +111,55 @@ export default async function BillingPage() {
   // the dashboard language toggle, never a client choice, no switcher.
   const { market, locked: marketLocked } = await resolveBillingMarket(supabase, user)
 
+  // PAY BY CARD (Creem) — OWNER DECISION, 10 Oct 2026: new customers only.
+  //
+  // Creem is the merchant of record outside Israel, and it is offered to an
+  // account that has NEVER paid through PayPal. Someone already paying through
+  // PayPal keeps the PayPal buttons untouched: moving a live subscription
+  // between providers is not something a page can do, and showing both would
+  // let one account be billed twice.
+  //
+  // Every condition must hold, and each one fails CLOSED to PayPal:
+  //   * CREEM_ENABLED is on. Off is the state of the world until the owner
+  //     says otherwise, and off means PayPal for everyone.
+  //   * The market is USD. Israel is always PayPal (lib/creem/checkout-products).
+  //   * Billing is not Shopify's, and governance was readable at all.
+  //   * No subscription row of this account has ever carried a PayPal
+  //     subscription id. A read we cannot trust counts as "has one".
+  //   * There is no active paid plan right now. An upgrade would open a SECOND
+  //     Creem subscription while the first keeps billing, so the card path is
+  //     offered for a first payment only — an upgrade is handled by hand until
+  //     a provider-side change-plan flow exists.
+  //   * The sandbox gate (lib/creem/config.ts) allows this account, so a test
+  //     mode never shows a real visitor a checkout that grants nothing.
+  //
+  // The checkout route re-checks all of this; this only decides what is drawn.
+  let creemCheckout = false
+  if (
+    isCreemEnabled()
+    && market === 'USD'
+    && !governanceUnavailable
+    && !shopifyConnected
+    && !shopifyStoreConnected
+    && !entitlement.hasActiveSubscription
+    && creemMayWriteToAccount(user.id)
+  ) {
+    // SERVICE-ROLE client, so the owner is filtered explicitly (CLAUDE.md).
+    const { data: paypalRows, error: paypalRowsError } = await admin
+      .from('subscriptions')
+      .select('id')
+      .eq('user_id', user.id)
+      .not('paypal_subscription_id', 'is', null)
+      .limit(1)
+    creemCheckout = !paypalRowsError && (paypalRows?.length ?? 0) === 0
+    if (paypalRowsError) {
+      console.error('[billing-page] could not tell whether this account ever paid through PayPal; keeping PayPal', {
+        userId: user.id,
+        message: paypalRowsError.message,
+      })
+    }
+  }
+
   return (
     <BillingView
       plan={entitlement.plan}
@@ -126,6 +176,7 @@ export default async function BillingPage() {
       websitePaidPeriod={websitePaidPeriod ? { paidUntil: websitePaidPeriod.paidUntil, renewalStopped: websitePaidPeriod.renewalStopped } : null}
       market={market}
       marketLocked={marketLocked}
+      creemCheckout={creemCheckout}
       planPrices={{
         trial: 0,
         regular: planPriceIn(PLAN_CATALOG.regular, market),

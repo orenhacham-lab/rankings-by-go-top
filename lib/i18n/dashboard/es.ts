@@ -2393,6 +2393,11 @@ export const dashboardEs: DeepPartial<DashboardDictionary> = {
       activatedSuccess: 'Tu plan está activo. Esta página se actualizará en un momento.',
       buttonError: 'Algo ha fallado con PayPal. Vuelve a intentarlo en un momento o escríbenos y te ayudamos.',
     },
+    creem: {
+      payButton: 'Pagar con tarjeta',
+      starting: 'Abriendo la página de pago segura...',
+      error: 'No hemos podido abrir la página de pago. Vuelve a intentarlo en un momento o escríbenos y te ayudamos.',
+    },
     shopify: {
       title: 'La facturación se gestiona a través de Shopify',
       description: 'Esta cuenta se factura con Shopify App Pricing, no con PayPal. Conectar una tienda para publicar no cambia eso por sí solo.',
