@@ -793,6 +793,18 @@ export const WORDPRESS_PAGE: MarketingPage = {
  *   - the automatic monthly AI check runs ChatGPT, Gemini and Google AI
  *     (MONTHLY_CORE_ENGINES); the other three are a click.
  */
+/**
+ * The Shopify page's own call to action (owner, 10 Oct 2026: on this page the
+ * buttons belong to Shopify, not to our signup). It is the App Store listing,
+ * in a new tab and rel="nofollow" like every other link to it; with no listing
+ * (SHOPIFY_APP_STORE_URL null) it falls back to the page's usual action, so the
+ * page never shows a dead button.
+ */
+const shopifyInstallCta = (label: string, fallback: { label: string; href: string }) =>
+  SHOPIFY_APP_STORE_URL
+    ? { label, href: SHOPIFY_APP_STORE_URL, rel: 'nofollow noopener noreferrer', target: '_blank' }
+    : fallback
+
 const shopifyAppStoreLink = (label: string) =>
   SHOPIFY_APP_STORE_URL
     ? (
@@ -836,7 +848,7 @@ export const SHOPIFY_PAGE: MarketingPage = {
         accent: 'מתפרסם ונמדד',
         subtitle: 'מתקינים את האפליקציה מחנות האפליקציות של Shopify, ומאותו רגע המערכת כותבת מאמרים על מה שהלקוחות שלכם מחפשים ומפרסמת אותם לבלוג של החנות, ומראה לכם איפה החנות מופיעה בגוגל, בגוגל מפות ובתשובות של ChatGPT, Gemini ו-Google AI.',
         trust: he.trust,
-        primary: he.trial,
+        primary: shopifyInstallCta('התקינו את האפליקציה ב-Shopify', he.trial),
         secondary: he.check,
         visual: (
           <WorkListVisual
@@ -906,7 +918,7 @@ export const SHOPIFY_PAGE: MarketingPage = {
           ],
         },
       ],
-      cta: { title: 'התחילו עם החנות שלכם', body: he.closeBody, primary: he.trial, secondary: he.check },
+      cta: { title: 'התחילו עם החנות שלכם', body: he.closeBody, primary: shopifyInstallCta('התקינו את האפליקציה ב-Shopify', he.trial), secondary: he.check },
     },
     en: {
       hero: {
@@ -916,7 +928,7 @@ export const SHOPIFY_PAGE: MarketingPage = {
         accent: 'published and measured',
         subtitle: 'Install the app from the Shopify App Store, and from then on the system writes articles about what your customers are searching for, publishes them to your store blog, and shows you where the store appears in Google, Google Maps and the answers of ChatGPT, Gemini and Google AI.',
         trust: en.trust,
-        primary: en.trial,
+        primary: shopifyInstallCta('Install the app on Shopify', en.trial),
         secondary: en.check,
         visual: (
           <WorkListVisual
@@ -986,7 +998,7 @@ export const SHOPIFY_PAGE: MarketingPage = {
           ],
         },
       ],
-      cta: { title: 'Start with your store', body: en.closeBody, primary: en.trial, secondary: en.check },
+      cta: { title: 'Start with your store', body: en.closeBody, primary: shopifyInstallCta('Install the app on Shopify', en.trial), secondary: en.check },
     },
     es: {
       hero: {
@@ -996,7 +1008,7 @@ export const SHOPIFY_PAGE: MarketingPage = {
         accent: 'se publica y se mide',
         subtitle: 'Instala la app desde la Shopify App Store y, a partir de ese momento, el sistema escribe artículos sobre lo que buscan tus clientes, los publica en el blog de tu tienda y te muestra dónde aparece la tienda en Google, en Google Maps y en las respuestas de ChatGPT, Gemini y Google AI.',
         trust: es.trust,
-        primary: es.trial,
+        primary: shopifyInstallCta('Instala la app en Shopify', es.trial),
         secondary: es.check,
         visual: (
           <WorkListVisual
@@ -1066,7 +1078,7 @@ export const SHOPIFY_PAGE: MarketingPage = {
           ],
         },
       ],
-      cta: { title: 'Empieza con tu tienda', body: es.closeBody, primary: es.trial, secondary: es.check },
+      cta: { title: 'Empieza con tu tienda', body: es.closeBody, primary: shopifyInstallCta('Instala la app en Shopify', es.trial), secondary: es.check },
     },
     'pt-BR': {
       hero: {
@@ -1076,7 +1088,7 @@ export const SHOPIFY_PAGE: MarketingPage = {
         accent: 'publicado e medido',
         subtitle: 'Instale o app na Shopify App Store e, a partir daí, o sistema escreve artigos sobre o que os seus clientes procuram, publica no blog da sua loja e mostra onde a loja aparece no Google, no Google Maps e nas respostas do ChatGPT, do Gemini e do Google AI.',
         trust: pt.trust,
-        primary: pt.trial,
+        primary: shopifyInstallCta('Instale o app no Shopify', pt.trial),
         secondary: pt.check,
         visual: (
           <WorkListVisual
@@ -1146,7 +1158,7 @@ export const SHOPIFY_PAGE: MarketingPage = {
           ],
         },
       ],
-      cta: { title: 'Comece com a sua loja', body: pt.closeBody, primary: pt.trial, secondary: pt.check },
+      cta: { title: 'Comece com a sua loja', body: pt.closeBody, primary: shopifyInstallCta('Instale o app no Shopify', pt.trial), secondary: pt.check },
     },
   },
 }
