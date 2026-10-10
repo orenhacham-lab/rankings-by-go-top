@@ -249,28 +249,55 @@ export default function EnglishPrivacyPage() {
           automatic approval for the three kinds of fix described in the Terms of Service, fixes of those kinds
           are applied without asking you each time.</li>
           <li><strong>Articles you publish.</strong> An article you approve in GO TOP is created as a post on
-          your site, as the author you choose there. <strong>The publish itself also writes that
+          your site, as the author you choose there, or as another author you pick for that article from the
+          list of people allowed to publish on the site. The publish can be scheduled for a future date, and a
+          second, separate post can be made for the same article. If GO TOP recorded a particular post on your
+          site for an article, the plugin can update that post even when it was not the plugin that created it
+          &mdash; a post GO TOP published earlier with the application password, for instance. That post is always
+          one GO TOP published itself, and this applies only to the one post recorded for that article, never to
+          another post, a page, a post in the trash, or a post belonging to a different article. <strong>The publish itself also writes that
           article&rsquo;s own SEO title, meta description, focus keyphrase and JSON-LD schema</strong>, through the same signed
           route and without a separate approval for each of them, because they are part of the publish you
           approved. If an article we published for you is left without an SEO title or without a meta description, we may fill in the missing field on that same article later, through the same signed route and without a further approval, as the completion of that publish. We never replace a value that already exists, and we do not touch other pages or other fields.</li>
           <li><strong>The images belonging to those articles.</strong> Your site downloads them from our file
           storage into its own Media Library, and from that point they are files on your site. Your site accepts
           them only from our storage address and refuses any other.</li>
-          <li><strong>Reading what is on a page,</strong> so we can show you the page and what a fix would
-          change: its title, address, content, headings and SEO fields. We can also ask your site to search its
-          published posts and pages for a word, which answers with the address and title of the matches; we use
-          this to find the page an internal link should point at.</li>
-          <li><strong>What still needs an Application Password even when the plugin is connected:</strong>
-          forcing a new post, scheduled publishing, and the scan of the site&rsquo;s existing posts and the
-          refresh of their index. If we hold no Application Password, those actions do not happen and you are
-          told so, rather than our trying another way.</li>
+          <li><strong>Reading what is on the site,</strong> so we can show you a page and what a fix would
+          change, build the content index, scan the internal links and assemble the site map. The plugin returns
+          these to us:
+          <ul>
+            <li>the contents of one post or page: its title, address, content as WordPress displays it,
+            headings and SEO fields;</li>
+            <li>the list of the site&rsquo;s published posts and pages, each with its id, type, address, slug,
+            title, publication date, last modified date and the focus keyphrase recorded for it in the SEO
+            plugin. A post or page that is not published, or is password protected, is not included, and
+            products are never included;</li>
+            <li>the categories, tags and product categories: name, slug, address and item count;</li>
+            <li>the matches for a word searched in the published posts and pages, with the address and title of
+            each; we use this to find the page an internal link should point at.</li>
+          </ul></li>
+          <li><strong>Who is allowed to publish on the site,</strong> so you can choose whose name an article is
+          published under: the plugin returns the id and display name of each user allowed to publish posts, and
+          the id of the default author. We do not receive their e-mail address, username, roles or any other
+          detail about them, and the list is used only for choosing an author.</li>
+          <li><strong>The Media Library.</strong> We can ask your site to find an image by a word in its file
+          name, title or slug, and it answers, for each image found, with its id, the address of the file and of
+          its resized copies, its alt text and its title. When you approve an alt-text fix for such an image,
+          the plugin writes it on the image itself in the Media Library, and undoing the fix deletes what was
+          written. We do not touch the image file, its name or its caption.</li>
+          <li><strong>What needs an Application Password.</strong> From version 3.1.0 of the plugin onwards,
+          nothing does: everything described here goes through the plugin. On a site running an earlier version
+          of the plugin, forcing a new post, scheduled publishing, and the scan of the site&rsquo;s existing
+          posts and the refresh of their index still go through the application password, and if we hold no such
+          password those actions do not happen and you are told so, rather than our trying another way.</li>
         </ul>
         <p>
           On a site
           without the plugin, the fixes WordPress&rsquo;s REST interface allows are written with the application
           password we stored, under the same approvals and into the same log. Alt text for an image a
-          page shows outside its own text is written on the image itself in the media library, so it applies on
-          every page that shows it; we do not touch the image file, its name or its caption.
+          page shows outside its own text is written on the image itself in the media library &mdash; through the
+          plugin where it is installed, or with the application password on a site without it &mdash; so it applies
+          on every page that shows it; we do not touch the image file, its name or its caption.
         </p>
         <ul>
           <li><strong>Fix log:</strong> every fix is recorded in our log with who approved it, the time it was

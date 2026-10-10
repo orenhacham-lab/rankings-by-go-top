@@ -1460,7 +1460,7 @@ console.log('\nmutation controls')
 
 // ── 22) what the WordPress plugin does, disclosed in every language ─────────
 /*
- * Version 3.0.0 of the GO TOP SEO Bridge plugin does more than apply fixes: it
+ * The GO TOP SEO Bridge plugin does more than apply fixes: it
  * creates whole POSTS from the articles a customer approves, it has the site
  * DOWNLOAD those articles' images into its Media Library, and it returns a
  * page's full CONTENT and can SEARCH the site's published posts. The policy
@@ -1478,10 +1478,29 @@ console.log('\nmutation controls')
  *    site with no SEO plugin). A policy that frames every plugin write as one
  *    the customer clicked is wrong about the thing that matters most: when we
  *    act without asking.
- * 2. Some operations still need the Application Password even when the plugin
- *    is paired — forcing a new post, scheduled publishing, and the scan of
- *    existing posts with its index refresh. A customer who paired the plugin
- *    alone must know those will be refused rather than silently routed.
+ * 2. From version 3.1.0 nothing needs the Application Password any more: the
+ *    four actions that used to (forcing a new post, scheduled publishing, the
+ *    scan of existing posts and its index refresh) go through the plugin. The
+ *    old sentence naming them is therefore required to be ABSENT, and the new
+ *    one has to carry BOTH halves — that 3.1.0 needs no password, and that an
+ *    earlier copy of the plugin still does. A customer running 3.0.0 who reads
+ *    only the first half would hand us no password and wonder why those
+ *    actions are refused.
+ *
+ * 3.1.0 also made the plugin return much more of the site, and each of these is
+ * personal or business data arriving on our servers, so each is held here
+ * separately: the LIST of published posts and pages with their focus keyphrase,
+ * one post's displayed HTML by id, the ids and display names of the USERS who
+ * may publish (and nothing else about them — no e-mail, login or role), and the
+ * Media Library search with alt text read and WRITTEN through the plugin rather
+ * than only through the password. Publishing gained a schedule, a chosen
+ * author, a second post, and taking over the post recorded for an article. That
+ * last one is the easiest to describe too broadly: `gotop_seo_bridge_may_adopt`
+ * only checks that the target is a post, not trashed and not tied to another
+ * article, so the promise that it is always a post GO TOP itself published
+ * rests on the app sending only the recorded `wp_post_id` — which is written
+ * solely from our own publish result (`created.wpPostId`). If a customer-supplied
+ * post id ever reaches that field, this text is wrong and must change first.
  *
  * The connection is also no longer one thing: paired with the plugin alone, no
  * password of the customer's is with us; connected with an Application
@@ -1493,41 +1512,69 @@ const PLUGIN_DOES: Record<string, RegExp[]> = {
     /מאמרים שאתה מפרסם/,
     /ספריית המדיה/,
     /רק מכתובת האחסון שלנו/,
-    /לחפש מילה/,
+    /חיפוש מילה בפוסטים ובעמודים המפורסמים/,
     /שתי דרכים לחבר/,
     /אין אצלנו שום סיסמה שלך/,
     /בפרסום עצמו נכתבים גם כותרת ה-SEO, תיאור המטא, ביטוי המפתח וסכמת ה-JSON-LD/,
-    /מה שדורש סיסמת אפליקציה גם כשהתוסף מחובר/,
+    /מגרסה 3.1.0 של התוסף ואילך, שום פעולה אינה דורשת/,
+    /באתר שבו מותקנת גרסה קודמת של התוסף/,
+    /רשימת הפוסטים והעמודים המפורסמים באתר/,
+    /המזהה ואת שם התצוגה של כל משתמש שמורשה לפרסם/,
+    /איננו\s+מקבלים את כתובת הדואר האלקטרוני שלהם/,
+    /התוסף\s+כותב אותו על התמונה עצמה בספריית המדיה/,
+    /ולא על פוסט שמשויך למאמר אחר/,
+    /הפוסט הזה הוא תמיד פוסט שהמערכת עצמה פרסמה/,
   ],
   en: [
     /Articles you publish/,
     /Media Library/,
     /only from our storage\s+address/,
-    /search its\s+published/,
+    /a word searched in the published posts and pages/,
     /two ways to connect/,
     /no password\s+of yours in our records/,
     /The publish itself also writes that\s+article&rsquo;s own SEO title, meta description, focus keyphrase and JSON-LD schema/,
-    /What still needs an Application Password even when the plugin is connected/,
+    /From version 3.1.0 of the plugin onwards,\s+nothing does/,
+    /On a site running an earlier version/,
+    /the list of the site&rsquo;s published posts and pages/,
+    /the id and display name of each user allowed to publish/,
+    /We do not receive their e-mail address, username, roles or any other/,
+    /the plugin writes it on the image itself in the Media Library/,
+    /or a post belonging to a\s+different article/,
+    /That post is always\s+one GO TOP published itself/,
   ],
   es: [
     /art[íi]culos que usted publica/i,
     /biblioteca de medios/,
     /[úu]nicamente desde nuestra direcci[óo]n de almacenamiento/,
-    /busque una palabra/,
+    /buscar una palabra\s+en las entradas y p[áa]ginas publicadas/,
     /dos formas de conectar/,
     /ninguna contrase[ñn]a suya en nuestros registros/,
     /La propia publicaci[óo]n escribe adem[áa]s el t[íi]tulo SEO, la meta descripci[óo]n, la frase clave principal y el esquema JSON-LD/,
-    /sigue necesitando una Application Password aunque el complemento est[ée] conectado/,
+    /Desde la versi[óo]n 3.1.0 del complemento, nada la necesita/,
+    /En un sitio con una versi[óo]n anterior del complemento/,
+    /la lista de las entradas y p[áa]ginas publicadas del sitio/,
+    /el identificador y el nombre visible de cada usuario autorizado a publicar/,
+    /No recibimos su direcci[óo]n de correo electr[óo]nico/,
+    /el complemento lo escribe en la propia imagen en la biblioteca de medios/,
+    /ni a una entrada que pertenezca a otro art[íi]culo/,
+    /Esa entrada es siempre una que GO TOP public[óo]/,
   ],
   'pt-BR': [
     /artigos que voc[êe] publica/i,
     /biblioteca de m[íi]dia/,
     /somente do nosso endere[çc]o de armazenamento/,
-    /busque uma palavra/,
+    /uma busca por palavra nos posts e p[áa]ginas publicados/,
     /duas formas de conectar/,
     /nenhuma senha sua nos nossos registros/,
     /A pr[óo]pria publica[çc][ãa]o tamb[ée]m escreve o t[íi]tulo de SEO, a meta descri[çc][ãa]o, a palavra-chave de foco e o esquema JSON-LD/,
-    /ainda precisa de uma Senha de Aplicativo mesmo com o plugin conectado/,
+    /Da vers[ãa]o 3.1.0 do plugin em diante, nada precisa/,
+    /Em um site com uma vers[ãa]o anterior do plugin/,
+    /a lista dos posts e p[áa]ginas publicados do site/,
+    /o identificador e o nome de exibi[çc][ãa]o de cada usu[áa]rio autorizado a publicar/,
+    /N[ãa]o recebemos o endere[çc]o de e-mail deles/,
+    /o plugin o escreve na pr[óo]pria imagem na biblioteca de m[íi]dia/,
+    /nem para um post que perten[çc]a a outro artigo/,
+    /Aquele post [ée] sempre um que o GO TOP publicou/,
   ],
 }
 {
@@ -1546,6 +1593,11 @@ const PLUGIN_DOES: Record<string, RegExp[]> = {
     // the one a reader would rely on, and it is now false.
     check(`${name}/privacy: no longer claims the plugin applies fixes and nothing else`,
       !/רק תיקונים\s*\n?\s*מרשימה סגורה|only fixes from a closed list|[úu]nicamente correcciones de una lista cerrada|apenas corre[çc][õo]es de uma lista fechada/.test(src))
+    // And the 3.0.0 sentence, which said those four actions need an Application
+    // Password even with the plugin connected, must be GONE: with 3.1.0 they do
+    // not, and a reader deciding whether to hand us a password would rely on it.
+    check(`${name}/privacy: no longer claims those actions need a password with the plugin connected`,
+      !/מה שדורש סיסמת אפליקציה גם כשהתוסף מחובר|What still needs an Application Password even when the plugin is connected|sigue necesitando una Application Password aunque el complemento est[ée] conectado|ainda precisa de uma Senha de Aplicativo mesmo com o plugin conectado/.test(src))
   }
   check('mutation control: the old "only fixes from a closed list" sentence fails the guard',
     /only fixes from a closed list/.test('the plugin applies to the site only fixes from a closed list (SEO title)'))
@@ -1555,8 +1607,20 @@ const PLUGIN_DOES: Record<string, RegExp[]> = {
     !PLUGIN_DOES.es[1].test('Los artículos que usted publica se crean como entradas en su sitio.'))
   check('mutation control: a policy where publishing writes nothing of its own is caught',
     !PLUGIN_DOES.en[6].test('An article you approve is created as a post on your site, as the author you choose there.'))
-  check('mutation control: a policy that hides the Application Password requirement is caught',
+  check('mutation control: a policy that drops the version the password stops being needed at is caught',
     !PLUGIN_DOES['pt-BR'][7].test('O plugin faz tudo sozinho, sem senha de aplicativo.'))
+  check('mutation control: a policy that forgets an older plugin still needs the password is caught',
+    !PLUGIN_DOES.en[8].test('From version 3.1.0 of the plugin onwards, nothing needs an Application Password.'))
+  check('mutation control: a policy that hides the list of published posts and pages is caught',
+    !PLUGIN_DOES.es[9].test('El complemento nos devuelve el contenido de una entrada concreta y los resultados de una b\u00fasqueda.'))
+  check('mutation control: a policy that hides who may publish is caught',
+    !PLUGIN_DOES.en[10].test('The plugin tells us which authors exist on the site.'))
+  check('mutation control: a policy that claims nothing of the site users reaches us is caught',
+    !PLUGIN_DOES['pt-BR'][11].test('N\u00e3o recebemos nada sobre os usu\u00e1rios do site.'))
+  check('mutation control: a policy where only the application password writes media alt text is caught',
+    !PLUGIN_DOES.en[12].test('Alt text is written on the image itself in the media library with the application password.'))
+  check('mutation control: an adopt sentence with no limits is caught',
+    !PLUGIN_DOES.he[13].test('\u05d4\u05de\u05e2\u05e8\u05db\u05ea \u05d9\u05db\u05d5\u05dc\u05d4 \u05dc\u05e2\u05d3\u05db\u05df \u05db\u05dc \u05e4\u05d5\u05e1\u05d8 \u05d1\u05d0\u05ea\u05e8.'))
 }
 
 // ── 23) no double billing when a Shopify store joins a PayPal account ───────
