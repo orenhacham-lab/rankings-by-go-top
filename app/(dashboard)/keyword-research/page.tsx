@@ -1384,7 +1384,7 @@ function KeywordResearchScreen() {
               last result is still being said), pinned to the bottom of the view, at
               most three actions; what they came to is said right above them. */}
           {(selectedKeywords.size > 0 || addToProjectMessage || addToProjectError || aiQuestionsError) && (
-            <div data-bulk-bar="" className="sticky bottom-4 z-20 mt-4 space-y-2">
+            <div data-bulk-bar="" data-float-clear="" className="sticky bottom-4 z-20 mt-4 space-y-2">
               {aiQuestionsError && (
                 <Notice tone="info" onDismiss={() => setAIQuestionsError('')}>{aiQuestionsError}</Notice>
               )}

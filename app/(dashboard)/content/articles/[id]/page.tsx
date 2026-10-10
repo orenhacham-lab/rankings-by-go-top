@@ -916,7 +916,7 @@ export default function ArticleEditorPage({ params }: { params: Promise<{ id: st
         </div>
 
         {/* The save bar stays in reach while the editor scrolls. */}
-        <div hidden={!editing} data-article-save-bar="" className="sticky bottom-4 z-10 rounded-card border border-line bg-surface/95 p-4 shadow-pop backdrop-blur-md">
+        <div hidden={!editing} data-article-save-bar="" data-float-clear="" className="sticky bottom-4 z-10 rounded-card border border-line bg-surface/95 p-4 shadow-pop backdrop-blur-md">
           <div className="flex flex-wrap items-center gap-2">
             <Button onClick={() => save()} loading={saving} disabled={saving}>{saving ? e.saving : e.saveDraft}</Button>
             {/* Hidden once the article is published to WordPress — "ready" must not

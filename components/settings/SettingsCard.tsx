@@ -62,6 +62,7 @@ export default function SettingsCard({
         <div className="px-5 py-5 sm:px-6 sm:py-6">{children}</div>
         {footer && (
           <footer
+            data-float-clear=""
             className={cn(
               'sticky bottom-0 z-10 flex flex-wrap items-center justify-between gap-3 border-t border-line bg-surface/90 px-5 py-3 backdrop-blur-md sm:px-6',
               'transition-colors duration-150 ease-snappy',
