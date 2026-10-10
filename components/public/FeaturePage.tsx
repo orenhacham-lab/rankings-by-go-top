@@ -27,7 +27,8 @@ import { MarketingHero } from './landing/MarketingHero'
 import { Rise } from './landing/motion'
 import styles from './landing/landing.module.css'
 
-type Cta = { label: string; href: string }
+/** `rel`/`target` make the button an outbound anchor (the Shopify App Store buttons). */
+type Cta = { label: string; href: string; rel?: string; target?: string }
 
 export type FeatureSection =
   | { kind: 'cards'; eyebrow?: string; title: string; intro?: string; columns?: 2 | 3; tone?: 'contrast'; items: { icon?: LucideIcon; title: string; body: React.ReactNode }[] }
@@ -182,8 +183,8 @@ export function FeaturePage({ locale, content }: { locale: PublicLocale; content
           trust={hero.trust}
         >
           <div className="flex flex-col items-stretch justify-center gap-3 sm:flex-row sm:items-center">
-            <ButtonLink href={hero.primary.href} size="lg" arrow className={styles.cta}>{hero.primary.label}</ButtonLink>
-            {hero.secondary && <ButtonLink href={hero.secondary.href} variant="secondary" size="lg">{hero.secondary.label}</ButtonLink>}
+            <ButtonLink href={hero.primary.href} rel={hero.primary.rel} target={hero.primary.target} size="lg" arrow className={styles.cta}>{hero.primary.label}</ButtonLink>
+            {hero.secondary && <ButtonLink href={hero.secondary.href} rel={hero.secondary.rel} target={hero.secondary.target} variant="secondary" size="lg">{hero.secondary.label}</ButtonLink>}
           </div>
           {hero.visual && (
             <figure className="mx-auto mt-12 max-w-4xl lg:mt-14">
@@ -208,8 +209,8 @@ export function FeaturePage({ locale, content }: { locale: PublicLocale; content
 
         <Section tone={sections.length % 2 === 0 ? 'surface' : 'canvas'}>
           <CtaBand title={cta.title} body={cta.body}>
-            <ButtonLink href={cta.primary.href} size="lg" arrow className={styles.cta}>{cta.primary.label}</ButtonLink>
-            {cta.secondary && <ButtonLink href={cta.secondary.href} variant="inverse" size="lg">{cta.secondary.label}</ButtonLink>}
+            <ButtonLink href={cta.primary.href} rel={cta.primary.rel} target={cta.primary.target} size="lg" arrow className={styles.cta}>{cta.primary.label}</ButtonLink>
+            {cta.secondary && <ButtonLink href={cta.secondary.href} rel={cta.secondary.rel} target={cta.secondary.target} variant="inverse" size="lg">{cta.secondary.label}</ButtonLink>}
           </CtaBand>
         </Section>
       </main>

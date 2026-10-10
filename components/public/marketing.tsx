@@ -58,7 +58,7 @@ export function buttonClasses(variant: ButtonVariant = 'primary', size: ButtonSi
 }
 
 export function ButtonLink({
-  href, variant = 'primary', size = 'md', className, children, onClick, arrow = false,
+  href, variant = 'primary', size = 'md', className, children, onClick, arrow = false, rel, target,
 }: {
   href: string
   variant?: ButtonVariant
@@ -66,6 +66,13 @@ export function ButtonLink({
   className?: string
   children: React.ReactNode
   onClick?: () => void
+  /**
+   * An outbound button: `rel` or `target` makes it a plain anchor, because
+   * next/link would prefetch a route that is not ours. The Shopify App Store
+   * buttons pass rel="nofollow noopener noreferrer" (house rule).
+   */
+  rel?: string
+  target?: string
   /**
    * A forward arrow that nudges ahead on hover and a press on click: the
    * call-to-action micro-interaction. Transform only, never looping. (The
@@ -85,6 +92,7 @@ export function ButtonLink({
   ) : children
   // mailto:/tel: are not routes; next/link would try to prefetch them.
   if (/^(mailto|tel):/.test(href)) return <a href={href} className={cls} onClick={onClick}>{content}</a>
+  if (rel || target) return <a href={href} rel={rel} target={target} className={cls} onClick={onClick}>{content}</a>
   return <Link href={href} className={cls} onClick={onClick}>{content}</Link>
 }
 

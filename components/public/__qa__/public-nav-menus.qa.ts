@@ -105,6 +105,16 @@ function main() {
       /apps\.shopify\.com/.test(shopifySrc.replace('href={SHOPIFY_APP_STORE_URL}', "href='https://apps.shopify.com/x'")))
     check('2d3: the page drops its outbound link when there is no listing', /SHOPIFY_APP_STORE_URL\s*\n?\s*\?/.test(shopifySrc))
     void outboundOk
+    // Owner, 10 Oct 2026: on the Shopify page the buttons belong to Shopify.
+    // Both calls to action, in every language, open the listing — nofollow and
+    // in a new tab like every other link to it.
+    const shopifyCtas = PUBLIC_LOCALES.flatMap((l) => [SHOPIFY_PAGE.content[l].hero.primary, SHOPIFY_PAGE.content[l].cta.primary])
+    const ctaGoesToTheStore = (c: { href: string; rel?: string; target?: string }) =>
+      c.href === SHOPIFY_APP_STORE_URL && c.rel === 'nofollow noopener noreferrer' && c.target === '_blank'
+    check('2i: both Shopify calls to action open the App Store listing, in all four languages',
+      SHOPIFY_APP_STORE_URL === null || shopifyCtas.every(ctaGoesToTheStore))
+    check('2i-MUT: a signup call to action on that page is caught',
+      SHOPIFY_APP_STORE_URL === null || !([...shopifyCtas, { href: '/signup' }] as { href: string; rel?: string; target?: string }[]).every(ctaGoesToTheStore))
     check('2e: the constant is null or an App Store listing', SHOPIFY_APP_STORE_URL === null || /^https:\/\/apps\.shopify\.com\/[a-z0-9-]+\/?$/.test(SHOPIFY_APP_STORE_URL))
     // MUTATION CONTROL
     const mutated = nav.replace('`${prefix}/solutions/shopify`', "'https://apps.shopify.com/x'")
