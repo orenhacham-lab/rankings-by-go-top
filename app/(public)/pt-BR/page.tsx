@@ -1,8 +1,26 @@
+import type { Metadata } from 'next'
 import { createClient } from '@/lib/supabase/server'
+import { buildHreflangAlternates } from '@/lib/seo/hreflang'
 import { LandingPage } from '@/components/public/LandingPage'
 import { landingPtBR } from '@/lib/i18n/public/landing-pt-BR'
 import { authHref } from '@/lib/i18n/auth-href'
 import { REFERRAL_PARAM, withReferral } from '@/lib/affiliate/referral'
+
+/**
+ * The home page's own canonical. The Hebrew root has always had one and
+ * these three had none, so the only thing naming this URL as itself was
+ * Google's guess. It lives on the PAGE, not on the language layout: a
+ * layout's canonical is inherited by every route under /pt-BR, which would
+ * point the legal pages that declare no canonical of their own at the home
+ * page. `alternates` replaces the layout's wholesale, so the hreflang set
+ * is restated here.
+ */
+export const metadata: Metadata = {
+  alternates: {
+    canonical: 'https://www.gotopseo.com/pt-BR',
+    languages: buildHreflangAlternates('/', '/en', '/es'),
+  },
+}
 
 /**
  * The Brazilian Portuguese home page. The call to action goes to the PORTUGUESE
@@ -10,6 +28,7 @@ import { REFERRAL_PARAM, withReferral } from '@/lib/affiliate/referral'
  * that a visitor who comes in on a language's site signs up, signs in and uses
  * the app in that language, with no language change along the way.
  */
+
 /**
  * A visitor who arrived on an affiliate link carries the code on the URL, and
  * the page's own "start free" button carries it into the signup form. Nothing is

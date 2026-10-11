@@ -17,12 +17,16 @@
  */
 import type { LucideIcon } from 'lucide-react'
 import { PublicNav } from '@/components/PublicNav'
+import { Breadcrumbs } from '@/components/Breadcrumbs'
 import { Footer } from '@/components/Footer'
 import type { PublicLocale } from '@/lib/i18n/locales'
 import { cn } from '@/lib/utils'
 import {
   ButtonLink, Callout, CheckList, CONTAINER, CtaBand, FaqList, FeatureCard, Section, SectionIntro, StepCard,
 } from './marketing'
+import { faqPageSchema, marketingBreadcrumbSchema } from '@/lib/seo/page-schema'
+import { LOCALE_PREFIX } from '@/lib/i18n/locales'
+import { jsonForScriptTag } from '@/lib/content/public-article-html'
 import { MarketingHero } from './landing/MarketingHero'
 import { Rise } from './landing/motion'
 import styles from './landing/landing.module.css'
@@ -55,6 +59,12 @@ export type FeaturePageContent = {
   }
   sections: FeatureSection[]
   cta: { title: string; body?: string; primary: Cta; secondary?: Cta }
+  /**
+   * The page's own name in the breadcrumb, when the hero's eyebrow is not it.
+   * The eyebrow is normally the short label of what the page is about ("AI
+   * visibility"), which is exactly the name a trail wants.
+   */
+  breadcrumbName?: string
 }
 
 /** Under every product picture: it is an illustration, and says so. */
@@ -167,14 +177,51 @@ function SectionBody({ section }: { section: FeatureSection }) {
   }
 }
 
-export function FeaturePage({ locale, content }: { locale: PublicLocale; content: FeaturePageContent }) {
+export function FeaturePage({
+  locale,
+  content,
+  path,
+}: {
+  locale: PublicLocale
+  content: FeaturePageContent
+  /**
+   * The page's path AFTER the language prefix (`/features/keyword-research`),
+   * the same shape `MarketingPage.path` carries. The breadcrumb is the only
+   * thing that needs it, and a page cannot be placed in the site without it,
+   * so a page that does not pass one simply carries no trail rather than a
+   * trail pointing at the wrong URL.
+   */
+  path?: string
+}) {
   const { hero, sections, cta } = content
+
+  // Both are built from copy that is already rendered below: the trail from the
+  // hero's label, the questions from the `faq` section's own items.
+  const crumbName = content.breadcrumbName ?? hero.eyebrow
+  const breadcrumb = path ? marketingBreadcrumbSchema(locale, path, crumbName) : null
+  const faq = faqPageSchema(
+    sections.flatMap((section) => (section.kind === 'faq' ? section.items : []))
+  )
+
   return (
     <div className="flex min-h-screen flex-col bg-canvas">
+      {breadcrumb && (
+        <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: jsonForScriptTag(breadcrumb) }} />
+      )}
+      {faq && (
+        <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: jsonForScriptTag(faq) }} />
+      )}
       <PublicNav locale={locale} />
 
       <main className="flex-1">
         <MarketingHero
+          /* THE TRAIL THE MARKUP DESCRIBES, on the page. Google's structured
+             data guidelines say not to mark up content that is not visible to
+             the reader, and the articles, the about page and the legal
+             documents have shown a trail here all along — these were the only
+             pages carrying a BreadcrumbList nobody could see. Same component,
+             same labels, so the two cannot drift. */
+          before={path ? <Breadcrumbs items={[{ label: crumbName, href: `${LOCALE_PREFIX[locale]}${path}` }]} locale={locale} /> : undefined}
           eyebrow={hero.eyebrow}
           eyebrowIcon={hero.eyebrowIcon}
           title={hero.title}

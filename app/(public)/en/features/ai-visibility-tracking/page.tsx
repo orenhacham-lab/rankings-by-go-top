@@ -16,7 +16,7 @@ export const metadata: Metadata = {
 }
 
 export default function AIVisibilityFeaturePage() {
-  return <FeaturePage locale="en" content={CONTENT} />
+  return <FeaturePage locale="en" content={CONTENT} path="/features/ai-visibility-tracking" />
 }
 
 const C = FEATURE_COMMON.en

@@ -4604,6 +4604,7 @@ export const dashboardEs: DeepPartial<DashboardDictionary> = {
     nextPaused: 'La publicación automática está en pausa',
     first: {
       approveHint: 'Al aprobarlo escribimos tu primer artículo al momento (cuenta en tu cupo)',
+      approveHintTrial: 'Tu primer artículo está incluido en la prueba. Aprueba un tema y empezamos a escribirlo ahora.',
       writingTitle: 'Escribiendo tu primer artículo…',
       writingBody: 'Esto tarda unos minutos. Puedes salir de la página; la redacción sigue sin ti.',
       readyTitle: 'Tu primer artículo está listo',
@@ -4776,6 +4777,9 @@ export const dashboardEs: DeepPartial<DashboardDictionary> = {
       approve: 'Tú apruebas ideas',
       approveBody: (n: string) => `${n} ideas esperan tu aprobación.`,
       approveNone: 'Ahora mismo no hay ninguna idea esperando tu aprobación.',
+      prepared: 'Nosotros preparamos los temas',
+      preparedBody: (n: string) => `${n} temas están listos para los próximos meses. Lo que necesita el mes que viene ya está en la cola.`,
+      preparedNone: 'Los temas del próximo mes ya están en la cola. Preparamos más antes de que se agoten.',
       write: 'Los artículos se escriben en el orden de la cola',
       writeBody: (date: string) => `El siguiente artículo de la cola está previsto para el ${date}.`,
       writeNone: 'Un tema aprobado entra en la cola de publicación y se escribe cuando le toca.',

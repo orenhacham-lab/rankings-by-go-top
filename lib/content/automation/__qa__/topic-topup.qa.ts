@@ -373,6 +373,7 @@ async function provenance() {
   const res = await handleStrategyGet(new Request('http://localhost/api/content/strategy?projectId=p1'), {
     enabled: () => true,
     auth: async () => ({ admin: fa as never, project: { id: 'p1', user_id: 'u1' }, user: { id: 'u1' } }),
+    entitled: async () => true,
   } as never)
   const body = await res.json() as { ok: boolean; topics: StrategyTopic[] }
   const byId = new Map(body.topics.map((tp) => [tp.id, tp]))

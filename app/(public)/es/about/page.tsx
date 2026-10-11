@@ -1,5 +1,6 @@
 import { AboutPage, type AboutCopy } from '@/components/public/AboutPage'
 import { FEATURE_COMMON } from '@/lib/i18n/public/feature-common'
+import { ABOUT_BREADCRUMB } from '@/lib/i18n/public/pages/breadcrumb-labels'
 
 export default function SpanishAboutPage() {
   return <AboutPage locale="es" copy={COPY} />
@@ -12,7 +13,7 @@ export default function SpanishAboutPage() {
  * nothing new is true of it yet.
  */
 const COPY: AboutCopy = {
-  breadcrumb: { label: 'Quiénes somos', href: '/es/about' },
+  breadcrumb: { label: ABOUT_BREADCRUMB['es'], href: '/es/about' },
   title: '11 años de SEO,',
   accent: 'en una plataforma que trabaja para ti.',
   subtitle: 'Una plataforma que escribe y publica artículos en tu web, sigue en qué puesto apareces en Google y en Google Maps, y comprueba si los motores de IA te recomiendan. La construye Go Top, una agencia digital con más de 11 años de experiencia en SEO y publicidad de pago.',

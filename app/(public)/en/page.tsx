@@ -1,8 +1,26 @@
+import type { Metadata } from 'next'
 import { createClient } from '@/lib/supabase/server'
+import { buildHreflangAlternates } from '@/lib/seo/hreflang'
 import { LandingPage } from '@/components/public/LandingPage'
 import { landingEn } from '@/lib/i18n/public/landing-en'
 import { authHref } from '@/lib/i18n/auth-href'
 import { REFERRAL_PARAM, withReferral } from '@/lib/affiliate/referral'
+
+/**
+ * The home page's own canonical. The Hebrew root has always had one and
+ * these three had none, so the only thing naming this URL as itself was
+ * Google's guess. It lives on the PAGE, not on the language layout: a
+ * layout's canonical is inherited by every route under /en, which would
+ * point the legal pages that declare no canonical of their own at the home
+ * page. `alternates` replaces the layout's wholesale, so the hreflang set
+ * is restated here.
+ */
+export const metadata: Metadata = {
+  alternates: {
+    canonical: 'https://www.gotopseo.com/en',
+    languages: buildHreflangAlternates('/', '/en', '/es'),
+  },
+}
 
 /**
  * A visitor who arrived on an affiliate link carries the code on the URL, and

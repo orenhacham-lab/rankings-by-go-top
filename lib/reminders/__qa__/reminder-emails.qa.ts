@@ -25,10 +25,11 @@ import type { ServiceRoleClient } from '@/lib/supabase/admin'
 import { decideReminder, inSendWindow, type ReminderState } from '../cadence'
 import { makeUnsubscribeToken, verifyUnsubscribeToken } from '../token'
 import { buildReminderEmail, safeOrigin } from '../email'
-import { reminderGate, runArticleReminders, type OutgoingReminder, type ReminderDeps } from '../run'
+import { reminderGate, runArticleReminders, type OutgoingReminder, type OwnerFacts, type ReminderDeps } from '../run'
 import { runIsolatedReminders } from '../isolated'
 import { handlePreferencesGet, handlePreferencesPut, handleUnsubscribe, unsubscribeByToken } from '../http'
 import { hashEmail } from '@/lib/email-suppression'
+import { fallbackEmailLocale } from '../recipient'
 import { withMutant } from './_mutant'
 
 let pass = 0
@@ -127,11 +128,11 @@ async function main() {
       project_reminder_state: over.state ? [over.state] : [],
     })
   }
-  const deps = (admin: FakeAdmin, o: { env?: Record<string, string | undefined>; sent?: OutgoingReminder[]; ok?: boolean; at?: Date; ownerFacts?: Partial<{ email: string | null; locale: 'he' | 'en' | null }> } = {}): ReminderDeps => ({
+  const deps = (admin: FakeAdmin, o: { env?: Record<string, string | undefined>; sent?: OutgoingReminder[]; ok?: boolean; at?: Date; ownerFacts?: Partial<OwnerFacts> } = {}): ReminderDeps => ({
     admin: admin as unknown as ServiceRoleClient,
     env: o.env ?? fullEnv,
     now: () => o.at ?? now,
-    owner: async (id) => (id === OWNER ? { email: 'owner@example.com', locale: 'he', firstName: 'דנה', shopify: false, ...o.ownerFacts } : null),
+    owner: async (id) => (id === OWNER ? { email: 'owner@example.com', locale: 'he', firstName: 'דנה', shopifyAppStoreOrigin: false, staff: false, ...o.ownerFacts } : null),
     send: async (m) => { (o.sent ??= []).push(m); return { ok: o.ok !== false } },
   })
   {
@@ -371,6 +372,56 @@ async function main() {
       },
     )
     check('H-MUT: without the gate we email someone who asked us to stop (H1 would fail)', gateMut)
+  }
+
+  // ── I) who it goes to, and in which language ──────────────────────────
+  console.log('\nI) The owner\u2019s own language, and never staff')
+  {
+    check('I1: without a recorded language, only App Store provenance means English', fallbackEmailLocale(true) === 'en' && fallbackEmailLocale(false) === 'he')
+    check('I2: unreadable provenance has no honest answer', fallbackEmailLocale(null) === null)
+
+    // The live bug, 11 October: an Israeli owner with two connected Shopify stores received
+    // the reminder in English, because a connection record was read as a language.
+    const agency: OutgoingReminder[] = []
+    await runArticleReminders(deps(world(), { sent: agency, ownerFacts: { locale: null } }))
+    check('I3: no recorded language, website account: Hebrew, not English',
+      agency.length === 1 && /מחכים/.test(agency[0].email.subject), agency[0]?.email.subject)
+
+    const fromAppStore: OutgoingReminder[] = []
+    await runArticleReminders(deps(world(), { sent: fromAppStore, ownerFacts: { locale: null, shopifyAppStoreOrigin: true } }))
+    check('I4: an App Store account with no recorded language gets English',
+      fromAppStore.length === 1 && /articles are waiting/.test(fromAppStore[0].email.subject), fromAppStore[0]?.email.subject)
+
+    const unreadable: OutgoingReminder[] = []
+    const uAdmin = world()
+    const held = await runArticleReminders(deps(uAdmin, { sent: unreadable, ownerFacts: { locale: null, shopifyAppStoreOrigin: null } }))
+    check('I5: no language and unreadable provenance: nothing sent, no claim taken',
+      held.status === 'done' && unreadable.length === 0 && !(uAdmin.tables.project_reminder_state ?? []).some((r) => r.last_sent_at))
+
+    const staffSent: OutgoingReminder[] = []
+    const sAdmin = world()
+    const staff = await runArticleReminders(deps(sAdmin, { sent: staffSent, ownerFacts: { staff: true } }))
+    check('I6: an administrator\u2019s own project gets no reminder',
+      staff.status === 'done' && staffSent.length === 0 && !(sAdmin.tables.project_reminder_state ?? []).some((r) => r.last_sent_at))
+
+    const staffMut = await withMutant<{ runArticleReminders: typeof runArticleReminders }, boolean>(
+      'lib/reminders/run.ts', [['if (facts.staff) continue', 'void facts.staff']],
+      async (m) => { const s2: OutgoingReminder[] = []; await m.runArticleReminders(deps(world(), { sent: s2, ownerFacts: { staff: true } })); return s2.length === 1 },
+    )
+    check('I-MUT: without the staff check we mail our own administrator (I6 would fail)', staffMut)
+
+    // The three live dependency modules must not go back to reading a connection record.
+    const lives = ['lib/reminders/live.ts', 'lib/onboarding-emails/live.ts', 'lib/reports/weekly/live.ts']
+    check('I7: no live sender reads shopify_connections any more',
+      lives.every((f) => !/shopify_connections/.test(strip(code(f)))))
+    check('I8: each live sender reads provenance and the administrator role instead',
+      lives.every((f) => { const src = strip(code(f)); return /loadBillingGovernance\(/.test(src) && /isAdminUser\(/.test(src) }))
+
+    const langMut = await withMutant<{ fallbackEmailLocale: typeof fallbackEmailLocale }, boolean>(
+      'lib/reminders/recipient.ts', [["  if (origin === null) return null", '  if (origin === null) return "en"']],
+      async (m) => m.fallbackEmailLocale(null) === 'en',
+    )
+    check('I-MUT2: guessing English for an unreadable account would write in the wrong language (I2 and I5 would fail)', langMut)
   }
 
   console.log(`\n${pass} passed, ${fail} failed`)

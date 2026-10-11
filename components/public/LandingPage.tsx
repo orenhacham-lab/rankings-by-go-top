@@ -23,6 +23,8 @@ import { PublicNav } from '@/components/PublicNav'
 import { Footer } from '@/components/Footer'
 import { FreeCheckHeroForm } from '@/components/free-check/FreeCheckHeroForm'
 import { getLocaleConfig, LOCALE_PREFIX, type PublicLocale } from '@/lib/i18n/locales'
+import { faqPageSchema } from '@/lib/seo/page-schema'
+import { jsonForScriptTag } from '@/lib/content/public-article-html'
 import { cn } from '@/lib/utils'
 import { ButtonLink, CONTAINER, CONTAINER_WIDE, Eyebrow, FaqList, IconSquircle, Section, SectionIntro } from './marketing'
 import { HeroDemo, type HeroDemoCopy } from './landing/HeroDemo'
@@ -113,8 +115,16 @@ export function LandingPage({
     { row: f.reports, visual: <ReportsVisual copy={f.reports.visual} /> },
   ]
 
+  // The questions the page already answers below, declared as questions. Built
+  // from the same copy the FaqList renders, so the markup can never say
+  // something the reader does not see.
+  const faq = faqPageSchema(copy.faq.items)
+
   return (
     <div className="flex min-h-screen flex-col bg-canvas">
+      {faq && (
+        <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: jsonForScriptTag(faq) }} />
+      )}
       <PublicNav locale={locale} tone="inverse" />
 
       <main className="flex-1">

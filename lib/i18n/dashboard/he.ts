@@ -2374,6 +2374,7 @@ export const dashboardHe = {
     // (lib/content/strategy/first-article.ts). "Publish now" is offered for it only.
     first: {
       approveHint: 'האישור כותב מיד את המאמר הראשון (נספר במכסת המאמרים)',
+      approveHintTrial: 'המאמר הראשון כלול בניסיון. אשרו נושא ונתחיל לכתוב אותו עכשיו.',
       writingTitle: 'כותבים את המאמר הראשון…',
       writingBody: 'זה לוקח כמה דקות. אפשר לצאת מהדף, הכתיבה ממשיכה גם בלעדיכם.',
       readyTitle: 'המאמר הראשון מוכן',
@@ -2551,6 +2552,9 @@ export const dashboardHe = {
       approve: 'אתם מאשרים רעיונות',
       approveBody: (n: string) => `${n} רעיונות מחכים לאישור שלכם.`,
       approveNone: 'אין כרגע רעיון שמחכה לאישור.',
+      prepared: 'אנחנו מכינים את הנושאים',
+      preparedBody: (n: string) => `${n} נושאים מוכנים לחודשים הבאים. את מה שדרוש לחודש הקרוב כבר הכנסנו לתור.`,
+      preparedNone: 'הנושאים לחודש הקרוב כבר בתור. נכין עוד לפני שייגמרו.',
       write: 'המאמר נכתב לפי התור',
       writeBody: (date: string) => `המאמר הבא בתור מתוכנן ל-${date}.`,
       writeNone: 'נושא שאושר נכנס לתור הפרסום ונכתב בתורו.',
