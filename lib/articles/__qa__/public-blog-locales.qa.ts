@@ -28,6 +28,7 @@ import { ARTICLES_COPY, articleHref, articlesIndexHref } from '@/lib/articles/i1
 import { extractFaqSchema, FAQ_HEADING, buildArticleSchemas, withSiteName } from '@/lib/articles/server'
 import { splitArticleBlocks } from '@/lib/articles/widgets'
 import { withHeadingIds } from '@/lib/articles/headings'
+import { linkifyBareUrls } from '@/lib/articles/bare-urls'
 import { readingMinutes } from '@/lib/articles/reading-time'
 import { articlePublishBlockReason } from '@/lib/articles/publish-rules'
 import { articleAuthor, authorPersonSchema } from '@/lib/articles/authors'
@@ -392,9 +393,32 @@ function main() {
     /title: withSiteName\(article\.meta_title \|\| article\.title\)/.test(serverSrc)
     && (serverSrc.match(/\| Go Top SEO`/g) ?? []).length === 1)
 
+  console.log('\nT. a web address written as plain text is clickable on every article page')
+  const bare = '<h2>כ</h2><p>להירשם דרך: https://www.gotopseo.com/signup?lang=he.</p>'
+  const bareOut = linkifyBareUrls(bare)
+  check('T1. the address becomes a link', bareOut.includes('<a href="https://www.gotopseo.com/signup?lang=he">'))
+  check('T2. the full stop stays outside it', bareOut.includes('</a>.</p>'))
+  check('T3. an address already inside a link is untouched', (() => {
+    const html = '<p><a href="https://www.gotopseo.com/x">https://www.gotopseo.com/x</a></p>'
+    return linkifyBareUrls(html) === html
+  })())
+  check('T4. an address in an attribute is untouched', (() => {
+    const html = '<p><img src="https://x.supabase.co/a.jpg" alt="https"></p>'
+    return linkifyBareUrls(html) === html
+  })())
+  check('T5. a foreign address is nofollow and opens in a new tab', (() => {
+    const out = linkifyBareUrls('<p>ראו https://example.com/a</p>')
+    return out.includes('rel="nofollow noopener"') && out.includes('target="_blank"')
+  })())
+  check('T6. running it twice changes nothing', linkifyBareUrls(bareOut) === bareOut)
+  check('T7. the article page runs it on the stored body, after the sanitizer',
+    /withHeadingIds\(linkifyBareUrls\(sanitizePublicArticleHtml\(article\.content\)\)\)/.test(stripComments(read('components/public/articles/ArticleView.tsx'))))
+  check('T8. headings still get their ids through it', withHeadingIds(bareOut).headings.length === 1)
+
   console.log('\nM. mutation controls — the behavioural guards fail on broken input')
   check('M1. a FAQ under the wrong language\'s heading yields nothing',
     extractFaqSchema(`<h2>${FAQ_HEADING.he}</h2><p><strong>Q?</strong><br>A.</p>`, 'es').length === 0)
+  check('M-T. an address left as prose has nothing to click', !bare.includes('<a '))
   check('M-R. appending the name unconditionally doubles it',
     `${'מדריך SEO | Go Top SEO'} | Go Top SEO` !== withSiteName('מדריך SEO | Go Top SEO'))
   check('M2. an article page of the wrong locale builds a different URL',

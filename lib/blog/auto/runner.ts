@@ -34,6 +34,7 @@ import {
   readTakenKeywords, recoverStaleLocks, releasePlanRow, MAX_ATTEMPTS,
 } from '@/lib/blog/auto/store'
 import { withArticleWidgets } from '@/lib/blog/auto/widgets'
+import { withBodyLinks, checkBodyLinks } from '@/lib/blog/auto/body-links'
 import type { ArticleBrief, ValidatedArticle, ValidatedArticleError } from '@/lib/content/gemini-article'
 import type { CoverResult } from '@/lib/blog/auto/cover'
 
@@ -151,6 +152,14 @@ export async function runBlogAutoPublish(
   })
   if (!truth.ok) return fail(`truth:${truth.failures.join(',')}`)
 
+  // The body's links: a bare URL becomes clickable, the product's first mention
+  // becomes a link into the trial, and our other articles of this language are
+  // offered at the end. The gate then refuses an article that never named the
+  // system or carries no way into it.
+  const linked = withBodyLinks(generated.safeHtml, { locale, internalTargets })
+  const links = checkBodyLinks(linked)
+  if (!links.ok) return fail(`links:${links.failures.join(',')}`)
+
   const cover: CoverResult = await deps.cover(admin, {
     slug: generated.slug,
     title: generated.article.title,
@@ -170,7 +179,7 @@ export async function runBlogAutoPublish(
     // The plan cards and the trial band are appended here, not asked of the
     // model: a widget the article forgot is a page that ends on prose with no
     // way to act on it.
-    html: withArticleWidgets(generated.safeHtml),
+    html: withArticleWidgets(linked),
     featuredImageUrl: cover.url,
     featuredImageAlt: generated.article.title,
   })
