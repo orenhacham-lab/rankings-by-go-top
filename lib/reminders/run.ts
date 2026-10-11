@@ -26,6 +26,7 @@ import type { Locale } from '@/lib/i18n/locales'
 import { FIRST_AFTER_MS, decideReminder, inSendWindow } from './cadence'
 import { buildReminderEmail, safeOrigin, type ReminderEmail } from './email'
 import { isSuppressed } from '@/lib/email-suppression'
+import { fallbackEmailLocale, type ShopifyOriginFact } from './recipient'
 import { claimSend, readState, releaseClaim } from './state'
 import { makeUnsubscribeToken } from './token'
 
@@ -34,7 +35,15 @@ export const REMINDER_FLAG = 'REMINDER_EMAILS_ENABLED'
 export const ARTICLE_READ_CAP = 600
 export const PROJECTS_PER_RUN = 20
 
-export interface OwnerFacts { email: string | null; locale: Locale | null; firstName: string | null; shopify: boolean }
+export interface OwnerFacts {
+  email: string | null
+  locale: Locale | null
+  firstName: string | null
+  /** Provenance, not a connected store; null when it could not be read. */
+  shopifyAppStoreOrigin: ShopifyOriginFact
+  /** An administrator's own project: no customer email. */
+  staff: boolean
+}
 export interface OutgoingReminder { to: string; email: ReminderEmail }
 
 export interface ReminderDeps {
@@ -118,7 +127,10 @@ export async function runArticleReminders(deps: ReminderDeps): Promise<ReminderR
 
       const facts = await deps.owner(ownerId).catch(() => null)
       if (!facts?.email) continue
-      const locale: Locale = facts.locale ?? (facts.shopify ? 'en' : 'he')
+      if (facts.staff) continue
+      const locale = facts.locale ?? fallbackEmailLocale(facts.shopifyAppStoreOrigin)
+      // No recorded language and no readable provenance: nothing to write in yet.
+      if (!locale) continue
       const token = makeUnsubscribeToken(projectId, ownerId, deps.env)
       const domain = str(p.target_domain) ?? str(p.business_name)
       if (!token || !domain) continue

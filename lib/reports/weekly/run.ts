@@ -33,6 +33,7 @@ import { safeOrigin } from '@/lib/reminders/email'
 import { makeUnsubscribeToken } from '@/lib/reminders/token'
 import { readState } from '@/lib/reminders/state'
 import { isSuppressed } from '@/lib/email-suppression'
+import { fallbackEmailLocale, type ShopifyOriginFact } from '@/lib/reminders/recipient'
 import { aggregateWeek } from './aggregate'
 import { buildWeeklyEmail, type WeeklyEmail } from './email'
 import { inWeeklyWindow, weekKeyOf, weekWindow } from './period'
@@ -51,7 +52,10 @@ export interface WeeklyOwner {
   email: string | null
   locale: PublicLocale | null
   firstName: string | null
-  shopify: boolean
+  /** Provenance, not a connected store; null when it could not be read. */
+  shopifyAppStoreOrigin: ShopifyOriginFact
+  /** An administrator's own project: no customer email. */
+  staff: boolean
 }
 
 export interface WeeklyDeps {
@@ -130,7 +134,9 @@ export async function runWeeklySummaries(deps: WeeklyDeps): Promise<WeeklyRun> {
 
       const who = await deps.owner(ownerId).catch(() => null)
       if (!who?.email) continue
-      const locale: PublicLocale = who.locale ?? (who.shopify ? 'en' : 'he')
+      if (who.staff) continue
+      const locale: PublicLocale | null = who.locale ?? fallbackEmailLocale(who.shopifyAppStoreOrigin)
+      if (!locale) continue
       const token = makeUnsubscribeToken(projectId, ownerId, deps.env)
       if (!token) continue
 

@@ -34,6 +34,7 @@ import { makeUnsubscribeToken } from '@/lib/reminders/token'
 import { CONNECT_AFTER_MS, PUBLISH_AFTER_MS, decideOnboardingEmail, type Stage } from './cadence'
 import { buildOnboardingEmail, type OnboardingEmail } from './email'
 import { isSuppressed } from '@/lib/email-suppression'
+import { fallbackEmailLocale, type ShopifyOriginFact } from '@/lib/reminders/recipient'
 import { claimOnboardingSend, readOnboardingState, releaseOnboardingClaim } from './state'
 
 export const ONBOARDING_FLAG = 'ONBOARDING_EMAILS_ENABLED'
@@ -48,7 +49,10 @@ export interface OnboardingOwner {
   email: string | null
   locale: PublicLocale | null
   firstName: string | null
-  shopify: boolean
+  /** Provenance, not a connected store; null when it could not be read. */
+  shopifyAppStoreOrigin: ShopifyOriginFact
+  /** An administrator's own project: no customer email. */
+  staff: boolean
 }
 
 export interface OnboardingDeps {
@@ -179,7 +183,9 @@ export async function runOnboardingEmails(deps: OnboardingDeps): Promise<Onboard
 
       const who = await deps.owner(ownerId).catch(() => null)
       if (!who?.email) continue
-      const locale: PublicLocale = who.locale ?? (who.shopify ? 'en' : 'he')
+      if (who.staff) continue
+      const locale: PublicLocale | null = who.locale ?? fallbackEmailLocale(who.shopifyAppStoreOrigin)
+      if (!locale) continue
       const token = makeUnsubscribeToken(projectId, ownerId, deps.env)
       const domain = str(row.target_domain) ?? str(row.business_name)
       if (!token || !domain) continue
