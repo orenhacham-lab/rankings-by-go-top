@@ -17,7 +17,7 @@
  */
 const { spawn } = require('child_process')
 const { join, resolve } = require('path')
-const { mkdirSync, copyFileSync, existsSync } = require('fs')
+const { mkdirSync, copyFileSync, existsSync, readFileSync } = require('fs')
 
 const ROOT = resolve(__dirname, '../..')
 const OWN_SERVER = !process.env.SL_BASE_URL
@@ -29,8 +29,11 @@ const MIRROR = '/mnt/project-files/shopify-listing/screenshots'
 const PID = 'a1111111-2222-3333-4444-555555555555'
 const USER = '674fc7c3-2048-48f4-ba25-6e2a6dff4a06'
 const W = 1600, H = 900
-// Shopify documents no mobile size; 900x1600 is the desktop ratio stood on end.
+// The phone is captured portrait at 900x1600, then centred on a 1600x900 canvas,
+// because the listing form takes every screenshot at 1600x900 (owner, 2026-10-11).
 const MW = 900, MH = 1600
+const CANVAS = '#f7f6f2'   // the app's own page colour, sampled from a desktop shot
+const PHONE_H = Number(process.env.SL_PHONE_H || 800) // leaves air above and below for the corner and shadow
 
 mkdirSync(SHOTS, { recursive: true })
 let mirror = null
@@ -229,7 +232,7 @@ const research = { ok: true, market: { country: 'US', language: 'en' }, fetchedA
 
     for (const sc of SCREENS) {
       const status = await go(sc.path, sc.ready)
-      const name = `${tag}-${sc.name}`
+      const name = `${tag === 'mobile' ? 'rawmobile' : tag}-${sc.name}`
       const file = join(SHOTS, `${name}.png`)
       // Viewport-only, never fullPage: the listing wants an exact size.
       await page.screenshot({ path: file }).catch(() => {})
@@ -245,9 +248,41 @@ const research = { ok: true, market: { country: 'US', language: 'en' }, fetchedA
     await ctx.close().catch(() => {})
   }
 
+  /**
+   * The listing form takes mobile screenshots at 1600x900 too, so a portrait
+   * phone capture cannot be uploaded as it stands. Each one is centred on a
+   * 1600x900 canvas painted the app's own page colour, as tall as the frame
+   * allows. Chromium does the compositing, so nothing is added to the toolchain
+   * and the rounded corner and shadow come from CSS.
+   */
+  const composeMobile = async () => {
+    const ctx = await browser.newContext({ viewport: { width: W, height: H }, deviceScaleFactor: 1 })
+    const page = await ctx.newPage()
+    for (const sc of SCREENS) {
+      const src = join(SHOTS, `rawmobile-${sc.name}.png`)
+      if (!existsSync(src)) { check(`mobile-${sc.name}: portrait capture exists`, false, src); continue }
+      const b64 = readFileSync(src).toString('base64')
+      await page.setContent(`<!doctype html><meta charset="utf-8"><style>
+        html,body{margin:0;height:100%}
+        body{background:${CANVAS};display:flex;align-items:center;justify-content:center}
+        img{height:${PHONE_H}px;width:auto;display:block;border-radius:18px;
+            box-shadow:0 18px 48px rgba(16,24,40,.18),0 2px 6px rgba(16,24,40,.08)}
+      </style><img src="data:image/png;base64,${b64}">`, { waitUntil: 'load' })
+      await page.waitForTimeout(250)
+      const name = `mobile-${sc.name}`
+      const file = join(SHOTS, `${name}.png`)
+      await page.screenshot({ path: file }).catch(() => {})
+      if (mirror) { try { copyFileSync(file, join(mirror, `${name}.png`)) } catch { /* best effort */ } }
+      const { width, height } = await page.evaluate(() => ({ width: innerWidth, height: innerHeight }))
+      check(`${name}: composed at ${W}x${H}`, width === W && height === H, `${width}x${height}`)
+    }
+    await ctx.close().catch(() => {})
+  }
+
   try {
     await capture({ tag: 'desktop', width: W, height: H, scale: 1, mobile: false })
     await capture({ tag: 'mobile', width: MW / 2, height: MH / 2, scale: 2, mobile: true })
+    await composeMobile()
   } finally {
     await browser.close().catch(() => {})
     kill()
