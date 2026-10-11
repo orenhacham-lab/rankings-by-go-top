@@ -167,24 +167,33 @@ async function main() {
   check('MUTATION CONTROL: a link above a card\'s button is caught',
     !ctaFirst(read(HE_PAGE).replace('<h3 className=', '<a href="/features" className="sr-only">x</a><h3 className=')))
 
-  console.log('\nF) the price in the grid is not presented as the final price')
+  console.log('\nF) the price in the grid says what it includes, per market')
   /*
-   * On a card payment Creem is the merchant of record and calculates indirect
-   * tax on the buyer's billing address (Merchant Terms 9.1, 3.3.4), so the
-   * figure in the grid is not what the buyer pays. An EU consumer has to see a
-   * tax-inclusive final price before paying; Creem's checkout is where that
-   * happens, and this sentence is what stops the grid from reading as the whole
-   * price. It is checked in all four dictionaries, not just the two pages this
-   * suite renders, because a missing sentence in one language is a price claim
+   * The grid shows one figure, and what that figure means depends on the
+   * BILLING MARKET rather than on the page's language: the same Hebrew page
+   * shows a shekel price to a visitor in Israel and a dollar price to a visitor
+   * outside it. So the note is keyed by market and both keys are checked, in
+   * all four dictionaries — a missing sentence in one language is a price claim
    * we cannot keep in that language.
    *
-   * The sentence deliberately says nothing about the shekel prices: whether
-   * those include Israeli VAT is not settled anywhere in the code or the terms,
-   * so a guard that demanded a statement about them would be demanding a guess.
+   *  - ILS must say the price INCLUDES Israeli VAT. The owner stated on
+   *    10 October 2026 that it does and that he reports that VAT himself, so a
+   *    shekel figure is the whole price. Israel pays through PayPal and never
+   *    through Creem, so naming Creem on this key would be wrong.
+   *  - USD must name Creem and say the figure does NOT include the tax it adds
+   *    (Merchant Terms 9.1, 3.3.4). An EU consumer has to see a tax-inclusive
+   *    final price before paying, and Creem's checkout is where that happens.
    */
   {
     const { pricingEs } = require(join(ROOT, 'lib/i18n/public/pricing-es.ts'))
     const { pricingPtBR } = require(join(ROOT, 'lib/i18n/public/pricing-pt-BR.ts'))
+    const { BILLING_MARKET_CODES } = require(join(ROOT, 'lib/billing/market.ts'))
+    const VAT_INCLUDED: Record<string, RegExp> = {
+      he: /המחירים כוללים מע״מ/,
+      en: /The prices include Israeli VAT/,
+      es: /Los precios incluyen el IVA israelí/,
+      'pt-BR': /Os preços incluem o IVA israelense/,
+    }
     const NOT_INCLUDED: Record<string, RegExp> = {
       he: /המחירים כאן אינם כוללים אותו/,
       en: /The prices here do not include it/,
@@ -193,20 +202,29 @@ async function main() {
     }
     const dicts: [string, any][] = [['he', pricingHe], ['en', pricingEn], ['es', pricingEs], ['pt-BR', pricingPtBR]]
     for (const [l, copy] of dicts) {
-      const note = copy.plans.taxNote as string | undefined
-      check(`F1 (${l}): the grid carries a tax note`, typeof note === 'string' && note.length > 0)
-      check(`F2 (${l}): it names Creem as the one that adds the tax`, /Creem/.test(note ?? ''))
-      check(`F3 (${l}): it says the price shown does not include that tax`, (NOT_INCLUDED[l] ?? /$^/).test(note ?? ''))
+      const note = copy.plans.taxNote as Record<string, string> | undefined
+      check(`F1 (${l}): every billing market has a tax note`,
+        !!note && BILLING_MARKET_CODES.every((m: string) => typeof note[m] === 'string' && note[m].length > 0))
+      check(`F2 (${l}): the shekel note says the price includes Israeli VAT`, (VAT_INCLUDED[l] ?? /$^/).test(note?.ILS ?? ''))
+      check(`F3 (${l}): the shekel note does not name Creem, which never bills Israel`, !/Creem/.test(note?.ILS ?? 'Creem'))
+      check(`F4 (${l}): the dollar note names Creem as the one that adds the tax`, /Creem/.test(note?.USD ?? ''))
+      check(`F5 (${l}): the dollar note says the price shown does not include that tax`, (NOT_INCLUDED[l] ?? /$^/).test(note?.USD ?? ''))
     }
-    const noteMarkup = renderToStaticMarkup(createElement(S.PricingChecksNote, { copy: pricingHe }))
-    check('F4: the note is rendered under the grid, not only stored',
-      noteMarkup.includes('data-tax-note') && noteMarkup.includes(pricingHe.plans.taxNote))
-    check('MUTATION CONTROL: a note that stops at naming Creem is caught',
+    for (const market of ['ILS', 'USD'] as const) {
+      const markup = renderToStaticMarkup(createElement(S.PricingChecksNote, { copy: pricingHe, market }))
+      check(`F6 (${market}): that market's note is rendered under the grid, not only stored`,
+        markup.includes('data-tax-note') && markup.includes(pricingHe.plans.taxNote[market]))
+      check(`F7 (${market}): the other market's note is not rendered beside it`,
+        !markup.includes(pricingHe.plans.taxNote[market === 'ILS' ? 'USD' : 'ILS']))
+    }
+    check('MUTATION CONTROL: a dollar note that stops at naming Creem is caught',
       !NOT_INCLUDED.en.test('On a card payment the merchant of record is Creem.'))
-    check('MUTATION CONTROL: a note claiming the price is tax inclusive is caught',
+    check('MUTATION CONTROL: a dollar note claiming the price is tax inclusive is caught',
       !NOT_INCLUDED.es.test('Los precios de aquí incluyen todos los impuestos aplicables.'))
-    check('MUTATION CONTROL: a dictionary with no tax note at all is caught',
-      !(typeof ({ ...pricingHe.plans, taxNote: undefined }).taxNote === 'string'))
+    check('MUTATION CONTROL: a shekel note left as the dollar sentence is caught',
+      !VAT_INCLUDED.he.test(pricingHe.plans.taxNote.USD))
+    check('MUTATION CONTROL: a market with no note at all is caught',
+      !BILLING_MARKET_CODES.every((m: string) => typeof ({ ...pricingHe.plans.taxNote, ILS: undefined } as Record<string, unknown>)[m] === 'string'))
   }
 
   console.log(`\n${pass} passed, ${fail} failed`)

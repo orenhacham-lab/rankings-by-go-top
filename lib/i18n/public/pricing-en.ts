@@ -30,7 +30,10 @@ export const pricingEn: PricingCopy = {
     dashboard: 'Go to my dashboard',
     noCard: 'No credit card needed',
     checksNote: CHECKS_EXPLAINER.en,
-    taxNote: 'On a card payment the merchant of record is Creem, which calculates tax by your billing address and shows the final amount before you pay. The prices here do not include it.',
+    taxNote: {
+      ILS: 'The prices include Israeli VAT. That is the amount you pay, with nothing added.',
+      USD: 'On a card payment the merchant of record is Creem, which calculates tax by your billing address and shows the final amount before you pay. The prices here do not include it.',
+    },
     everyPlanLabel: 'In every plan',
     everyPlan: [
       'Automatic scheduled publishing to WordPress, Shopify and Wix',
