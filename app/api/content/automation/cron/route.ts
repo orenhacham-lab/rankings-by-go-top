@@ -31,6 +31,10 @@
  * (07:00–08:59, the Vercel cron's 07:00 run and cron-job.org's quarter hours), and
  * outside it returns at once without a read or a line. No new cron schedule.
  *
+ * THEN, THE SITE MAPPING UPKEEP (lib/content/existing-content/map-upkeep.ts): at most one
+ * project per run whose mapping is missing or ageing is mapped, so automatic internal links
+ * have pages to point at. Only when a mapping's work window still fits in maxDuration.
+ *
  * LAST OF ALL, THE REMINDER EMAIL. After the top-up, the "articles are waiting for your OK" reminder
  * (lib/reminders): OFF unless REMINDER_EMAILS_ENABLED is exactly "true", and then only at
  * 09:00 Asia/Jerusalem, Sunday to Thursday. Isolated the same way: it cannot change, delay
@@ -48,6 +52,7 @@ import { runIsolatedReminders } from '@/lib/reminders/isolated'
 import { runIsolatedOnboardingEmails } from '@/lib/onboarding-emails/isolated'
 import { runIsolatedWeeklySummaries } from '@/lib/reports/weekly/isolated'
 import { checkPublishingStalls, isDailyStallCheckRun } from '@/lib/content/automation/stall-watch'
+import { runMapUpkeep, liveEnsure } from '@/lib/content/existing-content/map-upkeep'
 
 // Generation can take a while; request a generous budget (platform clamps to the
 // plan's max — e.g. 60s on Hobby, up to 300s on Pro).
@@ -88,6 +93,11 @@ async function handle(request: Request): Promise<Response> {
       (deadlineAt) => runTopicTopUp(createAdminClient(), { env: process.env, deadlineAt }),
       { startedAtMs: Date.parse(startedAt), maxDurationMs: maxDuration * 1000 },
     )
+    // Then, when enough of maxDuration is left: map ONE project whose site mapping is
+    // missing or ageing, so its articles get internal links
+    // (lib/content/existing-content/map-upkeep.ts). The 40s margin is left for the emails
+    // below. Never throws.
+    await runMapUpkeep(createAdminClient(), { deadlineAt: Date.parse(startedAt) + maxDuration * 1000 - 40_000, ensure: liveEnsure })
     // Last of all, and off unless REMINDER_EMAILS_ENABLED is "true": the reminder email for
     // articles waiting for approval (lib/reminders). Isolated; it never throws or rejects.
     await runIsolatedReminders()

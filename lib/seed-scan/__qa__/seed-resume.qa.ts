@@ -76,6 +76,10 @@ Module._load = function (request: string, parent: any, isMain: boolean) {
     const real = origLoad.call(this, request, parent, isMain)
     return { ...real, resumeStalledSeedRuns: (...a: any[]) => RESUME(...a) }
   }
+  // The site-mapping pass after the top-up is covered by its own suite (map-upkeep.qa.ts).
+  if (resolved.endsWith('lib/content/existing-content/map-upkeep.ts') && String(parent?.filename ?? '').endsWith('app/api/content/automation/cron/route.ts')) {
+    return { runMapUpkeep: async () => null, liveEnsure: async () => 'fresh' }
+  }
   if (request === 'next/server') {
     const real = origLoad.call(this, request, parent, isMain)
     return { ...real, after: (task: () => Promise<void>) => void scheduled.push(task) }
