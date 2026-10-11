@@ -1,7 +1,7 @@
 /**
  * ONE ARTICLE A DAY ON OUR OWN BLOG — the guard.
  *
- *   A) the rotation: which language each day, and that Portuguese is not in it;
+ *   A) the languages: every one of them every day, and not Portuguese;
  *   B) the truth limits: every claim this product may not make, each with the
  *      clean sentence it is the mutation of;
  *   C) keyword selection: the volume floor, the exclusions, and the
@@ -16,7 +16,7 @@
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import {
-  BLOG_AUTO_LOCALES, LOCALE_BY_WEEKDAY, isBlogAutoLocale, localeForDay, weeklyShare,
+  BLOG_AUTO_LOCALES, isBlogAutoLocale, localesForDay, weeklyShare,
 } from '@/lib/blog/auto/rotation'
 import { checkTruthLimits, plainText } from '@/lib/blog/auto/truth-limits'
 import {
@@ -25,7 +25,10 @@ import {
 } from '@/lib/blog/auto/keyword-plan'
 import { CTA_WIDGET, PLANS_WIDGET, withArticleWidgets } from '@/lib/blog/auto/widgets'
 import { BLOG_AUTHOR, BLOG_GUIDANCE, articlePath, buildBlogBrief, internalAnchors } from '@/lib/blog/auto/brief'
-import { runBlogAutoPublish, type BlogAutoDeps } from '@/lib/blog/auto/runner'
+import {
+  ALL_LOCALES_BUDGET_MS, TOPUP_FLOOR, runBlogAutoPublish, runBlogAutoPublishAllLocales,
+  type BlogAutoDeps,
+} from '@/lib/blog/auto/runner'
 import { MAX_ATTEMPTS, PLAN_TABLE } from '@/lib/blog/auto/store'
 import { FakeAdmin } from '@/lib/__qa__/_fake-admin'
 import type { createAdminClient } from '@/lib/supabase/admin'
@@ -45,29 +48,24 @@ const same = (a: unknown, b: unknown) => JSON.stringify(a) === JSON.stringify(b)
 const stripComments = (src: string) => src.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '')
 
 // ============================================================
-// A) THE ROTATION
+// A) THE LANGUAGES
 // ============================================================
 check('A1: three languages are written automatically', same([...BLOG_AUTO_LOCALES], ['he', 'en', 'es']))
-check('A2: a language a day, seven days', LOCALE_BY_WEEKDAY.length === 7)
-check('A3: Hebrew four days, English two, Spanish one', same(weeklyShare(), { he: 4, en: 2, es: 1 }), weeklyShare())
+check('A2: every language is due every day — there is no weekday rotation left',
+  same([...localesForDay()], [...BLOG_AUTO_LOCALES]))
+check('A3: that is seven articles a week in each language', same(weeklyShare(), { he: 7, en: 7, es: 7 }), weeklyShare())
 check(
-  'A4: Portuguese is NOT in the rotation — the generator has no Portuguese (lib/content/language.ts)',
-  !(LOCALE_BY_WEEKDAY as readonly string[]).includes('pt-BR') && !isBlogAutoLocale('pt-BR'),
+  'A4: Portuguese is NOT among them — the generator has no Portuguese (lib/content/language.ts)',
+  !(BLOG_AUTO_LOCALES as readonly string[]).includes('pt-BR') && !isBlogAutoLocale('pt-BR'),
 )
-// 2026-10-11 is a Sunday in Israel; 2026-10-16 a Friday.
-check('A5: Sunday is Hebrew', localeForDay(Date.parse('2026-10-11T09:00:00+03:00')) === 'he')
-check('A6: Monday is English', localeForDay(Date.parse('2026-10-12T09:00:00+03:00')) === 'en')
-check('A7: Friday is Spanish', localeForDay(Date.parse('2026-10-16T09:00:00+03:00')) === 'es')
+check('A5: the queue is refilled a week ahead, not three days', TOPUP_FLOOR >= 7)
+check('A6: an unknown language is not accepted as one', !isBlogAutoLocale('fr') && !isBlogAutoLocale('') && !isBlogAutoLocale(null))
+// Mutation control for A2/A3: the rotation this replaced gave each language only
+// some of the week, and Portuguese a day it could not write.
+const oldRotation = ['he', 'en', 'he', 'en', 'he', 'es', 'pt-BR'] as readonly string[]
 check(
-  'A8: the day is read in Israel time, not UTC — 23:30 Sunday local is still Sunday',
-  localeForDay(Date.parse('2026-10-11T23:30:00+03:00')) === 'he',
-)
-// Mutation control for A3/A4: a rotation that gave a day to Portuguese would be
-// a day the runner cannot write, and the share would stop being 4/2/1.
-const brokenRotation = ['he', 'en', 'he', 'en', 'he', 'es', 'pt-BR'] as readonly string[]
-check(
-  'A9 (control): the Portuguese and share checks fail on a rotation that includes pt-BR',
-  brokenRotation.includes('pt-BR') && brokenRotation.filter((l) => l === 'he').length !== 4,
+  'A7 (control): the old weekday rotation fails both checks',
+  oldRotation.filter((l) => l === 'en').length !== 7 && oldRotation.includes('pt-BR'),
 )
 
 // ============================================================
@@ -219,6 +217,11 @@ async function main() {
     audit: { score: 90, blockers: [], warnings: [], passes: [], counts: {} } as unknown as ValidatedArticle['audit'],
     model: 'test',
   })
+  /** The same article under a slug of its own, so three languages do not collide. */
+  const perLocale = (language: string): ValidatedArticle => {
+    const base = okArticle()
+    return { ...base, slug: `rank-check-${language}`, article: { ...base.article, slug: `rank-check-${language}` } }
+  }
   const deps = (over: Partial<BlogAutoDeps> = {}): BlogAutoDeps => ({
     generate: async () => okArticle(),
     cover: async () => ({ ok: true, url: 'https://x.supabase.co/storage/v1/object/public/article-images/auto/a.jpg' }),
@@ -324,6 +327,51 @@ async function main() {
     check('F23 (control): the gates are what stopped the runs above — unobstructed, it publishes', summary.published !== null && admin.tables.articles.length === 1)
   }
 
+  {
+    // Every language in one call: three runs, three gates, three summaries.
+    const admin = fake([
+      planned({ id: 'ph', locale: 'he' }),
+      planned({ id: 'pe', locale: 'en', topic: 'rank check', primary_keyword: 'rank check' }),
+      planned({ id: 'ps', locale: 'es', topic: 'posicion', primary_keyword: 'posicion' }),
+    ])
+    const summaries = await runBlogAutoPublishAllLocales(admin as unknown as Admin, {}, deps({
+      generate: async (brief) => perLocale(brief.language),
+    }))
+    check('F20: a call with no language covers every language', same(summaries.map((s) => s.locale), [...BLOG_AUTO_LOCALES]), summaries.map((s) => s.locale))
+    check('F21: each language published its own article', admin.tables.articles.length === BLOG_AUTO_LOCALES.length, admin.tables.articles.length)
+    check('F22: the budget leaves room for the first language whatever it is', ALL_LOCALES_BUDGET_MS > 0)
+  }
+  {
+    // One language's failure must not cost another its article.
+    const admin = fake([
+      planned({ id: 'ph', locale: 'he' }),
+      planned({ id: 'pe', locale: 'en', topic: 'rank check', primary_keyword: 'rank check' }),
+      planned({ id: 'ps', locale: 'es', topic: 'posicion', primary_keyword: 'posicion' }),
+    ])
+    let call = 0
+    const summaries = await runBlogAutoPublishAllLocales(admin as unknown as Admin, {}, deps({
+      generate: async (brief) => {
+        call += 1
+        return call === 1 ? { error: 'gemini_failed', reason: 'timeout', attempts: 1 } : perLocale(brief.language)
+      },
+    }))
+    check('F23: the first language failed', summaries[0].failure === 'generate:timeout', summaries[0].failure)
+    check('F24: the other two still published', admin.tables.articles.length === 2, admin.tables.articles.length)
+  }
+  {
+    // A spent budget skips the languages left rather than being killed mid-publish.
+    const admin = fake([
+      planned({ id: 'ph', locale: 'he' }),
+      planned({ id: 'pe', locale: 'en', topic: 'rank check', primary_keyword: 'rank check' }),
+      planned({ id: 'ps', locale: 'es', topic: 'posicion', primary_keyword: 'posicion' }),
+    ])
+    const summaries = await runBlogAutoPublishAllLocales(admin as unknown as Admin, { budgetMs: 0 }, deps({
+      generate: async (brief) => perLocale(brief.language),
+    }))
+    check('F25: with no time left only the first language runs', admin.tables.articles.length === 1, admin.tables.articles.length)
+    check('F26: the rest say why they were skipped', summaries.slice(1).every((s) => s.skipped === 'time_budget'), summaries.map((s) => s.skipped))
+  }
+
   // ============================================================
   // G) SOURCE
   // ============================================================
@@ -333,10 +381,20 @@ async function main() {
   check('G3: it refuses a caller without the cron secret', /authorizeCronRequest/.test(cronSrc))
   check('G4: it answers before it works, so a scheduler does not time out', /after\(/.test(cronSrc) && /status: 202/.test(cronSrc))
   const vercel = JSON.parse(read('vercel.json')) as { crons: { path: string; schedule: string }[] }
-  check('G5: the daily run is scheduled once a day', (() => {
-    const entry = vercel.crons.find((c) => c.path === '/api/blog/auto/cron')
-    return !!entry && /^\d+ \d+ \* \* \*$/.test(entry.schedule)
-  })(), vercel.crons.map((c) => c.path))
+  const blogCrons = vercel.crons.filter((c) => c.path.startsWith('/api/blog/auto/cron'))
+  check('G5: every language has its own daily run', (() => {
+    if (blogCrons.length !== BLOG_AUTO_LOCALES.length) return false
+    const daily = blogCrons.every((c) => /^\d+ \d+ \* \* \*$/.test(c.schedule))
+    const locales = blogCrons.map((c) => new URLSearchParams(c.path.split('?')[1] ?? '').get('locale'))
+    return daily && same([...locales].sort(), [...BLOG_AUTO_LOCALES].sort())
+  })(), blogCrons)
+  check('G5b: the runs do not start at the same minute — one article takes minutes',
+    new Set(blogCrons.map((c) => c.schedule)).size === blogCrons.length, blogCrons.map((c) => c.schedule))
+  check('G5c: the route writes the language it was asked for', (() => {
+    const route = /searchParams\.get\('locale'\)/.test(cronSrc) && /isBlogAutoLocale\(asked\)/.test(cronSrc)
+    const both = /runBlogAutoPublish\(admin, \{ locale \}\)/.test(cronSrc) && /runBlogAutoPublishAllLocales/.test(cronSrc)
+    return route && both
+  })())
   const adminApi = stripComments(read('app/api/admin/blog-plan/route.ts'))
   check('G6: the queue screen\'s actions are behind the administrator gate', /requireAdminApi/.test(adminApi))
   check('G7: the operator can take a keyword out and put one back', /'reject'/.test(adminApi) && /'restore'/.test(adminApi))

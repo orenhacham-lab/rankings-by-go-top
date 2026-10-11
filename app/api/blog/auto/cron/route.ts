@@ -1,8 +1,10 @@
 /**
  * The public blog's daily article — GET/POST /api/blog/auto/cron
  *
- * Writes and publishes at most ONE article per run on gotopseo.com, in the
- * language today's rotation calls for (lib/blog/auto/rotation.ts). Protected by
+ * Writes and publishes ONE article per language on gotopseo.com. The scheduler
+ * calls it once per language — `?locale=he|en|es` — because one article takes
+ * far longer than a third of the invocation's budget; a call that names no
+ * language covers every language itself, within a time budget. Protected by
  * CRON_SECRET, service-role only, no browser session, idempotent.
  *
  * OFF UNLESS BLOG_AUTO_PUBLISH_ENABLED IS EXACTLY "true". This route publishes
@@ -19,7 +21,8 @@
 import { after } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { authorizeCronRequest } from '@/lib/auth/cron'
-import { runBlogAutoPublish } from '@/lib/blog/auto/runner'
+import { runBlogAutoPublish, runBlogAutoPublishAllLocales } from '@/lib/blog/auto/runner'
+import { isBlogAutoLocale } from '@/lib/blog/auto/rotation'
 
 export const maxDuration = 300
 export const dynamic = 'force-dynamic'
@@ -36,25 +39,36 @@ async function handle(request: Request): Promise<Response> {
   if (denied) return denied
 
   const startedAt = new Date().toISOString()
+  // One language per call when the scheduler names one; every language when it
+  // does not. An unrecognized value is ignored rather than refused: the run is
+  // the scheduler's, and a typo must not cost the blog its articles.
+  const asked = new URL(request.url).searchParams.get('locale')
+  const locale = isBlogAutoLocale(asked) ? asked : null
+
   after(async () => {
     try {
-      const summary = await runBlogAutoPublish(createAdminClient(), {})
-      console.log('[blog-auto-cron] run complete', {
-        startedAt,
-        locale: summary.locale,
-        published: summary.published?.slug ?? null,
-        planned: summary.planned,
-        topUpAdded: summary.topUpAdded,
-        staleRecovered: summary.staleRecovered,
-        skipped: summary.skipped,
-        failure: summary.failure,
-        durationMs: summary.durationMs,
-      })
+      const admin = createAdminClient()
+      const summaries = locale
+        ? [await runBlogAutoPublish(admin, { locale })]
+        : await runBlogAutoPublishAllLocales(admin, {})
+      for (const summary of summaries) {
+        console.log('[blog-auto-cron] run complete', {
+          startedAt,
+          locale: summary.locale,
+          published: summary.published?.slug ?? null,
+          planned: summary.planned,
+          topUpAdded: summary.topUpAdded,
+          staleRecovered: summary.staleRecovered,
+          skipped: summary.skipped,
+          failure: summary.failure,
+          durationMs: summary.durationMs,
+        })
+      }
     } catch (e) {
-      console.error('[blog-auto-cron] run failed', { startedAt, message: e instanceof Error ? e.message : String(e) })
+      console.error('[blog-auto-cron] run failed', { startedAt, locale, message: e instanceof Error ? e.message : String(e) })
     }
   })
-  return Response.json({ ok: true, accepted: true, startedAt }, { status: 202 })
+  return Response.json({ ok: true, accepted: true, startedAt, locale }, { status: 202 })
 }
 
 export async function GET(request: Request) { return handle(request) }

@@ -28,8 +28,16 @@
       "schedule": "30 10 * * *"
     },
     {
-      "path": "/api/blog/auto/cron",
+      "path": "/api/blog/auto/cron?locale=he",
       "schedule": "0 4 * * *"
+    },
+    {
+      "path": "/api/blog/auto/cron?locale=en",
+      "schedule": "20 4 * * *"
+    },
+    {
+      "path": "/api/blog/auto/cron?locale=es",
+      "schedule": "40 4 * * *"
     }
   ]
 }
