@@ -994,6 +994,17 @@ html.a11y-image-descriptions img[data-a11y-noalt='true'] {
   text-decoration: underline;
 }
 .dark .article-content a { color: #a5b4fc; }
+
+/* The "read also" block the daily article appends (lib/blog/auto/body-links.ts):
+   plain HTML, so it needs its own separation from the text above it. */
+.article-content .gt-related {
+  margin-top: 2rem;
+  padding-top: 1rem;
+  border-top: 1px solid #e2e8f0;
+}
+.article-content .gt-related p { margin: 0 0 0.25rem; }
+.article-content .gt-related ul { margin: 0; }
+.dark .article-content .gt-related { border-top-color: #334155; }
 .article-content blockquote {
   border-inline-start: 3px solid #cbd5e1;
   padding-inline-start: 0.75rem;

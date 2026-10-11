@@ -56,6 +56,7 @@ const GUIDANCE_INSTRUCTIONS = [
   'The product has one name, Go Top SEO. Never call it by any earlier name.',
   'When Shopify is mentioned, the only link is https://apps.shopify.com/go-top-seo and it carries rel="nofollow".',
   'Do not write a table of contents, a plan-price table, or a closing call-to-action block: the page adds all three around the text.',
+  'Never write a bare web address in the text. Name the product and the page in words; the links are added to the body afterwards.',
 ].join('\n')
 
 const EXCLUSIONS = [
