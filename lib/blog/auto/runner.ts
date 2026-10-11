@@ -1,5 +1,5 @@
 /**
- * ONE ARTICLE A DAY ON gotopseo.com.
+ * ONE ARTICLE A DAY, IN EVERY LANGUAGE, ON gotopseo.com.
  *
  * The run, in order:
  *   1. free rows whose previous run died mid-generation;
@@ -24,7 +24,7 @@
 import type { createAdminClient } from '@/lib/supabase/admin'
 import { generateValidatedArticle } from '@/lib/content/gemini-article'
 import { runQualityGate } from '@/lib/content/automation/quality-gate'
-import { localeForDay, type BlogAutoLocale } from '@/lib/blog/auto/rotation'
+import { BLOG_AUTO_LOCALES, type BlogAutoLocale } from '@/lib/blog/auto/rotation'
 import { buildBlogBrief } from '@/lib/blog/auto/brief'
 import { checkTruthLimits } from '@/lib/blog/auto/truth-limits'
 import { researchKeywords, selectKeywords } from '@/lib/blog/auto/keyword-plan'
@@ -55,8 +55,12 @@ export const REAL_BLOG_AUTO_DEPS: BlogAutoDeps = {
   cover: createBlogCover,
 }
 
-/** Below this many planned rows for a language, research runs for it. */
-export const TOPUP_FLOOR = 4
+/**
+ * Below this many planned rows for a language, research runs for it. A week's
+ * worth: every language publishes every day, so a queue of four used to be a
+ * rotation's fortnight and is now three days.
+ */
+export const TOPUP_FLOOR = 7
 /** How many rows one research run may add.  */
 export const TOPUP_BATCH = 8
 
@@ -92,7 +96,7 @@ export async function runBlogAutoPublish(
 ): Promise<BlogAutoSummary> {
   const started = Date.now()
   const now = opts.now ?? started
-  const locale = opts.locale ?? localeForDay(now)
+  const locale = opts.locale ?? BLOG_AUTO_LOCALES[0]
   const summary: BlogAutoSummary = {
     locale, staleRecovered: 0, topUpAdded: 0, topUpError: null, planned: 0,
     published: null, skipped: null, failure: null, durationMs: 0, dryRun: !!opts.dryRun,
@@ -184,4 +188,43 @@ export async function runBlogAutoPublish(
   summary.published = { slug: published.slug, title: generated.article.title }
   summary.durationMs = Date.now() - started
   return summary
+}
+
+/**
+ * HOW LONG ONE RUN MAY KEEP WRITING, when it covers every language itself.
+ *
+ * The route's `maxDuration` is 300s and one article — generation, audit, cover —
+ * took 108s on the first real run, so three languages do not reliably fit in
+ * one invocation. The scheduler therefore calls the route once per language
+ * (see vercel.json), and this budget is the safety net for a call that was
+ * given no language: it starts a language only while there is plausibly time
+ * for it, and reports the rest as skipped rather than being killed mid-publish.
+ */
+export const ALL_LOCALES_BUDGET_MS = 200_000
+
+/**
+ * One article per language, in order. Used by a call that names no language:
+ * each language gets its own run, its own gates and its own summary, so one
+ * language's failure never costs another its article.
+ */
+export async function runBlogAutoPublishAllLocales(
+  admin: Admin,
+  opts: { now?: number; dryRun?: boolean; budgetMs?: number } = {},
+  deps: BlogAutoDeps = REAL_BLOG_AUTO_DEPS,
+): Promise<BlogAutoSummary[]> {
+  const started = Date.now()
+  const budget = opts.budgetMs ?? ALL_LOCALES_BUDGET_MS
+  const summaries: BlogAutoSummary[] = []
+  for (const locale of BLOG_AUTO_LOCALES) {
+    if (summaries.length > 0 && Date.now() - started >= budget) {
+      summaries.push({
+        locale, staleRecovered: 0, topUpAdded: 0, topUpError: null, planned: 0,
+        published: null, skipped: 'time_budget', failure: null, durationMs: 0,
+        dryRun: !!opts.dryRun,
+      })
+      continue
+    }
+    summaries.push(await runBlogAutoPublish(admin, { ...opts, locale }, deps))
+  }
+  return summaries
 }
