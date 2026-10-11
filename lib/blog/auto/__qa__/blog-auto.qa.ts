@@ -11,7 +11,10 @@
  *      prompt is allowed to state;
  *   F) the runner over FakeAdmin: the happy path, and that EVERY gate failure
  *      leaves the blog untouched and the keyword re-queued;
- *   G) source: the kill switch, the cron schedule, the admin gate, the migration.
+ *   G) source: the kill switch, the cron schedule, the admin gate, the migration;
+ *   H) the body's links: a bare URL made clickable, the product's first mention
+ *      linked to the trial, our other articles offered at the end, and the gate
+ *      that refuses an article which never named the system.
  */
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
@@ -25,6 +28,10 @@ import {
 } from '@/lib/blog/auto/keyword-plan'
 import { CTA_WIDGET, PLANS_WIDGET, withArticleWidgets } from '@/lib/blog/auto/widgets'
 import { BLOG_AUTHOR, BLOG_GUIDANCE, articlePath, buildBlogBrief, internalAnchors } from '@/lib/blog/auto/brief'
+import {
+  BRAND, RELATED_CLASS, checkBodyLinks, hasOwnLink, linkBrandMention, linkifyBareUrls,
+  relatedReading, trialHref, withBodyLinks,
+} from '@/lib/blog/auto/body-links'
 import { runBlogAutoPublish, type BlogAutoDeps } from '@/lib/blog/auto/runner'
 import { MAX_ATTEMPTS, PLAN_TABLE } from '@/lib/blog/auto/store'
 import { FakeAdmin } from '@/lib/__qa__/_fake-admin'
@@ -214,7 +221,7 @@ async function main() {
       metaDescription: 'איך בודקים מיקום בגוגל ומה לעשות עם התוצאה', excerpt: 'תקציר',
       contentHtml: '', contentMarkdown: '', faq: [], imagePrompt: 'desk', warnings: [],
     },
-    safeHtml: `<h2>כותרת</h2><p>${WORDS}</p><ul><li>א</li></ul>`,
+    safeHtml: `<h2>כותרת</h2><p>${WORDS}</p><p>כך זה עובד ב-Go Top SEO.</p><ul><li>א</li></ul>`,
     slug: 'rank-check', usage: null,
     audit: { score: 90, blockers: [], warnings: [], passes: [], counts: {} } as unknown as ValidatedArticle['audit'],
     model: 'test',
@@ -356,6 +363,83 @@ async function main() {
   check('G15: our blog does not share the customer engine\'s tables', !/article_pool_items|generated_articles|article_topics/.test(storeSrc))
   // Mutation control for G12/G13: the strings the guards look for are real calls.
   check('G16 (control): removing either call from the publish path is what the guards would catch', storeSrc.includes('sanitizePublicArticleHtml(article.html)'))
+
+  // ============================================================
+  // H) THE BODY'S LINKS
+  // ============================================================
+  // The sentence the first automatic article really shipped (11 Oct 2026).
+  const bareBody = '<h2>ה</h2><p>תוכלו להירשם דרך הקישור הבא: https://www.gotopseo.com/signup?lang=he.</p>'
+  const bareLinked = linkifyBareUrls(bareBody)
+  check('H1: a bare address of ours becomes a real link', /<a href="https:\/\/www\.gotopseo\.com\/signup\?lang=he">https:\/\/www\.gotopseo\.com\/signup\?lang=he<\/a>/.test(bareLinked), bareLinked)
+  check('H2: the sentence keeps its full stop outside the link', bareLinked.includes('</a>.</p>'), bareLinked)
+  check('H3: running it twice changes nothing', linkifyBareUrls(bareLinked) === bareLinked)
+  check('H4: an address inside an existing link is left alone', (() => {
+    const html = '<p><a href="https://www.gotopseo.com/pricing">https://www.gotopseo.com/pricing</a></p>'
+    return linkifyBareUrls(html) === html
+  })())
+  check('H5: an address in an attribute is not rewritten', (() => {
+    const html = '<p><img src="https://x.supabase.co/a.jpg" alt="a"></p>'
+    return linkifyBareUrls(html) === html
+  })())
+  check('H6: a foreign address is marked nofollow and opens in a new tab', (() => {
+    const out = linkifyBareUrls('<p>מקור: https://example.com/a</p>')
+    return out.includes('rel="nofollow noopener"') && out.includes('target="_blank"')
+  })(), linkifyBareUrls('<p>מקור: https://example.com/a</p>'))
+  check('H7: our own address stays in the tab', !linkifyBareUrls(bareBody).includes('target="_blank"'))
+
+  const brandBody = `<p>פתיחה ${BRAND} בפסקה הראשונה</p><h2>כ</h2><p>כך ${BRAND} עושה את זה.</p>`
+  const branded = linkBrandMention(brandBody, 'he')
+  check('H8: the product’s mention becomes a link to the trial', branded.includes(`<a href="${trialHref('he')}">${BRAND}</a>`), branded)
+  check('H9: the opening paragraph is left alone — a link there is too early', branded.indexOf('<a href') > branded.indexOf('<h2>'), branded)
+  check('H10: only one mention is linked', (branded.match(/<a href/g) ?? []).length === 1)
+  check('H11: a body that already links to us is not linked again', (() => {
+    const html = `<p>פתיחה</p><h2>כ</h2><p>כך <a href="/pricing">${BRAND}</a> עושה את זה, ${BRAND}.</p>`
+    return linkBrandMention(html, 'he') === html
+  })())
+  check('H12: a mention only inside a heading is not wrapped there', (() => {
+    const out = linkBrandMention(`<h2>${BRAND}</h2><p>טקסט</p>`, 'he')
+    return !out.includes('<a href')
+  })(), linkBrandMention(`<h2>${BRAND}</h2><p>טקסט</p>`, 'he'))
+  check('H13: each language links to its own trial page', trialHref('en') !== trialHref('he') && trialHref('es') !== trialHref('en'))
+
+  const targets = [
+    { title: 'מאמר א', slug: 'a' }, { title: 'מאמר ב', slug: 'b' },
+    { title: 'מאמר ג', slug: 'c' }, { title: 'מאמר ד', slug: 'd' },
+  ]
+  const withRelated = relatedReading('<p>גוף</p>', 'he', targets)
+  check('H14: our other articles are offered at the end', withRelated.includes(`class="${RELATED_CLASS}"`) && withRelated.includes('קראו גם'), withRelated)
+  check('H15: at most three of them', (withRelated.match(/<li>/g) ?? []).length === 3)
+  check('H16: each one is a link under its own language’s tree', withRelated.includes(`<a href="${articlePath('he', 'a')}">מאמר א</a>`), withRelated)
+  check('H17: a target the body already links is not repeated', !relatedReading(`<p><a href="${articlePath('he', 'a')}">מאמר א</a></p>`, 'he', [targets[0]]).includes(RELATED_CLASS))
+  check('H18: no other articles yet means no block', relatedReading('<p>גוף</p>', 'he', []) === '<p>גוף</p>')
+  check('H19: running it twice adds one block', relatedReading(withRelated, 'he', targets) === withRelated)
+  check('H20: the heading is in the article’s own language', relatedReading('<p>x</p>', 'es', targets).includes('Lee también'))
+
+  check('H21: the gate refuses an article that never named the system', (() => {
+    const r = checkBodyLinks('<p>טקסט בלי שם המוצר</p>')
+    return !r.ok && r.failures.includes('brand_not_mentioned') && r.failures.includes('no_link_to_product')
+  })(), checkBodyLinks('<p>טקסט</p>'))
+  check('H22: the three passes together satisfy the gate', (() => {
+    const out = withBodyLinks(brandBody, { locale: 'he', internalTargets: targets })
+    return checkBodyLinks(out).ok && hasOwnLink(out)
+  })(), withBodyLinks(brandBody, { locale: 'he', internalTargets: targets }))
+  check('H23: a relative link counts as a link into our site, a foreign one does not',
+    hasOwnLink('<p><a href="/pricing">x</a></p>') && !hasOwnLink('<p><a href="https://example.com">x</a></p>'))
+  check('H24: the runner links the body before it publishes, and gates it', (() => {
+    const i = runnerSrc.indexOf('withBodyLinks')
+    const g = runnerSrc.indexOf('checkBodyLinks')
+    const p = runnerSrc.indexOf('publishPlanArticle(admin')
+    return i > 0 && g > i && p > g && /withArticleWidgets\(linked\)/.test(runnerSrc)
+  })())
+  check('H25: the brief tells the model not to paste a bare address', /Never write a bare web address/.test(BLOG_GUIDANCE.instructions))
+  // Mutation controls: break each pass on purpose and show the guard fails.
+  check('H26 (control): a body whose bare address was NOT linked fails H1', !/<a href=/.test(bareBody))
+  check('H27 (control): linking the first paragraph instead would fail H9', (() => {
+    const wrong = brandBody.replace(BRAND, `<a href="${trialHref('he')}">${BRAND}</a>`)
+    return wrong.indexOf('<a href') < wrong.indexOf('<h2>')
+  })())
+  check('H28 (control): an article that names the system but links nowhere fails the gate',
+    !checkBodyLinks(`<p>${BRAND} בלי קישור</p>`).ok)
 
 
 }

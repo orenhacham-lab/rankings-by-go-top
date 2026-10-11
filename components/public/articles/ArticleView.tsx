@@ -15,6 +15,7 @@ import { sanitizePublicArticleHtml } from '@/lib/content/public-article-html'
 import { ARTICLES_COPY, articlesIndexHref } from '@/lib/articles/i18n'
 import { getPublicArticle } from '@/lib/articles/server'
 import { withHeadingIds } from '@/lib/articles/headings'
+import { linkifyBareUrls } from '@/lib/articles/bare-urls'
 import { splitArticleBlocks } from '@/lib/articles/widgets'
 import { readingMinutes } from '@/lib/articles/reading-time'
 import { resolveBillingMarket } from '@/lib/billing/server-market'
@@ -84,8 +85,11 @@ export async function ArticleView({ locale, slug }: { locale: PublicLocale; slug
   }
 
   // Sanitized at render as well as on write (lib/content/public-article-html):
-  // this HTML is injected on the app's own origin.
-  const { html, headings } = withHeadingIds(sanitizePublicArticleHtml(article.content))
+  // this HTML is injected on the app's own origin. An address written as plain
+  // text becomes a real link here too, so the articles published before the
+  // daily engine learned to link them are clickable without a data change
+  // (lib/articles/bare-urls.ts).
+  const { html, headings } = withHeadingIds(linkifyBareUrls(sanitizePublicArticleHtml(article.content)))
   const blocks = splitArticleBlocks(html)
   const hasCta = blocks.some((b) => b.kind === 'widget' && b.widget === 'cta')
   // The index the author box is rendered at: just before a closing call to
