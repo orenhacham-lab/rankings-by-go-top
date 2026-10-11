@@ -111,6 +111,21 @@ export const FAQ_HEADING: Record<PublicLocale, string> = {
   'pt-BR': 'Perguntas frequentes',
 }
 
+const SITE_NAME = 'Go Top SEO'
+
+/**
+ * "<title> | Go Top SEO", unless the title already ends with the site's name.
+ * A writer, or the article generator's own brand instruction, often puts the brand
+ * in the title; appending it again shipped "… | Go Top SEO | Go Top SEO" to the tab,
+ * the search result and the share card (the blog's first automatic article, 11 Oct
+ * 2026). Matching is case-insensitive and ignores the separator and the spaces
+ * around it, so "- go top seo" counts as the same ending.
+ */
+export function withSiteName(title: string): string {
+  const already = new RegExp(`[|\\-–—:]?\\s*${SITE_NAME}\\s*$`, 'i').test(title)
+  return already ? title.trim() : `${title} | ${SITE_NAME}`
+}
+
 /** Metadata for one article page. */
 export async function buildArticleMetadata(slug: string, locale: PublicLocale): Promise<Metadata> {
   const article = await getPublicArticle(slug, locale)
@@ -128,7 +143,7 @@ export async function buildArticleMetadata(slug: string, locale: PublicLocale): 
   const url = absoluteUrl(articleHref(locale, slug))
 
   return {
-    title: `${article.meta_title || article.title} | Go Top SEO`,
+    title: withSiteName(article.meta_title || article.title),
     description,
     openGraph: {
       title: article.title,
