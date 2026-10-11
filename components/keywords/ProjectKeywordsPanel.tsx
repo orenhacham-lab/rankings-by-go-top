@@ -11,6 +11,7 @@
  * every load is bounded, the table reports its own state, one click is one
  * request, and a provider failure never reaches the merchant as raw text.
  */
+import type { PublicLocale } from '@/lib/i18n/locales'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
 import { BarChart3, FileText, KeyRound, Plus, Search, SearchX, Telescope } from 'lucide-react'
@@ -323,7 +324,8 @@ export default function ProjectKeywordsPanel({ project }: { project: Project }) 
   const filtering = search.trim() !== '' || engineFilter !== ''
 
   const activeTargets = targets.filter((t) => t.is_active)
-  const facts = scanFacts(project, activeTargets[0]?.engine_type || 'google_search', dict, language)
+  // The WORDS' locale, not the bilingual one: a Spanish screen said "Google Spain · Spanish".
+  const facts = scanFacts(project, activeTargets[0]?.engine_type || 'google_search', dict, uiLocale)
 
   // You vs. competitors: each keyword's latest check, the one the table shows,
   // paired with the competitor positions recorded in that same check.
@@ -552,7 +554,7 @@ function LiveTrackingHeading({ title, body, badge }: { title: string; body: stri
 }
 
 /** A country or language code by its name in the screen's language ("IL" → "ישראל"); the code when the browser cannot name it. */
-function displayName(lang: 'he' | 'en', type: 'region' | 'language', code: string | null | undefined): string {
+function displayName(lang: PublicLocale, type: 'region' | 'language', code: string | null | undefined): string {
   if (!code) return ''
   try {
     return new Intl.DisplayNames([lang], { type }).of(type === 'region' ? code.toUpperCase() : code.toLowerCase()) ?? code
@@ -566,7 +568,7 @@ function displayName(lang: 'he' | 'en', type: 'region' | 'language', code: strin
  * hl=he", Google's own parameter codes; it now says the market the way a merchant
  * would (UX review P2-6): "גוגל ישראל · עברית · מחשב · תל אביב".
  */
-function scanFacts(project: Project, primaryEngine: string, dict: ReturnType<typeof getDashboardDictionary>, lang: 'he' | 'en') {
+function scanFacts(project: Project, primaryEngine: string, dict: ReturnType<typeof getDashboardDictionary>, lang: PublicLocale) {
   const f = dict.projects.frequency
   const frequency = (project.scan_frequency || 'manual').toLowerCase() === 'monthly' ? f.monthly : f.manual
 

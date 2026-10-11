@@ -24,8 +24,28 @@ const OWN_SERVER = !process.env.SL_BASE_URL
 const PORT = 3991
 const BASE = process.env.SL_BASE_URL || `http://127.0.0.1:${PORT}`
 const STUB = process.env.SL_STUB_URL || 'http://127.0.0.1:5555'
-const SHOTS = process.env.SL_SHOT_DIR || '/tmp/qa-logs/shopify-listing'
-const MIRROR = '/mnt/project-files/shopify-listing/screenshots'
+/*
+ * The UI language of the shots. The dashboard reads it from the
+ * `dashboard-language` cookie (lib/i18n/request-locale.ts), and Spanish only
+ * exists in a build made with NEXT_PUBLIC_SPANISH_SITE_ENABLED=true, because
+ * Next inlines that at BUILD time — see lib/i18n/spanish-site.ts. So:
+ *
+ *   SL_LANG=es node scripts/qa/shopify-listing-shots.js
+ *
+ * with the build made under that flag. A run under the wrong build does not
+ * fail quietly: MARKERS below asserts words only that language's dictionary
+ * has, because Spanish is English with the translated sections laid over it
+ * (lib/i18n/dashboard/getDashboardDictionary.ts), so a missing flag renders a
+ * perfectly valid ENGLISH page that would otherwise pass every other check.
+ */
+const LANG = process.env.SL_LANG || 'en'
+const LOCALES = { en: 'en-US', es: 'es-ES', he: 'he-IL', 'pt-BR': 'pt-BR' }
+const LOCALE = process.env.SL_LOCALE || LOCALES[LANG] || 'en-US'
+const SUFFIX = LANG === 'en' ? '' : `-${LANG}`
+/** Words the language's own dictionary has and English does not. */
+const MARKERS = { es: ['Palabras clave', 'Visibilidad en IA', 'Cerrar sesión'] }
+const SHOTS = process.env.SL_SHOT_DIR || `/tmp/qa-logs/shopify-listing${SUFFIX}`
+const MIRROR = `/mnt/project-files/shopify-listing/screenshots${SUFFIX}`
 const PID = 'a1111111-2222-3333-4444-555555555555'
 const USER = '674fc7c3-2048-48f4-ba25-6e2a6dff4a06'
 const W = 1600, H = 900
@@ -61,7 +81,67 @@ async function waitFor(proc, ms) {
   return false
 }
 
-// ── the fixture: a fictional US coffee store, no real person or customer in it ──
+// ── the fixture: a FICTIONAL coffee roaster, no real person or customer in it ──
+/*
+ * One per listing language, because a Spanish merchant reading the listing
+ * should see a Spanish shop: Shopify's screenshot rules forbid real customer
+ * data, and an English shop inside a Spanish screenshot reads as a translated
+ * demo rather than the product. Everything here is invented; `.example` can
+ * never resolve.
+ */
+const FIXTURES = {
+  en: {
+    name: 'Harbor Coffee Roasters', domain: 'harbor-coffee.example', shop: 'harbor-coffee.myshopify.com', country: 'US', city: 'Portland', lang: 'en',
+    keywords: [
+      ['single origin coffee beans', 'google_search', 14, 6],
+      ['cold brew concentrate', 'google_search', 9, 4],
+      ['coffee roaster portland', 'google_maps', 7, 3],
+      ['espresso beans online', 'google_search', 22, 18],
+      ['pour over coffee kit', 'google_search', null, 27],
+    ],
+    competitor: { name: 'Lighthouse Coffee Co.', domain: 'lighthouse-coffee.example' },
+    questions: [
+      ['Where can I buy single origin coffee beans online?', true, true],
+      ['Best cold brew concentrate to order', true, false],
+      ['Which Portland roaster ships nationwide?', true, true],
+    ],
+    mentioned: 'Harbor Coffee Roasters is named among the recommended roasters.',
+    notMentioned: 'The answer names other roasters only.',
+    collection: 'https://harbor-coffee.example/collections/beans',
+    citationTitle: 'Single origin beans',
+    blog: 'News',
+    articles: ['How to brew cold brew concentrate at home', 'Single origin vs blend: which beans to buy', 'A pour over guide for your first kit'],
+    seedKeyword: 'coffee beans', currency: 'USD',
+    research: ['cold brew concentrate', 'single origin coffee beans', 'best espresso beans', 'pour over coffee kit',
+      'whole bean coffee subscription', 'light roast coffee online'],
+  },
+  es: {
+    name: 'Tostadores Río Café', domain: 'tostadores-rio.example', shop: 'tostadores-rio.myshopify.com', country: 'ES', city: 'Madrid', lang: 'es',
+    keywords: [
+      ['café de origen único', 'google_search', 14, 6],
+      ['café en grano para espresso', 'google_search', 9, 4],
+      ['tostador de café madrid', 'google_maps', 7, 3],
+      ['comprar café recién tostado', 'google_search', 22, 18],
+      ['kit de café de filtro', 'google_search', null, 27],
+    ],
+    competitor: { name: 'Faro Café', domain: 'faro-cafe.example' },
+    questions: [
+      ['¿Dónde comprar café de origen único por internet?', true, true],
+      ['Mejor café en grano para espresso en casa', true, false],
+      ['¿Qué tostador de Madrid envía a toda España?', true, true],
+    ],
+    mentioned: 'Tostadores Río Café aparece entre los tostadores recomendados.',
+    notMentioned: 'La respuesta solo menciona a otros tostadores.',
+    collection: 'https://tostadores-rio.example/colecciones/cafe',
+    citationTitle: 'Café de origen único',
+    blog: 'Noticias',
+    articles: ['Cómo preparar café de filtro en casa', 'Origen único o mezcla: qué grano comprar', 'Guía para empezar con el café de filtro'],
+    seedKeyword: 'café en grano', currency: 'EUR',
+    research: ['café en grano para espresso', 'café de origen único', 'mejor café para cafetera italiana', 'kit de café de filtro',
+      'suscripción de café en grano', 'café de tueste claro online'],
+  },
+}
+const F = FIXTURES[LANG] || FIXTURES.en
 const H_ = { 'content-type': 'application/json', authorization: 'Bearer stub-service-key', apikey: 'stub-service-key' }
 const iso = (ms) => new Date(ms).toISOString()
 async function rest(method, path, body) {
@@ -72,17 +152,13 @@ async function seed() {
   await fetch(`${STUB}/__stub/reset`).catch(() => {})
   const now = Date.now()
   await rest('PATCH', `projects?id=eq.${PID}`, {
-    name: 'Harbor Coffee Roasters', business_name: 'Harbor Coffee Roasters',
-    target_domain: 'harbor-coffee.example', country: 'US', city: 'Portland',
-    language: 'en', device_type: 'desktop', scan_frequency: 'monthly',
+    name: F.name, business_name: F.name,
+    target_domain: F.domain, country: F.country, city: F.city,
+    language: F.lang, device_type: 'desktop', scan_frequency: 'monthly',
+    // The last check: without it the hero said "not checked yet" beside the figures it had just checked.
+    last_scan_at: iso(now - 3 * 3600000),
   })
-  const KW = [
-    ['single origin coffee beans', 'google_search', 14, 6],
-    ['cold brew concentrate', 'google_search', 9, 4],
-    ['coffee roaster portland', 'google_maps', 7, 3],
-    ['espresso beans online', 'google_search', 22, 18],
-    ['pour over coffee kit', 'google_search', null, 27],
-  ]
+  const KW = F.keywords
   await rest('POST', 'tracking_targets', KW.map(([keyword, engine_type], i) => ({
     id: `tt-${i + 1}`, project_id: PID, user_id: USER, keyword, engine_type, is_active: true,
     avg_monthly_searches: 2400 - i * 300, created_at: iso(now - 40 * 86400000),
@@ -92,22 +168,18 @@ async function seed() {
     { id: `sr-${i}-a`, scan_id: 'scan-1', tracking_target_id: `tt-${i + 1}`, keyword, engine_type, found: before !== null, position: before, checked_at: iso(D1) },
     { id: `sr-${i}-b`, scan_id: 'scan-2', tracking_target_id: `tt-${i + 1}`, keyword, engine_type, found: after !== null, position: after,
       change_value: before && after ? before - after : null, checked_at: iso(D2),
-      result_url: after ? 'https://harbor-coffee.example/collections/beans' : null },
+      result_url: after ? F.collection : null },
   ]))
   await rest('POST', 'ai_visibility_competitors', [{ id: 'c1', project_id: PID, user_id: USER,
-    name: 'Lighthouse Coffee Co.', domain: 'lighthouse-coffee.example', is_active: true, created_at: iso(now - 25 * 86400000) }])
+    name: F.competitor.name, domain: F.competitor.domain, is_active: true, created_at: iso(now - 25 * 86400000) }])
   await rest('POST', 'keyword_competitor_positions', [2, 3].map((n) => ({
-    tracking_target_id: `tt-${n}`, competitor_domain: 'lighthouse-coffee.example', position: n + 1,
-    url: 'https://lighthouse-coffee.example/', checked_at: iso(D2) })))
+    tracking_target_id: `tt-${n}`, competitor_domain: F.competitor.domain, position: n + 1,
+    url: `https://${F.competitor.domain}/`, checked_at: iso(D2) })))
   // AI visibility: three questions checked across the three engines of the automatic check.
-  const QS = [
-    ['Where can I buy single origin coffee beans online?', true, true],
-    ['Best cold brew concentrate to order', true, false],
-    ['Which Portland roaster ships nationwide?', true, true],
-  ]
+  const QS = F.questions
   await rest('POST', 'ai_prompts', QS.map(([prompt], i) => ({ id: `p${i + 1}`, project_id: PID, prompt,
-    target_domain: 'harbor-coffee.example', target_brand_name: 'Harbor Coffee Roasters',
-    country: 'US', language: 'en', is_active: true,
+    target_domain: F.domain, target_brand_name: F.name,
+    country: F.country, language: F.lang, is_active: true,
     created_at: iso(now - 20 * 86400000), updated_at: iso(now - 20 * 86400000) })))
   const ENGINES = ['chatgpt', 'gemini', 'google_ai_mode']
   await rest('POST', 'ai_scan_runs', [{ id: 'ai-run-1', project_id: PID, user_id: USER, provider: 'scrapellm',
@@ -123,22 +195,42 @@ async function seed() {
     results.push({ id, run_id: 'ai-run-1', project_id: PID, prompt_id: `p${i + 1}`, engine, provider: 'scrapellm',
       mentioned: on, target_cited: on && cited, mention_positions: null, citation_count: on && cited ? 1 : 0,
       source_count: 4 + e, competitors_mentioned: null,
-      response_summary: on ? 'Harbor Coffee Roasters is named among the recommended roasters.' : 'The answer names other roasters only.',
+      response_summary: on ? F.mentioned : F.notMentioned,
       response_text: null, raw_response: null, visibility_score: on ? 72 + e * 6 : 0, credits_used: 1,
       status: 'success', error_message: null, scanned_at: iso(now - 2 * 86400000), created_at: iso(now - 2 * 86400000) })
     if (on && cited) cites.push({ id: `aic-${i}-${e}`, result_id: id, project_id: PID, prompt_id: `p${i + 1}`, engine,
-      provider: 'scrapellm', url: 'https://harbor-coffee.example/collections/beans', domain: 'harbor-coffee.example',
-      title: 'Single origin beans', snippet: null, citation_position: 1, is_target_domain: true, created_at: iso(now - 2 * 86400000) })
+      provider: 'scrapellm', url: F.collection, domain: F.domain,
+      title: F.citationTitle, snippet: null, citation_position: 1, is_target_domain: true, created_at: iso(now - 2 * 86400000) })
   }))
   await rest('POST', 'ai_scan_results', results)
   if (cites.length) await rest('POST', 'ai_citations', cites)
 
+  /*
+   * The store IS connected. Without this row the articles screen drew "connect a
+   * platform" across the top, which is the one thing a Shopify App Store listing
+   * must not show. Seeded rather than intercepted, so every screen that asks
+   * about the connection gets the same answer. The token is a placeholder: the
+   * column is NOT NULL and nothing in these shots ever calls Shopify.
+   */
+  await rest('POST', 'shopify_connections', [{ id: 'sc-1', user_id: USER, project_id: PID,
+    shop_domain: F.shop, storefront_domain: F.domain, access_token_encrypted: 'stub:stub:stub',
+    api_version: '2026-07', connection_status: 'connected', last_tested_at: iso(now - 86400000),
+    last_synced_at: iso(now - 86400000), last_error: null, auth_method: 'oauth',
+    granted_scopes: ['read_products', 'read_content', 'write_content'], default_blog_id: '1',
+    created_at: iso(now - 40 * 86400000), updated_at: iso(now - 86400000) }])
+  const ENTITY_COUNTS = { product: 42, collection: 6, page: 9, blog: 1, article: 3 }
+  await rest('POST', 'shopify_entities', Object.entries(ENTITY_COUNTS).flatMap(([entity_type, n]) =>
+    Array.from({ length: n }, (_, k) => ({ id: `se-${entity_type}-${k}`, user_id: USER, project_id: PID,
+      connection_id: 'sc-1', shopify_gid: `gid://shopify/${entity_type}/${k + 1}`, entity_type,
+      shopify_numeric_id: String(k + 1), title: null, handle: null, canonical_url: null, is_active: true,
+      created_at: iso(now - 30 * 86400000), updated_at: iso(now - 86400000) }))))
+
   await rest('POST', 'generated_articles', [
-    { id: 'ga-1', project_id: PID, user_id: USER, title: 'How to brew cold brew concentrate at home', status: 'published',
+    { id: 'ga-1', project_id: PID, user_id: USER, title: F.articles[0], status: 'published',
       created_at: iso(now - 4 * 86400000), updated_at: iso(now - 3 * 86400000), published_at: iso(now - 3 * 86400000) },
-    { id: 'ga-2', project_id: PID, user_id: USER, title: 'Single origin vs blend: which beans to buy', status: 'draft',
+    { id: 'ga-2', project_id: PID, user_id: USER, title: F.articles[1], status: 'draft',
       created_at: iso(now - 2 * 86400000), updated_at: iso(now - 86400000) },
-    { id: 'ga-3', project_id: PID, user_id: USER, title: 'A pour over guide for your first kit', status: 'scheduled',
+    { id: 'ga-3', project_id: PID, user_id: USER, title: F.articles[2], status: 'scheduled',
       created_at: iso(now - 86400000), updated_at: iso(now - 3600000) },
   ])
 }
@@ -146,8 +238,8 @@ async function seed() {
 const START = Date.now() - 3 * 86400000
 const seedRun = { ok: true, run: { id: 'run-1', stage: 'b', status: 'done', stalled: false, startedAt: iso(START),
   steps: ['a1', 'a2', 'a3', 'a4', 'b1', 'b2', 'b3', 'b4', 'b5', 'b6'].map((step) => ({ step, status: 'done', errorCode: null, itemCount: null, startedAt: null, finishedAt: null })),
-  summary: { version: 1, source: 'scan', domain: 'harbor-coffee.example', url: 'https://harbor-coffee.example/', scannedAt: iso(START), locale: 'en',
-    storefrontLocked: false, siteAccess: 'direct', business: null, audiences: [], seedKeywords: ['coffee beans'], topics: [],
+  summary: { version: 1, source: 'scan', domain: F.domain, url: `https://${F.domain}/`, scannedAt: iso(START), locale: F.lang,
+    storefrontLocked: false, siteAccess: 'direct', business: null, audiences: [], seedKeywords: [F.seedKeyword], topics: [],
     findings: [], findingsOmitted: 0, geo: { state: 'measured', unavailableReason: null, passed: 3, total: 4, signals: [] }, competitors: [],
     counters: { keywords: 5, fixes: 0, geo: 3, articles: 3, competitors: 1 }, sitemapUrlCount: 62, sitemapTruncated: false } } }
 /** The store IS connected in these screenshots: a listing shows the product at work, not its first run. */
@@ -155,11 +247,10 @@ const waiting = { ok: true, connectionDown: false, articles: 0, topics: 0, queue
   pluginConnected: false, siteConnected: true, gscConnected: true }
 
 const LEVELS = ['LOW', 'MEDIUM', 'HIGH']
-const research = { ok: true, market: { country: 'US', language: 'en' }, fetchedAt: iso(START + 60000), truncated: false, tracked: [],
-  keywords: ['cold brew concentrate', 'single origin coffee beans', 'best espresso beans', 'pour over coffee kit',
-    'whole bean coffee subscription', 'light roast coffee online'].map((keyword, i) => ({ keyword,
+const research = { ok: true, market: { country: F.country, language: F.lang }, fetchedAt: iso(START + 60000), truncated: false, tracked: [],
+  keywords: F.research.map((keyword, i) => ({ keyword,
     avgMonthlySearches: 9900 - i * 1200, competition: LEVELS[i % 3], competitionIndex: 18 + i * 12,
-    lowTopOfPageBid: 0.9 + i * 0.3, highTopOfPageBid: 3.4 + i * 1.1, currency: 'USD',
+    lowTopOfPageBid: 0.9 + i * 0.3, highTopOfPageBid: 3.4 + i * 1.1, currency: F.currency,
     origins: ['site'], competitors: [], relevant: true })) }
 
 ;(async () => {
@@ -188,10 +279,10 @@ const research = { ok: true, market: { country: 'US', language: 'en' }, fetchedA
    */
   const capture = async ({ tag, width, height, scale, mobile }) => {
     const ctx = await browser.newContext({
-      viewport: { width, height }, locale: 'en-US', deviceScaleFactor: scale,
+      viewport: { width, height }, locale: LOCALE, deviceScaleFactor: scale,
       isMobile: mobile, hasTouch: mobile,
     })
-    await ctx.addCookies([{ name: 'dashboard-language', value: 'en', url: BASE }])
+    await ctx.addCookies([{ name: 'dashboard-language', value: LANG, url: BASE }])
     const page = await ctx.newPage()
     await page.route('**/*', (route) => {
       const req = route.request()
@@ -200,6 +291,10 @@ const research = { ok: true, market: { country: 'US', language: 'en' }, fetchedA
       if (u.pathname === `/api/projects/${PID}/seed` && req.method() === 'GET') return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(seedRun) })
       if (u.pathname === '/api/keyword-research/scan') return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(research) })
       if (u.pathname === `/api/projects/${PID}/waiting`) return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(waiting) })
+      // The destination card asks Shopify itself which blogs the store has. The
+      // stub cannot answer, and the card then says, correctly, that it could not
+      // read them — in red, across the listing image.
+      if (u.pathname === '/api/shopify/blogs') return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ blogs: [{ id: '1', title: F.blog, handle: 'news' }] }) })
       return route.continue()
     })
     await page.goto(`${BASE}/login`, { waitUntil: 'domcontentloaded', timeout: 60000 })
@@ -244,6 +339,14 @@ const research = { ok: true, market: { country: 'US', language: 'en' }, fetchedA
       const want = new URL(sc.path, BASE).pathname
       check(`${name}: rendered its own screen (${body} chars)`,
         status === 200 && body > 200 && here === want, `status=${status} at=${here} want=${want}`)
+      // A wrong build serves English under an `es` cookie, and every check above
+      // still passes. One word of the language's own dictionary settles it.
+      const want2 = MARKERS[LANG]
+      if (want2 && tag === 'desktop') {
+        const text = await page.evaluate(() => document.body.innerText || '')
+        const hit = want2.find((w) => text.includes(w))
+        check(`${name}: is in ${LANG} (${hit || 'none of ' + want2.join(', ')})`, Boolean(hit))
+      }
     }
     await ctx.close().catch(() => {})
   }
@@ -279,10 +382,39 @@ const research = { ok: true, market: { country: 'US', language: 'en' }, fetchedA
     await ctx.close().catch(() => {})
   }
 
+  /*
+   * The submission form takes ONE feature image, THREE desktop screenshots and
+   * SIX mobile ones (owner, from the live form, 2026-10-11), each in upload
+   * order. The captures are named after the screen; these are the files to
+   * upload, named after the box they go in, so nothing has to be matched by eye.
+   */
+  const FINAL = [
+    ['desktop-01-dashboard', 'feature-media-1600x900'],
+    ['desktop-06-keywords', 'desktop-1-rank-tracking'],
+    ['desktop-02-ai-visibility', 'desktop-2-ai-visibility'],
+    ['desktop-05-content', 'desktop-3-articles'],
+    ['mobile-01-dashboard', 'mobile-1-dashboard'],
+    ['mobile-06-keywords', 'mobile-2-rank-tracking'],
+    ['mobile-02-ai-visibility', 'mobile-3-ai-visibility'],
+    ['mobile-05-content', 'mobile-4-articles'],
+    ['mobile-04-keyword-research', 'mobile-5-keyword-research'],
+    ['mobile-07-reports', 'mobile-6-reports'],
+  ]
+  const nameForUpload = () => {
+    for (const [from, to] of FINAL) {
+      const src = join(SHOTS, `${from}.png`)
+      if (!existsSync(src)) { check(`${to}: its capture exists`, false, src); continue }
+      copyFileSync(src, join(SHOTS, `${to}.png`))
+      if (mirror) { try { copyFileSync(src, join(mirror, `${to}.png`)) } catch { /* best effort */ } }
+    }
+    check(`the ${FINAL.length} files to upload are named after their box`, true)
+  }
+
   try {
     await capture({ tag: 'desktop', width: W, height: H, scale: 1, mobile: false })
     await capture({ tag: 'mobile', width: MW / 2, height: MH / 2, scale: 2, mobile: true })
     await composeMobile()
+    nameForUpload()
   } finally {
     await browser.close().catch(() => {})
     kill()

@@ -598,10 +598,10 @@ export default function ArticlesScreen() {
                     </div>
                   </Td>
                   <Td className="hidden sm:table-cell"><Badge variant={STATUS_TONE[a.status] ?? 'neutral'}>{statusLabel(a.status)}</Badge></Td>
-                  <Td className="hidden md:table-cell"><span className="whitespace-nowrap text-caption text-muted">{formatDate(a.created_at, language)}</span></Td>
-                  <Td className="hidden xl:table-cell"><span className="whitespace-nowrap text-caption text-muted">{formatDate(a.updated_at, language)}</span></Td>
-                  <Td className="hidden lg:table-cell"><span className="whitespace-nowrap text-caption text-muted">{a.scheduled_at ? formatDate(a.scheduled_at, language) : '—'}</span></Td>
-                  <Td className="hidden lg:table-cell"><span className="whitespace-nowrap text-caption text-muted">{a.published_at ? formatDate(a.published_at, language) : '—'}</span></Td>
+                  <Td className="hidden md:table-cell"><span className="whitespace-nowrap text-caption text-muted">{formatDate(a.created_at, uiLocale)}</span></Td>
+                  <Td className="hidden xl:table-cell"><span className="whitespace-nowrap text-caption text-muted">{formatDate(a.updated_at, uiLocale)}</span></Td>
+                  <Td className="hidden lg:table-cell"><span className="whitespace-nowrap text-caption text-muted">{a.scheduled_at ? formatDate(a.scheduled_at, uiLocale) : '—'}</span></Td>
+                  <Td className="hidden lg:table-cell"><span className="whitespace-nowrap text-caption text-muted">{a.published_at ? formatDate(a.published_at, uiLocale) : '—'}</span></Td>
                   <Td className="hidden md:table-cell">
                     {(() => {
                       // Platform-aware publication state — a Shopify project shows Shopify

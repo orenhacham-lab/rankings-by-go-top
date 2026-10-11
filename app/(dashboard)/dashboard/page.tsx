@@ -426,7 +426,7 @@ function ProjectDashboard({ project, onStartMode }: { project: Project; onStartM
               <HoldingBack
                 t={t}
                 model={hold}
-                scannedLabel={hold.state === 'ready' && hold.scannedAt ? t.holdingBack.scannedAt(relativeTime(hold.scannedAt, now, language)) : null}
+                scannedLabel={hold.state === 'ready' && hold.scannedAt ? t.holdingBack.scannedAt(relativeTime(hold.scannedAt, now, uiLocale)) : null}
                 settingsHref={settingsHref}
                 summary={siteSummary}
               />
@@ -450,8 +450,8 @@ function ProjectDashboard({ project, onStartMode }: { project: Project; onStartM
           )}
           {(show.board || show.articles) && (
             <Reveal index={4} className={`order-8 grid min-w-0 gap-5 ${show.board && show.articles ? 'md:grid-cols-2' : ''} ${fold}`}>
-              {show.board && <PublishingBoard t={t} language={language} section={sectionOf('board')} retry={reload} />}
-              {show.articles && <RecentArticles t={t} language={language} section={sectionOf('articles')} retry={reload} firstArticleHref={null} />}
+              {show.board && <PublishingBoard t={t} language={uiLocale} section={sectionOf('board')} retry={reload} />}
+              {show.articles && <RecentArticles t={t} language={uiLocale} section={sectionOf('articles')} retry={reload} firstArticleHref={null} />}
             </Reveal>
           )}
           <Reveal index={5} className={`order-11 min-w-0 ${fold} empty:hidden`}>
@@ -469,7 +469,7 @@ function ProjectDashboard({ project, onStartMode }: { project: Project; onStartM
           )}
           {show.activity && (
             <Reveal index={1} className="order-3 min-w-0">
-              <RecentActivity t={t} model={activity} now={now} language={language} emptyHref="/keyword-research" />
+              <RecentActivity t={t} model={activity} now={now} language={uiLocale} emptyHref="/keyword-research" />
             </Reveal>
           )}
           {show.competitors && (
@@ -484,7 +484,7 @@ function ProjectDashboard({ project, onStartMode }: { project: Project; onStartM
           </Reveal>
           {show.ai && (
             <Reveal index={4} className={`order-10 min-w-0 ${fold}`}>
-              <AiVisibilityBrief t={t} language={language} section={sectionOf('ai')} retry={reload} now={now} />
+              <AiVisibilityBrief t={t} language={uiLocale} section={sectionOf('ai')} retry={reload} now={now} />
             </Reveal>
           )}
           {show.account && (

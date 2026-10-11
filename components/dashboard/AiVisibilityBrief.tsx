@@ -7,6 +7,7 @@
  * figures are the ones already stored. With AI visibility off on the server the
  * widget is not rendered.
  */
+import type { PublicLocale } from '@/lib/i18n/locales'
 import { Sparkles } from 'lucide-react'
 import type { AiData, Section } from '@/lib/dashboard/overview'
 import type { DashboardDictionary } from '@/lib/i18n/dashboard/he'
@@ -18,7 +19,7 @@ import { HeaderLink, LinkButton, Widget, WidgetEmpty, WidgetError, WidgetLoading
 
 export default function AiVisibilityBrief({ t, language, section, retry, now }: {
   t: DashboardDictionary['dashboardHome']
-  language: 'he' | 'en'
+  language: PublicLocale
   section: Section<AiData> | null
   retry: () => void
   now: Date

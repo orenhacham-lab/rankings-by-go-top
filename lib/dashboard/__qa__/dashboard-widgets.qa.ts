@@ -28,6 +28,7 @@ import { holdingBack, seedFeed, seedPhase, seedStateFrom, seedStillRunning, GEO_
 import { mergeFeed, relativeTime, setupTasks } from '../activity'
 import { competitorRows } from '../competitors'
 import type { ActivityEvent } from '../overview'
+import { toBilingualLocale } from '@/lib/i18n/locales'
 import type { SeedRunView, SeedStepView, SeedSummary } from '@/lib/seed-scan/types'
 import type { CompetitorComparison } from '@/lib/competitors/comparison'
 import { getDashboardDictionary } from '@/lib/i18n/dashboard/getDashboardDictionary'
@@ -232,6 +233,11 @@ async function main() {
     check('F5: the feed is capped at ten', mergeFeed(Array.from({ length: 20 }, (_, i) => ({ kind: 'topic_created' as const, at: ago(i), title: 'x', count: null })), []).length === 10)
     check('F6: relative time in English and Hebrew', relativeTime(ago(3), NOW, 'en') === '3 minutes ago' && HEBREW.test(relativeTime(ago(3), NOW, 'he')), [relativeTime(ago(3), NOW, 'en'), relativeTime(ago(3), NOW, 'he')])
     check('F7: a time a little in the future reads as now', relativeTime(ago(-2), NOW, 'en') === 'now', relativeTime(ago(-2), NOW, 'en'))
+    // A Spanish dashboard said "Analizada 3 days ago" until 2026-10-11, because the
+    // caller passed the BILINGUAL language (es → en) instead of the words' locale.
+    check('F8: a Spanish dashboard gets a Spanish relative time', relativeTime(ago(3), NOW, 'es') === 'hace 3 minutos', relativeTime(ago(3), NOW, 'es'))
+    check('F8-MUT: the bug was passing the bilingual value, and that would fail F8',
+      relativeTime(ago(3), NOW, toBilingualLocale('es')) === '3 minutes ago', relativeTime(ago(3), NOW, toBilingualLocale('es')))
   }
 
   // ── T) setup ────────────────────────────────────────────────────────────

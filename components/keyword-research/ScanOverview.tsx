@@ -35,19 +35,19 @@ export default function ScanOverview({
   /** Where the research came from, when it is not the scan alone (the project's own research, with its date). */
   sourceOverride?: string
 }) {
-  const { language, uiLocale } = useDashboardLanguage()
+  const { uiLocale } = useDashboardLanguage()
   const t = getDashboardDictionary(uiLocale).keywordResearchScan
-  const date = mode === 'scan' ? formatResearchDate(fetchedAt, language) : null
+  const date = mode === 'scan' ? formatResearchDate(fetchedAt, uiLocale) : null
   const badge = mode === 'manual' ? t.overview.badgeManual : running ? t.overview.badgeRunning : t.overview.badgeDone
   const source = sourceOverride ?? (mode === 'manual'
     ? t.overview.fromManual
     : `${domain ? t.overview.fromScan(domain) : t.overview.fromScanSite}${date ? ` · ${t.overview.asOf(date)}` : ''}`)
   const meta = [
-    totals.competitors > 0 ? t.overview.competitors(formatCount(totals.competitors, language)) : null,
-    t.overview.easyWins(formatCount(easyWins, language)),
+    totals.competitors > 0 ? t.overview.competitors(formatCount(totals.competitors, uiLocale)) : null,
+    t.overview.easyWins(formatCount(easyWins, uiLocale)),
   ].filter(Boolean).join(' · ')
   const cpc = totals.averageCpc
-  const count = (n: number) => formatCount(n, language)
+  const count = (n: number) => formatCount(n, uiLocale)
 
   // The share of the research that is an easy win: the one picture the hero carries.
   const share = totals.keywords > 0 ? Math.min(1, easyWins / totals.keywords) : 0
@@ -62,13 +62,13 @@ export default function ScanOverview({
               <span className="text-caption text-contrast-ink/70">{source}</span>
             </div>
             <h2 className="mt-5 max-w-3xl text-title font-bold tracking-tight tabular-nums">
-              {t.overview.headline(formatCount(totals.keywords, language), formatCount(totals.monthlySearches, language))}
+              {t.overview.headline(formatCount(totals.keywords, uiLocale), formatCount(totals.monthlySearches, uiLocale))}
             </h2>
             <p className="mt-2 text-copy text-contrast-ink/75 tabular-nums">{meta}</p>
             {(running || truncated || (mode === 'manual' && onBackToScan)) && (
               <div className="mt-4 flex flex-wrap items-center gap-x-4 gap-y-2 border-t border-contrast-ink/10 pt-4 text-copy text-contrast-ink/80">
                 {running && <p data-scan-still-running="">{t.overview.stillRunning}</p>}
-                {truncated && <p>{t.overview.truncated(formatCount(totals.keywords, language))}</p>}
+                {truncated && <p>{t.overview.truncated(formatCount(totals.keywords, uiLocale))}</p>}
                 {mode === 'manual' && onBackToScan && (
                   <button
                     type="button"
@@ -81,7 +81,7 @@ export default function ScanOverview({
               </div>
             )}
           </div>
-          <WinShare share={share} value={easyWins} format={(n) => formatCount(n, language)} label={t.tiles.easyWins} />
+          <WinShare share={share} value={easyWins} format={(n) => formatCount(n, uiLocale)} label={t.tiles.easyWins} />
         </div>
       </HeroPanel>
       <div className="stagger-in relative z-10 -mt-11 grid grid-cols-2 gap-3 px-2 sm:-mt-12 sm:px-4 lg:grid-cols-4">
@@ -101,9 +101,9 @@ export default function ScanOverview({
         />
         <StatTile
           label={t.tiles.cpc}
-          value={cpc ? <AnimatedNumber value={cpc.value} format={(n) => formatMoney(n, cpc.currency, language)} /> : ''}
+          value={cpc ? <AnimatedNumber value={cpc.value} format={(n) => formatMoney(n, cpc.currency, uiLocale)} /> : ''}
           empty={cpc ? undefined : t.tiles.cpcNone}
-          source={cpc ? t.tiles.cpcSource(formatCount(cpc.count, language)) : undefined}
+          source={cpc ? t.tiles.cpcSource(formatCount(cpc.count, uiLocale)) : undefined}
           icon={<Coins size={16} strokeWidth={2} />}
           className="shadow-pop"
         />

@@ -65,6 +65,12 @@ console.log('\nA) formatDate(lang): one format per language')
   check('A4-MUT: a bare "27.09.2026 17:09" (which RTL lays out time-first) fails A4', !isolated('27.09.2026 17:09'))
   check('A5: English date-time is "Sep 27, 2026 · 5:09 PM"', en.dateTime(d) === 'Sep 27, 2026 · 5:09 PM', en.dateTime(d))
   check('A6: a missing or invalid date is a dash, never "Invalid Date"', he.date(null) === '—' && en.dateTime('nope') === '—' && he.dateTime(undefined) === '—')
+  // A Spanish screen printed the ENGLISH "Oct 11, 2026" until 2026-10-11, because
+  // this formatter took the bilingual locale and anything not Hebrew was en-US.
+  const es = formatDate('es')
+  check('A7: Spanish spells its own month, not the English one', es.date(d) === '27 sept 2026', es.date(d))
+  check('A7-MUT: the old en-US fallback for every non-Hebrew language fails A7',
+    new Intl.DateTimeFormat('en-US', { day: 'numeric', month: 'short', year: 'numeric' }).format(d) !== es.date(d))
 }
 
 // ── B) Reports source ───────────────────────────────────────────────────────

@@ -7,6 +7,7 @@
  * its current step leads the list and the steps still to come are counted, so
  * the wait reads as work in progress rather than an empty screen.
  */
+import type { PublicLocale } from '@/lib/i18n/locales'
 import { Activity, AlertCircle, CheckCircle2, FileText, KeyRound, Loader2, Search, Sparkles, Target } from 'lucide-react'
 import type { ReactNode } from 'react'
 import { relativeTime, type FeedItem } from '@/lib/dashboard/activity'
@@ -49,7 +50,7 @@ export default function RecentActivity({ t, model, now, language, emptyHref }: {
   t: Copy
   model: ActivityModel
   now: Date
-  language: 'he' | 'en'
+  language: PublicLocale
   emptyHref: string
 }) {
   const a = t.activity

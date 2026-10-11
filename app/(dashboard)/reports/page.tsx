@@ -446,7 +446,7 @@ function ReportsContent() {
             sortOrder={sortOrder}
             setSortOrder={setSortOrder}
             t={t}
-            language={language}
+            language={uiLocale}
           />
         )}
 
@@ -458,7 +458,7 @@ function ReportsContent() {
             onExportPDF={handleExportPDF}
             onExportExcel={handleExportExcel}
             t={t}
-            language={language}
+            language={uiLocale}
           />
         )}
       </section>
@@ -479,7 +479,7 @@ function ReportsContent() {
 function ReportCard({ kind, project, language, exporting, onExportExcel, onExportPDF, empty, t }: {
   kind: string
   project: Project & { clients?: Client }
-  language: Locale
+  language: PublicLocale
   exporting: 'excel' | 'pdf' | null
   onExportExcel: () => void
   onExportPDF: () => void

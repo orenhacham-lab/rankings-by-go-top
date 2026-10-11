@@ -10,6 +10,7 @@
  * opens the topics screen, where an article is written through the existing
  * flow and counted in the existing allowance. Nothing here writes an article.
  */
+import type { PublicLocale } from '@/lib/i18n/locales'
 import { CalendarClock, FileText, Newspaper } from 'lucide-react'
 import type { ArticleLine, ArticleStatus, BoardData, BoardStatus, Section } from '@/lib/dashboard/overview'
 import type { DashboardDictionary } from '@/lib/i18n/dashboard/he'
@@ -21,7 +22,7 @@ import { HeaderLink, LinkButton, StatusPill, Widget, WidgetEmpty, WidgetError, W
 type Copy = DashboardDictionary['dashboardHome']
 
 /** Cards say when relatively ("in 2 days", "3 days ago"); tables give the full date (lib/format/date.ts). */
-function formatDay(iso: string, language: 'he' | 'en'): string {
+function formatDay(iso: string, language: PublicLocale): string {
   return formatDate(iso, language, 'relative')
 }
 
@@ -34,7 +35,7 @@ const ARTICLE_TONE: Record<ArticleStatus, 'ok' | 'info' | 'warn' | 'bad' | 'neut
 
 export function PublishingBoard({ t, language, section, retry }: {
   t: Copy
-  language: 'he' | 'en'
+  language: PublicLocale
   section: Section<BoardData> | null
   retry: () => void
 }) {
@@ -80,7 +81,7 @@ export function PublishingBoard({ t, language, section, retry }: {
 
 export function RecentArticles({ t, language, section, retry, firstArticleHref }: {
   t: Copy
-  language: 'he' | 'en'
+  language: PublicLocale
   section: Section<{ recent: ArticleLine[] }> | null
   retry: () => void
   /**

@@ -21,7 +21,7 @@ import Button, { buttonClasses } from '@/components/ui/Button'
 import { Skeleton } from '@/components/ui/Skeleton'
 import { useDashboardLanguage } from '@/lib/i18n/dashboard/useDashboardLanguage'
 import { getDashboardDictionary } from '@/lib/i18n/dashboard/getDashboardDictionary'
-import type { Locale } from '@/lib/i18n/locales'
+import { intlLocaleOf, type PublicLocale } from '@/lib/i18n/locales'
 import { ENGINE_META } from './EngineIcon'
 import { OVERVIEW_ENGINES, type AiOverview, type RecentOutcome } from './overview-model'
 import Switch from '@/components/ui/Switch'
@@ -44,18 +44,23 @@ export function monthlyNextDate(m: MonthlyView): string | null {
 type Copy = ReturnType<typeof getDashboardDictionary>['aiVisibilityOverview']
 export type OverviewData = AiOverview | null | 'error'
 
-export function formatWhen(iso: string | null, language: Locale, dateOnly = false): string {
+/**
+ * It takes the WORDS' locale (PublicLocale), not the bilingual one: passing the
+ * bilingual value put "Oct 9, 07:11 PM" on a Spanish screen. Fixed 2026-10-11.
+ */
+export function formatWhen(iso: string | null, language: PublicLocale, dateOnly = false): string {
   if (!iso) return ''
   const d = new Date(iso)
   if (Number.isNaN(d.getTime())) return ''
-  return new Intl.DateTimeFormat(language === 'he' ? 'he-IL' : 'en-US', {
+  return new Intl.DateTimeFormat(intlLocaleOf(language), {
     day: 'numeric', month: 'short', ...(dateOnly ? {} : { hour: '2-digit', minute: '2-digit' }),
   }).format(d)
 }
 
 function useCopy() {
-  const { language, uiLocale } = useDashboardLanguage()
-  return { c: getDashboardDictionary(uiLocale).aiVisibilityOverview, language }
+  const { uiLocale } = useDashboardLanguage()
+  // `language` here is only ever a date's locale, so it is the words' locale.
+  return { c: getDashboardDictionary(uiLocale).aiVisibilityOverview, language: uiLocale }
 }
 
 // ── Row 1 ────────────────────────────────────────────────────────────────────
@@ -373,7 +378,7 @@ export function mainEnginesChecked(engines: readonly string[]): number {
  * be read: the rest of the card stands without it.
  */
 function AutoCheckPanel({ c, language, monthly, running, error, onRunNow, onToggle }: {
-  c: Copy; language: Locale; monthly: MonthlyView; running: boolean; error: string | null
+  c: Copy; language: PublicLocale; monthly: MonthlyView; running: boolean; error: string | null
   onRunNow?: () => void; onToggle?: (next: boolean) => void
 }) {
   const adminView = adminMonthly(monthly)
@@ -473,7 +478,7 @@ export const TREND_MIN_POINTS = 3
  * and one hover target per check, wider than its dot, that names the score and
  * the date. Time runs left to right in both languages, like the numbers.
  */
-function ScoreTrend({ points, c, language }: { points: AiOverview['trend']; c: Copy; language: Locale }) {
+function ScoreTrend({ points, c, language }: { points: AiOverview['trend']; c: Copy; language: PublicLocale }) {
   const [active, setActive] = useState<number | null>(null)
   const n = points.length
   const x = (i: number) => (n === 1 ? 50 : 4 + (i / (n - 1)) * 92)
@@ -554,7 +559,7 @@ export function ChangePoints({ text }: { text: string }) {
   return <span className="whitespace-nowrap tabular-nums" data-ai-change-points=""><bdi dir="ltr">{num}</bdi>{unit.length > 0 ? ` ${unit.join(' ')}` : ''}</span>
 }
 
-function ChangeFigure({ c, data, language }: { c: Copy; data: AiOverview | null; language: Locale }) {
+function ChangeFigure({ c, data, language }: { c: Copy; data: AiOverview | null; language: PublicLocale }) {
   const change = data?.change ?? null
   const dir = !change ? null : change.points > 0 ? 'up' : change.points < 0 ? 'down' : 'flat'
   const Icon = dir === 'up' ? ArrowUpRight : ArrowDownRight

@@ -39,7 +39,7 @@ export default function ReadinessCard({
   scannedAt: string | null
   settingsHref: string
 }) {
-  const { language, uiLocale } = useDashboardLanguage()
+  const { uiLocale } = useDashboardLanguage()
   const c = getDashboardDictionary(uiLocale).aiVisibilityOverview
   const label: Record<ReadinessRowStatus, string> = {
     pass: c.statusPass,
@@ -124,7 +124,7 @@ export default function ReadinessCard({
       </ul>
 
       <p className="mt-4 flex flex-wrap items-center gap-x-2 gap-y-1 text-caption text-muted">
-        {scannedAt && view.state === 'measured' && <span>{c.checkedOn(formatWhen(scannedAt, language))}.</span>}
+        {scannedAt && view.state === 'measured' && <span>{c.checkedOn(formatWhen(scannedAt, uiLocale))}.</span>}
         <span>{c.rescanHint}</span>
         <Link href={settingsHref} className="font-medium text-action hover:underline">{c.rescanLink}</Link>
       </p>

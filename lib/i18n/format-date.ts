@@ -18,7 +18,7 @@
  *
  * The clock is the viewer's own: these helpers never pin a time zone.
  */
-import type { Locale } from './locales'
+import { intlLocaleOf, type PublicLocale } from './locales'
 
 type DateInput = string | number | Date | null | undefined
 
@@ -39,14 +39,21 @@ export interface DateFormatter {
   dateTime(value: DateInput): string
 }
 
-export function formatDate(lang: Locale): DateFormatter {
+/**
+ * It takes the WORDS' locale, so a Spanish screen reads "11 oct 2026" and not
+ * the English "Oct 11, 2026" it printed until 2026-10-11. Hebrew keeps the
+ * numeric form Israelis read on every form; every other language gets its own
+ * month name from `Intl`.
+ */
+export function formatDate(lang: PublicLocale): DateFormatter {
   const he = lang === 'he'
+  const loc = intlLocaleOf(lang)
   const dateFmt = he
     ? new Intl.DateTimeFormat('he-IL', { day: '2-digit', month: '2-digit', year: 'numeric' })
-    : new Intl.DateTimeFormat('en-US', { day: 'numeric', month: 'short', year: 'numeric' })
+    : new Intl.DateTimeFormat(loc, { day: 'numeric', month: 'short', year: 'numeric' })
   const timeFmt = he
     ? new Intl.DateTimeFormat('he-IL', { hour: '2-digit', minute: '2-digit', hourCycle: 'h23' })
-    : new Intl.DateTimeFormat('en-US', { hour: 'numeric', minute: '2-digit' })
+    : new Intl.DateTimeFormat(loc, { hour: 'numeric', minute: '2-digit' })
   const iso = (s: string) => (he ? `${LRI}${s}${PDI}` : s)
   return {
     date(value) {

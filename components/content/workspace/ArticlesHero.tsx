@@ -67,7 +67,7 @@ export default function ArticlesHero({ standing, connection }: {
       <div className="px-5 pb-6 pt-5 sm:px-8 sm:pb-7 sm:pt-7">
         <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
           <HeroBadge tone={s.lastPublishedAt ? 'ok' : 'muted'}>
-            {s.lastPublishedAt ? h.lastPublished(formatDate(s.lastPublishedAt, language)) : h.neverPublished}
+            {s.lastPublishedAt ? h.lastPublished(formatDate(s.lastPublishedAt, uiLocale)) : h.neverPublished}
           </HeroBadge>
           {s.ready > 0 && <span className="text-caption text-contrast-ink/75">{h.waiting(s.ready, count(s.ready))}</span>}
         </div>

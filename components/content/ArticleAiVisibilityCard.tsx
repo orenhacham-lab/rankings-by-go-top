@@ -12,6 +12,7 @@
  *      route. Running a check on it stays the existing, quota-checked action on
  *      the AI visibility screen.
  */
+import type { PublicLocale } from '@/lib/i18n/locales'
 import { useState } from 'react'
 import Link from 'next/link'
 import { Sparkles, Plus, Check } from 'lucide-react'
@@ -52,7 +53,7 @@ export function CitedBadge({ t, engines }: { t: AiDict; engines: string[] }) {
 
 export default function ArticleAiVisibilityCard({ t, language, projectId, data, onNotify, onTracked }: {
   t: AiDict
-  language: 'he' | 'en'
+  language: PublicLocale
   projectId: string | null
   data: ArticleVisibilityData
   onNotify: (text: string, ok: boolean) => void
