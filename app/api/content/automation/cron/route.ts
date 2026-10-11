@@ -47,6 +47,7 @@ import { runTopicTopUp, startIsolatedTopUp } from '@/lib/content/automation/topi
 import { runIsolatedReminders } from '@/lib/reminders/isolated'
 import { runIsolatedOnboardingEmails } from '@/lib/onboarding-emails/isolated'
 import { runIsolatedWeeklySummaries } from '@/lib/reports/weekly/isolated'
+import { checkPublishingStalls, isDailyStallCheckRun } from '@/lib/content/automation/stall-watch'
 
 // Generation can take a while; request a generous budget (platform clamps to the
 // plan's max — e.g. 60s on Hobby, up to 300s on Pro).
@@ -65,6 +66,7 @@ async function handle(request: Request): Promise<Response> {
   if (denied) return denied
 
   const startedAt = new Date().toISOString()
+  const dailyStallCheck = isDailyStallCheckRun(request)
   after(async () => {
     try {
       const summary = await runAutomation(createAdminClient(), {})
@@ -72,6 +74,10 @@ async function handle(request: Request): Promise<Response> {
     } catch (e) {
       console.error('[automation-cron] run failed', { startedAt, message: e instanceof Error ? e.message : String(e) })
     }
+    // Once a day (the Vercel cron's call): email the operator if any queue's
+    // articles are more than a day late (lib/content/automation/stall-watch.ts).
+    // Read only, and it never throws.
+    if (dailyStallCheck) await checkPublishingStalls(createAdminClient())
     // After the runner, never before or around it; resolves whatever the resume does.
     await startIsolatedSeedResume(
       (deadlineAt) => resumeStalledSeedRuns(createAdminClient(), { env: process.env, deadlineAt }),

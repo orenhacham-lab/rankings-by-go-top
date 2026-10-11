@@ -36,6 +36,20 @@ const NO_WRITE_REASONS = new Set([
   'generation_in_progress', 'reservation_error', 'project_owner_missing', 'topic_missing',
 ])
 
+/**
+ * The order the pools are walked in moves by one every run. With one
+ * generation per run, a fixed order lets whichever pool comes first take the
+ * slot every time if it keeps failing in a way that does spend it (a writer
+ * that keeps timing out, say). Rotating means every pool is first within as
+ * many runs as there are pools, whatever goes wrong with any one of them.
+ */
+export function rotateForRun<T extends { id: string }>(pools: T[], nowMs: number, runMs = 15 * 60 * 1000): T[] {
+  if (pools.length < 2) return pools
+  const sorted = [...pools].sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0))
+  const k = Math.floor(nowMs / runMs) % sorted.length
+  return sorted.slice(k).concat(sorted.slice(0, k))
+}
+
 /** True only when the attempt reached the article writer. */
 export function spentGenerationBudget(res: Pick<GenerateItemResult, 'noop' | 'reason'>): boolean {
   if (res.noop) return false
@@ -189,7 +203,7 @@ export async function runAutomation(admin: Admin, opts: { projectId?: string; dr
   let poolQ = admin.from('article_pools').select('id, project_id, cadence, interval_days, publish_time, timezone, next_publish_at, publish_days').eq('is_active', true)
   if (opts.projectId) poolQ = poolQ.eq('project_id', opts.projectId)
   const { data: pools } = await poolQ
-  const poolRows = (pools ?? []) as PoolRow[]
+  const poolRows = rotateForRun((pools ?? []) as PoolRow[], nowMs)
   summary.poolsChecked = poolRows.length
 
   // Diagnostic: an active project with NO active pool is a common "nothing runs"
