@@ -29,6 +29,8 @@ const MIRROR = '/mnt/project-files/shopify-listing/screenshots'
 const PID = 'a1111111-2222-3333-4444-555555555555'
 const USER = '674fc7c3-2048-48f4-ba25-6e2a6dff4a06'
 const W = 1600, H = 900
+// Shopify documents no mobile size; 900x1600 is the desktop ratio stood on end.
+const MW = 900, MH = 1600
 
 mkdirSync(SHOTS, { recursive: true })
 let mirror = null
@@ -174,8 +176,18 @@ const research = { ok: true, market: { country: 'US', language: 'en' }, fetchedA
 
   const { chromium } = require(require.resolve('playwright-core', { paths: [ROOT] }))
   const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium', args: ['--no-sandbox'] })
-  try {
-    const ctx = await browser.newContext({ viewport: { width: W, height: H }, locale: 'en-US', deviceScaleFactor: 1 })
+
+  /**
+   * One pass over every screen at one size. Desktop is the 1600x900 the listing
+   * asks for; mobile is the same ratio turned on its side (450x800 CSS at 2x =
+   * 900x1600), because Shopify documents no mobile size and ships no mobile
+   * template — only the 16:9 Screenshot.psd.
+   */
+  const capture = async ({ tag, width, height, scale, mobile }) => {
+    const ctx = await browser.newContext({
+      viewport: { width, height }, locale: 'en-US', deviceScaleFactor: scale,
+      isMobile: mobile, hasTouch: mobile,
+    })
     await ctx.addCookies([{ name: 'dashboard-language', value: 'en', url: BASE }])
     const page = await ctx.newPage()
     await page.route('**/*', (route) => {
@@ -215,15 +227,27 @@ const research = { ok: true, market: { country: 'US', language: 'en' }, fetchedA
     // The guided tour opens by itself on a fresh account and would cover the screen.
     await go(`/dashboard?projectId=${PID}`, '[data-dashboard-widget="hero"]')
 
-    for (const s of SCREENS) {
-      const status = await go(s.path, s.ready)
-      const file = join(SHOTS, `${s.name}.png`)
-      // Viewport-only (never fullPage): the listing wants exactly 1600x900.
+    for (const sc of SCREENS) {
+      const status = await go(sc.path, sc.ready)
+      const name = `${tag}-${sc.name}`
+      const file = join(SHOTS, `${name}.png`)
+      // Viewport-only, never fullPage: the listing wants an exact size.
       await page.screenshot({ path: file }).catch(() => {})
-      if (mirror) { try { copyFileSync(file, join(mirror, `${s.name}.png`)) } catch { /* best effort */ } }
+      if (mirror) { try { copyFileSync(file, join(mirror, `${name}.png`)) } catch { /* best effort */ } }
+      // `200 and some text` is not enough: a bounce to /login answers 200 too, and
+      // every screen then photographs identically. The screen must still be itself.
       const body = await page.evaluate(() => (document.body.innerText || '').trim().length)
-      check(`${s.name}: 200 and rendered (${body} chars)`, status === 200 && body > 200, `status=${status}`)
+      const here = new URL(page.url()).pathname
+      const want = new URL(sc.path, BASE).pathname
+      check(`${name}: rendered its own screen (${body} chars)`,
+        status === 200 && body > 200 && here === want, `status=${status} at=${here} want=${want}`)
     }
+    await ctx.close().catch(() => {})
+  }
+
+  try {
+    await capture({ tag: 'desktop', width: W, height: H, scale: 1, mobile: false })
+    await capture({ tag: 'mobile', width: MW / 2, height: MH / 2, scale: 2, mobile: true })
   } finally {
     await browser.close().catch(() => {})
     kill()
