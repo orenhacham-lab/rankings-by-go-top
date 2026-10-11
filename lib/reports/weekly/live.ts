@@ -4,6 +4,8 @@
  * lib/reports/weekly/run.ts passed its gate, so importing this file sends nothing.
  */
 import { createAdminClient } from '@/lib/supabase/admin'
+import { isAdminUser } from '@/lib/auth/admin-role'
+import { loadBillingGovernance } from '@/lib/billing/governance'
 import { normalizeDashboardUiLocale } from '@/lib/i18n/dashboard/locale'
 import type { OutgoingWeekly, WeeklyDeps, WeeklyOwner } from './run'
 
@@ -41,12 +43,18 @@ export function liveWeeklyDeps(): WeeklyDeps {
       const meta = (data.user.user_metadata ?? {}) as Record<string, unknown>
       const full = typeof meta.full_name === 'string' ? meta.full_name : typeof meta.name === 'string' ? meta.name : ''
       const first = full.trim().split(/\s+/)[0] ?? ''
-      const { data: shop } = await admin.from('shopify_connections').select('id').eq('user_id', userId).is('archived_at', null).limit(1)
+      // Provenance, not an integration record: see lib/reminders/recipient.ts.
+      const governance = await loadBillingGovernance(admin, userId)
+      const shopifyAppStoreOrigin = governance.status === 'loaded'
+        ? governance.governance.signupOrigin === 'shopify_app_store'
+        : governance.status === 'missing' ? false : null
       return {
         email: typeof data.user.email === 'string' ? data.user.email : null,
         locale: normalizeDashboardUiLocale(meta.locale),
         firstName: first ? first.slice(0, 40) : null,
-        shopify: Array.isArray(shop) && shop.length > 0,
+        shopifyAppStoreOrigin,
+        // An administrator's own projects get no customer email at all.
+        staff: await isAdminUser(admin, userId),
       }
     },
     send,
