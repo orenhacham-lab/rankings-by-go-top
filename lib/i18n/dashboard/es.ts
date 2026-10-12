@@ -6123,6 +6123,8 @@ export const dashboardEs: DeepPartial<DashboardDictionary> = {
       emptyTitle: 'Todavía no hay reseñas',
       emptyBody: 'Cuando un cliente escriba una reseña de tu negocio en Google, aparecerá aquí y podrás responderla.',
       loadMore: 'Más reseñas',
+      loadingMore: 'Cargando…',
+      shownCount: (shown: number, total: number) => `Mostrando ${shown} de ${total} reseñas`,
     },
     fields: {
       reply_empty: 'Escribe una respuesta.',

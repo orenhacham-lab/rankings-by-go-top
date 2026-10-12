@@ -461,6 +461,8 @@ export const aiVisibilityPtBR: DeepPartial<DashboardDictionary> = {
       emptyTitle: 'Ainda não há avaliações',
       emptyBody: 'Quando um cliente escrever uma avaliação do seu negócio no Google, ela aparecerá aqui e você poderá responder.',
       loadMore: 'Mais avaliações',
+      loadingMore: 'Carregando…',
+      shownCount: (shown: number, total: number) => `Mostrando ${shown} de ${total} avaliações`,
     },
     fields: {
       reply_empty: 'Escreva uma resposta.',

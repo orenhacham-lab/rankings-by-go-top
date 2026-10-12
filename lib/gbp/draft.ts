@@ -19,9 +19,7 @@
  * characters, no phone number (Google refuses those), no markdown.
  * Server-only. The generator is injected so a guard runs it without a network.
  */
-import { getRecoGenAiClient } from '@/lib/content/recommendations/genai-client'
-import { RECOMMENDATION_MODEL_PRIMARY } from '@/lib/content/recommendations/model'
-import { resolveModelConfig } from '@/lib/content/recommendations/model-config'
+import { generateGbpDraft } from './generate'
 import { clampPostText, containsPhoneNumber, GBP_SUMMARY_MAX, type GbpPostLanguage } from './validate'
 
 export interface DraftSource {
@@ -78,23 +76,8 @@ export function cleanDraft(raw: string): string {
 
 export type Generate = (prompt: string) => Promise<string>
 
-export const defaultGenerate: Generate = async (prompt) => {
-  const client = getRecoGenAiClient()
-  if (!client) throw new Error('draft_unavailable')
-  const mc = resolveModelConfig(RECOMMENDATION_MODEL_PRIMARY, 900)
-  const resp = await client.models.generateContent({
-    model: RECOMMENDATION_MODEL_PRIMARY,
-    contents: prompt,
-    config: {
-      responseMimeType: 'application/json',
-      temperature: 0.6,
-      maxOutputTokens: mc.maxOutputTokens,
-      thinkingConfig: { thinkingBudget: mc.thinkingBudget },
-      abortSignal: AbortSignal.timeout(30_000),
-    },
-  })
-  return typeof resp.text === 'string' ? resp.text : ''
-}
+export const defaultGenerate: Generate = (prompt) =>
+  generateGbpDraft(prompt, { label: 'post', answerBudget: 900, temperature: 0.6 })
 
 export async function draftPost(src: DraftSource, generate: Generate = defaultGenerate): Promise<{ ok: true; summary: string } | { ok: false }> {
   let raw: string

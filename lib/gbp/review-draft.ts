@@ -20,9 +20,7 @@
  * identifying a third party enters the AI path at all.
  * Server-only. The generator is injected so a guard runs it without a network.
  */
-import { getRecoGenAiClient } from '@/lib/content/recommendations/genai-client'
-import { RECOMMENDATION_MODEL_PRIMARY } from '@/lib/content/recommendations/model'
-import { resolveModelConfig } from '@/lib/content/recommendations/model-config'
+import { generateGbpDraft } from './generate'
 import { clampReply, GBP_REPLY_MAX } from './review-validate'
 import type { Generate } from './draft'
 
@@ -91,20 +89,5 @@ export async function draftReviewReply(src: ReviewDraftSource, generate: Generat
   return { ok: true, comment }
 }
 
-export const defaultReplyGenerate: Generate = async (prompt) => {
-  const client = getRecoGenAiClient()
-  if (!client) throw new Error('draft_unavailable')
-  const mc = resolveModelConfig(RECOMMENDATION_MODEL_PRIMARY, 600)
-  const resp = await client.models.generateContent({
-    model: RECOMMENDATION_MODEL_PRIMARY,
-    contents: prompt,
-    config: {
-      responseMimeType: 'application/json',
-      temperature: 0.5,
-      maxOutputTokens: mc.maxOutputTokens,
-      thinkingConfig: { thinkingBudget: mc.thinkingBudget },
-      abortSignal: AbortSignal.timeout(30_000),
-    },
-  })
-  return typeof resp.text === 'string' ? resp.text : ''
-}
+export const defaultReplyGenerate: Generate = (prompt) =>
+  generateGbpDraft(prompt, { label: 'review-reply', answerBudget: 600, temperature: 0.5 })

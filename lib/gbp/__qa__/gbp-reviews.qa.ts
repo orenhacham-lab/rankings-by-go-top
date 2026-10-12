@@ -512,6 +512,25 @@ function surfaceChecks() {
   check('the screen uses no confirm() or alert()', !/\b(window\.)?(confirm|alert)\s*\(/.test(strip(panel).replace(/await confirm\(/g, '')))
   check('no raw Tailwind colour in the screen', !/\b(bg|text|border|ring|from|to|via|fill|stroke|divide|placeholder)-(slate|gray|zinc|neutral|stone|red|orange|amber|yellow|lime|green|emerald|teal|cyan|sky|blue|indigo|violet|purple|fuchsia|pink|rose)-\d{2,3}\b/.test(panel))
   check('MUTATION: a raw colour is caught', /\b(bg|text)-(slate|blue)-\d{2,3}\b/.test(`${panel} text-blue-600`))
+  // A business with hundreds of reviews must not open hundreds of reply boxes on
+  // the first paint, and the reviews past Google's first page of 50 have to be
+  // reachable at all — the screen ignored nextPageToken until 13 October 2026.
+  const panelSrc = strip(panel)
+  check('the screen opens a fixed number of reviews, not all of them',
+    /const REVIEWS_PER_STEP = \d+/.test(panelSrc) && /\.slice\(0, shown\)/.test(panelSrc))
+  check('…and the step is small enough to matter', (Number(/const REVIEWS_PER_STEP = (\d+)/.exec(panelSrc)?.[1]) || 999) <= 25)
+  check('…and "show more" opens what is already here before asking Google again',
+    /if \(shown < body\.reviews\.length\) \{ setShown/.test(panelSrc)
+    && panelSrc.indexOf('if (shown < body.reviews.length)') < panelSrc.indexOf('if (!body.nextPageToken'))
+  check('…and the next page is appended, never replacing what the owner is reading',
+    /reviews: \[\.\.\.body\.reviews, \.\.\.added\]/.test(panelSrc))
+  check('…and a reload or a new sort order starts the window again',
+    /setBody\(result\.body\)\s*\n\s*setShown\(REVIEWS_PER_STEP\)/.test(panelSrc))
+  check('MUTATION: rendering every review at once is caught',
+    !/\.slice\(0, shown\)/.test(panelSrc.replace('.slice(0, shown)', '')))
+  check('MUTATION: replacing the list instead of appending is caught',
+    !/reviews: \[\.\.\.body\.reviews, \.\.\.added\]/.test(panelSrc.replace('reviews: [...body.reviews, ...added]', 'reviews: added')))
+
   check('the panel is on the screen', /ReviewsPanel/.test(read('components/maps-posts/MapsPostsView.tsx')))
 
   const keys = (o: any, p = ''): string[] => Object.entries(o).flatMap(([k, v]) =>

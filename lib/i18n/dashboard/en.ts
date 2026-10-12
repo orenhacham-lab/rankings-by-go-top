@@ -6462,6 +6462,8 @@ export const dashboardEn = {
       emptyTitle: 'No reviews yet',
       emptyBody: 'When a customer writes a review of your business on Google, it will appear here and you can reply to it.',
       loadMore: 'More reviews',
+      loadingMore: 'Loading…',
+      shownCount: (shown: number, total: number) => `Showing ${shown} of ${total} reviews`,
     },
     fields: {
       reply_empty: 'Write a reply.',
