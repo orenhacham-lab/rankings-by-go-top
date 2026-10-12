@@ -23,7 +23,7 @@
  *
  * Run: npx tsx lib/gbp/__qa__/gbp-reviews.qa.ts
  */
-import { readFileSync, writeFileSync, unlinkSync } from 'fs'
+import { readFileSync, writeFileSync, unlinkSync, mkdirSync } from 'fs'
 import { join, dirname } from 'path'
 import crypto from 'crypto'
 import { FakeAdmin } from '../../__qa__/_fake-admin'
@@ -57,8 +57,17 @@ function mutant<T>(rel: string, from: string | RegExp, to: string): T {
   const src = read(rel)
   const out = src.replace(from, to)
   if (out === src) throw new Error(`mutation did not apply to ${rel}`)
-  const file = join(ROOT, dirname(rel), `.mut-${crypto.randomUUID()}.ts`)
-  writeFileSync(file, out)
+  /*
+   * The copy goes in __qa__, not beside the file it copies: around sixty suites
+   * run at once and several of them walk the source tree, so a temporary .ts in
+   * lib/gbp/ gets listed by one of them and deleted by us before it is read.
+   * Its own relative imports move up one directory to compensate.
+   */
+  const moved = out.replace(/(\sfrom\s*|\brequire\()'\.\//g, "$1'../")
+  const dir = join(ROOT, dirname(rel), '__qa__')
+  mkdirSync(dir, { recursive: true })
+  const file = join(dir, `.mut-${crypto.randomUUID()}.ts`)
+  writeFileSync(file, moved)
   MUTANTS.push(file)
   return require(file) as T
 }
