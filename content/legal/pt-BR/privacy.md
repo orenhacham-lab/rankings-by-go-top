@@ -3,7 +3,7 @@ title: Política de Privacidade | Go Top SEO
 description: Política de privacidade do Go Top SEO.
 locale: pt-BR
 source: app/(public)/en/privacy/page.tsx
-lastUpdated: 2026-10-10
+lastUpdated: 2026-10-12
 register: voce
 extraSections: 1
 extraReason: One extra section, "Direitos de residentes no Brasil (LGPD)", placed beside the existing EEA/UK and United States rights sections, because the LGPD gives a different set of rights with a different deadline and a different authority to complain to. What the LGPD adds elsewhere goes inside the sections it belongs to - the legal bases of Art. 7, the international-transfer rule of Art. 33, and the communication channel that stands in for an appointed officer.
@@ -157,7 +157,9 @@ Para acompanhar posições a partir de um ponto exato, você pode digitar um end
 
 ## Conversão de um relatório em PDF
 
-Quando você pede para baixar um relatório em PDF, enviamos o conteúdo do relatório como exibido ao serviço **PDFShift**, que nos devolve o arquivo. Isso acontece somente quando você clicou para baixar um relatório, nunca de forma regular ou agendada, e o conteúdo é enviado apenas para a conversão. A retenção na PDFShift é regida pela política de privacidade e pelos termos dela.
+Quando você pede para baixar um relatório em PDF, enviamos o conteúdo do relatório como exibido ao serviço **PDFShift**, que nos devolve o arquivo. Isso acontece somente quando você clicou para baixar um relatório, nunca de forma regular ou agendada, e o conteúdo é enviado apenas para a conversão.
+
+Com a PDFShift temos um acordo de tratamento de dados nos termos do artigo 28 do RGPD. Conforme o anexo dele, o conteúdo que enviamos é tratado em memória apenas durante a conversão e não é retido depois. A PDFShift oferece um armazenamento opcional do arquivo gerado, e nós não o solicitamos. Os servidores e o armazenamento dela ficam na França, e o serviço de monitoramento de erros dela fica nos Estados Unidos, sob o Quadro de Privacidade de Dados UE-EUA e as cláusulas contratuais padrão.
 
 ## Rede de links
 
@@ -420,4 +422,4 @@ Se você tiver dúvidas sobre esta política de privacidade, fale com a gente:
 
 **Telefone:** [054-9489377](tel:0549489377)
 
-Esta política foi atualizada pela última vez em 10 de outubro de 2026
+Esta política foi atualizada pela última vez em 12 de outubro de 2026

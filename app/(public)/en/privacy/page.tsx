@@ -378,7 +378,14 @@ export default function EnglishPrivacyPage() {
           When you ask to download a report as a PDF, we send the report&rsquo;s content as displayed to the
           <strong> PDFShift</strong> service, which returns the file to us. This happens only when you pressed
           to download a report, never on a regular or scheduled basis, and the content is sent for the
-          conversion alone. Retention at PDFShift is governed by their own privacy policy and terms.
+          conversion alone.
+        </p>
+        <p>
+          We have a data processing agreement with PDFShift under Article 28 of the GDPR. Under its annex,
+          the content we send is processed in memory for the duration of the conversion alone and is not
+          retained afterwards. PDFShift offers optional storage of the generated file, and we do not ask for
+          it. Its servers and storage are in France, and its error-monitoring provider is in the United
+          States under the EU-US Data Privacy Framework and the standard contractual clauses.
         </p>
       </section>
 
@@ -966,7 +973,7 @@ export default function EnglishPrivacyPage() {
 
       <section>
         <p className={LEGAL_FOOTNOTE}>
-          This policy was last updated on October 10, 2026
+          This policy was last updated on October 12, 2026
         </p>
       </section>
     </LegalDoc>

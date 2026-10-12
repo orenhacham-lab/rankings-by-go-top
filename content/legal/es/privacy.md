@@ -3,7 +3,7 @@ title: Política de privacidad | Go Top SEO
 description: Política de privacidad de Go Top SEO: cómo recopilamos, utilizamos y protegemos sus datos.
 locale: es
 source: app/(public)/en/privacy/page.tsx
-lastUpdated: 2026-10-10
+lastUpdated: 2026-10-12
 register: usted
 ---
 
@@ -159,7 +159,9 @@ Para hacer el seguimiento del posicionamiento desde un punto exacto, usted puede
 
 ## Conversión de un informe a PDF
 
-Cuando usted solicita descargar un informe como PDF, enviamos el contenido del informe tal como se muestra al servicio **PDFShift**, que nos devuelve el archivo. Esto ocurre únicamente cuando usted pulsó para descargar un informe, nunca de forma habitual ni programada, y el contenido se envía solo para la conversión. La conservación en PDFShift se rige por su propia política de privacidad y sus propios términos.
+Cuando usted solicita descargar un informe como PDF, enviamos el contenido del informe tal como se muestra al servicio **PDFShift**, que nos devuelve el archivo. Esto ocurre únicamente cuando usted pulsó para descargar un informe, nunca de forma habitual ni programada, y el contenido se envía solo para la conversión.
+
+Con PDFShift tenemos un acuerdo de tratamiento de datos conforme al artículo 28 del RGPD. Según su anexo, el contenido que enviamos se trata en memoria durante el tiempo de la conversión y no se conserva después. PDFShift ofrece un almacenamiento opcional del archivo generado, y nosotros no lo solicitamos. Sus servidores y su almacenamiento están en Francia, y su servicio de supervisión de errores está en los Estados Unidos, al amparo del Marco de Privacidad de Datos UE-EE. UU. y de las cláusulas contractuales tipo.
 
 ## Red de enlaces
 
@@ -401,4 +403,4 @@ Si tiene preguntas sobre esta política de privacidad, contacte con:
 
 **Teléfono:** 054-9489377
 
-Esta política se actualizó por última vez el 10 de octubre de 2026
+Esta política se actualizó por última vez el 12 de octubre de 2026
