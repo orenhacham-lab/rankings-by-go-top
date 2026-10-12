@@ -882,16 +882,17 @@ export default function EnglishPrivacyPage() {
           business&rsquo;s name, its site, the platform the site runs on, the country, the contact
           email address and the contact&rsquo;s name where we found them, the postal address, the two
           public sources the details came from, the single finding with its date, which of the two
-          messages have been sent and when, a one-way fingerprint of the email address, a random
+          messages have been sent and when, whether a reply or a removal request came and when, the
+          dates the record was created and last changed, a one-way fingerprint of the email address, a random
           identifier that makes the unsubscribe link in the message work, and a short internal note
           about the business. <strong>From a record we wrote to, the email address, the
           contact&rsquo;s name and the postal address are erased 30 days after the last message we
           sent it</strong>, or 30 days after a reply or a removal request if that
           is later, and the date of the erasure is recorded. 30 days is not a round number: the
           unsubscribe link in our message has to keep working for at least that long, and it resolves
-          against this record. What remains afterwards is the business&rsquo;s name, its site, the
-          platform, the country, where the record stands in its two-message life, the dates, the
-          one-way fingerprint and the unsubscribe identifier, so that the link keeps working. The
+          against this record. What remains afterwards is everything else in the record above,
+          among it the one-way fingerprint and the unsubscribe identifier, so the link keeps
+          working. The
           fingerprint is what lets us know we already wrote to that business twice and keeps it from
           being added again. <strong>A record we never
           wrote to is deleted outright 90 days after it was added.</strong> The removal list is
