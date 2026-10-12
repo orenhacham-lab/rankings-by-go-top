@@ -484,7 +484,7 @@ function sourceChecks() {
   check('and answers 404 while the feature is off', /isGbpPostsEnabled\(\)/.test(route) && route.includes('404'))
   check('only PATCH exists on it', !/export (async )?function (GET|POST|DELETE|PUT)\b/.test(route))
 
-  const migration = read('supabase/migrations/20261012170000_gbp_auto_post.sql')
+  const migration = read('supabase/migrations/20261012180000_gbp_auto_post.sql')
   check('the migration is additive only', !/DROP\s+(TABLE|COLUMN)|ALTER\s+COLUMN|DELETE\s+FROM|TRUNCATE/i.test(strip(migration).replace(/^--.*$/gm, '')))
   check('the switch arrives OFF for everyone', /auto_post_on_publish boolean NOT NULL DEFAULT false/.test(migration))
   check('one automatic post per article is enforced by the database',

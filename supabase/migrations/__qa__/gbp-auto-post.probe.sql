@@ -1,5 +1,5 @@
 -- ============================================================================
--- EXECUTED PROBE — 20261012170000_gbp_auto_post.sql
+-- EXECUTED PROBE — 20261012180000_gbp_auto_post.sql
 --
 -- Applies the base GBP migration and then this one (twice, for idempotency) to a
 -- disposable PostgreSQL cluster carrying Supabase's roles and the projects
@@ -84,8 +84,8 @@ INSERT INTO public.gbp_posts (id, project_id, user_id, source_article_id, summar
    NULL, 'פוסט חופשי', 'scheduled');
 RESET ROLE;
 
-\i supabase/migrations/20261012170000_gbp_auto_post.sql
-\i supabase/migrations/20261012170000_gbp_auto_post.sql
+\i supabase/migrations/20261012180000_gbp_auto_post.sql
+\i supabase/migrations/20261012180000_gbp_auto_post.sql
 
 CREATE TABLE results (phase text, name text, ok boolean);
 CREATE FUNCTION chk(ph text, n text, c boolean) RETURNS void LANGUAGE plpgsql AS $$
@@ -362,7 +362,7 @@ BEGIN
   GRANT SELECT ON public.project_gbp_locations, public.gbp_posts TO authenticated;
 END $$;
 
-\i supabase/migrations/20261012170000_gbp_auto_post.sql
+\i supabase/migrations/20261012180000_gbp_auto_post.sql
 
 DO $$
 DECLARE r text;
