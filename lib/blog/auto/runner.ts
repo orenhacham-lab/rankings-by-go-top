@@ -23,7 +23,7 @@
 
 import type { createAdminClient } from '@/lib/supabase/admin'
 import { generateValidatedArticle } from '@/lib/content/gemini-article'
-import { runQualityGate } from '@/lib/content/automation/quality-gate'
+import { placeholderContext, runQualityGate } from '@/lib/content/automation/quality-gate'
 import { BLOG_AUTO_LOCALES, type BlogAutoLocale } from '@/lib/blog/auto/rotation'
 import { buildBlogBrief } from '@/lib/blog/auto/brief'
 import { checkTruthLimits } from '@/lib/blog/auto/truth-limits'
@@ -143,7 +143,19 @@ export async function runBlogAutoPublish(
     content_html: generated.safeHtml,
     slug: generated.slug,
   })
-  if (!gate.ok) return fail(`quality:${gate.failures.join(',')}`)
+  if (!gate.ok) {
+    // The article is thrown away with the run, so whatever tripped the gate is
+    // gone unless it is logged here.
+    if (gate.failures.includes('placeholder_found')) {
+      console.warn('[blog-auto] placeholder in generated article', {
+        locale,
+        slug: generated.slug,
+        inTitle: placeholderContext(generated.article.title),
+        inBody: placeholderContext(generated.safeHtml),
+      })
+    }
+    return fail(`quality:${gate.failures.join(',')}`)
+  }
 
   const truth = checkTruthLimits({
     title: generated.article.title,

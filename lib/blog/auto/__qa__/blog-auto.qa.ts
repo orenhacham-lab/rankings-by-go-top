@@ -16,12 +16,13 @@
  *      linked to the trial, our other articles offered at the end, and the gate
  *      that refuses an article which never named the system.
  */
-import { readFileSync } from 'node:fs'
+import { existsSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import {
   BLOG_AUTO_LOCALES, isBlogAutoLocale, localesForDay, weeklyShare,
 } from '@/lib/blog/auto/rotation'
 import { checkTruthLimits, plainText } from '@/lib/blog/auto/truth-limits'
+import { placeholderContext, runQualityGate } from '@/lib/content/automation/quality-gate'
 import {
   CANNIBAL_OVERLAP, EXCLUDED_PATTERNS, MIN_MONTHLY_SEARCHES, RESEARCH_MARKET, RESEARCH_SEEDS,
   keywordOverlap, keywordTokens, selectKeywords,
@@ -382,25 +383,39 @@ async function main() {
   // ============================================================
   // G) SOURCE
   // ============================================================
-  const cronSrc = stripComments(read('app/api/blog/auto/cron/route.ts'))
+  // The work lives in the shared handler; the two routes only pass it a language.
+  const cronSrc = stripComments(read('lib/blog/auto/cron-run.ts'))
+  const manualRouteSrc = stripComments(read('app/api/blog/auto/cron/route.ts'))
+  const localeRouteSrc = stripComments(read('app/api/blog/auto/cron/[locale]/route.ts'))
   check('G1: the daily route is off unless the switch is exactly "true"', /BLOG_AUTO_PUBLISH_ENABLED === 'true'/.test(cronSrc), )
   check('G2: off means 404 — the route does not exist until it is switched on', /isBlogAutoPublishEnabled\(\)/.test(cronSrc) && /status: 404/.test(cronSrc))
   check('G3: it refuses a caller without the cron secret', /authorizeCronRequest/.test(cronSrc))
   check('G4: it answers before it works, so a scheduler does not time out', /after\(/.test(cronSrc) && /status: 202/.test(cronSrc))
   const vercel = JSON.parse(read('vercel.json')) as { crons: { path: string; schedule: string }[] }
   const blogCrons = vercel.crons.filter((c) => c.path.startsWith('/api/blog/auto/cron'))
-  check('G5: every language has its own daily run', (() => {
+  check('G5: every language has its own daily run, on a path of its own', (() => {
     if (blogCrons.length !== BLOG_AUTO_LOCALES.length) return false
     const daily = blogCrons.every((c) => /^\d+ \d+ \* \* \*$/.test(c.schedule))
-    const locales = blogCrons.map((c) => new URLSearchParams(c.path.split('?')[1] ?? '').get('locale'))
+    const locales = blogCrons.map((c) => c.path.replace('/api/blog/auto/cron/', ''))
     return daily && same([...locales].sort(), [...BLOG_AUTO_LOCALES].sort())
   })(), blogCrons)
+  // 12 Oct 2026: three jobs that differed only by ?locale= left ONE of them
+  // running. Vercel keys a cron by its path, so the language is a path segment.
+  check('G5d: no scheduled job carries a query string', blogCrons.every((c) => !c.path.includes('?')), blogCrons.map((c) => c.path))
+  check('G5e: each scheduled path is distinct', new Set(blogCrons.map((c) => c.path)).size === blogCrons.length)
+  check('G5f: the scheduled path is the per-language route that exists on disk',
+    blogCrons.every((c) => /^\/api\/blog\/auto\/cron\/[a-z-]+$/.test(c.path))
+    && existsSync(join(process.cwd(), 'app/api/blog/auto/cron/[locale]/route.ts')))
+  check('G5g: the per-language route reads the language from its path and shares the one handler',
+    /await ctx\.params/.test(localeRouteSrc) && /handleBlogAutoCron\(request, locale\)/.test(localeRouteSrc))
+  check('G5h: the manual route still accepts a language in the query string',
+    /searchParams\.get\('locale'\)/.test(manualRouteSrc) && /handleBlogAutoCron/.test(manualRouteSrc))
   check('G5b: the runs do not start at the same minute — one article takes minutes',
     new Set(blogCrons.map((c) => c.schedule)).size === blogCrons.length, blogCrons.map((c) => c.schedule))
-  check('G5c: the route writes the language it was asked for', (() => {
-    const route = /searchParams\.get\('locale'\)/.test(cronSrc) && /isBlogAutoLocale\(asked\)/.test(cronSrc)
+  check('G5c: the handler writes the language it was asked for, and all of them when asked for none', (() => {
+    const validated = /isBlogAutoLocale\(asked\)/.test(cronSrc)
     const both = /runBlogAutoPublish\(admin, \{ locale \}\)/.test(cronSrc) && /runBlogAutoPublishAllLocales/.test(cronSrc)
-    return route && both
+    return validated && both
   })())
   const adminApi = stripComments(read('app/api/admin/blog-plan/route.ts'))
   check('G6: the queue screen\'s actions are behind the administrator gate', /requireAdminApi/.test(adminApi))
@@ -421,6 +436,22 @@ async function main() {
   check('G15: our blog does not share the customer engine\'s tables', !/article_pool_items|generated_articles|article_topics/.test(storeSrc))
   // Mutation control for G12/G13: the strings the guards look for are real calls.
   check('G16 (control): removing either call from the publish path is what the guards would catch', storeSrc.includes('sanitizePublicArticleHtml(article.html)'))
+
+  // ============================================================
+  // I) A GATE FAILURE SAYS WHAT TRIPPED IT
+  // ============================================================
+  check('I1: the placeholder that stopped an article is reported with its surroundings', (() => {
+    const ctx = placeholderContext('<p>הטקסט נמשך וממשיך ואז מופיעה המילה placeholder בתוך משפט שלם</p>')
+    return !!ctx && ctx.includes('placeholder')
+  })(), placeholderContext('<p>placeholder</p>'))
+  check('I2: a clean article reports nothing', placeholderContext('<p>טקסט נקי לגמרי</p>') === null)
+  check('I3: the run logs it, because the article itself is thrown away',
+    /placeholder_found/.test(runnerSrc) && /placeholderContext\(/.test(runnerSrc))
+  check('I4: the brief tells the model a placeholder rejects the whole article',
+    /Never write a placeholder of any kind/.test(BLOG_GUIDANCE.instructions)
+    && /rejects the whole article/.test(BLOG_GUIDANCE.instructions))
+  check('I5 (control): without the context helper the reason is just the gate\u2019s code',
+    runQualityGate({ title: 'כותרת', slug: 'a', content_html: `<p>${WORDS} placeholder</p>` }).failures.includes('placeholder_found'))
 
   // ============================================================
   // H) THE BODY'S LINKS
