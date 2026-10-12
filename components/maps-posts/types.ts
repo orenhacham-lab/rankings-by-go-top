@@ -22,7 +22,6 @@ export interface GbpPostView {
 export interface GbpArticleOption { id: string; title: string; url: string | null; imageUrl: string | null }
 
 export type GbpStatus =
-  | { ok: true; state: 'shopify' }
   | { ok: true; state: 'unavailable' }
   | {
       ok: true

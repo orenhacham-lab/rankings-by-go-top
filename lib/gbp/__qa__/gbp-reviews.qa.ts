@@ -277,7 +277,6 @@ function world(opts: { missing?: boolean } = {}) {
 function deps(admin: any, over: Partial<import('../http').GbpRouteDeps> = {}, as = OWNER): import('../http').GbpRouteDeps {
   return {
     auth: async (pid) => (!pid ? { error: 'x', status: 400 } : pid !== PROJECT ? { error: 'x', status: 404 } : as !== OWNER ? { error: 'x', status: 403 } : { user: { id: as }, admin, project: { id: PROJECT, user_id: OWNER } }) as any,
-    isShopifyProject: async () => false,
     publish: { refresh: async () => ({ accessToken: 'at' }), create: async () => { throw new Error('not used') } } as any,
     ...over,
   }
@@ -300,8 +299,12 @@ async function handlerChecks() {
     await connectOwner(admin)
     const other = await H.handleListReviews(get(`projectId=${PROJECT}`), deps(admin, { listReviews: onePage }, OTHER))
     check('another user gets 403 and no review text', other.status === 403 && !(await other.text()).includes('חזרתי'))
-    const shop = await H.handleListReviews(get(`projectId=${PROJECT}`), deps(admin, { listReviews: onePage, isShopifyProject: async () => true }))
-    check('a Shopify project cannot read reviews', shop.status === 409)
+    // CHANGED 13 October 2026: reviews live on the business profile, not on the
+    // site, so a project whose site is a Shopify store reads them like any other.
+    admin.tables.shopify_connections = [{ project_id: PROJECT, archived_at: null }]
+    const shop = await H.handleListReviews(get(`projectId=${PROJECT}`), deps(admin, { listReviews: onePage }))
+    check('a project whose site is a Shopify store reads its reviews like any other', shop.status === 200)
+    delete admin.tables.shopify_connections
     const missing = world({ missing: true })
     const m = await H.handleListReviews(get(`projectId=${PROJECT}`), deps(missing, { listReviews: onePage }))
     check('tables not applied → not_available, not an error', m.status === 409 && (await m.json()).error === 'not_available')

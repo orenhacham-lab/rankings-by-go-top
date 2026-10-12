@@ -22,7 +22,7 @@
  *
  * Run: npx tsx lib/gbp/__qa__/gbp-auto-post.qa.ts
  */
-import { readFileSync, writeFileSync, unlinkSync } from 'fs'
+import { readFileSync, writeFileSync, unlinkSync, readdirSync, statSync } from 'fs'
 import { join, dirname, sep } from 'path'
 import crypto from 'crypto'
 import { FakeAdmin } from '../../__qa__/_fake-admin'
@@ -49,6 +49,16 @@ function check(name: string, cond: boolean, detail?: string) {
 }
 const ROOT = join(__dirname, '..', '..', '..')
 const read = (rel: string) => readFileSync(join(ROOT, rel), 'utf8')
+/** Every .ts/.tsx file under a directory, as repo-relative paths. */
+function walk(rel: string, out: string[] = []): string[] {
+  for (const name of readdirSync(join(ROOT, rel))) {
+    if (name === 'node_modules' || name === '.next') continue
+    const child = `${rel}/${name}`
+    if (statSync(join(ROOT, child)).isDirectory()) walk(child, out)
+    else out.push(child)
+  }
+  return out
+}
 const strip = (s: string) => s.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\{\/\*[\s\S]*?\*\/\}/g, '').replace(/(^|[^:'"`\\])\/\/.*$/gm, '$1')
 const MUTANTS: string[] = []
 process.on('exit', () => { for (const f of MUTANTS) { try { unlinkSync(f) } catch { /* gone */ } } })
@@ -354,7 +364,6 @@ function deps(admin: any, over: Partial<import('../http').GbpRouteDeps> = {}, as
     auth: async (pid) => (!pid ? { error: 'x', status: 400 } : pid !== PROJECT ? { error: 'x', status: 404 }
       : as !== OWNER ? { error: 'x', status: 403 }
       : { user: { id: as }, admin, project: { id: PROJECT, user_id: OWNER } }) as any,
-    isShopifyProject: async () => false,
     ...over,
   }
 }
@@ -380,9 +389,13 @@ async function switchChecks() {
     check('another user cannot turn it on', r.status === 403 && admin.tables.project_gbp_locations[0].auto_post_on_publish === false)
   }
   {
+    // CHANGED 13 October 2026: the switch is offered on a Shopify store too, and
+    // lib/content/automation/publish-item-shopify.ts enqueues the post, so the
+    // promise on the screen holds there as well.
     const admin = world({ switchOn: false })
-    const r = await H.handleSetAutoPost(patch({ projectId: PROJECT, enabled: true }), deps(admin, { isShopifyProject: async () => true }))
-    check('a Shopify project never sees this feature', r.status === 409 && admin.tables.project_gbp_locations[0].auto_post_on_publish === false)
+    admin.tables.shopify_connections = [{ project_id: PROJECT, archived_at: null }]
+    const r = await H.handleSetAutoPost(patch({ projectId: PROJECT, enabled: true }), deps(admin))
+    check('a project whose site is a Shopify store can turn automatic posting on', r.status === 200 && admin.tables.project_gbp_locations[0].auto_post_on_publish === true)
   }
   {
     const admin = world({ withLocation: false })
@@ -446,6 +459,10 @@ const PUBLISH_PATHS = [
   'lib/content/automation/publish-item.ts',
   'lib/site-platforms/publish.ts',
   'app/api/content/articles/[id]/wordpress/route.ts',
+  // Added 13 October 2026, when the Shopify block came off the feature: a store
+  // that can turn the switch on must have its articles reach Google too.
+  'lib/content/automation/publish-item-shopify.ts',
+  'app/api/content/articles/[id]/shopify/route.ts',
 ]
 
 function sourceChecks() {
@@ -461,12 +478,28 @@ function sourceChecks() {
     check(`the article path calls it: ${rel}`, s.includes(HOOK))
     // It must come AFTER the article is already recorded as published, so a
     // failure here cannot leave the article unpublished.
-    const published = s.search(/status:\s*'published'|goesLive/)
+    // The anchor is whatever records the publication in THAT path. Two Shopify
+    // paths do not write the status themselves: publishArticleToShopify does it
+    // (see persistSuccess), so the anchor there is its result being accepted.
+    const published = s.search(/status:\s*'published'|goesLive|if \(!result\.ok\)/)
     const hook = s.lastIndexOf(`await ${HOOK}`)
     check(`and only after the article is already published: ${rel}`, published >= 0 && hook > published)
   }
-  const shopify = strip(read('lib/content/automation/publish-item-shopify.ts'))
-  check('the Shopify path is deliberately NOT wired (the feature is hidden there)', !shopify.includes(HOOK))
+  // Every path that can mark an article published is listed above. A new one
+  // that is not would publish silently, so the list is checked against the tree.
+  const publishers = walk('lib').concat(walk('app'))
+    .filter((f) => /\.tsx?$/.test(f) && !f.includes('__qa__'))
+    .filter((f) => /from '@\/lib\/shopify\/publish-article'|from '@\/lib\/content\/wordpress-plugin-publish'/.test(read(f)))
+    .filter((f) => /status:\s*'published'|published:\s*true/.test(strip(read(f))))
+  const missing = publishers.filter((f) => !PUBLISH_PATHS.includes(f) && !strip(read(f)).includes(HOOK))
+  if (missing.length > 0) console.log('      missing:', missing.join(', '))
+  check(`no publishing path is left out (${publishers.length} found)`, missing.length === 0)
+
+  const shopifyManual = strip(read('app/api/content/articles/[id]/shopify/route.ts'))
+  check('a Shopify DRAFT export does not post to Google (a draft is not a publication)',
+    /if \(published\) {/.test(shopifyManual))
+  check('MUTATION CONTROL: dropping the published check would post on a draft too',
+    !/if \(published\) {/.test(shopifyManual.replace('if (published) {', 'if (true) {')))
 
   const vercel = JSON.parse(read('vercel.json')) as { crons: { path: string; schedule: string }[] }
   const cron = vercel.crons.find((c) => c.path === '/api/gbp/cron')
