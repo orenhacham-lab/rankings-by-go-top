@@ -838,8 +838,15 @@ async function main() {
       /usage_period_unavailable: 'לא הצלחנו לאמת כרגע את תקופת החיוב\. נסו שוב בעוד רגע\.'/.test(he))
     check('A5-e: they are distinct from Gemini’s own provider-quota message',
       /gemini_quota_exceeded: 'Gemini quota \/ rate limit exceeded/.test(en))
-    check('A5-f: SOURCE — the queue UI resolves codes through the dictionary, not raw',
-      /const label = genErrors\[base\] \?\? base/.test(strip(read('components/content/AutomationSchedule.tsx'))))
+    // This used to ask for `genErrors[base] ?? base`, which printed the raw code
+    // at the merchant when it was not in the dictionary. The panel now degrades
+    // to a localized sentence instead, so the identifier never leaks — the house
+    // rule is that a merchant is never shown a provider's own error. The guard
+    // asks for the dictionary AND refuses the raw-code fallback.
+    const schedule = strip(read('components/content/AutomationSchedule.tsx'))
+    check('A5-f: SOURCE — the queue UI resolves codes through the dictionary, never raw',
+      /return genErrors\[base\] \?\? t\.alertReasonOther/.test(schedule)
+      && !/genErrors\[base\] \?\? base/.test(schedule))
     // THE QUEUE'S OWN DICTIONARY, matched by BRACE DEPTH rather than a fixed
     // slice. The previous version cut the block at 4000 characters while the EN
     // block is 4369 — the truncation is precisely why two missing codes went

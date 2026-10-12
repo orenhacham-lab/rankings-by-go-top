@@ -215,7 +215,14 @@ export default function GscMetricsTable({ projectId, refreshKey = 0 }: { project
                 <Td>
                   <a href={r.page} target="_blank" rel="noopener noreferrer" title={safeDecodeUrl(r.page)} dir="ltr"
                     className="inline-flex max-w-64 items-center gap-1 text-caption text-muted hover:text-action hover:underline">
-                    <ExternalLink aria-hidden="true" className="size-3.5 shrink-0" /><span className="truncate">{safeDecodeUrl(r.page)}</span>
+                    {/* The URL WRAPS inside the cell instead of being cut with an
+                        ellipsis. A cut URL is unreadable on a touch screen, where
+                        there is no hover to reveal the title — which is why the
+                        original panel wrapped it, a contract this table inherited
+                        when the markup moved here (lib/gsc/__qa__/property-summary.qa.ts,
+                        FIX7). The title stays for the mouse. */}
+                    <ExternalLink aria-hidden="true" className="size-3.5 shrink-0" />
+                    <span className="[overflow-wrap:anywhere]">{safeDecodeUrl(r.page)}</span>
                   </a>
                 </Td>
                 <Td className="text-end">{fmtInt(r.clicks)}</Td>
