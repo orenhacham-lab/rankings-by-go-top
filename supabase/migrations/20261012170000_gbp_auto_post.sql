@@ -38,6 +38,9 @@
 --   DROP INDEX IF EXISTS public.uq_gbp_posts_auto_article;
 --   ALTER TABLE public.gbp_posts DROP COLUMN IF EXISTS needs_ai_draft, DROP COLUMN IF EXISTS auto_created;
 --   ALTER TABLE public.gbp_posts DROP CONSTRAINT IF EXISTS gbp_posts_language;
+--   -- NOT safe once a Spanish or Brazilian post exists: narrowing the check back to
+--   -- he/en fails on those rows. Delete or re-language them first, or leave the
+--   -- widened check in place — it blocks nothing the app does.
 --   ALTER TABLE public.gbp_posts ADD CONSTRAINT gbp_posts_language CHECK (language_code IN ('he', 'en'));
 --   ALTER TABLE public.project_gbp_locations
 --     DROP CONSTRAINT IF EXISTS project_gbp_locations_auto_post_enabled_at,
