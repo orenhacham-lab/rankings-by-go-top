@@ -1140,8 +1140,8 @@ const OUTREACH_VERIFIED: Record<string, RegExp> = {
   'pt-BR': /verificamos, a partir de duas fontes independentes, que atuam nos Estados Unidos/,
 }
 const OUTREACH_NOT_DONE: Record<string, RegExp[]> = {
-  he: [/איננו קונים\s*רשימות כתובות ואיננו משתמשים בסוחרי מידע/, /איננו נכנסים לשום חלק באתר שאינו פתוח לכל מבקר/],
-  en: [/We do not buy\s*contact lists and we do not use data brokers/, /we do not enter any part of a site\s*that is not open to every visitor/],
+  he: [/איננו קונים\s*רשימות כתובות ואיננו משתמשים בסוחרי מידע/, /איננו נכנסים\s+לשום חלק באתר שאינו פתוח לכל מבקר/],
+  en: [/We do not buy contact lists and we do not use\s+data brokers/, /we do not enter any part of a site\s*that is not open to every visitor/],
   es: [/No compramos listas de direcciones y no usamos intermediarios de datos/, /no entramos en ninguna parte de un sitio que no esté abierta a cualquier visitante/],
   'pt-BR': [/Não compramos listas de endereços e não usamos intermediários de dados/, /não entramos em nenhuma parte de um site que não esteja aberta a qualquer visitante/],
 }
@@ -1152,10 +1152,10 @@ const OUTREACH_REMOVAL: Record<string, RegExp[]> = {
   'pt-BR': [/com a única finalidade de garantir que não entraremos em contato com você de novo/, /vale para todos os nossos canais, não só para aquele em que você pediu/],
 }
 const OUTREACH_NOTICE: Record<string, RegExp> = {
-  he: /מכיוון שלא\s*אספנו את המידע ממך עצמך, הסעיף הזה הוא ההודעה על האיסוף, והקישור אליו מופיע בכל\s*הודעה שאנו שולחים/,
-  en: /Because we did\s*not collect the information from you directly, this section is the notice of collection,\s*and a link to it appears in every message we send/,
-  es: /Como no recogimos la información de usted directamente, esta sección es el aviso de recogida, y un enlace a ella aparece en cada mensaje que enviamos/,
-  'pt-BR': /Como não coletamos a informação de você diretamente, esta seção é o aviso de coleta, e um link para ela aparece em cada mensagem que enviamos/,
+  he: /מכיוון שלא\s*אספנו את המידע ממך עצמך, הסעיף הזה הוא ההודעה על האיסוף, לרבות משך השמירה של כל פרט, והקישור אליו\s+מופיע בכל הודעה שאנו שולחים/,
+  en: /Because we did\s*not collect the information from you directly, this section is the notice of collection,\s+including how long each item is kept, and a link to it appears in every message we send/,
+  es: /Como no recogimos la información de usted directamente, esta sección es el aviso de recogida, incluido el plazo de conservación de cada dato, y un enlace a ella aparece en cada mensaje que enviamos/,
+  'pt-BR': /Como não coletamos a informação de você diretamente, esta seção é o aviso de coleta, incluindo por quanto tempo cada dado é guardado, e um link para ela aparece em cada mensagem que enviamos/,
 }
 const OUTREACH_NO_SALE: Record<string, RegExp> = {
   he: /איננו מוכרים\s*את המידע הזה ואיננו משתפים אותו לפרסום התנהגותי חוצה-אתרים/,
@@ -2497,6 +2497,161 @@ const AUTO_POST_NO_LONGER_TRUE = /we create a post only when you press publish|�
   check("mutation control: a person's name back in the draft input would be caught",
     /reviewerName|customerName|userName|authorName|ownerName|email/i.test(
       stripComments('export interface DraftSource { businessName: string | null; customerName: string }')))
+}
+
+/*
+ * 31. THE PROSPECT RECORD BEHIND THE OUTBOUND EMAILS, AND HOW LONG IT LIVES.
+ *
+ * Until 12 October 2026 the published section said what we collect for a cold
+ * email and nothing about keeping it, because nothing was kept: the list lived
+ * in a file. The outreach thread then built public.outreach_prospects, a stored
+ * record per business, and asked whether the text owed anything. It owed three
+ * things, and two of them were a published sentence being made false:
+ *
+ *   1. "we do not collect details about a private individual" against a
+ *      contact_name column. In a one-person business the person and the business
+ *      are the same human, and that is exactly who this channel writes to. The
+ *      sentence is now narrowed to the business role someone is published in,
+ *      which is what we actually take; the old absolute is refused below, in all
+ *      four languages, so it cannot come back in a rewrite.
+ *   2. postal_address was collected and not disclosed at all.
+ *   3. A retention period. CPRA s.1798.100(a)(3) makes the notice at collection
+ *      state how long each category is kept, or the criterion used, and
+ *      "as long as necessary" is the formula California regulators reject. The
+ *      thread confirmed on 12 October that NOTHING in the code set redacted_at:
+ *      the column existed so a deletion request had somewhere to land, and a row
+ *      would otherwise have sat with the address and the name in it forever. So
+ *      this was a gap in the code, not in the wording, and the rule it is now
+ *      built to is the one the text states: 30 days after the last message
+ *      (or after a reply or an opt-out, whichever is later) the address, the
+ *      contact name and the postal address go; a record never written to is
+ *      deleted whole at 90 days. 30 is not a round number anyone liked — the
+ *      unsubscribe link resolves against this row and CAN-SPAM makes it work for
+ *      at least 30 days after a message, so nothing shorter is possible.
+ *
+ * The code checks are gated on the migration, as in sections 29 and 30: they are
+ * no-ops until the table lands and bind the day it does. Two of them are the
+ * ones that matter most. The column list is frozen against the disclosed field
+ * set, so a column added later fails this suite instead of quietly turning the
+ * text into an incomplete list; and the sweep is REQUIRED to exist once the table
+ * does, because a published period with no code behind it is the worse of the two
+ * states we were in. The sweep is found by scanning the outreach sources for
+ * redacted_at rather than by a path, since the path is theirs to choose; a file
+ * that merely reads the column satisfies the first check, which is why the
+ * periods and the two extra columns are checked separately.
+ */
+const OUTREACH_CONTACT_NAME: Record<string, RegExp> = {
+  he: /שם איש הקשר כאשר האתר/,
+  en: /the name of the contact person where the site publishes one/,
+  es: /el nombre de la persona de contacto cuando el sitio lo publica/,
+  'pt-BR': /o nome da pessoa de contato quando o site o publica/,
+}
+const OUTREACH_POSTAL: Record<string, RegExp> = {
+  he: /כתובת הדואר שהעסק מפרסם/,
+  en: /the postal address the business publishes/,
+  es: /la direcci[óo]n postal que la empresa publica/,
+  'pt-BR': /o endere[çc]o postal que a empresa publica/,
+}
+const OUTREACH_PERSON_NARROW: Record<string, RegExp> = {
+  he: /איננו אוספים על אדם שום דבר מעבר לתפקיד העסקי שבו הוא מפורסם/,
+  en: /we collect nothing about a person\s+beyond the business role they are published in/,
+  es: /no recogemos nada sobre una persona m[áa]s all[áa] del cargo con el que aparece publicada/,
+  'pt-BR': /n[ãa]o coletamos nada sobre uma pessoa al[ée]m do cargo com que ela aparece publicada/,
+}
+const OUTREACH_ERASE_30: Record<string, RegExp> = {
+  he: /30 יום אחרי ההודעה האחרונה ששלחנו לה/,
+  en: /erased 30 days after the last message we\s+sent it/,
+  es: /30 d[í i]as despu[ée]s del [úu]ltimo mensaje que le enviamos/,
+  'pt-BR': /30 dias depois da [úu]ltima mensagem que enviamos a ele/,
+}
+const OUTREACH_DELETE_90: Record<string, RegExp> = {
+  he: /נמחקת כולה 90 יום אחרי שנוספה/,
+  en: /deleted outright 90 days after it was added/,
+  es: /se elimina por completo 90 d[í i]as despu[ée]s de haberse a[ñn]adido/,
+  'pt-BR': /[ée] exclu[í i]do por inteiro 90 dias depois de ter sido adicionado/,
+}
+/* The absolute the contact_name column made false. Any language keeping it is a lie. */
+const OUTREACH_NO_LONGER_TRUE = /we\s+do not collect details about a private individual|איננו\s+אוספים פרטים על אדם פרטי|no recogemos datos sobre una persona privada|n[ãa]o coletamos dados sobre uma pessoa privada/
+{
+  const read = (path: string) => (existsSync(path) ? readFileSync(path, 'utf8') : '')
+  const enSource = frontMatter(text[LOCALES[0]].privacy).source
+  const pages: [string, string][] = [
+    ['he', read(HEBREW_PRIVACY)],
+    ['en', enSource ? read(enSource) : ''],
+    ...LOCALES.map((l): [string, string] => [l, text[l].privacy]),
+  ]
+  for (const [name, src] of pages) {
+    check(`${name}/privacy: the page was read`, src.length > 0)
+    check(`${name}/privacy: the broad "nothing about a private individual" claim is gone`,
+      !OUTREACH_NO_LONGER_TRUE.test(src))
+    check(`${name}/privacy: the contact person's name is disclosed as collected`,
+      (OUTREACH_CONTACT_NAME[name] ?? /$^/).test(src))
+    check(`${name}/privacy: the postal address is disclosed as collected`,
+      (OUTREACH_POSTAL[name] ?? /$^/).test(src))
+    check(`${name}/privacy: what we take about a person is narrowed to their business role`,
+      (OUTREACH_PERSON_NARROW[name] ?? /$^/).test(src))
+    check(`${name}/privacy: the 30-day erasure after the last message is stated`,
+      (OUTREACH_ERASE_30[name] ?? /$^/).test(src))
+    check(`${name}/privacy: the 90-day deletion of a record never written to is stated`,
+      (OUTREACH_DELETE_90[name] ?? /$^/).test(src))
+  }
+
+  const PROSPECTS_MIGRATION = 'supabase/migrations/20261012170000_outreach_prospects.sql'
+  const prospectsLanded = existsSync(PROSPECTS_MIGRATION)
+  console.log(`  · the prospect record ${prospectsLanded ? 'HAS landed; its code is checked below' : 'has NOT landed yet; its code checks are waiting for it'}`)
+  if (prospectsLanded) {
+    const migration = read(PROSPECTS_MIGRATION)
+    check(`${PROSPECTS_MIGRATION}: the United States promise is a database rule`,
+      /CHECK \(country = 'US'\)/.test(migration))
+    check(`${PROSPECTS_MIGRATION}: the postal address can be erased`,
+      !/postal_address\s+text\s+NOT NULL/.test(migration))
+    const redaction = /outreach_prospects_redaction([\s\S]*?)(CONSTRAINT|\n\);)/.exec(migration)?.[1] ?? ''
+    check(`${PROSPECTS_MIGRATION}: a redacted row holds no address, no contact name and no postal address`,
+      /email IS NULL/.test(redaction) && /contact_name IS NULL/.test(redaction) && /postal_address IS NULL/.test(redaction))
+    const body = /CREATE TABLE IF NOT EXISTS public\.outreach_prospects \(([\s\S]*?)\n\);/.exec(migration)?.[1] ?? ''
+    const columns = [...body.matchAll(/^ {2}([a-z_]+)\s+(uuid|text|timestamptz|boolean|integer|jsonb)/gm)].map((m) => m[1])
+    const DISCLOSED = new Set([
+      'id', 'email', 'email_hash', 'unsub_token', 'company', 'contact_name', 'site_host',
+      'platform', 'country', 'postal_address', 'source_site', 'source_second', 'status',
+      'finding', 'finding_checked', 'first_sent_at', 'second_sent_at', 'replied_at',
+      'redacted_at', 'note', 'created_at', 'updated_at',
+    ])
+    const undisclosed = columns.filter((c) => !DISCLOSED.has(c))
+    check(`${PROSPECTS_MIGRATION}: the record holds nothing the published text does not list`,
+      columns.length > 0 && undisclosed.length === 0, undisclosed.join(', ') || 'no columns parsed')
+
+    const walk = (dir: string): string[] =>
+      existsSync(dir)
+        ? readdirSync(dir).flatMap((n) => {
+            const f = `${dir}/${n}`
+            return statSync(f).isDirectory() ? walk(f) : [f]
+          })
+        : []
+    const outreachSources = [...walk('lib/outreach'), ...walk('app/api/outreach')]
+      .filter((f) => f.endsWith('.ts') && !f.includes('__qa__'))
+    const sweepFiles = outreachSources.filter((f) => /redacted_at/.test(read(f)))
+    check('a retention sweep exists in the outreach code',
+      sweepFiles.length > 0, `scanned ${outreachSources.length} files`)
+    const sweep = sweepFiles.map(read).join('\n')
+    check('the sweep carries both published periods',
+      /\b30\b/.test(sweep) && /\b90\b/.test(sweep))
+    check('the sweep erases the contact name and the postal address, not only the address',
+      /contact_name/.test(sweep) && /postal_address/.test(sweep))
+  }
+
+  check('mutation control: the old "private individual" absolute is recognised',
+    OUTREACH_NO_LONGER_TRUE.test('We do not collect a phone number, we do not collect details about a private individual, and'))
+  check('mutation control: the narrowed sentence does not match the old absolute',
+    !OUTREACH_PERSON_NARROW.en.test('we do not collect details about a private individual'))
+  check('mutation control: a text giving only the 90-day rule is caught',
+    !OUTREACH_ERASE_30.en.test('A record we never wrote to is deleted outright 90 days after it was added.'))
+  check('mutation control: an undisclosed column would be caught',
+    [...'  phone_number      text NOT NULL'.matchAll(/^ {2}([a-z_]+)\s+(uuid|text|timestamptz|boolean|integer|jsonb)/gm)]
+      .map((m) => m[1]).filter((c) => c !== 'id').length === 1)
+  check('mutation control: a postal address that cannot be erased would be caught',
+    /postal_address\s+text\s+NOT NULL/.test('  postal_address    text NOT NULL,'))
+  check('mutation control: a redaction rule naming only the address would be caught',
+    !/contact_name IS NULL/.test("CONSTRAINT outreach_prospects_redaction CHECK ((email IS NULL) = (redacted_at IS NOT NULL))"))
 }
 
 console.log(`\n${pass} passed, ${fail} failed`)

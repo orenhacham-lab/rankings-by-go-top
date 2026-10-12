@@ -853,10 +853,12 @@ export default function EnglishPrivacyPage() {
         <p className="mt-4">
           <strong>What we collect and from where.</strong> The business&rsquo;s name, its website
           address, a contact email address shown on the business&rsquo;s own site or in a public
-          business registry, the country the business operates in, and one finding from an automated
-          check of the site&rsquo;s public pages, with the date it was checked. <strong>We do not buy
-          contact lists and we do not use data brokers.</strong> We do not collect a phone number, we
-          do not collect details about a private individual, and we do not enter any part of a site
+          business registry, the name of the contact person where the site publishes one next to
+          that address, the postal address the business publishes (a business that publishes no
+          address never enters the list), the country the business operates in, and one finding from an automated check of the site&rsquo;s public
+          pages, with the date it was checked. <strong>We do not buy contact lists and we do not use
+          data brokers.</strong> We do not collect a phone number, we collect nothing about a person
+          beyond the business role they are published in, and we do not enter any part of a site
           that is not open to every visitor.
         </p>
         <p className="mt-4">
@@ -876,6 +878,25 @@ export default function EnglishPrivacyPage() {
           follow-up a week later. After that the business leaves the list even without asking.
         </p>
         <p className="mt-4">
+          <strong>What we keep, and for how long.</strong> Each business is one record: the
+          business&rsquo;s name, its site, the platform the site runs on, the country, the contact
+          email address and the contact&rsquo;s name where we found them, the postal address, the two
+          public sources the details came from, the single finding with its date, which of the two
+          messages have been sent and when, a one-way fingerprint of the email address, a random
+          identifier that makes the unsubscribe link in the message work, and a short internal note
+          about the business. <strong>From a record we wrote to, the email address, the
+          contact&rsquo;s name and the postal address are erased 30 days after the last message we
+          sent it</strong>, or 30 days after a reply or a removal request if that
+          is later, and the date of the erasure is recorded. 30 days is not a round number: the
+          unsubscribe link in our message has to keep working for at least that long, and it resolves
+          against this record. What remains afterwards is the business&rsquo;s name, its site, the
+          platform, the country, the dates and the fingerprint, which is what lets us know we already
+          wrote to that business twice and keeps it from being added again. <strong>A record we never
+          wrote to is deleted outright 90 days after it was added.</strong> The removal list is
+          separate from this record and is kept for as long as we send email at all, because that is
+          the only way a removal can hold.
+        </p>
+        <p className="mt-4">
           <strong>How to stop it.</strong> Every message carries an unsubscribe link that works in
           one click, with no signing in and no explanation. It is honoured immediately and
           permanently. So that the removal holds, the address is kept on a removal list
@@ -890,7 +911,7 @@ export default function EnglishPrivacyPage() {
           be discriminated against for exercising a right. <strong>We do not sell this information
           and we do not share it for cross-context behavioural advertising.</strong> Because we did
           not collect the information from you directly, this section is the notice of collection,
-          and a link to it appears in every message we send. A request goes to the address in
+          including how long each item is kept, and a link to it appears in every message we send. A request goes to the address in
           &ldquo;Privacy Contact and Representatives&rdquo;, and we answer in writing.
         </p>
         <p className="mt-4">
