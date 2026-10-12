@@ -117,12 +117,14 @@ function main() {
     // A document that says when it was last updated has to be telling the truth
     // about the version the reader is looking at.
     // Per document, because they are no longer revised together: the privacy
-    // policy and the terms both moved to 10 October 2026 — the policy for the
-    // business-outreach section, the terms for Creem as the merchant of record —
-    // and the accessibility statement stayed at 5 October 2026, when the section
-    // that says how it is verified was added.
+    // policy moved to 12 October 2026, when PDFShift countersigned an Article 28
+    // agreement and the vague "retention is governed by their own policy" line
+    // was replaced by what that agreement actually says; the terms stayed at
+    // 10 October 2026 (Creem as the merchant of record, and what the displayed
+    // price includes); and the accessibility statement stayed at 5 October 2026,
+    // when the section that says how it is verified was added.
     check('D2: every document that was changed carries the new date',
-      /10 באוקטובר 2026/.test(read(HE_PRIVACY)) && /October 10, 2026/.test(read(EN_PRIVACY))
+      /12 באוקטובר 2026/.test(read(HE_PRIVACY)) && /October 12, 2026/.test(read(EN_PRIVACY))
       && /10 באוקטובר 2026/.test(read(HE_TERMS)) && /October 10, 2026/.test(read(EN_TERMS))
       && /5 באוקטובר 2026/.test(read(HE_A11Y)) && /October 5, 2026/.test(read(EN_A11Y)))
   }

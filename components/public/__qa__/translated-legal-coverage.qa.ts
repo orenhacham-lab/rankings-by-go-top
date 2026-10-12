@@ -52,6 +52,18 @@ function check(name: string, cond: boolean, detail?: string) {
   if (cond) { pass++; console.log(`  ✓ ${name}`) } else { fail++; console.log(`  ✗ ${name}${detail ? ` — ${detail}` : ''}`) }
 }
 
+/**
+ * Source guards match code, never comments: this drops block, line and JSX
+ * comments before section 28 looks at a caller. A `//` after a colon or a
+ * quote (a URL inside a string) is kept.
+ */
+function stripComments(src: string): string {
+  return src
+    .replace(/\{\/\*[\s\S]*?\*\/\}/g, '')
+    .replace(/\/\*[\s\S]*?\*\//g, '')
+    .replace(/(^|[^:\\'"`])\/\/[^\n]*/g, '$1')
+}
+
 const DOCS = ['terms', 'privacy', 'refund-policy', 'accessibility', 'affiliate-terms'] as const
 type Doc = (typeof DOCS)[number]
 
@@ -2103,6 +2115,90 @@ const PRICE_TAX_USD: Record<string, RegExp> = {
   check('mutation control: a text that settles neither currency is caught',
     !PRICE_VAT_ILS.en.test('Prices, plans and limits may change from time to time.')
     && !PRICE_TAX_USD.en.test('Prices, plans and limits may change from time to time.'))
+}
+
+// ── 28) What PDFShift keeps, and the code that makes the answer true ───
+/*
+ * PDFShift countersigned an Article 28 data processing agreement on 12 October
+ * 2026 (Oren signed through BoldSign; the executed copy is in his mail). Until
+ * then the privacy text said only that "retention at PDFShift is governed by
+ * their own privacy policy and terms", which told a merchant nothing and aged
+ * badly, because the vendor could change that policy without us noticing.
+ *
+ * The agreement replaces the deferral with a fact. Its Annex B: content sent
+ * for conversion "are processed transiently in volatile memory for the
+ * duration of the conversion request and are not intentionally written to
+ * persistent storage", EXCEPT where the caller passes the optional `filename`
+ * parameter — then the generated file sits on AWS S3 in Paris for up to two
+ * days. Annex A puts PDFShift's servers in France (OVH, AWS) and its error
+ * monitoring in the United States (Sentry, DPF / EU SCCs).
+ *
+ * So the published sentence is true only while our own callers leave that
+ * parameter out, which is why B is a SOURCE check and not a text check. Both
+ * callers currently send `source` and `landscape` alone. Adding `filename`
+ * would be a reasonable-looking change — it gives the download a nicer name —
+ * and it would silently turn a published promise into a false one. This guard
+ * is the thing standing between those two facts.
+ */
+const PDFSHIFT_DPA: Record<string, RegExp> = {
+  he: /הסכם עיבוד נתונים לפי סעיף 28/,
+  en: /data processing agreement with PDFShift under Article 28/,
+  es: /acuerdo de tratamiento de datos conforme al art[íi]culo 28/,
+  'pt-BR': /acordo de tratamento de dados nos termos do artigo 28/,
+}
+const PDFSHIFT_NO_RETENTION: Record<string, RegExp> = {
+  he: /מעובד\s+בזיכרון למשך ההמרה בלבד ואינו נשמר אצלם לאחריה/,
+  en: /processed in memory for the duration of the conversion alone and is not\s+retained afterwards/,
+  es: /se trata en memoria durante el tiempo de la conversi[óo]n y no se conserva despu[ée]s/,
+  'pt-BR': /[ée] tratado em mem[óo]ria apenas durante a convers[ãa]o e n[ãa]o [ée] retido depois/,
+}
+const PDFSHIFT_STORAGE_DECLINED: Record<string, RegExp> = {
+  he: /שמירה אופציונלית של הקובץ שנוצר,\s+ואנחנו לא מבקשים אותה/,
+  en: /optional storage of the generated file, and we do not ask for\s+it/,
+  es: /almacenamiento opcional del archivo generado, y nosotros no lo solicitamos/,
+  'pt-BR': /armazenamento opcional do arquivo gerado, e n[óo]s n[ãa]o o solicitamos/,
+}
+{
+  const read = (path: string) => (existsSync(path) ? readFileSync(path, 'utf8') : '')
+  const enSource = frontMatter(text[LOCALES[0]].privacy).source
+  const pages: [string, string][] = [
+    ['he', read(HEBREW_PRIVACY)],
+    ['en', enSource ? read(enSource) : ''],
+    ...LOCALES.map((l): [string, string] => [l, text[l].privacy]),
+  ]
+  for (const [name, src] of pages) {
+    check(`${name}/privacy: the page was read`, src.length > 0)
+    check(`${name}/privacy: the Article 28 agreement with PDFShift is stated`, (PDFSHIFT_DPA[name] ?? /$^/).test(src))
+    check(`${name}/privacy: the content is stated not to be retained after the conversion`,
+      (PDFSHIFT_NO_RETENTION[name] ?? /$^/).test(src))
+    check(`${name}/privacy: the optional storage is stated to be declined`,
+      (PDFSHIFT_STORAGE_DECLINED[name] ?? /$^/).test(src))
+    check(`${name}/privacy: the old "governed by their own policy" deferral is gone`,
+      !/governed by their own privacy policy|כפופה למדיניות הפרטיות ולתנאי השימוש|se rige por su propia pol[íi]tica de privacidad|regida pela pol[íi]tica de privacidade e pelos termos dela/.test(src))
+  }
+
+  /*
+   * B) The code behind the sentence. Every caller of the conversion endpoint is
+   * found by grepping for the endpoint itself, so a third caller added later is
+   * covered without editing this list.
+   */
+  const CONVERT_ENDPOINT = 'api.pdfshift.io/v3/convert'
+  const sources = ['app/api/reports/export-pdf/route.ts', 'lib/export/pdfshift.ts']
+    .map((f): [string, string] => [f, read(f)])
+  check('the known PDFShift callers were both read', sources.every(([, src]) => src.length > 0))
+  for (const [f, src] of sources) {
+    check(`${f}: still calls the conversion endpoint`, src.includes(CONVERT_ENDPOINT))
+    check(`${f}: sends no filename parameter, so nothing is stored at PDFShift`, !/\bfilename\s*:/.test(stripComments(src)))
+  }
+
+  check('mutation control: a filename parameter in the payload is caught',
+    /\bfilename\s*:/.test(stripComments('const payload = { source: html, filename: `report.pdf`, landscape: false }')))
+  check('mutation control: a filename inside a comment is NOT counted',
+    !/\bfilename\s*:/.test(stripComments('// filename: never send this, it turns on two-day storage\nconst p = { source: html }')))
+  check('mutation control: a retention claim with no agreement behind it is caught',
+    !PDFSHIFT_DPA.en.test('PDFShift does not keep the content of your reports.'))
+  check('mutation control: the vendor-policy deferral is recognised as the old wording',
+    /governed by their own privacy policy/.test('Retention at PDFShift is governed by their own privacy policy and terms.'))
 }
 
 console.log(`\n${pass} passed, ${fail} failed`)
