@@ -3,7 +3,7 @@ title: Política de privacidad | Go Top SEO
 description: Política de privacidad de Go Top SEO: cómo recopilamos, utilizamos y protegemos sus datos.
 locale: es
 source: app/(public)/en/privacy/page.tsx
-lastUpdated: 2026-10-10
+lastUpdated: 2026-10-12
 register: usted
 ---
 
@@ -90,8 +90,11 @@ Permiso: **business.manage**, solicitado en un consentimiento aparte únicamente
 
 - **Qué leemos:** las cuentas de Business Profile que usted administra y sus ubicaciones comerciales: nombre del negocio, dirección, sitio web y enlace de Google Maps.
 - **Qué almacenamos:** la ubicación que usted elige para un proyecto (sus identificadores de Google, nombre, dirección, sitio web y enlace de Maps), y cada publicación que usted crea: su texto, botón, foto, hora programada, y el identificador, el enlace y el estado de revisión de la publicación en Google.
-- **Qué hacemos con ello:** creamos una publicación únicamente cuando usted pulsa publicar, o a la hora que usted programó, y después volvemos a leer esa publicación desde Google para mostrarle si está activa. No modificamos la información de su negocio y no leemos ni respondemos reseñas.
-- **Borradores de IA:** si usted solicita un borrador, el nombre del negocio y el artículo o tema que usted eligió se envían al modelo Gemini de Google. Un borrador nunca se publica hasta que usted lo revise y pulse publicar.
+- **Qué hacemos con ello:** creamos una publicación cuando usted pulsa publicar, a la hora que usted programó, o —**si usted activó la publicación automática**— cada vez que el sistema publica un artículo en su sitio, y después volvemos a leer esa publicación desde Google para mostrarle si está activa. No modificamos la información de su negocio.
+- **Publicación automática:** desactivada por defecto. Si usted la activó, cada artículo que el sistema publica en su sitio se publica también como publicación en la ficha de su negocio, **sin que usted lo lea antes**. Lo que se envía al modelo es el nombre del negocio, el título del artículo y su resumen, sin ningún nombre de persona. Una publicación automática se redacta en el idioma del proyecto. Puede desactivarla en cualquier momento, y se desactiva por sí sola si usted cambia el negocio al que está conectado el proyecto.
+- **Reseñas:** cuando usted abre la pantalla de reseñas leemos desde Google las reseñas de su negocio: el nombre visible del autor (o «anónimo»), la valoración, el texto, las fechas y la respuesta existente, si la hay. **No almacenamos ningún contenido de reseñas**: ni el texto, ni el nombre del autor, ni la valoración, ni la respuesta. Guardamos únicamente dos marcas de tiempo, para poder señalar una reseña que usted todavía no ha visto. La foto de perfil del autor no se lee.
+- **Responder a una reseña:** una respuesta se publica en su nombre únicamente después de que usted la haya escrito o aprobado y haya pulsado enviar, **y es pública: aparece en la ficha de su negocio en Google y cualquier persona puede verla**. Puede editarla o eliminarla desde la misma pantalla. Google puede retirar una respuesta conforme a sus propias políticas de contenido, y eso no está bajo nuestro control.
+- **Borradores de IA:** si usted solicita un borrador, el nombre del negocio y el artículo o tema que usted eligió se envían al modelo Gemini de Google. Si usted solicita un borrador de respuesta a una reseña, se envían también el texto de la reseña y su valoración, **sin el nombre del autor**. Un borrador que usted solicitó no se publica hasta que lo revise y pulse publicar. Lo único que se publica sin ser leído es una publicación creada por la publicación automática, si usted la activó.
 
 ### Uso limitado
 
@@ -159,7 +162,9 @@ Para hacer el seguimiento del posicionamiento desde un punto exacto, usted puede
 
 ## Conversión de un informe a PDF
 
-Cuando usted solicita descargar un informe como PDF, enviamos el contenido del informe tal como se muestra al servicio **PDFShift**, que nos devuelve el archivo. Esto ocurre únicamente cuando usted pulsó para descargar un informe, nunca de forma habitual ni programada, y el contenido se envía solo para la conversión. La conservación en PDFShift se rige por su propia política de privacidad y sus propios términos.
+Cuando usted solicita descargar un informe como PDF, enviamos el contenido del informe tal como se muestra al servicio **PDFShift**, que nos devuelve el archivo. Esto ocurre únicamente cuando usted pulsó para descargar un informe, nunca de forma habitual ni programada, y el contenido se envía solo para la conversión.
+
+Con PDFShift tenemos un acuerdo de tratamiento de datos conforme al artículo 28 del RGPD. Según su anexo, el contenido que enviamos se trata en memoria durante el tiempo de la conversión y no se conserva después. PDFShift ofrece un almacenamiento opcional del archivo generado, y nosotros no lo solicitamos. Sus servidores y su almacenamiento están en Francia, y su servicio de supervisión de errores está en los Estados Unidos, al amparo del Marco de Privacidad de Datos UE-EE. UU. y de las cláusulas contractuales tipo.
 
 ## Red de enlaces
 
@@ -349,7 +354,7 @@ Respondemos en un plazo de 30 días. No le cobraremos ni degradaremos su servici
 
 Esta sección trata de alguien que ha recibido un correo nuestro y no es cliente nuestro. Si es su caso, usted no nos facilitó nada y no se registró en nada: obtuvimos la dirección de su empresa de fuentes públicas, y aquí decimos exactamente de cuáles, qué conservamos y cómo darse de baja con un solo clic.
 
-**Qué recogemos y de dónde.** El nombre de la empresa, la dirección de su sitio web, una dirección de correo de contacto que aparece en el propio sitio de la empresa o en un registro público de empresas, el país en el que opera la empresa, y un solo hallazgo de una comprobación automática de las páginas públicas del sitio, con la fecha en que se comprobó. **No compramos listas de direcciones y no usamos intermediarios de datos.** No recogemos números de teléfono, no recogemos datos sobre una persona privada y no entramos en ninguna parte de un sitio que no esté abierta a cualquier visitante.
+**Qué recogemos y de dónde.** El nombre de la empresa, la dirección de su sitio web, una dirección de correo de contacto que aparece en el propio sitio de la empresa o en un registro público de empresas, el nombre de la persona de contacto cuando el sitio lo publica junto a esa dirección, la dirección postal que la empresa publica (una empresa que no publica dirección nunca entra en la lista), el país en el que opera la empresa, y un solo hallazgo de una comprobación automática de las páginas públicas del sitio, con la fecha en que se comprobó. **No compramos listas de direcciones y no usamos intermediarios de datos.** No recogemos números de teléfono, no recogemos nada sobre una persona más allá del cargo con el que aparece publicada en la empresa y no entramos en ninguna parte de un sitio que no esté abierta a cualquier visitante.
 
 **Con qué finalidad.** Dirigirnos a la empresa una vez, con una oferta de nuestro servicio, y explicar qué encontramos en su sitio. Es un contacto comercial y lo decimos en el propio mensaje.
 
@@ -357,9 +362,11 @@ Esta sección trata de alguien que ha recibido un correo nuestro y no es cliente
 
 **Cuántos mensajes.** Dos como máximo: un mensaje y, si no llega respuesta, un seguimiento una semana después. Después de eso la empresa sale de la lista aunque no lo haya pedido.
 
+**Qué conservamos y durante cuánto tiempo.** Cada empresa es un registro: el nombre de la empresa, su sitio, la plataforma sobre la que funciona el sitio, el país, la dirección de correo y el nombre de la persona de contacto si los encontramos, la dirección postal, las dos fuentes públicas de las que tomamos los datos, el único hallazgo con su fecha, cuál de los dos mensajes se ha enviado y cuándo, si llegó una respuesta o una solicitud de baja y cuándo, las fechas en que el registro se creó y se modificó por última vez, una huella unidireccional de la dirección de correo, un identificador aleatorio que hace funcionar el enlace de baja del mensaje y una nota interna breve sobre la empresa. **De un registro al que escribimos se borran la dirección de correo, el nombre de la persona de contacto y la dirección postal 30 días después del último mensaje que le enviamos**, o 30 días después de una respuesta o de una solicitud de baja si eso es posterior, y se anota la fecha del borrado. 30 días no es un número redondo: el enlace de baja de nuestro mensaje tiene que seguir funcionando al menos ese tiempo, y se resuelve contra este registro. Lo que queda después es todo lo demás del registro anterior, entre ello la huella unidireccional y el identificador de baja, para que el enlace siga funcionando. La huella es lo que nos permite saber que ya escribimos dos veces a esa empresa y evita que vuelva a añadirse. **Un registro al que nunca escribimos se elimina por completo 90 días después de haberse añadido.** La lista de exclusión es independiente de este registro y se conserva mientras enviemos correo, porque es la única manera de que una baja se mantenga.
+
 **Cómo detenerlo.** Cada mensaje lleva un enlace de baja que funciona con un solo clic, sin iniciar sesión y sin dar explicaciones. Se atiende de inmediato y de forma permanente. Para que la baja se mantenga, la dirección se conserva en una lista de exclusión **con la única finalidad de asegurarnos de no volver a contactarle**, no se usa para nada más, y se aplica a todos nuestros canales, no solo a aquel en el que usted lo pidió. Una respuesta que pida no volver a escribir se trata igual.
 
-**Si usted está en California.** La dirección de un contacto de empresa es información personal conforme a la ley de privacidad de California, por lo que usted tiene derecho a saber qué conservamos sobre usted, a recibir una copia, a solicitar la supresión, a corregir información inexacta y a no ser discriminado por ejercer un derecho. **No vendemos esta información y no la compartimos para publicidad conductual entre contextos.** Como no recogimos la información de usted directamente, esta sección es el aviso de recogida, y un enlace a ella aparece en cada mensaje que enviamos. Las solicitudes se dirigen a la dirección indicada en «Contacto en materia de privacidad y representantes», y respondemos por escrito.
+**Si usted está en California.** La dirección de un contacto de empresa es información personal conforme a la ley de privacidad de California, por lo que usted tiene derecho a saber qué conservamos sobre usted, a recibir una copia, a solicitar la supresión, a corregir información inexacta y a no ser discriminado por ejercer un derecho. **No vendemos esta información y no la compartimos para publicidad conductual entre contextos.** Como no recogimos la información de usted directamente, esta sección es el aviso de recogida, incluido el plazo de conservación de cada dato, y un enlace a ella aparece en cada mensaje que enviamos. Las solicitudes se dirigen a la dirección indicada en «Contacto en materia de privacidad y representantes», y respondemos por escrito.
 
 Las mismas solicitudes —acceso, supresión y rectificación— se atienden también para quienes no están en California, en la misma dirección y del mismo modo. El responsable es GO TOP MARKETING GRUO LTD, n.º de empresa 517274346, en Israel.
 
@@ -401,4 +408,4 @@ Si tiene preguntas sobre esta política de privacidad, contacte con:
 
 **Teléfono:** 054-9489377
 
-Esta política se actualizó por última vez el 10 de octubre de 2026
+Esta política se actualizó por última vez el 12 de octubre de 2026

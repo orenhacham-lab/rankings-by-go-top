@@ -156,12 +156,29 @@ export default function EnglishPrivacyPage() {
           <li><strong>What we store:</strong> the location you choose for a project (its Google identifiers, name,
           address, website and Maps link), and each post you create: its text, button, photo, scheduled time, and
           Google&rsquo;s post identifier, link and review status.</li>
-          <li><strong>What we do with it:</strong> we create a post only when you press publish, or at the time you
-          scheduled it, and then read that post back from Google to show you whether it is live. We do not change
-          your business information and we do not read or reply to reviews.</li>
+          <li><strong>What we do with it:</strong> we create a post when you press publish, at the time you
+          scheduled it, or &ndash; <strong>if you turned automatic posting on</strong> &ndash; each time the system
+          publishes an article to your site, and then read that post back from Google to show you whether it is
+          live. We do not change your business information.</li>
+          <li><strong>Automatic posting:</strong> off by default. If you turned it on, every article the system
+          publishes to your site is also published as a post on your business listing, <strong>without you reading
+          it first</strong>. What is sent to the model is the business name, the article&rsquo;s title and its
+          summary, with no person&rsquo;s name. An automatic post is written in the project&rsquo;s language. You can turn it off at any time, and it turns itself off if you
+          change the business the project is connected to.</li>
+          <li><strong>Reviews:</strong> when you open the reviews screen we read your business&rsquo;s reviews from
+          Google: the reviewer&rsquo;s display name (or &ldquo;anonymous&rdquo;), the rating, the text, the times
+          and any existing reply. <strong>We store no review content</strong> &ndash; not the text, not the
+          reviewer&rsquo;s name, not the rating and not the reply. We keep two timestamps only, so we can mark a
+          review you have not seen yet. The reviewer&rsquo;s profile photo is not read.</li>
+          <li><strong>Replying to a review:</strong> a reply is published in your name only after you wrote or
+          approved it and pressed send, <strong>and it is public: it appears on your Google business listing and
+          anyone can see it</strong>. You can edit or delete it from the same screen. Google may remove a reply
+          under its own content policies, which is not something we control.</li>
           <li><strong>AI drafts:</strong> if you ask for a draft, the business name and the article or topic you
-          chose are sent to Google&rsquo;s Gemini model. A draft is never published until you review it and press
-          publish.</li>
+          chose are sent to Google&rsquo;s Gemini model. If you ask for a draft reply to a review, the
+          review&rsquo;s text and its rating are sent too, <strong>without the reviewer&rsquo;s name</strong>. A
+          draft you asked for is not published until you review it and press publish. The one thing published
+          without being read is a post created by automatic posting, if you turned it on.</li>
         </ul>
 
         <h3>Limited Use</h3>
@@ -378,7 +395,14 @@ export default function EnglishPrivacyPage() {
           When you ask to download a report as a PDF, we send the report&rsquo;s content as displayed to the
           <strong> PDFShift</strong> service, which returns the file to us. This happens only when you pressed
           to download a report, never on a regular or scheduled basis, and the content is sent for the
-          conversion alone. Retention at PDFShift is governed by their own privacy policy and terms.
+          conversion alone.
+        </p>
+        <p>
+          We have a data processing agreement with PDFShift under Article 28 of the GDPR. Under its annex,
+          the content we send is processed in memory for the duration of the conversion alone and is not
+          retained afterwards. PDFShift offers optional storage of the generated file, and we do not ask for
+          it. Its servers and storage are in France, and its error-monitoring provider is in the United
+          States under the EU-US Data Privacy Framework and the standard contractual clauses.
         </p>
       </section>
 
@@ -829,10 +853,12 @@ export default function EnglishPrivacyPage() {
         <p className="mt-4">
           <strong>What we collect and from where.</strong> The business&rsquo;s name, its website
           address, a contact email address shown on the business&rsquo;s own site or in a public
-          business registry, the country the business operates in, and one finding from an automated
-          check of the site&rsquo;s public pages, with the date it was checked. <strong>We do not buy
-          contact lists and we do not use data brokers.</strong> We do not collect a phone number, we
-          do not collect details about a private individual, and we do not enter any part of a site
+          business registry, the name of the contact person where the site publishes one next to
+          that address, the postal address the business publishes (a business that publishes no
+          address never enters the list), the country the business operates in, and one finding from an automated check of the site&rsquo;s public
+          pages, with the date it was checked. <strong>We do not buy contact lists and we do not use
+          data brokers.</strong> We do not collect a phone number, we collect nothing about a person
+          beyond the business role they are published in, and we do not enter any part of a site
           that is not open to every visitor.
         </p>
         <p className="mt-4">
@@ -852,6 +878,28 @@ export default function EnglishPrivacyPage() {
           follow-up a week later. After that the business leaves the list even without asking.
         </p>
         <p className="mt-4">
+          <strong>What we keep, and for how long.</strong> Each business is one record: the
+          business&rsquo;s name, its site, the platform the site runs on, the country, the contact
+          email address and the contact&rsquo;s name where we found them, the postal address, the two
+          public sources the details came from, the single finding with its date, which of the two
+          messages have been sent and when, whether a reply or a removal request came and when, the
+          dates the record was created and last changed, a one-way fingerprint of the email address, a random
+          identifier that makes the unsubscribe link in the message work, and a short internal note
+          about the business. <strong>From a record we wrote to, the email address, the
+          contact&rsquo;s name and the postal address are erased 30 days after the last message we
+          sent it</strong>, or 30 days after a reply or a removal request if that
+          is later, and the date of the erasure is recorded. 30 days is not a round number: the
+          unsubscribe link in our message has to keep working for at least that long, and it resolves
+          against this record. What remains afterwards is everything else in the record above,
+          among it the one-way fingerprint and the unsubscribe identifier, so the link keeps
+          working. The
+          fingerprint is what lets us know we already wrote to that business twice and keeps it from
+          being added again. <strong>A record we never
+          wrote to is deleted outright 90 days after it was added.</strong> The removal list is
+          separate from this record and is kept for as long as we send email at all, because that is
+          the only way a removal can hold.
+        </p>
+        <p className="mt-4">
           <strong>How to stop it.</strong> Every message carries an unsubscribe link that works in
           one click, with no signing in and no explanation. It is honoured immediately and
           permanently. So that the removal holds, the address is kept on a removal list
@@ -866,7 +914,7 @@ export default function EnglishPrivacyPage() {
           be discriminated against for exercising a right. <strong>We do not sell this information
           and we do not share it for cross-context behavioural advertising.</strong> Because we did
           not collect the information from you directly, this section is the notice of collection,
-          and a link to it appears in every message we send. A request goes to the address in
+          including how long each item is kept, and a link to it appears in every message we send. A request goes to the address in
           &ldquo;Privacy Contact and Representatives&rdquo;, and we answer in writing.
         </p>
         <p className="mt-4">
@@ -966,7 +1014,7 @@ export default function EnglishPrivacyPage() {
 
       <section>
         <p className={LEGAL_FOOTNOTE}>
-          This policy was last updated on October 10, 2026
+          This policy was last updated on October 12, 2026
         </p>
       </section>
     </LegalDoc>

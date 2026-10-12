@@ -17,7 +17,8 @@ import { FakeAdmin } from '@/lib/__qa__/_fake-admin'
 import { withMutant } from '@/lib/reminders/__qa__/_mutant'
 import { SUPPRESSION_TABLE, hashEmail } from '@/lib/email-suppression'
 import { makeOutreachUnsubscribeToken, readOutreachUnsubscribeToken } from '../unsubscribe-token'
-import { handleOutreachUnsubscribe, unsubscribeByToken, unsubscribePage } from '../http'
+import { PROSPECTS_TABLE, suppressByProspectToken } from '../prospects'
+import { handleOutreachUnsubscribe, unsubscribeByProspect, unsubscribeByToken, unsubscribePage } from '../http'
 
 let pass = 0
 let fail = 0
@@ -130,6 +131,56 @@ async function main() {
   check('R10: a failure page offers the reply-"no" fallback, not a false success',
     /reply/i.test(unsubscribePage('unavailable')) && !/unsubscribed/i.test(unsubscribePage('unavailable')))
 
+  // ── The prospect's own link, for a message the app did not send ────────────
+  const PTOKEN = 'a'.repeat(64)
+  const prospectRow = (over: Record<string, unknown> = {}) => ({
+    id: 'p-1', email: ADDR, unsub_token: PTOKEN, status: 'sent_first', ...over,
+  })
+  type TableHooks = Record<string, { select?: () => { code: string }; upsert?: () => { code: string } }>
+  const withProspects = (rows: Record<string, unknown>[], hooks: TableHooks = {}) =>
+    new FakeAdmin({ [PROSPECTS_TABLE]: rows, [SUPPRESSION_TABLE]: [] }, hooks)
+  const pReq = (q: string, method = 'GET') =>
+    new Request(`https://app.example/api/outreach/unsubscribe${q}`, { method })
+
+  const listP = withProspects([prospectRow()])
+  check('P1: the link suppresses the address the token names',
+    await suppressByProspectToken(asAdmin(listP), PTOKEN) === 'done'
+    && (listP.tables[SUPPRESSION_TABLE] as Record<string, unknown>[])[0]?.email_hash === hashEmail(ADDR))
+  check('P2: the row is marked, so the next send skips it',
+    (listP.tables[PROSPECTS_TABLE] as Record<string, unknown>[])[0]?.status === 'opted_out')
+  check('P3: the suppression is recorded as coming from the link, on this channel',
+    (listP.tables[SUPPRESSION_TABLE] as Record<string, unknown>[])[0]?.source === 'unsubscribe_link'
+    && (listP.tables[SUPPRESSION_TABLE] as Record<string, unknown>[])[0]?.channel === 'outbound_prospect')
+  check('P4: a token no row carries suppresses nothing',
+    await suppressByProspectToken(asAdmin(withProspects([prospectRow()])), 'b'.repeat(64)) === 'invalid')
+  check('P5: a token that is not 32-128 hex characters never reaches the database',
+    await suppressByProspectToken(asAdmin(withProspects([prospectRow()])), 'short') === 'invalid'
+    && await suppressByProspectToken(asAdmin(withProspects([prospectRow()])), `${'a'.repeat(63)}Z`) === 'invalid'
+    && await suppressByProspectToken(asAdmin(withProspects([prospectRow()])), null) === 'invalid')
+  check('P6: a read that fails is reported, never as success',
+    await suppressByProspectToken(
+      asAdmin(withProspects([prospectRow()], { [PROSPECTS_TABLE]: { select: () => ({ code: 'PGRST205' }) } })),
+      PTOKEN) === 'unavailable')
+  check('P7: a write that fails is reported, never as success',
+    await suppressByProspectToken(
+      asAdmin(withProspects([prospectRow()], { [SUPPRESSION_TABLE]: { upsert: () => ({ code: 'PGRST500' }) } })),
+      PTOKEN) === 'unavailable')
+  check('P8: a row whose address was already deleted on request still answers "removed"',
+    await suppressByProspectToken(asAdmin(withProspects([prospectRow({ email: null })])), PTOKEN) === 'done')
+  check('P9: a client that throws is reported, never as success',
+    await unsubscribeByProspect(PTOKEN, { admin: () => { throw new Error('down') }, env: ENV } as any) === 'unavailable')
+
+  const routeP = withProspects([prospectRow()])
+  const pRes = await handleOutreachUnsubscribe(pReq(`?u=${PTOKEN}`), deps(routeP))
+  check('R11: the prospect link answers 200 and the page never echoes the address',
+    pRes.status === 200 && !(await pRes.text()).includes(ADDR))
+  check('R12: an unknown prospect token answers 400',
+    (await handleOutreachUnsubscribe(pReq(`?u=${'c'.repeat(64)}`), deps(withProspects([])))).status === 400)
+  check('R13: a request carrying a signed token is judged on the signature alone',
+    (await handleOutreachUnsubscribe(pReq(`?t=aaa.bbb&u=${PTOKEN}`), deps(withProspects([prospectRow()])))).status === 400)
+  check('R14: this path needs no secret, so a sender that cannot sign can still link',
+    (await handleOutreachUnsubscribe(pReq(`?u=${PTOKEN}`), deps(withProspects([prospectRow()]), EMPTY))).status === 200)
+
   // ── The route file authenticates itself ────────────────────────────────────
   const routeSrc = stripComments(readFileSync(join(ROOT, 'app/api/outreach/unsubscribe/route.ts'), 'utf8'))
   const httpSrc = stripComments(readFileSync(join(ROOT, 'lib/outreach/http.ts'), 'utf8'))
@@ -182,6 +233,37 @@ async function main() {
     (m) => m.unsubscribePage('done').includes(ADDR),
   )
   check('R7-MUT: a page that echoed the address back would be caught', mutEcho)
+
+  const mutTokenShape = await withMutant<{ suppressByProspectToken: typeof suppressByProspectToken }, boolean>(
+    'lib/outreach/prospects.ts',
+    [[/  if \(!isTokenShaped\(token\)\) return 'invalid'/, '']],
+    async (m) => {
+      const list = withProspects([prospectRow({ unsub_token: 'short' })])
+      return await m.suppressByProspectToken(asAdmin(list), 'short') === 'done'
+    },
+  )
+  check('P5-MUT: without the shape check a guessable token would be accepted', mutTokenShape)
+
+  const mutReadFail = await withMutant<{ suppressByProspectToken: typeof suppressByProspectToken }, boolean>(
+    'lib/outreach/prospects.ts',
+    [[/    if \(error\) return 'unavailable'/, '']],
+    async (m) => await m.suppressByProspectToken(
+      asAdmin(withProspects([prospectRow()], { [PROSPECTS_TABLE]: { select: () => ({ code: 'PGRST205' }) } })),
+      PTOKEN) !== 'unavailable',
+  )
+  check('P6-MUT: a read error treated as "no such token" would be caught', mutReadFail)
+
+  const mutProspectFirst = await withMutant<{ handleOutreachUnsubscribe: typeof handleOutreachUnsubscribe }, boolean>(
+    'lib/outreach/http.ts',
+    [[/  const outcome = token === null && prospect !== null/, '  const outcome = prospect !== null']],
+    async (m) => {
+      const list = withProspects([prospectRow()])
+      const res = await m.handleOutreachUnsubscribe(
+        new Request(`https://app.example/api/outreach/unsubscribe?t=aaa.bbb&u=${PTOKEN}`), deps(list))
+      return res.status === 200
+    },
+  )
+  check('R13-MUT: a handler that preferred the prospect token would let a bad signature through', mutProspectFirst)
 
   console.log(`\n${pass} passed, ${fail} failed`)
   if (fail > 0) process.exit(1)
