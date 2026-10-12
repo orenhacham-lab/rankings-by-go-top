@@ -24,7 +24,7 @@ import { publishPost, accessTokenFor, defaultPublishDeps, type PublishDeps } fro
 import {
   gbpTablesPresent, GbpStoreError, createGbpOAuthState, consumeGbpOAuthState, readGbpConnection, storeGbpConnection,
   deleteGbpConnection, decryptRefreshToken, readProjectLocation, saveProjectLocation, listProjectPosts, insertPost,
-  readProjectPost, cancelPost, type GbpPostRow, type GbpConnectionRow,
+  readProjectPost, cancelPost, setAutoPostOnPublish, type GbpPostRow, type GbpConnectionRow,
 } from './store'
 
 type Admin = ReturnType<typeof createAdminClient>
@@ -67,6 +67,7 @@ export function sanitizePost(p: GbpPostRow) {
     id: p.id, summary: p.summary, ctaType: p.cta_type, ctaUrl: p.cta_url, imageUrl: p.image_url,
     status: p.status, scheduledAt: p.scheduled_at, publishedAt: p.published_at, googleState: p.google_state,
     searchUrl: p.google_search_url, errorCode: p.last_error_code, createdAt: p.created_at, sourceArticleId: p.source_article_id,
+    autoCreated: !!p.auto_created,
   }
 }
 export function sanitizeGbpConnection(c: GbpConnectionRow | null) {
@@ -111,6 +112,9 @@ export async function handleStatus(req: Request, deps: GbpRouteDeps): Promise<Re
       location: location && connection?.id && location.connection_id === connection.id
         ? { title: location.location_title, address: location.location_address, mapsUri: location.maps_uri, websiteUri: location.website_uri, locationName: location.location_name }
         : null,
+      // The owner's automatic-posting switch. Off unless a location of THEIR
+      // connection is selected, so the screen can never offer it without one.
+      autoPostOnPublish: !!(location && connection?.id && location.connection_id === connection.id && location.auto_post_on_publish),
       posts: posts.map(sanitizePost),
       siteUrl: p.target_domain ? (/^https?:\/\//.test(p.target_domain) ? p.target_domain : `https://${p.target_domain}`) : null,
       businessName: p.business_name ?? null,
@@ -357,3 +361,28 @@ export async function handleCancelPost(req: Request, postId: string, deps: GbpRo
   } catch (e) { return storeFail(e) }
 }
 
+// ── PATCH /api/gbp/auto-post {projectId, enabled} ──────────────────────────
+/**
+ * The owner turns automatic posting on or off. It exists only on top of a
+ * connected location of their OWN connection: without one there is nothing to
+ * post to, and a location row left over from a connection they removed must not
+ * become a switch they can flip.
+ */
+export async function handleSetAutoPost(req: Request, deps: GbpRouteDeps): Promise<Response> {
+  let body: Record<string, unknown>
+  try { body = await req.json() } catch { return err('invalid_request', 400) }
+  const g = await gate(deps, typeof body.projectId === 'string' ? body.projectId : null)
+  if (g instanceof Response) return g
+  if (typeof body.enabled !== 'boolean') return err('invalid_request', 400)
+  try {
+    const [conn, location] = await Promise.all([
+      readGbpConnection(g.admin, g.user.id),
+      readProjectLocation(g.admin, g.project.id),
+    ])
+    if (!conn || conn.status !== 'connected') return err('not_connected', 409)
+    if (!location || location.connection_id !== conn.id || location.user_id !== g.user.id) return err('no_location', 409)
+    const saved = await setAutoPostOnPublish(g.admin, g.project.id, body.enabled)
+    if (!saved) return err('no_location', 409)
+    return json({ ok: true, autoPostOnPublish: body.enabled })
+  } catch (e) { return storeFail(e) }
+}

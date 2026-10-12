@@ -1,8 +1,12 @@
 /**
  * GET|POST /api/gbp/cron — publish the posts whose time has come, then ask Google
  * whether posts under review went live. Bearer CRON_SECRET (fails closed), and
- * 404 unless GBP_POSTS_ENABLED. Not registered anywhere yet: turning the feature
- * on includes adding this URL to the scheduler (see the w7-gbp report).
+ * 404 unless GBP_POSTS_ENABLED.
+ *
+ * Registered in vercel.json at :15 past every hour — a quarter of an hour after
+ * the article cron, so an article that published at 07:00 and queued an automatic
+ * post (lib/gbp/auto-post.ts) goes up on the business profile at 07:15. Until the
+ * flag is on this route answers 404 and the pass costs nothing.
  */
 import { createAdminClient } from '@/lib/supabase/admin'
 import { authorizeCronRequest } from '@/lib/auth/cron'

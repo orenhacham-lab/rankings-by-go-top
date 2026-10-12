@@ -50,6 +50,8 @@ export interface GbpLocationRow {
   location_address: string | null
   website_uri: string | null
   maps_uri: string | null
+  /** The owner's switch: an article that publishes to their site also becomes a post here. */
+  auto_post_on_publish: boolean
 }
 export type GbpPostStatus = 'scheduled' | 'publishing' | 'published' | 'failed' | 'cancelled'
 export interface GbpPostRow {
@@ -72,6 +74,10 @@ export interface GbpPostRow {
   last_error_code: string | null
   published_at: string | null
   created_at: string
+  /** Queued by an article publish, not by a person. */
+  auto_created: boolean
+  /** The summary is still the article's own text; the cron rewrites it with the AI draft. */
+  needs_ai_draft: boolean
 }
 
 /** Is the schema there? One cheap read per table. */
@@ -170,8 +176,13 @@ export async function readProjectLocation(admin: Admin, projectId: string): Prom
   return (data as GbpLocationRow | null) ?? null
 }
 
-export async function saveProjectLocation(admin: Admin, row: Omit<GbpLocationRow, 'maps_uri' | 'website_uri' | 'location_address'> & Partial<GbpLocationRow>): Promise<void> {
+export async function saveProjectLocation(admin: Admin, row: Omit<GbpLocationRow, 'maps_uri' | 'website_uri' | 'location_address' | 'auto_post_on_publish'> & Partial<GbpLocationRow>): Promise<void> {
+  // Moving the project to a DIFFERENT business turns automatic posting off: the
+  // owner approved posting to the business they picked, not to the next one.
+  const previous = await readProjectLocation(admin, row.project_id)
+  const switched = previous !== null && previous.location_name !== row.location_name
   const { error } = await admin.from('project_gbp_locations').upsert({
+    ...(switched ? { auto_post_on_publish: false } : {}),
     project_id: row.project_id,
     user_id: row.user_id,
     connection_id: row.connection_id,
@@ -203,10 +214,40 @@ export async function insertPost(admin: Admin, row: {
   project_id: string; user_id: string; source_article_id: string | null; summary: string
   cta_type: GbpCtaType | null; cta_url: string | null; image_url: string | null; image_path: string | null
   language_code: 'he' | 'en'; scheduled_at: string
+  /** Both default to false: a post the merchant wrote in the composer. */
+  auto_created?: boolean; needs_ai_draft?: boolean
 }): Promise<GbpPostRow> {
   const { data, error } = await admin.from('gbp_posts').insert({ ...row, status: 'scheduled' }).select('*').single()
   if (error || !data) throw fail(error ?? {})
   return data as GbpPostRow
+}
+
+/**
+ * The owner's automatic-posting switch. Written only after the route proved they
+ * own the project AND a location is connected: without a location there is
+ * nothing to post to, so the switch has nowhere to live.
+ */
+export async function setAutoPostOnPublish(admin: Admin, projectId: string, on: boolean): Promise<boolean> {
+  const { data, error } = await admin.from('project_gbp_locations')
+    .update({ auto_post_on_publish: on, updated_at: new Date().toISOString() })
+    .eq('project_id', projectId)
+    .select('project_id')
+  if (error) throw fail(error)
+  return !!data && data.length > 0
+}
+
+/**
+ * Replace an automatic post's placeholder text with the AI draft, and only while
+ * it is still waiting for one. Called by the cron just before publishing, so the
+ * article's own publish path never waits for a model.
+ */
+export async function applyAutoDraft(admin: Admin, postId: string, summary: string): Promise<boolean> {
+  const { data, error } = await admin.from('gbp_posts')
+    .update({ summary, needs_ai_draft: false, updated_at: new Date().toISOString() })
+    .eq('id', postId).eq('needs_ai_draft', true)
+    .select('id')
+  if (error) return false
+  return !!data && data.length > 0
 }
 
 /**
