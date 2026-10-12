@@ -163,7 +163,8 @@ export default function EnglishPrivacyPage() {
           <li><strong>Automatic posting:</strong> off by default. If you turned it on, every article the system
           publishes to your site is also published as a post on your business listing, <strong>without you reading
           it first</strong>. What is sent to the model is the business name, the article&rsquo;s title and its
-          summary, with no person&rsquo;s name. You can turn it off at any time, and it turns itself off if you
+          summary, with no person&rsquo;s name. An automatic post goes out in Hebrew or English only, and a project
+          in another language gets no post. You can turn it off at any time, and it turns itself off if you
           change the business the project is connected to.</li>
           <li><strong>Reviews:</strong> when you open the reviews screen we read your business&rsquo;s reviews from
           Google: the reviewer&rsquo;s display name (or &ldquo;anonymous&rdquo;), the rating, the text, the times

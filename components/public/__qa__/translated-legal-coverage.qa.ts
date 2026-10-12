@@ -2348,14 +2348,20 @@ const NO_LONGER_TRUE = /we do not read or reply to reviews|ואיננו\s+קור
  * The terms carry the matching clause: content published in the owner's name is
  * the owner's responsibility even where no human read it first.
  *
- * Not pinned here, and left on the record instead: lib/gbp/draft.ts says in its
- * own header that Google rejects "auto-generated" posts, citing a research note
- * that is not in this repo. Either that comment is wrong or the feature breaches
- * Google's post content policy; support.google.com does not render from a
- * session, so it was raised with the feature thread to settle against Google's
- * own page before merge (patches/legal-gbp-auto-post-answers-2026-10-12.md).
- * That is a platform-compliance question about the merchant's listing, not a
- * claim in our published text, so it belongs in that decision and not in a test.
+ * SETTLED, and recorded here because it was nearly a reason to stop the feature:
+ * lib/gbp/draft.ts used to say in its own header that Google rejects
+ * "auto-generated" posts, citing a research note absent from this repo. That
+ * would have meant the feature risked the merchant's listing, so it was raised
+ * with the feature thread (patches/legal-gbp-auto-post-answers-2026-10-12.md).
+ * They read Google's own pages on 12 October 2026 — the posts content policy
+ * (business/answer/7213077), the policy overview (business/answer/13762416) and
+ * the prohibited-and-restricted-content policy (contributionpolicy/answer/
+ * 7400114) — and none names a rule about automatically, machine- or AI-generated
+ * content; what is prohibited and does touch this is "posting the same content
+ * multiple times", which uq_gbp_posts_auto_article prevents. The comment was
+ * wrong, not the feature, and they corrected it. support.google.com does not
+ * resolve from THIS session, so that reading is theirs and was not re-read here.
+ * It stays out of the checks below: no sentence we publish depends on it.
  */
 const AUTO_POST_OPT_IN: Record<string, RegExp> = {
   he: /ברירת המחדל היא כבוי/,
@@ -2374,6 +2380,12 @@ const AUTO_POST_NO_PERSON: Record<string, RegExp> = {
   en: /with no person&rsquo;s name/,
   es: /sin ning[úu]n nombre de persona/,
   'pt-BR': /sem nenhum nome de pessoa/,
+}
+const AUTO_POST_LANGUAGE: Record<string, RegExp> = {
+  he: /פוסט אוטומטי יוצא בעברית או באנגלית בלבד/,
+  en: /An automatic post goes out in Hebrew or English only/,
+  es: /Una publicaci[óo]n autom[áa]tica se emite [úu]nicamente en hebreo o en ingl[ée]s/,
+  'pt-BR': /Uma postagem autom[áa]tica sai somente em hebraico ou em ingl[êe]s/,
 }
 const AUTO_POST_SELF_OFF: Record<string, RegExp> = {
   he: /נכבית מעצמה אם החלפת/,
@@ -2397,6 +2409,7 @@ const AUTO_POST_NO_LONGER_TRUE = /we create a post only when you press publish|�
     check(`${name}/privacy: automatic posting is stated to be off by default`, (AUTO_POST_OPT_IN[name] ?? /$^/).test(src))
     check(`${name}/privacy: it is stated to publish without the owner reading it`, (AUTO_POST_NO_READ[name] ?? /$^/).test(src))
     check(`${name}/privacy: no person's name is stated to reach the model`, (AUTO_POST_NO_PERSON[name] ?? /$^/).test(src))
+    check(`${name}/privacy: the two languages a post can go out in are stated`, (AUTO_POST_LANGUAGE[name] ?? /$^/).test(src))
     check(`${name}/privacy: the switch is stated to turn itself off on a business change`, (AUTO_POST_SELF_OFF[name] ?? /$^/).test(src))
   }
 
@@ -2425,12 +2438,25 @@ const AUTO_POST_NO_LONGER_TRUE = /we create a post only when you press publish|�
   const AUTO_MIGRATION = 'supabase/migrations/20261012170000_gbp_auto_post.sql'
   const STORE = 'lib/gbp/store.ts'
   const DRAFT_SRC = 'lib/gbp/draft.ts'
+  const ENQUEUE = 'lib/gbp/auto-post.ts'
   const autoLanded = existsSync(AUTO_MIGRATION)
-  console.log(`  · automatic posting ${autoLanded ? 'HAS landed; its code is checked below' : 'has NOT landed yet; its three code checks are waiting for it'}`)
+  console.log(`  · automatic posting ${autoLanded ? 'HAS landed; its code is checked below' : 'has NOT landed yet; its five code checks are waiting for it'}`)
   if (autoLanded) {
     const migration = stripComments(read(AUTO_MIGRATION))
     check(`${AUTO_MIGRATION}: the switch defaults to off`,
       /auto_post_on_publish\s+boolean\s+NOT NULL\s+DEFAULT false/i.test(migration))
+    /*
+     * When the owner turned it on. Asked for on 12 October 2026 because we are
+     * the ones publishing in their name with no person reading it, so something
+     * has to answer "I never approved this"; the CHECK is what stops a stale
+     * timestamp sitting on a switch that is off.
+     */
+    check(`${AUTO_MIGRATION}: when the switch was turned on is recorded, and only while it is on`,
+      /ADD COLUMN IF NOT EXISTS auto_post_enabled_at timestamptz/.test(migration)
+      && /CHECK \(auto_post_on_publish OR auto_post_enabled_at IS NULL\)/.test(migration))
+    const enqueue = stripComments(read(ENQUEUE))
+    check(`${ENQUEUE}: a project in a language a post cannot carry is skipped, not posted`,
+      /language_unsupported/.test(enqueue))
     const store = stripComments(read(STORE))
     check(`${STORE}: moving the project to another business clears the switch`,
       /auto_post_on_publish:\s*false/.test(store))
@@ -2446,6 +2472,11 @@ const AUTO_POST_NO_LONGER_TRUE = /we create a post only when you press publish|�
     AUTO_POST_NO_LONGER_TRUE.test('A draft is never published until you review it and press publish.'))
   check('mutation control: automatic posting described without "off by default" is caught',
     !AUTO_POST_OPT_IN.en.test('Automatic posting: every article is also published as a post.'))
+  check('mutation control: a post language promise naming every language is caught',
+    !AUTO_POST_LANGUAGE.en.test('An automatic post goes out in your project language.'))
+  check('mutation control: a consent timestamp with no CHECK behind it would be caught',
+    !/CHECK \(auto_post_on_publish OR auto_post_enabled_at IS NULL\)/.test(
+      'ALTER TABLE x ADD COLUMN IF NOT EXISTS auto_post_enabled_at timestamptz;'))
   check('mutation control: a switch defaulting to true would be caught',
     !/auto_post_on_publish\s+boolean\s+NOT NULL\s+DEFAULT false/i.test('ADD COLUMN auto_post_on_publish boolean NOT NULL DEFAULT true'))
   check("mutation control: a person's name back in the draft input would be caught",
