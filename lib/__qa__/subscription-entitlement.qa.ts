@@ -150,7 +150,16 @@ async function main() {
   {
     const admin = adminWith([], 'admin', 'u1')
     const ent = await getUserEntitlement('u1', admin as never, nowFn)
-    check('admin gets premium limits regardless of subscription state', ent.isAdmin === true && ent.plan === 'premium')
+    // The admin is handed the LARGEST entitlement, whichever plan that is. It
+    // used to be hardcoded 'premium' here and in lib/subscription.ts, and when
+    // Premium became the 10-project entry tier that mapping would have SHRUNK
+    // an existing admin account from 25 projects to 10. The code moved to
+    // large_agency; this guard now asks for "no ceiling the product imposes"
+    // instead of a plan name, so the next catalog change cannot make it lie.
+    const adminLimits = PLAN_LIMITS[ent.plan as keyof typeof PLAN_LIMITS]
+    const biggest = Math.max(...Object.values(PLAN_LIMITS).map((l) => l.maxProjects))
+    check('admin gets the largest limits regardless of subscription state',
+      ent.isAdmin === true && !!adminLimits && adminLimits.maxProjects === biggest)
   }
 
   // ── Source contract: the fix is actually wired, not just behaviorally coincidental ──

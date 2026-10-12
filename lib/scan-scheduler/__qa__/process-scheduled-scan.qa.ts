@@ -33,8 +33,20 @@ function check(name: string, cond: boolean, detail?: string) {
 }
 
 const NOW = new Date('2026-08-15T06:00:00Z')
-const PERIOD_START = '2026-08-01T00:00:00Z'
-const PERIOD_END = '2026-09-01T00:00:00Z'
+/**
+ * The subscription's own period is deliberately WIDE, and not the month around
+ * NOW. Everything the scheduler does with time takes the injected `now`, but
+ * getUserEntitlement and resolveCurrentUsagePeriod read the WALL clock, and
+ * they decide whether this user has a paid plan at all. With an Aug-2026
+ * period this fixture passed until 2026-09-01 and then resolved to trial with
+ * a zero Google-check allowance, so every scenario below returned
+ * quota_exceeded instead of what it was written to prove — a failure that
+ * looks like a scheduler bug and is only a stale date (found 2026-10-12).
+ * A period that contains both clocks says what the scenario means: this user
+ * has an active paid plan.
+ */
+const PERIOD_START = '2020-01-01T00:00:00Z'
+const PERIOD_END = '2099-01-01T00:00:00Z'
 
 function baseline(overrides: {
   targetCount?: number
