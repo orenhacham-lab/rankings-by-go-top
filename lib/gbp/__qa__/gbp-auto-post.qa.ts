@@ -23,7 +23,7 @@
  * Run: npx tsx lib/gbp/__qa__/gbp-auto-post.qa.ts
  */
 import { readFileSync, writeFileSync, unlinkSync } from 'fs'
-import { join, dirname } from 'path'
+import { join, dirname, sep } from 'path'
 import crypto from 'crypto'
 import { FakeAdmin } from '../../__qa__/_fake-admin'
 
@@ -52,12 +52,25 @@ const read = (rel: string) => readFileSync(join(ROOT, rel), 'utf8')
 const strip = (s: string) => s.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\{\/\*[\s\S]*?\*\/\}/g, '').replace(/(^|[^:'"`\\])\/\/.*$/gm, '$1')
 const MUTANTS: string[] = []
 process.on('exit', () => { for (const f of MUTANTS) { try { unlinkSync(f) } catch { /* gone */ } } })
+/**
+ * A broken copy of a module, for a mutation control.
+ *
+ * The copy goes in __qa__, NOT next to the original, and its own relative
+ * imports are rewritten one level up to compensate. The reason is a race: this
+ * file is one of many suites verify.mjs runs at the same time, and about sixty
+ * of them walk app/, lib/ and components/ and read every .ts they find. A copy
+ * living in the source tree for a few milliseconds is listed by such a walk and
+ * then deleted before it is read, which crashes that unrelated suite (seen
+ * 2026-10-12: lib/google-ads/__qa__/api-version.qa.ts, ENOENT on a .mut- file
+ * of this suite). Every walker skips __qa__, so a copy in here is invisible.
+ */
 function mutant<T>(rel: string, from: string | RegExp, to: string): T {
   const src = read(rel)
   const out = src.replace(from, to)
   if (out === src) throw new Error(`mutation did not apply to ${rel}`)
-  const file = join(ROOT, dirname(rel), `.mut-${crypto.randomUUID()}.ts`)
-  writeFileSync(file, out)
+  const moved = out.replace(/(\sfrom\s*|\brequire\()'\.\//g, "$1'../")
+  const file = join(ROOT, dirname(rel), '__qa__', `.mut-${crypto.randomUUID()}.ts`)
+  writeFileSync(file, moved)
   MUTANTS.push(file)
   return require(file) as T
 }
@@ -496,6 +509,11 @@ function sourceChecks() {
 
   // The header of draft.ts used to assert a Google rule that Google does not state.
   // Unwrapped, so an assertion does not depend on where the comment happens to wrap.
+  // The broken copies this suite writes must stay out of the source tree, or they
+  // crash whichever tree-walking suite verify.mjs happens to run alongside.
+  check('every mutant copy this suite wrote lives in a __qa__ directory',
+    MUTANTS.length > 0 && MUTANTS.every((f) => f.includes(`${sep}__qa__${sep}`) && !/\.tsx?$/.test(f.replace(/\.ts$/, ''))))
+
   const draftHeader = read('lib/gbp/draft.ts').slice(0, 2000).replace(/\n\s*\*\s*/g, ' ')
   check('draft.ts no longer states as fact that Google rejects automatically generated posts',
     draftHeader.includes("That is NOT what Google's policy says") && !/posts, research\.md\)/.test(draftHeader))
