@@ -50,6 +50,10 @@ export interface GbpLocationRow {
   location_address: string | null
   website_uri: string | null
   maps_uri: string | null
+  /** Newest review updateTime the owner was already told about. No review content is stored. */
+  reviews_seen_update_time: string | null
+  /** When the last "new review" alert for this project was sent. */
+  reviews_alerted_at: string | null
 }
 export type GbpPostStatus = 'scheduled' | 'publishing' | 'published' | 'failed' | 'cancelled'
 export interface GbpPostRow {
@@ -170,8 +174,17 @@ export async function readProjectLocation(admin: Admin, projectId: string): Prom
   return (data as GbpLocationRow | null) ?? null
 }
 
-export async function saveProjectLocation(admin: Admin, row: Omit<GbpLocationRow, 'maps_uri' | 'website_uri' | 'location_address'> & Partial<GbpLocationRow>): Promise<void> {
+export async function saveProjectLocation(
+  admin: Admin,
+  row: Omit<GbpLocationRow, 'maps_uri' | 'website_uri' | 'location_address' | 'reviews_seen_update_time' | 'reviews_alerted_at'> & Partial<GbpLocationRow>,
+): Promise<void> {
+  // Switching to a different business location makes the review marks of the
+  // old one meaningless, so they are cleared with the switch; staying on the
+  // same location leaves them untouched (an upsert writes only these columns).
+  const previous = await readProjectLocation(admin, row.project_id)
+  const switched = previous !== null && previous.location_name !== row.location_name
   const { error } = await admin.from('project_gbp_locations').upsert({
+    ...(switched ? { reviews_seen_update_time: null, reviews_alerted_at: null } : {}),
     project_id: row.project_id,
     user_id: row.user_id,
     connection_id: row.connection_id,
@@ -183,6 +196,17 @@ export async function saveProjectLocation(admin: Admin, row: Omit<GbpLocationRow
     maps_uri: row.maps_uri ?? null,
     updated_at: new Date().toISOString(),
   }, { onConflict: 'project_id' })
+  if (error) throw fail(error)
+}
+
+/**
+ * The alert marks after the owner has been told. `seenUpdateTime` is the newest
+ * review updateTime Google reported; it is a time, never review content.
+ */
+export async function markReviewsSeen(admin: Admin, projectId: string, args: { seenUpdateTime: string | null; alertedAt?: string }): Promise<void> {
+  const patch: Record<string, string | null> = { reviews_seen_update_time: args.seenUpdateTime }
+  if (args.alertedAt) patch.reviews_alerted_at = args.alertedAt
+  const { error } = await admin.from('project_gbp_locations').update(patch).eq('project_id', projectId)
   if (error) throw fail(error)
 }
 

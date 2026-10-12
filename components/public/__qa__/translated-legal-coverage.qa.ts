@@ -2311,7 +2311,19 @@ const NO_LONGER_TRUE = /we do not read or reply to reviews|ואיננו\s+קור
       /ADD COLUMN IF NOT EXISTS reviews_seen_update_time timestamptz/.test(migration)
       && /ADD COLUMN IF NOT EXISTS reviews_alerted_at\s+timestamptz/.test(migration)
       && !/CREATE TABLE/i.test(migration))
-    check(`${MIGRATION}: stores no review text column`, !/comment|review_text|reviewer|rating|stars/i.test(migration))
+    /*
+     * stripComments understands JavaScript, so a `-- …` line in SQL survives it,
+     * and `COMMENT ON COLUMN` is SQL's own way of documenting a column: a
+     * migration that explains in prose what it deliberately does NOT store used
+     * to trip this check on the words it was promising to avoid. Both kinds of
+     * documentation are dropped first. A column actually NAMED comment still
+     * arrives as `ADD COLUMN ... comment`, which the pattern still catches, and
+     * the second mutation control below holds that line.
+     */
+    const columns = migration
+      .replace(/COMMENT\s+ON\s[\s\S]*?;/gi, '')
+      .replace(/--[^\n]*/g, '')
+    check(`${MIGRATION}: stores no review text column`, !/comment|review_text|reviewer|rating|stars/i.test(columns))
   }
 
   check('mutation control: the sentence that is no longer true is recognised',
@@ -2324,6 +2336,11 @@ const NO_LONGER_TRUE = /we do not read or reply to reviews|ואיננו\s+קור
     /reviewerName|reviewer_name/.test(stripComments('export interface ReviewDraftSource { reviewerName: string | null }')))
   check('mutation control: a migration that adds a review-text column is caught',
     /comment|review_text|reviewer|rating|stars/i.test(stripComments('ALTER TABLE x ADD COLUMN review_text text;')))
+  check('mutation control: dropping SQL documentation does not hide a column named comment',
+    /comment|review_text|reviewer|rating|stars/i.test(
+      stripComments("-- we keep no rating\nCOMMENT ON COLUMN x.y IS 'documented';\nALTER TABLE x ADD COLUMN comment text;")
+        .replace(/COMMENT\s+ON\s[\s\S]*?;/gi, '')
+        .replace(/--[^\n]*/g, '')))
 }
 
 // ── 30) Automatic posting to the Business Profile, published before its code ──
