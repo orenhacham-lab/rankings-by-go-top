@@ -38,6 +38,7 @@ const A = require('../auto-post') as typeof import('../auto-post')
 const S = require('../store') as typeof import('../store')
 const P = require('../publish') as typeof import('../publish')
 const H = require('../http') as typeof import('../http')
+const V = require('../validate') as typeof import('../validate')
 const { dashboardHe } = require('../../i18n/dashboard/he')
 const { dashboardEn } = require('../../i18n/dashboard/en')
 const { dashboardEs } = require('../../i18n/dashboard/es')
@@ -222,21 +223,32 @@ async function enqueueChecks() {
     await A.enqueueGbpPostForPublishedArticle(blank, ARTICLE)
     check('a project with no language recorded falls back to English', posts(blank)[0]?.language_code === 'en')
 
-    // A post cannot be written in Spanish or Portuguese yet, and an English post
-    // on a Spanish business's profile is worse for that business than no post.
-    for (const lang of ['es', 'pt-BR', 'pt']) {
-      const other = world({ language: lang })
-      const r = await A.enqueueGbpPostForPublishedArticle(other, ARTICLE)
-      check(`a ${lang} project is skipped rather than posted to in the wrong language`,
-        r.reason === 'language_unsupported' && posts(other).length === 0)
-    }
-    check('the language rule is pure, so it can be read at a glance',
-      A.postLanguageFor('he-IL') === 'he' && A.postLanguageFor('en-US') === 'en' && A.postLanguageFor('es') === null && A.postLanguageFor(null) === 'en')
+    const es = world({ language: 'es' })
+    await A.enqueueGbpPostForPublishedArticle(es, ARTICLE)
+    check('a Spanish project posts in Spanish, the way its articles are written', posts(es)[0]?.language_code === 'es')
+    const pt = world({ language: 'pt-BR' })
+    await A.enqueueGbpPostForPublishedArticle(pt, ARTICLE)
+    check('a Brazilian Portuguese project posts in pt-BR', posts(pt)[0]?.language_code === 'pt-BR')
 
-    const broken = mutant<typeof A>('lib/gbp/auto-post.ts', "if (lang.startsWith('en')) return 'en'", "if (lang.startsWith('en')) return 'en'\n  return 'en'")
-    const other = world({ language: 'es' })
+    check('the language rule is pure, so it can be read at a glance',
+      A.postLanguageFor('he-IL') === 'he' && A.postLanguageFor('iw') === 'he'
+      && A.postLanguageFor('en-US') === 'en' && A.postLanguageFor('es-MX') === 'es'
+      && A.postLanguageFor('pt') === 'pt-BR' && A.postLanguageFor('pt-PT') === 'pt-BR'
+      && A.postLanguageFor(null) === 'en' && A.postLanguageFor('sw') === 'en')
+    check('whatever it returns is a language the database column accepts',
+      V.GBP_POST_LANGUAGES.length === 4
+      && ['he', 'en', 'es', 'pt-BR', 'he-IL', 'iw', 'pt', 'pt-PT', 'es-MX', 'en-GB', '', null, 42]
+        .every((l) => V.normalizePostLanguage(A.postLanguageFor(l)) !== null))
+
+    // A regional tag is still that language, so a project recorded as es-MX posts in Spanish.
+    const esMx = world({ language: 'es-MX' })
+    await A.enqueueGbpPostForPublishedArticle(esMx, ARTICLE)
+    check('a regional tag still posts in its own language', posts(esMx)[0]?.language_code === 'es')
+
+    const broken = mutant<typeof A>('lib/gbp/auto-post.ts', "if (base === 'es') return 'es'", '')
+    const other = world({ language: 'es-MX' })
     const r = await broken.enqueueGbpPostForPublishedArticle(other, ARTICLE)
-    check('MUTATION CONTROL: without the language check a Spanish business gets an English post',
+    check('MUTATION CONTROL: drop the Spanish branch and a Spanish business gets an English post',
       r.queued === true && posts(other)[0]?.language_code === 'en')
   }
   {
@@ -467,13 +479,20 @@ function sourceChecks() {
   check('when the owner approved is recorded', /auto_post_enabled_at timestamptz/.test(migration))
   check('and an approval time cannot sit on a switch that is off',
     /CHECK \(auto_post_on_publish OR auto_post_enabled_at IS NULL\)/.test(migration))
-  // The one ALTER CONSTRAINT here only ADDS a check on a column this file created,
-  // after dropping it if present, so it is still additive and re-runnable.
-  // Comment lines out: the rollback recipe at the top names the same statement.
+  // Two DROP-then-ADD constraint pairs, both re-runnable and neither a tightening:
+  // one on a column this file creates, one WIDENING the language check so a post
+  // can be written in the project's own language. Comment lines are stripped
+  // first: the rollback recipe at the top names the same statements.
   const migrationSql = migration.replace(/^--.*$/gm, '')
-  check('the only constraint it touches is its own new one',
-    (migrationSql.match(/DROP CONSTRAINT/g) ?? []).length === 1
-    && migrationSql.includes('DROP CONSTRAINT IF EXISTS project_gbp_locations_auto_post_enabled_at'))
+  const dropped = [...migrationSql.matchAll(/DROP CONSTRAINT IF EXISTS (\w+)/g)].map((m) => m[1]).sort()
+  check('the only constraints it touches are its own new one and the language widening',
+    dropped.length === 2
+    && dropped.join(',') === 'gbp_posts_language,project_gbp_locations_auto_post_enabled_at')
+  check('a post may be written in any of the four app languages, like the articles',
+    /CHECK \(language_code IN \('he', 'en', 'es', 'pt-BR'\)\)/.test(migrationSql))
+  check('and widening it can never fail on a row that already exists',
+    // the old check allowed he and en only, both still allowed
+    ['he', 'en'].every((l) => (V.GBP_POST_LANGUAGES as readonly string[]).includes(l)))
 
   // The header of draft.ts used to assert a Google rule that Google does not state.
   // Unwrapped, so an assertion does not depend on where the comment happens to wrap.

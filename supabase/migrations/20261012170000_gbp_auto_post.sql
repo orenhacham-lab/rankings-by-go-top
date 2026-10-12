@@ -37,6 +37,8 @@
 -- Rollback:
 --   DROP INDEX IF EXISTS public.uq_gbp_posts_auto_article;
 --   ALTER TABLE public.gbp_posts DROP COLUMN IF EXISTS needs_ai_draft, DROP COLUMN IF EXISTS auto_created;
+--   ALTER TABLE public.gbp_posts DROP CONSTRAINT IF EXISTS gbp_posts_language;
+--   ALTER TABLE public.gbp_posts ADD CONSTRAINT gbp_posts_language CHECK (language_code IN ('he', 'en'));
 --   ALTER TABLE public.project_gbp_locations
 --     DROP CONSTRAINT IF EXISTS project_gbp_locations_auto_post_enabled_at,
 --     DROP COLUMN IF EXISTS auto_post_enabled_at, DROP COLUMN IF EXISTS auto_post_on_publish;
@@ -59,6 +61,16 @@ ALTER TABLE public.project_gbp_locations
 ALTER TABLE public.gbp_posts
   ADD COLUMN IF NOT EXISTS auto_created   boolean NOT NULL DEFAULT false,
   ADD COLUMN IF NOT EXISTS needs_ai_draft boolean NOT NULL DEFAULT false;
+
+-- The post is written in the project's OWN language, exactly as its articles are
+-- (Oren, 2026-10-12: "what is the problem with the post being in Spanish or
+-- Portuguese? that is what we do with the articles"). The column was limited to
+-- he and en, which would have given a Spanish business an English post. This
+-- WIDENS the check to the app's four languages, so no existing row can fail it.
+ALTER TABLE public.gbp_posts DROP CONSTRAINT IF EXISTS gbp_posts_language;
+ALTER TABLE public.gbp_posts
+  ADD CONSTRAINT gbp_posts_language
+  CHECK (language_code IN ('he', 'en', 'es', 'pt-BR'));
 
 -- One automatic post per article. Partial, so hand-written posts are untouched.
 CREATE UNIQUE INDEX IF NOT EXISTS uq_gbp_posts_auto_article

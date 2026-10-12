@@ -12,7 +12,7 @@ import crypto from 'crypto'
 import type { createAdminClient } from '@/lib/supabase/admin'
 import { encryptGscToken, decryptGscToken, GSC_ENCRYPTION_VERSION } from '@/lib/gsc/token-crypto'
 import { isGbpErrorCode, type GbpErrorCode } from './errors'
-import type { GbpCtaType } from './validate'
+import type { GbpCtaType, GbpPostLanguage } from './validate'
 
 type Admin = ReturnType<typeof createAdminClient>
 const STATE_TTL_MS = 10 * 60 * 1000
@@ -66,7 +66,7 @@ export interface GbpPostRow {
   cta_url: string | null
   image_url: string | null
   image_path: string | null
-  language_code: 'he' | 'en'
+  language_code: GbpPostLanguage
   status: GbpPostStatus
   scheduled_at: string
   attempts: number
@@ -215,7 +215,7 @@ export async function readProjectPost(admin: Admin, projectId: string, postId: s
 export async function insertPost(admin: Admin, row: {
   project_id: string; user_id: string; source_article_id: string | null; summary: string
   cta_type: GbpCtaType | null; cta_url: string | null; image_url: string | null; image_path: string | null
-  language_code: 'he' | 'en'; scheduled_at: string
+  language_code: GbpPostLanguage; scheduled_at: string
   /** Both default to false: a post the merchant wrote in the composer. */
   auto_created?: boolean; needs_ai_draft?: boolean
 }): Promise<GbpPostRow> {

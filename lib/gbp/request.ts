@@ -12,7 +12,7 @@
  * speaks to Google's post endpoint goes through here and lib/gbp/api.ts, so a
  * future migration is local.
  */
-import type { GbpCtaType } from './validate'
+import type { GbpCtaType, GbpPostLanguage } from './validate'
 
 export const GBP_V4_BASE = 'https://mybusiness.googleapis.com/v4'
 
@@ -31,7 +31,7 @@ export interface LocalPostSpec {
   ctaType: GbpCtaType | null
   ctaUrl: string | null
   imageUrl: string | null
-  languageCode: 'he' | 'en'
+  languageCode: GbpPostLanguage
 }
 
 export interface LocalPostRequest {

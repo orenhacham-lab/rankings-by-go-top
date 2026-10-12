@@ -22,11 +22,11 @@
 import { getRecoGenAiClient } from '@/lib/content/recommendations/genai-client'
 import { RECOMMENDATION_MODEL_PRIMARY } from '@/lib/content/recommendations/model'
 import { resolveModelConfig } from '@/lib/content/recommendations/model-config'
-import { clampPostText, containsPhoneNumber, GBP_SUMMARY_MAX } from './validate'
+import { clampPostText, containsPhoneNumber, GBP_SUMMARY_MAX, type GbpPostLanguage } from './validate'
 
 export interface DraftSource {
   businessName: string | null
-  language: 'he' | 'en'
+  language: GbpPostLanguage
   article?: { title: string; description: string | null; url: string | null } | null
   topic?: string | null
 }
@@ -34,8 +34,16 @@ export interface DraftSource {
 /** The target is below Google's 1,500 so the merchant has room to add a line. */
 export const GBP_DRAFT_TARGET = 900
 
+/** What the model is told to write in. Brazilian Portuguese is named as such. */
+const LANGUAGE_NAME: Record<GbpPostLanguage, string> = {
+  he: 'Hebrew',
+  en: 'English',
+  es: 'Spanish',
+  'pt-BR': 'Brazilian Portuguese',
+}
+
 export function buildDraftPrompt(src: DraftSource): string {
-  const lang = src.language === 'he' ? 'Hebrew' : 'English'
+  const lang = LANGUAGE_NAME[src.language] ?? 'English'
   const about = src.article
     ? `an article on the business's website.\nArticle title: ${src.article.title}\n${src.article.description ? `Article summary: ${src.article.description}\n` : ''}`
     : `this topic: ${src.topic ?? ''}\n`

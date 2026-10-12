@@ -191,6 +191,62 @@ BEGIN
   PERFORM chk('defaults', 'MUTATION CONTROL: without the constraint an approval time sits on a switch that is off', planted);
 END $$;
 
+-- ── the post's language ─────────────────────────────────────────────────────
+-- The column allowed he and en only, which would have given a Spanish business
+-- an English post. The migration WIDENS it to the app's four languages.
+CREATE FUNCTION ins_lang(post_id uuid, lang text) RETURNS text LANGUAGE plpgsql AS $$
+BEGIN
+  BEGIN
+    INSERT INTO public.gbp_posts (id, project_id, user_id, summary, language_code)
+      VALUES (post_id, 'a1111111-1111-1111-1111-111111111111',
+              '11111111-1111-1111-1111-111111111111', 'טקסט', lang);
+    RETURN 'accepted';
+  EXCEPTION WHEN OTHERS THEN RETURN 'denied:' || SQLSTATE;
+  END;
+END; $$;
+
+DO $$
+DECLARE r text;
+BEGIN
+  SET ROLE service_role;
+  r := ins_lang('c0000000-0000-0000-0000-000000000001', 'he');
+  PERFORM chk('defaults', 'a Hebrew post is still accepted -> ' || r, r = 'accepted');
+  r := ins_lang('c0000000-0000-0000-0000-000000000002', 'en');
+  PERFORM chk('defaults', 'an English post is still accepted -> ' || r, r = 'accepted');
+  r := ins_lang('c0000000-0000-0000-0000-000000000003', 'es');
+  PERFORM chk('defaults', 'a Spanish post is accepted, as its articles are -> ' || r, r = 'accepted');
+  r := ins_lang('c0000000-0000-0000-0000-000000000004', 'pt-BR');
+  PERFORM chk('defaults', 'a Brazilian Portuguese post is accepted -> ' || r, r = 'accepted');
+  -- Widened, not opened: a language the app does not have is still refused, so a
+  -- bug cannot send Google a tag no article was ever written in.
+  r := ins_lang('c0000000-0000-0000-0000-000000000005', 'de');
+  PERFORM chk('defaults', 'a language the app does not speak is refused -> ' || r, r = 'denied:23514');
+  r := ins_lang('c0000000-0000-0000-0000-000000000006', 'pt');
+  PERFORM chk('defaults', 'a bare pt (not pt-BR) is refused, so the code must normalise it -> ' || r, r = 'denied:23514');
+  PERFORM chk('defaults', 'the four accepted languages really landed in the table',
+    (SELECT count(DISTINCT language_code) = 4 FROM public.gbp_posts
+      WHERE id::text LIKE 'c0000000-%'));
+  DELETE FROM public.gbp_posts WHERE id::text LIKE 'c0000000-%';
+  RESET ROLE;
+END $$;
+
+-- MUTATION CONTROL: narrow it back to he/en and the Spanish post is refused.
+DO $$
+DECLARE r text;
+BEGIN
+  BEGIN
+    ALTER TABLE public.gbp_posts DROP CONSTRAINT gbp_posts_language;
+    ALTER TABLE public.gbp_posts ADD CONSTRAINT gbp_posts_language CHECK (language_code IN ('he', 'en'));
+    SET ROLE service_role;
+    r := ins_lang('c1111111-1111-1111-1111-111111111111', 'es');
+    RESET ROLE;
+    RAISE EXCEPTION 'undo_mutation';
+  EXCEPTION WHEN raise_exception THEN RESET ROLE;
+  END;
+  PERFORM chk('defaults', 'MUTATION CONTROL: with the old he/en check a Spanish post is refused -> ' || coalesce(r, 'null'),
+    r = 'denied:23514');
+END $$;
+
 -- ── dedupe ──────────────────────────────────────────────────────────────────
 CREATE FUNCTION ins_auto(post_id uuid, article uuid, auto boolean) RETURNS text LANGUAGE plpgsql AS $$
 BEGIN

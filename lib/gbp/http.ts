@@ -17,7 +17,7 @@ import { isGbpOAuthConfigured } from './config'
 import { GbpApiError, type GbpErrorCode } from './errors'
 import { buildGbpAuthUrl, createPkcePair, exchangeGbpCode, grantIncludesGbpScope, revokeGbpToken } from './oauth'
 import { listAllLocations, type GbpLocation } from './api'
-import { validatePostInput, GBP_CTA_TYPES } from './validate'
+import { validatePostInput, GBP_CTA_TYPES, normalizePostLanguage } from './validate'
 import { preparePostImage, GBP_SOURCE_TYPES, GBP_SOURCE_MAX_BYTES, type CropBox } from './image'
 import { draftPost, type Generate } from './draft'
 import { publishPost, accessTokenFor, defaultPublishDeps, type PublishDeps } from './publish'
@@ -244,7 +244,8 @@ export async function handleDraft(req: Request, deps: GbpRouteDeps): Promise<Res
   try { body = await req.json() } catch { return err('invalid_request', 400) }
   const g = await gate(deps, typeof body.projectId === 'string' ? body.projectId : null)
   if (g instanceof Response) return g
-  const language = body.language === 'en' ? 'en' : 'he'
+  // Hebrew is the fallback for an unrecognised value, as it is everywhere else.
+  const language = normalizePostLanguage(body.language) ?? 'he'
   let article: { title: string; description: string | null; url: string | null } | null = null
   if (typeof body.articleId === 'string' && body.articleId) {
     const { data } = await g.admin.from('generated_articles')
@@ -339,7 +340,7 @@ export async function handleCreatePost(req: Request, deps: GbpRouteDeps): Promis
     row = await insertPost(g.admin, {
       project_id: g.project.id, user_id: g.user.id, source_article_id: sourceArticleId,
       summary: checked.value.summary, cta_type: checked.value.ctaType, cta_url: checked.value.ctaUrl,
-      image_url: imageUrl, image_path: imagePath, language_code: body.language === 'en' ? 'en' : 'he',
+      image_url: imageUrl, image_path: imagePath, language_code: normalizePostLanguage(body.language) ?? 'he',
       scheduled_at: checked.value.scheduledAt ?? new Date().toISOString(),
     })
   } catch (e) { return storeFail(e) }
