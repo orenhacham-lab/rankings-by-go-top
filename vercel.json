@@ -41,7 +41,7 @@
     },
     {
       "path": "/api/gbp/cron",
-      "schedule": "15 * * * *"
+      "schedule": "30 7 * * *"
     }
   ]
 }

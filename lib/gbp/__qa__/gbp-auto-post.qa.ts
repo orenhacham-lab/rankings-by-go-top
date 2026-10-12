@@ -419,7 +419,13 @@ function sourceChecks() {
   const vercel = JSON.parse(read('vercel.json')) as { crons: { path: string; schedule: string }[] }
   const cron = vercel.crons.find((c) => c.path === '/api/gbp/cron')
   check('the cron that sends the posts is registered', !!cron)
-  check('it runs every hour, after the article cron on the hour', !!cron && /^\d+ \* \* \* \*$/.test(cron.schedule) && cron.schedule !== '0 * * * *')
+  // Daily, because the Vercel plan refuses anything more often. It must land
+  // AFTER the article cron, or the morning's automatic posts wait a whole day.
+  const articleCron = vercel.crons.find((c) => c.path === '/api/content/automation/cron')
+  const minutes = (c?: { schedule: string }) => { const [m, h] = (c?.schedule ?? '').split(' '); return Number(h) * 60 + Number(m) }
+  check('it runs once a day (the plan allows no more)', !!cron && /^\d+ \d+ \* \* \*$/.test(cron.schedule))
+  check('and after the article cron, so the morning\'s posts go out the same morning',
+    !!cron && !!articleCron && minutes(cron) > minutes(articleCron) && minutes(cron) - minutes(articleCron) <= 120)
 
   const route = strip(read('app/api/gbp/auto-post/route.ts'))
   check('the switch route authenticates itself (proxy.ts does not cover /api/*)', route.includes('realGbpDeps') && route.includes('handleSetAutoPost'))

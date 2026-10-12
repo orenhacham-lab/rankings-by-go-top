@@ -3,10 +3,17 @@
  * whether posts under review went live. Bearer CRON_SECRET (fails closed), and
  * 404 unless GBP_POSTS_ENABLED.
  *
- * Registered in vercel.json at :15 past every hour — a quarter of an hour after
- * the article cron, so an article that published at 07:00 and queued an automatic
- * post (lib/gbp/auto-post.ts) goes up on the business profile at 07:15. Until the
- * flag is on this route answers 404 and the pass costs nothing.
+ * Registered in vercel.json at 07:30 UTC — half an hour after the article cron
+ * at 07:00, so an article that published there and queued an automatic post
+ * (lib/gbp/auto-post.ts) goes up on the business profile in the same morning.
+ * Until the flag is on this route answers 404 and the pass costs nothing.
+ *
+ * Once a day, not hourly, because the Vercel plan allows only daily cron jobs
+ * (the deploy is refused outright otherwise). A post the merchant SCHEDULED for
+ * some other hour therefore waits for the next morning's pass. Calling this URL
+ * more often from outside Vercel fixes that without a code change: it is
+ * idempotent, each post is claimed once (scheduled -> publishing), and
+ * cron-job.org already calls /api/content/automation/cron the same way.
  */
 import { createAdminClient } from '@/lib/supabase/admin'
 import { authorizeCronRequest } from '@/lib/auth/cron'
