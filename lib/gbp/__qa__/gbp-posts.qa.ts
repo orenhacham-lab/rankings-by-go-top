@@ -381,6 +381,16 @@ async function handlerChecks() {
     const r = await H.handleDraft(post({ projectId: PROJECT, articleId: 'art-1' }), deps(admin, { generate: async (p) => { prompt = p; return JSON.stringify({ summary: `**לחם מחמצת** טרי.\nהתקשרו 050-1234567\n${'א'.repeat(2000)}\nhttps://evil.example.com` }) } }))
     const b = await r.json()
     check('the draft is clamped to 1,500, has no phone, no URL, no markdown', r.status === 200 && V.countPostChars(b.summary) <= 1500 && !V.containsPhoneNumber(b.summary) && !b.summary.includes('http') && !b.summary.includes('**'))
+    // The length the model is ASKED for. Google allows 1,500; asking for 400-900
+    // produced ~580-character drafts, which the owner flagged on 13 October 2026.
+    check('the draft asks for a length that uses Google\'s room and still leaves the owner some',
+      D.GBP_DRAFT_TARGET < V.GBP_SUMMARY_MAX && D.GBP_DRAFT_TARGET >= 1200 && D.GBP_DRAFT_MIN >= 700 && D.GBP_DRAFT_MIN < D.GBP_DRAFT_TARGET)
+    check('…and the prompt carries that band', prompt.includes(`Between ${D.GBP_DRAFT_MIN} and ${D.GBP_DRAFT_TARGET} characters`))
+    // Hebrew costs close to a token per character, so a budget that merely matches
+    // the character count comes back as MAX_TOKENS with an empty body.
+    const budget = Number(/answerBudget: (\d+)/.exec(strip(read('lib/gbp/draft.ts')))?.[1])
+    check('…and the token budget covers it with room for Hebrew', budget >= D.GBP_DRAFT_TARGET * 1.5)
+    check('MUTATION: a budget that only matches the character count is caught', !(D.GBP_DRAFT_TARGET >= D.GBP_DRAFT_TARGET * 1.5))
     check('the draft prompt is built from the article and the business, and nothing was posted', prompt.includes('לחם מחמצת') && prompt.includes('המאפייה של דנה') && admin.tables.gbp_posts.length === 0)
     const foreign = await H.handleDraft(post({ projectId: PROJECT, articleId: 'art-of-someone-else' }), deps(admin, { generate: async () => 'x' }))
     check('a draft from an article outside the project is refused', foreign.status === 404)

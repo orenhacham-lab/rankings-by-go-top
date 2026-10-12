@@ -29,8 +29,19 @@ export interface DraftSource {
   topic?: string | null
 }
 
-/** The target is below Google's 1,500 so the merchant has room to add a line. */
-export const GBP_DRAFT_TARGET = 900
+/**
+ * The length the model is asked for. Google's own ceiling is 1,500
+ * (GBP_SUMMARY_MAX) and this stays under it so the merchant can add a line
+ * without the text being clamped.
+ *
+ * It was 900 until 13 October 2026, and the drafts came back around 580 — the
+ * owner noticed and was right that the room was ours to give, not Google's to
+ * refuse. Raised with the floor, because a model told "between 400 and 900"
+ * aims at the middle.
+ */
+export const GBP_DRAFT_TARGET = 1300
+/** The shortest draft worth showing: below this the owner is writing it anyway. */
+export const GBP_DRAFT_MIN = 800
 
 /** What the model is told to write in. Brazilian Portuguese is named as such. */
 const LANGUAGE_NAME: Record<GbpPostLanguage, string> = {
@@ -47,7 +58,7 @@ export function buildDraftPrompt(src: DraftSource): string {
     : `this topic: ${src.topic ?? ''}\n`
   return [
     `Write one Google Business Profile "update" post in ${lang} for ${src.businessName ? `the business "${src.businessName}"` : 'a local business'}, about ${about}`,
-    `Rules: plain text only, no markdown, no hashtags, at most one emoji. Between 400 and ${GBP_DRAFT_TARGET} characters.`,
+    `Rules: plain text only, no markdown, no hashtags, at most one emoji. Between ${GBP_DRAFT_MIN} and ${GBP_DRAFT_TARGET} characters — use the room, do not stop at a few lines.`,
     'Open with the most useful sentence for a nearby customer. Speak to the reader. Be concrete and factual; do not invent prices, dates, discounts or claims.',
     'Never include a phone number, an email address or a URL in the text (the post has its own button).',
     'Return JSON: {"summary": "<the post text>"}',
@@ -77,7 +88,7 @@ export function cleanDraft(raw: string): string {
 export type Generate = (prompt: string) => Promise<string>
 
 export const defaultGenerate: Generate = (prompt) =>
-  generateGbpDraft(prompt, { label: 'post', answerBudget: 900, temperature: 0.6 })
+  generateGbpDraft(prompt, { label: 'post', answerBudget: 2400, temperature: 0.6 })
 
 export async function draftPost(src: DraftSource, generate: Generate = defaultGenerate): Promise<{ ok: true; summary: string } | { ok: false }> {
   let raw: string
