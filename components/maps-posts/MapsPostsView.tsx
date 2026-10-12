@@ -1,7 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useState } from 'react'
-import { MapPinOff, Store } from 'lucide-react'
+import { MapPinOff } from 'lucide-react'
 import Header from '@/components/layout/Header'
 import WorkspaceGate from '@/components/layout/WorkspaceGate'
 import EmptyState from '@/components/ui/EmptyState'
@@ -73,7 +73,6 @@ function Screen({ projectId }: { projectId: string }) {
     return <Notice tone="bad" action={{ label: t.retry, onClick: () => void load() }}>{t.loadFailed}</Notice>
   }
   if (!status) return <ScreenSkeleton label={t.loading} />
-  if (status.state === 'shopify') return <EmptyState icon={<Store className="size-5" />} title={t.shopifyTitle} body={t.shopifyBody} />
   if (status.state === 'unavailable') return <EmptyState icon={<MapPinOff className="size-5" />} title={t.unavailableTitle} body={t.unavailableBody} />
   const shown = withAuthLost(status, authLost)
 

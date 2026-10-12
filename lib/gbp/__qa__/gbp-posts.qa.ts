@@ -266,7 +266,6 @@ function world(opts: { missing?: boolean } = {}) {
 function deps(admin: any, over: Partial<import('../http').GbpRouteDeps> = {}, as = OWNER): import('../http').GbpRouteDeps {
   return {
     auth: async (pid) => (!pid ? { error: 'x', status: 400 } : pid !== PROJECT ? { error: 'x', status: 404 } : as !== OWNER ? { error: 'x', status: 403 } : { user: { id: as }, admin, project: { id: PROJECT, user_id: OWNER } }) as any,
-    isShopifyProject: async () => false,
     ...over,
   }
 }
@@ -287,14 +286,25 @@ async function handlerChecks() {
     const admin = world()
     const r = await H.handleStatus(new Request(`https://app.test/api/gbp/status?projectId=${PROJECT}`), deps(admin, {}, OTHER))
     check('another user gets 403 and no data', r.status === 403 && !(await r.text()).includes('דנה'))
-    const s = await H.handleStatus(new Request(`https://app.test/api/gbp/status?projectId=${PROJECT}`), deps(admin, { isShopifyProject: async () => true }))
-    check('a Shopify project sees state "shopify" (feature hidden)', (await s.json()).state === 'shopify')
+    // CHANGED 13 October 2026. The feature used to be refused on a Shopify store,
+    // and the test asked who BILLS the account, so one owner's WordPress sites were
+    // refused because another project of theirs is a store. The post goes to the
+    // business profile on Google, not to the site, so the site's platform decides
+    // nothing here and no platform is consulted at all any more.
+    const store = world()
+    store.tables.shopify_connections = [{ project_id: PROJECT, archived_at: null }]
+    const s = await H.handleStatus(new Request(`https://app.test/api/gbp/status?projectId=${PROJECT}`), deps(store))
+    const sj = await s.json()
+    check('a project whose site is a Shopify store is treated like any other', s.status === 200 && sj.state === 'ready' && sj.connection === null)
     const m = await H.handleStatus(new Request(`https://app.test/api/gbp/status?projectId=${PROJECT}`), deps(world({ missing: true })))
     check('tables not applied → state "unavailable", not an error', m.status === 200 && (await m.json()).state === 'unavailable')
     const c = await H.handleConnect(post({ projectId: PROJECT }), deps(world({ missing: true })))
     check('connect while tables are missing → not_available', c.status === 409 && (await c.json()).error === 'not_available')
-    const sh = await H.handleCreatePost(post({ projectId: PROJECT, summary: 'x' }), deps(admin, { isShopifyProject: async () => true }))
-    check('a Shopify project cannot create a post', sh.status === 409)
+    const storePost = world()
+    storePost.tables.shopify_connections = [{ project_id: PROJECT, archived_at: null }]
+    await connectOwner(storePost)
+    const sh = await H.handleCreatePost(post({ projectId: PROJECT, summary: 'פתחנו גם בימי שישי' }), deps(storePost))
+    check('…and can publish a post from that project', sh.status === 200 && storePost.tables.gbp_posts.length === 1)
   }
   {
     // Callback: fixed redirect, scope check, encrypted storage.

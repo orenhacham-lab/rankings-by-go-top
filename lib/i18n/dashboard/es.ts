@@ -5952,8 +5952,6 @@ export const dashboardEs: DeepPartial<DashboardDictionary> = {
     loading: 'Cargando tu perfil de empresa',
     unavailableTitle: 'Todavía no está abierto',
     unavailableBody: 'Las publicaciones en Google Maps llegan pronto. Por ahora no hay nada que hacer.',
-    shopifyTitle: 'No disponible para tiendas Shopify',
-    shopifyBody: 'Por ahora, publicar en Google Maps está disponible para webs conectadas directamente.',
     notConfiguredBody: 'La conexión con Google aún no está configurada por nuestra parte. Se abrirá en cuanto Google apruebe el acceso.',
     loadFailed: 'No hemos podido cargar esta pantalla. Prueba a recargar.',
     retry: 'Volver a intentarlo',

@@ -6291,8 +6291,6 @@ export const dashboardEn = {
     loading: 'Loading your business profile',
     unavailableTitle: 'Not open yet',
     unavailableBody: 'Posts on Google Maps are coming soon. There is nothing to do for now.',
-    shopifyTitle: 'Not available for Shopify stores',
-    shopifyBody: 'Posting to Google Maps is available for directly connected sites for now.',
     notConfiguredBody: 'The Google connection is not set up on our side yet. It opens as soon as Google approves access.',
     loadFailed: 'We could not load this screen. Try refreshing.',
     retry: 'Try again',

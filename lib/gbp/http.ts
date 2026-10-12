@@ -37,7 +37,6 @@ type Authed = Exclude<ContentAuthResult, { error: string }>
 
 export interface GbpRouteDeps {
   auth: (projectId: string | null) => Promise<ContentAuthResult>
-  isShopifyProject: (admin: Admin, userId: string, projectId: string) => Promise<boolean>
   fetchLocations?: (accessToken: string) => Promise<GbpLocation[]>
   exchange?: (code: string, verifier: string) => Promise<{ accessToken: string; refreshToken?: string; scope: string }>
   generate?: Generate
@@ -53,14 +52,13 @@ const json = (body: unknown, status = 200) => Response.json(body, { status })
 const err = (code: GbpErrorCode | 'invalid_request' | 'forbidden' | 'unauthorized' | 'not_found', status: number, extra: Record<string, unknown> = {}) =>
   json({ ok: false, error: code, ...extra }, status)
 
-/** Auth + Shopify + schema gate shared by every project-scoped handler. */
+/** Auth + schema gate shared by every project-scoped handler. */
 async function gate(deps: GbpRouteDeps, projectId: string | null): Promise<Authed | Response> {
   const auth = await deps.auth(projectId)
   if ('error' in auth) {
     const code = auth.status === 401 ? 'unauthorized' : auth.status === 403 ? 'forbidden' : auth.status === 404 ? 'not_found' : 'invalid_request'
     return err(code, auth.status)
   }
-  if (await deps.isShopifyProject(auth.admin, auth.user.id, auth.project.id)) return err('not_available', 409, { reason: 'shopify' })
   try {
     if (!(await gbpTablesPresent(auth.admin))) return err('not_available', 409, { reason: 'schema' })
   } catch {
@@ -97,7 +95,6 @@ export async function handleStatus(req: Request, deps: GbpRouteDeps): Promise<Re
   const projectId = new URL(req.url).searchParams.get('projectId')
   const auth = await deps.auth(projectId)
   if ('error' in auth) return err(auth.status === 401 ? 'unauthorized' : auth.status === 403 ? 'forbidden' : 'not_found', auth.status)
-  if (await deps.isShopifyProject(auth.admin, auth.user.id, auth.project.id)) return json({ ok: true, state: 'shopify' })
   try {
     if (!(await gbpTablesPresent(auth.admin))) return json({ ok: true, state: 'unavailable' })
   } catch { return err('unexpected', 500) }

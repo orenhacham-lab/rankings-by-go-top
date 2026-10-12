@@ -290,8 +290,6 @@ export const aiVisibilityPtBR: DeepPartial<DashboardDictionary> = {
     loading: 'Carregando o seu Perfil da Empresa',
     unavailableTitle: 'Ainda não está aberto',
     unavailableBody: 'As publicações no Google Maps chegam em breve. Por enquanto, não há nada a fazer.',
-    shopifyTitle: 'Não disponível para lojas Shopify',
-    shopifyBody: 'Por enquanto, publicar no Google Maps está disponível para sites conectados diretamente.',
     notConfiguredBody: 'A conexão com o Google ainda não foi configurada do nosso lado. Ela será aberta assim que o Google aprovar o acesso.',
     loadFailed: 'Não foi possível carregar esta tela. Tente recarregar a página.',
     retry: 'Tentar novamente',
