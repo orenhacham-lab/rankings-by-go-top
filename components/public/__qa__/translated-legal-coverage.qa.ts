@@ -2605,9 +2605,15 @@ const OUTREACH_NO_LONGER_TRUE = /we\s+do not collect details about a private ind
       /CHECK \(country = 'US'\)/.test(migration))
     check(`${PROSPECTS_MIGRATION}: the postal address can be erased`,
       !/postal_address\s+text\s+NOT NULL/.test(migration))
-    const redaction = /outreach_prospects_redaction([\s\S]*?)(CONSTRAINT|\n\);)/.exec(migration)?.[1] ?? ''
+    /*
+     * The three facts, not one constraint: the outreach thread expressed them as
+     * two CHECKs (outreach_prospects_redaction and ..._redaction_name) and may
+     * express them as three, so this asks the migration whether a redacted row
+     * can hold each column rather than how the author grouped them.
+     */
+    const checks = migration.replace(/^\s*--.*$/gm, '')
     check(`${PROSPECTS_MIGRATION}: a redacted row holds no address, no contact name and no postal address`,
-      /email IS NULL/.test(redaction) && /contact_name IS NULL/.test(redaction) && /postal_address IS NULL/.test(redaction))
+      /email IS NULL/.test(checks) && /contact_name IS NULL/.test(checks) && /postal_address IS NULL/.test(checks))
     const body = /CREATE TABLE IF NOT EXISTS public\.outreach_prospects \(([\s\S]*?)\n\);/.exec(migration)?.[1] ?? ''
     const columns = [...body.matchAll(/^ {2}([a-z_]+)\s+(uuid|text|timestamptz|boolean|integer|jsonb)/gm)].map((m) => m[1])
     const DISCLOSED = new Set([

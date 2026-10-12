@@ -890,8 +890,10 @@ export default function EnglishPrivacyPage() {
           is later, and the date of the erasure is recorded. 30 days is not a round number: the
           unsubscribe link in our message has to keep working for at least that long, and it resolves
           against this record. What remains afterwards is the business&rsquo;s name, its site, the
-          platform, the country, the dates and the fingerprint, which is what lets us know we already
-          wrote to that business twice and keeps it from being added again. <strong>A record we never
+          platform, the country, where the record stands in its two-message life, the dates, the
+          one-way fingerprint and the unsubscribe identifier, so that the link keeps working. The
+          fingerprint is what lets us know we already wrote to that business twice and keeps it from
+          being added again. <strong>A record we never
           wrote to is deleted outright 90 days after it was added.</strong> The removal list is
           separate from this record and is kept for as long as we send email at all, because that is
           the only way a removal can hold.
