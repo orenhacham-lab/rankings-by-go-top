@@ -44,11 +44,11 @@ ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON TABLES TO anon, authentic
 -- Fixture: one prospect already written to once, one already redacted.
 SET ROLE service_role;
 INSERT INTO public.outreach_prospects
-  (id, email, email_hash, unsub_token, company, site_host, platform, postal_address,
+  (id, email, email_hash, unsub_token, company, contact_name, site_host, platform, postal_address,
    source_site, source_second, status, finding, finding_checked, first_sent_at) VALUES
   ('e1111111-1111-1111-1111-111111111111', 'owner@store.example',
    encode(sha256('owner@store.example'::bytea), 'hex'), repeat('a', 48),
-   'Store Example LLC', 'store.example', 'shopify', '1 Main St, Nashville, TN 37201',
+   'Store Example LLC', 'A Person', 'store.example', 'shopify', '1 Main St, Nashville, TN 37201',
    'https://store.example/contact', 'Made in Example directory', 'sent_first',
    'no meta description on the home page', '2026-10-12T09:00:00Z', '2026-10-12T13:00:00Z');
 INSERT INTO public.outreach_prospects
@@ -197,6 +197,28 @@ BEGIN
   r := try_as('service_role', NULL, format(g, 'fresh@store.example', h, 'fresh.example', 'wordpress', 'US',
     'https://fresh.example', 'Made in Example directory', 'no meta description', '2026-10-12T09:00:00Z'));
   PERFORM chk('constraints', 'a well-formed prospect is accepted -> ' || r, r = 'ok:inserted');
+END $$;
+
+-- A redaction takes the contact's name with the address. The published privacy
+-- text states a retention period, and lib/outreach/retention.ts is what honours
+-- it; this constraint is what stops a sweep that forgets the name from quietly
+-- keeping a person's name for ever.
+DO $$
+DECLARE r text;
+BEGIN
+  r := try_as('service_role', NULL, $q$ WITH u AS (UPDATE public.outreach_prospects
+      SET email = NULL, redacted_at = now()
+      WHERE id = 'e1111111-1111-1111-1111-111111111111' RETURNING 1) SELECT count(*)::text FROM u $q$);
+  PERFORM chk('constraints', 'a redaction that keeps the contact name is rejected -> ' || r, r = 'denied:23514');
+  r := try_as('service_role', NULL, $q$ WITH u AS (UPDATE public.outreach_prospects
+      SET email = NULL, contact_name = NULL, redacted_at = now()
+      WHERE id = 'e1111111-1111-1111-1111-111111111111' RETURNING 1) SELECT count(*)::text FROM u $q$);
+  PERFORM chk('constraints', 'a redaction that takes both is accepted -> ' || r, r = 'ok:1');
+  r := try_as('service_role', NULL, $q$ INSERT INTO public.outreach_prospects
+    (email, email_hash, contact_name, company, site_host, platform, postal_address, source_site, source_second, redacted_at)
+    VALUES (NULL, encode(sha256('named@store.example'::bytea), 'hex'), 'A Person', 'Named LLC', 'named.example',
+            'shopify', '8 Main St, TN', 'https://named.example', 'directory', now()) RETURNING 'inserted' $q$);
+  PERFORM chk('constraints', 'a redacted row cannot be created holding a name -> ' || r, r = 'denied:23514');
 END $$;
 
 -- The token is random, so two rows inserted the same way do not share one.

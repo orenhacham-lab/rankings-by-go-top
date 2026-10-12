@@ -97,8 +97,12 @@ CREATE TABLE IF NOT EXISTS public.outreach_prospects (
   -- The plaintext, when present, is already normalized: trimmed, lower-cased.
   CONSTRAINT outreach_prospects_email_shape CHECK (
     email IS NULL OR (email = lower(btrim(email)) AND position('@' in email) > 1 AND length(email) <= 320)),
-  -- Redaction and the absence of plaintext are the same fact.
+  -- Redaction and the absence of plaintext are the same fact. A redaction takes
+  -- the contact's name with the address, so a sweep that forgets the name fails
+  -- here rather than quietly keeping a person's name for ever
+  -- (lib/outreach/retention.ts; the published privacy text states the period).
   CONSTRAINT outreach_prospects_redaction CHECK ((email IS NULL) = (redacted_at IS NOT NULL)),
+  CONSTRAINT outreach_prospects_redaction_name CHECK (redacted_at IS NULL OR contact_name IS NULL),
   -- The one country the published privacy text allows on this list.
   CONSTRAINT outreach_prospects_country CHECK (country = 'US'),
   CONSTRAINT outreach_prospects_platform CHECK (platform IN ('shopify', 'wordpress')),
@@ -113,6 +117,22 @@ CREATE TABLE IF NOT EXISTS public.outreach_prospects (
   CONSTRAINT outreach_prospects_order CHECK (second_sent_at IS NULL OR first_sent_at IS NOT NULL),
   CONSTRAINT outreach_prospects_note_len CHECK (note IS NULL OR length(note) <= 500)
 );
+
+-- The table may already exist from an earlier, partly applied run of this file
+-- (CREATE TABLE IF NOT EXISTS adds no constraint to a table that is already
+-- there), so the constraint added after the first version is also added here.
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_constraint
+     WHERE conrelid = 'public.outreach_prospects'::regclass
+       AND conname = 'outreach_prospects_redaction_name'
+  ) THEN
+    ALTER TABLE public.outreach_prospects
+      ADD CONSTRAINT outreach_prospects_redaction_name
+      CHECK (redacted_at IS NULL OR contact_name IS NULL);
+  END IF;
+END $$;
 
 CREATE UNIQUE INDEX IF NOT EXISTS outreach_prospects_token_key
   ON public.outreach_prospects (unsub_token);
