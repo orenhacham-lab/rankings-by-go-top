@@ -1,8 +1,19 @@
 /**
  * The AI first draft of a post, from one of the project's articles or from a
- * topic the merchant typed. It is ALWAYS a draft: it lands in the composer and
- * is published only after the merchant reads it and presses publish (Google
- * rejects "auto-generated" posts, research.md).
+ * topic the merchant typed. In the composer it is ALWAYS a draft: it lands on
+ * the screen and is published only after the merchant reads it and presses
+ * publish. Automatic posting (lib/gbp/auto-post.ts) publishes without that read,
+ * on a project whose owner switched it on.
+ *
+ * An earlier version of this header said Google rejects "auto-generated" posts,
+ * citing a research.md that is not in this repository. That is NOT what Google's
+ * policy says. Read 2026-10-12: the posts content policy (business/answer/7213077)
+ * restricts unverified phone numbers, e-mail addresses and social handles, and
+ * hotel offer posts; the policy overview (business/answer/13762416) and the
+ * prohibited-and-restricted-content policy (contributionpolicy/answer/7400114)
+ * name no rule about automatically, machine- or AI-generated content. What they do
+ * forbid nearby is REPETITIVE content — "posting the same content multiple times"
+ * — which is why an article gets at most one automatic post (uq_gbp_posts_auto_article).
  *
  * The result is cleaned before it reaches the screen: at most 1,500
  * characters, no phone number (Google refuses those), no markdown.
@@ -11,11 +22,11 @@
 import { getRecoGenAiClient } from '@/lib/content/recommendations/genai-client'
 import { RECOMMENDATION_MODEL_PRIMARY } from '@/lib/content/recommendations/model'
 import { resolveModelConfig } from '@/lib/content/recommendations/model-config'
-import { clampPostText, containsPhoneNumber, GBP_SUMMARY_MAX } from './validate'
+import { clampPostText, containsPhoneNumber, GBP_SUMMARY_MAX, type GbpPostLanguage } from './validate'
 
 export interface DraftSource {
   businessName: string | null
-  language: 'he' | 'en'
+  language: GbpPostLanguage
   article?: { title: string; description: string | null; url: string | null } | null
   topic?: string | null
 }
@@ -23,8 +34,16 @@ export interface DraftSource {
 /** The target is below Google's 1,500 so the merchant has room to add a line. */
 export const GBP_DRAFT_TARGET = 900
 
+/** What the model is told to write in. Brazilian Portuguese is named as such. */
+const LANGUAGE_NAME: Record<GbpPostLanguage, string> = {
+  he: 'Hebrew',
+  en: 'English',
+  es: 'Spanish',
+  'pt-BR': 'Brazilian Portuguese',
+}
+
 export function buildDraftPrompt(src: DraftSource): string {
-  const lang = src.language === 'he' ? 'Hebrew' : 'English'
+  const lang = LANGUAGE_NAME[src.language] ?? 'English'
   const about = src.article
     ? `an article on the business's website.\nArticle title: ${src.article.title}\n${src.article.description ? `Article summary: ${src.article.description}\n` : ''}`
     : `this topic: ${src.topic ?? ''}\n`

@@ -17,7 +17,7 @@ import { isGbpOAuthConfigured } from './config'
 import { GbpApiError, type GbpErrorCode } from './errors'
 import { buildGbpAuthUrl, createPkcePair, exchangeGbpCode, grantIncludesGbpScope, revokeGbpToken } from './oauth'
 import { listAllLocations, type GbpLocation } from './api'
-import { validatePostInput, GBP_CTA_TYPES } from './validate'
+import { validatePostInput, GBP_CTA_TYPES, normalizePostLanguage } from './validate'
 import { preparePostImage, GBP_SOURCE_TYPES, GBP_SOURCE_MAX_BYTES, type CropBox } from './image'
 import { draftPost, type Generate } from './draft'
 import { v4LocationParent } from './request'
@@ -28,7 +28,8 @@ import { publishPost, accessTokenFor, defaultPublishDeps, type PublishDeps } fro
 import {
   gbpTablesPresent, GbpStoreError, createGbpOAuthState, consumeGbpOAuthState, readGbpConnection, storeGbpConnection,
   deleteGbpConnection, decryptRefreshToken, readProjectLocation, saveProjectLocation, listProjectPosts, insertPost,
-  readProjectPost, cancelPost, markReviewsSeen, type GbpPostRow, type GbpConnectionRow, type GbpLocationRow,
+  readProjectPost, cancelPost, setAutoPostOnPublish, markReviewsSeen,
+  type GbpPostRow, type GbpConnectionRow, type GbpLocationRow,
 } from './store'
 
 type Admin = ReturnType<typeof createAdminClient>
@@ -75,6 +76,7 @@ export function sanitizePost(p: GbpPostRow) {
     id: p.id, summary: p.summary, ctaType: p.cta_type, ctaUrl: p.cta_url, imageUrl: p.image_url,
     status: p.status, scheduledAt: p.scheduled_at, publishedAt: p.published_at, googleState: p.google_state,
     searchUrl: p.google_search_url, errorCode: p.last_error_code, createdAt: p.created_at, sourceArticleId: p.source_article_id,
+    autoCreated: !!p.auto_created,
   }
 }
 export function sanitizeGbpConnection(c: GbpConnectionRow | null) {
@@ -119,6 +121,9 @@ export async function handleStatus(req: Request, deps: GbpRouteDeps): Promise<Re
       location: location && connection?.id && location.connection_id === connection.id
         ? { title: location.location_title, address: location.location_address, mapsUri: location.maps_uri, websiteUri: location.website_uri, locationName: location.location_name }
         : null,
+      // The owner's automatic-posting switch. Off unless a location of THEIR
+      // connection is selected, so the screen can never offer it without one.
+      autoPostOnPublish: !!(location && connection?.id && location.connection_id === connection.id && location.auto_post_on_publish),
       posts: posts.map(sanitizePost),
       siteUrl: p.target_domain ? (/^https?:\/\//.test(p.target_domain) ? p.target_domain : `https://${p.target_domain}`) : null,
       businessName: p.business_name ?? null,
@@ -248,7 +253,8 @@ export async function handleDraft(req: Request, deps: GbpRouteDeps): Promise<Res
   try { body = await req.json() } catch { return err('invalid_request', 400) }
   const g = await gate(deps, typeof body.projectId === 'string' ? body.projectId : null)
   if (g instanceof Response) return g
-  const language = body.language === 'en' ? 'en' : 'he'
+  // Hebrew is the fallback for an unrecognised value, as it is everywhere else.
+  const language = normalizePostLanguage(body.language) ?? 'he'
   let article: { title: string; description: string | null; url: string | null } | null = null
   if (typeof body.articleId === 'string' && body.articleId) {
     const { data } = await g.admin.from('generated_articles')
@@ -524,7 +530,7 @@ export async function handleCreatePost(req: Request, deps: GbpRouteDeps): Promis
     row = await insertPost(g.admin, {
       project_id: g.project.id, user_id: g.user.id, source_article_id: sourceArticleId,
       summary: checked.value.summary, cta_type: checked.value.ctaType, cta_url: checked.value.ctaUrl,
-      image_url: imageUrl, image_path: imagePath, language_code: body.language === 'en' ? 'en' : 'he',
+      image_url: imageUrl, image_path: imagePath, language_code: normalizePostLanguage(body.language) ?? 'he',
       scheduled_at: checked.value.scheduledAt ?? new Date().toISOString(),
     })
   } catch (e) { return storeFail(e) }
@@ -546,3 +552,28 @@ export async function handleCancelPost(req: Request, postId: string, deps: GbpRo
   } catch (e) { return storeFail(e) }
 }
 
+// ── PATCH /api/gbp/auto-post {projectId, enabled} ──────────────────────────
+/**
+ * The owner turns automatic posting on or off. It exists only on top of a
+ * connected location of their OWN connection: without one there is nothing to
+ * post to, and a location row left over from a connection they removed must not
+ * become a switch they can flip.
+ */
+export async function handleSetAutoPost(req: Request, deps: GbpRouteDeps): Promise<Response> {
+  let body: Record<string, unknown>
+  try { body = await req.json() } catch { return err('invalid_request', 400) }
+  const g = await gate(deps, typeof body.projectId === 'string' ? body.projectId : null)
+  if (g instanceof Response) return g
+  if (typeof body.enabled !== 'boolean') return err('invalid_request', 400)
+  try {
+    const [conn, location] = await Promise.all([
+      readGbpConnection(g.admin, g.user.id),
+      readProjectLocation(g.admin, g.project.id),
+    ])
+    if (!conn || conn.status !== 'connected') return err('not_connected', 409)
+    if (!location || location.connection_id !== conn.id || location.user_id !== g.user.id) return err('no_location', 409)
+    const saved = await setAutoPostOnPublish(g.admin, g.project.id, body.enabled)
+    if (!saved) return err('no_location', 409)
+    return json({ ok: true, autoPostOnPublish: body.enabled })
+  } catch (e) { return storeFail(e) }
+}

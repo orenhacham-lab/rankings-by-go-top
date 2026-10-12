@@ -20,6 +20,25 @@ export const GBP_URL_MAX = 2048
 export const GBP_CTA_TYPES = ['LEARN_MORE', 'BOOK', 'ORDER', 'SHOP', 'SIGN_UP', 'CALL'] as const
 export type GbpCtaType = typeof GBP_CTA_TYPES[number]
 
+/**
+ * The language a post is written in, sent to Google as localPosts.languageCode
+ * (a BCP-47 tag). These are the app's own four languages: a business is written
+ * to its own customers, so a Spanish business gets a Spanish post, the same way
+ * its articles are written in Spanish.
+ *
+ * Deliberately PublicLocale and not the two-language `Locale`: posts used to be
+ * he/en only, which quietly gave a Spanish business an English post.
+ */
+export const GBP_POST_LANGUAGES = ['he', 'en', 'es', 'pt-BR'] as const
+export type GbpPostLanguage = typeof GBP_POST_LANGUAGES[number]
+
+/** An untrusted value to a language we can post in, or null. */
+export function normalizePostLanguage(value: unknown): GbpPostLanguage | null {
+  return typeof value === 'string' && (GBP_POST_LANGUAGES as readonly string[]).includes(value)
+    ? (value as GbpPostLanguage)
+    : null
+}
+
 export type GbpValidationCode =
   | 'summary_empty'
   | 'summary_too_long'

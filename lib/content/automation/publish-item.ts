@@ -11,6 +11,7 @@ import type { createAdminClient } from '@/lib/supabase/admin'
 import { loadWordPressPublisher, publishArticleToWordPress, publishSeoFor } from '@/lib/content/wordpress-plugin-publish'
 import { runQualityGate } from '@/lib/content/automation/quality-gate'
 import { AUTOMATION_MAX_ATTEMPTS } from '@/lib/content/automation/generate-item'
+import { enqueueGbpPostForPublishedArticle } from '@/lib/gbp/auto-post'
 import { ensureProjectKeywordFromPublishedArticle } from '@/lib/content/keyword-from-article'
 import { recordPublishFinalFailureAlert, recordPublishBlockedAlert, resolvePublishAlerts } from '@/lib/content/automation/alerts'
 import type { AlertChannel } from '@/lib/content/automation/alert-read-model'
@@ -151,6 +152,10 @@ export async function publishPoolItem(admin: Admin, itemId: string): Promise<Pub
       // Phase 3E — first time this item reaches published, ensure its keyword.
       // Idempotent (deduped), so the already_published path is a cheap no-op too.
       await ensureProjectKeywordFromPublishedArticle(admin, article.id)
+      // Also a post on the business profile, when the owner connected Google
+      // Business Profile and approved automatic posting. Best-effort, no network
+      // call to Google or to a model here; never affects the publish outcome.
+      await enqueueGbpPostForPublishedArticle(admin, article.id)
       // Phase 4B.1 — a recovered/reconciled publish resolves any open failure alert.
       await resolvePublishAlerts(admin, itemId, { articleId: article.id, channel: 'wordpress' })
       return { itemId, status: 'published', articleId: article.id, wpPostUrl: article.wp_post_url, noop: item.status === 'published' ? 'already_published' : 'reconciled' }
@@ -284,6 +289,10 @@ export async function publishPoolItem(admin: Admin, itemId: string): Promise<Pub
     // Phase 3E — add the topic's primary keyword to the project's tracked
     // keywords. Best-effort + idempotent; never affects the publish outcome.
     await ensureProjectKeywordFromPublishedArticle(admin, article.id)
+    // Also a post on the business profile, when the owner connected Google
+    // Business Profile and approved automatic posting. Best-effort, no network
+    // call to Google or to a model here; never affects the publish outcome.
+    await enqueueGbpPostForPublishedArticle(admin, article.id)
 
     // Phase 4B.1 — a successful publish resolves any open failure alert, for this
     // item AND for this article's older attempts on the same (or unknown) channel.

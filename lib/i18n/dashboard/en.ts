@@ -6337,6 +6337,15 @@ export const dashboardEn = {
       openInMaps: 'Open in Google Maps',
       saving: 'Saving…',
     },
+    autoPost: {
+      label: 'Post every new article on Google automatically',
+      help: 'Each time the system publishes an article on your site, it writes a short post from it and puts it on your Google business profile. Switch it off whenever you like; posts already published stay.',
+      on: 'On',
+      off: 'Off',
+      needsLocation: 'Pick the business to post to first, then you can switch automatic posting on.',
+      saveFailed: 'We could not save that setting. Please try again.',
+      badge: 'Automatic',
+    },
     composer: {
       lockedConnect: 'To write a post, first connect your Google business profile (step 1).',
       lockedLocation: 'To write a post, first choose which business to post to (step 2).',

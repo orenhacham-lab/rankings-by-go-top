@@ -15,6 +15,8 @@ export interface GbpPostView {
   errorCode: string | null
   createdAt: string
   sourceArticleId: string | null
+  /** Queued by an article publish, not written by the merchant. */
+  autoCreated: boolean
 }
 
 export interface GbpArticleOption { id: string; title: string; url: string | null; imageUrl: string | null }
@@ -32,6 +34,8 @@ export type GbpStatus =
       siteUrl: string | null
       businessName: string | null
       articles: GbpArticleOption[]
+      /** The owner approved posting every new article automatically. */
+      autoPostOnPublish: boolean
     }
 
 export type GbpReadyStatus = Extract<GbpStatus, { state: 'ready' }>

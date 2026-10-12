@@ -336,6 +336,15 @@ export const aiVisibilityPtBR: DeepPartial<DashboardDictionary> = {
       openInMaps: 'Abrir no Google Maps',
       saving: 'Salvando…',
     },
+    autoPost: {
+      label: 'Publicar no Google, automaticamente, cada novo artigo',
+      help: 'Cada vez que o sistema publica um artigo no seu site, ele escreve uma publicação curta e a envia para o seu perfil da empresa no Google. Você pode desativar quando quiser; as publicações já enviadas permanecem.',
+      on: 'Ativado',
+      off: 'Desativado',
+      needsLocation: 'Escolha primeiro em qual negócio publicar; depois você poderá ativar a publicação automática.',
+      saveFailed: 'Não foi possível salvar a configuração. Tente novamente.',
+      badge: 'Automática',
+    },
     composer: {
       lockedConnect: 'Para escrever uma publicação, conecte primeiro o seu Perfil da Empresa no Google (passo 1).',
       lockedLocation: 'Para escrever uma publicação, escolha primeiro em qual empresa publicar (passo 2).',

@@ -5998,6 +5998,15 @@ export const dashboardEs: DeepPartial<DashboardDictionary> = {
       openInMaps: 'Abrir en Google Maps',
       saving: 'Guardando…',
     },
+    autoPost: {
+      label: 'Publicar en Google, de forma automática, cada artículo nuevo',
+      help: 'Cada vez que el sistema publica un artículo en tu sitio, escribe una publicación breve y la sube a tu perfil de empresa en Google. Puedes desactivarlo cuando quieras; las publicaciones ya subidas se mantienen.',
+      on: 'Activado',
+      off: 'Desactivado',
+      needsLocation: 'Elige primero en qué negocio publicar y luego podrás activar la publicación automática.',
+      saveFailed: 'No pudimos guardar el ajuste. Vuelve a intentarlo.',
+      badge: 'Automática',
+    },
     composer: {
       lockedConnect: 'Para escribir una publicación, conecta primero tu perfil de empresa en Google (paso 1).',
       lockedLocation: 'Para escribir una publicación, elige primero en qué empresa publicar (paso 2).',

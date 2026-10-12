@@ -7,15 +7,23 @@
  * Retry: only a rate limit or a Google outage, at most 3 attempts, 15 minutes
  * apart. One post at a time, with a pause between posts (10 edits per minute
  * per profile, research.md).
+ *
+ * An AUTOMATIC post (lib/gbp/auto-post.ts) arrives carrying the article's own
+ * title and summary and `needs_ai_draft`. This is where the AI draft is written,
+ * right before the post goes to Google — deliberately NOT in the article's
+ * publish path, which must never wait for a model. If the model is unavailable
+ * the article's own words go up as they are: a published row that still says
+ * needs_ai_draft is exactly that case.
  */
 import type { createAdminClient } from '@/lib/supabase/admin'
 import { GbpApiError, type GbpErrorCode } from './errors'
 import { refreshGbpAccessToken } from './oauth'
 import { createLocalPost, getLocalPost, type CreatedLocalPost } from './api'
 import type { LocalPostSpec } from './request'
+import { draftPost, type DraftSource } from './draft'
 import {
-  claimPost, finishPost, readGbpConnection, readProjectLocation, decryptRefreshToken, markGbpConnection,
-  duePostIds, updateGoogleState, type GbpConnectionRow, type GbpPostRow,
+  applyAutoDraft, claimPost, finishPost, readGbpConnection, readProjectLocation, decryptRefreshToken, markGbpConnection,
+  duePostIds, updateGoogleState, type GbpConnectionRow, type GbpLocationRow, type GbpPostRow,
 } from './store'
 
 type Admin = ReturnType<typeof createAdminClient>
@@ -26,6 +34,8 @@ export interface PublishDeps {
   refresh: (refreshToken: string) => Promise<{ accessToken: string }>
   create: (accessToken: string, spec: LocalPostSpec) => Promise<CreatedLocalPost>
   get?: (accessToken: string, name: string) => Promise<CreatedLocalPost>
+  /** Injected so a guard can run the automatic path without a model. */
+  draft?: (src: DraftSource) => Promise<{ ok: true; summary: string } | { ok: false }>
   now?: () => Date
   sleep?: (ms: number) => Promise<void>
 }
@@ -34,6 +44,40 @@ export const defaultPublishDeps: PublishDeps = {
   refresh: (t) => refreshGbpAccessToken(t),
   create: (a, s) => createLocalPost(a, s),
   get: (a, n) => getLocalPost(a, n),
+  draft: (src) => draftPost(src),
+}
+
+/**
+ * The AI text for an automatic post, written just before it is sent. Returns the
+ * summary to use: the draft when it worked, the article's own words otherwise.
+ * Never throws and never fails the publish.
+ */
+export async function draftedSummaryFor(
+  admin: Admin, post: GbpPostRow, location: Pick<GbpLocationRow, 'location_title'>, deps: Pick<PublishDeps, 'draft'>,
+): Promise<string> {
+  if (!post.needs_ai_draft || !deps.draft) return post.summary
+  try {
+    const { data } = await admin.from('generated_articles')
+      .select('title, meta_description, excerpt')
+      .eq('id', post.source_article_id ?? '').maybeSingle()
+    const a = (data ?? {}) as { title?: string | null; meta_description?: string | null; excerpt?: string | null }
+    const out = await deps.draft({
+      businessName: location.location_title || null,
+      language: post.language_code,
+      article: {
+        title: String(a.title ?? '').slice(0, 300),
+        description: (a.meta_description || a.excerpt || null)?.slice(0, 600) ?? null,
+        url: post.cta_url,
+      },
+    })
+    if (!out.ok || !out.summary) return post.summary
+    // Stored before the call to Google, so what the merchant later reads on the
+    // screen is the text that was actually sent.
+    await applyAutoDraft(admin, post.id, out.summary)
+    return out.summary
+  } catch {
+    return post.summary
+  }
 }
 
 /** A live access token for this user's connection, or a code. Marks the connection when Google says reconnect. */
@@ -86,11 +130,13 @@ export async function publishPost(admin: Admin, postId: string, deps: PublishDep
   const token = await accessTokenFor(admin, conn, deps)
   if (!token.ok) return giveUp(token.code, token.code === 'google_unavailable')
 
+  const summary = await draftedSummaryFor(admin, post, location, deps)
+
   try {
     const created = await deps.create(token.accessToken, {
       accountName: location.account_name,
       locationName: location.location_name,
-      summary: post.summary,
+      summary,
       ctaType: post.cta_type,
       ctaUrl: post.cta_url,
       imageUrl: post.image_url,

@@ -2462,7 +2462,7 @@ const AUTO_POST_NO_LONGER_TRUE = /we create a post only when you press publish|×
    * section 29: the day the feature merges these stop being no-ops by
    * themselves.
    */
-  const AUTO_MIGRATION = 'supabase/migrations/20261012170000_gbp_auto_post.sql'
+  const AUTO_MIGRATION = 'supabase/migrations/20261012180000_gbp_auto_post.sql'
   const STORE = 'lib/gbp/store.ts'
   const DRAFT_SRC = 'lib/gbp/draft.ts'
   const ENQUEUE = 'lib/gbp/auto-post.ts'

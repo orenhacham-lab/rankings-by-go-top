@@ -42,6 +42,10 @@
     {
       "path": "/api/blog/auto/cron/es",
       "schedule": "40 4 * * *"
+    },
+    {
+      "path": "/api/gbp/cron",
+      "schedule": "30 7 * * *"
     }
   ]
 }
