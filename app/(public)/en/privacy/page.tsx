@@ -158,10 +158,20 @@ export default function EnglishPrivacyPage() {
           Google&rsquo;s post identifier, link and review status.</li>
           <li><strong>What we do with it:</strong> we create a post only when you press publish, or at the time you
           scheduled it, and then read that post back from Google to show you whether it is live. We do not change
-          your business information and we do not read or reply to reviews.</li>
+          your business information.</li>
+          <li><strong>Reviews:</strong> when you open the reviews screen we read your business&rsquo;s reviews from
+          Google: the reviewer&rsquo;s display name (or &ldquo;anonymous&rdquo;), the rating, the text, the times
+          and any existing reply. <strong>We store no review content</strong> &ndash; not the text, not the
+          reviewer&rsquo;s name, not the rating and not the reply. We keep two timestamps only, so we can mark a
+          review you have not seen yet. The reviewer&rsquo;s profile photo is not read.</li>
+          <li><strong>Replying to a review:</strong> a reply is published in your name only after you wrote or
+          approved it and pressed send, <strong>and it is public: it appears on your Google business listing and
+          anyone can see it</strong>. You can edit or delete it from the same screen. Google may remove a reply
+          under its own content policies, which is not something we control.</li>
           <li><strong>AI drafts:</strong> if you ask for a draft, the business name and the article or topic you
-          chose are sent to Google&rsquo;s Gemini model. A draft is never published until you review it and press
-          publish.</li>
+          chose are sent to Google&rsquo;s Gemini model. If you ask for a draft reply to a review, the
+          review&rsquo;s text and its rating are sent too, <strong>without the reviewer&rsquo;s name</strong>. A
+          draft is never published until you review it and press publish.</li>
         </ul>
 
         <h3>Limited Use</h3>

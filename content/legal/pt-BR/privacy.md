@@ -88,8 +88,10 @@ Permissão: **business.manage**, pedida em um consentimento separado somente qua
 
 - **O que lemos:** as contas do Business Profile que você administra e seus locais: nome da empresa, endereço, site e link do Google Maps.
 - **O que armazenamos:** o local que você escolhe para um projeto (seus identificadores no Google, nome, endereço, site e link do Maps) e cada postagem que você cria: texto, botão, foto, horário agendado e o identificador, o link e o status de revisão da postagem no Google.
-- **O que fazemos com isso:** criamos uma postagem somente quando você clica em publicar, ou no horário que você agendou, e depois lemos essa postagem de volta no Google para mostrar se ela está ativa. Não alteramos as informações da sua empresa e não lemos nem respondemos avaliações.
-- **Rascunhos de IA:** se você pedir um rascunho, o nome da empresa e o artigo ou tema escolhido são enviados ao modelo Gemini do Google. Um rascunho nunca é publicado antes de você revisá-lo e clicar em publicar.
+- **O que fazemos com isso:** criamos uma postagem somente quando você clica em publicar, ou no horário que você agendou, e depois lemos essa postagem de volta no Google para mostrar se ela está ativa. Não alteramos as informações da sua empresa.
+- **Avaliações:** quando você abre a tela de avaliações, lemos no Google as avaliações da sua empresa: o nome de exibição de quem avaliou (ou "anônimo"), a nota, o texto, as datas e a resposta existente, se houver. **Não armazenamos nenhum conteúdo de avaliação**: nem o texto, nem o nome de quem avaliou, nem a nota, nem a resposta. Guardamos apenas duas marcas de tempo, para poder sinalizar uma avaliação que você ainda não viu. A foto de perfil de quem avaliou não é lida.
+- **Responder a uma avaliação:** uma resposta é publicada em seu nome somente depois que você a escreveu ou aprovou e clicou em enviar, **e ela é pública: aparece no perfil da sua empresa no Google e qualquer pessoa pode vê-la**. Você pode editá-la ou excluí-la na mesma tela. O Google pode remover uma resposta conforme as próprias políticas de conteúdo dele, e isso não está sob nosso controle.
+- **Rascunhos de IA:** se você pedir um rascunho, o nome da empresa e o artigo ou tema escolhido são enviados ao modelo Gemini do Google. Se você pedir um rascunho de resposta a uma avaliação, o texto da avaliação e a nota dela também são enviados, **sem o nome de quem avaliou**. Um rascunho nunca é publicado antes de você revisá-lo e clicar em publicar.
 
 ### Uso limitado
 

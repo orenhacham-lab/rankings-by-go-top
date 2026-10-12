@@ -1565,9 +1565,12 @@ console.log('\nmutation controls')
     !AGREEMENT_SHOPIFY_MANUAL.en.test('You earn 30% of each Qualifying Payment of a Referred Customer.'))
   check('an agreement that still says a suspended link stops working is caught',
     AGREEMENT_LINK_DIES.es.test('Cuando este acuerdo termine, su enlace de referido deja de funcionar.'))
+  // The drifted date is derived from whatever the document currently says, so
+  // this control keeps working when the terms are revised; pinning the literal
+  // date made it pass only until the next revision.
   check('a footer date that drifts from the written date is caught',
     writtenRevisionDate('es', text.es.terms)
-      !== frontMatter(text.es.terms.replace('lastUpdated: 2026-10-10', 'lastUpdated: 2026-10-06')).lastUpdated
+      !== frontMatter(text.es.terms.replace(/lastUpdated: \d{4}-\d{2}-\d{2}/, 'lastUpdated: 2026-10-06')).lastUpdated
       && writtenRevisionDate('es', text.es.terms) === frontMatter(text.es.terms).lastUpdated)
   check('a revision date read out of a statute sentence instead of the footer is caught',
     writtenRevisionDate('es', 'La Enmienda 13 entró en vigor el 14 de agosto de 2025.') === null)
@@ -2199,6 +2202,128 @@ const PDFSHIFT_STORAGE_DECLINED: Record<string, RegExp> = {
     !PDFSHIFT_DPA.en.test('PDFShift does not keep the content of your reports.'))
   check('mutation control: the vendor-policy deferral is recognised as the old wording',
     /governed by their own privacy policy/.test('Retention at PDFShift is governed by their own privacy policy and terms.'))
+}
+
+// ── 29) Reviews on the Business Profile, and the two code facts behind it ──
+/*
+ * Until 12 October 2026 the privacy policy said, in all four languages, that
+ * "we do not read or reply to reviews". The reviews feature makes that false,
+ * so the text had to move BEFORE the code, which is why this section lands a
+ * merge ahead of the feature and why the checks on the feature's own files are
+ * written to tolerate their absence until it lands.
+ *
+ * Three claims are published and each one is a promise about code:
+ *   1. No review content is stored. Verified on
+ *      claude/project-thread-4052du-gbp-reviews: the migration adds two
+ *      timestamptz columns to project_gbp_locations and creates no table, and
+ *      lib/gbp/__qa__/gbp-reviews.qa.ts section G runs the handlers and then
+ *      asserts the review text, the reviewer's name, our reply and the rating
+ *      appear in no table.
+ *   2. The reply is PUBLIC and Google may remove it. That one is not about our
+ *      code at all; it is the fact a merchant most needs before pressing send,
+ *      and the reason the terms now put the reply's content on them.
+ *   3. The reviewer's name is never sent to the model. This is the one that
+ *      earns a guard here rather than a reading. The draft path speaks to the
+ *      Gemini Developer API with an API key, whose free tier may use prompt
+ *      content, and a review's free text can carry special-category data on its
+ *      own ("they treated my condition"). Dropping the name was a legal
+ *      recommendation the feature took (patches/legal-gbp-reviews-answers-
+ *      2026-10-12.md); nothing enforces it except that the draft's input type
+ *      has no field for a name. If a field reappears, this fails.
+ *
+ * MUTATION CONTROLS at the end, including one proving the absence-tolerant
+ * checks still catch a broken claim once the files exist.
+ */
+const REVIEWS_NO_STORAGE: Record<string, RegExp> = {
+  he: /איננו שומרים אצלנו שום תוכן של ביקורת/,
+  en: /We store no review content/,
+  es: /No almacenamos ning[úu]n contenido de rese[ñn]as/,
+  'pt-BR': /N[ãa]o armazenamos nenhum conte[úu]do de avalia[çc][ãa]o/,
+}
+const REPLY_IS_PUBLIC: Record<string, RegExp> = {
+  he: /והוא פומבי: הוא מופיע בכרטיס העסק שלך בגוגל וכל אדם יכול לראות אותו/,
+  en: /and it is public: it appears on your Google business listing and\s+anyone can see it/,
+  es: /y es p[úu]blica: aparece en la ficha de su negocio en Google y cualquier persona puede verla/,
+  'pt-BR': /e ela [ée] p[úu]blica: aparece no perfil da sua empresa no Google e qualquer pessoa pode v[êe]-la/,
+}
+const GOOGLE_MAY_REMOVE: Record<string, RegExp> = {
+  he: /עשויה להסיר מענה לפי מדיניות התוכן שלה/,
+  en: /may remove a reply\s+under its own content policies/,
+  es: /puede retirar una respuesta conforme a sus propias pol[íi]ticas de contenido/,
+  'pt-BR': /pode remover uma resposta conforme as pr[óo]prias pol[íi]ticas de conte[úu]do/,
+}
+const NAME_NOT_SENT: Record<string, RegExp> = {
+  he: /בלי שם המבקר/,
+  en: /without the reviewer&rsquo;s name/,
+  es: /sin el nombre del autor/,
+  'pt-BR': /sem o nome de quem avaliou/,
+}
+const NO_LONGER_TRUE = /we do not read or reply to reviews|ואיננו\s+קוראים ביקורות או עונים עליהן|no leemos ni respondemos rese[ñn]as|n[ãa]o lemos nem respondemos avalia[çc][õo]es/
+{
+  const read = (path: string) => (existsSync(path) ? readFileSync(path, 'utf8') : '')
+  const enSource = frontMatter(text[LOCALES[0]].privacy).source
+  const pages: [string, string][] = [
+    ['he', read(HEBREW_PRIVACY)],
+    ['en', enSource ? read(enSource) : ''],
+    ...LOCALES.map((l): [string, string] => [l, text[l].privacy]),
+  ]
+  for (const [name, src] of pages) {
+    check(`${name}/privacy: the page was read`, src.length > 0)
+    check(`${name}/privacy: the old "we do not read reviews" sentence is gone`, !NO_LONGER_TRUE.test(src))
+    check(`${name}/privacy: no review content is stated to be stored`, (REVIEWS_NO_STORAGE[name] ?? /$^/).test(src))
+    check(`${name}/privacy: the reply is stated to be public`, (REPLY_IS_PUBLIC[name] ?? /$^/).test(src))
+    check(`${name}/privacy: Google's power to remove a reply is disclosed`, (GOOGLE_MAY_REMOVE[name] ?? /$^/).test(src))
+    check(`${name}/privacy: the reviewer's name is stated NOT to reach the model`, (NAME_NOT_SENT[name] ?? /$^/).test(src))
+  }
+
+  /* The terms put the reply's content on the merchant, in every language. */
+  const LIABILITY: Record<string, RegExp> = {
+    he: /האחריות לתוכן המענה היא שלכם/,
+    en: /You are responsible for the content of the reply/,
+    es: /Usted es responsable del contenido de la respuesta/,
+    'pt-BR': /Voc[êe] [ée] respons[áa]vel pelo conte[úu]do da resposta/,
+  }
+  const enTermsSource = frontMatter(text[LOCALES[0]].terms).source
+  const termsDocs: [string, string][] = [
+    ['he', read(HEBREW_TERMS)],
+    ['en', enTermsSource ? read(enTermsSource) : ''],
+    ...LOCALES.map((l): [string, string] => [l, text[l].terms]),
+  ]
+  for (const [name, src] of termsDocs) {
+    check(`${name}/terms: the reply's content is put on the merchant`, (LIABILITY[name] ?? /$^/).test(src))
+  }
+
+  /*
+   * The code behind claim 1 and claim 3. Both files arrive with the feature, so
+   * each is checked only once it exists — and the "exists" line is itself a
+   * check, so the day the feature lands these stop being no-ops and nobody has
+   * to remember to come back here.
+   */
+  const DRAFT = 'lib/gbp/review-draft.ts'
+  const MIGRATION = 'supabase/migrations/20261012120000_gbp_review_alerts.sql'
+  const featureLanded = existsSync(DRAFT) && existsSync(MIGRATION)
+  console.log(`  · the reviews feature ${featureLanded ? 'HAS landed; its code is checked below' : 'has NOT landed yet; its two code checks are waiting for it'}`)
+  if (featureLanded) {
+    const draft = stripComments(read(DRAFT))
+    check(`${DRAFT}: the draft's input carries no reviewer name`, !/reviewerName|reviewer_name/.test(draft))
+    const migration = stripComments(read(MIGRATION))
+    check(`${MIGRATION}: adds the two timestamp columns and creates no table`,
+      /ADD COLUMN IF NOT EXISTS reviews_seen_update_time timestamptz/.test(migration)
+      && /ADD COLUMN IF NOT EXISTS reviews_alerted_at\s+timestamptz/.test(migration)
+      && !/CREATE TABLE/i.test(migration))
+    check(`${MIGRATION}: stores no review text column`, !/comment|review_text|reviewer|rating|stars/i.test(migration))
+  }
+
+  check('mutation control: the sentence that is no longer true is recognised',
+    NO_LONGER_TRUE.test('We do not change your business information and we do not read or reply to reviews.'))
+  check('mutation control: a storage claim with no "no content" promise is caught',
+    !REVIEWS_NO_STORAGE.en.test('We read your reviews and keep them for your records.'))
+  check('mutation control: a reply described without its publicity is caught',
+    !REPLY_IS_PUBLIC.en.test('A reply is published in your name only after you pressed send.'))
+  check('mutation control: a reviewer name back in the draft input would be caught',
+    /reviewerName|reviewer_name/.test(stripComments('export interface ReviewDraftSource { reviewerName: string | null }')))
+  check('mutation control: a migration that adds a review-text column is caught',
+    /comment|review_text|reviewer|rating|stars/i.test(stripComments('ALTER TABLE x ADD COLUMN review_text text;')))
 }
 
 console.log(`\n${pass} passed, ${fail} failed`)

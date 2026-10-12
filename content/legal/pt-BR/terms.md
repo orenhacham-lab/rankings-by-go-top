@@ -3,7 +3,7 @@ title: Termos de Uso | Go Top SEO
 description: Termos de uso do Go Top SEO — as condições que regem o uso do nosso serviço.
 locale: pt-BR
 source: app/(public)/en/terms/page.tsx
-lastUpdated: 2026-10-10
+lastUpdated: 2026-10-12
 register: voce
 extraSections: 0
 extraReason: No extra section. What Brazilian law adds goes inside the sections it belongs to — the seven-day right of withdrawal as 7.5 in Refunds, and the Consumer Code's forum rule as 20.1 in Governing Law — so the heading structure stays identical to the English document.
@@ -203,6 +203,7 @@ O Serviço usa IA para produzir temas de artigos, perguntas e artigos. Esse cont
 - **Links internos.** O Serviço pode acrescentar automaticamente links internos para outras páginas do seu site dentro dos artigos.
 - **Caixa de chamada para ação.** A caixa de chamada para ação no fim de um artigo é opcional, e você pode ativá-la, desativá-la e editar seu texto.
 - **Aprovação e publicação.** O conteúdo é exibido a você para aprovação e é publicado no seu site conforme as configurações de aprovação e publicação que você escolheu para o projeto. Você pode editar, rejeitar ou excluir qualquer conteúdo.
+- **Responder a uma avaliação no seu Perfil da Empresa no Google.** Se você pedir um rascunho de resposta a uma avaliação, o rascunho é produzido por IA e exibido a você antes de qualquer envio. Uma resposta é enviada somente depois que você a escreveu ou aprovou e clicou em enviar, e ela é publicada publicamente no perfil da sua empresa e em seu nome. **Você é responsável pelo conteúdo da resposta**, mesmo quando o rascunho foi produzido por IA, o que inclui a exatidão dos fatos, a difamação, os direitos de terceiros e as políticas de conteúdo do Google. O Google pode remover uma resposta conforme essas políticas, e não temos controle sobre isso.
 
 ## 15G. Mensagens de e-mail
 
@@ -247,4 +248,4 @@ Para qualquer dúvida sobre estes termos ou sobre o Serviço, fale com a gente:
 Número da sociedade: 517274346  
 E-mail: [oren@gotop.co.il](mailto:oren@gotop.co.il)
 
-Última atualização: 10 de outubro de 2026
+Última atualização: 12 de outubro de 2026

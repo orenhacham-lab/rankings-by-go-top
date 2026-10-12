@@ -643,6 +643,15 @@ export default function EnglishTermsPage() {
             your site according to the approval and publishing settings you chose for the project. You may edit,
             reject or delete any content.
           </li>
+          <li>
+            <strong>Replying to a review on your Google Business Profile.</strong> If you ask for a draft reply
+            to a review, the draft is produced by AI and shown to you before anything is sent. A reply is sent
+            only after you wrote or approved it and pressed send, and it is published publicly on your business
+            listing and in your name. <strong>You are responsible for the content of the reply</strong>, even
+            where the draft was produced by AI, including the accuracy of facts, defamation, third-party rights
+            and Google&rsquo;s content policies. Google may remove a reply under those policies, and we have no
+            control over that.
+          </li>
         </ul>
       </section>
 
@@ -760,7 +769,7 @@ export default function EnglishTermsPage() {
 
       <section>
         <p className={LEGAL_FOOTNOTE}>
-          Last updated: October 10, 2026
+          Last updated: October 12, 2026
         </p>
       </section>
     </LegalDoc>
