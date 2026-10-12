@@ -12,6 +12,7 @@ import { getDashboardDictionary } from '@/lib/i18n/dashboard/getDashboardDiction
 import { ConnectCard, LocationCard } from './ConnectCards'
 import PostComposer from './PostComposer'
 import PostsList from './PostsList'
+import ReviewsPanel from './ReviewsPanel'
 import type { GbpReadyStatus, GbpStatus } from './types'
 
 /** The result the OAuth callback appends (?gbp=…) → our sentence. Fixed set; anything else is "failed". */
@@ -85,6 +86,7 @@ function Screen({ projectId }: { projectId: string }) {
       </div>
       <PostComposer key={shown.location?.locationName ?? 'none'} projectId={projectId} status={shown} onPosted={load} />
       <PostsList projectId={projectId} posts={status.posts} onChanged={load} />
+      <ReviewsPanel key={`reviews-${shown.location?.locationName ?? 'none'}`} projectId={projectId} status={shown} />
     </div>
   )
 }

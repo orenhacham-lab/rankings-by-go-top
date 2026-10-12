@@ -16,7 +16,12 @@ const LOCATION_READ_MASK = 'name,title,storefrontAddress,websiteUri,metadata'
 const MAX_ACCOUNTS = 20
 const MAX_LOCATIONS = 100
 
-async function call(fetchImpl: FetchLike, accessToken: string, url: string, init: RequestInit = {}): Promise<unknown> {
+/**
+ * One authenticated Business Profile call. Exported so lib/gbp/reviews.ts makes
+ * its calls exactly the same way: one timeout, one error classifier, and the
+ * provider's own message never leaving this module.
+ */
+export async function gbpCall(fetchImpl: FetchLike, accessToken: string, url: string, init: RequestInit = {}): Promise<unknown> {
   let res: Response
   try {
     res = await fetchImpl(url, {
@@ -49,7 +54,7 @@ export async function listAccounts(accessToken: string, fetchImpl: FetchLike = f
   let pageToken = ''
   do {
     const url = `${ACCOUNTS_BASE}/accounts?pageSize=20${pageToken ? `&pageToken=${encodeURIComponent(pageToken)}` : ''}`
-    const json = await call(fetchImpl, accessToken, url) as { accounts?: { name?: string; accountName?: string; type?: string }[]; nextPageToken?: string }
+    const json = await gbpCall(fetchImpl, accessToken, url) as { accounts?: { name?: string; accountName?: string; type?: string }[]; nextPageToken?: string }
     for (const a of json?.accounts ?? []) {
       if (typeof a.name === 'string' && /^accounts\/[0-9A-Za-z_-]+$/.test(a.name)) {
         out.push({ name: a.name, accountName: typeof a.accountName === 'string' ? a.accountName : '', type: typeof a.type === 'string' ? a.type : '' })
@@ -74,7 +79,7 @@ export async function listLocations(accessToken: string, accountName: string, fe
   let pageToken = ''
   do {
     const url = `${INFO_BASE}/${accountName}/locations?pageSize=100&readMask=${encodeURIComponent(LOCATION_READ_MASK)}${pageToken ? `&pageToken=${encodeURIComponent(pageToken)}` : ''}`
-    const json = await call(fetchImpl, accessToken, url) as { locations?: Record<string, unknown>[]; nextPageToken?: string }
+    const json = await gbpCall(fetchImpl, accessToken, url) as { locations?: Record<string, unknown>[]; nextPageToken?: string }
     for (const l of json?.locations ?? []) {
       const name = typeof l.name === 'string' ? l.name : ''
       if (!/^locations\/[0-9A-Za-z_-]+$/.test(name)) continue
@@ -129,11 +134,11 @@ function readPost(json: unknown): CreatedLocalPost {
 
 export async function createLocalPost(accessToken: string, spec: LocalPostSpec, fetchImpl: FetchLike = fetch): Promise<CreatedLocalPost> {
   const req = buildLocalPostRequest(spec)
-  const json = await call(fetchImpl, accessToken, req.url, { method: req.method, body: JSON.stringify(req.body) })
+  const json = await gbpCall(fetchImpl, accessToken, req.url, { method: req.method, body: JSON.stringify(req.body) })
   return readPost(json)
 }
 
 export async function getLocalPost(accessToken: string, postName: string, fetchImpl: FetchLike = fetch): Promise<CreatedLocalPost> {
   if (!/^accounts\/[0-9A-Za-z_-]+\/locations\/[0-9A-Za-z_-]+\/localPosts\/[0-9A-Za-z_-]+$/.test(postName)) throw new GbpApiError('unexpected')
-  return readPost(await call(fetchImpl, accessToken, `${GBP_V4_BASE}/${postName}`))
+  return readPost(await gbpCall(fetchImpl, accessToken, `${GBP_V4_BASE}/${postName}`))
 }
