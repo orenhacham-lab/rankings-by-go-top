@@ -51,12 +51,14 @@ INSERT INTO public.outreach_prospects
    'Store Example LLC', 'A Person', 'store.example', 'shopify', '1 Main St, Nashville, TN 37201',
    'https://store.example/contact', 'Made in Example directory', 'sent_first',
    'no meta description on the home page', '2026-10-12T09:00:00Z', '2026-10-12T13:00:00Z');
+-- The redacted one carries no postal address either: that is the state the sweep
+-- leaves a row in, and the constraint refuses any other.
 INSERT INTO public.outreach_prospects
-  (id, email, email_hash, unsub_token, company, site_host, platform, postal_address,
+  (id, email, email_hash, unsub_token, company, site_host, platform,
    source_site, source_second, status, redacted_at) VALUES
   ('e2222222-2222-2222-2222-222222222222', NULL,
    encode(sha256('gone@store.example'::bytea), 'hex'), repeat('b', 48),
-   'Gone Example LLC', 'gone.example', 'wordpress', '2 Main St, Memphis, TN 38103',
+   'Gone Example LLC', 'gone.example', 'wordpress',
    'https://gone.example/about', 'Made in Example directory', 'opted_out', '2026-10-11T10:00:00Z');
 RESET ROLE;
 
@@ -119,8 +121,11 @@ BEGIN
   PERFORM chk(ph, 'the server repoints a row at another address -> ' || r, (r LIKE 'denied:%') <> broken);
   r := try_as('service_role', NULL, format(upd, $s$first_sent_at = '2026-01-01T00:00:00Z'$s$));
   PERFORM chk(ph, 'the server rewrites a send that happened -> ' || r, (r LIKE 'denied:%') <> broken);
+  -- A full un-redaction, postal address included: with anything missing the
+  -- postal CHECK would deny it and this control would pass for the wrong reason.
   r := try_as('service_role', NULL, $q$ WITH u AS (UPDATE public.outreach_prospects
-      SET email = 'gone@store.example', redacted_at = NULL WHERE id = 'e2222222-2222-2222-2222-222222222222'
+      SET email = 'gone@store.example', redacted_at = NULL, postal_address = '2 Main St, Memphis, TN 38103'
+      WHERE id = 'e2222222-2222-2222-2222-222222222222'
       RETURNING 1) SELECT count(*)::text FROM u $q$);
   PERFORM chk(ph, 'the server puts a redacted address back -> ' || r, (r LIKE 'denied:%') <> broken);
 
@@ -199,26 +204,55 @@ BEGIN
   PERFORM chk('constraints', 'a well-formed prospect is accepted -> ' || r, r = 'ok:inserted');
 END $$;
 
--- A redaction takes the contact's name with the address. The published privacy
--- text states a retention period, and lib/outreach/retention.ts is what honours
--- it; this constraint is what stops a sweep that forgets the name from quietly
--- keeping a person's name for ever.
+-- A redaction takes all three of the things that point at a human: the address,
+-- the contact's name and the address the business publishes. The published
+-- privacy text states a retention period and names those three columns, and
+-- lib/outreach/retention.ts is what honours it; this constraint is what stops a
+-- sweep that forgets one of them from quietly keeping it for ever. The postal
+-- address is in there because this channel writes to one-person businesses,
+-- where the address the business publishes is the address the person lives at.
 DO $$
-DECLARE r text;
+DECLARE r text; q text;
 BEGIN
-  r := try_as('service_role', NULL, $q$ WITH u AS (UPDATE public.outreach_prospects
-      SET email = NULL, redacted_at = now()
-      WHERE id = 'e1111111-1111-1111-1111-111111111111' RETURNING 1) SELECT count(*)::text FROM u $q$);
+  q := $q$ WITH u AS (UPDATE public.outreach_prospects SET %s, redacted_at = now()
+      WHERE id = 'e1111111-1111-1111-1111-111111111111' RETURNING 1) SELECT count(*)::text FROM u $q$;
+  r := try_as('service_role', NULL, format(q, 'email = NULL'));
   PERFORM chk('constraints', 'a redaction that keeps the contact name is rejected -> ' || r, r = 'denied:23514');
-  r := try_as('service_role', NULL, $q$ WITH u AS (UPDATE public.outreach_prospects
-      SET email = NULL, contact_name = NULL, redacted_at = now()
-      WHERE id = 'e1111111-1111-1111-1111-111111111111' RETURNING 1) SELECT count(*)::text FROM u $q$);
-  PERFORM chk('constraints', 'a redaction that takes both is accepted -> ' || r, r = 'ok:1');
+  r := try_as('service_role', NULL, format(q, 'email = NULL, contact_name = NULL'));
+  PERFORM chk('constraints', 'a redaction that keeps the postal address is rejected -> ' || r, r = 'denied:23514');
+  r := try_as('service_role', NULL, format(q, 'email = NULL, postal_address = NULL'));
+  PERFORM chk('constraints', 'a redaction that keeps the name but drops the address is rejected -> ' || r, r = 'denied:23514');
+  r := try_as('service_role', NULL, format(q, 'email = NULL, contact_name = NULL, postal_address = NULL'));
+  PERFORM chk('constraints', 'a redaction that takes all three is accepted -> ' || r, r = 'ok:1');
   r := try_as('service_role', NULL, $q$ INSERT INTO public.outreach_prospects
     (email, email_hash, contact_name, company, site_host, platform, postal_address, source_site, source_second, redacted_at)
     VALUES (NULL, encode(sha256('named@store.example'::bytea), 'hex'), 'A Person', 'Named LLC', 'named.example',
             'shopify', '8 Main St, TN', 'https://named.example', 'directory', now()) RETURNING 'inserted' $q$);
   PERFORM chk('constraints', 'a redacted row cannot be created holding a name -> ' || r, r = 'denied:23514');
+  r := try_as('service_role', NULL, $q$ INSERT INTO public.outreach_prospects
+    (email, email_hash, company, site_host, platform, postal_address, source_site, source_second, redacted_at)
+    VALUES (NULL, encode(sha256('addr@store.example'::bytea), 'hex'), 'Addr LLC', 'addr.example',
+            'shopify', '9 Main St, TN', 'https://addr.example', 'directory', now()) RETURNING 'inserted' $q$);
+  PERFORM chk('constraints', 'a redacted row cannot be created holding a postal address -> ' || r, r = 'denied:23514');
+END $$;
+
+-- The published text also says a business that publishes no postal address never
+-- enters the list. The column cannot say that with NOT NULL any more, because a
+-- redacted row has to be allowed to have none, so a CHECK says it instead.
+DO $$
+DECLARE r text;
+BEGIN
+  r := try_as('service_role', NULL, $q$ INSERT INTO public.outreach_prospects
+    (email, email_hash, company, site_host, platform, source_site, source_second)
+    VALUES ('nopost@store.example', encode(sha256('nopost@store.example'::bytea), 'hex'), 'No Post LLC',
+            'nopost.example', 'shopify', 'https://nopost.example', 'directory') RETURNING 'inserted' $q$);
+  PERFORM chk('constraints', 'a live row with no postal address is rejected -> ' || r, r = 'denied:23514');
+  -- e1111111 is still live here: every attempt above ran through try_as, which
+  -- always rolls back, so the fixture is untouched.
+  r := try_as('service_role', NULL, $q$ WITH u AS (UPDATE public.outreach_prospects SET postal_address = NULL
+      WHERE id = 'e1111111-1111-1111-1111-111111111111' RETURNING 1) SELECT count(*)::text FROM u $q$);
+  PERFORM chk('constraints', 'emptying the postal address of a row that is not redacted is rejected -> ' || r,
+    r = 'denied:23514');
 END $$;
 
 -- The token is random, so two rows inserted the same way do not share one.

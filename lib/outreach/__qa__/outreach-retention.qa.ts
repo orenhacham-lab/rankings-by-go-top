@@ -112,8 +112,8 @@ async function main() {
     && rowsOf(due)[0]?.unsub_token === 'a'.repeat(64)
     && rowsOf(due)[0]?.company === 'Store Example LLC'
     && rowsOf(due)[0]?.second_sent_at === daysAgo(45))
-  check('A4: it keeps the business’s own published address',
-    rowsOf(due)[0]?.postal_address === '1 Main St, Nashville, TN 37201')
+  check('A4: it takes the published postal address too — in a one-person business that is a home',
+    rowsOf(due)[0]?.postal_address === null)
   check('A5: the row is not deleted — the hash is what stops it being added again',
     rowsOf(due).length === 1)
 
@@ -121,7 +121,8 @@ async function main() {
   const s2 = await applyProspectRetention(asAdmin(notDue), NOW)
   check('A6: a row inside its 30 days is left completely alone',
     s2.redacted === 0 && rowsOf(notDue)[0]?.email === 'owner@store.example'
-    && rowsOf(notDue)[0]?.contact_name === 'A Person')
+    && rowsOf(notDue)[0]?.contact_name === 'A Person'
+    && rowsOf(notDue)[0]?.postal_address === '1 Main St, Nashville, TN 37201')
 
   const unused = list([
     row({ id: 'u-1', first_sent_at: null, second_sent_at: null, status: 'new', created_at: daysAgo(91) }),
@@ -164,9 +165,19 @@ async function main() {
   const cron = vercelJson.crons.find((c) => c.path === '/api/outreach/retention/cron')
   check('S4: the pass is actually scheduled, once a day',
     cron !== undefined && /^\d+ \d+ \* \* \*$/.test(cron.schedule))
-  check('S5: the migration makes the database refuse a redaction that keeps the name',
-    /outreach_prospects_redaction_name/.test(
-      readFileSync(join(ROOT, 'supabase/migrations/20261012170000_outreach_prospects.sql'), 'utf8')))
+  // The published privacy text names three columns a redaction empties, so the
+  // database rule has to name all three: a sweep that forgets one must fail at
+  // the database rather than leave a home address behind.
+  const migrationSrc = readFileSync(join(ROOT, 'supabase/migrations/20261012170000_outreach_prospects.sql'), 'utf8')
+  const redactionRule = /outreach_prospects_redaction CHECK \(([\s\S]*?)\)\),/.exec(migrationSrc)?.[1] ?? ''
+  check('S5: the database refuses a redaction that keeps the address, the name or the postal address',
+    /email IS NULL/.test(redactionRule) && /contact_name IS NULL/.test(redactionRule)
+    && /postal_address IS NULL/.test(redactionRule))
+  check('S6: the postal address can be emptied at all — it is not NOT NULL',
+    !/postal_address\s+text\s+NOT NULL/.test(migrationSrc))
+  check('S7: a live row still has to carry one, which is what the NOT NULL used to say',
+    /outreach_prospects_postal_present CHECK \(\s*redacted_at IS NOT NULL OR postal_address IS NOT NULL\)/
+      .test(migrationSrc))
 
   // ── Mutation controls ──────────────────────────────────────────────────────
   const mutFloor = await withMutant<{ isDueForRedaction: typeof isDueForRedaction }, boolean>(
@@ -178,8 +189,7 @@ async function main() {
 
   const mutName = await withMutant<{ applyProspectRetention: typeof applyProspectRetention }, boolean>(
     'lib/outreach/retention.ts',
-    [[/            \.update\(\{ email: null, contact_name: null, redacted_at: now\.toISOString\(\) \}\)/,
-      '            .update({ email: null, redacted_at: now.toISOString() })']],
+    [[/              contact_name: null,\n/, '']],
     async (m) => {
       const f = list([row()])
       await m.applyProspectRetention(asAdmin(f), NOW)
@@ -187,6 +197,17 @@ async function main() {
     },
   )
   check('A2-MUT: a redaction that kept the person’s name would be caught', mutName)
+
+  const mutPostal = await withMutant<{ applyProspectRetention: typeof applyProspectRetention }, boolean>(
+    'lib/outreach/retention.ts',
+    [[/              postal_address: null,\n/, '']],
+    async (m) => {
+      const f = list([row()])
+      await m.applyProspectRetention(asAdmin(f), NOW)
+      return rowsOf(f)[0]?.postal_address === '1 Main St, Nashville, TN 37201'
+    },
+  )
+  check('A4-MUT: a redaction that kept the published postal address would be caught', mutPostal)
 
   const mutLatest = await withMutant<{ isDueForRedaction: typeof isDueForRedaction }, boolean>(
     'lib/outreach/retention.ts',

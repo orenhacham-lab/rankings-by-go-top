@@ -10,11 +10,12 @@
  *
  * THE TWO RULES.
  *
- *   A row we wrote to          `email` and `contact_name` are nulled and
- *                              `redacted_at` stamped 30 days after the last
- *                              thing that happened to it: the second message,
- *                              the first if there was no second, or a reply or
- *                              an opt-out if that came later.
+ *   A row we wrote to          `email`, `contact_name` and `postal_address`
+ *                              are nulled and `redacted_at` stamped 30 days
+ *                              after the last thing that happened to it: the
+ *                              second message, the first if there was no
+ *                              second, or a reply or an opt-out if that came
+ *                              later.
  *
  *   A row we never wrote to    deleted outright 90 days after it was added. At
  *                              that point we are holding a business's details
@@ -33,8 +34,14 @@
  * person's name. The link still works and still answers truthfully, because
  * what it reads after a redaction is the suppression row, not this one.
  *
- * `postal_address` is kept: it is the business's own published address, and the
- * privacy text discloses it. It is not a person's name.
+ * WHY `postal_address` GOES TOO. It looks like a company detail, and for a
+ * company it is one. This channel writes to one-person businesses, where the
+ * address the business publishes is the address the person lives at — the same
+ * objection that applies to `contact_name`, so it gets the same answer. Nothing
+ * legal is lost by letting it go: CAN-SPAM wants OUR postal address in the
+ * message, not the recipient's, so keeping theirs after the sequence ends buys
+ * no protection at all. The database refuses a redaction that keeps either of
+ * them (`outreach_prospects_redaction`), so forgetting one here fails loudly.
  *
  * Run daily by /api/outreach/retention/cron. Deliberately dull: it returns
  * counts, never throws, and nothing about any prospect reaches a log line.
@@ -44,7 +51,7 @@ type Admin = any
 
 import { PROSPECTS_TABLE } from './prospects'
 
-/** Days after the last message before the address and the contact name go. */
+/** Days after the last message before the address, the name and the address go. */
 export const PROSPECT_REDACTION_DAYS = 30
 /** Days we keep a prospect we never wrote to, after which the row is deleted. */
 export const UNUSED_PROSPECT_DAYS = 90
@@ -84,7 +91,7 @@ export function lastTouched(row: ProspectRetentionRow): number {
 }
 
 /**
- * Whether this row's address and contact name are due to go.
+ * Whether this row's identifying columns are due to go.
  *
  * A row already redacted is never due again, and a row nothing ever happened to
  * is not this rule's business — it belongs to the 90-day deletion instead.
@@ -98,7 +105,7 @@ export function isDueForRedaction(row: ProspectRetentionRow, now: Date, days = P
 }
 
 export interface ProspectRetentionSummary {
-  /** Rows whose address and contact name were nulled. */
+  /** Rows whose email, contact name and postal address were nulled. */
   redacted: number
   /** Rows we never wrote to, deleted whole. */
   unusedDeleted: number
@@ -127,7 +134,12 @@ export async function applyProspectRetention(admin: Admin, now = new Date()): Pr
       for (const row of due) {
         try {
           const { error: updateError } = await admin.from(PROSPECTS_TABLE)
-            .update({ email: null, contact_name: null, redacted_at: now.toISOString() })
+            .update({
+              email: null,
+              contact_name: null,
+              postal_address: null,
+              redacted_at: now.toISOString(),
+            })
             .eq('id', row.id)
           if (updateError) summary.failed.push('redaction_write_failed')
           else summary.redacted += 1

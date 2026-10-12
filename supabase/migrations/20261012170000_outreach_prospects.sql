@@ -37,6 +37,15 @@
 --                    published directly on the recipient's site; for any other
 --                    platform that promise is untrue, which is an FTC Act s.5
 --                    exposure quite apart from CAN-SPAM.
+--     postal_address the address the business publishes. NULLable for the same
+--                    reason the address is: in a one-person business the
+--                    published business address is where the person lives, so a
+--                    redaction takes it too. A row that is NOT redacted must
+--                    still have one — a business that publishes no postal
+--                    address never enters the list, which is what the published
+--                    privacy text says — and that is now a CHECK rather than a
+--                    column modifier, because the modifier cannot tell the two
+--                    states apart.
 --     source_site    the business's own public page the details came from.
 --     source_second  the independent public source that proves it operates in
 --                    the United States. Both are NOT NULL: a row that cannot
@@ -78,7 +87,7 @@ CREATE TABLE IF NOT EXISTS public.outreach_prospects (
   site_host         text NOT NULL,
   platform          text NOT NULL,
   country           text NOT NULL DEFAULT 'US',
-  postal_address    text NOT NULL,
+  postal_address    text,
   source_site       text NOT NULL,
   source_second     text NOT NULL,
   status            text NOT NULL DEFAULT 'new',
@@ -97,12 +106,18 @@ CREATE TABLE IF NOT EXISTS public.outreach_prospects (
   -- The plaintext, when present, is already normalized: trimmed, lower-cased.
   CONSTRAINT outreach_prospects_email_shape CHECK (
     email IS NULL OR (email = lower(btrim(email)) AND position('@' in email) > 1 AND length(email) <= 320)),
-  -- Redaction and the absence of plaintext are the same fact. A redaction takes
-  -- the contact's name with the address, so a sweep that forgets the name fails
-  -- here rather than quietly keeping a person's name for ever
+  -- Redaction and the absence of plaintext are the same fact, and a redaction
+  -- takes all three of the things that point at a human: the address, the
+  -- contact's name and the address the business publishes. A sweep that forgets
+  -- one of them fails here rather than quietly keeping it for ever
   -- (lib/outreach/retention.ts; the published privacy text states the period).
-  CONSTRAINT outreach_prospects_redaction CHECK ((email IS NULL) = (redacted_at IS NOT NULL)),
-  CONSTRAINT outreach_prospects_redaction_name CHECK (redacted_at IS NULL OR contact_name IS NULL),
+  CONSTRAINT outreach_prospects_redaction CHECK (
+    (email IS NULL) = (redacted_at IS NOT NULL)
+    AND (redacted_at IS NULL OR (contact_name IS NULL AND postal_address IS NULL))),
+  -- What the dropped NOT NULL used to say, for the only state it was ever true
+  -- in: a live row has a published postal address or it does not belong here.
+  CONSTRAINT outreach_prospects_postal_present CHECK (
+    redacted_at IS NOT NULL OR postal_address IS NOT NULL),
   -- The one country the published privacy text allows on this list.
   CONSTRAINT outreach_prospects_country CHECK (country = 'US'),
   CONSTRAINT outreach_prospects_platform CHECK (platform IN ('shopify', 'wordpress')),
@@ -115,24 +130,34 @@ CREATE TABLE IF NOT EXISTS public.outreach_prospects (
   CONSTRAINT outreach_prospects_finding CHECK ((finding IS NULL) = (finding_checked IS NULL)),
   -- The second message only exists after the first.
   CONSTRAINT outreach_prospects_order CHECK (second_sent_at IS NULL OR first_sent_at IS NOT NULL),
+  -- `note` is free text and no CHECK can read it, so the rule is stated where
+  -- whoever writes one will see it: the published policy says we take nothing
+  -- about a person beyond the business role they are published in, and that
+  -- binds this column exactly as it binds `contact_name`. A note about the
+  -- human behind the business makes the policy a false statement.
   CONSTRAINT outreach_prospects_note_len CHECK (note IS NULL OR length(note) <= 500)
 );
 
--- The table may already exist from an earlier, partly applied run of this file
--- (CREATE TABLE IF NOT EXISTS adds no constraint to a table that is already
--- there), so the constraint added after the first version is also added here.
-DO $$
-BEGIN
-  IF NOT EXISTS (
-    SELECT 1 FROM pg_constraint
-     WHERE conrelid = 'public.outreach_prospects'::regclass
-       AND conname = 'outreach_prospects_redaction_name'
-  ) THEN
-    ALTER TABLE public.outreach_prospects
-      ADD CONSTRAINT outreach_prospects_redaction_name
-      CHECK (redacted_at IS NULL OR contact_name IS NULL);
-  END IF;
-END $$;
+-- The table may already exist from an earlier, partly applied run of this file,
+-- and CREATE TABLE IF NOT EXISTS changes nothing about a table that is already
+-- there. So the three rules that arrived after the first version are applied
+-- here as well, in a form that converges from either shape: the postal address
+-- becomes erasable, the redaction rule is replaced by the one that names all
+-- three columns (`outreach_prospects_redaction_name` said a strictly weaker
+-- thing and is dropped rather than kept as a second, redundant rule), and the
+-- insert-time requirement the dropped NOT NULL used to carry is added as a
+-- CHECK. Every statement is safe to re-run; none of them touches a row.
+ALTER TABLE public.outreach_prospects ALTER COLUMN postal_address DROP NOT NULL;
+ALTER TABLE public.outreach_prospects DROP CONSTRAINT IF EXISTS outreach_prospects_redaction_name;
+ALTER TABLE public.outreach_prospects DROP CONSTRAINT IF EXISTS outreach_prospects_redaction;
+ALTER TABLE public.outreach_prospects DROP CONSTRAINT IF EXISTS outreach_prospects_postal_present;
+ALTER TABLE public.outreach_prospects
+  ADD CONSTRAINT outreach_prospects_redaction CHECK (
+    (email IS NULL) = (redacted_at IS NOT NULL)
+    AND (redacted_at IS NULL OR (contact_name IS NULL AND postal_address IS NULL)));
+ALTER TABLE public.outreach_prospects
+  ADD CONSTRAINT outreach_prospects_postal_present CHECK (
+    redacted_at IS NOT NULL OR postal_address IS NOT NULL);
 
 CREATE UNIQUE INDEX IF NOT EXISTS outreach_prospects_token_key
   ON public.outreach_prospects (unsub_token);
