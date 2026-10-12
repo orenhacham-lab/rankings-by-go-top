@@ -105,18 +105,23 @@ async function main() {
     check('MUTATION: one millisecond more and it does crawl (the window check is what stopped it)', w.calls.length === 1)
   }
 
-  console.log('C) the cron runs the pass, with the real crawl, after the runner')
+  console.log('C) the cron runs the pass, with the real crawl, alongside the runner')
   {
+    // In production every run that writes an article took 150-270s, so a pass placed after
+    // the runner never had its window: it must START with the runner and be awaited later.
     const src = code('app/api/content/automation/cron/route.ts')
-    const runAt = src.indexOf('runAutomation(createAdminClient()')
-    const upAt = src.indexOf('await runMapUpkeep(createAdminClient()')
-    check('the pass is awaited inside after(), after the runner', runAt > 0 && upAt > runAt, { runAt, upAt })
+    const afterAt = src.indexOf('after(async () => {')
+    const startAt = src.indexOf('const mapUpkeep = runMapUpkeep(createAdminClient()')
+    const runAt = src.indexOf('await runAutomation(createAdminClient()')
+    const awaitAt = src.indexOf('await mapUpkeep')
+    check('the pass starts inside after(), before the runner, without being awaited there', afterAt > 0 && startAt > afterAt && runAt > startAt, { afterAt, startAt, runAt })
+    check('it is awaited after the runner and before the emails', awaitAt > runAt && src.indexOf('runIsolatedReminders()') > awaitAt, { awaitAt })
     check('it uses the real crawl', /ensure: liveEnsure/.test(src))
-    check('it leaves time for the emails after it', /maxDuration \* 1000 - 40_000/.test(src) && src.indexOf('runIsolatedReminders()') > upAt)
+    check('it leaves time for the emails after it', /maxDuration \* 1000 - 40_000/.test(src))
     const mod = code('lib/content/existing-content/map-upkeep.ts')
     check('the real crawl is the same ensureSiteMapForProject, no second crawler', /ensureSiteMapForProject\(admin, scope/.test(mod) && /walk: liveWalk/.test(mod))
-    // MUTATION CONTROL — a route without the call fails the guard.
-    check('MUTATION: a route without the pass is caught', src.replace('await runMapUpkeep(createAdminClient()', '').indexOf('await runMapUpkeep(createAdminClient()') < 0)
+    // MUTATION CONTROL, run by hand: moving the call back after the runner (the first
+    // version, which never got its window in production) fails the first two checks above.
   }
 
   console.log(`\n${pass} passed, ${fail} failed`)

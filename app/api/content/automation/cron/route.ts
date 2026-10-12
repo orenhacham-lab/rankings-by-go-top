@@ -31,9 +31,9 @@
  * (07:00–08:59, the Vercel cron's 07:00 run and cron-job.org's quarter hours), and
  * outside it returns at once without a read or a line. No new cron schedule.
  *
- * THEN, THE SITE MAPPING UPKEEP (lib/content/existing-content/map-upkeep.ts): at most one
- * project per run whose mapping is missing or ageing is mapped, so automatic internal links
- * have pages to point at. Only when a mapping's work window still fits in maxDuration.
+ * ALONGSIDE ALL OF IT, THE SITE MAPPING UPKEEP (lib/content/existing-content/map-upkeep.ts):
+ * at most one project per run whose mapping is missing or ageing is mapped, so automatic
+ * internal links have pages to point at. Started with the runner, awaited before the emails.
  *
  * LAST OF ALL, THE REMINDER EMAIL. After the top-up, the "articles are waiting for your OK" reminder
  * (lib/reminders): OFF unless REMINDER_EMAILS_ENABLED is exactly "true", and then only at
@@ -73,6 +73,13 @@ async function handle(request: Request): Promise<Response> {
   const startedAt = new Date().toISOString()
   const dailyStallCheck = isDailyStallCheckRun(request)
   after(async () => {
+    // Map ONE project whose site mapping is missing or ageing, so its articles get internal
+    // links (lib/content/existing-content/map-upkeep.ts). It runs ALONGSIDE the runner, not
+    // after it: a run that writes an article takes 150-270s, which left a pass placed after
+    // it no time at all, and the crawl waits on the merchant's site, not on this process.
+    // It touches no table the runner writes, never throws, and its 40s margin is left for
+    // the emails below.
+    const mapUpkeep = runMapUpkeep(createAdminClient(), { deadlineAt: Date.parse(startedAt) + maxDuration * 1000 - 40_000, ensure: liveEnsure })
     try {
       const summary = await runAutomation(createAdminClient(), {})
       console.log('[automation-cron] run complete', { startedAt, poolsChecked: summary.poolsChecked, published: summary.published, generated: summary.generated, staleRecovered: summary.staleRecovered, failures: summary.failures, durationMs: summary.durationMs })
@@ -93,11 +100,8 @@ async function handle(request: Request): Promise<Response> {
       (deadlineAt) => runTopicTopUp(createAdminClient(), { env: process.env, deadlineAt }),
       { startedAtMs: Date.parse(startedAt), maxDurationMs: maxDuration * 1000 },
     )
-    // Then, when enough of maxDuration is left: map ONE project whose site mapping is
-    // missing or ageing, so its articles get internal links
-    // (lib/content/existing-content/map-upkeep.ts). The 40s margin is left for the emails
-    // below. Never throws.
-    await runMapUpkeep(createAdminClient(), { deadlineAt: Date.parse(startedAt) + maxDuration * 1000 - 40_000, ensure: liveEnsure })
+    // The site-mapping pass started next to the runner (above) is awaited here, before the emails.
+    await mapUpkeep
     // Last of all, and off unless REMINDER_EMAILS_ENABLED is "true": the reminder email for
     // articles waiting for approval (lib/reminders). Isolated; it never throws or rejects.
     await runIsolatedReminders()
