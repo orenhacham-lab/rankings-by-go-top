@@ -652,6 +652,15 @@ export default function EnglishTermsPage() {
             and Google&rsquo;s content policies. Google may remove a reply under those policies, and we have no
             control over that.
           </li>
+          <li>
+            <strong>Automatic posting to your Google Business Profile.</strong> If you turned automatic posting
+            on, every article the system publishes to your site is also published as a post on your Google
+            business listing, <strong>without you reading it first</strong>. <strong>You are responsible for the
+            content published in your name</strong>, both where the text was produced by AI and where you did not
+            read it before it went out, including the accuracy of facts, defamation, third-party rights and
+            Google&rsquo;s content policies. You can turn automatic posting off at any time, and it turns itself
+            off if you change the business the project is connected to.
+          </li>
         </ul>
       </section>
 

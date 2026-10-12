@@ -156,9 +156,15 @@ export default function EnglishPrivacyPage() {
           <li><strong>What we store:</strong> the location you choose for a project (its Google identifiers, name,
           address, website and Maps link), and each post you create: its text, button, photo, scheduled time, and
           Google&rsquo;s post identifier, link and review status.</li>
-          <li><strong>What we do with it:</strong> we create a post only when you press publish, or at the time you
-          scheduled it, and then read that post back from Google to show you whether it is live. We do not change
-          your business information.</li>
+          <li><strong>What we do with it:</strong> we create a post when you press publish, at the time you
+          scheduled it, or &ndash; <strong>if you turned automatic posting on</strong> &ndash; each time the system
+          publishes an article to your site, and then read that post back from Google to show you whether it is
+          live. We do not change your business information.</li>
+          <li><strong>Automatic posting:</strong> off by default. If you turned it on, every article the system
+          publishes to your site is also published as a post on your business listing, <strong>without you reading
+          it first</strong>. What is sent to the model is the business name, the article&rsquo;s title and its
+          summary, with no person&rsquo;s name. You can turn it off at any time, and it turns itself off if you
+          change the business the project is connected to.</li>
           <li><strong>Reviews:</strong> when you open the reviews screen we read your business&rsquo;s reviews from
           Google: the reviewer&rsquo;s display name (or &ldquo;anonymous&rdquo;), the rating, the text, the times
           and any existing reply. <strong>We store no review content</strong> &ndash; not the text, not the
@@ -171,7 +177,8 @@ export default function EnglishPrivacyPage() {
           <li><strong>AI drafts:</strong> if you ask for a draft, the business name and the article or topic you
           chose are sent to Google&rsquo;s Gemini model. If you ask for a draft reply to a review, the
           review&rsquo;s text and its rating are sent too, <strong>without the reviewer&rsquo;s name</strong>. A
-          draft is never published until you review it and press publish.</li>
+          draft you asked for is not published until you review it and press publish. The one thing published
+          without being read is a post created by automatic posting, if you turned it on.</li>
         </ul>
 
         <h3>Limited Use</h3>

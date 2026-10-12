@@ -2326,6 +2326,133 @@ const NO_LONGER_TRUE = /we do not read or reply to reviews|ואיננו\s+קור
     /comment|review_text|reviewer|rating|stars/i.test(stripComments('ALTER TABLE x ADD COLUMN review_text text;')))
 }
 
+// ── 30) Automatic posting to the Business Profile, published before its code ──
+/*
+ * Until 12 October 2026 the privacy policy said, in all four languages, that
+ * "we create a post only when you press publish, or at the time you scheduled
+ * it" and that "a draft is never published until you review it". Automatic
+ * posting (claude/project-thread-4052du-gbp-autopost) makes both false for an
+ * account that turned the switch on: an article that publishes to the owner's
+ * site also goes up on their business listing with NOBODY reading it first.
+ *
+ * The replacement text is deliberately conditional on the switch, so it is true
+ * both before the feature exists and after — which is what lets this land ahead
+ * of the code, as section 29 does. Four claims are pinned:
+ *   1. Off by default. A promise about the column's default, checked below.
+ *   2. Published without the owner reading it. The sentence that makes the terms
+ *      clause fair, and the one a merchant would otherwise be ambushed by.
+ *   3. Nothing but the business name and the article's own title and summary
+ *      reaches the model — no person's name, ever.
+ *   4. The switch turns itself off when the project moves to a different
+ *      business, because the approval was given for the business they picked.
+ * The terms carry the matching clause: content published in the owner's name is
+ * the owner's responsibility even where no human read it first.
+ *
+ * Not pinned here, and left on the record instead: lib/gbp/draft.ts says in its
+ * own header that Google rejects "auto-generated" posts, citing a research note
+ * that is not in this repo. Either that comment is wrong or the feature breaches
+ * Google's post content policy; support.google.com does not render from a
+ * session, so it was raised with the feature thread to settle against Google's
+ * own page before merge (patches/legal-gbp-auto-post-answers-2026-10-12.md).
+ * That is a platform-compliance question about the merchant's listing, not a
+ * claim in our published text, so it belongs in that decision and not in a test.
+ */
+const AUTO_POST_OPT_IN: Record<string, RegExp> = {
+  he: /ברירת המחדל היא כבוי/,
+  en: /off by default/,
+  es: /desactivada por defecto/,
+  'pt-BR': /desativada por padr[ãa]o/,
+}
+const AUTO_POST_NO_READ: Record<string, RegExp> = {
+  he: /בלי שתקרא אותו לפני הפרסום/,
+  en: /without you reading\s+it first/,
+  es: /sin que usted lo lea antes/,
+  'pt-BR': /sem que voc[êe] o leia antes/,
+}
+const AUTO_POST_NO_PERSON: Record<string, RegExp> = {
+  he: /בלי שום שם של אדם/,
+  en: /with no person&rsquo;s name/,
+  es: /sin ning[úu]n nombre de persona/,
+  'pt-BR': /sem nenhum nome de pessoa/,
+}
+const AUTO_POST_SELF_OFF: Record<string, RegExp> = {
+  he: /נכבית מעצמה אם החלפת/,
+  en: /turns itself off if you\s+change the business/,
+  es: /se desactiva por s[íi] sola si usted cambia el negocio/,
+  'pt-BR': /se desativa por conta pr[óo]pria se voc[êe] trocar a empresa/,
+}
+/* The two absolutes the feature contradicts. Either one surviving is a lie. */
+const AUTO_POST_NO_LONGER_TRUE = /we create a post only when you press publish|אנו יוצרים פוסט רק כשאתה לוחץ על פרסום|creamos una publicaci[óo]n [úu]nicamente cuando usted pulsa publicar|criamos uma postagem somente quando voc[êe] clica em publicar|draft is never published|טיוטה לעולם אינה מתפרסמת|Un borrador nunca se publica|Um rascunho nunca [ée] publicado/
+{
+  const read = (path: string) => (existsSync(path) ? readFileSync(path, 'utf8') : '')
+  const enSource = frontMatter(text[LOCALES[0]].privacy).source
+  const pages: [string, string][] = [
+    ['he', read(HEBREW_PRIVACY)],
+    ['en', enSource ? read(enSource) : ''],
+    ...LOCALES.map((l): [string, string] => [l, text[l].privacy]),
+  ]
+  for (const [name, src] of pages) {
+    check(`${name}/privacy: the page was read`, src.length > 0)
+    check(`${name}/privacy: neither absolute about posting survives`, !AUTO_POST_NO_LONGER_TRUE.test(src))
+    check(`${name}/privacy: automatic posting is stated to be off by default`, (AUTO_POST_OPT_IN[name] ?? /$^/).test(src))
+    check(`${name}/privacy: it is stated to publish without the owner reading it`, (AUTO_POST_NO_READ[name] ?? /$^/).test(src))
+    check(`${name}/privacy: no person's name is stated to reach the model`, (AUTO_POST_NO_PERSON[name] ?? /$^/).test(src))
+    check(`${name}/privacy: the switch is stated to turn itself off on a business change`, (AUTO_POST_SELF_OFF[name] ?? /$^/).test(src))
+  }
+
+  const AUTO_LIABILITY: Record<string, RegExp> = {
+    he: /האחריות לתוכן שמתפרסם בשמכם היא שלכם/,
+    en: /You are responsible for the\s+content published in your name/,
+    es: /Usted es responsable del contenido publicado en su nombre/,
+    'pt-BR': /Voc[êe] [ée] respons[áa]vel pelo conte[úu]do publicado em seu nome/,
+  }
+  const enTermsSource = frontMatter(text[LOCALES[0]].terms).source
+  const termsDocs: [string, string][] = [
+    ['he', read(HEBREW_TERMS)],
+    ['en', enTermsSource ? read(enTermsSource) : ''],
+    ...LOCALES.map((l): [string, string] => [l, text[l].terms]),
+  ]
+  for (const [name, src] of termsDocs) {
+    check(`${name}/terms: content published automatically is put on the merchant`, (AUTO_LIABILITY[name] ?? /$^/).test(src))
+  }
+
+  /*
+   * The code behind claims 1, 3 and 4. The migration arrives with the feature,
+   * so it gates the lot and the "has it landed" line is itself printed, as in
+   * section 29: the day the feature merges these stop being no-ops by
+   * themselves.
+   */
+  const AUTO_MIGRATION = 'supabase/migrations/20261012170000_gbp_auto_post.sql'
+  const STORE = 'lib/gbp/store.ts'
+  const DRAFT_SRC = 'lib/gbp/draft.ts'
+  const autoLanded = existsSync(AUTO_MIGRATION)
+  console.log(`  · automatic posting ${autoLanded ? 'HAS landed; its code is checked below' : 'has NOT landed yet; its three code checks are waiting for it'}`)
+  if (autoLanded) {
+    const migration = stripComments(read(AUTO_MIGRATION))
+    check(`${AUTO_MIGRATION}: the switch defaults to off`,
+      /auto_post_on_publish\s+boolean\s+NOT NULL\s+DEFAULT false/i.test(migration))
+    const store = stripComments(read(STORE))
+    check(`${STORE}: moving the project to another business clears the switch`,
+      /auto_post_on_publish:\s*false/.test(store))
+    const draft = stripComments(read(DRAFT_SRC))
+    const sourceType = /interface DraftSource \{[\s\S]*?\n\}/.exec(draft)?.[0] ?? ''
+    check(`${DRAFT_SRC}: the post draft's input carries no person's name`,
+      sourceType.length > 0 && !/reviewerName|customerName|userName|authorName|ownerName|email/i.test(sourceType))
+  }
+
+  check('mutation control: the old "only when you press publish" sentence is recognised',
+    AUTO_POST_NO_LONGER_TRUE.test('we create a post only when you press publish, or at the time you scheduled it'))
+  check('mutation control: the old "a draft is never published" absolute is recognised',
+    AUTO_POST_NO_LONGER_TRUE.test('A draft is never published until you review it and press publish.'))
+  check('mutation control: automatic posting described without "off by default" is caught',
+    !AUTO_POST_OPT_IN.en.test('Automatic posting: every article is also published as a post.'))
+  check('mutation control: a switch defaulting to true would be caught',
+    !/auto_post_on_publish\s+boolean\s+NOT NULL\s+DEFAULT false/i.test('ADD COLUMN auto_post_on_publish boolean NOT NULL DEFAULT true'))
+  check("mutation control: a person's name back in the draft input would be caught",
+    /reviewerName|customerName|userName|authorName|ownerName|email/i.test(
+      stripComments('export interface DraftSource { businessName: string | null; customerName: string }')))
+}
+
 console.log(`\n${pass} passed, ${fail} failed`)
 if (fail > 0) process.exit(1)
 
