@@ -28,6 +28,10 @@
       "schedule": "30 10 * * *"
     },
     {
+      "path": "/api/outreach/retention/cron",
+      "schedule": "30 11 * * *"
+    },
+    {
       "path": "/api/blog/auto/cron/he",
       "schedule": "0 4 * * *"
     },
@@ -38,6 +42,10 @@
     {
       "path": "/api/blog/auto/cron/es",
       "schedule": "40 4 * * *"
+    },
+    {
+      "path": "/api/gbp/cron",
+      "schedule": "30 7 * * *"
     }
   ]
 }

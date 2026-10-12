@@ -92,7 +92,9 @@ export default function PostComposer({ projectId, status, onPosted }: { projectI
     setDrafting(true); setNotice(null)
     const res = await fetch('/api/gbp/draft', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ projectId, language, ...(source === 'article' ? { articleId } : { topic }) }),
+      // The post is written in the language the merchant is using the dashboard in,
+      // which for a Spanish or Portuguese merchant is NOT `language` (he/en only).
+      body: JSON.stringify({ projectId, language: uiLocale, ...(source === 'article' ? { articleId } : { topic }) }),
     }).catch(() => null)
     const body = res ? await res.json().catch(() => ({})) : {}
     setDrafting(false)
@@ -150,7 +152,7 @@ export default function PostComposer({ projectId, status, onPosted }: { projectI
     const res = await fetch('/api/gbp/posts', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        projectId, language, summary, ctaType: ctaType || null, ctaUrl: ctaType === 'CALL' ? null : ctaUrl, allowOtherSite: allowOther,
+        projectId, language: uiLocale, summary, ctaType: ctaType || null, ctaUrl: ctaType === 'CALL' ? null : ctaUrl, allowOtherSite: allowOther,
         imagePath: image?.path ?? null, scheduledAt: local.value.scheduledAt, sourceArticleId: source === 'article' ? articleId || null : null,
       }),
     }).catch(() => null)

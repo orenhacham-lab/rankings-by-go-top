@@ -1,6 +1,9 @@
 /**
- * GET|POST /api/outreach/unsubscribe?t=<signed token> — the link in every outbound
- * prospecting email.
+ * GET|POST /api/outreach/unsubscribe — the link in every outbound prospecting email.
+ *
+ * `?t=<signed token>` is the link the app itself builds. `?u=<prospect token>` is the
+ * link a sender that cannot sign uses instead, verified against the prospect row
+ * (lib/outreach/prospects.ts). Both end in the same suppression.
  *
  * proxy.ts does not cover /api/*, so this handler authenticates itself: there is no
  * session and there never will be (the recipient has no account), so the signed token
@@ -19,6 +22,7 @@
  */
 import type { ServiceRoleClient } from '@/lib/supabase/admin'
 import { suppress } from '@/lib/email-suppression'
+import { suppressByProspectToken } from './prospects'
 import { readOutreachUnsubscribeToken } from './unsubscribe-token'
 
 export interface OutreachRouteDeps {
@@ -39,6 +43,19 @@ export async function unsubscribeByToken(token: unknown, deps: OutreachRouteDeps
       channel: 'outbound_prospect',
     })
     return result.status === 'ok' ? 'done' : 'unavailable'
+  } catch {
+    return 'unavailable'
+  }
+}
+
+/**
+ * The same unsubscribe, reached by a prospect's own secret instead of a
+ * signature. Building the client is inside the try for the same reason the
+ * signed path does it: a client that cannot be built is not a success.
+ */
+export async function unsubscribeByProspect(token: unknown, deps: OutreachRouteDeps): Promise<OutreachUnsubscribeOutcome> {
+  try {
+    return await suppressByProspectToken(deps.admin(), token)
   } catch {
     return 'unavailable'
   }
@@ -80,15 +97,29 @@ export function unsubscribePage(outcome: OutreachUnsubscribeOutcome): string {
 </body></html>`
 }
 
-/** The whole route: the token decides, and the answer is always a page, never a redirect. */
+/**
+ * The whole route, and the answer is always a page, never a redirect.
+ *
+ * Two links can reach it. `t` is the signed token and is tried first, so a
+ * signature that fails stays a failure and is never retried as something
+ * weaker. `u` is a prospect's own secret, for a message the app did not send
+ * and therefore could not sign (lib/outreach/prospects.ts). Both end in the
+ * same suppression on the same list.
+ */
 export async function handleOutreachUnsubscribe(request: Request, deps: OutreachRouteDeps): Promise<Response> {
   let token: string | null = null
+  let prospect: string | null = null
   try {
-    token = new URL(request.url).searchParams.get('t')
+    const params = new URL(request.url).searchParams
+    token = params.get('t')
+    prospect = params.get('u')
   } catch {
     token = null
+    prospect = null
   }
-  const outcome = await unsubscribeByToken(token, deps)
+  const outcome = token === null && prospect !== null
+    ? await unsubscribeByProspect(prospect, deps)
+    : await unsubscribeByToken(token, deps)
   return new Response(unsubscribePage(outcome), {
     status: outcome === 'invalid' ? 400 : outcome === 'unavailable' ? 503 : 200,
     headers: HEADERS,

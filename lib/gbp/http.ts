@@ -17,14 +17,19 @@ import { isGbpOAuthConfigured } from './config'
 import { GbpApiError, type GbpErrorCode } from './errors'
 import { buildGbpAuthUrl, createPkcePair, exchangeGbpCode, grantIncludesGbpScope, revokeGbpToken } from './oauth'
 import { listAllLocations, type GbpLocation } from './api'
-import { validatePostInput, GBP_CTA_TYPES } from './validate'
+import { validatePostInput, GBP_CTA_TYPES, normalizePostLanguage } from './validate'
 import { preparePostImage, GBP_SOURCE_TYPES, GBP_SOURCE_MAX_BYTES, type CropBox } from './image'
 import { draftPost, type Generate } from './draft'
+import { v4LocationParent } from './request'
+import { listReviews, getReview, replyToReview, deleteReviewReply, summarizeReviews, isReviewName, GBP_REVIEW_ORDERS, type GbpReview, type GbpReviewOrder, type GbpReviewPage } from './reviews'
+import { validateReplyInput, GBP_REPLY_MAX } from './review-validate'
+import { draftReviewReply } from './review-draft'
 import { publishPost, accessTokenFor, defaultPublishDeps, type PublishDeps } from './publish'
 import {
   gbpTablesPresent, GbpStoreError, createGbpOAuthState, consumeGbpOAuthState, readGbpConnection, storeGbpConnection,
   deleteGbpConnection, decryptRefreshToken, readProjectLocation, saveProjectLocation, listProjectPosts, insertPost,
-  readProjectPost, cancelPost, type GbpPostRow, type GbpConnectionRow,
+  readProjectPost, cancelPost, setAutoPostOnPublish, markReviewsSeen,
+  type GbpPostRow, type GbpConnectionRow, type GbpLocationRow,
 } from './store'
 
 type Admin = ReturnType<typeof createAdminClient>
@@ -36,6 +41,10 @@ export interface GbpRouteDeps {
   fetchLocations?: (accessToken: string) => Promise<GbpLocation[]>
   exchange?: (code: string, verifier: string) => Promise<{ accessToken: string; refreshToken?: string; scope: string }>
   generate?: Generate
+  listReviews?: (accessToken: string, args: { accountName: string; locationName: string; order?: GbpReviewOrder; pageToken?: string | null; pages?: number }) => Promise<GbpReviewPage>
+  replyToReview?: (accessToken: string, reviewName: string, comment: string) => Promise<{ comment: string; updateTime: string | null }>
+  deleteReviewReply?: (accessToken: string, reviewName: string) => Promise<void>
+  getReview?: (accessToken: string, reviewName: string) => Promise<GbpReview>
   publish?: PublishDeps
   authUrl?: (state: string, challenge: string) => string
 }
@@ -67,6 +76,7 @@ export function sanitizePost(p: GbpPostRow) {
     id: p.id, summary: p.summary, ctaType: p.cta_type, ctaUrl: p.cta_url, imageUrl: p.image_url,
     status: p.status, scheduledAt: p.scheduled_at, publishedAt: p.published_at, googleState: p.google_state,
     searchUrl: p.google_search_url, errorCode: p.last_error_code, createdAt: p.created_at, sourceArticleId: p.source_article_id,
+    autoCreated: !!p.auto_created,
   }
 }
 export function sanitizeGbpConnection(c: GbpConnectionRow | null) {
@@ -111,6 +121,9 @@ export async function handleStatus(req: Request, deps: GbpRouteDeps): Promise<Re
       location: location && connection?.id && location.connection_id === connection.id
         ? { title: location.location_title, address: location.location_address, mapsUri: location.maps_uri, websiteUri: location.website_uri, locationName: location.location_name }
         : null,
+      // The owner's automatic-posting switch. Off unless a location of THEIR
+      // connection is selected, so the screen can never offer it without one.
+      autoPostOnPublish: !!(location && connection?.id && location.connection_id === connection.id && location.auto_post_on_publish),
       posts: posts.map(sanitizePost),
       siteUrl: p.target_domain ? (/^https?:\/\//.test(p.target_domain) ? p.target_domain : `https://${p.target_domain}`) : null,
       businessName: p.business_name ?? null,
@@ -240,7 +253,8 @@ export async function handleDraft(req: Request, deps: GbpRouteDeps): Promise<Res
   try { body = await req.json() } catch { return err('invalid_request', 400) }
   const g = await gate(deps, typeof body.projectId === 'string' ? body.projectId : null)
   if (g instanceof Response) return g
-  const language = body.language === 'en' ? 'en' : 'he'
+  // Hebrew is the fallback for an unrecognised value, as it is everywhere else.
+  const language = normalizePostLanguage(body.language) ?? 'he'
   let article: { title: string; description: string | null; url: string | null } | null = null
   if (typeof body.articleId === 'string' && body.articleId) {
     const { data } = await g.admin.from('generated_articles')
@@ -269,6 +283,187 @@ export async function handleDraft(req: Request, deps: GbpRouteDeps): Promise<Res
   const out = await draftPost({ businessName, language, article, topic: article ? null : topic }, deps.generate)
   if (!out.ok) return err('draft_unavailable', 502)
   return json({ ok: true, summary: out.summary, articleUrl: article?.url ?? null })
+}
+
+// ── reviews ────────────────────────────────────────────────────────────────
+/**
+ * The connected location plus a live access token, for every review handler.
+ * A location saved under a connection that is not this user's is ignored, the
+ * same rule as handleStatus.
+ */
+async function reviewContext(g: Authed, deps: GbpRouteDeps):
+  Promise<{ ok: true; accessToken: string; location: GbpLocationRow } | { ok: false; res: Response }> {
+  let conn: GbpConnectionRow | null
+  let location: GbpLocationRow | null
+  try {
+    conn = await readGbpConnection(g.admin, g.user.id)
+    location = await readProjectLocation(g.admin, g.project.id)
+  } catch (e) { return { ok: false, res: storeFail(e) } }
+  if (!conn) return { ok: false, res: err('not_connected', 409) }
+  if (!location || location.connection_id !== conn.id) return { ok: false, res: err('no_location', 409) }
+  const token = await accessTokenFor(g.admin, conn, deps.publish ?? defaultPublishDeps)
+  if (!token.ok) return { ok: false, res: err(token.code, 409) }
+  return { ok: true, accessToken: token.accessToken, location }
+}
+
+/**
+ * The review really belongs to the location this project is connected to.
+ * Without this check a merchant could address a reply to any review name they
+ * typed, on a profile they do not manage through this project.
+ */
+export function belongsToLocation(reviewName: string, location: Pick<GbpLocationRow, 'account_name' | 'location_name'>): boolean {
+  let parent: string
+  try { parent = v4LocationParent(location.account_name, location.location_name) } catch { return false }
+  return reviewName.startsWith(`${parent}/reviews/`)
+}
+
+/** The newest review updateTime in a page, as an ISO string, or null. */
+export function newestReviewTime(reviews: GbpReview[]): string | null {
+  let best: number | null = null
+  for (const r of reviews) {
+    const t = r.updateTime ? Date.parse(r.updateTime) : NaN
+    if (Number.isFinite(t) && (best === null || t > best)) best = t
+  }
+  return best === null ? null : new Date(best).toISOString()
+}
+
+/** A review the owner has not been shown yet, by the mark the alert keeps. */
+export function isNewSince(review: GbpReview, seen: string | null): boolean {
+  if (!seen) return false
+  const t = review.updateTime ? Date.parse(review.updateTime) : NaN
+  const mark = Date.parse(seen)
+  return Number.isFinite(t) && Number.isFinite(mark) && t > mark
+}
+
+// ── GET /api/gbp/reviews?projectId=&order=&pageToken= ──────────────────────
+export async function handleListReviews(req: Request, deps: GbpRouteDeps): Promise<Response> {
+  const url = new URL(req.url)
+  const g = await gate(deps, url.searchParams.get('projectId'))
+  if (g instanceof Response) return g
+  const ctx = await reviewContext(g, deps)
+  if (!ctx.ok) return ctx.res
+
+  const rawOrder = url.searchParams.get('order')
+  const order: GbpReviewOrder | undefined = rawOrder && (GBP_REVIEW_ORDERS as readonly string[]).includes(rawOrder) ? rawOrder as GbpReviewOrder : undefined
+  let page: GbpReviewPage
+  try {
+    page = await (deps.listReviews ?? ((t: string, a: Parameters<typeof listReviews>[1]) => listReviews(t, a)))(ctx.accessToken, {
+      accountName: ctx.location.account_name,
+      locationName: ctx.location.location_name,
+      order,
+      pageToken: url.searchParams.get('pageToken'),
+      pages: 1,
+    })
+  } catch (e) {
+    return err(e instanceof GbpApiError ? e.code : 'unexpected', 502)
+  }
+
+  const seen = ctx.location.reviews_seen_update_time
+  return json({
+    ok: true,
+    summary: summarizeReviews(page),
+    reviews: page.reviews.map((r) => ({
+      reviewName: r.reviewName,
+      reviewerName: r.reviewerName,
+      isAnonymous: r.isAnonymous,
+      stars: r.stars,
+      comment: r.comment,
+      createTime: r.createTime,
+      updateTime: r.updateTime,
+      reply: r.reply,
+      isNew: isNewSince(r, seen),
+    })),
+    nextPageToken: page.nextPageToken,
+    replyMax: GBP_REPLY_MAX,
+    orders: GBP_REVIEW_ORDERS,
+  })
+}
+
+// ── POST /api/gbp/reviews/seen {projectId} ─────────────────────────────────
+/** The owner has read the list: the "new" marks move up to the newest review. */
+export async function handleMarkReviewsSeen(req: Request, deps: GbpRouteDeps): Promise<Response> {
+  let body: Record<string, unknown>
+  try { body = await req.json() } catch { return err('invalid_request', 400) }
+  const g = await gate(deps, typeof body.projectId === 'string' ? body.projectId : null)
+  if (g instanceof Response) return g
+  const newest = typeof body.newestUpdateTime === 'string' ? Date.parse(body.newestUpdateTime) : NaN
+  if (!Number.isFinite(newest)) return err('invalid_request', 400)
+  try {
+    await markReviewsSeen(g.admin, g.project.id, { seenUpdateTime: new Date(newest).toISOString() })
+  } catch (e) { return storeFail(e) }
+  return json({ ok: true })
+}
+
+// ── POST /api/gbp/reviews/draft {projectId, reviewName} ────────────────────
+export async function handleDraftReviewReply(req: Request, deps: GbpRouteDeps): Promise<Response> {
+  let body: Record<string, unknown>
+  try { body = await req.json() } catch { return err('invalid_request', 400) }
+  const g = await gate(deps, typeof body.projectId === 'string' ? body.projectId : null)
+  if (g instanceof Response) return g
+  if (!isReviewName(body.reviewName)) return err('invalid_request', 400)
+  const ctx = await reviewContext(g, deps)
+  if (!ctx.ok) return ctx.res
+  if (!belongsToLocation(body.reviewName, ctx.location)) return err('review_not_found', 404)
+
+  // The review is read from Google by name, never from the request: the draft
+  // must answer what the customer actually wrote.
+  let review: GbpReview
+  try {
+    review = await (deps.getReview ?? ((t: string, n: string) => getReview(t, n)))(ctx.accessToken, body.reviewName)
+  } catch (e) {
+    return err(e instanceof GbpApiError ? e.code : 'unexpected', e instanceof GbpApiError && e.code === 'review_not_found' ? 404 : 502)
+  }
+
+  const out = await draftReviewReply({
+    businessName: ctx.location.location_title || null,
+    language: body.language === 'en' ? 'en' : 'he',
+    // The reviewer's name is deliberately NOT passed on (see lib/gbp/review-draft.ts).
+    review: { stars: review.stars, comment: review.comment },
+  }, deps.generate)
+  if (!out.ok) return err('draft_unavailable', 502)
+  return json({ ok: true, comment: out.comment })
+}
+
+// ── PUT /api/gbp/reviews/reply {projectId, reviewName, comment} ────────────
+export async function handleReplyToReview(req: Request, deps: GbpRouteDeps): Promise<Response> {
+  let body: Record<string, unknown>
+  try { body = await req.json() } catch { return err('invalid_request', 400) }
+  const g = await gate(deps, typeof body.projectId === 'string' ? body.projectId : null)
+  if (g instanceof Response) return g
+  if (!isReviewName(body.reviewName)) return err('invalid_request', 400)
+  const checked = validateReplyInput({ comment: body.comment })
+  if (!checked.ok) return err('invalid_post', 400, { errors: checked.errors })
+  const ctx = await reviewContext(g, deps)
+  if (!ctx.ok) return ctx.res
+
+  // The review name carries the account and location; it must be the location
+  // this project is connected to, or one merchant could reply on another's behalf.
+  if (!belongsToLocation(body.reviewName, ctx.location)) return err('review_not_found', 404)
+
+  try {
+    const saved = await (deps.replyToReview ?? ((t: string, n: string, c: string) => replyToReview(t, n, c)))(ctx.accessToken, body.reviewName, checked.value.comment)
+    return json({ ok: true, reply: saved })
+  } catch (e) {
+    return err(e instanceof GbpApiError ? e.code : 'unexpected', 502)
+  }
+}
+
+// ── DELETE /api/gbp/reviews/reply?projectId=&reviewName= ───────────────────
+export async function handleDeleteReviewReply(req: Request, deps: GbpRouteDeps): Promise<Response> {
+  const url = new URL(req.url)
+  const g = await gate(deps, url.searchParams.get('projectId'))
+  if (g instanceof Response) return g
+  const reviewName = url.searchParams.get('reviewName')
+  if (!isReviewName(reviewName)) return err('invalid_request', 400)
+  const ctx = await reviewContext(g, deps)
+  if (!ctx.ok) return ctx.res
+  if (!belongsToLocation(reviewName, ctx.location)) return err('review_not_found', 404)
+  try {
+    await (deps.deleteReviewReply ?? ((t: string, n: string) => deleteReviewReply(t, n)))(ctx.accessToken, reviewName)
+    return json({ ok: true })
+  } catch (e) {
+    return err(e instanceof GbpApiError ? e.code : 'unexpected', 502)
+  }
 }
 
 // ── POST /api/gbp/image (multipart: projectId, file, crop) ─────────────────
@@ -335,7 +530,7 @@ export async function handleCreatePost(req: Request, deps: GbpRouteDeps): Promis
     row = await insertPost(g.admin, {
       project_id: g.project.id, user_id: g.user.id, source_article_id: sourceArticleId,
       summary: checked.value.summary, cta_type: checked.value.ctaType, cta_url: checked.value.ctaUrl,
-      image_url: imageUrl, image_path: imagePath, language_code: body.language === 'en' ? 'en' : 'he',
+      image_url: imageUrl, image_path: imagePath, language_code: normalizePostLanguage(body.language) ?? 'he',
       scheduled_at: checked.value.scheduledAt ?? new Date().toISOString(),
     })
   } catch (e) { return storeFail(e) }
@@ -357,3 +552,28 @@ export async function handleCancelPost(req: Request, postId: string, deps: GbpRo
   } catch (e) { return storeFail(e) }
 }
 
+// ── PATCH /api/gbp/auto-post {projectId, enabled} ──────────────────────────
+/**
+ * The owner turns automatic posting on or off. It exists only on top of a
+ * connected location of their OWN connection: without one there is nothing to
+ * post to, and a location row left over from a connection they removed must not
+ * become a switch they can flip.
+ */
+export async function handleSetAutoPost(req: Request, deps: GbpRouteDeps): Promise<Response> {
+  let body: Record<string, unknown>
+  try { body = await req.json() } catch { return err('invalid_request', 400) }
+  const g = await gate(deps, typeof body.projectId === 'string' ? body.projectId : null)
+  if (g instanceof Response) return g
+  if (typeof body.enabled !== 'boolean') return err('invalid_request', 400)
+  try {
+    const [conn, location] = await Promise.all([
+      readGbpConnection(g.admin, g.user.id),
+      readProjectLocation(g.admin, g.project.id),
+    ])
+    if (!conn || conn.status !== 'connected') return err('not_connected', 409)
+    if (!location || location.connection_id !== conn.id || location.user_id !== g.user.id) return err('no_location', 409)
+    const saved = await setAutoPostOnPublish(g.admin, g.project.id, body.enabled)
+    if (!saved) return err('no_location', 409)
+    return json({ ok: true, autoPostOnPublish: body.enabled })
+  } catch (e) { return storeFail(e) }
+}

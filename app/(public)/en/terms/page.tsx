@@ -643,6 +643,24 @@ export default function EnglishTermsPage() {
             your site according to the approval and publishing settings you chose for the project. You may edit,
             reject or delete any content.
           </li>
+          <li>
+            <strong>Replying to a review on your Google Business Profile.</strong> If you ask for a draft reply
+            to a review, the draft is produced by AI and shown to you before anything is sent. A reply is sent
+            only after you wrote or approved it and pressed send, and it is published publicly on your business
+            listing and in your name. <strong>You are responsible for the content of the reply</strong>, even
+            where the draft was produced by AI, including the accuracy of facts, defamation, third-party rights
+            and Google&rsquo;s content policies. Google may remove a reply under those policies, and we have no
+            control over that.
+          </li>
+          <li>
+            <strong>Automatic posting to your Google Business Profile.</strong> If you turned automatic posting
+            on, every article the system publishes to your site is also published as a post on your Google
+            business listing, <strong>without you reading it first</strong>. <strong>You are responsible for the
+            content published in your name</strong>, both where the text was produced by AI and where you did not
+            read it before it went out, including the accuracy of facts, defamation, third-party rights and
+            Google&rsquo;s content policies. You can turn automatic posting off at any time, and it turns itself
+            off if you change the business the project is connected to.
+          </li>
         </ul>
       </section>
 
@@ -760,7 +778,7 @@ export default function EnglishTermsPage() {
 
       <section>
         <p className={LEGAL_FOOTNOTE}>
-          Last updated: October 10, 2026
+          Last updated: October 12, 2026
         </p>
       </section>
     </LegalDoc>

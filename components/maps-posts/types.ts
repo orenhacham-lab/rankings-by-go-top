@@ -15,6 +15,8 @@ export interface GbpPostView {
   errorCode: string | null
   createdAt: string
   sourceArticleId: string | null
+  /** Queued by an article publish, not written by the merchant. */
+  autoCreated: boolean
 }
 
 export interface GbpArticleOption { id: string; title: string; url: string | null; imageUrl: string | null }
@@ -32,9 +34,36 @@ export type GbpStatus =
       siteUrl: string | null
       businessName: string | null
       articles: GbpArticleOption[]
+      /** The owner approved posting every new article automatically. */
+      autoPostOnPublish: boolean
     }
 
 export type GbpReadyStatus = Extract<GbpStatus, { state: 'ready' }>
+
+// ── reviews (lib/gbp/http.ts handleListReviews) ────────────────────────────
+export type GbpReviewOrderKey = 'updateTime desc' | 'rating' | 'rating desc'
+
+export interface GbpReviewView {
+  reviewName: string
+  reviewerName: string | null
+  isAnonymous: boolean
+  /** 1 to 5, or null when Google reports no rating. */
+  stars: number | null
+  comment: string | null
+  createTime: string | null
+  updateTime: string | null
+  reply: { comment: string; updateTime: string | null } | null
+  /** Newer than the newest review the owner was already shown. */
+  isNew: boolean
+}
+
+export interface GbpReviewsBody {
+  ok: true
+  summary: { total: number | null; average: number | null; unanswered: number; unansweredNegative: number }
+  reviews: GbpReviewView[]
+  nextPageToken: string | null
+  replyMax: number
+}
 
 /** The one status a merchant reads for a post: Google's review outcome wins over our transport state. */
 export type PostBadgeKey = 'scheduled' | 'publishing' | 'live' | 'review' | 'rejected' | 'failed' | 'cancelled'
