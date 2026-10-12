@@ -6497,6 +6497,8 @@ export const dashboardHe = {
       emptyTitle: 'עוד אין ביקורות',
       emptyBody: 'כשלקוח יכתוב ביקורת על העסק בגוגל, היא תופיע כאן ותוכלו לענות לה.',
       loadMore: 'עוד ביקורות',
+      loadingMore: 'טוען…',
+      shownCount: (shown: number, total: number) => `מוצגות ${shown} מתוך ${total} ביקורות`,
     },
     fields: {
       reply_empty: 'כתבו תשובה.',

@@ -481,6 +481,25 @@ function sourceChecks() {
     if (/const (GET|POST) = run/.test(s)) return /async function run[\s\S]*?authorizeCronRequest\([\s\S]*?isGbpPostsEnabled\(\)/.test(s)
     return handlers.every((h) => /^[^{]*\{\s*if \(!isGbpPostsEnabled\(\)\) return Response\.json\(\{ error: 'Not found' \}, \{ status: 404 \}\)/.test(h[0].slice(h[0].indexOf('{', h[0].indexOf(')')))) || /\{\s*if \(!isGbpPostsEnabled\(\)\) return/.test(h[0]))
   }
+  // The model is RESOLVED, never pinned. `gemini-2.5-flash` answered 404 "no
+  // longer available to new users" for the live key, which is why
+  // model-availability.ts exists; both GBP drafts called generateContent with the
+  // pinned id and skipped it, so the composer failed in production on 12 October
+  // 2026 while articles kept generating. One module now speaks to Gemini for the
+  // whole feature, and it logs every failure with a typed reason.
+  const gbpModules = walk('lib/gbp').filter((f) => f.endsWith('.ts') && !f.includes('__qa__'))
+  const callers = gbpModules.filter((f) => /\bmodels\.generateContent\(/.test(strip(read(f))))
+  check('exactly one module in lib/gbp calls the model', callers.length === 1 && callers[0] === 'lib/gbp/generate.ts', callers.join(', '))
+  const gen = strip(read('lib/gbp/generate.ts'))
+  check('…and it asks which model the key actually offers first', /resolveAvailableRecommendationModel\(\)/.test(gen))
+  check('…and never sends the pinned id without that answer',
+    gen.indexOf('resolveAvailableRecommendationModel()') < gen.indexOf('models.generateContent('))
+  check('…and every way out of it is logged', (gen.match(/console\.error\('\[gbp-draft\]/g) ?? []).length >= 5)
+  check('…and no prompt, key or provider text reaches the log',
+    !/console\.error\([^)]*prompt/.test(gen) && /sanitizeProviderMessage\(message\)/.test(gen))
+  check('MUTATION: a draft that pins the model again is caught',
+    !/resolveAvailableRecommendationModel\(\)/.test(gen.replace(/resolveAvailableRecommendationModel\(\)/g, 'RECOMMENDATION_MODEL_PRIMARY')))
+
   const offenders = routes.filter((f) => !gated(read(f)))
   check(`all ${routes.length} /api/gbp routes answer 404 unless GBP_POSTS_ENABLED (cron: CRON_SECRET first)`, routes.length >= 9 && offenders.length === 0, offenders.join(', '))
   check('MUTATION: a route without the flag check is caught', !gated(read('app/api/gbp/draft/route.ts').replace("if (!isGbpPostsEnabled()) return Response.json({ error: 'Not found' }, { status: 404 })", '')))
@@ -500,8 +519,19 @@ function sourceChecks() {
   const raws = client.filter((f) => rawErr(read(f)))
   check('no confirm()/alert(), no raw server or provider message on screen', raws.length === 0, raws.join(', '))
   check('MUTATION: showing body.message is caught', rawErr('setError(body.message)'))
-  const gbpLib = walk('lib/gbp').map(read).join('\n')
+  // lib/gbp/generate.ts is the one exception, and a narrow one: it logs the
+  // provider's error through sanitizeProviderMessage (keys, tokens and URLs
+  // stripped), to a SERVER log the merchant never sees, because without it a
+  // failed draft was not diagnosable from production at all. Everywhere else the
+  // ban stands, and the guard below holds generate.ts to the sanitizer.
+  const gbpLib = walk('lib/gbp').filter((f) => f !== 'lib/gbp/generate.ts').map(read).join('\n')
   check('no provider text is logged or stored (no console.* with a response body in lib/gbp)', !/console\.(log|error|warn)\([^)]*(json|body|message|text)/.test(strip(gbpLib)))
+  // `\s*` would let the lookahead pass on the space itself, so the space is literal.
+  const logsRaw = (src: string) => /message: (?!sanitizeProviderMessage)/.test(src)
+  check('…and the one module that logs a provider error sanitizes it',
+    !logsRaw(gen) && /message: sanitizeProviderMessage\(message\)/.test(gen))
+  check('MUTATION: logging the provider message raw is caught',
+    logsRaw(gen.replace('sanitizeProviderMessage(message)', 'message')))
 
   const keys = (o: unknown, p = ''): string[] => typeof o === 'object' && o !== null && !Array.isArray(o) ? Object.entries(o).flatMap(([k, v]) => keys(v, `${p}.${k}`)) : [p]
   const he = keys(dashboardHe.mapsPosts).sort(), en = keys(dashboardEn.mapsPosts).sort()

@@ -18,12 +18,16 @@ import { countReplyChars, validateReplyInput } from '@/lib/gbp/review-validate'
 import { gbpErrorText, gbpFieldText } from './error-text'
 import type { GbpReadyStatus, GbpReviewOrderKey, GbpReviewView, GbpReviewsBody } from './types'
 
+/** How many reviews open at once, and how many each press of "show more" adds. */
+const REVIEWS_PER_STEP = 10
+
 type ReviewsFetch = { ok: true; body: GbpReviewsBody } | { ok: false; code: string | null }
 
 /** The reviews as the server reports them. No state is touched here. */
-async function fetchReviews(projectId: string, order: GbpReviewOrderKey): Promise<ReviewsFetch> {
+async function fetchReviews(projectId: string, order: GbpReviewOrderKey, pageToken?: string | null): Promise<ReviewsFetch> {
   const res = await fetch(
-    `/api/gbp/reviews?projectId=${encodeURIComponent(projectId)}&order=${encodeURIComponent(order)}`,
+    `/api/gbp/reviews?projectId=${encodeURIComponent(projectId)}&order=${encodeURIComponent(order)}`
+    + (pageToken ? `&pageToken=${encodeURIComponent(pageToken)}` : ''),
     { cache: 'no-store' },
   ).catch(() => null)
   const json = res ? await res.json().catch(() => null) : null
@@ -63,6 +67,14 @@ export default function ReviewsPanel({ projectId, status }: { projectId: string;
   const [error, setError] = useState<string | null>(null)
   const [order, setOrder] = useState<GbpReviewOrderKey>('updateTime desc')
   const [flash, setFlash] = useState<string | null>(null)
+  /**
+   * A business with hundreds of reviews would otherwise open hundreds of rows,
+   * each with its own reply box, on the first paint. The owner asks for more in
+   * steps; when the steps run out the same button fetches Google's next page,
+   * which the screen could not reach at all before.
+   */
+  const [shown, setShown] = useState(REVIEWS_PER_STEP)
+  const [loadingMore, setLoadingMore] = useState(false)
 
   /**
    * The owner has now seen the list, so nothing stays marked "new" for them.
@@ -86,6 +98,7 @@ export default function ReviewsPanel({ projectId, status }: { projectId: string;
     if (!result.ok) { setError(result.code ? gbpErrorText(t, result.code) : t.reviews.loadFailed); return }
     setError(null)
     setBody(result.body)
+    setShown(REVIEWS_PER_STEP)
     markSeen(result.body.reviews)
   }, [t, markSeen])
 
@@ -103,6 +116,25 @@ export default function ReviewsPanel({ projectId, status }: { projectId: string;
   const refresh = async () => {
     setLoading(true)
     apply(await fetchReviews(projectId, order))
+  }
+
+  /**
+   * Open the next step. Only when every review already fetched is open AND
+   * Google said there is another page does this reach the network; the reviews
+   * already on screen stay exactly where they are, replies and all.
+   */
+  const showMore = async () => {
+    if (!body) return
+    if (shown < body.reviews.length) { setShown(shown + REVIEWS_PER_STEP); return }
+    if (!body.nextPageToken || loadingMore) return
+    setLoadingMore(true)
+    const result = await fetchReviews(projectId, order, body.nextPageToken)
+    setLoadingMore(false)
+    if (!result.ok) { setFlash(result.code ? gbpErrorText(t, result.code) : t.reviews.loadFailed); return }
+    const added = result.body.reviews
+    setBody({ ...result.body, reviews: [...body.reviews, ...added] })
+    setShown(shown + Math.min(REVIEWS_PER_STEP, added.length))
+    markSeen(added)
   }
 
   if (!connected) return <Card className="p-5 sm:p-6"><p className="text-copy text-body">{t.reviews.lockedConnect}</p></Card>
@@ -159,7 +191,7 @@ export default function ReviewsPanel({ projectId, status }: { projectId: string;
 
         {body && body.reviews.length > 0 && (
           <ul className="divide-y divide-line">
-            {body.reviews.map((r: GbpReviewView) => (
+            {body.reviews.slice(0, shown).map((r: GbpReviewView) => (
               <ReviewRow
                 key={r.reviewName}
                 projectId={projectId}
@@ -172,6 +204,19 @@ export default function ReviewsPanel({ projectId, status }: { projectId: string;
               />
             ))}
           </ul>
+        )}
+
+        {body && (shown < body.reviews.length || body.nextPageToken) && (
+          <div className="mt-4 flex justify-center">
+            <Button variant="secondary" onClick={() => { void showMore() }} disabled={loadingMore}>
+              {loadingMore ? t.reviews.loadingMore : t.reviews.loadMore}
+            </Button>
+          </div>
+        )}
+        {body && body.reviews.length > 0 && (
+          <p className="mt-3 text-center text-caption text-muted">
+            {t.reviews.shownCount(Math.min(shown, body.reviews.length), body.summary.total ?? body.reviews.length)}
+          </p>
         )}
 
         {body && <p className="mt-4 text-caption text-muted">{t.reviews.liveNote}</p>}
