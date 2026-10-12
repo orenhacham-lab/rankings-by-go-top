@@ -40,6 +40,7 @@ export type AutoPostReason =
   | 'not_connected'        // the Google connection needs reconnecting
   | 'already_queued'       // an automatic post for this article exists (incl. the race)
   | 'no_text'              // the article has no title and no summary to post
+  | 'language_unsupported' // a post can only be he or en today; see postLanguage
   | 'queued'
   | 'insert_failed'
   | 'error'
@@ -90,11 +91,31 @@ export function placeholderSummary(src: { title: string | null; description: str
   return clampPostText(text, GBP_SUMMARY_MAX)
 }
 
-/** The project's UI language decides the post's language. Google takes he or en here. */
-async function postLanguage(admin: Admin, projectId: string): Promise<'he' | 'en'> {
+/**
+ * The project's own language decides the post's language, and a post it cannot be
+ * written in is not written at all.
+ *
+ * gbp_posts.language_code allows only 'he' and 'en' today (the CHECK in
+ * 20260929020000_gbp_local_posts.sql), which the composer gets away with because a
+ * person picks there. Automatic posting cannot: publishing an English post on a
+ * Spanish business's profile would look broken to that business's own customers,
+ * which is worse than publishing nothing. So a project in any other language is
+ * skipped until posts support its language (the composer, the draft prompt and
+ * that CHECK all have to widen together — its own change, not this one).
+ */
+export function postLanguageFor(projectLanguage: unknown): 'he' | 'en' | null {
+  const lang = typeof projectLanguage === 'string' ? projectLanguage.toLowerCase() : ''
+  if (lang.startsWith('he')) return 'he'
+  if (lang.startsWith('en')) return 'en'
+  // No language recorded at all: the project predates the column or never set it.
+  // English is the app's own default there, and nothing is lost by using it.
+  if (lang === '') return 'en'
+  return null
+}
+
+async function postLanguage(admin: Admin, projectId: string): Promise<'he' | 'en' | null> {
   const { data } = await admin.from('projects').select('language').eq('id', projectId).maybeSingle()
-  const lang = (data as { language?: string | null } | null)?.language
-  return typeof lang === 'string' && lang.toLowerCase().startsWith('he') ? 'he' : 'en'
+  return postLanguageFor((data as { language?: string | null } | null)?.language ?? '')
 }
 
 /**
@@ -134,6 +155,9 @@ export async function enqueueGbpPostForPublishedArticle(admin: Admin, articleId:
       .eq('source_article_id', article.id).eq('auto_created', true).limit(1)
     if (Array.isArray(existing) && existing.length > 0) return skip('already_queued')
 
+    const language = await postLanguage(admin, article.project_id)
+    if (language === null) return skip('language_unsupported')
+
     const summary = placeholderSummary({
       title: typeof article.title === 'string' ? article.title : null,
       description: (typeof article.meta_description === 'string' && article.meta_description)
@@ -160,7 +184,7 @@ export async function enqueueGbpPostForPublishedArticle(admin: Admin, articleId:
         cta_url: url,
         image_url: imageUrl,
         image_path: null,
-        language_code: await postLanguage(admin, article.project_id),
+        language_code: language,
         // Due now: the next GBP cron pass drafts it and sends it to Google.
         scheduled_at: new Date().toISOString(),
         auto_created: true,

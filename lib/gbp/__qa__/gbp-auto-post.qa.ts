@@ -212,12 +212,32 @@ async function enqueueChecks() {
     check('no article URL → a post with no button (never a button with no link)', row && row.cta_type === null && row.cta_url === null)
   }
   {
-    const admin = world({ language: 'es' })
-    await A.enqueueGbpPostForPublishedArticle(admin, ARTICLE)
-    check('a project in another language posts in English (Google takes he or en here)', posts(admin)[0]?.language_code === 'en')
     const he = world({ language: 'he' })
     await A.enqueueGbpPostForPublishedArticle(he, ARTICLE)
     check('a Hebrew project posts in Hebrew', posts(he)[0]?.language_code === 'he')
+    const en = world({ language: 'en' })
+    await A.enqueueGbpPostForPublishedArticle(en, ARTICLE)
+    check('an English project posts in English', posts(en)[0]?.language_code === 'en')
+    const blank = world({ language: '' })
+    await A.enqueueGbpPostForPublishedArticle(blank, ARTICLE)
+    check('a project with no language recorded falls back to English', posts(blank)[0]?.language_code === 'en')
+
+    // A post cannot be written in Spanish or Portuguese yet, and an English post
+    // on a Spanish business's profile is worse for that business than no post.
+    for (const lang of ['es', 'pt-BR', 'pt']) {
+      const other = world({ language: lang })
+      const r = await A.enqueueGbpPostForPublishedArticle(other, ARTICLE)
+      check(`a ${lang} project is skipped rather than posted to in the wrong language`,
+        r.reason === 'language_unsupported' && posts(other).length === 0)
+    }
+    check('the language rule is pure, so it can be read at a glance',
+      A.postLanguageFor('he-IL') === 'he' && A.postLanguageFor('en-US') === 'en' && A.postLanguageFor('es') === null && A.postLanguageFor(null) === 'en')
+
+    const broken = mutant<typeof A>('lib/gbp/auto-post.ts', "if (lang.startsWith('en')) return 'en'", "if (lang.startsWith('en')) return 'en'\n  return 'en'")
+    const other = world({ language: 'es' })
+    const r = await broken.enqueueGbpPostForPublishedArticle(other, ARTICLE)
+    check('MUTATION CONTROL: without the language check a Spanish business gets an English post',
+      r.queued === true && posts(other)[0]?.language_code === 'en')
   }
   {
     // THE RULE THAT MATTERS MOST: this runs inside the article publish path, so
@@ -321,8 +341,13 @@ async function switchChecks() {
     const admin = world({ switchOn: false })
     const r = await H.handleSetAutoPost(patch({ projectId: PROJECT, enabled: true }), deps(admin))
     check('the owner turns it on', r.status === 200 && admin.tables.project_gbp_locations[0].auto_post_on_publish === true)
+    check('when they approved it is recorded, so "I never approved this" has an answer',
+      typeof admin.tables.project_gbp_locations[0].auto_post_enabled_at === 'string'
+      && Date.now() - new Date(admin.tables.project_gbp_locations[0].auto_post_enabled_at).getTime() < 10_000)
     const off = await H.handleSetAutoPost(patch({ projectId: PROJECT, enabled: false }), deps(admin))
     check('and off again', off.status === 200 && admin.tables.project_gbp_locations[0].auto_post_on_publish === false)
+    check('turning it off clears the approval time, so a stale one never looks current',
+      admin.tables.project_gbp_locations[0].auto_post_enabled_at === null)
   }
   {
     const admin = world({ switchOn: false })
@@ -363,7 +388,9 @@ async function switchChecks() {
       project_id: PROJECT, user_id: OWNER, connection_id: 'conn-1111',
       account_name: 'accounts/111', location_name: 'locations/999', location_title: 'סניף אחר',
     })
-    check('picking a DIFFERENT business turns automatic posting off', admin.tables.project_gbp_locations[0].auto_post_on_publish === false)
+    check('picking a DIFFERENT business turns automatic posting off and clears the approval time',
+      admin.tables.project_gbp_locations[0].auto_post_on_publish === false
+      && admin.tables.project_gbp_locations[0].auto_post_enabled_at === null)
 
     const same = world()
     await S.saveProjectLocation(same, {
@@ -437,6 +464,24 @@ function sourceChecks() {
   check('the switch arrives OFF for everyone', /auto_post_on_publish boolean NOT NULL DEFAULT false/.test(migration))
   check('one automatic post per article is enforced by the database',
     /CREATE UNIQUE INDEX IF NOT EXISTS uq_gbp_posts_auto_article/.test(migration))
+  check('when the owner approved is recorded', /auto_post_enabled_at timestamptz/.test(migration))
+  check('and an approval time cannot sit on a switch that is off',
+    /CHECK \(auto_post_on_publish OR auto_post_enabled_at IS NULL\)/.test(migration))
+  // The one ALTER CONSTRAINT here only ADDS a check on a column this file created,
+  // after dropping it if present, so it is still additive and re-runnable.
+  // Comment lines out: the rollback recipe at the top names the same statement.
+  const migrationSql = migration.replace(/^--.*$/gm, '')
+  check('the only constraint it touches is its own new one',
+    (migrationSql.match(/DROP CONSTRAINT/g) ?? []).length === 1
+    && migrationSql.includes('DROP CONSTRAINT IF EXISTS project_gbp_locations_auto_post_enabled_at'))
+
+  // The header of draft.ts used to assert a Google rule that Google does not state.
+  // Unwrapped, so an assertion does not depend on where the comment happens to wrap.
+  const draftHeader = read('lib/gbp/draft.ts').slice(0, 2000).replace(/\n\s*\*\s*/g, ' ')
+  check('draft.ts no longer states as fact that Google rejects automatically generated posts',
+    draftHeader.includes("That is NOT what Google's policy says") && !/posts, research\.md\)/.test(draftHeader))
+  check('and it cites the pages that were actually read instead',
+    draftHeader.includes('business/answer/7213077') && draftHeader.includes('contributionpolicy/answer/7400114'))
 
   // i18n: the same keys in all four languages, nothing left in English.
   const { dashboardPtBR } = require('../../i18n/dashboard/pt-BR') as any

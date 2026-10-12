@@ -52,6 +52,8 @@ export interface GbpLocationRow {
   maps_uri: string | null
   /** The owner's switch: an article that publishes to their site also becomes a post here. */
   auto_post_on_publish: boolean
+  /** When they turned it on; null whenever it is off. */
+  auto_post_enabled_at: string | null
 }
 export type GbpPostStatus = 'scheduled' | 'publishing' | 'published' | 'failed' | 'cancelled'
 export interface GbpPostRow {
@@ -176,13 +178,13 @@ export async function readProjectLocation(admin: Admin, projectId: string): Prom
   return (data as GbpLocationRow | null) ?? null
 }
 
-export async function saveProjectLocation(admin: Admin, row: Omit<GbpLocationRow, 'maps_uri' | 'website_uri' | 'location_address' | 'auto_post_on_publish'> & Partial<GbpLocationRow>): Promise<void> {
+export async function saveProjectLocation(admin: Admin, row: Omit<GbpLocationRow, 'maps_uri' | 'website_uri' | 'location_address' | 'auto_post_on_publish' | 'auto_post_enabled_at'> & Partial<GbpLocationRow>): Promise<void> {
   // Moving the project to a DIFFERENT business turns automatic posting off: the
   // owner approved posting to the business they picked, not to the next one.
   const previous = await readProjectLocation(admin, row.project_id)
   const switched = previous !== null && previous.location_name !== row.location_name
   const { error } = await admin.from('project_gbp_locations').upsert({
-    ...(switched ? { auto_post_on_publish: false } : {}),
+    ...(switched ? { auto_post_on_publish: false, auto_post_enabled_at: null } : {}),
     project_id: row.project_id,
     user_id: row.user_id,
     connection_id: row.connection_id,
@@ -228,8 +230,11 @@ export async function insertPost(admin: Admin, row: {
  * nothing to post to, so the switch has nowhere to live.
  */
 export async function setAutoPostOnPublish(admin: Admin, projectId: string, on: boolean): Promise<boolean> {
+  const now = new Date().toISOString()
   const { data, error } = await admin.from('project_gbp_locations')
-    .update({ auto_post_on_publish: on, updated_at: new Date().toISOString() })
+    // When they approved it is recorded, because we publish in their name with
+    // nobody reading it first (legal thread, 2026-10-12). Turning it off clears it.
+    .update({ auto_post_on_publish: on, auto_post_enabled_at: on ? now : null, updated_at: now })
     .eq('project_id', projectId)
     .select('project_id')
   if (error) throw fail(error)

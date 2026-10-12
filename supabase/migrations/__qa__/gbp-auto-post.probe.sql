@@ -120,11 +120,75 @@ BEGIN
   PERFORM chk('defaults', 'the post that existed before the migration is not marked automatic',
     (SELECT auto_created = false AND needs_ai_draft = false FROM public.gbp_posts
       WHERE id = 'e1111111-1111-1111-1111-111111111111'));
-  PERFORM chk('defaults', 'all three new columns are NOT NULL with a false default',
+  PERFORM chk('defaults', 'no location has an approval time yet',
+    NOT EXISTS (SELECT 1 FROM public.project_gbp_locations WHERE auto_post_enabled_at IS NOT NULL));
+  PERFORM chk('defaults', 'all three new boolean columns are NOT NULL with a false default',
     (SELECT count(*) = 3 FROM information_schema.columns
       WHERE table_schema = 'public' AND is_nullable = 'NO' AND column_default = 'false'
         AND ((table_name = 'project_gbp_locations' AND column_name = 'auto_post_on_publish')
           OR (table_name = 'gbp_posts' AND column_name IN ('auto_created', 'needs_ai_draft')))));
+END $$;
+
+-- ── the approval time ───────────────────────────────────────────────────────
+DO $$
+DECLARE r text;
+BEGIN
+  SET ROLE service_role;
+  -- An approval time only ever sits on a switch that is ON.
+  BEGIN
+    UPDATE public.project_gbp_locations SET auto_post_enabled_at = now()
+      WHERE project_id = 'a1111111-1111-1111-1111-111111111111';
+    r := 'accepted';
+  EXCEPTION WHEN OTHERS THEN r := 'denied:' || SQLSTATE;
+  END;
+  PERFORM chk('defaults', 'an approval time on a switch that is OFF is refused -> ' || r, r = 'denied:23514');
+
+  BEGIN
+    UPDATE public.project_gbp_locations SET auto_post_on_publish = true, auto_post_enabled_at = now()
+      WHERE project_id = 'a1111111-1111-1111-1111-111111111111';
+    r := 'accepted';
+  EXCEPTION WHEN OTHERS THEN r := 'denied:' || SQLSTATE;
+  END;
+  PERFORM chk('defaults', 'turning the switch on WITH an approval time is accepted -> ' || r, r = 'accepted');
+
+  BEGIN
+    UPDATE public.project_gbp_locations SET auto_post_on_publish = false, auto_post_enabled_at = NULL
+      WHERE project_id = 'a1111111-1111-1111-1111-111111111111';
+    r := 'accepted';
+  EXCEPTION WHEN OTHERS THEN r := 'denied:' || SQLSTATE;
+  END;
+  PERFORM chk('defaults', 'turning it off and clearing the time together is accepted -> ' || r, r = 'accepted');
+
+  BEGIN
+    UPDATE public.project_gbp_locations SET auto_post_on_publish = true WHERE project_id = 'a1111111-1111-1111-1111-111111111111';
+    UPDATE public.project_gbp_locations SET auto_post_on_publish = false
+      WHERE project_id = 'a1111111-1111-1111-1111-111111111111';
+    r := 'accepted';
+  EXCEPTION WHEN OTHERS THEN r := 'denied:' || SQLSTATE;
+  END;
+  PERFORM chk('defaults', 'the switch alone still toggles freely while the time stays NULL -> ' || r, r = 'accepted');
+  UPDATE public.project_gbp_locations SET auto_post_on_publish = false, auto_post_enabled_at = NULL
+    WHERE project_id = 'a1111111-1111-1111-1111-111111111111';
+  RESET ROLE;
+END $$;
+
+-- MUTATION CONTROL for that constraint: without it the contradictory row goes in.
+DO $$
+DECLARE planted boolean := false;
+BEGIN
+  BEGIN
+    ALTER TABLE public.project_gbp_locations DROP CONSTRAINT project_gbp_locations_auto_post_enabled_at;
+    SET ROLE service_role;
+    UPDATE public.project_gbp_locations SET auto_post_enabled_at = now()
+      WHERE project_id = 'a1111111-1111-1111-1111-111111111111';
+    planted := EXISTS (SELECT 1 FROM public.project_gbp_locations
+      WHERE project_id = 'a1111111-1111-1111-1111-111111111111'
+        AND auto_post_on_publish = false AND auto_post_enabled_at IS NOT NULL);
+    RESET ROLE;
+    RAISE EXCEPTION 'undo_mutation';
+  EXCEPTION WHEN raise_exception THEN RESET ROLE;
+  END;
+  PERFORM chk('defaults', 'MUTATION CONTROL: without the constraint an approval time sits on a switch that is off', planted);
 END $$;
 
 -- ── dedupe ──────────────────────────────────────────────────────────────────
@@ -254,6 +318,8 @@ BEGIN
     (SELECT auto_post_on_publish FROM public.project_gbp_locations WHERE project_id = 'a2222222-2222-2222-2222-222222222222'));
   PERFORM chk('restored', 're-applying the migration did not turn the other switch on',
     (SELECT auto_post_on_publish = false FROM public.project_gbp_locations WHERE project_id = 'a1111111-1111-1111-1111-111111111111'));
+  PERFORM chk('restored', 'the approval-time constraint is back',
+    EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'project_gbp_locations_auto_post_enabled_at'));
 END $$;
 
 \set QUIET off
