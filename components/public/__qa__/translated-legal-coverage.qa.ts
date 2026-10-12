@@ -2381,11 +2381,21 @@ const AUTO_POST_NO_PERSON: Record<string, RegExp> = {
   es: /sin ning[úu]n nombre de persona/,
   'pt-BR': /sem nenhum nome de pessoa/,
 }
+/*
+ * The post's language. This started as the opposite claim: the column allowed he
+ * and en only, so a Spanish project's article would have gone out in English on
+ * a Spanish business's listing, and the first version of this text said such a
+ * project gets no post at all. Oren rejected the limit on 12 October ("what is
+ * the problem with the post being in Spanish or Portuguese? that is what we do
+ * with the articles"), the feature widened the column's CHECK to all four app
+ * languages and dropped the skip, and the sentence now says the simple true
+ * thing. The two code checks below are what stops it drifting back.
+ */
 const AUTO_POST_LANGUAGE: Record<string, RegExp> = {
-  he: /פוסט אוטומטי יוצא בעברית או באנגלית בלבד/,
-  en: /An automatic post goes out in Hebrew or English only/,
-  es: /Una publicaci[óo]n autom[áa]tica se emite [úu]nicamente en hebreo o en ingl[ée]s/,
-  'pt-BR': /Uma postagem autom[áa]tica sai somente em hebraico ou em ingl[êe]s/,
+  he: /פוסט אוטומטי נכתב בשפת הפרויקט/,
+  en: /An automatic post is written in the project&rsquo;s language/,
+  es: /Una publicaci[óo]n autom[áa]tica se redacta en el idioma del proyecto/,
+  'pt-BR': /Uma postagem autom[áa]tica [ée] escrita no idioma do projeto/,
 }
 const AUTO_POST_SELF_OFF: Record<string, RegExp> = {
   he: /נכבית מעצמה אם החלפת/,
@@ -2440,7 +2450,7 @@ const AUTO_POST_NO_LONGER_TRUE = /we create a post only when you press publish|�
   const DRAFT_SRC = 'lib/gbp/draft.ts'
   const ENQUEUE = 'lib/gbp/auto-post.ts'
   const autoLanded = existsSync(AUTO_MIGRATION)
-  console.log(`  · automatic posting ${autoLanded ? 'HAS landed; its code is checked below' : 'has NOT landed yet; its five code checks are waiting for it'}`)
+  console.log(`  · automatic posting ${autoLanded ? 'HAS landed; its code is checked below' : 'has NOT landed yet; its six code checks are waiting for it'}`)
   if (autoLanded) {
     const migration = stripComments(read(AUTO_MIGRATION))
     check(`${AUTO_MIGRATION}: the switch defaults to off`,
@@ -2454,9 +2464,11 @@ const AUTO_POST_NO_LONGER_TRUE = /we create a post only when you press publish|�
     check(`${AUTO_MIGRATION}: when the switch was turned on is recorded, and only while it is on`,
       /ADD COLUMN IF NOT EXISTS auto_post_enabled_at timestamptz/.test(migration)
       && /CHECK \(auto_post_on_publish OR auto_post_enabled_at IS NULL\)/.test(migration))
+    check(`${AUTO_MIGRATION}: a post may carry any of the four app languages`,
+      /CHECK \(language_code IN \('he', 'en', 'es', 'pt-BR'\)\)/.test(migration))
     const enqueue = stripComments(read(ENQUEUE))
-    check(`${ENQUEUE}: a project in a language a post cannot carry is skipped, not posted`,
-      /language_unsupported/.test(enqueue))
+    check(`${ENQUEUE}: no project is skipped for its language`,
+      !/language_unsupported/.test(enqueue))
     const store = stripComments(read(STORE))
     check(`${STORE}: moving the project to another business clears the switch`,
       /auto_post_on_publish:\s*false/.test(store))
@@ -2472,8 +2484,11 @@ const AUTO_POST_NO_LONGER_TRUE = /we create a post only when you press publish|�
     AUTO_POST_NO_LONGER_TRUE.test('A draft is never published until you review it and press publish.'))
   check('mutation control: automatic posting described without "off by default" is caught',
     !AUTO_POST_OPT_IN.en.test('Automatic posting: every article is also published as a post.'))
-  check('mutation control: a post language promise naming every language is caught',
-    !AUTO_POST_LANGUAGE.en.test('An automatic post goes out in your project language.'))
+  check('mutation control: a post language narrowed back to two is caught',
+    !AUTO_POST_LANGUAGE.en.test('An automatic post goes out in Hebrew or English only.'))
+  check('mutation control: a CHECK narrowed back to two languages is caught',
+    !/CHECK \(language_code IN \('he', 'en', 'es', 'pt-BR'\)\)/.test(
+      "ADD CONSTRAINT gbp_posts_language CHECK (language_code IN ('he', 'en'))"))
   check('mutation control: a consent timestamp with no CHECK behind it would be caught',
     !/CHECK \(auto_post_on_publish OR auto_post_enabled_at IS NULL\)/.test(
       'ALTER TABLE x ADD COLUMN IF NOT EXISTS auto_post_enabled_at timestamptz;'))
