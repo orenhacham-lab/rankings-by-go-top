@@ -4,10 +4,11 @@
  * byte-for-byte this list (the repo-only README.md aside): a change to the PHP is a new plugin
  * release, and this list moves with it on purpose.
  *
- * 3.1.0 is the release candidate in this folder, NOT yet approved on WordPress.org: WordPress.org
- * serves 3.0.0 (APPROVED_WPORG_VERSION) until the 3.1.0 zip is submitted and approved. The app gates
- * every 3.1 feature by the site's plugin version (lib/site-fix/plugin-capabilities.ts), so a site on
- * 3.0.0 keeps exactly its 3.0.0 behaviour meanwhile.
+ * 3.1.1 is live on WordPress.org (Oren uploaded it and confirmed the listing, 13 Oct 2026), so
+ * APPROVED_WPORG_VERSION and APPROVED_PLUGIN_VERSION are both 3.1.1: it carries the corrected English
+ * company name in the plugin header and the readme. The app gates every 3.1 feature by `>=` the site's
+ * plugin version (lib/site-fix/plugin-capabilities.ts), so a site still on 3.1.0 is unaffected and is
+ * offered the update (PLUGIN_LATEST_VERSION in ../types.ts, which never runs ahead of this constant).
  *
  * Not a suite (no .qa.ts): imported by lib/content/__qa__/wordpress-plugin-publish.qa.ts and
  * lib/content/__qa__/wordpress-schema.qa.ts.
@@ -17,12 +18,12 @@ import { existsSync, readFileSync } from 'fs'
 import { join } from 'path'
 
 /** The release on WordPress.org today (slug go-top-seo-bridge). */
-export const APPROVED_WPORG_VERSION = '3.0.0'
+export const APPROVED_WPORG_VERSION = '3.1.1'
 /** The release in this folder (pinned below). */
-export const APPROVED_PLUGIN_VERSION = '3.1.0'
+export const APPROVED_PLUGIN_VERSION = '3.1.1'
 
 export const APPROVED_PLUGIN_SHA256: Readonly<Record<string, string>> = {
-  'gotop-seo-bridge.php': 'e03973fab72d23db163072efffc77da5d487569eeff4fa4117e59e8f69ee66e9',
+  'gotop-seo-bridge.php': 'b50f5ad87318db86755e4084b3ae249087be26fb7f700f7a2f83e5548e1a2a9b',
   'includes/admin.php': 'c329269dee8ed6deee6011e9fff6ff39fd034c7e37603dc755f17de109506560',
   'includes/auth.php': 'd3ed0d413a684d4f1a319636044acd4c0f8faca31981332fb0e76d5bea896873',
   'includes/content.php': '86caf96c0c5e6d4ed84fd40ec0e734dc459fe96e136bcc6faf45371c2e0845d1',
@@ -32,7 +33,7 @@ export const APPROVED_PLUGIN_SHA256: Readonly<Record<string, string>> = {
   'includes/publish.php': '982c394fa3e669de7cae6a2bfe731aed976d16ef0f1c6c9c85a0b3efbaad03de',
   'includes/read.php': 'dead168a3ebcc214645d1778022ba3d9d1502caf18ed20ea72a4ed058fce5fa0',
   'includes/routes.php': 'd990b59fdff6b005adb16c75cd76da61739ca83d282fc0e4c2fa674b9befe4e2',
-  'readme.txt': '4d132fb54e67b655f532c753310a3e4ffa67d4c005eb53ae12666eef3a5c6965',
+  'readme.txt': '693c8526e403a7c89d241d935e1361c24654aba29713a657b39bcdad2e3d75fb',
   'uninstall.php': 'f938ecab70d2dbab268a2350bc7940db67f9054d0e3e497164b8cd2081e6cee1',
 }
 

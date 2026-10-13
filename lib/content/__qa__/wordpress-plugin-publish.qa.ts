@@ -36,6 +36,8 @@ import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, unlinkSync, w
 import { tmpdir } from 'os'
 import { join } from 'path'
 
+import { APPROVED_PLUGIN_VERSION, APPROVED_WPORG_VERSION } from '@/lib/site-fix/__qa__/approved-plugin'
+
 process.env.CONTENT_CREDENTIALS_ENCRYPTION_KEY = process.env.CONTENT_CREDENTIALS_ENCRYPTION_KEY || 'c'.repeat(64)
 
 import { FakeAdmin } from '@/lib/__qa__/_fake-admin'
@@ -404,8 +406,8 @@ async function main() {
       const after = L.postfull(21)
       check('P10: 3.1.0: the recorded post of an application-password publish is updated in place and tied to the article, no new post',
         taken.ok && taken.via === 'plugin' && taken.wpPostId === 21 && (after.post as Row).post_title === 'Waterproof boots, taken over' && after.meta._gotop_article_id === ART && after.count === upd.count, JSON.stringify(taken).slice(0, 200))
-      check('P10a: the stored version followed the plugin\'s /status (3.0.0 -> 3.1.0) before it was asked to take over',
-        admin.tables.site_fix_plugin_links![0]!.plugin_version === '3.1.0', String(admin.tables.site_fix_plugin_links![0]!.plugin_version))
+      check('P10a: the stored version followed the plugin\'s /status (3.0.0 -> the shipped release) before it was asked to take over',
+        admin.tables.site_fix_plugin_links![0]!.plugin_version === APPROVED_PLUGIN_VERSION, String(admin.tables.site_fix_plugin_links![0]!.plugin_version))
       const off = await pluginMedia(pub.plugin.link, { url: 'https://evil.example.org/x.png', alt: 'x' }, L.post)
       check('P11: an image address outside GO TOP storage is refused (off_site) and never downloaded', !off.ok && off.pluginCode === 'off_site' && !L.postfull(id).downloads.includes('https://evil.example.org/x.png'))
       const draft = await M.publishArticleToWordPress(admin as never, pub, ARTICLE({ id: '1c2d3e4f-5a6b-4c7d-8e9f-0a1b2c3d4e5f', slug: 'second' }) as never, { status: 'draft' }, { post: L.post })
@@ -565,7 +567,14 @@ async function main() {
   }
   check('MUTATION CONTROL: copy that still says "download the zip" is caught', !copyOk(pluginBlock(read('lib/i18n/dashboard/en.ts')).replace('install: {', 'download: {')))
   const types = read('lib/site-fix/types.ts')
-  check('W7: the latest plugin is 3.1.0, so a 2.x or 3.0 link is offered the update', /PLUGIN_LATEST_VERSION = '3\.1\.0'/.test(types) && read('lib/site-fix/plugin-zip.generated.ts').includes("PLUGIN_VERSION = '3.1.0'"))
+  // The update we offer a connected site is the release it can actually install: the install steps send
+  // merchants to WordPress.org (PLUGIN_WPORG_URL), so PLUGIN_LATEST_VERSION must never run ahead of the
+  // release approved there. The zip this app serves is the release in the repo, which may be newer.
+  check(`W7: the update offered is the WordPress.org release (${APPROVED_WPORG_VERSION}), and the served zip is the release in the repo (${APPROVED_PLUGIN_VERSION})`,
+    new RegExp(`PLUGIN_LATEST_VERSION = '${APPROVED_WPORG_VERSION.replace(/\./g, '\\.')}'`).test(types) &&
+    read('lib/site-fix/plugin-zip.generated.ts').includes(`PLUGIN_VERSION = '${APPROVED_PLUGIN_VERSION}'`))
+  check('MUTATION CONTROL: a latest version ahead of the WordPress.org release is caught',
+    !new RegExp(`PLUGIN_LATEST_VERSION = '${APPROVED_WPORG_VERSION.replace(/\./g, '\\.')}'`).test(types.replace(`PLUGIN_LATEST_VERSION = '${APPROVED_WPORG_VERSION}'`, "PLUGIN_LATEST_VERSION = '9.9.9'")))
 
   console.log(`\n${passed} passed, ${failed} failed`)
   if (failed) process.exitCode = 1
