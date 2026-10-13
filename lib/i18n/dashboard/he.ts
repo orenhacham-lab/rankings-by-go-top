@@ -6614,7 +6614,7 @@ export const dashboardHe = {
       team: 'צוות Go Top SEO',
       footer: 'קיבלתם את המייל כי יש לכם פרויקט פעיל ב-Go Top SEO. לא רוצים תזכורות כאלה?',
       unsubscribe: 'הסרה בלחיצה אחת, בלי להתחבר',
-      company: 'Go Top SEO · oren@gotop.co.il',
+      company: 'גו טופ שיווק ופרסום דיגיטלי בע״מ (ח.פ. 517274346) · הרכסים 24/2, רמת גן 5235524 · oren@gotop.co.il',
     },
     unsubscribePage: {
       title: 'הוסרתם מהתזכורות',
@@ -6634,7 +6634,7 @@ export const dashboardHe = {
     team: 'צוות Go Top SEO',
     footer: 'קיבלתם את המייל כי פתחתם פרויקט ב-Go Top SEO ועוד לא סיימתם להקים אותו. לא רוצים מיילים כאלה?',
     unsubscribe: 'להפסיק את מיילי ההתחלה, בלחיצה אחת ובלי להתחבר',
-    company: 'Go Top SEO · oren@gotop.co.il',
+    company: 'גו טופ שיווק ופרסום דיגיטלי בע״מ (ח.פ. 517274346) · הרכסים 24/2, רמת גן 5235524 · oren@gotop.co.il',
     connect: {
       subject: (domain: string) => `האתר ${domain} עוד לא מחובר למערכת`,
       preheader: 'חיבור אחד, ומכאן המערכת עובדת לבד.',
@@ -6680,7 +6680,7 @@ export const dashboardHe = {
     team: 'צוות Go Top SEO',
     footer: 'קיבלתם את המייל כי הדלקתם את הסיכום השבועי בהגדרות הפרויקט. לא רוצים יותר?',
     unsubscribe: 'הסרה בלחיצה אחת, בלי להתחבר',
-    company: 'Go Top SEO · oren@gotop.co.il',
+    company: 'גו טופ שיווק ופרסום דיגיטלי בע״מ (ח.פ. 517274346) · הרכסים 24/2, רמת גן 5235524 · oren@gotop.co.il',
   },
 } as const
 

@@ -258,7 +258,7 @@ console.log('\nD) the real documents, in every language')
       // THE COMPANY'S REGISTERED NAME IS NEVER TRANSLATED (Oren, 2026-10-03):
       // the Hebrew pages carry the Hebrew name, English and every other language
       // carry the English name exactly as registered.
-      const named = /GO TOP MARKETING GRUO LTD/.test(body)
+      const named = /GO TOP DIGITAL MARKETING AND ADVERTISING LTD/.test(body)
       check(`D6 (${language}): …and the registered company name is not translated`,
         !TRANSLATED_NAME.some((re) => re.test(body)), body.match(/GO TOP[^.\n]{0,60}/i)?.[0])
       if (slug === 'terms' || slug === 'privacy') {

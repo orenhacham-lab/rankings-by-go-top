@@ -34,7 +34,7 @@ const OUR_FOOTER = `
 On Mon, Oct 12, 2026 at 9:02 AM Oren <oren@trygotopseo.com> wrote:
 > Would it be useful if I sent you the full free report? If it is not
 > relevant, reply "no" and I will not write again.
-> This is an advertisement sent by GO TOP MARKETING GRUO LTD, which operates
+> This is an advertisement sent by GO TOP DIGITAL MARKETING AND ADVERTISING LTD, which operates
 > Go Top SEO. If you would rather not hear from us again, unsubscribe here.`
 
 const emptyList = () => new FakeAdmin({ [SUPPRESSION_TABLE]: [] })

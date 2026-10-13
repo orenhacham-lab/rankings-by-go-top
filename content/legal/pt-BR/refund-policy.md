@@ -3,7 +3,7 @@ title: Política de Cancelamento e Reembolso | Go Top SEO
 description: Como cancelar uma assinatura do Go Top SEO e em que casos há reembolso.
 locale: pt-BR
 source: app/(public)/en/refund-policy/page.tsx
-lastUpdated: 2026-10-04
+lastUpdated: 2026-10-13
 register: voce
 extraSections: 1
 extraReason: The Brazilian Consumer Code's seven-day right of withdrawal (Art. 49) is stated in a section of its own, because a right a consumer has to infer from "where the law requires" is a right the same Code treats as not having been given (Arts. 46 and 54).
@@ -49,8 +49,8 @@ Se a sua conta é faturada pela Shopify (por exemplo, se você instalou o aplica
 
 ## 8. Contato
 
-**GO TOP MARKETING GRUO LTD**  
+**GO TOP DIGITAL MARKETING AND ADVERTISING LTD**  
 Número da sociedade: 517274346  
 E-mail: [oren@gotop.co.il](mailto:oren@gotop.co.il)
 
-Última atualização: 4 de outubro de 2026
+Última atualização: 13 de outubro de 2026

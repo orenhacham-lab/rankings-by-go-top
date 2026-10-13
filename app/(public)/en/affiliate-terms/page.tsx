@@ -26,7 +26,7 @@ export default function EnglishAffiliateTermsPage() {
         <h2>1. The parties and what this agreement is</h2>
         <p>
           This agreement governs participation in the Go Top SEO partner program (the
-          &ldquo;Program&rdquo;). It is made between GO TOP MARKETING GRUO LTD (company number
+          &ldquo;Program&rdquo;). It is made between GO TOP DIGITAL MARKETING AND ADVERTISING LTD (company number
           517274346) (the &ldquo;Company&rdquo;, &ldquo;we&rdquo;, &ldquo;us&rdquo;) and the person or
           entity whose application to the Program we approve (the &ldquo;Partner&rdquo;,
           &ldquo;you&rdquo;). It takes effect on the date we notify you that your application is
@@ -480,7 +480,7 @@ export default function EnglishAffiliateTermsPage() {
       </section>
 
       <section>
-        <p className={LEGAL_FOOTNOTE}>Last updated: 9 October 2026</p>
+        <p className={LEGAL_FOOTNOTE}>Last updated: 13 October 2026</p>
       </section>
     </LegalDoc>
   )
