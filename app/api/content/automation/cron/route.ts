@@ -31,6 +31,11 @@
  * (07:00–08:59, the Vercel cron's 07:00 run and cron-job.org's quarter hours), and
  * outside it returns at once without a read or a line. No new cron schedule.
  *
+ * ALONGSIDE ALL OF IT, THE COMPANY BLOG'S DAILY ARTICLE (lib/blog/auto/daily-window.ts):
+ * one language per run, at most one article a language a day, Production only and only in
+ * the UTC window 04:00-06:59, because Vercel's scheduler did not deliver the blog's own
+ * three daily jobs while this cron fires every fifteen minutes. Isolated the same way.
+ *
  * ALONGSIDE ALL OF IT, THE SITE MAPPING UPKEEP (lib/content/existing-content/map-upkeep.ts):
  * at most one project per run whose mapping is missing or ageing is mapped, so automatic
  * internal links have pages to point at. Started with the runner, awaited before the emails.
@@ -53,6 +58,7 @@ import { runIsolatedOnboardingEmails } from '@/lib/onboarding-emails/isolated'
 import { runIsolatedWeeklySummaries } from '@/lib/reports/weekly/isolated'
 import { checkPublishingStalls, isDailyStallCheckRun } from '@/lib/content/automation/stall-watch'
 import { runMapUpkeep, liveEnsure } from '@/lib/content/existing-content/map-upkeep'
+import { runBlogDailyWindow, startIsolatedBlogWindow } from '@/lib/blog/auto/daily-window'
 
 // Generation can take a while; request a generous budget (platform clamps to the
 // plan's max — e.g. 60s on Hobby, up to 300s on Pro).
@@ -80,6 +86,15 @@ async function handle(request: Request): Promise<Response> {
     // It touches no table the runner writes, never throws, and its 40s margin is left for
     // the emails below.
     const mapUpkeep = runMapUpkeep(createAdminClient(), { deadlineAt: Date.parse(startedAt) + maxDuration * 1000 - 40_000, ensure: liveEnsure })
+    // The company blog's own daily article, ALONGSIDE the runner for the same reason:
+    // a content run that publishes takes 150-270s, and Vercel's scheduler did not
+    // deliver the blog's own three daily jobs (lib/blog/auto/daily-window.ts). One
+    // language per run, at most one article a language a day, Production only and
+    // only in its morning UTC window. Isolated below; it never throws.
+    const blogWindow = startIsolatedBlogWindow(
+      (deadlineAt) => runBlogDailyWindow(createAdminClient(), { env: process.env, deadlineAt }),
+      { startedAtMs: Date.parse(startedAt), maxDurationMs: maxDuration * 1000 },
+    )
     try {
       const summary = await runAutomation(createAdminClient(), {})
       console.log('[automation-cron] run complete', { startedAt, poolsChecked: summary.poolsChecked, published: summary.published, generated: summary.generated, staleRecovered: summary.staleRecovered, failures: summary.failures, durationMs: summary.durationMs })
@@ -100,8 +115,10 @@ async function handle(request: Request): Promise<Response> {
       (deadlineAt) => runTopicTopUp(createAdminClient(), { env: process.env, deadlineAt }),
       { startedAtMs: Date.parse(startedAt), maxDurationMs: maxDuration * 1000 },
     )
-    // The site-mapping pass started next to the runner (above) is awaited here, before the emails.
+    // The site-mapping pass and the blog article started next to the runner (above) are
+    // awaited here, before the emails.
     await mapUpkeep
+    await blogWindow
     // Last of all, and off unless REMINDER_EMAILS_ENABLED is "true": the reminder email for
     // articles waiting for approval (lib/reminders). Isolated; it never throws or rejects.
     await runIsolatedReminders()
