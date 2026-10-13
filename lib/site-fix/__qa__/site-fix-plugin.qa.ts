@@ -93,7 +93,7 @@ function main() {
 
   console.log('\nA) authentication')
   const src = readFileSync(join(PLUGIN, 'gotop-seo-bridge.php'), 'utf8')
-  check('the plugin version is 3.1.0 (header, constant and readme Stable tag)', /Version:\s+3\.1\.0/.test(src) && /GOTOP_SEO_BRIDGE_VERSION', '3\.1\.0'/.test(src) && /Stable tag: 3\.1\.0/.test(readFileSync(join(PLUGIN, 'readme.txt'), 'utf8')))
+  check('the plugin version is 3.1.1 (header, constant and readme Stable tag)', /Version:\s+3\.1\.1/.test(src) && /GOTOP_SEO_BRIDGE_VERSION', '3\.1\.1'/.test(src) && /Stable tag: 3\.1\.1/.test(readFileSync(join(PLUGIN, 'readme.txt'), 'utf8')))
   const allPhp = phpFiles.map((f) => readFileSync(f, 'utf8')).join('\n')
   check('no route is open (__return_true never used as a permission_callback)', !/permission_callback'\s*=>\s*'__return_true'/.test(allPhp))
   check('the signature compare is constant time (hash_equals)', /hash_equals\(\$expected, \$sig\)/.test(allPhp))
@@ -132,7 +132,7 @@ function main() {
   check('a malformed pairing code is refused', r[0].status === 400 && r[0].body?.code === 'invalid_code')
   check('an administrator pairs with the code the app issued', r[1].status === 200 && r[1].body?.key_id === key.keyId, JSON.stringify(r[1]))
   const fixTypes = (r[2].body?.fix_types ?? []) as string[]
-  check('a signed status call answers with the version', r[2].status === 200 && r[2].body?.version === '3.1.0', JSON.stringify(r[2]))
+  check('a signed status call answers with the version', r[2].status === 200 && r[2].body?.version === '3.1.1', JSON.stringify(r[2]))
   check('the plugin whitelist is exactly the app whitelist (no drift)', JSON.stringify(fixTypes) === JSON.stringify([...FIX_TYPES]), fixTypes.join(','))
   check('an unsigned /fix is refused', r[3].status === 401 && r[3].body?.code === 'gotop_bad_headers', JSON.stringify(r[3]))
   check('a request signed with another secret is refused', r[4].body?.code === 'gotop_bad_signature', JSON.stringify(r[4]))
@@ -438,7 +438,7 @@ function main() {
       writeFileSync(main, readFileSync(main, 'utf8')
         .replace("add_action('plugins_loaded', function () {", '(function () {').replace(/\}, 0\);\s*$/, '})();\n')
         .replace("if (defined('GOTOP_SEO_BRIDGE_VERSION')) {", 'if (false) {')
-        .replace("define('GOTOP_SEO_BRIDGE_VERSION', '3.1.0');", "define('GOTOP_SEO_BRIDGE_VERSION', '3.0.0');")
+        .replace("define('GOTOP_SEO_BRIDGE_VERSION', '3.1.1');", "define('GOTOP_SEO_BRIDGE_VERSION', '3.0.0');")
         // 3.0.0 declared its route functions in the main file itself (PHP binds those as the file is read).
         .replace("    require_once GOTOP_SEO_BRIDGE_DIR . '/includes/routes.php';\n", '')
         + readFileSync(join(dir, 'includes', 'routes.php'), 'utf8').replace('<?php', '').replace("if (!defined('ABSPATH')) { exit; }", ''))
@@ -466,7 +466,7 @@ function main() {
     check('N23: 3.1 read first (go-top-seo-bridge/), an old copy after it: no fatal error, the old copy runs, 3.1 stays off with a notice',
       runsOne(newFirst, '3.0.0'), newFirst.raw)
     check('N23b: the old copy read first: the same, no fatal error', runsOne(oldFirst, '3.0.0'), oldFirst.raw)
-    check('N23c: two copies of 3.1: one runs, the other shows the notice', runsOne(both31, '3.1.0'), both31.raw)
+    check('N23c: two copies of 3.1: one runs, the other shows the notice', runsOne(both31, '3.1.1'), both31.raw)
     const quiet = dupRun(PLUGIN, old, [])
     check('N23d: the notice is only for users who may manage plugins', quiet.status === 0 && String(quiet.out[1]?.value) === '', quiet.raw)
     {
