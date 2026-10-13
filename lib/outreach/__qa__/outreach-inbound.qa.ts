@@ -29,13 +29,33 @@ const SECRET = 'webhook-secret-value'
 const ENV = { OUTREACH_INBOUND_SECRET: SECRET }
 const ADDR = 'owner@store.example'
 
-/** The footer of our own message, which a reply quotes back verbatim. */
+/**
+ * The footer of our own message, which a reply quotes back verbatim. It is the
+ * wording Oren approved on 10 October: the brand and the postal address, no
+ * company name and no company number. It is reproduced here exactly because
+ * the risk this suite exists for is OUR words being read as the recipient's —
+ * the footer contains "unsubscribe", so a footer that survives `ownWords` turns
+ * every interested reply into an opt-out.
+ *
+ * It deliberately names NO company. The entity rename of 13 October (#205)
+ * renamed a company name that sat in this fixture from a draft the channel never
+ * adopted; CAN-SPAM 15 U.S.C. 7704(a)(5) asks for the advertisement
+ * identification, the opt-out and a valid postal address, not a registered name,
+ * so the approved footer carries none and a rename cannot reach this channel.
+ */
+const FOOTER_TEXT = `This is an advertisement sent by Go Top SEO at HaRechasim 24/2, Ramat Gan 5235524, Israel. If you would rather not hear from us again, unsubscribe here — we act on it immediately. How we handle your details: https://www.gotopseo.com/en/privacy`
 const OUR_FOOTER = `
 On Mon, Oct 12, 2026 at 9:02 AM Oren <oren@trygotopseo.com> wrote:
 > Would it be useful if I sent you the full free report? If it is not
 > relevant, reply "no" and I will not write again.
-> This is an advertisement sent by GO TOP DIGITAL MARKETING AND ADVERTISING LTD, which operates
-> Go Top SEO. If you would rather not hear from us again, unsubscribe here.`
+> ${FOOTER_TEXT}`
+/**
+ * The same footer with no `>` prefixes, which is what Outlook and several
+ * mobile clients send. Here the `>` marker cannot help, so the footer is only
+ * removed by the marker that matches its opening words — which is the line this
+ * variant exists to keep honest.
+ */
+const OUR_FOOTER_UNQUOTED = `\n\n${FOOTER_TEXT}`
 
 const emptyList = () => new FakeAdmin({ [SUPPRESSION_TABLE]: [] })
 const rows = (f: FakeAdmin) => f.tables[SUPPRESSION_TABLE] as Record<string, unknown>[]
@@ -60,6 +80,13 @@ async function main() {
     !isOptOut(`Sure, interested.\nSent from my iPhone${OUR_FOOTER}`))
   check('Q4: "-----Original Message-----" is a quote marker too',
     !isOptOut('Sounds good.\n-----Original Message-----\nunsubscribe here'))
+  check('Q5: an UNQUOTED footer is removed too — no ">" to rely on',
+    ownWords(`Yes please, send it over.${OUR_FOOTER_UNQUOTED}`) === 'Yes please, send it over.')
+  check('Q6: so an interested reply that quotes it without ">" is still not an opt-out',
+    !isOptOut(`Yes please, send it over.${OUR_FOOTER_UNQUOTED}`)
+    && !isOptOut(`Sounds useful, what does it cost?${OUR_FOOTER_UNQUOTED}`))
+  check('Q7: a refusal underneath an unquoted footer is still a refusal',
+    isOptOut(`No thanks.${OUR_FOOTER_UNQUOTED}`))
 
   // ── A refusal is a refusal ─────────────────────────────────────────────────
   check('O1: a bare "no" is a refusal, because that is the word we asked for',
@@ -150,6 +177,13 @@ async function main() {
     (m) => m.isOptOut(`Yes please, send it over.${OUR_FOOTER}`),
   )
   check('Q2-MUT: matching the raw body would suppress everyone who said yes', mutQuote)
+
+  const mutFooterMarker = await withMutant<{ isOptOut: typeof isOptOut }, boolean>(
+    'lib/outreach/inbound.ts',
+    [[/  \/\^\\s\*this is an advertisement sent by\[\\s\\S\]\*\/im,\n/, '']],
+    (m) => m.isOptOut(`Yes please, send it over.${OUR_FOOTER_UNQUOTED}`),
+  )
+  check('Q5-MUT: without the footer marker, an unquoted footer would suppress a yes', mutFooterMarker)
 
   const mutShortNo = await withMutant<{ isOptOut: typeof isOptOut }, boolean>(
     'lib/outreach/inbound.ts',

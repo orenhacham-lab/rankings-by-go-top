@@ -17,6 +17,7 @@ import { join } from 'node:path'
 import { FakeAdmin } from '@/lib/__qa__/_fake-admin'
 import { withMutant } from '@/lib/reminders/__qa__/_mutant'
 import { PROSPECTS_TABLE } from '../prospects'
+import { runIsolatedProspectRetention } from '../retention-isolated'
 import {
   PROSPECT_REDACTION_DAYS,
   UNUSED_PROSPECT_DAYS,
@@ -179,6 +180,63 @@ async function main() {
     /outreach_prospects_postal_present CHECK \(\s*redacted_at IS NOT NULL OR postal_address IS NOT NULL\)/
       .test(migrationSrc))
 
+  // ── It actually runs, and we can see that it ran ──────────────────────────
+  // The gate on sending the first wave was "the pass has run once in Production".
+  // On 13 Oct 2026 that could not be answered: the route logged only when it had
+  // changed something, the table was empty, and a Vercel daily cron on this plan
+  // is best-effort. Both halves are pinned here.
+  const logsEveryPass = (src: string) =>
+    /console\.log\('\[outreach-retention\] pass complete', summary\)/.test(src)
+    && !/if \([^)]*summary\.(redacted|unusedDeleted|failed)[\s\S]{0,120}console\.log\('\[outreach-retention\]/.test(src)
+  check('S8: the route logs every pass, counts of zero included — a silent pass cannot be told from one that never fired',
+    logsEveryPass(routeSrc))
+  const automationSrc = stripComments(readFileSync(join(ROOT, 'app/api/content/automation/cron/route.ts'), 'utf8'))
+  const ridesQuarterHour = (src: string) =>
+    /import \{ runIsolatedProspectRetention \}/.test(src) && /await runIsolatedProspectRetention\(/.test(src)
+  check('S9: the pass rides the 15-minute cron too, not only the daily entry that may never fire',
+    ridesQuarterHour(automationSrc))
+  const isoSrc = stripComments(readFileSync(join(ROOT, 'lib/outreach/retention-isolated.ts'), 'utf8'))
+  check('S10: and nothing about a prospect reaches its log line either',
+    !/console\.(log|error|warn)\([^)]*\b(email|contact_name|company|postal_address|row)\b/.test(isoSrc))
+
+  const lines: unknown[][] = []
+  const origLog = console.log
+  const origError = console.error
+  const capture = async (fn: () => Promise<unknown>) => {
+    lines.length = 0
+    console.log = (...a: unknown[]) => { lines.push(a) }
+    console.error = (...a: unknown[]) => { lines.push(a) }
+    try { return await fn() } finally { console.log = origLog; console.error = origError }
+  }
+  const zero = { redacted: 0, unusedDeleted: 0, failed: [] as string[] }
+
+  const ranOutcome = await capture(() =>
+    runIsolatedProspectRetention(async () => zero, { env: { VERCEL_ENV: 'production' } }))
+  check('I1: a pass that changed nothing still prints its line — that is the evidence it ran',
+    JSON.stringify(ranOutcome) === JSON.stringify({ status: 'ran', ...zero })
+    && lines.length === 1 && String(lines[0]?.[0]).includes('[outreach-retention] pass complete'))
+
+  let touched = false
+  const outsideProd = await capture(() =>
+    runIsolatedProspectRetention(async () => { touched = true; return zero }, { env: { VERCEL_ENV: 'preview' } }))
+  check('I2: Preview shares the Production database, so a preview deployment sweeps nothing',
+    JSON.stringify(outsideProd) === JSON.stringify({ status: 'not_production' }) && !touched && lines.length === 0)
+
+  const threw = await capture(() =>
+    runIsolatedProspectRetention(async () => { throw new Error('down') }, { env: { VERCEL_ENV: 'production' } }))
+  check('I3: a pass that throws cannot fail the cron it rides, and says so',
+    JSON.stringify(threw) === JSON.stringify({ status: 'error' })
+    && lines.length === 1 && String(lines[0]?.[0]).includes('[outreach-retention] pass failed'))
+
+  check('I4: the pass itself is idempotent, which is what makes every quarter hour safe',
+    await (async () => {
+      const f = list([row(), row({ id: 'p-2', first_sent_at: null, created_at: daysAgo(200) })])
+      const first = await applyProspectRetention(asAdmin(f), NOW)
+      const second = await applyProspectRetention(asAdmin(f), NOW)
+      return first.redacted === 1 && first.unusedDeleted === 1
+        && second.redacted === 0 && second.unusedDeleted === 0 && second.failed.length === 0
+    })())
+
   // ── Mutation controls ──────────────────────────────────────────────────────
   const mutFloor = await withMutant<{ isDueForRedaction: typeof isDueForRedaction }, boolean>(
     'lib/outreach/retention.ts',
@@ -228,6 +286,13 @@ async function main() {
     },
   )
   check('A8-MUT: without the "never written to" test the 90-day rule would delete a prospect we wrote to', mutUnused)
+
+  check('S8-MUT: putting the line back behind "only when something changed" would be caught',
+    !logsEveryPass(routeSrc.replace(
+      "console.log('[outreach-retention] pass complete', summary)",
+      "if (summary.redacted || summary.unusedDeleted) { console.log('[outreach-retention] pass complete', summary) }")))
+  check('S9-MUT: dropping the pass from the 15-minute cron would be caught',
+    !ridesQuarterHour(automationSrc.replace(/await runIsolatedProspectRetention\(\)/, '')))
 
   console.log(`\n${pass} passed, ${fail} failed`)
   if (fail > 0) process.exit(1)
