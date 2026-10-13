@@ -25,7 +25,7 @@ export default function EnglishTermsPage() {
         <h2>1. Introduction and Service Definition</h2>
         <p>
           Go Top SEO (the &ldquo;Service&rdquo; or the &ldquo;Platform&rdquo;) is a SaaS service
-          operated by GO TOP MARKETING GRUO LTD (company number 517274346) (the &ldquo;Company&rdquo;). The
+          operated by GO TOP DIGITAL MARKETING AND ADVERTISING LTD (company number 517274346) (the &ldquo;Company&rdquo;). The
           Service allows customers to track keyword rankings on Google search, monitor Google Maps
           visibility, measure visibility on AI engines such as ChatGPT, Gemini and Perplexity, conduct
           keyword research, and generate professional reports. The Service also includes website scans,
@@ -765,7 +765,7 @@ export default function EnglishTermsPage() {
         <h2>21. Contact</h2>
         <p>For any question regarding these terms or the Service, please contact us:</p>
         <p className="mt-4">
-          <strong>GO TOP MARKETING GRUO LTD</strong>
+          <strong>GO TOP DIGITAL MARKETING AND ADVERTISING LTD</strong>
           <br />
           Company number: 517274346
           <br />
@@ -778,7 +778,7 @@ export default function EnglishTermsPage() {
 
       <section>
         <p className={LEGAL_FOOTNOTE}>
-          Last updated: October 12, 2026
+          Last updated: October 13, 2026
         </p>
       </section>
     </LegalDoc>

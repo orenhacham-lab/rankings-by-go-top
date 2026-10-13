@@ -23,7 +23,7 @@ export default function EnglishPrivacyPage() {
       <section>
         <h2>Introduction</h2>
         <p>
-          GO TOP MARKETING GRUO LTD (company number 517274346) (&ldquo;we&rdquo;, &ldquo;our&rdquo;, or &ldquo;the company&rdquo;) operates the Go Top SEO service
+          GO TOP DIGITAL MARKETING AND ADVERTISING LTD (company number 517274346) (&ldquo;we&rdquo;, &ldquo;our&rdquo;, or &ldquo;the company&rdquo;) operates the Go Top SEO service
           at https://www.gotopseo.com (the &ldquo;Service&rdquo;). This privacy policy describes our practices regarding the collection,
           use, and disclosure of personal information when you use our Service.
         </p>
@@ -920,7 +920,7 @@ export default function EnglishPrivacyPage() {
         <p className="mt-4">
           The same requests &mdash; access, deletion and correction &mdash; are answered for people
           who are not in California, at the same address and in the same way. The controller is
-          GO TOP MARKETING GRUO LTD, company 517274346, in Israel.
+          GO TOP DIGITAL MARKETING AND ADVERTISING LTD, company 517274346, in Israel.
         </p>
       </section>
 
@@ -1014,7 +1014,7 @@ export default function EnglishPrivacyPage() {
 
       <section>
         <p className={LEGAL_FOOTNOTE}>
-          This policy was last updated on October 12, 2026
+          This policy was last updated on October 13, 2026
         </p>
       </section>
     </LegalDoc>

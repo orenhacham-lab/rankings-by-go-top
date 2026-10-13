@@ -3,7 +3,7 @@ title: Política de privacidad | Go Top SEO
 description: Política de privacidad de Go Top SEO: cómo recopilamos, utilizamos y protegemos sus datos.
 locale: es
 source: app/(public)/en/privacy/page.tsx
-lastUpdated: 2026-10-12
+lastUpdated: 2026-10-13
 register: usted
 ---
 
@@ -13,7 +13,7 @@ Política de privacidad de Go Top SEO
 
 ## Introducción
 
-GO TOP MARKETING GRUO LTD (número de empresa 517274346) («nosotros», «nuestro» o «la empresa») opera el servicio Go Top SEO en https://www.gotopseo.com (el «Servicio»). Esta política de privacidad describe nuestras prácticas relativas a la recopilación, el uso y la divulgación de información personal cuando usted utiliza nuestro Servicio.
+GO TOP DIGITAL MARKETING AND ADVERTISING LTD (número de empresa 517274346) («nosotros», «nuestro» o «la empresa») opera el servicio Go Top SEO en https://www.gotopseo.com (el «Servicio»). Esta política de privacidad describe nuestras prácticas relativas a la recopilación, el uso y la divulgación de información personal cuando usted utiliza nuestro Servicio.
 
 ## Información que recopilamos
 
@@ -368,7 +368,7 @@ Esta sección trata de alguien que ha recibido un correo nuestro y no es cliente
 
 **Si usted está en California.** La dirección de un contacto de empresa es información personal conforme a la ley de privacidad de California, por lo que usted tiene derecho a saber qué conservamos sobre usted, a recibir una copia, a solicitar la supresión, a corregir información inexacta y a no ser discriminado por ejercer un derecho. **No vendemos esta información y no la compartimos para publicidad conductual entre contextos.** Como no recogimos la información de usted directamente, esta sección es el aviso de recogida, incluido el plazo de conservación de cada dato, y un enlace a ella aparece en cada mensaje que enviamos. Las solicitudes se dirigen a la dirección indicada en «Contacto en materia de privacidad y representantes», y respondemos por escrito.
 
-Las mismas solicitudes —acceso, supresión y rectificación— se atienden también para quienes no están en California, en la misma dirección y del mismo modo. El responsable es GO TOP MARKETING GRUO LTD, n.º de empresa 517274346, en Israel.
+Las mismas solicitudes —acceso, supresión y rectificación— se atienden también para quienes no están en California, en la misma dirección y del mismo modo. El responsable es GO TOP DIGITAL MARKETING AND ADVERTISING LTD, n.º de empresa 517274346, en Israel.
 
 ## Derechos de los residentes de Estados Unidos
 
@@ -408,4 +408,4 @@ Si tiene preguntas sobre esta política de privacidad, contacte con:
 
 **Teléfono:** 054-9489377
 
-Esta política se actualizó por última vez el 12 de octubre de 2026
+Esta política se actualizó por última vez el 13 de octubre de 2026

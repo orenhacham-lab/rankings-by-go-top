@@ -3,7 +3,7 @@ title: Política de Privacidade | Go Top SEO
 description: Política de privacidade do Go Top SEO.
 locale: pt-BR
 source: app/(public)/en/privacy/page.tsx
-lastUpdated: 2026-10-12
+lastUpdated: 2026-10-13
 register: voce
 extraSections: 1
 extraReason: One extra section, "Direitos de residentes no Brasil (LGPD)", placed beside the existing EEA/UK and United States rights sections, because the LGPD gives a different set of rights with a different deadline and a different authority to complain to. What the LGPD adds elsewhere goes inside the sections it belongs to - the legal bases of Art. 7, the international-transfer rule of Art. 33, and the communication channel that stands in for an appointed officer.
@@ -11,7 +11,7 @@ extraReason: One extra section, "Direitos de residentes no Brasil (LGPD)", place
 
 ## Introdução
 
-A GO TOP MARKETING GRUO LTD (número de sociedade 517274346) («nós», «nosso» ou «a empresa») opera o serviço Go Top SEO em https://www.gotopseo.com (o «Serviço»). Esta política de privacidade descreve nossas práticas de coleta, uso e divulgação de informações pessoais quando você usa o nosso Serviço.
+A GO TOP DIGITAL MARKETING AND ADVERTISING LTD (número de sociedade 517274346) («nós», «nosso» ou «a empresa») opera o serviço Go Top SEO em https://www.gotopseo.com (o «Serviço»). Esta política de privacidade descreve nossas práticas de coleta, uso e divulgação de informações pessoais quando você usa o nosso Serviço.
 
 ## Informações que coletamos
 
@@ -387,7 +387,7 @@ Esta seção trata de alguém que recebeu um e-mail nosso e não é nosso client
 
 **Se você está na Califórnia.** O endereço de um contato de empresa é informação pessoal conforme a lei de privacidade da Califórnia, portanto você tem o direito de saber o que guardamos sobre você, de receber uma cópia, de solicitar a exclusão, de corrigir informação incorreta e de não ser discriminado por exercer um direito. **Não vendemos essa informação e não a compartilhamos para publicidade comportamental entre contextos.** Como não coletamos a informação de você diretamente, esta seção é o aviso de coleta, incluindo por quanto tempo cada dado é guardado, e um link para ela aparece em cada mensagem que enviamos. Os pedidos vão para o endereço indicado em «Contato de privacidade e representantes», e respondemos por escrito.
 
-Os mesmos pedidos — acesso, exclusão e correção — são atendidos também para quem não está na Califórnia, no mesmo endereço e do mesmo modo. O controlador é a GO TOP MARKETING GRUO LTD, empresa 517274346, em Israel.
+Os mesmos pedidos — acesso, exclusão e correção — são atendidos também para quem não está na Califórnia, no mesmo endereço e do mesmo modo. O controlador é a GO TOP DIGITAL MARKETING AND ADVERTISING LTD, empresa 517274346, em Israel.
 
 ## Direitos de residentes dos Estados Unidos
 
@@ -427,4 +427,4 @@ Se você tiver dúvidas sobre esta política de privacidade, fale com a gente:
 
 **Telefone:** [054-9489377](tel:0549489377)
 
-Esta política foi atualizada pela última vez em 12 de outubro de 2026
+Esta política foi atualizada pela última vez em 13 de outubro de 2026

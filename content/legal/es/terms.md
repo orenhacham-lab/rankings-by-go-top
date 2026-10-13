@@ -3,7 +3,7 @@ title: Términos de Uso | Go Top SEO
 description: Términos de uso de Go Top SEO: las condiciones que rigen el uso de nuestro servicio.
 locale: es
 source: app/(public)/en/terms/page.tsx
-lastUpdated: 2026-10-12
+lastUpdated: 2026-10-13
 register: usted
 ---
 
@@ -13,7 +13,7 @@ Go Top SEO
 
 ## 1. Introducción y definición del Servicio
 
-Go Top SEO (el «Servicio» o la «Plataforma») es un servicio SaaS operado por GO TOP MARKETING GRUO LTD (número de sociedad 517274346) (la «Empresa»). El Servicio permite a los clientes hacer un seguimiento del posicionamiento de palabras clave en la búsqueda de Google, supervisar la visibilidad en Google Maps, medir la visibilidad en motores de IA como ChatGPT, Gemini y Perplexity, realizar investigación de palabras clave y generar informes profesionales. El Servicio también incluye análisis de sitios web, conexiones con cuentas de Google y sitios de WordPress, correcciones del sitio que usted apruebe, contenido y mensajes de correo electrónico generados por IA, según se establece en las secciones 15A a 15G.
+Go Top SEO (el «Servicio» o la «Plataforma») es un servicio SaaS operado por GO TOP DIGITAL MARKETING AND ADVERTISING LTD (número de sociedad 517274346) (la «Empresa»). El Servicio permite a los clientes hacer un seguimiento del posicionamiento de palabras clave en la búsqueda de Google, supervisar la visibilidad en Google Maps, medir la visibilidad en motores de IA como ChatGPT, Gemini y Perplexity, realizar investigación de palabras clave y generar informes profesionales. El Servicio también incluye análisis de sitios web, conexiones con cuentas de Google y sitios de WordPress, correcciones del sitio que usted apruebe, contenido y mensajes de correo electrónico generados por IA, según se establece en las secciones 15A a 15G.
 
 ## 2. Aceptación de los Términos
 
@@ -245,8 +245,8 @@ Estos términos se rigen por las leyes del Estado de Israel. La jurisdicción ex
 
 Para cualquier consulta sobre estos términos o sobre el Servicio, póngase en contacto con nosotros:
 
-**GO TOP MARKETING GRUO LTD**
+**GO TOP DIGITAL MARKETING AND ADVERTISING LTD**
 Número de sociedad: 517274346
 Correo electrónico: [oren@gotop.co.il](mailto:oren@gotop.co.il)
 
-Última actualización: 12 de octubre de 2026
+Última actualización: 13 de octubre de 2026
