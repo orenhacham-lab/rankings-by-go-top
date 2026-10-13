@@ -43,6 +43,15 @@ for j in lib/__qa__/reviewer-journey/*.js; do
   [ -n "$FILTER" ] && [[ "$name" != *"$FILTER"* ]] && continue
   QA_SCREENSHOT_DIR="$LOG_DIR/shots-$name" timeout 900 node "$j" > "$LOG_DIR/journey-$name.log" 2>&1
   summary="$(grep -Eo '[0-9]+ passed, [0-9]+ failed' "$LOG_DIR/journey-$name.log" | tail -1)"
+  # A journey that needs a build this shared one cannot provide (a NEXT_PUBLIC_
+  # flag Next inlines at build time) says so and counts nothing, instead of
+  # reporting a failure that is really a missing flag and making the whole set
+  # permanently red. It still has to be run on its own; the log says how.
+  if grep -q 'skipped (needs its own build)' "$LOG_DIR/journey-$name.log"; then
+    echo "journey $name: SKIPPED — needs its own build, see $LOG_DIR/journey-$name.log"
+    pkill -9 -f "[n]ext start -p 39" 2>/dev/null
+    continue
+  fi
   echo "journey $name: ${summary:-NO SUMMARY — see $LOG_DIR/journey-$name.log}"
   [[ "$summary" =~ ^[0-9]+\ passed,\ 0\ failed$ ]] || FAIL=1
   pkill -9 -f "[n]ext start -p 39" 2>/dev/null

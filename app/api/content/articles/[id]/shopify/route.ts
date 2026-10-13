@@ -11,6 +11,7 @@ import { authContentProject, isContentModuleEnabled } from '@/lib/content/api-au
 import { createAdminClient } from '@/lib/supabase/admin'
 import { loadShopifyConnection } from '@/lib/shopify/api-auth'
 import { publishArticleToShopify, type ShopifyPublishArticleRow } from '@/lib/shopify/publish-article'
+import { enqueueGbpPostForPublishedArticle } from '@/lib/gbp/auto-post'
 
 const ARTICLE_SELECT =
   'id, project_id, title, slug, excerpt, meta_description, content_html, featured_image_url, shopify_blog_id, shopify_article_id, shopify_tags'
@@ -72,6 +73,15 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
       ...(result.userErrors ? { userErrors: result.userErrors } : {}),
       imageWarnings: result.imageWarnings,
     }, { status: httpStatus })
+  }
+
+  // Also a post on the business profile, when the owner connected Google Business
+  // Profile and approved automatic posting. Best-effort, never blocks the publish;
+  // a draft is not a publication, so only a real publish enqueues one. The same
+  // call sits on the manual WordPress route.
+  if (published) {
+    const gbp = await enqueueGbpPostForPublishedArticle(auth.admin, id)
+    if (!gbp.ok) console.warn('[content-shopify-export] gbp auto post failed', { reason: gbp.reason })
   }
 
   return Response.json({

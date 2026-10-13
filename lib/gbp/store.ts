@@ -12,7 +12,7 @@ import crypto from 'crypto'
 import type { createAdminClient } from '@/lib/supabase/admin'
 import { encryptGscToken, decryptGscToken, GSC_ENCRYPTION_VERSION } from '@/lib/gsc/token-crypto'
 import { isGbpErrorCode, type GbpErrorCode } from './errors'
-import type { GbpCtaType } from './validate'
+import type { GbpCtaType, GbpPostLanguage } from './validate'
 
 type Admin = ReturnType<typeof createAdminClient>
 const STATE_TTL_MS = 10 * 60 * 1000
@@ -50,6 +50,14 @@ export interface GbpLocationRow {
   location_address: string | null
   website_uri: string | null
   maps_uri: string | null
+  /** The owner's switch: an article that publishes to their site also becomes a post here. */
+  auto_post_on_publish: boolean
+  /** When they turned it on; null whenever it is off. */
+  auto_post_enabled_at: string | null
+  /** Newest review updateTime the owner was already told about. No review content is stored. */
+  reviews_seen_update_time: string | null
+  /** When the last "new review" alert for this project was sent. */
+  reviews_alerted_at: string | null
 }
 export type GbpPostStatus = 'scheduled' | 'publishing' | 'published' | 'failed' | 'cancelled'
 export interface GbpPostRow {
@@ -62,7 +70,7 @@ export interface GbpPostRow {
   cta_url: string | null
   image_url: string | null
   image_path: string | null
-  language_code: 'he' | 'en'
+  language_code: GbpPostLanguage
   status: GbpPostStatus
   scheduled_at: string
   attempts: number
@@ -72,6 +80,10 @@ export interface GbpPostRow {
   last_error_code: string | null
   published_at: string | null
   created_at: string
+  /** Queued by an article publish, not by a person. */
+  auto_created: boolean
+  /** The summary is still the article's own text; the cron rewrites it with the AI draft. */
+  needs_ai_draft: boolean
 }
 
 /** Is the schema there? One cheap read per table. */
@@ -170,8 +182,32 @@ export async function readProjectLocation(admin: Admin, projectId: string): Prom
   return (data as GbpLocationRow | null) ?? null
 }
 
-export async function saveProjectLocation(admin: Admin, row: Omit<GbpLocationRow, 'maps_uri' | 'website_uri' | 'location_address'> & Partial<GbpLocationRow>): Promise<void> {
+export async function saveProjectLocation(
+  admin: Admin,
+  row: Omit<
+    GbpLocationRow,
+    | 'maps_uri' | 'website_uri' | 'location_address'
+    | 'auto_post_on_publish' | 'auto_post_enabled_at'
+    | 'reviews_seen_update_time' | 'reviews_alerted_at'
+  > & Partial<GbpLocationRow>,
+): Promise<void> {
+  // Moving the project to a DIFFERENT business turns automatic posting off: the
+  // owner approved posting to the business they picked, not to the next one.
+  // The old location's review marks go with it, for the same reason — they say
+  // what the owner was told about a business this project no longer tracks.
+  // Staying on the same location leaves all four untouched (an upsert writes
+  // only the columns named here).
+  const previous = await readProjectLocation(admin, row.project_id)
+  const switched = previous !== null && previous.location_name !== row.location_name
   const { error } = await admin.from('project_gbp_locations').upsert({
+    ...(switched
+      ? {
+          auto_post_on_publish: false,
+          auto_post_enabled_at: null,
+          reviews_seen_update_time: null,
+          reviews_alerted_at: null,
+        }
+      : {}),
     project_id: row.project_id,
     user_id: row.user_id,
     connection_id: row.connection_id,
@@ -183,6 +219,17 @@ export async function saveProjectLocation(admin: Admin, row: Omit<GbpLocationRow
     maps_uri: row.maps_uri ?? null,
     updated_at: new Date().toISOString(),
   }, { onConflict: 'project_id' })
+  if (error) throw fail(error)
+}
+
+/**
+ * The alert marks after the owner has been told. `seenUpdateTime` is the newest
+ * review updateTime Google reported; it is a time, never review content.
+ */
+export async function markReviewsSeen(admin: Admin, projectId: string, args: { seenUpdateTime: string | null; alertedAt?: string }): Promise<void> {
+  const patch: Record<string, string | null> = { reviews_seen_update_time: args.seenUpdateTime }
+  if (args.alertedAt) patch.reviews_alerted_at = args.alertedAt
+  const { error } = await admin.from('project_gbp_locations').update(patch).eq('project_id', projectId)
   if (error) throw fail(error)
 }
 
@@ -202,11 +249,44 @@ export async function readProjectPost(admin: Admin, projectId: string, postId: s
 export async function insertPost(admin: Admin, row: {
   project_id: string; user_id: string; source_article_id: string | null; summary: string
   cta_type: GbpCtaType | null; cta_url: string | null; image_url: string | null; image_path: string | null
-  language_code: 'he' | 'en'; scheduled_at: string
+  language_code: GbpPostLanguage; scheduled_at: string
+  /** Both default to false: a post the merchant wrote in the composer. */
+  auto_created?: boolean; needs_ai_draft?: boolean
 }): Promise<GbpPostRow> {
   const { data, error } = await admin.from('gbp_posts').insert({ ...row, status: 'scheduled' }).select('*').single()
   if (error || !data) throw fail(error ?? {})
   return data as GbpPostRow
+}
+
+/**
+ * The owner's automatic-posting switch. Written only after the route proved they
+ * own the project AND a location is connected: without a location there is
+ * nothing to post to, so the switch has nowhere to live.
+ */
+export async function setAutoPostOnPublish(admin: Admin, projectId: string, on: boolean): Promise<boolean> {
+  const now = new Date().toISOString()
+  const { data, error } = await admin.from('project_gbp_locations')
+    // When they approved it is recorded, because we publish in their name with
+    // nobody reading it first (legal thread, 2026-10-12). Turning it off clears it.
+    .update({ auto_post_on_publish: on, auto_post_enabled_at: on ? now : null, updated_at: now })
+    .eq('project_id', projectId)
+    .select('project_id')
+  if (error) throw fail(error)
+  return !!data && data.length > 0
+}
+
+/**
+ * Replace an automatic post's placeholder text with the AI draft, and only while
+ * it is still waiting for one. Called by the cron just before publishing, so the
+ * article's own publish path never waits for a model.
+ */
+export async function applyAutoDraft(admin: Admin, postId: string, summary: string): Promise<boolean> {
+  const { data, error } = await admin.from('gbp_posts')
+    .update({ summary, needs_ai_draft: false, updated_at: new Date().toISOString() })
+    .eq('id', postId).eq('needs_ai_draft', true)
+    .select('id')
+  if (error) return false
+  return !!data && data.length > 0
 }
 
 /**

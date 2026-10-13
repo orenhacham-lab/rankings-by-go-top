@@ -8,6 +8,7 @@ import Badge from '@/components/ui/Badge'
 import Notice from '@/components/ui/Notice'
 import EmptyState from '@/components/ui/EmptyState'
 import { Skeleton } from '@/components/ui/Skeleton'
+import Switch from '@/components/ui/Switch'
 import { useConfirm } from '@/components/ui/ConfirmDialog'
 import { useDashboardLanguage } from '@/lib/i18n/dashboard/useDashboardLanguage'
 import { getDashboardDictionary } from '@/lib/i18n/dashboard/getDashboardDictionary'
@@ -138,6 +139,45 @@ interface LocationOption { accountName: string; locationName: string; title: str
 export const GBP_AUTH_LOST_CODES: ReadonlySet<string> = new Set(['reauth_required', 'not_connected', 'connection_revoked'])
 
 /** Step 2: which of the merchant's businesses this project posts to. */
+/**
+ * The owner's approval for automatic posting (Oren, 2026-10-12: it must not be
+ * mandatory — the customer connects Google Business Profile and approves it).
+ * Shown only once a business is selected, because without one there is nowhere to
+ * post. The switch shows what the server last confirmed: it flips on the answer,
+ * never on the click, so a failed save never reads as "on".
+ */
+function AutoPostSwitch({ projectId, status, onChanged }: { projectId: string; status: GbpReadyStatus; onChanged: () => void }) {
+  const { uiLocale } = useDashboardLanguage()
+  const t = getDashboardDictionary(uiLocale).mapsPosts
+  const [saving, setSaving] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  const toggle = async (next: boolean) => {
+    setSaving(true); setError(null)
+    const res = await fetch('/api/gbp/auto-post', {
+      method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ projectId, enabled: next }),
+    }).catch(() => null)
+    const body = res ? await res.json().catch(() => ({})) : {}
+    setSaving(false)
+    if (!res || !res.ok || body?.ok !== true) { setError(gbpErrorText(t, body?.error) || t.autoPost.saveFailed); return }
+    onChanged()
+  }
+
+  return (
+    <div className="mt-4 rounded-inset border border-line bg-sunk px-4 py-3">
+      <Switch
+        checked={status.autoPostOnPublish}
+        onChange={(next) => void toggle(next)}
+        disabled={saving}
+        label={t.autoPost.label}
+        description={t.autoPost.help}
+      />
+      {error && <p className="mt-2 text-caption text-bad">{error}</p>}
+    </div>
+  )
+}
+
 export function LocationCard({ projectId, status, onChanged, onAuthLost }: {
   projectId: string
   status: GbpReadyStatus
@@ -190,6 +230,7 @@ export function LocationCard({ projectId, status, onChanged, onAuthLost }: {
       {!connected ? (
         <p className="max-w-prose text-copy text-muted">{t.location.body}</p>
       ) : status.location && !picking ? (
+        <>
         <div className="rounded-inset border border-line bg-sunk px-4 py-3">
           <p className="text-caption text-muted">{t.location.selectedLabel}</p>
           <p className="text-copy font-semibold text-ink">{status.location.title}</p>
@@ -201,6 +242,8 @@ export function LocationCard({ projectId, status, onChanged, onAuthLost }: {
             </a>
           )}
         </div>
+        <AutoPostSwitch projectId={projectId} status={status} onChanged={onChanged} />
+        </>
       ) : options === null ? (
         <div className="space-y-2" aria-busy="true" aria-label={t.location.loading}>
           <Skeleton className="h-14 w-full" /><Skeleton className="h-14 w-full" />

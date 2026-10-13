@@ -51,6 +51,8 @@ export default function PostsList({ projectId, posts, onChanged }: { projectId: 
                 <div className="min-w-0 flex-1 space-y-1.5">
                   <div className="flex flex-wrap items-center gap-2">
                     <Badge variant={BADGE[key]} dot>{t.list.status[key]}</Badge>
+                    {/* So the merchant can tell at a glance which posts the system wrote by itself. */}
+                    {p.autoCreated && <Badge variant="neutral">{t.autoPost.badge}</Badge>}
                     <span className="text-caption text-muted">
                       {p.status === 'scheduled'
                         ? (p.errorCode ? t.list.retrying : t.list.scheduledFor(fmt.dateTime(p.scheduledAt)))
