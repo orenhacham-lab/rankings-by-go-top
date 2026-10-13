@@ -36,8 +36,14 @@ const ADDR = 'owner@store.example'
  * the risk this suite exists for is OUR words being read as the recipient's —
  * the footer contains "unsubscribe", so a footer that survives `ownWords` turns
  * every interested reply into an opt-out.
+ *
+ * It deliberately names NO company. The entity rename of 13 October (#205)
+ * renamed a company name that sat in this fixture from a draft the channel never
+ * adopted; CAN-SPAM 15 U.S.C. 7704(a)(5) asks for the advertisement
+ * identification, the opt-out and a valid postal address, not a registered name,
+ * so the approved footer carries none and a rename cannot reach this channel.
  */
-const FOOTER_TEXT = `This is an advertisement sent by Go Top SEO at HaRechasim 24/2, Ramat Gan 5235524, Israel. If you would rather not hear from us again, unsubscribe here.`
+const FOOTER_TEXT = `This is an advertisement sent by Go Top SEO at HaRechasim 24/2, Ramat Gan 5235524, Israel. If you would rather not hear from us again, unsubscribe here — we act on it immediately. How we handle your details: https://www.gotopseo.com/en/privacy`
 const OUR_FOOTER = `
 On Mon, Oct 12, 2026 at 9:02 AM Oren <oren@trygotopseo.com> wrote:
 > Would it be useful if I sent you the full free report? If it is not

@@ -3,7 +3,7 @@ title: Política de cancelación y reembolso | Go Top SEO
 description: Cómo cancelar una suscripción a Go Top SEO y en qué casos se concede un reembolso.
 locale: es
 source: app/(public)/en/refund-policy/page.tsx
-lastUpdated: 2026-10-03
+lastUpdated: 2026-10-13
 register: usted
 ---
 
@@ -37,8 +37,8 @@ Si su cuenta se factura a través de Shopify (por ejemplo, si instaló la aplica
 
 ## 7. Contacto
 
-**GO TOP MARKETING GRUO LTD**  
+**GO TOP DIGITAL MARKETING AND ADVERTISING LTD**  
 Número de sociedad: 517274346  
 Correo electrónico: [oren@gotop.co.il](mailto:oren@gotop.co.il)
 
-Última actualización: 3 de octubre de 2026
+Última actualización: 13 de octubre de 2026

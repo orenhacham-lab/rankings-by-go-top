@@ -2684,7 +2684,7 @@ export const dashboardEs: DeepPartial<DashboardDictionary> = {
       team: 'El equipo de Go Top SEO',
       footer: 'Recibes este correo porque tienes una web activa en Go Top SEO. ¿No quieres estos recordatorios?',
       unsubscribe: 'Date de baja con un clic, sin iniciar sesión',
-      company: 'Go Top SEO · oren@gotop.co.il',
+      company: 'GO TOP DIGITAL MARKETING AND ADVERTISING LTD (n.º de empresa 517274346) · HaRechasim 24/2, Ramat Gan 5235524, Israel · oren@gotop.co.il',
     },
     unsubscribePage: {
       title: 'Te has dado de baja',
@@ -6381,7 +6381,7 @@ export const dashboardEs: DeepPartial<DashboardDictionary> = {
     team: 'El equipo de Go Top SEO',
     footer: 'Recibes este mensaje porque abriste un proyecto en Go Top SEO y aún no has terminado de ponerlo en marcha. ¿No quieres estos correos?',
     unsubscribe: 'Dejar de recibir los correos de puesta en marcha, con un clic y sin iniciar sesión',
-    company: 'Go Top SEO · oren@gotop.co.il',
+    company: 'GO TOP DIGITAL MARKETING AND ADVERTISING LTD (n.º de empresa 517274346) · HaRechasim 24/2, Ramat Gan 5235524, Israel · oren@gotop.co.il',
     connect: {
       subject: (domain: string) => `${domain} aún no está conectado`,
       preheader: 'Una conexión, y a partir de ahí el sistema trabaja solo.',
@@ -6427,6 +6427,6 @@ export const dashboardEs: DeepPartial<DashboardDictionary> = {
     team: 'El equipo de Go Top SEO',
     footer: 'Recibes este correo porque activaste el resumen semanal en los ajustes de la web. ¿Ya no lo quieres?',
     unsubscribe: 'Darse de baja con un clic, sin iniciar sesión',
-    company: 'Go Top SEO · oren@gotop.co.il',
+    company: 'GO TOP DIGITAL MARKETING AND ADVERTISING LTD (n.º de empresa 517274346) · HaRechasim 24/2, Ramat Gan 5235524, Israel · oren@gotop.co.il',
   },
 }
