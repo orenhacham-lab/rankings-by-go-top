@@ -574,7 +574,7 @@ async function main() {
     new RegExp(`PLUGIN_LATEST_VERSION = '${APPROVED_WPORG_VERSION.replace(/\./g, '\\.')}'`).test(types) &&
     read('lib/site-fix/plugin-zip.generated.ts').includes(`PLUGIN_VERSION = '${APPROVED_PLUGIN_VERSION}'`))
   check('MUTATION CONTROL: a latest version ahead of the WordPress.org release is caught',
-    !new RegExp(`PLUGIN_LATEST_VERSION = '${APPROVED_WPORG_VERSION.replace(/\./g, '\\.')}'`).test(types.replace(`PLUGIN_LATEST_VERSION = '${APPROVED_WPORG_VERSION}'`, `PLUGIN_LATEST_VERSION = '${APPROVED_PLUGIN_VERSION}'`)))
+    !new RegExp(`PLUGIN_LATEST_VERSION = '${APPROVED_WPORG_VERSION.replace(/\./g, '\\.')}'`).test(types.replace(`PLUGIN_LATEST_VERSION = '${APPROVED_WPORG_VERSION}'`, "PLUGIN_LATEST_VERSION = '9.9.9'")))
 
   console.log(`\n${passed} passed, ${failed} failed`)
   if (failed) process.exitCode = 1

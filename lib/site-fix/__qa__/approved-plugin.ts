@@ -4,11 +4,11 @@
  * byte-for-byte this list (the repo-only README.md aside): a change to the PHP is a new plugin
  * release, and this list moves with it on purpose.
  *
- * 3.1.0 was approved on WordPress.org (Oren, 13 Oct 2026), so APPROVED_WPORG_VERSION is 3.1.0.
- * 3.1.1 is the release candidate in this folder: the company's English name changed that day, and the
- * plugin header and readme name the operator, so the correction needs a release of its own. The app
- * gates every 3.1 feature by `>=` the site's plugin version (lib/site-fix/plugin-capabilities.ts), so
- * a 3.1.1 site keeps every 3.1 capability and a site still on 3.1.0 is unaffected.
+ * 3.1.1 is live on WordPress.org (Oren uploaded it and confirmed the listing, 13 Oct 2026), so
+ * APPROVED_WPORG_VERSION and APPROVED_PLUGIN_VERSION are both 3.1.1: it carries the corrected English
+ * company name in the plugin header and the readme. The app gates every 3.1 feature by `>=` the site's
+ * plugin version (lib/site-fix/plugin-capabilities.ts), so a site still on 3.1.0 is unaffected and is
+ * offered the update (PLUGIN_LATEST_VERSION in ../types.ts, which never runs ahead of this constant).
  *
  * Not a suite (no .qa.ts): imported by lib/content/__qa__/wordpress-plugin-publish.qa.ts and
  * lib/content/__qa__/wordpress-schema.qa.ts.
@@ -18,7 +18,7 @@ import { existsSync, readFileSync } from 'fs'
 import { join } from 'path'
 
 /** The release on WordPress.org today (slug go-top-seo-bridge). */
-export const APPROVED_WPORG_VERSION = '3.1.0'
+export const APPROVED_WPORG_VERSION = '3.1.1'
 /** The release in this folder (pinned below). */
 export const APPROVED_PLUGIN_VERSION = '3.1.1'
 
