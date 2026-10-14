@@ -268,8 +268,12 @@ for (const locale of LOCALES) {
 
 // ── 5) the registered company name, untranslated ────────────────────────────
 // Hebrew uses the Hebrew name; every other language uses the English name
-// exactly as registered, typo included, because that is what the registrar has.
-const REGISTERED = 'GO TOP MARKETING GRUO LTD'
+// exactly as Oren gave it on 2026-10-13, which replaced the earlier
+// "GO TOP MARKETING GRUO LTD". The registrar holds no English name at all
+// (company 517274346), so identification rests on the Hebrew name and the
+// company number, and the English string must be one single string everywhere.
+const REGISTERED = 'GO TOP DIGITAL MARKETING AND ADVERTISING LTD'
+const SUPERSEDED_NAME = /GO TOP MARKETING GRUO/i
 const TRANSLATED_NAME = /GO TOP (MARKETING|MERCADEO|MARKETING DIGITAL) (DIGITAL|Y PUBLICIDAD|E PUBLICIDADE|SRL|S\.?L\.?|LTDA\.?)/i
 for (const locale of LOCALES) {
   for (const doc of DOCS) {
@@ -277,6 +281,7 @@ for (const locale of LOCALES) {
     if (!/517274346/.test(src) && !src.includes(REGISTERED)) continue
     check(`${locale}/${doc}: the company name is the registered English one`, src.includes(REGISTERED))
     check(`${locale}/${doc}: the company name was not translated or re-spelled`, !TRANSLATED_NAME.test(src))
+    check(`${locale}/${doc}: the superseded company name is gone`, !SUPERSEDED_NAME.test(src))
     check(`${locale}/${doc}: the Hebrew company name is not used`, !/גו טופ/.test(src))
   }
   check(`${locale}: the contact documents carry the company number`,
@@ -1507,6 +1512,8 @@ console.log('\nmutation controls')
     !privacy.replace(/PDFShift/g, '').includes('PDFShift') && privacy.includes('PDFShift'))
   check('a translated company name is caught',
     TRANSLATED_NAME.test('GO TOP MARKETING E PUBLICIDADE LTDA'))
+  check('MUTATION — the superseded company name is caught',
+    SUPERSEDED_NAME.test('GO TOP MARKETING GRUO LTD') && !SUPERSEDED_NAME.test(REGISTERED))
   check('a link into a language tree with no page behind it is caught',
     // The example has to be a page that really is not there. It used to be
     // /pt-BR/terms, which exists now that the Portuguese tree is built.
@@ -2675,6 +2682,40 @@ const OUTREACH_NO_LONGER_TRUE = /we\s+do not collect details about a private ind
     /postal_address\s+text\s+NOT NULL/.test('  postal_address    text NOT NULL,'))
   check('mutation control: a redaction rule naming only the address would be caught',
     !/contact_name IS NULL/.test("CONSTRAINT outreach_prospects_redaction CHECK ((email IS NULL) = (redacted_at IS NOT NULL))"))
+}
+
+// ── 32) the sender identity in the emails we send customers ─────────────────
+// Oren, 2026-10-13: the company name belongs in the emails that go to
+// customers, not only on the legal pages. Israel's Communications Law
+// s.30A(d)(2) wants an advertising message to name its sender and give an
+// address, and the three email families below (reminders, setup emails, the
+// weekly summary) all carry one shared footer line per language. Hebrew names
+// the Hebrew company; every other language names the English one.
+{
+  const read = (path: string) => (existsSync(path) ? readFileSync(path, 'utf8') : '')
+  const COPY: Array<[string, string, RegExp]> = [
+    ['he', 'lib/i18n/dashboard/he.ts', /גו טופ שיווק ופרסום דיגיטלי בע״מ \(ח\.פ\. 517274346\)/],
+    ['en', 'lib/i18n/dashboard/en.ts', new RegExp(`${REGISTERED} \\(company number 517274346\\)`)],
+    ['es', 'lib/i18n/dashboard/es.ts', new RegExp(`${REGISTERED} \\(n\\.º de empresa 517274346\\)`)],
+    ['pt-BR', 'lib/i18n/dashboard/pt-BR/tracking.ts', new RegExp(`${REGISTERED} \\(número de sociedade 517274346\\)`)],
+  ]
+  for (const [locale, path, named] of COPY) {
+    const src = read(path)
+    const lines = [...src.matchAll(/company: '([^']*)'/g)].map((m) => m[1])
+    check(`${locale}: all three customer email footers share one identity line`,
+      lines.length === 3 && new Set(lines).size === 1, `${lines.length} line(s)`)
+    check(`${locale}: the email footer names the company and its number`,
+      lines.length > 0 && lines.every((l) => named.test(l)), lines[0])
+    check(`${locale}: the email footer gives the registered address`,
+      lines.every((l) => /(הרכסים 24\/2, רמת גן 5235524|HaRechasim 24\/2, Ramat Gan 5235524, Israel)/.test(l)))
+    check(`${locale}: the email footer does not carry the superseded name`,
+      lines.every((l) => !SUPERSEDED_NAME.test(l)))
+  }
+  check('mutation control: a brand-only footer line is caught',
+    !new RegExp(`${REGISTERED}`).test('Go Top SEO · oren@gotop.co.il'))
+  check('mutation control: a footer with no address is caught',
+    !/(הרכסים 24\/2, רמת גן 5235524|HaRechasim 24\/2, Ramat Gan 5235524, Israel)/
+      .test(`${REGISTERED} (company number 517274346) · oren@gotop.co.il`))
 }
 
 console.log(`\n${pass} passed, ${fail} failed`)

@@ -6578,7 +6578,7 @@ export const dashboardEn = {
       team: 'The Go Top SEO team',
       footer: "You get this because you have an active project on Go Top SEO. Don't want these reminders?",
       unsubscribe: 'Unsubscribe in one click, no login',
-      company: 'Go Top SEO · oren@gotop.co.il',
+      company: 'GO TOP DIGITAL MARKETING AND ADVERTISING LTD (company number 517274346) · HaRechasim 24/2, Ramat Gan 5235524, Israel · oren@gotop.co.il',
     },
     unsubscribePage: {
       title: "You're unsubscribed",
@@ -6598,7 +6598,7 @@ export const dashboardEn = {
     team: 'The Go Top SEO team',
     footer: 'You get this because you opened a project on Go Top SEO and have not finished setting it up. Don\'t want these emails?',
     unsubscribe: 'Stop the setup emails, in one click and with no login',
-    company: 'Go Top SEO · oren@gotop.co.il',
+    company: 'GO TOP DIGITAL MARKETING AND ADVERTISING LTD (company number 517274346) · HaRechasim 24/2, Ramat Gan 5235524, Israel · oren@gotop.co.il',
     connect: {
       subject: (domain: string) => `${domain} is not connected yet`,
       preheader: 'One connection, and the system runs on its own from here.',
@@ -6644,6 +6644,6 @@ export const dashboardEn = {
     team: 'The Go Top SEO team',
     footer: 'You get this because you turned the weekly summary on in the project settings. Don\'t want it any more?',
     unsubscribe: 'Unsubscribe in one click, no login',
-    company: 'Go Top SEO · oren@gotop.co.il',
+    company: 'GO TOP DIGITAL MARKETING AND ADVERTISING LTD (company number 517274346) · HaRechasim 24/2, Ramat Gan 5235524, Israel · oren@gotop.co.il',
   },
 } as const

@@ -84,7 +84,7 @@ export default function EnglishRefundPolicyPage() {
       <section>
         <h2>7. Contact</h2>
         <p>
-          <strong>GO TOP MARKETING GRUO LTD</strong>
+          <strong>GO TOP DIGITAL MARKETING AND ADVERTISING LTD</strong>
           <br />
           Company number: 517274346
           <br />
@@ -94,7 +94,7 @@ export default function EnglishRefundPolicyPage() {
 
       <section>
         <p className={LEGAL_FOOTNOTE}>
-          Last updated: October 3, 2026
+          Last updated: October 13, 2026
         </p>
       </section>
     </LegalDoc>

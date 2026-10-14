@@ -3,7 +3,7 @@ title: Acuerdo del Programa de Socios | Go Top SEO
 description: Las condiciones que rigen la participación en el programa de socios de Go Top SEO: comisiones, atribución, pagos y deberes del socio.
 locale: es
 source: app/(public)/en/affiliate-terms/page.tsx
-lastUpdated: 2026-10-09
+lastUpdated: 2026-10-13
 register: usted
 ---
 
@@ -13,7 +13,7 @@ Go Top SEO
 
 ## 1. Las partes y qué es este acuerdo
 
-Este acuerdo rige la participación en el programa de socios de Go Top SEO (el «Programa»). Se celebra entre GO TOP MARKETING GRUO LTD (número de sociedad 517274346) (la «Empresa», «nosotros») y la persona física o jurídica cuya solicitud de participación aprobemos (el «Socio», «usted»). Entra en vigor en la fecha en que le notifiquemos que su solicitud ha sido aprobada y se aplica a toda referencia que realice a partir de esa fecha.
+Este acuerdo rige la participación en el programa de socios de Go Top SEO (el «Programa»). Se celebra entre GO TOP DIGITAL MARKETING AND ADVERTISING LTD (número de sociedad 517274346) (la «Empresa», «nosotros») y la persona física o jurídica cuya solicitud de participación aprobemos (el «Socio», «usted»). Entra en vigor en la fecha en que le notifiquemos que su solicitud ha sido aprobada y se aplica a toda referencia que realice a partir de esa fecha.
 
 Este acuerdo se suma a nuestros [Términos de Uso](/es/terms) y a nuestra [Política de Privacidad](/es/privacy), y no los modifica. Si además utiliza el Servicio como cliente, su relación como cliente se rige por esos documentos y nada de lo aquí dispuesto la afecta.
 

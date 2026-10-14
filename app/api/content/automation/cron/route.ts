@@ -36,6 +36,12 @@
  * the UTC window 04:00-06:59, because Vercel's scheduler did not deliver the blog's own
  * three daily jobs while this cron fires every fifteen minutes. Isolated the same way.
  *
+ * THEN, THE OUTBOUND RETENTION PASS (lib/outreach/retention-isolated.ts): the 30-day
+ * redaction and the 90-day deletion the privacy text promises for a cold-email prospect.
+ * It rides this cron, not only its own daily entry in vercel.json, because a daily cron on
+ * this plan is best-effort. Production only, idempotent, isolated the same way, and it logs
+ * one counts-only line per pass — the only evidence the pass runs at all.
+ *
  * ALONGSIDE ALL OF IT, THE SITE MAPPING UPKEEP (lib/content/existing-content/map-upkeep.ts):
  * at most one project per run whose mapping is missing or ageing is mapped, so automatic
  * internal links have pages to point at. Started with the runner, awaited before the emails.
@@ -54,6 +60,7 @@ import { authorizeCronRequest } from '@/lib/auth/cron'
 import { resumeStalledSeedRuns, startIsolatedSeedResume } from '@/lib/seed-scan/resume'
 import { runTopicTopUp, startIsolatedTopUp } from '@/lib/content/automation/topic-topup'
 import { runIsolatedReminders } from '@/lib/reminders/isolated'
+import { runIsolatedProspectRetention } from '@/lib/outreach/retention-isolated'
 import { runIsolatedOnboardingEmails } from '@/lib/onboarding-emails/isolated'
 import { runIsolatedWeeklySummaries } from '@/lib/reports/weekly/isolated'
 import { checkPublishingStalls, isDailyStallCheckRun } from '@/lib/content/automation/stall-watch'
@@ -119,6 +126,13 @@ async function handle(request: Request): Promise<Response> {
     // awaited here, before the emails.
     await mapUpkeep
     await blogWindow
+    // Then the outbound-channel retention pass: it empties a prospect's address, name and
+    // postal address 30 days after the last message, which the published privacy text
+    // promises (lib/outreach/retention-isolated.ts). It rides this cron because a daily
+    // Vercel cron on this plan is best-effort, and the promise cannot depend on a job that
+    // may silently never fire. Production only, idempotent, milliseconds over a small
+    // table, isolated: it never throws, so it cannot change, delay or fail anything above.
+    await runIsolatedProspectRetention()
     // Last of all, and off unless REMINDER_EMAILS_ENABLED is "true": the reminder email for
     // articles waiting for approval (lib/reminders). Isolated; it never throws or rejects.
     await runIsolatedReminders()
