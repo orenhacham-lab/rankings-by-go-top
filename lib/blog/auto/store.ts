@@ -11,7 +11,7 @@
 import type { createAdminClient } from '@/lib/supabase/admin'
 import { sanitizePublicArticleHtml } from '@/lib/content/public-article-html'
 import { articlePublishBlockReason } from '@/lib/articles/publish-rules'
-import type { BlogAutoLocale } from '@/lib/blog/auto/rotation'
+import { BLOG_AUTO_LOCALES, type BlogAutoLocale } from '@/lib/blog/auto/rotation'
 import type { SelectedKeyword } from '@/lib/blog/auto/keyword-plan'
 import type { InternalLinkTarget } from '@/lib/blog/auto/brief'
 import { BLOG_AUTHOR } from '@/lib/blog/auto/brief'
@@ -210,4 +210,37 @@ export async function publishPlanArticle(admin: Admin, planId: string, article: 
     .eq('id', planId)
 
   return { ok: true, articleId, slug: article.slug }
+}
+
+/**
+ * Which languages already have an article published today (UTC), so a run that
+ * fires every fifteen minutes writes one article a language a day and no more.
+ */
+export async function localesPublishedSince(admin: Admin, sinceIso: string): Promise<BlogAutoLocale[]> {
+  const { data } = await admin
+    .from('articles')
+    .select('locale')
+    .eq('is_published', true)
+    .gte('published_at', sinceIso)
+  return ((data ?? []) as { locale: string | null }[])
+    .map((r) => r.locale)
+    .filter((l): l is BlogAutoLocale => !!l && (BLOG_AUTO_LOCALES as readonly string[]).includes(l))
+}
+
+/**
+ * Is a run of this language in flight? A claimed row means another invocation
+ * is generating right now, and a second one would publish a second article.
+ * A row claimed longer than STALE_LOCK_MS is not counted: recoverStaleLocks
+ * frees it, and until it does, the language is not blocked for the day.
+ */
+export async function isLocaleGenerating(admin: Admin, locale: BlogAutoLocale): Promise<boolean> {
+  const cutoff = new Date(Date.now() - STALE_LOCK_MS).toISOString()
+  const { data } = await admin
+    .from(PLAN_TABLE)
+    .select('id')
+    .eq('locale', locale)
+    .eq('status', 'generating')
+    .gte('locked_at', cutoff)
+    .limit(1)
+  return (data ?? []).length > 0
 }
