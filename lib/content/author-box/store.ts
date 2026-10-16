@@ -260,7 +260,8 @@ export async function decideAuthorBox(admin: SupabaseClient, req: AuthorBoxReque
     let authorName: string | null = null
     try { authorName = req.authorName ? await req.authorName() : null } catch { authorName = null }
     const [description, aboutUrl, topicLanguage] = await Promise.all([
-      readDescription(admin, req.projectId, project.owner),
+      // A store's description is kept out of its articles (writing guidance), so out of the box too.
+      req.platform === 'shopify' ? Promise.resolve(null) : readDescription(admin, req.projectId, project.owner),
       readAboutUrl(admin, req.projectId, project.owner, project.domain),
       readTopicLanguage(admin, req.articleId, req.projectId),
     ])

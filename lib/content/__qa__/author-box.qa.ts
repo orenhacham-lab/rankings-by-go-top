@@ -257,6 +257,8 @@ async function main() {
     check('C18: Wix: never a box', out === BODY && f.calls.length === 0)
     const shop = await publish(db({ articles: [{ id: ART, project_id: PROJECT, shopify_article_url: `https://${DOMAIN}/blogs/news/old`, published_at: '2026-10-01T00:00:00Z' }] }), noBoxFetch(), BODY, 'shopify')
     check('C19: a Shopify store gets it like WordPress (its own published article is read)', count(shop) === 1 && shop.includes('Levi Bakery'))
+    // MUTATION CONTROL, run by hand: reading the description for Shopify too fails this check.
+    check('C19b: a store\'s box leaves out the business description, as its articles do', !shop.includes(DESCRIPTION.split('.')[0]))
   }
   const unknownAsNo = await mutant<typeof import('@/lib/content/author-box/store')>('lib/content/author-box/store.ts', (s) => s.replace("if (answer !== 'no_box') return { add: false, reason: 'theme_unknown' }", "if (answer === 'has_box' && false) return { add: false, reason: 'theme_unknown' }"))
   {
