@@ -381,14 +381,24 @@ async function main() {
 
   /* -------------------------------------------------------- when, and how much */
 
-  check('S1: the ramp is five, ten, twenty, then the cap, by week of the channel’s life',
+  // Three days a step since 16 Oct 2026, when Oren asked for the most one
+  // mailbox can carry: weeks put thirty a day a month away for no reason.
+  check('S1: the ramp is five, ten, twenty, then the cap, a step every three days',
     dailyQuota(NOW, new Date(NOW.getTime() - 1 * DAY_MS)) === 5
-    && dailyQuota(NOW, new Date(NOW.getTime() - 8 * DAY_MS)) === 10
-    && dailyQuota(NOW, new Date(NOW.getTime() - 16 * DAY_MS)) === 20
+    && dailyQuota(NOW, new Date(NOW.getTime() - 4 * DAY_MS)) === 10
+    && dailyQuota(NOW, new Date(NOW.getTime() - 7 * DAY_MS)) === 20
+    && dailyQuota(NOW, new Date(NOW.getTime() - 10 * DAY_MS)) === DAILY_CAP
     && dailyQuota(NOW, new Date(NOW.getTime() - 60 * DAY_MS)) === DAILY_CAP
     && RAMP[RAMP.length - 1] === DAILY_CAP)
-  check('S1b: before the first message there is no ramp, and the quota is the first week’s',
+  check('S1b: before the first message there is no ramp, and the quota is the first step’s',
     dailyQuota(NOW, null) === RAMP[0])
+  // The brakes touching the ramp rather than the sending: one uncleared bounce
+  // of ours is not a stop, but it is a reason not to send more tomorrow.
+  check('S1c: an uncleared bounce of ours holds the ramp a step below the calendar',
+    dailyQuota(NOW, new Date(NOW.getTime() - 7 * DAY_MS), true) === 10
+    && dailyQuota(NOW, new Date(NOW.getTime() - 60 * DAY_MS), true) === 20)
+  check('S1d: and it can never hold it below the first step',
+    dailyQuota(NOW, new Date(NOW.getTime() - 1 * DAY_MS), true) === RAMP[0])
 
   // The approved plan is 09:00-11:00 for five a day. At five, the derived
   // window must BE that, or the plan and the code have diverged.
