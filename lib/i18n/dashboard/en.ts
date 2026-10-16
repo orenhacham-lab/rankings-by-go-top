@@ -6035,6 +6035,10 @@ export const dashboardEn = {
       disclosure:
         "A card payment is made through Creem (Armitage Labs OÜ), the merchant of record: Creem issues the invoice, adds tax by your billing address, and the charge appears on your statement in Creem's name. The service itself stays ours.",
       buyerTermsLabel: "Creem's buyer terms",
+      // A card subscription is billed by Creem, the merchant of record, so we
+      // cannot stop the charge ourselves. "Contact us and we will stop the
+      // billing" is a promise we cannot keep; this says where cancelling works.
+      cancelNote: 'This plan is billed by Creem, the merchant of record, so the cancellation happens there: use the subscription link in Creem’s receipt email. If it is easier, write to us and we will pass the cancellation request on to them for you. Either way your access stays active until the end of the period you have paid for.',
     },
     shopify: {
       title: 'Billing is managed through Shopify',
