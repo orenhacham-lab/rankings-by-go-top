@@ -5,7 +5,7 @@
  * converting a trial in place or inserting a row, spending the receipt, and
  * moving billing authority to the marketplace — is
  * `public.claim_marketplace_order` (supabase/migrations/
- * 20261016150000_marketplace_orders.sql), for the reason
+ * 20261016160000_marketplace_orders.sql), for the reason
  * lib/billing/governance.ts gives: every trusted billing-authority transition
  * in this schema is atomic in the database, not a sequence of writes from a
  * route. A route that half-finished would leave a paying buyer with an

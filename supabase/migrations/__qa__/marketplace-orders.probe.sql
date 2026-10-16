@@ -1,5 +1,5 @@
 -- ============================================================================
--- EXECUTED PROBE — 20261016150000_marketplace_orders.sql
+-- EXECUTED PROBE — 20261016160000_marketplace_orders.sql
 --
 -- Applies the real migration file (via \i, twice, for idempotency) to a
 -- disposable PostgreSQL cluster that carries Supabase's roles and the default
@@ -108,8 +108,8 @@ BEGIN
   RETURN false;
 END; $$;
 
-\i supabase/migrations/20261016150000_marketplace_orders.sql
-\i supabase/migrations/20261016150000_marketplace_orders.sql
+\i supabase/migrations/20261016160000_marketplace_orders.sql
+\i supabase/migrations/20261016160000_marketplace_orders.sql
 
 INSERT INTO auth.users (id, email) VALUES
   ('11111111-1111-1111-1111-111111111111', 'buyer@example.com'),
@@ -184,7 +184,7 @@ UPDATE public.marketplace_orders
  WHERE provider = 'digistore24';
 
 -- ── restored: the migration repairs it, policy and all ──────────────────────
-\i supabase/migrations/20261016150000_marketplace_orders.sql
+\i supabase/migrations/20261016160000_marketplace_orders.sql
 
 DO $$
 DECLARE sel text;

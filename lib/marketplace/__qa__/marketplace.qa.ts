@@ -473,7 +473,7 @@ async function main() {
 
   // ── I. The migration's own promises, as written ──────────────────────────────
   console.log('\nI. migration')
-  const MIG = 'supabase/migrations/20261016150000_marketplace_orders.sql'
+  const MIG = 'supabase/migrations/20261016160000_marketplace_orders.sql'
   const migSrc = read(MIG)
   check('I1: the orders table has RLS enabled',
     /ALTER TABLE public\.marketplace_orders ENABLE ROW LEVEL SECURITY/.test(migSrc))

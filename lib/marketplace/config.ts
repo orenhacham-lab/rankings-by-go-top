@@ -8,7 +8,7 @@
  * That is a different relationship from PayPal and Creem, where the checkout
  * starts inside a session of ours, and it is why the order has to be claimed
  * by the buyer rather than granted on the webhook (supabase/migrations/
- * 20261016150000_marketplace_orders.sql explains the choice).
+ * 20261016160000_marketplace_orders.sql explains the choice).
  *
  * THE REGISTRY IS THE CLOSED WORLD. The database column accepts any short
  * slug on purpose, so that adding a platform is configuration rather than a
