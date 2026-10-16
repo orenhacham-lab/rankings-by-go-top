@@ -10,6 +10,9 @@
  *     the inline images.
  * Wix gets the body untouched (see effectiveDesign in ./types.ts).
  *
+ * The author box (lib/content/author-box) is added here too, when the owner
+ * turned it on and the site's theme has none of its own (decideAuthorBox).
+ *
  * Never fails a publish: if the settings cannot be read, or the design throws,
  * the body goes out exactly as it did before this existed.
  */
@@ -18,20 +21,36 @@ import { injectInlineImages, type ComposableInlineImage } from '@/lib/content/in
 import { designForSite } from './render'
 import { readArticleCtaForArticle, readArticleStyleForArticle } from './store'
 import type { DesignPlatform } from './types'
+import { decideAuthorBox, type ThemeDeps } from '@/lib/content/author-box/store'
+import type { AuthorBoxContent } from '@/lib/content/author-box/box'
+
+export type ArticleDesignExtras = {
+  /** The name the post is published under on the site (asked only when an author box is added). */
+  authorName?: () => Promise<string | null>
+  /** Tests only: the theme page fetcher and the clock. */
+  themeDeps?: ThemeDeps
+}
 
 export async function applyArticleDesign(
   admin: SupabaseClient,
   articleId: string | null | undefined,
   html: string,
   platform: DesignPlatform,
+  extras: ArticleDesignExtras = {},
 ): Promise<string> {
   if (!articleId) return html
   try {
     if (platform === 'wix') return html
     const { style, projectId } = await readArticleStyleForArticle(admin, articleId)
     const cta = await readArticleCtaForArticle(admin, projectId)
+    let authorBox: AuthorBoxContent | null = null
+    if (projectId && (platform === 'wordpress' || platform === 'shopify' || platform === 'webhook')) {
+      const decision = await decideAuthorBox(admin, { articleId, projectId, platform, html, authorName: extras.authorName }, extras.themeDeps)
+      if (decision.add) authorBox = decision.content
+      else if (decision.reason !== 'off') console.log('[author-box] not added', { platform, reason: decision.reason })
+    }
     // The same function the preview and the article view draw with (./render.ts).
-    return designForSite(html, { style, cta, platform })
+    return designForSite(html, { style, cta, platform, authorBox })
   } catch {
     console.warn('[article-style] design skipped', { platform })
     return html

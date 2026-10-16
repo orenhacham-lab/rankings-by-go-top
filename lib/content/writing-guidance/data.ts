@@ -19,6 +19,7 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 import { ARTICLE_STYLE_TABLE, isMissingRelation } from '@/lib/content/article-style/store'
 import { parseGuidanceInput, parseRuleInput, toGuidanceRow, withRule, type GuidanceField, type WritingGuidance } from './guidance'
 import { readProjectWritingGuidance, WRITING_GUIDANCE_COLUMN } from './store'
+import { AUTHOR_BOX_COLUMN, readAuthorBoxSetting } from '@/lib/content/author-box/store'
 
 export type GuidanceSession = { userId: string | null; db: SupabaseClient }
 export type GuidanceDeps = { session: () => Promise<GuidanceSession>; now?: () => Date }
@@ -27,6 +28,14 @@ export type GuidanceView = {
   guidance: WritingGuidance
   /** False while the column does not exist: the card shows nothing to edit and cannot save. */
   editable: boolean
+  /**
+   * The author box (lib/content/author-box): added to published articles only
+   * when the site's theme has none. Off by default; its own column
+   * (project_article_styles.author_box), so its switch is disabled while that
+   * column does not exist, without taking the guidance down with it.
+   */
+  authorBox: boolean
+  authorBoxEditable: boolean
 }
 
 export type GuidanceErrorCode = 'unauthorized' | 'not_found' | 'invalid_request' | 'unavailable' | 'save_failed'
@@ -69,15 +78,24 @@ async function owner(deps: GuidanceDeps, projectId: unknown): Promise<Owner> {
 async function readView(o: Extract<Owner, { ok: true }>): Promise<LoadGuidanceResult> {
   const read = await readProjectWritingGuidance(o.db, o.projectId, o.userId)
   if (read.state === 'error') return { ok: false, code: 'unavailable' }
-  if (read.state === 'missing_column') return { ok: true, data: { guidance: read.guidance, editable: false } }
+  const box = await readAuthorBox(o)
+  if (read.state === 'missing_column') return { ok: true, data: { guidance: read.guidance, editable: false, ...box } }
   // No row yet: whether the column exists decides if the card can save (a first save creates the row).
-  if (read.state === 'default') return { ok: true, data: { guidance: read.guidance, editable: await columnExists(o) } }
-  return { ok: true, data: { guidance: read.guidance, editable: true } }
+  if (read.state === 'default') return { ok: true, data: { guidance: read.guidance, editable: await columnExists(o, WRITING_GUIDANCE_COLUMN), ...box } }
+  return { ok: true, data: { guidance: read.guidance, editable: true, ...box } }
 }
 
-async function columnExists(o: Extract<Owner, { ok: true }>): Promise<boolean> {
+/** The author-box switch: off, and not editable, while its column is missing or unreadable. */
+async function readAuthorBox(o: Extract<Owner, { ok: true }>): Promise<{ authorBox: boolean; authorBoxEditable: boolean }> {
+  const s = await readAuthorBoxSetting(o.db, o.projectId, o.userId)
+  if (s.state === 'saved') return { authorBox: s.enabled, authorBoxEditable: true }
+  if (s.state === 'default') return { authorBox: false, authorBoxEditable: await columnExists(o, AUTHOR_BOX_COLUMN) }
+  return { authorBox: false, authorBoxEditable: false }
+}
+
+async function columnExists(o: Extract<Owner, { ok: true }>, column: string): Promise<boolean> {
   try {
-    const { error } = await o.db.from(ARTICLE_STYLE_TABLE).select(`project_id, ${WRITING_GUIDANCE_COLUMN}`).eq('project_id', o.projectId).eq('user_id', o.userId).limit(1)
+    const { error } = await o.db.from(ARTICLE_STYLE_TABLE).select(`project_id, ${column}`).eq('project_id', o.projectId).eq('user_id', o.userId).limit(1)
     return !error
   } catch {
     return false
@@ -89,10 +107,17 @@ async function columnExists(o: Extract<Owner, { ok: true }>): Promise<boolean> {
  * touches the design or the call to action (a first save creates the row with
  * the design defaults, which are today's behaviour).
  */
-async function write(o: Extract<Owner, { ok: true }>, g: WritingGuidance): Promise<{ ok: true } | { ok: false; code: GuidanceErrorCode }> {
+async function write(o: Extract<Owner, { ok: true }>, g: WritingGuidance, authorBox?: boolean): Promise<{ ok: true } | { ok: false; code: GuidanceErrorCode }> {
   const { error } = await o.db
     .from(ARTICLE_STYLE_TABLE)
-    .upsert({ project_id: o.projectId, user_id: o.userId, [WRITING_GUIDANCE_COLUMN]: toGuidanceRow(g), updated_at: new Date().toISOString() }, { onConflict: 'project_id' })
+    .upsert({
+      project_id: o.projectId,
+      user_id: o.userId,
+      [WRITING_GUIDANCE_COLUMN]: toGuidanceRow(g),
+      // Only when the card sent it and its column exists (see saveWritingGuidance).
+      ...(typeof authorBox === 'boolean' ? { [AUTHOR_BOX_COLUMN]: authorBox } : {}),
+      updated_at: new Date().toISOString(),
+    }, { onConflict: 'project_id' })
   if (error) return { ok: false, code: isMissingRelation(error) ? 'unavailable' : 'save_failed' }
   return { ok: true }
 }
@@ -109,13 +134,17 @@ export async function saveWritingGuidance(deps: GuidanceDeps, projectId: unknown
   if (!o.ok) return o
   const parsed = parseGuidanceInput(input)
   if (!parsed.ok) return parsed.invalid.length ? { ok: false, code: 'invalid_guidance', invalid: parsed.invalid } : { ok: false, code: 'invalid_request' }
+  const rawBox = (input as Record<string, unknown>).authorBox
+  if (rawBox !== undefined && typeof rawBox !== 'boolean') return { ok: false, code: 'invalid_request' }
+  // A switch whose column does not exist yet is not written (the guidance still saves).
+  const authorBox = typeof rawBox === 'boolean' && (await readAuthorBox(o)).authorBoxEditable ? rawBox : undefined
   // Rules keep the time and article they came with; a rule typed in the card is stamped now.
   const current = await readProjectWritingGuidance(o.db, o.projectId, o.userId)
   if (current.state === 'error') return { ok: false, code: 'unavailable' }
   const known = new Map(current.guidance.rules.map((r) => [r.text, r]))
   const now = (deps.now ?? (() => new Date()))().toISOString()
   const rules = parsed.guidance.rules.map((r) => known.get(r.text) ?? { ...r, at: now, articleId: null })
-  const w = await write(o, { ...parsed.guidance, rules })
+  const w = await write(o, { ...parsed.guidance, rules }, authorBox)
   if (!w.ok) return w
   return readView(o)
 }

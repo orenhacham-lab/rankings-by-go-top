@@ -71,7 +71,8 @@ function GuidanceForm({ projectId, view, onData, t }: { projectId: string; view:
   const [pending, setPending] = useState('')
   const [save, setSave] = useState<SaveState>({ kind: 'idle' })
   const [tooLong, setTooLong] = useState(false)
-  const dirty = !sameGuidance(draft, saved)
+  const [authorBox, setAuthorBox] = useState(view.authorBox)
+  const dirty = !sameGuidance(draft, saved) || authorBox !== view.authorBox
   const disabled = !view.editable
 
   const addExclusion = () => {
@@ -91,10 +92,12 @@ function GuidanceForm({ projectId, view, onData, t }: { projectId: string; view:
       instructions: draft.instructions,
       exclusions: draft.exclusions,
       rules: draft.rules.map((r) => ({ text: r.text })),
+      ...(view.authorBoxEditable ? { authorBox } : {}),
     })
     if (res.ok) {
       setSave({ kind: 'saved' })
       setDraft(res.data.guidance)
+      setAuthorBox(res.data.authorBox)
       onData(res.data)
       return
     }
@@ -118,7 +121,7 @@ function GuidanceForm({ projectId, view, onData, t }: { projectId: string; view:
           state={save}
           note={tooLong ? w.errors.invalid_guidance : null}
           onSave={() => void onSave()}
-          onDiscard={() => { setDraft(saved); setSave({ kind: 'idle' }); setTooLong(false) }}
+          onDiscard={() => { setDraft(saved); setAuthorBox(view.authorBox); setSave({ kind: 'idle' }); setTooLong(false) }}
           t={t}
         />
       ) : undefined}
@@ -133,6 +136,16 @@ function GuidanceForm({ projectId, view, onData, t }: { projectId: string; view:
             onChange={(next) => setDraft({ ...draft, mentionBusiness: next })}
             label={w.mentionLabel}
             description={w.mentionHint}
+          />
+        </div>
+
+        <div data-writing-author-box="">
+          <Switch
+            checked={authorBox}
+            disabled={disabled || !view.authorBoxEditable}
+            onChange={setAuthorBox}
+            label={w.authorBoxLabel}
+            description={w.authorBoxHint}
           />
         </div>
 
