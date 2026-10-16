@@ -176,6 +176,12 @@ export async function GET() {
       changefreq: 'monthly',
       priority: '0.8',
     },
+    {
+      url: `${baseUrl}/features/google-maps-posts`,
+      lastmod: today,
+      changefreq: 'monthly',
+      priority: '0.8',
+    },
     // Hebrew legal pages
     // English site root and equivalents
     {
@@ -299,6 +305,12 @@ export async function GET() {
       changefreq: 'monthly',
       priority: '0.8',
     },
+    {
+      url: `${baseUrl}/en/features/google-maps-posts`,
+      lastmod: today,
+      changefreq: 'monthly',
+      priority: '0.8',
+    },
     // English legal pages
   ]
 
@@ -332,6 +344,7 @@ export async function GET() {
     { path: '/solutions/wordpress', changefreq: 'monthly', priority: '0.7' },
     { path: '/solutions/shopify', changefreq: 'monthly', priority: '0.7' },
     { path: '/features/site-links', changefreq: 'monthly', priority: '0.7' },
+    { path: '/features/google-maps-posts', changefreq: 'monthly', priority: '0.7' },
   ]
 
   const treePages = (prefix: string) =>

@@ -3,7 +3,7 @@
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { useState, useEffect } from 'react'
-import { BarChart3, Blocks, Briefcase, ChevronDown, FileText, MapPin, Menu, LineChart, Search, ShoppingBag, Sparkles, Store, Users, Telescope, Waypoints, Wrench, X, type LucideIcon } from 'lucide-react'
+import { BarChart3, Blocks, Briefcase, ChevronDown, FileText, MapPin, MapPinned, Menu, LineChart, Search, ShoppingBag, Sparkles, Store, Users, Telescope, Waypoints, Wrench, X, type LucideIcon } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { LOCALE_PREFIX, PUBLIC_LOCALES, localeHomeHref, type PublicLocale } from '@/lib/i18n/locales'
 import { getPublicDictionary } from '@/lib/i18n/getPublicDictionary'
@@ -100,8 +100,11 @@ export function PublicNav({ locale = 'he', tone = 'default' }: { locale?: Public
   // and how the results are shown. The columns balanced at three each (owner,
   // 6 Oct 2026) until the owner asked on 9 Oct 2026 whether links belonged
   // here; they do — "Links" is a shipped, ungated tab — so the middle column,
-  // which is the work itself, carries four. Every item is a feature that works
-  // today.
+  // which is the work itself, carries four. On 16 Oct 2026 the owner asked for
+  // posts on Google Maps here too. That is work the system does, so it joins
+  // the middle column, and keyword research, which measures demand before any
+  // work starts, moves to the first one, so no column runs to five. Every item
+  // is a feature that works today.
   const featureGroups: { id: string; title: string; items: MenuItem[] }[] = [
     {
       id: 'measure',
@@ -110,14 +113,15 @@ export function PublicNav({ locale = 'he', tone = 'default' }: { locale?: Public
         feature('googleOrganic', 'google-organic-rank-tracking', Search),
         feature('googleMaps', 'google-maps-rank-tracking', MapPin),
         feature('aiVisibility', 'ai-visibility-tracking', Sparkles),
+        feature('keywordResearch', 'keyword-research', Telescope),
       ],
     },
     {
       id: 'act',
       title: dict.nav.featureGroups.act,
       items: [
-        feature('keywordResearch', 'keyword-research', Telescope),
         feature('contentPublishing', 'seo-geo-content-publishing', FileText),
+        feature('mapsPosts', 'google-maps-posts', MapPinned),
         feature('siteFixes', 'site-health-fixes', Wrench),
         feature('links', 'site-links', Waypoints),
       ],
