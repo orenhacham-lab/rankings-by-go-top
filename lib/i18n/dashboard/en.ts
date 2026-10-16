@@ -445,6 +445,8 @@ export const dashboardEn = {
       body: 'What you write here goes into every article we write for the business, so the articles fit your business instead of the field in general.',
       mentionLabel: 'Mention the business by name in articles',
       mentionHint: 'Recommended. The business is named only where it helps the reader, as a source of practical know-how rather than an ad, and at most 2-3 times. It builds trust with Google and AI assistants. Never in the title, and never with made-up experience or achievements.',
+      authorBoxLabel: 'Author box at the end of the article',
+      authorBoxHint: 'Added only when your site\'s theme has no author box of its own. It shows the author\'s name, one line from the business description in your settings and a link to your site, nothing made up.',
       readOnly: 'These guidelines are not open for editing on your account yet.',
       appliesNext: 'Changes apply to the next articles we write. Articles already written stay as they are.',
       instructionsLabel: 'Standing instructions',

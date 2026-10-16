@@ -13,7 +13,7 @@
  */
 
 import type { createAdminClient } from '@/lib/supabase/admin'
-import { uploadMedia, createPost, updatePost, getCategories, getTags, detectSeoPlugin, WordPressClientError, type WordPressPostStatus, type WordPressErrorMeta } from '@/lib/wordpress/client'
+import { uploadMedia, createPost, updatePost, getCategories, getTags, detectSeoPlugin, getPublishingUserName, WordPressClientError, type WordPressPostStatus, type WordPressErrorMeta } from '@/lib/wordpress/client'
 import type { WordPressCredentials } from '@/lib/wordpress/types'
 import { reconcileInlineImagesForWordPress, injectInlineImages, type InlineWpResult } from '@/lib/content/inline-images'
 import { applyArticleDesign } from '@/lib/content/article-style/publish'
@@ -156,7 +156,10 @@ export async function wpCreatePost(
   // The project's article design (lib/content/article-style): the formatted
   // design in the brand colours, as inline styles WordPress keeps. Minimal (the
   // default) leaves the body exactly as above.
-  content = await applyArticleDesign(admin, article.id, content, 'wordpress')
+  // The author box's name, when one is added: the user the post is published under.
+  content = await applyArticleDesign(admin, article.id, content, 'wordpress', {
+    authorName: () => getPublishingUserName(creds, opts.existing?.postId ?? null).catch(() => null),
+  })
 
   // Phase 4E — resolve taxonomy (primary-in-list, dedupe, drop invalid/deleted
   // terms as a safe fallback). Fetch the site's terms ONLY when something is

@@ -2861,6 +2861,8 @@ export const dashboardEs: DeepPartial<DashboardDictionary> = {
       body: 'Lo que escribas aquí se incluye en cada artículo que escribimos para el negocio, para que los artículos se ajusten a tu negocio y no al sector en general.',
       mentionLabel: 'Mencionar el nombre del negocio en los artículos',
       mentionHint: 'Recomendado. El negocio se nombra solo donde ayuda al lector, como fuente de conocimiento práctico y no como anuncio, y como mucho 2-3 veces. Refuerza la confianza ante Google y los asistentes de IA. Nunca en el título, y sin inventar experiencia ni logros.',
+      authorBoxLabel: 'Recuadro del autor al final del artículo',
+      authorBoxHint: 'Solo se añade si la plantilla de tu sitio no tiene ya su propio recuadro de autor. Muestra el nombre del autor, una línea de la descripción del negocio en la configuración y un enlace a tu sitio, sin datos inventados.',
       readOnly: 'Estas pautas todavía no se pueden editar en tu cuenta.',
       appliesNext: 'Los cambios se aplican a los próximos artículos. Los artículos ya escritos no cambian.',
       instructionsLabel: 'Instrucciones fijas',

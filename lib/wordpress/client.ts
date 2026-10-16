@@ -886,6 +886,23 @@ export async function getAuthors(creds: WordPressCredentials): Promise<WordPress
   }))
 }
 
+/**
+ * The display name a post is published under over the application password:
+ * the existing post's author for an update, else the application password's
+ * own user (createPost sends no author). Null when the site does not say.
+ */
+export async function getPublishingUserName(creds: WordPressCredentials, existingPostId?: number | null): Promise<string | null> {
+  let path = '/users/me?context=edit&_fields=name'
+  if (typeof existingPostId === 'number' && existingPostId > 0) {
+    const post = await wpGet<{ author?: unknown }>(creds, `/posts/${existingPostId}?context=edit&_fields=author`)
+    const author = typeof post?.author === 'number' && post.author > 0 ? post.author : null
+    if (!author) return null
+    path = `/users/${author}?context=edit&_fields=name`
+  }
+  const user = await wpGet<{ name?: unknown }>(creds, path)
+  return typeof user?.name === 'string' && user.name.trim() ? user.name.trim() : null
+}
+
 /** Strip tags + collapse whitespace from a rendered field (title/excerpt). */
 function stripRendered(v: unknown): string {
   const s = typeof v === 'string' ? v : (v && typeof v === 'object' && 'rendered' in (v as Record<string, unknown>) ? String((v as { rendered?: unknown }).rendered ?? '') : '')
