@@ -3,7 +3,7 @@ title: Política de Privacidade | Go Top SEO
 description: Política de privacidade do Go Top SEO.
 locale: pt-BR
 source: app/(public)/en/privacy/page.tsx
-lastUpdated: 2026-10-13
+lastUpdated: 2026-10-16
 register: voce
 extraSections: 1
 extraReason: One extra section, "Direitos de residentes no Brasil (LGPD)", placed beside the existing EEA/UK and United States rights sections, because the LGPD gives a different set of rights with a different deadline and a different authority to complain to. What the LGPD adds elsewhere goes inside the sections it belongs to - the legal bases of Art. 7, the international-transfer rule of Art. 33, and the communication channel that stands in for an appointed officer.
@@ -93,6 +93,7 @@ Permissão: **business.manage**, pedida em um consentimento separado somente qua
 - **Avaliações:** quando você abre a tela de avaliações, lemos no Google as avaliações da sua empresa: o nome de exibição de quem avaliou (ou "anônimo"), a nota, o texto, as datas e a resposta existente, se houver. **Não armazenamos nenhum conteúdo de avaliação**: nem o texto, nem o nome de quem avaliou, nem a nota, nem a resposta. Guardamos apenas duas marcas de tempo, para poder sinalizar uma avaliação que você ainda não viu. A foto de perfil de quem avaliou não é lida.
 - **Responder a uma avaliação:** uma resposta é publicada em seu nome somente depois que você a escreveu ou aprovou e clicou em enviar, **e ela é pública: aparece no perfil da sua empresa no Google e qualquer pessoa pode vê-la**. Você pode editá-la ou excluí-la na mesma tela. O Google pode remover uma resposta conforme as próprias políticas de conteúdo dele, e isso não está sob nosso controle.
 - **Rascunhos de IA:** se você pedir um rascunho, o nome da empresa e o artigo ou tema escolhido são enviados ao modelo Gemini do Google. Se você pedir um rascunho de resposta a uma avaliação, o texto da avaliação e a nota dela também são enviados, **sem o nome de quem avaliou**. Um rascunho que você pediu não é publicado antes de você revisá-lo e clicar em publicar. A única coisa publicada sem ser lida é uma postagem criada pela publicação automática, se você a ativou.
+- **Uma foto criada por IA para uma postagem:** se você pedir uma foto para uma postagem escrita a partir de um tema, ao modelo Gemini do Google é enviado somente o tema que você escreveu, **sem o nome da empresa e sem o nome de nenhuma pessoa**. A foto volta para a sua tela, e não a guardamos até você escolhê-la e publicar a postagem.
 
 ### Uso limitado
 
@@ -427,4 +428,4 @@ Se você tiver dúvidas sobre esta política de privacidade, fale com a gente:
 
 **Telefone:** [054-9489377](tel:0549489377)
 
-Esta política foi atualizada pela última vez em 13 de outubro de 2026
+Esta política foi atualizada pela última vez em 16 de outubro de 2026

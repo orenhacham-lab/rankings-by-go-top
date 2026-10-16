@@ -3,7 +3,7 @@ title: Términos de Uso | Go Top SEO
 description: Términos de uso de Go Top SEO: las condiciones que rigen el uso de nuestro servicio.
 locale: es
 source: app/(public)/en/terms/page.tsx
-lastUpdated: 2026-10-13
+lastUpdated: 2026-10-16
 register: usted
 ---
 
@@ -197,7 +197,7 @@ Además de las comprobaciones que usted inicie por sí mismo, el Servicio ejecut
 
 ## 15F. Contenido generado por IA
 
-El Servicio utiliza IA para producir temas de artículos, preguntas y artículos. Dicho contenido puede contener inexactitudes, y revisarlo antes de publicarlo —incluida su exactitud factual, su adecuación a su negocio y a la ley, y los derechos de terceros— es responsabilidad suya.
+El Servicio utiliza IA para producir temas de artículos, preguntas, artículos e imágenes. Dicho contenido puede contener inexactitudes, y revisarlo antes de publicarlo —incluida su exactitud factual, su adecuación a su negocio y a la ley, y los derechos de terceros— es responsabilidad suya.
 
 - **Temas automáticos.** En los proyectos activos con un plan de pago, el Servicio repone automáticamente temas de artículos para que la cola de contenido tenga temas. Un tema no se publica y no le compromete a nada.
 - **Enlaces internos.** El Servicio puede añadir automáticamente enlaces internos a otras páginas de su sitio dentro de los artículos.
@@ -205,6 +205,7 @@ El Servicio utiliza IA para producir temas de artículos, preguntas y artículos
 - **Aprobación y publicación.** El contenido se le muestra para su aprobación y se publica en su sitio de acuerdo con los ajustes de aprobación y publicación que usted eligió para el proyecto. Usted puede editar, rechazar o eliminar cualquier contenido.
 - **Responder a una reseña en su Perfil de Empresa de Google.** Si usted solicita un borrador de respuesta a una reseña, el borrador lo produce la IA y se le muestra antes de enviar nada. Una respuesta se envía únicamente después de que usted la haya escrito o aprobado y haya pulsado enviar, y se publica públicamente en la ficha de su negocio y en su nombre. **Usted es responsable del contenido de la respuesta**, incluso cuando el borrador haya sido producido por IA, lo que comprende la exactitud de los hechos, la difamación, los derechos de terceros y las políticas de contenido de Google. Google puede retirar una respuesta conforme a esas políticas, y no tenemos control sobre ello.
 - **Publicación automática en su Perfil de Empresa de Google.** Si usted activó la publicación automática, cada artículo que el sistema publica en su sitio se publica también como publicación en la ficha de su negocio en Google, **sin que usted lo lea antes**. **Usted es responsable del contenido publicado en su nombre**, tanto cuando el texto haya sido producido por IA como cuando usted no lo haya leído antes de su publicación, lo que comprende la exactitud de los hechos, la difamación, los derechos de terceros y las políticas de contenido de Google. Puede desactivar la publicación automática en cualquier momento, y se desactiva por sí sola si usted cambia el negocio al que está conectado el proyecto.
+- **Una foto creada por IA para una publicación en su Perfil de Empresa de Google.** Si usted solicita una foto para una publicación escrita a partir de un tema, la foto la produce la IA. Es una imagen genérica y **no es una fotografía de su negocio, de su local, de su personal ni de un producto real suyo**, y se le muestra antes de publicar nada. Una foto se publica únicamente después de que usted la haya elegido y haya pulsado publicar, y aparece públicamente en la ficha de su negocio y en su nombre. **Usted es responsable de la foto publicada en su nombre**, lo que comprende su correspondencia con la realidad, los derechos de terceros y las políticas de contenido y de fotos de Google, según las cuales el contenido de una ficha de negocio debe representar el negocio y el producto tal como son en realidad. No utilice una foto así como si fuera una fotografía del negocio, del local o de un producto que no existe: una foto engañosa puede llevar a Google a retirar el contenido o a restringir la ficha, y además puede inducir a engaño a los consumidores. El archivo de la imagen lleva los marcadores propios de Google (SynthID y C2PA), que permiten identificarla como generada por IA.
 
 ## 15G. Mensajes de correo electrónico
 
@@ -249,4 +250,4 @@ Para cualquier consulta sobre estos términos o sobre el Servicio, póngase en c
 Número de sociedad: 517274346
 Correo electrónico: [oren@gotop.co.il](mailto:oren@gotop.co.il)
 
-Última actualización: 13 de octubre de 2026
+Última actualización: 16 de octubre de 2026

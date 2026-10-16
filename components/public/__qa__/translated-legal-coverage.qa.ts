@@ -2718,6 +2718,97 @@ const OUTREACH_NO_LONGER_TRUE = /we\s+do not collect details about a private ind
       .test(`${REGISTERED} (company number 517274346) · oren@gotop.co.il`))
 }
 
+// ── 33) an AI photo for a Business Profile post ─────────────────────────────
+/*
+ * The UX/build thread added a "create a photo" button to the Maps post composer
+ * (topic posts only): one generic, unbranded, photorealistic image from the same
+ * Gemini image pipeline that makes article featured images, shown to the merchant
+ * and published only when they press publish themselves.
+ *
+ * What made this worth text of its own is NOT that the image is AI-made. Google's
+ * posts content policy names no rule about machine- or AI-generated content —
+ * section 30 records that reading, and support.google.com still does not resolve
+ * from this session, so it was not re-read here. What does bite is accuracy: the
+ * policy overview (business/answer/13762416) and the prohibited-content policy
+ * require content on a listing to represent the location and the product as they
+ * actually are, and Google's photo guidance (business/answer/6123536, read
+ * through search snippets on 16 October 2026) asks for photos that represent
+ * reality and warns against excessive use of AI. A photorealistic image that a
+ * customer takes for a photo of THIS bakery's counter is therefore the merchant's
+ * exposure twice over: Google can remove the content or restrict the listing, and
+ * in Israel a misleading image of a good or service is consumer deception under
+ * the Consumer Protection Law.
+ *
+ * So the terms, in all four languages, pin five claims:
+ *   1. the photo is AI-made;
+ *   2. it is NOT a photograph of their business, premises, staff or real product;
+ *   3. it is published only after they choose it and press publish, in their name;
+ *   4. the responsibility for it is theirs, Google's content and photo policies
+ *      included, and a misleading photo risks the content or the listing;
+ *   5. the file carries Google's own SynthID and C2PA markers, so "nobody can
+ *      tell" is not a defence anyone should rely on.
+ * The privacy policy adds the data fact, which is favourable and verified in
+ * lib/gbp/topic-image.ts: only the topic goes to the model — no business name,
+ * no person's name — and nothing is stored before the merchant publishes.
+ */
+const AI_PHOTO_NOT_YOUR_BUSINESS: Record<string, RegExp> = {
+  he: /ואינה צילום של העסק שלכם, של המקום, של העובדים\s*או של מוצר ממשי שלכם/,
+  en: /it is not a\s*photograph of your business, your premises, your staff or an actual product of yours/,
+  es: /no es una fotograf[íi]a de su negocio, de su local, de su personal ni de un producto real suyo/,
+  'pt-BR': /n[ãa]o [ée] uma fotografia da sua empresa, do seu estabelecimento, da sua equipe nem de um produto real seu/,
+}
+const AI_PHOTO_YOUR_RESPONSIBILITY: Record<string, RegExp> = {
+  he: /האחריות לתמונה שמתפרסמת בשמכם היא\s*שלכם/,
+  en: /You are\s*responsible for the photo published in your name/,
+  es: /Usted es responsable de la foto publicada en su nombre/,
+  'pt-BR': /Voc[êe] é responsável pela foto publicada em seu nome/,
+}
+const AI_PHOTO_LISTING_RISK: Record<string, RegExp> = {
+  he: /עלולה להביא להסרת התוכן או להגבלת הכרטיס בידי\s*Google/,
+  en: /can lead Google to remove the content or restrict the listing/,
+  es: /puede llevar a Google a retirar el contenido o a restringir la ficha/,
+  'pt-BR': /pode levar o Google a remover o conte[úu]do ou a restringir o perfil/,
+}
+const AI_PHOTO_MARKERS: Record<string, RegExp> = {
+  he: /SynthID ו-C2PA/,
+  en: /SynthID and C2PA/,
+  es: /SynthID y C2PA/,
+  'pt-BR': /SynthID e C2PA/,
+}
+const AI_PHOTO_NO_BUSINESS_NAME: Record<string, RegExp> = {
+  he: /בלי שם העסק ובלי שם של אדם/,
+  en: /without the business name and\s*without any person&rsquo;s name/,
+  es: /sin el nombre del negocio y sin el nombre de ninguna persona/,
+  'pt-BR': /sem o nome da empresa e sem o nome de nenhuma pessoa/,
+}
+{
+  const read = (path: string) => (existsSync(path) ? readFileSync(path, 'utf8') : '')
+  const enTerms = frontMatter(text[LOCALES[0]].terms).source
+  const enPrivacy = frontMatter(text[LOCALES[0]].privacy).source
+  const docs: [string, string, string][] = [
+    ['he', read(HEBREW_TERMS), read(HEBREW_PRIVACY)],
+    ['en', enTerms ? read(enTerms) : '', enPrivacy ? read(enPrivacy) : ''],
+    ...LOCALES.map((l): [string, string, string] => [l, text[l].terms, text[l].privacy]),
+  ]
+  for (const [name, terms, privacy] of docs) {
+    check(`${name}/terms: the AI photo is not presented as a photograph of the business`, AI_PHOTO_NOT_YOUR_BUSINESS[name]!.test(terms))
+    check(`${name}/terms: the photo published in the merchant's name is the merchant's responsibility`, AI_PHOTO_YOUR_RESPONSIBILITY[name]!.test(terms))
+    check(`${name}/terms: a misleading photo is named as a risk to the content and the listing`, AI_PHOTO_LISTING_RISK[name]!.test(terms))
+    check(`${name}/terms: the file's AI markers are disclosed`, AI_PHOTO_MARKERS[name]!.test(terms))
+    check(`${name}/privacy: only the topic reaches the model, with no business or person name`, AI_PHOTO_NO_BUSINESS_NAME[name]!.test(privacy))
+  }
+  // The favourable data claim has to stay true in the code that makes the image.
+  const gen = read('lib/gbp/topic-image.ts')
+  if (gen) {
+    check('the generator sends no business name to the model', !/businessName/.test(gen))
+    check('the generator stores nothing itself', !/upload\(|storage\./.test(gen))
+  }
+  check('mutation control: a clause that calls it a photo of the business is caught',
+    !AI_PHOTO_NOT_YOUR_BUSINESS.en.test('It is a photograph of your business, taken by AI.'))
+  check('mutation control: a clause with no listing risk is caught',
+    !AI_PHOTO_LISTING_RISK.en.test('A misleading photo is not a good idea.'))
+}
+
 console.log(`\n${pass} passed, ${fail} failed`)
 if (fail > 0) process.exit(1)
 
