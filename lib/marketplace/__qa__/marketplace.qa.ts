@@ -450,6 +450,24 @@ async function main() {
   check('J10: the line offers a route that does not depend on the platform answering',
     /cannot reach \$\{seller\}, write to us and we will end your plan on our side/.test(enCancel)
     && /Only \$\{seller\} can stop the charge/.test(enCancel))
+  // The Hebrew follows this dictionary's own patterns, which the legal review
+  // read out of the file: no gender assigned to a foreign trade name (Hebrew
+  // has none settled for one), התוכנית rather than מסלול, and a maqaf before
+  // a Latin name, as the file writes ב-Shopify and never בShopify.
+  const heCancel = /cancelAtMarketplace: \(seller: string\) => `([^`]*)`/
+    .exec(read('lib/i18n/dashboard/he.ts'))?.[1] ?? ''
+  const hebrewFollowsTheFile = heCancel !== ''
+    && !/\$\{seller\} (?:יכולה|יכול|עוצרת|עוצר)/.test(heCancel)
+    && /אפשר לעצור רק אצל/.test(heCancel)
+    && /התוכנית/.test(heCancel) && !/מסלול/.test(heCancel)
+    && !/[בל]\$\{seller\}/.test(heCancel)
+  check('J11: the Hebrew assigns no gender to the platform and uses the file\'s own words',
+    hebrewFollowsTheFile, heCancel)
+  check('J-MUT6: a gendered verb on the platform name is caught',
+    /\$\{seller\} יכולה/.test('את החיוב רק ${seller} יכולה לעצור'))
+  check('J-MUT7: a missing maqaf before a Latin name is caught',
+    /[בל]\$\{seller\}/.test('קניתם ב${seller}'))
+
   check('J-MUT5: a second resort that promises to stop the charge is caught',
     !/Only \$\{seller\} can stop the charge/.test('write to us and we will stop the billing for you'))
 
