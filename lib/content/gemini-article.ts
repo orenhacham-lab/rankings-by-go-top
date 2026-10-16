@@ -73,7 +73,7 @@ export interface GeneratedArticleContent {
 export interface GeminiUsage { model: string; inputTokens: number; outputTokens: number }
 
 export interface ArticleTable { caption: string; columns: string[]; rows: string[][] }
-export interface Subsection { heading: string; paragraphs: string[] }
+export interface Subsection { heading: string; paragraphs: string[]; bullets: string[] }
 export interface Section { heading: string; answerFirst: string; paragraphs: string[]; bullets: string[]; table: ArticleTable | null; subsections: Subsection[] }
 export interface StructuredArticle {
   title: string; slug: string; metaTitle: string; metaDescription: string; excerpt: string
@@ -296,9 +296,9 @@ export function buildPrompt(brief: ArticleBrief, opts: GenOpts): string {
     ``,
     `Return ONLY valid JSON (no markdown, no text outside the JSON), as STRUCTURED DATA (NOT html), plain-text fields:`,
     `{"title":"...","slug":"...","metaTitle":"...","metaDescription":"...","excerpt":"...","searchIntent":"...","directAnswer":"...","intro":["...","..."],`,
-    `"sections":[{"heading":"...","answerFirst":"...","paragraphs":["...","..."],"bullets":["..."],"table":{"caption":"...","columns":["...","..."],"rows":[["...","..."]]},"subsections":[{"heading":"...","paragraphs":["..."]}]}],`,
+    `"sections":[{"heading":"...","answerFirst":"...","paragraphs":["...","..."],"bullets":["..."],"table":{"caption":"...","columns":["...","..."],"rows":[["...","..."]]},"subsections":[{"heading":"...","paragraphs":["..."],"bullets":["..."]}]}],`,
     `"comparisonTables":[{"caption":"...","columns":["...","..."],"rows":[["...","..."]]}],"faq":[{"question":"...","answer":"..."}],"readerChecks":["...","..."],"imagePrompt":"...","warnings":[]}`,
-    `- Every paragraph/answerFirst/directAnswer is PLAIN TEXT (no HTML). "table"/"bullets"/"subsections" are optional per section.`,
+    `- Every paragraph/answerFirst/directAnswer is PLAIN TEXT (no HTML). "table"/"bullets"/"subsections" are optional per section. Every subsection you include MUST have content under its heading: at least one paragraph, or its list items in its own "bullets".`,
     `- Do NOT use Markdown syntax in ANY field: no **bold**, no __bold__, no ##/### headings, no [text](url) links, no backticks. Return plain readable text only — the server builds all HTML and structure.`,
     `- faq answers: 40-90 words, concise, no duplicates. slug: MUST be English (translate, never transliterate Hebrew), lowercase, hyphens. metaTitle <= 60 chars; metaDescription 120-160 chars. imagePrompt in ${lang}.`,
   ].filter((l) => l !== undefined).join('\n')
@@ -412,6 +412,8 @@ function buildHtml(a: StructuredArticle, language: SuggestionLanguage, includeMa
     ;(s.subsections || []).forEach((sub, j) => {
       if (sub.heading?.trim()) out.push(`<h3 id="${makeId(sub.heading, `section-${i + 1}-sub`, j)}">${esc(sub.heading.trim())}</h3>`)
       emitParagraphs(out, sub.paragraphs)
+      const subBullets = (sub.bullets || []).map((b) => stripListMarker(b)).filter(Boolean)
+      if (subBullets.length) out.push(`<ul>${subBullets.map((b) => `<li>${esc(b)}</li>`).join('')}</ul>`)
     })
   })
 
@@ -431,6 +433,8 @@ function buildHtml(a: StructuredArticle, language: SuggestionLanguage, includeMa
 
 /** Phase 3J — the server HTML builder, exported for the QA harness. */
 export const buildArticleHtml = buildHtml
+/** The model-JSON reader, exported for the QA harness. */
+export const parseStructuredArticle = (parsed: Record<string, unknown>): StructuredArticle => parseStructured(parsed)
 
 function buildMarkdown(a: StructuredArticle, language: SuggestionLanguage): string {
   const out: string[] = []
@@ -444,6 +448,7 @@ function buildMarkdown(a: StructuredArticle, language: SuggestionLanguage): stri
     for (const sub of s.subsections || []) {
       if (sub.heading?.trim()) out.push(`### ${sub.heading.trim()}`)
       for (const para of sub.paragraphs || []) if (para?.trim()) out.push(para.trim())
+      for (const b of (sub.bullets || []).map((x) => (x || '').trim()).filter(Boolean)) out.push(`- ${b}`)
     }
   }
   if ((a.faq || []).length) {
@@ -527,7 +532,7 @@ function polishStructured(a: StructuredArticle, terms: CasingTerm[]): void {
   a.sections = a.sections.map((s) => ({
     ...s, heading: f(s.heading), answerFirst: f(s.answerFirst), paragraphs: s.paragraphs.map(f), bullets: s.bullets.map(f),
     table: s.table ? polishTable(s.table, terms) : null,
-    subsections: s.subsections.map((ss) => ({ heading: f(ss.heading), paragraphs: ss.paragraphs.map(f) })),
+    subsections: s.subsections.map((ss) => ({ heading: f(ss.heading), paragraphs: ss.paragraphs.map(f), bullets: ss.bullets.map(f) })),
   }))
   a.comparisonTables = a.comparisonTables.map((t) => polishTable(t, terms))
   a.faq = a.faq.map((x) => ({ question: f(x.question), answer: f(x.answer) }))
@@ -863,7 +868,12 @@ function parseStructured(parsed: Record<string, unknown>): StructuredArticle {
   const sections: Section[] = Array.isArray(parsed.sections) ? (parsed.sections as Record<string, unknown>[]).map((s) => ({
     heading: cstr(s?.heading), answerFirst: cstr(s?.answerFirst), paragraphs: cstrArr(s?.paragraphs), bullets: cstrArr(s?.bullets),
     table: parseTable(s?.table),
-    subsections: Array.isArray(s?.subsections) ? (s.subsections as Record<string, unknown>[]).map((ss) => ({ heading: cstr(ss?.heading), paragraphs: cstrArr(ss?.paragraphs) })) : [],
+    // A subsection is kept only with something under its heading: the model
+    // sometimes puts a list in the subsection's own "bullets", and a heading
+    // with nothing below it would publish as an empty <h3> (japan4u, 2026-10-14).
+    subsections: Array.isArray(s?.subsections) ? (s.subsections as Record<string, unknown>[])
+      .map((ss) => ({ heading: cstr(ss?.heading), paragraphs: cstrArr(ss?.paragraphs), bullets: cstrArr(ss?.bullets) }))
+      .filter((ss) => ss.paragraphs.length > 0 || ss.bullets.length > 0) : [],
   })) : []
   const faq: GeneratedArticleFaq[] = Array.isArray(parsed.faq) ? (parsed.faq as Record<string, unknown>[])
     .map((f) => ({ question: cstr(f?.question), answer: cstr(f?.answer) })).filter((f) => f.question && f.answer).slice(0, 12) : []
