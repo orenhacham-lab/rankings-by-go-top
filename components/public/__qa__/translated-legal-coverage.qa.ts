@@ -2809,6 +2809,91 @@ const AI_PHOTO_NO_BUSINESS_NAME: Record<string, RegExp> = {
     !AI_PHOTO_LISTING_RISK.en.test('A misleading photo is not a good idea.'))
 }
 
+// ── 34) a purchase made through an external marketplace ────────────────────
+/*
+ * Oren is opening accounts on affiliate marketplaces (the affiliates thread is
+ * building a shared intake layer behind per-platform off switches, with sales
+ * pages under /go/<platform>). Two of the candidates, ClickBank and Digistore24,
+ * are merchants of record: they sell the plan in their own name, they charge the
+ * buyer, they issue the invoice, and they operate their own refund windows —
+ * Digistore24 and ClickBank both run buyer-facing refund policies that are far
+ * wider than ours, and either can refund a transaction at its own discretion.
+ *
+ * Section 4 of our refund policy says a paid period is not refunded. That rule
+ * is the owner's own decision and is not softened here. But on a purchase we did
+ * not sell, section 4 is not the rule the buyer is owed: the seller's is. Leaving
+ * section 4 as the only statement on the page would be a narrower promise than
+ * the buyer actually holds, which in Israel is a misleading omission under the
+ * Consumer Protection Law and in the EU an unfair term under 93/13/EEC, since a
+ * consumer may not be told they have less than the law and the actual seller give
+ * them.
+ *
+ * So each refund policy carries one conditional section, numbered after the
+ * Shopify section so no existing number shifts (6A in he/en/es, 7A in pt-BR,
+ * whose Art. 49 section sits earlier). It names no platform, so it is true both
+ * before any marketplace is live and after, and it pins four claims:
+ *   1. the marketplace is the seller of that purchase — it charged you, it
+ *      invoiced you, cancellation happens there;
+ *   2. its own refund and return policy applies to that purchase;
+ *   3. explicitly, that this holds even where that policy is wider than ours,
+ *      and that section 4 does not narrow it;
+ *   4. section 4 governs purchases made from us, and the page you bought on
+ *      names the seller and links its policy.
+ * Claim 4's second half is a promise about the sales page, which is why the
+ * checks below also read app/go/[platform]/page.tsx once it exists.
+ */
+const MARKETPLACE_SELLER: Record<string, RegExp> = {
+  he: /המוכר של אותה\s*רכישה הוא אותה זירה/,
+  en: /the seller of that purchase is that\s*marketplace/,
+  es: /el vendedor de esa compra es ese mercado/,
+  'pt-BR': /o vendedor dessa compra [ée] esse marketplace/,
+}
+const MARKETPLACE_THEIR_POLICY: Record<string, RegExp> = {
+  he: /מדיניות ההחזרים וההחזרה שלה חלה על אותה רכישה/,
+  en: /Its own refund and return policy applies\s*to that purchase/,
+  es: /Su propia pol[íi]tica de reembolsos y devoluciones se aplica a esa compra/,
+  'pt-BR': /A pol[íi]tica de reembolso e devolu[çc][ãa]o dele se aplica a essa compra/,
+}
+const MARKETPLACE_WIDER: Record<string, RegExp> = {
+  he: /גם כשהיא רחבה\s*ממדיניות ההחזרים שבסעיף 4/,
+  en: /even where that policy is wider than the refund\s*policy in\s*section 4/,
+  es: /incluso cuando esa pol[íi]tica es m[áa]s amplia que la pol[íi]tica de reembolsos de la secci[óo]n 4/,
+  'pt-BR': /mesmo quando essa pol[íi]tica [ée] mais ampla que as regras de reembolso das se[çc][õo]es 4 e 5/,
+}
+const MARKETPLACE_NAMES_SELLER: Record<string, RegExp> = {
+  he: /בעמוד שבו רכשתם מופיע שם המוכר וקישור למדיניות שלו/,
+  en: /The page you bought (on|from) names the seller and links (to )?its policy/,
+  es: /La p[áa]gina en la que usted compr[óo] indica el nombre del vendedor y enlaza con su pol[íi]tica/,
+  'pt-BR': /A p[áa]gina em que voc[êe] comprou informa o nome do vendedor e traz o link para a pol[íi]tica dele/,
+}
+{
+  const read = (path: string) => (existsSync(path) ? readFileSync(path, 'utf8') : '')
+  const docs: [string, string][] = [
+    ['he', read('app/(legal)/refund-policy/page.tsx')],
+    ['en', read('app/(public)/en/refund-policy/page.tsx')],
+    ...LOCALES.map((l): [string, string] => [l, text[l]['refund-policy']]),
+  ]
+  for (const [name, refund] of docs) {
+    check(`${name}/refund-policy: the marketplace is named as the seller of that purchase`, MARKETPLACE_SELLER[name]!.test(refund))
+    check(`${name}/refund-policy: the marketplace's own refund policy is the one that applies`, MARKETPLACE_THEIR_POLICY[name]!.test(refund))
+    check(`${name}/refund-policy: our section 4 is not presented as narrowing a wider policy`, MARKETPLACE_WIDER[name]!.test(refund))
+    check(`${name}/refund-policy: the buyer is told where to find the seller and its policy`, MARKETPLACE_NAMES_SELLER[name]!.test(refund))
+    check(`${name}/refund-policy: the owner's no-refund rule is still the rule for purchases from us`,
+      /(סעיף 4 חלה על|in section 4 applies to\s*purchases made from us|de la secci[óo]n 4 se aplica a las compras realizadas a nosotros|das se[çc][õo]es 4 e 5 se aplicam [àa]s compras feitas de n[óo]s)/.test(refund))
+  }
+  // Claim 4 is a promise about the sales page. Once that page exists it has to keep it.
+  const salesPage = read('app/go/[platform]/page.tsx')
+  if (salesPage) {
+    check('the marketplace sales page names its seller', /seller|vendedor|מוכר/i.test(salesPage))
+    check('the marketplace sales page does not send the buyer to our own refund policy',
+      !/\/(en\/)?refund-policy/.test(salesPage))
+  }
+  check('mutation control: a clause that keeps us the seller is caught',
+    !MARKETPLACE_SELLER.en.test('We remain the seller of that purchase and you cancel with us.'))
+  check('mutation control: a clause that caps the buyer at our own policy is caught',
+    !MARKETPLACE_WIDER.en.test('The refund policy in section 4 applies to that purchase instead.'))
+}
+
 console.log(`\n${pass} passed, ${fail} failed`)
 if (fail > 0) process.exit(1)
 
