@@ -58,6 +58,8 @@ export default function EnglishPrivacyPage() {
           type) and the placement log — see &ldquo;Link Network&rdquo; below</li>
           <li><strong>Results and content:</strong> AI visibility check results, and content generated for you:
           topics, questions and articles</li>
+          <li><strong>Author photo:</strong> a photo you upload for an author box, if you chose to show
+          one &mdash; see &ldquo;An Author Photo You Upload&rdquo; below</li>
           <li><strong>Email preferences:</strong> which messages you receive, and unsubscribes from reminders</li>
           <li><strong>Payment information:</strong> we do not store your payment instrument. For
           accounts whose billing authority is Shopify — including merchants who installed the app
@@ -485,6 +487,36 @@ export default function EnglishPrivacyPage() {
       </section>
 
       <section>
+        <h2>An Author Photo You Upload</h2>
+        <p>
+          If you upload a photo for an author box, the file is kept in a dedicated storage bucket of ours
+          for as long as the setting is on. Its path is made of the project id and a random id, and never
+          of a person&rsquo;s name. We do not publish our copy and the article does not link to it.
+        </p>
+        <p>
+          When the article is published, the photo is copied into your site&rsquo;s media library or into
+          Shopify Files, and the article links to that copy. From then on the photo is visible to anyone
+          who visits your site, like any other image in an article.
+        </p>
+        <p>
+          The photo is not sent to any AI provider, is not used to train models, and we do not run face
+          recognition or any other biometric processing on it.
+        </p>
+        <p>
+          Deleting the photo or turning the setting off erases the file from our storage. A copy already
+          placed on your site is not under our control, and only whoever administers that site can delete
+          it there.
+        </p>
+        <p>
+          As to the person in the photo, the customer who uploaded it decides what it is used for, and we
+          process the file for them. If you are the person in the photo and not the customer who uploaded
+          it, write to us at the address at the end of this policy: we will erase the file from our
+          storage and approach the customer so that the copy on the site is taken down, but we cannot
+          ourselves delete content on a customer&rsquo;s site.
+        </p>
+      </section>
+
+      <section>
         <h2>AI Providers</h2>
         <p>Some features send data to the following AI services to produce the result you asked for:</p>
         <ul>
@@ -790,6 +822,9 @@ export default function EnglishPrivacyPage() {
           <li><strong>Cookie decision log:</strong> up to three years from the decision, so that we
           can demonstrate what you chose. That is the legal basis for keeping it, which is why it is
           not erased together with the account.</li>
+          <li><strong>Author photo:</strong> for as long as the setting is on. Deleting the photo or
+          turning the setting off erases the file immediately. A copy already placed on your site stays
+          there until you delete it.</li>
           <li><strong>Security and server logs:</strong> up to 90 days.</li>
         </ul>
       </section>
