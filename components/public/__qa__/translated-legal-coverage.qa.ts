@@ -2894,6 +2894,109 @@ const MARKETPLACE_NAMES_SELLER: Record<string, RegExp> = {
     !MARKETPLACE_WIDER.en.test('The refund policy in section 4 applies to that purchase instead.'))
 }
 
+// ── 35) a subscription billed by another company ───────────────────────────
+/*
+ * Terms section 6 said, with no carve-out of any kind, that the user may cancel
+ * the renewal "at any time through your account settings". That was already
+ * false for a Shopify-billed store, where the billing and the cancellation run
+ * through Shopify (the billing screen has had a Shopify card for that reason
+ * since long before this section existed). It is false for a card payment too,
+ * where section 5A makes Creem the seller and Creem holds the subscription: the
+ * Creem branch of the billing screen used to tell the buyer to contact us and
+ * that we would stop the billing for them, which we cannot do — we can end the
+ * plan, not stop someone else's charge. And it would be false again for a plan
+ * bought on a marketplace that resells the Service in its own name.
+ *
+ * A published promise that a cancellation route exists where it does not is the
+ * worst kind for us to carry: in Israel it is a misleading omission under the
+ * Consumer Protection Law, and in the EU it makes a cancellation right
+ * practically unusable, which is what the Consumer Rights Directive forbids.
+ *
+ * So section 6A says, platform-neutrally and therefore truthfully in every
+ * state the product can be in today or next month:
+ *   1. some subscriptions are billed by another company, and it names the three
+ *      — Shopify, Creem, an external marketplace;
+ *   2. in those cases the renewal is cancelled with that company and NOT through
+ *      the account settings, because that company holds the subscription;
+ *   3. we will pass a cancellation request on and confirm in writing that we
+ *      have — a promise we can keep — while the charge itself is stopped by that
+ *      company and not by us;
+ *   4. we do not issue a refund on another company's behalf;
+ *   5. access still lasts to the end of the period already paid for.
+ * Claim 3's second half is the one that matters most: it is what keeps the
+ * section from becoming the same unkeepable promise in a new place.
+ *
+ * Section 6 itself is deliberately NOT edited: it remains the rule for a
+ * subscription we bill, and the last check below holds it to that, so a future
+ * edit cannot quietly delete the account-settings route for everyone.
+ */
+const BILLED_ELSEWHERE_NOT_SETTINGS: Record<string, RegExp> = {
+  he: /חידוש המנוי מבוטל אצל אותה חברה ולא\s*דרך הגדרות החשבון/,
+  en: /the renewal is cancelled with that company and not through your account\s*settings/,
+  es: /la renovaci[óo]n se cancela ante esa empresa y no desde la configuraci[óo]n de su cuenta/,
+  'pt-BR': /o cancelamento da renova[çc][ãa]o [ée] feito junto a essa empresa, e n[ãa]o nas configura[çc][õo]es da sua conta/,
+}
+const BILLED_ELSEWHERE_WE_PASS_ON: Record<string, RegExp> = {
+  he: /נעביר אותה לאותה חברה ונאשר בכתב שהעברנו/,
+  en: /we will pass it on to that company and confirm in writing that we\s*have/,
+  es: /la trasladaremos a esa empresa y le confirmaremos por escrito que lo hemos hecho/,
+  'pt-BR': /n[óo]s o encaminhamos a essa empresa e confirmamos por escrito que o fizemos/,
+}
+const BILLED_ELSEWHERE_NOT_OUR_CHARGE: Record<string, RegExp> = {
+  he: /עצירת החיוב\s*עצמו נעשית בידי אותה חברה ולא בידינו/,
+  en: /the charge itself is stopped by that company and not by us/,
+  es: /el cobro lo detiene esa empresa y no nosotros/,
+  'pt-BR': /a cobran[çc]a [ée] interrompida por essa empresa e n[ãa]o por n[óo]s/,
+}
+const BILLED_ELSEWHERE_NO_REFUND_FOR_THEM: Record<string, RegExp> = {
+  he: /ואיננו מוציאים החזר בשמה/,
+  en: /we do not issue\s*a refund on its behalf/,
+  es: /no emitimos un reembolso en su nombre/,
+  'pt-BR': /n[ãa]o emitimos reembolso em nome dela/,
+}
+const BILLED_ELSEWHERE_ACCESS_KEPT: Record<string, RegExp> = {
+  he: /הגישה למערכת נשמרת עד תום תקופת החיוב\s*ששולמה/,
+  en: /access to the Service is retained until the end\s*of the billing period that has already been paid/,
+  es: /el acceso al Servicio se mantiene hasta el final del per[íi]odo de facturaci[óo]n que ya haya sido pagado/,
+  'pt-BR': /o acesso ao Servi[çc]o [ée] mantido at[ée] o fim do per[íi]odo de cobran[çc]a j[áa] pago/,
+}
+// Section 6 must keep the account-settings route for a subscription WE bill.
+const OWN_BILLING_STILL_SETTINGS: Record<string, RegExp> = {
+  he: /רשאי לבטל את חידוש המנוי בכל עת דרך הגדרות החשבון/,
+  en: /You may cancel renewal of your subscription at any time through your account settings/,
+  es: /puede cancelar la renovaci[óo]n de su suscripci[óo]n en cualquier momento desde la configuraci[óo]n de su cuenta/,
+  'pt-BR': /pode cancelar a renova[çc][ãa]o da sua assinatura a qualquer momento nas configura[çc][õo]es da conta/,
+}
+{
+  const read = (path: string) => (existsSync(path) ? readFileSync(path, 'utf8') : '')
+  const enTerms = frontMatter(text[LOCALES[0]].terms).source
+  const docs: [string, string][] = [
+    ['he', read(HEBREW_TERMS)],
+    ['en', enTerms ? read(enTerms) : ''],
+    ...LOCALES.map((l): [string, string] => [l, text[l].terms]),
+  ]
+  for (const [name, terms] of docs) {
+    check(`${name}/terms: a subscription billed elsewhere is cancelled there, not in the account settings`, BILLED_ELSEWHERE_NOT_SETTINGS[name]!.test(terms))
+    check(`${name}/terms: we promise only to pass the request on, and to confirm it in writing`, BILLED_ELSEWHERE_WE_PASS_ON[name]!.test(terms))
+    check(`${name}/terms: stopping the charge is named as the other company's act, not ours`, BILLED_ELSEWHERE_NOT_OUR_CHARGE[name]!.test(terms))
+    check(`${name}/terms: no refund is promised on another company's behalf`, BILLED_ELSEWHERE_NO_REFUND_FOR_THEM[name]!.test(terms))
+    check(`${name}/terms: access still runs to the end of the period already paid for`, BILLED_ELSEWHERE_ACCESS_KEPT[name]!.test(terms))
+    check(`${name}/terms: all three billing companies are named`, /Shopify/.test(terms) && /Creem/.test(terms) && /(זירת מכירות|mercado externo|marketplace externo|external marketplace)/.test(terms))
+    check(`${name}/terms: section 6 still gives the account-settings route for a subscription we bill`, OWN_BILLING_STILL_SETTINGS[name]!.test(terms))
+  }
+  // The billing screen is the other half of this promise: it must not tell a buyer
+  // whose subscription we do not hold that we will stop the billing for them.
+  // Today it still does — `contactToCancel` in lib/i18n/dashboard/*.ts reads "contact
+  // us and we will stop the billing for you", which is the branch a Creem buyer
+  // lands in. That text is being replaced in the PR that rewrites the screen, and
+  // the check belongs with the fix rather than here, where it would ship red; the
+  // thread that owns the screen has the exact assertion to add.
+  check('mutation control: a clause that keeps the cancellation in our account settings is caught',
+    !BILLED_ELSEWHERE_NOT_SETTINGS.en.test('In those cases the renewal is cancelled through your account settings as usual.'))
+  check('mutation control: a promise to stop the other company’s charge is caught',
+    !BILLED_ELSEWHERE_NOT_OUR_CHARGE.en.test('Write to us and we will stop the charge for you.'))
+}
+
 console.log(`\n${pass} passed, ${fail} failed`)
 if (fail > 0) process.exit(1)
 

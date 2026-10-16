@@ -179,6 +179,24 @@ export default function EnglishTermsPage() {
       </section>
 
       <section>
+        <h2>6A. A subscription billed by another company</h2>
+        <p>
+          Some subscriptions are billed by another company rather than by us: a store billed
+          through Shopify, a card payment in which Creem is the seller as described in section 5A,
+          and a plan bought on an external marketplace that resells the Service in its own name. In
+          those cases the renewal is cancelled with that company and not through your account
+          settings, because that company holds the subscription and charges you. If you send us a
+          cancellation request we will pass it on to that company and confirm in writing that we
+          have, but the charge itself is stopped by that company and not by us, and we do not issue
+          a refund on its behalf. If you are not sure which company bills your subscription, write
+          to us and we will tell you. In every case, access to the Service is retained until the end
+          of the billing period that has already been paid, as in section 6, and the refund policy
+          that applies to such a purchase is set out in our{' '}
+          <Link href="/en/refund-policy">Cancellation and Refund Policy</Link>.
+        </p>
+      </section>
+
+      <section>
         <h2>7. Refunds</h2>
         <p>
           Subscription fees are non-refundable for a period that has already begun or been paid,
