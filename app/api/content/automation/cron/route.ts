@@ -42,6 +42,12 @@
  * this plan is best-effort. Production only, idempotent, isolated the same way, and it logs
  * one counts-only line per pass — the only evidence the pass runs at all.
  *
+ * THEN, THE OUTBOUND SEND ITSELF (lib/outreach/sender-isolated.ts): at most one cold message
+ * per pass, which at a quarter-hour cron is the 5–15 minute spacing the channel's plan
+ * requires. OFF unless OUTREACH_SENDING_ENABLED is exactly "true" and the mailbox password is
+ * set, Production only, and every gate the plan names is inside it. It logs one line per pass
+ * with the outcome and no recipient.
+ *
  * ALONGSIDE ALL OF IT, THE SITE MAPPING UPKEEP (lib/content/existing-content/map-upkeep.ts):
  * at most one project per run whose mapping is missing or ageing is mapped, so automatic
  * internal links have pages to point at. Started with the runner, awaited before the emails.
@@ -61,6 +67,7 @@ import { resumeStalledSeedRuns, startIsolatedSeedResume } from '@/lib/seed-scan/
 import { runTopicTopUp, startIsolatedTopUp } from '@/lib/content/automation/topic-topup'
 import { runIsolatedReminders } from '@/lib/reminders/isolated'
 import { runIsolatedProspectRetention } from '@/lib/outreach/retention-isolated'
+import { runIsolatedProspectSend } from '@/lib/outreach/sender-isolated'
 import { runIsolatedOnboardingEmails } from '@/lib/onboarding-emails/isolated'
 import { runIsolatedWeeklySummaries } from '@/lib/reports/weekly/isolated'
 import { checkPublishingStalls, isDailyStallCheckRun } from '@/lib/content/automation/stall-watch'
@@ -133,6 +140,14 @@ async function handle(request: Request): Promise<Response> {
     // may silently never fire. Production only, idempotent, milliseconds over a small
     // table, isolated: it never throws, so it cannot change, delay or fail anything above.
     await runIsolatedProspectRetention()
+    // Then, OFF unless OUTREACH_SENDING_ENABLED is exactly "true" and the mailbox password is
+    // set: at most ONE cold message of the US channel (lib/outreach/sender-isolated.ts). It
+    // rides this cron because the plan needs minutes between messages and a daily Vercel cron
+    // on this plan gives neither the frequency nor the reliability; one message per quarter
+    // hour IS the plan's spacing. Production only. Every gate is inside it — the recipient's
+    // 09:00 window, the warm-up quota, the suppression list, the platform and a finding
+    // verified against the live page in this pass. Isolated: it never throws.
+    await runIsolatedProspectSend()
     // Last of all, and off unless REMINDER_EMAILS_ENABLED is "true": the reminder email for
     // articles waiting for approval (lib/reminders). Isolated; it never throws or rejects.
     await runIsolatedReminders()
