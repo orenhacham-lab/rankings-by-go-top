@@ -578,7 +578,7 @@ async function main() {
     check('J6: yesterday\'s article does not count as today\'s', yesterday.locale === 'he', yesterday)
 
     const busy = await nextLocaleToWrite(
-      fake([planned({ status: 'generating', locked_at: new Date(inWindow - 60_000).toISOString() })]) as unknown as Admin,
+      fake([planned({ status: 'generating', locked_at: new Date(Date.now() - 60_000).toISOString() })]) as unknown as Admin,
       inWindow)
     check('J7: a language being written right now is left to that run',
       busy.locale === null && busy.busy, busy)
