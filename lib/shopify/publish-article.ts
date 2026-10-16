@@ -308,6 +308,29 @@ async function persistSuccess(
   return { ok: true, articleId: node.id, url, handle: node.handle, status, publishedAt: node.publishedAt, imageWarnings, updated }
 }
 
+/**
+ * Replace ONLY the body of an article that already exists in the store, by its GID: the
+ * one-time empty-subheading repair (lib/content/empty-h3-repair/pass.ts) writes back the
+ * merchant's own live body with only the empty <h3>s cut out. It lives here so this file stays
+ * the single place that mutates Shopify articles, behind the same gates in the same order: the
+ * central billing guard FIRST, then write_content. Nothing else is sent (no title, handle,
+ * summary, tags, author, image or published state), and nothing is written to our row; a refusal
+ * is a code, never Shopify's text.
+ */
+export async function updateShopifyArticleBodyOnly(
+  admin: Admin,
+  connection: ShopifyConnectionRow,
+  creds: ShopifyCredentials,
+  articleGid: string,
+  body: string,
+): Promise<{ ok: true } | { ok: false; reason: 'billing_not_entitled' | 'missing_write_content_scope' | 'graphql_user_error' }> {
+  const entitlement = await checkShopifyPublishEntitlement(admin, connection)
+  if (!entitlement.ok) return { ok: false, reason: 'billing_not_entitled' }
+  if (!hasWriteContent(connection.granted_scopes)) return { ok: false, reason: 'missing_write_content_scope' }
+  const res = await shopifyArticleUpdate(creds, articleGid, { body })
+  return res.ok ? { ok: true } : { ok: false, reason: 'graphql_user_error' }
+}
+
 /** Record a failure WITHOUT erasing shopify_article_id or prior metadata. */
 async function persistError(admin: Admin, articleId: string, reason: string, detail?: string): Promise<void> {
   await admin.from('generated_articles').update({
