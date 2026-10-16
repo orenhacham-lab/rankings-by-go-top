@@ -179,6 +179,10 @@ export default function EnglishPrivacyPage() {
           review&rsquo;s text and its rating are sent too, <strong>without the reviewer&rsquo;s name</strong>. A
           draft you asked for is not published until you review it and press publish. The one thing published
           without being read is a post created by automatic posting, if you turned it on.</li>
+          <li><strong>An AI photo for a post:</strong> if you ask for a photo for a post written from a topic,
+          only the topic you wrote is sent to Google&rsquo;s Gemini model, <strong>without the business name and
+          without any person&rsquo;s name</strong>. The photo comes back to your screen, and we do not store it
+          until you choose it and publish the post.</li>
         </ul>
 
         <h3>Limited Use</h3>
@@ -1014,7 +1018,7 @@ export default function EnglishPrivacyPage() {
 
       <section>
         <p className={LEGAL_FOOTNOTE}>
-          This policy was last updated on October 13, 2026
+          This policy was last updated on October 16, 2026
         </p>
       </section>
     </LegalDoc>

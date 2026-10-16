@@ -81,8 +81,8 @@ const TOPICS: Record<string, Record<Lang, Rule>> = {
     he: { terms: [/ChatGPT/, /Gemini/, /Google AI Mode/, /Perplexity/, /Copilot/, /Grok/, /ספק סריקה חיצוני/, /בדיקה חודשית אוטומטית/, /מכסת הבדיקות הקיימת/, /לכבות/], privacy: [/ChatGPT/, /Perplexity/, /Gemini/, /Microsoft Copilot/, /Grok/, /Google AI Mode/, /בדיקה חודשית אוטומטית/, /מכסת הבדיקות/, /לכבות/] },
   },
   '6 AI-generated content': {
-    en: { terms: [/AI-Generated Content/, /article topics, questions and articles/, /tops up article\s+topics automatically/, /paid plan/, /automatically add internal links/, /call-to-action box/i, /approval/, /your responsibility/], privacy: [/topics, questions and articles/, /questions, articles, images/] },
-    he: { terms: [/תוכן שנוצר באמצעות AI/, /נושאים למאמרים, שאלות ומאמרים/, /משלימה נושאים\s+למאמרים באופן אוטומטי/, /תוכנית בתשלום/, /קישורים פנימיים/, /קריאה לפעולה/, /לאישורכם/, /היא שלכם/], privacy: [/נושאים, שאלות ומאמרים/, /שאלות, מאמרים, תמונות/] },
+    en: { terms: [/AI-Generated Content/, /article topics, questions, articles and images/, /tops up article\s+topics automatically/, /paid plan/, /automatically add internal links/, /call-to-action box/i, /approval/, /your responsibility/], privacy: [/topics, questions and articles/, /questions, articles, images/] },
+    he: { terms: [/תוכן שנוצר באמצעות AI/, /נושאים למאמרים, שאלות, מאמרים ותמונות/, /משלימה נושאים\s+למאמרים באופן אוטומטי/, /תוכנית בתשלום/, /קישורים פנימיים/, /קריאה לפעולה/, /לאישורכם/, /היא שלכם/], privacy: [/נושאים, שאלות ומאמרים/, /שאלות, מאמרים, תמונות/] },
   },
   '7 emails': {
     en: { terms: [/Email Messages/, /reminder email/i, /one-click unsubscribe/, /Weekly progress summary/, /Setup emails/, /Account and service messages/], privacy: [/Email Messages/, /Resend/, /one-click unsubscribe/, /Weekly summary/, /Setup emails/, /Account and service messages/] },
@@ -148,13 +148,15 @@ for (const [topic, byLang] of Object.entries(TOPICS)) {
 
 // The product name and the last-updated line.
 const OLD_NAME = /Rankings by Go Top/i
-// Hebrew and English diverge from 13 October 2026: Oren changed the company's
-// ENGLISH name that day, so the English documents were revised and the Hebrew
-// ones, which carry the unchanged Hebrew name, were not. Each document's date
-// belongs to that document.
+// Hebrew and English diverged on 13 October 2026, when Oren changed the
+// company's ENGLISH name: the English documents were revised and the Hebrew ones,
+// which carry the unchanged Hebrew name, were not. They meet again on 16 October
+// 2026, when the clause on an AI photo for a Business Profile post was added to
+// the terms and the privacy policy in all four languages. Each document's date
+// still belongs to that document, and the accessibility statement did not move.
 const LAST_UPDATED: Record<Doc, Record<Lang, RegExp>> = {
-  terms: { he: /12 באוקטובר 2026/, en: /October 13, 2026/ },
-  privacy: { he: /12 באוקטובר 2026/, en: /October 13, 2026/ },
+  terms: { he: /16 באוקטובר 2026/, en: /October 16, 2026/ },
+  privacy: { he: /16 באוקטובר 2026/, en: /October 16, 2026/ },
   a11y: { he: /5 באוקטובר 2026/, en: /October 5, 2026/ },
 }
 for (const lang of ['he', 'en'] as Lang[]) for (const doc of ['terms', 'privacy', 'a11y'] as Doc[]) {
