@@ -537,7 +537,14 @@ async function main() {
       try { d = execSync(`git diff -U0 8b468a8 -- ${file}`, { cwd: ROOT }).toString() } catch { return false }
       const added = d.split('\n').filter((l) => l.startsWith('+') && !l.startsWith('+++')).map((l) => l.slice(1).trim())
         .filter((l) => l && !l.startsWith('//') && !l.startsWith('*') && !l.startsWith('/*'))
-      return added.length > 0 && added.every((l) => /applyArticleDesign/.test(l))
+      // Owner 2026-10-16: the one-time empty-subheading repair adds ONE function here,
+      // updateShopifyArticleBodyOnly (only an article's body; the billing guard first — its own
+      // guards are lib/content/__qa__/empty-h3-repair.qa.ts C7). That block, signature to closing
+      // brace, is set aside; every other added line must still be the design step.
+      const i = added.findIndex((l) => l.startsWith('export async function updateShopifyArticleBodyOnly('))
+      const j = i < 0 ? -1 : added.indexOf('}', i)
+      const judged = j < 0 ? added : [...added.slice(0, i), ...added.slice(j + 1)]
+      return judged.length > 0 && judged.every((l) => /applyArticleDesign/.test(l))
     }
     untouched = untouched.split('\n').filter((f) => f && !(f === 'lib/shopify/publish-article.ts' && designOnly(f))).join('\n')
     // Owner 2026-10-05: the Shopify App Store connect deliberately finishes a
