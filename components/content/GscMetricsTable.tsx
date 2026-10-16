@@ -10,7 +10,7 @@
  * Shown inside GscPanel, in the project's settings (the Search Console screen that also
  * showed it is gone), so there is exactly one SC data model and no duplicated sync logic.
  */
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { ExternalLink } from 'lucide-react'
 import Button from '@/components/ui/Button'
 import Notice from '@/components/ui/Notice'
@@ -30,6 +30,7 @@ const WINDOWS: WindowDays[] = [28, 90]
 // L1 — default 10 rows; the metrics endpoint clamps pageSize ≤ 100 (client-only).
 const PAGE_SIZE_OPTIONS = [10, 25, 50, 100] as const
 
+type View = 'queries' | 'opportunities' | 'multipage'
 type ConnStatus = 'connected' | 'reauth_required' | 'revoked' | 'error'
 interface SummaryCard { runId: string; windowDays: number; startDate: string | null; endDate: string | null; latestAvailableDate: string | null; rowsFetched: number; truncated: boolean; finishedAt: string | null; summaryResyncRequired?: boolean; clicks: number | null; impressions: number | null; ctr: number | null; avgPosition: number | null }
 interface StatusResponse { ok: boolean; oauthConfigured: boolean; connection: { status: ConnStatus } | null; property: { siteUrl: string } | null; windows: Record<string, SummaryCard | null> }
@@ -66,8 +67,12 @@ export default function GscMetricsTable({ projectId, refreshKey = 0 }: { project
   const [statusAttempt, setStatusAttempt] = useState(0)
 
   const [activeWindow, setActiveWindow] = useState<WindowDays>(28)
-  const [activeTab, setActiveTab] = useState<'queries' | 'opportunities' | 'multipage'>('queries')
-  const [rows, setRows] = useState<(MetricRow | MultiPageRow)[]>([])
+  const [activeTab, setActiveTab] = useState<View>('queries')
+  // The rows remember which tab they were read for. Switching from the multi-page tab
+  // used to draw its rows in the per-page table for one render, before the new read
+  // began, and a row with no position threw: the screen fell to "this screen did not load".
+  const [loaded, setLoaded] = useState<{ view: View; rows: (MetricRow | MultiPageRow)[] }>({ view: 'queries', rows: [] })
+  const requestSeq = useRef(0)
   const [total, setTotal] = useState(0)
   const [page, setPage] = useState(0)
   const [pageSize, setPageSize] = useState<number>(10)
@@ -97,13 +102,20 @@ export default function GscMetricsTable({ projectId, refreshKey = 0 }: { project
 
   const loadRows = useCallback(async () => {
     if (!property) return
+    // Only the latest read may land: an older, slower answer for another tab is dropped.
+    const seq = ++requestSeq.current
+    const view = activeTab
     setLoadingRows(true); setRowsError(false)
     try {
-      const res = await fetch(`/api/gsc/metrics?projectId=${projectId}&window=${activeWindow}&view=${activeTab}&page=${page}&pageSize=${pageSize}`)
+      const res = await fetch(`/api/gsc/metrics?projectId=${projectId}&window=${activeWindow}&view=${view}&page=${page}&pageSize=${pageSize}`)
       const data = await res.json()
-      if (data.ok) { setRows(data.rows ?? []); setTotal(data.total ?? 0) }
-      else { setRows([]); setTotal(0); setRowsError(true) }
-    } catch { setRows([]); setTotal(0); setRowsError(true) } finally { setLoadingRows(false) }
+      if (seq !== requestSeq.current) return
+      if (data.ok) { setLoaded({ view, rows: data.rows ?? [] }); setTotal(data.total ?? 0) }
+      else { setLoaded({ view, rows: [] }); setTotal(0); setRowsError(true) }
+    } catch {
+      if (seq !== requestSeq.current) return
+      setLoaded({ view, rows: [] }); setTotal(0); setRowsError(true)
+    } finally { if (seq === requestSeq.current) setLoadingRows(false) }
   }, [projectId, property, activeWindow, activeTab, page, pageSize])
 
   useEffect(() => { setPage(0) }, [activeWindow, activeTab])
@@ -119,6 +131,9 @@ export default function GscMetricsTable({ projectId, refreshKey = 0 }: { project
   if (!property) return <Note>{t.noPropertyAssigned}</Note>
 
   const summary = status?.windows?.[String(activeWindow)] ?? null
+  // Rows read for another tab are never drawn: until this tab's own rows arrive, it loads.
+  const rowsReady = loaded.view === activeTab
+  const rows = rowsReady ? loaded.rows : []
 
   return (
     <div className="space-y-4">
@@ -158,7 +173,7 @@ export default function GscMetricsTable({ projectId, refreshKey = 0 }: { project
       )}
 
       {/* View tabs */}
-      <Segmented<'queries' | 'opportunities' | 'multipage'>
+      <Segmented<View>
         ariaLabel={t.viewsLabel}
         value={activeTab}
         onChange={setActiveTab}
@@ -169,7 +184,7 @@ export default function GscMetricsTable({ projectId, refreshKey = 0 }: { project
       {activeTab === 'multipage' && <p className="max-w-prose text-caption text-muted">{t.multipageHint}</p>}
 
       {/* Table */}
-      {loadingRows ? (
+      {loadingRows || !rowsReady ? (
         <div role="status" aria-busy="true" className="space-y-2">{[0, 1, 2].map((i) => <Skeleton key={i} className="h-10 w-full rounded-control" />)}</div>
       ) : rowsError ? (
         <Notice tone="bad">{t.genericError}</Notice>
@@ -227,8 +242,8 @@ export default function GscMetricsTable({ projectId, refreshKey = 0 }: { project
                 </Td>
                 <Td className="text-end">{fmtInt(r.clicks)}</Td>
                 <Td className="text-end">{fmtInt(r.impressions)}</Td>
-                <Td className="text-end">{fmtCtr(r.ctr)}</Td>
-                <Td className="text-end">{fmtPos(r.position)}</Td>
+                <Td className="text-end">{fmtCtr(r.ctr ?? 0)}</Td>
+                <Td className="text-end">{r.position != null ? fmtPos(r.position) : '—'}</Td>
               </TableRow>
             ))}
           </TableBody>
@@ -236,12 +251,12 @@ export default function GscMetricsTable({ projectId, refreshKey = 0 }: { project
       )}
 
       {/* Pagination + page-size selector (L1) */}
-      {total > 0 && !rowsError && (
+      {total > 0 && !rowsError && rowsReady && (
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div className="flex items-center gap-2">
             <label htmlFor={`gsc-page-size-${projectId}`} className="text-caption text-muted">{t.pageSizeLabel}</label>
             <Select id={`gsc-page-size-${projectId}`} value={String(pageSize)} onChange={(e) => { setPageSize(Number(e.target.value)); setPage(0) }}
-              options={PAGE_SIZE_OPTIONS.map((n) => ({ value: String(n), label: String(n) }))} className="h-8 w-20" />
+              options={PAGE_SIZE_OPTIONS.map((n) => ({ value: String(n), label: String(n) }))} className="h-8 w-24 py-0" />
           </div>
           <div className="flex items-center gap-2">
             <span className="text-caption text-muted tabular-nums">{t.pageOf(page * pageSize + 1, Math.min((page + 1) * pageSize, total), total)}</span>
