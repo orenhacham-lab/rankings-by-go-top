@@ -56,6 +56,10 @@ export const es = {
         label: 'Correcciones del sitio',
         description: 'Revisamos tu sitio y corregimos títulos, descripciones, texto alternativo de imágenes y enlaces. En WordPress con un clic, después de que lo apruebes.',
       },
+      mapsPosts: {
+        label: 'Publicaciones en Google Maps',
+        description: 'Publicaciones con foto y botón en tu Perfil de Empresa de Google, al momento o programadas, y respuestas a reseñas. Con un primer borrador que tú corriges.',
+      },
       links: {
         label: 'Enlaces a tu sitio',
         description: 'Enlaces internos entre tus propias páginas, páginas huérfanas a las que nadie enlaza y sitios gratuitos donde conviene que aparezca tu negocio.',

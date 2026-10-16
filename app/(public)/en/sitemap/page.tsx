@@ -43,6 +43,7 @@ export default function EnglishSitemapPage() {
         { label: 'Keyword Research', href: '/en/features/keyword-research' },
         { label: 'Site fixes', href: '/en/features/site-health-fixes' },
         { label: 'Links to your site', href: '/en/features/site-links' },
+        { label: 'Google Maps posts', href: '/en/features/google-maps-posts' },
         { label: 'You vs. competitors', href: '/en/features/competitor-tracking' },
         { label: 'Search Console data', href: '/en/features/search-console' },
       ],
