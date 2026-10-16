@@ -620,7 +620,7 @@ export default function EnglishTermsPage() {
       <section id="ai-content">
         <h2>15F. AI-Generated Content</h2>
         <p>
-          The Service uses AI to produce article topics, questions and articles. Such content may contain
+          The Service uses AI to produce article topics, questions, articles and images. Such content may contain
           inaccuracies, and reviewing it before publishing, including its factual accuracy, its fit to your
           business and to the law, and third-party rights, is your responsibility.
         </p>
@@ -660,6 +660,20 @@ export default function EnglishTermsPage() {
             read it before it went out, including the accuracy of facts, defamation, third-party rights and
             Google&rsquo;s content policies. You can turn automatic posting off at any time, and it turns itself
             off if you change the business the project is connected to.
+          </li>
+          <li>
+            <strong>An AI photo for a post on your Google Business Profile.</strong> If you ask for a photo for a
+            post written from a topic, the photo is produced by AI. It is a generic image and <strong>it is not a
+            photograph of your business, your premises, your staff or an actual product of yours</strong>, and it
+            is shown to you before anything is published. A photo is published only after you chose it and
+            pressed publish, and it appears publicly on your business listing and in your name. <strong>You are
+            responsible for the photo published in your name</strong>, including whether it reflects reality,
+            third-party rights and Google&rsquo;s content and photo policies, under which content on a business
+            listing has to represent the business and the product as they actually are. Do not use such a photo
+            as though it were a photograph of the business, of the premises or of a product that does not exist:
+            a misleading photo can lead Google to remove the content or restrict the listing, and may also be
+            misleading to consumers. The image file carries Google&rsquo;s own markers (SynthID and C2PA), which
+            make it identifiable as AI-generated.
           </li>
         </ul>
       </section>
@@ -778,7 +792,7 @@ export default function EnglishTermsPage() {
 
       <section>
         <p className={LEGAL_FOOTNOTE}>
-          Last updated: October 13, 2026
+          Last updated: October 16, 2026
         </p>
       </section>
     </LegalDoc>
