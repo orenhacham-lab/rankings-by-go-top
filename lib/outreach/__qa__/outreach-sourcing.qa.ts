@@ -180,6 +180,22 @@ async function main() {
     verdict.ok === true && verdict.draft.sourceSite.startsWith('https://store.example/')
     && verdict.draft.sourceSecond === CANDIDATE.sourceSecond)
 
+  // The two source columns answer different questions, so they are allowed to
+  // differ and the row has to say which page each one came from. Here the
+  // address is in the home page's footer and the email is on /contact.
+  check('Q1c: the address\'s page and the email\'s page are recorded separately',
+    verdict.ok === true
+    && verdict.draft.postalPage === 'https://store.example/'
+    && verdict.draft.sourceSite === 'https://store.example/contact')
+
+  fetched = []
+  const verdictContact = await qualifyBusiness(CANDIDATE, counting(site({
+    home: `<html>${SHOPIFY}</html>`,
+    contact: `<html>${SHOPIFY}${US_ADDRESS}${CONTACT}</html>`,
+  })))
+  check('Q1d: an address found deeper in the site names that page, not the home page',
+    verdictContact.ok === true && verdictContact.draft.postalPage === 'https://store.example/contact')
+
   fetched = []
   verdict = await qualifyBusiness(CANDIDATE, counting(site({
     robots: 'User-agent: *\nDisallow: /',
@@ -241,6 +257,7 @@ async function main() {
     email: 'info@store.example',
     platform: 'shopify' as const,
     postalAddress: '1420 Industrial Blvd, Suite 3, Nashville, TN 37210',
+    postalPage: 'https://store.example/contact',
     sourceSite: 'https://store.example/contact',
     sourceSecond: 'https://grown.example/directory/',
   }
@@ -255,6 +272,8 @@ async function main() {
     row.email_hash === hashEmail(draft.email) && row.country === 'US'
     && row.source_site === draft.sourceSite && row.source_second === draft.sourceSecond
     && row.status === 'new')
+  check('T1c: and the page the US address itself was read from',
+    row.postal_address_page === draft.postalPage)
 
   f = new FakeAdmin({
     [PROSPECTS_TABLE]: [],
@@ -398,6 +417,22 @@ async function main() {
       return await m.addProspect(asAdmin(broken), draft) === 'added'
     },
   )
+  const mutPostalPage = await withMutant<{ qualifyBusiness: typeof qualifyBusiness }, boolean>(
+    'lib/outreach/qualify.ts',
+    [[/      if \(postal !== null\) postalPage = page\.url \|\| `https:\/\/\$\{host\}\$\{path\}`/, '']],
+    async (m) => {
+      const v = await m.qualifyBusiness(CANDIDATE, site({
+        home: `<html>${SHOPIFY}</html>`,
+        contact: `<html>${SHOPIFY}${US_ADDRESS}${CONTACT}</html>`,
+      }))
+      // It would fall back to the home page, which does not carry the address:
+      // a URL that reads as evidence and is not.
+      return v.ok === true && v.draft.postalPage === 'https://store.example/'
+    },
+  )
+  check('Q1d-MUT: a page recorded after the fact would name a page without the address',
+    mutPostalPage)
+
   check('T2-MUT: and without the suppression check somebody who opted out would come back',
     mutSuppression === true)
 

@@ -80,9 +80,21 @@ export interface ProspectDraft {
    * questioned, a stored URL answers it in one query where a reconstruction
    * from the directory name does not. The postal address may come from another
    * page of the same site; this names the one the email was on, which is the
-   * one the harvesting provision is about.
+   * one the harvesting provision is about. The postal address's own page is
+   * `postalPage`, below.
    */
   sourceSite: string
+  /**
+   * The business's own page the POSTAL ADDRESS was read from.
+   *
+   * A separate column because it defends a different promise than `sourceSite`:
+   * that the business operates in the United States, resolved from the
+   * company's own site and not from the directory that named it, which is what
+   * keeps this list outside the GDPR. The directory cannot answer it and a
+   * reconstruction is not an answer, so the page is written down at the moment
+   * the address is read.
+   */
+  postalPage: string
   /** The independent public source that says this business exists. */
   sourceSecond: string
 }
@@ -158,9 +170,13 @@ export async function qualifyBusiness(input: QualifyInput, fetchPage: PageFetche
   // The walk. Every page is one the business published for anybody to read, and
   // each one is judged for all three things at once: the address, the contact
   // address, and whether it is a page that tells us not to.
+  const homeUrl = home.url || `https://${host}/`
   let postal: { line: string; state: string } | null = findUsPostalAddress(home.body)
+  // Set together with the address, never afterwards: a page recorded later is a
+  // guess about where the address came from.
+  let postalPage: string | null = postal === null ? null : homeUrl
   let email: string | null = contactEmailIn(home.body, host)
-  let sourceSite = home.url || `https://${host}/`
+  let sourceSite = homeUrl
   let europeanSignal = eeaUkSignalIn(home.body)
   let forbidden = email !== null && forbidsHarvesting(home.body)
 
@@ -171,7 +187,10 @@ export async function qualifyBusiness(input: QualifyInput, fetchPage: PageFetche
     pagesRead += 1
     if (page === null || !isOpenPage(page)) continue
     europeanSignal = europeanSignal ?? eeaUkSignalIn(page.body)
-    if (postal === null) postal = findUsPostalAddress(page.body)
+    if (postal === null) {
+      postal = findUsPostalAddress(page.body)
+      if (postal !== null) postalPage = page.url || `https://${host}${path}`
+    }
     if (email === null) {
       const found = contactEmailIn(page.body, host)
       if (found !== null) {
@@ -203,6 +222,7 @@ export async function qualifyBusiness(input: QualifyInput, fetchPage: PageFetche
       email: email.toLowerCase(),
       platform: platform.platform,
       postalAddress: postal.line,
+      postalPage: postalPage ?? homeUrl,
       sourceSite,
       sourceSecond: input.sourceSecond,
     },

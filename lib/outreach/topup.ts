@@ -245,6 +245,9 @@ export async function addProspect(admin: ServiceRoleClient, draft: ProspectDraft
   if (draft.sourceSite.trim().length === 0 || draft.sourceSecond.trim().length === 0) {
     return 'rejected: missing a source'
   }
+  // The page the US address was read from is part of what makes the row
+  // defensible, so a draft that cannot name it is not written.
+  if (draft.postalPage.trim().length === 0) return 'rejected: missing a source'
 
   let suppression
   try {
@@ -267,6 +270,7 @@ export async function addProspect(admin: ServiceRoleClient, draft: ProspectDraft
       platform: draft.platform,
       country: 'US',
       postal_address: draft.postalAddress,
+      postal_address_page: draft.postalPage,
       source_site: draft.sourceSite,
       source_second: draft.sourceSecond,
       status: 'new',
