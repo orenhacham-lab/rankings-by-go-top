@@ -220,6 +220,17 @@ console.log('\nD) what the button sends, and what it follows')
     !/handleCancel|paypal\/cancel/.test(billingView.slice(
       billingView.indexOf('creemGoverned ? ('),
       billingView.indexOf('hasPaypalSubscriptionId ? ('))))
+  // Written by the legal thread, which could not ship it: it is red against
+  // main. The fallback line is read by any account we bill ourselves without
+  // a PayPal subscription id, and it promised to stop a charge — which for
+  // such an account we can do only by ending the plan, so that is what it now
+  // says. The key stays, because that state still exists.
+  const fallbackLine = /contactToCancel: '([^']*)'/.exec(read('lib/i18n/dashboard/en.ts'))?.[1] ?? ''
+  check('D10: the billing screen does not promise to stop a charge that is not ours',
+    fallbackLine === '' || !/stop the billing/.test(fallbackLine), fallbackLine)
+  check('D10-MUT: the old promise is caught if it comes back',
+    /stop the billing/.test('To cancel your renewal, please contact us and we will stop the billing for you.'))
+
   check('D7-MUT: removing the line and keeping the old promise is caught',
     !/\{t\.creem\.cancelNote\}/.test(billingView.replace('{t.creem.cancelNote}', '{t.manage.contactToCancel}')))
   check('D9-MUT: a cancel button put into that state is caught',
@@ -280,12 +291,20 @@ console.log('\nE) every dashboard language has the strings')
       !(/Creem/.test('Contact us and we will stop the billing for you.')))
     // The second resort promises only what we can perform: ending the plan on
     // our side. Stopping the charge is Creem's, and the line says so.
-    const promisesOnlyOurs = /our side|מצידנו|por nuestra parte|do nosso lado/.test(cancelNote)
-      && /can stop the charge|can stop|יכולה לעצור|puede detener|pode interromper/.test(cancelNote)
+    const promisesOnlyOurs =
+      // a second route through us, and what it is worth: a written record
+      /write to us|כתבו לנו|escríbenos|fale com a gente/.test(cancelNote)
+      && /in writing|בכתב|por escrito/.test(cancelNote)
+      // and who stops the charge, said in the same breath
+      && /stopped by Creem|עוצרת Creem|detiene Creem|interrompida pela Creem/.test(cancelNote)
       && !/we will stop the billing|נבטל עבורכם את החיוב|detendremos el cobro|interromperemos a cobrança/.test(cancelNote)
-    check(`E6: ${lang} offers a second resort that stays within what we can do`, promisesOnlyOurs, cancelNote)
+    check(`E6: ${lang} offers a second route and names its limit`, promisesOnlyOurs, cancelNote)
     check(`E6-MUT: a ${lang} line that promises to stop the charge is caught`,
-      !/our side/.test('Contact us and we will stop the billing for you.'))
+      !/in writing/.test('Contact us and we will stop the billing for you.'))
+    // "Merchant of record" is a term of art; the screen is read by a
+    // first-time store owner, so it says what the phrase means instead.
+    check(`E7: ${lang} says what Creem does rather than naming its legal role`,
+      !/merchant of record|המוכר הרשום|vendedor registrado|vendedora registrada/.test(cancelNote), cancelNote)
   }
 }
 

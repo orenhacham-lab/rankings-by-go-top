@@ -148,7 +148,7 @@ export const billingPtBR: DeepPartial<DashboardDictionary> = {
       keepRenewal: 'Manter meu plano',
       cancelSuccess: 'A renovação da assinatura foi cancelada. Você mantém o acesso até o fim do período de cobrança.',
       cancelError: 'Não conseguimos cancelar a sua renovação. Tente novamente em instantes ou fale com a gente que cancelamos para você.',
-      contactToCancel: 'Para cancelar a sua renovação, fale com a gente e interromperemos a cobrança.',
+      contactToCancel: 'Para cancelar a sua renovação, fale com a gente e encerramos o seu plano.',
       renewalAlreadyCancelled: 'A renovação está cancelada. Você mantém o acesso até',
     },
     paypal: {
@@ -169,7 +169,7 @@ export const billingPtBR: DeepPartial<DashboardDictionary> = {
       disclosure:
         'O pagamento com cartão é feito pela Creem (Armitage Labs OÜ), a comerciante registrada: a Creem emite a fatura, acrescenta o imposto conforme o seu endereço de cobrança e a cobrança aparece na sua fatura em nome da Creem. O serviço em si continua sendo nosso.',
       buyerTermsLabel: 'Termos de compra da Creem',
-      cancelNote: 'Este plano é cobrado pela Creem, a vendedora registrada, então o cancelamento acontece lá: use o link da assinatura no e-mail de recibo da Creem. Se você não conseguir falar com eles, fale com a gente e encerramos o seu plano do nosso lado. Só a Creem pode interromper a cobrança. De todo modo, seu acesso continua ativo até o fim do período que você já pagou.',
+      cancelNote: 'A Creem vende este plano para você e faz a cobrança, então o cancelamento acontece na Creem: use o link da assinatura no e-mail de recibo que a Creem enviou. Se for mais fácil para você, fale com a gente e encaminhamos o pedido de cancelamento para a Creem e confirmamos por escrito que fizemos isso; a cobrança em si é interrompida pela Creem, não por nós. De todo modo, seu acesso continua ativo até o fim do período que você já pagou.',
     },
     shopify: {
       title: 'A cobrança é gerenciada pela Shopify',

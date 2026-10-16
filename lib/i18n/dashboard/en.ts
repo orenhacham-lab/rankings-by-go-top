@@ -6014,7 +6014,7 @@ export const dashboardEn = {
       keepRenewal: 'Keep my plan',
       cancelSuccess: 'Subscription renewal was canceled. Your access will remain active until the end of the billing period.',
       cancelError: 'We couldn’t cancel your renewal. Try again in a moment, or write to us and we’ll cancel it for you.',
-      contactToCancel: 'To cancel your renewal, please contact us and we will stop the billing for you.',
+      contactToCancel: 'To cancel your renewal, write to us and we will end your plan for you.',
       renewalAlreadyCancelled: 'Renewal has been cancelled. Your access remains active until',
     },
     paypal: {
@@ -6038,7 +6038,7 @@ export const dashboardEn = {
       // A card subscription is billed by Creem, the merchant of record, so we
       // cannot stop the charge ourselves. "Contact us and we will stop the
       // billing" is a promise we cannot keep; this says where cancelling works.
-      cancelNote: 'This plan is billed by Creem, the merchant of record, so the cancellation happens there: use the subscription link in Creem’s receipt email. If you cannot reach them, write to us and we will end your plan on our side. Only Creem can stop the charge. Either way your access stays active until the end of the period you have paid for.',
+      cancelNote: 'Creem sells this plan to you and bills it, so the cancellation happens at Creem: use the subscription link in the receipt email Creem sent you. If that is easier for you, write to us and we will pass the cancellation request on to Creem and confirm in writing that we have; the charge itself is stopped by Creem, not by us. Either way your access stays active until the end of the period you have paid for.',
     },
     shopify: {
       title: 'Billing is managed through Shopify',
