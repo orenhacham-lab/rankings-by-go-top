@@ -54,7 +54,7 @@ import type { Scope } from '@/lib/site-fix/store'
 import { versionAtLeast } from '@/lib/site-fix/types'
 import { loadConnectedPlugin, pluginCan, refreshedPlugin, type PluginCapability } from '@/lib/site-fix/plugin-capabilities'
 import {
-  pluginFix, pluginMedia, pluginPublish, pluginTerms,
+  pluginAuthors, pluginFix, pluginMedia, pluginPublish, pluginTerms,
   type PluginAnswer, type PluginLink, type PluginPost, type PluginPublishRequest,
 } from '@/lib/site-fix/plugin-client'
 import { CONTENT_IMAGE_BUCKET } from '@/lib/content/featured-image'
@@ -241,7 +241,17 @@ export async function pluginCreatePost(
     inlineImages = result
     if (result.failed.length > 0) imageWarning = true
   }
-  content = await applyArticleDesign(admin, articleId, content, 'wordpress')
+  // The author box's name, when one is added: the user the plugin publishes the post as
+  // (author_id, else the plugin's default), from its signed /authors list.
+  content = await applyArticleDesign(admin, articleId, content, 'wordpress', {
+    authorName: async () => {
+      if (!pluginCan(plugin.version, 'authors')) return null
+      const authors = await pluginAuthors(link, deps.post)
+      if (!authors.ok) return null
+      const id = typeof opts.authorId === 'number' ? opts.authorId : authors.body.default
+      return authors.body.items.find((a) => a.id === id)?.name ?? null
+    },
+  })
 
   let taxonomy: ResolvedTaxonomy | undefined
   const sel = {
