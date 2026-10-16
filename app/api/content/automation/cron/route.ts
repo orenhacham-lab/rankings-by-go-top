@@ -52,6 +52,10 @@
  * at most one project per run whose mapping is missing or ageing is mapped, so automatic
  * internal links have pages to point at. Started with the runner, awaited before the emails.
  *
+ * THEN, THE EMPTY-SUBHEADING REPAIR (lib/content/empty-h3-repair/pass.ts): a one-time,
+ * owner-approved pass over six published articles whose live post still shows an <h3> with
+ * nothing under it. Two articles a pass at most, Production only, isolated the same way.
+ *
  * LAST OF ALL, THE REMINDER EMAIL. After the top-up, the "articles are waiting for your OK" reminder
  * (lib/reminders): OFF unless REMINDER_EMAILS_ENABLED is exactly "true", and then only at
  * 09:00 Asia/Jerusalem, Sunday to Thursday. Isolated the same way: it cannot change, delay
@@ -74,6 +78,7 @@ import { runIsolatedWeeklySummaries } from '@/lib/reports/weekly/isolated'
 import { checkPublishingStalls, isDailyStallCheckRun } from '@/lib/content/automation/stall-watch'
 import { runMapUpkeep, liveEnsure } from '@/lib/content/existing-content/map-upkeep'
 import { runBlogDailyWindow, startIsolatedBlogWindow } from '@/lib/blog/auto/daily-window'
+import { runIsolatedEmptyH3Repair } from '@/lib/content/empty-h3-repair/pass'
 
 // Generation can take a while; request a generous budget (platform clamps to the
 // plan's max — e.g. 60s on Hobby, up to 300s on Pro).
@@ -134,6 +139,11 @@ async function handle(request: Request): Promise<Response> {
     // awaited here, before the emails.
     await mapUpkeep
     await blogWindow
+    // The one-time repair of six published articles' empty subheadings, approved by the
+    // owner (lib/content/empty-h3-repair/pass.ts): at most two articles a pass, each edited
+    // surgically on the live site, then in our copy. It stops by itself once our copies are
+    // clean, or after three attempts an article. Production only, isolated: it never throws.
+    await runIsolatedEmptyH3Repair()
     // Then the outbound-channel retention pass: it empties a prospect's address, name and
     // postal address 30 days after the last message, which the published privacy text
     // promises (lib/outreach/retention-isolated.ts). It rides this cron because a daily
