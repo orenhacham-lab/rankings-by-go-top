@@ -21,6 +21,12 @@
  */
 import type { ServiceRoleClient } from '@/lib/supabase/admin'
 import { normalizeEmail, suppress } from '@/lib/email-suppression'
+import {
+  classifyDelivery,
+  parkBouncedProspect,
+  recordDeliveryReport,
+  type DeliveryKind,
+} from './bounce'
 
 /** Where a reply stops being the person's own words and starts being ours, quoted back. */
 const QUOTE_MARKERS = [
@@ -131,16 +137,47 @@ export type InboundOutcome =
   | { action: 'suppressed'; }
   /** A reply for a human to read: nothing recorded. */
   | { action: 'left_for_a_human' }
+  /** The mail system reporting a failure or a complaint, now counted. */
+  | { action: 'delivery_report'; kind: DeliveryKind; attributed: boolean }
   /** We could not tell who wrote, so there is nothing to suppress. */
   | { action: 'no_sender' }
   /** The person asked to stop and we could not record it: the provider should retry. */
   | { action: 'failed' }
 
-/** The one decision this endpoint makes. */
-export async function handleInboundReply(payload: unknown, admin: ServiceRoleClient): Promise<InboundOutcome> {
+/**
+ * The decisions this endpoint makes, in the order that matters.
+ *
+ * THE DELIVERY REPORT IS READ FIRST, and the order is the point. A bounce body
+ * quotes the message that bounced, which is our message, which contains the
+ * word "unsubscribe" in its footer. Where the quote arrives in a shape the
+ * stripper above does not recognise — and a bounce wraps the original in
+ * message/rfc822 rather than in "On ... wrote:" — the opt-out matcher would read
+ * the mail system's own report as the business asking us to stop, and suppress
+ * an address that never asked for anything. Classifying first makes that
+ * impossible: a report from the mail system is never a person's words.
+ */
+export async function handleInboundReply(
+  payload: unknown,
+  admin: ServiceRoleClient,
+  now: Date = new Date(),
+): Promise<InboundOutcome> {
   const email = senderAddress(payload)
-  if (!email) return { action: 'no_sender' }
   const { subject, body } = messageText(payload)
+
+  const report = classifyDelivery({ sender: email, subject, body })
+  if (report !== null) {
+    const recorded = await recordDeliveryReport(admin, report, now)
+    // A report we could not write down is one the provider should deliver
+    // again: these are the channel's brakes, and a lost bounce is a brake that
+    // silently did not engage.
+    if (recorded === null) return { action: 'failed' }
+    if (recorded.kind === 'hard_bounce' && recorded.attributed && recorded.emailHash !== null) {
+      await parkBouncedProspect(admin, recorded.emailHash)
+    }
+    return { action: 'delivery_report', kind: recorded.kind, attributed: recorded.attributed }
+  }
+
+  if (!email) return { action: 'no_sender' }
   if (!isOptOut(body, subject)) return { action: 'left_for_a_human' }
   try {
     const result = await suppress(admin, {

@@ -1,6 +1,16 @@
 /**
  * When the outbound channel is allowed to send, and how much.
  *
+ * HOW THE RAMP ADVANCES, changed on 16 Oct 2026 at Oren's ask for the highest
+ * volume one mailbox can carry. It used to advance by calendar WEEKS, which put
+ * thirty a day four weeks out for no reason anyone could point at. It now
+ * advances every three days, and the next step opens only when the channel's
+ * own brakes are clean: `hold` is true while an uncleared bounce of ours is
+ * still in the window (lib/outreach/bounce.ts), and a held ramp sits one step
+ * below where the calendar would have it. So the rate climbs by itself while
+ * nothing is going wrong and backs off by itself when something is, which is
+ * the only version of "raise the volume" that does not need somebody watching.
+ *
  * WHY A RAMP AT ALL. trygotopseo.com is a young sending domain with almost no
  * history. Mailbox providers decide what to do with a domain mostly from how it
  * behaves over its first weeks, and a domain that goes from five messages a day
@@ -32,8 +42,10 @@
 
 /** The ceiling the plan sets, whatever the ramp would otherwise reach. */
 export const DAILY_CAP = 30
-/** Messages a day, by week of the channel's life. The last value repeats. */
+/** The steps the channel climbs. The last value repeats. */
 export const RAMP: readonly number[] = [5, 10, 20, DAILY_CAP]
+/** Days at one step before the next one opens, if nothing has bounced. */
+export const RAMP_STAGE_DAYS = 3
 /** The window opens at this hour, recipient's time. */
 export const WINDOW_OPEN_HOUR = 9
 /** And never runs past this hour, however large the quota. */
@@ -93,19 +105,28 @@ export function localTime(now: Date, timeZone = SENDING_TIME_ZONE): LocalTime {
 }
 
 /**
- * The day's quota, from how long the channel has been sending.
+ * The day's quota, from how long the channel has been sending and whether it
+ * has hurt anyone lately.
  *
  * `channelStartedAt` is the first message the channel ever sent, read from the
  * table rather than written down, so the ramp cannot drift out of step with
  * what actually happened. Before the first message there is no ramp to be on:
- * the quota is the first week's.
+ * the quota is the first step's.
+ *
+ * `hold` is the brakes touching the ramp rather than the sending. A bounce or
+ * two is not a reason to stop — the stop rules decide that, and they have their
+ * own thresholds — but it is a reason not to send MORE tomorrow than today. So
+ * one uncleared bounce of ours keeps the channel a step below the calendar, and
+ * the step is regained on its own once that bounce is cleared or ages out of
+ * the window.
  */
-export function dailyQuota(now: Date, channelStartedAt: Date | null): number {
+export function dailyQuota(now: Date, channelStartedAt: Date | null, hold = false): number {
   if (channelStartedAt === null) return RAMP[0]
   const elapsed = now.getTime() - channelStartedAt.getTime()
   if (!Number.isFinite(elapsed) || elapsed < 0) return RAMP[0]
-  const week = Math.floor(elapsed / (7 * DAY_MS))
-  return RAMP[Math.min(week, RAMP.length - 1)]
+  const stage = Math.floor(elapsed / (RAMP_STAGE_DAYS * DAY_MS))
+  const index = Math.min(stage, RAMP.length - 1)
+  return RAMP[hold ? Math.max(0, index - 1) : index]
 }
 
 /** The last minute of the window, as minutes after midnight, for a given quota. */
