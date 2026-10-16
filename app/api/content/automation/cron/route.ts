@@ -68,6 +68,7 @@ import { runTopicTopUp, startIsolatedTopUp } from '@/lib/content/automation/topi
 import { runIsolatedReminders } from '@/lib/reminders/isolated'
 import { runIsolatedProspectRetention } from '@/lib/outreach/retention-isolated'
 import { runIsolatedProspectSend } from '@/lib/outreach/sender-isolated'
+import { runIsolatedProspectTopUp } from '@/lib/outreach/topup-isolated'
 import { runIsolatedOnboardingEmails } from '@/lib/onboarding-emails/isolated'
 import { runIsolatedWeeklySummaries } from '@/lib/reports/weekly/isolated'
 import { checkPublishingStalls, isDailyStallCheckRun } from '@/lib/content/automation/stall-watch'
@@ -148,6 +149,14 @@ async function handle(request: Request): Promise<Response> {
     // 09:00 window, the warm-up quota, the suppression list, the platform and a finding
     // verified against the live page in this pass. Isolated: it never throws.
     await runIsolatedProspectSend()
+    // And, off unless OUTREACH_SOURCING_ENABLED is exactly "true": one business added to
+    // the prospect list of that same channel (lib/outreach/topup-isolated.ts). It rides
+    // this cron for the same reason as the sender, and it is a SEPARATE switch on purpose:
+    // the list may be filled and inspected while nothing is being sent, and it keeps
+    // filling while sending is off. One business a pass is far below anything that would
+    // look like a crawl, and the address only ever comes from the business's own public
+    // pages. Production only, isolated: it never throws.
+    await runIsolatedProspectTopUp()
     // Last of all, and off unless REMINDER_EMAILS_ENABLED is "true": the reminder email for
     // articles waiting for approval (lib/reminders). Isolated; it never throws or rejects.
     await runIsolatedReminders()
