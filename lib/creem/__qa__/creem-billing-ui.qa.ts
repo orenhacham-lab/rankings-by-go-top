@@ -228,6 +228,13 @@ console.log('\nD) what the button sends, and what it follows')
   const fallbackLine = /contactToCancel: '([^']*)'/.exec(read('lib/i18n/dashboard/en.ts'))?.[1] ?? ''
   check('D10: the billing screen does not promise to stop a charge that is not ours',
     fallbackLine === '' || !/stop the billing/.test(fallbackLine), fallbackLine)
+  // The DEFAULT has to be the safe one: an authority nobody matched lands
+  // here, and a fourth one would inherit whatever this says.
+  check('D11: the fallback also covers a subscription somebody else bills',
+    /billed by another company/.test(fallbackLine)
+    && /where the cancellation is done/.test(fallbackLine), fallbackLine)
+  check('D11-MUT: a fallback that assumes the billing is ours is caught',
+    !/billed by another company/.test('To cancel your renewal, write to us and we will end your plan for you.'))
   check('D10-MUT: the old promise is caught if it comes back',
     /stop the billing/.test('To cancel your renewal, please contact us and we will stop the billing for you.'))
 
@@ -296,7 +303,9 @@ console.log('\nE) every dashboard language has the strings')
       /write to us|כתבו לנו|escríbenos|fale com a gente/.test(cancelNote)
       && /in writing|בכתב|por escrito/.test(cancelNote)
       // and who stops the charge, said in the same breath
-      && /stopped by Creem|עוצרת Creem|detiene Creem|interrompida pela Creem/.test(cancelNote)
+      // where the charge can be stopped, not WHO has the power: Hebrew has no
+      // settled gender for a foreign trade name, so the sentence names a place
+      && /only be stopped at Creem|אפשר לעצור רק אצל Creem|solo se puede detener en Creem|só pode ser interrompida na Creem/.test(cancelNote)
       && !/we will stop the billing|נבטל עבורכם את החיוב|detendremos el cobro|interromperemos a cobrança/.test(cancelNote)
     check(`E6: ${lang} offers a second route and names its limit`, promisesOnlyOurs, cancelNote)
     check(`E6-MUT: a ${lang} line that promises to stop the charge is caught`,
