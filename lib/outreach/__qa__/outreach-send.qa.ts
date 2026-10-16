@@ -798,6 +798,21 @@ async function main() {
   check('I13-MUT: without the reply check a business that answered would be followed up anyway — caught',
     mutSecond)
 
+  // The published text promises at most two messages, ever. The assertion above
+  // (line "a business already written to twice is due nothing") says the cap
+  // holds; this says the cap is load-bearing. It matters more now that the list
+  // fills itself: a hand-built list ran out long before anyone could be written
+  // to a third time, and an automatic one never runs out.
+  const mutCap = await withMutant<{ nextMessageFor: typeof nextMessageFor }, boolean>(
+    'lib/outreach/schedule.ts',
+    [[/  if \(row\.second_sent_at !== null\) return null/, '']],
+    async (m) => m.nextMessageFor({
+      status: 'sent_first', email: 'a@b.c', first_sent_at: daysAgo(40),
+      second_sent_at: daysAgo(20), replied_at: null,
+    }, NOW) === 'second',
+  )
+  check('I14-MUT: without the two-message cap a third message would go out, and is caught', mutCap)
+
   const mutGate = await withMutant<{ assertSendable: typeof assertSendable }, boolean>(
     'lib/outreach/message.ts',
     [[/  if \(!text\.includes\(unsubscribeUrl\(token\)\)\) return \{ sendable: false, reason: 'unsubscribe_link_missing' \}/, '']],
