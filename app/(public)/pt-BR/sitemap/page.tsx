@@ -44,6 +44,7 @@ export default function PortugueseSitemapPage() {
         { label: 'Pesquisa de palavras-chave', href: '/pt-BR/features/keyword-research' },
         { label: 'Correções no site', href: '/pt-BR/features/site-health-fixes' },
         { label: 'Links para o seu site', href: '/pt-BR/features/site-links' },
+        { label: 'Posts no Google Maps', href: '/pt-BR/features/google-maps-posts' },
         { label: 'Você x concorrentes', href: '/pt-BR/features/competitor-tracking' },
         { label: 'Dados do Search Console', href: '/pt-BR/features/search-console' },
       ],

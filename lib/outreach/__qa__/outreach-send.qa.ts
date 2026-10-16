@@ -30,8 +30,9 @@ import { SUPPRESSION_TABLE, hashEmail } from '@/lib/email-suppression'
 import { isOptOut } from '../inbound'
 import { PROSPECTS_TABLE } from '../prospects'
 import {
-  ARTICLE_SITEMAPS, countH1, countImagesWithoutAlt, gatherEvidence, metaDescriptionLength,
-  monthAndYear, pickFinding, readArticles, readPlatform, type FetchedPage, type SiteEvidence,
+  ARTICLE_SITEMAPS, SITEMAP_INDEXES, articleSitemapsIn, countH1, countImagesWithoutAlt,
+  gatherEvidence, metaDescriptionLength, monthAndYear, pickFinding, readArticles, readPlatform,
+  type FetchedPage, type SiteEvidence,
 } from '../finding'
 import {
   assertSendable, composeFirstMessage, composeSecondMessage, FOOTER_OPENING, footer,
@@ -106,6 +107,11 @@ const HOME = `<!doctype html><html><head>
 <script src="https://cdn.shopify.com/s/files/theme.js"></script>
 </head><body><h1>Store</h1>${'<img src="a.png" alt="a">'.repeat(40)}</body></html>`
 
+const WP_HOME = `<!doctype html><html><head>
+<meta name="description" content="${'x'.repeat(140)}">
+<link rel="stylesheet" href="/wp-content/themes/crown/style.css">
+</head><body><h1>Crown</h1>${'<img src="a.png" alt="a">'.repeat(30)}</body></html>`
+
 /** A fetcher over a fixed map of URLs. Anything absent is a 404. */
 const pages = (map: Record<string, string | number>) =>
   async (url: string): Promise<FetchedPage> => {
@@ -176,13 +182,13 @@ async function main() {
     pickFinding(evidence({ articleCount: 0, imagesWithoutAlt: 30 }), NOW)?.kind === 'no_articles')
   check('F3: a stale blog is named by month and year, not by a number of days',
     pickFinding(evidence({ newestArticleAt: '2021-04-29T16:12:59Z' }), NOW)?.clause
-      === 'your newest article is from April 2021')
+      === 'the newest article in your sitemap is from April 2021')
   check('F4: one article reads as "a single article", not "1 articles"',
     pickFinding(evidence({ articleCount: 1, newestArticleAt: daysAgo(3) }), NOW)?.clause
-      === 'your blog holds a single article')
+      === 'your sitemap lists a single article')
   check('F4b: four articles are named by their count',
     pickFinding(evidence({ articleCount: 4, newestArticleAt: daysAgo(3) }), NOW)?.clause
-      === 'your blog holds 4 articles')
+      === 'your sitemap lists only 4 articles')
   check('F5: missing alt text needs both a floor and a share — four of forty is not a finding',
     pickFinding(evidence({ images: 40, imagesWithoutAlt: 4 }), NOW) === null)
   check('F5b: six of forty is below the share, and still not a finding',
@@ -224,14 +230,93 @@ async function main() {
     && readPlatform('<link href="/wp-content/themes/x.css">').platform === 'wordpress')
 
   const allMissing = await readArticles('https://store.example', 'shopify', pages({}))
-  check('F10: every article path answering 404 means the site has no articles',
-    allMissing.count === 0)
+  check('F10: nothing answering at all means we learned nothing, which is NOT zero articles',
+    allMissing.count === null)
   const allBroken = await readArticles('https://store.example', 'shopify',
     async () => { throw new Error('network') })
-  check('F10b: every article path failing means we learned nothing, which is not zero',
+  check('F10b: every path failing is the same',
     allBroken.count === null)
-  check('F10c: both platforms have article paths to probe',
-    ARTICLE_SITEMAPS.shopify.length > 0 && ARTICLE_SITEMAPS.wordpress.length > 0)
+  check('F10c: both platforms have fallback article paths, and there are indexes to try first',
+    ARTICLE_SITEMAPS.shopify.length > 0 && ARTICLE_SITEMAPS.wordpress.length > 0
+    && SITEMAP_INDEXES.length > 0)
+
+  /*
+   * THE REGRESSION. This is the Crown Laboratories case of 16 Oct 2026, which
+   * went out as a false claim: a WordPress site with 141 articles under a
+   * custom post type, whose `post` sitemaps answer 200 with nothing in them.
+   */
+  const CROWN = {
+    'https://crown.example/': WP_HOME,
+    'https://crown.example/wp-sitemap.xml':
+      '<sitemapindex><sitemap><loc>https://crown.example/page-sitemap.xml</loc></sitemap>'
+      + '<sitemap><loc>https://crown.example/news-sitemap.xml</loc></sitemap></sitemapindex>',
+    'https://crown.example/news-sitemap.xml': ARTICLES_XML(141, '2025-10-07T12:56:37+00:00'),
+    // Both platform defaults answer, and both are empty, exactly as they did.
+    'https://crown.example/wp-sitemap-posts-post-1.xml': '<urlset></urlset>',
+    'https://crown.example/post-sitemap.xml': '<urlset></urlset>',
+  }
+  const crown = await readArticles('https://crown.example', 'wordpress', pages(CROWN))
+  check('F12: a site whose articles live under a custom post type is counted from its OWN index',
+    crown.count === 141)
+  const crownEvidence = await gatherEvidence('crown.example', pages(CROWN))
+  check('F12b: and the finding for it is NOT "no articles" — the claim that actually went out',
+    pickFinding(crownEvidence, NOW)?.kind !== 'no_articles')
+  check('F12c: nor any blog claim at all, since its newest article is recent and it has 141',
+    !['no_articles', 'thin_blog'].includes(pickFinding(crownEvidence, NOW)?.kind ?? ''))
+
+  const indexNoArticles = await readArticles('https://plain.example', 'wordpress', pages({
+    'https://plain.example/sitemap.xml':
+      '<sitemapindex><sitemap><loc>https://plain.example/page-sitemap.xml</loc></sitemap>'
+      + '<sitemap><loc>https://plain.example/product-sitemap.xml</loc></sitemap></sitemapindex>',
+  }))
+  check('F13: an index that names no article sitemap at all IS evidence of none',
+    indexNoArticles.count === 0)
+
+  const namedButSilent = await readArticles('https://shy.example', 'wordpress', pages({
+    'https://shy.example/sitemap.xml':
+      '<sitemapindex><sitemap><loc>https://shy.example/news-sitemap.xml</loc></sitemap></sitemapindex>',
+    'https://shy.example/news-sitemap.xml': 500,
+  }))
+  check('F13b: an article sitemap the index names but that will not answer leaves no measurement',
+    namedButSilent.count === null)
+
+  const defaultsOnly = await readArticles('https://old.example', 'shopify', pages({
+    'https://old.example/sitemap_articles_1.xml': ARTICLES_XML(12, daysAgo(2)),
+  }))
+  check('F14: with no readable index, a default path that HOLDS articles still proves they exist',
+    defaultsOnly.count === 12)
+
+  const defaultsEmpty = await readArticles('https://old2.example', 'wordpress', pages({
+    'https://old2.example/wp-sitemap-posts-post-1.xml': '<urlset></urlset>',
+    'https://old2.example/post-sitemap.xml': '<urlset></urlset>',
+  }))
+  check('F14b: but an EMPTY default path proves nothing — this is the whole bug',
+    defaultsEmpty.count === null)
+
+  check('F15: an index child is judged by its path, and pages, products and taxonomies are not articles',
+    articleSitemapsIn(
+      '<sitemapindex>'
+      + '<sitemap><loc>https://x.example/wp-sitemap-posts-post-1.xml</loc></sitemap>'
+      + '<sitemap><loc>https://x.example/wp-sitemap-posts-page-1.xml</loc></sitemap>'
+      + '<sitemap><loc>https://x.example/page-sitemap.xml</loc></sitemap>'
+      + '<sitemap><loc>https://x.example/product-sitemap.xml</loc></sitemap>'
+      + '<sitemap><loc>https://x.example/wp-sitemap-taxonomies-category-1.xml</loc></sitemap>'
+      + '<sitemap><loc>https://x.example/author-sitemap.xml</loc></sitemap>'
+      + '<sitemap><loc>https://x.example/news-sitemap.xml</loc></sitemap>'
+      + '<sitemap><loc>https://x.example/sitemap_blogs_1.xml</loc></sitemap>'
+      + '</sitemapindex>',
+    ).join(' ') === 'https://x.example/wp-sitemap-posts-post-1.xml https://x.example/news-sitemap.xml https://x.example/sitemap_blogs_1.xml')
+  check('F15b: the HOST never decides — a site at news.example is not all articles',
+    articleSitemapsIn('<sitemapindex><sitemap><loc>https://news.example/product-sitemap.xml</loc></sitemap></sitemapindex>').length === 0)
+
+  // The wording is the durable half of the fix: a claim may not be broader than
+  // what it was read from.
+  check('F16: every blog claim names the sitemap, not the site',
+    pickFinding(evidence({ articleCount: 0 }), NOW)?.clause.startsWith('your sitemap lists no articles') === true
+    && pickFinding(evidence({ newestArticleAt: '2021-04-29T00:00:00Z' }), NOW)?.clause
+      === 'the newest article in your sitemap is from April 2021'
+    && pickFinding(evidence({ articleCount: 1, newestArticleAt: daysAgo(3) }), NOW)?.clause
+      === 'your sitemap lists a single article')
 
   const unreachable = await gatherEvidence('store.example', async () => { throw new Error('nope') })
   check('F11: a home page we cannot fetch yields no platform and no counts',
@@ -246,7 +331,7 @@ async function main() {
 
   const first = composeFirstMessage({
     company: 'Store Example LLC', siteHost: 'store.example', contactName: null,
-    unsubToken: TOKEN, findingClause: 'your blog holds a single article',
+    unsubToken: TOKEN, findingClause: 'your sitemap lists a single article',
   }, NOW)
 
   check('M1: the message carries the postal address, the per-recipient link and the privacy link',
@@ -296,14 +381,24 @@ async function main() {
 
   /* -------------------------------------------------------- when, and how much */
 
-  check('S1: the ramp is five, ten, twenty, then the cap, by week of the channel’s life',
+  // Three days a step since 16 Oct 2026, when Oren asked for the most one
+  // mailbox can carry: weeks put thirty a day a month away for no reason.
+  check('S1: the ramp is five, ten, twenty, then the cap, a step every three days',
     dailyQuota(NOW, new Date(NOW.getTime() - 1 * DAY_MS)) === 5
-    && dailyQuota(NOW, new Date(NOW.getTime() - 8 * DAY_MS)) === 10
-    && dailyQuota(NOW, new Date(NOW.getTime() - 16 * DAY_MS)) === 20
+    && dailyQuota(NOW, new Date(NOW.getTime() - 4 * DAY_MS)) === 10
+    && dailyQuota(NOW, new Date(NOW.getTime() - 7 * DAY_MS)) === 20
+    && dailyQuota(NOW, new Date(NOW.getTime() - 10 * DAY_MS)) === DAILY_CAP
     && dailyQuota(NOW, new Date(NOW.getTime() - 60 * DAY_MS)) === DAILY_CAP
     && RAMP[RAMP.length - 1] === DAILY_CAP)
-  check('S1b: before the first message there is no ramp, and the quota is the first week’s',
+  check('S1b: before the first message there is no ramp, and the quota is the first step’s',
     dailyQuota(NOW, null) === RAMP[0])
+  // The brakes touching the ramp rather than the sending: one uncleared bounce
+  // of ours is not a stop, but it is a reason not to send more tomorrow.
+  check('S1c: an uncleared bounce of ours holds the ramp a step below the calendar',
+    dailyQuota(NOW, new Date(NOW.getTime() - 7 * DAY_MS), true) === 10
+    && dailyQuota(NOW, new Date(NOW.getTime() - 60 * DAY_MS), true) === 20)
+  check('S1d: and it can never hold it below the first step',
+    dailyQuota(NOW, new Date(NOW.getTime() - 1 * DAY_MS), true) === RAMP[0])
 
   // The approved plan is 09:00-11:00 for five a day. At five, the derived
   // window must BE that, or the plan and the code have diverged.
@@ -622,6 +717,21 @@ async function main() {
   )
   check('F7-MUT: treating "we could not measure" as "zero" would invent a claim, and is caught',
     mutFinding)
+
+  // The control for the bug that actually shipped: put back BOTH halves of the
+  // old behaviour — defaults only, and a 0 concluded from an empty default —
+  // and the Crown Laboratories case must produce the false claim again.
+  const mutArticles = await withMutant<{ readArticles: typeof readArticles }, boolean>(
+    'lib/outreach/finding.ts',
+    [
+      [/  for \(const indexPath of SITEMAP_INDEXES\) \{/, '  for (const indexPath of [] as string[]) {'],
+      [/  if \(fallback !== null && fallback\.count > 0\) return fallback/,
+        '  if (fallback !== null) return fallback'],
+    ],
+    async (m) => (await m.readArticles('https://crown.example', 'wordpress', pages(CROWN))).count === 0,
+  )
+  check('F12-MUT: reading only the platform defaults calls a site with 141 articles empty — caught',
+    mutArticles)
 
   const mutQuota = await withMutant<{ sendNextProspect: typeof sendNextProspect }, boolean>(
     'lib/outreach/send.ts',

@@ -12,6 +12,8 @@
  *
  *   1. Is the channel switched on, and does it have a transport at all.
  *   2. Has it already stopped itself today (two permanent rejections).
+ *  2b. Has it stopped itself on what the recipients' own mail systems said: a
+ *      complaint, or a bounce rate above the plan's 3%.
  *   3. Is now inside the recipient's window, and is the day's quota left.
  *   4. For the chosen prospect: is the address on the suppression list. This
  *      FAILS CLOSED — a list we cannot read is not permission to write to
@@ -33,15 +35,17 @@
  * recipient both care about. So the order fails towards losing a prospect, on
  * purpose, and the failure is logged and marked rather than swallowed.
  *
- * WHAT THIS PROCESS CANNOT SEE, stated plainly because it is the channel's one
- * remaining blind spot: real bounces and spam complaints arrive in the mailbox,
- * and nothing here reads the mailbox. The plan's "stop above 3% bounces" and
- * "stop on one complaint" are therefore still watched by a person. What this
- * does see is a permanent rejection at submission, and two of those in a day
- * stop it on their own.
+ * WHAT THIS PROCESS SEES OF ITS OWN DAMAGE. Two different things, which used
+ * to be one. A permanent rejection at submission is visible immediately, and
+ * two in a day stop the day. A real bounce or a spam complaint arrives later,
+ * in the mailbox, and is read by the inbound webhook into
+ * outreach_delivery_events; lib/outreach/bounce.ts turns those into the plan's
+ * full stop, which this reads as check 2b. Until 16 Oct 2026 that second half
+ * did not exist and a person was the brake.
  */
 import type { ServiceRoleClient } from '@/lib/supabase/admin'
 import { isSuppressed } from '@/lib/email-suppression'
+import { readStopState } from './bounce'
 import { PROSPECTS_TABLE, type ProspectStatus } from './prospects'
 import { gatherEvidence, pickFinding, type PageFetcher } from './finding'
 import { assertSendable, composeFirstMessage, composeSecondMessage, SENDER_NAME } from './message'
@@ -75,6 +79,8 @@ export type SenderResult =
     status: 'idle'
     reason: 'outside_window' | 'quota_reached' | 'stopped_on_failures' | 'no_candidate' | 'read_failed'
   }
+  /** The channel has stopped itself on bounces or a complaint. Needs a human. */
+  | { status: 'idle'; reason: 'stopped_on_delivery'; stop: string }
   | { status: 'send_failed'; reason: 'rejected' | 'failed'; code: string }
 
 type ProspectRow = ProspectScheduleRow & {
@@ -251,7 +257,23 @@ export async function sendNextProspect(
   const { now, fetchPage, send } = deps
   const timeZone = deps.timeZone ?? SENDING_TIME_ZONE
 
-  const quota = dailyQuota(now, await readChannelStart(admin))
+  // The widest the window could be today, which is the window at the quota the
+  // calendar alone would give. Outside even that there is nothing to decide and
+  // nothing to read: this runs 96 times a day and most of those are at night.
+  const channelStart = await readChannelStart(admin)
+  const openQuota = dailyQuota(now, channelStart)
+  if (!sendWindow(now, openQuota, timeZone).open) return { status: 'idle', reason: 'outside_window' }
+
+  // 2b. What the recipients' own mail systems said. Read before the quota
+  // because it decides two different things: whether to send at all, and
+  // whether the ramp may be where the calendar says it is.
+  const stop = await readStopState(admin, now, timeZone)
+  if (!stop.readable) return { status: 'idle', reason: 'read_failed' }
+  if (stop.verdict.stopped) {
+    return { status: 'idle', reason: 'stopped_on_delivery', stop: `${stop.verdict.reason}: ${stop.verdict.detail}` }
+  }
+
+  const quota = dailyQuota(now, channelStart, stop.counts.hardBouncesInWindow > 0)
   const window = sendWindow(now, quota, timeZone)
   if (!window.open) return { status: 'idle', reason: 'outside_window' }
 
