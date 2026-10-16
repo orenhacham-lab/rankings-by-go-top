@@ -217,18 +217,22 @@ export function marketplaceBuyUrl(slug: string, plan: PlanCode): string | null {
 }
 
 /**
- * The platform's tracking pixel, as an https script URL
- * (`MARKETPLACE_<SLUG>_PIXEL_SRC`).
+ * The platform's own terms and return policy, as configured in
+ * `MARKETPLACE_<SLUG>_POLICY_URL`.
  *
- * Every one of these platforms treats a missing pixel as corrupting an
- * affiliate's statistics, which is a fair complaint: without it the affiliate
- * cannot see the sale they produced. It is configuration rather than code
- * because the URL is the platform's to change, and it is validated as an
- * absolute https URL before it is ever rendered. A platform that insists on
- * an inline snippet instead needs that snippet added here deliberately — not
- * injected from an environment variable.
+ * The sales page links THIS and not our own refund policy. Ours says Go Top
+ * SEO does not refund, which is true of a purchase made from us; a purchase
+ * made from a reseller is governed by the reseller's return policy, and
+ * pointing that buyer at ours would point them at the wrong document. An
+ * unconfigured provider renders no link rather than a guessed one.
+ *
+ * There is deliberately no tracking-pixel setting here. A conversion pixel is
+ * a marketing tag by this project's own classification, so it cannot fire
+ * before consent, and it is not needed: the sale completes on the platform's
+ * checkout, so the affiliate's credit rides the click id in the buy link and
+ * the platform's server-side postback.
  */
-export function marketplacePixelSrc(slug: string): string | null {
+export function marketplacePolicyUrl(slug: string): string | null {
   if (!marketplaceProvider(slug)) return null
-  return httpsUrlOrNull(process.env[`${envPrefix(slug)}PIXEL_SRC`])
+  return httpsUrlOrNull(process.env[`${envPrefix(slug)}POLICY_URL`])
 }

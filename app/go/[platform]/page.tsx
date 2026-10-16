@@ -44,7 +44,7 @@ import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import {
   marketplaceBuyUrl,
-  marketplacePixelSrc,
+  marketplacePolicyUrl,
   marketplaceProvider,
 } from '@/lib/marketplace/config'
 import { PLAN_CATALOG, PLAN_CODES } from '@/lib/plans/catalog'
@@ -59,7 +59,7 @@ export const metadata: Metadata = {
 const WHAT_IT_DOES: readonly string[] = [
   'Tracks where your pages rank on Google and reports the movement every month.',
   'Checks whether AI assistants mention your business — ChatGPT, Gemini and Google AI.',
-  'Finds what is holding the site back and fixes the technical items it can fix itself.',
+  'Finds what is holding the site back and applies the technical fixes you approve.',
   'Writes and publishes articles to your own site, on WordPress or Shopify.',
   'Works on one website or on many, depending on the plan.',
 ]
@@ -73,7 +73,7 @@ export default async function MarketplaceSalesPage({
   const provider = marketplaceProvider(platform)
   if (!provider) notFound()
 
-  const pixel = marketplacePixelSrc(provider.slug)
+  const policyUrl = marketplacePolicyUrl(provider.slug)
 
   return (
     <main className="mx-auto max-w-3xl px-4 py-16">
@@ -81,8 +81,8 @@ export default async function MarketplaceSalesPage({
         SEO that keeps working after you close the tab
       </h1>
       <p className="mt-4 text-lead-mkt text-body">
-        Go Top SEO watches your rankings, tells you what is wrong, fixes what it can and
-        publishes the content your site is missing. You pick the website and the plan; the
+        Go Top SEO watches your rankings, tells you what is wrong, applies the fixes you
+        approve and publishes the content your site is missing. You pick the website and the plan; the
         system does the monthly work.
       </p>
 
@@ -124,15 +124,24 @@ export default async function MarketplaceSalesPage({
         })}
       </section>
 
-      {/* The same two facts the pricing page states for a card payment
-          (lib/i18n/public/pricing-en.ts taxNote.USD), with this platform in
-          the seller's place: who the counterparty is, and that the price here
-          is before tax. A page that shows a price and leaves the tax unsaid
-          is the thing the standing rule forbids. */}
+      {/* Everything a buyer is owed before they are bound, in the words the
+          legal review wrote: who charges them and invoices them, that the
+          price is before tax, whose terms govern the purchase as opposed to
+          the account, that it renews, and where to stop it.
+          "Seller of record" is a term of art a buyer may not know, so the
+          sentence says what it means instead. */}
       <p className="mt-6 text-copy text-muted">
-        The seller of record for this purchase is {provider.label}, which calculates tax by
-        your billing address and shows the final amount before you pay. The prices above do
-        not include it.
+        You buy this plan from {provider.label}, which is the seller for this purchase: it
+        charges you, issues your invoice, calculates tax by your billing address and shows
+        the final amount before you pay. The prices above are before tax. {provider.label}&rsquo;s
+        own terms and return policy apply to this purchase; your Go Top SEO account is
+        governed by our Terms and Privacy Policy.
+      </p>
+
+      <p className="mt-4 text-copy text-muted">
+        The plan is a monthly subscription and renews every month until you cancel it. You
+        cancel it at {provider.label}, where you bought it, and the plan stays active until
+        the end of the period you have paid for.
       </p>
 
       <p className="mt-10 text-copy text-body">
@@ -140,11 +149,19 @@ export default async function MarketplaceSalesPage({
         active on it.
       </p>
 
-      {/* Only the links these platforms allow: terms, privacy, refunds. */}
+      {/* Only the links these platforms allow — and NOT our own refund
+          policy. That page says Go Top SEO does not refund, which is true of a
+          purchase made from us and is not this buyer's policy at all: their
+          seller is the platform, so the platform's return policy governs what
+          they just bought. Linking ours here would point them at the wrong
+          document. The platform's own policy page is configured per provider
+          and omitted rather than guessed. */}
       <nav className="mt-10 flex flex-wrap gap-4 text-copy text-action">
-        <Link href="/en/terms">Terms</Link>
+        <Link href="/en/terms">Account terms</Link>
         <Link href="/en/privacy">Privacy</Link>
-        <Link href="/en/refund-policy">Refunds</Link>
+        {policyUrl ? (
+          <a href={policyUrl} rel="nofollow">{provider.label} terms and refunds</a>
+        ) : null}
       </nav>
 
       {/* Rendered only once the legal thread has passed the platform's exact
@@ -153,9 +170,14 @@ export default async function MarketplaceSalesPage({
         <p className="mt-8 text-caption text-muted">{provider.requiredDisclaimer}</p>
       ) : null}
 
-      {/* The platform's own tracking pixel, without which the affiliate who
-          sent this visitor cannot see the sale. Absolute https only. */}
-      {pixel ? <script async src={pixel} /> : null}
+      {/* NO TRACKING PIXEL, DELIBERATELY. An affiliate platform's conversion
+          pixel is a marketing tag by this project's own classification
+          (lib/consent/categories.ts), so it may not fire before a prior
+          affirmative act — and this page is read by buyers in the EU and the
+          UK. It is also unnecessary here: the purchase happens on the
+          platform's own checkout, so the affiliate's credit rides the click
+          id in the buy link and the platform's server-side postback, neither
+          of which needs a script on our domain. */}
     </main>
   )
 }

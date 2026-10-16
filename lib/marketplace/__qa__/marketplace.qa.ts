@@ -26,7 +26,7 @@ import {
   MARKETPLACE_PROVIDERS,
   marketplaceBuyUrl,
   marketplaceClaimUrl,
-  marketplacePixelSrc,
+  marketplacePolicyUrl,
   marketplaceProvider,
   isMarketplaceProviderEnabled,
   marketplaceWebhookSecret,
@@ -125,11 +125,12 @@ check('D4: so is anything that is not a url at all',
 process.env.MARKETPLACE_DIGISTORE24_BUY_URL_ADVANCED = 'https://www.digistore24.com/product/123'
 check('D5: an https url is used', marketplaceBuyUrl('digistore24', 'advanced') === 'https://www.digistore24.com/product/123')
 check('D6: a plan with no configured url has none', marketplaceBuyUrl('digistore24', 'premium') === null)
-process.env.MARKETPLACE_DIGISTORE24_PIXEL_SRC = 'https://www.digistore24.com/pixel.js'
-check('D7: the pixel is read the same way', marketplacePixelSrc('digistore24') === 'https://www.digistore24.com/pixel.js')
-process.env.MARKETPLACE_DIGISTORE24_PIXEL_SRC = '" onload="evil()'
+process.env.MARKETPLACE_DIGISTORE24_POLICY_URL = 'https://www.digistore24.com/returns'
+check('D7: the platform\'s own policy page is read the same way',
+  marketplacePolicyUrl('digistore24') === 'https://www.digistore24.com/returns')
+process.env.MARKETPLACE_DIGISTORE24_POLICY_URL = '" onclick="evil()'
 check('D8: and a value that would break out of the attribute is refused',
-  marketplacePixelSrc('digistore24') === null)
+  marketplacePolicyUrl('digistore24') === null)
 
 // ── E. The signature, which is the only authentication ──────────────────────
 console.log('\nE. signature')
@@ -322,13 +323,14 @@ async function main() {
     /marketplaceBuyUrl/.test(salesSrc) && !/\/billing|creem|paypal/i.test(salesSrc))
   check('H10: an unregistered platform is a 404 rather than a blank page',
     /notFound\(\)/.test(salesSrc))
-  check('H11: the sales page links out only to terms, privacy and refunds',
-    // No raw anchor to a path of ours anywhere: the only <a> on the page is
-    // the platform's own buy button, whose href is a configured https url.
-    // And every <Link> goes to one of the three pages the platforms permit.
+  check('H11: the sales page links out only to our account terms, our privacy page and the platform\'s own policy',
+    // No raw anchor to a path of ours anywhere: every <a> on the page takes a
+    // configured https url (the platform's buy button and its policy page),
+    // and the only two internal links are the two documents that govern the
+    // ACCOUNT. Our refund policy is not among them, by H18.
     !/<a href="\//.test(salesSrc)
-    && (salesSrc.match(/<Link href="\/[^"]+"/g) ?? []).length === 3
-    && (salesSrc.match(/<Link href="\/[^"]+"/g) ?? []).every((l) => /terms|privacy|refund/.test(l)))
+    && (salesSrc.match(/<Link href="\/[^"]+"/g) ?? []).length === 2
+    && (salesSrc.match(/<Link href="\/[^"]+"/g) ?? []).every((l) => /terms|privacy/.test(l)))
   check('H12: the claim page requires an account before it claims anything',
     claimSrc.indexOf('auth.getUser') < claimSrc.indexOf('claimMarketplaceOrder(createAdminClient')
     && /if \(!user\) redirect/.test(claimSrc))
@@ -361,11 +363,27 @@ async function main() {
   // A page that prints $79 and says nothing about tax breaks the standing
   // pricing rule, and on a reseller page the seller's identity is the other
   // half of the same sentence.
-  check('H15: the sales page names the seller of record and says the price is before tax',
-    /seller of record for this purchase is \{provider\.label\}/.test(salesSrc)
-    && /do\s*\n?\s*not include it/.test(salesSrc))
+  check('H15: the page says who charges the buyer and that the price is before tax',
+    /is the seller for this purchase: it\s*\n?\s*charges you, issues your invoice/.test(salesSrc)
+    && /prices above are before tax/.test(salesSrc))
   check('H-MUT6: the tax guard catches a price shown with no tax line',
-    !/do\s*\n?\s*not include it/.test('<p>${plan.priceUSD} / month</p>'))
+    !/prices above are before tax/.test('<p>${plan.priceUSD} / month</p>'))
+  check('H16: it says the plan renews monthly and where to cancel it',
+    /renews every month until you cancel/.test(salesSrc)
+    && /cancel it at \{provider\.label\}/.test(salesSrc))
+  // A conversion pixel is a marketing tag, and marketing tags on this site
+  // load only after consent (lib/consent/categories.ts). This page has no
+  // consent gate, so it carries no pixel at all.
+  check('H17: the page loads no third-party script, so nothing fires before consent',
+    !/<script/.test(salesSrc) && !/PIXEL/.test(salesSrc))
+  check('H-MUT7: the script guard catches a pixel added back to the page',
+    /<script/.test(`${salesSrc}\n<script async src={pixel} />`))
+  // Our refund policy says WE do not refund, which is not this buyer's
+  // policy: their seller is the platform.
+  check('H18: it does not point the buyer at our refund policy, which is not theirs',
+    !/refund-policy/.test(salesSrc) && /marketplacePolicyUrl/.test(salesSrc))
+  check('H-MUT8: the refund-link guard catches our own policy linked back in',
+    /refund-policy/.test('<Link href="/en/refund-policy">Refunds</Link>'))
 
   check('H14: the sales page is on the design tokens, like every other page we publish',
     offTokens(salesSrc).length === 0, offTokens(salesSrc).join(' | '))
@@ -374,7 +392,7 @@ async function main() {
 
   const brokenLinks = '<Link href="/en/pricing">Pricing</Link>'
   check('H-MUT4: the outbound-link guard catches a link the platforms forbid',
-    !(brokenLinks.match(/<Link href="\/[^"]+"/g) ?? []).every((l) => /terms|privacy|refund/.test(l)))
+    !(brokenLinks.match(/<Link href="\/[^"]+"/g) ?? []).every((l) => /terms|privacy/.test(l)))
 
   // ── I. The migration's own promises, as written ──────────────────────────────
   console.log('\nI. migration')
