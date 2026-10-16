@@ -123,11 +123,13 @@ function main() {
     // merchant. The accessibility statement stayed at 5 October 2026, when the
     // section that says how it is verified was added.
     // The English documents moved to 13 October 2026, when Oren changed the
-    // company's English name; the Hebrew ones carry the unchanged Hebrew name
-    // and stayed at 12 October. The dates are per document and per language.
+    // company's English name, while the Hebrew ones stayed at 12 October. On
+    // 16 October 2026 both the terms and the privacy policy moved again, in all
+    // four languages, for the clause on an AI photo in a Business Profile post;
+    // the accessibility statement did not change. The dates are per document.
     check('D2: every document that was changed carries the new date',
-      /12 באוקטובר 2026/.test(read(HE_PRIVACY)) && /October 13, 2026/.test(read(EN_PRIVACY))
-      && /12 באוקטובר 2026/.test(read(HE_TERMS)) && /October 13, 2026/.test(read(EN_TERMS))
+      /16 באוקטובר 2026/.test(read(HE_PRIVACY)) && /October 16, 2026/.test(read(EN_PRIVACY))
+      && /16 באוקטובר 2026/.test(read(HE_TERMS)) && /October 16, 2026/.test(read(EN_TERMS))
       && /5 באוקטובר 2026/.test(read(HE_A11Y)) && /October 5, 2026/.test(read(EN_A11Y)))
   }
 
