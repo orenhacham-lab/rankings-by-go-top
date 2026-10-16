@@ -76,6 +76,14 @@ export interface MarketplaceProvider {
  * its sales page and its database rows are testable today; none can accept a
  * delivery while its `signature` is null.
  */
+/*
+ * JVZoo IS NOT A RESELLER, AND THAT IS A LEGAL DIFFERENCE, NOT A DETAIL. Its
+ * terms leave us the seller with the money arriving through our own PayPal,
+ * which brings back the EU VAT registration and the 14-day withdrawal right
+ * that selling through a reseller avoids. It stays registered so the row can
+ * be configured if the owner decides to accept that, and it stays off until he
+ * does. ClickBank and Digistore24 are resellers and carry neither problem.
+ */
 export const MARKETPLACE_PROVIDERS: readonly MarketplaceProvider[] = [
   { slug: 'digistore24', label: 'Digistore24', signature: null, requiredDisclaimer: null },
   { slug: 'clickbank', label: 'ClickBank', signature: null, requiredDisclaimer: null },
