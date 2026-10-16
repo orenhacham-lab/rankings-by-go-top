@@ -32,18 +32,6 @@
       "schedule": "30 11 * * *"
     },
     {
-      "path": "/api/blog/auto/cron/he",
-      "schedule": "0 4 * * *"
-    },
-    {
-      "path": "/api/blog/auto/cron/en",
-      "schedule": "20 4 * * *"
-    },
-    {
-      "path": "/api/blog/auto/cron/es",
-      "schedule": "40 4 * * *"
-    },
-    {
       "path": "/api/gbp/cron",
       "schedule": "30 7 * * *"
     }
