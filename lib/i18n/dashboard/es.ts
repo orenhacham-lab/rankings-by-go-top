@@ -2401,7 +2401,7 @@ export const dashboardEs: DeepPartial<DashboardDictionary> = {
       disclosure:
         'El pago con tarjeta se realiza a través de Creem (Armitage Labs OÜ), el comerciante registrado: Creem emite la factura, añade el impuesto según tu dirección de facturación y el cargo aparece en tu extracto a nombre de Creem. El servicio en sí sigue siendo nuestro.',
       buyerTermsLabel: 'Términos de compra de Creem',
-      cancelNote: 'Este plan lo cobra Creem, el vendedor registrado, así que la cancelación se hace allí: usa el enlace a la suscripción del correo de recibo de Creem. Si te resulta más fácil, escríbenos y le enviaremos la solicitud de cancelación por ti. En cualquier caso tu acceso sigue activo hasta el final del periodo que ya pagaste.',
+      cancelNote: 'Este plan lo cobra Creem, el vendedor registrado, así que la cancelación se hace allí: usa el enlace a la suscripción del correo de recibo de Creem. Si no puedes contactar con ellos, escríbenos y daremos de baja tu plan por nuestra parte. Solo Creem puede detener el cobro. En cualquier caso tu acceso sigue activo hasta el final del periodo que ya pagaste.',
     },
     shopify: {
       title: 'La facturación se gestiona a través de Shopify',

@@ -278,6 +278,14 @@ console.log('\nE) every dashboard language has the strings')
     check(`E5: ${lang} says cancelling happens at Creem`, saysWhereToCancel, cancelNote)
     check(`E5-MUT: a ${lang} line that names no provider is caught`,
       !(/Creem/.test('Contact us and we will stop the billing for you.')))
+    // The second resort promises only what we can perform: ending the plan on
+    // our side. Stopping the charge is Creem's, and the line says so.
+    const promisesOnlyOurs = /our side|מצידנו|por nuestra parte|do nosso lado/.test(cancelNote)
+      && /can stop the charge|can stop|יכולה לעצור|puede detener|pode interromper/.test(cancelNote)
+      && !/we will stop the billing|נבטל עבורכם את החיוב|detendremos el cobro|interromperemos a cobrança/.test(cancelNote)
+    check(`E6: ${lang} offers a second resort that stays within what we can do`, promisesOnlyOurs, cancelNote)
+    check(`E6-MUT: a ${lang} line that promises to stop the charge is caught`,
+      !/our side/.test('Contact us and we will stop the billing for you.'))
   }
 }
 
