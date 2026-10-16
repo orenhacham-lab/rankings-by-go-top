@@ -72,7 +72,16 @@ export interface ProspectDraft {
   email: string
   platform: ProspectPlatform
   postalAddress: string
-  /** The business's own page the address and the email came from. */
+  /**
+   * The business's own page the CONTACT ADDRESS came from, stored per row.
+   *
+   * Per row and not per source on purpose: the published text distinguishes the
+   * business's own site from a public registry, and if that distinction is ever
+   * questioned, a stored URL answers it in one query where a reconstruction
+   * from the directory name does not. The postal address may come from another
+   * page of the same site; this names the one the email was on, which is the
+   * one the harvesting provision is about.
+   */
   sourceSite: string
   /** The independent public source that says this business exists. */
   sourceSecond: string
