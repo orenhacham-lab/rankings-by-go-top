@@ -17,7 +17,11 @@
  *      the constant, nofollow, dropped when null. No other file may use it;
  *   3. the menu words exist, non-empty, in all four dictionaries;
  *   4. the new pages promise nothing the code cannot keep: no percentages, no
- *      ROI, no WordPress.org listing (the plugin is not approved yet).
+ *      ROI, no WordPress.org listing (the plugin is not approved yet);
+ *   5. the Google Maps posts page (owner, 16 Oct 2026) says in every language
+ *      that automatic posting is off by default, that nothing is promised about
+ *      ranking and that Go Top SEO is not affiliated with Google; it never
+ *      reads as Google's endorsement, names no model, and claims no AI photo.
  * Each group has a mutation control.
  *
  * Run: npx tsx components/public/__qa__/public-nav-menus.qa.ts
@@ -31,6 +35,7 @@ import { SITE_FIXES_PAGE } from '@/lib/i18n/public/pages/site-fixes'
 import { AGENCIES_PAGE, BUSINESSES_PAGE, SHOPIFY_PAGE, WORDPRESS_PAGE } from '@/lib/i18n/public/pages/solutions'
 import { SITE_LINKS_PAGE } from '@/lib/i18n/public/pages/site-links'
 import { COMPETITORS_PAGE, SEARCH_CONSOLE_PAGE } from '@/lib/i18n/public/pages/results'
+import { MAPS_POSTS_PAGE } from '@/lib/i18n/public/pages/maps-posts'
 
 const ROOT = join(__dirname, '..', '..', '..')
 let passed = 0
@@ -65,7 +70,8 @@ function main() {
       groupSizes.length === 3 && groupSizes.every((n) => n === 3 || n === 4) && Math.max(...groupSizes) - Math.min(...groupSizes) <= 1,
       JSON.stringify(groupSizes))
     check('1a2-MUT: a five-item column is caught', !([3, 5, 3].every((n) => n === 3 || n === 4)))
-    check('1b: ten features and four solution pages are read from the menu', paths.length === 14, JSON.stringify(paths))
+    // Eleven from 16 Oct 2026: posts on Google Maps joined the middle column.
+    check('1b: eleven features and four solution pages are read from the menu', paths.length === 15, JSON.stringify(paths))
     const missing = PUBLIC_LOCALES.flatMap((l) => paths.filter((p) => !existsSync(pageFile(LOCALE_PREFIX[l], p))).map((p) => `${l}${p}`))
     check('1c: …each with a page.tsx in he, en, es and pt-BR', missing.length === 0, missing.join(', '))
     const xml = read('app/sitemap.xml/route.ts')
@@ -77,7 +83,7 @@ function main() {
       return paths.filter((p) => !src.includes(`'${LOCALE_PREFIX[l]}${p}'`)).map((p) => `${l}${p}`)
     })
     check('1e: …and in the HTML sitemap of every language', htmlMissing.length === 0, htmlMissing.join(', '))
-    for (const page of [SITE_FIXES_PAGE, BUSINESSES_PAGE, AGENCIES_PAGE, WORDPRESS_PAGE, SHOPIFY_PAGE, SITE_LINKS_PAGE, COMPETITORS_PAGE, SEARCH_CONSOLE_PAGE]) {
+    for (const page of [SITE_FIXES_PAGE, BUSINESSES_PAGE, AGENCIES_PAGE, WORDPRESS_PAGE, SHOPIFY_PAGE, SITE_LINKS_PAGE, COMPETITORS_PAGE, SEARCH_CONSOLE_PAGE, MAPS_POSTS_PAGE]) {
       check(`1f: ${page.path} is a menu path`, paths.includes(page.path))
     }
     // MUTATION CONTROL
@@ -169,6 +175,7 @@ function main() {
       const words = [
         nav.solutions, nav.featureGroups.measure, nav.featureGroups.act, nav.featureGroups.prove,
         nav.featuresMenu.siteFixes.label, nav.featuresMenu.siteFixes.description,
+        nav.featuresMenu.mapsPosts.label, nav.featuresMenu.mapsPosts.description,
         ...Object.values(nav.solutionsMenu).flatMap((v) => [v.label, v.description]),
       ]
       check(`3a: ${l} has every menu word`, words.every((w) => typeof w === 'string' && w.trim().length > 0))
@@ -181,7 +188,7 @@ function main() {
 
   console.log('\n4) the new pages promise only what the code does')
   {
-    const sources = ['lib/i18n/public/pages/site-fixes.tsx', 'lib/i18n/public/pages/solutions.tsx', 'lib/i18n/public/pages/results.tsx', 'lib/i18n/public/pages/site-links.tsx'].map((f) => strip(read(f)))
+    const sources = ['lib/i18n/public/pages/site-fixes.tsx', 'lib/i18n/public/pages/solutions.tsx', 'lib/i18n/public/pages/results.tsx', 'lib/i18n/public/pages/site-links.tsx', 'lib/i18n/public/pages/maps-posts.tsx'].map((f) => strip(read(f)))
     const all = sources.join('\n')
     check('4a: no percentage claims', !/\d\s?%/.test(all))
     check('4b: no ROI claims', !/\bROI\b/.test(all))
@@ -290,12 +297,65 @@ function main() {
       risksArePointedAt.every((re) => re.test(flat)))
     check('4m-MUT: dropping the English risks pointer is caught',
       !risksArePointedAt.every((re) => re.test(flat.replace(/together with the risks of joining/gi, ''))))
-    for (const page of [SITE_FIXES_PAGE, BUSINESSES_PAGE, AGENCIES_PAGE, WORDPRESS_PAGE, SHOPIFY_PAGE, SITE_LINKS_PAGE, COMPETITORS_PAGE, SEARCH_CONSOLE_PAGE]) {
+    for (const page of [SITE_FIXES_PAGE, BUSINESSES_PAGE, AGENCIES_PAGE, WORDPRESS_PAGE, SHOPIFY_PAGE, SITE_LINKS_PAGE, COMPETITORS_PAGE, SEARCH_CONSOLE_PAGE, MAPS_POSTS_PAGE]) {
       check(`4e: ${page.path} has content and a title in every language`,
         PUBLIC_LOCALES.every((l) => page.content[l]?.hero.title && page.meta[l]?.title && page.meta[l]?.description))
     }
     // MUTATION CONTROL
     check('4-MUT: a "30% more traffic" line fails 4a', /\d\s?%/.test(all + ' 30% more traffic'))
+  }
+
+  console.log('\n5) the Google Maps posts page says what the feature is, and nothing more')
+  {
+    const flat = strip(read('lib/i18n/public/pages/maps-posts.tsx')).replace(/\s+/g, ' ')
+    check('5a: the page is the menu item that points at it', paths.includes(MAPS_POSTS_PAGE.path) && MAPS_POSTS_PAGE.path === '/features/google-maps-posts')
+    // Automatic posting goes out without the owner reading it, so the page has
+    // to say, in every language, that it is off until they turn it on.
+    const autoOff = [
+      /\u05db\u05d1\u05d5\u05d9\u05d4 \u05db\u05d1\u05e8\u05d9\u05e8\u05ea \u05de\u05d7\u05d3\u05dc/,
+      /off by default/i,
+      /desactivada por defecto/i,
+      /Vem desligado/,
+    ]
+    check('5b: automatic posting is said to be off by default, in all four languages', autoOff.every((re) => re.test(flat)))
+    check('5b-MUT: dropping the Spanish sentence is caught', !autoOff.every((re) => re.test(flat.replace(/desactivada por defecto/gi, ''))))
+    const noRanking = [
+      /\u05d0\u05d9\u05df \u05d4\u05ea\u05d7\u05d9\u05d9\u05d1\u05d5\u05ea \u05dc\u05d3\u05d9\u05e8\u05d5\u05d2/,
+      /no ranking promise/i,
+      /no hay promesa de posicionamiento/i,
+      /n\u00e3o h\u00e1 promessa de posicionamento/i,
+    ]
+    check('5c: no ranking is promised, in all four languages', noRanking.every((re) => re.test(flat)))
+    check('5c-MUT: dropping the Hebrew sentence is caught', !noRanking.every((re) => re.test(flat.replace(noRanking[0], ''))))
+    const notAffiliated = [
+      /Go Top SEO \u05d0\u05d9\u05e0\u05d4 \u05e7\u05e9\u05d5\u05e8\u05d4 \u05dc-Google/,
+      /Go Top SEO is not affiliated with Google/,
+      /Go Top SEO no est\u00e1 vinculada a Google/,
+      /Go Top SEO n\u00e3o tem v\u00ednculo com o Google/,
+    ]
+    check('5d: the page says Go Top SEO is not affiliated with Google, in all four languages', notAffiliated.every((re) => re.test(flat)))
+    check('5d-MUT: dropping the Portuguese sentence is caught', !notAffiliated.every((re) => re.test(flat.replace(notAffiliated[3], ''))))
+    // Owner: Google's names only describe where the post lands, never an
+    // endorsement; no model or provider is named.
+    const forbidden = [
+      /\bofficial\b|\boficial\b|\u05e8\u05e9\u05de\u05d9/i,
+      /google[- ](approved|certified|partner|endorsed)|partner of google|socio de google|parceir[oa] do google|\u05e9\u05d5\u05ea\u05e3 \u05e9\u05dc \u05d2\u05d5\u05d2\u05dc/i,
+      /\b(gemini|gpt|chatgpt|openai|claude|anthropic|llm)\b/i,
+    ]
+    const hits = forbidden.filter((re) => re.test(flat)).map(String)
+    check('5e: no "official", no Google endorsement or partnership, no model name', hits.length === 0, hits.join(' | '))
+    check('5e-MUT: a "Google-approved" line is caught', forbidden.some((re) => re.test(`${flat} Google-approved posts`)))
+    check('5e-MUT2: a model name is caught', forbidden.some((re) => re.test(`${flat} written by Gemini`)))
+    // Legal (terms 15F): the AI image is offered for a topic post only, and is
+    // a generic picture, not a photo of the business, its staff or its products.
+    const aiImage = [
+      /\u05e4\u05d5\u05e1\u05d8 \u05de\u05e0\u05d5\u05e9\u05d0[^.]*AI\. \u05d6\u05d5 \u05ea\u05de\u05d5\u05e0\u05d4 \u05db\u05dc\u05dc\u05d9\u05ea, \u05dc\u05d0 \u05e6\u05d9\u05dc\u05d5\u05dd \u05e9\u05dc \u05d4\u05e2\u05e1\u05e7/,
+      /post from a topic[^.]*with AI\. It is a generic picture, not a photo of your business/,
+      /a partir de un tema[^.]*con IA\. Es una imagen gen\u00e9rica, no una foto de tu negocio/,
+      /a partir de um tema[^.]*com IA\. \u00c9 uma imagem gen\u00e9rica, n\u00e3o uma foto do seu neg\u00f3cio/,
+    ]
+    check('5f: the AI image is for a topic post and is not a photo of the business, in all four languages', aiImage.every((re) => re.test(flat)), aiImage.filter((re) => !re.test(flat)).map(String).join(' | '))
+    check('5f-MUT: dropping the English disclaimer is caught', !aiImage.every((re) => re.test(flat.replace('not a photo of your business', 'a photo'))))
   }
 
   console.log(`\n${passed} passed, ${failed} failed`)

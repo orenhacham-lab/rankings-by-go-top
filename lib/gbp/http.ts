@@ -20,6 +20,8 @@ import { listAllLocations, type GbpLocation } from './api'
 import { validatePostInput, GBP_CTA_TYPES, normalizePostLanguage } from './validate'
 import { preparePostImage, GBP_SOURCE_TYPES, GBP_SOURCE_MAX_BYTES, type CropBox } from './image'
 import { draftPost, type Generate } from './draft'
+import { generateTopicImage, GBP_TOPIC_MAX, type GenerateTopicImage } from './topic-image'
+import { imageGenerationHttpStatus } from '@/lib/content/image-generation-http'
 import { v4LocationParent } from './request'
 import { listReviews, getReview, replyToReview, deleteReviewReply, summarizeReviews, isReviewName, GBP_REVIEW_ORDERS, type GbpReview, type GbpReviewOrder, type GbpReviewPage } from './reviews'
 import { validateReplyInput, GBP_REPLY_MAX } from './review-validate'
@@ -40,6 +42,7 @@ export interface GbpRouteDeps {
   fetchLocations?: (accessToken: string) => Promise<GbpLocation[]>
   exchange?: (code: string, verifier: string) => Promise<{ accessToken: string; refreshToken?: string; scope: string }>
   generate?: Generate
+  generateImage?: GenerateTopicImage
   listReviews?: (accessToken: string, args: { accountName: string; locationName: string; order?: GbpReviewOrder; pageToken?: string | null; pages?: number }) => Promise<GbpReviewPage>
   replyToReview?: (accessToken: string, reviewName: string, comment: string) => Promise<{ comment: string; updateTime: string | null }>
   deleteReviewReply?: (accessToken: string, reviewName: string) => Promise<void>
@@ -280,6 +283,36 @@ export async function handleDraft(req: Request, deps: GbpRouteDeps): Promise<Res
   const out = await draftPost({ businessName, language, article, topic: article ? null : topic }, deps.generate)
   if (!out.ok) return err('draft_unavailable', 502)
   return json({ ok: true, summary: out.summary, articleUrl: article?.url ?? null })
+}
+
+// ── POST /api/gbp/image/generate {projectId, topic} ────────────────────────
+/**
+ * An AI photo for a post written from a topic. Answers the JPEG itself, which
+ * the composer puts through the same crop and "use this photo" steps as an
+ * upload, so nothing is stored here. A failure is logged with our own reason
+ * and answered with one stable code; the provider's words go nowhere.
+ */
+export async function handleGenerateImage(req: Request, deps: GbpRouteDeps): Promise<Response> {
+  let body: Record<string, unknown>
+  try { body = await req.json() } catch { return err('invalid_request', 400) }
+  const g = await gate(deps, typeof body.projectId === 'string' ? body.projectId : null)
+  if (g instanceof Response) return g
+  const topic = typeof body.topic === 'string' ? body.topic.trim() : ''
+  if (!topic || topic.length > GBP_TOPIC_MAX) return err('invalid_request', 400)
+  let reason: string
+  try {
+    const out = await (deps.generateImage ?? generateTopicImage)({ topic })
+    if (out.ok) {
+      return new Response(new Uint8Array(out.bytes), { status: 200, headers: { 'Content-Type': 'image/jpeg', 'Cache-Control': 'no-store' } })
+    }
+    reason = out.reason
+  } catch {
+    reason = 'generator_threw'
+  }
+  // Only a code of ours reaches the log; anything that looks like free text is not one.
+  const classified = /^[a-z][a-z0-9_]{0,59}$/.test(reason) ? reason : 'unclassified'
+  console.error('[gbp-topic-image] generation failed', { reason: classified, projectId: g.project.id })
+  return err('image_generation_failed', imageGenerationHttpStatus(classified))
 }
 
 // ── reviews ────────────────────────────────────────────────────────────────

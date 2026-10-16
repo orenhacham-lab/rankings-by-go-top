@@ -354,12 +354,12 @@ async function main() {
     const inj = src.indexOf("injectInlineImages(sanitized, images, 'preview')")
     const des = src.indexOf('applyArticleDesign(')
     return san >= 0 && inj > san && des > san && (src.match(/applyArticleDesign\(/g) ?? []).length === 1 &&
-      /applyArticleDesign\(admin[^,]*, article\.id, injectInlineImages\(sanitized, images, 'preview'\), 'shopify'\)/.test(src) &&
+      /applyArticleDesign\(admin[^,]*, article\.id, injectInlineImages\(sanitized, images, 'preview'\), 'shopify'(?:\)|, \{)/.test(src) &&
       !/styleArticleHtml|designForSite/.test(src)
   }
   check('F6: Shopify sanitizes the stored body, adds the inline images, then applies the design once', shopifyOrder(shopifySrc))
   check('MUTATION CONTROL: a Shopify publisher that styles the raw body is caught',
-    !shopifyOrder(shopifySrc.replace("injectInlineImages(sanitized, images, 'preview'), 'shopify')", "String(article.content_html || ''), 'shopify')")))
+    !shopifyOrder(shopifySrc.replace("injectInlineImages(sanitized, images, 'preview'), 'shopify'", "String(article.content_html || ''), 'shopify'")))
   check('MUTATION CONTROL: a Shopify publisher that calls the styler directly is caught',
     !shopifyOrder(shopifySrc + "\nconst x = styleArticleHtml(body)"))
 
