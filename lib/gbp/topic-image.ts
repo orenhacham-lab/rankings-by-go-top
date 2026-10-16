@@ -6,7 +6,7 @@
  * Nothing is stored here; the merchant's own "use this photo" step does that.
  * Server-only (Gemini, sharp).
  */
-import { generateArticleImage, normalizeFeaturedImage, writeCommercialSafeConcept } from '@/lib/content/gemini-image'
+import { generateArticleImage, normalizeFeaturedImage } from '@/lib/content/gemini-image'
 
 export const GBP_TOPIC_MAX = 300
 
@@ -18,13 +18,13 @@ export type TopicImageResult =
 export type GenerateTopicImage = (input: { topic: string }) => Promise<TopicImageResult>
 
 export const generateTopicImage: GenerateTopicImage = async ({ topic }) => {
-  // The concept is written in English, the language the image model follows
-  // best; the picture has no words in it, so the post's language is irrelevant.
-  const concept = await writeCommercialSafeConcept({ title: topic, topic, language: 'en' })
+  // No separate text-model call for a concept: that writer pins a text model by
+  // name, which this project must not do (lib/gbp/generate.ts). buildImagePrompt
+  // already strips brand names and adds the no-text, no-logo, unbranded rules.
   const out = await generateArticleImage({
     title: topic,
     topic,
-    imagePrompt: `${concept} A real-looking photo a local business could post on its Google Business Profile.`,
+    imagePrompt: `A real-looking photo a local business could post on its Google Business Profile, about: ${topic}.`,
     subject: topic,
     aspectRatio: '16:9',
     language: 'en',

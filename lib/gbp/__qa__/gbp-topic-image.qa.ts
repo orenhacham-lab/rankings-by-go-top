@@ -194,7 +194,7 @@ async function successChecks() {
   check('the photo passes the existing 4:3 crop to the 1200×900 JPEG Google needs', prepared.ok && prepared.width === 1200 && prepared.height === 900 && (await sharp(prepared.bytes).metadata()).format === 'jpeg')
   const ti = strip(read('lib/gbp/topic-image.ts'))
   check('the real generator asks for 16:9 and normalizes to a 16:9 JPEG (wide enough for the 480-px crop)', /aspectRatio: '16:9'/.test(ti) && /normalizeFeaturedImage\(out\.data, '16:9'\)/.test(ti))
-  check('…and goes through the commercial-safe concept and image prompt (no text, no logos, unbranded)', /writeCommercialSafeConcept\(/.test(ti) && /generateArticleImage\(/.test(ti) && !/businessName/.test(ti))
+  check('…and goes through the commercial-safe image prompt (no text, no logos, unbranded), with no text model pinned by name', /generateArticleImage\(/.test(ti) && !/writeCommercialSafeConcept\(/.test(ti) && !/gemini-\d/.test(ti) && !/businessName/.test(ti))
   check('MUTATION: a square request is caught', !/aspectRatio: '16:9'/.test(ti.replace("aspectRatio: '16:9'", "aspectRatio: '1:1'")))
 }
 
