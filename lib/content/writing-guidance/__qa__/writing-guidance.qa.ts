@@ -232,7 +232,17 @@ async function main() {
   check('D6: a Shopify store: no description, no city, but the owner\'s own guidance still applies', shop.shopify && shop.business.description === null && shop.business.city === null && shop.guidance.instructions === 'בלי מחירים')
   ;(shopDb.tables.shopify_connections as Record<string, unknown>[])[0].archived_at = '2026-10-01T00:00:00Z'
   shopDb.tables.billing_governance = [{ user_id: OWNER, billing_authority: 'shopify' }]
-  check('D7: an account Shopify bills counts as Shopify even without a live store connection', (await readGenerationContext(shopDb as never, PROJECT, null)).shopify)
+  // CHANGED 11 October 2026 (was: "an account Shopify bills counts as Shopify even without a live
+  // store connection"). That rule silenced the business name, description and city on every
+  // WordPress site of an account that also has a Shopify store. The project's own store decides.
+  const unShop = await readGenerationContext(shopDb as never, PROJECT, 'רמת גן')
+  check('D7: an account Shopify bills, on a project with no live store, is NOT a Shopify store: description and city reach the prompt', !unShop.shopify && unShop.business.description === 'חנות' && unShop.business.city === 'רמת גן')
+  ;(shopDb.tables.shopify_connections as Record<string, unknown>[])[0].archived_at = null
+  check('D7b: the same account\'s project WITH a live store stays a Shopify store', (await readGenerationContext(shopDb as never, PROJECT, null)).shopify)
+  const byBilling = await mutant<typeof import('../store')>('lib/content/writing-guidance/store.ts', (src) => src.replace("return (conn.data ?? []).length > 0", "return true"))
+  check('MUTATION CONTROL: a rule that treats every project as Shopify fails D7', (await byBilling.readGenerationContext(new FakeAdmin({
+    projects: [{ id: PROJECT, user_id: OWNER }], project_profiles: [{ project_id: PROJECT, user_id: OWNER, description: 'חנות', is_local: true }],
+    shopify_connections: [], billing_governance: [{ user_id: OWNER, billing_authority: 'shopify' }] }) as never, PROJECT, 'רמת גן')).shopify)
   const brokenDb = { from: (t: string) => (t === 'shopify_connections' ? { select: () => ({ eq: () => ({ is: () => ({ limit: async () => ({ data: null, error: { code: '500' } }) }) }) }) } : (genDb as FakeAdmin).from(t)) }
   check('D8: a read that fails counts as Shopify (fails closed)', (await readGenerationContext(brokenDb as never, PROJECT, 'רמת גן')).shopify)
   const noShopCheck = await mutant<typeof import('../store')>('lib/content/writing-guidance/store.ts', (src) => src.replace("if (shopify) return { guidance: guidance.guidance, business: { description: null, city: null }, shopify: true }", ''))
@@ -273,6 +283,7 @@ async function main() {
   check('MUTATION CONTROL: naming the business on a Shopify store too is caught', !brandWired(genSrc.replace('!generationContext.shopify && ', '')))
   check('MUTATION CONTROL: the old default (never name it) is caught', !brandWired(genSrc.replace(/includeBrandName: decodedNotes\.brandChoiceSet[^,]*,/, 'includeBrandName: decodedNotes.flags.includeBrandName,')))
   const named = buildPrompt(brief({ includeBrandName: true, brandNameToInclude: 'שיפוצי כהן' }), {})
+  check('F4b: when naming is on, the business is named at least once (in the conclusion if nowhere else), not left out', /name it AT LEAST ONCE/.test(named) && /once in the conclusion as the natural next step/.test(named) && !/mention it once at most/.test(named))
   check('F4: the business is named only where it adds E-E-A-T value, at most 2-3 times, never in the title or as praise', named.includes('Name "שיפוצי כהן" ONLY where it adds E-E-A-T value') && /At most 2-3 mentions/.test(named) && /Never in the title/.test(named) && /never as a sales slogan or praise/.test(named))
   check('F5: …and never invents experience, numbers, certifications or awards', /do NOT invent experience, years in business, customer numbers, certifications, awards/.test(named) && /Ground every statement about the business ONLY/.test(named))
   check('F6: with the choice off the old rule stands', before.includes('Do NOT mention any business or brand name'))

@@ -100,6 +100,9 @@ export async function GET(request: Request) {
         .from('gsc_query_page_metrics')
         .select('query,page,clicks,impressions,ctr,position')
         .eq('sync_run_id', run.id)
+        .eq('project_id', auth.project.id)
+        // A stable order, or the chunks can repeat or skip rows and the counts drift.
+        .order('query', { ascending: true }).order('page', { ascending: true })
         .range(offset, offset + FETCH_CHUNK - 1)
       if (error) return Response.json({ ok: false, error: 'metrics_read_failed' }, { status: 500 })
       const batch = (data ?? []) as GscMetricRow[]

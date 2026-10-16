@@ -43,8 +43,7 @@ export type GenerationContext = {
   guidance: WritingGuidance
   business: BusinessContext
   /**
-   * A Shopify store (a store connection on the project, or an account Shopify
-   * bills). Its articles keep the defaults they had: no business description or
+   * A Shopify store (a live store connection on this project). Its articles keep the defaults they had: no business description or
    * city in the prompt, and the business is not named unless the brief says so.
    * The owner's own guidance (empty unless they wrote some) still applies.
    */
@@ -53,20 +52,20 @@ export type GenerationContext = {
 
 /**
  * Whether the project is a Shopify store's: a live (not archived) store
- * connection, or an owner whose billing authority is Shopify, the same test the
- * link network uses. FAILS CLOSED: any read error counts as Shopify, so a
- * Shopify store's articles are never changed by a read that did not answer.
+ * connection on THIS project. FAILS CLOSED: a read error counts as Shopify, so
+ * a Shopify store's articles are never changed by a read that did not answer.
+ *
+ * Who bills the account is deliberately not part of it. Until 11 October 2026
+ * an account Shopify bills counted as Shopify for every project it owns, and
+ * one account with two stores and twenty-one WordPress sites had the business
+ * name, description and city left out of every article on all of them. The
+ * article goes to the site the project is connected to; that is what decides.
  */
-export async function isShopifyProject(admin: SupabaseClient, projectId: string, ownerId: string): Promise<boolean> {
+export async function isShopifyProject(admin: SupabaseClient, projectId: string): Promise<boolean> {
   try {
-    const [conn, gov] = await Promise.all([
-      admin.from('shopify_connections').select('project_id').eq('project_id', projectId).is('archived_at', null).limit(1),
-      admin.from('billing_governance').select('user_id, billing_authority').eq('user_id', ownerId).limit(1),
-    ])
-    if (conn.error || gov.error) return true
-    if ((conn.data ?? []).length > 0) return true
-    const g = (gov.data ?? [])[0] as { user_id?: string; billing_authority?: string | null } | undefined
-    return g?.user_id === ownerId && g.billing_authority === 'shopify'
+    const conn = await admin.from('shopify_connections').select('project_id').eq('project_id', projectId).is('archived_at', null).limit(1)
+    if (conn.error) return true
+    return (conn.data ?? []).length > 0
   } catch {
     return true
   }
@@ -85,7 +84,7 @@ export async function readGenerationContext(admin: SupabaseClient, projectId: st
   const [guidance, profile, shopify] = await Promise.all([
     readProjectWritingGuidance(admin, projectId, owner),
     readProfile(admin, projectId, owner),
-    isShopifyProject(admin, projectId, owner),
+    isShopifyProject(admin, projectId),
   ])
   if (shopify) return { guidance: guidance.guidance, business: { description: null, city: null }, shopify: true }
   return {
