@@ -20,7 +20,7 @@ import {
   type SiteSignalsResult,
 } from '@/lib/content/article-style/data'
 import type { DesignPlatform } from '@/lib/content/article-style/types'
-import { loadActivePlatform } from '@/lib/content/platform/load-active-platform'
+import { loadDesignPlatform } from '@/lib/content/platform/load-active-platform'
 import { fetchHomeHtml } from '@/lib/content/article-style/site-home'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { createClient } from '@/lib/supabase/server'
@@ -33,12 +33,7 @@ function liveDeps(): ArticleStyleDeps {
       return { userId: !error && data?.user ? data.user.id : null, db }
     },
     // Called only after the project was proven the signed-in owner's.
-    platform: async (projectId): Promise<DesignPlatform> => {
-      const r = await loadActivePlatform(createAdminClient(), projectId)
-      if (r.platform === 'shopify' || r.shopifyPresent) return 'shopify'
-      if (r.platform === 'wordpress' || r.platform === 'wix' || r.platform === 'webhook') return r.platform
-      return 'none'
-    },
+    platform: (projectId): Promise<DesignPlatform> => loadDesignPlatform(createAdminClient(), projectId),
     // The URL admission runs before the first request (site-home.ts).
     fetchHome: (domain) => fetchHomeHtml(domain),
   }

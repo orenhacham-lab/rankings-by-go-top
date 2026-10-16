@@ -19,6 +19,10 @@
  * free check's guarded fetcher (normalizeCheckUrl + fetchSiteHtml: public
  * hosts only, every redirect re-admitted, size and time capped).
  *
+ * THE OWNER'S OWN NAME, LINK AND IMAGE (author_box_name, author_box_url,
+ * author_box_image) are read on their own (readAuthorBoxOverrides): while their
+ * migration is not applied the box is exactly as before.
+ *
  * FAILS SAFE: no column yet (the migration is not applied), the setting off,
  * any read error, no published page, a page that could not be read or was cut
  * off: no box. Never fails a publish.
@@ -28,11 +32,21 @@ import { normalizeCheckUrl } from '@/lib/free-check/url-guard'
 import { fetchSiteHtml } from '@/lib/free-check/site-fetch'
 import { ARTICLE_STYLE_TABLE, isMissingRelation } from '@/lib/content/article-style/store'
 import { articleLanguage } from '@/lib/content/article-style/labels'
-import { authorBoxContent, authorBoxLanguage, themeHasAuthorBox, type AuthorBoxContent } from './box'
+import { authorBoxContent, authorBoxImageChoice, authorBoxLanguage, cleanAuthorBoxName, normalizeAuthorBoxUrl, themeHasAuthorBox, type AuthorBoxContent, type AuthorBoxImageChoice, type AuthorBoxInputs } from './box'
+import { readWordPressSiteIcon, type FetchText } from './site-icon'
 
 export const AUTHOR_BOX_COLUMN = 'author_box'
 export const THEME_BOX_COLUMN = 'theme_author_box'
 export const THEME_CHECKED_COLUMN = 'theme_author_box_checked_at'
+/**
+ * The owner's own name and link for the box (supabase/migrations/
+ * 20261016180000_project_author_box_overrides.sql). Read on their own, never
+ * with the switch: while that migration is not applied, the box works exactly
+ * as before (the resolved name, the about or home page).
+ */
+export const AUTHOR_NAME_COLUMN = 'author_box_name'
+export const AUTHOR_URL_COLUMN = 'author_box_url'
+export const AUTHOR_IMAGE_COLUMN = 'author_box_image'
 
 export const THEME_CHECK_TTL_MS = 14 * 24 * 60 * 60 * 1000
 export const UNKNOWN_TTL_MS = 24 * 60 * 60 * 1000
@@ -71,6 +85,36 @@ export async function readAuthorBoxSetting(db: SupabaseClient, projectId: string
     }
   } catch {
     return off('error')
+  }
+}
+
+export type AuthorBoxOverrides = {
+  state: 'saved' | 'default' | 'missing_column' | 'error'
+  /** '' when the owner left it empty: the resolver picks the name. */
+  name: string
+  /** '' when the owner left it empty: the about page, else the home page. */
+  url: string
+  /** 'none' (the default) draws no image. */
+  image: AuthorBoxImageChoice
+}
+
+/** The owner's own name and link for the box, read for its owner. Empty on any failure (today's behaviour). */
+export async function readAuthorBoxOverrides(db: SupabaseClient, projectId: string, ownerId: string): Promise<AuthorBoxOverrides> {
+  const none = (state: AuthorBoxOverrides['state']): AuthorBoxOverrides => ({ state, name: '', url: '', image: 'none' })
+  try {
+    const { data, error } = await db
+      .from(ARTICLE_STYLE_TABLE)
+      .select(`project_id, user_id, ${AUTHOR_NAME_COLUMN}, ${AUTHOR_URL_COLUMN}, ${AUTHOR_IMAGE_COLUMN}`)
+      .eq('project_id', projectId)
+      .eq('user_id', ownerId)
+      .maybeSingle()
+    if (error) return none(isMissingRelation(error) ? 'missing_column' : 'error')
+    const row = data as Record<string, unknown> | null
+    if (!row || row.project_id !== projectId || row.user_id !== ownerId) return none('default')
+    // Checked again on the way out: a value that does not pass is treated as empty.
+    return { state: 'saved', name: cleanAuthorBoxName(row[AUTHOR_NAME_COLUMN]), url: normalizeAuthorBoxUrl(row[AUTHOR_URL_COLUMN]) ?? '', image: authorBoxImageChoice(row[AUTHOR_IMAGE_COLUMN]) }
+  } catch {
+    return none('error')
   }
 }
 
@@ -128,6 +172,8 @@ export async function findPublishedPage(admin: SupabaseClient, projectId: string
 
 export type ThemeDeps = {
   fetchHtml?: typeof fetchSiteHtml
+  /** The site icon's REST reads (./site-icon.ts). */
+  fetchText?: FetchText
   now?: () => Date
 }
 
@@ -188,9 +234,10 @@ export function findAboutUrl(entries: readonly { u?: unknown }[] | null | undefi
   return best
 }
 
-type ProjectFacts = { owner: string; name: string | null; domain: string | null; language: string | null }
+export type ProjectFacts = { owner: string; name: string | null; domain: string | null; language: string | null }
 
-async function readProject(admin: SupabaseClient, projectId: string): Promise<ProjectFacts | null> {
+/** The project's owner, business name, site and language (service role: by the project id only, the owner read off the row). */
+export async function readProject(admin: SupabaseClient, projectId: string): Promise<ProjectFacts | null> {
   try {
     const { data } = await admin.from('projects').select('id, user_id, name, business_name, target_domain, language').eq('id', projectId).maybeSingle()
     const p = data as { id?: string; user_id?: string | null; name?: string | null; business_name?: string | null; target_domain?: string | null; language?: string | null } | null
@@ -237,6 +284,56 @@ export type AuthorBoxRequest = {
   authorName?: () => Promise<string | null>
 }
 
+/**
+ * Everything the box is made from, for publishing AND for the settings
+ * preview (./preview.ts): the owner's own name and link, the site's publishing
+ * user (asked only when the owner typed no name), the business name, the
+ * description (never a store's), the about page and the language. Every read
+ * names the project and its owner. `articleId` null = the preview: the
+ * language is the project's, else the description's.
+ */
+export async function readAuthorBoxInputs(admin: SupabaseClient, req: {
+  project: ProjectFacts
+  projectId: string
+  articleId: string | null
+  platform: AuthorBoxPlatform
+  html?: string | null
+  authorName?: () => Promise<string | null>
+  /** The preview: ask the site's user and icon even when the saved choices would not need them, so a draft can switch. */
+  preview?: boolean
+  fetchText?: FetchText
+}): Promise<AuthorBoxInputs> {
+  const { project } = req
+  const overrides = await readAuthorBoxOverrides(admin, req.projectId, project.owner)
+  // The site icon: WordPress only (see ./site-icon.ts), and only when chosen.
+  const wantIcon = req.platform === 'wordpress' && (req.preview || overrides.image === 'site_icon')
+  const icon = wantIcon ? readWordPressSiteIcon(project.domain, req.fetchText).catch(() => null) : Promise.resolve(null)
+  let authorName: string | null = null
+  if (!overrides.name || req.preview) {
+    try { authorName = req.authorName ? await req.authorName() : null } catch { authorName = null }
+  }
+  const [description, aboutUrl, topicLanguage] = await Promise.all([
+    // A store's description is kept out of its articles (writing guidance), so out of the box too.
+    req.platform === 'shopify' ? Promise.resolve(null) : readDescription(admin, req.projectId, project.owner),
+    readAboutUrl(admin, req.projectId, project.owner, project.domain),
+    req.articleId ? readTopicLanguage(admin, req.articleId, req.projectId) : Promise.resolve(null),
+  ])
+  const language = authorBoxLanguage(topicLanguage) ?? authorBoxLanguage(project.language)
+    ?? articleLanguage(req.html ?? `${description ?? ''} ${project.name ?? ''}`)
+  return {
+    language,
+    nameOverride: overrides.name || null,
+    authorName,
+    businessName: project.name,
+    description,
+    domain: project.domain,
+    aboutUrl,
+    linkUrl: overrides.url || null,
+    imageChoice: req.platform === 'wordpress' ? overrides.image : 'none',
+    imageUrl: await icon,
+  }
+}
+
 /** Whether to add the box to this article, and what it says. */
 export async function decideAuthorBox(admin: SupabaseClient, req: AuthorBoxRequest, deps: ThemeDeps = {}): Promise<AuthorBoxDecision> {
   try {
@@ -257,16 +354,9 @@ export async function decideAuthorBox(admin: SupabaseClient, req: AuthorBoxReque
     if (answer === 'has_box') return { add: false, reason: 'theme_has_box' }
     if (answer !== 'no_box') return { add: false, reason: 'theme_unknown' }
 
-    let authorName: string | null = null
-    try { authorName = req.authorName ? await req.authorName() : null } catch { authorName = null }
-    const [description, aboutUrl, topicLanguage] = await Promise.all([
-      // A store's description is kept out of its articles (writing guidance), so out of the box too.
-      req.platform === 'shopify' ? Promise.resolve(null) : readDescription(admin, req.projectId, project.owner),
-      readAboutUrl(admin, req.projectId, project.owner, project.domain),
-      readTopicLanguage(admin, req.articleId, req.projectId),
-    ])
-    const language = authorBoxLanguage(topicLanguage) ?? authorBoxLanguage(project.language) ?? articleLanguage(req.html)
-    const content = authorBoxContent({ language, authorName, businessName: project.name, description, domain: project.domain, aboutUrl })
+    // The same inputs and the same resolver as the settings preview (./preview.ts).
+    const inputs = await readAuthorBoxInputs(admin, { project, projectId: req.projectId, articleId: req.articleId, platform: req.platform, html: req.html, authorName: req.authorName, fetchText: deps.fetchText })
+    const content = authorBoxContent(inputs)
     return content ? { add: true, content } : { add: false, reason: 'no_name' }
   } catch {
     return { add: false, reason: 'error' }

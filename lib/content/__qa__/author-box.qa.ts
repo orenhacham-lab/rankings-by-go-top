@@ -21,7 +21,18 @@
  *   F) the settings switch: saved on the owner's row, refused when not a
  *      boolean, left alone while its column is missing; the card shows it
  *      with its hint, in all four dashboard languages;
- *   G) the WordPress publishers name the user the post is published as.
+ *   G) the WordPress publishers name the user the post is published as, and
+ *      the settings preview asks with the same lookups;
+ *   H) the owner's own name (wins; empty falls back to the resolver; cleaned
+ *      and escaped) and link (http(s) only, else refused); saved on the owner's
+ *      row, left alone while the columns are missing (the box as before); the
+ *      preview is drawn from the publisher's inputs with the publisher's
+ *      resolver, for the owner's own project only;
+ *   I) the image: none by default (today's box, the site not asked), or the
+ *      WordPress site icon (https, the site's host or WordPress' CDN, alt and
+ *      size, round in the formatted design; missing = no markup); never on a
+ *      Shopify store;
+ *   J) every new string in the four dashboard languages.
  *
  * Every group has a MUTATION CONTROL: a deliberately broken copy of the module
  * (written next to it, imported, deleted) or of the source text must fail the
@@ -41,7 +52,7 @@ import { styleArticleHtml } from '@/lib/content/article-style/html'
 import { DEFAULT_ARTICLE_STYLE } from '@/lib/content/article-style/types'
 import type { fetchSiteHtml } from '@/lib/free-check/site-fetch'
 import {
-  AUTHOR_BOX_HEADINGS, OWN_CLASS, authorBoxContent, authorBoxStructure, descriptionLine, themeHasAuthorBox,
+  AUTHOR_BOX_HEADINGS, OWN_CLASS, authorBoxContent, authorBoxStructure, descriptionLine, normalizeAuthorBoxUrl, themeHasAuthorBox,
   type AuthorBoxContent,
 } from '@/lib/content/author-box/box'
 import { THEME_CHECK_TTL_MS, findAboutUrl, isProjectPage } from '@/lib/content/author-box/store'
@@ -392,10 +403,208 @@ async function main() {
   console.log('\nG) the name on the box is the user the post is published as')
   const pluginSrc = strip(read('lib/content/wordpress-plugin-publish.ts'))
   const appSrc = strip(read('lib/content/wordpress-publish.ts'))
-  const pluginGuard = (s: string) => /applyArticleDesign\(admin, articleId, content, 'wordpress', \{[\s\S]{0,400}pluginAuthors\(link[\s\S]{0,200}opts\.authorId[\s\S]{0,80}authors\.body\.default/.test(s)
+  const pluginGuard = (s: string) => /applyArticleDesign\(admin, articleId, content, 'wordpress', \{\s*authorName: \(\) => pluginPublishingUserName\(link, plugin\.version, opts\.authorId, deps\.post\)/.test(s)
+    && /function pluginPublishingUserName\([\s\S]{0,300}pluginAuthors\(link[\s\S]{0,120}typeof authorId === 'number' \? authorId : authors\.body\.default/.test(s)
   check('G1: plugin path: the chosen author (author_id, else the plugin default) from the signed /authors list', pluginGuard(pluginSrc))
   check('G2: application password path: the existing post\'s author on update, else the password\'s own user', /applyArticleDesign\(admin, article\.id, content, 'wordpress', \{\s*authorName: \(\) => getPublishingUserName\(creds, opts\.existing\?\.postId \?\? null\)/.test(appSrc))
-  check('MUTATION CONTROL: a plugin path that ignores the chosen author fails G1', !pluginGuard(pluginSrc.replace('typeof opts.authorId === \'number\' ? opts.authorId : authors.body.default', 'authors.body.default')))
+  const siteUserSrc = strip(read('lib/content/author-box/site-user.ts'))
+  const previewLookup = (s: string) => /via === 'plugin'\) return await pluginPublishingUserName\(publisher\.plugin\.link, publisher\.plugin\.version, null\)/.test(s) && /return await getPublishingUserName\(publisher\.creds, null\)/.test(s)
+  check('G3: the preview asks the site with the publishers\' own lookups, for a new post', previewLookup(siteUserSrc))
+  check('MUTATION CONTROL: a preview lookup of its own (the login, not the display name) fails G3', !previewLookup(siteUserSrc.replace('return await getPublishingUserName(publisher.creds, null)', 'return publisher.creds.username')))
+  check('MUTATION CONTROL: a plugin path that ignores the chosen author fails G1', !pluginGuard(pluginSrc.replace('typeof authorId === \'number\' ? authorId : authors.body.default', 'authors.body.default')))
+
+  // ── H) the owner's own name and link, and the preview ───────────────────
+  console.log('\nH) the owner\'s own name and link; the preview draws with the publisher\'s resolver')
+  {
+    const base = { language: 'en' as const, businessName: 'Levi Bakery', description: DESCRIPTION, domain: DOMAIN, aboutUrl: `https://${DOMAIN}/about-us/` }
+    const wins = (m: typeof import('@/lib/content/author-box/box')) =>
+      m.authorBoxContent({ ...base, nameOverride: 'Dana Cohen', authorName: 'Real Author' })?.name === 'Dana Cohen'
+      && m.authorBoxContent({ ...base, nameOverride: 'Dana Cohen', authorName: 'japan4u_adm' })?.name === 'Dana Cohen'
+      && m.resolveAuthorName({ ...base, nameOverride: 'Dana Cohen', authorName: 'Real Author' }).source === 'override'
+    check('H1: the owner\'s name wins over the WordPress user and the business name', wins(await import('@/lib/content/author-box/box')))
+    const noOverride = await mutant<typeof import('@/lib/content/author-box/box')>('lib/content/author-box/box.ts', (s) => s.replace("if (override) return { name: override, source: 'override', rejectedLogin: null }", ''))
+    check('MUTATION CONTROL: a resolver that ignores the owner\'s name fails H1', !wins(noOverride))
+
+    const hostileName = authorBoxContent({ ...base, nameOverride: `<b>B&B</b> "x" <script>y</script>${'z'.repeat(200)}` })!
+    check('H2: the owner\'s name is cleaned like the picked name (tags out, the 80 limit) and escaped in the box',
+      hostileName.name.length <= 80 && !/[<>]/.test(hostileName.name) && hostileName.name.startsWith('B&B "x" y')
+      && authorBoxStructure(hostileName).includes('B&amp;B "x" y') && !/<script|<b>/i.test(authorBoxStructure(hostileName)))
+
+    const falls = (m: typeof import('@/lib/content/author-box/box')) => ['', '   ', null, undefined, '<b></b>'].every((o) =>
+      JSON.stringify(m.authorBoxContent({ ...base, nameOverride: o, authorName: 'Dana Levi' })) === JSON.stringify(authorBoxContent({ ...base, authorName: 'Dana Levi' }))
+      && m.authorBoxContent({ ...base, nameOverride: o, authorName: 'japan4u_adm' })?.name === 'Levi Bakery')
+    check('H3: an empty name falls back to the resolver: the WordPress user, or the business name for a login', falls(await import('@/lib/content/author-box/box')))
+    const alwaysOverride = await mutant<typeof import('@/lib/content/author-box/box')>('lib/content/author-box/box.ts', (s) => s.replace("const override = cleanAuthorBoxName(input.nameOverride ?? '')", "const override = cleanAuthorBoxName(input.nameOverride ?? '') || 'Author'"))
+    check('MUTATION CONTROL: an empty name that does not fall back fails H3', !falls(alwaysOverride))
+
+    const BAD_URLS = ['javascript:alert(1)', 'JaVaScRiPt:alert(1)', 'data:text/html,x', 'ftp://levi.example/a', 'mailto:a@b.co', '//evil.example/x', '/about', 'https://u:p@evil.example/', 'https://levi.example:8443/', 'https://levi.example/a b', 'https://levi.example/"onmouseover=x', 'http://localhost/', 'https://10.0.0.1/']
+    const rejects = (m: typeof import('@/lib/content/author-box/box')) => BAD_URLS.every((u) => m.normalizeAuthorBoxUrl(u) === null)
+      && m.authorBoxContent({ ...base, linkUrl: 'javascript:alert(1)' })?.link?.url === `https://${DOMAIN}/about-us/`
+    check('H4: a link that is not http(s) to a public host is refused, and the box keeps the about page', rejects(await import('@/lib/content/author-box/box')),
+      BAD_URLS.filter((u) => normalizeAuthorBoxUrl(u) !== null).join(' '))
+    const anyScheme = await mutant<typeof import('@/lib/content/author-box/box')>('lib/content/author-box/box.ts', (s) => s.replace('  if (!checked) return null\n', '  if (!checked) return raw\n'))
+    check('MUTATION CONTROL: a link check that lets other schemes through fails H4', !rejects(anyScheme))
+    const own = authorBoxContent({ ...base, linkUrl: 'http://linkedin.example/in/dana' })!
+    check('H5: an http or https link wins, http kept as http; empty keeps the about page, else the home page',
+      own.link?.url === 'http://linkedin.example/in/dana' && own.link.label === 'Levi Bakery'
+      && authorBoxContent({ ...base, linkUrl: 'https://levi.example/team' })!.link?.url === 'https://levi.example/team'
+      && authorBoxContent({ ...base, linkUrl: '' })!.link?.url === `https://${DOMAIN}/about-us/`
+      && authorBoxContent({ ...base, aboutUrl: null, linkUrl: null })!.link?.url === `https://${DOMAIN}/`)
+  }
+  {
+    const d = settingsDb()
+    const loaded = await loadWritingGuidance(deps(d), PROJECT)
+    check('H6: the fields start empty, no image, editable', loaded.ok && loaded.data.authorBoxName === '' && loaded.data.authorBoxUrl === '' && loaded.data.authorBoxImage === 'none' && loaded.data.authorBoxOverridesEditable === true)
+    const saved = await saveWritingGuidance(deps(d), PROJECT, { instructions: '', exclusions: [], rules: [], authorBoxName: '  Dana <i>Cohen</i> ', authorBoxUrl: 'http://levi.example/team', authorBoxImage: 'site_icon' })
+    check('H7: the name (cleaned), the link and the image are saved on the owner\'s row',
+      saved.ok && styleRow(d).author_box_name === 'Dana Cohen' && styleRow(d).author_box_url === 'http://levi.example/team' && styleRow(d).author_box_image === 'site_icon' && saved.data.authorBoxName === 'Dana Cohen')
+    const bad = await saveWritingGuidance(deps(d), PROJECT, { instructions: 'changed', exclusions: [], rules: [], authorBoxUrl: 'javascript:alert(1)' })
+    check('H8: a link that is not http(s) is refused with its own code, nothing written', !bad.ok && bad.code === 'invalid_author_link' && styleRow(d).author_box_url === 'http://levi.example/team' && (styleRow(d).writing_guidance as { instructions?: string }).instructions !== 'changed')
+    const badImage = await saveWritingGuidance(deps(d), PROJECT, { instructions: '', exclusions: [], rules: [], authorBoxImage: 'upload' })
+    check('H9: an image choice that does not exist yet (upload) is refused', !badImage.ok && badImage.code === 'invalid_request' && styleRow(d).author_box_image === 'site_icon')
+    const cleared = await saveWritingGuidance(deps(d), PROJECT, { instructions: '', exclusions: [], rules: [], authorBoxName: '   ', authorBoxUrl: '' })
+    check('H10: empty fields clear back to NULL (the resolver\'s choice)', cleared.ok && styleRow(d).author_box_name === null && styleRow(d).author_box_url === null)
+  }
+  {
+    const d = settingsDb()
+    const m = missingColumn(d, 'author_box_name')
+    const loaded = await loadWritingGuidance(deps(m), PROJECT)
+    check('H11: the columns missing: the fields are disabled, the switch and the guidance still editable', loaded.ok && loaded.data.authorBoxOverridesEditable === false && loaded.data.authorBoxEditable === true && loaded.data.editable === true)
+    const saved = await saveWritingGuidance(deps(m), PROJECT, { instructions: 'keep', exclusions: [], rules: [], authorBox: true, authorBoxName: 'Dana', authorBoxUrl: 'https://levi.example/', authorBoxImage: 'site_icon' })
+    check('H12: ...and a save writes the switch and the guidance, not the missing columns', saved.ok && styleRow(d).author_box === true && !('author_box_name' in styleRow(d)) && !('author_box_url' in styleRow(d)) && !('author_box_image' in styleRow(d)))
+  }
+  {
+    const styles = [{ project_id: PROJECT, user_id: OWNER, design: 'minimal', brand_colors: [], author_box: true, theme_author_box: false, theme_author_box_checked_at: NOW.toISOString(), author_box_name: 'Dana Cohen', author_box_url: 'https://levi.example/team' }]
+    let asked = 0
+    const out = await publish(db({ styles }), noBoxFetch(), BODY, 'wordpress', async () => { asked++; return 'Real Author' })
+    check('H13: publishing uses the owner\'s name and link, without asking the site for its user', out.includes('Dana Cohen') && out.includes('href="https://levi.example/team"') && !out.includes('Real Author') && asked === 0)
+    const base = db({ styles: [{ ...styles[0], author_box_name: undefined, author_box_url: undefined }] })
+    const fallback = await publish(missingColumn(base, 'author_box_name'), noBoxFetch(), BODY, 'wordpress', async () => 'Dana Levi')
+    check('H14: the columns missing: the box is published as before (the WordPress user, the about page)', fallback.includes('Dana Levi') && fallback.includes(`href="https://${DOMAIN}/about-us/"`) && count(fallback) === 1)
+  }
+  {
+    // The preview: the owner's own project first, then the publisher's reader; the card draws with authorBoxContent.
+    const { previewAuthorBox } = await import('@/lib/content/author-box/preview')
+    const { decideAuthorBox } = await import('@/lib/content/author-box/store')
+    type PreviewMod = typeof import('@/lib/content/author-box/preview')
+    const styles = [{ project_id: PROJECT, user_id: OWNER, design: 'minimal', brand_colors: [], author_box: true, theme_author_box: false, theme_author_box_checked_at: NOW.toISOString() }]
+    const pdeps = (d: FakeAdmin, wpName: string | null, platform: 'wordpress' | 'shopify' | 'wix' = 'wordpress', user = OWNER) => ({
+      session: async () => ({ userId: user, db: d as never }), admin: () => d as never, platform: async () => platform, siteUserName: async () => wpName,
+      fetchText: (async () => ({ ok: false, reason: 'network' })) as never,
+    })
+    const same = async (mod: PreviewMod, wpName: string) => {
+      const d = db({ styles })
+      const p = await mod.previewAuthorBox(pdeps(d, wpName), PROJECT)
+      const decision = await decideAuthorBox(d as never, { articleId: ART, projectId: PROJECT, platform: 'wordpress', html: BODY, authorName: async () => wpName }, { now: () => NOW, fetchText: (async () => ({ ok: false, reason: 'network' })) as never })
+      return p.ok && decision.add && JSON.stringify(authorBoxContent(p.data.inputs)) === JSON.stringify(decision.content) ? authorBoxContent(p.data.inputs)!.name : null
+    }
+    const real = await same({ previewAuthorBox } as PreviewMod, 'Dana Levi')
+    const login = await same({ previewAuthorBox } as PreviewMod, 'japan4u_adm')
+    check('H15: the preview shows exactly what publishing draws: the WordPress user, or the business name for a login', real === 'Dana Levi' && login === 'Levi Bakery', `${real} / ${login}`)
+    const blind = await mutant<PreviewMod>('lib/content/author-box/preview.ts', (s) => s.replace("authorName: boxPlatform === 'wordpress' ? () => capped(deps.siteUserName(admin, o.projectId, o.userId), ms, null) : undefined,", 'authorName: undefined,'))
+    check('MUTATION CONTROL: a preview that skips the WordPress user lookup fails H15', (await same(blind, 'Dana Levi')) === null)
+    const cardSrc2 = strip(read('components/settings/WritingGuidanceCard.tsx'))
+    const previewSrc = strip(read('lib/content/author-box/preview.ts'))
+    const storeSrc2 = strip(read('lib/content/author-box/store.ts'))
+    const sameResolver = (card: string) => /const content = authorBoxContent\(inputs\)/.test(card) && /const who = resolveAuthorName\(inputs\)/.test(card)
+      && /\.\.\.preview\.data\.inputs, nameOverride: name, linkUrl: url, imageChoice: image/.test(card)
+      && !/looksLikeLogin/.test(card) && /readAuthorBoxInputs\(admin, \{/.test(previewSrc)
+      && /const inputs = await readAuthorBoxInputs\([\s\S]{0,200}\)\n\s*const content = authorBoxContent\(inputs\)/.test(storeSrc2)
+    check('H16: the card draws the preview with authorBoxContent over the publisher\'s inputs; publishing reads and draws the same way', sameResolver(cardSrc2))
+    check('MUTATION CONTROL: a card that picks the name itself fails H16', !sameResolver(cardSrc2.replace('const content = authorBoxContent(inputs)', 'const content = { ...authorBoxContent(inputs)!, name: name || preview.data.inputs.authorName || \'\' }')))
+    {
+      const d = db({ styles })
+      const other = await previewAuthorBox(pdeps(d, 'x', 'wordpress', OTHER), PROJECT)
+      const bad = await previewAuthorBox(pdeps(d, 'x'), 'not-a-uuid')
+      check('H17: another user\'s project (or a bad id) gets no preview', !other.ok && other.code === 'not_found' && !bad.ok)
+      const shop = await previewAuthorBox(pdeps(d, 'Dana Levi'), PROJECT)
+      const shopify = await previewAuthorBox(pdeps(d, 'Dana Levi', 'shopify'), PROJECT)
+      check('H18: a store is never asked for a WordPress user and gets no description, like its published box', shop.ok && shopify.ok && shopify.data.inputs.authorName === null && shopify.data.inputs.description === null && shopify.data.siteIconAvailable === false && shop.data.siteIconAvailable === true)
+      const slow = await previewAuthorBox({ ...pdeps(d, null), siteUserName: () => new Promise<string | null>(() => {}), timeoutMs: 50 }, PROJECT)
+      check('H19: a site that does not answer: the preview still comes within the time cap, with the business name', slow.ok && slow.data.inputs.authorName === null && authorBoxContent(slow.data.inputs)?.name === 'Levi Bakery')
+    }
+  }
+
+  // ── I) the image: none (default) or the site icon ───────────────────────
+  console.log('\nI) the image: none by default, or the WordPress site icon')
+  {
+    const ICON = `https://${DOMAIN}/wp-content/uploads/2026/01/cropped-icon-192x192.png`
+    const textFetcher = (index: unknown, media?: unknown) => {
+      const calls: string[] = []
+      const fn = (async (u: URL) => {
+        calls.push(u.toString())
+        const body = u.pathname.includes('/media/') ? media : index
+        return body === undefined ? { ok: false, reason: 'http_error', status: 404 } : { ok: true, url: u.toString(), status: 200, text: JSON.stringify(body) }
+      }) as never
+      return { fn, calls }
+    }
+    const { readWordPressSiteIcon } = await import('@/lib/content/author-box/site-icon')
+    const styles = (image: string | undefined, design = 'minimal') => [{ project_id: PROJECT, user_id: OWNER, design, brand_colors: ['#e11d48'], author_box: true, theme_author_box: false, theme_author_box_checked_at: NOW.toISOString(), author_box_image: image }]
+    const publishWith = (d: unknown, t: ReturnType<typeof textFetcher>, platform: 'wordpress' | 'shopify' = 'wordpress') =>
+      applyArticleDesign(d as never, ART, BODY, platform, { themeDeps: { fetchHtml: noBoxFetch().fn, fetchText: t.fn, now: () => NOW } })
+
+    {
+      const t = textFetcher({ site_icon_url: ICON })
+      const out = await publishWith(db({ styles: styles('site_icon') }), t)
+      const img = out.match(/<img[^>]*>/)?.[0] ?? ''
+      check('I1: the site icon chosen: one small img, https, with the business name as alt and explicit width and height',
+        img.includes(`src="${ICON}"`) && img.includes('alt="Levi Bakery"') && img.includes('width="56"') && img.includes('height="56"') && t.calls[0] === `https://${DOMAIN}/wp-json/?_fields=site_icon_url,site_icon`, img)
+      const formatted = await publishWith(db({ styles: styles('site_icon', 'formatted') }), textFetcher({ site_icon_url: ICON }))
+      check('I2: the formatted design draws it round (border-radius half its size)', /<img[^>]*style="border-radius:28px"[^>]*>/.test(formatted) || /<img[^>]*border-radius:28px/.test(formatted))
+    }
+    {
+      const before = await publishWith(db({ styles: styles(undefined) }), textFetcher({ site_icon_url: ICON }))
+      const t = textFetcher({ site_icon_url: ICON })
+      const none = await publishWith(db({ styles: styles('none') }), t)
+      check('I3: no image (the default): the site is not asked, and the box is exactly today\'s', t.calls.length === 0 && none === before && !/<img/.test(none))
+      const always = await mutant<typeof import('@/lib/content/author-box/store')>('lib/content/author-box/store.ts', (s) => s.replace("(req.preview || overrides.image === 'site_icon')", '(true)'))
+      const t2 = textFetcher({ site_icon_url: ICON })
+      await always.decideAuthorBox(db({ styles: styles('none') }) as never, { articleId: ART, projectId: PROJECT, platform: 'wordpress', html: BODY }, { now: () => NOW, fetchText: t2.fn })
+      check('MUTATION CONTROL: a reader that fetches the icon without the choice fails I3', t2.calls.length > 0)
+    }
+    {
+      const offSite = ['https://evil.example/icon.png', `http://${DOMAIN}/icon.png`, `https://${DOMAIN}:8443/icon.png`, 'javascript:alert(1)', `https://${DOMAIN}/i.png" onerror="x`]
+      const rejects = (m: typeof import('@/lib/content/author-box/box')) => offSite.every((u) => m.normalizeAuthorBoxImage(u, DOMAIN) === null)
+        && m.normalizeAuthorBoxImage(`https://www.${DOMAIN}/i.png`, DOMAIN) !== null && m.normalizeAuthorBoxImage('https://i0.wp.com/x/i.png', DOMAIN) !== null
+      check('I4: only https on the site\'s own host or WordPress\' CDN', rejects(await import('@/lib/content/author-box/box')))
+      const anyHost = await mutant<typeof import('@/lib/content/author-box/box')>('lib/content/author-box/box.ts', (s) => s.replace('if (h !== site && !WP_CDN.test(h)) return null', ''))
+      check('MUTATION CONTROL: an image check without the host rule fails I4', !rejects(anyHost))
+      const missing = await publishWith(db({ styles: styles('site_icon') }), textFetcher({ site_icon_url: 'https://evil.example/icon.png' }))
+      const noIndex = await publishWith(db({ styles: styles('site_icon') }), textFetcher(undefined))
+      const before = await publishWith(db({ styles: styles(undefined) }), textFetcher(undefined))
+      check('I5: an icon off the site, or no icon at all: no img and no empty markup (the box as without the choice)', missing === before && noIndex === before && !/<img|-photo/.test(missing))
+    }
+    {
+      const viaMedia = await readWordPressSiteIcon(DOMAIN, textFetcher({ site_icon: 42 }, { source_url: ICON }).fn)
+      const notNumber = textFetcher({ site_icon: '42/../users' }, { source_url: ICON })
+      check('I6: only site_icon (a media id): the media item\'s source_url; anything but a positive id is not followed',
+        viaMedia === ICON && (await readWordPressSiteIcon(DOMAIN, notNumber.fn)) === null && notNumber.calls.length === 1)
+      const t = textFetcher({ site_icon_url: ICON })
+      const store = await publishWith(db({ styles: styles('site_icon') }), t, 'shopify')
+      check('I7: a Shopify store: the site is never asked and no image is drawn (the choice is not offered there)', t.calls.length === 0 && !/<img/.test(store))
+    }
+    const card3 = strip(read('components/settings/WritingGuidanceCard.tsx'))
+    const offered = (s: string) => /AUTHOR_BOX_IMAGE_CHOICES\.filter\(\(c\) => c === 'none' \|\| iconOffered\)/.test(s) && /image=\{iconOffered \? image : 'none'\}/.test(s)
+    check('I8: the card offers the site icon only where it can be read (WordPress), and previews it', offered(card3) && /content\.image &&/.test(card3))
+    check('MUTATION CONTROL: a card that always offers the site icon fails I8', !offered(card3.replace("c === 'none' || iconOffered", 'true')))
+  }
+
+  // ── J) the card's new strings ───────────────────────────────────────────
+  console.log('\nJ) every new string in the four dashboard languages')
+  {
+    const KEYS = ['authorBoxPreviewTitle', 'authorBoxPreviewNote', 'authorBoxPreviewFailed', 'authorBoxPreviewWix', 'authorBoxPreviewNoName', 'authorBoxNameSourceLabel', 'authorBoxSourceOverride', 'authorBoxSourceSiteUser', 'authorBoxSourceBusiness', 'authorBoxSourceLogin', 'authorBoxLinkLabel', 'authorBoxNoLink', 'authorBoxNameLabel', 'authorBoxNameHint', 'authorBoxUrlLabel', 'authorBoxUrlHint', 'authorBoxUrlInvalid', 'authorBoxImageLabel', 'authorBoxImageNone', 'authorBoxImageSiteIcon', 'authorBoxImageHint', 'authorBoxImageMissing', 'authorBoxOverridesUnavailable']
+    const dict = (l: 'he' | 'en' | 'es' | 'pt-BR') => getDashboardDictionary(l).projectSettings.writingGuidance as unknown as Record<string, string | undefined>
+    const allThere = (get: typeof dict) => (['he', 'en', 'es', 'pt-BR'] as const).every((l) => KEYS.every((k) => {
+      const v = get(l)[k]
+      return !!v?.trim() && (l === 'he' ? true : !/[א-ת]/.test(v))
+    })) && KEYS.filter((k) => !/Image(None|SiteIcon)|LinkLabel|NameSourceLabel/.test(k)).every((k) => /[א-ת]/.test(dict('he')[k]!))
+    check('J1: every new string exists in he, en, es and pt-BR (Hebrew only in Hebrew; English for Shopify merchants)', allThere(dict))
+    check('J2: the login note names the rejected name', ['he', 'en', 'es', 'pt-BR'].every((l) => dict(l as 'he').authorBoxSourceLogin!.includes('{login}')))
+    check('MUTATION CONTROL: a language missing a string fails J1', !allThere((l) => (l === 'pt-BR' ? { ...dict(l), authorBoxUrlInvalid: '' } : dict(l))))
+    const cardSrc4 = read('components/settings/WritingGuidanceCard.tsx')
+    const used = KEYS.every((k) => cardSrc4.includes(`w.${k}`))
+    check('J3: the card uses every one of them (no string typed into the card)', used)
+  }
 
   console.log(`\n${passed} passed, ${failed} failed`)
   if (failed) process.exit(1)
