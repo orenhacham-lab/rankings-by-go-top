@@ -6406,7 +6406,7 @@ export const dashboardHe = {
       imageFromArticle: 'תמונת המאמר',
       imageGenerate: 'יצירת תמונה',
       imageGenerating: 'יוצרים תמונה…',
-      imageGeneratedHint: 'התמונה נוצרה בבינה מלאכותית. כדאי לבדוק אותה לפני הפרסום, כי גוגל תציג אותה תחת שם העסק.',
+      imageGeneratedHint: 'התמונה נוצרה בבינה מלאכותית ואינה צילום של העסק שלכם. גוגל תציג אותה תחת שם העסק, ולכן אין להשתמש בה כאילו היא צילום של המקום, של העובדים או של מוצר ממשי.',
       imageReplace: 'החלפה',
       imageRemove: 'הסרה',
       imageZoom: 'זום',

@@ -24,7 +24,8 @@ export const generateTopicImage: GenerateTopicImage = async ({ topic }) => {
   const out = await generateArticleImage({
     title: topic,
     topic,
-    imagePrompt: `A real-looking photo a local business could post on its Google Business Profile, about: ${topic}.`,
+    // Never "real-looking": the photo must not pass for one of the business itself (legal review).
+    imagePrompt: `A generic, unbranded illustrative photo about: ${topic}. Not a photo of any specific business, its premises, its staff or its products, and no identifiable people.`,
     subject: topic,
     aspectRatio: '16:9',
     language: 'en',

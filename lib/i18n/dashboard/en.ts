@@ -6371,7 +6371,7 @@ export const dashboardEn = {
       imageFromArticle: 'Article image',
       imageGenerate: 'Create a photo',
       imageGenerating: 'Creating the photo…',
-      imageGeneratedHint: 'This photo was created by AI. Check it before you post, because Google shows it under your business name.',
+      imageGeneratedHint: 'This photo was created by AI and is not a photograph of your business. Google shows it under your business name, so do not use it as though it were a photo of your premises, your staff or a real product.',
       imageReplace: 'Replace',
       imageRemove: 'Remove',
       imageZoom: 'Zoom',

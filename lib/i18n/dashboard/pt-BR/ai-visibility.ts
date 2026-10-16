@@ -370,7 +370,7 @@ export const aiVisibilityPtBR: DeepPartial<DashboardDictionary> = {
       imageFromArticle: 'Imagem do artigo',
       imageGenerate: 'Criar uma foto',
       imageGenerating: 'Criando a foto…',
-      imageGeneratedHint: 'Esta foto foi criada por IA. Confira antes de publicar, porque o Google a mostra com o nome da sua empresa.',
+      imageGeneratedHint: 'Esta foto foi criada por IA e não é uma fotografia da sua empresa. O Google a mostra com o nome da sua empresa, portanto não a use como se fosse uma foto do seu estabelecimento, da sua equipe ou de um produto real.',
       imageReplace: 'Trocar',
       imageRemove: 'Remover',
       imageZoom: 'Zoom',

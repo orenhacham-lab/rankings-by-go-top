@@ -195,6 +195,9 @@ async function successChecks() {
   const ti = strip(read('lib/gbp/topic-image.ts'))
   check('the real generator asks for 16:9 and normalizes to a 16:9 JPEG (wide enough for the 480-px crop)', /aspectRatio: '16:9'/.test(ti) && /normalizeFeaturedImage\(out\.data, '16:9'\)/.test(ti))
   check('…and goes through the commercial-safe image prompt (no text, no logos, unbranded), with no text model pinned by name', /generateArticleImage\(/.test(ti) && !/writeCommercialSafeConcept\(/.test(ti) && !/gemini-\d/.test(ti) && !/businessName/.test(ti))
+  // Legal review 16 Oct 2026: the photo must never pass for one of the business itself.
+  // MUTATION CONTROL, run by hand: putting "A real-looking photo" back fails this check.
+  check('…and asks for a generic illustration, never a real-looking photo of the business', !/real-looking/i.test(ti) && /Not a photo of any specific business, its premises, its staff or its products/.test(ti) && /no identifiable people/.test(ti))
   check('MUTATION: a square request is caught', !/aspectRatio: '16:9'/.test(ti.replace("aspectRatio: '16:9'", "aspectRatio: '1:1'")))
 }
 

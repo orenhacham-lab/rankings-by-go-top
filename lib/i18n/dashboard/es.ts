@@ -6032,7 +6032,7 @@ export const dashboardEs: DeepPartial<DashboardDictionary> = {
       imageFromArticle: 'Imagen del artículo',
       imageGenerate: 'Crear una foto',
       imageGenerating: 'Creando la foto…',
-      imageGeneratedHint: 'Esta foto la ha creado la IA. Revísala antes de publicar, porque Google la muestra con el nombre de tu negocio.',
+      imageGeneratedHint: 'Esta foto la ha creado la IA y no es una fotografía de su negocio. Google la muestra con el nombre de su negocio, así que no la utilice como si fuera una foto de su local, de su personal o de un producto real.',
       imageReplace: 'Cambiar',
       imageRemove: 'Quitar',
       imageZoom: 'Zoom',
