@@ -336,17 +336,26 @@ function main() {
     check('5d: the page says Go Top SEO is not affiliated with Google, in all four languages', notAffiliated.every((re) => re.test(flat)))
     check('5d-MUT: dropping the Portuguese sentence is caught', !notAffiliated.every((re) => re.test(flat.replace(notAffiliated[3], ''))))
     // Owner: Google's names only describe where the post lands, never an
-    // endorsement; no model or provider is named; AI photos are not shipped.
+    // endorsement; no model or provider is named.
     const forbidden = [
       /\bofficial\b|\boficial\b|\u05e8\u05e9\u05de\u05d9/i,
       /google[- ](approved|certified|partner|endorsed)|partner of google|socio de google|parceir[oa] do google|\u05e9\u05d5\u05ea\u05e3 \u05e9\u05dc \u05d2\u05d5\u05d2\u05dc/i,
       /\b(gemini|gpt|chatgpt|openai|claude|anthropic|llm)\b/i,
-      /AI[- ]generated (photo|image)|\u05ea\u05de\u05d5\u05e0\u05d4 \u05e9\u05e0\u05d5\u05e6\u05e8\u05d4|imagen generada|imagem gerada/i,
     ]
     const hits = forbidden.filter((re) => re.test(flat)).map(String)
-    check('5e: no "official", no Google endorsement or partnership, no model name, no AI photo', hits.length === 0, hits.join(' | '))
+    check('5e: no "official", no Google endorsement or partnership, no model name', hits.length === 0, hits.join(' | '))
     check('5e-MUT: a "Google-approved" line is caught', forbidden.some((re) => re.test(`${flat} Google-approved posts`)))
     check('5e-MUT2: a model name is caught', forbidden.some((re) => re.test(`${flat} written by Gemini`)))
+    // Legal (terms 15F): the AI image is offered for a topic post only, and is
+    // a generic picture, not a photo of the business, its staff or its products.
+    const aiImage = [
+      /\u05e4\u05d5\u05e1\u05d8 \u05de\u05e0\u05d5\u05e9\u05d0[^.]*AI\. \u05d6\u05d5 \u05ea\u05de\u05d5\u05e0\u05d4 \u05db\u05dc\u05dc\u05d9\u05ea, \u05dc\u05d0 \u05e6\u05d9\u05dc\u05d5\u05dd \u05e9\u05dc \u05d4\u05e2\u05e1\u05e7/,
+      /post from a topic[^.]*with AI\. It is a generic picture, not a photo of your business/,
+      /a partir de un tema[^.]*con IA\. Es una imagen gen\u00e9rica, no una foto de tu negocio/,
+      /a partir de um tema[^.]*com IA\. \u00c9 uma imagem gen\u00e9rica, n\u00e3o uma foto do seu neg\u00f3cio/,
+    ]
+    check('5f: the AI image is for a topic post and is not a photo of the business, in all four languages', aiImage.every((re) => re.test(flat)), aiImage.filter((re) => !re.test(flat)).map(String).join(' | '))
+    check('5f-MUT: dropping the English disclaimer is caught', !aiImage.every((re) => re.test(flat.replace('not a photo of your business', 'a photo'))))
   }
 
   console.log(`\n${passed} passed, ${failed} failed`)

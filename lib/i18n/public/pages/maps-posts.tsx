@@ -36,15 +36,17 @@
  *     language, without the reviewer's name; edit and delete a reply
  *     (lib/gbp/reviews.ts, review-draft.ts, ReviewsPanel);
  *   - nothing else on the profile (hours, address, phone) is changed.
- * WHAT IT DELIBERATELY DOES NOT SAY: no AI-made photos (not shipped), no model
- * or provider name, no ranking promise, no number, no percentage, and nothing
+ *   - an illustrative AI image for a post written from a topic only, said to be
+ *     a generic picture and not a photo of the business, its staff or products,
+ *     used only if the owner picks it (lib/gbp/topic-image.ts; terms 15F);
+ * WHAT IT DELIBERATELY DOES NOT SAY: no model or provider name, no ranking promise, no number, no percentage, and nothing
  * that reads as Google endorsing or partnering with Go Top SEO. Google's names
  * are used only to say which product the posts land on.
  *
  * Guarded by components/public/__qa__/public-nav-menus.qa.ts (group 5).
  */
 import {
-  Crop, Eye, Info, Languages, Lock, MapPinned, MessageSquareText, MousePointerClick,
+  Crop, Eye, ImagePlus, Info, Languages, Lock, MapPinned, MessageSquareText, MousePointerClick,
   PenLine, Repeat, ShieldCheck, Sparkles, ToggleLeft, Type, Zap,
 } from 'lucide-react'
 import { MapsPostVisual } from '@/components/public/feature-visuals'
@@ -128,6 +130,7 @@ export const MAPS_POSTS_PAGE: MarketingPage = {
           title: 'פוסט שנראה כמו שצריך',
           items: [
             { icon: Crop, title: 'תמונה בגודל הנכון', body: 'מעלים תמונה וחותכים אותה ליחס 4:3, כמו שגוגל מציגה, עם זום ומיקום. בפוסט שנכתב ממאמר אפשר לקחת את תמונת המאמר בלחיצה.' },
+            { icon: ImagePlus, title: 'תמונה מוכנה לפוסט לפי נושא', body: 'כשכותבים פוסט מנושא שהקלדתם, אפשר לבקש מהמערכת ליצור תמונה להמחשה בעזרת AI. זו תמונה כללית, לא צילום של העסק, של העובדים או של המוצרים שלכם, והיא נכנסת לפוסט רק אם בחרתם בה.' },
             { icon: MousePointerClick, title: 'כפתור שמוביל לפעולה', body: 'מידע נוסף, הזמנת תור, הזמנה אונליין, קנייה, הרשמה או התקשרו. הכפתור מוביל לעמוד באתר שלכם, ואפשר גם לאתר אחר כמו מערכת זימון תורים. "התקשרו" מחייג למספר שבפרופיל.' },
             { icon: Eye, title: 'רואים לפני שמפרסמים', body: 'לצד הכתיבה יש תצוגה מקדימה של הפוסט: שם העסק, התמונה, הטקסט והכפתור, כדי שלא יהיו הפתעות.' },
             { icon: Type, title: 'בתוך הכללים של גוגל', body: 'מונה תווים עד 1,500, המגבלה של גוגל. אם יש בטקסט מספר טלפון תקבלו התראה, כי גוגל מגבילה טלפונים בפוסטים, ולשיחות יש את הכפתור "התקשרו".' },
@@ -242,6 +245,7 @@ export const MAPS_POSTS_PAGE: MarketingPage = {
           title: 'A post that looks right',
           items: [
             { icon: Crop, title: 'The right photo size', body: 'Upload a photo and crop it to 4:3, the way Google shows it, with zoom and position. A post written from an article can use the article’s image in one click.' },
+            { icon: ImagePlus, title: 'A ready image for a topic post', body: 'When you write a post from a topic you typed, you can have the app create an illustrative image with AI. It is a generic picture, not a photo of your business, your staff or your products, and it goes into the post only if you choose it.' },
             { icon: MousePointerClick, title: 'A button that leads somewhere', body: 'Learn more, Book, Order online, Buy, Sign up or Call now. The button leads to a page on your site, or to another site such as a booking system if you allow it. Call now dials the number on your profile.' },
             { icon: Eye, title: 'See it before it goes out', body: 'Next to the editor there is a preview of the post: the business name, the photo, the text and the button, so nothing comes as a surprise.' },
             { icon: Type, title: 'Within Google’s rules', body: 'A character counter up to 1,500, Google’s limit. If the text has a phone number you get a warning, because Google restricts phone numbers in posts, and calls have the Call now button.' },
@@ -357,6 +361,7 @@ export const MAPS_POSTS_PAGE: MarketingPage = {
           title: 'Una publicación que se ve bien',
           items: [
             { icon: Crop, title: 'La foto del tamaño correcto', body: 'Subes una foto y la recortas en formato 4:3, como la muestra Google, con zoom y posición. Si la publicación sale de un artículo, puedes usar la imagen del artículo con un clic.' },
+            { icon: ImagePlus, title: 'Una imagen lista para la publicación por tema', body: 'Cuando escribes una publicación a partir de un tema, puedes pedir que la aplicación cree una imagen ilustrativa con IA. Es una imagen genérica, no una foto de tu negocio, de tu equipo ni de tus productos, y solo entra en la publicación si la eliges.' },
             { icon: MousePointerClick, title: 'Un botón que lleva a la acción', body: 'Más información, Reservar, Pedir online, Comprar, Registrarse o Llamar ahora. El botón lleva a una página de tu sitio o, si lo permites, a otro sitio, como un sistema de citas. Llamar ahora marca el número de tu perfil.' },
             { icon: Eye, title: 'La ves antes de publicarla', body: 'Junto al editor hay una vista previa de la publicación: el nombre del negocio, la foto, el texto y el botón, para que no haya sorpresas.' },
             { icon: Type, title: 'Dentro de las reglas de Google', body: 'Un contador de caracteres hasta 1500, el límite de Google. Si el texto lleva un número de teléfono recibes un aviso, porque Google limita los teléfonos en las publicaciones, y para las llamadas está el botón Llamar ahora.' },
@@ -472,6 +477,7 @@ export const MAPS_POSTS_PAGE: MarketingPage = {
           title: 'Um post com cara de profissional',
           items: [
             { icon: Crop, title: 'A foto no tamanho certo', body: 'Envie uma foto e recorte no formato 4:3, do jeito que o Google mostra, com zoom e posição. Num post feito a partir de um artigo, dá para usar a imagem do artigo com um clique.' },
+            { icon: ImagePlus, title: 'Uma imagem pronta para o post por tema', body: 'Quando você escreve um post a partir de um tema, pode pedir que o app crie uma imagem ilustrativa com IA. É uma imagem genérica, não uma foto do seu negócio, da sua equipe ou dos seus produtos, e só entra no post se você escolher.' },
             { icon: MousePointerClick, title: 'Um botão que leva à ação', body: 'Saiba mais, Reservar, Pedir online, Comprar, Cadastrar-se ou Ligar agora. O botão leva a uma página do seu site ou, se você permitir, a outro site, como um sistema de agendamento. Ligar agora disca o número do seu perfil.' },
             { icon: Eye, title: 'Veja antes de publicar', body: 'Ao lado do editor há uma prévia do post: o nome do negócio, a foto, o texto e o botão, para não ter surpresas.' },
             { icon: Type, title: 'Dentro das regras do Google', body: 'Um contador de caracteres até 1.500, o limite do Google. Se o texto tiver um número de telefone, você recebe um aviso, porque o Google restringe telefones nos posts, e para ligações existe o botão Ligar agora.' },
