@@ -29,7 +29,7 @@
 --     DROP COLUMN IF EXISTS author_box_image;
 -- Executed probe: supabase/migrations/__qa__/project-author-box-overrides.probe.sql
 --   bash scripts/qa/pg-probe.sh supabase/migrations/__qa__/project-author-box-overrides.probe.sql
--- NOT APPLIED ANYWHERE: needs the owner's approval before Production.
+-- Applied to Production on 2026-10-16 (owner approval), verified in information_schema.
 -- ============================================================================
 
 BEGIN;
