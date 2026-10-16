@@ -56,6 +56,10 @@ export const ptBR = {
         label: 'Correções no site',
         description: 'Verificamos o seu site e corrigimos títulos, descrições, texto alternativo das imagens e links. No WordPress com um clique, depois que você aprovar.',
       },
+      mapsPosts: {
+        label: 'Posts no Google Maps',
+        description: 'Posts com foto e botão no seu Perfil da Empresa no Google, na hora ou agendados, e respostas a avaliações. Com um primeiro rascunho que você ajusta.',
+      },
       links: {
         label: 'Links para o seu site',
         description: 'Links internos entre as suas próprias páginas, páginas órfãs que ninguém referencia e lugares gratuitos onde vale a pena o seu negócio aparecer.',

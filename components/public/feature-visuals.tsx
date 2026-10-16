@@ -7,7 +7,7 @@
  * The words come from each page (Hebrew or English); these only lay them out.
  */
 import type { LucideIcon } from 'lucide-react'
-import { ArrowDown, ArrowUp, Check, FileSpreadsheet, FileText, Minus, Plus, Search, Star, X } from 'lucide-react'
+import { ArrowDown, ArrowUp, CalendarClock, Check, FileSpreadsheet, FileText, MapPin, MessageSquareReply, Minus, Plus, Search, Star, X, Zap } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { IconSquircle, ProductFrame } from './marketing'
 
@@ -293,6 +293,99 @@ export function WorkListVisual({
           </li>
         ))}
       </ul>
+    </ProductFrame>
+  )
+}
+
+/**
+ * A post on the business profile as the composer previews it (business line,
+ * the 4:3 photo, the text, the one button), beside the two things around it in
+ * the app: the queue of scheduled and automatic posts, and a review with a
+ * drafted reply. The photo is a drawn placeholder, never a real business's
+ * picture, and the frame's caption already says the names are examples.
+ */
+export function MapsPostVisual({
+  business, kind, text, button, queueHeading, queue, review,
+}: {
+  business: string
+  /** "Update · Thursday 10:00", the line under the business name. */
+  kind: string
+  text: string
+  button: string
+  queueHeading: string
+  queue: { title: string; detail: string; status: string; auto?: boolean; done: boolean }[]
+  review: { heading: string; author: string; stars: number; text: string; replyLabel: string; reply: string; starsLabel: string }
+}) {
+  const initial = Array.from(business.trim())[0] ?? ''
+  return (
+    <ProductFrame>
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] sm:gap-5">
+        <div className="overflow-hidden rounded-inset border border-line bg-surface">
+          <div className="flex items-center gap-3 px-4 py-3">
+            <span aria-hidden="true" className="inline-flex size-9 shrink-0 items-center justify-center rounded-pill bg-action-soft text-copy font-semibold text-action">{initial}</span>
+            <div className="min-w-0">
+              <div className="truncate text-copy font-semibold text-ink">{business}</div>
+              <div className="flex items-center gap-1 text-caption text-muted">
+                <MapPin className="size-3.5" aria-hidden="true" />
+                <span className="truncate">{kind}</span>
+              </div>
+            </div>
+          </div>
+          <div aria-hidden="true" className="relative aspect-[4/3] overflow-hidden bg-action-soft">
+            <svg viewBox="0 0 400 300" className="absolute inset-0 size-full" preserveAspectRatio="xMidYMid slice">
+              <circle cx="300" cy="78" r="34" className="fill-current text-action/25" />
+              <path d="M0 230 L110 130 L190 205 L250 160 L400 270 L400 300 L0 300 Z" className="fill-current text-action/30" />
+              <path d="M0 262 L140 190 L260 250 L330 215 L400 245 L400 300 L0 300 Z" className="fill-current text-action/45" />
+            </svg>
+            <span className="absolute end-3 top-3 rounded-pill bg-surface/90 px-2 py-0.5 text-caption font-semibold tabular-nums text-muted" dir="ltr">4:3</span>
+          </div>
+          <div className="space-y-3 px-4 py-4">
+            <p className="line-clamp-4 text-copy text-body">{text}</p>
+            <span className="inline-flex h-8 items-center rounded-pill border border-line-strong px-3.5 text-caption font-semibold text-action">{button}</span>
+          </div>
+        </div>
+
+        <div className="flex flex-col gap-4">
+          <div>
+            <h3 className="mb-2.5 text-copy font-semibold text-ink">{queueHeading}</h3>
+            <ul className="space-y-2">
+              {queue.map((row) => (
+                <li key={row.title} className={cn('flex items-center gap-3 rounded-inset border border-line border-s-[3px] bg-surface p-3', row.done ? 'border-s-ok' : 'border-s-action')}>
+                  <IconSquircle icon={row.auto ? Zap : CalendarClock} className="size-9" />
+                  <div className="min-w-0 flex-1">
+                    <div className="truncate text-caption font-semibold text-ink">{row.title}</div>
+                    <div className="truncate text-caption text-muted">{row.detail}</div>
+                  </div>
+                  <span className={cn('inline-flex h-6 shrink-0 items-center gap-1 rounded-pill px-2 text-caption font-semibold', row.done ? 'bg-ok-soft text-ok' : 'bg-action-soft text-action')}>
+                    {row.done && <Check className="size-3" strokeWidth={3} aria-hidden="true" />}
+                    {row.status}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          </div>
+
+          <div className="rounded-inset border border-line bg-surface p-3.5">
+            <div className="mb-2 flex items-center justify-between gap-2">
+              <h3 className="text-copy font-semibold text-ink">{review.heading}</h3>
+              <span className="flex items-center gap-0.5 text-action" role="img" aria-label={review.starsLabel}>
+                {Array.from({ length: 5 }, (_, i) => (
+                  <Star key={i} className={cn('size-3.5', i < review.stars ? 'fill-current' : 'text-line-strong')} aria-hidden="true" />
+                ))}
+              </span>
+            </div>
+            <p className="text-caption font-semibold text-ink">{review.author}</p>
+            <p className="mt-0.5 line-clamp-2 text-caption text-muted">{review.text}</p>
+            <div className="mt-3 rounded-inset border-s-[3px] border-s-action bg-action-soft p-2.5">
+              <div className="mb-1 flex items-center gap-1.5 text-caption font-semibold text-action">
+                <MessageSquareReply className="size-3.5" aria-hidden="true" />
+                {review.replyLabel}
+              </div>
+              <p className="line-clamp-3 text-caption text-body">{review.reply}</p>
+            </div>
+          </div>
+        </div>
+      </div>
     </ProductFrame>
   )
 }

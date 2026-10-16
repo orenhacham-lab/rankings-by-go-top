@@ -152,7 +152,7 @@ async function main() {
   const site = await applyArticleDesign(pubDb(STYLE, CTA) as never, ART, GENERATED, 'wordpress')
   check('B4: the article view (designForSite) draws the published article exactly', view === site)
   check('B5: the box sits right before the FAQ', site.indexOf('מתעניינים בטיול ליפן?') < site.indexOf('id="faq"') && site.indexOf('id="section-8"') < site.indexOf('מתעניינים בטיול ליפן?'))
-  const noCtaPublish = await mutant<typeof import('../publish')>('lib/content/article-style/publish.ts', (s) => s.replace('return designForSite(html, { style, cta, platform })', 'return designForSite(html, { style, cta: null, platform })'))
+  const noCtaPublish = await mutant<typeof import('../publish')>('lib/content/article-style/publish.ts', (s) => s.replace('return designForSite(html, { style, cta, platform, authorBox })', 'return designForSite(html, { style, cta: null, platform, authorBox })'))
   const brokenPub = await noCtaPublish.applyArticleDesign(pubDb(STYLE, CTA) as never, ART, sample, 'wordpress')
   check('MUTATION CONTROL: a publisher that drops the call to action no longer matches the preview (so B1 would fail)', brokenPub !== previewHtml(STYLE, CTA, 'wordpress'))
   const noPlatformRule = await mutant<typeof import('../cta')>('lib/content/article-style/cta.ts', (s) => s.replace("  if (platform === 'wix') return null\n  return isCompleteCta", '  return isCompleteCta'))

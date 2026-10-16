@@ -173,6 +173,8 @@ export const projectSettingsPtBR: DeepPartial<DashboardDictionary> = {
       body: 'O que você escrever aqui entra em cada artigo que escrevemos para o negócio, para que os artigos combinem com o seu negócio e não com o setor em geral.',
       mentionLabel: 'Mencionar o nome do negócio nos artigos',
       mentionHint: 'Recomendado. O negócio só é citado onde ajuda o leitor, como fonte de conhecimento prático e não como anúncio, e no máximo 2-3 vezes. Isso reforça a confiança do Google e dos assistentes de IA. Nunca no título, e sem inventar experiência ou conquistas.',
+      authorBoxLabel: 'Caixa do autor no fim do artigo',
+      authorBoxHint: 'Só é adicionada se o tema do seu site ainda não tiver uma caixa de autor própria. Mostra o nome do autor, uma linha da descrição do negócio nas configurações e um link para o seu site, sem dados inventados.',
       readOnly: 'Estas diretrizes ainda não podem ser editadas na sua conta.',
       appliesNext: 'As mudanças valem para os próximos artigos. Artigos já escritos continuam como estão.',
       instructionsLabel: 'Instruções fixas',
