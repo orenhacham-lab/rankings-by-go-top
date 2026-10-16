@@ -6018,8 +6018,8 @@ export const dashboardEn = {
       // Bought on an external marketplace: that platform is the seller and
       // holds the payment instrument, so this says where cancelling works
       // rather than offering a cancellation we cannot perform.
-      cancelAtMarketplace: (seller: string) => `You bought this plan on ${seller}, and the billing runs there. You cancel the renewal in your ${seller} account, and your access stays active until the end of the period you have paid for.`,
-      marketplacePolicyLink: (seller: string) => `${seller}'s terms and cancellation policy`,
+      cancelAtMarketplace: (seller: string) => `You bought this plan on ${seller}, and the billing runs there. You cancel the renewal in your ${seller} account, and your access stays active until the end of the period you have paid for. If you cannot reach ${seller}, write to us and we will end your plan on our side. Only ${seller} can stop the charge.`,
+      marketplacePolicyLink: (seller: string) => `${seller}'s terms and policies`,
       renewalAlreadyCancelled: 'Renewal has been cancelled. Your access remains active until',
     },
     paypal: {

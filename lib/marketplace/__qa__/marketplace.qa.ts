@@ -436,6 +436,22 @@ async function main() {
     || !/marketplacePolicyLink/.test(read(f)))
   check('J7: all four dashboard languages carry the cancellation wording',
     missingCopy.length === 0, missingCopy.join(' | '))
+  // The sentence identifies the seller, so the name in it is the platform's
+  // own trading name from the registry — never a slug and never our shorthand.
+  check('J8: the seller is named by the registry label, not by the stored slug',
+    /label: provider\.label/.test(billingPage) && !/label: order\?\.provider/.test(billingPage))
+  check('J9: …and every registered platform has a label a buyer would recognise',
+    MARKETPLACE_PROVIDERS.every((p) => p.label.length > 2 && p.label !== p.slug))
+  check('J-MUT4: the label guard catches the raw slug put in its place',
+    /label: order\?\.provider/.test('label: order?.provider,'))
+  // The second resort names what WE can do and no more: a plan ended on our
+  // side is in our power, stopping their charge is not.
+  const enCancel = read('lib/i18n/dashboard/en.ts')
+  check('J10: the line offers a route that does not depend on the platform answering',
+    /cannot reach \$\{seller\}, write to us and we will end your plan on our side/.test(enCancel)
+    && /Only \$\{seller\} can stop the charge/.test(enCancel))
+  check('J-MUT5: a second resort that promises to stop the charge is caught',
+    !/Only \$\{seller\} can stop the charge/.test('write to us and we will stop the billing for you'))
 
   // ── I. The migration's own promises, as written ──────────────────────────────
   console.log('\nI. migration')

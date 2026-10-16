@@ -2381,8 +2381,8 @@ export const dashboardEs: DeepPartial<DashboardDictionary> = {
       cancelSuccess: 'Se ha cancelado la renovación de la suscripción. Mantienes el acceso hasta el final del periodo de facturación.',
       cancelError: 'No hemos podido cancelar tu renovación. Vuelve a intentarlo en un momento o escríbenos y la cancelamos nosotros.',
       contactToCancel: 'Para cancelar tu renovación, escríbenos y detendremos el cobro.',
-      cancelAtMarketplace: (seller: string) => `Compraste este plan en ${seller} y el cobro se gestiona allí. La renovación se cancela en tu cuenta de ${seller}, y tu acceso sigue activo hasta el final del periodo que ya pagaste.`,
-      marketplacePolicyLink: (seller: string) => `Términos y política de cancelación de ${seller}`,
+      cancelAtMarketplace: (seller: string) => `Compraste este plan en ${seller} y el cobro se gestiona allí. La renovación se cancela en tu cuenta de ${seller}, y tu acceso sigue activo hasta el final del periodo que ya pagaste. Si no puedes contactar con ${seller}, escríbenos y daremos de baja tu plan por nuestra parte. Solo ${seller} puede detener el cobro.`,
+      marketplacePolicyLink: (seller: string) => `Términos y políticas de ${seller}`,
       renewalAlreadyCancelled: 'La renovación está cancelada. Mantienes el acceso hasta el',
     },
     paypal: {

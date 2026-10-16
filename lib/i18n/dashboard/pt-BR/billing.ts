@@ -149,8 +149,8 @@ export const billingPtBR: DeepPartial<DashboardDictionary> = {
       cancelSuccess: 'A renovação da assinatura foi cancelada. Você mantém o acesso até o fim do período de cobrança.',
       cancelError: 'Não conseguimos cancelar a sua renovação. Tente novamente em instantes ou fale com a gente que cancelamos para você.',
       contactToCancel: 'Para cancelar a sua renovação, fale com a gente e interromperemos a cobrança.',
-      cancelAtMarketplace: (seller: string) => `Você comprou este plano na ${seller}, e a cobrança acontece lá. A renovação é cancelada na sua conta da ${seller}, e seu acesso continua ativo até o fim do período que você já pagou.`,
-      marketplacePolicyLink: (seller: string) => `Termos e política de cancelamento da ${seller}`,
+      cancelAtMarketplace: (seller: string) => `Você comprou este plano na ${seller}, e a cobrança acontece lá. A renovação é cancelada na sua conta da ${seller}, e seu acesso continua ativo até o fim do período que você já pagou. Se você não conseguir falar com a ${seller}, fale com a gente e encerramos o seu plano do nosso lado. Só a ${seller} pode interromper a cobrança.`,
+      marketplacePolicyLink: (seller: string) => `Termos e políticas da ${seller}`,
       renewalAlreadyCancelled: 'A renovação está cancelada. Você mantém o acesso até',
     },
     paypal: {
