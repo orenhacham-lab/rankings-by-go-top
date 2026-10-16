@@ -394,6 +394,49 @@ async function main() {
   check('H-MUT4: the outbound-link guard catches a link the platforms forbid',
     !(brokenLinks.match(/<Link href="\/[^"]+"/g) ?? []).every((l) => /terms|privacy/.test(l)))
 
+  // ── J. The cancellation route the buyer is actually given ───────────────────
+  console.log('\nJ. cancelling a marketplace plan')
+  const BILLING_PAGE = 'app/(dashboard)/billing/page.tsx'
+  const BILLING_VIEW = 'app/(dashboard)/billing/BillingView.tsx'
+  const billingPage = code(BILLING_PAGE)
+  const billingView = code(BILLING_VIEW)
+
+  // Before this, a marketplace buyer fell through to "contact us and we will
+  // stop the billing for you" — an offer we cannot honour, because we hold no
+  // payment instrument for that subscription.
+  check('J1: the screen names the marketplace that holds the subscription',
+    /marketplaceSeller/.test(billingView) && /cancelAtMarketplace/.test(billingView))
+  check('J2: and it does so BEFORE falling through to the contact-us answer',
+    billingView.indexOf('marketplaceSeller ?') < billingView.indexOf('contactToCancel'))
+  // The BRANCH itself, not the file: handleCancel lives further down the file
+  // for the PayPal case, and that is correct.
+  const sellerBranch = billingView.slice(billingView.indexOf('marketplaceSeller ? ('),
+    billingView.indexOf('hasPaypalSubscriptionId ? ('))
+  check('J3: it never offers our own cancel request for such a subscription',
+    sellerBranch.length > 0 && !/handleCancel|paypal\/cancel/.test(sellerBranch))
+  check('J4: the seller is read with the service role, since the orders table is server-only',
+    /from\('marketplace_orders'\)/.test(billingPage) && /createAdminClient\(\)/.test(billingPage))
+  check('J5: …and filtered by the owner as well as the id, because that client bypasses RLS',
+    new RegExp("from\\('marketplace_orders'\\)[\\s\\S]{0,300}eq\\('claimed_by', user\\.id\\)").test(billingPage))
+  check('J6: an unregistered slug in the row names no seller at all',
+    /marketplaceProvider\(order\?\.provider\)/.test(billingPage) && /if \(provider\)/.test(billingPage))
+  check('J-MUT3: the branch guard catches a cancel button put in that branch',
+    /handleCancel/.test(`${sellerBranch}<Button onClick={handleCancel} />`))
+  check('J-MUT1: the ordering guard catches the contact-us answer coming first',
+    !('contactToCancel marketplaceSeller ?'.indexOf('marketplaceSeller ?') < 'contactToCancel marketplaceSeller ?'.indexOf('contactToCancel')))
+  check('J-MUT2: the ownership guard catches a lookup by id alone',
+    !new RegExp("from\\('marketplace_orders'\\)[\\s\\S]{0,300}eq\\('claimed_by', user\\.id\\)")
+      .test("from('marketplace_orders').select('provider').eq('id', activeSub.marketplace_order_id).maybeSingle()"))
+
+  // The words exist in every language the dashboard speaks: a cancellation
+  // route a reader cannot read is not a route.
+  const CANCEL_COPY = ['lib/i18n/dashboard/he.ts', 'lib/i18n/dashboard/en.ts',
+    'lib/i18n/dashboard/es.ts', 'lib/i18n/dashboard/pt-BR/billing.ts']
+  const missingCopy = CANCEL_COPY.filter((f) => !/cancelAtMarketplace/.test(read(f))
+    || !/marketplacePolicyLink/.test(read(f)))
+  check('J7: all four dashboard languages carry the cancellation wording',
+    missingCopy.length === 0, missingCopy.join(' | '))
+
   // ── I. The migration's own promises, as written ──────────────────────────────
   console.log('\nI. migration')
   const MIG = 'supabase/migrations/20261016150000_marketplace_orders.sql'

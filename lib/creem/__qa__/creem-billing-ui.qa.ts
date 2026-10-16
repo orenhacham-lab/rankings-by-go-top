@@ -148,13 +148,17 @@ console.log('\nC) one plan card, one way to pay')
   check('C4-MUT: falling through to the PayPal container is caught',
     !/if \(creemGoverned\) return <p/.test(view.replace('if (creemGoverned) return <p className="text-caption text-muted">{t.creem.changePlanNote}</p>', '')))
 
+  // The columns the row is read for, not the exact spelling of the select:
+  // the list grew when marketplace billing landed, and a guard that pins the
+  // whole string fails on an addition that changes nothing it cares about.
+  const subscriptionSelect = /\.select\('([^']*)'\)/.exec(page)?.[1] ?? ''
   check('C5: the server decides it, from the subscription row itself',
     /const creemGoverned = entitlement\.hasActiveSubscription && !!activeSub\?\.creem_subscription_id/.test(page)
-    && /\.select\('status, paypal_subscription_id, creem_subscription_id'\)/.test(page)
-    && /creemGoverned=\{creemGoverned\}/.test(page))
+    && /\bcreem_subscription_id\b/.test(subscriptionSelect)
+    && /\bpaypal_subscription_id\b/.test(subscriptionSelect)
+    && /creemGoverned=\{creemGoverned\}/.test(page), subscriptionSelect)
   check('C5-MUT: not reading the Creem id is caught',
-    !/\.select\('status, paypal_subscription_id, creem_subscription_id'\)/.test(
-      page.replace(".select('status, paypal_subscription_id, creem_subscription_id')", ".select('status, paypal_subscription_id')")))
+    !/\bcreem_subscription_id\b/.test(subscriptionSelect.replace('creem_subscription_id', 'x')))
 }
 
 console.log('\nD) what the button sends, and what it follows')
