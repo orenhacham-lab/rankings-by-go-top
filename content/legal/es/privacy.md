@@ -3,7 +3,7 @@ title: Política de privacidad | Go Top SEO
 description: Política de privacidad de Go Top SEO: cómo recopilamos, utilizamos y protegemos sus datos.
 locale: es
 source: app/(public)/en/privacy/page.tsx
-lastUpdated: 2026-10-13
+lastUpdated: 2026-10-16
 register: usted
 ---
 
@@ -95,6 +95,7 @@ Permiso: **business.manage**, solicitado en un consentimiento aparte únicamente
 - **Reseñas:** cuando usted abre la pantalla de reseñas leemos desde Google las reseñas de su negocio: el nombre visible del autor (o «anónimo»), la valoración, el texto, las fechas y la respuesta existente, si la hay. **No almacenamos ningún contenido de reseñas**: ni el texto, ni el nombre del autor, ni la valoración, ni la respuesta. Guardamos únicamente dos marcas de tiempo, para poder señalar una reseña que usted todavía no ha visto. La foto de perfil del autor no se lee.
 - **Responder a una reseña:** una respuesta se publica en su nombre únicamente después de que usted la haya escrito o aprobado y haya pulsado enviar, **y es pública: aparece en la ficha de su negocio en Google y cualquier persona puede verla**. Puede editarla o eliminarla desde la misma pantalla. Google puede retirar una respuesta conforme a sus propias políticas de contenido, y eso no está bajo nuestro control.
 - **Borradores de IA:** si usted solicita un borrador, el nombre del negocio y el artículo o tema que usted eligió se envían al modelo Gemini de Google. Si usted solicita un borrador de respuesta a una reseña, se envían también el texto de la reseña y su valoración, **sin el nombre del autor**. Un borrador que usted solicitó no se publica hasta que lo revise y pulse publicar. Lo único que se publica sin ser leído es una publicación creada por la publicación automática, si usted la activó.
+- **Una foto creada por IA para una publicación:** si usted solicita una foto para una publicación escrita a partir de un tema, al modelo Gemini de Google se envía únicamente el tema que usted escribió, **sin el nombre del negocio y sin el nombre de ninguna persona**. La foto vuelve a su pantalla, y no la conservamos hasta que usted la elija y publique la publicación.
 
 ### Uso limitado
 
@@ -408,4 +409,4 @@ Si tiene preguntas sobre esta política de privacidad, contacte con:
 
 **Teléfono:** 054-9489377
 
-Esta política se actualizó por última vez el 13 de octubre de 2026
+Esta política se actualizó por última vez el 16 de octubre de 2026

@@ -3,7 +3,7 @@ title: Termos de Uso | Go Top SEO
 description: Termos de uso do Go Top SEO — as condições que regem o uso do nosso serviço.
 locale: pt-BR
 source: app/(public)/en/terms/page.tsx
-lastUpdated: 2026-10-13
+lastUpdated: 2026-10-16
 register: voce
 extraSections: 0
 extraReason: No extra section. What Brazilian law adds goes inside the sections it belongs to — the seven-day right of withdrawal as 7.5 in Refunds, and the Consumer Code's forum rule as 20.1 in Governing Law — so the heading structure stays identical to the English document.
@@ -197,7 +197,7 @@ Além das verificações que você inicia, o Serviço executa uma verificação 
 
 ## 15F. Conteúdo gerado por IA
 
-O Serviço usa IA para produzir temas de artigos, perguntas e artigos. Esse conteúdo pode conter inexatidões, e revisá-lo antes de publicar — inclusive sua exatidão factual, sua adequação à sua empresa e à lei, e direitos de terceiros — é de sua responsabilidade.
+O Serviço usa IA para produzir temas de artigos, perguntas, artigos e imagens. Esse conteúdo pode conter inexatidões, e revisá-lo antes de publicar — inclusive sua exatidão factual, sua adequação à sua empresa e à lei, e direitos de terceiros — é de sua responsabilidade.
 
 - **Temas automáticos.** Em projetos ativos com plano pago, o Serviço repõe temas de artigos automaticamente para que a fila de conteúdo tenha temas. Um tema não é publicado e não compromete você com nada.
 - **Links internos.** O Serviço pode acrescentar automaticamente links internos para outras páginas do seu site dentro dos artigos.
@@ -205,6 +205,7 @@ O Serviço usa IA para produzir temas de artigos, perguntas e artigos. Esse cont
 - **Aprovação e publicação.** O conteúdo é exibido a você para aprovação e é publicado no seu site conforme as configurações de aprovação e publicação que você escolheu para o projeto. Você pode editar, rejeitar ou excluir qualquer conteúdo.
 - **Responder a uma avaliação no seu Perfil da Empresa no Google.** Se você pedir um rascunho de resposta a uma avaliação, o rascunho é produzido por IA e exibido a você antes de qualquer envio. Uma resposta é enviada somente depois que você a escreveu ou aprovou e clicou em enviar, e ela é publicada publicamente no perfil da sua empresa e em seu nome. **Você é responsável pelo conteúdo da resposta**, mesmo quando o rascunho foi produzido por IA, o que inclui a exatidão dos fatos, a difamação, os direitos de terceiros e as políticas de conteúdo do Google. O Google pode remover uma resposta conforme essas políticas, e não temos controle sobre isso.
 - **Publicação automática no seu Perfil da Empresa no Google.** Se você ativou a publicação automática, cada artigo que o sistema publica no seu site também é publicado como postagem no perfil da sua empresa no Google, **sem que você o leia antes**. **Você é responsável pelo conteúdo publicado em seu nome**, tanto quando o texto foi produzido por IA como quando você não o leu antes da publicação, o que inclui a exatidão dos fatos, a difamação, os direitos de terceiros e as políticas de conteúdo do Google. Você pode desativar a publicação automática a qualquer momento, e ela se desativa por conta própria se você trocar a empresa à qual o projeto está conectado.
+- **Uma foto criada por IA para uma postagem no seu Perfil da Empresa no Google.** Se você pedir uma foto para uma postagem escrita a partir de um tema, a foto é produzida por IA. Ela é uma imagem genérica e **não é uma fotografia da sua empresa, do seu estabelecimento, da sua equipe nem de um produto real seu**, e é exibida a você antes de qualquer publicação. Uma foto é publicada somente depois que você a escolheu e clicou em publicar, e ela aparece publicamente no perfil da sua empresa e em seu nome. **Você é responsável pela foto publicada em seu nome**, o que inclui a correspondência com a realidade, os direitos de terceiros e as políticas de conteúdo e de fotos do Google, segundo as quais o conteúdo de um perfil de empresa deve representar a empresa e o produto como realmente são. Não use uma foto assim como se fosse uma fotografia da empresa, do estabelecimento ou de um produto que não existe: uma foto enganosa pode levar o Google a remover o conteúdo ou a restringir o perfil, e também pode induzir o consumidor a erro. O arquivo da imagem carrega os marcadores próprios do Google (SynthID e C2PA), que permitem identificá-la como gerada por IA.
 
 ## 15G. Mensagens de e-mail
 
@@ -249,4 +250,4 @@ Para qualquer dúvida sobre estes termos ou sobre o Serviço, fale com a gente:
 Número da sociedade: 517274346  
 E-mail: [oren@gotop.co.il](mailto:oren@gotop.co.il)
 
-Última atualização: 13 de outubro de 2026
+Última atualização: 16 de outubro de 2026

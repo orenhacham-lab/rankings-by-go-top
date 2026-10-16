@@ -16,6 +16,7 @@ import Button from '@/components/ui/Button'
 import Input from '@/components/ui/Input'
 import { freeCheckCopy } from '@/lib/free-check/copy'
 import type { PublicLocale } from '@/lib/i18n/locales'
+import { freeCheckPath } from '@/lib/free-check/paths'
 import { cn } from '@/lib/utils'
 
 /**
@@ -31,7 +32,16 @@ export function FreeCheckHeroForm({ locale, tone = 'default', compact = false }:
   const copy = freeCheckCopy(locale)
   const router = useRouter()
   const [url, setUrl] = useState('')
-  const target = locale === 'en' ? '/en/free-check' : '/free-check'
+  /**
+   * EVERY locale's own page, never a default.
+   * This read `locale === 'en' ? '/en/free-check' : '/free-check'` from the
+   * two-language era, so a Spanish or Portuguese visitor typing their address
+   * in the hero field — the page's main action — was navigated to the HEBREW
+   * check. The nav link and the section's own button were already built from
+   * LOCALE_PREFIX, which is why only the field was wrong and why nothing
+   * failed: the form has no business knowing which languages exist.
+   */
+  const target = freeCheckPath(locale)
 
   return (
     <form

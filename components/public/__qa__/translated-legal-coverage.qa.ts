@@ -2718,6 +2718,182 @@ const OUTREACH_NO_LONGER_TRUE = /we\s+do not collect details about a private ind
       .test(`${REGISTERED} (company number 517274346) · oren@gotop.co.il`))
 }
 
+// ── 33) an AI photo for a Business Profile post ─────────────────────────────
+/*
+ * The UX/build thread added a "create a photo" button to the Maps post composer
+ * (topic posts only): one generic, unbranded, photorealistic image from the same
+ * Gemini image pipeline that makes article featured images, shown to the merchant
+ * and published only when they press publish themselves.
+ *
+ * What made this worth text of its own is NOT that the image is AI-made. Google's
+ * posts content policy names no rule about machine- or AI-generated content —
+ * section 30 records that reading, and support.google.com still does not resolve
+ * from this session, so it was not re-read here. What does bite is accuracy: the
+ * policy overview (business/answer/13762416) and the prohibited-content policy
+ * require content on a listing to represent the location and the product as they
+ * actually are, and Google's photo guidance (business/answer/6123536, read
+ * through search snippets on 16 October 2026) asks for photos that represent
+ * reality and warns against excessive use of AI. A photorealistic image that a
+ * customer takes for a photo of THIS bakery's counter is therefore the merchant's
+ * exposure twice over: Google can remove the content or restrict the listing, and
+ * in Israel a misleading image of a good or service is consumer deception under
+ * the Consumer Protection Law.
+ *
+ * So the terms, in all four languages, pin five claims:
+ *   1. the photo is AI-made;
+ *   2. it is NOT a photograph of their business, premises, staff or real product;
+ *   3. it is published only after they choose it and press publish, in their name;
+ *   4. the responsibility for it is theirs, Google's content and photo policies
+ *      included, and a misleading photo risks the content or the listing;
+ *   5. the file carries Google's own SynthID and C2PA markers, so "nobody can
+ *      tell" is not a defence anyone should rely on.
+ * The privacy policy adds the data fact, which is favourable and verified in
+ * lib/gbp/topic-image.ts: only the topic goes to the model — no business name,
+ * no person's name — and nothing is stored before the merchant publishes.
+ */
+const AI_PHOTO_NOT_YOUR_BUSINESS: Record<string, RegExp> = {
+  he: /ואינה צילום של העסק שלכם, של המקום, של העובדים\s*או של מוצר ממשי שלכם/,
+  en: /it is not a\s*photograph of your business, your premises, your staff or an actual product of yours/,
+  es: /no es una fotograf[íi]a de su negocio, de su local, de su personal ni de un producto real suyo/,
+  'pt-BR': /n[ãa]o [ée] uma fotografia da sua empresa, do seu estabelecimento, da sua equipe nem de um produto real seu/,
+}
+const AI_PHOTO_YOUR_RESPONSIBILITY: Record<string, RegExp> = {
+  he: /האחריות לתמונה שמתפרסמת בשמכם היא\s*שלכם/,
+  en: /You are\s*responsible for the photo published in your name/,
+  es: /Usted es responsable de la foto publicada en su nombre/,
+  'pt-BR': /Voc[êe] é responsável pela foto publicada em seu nome/,
+}
+const AI_PHOTO_LISTING_RISK: Record<string, RegExp> = {
+  he: /עלולה להביא להסרת התוכן או להגבלת הכרטיס בידי\s*Google/,
+  en: /can lead Google to remove the content or restrict the listing/,
+  es: /puede llevar a Google a retirar el contenido o a restringir la ficha/,
+  'pt-BR': /pode levar o Google a remover o conte[úu]do ou a restringir o perfil/,
+}
+const AI_PHOTO_MARKERS: Record<string, RegExp> = {
+  he: /SynthID ו-C2PA/,
+  en: /SynthID and C2PA/,
+  es: /SynthID y C2PA/,
+  'pt-BR': /SynthID e C2PA/,
+}
+const AI_PHOTO_NO_BUSINESS_NAME: Record<string, RegExp> = {
+  he: /בלי שם העסק ובלי שם של אדם/,
+  en: /without the business name and\s*without any person&rsquo;s name/,
+  es: /sin el nombre del negocio y sin el nombre de ninguna persona/,
+  'pt-BR': /sem o nome da empresa e sem o nome de nenhuma pessoa/,
+}
+{
+  const read = (path: string) => (existsSync(path) ? readFileSync(path, 'utf8') : '')
+  const enTerms = frontMatter(text[LOCALES[0]].terms).source
+  const enPrivacy = frontMatter(text[LOCALES[0]].privacy).source
+  const docs: [string, string, string][] = [
+    ['he', read(HEBREW_TERMS), read(HEBREW_PRIVACY)],
+    ['en', enTerms ? read(enTerms) : '', enPrivacy ? read(enPrivacy) : ''],
+    ...LOCALES.map((l): [string, string, string] => [l, text[l].terms, text[l].privacy]),
+  ]
+  for (const [name, terms, privacy] of docs) {
+    check(`${name}/terms: the AI photo is not presented as a photograph of the business`, AI_PHOTO_NOT_YOUR_BUSINESS[name]!.test(terms))
+    check(`${name}/terms: the photo published in the merchant's name is the merchant's responsibility`, AI_PHOTO_YOUR_RESPONSIBILITY[name]!.test(terms))
+    check(`${name}/terms: a misleading photo is named as a risk to the content and the listing`, AI_PHOTO_LISTING_RISK[name]!.test(terms))
+    check(`${name}/terms: the file's AI markers are disclosed`, AI_PHOTO_MARKERS[name]!.test(terms))
+    check(`${name}/privacy: only the topic reaches the model, with no business or person name`, AI_PHOTO_NO_BUSINESS_NAME[name]!.test(privacy))
+  }
+  // The favourable data claim has to stay true in the code that makes the image.
+  const gen = read('lib/gbp/topic-image.ts')
+  if (gen) {
+    check('the generator sends no business name to the model', !/businessName/.test(gen))
+    check('the generator stores nothing itself', !/upload\(|storage\./.test(gen))
+  }
+  check('mutation control: a clause that calls it a photo of the business is caught',
+    !AI_PHOTO_NOT_YOUR_BUSINESS.en.test('It is a photograph of your business, taken by AI.'))
+  check('mutation control: a clause with no listing risk is caught',
+    !AI_PHOTO_LISTING_RISK.en.test('A misleading photo is not a good idea.'))
+}
+
+// ── 34) a purchase made through an external marketplace ────────────────────
+/*
+ * Oren is opening accounts on affiliate marketplaces (the affiliates thread is
+ * building a shared intake layer behind per-platform off switches, with sales
+ * pages under /go/<platform>). Two of the candidates, ClickBank and Digistore24,
+ * are merchants of record: they sell the plan in their own name, they charge the
+ * buyer, they issue the invoice, and they operate their own refund windows —
+ * Digistore24 and ClickBank both run buyer-facing refund policies that are far
+ * wider than ours, and either can refund a transaction at its own discretion.
+ *
+ * Section 4 of our refund policy says a paid period is not refunded. That rule
+ * is the owner's own decision and is not softened here. But on a purchase we did
+ * not sell, section 4 is not the rule the buyer is owed: the seller's is. Leaving
+ * section 4 as the only statement on the page would be a narrower promise than
+ * the buyer actually holds, which in Israel is a misleading omission under the
+ * Consumer Protection Law and in the EU an unfair term under 93/13/EEC, since a
+ * consumer may not be told they have less than the law and the actual seller give
+ * them.
+ *
+ * So each refund policy carries one conditional section, numbered after the
+ * Shopify section so no existing number shifts (6A in he/en/es, 7A in pt-BR,
+ * whose Art. 49 section sits earlier). It names no platform, so it is true both
+ * before any marketplace is live and after, and it pins four claims:
+ *   1. the marketplace is the seller of that purchase — it charged you, it
+ *      invoiced you, cancellation happens there;
+ *   2. its own refund and return policy applies to that purchase;
+ *   3. explicitly, that this holds even where that policy is wider than ours,
+ *      and that section 4 does not narrow it;
+ *   4. section 4 governs purchases made from us, and the page you bought on
+ *      names the seller and links its policy.
+ * Claim 4's second half is a promise about the sales page, which is why the
+ * checks below also read app/go/[platform]/page.tsx once it exists.
+ */
+const MARKETPLACE_SELLER: Record<string, RegExp> = {
+  he: /המוכר של אותה\s*רכישה הוא אותה זירה/,
+  en: /the seller of that purchase is that\s*marketplace/,
+  es: /el vendedor de esa compra es ese mercado/,
+  'pt-BR': /o vendedor dessa compra [ée] esse marketplace/,
+}
+const MARKETPLACE_THEIR_POLICY: Record<string, RegExp> = {
+  he: /מדיניות ההחזרים וההחזרה שלה חלה על אותה רכישה/,
+  en: /Its own refund and return policy applies\s*to that purchase/,
+  es: /Su propia pol[íi]tica de reembolsos y devoluciones se aplica a esa compra/,
+  'pt-BR': /A pol[íi]tica de reembolso e devolu[çc][ãa]o dele se aplica a essa compra/,
+}
+const MARKETPLACE_WIDER: Record<string, RegExp> = {
+  he: /גם כשהיא רחבה\s*ממדיניות ההחזרים שבסעיף 4/,
+  en: /even where that policy is wider than the refund\s*policy in\s*section 4/,
+  es: /incluso cuando esa pol[íi]tica es m[áa]s amplia que la pol[íi]tica de reembolsos de la secci[óo]n 4/,
+  'pt-BR': /mesmo quando essa pol[íi]tica [ée] mais ampla que as regras de reembolso das se[çc][õo]es 4 e 5/,
+}
+const MARKETPLACE_NAMES_SELLER: Record<string, RegExp> = {
+  he: /בעמוד שבו רכשתם מופיע שם המוכר וקישור למדיניות שלו/,
+  en: /The page you bought (on|from) names the seller and links (to )?its policy/,
+  es: /La p[áa]gina en la que usted compr[óo] indica el nombre del vendedor y enlaza con su pol[íi]tica/,
+  'pt-BR': /A p[áa]gina em que voc[êe] comprou informa o nome do vendedor e traz o link para a pol[íi]tica dele/,
+}
+{
+  const read = (path: string) => (existsSync(path) ? readFileSync(path, 'utf8') : '')
+  const docs: [string, string][] = [
+    ['he', read('app/(legal)/refund-policy/page.tsx')],
+    ['en', read('app/(public)/en/refund-policy/page.tsx')],
+    ...LOCALES.map((l): [string, string] => [l, text[l]['refund-policy']]),
+  ]
+  for (const [name, refund] of docs) {
+    check(`${name}/refund-policy: the marketplace is named as the seller of that purchase`, MARKETPLACE_SELLER[name]!.test(refund))
+    check(`${name}/refund-policy: the marketplace's own refund policy is the one that applies`, MARKETPLACE_THEIR_POLICY[name]!.test(refund))
+    check(`${name}/refund-policy: our section 4 is not presented as narrowing a wider policy`, MARKETPLACE_WIDER[name]!.test(refund))
+    check(`${name}/refund-policy: the buyer is told where to find the seller and its policy`, MARKETPLACE_NAMES_SELLER[name]!.test(refund))
+    check(`${name}/refund-policy: the owner's no-refund rule is still the rule for purchases from us`,
+      /(סעיף 4 חלה על|in section 4 applies to\s*purchases made from us|de la secci[óo]n 4 se aplica a las compras realizadas a nosotros|das se[çc][õo]es 4 e 5 se aplicam [àa]s compras feitas de n[óo]s)/.test(refund))
+  }
+  // Claim 4 is a promise about the sales page. Once that page exists it has to keep it.
+  const salesPage = read('app/go/[platform]/page.tsx')
+  if (salesPage) {
+    check('the marketplace sales page names its seller', /seller|vendedor|מוכר/i.test(salesPage))
+    check('the marketplace sales page does not send the buyer to our own refund policy',
+      !/\/(en\/)?refund-policy/.test(salesPage))
+  }
+  check('mutation control: a clause that keeps us the seller is caught',
+    !MARKETPLACE_SELLER.en.test('We remain the seller of that purchase and you cancel with us.'))
+  check('mutation control: a clause that caps the buyer at our own policy is caught',
+    !MARKETPLACE_WIDER.en.test('The refund policy in section 4 applies to that purchase instead.'))
+}
+
 console.log(`\n${pass} passed, ${fail} failed`)
 if (fail > 0) process.exit(1)
 
