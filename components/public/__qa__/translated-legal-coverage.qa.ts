@@ -2936,11 +2936,19 @@ const BILLED_ELSEWHERE_NOT_SETTINGS: Record<string, RegExp> = {
   es: /la renovaci[óo]n se cancela ante esa empresa y no desde la configuraci[óo]n de su cuenta/,
   'pt-BR': /o cancelamento da renova[çc][ãa]o [ée] feito junto a essa empresa, e n[ãa]o nas configura[çc][õo]es da sua conta/,
 }
+// The written-confirmation clause was deliberately REMOVED before merge. It read
+// well and it protected the buyer, but nothing in the codebase sends such a mail
+// on a cancellation request: it would have meant the owner replying by hand, which
+// is keepable at one request a month and stops being keepable quietly. The house
+// rule is that no written promise is published that the code cannot keep, so the
+// terms now promise only what inbound mail already does — we pass the request on —
+// and the check below fails if the confirmation sentence returns in any language
+// without something to send it.
 const BILLED_ELSEWHERE_WE_PASS_ON: Record<string, RegExp> = {
-  he: /נעביר אותה לאותה חברה ונאשר בכתב שהעברנו/,
-  en: /we will pass it on to that company and confirm in writing that we\s*have/,
-  es: /la trasladaremos a esa empresa y le confirmaremos por escrito que lo hemos hecho/,
-  'pt-BR': /n[óo]s o encaminhamos a essa empresa e confirmamos por escrito que o fizemos/,
+  he: /נעביר אותה לאותה חברה, אך עצירת החיוב/,
+  en: /we will pass it on to that company, but the charge itself/,
+  es: /la trasladaremos a esa empresa, pero el cobro/,
+  'pt-BR': /n[óo]s o encaminhamos a essa empresa, mas a cobran[çc]a/,
 }
 const BILLED_ELSEWHERE_NOT_OUR_CHARGE: Record<string, RegExp> = {
   he: /עצירת החיוב\s*עצמו נעשית בידי אותה חברה ולא בידינו/,
@@ -2977,8 +2985,10 @@ const OWN_BILLING_STILL_SETTINGS: Record<string, RegExp> = {
   ]
   for (const [name, terms] of docs) {
     check(`${name}/terms: a subscription billed elsewhere is cancelled there, not in the account settings`, BILLED_ELSEWHERE_NOT_SETTINGS[name]!.test(terms))
-    check(`${name}/terms: we promise only to pass the request on, and to confirm it in writing`, BILLED_ELSEWHERE_WE_PASS_ON[name]!.test(terms))
+    check(`${name}/terms: we promise only to pass the request on, and nothing no code performs`, BILLED_ELSEWHERE_WE_PASS_ON[name]!.test(terms))
     check(`${name}/terms: stopping the charge is named as the other company's act, not ours`, BILLED_ELSEWHERE_NOT_OUR_CHARGE[name]!.test(terms))
+    check(`${name}/terms: no written confirmation is promised, because nothing sends one`,
+      !/(ונאשר בכתב|confirm in writing|confirmaremos por escrito|confirmamos por escrito)/.test(terms))
     check(`${name}/terms: no refund is promised on another company's behalf`, BILLED_ELSEWHERE_NO_REFUND_FOR_THEM[name]!.test(terms))
     check(`${name}/terms: access still runs to the end of the period already paid for`, BILLED_ELSEWHERE_ACCESS_KEPT[name]!.test(terms))
     check(`${name}/terms: all three billing companies are named`, /Shopify/.test(terms) && /Creem/.test(terms) && /(זירת מכירות|mercado externo|marketplace externo|external marketplace)/.test(terms))

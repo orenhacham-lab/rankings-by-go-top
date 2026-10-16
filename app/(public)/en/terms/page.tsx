@@ -186,8 +186,7 @@ export default function EnglishTermsPage() {
           and a plan bought on an external marketplace that resells the Service in its own name. In
           those cases the renewal is cancelled with that company and not through your account
           settings, because that company holds the subscription and charges you. If you send us a
-          cancellation request we will pass it on to that company and confirm in writing that we
-          have, but the charge itself is stopped by that company and not by us, and we do not issue
+          cancellation request we will pass it on to that company, but the charge itself is stopped by that company and not by us, and we do not issue
           a refund on its behalf. If you are not sure which company bills your subscription, write
           to us and we will tell you. In every case, access to the Service is retained until the end
           of the billing period that has already been paid, as in section 6, and the refund policy
