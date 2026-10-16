@@ -60,6 +60,10 @@ El pago a través de PayPal y el pago a través de Shopify no cambian: allí el 
 
 Usted puede cancelar la renovación de su suscripción en cualquier momento desde la configuración de su cuenta. El acceso al Servicio se mantendrá hasta el final del período de facturación que ya haya sido pagado. No se concederá la cancelación retroactiva de un período que ya haya sido pagado, salvo en los casos exigidos por la ley aplicable.
 
+## 6A. Una suscripción facturada por otra empresa
+
+Algunas suscripciones las factura otra empresa y no nosotros: una tienda facturada a través de Shopify, un pago con tarjeta en el que Creem es el vendedor, tal como se describe en la sección 5A, y un plan comprado en un mercado externo que revende el Servicio en su propio nombre. En esos casos la renovación se cancela ante esa empresa y no desde la configuración de su cuenta, porque es esa empresa la que tiene la suscripción y la que le cobra. Si usted nos envía una solicitud de cancelación, la trasladaremos a esa empresa, pero el cobro lo detiene esa empresa y no nosotros, y no emitimos un reembolso en su nombre. Si no sabe con certeza qué empresa factura su suscripción, escríbanos y se lo diremos. En todos los casos, el acceso al Servicio se mantiene hasta el final del período de facturación que ya haya sido pagado, igual que en la sección 6, y la política de reembolsos que se aplica a esa compra consta en nuestra Política de cancelación y reembolso.
+
 ## 7. Reembolsos
 
 Las tarifas de suscripción no son reembolsables respecto de un período que ya haya comenzado o haya sido pagado, salvo cuando la ley exija un reembolso. Las solicitudes de cancelación conforme a la ley deben presentarse por escrito a la dirección de correo electrónico de la Empresa. Los detalles completos figuran en nuestra [Política de Cancelación y Reembolso](/es/refund-policy).
