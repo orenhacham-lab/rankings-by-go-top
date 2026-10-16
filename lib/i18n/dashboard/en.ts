@@ -6038,7 +6038,7 @@ export const dashboardEn = {
       // A card subscription is billed by Creem, the merchant of record, so we
       // cannot stop the charge ourselves. "Contact us and we will stop the
       // billing" is a promise we cannot keep; this says where cancelling works.
-      cancelNote: 'Creem sells this plan to you and bills it, so the cancellation happens at Creem, from the subscription details Creem sent you when you paid. If that is easier for you, write to us and we will pass the cancellation request on to Creem and confirm in writing that we have; the charge itself can only be stopped at Creem. Either way your access stays active until the end of the period you have paid for.',
+      cancelNote: 'Creem sells this plan to you and bills it, so the cancellation happens at Creem, from the subscription details Creem sent you when you paid. If that is easier for you, write to us and we will pass the cancellation request on to Creem; the charge itself can only be stopped at Creem. Either way your access stays active until the end of the period you have paid for.',
     },
     shopify: {
       title: 'Billing is managed through Shopify',

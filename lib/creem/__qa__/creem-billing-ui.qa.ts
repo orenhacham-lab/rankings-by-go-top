@@ -301,7 +301,11 @@ console.log('\nE) every dashboard language has the strings')
     const promisesOnlyOurs =
       // a second route through us, and what it is worth: a written record
       /write to us|כתבו לנו|escríbenos|fale com a gente/.test(cancelNote)
-      && /in writing|בכתב|por escrito/.test(cancelNote)
+      // and NOT a written confirmation: nothing in the codebase sends that
+      // mail, so the promise would rest on somebody answering by hand. The
+      // legal review cut the same sentence from the terms; it can come back
+      // on both sides the day an acknowledgement is actually sent.
+      && !/in writing|בכתב|por escrito/.test(cancelNote)
       // and who stops the charge, said in the same breath
       // where the charge can be stopped, not WHO has the power: Hebrew has no
       // settled gender for a foreign trade name, so the sentence names a place
@@ -309,7 +313,9 @@ console.log('\nE) every dashboard language has the strings')
       && !/we will stop the billing|נבטל עבורכם את החיוב|detendremos el cobro|interromperemos a cobrança/.test(cancelNote)
     check(`E6: ${lang} offers a second route and names its limit`, promisesOnlyOurs, cancelNote)
     check(`E6-MUT: a ${lang} line that promises to stop the charge is caught`,
-      !/in writing/.test('Contact us and we will stop the billing for you.'))
+      !/write to us|כתבו לנו|escríbenos|fale com a gente/.test('We will stop the billing for you.'))
+    check(`E6-MUT2: a ${lang} line that promises a written confirmation is caught`,
+      /in writing/.test('we will pass it on and confirm in writing that we have'))
     // "Merchant of record" is a term of art; the screen is read by a
     // first-time store owner, so it says what the phrase means instead.
     check(`E7: ${lang} says what Creem does rather than naming its legal role`,
