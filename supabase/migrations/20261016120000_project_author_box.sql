@@ -26,7 +26,7 @@
 --     DROP COLUMN IF EXISTS theme_author_box_checked_at;
 -- Executed probe: supabase/migrations/__qa__/project-author-box.probe.sql
 --   bash scripts/qa/pg-probe.sh supabase/migrations/__qa__/project-author-box.probe.sql
--- NOT APPLIED ANYWHERE: needs the owner's approval before Production.
+-- Applied to Production on 2026-10-16 with the owner's approval.
 -- ============================================================================
 
 BEGIN;
