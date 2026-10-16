@@ -78,6 +78,23 @@ const host = (domain: unknown) => String(domain ?? '').trim().toLowerCase().repl
 const bare = (h: string) => h.replace(/^www\./, '')
 
 /**
+ * True when a WordPress display name is really a login. WordPress shows the
+ * login as the display name until the user picks another, so a box could read
+ * "japan4u_adm" (reported on japan4u, 2026-10-16). A name with an @, or one
+ * word that is lowercase, carries digits or _ . -, or is Latin-only on a site
+ * not written in English, is treated as a login, and the business name is shown.
+ */
+export function looksLikeLogin(name: string, language: AuthorBoxLanguage): boolean {
+  const n = name.trim()
+  if (!n) return false
+  if (n.includes('@')) return true
+  if (/\s/.test(n)) return false
+  if (/[\d_.\-]/.test(n)) return true
+  if (/^[a-z]+$/.test(n)) return true
+  return language !== 'en' && /^[A-Za-z]+$/.test(n)
+}
+
+/**
  * The box's content from the project's own facts, or null when there is not
  * even a name to show. The link must be on the project's own site.
  */
@@ -90,7 +107,8 @@ export function authorBoxContent(input: {
   aboutUrl?: string | null
 }): AuthorBoxContent | null {
   const business = cleanCtaText(input.businessName ?? '', AUTHOR_BOX_LIMITS.name)
-  const name = cleanCtaText(input.authorName ?? '', AUTHOR_BOX_LIMITS.name) || business
+  const author = cleanCtaText(input.authorName ?? '', AUTHOR_BOX_LIMITS.name)
+  const name = (author && !looksLikeLogin(author, input.language) ? author : '') || business
   if (!name) return null
   const site = host(input.domain)
   let link: AuthorBoxContent['link'] = null

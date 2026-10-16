@@ -172,6 +172,13 @@ async function main() {
   check('B6: no name at all: no box', authorBoxContent({ language: 'en', authorName: '  ', businessName: '', domain: DOMAIN }) === null)
   const hostile = authorBoxStructure(authorBoxContent({ language: 'en', authorName: '<script>alert(1)</script>Dana', businessName: 'B&B "x"', domain: DOMAIN })!)
   check('B7: tags are removed and markup is escaped', !/<script/i.test(hostile) && hostile.includes('B&amp;B'))
+  // A WordPress login shown as the display name falls back to the business name (japan4u, 2026-10-16).
+  const asName = (n: string, language: 'he' | 'en' = 'he') => authorBoxContent({ language, authorName: n, businessName: 'Levi Bakery', domain: DOMAIN })!.name
+  check('B7a: a login is never the author name: digits, underscore, dot, @, lowercase, Latin on a Hebrew site',
+    ["'japanuco_admin'", 'japan4u_adm', 'j4pan', 'oren.h', 'info@levi.co.il', 'admin', 'Japan'].every((n) => asName(n) === 'Levi Bakery'),
+    ['japan4u_adm', 'j4pan', 'oren.h', 'info@levi.co.il', 'admin', 'Japan'].map((n) => asName(n)).join(','))
+  check('B7b: a real name stays: two words, Hebrew, or one capitalised English name on an English site',
+    asName('Dana Levi') === 'Dana Levi' && asName('דנה לוי') === 'דנה לוי' && asName('דנה') === 'דנה' && asName('Dana', 'en') === 'Dana')
   check('B8: the about page is found among the mapped pages, shortest first, on the project\'s host only',
     findAboutUrl([{ u: 'https://evil.example/about' }, { u: `https://${DOMAIN}/company/about-us/team` }, { u: `https://www.${DOMAIN}/about/` }], DOMAIN) === `https://www.${DOMAIN}/about/`)
   const inventing = await mutant<typeof import('@/lib/content/author-box/box')>('lib/content/author-box/box.ts', (s) => s.replace("p('author-name', 'name', `<strong>${escText(c.name)}</strong>`)", "p('author-name', 'name', `<strong>${escText(c.name)}</strong>, certified expert`)"))
