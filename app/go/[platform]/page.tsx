@@ -124,6 +124,17 @@ export default async function MarketplaceSalesPage({
         })}
       </section>
 
+      {/* The same two facts the pricing page states for a card payment
+          (lib/i18n/public/pricing-en.ts taxNote.USD), with this platform in
+          the seller's place: who the counterparty is, and that the price here
+          is before tax. A page that shows a price and leaves the tax unsaid
+          is the thing the standing rule forbids. */}
+      <p className="mt-6 text-copy text-muted">
+        The seller of record for this purchase is {provider.label}, which calculates tax by
+        your billing address and shows the final amount before you pay. The prices above do
+        not include it.
+      </p>
+
       <p className="mt-10 text-copy text-body">
         After payment you will be sent back here to open your account and the plan becomes
         active on it.

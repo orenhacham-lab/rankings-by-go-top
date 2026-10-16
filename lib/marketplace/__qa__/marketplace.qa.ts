@@ -358,6 +358,15 @@ async function main() {
     { label: 'raw palette colour', re: /\b(?:bg|text|border)-(?:gray|slate|zinc|neutral|stone|red|blue|green|emerald|indigo|violet|purple|pink|amber|yellow|orange|teal|cyan|sky|rose|lime|fuchsia)-\d{2,3}\b/ },
   ]
   const offTokens = (src: string) => OFF_TOKEN.filter(({ re }) => re.test(src)).map(({ label }) => label)
+  // A page that prints $79 and says nothing about tax breaks the standing
+  // pricing rule, and on a reseller page the seller's identity is the other
+  // half of the same sentence.
+  check('H15: the sales page names the seller of record and says the price is before tax',
+    /seller of record for this purchase is \{provider\.label\}/.test(salesSrc)
+    && /do\s*\n?\s*not include it/.test(salesSrc))
+  check('H-MUT6: the tax guard catches a price shown with no tax line',
+    !/do\s*\n?\s*not include it/.test('<p>${plan.priceUSD} / month</p>'))
+
   check('H14: the sales page is on the design tokens, like every other page we publish',
     offTokens(salesSrc).length === 0, offTokens(salesSrc).join(' | '))
   check('H-MUT5: the token guard catches the bg-black button this page started with',
