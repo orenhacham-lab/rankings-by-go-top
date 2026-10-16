@@ -15,6 +15,7 @@ import { generatePoolItem, AUTOMATION_MAX_ATTEMPTS, type GenerateItemResult } fr
 import { publishPoolItem } from '@/lib/content/automation/publish-item'
 import { localWeekday, isNoPublishWeekday, makeSlotAfter, slotFitsRhythm, resolveIntervalDays, spreadNextPublishAt, DEFAULT_PUBLISH_TIME, DEFAULT_TIMEZONE, type Cadence } from '@/lib/content/automation/schedule'
 import { readPublishRhythmForProject } from '@/lib/content/automation/plan-rhythm'
+import { loadActivePlatform } from '@/lib/content/platform/load-active-platform'
 
 type Admin = ReturnType<typeof createAdminClient>
 
@@ -191,12 +192,18 @@ async function pickForPublish(admin: Admin, poolId: string): Promise<PickedItem 
   return withTitle(admin, row ? { id: row.id, topic_id: row.topic_id } : null)
 }
 
-export async function runAutomation(admin: Admin, opts: { projectId?: string; dryRun?: boolean; nowMs?: number; generate?: typeof generatePoolItem } = {}): Promise<AutomationSummary> {
+export async function runAutomation(admin: Admin, opts: { projectId?: string; dryRun?: boolean; nowMs?: number; generate?: typeof generatePoolItem; platform?: (admin: Admin, projectId: string) => Promise<{ platform: string }> } = {}): Promise<AutomationSummary> {
   const started = Date.now()
   const dryRun = opts.dryRun === true
   const summary: AutomationSummary = { poolsChecked: 0, staleRecovered: 0, generated: 0, published: 0, skipped: 0, failures: 0, durationMs: 0, dryRun, details: [], diagnostics: [] }
   const nowMs = opts.nowMs ?? Date.now()
   const cutoffIso = new Date(nowMs - STALE_LOCK_MS).toISOString()
+  const platformOf = opts.platform ?? loadActivePlatform
+  /** 'none' or 'conflict' when the project cannot publish; null when it can, or the check failed. */
+  const publishBlocker = async (a: Admin, projectId: string): Promise<string | null> => {
+    const r = await platformOf(a, projectId).catch(() => null)
+    return r && (r.platform === 'none' || r.platform === 'conflict') ? `platform_${r.platform}` : null
+  }
 
   if (!dryRun) await recoverStaleLocks(admin, opts.projectId, cutoffIso, summary)
 
@@ -263,7 +270,16 @@ export async function runAutomation(admin: Admin, opts: { projectId?: string; dr
         const need = due ? Math.max(DESIRED_READY_AHEAD, 1) : DESIRED_READY_AHEAD
         if (diag.generatedCount < need) {
           const q = await pickForGenerate(admin, pool.id)
-          if (q) {
+          // An article written for a project with nowhere to publish it is paused at
+          // publish time, which leaves the pool short of a ready article, so the next run
+          // wrote another: from 5 to 12 October 2026 one Google Maps project with no site
+          // connected got a fresh article on most runs, spending its allowance and the
+          // run's one generation. Nothing is written until a platform is connected.
+          const blocked = q ? await publishBlocker(admin, pool.project_id) : null
+          if (q && blocked) {
+            diag.note = 'held_no_publishing_platform'
+            summary.details.push(`pool ${pool.id}: generation held (${blocked})`)
+          } else if (q) {
             diag.selectedTopicId = q.topicId; diag.selectedTopicTitle = q.topicTitle; diag.generateAttempted = true
             // Phase 3G.2 — scheduled generation also auto-inserts the topic's APPROVED
             // internal links into the draft (only user-approved links are ever inserted).
@@ -327,7 +343,7 @@ export async function runAutomation(admin: Admin, opts: { projectId?: string; dr
         } else {
           // Due but nothing generated (e.g. no queued items or generation failed).
           summary.skipped++
-          diag.note = diag.queuedCount === 0 ? 'due_but_no_queued_items' : 'due_but_generation_did_not_produce_item'
+          diag.note = diag.note ?? (diag.queuedCount === 0 ? 'due_but_no_queued_items' : 'due_but_generation_did_not_produce_item')
           summary.details.push(`pool ${pool.id}: due, no generated item ready`)
         }
       }

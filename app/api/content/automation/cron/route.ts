@@ -31,6 +31,21 @@
  * (07:00–08:59, the Vercel cron's 07:00 run and cron-job.org's quarter hours), and
  * outside it returns at once without a read or a line. No new cron schedule.
  *
+ * ALONGSIDE ALL OF IT, THE COMPANY BLOG'S DAILY ARTICLE (lib/blog/auto/daily-window.ts):
+ * one language per run, at most one article a language a day, Production only and only in
+ * the UTC window 04:00-06:59, because Vercel's scheduler did not deliver the blog's own
+ * three daily jobs while this cron fires every fifteen minutes. Isolated the same way.
+ *
+ * THEN, THE OUTBOUND RETENTION PASS (lib/outreach/retention-isolated.ts): the 30-day
+ * redaction and the 90-day deletion the privacy text promises for a cold-email prospect.
+ * It rides this cron, not only its own daily entry in vercel.json, because a daily cron on
+ * this plan is best-effort. Production only, idempotent, isolated the same way, and it logs
+ * one counts-only line per pass — the only evidence the pass runs at all.
+ *
+ * ALONGSIDE ALL OF IT, THE SITE MAPPING UPKEEP (lib/content/existing-content/map-upkeep.ts):
+ * at most one project per run whose mapping is missing or ageing is mapped, so automatic
+ * internal links have pages to point at. Started with the runner, awaited before the emails.
+ *
  * LAST OF ALL, THE REMINDER EMAIL. After the top-up, the "articles are waiting for your OK" reminder
  * (lib/reminders): OFF unless REMINDER_EMAILS_ENABLED is exactly "true", and then only at
  * 09:00 Asia/Jerusalem, Sunday to Thursday. Isolated the same way: it cannot change, delay
@@ -45,9 +60,12 @@ import { authorizeCronRequest } from '@/lib/auth/cron'
 import { resumeStalledSeedRuns, startIsolatedSeedResume } from '@/lib/seed-scan/resume'
 import { runTopicTopUp, startIsolatedTopUp } from '@/lib/content/automation/topic-topup'
 import { runIsolatedReminders } from '@/lib/reminders/isolated'
+import { runIsolatedProspectRetention } from '@/lib/outreach/retention-isolated'
 import { runIsolatedOnboardingEmails } from '@/lib/onboarding-emails/isolated'
 import { runIsolatedWeeklySummaries } from '@/lib/reports/weekly/isolated'
 import { checkPublishingStalls, isDailyStallCheckRun } from '@/lib/content/automation/stall-watch'
+import { runMapUpkeep, liveEnsure } from '@/lib/content/existing-content/map-upkeep'
+import { runBlogDailyWindow, startIsolatedBlogWindow } from '@/lib/blog/auto/daily-window'
 
 // Generation can take a while; request a generous budget (platform clamps to the
 // plan's max — e.g. 60s on Hobby, up to 300s on Pro).
@@ -68,6 +86,22 @@ async function handle(request: Request): Promise<Response> {
   const startedAt = new Date().toISOString()
   const dailyStallCheck = isDailyStallCheckRun(request)
   after(async () => {
+    // Map ONE project whose site mapping is missing or ageing, so its articles get internal
+    // links (lib/content/existing-content/map-upkeep.ts). It runs ALONGSIDE the runner, not
+    // after it: a run that writes an article takes 150-270s, which left a pass placed after
+    // it no time at all, and the crawl waits on the merchant's site, not on this process.
+    // It touches no table the runner writes, never throws, and its 40s margin is left for
+    // the emails below.
+    const mapUpkeep = runMapUpkeep(createAdminClient(), { deadlineAt: Date.parse(startedAt) + maxDuration * 1000 - 40_000, ensure: liveEnsure })
+    // The company blog's own daily article, ALONGSIDE the runner for the same reason:
+    // a content run that publishes takes 150-270s, and Vercel's scheduler did not
+    // deliver the blog's own three daily jobs (lib/blog/auto/daily-window.ts). One
+    // language per run, at most one article a language a day, Production only and
+    // only in its morning UTC window. Isolated below; it never throws.
+    const blogWindow = startIsolatedBlogWindow(
+      (deadlineAt) => runBlogDailyWindow(createAdminClient(), { env: process.env, deadlineAt }),
+      { startedAtMs: Date.parse(startedAt), maxDurationMs: maxDuration * 1000 },
+    )
     try {
       const summary = await runAutomation(createAdminClient(), {})
       console.log('[automation-cron] run complete', { startedAt, poolsChecked: summary.poolsChecked, published: summary.published, generated: summary.generated, staleRecovered: summary.staleRecovered, failures: summary.failures, durationMs: summary.durationMs })
@@ -88,6 +122,17 @@ async function handle(request: Request): Promise<Response> {
       (deadlineAt) => runTopicTopUp(createAdminClient(), { env: process.env, deadlineAt }),
       { startedAtMs: Date.parse(startedAt), maxDurationMs: maxDuration * 1000 },
     )
+    // The site-mapping pass and the blog article started next to the runner (above) are
+    // awaited here, before the emails.
+    await mapUpkeep
+    await blogWindow
+    // Then the outbound-channel retention pass: it empties a prospect's address, name and
+    // postal address 30 days after the last message, which the published privacy text
+    // promises (lib/outreach/retention-isolated.ts). It rides this cron because a daily
+    // Vercel cron on this plan is best-effort, and the promise cannot depend on a job that
+    // may silently never fire. Production only, idempotent, milliseconds over a small
+    // table, isolated: it never throws, so it cannot change, delay or fail anything above.
+    await runIsolatedProspectRetention()
     // Last of all, and off unless REMINDER_EMAILS_ENABLED is "true": the reminder email for
     // articles waiting for approval (lib/reminders). Isolated; it never throws or rejects.
     await runIsolatedReminders()

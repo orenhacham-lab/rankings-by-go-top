@@ -97,13 +97,27 @@ async function main() {
   check('(16/17) run succeeds only after summary fetched + validated', /aggregationType !== 'byProperty'[\s\S]{0,120}gsc_summary_aggregation_mismatch/.test(sync) && sync.indexOf('fetchSummary(') < sync.indexOf("status: 'succeeded', rowsFetched: rows.length"))
   check('no silent fallback to detail sums on summary failure (failed branch summary null)', /status: 'failed'[\s\S]{0,200}summary: null/.test(sync))
 
+  // The summary cards and the metrics table moved out of GscPanel.tsx into the
+  // reusable components/content/GscMetricsTable.tsx (so AI visibility and the
+  // content workspace show the same table). The contracts below are unchanged;
+  // they are read where the markup now lives. The sync BUTTON stayed in the
+  // panel, which renders the table, so the warning and the action are still on
+  // one screen — that pair is what FIX8 was about, and it is asserted across
+  // both files rather than inside one.
   const panel = read('components/content/GscPanel.tsx')
-  check('FIX7 page URL is a decoded external link (href=raw, target _blank, rel noopener)', /<a href=\{r\.page\} target="_blank" rel="noopener noreferrer" title=\{safeDecodeUrl\(r\.page\)\}/.test(panel))
-  check('FIX7 URL wraps (overflow-wrap/break-all), not ellipsis-only', /\[overflow-wrap:anywhere\]|break-all/.test(panel) && /safeDecodeUrl\(r\.page\)/.test(panel))
-  check('FIX7 external-link icon present', /<ExternalLink /.test(panel))
-  check('FIX8 panel shows the property-summary label + provenance note', /propertySummaryLabel/.test(panel) && /detailVsSummaryNote/.test(panel))
-  check('FIX8 panel handles summaryResyncRequired with a sync CTA', /card\.summaryResyncRequired/.test(panel) && /summaryResyncRequired[\s\S]{0,200}handleSync/.test(panel))
-  check('FIX8 cards read card.clicks/impressions/ctr/avgPosition (from summary)', /t\.cardClicks, value: fmtInt\(card\.clicks/.test(panel))
+  const table = read('components/content/GscMetricsTable.tsx')
+  check('FIX7 page URL is a decoded external link (href=raw, target _blank, rel noopener)', /<a href=\{r\.page\} target="_blank" rel="noopener noreferrer" title=\{safeDecodeUrl\(r\.page\)\}/.test(table))
+  check('FIX7 URL wraps (overflow-wrap/break-all), not ellipsis-only',
+    /\[overflow-wrap:anywhere\]|break-all/.test(table) && /safeDecodeUrl\(r\.page\)/.test(table)
+    && !/<span className="truncate">\{safeDecodeUrl\(r\.page\)\}/.test(table))
+  check('FIX7 external-link icon present', /<ExternalLink /.test(table))
+  check('FIX8 panel shows the property-summary label + provenance note', /propertySummaryLabel/.test(table) && /detailVsSummaryNote/.test(table))
+  check('FIX8 panel handles summaryResyncRequired with a sync CTA',
+    /summary\.summaryResyncRequired/.test(table) && /summaryResyncRequired[\s\S]{0,200}Notice tone="warn"/.test(table)
+    && /onClick=\{handleSync\}/.test(panel) && /<GscMetricsTable/.test(panel))
+  check('FIX8 cards read the summary\'s own clicks/impressions/ctr/avgPosition (never the detail rows)',
+    /t\.cardClicks, value: fmtInt\(summary\.clicks/.test(table)
+    && /summary\.impressions/.test(table) && /summary\.ctr/.test(table) && /summary\.avgPosition/.test(table))
 
   // FIX 7 decode behavior + safe fallback.
   const encoded = 'https://x.co/%D7%A0%D7%A2%D7%9C%D7%99%D7%99%D7%9D'

@@ -52,6 +52,18 @@ function check(name: string, cond: boolean, detail?: string) {
   if (cond) { pass++; console.log(`  ✓ ${name}`) } else { fail++; console.log(`  ✗ ${name}${detail ? ` — ${detail}` : ''}`) }
 }
 
+/**
+ * Source guards match code, never comments: this drops block, line and JSX
+ * comments before section 28 looks at a caller. A `//` after a colon or a
+ * quote (a URL inside a string) is kept.
+ */
+function stripComments(src: string): string {
+  return src
+    .replace(/\{\/\*[\s\S]*?\*\/\}/g, '')
+    .replace(/\/\*[\s\S]*?\*\//g, '')
+    .replace(/(^|[^:\\'"`])\/\/[^\n]*/g, '$1')
+}
+
 const DOCS = ['terms', 'privacy', 'refund-policy', 'accessibility', 'affiliate-terms'] as const
 type Doc = (typeof DOCS)[number]
 
@@ -256,8 +268,12 @@ for (const locale of LOCALES) {
 
 // ── 5) the registered company name, untranslated ────────────────────────────
 // Hebrew uses the Hebrew name; every other language uses the English name
-// exactly as registered, typo included, because that is what the registrar has.
-const REGISTERED = 'GO TOP MARKETING GRUO LTD'
+// exactly as Oren gave it on 2026-10-13, which replaced the earlier
+// "GO TOP MARKETING GRUO LTD". The registrar holds no English name at all
+// (company 517274346), so identification rests on the Hebrew name and the
+// company number, and the English string must be one single string everywhere.
+const REGISTERED = 'GO TOP DIGITAL MARKETING AND ADVERTISING LTD'
+const SUPERSEDED_NAME = /GO TOP MARKETING GRUO/i
 const TRANSLATED_NAME = /GO TOP (MARKETING|MERCADEO|MARKETING DIGITAL) (DIGITAL|Y PUBLICIDAD|E PUBLICIDADE|SRL|S\.?L\.?|LTDA\.?)/i
 for (const locale of LOCALES) {
   for (const doc of DOCS) {
@@ -265,6 +281,7 @@ for (const locale of LOCALES) {
     if (!/517274346/.test(src) && !src.includes(REGISTERED)) continue
     check(`${locale}/${doc}: the company name is the registered English one`, src.includes(REGISTERED))
     check(`${locale}/${doc}: the company name was not translated or re-spelled`, !TRANSLATED_NAME.test(src))
+    check(`${locale}/${doc}: the superseded company name is gone`, !SUPERSEDED_NAME.test(src))
     check(`${locale}/${doc}: the Hebrew company name is not used`, !/גו טופ/.test(src))
   }
   check(`${locale}: the contact documents carry the company number`,
@@ -1128,8 +1145,8 @@ const OUTREACH_VERIFIED: Record<string, RegExp> = {
   'pt-BR': /verificamos, a partir de duas fontes independentes, que atuam nos Estados Unidos/,
 }
 const OUTREACH_NOT_DONE: Record<string, RegExp[]> = {
-  he: [/איננו קונים\s*רשימות כתובות ואיננו משתמשים בסוחרי מידע/, /איננו נכנסים לשום חלק באתר שאינו פתוח לכל מבקר/],
-  en: [/We do not buy\s*contact lists and we do not use data brokers/, /we do not enter any part of a site\s*that is not open to every visitor/],
+  he: [/איננו קונים\s*רשימות כתובות ואיננו משתמשים בסוחרי מידע/, /איננו נכנסים\s+לשום חלק באתר שאינו פתוח לכל מבקר/],
+  en: [/We do not buy contact lists and we do not use\s+data brokers/, /we do not enter any part of a site\s*that is not open to every visitor/],
   es: [/No compramos listas de direcciones y no usamos intermediarios de datos/, /no entramos en ninguna parte de un sitio que no esté abierta a cualquier visitante/],
   'pt-BR': [/Não compramos listas de endereços e não usamos intermediários de dados/, /não entramos em nenhuma parte de um site que não esteja aberta a qualquer visitante/],
 }
@@ -1140,10 +1157,10 @@ const OUTREACH_REMOVAL: Record<string, RegExp[]> = {
   'pt-BR': [/com a única finalidade de garantir que não entraremos em contato com você de novo/, /vale para todos os nossos canais, não só para aquele em que você pediu/],
 }
 const OUTREACH_NOTICE: Record<string, RegExp> = {
-  he: /מכיוון שלא\s*אספנו את המידע ממך עצמך, הסעיף הזה הוא ההודעה על האיסוף, והקישור אליו מופיע בכל\s*הודעה שאנו שולחים/,
-  en: /Because we did\s*not collect the information from you directly, this section is the notice of collection,\s*and a link to it appears in every message we send/,
-  es: /Como no recogimos la información de usted directamente, esta sección es el aviso de recogida, y un enlace a ella aparece en cada mensaje que enviamos/,
-  'pt-BR': /Como não coletamos a informação de você diretamente, esta seção é o aviso de coleta, e um link para ela aparece em cada mensagem que enviamos/,
+  he: /מכיוון שלא\s*אספנו את המידע ממך עצמך, הסעיף הזה הוא ההודעה על האיסוף, לרבות משך השמירה של כל פרט, והקישור אליו\s+מופיע בכל הודעה שאנו שולחים/,
+  en: /Because we did\s*not collect the information from you directly, this section is the notice of collection,\s+including how long each item is kept, and a link to it appears in every message we send/,
+  es: /Como no recogimos la información de usted directamente, esta sección es el aviso de recogida, incluido el plazo de conservación de cada dato, y un enlace a ella aparece en cada mensaje que enviamos/,
+  'pt-BR': /Como não coletamos a informação de você diretamente, esta seção é o aviso de coleta, incluindo por quanto tempo cada dado é guardado, e um link para ela aparece em cada mensagem que enviamos/,
 }
 const OUTREACH_NO_SALE: Record<string, RegExp> = {
   he: /איננו מוכרים\s*את המידע הזה ואיננו משתפים אותו לפרסום התנהגותי חוצה-אתרים/,
@@ -1495,6 +1512,8 @@ console.log('\nmutation controls')
     !privacy.replace(/PDFShift/g, '').includes('PDFShift') && privacy.includes('PDFShift'))
   check('a translated company name is caught',
     TRANSLATED_NAME.test('GO TOP MARKETING E PUBLICIDADE LTDA'))
+  check('MUTATION — the superseded company name is caught',
+    SUPERSEDED_NAME.test('GO TOP MARKETING GRUO LTD') && !SUPERSEDED_NAME.test(REGISTERED))
   check('a link into a language tree with no page behind it is caught',
     // The example has to be a page that really is not there. It used to be
     // /pt-BR/terms, which exists now that the Portuguese tree is built.
@@ -1553,9 +1572,12 @@ console.log('\nmutation controls')
     !AGREEMENT_SHOPIFY_MANUAL.en.test('You earn 30% of each Qualifying Payment of a Referred Customer.'))
   check('an agreement that still says a suspended link stops working is caught',
     AGREEMENT_LINK_DIES.es.test('Cuando este acuerdo termine, su enlace de referido deja de funcionar.'))
+  // The drifted date is derived from whatever the document currently says, so
+  // this control keeps working when the terms are revised; pinning the literal
+  // date made it pass only until the next revision.
   check('a footer date that drifts from the written date is caught',
     writtenRevisionDate('es', text.es.terms)
-      !== frontMatter(text.es.terms.replace('lastUpdated: 2026-10-10', 'lastUpdated: 2026-10-06')).lastUpdated
+      !== frontMatter(text.es.terms.replace(/lastUpdated: \d{4}-\d{2}-\d{2}/, 'lastUpdated: 2026-10-06')).lastUpdated
       && writtenRevisionDate('es', text.es.terms) === frontMatter(text.es.terms).lastUpdated)
   check('a revision date read out of a statute sentence instead of the footer is caught',
     writtenRevisionDate('es', 'La Enmienda 13 entró en vigor el 14 de agosto de 2025.') === null)
@@ -2103,6 +2125,597 @@ const PRICE_TAX_USD: Record<string, RegExp> = {
   check('mutation control: a text that settles neither currency is caught',
     !PRICE_VAT_ILS.en.test('Prices, plans and limits may change from time to time.')
     && !PRICE_TAX_USD.en.test('Prices, plans and limits may change from time to time.'))
+}
+
+// ── 28) What PDFShift keeps, and the code that makes the answer true ───
+/*
+ * PDFShift countersigned an Article 28 data processing agreement on 12 October
+ * 2026 (Oren signed through BoldSign; the executed copy is in his mail). Until
+ * then the privacy text said only that "retention at PDFShift is governed by
+ * their own privacy policy and terms", which told a merchant nothing and aged
+ * badly, because the vendor could change that policy without us noticing.
+ *
+ * The agreement replaces the deferral with a fact. Its Annex B: content sent
+ * for conversion "are processed transiently in volatile memory for the
+ * duration of the conversion request and are not intentionally written to
+ * persistent storage", EXCEPT where the caller passes the optional `filename`
+ * parameter — then the generated file sits on AWS S3 in Paris for up to two
+ * days. Annex A puts PDFShift's servers in France (OVH, AWS) and its error
+ * monitoring in the United States (Sentry, DPF / EU SCCs).
+ *
+ * So the published sentence is true only while our own callers leave that
+ * parameter out, which is why B is a SOURCE check and not a text check. Both
+ * callers currently send `source` and `landscape` alone. Adding `filename`
+ * would be a reasonable-looking change — it gives the download a nicer name —
+ * and it would silently turn a published promise into a false one. This guard
+ * is the thing standing between those two facts.
+ */
+const PDFSHIFT_DPA: Record<string, RegExp> = {
+  he: /הסכם עיבוד נתונים לפי סעיף 28/,
+  en: /data processing agreement with PDFShift under Article 28/,
+  es: /acuerdo de tratamiento de datos conforme al art[íi]culo 28/,
+  'pt-BR': /acordo de tratamento de dados nos termos do artigo 28/,
+}
+const PDFSHIFT_NO_RETENTION: Record<string, RegExp> = {
+  he: /מעובד\s+בזיכרון למשך ההמרה בלבד ואינו נשמר אצלם לאחריה/,
+  en: /processed in memory for the duration of the conversion alone and is not\s+retained afterwards/,
+  es: /se trata en memoria durante el tiempo de la conversi[óo]n y no se conserva despu[ée]s/,
+  'pt-BR': /[ée] tratado em mem[óo]ria apenas durante a convers[ãa]o e n[ãa]o [ée] retido depois/,
+}
+const PDFSHIFT_STORAGE_DECLINED: Record<string, RegExp> = {
+  he: /שמירה אופציונלית של הקובץ שנוצר,\s+ואנחנו לא מבקשים אותה/,
+  en: /optional storage of the generated file, and we do not ask for\s+it/,
+  es: /almacenamiento opcional del archivo generado, y nosotros no lo solicitamos/,
+  'pt-BR': /armazenamento opcional do arquivo gerado, e n[óo]s n[ãa]o o solicitamos/,
+}
+{
+  const read = (path: string) => (existsSync(path) ? readFileSync(path, 'utf8') : '')
+  const enSource = frontMatter(text[LOCALES[0]].privacy).source
+  const pages: [string, string][] = [
+    ['he', read(HEBREW_PRIVACY)],
+    ['en', enSource ? read(enSource) : ''],
+    ...LOCALES.map((l): [string, string] => [l, text[l].privacy]),
+  ]
+  for (const [name, src] of pages) {
+    check(`${name}/privacy: the page was read`, src.length > 0)
+    check(`${name}/privacy: the Article 28 agreement with PDFShift is stated`, (PDFSHIFT_DPA[name] ?? /$^/).test(src))
+    check(`${name}/privacy: the content is stated not to be retained after the conversion`,
+      (PDFSHIFT_NO_RETENTION[name] ?? /$^/).test(src))
+    check(`${name}/privacy: the optional storage is stated to be declined`,
+      (PDFSHIFT_STORAGE_DECLINED[name] ?? /$^/).test(src))
+    check(`${name}/privacy: the old "governed by their own policy" deferral is gone`,
+      !/governed by their own privacy policy|כפופה למדיניות הפרטיות ולתנאי השימוש|se rige por su propia pol[íi]tica de privacidad|regida pela pol[íi]tica de privacidade e pelos termos dela/.test(src))
+  }
+
+  /*
+   * B) The code behind the sentence. Every caller of the conversion endpoint is
+   * found by grepping for the endpoint itself, so a third caller added later is
+   * covered without editing this list.
+   */
+  const CONVERT_ENDPOINT = 'api.pdfshift.io/v3/convert'
+  const sources = ['app/api/reports/export-pdf/route.ts', 'lib/export/pdfshift.ts']
+    .map((f): [string, string] => [f, read(f)])
+  check('the known PDFShift callers were both read', sources.every(([, src]) => src.length > 0))
+  for (const [f, src] of sources) {
+    check(`${f}: still calls the conversion endpoint`, src.includes(CONVERT_ENDPOINT))
+    check(`${f}: sends no filename parameter, so nothing is stored at PDFShift`, !/\bfilename\s*:/.test(stripComments(src)))
+  }
+
+  check('mutation control: a filename parameter in the payload is caught',
+    /\bfilename\s*:/.test(stripComments('const payload = { source: html, filename: `report.pdf`, landscape: false }')))
+  check('mutation control: a filename inside a comment is NOT counted',
+    !/\bfilename\s*:/.test(stripComments('// filename: never send this, it turns on two-day storage\nconst p = { source: html }')))
+  check('mutation control: a retention claim with no agreement behind it is caught',
+    !PDFSHIFT_DPA.en.test('PDFShift does not keep the content of your reports.'))
+  check('mutation control: the vendor-policy deferral is recognised as the old wording',
+    /governed by their own privacy policy/.test('Retention at PDFShift is governed by their own privacy policy and terms.'))
+}
+
+// ── 29) Reviews on the Business Profile, and the two code facts behind it ──
+/*
+ * Until 12 October 2026 the privacy policy said, in all four languages, that
+ * "we do not read or reply to reviews". The reviews feature makes that false,
+ * so the text had to move BEFORE the code, which is why this section lands a
+ * merge ahead of the feature and why the checks on the feature's own files are
+ * written to tolerate their absence until it lands.
+ *
+ * Three claims are published and each one is a promise about code:
+ *   1. No review content is stored. Verified on
+ *      claude/project-thread-4052du-gbp-reviews: the migration adds two
+ *      timestamptz columns to project_gbp_locations and creates no table, and
+ *      lib/gbp/__qa__/gbp-reviews.qa.ts section G runs the handlers and then
+ *      asserts the review text, the reviewer's name, our reply and the rating
+ *      appear in no table.
+ *   2. The reply is PUBLIC and Google may remove it. That one is not about our
+ *      code at all; it is the fact a merchant most needs before pressing send,
+ *      and the reason the terms now put the reply's content on them.
+ *   3. The reviewer's name is never sent to the model. This is the one that
+ *      earns a guard here rather than a reading. The draft path speaks to the
+ *      Gemini Developer API with an API key, whose free tier may use prompt
+ *      content, and a review's free text can carry special-category data on its
+ *      own ("they treated my condition"). Dropping the name was a legal
+ *      recommendation the feature took (patches/legal-gbp-reviews-answers-
+ *      2026-10-12.md); nothing enforces it except that the draft's input type
+ *      has no field for a name. If a field reappears, this fails.
+ *
+ * MUTATION CONTROLS at the end, including one proving the absence-tolerant
+ * checks still catch a broken claim once the files exist.
+ */
+const REVIEWS_NO_STORAGE: Record<string, RegExp> = {
+  he: /איננו שומרים אצלנו שום תוכן של ביקורת/,
+  en: /We store no review content/,
+  es: /No almacenamos ning[úu]n contenido de rese[ñn]as/,
+  'pt-BR': /N[ãa]o armazenamos nenhum conte[úu]do de avalia[çc][ãa]o/,
+}
+const REPLY_IS_PUBLIC: Record<string, RegExp> = {
+  he: /והוא פומבי: הוא מופיע בכרטיס העסק שלך בגוגל וכל אדם יכול לראות אותו/,
+  en: /and it is public: it appears on your Google business listing and\s+anyone can see it/,
+  es: /y es p[úu]blica: aparece en la ficha de su negocio en Google y cualquier persona puede verla/,
+  'pt-BR': /e ela [ée] p[úu]blica: aparece no perfil da sua empresa no Google e qualquer pessoa pode v[êe]-la/,
+}
+const GOOGLE_MAY_REMOVE: Record<string, RegExp> = {
+  he: /עשויה להסיר מענה לפי מדיניות התוכן שלה/,
+  en: /may remove a reply\s+under its own content policies/,
+  es: /puede retirar una respuesta conforme a sus propias pol[íi]ticas de contenido/,
+  'pt-BR': /pode remover uma resposta conforme as pr[óo]prias pol[íi]ticas de conte[úu]do/,
+}
+const NAME_NOT_SENT: Record<string, RegExp> = {
+  he: /בלי שם המבקר/,
+  en: /without the reviewer&rsquo;s name/,
+  es: /sin el nombre del autor/,
+  'pt-BR': /sem o nome de quem avaliou/,
+}
+const NO_LONGER_TRUE = /we do not read or reply to reviews|ואיננו\s+קוראים ביקורות או עונים עליהן|no leemos ni respondemos rese[ñn]as|n[ãa]o lemos nem respondemos avalia[çc][õo]es/
+{
+  const read = (path: string) => (existsSync(path) ? readFileSync(path, 'utf8') : '')
+  const enSource = frontMatter(text[LOCALES[0]].privacy).source
+  const pages: [string, string][] = [
+    ['he', read(HEBREW_PRIVACY)],
+    ['en', enSource ? read(enSource) : ''],
+    ...LOCALES.map((l): [string, string] => [l, text[l].privacy]),
+  ]
+  for (const [name, src] of pages) {
+    check(`${name}/privacy: the page was read`, src.length > 0)
+    check(`${name}/privacy: the old "we do not read reviews" sentence is gone`, !NO_LONGER_TRUE.test(src))
+    check(`${name}/privacy: no review content is stated to be stored`, (REVIEWS_NO_STORAGE[name] ?? /$^/).test(src))
+    check(`${name}/privacy: the reply is stated to be public`, (REPLY_IS_PUBLIC[name] ?? /$^/).test(src))
+    check(`${name}/privacy: Google's power to remove a reply is disclosed`, (GOOGLE_MAY_REMOVE[name] ?? /$^/).test(src))
+    check(`${name}/privacy: the reviewer's name is stated NOT to reach the model`, (NAME_NOT_SENT[name] ?? /$^/).test(src))
+  }
+
+  /* The terms put the reply's content on the merchant, in every language. */
+  const LIABILITY: Record<string, RegExp> = {
+    he: /האחריות לתוכן המענה היא שלכם/,
+    en: /You are responsible for the content of the reply/,
+    es: /Usted es responsable del contenido de la respuesta/,
+    'pt-BR': /Voc[êe] [ée] respons[áa]vel pelo conte[úu]do da resposta/,
+  }
+  const enTermsSource = frontMatter(text[LOCALES[0]].terms).source
+  const termsDocs: [string, string][] = [
+    ['he', read(HEBREW_TERMS)],
+    ['en', enTermsSource ? read(enTermsSource) : ''],
+    ...LOCALES.map((l): [string, string] => [l, text[l].terms]),
+  ]
+  for (const [name, src] of termsDocs) {
+    check(`${name}/terms: the reply's content is put on the merchant`, (LIABILITY[name] ?? /$^/).test(src))
+  }
+
+  /*
+   * The code behind claim 1 and claim 3. Both files arrive with the feature, so
+   * each is checked only once it exists — and the "exists" line is itself a
+   * check, so the day the feature lands these stop being no-ops and nobody has
+   * to remember to come back here.
+   */
+  const DRAFT = 'lib/gbp/review-draft.ts'
+  const MIGRATION = 'supabase/migrations/20261012120000_gbp_review_alerts.sql'
+  const featureLanded = existsSync(DRAFT) && existsSync(MIGRATION)
+  console.log(`  · the reviews feature ${featureLanded ? 'HAS landed; its code is checked below' : 'has NOT landed yet; its two code checks are waiting for it'}`)
+  if (featureLanded) {
+    const draft = stripComments(read(DRAFT))
+    check(`${DRAFT}: the draft's input carries no reviewer name`, !/reviewerName|reviewer_name/.test(draft))
+    const migration = stripComments(read(MIGRATION))
+    check(`${MIGRATION}: adds the two timestamp columns and creates no table`,
+      /ADD COLUMN IF NOT EXISTS reviews_seen_update_time timestamptz/.test(migration)
+      && /ADD COLUMN IF NOT EXISTS reviews_alerted_at\s+timestamptz/.test(migration)
+      && !/CREATE TABLE/i.test(migration))
+    /*
+     * stripComments understands JavaScript, so a `-- …` line in SQL survives it,
+     * and `COMMENT ON COLUMN` is SQL's own way of documenting a column: a
+     * migration that explains in prose what it deliberately does NOT store used
+     * to trip this check on the words it was promising to avoid. Both kinds of
+     * documentation are dropped first. A column actually NAMED comment still
+     * arrives as `ADD COLUMN ... comment`, which the pattern still catches, and
+     * the second mutation control below holds that line.
+     */
+    const columns = migration
+      .replace(/COMMENT\s+ON\s[\s\S]*?;/gi, '')
+      .replace(/--[^\n]*/g, '')
+    check(`${MIGRATION}: stores no review text column`, !/comment|review_text|reviewer|rating|stars/i.test(columns))
+  }
+
+  check('mutation control: the sentence that is no longer true is recognised',
+    NO_LONGER_TRUE.test('We do not change your business information and we do not read or reply to reviews.'))
+  check('mutation control: a storage claim with no "no content" promise is caught',
+    !REVIEWS_NO_STORAGE.en.test('We read your reviews and keep them for your records.'))
+  check('mutation control: a reply described without its publicity is caught',
+    !REPLY_IS_PUBLIC.en.test('A reply is published in your name only after you pressed send.'))
+  check('mutation control: a reviewer name back in the draft input would be caught',
+    /reviewerName|reviewer_name/.test(stripComments('export interface ReviewDraftSource { reviewerName: string | null }')))
+  check('mutation control: a migration that adds a review-text column is caught',
+    /comment|review_text|reviewer|rating|stars/i.test(stripComments('ALTER TABLE x ADD COLUMN review_text text;')))
+  check('mutation control: dropping SQL documentation does not hide a column named comment',
+    /comment|review_text|reviewer|rating|stars/i.test(
+      stripComments("-- we keep no rating\nCOMMENT ON COLUMN x.y IS 'documented';\nALTER TABLE x ADD COLUMN comment text;")
+        .replace(/COMMENT\s+ON\s[\s\S]*?;/gi, '')
+        .replace(/--[^\n]*/g, '')))
+}
+
+// ── 30) Automatic posting to the Business Profile, published before its code ──
+/*
+ * Until 12 October 2026 the privacy policy said, in all four languages, that
+ * "we create a post only when you press publish, or at the time you scheduled
+ * it" and that "a draft is never published until you review it". Automatic
+ * posting (claude/project-thread-4052du-gbp-autopost) makes both false for an
+ * account that turned the switch on: an article that publishes to the owner's
+ * site also goes up on their business listing with NOBODY reading it first.
+ *
+ * The replacement text is deliberately conditional on the switch, so it is true
+ * both before the feature exists and after — which is what lets this land ahead
+ * of the code, as section 29 does. Four claims are pinned:
+ *   1. Off by default. A promise about the column's default, checked below.
+ *   2. Published without the owner reading it. The sentence that makes the terms
+ *      clause fair, and the one a merchant would otherwise be ambushed by.
+ *   3. Nothing but the business name and the article's own title and summary
+ *      reaches the model — no person's name, ever.
+ *   4. The switch turns itself off when the project moves to a different
+ *      business, because the approval was given for the business they picked.
+ * The terms carry the matching clause: content published in the owner's name is
+ * the owner's responsibility even where no human read it first.
+ *
+ * SETTLED, and recorded here because it was nearly a reason to stop the feature:
+ * lib/gbp/draft.ts used to say in its own header that Google rejects
+ * "auto-generated" posts, citing a research note absent from this repo. That
+ * would have meant the feature risked the merchant's listing, so it was raised
+ * with the feature thread (patches/legal-gbp-auto-post-answers-2026-10-12.md).
+ * They read Google's own pages on 12 October 2026 — the posts content policy
+ * (business/answer/7213077), the policy overview (business/answer/13762416) and
+ * the prohibited-and-restricted-content policy (contributionpolicy/answer/
+ * 7400114) — and none names a rule about automatically, machine- or AI-generated
+ * content; what is prohibited and does touch this is "posting the same content
+ * multiple times", which uq_gbp_posts_auto_article prevents. The comment was
+ * wrong, not the feature, and they corrected it. support.google.com does not
+ * resolve from THIS session, so that reading is theirs and was not re-read here.
+ * It stays out of the checks below: no sentence we publish depends on it.
+ */
+const AUTO_POST_OPT_IN: Record<string, RegExp> = {
+  he: /ברירת המחדל היא כבוי/,
+  en: /off by default/,
+  es: /desactivada por defecto/,
+  'pt-BR': /desativada por padr[ãa]o/,
+}
+const AUTO_POST_NO_READ: Record<string, RegExp> = {
+  he: /בלי שתקרא אותו לפני הפרסום/,
+  en: /without you reading\s+it first/,
+  es: /sin que usted lo lea antes/,
+  'pt-BR': /sem que voc[êe] o leia antes/,
+}
+const AUTO_POST_NO_PERSON: Record<string, RegExp> = {
+  he: /בלי שום שם של אדם/,
+  en: /with no person&rsquo;s name/,
+  es: /sin ning[úu]n nombre de persona/,
+  'pt-BR': /sem nenhum nome de pessoa/,
+}
+/*
+ * The post's language. This started as the opposite claim: the column allowed he
+ * and en only, so a Spanish project's article would have gone out in English on
+ * a Spanish business's listing, and the first version of this text said such a
+ * project gets no post at all. Oren rejected the limit on 12 October ("what is
+ * the problem with the post being in Spanish or Portuguese? that is what we do
+ * with the articles"), the feature widened the column's CHECK to all four app
+ * languages and dropped the skip, and the sentence now says the simple true
+ * thing. The two code checks below are what stops it drifting back.
+ */
+const AUTO_POST_LANGUAGE: Record<string, RegExp> = {
+  he: /פוסט אוטומטי נכתב בשפת הפרויקט/,
+  en: /An automatic post is written in the project&rsquo;s language/,
+  es: /Una publicaci[óo]n autom[áa]tica se redacta en el idioma del proyecto/,
+  'pt-BR': /Uma postagem autom[áa]tica [ée] escrita no idioma do projeto/,
+}
+const AUTO_POST_SELF_OFF: Record<string, RegExp> = {
+  he: /נכבית מעצמה אם החלפת/,
+  en: /turns itself off if you\s+change the business/,
+  es: /se desactiva por s[íi] sola si usted cambia el negocio/,
+  'pt-BR': /se desativa por conta pr[óo]pria se voc[êe] trocar a empresa/,
+}
+/* The two absolutes the feature contradicts. Either one surviving is a lie. */
+const AUTO_POST_NO_LONGER_TRUE = /we create a post only when you press publish|אנו יוצרים פוסט רק כשאתה לוחץ על פרסום|creamos una publicaci[óo]n [úu]nicamente cuando usted pulsa publicar|criamos uma postagem somente quando voc[êe] clica em publicar|draft is never published|טיוטה לעולם אינה מתפרסמת|Un borrador nunca se publica|Um rascunho nunca [ée] publicado/
+{
+  const read = (path: string) => (existsSync(path) ? readFileSync(path, 'utf8') : '')
+  const enSource = frontMatter(text[LOCALES[0]].privacy).source
+  const pages: [string, string][] = [
+    ['he', read(HEBREW_PRIVACY)],
+    ['en', enSource ? read(enSource) : ''],
+    ...LOCALES.map((l): [string, string] => [l, text[l].privacy]),
+  ]
+  for (const [name, src] of pages) {
+    check(`${name}/privacy: the page was read`, src.length > 0)
+    check(`${name}/privacy: neither absolute about posting survives`, !AUTO_POST_NO_LONGER_TRUE.test(src))
+    check(`${name}/privacy: automatic posting is stated to be off by default`, (AUTO_POST_OPT_IN[name] ?? /$^/).test(src))
+    check(`${name}/privacy: it is stated to publish without the owner reading it`, (AUTO_POST_NO_READ[name] ?? /$^/).test(src))
+    check(`${name}/privacy: no person's name is stated to reach the model`, (AUTO_POST_NO_PERSON[name] ?? /$^/).test(src))
+    check(`${name}/privacy: the two languages a post can go out in are stated`, (AUTO_POST_LANGUAGE[name] ?? /$^/).test(src))
+    check(`${name}/privacy: the switch is stated to turn itself off on a business change`, (AUTO_POST_SELF_OFF[name] ?? /$^/).test(src))
+  }
+
+  const AUTO_LIABILITY: Record<string, RegExp> = {
+    he: /האחריות לתוכן שמתפרסם בשמכם היא שלכם/,
+    en: /You are responsible for the\s+content published in your name/,
+    es: /Usted es responsable del contenido publicado en su nombre/,
+    'pt-BR': /Voc[êe] [ée] respons[áa]vel pelo conte[úu]do publicado em seu nome/,
+  }
+  const enTermsSource = frontMatter(text[LOCALES[0]].terms).source
+  const termsDocs: [string, string][] = [
+    ['he', read(HEBREW_TERMS)],
+    ['en', enTermsSource ? read(enTermsSource) : ''],
+    ...LOCALES.map((l): [string, string] => [l, text[l].terms]),
+  ]
+  for (const [name, src] of termsDocs) {
+    check(`${name}/terms: content published automatically is put on the merchant`, (AUTO_LIABILITY[name] ?? /$^/).test(src))
+  }
+
+  /*
+   * The code behind claims 1, 3 and 4. The migration arrives with the feature,
+   * so it gates the lot and the "has it landed" line is itself printed, as in
+   * section 29: the day the feature merges these stop being no-ops by
+   * themselves.
+   */
+  const AUTO_MIGRATION = 'supabase/migrations/20261012180000_gbp_auto_post.sql'
+  const STORE = 'lib/gbp/store.ts'
+  const DRAFT_SRC = 'lib/gbp/draft.ts'
+  const ENQUEUE = 'lib/gbp/auto-post.ts'
+  const autoLanded = existsSync(AUTO_MIGRATION)
+  console.log(`  · automatic posting ${autoLanded ? 'HAS landed; its code is checked below' : 'has NOT landed yet; its six code checks are waiting for it'}`)
+  if (autoLanded) {
+    const migration = stripComments(read(AUTO_MIGRATION))
+    check(`${AUTO_MIGRATION}: the switch defaults to off`,
+      /auto_post_on_publish\s+boolean\s+NOT NULL\s+DEFAULT false/i.test(migration))
+    /*
+     * When the owner turned it on. Asked for on 12 October 2026 because we are
+     * the ones publishing in their name with no person reading it, so something
+     * has to answer "I never approved this"; the CHECK is what stops a stale
+     * timestamp sitting on a switch that is off.
+     */
+    check(`${AUTO_MIGRATION}: when the switch was turned on is recorded, and only while it is on`,
+      /ADD COLUMN IF NOT EXISTS auto_post_enabled_at timestamptz/.test(migration)
+      && /CHECK \(auto_post_on_publish OR auto_post_enabled_at IS NULL\)/.test(migration))
+    check(`${AUTO_MIGRATION}: a post may carry any of the four app languages`,
+      /CHECK \(language_code IN \('he', 'en', 'es', 'pt-BR'\)\)/.test(migration))
+    const enqueue = stripComments(read(ENQUEUE))
+    check(`${ENQUEUE}: no project is skipped for its language`,
+      !/language_unsupported/.test(enqueue))
+    const store = stripComments(read(STORE))
+    check(`${STORE}: moving the project to another business clears the switch`,
+      /auto_post_on_publish:\s*false/.test(store))
+    const draft = stripComments(read(DRAFT_SRC))
+    const sourceType = /interface DraftSource \{[\s\S]*?\n\}/.exec(draft)?.[0] ?? ''
+    check(`${DRAFT_SRC}: the post draft's input carries no person's name`,
+      sourceType.length > 0 && !/reviewerName|customerName|userName|authorName|ownerName|email/i.test(sourceType))
+  }
+
+  check('mutation control: the old "only when you press publish" sentence is recognised',
+    AUTO_POST_NO_LONGER_TRUE.test('we create a post only when you press publish, or at the time you scheduled it'))
+  check('mutation control: the old "a draft is never published" absolute is recognised',
+    AUTO_POST_NO_LONGER_TRUE.test('A draft is never published until you review it and press publish.'))
+  check('mutation control: automatic posting described without "off by default" is caught',
+    !AUTO_POST_OPT_IN.en.test('Automatic posting: every article is also published as a post.'))
+  check('mutation control: a post language narrowed back to two is caught',
+    !AUTO_POST_LANGUAGE.en.test('An automatic post goes out in Hebrew or English only.'))
+  check('mutation control: a CHECK narrowed back to two languages is caught',
+    !/CHECK \(language_code IN \('he', 'en', 'es', 'pt-BR'\)\)/.test(
+      "ADD CONSTRAINT gbp_posts_language CHECK (language_code IN ('he', 'en'))"))
+  check('mutation control: a consent timestamp with no CHECK behind it would be caught',
+    !/CHECK \(auto_post_on_publish OR auto_post_enabled_at IS NULL\)/.test(
+      'ALTER TABLE x ADD COLUMN IF NOT EXISTS auto_post_enabled_at timestamptz;'))
+  check('mutation control: a switch defaulting to true would be caught',
+    !/auto_post_on_publish\s+boolean\s+NOT NULL\s+DEFAULT false/i.test('ADD COLUMN auto_post_on_publish boolean NOT NULL DEFAULT true'))
+  check("mutation control: a person's name back in the draft input would be caught",
+    /reviewerName|customerName|userName|authorName|ownerName|email/i.test(
+      stripComments('export interface DraftSource { businessName: string | null; customerName: string }')))
+}
+
+/*
+ * 31. THE PROSPECT RECORD BEHIND THE OUTBOUND EMAILS, AND HOW LONG IT LIVES.
+ *
+ * Until 12 October 2026 the published section said what we collect for a cold
+ * email and nothing about keeping it, because nothing was kept: the list lived
+ * in a file. The outreach thread then built public.outreach_prospects, a stored
+ * record per business, and asked whether the text owed anything. It owed three
+ * things, and two of them were a published sentence being made false:
+ *
+ *   1. "we do not collect details about a private individual" against a
+ *      contact_name column. In a one-person business the person and the business
+ *      are the same human, and that is exactly who this channel writes to. The
+ *      sentence is now narrowed to the business role someone is published in,
+ *      which is what we actually take; the old absolute is refused below, in all
+ *      four languages, so it cannot come back in a rewrite.
+ *   2. postal_address was collected and not disclosed at all.
+ *   3. A retention period. CPRA s.1798.100(a)(3) makes the notice at collection
+ *      state how long each category is kept, or the criterion used, and
+ *      "as long as necessary" is the formula California regulators reject. The
+ *      thread confirmed on 12 October that NOTHING in the code set redacted_at:
+ *      the column existed so a deletion request had somewhere to land, and a row
+ *      would otherwise have sat with the address and the name in it forever. So
+ *      this was a gap in the code, not in the wording, and the rule it is now
+ *      built to is the one the text states: 30 days after the last message
+ *      (or after a reply or an opt-out, whichever is later) the address, the
+ *      contact name and the postal address go; a record never written to is
+ *      deleted whole at 90 days. 30 is not a round number anyone liked — the
+ *      unsubscribe link resolves against this row and CAN-SPAM makes it work for
+ *      at least 30 days after a message, so nothing shorter is possible.
+ *
+ * The code checks are gated on the migration, as in sections 29 and 30: they are
+ * no-ops until the table lands and bind the day it does. Two of them are the
+ * ones that matter most. The column list is frozen against the disclosed field
+ * set, so a column added later fails this suite instead of quietly turning the
+ * text into an incomplete list; and the sweep is REQUIRED to exist once the table
+ * does, because a published period with no code behind it is the worse of the two
+ * states we were in. The sweep is found by scanning the outreach sources for
+ * redacted_at rather than by a path, since the path is theirs to choose; a file
+ * that merely reads the column satisfies the first check, which is why the
+ * periods and the two extra columns are checked separately.
+ */
+const OUTREACH_CONTACT_NAME: Record<string, RegExp> = {
+  he: /שם איש הקשר כאשר האתר/,
+  en: /the name of the contact person where the site publishes one/,
+  es: /el nombre de la persona de contacto cuando el sitio lo publica/,
+  'pt-BR': /o nome da pessoa de contato quando o site o publica/,
+}
+const OUTREACH_POSTAL: Record<string, RegExp> = {
+  he: /כתובת הדואר שהעסק מפרסם/,
+  en: /the postal address the business publishes/,
+  es: /la direcci[óo]n postal que la empresa publica/,
+  'pt-BR': /o endere[çc]o postal que a empresa publica/,
+}
+const OUTREACH_PERSON_NARROW: Record<string, RegExp> = {
+  he: /איננו אוספים על אדם שום דבר מעבר לתפקיד העסקי שבו הוא מפורסם/,
+  en: /we collect nothing about a person\s+beyond the business role they are published in/,
+  es: /no recogemos nada sobre una persona m[áa]s all[áa] del cargo con el que aparece publicada/,
+  'pt-BR': /n[ãa]o coletamos nada sobre uma pessoa al[ée]m do cargo com que ela aparece publicada/,
+}
+const OUTREACH_ERASE_30: Record<string, RegExp> = {
+  he: /30 יום אחרי ההודעה האחרונה ששלחנו לה/,
+  en: /erased 30 days after the last message we\s+sent it/,
+  es: /30 d[í i]as despu[ée]s del [úu]ltimo mensaje que le enviamos/,
+  'pt-BR': /30 dias depois da [úu]ltima mensagem que enviamos a ele/,
+}
+const OUTREACH_DELETE_90: Record<string, RegExp> = {
+  he: /נמחקת כולה 90 יום אחרי שנוספה/,
+  en: /deleted outright 90 days after it was added/,
+  es: /se elimina por completo 90 d[í i]as despu[ée]s de haberse a[ñn]adido/,
+  'pt-BR': /[ée] exclu[í i]do por inteiro 90 dias depois de ter sido adicionado/,
+}
+/* The absolute the contact_name column made false. Any language keeping it is a lie. */
+const OUTREACH_NO_LONGER_TRUE = /we\s+do not collect details about a private individual|איננו\s+אוספים פרטים על אדם פרטי|no recogemos datos sobre una persona privada|n[ãa]o coletamos dados sobre uma pessoa privada/
+{
+  const read = (path: string) => (existsSync(path) ? readFileSync(path, 'utf8') : '')
+  const enSource = frontMatter(text[LOCALES[0]].privacy).source
+  const pages: [string, string][] = [
+    ['he', read(HEBREW_PRIVACY)],
+    ['en', enSource ? read(enSource) : ''],
+    ...LOCALES.map((l): [string, string] => [l, text[l].privacy]),
+  ]
+  for (const [name, src] of pages) {
+    check(`${name}/privacy: the page was read`, src.length > 0)
+    check(`${name}/privacy: the broad "nothing about a private individual" claim is gone`,
+      !OUTREACH_NO_LONGER_TRUE.test(src))
+    check(`${name}/privacy: the contact person's name is disclosed as collected`,
+      (OUTREACH_CONTACT_NAME[name] ?? /$^/).test(src))
+    check(`${name}/privacy: the postal address is disclosed as collected`,
+      (OUTREACH_POSTAL[name] ?? /$^/).test(src))
+    check(`${name}/privacy: what we take about a person is narrowed to their business role`,
+      (OUTREACH_PERSON_NARROW[name] ?? /$^/).test(src))
+    check(`${name}/privacy: the 30-day erasure after the last message is stated`,
+      (OUTREACH_ERASE_30[name] ?? /$^/).test(src))
+    check(`${name}/privacy: the 90-day deletion of a record never written to is stated`,
+      (OUTREACH_DELETE_90[name] ?? /$^/).test(src))
+  }
+
+  const PROSPECTS_MIGRATION = 'supabase/migrations/20261012170000_outreach_prospects.sql'
+  const prospectsLanded = existsSync(PROSPECTS_MIGRATION)
+  console.log(`  · the prospect record ${prospectsLanded ? 'HAS landed; its code is checked below' : 'has NOT landed yet; its code checks are waiting for it'}`)
+  if (prospectsLanded) {
+    const migration = read(PROSPECTS_MIGRATION)
+    check(`${PROSPECTS_MIGRATION}: the United States promise is a database rule`,
+      /CHECK \(country = 'US'\)/.test(migration))
+    check(`${PROSPECTS_MIGRATION}: the postal address can be erased`,
+      !/postal_address\s+text\s+NOT NULL/.test(migration))
+    /*
+     * The three facts, not one constraint: the outreach thread expressed them as
+     * two CHECKs (outreach_prospects_redaction and ..._redaction_name) and may
+     * express them as three, so this asks the migration whether a redacted row
+     * can hold each column rather than how the author grouped them.
+     */
+    const checks = migration.replace(/^\s*--.*$/gm, '')
+    check(`${PROSPECTS_MIGRATION}: a redacted row holds no address, no contact name and no postal address`,
+      /email IS NULL/.test(checks) && /contact_name IS NULL/.test(checks) && /postal_address IS NULL/.test(checks))
+    const body = /CREATE TABLE IF NOT EXISTS public\.outreach_prospects \(([\s\S]*?)\n\);/.exec(migration)?.[1] ?? ''
+    const columns = [...body.matchAll(/^ {2}([a-z_]+)\s+(uuid|text|timestamptz|boolean|integer|jsonb)/gm)].map((m) => m[1])
+    const DISCLOSED = new Set([
+      'id', 'email', 'email_hash', 'unsub_token', 'company', 'contact_name', 'site_host',
+      'platform', 'country', 'postal_address', 'source_site', 'source_second', 'status',
+      'finding', 'finding_checked', 'first_sent_at', 'second_sent_at', 'replied_at',
+      'redacted_at', 'note', 'created_at', 'updated_at',
+    ])
+    const undisclosed = columns.filter((c) => !DISCLOSED.has(c))
+    check(`${PROSPECTS_MIGRATION}: the record holds nothing the published text does not list`,
+      columns.length > 0 && undisclosed.length === 0, undisclosed.join(', ') || 'no columns parsed')
+
+    const walk = (dir: string): string[] =>
+      existsSync(dir)
+        ? readdirSync(dir).flatMap((n) => {
+            const f = `${dir}/${n}`
+            return statSync(f).isDirectory() ? walk(f) : [f]
+          })
+        : []
+    const outreachSources = [...walk('lib/outreach'), ...walk('app/api/outreach')]
+      .filter((f) => f.endsWith('.ts') && !f.includes('__qa__'))
+    const sweepFiles = outreachSources.filter((f) => /redacted_at/.test(read(f)))
+    check('a retention sweep exists in the outreach code',
+      sweepFiles.length > 0, `scanned ${outreachSources.length} files`)
+    const sweep = sweepFiles.map(read).join('\n')
+    check('the sweep carries both published periods',
+      /\b30\b/.test(sweep) && /\b90\b/.test(sweep))
+    check('the sweep erases the contact name and the postal address, not only the address',
+      /contact_name/.test(sweep) && /postal_address/.test(sweep))
+  }
+
+  check('mutation control: the old "private individual" absolute is recognised',
+    OUTREACH_NO_LONGER_TRUE.test('We do not collect a phone number, we do not collect details about a private individual, and'))
+  check('mutation control: the narrowed sentence does not match the old absolute',
+    !OUTREACH_PERSON_NARROW.en.test('we do not collect details about a private individual'))
+  check('mutation control: a text giving only the 90-day rule is caught',
+    !OUTREACH_ERASE_30.en.test('A record we never wrote to is deleted outright 90 days after it was added.'))
+  check('mutation control: an undisclosed column would be caught',
+    [...'  phone_number      text NOT NULL'.matchAll(/^ {2}([a-z_]+)\s+(uuid|text|timestamptz|boolean|integer|jsonb)/gm)]
+      .map((m) => m[1]).filter((c) => c !== 'id').length === 1)
+  check('mutation control: a postal address that cannot be erased would be caught',
+    /postal_address\s+text\s+NOT NULL/.test('  postal_address    text NOT NULL,'))
+  check('mutation control: a redaction rule naming only the address would be caught',
+    !/contact_name IS NULL/.test("CONSTRAINT outreach_prospects_redaction CHECK ((email IS NULL) = (redacted_at IS NOT NULL))"))
+}
+
+// ── 32) the sender identity in the emails we send customers ─────────────────
+// Oren, 2026-10-13: the company name belongs in the emails that go to
+// customers, not only on the legal pages. Israel's Communications Law
+// s.30A(d)(2) wants an advertising message to name its sender and give an
+// address, and the three email families below (reminders, setup emails, the
+// weekly summary) all carry one shared footer line per language. Hebrew names
+// the Hebrew company; every other language names the English one.
+{
+  const read = (path: string) => (existsSync(path) ? readFileSync(path, 'utf8') : '')
+  const COPY: Array<[string, string, RegExp]> = [
+    ['he', 'lib/i18n/dashboard/he.ts', /גו טופ שיווק ופרסום דיגיטלי בע״מ \(ח\.פ\. 517274346\)/],
+    ['en', 'lib/i18n/dashboard/en.ts', new RegExp(`${REGISTERED} \\(company number 517274346\\)`)],
+    ['es', 'lib/i18n/dashboard/es.ts', new RegExp(`${REGISTERED} \\(n\\.º de empresa 517274346\\)`)],
+    ['pt-BR', 'lib/i18n/dashboard/pt-BR/tracking.ts', new RegExp(`${REGISTERED} \\(número de sociedade 517274346\\)`)],
+  ]
+  for (const [locale, path, named] of COPY) {
+    const src = read(path)
+    const lines = [...src.matchAll(/company: '([^']*)'/g)].map((m) => m[1])
+    check(`${locale}: all three customer email footers share one identity line`,
+      lines.length === 3 && new Set(lines).size === 1, `${lines.length} line(s)`)
+    check(`${locale}: the email footer names the company and its number`,
+      lines.length > 0 && lines.every((l) => named.test(l)), lines[0])
+    check(`${locale}: the email footer gives the registered address`,
+      lines.every((l) => /(הרכסים 24\/2, רמת גן 5235524|HaRechasim 24\/2, Ramat Gan 5235524, Israel)/.test(l)))
+    check(`${locale}: the email footer does not carry the superseded name`,
+      lines.every((l) => !SUPERSEDED_NAME.test(l)))
+  }
+  check('mutation control: a brand-only footer line is caught',
+    !new RegExp(`${REGISTERED}`).test('Go Top SEO · oren@gotop.co.il'))
+  check('mutation control: a footer with no address is caught',
+    !/(הרכסים 24\/2, רמת גן 5235524|HaRechasim 24\/2, Ramat Gan 5235524, Israel)/
+      .test(`${REGISTERED} (company number 517274346) · oren@gotop.co.il`))
 }
 
 console.log(`\n${pass} passed, ${fail} failed`)

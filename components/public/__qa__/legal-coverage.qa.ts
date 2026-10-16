@@ -148,9 +148,13 @@ for (const [topic, byLang] of Object.entries(TOPICS)) {
 
 // The product name and the last-updated line.
 const OLD_NAME = /Rankings by Go Top/i
+// Hebrew and English diverge from 13 October 2026: Oren changed the company's
+// ENGLISH name that day, so the English documents were revised and the Hebrew
+// ones, which carry the unchanged Hebrew name, were not. Each document's date
+// belongs to that document.
 const LAST_UPDATED: Record<Doc, Record<Lang, RegExp>> = {
-  terms: { he: /10 באוקטובר 2026/, en: /October 10, 2026/ },
-  privacy: { he: /10 באוקטובר 2026/, en: /October 10, 2026/ },
+  terms: { he: /12 באוקטובר 2026/, en: /October 13, 2026/ },
+  privacy: { he: /12 באוקטובר 2026/, en: /October 13, 2026/ },
   a11y: { he: /5 באוקטובר 2026/, en: /October 5, 2026/ },
 }
 for (const lang of ['he', 'en'] as Lang[]) for (const doc of ['terms', 'privacy', 'a11y'] as Doc[]) {

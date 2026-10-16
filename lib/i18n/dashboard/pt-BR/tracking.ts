@@ -210,7 +210,7 @@ export const trackingPtBR: DeepPartial<DashboardDictionary> = {
       team: 'A equipe da Go Top SEO',
       footer: 'Você recebe este e-mail porque tem um site ativo na Go Top SEO. Não quer estes lembretes?',
       unsubscribe: 'Cancele a inscrição com um clique, sem fazer login',
-      company: 'Go Top SEO · oren@gotop.co.il',
+      company: 'GO TOP DIGITAL MARKETING AND ADVERTISING LTD (número de sociedade 517274346) · HaRechasim 24/2, Ramat Gan 5235524, Israel · oren@gotop.co.il',
     },
     unsubscribePage: {
       title: 'Você cancelou a inscrição',
@@ -230,7 +230,7 @@ export const trackingPtBR: DeepPartial<DashboardDictionary> = {
     team: 'Equipe Go Top SEO',
     footer: 'Você recebeu este e-mail porque abriu um site no Go Top SEO e ainda não terminou de configurá-lo. Não quer estes e-mails?',
     unsubscribe: 'Parar os e-mails de início, com um clique e sem fazer login',
-    company: 'Go Top SEO · oren@gotop.co.il',
+    company: 'GO TOP DIGITAL MARKETING AND ADVERTISING LTD (número de sociedade 517274346) · HaRechasim 24/2, Ramat Gan 5235524, Israel · oren@gotop.co.il',
     connect: {
       subject: (domain: string) => `O site ${domain} ainda não está conectado`,
       preheader: 'Uma conexão, e a partir daí o sistema trabalha sozinho.',
@@ -276,7 +276,7 @@ export const trackingPtBR: DeepPartial<DashboardDictionary> = {
     team: 'Equipe Go Top SEO',
     footer: 'Você recebeu este e-mail porque ativou o resumo semanal nas configurações do site. Não quer mais?',
     unsubscribe: 'Cancelar com um clique, sem fazer login',
-    company: 'Go Top SEO · oren@gotop.co.il',
+    company: 'GO TOP DIGITAL MARKETING AND ADVERTISING LTD (número de sociedade 517274346) · HaRechasim 24/2, Ramat Gan 5235524, Israel · oren@gotop.co.il',
   },
 }
 

@@ -21,6 +21,7 @@ import { publishViaWebhook, type WebhookDeps } from './webhook'
 import { SITE_ARTICLE_SELECT, type SitePlatform, type SitePublishArticle, type SitePublishResult, type SiteErrorCode } from './types'
 import { AUTOMATION_MAX_ATTEMPTS } from '@/lib/content/automation/generate-item'
 import { recordPublishFinalFailureAlert, recordPublishBlockedAlert, resolvePublishAlerts } from '@/lib/content/automation/alerts'
+import { enqueueGbpPostForPublishedArticle } from '@/lib/gbp/auto-post'
 import { ensureProjectKeywordFromPublishedArticle } from '@/lib/content/keyword-from-article'
 import { loadSchemaContext } from '@/lib/content/article-visibility'
 import { composeWebhookBody } from '@/lib/content/article-style/publish'
@@ -122,6 +123,10 @@ export async function publishArticleToSite(
   }
   await admin.from('generated_articles').update({ status: 'published', published_at: nowIso(), last_error: null, updated_at: nowIso() }).eq('id', article.id)
   await ensureProjectKeywordFromPublishedArticle(admin, article.id)
+  // Also a post on the business profile, when the owner connected Google
+  // Business Profile and approved automatic posting. Best-effort, no network
+  // call to Google or to a model here; never affects the publish outcome.
+  await enqueueGbpPostForPublishedArticle(admin, article.id)
   return { ok: true, platform, postId: result.postId, url: result.url, reconciled: false }
 }
 

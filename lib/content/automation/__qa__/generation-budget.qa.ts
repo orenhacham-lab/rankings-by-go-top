@@ -49,6 +49,9 @@ function fakeGenerate(blocked: Set<string>, reason = 'quota_exceeded') {
   return { fn, calls, wrote }
 }
 
+/** Every project here has a connected site, unless a check says otherwise. */
+const connected = async () => ({ platform: 'wordpress' })
+
 async function main() {
   console.log('1) the pure rule')
   check('a written article spends the budget', spentGenerationBudget({}))
@@ -63,7 +66,7 @@ async function main() {
     const pools = [pool('a-trial-spent'), pool('b-shop'), pool('c-shop')]
     const admin = new FakeAdmin({ article_pools: pools, article_pool_items: pools.map((p) => item(p.id)) })
     const g = fakeGenerate(new Set(['a-trial-spent']))
-    await quiet(() => runAutomation(admin as unknown as Admin, { generate: g.fn, nowMs: firstRunFor(pools.length) }))
+    await quiet(() => runAutomation(admin as unknown as Admin, { generate: g.fn, platform: connected, nowMs: firstRunFor(pools.length) }))
     check('the blocked pool was tried', g.calls[0] === 'a-trial-spent', g.calls)
     check('the next pool still got its article written', g.wrote[0] === 'b-shop', g.wrote)
     check('the budget still caps real writes at one per run', g.wrote.length === 1, g.wrote)
@@ -74,7 +77,7 @@ async function main() {
     const pools = [pool('x1'), pool('x2'), pool('x3'), pool('y-ok')]
     const admin = new FakeAdmin({ article_pools: pools, article_pool_items: pools.map((p) => item(p.id)) })
     const g = fakeGenerate(new Set(['x1', 'x2', 'x3']), reason)
-    await quiet(() => runAutomation(admin as unknown as Admin, { generate: g.fn, nowMs: firstRunFor(pools.length) }))
+    await quiet(() => runAutomation(admin as unknown as Admin, { generate: g.fn, platform: connected, nowMs: firstRunFor(pools.length) }))
     check(`${reason}: the fourth pool still writes`, g.wrote.length === 1 && g.wrote[0] === 'y-ok', g)
   }
 
@@ -83,7 +86,7 @@ async function main() {
     const pools = [pool('a'), pool('b')]
     const admin = new FakeAdmin({ article_pools: pools, article_pool_items: pools.map((p) => item(p.id)) })
     const g = fakeGenerate(new Set())
-    await quiet(() => runAutomation(admin as unknown as Admin, { generate: g.fn, nowMs: firstRunFor(pools.length) }))
+    await quiet(() => runAutomation(admin as unknown as Admin, { generate: g.fn, platform: connected, nowMs: firstRunFor(pools.length) }))
     check('only the first pool was written', g.calls.length === 1 && g.wrote[0] === 'a', g)
   }
 
@@ -101,10 +104,32 @@ async function main() {
     for (let i = 0; i < 3; i++) {
       const admin = new FakeAdmin({ article_pools: pools, article_pool_items: pools.map((p) => item(p.id)) })
       const g = fakeGenerate(new Set(['a-times-out']), 'gemini_timeout')
-      await quiet(() => runAutomation(admin as unknown as Admin, { generate: g.fn, nowMs: firstRunFor(3) + i * RUN }))
+      await quiet(() => runAutomation(admin as unknown as Admin, { generate: g.fn, platform: connected, nowMs: firstRunFor(3) + i * RUN }))
       g.wrote.forEach((w) => wrote.add(w))
     }
     check('a pool whose writer keeps failing still lets both others write within three runs', wrote.has('b-shop') && wrote.has('c-shop'), [...wrote])
+  }
+
+  console.log('5b) a project with nowhere to publish gets no new article')
+  {
+    // Production, 5-12 Oct 2026: a Google Maps project with no site connected was written a
+    // fresh article on most runs; each was paused at publish, so the pool was short again.
+    const pools = [pool('a-maps'), pool('b-shop')]
+    const admin = new FakeAdmin({ article_pools: pools, article_pool_items: pools.map((p) => item(p.id)) })
+    const g = fakeGenerate(new Set())
+    const platform = async (_a: unknown, projectId: string) => ({ platform: projectId === 'project-a-maps' ? 'none' : 'wordpress' })
+    const r = await quiet(() => runAutomation(admin as unknown as Admin, { generate: g.fn, platform, nowMs: firstRunFor(2) }))
+    check('the project with no platform is never written to', !g.calls.includes('a-maps'), g.calls)
+    check('and it does not take the run\'s one generation from the next pool', g.wrote[0] === 'b-shop', g.wrote)
+    check('its diagnostic says why', r.diagnostics.find((d) => d.poolId === 'a-maps')?.note === 'held_no_publishing_platform', r.diagnostics.map((d) => d.note))
+    const conflict = fakeGenerate(new Set())
+    await quiet(() => runAutomation(new FakeAdmin({ article_pools: [pool('c')], article_pool_items: [item('c')] }) as unknown as Admin, { generate: conflict.fn, platform: async () => ({ platform: 'conflict' }), nowMs: firstRunFor(1) }))
+    check('two connected platforms in conflict hold it too', conflict.calls.length === 0)
+    const blip = fakeGenerate(new Set())
+    await quiet(() => runAutomation(new FakeAdmin({ article_pools: [pool('d')], article_pool_items: [item('d')] }) as unknown as Admin, { generate: blip.fn, platform: async () => { throw new Error('read failed') }, nowMs: firstRunFor(1) }))
+    check('a platform check that throws does not stop a connected project', blip.wrote.length === 1)
+    // MUTATION CONTROL, run by hand: deleting the `if (q && blocked)` branch in runner.ts fails
+    // the first three checks above (the Maps pool is written and takes the slot).
   }
 
   console.log('6) the daily stall check')
@@ -130,12 +155,15 @@ async function main() {
       article_pool_items: [{ id: 'i1', ...I('late', 'queued') }, { id: 'i2', ...I('ok', 'queued') }],
       projects: [{ id: 'pr-late', name: 'מטלון' }, { id: 'pr-ok', name: 'ok' }],
     })
-    const r = await quiet(() => checkPublishingStalls(world as unknown as Admin, { nowMs: now, deps: { env, send } }))
+    const r = await quiet(() => checkPublishingStalls(world as unknown as Admin, { nowMs: now, deps: { env, send }, platform: connected }))
     check('the check emails the operator once, naming the count', sent.length === 1 && sent[0].includes('1') && r.alert?.sent === true, [sent, r])
     const calm = new FakeAdmin({ article_pools: [{ ...P('ok', '2026-10-12T06:00:00Z'), is_active: true }], article_pool_items: [], projects: [] })
     sent.length = 0
-    await quiet(() => checkPublishingStalls(calm as unknown as Admin, { nowMs: now, deps: { env, send } }))
+    await quiet(() => checkPublishingStalls(calm as unknown as Admin, { nowMs: now, deps: { env, send }, platform: connected }))
     check('nothing late, no email', sent.length === 0)
+    sent.length = 0
+    const maps = await quiet(() => checkPublishingStalls(world as unknown as Admin, { nowMs: now, deps: { env, send }, platform: async () => ({ platform: 'none' }) }))
+    check('a late queue whose project has no site to publish to is not reported (12 Oct false alarm)', sent.length === 0 && maps.stalled.length === 0, maps)
     check('only the Vercel cron\'s call runs the daily check', isDailyStallCheckRun(new Request('http://x', { headers: { 'user-agent': 'vercel-cron/1.0' } })) && !isDailyStallCheckRun(new Request('http://x', { headers: { 'user-agent': 'cron-job.org' } })))
   }
 

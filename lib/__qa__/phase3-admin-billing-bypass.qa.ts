@@ -13,7 +13,12 @@
  * it should never reach at all.
  *
  * Root cause: getUserEntitlement's admin short-circuit deliberately returns
- * plan: 'premium' as an internal stand-in to grant full product limits (see
+ * the LARGEST plan as an internal stand-in to grant full product limits —
+ * 'premium' when this was written, 'large_agency' since Premium became the
+ * 10-project entry tier (keeping 'premium' would have shrunk an existing
+ * admin account from 25 projects to 10). The checks below ask for the
+ * largest entitlement rather than a plan name, so the next catalog change
+ * cannot make them lie (see
  * lib/subscription.ts) — this was never meant to represent a real
  * subscribed plan, but app/(dashboard)/billing/page.tsx displayed it as
  * one. Separately, that same page computed `shopifyConnected` directly from
@@ -52,7 +57,7 @@
 import { readFileSync } from 'fs'
 import { join } from 'path'
 import { FakeAdmin } from './_fake-admin'
-import { getUserEntitlement } from '../subscription'
+import { getUserEntitlement, PLAN_LIMITS } from '../subscription'
 import { isAdminUser } from '@/app/api/shopify/billing/start-intent/route'
 import { dashboardHe } from '../i18n/dashboard/he'
 import { dashboardEn } from '../i18n/dashboard/en'
@@ -61,6 +66,14 @@ let pass = 0, fail = 0
 function check(name: string, cond: boolean, detail?: string) {
   if (cond) { pass++; console.log(`  ✓ ${name}`) } else { fail++; console.log(`  ✗ ${name}${detail ? ` — ${detail}` : ''}`) }
 }
+/** The admin stand-in must be whichever plan imposes no ceiling, by its limits
+ *  and not by its name: a literal here is what went stale when the catalog moved. */
+function isLargestPlan(plan: string): boolean {
+  const limits = PLAN_LIMITS[plan as keyof typeof PLAN_LIMITS]
+  const biggest = Math.max(...Object.values(PLAN_LIMITS).map((l) => l.maxProjects))
+  return !!limits && limits.maxProjects === biggest
+}
+
 const ROOT = join(__dirname, '..', '..')
 const read = (rel: string) => readFileSync(join(ROOT, rel), 'utf8')
 /** Strips block/line comments before a source-contract regex check — a
@@ -87,7 +100,7 @@ async function main() {
     )
     const ent = await getUserEntitlement('u1', admin as never)
     check('1: isAdmin is true', ent.isAdmin === true)
-    check('1: plan is the internal stand-in only (never surfaced as a real plan by the UI after this fix)', ent.plan === 'premium')
+    check('1: plan is the internal stand-in only (never surfaced as a real plan by the UI after this fix)', isLargestPlan(ent.plan))
     check('1: hasActiveSubscription true (full product access)', ent.hasActiveSubscription === true)
   }
 
@@ -105,7 +118,11 @@ async function main() {
     )
     const ent = await getUserEntitlement('u1', admin as never)
     check('3: isAdmin is true — an active-looking Shopify cache never overrides admin status', ent.isAdmin === true)
-    check('3: plan is still the internal stand-in, not the Shopify-cached plan', ent.plan === 'premium')
+    // Not compared against the cached handle 'premium-plan': PlanType and the
+    // Shopify handles are different string sets, so tsc already refuses that
+    // comparison. What is checkable, and what the scenario means, is that the
+    // active-looking cache did not change the answer.
+    check('3: plan is still the internal stand-in, not the Shopify-cached plan', isLargestPlan(ent.plan))
   }
 
   console.log('\n4) isAdminUser (start-intent route\'s exported gate function) — behavioral proof')

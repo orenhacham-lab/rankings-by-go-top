@@ -9,13 +9,15 @@
  * than a day ago while it still has work in it.
  *
  * A queue held by its owner's account (allowance spent, Shopify plan not
- * chosen) is not a stall: it is by design and the owner already sees it. It is
- * left out so the email only ever means "something is broken".
+ * chosen, no site connected to publish to) is not a stall: it is by design and
+ * the owner already sees it. It is left out so the email only ever means
+ * "something is broken".
  *
  * Read only. Runs once a day from the Vercel cron (see the cron route).
  */
 import type { createAdminClient } from '@/lib/supabase/admin'
 import { deliverOperatorEmail, type AlertDeps, type DeliverResult } from '@/lib/notifications/operator-alerts'
+import { loadActivePlatform } from '@/lib/content/platform/load-active-platform'
 
 type Admin = ReturnType<typeof createAdminClient>
 
@@ -55,7 +57,7 @@ export function buildStallAlertHtml(stalled: StalledPool[]): string {
 
 /** Reads the queues and emails the operator when any are stalled. Never throws. */
 export async function checkPublishingStalls(
-  admin: Admin, opts: { nowMs?: number; deps?: AlertDeps } = {},
+  admin: Admin, opts: { nowMs?: number; deps?: AlertDeps; platform?: (admin: Admin, projectId: string) => Promise<{ platform: string }> } = {},
 ): Promise<{ stalled: StalledPool[]; alert: DeliverResult | null }> {
   try {
     const nowMs = opts.nowMs ?? Date.now()
@@ -67,7 +69,16 @@ export async function checkPublishingStalls(
       .in('pool_id', late.map((p) => p.id)).in('status', ['queued', 'generated'])
     const { data: projects } = await admin.from('projects').select('id, name').in('id', late.map((p) => p.project_id))
     const names = new Map(((projects ?? []) as { id: string; name: string | null }[]).map((p) => [p.id, p.name ?? p.id]))
-    const stalled = findStalledPools(late, (items ?? []) as ItemRow[], names, nowMs)
+    const found = findStalledPools(late, (items ?? []) as ItemRow[], names, nowMs)
+    // A project with no publishing platform (or two in conflict) waits on its owner.
+    const platformOf = opts.platform ?? loadActivePlatform
+    const projectOf = new Map(late.map((p) => [p.id, p.project_id]))
+    const stalled: StalledPool[] = []
+    for (const s of found) {
+      const r = await platformOf(admin, projectOf.get(s.poolId) ?? '').catch(() => null)
+      if (r && (r.platform === 'none' || r.platform === 'conflict')) continue
+      stalled.push(s)
+    }
     if (stalled.length === 0) return { stalled, alert: null }
     console.error('[automation-stall] scheduled articles are overdue', { count: stalled.length, worstHours: stalled[0].overdueHours })
     const alert = await deliverOperatorEmail({ subject: `התראה: מאמרים מתוזמנים לא יצאו ב-${stalled.length} פרויקטים`, html: buildStallAlertHtml(stalled) }, opts.deps)

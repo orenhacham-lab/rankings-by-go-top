@@ -3,7 +3,7 @@ title: Termos de Uso | Go Top SEO
 description: Termos de uso do Go Top SEO — as condições que regem o uso do nosso serviço.
 locale: pt-BR
 source: app/(public)/en/terms/page.tsx
-lastUpdated: 2026-10-10
+lastUpdated: 2026-10-13
 register: voce
 extraSections: 0
 extraReason: No extra section. What Brazilian law adds goes inside the sections it belongs to — the seven-day right of withdrawal as 7.5 in Refunds, and the Consumer Code's forum rule as 20.1 in Governing Law — so the heading structure stays identical to the English document.
@@ -11,7 +11,7 @@ extraReason: No extra section. What Brazilian law adds goes inside the sections 
 
 ## 1. Introdução e definição do Serviço
 
-O Go Top SEO (o «Serviço» ou a «Plataforma») é um serviço SaaS operado pela GO TOP MARKETING GRUO LTD (número de sociedade 517274346) (a «Empresa»). O Serviço permite que os clientes acompanhem posições de palavras-chave na busca do Google, monitorem a visibilidade no Google Maps, meçam a visibilidade em motores de IA como ChatGPT, Gemini e Perplexity, realizem pesquisa de palavras-chave e gerem relatórios profissionais. O Serviço inclui também análises de sites, conexões com contas Google e sites WordPress, correções no site aprovadas por você, conteúdo e mensagens de e-mail gerados por IA, conforme as seções 15A a 15G.
+O Go Top SEO (o «Serviço» ou a «Plataforma») é um serviço SaaS operado pela GO TOP DIGITAL MARKETING AND ADVERTISING LTD (número de sociedade 517274346) (a «Empresa»). O Serviço permite que os clientes acompanhem posições de palavras-chave na busca do Google, monitorem a visibilidade no Google Maps, meçam a visibilidade em motores de IA como ChatGPT, Gemini e Perplexity, realizem pesquisa de palavras-chave e gerem relatórios profissionais. O Serviço inclui também análises de sites, conexões com contas Google e sites WordPress, correções no site aprovadas por você, conteúdo e mensagens de e-mail gerados por IA, conforme as seções 15A a 15G.
 
 ## 2. Aceitação dos Termos
 
@@ -203,6 +203,8 @@ O Serviço usa IA para produzir temas de artigos, perguntas e artigos. Esse cont
 - **Links internos.** O Serviço pode acrescentar automaticamente links internos para outras páginas do seu site dentro dos artigos.
 - **Caixa de chamada para ação.** A caixa de chamada para ação no fim de um artigo é opcional, e você pode ativá-la, desativá-la e editar seu texto.
 - **Aprovação e publicação.** O conteúdo é exibido a você para aprovação e é publicado no seu site conforme as configurações de aprovação e publicação que você escolheu para o projeto. Você pode editar, rejeitar ou excluir qualquer conteúdo.
+- **Responder a uma avaliação no seu Perfil da Empresa no Google.** Se você pedir um rascunho de resposta a uma avaliação, o rascunho é produzido por IA e exibido a você antes de qualquer envio. Uma resposta é enviada somente depois que você a escreveu ou aprovou e clicou em enviar, e ela é publicada publicamente no perfil da sua empresa e em seu nome. **Você é responsável pelo conteúdo da resposta**, mesmo quando o rascunho foi produzido por IA, o que inclui a exatidão dos fatos, a difamação, os direitos de terceiros e as políticas de conteúdo do Google. O Google pode remover uma resposta conforme essas políticas, e não temos controle sobre isso.
+- **Publicação automática no seu Perfil da Empresa no Google.** Se você ativou a publicação automática, cada artigo que o sistema publica no seu site também é publicado como postagem no perfil da sua empresa no Google, **sem que você o leia antes**. **Você é responsável pelo conteúdo publicado em seu nome**, tanto quando o texto foi produzido por IA como quando você não o leu antes da publicação, o que inclui a exatidão dos fatos, a difamação, os direitos de terceiros e as políticas de conteúdo do Google. Você pode desativar a publicação automática a qualquer momento, e ela se desativa por conta própria se você trocar a empresa à qual o projeto está conectado.
 
 ## 15G. Mensagens de e-mail
 
@@ -243,8 +245,8 @@ Estes termos são regidos pelas leis do Estado de Israel. A competência exclusi
 
 Para qualquer dúvida sobre estes termos ou sobre o Serviço, fale com a gente:
 
-**GO TOP MARKETING GRUO LTD**  
+**GO TOP DIGITAL MARKETING AND ADVERTISING LTD**  
 Número da sociedade: 517274346  
 E-mail: [oren@gotop.co.il](mailto:oren@gotop.co.il)
 
-Última atualização: 10 de outubro de 2026
+Última atualização: 13 de outubro de 2026

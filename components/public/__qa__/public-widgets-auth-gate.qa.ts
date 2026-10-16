@@ -39,9 +39,18 @@ function main() {
 
   console.log('SOURCE) auth is resolved server-side and passed to the widget')
   const layout = strip(read('app/layout.tsx'))
-  check('root layout is async + reads auth via getUser()', /async function RootLayout/.test(layout) && /supabase\.auth\.getUser\(\)/.test(layout))
+  // The read itself moved out of app/layout.tsx into lib/i18n/root-request.ts,
+  // wrapped in React's `cache`, so the root layout's generateMetadata and its
+  // render resolve "who is this" ONCE instead of twice (two answers could
+  // disagree and put a Hebrew title on an English document). The contract this
+  // file guards is unchanged, so it is now checked where it lives.
+  const rootCtx = strip(read('lib/i18n/root-request.ts'))
+  check('root layout is async + reads auth via getUser()',
+    /async function RootLayout/.test(layout)
+    && /await getRootRequestContext\(\)/.test(layout)
+    && /supabase\.auth\.getUser\(\)/.test(rootCtx))
   check('root layout passes isAuthenticated to the widget', /<PublicSiteWidgets isAuthenticated=\{isAuthenticated\}/.test(layout))
-  check('auth failure defaults to the safe public behavior (no app break)', /catch\s*\{[\s\S]*isAuthenticated = false/.test(layout))
+  check('auth failure defaults to the safe public behavior (no app break)', /catch\s*\{[\s\S]*isAuthenticated = false/.test(rootCtx))
   const widget = strip(read('components/public/PublicSiteWidgets.tsx'))
   check('widget early-returns null when it should not render', /if \(!shouldRenderPublicWidgets\([\s\S]*return null/.test(widget))
   check('widget still preserves the pathname gate for unauth visitors', /isNonPublicArea/.test(widget))

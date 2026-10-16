@@ -566,6 +566,15 @@ async function main() {
       'lib/billing/__qa__/billing-authority.qa.ts', 'lib/billing/__qa__/shopify-trial-usage-period.qa.ts',
     ])
     untouched = untouched.split('\n').filter((f) => f && !NO_DOUBLE_BILLING.has(f)).join('\n')
+    // Owner 2026-10-10: Creem as a second provider (9f1723e4). The one write that
+    // turns a verified payment into an entitlement MOVED from
+    // lib/paypal/activation-processing.ts to this file, unchanged in behaviour,
+    // because Creem needs the same write and a second copy of it is the last
+    // thing this table should have; the old path re-exports it. No plan, price
+    // or quota VALUE changes here — H3c above proves the catalog itself is
+    // untouched, and that is the number this check exists to protect.
+    const CREEM_PROVIDER = new Set(['lib/billing/entitlement-write.ts'])
+    untouched = untouched.split('\n').filter((f) => f && !CREEM_PROVIDER.has(f)).join('\n')
     check('H4: plans, prices, quotas, billing, entitlement and Shopify files are untouched', untouched === '', untouched)
     // lib/subscription.ts may differ from 8b468a8 ONLY on the display-only trial line (PLAN_FEATURES.trial); nothing of entitlement moved.
     let subDiff = ''
