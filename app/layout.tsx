@@ -14,6 +14,7 @@ import { marketForCountry } from '@/lib/billing/market'
 import { requestCountry } from '@/lib/billing/server-market'
 import { GOOGLE_CONSENT_DEFAULT_SCRIPT } from '@/lib/consent/google-consent-mode'
 import { GoogleTags } from '@/components/consent/GoogleTags'
+import { MetaPixel } from '@/components/consent/MetaPixel'
 import { DocumentLocaleSync } from '@/components/DocumentLocaleSync'
 
 /**
@@ -183,6 +184,7 @@ export default async function RootLayout({
           who can neither be asked for consent nor withdraw it.
         */}
         <GoogleTags />
+        <MetaPixel />
         {/* <html lang/dir> is rendered once, above every changing segment; this
             re-states it after a client-side navigation into another language. */}
         <DocumentLocaleSync />
