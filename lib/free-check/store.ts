@@ -18,7 +18,7 @@ import { createHash } from 'crypto'
 import { createAdminClient, type ServiceRoleClient } from '@/lib/supabase/admin'
 import type { FreeCheckResult } from './types'
 import type { FreeCheckSeed } from './run'
-import type { Locale } from '@/lib/i18n/locales'
+import type { PublicLocale } from '@/lib/i18n/locales'
 
 /** A cached result is replayed for this long. Matches "one check per day per domain". */
 export const CACHE_TTL_MS = 24 * 60 * 60 * 1000
@@ -69,7 +69,7 @@ export type Gate =
  * spend a model call.
  */
 export async function checkGate(
-  args: { domain: string; locale: Locale; clientHash: string },
+  args: { domain: string; locale: PublicLocale; clientHash: string },
   admin: ServiceRoleClient = createAdminClient(),
   now: Date = new Date(),
 ): Promise<Gate> {
@@ -118,7 +118,7 @@ export async function checkGate(
  * account handoff are lost with it, so the id comes back null instead.
  */
 export async function recordRun(
-  args: { domain: string; locale: Locale; url: string; result: FreeCheckResult; seed: FreeCheckSeed; clientHash: string },
+  args: { domain: string; locale: PublicLocale; url: string; result: FreeCheckResult; seed: FreeCheckSeed; clientHash: string },
   admin: ServiceRoleClient = createAdminClient(),
 ): Promise<string | null> {
   const { data, error } = await admin

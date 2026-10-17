@@ -17,7 +17,7 @@ import { createAdminClient, type ServiceRoleClient } from '@/lib/supabase/admin'
 import { CACHE_TTL_MS } from './store'
 import type { FreeCheckSeed } from './run'
 import type { FreeCheckResult } from './types'
-import type { Locale } from '@/lib/i18n/locales'
+import type { PublicLocale } from '@/lib/i18n/locales'
 
 export function hashClaimToken(token: string): string {
   return createHash('sha256').update(token).digest('hex')
@@ -54,7 +54,7 @@ export type ClaimedScan = {
   checkId: string
   domain: string
   url: string
-  locale: Locale
+  locale: PublicLocale
   /** The public result, as the visitor saw it. */
   result: FreeCheckResult
   /**
@@ -118,7 +118,7 @@ export async function consumeClaimToken(
     .eq('id', row.check_id)
     .limit(1)
   if (scan.error) return { ok: false, reason: 'internal' }
-  const found = (scan.data as { id: string; domain: string; url: string; locale: Locale; result: FreeCheckResult; seed: FreeCheckSeed | null }[] | null)?.[0]
+  const found = (scan.data as { id: string; domain: string; url: string; locale: PublicLocale; result: FreeCheckResult; seed: FreeCheckSeed | null }[] | null)?.[0]
   if (!found) return { ok: false, reason: 'not_found' }
 
   return {

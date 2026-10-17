@@ -13,7 +13,7 @@
 import { freeCheckCopy } from './copy'
 import { readRobots, type SiteSignals } from './html-signals'
 import type { FreeCheckFinding, GeoSignal } from './types'
-import type { Locale } from '@/lib/i18n/locales'
+import type { PublicLocale } from '@/lib/i18n/locales'
 
 const TITLE_MIN = 30
 const TITLE_MAX = 65
@@ -23,7 +23,7 @@ const THIN_CONTENT_WORDS = 250
 /** Below this share of images carrying alt text, it is worth reporting. */
 const ALT_TOLERANCE = 0.2
 
-export function buildFindings(signals: SiteSignals, locale: Locale): FreeCheckFinding[] {
+export function buildFindings(signals: SiteSignals, locale: PublicLocale): FreeCheckFinding[] {
   const copy = freeCheckCopy(locale)
   const out: FreeCheckFinding[] = []
   const add = (id: string, severity: FreeCheckFinding['severity'], evidence?: string) => {
@@ -64,7 +64,7 @@ export function buildFindings(signals: SiteSignals, locale: Locale): FreeCheckFi
 }
 
 /** The four AI-readiness signals, in the order the results screen shows them. */
-export function buildGeoSignals(signals: SiteSignals, locale: Locale): GeoSignal[] {
+export function buildGeoSignals(signals: SiteSignals, locale: PublicLocale): GeoSignal[] {
   const copy = freeCheckCopy(locale)
   const robots = readRobots(signals.robotsTxt)
   const states: { id: keyof typeof copy.geo | string; ok: boolean }[] = [
