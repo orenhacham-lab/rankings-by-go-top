@@ -85,9 +85,9 @@ export const PUBLIC_SOURCES: readonly PublicSource[] = [
   { name: 'springfield-chamber', url: 'https://business.springfieldchamber.com/activememberdirectory/Search/manufacturing-128889' },
   { name: 'minnesota-grown', url: 'https://minnesotagrown.com/member/', detailHint: '/member/' },
   { name: 'georgia-grown', url: 'https://georgiagrown.com/membership/member-directory/', detailHint: '/member/' },
-  { name: 'pride-of-ny', url: 'https://certifiedny.agriculture.ny.gov/producers', detailHint: '/producer' },
-  { name: 'made-in-michigan', url: 'https://www.michiganbusiness.org/industries/food-agriculture/' },
-  { name: 'alabama-farmers', url: 'https://alabamafarmersmarket.org/vendors/' },
+  // pride-of-ny, made-in-michigan and alabama-farmers are gone too: the pass at
+  // 11:15 UTC on 17 Oct read all three and not one of them answered, which is
+  // Production saying what a cloud container could only guess.
   // jersey-fresh is deliberately gone: findjerseyfresh.com/directory/ is a
   // search form, its members are reachable only by submitting it, and the only
   // off-site links it carries are the state's other programmes.
@@ -155,8 +155,14 @@ export async function runProspectTopUp(
     if (summary.examined >= MAX_CANDIDATES_PER_PASS) return summary
     if (listingsRead >= MAX_SOURCES_PER_PASS) return summary
     const source = sources[(start + i) % sources.length]
-    const candidates = await readListing(source, deps, summary)
-    listingsRead += 1
+    const listing = await readListing(source, deps, summary)
+    // A SOURCE THAT DID NOT ANSWER DOES NOT SPEND A SLOT. The pass at 11:15 UTC
+    // on 17 Oct started, by the hour, at the three directories that answer
+    // nothing, and the budget of three was gone before it reached a working
+    // one: three fetches, nothing examined. An unreachable listing costs one
+    // request, which is the honest price of it, not a third of the pass.
+    if (listing.reachable) listingsRead += 1
+    const candidates = listing.candidates
     if (candidates.length === 0) continue
     summary.source = source.name
 
@@ -189,15 +195,25 @@ export async function runProspectTopUp(
   return summary
 }
 
-/** The businesses one source names, following one hop where it needs to. */
+/**
+ * The businesses one source names, following one hop where it needs to, and
+ * whether the listing answered at all — which decides whether this source
+ * spent one of the pass's slots.
+ */
+interface ListingRead {
+  candidates: ListingCandidate[]
+  /** False when the listing could not be fetched or was not an open page. */
+  reachable: boolean
+}
+
 async function readListing(
   source: PublicSource,
   deps: TopUpDeps,
   summary: TopUpSummary,
-): Promise<ListingCandidate[]> {
+): Promise<ListingRead> {
   const listing = await fetchOrNull(deps.fetchPage, source.url)
   summary.fetched += 1
-  if (listing === null || !isOpenPage(listing)) return []
+  if (listing === null || !isOpenPage(listing)) return { candidates: [], reachable: false }
 
   // Their robots.txt decides, on the listing as on anything else.
   const origin = (() => { try { return new URL(source.url).origin } catch { return null } })()
@@ -205,7 +221,9 @@ async function readListing(
     const robots = await fetchOrNull(deps.fetchPage, `${origin}/robots.txt`)
     summary.fetched += 1
     const path = (() => { try { return new URL(source.url).pathname } catch { return '/' } })()
-    if (robots !== null && robots.status === 200 && !robotsAllows(robots.body, path, CRAWLER_AGENT)) return []
+    if (robots !== null && robots.status === 200 && !robotsAllows(robots.body, path, CRAWLER_AGENT)) {
+      return { candidates: [], reachable: true }
+    }
   }
 
   // THE MEMBER PAGES COME FIRST where the source declares them. A directory
@@ -216,9 +234,9 @@ async function readListing(
   // directories that have no hop.
   if (source.detailHint !== undefined) {
     const members = await readDetailPages(listing.body, source.url, source.detailHint, deps, summary)
-    if (members.length > 0) return members
+    if (members.length > 0) return { candidates: members, reachable: true }
   }
-  return listingCandidates(listing.body, source.url)
+  return { candidates: listingCandidates(listing.body, source.url), reachable: true }
 }
 
 /**
