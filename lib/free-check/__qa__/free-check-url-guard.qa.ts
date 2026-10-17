@@ -86,7 +86,9 @@ async function main() {
   const fetchSrc = stripComments(read('../site-fetch.ts'))
   check('redirects are followed manually, never by fetch', /redirect:\s*'manual'/.test(fetchSrc))
   check('each hop goes through normalizeCheckUrl', /normalizeCheckUrl\(next\.toString\(\)\)/.test(fetchSrc))
-  check('each request re-resolves through assertPublicHost', /assertPublicHost\(url\.hostname\)/.test(fetchSrc))
+  // The hop's OWN hostname must be the first argument; a second one is allowed
+  // because the fetcher takes an injectable resolver for tests.
+  check('each request re-resolves through assertPublicHost', /assertPublicHost\(url\.hostname\s*[,)]/.test(fetchSrc))
   check('hop count is bounded', /MAX_REDIRECTS/.test(fetchSrc))
   check('body size is capped while streaming', /total > MAX_BYTES/.test(fetchSrc))
   check('a wall-clock timeout aborts the request', /AbortController|setTimeout\(\(\) => controller\.abort/.test(fetchSrc))

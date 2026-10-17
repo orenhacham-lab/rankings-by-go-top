@@ -199,7 +199,12 @@ async function main() {
     })
     const res = new Response(body, { status: 200, headers: { 'content-type': 'text/html' } })
     const { fetchSiteHtml } = await import('../site-fetch')
-    return fetchSiteHtml(new URL('https://example.co.il/'), { fetchImpl: async () => res })
+    // A fixed resolver, so this case is about the BODY dying mid-stream and not
+    // about whether a public hostname resolves from wherever the suite runs.
+    return fetchSiteHtml(new URL('https://example.co.il/'), {
+      fetchImpl: async () => res,
+      resolver: async () => [{ address: '93.184.216.34', family: 4 }],
+    })
   })()
   check('a stream that dies with nothing usable is a fetch failure, not an exception',
     !brokenStream.ok && brokenStream.reason === 'timeout', JSON.stringify(brokenStream))
