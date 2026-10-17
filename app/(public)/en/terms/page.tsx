@@ -728,9 +728,9 @@ export default function EnglishTermsPage() {
           person in the photo is a minor, their guardian&rsquo;s consent is required.
         </p>
         <p>
-          If that consent is withdrawn, you must remove the photo in the Service. Deleting the photo or
-          turning the setting off erases the file from our storage, but a copy already placed in your
-          site&rsquo;s media library or in Shopify Files is under your control and only you can delete it
+          If that consent is withdrawn, you must remove the photo in the Service. Deleting the photo, or
+          switching to an option with no photo, erases the file from our storage, but a copy already
+          placed in your site&rsquo;s media library is under your control and only you can delete it
           there. We may remove a photo from the Service if we receive a credible report that it was
           published without permission.
         </p>

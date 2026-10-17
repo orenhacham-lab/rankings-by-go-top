@@ -222,7 +222,7 @@ El Servicio utiliza IA para producir temas de artículos, preguntas, artículos 
 
 Si sube una foto para una caja de autor, usted confirma que dispone de todos los derechos necesarios para publicarla y que, si en ella aparece una persona — usted u otra —, esa persona ha consentido que la foto se publique en su sitio para promocionar un negocio, incluido el uso comercial. Si la persona que aparece en la foto es menor de edad, se requiere el consentimiento de su tutor.
 
-Si ese consentimiento se retira, usted debe eliminar la foto en el Servicio. Al eliminar la foto o al desactivar la opción se borra el archivo de nuestro almacenamiento, pero una copia que ya se haya colocado en la biblioteca de medios de su sitio o en Shopify Files está bajo su control y solo usted puede eliminarla allí. Podemos retirar una foto del Servicio si recibimos un aviso fundado de que se publicó sin autorización.
+Si ese consentimiento se retira, usted debe eliminar la foto en el Servicio. Al eliminar la foto, o al pasar a una opción sin foto, se borra el archivo de nuestro almacenamiento, pero una copia que ya se haya colocado en la biblioteca de medios de su sitio está bajo su control y solo usted puede eliminarla allí. Podemos retirar una foto del Servicio si recibimos un aviso fundado de que se publicó sin autorización.
 
 ## 16. Privacidad
 
