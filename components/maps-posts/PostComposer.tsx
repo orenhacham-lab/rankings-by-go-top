@@ -299,6 +299,7 @@ export default function PostComposer({ projectId, status, onPosted }: { projectI
               </div>
             </div>
             <p className="text-caption text-muted">{c.imageHint}</p>
+            <p className="text-caption text-muted" data-gbp-image-consent="">{c.imageConsent}</p>
             {picked?.ai && <p data-gbp-image-ai="" className="text-caption text-muted">{c.imageGeneratedHint}</p>}
             {picked && (
               <div className="grid gap-4 rounded-inset border border-line bg-sunk p-4 sm:grid-cols-[12rem_minmax(0,1fr)]">
