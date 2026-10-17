@@ -162,7 +162,13 @@ export async function runProspectTopUp(
     // one: three fetches, nothing examined. An unreachable listing costs one
     // request, which is the honest price of it, not a third of the pass.
     if (listing.reachable) listingsRead += 1
-    const candidates = listing.candidates
+    // AND THE SAME WINDOW OVER A FLAT LISTING'S CANDIDATES. Production, 14:15
+    // and 14:30 UTC on 17 Oct: the same four businesses of a 384-member
+    // directory, examined twice, refused twice, with 380 members never reached.
+    // A candidate is skipped from our own table only once it was ADDED; one
+    // that was refused (a 403, no contact address, an unrecognised platform)
+    // sits at the head of the list for ever. So the window moves.
+    const candidates = passWindow(listing.candidates, deps.now, MAX_CANDIDATES_PER_PASS)
     if (candidates.length === 0) continue
     summary.source = source.name
 
@@ -291,21 +297,25 @@ async function readDetailPages(
 }
 
 /**
- * The member pages this pass reads, out of however many the listing names.
+ * The slice of a long list this pass works on, out of however many it holds.
  *
  * The window MOVES, and that is the whole point: a fixed first four would be
- * the same four businesses every quarter hour for ever, so a directory would
- * add at most four and then nothing. Unlike the flat listings, a member page
- * cannot be skipped from our own table before it is fetched, since the host it
- * names is only known after reading it.
+ * the same four every quarter hour for ever, so a directory of hundreds would
+ * yield at most four and then nothing. It moves by a whole window, not by one,
+ * so consecutive passes do not re-read three quarters of the same slice.
  */
-export function detailPageWindow(pages: string[], now: Date): string[] {
-  if (pages.length <= MAX_DETAIL_PAGES) return pages
+export function passWindow<T>(items: T[], now: Date, size: number): T[] {
+  if (items.length <= size) return items
   const quarterHours = Math.floor(now.getTime() / (15 * 60 * 1000))
-  const start = ((quarterHours % pages.length) + pages.length) % pages.length
-  const out: string[] = []
-  for (let i = 0; i < MAX_DETAIL_PAGES; i += 1) out.push(pages[(start + i) % pages.length])
+  const start = (((quarterHours * size) % items.length) + items.length) % items.length
+  const out: T[] = []
+  for (let i = 0; i < size; i += 1) out.push(items[(start + i) % items.length])
   return out
+}
+
+/** The member pages this pass reads. */
+export function detailPageWindow(pages: string[], now: Date): string[] {
+  return passWindow(pages, now, MAX_DETAIL_PAGES)
 }
 
 async function fetchOrNull(fetchPage: PageFetcher, url: string) {
