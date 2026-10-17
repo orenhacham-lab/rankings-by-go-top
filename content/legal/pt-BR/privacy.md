@@ -29,6 +29,7 @@ Coletamos diferentes tipos de informação, entre eles:
 - **Um endereço para acompanhamento local de posições:** se você digitou um endereço exato, ele é armazenado junto com as coordenadas retornadas — veja «Conversão de um endereço em coordenadas» abaixo
 - **Rede de links:** o seu consentimento de entrada (quem aceitou, quando, o texto e o tipo de link) e o log de inserções — veja «Rede de links» abaixo
 - **Resultados e conteúdo:** resultados das verificações de visibilidade em IA e o conteúdo gerado para você: temas, perguntas e artigos
+- **Foto de autor:** uma foto que você envia para uma caixa de autor, se tiver escolhido exibi-la — veja «Uma foto de autor que você envia» abaixo
 - **Preferências de e-mail:** quais mensagens você recebe e os cancelamentos de lembretes
 - **Informações de pagamento:** não armazenamos o seu meio de pagamento. Para contas cuja autoridade de cobrança é a Shopify — inclusive comerciantes que instalaram o aplicativo pela Shopify — o pagamento é processado pela Shopify sob o Shopify App Pricing, e nunca os direcionamos ao PayPal. Para clientes que se cadastraram diretamente no nosso site, cuja autoridade de cobrança não é a Shopify, o pagamento é processado pelo PayPal
 
@@ -185,6 +186,18 @@ O programa de parceiros é para quem recomenda o Serviço e recebe uma comissão
 
 Na data desta política o programa funciona assim: a candidatura é enviada deste site, por e-mail ou no formulário, e é aprovada por uma pessoa; um parceiro aprovado tem um código e um link; os cliques são contados como um total diário por parceiro; uma conta nova que se cadastra com um código é atribuída àquele parceiro uma vez e para sempre; a comissão é registrada sobre cada pagamento efetivamente recebido, fica retida por 30 dias, que é a janela de reembolso, e é aprovada por uma pessoa; e o pagamento em si é feito manualmente contra um comprovante. **Um cliente cobrado pela Shopify não gera comissão automática**, porque a Shopify nos informa que um plano está ativo e não que uma cobrança foi feita; essa comissão é registrada manualmente, com o mesmo percentual. Os termos estão no [Contrato do Programa de Parceiros](/pt-BR/affiliate-terms), que também obriga o parceiro a declarar abertamente que é remunerado.
 
+## Uma foto de autor que você envia
+
+Se você enviar uma foto para uma caixa de autor, o arquivo fica guardado em um armazenamento nosso dedicado enquanto a opção estiver ligada. O caminho dele é formado pelo identificador do projeto e por um identificador aleatório, nunca pelo nome de uma pessoa. Não publicamos a nossa cópia e o artigo não aponta para ela.
+
+Na publicação do artigo, a foto é copiada para a biblioteca de mídia do seu site ou para o Shopify Files, e o artigo aponta para essa cópia. A partir daí a foto fica visível para qualquer pessoa que acesse o seu site, como qualquer outra imagem de um artigo.
+
+A foto não é enviada a nenhum provedor de IA, não é usada para treinar modelos e não executamos sobre ela reconhecimento facial nem qualquer outro tratamento biométrico.
+
+Apagar a foto ou desligar a opção exclui o arquivo do nosso armazenamento. Uma cópia já colocada no seu site não está sob o nosso controle, e somente quem administra esse site pode excluí-la de lá.
+
+Quanto à pessoa retratada, o cliente que enviou a foto é quem decide para que ela é usada, e nós tratamos o arquivo por conta dele. Se você é a pessoa da foto e não o cliente que a enviou, escreva para o endereço que está no fim desta política: vamos apagar o arquivo do nosso armazenamento e procurar o cliente para que a cópia no site seja retirada, mas não podemos excluir por conta própria conteúdo no site de um cliente.
+
 ## Provedores de IA
 
 Alguns recursos enviam dados aos seguintes serviços de IA para produzir o resultado que você pediu:
@@ -324,6 +337,7 @@ Guardamos os dados apenas pelo tempo necessário à finalidade da coleta:
 - **Credenciais de conexão** (WordPress, Shopify, Search Console): até você desconectar ou excluir a conta, e então apagadas imediatamente.
 - **Verificação gratuita do site:** em cache por até 24 horas e então apagada, se nenhuma conta tiver sido aberta a partir dela.
 - **Registro das decisões de cookies:** até três anos a contar da decisão, para que possamos demonstrar o que você escolheu. Essa é a base legal da guarda, e é por isso que ele não é apagado junto com a conta.
+- **Foto de autor:** enquanto a opção estiver ligada. Apagar a foto ou desligar a opção exclui o arquivo imediatamente. Uma cópia já colocada no seu site permanece lá até que você a exclua.
 - **Logs de segurança e de servidor:** até 90 dias.
 
 ## Transferências internacionais
