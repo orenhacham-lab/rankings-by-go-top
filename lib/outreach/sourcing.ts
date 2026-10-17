@@ -329,7 +329,42 @@ const NOT_A_BUSINESS_SITE = [
   'pinterest.com', 'tiktok.com', 'yelp.com', 'google.com', 'goo.gl', 'maps.app.goo.gl',
   'apple.com', 'amazon.com', 'etsy.com', 'ebay.com', 'wikipedia.org', 'mailchi.mp',
   'eventbrite.com', 'bbb.org', 'zoominfo.com', 'apollo.io', 'hunter.io', 'dnb.com',
+  // Plumbing a page links to as a page rather than as an asset.
+  'cdn.jsdelivr.net', 'bootstrapcdn.com', 'googleapis.com', 'gstatic.com', 'jquery.com',
+  'w3.org', 'wordpress.org', 'shopify.com', 'adobe.com',
 ]
+
+/**
+ * Suffixes that are an institution rather than a business.
+ *
+ * THIS IS THE BUG THAT COST THE CRAWLER ITS FIRST DAY. A state programme's
+ * directory is itself a government site, and the only off-site links on
+ * `findjerseyfresh.com/directory/` are the state's other programmes
+ * (`jerseyseafood.nj.gov`, `jerseygrown.nj.gov`, `jerseyequine.nj.gov`,
+ * `nj.gov`). Those read as four perfectly good candidates, each cost three
+ * fetches to refuse, and the pass then ended having examined nobody. A `.gov`
+ * host is never a prospect: it sells nothing, and the product has nothing to
+ * offer it.
+ */
+const NOT_A_BUSINESS_TLD = ['gov', 'mil', 'edu', 'int']
+
+/** True when this host belongs to a government, a school or an institution. */
+export function isInstitutionalDomain(host: string): boolean {
+  const clean = host.toLowerCase().replace(/\.$/, '')
+  return NOT_A_BUSINESS_TLD.some((tld) => clean === tld || clean.endsWith(`.${tld}`))
+}
+
+/**
+ * True when two hosts are the same site: equal, or one inside the other.
+ *
+ * The listing's own navigation is not its membership, and a directory that
+ * lives on `directory.example.org` links back to `example.org` on every page.
+ * Checked in both directions for exactly that reason.
+ */
+export function sameSite(host: string, other: string): boolean {
+  if (host === other) return true
+  return host.endsWith(`.${other}`) || other.endsWith(`.${host}`)
+}
 
 /** The host of a URL, lowercased and without `www.`, or null when it is not one. */
 export function hostOf(url: string): string | null {
@@ -366,8 +401,10 @@ export function listingCandidates(html: string, listingUrl: string): ListingCand
     let absolute = href
     try { absolute = new URL(href, listingUrl).toString() } catch { continue }
     const host = hostOf(absolute)
-    if (host === null || host === listingHost) continue
+    if (host === null) continue
+    if (listingHost !== null && sameSite(host, listingHost)) continue
     if (NOT_A_BUSINESS_SITE.some((bad) => host === bad || host.endsWith(`.${bad}`))) continue
+    if (isInstitutionalDomain(host)) continue
     if (isEeaUkDomain(host)) continue
     if (seen.has(host)) continue
     const company = visibleText(inner).slice(0, 120).trim()
@@ -401,6 +438,10 @@ export function detailLinks(html: string, listingUrl: string, hint: string): str
     if (!path.includes(hint)) continue
     // The listing page itself, and its paginated variants, are not businesses.
     if (path.replace(/\/+$/, '') === hint.replace(/\/+$/, '')) continue
+    // A search URL and an RSS feed sit under the same path as the members and
+    // are a wasted fetch each: the one budget this pass really spends.
+    if (absolute.includes('?')) continue
+    if (/\/(feed|rss|page)\/?$/.test(path)) continue
     const clean = absolute.split('#')[0]
     if (seen.has(clean)) continue
     seen.add(clean)
