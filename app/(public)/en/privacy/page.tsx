@@ -490,22 +490,24 @@ export default function EnglishPrivacyPage() {
         <h2>An Author Photo You Upload</h2>
         <p>
           If you upload a photo for an author box, the file is kept in a dedicated storage bucket of ours
-          for as long as the setting is on. Its path is made of the project id and a random id, and never
-          of a person&rsquo;s name. We do not publish our copy and the article does not link to it.
+          for as long as the photo is configured on the project. Its path is made of the project id and a
+          random id, and never of a person&rsquo;s name. We do not publish our copy and the article does not link to it.
         </p>
         <p>
-          When the article is published, the photo is copied into your site&rsquo;s media library or into
-          Shopify Files, and the article links to that copy. From then on the photo is visible to anyone
-          who visits your site, like any other image in an article.
+          When the article is published, the photo is copied into your site&rsquo;s media library, and the
+          article links to that copy. From then on the photo is visible to anyone who visits your site,
+          like any other image in an article. The upload is offered only on a project where that copy can
+          be made.
         </p>
         <p>
           The photo is not sent to any AI provider, is not used to train models, and we do not run face
           recognition or any other biometric processing on it.
         </p>
         <p>
-          Deleting the photo or turning the setting off erases the file from our storage. A copy already
-          placed on your site is not under our control, and only whoever administers that site can delete
-          it there.
+          Deleting the photo, or switching to no photo or to the site icon, erases the file from our
+          storage. Turning the whole author box off does not erase the photo: it is kept until you delete
+          it or choose another option. A copy already placed on your site is not under our control, and
+          only whoever administers that site can delete it there.
         </p>
         <p>
           As to the person in the photo, the customer who uploaded it decides what it is used for, and we
@@ -822,9 +824,9 @@ export default function EnglishPrivacyPage() {
           <li><strong>Cookie decision log:</strong> up to three years from the decision, so that we
           can demonstrate what you chose. That is the legal basis for keeping it, which is why it is
           not erased together with the account.</li>
-          <li><strong>Author photo:</strong> for as long as the setting is on. Deleting the photo or
-          turning the setting off erases the file immediately. A copy already placed on your site stays
-          there until you delete it.</li>
+          <li><strong>Author photo:</strong> for as long as the photo is configured on the project.
+          Deleting it, or switching to no photo or to the site icon, erases the file immediately. A copy
+          already placed on your site stays there until you delete it.</li>
           <li><strong>Security and server logs:</strong> up to 90 days.</li>
         </ul>
       </section>

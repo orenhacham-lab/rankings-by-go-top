@@ -190,13 +190,13 @@ En la fecha de esta política el programa funciona así: la solicitud se envía 
 
 ## Una foto de autor que usted sube
 
-Si sube una foto para una caja de autor, el archivo se guarda en un almacenamiento propio dedicado mientras la opción esté activada. Su ruta se compone del identificador del proyecto y de un identificador aleatorio, y nunca del nombre de una persona. No publicamos nuestra copia y el artículo no enlaza a ella.
+Si sube una foto para una caja de autor, el archivo se guarda en un almacenamiento propio dedicado mientras la foto esté configurada en el proyecto. Su ruta se compone del identificador del proyecto y de un identificador aleatorio, y nunca del nombre de una persona. No publicamos nuestra copia y el artículo no enlaza a ella.
 
-Al publicarse el artículo, la foto se copia en la biblioteca de medios de su sitio o en Shopify Files, y el artículo enlaza a esa copia. Desde ese momento la foto es visible para cualquiera que visite su sitio, como cualquier otra imagen de un artículo.
+Al publicarse el artículo, la foto se copia en la biblioteca de medios de su sitio y el artículo enlaza a esa copia. Desde ese momento la foto es visible para cualquiera que visite su sitio, como cualquier otra imagen de un artículo. La subida solo se ofrece en un proyecto donde esa copia pueda hacerse.
 
 La foto no se envía a ningún proveedor de IA, no se utiliza para entrenar modelos y no ejecutamos sobre ella reconocimiento facial ni ningún otro tratamiento biométrico.
 
-Al eliminar la foto o desactivar la opción se borra el archivo de nuestro almacenamiento. Una copia ya colocada en su sitio no está bajo nuestro control, y solo quien administra ese sitio puede eliminarla allí.
+Al eliminar la foto, o al pasar a ninguna foto o al icono del sitio, se borra el archivo de nuestro almacenamiento. Desactivar toda la caja de autor no borra la foto: se conserva hasta que usted la elimine o elija otra opción. Una copia ya colocada en su sitio no está bajo nuestro control, y solo quien administra ese sitio puede eliminarla allí.
 
 Respecto de la persona que aparece en la foto, el cliente que la subió es quien decide para qué se usa, y nosotros tratamos el archivo por cuenta suya. Si usted es la persona de la foto y no el cliente que la subió, escríbanos a la dirección que figura al final de esta política: borraremos el archivo de nuestro almacenamiento y nos dirigiremos al cliente para que retire la copia del sitio, pero no podemos eliminar nosotros mismos contenido en el sitio de un cliente.
 
@@ -339,7 +339,7 @@ Conservamos los datos únicamente durante el tiempo necesario para la finalidad 
 - **Credenciales de conexión** (WordPress, Shopify, Search Console): hasta que usted se desconecte o elimine la cuenta, y después se suprimen de inmediato.
 - **Verificación gratuita del sitio:** se almacena en caché hasta 24 horas y después se suprime si a partir de ella no se abrió una cuenta.
 - **Registro de decisiones sobre cookies:** hasta tres años desde la decisión, para que podamos demostrar lo que usted eligió. Esa es la base jurídica para conservarlo, razón por la cual no se suprime junto con la cuenta.
-- **Foto de autor:** mientras la opción esté activada. Al eliminar la foto o desactivar la opción, el archivo se borra de inmediato. Una copia ya colocada en su sitio permanece allí hasta que usted la elimine.
+- **Foto de autor:** mientras la foto esté configurada en el proyecto. Al eliminarla, o al pasar a ninguna foto o al icono del sitio, el archivo se borra de inmediato. Una copia ya colocada en su sitio permanece allí hasta que usted la elimine.
 - **Registros de seguridad y del servidor:** hasta 90 días.
 
 ## Transferencias internacionales

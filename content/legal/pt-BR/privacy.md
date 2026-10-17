@@ -188,13 +188,13 @@ Na data desta política o programa funciona assim: a candidatura é enviada dest
 
 ## Uma foto de autor que você envia
 
-Se você enviar uma foto para uma caixa de autor, o arquivo fica guardado em um armazenamento nosso dedicado enquanto a opção estiver ligada. O caminho dele é formado pelo identificador do projeto e por um identificador aleatório, nunca pelo nome de uma pessoa. Não publicamos a nossa cópia e o artigo não aponta para ela.
+Se você enviar uma foto para uma caixa de autor, o arquivo fica guardado em um armazenamento nosso dedicado enquanto a foto estiver configurada no projeto. O caminho dele é formado pelo identificador do projeto e por um identificador aleatório, nunca pelo nome de uma pessoa. Não publicamos a nossa cópia e o artigo não aponta para ela.
 
-Na publicação do artigo, a foto é copiada para a biblioteca de mídia do seu site ou para o Shopify Files, e o artigo aponta para essa cópia. A partir daí a foto fica visível para qualquer pessoa que acesse o seu site, como qualquer outra imagem de um artigo.
+Na publicação do artigo, a foto é copiada para a biblioteca de mídia do seu site e o artigo aponta para essa cópia. A partir daí a foto fica visível para qualquer pessoa que acesse o seu site, como qualquer outra imagem de um artigo. O envio só é oferecido em um projeto onde essa cópia possa ser feita.
 
 A foto não é enviada a nenhum provedor de IA, não é usada para treinar modelos e não executamos sobre ela reconhecimento facial nem qualquer outro tratamento biométrico.
 
-Apagar a foto ou desligar a opção exclui o arquivo do nosso armazenamento. Uma cópia já colocada no seu site não está sob o nosso controle, e somente quem administra esse site pode excluí-la de lá.
+Apagar a foto, ou passar para nenhuma foto ou para o ícone do site, exclui o arquivo do nosso armazenamento. Desligar a caixa de autor inteira não exclui a foto: ela fica guardada até que você a apague ou escolha outra opção. Uma cópia já colocada no seu site não está sob o nosso controle, e somente quem administra esse site pode excluí-la de lá.
 
 Quanto à pessoa retratada, o cliente que enviou a foto é quem decide para que ela é usada, e nós tratamos o arquivo por conta dele. Se você é a pessoa da foto e não o cliente que a enviou, escreva para o endereço que está no fim desta política: vamos apagar o arquivo do nosso armazenamento e procurar o cliente para que a cópia no site seja retirada, mas não podemos excluir por conta própria conteúdo no site de um cliente.
 
@@ -337,7 +337,7 @@ Guardamos os dados apenas pelo tempo necessário à finalidade da coleta:
 - **Credenciais de conexão** (WordPress, Shopify, Search Console): até você desconectar ou excluir a conta, e então apagadas imediatamente.
 - **Verificação gratuita do site:** em cache por até 24 horas e então apagada, se nenhuma conta tiver sido aberta a partir dela.
 - **Registro das decisões de cookies:** até três anos a contar da decisão, para que possamos demonstrar o que você escolheu. Essa é a base legal da guarda, e é por isso que ele não é apagado junto com a conta.
-- **Foto de autor:** enquanto a opção estiver ligada. Apagar a foto ou desligar a opção exclui o arquivo imediatamente. Uma cópia já colocada no seu site permanece lá até que você a exclua.
+- **Foto de autor:** enquanto a foto estiver configurada no projeto. Apagá-la, ou passar para nenhuma foto ou para o ícone do site, exclui o arquivo imediatamente. Uma cópia já colocada no seu site permanece lá até que você a exclua.
 - **Logs de segurança e de servidor:** até 90 dias.
 
 ## Transferências internacionais

@@ -3049,14 +3049,14 @@ const PHOTO_MINOR: Record<string, RegExp> = {
   'pt-BR': /for menor de idade, [\u00e9e] necess[\u00e1a]rio o consentimento do respons[\u00e1a]vel/,
 }
 const PHOTO_COPY_NOT_OURS: Record<string, RegExp> = {
-  he: /\u05e2\u05d5\u05ea\u05e7 \u05e9\u05db\u05d1\u05e8 \u05d4\u05d5\u05e2\u05ea\u05e7/,
-  en: /a copy already placed in your\s*site&rsquo;s media library or in Shopify Files is under your control/,
-  es: /una copia que ya se haya colocado en la biblioteca de medios de su sitio o en Shopify Files est[\u00e1a] bajo su control/,
-  'pt-BR': /uma c[\u00f3o]pia j[\u00e1a] colocada na biblioteca de m[\u00ed i]dia do seu site ou no Shopify Files est[\u00e1a] sob o seu controle/,
+  he: /\u05e2\u05d5\u05ea\u05e7 \u05e9\u05db\u05d1\u05e8 \u05d4\u05d5\u05e2\u05ea\u05e7 \u05dc\u05e1\u05e4\u05e8\u05d9\u05d9\u05ea\s*\u05d4\u05de\u05d3\u05d9\u05d4 \u05e9\u05dc \u05d4\u05d0\u05ea\u05e8 \u05e9\u05dc\u05db\u05dd \u05e0\u05de\u05e6\u05d0 \u05d1\u05e9\u05dc\u05d9\u05d8\u05ea\u05db\u05dd/,
+  en: /a copy already\s*placed in your site&rsquo;s media library is under your control/,
+  es: /una copia que ya se haya colocado en la biblioteca de medios de su sitio est[\u00e1a] bajo su control/,
+  'pt-BR': /uma c[\u00f3o]pia j[\u00e1a] colocada na biblioteca de m[\u00ed i]dia do seu site est[\u00e1a] sob o seu controle/,
 }
 const PHOTO_PATH_NO_NAME: Record<string, RegExp> = {
   he: /\u05de\u05de\u05d6\u05d4\u05d4 \u05d4\u05e4\u05e8\u05d5\u05d9\u05e7\u05d8 \u05d5\u05de\u05de\u05d6\u05d4\u05d4 \u05d0\u05e7\u05e8\u05d0\u05d9/,
-  en: /the project id and a random id, and never\s*of a person&rsquo;s name/,
+  en: /the project id and a\s*random id, and never of a person&rsquo;s name/,
   es: /del identificador del proyecto y de un identificador aleatorio, y nunca del nombre de una persona/,
   'pt-BR': /pelo identificador do projeto e por um identificador aleat[\u00f3o]rio, nunca pelo nome de uma pessoa/,
 }
@@ -3072,9 +3072,24 @@ const PHOTO_NO_BIOMETRIC: Record<string, RegExp> = {
   es: /no ejecutamos sobre ella reconocimiento facial ni ning[\u00fau]n otro tratamiento biom[\u00e9e]trico/,
   'pt-BR': /n[\u00e3a]o executamos sobre ela reconhecimento facial nem qualquer outro tratamento biom[\u00e9e]trico/,
 }
+/*
+ * Two sentences were corrected on 2026-10-17, the day after they went live,
+ * once the upload was built and its real behaviour could be read:
+ *   - "or into Shopify Files" named a destination the photo cannot reach. The
+ *     app's Shopify scopes (read_products, read_content, write_content) cannot
+ *     write to Shopify Files, and lib/content/author-box/photo-copy.ts offers
+ *     the upload only on a WordPress site with an application password. A
+ *     published document should not describe a copy that is never made.
+ *   - "turning the setting off erases the file" was wrong about which setting.
+ *     Deleting the photo, or moving the image choice to 'none' or 'site_icon',
+ *     calls removeAuthorPhotoObject; turning the whole author box off KEEPS the
+ *     file. Rather than make a toggle destroy a customer's file, the text now
+ *     says which action erases it and which does not.
+ * The last two checks in this section fail if either sentence comes back.
+ */
 const PHOTO_DELETE_ERASES_FILE: Record<string, RegExp> = {
-  he: /\u05de\u05d5\u05d7\u05e7\u05d9\u05dd \u05d0\u05ea \u05d4\u05e7\u05d5\u05d1\u05e5 \u05de\u05d4\u05d0\u05d7\u05e1\u05d5\u05df \u05e9\u05dc\u05e0\u05d5/,
-  en: /erases the file from our storage/,
+  he: /\u05de\u05d5\u05d7\u05e7\u05d9\u05dd \u05d0\u05ea \u05d4\u05e7\u05d5\u05d1\u05e5\s*\u05de\u05d4\u05d0\u05d7\u05e1\u05d5\u05df \u05e9\u05dc\u05e0\u05d5/,
+  en: /erases the file from our\s*storage/,
   es: /se borra el archivo de nuestro almacenamiento/,
   'pt-BR': /exclui o arquivo do nosso armazenamento/,
 }
@@ -3084,11 +3099,17 @@ const PHOTO_SUBJECT_ROUTE: Record<string, RegExp> = {
   es: /Si usted es la persona de la foto y no el cliente que la subi[\u00f3o]/,
   'pt-BR': /Se voc[\u00ea e] [\u00e9e] a pessoa da foto e n[\u00e3a]o o cliente que a enviou/,
 }
+const PHOTO_BOX_OFF_KEEPS: Record<string, RegExp> = {
+  he: /\u05db\u05d9\u05d1\u05d5\u05d9 \u05ea\u05d9\u05d1\u05ea \u05d4\u05de\u05d7\u05d1\u05e8 \u05db\u05d5\u05dc\u05d4 \u05d0\u05d9\u05e0\u05d5 \u05de\u05d5\u05d7\u05e7 \u05d0\u05ea \u05d4\u05ea\u05de\u05d5\u05e0\u05d4/,
+  en: /Turning the whole author box off does not erase the photo/,
+  es: /Desactivar toda la caja de autor no borra la foto/,
+  'pt-BR': /Desligar a caixa de autor inteira n[\u00e3a]o exclui a foto/,
+}
 const PHOTO_IN_RETENTION: Record<string, RegExp> = {
-  he: /<strong>\u05ea\u05de\u05d5\u05e0\u05ea \u05de\u05d7\u05d1\u05e8:<\/strong> \u05db\u05dc \u05e2\u05d5\u05d3 \u05d4\u05d4\u05d2\u05d3\u05e8\u05d4 \u05e4\u05e2\u05d9\u05dc\u05d4/,
-  en: /<strong>Author photo:<\/strong> for as long as the setting is on/,
-  es: /\*\*Foto de autor:\*\* mientras la opci[\u00f3o]n est[\u00e9e] activada/,
-  'pt-BR': /\*\*Foto de autor:\*\* enquanto a op[\u00e7c][\u00e3a]o estiver ligada/,
+  he: /<strong>\u05ea\u05de\u05d5\u05e0\u05ea \u05de\u05d7\u05d1\u05e8:<\/strong> \u05db\u05dc \u05e2\u05d5\u05d3 \u05d4\u05ea\u05de\u05d5\u05e0\u05d4 \u05de\u05d5\u05d2\u05d3\u05e8\u05ea \u05d1\u05e4\u05e8\u05d5\u05d9\u05e7\u05d8/,
+  en: /<strong>Author photo:<\/strong> for as long as the photo is configured on the project/,
+  es: /\*\*Foto de autor:\*\* mientras la foto est[\u00e9e] configurada en el proyecto/,
+  'pt-BR': /\*\*Foto de autor:\*\* enquanto a foto estiver configurada no projeto/,
 }
 {
   const read = (path: string) => (existsSync(path) ? readFileSync(path, 'utf8') : '')
@@ -3116,6 +3137,12 @@ const PHOTO_IN_RETENTION: Record<string, RegExp> = {
     check(`${name}/privacy: deleting the photo erases the stored file, not only the row`, PHOTO_DELETE_ERASES_FILE[name]!.test(privacy))
     check(`${name}/privacy: the person in the photo has a route to us`, PHOTO_SUBJECT_ROUTE[name]!.test(privacy))
     check(`${name}/privacy: the photo appears in how long we keep data`, PHOTO_IN_RETENTION[name]!.test(privacy))
+    check(`${name}/privacy: turning the whole author box off is NOT claimed to erase the photo`,
+      PHOTO_BOX_OFF_KEEPS[name]!.test(privacy))
+  }
+  /* No document may name a destination the photo cannot reach. */
+  for (const [name, doc] of [...termsDocs, ...privacyDocs]) {
+    check(`${name}: Shopify Files is not named as a place the photo is copied to`, !/Shopify Files/.test(doc))
   }
   /*
    * The code half. The upload is not built yet, so these bind the moment it is:
@@ -3138,6 +3165,8 @@ const PHOTO_IN_RETENTION: Record<string, RegExp> = {
     !PHOTO_CONSENT.en.test('You may upload any photo you like for the author box.'))
   check('mutation control: a promise to delete the copy on the customer site is caught',
     !PHOTO_COPY_NOT_OURS.en.test('We will also delete the copy in your media library for you.'))
+  check('mutation control: a text claiming the box switch erases the photo is caught',
+    !PHOTO_BOX_OFF_KEEPS.en.test('Turning the whole author box off erases the photo from our storage.'))
   check('mutation control: a policy that sends the photo to an AI provider is caught',
     !PHOTO_NO_AI.en.test('The photo is sent to our AI provider to improve the author box.'))
 }
