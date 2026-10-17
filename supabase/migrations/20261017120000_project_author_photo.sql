@@ -33,7 +33,7 @@
 --   (then the CHECK of 20261016180000 again), and DELETE FROM storage.buckets WHERE id = 'author-photos'.
 -- Executed probe: supabase/migrations/__qa__/project-author-photo.probe.sql
 --   bash scripts/qa/pg-probe.sh supabase/migrations/__qa__/project-author-photo.probe.sql
--- NOT applied to Production.
+-- Applied to Production on 2026-10-17 (columns, CHECK and the private bucket verified).
 -- ============================================================================
 
 BEGIN;
