@@ -13,7 +13,7 @@ import { extractSiteSignals } from './html-signals'
 import { fetchSiteHtml, fetchSiteText } from './site-fetch'
 import { domainKey } from './url-guard'
 import type { FreeCheckErrorCode, FreeCheckFinding, FreeCheckResult } from './types'
-import type { Locale } from '@/lib/i18n/locales'
+import type { PublicLocale } from '@/lib/i18n/locales'
 
 export type RunDeps = {
   fetchHtml?: typeof fetchSiteHtml
@@ -43,7 +43,7 @@ export type RunOutcome =
 
 export async function runFreeCheck(
   url: URL,
-  locale: Locale,
+  locale: PublicLocale,
   options: { allowAi: boolean },
   deps: RunDeps = {},
 ): Promise<RunOutcome> {

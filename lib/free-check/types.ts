@@ -1,5 +1,5 @@
 /** Shared shape of a free-site-check result, from the API to the UI. */
-import type { Locale } from '@/lib/i18n/locales'
+import type { PublicLocale } from '@/lib/i18n/locales'
 
 export type FindingSeverity = 'blocker' | 'warning' | 'info'
 
@@ -43,7 +43,7 @@ export type FreeCheckResult = {
   url: string
   domain: string
   scannedAt: string
-  locale: Locale
+  locale: PublicLocale
   /** null when the model was unavailable or capped — the check still returns. */
   business: FreeCheckBusiness | null
   keywords: string[]
