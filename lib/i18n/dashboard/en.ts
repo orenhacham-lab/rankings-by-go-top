@@ -6414,6 +6414,7 @@ export const dashboardEn = {
       phoneHint: 'No phone number in the text: Google rejects those. Use the "Call" button for calls.',
       imageLabel: 'Photo',
       imageHint: 'We crop to 1200×900 (4:3), the way Google shows it. JPG, PNG or WebP.',
+      imageConsent: 'Upload only a photo you have the right to publish and, if a person appears in it, only if they agreed to it being published on your Google business profile to promote the business (a minor needs a parent\'s or guardian\'s consent).',
       imageUpload: 'Upload a photo',
       imageFromArticle: 'Article image',
       imageGenerate: 'Create a photo',
