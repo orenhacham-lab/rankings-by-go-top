@@ -44,7 +44,14 @@ import {
   robotsAllows,
 } from '../sourcing'
 import { CONTACT_PATHS, MAX_PAGES_PER_SITE, qualifyBusiness } from '../qualify'
-import { addProspect, runProspectTopUp, type PublicSource, type TopUpSummary } from '../topup'
+import {
+  MAX_DETAIL_PAGES,
+  addProspect,
+  detailPageWindow,
+  runProspectTopUp,
+  type PublicSource,
+  type TopUpSummary,
+} from '../topup'
 import { SOURCING_FLAG, runIsolatedProspectTopUp } from '../topup-isolated'
 
 let pass = 0
@@ -553,6 +560,22 @@ async function main() {
   )
   check('T9c-MUT: without it the shared link is examined as if it were a member',
     mutShared.some((url) => url.includes('coop.example')))
+
+  // A fixed first four member pages would be the same four businesses every
+  // quarter hour for ever, so a directory would add four and then nothing.
+  const many = Array.from({ length: 10 }, (_, i) => `https://grown.example/member/m${i}/`)
+  const at = (iso: string) => detailPageWindow(many, new Date(iso))
+  check('T10: the member pages this pass reads move with the quarter hour',
+    at('2026-10-17T10:00:00Z').length === MAX_DETAIL_PAGES
+    && JSON.stringify(at('2026-10-17T10:00:00Z')) !== JSON.stringify(at('2026-10-17T10:15:00Z'))
+    && JSON.stringify(at('2026-10-17T10:00:00Z')) === JSON.stringify(at('2026-10-17T10:14:59Z')))
+  check('T10b: the window wraps, so every member page comes up in turn',
+    new Set(Array.from({ length: 10 }, (_, i) =>
+      at(new Date(Date.parse('2026-10-17T10:00:00Z') + i * 15 * 60 * 1000).toISOString()))
+      .flat()).size === many.length)
+  check('T10c: and a directory with few member pages is read whole',
+    JSON.stringify(detailPageWindow(many.slice(0, 3), new Date('2026-10-17T10:00:00Z')))
+      === JSON.stringify(many.slice(0, 3)))
 
   console.log('\n— G: the switches and the cron —')
 

@@ -319,9 +319,10 @@ check('MUTATION — an English-only extra section is caught', pages.he.terms.h2 
     // crawler takes from them is a business name and a website — never an
     // address, which the published outreach section says comes only from the
     // business's own site or a public registry.
+    'newmfgalliance.org': 'a public business directory whose open pages are read; no customer data is sent to it',
+    'business.springfieldchamber.com': 'a public business directory whose open pages are read; no customer data is sent to it',
     'minnesotagrown.com': 'a public business directory whose open pages are read; no customer data is sent to it',
     'georgiagrown.com': 'a public business directory whose open pages are read; no customer data is sent to it',
-    'findjerseyfresh.com': 'a public business directory whose open pages are read; no customer data is sent to it',
     'www.michiganbusiness.org': 'a public business directory whose open pages are read; no customer data is sent to it',
     'alabamafarmersmarket.org': 'a public business directory whose open pages are read; no customer data is sent to it',
     // Literals that are examples or test shapes even outside __qa__.
