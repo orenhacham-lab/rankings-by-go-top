@@ -131,9 +131,39 @@ async function main() {
   check('runs that spent nothing do not count toward the cap', notCapped.allowed && notCapped.allowAi === true)
   delete process.env.FREE_CHECK_DAILY_AI_CAP
 
-  console.log('\nFAIL CLOSED) an unreadable ledger refuses the run')
-  const broken = await checkGate({ domain: 'example.co.il', locale: 'he', clientHash: CLIENT }, admin([], { select: () => ({ code: '42501' }) }), NOW)
+  console.log('\nFAIL CLOSED) an unreadable ledger refuses the run, and says why in the logs')
+  const captureErrors = async <T>(fn: () => Promise<T>): Promise<{ value: T; logs: unknown[][] }> => {
+    const logs: unknown[][] = []
+    const real = console.error
+    console.error = (...args: unknown[]) => { logs.push(args) }
+    try {
+      return { value: await fn(), logs }
+    } finally {
+      console.error = real
+    }
+  }
+
+  const { value: broken, logs: permissionLogs } = await captureErrors(() =>
+    checkGate({ domain: 'example.co.il', locale: 'he', clientHash: CLIENT }, admin([], { select: () => ({ code: '42501' }) }), NOW))
   check('a ledger read error is internal, never an allow', !broken.allowed && broken.reason === 'internal')
+
+  // A silent refusal and a broken feature look identical from the outside: the
+  // route answers with the same generic copy either way. The log is the only
+  // place that separates them, so it is part of the contract.
+  check('the refusal is logged rather than swallowed', permissionLogs.length === 1, JSON.stringify(permissionLogs))
+  const permissionFields = permissionLogs[0]?.[1] as { stage?: string; code?: string; migrationMissing?: boolean } | undefined
+  check('it names the stage and the Postgres code',
+    permissionFields?.stage === 'rate' && permissionFields?.code === '42501', JSON.stringify(permissionFields))
+  check('a permission error is NOT reported as a missing migration', permissionFields?.migrationMissing === false)
+
+  // 42P01 is undefined_table: the migration has not been applied. That is the
+  // one cause an operator can fix in a minute, so it must be unmistakable.
+  const { logs: missingTableLogs } = await captureErrors(() =>
+    checkGate({ domain: 'example.co.il', locale: 'he', clientHash: CLIENT }, admin([], { select: () => ({ code: '42P01' }) }), NOW))
+  const missingFields = missingTableLogs[0]?.[1] as { migrationMissing?: boolean } | undefined
+  check('an undefined table is called out as the migration not having run', missingFields?.migrationMissing === true)
+  check('no provider or database message text is logged',
+    !JSON.stringify([...permissionLogs, ...missingTableLogs]).toLowerCase().includes('message'))
 
   console.log('\nLEDGER WRITE) a failed insert never fails the response')
   let threw = false
@@ -169,7 +199,12 @@ async function main() {
     })
     const res = new Response(body, { status: 200, headers: { 'content-type': 'text/html' } })
     const { fetchSiteHtml } = await import('../site-fetch')
-    return fetchSiteHtml(new URL('https://example.co.il/'), { fetchImpl: async () => res })
+    // A fixed resolver, so this case is about the BODY dying mid-stream and not
+    // about whether a public hostname resolves from wherever the suite runs.
+    return fetchSiteHtml(new URL('https://example.co.il/'), {
+      fetchImpl: async () => res,
+      resolver: async () => [{ address: '93.184.216.34', family: 4 }],
+    })
   })()
   check('a stream that dies with nothing usable is a fetch failure, not an exception',
     !brokenStream.ok && brokenStream.reason === 'timeout', JSON.stringify(brokenStream))

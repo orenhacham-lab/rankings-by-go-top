@@ -65,6 +65,27 @@ export type Gate =
   | { allowed: false; reason: 'rate_limited' | 'internal' }
 
 /**
+ * Why a fail-closed refusal is logged.
+ *
+ * Every read below refuses the run when it fails, which is right: without the
+ * ledger there is no rate limit and no spend ceiling. But a silent refusal is
+ * indistinguishable from a broken feature — the route answers with the same
+ * generic copy either way — so the reason has to reach the logs. The Postgres
+ * code alone separates the two cases that matter: `42P01` is undefined_table,
+ * meaning the migration has not been applied, and anything else is a real read
+ * failure. The merchant-facing answer is unchanged, and no provider text is
+ * logged.
+ */
+function ledgerReadFailed(stage: 'rate' | 'cache' | 'spend', error: { code?: string }): Gate {
+  console.error('[free-check] ledger read failed', {
+    stage,
+    code: error.code ?? 'unknown',
+    migrationMissing: error.code === '42P01',
+  })
+  return { allowed: false, reason: 'internal' }
+}
+
+/**
  * Decide, in one place, whether this run may proceed — and if so whether it may
  * spend a model call.
  */
@@ -80,7 +101,7 @@ export async function checkGate(
     .select('id', { count: 'exact', head: true })
     .eq('client_hash', args.clientHash)
     .gt('created_at', windowStart)
-  if (recent.error) return { allowed: false, reason: 'internal' }
+  if (recent.error) return ledgerReadFailed('rate', recent.error)
   if ((recent.count ?? 0) >= RATE_MAX_IN_WINDOW) return { allowed: false, reason: 'rate_limited' }
 
   // 2) Cache: the newest run for this domain and locale inside the TTL.
@@ -93,7 +114,7 @@ export async function checkGate(
     .gt('created_at', cacheStart)
     .order('created_at', { ascending: false })
     .limit(1)
-  if (cachedRow.error) return { allowed: false, reason: 'internal' }
+  if (cachedRow.error) return ledgerReadFailed('cache', cachedRow.error)
   const hit = (cachedRow.data as LedgerRow[] | null)?.[0]
   if (hit?.result) return { allowed: true, cached: { ...hit.result, cached: true }, cachedCheckId: hit.id, allowAi: false }
 
@@ -106,7 +127,7 @@ export async function checkGate(
     .select('id', { count: 'exact', head: true })
     .eq('ai_used', true)
     .gt('created_at', dayStart)
-  if (spent.error) return { allowed: false, reason: 'internal' }
+  if (spent.error) return ledgerReadFailed('spend', spent.error)
 
   return { allowed: true, allowAi: (spent.count ?? 0) < dailyAiCap() }
 }
