@@ -13,19 +13,31 @@
  * NOTHING INVENTED. Every word in the box comes from one of these, and from
  * nothing else:
  *   heading   AUTHOR_BOX_HEADINGS, in the ARTICLE's language
- *   name      the WordPress user the post is published as (display name), else
- *             the business name
+ *   name      the name the owner typed in the settings (author_box_name), else
+ *             the WordPress user the post is published as (display name) unless
+ *             it looks like a login, else the business name (resolveAuthorName)
  *   line      the first sentence of the business description in the project's
  *             own settings (project_profiles.description), when there is one
- *   link      the site's own about page (from the site map) or its home page,
- *             labelled with the business name (or the site's host name)
- * No biography, no credentials, no photo.
+ *   link      the address the owner typed in the settings (author_box_url,
+ *             http or https only), else the site's own about page (from the
+ *             site map) or its home page; labelled with the business name (or
+ *             the link's host name)
+ *   image     only when the owner chose "the site icon" (author_box_image) and
+ *             the site has one: the WordPress site icon (site_icon_url), https,
+ *             on the site's own host or WordPress' CDN; a small round image
+ *             with the business name as its alt. No icon: no image at all.
+ * No biography, no credentials, no uploaded photo.
  *
  * Drawn by the article design (lib/content/article-style/html.ts): the
  * formatted design gives it the brand colours as inline styles; the minimal one
  * leaves plain paragraphs under a rule. Either way it passes the design's
  * sanitizer, and every text is escaped. The paragraphs carry OWN_CLASS so the
  * box is never added twice and is never mistaken for the theme's own.
+ *
+ * ONE RESOLVER. authorBoxContent is what publishing draws (store.ts,
+ * decideAuthorBox) AND what the settings card's preview draws
+ * (components/settings/WritingGuidanceCard.tsx, from the same inputs read by
+ * store.ts readAuthorBoxInputs), so the owner sees the name that will be used.
  *
  * Pure: no I/O, safe in the browser and on the server.
  */
@@ -43,14 +55,28 @@ export const AUTHOR_BOX_HEADINGS: Record<AuthorBoxLanguage, string> = {
 /** The class on every paragraph of our box. Contains no "author", so the theme test never counts our own box. */
 export const OWN_CLASS = 'gotop-writer-card'
 
-export const AUTHOR_BOX_LIMITS = { name: 80, line: 220, label: 60 } as const
+export const AUTHOR_BOX_LIMITS = { name: 80, line: 220, label: 60, url: 300, image: 600 } as const
 
-/** What the box shows, already checked: plain text and one https link. */
+/**
+ * The image in the box, as the owner chose it. A list so that a later choice
+ * ("upload", an author photo, waiting on a privacy check) is one more entry
+ * here and in the column's CHECK, not a new shape. Anything unknown is 'none'.
+ */
+export const AUTHOR_BOX_IMAGE_CHOICES = ['none', 'site_icon'] as const
+export type AuthorBoxImageChoice = (typeof AUTHOR_BOX_IMAGE_CHOICES)[number]
+export const authorBoxImageChoice = (v: unknown): AuthorBoxImageChoice =>
+  (AUTHOR_BOX_IMAGE_CHOICES as readonly unknown[]).includes(v) ? (v as AuthorBoxImageChoice) : 'none'
+
+/** The image's drawn size, in pixels (explicit width and height on the img). */
+export const AUTHOR_BOX_IMAGE_SIZE = 56
+
+/** What the box shows, already checked: plain text, one http(s) link and, when chosen, one https image. */
 export type AuthorBoxContent = {
   language: AuthorBoxLanguage
   name: string
   line: string
   link: { url: string; label: string } | null
+  image?: { url: string; alt: string } | null
 }
 
 /** A content or project language value → the box's language. */
@@ -78,29 +104,130 @@ const host = (domain: unknown) => String(domain ?? '').trim().toLowerCase().repl
 const bare = (h: string) => h.replace(/^www\./, '')
 
 /**
- * The box's content from the project's own facts, or null when there is not
- * even a name to show. The link must be on the project's own site.
+ * True when a WordPress display name is really a login. WordPress shows the
+ * login as the display name until the user picks another, so a box could read
+ * "japan4u_adm" (reported on japan4u, 2026-10-16). A name with an @, or one
+ * word that is lowercase, carries digits or _ . -, or is Latin-only on a site
+ * not written in English, is treated as a login, and the business name is shown.
  */
-export function authorBoxContent(input: {
+export function looksLikeLogin(name: string, language: AuthorBoxLanguage): boolean {
+  const n = name.trim()
+  if (!n) return false
+  if (n.includes('@')) return true
+  if (/\s/.test(n)) return false
+  if (/[\d_.\-]/.test(n)) return true
+  if (/^[a-z]+$/.test(n)) return true
+  return language !== 'en' && /^[A-Za-z]+$/.test(n)
+}
+
+/** The owner's "author name to show": plain text, exactly as a name is cleaned (cleanCtaText, the name limit); '' when empty. */
+export function cleanAuthorBoxName(input: unknown): string {
+  return cleanCtaText(input, AUTHOR_BOX_LIMITS.name)
+}
+
+/**
+ * The owner's link address: http or https only, a public host name, no user
+ * name, password or port (normalizeCtaUrl's rules; a bare "example.com" is read
+ * as https). Null for anything else: javascript:, data:, mailto:, ftp:, a
+ * relative path, an address with spaces or quotes.
+ */
+export function normalizeAuthorBoxUrl(input: unknown): string | null {
+  if (typeof input !== 'string') return null
+  const raw = input.trim()
+  if (!raw || raw.length > AUTHOR_BOX_LIMITS.url) return null
+  const plain = /^http:\/\//i.test(raw)
+  const checked = normalizeCtaUrl(plain ? `https://${raw.slice(7)}` : raw)
+  if (!checked) return null
+  const out = plain ? `http://${checked.slice('https://'.length)}` : checked
+  return out.length <= AUTHOR_BOX_LIMITS.url ? out : null
+}
+
+/** CDN hosts a WordPress site icon may be served from (Jetpack's image CDN, WordPress.com files). */
+const WP_CDN = /(?:^|\.)(?:wp\.com|files\.wordpress\.com)$/
+
+/**
+ * The site icon's address when it may be drawn: https only, no user name,
+ * password or port, on the site's own host (with or without www) or WordPress'
+ * CDN. Null for anything else, and when the site is not known.
+ */
+export function normalizeAuthorBoxImage(input: unknown, domain: unknown): string | null {
+  if (typeof input !== 'string') return null
+  const raw = input.trim()
+  if (!raw || raw.length > AUTHOR_BOX_LIMITS.image || !/^https:\/\//i.test(raw) || /[\s<>"'`\\]/.test(raw)) return null
+  const site = bare(host(domain))
+  if (!site) return null
+  let url: URL
+  try { url = new URL(raw) } catch { return null }
+  if (url.protocol !== 'https:' || url.username || url.password || url.port) return null
+  const h = bare(url.hostname.toLowerCase().replace(/\.$/, ''))
+  if (h !== site && !WP_CDN.test(h)) return null
+  const out = url.toString()
+  return out.length <= AUTHOR_BOX_LIMITS.image ? out : null
+}
+
+export type AuthorNameSource = 'override' | 'site_user' | 'business'
+
+/**
+ * Which name the box shows, and why: the owner's own name when typed, else the
+ * site's publishing user unless it looks like a login, else the business name.
+ * `rejectedLogin` is the site's name when it was set aside as a login.
+ */
+export function resolveAuthorName(input: {
   language: AuthorBoxLanguage
+  nameOverride?: string | null
+  authorName?: string | null
+  businessName?: string | null
+}): { name: string; source: AuthorNameSource | null; rejectedLogin: string | null } {
+  const override = cleanAuthorBoxName(input.nameOverride ?? '')
+  if (override) return { name: override, source: 'override', rejectedLogin: null }
+  const author = cleanCtaText(input.authorName ?? '', AUTHOR_BOX_LIMITS.name)
+  const login = !!author && looksLikeLogin(author, input.language)
+  if (author && !login) return { name: author, source: 'site_user', rejectedLogin: null }
+  const business = cleanCtaText(input.businessName ?? '', AUTHOR_BOX_LIMITS.name)
+  return { name: business, source: business ? 'business' : null, rejectedLogin: login ? author : null }
+}
+
+/** Everything the box is made from (store.ts readAuthorBoxInputs reads it; the preview receives it). */
+export type AuthorBoxInputs = {
+  language: AuthorBoxLanguage
+  /** The owner's own name for the box; wins when not empty. */
+  nameOverride?: string | null
   authorName?: string | null
   businessName?: string | null
   description?: string | null
   domain?: string | null
   aboutUrl?: string | null
-}): AuthorBoxContent | null {
+  /** The owner's own link address (http or https); wins when valid. */
+  linkUrl?: string | null
+  /** The owner's image choice; 'none' (or absent) draws no image. */
+  imageChoice?: AuthorBoxImageChoice | null
+  /** The site icon's address, when the site has one (read at publish time). */
+  imageUrl?: string | null
+}
+
+/**
+ * The box's content from the project's own facts, or null when there is not
+ * even a name to show. Without the owner's own address, the link must be on
+ * the project's own site.
+ */
+export function authorBoxContent(input: AuthorBoxInputs): AuthorBoxContent | null {
   const business = cleanCtaText(input.businessName ?? '', AUTHOR_BOX_LIMITS.name)
-  const name = cleanCtaText(input.authorName ?? '', AUTHOR_BOX_LIMITS.name) || business
+  const { name } = resolveAuthorName(input)
   if (!name) return null
   const site = host(input.domain)
   let link: AuthorBoxContent['link'] = null
-  if (site) {
+  const own = input.linkUrl ? normalizeAuthorBoxUrl(input.linkUrl) : null
+  if (own) {
+    link = { url: own, label: cleanCtaText(business || bare(new URL(own).hostname), AUTHOR_BOX_LIMITS.label) }
+  } else if (site) {
     const about = input.aboutUrl ? normalizeCtaUrl(input.aboutUrl) : null
     const onSite = about && bare(new URL(about).hostname) === bare(site) ? about : null
     const url = onSite ?? normalizeCtaUrl(`https://${site}/`)
     if (url) link = { url, label: cleanCtaText(business || bare(site), AUTHOR_BOX_LIMITS.label) }
   }
-  return { language: input.language, name, line: descriptionLine(input.description), link }
+  const iconUrl = authorBoxImageChoice(input.imageChoice) === 'site_icon' ? normalizeAuthorBoxImage(input.imageUrl, input.domain) : null
+  const image = iconUrl ? { url: iconUrl, alt: cleanCtaText(business || name, AUTHOR_BOX_LIMITS.label) } : null
+  return { language: input.language, name, line: descriptionLine(input.description), link, ...(image ? { image } : {}) }
 }
 
 const escText = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
@@ -112,7 +239,11 @@ const escAttr = (s: string) => escText(s).replace(/"/g, '&quot;')
  */
 export function authorBoxStructure(c: AuthorBoxContent): string {
   const p = (role: string, part: string, inner: string) => `<p class="${OWN_CLASS} ${OWN_CLASS}-${part}" data-as="${role}">${inner}</p>`
+  const img = c.image && /^https:\/\//i.test(c.image.url)
+    ? p('author-photo', 'photo', `<img data-as="author-image" src="${escAttr(c.image.url)}" alt="${escAttr(c.image.alt)}" width="${AUTHOR_BOX_IMAGE_SIZE}" height="${AUTHOR_BOX_IMAGE_SIZE}" loading="lazy">`)
+    : ''
   return `<div data-as="author">` +
+    img +
     p('author-title', 'title', `<strong>${escText(AUTHOR_BOX_HEADINGS[c.language])}</strong>`) +
     p('author-name', 'name', `<strong>${escText(c.name)}</strong>`) +
     (c.line ? p('author-text', 'text', escText(c.line)) : '') +
