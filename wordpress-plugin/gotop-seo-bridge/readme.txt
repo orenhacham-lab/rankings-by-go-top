@@ -4,7 +4,7 @@ Tags: seo, schema, publishing, content, ai
 Requires at least: 6.0
 Tested up to: 7.1
 Requires PHP: 7.4
-Stable tag: 3.1.1
+Stable tag: 3.1.2
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -12,7 +12,7 @@ Connects your site to GO TOP: publishes the articles you send from GO TOP and ap
 
 == Description ==
 
-GO TOP (https://gotopseo.com) plans and writes articles for your business and finds SEO problems on your site. This plugin is the connection between GO TOP and your WordPress site. It needs a GO TOP account; on its own it does nothing.
+GO TOP (https://www.gotopseo.com/en) plans and writes articles for your business and finds SEO problems on your site. This plugin is the connection between GO TOP and your WordPress site. It needs a GO TOP account; on its own it does nothing.
 
 = Publishing articles =
 
@@ -55,7 +55,7 @@ Every request from GO TOP is signed with a key that only your site and your GO T
 
 == External services ==
 
-This plugin connects your site to GO TOP (https://gotopseo.com), a search-optimisation
+This plugin connects your site to GO TOP (https://www.gotopseo.com/en), a search-optimisation
 service operated by GO TOP DIGITAL MARKETING AND ADVERTISING LTD, company number 517274346, Israel. You need
 a GO TOP account to use it. The plugin does nothing until you connect your site, and you
 connect it yourself with a pairing code from your GO TOP account.
@@ -120,8 +120,8 @@ The one address your site contacts by itself: GO TOP's file storage, hosted on S
 The plugin adds no tracking, no analytics and no script to your site's pages, and it sends
 nothing about your visitors anywhere.
 
-GO TOP terms of service: https://gotopseo.com/en/terms
-GO TOP privacy policy: https://gotopseo.com/en/privacy
+GO TOP terms of service: https://www.gotopseo.com/en/terms
+GO TOP privacy policy: https://www.gotopseo.com/en/privacy
 
 == Installation ==
 
@@ -160,6 +160,9 @@ Settings > GO TOP SEO > Disconnect. GO TOP can no longer reach the site. Deletin
 
 == Changelog ==
 
+= 3.1.2 =
+* The links to the GO TOP site now carry www and point at the English pages, which is the language this plugin and its readme are written in. The plugin's code, its routes and the connection are unchanged.
+
 = 3.1.1 =
 * The company name in English changed. The plugin now names the operator GO TOP DIGITAL MARKETING AND ADVERTISING LTD, in the plugin header and in the external-services section. The company, its number and the service are unchanged, and nothing else in the plugin changed.
 
@@ -187,6 +190,9 @@ Settings > GO TOP SEO > Disconnect. GO TOP can no longer reach the site. Deletin
 * First release.
 
 == Upgrade Notice ==
+
+= 3.1.2 =
+Only the links to the GO TOP site changed. The connection is kept.
 
 = 3.1.1 =
 The operator's name in English is updated. Nothing else changes and the connection is kept.

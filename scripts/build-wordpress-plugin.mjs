@@ -8,8 +8,15 @@
  *
  * The app serves the zip from the generated module (GET /api/site-health/plugin-zip), so the
  * download always matches the PHP in the repo; a QA guard runs --check. The zip is deterministic:
- * entries sorted, stored (no compression, so no zlib-version drift), fixed timestamps. Its folder
- * is "gotop-seo-bridge/", which WordPress's "Upload plugin" expects.
+ * entries sorted, stored (no compression, so no zlib-version drift), fixed timestamps.
+ *
+ * ITS FOLDER IS THE WORDPRESS.ORG SLUG, "go-top-seo-bridge/", and that is not cosmetic.
+ * WordPress asks WordPress.org for updates by the plugin's own DIRECTORY name, so a copy
+ * installed from a zip that unpacks into "gotop-seo-bridge/" is a plugin WordPress.org has
+ * never heard of: it is never offered an update and never shows the site owner that one
+ * exists. A WordPress.org install unpacks into the slug, so matching it here makes the
+ * zip — the signed-in support fallback for a host that blocks installs from
+ * WordPress.org — update-eligible exactly like the directory copy.
  * The repo-only README.md is left out; readme.txt is what WordPress shows.
  */
 import { createHash } from 'node:crypto'
@@ -20,7 +27,7 @@ import { fileURLToPath } from 'node:url'
 const ROOT = join(fileURLToPath(import.meta.url), '..', '..')
 const SRC = join(ROOT, 'wordpress-plugin', 'gotop-seo-bridge')
 const GENERATED = join(ROOT, 'lib', 'site-fix', 'plugin-zip.generated.ts')
-const FOLDER = 'gotop-seo-bridge'
+const FOLDER = 'go-top-seo-bridge'
 
 function listFiles(dir) {
   const out = []
