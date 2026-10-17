@@ -435,8 +435,8 @@ async function main() {
 
   const mutHop = await withMutant<{ runProspectTopUp: typeof runProspectTopUp }, string[]>(
     'lib/outreach/topup.ts',
-    [[/  if \(source\.detailHint !== undefined\) \{\n    const members = await readDetailPages\(listing\.body, source\.url, source\.detailHint, deps, summary\)\n    if \(members\.length > 0\) return members\n  \}\n  return listingCandidates\(listing\.body, source\.url\)/,
-      '  const direct = listingCandidates(listing.body, source.url)\n  if (direct.length > 0) return direct\n  if (source.detailHint === undefined) return []\n  return readDetailPages(listing.body, source.url, source.detailHint, deps, summary)']],
+    [[/  if \(source\.detailHint !== undefined\) \{\n    const members = await readDetailPages\(listing\.body, source\.url, source\.detailHint, deps, summary\)\n    if \(members\.length > 0\) return \{ candidates: members, reachable: true \}\n  \}\n  return \{ candidates: listingCandidates\(listing\.body, source\.url\), reachable: true \}/,
+      '  const direct = listingCandidates(listing.body, source.url)\n  if (direct.length > 0) return { candidates: direct, reachable: true }\n  if (source.detailHint === undefined) return { candidates: [], reachable: true }\n  const members = await readDetailPages(listing.body, source.url, source.detailHint, deps, summary)\n  return { candidates: members, reachable: true }']],
     async (m) => {
       const seen: string[] = []
       await m.runProspectTopUp(asAdmin(world()), {
@@ -576,6 +576,36 @@ async function main() {
   check('T10c: and a directory with few member pages is read whole',
     JSON.stringify(detailPageWindow(many.slice(0, 3), new Date('2026-10-17T10:00:00Z')))
       === JSON.stringify(many.slice(0, 3)))
+
+  // The 11:15 UTC pass: the hour started it at three directories that answer
+  // nothing, and the budget of three sources was gone before it reached one
+  // that works.
+  const DEAD_THEN_GOOD: PublicSource[] = [
+    { name: 'dead-1', url: 'https://dead1.example/list/' },
+    { name: 'dead-2', url: 'https://dead2.example/list/' },
+    { name: 'dead-3', url: 'https://dead3.example/list/' },
+    { name: 'good-directory', url: 'https://grown.example/directory/' },
+  ]
+  const deadNet = async (url: string): Promise<FetchedPage> => {
+    if (/^https:\/\/dead[123]\.example/.test(url)) throw new Error('unreachable')
+    return net(url)
+  }
+  f = world()
+  summary = await runProspectTopUp(asAdmin(f), {
+    fetchPage: deadNet, now: NOW, startAt: 0, sources: DEAD_THEN_GOOD,
+  })
+  check('T11: three sources that cannot be reached do not spend the pass',
+    summary.added === 'store.example' && summary.source === 'good-directory')
+
+  const mutBudget = await withMutant<{ runProspectTopUp: typeof runProspectTopUp }, TopUpSummary>(
+    'lib/outreach/topup.ts',
+    [[/    if \(listing\.reachable\) listingsRead \+= 1/, '    listingsRead += 1']],
+    async (m) => m.runProspectTopUp(asAdmin(world()), {
+      fetchPage: deadNet, now: NOW, startAt: 0, sources: DEAD_THEN_GOOD,
+    }),
+  )
+  check('T11-MUT: counting them would end the pass before the working directory',
+    mutBudget.added === null)
 
   console.log('\n— G: the switches and the cron —')
 
