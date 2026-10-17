@@ -73,10 +73,16 @@ export interface PublicSource {
  * and "made" programmes fit all three, which is why they lead.
  */
 export const PUBLIC_SOURCES: readonly PublicSource[] = [
-  // Both of these were checked against the live pages on 17 Oct 2026, by
-  // listing the member links each one actually serves. `minnesotagrown.com/directory/`
-  // is a landing page and `georgia-grown-members/` answers 404 — neither names
-  // a member, which is half of why the first day added nobody.
+  // MEASURED, 17 Oct 2026, by reading each page and judging a sample of the
+  // businesses it names (platform and a US address on their own site):
+  //   newmfgalliance   384 members on one page, 4 of 14 sampled usable
+  //   springfield      72 members, 6 of 14 usable
+  // That ratio is what decides how many directories the channel needs, and it
+  // is why the "grown" programmes below are no longer first: a farm directory's
+  // members are mostly neither Shopify nor WordPress, so nearly every one is
+  // refused after three fetches. Manufacturers and chamber members are not.
+  { name: 'newmfgalliance', url: 'https://newmfgalliance.org/manufacturers/alliance-members-websites/' },
+  { name: 'springfield-chamber', url: 'https://business.springfieldchamber.com/activememberdirectory/Search/manufacturing-128889' },
   { name: 'minnesota-grown', url: 'https://minnesotagrown.com/member/', detailHint: '/member/' },
   { name: 'georgia-grown', url: 'https://georgiagrown.com/membership/member-directory/', detailHint: '/member/' },
   { name: 'pride-of-ny', url: 'https://certifiedny.agriculture.ny.gov/producers', detailHint: '/producer' },
@@ -239,7 +245,7 @@ async function readDetailPages(
 ): Promise<ListingCandidate[]> {
   const navigation = new Set(listingCandidates(listingBody, listingUrl).map((c) => c.host))
   const read: { company: string | null; hosts: string[] }[] = []
-  const pages = detailLinks(listingBody, listingUrl, hint).slice(0, MAX_DETAIL_PAGES)
+  const pages = detailPageWindow(detailLinks(listingBody, listingUrl, hint), deps.now)
   for (const url of pages) {
     const page = await fetchOrNull(deps.fetchPage, url)
     summary.fetched += 1
@@ -263,6 +269,24 @@ async function readDetailPages(
     taken.add(host)
     out.push({ company: company ?? host, host })
   }
+  return out
+}
+
+/**
+ * The member pages this pass reads, out of however many the listing names.
+ *
+ * The window MOVES, and that is the whole point: a fixed first four would be
+ * the same four businesses every quarter hour for ever, so a directory would
+ * add at most four and then nothing. Unlike the flat listings, a member page
+ * cannot be skipped from our own table before it is fetched, since the host it
+ * names is only known after reading it.
+ */
+export function detailPageWindow(pages: string[], now: Date): string[] {
+  if (pages.length <= MAX_DETAIL_PAGES) return pages
+  const quarterHours = Math.floor(now.getTime() / (15 * 60 * 1000))
+  const start = ((quarterHours % pages.length) + pages.length) % pages.length
+  const out: string[] = []
+  for (let i = 0; i < MAX_DETAIL_PAGES; i += 1) out.push(pages[(start + i) % pages.length])
   return out
 }
 
