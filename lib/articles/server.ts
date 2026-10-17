@@ -16,7 +16,7 @@ import { createClient } from '@/lib/supabase/server'
 import { ARTICLES_COPY, articleHref, articlesIndexHref } from '@/lib/articles/i18n'
 import { localeHomeHref, LOCALE_CONFIG, type PublicLocale } from '@/lib/i18n/locales'
 import { getPublicDictionary } from '@/lib/i18n/getPublicDictionary'
-import { articleAuthor } from '@/lib/articles/authors'
+import { articleAuthor, authorDisplayName } from '@/lib/articles/authors'
 
 export const SITE_URL = 'https://www.gotopseo.com'
 
@@ -163,7 +163,7 @@ export async function buildArticleMetadata(slug: string, locale: PublicLocale): 
         publishedTime: article.published_at,
       }),
       ...(article.author && {
-        authors: [article.author],
+        authors: [authorDisplayName(article.author, locale)],
       }),
     },
     twitter: {
