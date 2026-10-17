@@ -461,6 +461,8 @@ export const dashboardEn = {
       authorBoxNoLink: 'No link: there is no site address in your settings.',
       authorBoxNameLabel: 'Author name to show (optional)',
       authorBoxNameHint: 'Leave empty to use the name picked automatically.',
+      authorBoxLineLabel: 'A line about the author (optional)',
+      authorBoxLineHint: 'What you write here appears under the name. Leave it empty to use the first sentence of the business description.',
       authorBoxUrlLabel: 'Author link (optional)',
       authorBoxUrlHint: 'A full address starting with http:// or https://. Leave empty to link to your about page, or to your home page if there is none.',
       authorBoxUrlInvalid: 'Enter a full address that starts with http:// or https://.',
