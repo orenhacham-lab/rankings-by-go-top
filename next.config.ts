@@ -26,6 +26,14 @@ const nextConfig: NextConfig = {
       'node_modules/@img/sharp-linuxmusl-x64/**/*',
     ],
   },
+  // The author photo is uploaded through a server action (app/(dashboard)/
+  // settings/writing-guidance-actions.ts uploadAuthorPhotoAction), and the
+  // photo may be up to 2 MB (lib/content/author-box/photo-file.ts), above the
+  // 1 MB default. 3 MB leaves room for the multipart envelope; the server
+  // still refuses anything over 2 MB by its bytes.
+  experimental: {
+    serverActions: { bodySizeLimit: '3mb' },
+  },
   images: {
     remotePatterns: [
       {
