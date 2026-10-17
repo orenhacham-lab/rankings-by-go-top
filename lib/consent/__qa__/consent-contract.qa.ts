@@ -10,6 +10,7 @@
  * D) refusing is as easy as agreeing, and withdrawable from every page
  * E) the audit log can only be written, never read, and holds no address
  * F) the copy no longer claims that browsing is agreement
+ * G) the consent UPDATE reaches Google in the shape Google reads
  *
  * Every check has a mutation control: the code is broken on purpose and the
  * guard is shown to fail. A guard that cannot fail proves nothing.
@@ -244,6 +245,34 @@ function main() {
     }
     check('MUT: the old "continued use is agreement" sentence is caught',
       /המשך השימוש/.test('אנו משתמשים בעוגיות. המשך השימוש באתר מהווה הסכמה'))
+  }
+
+  console.log('\nG) the consent UPDATE reaches Google in the shape Google reads')
+  {
+    // Measured live on 17 Oct 2026: with the update pushed as a plain ARRAY,
+    // the GA4 hit after "accept all" carried gcs=G100 — ad_storage and
+    // analytics_storage DENIED — so Google kept nothing. Google reads a consent
+    // command only as the `arguments` object that gtag() pushes; GTM never even
+    // stamped the array entries with gtm.uniqueEventId. The guard is on the
+    // shape, because the shape is the whole defect.
+    const tags = code('components/consent/GoogleTags.tsx')
+    check("G1: no consent command is pushed as an array literal",
+      !/dataLayer\s*\.\s*push\s*\(\s*\[\s*['\"]consent['\"]/.test(tags)
+      && !/push\s*\(\s*\[\s*['\"]consent['\"]/.test(tags), 'an array-shaped consent command is ignored by Google')
+    check('G2: the update goes through gtag when it is there',
+      /gtag\s*\(\s*['\"]consent['\"]\s*,\s*['\"]update['\"]/.test(tags))
+    check('G3: the fallback pushes the arguments OBJECT, not an array',
+      /\barguments\b/.test(tags) && /push\s*\(\s*arguments\s*\)/.test(tags))
+    // The default and the update must speak the same vocabulary, or a tag sees
+    // a signal declared in one and never updated in the other.
+    const defaults = Object.keys(GOOGLE_CONSENT_DEFAULT).sort()
+    const updated = Object.keys(googleConsentFrom({ necessary: true, analytics: true, marketing: true })).sort()
+    check('G4: the update names exactly the signals the default names',
+      JSON.stringify(defaults) === JSON.stringify(updated), { defaults, updated })
+    check('G5: accepting everything grants analytics_storage',
+      googleConsentFrom({ necessary: true, analytics: true, marketing: true }).analytics_storage === 'granted')
+    check('MUT: the array-shaped push this section exists for is caught',
+      /push\s*\(\s*\[\s*['\"]consent['\"]/.test("w.dataLayer.push(['consent', 'update', googleConsentFrom(choices)])"))
   }
 
   console.log(`\n${pass} passed, ${fail} failed`)

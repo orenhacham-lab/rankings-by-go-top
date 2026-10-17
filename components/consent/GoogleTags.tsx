@@ -28,19 +28,61 @@
  */
 import { useEffect, useRef } from 'react'
 import { CONSENT_CHANGED_EVENT, currentChoices } from '@/lib/consent/client-store'
-import { googleConsentFrom } from '@/lib/consent/google-consent-mode'
+import { googleConsentFrom, type GoogleConsentState } from '@/lib/consent/google-consent-mode'
 import type { ConsentChoices } from '@/lib/consent/categories'
 
 const GTM_ID = 'GTM-PC29G3NQ'
 const GTM_SRC = `https://www.googletagmanager.com/gtm.js?id=${GTM_ID}`
 
-type DataLayerWindow = Window & { dataLayer?: unknown[] }
+type DataLayerWindow = Window & {
+  dataLayer?: unknown[]
+  gtag?: (...args: unknown[]) => void
+}
 
-/** Push through the dataLayer, not through a `gtag` global we did not define. */
+/**
+ * THE UPDATE GOES THROUGH `gtag`, AND THE SHAPE IS THE WHOLE POINT.
+ *
+ * This used to push a plain array — `dataLayer.push(['consent','update',…])` —
+ * on the reasoning that we should not depend on a global we did not define. We
+ * do define it: `GOOGLE_CONSENT_DEFAULT_SCRIPT` runs first in <head> and sets
+ * `gtag()`, which pushes its `arguments` OBJECT. Google reads a consent command
+ * only in that shape. An array is left on the dataLayer and ignored, so the
+ * default — everything optional denied — stayed in force for a visitor who had
+ * just accepted everything.
+ *
+ * Measured on the live site on 17 October 2026 before this fix: after clicking
+ * "accept all", the GA4 hit carried `gcs=G100` (ad_storage denied,
+ * analytics_storage denied) and `npa=1`. Google answers 204 to such a hit and
+ * keeps nothing: it is a cookieless ping, absent from Realtime and from every
+ * report. Hence months of an empty property with the tag "installed".
+ *
+ * The proof of the shape, from the same capture: GTM stamps every dataLayer
+ * entry it processes with `gtm.uniqueEventId`. The two entries from the
+ * `gtag`-shaped default carried the stamp; the two array-shaped updates had no
+ * stamp at all.
+ *
+ * The fallback builds the same `arguments` object without the global, for the
+ * case where this component runs before the inline script (it should not, but a
+ * consent signal is not the place to rely on that).
+ */
 function pushConsentUpdate(choices: ConsentChoices) {
   const w = window as DataLayerWindow
   w.dataLayer = w.dataLayer || []
-  w.dataLayer.push(['consent', 'update', googleConsentFrom(choices)])
+  const state = googleConsentFrom(choices)
+  if (typeof w.gtag === 'function') {
+    w.gtag('consent', 'update', state)
+    return
+  }
+  const layer = w.dataLayer
+  // Declared without parameters and typed through a cast, because what must
+  // reach the dataLayer is the `arguments` object itself — named parameters
+  // would be unused by construction, and rest parameters would turn it into a
+  // real Array, which is the shape Google ignores.
+  const pushArguments = function () {
+    // eslint-disable-next-line prefer-rest-params -- the arguments OBJECT *is* the contract.
+    layer.push(arguments)
+  } as unknown as (command: 'consent', action: 'update', state: GoogleConsentState) => void
+  pushArguments('consent', 'update', state)
 }
 
 function wantsTags(choices: ConsentChoices): boolean {
