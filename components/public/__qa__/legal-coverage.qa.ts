@@ -262,6 +262,11 @@ check('MUTATION — an English-only extra section is caught', pages.he.terms.h2 
     'partners.shopify.com': { en: /Shopify/, he: /Shopify/ },
     'supabase.com': { en: /Supabase/, he: /Supabase/ },
     'graph.facebook.com': { en: /Conversions API/, he: /Conversions API/ },
+    // The browser pixel. It used to be a tag inside the GTM container, where no
+    // host literal reached this guard; it is our code now, so the guard sees it
+    // and both policies have to keep naming it. They already do: the pixel has
+    // its own section in each, and the marketing category names Meta.
+    'connect.facebook.net': { en: /Meta Pixel/, he: /Meta Pixel/ },
     // Creem is a payment provider, so it is a recipient whatever the state of its
     // off switch: the sharing list says what we send it when a payment goes through
     // it. Both hosts are listed because the mode is an explicit variable

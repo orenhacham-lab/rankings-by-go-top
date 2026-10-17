@@ -19,6 +19,8 @@ import { NoticeBox } from '@/components/ui/Notice'
 import PasswordField from '@/components/auth/PasswordField'
 import { authHref, withLocaleParam } from '@/lib/i18n/auth-href'
 import { REFERRAL_PARAM, normalizeReferralCode, withReferral } from '@/lib/affiliate/referral'
+import { currentChoices } from '@/lib/consent/client-store'
+import { META_SIGNUP_EVENT, metaPixelAllowed } from '@/lib/consent/meta-pixel'
 
 const SIGNUP_UI = {
   he: {
@@ -545,13 +547,14 @@ export function SignupForm() {
         // Don't block signup if email fails
       }
 
-      // Track signup success in Google Tag Manager (for Meta Pixel via GTM)
-      if (typeof window !== 'undefined') {
-        (window as any).dataLayer = (window as any).dataLayer || []
-        ;(window as any).dataLayer.push({
-          event: 'signup_success',
-          product: 'rankings_by_go_top',
-        })
+      // The conversion Meta's ad sets optimise on. It used to be a dataLayer
+      // event read by a tag inside the GTM container; the pixel is ours now
+      // (lib/consent/meta-pixel.ts), so the event is sent here — and only for a
+      // visitor who allowed marketing, which is the gate the container tag
+      // never had.
+      if (typeof window !== 'undefined' && metaPixelAllowed(currentChoices())) {
+        const fbq = (window as Window & { fbq?: (...args: unknown[]) => void }).fbq
+        fbq?.('track', META_SIGNUP_EVENT)
       }
 
       // Area G — immediate-session path: seed the EXISTING dashboard-language store so the
