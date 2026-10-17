@@ -63,6 +63,7 @@ import { applyArticleDesign } from '@/lib/content/article-style/publish'
 import { resolveTaxonomy, type ResolvedTaxonomy, type SeoPlugin } from '@/lib/content/wordpress-taxonomy'
 import { publishArticleSchemaToWordPress, type ArticleSchemaOutcome } from '@/lib/content/wordpress-schema'
 import { loadFocusKeyword, persistSeoOutcome, publishArticleSeo, type SeoPublishResult } from '@/lib/content/seo-publish'
+import { copyAuthorPhotoToWordPress } from '@/lib/content/author-box/photo-copy'
 import { wpCreatePost, type WpArticleForExport, type WpCreateError, type WpCreateResult } from '@/lib/content/wordpress-publish'
 
 type Admin = ReturnType<typeof createAdminClient>
@@ -219,6 +220,12 @@ export async function pluginCreatePost(
     scheduleAt?: string
     forceNew?: boolean
     authorId?: number
+    /**
+     * The project's application password, when it has one too: the only way the owner's
+     * uploaded author photo reaches the media library (the plugin's /media takes public
+     * GO TOP storage addresses only, and the photo's bucket is private).
+     */
+    photoCreds?: WordPressCredentials | null
   },
   deps: PluginPublishDeps = {},
 ): Promise<WpCreateResult | (WpCreateError & { pluginCode?: string })> {
@@ -263,6 +270,7 @@ export async function pluginCreatePost(
   // (author_id, else the plugin's default), from its signed /authors list.
   content = await applyArticleDesign(admin, articleId, content, 'wordpress', {
     authorName: () => pluginPublishingUserName(link, plugin.version, opts.authorId, deps.post),
+    ...(opts.photoCreds ? { authorPhoto: (projectId: string, ownerId: string) => copyAuthorPhotoToWordPress(admin, opts.photoCreds!, projectId, ownerId) } : {}),
   })
 
   let taxonomy: ResolvedTaxonomy | undefined
@@ -400,7 +408,7 @@ export async function publishArticleToWordPress(
     }
     return refuse(unsupported)
   }
-  const r = await pluginCreatePost(admin, plugin, article, { ...wpOpts, scheduleAt: opts.scheduleAt, forceNew: opts.forceNew, authorId: opts.authorId }, deps)
+  const r = await pluginCreatePost(admin, plugin, article, { ...wpOpts, scheduleAt: opts.scheduleAt, forceNew: opts.forceNew, authorId: opts.authorId, photoCreds: publisher.creds }, deps)
   if (r.ok) return { ...r, via: 'plugin' }
   // The post was made over the application password before: the plugin refused before writing.
   // Never with a time or an author: the application password would publish without them.

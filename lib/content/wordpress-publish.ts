@@ -20,6 +20,7 @@ import { applyArticleDesign } from '@/lib/content/article-style/publish'
 import { resolveTaxonomy, type ResolvedTaxonomy } from '@/lib/content/wordpress-taxonomy'
 import { publishArticleSchemaToWordPress, type ArticleSchemaDeps, type ArticleSchemaOutcome } from '@/lib/content/wordpress-schema'
 import { decryptCredential } from '@/lib/security/credentials-crypto'
+import { copyAuthorPhotoToWordPress } from '@/lib/content/author-box/photo-copy'
 
 type Admin = ReturnType<typeof createAdminClient>
 
@@ -159,6 +160,8 @@ export async function wpCreatePost(
   // The author box's name, when one is added: the user the post is published under.
   content = await applyArticleDesign(admin, article.id, content, 'wordpress', {
     authorName: () => getPublishingUserName(creds, opts.existing?.postId ?? null).catch(() => null),
+    // The owner's uploaded author photo: copied into this site's media library once, then reused.
+    authorPhoto: (projectId, ownerId) => copyAuthorPhotoToWordPress(admin, creds, projectId, ownerId),
   })
 
   // Phase 4E — resolve taxonomy (primary-in-list, dedupe, drop invalid/deleted

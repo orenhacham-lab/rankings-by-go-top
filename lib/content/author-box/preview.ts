@@ -22,6 +22,7 @@ import { owner, type GuidanceDeps } from '@/lib/content/writing-guidance/data'
 import type { AuthorBoxInputs } from './box'
 import { readAuthorBoxInputs, readProject, type AuthorBoxPlatform } from './store'
 import type { FetchText } from './site-icon'
+import { authorPhotoPreviewUrl, readAuthorPhoto, type PhotoStorage } from '@/lib/content/author-box/photo'
 
 export type AuthorBoxPreviewDeps = {
   session: GuidanceDeps['session']
@@ -32,6 +33,8 @@ export type AuthorBoxPreviewDeps = {
   siteUserName: (admin: SupabaseClient, projectId: string, ownerId: string) => Promise<string | null>
   fetchText?: FetchText
   timeoutMs?: number
+  /** A copy of the uploaded photo can be made in this site (./photo-copy.ts canCopyAuthorPhoto). Absent = never. */
+  photoCopyAvailable?: (admin: SupabaseClient, projectId: string) => Promise<boolean>
 }
 
 export type AuthorBoxPreview = {
@@ -40,6 +43,14 @@ export type AuthorBoxPreview = {
   inputs: AuthorBoxInputs
   /** The "site icon" choice is offered (WordPress only). */
   siteIconAvailable: boolean
+  /**
+   * The "upload a photo" choice is offered: WordPress with an application
+   * password only (the photo is copied into its media library at publish time).
+   * Never on a Shopify store, a custom site or Wix.
+   */
+  photoUploadAvailable: boolean
+  /** Our stored photo, signed for a few minutes, for this preview only (never published). */
+  photoPreviewUrl: string | null
 }
 
 export type AuthorBoxPreviewResult = { ok: true; data: AuthorBoxPreview } | { ok: false; code: 'unauthorized' | 'not_found' | 'invalid_request' | 'unavailable' | 'save_failed' }
@@ -74,7 +85,11 @@ export async function previewAuthorBox(deps: AuthorBoxPreviewDeps, projectId: un
       fetchText: deps.fetchText,
     }), ms * 2, null)
     if (!inputs) return { ok: false, code: 'unavailable' }
-    return { ok: true, data: { platform, inputs, siteIconAvailable: boxPlatform === 'wordpress' } }
+    const photoUploadAvailable = boxPlatform === 'wordpress' && !!deps.photoCopyAvailable
+      && await capped(deps.photoCopyAvailable(admin, o.projectId), ms, false)
+    const photo = await readAuthorPhoto(admin, o.projectId, o.userId)
+    const photoPreviewUrl = await capped(authorPhotoPreviewUrl(admin as PhotoStorage, o.projectId, photo.path), ms, null)
+    return { ok: true, data: { platform, inputs, siteIconAvailable: boxPlatform === 'wordpress', photoUploadAvailable, photoPreviewUrl } }
   } catch {
     return { ok: false, code: 'unavailable' }
   }
