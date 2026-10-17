@@ -45,6 +45,7 @@ import {
 } from '../sourcing'
 import { CONTACT_PATHS, MAX_PAGES_PER_SITE, qualifyBusiness } from '../qualify'
 import {
+  MAX_CANDIDATES_PER_PASS,
   MAX_DETAIL_PAGES,
   addProspect,
   detailPageWindow,
@@ -606,6 +607,49 @@ async function main() {
   )
   check('T11-MUT: counting them would end the pass before the working directory',
     mutBudget.added === null)
+
+  // THE SAME BUG ON A FLAT LISTING, from Production at 14:15 and 14:30 UTC on
+  // 17 Oct: the identical four businesses of a 384-member directory, examined
+  // twice, refused twice, 380 members never reached.
+  const WIDE: PublicSource[] = [{ name: 'wide-directory', url: 'https://wide.example/list/' }]
+  const wideListing = Array.from({ length: 12 }, (_, i) =>
+    `<a href="https://biz${i}.example">Business ${i}</a>`).join('')
+  const wideNet = async (url: string): Promise<FetchedPage> => {
+    if (url === 'https://wide.example/list/') return page(wideListing, 200, url)
+    if (url === 'https://wide.example/robots.txt') return page('User-agent: *\nDisallow: /wp-admin/', 200, url)
+    // Every business refuses, so nothing is ever added and nothing is skipped
+    // from our own table: only the window can move the pass along.
+    throw new Error('unreachable')
+  }
+  const hostsExamined = async (iso: string): Promise<string[]> => {
+    const s = await runProspectTopUp(asAdmin(world()), {
+      fetchPage: wideNet, now: new Date(iso), startAt: 0, sources: WIDE,
+    })
+    return s.refusals.map((r) => r.split(':')[0])
+  }
+  const firstPass = await hostsExamined('2026-10-17T14:15:00Z')
+  const secondPass = await hostsExamined('2026-10-17T14:30:00Z')
+  check('T12: consecutive passes over one flat listing examine different businesses',
+    firstPass.length === MAX_CANDIDATES_PER_PASS
+    && secondPass.length === MAX_CANDIDATES_PER_PASS
+    && firstPass.every((h) => !secondPass.includes(h)))
+
+  const mutWide = await withMutant<{ runProspectTopUp: typeof runProspectTopUp }, string[][]>(
+    'lib/outreach/topup.ts',
+    [[/    const candidates = passWindow\(listing\.candidates, deps\.now, MAX_CANDIDATES_PER_PASS\)/,
+      '    const candidates = listing.candidates']],
+    async (m) => {
+      const run = async (iso: string) => {
+        const s = await m.runProspectTopUp(asAdmin(world()), {
+          fetchPage: wideNet, now: new Date(iso), startAt: 0, sources: WIDE,
+        })
+        return s.refusals.map((r: string) => r.split(':')[0])
+      }
+      return [await run('2026-10-17T14:15:00Z'), await run('2026-10-17T14:30:00Z')]
+    },
+  )
+  check('T12-MUT: without the window both passes refuse the same four for ever',
+    JSON.stringify(mutWide[0]) === JSON.stringify(mutWide[1]))
 
   console.log('\n— G: the switches and the cron —')
 
