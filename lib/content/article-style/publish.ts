@@ -21,12 +21,14 @@ import { injectInlineImages, type ComposableInlineImage } from '@/lib/content/in
 import { designForSite } from './render'
 import { readArticleCtaForArticle, readArticleStyleForArticle } from './store'
 import type { DesignPlatform } from './types'
-import { decideAuthorBox, type ThemeDeps } from '@/lib/content/author-box/store'
+import { decideAuthorBox, type AuthorPhotoCopy, type ThemeDeps } from '@/lib/content/author-box/store'
 import type { AuthorBoxContent } from '@/lib/content/author-box/box'
 
 export type ArticleDesignExtras = {
   /** The name the post is published under on the site (asked only when an author box is added). */
   authorName?: () => Promise<string | null>
+  /** The owner's uploaded photo, copied into the site's media library (WordPress publishers only). */
+  authorPhoto?: AuthorPhotoCopy
   /** Tests only: the theme page fetcher and the clock. */
   themeDeps?: ThemeDeps
 }
@@ -45,7 +47,7 @@ export async function applyArticleDesign(
     const cta = await readArticleCtaForArticle(admin, projectId)
     let authorBox: AuthorBoxContent | null = null
     if (projectId && (platform === 'wordpress' || platform === 'shopify' || platform === 'webhook')) {
-      const decision = await decideAuthorBox(admin, { articleId, projectId, platform, html, authorName: extras.authorName }, extras.themeDeps)
+      const decision = await decideAuthorBox(admin, { articleId, projectId, platform, html, authorName: extras.authorName, authorPhoto: extras.authorPhoto }, extras.themeDeps)
       if (decision.add) authorBox = decision.content
       else if (decision.reason !== 'off') console.log('[author-box] not added', { platform, reason: decision.reason })
     }

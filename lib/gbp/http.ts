@@ -25,6 +25,7 @@ import { imageGenerationHttpStatus } from '@/lib/content/image-generation-http'
 import { v4LocationParent } from './request'
 import { listReviews, getReview, replyToReview, deleteReviewReply, summarizeReviews, isReviewName, GBP_REVIEW_ORDERS, type GbpReview, type GbpReviewOrder, type GbpReviewPage } from './reviews'
 import { validateReplyInput, GBP_REPLY_MAX } from './review-validate'
+import { normalizeStoredLocale } from '@/lib/i18n/locales'
 import { draftReviewReply } from './review-draft'
 import { publishPost, accessTokenFor, defaultPublishDeps, type PublishDeps } from './publish'
 import {
@@ -446,7 +447,10 @@ export async function handleDraftReviewReply(req: Request, deps: GbpRouteDeps): 
 
   const out = await draftReviewReply({
     businessName: ctx.location.location_title || null,
-    language: body.language === 'en' ? 'en' : 'he',
+    // The project's language, whole: this read `=== 'en' ? 'en' : 'he'`, so a
+    // Spanish or Portuguese project got a Hebrew draft. An absent or unknown
+    // value is Hebrew, the site's own default.
+    language: normalizeStoredLocale(body.language) ?? 'he',
     // The reviewer's name is deliberately NOT passed on (see lib/gbp/review-draft.ts).
     review: { stars: review.stars, comment: review.comment },
   }, deps.generate)

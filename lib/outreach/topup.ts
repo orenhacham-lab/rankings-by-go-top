@@ -73,18 +73,31 @@ export interface PublicSource {
  * and "made" programmes fit all three, which is why they lead.
  */
 export const PUBLIC_SOURCES: readonly PublicSource[] = [
-  { name: 'minnesota-grown', url: 'https://minnesotagrown.com/directory/', detailHint: '/directory/' },
-  { name: 'georgia-grown', url: 'https://georgiagrown.com/georgia-grown-members/', detailHint: '/member' },
+  // Both of these were checked against the live pages on 17 Oct 2026, by
+  // listing the member links each one actually serves. `minnesotagrown.com/directory/`
+  // is a landing page and `georgia-grown-members/` answers 404 — neither names
+  // a member, which is half of why the first day added nobody.
+  { name: 'minnesota-grown', url: 'https://minnesotagrown.com/member/', detailHint: '/member/' },
+  { name: 'georgia-grown', url: 'https://georgiagrown.com/membership/member-directory/', detailHint: '/member/' },
   { name: 'pride-of-ny', url: 'https://certifiedny.agriculture.ny.gov/producers', detailHint: '/producer' },
-  { name: 'jersey-fresh', url: 'https://findjerseyfresh.com/directory/', detailHint: '/listing' },
   { name: 'made-in-michigan', url: 'https://www.michiganbusiness.org/industries/food-agriculture/' },
   { name: 'alabama-farmers', url: 'https://alabamafarmersmarket.org/vendors/' },
+  // jersey-fresh is deliberately gone: findjerseyfresh.com/directory/ is a
+  // search form, its members are reachable only by submitting it, and the only
+  // off-site links it carries are the state's other programmes.
 ]
 
 /** Businesses examined in one pass before it gives up and waits for the next. */
 export const MAX_CANDIDATES_PER_PASS = 4
 /** Member pages followed on one directory in one pass. */
 export const MAX_DETAIL_PAGES = 4
+/**
+ * Listings read in one pass.
+ *
+ * The pass now moves on from a source that yielded nothing addable, so this is
+ * what keeps "move on" from meaning "read all six every quarter hour".
+ */
+export const MAX_SOURCES_PER_PASS = 3
 
 export interface TopUpSummary {
   /** The source this pass used, or null when none could be read. */
@@ -123,10 +136,21 @@ export async function runProspectTopUp(
 
   // Rotate, so a source that is down or exhausted costs one pass rather than
   // every pass. The hour is the rotation, which needs nothing stored.
+  //
+  // AND MOVE ON FROM A SOURCE THAT YIELDED NOTHING ADDABLE. Returning as soon
+  // as a source produced *any* candidate is what let one bad listing burn a
+  // whole hour of passes on 17 Oct: it offered four candidates, all four were
+  // refused, and the pass ended there, every quarter hour, while five usable
+  // directories went unread. A source earns the rest of the pass by adding a
+  // business, not by answering.
   const start = deps.startAt ?? deps.now.getUTCHours()
+  let listingsRead = 0
   for (let i = 0; i < sources.length; i += 1) {
+    if (summary.examined >= MAX_CANDIDATES_PER_PASS) return summary
+    if (listingsRead >= MAX_SOURCES_PER_PASS) return summary
     const source = sources[(start + i) % sources.length]
     const candidates = await readListing(source, deps, summary)
+    listingsRead += 1
     if (candidates.length === 0) continue
     summary.source = source.name
 
@@ -155,7 +179,6 @@ export async function runProspectTopUp(
       }
       summary.refusals.push(`${candidate.host}: ${written}`)
     }
-    return summary
   }
   return summary
 }
@@ -179,23 +202,66 @@ async function readListing(
     if (robots !== null && robots.status === 200 && !robotsAllows(robots.body, path, CRAWLER_AGENT)) return []
   }
 
-  const direct = listingCandidates(listing.body, source.url)
-  if (direct.length > 0) return direct
-  if (source.detailHint === undefined) return []
+  // THE MEMBER PAGES COME FIRST where the source declares them. A directory
+  // that names its members on its own pages also carries its own navigation,
+  // and taking whatever off-site link the listing page happens to show meant
+  // taking the navigation: the hop the source was configured for was never
+  // tried. Off-site links on the listing itself are the fallback, for the flat
+  // directories that have no hop.
+  if (source.detailHint !== undefined) {
+    const members = await readDetailPages(listing.body, source.url, source.detailHint, deps, summary)
+    if (members.length > 0) return members
+  }
+  return listingCandidates(listing.body, source.url)
+}
 
-  // One hop in: the member's own page, where the member's website is.
-  const out: ListingCandidate[] = []
-  const pages = detailLinks(listing.body, source.url, source.detailHint).slice(0, MAX_DETAIL_PAGES)
+/**
+ * One hop in: the member's own page, where the member's website is.
+ *
+ * THE SECOND HALF OF THE SAME BUG. The first pass after the fix read four
+ * Minnesota Grown member pages and examined `bonfire.com` four times: the
+ * directory's own merch store, which sits in the site-wide header of every
+ * member page and is therefore the first off-site link on each. So the links
+ * the LISTING page carries are the navigation by definition, and a member page
+ * is read for what it has that the listing does not. A host that shows up on
+ * more than one member page is the same thing one level down, since each member
+ * page names a different business.
+ *
+ * A member with no website of its own then yields nothing, which is the right
+ * answer: there is nothing for the product to act on.
+ */
+async function readDetailPages(
+  listingBody: string,
+  listingUrl: string,
+  hint: string,
+  deps: TopUpDeps,
+  summary: TopUpSummary,
+): Promise<ListingCandidate[]> {
+  const navigation = new Set(listingCandidates(listingBody, listingUrl).map((c) => c.host))
+  const read: { company: string | null; hosts: string[] }[] = []
+  const pages = detailLinks(listingBody, listingUrl, hint).slice(0, MAX_DETAIL_PAGES)
   for (const url of pages) {
     const page = await fetchOrNull(deps.fetchPage, url)
     summary.fetched += 1
     if (page === null || !isOpenPage(page)) continue
-    const links = listingCandidates(page.body, url)
+    const links = listingCandidates(page.body, url).filter((c) => !navigation.has(c.host))
     if (links.length === 0) continue
     // The member page names one business; its own heading is that business's
     // name, which reads better in a subject line than a link's anchor text.
-    const named = pageTitle(page.body)
-    out.push({ company: named ?? links[0].company, host: links[0].host })
+    read.push({ company: pageTitle(page.body), hosts: links.map((c) => c.host) })
+  }
+
+  const seenOn = new Map<string, number>()
+  for (const { hosts } of read) {
+    for (const host of new Set(hosts)) seenOn.set(host, (seenOn.get(host) ?? 0) + 1)
+  }
+  const out: ListingCandidate[] = []
+  const taken = new Set<string>()
+  for (const { company, hosts } of read) {
+    const host = hosts.find((h) => seenOn.get(h) === 1 && !taken.has(h))
+    if (host === undefined) continue
+    taken.add(host)
+    out.push({ company: company ?? host, host })
   }
   return out
 }

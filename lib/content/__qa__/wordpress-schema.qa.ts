@@ -245,20 +245,7 @@ async function main() {
     .filter((l) => l.startsWith('+') && !l.startsWith('+++'))
     .map((l) => l.slice(1).trim())
     .filter((l) => l.length > 0 && !l.startsWith('//') && !l.startsWith('*') && !l.startsWith('/*'))
-  // Owner 2026-10-16: the one-time empty-subheading repair (lib/content/empty-h3-repair) writes
-  // ONLY an article's body through updateShopifyArticleBodyOnly, which has to live in the Shopify
-  // publisher (phase2-source-contracts: the one file that mutates articles, billing guard first;
-  // its own guards are in lib/content/__qa__/empty-h3-repair.qa.ts C7). That one function block,
-  // from its signature to its closing brace, is its own feature and is set aside here; every
-  // other added line is still judged.
-  const withoutBodyOnlyRepair = (lines: string[]) => {
-    const i = lines.findIndex((l) => l.startsWith('export async function updateShopifyArticleBodyOnly('))
-    const j = i < 0 ? -1 : lines.indexOf('}', i)
-    return j < 0 ? lines : [...lines.slice(0, i), ...lines.slice(j + 1)]
-  }
-  check('MUTATION CONTROL: a line added outside the body-only repair function is still judged',
-    withoutBodyOnlyRepair(['export async function updateShopifyArticleBodyOnly(', 'x', '}', 'leak()']).join() === 'leak()')
-  const shopifyAddedLinesJudged = (base: string) => withoutBodyOnlyRepair(shopifyAddedLines(base))
+  const shopifyAddedLinesJudged = (base: string) => shopifyAddedLines(base)
     // Structure-only lines (a closing brace, a lone paren) carry no feature logic.
     .filter((l) => !/^[{}()\[\];,]+$/.test(l))
   const foreignShopifyLines = (base: string) => shopifyAddedLinesJudged(base)

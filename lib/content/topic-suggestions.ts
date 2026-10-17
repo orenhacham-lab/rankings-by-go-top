@@ -46,6 +46,15 @@ const ES_BASE = (kw: string): string[] => [
   `Mejor ${kw}: ¿qué conviene comparar?`,
 ]
 
+const PT_BASE = (kw: string): string[] => [
+  `Como escolher ${kw}?`,
+  `${kw}: o que conferir antes de contratar`,
+  `${kw}: guia completo para iniciantes`,
+  `Quanto custa ${kw}?`,
+  `Erros comuns ao escolher ${kw}`,
+  `Melhor ${kw}: o que vale a pena comparar?`,
+]
+
 /** A couple of intent-flavoured extras so the list feels tailored. */
 const HE_INTENT: Partial<Record<SuggestionIntent, (kw: string) => string[]>> = {
   comparison: (kw) => [`${kw}: השוואה בין האפשרויות הפופולריות`, `מה ההבדל בין סוגי ${kw}?`],
@@ -71,9 +80,18 @@ const ES_INTENT: Partial<Record<SuggestionIntent, (kw: string) => string[]>> = {
   informational: (kw) => [`Todo lo que hay que saber sobre ${kw}`],
 }
 
-const BASE: Record<SuggestionLanguage, (kw: string) => string[]> = { he: HE_BASE, en: EN_BASE, es: ES_BASE }
+
+const PT_INTENT: Partial<Record<SuggestionIntent, (kw: string) => string[]>> = {
+  comparison: (kw) => [`${kw}: comparação das opções mais populares`, `Qual é a diferença entre os tipos de ${kw}?`],
+  commercial: (kw) => [`${kw} — como escolher bem e não se arrepender`, `No que prestar atenção ao contratar ${kw}?`],
+  local: (kw) => [`${kw}: como escolher um fornecedor local de confiança`],
+  transactional: (kw) => [`Quando vale a pena pedir ${kw} — e de quem?`],
+  informational: (kw) => [`Tudo o que você precisa saber sobre ${kw}`],
+}
+
+const BASE: Record<SuggestionLanguage, (kw: string) => string[]> = { he: HE_BASE, en: EN_BASE, es: ES_BASE, 'pt-BR': PT_BASE }
 const INTENT: Record<SuggestionLanguage, Partial<Record<SuggestionIntent, (kw: string) => string[]>>> =
-  { he: HE_INTENT, en: EN_INTENT, es: ES_INTENT }
+  { he: HE_INTENT, en: EN_INTENT, es: ES_INTENT, 'pt-BR': PT_INTENT }
 
 /**
  * Return up to `max` distinct, natural topic suggestions for a keyword.

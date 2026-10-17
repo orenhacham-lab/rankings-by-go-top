@@ -643,14 +643,3 @@ export async function shopifyGetArticle(creds: ShopifyCredentials, id: string): 
   return toArticleNode(data.node as never)
 }
 
-/**
- * Read an article's current body (its HTML as the store holds it now) by GID, for a surgical
- * edit of the live article (lib/content/empty-h3-repair). Null when it no longer exists.
- */
-export async function shopifyGetArticleBody(creds: ShopifyCredentials, id: string): Promise<{ id: string; body: string } | null> {
-  const query = `query($id: ID!){ node(id: $id){ ... on Article { id body } } }`
-  const { data } = await graphql<{ node?: { id?: unknown; body?: unknown } | null }>(creds, query, { id })
-  const node = data.node
-  if (!node || typeof node.id !== 'string' || typeof node.body !== 'string') return null
-  return { id: node.id, body: node.body }
-}

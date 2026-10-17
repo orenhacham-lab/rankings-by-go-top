@@ -27,7 +27,7 @@ import { NoticeBox } from '@/components/ui/Notice'
 import { freeCheckCopy } from '@/lib/free-check/copy'
 import { authHref } from '@/lib/i18n/auth-href'
 import { FixedDashboardLanguage } from '@/lib/i18n/dashboard/useDashboardLanguage'
-import { toBilingualLocale, type PublicLocale } from '@/lib/i18n/locales'
+import type { PublicLocale } from '@/lib/i18n/locales'
 import { readSiteInput } from '@/lib/onboarding/site-input'
 import { INITIAL_STEPS, knownResearchCode, readResearchStream, researchRun, withStep } from '@/lib/presignup/client'
 import { researchScreenCopy } from '@/lib/presignup/copy'
@@ -147,12 +147,11 @@ export function FreeCheckResearch({ locale, initialUrl = '' }: { locale: PublicL
         />
       )}
       {/* The research SUMMARY is the dashboard's own component tree, read from the
-          dashboard dictionary, which has no Spanish yet — so this screen runs in
-          the nearest language it has. It is behind an off flag on every locale;
-          the Spanish free check renders FreeCheckExperience, whose copy is fully
-          translated. */}
+          dashboard dictionary, which now answers in all four public locales
+          (lib/i18n/dashboard/getDashboardDictionary.ts), so it runs in the
+          visitor's own language rather than the nearest of two. */}
       {phase !== 'form' && (
-        <FixedDashboardLanguage locale={toBilingualLocale(locale)}>
+        <FixedDashboardLanguage locale={locale}>
           <div className="relative mx-auto w-full max-w-6xl px-4 pb-16 pt-6 sm:px-6 md:pt-10">
             {phase === 'progress' && <SeedProgress run={researchRun(steps)} domain={domain} projectId={null} reconnecting={false} />}
             {phase === 'summary' && view && (

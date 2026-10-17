@@ -21,7 +21,9 @@
  *
  * THE OWNER'S OWN NAME, LINK AND IMAGE (author_box_name, author_box_url,
  * author_box_image) are read on their own (readAuthorBoxOverrides): while their
- * migration is not applied the box is exactly as before.
+ * migration is not applied the box is exactly as before. The uploaded photo
+ * ('upload') is drawn only as its copy in the site (authorPhoto, given by the
+ * WordPress publishers: ./photo-copy.ts), never as our stored file.
  *
  * FAILS SAFE: no column yet (the migration is not applied), the setting off,
  * any read error, no published page, a page that could not be read or was cut
@@ -282,7 +284,15 @@ export type AuthorBoxRequest = {
   html: string
   /** The name the post is published under on the site, asked only when a box will be added. */
   authorName?: () => Promise<string | null>
+  /**
+   * The owner's uploaded photo as a copy in the site's media library
+   * (./photo-copy.ts), asked only when a box will be added with the 'upload' choice.
+   */
+  authorPhoto?: AuthorPhotoCopy
 }
+
+/** The site copy's address of the project's photo, or null (no photo, no copy possible). */
+export type AuthorPhotoCopy = (projectId: string, ownerId: string) => Promise<string | null>
 
 /**
  * Everything the box is made from, for publishing AND for the settings
@@ -299,6 +309,8 @@ export async function readAuthorBoxInputs(admin: SupabaseClient, req: {
   platform: AuthorBoxPlatform
   html?: string | null
   authorName?: () => Promise<string | null>
+  /** Publishing only: the photo's copy in the site (never asked by the preview, which shows our file signed). */
+  authorPhoto?: AuthorPhotoCopy
   /** The preview: ask the site's user and icon even when the saved choices would not need them, so a draft can switch. */
   preview?: boolean
   fetchText?: FetchText
@@ -308,6 +320,9 @@ export async function readAuthorBoxInputs(admin: SupabaseClient, req: {
   // The site icon: WordPress only (see ./site-icon.ts), and only when chosen.
   const wantIcon = req.platform === 'wordpress' && (req.preview || overrides.image === 'site_icon')
   const icon = wantIcon ? readWordPressSiteIcon(project.domain, req.fetchText).catch(() => null) : Promise.resolve(null)
+  // The uploaded photo: WordPress only (./photo-copy.ts), only when chosen, never in the preview.
+  const wantPhoto = req.platform === 'wordpress' && !req.preview && overrides.image === 'upload' && !!req.authorPhoto
+  const photo = wantPhoto ? req.authorPhoto!(req.projectId, project.owner).catch(() => null) : Promise.resolve(null)
   let authorName: string | null = null
   if (!overrides.name || req.preview) {
     try { authorName = req.authorName ? await req.authorName() : null } catch { authorName = null }
@@ -331,6 +346,7 @@ export async function readAuthorBoxInputs(admin: SupabaseClient, req: {
     linkUrl: overrides.url || null,
     imageChoice: req.platform === 'wordpress' ? overrides.image : 'none',
     imageUrl: await icon,
+    photoUrl: await photo,
   }
 }
 
@@ -355,7 +371,7 @@ export async function decideAuthorBox(admin: SupabaseClient, req: AuthorBoxReque
     if (answer !== 'no_box') return { add: false, reason: 'theme_unknown' }
 
     // The same inputs and the same resolver as the settings preview (./preview.ts).
-    const inputs = await readAuthorBoxInputs(admin, { project, projectId: req.projectId, articleId: req.articleId, platform: req.platform, html: req.html, authorName: req.authorName, fetchText: deps.fetchText })
+    const inputs = await readAuthorBoxInputs(admin, { project, projectId: req.projectId, articleId: req.articleId, platform: req.platform, html: req.html, authorName: req.authorName, authorPhoto: req.authorPhoto, fetchText: deps.fetchText })
     const content = authorBoxContent(inputs)
     return content ? { add: true, content } : { add: false, reason: 'no_name' }
   } catch {

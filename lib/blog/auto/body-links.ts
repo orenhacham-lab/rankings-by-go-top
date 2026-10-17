@@ -41,6 +41,7 @@ const RELATED_HEADING: Record<BlogAutoLocale, string> = {
   he: 'קראו גם',
   en: 'Read also',
   es: 'Lee también',
+  'pt-BR': 'Leia também',
 }
 
 /** Where the in-body product link goes: the free trial, in the article's language. */

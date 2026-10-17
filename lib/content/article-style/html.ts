@@ -237,7 +237,7 @@ function stylesFor(p: ArticlePalette, lang: ArticleLanguage) {
     'author-name': `margin:0 0 6px;font-size:18px;line-height:1.3;font-weight:700;color:${p.ink}`,
     'author-text': `margin:0 0 8px;line-height:1.6;color:${p.muted}`,
     'author-action': 'margin:0',
-    'author-link': `color:${p.text};font-weight:600;text-decoration:underline`,
+    'author-link': `color:${p.ink};text-decoration:underline`,
     // Round at the img's explicit 56 x 56 (box.ts AUTHOR_BOX_IMAGE_SIZE): half the size.
     'author-photo': 'margin:0 0 10px',
     'author-image': 'border-radius:28px',

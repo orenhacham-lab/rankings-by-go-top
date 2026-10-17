@@ -58,6 +58,16 @@ export const REASON_TEXT: Record<ContentLanguage, ReasonText> = {
     supportingTopic: 'Tema complementario según los datos del sitio',
     numberLocale: 'es-ES',
   },
+  'pt-BR': {
+    fillsGap: 'O tema preenche uma lacuna de conteúdo em uma área de atuação do negócio.',
+    freshAngle: 'O tema traz um ângulo novo ao lado do conteúdo que já existe no site.',
+    supportedByExisting: 'Ele se apoia em páginas e produtos que já existem no site.',
+    demand: (query, volume) => `Segundo a pesquisa de palavras-chave, "${query}" tem cerca de ${volume} buscas mensais.`,
+    neutral: 'O tema é relevante para a atividade do negócio e para os termos de busca encontrados na pesquisa.',
+    foundInSearchData: (volume) => `Encontrado nos dados de busca com cerca de ${volume} buscas mensais`,
+    supportingTopic: 'Tema complementar segundo os dados do site',
+    numberLocale: 'pt-BR',
+  },
 }
 
 /**

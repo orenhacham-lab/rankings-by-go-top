@@ -13,6 +13,7 @@ import { SEED_CLAIM_COOKIE } from '@/lib/onboarding/claim-cookie'
 import { afterSignupPath } from '@/lib/onboarding/claim-start'
 import { GOOGLE_FLOW_COOKIE, completeGoogleSignIn, googleDirectConfig, googleFlowCookieOptions, matchGoogleState } from '@/lib/auth/google-direct'
 import { googleSignInFailureUrl } from '@/lib/auth/google-signin'
+import { normalizeStoredLocale } from '@/lib/i18n/locales'
 import { statedAuthUrl } from '@/lib/i18n/auth-href'
 import { splitReferralFromPath } from '@/lib/affiliate/referral'
 import { attachReferral } from '@/lib/affiliate/attribution'
@@ -161,7 +162,11 @@ async function signedIn(
   // any other `next` is kept as it was.
   const landing = afterSignupPath({ next, claimCookie: cookieStore.get(SEED_CLAIM_COOKIE)?.value, env: process.env })
   const dest = new URL(landing, origin)
-  if (lang === 'en' || lang === 'he') dest.searchParams.set('lang', lang)
+  // Every public locale, not just the two: this read `lang === 'en' || lang === 'he'`,
+  // so a Spanish sign-up lost its language on the hop and the dashboard fell back
+  // to Hebrew whenever the language cookie was not there to save it.
+  const keptLang = normalizeStoredLocale(lang)
+  if (keptLang) dest.searchParams.set('lang', keptLang)
   return NextResponse.redirect(dest.toString())
 }
 

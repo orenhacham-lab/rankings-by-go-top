@@ -40,8 +40,10 @@ import {
 import { MAX_ATTEMPTS, PLAN_TABLE, STALE_LOCK_MS } from '@/lib/blog/auto/store'
 import { FakeAdmin } from '@/lib/__qa__/_fake-admin'
 import {
+  WINDOW_HOURS_UTC,
   isInWindow, startOfUtcDay, nextLocaleToWrite, runBlogDailyWindow, startIsolatedBlogWindow,
 } from '@/lib/blog/auto/daily-window'
+import { CONTENT_LANGUAGES, normalizeContentLanguage } from '@/lib/content/language'
 import type { createAdminClient } from '@/lib/supabase/admin'
 import type { KeywordIdeaResult } from '@/lib/google-ads/keyword-ideas'
 import type { ValidatedArticle } from '@/lib/content/gemini-article'
@@ -61,22 +63,34 @@ const stripComments = (src: string) => src.replace(/\/\*[\s\S]*?\*\//g, '').repl
 // ============================================================
 // A) THE LANGUAGES
 // ============================================================
-check('A1: three languages are written automatically', same([...BLOG_AUTO_LOCALES], ['he', 'en', 'es']))
+check('A1: four languages are written automatically', same([...BLOG_AUTO_LOCALES], ['he', 'en', 'es', 'pt-BR']))
 check('A2: every language is due every day — there is no weekday rotation left',
   same([...localesForDay()], [...BLOG_AUTO_LOCALES]))
-check('A3: that is seven articles a week in each language', same(weeklyShare(), { he: 7, en: 7, es: 7 }), weeklyShare())
+check('A3: that is seven articles a week in each language', same(weeklyShare(), { he: 7, en: 7, es: 7, 'pt-BR': 7 }), weeklyShare())
 check(
-  'A4: Portuguese is NOT among them — the generator has no Portuguese (lib/content/language.ts)',
-  !(BLOG_AUTO_LOCALES as readonly string[]).includes('pt-BR') && !isBlogAutoLocale('pt-BR'),
+  'A4: Portuguese IS among them, now that the content layer writes it (lib/content/language.ts)',
+  (BLOG_AUTO_LOCALES as readonly string[]).includes('pt-BR') && isBlogAutoLocale('pt-BR')
+  && (CONTENT_LANGUAGES as readonly string[]).includes('pt-BR'),
+)
+check(
+  'A4b: the Portuguese the blog names is the one the content layer knows — no bare "pt" anywhere',
+  normalizeContentLanguage('pt-BR') === 'pt-BR' && normalizeContentLanguage('pt') === 'pt-BR'
+  && !(BLOG_AUTO_LOCALES as readonly string[]).includes('pt') && !isBlogAutoLocale('pt'),
 )
 check('A5: the queue is refilled a week ahead, not three days', TOPUP_FLOOR >= 7)
 check('A6: an unknown language is not accepted as one', !isBlogAutoLocale('fr') && !isBlogAutoLocale('') && !isBlogAutoLocale(null))
 // Mutation control for A2/A3: the rotation this replaced gave each language only
-// some of the week, and Portuguese a day it could not write.
-const oldRotation = ['he', 'en', 'he', 'en', 'he', 'es', 'pt-BR'] as readonly string[]
+// some of the week.
+const oldRotation = ['he', 'en', 'he', 'en', 'he', 'es', 'he'] as readonly string[]
 check(
-  'A7 (control): the old weekday rotation fails both checks',
-  oldRotation.filter((l) => l === 'en').length !== 7 && oldRotation.includes('pt-BR'),
+  'A7 (control): the old weekday rotation fails the every-language-every-day check',
+  oldRotation.filter((l) => l === 'en').length !== 7,
+)
+// Mutation control for A4: a language the content layer cannot write must not be
+// a blog language. French is the live example of one that is research-only.
+check(
+  'A8 (control): a research-only language is neither a content language nor a blog language',
+  !(CONTENT_LANGUAGES as readonly string[]).includes('fr') && !isBlogAutoLocale('fr'),
 )
 
 // ============================================================
@@ -228,10 +242,12 @@ async function main() {
     audit: { score: 90, blockers: [], warnings: [], passes: [], counts: {} } as unknown as ValidatedArticle['audit'],
     model: 'test',
   })
-  /** The same article under a slug of its own, so three languages do not collide. */
+  /** The same article under a slug of its own, so the languages do not collide.
+   *  Lower-cased: 'pt-BR' carries a capital region, and a slug may not. */
   const perLocale = (language: string): ValidatedArticle => {
     const base = okArticle()
-    return { ...base, slug: `rank-check-${language}`, article: { ...base.article, slug: `rank-check-${language}` } }
+    const slug = `rank-check-${language.toLowerCase()}`
+    return { ...base, slug, article: { ...base.article, slug } }
   }
   const deps = (over: Partial<BlogAutoDeps> = {}): BlogAutoDeps => ({
     generate: async () => okArticle(),
@@ -344,6 +360,7 @@ async function main() {
       planned({ id: 'ph', locale: 'he' }),
       planned({ id: 'pe', locale: 'en', topic: 'rank check', primary_keyword: 'rank check' }),
       planned({ id: 'ps', locale: 'es', topic: 'posicion', primary_keyword: 'posicion' }),
+      planned({ id: 'pp', locale: 'pt-BR', topic: 'posicionamento', primary_keyword: 'posicionamento' }),
     ])
     const summaries = await runBlogAutoPublishAllLocales(admin as unknown as Admin, {}, deps({
       generate: async (brief) => perLocale(brief.language),
@@ -556,9 +573,11 @@ async function main() {
     const far = () => Date.now() + 120_000
     const article = (locale: string, publishedAt: string) => ({ locale, is_published: true, published_at: publishedAt })
 
-    check('J1: the morning window is 04:00-06:59 UTC and nothing else',
-      [4, 5, 6].every((h) => isInWindow(Date.parse(`2026-10-14T0${h}:30:00Z`)))
-      && ![3, 7, 12, 23].some((h) => isInWindow(Date.parse(`2026-10-14T${String(h).padStart(2, '0')}:30:00Z`))))
+    check('J1: the morning window is 04:00-07:59 UTC and nothing else',
+      [4, 5, 6, 7].every((h) => isInWindow(Date.parse(`2026-10-14T0${h}:30:00Z`)))
+      && ![3, 8, 12, 23].some((h) => isInWindow(Date.parse(`2026-10-14T${String(h).padStart(2, '0')}:30:00Z`))))
+    check('J1b: the window holds a pass for every language, with retries to spare',
+      WINDOW_HOURS_UTC.length * 4 >= BLOG_AUTO_LOCALES.length * 2, WINDOW_HOURS_UTC.length)
     check('J2: "today" starts at midnight UTC', startOfUtcDay(inWindow) === '2026-10-14T00:00:00.000Z')
 
     const fresh = await nextLocaleToWrite(fake([]) as unknown as Admin, inWindow)

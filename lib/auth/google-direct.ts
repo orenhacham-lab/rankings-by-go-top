@@ -36,7 +36,7 @@
  */
 import { createHash, createHmac, randomBytes, timingSafeEqual } from 'node:crypto'
 import type { SupabaseClient, User } from '@supabase/supabase-js'
-import type { Locale } from '@/lib/i18n/locales'
+import { normalizeStoredLocale, type PublicLocale } from '@/lib/i18n/locales'
 import { sanitizeNextPath } from '@/lib/i18n/request-locale'
 
 export const GOOGLE_AUTHORIZE_URL = 'https://accounts.google.com/o/oauth2/v2/auth'
@@ -72,10 +72,16 @@ export function hashedNonce(nonce: string): string {
   return createHash('sha256').update(nonce, 'utf8').digest('hex')
 }
 
-export type GoogleFlow = { state: string; verifier: string; nonce: string; next: string; lang: Locale }
+/**
+ * `lang` is the FORM's language, kept as a public locale. It used to be
+ * `lang === 'en' ? 'en' : 'he'`, so a Spanish visitor who signed in with Google
+ * came back as Hebrew and met a right-to-left dashboard they cannot read. An
+ * absent or unknown value is still Hebrew, the site's own default.
+ */
+export type GoogleFlow = { state: string; verifier: string; nonce: string; next: string; lang: PublicLocale }
 
 export function newGoogleFlow(nextPath: string | null | undefined, lang: string | null | undefined): GoogleFlow {
-  return { state: random(), verifier: random(), nonce: random(), next: sanitizeNextPath(nextPath, '/dashboard'), lang: lang === 'en' ? 'en' : 'he' }
+  return { state: random(), verifier: random(), nonce: random(), next: sanitizeNextPath(nextPath, '/dashboard'), lang: normalizeStoredLocale(lang) ?? 'he' }
 }
 
 export function googleRedirectUri(origin: string): string {
@@ -134,7 +140,7 @@ export function openGoogleFlow(config: GoogleDirectConfig, value: string | null 
     const raw = JSON.parse(Buffer.from(payload, 'base64url').toString('utf8'))
     if (typeof raw?.exp !== 'number' || raw.exp < now) return null
     if (![raw.state, raw.verifier, raw.nonce].every((v) => typeof v === 'string' && TOKEN.test(v))) return null
-    return { state: raw.state, verifier: raw.verifier, nonce: raw.nonce, next: sanitizeNextPath(raw.next, '/dashboard'), lang: raw.lang === 'en' ? 'en' : 'he' }
+    return { state: raw.state, verifier: raw.verifier, nonce: raw.nonce, next: sanitizeNextPath(raw.next, '/dashboard'), lang: normalizeStoredLocale(raw.lang) ?? 'he' }
   } catch {
     return null
   }

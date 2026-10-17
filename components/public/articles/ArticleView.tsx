@@ -13,6 +13,7 @@ import { ArticleCta } from '@/components/public/articles/ArticleCta'
 import { ArticleAuthorBox } from '@/components/public/articles/ArticleAuthorBox'
 import { sanitizePublicArticleHtml } from '@/lib/content/public-article-html'
 import { ARTICLES_COPY, articlesIndexHref } from '@/lib/articles/i18n'
+import { authorDisplayName, authorInitial } from '@/lib/articles/authors'
 import { getPublicArticle } from '@/lib/articles/server'
 import { withHeadingIds } from '@/lib/articles/headings'
 import { linkifyBareUrls } from '@/lib/articles/bare-urls'
@@ -143,9 +144,11 @@ export async function ArticleView({ locale, slug }: { locale: PublicLocale; slug
                     className="flex size-9 items-center justify-center rounded-pill bg-action-soft text-caption font-bold text-action"
                     aria-hidden="true"
                   >
-                    {article.author.charAt(0)}
+                    {authorInitial(authorDisplayName(article.author, locale))}
                   </span>
-                  <span className="text-copy font-semibold text-ink">{article.author}</span>
+                  <span className="text-copy font-semibold text-ink">
+                    {authorDisplayName(article.author, locale)}
+                  </span>
                 </div>
               )}
               {published && (

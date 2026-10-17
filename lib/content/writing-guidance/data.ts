@@ -21,9 +21,19 @@ import { parseGuidanceInput, parseRuleInput, toGuidanceRow, withRule, type Guida
 import { readProjectWritingGuidance, WRITING_GUIDANCE_COLUMN } from './store'
 import { AUTHOR_BOX_COLUMN, AUTHOR_IMAGE_COLUMN, AUTHOR_NAME_COLUMN, AUTHOR_URL_COLUMN, readAuthorBoxOverrides, readAuthorBoxSetting } from '@/lib/content/author-box/store'
 import { AUTHOR_BOX_IMAGE_CHOICES, cleanAuthorBoxName, normalizeAuthorBoxUrl, type AuthorBoxImageChoice } from '@/lib/content/author-box/box'
+import { AUTHOR_PHOTO_MEDIA_COLUMN, AUTHOR_PHOTO_PATH_COLUMN, readAuthorPhoto, removeAuthorPhotoObject, type PhotoStorage } from '@/lib/content/author-box/photo'
 
 export type GuidanceSession = { userId: string | null; db: SupabaseClient }
-export type GuidanceDeps = { session: () => Promise<GuidanceSession>; now?: () => Date }
+export type GuidanceDeps = {
+  session: () => Promise<GuidanceSession>
+  now?: () => Date
+  /**
+   * The service-role client's storage, for removing the owner's uploaded author
+   * photo when a save sets the image back to 'none' or 'site_icon'
+   * (lib/content/author-box/photo.ts). Without it such a save is refused while a photo exists.
+   */
+  storage?: () => PhotoStorage
+}
 
 export type GuidanceView = {
   guidance: WritingGuidance
@@ -47,6 +57,10 @@ export type GuidanceView = {
   authorBoxUrl: string
   authorBoxImage: AuthorBoxImageChoice
   authorBoxOverridesEditable: boolean
+  /** An uploaded author photo is stored (lib/content/author-box/photo.ts). */
+  authorBoxPhoto: boolean
+  /** Its columns exist (20261017120000_project_author_photo.sql); false = 'upload' is not offered. */
+  authorBoxPhotoEditable: boolean
 }
 
 export type GuidanceErrorCode = 'unauthorized' | 'not_found' | 'invalid_request' | 'unavailable' | 'save_failed'
@@ -90,28 +104,36 @@ export async function owner(deps: Pick<GuidanceDeps, 'session'>, projectId: unkn
 async function readView(o: Extract<Owner, { ok: true }>): Promise<LoadGuidanceResult> {
   const read = await readProjectWritingGuidance(o.db, o.projectId, o.userId)
   if (read.state === 'error') return { ok: false, code: 'unavailable' }
-  const box = await readAuthorBox(o)
+  const box = publicBox(await readAuthorBox(o))
   if (read.state === 'missing_column') return { ok: true, data: { guidance: read.guidance, editable: false, ...box } }
   // No row yet: whether the column exists decides if the card can save (a first save creates the row).
   if (read.state === 'default') return { ok: true, data: { guidance: read.guidance, editable: await columnExists(o, WRITING_GUIDANCE_COLUMN), ...box } }
   return { ok: true, data: { guidance: read.guidance, editable: true, ...box } }
 }
 
-type AuthorBoxView = Pick<GuidanceView, 'authorBox' | 'authorBoxEditable' | 'authorBoxName' | 'authorBoxUrl' | 'authorBoxImage' | 'authorBoxOverridesEditable'>
+type AuthorBoxView = Pick<GuidanceView, 'authorBox' | 'authorBoxEditable' | 'authorBoxName' | 'authorBoxUrl' | 'authorBoxImage' | 'authorBoxOverridesEditable' | 'authorBoxPhoto' | 'authorBoxPhotoEditable'> & { photoPath: string | null }
 
 /** The author-box switch, name, link and image: off / empty, and not editable, while their columns are missing or unreadable. */
 async function readAuthorBox(o: Extract<Owner, { ok: true }>): Promise<AuthorBoxView> {
-  const [s, v] = await Promise.all([readAuthorBoxSetting(o.db, o.projectId, o.userId), readAuthorBoxOverrides(o.db, o.projectId, o.userId)])
+  const [s, v, ph] = await Promise.all([readAuthorBoxSetting(o.db, o.projectId, o.userId), readAuthorBoxOverrides(o.db, o.projectId, o.userId), readAuthorPhoto(o.db, o.projectId, o.userId)])
   const sw = s.state === 'saved' ? { authorBox: s.enabled, authorBoxEditable: true }
     : s.state === 'default' ? { authorBox: false, authorBoxEditable: await columnExists(o, AUTHOR_BOX_COLUMN) }
       : { authorBox: false, authorBoxEditable: false }
   const editable = v.state === 'saved' ? true
     : v.state === 'default' ? await columnExists(o, `${AUTHOR_NAME_COLUMN}, ${AUTHOR_URL_COLUMN}, ${AUTHOR_IMAGE_COLUMN}`)
       : false
-  return { ...sw, authorBoxName: v.name, authorBoxUrl: v.url, authorBoxImage: v.image, authorBoxOverridesEditable: editable }
+  const photoEditable = editable && (ph.state === 'saved' ? true : ph.state === 'default' ? await columnExists(o, `${AUTHOR_PHOTO_PATH_COLUMN}, ${AUTHOR_PHOTO_MEDIA_COLUMN}`) : false)
+  // While the photo's columns are missing, an 'upload' read off the row cannot exist (the CHECK refuses it); shown as none.
+  const image = v.image === 'upload' && !photoEditable ? 'none' : v.image
+  return {
+    ...sw, authorBoxName: v.name, authorBoxUrl: v.url, authorBoxImage: image, authorBoxOverridesEditable: editable,
+    authorBoxPhoto: !!ph.path, authorBoxPhotoEditable: photoEditable, photoPath: ph.path,
+  }
 }
 
-type AuthorBoxWrite = { authorBox?: boolean; name?: string | null; url?: string | null; image?: AuthorBoxImageChoice }
+const publicBox = ({ photoPath: _p, ...view }: AuthorBoxView): Omit<AuthorBoxView, 'photoPath'> => { void _p; return view }
+
+type AuthorBoxWrite = { authorBox?: boolean; name?: string | null; url?: string | null; image?: AuthorBoxImageChoice; clearPhoto?: boolean }
 
 /**
  * The card's author-box fields, checked: the name cleaned exactly as a name is
@@ -168,6 +190,8 @@ async function write(o: Extract<Owner, { ok: true }>, g: WritingGuidance, box: A
       ...(box.name !== undefined ? { [AUTHOR_NAME_COLUMN]: box.name } : {}),
       ...(box.url !== undefined ? { [AUTHOR_URL_COLUMN]: box.url } : {}),
       ...(box.image !== undefined ? { [AUTHOR_IMAGE_COLUMN]: box.image } : {}),
+      // The photo's object was removed first (saveWritingGuidance); its pointer and site copy go with it.
+      ...(box.clearPhoto ? { [AUTHOR_PHOTO_PATH_COLUMN]: null, [AUTHOR_PHOTO_MEDIA_COLUMN]: null } : {}),
       updated_at: new Date().toISOString(),
     }, { onConflict: 'project_id' })
   if (error) return { ok: false, code: isMissingRelation(error) ? 'unavailable' : 'save_failed' }
@@ -193,7 +217,17 @@ export async function saveWritingGuidance(deps: GuidanceDeps, projectId: unknown
   // A switch, name, link or image whose column does not exist yet is not written (the guidance still saves).
   const boxView = await readAuthorBox(o)
   const authorBox = typeof rawBox === 'boolean' && boxView.authorBoxEditable ? rawBox : undefined
-  const overrides = boxView.authorBoxOverridesEditable ? parsedBox.value : {}
+  const overrides: AuthorBoxWrite = boxView.authorBoxOverridesEditable ? { ...parsedBox.value } : {}
+  if (overrides.image === 'upload' && (!boxView.authorBoxPhotoEditable || !boxView.photoPath)) {
+    // 'upload' is set by the upload itself (lib/content/author-box/photo.ts); never without a stored photo.
+    return { ok: false, code: 'invalid_request' }
+  }
+  if (overrides.image !== undefined && overrides.image !== 'upload' && boxView.photoPath) {
+    // Back to none or the site icon: the stored photo is REMOVED from storage, not only unlinked.
+    if (!deps.storage) return { ok: false, code: 'unavailable' }
+    if (!(await removeAuthorPhotoObject(deps.storage(), o.projectId, boxView.photoPath))) return { ok: false, code: 'save_failed' }
+    overrides.clearPhoto = true
+  }
   // Rules keep the time and article they came with; a rule typed in the card is stamped now.
   const current = await readProjectWritingGuidance(o.db, o.projectId, o.userId)
   if (current.state === 'error') return { ok: false, code: 'unavailable' }
