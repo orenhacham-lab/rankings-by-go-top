@@ -30,6 +30,7 @@ const QUESTION_START: Record<SuggestionLanguage, RegExp> = {
   he: /^(?:מה|מהו|מהי|מהם|מהן|איך|כיצד|למה|מדוע|כמה|איפה|היכן|מתי|האם|איזה|איזו|אילו|מי)(?:\s|$)/,
   en: /^(?:what|how|why|which|where|when|who|is|are|can|should|do|does)\b/i,
   es: /^(?:qu[ée]|c[oó]mo|por\s+qu[ée]|cu[áa]l|cu[áa]les|d[oó]nde|cu[áa]ndo|qui[ée]n|cu[áa]nto|cu[áa]nta|cu[áa]ntos|cu[áa]ntas|es|son|puedo|debo|hay|conviene|sirve|vale)\b/i,
+  'pt-BR': /^(?:o\s+que|que|como|por\s+que|qual|quais|onde|quando|quem|quanto|quanta|quantos|quantas|[ée]|s[ãa]o|posso|devo|vale|existe|h[áa]|serve|precisa)\b/i,
 }
 
 /** "best / recommended" words: the question asks for a recommendation. */
@@ -37,6 +38,7 @@ const RECOMMEND: Record<SuggestionLanguage, RegExp> = {
   he: /(?:^|\s)(?:הכי\s+טוב\S*|מומלצ\S*|הטוב\S*\s+ביותר|טופ)(?:\s|$)/,
   en: /\b(?:best|top|recommended)\b/i,
   es: /\b(?:mejor|mejores|recomendad\w*|top)\b/i,
+  'pt-BR': /\b(?:melhor|melhores|recomendad\w*|top)\b/i,
 }
 
 /** A keyword that already names the act of buying ("buying X", "buy X"). */
@@ -44,6 +46,7 @@ const BUY: Record<SuggestionLanguage, RegExp> = {
   he: /^(?:קניית|קנייה של|רכישת|הזמנת)\s/,
   en: /^(?:buy|buying|order|ordering)\s/i,
   es: /^(?:comprar|compra de|comprando|pedir|encargar|contratar)\s/i,
+  'pt-BR': /^(?:comprar|compra de|comprando|pedir|encomendar|contratar)\s/i,
 }
 
 const TEMPLATES: Record<SuggestionLanguage, { recommend: (k: string) => string; buy: (k: string) => string; general: (k: string) => string }> = {
@@ -61,6 +64,11 @@ const TEMPLATES: Record<SuggestionLanguage, { recommend: (k: string) => string; 
     recommend: (k) => `Busco ${k.replace(/^el\s+|^la\s+|^los\s+|^las\s+/i, '')}. ¿Qué me recomiendas?`,
     buy: (k) => `¿Qué debo revisar antes de ${k.replace(/^compra de\s/i, 'comprar ')}?`,
     general: (k) => `¿Qué debo saber sobre ${k}?`,
+  },
+  'pt-BR': {
+    recommend: (k) => `Estou procurando ${k.replace(/^o\s+|^a\s+|^os\s+|^as\s+/i, '')}. O que você recomenda?`,
+    buy: (k) => `O que devo verificar antes de ${k.replace(/^compra de\s/i, 'comprar ')}?`,
+    general: (k) => `O que devo saber sobre ${k}?`,
   },
 }
 

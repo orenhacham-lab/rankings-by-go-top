@@ -174,6 +174,12 @@ const ARTICLE_TEXT: Record<SuggestionLanguage, {
     anchorSentence: (link) => ` En este contexto, ${link} es una de las opciones clave que conviene conocer.`,
     phraseSentence: (phrase) => ` En este contexto, también conviene conocer de cerca ${phrase}.`,
   },
+  'pt-BR': {
+    toc: 'Índice',
+    faqHeading: 'Perguntas frequentes',
+    anchorSentence: (link) => ` Nesse contexto, ${link} é uma das opções principais que vale a pena conhecer.`,
+    phraseSentence: (phrase) => ` Nesse contexto, também vale a pena conhecer de perto ${phrase}.`,
+  },
 }
 
 /** Natural transition words to hand the model, in the language it writes in. */
@@ -181,6 +187,7 @@ const TRANSITION_HINT: Record<SuggestionLanguage, string> = {
   he: 'בנוסף, לכן, עם זאת, למשל, לסיכום',
   en: 'additionally, therefore, however, for example, in summary',
   es: 'además, por lo tanto, sin embargo, por ejemplo, en resumen',
+  'pt-BR': 'além disso, portanto, no entanto, por exemplo, em resumo',
 }
 
 /** The filler opening to warn the model off, written in the language it writes in. */
@@ -188,6 +195,7 @@ const FILLER_EXAMPLE: Record<SuggestionLanguage, string> = {
   he: 'e.g. "בעולם שבו כולם מחפשים…"',
   en: 'e.g. "In a world where everyone is looking for…"',
   es: 'e.g. "En un mundo donde todos buscan…"',
+  'pt-BR': 'e.g. "Em um mundo onde todos procuram…"',
 }
 
 /** Who the article is actually written for. A Spanish article is NOT for Israeli readers. */
@@ -195,6 +203,7 @@ const AUDIENCE_NOTE: Record<SuggestionLanguage, string> = {
   he: 'In Hebrew, write naturally for Israeli readers.',
   en: 'Write naturally for a general English-speaking audience.',
   es: 'Write naturally for Spanish-speaking readers in neutral Spanish that reads well in Spain and in Latin America alike.',
+  'pt-BR': 'Write naturally for Brazilian readers in Brazilian Portuguese — not European Portuguese.',
 }
 
 /** Per-language writing-quality notes. Empty for a language with nothing extra to say. */
@@ -204,6 +213,10 @@ const WRITING_QUALITY_LINES: Record<SuggestionLanguage, string[]> = {
     `- Keep brand/product names in their proper English casing (e.g. "Kingsmith WalkingPad X21", not "kingsmith walkingpad x21"). Never write the hyphenated Hebrew article before a name ("ה-Kingsmith", "ה-הליכון") — write "Kingsmith…", "הליכון…", or "דגם/מכשיר Kingsmith…".`,
   ],
   en: [],
+  'pt-BR': [
+    `- Brazilian Portuguese writing quality: write in BRAZILIAN Portuguese, not European — address the reader as "você" consistently (never "tu", never the European "si"), and prefer the Brazilian word where the two differ ("celular" not "telemóvel", "time" not "equipa", "ônibus" not "autocarro", "tela" not "ecrã"). Use the gerund where Brazilians use it ("estamos vendo", not "estamos a ver"). VARY sentence and paragraph openings — do not start many consecutive sentences with the same word (avoid over-using "Além disso", "Por outro lado", "É importante"); mix openings like "Na prática", "Por isso", "Em muitos casos", "Vale lembrar", "Na hora de decidir", "Em resumo". Prefer clear, practical, promotional SEO writing over poetic language.`,
+    `- Brazilian Portuguese typography: keep the accents and the cedilla correct (ç, ã, õ, é, ê, á, í, ó, ú) — never write Portuguese without accents — and keep brand/product names in their proper original casing (e.g. "Kingsmith WalkingPad X21").`,
+  ],
   es: [
     `- Spanish writing quality: use NEUTRAL Latin-American-and-Spain Spanish and address the reader as "tú" consistently (never mix "tú" and "usted", never "vos"). Avoid regional slang and country-specific terms where a neutral word exists (prefer "teléfono" over "móvil"/"celular", "coche/auto" only when the topic requires it). VARY sentence and paragraph openings — do not start many consecutive sentences with the same word (avoid over-using "Además", "Por otro lado", "Es importante"); mix openings like "En la práctica", "Por eso", "En muchos casos", "Conviene recordar", "A la hora de decidir", "En resumen". Prefer clear, practical, promotional SEO writing over poetic language.`,
     `- Spanish typography: always use the opening marks "¿" and "¡" in questions and exclamations, keep accents and "ñ" correct (never write Spanish without accents), and keep brand/product names in their proper original casing (e.g. "Kingsmith WalkingPad X21").`,

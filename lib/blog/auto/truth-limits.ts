@@ -50,15 +50,15 @@ function sentences(text: string): string[] {
   return text.split(/(?<=[.!?׃:;•])\s+|\s*\|\s*/).filter(Boolean)
 }
 
-const PERCENT = /\d[\d.,]*\s*(%|אחוז(?:ים)?|percent|por\s?ciento)/i
-const COUNT_AFTER = /\d[\d.,]*\s*\+?\s*(לקוחות|מנויים|עסקים|customers|clients|subscribers|businesses|clientes|suscriptores|negocios)/i
+const PERCENT = /\d[\d.,]*\s*(%|אחוז(?:ים)?|percent|por\s?ciento|por\s?cento)/i
+const COUNT_AFTER = /\d[\d.,]*\s*\+?\s*(לקוחות|מנויים|עסקים|customers|clients|subscribers|businesses|clientes|suscriptores|negocios|assinantes|empresas|neg[óo]cios)/i
 const COUNT_BEFORE = /(לקוחות|מנויים|customers|clients|clientes)\s*[:–-]?\s*\d/i
-const CADENCE = /(מעקב|בדיקה|סריקה)\s+(יומי|יומית|שבועי|שבועית)|(daily|weekly)\s+(tracking|rank\s*check|scan)|seguimiento\s+(diario|semanal)/i
+const CADENCE = /(מעקב|בדיקה|סריקה)\s+(יומי|יומית|שבועי|שבועית)|(daily|weekly)\s+(tracking|rank\s*check|scan)|seguimiento\s+(diario|semanal)|(acompanhamento|monitoramento|verifica[çc][ãa]o|varredura)\s+(di[áa]ri[ao]|semanal)/i
 const OTHER_ENGINES = /perplexity|copilot|grok/i
 const AUTOMATIC = /אוטומט|automatic|automátic|automatically/i
-const RATING = /\d(?:[.,]\d)?\s*(כוכבים|כוכב|stars?|estrellas?)|(ביקורות|reviews|reseñas)\s*\d|\d[\d.,]*\s*(ביקורות|reviews|reseñas)/i
-const GUARANTEE = /מובטח|מבטיח(?:ים|ה)?\s+(מקום|דירוג|עלייה)|guarantee[ds]?\s+(ranking|position|results)|garantiza(?:mos|do)?\s+(posición|resultados)/i
-const SCHEMA_WORD = /schema|json-?ld|סכימה|נתונים מובנים|datos estructurados/i
+const RATING = /\d(?:[.,]\d)?\s*(כוכבים|כוכב|stars?|estrellas?|estrelas?)|(ביקורות|reviews|reseñas|avalia[çc][õo]es)\s*\d|\d[\d.,]*\s*(ביקורות|reviews|reseñas|avalia[çc][õo]es)/i
+const GUARANTEE = /מובטח|מבטיח(?:ים|ה)?\s+(מקום|דירוג|עלייה)|guarantee[ds]?\s+(ranking|position|results)|garantiza(?:mos|do)?\s+(posición|resultados)|garant(?:imos|ido|ia|e)\s+(posi[çc][ãa]o|resultados|ranking)/i
+const SCHEMA_WORD = /schema|json-?ld|סכימה|נתונים מובנים|datos estructurados|dados estruturados/i
 const SHOPIFY = /shopify/i
 
 const APP_STORE_HREF = 'apps.shopify.com/go-top-seo'

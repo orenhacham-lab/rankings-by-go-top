@@ -33,6 +33,7 @@ const AUDIENCE: Record<BlogAutoLocale, string> = {
   he: 'בעל עסק או מנהל שיווק בישראל שמנסה להבין איך האתר שלו מדורג בגוגל ובמנועי AI, ומה לעשות עם זה',
   en: 'a small-business owner or marketer deciding how to get found in Google and in AI assistants',
   es: 'el dueño de un negocio o responsable de marketing que quiere aparecer en Google y en los asistentes de IA',
+  'pt-BR': 'o dono de um negócio ou responsável por marketing no Brasil que quer aparecer no Google e nos assistentes de IA',
 }
 
 /**
