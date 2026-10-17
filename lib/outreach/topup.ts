@@ -215,7 +215,21 @@ async function readListing(
   return listingCandidates(listing.body, source.url)
 }
 
-/** One hop in: the member's own page, where the member's website is. */
+/**
+ * One hop in: the member's own page, where the member's website is.
+ *
+ * THE SECOND HALF OF THE SAME BUG. The first pass after the fix read four
+ * Minnesota Grown member pages and examined `bonfire.com` four times: the
+ * directory's own merch store, which sits in the site-wide header of every
+ * member page and is therefore the first off-site link on each. So the links
+ * the LISTING page carries are the navigation by definition, and a member page
+ * is read for what it has that the listing does not. A host that shows up on
+ * more than one member page is the same thing one level down, since each member
+ * page names a different business.
+ *
+ * A member with no website of its own then yields nothing, which is the right
+ * answer: there is nothing for the product to act on.
+ */
 async function readDetailPages(
   listingBody: string,
   listingUrl: string,
@@ -223,18 +237,31 @@ async function readDetailPages(
   deps: TopUpDeps,
   summary: TopUpSummary,
 ): Promise<ListingCandidate[]> {
-  const out: ListingCandidate[] = []
+  const navigation = new Set(listingCandidates(listingBody, listingUrl).map((c) => c.host))
+  const read: { company: string | null; hosts: string[] }[] = []
   const pages = detailLinks(listingBody, listingUrl, hint).slice(0, MAX_DETAIL_PAGES)
   for (const url of pages) {
     const page = await fetchOrNull(deps.fetchPage, url)
     summary.fetched += 1
     if (page === null || !isOpenPage(page)) continue
-    const links = listingCandidates(page.body, url)
+    const links = listingCandidates(page.body, url).filter((c) => !navigation.has(c.host))
     if (links.length === 0) continue
     // The member page names one business; its own heading is that business's
     // name, which reads better in a subject line than a link's anchor text.
-    const named = pageTitle(page.body)
-    out.push({ company: named ?? links[0].company, host: links[0].host })
+    read.push({ company: pageTitle(page.body), hosts: links.map((c) => c.host) })
+  }
+
+  const seenOn = new Map<string, number>()
+  for (const { hosts } of read) {
+    for (const host of new Set(hosts)) seenOn.set(host, (seenOn.get(host) ?? 0) + 1)
+  }
+  const out: ListingCandidate[] = []
+  const taken = new Set<string>()
+  for (const { company, hosts } of read) {
+    const host = hosts.find((h) => seenOn.get(h) === 1 && !taken.has(h))
+    if (host === undefined) continue
+    taken.add(host)
+    out.push({ company: company ?? host, host })
   }
   return out
 }

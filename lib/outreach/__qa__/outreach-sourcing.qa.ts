@@ -442,6 +442,118 @@ async function main() {
   check('T8-MUT: reading the listing\'s own links first spends the pass on its navigation',
     mutHop.some((url) => url.includes('partner.example')))
 
+  // THE SECOND HALF OF THE SAME BUG, from the first pass after the fix: four
+  // member pages, four examinations of bonfire.com, the directory's own merch
+  // store in the header of every member page.
+  const NAV: PublicSource[] = [
+    { name: 'nav-directory', url: 'https://grown.example/member/', detailHint: '/member/' },
+  ]
+  const MERCH = '<a href="https://merch.example/store/grown">Shop our merch</a>'
+  const navNet = async (url: string): Promise<FetchedPage> => {
+    if (url === 'https://grown.example/member/') {
+      return page(
+        MERCH + '<a href="/member/albers/">Albers</a><a href="/member/store-example/">Store</a>',
+        200, url,
+      )
+    }
+    // The member with no website of its own: nothing but the navigation.
+    if (url === 'https://grown.example/member/albers/') {
+      return page('<title>Albers Acres - Grown</title>' + MERCH, 200, url)
+    }
+    if (url === 'https://grown.example/member/store-example/') {
+      return page('<title>Store Example LLC - Grown</title>' + MERCH
+        + '<a href="https://store.example">Website</a>', 200, url)
+    }
+    if (url === 'https://grown.example/robots.txt') return page('User-agent: *\nDisallow: /wp-admin/', 200, url)
+    if (url.startsWith('https://merch.example')) return page('<html><body>a merch store</body></html>', 200, url)
+    return net(url)
+  }
+
+  f = world()
+  const navSeen: string[] = []
+  summary = await runProspectTopUp(asAdmin(f), {
+    fetchPage: async (url) => { navSeen.push(url); return navNet(url) },
+    now: NOW, startAt: 0, sources: NAV,
+  })
+  check('T9: a link the listing page also carries is the directory\'s navigation, not a member\'s site',
+    summary.added === 'store.example'
+    && !navSeen.some((url) => url.includes('merch.example'))
+    && summary.examined === 1)
+
+  // One member page only, so the cross-page rule below cannot be what saves it:
+  // this is the listing's own links doing the work, on its own.
+  const ONE: PublicSource[] = [
+    { name: 'one-member', url: 'https://grown.example/member/', detailHint: '/member/' },
+  ]
+  const oneNet = async (url: string): Promise<FetchedPage> => {
+    if (url === 'https://grown.example/member/') {
+      return page(MERCH + '<a href="/member/store-example/">Store</a>', 200, url)
+    }
+    return navNet(url)
+  }
+  f = world()
+  summary = await runProspectTopUp(asAdmin(f), { fetchPage: oneNet, now: NOW, startAt: 0, sources: ONE })
+  check('T9b: which holds with a single member page, where only the listing\'s own links can tell',
+    summary.added === 'store.example')
+
+  const mutNav = await withMutant<{ runProspectTopUp: typeof runProspectTopUp }, string[]>(
+    'lib/outreach/topup.ts',
+    [[/\.filter\(\(c\) => !navigation\.has\(c\.host\)\)/, '']],
+    async (m) => {
+      const seen: string[] = []
+      await m.runProspectTopUp(asAdmin(world()), {
+        fetchPage: async (url: string) => { seen.push(url); return oneNet(url) },
+        now: NOW, startAt: 0, sources: ONE,
+      })
+      return seen
+    },
+  )
+  check('T9b-MUT: without that the merch store is examined instead of the member',
+    mutNav.some((url) => url.includes('merch.example')))
+
+  // And the same thing one level down: a host on several member pages is shared
+  // furniture, whatever the listing page shows.
+  const SHARED: PublicSource[] = [
+    { name: 'shared-link', url: 'https://grown.example/member/', detailHint: '/member/' },
+  ]
+  const sharedNet = async (url: string): Promise<FetchedPage> => {
+    if (url === 'https://grown.example/member/') {
+      return page('<a href="/member/albers/">Albers</a><a href="/member/store-example/">Store</a>', 200, url)
+    }
+    if (url === 'https://grown.example/member/albers/') {
+      return page('<title>Albers Acres - Grown</title><a href="https://coop.example">Our co-op</a>', 200, url)
+    }
+    if (url === 'https://grown.example/member/store-example/') {
+      return page('<title>Store Example LLC - Grown</title><a href="https://coop.example">Our co-op</a>'
+        + '<a href="https://store.example">Website</a>', 200, url)
+    }
+    if (url.startsWith('https://coop.example')) return page('<html><body>a co-op</body></html>', 200, url)
+    return navNet(url)
+  }
+  f = world()
+  const sharedSeen: string[] = []
+  summary = await runProspectTopUp(asAdmin(f), {
+    fetchPage: async (url) => { sharedSeen.push(url); return sharedNet(url) },
+    now: NOW, startAt: 0, sources: SHARED,
+  })
+  check('T9c: a host several member pages share is not any one of their businesses',
+    summary.added === 'store.example' && !sharedSeen.some((url) => url.includes('coop.example')))
+
+  const mutShared = await withMutant<{ runProspectTopUp: typeof runProspectTopUp }, string[]>(
+    'lib/outreach/topup.ts',
+    [[/seenOn\.get\(h\) === 1 && /, '']],
+    async (m) => {
+      const seen: string[] = []
+      await m.runProspectTopUp(asAdmin(world()), {
+        fetchPage: async (url: string) => { seen.push(url); return sharedNet(url) },
+        now: NOW, startAt: 0, sources: SHARED,
+      })
+      return seen
+    },
+  )
+  check('T9c-MUT: without it the shared link is examined as if it were a member',
+    mutShared.some((url) => url.includes('coop.example')))
+
   console.log('\n— G: the switches and the cron —')
 
   check('G1: the crawler is off unless its own switch is exactly "true"',
