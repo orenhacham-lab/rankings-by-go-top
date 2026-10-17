@@ -3306,6 +3306,12 @@ export function normalizeLanguage(
   // regex matches nothing in it.
   if (v === 'es' || v.startsWith('spanish') || v.startsWith('español') || v.startsWith('espanol') ||
       v.startsWith('castellano') || normalizeContentLanguage(v) === 'es') return 'es'
+  // Portuguese is a CONTENT language (the blog and customer articles are written
+  // in it) but has no question bank here yet, so it reads as ENGLISH rather than
+  // falling through to the Hebrew default: it shares English's latin script, so
+  // the heuristics below behave, while a Hebrew bank would hand a Brazilian
+  // reader questions in Hebrew letters. Same rule as `toHebrewOrEnglish`.
+  if (normalizeContentLanguage(v) === 'pt-BR') return 'en'
   // Anything else (e.g. 'ar') — default to the safe fallback, because a
   // language with no bank would otherwise get an empty one.
   return fallback

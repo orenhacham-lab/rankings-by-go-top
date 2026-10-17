@@ -130,9 +130,14 @@ function main() {
     // language list had no Spanish and the fallback was Hebrew: a Spanish site
     // was handed Hebrew topic titles.
     check('D1: Spanish is written in Spanish', contentLanguageOrEnglish('es') === 'es' && contentLanguageOrEnglish('es-MX') === 'es')
+    // Portuguese left this group on 17 Oct 2026: it is a content language of its
+    // own now (lib/content/__qa__/portuguese-content-language.qa.ts), so research
+    // in Portuguese is written in Portuguese, not in English.
     check('D2: a language we do not write in yet reads as English, not Hebrew',
-      contentLanguageOrEnglish('pt') === 'en' && contentLanguageOrEnglish('pt-BR') === 'en' && contentLanguageOrEnglish('el') === 'en'
-      && contentLanguageOrEnglish('ru') === 'en' && contentLanguageOrEnglish('ar') === 'en')
+      contentLanguageOrEnglish('el') === 'en' && contentLanguageOrEnglish('ru') === 'en'
+      && contentLanguageOrEnglish('ar') === 'en')
+    check('D2b: Portuguese research is written in Portuguese',
+      contentLanguageOrEnglish('pt') === 'pt-BR' && contentLanguageOrEnglish('pt-BR') === 'pt-BR')
     check('D3: Hebrew and the legacy code are still Hebrew', contentLanguageOrEnglish('he') === 'he' && contentLanguageOrEnglish('iw') === 'he')
     check('D4: no language at all keeps the Hebrew default', contentLanguageOrEnglish('') === 'he' && contentLanguageOrEnglish(null) === 'he' && contentLanguageOrEnglish(undefined) === 'he')
     check('D5: whatever it answers, the reason wording exists for it',

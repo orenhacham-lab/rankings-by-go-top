@@ -132,10 +132,11 @@ export const ANCHOR_MIN_PARAGRAPH_GAP = 2
 
 const MECHANICAL_HE = ['למידע נוסף', 'מידע נוסף', 'לחצו כאן', 'לחץ כאן', 'קראו עוד', 'קרא עוד', 'אתר כמו', 'אתרים כמו', 'אפשר למצוא מידע', 'ניתן למצוא מידע', 'להמשך קריאה', 'ראו כאן', 'ראה כאן']
 const MECHANICAL_ES = ['más información', 'mas informacion', 'haz clic aquí', 'haga clic aquí', 'clic aquí', 'leer más', 'lee más', 'un sitio como', 'sitios como', 'una web como', 'para más información', 'ver aquí', 'ver más', 'sigue leyendo']
+const MECHANICAL_PT = ['mais informações', 'mais informacoes', 'clique aqui', 'leia mais', 'saiba mais', 'um site como', 'sites como', 'para mais informações', 'veja aqui', 'veja mais', 'continue lendo', 'confira aqui']
 const MECHANICAL_EN = ['read more', 'click here', 'learn more', 'for more information', 'more information', 'a site like', 'sites like', 'website like', 'find out more', 'more info', 'visit this site', 'see here']
 
 /** Mechanical anchor phrases keyed by content language. */
-const MECHANICAL: Record<SuggestionLanguage, string[]> = { he: MECHANICAL_HE, en: MECHANICAL_EN, es: MECHANICAL_ES }
+const MECHANICAL: Record<SuggestionLanguage, string[]> = { he: MECHANICAL_HE, en: MECHANICAL_EN, es: MECHANICAL_ES, 'pt-BR': MECHANICAL_PT }
 
 export interface AnchorHit {
   href: string

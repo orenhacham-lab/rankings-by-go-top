@@ -160,6 +160,7 @@ const CONCEPT_FALLBACK: Record<ContentLanguage, (subject: string) => string> = {
   he: (s) => `סצנה עריכתית פרימיום, נקייה ופוטוריאליסטית בנושא ${s || 'התוכן'}, גנרית ולא ממותגת, ללא לוגו, ללא טקסט וללא אריזות רשמיות.`,
   en: (s) => `A premium, clean, photorealistic editorial scene about ${s || 'the topic'}, generic and unbranded, no logo, no text, no official packaging.`,
   es: (s) => `Una escena editorial premium, limpia y fotorrealista sobre ${s || 'el tema'}, genérica y sin marca, sin logotipos, sin texto y sin envases oficiales.`,
+  'pt-BR': (s) => `Uma cena editorial premium, limpa e fotorrealista sobre ${s || 'o tema'}, genérica e sem marca, sem logotipos, sem texto e sem embalagens oficiais.`,
 }
 
 export async function writeCommercialSafeConcept(input: {
