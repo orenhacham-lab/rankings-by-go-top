@@ -43,7 +43,16 @@ export const BRAND = 'Go Top SEO'
 export const POSTAL_ADDRESS = 'HaRechasim 24/2, Ramat Gan 5235524, Israel'
 /** The section "Business Outreach by Email" lives here. Required by CPRA. */
 export const PRIVACY_URL = 'https://www.gotopseo.com/en/privacy'
-export const SITE_URL = 'https://www.gotopseo.com'
+/**
+ * The landing page the signature sends an American reader to — the ENGLISH
+ * tree, not the bare root. The root is the Hebrew site (`LOCALE_PREFIX.he` is
+ * the empty prefix), so every prospect who clicked the signature until now
+ * arrived on a right-to-left Hebrew page after an English cold email. Nothing
+ * about the recipient is known at compose time except that the message is
+ * written in English, so the language of the destination is a property of this
+ * channel and belongs here rather than in a per-request guess.
+ */
+export const SITE_URL = 'https://www.gotopseo.com/en'
 export const UNSUBSCRIBE_BASE = 'https://www.gotopseo.com/api/outreach/unsubscribe'
 
 /** The six words lib/outreach/inbound.ts recognises the footer by. */
