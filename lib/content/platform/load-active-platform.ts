@@ -37,3 +37,15 @@ export async function loadActivePlatform(admin: Admin, projectId: string): Promi
     site,
   })
 }
+
+/**
+ * The platform the project's articles go to, as the article design reads it: a
+ * Shopify store whenever one is present, else the active platform. Used by the
+ * article design card and the author-box preview, so both see the same site.
+ */
+export async function loadDesignPlatform(admin: Admin, projectId: string): Promise<'wordpress' | 'webhook' | 'shopify' | 'wix' | 'none'> {
+  const r = await loadActivePlatform(admin, projectId)
+  if (r.platform === 'shopify' || r.shopifyPresent) return 'shopify'
+  if (r.platform === 'wordpress' || r.platform === 'wix' || r.platform === 'webhook') return r.platform
+  return 'none'
+}
