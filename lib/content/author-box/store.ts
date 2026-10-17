@@ -19,9 +19,10 @@
  * free check's guarded fetcher (normalizeCheckUrl + fetchSiteHtml: public
  * hosts only, every redirect re-admitted, size and time capped).
  *
- * THE OWNER'S OWN NAME, LINK AND IMAGE (author_box_name, author_box_url,
- * author_box_image) are read on their own (readAuthorBoxOverrides): while their
- * migration is not applied the box is exactly as before. The uploaded photo
+ * THE OWNER'S OWN NAME, LINE, LINK AND IMAGE (author_box_name,
+ * author_box_line, author_box_url, author_box_image) are read on their own
+ * (readAuthorBoxOverrides): while their migration is not applied the box is
+ * exactly as before. The uploaded photo
  * ('upload') is drawn only as its copy in the site (authorPhoto, given by the
  * WordPress publishers: ./photo-copy.ts), never as our stored file.
  *
@@ -34,19 +35,22 @@ import { normalizeCheckUrl } from '@/lib/free-check/url-guard'
 import { fetchSiteHtml } from '@/lib/free-check/site-fetch'
 import { ARTICLE_STYLE_TABLE, isMissingRelation } from '@/lib/content/article-style/store'
 import { articleLanguage } from '@/lib/content/article-style/labels'
-import { authorBoxContent, authorBoxImageChoice, authorBoxLanguage, cleanAuthorBoxName, normalizeAuthorBoxUrl, themeHasAuthorBox, type AuthorBoxContent, type AuthorBoxImageChoice, type AuthorBoxInputs } from './box'
+import { authorBoxContent, authorBoxImageChoice, authorBoxLanguage, cleanAuthorBoxLine, cleanAuthorBoxName, normalizeAuthorBoxUrl, themeHasAuthorBox, type AuthorBoxContent, type AuthorBoxImageChoice, type AuthorBoxInputs } from './box'
 import { readWordPressSiteIcon, type FetchText } from './site-icon'
 
 export const AUTHOR_BOX_COLUMN = 'author_box'
 export const THEME_BOX_COLUMN = 'theme_author_box'
 export const THEME_CHECKED_COLUMN = 'theme_author_box_checked_at'
 /**
- * The owner's own name and link for the box (supabase/migrations/
- * 20261016180000_project_author_box_overrides.sql). Read on their own, never
- * with the switch: while that migration is not applied, the box works exactly
- * as before (the resolved name, the about or home page).
+ * The owner's own name, line and link for the box (supabase/migrations/
+ * 20261016180000_project_author_box_overrides.sql, and
+ * 20261017140000_project_author_box_line.sql for the line). Read on their own,
+ * never with the switch: while those migrations are not applied, the box works
+ * exactly as before (the resolved name, the description's first sentence, the
+ * about or home page).
  */
 export const AUTHOR_NAME_COLUMN = 'author_box_name'
+export const AUTHOR_LINE_COLUMN = 'author_box_line'
 export const AUTHOR_URL_COLUMN = 'author_box_url'
 export const AUTHOR_IMAGE_COLUMN = 'author_box_image'
 
@@ -94,19 +98,21 @@ export type AuthorBoxOverrides = {
   state: 'saved' | 'default' | 'missing_column' | 'error'
   /** '' when the owner left it empty: the resolver picks the name. */
   name: string
+  /** '' when the owner left it empty: the description's first sentence. */
+  line: string
   /** '' when the owner left it empty: the about page, else the home page. */
   url: string
   /** 'none' (the default) draws no image. */
   image: AuthorBoxImageChoice
 }
 
-/** The owner's own name and link for the box, read for its owner. Empty on any failure (today's behaviour). */
+/** The owner's own name, line and link for the box, read for its owner. Empty on any failure (today's behaviour). */
 export async function readAuthorBoxOverrides(db: SupabaseClient, projectId: string, ownerId: string): Promise<AuthorBoxOverrides> {
-  const none = (state: AuthorBoxOverrides['state']): AuthorBoxOverrides => ({ state, name: '', url: '', image: 'none' })
+  const none = (state: AuthorBoxOverrides['state']): AuthorBoxOverrides => ({ state, name: '', line: '', url: '', image: 'none' })
   try {
     const { data, error } = await db
       .from(ARTICLE_STYLE_TABLE)
-      .select(`project_id, user_id, ${AUTHOR_NAME_COLUMN}, ${AUTHOR_URL_COLUMN}, ${AUTHOR_IMAGE_COLUMN}`)
+      .select(`project_id, user_id, ${AUTHOR_NAME_COLUMN}, ${AUTHOR_LINE_COLUMN}, ${AUTHOR_URL_COLUMN}, ${AUTHOR_IMAGE_COLUMN}`)
       .eq('project_id', projectId)
       .eq('user_id', ownerId)
       .maybeSingle()
@@ -114,7 +120,7 @@ export async function readAuthorBoxOverrides(db: SupabaseClient, projectId: stri
     const row = data as Record<string, unknown> | null
     if (!row || row.project_id !== projectId || row.user_id !== ownerId) return none('default')
     // Checked again on the way out: a value that does not pass is treated as empty.
-    return { state: 'saved', name: cleanAuthorBoxName(row[AUTHOR_NAME_COLUMN]), url: normalizeAuthorBoxUrl(row[AUTHOR_URL_COLUMN]) ?? '', image: authorBoxImageChoice(row[AUTHOR_IMAGE_COLUMN]) }
+    return { state: 'saved', name: cleanAuthorBoxName(row[AUTHOR_NAME_COLUMN]), line: cleanAuthorBoxLine(row[AUTHOR_LINE_COLUMN]), url: normalizeAuthorBoxUrl(row[AUTHOR_URL_COLUMN]) ?? '', image: authorBoxImageChoice(row[AUTHOR_IMAGE_COLUMN]) }
   } catch {
     return none('error')
   }
@@ -298,7 +304,8 @@ export type AuthorPhotoCopy = (projectId: string, ownerId: string) => Promise<st
  * Everything the box is made from, for publishing AND for the settings
  * preview (./preview.ts): the owner's own name and link, the site's publishing
  * user (asked only when the owner typed no name), the business name, the
- * description (never a store's), the about page and the language. Every read
+ * owner's own line, the description (never a store's), the about page and the
+ * language. Every read
  * names the project and its owner. `articleId` null = the preview: the
  * language is the project's, else the description's.
  */
@@ -341,6 +348,7 @@ export async function readAuthorBoxInputs(admin: SupabaseClient, req: {
     authorName,
     businessName: project.name,
     description,
+    lineOverride: overrides.line || null,
     domain: project.domain,
     aboutUrl,
     linkUrl: overrides.url || null,

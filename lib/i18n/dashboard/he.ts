@@ -459,6 +459,8 @@ export const dashboardHe = {
       authorBoxNoLink: 'אין קישור: אין כתובת אתר בהגדרות.',
       authorBoxNameLabel: 'שם המחבר שיוצג (לא חובה)',
       authorBoxNameHint: 'השאירו ריק כדי להשתמש בשם שנבחר אוטומטית.',
+      authorBoxLineLabel: 'משפט על הכותב (לא חובה)',
+      authorBoxLineHint: 'מה שתכתבו כאן יופיע מתחת לשם. השאירו ריק כדי להשתמש במשפט הראשון מתיאור העסק.',
       authorBoxUrlLabel: 'קישור המחבר (לא חובה)',
       authorBoxUrlHint: 'כתובת מלאה שמתחילה ב-http:// או ב-https://. השאירו ריק כדי לקשר לעמוד האודות, או לעמוד הבית אם אין עמוד כזה.',
       authorBoxUrlInvalid: 'כתבו כתובת מלאה שמתחילה ב-http:// או ב-https://.',

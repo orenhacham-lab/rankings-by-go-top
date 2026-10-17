@@ -189,6 +189,8 @@ export const projectSettingsPtBR: DeepPartial<DashboardDictionary> = {
       authorBoxNoLink: 'Sem link: não há endereço do site nas configurações.',
       authorBoxNameLabel: 'Nome do autor a mostrar (opcional)',
       authorBoxNameHint: 'Deixe vazio para usar o nome escolhido automaticamente.',
+      authorBoxLineLabel: 'Uma frase sobre o autor (opcional)',
+      authorBoxLineHint: 'O que você escrever aqui aparece abaixo do nome. Deixe vazio para usar a primeira frase da descrição do negócio.',
       authorBoxUrlLabel: 'Link do autor (opcional)',
       authorBoxUrlHint: 'Um endereço completo que comece com http:// ou https://. Deixe vazio para linkar a página “sobre”, ou a página inicial se não houver uma.',
       authorBoxUrlInvalid: 'Digite um endereço completo que comece com http:// ou https://.',

@@ -2880,6 +2880,8 @@ export const dashboardEs: DeepPartial<DashboardDictionary> = {
       authorBoxNoLink: 'Sin enlace: no hay dirección del sitio en tu configuración.',
       authorBoxNameLabel: 'Nombre del autor que se mostrará (opcional)',
       authorBoxNameHint: 'Déjalo vacío para usar el nombre elegido automáticamente.',
+      authorBoxLineLabel: 'Una frase sobre el autor (opcional)',
+      authorBoxLineHint: 'Lo que escribas aquí aparece debajo del nombre. Déjalo vacío para usar la primera frase de la descripción del negocio.',
       authorBoxUrlLabel: 'Enlace del autor (opcional)',
       authorBoxUrlHint: 'Una dirección completa que empiece por http:// o https://. Déjalo vacío para enlazar a tu página «sobre nosotros», o a la página de inicio si no la hay.',
       authorBoxUrlInvalid: 'Escribe una dirección completa que empiece por http:// o https://.',

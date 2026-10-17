@@ -532,7 +532,7 @@ async function main() {
     const previewSrc = strip(read('lib/content/author-box/preview.ts'))
     const storeSrc2 = strip(read('lib/content/author-box/store.ts'))
     const sameResolver = (card: string) => /const content = authorBoxContent\(inputs\)/.test(card) && /const who = resolveAuthorName\(inputs\)/.test(card)
-      && /\.\.\.preview\.data\.inputs, nameOverride: name, linkUrl: url, imageChoice: image/.test(card)
+      && /\.\.\.preview\.data\.inputs, nameOverride: name, lineOverride: line, linkUrl: url, imageChoice: image/.test(card)
       && !/looksLikeLogin/.test(card) && /readAuthorBoxInputs\(admin, \{/.test(previewSrc)
       && /const inputs = await readAuthorBoxInputs\([\s\S]{0,200}\)\n\s*const content = authorBoxContent\(inputs\)/.test(storeSrc2)
     check('H16: the card draws the preview with authorBoxContent over the publisher\'s inputs; publishing reads and draws the same way', sameResolver(cardSrc2))

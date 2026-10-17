@@ -16,8 +16,10 @@
  *   name      the name the owner typed in the settings (author_box_name), else
  *             the WordPress user the post is published as (display name) unless
  *             it looks like a login, else the business name (resolveAuthorName)
- *   line      the first sentence of the business description in the project's
- *             own settings (project_profiles.description), when there is one
+ *   line      the sentence the owner typed in the settings (author_box_line),
+ *             else the first sentence of the business description in the
+ *             project's own settings (project_profiles.description), when there
+ *             is one
  *   link      the address the owner typed in the settings (author_box_url,
  *             http or https only), else the site's own about page (from the
  *             site map) or its home page. The NAME line itself is the link:
@@ -32,7 +34,10 @@
  *             either way https, on the site's own host or WordPress' CDN; a
  *             small round image with the business name as its alt. Nothing
  *             readable: no image at all.
- * No biography, no credentials.
+ * No credentials, and nothing written by the system about the person: the only
+ * free text in the box is the owner's own line, which they typed themselves
+ * (asked for 2026-10-17, because the description's first sentence is not always
+ * what the owner would say about the author).
  *
  * Drawn by the article design (lib/content/article-style/html.ts): the
  * formatted design gives it the brand colours as inline styles; the minimal one
@@ -61,7 +66,13 @@ export const AUTHOR_BOX_HEADINGS: Record<AuthorBoxLanguage, string> = {
 /** The class on every paragraph of our box. Contains no "author", so the theme test never counts our own box. */
 export const OWN_CLASS = 'gotop-writer-card'
 
-export const AUTHOR_BOX_LIMITS = { name: 80, line: 220, label: 60, url: 300, image: 600 } as const
+/**
+ * `line` caps the sentence taken from the business description; `ownLine` the
+ * one the owner typed, which may be a little longer because they chose every
+ * word of it (the column's CHECK is the same 300:
+ * supabase/migrations/20261017140000_project_author_box_line.sql).
+ */
+export const AUTHOR_BOX_LIMITS = { name: 80, line: 220, ownLine: 300, label: 60, url: 300, image: 600 } as const
 
 /**
  * The image in the box, as the owner chose it: none, the WordPress site icon,
@@ -129,6 +140,15 @@ export function looksLikeLogin(name: string, language: AuthorBoxLanguage): boole
 /** The owner's "author name to show": plain text, exactly as a name is cleaned (cleanCtaText, the name limit); '' when empty. */
 export function cleanAuthorBoxName(input: unknown): string {
   return cleanCtaText(input, AUTHOR_BOX_LIMITS.name)
+}
+
+/**
+ * The owner's own line about the author: plain text, cleaned exactly as the
+ * name is (cleanCtaText strips markup and collapses whitespace), to its own
+ * limit; '' when empty. Shown INSTEAD of the description's first sentence.
+ */
+export function cleanAuthorBoxLine(input: unknown): string {
+  return cleanCtaText(input, AUTHOR_BOX_LIMITS.ownLine)
 }
 
 /**
@@ -201,6 +221,8 @@ export type AuthorBoxInputs = {
   authorName?: string | null
   businessName?: string | null
   description?: string | null
+  /** The owner's own line about the author; wins over the description's first sentence. */
+  lineOverride?: string | null
   domain?: string | null
   aboutUrl?: string | null
   /** The owner's own link address (http or https); wins when valid. */
@@ -241,7 +263,8 @@ export function authorBoxContent(input: AuthorBoxInputs): AuthorBoxContent | nul
     : choice === 'upload' ? normalizeAuthorBoxImage(input.photoUrl, input.domain)
       : null
   const image = iconUrl ? { url: iconUrl, alt: cleanCtaText(business || name, AUTHOR_BOX_LIMITS.label) } : null
-  return { language: input.language, name, line: descriptionLine(input.description), link, ...(image ? { image } : {}) }
+  const line = cleanAuthorBoxLine(input.lineOverride ?? '') || descriptionLine(input.description)
+  return { language: input.language, name, line, link, ...(image ? { image } : {}) }
 }
 
 const escText = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
