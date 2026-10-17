@@ -20,13 +20,19 @@
  *             own settings (project_profiles.description), when there is one
  *   link      the address the owner typed in the settings (author_box_url,
  *             http or https only), else the site's own about page (from the
- *             site map) or its home page; labelled with the business name (or
- *             the link's host name)
- *   image     only when the owner chose "the site icon" (author_box_image) and
- *             the site has one: the WordPress site icon (site_icon_url), https,
- *             on the site's own host or WordPress' CDN; a small round image
- *             with the business name as its alt. No icon: no image at all.
- * No biography, no credentials, no uploaded photo.
+ *             site map) or its home page. The NAME line itself is the link:
+ *             there is no second line with the business name under it (which
+ *             repeated the name whenever the name fell back to the business)
+ *   image     only when the owner chose one (author_box_image):
+ *             'site_icon'  the WordPress site icon (site_icon_url) when the
+ *                          site has one;
+ *             'upload'     the owner's own photo (lib/content/author-box/photo.ts), as the COPY
+ *                          placed in the site's media library at publish time
+ *                          (./photo-copy.ts); never our stored file;
+ *             either way https, on the site's own host or WordPress' CDN; a
+ *             small round image with the business name as its alt. Nothing
+ *             readable: no image at all.
+ * No biography, no credentials.
  *
  * Drawn by the article design (lib/content/article-style/html.ts): the
  * formatted design gives it the brand colours as inline styles; the minimal one
@@ -58,11 +64,11 @@ export const OWN_CLASS = 'gotop-writer-card'
 export const AUTHOR_BOX_LIMITS = { name: 80, line: 220, label: 60, url: 300, image: 600 } as const
 
 /**
- * The image in the box, as the owner chose it. A list so that a later choice
- * ("upload", an author photo, waiting on a privacy check) is one more entry
- * here and in the column's CHECK, not a new shape. Anything unknown is 'none'.
+ * The image in the box, as the owner chose it: none, the WordPress site icon,
+ * or the photo the owner uploaded ('upload', lib/content/author-box/photo.ts; the column's CHECK
+ * lists it from 20261017120000_project_author_photo.sql). Anything unknown is 'none'.
  */
-export const AUTHOR_BOX_IMAGE_CHOICES = ['none', 'site_icon'] as const
+export const AUTHOR_BOX_IMAGE_CHOICES = ['none', 'site_icon', 'upload'] as const
 export type AuthorBoxImageChoice = (typeof AUTHOR_BOX_IMAGE_CHOICES)[number]
 export const authorBoxImageChoice = (v: unknown): AuthorBoxImageChoice =>
   (AUTHOR_BOX_IMAGE_CHOICES as readonly unknown[]).includes(v) ? (v as AuthorBoxImageChoice) : 'none'
@@ -203,6 +209,11 @@ export type AuthorBoxInputs = {
   imageChoice?: AuthorBoxImageChoice | null
   /** The site icon's address, when the site has one (read at publish time). */
   imageUrl?: string | null
+  /**
+   * The uploaded photo's address IN THE CUSTOMER'S SITE (the media-library copy,
+   * ./photo-copy.ts), when the choice is 'upload'. Never our storage's address.
+   */
+  photoUrl?: string | null
 }
 
 /**
@@ -225,7 +236,10 @@ export function authorBoxContent(input: AuthorBoxInputs): AuthorBoxContent | nul
     const url = onSite ?? normalizeCtaUrl(`https://${site}/`)
     if (url) link = { url, label: cleanCtaText(business || bare(site), AUTHOR_BOX_LIMITS.label) }
   }
-  const iconUrl = authorBoxImageChoice(input.imageChoice) === 'site_icon' ? normalizeAuthorBoxImage(input.imageUrl, input.domain) : null
+  const choice = authorBoxImageChoice(input.imageChoice)
+  const iconUrl = choice === 'site_icon' ? normalizeAuthorBoxImage(input.imageUrl, input.domain)
+    : choice === 'upload' ? normalizeAuthorBoxImage(input.photoUrl, input.domain)
+      : null
   const image = iconUrl ? { url: iconUrl, alt: cleanCtaText(business || name, AUTHOR_BOX_LIMITS.label) } : null
   return { language: input.language, name, line: descriptionLine(input.description), link, ...(image ? { image } : {}) }
 }
@@ -245,9 +259,10 @@ export function authorBoxStructure(c: AuthorBoxContent): string {
   return `<div data-as="author">` +
     img +
     p('author-title', 'title', `<strong>${escText(AUTHOR_BOX_HEADINGS[c.language])}</strong>`) +
-    p('author-name', 'name', `<strong>${escText(c.name)}</strong>`) +
+    // The NAME is the link (to the owner's address, else the about or home page): no second line
+    // repeating the business name under it.
+    p('author-name', 'name', `<strong>${c.link ? `<a data-as="author-link" href="${escAttr(c.link.url)}">${escText(c.name)}</a>` : escText(c.name)}</strong>`) +
     (c.line ? p('author-text', 'text', escText(c.line)) : '') +
-    (c.link ? p('author-action', 'link', `<a data-as="author-link" href="${escAttr(c.link.url)}">${escText(c.link.label)}</a>`) : '') +
     `</div>`
 }
 

@@ -470,6 +470,22 @@ export const dashboardEn = {
       authorBoxImageHint: 'The small icon your WordPress site shows in the browser tab, shown round next to the name.',
       authorBoxImageMissing: 'Your site has no site icon, so the box will show no image.',
       authorBoxOverridesUnavailable: 'The name, link and image are not open for editing in your account yet.',
+      authorBoxImageUpload: 'A photo I upload',
+      authorBoxPhotoHint: 'JPEG, PNG or WebP, up to 2 MB. We keep a copy without its camera and location data, and copy it into your WordPress media library when an article is published.',
+      authorBoxPhotoConsent: 'Upload only a photo you have the right to publish and, if a person appears in it, only if they agreed to it being published on your site to promote the business (a minor needs a parent\'s or guardian\'s consent).',
+      authorBoxPhotoChoose: 'Upload a photo',
+      authorBoxPhotoReplace: 'Replace the photo',
+      authorBoxPhotoDelete: 'Delete the photo',
+      authorBoxPhotoBusy: 'One moment…',
+      authorBoxPhotoAlt: 'The author photo you uploaded',
+      authorBoxPhotoEmpty: 'No photo uploaded yet.',
+      authorBoxPhotoDeleteNote: 'Deleting erases the file from our storage. A copy already in your site\'s media library stays there until you delete it.',
+      authorBoxPhotoWillDelete: 'Saving with another choice deletes the photo you uploaded from our storage.',
+      authorBoxPhotoPublishNote: 'The preview shows the photo we keep; the article shows the copy in your site\'s media library.',
+      authorBoxPhotoTooLarge: 'The file is larger than 2 MB. Choose a smaller photo.',
+      authorBoxPhotoType: 'Only JPEG, PNG or WebP can be uploaded.',
+      authorBoxPhotoUnreadable: 'We could not read this photo. Try another file.',
+      authorBoxPhotoFailed: 'That did not work. Try again in a moment.',
       readOnly: 'These guidelines are not open for editing on your account yet.',
       appliesNext: 'Changes apply to the next articles we write. Articles already written stay as they are.',
       instructionsLabel: 'Standing instructions',
@@ -2071,6 +2087,7 @@ export const dashboardEn = {
       wpImageWarn: 'The featured image was not uploaded — the article was sent without it.',
       wpKeywordAdded: 'The keyword was added to the project keywords',
       wpNoImageWarn: 'No featured image. You can continue anyway.',
+      wpAuthor: { label: 'Article author on your site', hint: 'The name your site shows as the article\'s author. If you don\'t choose one, the site\'s default author is used.', defaultOption: 'The site\'s default author' },
       wpAlreadyExported: 'This article was already exported to WordPress. The existing link is shown below.',
       wpFailed: 'The WordPress action failed. Please try again.',
       wpDraftBadge: 'WordPress draft',
@@ -2089,6 +2106,7 @@ export const dashboardEn = {
         plugin_new_post_unsupported: 'This article was already sent through the GO TOP SEO Bridge plugin. To create another new post, update the plugin to the latest version in WordPress, or update the existing post.',
         plugin_schedule_unsupported: 'Scheduling a post on your site needs the latest GO TOP SEO Bridge plugin. Update the plugin in WordPress, or publish now.',
         plugin_author_unsupported: 'Choosing the post\'s author needs the latest GO TOP SEO Bridge plugin. Update the plugin in WordPress, or publish without choosing an author.',
+        plugin_author_invalid: 'The author you chose isn\'t allowed to publish posts on your site, so the article wasn\'t sent. Choose another author, or publish under the site\'s default author.',
         invalid_schedule: 'The publishing time is not valid. Choose a time in the future.',
         invalid_author: 'The chosen author is not valid. Choose an author from the list.',
         unknown: 'The WordPress action failed. Please try again.',
@@ -6039,7 +6057,7 @@ export const dashboardEn = {
       keepRenewal: 'Keep my plan',
       cancelSuccess: 'Subscription renewal was canceled. Your access will remain active until the end of the billing period.',
       cancelError: 'We couldn’t cancel your renewal. Try again in a moment, or write to us and we’ll cancel it for you.',
-      contactToCancel: 'To cancel your renewal, please contact us and we will stop the billing for you.',
+      contactToCancel: 'To cancel your renewal, write to us and we will end your plan for you. If the subscription is billed by another company, we will tell you where the cancellation is done and pass your request on to them.',
       renewalAlreadyCancelled: 'Renewal has been cancelled. Your access remains active until',
     },
     paypal: {
@@ -6060,6 +6078,10 @@ export const dashboardEn = {
       disclosure:
         "A card payment is made through Creem (Armitage Labs OÜ), the merchant of record: Creem issues the invoice, adds tax by your billing address, and the charge appears on your statement in Creem's name. The service itself stays ours.",
       buyerTermsLabel: "Creem's buyer terms",
+      // A card subscription is billed by Creem, the merchant of record, so we
+      // cannot stop the charge ourselves. "Contact us and we will stop the
+      // billing" is a promise we cannot keep; this says where cancelling works.
+      cancelNote: 'Creem sells this plan to you and bills it, so the cancellation happens at Creem, from the subscription details Creem sent you when you paid. If that is easier for you, write to us and we will pass the cancellation request on to Creem; the charge itself can only be stopped at Creem. Either way your access stays active until the end of the period you have paid for.',
     },
     shopify: {
       title: 'Billing is managed through Shopify',

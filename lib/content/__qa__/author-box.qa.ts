@@ -171,10 +171,10 @@ async function main() {
   const content = authorBoxContent({ language: 'en', authorName: 'Dana Levi', businessName: 'Levi Bakery', description: DESCRIPTION, domain: DOMAIN, aboutUrl: `https://${DOMAIN}/about-us/` })!
   check('B1: the name is the WordPress author\'s; the line is the description\'s first sentence; the link is the about page',
     content.name === 'Dana Levi' && content.line === 'Family bakery in Haifa baking sourdough since 1998.' && content.link?.url === `https://${DOMAIN}/about-us/` && content.link.label === 'Levi Bakery')
-  const allowed = [AUTHOR_BOX_HEADINGS.en, 'Dana Levi', 'Family bakery in Haifa baking sourdough since 1998.', 'Levi Bakery']
+  const allowed = [AUTHOR_BOX_HEADINGS.en, 'Dana Levi', 'Family bakery in Haifa baking sourdough since 1998.']
   const textOf = (h: string) => h.replace(/<[^>]+>/g, '\n').split('\n').map((t) => t.trim()).filter(Boolean)
   const onlyAllowed = (h: string) => textOf(h).every((t) => allowed.includes(t))
-  check('B2: every text in the box is one of the allowed sources, and nothing else', onlyAllowed(authorBoxStructure(content)) && textOf(authorBoxStructure(content)).length === 4)
+  check('B2: every text in the box is one of the allowed sources, and nothing else', onlyAllowed(authorBoxStructure(content)) && textOf(authorBoxStructure(content)).length === 3)
   const fallback = authorBoxContent({ language: 'he', authorName: null, businessName: 'Levi Bakery', description: null, domain: DOMAIN })!
   check('B3: no author known: the business name; no description: no line; the home page link; the heading in the article\'s language',
     fallback.name === 'Levi Bakery' && fallback.line === '' && fallback.link?.url === `https://${DOMAIN}/` && authorBoxStructure(fallback).includes('על הכותב'))
@@ -182,7 +182,8 @@ async function main() {
   check('B5: an about page on another site is never linked', authorBoxContent({ language: 'en', businessName: 'B', domain: DOMAIN, aboutUrl: 'https://evil.example/about' })!.link?.url === `https://${DOMAIN}/`)
   check('B6: no name at all: no box', authorBoxContent({ language: 'en', authorName: '  ', businessName: '', domain: DOMAIN }) === null)
   const hostile = authorBoxStructure(authorBoxContent({ language: 'en', authorName: '<script>alert(1)</script>Dana', businessName: 'B&B "x"', domain: DOMAIN })!)
-  check('B7: tags are removed and markup is escaped', !/<script/i.test(hostile) && hostile.includes('B&amp;B'))
+  const hostileBusiness = authorBoxStructure(authorBoxContent({ language: 'en', authorName: null, businessName: 'B&B "x"', domain: DOMAIN })!)
+  check('B7: tags are removed and markup is escaped', !/<script/i.test(hostile) && hostileBusiness.includes('>B&amp;B "x"</a>'))
   // A WordPress login shown as the display name falls back to the business name (japan4u, 2026-10-16).
   const asName = (n: string, language: 'he' | 'en' = 'he') => authorBoxContent({ language, authorName: n, businessName: 'Levi Bakery', domain: DOMAIN })!.name
   check('B7a: a login is never the author name: digits, underscore, dot, @, lowercase, Latin on a Hebrew site',
@@ -192,10 +193,34 @@ async function main() {
     asName('Dana Levi') === 'Dana Levi' && asName('דנה לוי') === 'דנה לוי' && asName('דנה') === 'דנה' && asName('Dana', 'en') === 'Dana')
   check('B8: the about page is found among the mapped pages, shortest first, on the project\'s host only',
     findAboutUrl([{ u: 'https://evil.example/about' }, { u: `https://${DOMAIN}/company/about-us/team` }, { u: `https://www.${DOMAIN}/about/` }], DOMAIN) === `https://www.${DOMAIN}/about/`)
-  const inventing = await mutant<typeof import('@/lib/content/author-box/box')>('lib/content/author-box/box.ts', (s) => s.replace("p('author-name', 'name', `<strong>${escText(c.name)}</strong>`)", "p('author-name', 'name', `<strong>${escText(c.name)}</strong>, certified expert`)"))
+  const inventing = await mutant<typeof import('@/lib/content/author-box/box')>('lib/content/author-box/box.ts', (s) => s.replace("escText(c.name)}</a>` : escText(c.name)}</strong>`)", "escText(c.name)}</a>` : escText(c.name)}</strong>, certified expert`)"))
   check('MUTATION CONTROL: a box that adds a claim of its own fails B2', !onlyAllowed(inventing.authorBoxStructure(content)))
   const wholeDescription = await mutant<typeof import('@/lib/content/author-box/box')>('lib/content/author-box/box.ts', (s) => s.replace('const first = (m ? m[0] : text).trim()', 'const first = text.trim()'))
   check('MUTATION CONTROL: the whole description instead of its first sentence fails B1', wholeDescription.descriptionLine(DESCRIPTION) !== descriptionLine(DESCRIPTION))
+
+  // The NAME is the link; no second line with the business name (it repeated the name when the name fell back to it).
+  type BoxMod = typeof import('@/lib/content/author-box/box')
+  const nameIsAnchor = (m: BoxMod) => {
+    const person = m.authorBoxStructure(m.authorBoxContent({ language: 'en', authorName: 'Dana Levi', businessName: 'Levi Bakery', domain: DOMAIN, aboutUrl: `https://${DOMAIN}/about-us/` })!)
+    const business = m.authorBoxStructure(m.authorBoxContent({ language: 'en', authorName: null, businessName: 'Levi Bakery', domain: DOMAIN })!)
+    const nameLine = (h: string) => h.match(/<p[^>]*data-as="author-name"[^>]*>([\s\S]*?)<\/p>/)?.[1] ?? ''
+    return nameLine(person) === `<strong><a data-as="author-link" href="https://${DOMAIN}/about-us/">Dana Levi</a></strong>`
+      && nameLine(business) === `<strong><a data-as="author-link" href="https://${DOMAIN}/">Levi Bakery</a></strong>`
+  }
+  const oneLink = (m: BoxMod) => [
+    m.authorBoxContent({ language: 'en', authorName: 'Dana Levi', businessName: 'Levi Bakery', domain: DOMAIN })!,
+    m.authorBoxContent({ language: 'he', authorName: null, businessName: 'Levi Bakery', domain: DOMAIN })!,
+  ].every((c) => {
+    const h = m.authorBoxStructure(c)
+    return (h.match(/<a\b/g) ?? []).length === 1 && !h.includes('author-action') && (h.match(/Levi Bakery/g) ?? []).length === (c.name === 'Levi Bakery' ? 1 : 0)
+  })
+  check('B9: the name line itself is the link (a person, or the business name), to the resolved target', nameIsAnchor(await import('@/lib/content/author-box/box')))
+  check('B10: no second link line: one link in the box, the business name never repeated under the name', oneLink(await import('@/lib/content/author-box/box')))
+  const oldLinkLine = await mutant<BoxMod>('lib/content/author-box/box.ts', (s) => s.replace("(c.line ? p('author-text', 'text', escText(c.line)) : '') +",
+    "(c.line ? p('author-text', 'text', escText(c.line)) : '') + (c.link ? p('author-action', 'link', `<a data-as=\"author-link\" href=\"${escAttr(c.link.url)}\">${escText(c.link.label)}</a>`) : '') +"))
+  check('MUTATION CONTROL: the separate bottom link line put back fails B10', !oneLink(oldLinkLine))
+  const plainName = await mutant<BoxMod>('lib/content/author-box/box.ts', (s) => s.replace("`<strong>${c.link ? `<a data-as=\"author-link\" href=\"${escAttr(c.link.url)}\">${escText(c.name)}</a>` : escText(c.name)}</strong>`", '`<strong>${escText(c.name)}</strong>`'))
+  check('MUTATION CONTROL: a name that is not the anchor fails B9', !nameIsAnchor(plainName))
 
   // ── C) publishing ───────────────────────────────────────────────────────
   console.log('\nC) publishing: off by default, only where the theme has none, once')
@@ -584,9 +609,10 @@ async function main() {
       check('I7: a Shopify store: the site is never asked and no image is drawn (the choice is not offered there)', t.calls.length === 0 && !/<img/.test(store))
     }
     const card3 = strip(read('components/settings/WritingGuidanceCard.tsx'))
-    const offered = (s: string) => /AUTHOR_BOX_IMAGE_CHOICES\.filter\(\(c\) => c === 'none' \|\| iconOffered\)/.test(s) && /image=\{iconOffered \? image : 'none'\}/.test(s)
-    check('I8: the card offers the site icon only where it can be read (WordPress), and previews it', offered(card3) && /content\.image &&/.test(card3))
-    check('MUTATION CONTROL: a card that always offers the site icon fails I8', !offered(card3.replace("c === 'none' || iconOffered", 'true')))
+    const offered = (s: string) => /const offered = \(c: AuthorBoxImageChoice\) => c === 'none' \|\| \(c === 'site_icon' && iconOffered\) \|\| \(c === 'upload' && photoOffered\)/.test(s)
+      && /AUTHOR_BOX_IMAGE_CHOICES\.filter\(offered\)/.test(s) && /const shown: AuthorBoxImageChoice = offered\(image\) \? image : 'none'/.test(s) && /image=\{shown\}/.test(s)
+    check('I8: the card offers the site icon only where it can be read (WordPress), and previews it', offered(card3) && /const img = content\?\.image \?\?/.test(card3))
+    check('MUTATION CONTROL: a card that always offers the site icon fails I8', !offered(card3.replace("(c === 'site_icon' && iconOffered)", "c === 'site_icon'")))
   }
 
   // ── J) the card's new strings ───────────────────────────────────────────

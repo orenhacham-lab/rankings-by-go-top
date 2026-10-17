@@ -193,16 +193,56 @@ console.log('\nD) what the button sends, and what it follows')
   check('D5-MUT: a provider name in a shown string is caught',
     !literals(button.replace('t.payButton}', "'Pay with Creem'}")).every(allowed))
   check('D5-MUT2: another creem.io URL smuggled in is caught',
-    !literals(button.replace(BUYER_TERMS_URL, 'https://www.creem.io/anything-else')).every(allowed))
+    !literals(`${button}\nconst other = 'https://www.creem.io/anything-else'`).every(allowed))
 
   // 3.8: the buyer must be SHOWN Creem's buyer terms. Text they cannot click
   // shows them nothing, so this is a real anchor, opened safely.
+  // The URL moved to lib/public-links/creem-buyer-terms.ts when the manage
+  // card had to show it too; the component imports it rather than repeating it.
+  const BUYER_TERMS_MODULE = read('lib/public-links/creem-buyer-terms.ts')
   check('D6: the buyer terms are a real link, and the label comes from the dictionary',
-    new RegExp(`const CREEM_BUYER_TERMS_URL = '${BUYER_TERMS_URL}'`).test(button)
+    new RegExp(`export const CREEM_BUYER_TERMS_URL = '${BUYER_TERMS_URL}'`).test(BUYER_TERMS_MODULE)
+    && /from '@\/lib\/public-links\/creem-buyer-terms'/.test(button)
     && /href=\{CREEM_BUYER_TERMS_URL\}/.test(button)
     && /rel="noopener noreferrer"/.test(button)
     && /\{t\.buyerTermsLabel\}/.test(button)
     && /\{t\.disclosure\}/.test(button))
+  // The manage card's own state for a Creem-billed account. Before this it
+  // fell through to manage.contactToCancel — "contact us and we will stop the
+  // billing for you" — which Creem being the merchant of record makes
+  // impossible for us to do.
+  const billingView = read('app/(dashboard)/billing/BillingView.tsx')
+  check('D7: a Creem-billed account is told where cancelling happens',
+    /creemGoverned \? \(/.test(billingView) && /\{t\.creem\.cancelNote\}/.test(billingView))
+  check('D8: …before the screen falls through to the contact-us answer',
+    billingView.indexOf('creemGoverned ? (') < billingView.indexOf('contactToCancel'))
+  check('D9: and that state offers no cancel request of ours',
+    !/handleCancel|paypal\/cancel/.test(billingView.slice(
+      billingView.indexOf('creemGoverned ? ('),
+      billingView.indexOf('hasPaypalSubscriptionId ? ('))))
+  // Written by the legal thread, which could not ship it: it is red against
+  // main. The fallback line is read by any account we bill ourselves without
+  // a PayPal subscription id, and it promised to stop a charge — which for
+  // such an account we can do only by ending the plan, so that is what it now
+  // says. The key stays, because that state still exists.
+  const fallbackLine = /contactToCancel: '([^']*)'/.exec(read('lib/i18n/dashboard/en.ts'))?.[1] ?? ''
+  check('D10: the billing screen does not promise to stop a charge that is not ours',
+    fallbackLine === '' || !/stop the billing/.test(fallbackLine), fallbackLine)
+  // The DEFAULT has to be the safe one: an authority nobody matched lands
+  // here, and a fourth one would inherit whatever this says.
+  check('D11: the fallback also covers a subscription somebody else bills',
+    /billed by another company/.test(fallbackLine)
+    && /where the cancellation is done/.test(fallbackLine), fallbackLine)
+  check('D11-MUT: a fallback that assumes the billing is ours is caught',
+    !/billed by another company/.test('To cancel your renewal, write to us and we will end your plan for you.'))
+  check('D10-MUT: the old promise is caught if it comes back',
+    /stop the billing/.test('To cancel your renewal, please contact us and we will stop the billing for you.'))
+
+  check('D7-MUT: removing the line and keeping the old promise is caught',
+    !/\{t\.creem\.cancelNote\}/.test(billingView.replace('{t.creem.cancelNote}', '{t.manage.contactToCancel}')))
+  check('D9-MUT: a cancel button put into that state is caught',
+    /handleCancel/.test(`${billingView.slice(billingView.indexOf('creemGoverned ? ('))}`.slice(0, 200) + '<Button onClick={handleCancel} />'))
+
   check('D6-MUT: turning the link back into plain text is caught',
     !/href=\{CREEM_BUYER_TERMS_URL\}/.test(button.replace('href={CREEM_BUYER_TERMS_URL}', 'title="buyer terms"')))
 }
@@ -247,6 +287,39 @@ console.log('\nE) every dashboard language has the strings')
     check(`E3-MUT: a ${lang} sentence that only names the processor is caught`,
       !namesTheRole('Payment is processed by Creem.'))
     check(`E4: ${lang} has a label for the buyer terms`, valueOf('buyerTermsLabel').includes('Creem'))
+    // The cancellation line, in every language. It must say Creem is where
+    // cancelling happens and must NOT promise that we stop the charge: that
+    // is what the old fallback did, and we hold no payment instrument.
+    const cancelNote = valueOf('cancelNote')
+    const saysWhereToCancel = /Creem/.test(cancelNote)
+      && /cancel|ביטול|cancela/i.test(cancelNote)
+    check(`E5: ${lang} says cancelling happens at Creem`, saysWhereToCancel, cancelNote)
+    check(`E5-MUT: a ${lang} line that names no provider is caught`,
+      !(/Creem/.test('Contact us and we will stop the billing for you.')))
+    // The second resort promises only what we can perform: ending the plan on
+    // our side. Stopping the charge is Creem's, and the line says so.
+    const promisesOnlyOurs =
+      // a second route through us, and what it is worth: a written record
+      /write to us|כתבו לנו|escríbenos|fale com a gente/.test(cancelNote)
+      // and NOT a written confirmation: nothing in the codebase sends that
+      // mail, so the promise would rest on somebody answering by hand. The
+      // legal review cut the same sentence from the terms; it can come back
+      // on both sides the day an acknowledgement is actually sent.
+      && !/in writing|בכתב|por escrito/.test(cancelNote)
+      // and who stops the charge, said in the same breath
+      // where the charge can be stopped, not WHO has the power: Hebrew has no
+      // settled gender for a foreign trade name, so the sentence names a place
+      && /only be stopped at Creem|אפשר לעצור רק אצל Creem|solo se puede detener en Creem|só pode ser interrompida na Creem/.test(cancelNote)
+      && !/we will stop the billing|נבטל עבורכם את החיוב|detendremos el cobro|interromperemos a cobrança/.test(cancelNote)
+    check(`E6: ${lang} offers a second route and names its limit`, promisesOnlyOurs, cancelNote)
+    check(`E6-MUT: a ${lang} line that promises to stop the charge is caught`,
+      !/write to us|כתבו לנו|escríbenos|fale com a gente/.test('We will stop the billing for you.'))
+    check(`E6-MUT2: a ${lang} line that promises a written confirmation is caught`,
+      /in writing/.test('we will pass it on and confirm in writing that we have'))
+    // "Merchant of record" is a term of art; the screen is read by a
+    // first-time store owner, so it says what the phrase means instead.
+    check(`E7: ${lang} says what Creem does rather than naming its legal role`,
+      !/merchant of record|המוכר הרשום|vendedor registrado|vendedora registrada/.test(cancelNote), cancelNote)
   }
 }
 

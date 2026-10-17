@@ -48,10 +48,10 @@ const OREN: ArticleAuthor = {
     'pt-BR': 'Oren Hacham',
   },
   role: {
-    he: 'Go Top — קידום אתרים ודיגיטל',
-    en: 'Go Top — SEO and digital marketing',
-    es: 'Go Top — SEO y marketing digital',
-    'pt-BR': 'Go Top — SEO e marketing digital',
+    he: 'מייסד Go Top — קידום אתרים ודיגיטל',
+    en: 'Founder of Go Top — SEO and digital marketing',
+    es: 'Fundador de Go Top — SEO y marketing digital',
+    'pt-BR': 'Fundador da Go Top — SEO e marketing digital',
   },
   bio: {
     he: 'עומד מאחורי Go Top, סוכנות דיגיטל שעוסקת מעל 11 שנה בקידום אתרים אורגני ובפרסום ממומן לעסקים בישראל, ומאחורי המערכת Go Top SEO.',
@@ -79,6 +79,24 @@ const BY_NAME: Record<string, ArticleAuthor> = {
 export function articleAuthor(author: string | null | undefined): ArticleAuthor | null {
   if (!author) return null
   return BY_NAME[author.trim().toLowerCase()] ?? null
+}
+
+/**
+ * The byline as the page's own language writes it.
+ *
+ * The `author` column holds ONE spelling — 'אורן חכם' — because it is what
+ * matches the profile and what the WordPress bridge and the admin form write.
+ * Rendering that column directly put a Hebrew name on the English, Spanish and
+ * Portuguese pages: the author box resolved the locale and the headline byline
+ * beside it did not, so one page showed the name twice, in two alphabets. Every
+ * surface that shows a byline goes through here.
+ *
+ * An author with no profile keeps the column's own text: it is the only name we
+ * have, and dropping it would leave the article unsigned.
+ */
+export function authorDisplayName(author: string | null | undefined, locale: PublicLocale): string {
+  if (!author) return ''
+  return articleAuthor(author)?.name[locale] ?? author
 }
 
 /** The initials for the avatar, for an author with no photo on file. */

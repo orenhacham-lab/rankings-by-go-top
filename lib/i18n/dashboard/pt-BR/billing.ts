@@ -148,7 +148,7 @@ export const billingPtBR: DeepPartial<DashboardDictionary> = {
       keepRenewal: 'Manter meu plano',
       cancelSuccess: 'A renovação da assinatura foi cancelada. Você mantém o acesso até o fim do período de cobrança.',
       cancelError: 'Não conseguimos cancelar a sua renovação. Tente novamente em instantes ou fale com a gente que cancelamos para você.',
-      contactToCancel: 'Para cancelar a sua renovação, fale com a gente e interromperemos a cobrança.',
+      contactToCancel: 'Para cancelar a sua renovação, fale com a gente e encerramos o seu plano. Se a assinatura for cobrada por outra empresa, diremos onde o cancelamento é feito e encaminharemos o seu pedido.',
       renewalAlreadyCancelled: 'A renovação está cancelada. Você mantém o acesso até',
     },
     paypal: {
@@ -169,6 +169,7 @@ export const billingPtBR: DeepPartial<DashboardDictionary> = {
       disclosure:
         'O pagamento com cartão é feito pela Creem (Armitage Labs OÜ), a comerciante registrada: a Creem emite a fatura, acrescenta o imposto conforme o seu endereço de cobrança e a cobrança aparece na sua fatura em nome da Creem. O serviço em si continua sendo nosso.',
       buyerTermsLabel: 'Termos de compra da Creem',
+      cancelNote: 'A Creem vende este plano para você e faz a cobrança, então o cancelamento acontece na Creem, pelos dados da assinatura que a Creem enviou quando você pagou. Se for mais fácil para você, fale com a gente e encaminhamos o pedido de cancelamento para a Creem; a cobrança só pode ser interrompida na Creem. De todo modo, seu acesso continua ativo até o fim do período que você já pagou.',
     },
     shopify: {
       title: 'A cobrança é gerenciada pela Shopify',

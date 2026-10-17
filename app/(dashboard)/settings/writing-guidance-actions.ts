@@ -22,6 +22,10 @@ import { createAdminClient } from '@/lib/supabase/admin'
 import { previewAuthorBox, type AuthorBoxPreviewResult } from '@/lib/content/author-box/preview'
 import { siteUserNameForNewPost } from '@/lib/content/author-box/site-user'
 import { loadDesignPlatform } from '@/lib/content/platform/load-active-platform'
+import { canCopyAuthorPhoto } from '@/lib/content/author-box/photo-copy'
+import { deleteAuthorPhoto, uploadAuthorPhoto, type AuthorPhotoErrorCode, type AuthorPhotoResult } from '@/lib/content/author-box/photo'
+
+export type AuthorPhotoActionResult = LoadGuidanceResult | { ok: false; code: AuthorPhotoErrorCode }
 
 function liveDeps(): GuidanceDeps {
   return {
@@ -30,6 +34,8 @@ function liveDeps(): GuidanceDeps {
       const { data, error } = await db.auth.getUser()
       return { userId: !error && data?.user ? data.user.id : null, db }
     },
+    // The service role for the author photo's storage object only, after the owner check (author-photo.ts).
+    storage: () => createAdminClient(),
   }
 }
 
@@ -74,9 +80,41 @@ export async function previewAuthorBoxAction(projectId: string): Promise<AuthorB
       admin: () => createAdminClient(),
       platform: (admin, id) => loadDesignPlatform(admin as ReturnType<typeof createAdminClient>, id),
       siteUserName: siteUserNameForNewPost,
+      photoCopyAvailable: canCopyAuthorPhoto,
     }, projectId)
   } catch (err) {
     console.error('[writing-guidance] author box preview failed', { error: errorName(err) })
     return { ok: false, code: 'unavailable' }
+  }
+}
+
+/**
+ * The author photo: upload (one per project; replaces the earlier one) and
+ * delete. The owner check, the file checks and the storage rules live in
+ * lib/content/author-box/photo.ts. Both answer the card's whole view again, so the
+ * card shows what is stored now.
+ */
+async function photoThenView(run: (deps: ReturnType<typeof liveDeps> & { storage: () => ReturnType<typeof createAdminClient> }) => Promise<AuthorPhotoResult>, projectId: string): Promise<AuthorPhotoActionResult> {
+  const deps = { ...liveDeps(), storage: () => createAdminClient() }
+  const r = await run(deps)
+  if (!r.ok) return r
+  return loadWritingGuidance(deps, projectId)
+}
+
+export async function uploadAuthorPhotoAction(projectId: string, form: FormData): Promise<AuthorPhotoActionResult> {
+  try {
+    return await photoThenView((deps) => uploadAuthorPhoto(deps, projectId, form.get('photo')), projectId)
+  } catch (err) {
+    console.error('[author-photo] upload failed', { error: errorName(err) })
+    return { ok: false, code: 'save_failed' }
+  }
+}
+
+export async function deleteAuthorPhotoAction(projectId: string): Promise<AuthorPhotoActionResult> {
+  try {
+    return await photoThenView((deps) => deleteAuthorPhoto(deps, projectId), projectId)
+  } catch (err) {
+    console.error('[author-photo] delete failed', { error: errorName(err) })
+    return { ok: false, code: 'delete_failed' }
   }
 }

@@ -31,7 +31,7 @@ import { withHeadingIds } from '@/lib/articles/headings'
 import { linkifyBareUrls } from '@/lib/articles/bare-urls'
 import { readingMinutes } from '@/lib/articles/reading-time'
 import { articlePublishBlockReason } from '@/lib/articles/publish-rules'
-import { articleAuthor, authorPersonSchema } from '@/lib/articles/authors'
+import { articleAuthor, authorDisplayName, authorPersonSchema } from '@/lib/articles/authors'
 import { sanitizePublicArticleHtml } from '@/lib/content/public-article-html'
 
 const ROOT = join(__dirname, '..', '..', '..')
@@ -330,6 +330,41 @@ function main() {
   check('O10. the Person in the schema carries the same photograph',
     /articleAuthor\(article\.author\)\?\.photo/.test(serverSrc)
     && /image: `\$\{SITE_URL\}\$\{articleAuthor\(article\.author\)\?\.photo\}`/.test(serverSrc))
+
+  // O11-O15: the byline is the LANGUAGE'S spelling of the name, not the
+  // `author` column's. The column holds 'אורן חכם' for every article, so the
+  // foreign pages used to print a Hebrew name above an English article, and
+  // again on the card in the index, while the author box under the same
+  // article had it right.
+  const HEBREW_LETTER = /\p{Script=Hebrew}/u
+  for (const locale of PUBLIC_LOCALES) {
+    const shown = authorDisplayName('אורן חכם', locale)
+    check(`O11. ${locale}: the byline is written in the page's own language`,
+      locale === 'he' ? HEBREW_LETTER.test(shown) : !HEBREW_LETTER.test(shown) && shown === 'Oren Hacham', shown)
+  }
+  check('O12. an author with no profile keeps the name the article carries',
+    authorDisplayName('Someone Else', 'en') === 'Someone Else' && authorDisplayName(null, 'en') === '')
+  // MUTATION: print `article.author` in either surface and this fails — that
+  // is the bug itself.
+  check('O13. the article headline byline and its initial go through the helper',
+    /authorDisplayName\(article\.author, locale\)/.test(viewSrc)
+    && /authorInitial\(authorDisplayName\(article\.author, locale\)\)/.test(viewSrc)
+    && !/>\s*\{article\.author\}\s*</.test(viewSrc) && !/\{article\.author\.charAt\(0\)\}/.test(viewSrc))
+  check('O14. the index card byline goes through the helper',
+    /authorDisplayName\(article\.author, locale\)/.test(indexSrc) && !/>\s*\{article\.author\}\s*</.test(indexSrc))
+  check('O15. the page metadata names the author in the page\'s language',
+    /authors: \[authorDisplayName\(article\.author, locale\)\]/.test(serverSrc))
+  // O16: the role Oren approved on 17 Oct 2026 — he is named as the founder.
+  for (const locale of PUBLIC_LOCALES) {
+    const role = articleAuthor('אורן חכם')?.role[locale] ?? ''
+    check(`O16. ${locale}: the role names him as the founder`,
+      /מייסד|Founder|Fundador/.test(role), role)
+  }
+  // MUTATION CONTROL for O11/O16: the Hebrew spelling and the Hebrew role are
+  // still Hebrew, so these checks are not passing on an empty table.
+  check('O17 (control): Hebrew is unchanged',
+    HEBREW_LETTER.test(authorDisplayName('אורן חכם', 'he'))
+    && HEBREW_LETTER.test(articleAuthor('אורן חכם')?.role.he ?? ''))
 
   // The blog editor keeps only what TipTap's schema knows. Registered against
   // a measured loss: with StarterKit and Link alone, loading an article with a

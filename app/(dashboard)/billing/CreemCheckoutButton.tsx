@@ -5,6 +5,7 @@ import Button from '@/components/ui/Button'
 import Notice from '@/components/ui/Notice'
 import { useDashboardLanguage } from '@/lib/i18n/dashboard/useDashboardLanguage'
 import { getDashboardDictionary } from '@/lib/i18n/dashboard/getDashboardDictionary'
+import { CREEM_BUYER_TERMS_URL } from '@/lib/public-links/creem-buyer-terms'
 
 /**
  * The card-payment button for one plan, on the Creem path.
@@ -32,7 +33,6 @@ import { getDashboardDictionary } from '@/lib/i18n/dashboard/getDashboardDiction
  * (CLAUDE.md); the provider's detail stays in the console.
  */
 /** Creem's own buyer terms. A fixed, absolute URL — never built from input. */
-const CREEM_BUYER_TERMS_URL = 'https://www.creem.io/buyer-terms'
 
 export default function CreemCheckoutButton({ plan }: { plan: string }) {
   const { uiLocale } = useDashboardLanguage()
