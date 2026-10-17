@@ -31,6 +31,7 @@ Recopilamos distintos tipos de información, entre ellos:
 - **Una dirección para el seguimiento de posicionamiento local:** si usted escribió una dirección exacta, se almacena junto con las coordenadas obtenidas; véase «Conversión de una dirección en coordenadas» más abajo
 - **Red de enlaces:** su consentimiento de adhesión (quién lo aceptó, cuándo, el texto y el tipo de enlace) y el registro de colocaciones; véase «Red de enlaces» más abajo
 - **Resultados y contenido:** resultados de las comprobaciones de visibilidad en IA y el contenido generado para usted: temas, preguntas y artículos
+- **Foto de autor:** una foto que usted sube para una caja de autor, si eligió mostrarla; véase «Una foto de autor que usted sube» más abajo
 - **Preferencias de correo electrónico:** qué mensajes recibe y las cancelaciones de suscripción a los recordatorios
 - **Información de pago:** no almacenamos su instrumento de pago. Para las cuentas cuya autoridad de facturación es Shopify, incluidos los comerciantes que instalaron la aplicación a través de Shopify, el pago es procesado por Shopify conforme a Shopify App Pricing, y nunca los dirigimos a PayPal. Para los clientes que se registraron directamente en nuestro sitio web, cuya autoridad de facturación no es Shopify, el pago se procesa a través de PayPal
 
@@ -187,6 +188,18 @@ El programa de socios está dirigido a quienes recomiendan el Servicio y reciben
 
 En la fecha de esta política el programa funciona así: la solicitud se envía desde este sitio, por correo electrónico o en el formulario, y la aprueba una persona; un socio aprobado tiene un código y un enlace; los clics se cuentan como un total diario por socio; una cuenta nueva que se registra con un código se atribuye a ese socio una vez y para siempre; la comisión se registra sobre cada pago efectivamente recibido, se retiene 30 días, que es la ventana de reembolso, y la aprueba una persona; y el pago en sí se realiza a mano contra un comprobante. **Un cliente facturado a través de Shopify no genera comisión automática**, porque Shopify nos informa de que un plan está activo y no de que se haya cobrado un cargo; esa comisión se registra a mano, al mismo porcentaje. Los términos están en el [Acuerdo del Programa de Socios](/es/affiliate-terms), que además obliga al socio a declarar abiertamente que está remunerado.
 
+## Una foto de autor que usted sube
+
+Si sube una foto para una caja de autor, el archivo se guarda en un almacenamiento propio dedicado mientras la foto esté configurada en el proyecto. Su ruta se compone del identificador del proyecto y de un identificador aleatorio, y nunca del nombre de una persona. No publicamos nuestra copia y el artículo no enlaza a ella.
+
+Al publicarse el artículo, la foto se copia en la biblioteca de medios de su sitio y el artículo enlaza a esa copia. Desde ese momento la foto es visible para cualquiera que visite su sitio, como cualquier otra imagen de un artículo. La subida solo se ofrece en un proyecto donde esa copia pueda hacerse.
+
+La foto no se envía a ningún proveedor de IA, no se utiliza para entrenar modelos y no ejecutamos sobre ella reconocimiento facial ni ningún otro tratamiento biométrico.
+
+Al eliminar la foto, o al pasar a ninguna foto o al icono del sitio, se borra el archivo de nuestro almacenamiento. Desactivar toda la caja de autor no borra la foto: se conserva hasta que usted la elimine o elija otra opción. Una copia ya colocada en su sitio no está bajo nuestro control, y solo quien administra ese sitio puede eliminarla allí.
+
+Respecto de la persona que aparece en la foto, el cliente que la subió es quien decide para qué se usa, y nosotros tratamos el archivo por cuenta suya. Si usted es la persona de la foto y no el cliente que la subió, escríbanos a la dirección que figura al final de esta política: borraremos el archivo de nuestro almacenamiento y nos dirigiremos al cliente para que retire la copia del sitio, pero no podemos eliminar nosotros mismos contenido en el sitio de un cliente.
+
 ## Proveedores de IA
 
 Algunas funciones envían datos a los siguientes servicios de IA para producir el resultado que usted solicitó:
@@ -326,6 +339,7 @@ Conservamos los datos únicamente durante el tiempo necesario para la finalidad 
 - **Credenciales de conexión** (WordPress, Shopify, Search Console): hasta que usted se desconecte o elimine la cuenta, y después se suprimen de inmediato.
 - **Verificación gratuita del sitio:** se almacena en caché hasta 24 horas y después se suprime si a partir de ella no se abrió una cuenta.
 - **Registro de decisiones sobre cookies:** hasta tres años desde la decisión, para que podamos demostrar lo que usted eligió. Esa es la base jurídica para conservarlo, razón por la cual no se suprime junto con la cuenta.
+- **Foto de autor:** mientras la foto esté configurada en el proyecto. Al eliminarla, o al pasar a ninguna foto o al icono del sitio, el archivo se borra de inmediato. Una copia ya colocada en su sitio permanece allí hasta que usted la elimine.
 - **Registros de seguridad y del servidor:** hasta 90 días.
 
 ## Transferencias internacionales

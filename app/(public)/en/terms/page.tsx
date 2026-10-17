@@ -720,6 +720,23 @@ export default function EnglishTermsPage() {
       </section>
 
       <section>
+        <h2>15H. Author Photo</h2>
+        <p>
+          If you upload a photo for an author box, you confirm that you hold every right needed to publish
+          it, and that if a person appears in it &mdash; you or someone else &mdash; that person has consented
+          to the photo being published on your site to promote a business, including commercial use. If the
+          person in the photo is a minor, their guardian&rsquo;s consent is required.
+        </p>
+        <p>
+          If that consent is withdrawn, you must remove the photo in the Service. Deleting the photo, or
+          switching to an option with no photo, erases the file from our storage, but a copy already
+          placed in your site&rsquo;s media library is under your control and only you can delete it
+          there. We may remove a photo from the Service if we receive a credible report that it was
+          published without permission.
+        </p>
+      </section>
+
+      <section>
         <h2>16. Privacy</h2>
         <p>
           Use of the Service is also governed by the Company&rsquo;s Privacy Policy, which forms an

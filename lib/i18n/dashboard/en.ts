@@ -447,6 +447,29 @@ export const dashboardEn = {
       mentionHint: 'Recommended. The business is named only where it helps the reader, as a source of practical know-how rather than an ad, and at most 2-3 times. It builds trust with Google and AI assistants. Never in the title, and never with made-up experience or achievements.',
       authorBoxLabel: 'Author box at the end of the article',
       authorBoxHint: 'Added only when your site\'s theme has no author box of its own. It shows the author\'s name, one line from the business description in your settings and a link to your site, nothing made up.',
+      authorBoxPreviewTitle: 'How the box will look',
+      authorBoxPreviewNote: 'Built from the same details the system uses when it publishes. On WordPress, the name is the user new posts are published as.',
+      authorBoxPreviewFailed: 'The preview could not be loaded right now. Your settings are not affected.',
+      authorBoxPreviewWix: 'Wix sites get no author box.',
+      authorBoxPreviewNoName: 'There is no name to show yet: add a business name in your settings, or type an author name below.',
+      authorBoxNameSourceLabel: 'Name taken from:',
+      authorBoxSourceOverride: 'the name you typed below.',
+      authorBoxSourceSiteUser: 'the WordPress user new posts are published as.',
+      authorBoxSourceBusiness: 'your business name.',
+      authorBoxSourceLogin: 'your business name, because the WordPress name "{login}" looks like a username, not a person\'s name.',
+      authorBoxLinkLabel: 'Link goes to:',
+      authorBoxNoLink: 'No link: there is no site address in your settings.',
+      authorBoxNameLabel: 'Author name to show (optional)',
+      authorBoxNameHint: 'Leave empty to use the name picked automatically.',
+      authorBoxUrlLabel: 'Author link (optional)',
+      authorBoxUrlHint: 'A full address starting with http:// or https://. Leave empty to link to your about page, or to your home page if there is none.',
+      authorBoxUrlInvalid: 'Enter a full address that starts with http:// or https://.',
+      authorBoxImageLabel: 'Image in the box',
+      authorBoxImageNone: 'No image',
+      authorBoxImageSiteIcon: 'The site icon',
+      authorBoxImageHint: 'The small icon your WordPress site shows in the browser tab, shown round next to the name.',
+      authorBoxImageMissing: 'Your site has no site icon, so the box will show no image.',
+      authorBoxOverridesUnavailable: 'The name, link and image are not open for editing in your account yet.',
       readOnly: 'These guidelines are not open for editing on your account yet.',
       appliesNext: 'Changes apply to the next articles we write. Articles already written stay as they are.',
       instructionsLabel: 'Standing instructions',
@@ -6016,7 +6039,7 @@ export const dashboardEn = {
       keepRenewal: 'Keep my plan',
       cancelSuccess: 'Subscription renewal was canceled. Your access will remain active until the end of the billing period.',
       cancelError: 'We couldn’t cancel your renewal. Try again in a moment, or write to us and we’ll cancel it for you.',
-      contactToCancel: 'To cancel your renewal, please contact us and we will stop the billing for you.',
+      contactToCancel: 'To cancel your renewal, write to us and we will end your plan for you. If the subscription is billed by another company, we will tell you where the cancellation is done and pass your request on to them.',
       // Bought on an external marketplace: that platform is the seller and
       // holds the payment instrument, so this says where cancelling works
       // rather than offering a cancellation we cannot perform.
@@ -6042,6 +6065,10 @@ export const dashboardEn = {
       disclosure:
         "A card payment is made through Creem (Armitage Labs OÜ), the merchant of record: Creem issues the invoice, adds tax by your billing address, and the charge appears on your statement in Creem's name. The service itself stays ours.",
       buyerTermsLabel: "Creem's buyer terms",
+      // A card subscription is billed by Creem, the merchant of record, so we
+      // cannot stop the charge ourselves. "Contact us and we will stop the
+      // billing" is a promise we cannot keep; this says where cancelling works.
+      cancelNote: 'Creem sells this plan to you and bills it, so the cancellation happens at Creem, from the subscription details Creem sent you when you paid. If that is easier for you, write to us and we will pass the cancellation request on to Creem; the charge itself can only be stopped at Creem. Either way your access stays active until the end of the period you have paid for.',
     },
     shopify: {
       title: 'Billing is managed through Shopify',

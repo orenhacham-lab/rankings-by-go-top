@@ -17,6 +17,7 @@ import BillingClient from './client'
 import CreemCheckoutButton from './CreemCheckoutButton'
 import { INTL_LOCALE } from '@/lib/i18n/locales'
 import { SHOPIFY_APP_STORE_URL } from '@/lib/public-links/shopify-app-store'
+import { CREEM_BUYER_TERMS_URL } from '@/lib/public-links/creem-buyer-terms'
 
 /** The 5 plans this view actually has cards/labels for. */
 type PlanKey = 'trial' | 'regular' | 'advanced' | 'premium' | 'large_agency'
@@ -291,6 +292,23 @@ export default function BillingView({
                       </a>
                     </>
                   )}
+                </p>
+              ) : creemGoverned ? (
+                /* Creem is the merchant of record for a card subscription, so
+                   the charge is not ours to stop. Falling through to "contact
+                   us and we will stop the billing for you" promised exactly
+                   that. */
+                <p className="text-copy text-body">
+                  {t.creem.cancelNote}{' '}
+                  <a
+                    href={CREEM_BUYER_TERMS_URL}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="underline"
+                    data-creem-cancel-terms
+                  >
+                    {t.creem.buyerTermsLabel}
+                  </a>
                 </p>
               ) : hasPaypalSubscriptionId ? (
                 <>

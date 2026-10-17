@@ -312,6 +312,18 @@ check('MUTATION — an English-only extra section is caught', pages.he.terms.h2 
     'www.bingplaces.com': 'a directory named in advice text; not contacted',
     'www.capterra.com': 'a directory named in advice text; not contacted',
     'www.tripadvisor.com': 'a directory named in advice text; not contacted',
+    // The public listings the prospect crawler reads (lib/outreach/topup.ts).
+    // They are FETCHED, unlike the directories above, so they are here on a
+    // different ground: the request is a plain GET for a page already open to
+    // every visitor, and nothing of any customer's travels with it. What the
+    // crawler takes from them is a business name and a website — never an
+    // address, which the published outreach section says comes only from the
+    // business's own site or a public registry.
+    'minnesotagrown.com': 'a public business directory whose open pages are read; no customer data is sent to it',
+    'georgiagrown.com': 'a public business directory whose open pages are read; no customer data is sent to it',
+    'findjerseyfresh.com': 'a public business directory whose open pages are read; no customer data is sent to it',
+    'www.michiganbusiness.org': 'a public business directory whose open pages are read; no customer data is sent to it',
+    'alabamafarmersmarket.org': 'a public business directory whose open pages are read; no customer data is sent to it',
     // Literals that are examples or test shapes even outside __qa__.
     'example.com': 'placeholder in a comment or default',
     'www.example.com': 'placeholder in a comment or default',

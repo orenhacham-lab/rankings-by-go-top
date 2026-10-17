@@ -18,6 +18,10 @@ import {
   type SaveGuidanceResult,
 } from '@/lib/content/writing-guidance/data'
 import { createClient } from '@/lib/supabase/server'
+import { createAdminClient } from '@/lib/supabase/admin'
+import { previewAuthorBox, type AuthorBoxPreviewResult } from '@/lib/content/author-box/preview'
+import { siteUserNameForNewPost } from '@/lib/content/author-box/site-user'
+import { loadDesignPlatform } from '@/lib/content/platform/load-active-platform'
 
 function liveDeps(): GuidanceDeps {
   return {
@@ -55,5 +59,24 @@ export async function addWritingRuleAction(articleId: string, text: string): Pro
   } catch (err) {
     console.error('[writing-guidance] add rule failed', { error: errorName(err) })
     return { ok: false, code: 'save_failed' }
+  }
+}
+
+/**
+ * The author box as it will be published: the inputs read by the publisher's
+ * own reader (lib/content/author-box/preview.ts), after the project was proven
+ * the signed-in owner's. The service role only after that check.
+ */
+export async function previewAuthorBoxAction(projectId: string): Promise<AuthorBoxPreviewResult> {
+  try {
+    return await previewAuthorBox({
+      session: liveDeps().session,
+      admin: () => createAdminClient(),
+      platform: (admin, id) => loadDesignPlatform(admin as ReturnType<typeof createAdminClient>, id),
+      siteUserName: siteUserNameForNewPost,
+    }, projectId)
+  } catch (err) {
+    console.error('[writing-guidance] author box preview failed', { error: errorName(err) })
+    return { ok: false, code: 'unavailable' }
   }
 }

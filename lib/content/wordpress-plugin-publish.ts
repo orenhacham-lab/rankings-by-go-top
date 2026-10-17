@@ -125,6 +125,24 @@ export async function hasPublishPlugin(admin: Admin, projectId: string, ownerId?
   return !!(await loadPublishPlugin(admin, projectId, { ownerId }))
 }
 
+/**
+ * The display name the plugin publishes a post as: the chosen author (author_id), else the
+ * plugin's default, from its signed /authors list. Null when the plugin cannot list authors or
+ * does not answer. Also what the settings card's author-box preview shows for a new post
+ * (lib/content/author-box/preview.ts), so the two never disagree.
+ */
+export async function pluginPublishingUserName(link: PluginLink, version: string, authorId?: number | null, post?: PluginPost): Promise<string | null> {
+  try {
+    if (!pluginCan(version, 'authors')) return null
+    const authors = await pluginAuthors(link, post)
+    if (!authors.ok) return null
+    const id = typeof authorId === 'number' ? authorId : authors.body.default
+    return authors.body.items.find((a) => a.id === id)?.name ?? null
+  } catch {
+    return null
+  }
+}
+
 // ── Values the plugin accepts (fixes.php gotop_seo_bridge_text_ok: no < >, length bounds) ─────
 
 /** Plain text for the plugin: no "<" or ">", whitespace collapsed, at most `max` characters. */
@@ -244,13 +262,7 @@ export async function pluginCreatePost(
   // The author box's name, when one is added: the user the plugin publishes the post as
   // (author_id, else the plugin's default), from its signed /authors list.
   content = await applyArticleDesign(admin, articleId, content, 'wordpress', {
-    authorName: async () => {
-      if (!pluginCan(plugin.version, 'authors')) return null
-      const authors = await pluginAuthors(link, deps.post)
-      if (!authors.ok) return null
-      const id = typeof opts.authorId === 'number' ? opts.authorId : authors.body.default
-      return authors.body.items.find((a) => a.id === id)?.name ?? null
-    },
+    authorName: () => pluginPublishingUserName(link, plugin.version, opts.authorId, deps.post),
   })
 
   let taxonomy: ResolvedTaxonomy | undefined

@@ -218,6 +218,12 @@ El Servicio utiliza IA para producir temas de artículos, preguntas, artículos 
 - **Correos de puesta en marcha.** Hasta dos correos sobre un proyecto sin sitio conectado, o con uno conectado y nada publicado, que explican cómo completar el paso. Sin oferta y sin precio, con un enlace de baja que detiene solo esos correos.
 - **Resumen semanal de progreso.** Un resumen del progreso del proyecto, para los proyectos en los que usted lo activó en la configuración, los domingos por la mañana y solo cuando hay algo que contar. Una semana en la que no pasó nada no recibe correo.
 
+## 15H. Foto del autor
+
+Si sube una foto para una caja de autor, usted confirma que dispone de todos los derechos necesarios para publicarla y que, si en ella aparece una persona — usted u otra —, esa persona ha consentido que la foto se publique en su sitio para promocionar un negocio, incluido el uso comercial. Si la persona que aparece en la foto es menor de edad, se requiere el consentimiento de su tutor.
+
+Si ese consentimiento se retira, usted debe eliminar la foto en el Servicio. Al eliminar la foto, o al pasar a una opción sin foto, se borra el archivo de nuestro almacenamiento, pero una copia que ya se haya colocado en la biblioteca de medios de su sitio está bajo su control y solo usted puede eliminarla allí. Podemos retirar una foto del Servicio si recibimos un aviso fundado de que se publicó sin autorización.
+
 ## 16. Privacidad
 
 El uso del Servicio también se rige por la Política de Privacidad de la Empresa, que forma parte integrante de estos términos. Cuando se publique en el sitio web una política de privacidad independiente, deberá leerse conjuntamente con estos términos.

@@ -218,6 +218,12 @@ O Serviço usa IA para produzir temas de artigos, perguntas, artigos e imagens. 
 - **E-mails de início.** Até dois e-mails sobre um projeto sem site conectado, ou com um conectado e nada publicado, explicando como concluir a etapa. Sem oferta e sem preço, com um link de cancelamento que interrompe somente esses e-mails.
 - **Resumo semanal de progresso.** Um resumo do progresso do projeto, para os projetos em que você o ativou nas configurações, no domingo pela manhã e somente quando há algo a contar. Uma semana em que nada aconteceu não recebe e-mail.
 
+## 15H. Foto do autor
+
+Se você enviar uma foto para uma caixa de autor, declara que possui todos os direitos necessários para publicá-la e que, se nela aparecer uma pessoa — você ou outra —, essa pessoa consentiu com a publicação da foto no seu site para divulgar um negócio, inclusive com uso comercial. Se a pessoa retratada for menor de idade, é necessário o consentimento do responsável por ela.
+
+Se esse consentimento for retirado, você deve remover a foto no Serviço. Apagar a foto, ou passar para uma opção sem foto, exclui o arquivo do nosso armazenamento, mas uma cópia já colocada na biblioteca de mídia do seu site está sob o seu controle e somente você pode excluí-la de lá. Podemos remover uma foto do Serviço se recebermos um aviso consistente de que ela foi publicada sem autorização.
+
 ## 16. Privacidade
 
 O uso do Serviço também é regido pela Política de Privacidade da Empresa, que é parte integrante destes termos. Quando uma política de privacidade separada é publicada no site, ela deve ser lida em conjunto com estes termos.
