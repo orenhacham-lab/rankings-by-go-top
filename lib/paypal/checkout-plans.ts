@@ -14,8 +14,10 @@
  */
 
 import type { PlanCode } from '@/lib/plans/catalog'
+import { PLAN_CODES } from '@/lib/plans/catalog'
+import type { BillingMarket } from '@/lib/billing/market'
 
-export type BillingMarket = 'ILS' | 'USD'
+export type { BillingMarket } from '@/lib/billing/market'
 
 export interface CheckoutPlanResolution {
   market: BillingMarket
@@ -25,51 +27,52 @@ export interface CheckoutPlanResolution {
   plans: Record<PlanCode, string | null>
 }
 
-function envPlanId(market: BillingMarket, code: PlanCode): string | undefined {
-  const suffix = code.toUpperCase()
-  const name = `NEXT_PUBLIC_PAYPAL_PLAN_ID_${market}_${suffix}`
-  // process.env.X must be a static, literal property access for Next.js to
-  // inline NEXT_PUBLIC_* vars at build time — a computed/dynamic key (as
-  // used above for logging only) would NOT be inlined and would always read
-  // undefined in the browser bundle. The explicit switch below is what
-  // actually resolves the value; `name` exists only for diagnostics.
-  void name
-  switch (market) {
-    case 'ILS':
-      switch (code) {
-        case 'regular': return process.env.NEXT_PUBLIC_PAYPAL_PLAN_ID_ILS_REGULAR
-        case 'advanced': return process.env.NEXT_PUBLIC_PAYPAL_PLAN_ID_ILS_ADVANCED
-        case 'premium': return process.env.NEXT_PUBLIC_PAYPAL_PLAN_ID_ILS_PREMIUM
-        case 'large_agency': return process.env.NEXT_PUBLIC_PAYPAL_PLAN_ID_ILS_LARGE_AGENCY
-      }
-      break
-    case 'USD':
-      switch (code) {
-        case 'regular': return process.env.NEXT_PUBLIC_PAYPAL_PLAN_ID_USD_REGULAR
-        case 'advanced': return process.env.NEXT_PUBLIC_PAYPAL_PLAN_ID_USD_ADVANCED
-        case 'premium': return process.env.NEXT_PUBLIC_PAYPAL_PLAN_ID_USD_PREMIUM
-        case 'large_agency': return process.env.NEXT_PUBLIC_PAYPAL_PLAN_ID_USD_LARGE_AGENCY
-      }
-      break
+/**
+ * The market-specific PayPal plan ids, as DATA (w17): one row per billing
+ * market, typed by BillingMarket so a new market (e.g. EUR) cannot be added
+ * without its row. Built in a function so each call reads the env afresh.
+ *
+ * process.env.X must be a static, literal property access for Next.js to
+ * inline NEXT_PUBLIC_* vars at build time — a computed/dynamic key would NOT
+ * be inlined and would always read undefined in the browser bundle. Hence
+ * the literal accesses below. The legacy bare vars are deliberately absent.
+ */
+function checkoutPlanIdTable(): Record<BillingMarket, Record<PlanCode, string | undefined>> {
+  return {
+    ILS: {
+      regular: process.env.NEXT_PUBLIC_PAYPAL_PLAN_ID_ILS_REGULAR,
+      advanced: process.env.NEXT_PUBLIC_PAYPAL_PLAN_ID_ILS_ADVANCED,
+      premium: process.env.NEXT_PUBLIC_PAYPAL_PLAN_ID_ILS_PREMIUM,
+      large_agency: process.env.NEXT_PUBLIC_PAYPAL_PLAN_ID_ILS_LARGE_AGENCY,
+    },
+    USD: {
+      regular: process.env.NEXT_PUBLIC_PAYPAL_PLAN_ID_USD_REGULAR,
+      advanced: process.env.NEXT_PUBLIC_PAYPAL_PLAN_ID_USD_ADVANCED,
+      premium: process.env.NEXT_PUBLIC_PAYPAL_PLAN_ID_USD_PREMIUM,
+      large_agency: process.env.NEXT_PUBLIC_PAYPAL_PLAN_ID_USD_LARGE_AGENCY,
+    },
   }
-  return undefined
 }
 
 /** Resolve the 4 checkout plan IDs for ONE billing market. Never reads the
  *  legacy bare env vars, never falls back across markets. */
 export function resolveCheckoutPlans(market: BillingMarket): CheckoutPlanResolution {
-  const codes: PlanCode[] = ['regular', 'advanced', 'premium', 'large_agency']
+  const row = checkoutPlanIdTable()[market]
   const plans = {} as Record<PlanCode, string | null>
-  for (const code of codes) {
-    plans[code] = envPlanId(market, code) || null
+  for (const code of PLAN_CODES) {
+    plans[code] = row?.[code] || null
   }
   return { market, plans }
 }
 
-/** Hebrew site routes -> ILS; /en routes -> USD; this maps the persisted
- *  billing-market signal (never a mutable UI toggle) to a market. */
-export function billingMarketFromLocale(locale: string | null | undefined): BillingMarket | null {
-  if (locale === 'he') return 'ILS'
-  if (locale === 'en') return 'USD'
+/** Which market a PayPal plan id belongs to (w17: the currency PayPal really
+ *  charges, recorded as the account's market at the first checkout). A
+ *  legacy bare plan id, or an unknown one, belongs to no market: null. */
+export function marketForPayPalPlanId(planId: string | null | undefined): BillingMarket | null {
+  if (!planId) return null
+  const table = checkoutPlanIdTable()
+  for (const market of Object.keys(table) as BillingMarket[]) {
+    if (Object.values(table[market]).some((id) => !!id && id === planId)) return market
+  }
   return null
 }

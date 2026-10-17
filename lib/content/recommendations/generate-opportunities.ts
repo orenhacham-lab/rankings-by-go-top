@@ -17,7 +17,8 @@
  */
 
 import type { createAdminClient } from '@/lib/supabase/admin'
-import { getCachedIndex, reassembleReport } from '@/lib/content/wordpress-content-index'
+import { reassembleReport } from '@/lib/content/wordpress-content-index'
+import { getContentIndex } from '@/lib/content/content-index'
 import type { ScannedTarget } from '@/lib/content/wordpress-content-scan'
 import { buildKeywordGuard } from './keyword-guard'
 import { buildEvidenceClustersWithDiag, rankClusters, selectClustersWithinBudget, clustersForTier, flattenKeywordResearchCache, contentTokens, type EvidenceInput, type EntityNode } from './evidence-cluster'
@@ -34,6 +35,7 @@ import { slugKey } from './dedupe'
 import { normalizeText } from './topic-idea-store'
 import type { RunCostController } from './run-cost-controller'
 import type { TopicSuggestion } from './types'
+import { languageNameInEnglish, normalizeContentLanguage } from '@/lib/content/language'
 
 type Admin = ReturnType<typeof createAdminClient>
 
@@ -123,8 +125,8 @@ export async function generateOpportunities(
   // 1) Load evidence.
   const { data: proj } = await admin.from('projects').select('business_name, target_domain, language, country').eq('id', input.projectId).maybeSingle()
   const p = (proj as { business_name: string | null; target_domain: string | null; language: string | null } | null) ?? { business_name: null, target_domain: null, language: null }
-  const language: 'he' | 'en' = String(p.language || '').toLowerCase().startsWith('en') ? 'en' : 'he'
-  const langLabel = language === 'he' ? 'Hebrew' : 'English'
+  const language = normalizeContentLanguage(p.language)
+  const langLabel = languageNameInEnglish(language)
 
   const guard = await buildKeywordGuard(admin, input.projectId)
 
@@ -144,7 +146,7 @@ export async function generateOpportunities(
   const entities: EntityNode[] = []
   let siteScanEntities = 0
   try {
-    const cacheRow = await getCachedIndex(admin, input.projectId)
+    const cacheRow = await getContentIndex(input.projectId, null, admin)
     const targets = cacheRow ? ((reassembleReport(cacheRow).targets ?? []) as ScannedTarget[]) : []
     for (const t of targets) if (t.targetTitle) { entities.push({ name: t.targetTitle, url: t.targetUrl, type: PAGE_TYPE(t.targetType) }); siteScanEntities++ }
   } catch { /* optional */ }

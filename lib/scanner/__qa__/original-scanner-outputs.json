@@ -1,0 +1,832 @@
+{
+ "N1": {
+  "result": {
+   "found": true,
+   "position": 2,
+   "resultUrl": "https://www.shoes-il.co.il/running",
+   "resultTitle": "נעלי ריצה | Shoes IL",
+   "resultAddress": null,
+   "error": null
+  },
+  "calls": 2,
+  "bodies": [
+   {
+    "q": "נעלי ריצה תל אביב",
+    "gl": "il",
+    "hl": "he",
+    "type": "search",
+    "device": "desktop",
+    "location": "Tel Aviv",
+    "num": 10,
+    "page": 1
+   },
+   {
+    "q": "נעלי ריצה תל אביב",
+    "gl": "il",
+    "hl": "he",
+    "type": "search",
+    "device": "desktop",
+    "location": "Tel Aviv",
+    "num": 10,
+    "page": 2
+   }
+  ]
+ },
+ "N2": {
+  "result": {
+   "found": false,
+   "position": null,
+   "resultUrl": null,
+   "resultTitle": null,
+   "resultAddress": null,
+   "error": null
+  },
+  "calls": 2,
+  "bodies": [
+   {
+    "q": "נעלי ריצה תל אביב",
+    "gl": "il",
+    "hl": "he",
+    "type": "search",
+    "device": "desktop",
+    "location": "Tel Aviv",
+    "num": 10,
+    "page": 1
+   },
+   {
+    "q": "נעלי ריצה תל אביב",
+    "gl": "il",
+    "hl": "he",
+    "type": "search",
+    "device": "desktop",
+    "location": "Tel Aviv",
+    "num": 10,
+    "page": 2
+   }
+  ]
+ },
+ "N3": {
+  "result": {
+   "found": true,
+   "position": 2,
+   "resultUrl": "https://www.shoes-il.co.il/running",
+   "resultTitle": "נעלי ריצה | Shoes IL",
+   "resultAddress": null,
+   "error": null
+  },
+  "calls": 2,
+  "bodies": [
+   {
+    "q": "נעלי ריצה תל אביב",
+    "gl": "il",
+    "hl": "he",
+    "type": "search",
+    "device": "desktop",
+    "location": "Tel Aviv",
+    "num": 10,
+    "page": 1
+   },
+   {
+    "q": "נעלי ריצה תל אביב",
+    "gl": "il",
+    "hl": "he",
+    "type": "search",
+    "device": "desktop",
+    "location": "Tel Aviv",
+    "num": 10,
+    "page": 2
+   }
+  ]
+ },
+ "N4": {
+  "result": {
+   "found": false,
+   "position": null,
+   "resultUrl": null,
+   "resultTitle": null,
+   "resultAddress": null,
+   "error": "Serper API error: 500 Internal Server Error — upstream exploded: secret-provider-detail"
+  },
+  "calls": 2,
+  "bodies": [
+   {
+    "q": "נעלי ריצה תל אביב",
+    "gl": "il",
+    "hl": "he",
+    "type": "search",
+    "device": "desktop",
+    "location": "Tel Aviv",
+    "num": 10,
+    "page": 1
+   },
+   {
+    "q": "נעלי ריצה תל אביב",
+    "gl": "il",
+    "hl": "he",
+    "type": "search",
+    "device": "desktop",
+    "location": "Tel Aviv",
+    "num": 10,
+    "page": 2
+   }
+  ]
+ },
+ "N5": {
+  "result": {
+   "found": false,
+   "position": null,
+   "resultUrl": null,
+   "resultTitle": null,
+   "resultAddress": null,
+   "error": null
+  },
+  "calls": 2,
+  "bodies": [
+   {
+    "q": "נעלי ריצה תל אביב",
+    "gl": "il",
+    "hl": "he",
+    "type": "search",
+    "device": "desktop",
+    "location": "Tel Aviv",
+    "num": 10,
+    "page": 1
+   },
+   {
+    "q": "נעלי ריצה תל אביב",
+    "gl": "il",
+    "hl": "he",
+    "type": "search",
+    "device": "desktop",
+    "location": "Tel Aviv",
+    "num": 10,
+    "page": 2
+   }
+  ]
+ },
+ "N6": {
+  "result": {
+   "found": true,
+   "position": 12,
+   "resultUrl": "https://shop.competitor-c.com/running",
+   "resultTitle": "Competitor C shop",
+   "resultAddress": null,
+   "error": null
+  },
+  "calls": 2,
+  "bodies": [
+   {
+    "q": "נעלי ריצה תל אביב",
+    "gl": "il",
+    "hl": "he",
+    "type": "search",
+    "device": "desktop",
+    "ll": "@32.08,34.78,13z",
+    "num": 10,
+    "page": 1
+   },
+   {
+    "q": "נעלי ריצה תל אביב",
+    "gl": "il",
+    "hl": "he",
+    "type": "search",
+    "device": "desktop",
+    "ll": "@32.08,34.78,13z",
+    "num": 10,
+    "page": 2
+   }
+  ]
+ },
+ "N7": {
+  "result": {
+   "found": true,
+   "position": 13,
+   "resultUrl": "https://www.aggregator.co.il/best-running-shoes",
+   "resultTitle": "השוואת נעלי ריצה",
+   "resultAddress": null,
+   "error": null
+  },
+  "calls": 2,
+  "bodies": [
+   {
+    "q": "נעלי ריצה תל אביב",
+    "gl": "il",
+    "hl": "he",
+    "type": "search",
+    "device": "desktop",
+    "location": "Tel Aviv",
+    "num": 10,
+    "page": 1
+   },
+   {
+    "q": "נעלי ריצה תל אביב",
+    "gl": "il",
+    "hl": "he",
+    "type": "search",
+    "device": "desktop",
+    "location": "Tel Aviv",
+    "num": 10,
+    "page": 2
+   }
+  ]
+ },
+ "N8": {
+  "result": {
+   "found": true,
+   "position": 4,
+   "resultUrl": "https://www.google.com/url?q=https%3A%2F%2Fwww.competitor-b.co.il%2Fsale&sa=U&ved=2ah",
+   "resultTitle": "מבצע נעלי ריצה",
+   "resultAddress": null,
+   "error": null
+  },
+  "calls": 2,
+  "bodies": [
+   {
+    "q": "נעלי ריצה תל אביב",
+    "gl": "il",
+    "hl": "he",
+    "type": "search",
+    "device": "desktop",
+    "location": "Haifa",
+    "num": 10,
+    "page": 1
+   },
+   {
+    "q": "נעלי ריצה תל אביב",
+    "gl": "il",
+    "hl": "he",
+    "type": "search",
+    "device": "desktop",
+    "location": "Haifa",
+    "num": 10,
+    "page": 2
+   }
+  ]
+ },
+ "R1": {
+  "result": {
+   "found": true,
+   "position": 6,
+   "resultUrl": null,
+   "resultTitle": "Shoes IL east",
+   "resultAddress": null,
+   "error": null,
+   "radiusScanMetadata": {
+    "centerZip": "93313",
+    "centerLat": 35.32,
+    "centerLng": -119.08,
+    "radiusMiles": 5,
+    "pointsScanned": 9,
+    "successfulScans": 3,
+    "radiusAttempts": [
+     {
+      "direction": "center",
+      "label": "Center (ZIP 93313)",
+      "lat": 35.32,
+      "lng": -119.08,
+      "distanceMiles": 0,
+      "found": true,
+      "position": 9
+     },
+     {
+      "direction": "north",
+      "label": "North",
+      "lat": 35.392463768115945,
+      "lng": -119.08,
+      "distanceMiles": 5,
+      "found": true,
+      "position": 12
+     },
+     {
+      "direction": "south",
+      "label": "South",
+      "lat": 35.247536231884055,
+      "lng": -119.08,
+      "distanceMiles": 5,
+      "found": false,
+      "position": null
+     },
+     {
+      "direction": "east",
+      "label": "East",
+      "lat": 35.32,
+      "lng": -118.99118937856178,
+      "distanceMiles": 5,
+      "found": true,
+      "position": 6
+     },
+     {
+      "direction": "west",
+      "label": "West",
+      "lat": 35.32,
+      "lng": -119.16881062143821,
+      "distanceMiles": 5,
+      "found": false,
+      "position": null
+     },
+     {
+      "direction": "northeast",
+      "label": "Northeast",
+      "lat": 35.37072463768116,
+      "lng": -119.01783256499324,
+      "distanceMiles": 3.5,
+      "found": false,
+      "position": null
+     },
+     {
+      "direction": "northwest",
+      "label": "Northwest",
+      "lat": 35.37072463768116,
+      "lng": -119.14216743500675,
+      "distanceMiles": 3.5,
+      "found": false,
+      "position": null
+     },
+     {
+      "direction": "southeast",
+      "label": "Southeast",
+      "lat": 35.269275362318844,
+      "lng": -119.01783256499324,
+      "distanceMiles": 3.5,
+      "found": false,
+      "position": null
+     },
+     {
+      "direction": "southwest",
+      "label": "Southwest",
+      "lat": 35.269275362318844,
+      "lng": -119.14216743500675,
+      "distanceMiles": 3.5,
+      "found": false,
+      "position": null
+     }
+    ],
+    "bestMatch": {
+     "direction": "east",
+     "label": "East",
+     "position": 6
+    }
+   }
+  },
+  "calls": 9,
+  "bodies": [
+   {
+    "q": "נעלי ריצה תל אביב",
+    "gl": "us",
+    "hl": "en",
+    "type": "search",
+    "num": 100,
+    "device": "desktop",
+    "ll": "@35.32,-119.08,13z"
+   },
+   {
+    "q": "נעלי ריצה תל אביב",
+    "gl": "us",
+    "hl": "en",
+    "type": "search",
+    "num": 100,
+    "device": "desktop",
+    "ll": "@35.392463768115945,-119.08,13z"
+   },
+   {
+    "q": "נעלי ריצה תל אביב",
+    "gl": "us",
+    "hl": "en",
+    "type": "search",
+    "num": 100,
+    "device": "desktop",
+    "ll": "@35.247536231884055,-119.08,13z"
+   },
+   {
+    "q": "נעלי ריצה תל אביב",
+    "gl": "us",
+    "hl": "en",
+    "type": "search",
+    "num": 100,
+    "device": "desktop",
+    "ll": "@35.32,-118.99118937856178,13z"
+   },
+   {
+    "q": "נעלי ריצה תל אביב",
+    "gl": "us",
+    "hl": "en",
+    "type": "search",
+    "num": 100,
+    "device": "desktop",
+    "ll": "@35.32,-119.16881062143821,13z"
+   },
+   {
+    "q": "נעלי ריצה תל אביב",
+    "gl": "us",
+    "hl": "en",
+    "type": "search",
+    "num": 100,
+    "device": "desktop",
+    "ll": "@35.37072463768116,-119.01783256499324,13z"
+   },
+   {
+    "q": "נעלי ריצה תל אביב",
+    "gl": "us",
+    "hl": "en",
+    "type": "search",
+    "num": 100,
+    "device": "desktop",
+    "ll": "@35.37072463768116,-119.14216743500675,13z"
+   },
+   {
+    "q": "נעלי ריצה תל אביב",
+    "gl": "us",
+    "hl": "en",
+    "type": "search",
+    "num": 100,
+    "device": "desktop",
+    "ll": "@35.269275362318844,-119.01783256499324,13z"
+   },
+   {
+    "q": "נעלי ריצה תל אביב",
+    "gl": "us",
+    "hl": "en",
+    "type": "search",
+    "num": 100,
+    "device": "desktop",
+    "ll": "@35.269275362318844,-119.14216743500675,13z"
+   }
+  ]
+ },
+ "R2": {
+  "result": {
+   "found": false,
+   "position": null,
+   "resultUrl": null,
+   "resultTitle": null,
+   "resultAddress": null,
+   "error": null,
+   "radiusScanMetadata": {
+    "centerZip": "93313",
+    "centerLat": 35.32,
+    "centerLng": -119.08,
+    "radiusMiles": 5,
+    "pointsScanned": 9,
+    "successfulScans": 0,
+    "radiusAttempts": [
+     {
+      "direction": "center",
+      "label": "Center (ZIP 93313)",
+      "lat": 35.32,
+      "lng": -119.08,
+      "distanceMiles": 0,
+      "found": false,
+      "position": null
+     },
+     {
+      "direction": "north",
+      "label": "North",
+      "lat": 35.392463768115945,
+      "lng": -119.08,
+      "distanceMiles": 5,
+      "found": false,
+      "position": null
+     },
+     {
+      "direction": "south",
+      "label": "South",
+      "lat": 35.247536231884055,
+      "lng": -119.08,
+      "distanceMiles": 5,
+      "found": false,
+      "position": null
+     },
+     {
+      "direction": "east",
+      "label": "East",
+      "lat": 35.32,
+      "lng": -118.99118937856178,
+      "distanceMiles": 5,
+      "found": false,
+      "position": null
+     },
+     {
+      "direction": "west",
+      "label": "West",
+      "lat": 35.32,
+      "lng": -119.16881062143821,
+      "distanceMiles": 5,
+      "found": false,
+      "position": null
+     },
+     {
+      "direction": "northeast",
+      "label": "Northeast",
+      "lat": 35.37072463768116,
+      "lng": -119.01783256499324,
+      "distanceMiles": 3.5,
+      "found": false,
+      "position": null
+     },
+     {
+      "direction": "northwest",
+      "label": "Northwest",
+      "lat": 35.37072463768116,
+      "lng": -119.14216743500675,
+      "distanceMiles": 3.5,
+      "found": false,
+      "position": null
+     },
+     {
+      "direction": "southeast",
+      "label": "Southeast",
+      "lat": 35.269275362318844,
+      "lng": -119.01783256499324,
+      "distanceMiles": 3.5,
+      "found": false,
+      "position": null
+     },
+     {
+      "direction": "southwest",
+      "label": "Southwest",
+      "lat": 35.269275362318844,
+      "lng": -119.14216743500675,
+      "distanceMiles": 3.5,
+      "found": false,
+      "position": null
+     }
+    ],
+    "bestMatch": null
+   }
+  },
+  "calls": 9,
+  "bodies": [
+   {
+    "q": "נעלי ריצה תל אביב",
+    "gl": "us",
+    "hl": "en",
+    "type": "search",
+    "num": 100,
+    "device": "desktop",
+    "ll": "@35.32,-119.08,13z"
+   },
+   {
+    "q": "נעלי ריצה תל אביב",
+    "gl": "us",
+    "hl": "en",
+    "type": "search",
+    "num": 100,
+    "device": "desktop",
+    "ll": "@35.392463768115945,-119.08,13z"
+   },
+   {
+    "q": "נעלי ריצה תל אביב",
+    "gl": "us",
+    "hl": "en",
+    "type": "search",
+    "num": 100,
+    "device": "desktop",
+    "ll": "@35.247536231884055,-119.08,13z"
+   },
+   {
+    "q": "נעלי ריצה תל אביב",
+    "gl": "us",
+    "hl": "en",
+    "type": "search",
+    "num": 100,
+    "device": "desktop",
+    "ll": "@35.32,-118.99118937856178,13z"
+   },
+   {
+    "q": "נעלי ריצה תל אביב",
+    "gl": "us",
+    "hl": "en",
+    "type": "search",
+    "num": 100,
+    "device": "desktop",
+    "ll": "@35.32,-119.16881062143821,13z"
+   },
+   {
+    "q": "נעלי ריצה תל אביב",
+    "gl": "us",
+    "hl": "en",
+    "type": "search",
+    "num": 100,
+    "device": "desktop",
+    "ll": "@35.37072463768116,-119.01783256499324,13z"
+   },
+   {
+    "q": "נעלי ריצה תל אביב",
+    "gl": "us",
+    "hl": "en",
+    "type": "search",
+    "num": 100,
+    "device": "desktop",
+    "ll": "@35.37072463768116,-119.14216743500675,13z"
+   },
+   {
+    "q": "נעלי ריצה תל אביב",
+    "gl": "us",
+    "hl": "en",
+    "type": "search",
+    "num": 100,
+    "device": "desktop",
+    "ll": "@35.269275362318844,-119.01783256499324,13z"
+   },
+   {
+    "q": "נעלי ריצה תל אביב",
+    "gl": "us",
+    "hl": "en",
+    "type": "search",
+    "num": 100,
+    "device": "desktop",
+    "ll": "@35.269275362318844,-119.14216743500675,13z"
+   }
+  ]
+ },
+ "R3": {
+  "result": {
+   "found": true,
+   "position": 2,
+   "resultUrl": null,
+   "resultTitle": "hit https://rival-shoes.com/north",
+   "resultAddress": null,
+   "error": null,
+   "radiusScanMetadata": {
+    "centerZip": "93313",
+    "centerLat": 35.32,
+    "centerLng": -119.08,
+    "radiusMiles": 5,
+    "pointsScanned": 9,
+    "successfulScans": 3,
+    "radiusAttempts": [
+     {
+      "direction": "center",
+      "label": "Center (ZIP 93313)",
+      "lat": 35.32,
+      "lng": -119.08,
+      "distanceMiles": 0,
+      "found": true,
+      "position": 4
+     },
+     {
+      "direction": "north",
+      "label": "North",
+      "lat": 35.392463768115945,
+      "lng": -119.08,
+      "distanceMiles": 5,
+      "found": true,
+      "position": 2
+     },
+     {
+      "direction": "south",
+      "label": "South",
+      "lat": 35.247536231884055,
+      "lng": -119.08,
+      "distanceMiles": 5,
+      "found": false,
+      "position": null
+     },
+     {
+      "direction": "east",
+      "label": "East",
+      "lat": 35.32,
+      "lng": -118.99118937856178,
+      "distanceMiles": 5,
+      "found": false,
+      "position": null
+     },
+     {
+      "direction": "west",
+      "label": "West",
+      "lat": 35.32,
+      "lng": -119.16881062143821,
+      "distanceMiles": 5,
+      "found": false,
+      "position": null
+     },
+     {
+      "direction": "northeast",
+      "label": "Northeast",
+      "lat": 35.37072463768116,
+      "lng": -119.01783256499324,
+      "distanceMiles": 3.5,
+      "found": true,
+      "position": 7
+     },
+     {
+      "direction": "northwest",
+      "label": "Northwest",
+      "lat": 35.37072463768116,
+      "lng": -119.14216743500675,
+      "distanceMiles": 3.5,
+      "found": false,
+      "position": null
+     },
+     {
+      "direction": "southeast",
+      "label": "Southeast",
+      "lat": 35.269275362318844,
+      "lng": -119.01783256499324,
+      "distanceMiles": 3.5,
+      "found": false,
+      "position": null
+     },
+     {
+      "direction": "southwest",
+      "label": "Southwest",
+      "lat": 35.269275362318844,
+      "lng": -119.14216743500675,
+      "distanceMiles": 3.5,
+      "found": false,
+      "position": null
+     }
+    ],
+    "bestMatch": {
+     "direction": "north",
+     "label": "North",
+     "position": 2
+    }
+   }
+  },
+  "calls": 9,
+  "bodies": [
+   {
+    "q": "נעלי ריצה תל אביב",
+    "gl": "us",
+    "hl": "en",
+    "type": "search",
+    "num": 100,
+    "device": "desktop",
+    "ll": "@35.32,-119.08,13z"
+   },
+   {
+    "q": "נעלי ריצה תל אביב",
+    "gl": "us",
+    "hl": "en",
+    "type": "search",
+    "num": 100,
+    "device": "desktop",
+    "ll": "@35.392463768115945,-119.08,13z"
+   },
+   {
+    "q": "נעלי ריצה תל אביב",
+    "gl": "us",
+    "hl": "en",
+    "type": "search",
+    "num": 100,
+    "device": "desktop",
+    "ll": "@35.247536231884055,-119.08,13z"
+   },
+   {
+    "q": "נעלי ריצה תל אביב",
+    "gl": "us",
+    "hl": "en",
+    "type": "search",
+    "num": 100,
+    "device": "desktop",
+    "ll": "@35.32,-118.99118937856178,13z"
+   },
+   {
+    "q": "נעלי ריצה תל אביב",
+    "gl": "us",
+    "hl": "en",
+    "type": "search",
+    "num": 100,
+    "device": "desktop",
+    "ll": "@35.32,-119.16881062143821,13z"
+   },
+   {
+    "q": "נעלי ריצה תל אביב",
+    "gl": "us",
+    "hl": "en",
+    "type": "search",
+    "num": 100,
+    "device": "desktop",
+    "ll": "@35.37072463768116,-119.01783256499324,13z"
+   },
+   {
+    "q": "נעלי ריצה תל אביב",
+    "gl": "us",
+    "hl": "en",
+    "type": "search",
+    "num": 100,
+    "device": "desktop",
+    "ll": "@35.37072463768116,-119.14216743500675,13z"
+   },
+   {
+    "q": "נעלי ריצה תל אביב",
+    "gl": "us",
+    "hl": "en",
+    "type": "search",
+    "num": 100,
+    "device": "desktop",
+    "ll": "@35.269275362318844,-119.01783256499324,13z"
+   },
+   {
+    "q": "נעלי ריצה תל אביב",
+    "gl": "us",
+    "hl": "en",
+    "type": "search",
+    "num": 100,
+    "device": "desktop",
+    "ll": "@35.269275362318844,-119.14216743500675,13z"
+   }
+  ]
+ }
+}

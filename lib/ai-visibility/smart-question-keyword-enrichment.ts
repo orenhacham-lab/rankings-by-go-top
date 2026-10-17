@@ -25,6 +25,7 @@ import { generateKeywordResearchQuestions } from './keyword-research-question-ge
 import type { PromptSuggestion } from './prompt-templates'
 import type { BusinessCategory, PromptIntent } from './prompt-templates'
 import type { KeywordType, KeywordTopic } from './keyword-analysis'
+import type { PromptLanguage } from './prompt-templates'
 
 // ============================================================================
 // OUTPUT TYPES
@@ -270,7 +271,11 @@ function isNonPriceableBusinessEntity(text: string, language: 'he' | 'en'): bool
  *   - "כמה עולה חברת SEO?" (company price — not priceable)
  *   - "How much does a company cost?" (company price — not priceable)
  */
-export function isInvalidPriceQuestion(prompt: string, language: 'he' | 'en'): boolean {
+export function isInvalidPriceQuestion(prompt: string, language: PromptLanguage): boolean {
+  // Spanish asks the price with its own words, and the Spanish entity and
+  // service lists below are its own too; without them a Spanish question would
+  // match neither branch and this filter would never fire.
+  if (language === 'es') return isInvalidPriceQuestionEs(prompt)
   // Only check price questions
   const isPriceQuestion =
     language === 'he'
@@ -318,6 +323,27 @@ export function isInvalidPriceQuestion(prompt: string, language: 'he' | 'en'): b
 
   // Business-type-first patterns like "cleaning company" are invalid
   return true
+}
+
+/**
+ * The Spanish half of `isInvalidPriceQuestion`: a price question about a
+ * BUSINESS ("¿cuánto cuesta una empresa de limpieza?") is not answerable, while
+ * one about the SERVICE it sells ("¿cuánto cuesta la limpieza de oficinas?") is.
+ */
+function isInvalidPriceQuestionEs(prompt: string): boolean {
+  const text = normalizePrompt(prompt)
+  if (!/(cu[áa]nto\s+(cuesta|vale|cuestan|valen)|precio\s+de)/i.test(text)) return false
+  const businessType = /(empresa|compa[ñn][íi]a|agencia|despacho|tienda|negocio|marca|proveedor|web|sitio|categor[íi]a)/i
+  const service = /(limpieza|reforma|reparaci[óo]n|arreglo|asesor[íi]a|consultor[íi]a|publicidad|servicio|instalaci[óo]n|env[íi]o|mudanza)/i
+  if (!businessType.test(text)) return false
+  if (!service.test(text)) return true
+  // Both appear: valid only when the SERVICE is what is being priced, i.e. it
+  // comes first and no business word follows it immediately.
+  const serviceFirst = new RegExp(
+    `(cu[áa]nto\\s+(?:cuesta|vale|cuestan|valen)|precio\\s+de)\\s+(?:el\\s+|la\\s+|los\\s+|las\\s+|un\\s+|una\\s+)?[\\w\\s]*${service.source}(?!\\s+(?:de\\s+)?(?:una?\\s+)?${businessType.source})`,
+    'i',
+  )
+  return !serviceFirst.test(text)
 }
 
 /** Localized intent labels */

@@ -96,7 +96,7 @@ function serverOutcome(o: Partial<TopicStageOutcomes>) {
 async function main() {
   console.log('Queueing a topic without a site index\n')
   const drawer = strip(read('components/content/TopicPlanDrawer.tsx'))
-  const hub = strip(read('components/content/ContentHub.tsx'))
+  const hub = strip(read('components/content/workspace/ContentWorkspaceProvider.tsx'))
   const route = strip(read('app/api/content/automation/pools/[id]/approve-and-queue/route.ts'))
 
   // ───────────────────────────────────────────────────────────────────────
@@ -243,8 +243,20 @@ async function main() {
       /setError\(t\.loadError\); setSaved\(null\); setSavedStatus\('unavailable'\)\s*\n\s*\} finally/.test(drawer))
     check('6i: SOURCE — the handler refuses unless the decision can queue',
       /if \(!queueDecision\.canQueue\) return/.test(drawer))
-    check('6j: SOURCE — and the button is disabled until then',
-      /disabled=\{saving \|\| savingQueue \|\| !queueDecision\.canQueue\}/.test(drawer))
+    // R17 — the footer has two queue buttons now: the primary (with the recommended links)
+    // and, only on the confirmed no-index path, the secondary "without links". Neither can
+    // run before the decision can queue.
+    const sixJ = (src: string) =>
+      /const noIndexPath = queueDecision\.canQueue && !queueDecision\.expectsLinks\b/.test(src)
+      && /disabled=\{saving \|\| savingQueue \|\| !queueDecision\.canQueue \|\| noIndexPath\}/.test(src)
+      && /\{noIndexPath && \(\s*<Button variant="secondary" onClick=\{saveAndQueue\}/.test(src)
+    check('6j: SOURCE — and the buttons are disabled until then', sixJ(drawer))
+    // MUTATION CONTROL: a primary that forgets the decision, or a "without links" button
+    // shown outside the confirmed path, must fail the same predicate.
+    check('6j MUT: a primary without the canQueue gate is caught',
+      !sixJ(drawer.replace('disabled={saving || savingQueue || !queueDecision.canQueue || noIndexPath}', 'disabled={saving || savingQueue || noIndexPath}')))
+    check('6j MUT: an ungated "without links" button is caught',
+      !sixJ(drawer.replace(/\{noIndexPath && \(\s*<Button variant="secondary"/, '{(\n        <Button variant="secondary"')))
     check('6k: SOURCE — a refresh in flight keeps the preview pending, so stale data cannot decide',
       /running \|\| previewStatus === 'pending' \|\| !dry/.test(drawer))
   }
@@ -476,13 +488,20 @@ async function main() {
   {
     const en = read('lib/i18n/dashboard/en.ts')
     const he = read('lib/i18n/dashboard/he.ts')
-    check('9a: SOURCE — the label follows the decision, and only a queueable one can read it',
-      /queueDecision\.canQueue && !queueDecision\.expectsLinks \? t\.queueWithoutLinks : t\.saveAndQueue/.test(drawer))
+    // R17 — "without links" is its own secondary button, rendered only on the confirmed
+    // no-index path (noIndexPath = canQueue && !expectsLinks); the primary never reads it.
+    const nineA = (src: string) =>
+      /\{noIndexPath && \(\s*<Button variant="secondary"[^>]*data-plan-action="queue-without-links">\s*\{savingQueue \? t\.savingQueue : t\.queueWithoutLinks\}/.test(src)
+      && (src.match(/t\.queueWithoutLinks/g) ?? []).length === 1
+      && /data-plan-action="queue-with-links"[\s\S]{0,160}\? `\$\{t\.queueWithLinks\} \(\$\{checkedCount\}\)` : t\.saveAndQueue/.test(src)
+    check('9a: SOURCE — the label follows the decision, and only a queueable one can read it', nineA(drawer))
+    check('9a MUT: the primary reading "without links" is caught',
+      !nineA(drawer.replace('`${t.queueWithLinks} (${checkedCount})` : t.saveAndQueue', '`${t.queueWithLinks} (${checkedCount})` : t.queueWithoutLinks')))
     check('9b: English label states there are no internal links',
       /queueWithoutLinks: 'Add to queue without internal links'/.test(en))
     check('9c: Hebrew label likewise', /queueWithoutLinks: 'הוסף לתור ללא קישורים פנימיים'/.test(he))
     check('9d: the missing-index notice is still shown',
-      /dry\?\.cacheState === 'missing' && <p/.test(drawer))
+      /dry\?\.cacheState === 'missing' && <Notice tone="warn">\{t\.cacheMissing\}<\/Notice>/.test(drawer.replace(/ className="[^"]*"/g, '')))
     check('9e: but no longer tells the user to refresh and try again',
       !/refresh the index first/.test(en) && !/רענן את האינדקס תחילה/.test(he))
     check('9f: it now says the topic can still be queued',

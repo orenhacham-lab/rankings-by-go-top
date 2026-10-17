@@ -19,6 +19,9 @@ import {
 import { runArticleAudit, thresholdsFor, auditSummary, includesKw, type AuditResult, type AuditSummary } from '@/lib/content/article-audit'
 import type { ArticleTopicAnchor } from '@/lib/supabase/types'
 import type { SuggestionLanguage } from '@/lib/content/topic-suggestions'
+import { contentDirection, languageNameInEnglish } from '@/lib/content/language'
+import { businessContextLines, guidancePromptLines, type BusinessContext, type WritingGuidance } from '@/lib/content/writing-guidance/guidance'
+import { indexOfCaseInsensitive } from '@/lib/text/ci-index'
 
 export interface ArticleBrief {
   language: SuggestionLanguage
@@ -55,6 +58,11 @@ export interface ArticleBrief {
   businessName: string | null
   domain: string | null
   category: string | null
+  // The owner's standing instructions, exclusions and rules from feedback
+  // (lib/content/writing-guidance). Optional: absent or empty = the prompt as before.
+  writingGuidance?: WritingGuidance | null
+  // What the business does and, for a local business, the city it serves.
+  businessContext?: BusinessContext | null
 }
 
 export interface GeneratedArticleFaq { question: string; answer: string }
@@ -65,12 +73,16 @@ export interface GeneratedArticleContent {
 export interface GeminiUsage { model: string; inputTokens: number; outputTokens: number }
 
 export interface ArticleTable { caption: string; columns: string[]; rows: string[][] }
-export interface Subsection { heading: string; paragraphs: string[] }
+export interface Subsection { heading: string; paragraphs: string[]; bullets: string[] }
 export interface Section { heading: string; answerFirst: string; paragraphs: string[]; bullets: string[]; table: ArticleTable | null; subsections: Subsection[] }
 export interface StructuredArticle {
   title: string; slug: string; metaTitle: string; metaDescription: string; excerpt: string
   directAnswer: string; intro: string[]; sections: Section[]; comparisonTables: ArticleTable[]
   faq: GeneratedArticleFaq[]; imagePrompt: string; warnings: string[]
+  /** What the article gives the reader to check, ask for or compare, as the
+   *  model itself lists it. The quality gate reads it instead of guessing from
+   *  wording; it is never rendered into the article. */
+  readerChecks: string[]
 }
 
 const TONE_HINT: Record<string, string> = {
@@ -92,7 +104,8 @@ export function articleModel(): { model: string; fellBack: boolean } {
 
 interface GenOpts { repairFailures?: string[] }
 
-const FAILURE_HINT: Record<string, string> = {
+/** Exported for the quality guard: lib/content/__qa__/article-reader-verify.qa.ts. */
+export const FAILURE_HINT: Record<string, string> = {
   primary_keyword_in_title: 'include the primary keyword naturally in the title AND the metaTitle',
   meta_description_exists: 'write a metaDescription of 120-160 characters that includes the primary keyword',
   too_few_h2: 'add more distinct <h2> sections',
@@ -123,13 +136,83 @@ const FAILURE_HINT: Record<string, string> = {
   markdown_artifacts_absent: 'do NOT use any Markdown (**bold**, ## headings, [text](url), backticks) — plain text only',
   has_early_answer: 'add a clear direct answer in the first paragraph',
   not_generic: 'add practical value: examples, common mistakes, a checklist, or decision criteria',
+  reader_can_verify: 'give the reader concrete things to CHECK, ASK FOR or COMPARE before deciding (what to look for, what to request, what to compare) — imperative, specific, and never an invented fact — and list those same items in "readerChecks", copied from the body',
   anchor_too_early: 'move the required link OUT of the direct answer / first paragraph — place it only after the article has established context',
   anchor_spacing_too_close: 'spread the links across different sections (>=2 paragraphs apart), never two in the same paragraph',
   anchor_inserted_mechanically: 'integrate each link into a genuinely relevant sentence — no "read more", "click here", "אתר כמו", "למידע נוסף"',
 }
 
-function buildPrompt(brief: ArticleBrief, opts: GenOpts): string {
-  const lang = brief.language === 'he' ? 'Hebrew' : 'English'
+/**
+ * Every language-dependent string this file EMITS into the article (as opposed to
+ * instructs the model about). Keyed by content language so adding a language is a
+ * compile error here rather than a silent fall-through to English — which is how
+ * Spanish would otherwise have been written.
+ */
+const ARTICLE_TEXT: Record<SuggestionLanguage, {
+  toc: string
+  faqHeading: string
+  /** "In this context, <link> is a key option worth knowing." */
+  anchorSentence: (link: string) => string
+  /** The same sentence for a phrase that carries no link. */
+  phraseSentence: (phrase: string) => string
+}> = {
+  he: {
+    toc: 'תוכן העניינים',
+    faqHeading: 'שאלות נפוצות',
+    anchorSentence: (link) => ` בהקשר זה, ${link} הוא אחד הגורמים המרכזיים שכדאי להכיר.`,
+    phraseSentence: (phrase) => ` בהקשר זה, כדאי להכיר מקרוב גם ${phrase}.`,
+  },
+  en: {
+    toc: 'Table of contents',
+    faqHeading: 'Frequently Asked Questions',
+    anchorSentence: (link) => ` In this context, ${link} is a key option worth knowing.`,
+    phraseSentence: (phrase) => ` In this context, it is also worth exploring ${phrase}.`,
+  },
+  es: {
+    toc: 'Tabla de contenidos',
+    faqHeading: 'Preguntas frecuentes',
+    anchorSentence: (link) => ` En este contexto, ${link} es una de las opciones clave que conviene conocer.`,
+    phraseSentence: (phrase) => ` En este contexto, también conviene conocer de cerca ${phrase}.`,
+  },
+}
+
+/** Natural transition words to hand the model, in the language it writes in. */
+const TRANSITION_HINT: Record<SuggestionLanguage, string> = {
+  he: 'בנוסף, לכן, עם זאת, למשל, לסיכום',
+  en: 'additionally, therefore, however, for example, in summary',
+  es: 'además, por lo tanto, sin embargo, por ejemplo, en resumen',
+}
+
+/** The filler opening to warn the model off, written in the language it writes in. */
+const FILLER_EXAMPLE: Record<SuggestionLanguage, string> = {
+  he: 'e.g. "בעולם שבו כולם מחפשים…"',
+  en: 'e.g. "In a world where everyone is looking for…"',
+  es: 'e.g. "En un mundo donde todos buscan…"',
+}
+
+/** Who the article is actually written for. A Spanish article is NOT for Israeli readers. */
+const AUDIENCE_NOTE: Record<SuggestionLanguage, string> = {
+  he: 'In Hebrew, write naturally for Israeli readers.',
+  en: 'Write naturally for a general English-speaking audience.',
+  es: 'Write naturally for Spanish-speaking readers in neutral Spanish that reads well in Spain and in Latin America alike.',
+}
+
+/** Per-language writing-quality notes. Empty for a language with nothing extra to say. */
+const WRITING_QUALITY_LINES: Record<SuggestionLanguage, string[]> = {
+  he: [
+    `- Hebrew writing quality: VARY sentence and paragraph openings — do not start many consecutive sentences/paragraphs with the same word (avoid over-using "בנוסף", "אחד", "היתרון", "המשמעות", "כדי", "כאשר"). Mix openings like "מעבר לכך", "בפועל", "לכן", "מצד שני", "במקרים רבים", "בשלב הבא", "חשוב לזכור", "בשורה התחתונה", "לצד זאת", "מבחינה פרקטית", "עבור משתמשים ביתיים", "בהשוואה לדגמים רגילים" — but naturally, NOT a transition word in every sentence. Prefer clear, practical, promotional SEO writing over poetic language; avoid repetitive paragraph structure.`,
+    `- Keep brand/product names in their proper English casing (e.g. "Kingsmith WalkingPad X21", not "kingsmith walkingpad x21"). Never write the hyphenated Hebrew article before a name ("ה-Kingsmith", "ה-הליכון") — write "Kingsmith…", "הליכון…", or "דגם/מכשיר Kingsmith…".`,
+  ],
+  en: [],
+  es: [
+    `- Spanish writing quality: use NEUTRAL Latin-American-and-Spain Spanish and address the reader as "tú" consistently (never mix "tú" and "usted", never "vos"). Avoid regional slang and country-specific terms where a neutral word exists (prefer "teléfono" over "móvil"/"celular", "coche/auto" only when the topic requires it). VARY sentence and paragraph openings — do not start many consecutive sentences with the same word (avoid over-using "Además", "Por otro lado", "Es importante"); mix openings like "En la práctica", "Por eso", "En muchos casos", "Conviene recordar", "A la hora de decidir", "En resumen". Prefer clear, practical, promotional SEO writing over poetic language.`,
+    `- Spanish typography: always use the opening marks "¿" and "¡" in questions and exclamations, keep accents and "ñ" correct (never write Spanish without accents), and keep brand/product names in their proper original casing (e.g. "Kingsmith WalkingPad X21").`,
+  ],
+}
+
+/** Exported for the writing-guidance guards (lib/content/writing-guidance/__qa__). */
+export function buildPrompt(brief: ArticleBrief, opts: GenOpts): string {
+  const lang = languageNameInEnglish(brief.language)
   const tone = (brief.toneOfVoice && TONE_HINT[brief.toneOfVoice]) || 'professional and credible'
   // Phase 3D — target range drives length; midpoint drives structural thresholds.
   const wMin = brief.targetWordMin ?? (brief.desiredWordCount || 1000)
@@ -150,7 +233,7 @@ function buildPrompt(brief: ArticleBrief, opts: GenOpts): string {
   const ctaLine = ctaEnabled ? ctaDetailLines.join('\n') : 'Do NOT include any call-to-action anywhere.'
   const brandName = (brief.brandNameToInclude || '').trim()
   const brandLine = brief.includeBrandName && brandName
-    ? `You MAY mention the business/brand name "${brandName}" naturally and subtly.`
+    ? `This article is published on the site of "${brandName}" and speaks for it. Name "${brandName}" ONLY where it adds E-E-A-T value for the reader: as the source of practical, first-hand guidance (how the business approaches the problem, what it checks, what it recommends to its own customers) or as a clear next step at the end. At most 2-3 mentions in the whole article and never more than one per section; name it AT LEAST ONCE: if nowhere else genuinely helps the reader, once in the conclusion as the natural next step (who to turn to for this). Never in the title, metaTitle, slug, headings or FAQ questions, never as a sales slogan or praise ("the best", "leading", "professional team"), never in a sentence that would read the same for any business. Ground every statement about the business ONLY in the business details and owner instructions in this brief; do NOT invent experience, years in business, customer numbers, certifications, awards, guarantees or results.`
     : 'Do NOT mention any business or brand name in the article text. EXCEPTION: if one of the required link phrases below is (or contains) the business name, use it ONLY inside that exact link and add NO other brand mentions anywhere.'
   const anchorTopics = brief.anchors
     .filter((a) => a.anchor_text?.trim() && a.target_url?.trim())
@@ -171,6 +254,7 @@ function buildPrompt(brief: ArticleBrief, opts: GenOpts): string {
     brief.searchIntent ? `Search intent: ${brief.searchIntent}.` : '',
     brief.targetAudience ? `Target audience: ${brief.targetAudience}.` : '',
     brief.category ? `Field: ${brief.category}.` : '',
+    ...businessContextLines(brief.businessContext),
     brief.briefNotes ? `Extra instructions from the brief (obey these): ${brief.briefNotes}` : '',
     brief.briefNotes ? `- Treat [ARTICLE ANGLE] as the STRATEGIC angle of the whole article — make it less generic and focus the piece around it.` : '',
     brief.briefNotes ? `- Treat [MUST INCLUDE] items as important content requirements: don't mention them once and move on — turn them into sections, bullet points, examples, FAQ answers, or comparison-table rows, woven naturally and prominently.` : '',
@@ -182,23 +266,25 @@ function buildPrompt(brief: ArticleBrief, opts: GenOpts): string {
     depthKind === 'support' ? `- This is a concise supporting article: stay focused and tight; cover the essentials well without over-expanding.` : '',
     brandLine,
     ctaLine,
+    ...guidancePromptLines(brief.writingGuidance),
     ``,
     `Writing rules:`,
     `- directAnswer: a direct 2-3 sentence answer to the main question (will appear at the very top).`,
     `- Each major section starts with "answerFirst": one short sentence answering that section's question.`,
     `- Short paragraphs (2-4 sentences). Short-ish sentences. Mostly ACTIVE voice; avoid passive.`,
-    `- Use natural transition words (${brief.language === 'he' ? 'בנוסף, לכן, עם זאת, למשל, לסיכום' : 'additionally, therefore, however, for example, in summary'}).`,
+    `- Use natural transition words (${TRANSITION_HINT[brief.language]}).`,
     `- Do not start many sentences with the same word.`,
     `- Relevant entities; practical specifics. Include at least 3 of: examples, common mistakes, a checklist, comparison, tips by situation, budget/price considerations, steps, when-to / when-not-to, what to check before deciding.`,
+    `- EXPERIENCE (E-E-A-T): the reader must come away with things to CHECK, ASK FOR or COMPARE themselves before they decide — what to look for, what to request from a supplier, what to compare between two options. Write them as imperatives in a list or a short paragraph, grounded in how this field actually works; never invent a fact, a price, a standard or a law to make one.`,
+    `- Then LIST those same items in "readerChecks", copying each one as it appears in the article body. It is a declaration for the quality check and is never shown to the reader, so it must contain nothing the article itself does not say.`,
     `- For any list-worthy section (tips, common mistakes, a checklist, steps, how-to-choose, what-to-check, pros/cons), put the items in the section's "bullets" array — NOT as dash lines inside a paragraph. At least one real list in the article.`,
     `- Weave the most important user questions into the BODY as <h2>/<h3> question-style section headings where natural — do NOT leave all questions only for the FAQ section at the end.`,
     `- FAQ section (end of article): ${th.minFaq}-${th.minFaq + 2} concise pairs; real, specific questions (no generic filler like "what is X?"); answers 40-90 words; never repeat earlier paragraphs word-for-word.`,
     `- Do NOT invent prices/statistics/laws/facts not in this brief; when unsure use hedges ("in most cases", "typically", "prices may vary", "check with the provider").`,
     `- Never add a year (e.g. 2024/2025/2026) to the title, metaTitle, slug, headings, or content UNLESS that exact year appears in the topic, keyword, or brief above. If the topic is evergreen, keep it evergreen; never use outdated years.`,
     `- SEO/GEO depth: be practical, specific and useful — never generic. Include concrete criteria, examples, checks, warning signs and decision-making guidance; add related subtopics naturally when relevant. For commercial/comparison/price/cost/choice topics include a useful comparison TABLE.`,
-    `- Avoid generic filler openings (e.g. "בעולם שבו כולם מחפשים…"). Open directly and match search intent — the FIRST paragraph answers the query. Each <h2> should answer a real user question, comparison point, or decision factor. In Hebrew, write naturally for Israeli readers.`,
-    brief.language === 'he' ? `- Hebrew writing quality: VARY sentence and paragraph openings — do not start many consecutive sentences/paragraphs with the same word (avoid over-using "בנוסף", "אחד", "היתרון", "המשמעות", "כדי", "כאשר"). Mix openings like "מעבר לכך", "בפועל", "לכן", "מצד שני", "במקרים רבים", "בשלב הבא", "חשוב לזכור", "בשורה התחתונה", "לצד זאת", "מבחינה פרקטית", "עבור משתמשים ביתיים", "בהשוואה לדגמים רגילים" — but naturally, NOT a transition word in every sentence. Prefer clear, practical, promotional SEO writing over poetic language; avoid repetitive paragraph structure.` : '',
-    brief.language === 'he' ? `- Keep brand/product names in their proper English casing (e.g. "Kingsmith WalkingPad X21", not "kingsmith walkingpad x21"). Never write the hyphenated Hebrew article before a name ("ה-Kingsmith", "ה-הליכון") — write "Kingsmith…", "הליכון…", or "דגם/מכשיר Kingsmith…".` : '',
+    `- Avoid generic filler openings (${FILLER_EXAMPLE[brief.language]}). Open directly and match search intent — the FIRST paragraph answers the query. Each <h2> should answer a real user question, comparison point, or decision factor. ${AUDIENCE_NOTE[brief.language]}`,
+    ...WRITING_QUALITY_LINES[brief.language],
     anchorTopics.length ? `- Naturally use these exact phrases (they will become links):` : '',
     ...anchorTopics,
     anchorTopics.length ? `- LINK PLACEMENT RULES: never place a link in the directAnswer or the first paragraph; place the first link only after the article has established context (after the first <h2> and a couple of paragraphs). If there are multiple links, distribute them across DIFFERENT sections — never two links in the same paragraph or back-to-back. Integrate every link into a genuinely relevant sentence; do NOT use generic phrases like "read more", "click here", "אתר כמו", "למידע נוסף".` : '',
@@ -210,9 +296,9 @@ function buildPrompt(brief: ArticleBrief, opts: GenOpts): string {
     ``,
     `Return ONLY valid JSON (no markdown, no text outside the JSON), as STRUCTURED DATA (NOT html), plain-text fields:`,
     `{"title":"...","slug":"...","metaTitle":"...","metaDescription":"...","excerpt":"...","searchIntent":"...","directAnswer":"...","intro":["...","..."],`,
-    `"sections":[{"heading":"...","answerFirst":"...","paragraphs":["...","..."],"bullets":["..."],"table":{"caption":"...","columns":["...","..."],"rows":[["...","..."]]},"subsections":[{"heading":"...","paragraphs":["..."]}]}],`,
-    `"comparisonTables":[{"caption":"...","columns":["...","..."],"rows":[["...","..."]]}],"faq":[{"question":"...","answer":"..."}],"imagePrompt":"...","warnings":[]}`,
-    `- Every paragraph/answerFirst/directAnswer is PLAIN TEXT (no HTML). "table"/"bullets"/"subsections" are optional per section.`,
+    `"sections":[{"heading":"...","answerFirst":"...","paragraphs":["...","..."],"bullets":["..."],"table":{"caption":"...","columns":["...","..."],"rows":[["...","..."]]},"subsections":[{"heading":"...","paragraphs":["..."],"bullets":["..."]}]}],`,
+    `"comparisonTables":[{"caption":"...","columns":["...","..."],"rows":[["...","..."]]}],"faq":[{"question":"...","answer":"..."}],"readerChecks":["...","..."],"imagePrompt":"...","warnings":[]}`,
+    `- Every paragraph/answerFirst/directAnswer is PLAIN TEXT (no HTML). "table"/"bullets"/"subsections" are optional per section. Every subsection you include MUST have content under its heading: at least one paragraph, or its list items in its own "bullets".`,
     `- Do NOT use Markdown syntax in ANY field: no **bold**, no __bold__, no ##/### headings, no [text](url) links, no backticks. Return plain readable text only — the server builds all HTML and structure.`,
     `- faq answers: 40-90 words, concise, no duplicates. slug: MUST be English (translate, never transliterate Hebrew), lowercase, hyphens. metaTitle <= 60 chars; metaDescription 120-160 chars. imagePrompt in ${lang}.`,
   ].filter((l) => l !== undefined).join('\n')
@@ -287,7 +373,7 @@ function tableHtml(t: ArticleTable | null, language: SuggestionLanguage): string
   const body = `<tbody>${rows.map((r) => `<tr>${r.map((c) => `<td>${esc(String(c))}</td>`).join('')}</tr>`).join('')}</tbody>`
   // Hebrew tables render RTL so the first (attribute) column sits on the RIGHT;
   // English tables stay LTR. dir travels with the HTML to WordPress.
-  const dir = language === 'he' ? ' dir="rtl"' : ''
+  const dir = contentDirection(language) === 'rtl' ? ' dir="rtl"' : ''
   // The table TITLE is a sibling <p> ABOVE the table — NOT a <caption> (TipTap's
   // table schema has no caption and would push it into a stray first row).
   const titleText = (t.caption || '').trim()
@@ -312,7 +398,7 @@ function buildHtml(a: StructuredArticle, language: SuggestionLanguage, includeMa
   const sectionIds = sections.map((s, i) => makeId(s.heading, 'section', i))
   if (includeManualToc) {
     const toc = sections.map((s, i) => s.heading?.trim() ? `<li><a href="#${sectionIds[i]}">${esc(s.heading.trim())}</a></li>` : '').filter(Boolean).join('')
-    if (toc) out.push(`<nav class="toc" aria-label="${language === 'he' ? 'תוכן העניינים' : 'Table of contents'}"><ul>${toc}</ul></nav>`)
+    if (toc) out.push(`<nav class="toc" aria-label="${ARTICLE_TEXT[language].toc}"><ul>${toc}</ul></nav>`)
   }
 
   sections.forEach((s, i) => {
@@ -326,13 +412,15 @@ function buildHtml(a: StructuredArticle, language: SuggestionLanguage, includeMa
     ;(s.subsections || []).forEach((sub, j) => {
       if (sub.heading?.trim()) out.push(`<h3 id="${makeId(sub.heading, `section-${i + 1}-sub`, j)}">${esc(sub.heading.trim())}</h3>`)
       emitParagraphs(out, sub.paragraphs)
+      const subBullets = (sub.bullets || []).map((b) => stripListMarker(b)).filter(Boolean)
+      if (subBullets.length) out.push(`<ul>${subBullets.map((b) => `<li>${esc(b)}</li>`).join('')}</ul>`)
     })
   })
 
   for (const t of a.comparisonTables || []) { const h = tableHtml(t, language); if (h) out.push(h) }
 
   if ((a.faq || []).length) {
-    out.push(`<h2 id="${makeId('faq', 'faq', 0)}">${language === 'he' ? 'שאלות נפוצות' : 'Frequently Asked Questions'}</h2>`)
+    out.push(`<h2 id="${makeId('faq', 'faq', 0)}">${ARTICLE_TEXT[language].faqHeading}</h2>`)
     a.faq.forEach((f, k) => {
       if (f.question?.trim() && f.answer?.trim()) {
         out.push(`<h3 id="${makeId(f.question, 'faq-q', k)}">${esc(f.question.trim())}</h3>`)
@@ -345,6 +433,8 @@ function buildHtml(a: StructuredArticle, language: SuggestionLanguage, includeMa
 
 /** Phase 3J — the server HTML builder, exported for the QA harness. */
 export const buildArticleHtml = buildHtml
+/** The model-JSON reader, exported for the QA harness. */
+export const parseStructuredArticle = (parsed: Record<string, unknown>): StructuredArticle => parseStructured(parsed)
 
 function buildMarkdown(a: StructuredArticle, language: SuggestionLanguage): string {
   const out: string[] = []
@@ -358,10 +448,11 @@ function buildMarkdown(a: StructuredArticle, language: SuggestionLanguage): stri
     for (const sub of s.subsections || []) {
       if (sub.heading?.trim()) out.push(`### ${sub.heading.trim()}`)
       for (const para of sub.paragraphs || []) if (para?.trim()) out.push(para.trim())
+      for (const b of (sub.bullets || []).map((x) => (x || '').trim()).filter(Boolean)) out.push(`- ${b}`)
     }
   }
   if ((a.faq || []).length) {
-    out.push(`## ${language === 'he' ? 'שאלות נפוצות' : 'Frequently Asked Questions'}`)
+    out.push(`## ${ARTICLE_TEXT[language].faqHeading}`)
     for (const f of a.faq) if (f.question?.trim() && f.answer?.trim()) { out.push(`### ${f.question.trim()}`); out.push(f.answer.trim()) }
   }
   return out.join('\n\n')
@@ -415,13 +506,17 @@ function buildCasingTerms(brief: ArticleBrief): CasingTerm[] {
 }
 
 /** Restore brand casing + remove the artifact hyphenated definite article "ה-". */
-function polishText(s: string, terms: CasingTerm[]): string {
+/** Exported for the article-text integrity guard (lib/content/__qa__/article-text-integrity.qa.ts). */
+export function polishText(s: string, terms: CasingTerm[]): string {
   if (!s) return s
   let out = s
   for (const t of terms) out = out.replace(t.re, t.replacement)
   // "ה-Kingsmith" → "Kingsmith", "ה-הליכון" → "הליכון" (only the hyphenated form;
   // a normal attached definite article like "המכשיר" is never touched).
-  out = out.replace(/ה-(?=[A-Za-zא-ת])/g, '')
+  // The ה must START a word: without the left guard this also ate the ה of a
+  // hyphenated compound and welded the two halves into a nonsense word
+  // ("חברה-בת" → "חברבת", "שאלה-תשובה" → "שאלתשובה").
+  out = out.replace(/(?<![א-ת])ה-(?=[A-Za-zא-ת])/g, '')
   return out
 }
 
@@ -437,7 +532,7 @@ function polishStructured(a: StructuredArticle, terms: CasingTerm[]): void {
   a.sections = a.sections.map((s) => ({
     ...s, heading: f(s.heading), answerFirst: f(s.answerFirst), paragraphs: s.paragraphs.map(f), bullets: s.bullets.map(f),
     table: s.table ? polishTable(s.table, terms) : null,
-    subsections: s.subsections.map((ss) => ({ heading: f(ss.heading), paragraphs: ss.paragraphs.map(f) })),
+    subsections: s.subsections.map((ss) => ({ heading: f(ss.heading), paragraphs: ss.paragraphs.map(f), bullets: ss.bullets.map(f) })),
   }))
   a.comparisonTables = a.comparisonTables.map((t) => polishTable(t, terms))
   a.faq = a.faq.map((x) => ({ question: f(x.question), answer: f(x.answer) }))
@@ -526,7 +621,7 @@ function insertAnchors(html: string, missing: { anchorText: string; targetUrl: s
     let placed = false
     for (const p of paras) {
       if (!farEnough(p.wordStart)) continue
-      const idx = p.inner.toLowerCase().indexOf(text.toLowerCase())
+      const idx = indexOfCaseInsensitive(p.inner, text)
       if (idx < 0 || p.inner.slice(0, idx).includes('<')) continue // keep it out of any tag
       const newInner = `${p.inner.slice(0, idx)}<a href="${escAttr(url)}">${p.inner.slice(idx, idx + text.length)}</a>${p.inner.slice(idx + text.length)}`
       out = out.slice(0, p.start) + `<p>${newInner}</p>` + out.slice(p.end)
@@ -538,9 +633,7 @@ function insertAnchors(html: string, missing: { anchorText: string; targetUrl: s
 
     // 2) Append the anchor as a natural sentence into an eligible paragraph.
     const link = `<a href="${escAttr(url)}">${escAttr(text)}</a>`
-    const sentence = language === 'he'
-      ? ` בהקשר זה, ${link} הוא אחד הגורמים המרכזיים שכדאי להכיר.`
-      : ` In this context, ${link} is a key option worth knowing.`
+    const sentence = ARTICLE_TEXT[language].anchorSentence(link)
     const target = paras.find((p) => farEnough(p.wordStart)) || paras[0]
     if (target) {
       out = out.slice(0, target.start) + `<p>${target.inner}${sentence}</p>` + out.slice(target.end)
@@ -548,7 +641,7 @@ function insertAnchors(html: string, missing: { anchorText: string; targetUrl: s
       continue
     }
     // 3) Last resort (tiny article): a standalone natural sentence, not a footer link.
-    out = `${out}\n<p>${language === 'he' ? 'בהקשר זה, ' : 'In this context, '}${link}${language === 'he' ? ' הוא גורם מרכזי שכדאי להכיר.' : ' is a key option worth knowing.'}</p>`
+    out = `${out}\n<p>${ARTICLE_TEXT[language].anchorSentence(link).trim()}</p>`
     used.push(countWords(out))
   }
   return out
@@ -628,9 +721,7 @@ export function ensurePlannedPhrases(html: string, phrases: string[], language: 
       (firstH2 < 0 || p.start > firstH2))
     const pool = eligible.length ? eligible : paras.filter((p) => !p.hasLink && p.index >= 1)
     const target = pool.find((p) => farEnough(p.wordStart)) || pool[pool.length - 1]
-    const sentence = language === 'he'
-      ? ` בהקשר זה, כדאי להכיר מקרוב גם ${esc(phrase)}.`
-      : ` In this context, it is also worth exploring ${esc(phrase)}.`
+    const sentence = ARTICLE_TEXT[language].phraseSentence(esc(phrase))
     if (target) {
       out = out.slice(0, target.start) + `<p>${target.inner}${sentence}</p>` + out.slice(target.end)
       used.push(target.wordStart)
@@ -751,8 +842,11 @@ export function cleanMarkdown(input: string): string {
   // Bold/italic: **text**, __text__, then leftover markers; *text*, _text_.
   t = t.replace(/\*\*([^*]+)\*\*/g, '$1').replace(/__([^_]+)__/g, '$1')
   t = t.replace(/\*\*/g, '').replace(/(?<!_)__(?!_)/g, '')
-  t = t.replace(/(?<![\w*])\*([^*\n]+)\*(?![\w*])/g, '$1')
-  t = t.replace(/(?<![\w_])_([^_\n]+)_(?![\w_])/g, '$1')
+  // The "not mid-word" guards must be Unicode-aware: \w is ASCII-only, so in
+  // Hebrew (and any non-Latin script) they matched nothing and a word holding
+  // two underscores lost them and fused ("מילה_אחת_בלבד" → "מילהאחתבלבד").
+  t = t.replace(/(?<![\p{L}\p{N}*])\*([^*\n]+)\*(?![\p{L}\p{N}*])/gu, '$1')
+  t = t.replace(/(?<![\p{L}\p{N}_])_([^_\n]+)_(?![\p{L}\p{N}_])/gu, '$1')
   // Inline code `text` → text (no code in marketing/SEO articles).
   t = t.replace(/`+([^`]*)`+/g, '$1').replace(/`/g, '')
   // Heading + blockquote line markers → drop the marker, keep the text.
@@ -774,7 +868,12 @@ function parseStructured(parsed: Record<string, unknown>): StructuredArticle {
   const sections: Section[] = Array.isArray(parsed.sections) ? (parsed.sections as Record<string, unknown>[]).map((s) => ({
     heading: cstr(s?.heading), answerFirst: cstr(s?.answerFirst), paragraphs: cstrArr(s?.paragraphs), bullets: cstrArr(s?.bullets),
     table: parseTable(s?.table),
-    subsections: Array.isArray(s?.subsections) ? (s.subsections as Record<string, unknown>[]).map((ss) => ({ heading: cstr(ss?.heading), paragraphs: cstrArr(ss?.paragraphs) })) : [],
+    // A subsection is kept only with something under its heading: the model
+    // sometimes puts a list in the subsection's own "bullets", and a heading
+    // with nothing below it would publish as an empty <h3> (japan4u, 2026-10-14).
+    subsections: Array.isArray(s?.subsections) ? (s.subsections as Record<string, unknown>[])
+      .map((ss) => ({ heading: cstr(ss?.heading), paragraphs: cstrArr(ss?.paragraphs), bullets: cstrArr(ss?.bullets) }))
+      .filter((ss) => ss.paragraphs.length > 0 || ss.bullets.length > 0) : [],
   })) : []
   const faq: GeneratedArticleFaq[] = Array.isArray(parsed.faq) ? (parsed.faq as Record<string, unknown>[])
     .map((f) => ({ question: cstr(f?.question), answer: cstr(f?.answer) })).filter((f) => f.question && f.answer).slice(0, 12) : []
@@ -783,6 +882,7 @@ function parseStructured(parsed: Record<string, unknown>): StructuredArticle {
     title: cstr(parsed.title), slug: cstr(parsed.slug), metaTitle: cstr(parsed.metaTitle),
     metaDescription: cstr(parsed.metaDescription), excerpt: cstr(parsed.excerpt),
     directAnswer: cstr(parsed.directAnswer), intro: cstrArr(parsed.intro), sections, comparisonTables, faq,
+    readerChecks: cstrArr(parsed.readerChecks).slice(0, 12),
     imagePrompt: cstr(parsed.imagePrompt), warnings: Array.isArray(parsed.warnings) ? (parsed.warnings as unknown[]).filter((w): w is string => typeof w === 'string') : [],
   }
 }
@@ -934,6 +1034,7 @@ function auditFor(brief: ArticleBrief, structured: StructuredArticle, safeHtml: 
     brandName: brief.brandNameToInclude, businessName: brief.businessName,
     title: structured.title, metaTitle: structured.metaTitle, metaDescription: structured.metaDescription,
     slug, excerpt: structured.excerpt, contentHtml: safeHtml, faq: structured.faq, anchors: brief.anchors,
+    readerChecks: structured.readerChecks,
   })
 }
 

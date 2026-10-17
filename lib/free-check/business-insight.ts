@@ -15,7 +15,7 @@
 import { getGeminiClient, GEMINI_REQUEST_TIMEOUT_MS } from '@/lib/ai-visibility/gemini-semantic-classifier'
 import type { SiteSignals } from './html-signals'
 import type { CommerceType, FreeCheckBusiness } from './types'
-import type { Locale } from '@/lib/i18n/locales'
+import type { PublicLocale } from '@/lib/i18n/locales'
 
 /** How much page text the prompt carries. Enough to characterise, cheap to send. */
 const TEXT_BUDGET = 6_000
@@ -34,8 +34,22 @@ export type BusinessInsight = {
 
 export type InsightResult = { ok: true; insight: BusinessInsight } | { ok: false; reason: string }
 
-function buildPrompt(signals: SiteSignals, locale: Locale): string {
-  const language = locale === 'en' ? 'English' : 'Hebrew'
+/**
+ * The language the model answers in, one entry per public locale. A two-way
+ * `locale === 'en' ? 'English' : 'Hebrew'` answered a Spanish visitor in one of
+ * the two languages that existed when it was written, and its else branch is a
+ * real language, so it failed silently. A Record over PublicLocale cannot: a
+ * fifth language is a type error here rather than a wrong answer in production.
+ */
+const PROMPT_LANGUAGE: Record<PublicLocale, string> = {
+  he: 'Hebrew',
+  en: 'English',
+  es: 'Spanish',
+  'pt-BR': 'Brazilian Portuguese',
+}
+
+function buildPrompt(signals: SiteSignals, locale: PublicLocale): string {
+  const language = PROMPT_LANGUAGE[locale]
   return [
     'You are an SEO strategist reading one page of a real website.',
     `Answer in ${language}. Return JSON only, matching this shape exactly:`,
@@ -122,7 +136,7 @@ function cleanDomains(value: unknown, self: string): string[] {
     .filter((d) => /^[a-z0-9-]+(\.[a-z0-9-]+)*\.[a-z]{2,}$/.test(d) && d !== self && !d.endsWith(`.${self}`))
 }
 
-export async function fetchBusinessInsight(signals: SiteSignals, locale: Locale, selfDomain: string): Promise<InsightResult> {
+export async function fetchBusinessInsight(signals: SiteSignals, locale: PublicLocale, selfDomain: string): Promise<InsightResult> {
   const client = getGeminiClient()
   if (!client) return { ok: false, reason: process.env.GEMINI_API_KEY ? 'gemini_init_failed' : 'missing_gemini_api_key' }
 

@@ -4,7 +4,14 @@ import { revalidatePath } from 'next/cache'
 import { NextRequest, NextResponse } from 'next/server'
 import { getUserEntitlement, PLAN_LIMITS } from '@/lib/subscription'
 import { buildQuotaError, buildEntitlementUnavailableError, isEntitlementUnknown } from '@/lib/quota'
-import { calculateNextScanDate, isValidScanFrequency } from '@/lib/utils'
+import { firstScanDate, isValidScanFrequency } from '@/lib/utils'
+import { markScanOwnedFields, type SeedProjectField } from '@/lib/seed-scan/settings'
+import { bilingualError } from '@/lib/i18n/action-messages'
+import { isAdminUser } from '@/lib/auth/admin-role'
+import { runAfterResponse } from '@/lib/notifications/after-response'
+import { notifyProjectAdded } from '@/lib/notifications/operator-alerts'
+import { claimCookieFromHeader } from '@/lib/onboarding/claim-cookie'
+import { peekSeedClaim } from '@/lib/onboarding/claim-peek'
 
 // API Route for creating new projects
 // Replaces Server Action approach to avoid production crashes
@@ -18,14 +25,14 @@ export async function POST(request: NextRequest) {
     if (userError) {
       console.error('[API] Auth error:', userError.message)
       return NextResponse.json(
-        { error: 'שגיאה בקבלת פרטי משתמש' },
+        bilingualError('userLookupFailed'),
         { status: 401 }
       )
     }
     if (!user) {
       console.error('[API] No authenticated user')
       return NextResponse.json(
-        { error: 'משתמש לא מחובר' },
+        bilingualError('notSignedIn'),
         { status: 401 }
       )
     }
@@ -56,7 +63,7 @@ export async function POST(request: NextRequest) {
       if (countError) {
         console.error('[API] Error counting projects:', countError.message)
         return NextResponse.json(
-          { error: 'שגיאה בבדיקת הפרויקטים הקיימים' },
+          bilingualError('projectsCheckFailed'),
           { status: 500 }
         )
       }
@@ -83,7 +90,7 @@ export async function POST(request: NextRequest) {
     if (!name) {
       console.error('[API] Missing required field: name')
       return NextResponse.json(
-        { error: 'שם הפרויקט הוא שדה חובה' },
+        bilingualError('projectNameRequired'),
         { status: 400 }
       )
     }
@@ -91,7 +98,7 @@ export async function POST(request: NextRequest) {
     if (!targetDomain) {
       console.error('[API] Missing required field: target_domain')
       return NextResponse.json(
-        { error: 'דומיין יעד הוא שדה חובה' },
+        bilingualError('targetDomainRequired'),
         { status: 400 }
       )
     }
@@ -99,7 +106,7 @@ export async function POST(request: NextRequest) {
     if (!clientId) {
       console.error('[API] Missing required field: client_id')
       return NextResponse.json(
-        { error: 'בחירת לקוח היא שדה חובה' },
+        bilingualError('clientRequired'),
         { status: 400 }
       )
     }
@@ -108,13 +115,18 @@ export async function POST(request: NextRequest) {
     // Phase 3 — reject weekly (and any other unsupported value) server-side,
     // never relying solely on the DB CHECK constraint.
     if (!isValidScanFrequency(rawScanFrequency)) {
-      return NextResponse.json({ error: 'תדירות סריקה לא נתמכת. רק "ידני" או "פעם בחודש" מותרים.' }, { status: 400 })
+      return NextResponse.json(bilingualError('unsupportedFrequency'), { status: 400 })
     }
     const scanFrequency = rawScanFrequency
     const autoScanEnabled = formData.get('auto_scan_enabled') === 'true'
-    const nextScanAt = autoScanEnabled && scanFrequency !== 'manual'
-      ? calculateNextScanDate(scanFrequency)
-      : null
+    // A NEW project's first automatic scan is a week out, not a month (firstScanDate).
+    const nextScanAt = autoScanEnabled ? firstScanDate(scanFrequency) : null
+
+    // Placeholders, not choices: a project created without a country or a
+    // language gets IL / he, and the seed scan may replace them (see below).
+    const placeholders: SeedProjectField[] = []
+    if (!formData.get('country')) placeholders.push('country')
+    if (!formData.get('language')) placeholders.push('language')
 
     const data = {
       user_id: user.id,
@@ -139,7 +151,9 @@ export async function POST(request: NextRequest) {
     })
 
     // Insert into database
-    const { data: insertResult, error } = await supabase.from('projects').insert(data)
+    // The new row's id comes back so the app can open the project it just
+    // created. RLS returns only the caller's own row.
+    const { data: insertResult, error } = await supabase.from('projects').insert(data).select('id').single()
 
     if (error) {
       console.error('[API] Database error:', {
@@ -147,12 +161,41 @@ export async function POST(request: NextRequest) {
         code: error.code,
       })
       return NextResponse.json(
-        { error: 'שגיאה בהוספת פרויקט' },
+        bilingualError('projectCreateFailed'),
         { status: 400 }
       )
     }
 
     console.log('[API] Project created successfully for user:', user.id)
+
+    // The seed scan fills only a field that is empty or marked 'scan'
+    // (lib/seed-scan/settings.ts), so the placeholders above are marked as the
+    // scan's; a field the owner chose is never marked. Best effort: without
+    // the mark the placeholder simply stays, as it did before the scan existed.
+    const createdId = (insertResult as { id: string } | null)?.id
+    if (createdId && placeholders.length > 0) {
+      try {
+        const marked = await markScanOwnedFields(createAdminClient(), { projectId: createdId, userId: user.id }, placeholders)
+        if (!marked) console.warn('[API] Placeholder fields not marked for the scan:', { projectId: createdId })
+      } catch {
+        console.warn('[API] Placeholder fields not marked for the scan:', { projectId: createdId })
+      }
+    }
+
+    // Tell the operator an existing user added a site (not an administrator,
+    // and not the project made from the sign-up's own free-check claim, which
+    // the signup email already covers). After the response; never fails it.
+    const claimCookie = claimCookieFromHeader(request.headers.get('cookie')).token
+    runAfterResponse(async () => {
+      const admin = createAdminClient()
+      const isAdmin = entitlement.isAdmin || (await isAdminUser(admin, user.id))
+      let claimDomain: string | null = null
+      if (claimCookie && !isAdmin) {
+        const peek = await peekSeedClaim(admin, claimCookie, new Date())
+        if (peek.state === 'usable') claimDomain = peek.domain
+      }
+      await notifyProjectAdded({ user, isAdmin, domain: data.target_domain, claimDomain, entitlement })
+    })
 
     // Revalidate the projects page
     revalidatePath('/projects')
@@ -162,10 +205,10 @@ export async function POST(request: NextRequest) {
       { status: 201 }
     )
   } catch (err) {
-    const message = err instanceof Error ? err.message : 'שגיאה בעיבוד הבקשה'
-    console.error('[API] Unexpected error:', message, err)
+    // Logged here; never returned — a thrown message is not written for the merchant.
+    console.error('[API] Unexpected error:', err instanceof Error ? err.message : 'unknown', err)
     return NextResponse.json(
-      { error: message },
+      bilingualError('requestFailed'),
       { status: 500 }
     )
   }

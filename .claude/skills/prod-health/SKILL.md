@@ -43,3 +43,21 @@ Healthy: gsc_runs_today ≥ 1 after 06:00 UTC; scans_overdue = 0; stuck = 0; due
 `get_runtime_logs` with `query: "run complete"`, `since: "1h"`, `limit: 5`. Each run logs one
 `[automation-cron] run complete {generated, published, failures, durationMs}` line; the route answers
 202 immediately and works in `after()`. Runs near 300 s risk the maxDuration cut-off.
+
+## 5. Customer email, and the one promise no test can keep
+`mcp__Resend__get-domain` with id `884743e5-f5b7-454d-b87e-0cd92185fbbe` (`mail.gotopseo.com`).
+Healthy: Status **verified**, every DNS record verified, Sending enabled, Receiving disabled, and
+**Open Tracking false AND Click Tracking false**.
+
+Those last two are the point of this step. The legal pages state in all four languages, as a fact
+about the system, that our emails carry no open pixel, no click tracking and no link rewriting. That
+is the only published promise about this product that lives in a provider's console rather than in
+code: a switch in the Resend dashboard breaks it, and no suite fails and no review catches it. If
+either reads true, say so plainly as a legal exposure, not a setting: nothing may send until it is
+off again or the legal text is changed first.
+
+Nothing is being sent at all while `REMINDER_EMAILS_ENABLED`, `ONBOARDING_EMAILS_ENABLED` and
+`WEEKLY_SUMMARY_EMAIL_ENABLED` are unset or anything but exactly `"true"` (`filter_project_envs`).
+When they are on, `mcp__Resend__get-usage` is the cheapest "is anything going out" check, and the
+automation cron logs one `[reminder-emails] run complete`, `[onboarding-emails] run complete` or
+`[weekly-summary] run complete` line per run that did something.

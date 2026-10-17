@@ -1,4 +1,7 @@
 {
+  "regions": [
+    "bom1"
+  ],
   "crons": [
     {
       "path": "/api/schedule",
@@ -11,6 +14,26 @@
     {
       "path": "/api/gsc/sync/cron",
       "schedule": "0 5 * * *"
+    },
+    {
+      "path": "/api/reports/monthly/cron",
+      "schedule": "30 8 * * *"
+    },
+    {
+      "path": "/api/site-health/auto-fix/cron",
+      "schedule": "30 9 * * *"
+    },
+    {
+      "path": "/api/affiliate/retention/cron",
+      "schedule": "30 10 * * *"
+    },
+    {
+      "path": "/api/outreach/retention/cron",
+      "schedule": "30 11 * * *"
+    },
+    {
+      "path": "/api/gbp/cron",
+      "schedule": "30 7 * * *"
     }
   ]
 }

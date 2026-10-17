@@ -49,7 +49,10 @@ import {
   containsDirectAddress,
   isWeakPromotionalQuestion,
 } from '@/lib/ai-visibility/suggestion-cache'
-import { generateProjectEnrichmentQuestions } from '@/lib/ai-visibility/gemini-semantic-classifier'
+import { generateProjectEnrichmentQuestions, MAX_PROMPT_PAGES, type SiteContentForPrompt } from '@/lib/ai-visibility/gemini-semantic-classifier'
+import { readSeedScopeTerms, widenBusinessScope } from '@/lib/ai-visibility/seed-scope'
+import { decodeTitle, isUtilityTitle } from '@/lib/ai-visibility/site-topics'
+import { readSiteMap } from '@/lib/content/existing-content/site-map-store'
 import {
   buildFallbackSuggestions,
   isLegacyWeakQuestion,
@@ -117,6 +120,39 @@ async function authAndProject(projectId: string) {
   return { user, admin, project }
 }
 
+/**
+ * The site's page titles for the question prompt: the full-site mapping
+ * (site_page_map) and the scan's niche, read with the service role and filtered
+ * by the project AND its owner. Read only when the model is about to be called; any failure means
+ * no pages, and the prompt is then exactly what it was before.
+ */
+async function readSiteContent(
+  admin: ReturnType<typeof createAdminClient>,
+  projectId: string,
+  userId: string,
+  location: string | null,
+): Promise<SiteContentForPrompt | null> {
+  try {
+    const [read, { niche }] = await Promise.all([
+      readSiteMap(admin, { projectId, userId }, { entries: true }),
+      readSeedScopeTerms(admin, projectId, userId),
+    ])
+    if (!read.available || !read.row) return null
+    const seen = new Set<string>()
+    const pages: string[] = []
+    for (const e of read.row.entries ?? []) {
+      const title = decodeTitle(String(e?.t ?? '')).replace(/\s+/g, ' ').trim()
+      if (!title || isUtilityTitle(title) || seen.has(title)) continue
+      seen.add(title)
+      pages.push(title)
+      if (pages.length >= MAX_PROMPT_PAGES) break
+    }
+    return pages.length > 0 ? { pages, niche, location } : null
+  } catch {
+    return null
+  }
+}
+
 export async function POST(request: Request) {
   if (process.env.ENABLE_AI_VISIBILITY !== 'true') {
     return Response.json({ error: 'Not found' }, { status: 404 })
@@ -151,13 +187,19 @@ export async function POST(request: Request) {
     return Response.json({ error: result.error }, { status: result.status })
   }
 
-  const { admin, project } = result
+  const { admin, project, user } = result
 
   try {
     // Extract allowed locations and service areas from project data
     const allowedLocations = extractAllowedLocations(project as Record<string, any>)
     const allowedServiceAreas = extractAllowedServiceAreas(project as Record<string, any>)
-    const businessScope = extractBusinessScope(project as Record<string, any>)
+    // The seeding scan's niche, audiences and seed keywords widen the scope,
+    // so the questions b5 prepared are not hidden here. Only added to; a project
+    // without a seed profile keeps exactly this scope (lib/ai-visibility/seed-scope.ts).
+    const businessScope = widenBusinessScope(
+      extractBusinessScope(project as Record<string, unknown>),
+      await readSeedScopeTerms(admin, projectId, user.id),
+    )
 
     console.log('[enriched-suggestions] API called', {
       projectId,
@@ -519,7 +561,9 @@ export async function POST(request: Request) {
           countryForGemini, // Pass display name, not code
           allowedLocations,
           businessScope,
-          candidateCount // Pass the scaled candidate count
+          candidateCount, // Pass the scaled candidate count
+          // The site's own pages, niche and location: the questions come from its content (w8-relevance).
+          await readSiteContent(admin, projectId, user.id, project.city || countryForGemini || null),
         )
 
         geminiGenerationResult.rawCount = geminiSuggestions.length

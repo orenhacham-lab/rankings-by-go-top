@@ -131,7 +131,11 @@ export const ANCHOR_MIN_WORD_GAP = 200
 export const ANCHOR_MIN_PARAGRAPH_GAP = 2
 
 const MECHANICAL_HE = ['למידע נוסף', 'מידע נוסף', 'לחצו כאן', 'לחץ כאן', 'קראו עוד', 'קרא עוד', 'אתר כמו', 'אתרים כמו', 'אפשר למצוא מידע', 'ניתן למצוא מידע', 'להמשך קריאה', 'ראו כאן', 'ראה כאן']
+const MECHANICAL_ES = ['más información', 'mas informacion', 'haz clic aquí', 'haga clic aquí', 'clic aquí', 'leer más', 'lee más', 'un sitio como', 'sitios como', 'una web como', 'para más información', 'ver aquí', 'ver más', 'sigue leyendo']
 const MECHANICAL_EN = ['read more', 'click here', 'learn more', 'for more information', 'more information', 'a site like', 'sites like', 'website like', 'find out more', 'more info', 'visit this site', 'see here']
+
+/** Mechanical anchor phrases keyed by content language. */
+const MECHANICAL: Record<SuggestionLanguage, string[]> = { he: MECHANICAL_HE, en: MECHANICAL_EN, es: MECHANICAL_ES }
 
 export interface AnchorHit {
   href: string
@@ -231,7 +235,7 @@ export function analyzeAnchorQuality(contentHtml: string, language: SuggestionLa
     if (wordGap < ANCHOR_MIN_WORD_GAP && paraGap < ANCHOR_MIN_PARAGRAPH_GAP) anchorsTooClose = true
   }
 
-  const mech = language === 'he' ? MECHANICAL_HE : MECHANICAL_EN
+  const mech = MECHANICAL[language]
   let mechanicalAnchorPhrase = false
   for (const h of hits) {
     const hay = `${h.text} ${h.precedingText}`.toLowerCase()

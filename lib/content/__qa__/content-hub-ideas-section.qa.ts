@@ -7,6 +7,7 @@
 import { readFileSync } from 'fs'
 import { join } from 'path'
 import { ideasSectionFromParam, ideasSectionToParam } from '../content-hub-ideas-section'
+import { strategyHref, STRATEGY_ANCHORS } from '../strategy/view'
 import { getDashboardDictionary } from '../../i18n/dashboard/getDashboardDictionary'
 
 let pass = 0, fail = 0
@@ -30,28 +31,63 @@ function main() {
   check('round-trip auto', ideasSectionFromParam(ideasSectionToParam('auto')) === 'auto')
   check('round-trip manual', ideasSectionFromParam(ideasSectionToParam('manual')) === 'manual')
 
-  console.log('SOURCE) Content Hub wiring')
-  const hub = strip(read('components/content/ContentHub.tsx'))
+  console.log('SOURCE) content workspace wiring')
+  // The workspace is one screen per concern now, so each contract names the file that
+  // owns it: the shared create-topic action and the ?section mirror live in the provider
+  // (they cross screens), the sub-tabs and the automatic workflow live on the automation
+  // screen, and the create-topic BUTTONS live on the screens a merchant starts from.
+  const workspace = strip(read('components/content/workspace/ContentWorkspaceProvider.tsx'))
+  const automation = strip(read('components/content/workspace/AutomationScreen.tsx'))
+  const articles = strip(read('components/content/workspace/ArticlesScreen.tsx'))
+  const topics = strip(read('components/content/workspace/TopicsScreen.tsx'))
+  const screens = [articles, topics, automation].join('\n')
 
-  // 1 — every "New article topic" button is retargeted to the single handler.
-  check('all create-topic buttons use handleCreateTopic', (hub.match(/onClick=\{handleCreateTopic\}/g) || []).length === 3)
-  check('handleCreateTopic → ideas section when automation on, else the modal',
-    /handleCreateTopic = useCallback\(\(\) => \{[\s\S]*?if \(automationEnabled\) goToIdeas\(\)[\s\S]*?else \{ setEditingTopic\(null\); setBriefOpen\(true\) \}/.test(hub))
-  check('goToIdeas selects the automatic sub-tab + scrolls to it', /goToIdeas = useCallback[\s\S]*?changeIdeasSection\('auto'\)[\s\S]*?ideasSectionRef\.current\?\.scrollIntoView/.test(hub))
+  // 1 — every "New article topic" button is retargeted to the single shared handler.
+  check('all create-topic buttons use handleCreateTopic (2 on articles, 1 on topics)',
+    (articles.match(/onClick=\{handleCreateTopic\}/g) || []).length === 2
+    && (topics.match(/onClick=\{handleCreateTopic\}/g) || []).length === 1)
+  // "New topic" used to land on the list view's automatic ideas, the old design, where
+  // approving an idea was the only thing it offered. It now opens the content strategy
+  // board's "add a keyword" field (the keyword becomes an approved topic); approving an
+  // idea happens on the board (content-strategy-idea-actions.qa.ts).
+  const createsOnBoard = (src: string) =>
+    /handleCreateTopic = useCallback\(\(\) => \{[\s\S]*?if \(automationEnabled\) router\.push\(strategyAddKeywordHref\(\)\)[\s\S]*?else \{ setEditingTopic\(null\); setBriefOpen\(true\) \}/.test(src)
+  check('handleCreateTopic → the board\'s keyword field when automation on, else the modal', createsOnBoard(workspace))
+  check('MUT: handleCreateTopic back to the list view\'s ideas fails that check',
+    !createsOnBoard(workspace.replace('router.push(strategyAddKeywordHref())', 'goToIdeas()')))
+  // It used to scroll to a section of the one big page, then to navigate to the
+  // automation screen. That screen is the ideas section of the content strategy tab's
+  // list view now (W6c), so the same intent navigates there, on the automatic sub-tab —
+  // which survives a refresh and a share.
+  const toIdeas = (src: string) =>
+    /goToIdeas = useCallback[\s\S]*?router\.push\(strategyHref\('list', STRATEGY_ANCHORS\.ideas, \{ section: ideasSectionToParam\('auto'\) \}\)\)/.test(src)
+  check('goToIdeas navigates to the ideas section of the strategy list view, on the automatic sub-tab', toIdeas(workspace))
+  check('MUT: goToIdeas that still pushes the retired automation screen fails that check',
+    !toIdeas(workspace.replace("router.push(strategyHref('list', STRATEGY_ANCHORS.ideas, { section: ideasSectionToParam('auto') }))", "router.push('/content/automation?section=ideas')")))
+  check('…and that href is the list view at the ideas, with the sub-tab',
+    strategyHref('list', STRATEGY_ANCHORS.ideas, { section: ideasSectionToParam('auto') }) === '/content/strategy?view=list&section=ideas#ideas')
 
   // 2 — the ideas destination has auto + manual sub-tabs; manual reuses the SAME modal.
-  check('ideas sub-tab bar (auto + manual)', /t\.ideasSubTabs\.auto/.test(hub) && /t\.ideasSubTabs\.manual/.test(hub) && /changeIdeasSection\(key\)/.test(hub))
+  check('ideas sub-tab bar (auto + manual)', /t\.ideasSubTabs\.auto/.test(automation) && /t\.ideasSubTabs\.manual/.test(automation) && /onChange=\{changeIdeasSection\}/.test(automation) && /<Segmented/.test(automation))
   check("manual sub-tab reuses ArticleBriefModal (setBriefOpen) — not a new topic type",
-    /ideasSection === 'manual' \?[\s\S]*?manualTopicTitle[\s\S]*?onClick=\{\(\) => \{ setEditingTopic\(null\); setBriefOpen\(true\) \}\}/.test(hub))
-  check('manual create button is the ONLY direct setBriefOpen (the 3 list buttons were retargeted)',
-    (hub.match(/onClick=\{\(\) => \{ setEditingTopic\(null\); setBriefOpen\(true\) \}\}/g) || []).length === 1)
+    /ideasSection === 'manual' \?[\s\S]*?manualTopicTitle[\s\S]*?onClick=\{\(\) => \{ setEditingTopic\(null\); setBriefOpen\(true\) \}\}/.test(automation))
+  check('manual create button is the ONLY direct setBriefOpen across the workspace',
+    (screens.match(/onClick=\{\(\) => \{ setEditingTopic\(null\); setBriefOpen\(true\) \}\}/g) || []).length === 1)
+  // ONE modal for the whole workspace, mounted by the shell — not one per screen.
+  const shell = strip(read('components/content/workspace/ContentWorkspaceShell.tsx'))
+  check('the brief modal is mounted ONCE, by the shell',
+    (shell.match(/<ArticleBriefModal/g) || []).length === 1 && !/<ArticleBriefModal/.test(screens))
 
   // 3 — automatic workflow unchanged (still the AutomationIdeas + schedule, under 'auto').
-  check('automatic ideas workflow preserved (AutomationIdeas + AutomationSchedule)', /<AutomationIdeas/.test(hub) && /<AutomationSchedule/.test(hub))
+  check('automatic ideas workflow preserved (AutomationIdeas + AutomationSchedule)', /<AutomationIdeas/.test(automation) && /<AutomationSchedule/.test(automation))
 
   // URL sync — one mechanism (?section), deep-link/refresh/back-forward via searchParams.
-  check('sub-tab change writes ?section via router.replace (no history spam)', /params\.set\('section', ideasSectionToParam\(section\)\)[\s\S]*?router\.replace/.test(hub) && !/router\.push\([^)]*section/.test(hub))
-  check('sub-tab mirrors the URL section param (deep-link / back-forward)', /setIdeasSection\(ideasSectionFromParam\(searchParams\.get\('section'\)\)\)/.test(hub))
+  // The sub-tab change must still REPLACE (no history spam); only the cross-screen
+  // navigation above pushes, which is what a navigation should do.
+  const changeFn = workspace.slice(workspace.indexOf('const changeIdeasSection'), workspace.indexOf('const goToIdeas'))
+  check('sub-tab change writes ?section via router.replace (no history spam)',
+    /params\.set\('section', ideasSectionToParam\(section\)\)[\s\S]*?router\.replace/.test(changeFn) && !/router\.push/.test(changeFn))
+  check('sub-tab mirrors the URL section param (deep-link / back-forward)', /setIdeasSection\(ideasSectionFromParam\(searchParams\.get\('section'\)\)\)/.test(workspace))
 
   // The manual create still goes through the existing endpoint (reuse, no bypass).
   const modal = strip(read('components/content/ArticleBriefModal.tsx'))

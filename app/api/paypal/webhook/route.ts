@@ -1,6 +1,7 @@
 import { createAdminClient } from '@/lib/supabase/admin'
 import { extractPayPalWebhookHeaders, verifyPayPalWebhookSignature, fetchAuthoritativeBillingPeriod } from '@/lib/paypal/client'
 import { processVerifiedPayPalWebhookEvent, httpStatusForOutcome, type PayPalWebhookEvent } from '@/lib/paypal/webhook-processing'
+import { applyPayPalEventToAffiliateBooks, bridgeOutcomeIsNotable, type PayPalAffiliateEvent } from '@/lib/affiliate/paypal-bridge'
 
 /**
  * PayPal sends webhook events to this endpoint.
@@ -86,6 +87,20 @@ async function handle(request: Request): Promise<Response> {
     // A concurrent renewal handler won the race — THIS delivery must be
     // retried (unlike duplicate/stale, which are permanent no-ops).
     console.warn('[paypal-webhook] renewal conflict — concurrent handler already advanced this row, retry needed', outcome)
+  }
+
+  // The affiliate books, as a SEPARATE pass over the same verified event: a
+  // payment earns the partner who referred the payer a commission, a refund
+  // reverses it, a cancellation stops the referral counting towards their tier.
+  // Deliberately after the subscription work and deliberately unable to change
+  // this route's answer — lib/affiliate/paypal-bridge.ts says why. A failure
+  // here is a line in the log, never a non-2xx that would make PayPal retry an
+  // event whose real work already succeeded.
+  try {
+    const affiliate = await applyPayPalEventToAffiliateBooks(admin, parsed as PayPalAffiliateEvent)
+    if (bridgeOutcomeIsNotable(affiliate)) console.warn('[paypal-webhook] affiliate books', affiliate)
+  } catch (affiliateError) {
+    console.error('[paypal-webhook] affiliate books threw', affiliateError instanceof Error ? affiliateError.name : 'unknown')
   }
 
   const isError = outcome.kind === 'update_failed' || outcome.kind === 'lookup_failed'

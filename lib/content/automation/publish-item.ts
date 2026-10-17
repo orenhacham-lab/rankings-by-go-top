@@ -2,20 +2,21 @@
  * Content-automation — headless "publish one generated item to WordPress"
  * service (Phase 6). Atomic locking, duplicate prevention, publish-time quality
  * gate, and crash recovery. Reuses the existing WordPress libs (loadWordPress-
- * Credentials, wpCreatePost → uploadMedia/createPost, updatePostSeoMeta). Never
+ * Publisher → the plugin >= 3.0.0 or the application password, wpCreatePost → uploadMedia/createPost,
+ * updatePostSeoMeta). Never
  * uses force. No cron. NO changes to the manual publish route behavior.
  */
 
 import type { createAdminClient } from '@/lib/supabase/admin'
-import { loadWordPressCredentials } from '@/lib/content/api-auth'
-import { publishArticleSeo } from '@/lib/content/seo-publish'
-import { wpCreatePost } from '@/lib/content/wordpress-publish'
+import { loadWordPressPublisher, publishArticleToWordPress, publishSeoFor } from '@/lib/content/wordpress-plugin-publish'
 import { runQualityGate } from '@/lib/content/automation/quality-gate'
 import { AUTOMATION_MAX_ATTEMPTS } from '@/lib/content/automation/generate-item'
+import { enqueueGbpPostForPublishedArticle } from '@/lib/gbp/auto-post'
 import { ensureProjectKeywordFromPublishedArticle } from '@/lib/content/keyword-from-article'
 import { recordPublishFinalFailureAlert, recordPublishBlockedAlert, resolvePublishAlerts } from '@/lib/content/automation/alerts'
 import type { AlertChannel } from '@/lib/content/automation/alert-read-model'
 import { publishShopifyPoolItem } from '@/lib/content/automation/publish-item-shopify'
+import { publishSitePoolItem } from '@/lib/site-platforms/publish'
 import { loadActivePlatform } from '@/lib/content/platform/load-active-platform'
 import type { WpCreateError } from '@/lib/content/wordpress-publish'
 
@@ -132,6 +133,9 @@ export async function publishPoolItem(admin: Admin, itemId: string): Promise<Pub
     if (active.platform === 'shopify') {
       return await publishShopifyPoolItem(admin, item)
     }
+    if (active.platform === 'wix' || active.platform === 'webhook') {
+      return await publishSitePoolItem(admin, item)
+    }
 
     const { data: artData } = await admin.from('generated_articles').select(ARTICLE_SELECT).eq('id', item.article_id).maybeSingle()
     const article = artData as ArticleRow | null
@@ -148,6 +152,10 @@ export async function publishPoolItem(admin: Admin, itemId: string): Promise<Pub
       // Phase 3E — first time this item reaches published, ensure its keyword.
       // Idempotent (deduped), so the already_published path is a cheap no-op too.
       await ensureProjectKeywordFromPublishedArticle(admin, article.id)
+      // Also a post on the business profile, when the owner connected Google
+      // Business Profile and approved automatic posting. Best-effort, no network
+      // call to Google or to a model here; never affects the publish outcome.
+      await enqueueGbpPostForPublishedArticle(admin, article.id)
       // Phase 4B.1 — a recovered/reconciled publish resolves any open failure alert.
       await resolvePublishAlerts(admin, itemId, { articleId: article.id, channel: 'wordpress' })
       return { itemId, status: 'published', articleId: article.id, wpPostUrl: article.wp_post_url, noop: item.status === 'published' ? 'already_published' : 'reconciled' }
@@ -186,8 +194,9 @@ export async function publishPoolItem(admin: Admin, itemId: string): Promise<Pub
       if (dup) { await blockItem(admin, itemId, 'duplicate_topic_published', ctx, 'wordpress'); return { itemId, status: 'paused', articleId: article.id, reason: 'duplicate_topic_published' } }
     }
 
-    // (E) WordPress credentials must be present/valid. Deterministic → pause + alert.
-    const loaded = await loadWordPressCredentials(admin, item.project_id)
+    // (E) A WordPress publishing connection must be present/valid: the GO TOP SEO Bridge plugin
+    // >= 3.0.0 when connected, otherwise the application password as before. Deterministic → pause + alert.
+    const loaded = await loadWordPressPublisher(admin, item.project_id)
     if ('error' in loaded) {
       await blockItem(admin, itemId, 'no_wordpress_connection', ctx, 'wordpress')
       return { itemId, status: 'paused', articleId: article.id, reason: 'no_wordpress_connection' }
@@ -217,7 +226,7 @@ export async function publishPoolItem(admin: Admin, itemId: string): Promise<Pub
 
     // Create the WordPress post (status=publish; never force; blocks on image
     // upload failure so nothing goes live without its intended image).
-    const created = await wpCreatePost(admin, loaded.creds, article as never, { status: 'publish' })
+    const created = await publishArticleToWordPress(admin, loaded, article as never, { status: 'publish' })
     if (!created.ok) {
       await admin.from('generated_articles').update({ status: 'draft', updated_at: nowIso() }).eq('id', article.id)
       if (created.kind === 'media_upload_failed') {
@@ -244,7 +253,7 @@ export async function publishPoolItem(admin: Admin, itemId: string): Promise<Pub
     const wpPatch: Record<string, unknown> = {
       wp_post_id: created.wpPostId,
       wp_post_url: created.wpPostUrl,
-      wp_connection_id: loaded.connection.id,
+      wp_connection_id: loaded.connectionId,
       updated_at: nowIso(),
     }
     if (typeof created.featuredMediaId === 'number') wpPatch.wp_featured_media_id = created.featuredMediaId
@@ -266,8 +275,9 @@ export async function publishPoolItem(admin: Admin, itemId: string): Promise<Pub
     // topic's primary_keyword) and PERSISTED truthfully. Never swallowed, never a silent
     // publish without complete SEO data. Non-fatal to the post itself.
     try {
-      const seo = await publishArticleSeo(admin, loaded.creds, created.wpPostId, {
+      const seo = await publishSeoFor(admin, loaded, created, {
         articleId: article.id, metaTitle: article.meta_title || String(article.title || ''), metaDescription: article.meta_description || null, topicId: article.topic_id,
+        postUrl: created.wpPostUrl,
       })
       if (seo.status !== 'verified') console.warn('[automation-publish] seo_not_verified', { itemId, articleId: article.id, plugin: seo.plugin, status: seo.status })
     } catch (e) { console.warn('[automation-publish] seo write failed', { itemId, message: (e as Error)?.message?.slice(0, 120) }) }
@@ -279,6 +289,10 @@ export async function publishPoolItem(admin: Admin, itemId: string): Promise<Pub
     // Phase 3E — add the topic's primary keyword to the project's tracked
     // keywords. Best-effort + idempotent; never affects the publish outcome.
     await ensureProjectKeywordFromPublishedArticle(admin, article.id)
+    // Also a post on the business profile, when the owner connected Google
+    // Business Profile and approved automatic posting. Best-effort, no network
+    // call to Google or to a model here; never affects the publish outcome.
+    await enqueueGbpPostForPublishedArticle(admin, article.id)
 
     // Phase 4B.1 — a successful publish resolves any open failure alert, for this
     // item AND for this article's older attempts on the same (or unknown) channel.

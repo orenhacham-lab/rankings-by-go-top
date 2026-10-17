@@ -1,11 +1,38 @@
-import type { Metadata } from 'next'
+import type { Metadata, Viewport } from 'next'
+import { Heebo, Inter } from 'next/font/google'
 import './globals.css'
-import { PublicSiteWidgets } from '@/components/public/PublicSiteWidgets'
+import { PublicConsentNotice, PublicSiteWidgets } from '@/components/public/PublicSiteWidgets'
 import { RootThemeProvider } from './RootThemeProvider'
 import { buildHreflangAlternates } from '@/lib/seo/hreflang'
 import { documentLocaleAttributes } from '@/lib/i18n/document-locale'
 import { getRootRequestContext } from '@/lib/i18n/root-request'
 import { getSiteMetadata } from '@/lib/i18n/site-metadata'
+import { softwareOffer } from '@/lib/seo/software-offer'
+import { websiteSchema } from '@/lib/seo/page-schema'
+import { localeHomeHref } from '@/lib/i18n/locales'
+import { marketForCountry } from '@/lib/billing/market'
+import { requestCountry } from '@/lib/billing/server-market'
+import { GOOGLE_CONSENT_DEFAULT_SCRIPT } from '@/lib/consent/google-consent-mode'
+import { GoogleTags } from '@/components/consent/GoogleTags'
+import { DocumentLocaleSync } from '@/components/DocumentLocaleSync'
+
+/**
+ * The two faces of the type system (see --font-sans in globals.css): Inter for
+ * Latin and every digit, Heebo for Hebrew. Self-hosted by next/font, so no page
+ * waits on a third-party stylesheet and the fallback is metric-adjusted — the
+ * text does not jump when the font arrives.
+ */
+const inter = Inter({ subsets: ['latin'], display: 'swap', variable: '--font-inter' })
+const heebo = Heebo({ subsets: ['hebrew', 'latin'], display: 'swap', variable: '--font-heebo' })
+
+/**
+ * The viewport is its own export: inside `metadata` Next ignores it and logs
+ * "Unsupported metadata viewport" on every render. Same values as before.
+ */
+export const viewport: Viewport = {
+  width: 'device-width',
+  initialScale: 1,
+}
 
 /**
  * The document's metadata follows the SAME resolved locale as <html lang/dir>.
@@ -21,29 +48,23 @@ export async function generateMetadata(): Promise<Metadata> {
     title: m.title,
     description: m.description,
     keywords: m.keywords,
-    icons: {
-      icon: [
-        { url: '/favicon.ico' },
-        { url: '/favicon-192.png', sizes: '192x192', type: 'image/png' },
-        { url: '/favicon-512.png', sizes: '512x512', type: 'image/png' },
-      ],
-      shortcut: '/favicon.ico',
-      apple: '/apple-touch-icon.png',
-    },
+    // No `icons` here, and no <link rel="icon"> in <head> below: the icons are
+    // the file conventions app/favicon.ico, app/icon.png and app/apple-icon.png
+    // (rendered by scripts/brand/icons.ts), which Next links ONCE each, with a
+    // content hash. Declaring them here too put every icon in the head three times.
     openGraph: {
       title: m.ogTitle,
       description: m.ogDescription,
       images: ['/gotop-primary.png'],
       url: 'https://www.gotopseo.com',
-      siteName: 'Rankings by Go Top',
+      siteName: 'Go Top SEO',
       locale: m.ogLocale,
       type: 'website',
     },
     alternates: {
       canonical: 'https://www.gotopseo.com',
-      languages: buildHreflangAlternates('/', '/en'),
+      languages: buildHreflangAlternates('/', '/en', '/es'),
     },
-    viewport: 'width=device-width, initial-scale=1',
     robots: 'index, follow',
     authors: [{ name: 'Go Top' }],
   }
@@ -66,55 +87,57 @@ export default async function RootLayout({
   // up after hydration.
   const { isAuthenticated, locale } = await getRootRequestContext()
   const { lang, dir } = documentLocaleAttributes(locale)
+  const schema = getSiteMetadata(locale)
+  // The page the reader is on, not always the Hebrew root: the markup used to
+  // point every language's `url` at https://www.gotopseo.com.
+  const localeHome = `https://www.gotopseo.com${localeHomeHref(locale) === '/' ? '' : localeHomeHref(locale)}`
+  // The SAME basis the pricing page prices by: the visitor's country, not the
+  // page's language (lib/billing/server-market.ts). By language the markup
+  // would still contradict the page for an Israeli reading the English one.
+  // Header-only, so no auth read and no query: a crawler and an anonymous
+  // visitor get exactly what the pricing page would show them.
+  const market = marketForCountry(await requestCountry())
 
   return (
-    <html lang={lang} dir={dir} className="h-full" suppressHydrationWarning>
+    <html lang={lang} dir={dir} className={`h-full ${inter.variable} ${heebo.variable}`} suppressHydrationWarning>
       <head>
         <meta charSet="utf-8" />
         <meta name="google-site-verification" content="UL2PVup2WIEC5Gt3M45JUnk6Ks4sZqQAtdJ_6l2GHZA" />
-        {/* Favicon - Go Top logo */}
-        <link rel="icon" type="image/x-icon" href="/favicon.ico?v=7" />
-        <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16.png?v=7" />
-        <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32.png?v=7" />
-        <link rel="icon" type="image/png" sizes="64x64" href="/favicon-64.png?v=7" />
-        <link rel="icon" type="image/png" sizes="192x192" href="/favicon-192.png?v=7" />
-        <link rel="icon" type="image/png" sizes="512x512" href="/favicon-512.png?v=7" />
-        <link rel="apple-touch-icon" href="/apple-touch-icon.png?v=7" />
         <meta name="theme-color" content="#0666C2" />
 
-        {/* Google Tag Manager - Initialize data layer BEFORE GTM script */}
-        <script
-          dangerouslySetInnerHTML={{
-            __html: `
-              window.dataLayer = window.dataLayer || [];
-              function gtag(){dataLayer.push(arguments);}
-              gtag('js', new Date());
-              gtag('config', 'GTM-PC29G3NQ');
-            `,
-          }}
-        />
+        {/*
+          CONSENT MODE v2 DEFAULT — the first script on the page, and the reason
+          the tag loader below is safe to exist at all. It creates the dataLayer
+          and declares every optional storage bucket DENIED before any tag can
+          be evaluated. Ordering is the whole point: a default pushed after a tag
+          has fired cannot un-fire it, so this is inline in <head> rather than a
+          component. It contacts nothing; gtm.js itself is requested only once a
+          visitor has allowed a category (components/consent/GoogleTags.tsx).
+        */}
+        <script dangerouslySetInnerHTML={{ __html: GOOGLE_CONSENT_DEFAULT_SCRIPT }} />
 
-        {/* Google Tag Manager Script */}
-        <script async src="https://www.googletagmanager.com/gtm.js?id=GTM-PC29G3NQ"></script>
-
-        <link rel="preconnect" href="https://fonts.googleapis.com" />
-        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
-        <link
-          href="https://fonts.googleapis.com/css2?family=Rubik:wght@300;400;500;600;700&display=swap"
-          rel="stylesheet"
-        />
-        {/* JSON-LD Schema for SEO */}
+        {/* JSON-LD Schema for SEO — IN THE REQUEST'S LANGUAGE.
+            Its two descriptions were hard-coded Hebrew, so the Spanish and the
+            English pages told a crawler, in Hebrew, what the product does. The
+            document's own <html lang> and <title> already follow the resolved
+            locale (generateMetadata above); this now reads the same table. */}
         <script
           type="application/ld+json"
           dangerouslySetInnerHTML={{
             __html: JSON.stringify([
+              websiteSchema(locale, schema.description),
               {
                 '@context': 'https://schema.org',
                 '@type': 'Organization',
-                name: 'Rankings by Go Top',
+                // The id the WebSite above names as its publisher, so the two
+                // are one graph rather than two unrelated nodes repeated on
+                // every URL.
+                '@id': 'https://www.gotopseo.com/#organization',
+                name: 'Go Top SEO',
+                alternateName: ['Rankings by Go Top'],
                 url: 'https://www.gotopseo.com',
                 logo: 'https://www.gotopseo.com/gotop-primary.png',
-                description: 'יצירה, תזמון ופרסום תוכן SEO ו-GEO, לצד מעקב מיקומים בגוגל אורגני, מפות ונראות ב-AI',
+                description: schema.description,
                 sameAs: ['https://www.gotop.co.il'],
                 contactPoint: {
                   '@type': 'ContactPoint',
@@ -124,31 +147,28 @@ export default async function RootLayout({
                 },
                 parentOrganization: {
                   '@type': 'Organization',
-                  name: 'Go Top',
+                  name: 'GO TOP',
                   url: 'https://www.gotop.co.il',
                 },
               },
               {
                 '@context': 'https://schema.org',
                 '@type': 'SoftwareApplication',
-                name: 'Rankings by Go Top',
-                description: 'יצירה, תזמון ופרסום תוכן SEO ו-GEO, לצד מעקב מיקומים בגוגל אורגני, מפות ונראות ב-AI',
-                url: 'https://www.gotopseo.com',
+                name: 'Go Top SEO',
+                alternateName: ['Rankings by Go Top'],
+                publisher: { '@type': 'Organization', name: 'GO TOP', url: 'https://www.gotop.co.il' },
+                brand: { '@type': 'Organization', name: 'GO TOP', url: 'https://www.gotop.co.il' },
+                description: schema.description,
+                url: localeHome,
                 applicationCategory: 'BusinessApplication',
                 operatingSystem: 'Web',
-                aggregateRating: {
-                  '@type': 'AggregateRating',
-                  ratingValue: '4.8',
-                  ratingCount: '156',
-                },
-                offers: {
-                  '@type': 'Offer',
-                  price: '0',
-                  priceCurrency: 'ILS',
-                },
+                // No aggregateRating: a rating may only describe real, collected
+                // reviews (Google's review-snippet policy; FTC fake-review rule).
+                // The offer is the real plan range from the catalog.
+                offers: softwareOffer(market),
                 author: {
                   '@type': 'Organization',
-                  name: 'Go Top',
+                  name: 'GO TOP',
                   url: 'https://www.gotop.co.il',
                 },
               },
@@ -156,15 +176,21 @@ export default async function RootLayout({
           }}
         />
       </head>
-      <body className="min-h-full bg-slate-50 text-slate-900 antialiased overflow-x-hidden">
-        {/* Google Tag Manager (noscript) - must be first element in body */}
-        <div
-          suppressHydrationWarning
-          dangerouslySetInnerHTML={{
-            __html: `<noscript><iframe src="https://www.googletagmanager.com/ns.html?id=GTM-PC29G3NQ" height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>`,
-          }}
-        />
+      <body className="min-h-full bg-canvas text-body antialiased overflow-x-hidden">
+        {/*
+          The GTM <noscript> iframe used to be here. It is gone: it loaded the
+          container for every visitor with JavaScript disabled — the one visitor
+          who can neither be asked for consent nor withdraw it.
+        */}
+        <GoogleTags />
+        {/* <html lang/dir> is rendered once, above every changing segment; this
+            re-states it after a client-side navigation into another language. */}
+        <DocumentLocaleSync />
         <RootThemeProvider>
+          {/* Above `children` on purpose: the notice is fixed-positioned, so this
+              changes nothing visually and everything about the tab order. See
+              PublicConsentNotice. */}
+          <PublicConsentNotice isAuthenticated={isAuthenticated} />
           {children}
           <PublicSiteWidgets isAuthenticated={isAuthenticated} />
         </RootThemeProvider>

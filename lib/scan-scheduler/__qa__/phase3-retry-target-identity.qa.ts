@@ -48,8 +48,17 @@ const ROOT = join(__dirname, '..', '..', '..')
 const read = (rel: string) => readFileSync(join(ROOT, rel), 'utf8')
 
 const NOW = new Date('2026-08-15T06:00:00Z')
-const PERIOD_START = '2026-08-01T00:00:00Z'
-const PERIOD_END = '2026-09-01T00:00:00Z'
+/**
+ * Wide on purpose, not the month around NOW: the scheduler takes the injected
+ * `now`, but getUserEntitlement and resolveCurrentUsagePeriod read the WALL
+ * clock to decide whether this user has a paid plan. An Aug-2026 period made
+ * this fixture resolve to trial with a zero allowance from 2026-09-01 on, so
+ * every scenario returned quota_exceeded and nothing it was written to prove
+ * was actually exercised (found 2026-10-12). Same note in
+ * process-scheduled-scan.qa.ts.
+ */
+const PERIOD_START = '2020-01-01T00:00:00Z'
+const PERIOD_END = '2099-01-01T00:00:00Z'
 
 function admin(tables: Record<string, unknown[]>) {
   return new FakeAdmin({
@@ -200,7 +209,17 @@ async function main() {
     const src = read('app/api/ai-visibility/runs/route.ts')
     check('every request is scoped to exactly ONE promptId + ONE engine (never a batch/array of targets)', /promptId, engine \} = body/.test(src))
     check('a fresh ai_scan_runs row is created for EVERY call — never reused/resumed across requests', /triggered_by: 'manual'/.test(src) && !/eq\('status', 'running'\)/.test(src))
-    check('the idempotency key includes Date.now() — deliberately UNIQUE per call, never stable across retries (no reservation-reuse-across-attempts concept exists here at all)', /idempotencyKey: `manual:\$\{projectId\}:\$\{promptId\}:\$\{engine\}:\$\{Date\.now\(\)\}`/.test(src))
+    // This asked for `Date.now()` in the key, which the route has since replaced
+    // with the CLAIM's own key: identical for anything that joins the same
+    // operation, different for a legitimate later retry. That is strictly better
+    // than a per-millisecond key (two requests racing into one operation used to
+    // reserve twice), so the guard now asks for the operation's identity and
+    // refuses a per-millisecond or per-request one.
+    check('the idempotency key is the OPERATION\'s identity — never per-millisecond and never per-request',
+      /idempotencyKey: `manual:\$\{projectId\}:\$\{promptId\}:\$\{engine\}:\$\{operationKey\}`/.test(src)
+      && /operationKey = claim\.operationKey/.test(src)
+      && !/idempotencyKey:[^\n]*Date\.now\(\)/.test(src)
+      && !/idempotencyKey:[^\n]*\$\{requestId\}/.test(src))
     check('there is no "remaining"/"doneIds"/scan_results-style diff logic anywhere in this route', !/remaining/i.test(src) && !/doneIds/.test(src))
   }
 

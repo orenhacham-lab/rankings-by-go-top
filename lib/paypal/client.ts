@@ -198,6 +198,9 @@ type VerifiedActivationResult =
   | {
       ok: true
       planCode: SubscriptionPlan
+      /** w17 — the PayPal-verified plan id, so the caller can record which
+       *  market (currency) PayPal really charges. Read from the SAME fetch. */
+      planId: string
       /** Phase 3 — authoritative period boundaries from the SAME verified
        *  fetch (no extra API call). `periodEnd` is always present when
        *  `ok: true` (an activation with no future billing cycle at all is
@@ -250,7 +253,7 @@ export async function verifyPayPalActivation(
   // periodStart).
   const periodEnd = normalizeInstant(details.billing_info?.next_billing_time)
   if (!periodEnd) return { ok: false, reason: 'no_authoritative_period' }
-  return { ok: true, planCode: resolvedPlanCode, periodEnd, periodStart: normalizeInstant(details.start_time) }
+  return { ok: true, planCode: resolvedPlanCode, planId: details.plan_id as string, periodEnd, periodStart: normalizeInstant(details.start_time) }
 }
 
 export type CancelSubscriptionResult =

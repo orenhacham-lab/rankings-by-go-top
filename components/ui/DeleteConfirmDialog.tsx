@@ -66,17 +66,17 @@ export default function DeleteConfirmDialog({
 
   return (
     <Modal open={open} onClose={handleClose} title={labels.title} size="sm">
-      <p className="text-sm text-slate-600 dark:text-slate-300 whitespace-pre-line">
+      <p className="text-copy text-body whitespace-pre-line">
         {labels.body.replace('{name}', name)}
       </p>
 
       {failed && (
-        <p role="alert" className="mt-3 text-sm text-red-600 dark:text-red-400">
+        <p role="alert" className="mt-3 rounded-control border border-bad/20 bg-bad-soft px-3 py-2 text-copy text-bad">
           {labels.error}
         </p>
       )}
 
-      <div className="mt-5 flex justify-end gap-2">
+      <div className="mt-6 flex flex-wrap justify-end gap-2">
         <Button variant="ghost" onClick={handleClose} disabled={deleting}>
           {labels.cancel}
         </Button>

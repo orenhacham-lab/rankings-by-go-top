@@ -12,7 +12,8 @@
  * never duplicates a <figure>.
  */
 
-export const INLINE_IMAGE_MAX = 3
+/** Matches the article design setting's range (lib/content/article-style MAX_INLINE_IMAGES). */
+export const INLINE_IMAGE_MAX = 4
 
 export interface InlineImage {
   id: string
@@ -79,7 +80,7 @@ export function figureHtml(img: { id: string; url: string; alt: string | null; c
 /**
  * Compose inline images into the body: insert each image's <figure> right AFTER
  * its target section's first paragraph. Rules: max ONE image per section (first
- * by position), max 3 total, never in the intro / heading / list / table / FAQ.
+ * by position), max INLINE_IMAGE_MAX (4) total, never in the intro / heading / list / table / FAQ.
  * `mode` picks the URL: 'publish' uses ONLY the WordPress URL (skips images not
  * yet uploaded — never emits a temporary URL live); 'preview' falls back to the
  * storage URL. Idempotent: skips a section already carrying that image's figure.

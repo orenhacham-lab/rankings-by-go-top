@@ -332,20 +332,28 @@ async function main() {
     const { readFileSync } = require('fs')
     const { join } = require('path')
     const ROOT = join(__dirname, '..', '..', '..')
-    const page = readFileSync(join(ROOT, 'app/(dashboard)/projects/[id]/page.tsx'), 'utf8')
-    check('D1: creating a keyword schedules a volume refresh',
-      /onSuccess=\{\(\) => \{[\s\S]*?refreshMissingVolumes\(\)/.test(page))
-    check('D2: creation never waits on it — the refresh runs after the row is shown',
-      /void loadData\(\)\.then\(\(\) => refreshMissingVolumes\(\)\)/.test(page))
-    check('D3: the refresh asks for the PROJECT, so one add is one request and a bulk add is one batch',
-      /refreshMissingVolumes[\s\S]*?body: JSON\.stringify\(\{ projectId: id \}\)/.test(page)
-      // Scoped to the refresh function: `targetIds` appears elsewhere on the
-      // page for an unrelated scan_results query.
-      && !/refreshMissingVolumes[\s\S]{0,600}targetIds/.test(page))
-    check('D4: its failures are swallowed, so a provider fault cannot fail keyword creation',
-      /refreshMissingVolumes[\s\S]*?catch \{[\s\S]*?\}[\s\S]*?finally/.test(page))
-    check('D5: one in-flight guard covers both the automatic refresh and the manual button',
-      (page.match(/volumeRequestInFlight\.current/g) ?? []).length >= 4)
+    // The keyword table and its actions are the keywords tab of the current project
+    // now; they were a section of the project page, whose load was `loadData`.
+    const panel = readFileSync(join(ROOT, 'components/keywords/ProjectKeywordsPanel.tsx'), 'utf8')
+    const D = {
+      schedules: (src: string) => /onSuccess=\{\(\) => \{[\s\S]*?refreshMissingVolumes\(\)/.test(src),
+      afterRows: (src: string) => /void loadTargets\(\)\.then\(\(\) => refreshMissingVolumes\(\)\)/.test(src),
+      // Scoped to the refresh function: `targetIds` appears elsewhere in the panel
+      // for an unrelated scan_results query.
+      perProject: (src: string) => /refreshMissingVolumes[\s\S]*?body: JSON\.stringify\(\{ projectId: id \}\)/.test(src)
+        && !/const refreshMissingVolumes[\s\S]{0,600}targetIds/.test(src),
+      swallowed: (src: string) => /refreshMissingVolumes[\s\S]*?catch \{[\s\S]*?\}[\s\S]*?finally/.test(src),
+      oneGuard: (src: string) => (src.match(/volumeRequestInFlight\.current/g) ?? []).length >= 4,
+    }
+    check('D1: creating a keyword schedules a volume refresh', D.schedules(panel))
+    check('D2: creation never waits on it — the refresh runs after the row is shown', D.afterRows(panel))
+    check('D3: the refresh asks for the PROJECT, so one add is one request and a bulk add is one batch', D.perProject(panel))
+    check('D4: its failures are swallowed, so a provider fault cannot fail keyword creation', D.swallowed(panel))
+    check('D5: one in-flight guard covers both the automatic refresh and the manual button', D.oneGuard(panel))
+    check('D-MUT: awaiting the refresh before the rows fails D2',
+      !D.afterRows(panel.replace('void loadTargets().then(() => refreshMissingVolumes())', 'await refreshMissingVolumes(); void loadTargets()')))
+    check('D-MUT: a refresh that lists keyword ids fails D3',
+      !D.perProject(panel.replace('body: JSON.stringify({ projectId: id })', 'body: JSON.stringify({ projectId: id, targetIds })')))
     const table = readFileSync(join(ROOT, 'components/keywords/TrackingTargetsTable.tsx'), 'utf8')
     check('D6: a keyword awaiting its volume shows a pending state, not a bare dash',
       /volumePending \?/.test(table) && /k\.volumePending/.test(table))

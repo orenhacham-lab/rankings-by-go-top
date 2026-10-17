@@ -17,12 +17,13 @@ import { generateRecommendationJSON } from './model'
 import { isTitleKeywordAligned } from './coverage'
 import { isMalformedReason } from './opportunity-validation'
 import type { RunCostController } from './run-cost-controller'
+import { type ContentLanguage } from '@/lib/content/language'
 
 export interface ImproveOneInput {
   primaryKeyword: string
   title: string
   suggestionReason: string
-  language: 'he' | 'en'
+  language: ContentLanguage
 }
 
 export type ImproveOneReason = 'model_unavailable' | 'provider_error' | 'invalid_output' | 'no_change'
@@ -53,10 +54,15 @@ function parseObject(text: string): { title?: unknown; reason?: unknown } | null
   try { return JSON.parse(m[0]) } catch { return null }
 }
 
+/** The "write in X" instruction, in the language the recommendation is read in. */
+const LANG_LINE: Record<ContentLanguage, string> = {
+  he: 'כתוב בעברית תקנית וזורמת.',
+  en: 'Write in natural English.',
+  es: 'Escribe en español neutro, correcto y fluido, con acentos y signos de apertura (¿ ¡) correctos.',
+}
+
 function buildPrompt(input: ImproveOneInput): string {
-  const langLine = input.language === 'en'
-    ? 'Write in natural English.'
-    : 'כתוב בעברית תקנית וזורמת.'
+  const langLine = LANG_LINE[input.language]
   return [
     'You refine the wording of ONE existing SEO content recommendation. You do NOT change its subject, its target keyword, its intent, or invent any facts, numbers or search-volume claims.',
     langLine,

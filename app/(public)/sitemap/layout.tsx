@@ -1,9 +1,9 @@
 export const metadata = {
-  title: 'מפת אתר - Rankings by Go Top',
-  description: 'מפת אתר של Rankings by Go Top - ניווט קל לכל העמודים וההמאמרים באתר',
+  title: 'מפת אתר - Go Top SEO',
+  description: 'מפת אתר של Go Top SEO - ניווט קל לכל העמודים וההמאמרים באתר',
   openGraph: {
-    title: 'מפת אתר - Rankings by Go Top',
-    description: 'מפת אתר של Rankings by Go Top',
+    title: 'מפת אתר - Go Top SEO',
+    description: 'מפת אתר של Go Top SEO',
     url: 'https://www.gotopseo.com/sitemap',
     type: 'website',
   },

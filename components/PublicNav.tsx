@@ -1,31 +1,69 @@
 'use client'
 
 import Link from 'next/link'
-import Image from 'next/image'
+import { usePathname } from 'next/navigation'
 import { useState, useEffect } from 'react'
+import { BarChart3, Blocks, Briefcase, ChevronDown, FileText, MapPin, MapPinned, Menu, LineChart, Search, ShoppingBag, Sparkles, Store, Users, Telescope, Waypoints, Wrench, X, type LucideIcon } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
-import type { Locale } from '@/lib/i18n/locales'
+import { LOCALE_PREFIX, PUBLIC_LOCALES, localeHomeHref, type PublicLocale } from '@/lib/i18n/locales'
 import { getPublicDictionary } from '@/lib/i18n/getPublicDictionary'
+import GoTopMark from '@/components/brand/GoTopMark'
+import { buttonClasses } from '@/components/public/marketing'
+import { cn } from '@/lib/utils'
 import { LanguageSwitcher } from './LanguageSwitcher'
+import { authHref } from '@/lib/i18n/auth-href'
+import { ContactMenu, ContactRows } from '@/components/public/ContactMenu'
+import { SHOPIFY_APP_STORE_URL } from '@/lib/public-links/shopify-app-store'
 
-export function PublicNav({ locale = 'he' }: { locale?: Locale } = {}) {
+/**
+ * The public site's top bar, in the app's own vocabulary: the Go Top mark and
+ * the "Go Top SEO" lockup from the rail, copy-sized links, one primary
+ * button. Transparent over the hero's paper, a hairline and a blur once the page
+ * scrolls. The features menu opens on hover AND on keyboard focus.
+ *
+ * `tone="inverse"` (wave 8, UX decision D) is for a page whose hero is navy
+ * (home, About): transparent with white ink over the hero, and the usual canvas
+ * with a blur once the page has scrolled 80px. The last text item, "צרו קשר",
+ * opens the contact menu (UX decision C).
+ */
+export function PublicNav({ locale = 'he', tone = 'default' }: { locale?: PublicLocale; tone?: 'default' | 'inverse' } = {}) {
+  const pathname = usePathname() ?? '/'
   const [scrolled, setScrolled] = useState(false)
   const [mobileOpen, setMobileOpen] = useState(false)
   const [isAuthed, setIsAuthed] = useState(false)
   const [authChecked, setAuthChecked] = useState(false)
   const [featuresOpen, setFeaturesOpen] = useState(false)
+  const [solutionsOpen, setSolutionsOpen] = useState(false)
 
   const dict = getPublicDictionary(locale)
-  const prefix = locale === 'en' ? '/en' : ''
-  const signupHref = locale === 'en' ? '/en/signup' : '/signup'
-  const loginHref = locale === 'en' ? '/en/login' : '/login'
+  const prefix = LOCALE_PREFIX[locale]
+  // The auth pages in THIS page's language (lib/i18n/auth-href.ts). They exist in
+  // Hebrew and English only, so a Spanish visitor is sent to the English form —
+  // the one they can read — until the dashboard is translated.
+  // The nav's own language, not a narrowed one: the page a visitor is reading
+  // decides the form they get, so a Spanish page links the Spanish form
+  // (owner, 4 October 2026 — one language from the site to the dashboard).
+  const signupHref = authHref('signup', locale)
+  const loginHref = authHref('login', locale)
 
+  const scrollThreshold = tone === 'inverse' ? 80 : 8
   useEffect(() => {
-    const onScroll = () => setScrolled(window.scrollY > 8)
+    const onScroll = () => setScrolled(window.scrollY > scrollThreshold)
     onScroll()
     window.addEventListener('scroll', onScroll, { passive: true })
     return () => window.removeEventListener('scroll', onScroll)
-  }, [])
+  }, [scrollThreshold])
+  // While the menu is open, the floating widgets (contact bar, WhatsApp, accessibility, privacy
+  // notice: [data-public-float]) step aside, so none of them covers the menu's "start free"
+  // button (owner, wave 10). globals.css hides them under this attribute.
+  useEffect(() => {
+    if (!mobileOpen) return
+    const root = document.documentElement
+    root.setAttribute('data-public-menu', 'open')
+    return () => root.removeAttribute('data-public-menu')
+  }, [mobileOpen])
+  // White ink while the bar is still over a navy hero.
+  const onDark = tone === 'inverse' && !scrolled && !mobileOpen
 
   useEffect(() => {
     const supabase = createClient()
@@ -36,7 +74,9 @@ export function PublicNav({ locale = 'he' }: { locale?: Locale } = {}) {
   }, [])
 
   const links = [
-    { href: `${prefix}/` === '/en/' ? '/en' : `${prefix}/`, label: dict.nav.home },
+    // localeHomeHref, never a hand-written prefix: the Spanish home is /es, and the
+    // two spellings here used to fall through to the Hebrew home (owner, 5 Oct 2026).
+    { href: localeHomeHref(locale), label: dict.nav.home },
     { href: `${prefix}/free-check`, label: dict.nav.freeCheck },
     { href: `${prefix}/pricing`, label: dict.nav.pricing },
     { href: `${prefix}/articles`, label: dict.nav.articles },
@@ -45,141 +85,169 @@ export function PublicNav({ locale = 'he' }: { locale?: Locale } = {}) {
 
   const homeLink = links[0]
   const restLinks = links.slice(1)
+  // A locale's HOME matches exactly; every other link also matches its own subtree.
+  // Spelling the home hrefs out by hand left /es out, so /es/pricing lit up "home".
+  const homeHrefs = new Set(PUBLIC_LOCALES.map(localeHomeHref))
+  const isActive = (href: string) => (homeHrefs.has(href) ? pathname === href : pathname === href || pathname.startsWith(`${href}/`))
 
-  const featureItems = [
+  type MenuItem = NavMenuItem
+  const fm = dict.nav.featuresMenu
+  const feature = (id: keyof typeof fm, slug: string, icon: LucideIcon): MenuItem => ({
+    id, href: `${prefix}/features/${slug}`, label: fm[id].label, description: fm[id].description, icon,
+  })
+  // Three columns, in the order a customer meets the value (owner, 5 Oct 2026,
+  // after the competitor's menu): what we measure, the work the system does,
+  // and how the results are shown. The columns balanced at three each (owner,
+  // 6 Oct 2026) until the owner asked on 9 Oct 2026 whether links belonged
+  // here; they do — "Links" is a shipped, ungated tab — so the middle column,
+  // which is the work itself, carries four. On 16 Oct 2026 the owner asked for
+  // posts on Google Maps here too. That is work the system does, so it joins
+  // the middle column, and keyword research, which measures demand before any
+  // work starts, moves to the first one, so no column runs to five. Every item
+  // is a feature that works today.
+  const featureGroups: { id: string; title: string; items: MenuItem[] }[] = [
     {
-      id: 'contentPublishing',
-      href: `${prefix}/features/seo-geo-content-publishing`,
-      label: dict.nav.featuresMenu.contentPublishing.label,
-      description: dict.nav.featuresMenu.contentPublishing.description,
+      id: 'measure',
+      title: dict.nav.featureGroups.measure,
+      items: [
+        feature('googleOrganic', 'google-organic-rank-tracking', Search),
+        feature('googleMaps', 'google-maps-rank-tracking', MapPin),
+        feature('aiVisibility', 'ai-visibility-tracking', Sparkles),
+        feature('keywordResearch', 'keyword-research', Telescope),
+      ],
     },
     {
-      id: 'googleOrganic',
-      href: `${prefix}/features/google-organic-rank-tracking`,
-      label: dict.nav.featuresMenu.googleOrganic.label,
-      description: dict.nav.featuresMenu.googleOrganic.description,
+      id: 'act',
+      title: dict.nav.featureGroups.act,
+      items: [
+        feature('contentPublishing', 'seo-geo-content-publishing', FileText),
+        feature('mapsPosts', 'google-maps-posts', MapPinned),
+        feature('siteFixes', 'site-health-fixes', Wrench),
+        feature('links', 'site-links', Waypoints),
+      ],
     },
     {
-      id: 'googleMaps',
-      href: `${prefix}/features/google-maps-rank-tracking`,
-      label: dict.nav.featuresMenu.googleMaps.label,
-      description: dict.nav.featuresMenu.googleMaps.description,
-    },
-    {
-      id: 'aiVisibility',
-      href: `${prefix}/features/ai-visibility-tracking`,
-      label: dict.nav.featuresMenu.aiVisibility.label,
-      description: dict.nav.featuresMenu.aiVisibility.description,
-    },
-    {
-      id: 'reports',
-      href: `${prefix}/features/seo-geo-reports`,
-      label: dict.nav.featuresMenu.reports.label,
-      description: dict.nav.featuresMenu.reports.description,
-    },
-    {
-      id: 'keywordResearch',
-      href: `${prefix}/features/keyword-research`,
-      label: dict.nav.featuresMenu.keywordResearch.label,
-      description: dict.nav.featuresMenu.keywordResearch.description,
+      id: 'prove',
+      title: dict.nav.featureGroups.prove,
+      items: [
+        feature('competitors', 'competitor-tracking', Users),
+        feature('searchConsole', 'search-console', LineChart),
+        feature('reports', 'seo-geo-reports', BarChart3),
+      ],
     },
   ]
+  const sm = dict.nav.solutionsMenu
+  // Shopify used to be the App Store listing itself. From w11 the menu goes to
+  // our own page (owner, 9 Oct 2026: "a page with content, and a link to the app
+  // in it"), and that page is the one that links out to the listing, still
+  // through SHOPIFY_APP_STORE_URL and still rel="nofollow". A store can only
+  // install from the listing, so when the constant is null there is nothing to
+  // send anyone to and the item is left out, exactly as before.
+  const solutionItems: MenuItem[] = [
+    { id: 'businesses', href: `${prefix}/solutions/businesses`, label: sm.businesses.label, description: sm.businesses.description, icon: Store },
+    { id: 'agencies', href: `${prefix}/solutions/agencies`, label: sm.agencies.label, description: sm.agencies.description, icon: Briefcase },
+    ...(SHOPIFY_APP_STORE_URL
+      ? [{ id: 'shopify', href: `${prefix}/solutions/shopify`, label: sm.shopify.label, description: sm.shopify.description, icon: ShoppingBag }]
+      : []),
+    { id: 'wordpress', href: `${prefix}/solutions/wordpress`, label: sm.wordpress.label, description: sm.wordpress.description, icon: Blocks },
+  ]
+  const solutionsActive = pathname.includes('/solutions/')
+  const closeMobile = () => {
+    setMobileOpen(false)
+    setFeaturesOpen(false)
+    setSolutionsOpen(false)
+  }
+  const featuresActive = pathname.includes('/features/')
+
+  const linkClass = (active: boolean) =>
+    cn(
+      'inline-flex h-9 items-center gap-1.5 rounded-control px-3 text-copy font-medium transition-[background-color,color] duration-150 ease-snappy',
+      'focus-visible:outline-none focus-visible:ring-4',
+      onDark
+        ? cn('focus-visible:ring-white/40', active ? 'bg-white/15 text-contrast-ink' : 'text-contrast-ink/85 hover:bg-white/10 hover:text-contrast-ink')
+        : cn('focus-visible:ring-action/20', active ? 'bg-sunk text-ink' : 'text-body hover:bg-sunk hover:text-ink'),
+    )
 
   return (
     <header
-      className={`fixed top-0 inset-x-0 z-50 transition-all duration-300 ${
-        scrolled
-          ? 'bg-white/85 backdrop-blur-md shadow-sm border-b border-slate-200/80'
-          : 'bg-transparent'
-      }`}
+      className={cn(
+        'fixed inset-x-0 top-0 z-50 border-b transition-[background-color,border-color] duration-150 ease-snappy',
+        scrolled || mobileOpen ? 'border-line bg-canvas/90 backdrop-blur-md' : 'border-transparent bg-transparent',
+      )}
     >
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex items-center justify-between h-20 lg:h-28">
-          {/* Logo */}
-          <Link href={prefix === '/en' ? '/en' : '/'} className="flex items-center shrink-0 group" aria-label="Rankings by Go Top - home">
-            <Image
-              src="/gotop-primary.png"
-              alt="Go Top"
-              width={270}
-              height={108}
-              className="h-[72px] lg:h-24 w-auto group-hover:opacity-80 transition-opacity"
-              priority
-            />
+      {/* max-w-7xl: seven links, the language switch and two buttons need the room from xl */}
+      <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+        <div className="flex h-16 items-center justify-between gap-4 lg:h-[4.5rem]">
+          {/* The lockup, as on the rail */}
+          <Link
+            href={localeHomeHref(locale)}
+            className="flex shrink-0 items-center gap-2.5 rounded-control focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-action/20"
+            aria-label={dict.nav.homeAria}
+          >
+            <GoTopMark size={32} className="shrink-0" />
+            <span className="flex flex-col" dir="ltr">
+              <span className={cn('text-section font-semibold leading-5', onDark ? 'text-contrast-ink' : 'text-ink')}>Go Top</span>
+              <span className={cn('text-overline font-semibold', onDark ? 'text-rail-tagline' : 'text-action')}>SEO</span>
+            </span>
           </Link>
 
           {/* Desktop Menu */}
-          <nav className="hidden lg:flex items-center gap-8">
-            <Link
-              key={homeLink.href}
-              href={homeLink.href}
-              className="text-lg font-medium text-slate-700 hover:text-blue-600 transition-colors"
-            >
+          <nav className="hidden items-center gap-0.5 whitespace-nowrap xl:flex" aria-label={dict.nav.primaryAria}>
+            <Link key={homeLink.href} href={homeLink.href} className={linkClass(isActive(homeLink.href))}>
               {homeLink.label}
             </Link>
-            {/* Features Dropdown */}
-            <div className="relative group">
-              <button
-                className="text-lg font-medium text-slate-700 hover:text-blue-600 transition-colors flex items-center gap-1.5"
-                aria-haspopup="true"
-              >
+            {/* Features: three columns, measure / do the work / show results */}
+            <div className="group relative">
+              <button type="button" className={linkClass(featuresActive)} aria-haspopup="true">
                 {dict.nav.features}
-                <svg
-                  className="w-4 h-4 transition-transform group-hover:rotate-180"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 14l-7 7m0 0l-7-7m7 7V3" />
-                </svg>
+                <ChevronDown className="size-4 transition-transform duration-150 ease-snappy group-focus-within:rotate-180 group-hover:rotate-180" aria-hidden="true" />
               </button>
-              <div className="absolute top-full left-0 mt-2 w-96 bg-white rounded-lg shadow-lg border border-slate-200 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 py-2 z-50">
-                {featureItems.map((item) => (
-                  <Link
-                    key={item.id}
-                    href={item.href}
-                    className="block px-4 py-3 hover:bg-blue-50 transition-colors"
-                  >
-                    <div className="font-medium text-slate-900">{item.label}</div>
-                    <div className="text-sm text-slate-600 mt-1">{item.description}</div>
-                  </Link>
-                ))}
+              <div className={PANEL_WRAP}>
+                <div data-features-panel className="grid w-[54rem] grid-cols-3 gap-2 whitespace-normal rounded-card border border-line bg-surface p-3 shadow-pop">
+                  {featureGroups.map((group) => (
+                    <div key={group.id} data-feature-group={group.id} className="flex flex-col gap-0.5">
+                      <p className="px-3 pb-1 pt-2 text-overline font-semibold uppercase text-muted">{group.title}</p>
+                      {group.items.map((item) => <DesktopMenuLink key={item.id} item={item} />)}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+            {/* Who it's for */}
+            <div className="group relative">
+              <button type="button" className={linkClass(solutionsActive)} aria-haspopup="true">
+                {dict.nav.solutions}
+                <ChevronDown className="size-4 transition-transform duration-150 ease-snappy group-focus-within:rotate-180 group-hover:rotate-180" aria-hidden="true" />
+              </button>
+              <div className={PANEL_WRAP}>
+                <div data-solutions-panel className="grid w-[26rem] grid-cols-1 gap-0.5 whitespace-normal rounded-card border border-line bg-surface p-2 shadow-pop">
+                  {solutionItems.map((item) => <DesktopMenuLink key={item.id} item={item} />)}
+                </div>
               </div>
             </div>
             {restLinks.map((link) => (
-              <Link
-                key={link.href}
-                href={link.href}
-                className="text-lg font-medium text-slate-700 hover:text-blue-600 transition-colors"
-              >
+              <Link key={link.href} href={link.href} className={linkClass(isActive(link.href))}>
                 {link.label}
               </Link>
             ))}
+            <ContactMenu locale={locale} linkClassName={linkClass(false)} />
           </nav>
 
           {/* CTA Buttons + Language Switcher */}
-          <div className="hidden lg:flex items-center gap-4">
-            <LanguageSwitcher locale={locale} />
+          <div className="hidden items-center gap-1 lg:ms-auto lg:flex xl:ms-0">
+            <LanguageSwitcher locale={locale} inverse={onDark} />
             {!authChecked ? (
-              <div className="w-32 h-10" />
+              <div className="h-10 w-40" />
             ) : isAuthed ? (
-              <Link
-                href="/dashboard"
-                className="px-5 py-2.5 rounded-lg bg-gradient-to-r from-blue-600 to-indigo-600 text-white text-lg font-semibold shadow-sm hover:shadow-md hover:from-blue-700 hover:to-indigo-700 transition-all"
-              >
+              <Link href="/dashboard" className={buttonClasses('primary', 'md', 'ms-2')}>
                 {dict.nav.toDashboard}
               </Link>
             ) : (
               <>
-                <Link
-                  href={loginHref}
-                  className="px-4 py-2 text-lg font-medium text-slate-700 hover:text-blue-600 transition-colors"
-                >
+                <Link href={loginHref} className={buttonClasses(onDark ? 'ghost-inverse' : 'ghost', 'md')}>
                   {dict.nav.login}
                 </Link>
-                <Link
-                  href={signupHref}
-                  className="px-5 py-2.5 rounded-lg bg-gradient-to-r from-blue-600 to-indigo-600 text-white text-lg font-semibold shadow-sm hover:shadow-md hover:from-blue-700 hover:to-indigo-700 transition-all"
-                >
+                <Link href={signupHref} className={buttonClasses('primary', 'md', 'ms-1')}>
                   {dict.nav.startFree}
                 </Link>
               </>
@@ -188,117 +256,152 @@ export function PublicNav({ locale = 'he' }: { locale?: Locale } = {}) {
 
           {/* Mobile Hamburger */}
           <button
+            type="button"
             onClick={() => setMobileOpen(!mobileOpen)}
-            className="lg:hidden p-2 rounded-lg hover:bg-slate-100 transition-colors"
-            aria-label={dict.nav.menu}
+            className={cn(
+              'flex size-10 items-center justify-center rounded-control transition-[background-color] duration-150 ease-snappy focus-visible:outline-none focus-visible:ring-4 xl:hidden',
+              onDark ? 'text-contrast-ink hover:bg-white/10 focus-visible:ring-white/40' : 'text-ink hover:bg-sunk focus-visible:ring-action/20',
+            )}
+            aria-label={mobileOpen ? dict.nav.closeMenu : dict.nav.menu}
+            aria-expanded={mobileOpen}
           >
-            <svg
-              className="w-6 h-6 text-slate-700"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-            >
-              {mobileOpen ? (
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-              ) : (
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
-              )}
-            </svg>
+            {mobileOpen ? <X className="size-5" aria-hidden="true" /> : <Menu className="size-5" aria-hidden="true" />}
           </button>
         </div>
+      </div>
 
-        {/* Mobile Menu */}
-        {mobileOpen && (
-          <div className="lg:hidden border-t border-slate-200 bg-white py-4 -mx-4 sm:-mx-6 px-4 sm:px-6">
-            <nav className="flex flex-col gap-1">
+      {/* Mobile Menu */}
+      {mobileOpen && (
+        <div className="max-h-[calc(100dvh-4rem)] animate-pop-in overflow-y-auto border-t border-line bg-surface shadow-pop xl:hidden">
+          <div className="px-4 py-4 sm:px-6">
+            <nav className="flex flex-col gap-0.5" aria-label={dict.nav.primaryAria}>
               <Link
                 key={homeLink.href}
                 href={homeLink.href}
                 onClick={() => setMobileOpen(false)}
-                className="px-3 py-3 rounded-lg text-base font-medium text-slate-700 hover:bg-slate-50 hover:text-blue-600 transition-colors"
+                className={cn(linkClass(isActive(homeLink.href)), 'h-11')}
               >
                 {homeLink.label}
               </Link>
-              {/* Features Dropdown Mobile */}
-              <div className="px-3 py-3">
-                <button
-                  onClick={() => setFeaturesOpen(!featuresOpen)}
-                  className="w-full text-left text-base font-medium text-slate-700 hover:text-blue-600 transition-colors flex items-center justify-between"
-                >
-                  {dict.nav.features}
-                  <svg
-                    className={`w-4 h-4 transition-transform ${featuresOpen ? 'rotate-180' : ''}`}
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
-                  >
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 14l-7 7m0 0l-7-7m7 7V3" />
-                  </svg>
-                </button>
-                {featuresOpen && (
-                  <div className="mt-2 space-y-2 border-l-2 border-slate-200 pl-2">
-                    {featureItems.map((item) => (
-                      <Link
-                        key={item.id}
-                        href={item.href}
-                        onClick={() => {
-                          setMobileOpen(false)
-                          setFeaturesOpen(false)
-                        }}
-                        className="block px-3 py-2 rounded-lg hover:bg-blue-50 transition-colors"
-                      >
-                        <div className="text-sm font-medium text-slate-900">{item.label}</div>
-                        <div className="text-xs text-slate-600 mt-0.5">{item.description}</div>
-                      </Link>
-                    ))}
-                  </div>
-                )}
-              </div>
+              {/* Features, by group */}
+              <button
+                type="button"
+                onClick={() => setFeaturesOpen(!featuresOpen)}
+                aria-expanded={featuresOpen}
+                className={cn(linkClass(featuresActive), 'h-11 w-full justify-between')}
+              >
+                {dict.nav.features}
+                <ChevronDown className={cn('size-4 transition-transform duration-150 ease-snappy', featuresOpen && 'rotate-180')} aria-hidden="true" />
+              </button>
+              {featuresOpen && (
+                <div className="mb-1 ms-3 space-y-0.5 border-s border-line ps-2">
+                  {featureGroups.map((group) => (
+                    <div key={group.id}>
+                      <p className="px-2 pb-1 pt-2 text-caption font-semibold text-muted">{group.title}</p>
+                      {group.items.map((item) => <MobileMenuLink key={item.id} item={item} onPick={closeMobile} />)}
+                    </div>
+                  ))}
+                </div>
+              )}
+              <button
+                type="button"
+                onClick={() => setSolutionsOpen(!solutionsOpen)}
+                aria-expanded={solutionsOpen}
+                className={cn(linkClass(solutionsActive), 'h-11 w-full justify-between')}
+              >
+                {dict.nav.solutions}
+                <ChevronDown className={cn('size-4 transition-transform duration-150 ease-snappy', solutionsOpen && 'rotate-180')} aria-hidden="true" />
+              </button>
+              {solutionsOpen && (
+                <div className="mb-1 ms-3 space-y-0.5 border-s border-line ps-2">
+                  {solutionItems.map((item) => <MobileMenuLink key={item.id} item={item} onPick={closeMobile} />)}
+                </div>
+              )}
               {restLinks.map((link) => (
                 <Link
                   key={link.href}
                   href={link.href}
                   onClick={() => setMobileOpen(false)}
-                  className="px-3 py-3 rounded-lg text-base font-medium text-slate-700 hover:bg-slate-50 hover:text-blue-600 transition-colors"
+                  className={cn(linkClass(isActive(link.href)), 'h-11')}
                 >
                   {link.label}
                 </Link>
               ))}
             </nav>
-            <div className="border-t border-slate-200 mt-4 pt-4 flex flex-col gap-2">
-              <div className="px-3 py-2">
-                <LanguageSwitcher locale={locale} />
-              </div>
+            {/* Contact: the same three rows as the desktop menu */}
+            <div className="mt-3 border-t border-line pt-3" data-mobile-contact>
+              <p className="px-3 pb-1 text-caption font-semibold text-muted">{dict.nav.contact}</p>
+              <ContactRows locale={locale} onPick={() => setMobileOpen(false)} />
+            </div>
+            <div className="mt-4 flex flex-col gap-2 border-t border-line pt-4">
+              <LanguageSwitcher locale={locale} className="self-start" />
               {isAuthed ? (
-                <Link
-                  href="/dashboard"
-                  onClick={() => setMobileOpen(false)}
-                  className="px-4 py-3 rounded-lg bg-gradient-to-r from-blue-600 to-indigo-600 text-white text-center text-sm font-semibold"
-                >
+                <Link href="/dashboard" onClick={() => setMobileOpen(false)} className={buttonClasses('primary', 'lg', 'w-full')}>
                   {dict.nav.toDashboard}
                 </Link>
               ) : (
                 <>
-                  <Link
-                    href={loginHref}
-                    onClick={() => setMobileOpen(false)}
-                    className="px-4 py-3 rounded-lg border border-slate-200 text-center text-sm font-medium text-slate-700 hover:bg-slate-50"
-                  >
+                  <Link href={loginHref} onClick={() => setMobileOpen(false)} className={buttonClasses('secondary', 'lg', 'w-full')}>
                     {dict.nav.login}
                   </Link>
-                  <Link
-                    href={signupHref}
-                    onClick={() => setMobileOpen(false)}
-                    className="px-4 py-3 rounded-lg bg-gradient-to-r from-blue-600 to-indigo-600 text-white text-center text-sm font-semibold"
-                  >
+                  <Link href={signupHref} onClick={() => setMobileOpen(false)} className={buttonClasses('primary', 'lg', 'w-full')}>
                     {dict.nav.startFree}
                   </Link>
                 </>
               )}
             </div>
           </div>
-        )}
-      </div>
+        </div>
+      )}
     </header>
+  )
+}
+
+type NavMenuItem = { id: string; href: string; label: string; description: string; icon: LucideIcon; external?: boolean }
+
+const PANEL_WRAP =
+  'invisible absolute start-0 top-full z-50 pt-2 opacity-0 transition-[opacity,visibility] duration-150 ease-snappy group-focus-within:visible group-focus-within:opacity-100 group-hover:visible group-hover:opacity-100'
+
+/** An external item (the Shopify App Store listing) opens in a new tab. */
+function MenuAnchor({ item, className, onClick, children }: { item: NavMenuItem; className: string; onClick?: () => void; children: React.ReactNode }) {
+  if (item.external) {
+    return (
+      <a href={item.href} target="_blank" rel="nofollow noopener noreferrer" className={className} onClick={onClick}>
+        {children}
+      </a>
+    )
+  }
+  return (
+    <Link href={item.href} className={className} onClick={onClick}>
+      {children}
+    </Link>
+  )
+}
+
+function DesktopMenuLink({ item }: { item: NavMenuItem }) {
+  return (
+    <MenuAnchor
+      item={item}
+      className="flex items-start gap-3 rounded-inset p-3 transition-[background-color] duration-150 ease-snappy hover:bg-sunk focus-visible:bg-sunk focus-visible:outline-none"
+    >
+      <span className="flex size-9 shrink-0 items-center justify-center rounded-inset bg-action-soft text-action" aria-hidden="true">
+        <item.icon className="size-4" />
+      </span>
+      <span className="min-w-0">
+        <span className="block text-copy font-semibold text-ink text-pretty">{item.label}</span>
+        <span className="mt-0.5 block text-caption text-muted text-pretty">{item.description}</span>
+      </span>
+    </MenuAnchor>
+  )
+}
+
+function MobileMenuLink({ item, onPick }: { item: NavMenuItem; onPick: () => void }) {
+  return (
+    <MenuAnchor item={item} onClick={onPick} className="flex items-center gap-3 rounded-inset px-2 py-2 hover:bg-sunk">
+      <span className="flex size-8 shrink-0 items-center justify-center rounded-inset bg-action-soft text-action" aria-hidden="true">
+        <item.icon className="size-4" />
+      </span>
+      <span className="text-copy font-medium text-ink">{item.label}</span>
+    </MenuAnchor>
   )
 }

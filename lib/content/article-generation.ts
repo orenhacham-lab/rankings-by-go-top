@@ -14,9 +14,13 @@
  * only the admin (service-role) client, so it is fully headless-safe.
  */
 
+import { trackArticleQuestion } from '@/lib/ai-visibility/article-question'
+import { runLinkNetworkStep } from '@/lib/link-network/step'
+import { runAutoInternalLinksStep } from '@/lib/content/auto-internal-links/step'
 import type { createAdminClient } from '@/lib/supabase/admin'
 import { generateValidatedArticle, type ArticleBrief } from '@/lib/content/gemini-article'
 import { createFeaturedImageForArticle } from '@/lib/content/featured-image'
+import { runArticleImageStep } from '@/lib/content/article-style/generation'
 import { decodeBriefNotes } from '@/lib/content/brief-notes'
 import { resolveArticleDepth, DEPTH_PROMPT_LABEL } from '@/lib/content/article-depth'
 import { loadApprovedPlanAnchors } from '@/lib/content/internal-link-generation-guidance'
@@ -27,6 +31,8 @@ import { getUserEntitlement } from '@/lib/subscription'
 import { resolveCurrentUsagePeriod } from '@/lib/billing/usage-period'
 import { reserveUsage, finalizeArticleGeneration, releaseUsageReservation } from '@/lib/billing/usage-reservations'
 import type { ArticleTopicAnchor } from '@/lib/supabase/types'
+import { normalizeContentLanguage } from '@/lib/content/language'
+import { readGenerationContext } from '@/lib/content/writing-guidance/store'
 
 type Admin = ReturnType<typeof createAdminClient>
 
@@ -141,7 +147,7 @@ export async function generateArticleForTopic(
   // Project context (safe fields only).
   const { data: project } = await admin
     .from('projects')
-    .select('business_name, target_domain, ai_business_profile')
+    .select('business_name, target_domain, ai_business_profile, city')
     .eq('id', projectId)
     .maybeSingle()
   const category =
@@ -150,7 +156,7 @@ export async function generateArticleForTopic(
   const { data: wpConn } = await admin.from('wordpress_connections').select('id').eq('project_id', projectId).maybeSingle()
 
   const anchors = (Array.isArray(t.anchors_json) ? t.anchors_json : []) as ArticleTopicAnchor[]
-  const language = String(t.language || '').toLowerCase().startsWith('en') ? 'en' : 'he'
+  const language = normalizeContentLanguage(t.language)
   const decodedNotes = decodeBriefNotes((t.brief_notes as string) ?? null)
 
   // Pre-check: a required anchor with no usable URL can never be placed.
@@ -207,6 +213,10 @@ export async function generateArticleForTopic(
     planStale: approvedGuidance.diagnostics.planStale,
   })
 
+  // The owner's standing instructions, what the business does not sell, the rules left on earlier
+  // articles, and what the business is and where it serves. Empty on any failure: the prompt as before.
+  const generationContext = await readGenerationContext(admin, projectId, (project as { city?: string | null } | null)?.city ?? null)
+
   const brief: ArticleBrief = {
     language,
     topic: String(t.topic || ''),
@@ -226,7 +236,11 @@ export async function generateArticleForTopic(
     ctaWhatsApp: decodedNotes.flags.cta.whatsapp || null,
     ctaUrl: decodedNotes.flags.cta.url || null,
     briefNotes: decodedNotes.notes || null,
-    includeBrandName: decodedNotes.flags.includeBrandName,
+    // E-E-A-T: the article is the business's own, so a topic the system created names the business
+    // (when its name is known). A choice the owner made in the brief form is kept as made.
+    // A Shopify store's articles keep their default (not named) until the owner decides otherwise;
+    // the owner can switch naming off for the project in the writing guidelines.
+    includeBrandName: decodedNotes.brandChoiceSet ? decodedNotes.flags.includeBrandName : !generationContext.shopify && generationContext.guidance.mentionBusiness && !!businessName?.trim(),
     brandNameToInclude: decodedNotes.flags.brandNameToInclude || businessName,
     includeManualToc: decodedNotes.flags.includeManualToc,
     anchors,
@@ -234,6 +248,8 @@ export async function generateArticleForTopic(
     businessName,
     domain: (project as { target_domain?: string } | null)?.target_domain ?? null,
     category,
+    writingGuidance: generationContext.guidance,
+    businessContext: generationContext.business,
   }
 
   // Phase 3 — atomic article-credit reservation, taken immediately before
@@ -363,6 +379,17 @@ export async function generateArticleForTopic(
     await admin.from('article_topics').update({ status: 'used', updated_at: new Date().toISOString() }).eq('id', topicId)
   } catch { /* non-fatal */ }
 
+  // One tracked AI-visibility question for the article, from its primary keyword
+  // (lib/ai-visibility/article-question.ts). Adds a row only: no check runs and
+  // nothing is spent. Best-effort; never fails generation.
+  const aiQuestion = await trackArticleQuestion(admin, {
+    projectId,
+    userId,
+    title: article.title ?? null,
+    topic: { primary_keyword: (t.primary_keyword as string) ?? null, language: (t.language as string) ?? null },
+  })
+  if (aiQuestion.outcome === 'failed') console.warn('[content-article-generation] ai question skipped', { articleId: inserted.id })
+
   console.log('[content-article-generation] created', { articleId: inserted.id, projectId, score: gen.audit.score, warnings: gen.audit.warnings.length })
 
   // Phase 2J — auto-insert approved internal links into the fresh DRAFT, once,
@@ -388,17 +415,24 @@ export async function generateArticleForTopic(
     })
   }
 
-  // Auto-generate a brand-neutral featured image (default ON). Best-effort.
-  let imageGenerated = false
-  if (process.env.CONTENT_AUTO_FEATURED_IMAGE !== 'false') {
-    try {
-      const img = await deps.createFeaturedImage(admin, inserted.id)
-      imageGenerated = !('error' in img)
-      if ('error' in img) console.warn('[content-article-generation] auto image skipped', { articleId: inserted.id, reason: img.error })
-    } catch (e) {
-      console.warn('[content-article-generation] auto image threw', { message: e instanceof Error ? e.message : String(e) })
-    }
-  }
+  // Automatic internal links (lib/content/auto-internal-links): 2 to 5 links to
+  // the site's own live pages, chosen by topic from the latest site mapping and
+  // placed on words already in the text. Every generation path, no approval
+  // step (the article view lists them, each removable). After the approved plan
+  // links above, so a page already linked is not linked twice. Best-effort.
+  await runAutoInternalLinksStep(admin, { projectId, userId, articleId: inserted.id })
+
+  // Link network (lib/link-network): at most one link to a complementary member,
+  // only for a project that joined. One delimited, best-effort step; never throws.
+  await runLinkNetworkStep(admin, { projectId, userId, articleId: inserted.id })
+
+  // The article's images, by the project's article-design settings
+  // (lib/content/article-style/generation.ts): the brand-neutral featured image
+  // as before (default ON, best-effort), in the project's image style, plus the
+  // inline images the project asked for. No settings = the featured image only.
+  const { imageGenerated } = await runArticleImageStep(admin, { articleId: inserted.id, projectId, ownerId: userId }, {
+    createFeaturedImage: () => deps.createFeaturedImage(admin, inserted.id),
+  })
 
   return { ok: true, articleId: inserted.id, warnings: article.warnings, audit: gen.audit, imageGenerated, autoInternalLinks }
 }

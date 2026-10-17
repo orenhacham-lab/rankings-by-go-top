@@ -347,19 +347,19 @@ async function main() {
   }
 
   // ── PayPal-checkout blocking ──
-  console.log('\n22) A CONNECTED Shopify store no longer blocks PayPal by itself')
+  console.log('\n22) A connected Shopify store blocks a NEW PayPal subscription (owner decision, 9 Oct 2026)')
   {
-    // The old hasActiveShopifyConnection() gate is gone: a website customer who
-    // connects Shopify to publish keeps their PayPal controls. Only billing
-    // AUTHORITY (or an in-flight migration) blocks PayPal now.
+    // Reversed by the owner: an account with any Shopify store connected is
+    // billed through Shopify and can never also start a PayPal subscription.
+    // lib/shopify/__qa__/no-double-billing.qa.ts covers the full matrix.
     const { isShopifyBillingRequiredForUser } = await import('../paypal-block')
     const connectedWebsiteUser = new FakeAdmin({
       billing_governance: [{ user_id: 'u1', signup_origin: 'website', billing_authority: 'website' }],
       shopify_connections: [{ id: 'c1', user_id: 'u1', connection_status: 'connected', archived_at: null }],
       shopify_billing_migrations: [],
     })
-    check('a website-authority user with a CONNECTED store keeps PayPal',
-      await isShopifyBillingRequiredForUser(connectedWebsiteUser as unknown as Admin, 'u1') === false)
+    check('a website-authority user with a CONNECTED store cannot start PayPal',
+      await isShopifyBillingRequiredForUser(connectedWebsiteUser as unknown as Admin, 'u1') === true)
     const shopifyAuthority = new FakeAdmin({
       billing_governance: [{ user_id: 'u1', signup_origin: 'shopify_app_store', billing_authority: 'shopify' }],
       shopify_connections: [], shopify_billing_migrations: [],
@@ -392,7 +392,7 @@ async function main() {
   {
     const admin = new FakeAdmin({
       shopify_billing_migrations: [{ id: 'm1', user_id: 'u1', project_id: 'p1', shopify_connection_id: 'c1', paypal_subscription_id: 'SUB-1', status: 'pending', paypal_cancel_attempts: 0 }],
-      subscriptions: [{ user_id: 'u1', status: 'active', paypal_subscription_id: 'SUB-1' }],
+      subscriptions: [{ user_id: 'u1', status: 'active', paypal_subscription_id: 'SUB-1', current_period_end: '2020-01-01T00:00:00Z' }],
     })
     const f = fakePayPalFetch(() => ({ ok: true, status: 204, body: {} }))
     const result = await confirmShopifyActiveAndAdvance(admin as unknown as Admin, 'u1', f)
@@ -406,7 +406,7 @@ async function main() {
   {
     const admin = new FakeAdmin({
       shopify_billing_migrations: [{ id: 'm1', user_id: 'u1', project_id: 'p1', shopify_connection_id: 'c1', paypal_subscription_id: 'SUB-1', status: 'pending', paypal_cancel_attempts: 0 }],
-      subscriptions: [{ user_id: 'u1', status: 'active', paypal_subscription_id: 'SUB-1' }],
+      subscriptions: [{ user_id: 'u1', status: 'active', paypal_subscription_id: 'SUB-1', current_period_end: '2020-01-01T00:00:00Z' }],
     })
     const f = fakePayPalFetch(() => ({ ok: false, status: 500, body: {} }))
     const result = await confirmShopifyActiveAndAdvance(admin as unknown as Admin, 'u1', f)

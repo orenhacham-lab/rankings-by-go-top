@@ -8,7 +8,7 @@
  * browser. Every failure maps to a clear ?shopify=error&reason=… redirect.
  */
 
-import { NextResponse } from 'next/server'
+import { NextResponse, after } from 'next/server'
 import { cookies } from 'next/headers'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { isContentModuleEnabled, authContentProject } from '@/lib/content/api-auth'
@@ -23,6 +23,10 @@ import type { ExpiringOfflineToken } from '@/lib/shopify/oauth'
 import { encryptCredential, isCredentialsCryptoConfigured } from '@/lib/security/credentials-crypto'
 import { createPendingInstall, signPendingLinkCookieValue, PendingInstallPersistenceError, PENDING_LINK_COOKIE, PENDING_LINK_TTL_MS } from '@/lib/shopify/pending-link'
 import { claimShopForProject } from '@/lib/shopify/connection-ownership'
+import { scheduleShopifySeedScan } from '@/lib/seed-scan/shopify-install'
+
+// The store's first seeding scan may run in after(), once connected.
+export const maxDuration = 300
 
 type Admin = ReturnType<typeof createAdminClient>
 
@@ -150,6 +154,7 @@ async function completePreAuthInstall(
 }
 
 export async function GET(request: Request) {
+  const startedAt = Date.now()
   if (!isContentModuleEnabled()) return Response.json({ error: 'Not found' }, { status: 404 })
 
   const config = getShopifyOAuthConfig()
@@ -333,6 +338,12 @@ export async function GET(request: Request) {
   if (!claim.ok) {
     console.warn('[Shopify OAuth] ownership claim rejected', { route: 'shopify_oauth_callback', reason: claim.reason })
     return toProject(st.project_id, { shopify: 'error', reason: claim.reason })
+  }
+
+  // The store's first seeding scan, after this response (lib/seed-scan/
+  // shopify-install.ts decides whether: the feature, the plan, the caps).
+  if (missing.length === 0) {
+    scheduleShopifySeedScan(after, { admin: auth.admin, source: 'oauth', userId: auth.project.user_id, projectId: auth.project.id, connectionId: claim.connectionId, shopName: test.shopName ?? null, startedAt })
   }
 
   // K1 — a WARNING (missing scopes) stays on the integration (project) screen so

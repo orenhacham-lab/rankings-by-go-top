@@ -1,125 +1,16 @@
-'use client'
+import { redirect } from 'next/navigation'
+import { scanHistoryHref } from '@/lib/scans/history-href'
 
-import { useState, useEffect } from 'react'
-import { createClient } from '@/lib/supabase/client'
-import { Scan } from '@/lib/supabase/types'
-import Header from '@/components/layout/Header'
-import { Table, TableHead, TableBody, TableRow, Th, Td, EmptyRow } from '@/components/ui/Table'
-import { ScanStatusBadge } from '@/components/ui/StatusBadge'
-import Badge from '@/components/ui/Badge'
-import { formatDateTime } from '@/lib/utils'
-import Link from 'next/link'
-import { useDashboardLanguage } from '@/lib/i18n/dashboard/useDashboardLanguage'
-import { getDashboardDictionary } from '@/lib/i18n/dashboard/getDashboardDictionary'
-
-export default function ScansPage() {
-  const { language } = useDashboardLanguage()
-  const dict = getDashboardDictionary(language)
-  const t = dict.scans
-
-  const [scans, setScans] = useState<(Scan & { projects?: { name: string; id: string; clients?: { name: string } } })[]>([])
-  const [loading, setLoading] = useState(true)
-
-  useEffect(() => {
-    async function loadData() {
-      const supabase = createClient()
-      const { data: { user } } = await supabase.auth.getUser()
-      if (!user) {
-        setLoading(false)
-        return
-      }
-
-      const { data } = await supabase
-        .from('scans')
-        .select('*, projects(id, name, clients(name))')
-        .eq('user_id', user.id)
-        .order('created_at', { ascending: false })
-        .limit(100)
-      setScans(data || [])
-      setLoading(false)
-    }
-    loadData()
-  }, [])
-
-  return (
-    <div>
-      <Header title={t.title} subtitle={t.subtitle} />
-
-      {loading ? (
-        <div className="flex items-center justify-center py-20 text-slate-400">
-          <span className="w-6 h-6 border-2 border-blue-500 border-t-transparent rounded-full animate-spin ml-2" />
-          {t.loading}
-        </div>
-      ) : (
-        <Table>
-          <TableHead>
-            <tr>
-              <Th>{t.table.project}</Th>
-              <Th>{t.table.client}</Th>
-              <Th>{t.table.status}</Th>
-              <Th>{t.table.trigger}</Th>
-              <Th>{t.table.results}</Th>
-              <Th>{t.table.started}</Th>
-              <Th>{t.table.finished}</Th>
-              <Th>{t.table.actions}</Th>
-            </tr>
-          </TableHead>
-          <TableBody>
-            {scans.length === 0 && (
-              <EmptyRow colSpan={8} message={t.table.emptyState} />
-            )}
-            {scans.map((scan) => (
-              <TableRow key={scan.id}>
-                <Td>
-                  {scan.projects ? (
-                    <Link href={`/projects/${scan.projects.id}`} className="text-blue-600 hover:underline font-medium">
-                      {scan.projects.name}
-                    </Link>
-                  ) : '—'}
-                </Td>
-                <Td>
-                  <span className="text-slate-500 dark:text-slate-400 text-sm">
-                    {(scan.projects as { clients?: { name: string } })?.clients?.name || '—'}
-                  </span>
-                </Td>
-                <Td>
-                  <ScanStatusBadge status={scan.status} />
-                </Td>
-                <Td>
-                  <Badge variant={scan.triggered_by === 'scheduled' ? 'info' : 'neutral'}>
-                    {scan.triggered_by === 'scheduled' ? t.trigger.automatic : t.trigger.manual}
-                  </Badge>
-                </Td>
-                <Td>
-                  <span className="text-sm">
-                    <span className="text-green-600 font-medium">{scan.completed_targets}</span>
-                    {' / '}
-                    <span className="text-slate-600 dark:text-slate-300">{scan.total_targets}</span>
-                    {scan.failed_targets > 0 && (
-                      <span className="text-red-500 mr-1"> {t.table.failedSuffix(scan.failed_targets)}</span>
-                    )}
-                  </span>
-                </Td>
-                <Td>
-                  <span className="text-xs text-slate-500 dark:text-slate-400">
-                    {scan.started_at ? formatDateTime(scan.started_at) : '—'}
-                  </span>
-                </Td>
-                <Td>
-                  <span className="text-xs text-slate-500 dark:text-slate-400">
-                    {scan.completed_at ? formatDateTime(scan.completed_at) : '—'}
-                  </span>
-                </Td>
-                <Td>
-                  <Link href={`/scans/${scan.id}/details`} className="text-blue-600 hover:text-blue-700 text-sm font-medium">
-                    {t.table.viewDetails}
-                  </Link>
-                </Td>
-              </TableRow>
-            ))}
-          </TableBody>
-        </Table>
-      )}
-    </div>
-  )
+/**
+ * The Scans tab is gone (UX review, decision 5): its history is a section of
+ * Keywords and of Reports. This route stays only to send old links there, on the
+ * server, before anything renders.
+ */
+export default async function ScansRedirect({
+  searchParams,
+}: {
+  searchParams: Promise<Record<string, string | string[] | undefined>>
+}) {
+  const { projectId } = await searchParams
+  redirect(scanHistoryHref(projectId))
 }

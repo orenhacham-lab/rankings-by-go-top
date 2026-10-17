@@ -9,6 +9,7 @@
  */
 
 import type { SuggestionLanguage } from '@/lib/content/topic-suggestions'
+import { contentScript } from '@/lib/content/language'
 import type { ArticleTopicAnchor } from '@/lib/supabase/types'
 import { validateAnchorPlacement, analyzeAnchorQuality, brandMentionedOutsideAnchors, type AnchorQuality } from '@/lib/content/anchors-check'
 import type { CtaDetails } from '@/lib/content/brief-notes'
@@ -63,6 +64,10 @@ export interface AuditInput {
   contentHtml: string
   faq: { question: string; answer: string }[]
   anchors: ArticleTopicAnchor[]
+  /** What the model itself says it gave the reader to check, ask for or compare.
+   *  Absent for a pasted or already-published article, which is why the word
+   *  cues below stay as a fallback rather than being replaced. */
+  readerChecks?: string[]
 }
 
 // -- length thresholds ------------------------------------------------------
@@ -81,13 +86,19 @@ export function thresholdsFor(desired: number): Thresholds {
 const TRANSITIONS_HE = ['בנוסף', 'לכן', 'עם זאת', 'יחד עם זאת', 'מצד שני', 'מנגד', 'למשל', 'לדוגמה', 'בפועל', 'לסיכום', 'חשוב לדעת', 'חשוב לזכור', 'מעבר לכך', 'מעבר לזה', 'כלומר', 'במילים אחרות', 'לעומת זאת', 'בסופו של דבר', 'ראשית', 'שנית', 'לבסוף', 'לאחר מכן', 'במקרים רבים', 'במקרים אלה', 'בשורה התחתונה', 'לצד זאת', 'מבחינה פרקטית', 'כתוצאה מכך', 'בשלב הבא', 'בהשוואה', 'בהשוואה לכך', 'באופן דומה']
 // Common, natural Hebrew sentence-openers we should NOT penalize for repetition.
 const START_STOPWORDS_HE = new Set(['כדי', 'אם', 'כאשר', 'בנוסף', 'עם', 'מעבר', 'לאחר', 'במקרים', 'חשוב', 'לכן', 'אחד', 'עבור', 'זה', 'זו', 'יש', 'כך'])
+const TRANSITIONS_ES = ['además', 'por lo tanto', 'sin embargo', 'por otro lado', 'en cambio', 'por ejemplo', 'en la práctica', 'en resumen', 'es importante', 'conviene recordar', 'en otras palabras', 'finalmente', 'en primer lugar', 'en segundo lugar', 'por eso', 'como resultado', 'en muchos casos', 'a la hora de decidir', 'en conclusión', 'de forma similar', 'en comparación']
+/** Spanish function words that start a sentence without carrying meaning — the
+ *  repetitive-opening check ignores them, as START_STOPWORDS_HE does in Hebrew. */
+const START_STOPWORDS_ES = new Set(['el', 'la', 'los', 'las', 'un', 'una', 'si', 'cuando', 'para', 'por', 'con', 'esto', 'esta', 'este', 'hay', 'es', 'son', 'además'])
 const TRANSITIONS_EN = ['additionally', 'therefore', 'however', 'on the other hand', 'for example', 'in practice', 'in summary', 'importantly', 'moreover', 'in other words', 'finally', 'first', 'second', 'meanwhile', 'in short']
 // Unambiguous, standalone CTA phrases (imperative action + intent). Natural
 // service words like "הזמנה"/"משלוח"/"שירות" are deliberately NOT here.
 const CTA_STRONG_HE = ['צרו קשר', 'צור קשר', 'צרו איתנו קשר', 'דברו איתנו', 'השאירו פרטים', 'לחצו כאן', 'להזמנה עכשיו', 'הזמינו עכשיו', 'לקבלת הצעת מחיר', 'שלחו הודעת וואטסאפ', 'שלחו לנו הודעה', 'חייגו עכשיו', 'התקשרו עכשיו', 'הזמינו כעת']
+const CTA_STRONG_ES = ['contáctanos', 'contacta con nosotros', 'llama ahora', 'haz clic aquí', 'pide ahora', 'solicita ahora', 'reserva ahora', 'escríbenos', 'déjanos tus datos', 'pide presupuesto', 'solicita presupuesto', 'escríbenos por whatsapp', 'llámanos ahora', 'compra ahora']
 const CTA_STRONG_EN = ['contact us', 'call now', 'click here', 'order now', 'get in touch', 'sign up now', 'book now', 'reach out to us', 'send us a message', 'leave your details', 'get a quote', 'whatsapp us', 'call us now', 'buy now']
 // Action imperatives that only count as a CTA when a contact CHANNEL is nearby.
 const CTA_ACTION_HE = ['התקשרו', 'חייגו', 'שלחו', 'פנו אלינו', 'לחצו', 'דברו', 'השאירו', 'כתבו לנו']
+const CTA_ACTION_ES = ['llama', 'llámanos', 'escribe', 'escríbenos', 'contacta', 'haz clic', 'pide', 'solicita', 'reserva', 'déjanos']
 const CTA_ACTION_EN = ['call', 'text', 'message', 'click', 'contact', 'reach out', 'book']
 // A phone/WhatsApp number, WhatsApp/phone words, or a URL — the "target" of a CTA.
 const CTA_CHANNEL_RE = /(\d[\d\-\s]{5,}\d|וואטסאפ|whatsapp|טלפון|נייד|https?:\/\/|www\.)/i
@@ -98,10 +109,16 @@ const CTA_CHANNEL_RE = /(\d[\d\-\s]{5,}\d|וואטסאפ|whatsapp|טלפון|נ�
  * next to a contact channel (number/WhatsApp/phone/URL). This avoids treating
  * everyday words like "הזמנה"/"משלוח"/"שירות" as CTAs.
  */
+/** The word lists, keyed by content language: adding a language stops compiling here. */
+const CTA_STRONG: Record<SuggestionLanguage, string[]> = { he: CTA_STRONG_HE, en: CTA_STRONG_EN, es: CTA_STRONG_ES }
+const CTA_ACTION: Record<SuggestionLanguage, string[]> = { he: CTA_ACTION_HE, en: CTA_ACTION_EN, es: CTA_ACTION_ES }
+const TRANSITIONS: Record<SuggestionLanguage, string[]> = { he: TRANSITIONS_HE, en: TRANSITIONS_EN, es: TRANSITIONS_ES }
+const START_STOPWORDS: Record<SuggestionLanguage, Set<string>> = { he: START_STOPWORDS_HE, en: new Set<string>(), es: START_STOPWORDS_ES }
+
 function detectCtaFirstWord(bodyText: string, lang: SuggestionLanguage): number {
   const low = bodyText.toLowerCase()
-  const strong = lang === 'he' ? CTA_STRONG_HE : CTA_STRONG_EN
-  const actions = lang === 'he' ? CTA_ACTION_HE : CTA_ACTION_EN
+  const strong = CTA_STRONG[lang]
+  const actions = CTA_ACTION[lang]
   let earliest = -1
   const mark = (idx: number) => {
     if (idx < 0) return
@@ -164,7 +181,92 @@ export function includesKw(haystack: string, kw: string): boolean {
   if (h.includes(k)) return true
   // token-level fallback for inflected languages: all keyword tokens present.
   const toks = k.split(/\s+/).filter((t) => t.length > 2)
-  return toks.length > 0 && toks.every((t) => h.includes(t))
+  if (toks.length === 0) return false
+  if (toks.every((t) => h.includes(t))) return true
+  // Hebrew glues ו/ה/ב/ל/מ/ש/כ onto the next word and bends a noun before
+  // another ("פתיחה" → "פתיחת"). Exact substrings miss the keyword whenever the
+  // KEYWORD carries the prefix ("בכיור" vs "הכיור") or the other form, so
+  // compare whole words through their prefix-less cores.
+  if (!HEBREW_LETTER.test(k)) return false
+  const hayWords = h.split(/[^\p{L}\p{N}]+/u).filter(Boolean)
+  return toks.every((t) => {
+    const tw = t.replace(/[^\p{L}\p{N}]+/gu, '')
+    if (!tw) return true
+    if (!HEBREW_LETTER.test(tw)) return h.includes(t)
+    return hayWords.some((w) => hebrewWordMatches(w, tw))
+  })
+}
+
+const HEBREW_LETTER = /[\u05d0-\u05ea]/
+const HE_PREFIX_LETTERS = new Set(['ו', 'ה', 'ב', 'ל', 'מ', 'ש', 'כ'])
+
+/** A word and its forms with up to three leading prefix letters removed, never below three letters. */
+function hebrewCores(word: string): { core: string; stripped: number }[] {
+  const out = [{ core: word, stripped: 0 }]
+  let t = word
+  for (let i = 1; i <= 3 && t.length > 3 && HE_PREFIX_LETTERS.has(t[0]); i++) {
+    t = t.slice(1)
+    out.push({ core: t, stripped: i })
+  }
+  return out
+}
+/** The construct state ends in ת where the free noun ends in ה ("תחזוקת" / "תחזוקה"). */
+const freeForm = (w: string) => (w.length >= 4 && w.endsWith('ת') ? `${w.slice(0, -1)}ה` : w)
+
+/**
+ * Whether one Hebrew word is the keyword word under a prefix or construct form:
+ * "בכיור" ~ "הכיור" ~ "כיור", "פתיחת" ~ "פתיחה". When BOTH sides lose letters the
+ * shared core must keep four, so "שלום" and "בלום" (core "לום") stay different.
+ */
+export function hebrewWordMatches(word: string, kwWord: string): boolean {
+  if (word === kwWord) return true
+  for (const a of hebrewCores(word)) {
+    for (const b of hebrewCores(kwWord)) {
+      const x = freeForm(a.core)
+      if (x !== freeForm(b.core)) continue
+      if (x.length >= (a.stripped && b.stripped ? 4 : 3)) return true
+    }
+  }
+  return false
+}
+
+const FAQ_HEADING = /(שאלות\s+נפוצות|שאלות\s+ותשובות|frequently\s+asked|\bfaq\b|\bq\s*&\s*a\b)/i
+
+/**
+ * FAQ written into the article body ("<h2>שאלות נפוצות</h2><h3>…?</h3><p>…</p>")
+ * rather than into the separate FAQ list. Each sub-heading under the FAQ heading
+ * is a question; without sub-headings, each paragraph ending in "?" is one. The
+ * answer is the text up to the next question.
+ */
+export function faqFromHtml(html: string): { question: string; answer: string }[] {
+  const src = html || ''
+  const headRe = /<h([2-4])[^>]*>([\s\S]*?)<\/h\1>/gi
+  let m: RegExpExecArray | null
+  while ((m = headRe.exec(src)) !== null) {
+    if (!FAQ_HEADING.test(textOf(m[2]))) continue
+    const level = Number(m[1])
+    const rest = src.slice(m.index + m[0].length)
+    const end = rest.search(new RegExp(`<h[1-${level}][\\s>]`, 'i'))
+    const section = end < 0 ? rest : rest.slice(0, end)
+    const out: { question: string; answer: string }[] = []
+    const subRe = new RegExp(`<h([${level + 1}-6])[^>]*>([\\s\\S]*?)<\\/h\\1>`, 'gi')
+    const subs = [...section.matchAll(subRe)]
+    if (subs.length > 0) {
+      subs.forEach((s, i) => {
+        const from = (s.index ?? 0) + s[0].length
+        const to = i + 1 < subs.length ? (subs[i + 1].index ?? section.length) : section.length
+        const question = textOf(s[2])
+        if (question) out.push({ question, answer: textOf(section.slice(from, to)) })
+      })
+      return out
+    }
+    const paras = paragraphs(section)
+    paras.forEach((p, i) => {
+      if (/[?؟]\s*$/.test(p)) out.push({ question: p, answer: paras[i + 1] && !/[?؟]\s*$/.test(paras[i + 1]) ? paras[i + 1] : '' })
+    })
+    return out
+  }
+  return []
 }
 
 // -- table helpers ----------------------------------------------------------
@@ -188,21 +290,81 @@ function isRealTable(t: TableShape): boolean { return t.cols >= 2 && t.rows >= 2
 
 // Topics that genuinely call for a comparison/data table.
 const TABLE_WORDS_HE = ['השווא', 'להשוו', 'מחיר', 'עלות', 'עלויות', 'כמה עולה', 'הכי טוב', 'סוגי', 'לבחור', 'בחירת', 'יתרונות', 'חסרונות', 'מדריך קנייה', 'טבלה']
+const TABLE_WORDS_ES = ['compar', 'precio', 'coste', 'costo', 'cuánto cuesta', 'cuanto cuesta', 'mejor', 'mejores', 'tipos de', 'elegir', 'cómo elegir', 'ventajas', 'desventajas', 'guía de compra', 'tabla', ' vs ', 'más barato']
 const TABLE_WORDS_EN = ['compar', 'price', 'cost', 'best', ' vs', 'versus', 'types', 'choose', 'choosing', 'buying guide', 'pros and cons', 'pros/cons', 'cheapest']
+const TABLE_WORDS: Record<SuggestionLanguage, string[]> = { he: TABLE_WORDS_HE, en: TABLE_WORDS_EN, es: TABLE_WORDS_ES }
 function isTableWorthy(text: string, lang: SuggestionLanguage): boolean {
   const t = (text || '').toLowerCase()
-  const words = lang === 'he' ? TABLE_WORDS_HE : TABLE_WORDS_EN
+  const words = TABLE_WORDS[lang]
   return words.some((w) => t.includes(w))
 }
 
 // Question-style heading detection (so important questions live in the body too).
 const QUESTION_WORDS_HE = ['מה ', 'מהו', 'מהי', 'איך', 'כיצד', 'כמה', 'למה', 'מדוע', 'האם', 'מתי', 'איפה', 'היכן', 'מי ']
+const QUESTION_WORDS_ES = ['qué ', 'que ', 'cómo ', 'como ', 'cuánto', 'cuanto', 'por qué', 'por que', 'cuál', 'cual', 'cuándo', 'cuando', 'dónde', 'donde', 'quién', 'quien', 'es ', 'son ', 'conviene', 'debo ', 'hay que', '¿']
 const QUESTION_WORDS_EN = ['how ', 'what ', 'why ', 'when ', 'which ', 'where ', 'who ', 'is ', 'are ', 'should ', 'can ', 'do ']
+const QUESTION_WORDS: Record<SuggestionLanguage, string[]> = { he: QUESTION_WORDS_HE, en: QUESTION_WORDS_EN, es: QUESTION_WORDS_ES }
+
+/**
+ * E-E-A-T, the part a generated article can honestly carry: something the
+ * READER can check, ask for or compare for themselves. Google's "Experience"
+ * dimension is first-hand usefulness, and the one thing an article about a
+ * trade can always give without inventing a fact is what to verify before
+ * deciding. The audit looked only at structure (lists, tables, FAQ), so an
+ * article could be perfectly shaped and still tell the reader nothing to do.
+ *
+ * Imperative and infinitive forms only — a noun like "בדיקה" appears in
+ * ordinary prose and would pass the check without giving the reader anything.
+ */
+const VERIFY_CUES_HE = ['בדקו', 'לבדוק', 'תבדקו', 'שאלו', 'לשאול', 'תשאלו', 'בקשו', 'לבקש', 'תבקשו', 'השוו', 'להשוות', 'ודאו', 'לוודא', 'דרשו', 'לדרוש']
+const VERIFY_CUES_EN = ['check ', 'check the', 'ask for', 'ask the', 'ask your', 'compare ', 'make sure', 'verify ', 'request ', 'confirm ', 'look for']
+const VERIFY_CUES_ES = ['comprueba', 'compruebe', 'verifica', 'verifique', 'pregunta', 'pregunte', 'compara', 'compare ', 'asegúrate', 'asegúrese', 'solicita', 'solicite', 'confirma', 'fíjate']
+const VERIFY_CUES: Record<SuggestionLanguage, string[]> = { he: VERIFY_CUES_HE, en: VERIFY_CUES_EN, es: VERIFY_CUES_ES }
+
+/** How many of the cues the body uses, counted once per cue. */
+export function readerVerifyCount(bodyText: string, lang: SuggestionLanguage): number {
+  const hay = bodyText.toLowerCase()
+  return VERIFY_CUES[lang].filter((w) => hay.includes(w)).length
+}
+
+/**
+ * Did the article give the reader something to check?
+ *
+ * The model DECLARES each item it gave (`readerChecks`), which is the reliable
+ * signal: guessing from words alone flags an article that gave real guidance in
+ * wording the cue list does not hold, and that false flag was the one risk worth
+ * removing. A declaration is only trusted when the body backs it up, so a model
+ * cannot satisfy the check by listing items it never wrote. Where there is no
+ * declaration at all — a pasted article, an older draft, a response that
+ * dropped the field — the word cues still decide, so the check never goes
+ * blind.
+ */
+export function readerChecksSatisfied(
+  bodyText: string,
+  lang: SuggestionLanguage,
+  declared: readonly string[] | undefined,
+): boolean {
+  const hay = norm(bodyText)
+  const corroborated = (declared ?? []).filter((d) => {
+    const item = norm(d)
+    if (item.length < 12) return false // too short to be a real instruction, or to match honestly
+    // The first words are enough: the model rarely repeats a bullet verbatim.
+    const head = item.split(' ').slice(0, 4).join(' ')
+    return head.length >= 10 && hay.includes(head)
+  })
+  if (corroborated.length > 0) return true
+  return readerVerifyCount(bodyText, lang) >= 2
+}
+
+/** Same text on both sides: collapsed whitespace, no quotes or dashes. */
+function norm(s: string): string {
+  return String(s || '').toLowerCase().replace(/[\u2018\u2019\u201c\u201d'"`\u2013\u2014-]/g, ' ').replace(/\s+/g, ' ').trim()
+}
 function looksLikeQuestion(text: string, lang: SuggestionLanguage): boolean {
   const t = (text || '').trim().toLowerCase()
   if (!t) return false
   if (t.includes('?')) return true
-  const words = lang === 'he' ? QUESTION_WORDS_HE : QUESTION_WORDS_EN
+  const words = QUESTION_WORDS[lang]
   return words.some((w) => t.startsWith(w))
 }
 function headingTexts(html: string, tag: 'h2' | 'h3'): string[] {
@@ -230,11 +392,14 @@ export function runArticleAudit(input: AuditInput): AuditResult {
   const h3 = countTag(html, 'h3')
   const pCount = paras.length
   const wordCount = allWords.length
-  const faqCount = input.faq.length
+  // The FAQ list wins; an article whose FAQ lives only in the body (published
+  // articles, pasted content) is still credited for it instead of reading 0.
+  const faqItems = input.faq.length > 0 ? input.faq : faqFromHtml(html)
+  const faqCount = faqItems.length
 
   // Readability metrics.
-  const transitions = lang === 'he' ? TRANSITIONS_HE : TRANSITIONS_EN
-  const startStop = lang === 'he' ? START_STOPWORDS_HE : new Set<string>()
+  const transitions = TRANSITIONS[lang]
+  const startStop = START_STOPWORDS[lang]
   // Count TOTAL transition phrases across the whole body (anywhere in a sentence/
   // paragraph), including multi-word phrases — not just per-paragraph.
   const bodyLower = bodyText.toLowerCase()
@@ -352,21 +517,29 @@ export function runArticleAudit(input: AuditInput): AuditResult {
   add('faq_present', 'geo', 'info', faqCount > 0)
   // FAQ answers should carry real value (not thin). faq_json stays ready for a
   // future FAQ schema at PUBLISH time — no JSON-LD/Yoast/Rank-Math block here.
-  add('faq_answers_have_value', 'geo', 'warning', faqCount === 0 || input.faq.every((f) => words(f.answer).length >= 12))
+  add('faq_answers_have_value', 'geo', 'warning', faqCount === 0 || faqItems.every((f) => words(f.answer).length >= 12))
   // Questions shouldn't be generic filler ("what is X?").
-  add('faq_not_generic', 'geo', 'info', faqCount === 0 || input.faq.every((f) => words(f.question).length >= 3))
+  add('faq_not_generic', 'geo', 'info', faqCount === 0 || faqItems.every((f) => words(f.question).length >= 3))
   // Important questions should also appear in the body as H2/H3, not only in FAQ.
   const bodyHeadings = [...headingTexts(html, 'h2'), ...headingTexts(html, 'h3')]
   add('questions_in_body', 'geo', 'info', bodyHeadings.some((h) => looksLikeQuestion(h, lang)))
   // direct answer early + entities/practicality are approximated by structure.
   add('has_early_answer', 'geo', 'warning', pCount > 0 && words(paras[0]).length >= 20)
   add('not_generic', 'geo', 'info', tables >= 1 || lists >= 1 || faqCount >= 2 || h3 >= 1)
+  // E-E-A-T: the article has to give the reader something to check, ask for or
+  // compare themselves — a warning, so the repair attempt gets a chance at it.
+  add('reader_can_verify', 'geo', 'warning', readerChecksSatisfied(bodyText, lang, input.readerChecks))
 
   // --- language ---
-  if (lang === 'he') {
+  // The article must actually be written in its own script. Hebrew content is
+  // mostly Hebrew letters; a latin-script language (English, Spanish) is mostly
+  // latin letters — an article returned in the wrong language fails here instead
+  // of saving, which is what used to happen to any language that was not Hebrew.
+  {
     const hebrew = (bodyText.match(/[֐-׿]/g) || []).length
     const latin = (bodyText.match(/[A-Za-z]/g) || []).length
-    add('language_matches', 'technical', 'blocker', hebrew >= latin)
+    add('language_matches', 'technical', 'blocker',
+      contentScript(lang) === 'hebrew' ? hebrew >= latin : latin >= hebrew)
   }
 
   // --- brand / CTA rules ---

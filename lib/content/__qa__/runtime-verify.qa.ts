@@ -162,13 +162,16 @@ async function main() {
     // 10. article-load failures return BEFORE any WordPress work.
     const beforeWp = src.slice(0, src.indexOf("logStage('wp_create_post_started')"))
     check('10. failArticle is reached before wp_create_post_started', /failArticle\(/.test(beforeWp))
-    check('10. no wpCreatePost call before the article-load guards', beforeWp.indexOf('wpCreatePost(') === -1)
+    check('10. no wpCreatePost call before the article-load guards', beforeWp.indexOf('wpCreatePost(') === -1 && beforeWp.indexOf('publishArticleToWordPress(') === -1)
     // 7. params awaited correctly (Next.js 15 async params).
     check('7. route awaits params before using id', /const resolvedParams = await params/.test(src) && /id = resolvedParams\.id/.test(src))
     // Preview-only sanitized Supabase code/message; production public-only.
     check('article-load Preview diagnostics carry sanitized supabase message', /sanitizedSupabaseMessage: sanitizeTrace\(se\?\.message\)/.test(src))
-    // 11. successful publishing path is unchanged (still calls wpCreatePost + typed WP errors).
-    check('11. successful WordPress publish path unchanged (wpCreatePost + typed WP mapping)', /wpCreatePost\(auth\.admin, loaded\.creds/.test(src) && /classifyWordPressError/.test(src))
+    // 11. successful publishing path is unchanged (typed WP errors). Since the WordPress.org plugin
+    // 3.0.0 the route publishes through publishArticleToWordPress, which keeps wpCreatePost for the
+    // application password (lib/content/__qa__/wordpress-plugin-publish.qa.ts R5 proves it unchanged).
+    check('11. successful WordPress publish path unchanged (wpCreatePost + typed WP mapping)', /publishArticleToWordPress\(auth\.admin, loaded/.test(src) && /classifyWordPressError/.test(src) &&
+      /const r = await viaAppPassword\(admin, publisher\.creds, article, wpOpts\)/.test(read('../wordpress-plugin-publish.ts')) && /deps\.appPassword \?\? wpCreatePost/.test(read('../wordpress-plugin-publish.ts')))
     // Part 12 — a THROW in the load block (not just a returned error) is now caught.
     check('P12. narrow try/catch around the article-load block', /try \{[\s\S]{0,320}\.from\('generated_articles'\)\.select\('\*'\)\.eq\('id', id\)\.maybeSingle\(\)[\s\S]{0,120}\} catch \(err\) \{[\s\S]{0,120}failArticle\('article_load_failed', 502, \{ thrown: err \}\)/.test(src))
     check('P12. article_load_failed diagnostics include supabase code/details/hint + errorName + stack frame', /queryTable: 'generated_articles'/.test(src) && /queryMode: 'maybeSingle'/.test(src) && /sanitizedSupabaseDetails/.test(src) && /sanitizedSupabaseHint/.test(src) && /safeTopStackFrame: th \?/.test(src))

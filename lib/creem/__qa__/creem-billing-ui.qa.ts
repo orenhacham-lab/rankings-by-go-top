@@ -1,0 +1,386 @@
+/**
+ * The billing screen's card-payment button, guarded at the source.
+ *
+ * OWNER DECISION, 10 Oct 2026: new customers only. So what this suite pins is
+ * not how the button looks but WHO is ever shown it, and the fact that a plan
+ * card can never offer two ways to pay:
+ *
+ *  A) the server decides. Every condition is on the page, in one place, and
+ *     the decision reaches the view as a prop — the client never infers it
+ *  B) an account that has ever paid through PayPal is excluded, and a read
+ *     that fails leaves PayPal in place
+ *  C) the view draws the card button INSTEAD of the PayPal container, and
+ *     does not load the PayPal SDK at all on that path
+ *  D) the button sends a plan code and nothing else, follows only an https
+ *     URL, and never shows the provider's own words
+ *  E) all four dashboard languages have the strings
+ *
+ * Every assertion has a MUTATION CONTROL alongside it: the same check re-run
+ * against a source with that guard removed, which must fail.
+ *
+ * Run: npx tsx lib/creem/__qa__/creem-billing-ui.qa.ts
+ */
+/* eslint-disable @typescript-eslint/no-require-imports */
+import { readFileSync } from 'fs'
+import { join } from 'path'
+
+let pass = 0, fail = 0
+function check(name: string, cond: boolean, detail?: string) {
+  if (cond) { pass++; console.log(`  ✓ ${name}`) } else { fail++; console.log(`  ✗ ${name}${detail ? ` — ${detail}` : ''}`) }
+}
+const ROOT = join(__dirname, '..', '..', '..')
+const read = (p: string) => readFileSync(join(ROOT, p), 'utf8')
+const strip = (s: string) => s.replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[^:])\/\/[^\n]*/g, '$1')
+
+const PAGE = 'app/(dashboard)/billing/page.tsx'
+const VIEW = 'app/(dashboard)/billing/BillingView.tsx'
+const BUTTON = 'app/(dashboard)/billing/CreemCheckoutButton.tsx'
+
+const page = strip(read(PAGE))
+const view = strip(read(VIEW))
+// Only the BLOCK comments come off the button: stripping line comments too
+// would eat its own https guard, whose `\/\/` ends in two slashes.
+const button = read(BUTTON).replace(/\/\*[\s\S]*?\*\//g, '')
+
+console.log('\nA) the server decides who sees a card button')
+{
+  const gate = (src: string) => {
+    const open = src.indexOf('let creemCheckout = false')
+    const cond = src.indexOf('if (', open)
+    const close = src.indexOf('creemCheckout = !paypalRowsError', open)
+    return open > 0 && cond > open && close > cond ? src.slice(open, close) : ''
+  }
+  const g = gate(page)
+  check('A1: the whole decision is one server-side block on the billing page', g.length > 0)
+  for (const condition of [
+    'isCreemEnabled()',
+    "market === 'USD'",
+    '!governanceUnavailable',
+    '!shopifyConnected',
+    '!shopifyStoreConnected',
+    '!entitlement.hasActiveSubscription',
+    'creemMayWriteToAccount(user.id)',
+  ]) {
+    check(`A2: the gate requires ${condition}`, g.includes(condition))
+  }
+  check('A2-MUT: dropping the USD condition is caught', !gate(page.replace("    && market === 'USD'\n", '')).includes("market === 'USD'"))
+  check('A2-MUT2: dropping the sandbox condition is caught',
+    !gate(page.replace('    && creemMayWriteToAccount(user.id)\n', '')).includes('creemMayWriteToAccount(user.id)'))
+  check('A2-MUT3: dropping the Shopify condition is caught',
+    !gate(page.replace('    && !shopifyStoreConnected\n', '')).includes('!shopifyStoreConnected'))
+
+  check('A3: the decision reaches the view as a prop', /creemCheckout=\{creemCheckout\}/.test(page))
+  check('A3-MUT: not passing it is caught', !/creemCheckout=\{creemCheckout\}/.test(page.replace('creemCheckout={creemCheckout}', '')))
+
+  // The client cannot decide this for itself: the switch, the sandbox list and
+  // the account's payment history are all server-side facts.
+  check('A4: neither the view nor the button reads the switch or the sandbox list',
+    !/isCreemEnabled|creemMayWriteToAccount|CREEM_ENABLED/.test(view + button))
+  check('A4-MUT: a client-side switch read is caught',
+    /isCreemEnabled/.test(view + button + 'isCreemEnabled()'))
+}
+
+console.log('\nB) an existing PayPal payer is never moved')
+{
+  const ownerFiltered = /\.from\('subscriptions'\)[\s\S]{0,200}?\.eq\('user_id', user\.id\)/.test(page)
+  check('B1: the PayPal-history read is filtered by the owner (service-role client)', ownerFiltered)
+  // The mutation drops the owner filter from the PayPal-history read only, so
+  // the guard must look at THAT read and not at any other query on the page.
+  const historyRead = (src: string) => {
+    const at = src.indexOf(".not('paypal_subscription_id', 'is', null)")
+    return at > 0 ? src.slice(Math.max(0, at - 300), at) : ''
+  }
+  check('B1-MUT: dropping the owner filter is caught',
+    !/\.eq\('user_id', user\.id\)/.test(historyRead(page.replace(
+      "      .eq('user_id', user.id)\n      .not('paypal_subscription_id', 'is', null)",
+      "      .not('paypal_subscription_id', 'is', null)"))))
+
+  check('B2: any row that ever carried a PayPal subscription id excludes the account',
+    /\.not\('paypal_subscription_id', 'is', null\)/.test(page))
+  check('B2-MUT: narrowing it to active rows only is caught',
+    !/\.not\('paypal_subscription_id', 'is', null\)/.test(page.replace(".not('paypal_subscription_id', 'is', null)", ".eq('status', 'active')")))
+
+  // A read we cannot trust must leave PayPal in place, not fall through to the
+  // card button: the one outcome this decision rules out is a PayPal payer
+  // being shown a second way to pay.
+  check('B3: a failed read keeps PayPal', /creemCheckout = !paypalRowsError && \(paypalRows\?\.length \?\? 0\) === 0/.test(page))
+  check('B3-MUT: ignoring the read error is caught',
+    !/creemCheckout = !paypalRowsError &&/.test(page.replace('creemCheckout = !paypalRowsError && (paypalRows?.length ?? 0) === 0', 'creemCheckout = (paypalRows?.length ?? 0) === 0')))
+}
+
+console.log('\nC) one plan card, one way to pay')
+{
+  const PLANS = ['regular', 'advanced', 'premium', 'large_agency'] as const
+  // Every paid card asks the SAME helper what to offer, so no card can be
+  // given a button the other three are not.
+  for (const plan of PLANS) {
+    check(`C1: the ${plan} card takes its action from the one helper`,
+      view.includes(`action={checkoutActionFor("${plan}")}`))
+  }
+  check('C1-MUT: a card wired straight to the button is caught',
+    !view.replace('action={checkoutActionFor("regular")}', 'action={<CreemCheckoutButton plan="regular" />}')
+      .includes('action={checkoutActionFor("regular")}'))
+  check('C1b: the helper hands out the card button only when the server said so',
+    /if \(creemCheckout\) return <CreemCheckoutButton plan=\{plan\} \/>/.test(view))
+  check('C1b-MUT: an unconditional button in the helper is caught',
+    !/if \(creemCheckout\) return <CreemCheckoutButton/.test(view.replace('if (creemCheckout) return <CreemCheckoutButton plan={plan} />', 'return <CreemCheckoutButton plan={plan} />')))
+
+  // PlanCard renders `action` INSTEAD of the PayPal container, so a card that
+  // has one cannot show both.
+  const actionWins = /\) : action \? \(\s*action\s*\) : \(/.test(view) && view.indexOf('id={`paypal-button-${plan}`}') > view.indexOf(') : action ? (')
+  check('C2: a card with an action never renders the PayPal container', actionWins)
+  check('C2-MUT: rendering the container regardless is caught',
+    !/\) : action \? \(\s*action\s*\) : \(/.test(view.replace(') : action ? (\n        action\n      ) : (', ') : (')))
+
+  check('C3: the PayPal SDK is not loaded on either Creem path',
+    /\{!creemCheckout && !creemGoverned && <BillingClient market=\{market\} \/>\}/.test(view))
+  check('C3-MUT: loading it anyway is caught',
+    !/!creemCheckout && !creemGoverned && <BillingClient/.test(view.replace('{!creemCheckout && !creemGoverned && <BillingClient market={market} />}', '<BillingClient market={market} />')))
+  check('C3-MUT2: dropping only the governed half is caught',
+    !/!creemCheckout && !creemGoverned && <BillingClient/.test(view.replace('!creemCheckout && !creemGoverned &&', '!creemCheckout &&')))
+
+  // An account Creem already bills is offered NOTHING to click: the card
+  // button is for a first payment, and the PayPal container underneath would
+  // open a second subscription at a second provider.
+  const governedAction = /if \(creemGoverned\) return <p[^>]*>\{t\.creem\.changePlanNote\}<\/p>/.test(view)
+    && view.indexOf('if (creemCheckout) return <CreemCheckoutButton') < view.indexOf('if (creemGoverned) return')
+  check('C4: a Creem-billed account gets the contact line instead of a button', governedAction)
+  check('C4-MUT: falling through to the PayPal container is caught',
+    !/if \(creemGoverned\) return <p/.test(view.replace('if (creemGoverned) return <p className="text-caption text-muted">{t.creem.changePlanNote}</p>', '')))
+
+  check('C5: the server decides it, from the subscription row itself',
+    /const creemGoverned = entitlement\.hasActiveSubscription && !!activeSub\?\.creem_subscription_id/.test(page)
+    && /\.select\('status, paypal_subscription_id, creem_subscription_id'\)/.test(page)
+    && /creemGoverned=\{creemGoverned\}/.test(page))
+  check('C5-MUT: not reading the Creem id is caught',
+    !/\.select\('status, paypal_subscription_id, creem_subscription_id'\)/.test(
+      page.replace(".select('status, paypal_subscription_id, creem_subscription_id')", ".select('status, paypal_subscription_id')")))
+}
+
+console.log('\nD) what the button sends, and what it follows')
+{
+  check('D1: it posts to our own checkout route', /fetch\('\/api\/creem\/checkout'/.test(button))
+  check('D2: the body is the plan code and nothing else', /JSON\.stringify\(\{ plan \}\)/.test(button))
+  check('D2-MUT: sending a price or a product id is caught',
+    !/JSON\.stringify\(\{ plan \}\)/.test(button.replace('JSON.stringify({ plan })', 'JSON.stringify({ plan, price })')))
+
+  // A redirect target is only ever an absolute https URL. Our route is the only
+  // source of it, but a javascript: or data: string would run in the page.
+  const HTTPS_GUARD = "!/^https:\\/\\//.test(url)"
+  const guardsRedirect = (src: string) => {
+    const guard = src.indexOf(HTTPS_GUARD)
+    const follow = src.indexOf('window.location.assign(url)')
+    return guard > 0 && follow > guard && src.includes("typeof url !== 'string'")
+  }
+  check('D3: only an absolute https URL is followed, and the check comes first', guardsRedirect(button))
+  check('D3-MUT: following whatever came back is caught', !guardsRedirect(button.replace(HTTPS_GUARD, 'false')))
+
+  // CLAUDE.md: a merchant never reads a provider's own error text.
+  check('D4: the shown message comes from the dictionary', /\{t\.error\}/.test(button) && /\{starting \? t\.starting : t\.payButton\}/.test(button))
+  check('D4-MUT: showing the response body is caught',
+    !/\{t\.error\}/.test(button.replace('{t.error}', '{payload?.error}')))
+  // The component's own name, the route path and the buyer-terms URL say
+  // "creem"; no SENTENCE the merchant reads is written here. The disclosure
+  // Merchant Terms 3.7 requires is the legal thread's wording and lives in the
+  // dictionaries, checked in section E. The URL is the one exception, because
+  // an href cannot come from a translation that a language might omit.
+  const BUYER_TERMS_URL = 'https://www.creem.io/buyer-terms'
+  const allowed = (text: string) =>
+    !/creem/i.test(text) || text.startsWith('/api/') || text.startsWith('[creem-') || text === BUYER_TERMS_URL
+  const literals = (src: string) => [...src.replace(/^import[^\n]*\n/gm, '').matchAll(/'([^']*)'|"([^"]*)"/g)]
+    .map((m) => m[1] ?? m[2] ?? '')
+  check('D5: no string in the component names the provider', literals(button).every(allowed))
+  check('D5-MUT: a provider name in a shown string is caught',
+    !literals(button.replace('t.payButton}', "'Pay with Creem'}")).every(allowed))
+  check('D5-MUT2: another creem.io URL smuggled in is caught',
+    !literals(`${button}\nconst other = 'https://www.creem.io/anything-else'`).every(allowed))
+
+  // 3.8: the buyer must be SHOWN Creem's buyer terms. Text they cannot click
+  // shows them nothing, so this is a real anchor, opened safely.
+  // The URL moved to lib/public-links/creem-buyer-terms.ts when the manage
+  // card had to show it too; the component imports it rather than repeating it.
+  const BUYER_TERMS_MODULE = read('lib/public-links/creem-buyer-terms.ts')
+  check('D6: the buyer terms are a real link, and the label comes from the dictionary',
+    new RegExp(`export const CREEM_BUYER_TERMS_URL = '${BUYER_TERMS_URL}'`).test(BUYER_TERMS_MODULE)
+    && /from '@\/lib\/public-links\/creem-buyer-terms'/.test(button)
+    && /href=\{CREEM_BUYER_TERMS_URL\}/.test(button)
+    && /rel="noopener noreferrer"/.test(button)
+    && /\{t\.buyerTermsLabel\}/.test(button)
+    && /\{t\.disclosure\}/.test(button))
+  // The manage card's own state for a Creem-billed account. Before this it
+  // fell through to manage.contactToCancel — "contact us and we will stop the
+  // billing for you" — which Creem being the merchant of record makes
+  // impossible for us to do.
+  const billingView = read('app/(dashboard)/billing/BillingView.tsx')
+  check('D7: a Creem-billed account is told where cancelling happens',
+    /creemGoverned \? \(/.test(billingView) && /\{t\.creem\.cancelNote\}/.test(billingView))
+  check('D8: …before the screen falls through to the contact-us answer',
+    billingView.indexOf('creemGoverned ? (') < billingView.indexOf('contactToCancel'))
+  check('D9: and that state offers no cancel request of ours',
+    !/handleCancel|paypal\/cancel/.test(billingView.slice(
+      billingView.indexOf('creemGoverned ? ('),
+      billingView.indexOf('hasPaypalSubscriptionId ? ('))))
+  // Written by the legal thread, which could not ship it: it is red against
+  // main. The fallback line is read by any account we bill ourselves without
+  // a PayPal subscription id, and it promised to stop a charge — which for
+  // such an account we can do only by ending the plan, so that is what it now
+  // says. The key stays, because that state still exists.
+  const fallbackLine = /contactToCancel: '([^']*)'/.exec(read('lib/i18n/dashboard/en.ts'))?.[1] ?? ''
+  check('D10: the billing screen does not promise to stop a charge that is not ours',
+    fallbackLine === '' || !/stop the billing/.test(fallbackLine), fallbackLine)
+  // The DEFAULT has to be the safe one: an authority nobody matched lands
+  // here, and a fourth one would inherit whatever this says.
+  check('D11: the fallback also covers a subscription somebody else bills',
+    /billed by another company/.test(fallbackLine)
+    && /where the cancellation is done/.test(fallbackLine), fallbackLine)
+  check('D11-MUT: a fallback that assumes the billing is ours is caught',
+    !/billed by another company/.test('To cancel your renewal, write to us and we will end your plan for you.'))
+  check('D10-MUT: the old promise is caught if it comes back',
+    /stop the billing/.test('To cancel your renewal, please contact us and we will stop the billing for you.'))
+
+  check('D7-MUT: removing the line and keeping the old promise is caught',
+    !/\{t\.creem\.cancelNote\}/.test(billingView.replace('{t.creem.cancelNote}', '{t.manage.contactToCancel}')))
+  check('D9-MUT: a cancel button put into that state is caught',
+    /handleCancel/.test(`${billingView.slice(billingView.indexOf('creemGoverned ? ('))}`.slice(0, 200) + '<Button onClick={handleCancel} />'))
+
+  check('D6-MUT: turning the link back into plain text is caught',
+    !/href=\{CREEM_BUYER_TERMS_URL\}/.test(button.replace('href={CREEM_BUYER_TERMS_URL}', 'title="buyer terms"')))
+}
+
+console.log('\nE) every dashboard language has the strings')
+{
+  const KEYS = ['payButton', 'starting', 'error', 'changePlanNote'] as const
+  const DICTS = {
+    he: 'lib/i18n/dashboard/he.ts',
+    en: 'lib/i18n/dashboard/en.ts',
+    es: 'lib/i18n/dashboard/es.ts',
+    'pt-BR': 'lib/i18n/dashboard/pt-BR/billing.ts',
+  }
+  for (const [lang, path] of Object.entries(DICTS)) {
+    const src = read(path)
+    const start = src.indexOf('    creem: {')
+    const section = start > 0 ? src.slice(start, src.indexOf('    },', start)) : ''
+    check(`E1: ${lang} has a billing.creem section`, section.length > 0)
+    for (const key of KEYS) {
+      check(`E2: ${lang} has ${key}`, new RegExp(`${key}: '[^']+'`).test(section))
+    }
+    check(`E2-MUT: an empty ${lang} string is caught`, !new RegExp("payButton: ''").test(section))
+
+    // The disclosure is the one string in this product that a contract
+    // dictates. Merchant Terms 3.7 is satisfied only if the buyer is told WHO
+    // charges and in WHAT ROLE, so "payment processed by Creem" on its own is
+    // not enough and must fail here. Both quote styles and a wrapped line are
+    // accepted, because the sentence is long enough to wrap in every language.
+    const valueOf = (key: string) => {
+      const at = section.indexOf(`${key}:`)
+      if (at < 0) return ''
+      const quote = section.slice(at).search(/['"]/)
+      const rest = section.slice(at + quote)
+      const closing = rest.indexOf(rest[0], 1)
+      return closing > 0 ? rest.slice(1, closing) : ''
+    }
+    const namesTheRole = (text: string) =>
+      /Creem/.test(text)
+      && /Armitage Labs/.test(text)
+      && /merchant of record|מוכר הרשום|comerciante registrado|comerciante registrada/.test(text)
+    check(`E3: ${lang} discloses Creem as the merchant of record`, namesTheRole(valueOf('disclosure')))
+    check(`E3-MUT: a ${lang} sentence that only names the processor is caught`,
+      !namesTheRole('Payment is processed by Creem.'))
+    check(`E4: ${lang} has a label for the buyer terms`, valueOf('buyerTermsLabel').includes('Creem'))
+    // The cancellation line, in every language. It must say Creem is where
+    // cancelling happens and must NOT promise that we stop the charge: that
+    // is what the old fallback did, and we hold no payment instrument.
+    const cancelNote = valueOf('cancelNote')
+    const saysWhereToCancel = /Creem/.test(cancelNote)
+      && /cancel|ביטול|cancela/i.test(cancelNote)
+    check(`E5: ${lang} says cancelling happens at Creem`, saysWhereToCancel, cancelNote)
+    check(`E5-MUT: a ${lang} line that names no provider is caught`,
+      !(/Creem/.test('Contact us and we will stop the billing for you.')))
+    // The second resort promises only what we can perform: ending the plan on
+    // our side. Stopping the charge is Creem's, and the line says so.
+    const promisesOnlyOurs =
+      // a second route through us, and what it is worth: a written record
+      /write to us|כתבו לנו|escríbenos|fale com a gente/.test(cancelNote)
+      // and NOT a written confirmation: nothing in the codebase sends that
+      // mail, so the promise would rest on somebody answering by hand. The
+      // legal review cut the same sentence from the terms; it can come back
+      // on both sides the day an acknowledgement is actually sent.
+      && !/in writing|בכתב|por escrito/.test(cancelNote)
+      // and who stops the charge, said in the same breath
+      // where the charge can be stopped, not WHO has the power: Hebrew has no
+      // settled gender for a foreign trade name, so the sentence names a place
+      && /only be stopped at Creem|אפשר לעצור רק אצל Creem|solo se puede detener en Creem|só pode ser interrompida na Creem/.test(cancelNote)
+      && !/we will stop the billing|נבטל עבורכם את החיוב|detendremos el cobro|interromperemos a cobrança/.test(cancelNote)
+    check(`E6: ${lang} offers a second route and names its limit`, promisesOnlyOurs, cancelNote)
+    check(`E6-MUT: a ${lang} line that promises to stop the charge is caught`,
+      !/write to us|כתבו לנו|escríbenos|fale com a gente/.test('We will stop the billing for you.'))
+    check(`E6-MUT2: a ${lang} line that promises a written confirmation is caught`,
+      /in writing/.test('we will pass it on and confirm in writing that we have'))
+    // "Merchant of record" is a term of art; the screen is read by a
+    // first-time store owner, so it says what the phrase means instead.
+    check(`E7: ${lang} says what Creem does rather than naming its legal role`,
+      !/merchant of record|המוכר הרשום|vendedor registrado|vendedora registrada/.test(cancelNote), cancelNote)
+  }
+}
+
+console.log('\nF) what the screen actually renders')
+{
+  // The same harness lib/__qa__/reports-billing-screens.qa.ts uses: the view
+  // rendered to static markup, so this is what a merchant's browser receives.
+  const { createElement } = require('react')
+  const { renderToStaticMarkup } = require('react-dom/server')
+  const BillingView = require('../../../app/(dashboard)/billing/BillingView').default
+  const { DashboardLanguageProvider } = require('../../i18n/dashboard/useDashboardLanguage')
+  const { getDashboardDictionary } = require('../../i18n/dashboard/getDashboardDictionary')
+
+  const base = {
+    plan: 'trial', hasActiveSubscription: false, trialActive: true,
+    trialEndsAt: '2026-10-17T00:00:00Z', subscriptionEndsAt: null,
+    hasPaypalSubscriptionId: false, renewalCancelled: false, shopifyConnected: false,
+    shopifyMigrationStatus: null, marketLocked: false, market: 'USD',
+    planPrices: { trial: 0, regular: 79, advanced: 179, premium: 329, large_agency: 649 },
+  }
+  const render = (locale: string, props: Record<string, unknown>) =>
+    renderToStaticMarkup(createElement(DashboardLanguageProvider, { initialLocale: locale },
+      createElement(BillingView, { ...base, ...props })))
+
+  const PLANS = ['regular', 'advanced', 'premium', 'large_agency'] as const
+  // he and en only: DashboardLanguageProvider's initialLocale resolves to
+  // Hebrew for the two partial dictionaries in this harness (the real locale
+  // comes from the request), so a Spanish render here would prove nothing.
+  // Their strings are checked in section E.
+  for (const locale of ['he', 'en']) {
+    const t = getDashboardDictionary(locale).billing.creem
+    const card = render(locale, { creemCheckout: true })
+    const paypal = render(locale, { creemCheckout: false })
+
+    check(`F1 (${locale}): the card path draws a pay button on every paid plan`,
+      PLANS.every((plan) => card.includes(`data-creem-checkout="${plan}"`)))
+    check(`F2 (${locale}): and no PayPal container anywhere`, !card.includes('paypal-button-'))
+    check(`F3 (${locale}): the button is in this language`, card.includes(t.payButton))
+    check(`F4 (${locale}): the PayPal path is untouched — containers, no pay button`,
+      PLANS.every((plan) => paypal.includes(`paypal-button-${plan}`)) && !paypal.includes('data-creem-checkout'))
+
+    const governed = render(locale, { creemCheckout: false, creemGoverned: true, hasActiveSubscription: true, trialActive: false, plan: 'regular' })
+    check(`F5 (${locale}): a Creem-billed account sees no checkout at all`,
+      !governed.includes('paypal-button-') && !governed.includes('data-creem-checkout'))
+    check(`F6 (${locale}): and is told how to change plan`, governed.includes(t.changePlanNote))
+
+    // Merchant Terms 3.7 and 3.8 are satisfied by what the browser receives,
+    // not by what the source says, so this reads the markup: the disclosure in
+    // this language beside every card button, and a buyer-terms link that
+    // actually opens.
+    const escaped = (text: string) => text.replace(/&/g, '&amp;').replace(/'/g, '&#x27;')
+    check(`F7 (${locale}): the merchant-of-record disclosure is on the card path`,
+      card.includes(escaped(t.disclosure)) && !paypal.includes(escaped(t.disclosure)))
+    check(`F8 (${locale}): and the buyer terms are a link that opens`,
+      card.includes('href="https://www.creem.io/buyer-terms"')
+      && card.includes('rel="noopener noreferrer"')
+      && card.includes(escaped(t.buyerTermsLabel)))
+  }
+}
+
+console.log(`\n${pass} passed, ${fail} failed`)
+if (fail > 0) process.exit(1)
+
+export {}

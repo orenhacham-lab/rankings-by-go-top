@@ -27,6 +27,23 @@ export interface ScanInput {
   postalCode?: string | null
   exactPoint?: ExactPointInput | null
   radiusCenter?: RadiusCenter | null
+  /**
+   * The project's competitor domains, located in the SAME organic results this
+   * scan fetches for the target domain. Never causes a request of its own.
+   * Google organic only; other engines ignore it.
+   */
+  competitorDomains?: string[] | null
+}
+
+/**
+ * Where one competitor ranked in the result page the scan already fetched:
+ * 1-20, or null when it is not in the top 20. `domain` is normalized exactly as
+ * the target domain is.
+ */
+export interface CompetitorPosition {
+  domain: string
+  position: number | null
+  url: string | null
 }
 
 export interface ScanAttempt {
@@ -113,4 +130,10 @@ export interface ScanOutput {
       position: number
     } | null
   }
+  /**
+   * Present only when the input named competitor domains AND a result page was
+   * read. One entry per normalized competitor domain. Every other field of this
+   * output is computed exactly as it is without competitors.
+   */
+  competitorPositions?: CompetitorPosition[]
 }

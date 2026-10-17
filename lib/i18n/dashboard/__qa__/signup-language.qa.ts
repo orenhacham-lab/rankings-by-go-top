@@ -60,14 +60,24 @@ function main() {
   // 4 — emailRedirectTo carries ?lang so the confirmation hop preserves the choice.
   check('signup emailRedirectTo carries &lang=${lang}', /emailRedirectTo:[^\n]*&lang=\$\{lang\}/.test(signup))
   // callback preserves a validated lang on the redirect.
+  // It used to validate with `lang === 'en' || lang === 'he'`, which DROPPED a
+  // Spanish or Portuguese language on the confirmation hop and landed the new
+  // customer in Hebrew. It now validates through normalizeStoredLocale, so
+  // every public locale survives and a hand-edited one still cannot.
   check('callback reads + validates lang and sets it on the redirect',
-    /searchParams\.get\('lang'\)/.test(callback) && /lang === 'en' \|\| lang === 'he'/.test(callback) && /dest\.searchParams\.set\('lang', lang\)/.test(callback))
+    /searchParams\.get\('lang'\)/.test(callback) && /normalizeStoredLocale\(lang\)/.test(callback) && /dest\.searchParams\.set\('lang', keptLang\)/.test(callback))
+  check('CONTROL: the old two-language filter fails this guard',
+    !/normalizeStoredLocale\(lang\)/.test(callback.replace(/normalizeStoredLocale\(lang\)/g, "(lang === 'en' || lang === 'he')")))
   const rootLayout = read('app/layout.tsx')
   // 3 — the layout still seeds from auth metadata, now THROUGH the server locale
   // resolver (cookie first, metadata as the fresh-device seed). The shape changed
   // with the server language contract; the guarantee did not.
+  // Either spelling satisfies this. The dashboard now seeds from
+  // getServerPublicLocale because its WORDS can be Spanish; what this checks is
+  // that the seed is the server's own resolution of the signup locale and not a
+  // second mechanism.
   check('dashboard layout seeds the provider from the server-resolved locale',
-    /getServerLocale\(user\.user_metadata\?\.locale/.test(layout))
+    /getServer(?:Public)?Locale\(user\.user_metadata\?\.locale/.test(layout))
   // The root document's seed read moved into the request-cached context module so
   // <html> and the page <title> resolve ONCE and cannot disagree. Same seed, same
   // resolver — asserted where it now lives.
@@ -75,7 +85,7 @@ function main() {
   check('and the root document applies the SAME seed, so the two agree',
     /getRootRequestContext\(\)/.test(rootLayout)
     && /user\?\.user_metadata\?\.locale/.test(rootRequest)
-    && /getServerLocale\(seed\)/.test(rootRequest))
+    && /getServer(?:Public)?Locale\(seed\)/.test(rootRequest))
   {
     check('a signup-EN seed still wins on a device with no cookie',
       resolveRequestLocale({ pathname: '/dashboard', cookieValue: null, seed: 'en' }) === 'en')

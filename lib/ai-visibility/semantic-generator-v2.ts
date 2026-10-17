@@ -13,7 +13,7 @@
  */
 
 import type { PromptIntent, BusinessCategory, PromptSuggestion } from './prompt-templates'
-import { getConfidenceTier, generateSignalChips, generateValueReason } from './prompt-templates'
+import { getConfidenceTier, generateSignalChips, generateValueReason, normalizeLanguage, getIntentLabelFor } from './prompt-templates'
 import { classifyKeywordMode, type KeywordMode, type KeywordClassification } from './keyword-classifier'
 
 // ============================================================================
@@ -363,6 +363,67 @@ function phraseNaturalHebrewQuestion(
   return null
 }
 
+/**
+ * The Spanish phrasings, one per behaviour, mirroring the English function
+ * below. Without this, `language === 'he' ? hebrew : english` gave a Spanish
+ * project English sentences — «Reviews of comprar perfume nicho».
+ */
+function phraseNaturalSpanishQuestion(
+  need: UserNeed,
+  entity: EntityProfile,
+  city: string | null
+): string | null {
+  const { keyword, entityType } = entity
+
+  if (need.behavior === 'price_discovery' || need.behavior === 'pricing_plans') {
+    return `¿Cuánto cuesta ${keyword}?`
+  }
+
+  if (need.behavior === 'provider_selection') {
+    if (entityType === 'service_category') {
+      if (city) return `Mejores proveedores de ${keyword} en ${city}`
+      return `Mejores proveedores de ${keyword}`
+    }
+    return null
+  }
+
+  if (need.behavior === 'product_recommendation') {
+    if (entityType === 'product' || entityType === 'brand') {
+      return `¿Qué ${keyword} se recomienda?`
+    }
+    return null
+  }
+
+  if (need.behavior === 'product_reviews') {
+    if (entityType === 'product' || entityType === 'brand') {
+      return `Opiniones sobre ${keyword}`
+    }
+    return null
+  }
+
+  if (need.behavior === 'local_availability') {
+    if (city) return `Dónde encontrar ${keyword} en ${city}`
+    return null
+  }
+
+  if (need.behavior === 'quality_assurance_service') {
+    if (entityType === 'service_category') {
+      return `Qué revisar al elegir ${keyword}`
+    }
+    return null
+  }
+
+  if (need.behavior === 'alternative_evaluation') {
+    return `Mejores alternativas a ${keyword}`
+  }
+
+  if (need.behavior === 'explanation') {
+    return `Cómo usar ${keyword}`
+  }
+
+  return null
+}
+
 function phraseNaturalEnglishQuestion(
   need: UserNeed,
   entity: EntityProfile,
@@ -618,9 +679,12 @@ export function generateHumanLikeSmartQuestionsDebug(ctx: GeneratorContext): Gen
   // Step 3 & 4: Generate and validate questions
   for (const need of needs) {
     // Generate natural phrasing
-    const phrase = language === 'he'
+    const lang = normalizeLanguage(language)
+    const phrase = lang === 'he'
       ? phraseNaturalHebrewQuestion(need, entity, city)
-      : phraseNaturalEnglishQuestion(need, entity, city)
+      : lang === 'es'
+        ? phraseNaturalSpanishQuestion(need, entity, city)
+        : phraseNaturalEnglishQuestion(need, entity, city)
 
     if (!phrase) {
       // Couldn't phrase naturally - skip silently (this is OK, not an error)
@@ -671,43 +735,19 @@ export function convertToPromptSuggestions(
 ): Partial<PromptSuggestion>[] {
   const suggestions: Partial<PromptSuggestion>[] = []
 
-  const HE_INTENT_LABEL: Record<PromptIntent, string> = {
-    recommendation: 'המלצה',
-    comparison: 'השוואה',
-    commercial: 'מחיר',
-    pre_purchase: 'מידע לפני רכישה',
-    transactional: 'בחירה',
-    local: 'מקומי',
-    brand: 'מותג',
-    informational: 'מידע',
-    alternatives: 'אלטרנטיבות',
-    gift: 'מתנה',
-  }
-
-  const EN_INTENT_LABEL: Record<PromptIntent, string> = {
-    recommendation: 'Recommendation',
-    comparison: 'Comparison',
-    commercial: 'Price',
-    pre_purchase: 'Pre-purchase',
-    transactional: 'Selection',
-    local: 'Local',
-    brand: 'Brand',
-    informational: 'Info',
-    alternatives: 'Alternatives',
-    gift: 'Gift',
-  }
-
-  const intentLabels = language === 'he' ? HE_INTENT_LABEL : EN_INTENT_LABEL
+  // The labels used to be copied into this file, so a third language had to be
+  // added twice. They now come from the one table the template engine reads.
+  const lang = normalizeLanguage(language)
 
   for (const q of v2Questions) {
     const tier = getConfidenceTier(q.score)
-    const chips = generateSignalChips(q.prompt, q.intent, q.score, language as 'he' | 'en', false)
-    const valueReason = generateValueReason(q.intent, q.score, q.prompt, language as 'he' | 'en', false)
+    const chips = generateSignalChips(q.prompt, q.intent, q.score, lang, false)
+    const valueReason = generateValueReason(q.intent, q.score, q.prompt, lang, false)
 
     suggestions.push({
       prompt: q.prompt,
       intent: q.intent,
-      intentLabel: intentLabels[q.intent],
+      intentLabel: getIntentLabelFor(q.intent, lang),
       language,
       qualityScore: q.score,
       confidenceTier: tier,

@@ -37,15 +37,15 @@ export default function ArticleBodyPreview({
 
   return (
     <div>
-      <div className="text-xs font-medium text-slate-500 dark:text-slate-400 mb-2">{label}</div>
+      <div className="text-caption font-medium text-muted mb-2">{label}</div>
       {composed.trim() ? (
         <div
           dir={dir}
-          className="article-content max-w-none rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 px-3 py-2 text-slate-800 dark:text-slate-100 max-h-[70vh] overflow-y-auto"
+          className="article-content max-w-none rounded-control border border-line bg-surface px-3 py-2 text-ink max-h-[70vh] overflow-y-auto"
           dangerouslySetInnerHTML={{ __html: composed }}
         />
       ) : (
-        <p className="text-xs text-slate-400 dark:text-slate-500">{emptyHint || '—'}</p>
+        <p className="text-caption text-muted">{emptyHint || '—'}</p>
       )}
     </div>
   )

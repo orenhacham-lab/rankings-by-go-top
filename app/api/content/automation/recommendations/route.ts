@@ -33,6 +33,9 @@ import { BillingExhaustedError, RecommendationModelUnavailableError } from '@/li
 import { classifyRecoRun } from '@/lib/content/recommendations/run-classify'
 import { runtimeInfo } from '@/lib/runtime-info'
 import { assertContentGenerationAllowedForUser, gateDenialHttp } from '@/lib/content/entitlement-guard'
+import { isGscReadOnlyEnabled } from '@/lib/gsc/config'
+import { loadOverlapIndex } from '@/lib/content/cannibalization/load'
+import { skipOverlapping } from '@/lib/content/cannibalization/check'
 import { randomUUID } from 'crypto'
 
 // Node runtime (uses node:crypto for run ids + SHA-256 domain fingerprints).
@@ -323,6 +326,22 @@ export async function POST(request: Request) {
       console.warn('[automation-recommendations] canonical link preview skipped', { message: (e as Error)?.message?.slice(0, 120) })
     }
 
+    // The cannibalization check (lib/content/cannibalization) — strategy generation is
+    // an AUTOMATIC path, so an idea whose subject is already a page of the site, one of
+    // our articles, a query the site ranks for with a page, or a planned topic is
+    // SKIPPED here, before anything is stored. Best-effort: a load failure keeps the set.
+    let cannibalizationSkipped = 0
+    try {
+      const overlapIndex = await loadOverlapIndex(auth.admin, { projectId: auth.project.id, userId: auth.user.id }, { gsc: isGscReadOnlyEnabled() })
+      const kept = skipOverlapping(overlapIndex, fresh)
+      cannibalizationSkipped = fresh.length - kept.length
+      // The funnel names the reason for each skipped candidate (final-outcomes.ts).
+      const keptSet = new Set(kept)
+      for (const s of fresh) if (!keptSet.has(s)) blogRejectedByTitle.set(normalizeText(s.title), 'cannibalization_overlap')
+      fresh = kept
+    } catch { /* the set stays as the engine and the guards left it */ }
+    if (cannibalizationSkipped > 0) console.log('[automation-recommendations] cannibalization skipped', { count: cannibalizationSkipped })
+
     // E — one truthful stage contract. raw = model output BEFORE gates; engine-accepted
     // = engine output; the engine's removal count is ALWAYS surfaced (customer funnel)
     // so "generated N / 0 rejections" can never happen when the engine removed some.
@@ -330,7 +349,7 @@ export async function POST(request: Request) {
     const engineAcceptedCount = result.suggestions.length
     const engineFiltered = Math.max(0, rawGeneratedCount - engineAcceptedCount)
     const engineRejectedByReason = briefDiagnostics?.rejected_by_reason ?? opportunityDiagnostics?.rejected_by_reason ?? {}
-    const routeRejectedByReason = () => ({ title_exists: filteredTitleExists, exact_existing_keyword_owner: exactExistingKeywordOwner, source_only_entity_expansion: sourceOnlyEntityExpansion, covered_by_existing_content: filteredCoveredByContent, primary_keyword_exists: filteredPrimaryKeywordExists, intra_run_removed: intraRun.removed, intra_run_merged: intraRun.merged })
+    const routeRejectedByReason = () => ({ title_exists: filteredTitleExists, exact_existing_keyword_owner: exactExistingKeywordOwner, source_only_entity_expansion: sourceOnlyEntityExpansion, covered_by_existing_content: filteredCoveredByContent, primary_keyword_exists: filteredPrimaryKeywordExists, intra_run_removed: intraRun.removed, intra_run_merged: intraRun.merged, cannibalization_overlap: cannibalizationSkipped })
 
     // Scope 2 — STAGE-AWARE final outcomes. engineCandidateOutcomes stop at ENGINE
     // acceptance; this traces each generated candidate through route finalization + the

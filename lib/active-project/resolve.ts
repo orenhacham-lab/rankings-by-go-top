@@ -11,6 +11,10 @@ export interface ActiveProjectLite {
   name?: string | null
   /** Used only for the documented deterministic fallback (most-recently-updated). */
   updated_at?: string | null
+  /** For the switcher's site icon only (lib/site-icon.ts); never used to resolve anything. */
+  target_domain?: string | null
+  /** The icon the project's latest scan found in its HTML, already checked by the route. */
+  site_icon?: string | null
 }
 
 /** User-namespaced storage key — prevents cross-user leakage on a shared browser. */

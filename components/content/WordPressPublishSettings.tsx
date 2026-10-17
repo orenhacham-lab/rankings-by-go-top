@@ -14,6 +14,11 @@ import { useCallback, useEffect, useState } from 'react'
 import { Card } from '@/components/ui/Card'
 import Button from '@/components/ui/Button'
 import Badge from '@/components/ui/Badge'
+import Checkbox from '@/components/ui/Checkbox'
+import Notice from '@/components/ui/Notice'
+import Select from '@/components/ui/Select'
+import { Skeleton } from '@/components/ui/Skeleton'
+import { FIELD_LABEL_CLASSES } from '@/components/ui/Input'
 
 type Term = { id: number; name: string }
 export type WpExportStatus = {
@@ -35,9 +40,7 @@ type Dict = {
 }
 
 const listCls =
-  'max-h-40 overflow-y-auto rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 p-2 space-y-1'
-const selectCls =
-  'w-full px-3 py-2 text-sm rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-500'
+  'max-h-40 space-y-2 overflow-y-auto rounded-control border border-line bg-surface p-3'
 
 export default function WordPressPublishSettings({
   projectId,
@@ -121,6 +124,7 @@ export default function WordPressPublishSettings({
     } catch { notify(t.saveError, false) } finally { setSaving(false) }
   }
 
+  const seoPluginKnown = (p: string) => p === 'yoast' || p === 'rankmath' || p === 'none' || p === 'permission_error'
   function seoPluginLabel(p: string): string {
     if (p === 'yoast') return t.seoYoast
     if (p === 'rankmath') return t.seoRankMath
@@ -142,79 +146,79 @@ export default function WordPressPublishSettings({
   const seoStatusWarn = lastExport?.seoStatus === 'written_not_verifiable'
 
   return (
-    <Card className="hover:translate-y-0" >
+    <Card className="p-5 sm:p-6">
       <div className="flex items-center justify-between gap-2 mb-1">
-        <h3 className="text-base font-semibold text-slate-800 dark:text-slate-100">{t.title}</h3>
-        <Badge variant={seoPlugin === 'yoast' || seoPlugin === 'rankmath' ? 'success' : 'neutral'}>
-          {t.seoPluginLabel}: {seoPluginLabel(seoPlugin)}
-        </Badge>
+        <h3 className="text-section font-semibold text-ink">{t.title}</h3>
+        {/* An unknown value says nothing to the owner: the badge shows only what we actually know. */}
+        {seoPluginKnown(seoPlugin) && (
+          <Badge variant={seoPlugin === 'yoast' || seoPlugin === 'rankmath' ? 'success' : 'neutral'}>
+            {t.seoPluginLabel}: {seoPluginLabel(seoPlugin)}
+          </Badge>
+        )}
       </div>
-      <p className="text-xs text-slate-500 dark:text-slate-400 mb-3">{t.hint}</p>
+      <p className="mb-4 max-w-prose text-caption text-muted">{t.hint}</p>
 
       {loading ? (
-        <p className="text-xs text-slate-400 dark:text-slate-500">{t.loading}</p>
+        <div role="status" aria-label={t.loading} className="space-y-2">
+          <Skeleton className="h-10 w-full" />
+          <Skeleton className="h-24 w-full" />
+        </div>
       ) : error === 'permission' ? (
-        <p className="text-xs text-amber-700 dark:text-amber-400">{t.permissionError}</p>
+        <Notice tone="warn">{t.permissionError}</Notice>
       ) : error === 'connection' ? (
-        <p className="text-xs text-amber-700 dark:text-amber-400">{t.connectionError}</p>
+        <Notice tone="warn">{t.connectionError}</Notice>
       ) : (
-        <div className="space-y-3" dir={dir}>
+        <div className="space-y-4" dir={dir}>
           {/* Primary category */}
-          <div className="flex flex-col gap-1">
-            <label className="text-xs font-medium text-slate-600 dark:text-slate-300">{t.primaryCategory}</label>
-            <select className={selectCls} value={primary ?? ''} onChange={(e) => setPrimary(e.target.value ? Number(e.target.value) : null)}>
-              <option value="">{t.primaryNone}</option>
-              {categories.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
-            </select>
-          </div>
+          <Select
+            id="wp-primary-category"
+            label={t.primaryCategory}
+            value={primary == null ? '' : String(primary)}
+            onChange={(e) => setPrimary(e.target.value ? Number(e.target.value) : null)}
+            options={[{ value: '', label: t.primaryNone }, ...categories.map((c) => ({ value: String(c.id), label: c.name }))]}
+          />
 
           {/* Additional categories */}
-          <div className="flex flex-col gap-1">
-            <label className="text-xs font-medium text-slate-600 dark:text-slate-300">{t.additionalCategories}</label>
+          <div className="flex flex-col gap-1.5">
+            <span className={FIELD_LABEL_CLASSES}>{t.additionalCategories}</span>
             {categories.length === 0 ? (
-              <p className="text-xs text-slate-400 dark:text-slate-500">{t.empty}</p>
+              <p className="text-caption text-muted">{t.empty}</p>
             ) : (
               <div className={listCls}>
                 {categories.filter((c) => c.id !== primary).map((c) => (
-                  <label key={c.id} className="flex items-center gap-2 text-sm text-slate-700 dark:text-slate-200 cursor-pointer">
-                    <input type="checkbox" checked={catIds.includes(c.id)} onChange={() => setCatIds((p) => toggle(p, c.id))} />
-                    <span>{c.name}</span>
-                  </label>
+                  <Checkbox key={c.id} checked={catIds.includes(c.id)} onChange={() => setCatIds((p) => toggle(p, c.id))} label={c.name} />
                 ))}
               </div>
             )}
           </div>
 
           {/* Tags */}
-          <div className="flex flex-col gap-1">
-            <label className="text-xs font-medium text-slate-600 dark:text-slate-300">{t.tags}</label>
+          <div className="flex flex-col gap-1.5">
+            <span className={FIELD_LABEL_CLASSES}>{t.tags}</span>
             {tags.length === 0 ? (
-              <p className="text-xs text-slate-400 dark:text-slate-500">{t.empty}</p>
+              <p className="text-caption text-muted">{t.empty}</p>
             ) : (
               <div className={listCls}>
                 {tags.map((tg) => (
-                  <label key={tg.id} className="flex items-center gap-2 text-sm text-slate-700 dark:text-slate-200 cursor-pointer">
-                    <input type="checkbox" checked={tagIds.includes(tg.id)} onChange={() => setTagIds((p) => toggle(p, tg.id))} />
-                    <span>{tg.name}</span>
-                  </label>
+                  <Checkbox key={tg.id} checked={tagIds.includes(tg.id)} onChange={() => setTagIds((p) => toggle(p, tg.id))} label={tg.name} />
                 ))}
               </div>
             )}
           </div>
 
-          <Button size="sm" onClick={save} loading={saving} disabled={saving}>{saving ? t.saving : t.save}</Button>
+          <Button size="sm" variant="secondary" onClick={save} loading={saving} disabled={saving}>{saving ? t.saving : t.save}</Button>
 
           {/* Last export status (taxonomy + SEO meta) — never a silent success. */}
           {lastExport && (
-            <div className="pt-2 border-t border-slate-100 dark:border-slate-800 space-y-1">
-              <div className="text-xs text-slate-500 dark:text-slate-400">{t.lastExportLabel}</div>
+            <div className="space-y-2 border-t border-line pt-4">
+              <div className="text-overline font-semibold uppercase tracking-wide text-muted">{t.lastExportLabel}</div>
               {lastExport.seoStatus && (
-                <p className={`text-xs ${seoStatusOk ? 'text-green-700 dark:text-green-400' : seoStatusWarn ? 'text-amber-700 dark:text-amber-400' : 'text-red-600 dark:text-red-400'}`}>
+                <Notice tone={seoStatusOk ? 'ok' : seoStatusWarn ? 'warn' : 'bad'}>
                   {seoPluginLabel(lastExport.seoPlugin || seoPlugin)} · {seoStatusLabel(lastExport.seoStatus)}
-                </p>
+                </Notice>
               )}
               {lastExport.taxonomyWarning && (
-                <p className="text-xs text-amber-700 dark:text-amber-400">{t.taxonomyWarning}</p>
+                <Notice tone="warn">{t.taxonomyWarning}</Notice>
               )}
             </div>
           )}

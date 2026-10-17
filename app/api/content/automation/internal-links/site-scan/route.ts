@@ -19,7 +19,10 @@
  */
 
 import { authContentProject, isInternalLinkPlanningEnabled, loadWordPressCredentials } from '@/lib/content/api-auth'
+import { hasPublishPlugin } from '@/lib/content/wordpress-plugin-publish'
 import { scanWordPressSite, type SiteScanReport } from '@/lib/content/wordpress-content-scan'
+import { credsReadSource, pluginReadSource, type WordPressReadSource } from '@/lib/content/wordpress-read-source'
+import { loadPluginFor } from '@/lib/site-fix/plugin-capabilities'
 import { renderScanReportHtml } from '@/lib/content/wordpress-scan-report-html'
 
 export const dynamic = 'force-dynamic'
@@ -40,9 +43,21 @@ export async function GET(request: Request) {
   if ('error' in auth) return Response.json({ error: auth.error }, { status: auth.status })
   const { admin, project } = auth
 
-  // Load the saved WordPress credentials (decrypted at call time; never returned).
-  const wp = await loadWordPressCredentials(admin, project.id)
-  if ('error' in wp) return Response.json({ error: wp.error }, { status: wp.status })
+  // The GO TOP SEO Bridge plugin >= 3.1.0 (project AND owner), else the saved WordPress credentials
+  // (decrypted at call time; never returned).
+  let source: WordPressReadSource
+  const plugin = await loadPluginFor(admin, project.id, 'content', { ownerId: auth.user.id })
+  if (plugin) {
+    source = pluginReadSource(plugin.link)
+  } else {
+    const wp = await loadWordPressCredentials(admin, project.id)
+    if ('error' in wp) {
+      // A 3.0.0 plugin alone cannot list every post: the plugin update (or an application password).
+      if (wp.status === 404 && await hasPublishPlugin(admin, project.id, auth.user.id)) return Response.json({ error: 'needs_app_password', reason: 'needs_app_password' }, { status: 409 })
+      return Response.json({ error: wp.error }, { status: wp.status })
+    }
+    source = credsReadSource(wp.creds)
+  }
 
   // Read-only: our own published articles, for target↔generated_article matching
   // (+ their topic's primary_keyword as a high-priority keyword signal).
@@ -70,7 +85,7 @@ export async function GET(request: Request) {
 
   let report: SiteScanReport
   try {
-    report = await scanWordPressSite(wp.creds, { includePages, maxItems, modifiedAfter, generatedArticles })
+    report = await scanWordPressSite(source, { includePages, maxItems, modifiedAfter, generatedArticles })
   } catch (e) {
     console.error('[wp-site-scan] scan failed', { message: e instanceof Error ? e.message : String(e) })
     return Response.json({ error: 'scan_failed' }, { status: 502 })

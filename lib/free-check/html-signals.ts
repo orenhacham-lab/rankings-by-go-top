@@ -24,9 +24,25 @@ export type SiteSignals = {
   canonical: string | null
   h1: string[]
   h2: string[]
-  images: { total: number; missingAlt: number }
-  /** Distinct @type values found across all JSON-LD blocks. */
+  /**
+   * `missing`: the address of each image without alt text, in page order (at most MAX_MISSING_ALT;
+   * '' when the image has no address of its own, such as a lazy-load placeholder). The site's check
+   * uses it to tell the theme's images, the same ones on every page, from the page's own.
+   */
+  images: { total: number; missingAlt: number; missing: string[] }
+  /**
+   * Distinct schema.org types the page declares, however it declares them: JSON-LD @type values,
+   * microdata (`itemscope itemtype="https://schema.org/Product"`) and RDFa (`typeof`, with the
+   * schema.org vocabulary). Many Shopify themes emit microdata only.
+   */
   schemaTypes: string[]
+  /**
+   * The JSON-LD @type values alone. The seed crawl reads a page's KIND from these
+   * (lib/seed-scan/crawl.ts wpTypeHint), and a theme's microdata product cards on a home page or a
+   * collection must not make it a product. Absent in signals stored before it existed, which were
+   * JSON-LD only, so `jsonLdTypes ?? schemaTypes` is exact for them.
+   */
+  jsonLdTypes?: string[]
   hasOrganizationSchema: boolean
   hasFaqSchema: boolean
   /** A visible Q&A block: FAQ schema, or several question-shaped headings. */
@@ -52,6 +68,19 @@ export type SiteSignals = {
   robotsTxt: string | null
   llmsTxt: boolean
 }
+
+/**
+ * A questions-and-answers block written the usual way: a heading that names it ("שאלות נפוצות",
+ * "FAQ") with its questions one level down, as H3s. The FAQ block the site-health fix adds is
+ * exactly that (lib/site-fix/content.ts), so without this a page fixed with it still read
+ * "no FAQ" on the next check (wave 9).
+ */
+function faqBlockBelow(clean: string, upper: string[]): boolean {
+  const named = upper.some((t) => FAQ_NAMES.some((n) => t.toLowerCase().includes(n)))
+  if (!named) return false
+  return headings(clean, 'h3').filter((t) => /[?？]\s*$/.test(t)).length >= 2
+}
+const FAQ_NAMES = ['שאלות נפוצות', 'שאלות ותשובות', 'faq', 'frequently asked']
 
 const QUESTION_MARKERS = [
   'איך', 'מה ', 'מהו', 'מהי', 'למה', 'כמה', 'מתי', 'האם', 'איפה', 'שאלות נפוצות',
@@ -226,6 +255,33 @@ function attrValues(html: string, tag: string, attr: string): string[] {
   return out
 }
 
+export const MAX_MISSING_ALT = 40
+
+/**
+ * The address of each <img> without alt text (none, or blank), resolved against the page. A lazy-load
+ * placeholder (a data: address) gives way to data-src or data-lazy-src; with neither, the image has no
+ * address of its own and is listed as ''.
+ */
+function imagesWithoutAlt(html: string, pageUrl: string): string[] {
+  const out: string[] = []
+  const val = (t: string, name: string) => {
+    const m = t.match(new RegExp(`\\s${name}\\s*=\\s*("([^"]*)"|'([^']*)'|([^\\s">]+))`, 'i'))
+    return m ? (m[2] ?? m[3] ?? m[4] ?? '').trim() : null
+  }
+  for (const t of openTags(html, 'img')) {
+    if ((val(t, 'alt') ?? '').length > 0) continue
+    let src = val(t, 'src') ?? ''
+    if (!src || /^data:/i.test(src)) src = val(t, 'data-src') ?? val(t, 'data-lazy-src') ?? ''
+    let abs = ''
+    if (src && !/^data:/i.test(src)) {
+      try { const u = new URL(decodeEntities(src), pageUrl); u.hash = ''; abs = u.toString() } catch { abs = '' }
+    }
+    out.push(abs)
+    if (out.length >= MAX_MISSING_ALT) break
+  }
+  return out
+}
+
 /** Content of a `<meta name="x">` / `<meta property="x">`, first match wins. */
 function metaContent(html: string, key: string): string | null {
   const tags = openTags(html, 'meta')
@@ -240,7 +296,7 @@ function metaContent(html: string, key: string): string | null {
   return null
 }
 
-function headings(html: string, tag: 'h1' | 'h2'): string[] {
+function headings(html: string, tag: 'h1' | 'h2' | 'h3'): string[] {
   const out: string[] = []
   const hay = html.toLowerCase()
   let i = 0
@@ -307,6 +363,83 @@ function typesOf(nodes: JsonLdNode[]): string[] {
     const t = n['@type']
     if (typeof t === 'string') types.add(t)
     else if (Array.isArray(t)) for (const x of t) if (typeof x === 'string') types.add(x)
+  }
+  return [...types]
+}
+
+/** How many microdata/RDFa type attributes we read. Far above any real page. */
+const MAX_TYPE_ATTRS = 2_000
+/** How far back from a type attribute we look for the `<` of its tag. */
+const TAG_LOOKBACK = 4_000
+
+/** A schema.org type name: letters and digits, starting with a letter. */
+const TYPE_NAME = /^[A-Za-z][A-Za-z0-9]{0,63}$/
+/** `http(s)://(www.)schema.org/…` (or scheme-relative), any case, as microdata and RDFa write it. */
+const SCHEMA_ORG_IRI = /^(?:https?:)?\/\/(?:www\.)?schema\.org\/(.*)$/i
+
+/** The type an IRI names when it is schema.org's: its last path segment. */
+function schemaOrgTypeOf(iri: string): string | null {
+  const m = iri.match(SCHEMA_ORG_IRI)
+  if (!m) return null
+  const segs = m[1].split(/[?#]/)[0].split('/').filter(Boolean)
+  const last = segs[segs.length - 1] ?? ''
+  return TYPE_NAME.test(last) ? last : null
+}
+
+function attrOf(tag: string, name: string): string | null {
+  const m = tag.match(new RegExp(`\\s${name}\\s*=\\s*("([^"]*)"|'([^']*)'|([^\\s">]+))`, 'i'))
+  return m ? decodeEntities(m[2] ?? m[3] ?? m[4] ?? '').trim() : null
+}
+
+/**
+ * schema.org types declared as microdata or RDFa, from the TOP-LEVEL items only: an item that is
+ * a property of another (`itemprop`, or RDFa `property`/`rel` on the same tag) is part of that
+ * item, the way a nested object is part of a JSON-LD node, and is not counted on its own.
+ *
+ *   microdata  itemtype holds one or more absolute IRIs; only schema.org's count.
+ *   RDFa       typeof holds one or more terms: a schema.org IRI, `schema:Type` (schema is in RDFa's
+ *              default context), or a bare `Type` when the page sets vocab to schema.org.
+ *              Other vocabularies (og:, foaf:, sioc:) are not schema.org and do not count.
+ *
+ * Same discipline as the rest of this file: the attributes are found with a linear scan over the
+ * de-scripted markup (so `typeof x` in JavaScript never counts), and each tag is bounded.
+ */
+function markupTypes(clean: string): string[] {
+  const types = new Set<string>()
+  const hay = clean.toLowerCase()
+  const schemaVocab = /\svocab\s*=\s*["']?(?:https?:)?\/\/(?:www\.)?schema\.org\/?["'\s>]/i.test(clean)
+  const re = /\s(?:itemtype|typeof)\s*=/gi
+  let lastTagEnd = -1
+  let seen = 0
+  for (let m = re.exec(hay); m && seen < MAX_TYPE_ATTRS; m = re.exec(hay)) {
+    seen++
+    const at = m.index
+    if (at <= lastTagEnd) continue
+    // Inside a tag: the nearest '<' behind it comes after the nearest '>'.
+    const from = Math.max(0, at - TAG_LOOKBACK)
+    const window = hay.slice(from, at)
+    const lt = window.lastIndexOf('<')
+    if (lt < 0 || window.lastIndexOf('>') > lt) continue
+    const close = hay.indexOf('>', at)
+    if (close < 0) break
+    const tag = clean.slice(from + lt, close + 1)
+    lastTagEnd = close
+    re.lastIndex = close + 1
+    const microdata = attrOf(tag, 'itemtype')
+    if (microdata && attrOf(tag, 'itemprop') === null) {
+      for (const iri of microdata.split(/\s+/)) {
+        const t = schemaOrgTypeOf(iri)
+        if (t) types.add(t)
+      }
+    }
+    const rdfa = attrOf(tag, 'typeof')
+    if (rdfa && attrOf(tag, 'property') === null && attrOf(tag, 'rel') === null) {
+      for (const term of rdfa.split(/\s+/)) {
+        const prefixed = term.match(/^schema:([A-Za-z][A-Za-z0-9]*)$/i)
+        const t = schemaOrgTypeOf(term) ?? (prefixed ? prefixed[1] : null) ?? (schemaVocab && TYPE_NAME.test(term) ? term : null)
+        if (t) types.add(t)
+      }
+    }
   }
   return [...types]
 }
@@ -406,9 +539,11 @@ export function extractSiteSignals(
   const imgAlts = attrValues(clean, 'img', 'alt')
   const imgTotal = (clean.match(/<img\b/gi) ?? []).length
   const missingAlt = Math.max(0, imgTotal - imgAlts.filter((a) => a.trim().length > 0).length)
+  const missingSrcs = imagesWithoutAlt(clean, finalUrl)
 
   const nodes = jsonLdNodes(html)
-  const schemaTypes = typesOf(nodes)
+  const jsonLdTypes = typesOf(nodes)
+  const schemaTypes = [...new Set([...jsonLdTypes, ...markupTypes(clean)])]
   const hasFaqSchema = schemaTypes.some((t) => t === 'FAQPage' || t === 'QAPage')
 
   const h1 = headings(clean, 'h1')
@@ -453,11 +588,12 @@ export function extractSiteSignals(
     canonical,
     h1,
     h2,
-    images: { total: imgTotal, missingAlt },
+    images: { total: imgTotal, missingAlt, missing: missingSrcs },
     schemaTypes,
+    jsonLdTypes,
     hasOrganizationSchema: schemaTypes.some((t) => ORGANIZATION_TYPES.has(t)),
     hasFaqSchema,
-    hasFaqSection: hasFaqSchema || questionHeadings.length >= 3,
+    hasFaqSection: hasFaqSchema || questionHeadings.length >= 3 || faqBlockBelow(clean, [...h1, ...h2]),
     wordCount,
     text,
     internalLinks,

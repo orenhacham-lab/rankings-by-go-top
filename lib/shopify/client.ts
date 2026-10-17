@@ -236,6 +236,39 @@ async function graphql<T>(creds: ShopifyCredentials, query: string, variables: R
 }
 
 /**
+ * The shop's own market, for the seeding scan's searches (lib/seed-scan/
+ * shopify-market.ts): its country — the shop's address, else its primary
+ * domain's — and its primary domain's default locale. Only fields of the shop
+ * and its primary domain, read with the scopes the app already has; when the
+ * domain's localization is refused or absent, the address alone is asked.
+ * Read-only, never throws: what Shopify does not give is null.
+ */
+export async function getShopMarket(creds: ShopifyCredentials): Promise<{ country: string | null; locale: string | null }> {
+  type ShopMarketData = {
+    shop?: {
+      billingAddress?: { countryCodeV2?: string | null } | null
+      primaryDomain?: { localization?: { country?: string | null; defaultLocale?: string | null } | null } | null
+    }
+  }
+  const code = (v: unknown) => (typeof v === 'string' && /^[A-Z]{2}$/.test(v) ? v : null)
+  try {
+    const { data } = await graphql<ShopMarketData>(creds, `{ shop { billingAddress { countryCodeV2 } primaryDomain { localization { country defaultLocale } } } }`)
+    const loc = data.shop?.primaryDomain?.localization
+    return {
+      country: code(data.shop?.billingAddress?.countryCodeV2) ?? code(loc?.country),
+      locale: typeof loc?.defaultLocale === 'string' ? loc.defaultLocale : null,
+    }
+  } catch {
+    try {
+      const { data } = await graphql<ShopMarketData>(creds, `{ shop { billingAddress { countryCodeV2 } } }`)
+      return { country: code(data.shop?.billingAddress?.countryCodeV2), locale: null }
+    } catch {
+      return { country: null, locale: null }
+    }
+  }
+}
+
+/**
  * Read the Admin API scopes GRANTED to the current access token via the
  * supported `currentAppInstallation.accessScopes` query. Returns { scopes,
  * readable } — readable=false when the query itself is denied (permission_error)
@@ -264,6 +297,31 @@ export async function getGrantedScopes(creds: ShopifyCredentials): Promise<{
         messages: e?.shopifyMessages, codes: e?.shopifyCodes,
       },
     }
+  }
+}
+
+/**
+ * The app's OWN subscriptions on this store, straight from the Admin API
+ * (`currentAppInstallation.activeSubscriptions`, which needs no access scope —
+ * it is the app reading its own installation). Shopify documents this query as
+ * the way to confirm a managed-pricing plan.
+ *
+ * Used as a SECOND, independent confirmation before an irreversible billing
+ * step (cancelling a PayPal subscription on app load — see
+ * lib/shopify/app-load-billing-sync.ts). Never throws: any failure is
+ * `{ ok: false }`, which every caller must treat as "not confirmed".
+ */
+export async function getActiveAppSubscriptionStatuses(
+  creds: ShopifyCredentials,
+): Promise<{ ok: true; statuses: string[] } | { ok: false; reason: ShopifyErrorKind | 'malformed' }> {
+  const query = `{ currentAppInstallation { activeSubscriptions { status } } }`
+  try {
+    const { data } = await graphql<{ currentAppInstallation?: { activeSubscriptions?: { status?: string | null }[] | null } | null }>(creds, query)
+    const list = data.currentAppInstallation?.activeSubscriptions
+    if (!Array.isArray(list)) return { ok: false, reason: 'malformed' }
+    return { ok: true, statuses: list.map((s) => String(s?.status || '').toUpperCase()).filter(Boolean) }
+  } catch (err) {
+    return { ok: false, reason: err instanceof ShopifyClientError ? err.kind : 'api_error' }
   }
 }
 
@@ -584,3 +642,4 @@ export async function shopifyGetArticle(creds: ShopifyCredentials, id: string): 
   const { data } = await graphql<{ node?: unknown }>(creds, query, { id })
   return toArticleNode(data.node as never)
 }
+

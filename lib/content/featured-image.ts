@@ -10,8 +10,10 @@
  */
 
 import type { createAdminClient } from '@/lib/supabase/admin'
-import { generateArticleImage, normalizeFeaturedImage, writeCommercialSafeConcept } from '@/lib/content/gemini-image'
+import { generateArticleImage, normalizeFeaturedImage, sanitizeImageConceptForCommercialUse, writeCommercialSafeConcept } from '@/lib/content/gemini-image'
 import { assertContentGenerationAllowedForProject, gateDenialCode } from '@/lib/content/entitlement-guard'
+import { readArticleStyleForArticle } from '@/lib/content/article-style/store'
+import { DEFAULT_CONTENT_LANGUAGE, normalizeContentLanguage, type ContentLanguage } from '@/lib/content/language'
 
 export const CONTENT_IMAGE_BUCKET = 'content-article-images'
 
@@ -47,13 +49,13 @@ export async function createFeaturedImageForArticle(
   if (!gate.allowed) return { error: gateDenialCode(gate) }
 
   // Language + topical context from the linked topic (best-effort).
-  let language: 'he' | 'en' = 'he'
+  let language: ContentLanguage = DEFAULT_CONTENT_LANGUAGE
   let topicText = ''
   let primaryKeyword = ''
   if (a.topic_id && typeof a.topic_id === 'string') {
     const { data: topic } = await admin.from('article_topics').select('language, topic, primary_keyword').eq('id', a.topic_id).maybeSingle()
     const t = topic as { language?: string; topic?: string; primary_keyword?: string } | null
-    language = String(t?.language || '').toLowerCase().startsWith('en') ? 'en' : 'he'
+    language = normalizeContentLanguage(t?.language)
     topicText = t?.topic || ''
     primaryKeyword = t?.primary_keyword || ''
   }
@@ -67,14 +69,24 @@ export async function createFeaturedImageForArticle(
     language,
   })
 
-  const gen = await generateArticleImage({ title: String(a.title || ''), imagePrompt: concept, topic: topicText || null, language })
+  // The project's image style and hero shape (lib/content/article-style). No
+  // setting, or no table yet, is the realistic 16:9 hero this always made.
+  const { style } = await readArticleStyleForArticle(admin, articleId)
+
+  const gen = await generateArticleImage({
+    title: String(a.title || ''), imagePrompt: concept, topic: topicText || null, language,
+    style: style.imageStyle, brandColors: style.brandColors, aspectRatio: style.heroRatio,
+    // The article's subject is pinned as the focal point, so a mood-only concept cannot drift off topic.
+    // A candidate that is only a brand name sanitizes to nothing, so the next one is used.
+    subject: [primaryKeyword, topicText, String(a.title || '')].find((c) => sanitizeImageConceptForCommercialUse(c)) || null,
+  })
   if ('error' in gen) return { error: gen.error }
 
-  // Normalize to JPEG 1600x900 before storing (falls back to raw on sharp error).
+  // Normalize to JPEG 1600x900 (or 1200x1200 for a square hero) before storing (falls back to raw on sharp error).
   let bytes = gen.data
   let mimeType = gen.mimeType
   try {
-    const norm = await normalizeFeaturedImage(gen.data)
+    const norm = await normalizeFeaturedImage(gen.data, style.heroRatio)
     bytes = norm.data
     mimeType = norm.mimeType
   } catch (e) {

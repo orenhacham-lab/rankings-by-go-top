@@ -39,15 +39,17 @@ export default function NewProjectPage() {
     loadClients()
   }, [])
 
-  function handleSuccess() {
+  function handleSuccess(createdId?: string) {
     if (defaultClientId) {
       router.push(`/clients/${defaultClientId}`)
       router.refresh()
       return
     }
 
-    router.push('/projects')
-    router.refresh()
+    // A new project opens as the CURRENT project, on its settings, where it gets
+    // connected. The provider adopts the id only after validating it against the
+    // user's own projects.
+    router.push(createdId ? `/settings?projectId=${encodeURIComponent(createdId)}` : '/dashboard')
   }
 
   return (

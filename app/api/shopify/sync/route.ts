@@ -6,14 +6,17 @@
  * token. Gated by ENABLE_CONTENT + project ownership.
  */
 
+import { after } from 'next/server'
 import { isContentModuleEnabled, authContentProject } from '@/lib/content/api-auth'
 import { loadShopifyConnection } from '@/lib/shopify/api-auth'
 import { runShopifySync } from '@/lib/shopify/sync'
+import { scheduleShopifySeedScan } from '@/lib/seed-scan/shopify-install'
 
 // Entity discovery paginates several types — allow a longer budget.
 export const maxDuration = 300
 
 export async function POST(request: Request) {
+  const startedAt = Date.now()
   if (!isContentModuleEnabled()) return Response.json({ error: 'Not found' }, { status: 404 })
 
   let body: { projectId?: string }
@@ -32,6 +35,9 @@ export async function POST(request: Request) {
     if (!result.ok) {
       return Response.json({ error: result.error ?? 'sync_failed', reason: result.error ?? 'sync_failed', warnings: result.warnings }, { status: 502 })
     }
+    // The products and collections have landed: a newly installed store's first
+    // seeding scan, after this response (lib/seed-scan/shopify-install.ts).
+    scheduleShopifySeedScan(after, { admin: auth.admin, source: 'sync', userId: auth.user.id, projectId: auth.project.id, connectionId: loaded.connection.id, startedAt })
     return Response.json({
       ok: true,
       counts: result.counts,

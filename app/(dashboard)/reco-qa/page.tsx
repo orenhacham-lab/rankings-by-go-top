@@ -15,6 +15,13 @@
  */
 
 import { useEffect, useState } from 'react'
+import { Check, Download, Play, TriangleAlert, X } from 'lucide-react'
+import Button from '@/components/ui/Button'
+import Checkbox from '@/components/ui/Checkbox'
+import Segmented from '@/components/ui/Segmented'
+import Select from '@/components/ui/Select'
+import { FIELD_CLASSES, FIELD_LABEL_CLASSES } from '@/components/ui/Input'
+import { cn } from '@/lib/utils'
 
 interface ProjectOpt { id: string; name: string | null; business_name: string | null }
 interface RuleRow { id: string; level: 'fail' | 'warn'; pass: boolean; detail: string }
@@ -88,53 +95,49 @@ export default function RecoQaPage() {
   const done = Object.keys(reports).length
   const verdictOf = (r: RunReport): 'PASS' | 'FAIL' | 'INSUFFICIENT_INVENTORY' =>
     !r.ok ? 'FAIL' : (r.acceptance?.verdict ?? (r.acceptance?.passed ? 'PASS' : 'FAIL'))
-  const verdictColor = (v: string) => v === 'PASS' ? 'text-emerald-600' : v === 'INSUFFICIENT_INVENTORY' ? 'text-amber-600' : 'text-red-600'
+  const verdictColor = (v: string) => v === 'PASS' ? 'text-ok' : v === 'INSUFFICIENT_INVENTORY' ? 'text-warn' : 'text-bad'
   const counts = Object.values(reports).reduce((acc, r) => { const v = verdictOf(r); acc[v] = (acc[v] ?? 0) + 1; return acc }, {} as Record<string, number>)
   const allPassed = done > 0 && (counts['FAIL'] ?? 0) === 0 && (counts['INSUFFICIENT_INVENTORY'] ?? 0) === 0
 
   return (
-    <div className="max-w-5xl mx-auto py-8 px-4" dir="rtl">
-      <h1 className="text-xl font-bold text-slate-800 dark:text-slate-100 mb-1">בדיקת קבלה חיה — מנוע הרעיונות</h1>
-      <p className="text-xs text-slate-500 mb-4">מריץ את המנוע על נתוני הפרויקטים האמיתיים מול Gemini אמיתי, בודק אוטומטית את כל כללי הקבלה ומפיק דוח. Preview בלבד (דורש RECO_ISOLATION_DIAGNOSTICS=1).</p>
+    <div className="mx-auto max-w-5xl space-y-6 px-4 py-8" dir="rtl">
+      <div>
+      <h1 className="text-title font-bold tracking-tight text-ink">בדיקת קבלה חיה — מנוע הרעיונות</h1>
+      <p className="mt-1.5 max-w-prose text-copy text-muted">מריץ את המנוע על נתוני הפרויקטים האמיתיים מול Gemini אמיתי, בודק אוטומטית את כל כללי הקבלה ומפיק דוח. Preview בלבד (דורש RECO_ISOLATION_DIAGNOSTICS=1).</p>
+      </div>
 
-      <div className="flex flex-wrap items-center gap-3 mb-3 text-sm">
-        <div className="flex items-center gap-1">
-          {(['premium', 'standard'] as const).map((m) => (
-            <button key={m} onClick={() => setTier(m)} disabled={running}
-              className={`rounded-full border px-3 py-1 text-xs ${tier === m ? 'border-indigo-400 bg-indigo-50 text-indigo-700' : 'border-slate-200 text-slate-500'}`}>
-              {m === 'premium' ? 'איכותי — Gemini Pro' : 'מהיר — Gemini Flash'}
-            </button>
-          ))}
-        </div>
-        <label className="flex items-center gap-1 text-xs text-slate-600">
-          <input type="checkbox" checked={persist} onChange={(e) => setPersist(e.target.checked)} disabled={running} />
-          שמור רעיונות בפרויקט (בדיקת persistence מלאה)
-        </label>
-        <button onClick={runMatrix} disabled={running || selected.size === 0}
-          className="rounded-md bg-indigo-600 text-white px-4 py-1.5 text-sm disabled:opacity-50">
+      <div className="flex flex-wrap items-center gap-3 mb-3 text-copy">
+        <Segmented
+          ariaLabel="מודל"
+          value={tier}
+          onChange={(m) => setTier(m)}
+          options={(['premium', 'standard'] as const).map((m) => ({ value: m, label: m === 'premium' ? 'איכותי: Gemini Pro' : 'מהיר: Gemini Flash', disabled: running }))}
+        />
+        <Checkbox id="reco-qa-persist" checked={persist} onChange={(checked) => setPersist(checked)} disabled={running} label="שמור רעיונות בפרויקט (בדיקת persistence מלאה)" />
+        <Button onClick={runMatrix} disabled={running || selected.size === 0} loading={running}>
+          {!running && <Play aria-hidden className="size-4" />}
           {running ? `מריץ… ${current ? label(projects.find((p) => p.id === current) ?? { id: current, name: null, business_name: null }) : ''}` : `הרץ בדיקת קבלה (${selected.size} פרויקטים)`}
-        </button>
+        </Button>
         {done > 0 && !running && (
-          <button onClick={downloadJson} className="rounded-md border border-slate-300 px-3 py-1.5 text-sm">הורד דוח JSON</button>
+          <Button variant="secondary" onClick={downloadJson}><Download aria-hidden className="size-4" />הורד דוח JSON</Button>
         )}
       </div>
 
-      <div className="flex flex-wrap gap-2 mb-5 text-xs">
+      <div className="flex flex-wrap gap-2 mb-5 text-caption">
         {projects.map((p) => (
-          <label key={p.id} className="flex items-center gap-1 rounded border border-slate-200 dark:border-slate-700 px-2 py-1">
-            <input type="checkbox" checked={selected.has(p.id)} disabled={running}
-              onChange={(e) => setSelected((prev) => { const n = new Set(prev); if (e.target.checked) n.add(p.id); else n.delete(p.id); return n })} />
-            {label(p)}
+          <div key={p.id} className="flex items-center gap-2 rounded-control border border-line bg-surface px-2.5 py-1.5">
+            <Checkbox id={`reco-qa-project-${p.id}`} checked={selected.has(p.id)} disabled={running}
+              onChange={(checked) => setSelected((prev) => { const n = new Set(prev); if (checked) n.add(p.id); else n.delete(p.id); return n })} label={label(p)} />
             {reports[p.id] && (
               <span className={`${verdictColor(verdictOf(reports[p.id]))} font-bold`}>{verdictOf(reports[p.id])}</span>
             )}
-          </label>
+          </div>
         ))}
-        {loadError && <span className="text-red-600">{loadError}</span>}
+        {loadError && <span className="text-bad">{loadError}</span>}
       </div>
 
       {done > 0 && !running && (
-        <p className={`text-sm font-bold mb-4 ${allPassed ? 'text-emerald-700' : (counts['FAIL'] ?? 0) > 0 ? 'text-red-700' : 'text-amber-700'}`}>
+        <p className={`text-copy font-bold mb-4 ${allPassed ? 'text-ok' : (counts['FAIL'] ?? 0) > 0 ? 'text-bad' : 'text-warn'}`}>
           {`PASS: ${counts['PASS'] ?? 0} · INSUFFICIENT_INVENTORY: ${counts['INSUFFICIENT_INVENTORY'] ?? 0} · FAIL: ${counts['FAIL'] ?? 0}`}
         </p>
       )}
@@ -143,30 +146,30 @@ export default function RecoQaPage() {
         const p = projects.find((x) => x.id === pid)
         const mp = r.run?.modelPath
         return (
-          <div key={pid} className="mb-6 rounded-lg border border-slate-200 dark:border-slate-700 p-4">
-            <h2 className="font-bold text-slate-800 dark:text-slate-100 mb-1">
+          <div key={pid} className="rounded-card border border-line bg-surface p-5 shadow-card sm:p-6">
+            <h2 className="font-bold text-ink mb-1">
               {p ? label(p) : pid} — <span className={verdictColor(verdictOf(r))}>{verdictOf(r)}</span>
-              {typeof r.acceptance?.warnings === 'number' && r.acceptance.warnings > 0 && <span className="text-amber-600 text-xs"> · {r.acceptance.warnings} לבדיקה ידנית</span>}
+              {typeof r.acceptance?.warnings === 'number' && r.acceptance.warnings > 0 && <span className="text-warn text-caption"> · {r.acceptance.warnings} לבדיקה ידנית</span>}
             </h2>
-            {!r.ok && <p className="text-xs text-red-600 mb-2">{r.error} {r.message}</p>}
+            {!r.ok && <p className="text-caption text-bad mb-2">{r.error} {r.message}</p>}
             {mp && (
-              <p className="text-xs text-slate-600 dark:text-slate-300 mb-2" dir="ltr">
-                model: <b>{mp.model}</b> · tierUsed: <b>{mp.tierUsed}</b> · requested: {mp.requestedTier} · downgraded: <b className={mp.downgraded ? 'text-red-600' : 'text-emerald-600'}>{String(mp.downgraded)}</b>
+              <p className="text-caption text-body mb-2" dir="ltr">
+                model: <b>{mp.model}</b> · tierUsed: <b>{mp.tierUsed}</b> · requested: {mp.requestedTier} · downgraded: <b className={mp.downgraded ? 'text-bad' : 'text-ok'}>{String(mp.downgraded)}</b>
                 {' '}· calls: {String(r.run?.model_calls)} · accepted: {String(r.run?.accepted)} · pool: {String(r.run?.brief_pool?.pool_size)} · stop: {String(r.run?.stop_reason)} · {r.durationMs}ms
               </p>
             )}
             {r.run?.modelConfig && (
-              <p className="text-[11px] text-slate-500 mb-1" dir="ltr">
+              <p className="text-caption text-muted mb-1" dir="ltr">
                 thinking: {r.run.modelConfig.thinkingMode} · budget {r.run.modelConfig.thinkingBudget} · maxOutputTokens {r.run.modelConfig.maxOutputTokens}
               </p>
             )}
             {r.run?.brief_pool && (
-              <p className="text-[11px] text-slate-500 mb-1" dir="ltr">
-                pool: raw {String(r.run.brief_pool.total_raw_candidates ?? '—')} (queries {String(r.run.brief_pool.raw_query_candidates ?? '—')} · tracked {String(r.run.brief_pool.raw_tracked_candidates ?? '—')} · themes {String(r.run.brief_pool.raw_theme_candidates ?? '—')}) → pool {r.run.brief_pool.pool_size} · withDemand {String(r.run.brief_pool.with_demand ?? '—')} · rejected {JSON.stringify(r.run.brief_pool.rejected_by_reason ?? {})}
+              <p className="text-caption text-muted mb-1" dir="ltr">
+                pool: raw {String(r.run.brief_pool.total_raw_candidates ?? '—')} (queries {String(r.run.brief_pool.raw_query_candidates ?? '—')} · tracked {String(r.run.brief_pool.raw_tracked_candidates ?? '—')} · themes {String(r.run.brief_pool.raw_theme_candidates ?? '—')}), pool {r.run.brief_pool.pool_size} · withDemand {String(r.run.brief_pool.with_demand ?? '—')} · rejected {JSON.stringify(r.run.brief_pool.rejected_by_reason ?? {})}
               </p>
             )}
             {Array.isArray(r.run?.brief_pool?.rejected_examples) && r.run.brief_pool.rejected_examples.length > 0 && (
-              <details className="text-[11px] text-slate-500 mb-2">
+              <details className="text-caption text-muted mb-2">
                 <summary>דוגמאות מועמדים שנדחו ({r.run.brief_pool.rejected_examples.length})</summary>
                 <ul className="mt-1 space-y-0.5">
                   {r.run.brief_pool.rejected_examples.map((ex, i) => (
@@ -176,14 +179,14 @@ export default function RecoQaPage() {
               </details>
             )}
             {r.acceptance && (
-              <table className="w-full text-[11px] mb-3" dir="ltr">
+              <table className="w-full text-caption mb-3" dir="ltr">
                 <tbody>
                   {r.acceptance.rules.map((rule) => (
-                    <tr key={rule.id} className="border-t border-slate-100 dark:border-slate-800">
-                      <td className={`py-0.5 pr-2 font-mono whitespace-nowrap ${rule.pass ? 'text-emerald-600' : rule.level === 'warn' ? 'text-amber-600' : 'text-red-600'}`}>
-                        {rule.pass ? '✓' : rule.level === 'warn' ? '⚠' : '✗'} {rule.id}
+                    <tr key={rule.id} className="border-t border-line">
+                      <td className={`py-0.5 pr-2 whitespace-nowrap ${rule.pass ? 'text-ok' : rule.level === 'warn' ? 'text-warn' : 'text-bad'}`}>
+                        <span className="inline-flex items-center gap-1">{rule.pass ? <Check aria-hidden className="size-3.5" /> : rule.level === 'warn' ? <TriangleAlert aria-hidden className="size-3.5" /> : <X aria-hidden className="size-3.5" />}{rule.id}</span>
                       </td>
-                      <td className="py-0.5 text-slate-500 break-all">{rule.detail}</td>
+                      <td className="py-0.5 text-muted break-all">{rule.detail}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -196,13 +199,13 @@ export default function RecoQaPage() {
               return (
                 <>
                   {cost && (
-                    <p className="text-[11px] text-slate-500 mb-1" dir="ltr">
+                    <p className="text-caption text-muted mb-1" dir="ltr">
                       cost: ${cost.estimatedRunCostUsd} (₪{cost.estimatedRunCostIls}) · perTopic ${cost.costPerAcceptedTopic} · calls {cost.totalPaidCalls}/2 · ceiling ${cost.configuredCostCeilingUsd} · remaining ${cost.remainingBudgetUsd} · preventedByBudget {cost.callsPreventedByBudget}
-                      {(cost.calls ?? []).map((c, i) => <span key={i}> · [{c.callPurpose} {c.model}: in {c.inputTokens} / out {c.answerOutputTokens} + think {c.thinkingTokens} = {c.totalBillableOutputTokens} → ${c.estimatedCostUsd}]</span>)}
+                      {(cost.calls ?? []).map((c, i) => <span key={i}> · [{c.callPurpose} {c.model}: in {c.inputTokens} / out {c.answerOutputTokens} + think {c.thinkingTokens} = {c.totalBillableOutputTokens}, ${c.estimatedCostUsd}]</span>)}
                     </p>
                   )}
                   {cl && (
-                    <p className={`text-[11px] mb-1 ${acceptedLeak.length ? 'text-red-600' : 'text-slate-500'}`} dir="rtl">
+                    <p className={`text-caption mb-1 ${acceptedLeak.length ? 'text-bad' : 'text-muted'}`} dir="rtl">
                       דליפת מתחרים — בפלט מאושר: {acceptedLeak.length ? acceptedLeak.join(' · ') : 'אין'} · במחקר שנדחה (אבחון): {(cl.researchRejected ?? []).length}
                     </p>
                   )}
@@ -212,20 +215,20 @@ export default function RecoQaPage() {
             {Array.isArray(r.topics) && r.topics.length > 0 && (
               <div className="space-y-2">
                 {r.topics.map((t0, i) => (
-                  <div key={i} className="rounded border border-slate-100 dark:border-slate-800 p-2 text-xs">
-                    <div className="font-medium text-slate-800 dark:text-slate-200">{t0.title}</div>
-                    <div className="text-slate-500">מילת מפתח: {t0.normalizedPrimaryKeyword ?? t0.primaryKeyword} · כוונה: {t0.intent}{t0.recommendedPageType ? ` · ${t0.recommendedPageType}` : ''} · demand: {t0.demandMatchType ?? 'none'}{t0.demand?.avgMonthlySearches && (t0.demandMatchType === 'exact' || t0.demandMatchType === 'close_intent') ? ` "${t0.demand.demandQuery}" ≈ ${t0.demand.avgMonthlySearches}/חודש` : ''}</div>
-                    <div className="text-slate-500">{t0.reason}</div>
+                  <div key={i} className="rounded-inset border border-line p-3 text-caption">
+                    <div className="font-medium text-ink ">{t0.title}</div>
+                    <div className="text-muted">מילת מפתח: {t0.normalizedPrimaryKeyword ?? t0.primaryKeyword} · כוונה: {t0.intent}{t0.recommendedPageType ? ` · ${t0.recommendedPageType}` : ''} · demand: {t0.demandMatchType ?? 'none'}{t0.demand?.avgMonthlySearches && (t0.demandMatchType === 'exact' || t0.demandMatchType === 'close_intent') ? ` "${t0.demand.demandQuery}" ≈ ${t0.demand.avgMonthlySearches}/חודש` : ''}</div>
+                    <div className="text-muted">{t0.reason}</div>
                     {(t0.coverageMatches ?? []).filter((m) => m.matchType !== 'distinct').length > 0 && (
-                      <div className="text-amber-600" dir="rtl">כיסוי קיים: {(t0.coverageMatches ?? []).filter((m) => m.matchType !== 'distinct').map((m) => `${m.existingTitle} (${m.matchType} ${m.score})`).join(' · ')}</div>
+                      <div className="text-warn" dir="rtl">כיסוי קיים: {(t0.coverageMatches ?? []).filter((m) => m.matchType !== 'distinct').map((m) => `${m.existingTitle} (${m.matchType} ${m.score})`).join(' · ')}</div>
                     )}
                     {(t0.linkDiagnostics ?? []).filter((l) => !!l.acceptedBecause).length > 0 && (
-                      <div className="text-emerald-600" dir="ltr">✓ links: {(t0.linkDiagnostics ?? []).filter((l) => !!l.acceptedBecause).map((l) => `${l.targetTitle} [${l.role}] ${l.acceptedBecause}`).join(' · ')}</div>
+                      <div className="text-ok" dir="ltr"><Check aria-hidden className="inline size-3.5" /> links: {(t0.linkDiagnostics ?? []).filter((l) => !!l.acceptedBecause).map((l) => `${l.targetTitle} [${l.role}] ${l.acceptedBecause}`).join(' · ')}</div>
                     )}
                     {(t0.linkDiagnostics ?? []).filter((l) => !l.acceptedBecause).length > 0 && (
-                      <div className="text-rose-400/80" dir="ltr">✗ rejected: {(t0.linkDiagnostics ?? []).filter((l) => !l.acceptedBecause).map((l) => `${l.targetTitle} (${l.rejectionReasons.join(',')})`).join(' · ')}</div>
+                      <div className="text-bad" dir="ltr"><X aria-hidden className="inline size-3.5" /> rejected: {(t0.linkDiagnostics ?? []).filter((l) => !l.acceptedBecause).map((l) => `${l.targetTitle} (${l.rejectionReasons.join(',')})`).join(' · ')}</div>
                     )}
-                    {(t0.linkDiagnostics ?? []).length === 0 && t0.links.length > 0 && <div className="text-slate-400" dir="ltr">{t0.links.map((l) => l.url).join(' · ')}</div>}
+                    {(t0.linkDiagnostics ?? []).length === 0 && t0.links.length > 0 && <div className="text-muted" dir="ltr">{t0.links.map((l) => l.url).join(' · ')}</div>}
                   </div>
                 ))}
               </div>
@@ -343,43 +346,42 @@ function ComparisonSection({ projects, label }: { projects: ProjectOpt[]; label:
   const pct = (n: number) => `${Math.round(n * 100)}%`
 
   return (
-    <section className="mt-10 rounded-lg border-2 border-dashed border-indigo-300 dark:border-indigo-800 p-4" dir="rtl" data-testid="reco-qa-comparison">
-      <h2 className="text-lg font-bold text-indigo-800 dark:text-indigo-300 mb-1">השוואת Flash מול Pro (QA/אדמין בלבד)</h2>
-      <p className="text-xs text-slate-500 mb-3">מריץ תמונת מצב אחת (snapshot) ומריץ עליה מספר ניסיונות Flash ו-Pro. אינו נוגע בזרימת המשתמש הרגילה, אינו שומר דבר, ואינו מפעיל אסקלציה אוטומטית. Preview בלבד.</p>
+    <section className="mt-10 rounded-card border border-line border-s-[3px] border-s-action bg-surface p-5 shadow-card sm:p-6" dir="rtl" data-testid="reco-qa-comparison">
+      <h2 className="mb-1 text-section font-semibold text-ink">השוואת Flash מול Pro (QA/אדמין בלבד)</h2>
+      <p className="text-caption text-muted mb-3">מריץ תמונת מצב אחת (snapshot) ומריץ עליה מספר ניסיונות Flash ו-Pro. אינו נוגע בזרימת המשתמש הרגילה, אינו שומר דבר, ואינו מפעיל אסקלציה אוטומטית. Preview בלבד.</p>
 
-      <div className="flex flex-wrap items-end gap-3 mb-3 text-sm">
-        <label className="flex flex-col gap-1 text-xs">פרויקט
-          <select value={effectiveProject} onChange={(e) => { setProjectId(e.target.value); invalidatePreflight() }} disabled={busy} className="rounded border border-slate-300 px-2 py-1 text-sm min-w-[180px]">
-            {projects.map((p) => <option key={p.id} value={p.id}>{label(p)}</option>)}
-          </select>
+      <div className="flex flex-wrap items-end gap-3 mb-3 text-copy">
+        <div className="min-w-[180px]">
+          <Select id="reco-qa-compare-project" label="פרויקט" value={effectiveProject} onChange={(e) => { setProjectId(e.target.value); invalidatePreflight() }} disabled={busy}
+            options={projects.map((p) => ({ value: p.id, label: label(p) }))} />
+        </div>
+        <label className={cn('flex flex-col gap-1.5', FIELD_LABEL_CLASSES)}>מספר המלצות מבוקש
+          <input type="number" min={1} max={20} value={targetCount} disabled={busy} onChange={(e) => { setTargetCount(Number(e.target.value) || 1); invalidatePreflight() }} className={cn(FIELD_CLASSES, 'h-9 w-24 font-normal')} />
         </label>
-        <label className="flex flex-col gap-1 text-xs">מספר המלצות מבוקש
-          <input type="number" min={1} max={20} value={targetCount} disabled={busy} onChange={(e) => { setTargetCount(Number(e.target.value) || 1); invalidatePreflight() }} className="rounded border border-slate-300 px-2 py-1 text-sm w-24" />
+        <label className={cn('flex flex-col gap-1.5', FIELD_LABEL_CLASSES)}>ניסיונות לכל מודל
+          <input type="number" min={3} max={6} value={attempts} disabled={busy} onChange={(e) => { setAttempts(Number(e.target.value) || 3); invalidatePreflight() }} className={cn(FIELD_CLASSES, 'h-9 w-24 font-normal')} />
         </label>
-        <label className="flex flex-col gap-1 text-xs">ניסיונות לכל מודל
-          <input type="number" min={3} max={6} value={attempts} disabled={busy} onChange={(e) => { setAttempts(Number(e.target.value) || 3); invalidatePreflight() }} className="rounded border border-slate-300 px-2 py-1 text-sm w-24" />
-        </label>
-        <button type="button" onClick={doPreflight} disabled={busy} className="rounded-md bg-indigo-600 text-white px-4 py-1.5 text-sm disabled:opacity-50" data-testid="reco-qa-preflight-btn">
+        <button type="button" onClick={doPreflight} disabled={busy} className="inline-flex h-9 items-center rounded-control bg-action px-4 text-copy font-semibold text-action-ink transition-colors duration-150 ease-snappy hover:bg-action-hover disabled:opacity-50" data-testid="reco-qa-preflight-btn">
           {isCalculatingCost ? 'מחשב…' : 'חשב עלות מקסימלית'}
         </button>
       </div>
 
-      {err && <p className="text-xs text-red-600 mb-2" data-testid="reco-qa-error">{err}</p>}
+      {err && <p className="text-caption text-bad mb-2" data-testid="reco-qa-error">{err}</p>}
 
       {preflight && !result && (() => {
         const estWorst = preflight.estimatedWorstCaseCostUsd ?? preflight.maxAuthorizedCostUsd
         const limit = preflight.authorizedLimitUsd
         return (
-          <div className="rounded border border-amber-300 bg-amber-50 dark:bg-amber-950/30 p-3 mb-3 text-sm" data-testid="reco-qa-preflight">
-            <p className="text-amber-800 dark:text-amber-300 mb-2" dir="rtl">
+          <div className="mb-3 rounded-inset border border-line border-s-[3px] border-s-warn bg-surface p-4 text-copy" data-testid="reco-qa-preflight">
+            <p className="text-warn mb-2" dir="rtl">
               עלות בתרחיש הגרוע: <b dir="ltr">${estWorst}</b> · תקרת QA מאושרת: <b dir="ltr">${limit ?? '—'}</b> · {attempts}×2 ניסיונות · יעד {targetCount}. הריצה אינה שומרת המלצות.
             </p>
             {within ? (
-              <button type="button" onClick={doRun} disabled={!canConfirm} className="rounded-md bg-rose-600 text-white px-4 py-1.5 text-sm disabled:opacity-50" data-testid="reco-qa-confirm-run">
+              <button type="button" onClick={doRun} disabled={!canConfirm} className="inline-flex h-9 items-center rounded-control bg-bad px-4 text-copy font-semibold text-bad-ink transition-colors duration-150 ease-snappy hover:opacity-90 disabled:opacity-50" data-testid="reco-qa-confirm-run">
                 {isRunningComparison ? 'מריץ השוואה…' : 'אשר והרץ השוואה'}
               </button>
             ) : (
-              <p className="text-red-600 text-xs" data-testid="reco-qa-cost-blocked" dir="rtl">
+              <p className="text-bad text-caption" data-testid="reco-qa-cost-blocked" dir="rtl">
                 הריצה חסומה: העלות בתרחיש הגרוע (${estWorst}) חורגת מהתקרה המאושרת (${limit}). הקטן את מספר הניסיונות או העלה את RECO_QA_MAX_RUN_COST_USD ופרוס מחדש את ה-Preview.
               </p>
             )}
@@ -389,16 +391,16 @@ function ComparisonSection({ projects, label }: { projects: ProjectOpt[]; label:
 
       {result && (
         <div data-testid="reco-qa-comparison-result">
-          <p className="text-xs text-slate-600 dark:text-slate-300 mb-2" dir="ltr">
+          <p className="text-caption text-body mb-2" dir="ltr">
             snapshot <b>{result.snapshotId}</b> · commit <b>{result.commitSha ?? 'unknown'}</b> · pool {result.poolSize} · discovery {String(result.discoveryRan)} · prepCalls {result.preparationProviderCalls} · maxCost ${result.maxAuthorizedCostUsd} · actualCost ${result.actualCostUsd} · persist {String(result.persist)} · writes {result.persistedWrites}
           </p>
           {result.modelResolution && (
-            <p className="text-xs mb-1" dir="ltr" data-testid="reco-qa-model-resolution">
+            <p className="text-caption mb-1" dir="ltr" data-testid="reco-qa-model-resolution">
               models: flash <b>{result.modelResolution.flashRequested}</b>{result.modelResolution.flashResolved ? '' : ` (unresolved: ${result.modelResolution.flashResolutionReason})`} · pro <b>{result.modelResolution.proRequested}</b> (tierUsed {result.modelResolution.proTierUsed}{result.modelResolution.proDowngraded ? ` · DOWNGRADED: ${result.modelResolution.proDowngradeReason}` : ''})
             </p>
           )}
           {result.selectionSimulation && (
-            <p className="text-xs mb-3" dir="ltr" data-testid="reco-qa-selection-sim">
+            <p className="text-caption mb-3" dir="ltr" data-testid="reco-qa-selection-sim">
               selection <b>(simulated · {result.selectionSimulation.policy}, paired by {result.selectionSimulation.pairedBy})</b>: Pro won {result.selectionSimulation.summary.proWins}/{result.selectionSimulation.summary.pairsCompared} · Flash won {result.selectionSimulation.summary.flashWins} · provisional ties {result.selectionSimulation.summary.provisionalTies} · no-decision {result.selectionSimulation.summary.noDecision} · budget <b>{result.budget?.path}</b>
             </p>
           )}
@@ -407,25 +409,25 @@ function ComparisonSection({ projects, label }: { projects: ProjectOpt[]; label:
             <button type="button"
               onClick={() => result.blindReview && download(result.blindReview, `blind-review-${result.snapshotId}.json`)}
               disabled={!result.blindAvailable}
-              className="rounded-md border border-slate-300 px-3 py-1.5 text-sm disabled:opacity-40" data-testid="reco-qa-download-blind">
+              className="inline-flex h-9 items-center rounded-control border border-line bg-surface px-3 text-copy font-semibold text-ink shadow-control transition-colors duration-150 ease-snappy hover:bg-sunk/60 disabled:opacity-40" data-testid="reco-qa-download-blind">
               הורדת קובץ לבדיקה עיוורת
             </button>
             <button type="button"
               onClick={() => result.mapping && download(result.mapping, `blind-mapping-${result.snapshotId}.json`)}
-              className="rounded-md border border-slate-300 px-3 py-1.5 text-sm" data-testid="reco-qa-download-mapping">
+              className="inline-flex h-9 items-center rounded-control border border-line bg-surface px-3 text-copy font-semibold text-ink shadow-control transition-colors duration-150 ease-snappy hover:bg-sunk/60" data-testid="reco-qa-download-mapping">
               הורדת מיפוי פנימי
             </button>
-            {!result.blindAvailable && <span className="text-xs text-red-600 self-center" data-testid="reco-qa-blind-blocked">קובץ הבדיקה נחסם: {result.blindBlocked?.reason} ({result.blindBlocked?.hitCount})</span>}
+            {!result.blindAvailable && <span className="text-caption text-bad self-center" data-testid="reco-qa-blind-blocked">קובץ הבדיקה נחסם: {result.blindBlocked?.reason} ({result.blindBlocked?.hitCount})</span>}
             {result.exportIntegrity && (
-              <span className={`text-xs self-center ${result.exportIntegrity.ok ? 'text-emerald-600' : 'text-red-600'}`} data-testid="reco-qa-export-integrity">
+              <span className={`text-caption self-center ${result.exportIntegrity.ok ? 'text-ok' : 'text-bad'}`} data-testid="reco-qa-export-integrity">
                 תקינות ייצוא: {result.exportIntegrity.ok ? 'תקין (blind = finalized לכל אצווה)' : `נכשל — ${result.exportIntegrity.failures.map((f) => `${f.batchId}:${f.invariant}`).join(' · ')}`}
               </span>
             )}
           </div>
 
           {result.aggregate && (
-            <table className="w-full text-[11px] mb-4 border border-slate-200 dark:border-slate-700" dir="ltr">
-              <thead><tr className="bg-slate-50 dark:bg-slate-800">
+            <table className="w-full text-caption mb-4 border border-line" dir="ltr">
+              <thead><tr className="bg-sunk">
                 <th className="p-1 text-right">metric</th><th className="p-1">Flash</th><th className="p-1">Pro</th>
               </tr></thead>
               <tbody>
@@ -445,8 +447,8 @@ function ComparisonSection({ projects, label }: { projects: ProjectOpt[]; label:
                   ['provider fail rate', (a: AggMetrics) => pct(a.providerFailureRate)],
                   ['synthesis fail rate', (a: AggMetrics) => pct(a.synthesisFailureRate)],
                 ] as [string, (a: AggMetrics) => unknown][]).map(([k, f]) => (
-                  <tr key={k} className="border-t border-slate-100 dark:border-slate-800">
-                    <td className="p-1 text-right text-slate-500">{k}</td>
+                  <tr key={k} className="border-t border-line">
+                    <td className="p-1 text-right text-muted">{k}</td>
                     <td className="p-1 text-center">{String(f(result.aggregate!.flash))}</td>
                     <td className="p-1 text-center">{String(f(result.aggregate!.pro))}</td>
                   </tr>
@@ -455,20 +457,20 @@ function ComparisonSection({ projects, label }: { projects: ProjectOpt[]; label:
             </table>
           )}
 
-          <table className="w-full text-[10px] border border-slate-200 dark:border-slate-700" dir="ltr" data-testid="reco-qa-attempt-table">
-            <thead><tr className="bg-slate-50 dark:bg-slate-800">
+          <table className="w-full text-caption border border-line" dir="ltr" data-testid="reco-qa-attempt-table">
+            <thead><tr className="bg-sunk">
               {['batchId', 'model', 'final', 'engine', 'zero', 'provider', 'synth', 'stop', 'cost$', 'tokens(i/o/t)', 'calls', 'ms', 'uniqAccepted', 'rescue', 'escalate', 'reqModel', 'providerErr', 'http', 'retry', 'providerMsg'].map((h) => <th key={h} className="p-1">{h}</th>)}
             </tr></thead>
             <tbody>
               {(result.attempts ?? []).map((a) => (
-                <tr key={a.attemptId} className={`border-t border-slate-100 dark:border-slate-800 ${a.failed ? 'bg-rose-50 dark:bg-rose-950/30' : ''}`}>
-                  <td className="p-1 font-mono">{a.attemptId}</td>
+                <tr key={a.attemptId} className={`border-t border-line ${a.failed ? 'bg-bad-soft ' : ''}`}>
+                  <td className="p-1">{a.attemptId}</td>
                   <td className="p-1">{a.model}</td>
                   <td className="p-1 text-center font-bold">{a.finalizedCount}</td>
                   <td className="p-1 text-center">{a.engineAcceptedCount}</td>
-                  <td className="p-1 text-center">{a.zeroResult ? '∅' : ''}</td>
-                  <td className={`p-1 text-center ${a.providerStatus === 'ok' ? 'text-emerald-600' : 'text-red-600'}`}>{a.providerStatus}</td>
-                  <td className={`p-1 text-center ${a.synthesisStatus === 'ok' ? 'text-emerald-600' : 'text-red-600'}`}>{a.synthesisStatus}</td>
+                  <td className="p-1 text-center">{a.zeroResult ? '0' : ''}</td>
+                  <td className={`p-1 text-center ${a.providerStatus === 'ok' ? 'text-ok' : 'text-bad'}`}>{a.providerStatus}</td>
+                  <td className={`p-1 text-center ${a.synthesisStatus === 'ok' ? 'text-ok' : 'text-bad'}`}>{a.synthesisStatus}</td>
                   <td className="p-1">{a.stopReason}</td>
                   <td className="p-1 text-center">{a.estimatedCostUsd}</td>
                   <td className="p-1 text-center">{a.tokenUsage.input}/{a.tokenUsage.output}/{a.tokenUsage.thinking}</td>
@@ -476,12 +478,12 @@ function ComparisonSection({ projects, label }: { projects: ProjectOpt[]; label:
                   <td className="p-1 text-center">{a.latencyMs}</td>
                   <td className="p-1 text-center">{a.uniqueAcceptedCount}</td>
                   <td className="p-1 text-center" title={`rescue potential ${a.rescueCounts.totalRescuePotential}`}>{a.rescueCounts.totalRescuePotential}</td>
-                  <td className={`p-1 text-center ${a.escalation.escalate ? 'text-amber-600' : 'text-slate-400'}`}>{a.escalation.escalate ? a.escalation.reason : '—'}</td>
-                  <td className="p-1 font-mono">{a.providerDiagnostics?.requestedModel ?? '—'}</td>
-                  <td className={`p-1 ${a.providerDiagnostics?.providerErrorType ? 'text-red-600' : 'text-slate-400'}`}>{a.providerDiagnostics?.providerErrorType ?? '—'}</td>
+                  <td className={`p-1 text-center ${a.escalation.escalate ? 'text-warn' : 'text-muted'}`}>{a.escalation.escalate ? a.escalation.reason : '—'}</td>
+                  <td className="p-1">{a.providerDiagnostics?.requestedModel ?? '—'}</td>
+                  <td className={`p-1 ${a.providerDiagnostics?.providerErrorType ? 'text-bad' : 'text-muted'}`}>{a.providerDiagnostics?.providerErrorType ?? '—'}</td>
                   <td className="p-1 text-center">{a.providerDiagnostics?.httpStatus ?? '—'}</td>
                   <td className="p-1 text-center">{a.providerDiagnostics?.retryCount ?? 0}</td>
-                  <td className="p-1 text-rose-500 max-w-[240px] truncate" title={a.providerDiagnostics?.sanitizedProviderMessage ?? ''}>{a.providerDiagnostics?.sanitizedProviderMessage ?? '—'}</td>
+                  <td className="p-1 text-bad max-w-[240px] truncate" title={a.providerDiagnostics?.sanitizedProviderMessage ?? ''}>{a.providerDiagnostics?.sanitizedProviderMessage ?? '—'}</td>
                 </tr>
               ))}
             </tbody>

@@ -21,6 +21,7 @@ import type { RecommendationSource, TopicSuggestion } from './types'
 import { tokens, jaccard, slugKey } from './dedupe'
 import { normalizeText } from './topic-idea-store'
 import { normalizePhrase } from './keyword-guard'
+import type { ContentLanguage } from '@/lib/content/language'
 
 export interface ProviderRun {
   source: RecommendationSource
@@ -72,15 +73,32 @@ export function hybridRankScore(relevance: number, intent: string, sourceCount: 
 
 /** Human, language-aware provenance summary folded into suggestionReason so it
  *  survives persistence (badges from supportingSources are added on the fresh run). */
-export function hybridProvenanceReason(sources: RecommendationSource[], language: 'he' | 'en', repReason: string): string {
-  const he = language === 'he'
-  const label: Record<string, string> = he
-    ? { site_scan: 'סריקת אתר', keyword_research_url: 'מחקר מילות מפתח', project_data: 'נתוני הפרויקט', keyword: 'מילת מפתח', hybrid: 'משולב' }
-    : { site_scan: 'Site scan', keyword_research_url: 'Keyword research', project_data: 'Project data', keyword: 'Keyword', hybrid: 'Hybrid' }
+const PROVENANCE: Record<ContentLanguage, {
+  label: Record<string, string>
+  many: (n: number, names: string) => string
+  one: (name: string) => string
+}> = {
+  he: {
+    label: { site_scan: 'סריקת אתר', keyword_research_url: 'מחקר מילות מפתח', project_data: 'נתוני הפרויקט', keyword: 'מילת מפתח', hybrid: 'משולב' },
+    many: (n, names) => `נתמך על ידי ${n} מקורות: ${names}`,
+    one: (name) => `נתמך על ידי: ${name}`,
+  },
+  en: {
+    label: { site_scan: 'Site scan', keyword_research_url: 'Keyword research', project_data: 'Project data', keyword: 'Keyword', hybrid: 'Hybrid' },
+    many: (n, names) => `Supported by ${n} sources: ${names}`,
+    one: (name) => `Supported only by: ${name}`,
+  },
+  es: {
+    label: { site_scan: 'Análisis del sitio', keyword_research_url: 'Investigación de palabras clave', project_data: 'Datos del proyecto', keyword: 'Palabra clave', hybrid: 'Combinado' },
+    many: (n, names) => `Respaldado por ${n} fuentes: ${names}`,
+    one: (name) => `Respaldado solo por: ${name}`,
+  },
+}
+
+export function hybridProvenanceReason(sources: RecommendationSource[], language: ContentLanguage, repReason: string): string {
+  const { label, many, one } = PROVENANCE[language]
   const names = sources.map((s) => label[s] ?? s)
-  const prefix = sources.length > 1
-    ? (he ? `נתמך על ידי ${sources.length} מקורות: ${names.join(', ')}` : `Supported by ${sources.length} sources: ${names.join(', ')}`)
-    : (he ? `נתמך על ידי: ${names[0] ?? ''}` : `Supported only by: ${names[0] ?? ''}`)
+  const prefix = sources.length > 1 ? many(sources.length, names.join(', ')) : one(names[0] ?? '')
   const base = (repReason || '').trim()
   return base ? `${prefix} · ${base}` : prefix
 }

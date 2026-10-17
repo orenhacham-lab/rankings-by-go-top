@@ -144,8 +144,12 @@ export function decodeBriefSections(notes: string | null | undefined): BriefSect
   return res
 }
 
-/** Parse the flags (and clean notes) from a stored brief_notes value. */
-export function decodeBriefNotes(raw: string | null | undefined): { notes: string; flags: BriefFlags } {
+/**
+ * Parse the flags (and clean notes) from a stored brief_notes value.
+ * `brandChoiceSet`: the owner made the brand-name choice for this topic (the
+ * brief form always writes it); topics the system created carry no choice.
+ */
+export function decodeBriefNotes(raw: string | null | undefined): { notes: string; flags: BriefFlags; brandChoiceSet: boolean } {
   const text = raw || ''
   const m = text.match(MARKER_RE)
   const flags: BriefFlags = { includeBrandName: false, brandNameToInclude: '', includeManualToc: false, cta: { ...EMPTY_CTA }, internalLinks: [], articleDepth: 'auto' }
@@ -183,5 +187,5 @@ export function decodeBriefNotes(raw: string | null | undefined): { notes: strin
       } catch { /* ignore malformed links marker */ }
     }
   }
-  return { notes: stripBriefMarker(text), flags }
+  return { notes: stripBriefMarker(text), flags, brandChoiceSet: !!m && /includeBrandName=[01]/.test(m[1]) }
 }

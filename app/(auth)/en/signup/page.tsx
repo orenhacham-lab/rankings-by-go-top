@@ -5,7 +5,7 @@ import { SignupForm } from '../../../(auth)/signup/page'
 
 export default function EnSignupPage() {
   return (
-    <Suspense fallback={<div className="min-h-screen bg-gradient-to-br from-blue-50 to-slate-100" />}>
+    <Suspense fallback={<div className="min-h-screen bg-canvas" />}>
       <SignupForm />
     </Suspense>
   )

@@ -26,7 +26,7 @@ function main() {
   check('fetch uses the dynamic pageSize (not a hardcoded 25)', /pageSize=\$\{pageSize\}/.test(panel) && !/pageSize=\$\{PAGE_SIZE\}/.test(panel))
   check('page resets to 0 when the size changes', /setPageSize\(Number\(e\.target\.value\)\); setPage\(0\)/.test(panel))
   check('pageSize is a fetch dependency (re-loads on change)', /activeTab, page, pageSize\]/.test(panel))
-  check('the size selector renders all options', /PAGE_SIZE_OPTIONS\.map\(\(n\) => \(<option/.test(panel))
+  check('the size selector renders all options (ui/Select, no raw <select>)', /<Select [^>]*onChange=\{\(e\) => \{ setPageSize/.test(panel) && /options=\{PAGE_SIZE_OPTIONS\.map\(\(n\) => \(\{ value: String\(n\)/.test(panel) && !/<select/.test(panel))
   // Sorting/filtering (window + view tabs) untouched — still present.
   check('window + view tabs preserved (sorting/filtering intact)', /setActiveWindow/.test(panel) && /setActiveTab/.test(panel))
 

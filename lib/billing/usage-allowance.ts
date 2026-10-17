@@ -34,7 +34,8 @@ const RESERVATION_LEASE_MS = 30 * 60 * 1000
 export type AllowanceState =
   /** A real limit, a real period and a real count. */
   | { state: 'known'; limit: number; used: number; remaining: number
-      periodStart: string; periodEnd: string; plan: string }
+      /** Null for a trial's lifetime allowance, which has no period. */
+      periodStart: string | null; periodEnd: string | null; plan: string }
   /** Entitlement could not be read. NOT zero — the caller must say "unknown". */
   | { state: 'unknown'; reason: 'entitlement_unavailable' | 'no_period' }
   /** Admin accounts are not metered. */
@@ -58,6 +59,21 @@ export async function readUsageAllowance(
     usageType: UsageType
     /** Which limit this usage is measured against, from the entitlement. */
     limitFor: (limits: import('@/lib/subscription').PlanLimits) => number
+    /**
+     * A TRIAL MEASURED OVER ITS LIFETIME, the way its dispatcher measures it.
+     *
+     * The AI-check dispatcher (app/api/ai-visibility/runs) does not meter a
+     * `trial` plan against the period ledger at all: it counts the account's
+     * lifetime checks against `maxAIScansTotal`. Reading the period limit for
+     * that plan (0) told a trial merchant "not included in your plan" while the
+     * dispatcher would still run their 3 checks. Passing the dispatcher's own
+     * limit and count here makes the two answers one answer. Omitted, a trial is
+     * read from the ledger like any other plan.
+     */
+    trialLifetime?: {
+      limitFor: (limits: import('@/lib/subscription').PlanLimits) => number
+      countUsed: (admin: ServiceRoleClient, userId: string) => Promise<number>
+    }
     nowMs?: number
   },
 ): Promise<AllowanceState> {
@@ -66,6 +82,15 @@ export async function readUsageAllowance(
   // reproduce, in the UI, the exact lie the routes were fixed to stop telling.
   if (isEntitlementUnknown(entitlement.plan)) return { state: 'unknown', reason: 'entitlement_unavailable' }
   if (entitlement.isAdmin) return { state: 'unmetered' }
+
+  if (entitlement.plan === 'trial' && args.trialLifetime) {
+    const limit = args.trialLifetime.limitFor(entitlement.limits)
+    const used = await args.trialLifetime.countUsed(admin, args.userId)
+    return {
+      state: 'known', limit, used, remaining: Math.max(0, limit - used),
+      periodStart: null, periodEnd: null, plan: entitlement.plan,
+    }
+  }
 
   const period = await resolveCurrentUsagePeriod(admin, args.userId)
   if (!period) return { state: 'unknown', reason: 'no_period' }

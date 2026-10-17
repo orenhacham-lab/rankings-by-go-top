@@ -14,8 +14,11 @@
  *   - topicIds = comma-separated (overrides scope)
  *   - limit = max topics (default 25, max 100)
  *   - allowCaution = '1' to include caution targets (higher bar; default off)
- *   - strict = '1' to refuse a stale / version-stale / missing cache
+ *   - strict = '1' to refuse a stale / version-stale cache (409)
  *   - format=html | pretty=1
+ *
+ * No cached index at all is the expected "not built yet" state: 200 with
+ * { ok: false, cacheState: 'missing' } and no topics. Clients read `ok`.
  */
 
 import { authContentProject, isInternalLinkPlanningEnabled } from '@/lib/content/api-auth'
@@ -55,7 +58,12 @@ export async function GET(request: Request) {
   // ── Cache-only: read the stored index (NEVER a live scan) ──
   const row = await getCachedIndex(admin, project.id)
   if (!row) {
-    return Response.json({ ok: false, cacheState: 'missing', warning: 'no_cache_refresh_first', hint: 'POST …/index/refresh first' }, { status: 409 })
+    // An EXPECTED state, not a failure: a site whose index was never built simply
+    // has no link suggestions yet (the topic can still be queued without links).
+    // It answers 200 with ok:false, so opening the plan no longer logs an error
+    // in the browser console on every drawer open (final review R30). Real
+    // failures (auth, strict refusal below) keep their error statuses.
+    return Response.json({ ok: false, cacheState: 'missing', warning: 'no_cache_refresh_first', hint: 'POST …/index/refresh first' })
   }
   const stale = isStale(row)
   const versionStale = isVersionStale(row)

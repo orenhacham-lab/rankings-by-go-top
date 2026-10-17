@@ -20,6 +20,7 @@ import { deriveIntent } from './opportunity-validation'
 import { normalizePhrase } from './keyword-guard'
 import { topicSignature, isHighConfidenceDuplicate, distinctiveTokensOf, canonicalVariants, type TopicSignature } from './semantic-dup'
 import type { OpportunityFamily } from './opportunity-synthesis'
+import { type ContentLanguage } from '@/lib/content/language'
 
 export type SearchNeed =
   | 'question'
@@ -74,7 +75,7 @@ export interface BriefPriority {
 }
 
 export interface BriefPoolInput {
-  language: 'he' | 'en'
+  language: ContentLanguage
   keywordResearch: KeywordResearchNode[]
   trackedKeywords: string[]
   projectFocus: string[]

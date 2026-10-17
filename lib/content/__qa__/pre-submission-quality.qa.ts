@@ -165,11 +165,14 @@ async function main() {
     const providerSrc = require('fs').readFileSync(require('path').join(__dirname, '..', '..', 'active-project', 'ActiveProjectProvider.tsx'), 'utf8')
     check('2l: SOURCE — the provider exposes a load-failure flag and a retry',
       /projectsError/.test(providerSrc) && /reloadProjects/.test(providerSrc))
-    const hubSrc = require('fs').readFileSync(require('path').join(__dirname, '..', '..', '..', 'components', 'content', 'ContentHub.tsx'), 'utf8')
-    check('2m: SOURCE — the hub builds its options from the AUTHORITATIVE list',
+    const hubSrc = require('fs').readFileSync(require('path').join(__dirname, '..', '..', '..', 'components', 'content', 'workspace', 'ContentWorkspaceProvider.tsx'), 'utf8')
+    check('2m: SOURCE — the workspace builds its options from the AUTHORITATIVE list',
       /accessibleProjects\.map/.test(hubSrc) && !/const projects = data\?\.projects \?\? \[\]/.test(hubSrc))
+    // The three states are rendered by the workspace SHELL, which frames every content
+    // screen, so one screen cannot disagree with another about whether projects loaded.
+    const shellSrc = require('fs').readFileSync(require('path').join(__dirname, '..', '..', '..', 'components', 'content', 'workspace', 'ContentWorkspaceShell.tsx'), 'utf8')
     check('2n: SOURCE — and distinguishes loading / failed / genuinely empty',
-      /projectsResolved && projectsError/.test(hubSrc) && /!projectsResolved \?/.test(hubSrc))
+      /projectsResolved && projectsError/.test(shellSrc) && /!projectsResolved \?/.test(shellSrc))
 
     for (const lang of ['en', 'he'] as const) {
       const d = getDashboardDictionary(lang).contentHub as any
@@ -296,7 +299,7 @@ async function main() {
       /update\.status = 'published'; update\.published_at = new Date\(\)\.toISOString\(\)/.test(wpRoute))
 
     // ── The column heading is no longer WordPress-specific for a Shopify row. ──
-    const hubSrc = require('fs').readFileSync(require('path').join(__dirname, '..', '..', '..', 'components', 'content', 'ContentHub.tsx'), 'utf8')
+    const hubSrc = require('fs').readFileSync(require('path').join(__dirname, '..', '..', '..', 'components', 'content', 'workspace', 'ArticlesScreen.tsx'), 'utf8')
     check('3v: SOURCE — the publication column heading is platform-aware',
       /isShopify \? t\.table\.publication : t\.table\.wordpressUrl/.test(hubSrc))
     for (const lang of ['en', 'he'] as const) {
@@ -331,7 +334,10 @@ async function main() {
     check('4f: SOURCE — the effect sets document.documentElement lang AND dir', /html\.lang = lang/.test(effectSrc) && /html\.dir = dir/.test(effectSrc))
     check('4g: SOURCE — it re-runs when the locale changes', /\}, \[locale, restoreOnUnmount\]\)/.test(effectSrc))
     const providerSrc = require('fs').readFileSync(require('path').join(__dirname, '..', '..', 'i18n', 'dashboard', 'useDashboardLanguage.tsx'), 'utf8')
-    check('4h: SOURCE — the dashboard language provider drives it', /<DocumentLocaleEffect locale=\{language\} \/>/.test(providerSrc))
+    // It follows the UI locale, which is the one the document must agree with:
+    // a Spanish dashboard has to declare lang="es" dir="ltr", and `language` is
+    // the narrowed value that cannot say so.
+    check('4h: SOURCE — the dashboard language provider drives it', /<DocumentLocaleEffect locale=\{uiLocale\} \/>/.test(providerSrc))
     const enLayout = require('fs').readFileSync(require('path').join(__dirname, '..', '..', '..', 'app', '(public)', 'en', 'layout.tsx'), 'utf8')
     check('4i: SOURCE — the public /en layout reuses the SAME component', /<DocumentLocaleEffect locale="en" restoreOnUnmount \/>/.test(enLayout))
     check('4j: SOURCE — the old single-purpose EnglishLocaleEffect is gone',

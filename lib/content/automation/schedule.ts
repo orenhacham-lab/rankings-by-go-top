@@ -145,3 +145,370 @@ export function advanceNextPublishAt(
   while (inst <= now && guard < 500) { k += step; inst = zonedWallToUtc(y, mo, d + k, h, mi, timeZone); guard++ }
   return new Date(inst).toISOString()
 }
+
+/**
+ * SPREAD THE PLAN'S ARTICLES OVER THE BILLING CYCLE.
+ *
+ * The cadence the owner picked decides the slots; the plan's article allowance
+ * was never consulted. A cadence with more slots before the cycle ends than
+ * articles left (Basic: 4 a month on a weekly cadence has 5 Sundays in some
+ * cycles; twice a week has ~8) published the allowance early and then stood
+ * still, its next item failing as quota_exceeded until the cycle renewed.
+ *
+ * Given the cadence's next slot (`cadenceNextIso`) and `slotAfter` (the
+ * cadence's next slot strictly after an instant), this keeps the cadence's own
+ * slot whenever the articles left (`remaining` unconsumed + `ready` already
+ * generated) cover every slot before `periodEndIso`. Otherwise it aims the next
+ * publish at an even share of the time left, `(end - now) / (articles + 1)`
+ * (the "+1" is the next cycle's first article), and takes the cadence's first
+ * slot at or after that. Nothing left at all: the first slot of the next cycle.
+ * Never earlier than the cadence's own slot. Pure; the allowance is only read.
+ */
+export function spreadNextPublishAt(input: {
+  cadenceNextIso: string
+  nowMs: number
+  periodEndIso: string | null
+  remaining: number
+  ready: number
+  slotAfter: (fromMs: number) => string
+}): string {
+  const next = Date.parse(input.cadenceNextIso)
+  const end = input.periodEndIso ? Date.parse(input.periodEndIso) : NaN
+  if (!Number.isFinite(next) || !Number.isFinite(end) || end <= input.nowMs || next >= end) return input.cadenceNextIso
+  const articles = Math.max(0, Math.floor(input.remaining)) + Math.max(0, Math.floor(input.ready))
+
+  let slots = 0
+  for (let at = next, guard = 0; at < end && guard < 400; guard++) {
+    slots++
+    at = Date.parse(input.slotAfter(at))
+    if (!Number.isFinite(at)) break
+  }
+  if (slots <= articles) return input.cadenceNextIso
+
+  const target = articles <= 0 ? end : input.nowMs + (end - input.nowMs) / (articles + 1)
+  if (target <= next) return input.cadenceNextIso
+  const spread = input.slotAfter(Math.ceil(target) - 1)
+  return Date.parse(spread) > next ? spread : input.cadenceNextIso
+}
+
+/* ─────────────────────────────────────────────────────────────────────────────
+ * THE PLAN DECIDES THE RHYTHM (owner, 2026-10-02).
+ *
+ * Articles a week = the plan's monthly article allowance ÷ 4 (Basic 4 → 1,
+ * Advanced 12 → 3), on fixed working days in the project's own time zone:
+ *   1 → Sun · 2 → Sun, Wed · 3 → Sun, Tue, Thu · 4 → Sun, Mon, Tue, Thu
+ *   5 → Sun–Thu · more → spread evenly over Sun–Thu, several on a day.
+ * Nothing is ever published on Friday or Saturday, on any schedule.
+ * ───────────────────────────────────────────────────────────────────────────── */
+
+/** Friday and Saturday (0=Sun … 6=Sat). Never a publishing day. */
+export const NO_PUBLISH_WEEKDAYS: readonly number[] = [5, 6]
+export const isNoPublishWeekday = (wd: number) => NO_PUBLISH_WEEKDAYS.includes(wd)
+
+/** The working days a given count of extra articles lands on, Sun–Thu. */
+const RHYTHM_DAYS: Record<number, number[]> = { 1: [0], 2: [0, 3], 3: [0, 2, 4], 4: [0, 1, 2, 4], 5: [0, 1, 2, 3, 4] }
+
+/**
+ * NO SITE TAKES MORE THAN ONE ARTICLE A WORKING DAY (owner, 4 October 2026:
+ * "if a customer added their first project and you pushed 200 articles into
+ * one site straight away, that is not reasonable").
+ *
+ * The monthly allowance stays account-wide and shared between the account's
+ * sites; this is the ceiling on what ONE of them absorbs. It only ever binds
+ * on a multi-site plan with fewer sites than its allowance assumes: Premium
+ * (50 a month) with a single site was scheduled 13 a week, three on some days,
+ * and Agency (200) 50 a week — around ten a day into the same site. Basic (1 a
+ * week) and Advanced (3) are under the ceiling and unchanged.
+ *
+ * Five is also the widest rhythm the weekday spread has a shape for
+ * (RHYTHM_DAYS tops out at Sun-Thu); above it `weeklyRhythm` starts stacking
+ * several articles on the same day.
+ */
+export const MAX_ARTICLES_PER_WEEK_PER_SITE = 5
+
+/** A month is 4.35 weeks, not 4. The rate is per month, the rhythm per week. */
+const WEEKS_PER_MONTH = 30.44 / 7
+
+/**
+ * A SITE WHOSE SHARE DOES NOT FIT A WHOLE NUMBER OF ARTICLES A WEEK GETS A GAP
+ * IN DAYS INSTEAD OF A WEEKDAY.
+ *
+ * A weekly rhythm can only publish a whole number of times a week, and it
+ * cannot go below once. Rounding each site to the nearest week made the
+ * account's sites add up to more than the account's allowance: an Agency
+ * account (200 a month) over 30 sites is 1.5 articles a week each, which
+ * rounded to 2 and scheduled 261 a month, and over 100 sites it was floored at
+ * one a week and scheduled 435. Nothing over-published — the account's ledger
+ * stops that — but the quota then went to whichever site the runner reached
+ * first, and the sites added last could get nothing in a cycle.
+ *
+ * So the weekly rhythm is used only where it is a close fit (within
+ * WEEKLY_FIT_TOLERANCE of the real rate), which is every single-site plan and
+ * every multi-site account whose sites divide the allowance evenly. Everywhere
+ * else the site publishes every N days, which can express any rate.
+ *
+ * A tenth keeps Basic on the Sunday it has today: four a month is 0.92 of a
+ * week, 8% off a weekly slot, and that much the cycle spread already absorbs.
+ */
+export const WEEKLY_FIT_TOLERANCE = 0.1
+
+/** What ONE site publishes: a weekly rhythm, or a gap in days when no weekly rhythm fits. */
+export interface PerSiteRate {
+  /** Articles a week, 1..MAX_ARTICLES_PER_WEEK_PER_SITE. 0 when `intervalDays` carries the rate. */
+  perWeek: number
+  /** Days between articles, when no weekly rhythm fits the share. */
+  intervalDays: number | null
+}
+
+/**
+ * The rate for one site of an account: the account-wide monthly allowance
+ * shared by its active queues, never above one article a working day
+ * (MAX_ARTICLES_PER_WEEK_PER_SITE) and never rounded up into more than the
+ * account is allowed (WEEKLY_FIT_TOLERANCE).
+ */
+export function perSiteRate(monthlyAllowance: number, activeQueues = 1): PerSiteRate {
+  if (!(monthlyAllowance > 0)) return { perWeek: 0, intervalDays: null }
+  return rateForMonthly(monthlyAllowance / Math.max(1, Math.floor(activeQueues)))
+}
+
+/**
+ * The same rate from the site's own monthly count, however that count was
+ * reached: an even split of the account's allowance, or the number its owner
+ * set for this website (monthlyForSite). The ceiling and the fit rule are the
+ * rate's, not the split's, so a chosen share is held to exactly the same
+ * limits as a share nobody chose.
+ */
+export function rateForMonthly(monthlyPerSite: number): PerSiteRate {
+  if (!(monthlyPerSite > 0)) return { perWeek: 0, intervalDays: null }
+  const perWeek = monthlyPerSite / WEEKS_PER_MONTH
+  // Above the ceiling the rate is deliberately not the share, so no fit is
+  // asked for: the site publishes once a working day and the rest of the
+  // allowance waits for the account's other sites.
+  if (perWeek >= MAX_ARTICLES_PER_WEEK_PER_SITE) return { perWeek: MAX_ARTICLES_PER_WEEK_PER_SITE, intervalDays: null }
+  const whole = Math.round(perWeek)
+  if (whole >= 1 && Math.abs(whole - perWeek) <= WEEKLY_FIT_TOLERANCE * perWeek) return { perWeek: whole, intervalDays: null }
+  const days = Math.round((WEEKS_PER_MONTH * 7) / monthlyPerSite)
+  return { perWeek: 0, intervalDays: Math.min(90, Math.max(2, days)) }
+}
+
+/**
+ * THE MOST ONE WEBSITE MAY BE GIVEN A MONTH.
+ *
+ * The ceiling is a weekly one (one article a working day), and a month is
+ * WEEKS_PER_MONTH weeks, so this is the monthly form of the same limit. It is
+ * floored, because a share is a whole number of articles and the ceiling must
+ * not be rounded up past what the rate will actually publish.
+ */
+export const MAX_MONTHLY_SHARE_PER_SITE = Math.floor(MAX_ARTICLES_PER_WEEK_PER_SITE * WEEKS_PER_MONTH)
+
+/**
+ * HOW MANY OF THE ACCOUNT'S MONTHLY ARTICLES THIS WEBSITE GETS.
+ *
+ * The even split is the default and the answer whenever nobody has said
+ * otherwise. An owner who does say otherwise (article_pools.monthly_share, a
+ * Premium or Agency account deciding that its main website matters more than
+ * the small one it took on last week) sets a number for some of their sites;
+ * the sites with no number of their own share what those leave, evenly.
+ *
+ * A declared share is capped by what the OTHER declared shares have not already
+ * claimed. That is not a second opinion about the limit the write path enforces
+ * — it is what keeps a stale or half-written set of numbers from scheduling
+ * more than the account may publish, because the write path can only ever have
+ * checked the account as it was at that moment.
+ *
+ * The result is deliberately fractional for the even case: it is a rate, and
+ * `rateForMonthly` is what turns it into days or a weekly rhythm.
+ */
+export function monthlyForSite(input: {
+  monthlyAllowance: number
+  /** Every OTHER queue counted in the split: its declared share, or null for the even share. */
+  otherShares: (number | null)[]
+  /** This queue's own declared share, or null for the even share. */
+  mine: number | null
+}): number {
+  const allowance = Number.isFinite(input.monthlyAllowance) ? Math.floor(input.monthlyAllowance) : 0
+  if (!(allowance > 0)) return 0
+  const share = (v: number | null) => (typeof v === 'number' && Number.isFinite(v) && v > 0 ? Math.floor(v) : null)
+  const others = input.otherShares.map(share)
+  const claimed = others.reduce<number>((sum, v) => sum + (v ?? 0), 0)
+  const left = Math.max(0, allowance - claimed)
+  const mine = share(input.mine)
+  if (mine !== null) return Math.min(mine, left)
+  const evenQueues = others.filter((v) => v === null).length + 1
+  return left / evenQueues
+}
+
+/**
+ * Articles a week for one site. 0 both when there is no allowance to divide
+ * and when no weekly rhythm fits the share — `perSiteRate` says which, and
+ * `articlesPerMonthPerSite` answers the question either way.
+ */
+export function articlesPerWeekFor(monthlyAllowance: number, activeQueues = 1): number {
+  return perSiteRate(monthlyAllowance, activeQueues).perWeek
+}
+
+/** What one site publishes in about a month, whichever shape its rate has. */
+export function articlesPerMonthPerSite(monthlyAllowance: number, activeQueues = 1): number {
+  if (!(monthlyAllowance > 0)) return 0
+  return articlesPerMonthForShare(monthlyAllowance / Math.max(1, Math.floor(activeQueues)))
+}
+
+/** The same count from the site's own monthly share, however it was reached. */
+export function articlesPerMonthForShare(monthlyPerSite: number): number {
+  const rate = rateForMonthly(monthlyPerSite)
+  if (rate.intervalDays) return Math.ceil(30 / rate.intervalDays)
+  return Math.ceil(rate.perWeek * WEEKS_PER_MONTH)
+}
+
+/** Articles per weekday (index 0=Sun … 6=Sat) for a weekly count. Fri/Sat are always 0. */
+export function weeklyRhythm(perWeek: number): number[] {
+  const n = Math.max(0, Math.floor(perWeek))
+  const out = [0, 0, 0, 0, 0, 0, 0]
+  const base = Math.floor(n / 5)
+  for (let wd = 0; wd <= 4; wd++) out[wd] = base
+  for (const wd of RHYTHM_DAYS[n % 5] ?? []) out[wd]!++
+  return out
+}
+
+/** The weekdays a rhythm publishes on, in order. */
+export const rhythmWeekdays = (perDay: number[]) => perDay.map((n, wd) => (n > 0 && !isNoPublishWeekday(wd) ? wd : -1)).filter((wd) => wd >= 0)
+
+/** Minutes after local midnight for `n` articles on one day: hourly from the
+ *  publish time, pulled earlier when the last one would run past 23:30. */
+export function daySlotMinutes(startMinute: number, n: number): number[] {
+  const count = Math.max(1, Math.min(88, Math.floor(n)))
+  if (count === 1) return [startMinute]
+  const gap = Math.max(15, Math.min(60, Math.floor((22 * 60) / (count - 1))))
+  const start = Math.max(0, Math.min(startMinute, 23 * 60 + 30 - (count - 1) * gap))
+  return Array.from({ length: count }, (_, j) => start + j * gap)
+}
+
+/** The local weekday (0=Sun … 6=Sat) of an instant in `timeZone`. */
+export function localWeekday(instant: number, timeZone: string): number {
+  const { y, mo, d } = localDateParts(instant, timeZone)
+  return new Date(Date.UTC(y, mo - 1, d)).getUTCDay()
+}
+
+/** The next slot of a plan rhythm strictly after `from`, in `timeZone`. */
+export function nextRhythmSlotAt(publishTime: string, timeZone: string, perDay: number[], from: number = Date.now()): string {
+  const [h, mi] = parseTime(publishTime)
+  const { y, mo, d } = localDateParts(from, timeZone)
+  for (let k = 0; k < 15; k++) {
+    const wd = new Date(Date.UTC(y, mo - 1, d + k)).getUTCDay()
+    const n = isNoPublishWeekday(wd) ? 0 : (perDay[wd] ?? 0)
+    if (n <= 0) continue
+    for (const m of daySlotMinutes(h * 60 + mi, n)) {
+      const inst = zonedWallToUtc(y, mo, d + k, Math.floor(m / 60), m % 60, timeZone)
+      if (inst > from) return new Date(inst).toISOString()
+    }
+  }
+  return skipNoPublishDays(computeNextPublishAt(publishTime, timeZone, from), timeZone, publishTime)
+}
+
+/** The owner's chosen weekdays without Friday and Saturday (Sunday if nothing is left). */
+export function workingPublishDays(days: number[] | null | undefined): number[] {
+  const list = (days ?? []).filter((d) => Number.isInteger(d) && d >= 0 && d <= 6)
+  if (list.length === 0) return []
+  const kept = list.filter((d) => !isNoPublishWeekday(d))
+  return kept.length ? kept : [0]
+}
+
+/** A slot on Friday or Saturday moves to the following Sunday, same wall time. */
+export function skipNoPublishDays(iso: string, timeZone: string, publishTime: string): string {
+  const at = Date.parse(iso)
+  if (!Number.isFinite(at) || !isNoPublishWeekday(localWeekday(at, timeZone))) return iso
+  const [h, mi] = parseTime(publishTime)
+  const { y, mo, d } = localDateParts(at, timeZone)
+  const wd = new Date(Date.UTC(y, mo - 1, d)).getUTCDay()
+  return new Date(zonedWallToUtc(y, mo, d + (7 - wd), h, mi, timeZone)).toISOString()
+}
+
+/**
+ * The one slot function every caller uses (runner, pool routes, the screen's
+ * projection): the plan's rhythm when there is one, otherwise the owner's own
+ * schedule (weekdays, or every N days anchored on `anchorIso`), and never a
+ * Friday or Saturday either way.
+ */
+export function makeSlotAfter(input: {
+  publishTime: string
+  timeZone: string
+  perDay: number[] | null
+  publishDays: number[] | null | undefined
+  intervalDays: number
+  anchorIso: string | null
+  /**
+   * The gap the PLAN gives this site when its share is below a weekly rhythm
+   * (perSiteRate). Like `perDay` it outranks `publishDays`, because the plan
+   * decides the rhythm and the owner's own weekdays would publish far more
+   * than the account is allowed.
+   */
+  planIntervalDays?: number | null
+}): (fromMs: number) => string {
+  const { publishTime, timeZone, perDay } = input
+  if (perDay && perDay.some((n, wd) => n > 0 && !isNoPublishWeekday(wd))) {
+    return (fromMs) => nextRhythmSlotAt(publishTime, timeZone, perDay, fromMs)
+  }
+  const planInterval = input.planIntervalDays && input.planIntervalDays > 0 ? Math.floor(input.planIntervalDays) : null
+  if (planInterval) {
+    return (fromMs) => {
+      const anchor = input.anchorIso && Number.isFinite(Date.parse(input.anchorIso)) ? input.anchorIso : null
+      const next = anchor ? advanceNextPublishAt(anchor, timeZone, publishTime, planInterval, fromMs) : computeNextPublishAt(publishTime, timeZone, fromMs)
+      return skipNoPublishDays(next, timeZone, publishTime)
+    }
+  }
+  const days = workingPublishDays(input.publishDays)
+  if (days.length) return (fromMs) => nextPublishAtWeekdays(publishTime, timeZone, days, fromMs)
+  return (fromMs) => {
+    const anchor = input.anchorIso && Number.isFinite(Date.parse(input.anchorIso)) ? input.anchorIso : null
+    const next = anchor ? advanceNextPublishAt(anchor, timeZone, publishTime, input.intervalDays, fromMs) : computeNextPublishAt(publishTime, timeZone, fromMs)
+    return skipNoPublishDays(next, timeZone, publishTime)
+  }
+}
+
+/**
+ * Whether a stored slot still belongs to the schedule: never Friday/Saturday,
+ * and with a plan rhythm, on one of the rhythm's days. A slot stored before the
+ * plan decided the rhythm (an owner's Wednesday on Basic) is realigned, not
+ * published.
+ */
+export function slotFitsRhythm(iso: string | null, timeZone: string, perDay: number[] | null): boolean {
+  const at = iso ? Date.parse(iso) : NaN
+  if (!Number.isFinite(at)) return true
+  const wd = localWeekday(at, timeZone)
+  if (isNoPublishWeekday(wd)) return false
+  return perDay ? (perDay[wd] ?? 0) > 0 : true
+}
+
+/**
+ * The publish dates of the next `count` queued items, the way the runner will
+ * produce them: each one at the schedule's next slot, spread over what is left
+ * of the billing cycle when the allowance is known (spreadNextPublishAt), and a
+ * new cycle restoring the plan's monthly allowance.
+ */
+export function projectPublishDates(input: {
+  firstIso: string
+  count: number
+  slotAfter: (fromMs: number) => string
+  cycle: { periodStartIso: string | null; periodEndIso: string; articlesLeft: number; perCycle: number } | null
+}): string[] {
+  const out: string[] = []
+  let cursor = input.firstIso
+  const c = input.cycle
+  let end = c ? Date.parse(c.periodEndIso) : NaN
+  const start = c?.periodStartIso ? Date.parse(c.periodStartIso) : NaN
+  const len = Number.isFinite(start) && end > start ? end - start : 30 * 86_400_000
+  let left = c ? Math.max(0, Math.floor(c.articlesLeft)) : 0
+  for (let i = 0; i < input.count; i++) {
+    out.push(cursor)
+    if (i === input.count - 1) break
+    const at = Date.parse(cursor)
+    if (!Number.isFinite(at)) break
+    const nowMs = at + 60_000
+    const cadenceNextIso = input.slotAfter(nowMs)
+    if (!c || !Number.isFinite(end)) { cursor = cadenceNextIso; continue }
+    for (let g = 0; at >= end && g < 60; g++) { end += len; left = c.perCycle }
+    left = Math.max(0, left - 1)
+    cursor = spreadNextPublishAt({ cadenceNextIso, nowMs, periodEndIso: new Date(end).toISOString(), remaining: left, ready: 0, slotAfter: input.slotAfter })
+  }
+  return out
+}

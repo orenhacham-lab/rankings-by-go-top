@@ -16,6 +16,7 @@ import { matchExistingContent } from '../content-match'
 import { scoreOpportunity } from '../score'
 import { loadOpportunityInputs } from '../load'
 import { FakeAdmin } from '../../__qa__/_fake-admin'
+import { settingsGscHref } from '../../../content/content-hub-setup'
 import type { GscMetricRow } from '../../summary'
 import type { ContentEvidence, OpportunityRunMeta } from '../types'
 
@@ -269,15 +270,28 @@ async function main() {
     check('F3(11) different cluster → different id', base !== diffCluster)
   }
 
-  // ── FIX 4: mounted inside ContentHub, not the project page; still read-only ─
+  // ── FIX 4: a dev-only diagnostic behind its own flag, not the project page; still read-only ─
   {
-    const hub = read('components/content/ContentHub.tsx')
-    check('F4(12) GscOpportunities imported into ContentHub', /import GscOpportunities from '@\/components\/content\/GscOpportunities'/.test(hub))
-    check('F4(12) rendered under the gscIdeas tab', /activeTab === 'gscIdeas'/.test(hub) && /<GscOpportunities\s[\s\S]{0,120}projectId=\{projectId\}/.test(hub))
-    check('F4(12) tab gated by the GSC client flag', /NEXT_PUBLIC_GSC_READ_ONLY_ENABLED === 'true'[\s\S]{0,400}setActiveTab\('gscIdeas'\)/.test(hub))
-    const projectPage = read('app/(dashboard)/projects/[id]/page.tsx')
-    check('F4(13) NOT mounted on the project page anymore', !/GscOpportunities/.test(projectPage))
-    check('F4(13) Stage E1 GscPanel is untouched on the project page', /<GscPanel projectId=\{id\}/.test(projectPage))
+    // It is a raw DIAGNOSTIC, never the merchant-facing view: on main (the content hub)
+    // and on the content workspace's Search Console screen it rendered only when
+    // NEXT_PUBLIC_GSC_RAW_BROWSER_ENABLED === 'true'. That screen is gone, and keyword
+    // research mounts it now, behind the same flag (a merchant-grade presentation of the
+    // opportunities is a later package; components/gsc/__qa__/gsc-widgets.qa.ts E4).
+    const research = read('app/(dashboard)/keyword-research/page.tsx').replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/.*$/gm, '')
+    const mountedBehindFlag = (src: string) =>
+      /import GscOpportunities from '@\/components\/content\/GscOpportunities'/.test(src)
+      && (src.match(/<GscOpportunities\b/g) ?? []).length === 1
+      && /\{process\.env\.NEXT_PUBLIC_GSC_RAW_BROWSER_ENABLED === 'true' && \(\s*<div className="mt-8">\s*<GscOpportunities projectId=\{selectedProject\}/.test(src)
+    check('F4(12) GscOpportunities renders in keyword research only behind NEXT_PUBLIC_GSC_RAW_BROWSER_ENABLED, for the project the top bar names',
+      mountedBehindFlag(research))
+    check('F4(12) MUT: mounting it without the flag (merchant-facing) fails that check',
+      !mountedBehindFlag(research.replace("process.env.NEXT_PUBLIC_GSC_RAW_BROWSER_ENABLED === 'true' && ", '')))
+    check('F4(12) the Search Console screen that held it is gone',
+      !/GscOpportunities/.test((() => { try { return read('components/content/workspace/SearchConsoleScreen.tsx') } catch { return '' } })()))
+    // The project page became tabs; its connection panels live in the project's settings.
+    const settingsPage = read('app/(dashboard)/settings/page.tsx')
+    check("F4(13) NOT mounted in the project's settings (it is data, not a connection)", !/GscOpportunities/.test(settingsPage))
+    check("F4(13) Stage E1 GscPanel is mounted, unchanged, in the project's settings", /<GscPanel projectId=\{project\.id\}/.test(settingsPage))
     // (14) no Stage E2B actions / no writes in the UI. Strip comments first so descriptive
     // prose (e.g. "never creates/approves/publishes") doesn't trip the guard.
     const ui = read('components/content/GscOpportunities.tsx')
@@ -328,7 +342,11 @@ async function main() {
     check('LF2(9) not_connected shows a project-page CTA', /not_connected[\s\S]{0,120}ctaFor\('not_connected'\)/.test(ui) && /t\.ctaConnect/.test(ui))
     check('LF2(10) no_property shows a project-page CTA', /no_property[\s\S]{0,120}ctaFor\('no_property'\)/.test(ui) && /t\.ctaSelectProperty/.test(ui))
     check('LF2(11) never_synced shows a project-page CTA', /never_synced[\s\S]{0,120}ctaFor\('never_synced'\)/.test(ui) && /t\.ctaSync/.test(ui))
-    check('LF2 CTA links to the project GSC section preserving project', /\/projects\/\$\{projectId\}#gsc-section/.test(ui))
+    const ctaToSettings = (src: string) => /const gscHref = settingsGscHref\(projectId\)/.test(src)
+    check("LF2 CTA links to the Search Console section of the project's settings, preserving project",
+      ctaToSettings(ui) && settingsGscHref('p1') === '/settings?projectId=p1#search-console')
+    check('LF2 MUT: a CTA to the retired project page fails that check',
+      !ctaToSettings(ui.replace('settingsGscHref(projectId)', '`/projects/${projectId}#gsc-section`')))
     check('LF2(12) NO OAuth/connect implementation duplicated in Content Hub', !/api\/gsc\/connect|buildAuthUrl|oauth|access_type|listSites/i.test(ui) && !/api\/gsc\/property/.test(ui))
   }
 

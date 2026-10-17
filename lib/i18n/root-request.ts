@@ -12,12 +12,12 @@
 
 import { cache } from 'react'
 import { createClient } from '@/lib/supabase/server'
-import { getServerLocale } from './server-locale'
-import type { Locale } from './locales'
+import { getServerPublicLocale } from './server-locale'
+import type { PublicLocale } from './locales'
 
 export interface RootRequestContext {
   isAuthenticated: boolean
-  locale: Locale
+  locale: PublicLocale
 }
 
 export const getRootRequestContext = cache(async (): Promise<RootRequestContext> => {
@@ -34,5 +34,5 @@ export const getRootRequestContext = cache(async (): Promise<RootRequestContext>
     // breaks the app; the locale still resolves from cookie/header.
     isAuthenticated = false
   }
-  return { isAuthenticated, locale: await getServerLocale(seed) }
+  return { isAuthenticated, locale: await getServerPublicLocale(seed) }
 })

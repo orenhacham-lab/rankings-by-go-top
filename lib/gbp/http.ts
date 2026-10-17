@@ -1,0 +1,613 @@
+/**
+ * The /api/gbp/* handlers, with their collaborators injected so a guard can run
+ * them against FakeAdmin and a fake Google. The route files are one line each.
+ *
+ * Every handler:
+ *   - is reached only when GBP_POSTS_ENABLED is 'true' (the route checks first);
+ *   - proves the caller owns the project (authContentProject) before touching data;
+ *   - refuses a Shopify project (the live Shopify app is never changed by this);
+ *   - answers `not_available` while the tables are not applied;
+ *   - returns stable codes, never a provider's or database's words.
+ */
+import type { createAdminClient } from '@/lib/supabase/admin'
+import type { ContentAuthResult } from '@/lib/content/api-auth'
+import { isGscTokenCryptoConfigured } from '@/lib/gsc/token-crypto'
+import { CONTENT_IMAGE_BUCKET } from '@/lib/content/featured-image'
+import { isGbpOAuthConfigured } from './config'
+import { GbpApiError, type GbpErrorCode } from './errors'
+import { buildGbpAuthUrl, createPkcePair, exchangeGbpCode, grantIncludesGbpScope, revokeGbpToken } from './oauth'
+import { listAllLocations, type GbpLocation } from './api'
+import { validatePostInput, GBP_CTA_TYPES, normalizePostLanguage } from './validate'
+import { preparePostImage, GBP_SOURCE_TYPES, GBP_SOURCE_MAX_BYTES, type CropBox } from './image'
+import { draftPost, type Generate } from './draft'
+import { generateTopicImage, GBP_TOPIC_MAX, type GenerateTopicImage } from './topic-image'
+import { imageGenerationHttpStatus } from '@/lib/content/image-generation-http'
+import { v4LocationParent } from './request'
+import { listReviews, getReview, replyToReview, deleteReviewReply, summarizeReviews, isReviewName, GBP_REVIEW_ORDERS, type GbpReview, type GbpReviewOrder, type GbpReviewPage } from './reviews'
+import { validateReplyInput, GBP_REPLY_MAX } from './review-validate'
+import { normalizeStoredLocale } from '@/lib/i18n/locales'
+import { draftReviewReply } from './review-draft'
+import { publishPost, accessTokenFor, defaultPublishDeps, type PublishDeps } from './publish'
+import {
+  gbpTablesPresent, GbpStoreError, createGbpOAuthState, consumeGbpOAuthState, readGbpConnection, storeGbpConnection,
+  deleteGbpConnection, decryptRefreshToken, readProjectLocation, saveProjectLocation, listProjectPosts, insertPost,
+  readProjectPost, cancelPost, setAutoPostOnPublish, markReviewsSeen,
+  type GbpPostRow, type GbpConnectionRow, type GbpLocationRow,
+} from './store'
+
+type Admin = ReturnType<typeof createAdminClient>
+type Authed = Exclude<ContentAuthResult, { error: string }>
+
+export interface GbpRouteDeps {
+  auth: (projectId: string | null) => Promise<ContentAuthResult>
+  fetchLocations?: (accessToken: string) => Promise<GbpLocation[]>
+  exchange?: (code: string, verifier: string) => Promise<{ accessToken: string; refreshToken?: string; scope: string }>
+  generate?: Generate
+  generateImage?: GenerateTopicImage
+  listReviews?: (accessToken: string, args: { accountName: string; locationName: string; order?: GbpReviewOrder; pageToken?: string | null; pages?: number }) => Promise<GbpReviewPage>
+  replyToReview?: (accessToken: string, reviewName: string, comment: string) => Promise<{ comment: string; updateTime: string | null }>
+  deleteReviewReply?: (accessToken: string, reviewName: string) => Promise<void>
+  getReview?: (accessToken: string, reviewName: string) => Promise<GbpReview>
+  publish?: PublishDeps
+  authUrl?: (state: string, challenge: string) => string
+}
+
+const json = (body: unknown, status = 200) => Response.json(body, { status })
+const err = (code: GbpErrorCode | 'invalid_request' | 'forbidden' | 'unauthorized' | 'not_found', status: number, extra: Record<string, unknown> = {}) =>
+  json({ ok: false, error: code, ...extra }, status)
+
+/** Auth + schema gate shared by every project-scoped handler. */
+async function gate(deps: GbpRouteDeps, projectId: string | null): Promise<Authed | Response> {
+  const auth = await deps.auth(projectId)
+  if ('error' in auth) {
+    const code = auth.status === 401 ? 'unauthorized' : auth.status === 403 ? 'forbidden' : auth.status === 404 ? 'not_found' : 'invalid_request'
+    return err(code, auth.status)
+  }
+  try {
+    if (!(await gbpTablesPresent(auth.admin))) return err('not_available', 409, { reason: 'schema' })
+  } catch {
+    return err('unexpected', 500)
+  }
+  return auth
+}
+
+const storeFail = (e: unknown) => (e instanceof GbpStoreError && e.code === 'missing' ? err('not_available', 409, { reason: 'schema' }) : err('unexpected', 500))
+
+export function sanitizePost(p: GbpPostRow) {
+  return {
+    id: p.id, summary: p.summary, ctaType: p.cta_type, ctaUrl: p.cta_url, imageUrl: p.image_url,
+    status: p.status, scheduledAt: p.scheduled_at, publishedAt: p.published_at, googleState: p.google_state,
+    searchUrl: p.google_search_url, errorCode: p.last_error_code, createdAt: p.created_at, sourceArticleId: p.source_article_id,
+    autoCreated: !!p.auto_created,
+  }
+}
+export function sanitizeGbpConnection(c: GbpConnectionRow | null) {
+  if (!c) return null
+  return { status: c.status, errorCode: c.last_error_code, updatedAt: c.updated_at }
+}
+
+const articleUrl = (a: Record<string, unknown>): string | null => {
+  for (const k of ['wp_post_url', 'shopify_article_url', 'site_post_url']) {
+    const v = a[k]
+    if (typeof v === 'string' && /^https:\/\//.test(v)) return v
+  }
+  return null
+}
+
+// ── GET /api/gbp/status?projectId= ─────────────────────────────────────────
+export async function handleStatus(req: Request, deps: GbpRouteDeps): Promise<Response> {
+  const projectId = new URL(req.url).searchParams.get('projectId')
+  const auth = await deps.auth(projectId)
+  if ('error' in auth) return err(auth.status === 401 ? 'unauthorized' : auth.status === 403 ? 'forbidden' : 'not_found', auth.status)
+  try {
+    if (!(await gbpTablesPresent(auth.admin))) return json({ ok: true, state: 'unavailable' })
+  } catch { return err('unexpected', 500) }
+  try {
+    const [connection, location, posts] = await Promise.all([
+      readGbpConnection(auth.admin, auth.user.id),
+      readProjectLocation(auth.admin, auth.project.id),
+      listProjectPosts(auth.admin, auth.project.id),
+    ])
+    const { data: project } = await auth.admin.from('projects').select('target_domain, business_name').eq('id', auth.project.id).maybeSingle()
+    const { data: arts } = await auth.admin.from('generated_articles')
+      .select('id, title, status, featured_image_url, wp_post_url, shopify_article_url, site_post_url')
+      .eq('project_id', auth.project.id).in('status', ['published', 'ready', 'scheduled']).order('created_at', { ascending: false }).limit(30)
+    const p = (project ?? {}) as { target_domain?: string | null; business_name?: string | null }
+    return json({
+      ok: true,
+      state: 'ready',
+      configured: isGbpOAuthConfigured() && isGscTokenCryptoConfigured(),
+      connection: sanitizeGbpConnection(connection),
+      // A location saved under a connection that is not this user's is ignored (never shown, never used).
+      location: location && connection?.id && location.connection_id === connection.id
+        ? { title: location.location_title, address: location.location_address, mapsUri: location.maps_uri, websiteUri: location.website_uri, locationName: location.location_name }
+        : null,
+      // The owner's automatic-posting switch. Off unless a location of THEIR
+      // connection is selected, so the screen can never offer it without one.
+      autoPostOnPublish: !!(location && connection?.id && location.connection_id === connection.id && location.auto_post_on_publish),
+      posts: posts.map(sanitizePost),
+      siteUrl: p.target_domain ? (/^https?:\/\//.test(p.target_domain) ? p.target_domain : `https://${p.target_domain}`) : null,
+      businessName: p.business_name ?? null,
+      articles: ((arts ?? []) as Record<string, unknown>[]).map((a) => ({
+        id: String(a.id), title: String(a.title ?? ''), url: articleUrl(a),
+        imageUrl: typeof a.featured_image_url === 'string' && /^https:\/\//.test(a.featured_image_url) ? a.featured_image_url : null,
+      })),
+      ctaTypes: GBP_CTA_TYPES,
+    })
+  } catch (e) { return storeFail(e) }
+}
+
+// ── POST /api/gbp/connect {projectId} ──────────────────────────────────────
+export async function handleConnect(req: Request, deps: GbpRouteDeps): Promise<Response> {
+  let body: Record<string, unknown>
+  try { body = await req.json() } catch { return err('invalid_request', 400) }
+  const g = await gate(deps, typeof body.projectId === 'string' ? body.projectId : null)
+  if (g instanceof Response) return g
+  if (!isGbpOAuthConfigured() || !isGscTokenCryptoConfigured()) return err('not_available', 503, { reason: 'not_configured' })
+  const pkce = createPkcePair()
+  try {
+    const state = await createGbpOAuthState(g.admin, { userId: g.user.id, projectId: g.project.id, codeVerifier: pkce.verifier })
+    return json({ ok: true, authUrl: (deps.authUrl ?? buildGbpAuthUrl)(state, pkce.challenge) })
+  } catch (e) { return storeFail(e) }
+}
+
+// ── GET /api/gbp/callback?code&state ───────────────────────────────────────
+/**
+ * The only GET that writes, and only after consuming its one-time state. The
+ * return address is fixed (/maps-posts?projectId=<from the state>) with a
+ * result code; nothing from the query decides where the browser goes.
+ */
+export async function handleCallback(req: Request, deps: GbpRouteDeps & { sessionUserId: () => Promise<string | null>; admin: () => Admin }): Promise<Response> {
+  const url = new URL(req.url)
+  const back = (projectId: string | null, result: string) => {
+    const to = new URL(projectId ? '/maps-posts' : '/projects', url.origin)
+    if (projectId) to.searchParams.set('projectId', projectId)
+    to.searchParams.set('gbp', result)
+    return Response.redirect(to.toString(), 303)
+  }
+  const userId = await deps.sessionUserId()
+  if (!userId) return back(null, 'unauthenticated')
+  const admin = deps.admin()
+  const consumed = await consumeGbpOAuthState(admin, { rawState: url.searchParams.get('state') ?? '', userId }).catch(() => null)
+  if (!consumed) return back(null, 'invalid_state')
+  const pid = consumed.projectId
+  if (url.searchParams.get('error')) return back(pid, url.searchParams.get('error') === 'access_denied' ? 'access_denied' : 'oauth_error')
+  const code = url.searchParams.get('code')
+  if (!code) return back(pid, 'oauth_error')
+  let tokens
+  try {
+    tokens = await (deps.exchange ?? ((c: string, v: string) => exchangeGbpCode(c, v)))(code, consumed.codeVerifier)
+  } catch (e) {
+    return back(pid, e instanceof GbpApiError && e.code === 'google_unavailable' ? 'google_unavailable' : 'oauth_error')
+  }
+  // The consent screen lets a person untick the permission; without it there is nothing to store.
+  if (!grantIncludesGbpScope(tokens.scope)) return back(pid, 'scope_missing')
+  try {
+    await storeGbpConnection(admin, userId, { refreshToken: tokens.refreshToken, scope: tokens.scope })
+  } catch {
+    return back(pid, 'store_failed')
+  }
+  return back(pid, 'connected')
+}
+
+// ── GET /api/gbp/locations?projectId= ──────────────────────────────────────
+async function merchantLocations(g: Authed, deps: GbpRouteDeps): Promise<{ ok: true; conn: GbpConnectionRow; list: GbpLocation[] } | { ok: false; res: Response }> {
+  let conn: GbpConnectionRow | null
+  try { conn = await readGbpConnection(g.admin, g.user.id) } catch (e) { return { ok: false, res: storeFail(e) } }
+  const token = await accessTokenFor(g.admin, conn, deps.publish ?? defaultPublishDeps)
+  if (!token.ok) return { ok: false, res: err(token.code, 409) }
+  try {
+    const list = await (deps.fetchLocations ?? ((t: string) => listAllLocations(t)))(token.accessToken)
+    return { ok: true, conn: conn as GbpConnectionRow, list }
+  } catch (e) {
+    return { ok: false, res: err(e instanceof GbpApiError ? e.code : 'unexpected', 502) }
+  }
+}
+
+export async function handleListLocations(req: Request, deps: GbpRouteDeps): Promise<Response> {
+  const g = await gate(deps, new URL(req.url).searchParams.get('projectId'))
+  if (g instanceof Response) return g
+  const r = await merchantLocations(g, deps)
+  if (!r.ok) return r.res
+  return json({ ok: true, locations: r.list.map((l) => ({ accountName: l.accountName, locationName: l.locationName, title: l.title, address: l.address, websiteUri: l.websiteUri })) })
+}
+
+// ── POST /api/gbp/locations {projectId, accountName, locationName} ─────────
+export async function handleSelectLocation(req: Request, deps: GbpRouteDeps): Promise<Response> {
+  let body: Record<string, unknown>
+  try { body = await req.json() } catch { return err('invalid_request', 400) }
+  const g = await gate(deps, typeof body.projectId === 'string' ? body.projectId : null)
+  if (g instanceof Response) return g
+  const r = await merchantLocations(g, deps)
+  if (!r.ok) return r.res
+  // Only a location Google lists for THIS merchant; the title and links come from Google, not the request.
+  const pick = r.list.find((l) => l.accountName === body.accountName && l.locationName === body.locationName)
+  if (!pick) return err('location_not_found', 404)
+  try {
+    await saveProjectLocation(g.admin, {
+      project_id: g.project.id, user_id: g.user.id, connection_id: r.conn.id,
+      account_name: pick.accountName, location_name: pick.locationName, location_title: pick.title || pick.locationName,
+      location_address: pick.address, website_uri: pick.websiteUri, maps_uri: pick.mapsUri,
+    })
+  } catch (e) { return storeFail(e) }
+  return json({ ok: true })
+}
+
+// ── DELETE /api/gbp/connection?projectId= ──────────────────────────────────
+export async function handleDisconnect(req: Request, deps: GbpRouteDeps & { revoke?: (token: string) => Promise<boolean> }): Promise<Response> {
+  const g = await gate(deps, new URL(req.url).searchParams.get('projectId'))
+  if (g instanceof Response) return g
+  try {
+    const conn = await readGbpConnection(g.admin, g.user.id)
+    if (conn) {
+      const refresh = decryptRefreshToken(conn)
+      if (refresh) await (deps.revoke ?? revokeGbpToken)(refresh)
+      await deleteGbpConnection(g.admin, g.user.id)
+    }
+  } catch (e) { return storeFail(e) }
+  return json({ ok: true })
+}
+
+// ── POST /api/gbp/draft {projectId, articleId? | topic?} ───────────────────
+export async function handleDraft(req: Request, deps: GbpRouteDeps): Promise<Response> {
+  let body: Record<string, unknown>
+  try { body = await req.json() } catch { return err('invalid_request', 400) }
+  const g = await gate(deps, typeof body.projectId === 'string' ? body.projectId : null)
+  if (g instanceof Response) return g
+  // Hebrew is the fallback for an unrecognised value, as it is everywhere else.
+  const language = normalizePostLanguage(body.language) ?? 'he'
+  let article: { title: string; description: string | null; url: string | null } | null = null
+  if (typeof body.articleId === 'string' && body.articleId) {
+    const { data } = await g.admin.from('generated_articles')
+      .select('title, meta_description, excerpt, wp_post_url, shopify_article_url, site_post_url')
+      .eq('id', body.articleId).eq('project_id', g.project.id).maybeSingle()
+    if (!data) return err('not_found', 404)
+    const a = data as Record<string, unknown>
+    article = {
+      title: String(a.title ?? '').slice(0, 300),
+      description: (typeof a.meta_description === 'string' ? a.meta_description : typeof a.excerpt === 'string' ? a.excerpt : null)?.slice(0, 600) ?? null,
+      url: articleUrl(a),
+    }
+  }
+  const topic = typeof body.topic === 'string' ? body.topic.trim().slice(0, 300) : ''
+  if (!article && !topic) return err('invalid_request', 400)
+  let businessName: string | null = null
+  try {
+    const loc = await readProjectLocation(g.admin, g.project.id)
+    businessName = loc?.location_title ?? null
+  } catch { /* the draft works without it */ }
+  if (!businessName) {
+    const { data } = await g.admin.from('projects').select('business_name, name').eq('id', g.project.id).maybeSingle()
+    const p = (data ?? {}) as { business_name?: string | null; name?: string | null }
+    businessName = p.business_name || p.name || null
+  }
+  const out = await draftPost({ businessName, language, article, topic: article ? null : topic }, deps.generate)
+  if (!out.ok) return err('draft_unavailable', 502)
+  return json({ ok: true, summary: out.summary, articleUrl: article?.url ?? null })
+}
+
+// ── POST /api/gbp/image/generate {projectId, topic} ────────────────────────
+/**
+ * An AI photo for a post written from a topic. Answers the JPEG itself, which
+ * the composer puts through the same crop and "use this photo" steps as an
+ * upload, so nothing is stored here. A failure is logged with our own reason
+ * and answered with one stable code; the provider's words go nowhere.
+ */
+export async function handleGenerateImage(req: Request, deps: GbpRouteDeps): Promise<Response> {
+  let body: Record<string, unknown>
+  try { body = await req.json() } catch { return err('invalid_request', 400) }
+  const g = await gate(deps, typeof body.projectId === 'string' ? body.projectId : null)
+  if (g instanceof Response) return g
+  const topic = typeof body.topic === 'string' ? body.topic.trim() : ''
+  if (!topic || topic.length > GBP_TOPIC_MAX) return err('invalid_request', 400)
+  let reason: string
+  try {
+    const out = await (deps.generateImage ?? generateTopicImage)({ topic })
+    if (out.ok) {
+      return new Response(new Uint8Array(out.bytes), { status: 200, headers: { 'Content-Type': 'image/jpeg', 'Cache-Control': 'no-store' } })
+    }
+    reason = out.reason
+  } catch {
+    reason = 'generator_threw'
+  }
+  // Only a code of ours reaches the log; anything that looks like free text is not one.
+  const classified = /^[a-z][a-z0-9_]{0,59}$/.test(reason) ? reason : 'unclassified'
+  console.error('[gbp-topic-image] generation failed', { reason: classified, projectId: g.project.id })
+  return err('image_generation_failed', imageGenerationHttpStatus(classified))
+}
+
+// ── reviews ────────────────────────────────────────────────────────────────
+/**
+ * The connected location plus a live access token, for every review handler.
+ * A location saved under a connection that is not this user's is ignored, the
+ * same rule as handleStatus.
+ */
+async function reviewContext(g: Authed, deps: GbpRouteDeps):
+  Promise<{ ok: true; accessToken: string; location: GbpLocationRow } | { ok: false; res: Response }> {
+  let conn: GbpConnectionRow | null
+  let location: GbpLocationRow | null
+  try {
+    conn = await readGbpConnection(g.admin, g.user.id)
+    location = await readProjectLocation(g.admin, g.project.id)
+  } catch (e) { return { ok: false, res: storeFail(e) } }
+  if (!conn) return { ok: false, res: err('not_connected', 409) }
+  if (!location || location.connection_id !== conn.id) return { ok: false, res: err('no_location', 409) }
+  const token = await accessTokenFor(g.admin, conn, deps.publish ?? defaultPublishDeps)
+  if (!token.ok) return { ok: false, res: err(token.code, 409) }
+  return { ok: true, accessToken: token.accessToken, location }
+}
+
+/**
+ * The review really belongs to the location this project is connected to.
+ * Without this check a merchant could address a reply to any review name they
+ * typed, on a profile they do not manage through this project.
+ */
+export function belongsToLocation(reviewName: string, location: Pick<GbpLocationRow, 'account_name' | 'location_name'>): boolean {
+  let parent: string
+  try { parent = v4LocationParent(location.account_name, location.location_name) } catch { return false }
+  return reviewName.startsWith(`${parent}/reviews/`)
+}
+
+/** The newest review updateTime in a page, as an ISO string, or null. */
+export function newestReviewTime(reviews: GbpReview[]): string | null {
+  let best: number | null = null
+  for (const r of reviews) {
+    const t = r.updateTime ? Date.parse(r.updateTime) : NaN
+    if (Number.isFinite(t) && (best === null || t > best)) best = t
+  }
+  return best === null ? null : new Date(best).toISOString()
+}
+
+/** A review the owner has not been shown yet, by the mark the alert keeps. */
+export function isNewSince(review: GbpReview, seen: string | null): boolean {
+  if (!seen) return false
+  const t = review.updateTime ? Date.parse(review.updateTime) : NaN
+  const mark = Date.parse(seen)
+  return Number.isFinite(t) && Number.isFinite(mark) && t > mark
+}
+
+// ── GET /api/gbp/reviews?projectId=&order=&pageToken= ──────────────────────
+export async function handleListReviews(req: Request, deps: GbpRouteDeps): Promise<Response> {
+  const url = new URL(req.url)
+  const g = await gate(deps, url.searchParams.get('projectId'))
+  if (g instanceof Response) return g
+  const ctx = await reviewContext(g, deps)
+  if (!ctx.ok) return ctx.res
+
+  const rawOrder = url.searchParams.get('order')
+  const order: GbpReviewOrder | undefined = rawOrder && (GBP_REVIEW_ORDERS as readonly string[]).includes(rawOrder) ? rawOrder as GbpReviewOrder : undefined
+  let page: GbpReviewPage
+  try {
+    page = await (deps.listReviews ?? ((t: string, a: Parameters<typeof listReviews>[1]) => listReviews(t, a)))(ctx.accessToken, {
+      accountName: ctx.location.account_name,
+      locationName: ctx.location.location_name,
+      order,
+      pageToken: url.searchParams.get('pageToken'),
+      pages: 1,
+    })
+  } catch (e) {
+    return err(e instanceof GbpApiError ? e.code : 'unexpected', 502)
+  }
+
+  const seen = ctx.location.reviews_seen_update_time
+  return json({
+    ok: true,
+    summary: summarizeReviews(page),
+    reviews: page.reviews.map((r) => ({
+      reviewName: r.reviewName,
+      reviewerName: r.reviewerName,
+      isAnonymous: r.isAnonymous,
+      stars: r.stars,
+      comment: r.comment,
+      createTime: r.createTime,
+      updateTime: r.updateTime,
+      reply: r.reply,
+      isNew: isNewSince(r, seen),
+    })),
+    nextPageToken: page.nextPageToken,
+    replyMax: GBP_REPLY_MAX,
+    orders: GBP_REVIEW_ORDERS,
+  })
+}
+
+// ── POST /api/gbp/reviews/seen {projectId} ─────────────────────────────────
+/** The owner has read the list: the "new" marks move up to the newest review. */
+export async function handleMarkReviewsSeen(req: Request, deps: GbpRouteDeps): Promise<Response> {
+  let body: Record<string, unknown>
+  try { body = await req.json() } catch { return err('invalid_request', 400) }
+  const g = await gate(deps, typeof body.projectId === 'string' ? body.projectId : null)
+  if (g instanceof Response) return g
+  const newest = typeof body.newestUpdateTime === 'string' ? Date.parse(body.newestUpdateTime) : NaN
+  if (!Number.isFinite(newest)) return err('invalid_request', 400)
+  try {
+    await markReviewsSeen(g.admin, g.project.id, { seenUpdateTime: new Date(newest).toISOString() })
+  } catch (e) { return storeFail(e) }
+  return json({ ok: true })
+}
+
+// ── POST /api/gbp/reviews/draft {projectId, reviewName} ────────────────────
+export async function handleDraftReviewReply(req: Request, deps: GbpRouteDeps): Promise<Response> {
+  let body: Record<string, unknown>
+  try { body = await req.json() } catch { return err('invalid_request', 400) }
+  const g = await gate(deps, typeof body.projectId === 'string' ? body.projectId : null)
+  if (g instanceof Response) return g
+  if (!isReviewName(body.reviewName)) return err('invalid_request', 400)
+  const ctx = await reviewContext(g, deps)
+  if (!ctx.ok) return ctx.res
+  if (!belongsToLocation(body.reviewName, ctx.location)) return err('review_not_found', 404)
+
+  // The review is read from Google by name, never from the request: the draft
+  // must answer what the customer actually wrote.
+  let review: GbpReview
+  try {
+    review = await (deps.getReview ?? ((t: string, n: string) => getReview(t, n)))(ctx.accessToken, body.reviewName)
+  } catch (e) {
+    return err(e instanceof GbpApiError ? e.code : 'unexpected', e instanceof GbpApiError && e.code === 'review_not_found' ? 404 : 502)
+  }
+
+  const out = await draftReviewReply({
+    businessName: ctx.location.location_title || null,
+    // The project's language, whole: this read `=== 'en' ? 'en' : 'he'`, so a
+    // Spanish or Portuguese project got a Hebrew draft. An absent or unknown
+    // value is Hebrew, the site's own default.
+    language: normalizeStoredLocale(body.language) ?? 'he',
+    // The reviewer's name is deliberately NOT passed on (see lib/gbp/review-draft.ts).
+    review: { stars: review.stars, comment: review.comment },
+  }, deps.generate)
+  if (!out.ok) return err('draft_unavailable', 502)
+  return json({ ok: true, comment: out.comment })
+}
+
+// ── PUT /api/gbp/reviews/reply {projectId, reviewName, comment} ────────────
+export async function handleReplyToReview(req: Request, deps: GbpRouteDeps): Promise<Response> {
+  let body: Record<string, unknown>
+  try { body = await req.json() } catch { return err('invalid_request', 400) }
+  const g = await gate(deps, typeof body.projectId === 'string' ? body.projectId : null)
+  if (g instanceof Response) return g
+  if (!isReviewName(body.reviewName)) return err('invalid_request', 400)
+  const checked = validateReplyInput({ comment: body.comment })
+  if (!checked.ok) return err('invalid_post', 400, { errors: checked.errors })
+  const ctx = await reviewContext(g, deps)
+  if (!ctx.ok) return ctx.res
+
+  // The review name carries the account and location; it must be the location
+  // this project is connected to, or one merchant could reply on another's behalf.
+  if (!belongsToLocation(body.reviewName, ctx.location)) return err('review_not_found', 404)
+
+  try {
+    const saved = await (deps.replyToReview ?? ((t: string, n: string, c: string) => replyToReview(t, n, c)))(ctx.accessToken, body.reviewName, checked.value.comment)
+    return json({ ok: true, reply: saved })
+  } catch (e) {
+    return err(e instanceof GbpApiError ? e.code : 'unexpected', 502)
+  }
+}
+
+// ── DELETE /api/gbp/reviews/reply?projectId=&reviewName= ───────────────────
+export async function handleDeleteReviewReply(req: Request, deps: GbpRouteDeps): Promise<Response> {
+  const url = new URL(req.url)
+  const g = await gate(deps, url.searchParams.get('projectId'))
+  if (g instanceof Response) return g
+  const reviewName = url.searchParams.get('reviewName')
+  if (!isReviewName(reviewName)) return err('invalid_request', 400)
+  const ctx = await reviewContext(g, deps)
+  if (!ctx.ok) return ctx.res
+  if (!belongsToLocation(reviewName, ctx.location)) return err('review_not_found', 404)
+  try {
+    await (deps.deleteReviewReply ?? ((t: string, n: string) => deleteReviewReply(t, n)))(ctx.accessToken, reviewName)
+    return json({ ok: true })
+  } catch (e) {
+    return err(e instanceof GbpApiError ? e.code : 'unexpected', 502)
+  }
+}
+
+// ── POST /api/gbp/image (multipart: projectId, file, crop) ─────────────────
+export async function handleImage(req: Request, deps: GbpRouteDeps & { newId?: () => string }): Promise<Response> {
+  let form: FormData
+  try { form = await req.formData() } catch { return err('invalid_request', 400) }
+  const g = await gate(deps, typeof form.get('projectId') === 'string' ? String(form.get('projectId')) : null)
+  if (g instanceof Response) return g
+  const file = form.get('file')
+  if (!(file instanceof Blob)) return err('image_invalid', 400)
+  if (!(GBP_SOURCE_TYPES as readonly string[]).includes(file.type) || file.size > GBP_SOURCE_MAX_BYTES) return err('image_invalid', 400)
+  let crop: Partial<CropBox> | null = null
+  try { crop = JSON.parse(String(form.get('crop') ?? 'null')) as Partial<CropBox> | null } catch { crop = null }
+  const prepared = await preparePostImage(Buffer.from(await file.arrayBuffer()), crop)
+  if (!prepared.ok) return err(prepared.code, 400)
+  const id = (deps.newId ?? (() => crypto.randomUUID()))()
+  const path = `${g.project.id}/gbp/${id}.jpg`
+  const up = await g.admin.storage.from(CONTENT_IMAGE_BUCKET).upload(path, prepared.bytes, { contentType: 'image/jpeg', upsert: false })
+  if (up.error) return err('image_upload_failed', 500)
+  const { data: pub } = g.admin.storage.from(CONTENT_IMAGE_BUCKET).getPublicUrl(path)
+  return json({ ok: true, imagePath: path, imageUrl: pub.publicUrl, width: prepared.width, height: prepared.height })
+}
+
+// ── POST /api/gbp/posts ────────────────────────────────────────────────────
+export async function handleCreatePost(req: Request, deps: GbpRouteDeps): Promise<Response> {
+  let body: Record<string, unknown>
+  try { body = await req.json() } catch { return err('invalid_request', 400) }
+  const g = await gate(deps, typeof body.projectId === 'string' ? body.projectId : null)
+  if (g instanceof Response) return g
+
+  const { data: project } = await g.admin.from('projects').select('target_domain').eq('id', g.project.id).maybeSingle()
+  const checked = validatePostInput({
+    summary: typeof body.summary === 'string' ? body.summary : '',
+    ctaType: typeof body.ctaType === 'string' ? body.ctaType : null,
+    ctaUrl: typeof body.ctaUrl === 'string' ? body.ctaUrl : null,
+    siteUrl: (project as { target_domain?: string | null } | null)?.target_domain ?? null,
+    allowOtherSite: body.allowOtherSite === true,
+    scheduledAt: typeof body.scheduledAt === 'string' && body.scheduledAt ? body.scheduledAt : null,
+  })
+  if (!checked.ok) return json({ ok: false, error: 'invalid_post', fields: checked.errors }, 400)
+
+  // The image must be one we prepared for THIS project; its public URL is rebuilt from the path, never taken from the request.
+  let imagePath: string | null = null
+  let imageUrl: string | null = null
+  if (typeof body.imagePath === 'string' && body.imagePath) {
+    if (!new RegExp(`^${g.project.id}/gbp/[0-9a-f-]{36}\\.jpg$`).test(body.imagePath)) return err('image_invalid', 400)
+    imagePath = body.imagePath
+    imageUrl = g.admin.storage.from(CONTENT_IMAGE_BUCKET).getPublicUrl(imagePath).data.publicUrl
+    if (!/^https:\/\//.test(imageUrl)) return err('image_invalid', 400)
+  }
+
+  let sourceArticleId: string | null = null
+  if (typeof body.sourceArticleId === 'string' && body.sourceArticleId) {
+    const { data } = await g.admin.from('generated_articles').select('id').eq('id', body.sourceArticleId).eq('project_id', g.project.id).maybeSingle()
+    sourceArticleId = data ? String((data as { id: string }).id) : null
+  }
+
+  let location
+  try { location = await readProjectLocation(g.admin, g.project.id) } catch (e) { return storeFail(e) }
+  if (!location) return err('no_location', 409)
+
+  let row: GbpPostRow
+  try {
+    row = await insertPost(g.admin, {
+      project_id: g.project.id, user_id: g.user.id, source_article_id: sourceArticleId,
+      summary: checked.value.summary, cta_type: checked.value.ctaType, cta_url: checked.value.ctaUrl,
+      image_url: imageUrl, image_path: imagePath, language_code: normalizePostLanguage(body.language) ?? 'he',
+      scheduled_at: checked.value.scheduledAt ?? new Date().toISOString(),
+    })
+  } catch (e) { return storeFail(e) }
+
+  if (checked.value.scheduledAt) return json({ ok: true, post: sanitizePost(row), outcome: 'scheduled' })
+  const out = await publishPost(g.admin, row.id, deps.publish ?? defaultPublishDeps)
+  const fresh = await readProjectPost(g.admin, g.project.id, row.id).catch(() => null)
+  return json({ ok: true, post: sanitizePost(fresh ?? row), outcome: out.ok ? 'published' : out.willRetry ? 'retrying' : 'failed', errorCode: out.ok ? null : out.code })
+}
+
+// ── DELETE /api/gbp/posts/[id]?projectId= (cancel a scheduled post) ───────
+export async function handleCancelPost(req: Request, postId: string, deps: GbpRouteDeps): Promise<Response> {
+  const g = await gate(deps, new URL(req.url).searchParams.get('projectId'))
+  if (g instanceof Response) return g
+  if (!/^[0-9a-f-]{36}$/.test(postId)) return err('not_found', 404)
+  try {
+    const ok = await cancelPost(g.admin, g.project.id, postId)
+    return ok ? json({ ok: true }) : err('not_found', 404)
+  } catch (e) { return storeFail(e) }
+}
+
+// ── PATCH /api/gbp/auto-post {projectId, enabled} ──────────────────────────
+/**
+ * The owner turns automatic posting on or off. It exists only on top of a
+ * connected location of their OWN connection: without one there is nothing to
+ * post to, and a location row left over from a connection they removed must not
+ * become a switch they can flip.
+ */
+export async function handleSetAutoPost(req: Request, deps: GbpRouteDeps): Promise<Response> {
+  let body: Record<string, unknown>
+  try { body = await req.json() } catch { return err('invalid_request', 400) }
+  const g = await gate(deps, typeof body.projectId === 'string' ? body.projectId : null)
+  if (g instanceof Response) return g
+  if (typeof body.enabled !== 'boolean') return err('invalid_request', 400)
+  try {
+    const [conn, location] = await Promise.all([
+      readGbpConnection(g.admin, g.user.id),
+      readProjectLocation(g.admin, g.project.id),
+    ])
+    if (!conn || conn.status !== 'connected') return err('not_connected', 409)
+    if (!location || location.connection_id !== conn.id || location.user_id !== g.user.id) return err('no_location', 409)
+    const saved = await setAutoPostOnPublish(g.admin, g.project.id, body.enabled)
+    if (!saved) return err('no_location', 409)
+    return json({ ok: true, autoPostOnPublish: body.enabled })
+  } catch (e) { return storeFail(e) }
+}

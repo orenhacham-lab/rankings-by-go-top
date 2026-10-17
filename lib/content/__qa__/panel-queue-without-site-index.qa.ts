@@ -181,7 +181,7 @@ const serverOutcome = (o: Partial<TopicStageOutcomes>) => classifyTopicOutcome('
 async function main() {
   console.log('NewTopicsLinkPlanPanel — queueing without a site index\n')
   const panel = strip(read('components/content/NewTopicsLinkPlanPanel.tsx'))
-  const hub = strip(read('components/content/ContentHub.tsx'))
+  const hub = strip(read('components/content/workspace/ContentWorkspaceProvider.tsx'))
 
   // ───────────────────────────────────────────────────────────────────────
   console.log('1) THE INCIDENT — confirmed missing index + zero links')
@@ -497,7 +497,7 @@ async function main() {
       /mixedSavedPlans: 'Some of these topics already have a saved link plan/.test(read('lib/i18n/dashboard/en.ts'))
       && /mixedSavedPlans: 'לחלק מהנושאים/.test(read('lib/i18n/dashboard/he.ts')))
     check('5D-l: SOURCE — the mixed batch shows its own explanation',
-      /\{mixedSavedPlans && <p[^>]*>\{t\.mixedSavedPlans\}<\/p>\}/.test(panel))
+      /\{mixedSavedPlans && <Notice tone="warn"[^>]*>\{t\.mixedSavedPlans\}<\/Notice>\}/.test(panel))
     check('5D-m: the claim-without-saving label exists in both languages',
       /queueWithSavedPlan: 'Add to queue with the saved links'/.test(read('lib/i18n/dashboard/en.ts'))
       && /queueWithSavedPlan: 'הוסף לתור עם הקישורים השמורים'/.test(read('lib/i18n/dashboard/he.ts')))
@@ -529,7 +529,7 @@ async function main() {
       && !/onEnqueue\(topicIdsToSave, false\)/.test(panel))
     check('6i: the plan-saving branch still enqueues with an explicit true',
       /onEnqueue\(r\.okIds, true\)/.test(panel))
-    check('6j: ContentHub still forwards whatever it is given',
+    check('6j: the workspace still forwards whatever it is given',
       /topics: topicIds\.map\(\(topicId\) => \(\{ topicId, expectsLinks \}\)\)/.test(hub))
     check('6k: no second copy of the policy — the panel defines no cacheState rule of its own',
       !/cacheState !== 'missing'/.test(panel) && !/expectsLinks: true/.test(panel))
@@ -569,7 +569,7 @@ async function main() {
     check('7b: English label', /queueWithoutLinks: 'Add to queue without internal links'/.test(en))
     check('7c: Hebrew label', /queueWithoutLinks: 'הוסף לתור ללא קישורים פנימיים'/.test(he))
     check('7d: the notice is rendered as information, not as the red error',
-      /\{cacheNote && <p className="mt-2 text-xs text-amber-700/.test(panel))
+      /\{cacheNote && <Notice tone="warn"/.test(panel) && !/\{cacheNote && <(?:Notice tone="bad"|p className="[^"]*text-bad)/.test(panel))
     check('7e: it no longer tells the user to refresh and try again',
       !/Site index missing — refresh the index and try again/.test(en)
       && !/אינדקס האתר חסר — רעננו את האינדקס ונסו שוב/.test(he))

@@ -52,3 +52,13 @@ Keep this file short. It replaces the per-session "handoff" re-explanation.
 - The egress proxy blocks `*.vercel.app`, `gotopseo.com` and `api.cron-job.org`. Check production through the Vercel/Supabase MCP tools (see `/prod-health`).
 - Vercel runtime logs: always use `group_by`, or `query` with `limit ≤ 5`. The runner logs a pool only when it acts on it or the pool fails, and counts idle pools in one `[automation-runner] idle pools` line.
 - Commit trailer and PR attribution: follow the session's system reminder.
+
+<!-- BEGIN:nextjs-agent-rules -->
+
+# This is NOT the Next.js you know
+
+This version has breaking changes — APIs, conventions, and file structure may all differ from your training data. Read the relevant guide in `node_modules/next/dist/docs/` (resolved from this file's directory; in monorepos the `next` package may not be visible from the repo root) before writing any code. Heed deprecation notices.
+
+This block is written and re-added by `next dev` — verify at `node_modules/next/dist/server/lib/generate-agent-files.js`. Removing it from a diff only re-creates the uncommitted change; committing it with your work keeps the tree clean.
+
+<!-- END:nextjs-agent-rules -->

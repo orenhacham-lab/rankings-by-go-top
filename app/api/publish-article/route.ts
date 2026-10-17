@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { createHash, timingSafeEqual } from 'crypto'
 import { sanitizePublicArticleHtml } from '@/lib/content/public-article-html'
+import { articlePublishBlockReason } from '@/lib/articles/publish-rules'
 
 function constantTimeEquals(a: string, b: string): boolean {
   const ha = createHash('sha256').update(a).digest()
@@ -23,6 +24,15 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json()
+
+    // The same rule the admin API enforces: nothing reaches the blog published
+    // without a cover image. This endpoint defaults is_published to true, so
+    // without the check a caller that omits the image publishes a bare post.
+    const blocked = articlePublishBlockReason({
+      is_published: body.is_published !== false,
+      featured_image_url: body.featured_image_url,
+    })
+    if (blocked) return NextResponse.json({ error: blocked }, { status: 400 })
 
     // Initialize Supabase admin client
     const supabase = createClient(

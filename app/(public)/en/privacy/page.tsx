@@ -1,14 +1,12 @@
-import { PublicNav } from '@/components/PublicNav'
-import { Footer } from '@/components/Footer'
-import { Breadcrumbs } from '@/components/Breadcrumbs'
+import { LEGAL_FOOTNOTE, LegalDoc } from '@/components/public/LegalDoc'
 
 export const metadata = {
-  title: 'Privacy Policy | Rankings by Go Top',
-  description: 'Privacy policy for Rankings by Go Top — how we collect, use and protect your data.',
+  title: 'Privacy Policy | Go Top SEO',
+  description: 'Privacy policy for Go Top SEO — how we collect, use and protect your data.',
   robots: 'noindex, nofollow',
   openGraph: {
-    title: 'Privacy Policy | Rankings by Go Top',
-    description: 'Privacy policy for Rankings by Go Top',
+    title: 'Privacy Policy | Go Top SEO',
+    description: 'Privacy policy for Go Top SEO',
     url: 'https://www.gotopseo.com/en/privacy',
     locale: 'en_US',
   },
@@ -16,208 +14,1050 @@ export const metadata = {
 
 export default function EnglishPrivacyPage() {
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-slate-100 flex flex-col">
-      <PublicNav locale="en" />
-      <div className="flex-1 pt-28 lg:pt-36 pb-12 px-4">
-        <div className="max-w-3xl mx-auto bg-white rounded-2xl shadow-sm border border-slate-200 p-8">
-          <Breadcrumbs items={[{ label: 'Privacy Policy', href: '/en/privacy' }]} locale="en" />
-          <h1 className="text-4xl font-bold text-slate-900 mb-2">Privacy Policy</h1>
-          <p className="text-slate-600 mb-8">Privacy policy for Rankings by Go Top</p>
+    <LegalDoc
+      locale="en"
+      breadcrumbs={[{ label: 'Privacy Policy', href: '/en/privacy' }]}
+      title="Privacy Policy"
+      subtitle="Privacy policy for Go Top SEO"
+    >
+      <section>
+        <h2>Introduction</h2>
+        <p>
+          GO TOP DIGITAL MARKETING AND ADVERTISING LTD (company number 517274346) (&ldquo;we&rdquo;, &ldquo;our&rdquo;, or &ldquo;the company&rdquo;) operates the Go Top SEO service
+          at https://www.gotopseo.com (the &ldquo;Service&rdquo;). This privacy policy describes our practices regarding the collection,
+          use, and disclosure of personal information when you use our Service.
+        </p>
+      </section>
 
-          <div className="prose prose-sm max-w-none space-y-6 text-slate-700">
-            <section>
-              <h2 className="text-2xl font-bold text-slate-900 mt-8 mb-4">Introduction</h2>
-              <p>
-                Go Top Digital Marketing &amp; Advertising Ltd. (&ldquo;we&rdquo;, &ldquo;our&rdquo;, or &ldquo;the company&rdquo;) operates the Rankings by Go Top service
-                at https://www.gotopseo.com (the &ldquo;Service&rdquo;). This privacy policy describes our practices regarding the collection,
-                use, and disclosure of personal information when you use our Service.
-              </p>
-            </section>
+      <section>
+        <h2>Information We Collect</h2>
+        <p>We collect different types of information, including:</p>
+        <ul>
+          <li><strong>Authentication information:</strong> name, email address, password (encrypted)</li>
+          <li><strong>Profile information:</strong> plan details and subscription information</li>
+          <li><strong>Business information:</strong> company name, domain, keywords, ranking data</li>
+          <li><strong>Technical information:</strong> IP address, browser type, referring page</li>
+          <li><strong>Google account data:</strong> only if you choose to sign in with Google or to connect
+          Google Search Console or Google Business Profile — see &ldquo;Data We Receive from Google&rdquo; below</li>
+          <li><strong>Information from your site:</strong> public pages, robots.txt, the sitemap and llms.txt
+          read in the free site check and the onboarding scan, and the findings derived from them — see
+          &ldquo;Site Scanning&rdquo; below</li>
+          <li><strong>WordPress connection:</strong> the site address, the plugin&rsquo;s signing key, and, on a
+          connection made with a username and Application Password, those too (all stored encrypted), and the log
+          of fixes on the site — see &ldquo;WordPress
+          Connection&rdquo; below</li>
+          <li><strong>Shopify connection:</strong> the store address, the store identifier, the permissions you
+          approved at installation, and the access token the store issues (stored encrypted) — see
+          &ldquo;Connecting a Site on Another Platform&rdquo; below</li>
+          <li><strong>Wix or webhook connection:</strong> the site address or the endpoint you configured, and
+          the Wix API key or the signing secret (stored encrypted and never shown again after saving) — see
+          &ldquo;Connecting a Site on Another Platform&rdquo; below</li>
+          <li><strong>An address for local rank tracking:</strong> if you typed an exact address, it is stored
+          together with the coordinates returned — see &ldquo;Turning an Address into Coordinates&rdquo; below</li>
+          <li><strong>Link network:</strong> your joining consent (who accepted, when, the wording and the link
+          type) and the placement log — see &ldquo;Link Network&rdquo; below</li>
+          <li><strong>Results and content:</strong> AI visibility check results, and content generated for you:
+          topics, questions and articles</li>
+          <li><strong>Author photo:</strong> a photo you upload for an author box, if you chose to show
+          one &mdash; see &ldquo;An Author Photo You Upload&rdquo; below</li>
+          <li><strong>Email preferences:</strong> which messages you receive, and unsubscribes from reminders</li>
+          <li><strong>Payment information:</strong> we do not store your payment instrument. For
+          accounts whose billing authority is Shopify — including merchants who installed the app
+          through Shopify — payment is processed by Shopify under Shopify App Pricing, and we never
+          direct them to PayPal. For customers who signed up directly on our website, whose billing
+          authority is not Shopify, payment is processed through PayPal</li>
+        </ul>
+      </section>
 
-            <section>
-              <h2 className="text-2xl font-bold text-slate-900 mt-8 mb-4">Information We Collect</h2>
-              <p>We collect different types of information, including:</p>
-              <ul className="list-disc list-inside space-y-2">
-                <li><strong>Authentication information:</strong> name, email address, password (encrypted)</li>
-                <li><strong>Profile information:</strong> plan details and subscription information</li>
-                <li><strong>Business information:</strong> company name, domain, keywords, ranking data</li>
-                <li><strong>Technical information:</strong> IP address, browser type, referring page</li>
-                <li><strong>Payment information:</strong> we do not store your payment instrument. For
-                accounts whose billing authority is Shopify — including merchants who installed the app
-                through Shopify — payment is processed by Shopify under Shopify App Pricing, and we never
-                direct them to PayPal. For customers who signed up directly on our website, whose billing
-                authority is not Shopify, payment is processed through PayPal</li>
-              </ul>
-            </section>
+      <section>
+        <h2>How We Use Your Data</h2>
+        <p>We use your information to:</p>
+        <ul>
+          <li>Provide the rank tracking service</li>
+          <li>Run scans and AI visibility checks, generate content and apply the site fixes you approve</li>
+          <li>Send reminders and progress reports, and answer your enquiries</li>
+          <li>Authenticate users and manage accounts</li>
+          <li>Process payments</li>
+          <li>Send service updates and news</li>
+          <li>Improve our service</li>
+          <li>Comply with legal requirements</li>
+        </ul>
+      </section>
 
-            <section>
-              <h2 className="text-2xl font-bold text-slate-900 mt-8 mb-4">How We Use Your Data</h2>
-              <p>We use your information to:</p>
-              <ul className="list-disc list-inside space-y-2">
-                <li>Provide the rank tracking service</li>
-                <li>Authenticate users and manage accounts</li>
-                <li>Process payments</li>
-                <li>Send service updates and news</li>
-                <li>Improve our service</li>
-                <li>Comply with legal requirements</li>
-              </ul>
-            </section>
+      <section>
+        <h2>Information Sharing</h2>
+        <p>We do not share your personal information with third parties, except:</p>
+        <ul>
+          <li><strong>Shopify:</strong> for payment processing for accounts billed through Shopify App Pricing, and for publishing content to a connected store</li>
+          <li><strong>PayPal:</strong> for payment processing for website-billed customers only</li>
+          <li><strong>Creem:</strong> for payment processing, where an account&rsquo;s payment goes through it. To
+          open a payment we send the e-mail address of the account, the identifier of the plan chosen and our
+          own reference for that request, and we receive back a customer identifier held by them, a plan
+          identifier, the subscription status and the dates of the billing period. Card details, and any other
+          payment instrument, never reach us at any point</li>
+          <li><strong>Supabase:</strong> for secure data storage</li>
+          <li><strong>Serper:</strong> for Google search queries and rank checks</li>
+          <li><strong>Resend:</strong> for sending email — see &ldquo;Email Messages&rdquo; below</li>
+          <li><strong>Vercel:</strong> for hosting the site and the Service</li>
+          <li><strong>Google (Gemini API, Search Console, Business Profile, Google Ads API):</strong> our AI provider for generating text and images, the connections you choose to make, and the Google Ads API, to which we send keywords to get search volumes and further keyword ideas. That interface is a Company account and not an advertising account of yours; we do not run campaigns for you — see &ldquo;AI Providers&rdquo; and &ldquo;Data We Receive from Google&rdquo; below</li>
+          <li><strong>Wix:</strong> only if you connected a Wix site — to read the site&rsquo;s content and publish articles to its blog</li>
+          <li><strong>The endpoint you configured yourself (webhook):</strong> only if you connected a site on another platform — the article is sent to the address you gave, in a signed request</li>
+          <li><strong>PDFShift:</strong> to convert a report to PDF, and only when you asked to download one. We send the report&rsquo;s content as displayed in order to get the PDF file back</li>
+          <li><strong>OpenStreetMap (Nominatim):</strong> to turn an address into coordinates, and only when you typed an exact address for local rank tracking. The address you typed and the country name are sent, never account details</li>
+          <li><strong>ScrapeLLM:</strong> for AI visibility tracking — see &ldquo;AI Providers&rdquo; below</li>
+          <li><strong>Other sites in the link network:</strong> only if you joined the network — see &ldquo;Link Network&rdquo; below</li>
+          <li><strong>Meta (Facebook / Instagram):</strong> for targeted advertising, and for a report of a
+          completed signup sent from our server — see the Meta Advertising section below. For those conversion
+          events Meta does not process data on our behalf: it is a joint controller with us, as that section
+          explains.
+          Data we receive from Google APIs is never shared with Meta or used for advertising</li>
+          <li>When required by law</li>
+        </ul>
+      </section>
 
-            <section>
-              <h2 className="text-2xl font-bold text-slate-900 mt-8 mb-4">Information Sharing</h2>
-              <p>We do not share your personal information with third parties, except:</p>
-              <ul className="list-disc list-inside space-y-2">
-                <li><strong>Shopify:</strong> for payment processing for accounts billed through Shopify App Pricing, and for publishing content to a connected store</li>
-                <li><strong>PayPal:</strong> for payment processing for website-billed customers only</li>
-                <li><strong>Supabase:</strong> for secure data storage</li>
-                <li><strong>Serper:</strong> for Google search queries</li>
-                <li><strong>Vercel:</strong> for site hosting</li>
-                <li><strong>Meta (Facebook / Instagram):</strong> for targeted advertising — see the Meta Advertising section below</li>
-                <li>When required by law</li>
-              </ul>
-            </section>
+      <section>
+        <h2>Data We Receive from Google</h2>
+        <p>
+          Go Top SEO can connect to your Google account in three optional ways. Each one asks for its own
+          permission on Google&rsquo;s consent screen, and we request only the access described here.
+        </p>
 
-            <section>
-              <h2 className="text-2xl font-bold text-slate-900 mt-8 mb-4">Data Security</h2>
-              <p>
-                We use SSL/TLS encryption for all communication. Your passwords are stored encrypted via Supabase Auth.
-                We maintain high data security standards, but we cannot guarantee 100% security.
-              </p>
-            </section>
+        <h3>Sign in with Google</h3>
+        <p>
+          If you choose &ldquo;Continue with Google&rdquo;, Google shares your name, email address and profile picture
+          with us through Supabase Auth. We use them only to create your account and sign you in.
+        </p>
 
-            <section>
-              <h2 className="text-2xl font-bold text-slate-900 mt-8 mb-4">Your Rights</h2>
-              <p>Under applicable privacy law, you have the right to:</p>
-              <ul className="list-disc list-inside space-y-2">
-                <li>Access your personal data</li>
-                <li>Correct inaccurate data</li>
-                <li>Delete your account</li>
-                <li>Object to certain processing</li>
-                <li>Request data portability</li>
-              </ul>
-              <p className="mt-4">To exercise these rights, contact us at:</p>
-              <p className="mt-2">
-                <strong>Email:</strong>{' '}
-                <a href="mailto:oren@gotop.co.il" className="text-blue-600 hover:underline">
-                  oren@gotop.co.il
-                </a>
-              </p>
-              <p>
-                <strong>Phone:</strong>{' '}
-                <a href="tel:0549489377" className="text-blue-600 hover:underline">
-                  054-9489377
-                </a>
-              </p>
-            </section>
+        <h3>Google Search Console</h3>
+        <p>
+          Permission: read-only access to Search Console (<strong>webmasters.readonly</strong>). We never ask for
+          permission to change anything in your Search Console account.
+        </p>
+        <ul>
+          <li><strong>What we read:</strong> the list of Search Console properties your Google account can access, so
+          you can choose one for each project; and, for the property you choose, its search performance data: search
+          queries and pages with their clicks, impressions, click-through rate and average position, and the
+          property&rsquo;s totals.</li>
+          <li><strong>What we store:</strong> the property assigned to each project and your permission level on it,
+          and the performance data of each sync (the last 28 and 90 days). Data is synced when you press sync and
+          automatically about once a week.</li>
+          <li><strong>How we use it:</strong> to show you your site&rsquo;s search performance, to find content
+          opportunities, to include search figures in your reports, and to suggest article topics. For topic
+          suggestions, search queries from this data may be sent to Google&rsquo;s Gemini model (see &ldquo;AI
+          Providers&rdquo; below).</li>
+        </ul>
 
-            <section>
-              <h2 className="text-2xl font-bold text-slate-900 mt-8 mb-4">Cookies</h2>
-              <p>We use cookies for essential purposes:</p>
-              <ul className="list-disc list-inside space-y-2">
-                <li><strong>Session cookies:</strong> for secure server communication and session management</li>
-                <li><strong>Analytics cookies:</strong> for site usage analysis via Google Analytics and Google Tag Manager</li>
-              </ul>
-              <p className="mt-4">By continuing to use the site, you agree to the use of cookies as described above.</p>
-            </section>
+        <h3>Google Business Profile (Posts on Google Maps)</h3>
+        <p>
+          Permission: <strong>business.manage</strong>, requested in a separate consent only when you connect this
+          feature. Google offers no narrower permission that allows creating posts.
+        </p>
+        <ul>
+          <li><strong>What we read:</strong> the Business Profile accounts you manage and their business locations:
+          business name, address, website and Google Maps link.</li>
+          <li><strong>What we store:</strong> the location you choose for a project (its Google identifiers, name,
+          address, website and Maps link), and each post you create: its text, button, photo, scheduled time, and
+          Google&rsquo;s post identifier, link and review status.</li>
+          <li><strong>What we do with it:</strong> we create a post when you press publish, at the time you
+          scheduled it, or &ndash; <strong>if you turned automatic posting on</strong> &ndash; each time the system
+          publishes an article to your site, and then read that post back from Google to show you whether it is
+          live. We do not change your business information.</li>
+          <li><strong>Automatic posting:</strong> off by default. If you turned it on, every article the system
+          publishes to your site is also published as a post on your business listing, <strong>without you reading
+          it first</strong>. What is sent to the model is the business name, the article&rsquo;s title and its
+          summary, with no person&rsquo;s name. An automatic post is written in the project&rsquo;s language. You can turn it off at any time, and it turns itself off if you
+          change the business the project is connected to.</li>
+          <li><strong>Reviews:</strong> when you open the reviews screen we read your business&rsquo;s reviews from
+          Google: the reviewer&rsquo;s display name (or &ldquo;anonymous&rdquo;), the rating, the text, the times
+          and any existing reply. <strong>We store no review content</strong> &ndash; not the text, not the
+          reviewer&rsquo;s name, not the rating and not the reply. We keep two timestamps only, so we can mark a
+          review you have not seen yet. The reviewer&rsquo;s profile photo is not read.</li>
+          <li><strong>Replying to a review:</strong> a reply is published in your name only after you wrote or
+          approved it and pressed send, <strong>and it is public: it appears on your Google business listing and
+          anyone can see it</strong>. You can edit or delete it from the same screen. Google may remove a reply
+          under its own content policies, which is not something we control.</li>
+          <li><strong>AI drafts:</strong> if you ask for a draft, the business name and the article or topic you
+          chose are sent to Google&rsquo;s Gemini model. If you ask for a draft reply to a review, the
+          review&rsquo;s text and its rating are sent too, <strong>without the reviewer&rsquo;s name</strong>. A
+          draft you asked for is not published until you review it and press publish. The one thing published
+          without being read is a post created by automatic posting, if you turned it on.</li>
+          <li><strong>An AI photo for a post:</strong> if you ask for a photo for a post written from a topic,
+          only the topic you wrote is sent to Google&rsquo;s Gemini model, <strong>without the business name and
+          without any person&rsquo;s name</strong>. The photo comes back to your screen, and we do not store it
+          until you choose it and publish the post.</li>
+        </ul>
 
-            <section>
-              <h2 className="text-2xl font-bold text-slate-900 mt-8 mb-4">Analytics &amp; Marketing Services</h2>
-              <p>We use the following services for user behavior analysis and marketing channel management:</p>
-              <ul className="list-disc list-inside space-y-2">
-                <li><strong>Google Analytics:</strong> to analyze traffic and acquisition channels</li>
-                <li><strong>Google Tag Manager:</strong> to manage tags and analyze user composition</li>
-              </ul>
-              <p className="mt-4">
-                These cookies do not personally identify you and are used to improve user experience and the service.
-              </p>
-            </section>
+        <h3>Limited Use</h3>
+        <p>
+          Go Top SEO&rsquo;s use and transfer of information received from Google APIs to any other app will
+          adhere to the{' '}
+          <a href="https://developers.google.com/terms/api-services-user-data-policy" target="_blank" rel="noopener noreferrer">
+            Google API Services User Data Policy
+          </a>
+          , including the Limited Use requirements. In particular:
+        </p>
+        <ul>
+          <li>We use Google user data only to provide the features described above, which you see and use in the app.</li>
+          <li>We do not sell Google user data, and we do not use or transfer it for advertising, including
+          retargeting and personalised or interest-based ads.</li>
+          <li>We do not use Google user data to develop, improve or train generalised AI or machine-learning models.
+          We send parts of it to an AI provider only to produce the result you asked for, as described in
+          &ldquo;AI Providers&rdquo; below.</li>
+          <li>We do not allow people to read this data, unless you give us permission (for example, when you ask
+          for support), it is necessary for security purposes such as investigating abuse, it is required to comply
+          with applicable law, or the data is aggregated and anonymised for internal operations.</li>
+        </ul>
 
-            <section>
-              <h2 className="text-2xl font-bold text-slate-900 mt-8 mb-4">Meta Advertising (Facebook / Instagram)</h2>
-              <p>
-                We use the Meta Pixel (Facebook Pixel) to run advertising campaigns on Facebook and Instagram. The Pixel
-                allows us to measure conversion events (such as completing a signup), build custom audiences, and show
-                relevant ads to people who have visited our site.
-              </p>
-              <p className="mt-4">Information that may be collected and sent to Meta includes:</p>
-              <ul className="list-disc list-inside space-y-2">
-                <li>Browsing data and pages visited on our site</li>
-                <li>Conversion events (such as registering for the service)</li>
-                <li>IP address and browser technical information</li>
-                <li>Information collected via Meta cookies</li>
-              </ul>
-              <p className="mt-4">
-                This use is subject to the privacy policy of Meta Platforms, Inc., available at{' '}
-                <a href="https://www.facebook.com/privacy/policy/" target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline">
-                  facebook.com/privacy/policy
-                </a>
-                {'. '}
-                You can opt out of personalised advertising through your Facebook account&rsquo;s privacy settings.
-              </p>
-            </section>
+        <h3>How We Protect Google Data</h3>
+        <ul>
+          <li>The Google OAuth refresh tokens that let us access Search Console and Business Profile are encrypted
+          with AES-256-GCM before we store them, and are decrypted only on our servers at the moment of use. We do
+          not store access tokens.</li>
+          <li>Google data is stored in our Supabase database, and the app shows it only to your own account.</li>
+        </ul>
 
-            <section>
-              <h2 className="text-2xl font-bold text-slate-900 mt-8 mb-4">Contacting Us via WhatsApp</h2>
-              <p>
-                Our site and services may offer an option to contact us via WhatsApp. When a user chooses to contact us
-                through WhatsApp, we may receive and process the information provided as part of that contact, including
-                name, phone number, the content of the messages, files or images sent to us at the user&rsquo;s initiative,
-                and any additional contact details shared during the conversation.
-              </p>
-              <p className="mt-4">
-                The information provided to us via WhatsApp will be used to respond to the inquiry, provide service and
-                support, handle requests, document inquiries, improve the service, maintain information security and
-                protect our rights, as well as to comply with legal requirements where necessary.
-              </p>
-              <p className="mt-4">
-                Use of WhatsApp is also subject to the terms of use and privacy policy of WhatsApp and/or Meta, and we
-                recommend reviewing them before using this channel. Please do not send us, via WhatsApp, sensitive
-                information that is not required to handle your inquiry, including passwords, full payment details, medical
-                information, identification documents or other sensitive personal information, unless you have been
-                expressly asked to do so for a defined purpose.
-              </p>
-              <p className="mt-4">
-                We may retain the correspondence records for as long as necessary for the purposes of providing the
-                service, handling inquiries, documentation, monitoring, legal defense and compliance with the law. Users
-                may contact us to request access to, correction of, or deletion of the personal information they provided,
-                subject to applicable law and this privacy policy.
-              </p>
-            </section>
+        <h3>Disconnecting, Retention and Deletion</h3>
+        <ul>
+          <li><strong>Search Console:</strong> &ldquo;Disconnect property from project&rdquo; removes the property
+          from that project and stops syncing it. &ldquo;Revoke Google access for the whole account&rdquo; is
+          available once no project uses the connection: it asks Google to revoke our access and deletes the stored
+          token. In both cases, data already synced is kept.</li>
+          <li><strong>Business Profile:</strong> &ldquo;Disconnect&rdquo; asks Google to revoke our access and
+          deletes the stored token and the saved business location. Your post history stays in the app, and
+          published posts stay on Google until you remove them there.</li>
+          <li><strong>Retention:</strong> synced Search Console data and your post history are kept for as long as
+          your account exists, unless you ask us to delete them.</li>
+          <li><strong>Deletion:</strong> to delete your account or the Google data stored with it, email us at{' '}
+          <a href="mailto:oren@gotop.co.il">oren@gotop.co.il</a>.</li>
+          <li><strong>Revoking access at Google:</strong> you can also remove our access at any time at{' '}
+          <a href="https://myaccount.google.com/permissions" target="_blank" rel="noopener noreferrer">
+            myaccount.google.com/permissions
+          </a>
+          . After that we can no longer read from or post to your Google account. Data we already stored stays
+          until you disconnect in the app or ask us to delete it.</li>
+        </ul>
+      </section>
 
-            <section>
-              <h2 className="text-2xl font-bold text-slate-900 mt-8 mb-4">Updates to This Policy</h2>
-              <p>
-                We may update this policy from time to time. Changes take effect immediately upon publication. We encourage you
-                to review this policy regularly.
-              </p>
-            </section>
+      <section>
+        <h2>Site Scanning (Free Check and Onboarding Scan)</h2>
+        <p>
+          In the free site check, which you can run before signing up, and in the onboarding scan after a project
+          is created, we access the site address you entered and read public pages on it, and its robots.txt,
+          sitemap and llms.txt files. Reading is done without signing in, without cookies and without access to
+          protected areas, and the onboarding scan reads a page only if robots.txt allows it.
+        </p>
+        <ul>
+          <li><strong>What we store:</strong> the site address, the findings derived from the pages (such as
+          titles, descriptions, site structure and SEO signals), and a business summary generated from them. The result of a free check is also
+          stored so it can be shown again and to limit misuse of the check.</li>
+          <li><strong>How we use it:</strong> to show you the findings, to tailor the Service to your site and to
+          suggest topics and fixes. Some of the text may be sent to Google&rsquo;s Gemini model to produce the
+          summary (see &ldquo;AI Providers&rdquo;).</li>
+          <li><strong>Deletion:</strong> you can email us to ask for stored results to be deleted.</li>
+        </ul>
+      </section>
 
-            <section>
-              <h2 className="text-2xl font-bold text-slate-900 mt-8 mb-4">Contact</h2>
-              <p>If you have questions about this privacy policy, please contact:</p>
-              <p className="mt-2">
-                <strong>Email:</strong>{' '}
-                <a href="mailto:oren@gotop.co.il" className="text-blue-600 hover:underline">
-                  oren@gotop.co.il
-                </a>
-              </p>
-              <p>
-                <strong>Phone:</strong>{' '}
-                <a href="tel:0549489377" className="text-blue-600 hover:underline">
-                  054-9489377
-                </a>
-              </p>
-            </section>
+      <section>
+        <h2>WordPress Connection and the GO TOP SEO Bridge Plugin</h2>
+        <p>
+          There are two ways to connect a WordPress site, and what we store depends on which you use. If you
+          connect with a username and Application Password, we store the site address, both of those, and the
+          signing key that authenticates requests between us and the plugin. If you connect with a pairing code
+          from the plugin alone, the site address and that signing key are all we store, and there is no password
+          of yours in our records. Anything stored is encrypted and decrypted only on our servers at the moment
+          of use.
+        </p>
+        <p className="mt-4">
+          What the GO TOP SEO Bridge plugin does on the site, with your consent, is this and nothing else:
+        </p>
+        <ul>
+          <li><strong>Fixes you approve,</strong> one by one, from a closed list: SEO title, meta description,
+          canonical address, focus keyphrase, image alt text, an FAQ block, JSON-LD schema, internal links,
+          repair of broken links, demotion of a duplicate H1 heading, and creating llms.txt. If you turned on
+          automatic approval for the three kinds of fix described in the Terms of Service, fixes of those kinds
+          are applied without asking you each time.</li>
+          <li><strong>Articles you publish.</strong> An article you approve in GO TOP is created as a post on
+          your site, as the author you choose there, or as another author you pick for that article from the
+          list of people allowed to publish on the site. The publish can be scheduled for a future date, and a
+          second, separate post can be made for the same article. If GO TOP recorded a particular post on your
+          site for an article, the plugin can update that post even when it was not the plugin that created it
+          &mdash; a post GO TOP published earlier with the application password, for instance. That post is always
+          one GO TOP published itself, and this applies only to the one post recorded for that article, never to
+          another post, a page, a post in the trash, or a post belonging to a different article. <strong>The publish itself also writes that
+          article&rsquo;s own SEO title, meta description, focus keyphrase and JSON-LD schema</strong>, through the same signed
+          route and without a separate approval for each of them, because they are part of the publish you
+          approved. If an article we published for you is left without an SEO title or without a meta description, we may fill in the missing field on that same article later, through the same signed route and without a further approval, as the completion of that publish. We never replace a value that already exists, and we do not touch other pages or other fields.</li>
+          <li><strong>The images belonging to those articles.</strong> Your site downloads them from our file
+          storage into its own Media Library, and from that point they are files on your site. Your site accepts
+          them only from our storage address and refuses any other.</li>
+          <li><strong>Reading what is on the site,</strong> so we can show you a page and what a fix would
+          change, build the content index, scan the internal links and assemble the site map. The plugin returns
+          these to us:
+          <ul>
+            <li>the contents of one post or page: its title, address, content as WordPress displays it,
+            headings and SEO fields;</li>
+            <li>the list of the site&rsquo;s published posts and pages, each with its id, type, address, slug,
+            title, publication date, last modified date and the focus keyphrase recorded for it in the SEO
+            plugin. A post or page that is not published, or is password protected, is not included, and
+            products are never included;</li>
+            <li>the categories, tags and product categories: name, slug, address and item count;</li>
+            <li>the matches for a word searched in the published posts and pages, with the address and title of
+            each; we use this to find the page an internal link should point at.</li>
+          </ul></li>
+          <li><strong>Who is allowed to publish on the site,</strong> so you can choose whose name an article is
+          published under: the plugin returns the id and display name of each user allowed to publish posts, and
+          the id of the default author. We do not receive their e-mail address, username, roles or any other
+          detail about them, and the list is used only for choosing an author.</li>
+          <li><strong>The Media Library.</strong> We can ask your site to find an image by a word in its file
+          name, title or slug, and it answers, for each image found, with its id, the address of the file and of
+          its resized copies, its alt text and its title. When you approve an alt-text fix for such an image,
+          the plugin writes it on the image itself in the Media Library, and undoing the fix deletes what was
+          written. We do not touch the image file, its name or its caption.</li>
+          <li><strong>What needs an Application Password.</strong> From version 3.1.0 of the plugin onwards,
+          nothing does: everything described here goes through the plugin. There is one case in which an
+          application password we still hold from an earlier connection is used although the plugin is
+          installed: when the plugin refuses to update the post recorded for an article because it is not a
+          post it may take over, we update that post with the application password, and if we hold no such
+          password the update does not happen. On a site running an earlier version
+          of the plugin, forcing a new post, scheduled publishing, and the scan of the site&rsquo;s existing
+          posts and the refresh of their index still go through the application password, and if we hold no such
+          password those actions do not happen and you are told so, rather than our trying another way.</li>
+        </ul>
+        <p>
+          On a site
+          without the plugin, the fixes WordPress&rsquo;s REST interface allows are written with the application
+          password we stored, under the same approvals and into the same log. Alt text for an image a
+          page shows outside its own text is written on the image itself in the media library &mdash; through the
+          plugin where it is installed, or with the application password on a site without it &mdash; so it applies
+          on every page that shows it; we do not touch the image file, its name or its caption.
+        </p>
+        <ul>
+          <li><strong>Fix log:</strong> every fix is recorded in our log with who approved it, the time it was
+          applied, the IP address the approval was given from, and the previous and the new value, so that it can
+          be shown and undone and so that we have evidence that the write to the site was made with your
+          approval. The log is kept as long as the project exists.</li>
+          <li><strong>Automatic approval of fixes:</strong> if you turned on automatic approval in a project, for
+          the three types of fix described in the Terms of Use, we keep a separate record of that: who turned it
+          on, when, the IP address it was turned on from, and after it is turned off also who turned it off and
+          when. A fix applied under automatic approval is recorded in the fix log with the time it was applied, the
+          person who turned the approval on and the IP address recorded when it was turned on, and is marked as an
+          automatic fix. At the moment the fix itself is applied we do not read and do not store a new IP address,
+          because no person acted then and we do not need it. A summary of the automatic fixes is shown on the Site
+          health screen and we do not send an email about it. The records are kept as long as the project
+          exists.</li>
+          <li><strong>Disconnecting and removal:</strong> &ldquo;Disconnect&rdquo; deletes the stored connection
+          details and the signing key, after which we can no longer reach the site. You can also remove the plugin
+          from your WordPress admin at any time. Fixes already applied stay on the site unless you undid them.</li>
+          <li><strong>What we do not do:</strong> we do not delete content, and we do not touch your site&rsquo;s
+          prices, products, theme, other plugins, settings or users.</li>
+        </ul>
+      </section>
 
-            <section>
-              <p className="text-slate-500 text-sm mt-8 pt-8 border-t border-slate-200">
-                This policy was last updated in June 2026
-              </p>
-            </section>
-          </div>
-        </div>
-      </div>
-      <Footer locale="en" />
-    </div>
+      <section>
+        <h2>Connecting a Site on Another Platform</h2>
+        <p>
+          Besides WordPress, you can connect a Shopify store, a Wix site, or a site on any other platform
+          through an endpoint you configure. Each connection is optional and is made by you.
+        </p>
+        <ul>
+          <li><strong>Shopify:</strong> installing the app in your store lets us read the store&rsquo;s content,
+          products and pages, and publish articles to the store blog, within the permissions you approved at
+          installation. With your approval of each fix, we also write site fixes to the store&rsquo;s articles and
+          pages. The approval itself is recorded in a log: who approved it, when, the IP address the approval was
+          given from, and the previous and the new value — so that we can show you what was done, so that a fix
+          can be undone, and so that we have evidence that the write to your store was made with your approval.
+          The log is kept for as long as the project exists. The store&rsquo;s access token
+          is stored encrypted. Removing the app from the store revokes the access.</li>
+          <li><strong>Wix:</strong> the connection uses an API key you issue in your own account, and is used
+          to read the site&rsquo;s content and publish articles to its blog. We send Wix the article&rsquo;s
+          content and its publishing details, and no other account data. The key is stored encrypted, is never
+          shown again after saving, and is deleted when you disconnect. You can revoke it on the Wix side at
+          any time.</li>
+          <li><strong>Webhook:</strong> the Service sends the article to the endpoint you configured, in a
+          signed request. The endpoint is yours, so what happens to the article once it arrives is under your
+          control. The signing secret is stored encrypted, is never shown again after saving, and is deleted
+          when you disconnect.</li>
+          <li><strong>Errors:</strong> if publishing fails we store an internal error code only. We do not
+          store or display the provider&rsquo;s or your server&rsquo;s own error text.</li>
+        </ul>
+      </section>
+
+      <section>
+        <h2>Turning an Address into Coordinates</h2>
+        <p>
+          To track rankings from an exact point you can type an address instead of coordinates. When you do, we
+          send the address you typed and the project&rsquo;s country name to OpenStreetMap&rsquo;s
+          <strong> Nominatim</strong> service to get coordinates back. We do not send your name, your email
+          address or any other account details. The address and the coordinates returned are stored with us as
+          the tracking target&rsquo;s definition, and you can change or delete them in the target&rsquo;s
+          settings. OpenStreetMap is operated by the OpenStreetMap Foundation, and the Nominatim service has
+          its own usage and privacy policy.
+        </p>
+      </section>
+
+      <section>
+        <h2>Converting a Report to PDF</h2>
+        <p>
+          When you ask to download a report as a PDF, we send the report&rsquo;s content as displayed to the
+          <strong> PDFShift</strong> service, which returns the file to us. This happens only when you pressed
+          to download a report, never on a regular or scheduled basis, and the content is sent for the
+          conversion alone.
+        </p>
+        <p>
+          We have a data processing agreement with PDFShift under Article 28 of the GDPR. Under its annex,
+          the content we send is processed in memory for the duration of the conversion alone and is not
+          retained afterwards. PDFShift offers optional storage of the generated file, and we do not ask for
+          it. Its servers and storage are in France, and its error-monitoring provider is in the United
+          States under the EU-US Data Privacy Framework and the standard contractual clauses.
+        </p>
+      </section>
+
+      <section>
+        <h2>Link Network</h2>
+        <p>
+          Joining the link network is optional, is done for each project separately, and is off by default.
+          Whoever joins agrees to both directions: that a link from their articles may point to another network
+          member&rsquo;s site, and that links to their site may be placed in other members&rsquo; articles. A
+          connected Shopify store can join as well, and the links are placed only inside articles the Service
+          writes and publishes to the store&rsquo;s blog. For such a store, ownership of the domain is taken from
+          the connection itself: the store&rsquo;s myshopify address and its primary domain, as Shopify reported
+          them at installation.
+        </p>
+        <ul>
+          <li><strong>What we store:</strong> who accepted the joining, when, the wording of the terms accepted and
+          the link type, and each placement made, on both sides.</li>
+          <li><strong>What another member sees:</strong> the Company does not publish a member list. The receiving
+          side sees the address of the site that links to it and, once published, the page where the link
+          appeared. A published link is a public link on the site.</li>
+          <li><strong>Leaving:</strong> you can leave the network at any time. Leaving stops new placements; links
+          already published stay unless you remove them from your site, and placements stay in the log.</li>
+        </ul>
+      </section>
+
+      <section>
+        <h2>Partner Program</h2>
+        <p>
+          The partner program is for people who recommend the Service and receive a commission for customers who
+          join through them. Taking part is voluntary, every application is reviewed by a person, and none of this
+          applies to you unless you apply.
+        </p>
+        <ul>
+          <li><strong>When you apply:</strong> the application reaches us from this site, by email or through the application form, and what we receive is
+          what you filled in: your name, your email address, a description of the audience you intend to promote
+          to, and optionally a phone number, a website and a country. We ask for no payout details at this stage,
+          because we do not want to hold the bank details of someone we may refuse. When the application comes through the form we also record the
+          IP address it was sent from, for two purposes and no others: telling a ring of fake applications from a
+          real agency, and limiting three applications an hour from one address. It cannot be changed once
+          recorded. <strong>A rejected application is deleted in full after 12 months, and in every other case the
+          IP address is deleted after 12 months</strong> while the record itself stays.</li>
+          <li><strong>While you are a partner:</strong> we store your contact details, your referral code, the
+          payout details you give us, the number of clicks on your link as one daily total, the
+          accounts that opened through it, the qualifying payments and the commission calculated on them, the
+          payouts made to you, and the invoices and tax certificates the law requires us to keep. A referral may
+          carry a flag for human review &mdash; when the email address on your application is the one that signed
+          up, or when the new account is on your own website&rsquo;s domain. Such a flag asks a person to look
+          before any commission is approved; it blocks nothing by itself.</li>
+          <li><strong>What a partner sees about the people they referred:</strong> nothing personal. A partner sees
+          counts and amounts. A partner does not receive the email address, the website, the plan or the identity of
+          any customer they referred.</li>
+          <li><strong>Paying commission:</strong> the provider the partner chooses &mdash; PayPal, Wise or a bank
+          transfer &mdash; receives the details it needs in order to pay. Invoices and withholding certificates are
+          kept for seven years, as Israeli bookkeeping rules require.</li>
+          <li><strong>Crediting a referral:</strong> the partner&rsquo;s code travels in the link itself. We
+          set no cookie for the program and store nothing on your device, so what you choose about cookies does
+          not affect it in either direction. If we ever credit a visit that comes back later, which would mean
+          storing something, this policy will say so and your consent will be asked first. <strong>What is
+          recorded when a visitor follows a partner link is a count: one added to that partner&rsquo;s daily
+          total, and that is the whole record</strong> &mdash; no IP address, no browser, no site you came from,
+          no identifier of any kind. The crediting itself is done from the code carried in the page address, read
+          once at the moment the account is created.</li>
+        </ul>
+        <p className="mt-4">
+          As of the date of this policy the program runs like this: an application is sent from this site, by email or in the form, and is
+          approved by a person; an approved partner has a code and a link; clicks are counted as a daily total per
+          partner; a new account that signs up with a code is credited to that partner once and for ever; a
+          commission is recorded on each payment actually received, held for 30 days, which is the refund window,
+          and approved by a person; and the payout itself is made by hand against a reference.{' '}
+          <strong>A customer billed through Shopify produces no automatic commission</strong>, because Shopify
+          tells us a plan is active rather than that a charge was taken; such a commission is recorded by hand, at
+          the same rate. The terms themselves are in the{' '}
+          <a href="/en/affiliate-terms">Partner Program Agreement</a>, which also requires a partner to say openly
+          that they are paid.
+        </p>
+      </section>
+
+      <section>
+        <h2>An Author Photo You Upload</h2>
+        <p>
+          If you upload a photo for an author box, the file is kept in a dedicated storage bucket of ours
+          for as long as the photo is configured on the project. Its path is made of the project id and a
+          random id, and never of a person&rsquo;s name. We do not publish our copy and the article does not link to it.
+        </p>
+        <p>
+          When the article is published, the photo is copied into your site&rsquo;s media library, and the
+          article links to that copy. From then on the photo is visible to anyone who visits your site,
+          like any other image in an article. The upload is offered only on a project where that copy can
+          be made.
+        </p>
+        <p>
+          The photo is not sent to any AI provider, is not used to train models, and we do not run face
+          recognition or any other biometric processing on it.
+        </p>
+        <p>
+          Deleting the photo, or switching to no photo or to the site icon, erases the file from our
+          storage. Turning the whole author box off does not erase the photo: it is kept until you delete
+          it or choose another option. A copy already placed on your site is not under our control, and
+          only whoever administers that site can delete it there.
+        </p>
+        <p>
+          As to the person in the photo, the customer who uploaded it decides what it is used for, and we
+          process the file for them. If you are the person in the photo and not the customer who uploaded
+          it, write to us at the address at the end of this policy: we will erase the file from our
+          storage and approach the customer so that the copy on the site is taken down, but we cannot
+          ourselves delete content on a customer&rsquo;s site.
+        </p>
+      </section>
+
+      <section>
+        <h2>AI Providers</h2>
+        <p>Some features send data to the following AI services to produce the result you asked for:</p>
+        <ul>
+          <li><strong>Google Gemini (Gemini API):</strong> generates article topic ideas, questions, articles, images, and
+          Google Business Profile post drafts. We send the details a request needs, such as your business name,
+          website, keywords and topics and, as described above, Search Console search queries and your Business
+          Profile name.</li>
+          <li><strong>ScrapeLLM:</strong> for AI visibility tracking, sends questions built from your business name,
+          location and tracked keywords to AI assistants (ChatGPT, Perplexity, Gemini, Microsoft Copilot, Grok and
+          Google AI Mode) and returns their answers to us. It does not receive data from your Google account. In addition to checks you start
+          yourself, an automatic monthly check runs for the project; it counts toward your plan&rsquo;s allowance of checks
+          and can be turned off on the &ldquo;AI Visibility&rdquo; screen, in the &ldquo;Automatic monthly check&rdquo; card.</li>
+        </ul>
+      </section>
+
+      <section>
+        <h2>Email Messages</h2>
+        <p>
+          We send email through the sending provider Resend, which receives your email address and the content of the
+          message in order to deliver it.
+        </p>
+        <ul>
+          <li><strong>Account and service messages:</strong> sign-up, verification, billing and updates about using the
+          Service.</li>
+          <li><strong>Reminders:</strong> when content is waiting for your approval, a reminder may be sent. Every
+          reminder has a one-click unsubscribe link, with no sign-in needed, and unsubscribing stops these reminders.
+          Your preference is stored with us.</li>
+          <li><strong>Setup emails:</strong> if you opened a project and have not connected a site to it, or connected
+          one and nothing has been published on it, we may send up to two emails explaining how to finish the step and
+          linking to the matching screen in the app. <strong>They carry no offer, no price, no discount and no
+          upgrade</strong> &mdash; they carry a link to the in-app guide, the WhatsApp number and an unsubscribe link.
+          No third one is sent, and we send no more than one email about the same project within 72 hours.</li>
+          <li><strong>Weekly summary:</strong> a summary of the project, for projects where you turned it on in the
+          settings. The summary goes out on Sunday morning, <strong>and only when there is something to say; a week
+          with nothing in it gets no email.</strong> A section we could not read is left out of the email rather than
+          reported as a zero, so the email never states a number we did not measure.</li>
+        </ul>
+        <p className="mt-4">
+          <strong>Unsubscribing, as narrowly as you asked.</strong> The unsubscribe link in a setup email stops the
+          setup emails only, and the page it leads to tells you plainly that the reminders and the weekly summary keep
+          coming, and offers one click to stop those too. The unsubscribe link in a reminder or in the weekly summary
+          stops every email about that project. Turning the project&rsquo;s email switch back on in the settings clears
+          any such stop, so the switch you see in the settings is the whole picture.
+        </p>
+        <p className="mt-4">
+          <strong>We do not measure what you did with the email.</strong> Our messages carry no pixel that reports an
+          open, we do not track clicks, and we do not rewrite the links inside them to route you through us.
+        </p>
+      </section>
+
+      <section>
+        <h2>How We May Contact You About a Free Check</h2>
+        <p>
+          If you ran a free check on a website, we may get in touch about it. By email, only to the address
+          you gave us and only as far as the boxes you ticked allow: the report you asked for, and updates or
+          marketing content only if you agreed to those on their own separate box.
+        </p>
+        <p>
+          We may also contact the business whose website was checked, using contact details that business
+          publishes on its own site &mdash; a phone number or a general address. We do that on our legitimate
+          interest in offering a service to a business that looks like a fit (GDPR Art. 6(1)(f)), not on your
+          consent, and those details come from the site itself rather than from anything you gave us. When we
+          call, we say who we are and where we got the number.
+        </p>
+        <p>
+          You can tell us to stop at any time and by any channel, and we stop &mdash; by email, by phone, in
+          every language. For direct marketing that is an absolute right (GDPR Art. 21(2)), it costs you
+          nothing, and we record it so a later list cannot undo it.
+        </p>
+      </section>
+
+      <section>
+        <h2>Data Security</h2>
+        <p>
+          We use SSL/TLS encryption for all communication. Your passwords are stored encrypted via Supabase Auth.
+          We maintain high data security standards, but we cannot guarantee 100% security.
+        </p>
+      </section>
+
+      <section>
+        <h2>Your Rights</h2>
+        <p>Under applicable privacy law, you have the right to:</p>
+        <ul>
+          <li>Access your personal data</li>
+          <li>Correct inaccurate data</li>
+          <li>Delete your account</li>
+          <li>Object to certain processing</li>
+          <li>Request data portability</li>
+        </ul>
+        <p className="mt-4">To exercise these rights, contact us at:</p>
+        <p className="mt-2">
+          <strong>Email:</strong>{' '}
+          <a href="mailto:oren@gotop.co.il">
+            oren@gotop.co.il
+          </a>
+        </p>
+        <p>
+          <strong>Phone:</strong>{' '}
+          <a href="tel:0549489377">
+            054-9489377
+          </a>
+        </p>
+      </section>
+
+      <section>
+        <h2>Cookies</h2>
+        <p>We sort cookies into three categories, and we ask you about two of them before they load:</p>
+        <ul>
+          <li><strong>Strictly necessary:</strong> signing in, remembering your interface language,
+          security and abuse prevention. The service cannot run without them, so they need no consent.</li>
+          <li><strong>Measurement:</strong> how many people visited, which pages they read and what
+          did not work. Loaded only if you allow it.</li>
+          <li><strong>Marketing:</strong> measuring how our ads perform and showing relevant ads on
+          the Google and Meta networks. Loaded only if you allow it. Allowing this category also covers
+          a conversion report we send to Meta from our server with no cookie at all — see the Meta
+          Advertising section.</li>
+        </ul>
+        <p className="mt-4">
+          <strong>Before you choose, no measurement or marketing cookie is set and no request is
+          made to Google&rsquo;s servers.</strong>{' '}
+          Accepting and refusing are two equal buttons on the notice, and each category can be
+          allowed on its own.
+        </p>
+        <p className="mt-4">
+          <strong>Changing or withdrawing your consent:</strong> at any time, through the
+          &ldquo;Cookie settings&rdquo; link at the bottom of every page. Withdrawing is exactly as
+          easy as giving consent, and costs you nothing in the service.
+        </p>
+        <p className="mt-3">
+            <strong>The partner program:</strong> it sets no cookie at all. If you reach the site through a
+          partner link, that partner&rsquo;s code is carried in the link itself and nothing is written to your
+          device, which is why the program does not appear among the categories above and why your choice on
+          this notice neither helps nor hinders it. A cookie that keeps a partner&rsquo;s code is not strictly
+          necessary for the site to work, so we would have needed your consent for one; we chose not to need it.
+          What is recorded on the click is a count: one added to that partner&rsquo;s daily total, with nothing
+          about you in it.
+        </p>
+        <p className="mt-4">
+          If your browser sends a Global Privacy Control signal, we treat it as a refusal: no
+          measurement or marketing cookies are loaded, and we do not show you the notice.
+        </p>
+        <p className="mt-4">
+          So that we can demonstrate what you chose, we record every decision: what you were shown,
+          what you chose, when, in which language, on which page, and a one-way hash of your IP
+          address. <strong>The IP address itself is not stored in that log.</strong> The log is
+          append-only and cannot be edited or deleted from within the system.
+        </p>
+      </section>
+
+      <section>
+        <h2>Analytics &amp; Marketing Services</h2>
+        <p>
+          Our measurement and marketing tools are managed through Google Tag Manager, which loads
+          only after you have allowed measurement or marketing. The tools that may run through it:
+        </p>
+        <ul>
+          <li><strong>Google Analytics:</strong> traffic and acquisition analysis (subject to measurement consent)</li>
+          <li><strong>Google Ads:</strong> conversion measurement and personalised advertising (subject to marketing consent)</li>
+          <li><strong>Meta Pixel:</strong> conversion measurement and advertising on Facebook and Instagram (subject to marketing consent)</li>
+        </ul>
+        <p className="mt-4">
+          Which tools are active changes from time to time. What does not change: none of them loads
+          before you have allowed its category, and withdrawing your consent stops the collection.
+          Besides these tools, which run in the browser, we send Meta a conversion report from our
+          server; it too is subject to marketing consent and stops when that consent is withdrawn.
+        </p>
+        <p className="mt-4">
+          We declare your consent state to Google through the Consent Mode v2 protocol, so the tools
+          are bound by your choice even if we add a new tag in the future.
+        </p>
+      </section>
+
+      <section>
+        <h2>Meta Advertising (Facebook / Instagram)</h2>
+        <p>
+          We use the Meta Pixel (Facebook Pixel) to run advertising campaigns on Facebook and Instagram. The Pixel
+          allows us to measure conversion events (such as completing a signup), build custom audiences, and show
+          relevant ads to people who have visited our site.
+        </p>
+        <p className="mt-4">Information that may be collected and sent to Meta includes:</p>
+        <ul>
+          <li>Browsing data and pages visited on our site</li>
+          <li>Conversion events (such as registering for the service)</li>
+          <li>IP address and browser technical information</li>
+          <li>Information collected via Meta cookies</li>
+        </ul>
+        <p className="mt-4">
+          This use is subject to the privacy policy of Meta Platforms, Inc., available at{' '}
+          <a href="https://www.facebook.com/privacy/policy/" target="_blank" rel="noopener noreferrer">
+            facebook.com/privacy/policy
+          </a>
+          {'. '}
+          You can opt out of personalised advertising through your Facebook account&rsquo;s privacy settings.
+        </p>
+
+        <h3>A conversion report from our server (Conversions API)</h3>
+        <p>
+          Besides the Pixel that runs in the browser, we report a completed signup to Meta from our
+          server, through an interface called the Conversions API. The report is sent{' '}
+          <strong>only</strong> if you allowed the marketing category on the cookie notice. If you
+          refused, or have not chosen yet, nothing is sent.
+        </p>
+        <p className="mt-4">What that report contains:</p>
+        <ul>
+          <li>the name of the event (a completed signup) and the time it happened</li>
+          <li>a one-time event identifier, so that Meta does not count the same signup twice</li>
+          <li>a one-way hash (SHA-256) of the email address you signed up with</li>
+          <li>a one-way hash, by the same method, of your account identifier with us</li>
+          <li>the address of the page you signed up from, without anything after the question mark</li>
+        </ul>
+        <p className="mt-4">
+          We do not send the email address itself, but the hash does not make the information
+          anonymous: if the same address is also on your Meta account, Meta can match the two and
+          identify you, so we treat this report as personal data in every respect.{' '}
+          <strong>In this report we do not send your IP address, your browser details or any Meta
+          cookie, nor your name or your phone number, and it is sent on a completed signup only,
+          never on a page view.</strong>
+        </p>
+        <p className="mt-4">
+          Withdrawing marketing consent stops future reports immediately. A report already sent we
+          cannot recall, and you can require Meta to delete it directly, through its own rights
+          channel.
+        </p>
+        <p className="mt-4">
+          <strong>Who is responsible for this data:</strong> for the collection and transmission of
+          these conversion events, we and Meta are joint controllers: Meta Platforms Ireland Limited
+          for visitors in the European Economic Area and the United Kingdom, and Meta Platforms, Inc.
+          for everyone else. From
+          the moment the data reaches Meta, Meta is an independent controller for the use it makes of
+          it for its own purposes. You may exercise your rights over this data directly against Meta,
+          and if you come to us we will pass your request on to Meta.
+        </p>
+      </section>
+
+      <section>
+        <h2>Contacting Us via WhatsApp</h2>
+        <p>
+          Our site and services may offer an option to contact us via WhatsApp. When a user chooses to contact us
+          through WhatsApp, we may receive and process the information provided as part of that contact, including
+          name, phone number, the content of the messages, files or images sent to us at the user&rsquo;s initiative,
+          and any additional contact details shared during the conversation.
+        </p>
+        <p className="mt-4">
+          The information provided to us via WhatsApp will be used to respond to the inquiry, provide service and
+          support, handle requests, document inquiries, improve the service, maintain information security and
+          protect our rights, as well as to comply with legal requirements where necessary.
+        </p>
+        <p className="mt-4">
+          Use of WhatsApp is also subject to the terms of use and privacy policy of WhatsApp and/or Meta, and we
+          recommend reviewing them before using this channel. Please do not send us, via WhatsApp, sensitive
+          information that is not required to handle your inquiry, including passwords, full payment details, medical
+          information, identification documents or other sensitive personal information, unless you have been
+          expressly asked to do so for a defined purpose.
+        </p>
+        <p className="mt-4">
+          We may retain the correspondence records for as long as necessary for the purposes of providing the
+          service, handling inquiries, documentation, monitoring, legal defense and compliance with the law. Users
+          may contact us to request access to, correction of, or deletion of the personal information they provided,
+          subject to applicable law and this privacy policy.
+        </p>
+      </section>
+
+      <section>
+        <h2>Legal Basis for Processing</h2>
+        <p>
+          We process personal data only where we have a legal basis for it. Each purpose has its own
+          basis, which is why your options differ from one purpose to the next:
+        </p>
+        <ul>
+          <li><strong>Performance of a contract</strong> (GDPR Art. 6(1)(b)): opening an account,
+          running the subscription, performing scans and checks, generating content and publishing it
+          to the site you connected. Without this there is no service.</li>
+          <li><strong>Consent</strong> (Art. 6(1)(a) and the ePrivacy rules): measurement and
+          marketing cookies, marketing email, and joining the link network. Each is separate, and
+          each can be withdrawn at any time.</li>
+          <li><strong>Legitimate interests</strong> (Art. 6(1)(f)): securing the system, preventing
+          abuse, operational reminders about your own account, and improving the service from
+          aggregate data. You may object to processing on this basis.</li>
+          <li><strong>Legal obligation</strong> (Art. 6(1)(c)): keeping billing records and
+          reporting to the tax authorities.</li>
+        </ul>
+        <p className="mt-4">
+          In Israel we are subject to the Protection of Privacy Law, 5741-1981, including Amendment
+          13, which took effect on 14 August 2025. We are not required to appoint a data protection
+          officer under that amendment, and we are not a data broker: we do not sell personal data to
+          anyone, for any consideration.
+        </p>
+      </section>
+
+      <section>
+        <h2>How Long We Keep Data</h2>
+        <p>We keep data only as long as it is needed for the purpose it was collected for:</p>
+        <ul>
+          <li><strong>Account and the content generated for you:</strong> for the life of the
+          account, and up to 90 days after it is deleted so an accidental deletion can be undone.
+          Then erased.</li>
+          <li><strong>Billing records and invoices:</strong> seven years, as Israeli tax law
+          requires. We have no discretion here, even if you ask for erasure.</li>
+          <li><strong>Connection credentials</strong> (WordPress, Shopify, Search Console): until you
+          disconnect or delete the account, and then erased immediately.</li>
+          <li><strong>Free site check:</strong> cached for up to 24 hours, then erased if no account
+          was opened from it.</li>
+          <li><strong>Cookie decision log:</strong> up to three years from the decision, so that we
+          can demonstrate what you chose. That is the legal basis for keeping it, which is why it is
+          not erased together with the account.</li>
+          <li><strong>Author photo:</strong> for as long as the photo is configured on the project.
+          Deleting it, or switching to no photo or to the site icon, erases the file immediately. A copy
+          already placed on your site stays there until you delete it.</li>
+          <li><strong>Security and server logs:</strong> up to 90 days.</li>
+        </ul>
+      </section>
+
+      <section>
+        <h2>International Transfers</h2>
+        <p>
+          The service runs on international cloud and infrastructure providers, so data may be stored
+          or processed outside your country of residence. The main providers: Vercel (application
+          hosting), Supabase (the database, in the Mumbai region in India), and every other provider listed
+          under &ldquo;Information Sharing&rdquo; above, among them the AI and search providers, the PDF
+          conversion provider and the address lookup service.
+        </p>
+        <p className="mt-4">
+          For data about residents of the European Economic Area, Switzerland or the United Kingdom:
+          Israel has been recognised by the European Commission as providing an adequate level of
+          protection, so a transfer to us requires no further instrument. For transfers to providers
+          outside the EU in countries without an adequacy decision we rely on the European
+          Commission&rsquo;s Standard Contractual Clauses, within those providers&rsquo; own terms.
+        </p>
+        <p className="mt-4">
+          You may ask us which instrument we rely on for a particular transfer, and we will answer in
+          writing.
+        </p>
+      </section>
+
+      <section>
+        <h2>Rights of Residents of the EEA, Switzerland and the UK</h2>
+        <p>
+          If you are in the European Economic Area, Switzerland or the United Kingdom, you also have
+          the following rights under the GDPR and the UK GDPR:
+        </p>
+        <ul>
+          <li><strong>Access</strong> (Art. 15): a copy of the data we hold about you.</li>
+          <li><strong>Rectification</strong> (Art. 16) and <strong>erasure</strong> (Art. 17).</li>
+          <li><strong>Restriction of processing</strong> (Art. 18).</li>
+          <li><strong>Portability</strong> (Art. 20): your data in a structured, machine-readable format.</li>
+          <li><strong>Objection</strong> (Art. 21), including an absolute right to object to marketing.</li>
+          <li><strong>Withdrawal of consent</strong> (Art. 7(3)) at any time, without affecting the
+          lawfulness of processing carried out before it.</li>
+        </ul>
+        <p className="mt-4">
+          We answer within 30 days. We will not charge you and will not degrade your service because
+          you exercised a right.
+        </p>
+        <p className="mt-4">
+          <strong>Right to complain:</strong> if you are not satisfied with our answer, you may
+          complain to the supervisory authority in your country of residence, or to the Israeli
+          Privacy Protection Authority
+          (<a href="https://www.gov.il/en/departments/the_privacy_protection_authority" target="_blank" rel="noopener noreferrer">
+            Privacy Protection Authority
+          </a>). Contacting us first is not a condition of complaining, though we would welcome the
+          chance to put it right.
+        </p>
+      </section>
+
+      <section>
+        <h2>Business Outreach by Email</h2>
+        <p>
+          This section is about someone who received an email from us and is not a customer of
+          ours. If that is you, you gave us nothing and signed up for nothing: we obtained your
+          business&rsquo;s address from public sources, and this section says exactly which, what we
+          hold, and how to take yourself out in one click.
+        </p>
+        <p className="mt-4">
+          <strong>What we collect and from where.</strong> The business&rsquo;s name, its website
+          address, a contact email address shown on the business&rsquo;s own site or in a public
+          business registry, the name of the contact person where the site publishes one next to
+          that address, the postal address the business publishes (a business that publishes no
+          address never enters the list), the country the business operates in, and one finding from an automated check of the site&rsquo;s public
+          pages, with the date it was checked. <strong>We do not buy contact lists and we do not use
+          data brokers.</strong> We do not collect a phone number, we collect nothing about a person
+          beyond the business role they are published in, and we do not enter any part of a site
+          that is not open to every visitor.
+        </p>
+        <p className="mt-4">
+          <strong>For what purpose.</strong> To approach the business once, with an offer of our
+          service, and to explain what we found on its site. It is a marketing approach and we say
+          so in the message itself.
+        </p>
+        <p className="mt-4">
+          <strong>For which countries.</strong> We hold addresses for this purpose only for
+          businesses we have verified, from two independent sources, to be operating in the United
+          States. <strong>We do not hold addresses for this purpose for businesses in Israel, the
+          European Economic Area or the United Kingdom</strong>, and a business whose country we
+          could not verify never enters the list at all.
+        </p>
+        <p className="mt-4">
+          <strong>How many messages.</strong> Two at most: one message, and, if no reply comes, one
+          follow-up a week later. After that the business leaves the list even without asking.
+        </p>
+        <p className="mt-4">
+          <strong>What we keep, and for how long.</strong> Each business is one record: the
+          business&rsquo;s name, its site, the platform the site runs on, the country, the contact
+          email address and the contact&rsquo;s name where we found them, the postal address, the two
+          public sources the details came from, the single finding with its date, which of the two
+          messages have been sent and when, whether a reply or a removal request came and when, the
+          dates the record was created and last changed, a one-way fingerprint of the email address, a random
+          identifier that makes the unsubscribe link in the message work, and a short internal note
+          about the business. <strong>From a record we wrote to, the email address, the
+          contact&rsquo;s name and the postal address are erased 30 days after the last message we
+          sent it</strong>, or 30 days after a reply or a removal request if that
+          is later, and the date of the erasure is recorded. 30 days is not a round number: the
+          unsubscribe link in our message has to keep working for at least that long, and it resolves
+          against this record. What remains afterwards is everything else in the record above,
+          among it the one-way fingerprint and the unsubscribe identifier, so the link keeps
+          working. The
+          fingerprint is what lets us know we already wrote to that business twice and keeps it from
+          being added again. <strong>A record we never
+          wrote to is deleted outright 90 days after it was added.</strong> The removal list is
+          separate from this record and is kept for as long as we send email at all, because that is
+          the only way a removal can hold.
+        </p>
+        <p className="mt-4">
+          <strong>How to stop it.</strong> Every message carries an unsubscribe link that works in
+          one click, with no signing in and no explanation. It is honoured immediately and
+          permanently. So that the removal holds, the address is kept on a removal list
+          <strong> for the single purpose of making sure we do not contact you again</strong>, it is
+          used for nothing else, and it applies across every channel of ours, not only the one you
+          asked in. A reply saying not to write again is treated the same way.
+        </p>
+        <p className="mt-4">
+          <strong>If you are in California.</strong> A business contact&rsquo;s address is personal
+          information under California privacy law, so you have the right to know what we hold about
+          you, to receive a copy, to request deletion, to correct inaccurate information, and not to
+          be discriminated against for exercising a right. <strong>We do not sell this information
+          and we do not share it for cross-context behavioural advertising.</strong> Because we did
+          not collect the information from you directly, this section is the notice of collection,
+          including how long each item is kept, and a link to it appears in every message we send. A request goes to the address in
+          &ldquo;Privacy Contact and Representatives&rdquo;, and we answer in writing.
+        </p>
+        <p className="mt-4">
+          The same requests &mdash; access, deletion and correction &mdash; are answered for people
+          who are not in California, at the same address and in the same way. The controller is
+          GO TOP DIGITAL MARKETING AND ADVERTISING LTD, company 517274346, in Israel.
+        </p>
+      </section>
+
+      <section>
+        <h2>Rights of United States Residents</h2>
+        <p>
+          If you are a resident of California, or of another state that has enacted a state privacy
+          law, you have the right to know which categories of data were collected about you, to
+          obtain a copy, to request deletion, to correct inaccurate data, and not to be discriminated
+          against for exercising a right.
+        </p>
+        <p className="mt-4">
+          <strong>We do not sell personal information and we do not transfer it for
+          consideration.</strong> We do share identifiers and usage events with the Google and Meta
+          advertising networks for targeted advertising, in the browser and from our server, which may count as &ldquo;sharing&rdquo;
+          under California law. That sharing happens <strong>only</strong> if you allowed the
+          marketing category, and it stops the moment you withdraw.
+        </p>
+        <p className="mt-4">
+          We honour the browser&rsquo;s Global Privacy Control signal as a &ldquo;do not sell or
+          share my personal information&rdquo; request, and we record it. No form is needed: the
+          signal itself is enough.
+        </p>
+      </section>
+
+      <section>
+        <h2>Automated Decisions</h2>
+        <p>
+          The service produces recommendations and content with AI models, but it makes no automated
+          decision with a legal or similarly significant effect on you: no credit scoring, no
+          candidate screening, and no eligibility decision made without a person. Content is
+          published to the site you connected according to the schedule and the approvals you set.
+        </p>
+      </section>
+
+      <section>
+        <h2>Minimum Age</h2>
+        <p>
+          The service is intended for businesses and site owners, not for children. We do not
+          knowingly collect data from anyone under 18, and the service may not be used below that
+          age. If such data has reached us, write to us and we will erase it.
+        </p>
+      </section>
+
+      <section>
+        <h2>Privacy Contact and Representatives</h2>
+        <p>For any privacy matter, including exercising the rights above:</p>
+        <p className="mt-2">
+          <strong>Email:</strong>{' '}
+          <a href="mailto:oren@gotop.co.il">
+            oren@gotop.co.il
+          </a>
+        </p>
+        <p>
+          <strong>Phone:</strong>{' '}
+          <a href="tel:0549489377" dir="ltr">
+            +972-54-948-9377
+          </a>
+        </p>
+        <p className="mt-4">
+          We are not required to appoint a data protection officer under Amendment 13 to the Israeli
+          Protection of Privacy Law, and we have not appointed one. Requests are handled by the
+          contact above.
+        </p>
+      </section>
+
+      <section>
+        <h2>Updates to This Policy</h2>
+        <p>
+          We may update this policy from time to time. Changes take effect immediately upon publication. We encourage you
+          to review this policy regularly.
+        </p>
+      </section>
+
+      <section>
+        <h2>Contact</h2>
+        <p>If you have questions about this privacy policy, please contact:</p>
+        <p className="mt-2">
+          <strong>Email:</strong>{' '}
+          <a href="mailto:oren@gotop.co.il">
+            oren@gotop.co.il
+          </a>
+        </p>
+        <p>
+          <strong>Phone:</strong>{' '}
+          <a href="tel:0549489377">
+            054-9489377
+          </a>
+        </p>
+      </section>
+
+      <section>
+        <p className={LEGAL_FOOTNOTE}>
+          This policy was last updated on October 16, 2026
+        </p>
+      </section>
+    </LegalDoc>
   )
 }

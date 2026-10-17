@@ -225,7 +225,8 @@ async function main() {
 
     const wp = strip(read('app/api/content/articles/[id]/wordpress/route.ts'))
     const gateIdx4 = wp.indexOf('assertContentGenerationAllowedForUser(')
-    const publishIdx4 = wp.indexOf('wpCreatePost(')
+    // The publish goes through publishArticleToWordPress (plugin 3.0.0 or wpCreatePost) since the WordPress.org switch.
+    const publishIdx4 = wp.indexOf('publishArticleToWordPress(')
     check('wordpress/route.ts: gate before wpCreatePost', gateIdx4 !== -1 && publishIdx4 !== -1 && gateIdx4 < publishIdx4)
   }
 

@@ -18,11 +18,17 @@
  *     zero usable rows (or both present yet neither connected) resolve to 'none'.
  */
 
-export type ActivePlatform = 'wordpress' | 'shopify' | 'conflict' | 'none'
+export type ActivePlatform = 'wordpress' | 'shopify' | 'wix' | 'webhook' | 'conflict' | 'none'
 
 export interface PlatformConnectionState {
   wordpress: { present: boolean; connectionStatus: string | null }
   shopify: { present: boolean; connectionStatus: string | null; canPublish: boolean }
+  /**
+   * The project's Wix / custom-site (webhook) connection, from
+   * site_platform_connections. Optional: a caller that does not pass it — and a
+   * project without one — resolves exactly as before this field existed.
+   */
+  site?: { present: boolean; connectionStatus: string | null; platform: 'wix' | 'webhook' } | null
 }
 
 export interface ActivePlatformResult {
@@ -35,9 +41,17 @@ export interface ActivePlatformResult {
   /** Shopify is the active platform but write_content scope is missing → publishing needs
    *  the merchant to re-grant the scope (surfaced by the UI as a corrective action). */
   shopifyNeedsScope: boolean
+  /** The Wix / webhook connection is 'connected'. */
+  siteActive: boolean
 }
 
 const isConnected = (status: string | null): boolean => status === 'connected'
+
+/** A site_platform_connections row (or a failed/missing read → null) as resolver input. */
+export function siteConnectionState(row: { platform?: unknown; connection_status?: unknown } | null | undefined): PlatformConnectionState['site'] {
+  if (!row || (row.platform !== 'wix' && row.platform !== 'webhook')) return null
+  return { present: true, connectionStatus: typeof row.connection_status === 'string' ? row.connection_status : null, platform: row.platform }
+}
 
 export function resolveActivePlatform(s: PlatformConnectionState): ActivePlatformResult {
   const wordpressActive = s.wordpress.present && isConnected(s.wordpress.connectionStatus)
@@ -51,6 +65,16 @@ export function resolveActivePlatform(s: PlatformConnectionState): ActivePlatfor
   else if (s.shopify.present && !s.wordpress.present) platform = 'shopify'   // Shopify-only (maybe untested) — Shopify route surfaces the exact state
   else platform = 'none'
 
+  // Wix / webhook. The same rule, one level up: a connected site platform next
+  // to a connected WordPress or Shopify is a conflict; a connected one alone is
+  // the platform; an untested one is used only when nothing else is present.
+  const site = s.site && s.site.present ? s.site : null
+  const siteActive = !!site && isConnected(site.connectionStatus)
+  if (site) {
+    if (siteActive) platform = wordpressActive || shopifyActive ? 'conflict' : site.platform
+    else if (platform === 'none' && !s.wordpress.present && !s.shopify.present) platform = site.platform
+  }
+
   return {
     platform,
     wordpressActive,
@@ -58,6 +82,7 @@ export function resolveActivePlatform(s: PlatformConnectionState): ActivePlatfor
     wordpressPresent: s.wordpress.present,
     shopifyPresent: s.shopify.present,
     shopifyCanPublish: s.shopify.canPublish,
-    shopifyNeedsScope: shopifyActive && !s.shopify.canPublish,
+    shopifyNeedsScope: shopifyActive && !s.shopify.canPublish && !siteActive,
+    siteActive,
   }
 }

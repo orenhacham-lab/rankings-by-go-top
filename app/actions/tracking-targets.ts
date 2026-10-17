@@ -4,7 +4,9 @@ import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { revalidatePath } from 'next/cache'
 import { getUserEntitlement } from '@/lib/subscription'
-import { buildEntitlementUnavailableError, isEntitlementUnknown } from '@/lib/quota'
+import { buildQuotaError, EN_PLAN_LABEL, EntitlementUnavailableError, isEntitlementUnknown, KeywordQuotaError } from '@/lib/quota'
+import { actionMessages, asActionResult, type ActionMessages, type ActionResult } from '@/lib/i18n/action-messages'
+import { UserFacingError } from '@/lib/i18n/user-facing-error'
 import { geocodeAddress, validateCoordinatePair } from '@/lib/geocoding'
 import type { ExactPointResolutionSource } from '@/lib/supabase/types'
 import { isAdminUser } from '@/lib/auth/admin-role'
@@ -34,7 +36,8 @@ interface ResolvedExactPoint {
  */
 async function resolveExactPointFromFormData(
   formData: FormData,
-  projectCountry: string
+  projectCountry: string,
+  m: ActionMessages,
 ): Promise<ResolvedExactPoint> {
   const addressInput = safeStringFromFormData(formData, 'exact_address_input')
   const rawLat = safeStringFromFormData(formData, 'exact_resolved_lat')
@@ -44,7 +47,7 @@ async function resolveExactPointFromFormData(
   if (rawLat !== null && rawLng !== null) {
     const validated = validateCoordinatePair(rawLat, rawLng)
     if (!validated.ok) {
-      throw new Error(`קואורדינטות לא תקינות: ${validated.reason}`)
+      throw new UserFacingError(m.invalidCoordinates)
     }
     return {
       exact_address_input: addressInput,
@@ -57,42 +60,41 @@ async function resolveExactPointFromFormData(
 
   // Path 2: address geocoding
   if (addressInput) {
+    // The geocoder's own reason and the providers it tried are not shown (they
+    // were English provider detail inside a Hebrew sentence): the merchant is
+    // told what to do instead.
+    let geo: Awaited<ReturnType<typeof geocodeAddress>>
     try {
-      const geo = await geocodeAddress(addressInput, projectCountry)
-      if (!geo.ok) {
-        throw new Error(
-          `כתובת לא ניתנת לפתרון — ${geo.reason}. ספקים שנוסו: ${geo.providersTried.join(', ')}`
-        )
-      }
-      const source: ExactPointResolutionSource =
-        geo.provider === 'google' ? 'geocoded_google' : 'geocoded_nominatim'
-      return {
-        exact_address_input: addressInput,
-        exact_resolved_lat: geo.lat,
-        exact_resolved_lng: geo.lng,
-        exact_resolution_source: source,
-        exact_geocoding_provider: geo.provider + (geo.usedFallback ? ' (fallback)' : ''),
-      }
-    } catch (err) {
-      throw new Error(
-        `שגיאה בפתרון כתובת: ${(err as Error).message || 'unknown error'}`
-      )
+      geo = await geocodeAddress(addressInput, projectCountry)
+    } catch {
+      throw new UserFacingError(m.addressUnresolvable)
+    }
+    if (!geo.ok) throw new UserFacingError(m.addressUnresolvable)
+    const source: ExactPointResolutionSource =
+      geo.provider === 'google' ? 'geocoded_google' : 'geocoded_nominatim'
+    return {
+      exact_address_input: addressInput,
+      exact_resolved_lat: geo.lat,
+      exact_resolved_lng: geo.lng,
+      exact_resolution_source: source,
+      exact_geocoding_provider: geo.provider + (geo.usedFallback ? ' (fallback)' : ''),
     }
   }
 
-  throw new Error('דרוש פתרון: ספק כתובת או קואורדינטות (lat/lng) עבור מצב "נקודה מדויקת"')
+  throw new UserFacingError(m.exactPointNeedsLocation)
 }
 
 async function fetchProjectCountry(
   supabase: Awaited<ReturnType<typeof createClient>>,
-  projectId: string
+  projectId: string,
+  m: ActionMessages,
 ): Promise<string> {
   const { data, error } = await supabase
     .from('projects')
     .select('country')
     .eq('id', projectId)
     .single()
-  if (error || !data) throw new Error('לא נמצא פרויקט')
+  if (error || !data) throw new UserFacingError(m.projectNotFound)
   return (data.country || 'IL').toString()
 }
 
@@ -106,13 +108,14 @@ async function fetchProjectCountry(
 async function assertOwnedProject(
   supabase: Awaited<ReturnType<typeof createClient>>,
   userId: string,
-  projectId: string
+  projectId: string,
+  m: ActionMessages,
 ): Promise<void> {
-  if (!projectId) throw new Error('לא נמצא פרויקט')
+  if (!projectId) throw new UserFacingError(m.projectNotFound)
   const { data } = await supabase.from('projects').select('id, user_id').eq('id', projectId).maybeSingle()
   const owner = (data as { user_id?: string | null } | null)?.user_id
   if (!data || (owner !== userId && !(await isAdminUser(createAdminClient(), userId)))) {
-    throw new Error('לא נמצא פרויקט')
+    throw new UserFacingError(m.projectNotFound)
   }
 }
 
@@ -120,10 +123,11 @@ export async function createTrackingTargetAction(formData: FormData) {
   const supabase = await createClient()
 
   const { data: { user } } = await supabase.auth.getUser()
-  if (!user) throw new Error('לא מחובר')
+  const { locale, m } = await actionMessages(user?.user_metadata?.locale)
+  if (!user) throw new UserFacingError(m.notSignedIn)
 
   const projectId = formData.get('project_id') as string
-  await assertOwnedProject(supabase, user.id, projectId)
+  await assertOwnedProject(supabase, user.id, projectId, m)
 
   // Enforce keyword limit per project
   // SERVICE-ROLE, not the request-scoped client: getUserEntitlement reads
@@ -134,7 +138,7 @@ export async function createTrackingTargetAction(formData: FormData) {
   // A read failure is not an exhausted quota. Throwing a quota message here is
   // what surfaced to the reviewer as a generic server error on "Add keyword".
   if (isEntitlementUnknown(entitlement.plan)) {
-    throw new Error(buildEntitlementUnavailableError().error)
+    throw new EntitlementUnavailableError(locale)
   }
   if (!entitlement.isAdmin) {
     const { count } = await supabase
@@ -144,9 +148,8 @@ export async function createTrackingTargetAction(formData: FormData) {
       .eq('is_active', true)
 
     if ((count ?? 0) >= entitlement.limits.maxKeywordsPerProject) {
-      throw new Error(
-        `הגעת למגבלת ${entitlement.limits.maxKeywordsPerProject} מילות מפתח לפרויקט בתוכנית ${entitlement.limits.label}. שדרג את המנוי כדי להוסיף מילות מפתח נוספות.`
-      )
+      const q = buildQuotaError('QUOTA_KEYWORDS_PER_PROJECT', entitlement.plan, entitlement.limits, entitlement.limits.maxKeywordsPerProject)
+      throw new KeywordQuotaError(locale === 'en' ? q.errorEn : q.error)
     }
   }
 
@@ -193,24 +196,24 @@ export async function createTrackingTargetAction(formData: FormData) {
   }
 
   if (locationMode === 'exact_point') {
-    const projectCountry = await fetchProjectCountry(supabase, projectId)
+    const projectCountry = await fetchProjectCountry(supabase, projectId, m)
     // exact_point is US-only
     if (projectCountry.toUpperCase() !== 'US') {
-      throw new Error('מצב "נקודה מדויקת" זמין רק לפרויקטי ארה"ב')
+      throw new UserFacingError(m.exactPointUsOnly)
     }
-    const resolved = await resolveExactPointFromFormData(formData, projectCountry)
+    const resolved = await resolveExactPointFromFormData(formData, projectCountry, m)
     Object.assign(data, resolved)
   } else if (locationMode === 'radius') {
-    const projectCountry = await fetchProjectCountry(supabase, projectId)
+    const projectCountry = await fetchProjectCountry(supabase, projectId, m)
     // radius is US-only
     if (projectCountry.toUpperCase() !== 'US') {
-      throw new Error('Radius Scan זמין רק לפרויקטי ארה"ב')
+      throw new UserFacingError(m.radiusUsOnly)
     }
     if (!data.radius_center_zip) {
-      throw new Error('Radius Scan דורש ZIP code למרכז הסריקה')
+      throw new UserFacingError(m.radiusZipRequired)
     }
     if (!data.radius_miles || typeof data.radius_miles !== 'number' || data.radius_miles <= 0) {
-      throw new Error('Radius Scan דורש מרחק תקין (מיילים)')
+      throw new UserFacingError(m.radiusDistanceInvalid)
     }
     // Clear exact_point fields
     data.exact_address_input = null
@@ -251,7 +254,7 @@ export async function createTrackingTargetAction(formData: FormData) {
     } = data
     void _r; void _m
     if (locationMode === 'radius') {
-      throw new Error('Radius Scan לא זמין — יש להפעיל את מיגרציית DB')
+      throw new UserFacingError(m.radiusUnavailable)
     }
     const { error: retryError } = await supabase.from('tracking_targets').insert(dataWithoutRadius)
     if (retryError) throw new Error(retryError.message)
@@ -267,10 +270,11 @@ export async function createBulkTrackingTargetsAction(formData: FormData) {
   const supabase = await createClient()
 
   const { data: { user } } = await supabase.auth.getUser()
-  if (!user) throw new Error('לא מחובר')
+  const { locale, m } = await actionMessages(user?.user_metadata?.locale)
+  if (!user) throw new UserFacingError(m.notSignedIn)
 
   const projectId = formData.get('project_id') as string
-  await assertOwnedProject(supabase, user.id, projectId)
+  await assertOwnedProject(supabase, user.id, projectId, m)
   const engineType = formData.get('engine_type') as string
   const targetDomain = (formData.get('target_domain') as string) || null
   const targetBusinessName = (formData.get('target_business_name') as string) || null
@@ -289,7 +293,7 @@ export async function createBulkTrackingTargetsAction(formData: FormData) {
   ]
 
   if (keywords.length === 0) {
-    throw new Error('לא הוזנו מילות מפתח')
+    throw new UserFacingError(m.noKeywords)
   }
 
   // Fetch existing keywords for this project to avoid duplicates
@@ -310,12 +314,12 @@ export async function createBulkTrackingTargetsAction(formData: FormData) {
   // Resolve exact_point ONCE for the whole bulk batch (all new rows share the same location)
   let resolvedExact: ResolvedExactPoint | null = null
   if (locationMode === 'exact_point') {
-    const projectCountry = await fetchProjectCountry(supabase, projectId)
+    const projectCountry = await fetchProjectCountry(supabase, projectId, m)
     // exact_point is US-only
     if (projectCountry.toUpperCase() !== 'US') {
-      throw new Error('מצב "נקודה מדויקת" זמין רק לפרויקטי ארה"ב')
+      throw new UserFacingError(m.exactPointUsOnly)
     }
-    resolvedExact = await resolveExactPointFromFormData(formData, projectCountry)
+    resolvedExact = await resolveExactPointFromFormData(formData, projectCountry, m)
   }
 
   const toInsert = keywords
@@ -344,7 +348,7 @@ export async function createBulkTrackingTargetsAction(formData: FormData) {
     }))
 
   if (toInsert.length === 0) {
-    throw new Error('כל מילות המפתח שהוזנו כבר קיימות בפרויקט')
+    throw new UserFacingError(m.allKeywordsExist)
   }
 
   // Enforce keyword limit per project
@@ -356,23 +360,20 @@ export async function createBulkTrackingTargetsAction(formData: FormData) {
   // A read failure is not an exhausted quota. Throwing a quota message here is
   // what surfaced to the reviewer as a generic server error on "Add keyword".
   if (isEntitlementUnknown(entitlement.plan)) {
-    throw new Error(buildEntitlementUnavailableError().error)
+    throw new EntitlementUnavailableError(locale)
   }
   if (!entitlement.isAdmin) {
     const currentCount = existingSet.size
     const limit = entitlement.limits.maxKeywordsPerProject
     const available = Math.max(0, limit - currentCount)
+    const planName = locale === 'en' ? EN_PLAN_LABEL[entitlement.plan] : entitlement.limits.label
 
     if (available === 0) {
-      throw new Error(
-        `הגעת למגבלת ${limit} מילות מפתח לפרויקט בתוכנית ${entitlement.limits.label}.`
-      )
+      throw new KeywordQuotaError(m.keywordsLimitReached(limit, planName))
     }
 
     if (toInsert.length > available) {
-      throw new Error(
-        `ניתן להוסיף עוד ${available} מילות מפתח בלבד (מגבלת ${limit} בתוכנית ${entitlement.limits.label}).`
-      )
+      throw new KeywordQuotaError(m.keywordsOnlyRoomFor(available, limit, planName))
     }
   }
 
@@ -406,6 +407,7 @@ export async function createBulkTrackingTargetsAction(formData: FormData) {
 
 export async function updateTrackingTargetAction(id: string, formData: FormData) {
   const supabase = await createClient()
+  const { m } = await actionMessages()
 
   const locationMode = safeStringFromFormData(formData, 'location_mode') || 'project'
   const radiusMilesStr = safeStringFromFormData(formData, 'radius_miles')
@@ -434,13 +436,13 @@ export async function updateTrackingTargetAction(id: string, formData: FormData)
       .select('project_id, projects!inner(country)')
       .eq('id', id)
       .single<{ project_id: string; projects: { country: string } }>()
-    if (lookupErr || !existing) throw new Error('לא ניתן לטעון פרויקט עבור עדכון')
+    if (lookupErr || !existing) throw new UserFacingError(m.projectNotFound)
     const projectCountry = existing.projects.country || 'IL'
     // exact_point is US-only
     if (projectCountry.toUpperCase() !== 'US') {
-      throw new Error('מצב "נקודה מדויקת" זמין רק לפרויקטי ארה"ב')
+      throw new UserFacingError(m.exactPointUsOnly)
     }
-    const resolved = await resolveExactPointFromFormData(formData, projectCountry)
+    const resolved = await resolveExactPointFromFormData(formData, projectCountry, m)
     Object.assign(data, resolved)
   } else if (locationMode === 'radius') {
     // Need project country to validate — look up via the target row
@@ -449,17 +451,17 @@ export async function updateTrackingTargetAction(id: string, formData: FormData)
       .select('project_id, projects!inner(country)')
       .eq('id', id)
       .single<{ project_id: string; projects: { country: string } }>()
-    if (lookupErr || !existing) throw new Error('לא ניתן לטעון פרויקט עבור עדכון')
+    if (lookupErr || !existing) throw new UserFacingError(m.projectNotFound)
     const projectCountry = existing.projects.country || 'IL'
     // radius is US-only
     if (projectCountry.toUpperCase() !== 'US') {
-      throw new Error('Radius Scan זמין רק לפרויקטי ארה"ב')
+      throw new UserFacingError(m.radiusUsOnly)
     }
     if (!data.radius_center_zip) {
-      throw new Error('Radius Scan דורש ZIP code למרכז הסריקה')
+      throw new UserFacingError(m.radiusZipRequired)
     }
     if (!data.radius_miles || typeof data.radius_miles !== 'number' || data.radius_miles <= 0) {
-      throw new Error('Radius Scan דורש מרחק תקין (מיילים)')
+      throw new UserFacingError(m.radiusDistanceInvalid)
     }
     // Clear exact_point fields
     data.exact_address_input = null
@@ -491,7 +493,7 @@ export async function updateTrackingTargetAction(id: string, formData: FormData)
     } = data
     void _a; void _b; void _c; void _d; void _e
     if (locationMode === 'exact_point') {
-      throw new Error('מצב "נקודה מדויקת" לא זמין — יש להפעיל את מיגרציית DB')
+      throw new UserFacingError(m.exactPointUnavailable)
     }
     ;({ error } = await supabase.from('tracking_targets').update(reduced).eq('id', id))
   }
@@ -505,7 +507,7 @@ export async function updateTrackingTargetAction(id: string, formData: FormData)
     } = data
     void _r; void _m
     if (locationMode === 'radius') {
-      throw new Error('Radius Scan לא זמין — יש להפעיל את מיגרציית DB')
+      throw new UserFacingError(m.radiusUnavailable)
     }
     ;({ error } = await supabase.from('tracking_targets').update(reduced).eq('id', id))
   }
@@ -539,4 +541,27 @@ export async function deleteTrackingTargetAction(id: string, projectId: string) 
   if (error) throw new Error(error.message)
   revalidatePath(`/projects/${projectId}`)
   revalidatePath('/keywords')
+}
+
+/**
+ * The keywords form's one entry point: the same work as the three actions
+ * above, with its refusal RETURNED in the merchant's language instead of
+ * thrown (a thrown message does not survive the server-action boundary in
+ * production — see lib/i18n/action-messages.ts).
+ */
+export async function saveTrackingTargetsAction(
+  mode: 'create' | 'bulk' | 'update',
+  formData: FormData,
+  targetId?: string,
+): Promise<ActionResult<{ created?: number; skipped?: number }>> {
+  return asActionResult(async () => {
+    if (mode === 'update') {
+      if (!targetId) throw new UserFacingError((await actionMessages()).m.saveFailed)
+      await updateTrackingTargetAction(targetId, formData)
+      return {}
+    }
+    if (mode === 'bulk') return createBulkTrackingTargetsAction(formData)
+    await createTrackingTargetAction(formData)
+    return {}
+  }, 'tracking-targets')
 }

@@ -2,6 +2,8 @@ import { ScanResult, TrackingTarget, Project, Client } from '@/lib/supabase/type
 import { getEngineDisplayLabel } from '@/lib/utils'
 import { sortTargetsByPosition } from '@/lib/sorting'
 import { ExportLanguage, getExportLabels, normalizeExportLanguage } from './i18n'
+import { intlLocaleOf } from '@/lib/i18n/locales'
+import { REPORT_SITE_ICON_CSS, reportSiteIconImg } from '@/lib/reports/report-site-icon'
 
 interface ExportData {
   client: Client
@@ -9,11 +11,15 @@ interface ExportData {
   targets: TrackingTarget[]
   latestResults: Record<string, ScanResult>
   language?: ExportLanguage
+  /** The site's icon from the scan, already checked (lib/reports/report-site-icon.ts). */
+  siteIcon?: string | null
 }
 
 interface AIExportData {
   client: Client
   project: Project
+  /** The site's icon from the scan, already checked (lib/reports/report-site-icon.ts). */
+  siteIcon?: string | null
   summary: {
     totalScans: number
     totalResults: number
@@ -40,7 +46,7 @@ function generateReportHTML(data: ExportData): string {
   const language = normalizeExportLanguage(data.language)
   const L = getExportLabels(language)
   const isRtl = language === 'he'
-  const dateLocale = isRtl ? 'he-IL' : 'en-US'
+  const dateLocale = intlLocaleOf(language)
   const now = new Date().toLocaleDateString(dateLocale)
 
   const found = data.targets.filter((t) => data.latestResults[t.id]?.found).length
@@ -84,7 +90,7 @@ function generateReportHTML(data: ExportData): string {
 
   return `
     <!DOCTYPE html>
-    <html dir="${isRtl ? 'rtl' : 'ltr'}" lang="${isRtl ? 'he' : 'en'}">
+    <html dir="${isRtl ? 'rtl' : 'ltr'}" lang="${language}">
     <head>
       <meta charset="UTF-8">
       <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -150,6 +156,8 @@ function generateReportHTML(data: ExportData): string {
           color: #1f2937;
           margin-bottom: 5px;
         }
+
+        ${REPORT_SITE_ICON_CSS}
 
         .project-meta {
           font-size: 9pt;
@@ -333,7 +341,7 @@ function generateReportHTML(data: ExportData): string {
 
         <div class="project-info">
           <div class="project-details">
-            <div class="project-name">${escapeHtml(data.project.name)}</div>
+            <div class="project-name">${reportSiteIconImg(data.siteIcon, escapeHtml)}${escapeHtml(data.project.name)}</div>
             <div class="project-meta">${escapeHtml(data.client.name)} | ${escapeHtml(data.project.target_domain)} | ${escapeHtml(now)}</div>
           </div>
         </div>
@@ -376,7 +384,7 @@ function generateReportHTML(data: ExportData): string {
         </table>
 
         <div class="footer">
-          Go Top | ${escapeHtml(L.generatedOn)} ${escapeHtml(now)}
+          Go Top SEO | ${escapeHtml(L.generatedOn)} ${escapeHtml(now)}
         </div>
       </div>
     </body>
@@ -399,7 +407,7 @@ function generateAIReportHTML(data: AIExportData): string {
   const language = normalizeExportLanguage(data.language)
   const L = getExportLabels(language)
   const isRtl = language === 'he'
-  const dateLocale = isRtl ? 'he-IL' : 'en-US'
+  const dateLocale = intlLocaleOf(language)
   const now = new Date().toLocaleDateString(dateLocale)
 
   const engineLabels: Record<string, string> = {
@@ -456,7 +464,7 @@ function generateAIReportHTML(data: AIExportData): string {
 
   return `
     <!DOCTYPE html>
-    <html dir="${isRtl ? 'rtl' : 'ltr'}" lang="${isRtl ? 'he' : 'en'}">
+    <html dir="${isRtl ? 'rtl' : 'ltr'}" lang="${language}">
     <head>
       <meta charset="UTF-8">
       <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -522,6 +530,8 @@ function generateAIReportHTML(data: AIExportData): string {
           color: #1f2937;
           margin-bottom: 5px;
         }
+
+        ${REPORT_SITE_ICON_CSS}
 
         .project-meta {
           font-size: 9pt;
@@ -663,7 +673,7 @@ function generateAIReportHTML(data: AIExportData): string {
 
         <div class="project-info">
           <div class="project-details">
-            <div class="project-name">${escapeHtml(data.project.name)}</div>
+            <div class="project-name">${reportSiteIconImg(data.siteIcon, escapeHtml)}${escapeHtml(data.project.name)}</div>
             <div class="project-meta">${escapeHtml(data.client.name)} | ${escapeHtml(data.project.target_domain)} | ${escapeHtml(now)}</div>
           </div>
         </div>
@@ -727,7 +737,7 @@ function generateAIReportHTML(data: AIExportData): string {
         </table>
 
         <div class="footer">
-          Go Top | ${escapeHtml(L.generatedOn)} ${escapeHtml(now)}
+          Go Top SEO | ${escapeHtml(L.generatedOn)} ${escapeHtml(now)}
         </div>
       </div>
     </body>

@@ -82,11 +82,13 @@ async function main() {
     const ideas = read('../../../components/content/AutomationIdeas.tsx')
     check('A. onPlansSaved carries the REAL summary (approvedCount + stale), not just linkCount',
       /onPlansSaved\?: \(plans: \{ topicId: string; exists: boolean; linkCount: number; approvedCount: number; stale: boolean \}/.test(ideas) && /out\.summaries\.push\(\{ topicId: id, exists: true, linkCount: r\?\.linkCount/.test(ideas) && /onPlansSaved\?\.\(planSummaries\)/.test(ideas))
-    const hub = read('../../../components/content/ContentHub.tsx')
-    check('ContentHub seeds the REAL approvedCount/stale (never hardcoded 0)',
+    const hub = read('../../../components/content/workspace/AutomationScreen.tsx')
+    check('the automation screen seeds the REAL approvedCount/stale (never hardcoded 0)',
       /approvedCount: p\.approvedCount, stale: p\.stale/.test(hub) && !/approvedCount: 0, stale: false/.test(hub))
-    check('ContentHub hydrates planStatus from the topics route on load/refresh (one-shot)',
-      /json\.planStatus/.test(hub) && /planStatusLoading=\{topicsLoading\}/.test(hub))
+    const workspace = read('../../../components/content/workspace/ContentWorkspaceProvider.tsx')
+    const topicsScreen = read('../../../components/content/workspace/TopicsScreen.tsx')
+    check('the workspace hydrates planStatus from the topics route on load/refresh (one-shot)',
+      /json\.planStatus/.test(workspace) && /planStatusLoading=\{topicsLoading\}/.test(topicsScreen))
     const route = read('../../../app/api/content/topics/route.ts')
     check('topics route returns planStatus in ONE owner-scoped batch (no N+1)',
       /loadPlanSummariesForProject\(auth\.admin, auth\.project\.id\)/.test(route) && /planStatus \}/.test(route))

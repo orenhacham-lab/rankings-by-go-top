@@ -3,6 +3,8 @@
 import { createClient } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
 import { deleteOwnedRecord, type DeleteOwnedResult } from '@/lib/data/delete-owned-record'
+import { actionMessages, asActionResult, type ActionResult } from '@/lib/i18n/action-messages'
+import { UserFacingError } from '@/lib/i18n/user-facing-error'
 
 // Note: createClientAction is deprecated - client creation now uses API route /api/clients/create
 // Kept here for backwards compatibility if needed
@@ -10,16 +12,17 @@ export async function createClientAction(formData: FormData) {
   const supabase = await createClient()
 
   const { data: { user }, error: userError } = await supabase.auth.getUser()
+  const { m } = await actionMessages(user?.user_metadata?.locale)
   if (userError) {
-    throw new Error('שגיאה בקבלת פרטי משתמש')
+    throw new UserFacingError(m.userLookupFailed)
   }
   if (!user) {
-    throw new Error('משתמש לא מחובר')
+    throw new UserFacingError(m.notSignedIn)
   }
 
   const name = formData.get('name') as string
   if (!name || !name.trim()) {
-    throw new Error('שם הלקוח הוא שדה חובה')
+    throw new UserFacingError(m.clientNameRequired)
   }
 
   const data = {
@@ -34,7 +37,9 @@ export async function createClientAction(formData: FormData) {
 
   const { error } = await supabase.from('clients').insert(data)
   if (error) {
-    throw new Error(`שגיאה בהוספת לקוח: ${error.message}`)
+    // The database's own message is logged by name, never shown.
+    console.error('[Clients] Create error:', error.code)
+    throw new UserFacingError(m.clientCreateFailed)
   }
 
   revalidatePath('/clients')
@@ -54,7 +59,7 @@ export async function updateClientAction(id: string, formData: FormData) {
   const { error } = await supabase.from('clients').update(data).eq('id', id)
   if (error) {
     console.error('[Clients] Update error:', error.message, error.code)
-    throw new Error('שגיאה בעדכון לקוח')
+    throw new UserFacingError((await actionMessages()).m.clientUpdateFailed)
   }
 
   revalidatePath('/clients')
@@ -68,7 +73,7 @@ export async function toggleClientActiveAction(id: string, isActive: boolean) {
     .eq('id', id)
   if (error) {
     console.error('[Clients] Toggle error:', error.message, error.code)
-    throw new Error('שגיאה בעדכון סטטוס הלקוח')
+    throw new UserFacingError((await actionMessages()).m.clientStatusFailed)
   }
   revalidatePath('/clients')
 }
@@ -90,4 +95,9 @@ export async function deleteClientAction(id: string): Promise<DeleteOwnedResult 
     revalidatePath('/projects')
   }
   return res
+}
+
+/** The client form's save: updateClientAction, with its refusal returned in the merchant's language. */
+export async function saveClientAction(id: string, formData: FormData): Promise<ActionResult<object>> {
+  return asActionResult(() => updateClientAction(id, formData), 'clients')
 }

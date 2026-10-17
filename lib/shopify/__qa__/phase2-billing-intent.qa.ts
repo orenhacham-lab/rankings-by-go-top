@@ -162,7 +162,7 @@ async function main() {
   {
     const admin = freshAdmin()
     admin.tables.shopify_billing_migrations.push({ id: 'm1', user_id: CONN_A.user_id, project_id: CONN_A.project_id, shopify_connection_id: CONN_A.id, paypal_subscription_id: 'SUB-1', status: 'pending', paypal_cancel_attempts: 0 })
-    admin.tables.subscriptions.push({ user_id: CONN_A.user_id, status: 'active', paypal_subscription_id: 'SUB-1' })
+    admin.tables.subscriptions.push({ user_id: CONN_A.user_id, status: 'active', paypal_subscription_id: 'SUB-1', current_period_end: '2020-01-01T00:00:00Z' }) // paid PayPal period already over (lib/shopify/paypal-paid-period.ts)
     const nonce = await createBillingIntent(admin as unknown as Admin, { userId: CONN_A.user_id, projectId: CONN_A.project_id, connectionId: CONN_A.id, shopDomain: CONN_A.shop_domain, shopGid: CONN_A.shop_gid })
 
     const f1 = fakePartnerFetch(() => ({ status: 200, body: activeSubBody('premium', CONN_A.shop_gid, CONN_A.shop_domain) }))

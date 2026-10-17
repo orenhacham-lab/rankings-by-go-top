@@ -352,10 +352,12 @@ async function main() {
       JSON.stringify(Object.keys(unmetered)) === JSON.stringify(['state']) && unmetered.state === 'unmetered',
       JSON.stringify(unmetered))
 
-    // Unknown: the discriminator stays server-side.
+    // Unknown: the discriminator stays server-side. (An UNREADABLE governance
+    // record — empty tables are not "unknown": they resolve to the website trial,
+    // whose lifetime allowance the dispatcher enforces and this route reports.)
     const broken = twoTenantTables()
-    broken.billing_governance = []; broken.shopify_connections = []; broken.subscriptions = []
     actAs(USER, broken)
+    ADMIN_CLIENT = new FakeAdmin(broken, { billing_governance: { select: () => ({ code: '42501', message: 'permission denied' }) } })
     quiet(); const unknown = await (await GET()).json(); loud()
     check('S6e: an unavailable allowance is told only that, with no internal reason',
       unknown.state === 'unknown' && unknown.reason === undefined
@@ -372,10 +374,12 @@ async function main() {
   // ── 7) it fails closed, and says so in the merchant's language ───────────
   say('\n7) it fails closed with a typed, localizable unavailable state')
   {
-    // (a) entitlement cannot be resolved at all
+    // (a) entitlement cannot be resolved at all: the governance record is unreadable.
+    // (Empty tables once stood in for this, but they resolve to the website trial,
+    // which is a KNOWN allowance of 3 lifetime checks: lib/ops/__qa__/ai-allowance-matches-dispatch.qa.ts.)
     const t = twoTenantTables()
-    t.billing_governance = []; t.shopify_connections = []; t.subscriptions = []
     actAs(USER, t)
+    ADMIN_CLIENT = new FakeAdmin(t, { billing_governance: { select: () => ({ code: '42501', message: 'permission denied' }) } })
     quiet(); const r1 = await GET(); const b1 = await r1.json(); loud()
     check('S7a: an unresolvable entitlement answers `unknown`', b1.state === 'unknown', JSON.stringify(b1))
     check('S7b: and NEVER a zero allowance',

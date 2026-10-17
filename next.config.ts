@@ -1,6 +1,39 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
+  // The Spanish legal pages read their text from content/legal/es/*.md at
+  // request time, by a path built with join(), which file tracing cannot see.
+  // Without this the files are absent from the server bundle and the four
+  // pages throw ENOENT in production while working perfectly in dev.
+  outputFileTracingIncludes: {
+    '/es/*': ['./content/legal/es/**/*'],
+    '/pt-BR/*': ['./content/legal/pt-BR/**/*'],
+  },
+  // sharp ships one prebuilt libvips per platform AND per C library. npm
+  // installs both x64 Linux pairs, glibc and musl, but the runtime loads
+  // exactly one: Vercel's Node runtime is Amazon Linux, so it is always the
+  // glibc pair (@img/sharp-linux-x64 + @img/sharp-libvips-linux-x64).
+  // File tracing cannot tell which one will load, so it copies both into
+  // every function that reaches sharp. Thirty-two routes do, through
+  // lib/content/gemini-image.ts and lib/gbp/image.ts, and the musl pair is
+  // 18 MB of each of them: 585 MB of a deployment's function storage spent
+  // on binaries that are never opened. Excluding them touches the traced
+  // file lists only, so node_modules on disk and `next start` locally are
+  // unaffected. A guard locks this: lib/__qa__/function-storage.qa.ts.
+  outputFileTracingExcludes: {
+    '*': [
+      'node_modules/@img/sharp-libvips-linuxmusl-x64/**/*',
+      'node_modules/@img/sharp-linuxmusl-x64/**/*',
+    ],
+  },
+  // The author photo is uploaded through a server action (app/(dashboard)/
+  // settings/writing-guidance-actions.ts uploadAuthorPhotoAction), and the
+  // photo may be up to 2 MB (lib/content/author-box/photo-file.ts), above the
+  // 1 MB default. 3 MB leaves room for the multipart envelope; the server
+  // still refuses anything over 2 MB by its bytes.
+  experimental: {
+    serverActions: { bodySizeLimit: '3mb' },
+  },
   images: {
     remotePatterns: [
       {

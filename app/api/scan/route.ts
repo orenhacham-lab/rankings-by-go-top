@@ -20,6 +20,9 @@ import {
 } from '@/lib/ops/deadline'
 import { claimOperation, releaseOperationClaim, rankingScanScope } from '@/lib/ops/single-flight'
 import { isAdminUser } from '@/lib/auth/admin-role'
+import {
+  loadCompetitorDomainsForScan, recordCompetitorPositions, finishCompetitorSavesAfterResponse,
+} from '@/lib/competitors/scan-positions'
 
 /**
  * The platform ceiling this handler must ALWAYS answer inside.
@@ -37,6 +40,8 @@ const OPERATION_BUDGET_MS = 45_000
 /** One target's provider call. The scanner has its own per-request timeouts;
  *  this bounds the STEP, so a batch cannot spend the whole budget on target one. */
 const PROVIDER_STEP_MS = 20_000
+/** A batch does not start a provider call with less than this left (a typical check takes 2-3 s). */
+const MIN_PROVIDER_START_MS = 6_000
 /** The single-flight claim outlives the operation budget by a margin, so a live
  *  operation is never stolen, and expires soon enough that one abandoned by a
  *  killed function recovers without anyone intervening. */
@@ -307,6 +312,17 @@ export async function POST(request: Request) {
       await releaseIfReserved('project_not_found')
       return Response.json({ error: 'Project not found' }, { status: 404 })
     }
+
+    // COMPETITORS RIDE ALONG, NEVER IN THE WAY. The scanner locates the
+    // project's competitors in the result pages it fetches for the project
+    // anyway (no request of its own). Their list loads while the steps below
+    // run and is never awaited: a keyword dispatched before it arrives is
+    // scanned exactly as before, without competitors. Scoped to the project
+    // AND its owner, because this client bypasses RLS.
+    let competitorDomains: string[] = []
+    void loadCompetitorDomainsForScan(admin, { projectId, ownerId: project.user_id })
+      .then((domains) => { competitorDomains = domains })
+    const competitorSaves: Promise<unknown>[] = []
 
     // Load targets to scan
     let targetsQuery = admin
@@ -601,6 +617,7 @@ export async function POST(request: Request) {
             : null,
           exactPoint: exactPointInput,
           radiusCenter: radiusCenterInput,
+          ...(target.engine_type === 'google_search' && competitorDomains.length > 0 ? { competitorDomains } : {}),
         }
 
         if (locationMode === 'radius') {
@@ -643,6 +660,12 @@ export async function POST(request: Request) {
         // dispatch is not "consumed": the provider call never happens, so the
         // check must not be counted against the reservation.
         deadline.assertNotExpired('provider')
+        // In a "Scan all", a check that cannot finish in what is left is not
+        // started: it would be paid for and its answer dropped. It waits for the
+        // next round (the scan stays running, see `continues` below).
+        if (!targetId && deadline.remaining() < Math.min(MIN_PROVIDER_START_MS, deadline.budgetMs * 0.15)) {
+          throw new DeadlineExceededError('provider')
+        }
         diag.stage = 'provider'
         dispatchedCount++ // the provider call is about to actually happen — this check is now "consumed" regardless of outcome (including a valid not-found result)
         const scanOutput = await withDeadline(
@@ -730,6 +753,16 @@ export async function POST(request: Request) {
           // Scan attempted but API returned an error — result saved with error_message
         }
 
+        // Only once this check's own row is in: the competitors' positions are
+        // written under the SAME checked_at, which is how a screen pairs them
+        // with this position. Not awaited, and it never rejects.
+        if (scanOutput.competitorPositions) {
+          competitorSaves.push(recordCompetitorPositions(admin, {
+            ownerId: project.user_id, projectId, trackingTargetId: target.id,
+            checkedAt: resultData.checked_at as string, positions: scanOutput.competitorPositions,
+          }))
+        }
+
         results.push({
           targetId: target.id,
           keyword: target.keyword,
@@ -758,13 +791,24 @@ export async function POST(request: Request) {
       }
     }
 
+    // Competitor inserts still in flight finish after the response.
+    finishCompetitorSavesAfterResponse(competitorSaves)
+
     // Cumulative tally across ALL attempts of this scan row (not just this
     // attempt's targetsToRun) — correct even when this request resumed a
     // previously-crashed "Scan All".
     const { data: allScanResultRows } = await admin.from('scan_results').select('error_message').eq('scan_id', scan.id)
     const cumulativeCompleted = (allScanResultRows ?? []).filter((r: { error_message: string | null }) => !r.error_message).length
     const cumulativeFailed = (allScanResultRows ?? []).filter((r: { error_message: string | null }) => !!r.error_message).length
-    const finalStatus = cumulativeFailed === targets.length ? 'failed' : 'completed'
+    // The operation's budget ran out before every target was checked (a large
+    // "Scan all"): the targets left have NO row under this scan and were never
+    // sent to the provider. The scan stays 'running', so the next request resumes
+    // exactly those (the resume path above), and the answer tells the client to
+    // send it. Before this, the scan was marked completed and the rest were
+    // silently left unchecked.
+    const remainingTargets = Math.max(0, targets.length - (allScanResultRows ?? []).length)
+    const continues = !targetId && timedOutTargets > 0 && remainingTargets > 0 && (allScanResultRows ?? []).length > 0
+    const finalStatus = continues ? 'running' : cumulativeFailed === targets.length ? 'failed' : 'completed'
 
     // Build error summary if scan failed
     let scanErrorMessage: string | null = null
@@ -783,7 +827,7 @@ export async function POST(request: Request) {
       status: finalStatus,
       completed_targets: cumulativeCompleted,
       failed_targets: cumulativeFailed,
-      completed_at: new Date().toISOString(),
+      ...(continues ? {} : { completed_at: new Date().toISOString() }),
     }
     if (scanErrorMessage) {
       updatePayload.error_message = scanErrorMessage
@@ -841,7 +885,8 @@ export async function POST(request: Request) {
 
     return Response.json({
       scanId: scan.id,
-      status: finalStatus,
+      status: continues ? 'partial' : finalStatus,
+      ...(continues ? { continue: true, remaining: remainingTargets } : {}),
       completed: cumulativeCompleted,
       failed: cumulativeFailed,
       total: targets.length,

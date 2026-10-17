@@ -45,6 +45,7 @@
 import { isAdminUser } from '@/lib/auth/admin-role'
 import { resolveBillingAuthority } from '@/lib/billing/governance'
 import { getActiveMigrationResult } from '@/lib/shopify/paypal-migration'
+import { readWebsitePaidPeriod } from '@/lib/shopify/paypal-paid-period'
 import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
@@ -53,6 +54,7 @@ import { verifyShopifySessionToken } from '@/lib/shopify/session-token'
 import { buildShopifyPricingUrl } from '@/lib/shopify/billing-urls'
 import { createBillingIntent, signBillingIntentHandoff, BILLING_INTENT_COOKIE, BILLING_INTENT_COOKIE_PATH, BILLING_INTENT_TTL_MS, BILLING_INTENT_RESUME_PATH, BILLING_INTENT_ACTION_EMBEDDED, BILLING_INTENT_ACTION_WEBSITE } from '@/lib/shopify/billing-intent'
 import { getShopifyOAuthConfig } from '@/lib/shopify/oauth'
+import { logRestrictedAttempt, restrictionForRequest } from '@/lib/sanctions/guard'
 
 interface ResolvedConnection {
   id: string
@@ -76,6 +78,14 @@ export { isAdminUser }
 
 export async function GET(request: Request) {
   if (!isContentModuleEnabled()) return Response.json({ error: 'Not found' }, { status: 404 })
+
+  // A Shopify merchant reaching the hosted pricing page is the start of a
+  // payment, so it is refused for a restricted country like the PayPal path.
+  const restricted = restrictionForRequest(request.headers)
+  if (restricted) {
+    logRestrictedAttempt('shopify-billing-start', restricted)
+    return Response.json({ error: 'Not available', reason: 'restricted_country' }, { status: 451 })
+  }
 
   const admin = createAdminClient()
   const authHeader = request.headers.get('authorization') || ''
@@ -148,6 +158,27 @@ export async function GET(request: Request) {
     return isApiCall
       ? Response.json({ error: 'shopify_billing_not_applicable' }, { status: 403 })
       : NextResponse.redirect(new URL('/billing?shopify=error&reason=shopify_billing_not_applicable', request.url))
+  }
+  // THE PAID PAYPAL PERIOD (owner decision, 9 Oct 2026). An account with ANY
+  // PayPal subscription row ('active' or 'cancelled') whose paid period has
+  // not ended is not sent to Shopify's pricing page — whatever the stored
+  // authority and whether or not a migration row exists (a renewal cancelled
+  // BEFORE the store connected creates none). Choosing a plan now would start
+  // a Shopify charge for days PayPal was already paid for. Billing moves after
+  // that period ends (lib/shopify/paypal-paid-period.ts). Unreadable → nothing
+  // is minted.
+  {
+    const paid = await readWebsitePaidPeriod(admin, connection.user_id)
+    if (!paid.ok) {
+      return isApiCall
+        ? Response.json({ error: 'entitlement_unavailable' }, { status: 503 })
+        : NextResponse.redirect(new URL('/billing?shopify=error&reason=entitlement_unavailable', request.url))
+    }
+    if (paid.period.inPaidPeriod) {
+      return isApiCall
+        ? Response.json({ error: 'website_paid_period_active', paidUntil: paid.period.paidUntil }, { status: 409 })
+        : NextResponse.redirect(new URL('/billing?shopify=info&reason=website_paid_period_active', request.url))
+    }
   }
   if (!connection.shop_gid) {
     return isApiCall

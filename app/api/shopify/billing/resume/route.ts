@@ -42,6 +42,7 @@ import {
   BILLING_INTENT_COOKIE, BILLING_INTENT_COOKIE_PATH, BILLING_INTENT_TTL_MS,
   verifyBillingIntentHandoff, loadBillingIntentByNonce,
 } from '@/lib/shopify/billing-intent'
+import { logRestrictedAttempt, restrictionForRequest } from '@/lib/sanctions/guard'
 
 export const runtime = 'nodejs'
 
@@ -55,6 +56,14 @@ const MAX_BODY_BYTES = 4096
 
 export async function POST(request: Request) {
   if (!isContentModuleEnabled()) return NextResponse.json({ error: 'Not found' }, { status: 404 })
+
+  // Resuming a Shopify subscription is a payment start, refused for a
+  // restricted country like every other one.
+  const restricted = restrictionForRequest(request.headers)
+  if (restricted) {
+    logRestrictedAttempt('shopify-billing-resume', restricted)
+    return NextResponse.json({ error: 'Not available', reason: 'restricted_country' }, { status: 451 })
+  }
 
   const config = getShopifyOAuthConfig()
   if (!config) return NextResponse.json({ error: 'shopify_oauth_not_configured' }, { status: 500 })

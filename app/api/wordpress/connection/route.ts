@@ -1,7 +1,8 @@
 /**
  * Content module — /api/wordpress/connection
  *
- * GET    ?projectId=  → sanitized connection (no password, ever)
+ * GET    ?projectId=  → sanitized connection (no password, ever), and the publishing plugin
+ *                       (GO TOP SEO Bridge >= 3.0.0: site and version only) when connected
  * POST   { projectId, siteUrl, username, applicationPassword?, defaults? }
  *        → create/update the project's connection (password encrypted at rest).
  *          On update, applicationPassword may be omitted to keep the stored one.
@@ -19,6 +20,7 @@ import {
   type WordPressConnectionRow,
 } from '@/lib/content/api-auth'
 import { runProjectIndexRefresh } from '@/lib/content/wordpress-index-refresh'
+import { loadPublishPlugin } from '@/lib/content/wordpress-plugin-publish'
 import {
   encryptCredential,
   decryptCredential,
@@ -50,8 +52,13 @@ export async function GET(request: Request) {
     return Response.json({ error: 'Failed to load connection' }, { status: 500 })
   }
 
+  // The GO TOP SEO Bridge plugin >= 3.0.0 publishes too (lib/content/wordpress-plugin-publish.ts):
+  // its site and version only, never its key. Read by this project and its owner.
+  const plugin = await loadPublishPlugin(auth.admin, auth.project.id, { ownerId: auth.user.id })
+
   return Response.json({
     connection: data ? sanitizeConnection(data as WordPressConnectionRow) : null,
+    publishingPlugin: plugin ? { siteUrl: plugin.link.siteUrl, version: plugin.version } : null,
   })
 }
 

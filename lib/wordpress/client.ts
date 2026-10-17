@@ -30,7 +30,7 @@ import type {
   WordPressListOptions,
   SeoKeywordSource,
 } from './types'
-import { seoPluginFromNamespaces, seoMetaKeys, verifySeoMeta, verifySeoMetaPerField, hasSeoBridgeNamespace, type SeoPlugin, type SeoMetaStatus } from '@/lib/content/wordpress-taxonomy'
+import { seoPluginFromNamespaces, otherSeoPluginInNamespaces, seoMetaKeys, verifySeoMeta, verifySeoMetaPerField, hasSeoBridgeNamespace, type SeoPlugin, type SeoMetaStatus } from '@/lib/content/wordpress-taxonomy'
 
 const REQUEST_TIMEOUT_MS = 15_000
 const MAX_RESPONSE_BYTES = 2_000_000
@@ -337,7 +337,7 @@ function httpsGet(target: URL, authHeader?: string): Promise<{ status: number; b
  */
 function httpsSend(
   target: URL,
-  authHeader: string,
+  authHeader: string | null,
   body: Buffer,
   extraHeaders: Record<string, string>
 ): Promise<{ status: number; body: string; contentType: string }> {
@@ -350,7 +350,8 @@ function httpsSend(
         path: `${target.pathname}${target.search}`,
         method: 'POST',
         headers: {
-          Authorization: authHeader,
+          // The signed Go Top plugin routes carry their own HMAC headers and no Basic auth.
+          ...(authHeader ? { Authorization: authHeader } : {}),
           Accept: 'application/json',
           'User-Agent': 'RankingsByGoTop-Content/1.0',
           'Content-Length': String(body.length),
@@ -519,7 +520,7 @@ export async function detectSeoPlugin(creds: WordPressCredentials): Promise<SeoP
  * (namespace gotop/v1) — from a single REST-root namespaces probe. The bridge is what makes
  * protected Yoast/Rank Math meta actually writable+verifiable when core REST cannot.
  */
-export async function detectSeoCapabilities(creds: WordPressCredentials): Promise<{ plugin: SeoPlugin; hasBridge: boolean }> {
+export async function detectSeoCapabilities(creds: WordPressCredentials): Promise<{ plugin: SeoPlugin; hasBridge: boolean; otherSeo?: boolean }> {
   try {
     const origin = await assertSafeSiteUrl(creds.siteUrl)
     const target = new URL(`${origin}/wp-json/?_fields=namespaces`)
@@ -528,10 +529,36 @@ export async function detectSeoCapabilities(creds: WordPressCredentials): Promis
     if (status < 200 || status >= 300) return { plugin: 'unknown', hasBridge: false }
     let parsed: { namespaces?: unknown }
     try { parsed = JSON.parse(body) } catch { return { plugin: 'unknown', hasBridge: false } }
-    return { plugin: seoPluginFromNamespaces(parsed?.namespaces), hasBridge: hasSeoBridgeNamespace(parsed?.namespaces) }
+    return { plugin: seoPluginFromNamespaces(parsed?.namespaces), hasBridge: hasSeoBridgeNamespace(parsed?.namespaces), otherSeo: otherSeoPluginInNamespaces(parsed?.namespaces) }
   } catch {
     return { plugin: 'unknown', hasBridge: false }
   }
+}
+
+/**
+ * One POST to a Go Top plugin route (`/wp-json/gotop/v1/<route>`), through the same guards as
+ * every other WordPress call: https only, the site URL checked, the address re-checked at connect
+ * time (no private networks, no DNS rebinding), no redirects, a timeout and a response cap.
+ *
+ *   auth: 'signed'    no Authorization header; `headers` carry the plugin HMAC signature
+ *                     (lib/site-fix/plugin-auth.ts).
+ *   auth: creds       the site's application password (used only to pair the plugin).
+ *
+ * Returns the status and the raw body for the caller to parse. Throws WordPressClientError on a
+ * transport failure (its message is ours, never the site's).
+ */
+export async function postToGoTopPlugin(
+  siteUrl: string,
+  route: string,
+  body: string,
+  opts: { headers?: Record<string, string>; creds?: WordPressCredentials },
+): Promise<{ status: number; body: string }> {
+  if (!/^\/[a-z-]{2,20}$/.test(route)) throw new Error('postToGoTopPlugin: route must be a fixed /gotop/v1 path') // a programming error, never shown
+  const origin = await assertSafeSiteUrl(siteUrl)
+  const target = new URL(`${origin}/wp-json/gotop/v1${route}`)
+  const auth = opts.creds ? buildAuthHeader(opts.creds) : null
+  const res = await httpsSend(target, auth, Buffer.from(body, 'utf8'), { 'Content-Type': 'application/json', ...(opts.headers ?? {}) })
+  return { status: res.status, body: res.body }
 }
 
 /**
@@ -572,13 +599,18 @@ export async function writeVerifiedSeoMeta(
   postId: number,
   seo: { metaTitle?: string | null; metaDescription?: string | null; focusKeyword?: string | null },
   knownPlugin?: SeoPlugin,
+  // Site health writes the SEO meta of a PAGE too. Posts stay the default, so every
+  // existing caller sends exactly what it sent before.
+  endpoint: WpContentEndpoint = '/posts',
 ): Promise<{ plugin: SeoPlugin; status: SeoMetaStatus; detail?: string }> {
   // ONE capability probe → plugin + whether the GO TOP SEO bridge is installed.
   const caps = knownPlugin && knownPlugin !== 'unknown'
-    ? { plugin: knownPlugin, hasBridge: false as boolean, probed: false }
+    ? { plugin: knownPlugin, hasBridge: false as boolean, otherSeo: false as boolean | undefined, probed: false }
     : { ...(await detectSeoCapabilities(creds)), probed: true }
   const plugin = caps.plugin
   if (plugin === 'permission_error') return { plugin, status: 'permission_error' }
+  // `other_seo_plugin`: All in One SEO or SEOPress prints the meta, so nobody may add a second one.
+  if (plugin === 'none' && caps.otherSeo) return { plugin, status: 'plugin_unavailable', detail: 'other_seo_plugin' }
   if (plugin === 'none' || plugin === 'unknown') return { plugin, status: 'plugin_unavailable' }
 
   const meta = seoMetaKeys(plugin, seo)
@@ -587,10 +619,10 @@ export async function writeVerifiedSeoMeta(
   // 1) Try core REST first (works when the site registered these keys in REST).
   let coreStatus: SeoMetaStatus
   try {
-    await wpPostJson(creds, `/posts/${postId}`, { meta })
+    await wpPostJson(creds, `${endpoint}/${postId}`, { meta })
     let readback: Record<string, unknown> | null = null
     try {
-      const obj = await wpGet<{ meta?: Record<string, unknown> }>(creds, `/posts/${postId}?_fields=meta`)
+      const obj = await wpGet<{ meta?: Record<string, unknown> }>(creds, `${endpoint}/${postId}?_fields=meta`)
       readback = obj && typeof obj.meta === 'object' ? (obj.meta as Record<string, unknown>) : null
     } catch { readback = null }
     coreStatus = verifySeoMeta(meta, readback)
@@ -657,6 +689,51 @@ async function wpGet<T>(creds: WordPressCredentials, path: string): Promise<T> {
   } catch {
     throw new WordPressClientError('WordPress returned an invalid response.', invalidJsonMeta(status, contentType, body))
   }
+}
+
+/** One Media Library item, as the site-fix media alt text needs it (lib/site-fix/media-alt.ts). */
+export interface WpMediaItem {
+  id: number
+  sourceUrl: string
+  /** Every size WordPress made of it (thumbnail, medium, …): the page may show any of them. */
+  sizeUrls: string[]
+  alt: string
+  title: string
+}
+
+function mediaOf(m: unknown): WpMediaItem | null {
+  const r = (m ?? {}) as { id?: unknown; source_url?: unknown; alt_text?: unknown; title?: { raw?: unknown; rendered?: unknown } | unknown; media_details?: { sizes?: Record<string, { source_url?: unknown }> } }
+  if (typeof r.id !== 'number' || typeof r.source_url !== 'string') return null
+  const t = (r.title ?? {}) as { raw?: unknown; rendered?: unknown }
+  const sizes = Object.values(r.media_details?.sizes ?? {}).map((x) => String(x?.source_url ?? '')).filter(Boolean)
+  return { id: r.id, sourceUrl: r.source_url, sizeUrls: sizes, alt: String(r.alt_text ?? ''), title: String(t.raw ?? t.rendered ?? '') }
+}
+
+/**
+ * Media Library images named like `name` (a file's name without its extension), at most 20: by their
+ * title (`by: 'title'`, WordPress titles an upload with its file name) or by their slug (also made from
+ * the file name, and kept when the title is renamed). Read-only.
+ */
+export async function searchMedia(creds: WordPressCredentials, name: string, by: 'title' | 'slug' = 'title'): Promise<WpMediaItem[]> {
+  const v = name.slice(0, 100)
+  const query = by === 'slug' ? `slug=${encodeURIComponent(v.toLowerCase())}` : `search=${encodeURIComponent(v)}`
+  const list = await wpGet<unknown[]>(creds, `/media?context=edit&per_page=20&media_type=image&${query}`)
+  return (Array.isArray(list) ? list : []).map(mediaOf).filter((m): m is WpMediaItem => !!m)
+}
+
+/** One Media Library item by id, or null when there is none. Read-only. */
+export async function getMedia(creds: WordPressCredentials, id: number): Promise<WpMediaItem | null> {
+  try {
+    return mediaOf(await wpGet<unknown>(creds, `/media/${Math.trunc(id)}?context=edit`))
+  } catch (err) {
+    if (err instanceof WordPressClientError && err.meta.status === 404) return null
+    throw err
+  }
+}
+
+/** Set one Media Library item's alt text (nothing else). Returns the item as WordPress now holds it. */
+export async function setMediaAlt(creds: WordPressCredentials, id: number, alt: string): Promise<WpMediaItem | null> {
+  return mediaOf(await wpPostJson<unknown>(creds, `/media/${Math.trunc(id)}`, { alt_text: alt }))
 }
 
 /**
@@ -741,19 +818,20 @@ async function rawJsonArray(origin: string, path: string, authHeader?: string): 
   }
 }
 
-export async function discoverStoreEntities(creds: WordPressCredentials): Promise<StoreDiscoveryResult> {
+export async function discoverStoreEntities(creds: WordPressCredentials | { siteUrl: string }): Promise<StoreDiscoveryResult> {
   const origin = await assertSafeSiteUrl(creds.siteUrl).catch(() => null)
   if (!origin) return { products: [], categories: [], source: 'none', lastHttpStatus: null }
-  const auth = buildAuthHeader(creds)
+  // Without an application password (a site connected by the GO TOP plugin only) the public tries alone.
+  const auth = 'applicationPassword' in creds ? buildAuthHeader(creds) : undefined
   let lastStatus: number | null = null
 
   // 1+2) Store API — resolve a WORKING (namespace, auth) variant on products
   // page 1, then reuse it for pagination + categories.
   const variants: { ns: string; source: 'store_api' | 'store_api_legacy'; authHeader?: string }[] = [
     { ns: '/wp-json/wc/store/v1', source: 'store_api' },
-    { ns: '/wp-json/wc/store/v1', source: 'store_api', authHeader: auth },
+    ...(auth ? [{ ns: '/wp-json/wc/store/v1', source: 'store_api' as const, authHeader: auth }] : []),
     { ns: '/wp-json/wc/store', source: 'store_api_legacy' },
-    { ns: '/wp-json/wc/store', source: 'store_api_legacy', authHeader: auth },
+    ...(auth ? [{ ns: '/wp-json/wc/store', source: 'store_api_legacy' as const, authHeader: auth }] : []),
   ]
   for (const v of variants) {
     const first = await rawJsonArray(origin, `${v.ns}/products?per_page=100&page=1&orderby=popularity`, v.authHeader)
@@ -770,7 +848,7 @@ export async function discoverStoreEntities(creds: WordPressCredentials): Promis
   }
 
   // 3) Core REST product CPT fallback (title.rendered + link).
-  for (const authHeader of [undefined, auth]) {
+  for (const authHeader of auth ? [undefined, auth] : [undefined]) {
     const res = await rawJsonArray(origin, `/wp-json/wp/v2/product?per_page=50&_fields=title,link`, authHeader)
     if (res.status) lastStatus = res.status
     if (res.rows === null) continue
@@ -806,6 +884,23 @@ export async function getAuthors(creds: WordPressCredentials): Promise<WordPress
     name: u.name,
     slug: u.slug,
   }))
+}
+
+/**
+ * The display name a post is published under over the application password:
+ * the existing post's author for an update, else the application password's
+ * own user (createPost sends no author). Null when the site does not say.
+ */
+export async function getPublishingUserName(creds: WordPressCredentials, existingPostId?: number | null): Promise<string | null> {
+  let path = '/users/me?context=edit&_fields=name'
+  if (typeof existingPostId === 'number' && existingPostId > 0) {
+    const post = await wpGet<{ author?: unknown }>(creds, `/posts/${existingPostId}?context=edit&_fields=author`)
+    const author = typeof post?.author === 'number' && post.author > 0 ? post.author : null
+    if (!author) return null
+    path = `/users/${author}?context=edit&_fields=name`
+  }
+  const user = await wpGet<{ name?: unknown }>(creds, path)
+  return typeof user?.name === 'string' && user.name.trim() ? user.name.trim() : null
 }
 
 /** Strip tags + collapse whitespace from a rendered field (title/excerpt). */
@@ -892,7 +987,11 @@ export async function getPages(creds: WordPressCredentials, opts: WordPressListO
   return (Array.isArray(rows) ? rows : []).map(mapContentItem)
 }
 
-export type WpContentEndpoint = '/posts' | '/pages'
+/**
+ * A REST collection of editable items: posts, pages, or a public custom post type such as
+ * WooCommerce's products (`/product`), whose rest_base the site itself reports (`/types`).
+ */
+export type WpContentEndpoint = '/posts' | '/pages' | `/${string}`
 
 /**
  * Read-only: fetch the rendered content HTML of ONE item by id. Kept as a
@@ -903,4 +1002,150 @@ export type WpContentEndpoint = '/posts' | '/pages'
 export async function getItemContentHtml(creds: WordPressCredentials, endpoint: WpContentEndpoint, id: number): Promise<string> {
   const obj = await wpGet<any>(creds, `${endpoint}/${id}?_fields=id,content`)
   return typeof obj?.content === 'string' ? obj.content : String(obj?.content?.rendered ?? '')
+}
+
+// ── Site health: one post or page, found by its public address ─────────────
+
+/** A published post or page, as site health edits it: the RAW title and content (context=edit). */
+export interface WordPressEditableItem {
+  endpoint: WpContentEndpoint
+  id: number
+  link: string
+  title: string
+  content: string
+}
+
+const pathOf = (raw: string): string | null => {
+  try {
+    const u = new URL(raw)
+    let p = u.pathname
+    try { p = decodeURI(p) } catch { /* keep as sent */ }
+    return (p.replace(/\/+$/, '') || '/').toLowerCase()
+  } catch {
+    return null
+  }
+}
+
+/** Post types that are never a public page of their own. */
+const NOT_A_PAGE_TYPE = new Set(['post', 'page', 'attachment', 'nav_menu_item'])
+/** At most this many custom types are looked through for one address. */
+export const FIND_MAX_CUSTOM_TYPES = 4
+
+type WpGetter = <T>(path: string) => Promise<T>
+
+/**
+ * Read-only: the item whose public address is `url`, or null. Looks the slug up in pages, then
+ * posts, then the site's public custom types (WooCommerce products and the like, as `/types`
+ * lists them, the one whose base starts the address first), published only, and accepts a match
+ * only when the item's own link has the same path, so a slug shared by two types never picks the
+ * wrong one. The home page is the static front page WordPress is set to show, when it shows one.
+ *
+ * Wave 10: only pages and posts were looked at, and the home page never, so "fix it for me" on a
+ * store's product or on the home page said "we could not find this page in WordPress".
+ */
+export async function findItemByUrlWith(get: WpGetter, url: string): Promise<{ endpoint: WpContentEndpoint; id: number; link: string } | null> {
+  const path = pathOf(url)
+  if (!path) return null
+  if (path === '/') return frontPage(get)
+  const segments = path.split('/').filter(Boolean)
+  const slug = segments[segments.length - 1] ?? ''
+  if (!slug) return null
+  const match = async (endpoint: WpContentEndpoint): Promise<{ endpoint: WpContentEndpoint; id: number; link: string } | null> => {
+    const rows = await get<unknown[]>(`${endpoint}?slug=${encodeURIComponent(slug)}&status=publish&per_page=5&_fields=id,link`)
+    for (const r of Array.isArray(rows) ? rows : []) {
+      const row = r as { id?: unknown; link?: unknown }
+      const id = Number(row.id)
+      const link = String(row.link ?? '')
+      if (id > 0 && pathOf(link) === path) return { endpoint, id, link }
+    }
+    return null
+  }
+  for (const endpoint of ['/pages', '/posts'] as const) {
+    const hit = await match(endpoint)
+    if (hit) return hit
+  }
+  for (const endpoint of await customTypeEndpoints(get, segments.length > 1 ? segments[0] : null)) {
+    // A type the site lists but does not serve to this user is not an answer: the next one is tried.
+    const hit = await match(endpoint).catch(() => null)
+    if (hit) return hit
+  }
+  return null
+}
+
+/** The public custom types' collections, the one whose base or name starts the address first. */
+async function customTypeEndpoints(get: WpGetter, firstSegment: string | null): Promise<WpContentEndpoint[]> {
+  let types: Record<string, { slug?: unknown; rest_base?: unknown }> = {}
+  try {
+    const t = await get<Record<string, { slug?: unknown; rest_base?: unknown }>>('/types?_fields=slug,rest_base')
+    if (t && typeof t === 'object' && !Array.isArray(t)) types = t
+  } catch { /* the type list is not readable: WooCommerce's products are still tried */ }
+  const bases: { base: string; slug: string }[] = []
+  for (const [key, v] of Object.entries(types)) {
+    const slug = String(v?.slug ?? key)
+    const base = String(v?.rest_base ?? '')
+    if (NOT_A_PAGE_TYPE.has(slug) || slug.startsWith('wp_') || !/^[a-z0-9_-]{1,40}$/i.test(base)) continue
+    if (!bases.some((b) => b.base === base)) bases.push({ base, slug })
+  }
+  if (bases.length === 0) bases.push({ base: 'product', slug: 'product' })
+  const first = (firstSegment ?? '').toLowerCase()
+  bases.sort((a, b) => Number(b.base === first || b.slug === first) - Number(a.base === first || a.slug === first))
+  return bases.slice(0, FIND_MAX_CUSTOM_TYPES).map((b) => `/${b.base}` as WpContentEndpoint)
+}
+
+/** The page WordPress shows as its home page ("a static page" in Settings → Reading), or null. */
+async function frontPage(get: WpGetter): Promise<{ endpoint: WpContentEndpoint; id: number; link: string } | null> {
+  try {
+    const s = await get<{ show_on_front?: unknown; page_on_front?: unknown }>('/settings?_fields=show_on_front,page_on_front')
+    const id = Number(s?.page_on_front)
+    if (s?.show_on_front !== 'page' || !(id > 0)) return null
+    const row = await get<{ id?: unknown; link?: unknown }>(`/pages/${id}?_fields=id,link`)
+    return Number(row?.id) === id ? { endpoint: '/pages', id, link: String(row?.link ?? '') } : null
+  } catch {
+    // Reading the settings needs an administrator's password: without it the home page stays "not found".
+    return null
+  }
+}
+
+export async function findItemByUrl(creds: WordPressCredentials, url: string): Promise<{ endpoint: WpContentEndpoint; id: number; link: string } | null> {
+  return findItemByUrlWith(<T>(path: string) => wpGet<T>(creds, path), url)
+}
+
+/** Read-only: one item's raw title and content, as the editor holds them. */
+export async function getItemForEdit(creds: WordPressCredentials, endpoint: WpContentEndpoint, id: number): Promise<WordPressEditableItem> {
+  const obj = await wpGet<{ id?: unknown; link?: unknown; title?: { raw?: unknown }; content?: { raw?: unknown } }>(
+    creds, `${endpoint}/${id}?context=edit&_fields=id,link,title,content`)
+  const raw = (v: { raw?: unknown } | undefined) => (typeof v?.raw === 'string' ? v.raw : '')
+  if (!obj || Number(obj.id) !== id) throw new WordPressClientError('WordPress returned an invalid response.')
+  return { endpoint, id, link: String(obj.link ?? ''), title: raw(obj.title), content: raw(obj.content) }
+}
+
+/**
+ * Update ONLY the title and/or the content of one existing item. Nothing else is
+ * sent: not its status, slug, author, terms or featured image, so an approved fix
+ * can never publish a draft or move a page.
+ */
+export async function updateItemFields(
+  creds: WordPressCredentials,
+  endpoint: WpContentEndpoint,
+  id: number,
+  fields: { title?: string; content?: string },
+): Promise<void> {
+  const payload: Record<string, unknown> = {}
+  if (typeof fields.title === 'string') payload.title = fields.title
+  if (typeof fields.content === 'string') payload.content = fields.content
+  if (Object.keys(payload).length === 0) return
+  const updated = await wpPostJson<{ id?: number }>(creds, `${endpoint}/${id}`, payload)
+  if (!updated || updated.id !== id) throw new WordPressClientError('WordPress returned an invalid response.')
+}
+
+/** Read-only: up to `limit` published items whose text matches `term` (WordPress's own search). */
+export async function searchItems(creds: WordPressCredentials, endpoint: WpContentEndpoint, term: string, limit = 5): Promise<{ id: number; link: string; title: string }[]> {
+  const q = term.trim().slice(0, 80)
+  if (!q) return []
+  const n = Math.min(Math.max(limit, 1), 10)
+  const rows = await wpGet<unknown[]>(creds, `${endpoint}?search=${encodeURIComponent(q)}&status=publish&per_page=${n}&_fields=id,link,title`)
+  return (Array.isArray(rows) ? rows : [])
+    .map((r) => r as { id?: unknown; link?: unknown; title?: unknown })
+    .map((r) => ({ id: Number(r.id) || 0, link: String(r.link ?? ''), title: stripRendered(r.title) }))
+    .filter((r) => r.id > 0)
 }

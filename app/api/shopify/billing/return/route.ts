@@ -46,6 +46,9 @@ const OUTCOME_TO_QUERY: Record<BillingReturnOutcome, { shopify: string; reason: 
   // finish — never reported as a plain success, because the customer's PayPal
   // subscription may still be live.
   migration_incomplete: { shopify: 'warning', reason: 'migration_incomplete' },
+  // Still inside the PayPal period the merchant already paid for: billing has
+  // NOT moved and PayPal was not contacted (lib/shopify/paypal-paid-period.ts).
+  migration_deferred: { shopify: 'info', reason: 'website_paid_period_active' },
   // The intent cookie never arrived (Shopify framed this return, so our
   // SameSite=Lax cookie was third-party), but Shopify's own signature and a
   // live subscription check confirmed the plan and the cache was reconciled.

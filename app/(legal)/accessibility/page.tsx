@@ -1,118 +1,174 @@
-import Link from 'next/link'
-import { PublicNav } from '@/components/PublicNav'
-import { Footer } from '@/components/Footer'
-import { Breadcrumbs } from '@/components/Breadcrumbs'
+import { LEGAL_FOOTNOTE, LegalDoc } from '@/components/public/LegalDoc'
 
 export const metadata = {
-  title: 'נגישות | Rankings by Go Top',
-  description: 'מידע על נגישות באתר Rankings by Go Top',
+  title: 'נגישות | Go Top SEO',
+  description: 'מידע על נגישות באתר Go Top SEO',
   robots: 'noindex, nofollow',
 }
 
 export default function AccessibilityPage() {
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-slate-100 flex flex-col">
-      <PublicNav />
-      <main className="flex-1 pt-28 lg:pt-36 pb-12 px-4">
-        <div className="max-w-3xl mx-auto bg-white rounded-2xl shadow-sm border border-slate-200 p-8">
-          <Breadcrumbs items={[{ label: 'נגישות', href: '/accessibility' }]} />
-        <h1 className="text-4xl font-bold text-slate-900 mb-2">נגישות</h1>
-        <p className="text-slate-600 mb-8">עמוד נגישות של Rankings by Go Top</p>
+    <LegalDoc
+      locale="he"
+      breadcrumbs={[{ label: 'נגישות', href: '/accessibility' }]}
+      title="נגישות"
+      subtitle="עמוד נגישות של Go Top SEO"
+    >
+      <section>
+        <h2>התחייבותנו לנגישות</h2>
+        <p>
+          ב-Go Top SEO, אנו מחויבים להנגיש את המערכת שלנו לכולם, כולל אנשים עם מוגבלויות. אנו משתדלים לעמוד בתקנים גבוהים של נגישות דיגיטלית ולהמשיך להשתפר.
+        </p>
+      </section>
 
-        <div className="prose prose-sm max-w-none space-y-6 text-slate-700">
-          <section>
-            <h2 className="text-2xl font-bold text-slate-900 mt-8 mb-4">התחייבותנו לנגישות</h2>
-            <p>
-              ב-Rankings by Go Top, אנו מחויבים להנגיש את המערכת שלנו לכולם, כולל אנשים עם מוגבלויות. אנו משתדלים לעמוד בתקנים גבוהים של נגישות דיגיטלית ולהמשיך להשתפר.
-            </p>
-          </section>
+      <section>
+        <h2>תקנים שאנו עומדים בהם</h2>
+        <p>
+          המערכת שלנו פותחה בהתאמה לנחיות WCAG 2.1 (Web Content Accessibility Guidelines) בדרגה AA. אנו משתמשים בסטנדרטים של HTML סמנטי, תוויות ARIA מתאימות, ודגשים על ניגודיות צבעים.
+        </p>
+        <p className="mt-3">
+          בישראל חל על שירותי אינטרנט התקן הישראלי ת&quot;י 5568, המבוסס על WCAG 2.0 ברמה AA, לפי תקנות שוויון זכויות
+          לאנשים עם מוגבלות (התאמות נגישות לשירות), התשע&quot;ג-2013. אנו פועלים להתאים את האתר והמערכת לתקן זה
+          ברמה AA, ובנחיות WCAG 2.1 ברמה AA שאנו מיישמים כלולות גם דרישות WCAG 2.0.
+        </p>
+        <p className="mt-3">
+          <strong>הצהרת ההתאמה:</strong> האתר והמערכת מותאמים חלקית לתקן, ברמה AA. &ldquo;חלקית&rdquo;
+          ולא &ldquo;מלאה&rdquo; מפני שחלקים מסוימים טרם נבדקו מקצה לקצה, ומפני שתוכן של צד שלישי
+          אינו בשליטתנו. החלקים הידועים שאינם נגישים במלואם מפורטים בהמשך העמוד.
+        </p>
+        <p className="mt-3">
+          <strong>כיצד נבדקנו:</strong> כל עמוד ציבורי באתר נבדק אוטומטית בדפדפן אמיתי מול כלל
+          כללי WCAG 2.1 בדרגות A ו-AA, בעברית ובאנגלית, וכן נבדקים מבנה הכותרות, הצהרת השפה והכיוון,
+          סדר המיקוד ותיאור חלופי לכל תמונה. הודעת העוגיות נבדקת בנפרד בניווט מקלדת בלבד, כולל
+          שאפשרות הסירוב מגיעה ראשונה. הבדיקות רצות בכל שינוי בקוד, ושינוי שמפר אותן אינו עולה
+          לאוויר. בדיקה אוטומטית מזהה חלק מהחסמים ולא את כולם: היא אינה יכולה לשפוט אם תיאור
+          חלופי אכן מובן, או איך קורא מסך מקריא רכיב בפועל. את אלה בודק אדם שמשתמש בטכנולוגיה
+          מסייעת, ובדיקה כזו טרם נעשתה אצלנו. זו הסיבה שההצהרה אומרת &ldquo;חלקית&rdquo;.
+        </p>
+        <p className="mt-3">
+          <strong>מבקרים מהאיחוד האירופי:</strong> הדירקטיבה האירופית לנגישות ((EU) 2019/882),
+          שחלה מ-28 ביוני 2025, פוטרת מיקרו-עסקים נותני שירות (פחות מעשרה עובדים ומחזור או מאזן
+          שאינם עולים על שני מיליון אירו) מדרישות הנגישות שבה. אנו עומדים בהגדרה הזו, ולכן הדרישות
+          אינן חלות עלינו. בחרנו לפעול לפי WCAG 2.1 ברמה AA בכל זאת, כי נגישות אינה שאלה של חובה.
+        </p>
+      </section>
 
-          <section>
-            <h2 className="text-2xl font-bold text-slate-900 mt-8 mb-4">תקנים שאנו עומדים בהם</h2>
-            <p>
-              המערכת שלנו פותחה בהתאמה לנחיות WCAG 2.1 (Web Content Accessibility Guidelines) בדרגה AA. אנו משתמשים בסטנדרטים של HTML סמנטי, תוויות ARIA מתאימות, ודגשים על ניגודיות צבעים.
-            </p>
-          </section>
+      <section>
+        <h2>יכולות נגישות</h2>
+        <ul>
+          <li>תמיכה מלאה בקורא מסך (Screen Reader)</li>
+          <li>ניווט באמצעות לוח המקלדת בלבד</li>
+          <li>תוויות ברורות לכל שדה בטפסים</li>
+          <li>ניגודיות צבעים בדרגה AA לטקסט ולרכיבי הממשק, בעיצוב החדש של האתר והמערכת</li>
+          <li>גדלים גדולים של טקסט וזמן מספיק להתמצאות</li>
+          <li>סימון פוקוס ברור בניווט במקלדת, ותפריט נגישות באתר להתאמת גודל הטקסט, הניגודיות ועוד</li>
+          <li>תמיכה בהעדפת &ldquo;הפחתת תנועה&rdquo; (prefers-reduced-motion) של מערכת ההפעלה: אנימציות ומעברים
+          מופחתים או מבוטלים למי שביקש זאת</li>
+          {/*
+            The languages are described by how each is HANDLED, not as a list of
+            the languages the product happens to offer today. A list dates: the
+            Spanish site and dashboard exist on preview, so "Hebrew and English"
+            was already on its way to being untrue, and an accessibility
+            statement that overstates what it covers is exactly the kind of
+            claim that costs more than it buys. This wording stays true before
+            and after any language is added, and each language version of the
+            statement names the language it is written in.
+          */}
+          <li>כיוון הטקסט, הפריסה והניווט מותאמים לכל שפה שהאתר מתפרסם בה: עברית מימין לשמאל (RTL), אנגלית
+          וכל שפה נוספת משמאל לימין (LTR). ההצהרה הזאת חלה על כל גרסאות השפה של האתר</li>
+        </ul>
+      </section>
 
-          <section>
-            <h2 className="text-2xl font-bold text-slate-900 mt-8 mb-4">יכולות נגישות</h2>
-            <ul className="list-disc list-inside space-y-2">
-              <li>תמיכה מלאה בקורא מסך (Screen Reader)</li>
-              <li>ניווט באמצעות לוח המקלדת בלבד</li>
-              <li>תוויות תיאוריות למכשירים טפטופיים (form fields)</li>
-              <li>ניגודיות צבעים מספקת לקריאה טובה</li>
-              <li>גדלים גדולים של טקסט וזמן מספיק להתמצאות</li>
-              <li>מעברים שכן משבשים ונגישים</li>
-            </ul>
-          </section>
+      <section>
+        <h2>דפדפנים נתמכים</h2>
+        <p>
+          המערכת שלנו תומכת בדפדפנים עדכניים:
+        </p>
+        <ul>
+          <li>Chrome (גרסה אחרונה)</li>
+          <li>Firefox (גרסה אחרונה)</li>
+          <li>Safari (גרסה אחרונה)</li>
+          <li>Edge (גרסה אחרונה)</li>
+        </ul>
+      </section>
 
-          <section>
-            <h2 className="text-2xl font-bold text-slate-900 mt-8 mb-4">דפדפנים נתמכים</h2>
-            <p>
-              המערכת שלנו תומכת בדפדפנים עדכניים:
-            </p>
-            <ul className="list-disc list-inside space-y-2">
-              <li>Chrome (גרסה אחרונה)</li>
-              <li>Firefox (גרסה אחרונה)</li>
-              <li>Safari (גרסה אחרונה)</li>
-              <li>Edge (גרסה אחרונה)</li>
-            </ul>
-          </section>
+      <section>
+        <h2>דיווח על בעיות נגישות</h2>
+        <p>
+          אם נתקלתם בבעיה בנגישות — עמוד שלא נקרא, פעולה שאי אפשר להשלים במקלדת, טקסט שקורא
+          המסך מדלג עליו — כתבו לנו ונטפל בה. רכז הנגישות של השירות:
+        </p>
+        <p className="mt-2">
+          <strong>דואר אלקטרוני:</strong>{' '}
+          <a href="mailto:oren@gotop.co.il">
+            oren@gotop.co.il
+          </a>
+        </p>
+        <p>
+          <strong>טלפון:</strong>{' '}
+          <a href="tel:0549489377">
+            054-9489377
+          </a>
+        </p>
+        <p className="mt-2">
+          אנחנו משיבים בתוך 48 שעות, ומוסרים בתשובה מה נעשה ומתי. אם הפנייה כוללת בקשה להתאמה
+          מסוימת, נציין אם היא אפשרית ומה לוח הזמנים.
+        </p>
+        <p className="mt-4">
+          <strong>אם לא קיבלתם מאיתנו מענה, או שהמענה לא פתר את הבעיה:</strong> אפשר לפנות
+          לנציבות שוויון זכויות לאנשים עם מוגבלות במשרד המשפטים
+          (<a href="https://www.gov.il/he/departments/commission_for_equal_rights_of_persons_with_disabilities" target="_blank" rel="noopener noreferrer">
+            נציבות שוויון זכויות לאנשים עם מוגבלות
+          </a>). פנייה אלינו אינה תנאי לכך.
+        </p>
+      </section>
 
-          <section>
-            <h2 className="text-2xl font-bold text-slate-900 mt-8 mb-4">דיווח על בעיות נגישות</h2>
-            <p>
-              אם נתקלת בבעיה בנגישות, אנא צור קשר עם צוות התמיכה שלנו:
-            </p>
-            <p className="mt-2">
-              <strong>דואר אלקטרוני:</strong>{' '}
-              <a href="mailto:oren@gotop.co.il" className="text-blue-600 hover:underline">
-                oren@gotop.co.il
-              </a>
-            </p>
-            <p>
-              <strong>טלפון:</strong>{' '}
-              <a href="tel:0549489377" className="text-blue-600 hover:underline">
-                054-9489377
-              </a>
-            </p>
-            <p className="mt-2">
-              אנחנו נשתדל להשיב בתוך 48 שעות ולעבוד על פתרון הבעיה.
-            </p>
-          </section>
+      <section>
+        <h2>חלקים שעדיין לא נגישים במלואם</h2>
+        <p>
+          הצהרה כללית על נגישות מלאה היא הצהרה שאי אפשר לקיים, ולכן אנו מפרטים מה ידוע לנו:
+        </p>
+        <ul>
+          <li><strong>תוכן של צד שלישי</strong> שמוצג בתוך המערכת (תוצאות מגוגל, תצוגות מספקים
+          חיצוניים): אינו בשליטתנו ואינו מובטח כנגיש.</li>
+          <li><strong>קבצים שהועלו אלינו</strong> על ידי משתמשים, לרבות קובצי CSV ודוחות: נשמרים
+          כפי שהם ואינם מונגשים אוטומטית.</li>
+          <li><strong>מסכים חדשים</strong> בשבועות הראשונים לאחר שעלו: נבדקים ידנית, וייתכן שעד
+          שהבדיקה מסתיימת יימצאו בהם פערים.</li>
+        </ul>
+        <p className="mt-4">
+          אם נתקלתם בחלק כזה, או בכל חלק אחר, כתבו לנו ונטפל בו. בקשה להתאמה פרטנית תיבדק לגופה.
+        </p>
+      </section>
 
-          <section>
-            <h2 className="text-2xl font-bold text-slate-900 mt-8 mb-4">עדכונים ושיפורים</h2>
-            <p>
-              אנחנו מעדכנים את האתר באופן קבוע על מנת לעדכן ולשפר את הנגישות. אם יש לך הצעות לשיפור, אנא שלח לנו דואר אלקטרוני.
-            </p>
-          </section>
+      <section>
+        <h2>עדכונים ושיפורים</h2>
+        <p>
+          אנחנו מעדכנים את האתר באופן קבוע על מנת לעדכן ולשפר את הנגישות. אם יש לכם הצעות לשיפור, אנא שלחו לנו דואר אלקטרוני.
+        </p>
+      </section>
 
-          <section>
-            <h2 className="text-2xl font-bold text-slate-900 mt-8 mb-4">משאבים נוספים</h2>
-            <ul className="list-disc list-inside space-y-2">
-              <li>
-                <a href="https://www.w3.org/WAI/WCAG21/quickref/" className="text-blue-600 hover:underline" target="_blank" rel="noopener noreferrer">
-                  WCAG 2.1 Quick Reference
-                </a>
-              </li>
-              <li>
-                <a href="https://www.w3.org/WAI/" className="text-blue-600 hover:underline" target="_blank" rel="noopener noreferrer">
-                  W3C Web Accessibility Initiative
-                </a>
-              </li>
-            </ul>
-          </section>
+      <section>
+        <h2>משאבים נוספים</h2>
+        <ul>
+          <li>
+            <a href="https://www.w3.org/WAI/WCAG21/quickref/" target="_blank" rel="noopener noreferrer">
+              WCAG 2.1 Quick Reference
+            </a>
+          </li>
+          <li>
+            <a href="https://www.w3.org/WAI/" target="_blank" rel="noopener noreferrer">
+              W3C Web Accessibility Initiative
+            </a>
+          </li>
+        </ul>
+      </section>
 
-          <section>
-            <p className="text-slate-500 text-sm mt-8 pt-8 border-t border-slate-200">
-              עמוד זה עודכן לאחרונה באפריל 2026
-            </p>
-          </section>
-        </div>
-      </div>
-      </main>
-      <Footer />
-    </div>
+      <section>
+        <p className={LEGAL_FOOTNOTE}>
+          עמוד זה עודכן לאחרונה ב-5 באוקטובר 2026
+        </p>
+      </section>
+    </LegalDoc>
   )
 }

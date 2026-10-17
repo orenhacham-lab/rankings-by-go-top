@@ -25,7 +25,11 @@ import { runFreeCheck } from '@/lib/free-check/run'
 import { checkGate, clientIpFrom, hashClient, recordRun } from '@/lib/free-check/store'
 import { domainKey, normalizeCheckUrl } from '@/lib/free-check/url-guard'
 import type { FreeCheckErrorCode, FreeCheckResponse } from '@/lib/free-check/types'
-import { LOCALES, type Locale } from '@/lib/i18n/locales'
+import { PUBLIC_LOCALES, type PublicLocale } from '@/lib/i18n/locales'
+import { runAfterResponse } from '@/lib/notifications/after-response'
+import { notifyFreeCheckCompleted } from '@/lib/notifications/operator-alerts'
+import { createAdminClient } from '@/lib/supabase/admin'
+import { logRestrictedAttempt, restrictionForRequest } from '@/lib/sanctions/guard'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -37,6 +41,11 @@ function fail(code: FreeCheckErrorCode, status: number) {
 }
 
 export async function POST(request: Request) {
+  const restricted = restrictionForRequest(request.headers)
+  if (restricted) {
+    logRestrictedAttempt('free-check', restricted)
+    return fail('blocked_url', 451)
+  }
   let body: unknown
   try {
     body = await request.json()
@@ -46,7 +55,14 @@ export async function POST(request: Request) {
   const payload = (body ?? {}) as { url?: unknown; locale?: unknown }
   if (typeof payload.url !== 'string') return fail('invalid_url', 400)
 
-  const locale: Locale = typeof payload.locale === 'string' && (LOCALES as string[]).includes(payload.locale) ? (payload.locale as Locale) : 'he'
+  // The page's language, kept whole. lib/free-check/copy.ts has every finding
+  // in all four public locales and the two ledger tables accept all four, so
+  // collapsing to he|en here was the only reason a Spanish visitor read an
+  // English check.
+  const locale: PublicLocale =
+    typeof payload.locale === 'string' && (PUBLIC_LOCALES as string[]).includes(payload.locale)
+      ? (payload.locale as PublicLocale)
+      : 'he'
 
   const admitted = normalizeCheckUrl(payload.url)
   if (!admitted.ok) {
@@ -91,6 +107,12 @@ export async function POST(request: Request) {
   // every completed run — but it must never turn a good result into an error.
   const checkId = await recordRun({ domain, locale, url: outcome.result.url, result: outcome.result, seed: outcome.seed, clientHash })
   const claimToken = checkId ? await issueClaimToken(checkId) : null
+
+  // Tell the operator which site was scanned (once per domain per 24h), after
+  // the response has gone: it can never slow or fail the scan.
+  if (checkId) {
+    runAfterResponse(() => notifyFreeCheckCompleted({ admin: createAdminClient(), checkId, domain, locale, result: outcome.result }))
+  }
 
   return NextResponse.json(
     { ok: true, result: outcome.result, ...(claimToken ? { claimToken } : {}) } satisfies FreeCheckResponse,

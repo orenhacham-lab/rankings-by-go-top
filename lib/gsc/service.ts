@@ -186,6 +186,28 @@ export async function latestSucceededRun(admin: Admin, projectId: string, window
   return (data as import('@/lib/supabase/types').GscSyncRun | null) ?? null
 }
 
+/**
+ * Whether a sync is running for the project right now, and whether the latest finished
+ * one failed (code only). This is what lets the screen show "syncing" after the
+ * automatic start and a friendly failure after it. A read problem answers null: this is
+ * additive information, so it must never turn the status route into an error.
+ */
+export interface GscSyncState { running: boolean; lastFailure: { code: string; at: string | null } | null }
+export async function loadSyncState(admin: Admin, projectId: string, nowMs: number = Date.now()): Promise<GscSyncState | null> {
+  const { data, error } = await admin.from('gsc_sync_runs')
+    .select('status, sanitized_error_code, started_at, finished_at')
+    .eq('project_id', projectId).order('started_at', { ascending: false }).limit(4)
+  if (error || !Array.isArray(data)) return null
+  const rows = data as { status: string; sanitized_error_code: string | null; started_at: string; finished_at: string | null }[]
+  const lease = nowMs - 15 * 60 * 1000
+  const running = rows.some((r) => r.status === 'running' && Date.parse(r.started_at) > lease)
+  const latest = rows.find((r) => r.status !== 'running' || Date.parse(r.started_at) <= lease)
+  const lastFailure = latest && latest.status === 'failed'
+    ? { code: /^[a-z0-9_]{1,64}$/.test(latest.sanitized_error_code ?? '') ? String(latest.sanitized_error_code) : 'sync_failed', at: latest.finished_at }
+    : null
+  return { running, lastFailure }
+}
+
 /** Sanitize a connection row for the browser (NEVER expose the encrypted token). */
 export function sanitizeConnection(c: GscConnection | null): { id: string; status: string; grantedScope: string | null; lastErrorCode: string | null; updatedAt: string } | null {
   if (!c) return null

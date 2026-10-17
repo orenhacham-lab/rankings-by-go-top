@@ -13,15 +13,20 @@
 import { authContentProject, isContentAutomationEnabled } from '@/lib/content/api-auth'
 import { toPoolDTO, isMigrationMissing, type PoolRow } from '@/lib/content/automation/api'
 import {
-  computeNextPublishAt,
-  nextPublishAtWeekdays,
-  projectedPublishAt,
+  makeSlotAfter,
+  resolveIntervalDays,
+  projectPublishDates,
+  rhythmWeekdays,
+  slotFitsRhythm,
+  spreadNextPublishAt,
   DEFAULT_TIMEZONE,
   DEFAULT_PUBLISH_TIME,
   type Cadence,
 } from '@/lib/content/automation/schedule'
+import { readPublishRhythm, type PublishRhythm } from '@/lib/content/automation/plan-rhythm'
 
 const CADENCES: Cadence[] = ['daily', 'weekly', 'monthly', 'custom']
+const PENDING = ['queued', 'scheduled', 'generating', 'generated', 'publishing']
 const POOL_SELECT = 'id, project_id, name, cadence, interval_days, publish_time, timezone, is_active, next_publish_at, publish_days'
 
 /** Sanitize an incoming weekday array (0=Sun … 6=Sat), unique + sorted. */
@@ -32,9 +37,52 @@ function cleanPublishDays(v: unknown): number[] {
   return Array.from(set).sort((a, b) => a - b)
 }
 
-/** First/next publish slot honoring weekday schedule when present. */
-function firstSlot(publishTime: string, timezone: string, publishDays: number[]): string {
-  return publishDays.length ? nextPublishAtWeekdays(publishTime, timezone, publishDays) : computeNextPublishAt(publishTime, timezone)
+/** First/next publish slot: the plan's rhythm when there is one, else the
+ *  owner's weekdays / interval; never Friday or Saturday. */
+function firstSlot(publishTime: string, timezone: string, publishDays: number[], intervalDays: number, rhythm: PublishRhythm): string {
+  return makeSlotAfter({ publishTime, timeZone: timezone, perDay: rhythm.plan?.perDay ?? null, publishDays, intervalDays, anchorIso: null, planIntervalDays: rhythm.plan?.intervalDays ?? null })(Date.now())
+}
+
+/**
+ * What the screen says about the rhythm (no allowance numbers leave the server).
+ *
+ * 'owner' means the picker: the account chooses its own days. It is NOT the
+ * customer's (owner, 4 October 2026: "not only on a trial — customers with a
+ * subscription don't control this either, it is set by the plan"), so it is
+ * reached only by an account with no plan and no trial, which is an admin.
+ * A paid plan gets 'plan' and says what the plan gives; a trial gets 'trial'
+ * and says the dates were set when the account opened.
+ */
+function rhythmDTO(rhythm: PublishRhythm) {
+  if (rhythm.plan) {
+    return {
+      source: 'plan' as const,
+      perWeek: rhythm.plan.perWeek,
+      weekdays: rhythm.plan.perDay ? rhythmWeekdays(rhythm.plan.perDay) : [],
+      perDay: rhythm.plan.perDay,
+      // Set instead of the weekdays when the account has more sites than a
+      // weekly rhythm can serve: this site publishes every N days.
+      intervalDays: rhythm.plan.intervalDays,
+      /**
+       * The split, which IS the customer's. `share` is the number they set for
+       * this website, null while it takes the even share; `siteMonthly` is what
+       * the site gets either way, `accountMonthly` what the plan gives the whole
+       * account; `maxShare` is the most it may be given now (the
+       * per-site ceiling, or what the account's other websites have left,
+       * whichever is smaller); `multiSite` is false on a one-site plan, where
+       * there is nothing to divide and the field is not offered.
+       */
+      share: rhythm.plan.monthlyShare,
+      // The plan's own monthly allowance, which is on the pricing page; what is
+      // LEFT of it this cycle still does not leave the server.
+      accountMonthly: rhythm.plan.monthly,
+      siteMonthly: rhythm.plan.monthlyForThisSite,
+      maxShare: rhythm.plan.maxShare,
+      multiSite: rhythm.plan.multiSite,
+    }
+  }
+  if (rhythm.trial) return { source: 'trial' as const }
+  return { source: 'owner' as const }
 }
 
 export async function GET(request: Request) {
@@ -55,7 +103,9 @@ export async function GET(request: Request) {
     if (isMigrationMissing((error as { code?: string }).code)) return Response.json({ error: 'automation_migration_required' }, { status: 503 })
     return Response.json({ error: 'Failed to load pool' }, { status: 500 })
   }
-  if (!poolRow) return Response.json({ pool: null, items: [] })
+  const poolActive = (poolRow as { is_active?: boolean } | null)?.is_active === true
+  const rhythm = await readPublishRhythm(auth.admin, auth.project.user_id, { countThisQueue: !poolActive, projectId: auth.project.id })
+  if (!poolRow) return Response.json({ pool: null, items: [], rhythm: rhythmDTO(rhythm) })
 
   const pool = toPoolDTO(poolRow as PoolRow)
 
@@ -86,11 +136,53 @@ export async function GET(request: Request) {
     for (const a of (arts ?? []) as { id: string; wp_post_url: string | null }[]) wpUrlByArticle[a.id] = a.wp_post_url
   }
 
-  // Projected publish dates for still-pending items, in queue order.
+  // Projected publish dates for still-pending items, in queue order — the
+  // same slots the runner will keep: the plan's rhythm (or the owner's
+  // schedule), never Friday/Saturday, spread over what is left of the cycle.
   const ptime = pool.publishTime || DEFAULT_PUBLISH_TIME
-  const base = pool.nextPublishAt || (pool.isActive ? firstSlot(ptime, pool.timezone, pool.publishDays) : null)
+  const perDay = rhythm.plan?.perDay ?? null
+  const stored = pool.nextPublishAt || (pool.isActive ? firstSlot(ptime, pool.timezone, pool.publishDays, pool.intervalDays, rhythm) : null)
+  const slotAfter = makeSlotAfter({ publishTime: ptime, timeZone: pool.timezone, perDay, publishDays: pool.publishDays, intervalDays: pool.intervalDays, anchorIso: stored, planIntervalDays: rhythm.plan?.intervalDays ?? null })
+  const readyNow = items.filter((i) => i.status === 'generated').length
+  /**
+   * THE ALLOWANCE IS THE ACCOUNT'S, THE SCREEN IS ONE PROJECT'S.
+   *
+   * `remaining` is what is left for the whole account this cycle. Showing all
+   * of it on every project's screen promised each of them the whole plan: an
+   * account on Basic with two projects projected four dates on each, while the
+   * ledger — which is account-wide — would only ever publish four between
+   * them. The weekly rhythm already divides by the active queues
+   * (articlesPerWeekFor); this divides the allowance the same way, rounding
+   * DOWN so a projection never promises an article the cycle will not produce.
+   * Articles already generated belong to this project, so they are added after
+   * the split.
+   */
+  const queues = Math.max(1, rhythm.plan?.activeQueues ?? 1)
+  // This site's slice of what is left. The even split is the default, so the
+  // fraction is normally 1/queues; a website whose owner gave it a share of its
+  // own gets that share's fraction instead, which is the same question asked of
+  // the same numbers (monthlyForSite).
+  const shareFraction = rhythm.plan && rhythm.plan.monthly > 0 ? rhythm.plan.monthlyForThisSite / rhythm.plan.monthly : 1 / queues
+  const shareOf = (n: number) => Math.floor(Math.max(0, n) * shareFraction)
+  const articlesLeft = rhythm.allowance ? shareOf(rhythm.allowance.remaining) + readyNow : 0
+  // A stored slot the runner would move (a Friday/Saturday, or a day the plan's
+  // rhythm does not publish on) is shown where the runner will move it.
+  let base = stored
+  if (stored && !slotFitsRhythm(stored, pool.timezone, perDay)) {
+    const fromMs = Math.max(Date.now(), Date.parse(stored))
+    const cadenceNextIso = slotAfter(fromMs)
+    base = rhythm.allowance
+      ? spreadNextPublishAt({ cadenceNextIso, nowMs: fromMs, periodEndIso: rhythm.allowance.periodEnd, remaining: shareOf(rhythm.allowance.remaining), ready: readyNow, slotAfter })
+      : cadenceNextIso
+  }
+  const pendingCount = items.filter((i) => PENDING.includes(i.status)).length
+  const projectedDates = base
+    ? projectPublishDates({
+      firstIso: base, count: pendingCount, slotAfter,
+      cycle: rhythm.allowance ? { periodStartIso: rhythm.allowance.periodStart, periodEndIso: rhythm.allowance.periodEnd, articlesLeft, perCycle: shareOf(rhythm.allowance.limit) } : null,
+    })
+    : []
   let pendingIndex = 0
-  let weekdayCursor = base // sequential weekday projection cursor
   const dtoItems = items.map((i) => {
     // Phase 3G.9 — every NOT-YET-PUBLISHED working item occupies an upcoming
     // cadence slot: the cron publishes the earliest GENERATED item at each due
@@ -98,16 +190,10 @@ export async function GET(request: Request) {
     // the FIRST to consume slots — they must not fall through to scheduled_at
     // (usually null) and display as "not scheduled" while automation is active.
     // failed/skipped/published stay out (they show their own state instead).
-    const pending = ['queued', 'scheduled', 'generating', 'generated', 'publishing'].includes(i.status)
-    let projected: string | null
-    if (!pending || !base) {
-      projected = i.published_at ?? i.scheduled_at ?? null
-    } else if (pool.publishDays.length) {
-      projected = weekdayCursor
-      weekdayCursor = weekdayCursor ? nextPublishAtWeekdays(ptime, pool.timezone, pool.publishDays, Date.parse(weekdayCursor) + 60000) : null
-    } else {
-      projected = projectedPublishAt(base, ptime, pool.timezone, pool.intervalDays, pendingIndex)
-    }
+    const pending = PENDING.includes(i.status)
+    const projected: string | null = !pending || !base
+      ? i.published_at ?? i.scheduled_at ?? null
+      : projectedDates[pendingIndex] ?? null
     if (pending) pendingIndex++
     return {
       id: i.id,
@@ -149,7 +235,7 @@ export async function GET(request: Request) {
     needsAttention: failedItems.length > 0 || stuckItems.length > 0 || (overdue && readyCount === 0 && queuedCount === 0),
   }
 
-  return Response.json({ pool: { ...pool, nextPublishAt: base }, items: dtoItems, health })
+  return Response.json({ pool: { ...pool, nextPublishAt: base }, items: dtoItems, health, rhythm: rhythmDTO(rhythm) })
 }
 
 export async function POST(request: Request) {
@@ -190,7 +276,8 @@ export async function POST(request: Request) {
   // is_active / publish_days are only changed when explicitly present in the body.
   const isActive = 'isActive' in body ? body.isActive === true : (prev?.is_active ?? false)
   const publishDays = 'publishDays' in body ? cleanPublishDays(body.publishDays) : (Array.isArray(prev?.publish_days) ? prev!.publish_days : [])
-  const nextPublishAt = isActive ? firstSlot(publishTime, timezone, publishDays) : null
+  const rhythm = isActive ? await readPublishRhythm(auth.admin, auth.project.user_id, { countThisQueue: !prev?.is_active, projectId: auth.project.id }) : null
+  const nextPublishAt = isActive && rhythm ? firstSlot(publishTime, timezone, publishDays, resolveIntervalDays(cadence, intervalDays), rhythm) : null
 
   const patch = { name, cadence, interval_days: intervalDays, publish_time: publishTime, timezone, is_active: isActive, publish_days: publishDays.length ? publishDays : null, next_publish_at: nextPublishAt, updated_at: new Date().toISOString() }
 

@@ -9,6 +9,7 @@
 
 import { getGeminiClient, GEMINI_REQUEST_TIMEOUT_MS } from '@/lib/ai-visibility/gemini-semantic-classifier'
 import type { SuggestionLanguage, SuggestionIntent } from '@/lib/content/topic-suggestions'
+import { languageNameInEnglish } from '@/lib/content/language'
 
 export interface GeminiTopicSuggestion {
   title: string
@@ -133,7 +134,7 @@ export function filterTopicSuggestions(
 }
 
 function buildPrompt(ctx: TopicSuggestionContext, strengthen: boolean): string {
-  const lang = ctx.language === 'he' ? 'Hebrew' : 'English'
+  const lang = languageNameInEnglish(ctx.language)
   const lines = [
     `You are an SEO/GEO content strategist. Return EXACTLY ${ctx.count} DISTINCT article topics (titles only) that rank in Google organic search AND are citable by AI answer engines (GEO).`,
     strengthen ? `IMPORTANT: your previous set was too few or too similar — return MORE VARIED, clearly distinct topics this time.` : '',

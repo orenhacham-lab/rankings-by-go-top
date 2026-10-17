@@ -34,7 +34,8 @@
  */
 
 import type { createAdminClient } from '@/lib/supabase/admin'
-import { getCachedIndex, reassembleReport } from '@/lib/content/wordpress-content-index'
+import { reassembleReport } from '@/lib/content/wordpress-content-index'
+import { getContentIndex } from '@/lib/content/content-index'
 import type { ScannedTarget } from '@/lib/content/wordpress-content-scan'
 import { buildKeywordGuard, coveredByExistingContent, ownedByExistingEntity, normalizePhrase, titleMainPhrase, keywordOriginsOf, type KeywordOriginEntry } from './keyword-guard'
 import { flattenKeywordResearchCacheDetailed, contentTokens, type EntityNode, type KeywordResearchIngestion } from './evidence-cluster'
@@ -63,11 +64,13 @@ import {
   emptyLowYieldFallbackDiagnostics, MAX_SEEDS_SENT,
   type RawSeedCandidate, type LowYieldFallbackDiagnostics, type ThirdCallStrategy,
 } from './low-yield-fallback'
+import { languageNameInEnglish, normalizeContentLanguage } from '@/lib/content/language'
 import { topicSignature, isHighConfidenceDuplicate, distinctiveTokensOf, canonicalVariants, type TopicSignature } from './semantic-dup'
 import { dedupeMegaGuideTitle } from './title-diversity'
 import { normalizeToSearchPhrase, isSearchPhraseQuality, keywordPreservesSubject, keywordHasRealSubject, conciseSubject } from './search-phrase'
 import type { RunCostController } from './run-cost-controller'
 import type { TopicSuggestion } from './types'
+import { REASON_TEXT, demandSentence } from './reason-text'
 
 type Admin = ReturnType<typeof createAdminClient>
 
@@ -435,8 +438,8 @@ export async function prepareBriefRun(
   // ── 1) Evidence inventory (project-scoped; failures RECORDED, never silent) ──
   const { data: proj } = await admin.from('projects').select('business_name, target_domain, language, country').eq('id', input.projectId).maybeSingle()
   const p = (proj as { business_name: string | null; target_domain: string | null; language: string | null; country?: string | null } | null) ?? { business_name: null, target_domain: null, language: null, country: null }
-  const language: 'he' | 'en' = String(p.language || '').toLowerCase().startsWith('en') ? 'en' : 'he'
-  const langLabel = language === 'he' ? 'Hebrew' : 'English'
+  const language = normalizeContentLanguage(p.language)
+  const langLabel = languageNameInEnglish(language)
 
   const guard = await buildKeywordGuard(admin, input.projectId)
 
@@ -491,7 +494,7 @@ export async function prepareBriefRun(
   let siteScanEntities = 0
   let staleIndexExcluded = false
   try {
-    const cacheRow = await getCachedIndex(admin, input.projectId)
+    const cacheRow = await getContentIndex(input.projectId, input.userId, admin)
     // D11 guard — a scan blob whose site host does not match the project's CURRENT
     // target domain is a previous site's content (the index is preserved across
     // re-points and write failures). Its pages/links must not enter this project's
@@ -880,16 +883,12 @@ export async function synthesizeFromSnapshot(
   // impossible by construction). Templates are grammatical function frames.
   const composeReason = (brief: OpportunityBrief, demand: DemandEvidence): string => {
     const parts: string[] = []
-    if (language === 'he') {
-      if (brief.existingContentGap) parts.push('הנושא משלים פער תוכן בתחום שהעסק עוסק בו.')
-      else parts.push('הנושא מוסיף זווית חדשה לצד תוכן קיים באתר.')
-      if (brief.relatedEntities.length > 0) parts.push('הוא נתמך בעמודים ובמוצרים קיימים באתר.')
-      if (demand.demandEvidenceAvailable && (demand.avgMonthlySearches ?? 0) > 0) parts.push(`לפי מחקר מילות מפתח, ל"${demand.demandQuery}" יש כ־${demand.avgMonthlySearches} חיפושים חודשיים.`)
-    } else {
-      if (brief.existingContentGap) parts.push('This topic fills a content gap in an area the business covers.')
-      else parts.push('This topic adds a fresh angle alongside existing site content.')
-      if (brief.relatedEntities.length > 0) parts.push('It is supported by existing site pages and products.')
-      if (demand.demandEvidenceAvailable && (demand.avgMonthlySearches ?? 0) > 0) parts.push(`Keyword research shows ~${demand.avgMonthlySearches} monthly searches for "${demand.demandQuery}".`)
+    const text = REASON_TEXT[language]
+    parts.push(brief.existingContentGap ? text.fillsGap : text.freshAngle)
+    if (brief.relatedEntities.length > 0) parts.push(text.supportedByExisting)
+    if (demand.demandEvidenceAvailable && (demand.avgMonthlySearches ?? 0) > 0) {
+      const sentence = demandSentence(language, demand.demandQuery, demand.avgMonthlySearches as number)
+      if (sentence) parts.push(sentence)
     }
     return parts.join(' ')
   }
@@ -1281,7 +1280,7 @@ export async function synthesizeFromSnapshot(
 
     // Reason safety net: the composed reason is deterministic, but assert anyway.
     const finalReason = isMalformedReason(suggestionReason)
-      ? (language === 'he' ? 'הנושא רלוונטי לתחום הפעילות של העסק ולביטויי החיפוש שנמצאו במחקר.' : 'The topic is relevant to the business and to the search terms found in research.')
+      ? REASON_TEXT[language].neutral
       : suggestionReason
 
     acceptedSignatures.push(sig)

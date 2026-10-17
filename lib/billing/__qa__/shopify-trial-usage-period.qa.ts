@@ -91,7 +91,7 @@ async function main() {
   const route = strip(read('app/api/content/articles/generate/route.ts'))
   const item = strip(read('lib/content/automation/generate-item.ts'))
   const appHome = strip(read('app/api/shopify/app-home/route.ts'))
-  const hub = strip(read('components/content/ContentHub.tsx'))
+  const hub = strip(read('components/content/workspace/AutomationScreen.tsx'))
 
   // ───────────────────────────────────────────────────────────────────────
   console.log('A1) THE INCIDENT — an active Advanced trial resolves a real period')
@@ -385,18 +385,28 @@ async function main() {
         r?.end.toISOString() === new Date(TRIAL_ENDS_AT).toISOString())
     }
 
-    // D. Shopify authority can never fall back to PayPal.
+    // D. Shopify authority never falls back to an ENDED PayPal period. (Owner
+    // decision, 9 Oct 2026: a PayPal period still PAID FOR keeps the account
+    // website-billed until it ends — see D1b.)
     {
       const shopifyWithPaypal = new FakeAdmin({
         // Shopify-governed, but the Shopify billing fields are empty.
         shopify_connections: [shopifyConn({ shopify_subscription_status: 'none', shopify_plan_handle: null, shopify_trial_ends_at: null })],
         billing_governance: [SHOPIFY_AUTHORITY],
         shopify_billing_migrations: [],
-        // A PayPal row that MUST NOT be consulted.
-        subscriptions: [paypalSub],
+        // An ENDED PayPal row that MUST NOT be consulted.
+        subscriptions: [{ ...paypalSub, current_period_end: '2026-08-30T00:00:00Z' }],
       }, {}, () => NOW.getTime())
       const r = await resolveCurrentUsagePeriod(shopifyWithPaypal as never, USER, now)
-      check('A3B-D1: a Shopify-governed account NEVER falls back to PayPal', r === null)
+      check('A3B-D1: a Shopify-governed account NEVER falls back to an ENDED PayPal period', r === null)
+      const paidWorld = new FakeAdmin({
+        shopify_connections: [shopifyConn({ shopify_subscription_status: 'none', shopify_plan_handle: null, shopify_trial_ends_at: null })],
+        billing_governance: [SHOPIFY_AUTHORITY],
+        shopify_billing_migrations: [],
+        subscriptions: [paypalSub],
+      }, {}, () => NOW.getTime())
+      const paid = await resolveCurrentUsagePeriod(paidWorld as never, USER, now)
+      check('A3B-D1b: …but a PayPal period still PAID FOR is the usage period until it ends (owner, 9 Oct 2026)', paid?.source === 'paypal')
       // Nor to a website trial, nor when it has no connection row at all.
       const noConn = new FakeAdmin({
         shopify_connections: [], billing_governance: [SHOPIFY_AUTHORITY], shopify_billing_migrations: [],
@@ -828,8 +838,15 @@ async function main() {
       /usage_period_unavailable: 'לא הצלחנו לאמת כרגע את תקופת החיוב\. נסו שוב בעוד רגע\.'/.test(he))
     check('A5-e: they are distinct from Gemini’s own provider-quota message',
       /gemini_quota_exceeded: 'Gemini quota \/ rate limit exceeded/.test(en))
-    check('A5-f: SOURCE — the queue UI resolves codes through the dictionary, not raw',
-      /const label = genErrors\[base\] \?\? base/.test(strip(read('components/content/AutomationSchedule.tsx'))))
+    // This used to ask for `genErrors[base] ?? base`, which printed the raw code
+    // at the merchant when it was not in the dictionary. The panel now degrades
+    // to a localized sentence instead, so the identifier never leaks — the house
+    // rule is that a merchant is never shown a provider's own error. The guard
+    // asks for the dictionary AND refuses the raw-code fallback.
+    const schedule = strip(read('components/content/AutomationSchedule.tsx'))
+    check('A5-f: SOURCE — the queue UI resolves codes through the dictionary, never raw',
+      /return genErrors\[base\] \?\? t\.alertReasonOther/.test(schedule)
+      && !/genErrors\[base\] \?\? base/.test(schedule))
     // THE QUEUE'S OWN DICTIONARY, matched by BRACE DEPTH rather than a fixed
     // slice. The previous version cut the block at 4000 characters while the EN
     // block is 4369 — the truncation is precisely why two missing codes went
@@ -902,16 +919,22 @@ async function main() {
       (hub.match(/<AutomationSchedule/g) ?? []).length === 1)
     check('B-b: and exactly one import of it', (hub.match(/import AutomationSchedule from/g) ?? []).length === 1)
 
-    // It must sit AFTER the auto/manual conditional closes, and still inside
-    // the automationEnabled block.
-    const gate = hub.indexOf('{automationEnabled && (')
+    // It must sit AFTER the auto/manual conditional closes. The whole SCREEN is now
+    // gated by NEXT_PUBLIC_ENABLE_CONTENT_AUTOMATION on its own route, so the gate is
+    // checked on the route rather than as an inline conditional around the queue.
     const conditional = hub.indexOf("{ideasSection === 'manual' ? (")
-    const conditionalEnd = hub.indexOf('</>\n                  )}', conditional)
+    const conditionalEnd = hub.indexOf('</>\n      )}', conditional)
     const schedule = hub.indexOf('<AutomationSchedule')
+    // W6c content strategy: the automation screen has no route of its own any more; it
+    // is mounted in the content strategy tab's list view, behind the same flag.
+    const route = strip(read('components/content-strategy/ContentStrategyScreen.tsx'))
+    const provider = strip(read('components/content/workspace/ContentWorkspaceProvider.tsx'))
     check('B-c: it is rendered OUTSIDE the auto/manual conditional',
       conditionalEnd !== -1 && schedule > conditionalEnd)
-    check('B-d: and still INSIDE automationEnabled', gate !== -1 && gate < schedule)
-    check('B-e: so section=manual renders the queue', schedule > conditionalEnd && gate < schedule)
+    check('B-d: and the screen itself is gated by the automation flag, where it is mounted',
+      /\{automationEnabled && \([\s\S]{0,300}<AutomationScreen /.test(route)
+      && /const automationEnabled = process\.env\.NEXT_PUBLIC_ENABLE_CONTENT_AUTOMATION === 'true'/.test(provider))
+    check('B-e: so section=manual renders the queue', conditionalEnd !== -1 && schedule > conditionalEnd)
     check('B-f: and section=auto renders the same one', (hub.match(/<AutomationSchedule/g) ?? []).length === 1)
     check('B-g: the manual branch still offers manual topic creation',
       /t\.manualTopicTitle/.test(hub) && /t\.newTopicButton/.test(hub))
@@ -928,11 +951,16 @@ async function main() {
       (hub.match(/onGoToQueue=\{\(\) => scheduleSectionRef\.current\?\.scrollIntoView/g) ?? []).length >= 1)
     check('B-m: ONE component means one state — switching tabs cannot create a second queue',
       (hub.match(/<AutomationSchedule/g) ?? []).length === 1 && !/ideasSection === 'auto'[\s\S]{0,200}<AutomationSchedule/.test(hub))
-    check('B-n: nor can it lose the refreshed state — refreshKey lives in the parent',
-      /const \[automationRefresh, setAutomationRefresh\] = useState/.test(hub)
-      && hub.indexOf('const [automationRefresh') < gate)
+    // The refresh signal outlives a single screen: the queue is refreshed by an enqueue
+    // that can start on the topics screen, so it lives in the workspace provider and the
+    // automation screen only reads it. Switching sub-tabs cannot reset it.
+    const workspace = strip(read('components/content/workspace/ContentWorkspaceProvider.tsx'))
+    check('B-n: nor can it lose the refreshed state — refreshKey lives in the workspace, above the screen',
+      /const \[automationRefresh, setAutomationRefresh\] = useState/.test(workspace)
+      && !/const \[automationRefresh/.test(hub)
+      && /refreshKey=\{automationRefresh\}/.test(hub))
     check('B-o: queueing a manual topic still refreshes that queue',
-      /const handleScheduled = useCallback/.test(hub) && /setAutomationRefresh/.test(hub))
+      /const handleScheduled = useCallback/.test(workspace) && /setAutomationRefresh/.test(workspace))
     check('B-p: SCOPE — a source contract on placement; not a rendered-DOM test', true)
   }
 

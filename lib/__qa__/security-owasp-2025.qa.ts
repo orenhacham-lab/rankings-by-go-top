@@ -72,9 +72,25 @@ function main() {
   check('JSON-LD cannot close its <script> tag', !/<\/script/i.test(ld) && !/</.test(ld), ld)
   check('JSON-LD still parses to the same value', JSON.parse(ld).headline === 'x</script><script>alert(1)</script>')
   check('MUTATION CONTROL: plain JSON.stringify does break out', /<\/script/.test(JSON.stringify({ h: '</script>' })))
-  const layout = strip(read('app/(public)/articles/[slug]/layout.tsx'))
-  check('article layout emits JSON-LD only through jsonForScriptTag', /jsonForScriptTag\(/.test(layout) && !/__html:\s*JSON\.stringify/.test(layout))
-  const pageSrc = strip(read('app/(public)/articles/[slug]/page.tsx'))
+  // Every language's blog, not only the Hebrew one: the article page is now
+  // one component (components/public/articles/ArticleView) behind four thin
+  // routes, and a layout that emitted raw JSON.stringify in ONE of the four
+  // would be an injection point the Hebrew-only check could not see.
+  for (const dir of ['articles', 'en/articles', 'es/articles', 'pt-BR/articles']) {
+    const layout = strip(read(`app/(public)/${dir}/[slug]/layout.tsx`))
+    check(`${dir}: article layout emits JSON-LD only through jsonForScriptTag`,
+      /jsonForScriptTag\(/.test(layout) && !/__html:\s*JSON\.stringify/.test(layout))
+    // The listing's own JSON-LD moved out of this layout and into the index
+    // component: a layout wraps its whole segment, so from here it was also
+    // rendered on every article page. What matters for injection is unchanged
+    // and checked below — a layout that emits no __html cannot be the hole.
+    const indexLayout = strip(read(`app/(public)/${dir}/layout.tsx`))
+    check(`${dir}: listing layout emits no raw JSON-LD`, !/__html:/.test(indexLayout))
+  }
+  const indexSrc = strip(read('components/public/articles/ArticlesIndex.tsx'))
+  check('articles index emits JSON-LD only through jsonForScriptTag',
+    /jsonForScriptTag\(/.test(indexSrc) && !/__html:\s*JSON\.stringify/.test(indexSrc))
+  const pageSrc = strip(read('components/public/articles/ArticleView.tsx'))
   check('article page sanitizes before rendering and never parses with innerHTML =',
     /sanitizePublicArticleHtml\(article\.content\)/.test(pageSrc) && !/\.innerHTML\s*=\s*article\.content/.test(pageSrc))
   const publish = strip(read('app/api/publish-article/route.ts'))
@@ -135,7 +151,7 @@ function main() {
   check('MUTATION CONTROL: the permissive owner check is recognised', permissive.test('if (ownerId && ownerId !== user.id) {'))
   const tt = strip(read('app/actions/tracking-targets.ts'))
   check('both keyword-create actions assert project ownership before inserting',
-    (tt.match(/await assertOwnedProject\(supabase, user\.id, projectId\)/g) || []).length === 2)
+    (tt.match(/await assertOwnedProject\(supabase, user\.id, projectId(?:, m)?\)/g) || []).length === 2)
   const dbg = strip(read('app/api/google-ads/debug-customers/route.ts'))
   check('google-ads/debug-customers is admin-only', /isAdminUser\(createAdminClient\(\), user\.id\)/.test(dbg))
 

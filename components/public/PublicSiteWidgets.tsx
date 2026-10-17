@@ -1,8 +1,10 @@
 'use client'
 
+import { useState } from 'react'
 import { usePathname } from 'next/navigation'
 import { CookieConsent } from '@/components/CookieConsent'
 import { WhatsAppFloat } from './WhatsAppFloat'
+import { PublicDemoFloat } from './DemoFloat'
 import { MobileContactBar } from './MobileContactBar'
 import { AccessibilityWidget } from './AccessibilityWidget'
 
@@ -16,6 +18,10 @@ import { AccessibilityWidget } from './AccessibilityWidget'
  *
  * The cookie banner is bundled here so it coordinates spacing with the mobile
  * contact bar and never overlaps form actions on the login/signup screens.
+ * The WhatsApp button is never hidden by it: the card sits beside the button. On a
+ * phone the notice, the contact bar and the accessibility button share ONE
+ * bottom strip: the sheet lies over the bar, and both keep the start slot free
+ * for the accessibility button, so none of them floats over the page.
  */
 
 // Route prefixes where the floating widgets must NOT appear. Matched as exact
@@ -38,6 +44,15 @@ const NON_PUBLIC_PREFIXES = [
   '/signup',
   '/en/login',
   '/en/signup',
+  '/es/login',
+  '/es/signup',
+  // The password-reset pages are auth screens too: nothing floats over their form.
+  '/forgot-password',
+  '/reset-password',
+  '/en/forgot-password',
+  '/en/reset-password',
+  '/es/forgot-password',
+  '/es/reset-password',
 ]
 
 function isNonPublicArea(pathname: string | null): boolean {
@@ -59,6 +74,31 @@ export function shouldRenderPublicWidgets(isAuthenticated: boolean, pathname: st
   return !isNonPublicArea(pathname)
 }
 
+/**
+ * THE CONSENT NOTICE IS RENDERED BEFORE THE PAGE, NOT AFTER IT.
+ *
+ * It looks the same either way, because it is fixed-positioned. What changes is
+ * the TAB ORDER. Rendered with the other floating widgets, at the end of the
+ * document, the notice was tab stop 47 on the home page: a visitor with a mouse
+ * refused cookies in one click, and a visitor using only a keyboard had to pass
+ * the whole page first. Refusing has to be as easy as accepting (GDPR Art. 7
+ * and the EDPB's cookie-banner guidance), and "as easy" cannot mean 46 extra
+ * keystrokes. So the root layout renders this one above `children`, and the
+ * rest of the widgets stay below it. Measured by
+ * lib/__qa__/reviewer-journey/public-a11y.js, which fails if the notice is not
+ * among the first stops.
+ */
+export function PublicConsentNotice({ isAuthenticated = false }: { isAuthenticated?: boolean }) {
+  const pathname = usePathname()
+  const [, setCookieOpen] = useState(false)
+
+  if (!shouldRenderPublicWidgets(isAuthenticated, pathname)) {
+    return null
+  }
+
+  return <CookieConsent onOpenChange={setCookieOpen} />
+}
+
 export function PublicSiteWidgets({ isAuthenticated = false }: { isAuthenticated?: boolean }) {
   const pathname = usePathname()
 
@@ -69,9 +109,9 @@ export function PublicSiteWidgets({ isAuthenticated = false }: { isAuthenticated
   return (
     <>
       <AccessibilityWidget />
+      <PublicDemoFloat />
       <WhatsAppFloat />
       <MobileContactBar />
-      <CookieConsent />
     </>
   )
 }

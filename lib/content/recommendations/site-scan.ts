@@ -13,7 +13,8 @@
  */
 
 import type { createAdminClient } from '@/lib/supabase/admin'
-import { getCachedIndex, reassembleReport } from '@/lib/content/wordpress-content-index'
+import { reassembleReport } from '@/lib/content/wordpress-content-index'
+import { getContentIndex } from '@/lib/content/content-index'
 import type { ScannedTarget } from '@/lib/content/wordpress-content-scan'
 import { loadShopifyScannedTargets } from '@/lib/shopify/site-targets'
 import { clusterByTokens, slugKey } from './dedupe'
@@ -23,6 +24,7 @@ import { recommendationGuidance, structuredOutputContract } from './prompt-guida
 import { validateIdea } from './validate'
 import { domainFlags, fingerprint, type DomainFlags } from './domain-flags'
 import type { TopicSuggestion } from './types'
+import { type ContentLanguage } from '@/lib/content/language'
 
 const currentYear = (): number => new Date().getFullYear()
 
@@ -30,7 +32,7 @@ type Admin = ReturnType<typeof createAdminClient>
 
 export interface SiteScanRecoInput {
   projectId: string
-  language: 'he' | 'en'
+  language: ContentLanguage
   langLabel: string
   /** Phase 3H.4 — titles/keywords already existing or already SUGGESTED (pending
    *  ideas). Without this the source had NO MEMORY between runs: a second click
@@ -418,7 +420,7 @@ export async function recommendFromSiteScan(admin: Admin, input: SiteScanRecoInp
   // entities mapped to the same ScannedTarget model. Shopify-only projects have
   // no WP cache row but a full Shopify corpus; WordPress-only projects get [] for
   // Shopify → identical to before. No ranking/dedup/provenance change.
-  const cacheRow = await getCachedIndex(admin, input.projectId)
+  const cacheRow = await getContentIndex(input.projectId, null, admin)
   const wpTargets = cacheRow ? ((reassembleReport(cacheRow).targets ?? []) as ScannedTarget[]) : []
   const shopifyTargets = await loadShopifyScannedTargets(admin, input.projectId)
   const targets = [...wpTargets, ...shopifyTargets]

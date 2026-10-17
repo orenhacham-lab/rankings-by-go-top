@@ -1,9 +1,11 @@
 'use client'
 
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
+import Notice, { type NoticeTone } from '@/components/ui/Notice'
 import { useDashboardLanguage } from '@/lib/i18n/dashboard/useDashboardLanguage'
 import { getDashboardDictionary } from '@/lib/i18n/dashboard/getDashboardDictionary'
 import { resolveCheckoutPlans, type BillingMarket } from '@/lib/paypal/checkout-plans'
+import { PAYPAL_LOCALE } from '@/lib/i18n/locales'
 
 interface PayPalButtonsOptions {
   style: {
@@ -24,13 +26,20 @@ interface PayPalWindow extends Window {
 }
 
 export default function BillingClient({ market }: { market: BillingMarket }) {
-  const { language } = useDashboardLanguage()
-  const dict = getDashboardDictionary(language)
+  const { uiLocale } = useDashboardLanguage()
+  const dict = getDashboardDictionary(uiLocale)
   const t = dict.billing.paypal
-  const paypalLocale = language === 'en' ? 'en_US' : 'he_IL'
+  const paypalLocale = PAYPAL_LOCALE[uiLocale]
 
   const [loading, setLoading] = useState(true)
   const [configError, setConfigError] = useState('')
+  // What the PayPal buttons report, shown in the page (never a browser alert and
+  // never PayPal's or our route's own error text: the console keeps those).
+  const [message, setMessage] = useState<{ tone: NoticeTone; text: string } | null>(null)
+  const messageRef = useRef<HTMLDivElement>(null)
+  useEffect(() => {
+    if (message) messageRef.current?.scrollIntoView({ block: 'nearest', behavior: 'smooth' })
+  }, [message])
 
   const initPayPalButtons = useCallback(() => {
     const paypalWindow = window as PayPalWindow
@@ -58,10 +67,8 @@ export default function BillingClient({ market }: { market: BillingMarket }) {
       if (!planId) {
         const envVarName = `NEXT_PUBLIC_PAYPAL_PLAN_ID_${plan.toUpperCase()}`
         console.warn(`[PayPal] Plan ID for "${plan}" not configured. Set env var: ${envVarName}`)
-        container.innerHTML = `<p class="text-xs text-slate-500 text-center py-3 p-2 bg-amber-50 rounded border border-amber-200">
-          ${t.planNotConfiguredPrefix} ${plan} ${t.planNotConfiguredSuffix}<br/>
-          <span class="text-xs">${t.envVarLabel} ${envVarName}</span>
-        </p>`
+        // The env var name is for the console only; the merchant reads our sentence.
+        container.innerHTML = `<p class="rounded-control border border-line bg-sunk px-3 py-3 text-center text-caption text-muted">${t.planUnavailable}</p>`
         continue
       }
 
@@ -83,7 +90,7 @@ export default function BillingClient({ market }: { market: BillingMarket }) {
             } catch (error) {
               const errorMsg = error instanceof Error ? error.message : String(error)
               console.error('[PayPal] Failed to create subscription:', errorMsg)
-              alert(`${t.createSubscriptionError} ${errorMsg}`)
+              setMessage({ tone: 'bad', text: t.createSubscriptionError })
               throw error
             }
           },
@@ -97,21 +104,22 @@ export default function BillingClient({ market }: { market: BillingMarket }) {
               })
               if (!response.ok) {
                 const err = await response.json() as Record<string, unknown>
-                const errorMsg = (err.error as string) || t.unknownError
+                const errorMsg = (err.error as string) || 'unknown'
                 console.error('[PayPal] Activate error:', err)
                 console.error('[PayPal] Error message:', errorMsg)
-                alert(`${t.activateSubscriptionError} ${errorMsg}`)
+                setMessage({ tone: 'bad', text: t.activateSubscriptionError })
                 return
               }
               const result = await response.json()
               console.log('[PayPal] Subscription activation successful:', result)
-              alert(t.activatedSuccess)
-              window.location.reload()
+              setMessage({ tone: 'ok', text: t.activatedSuccess })
+              // The same reload as before, after a moment to read the confirmation.
+              setTimeout(() => window.location.reload(), 1500)
             } catch (error) {
               const errorMsg = error instanceof Error ? error.message : String(error)
               console.error('[PayPal] Failed to activate subscription:', error)
               console.error('[PayPal] Error details:', errorMsg)
-              alert(`${t.activateSubscriptionError} ${errorMsg}`)
+              setMessage({ tone: 'bad', text: t.activateSubscriptionError })
             }
           },
           onError: (err: unknown) => {
@@ -119,15 +127,18 @@ export default function BillingClient({ market }: { market: BillingMarket }) {
             console.error('[PayPal] Button error:', err)
             console.error('[PayPal] Error details:', errorDetails)
 
-            // Show detailed error to help debug
-            let userMessage = `${t.buttonError} ${errorDetails}`
+            // The details stay in the console; the merchant gets our words for the
+            // three cases (a plan PayPal does not know, a bad client id, anything else).
+            let userMessage: string = t.buttonError
             if (errorDetails.includes('Invalid plan')) {
-              userMessage = `${t.invalidPlanIdPrefix} ${planId}${t.invalidPlanIdSuffix}${plan.toUpperCase()}`
+              console.error(`[PayPal] Invalid plan id ${planId}: check NEXT_PUBLIC_PAYPAL_PLAN_ID_${plan.toUpperCase()}`)
+              userMessage = t.planUnavailable
             } else if (errorDetails.toLowerCase().includes('client')) {
-              userMessage = t.invalidClientId
+              console.error('[PayPal] Invalid client id: check NEXT_PUBLIC_PAYPAL_CLIENT_ID')
+              userMessage = t.notConfigured
             }
 
-            alert(userMessage)
+            setMessage({ tone: 'bad', text: userMessage })
           },
         }).render(`#${id}`)
       } catch (error) {
@@ -178,14 +189,22 @@ export default function BillingClient({ market }: { market: BillingMarket }) {
 
   if (loading) {
     return (
-      <div className="text-center py-4 text-slate-400 text-sm">{t.loading}</div>
+      <div className="py-4 text-center text-copy text-muted">{t.loading}</div>
     )
   }
 
   if (configError) {
     return (
-      <div className="mt-4 p-3 bg-amber-50 border border-amber-200 rounded-lg text-amber-800 text-sm text-center">
-        {configError}
+      <div className="mt-4" data-paypal-unavailable="">
+        <Notice tone="info">{configError}</Notice>
+      </div>
+    )
+  }
+
+  if (message) {
+    return (
+      <div ref={messageRef} className="mt-4 scroll-mt-24" data-paypal-message={message.tone}>
+        <Notice tone={message.tone} onDismiss={message.tone === 'ok' ? undefined : () => setMessage(null)}>{message.text}</Notice>
       </div>
     )
   }

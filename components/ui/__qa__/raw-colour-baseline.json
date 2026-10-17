@@ -1,0 +1,10 @@
+{
+ "_note": "Raw Tailwind palette colours per file (design contract §1). This list may only SHRINK: a file not listed here must have none, a listed file may not gain any. Lower or delete an entry when you clean a file (npx tsx components/ui/__qa__/raw-colour.qa.ts --shrink rewrites the counts downward).",
+ "files": {
+  "app/(dashboard)/billing/BillingView.tsx": 15,
+  "app/(dashboard)/projects/new/page.tsx": 2,
+  "components/admin/ArticleEditor.tsx": 2,
+  "components/ai-visibility/OverviewRows.tsx": 2,
+  "components/content/ShopifyConnectionPanel.tsx": 46
+ }
+}

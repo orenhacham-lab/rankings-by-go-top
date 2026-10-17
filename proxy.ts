@@ -5,11 +5,45 @@ import { NextResponse, type NextRequest } from 'next/server'
 import { explainAccess, type AccessDiagnostics } from '@/lib/subscription'
 import {
   LANGUAGE_COOKIE, LANGUAGE_PARAM, LOCALE_HEADER,
-  explicitRequestLocale, languageCookieString, sanitizeNextPath,
+  explicitRequestLocale, languageCookieString, localeParamToPersist, sanitizeNextPath,
 } from '@/lib/i18n/request-locale'
+import { normalizeStoredLocale, type PublicLocale } from '@/lib/i18n/locales'
+import {
+  isRestrictedPath, logRestrictedAttempt, noticeLocaleForPath,
+  restrictionForRequest, sanctionsNotice,
+} from '@/lib/sanctions/guard'
 
 export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl
+
+  // ── Restricted countries ────────────────────────────────────────
+  // Before anything else, including the Supabase client below: a request we
+  // are not allowed to deal with should cost us nothing and should never
+  // reach a sign-up form or a payment button. Only the pages where a dealing
+  // STARTS are refused (signup, the free check, billing) — not the public
+  // site and not /login. lib/sanctions/guard.ts has the whole reasoning, and
+  // lib/sanctions/countries.ts the law behind each country.
+  //
+  // This fails OPEN when the geo header is absent (local development, any
+  // non-CDN path), so it cannot take the site down; the route-handler checks
+  // on the payment and account-creation paths are the second layer.
+  if (isRestrictedPath(pathname)) {
+    const restriction = restrictionForRequest(request.headers)
+    if (restriction) {
+      logRestrictedAttempt(`page:${pathname}`, restriction)
+      // 451: the status that exists for exactly this, and it tells a crawler
+      // not to treat the page as merely missing. noindex because a refusal is
+      // not content we want indexed in place of the real page.
+      return new NextResponse(sanctionsNotice(noticeLocaleForPath(pathname)), {
+        status: 451,
+        headers: {
+          'content-type': 'text/plain; charset=utf-8',
+          'cache-control': 'no-store',
+          'x-robots-tag': 'noindex, nofollow',
+        },
+      })
+    }
+  }
 
   // ── Setup mode guard ────────────────────────────────────────────
   // If Supabase isn't configured yet, the createServerClient call below
@@ -42,9 +76,9 @@ export async function proxy(request: NextRequest) {
   // dir="rtl" for every response — including English ones — and only a client
   // effect corrected it after hydration.
   //
-  // Set ONLY when this request decides the locale on its own — an /en route, or
-  // an explicit cookie. With neither, the header is omitted so a server layout
-  // can still apply its seed (the signup language in auth metadata), which the
+  // Set ONLY when this request decides the locale on its own — an /en or /es
+  // route, or an explicit cookie. With neither, the header is omitted so a
+  // server layout can still apply its seed (the signup language in auth metadata), which the
   // proxy cannot see. Sending a default here would silently outrank that seed
   // and give an English signup a Hebrew first page on a fresh device.
   //
@@ -70,10 +104,24 @@ export async function proxy(request: NextRequest) {
    * (`/en/*`, `/privacy`, the Shopify surface) is a property of that URL and
    * must never be remembered as the account's preference.
    */
-  const localeToPersist = normalizedLangParam(langParam)
+  // …but NOT when it would narrow a wider choice the reader already made:
+  // localeParamToPersist says why, and is tested in
+  // lib/i18n/dashboard/__qa__/spanish-dashboard.qa.ts group 9.
+  const localeToPersist = localeParamToPersist(
+    request.cookies.get(LANGUAGE_COOKIE)?.value ?? null,
+    normalizedLangParam(langParam),
+  )
+  // An affiliate link carries its code in the URL and NOTHING is written here for
+  // it: no cookie, no header, no storage of any kind. lib/affiliate/referral.ts
+  // says why (ePrivacy art. 5(3), and a consent record this middleware cannot
+  // read), and the live agreement promises partners exactly that in four
+  // languages. The code is read on the way to signing up, and the partner's own
+  // link is /r/<code>, which counts the click server-side and lands the visitor
+  // on the site with the code on the URL.
   const persistLocale = (res: NextResponse): NextResponse => {
+    const secure = request.nextUrl.protocol === 'https:'
     if (localeToPersist) {
-      res.headers.append('set-cookie', languageCookieString(localeToPersist, request.nextUrl.protocol === 'https:'))
+      res.headers.append('set-cookie', languageCookieString(localeToPersist, secure))
     }
     return res
   }
@@ -102,6 +150,9 @@ export async function proxy(request: NextRequest) {
     data: { user },
   } = await supabase.auth.getUser()
 
+  // /settings and /ai-visibility hold what used to be sections of /projects/{id}
+  // (the project's details and connections, and the AI visibility tool), so they
+  // sit behind the same sign-in and subscription gate that page did.
   const isProtectedRoute =
     pathname.startsWith('/dashboard') ||
     pathname.startsWith('/clients') ||
@@ -109,6 +160,8 @@ export async function proxy(request: NextRequest) {
     pathname.startsWith('/keywords') ||
     pathname.startsWith('/scans') ||
     pathname.startsWith('/reports') ||
+    pathname.startsWith('/settings') ||
+    pathname.startsWith('/ai-visibility') ||
     pathname.startsWith('/billing') ||
     pathname.startsWith('/admin')
 
@@ -180,9 +233,12 @@ export async function proxy(request: NextRequest) {
 
 /** The `?lang=` value, normalised, or null. Kept beside the proxy so the cookie
  *  and the header can never be written from different readings of it. */
-function normalizedLangParam(raw: string | null): 'he' | 'en' | null {
-  const v = (raw ?? '').trim().toLowerCase()
-  return v === 'he' || v === 'en' ? v : null
+function normalizedLangParam(raw: string | null): PublicLocale | null {
+  // Spanish included, and only while the Spanish build is on — that is what
+  // normalizeStoredLocale guarantees. A hand-rolled he|en check here is what
+  // dropped `?lang=es` and reset a Spanish sign-up to Hebrew on its first
+  // dashboard load.
+  return normalizeStoredLocale(typeof raw === 'string' ? raw.trim().toLowerCase() : raw)
 }
 
 function redirectToBilling(request: NextRequest) {

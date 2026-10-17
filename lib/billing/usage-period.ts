@@ -40,7 +40,7 @@
  */
 
 import { parseInstantMs } from '@/lib/paypal/timestamp'
-import { resolveBillingAuthority } from '@/lib/billing/governance'
+import { resolveEffectiveBillingAuthority } from '@/lib/shopify/paypal-paid-period'
 import { PLAN_CATALOG, type PlanCode } from '@/lib/plans/catalog'
 import { isSupportedShopifyPlanHandle, type ShopifyPlanHandle } from '@/lib/shopify/constants'
 
@@ -125,7 +125,10 @@ export async function resolveCurrentUsagePeriod(
   //
   // A governance READ FAILURE is not "website": it is an outage, and it stops
   // here rather than falling through to PayPal/trial data.
-  const authority = await resolveBillingAuthority(admin, userId)
+  // A Shopify-authority account inside a paid PayPal period is website-billed
+  // until it ends (owner decision, 9 Oct 2026): the PayPal period is its usage
+  // period, matching lib/shopify/entitlement-resolver.ts.
+  const authority = await resolveEffectiveBillingAuthority(admin, userId, nowFn())
   if (!authority.ok) return null
 
   if (authority.authority !== 'shopify') {

@@ -44,6 +44,12 @@ export type BillingReturnOutcome =
    * never moved.
    */
   | 'migration_incomplete'
+  /**
+   * Shopify confirmed a plan, but the account is still inside the PayPal period
+   * it already paid for (lib/shopify/paypal-paid-period.ts). Nothing moved and
+   * PayPal was not contacted; billing moves only after that period ends.
+   */
+  | 'migration_deferred'
   | 'success'
   /**
    * COOKIE-LESS RECOVERY. No usable intent cookie reached us, but Shopify
@@ -96,8 +102,10 @@ export interface BillingReturnResult {
  *
  * What this path deliberately does NOT do: consume an intent (there is none),
  * advance a PayPal→Shopify migration, or cancel a PayPal subscription. Those
- * stay behind the intent-authorized path, so a replayed callback can never
- * repeat an irreversible billing transition. Re-running this is safe: the only
+ * stay behind the intent-authorized path below and the embedded app's
+ * session-token-authenticated load (lib/shopify/app-load-billing-sync.ts, which
+ * also requires an Admin API ACTIVE confirmation and a CAS claim), so a
+ * replayed callback can never trigger an irreversible billing transition. Re-running this is safe: the only
  * write is the billing-cache upsert, which is idempotent.
  */
 async function reconcileFromVerifiedShopifyCallback(
@@ -288,6 +296,7 @@ export async function processShopifyBillingReturn(
   // so a failed PayPal cancellation or an unconfirmed completion still
   // reported success.
   const advanced = await confirmShopifyActiveAndAdvance(admin, connection.user_id, fetchImpl)
+  if (advanced?.deferred) return result('migration_deferred', intent.project_id, route)
   if (advanced && (advanced.cancelFailed || advanced.dbWriteUnconfirmed || advanced.status !== 'completed')) {
     console.warn('[shopify-billing-return] plan confirmed but the migration did not complete', {
       status: advanced.status,

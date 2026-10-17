@@ -260,15 +260,10 @@ async function main() {
           check(`${id}: ${code}'s five limit lines render in the approved ORDER`,
             JSON.stringify(rendered) === JSON.stringify(expected),
             `rendered=${JSON.stringify(rendered)} expected=${JSON.stringify(expected)}`)
-          if (PLAN_CATALOG[code].maxProjects === 1) {
-            check(`${id}: ${code} shows the article allowance SECOND, right after the project line`,
-              rendered[1] === planArticleLine(code, page.lang)
-              && /^(1 project|פרויקט אחד)$/.test(rendered[0]),
-              `${rendered[0]} → ${rendered[1]}`)
-          } else {
-            check(`${id}: ${code} keeps the account-wide article line LAST`,
-              rendered[4] === planArticleLine(code, page.lang), rendered[4])
-          }
+          check(`${id}: ${code} shows the article allowance FIRST, then the website line`,
+            rendered[0] === planArticleLine(code, page.lang)
+            && /^(1 website|Up to \d+ websites|אתר אחד|עד \d+ אתרים)$/.test(rendered[1]),
+            `${rendered[0]} → ${rendered[1]}`)
         }
 
         // ── copy: label, description and limit lines, per plan ──────────────
@@ -288,7 +283,7 @@ async function main() {
         check(`${id}: nothing shown for Advanced describes it as multi-site`,
           !MULTI_SITE.some((re) => re.test(advancedCopy)), advancedCopy)
         // The account-wide clause appears only where sharing is real.
-        const SHARED = page.lang === 'en' ? 'shared across your account' : 'משותפים לכל החשבון'
+        const SHARED = page.lang === 'en' ? 'shared across all your websites' : 'משותפים לכל האתרים שלכם'
         check(`${id}: Basic and Advanced do NOT claim an account-wide article pool`,
           !planArticleLine('regular', page.lang).includes(SHARED)
           && !planArticleLine('advanced', page.lang).includes(SHARED))
