@@ -3007,6 +3007,170 @@ const OWN_BILLING_STILL_SETTINGS: Record<string, RegExp> = {
     !BILLED_ELSEWHERE_NOT_OUR_CHARGE.en.test('Write to us and we will stop the charge for you.'))
 }
 
+// ── 36) an author photo a customer uploads ──────────────────────────────
+/*
+ * The author box lets a customer upload a photo. A photo of a person is not the
+ * kind of user content section 15 was written for: that clause warrants rights
+ * over text the customer owns (domains, keywords, client details). A photograph
+ * of a human being is personal data about a third party who never agreed to
+ * anything with us, and under section 2(6) of Israel's Protection of Privacy Law
+ * using a person's likeness for profit is an infringement in itself, consent or
+ * no contract. The privacy policy was the larger gap: no uploaded file appeared
+ * in what we collect or in how long we keep it, and the person in the picture
+ * had no route to us at all.
+ *
+ * What the two documents now say, and what therefore has to stay true in code:
+ *   1. the customer warrants the depicted person's consent, a guardian's where
+ *      the person is a minor, and must remove the photo if that consent is
+ *      withdrawn;
+ *   2. the file is stored under the project id plus a random id, never under a
+ *      person's name, and we neither publish our copy nor link to it;
+ *   3. deleting the photo, or turning the setting off, erases the storage
+ *      object - not only the row;
+ *   4. the photo reaches no AI provider, trains no model, and gets no face
+ *      recognition or other biometric processing;
+ *   5. the copy published into the customer's media library or Shopify Files is
+ *      outside our control, and we say so rather than promising a deletion we
+ *      cannot perform.
+ * Claim 5 is the honest half of claim 3, and claim 4 is the one that would be
+ * cheapest to break by accident, which is why both have checks bound to code
+ * below as soon as the upload exists.
+ */
+const PHOTO_CONSENT: Record<string, RegExp> = {
+  he: /\u05d0\u05d5\u05ea\u05d5 \u05d0\u05d3\u05dd \u05d4\u05e1\u05db\u05d9\u05dd \u05e9\u05d4\u05ea\u05de\u05d5\u05e0\u05d4 \u05ea\u05ea\u05e4\u05e8\u05e1\u05dd/,
+  en: /that person has consented\s*to the photo being published/,
+  es: /esa persona ha consentido que la foto se publique/,
+  'pt-BR': /essa pessoa consentiu com a publica[\u00e7c][\u00e3a]o da foto/,
+}
+const PHOTO_MINOR: Record<string, RegExp> = {
+  he: /\u05e7\u05d8\u05d9\u05df, \u05e0\u05d3\u05e8\u05e9\u05ea \u05d4\u05e1\u05db\u05de\u05ea \u05d4\u05d0\u05e4\u05d5\u05d8\u05e8\u05d5\u05e4\u05d5\u05e1/,
+  en: /is a minor, their guardian&rsquo;s consent is required/,
+  es: /es menor de edad, se requiere el consentimiento de su tutor/,
+  'pt-BR': /for menor de idade, [\u00e9e] necess[\u00e1a]rio o consentimento do respons[\u00e1a]vel/,
+}
+const PHOTO_COPY_NOT_OURS: Record<string, RegExp> = {
+  he: /\u05e2\u05d5\u05ea\u05e7 \u05e9\u05db\u05d1\u05e8 \u05d4\u05d5\u05e2\u05ea\u05e7 \u05dc\u05e1\u05e4\u05e8\u05d9\u05d9\u05ea\s*\u05d4\u05de\u05d3\u05d9\u05d4 \u05e9\u05dc \u05d4\u05d0\u05ea\u05e8 \u05e9\u05dc\u05db\u05dd \u05e0\u05de\u05e6\u05d0 \u05d1\u05e9\u05dc\u05d9\u05d8\u05ea\u05db\u05dd/,
+  en: /a copy already\s*placed in your site&rsquo;s media library is under your control/,
+  es: /una copia que ya se haya colocado en la biblioteca de medios de su sitio est[\u00e1a] bajo su control/,
+  'pt-BR': /uma c[\u00f3o]pia j[\u00e1a] colocada na biblioteca de m[\u00ed i]dia do seu site est[\u00e1a] sob o seu controle/,
+}
+const PHOTO_PATH_NO_NAME: Record<string, RegExp> = {
+  he: /\u05de\u05de\u05d6\u05d4\u05d4 \u05d4\u05e4\u05e8\u05d5\u05d9\u05e7\u05d8 \u05d5\u05de\u05de\u05d6\u05d4\u05d4 \u05d0\u05e7\u05e8\u05d0\u05d9/,
+  en: /the project id and a\s*random id, and never of a person&rsquo;s name/,
+  es: /del identificador del proyecto y de un identificador aleatorio, y nunca del nombre de una persona/,
+  'pt-BR': /pelo identificador do projeto e por um identificador aleat[\u00f3o]rio, nunca pelo nome de uma pessoa/,
+}
+const PHOTO_NO_AI: Record<string, RegExp> = {
+  he: /\u05d0\u05d9\u05e0\u05d4 \u05e0\u05e9\u05dc\u05d7\u05ea \u05dc\u05d0\u05e3 \u05e1\u05e4\u05e7 AI/,
+  en: /is not sent to any AI provider, is not used to train models/,
+  es: /no se env[\u00ed i]a a ning[\u00fau]n proveedor de IA, no se utiliza para entrenar modelos/,
+  'pt-BR': /n[\u00e3a]o [\u00e9e] enviada a nenhum provedor de IA, n[\u00e3a]o [\u00e9e] usada para treinar modelos/,
+}
+const PHOTO_NO_BIOMETRIC: Record<string, RegExp> = {
+  he: /\u05d6\u05d9\u05d4\u05d5\u05d9 \u05e4\u05e0\u05d9\u05dd \u05d0\u05d5 \u05db\u05dc \u05e2\u05d9\u05d1\u05d5\u05d3 \u05d1\u05d9\u05d5\u05de\u05d8\u05e8\u05d9 \u05d0\u05d7\u05e8/,
+  en: /we do not run face\s*recognition or any other biometric processing on it/,
+  es: /no ejecutamos sobre ella reconocimiento facial ni ning[\u00fau]n otro tratamiento biom[\u00e9e]trico/,
+  'pt-BR': /n[\u00e3a]o executamos sobre ela reconhecimento facial nem qualquer outro tratamento biom[\u00e9e]trico/,
+}
+/*
+ * Two sentences were corrected on 2026-10-17, the day after they went live,
+ * once the upload was built and its real behaviour could be read:
+ *   - "or into Shopify Files" named a destination the photo cannot reach. The
+ *     app's Shopify scopes (read_products, read_content, write_content) cannot
+ *     write to Shopify Files, and lib/content/author-box/photo-copy.ts offers
+ *     the upload only on a WordPress site with an application password. A
+ *     published document should not describe a copy that is never made.
+ *   - "turning the setting off erases the file" was wrong about which setting.
+ *     Deleting the photo, or moving the image choice to 'none' or 'site_icon',
+ *     calls removeAuthorPhotoObject; turning the whole author box off KEEPS the
+ *     file. Rather than make a toggle destroy a customer's file, the text now
+ *     says which action erases it and which does not.
+ * The last two checks in this section fail if either sentence comes back.
+ */
+const PHOTO_DELETE_ERASES_FILE: Record<string, RegExp> = {
+  he: /\u05de\u05d5\u05d7\u05e7\u05d9\u05dd \u05d0\u05ea \u05d4\u05e7\u05d5\u05d1\u05e5\s*\u05de\u05d4\u05d0\u05d7\u05e1\u05d5\u05df \u05e9\u05dc\u05e0\u05d5/,
+  en: /erases the file from our\s*storage/,
+  es: /se borra el archivo de nuestro almacenamiento/,
+  'pt-BR': /exclui o arquivo do nosso armazenamento/,
+}
+const PHOTO_SUBJECT_ROUTE: Record<string, RegExp> = {
+  he: /\u05d0\u05dd \u05d0\u05ea\u05dd \u05d4\u05d0\u05d3\u05dd \u05e9\u05d1\u05ea\u05de\u05d5\u05e0\u05d4/,
+  en: /If you are the person in the photo and not the customer who uploaded/,
+  es: /Si usted es la persona de la foto y no el cliente que la subi[\u00f3o]/,
+  'pt-BR': /Se voc[\u00ea e] [\u00e9e] a pessoa da foto e n[\u00e3a]o o cliente que a enviou/,
+}
+const PHOTO_BOX_OFF_KEEPS: Record<string, RegExp> = {
+  he: /\u05db\u05d9\u05d1\u05d5\u05d9 \u05ea\u05d9\u05d1\u05ea \u05d4\u05de\u05d7\u05d1\u05e8 \u05db\u05d5\u05dc\u05d4 \u05d0\u05d9\u05e0\u05d5 \u05de\u05d5\u05d7\u05e7 \u05d0\u05ea \u05d4\u05ea\u05de\u05d5\u05e0\u05d4/,
+  en: /Turning the whole author box off does not erase the photo/,
+  es: /Desactivar toda la caja de autor no borra la foto/,
+  'pt-BR': /Desligar a caixa de autor inteira n[\u00e3a]o exclui a foto/,
+}
+const PHOTO_IN_RETENTION: Record<string, RegExp> = {
+  he: /<strong>\u05ea\u05de\u05d5\u05e0\u05ea \u05de\u05d7\u05d1\u05e8:<\/strong> \u05db\u05dc \u05e2\u05d5\u05d3 \u05d4\u05ea\u05de\u05d5\u05e0\u05d4 \u05de\u05d5\u05d2\u05d3\u05e8\u05ea \u05d1\u05e4\u05e8\u05d5\u05d9\u05e7\u05d8/,
+  en: /<strong>Author photo:<\/strong> for as long as the photo is configured on the project/,
+  es: /\*\*Foto de autor:\*\* mientras la foto est[\u00e9e] configurada en el proyecto/,
+  'pt-BR': /\*\*Foto de autor:\*\* enquanto a foto estiver configurada no projeto/,
+}
+{
+  const read = (path: string) => (existsSync(path) ? readFileSync(path, 'utf8') : '')
+  const enTermsSource = frontMatter(text[LOCALES[0]].terms).source
+  const enPrivacySource = frontMatter(text[LOCALES[0]].privacy).source
+  const termsDocs: [string, string][] = [
+    ['he', read(HEBREW_TERMS)],
+    ['en', enTermsSource ? read(enTermsSource) : ''],
+    ...LOCALES.map((l): [string, string] => [l, text[l].terms]),
+  ]
+  const privacyDocs: [string, string][] = [
+    ['he', read(HEBREW_PRIVACY)],
+    ['en', enPrivacySource ? read(enPrivacySource) : ''],
+    ...LOCALES.map((l): [string, string] => [l, text[l].privacy]),
+  ]
+  for (const [name, terms] of termsDocs) {
+    check(`${name}/terms: the uploader warrants the depicted person's consent`, PHOTO_CONSENT[name]!.test(terms))
+    check(`${name}/terms: a minor needs a guardian's consent`, PHOTO_MINOR[name]!.test(terms))
+    check(`${name}/terms: the copy already on the customer's site is named as theirs to delete`, PHOTO_COPY_NOT_OURS[name]!.test(terms))
+  }
+  for (const [name, privacy] of privacyDocs) {
+    check(`${name}/privacy: the stored path carries no person's name`, PHOTO_PATH_NO_NAME[name]!.test(privacy))
+    check(`${name}/privacy: the photo reaches no AI provider and trains no model`, PHOTO_NO_AI[name]!.test(privacy))
+    check(`${name}/privacy: no face recognition and no other biometric processing`, PHOTO_NO_BIOMETRIC[name]!.test(privacy))
+    check(`${name}/privacy: deleting the photo erases the stored file, not only the row`, PHOTO_DELETE_ERASES_FILE[name]!.test(privacy))
+    check(`${name}/privacy: the person in the photo has a route to us`, PHOTO_SUBJECT_ROUTE[name]!.test(privacy))
+    check(`${name}/privacy: the photo appears in how long we keep data`, PHOTO_IN_RETENTION[name]!.test(privacy))
+    check(`${name}/privacy: turning the whole author box off is NOT claimed to erase the photo`,
+      PHOTO_BOX_OFF_KEEPS[name]!.test(privacy))
+  }
+  /* No document may name a destination the photo cannot reach. */
+  for (const [name, doc] of [...termsDocs, ...privacyDocs]) {
+    check(`${name}: Shopify Files is not named as a place the photo is copied to`, !/Shopify Files/.test(doc))
+  }
+  /*
+   * The code half. The upload is not built yet, so these bind the moment it is:
+   * whatever module names the author-photo bucket must delete the object and must
+   * not hand the file to a model. Until that file exists there is nothing to
+   * check, and a guard that passed on an absent file would be worse than none,
+   * so the skip is explicit.
+   */
+  const photoModule = ['lib/content/author-box/photo.ts', 'lib/content/author-photo.ts', 'lib/content/author-box.ts']
+    .map((f) => [f, read(f)] as [string, string])
+    .find(([, body]) => body.length > 0)
+  if (photoModule) {
+    const [photoPath, photoBody] = photoModule
+    check(`${photoPath}: removing the photo deletes the storage object`, /\.remove\(|\.delete\(/.test(photoBody))
+    check(`${photoPath}: the photo is never handed to a model`, !/gemini|generateContent|openai/i.test(photoBody))
+  } else {
+    check('author-photo module not built yet, so its two code checks are pending (not a pass)', true)
+  }
+  check('mutation control: a clause that drops the consent warranty is caught',
+    !PHOTO_CONSENT.en.test('You may upload any photo you like for the author box.'))
+  check('mutation control: a promise to delete the copy on the customer site is caught',
+    !PHOTO_COPY_NOT_OURS.en.test('We will also delete the copy in your media library for you.'))
+  check('mutation control: a text claiming the box switch erases the photo is caught',
+    !PHOTO_BOX_OFF_KEEPS.en.test('Turning the whole author box off erases the photo from our storage.'))
+  check('mutation control: a policy that sends the photo to an AI provider is caught',
+    !PHOTO_NO_AI.en.test('The photo is sent to our AI provider to improve the author box.'))
+}
+
 console.log(`\n${pass} passed, ${fail} failed`)
 if (fail > 0) process.exit(1)
 

@@ -83,7 +83,7 @@ type Role =
   | 'cta' | 'cta-text' | 'cta-link'
   | 'pcta' | 'pcta-title' | 'pcta-text' | 'pcta-action' | 'pcta-button'
   | 'table-wrap'
-  | 'author' | 'author-title' | 'author-name' | 'author-text' | 'author-action' | 'author-link'
+  | 'author' | 'author-title' | 'author-name' | 'author-text' | 'author-action' | 'author-link' | 'author-photo' | 'author-image'
 
 const stripTags = (s: string) => s.replace(/<[^>]+>/g, ' ').replace(/&nbsp;/g, ' ').replace(/\s+/g, ' ').trim()
 const escText = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
@@ -238,6 +238,9 @@ function stylesFor(p: ArticlePalette, lang: ArticleLanguage) {
     'author-text': `margin:0 0 8px;line-height:1.6;color:${p.muted}`,
     'author-action': 'margin:0',
     'author-link': `color:${p.text};font-weight:600;text-decoration:underline`,
+    // Round at the img's explicit 56 x 56 (box.ts AUTHOR_BOX_IMAGE_SIZE): half the size.
+    'author-photo': 'margin:0 0 10px',
+    'author-image': 'border-radius:28px',
   }
   const byTag: Record<string, string> = {
     h2: `margin:36px 0 14px;padding:0;padding-${start}:12px;border:0;border-${start}:4px solid ${p.brand};line-height:1.3;color:${p.ink}`,
