@@ -37,13 +37,14 @@ import {
   findUsPostalAddress,
   forbidsHarvesting,
   isEeaUkDomain,
+  isInstitutionalDomain,
   isOpenPage,
   listingCandidates,
   pageTitle,
   robotsAllows,
 } from '../sourcing'
 import { CONTACT_PATHS, MAX_PAGES_PER_SITE, qualifyBusiness } from '../qualify'
-import { addProspect, runProspectTopUp, type PublicSource } from '../topup'
+import { addProspect, runProspectTopUp, type PublicSource, type TopUpSummary } from '../topup'
 import { SOURCING_FLAG, runIsolatedProspectTopUp } from '../topup-isolated'
 
 let pass = 0
@@ -153,12 +154,38 @@ async function main() {
   check('P8: a listing yields the businesses and nothing else',
     found.length === 1 && found[0].host === 'store.example' && found[0].company === 'Store Example LLC')
 
+  // THE 17 OCT REGRESSION, as three rules.
+  //
+  // The crawler's first day on `findjerseyfresh.com/directory/` examined four
+  // businesses and added none, because the page's only off-site links are the
+  // state's other programmes. A `.gov` host is never a prospect.
+  const stateNav = `<a href="https://store.example">Store Example LLC</a>
+    <a href="https://www.jerseyseafood.nj.gov">Jersey Seafood</a>
+    <a href="https://nj.gov">NJ.gov</a>
+    <a href="https://certifiedny.agriculture.ny.gov/producers">Pride of New York</a>`
+  const navFound = listingCandidates(stateNav, 'https://findjerseyfresh.com/directory/')
+  check('P8c: a state programme\'s own government sites are not businesses',
+    navFound.length === 1 && navFound[0].host === 'store.example')
+  check('P8d: which is true of the host on its own, so nothing downstream has to re-derive it',
+    isInstitutionalDomain('jerseyseafood.nj.gov') && isInstitutionalDomain('nj.gov')
+    && isInstitutionalDomain('mit.edu') && !isInstitutionalDomain('store.example')
+    && !isInstitutionalDomain('governor-cigars.com'))
+  check('P8e: and a link back to the listing\'s own parent domain is the listing, not a member',
+    listingCandidates('<a href="https://grown.example/join">Join</a>', 'https://directory.grown.example/d/')
+      .length === 0)
+
   const members = `<a href="/directory/store-example/">Store Example</a><a href="/directory/">All</a><a href="/about">About</a>`
   check('P9: a directory that names its members on its own pages is followed one hop',
     JSON.stringify(detailLinks(members, 'https://grown.example/directory/', '/directory/'))
       === JSON.stringify(['https://grown.example/directory/store-example/']))
   check('P9b: and the member page\'s own heading names the business',
     pageTitle('<title>Store Example LLC - Minnesota Grown</title>') === 'Store Example LLC')
+  check('P9c: a search URL and a feed under the members\' own path are not members',
+    JSON.stringify(detailLinks(
+      `<a href="/member/store-example/">Store</a><a href="/member/feed/">RSS</a>`
+      + `<a href="/member/?fwp_member_search=x">Search</a>`,
+      'https://grown.example/member/', '/member/',
+    )) === JSON.stringify(['https://grown.example/member/store-example/']))
 
   console.log('\n— Q: qualifying one business from its own site —')
 
@@ -331,6 +358,89 @@ async function main() {
   summary = await runProspectTopUp(asAdmin(f), { fetchPage: net, now: NOW, startAt: 0, sources: SOURCES })
   check('T6: a list we could not read means nothing is added',
     summary.added === null && f.tables[PROSPECTS_TABLE].length === 0)
+
+  /* ------------------------------------- rotation, and the member-page hop */
+
+  // A source that ANSWERS is not a source that yields. On 17 Oct one directory
+  // offered four candidates, all four were refused, and the pass ended there —
+  // every quarter hour, while five usable directories went unread.
+  const TWO: PublicSource[] = [
+    { name: 'barren-directory', url: 'https://barren.example/directory/' },
+    { name: 'good-directory', url: 'https://grown.example/directory/' },
+  ]
+  const twoNet = async (url: string): Promise<FetchedPage> => {
+    if (url === 'https://barren.example/directory/') {
+      return page('<a href="https://nothing.example">Nothing Co</a>', 200, url)
+    }
+    if (url === 'https://nothing.example/') return page('<html><body>plain html, no platform</body></html>', 200, url)
+    if (url.startsWith('https://nothing.example/')) return page('', 404, url)
+    return net(url)
+  }
+
+  f = world()
+  summary = await runProspectTopUp(asAdmin(f), { fetchPage: twoNet, now: NOW, startAt: 0, sources: TWO })
+  check('T7: a source whose candidates are all refused does not end the pass',
+    summary.added === 'store.example' && summary.source === 'good-directory'
+    && summary.refusals.some((r) => r.startsWith('nothing.example:')))
+
+  const mutRotation = await withMutant<{ runProspectTopUp: typeof runProspectTopUp }, TopUpSummary>(
+    'lib/outreach/topup.ts',
+    [[/      summary\.refusals\.push\(`\$\{candidate\.host\}: \$\{written\}`\)\n    \}\n  \}/,
+      '      summary.refusals.push(`${candidate.host}: ${written}`)\n    }\n    return summary\n  }']],
+    async (m) => m.runProspectTopUp(
+      asAdmin(world()), { fetchPage: twoNet, now: NOW, startAt: 0, sources: TWO },
+    ),
+  )
+  check('T7-MUT: and stopping at the first source that answered is the bug returning',
+    mutRotation.added === null)
+
+  // The member-page hop, which the same day never reached: the listing page
+  // carries the directory's own navigation, so taking its off-site links means
+  // taking the navigation.
+  const HOP: PublicSource[] = [
+    { name: 'hop-directory', url: 'https://grown.example/member/', detailHint: '/member/' },
+  ]
+  const hopNet = async (url: string): Promise<FetchedPage> => {
+    if (url === 'https://grown.example/member/') {
+      return page(
+        '<a href="https://partner.example">Our marketing partner</a>'
+        + '<a href="/member/store-example/">Store Example</a>',
+        200, url,
+      )
+    }
+    if (url === 'https://grown.example/member/store-example/') {
+      return page('<title>Store Example LLC - Grown</title><a href="https://store.example">Website</a>', 200, url)
+    }
+    if (url === 'https://grown.example/robots.txt') return page('User-agent: *\nDisallow: /wp-admin/', 200, url)
+    if (url.startsWith('https://partner.example')) return page('<html><body>an agency</body></html>', 200, url)
+    return net(url)
+  }
+
+  f = world()
+  const hopSeen: string[] = []
+  summary = await runProspectTopUp(asAdmin(f), {
+    fetchPage: async (url) => { hopSeen.push(url); return hopNet(url) },
+    now: NOW, startAt: 0, sources: HOP,
+  })
+  check('T8: a directory that declares member pages is read through them, not through its navigation',
+    summary.added === 'store.example' && f.tables[PROSPECTS_TABLE][0].company === 'Store Example LLC'
+    && !hopSeen.some((url) => url.includes('partner.example')))
+
+  const mutHop = await withMutant<{ runProspectTopUp: typeof runProspectTopUp }, string[]>(
+    'lib/outreach/topup.ts',
+    [[/  if \(source\.detailHint !== undefined\) \{\n    const members = await readDetailPages\(listing\.body, source\.url, source\.detailHint, deps, summary\)\n    if \(members\.length > 0\) return members\n  \}\n  return listingCandidates\(listing\.body, source\.url\)/,
+      '  const direct = listingCandidates(listing.body, source.url)\n  if (direct.length > 0) return direct\n  if (source.detailHint === undefined) return []\n  return readDetailPages(listing.body, source.url, source.detailHint, deps, summary)']],
+    async (m) => {
+      const seen: string[] = []
+      await m.runProspectTopUp(asAdmin(world()), {
+        fetchPage: async (url: string) => { seen.push(url); return hopNet(url) },
+        now: NOW, startAt: 0, sources: HOP,
+      })
+      return seen
+    },
+  )
+  check('T8-MUT: reading the listing\'s own links first spends the pass on its navigation',
+    mutHop.some((url) => url.includes('partner.example')))
 
   console.log('\n— G: the switches and the cron —')
 
