@@ -6058,6 +6058,11 @@ export const dashboardEn = {
       cancelSuccess: 'Subscription renewal was canceled. Your access will remain active until the end of the billing period.',
       cancelError: 'We couldn’t cancel your renewal. Try again in a moment, or write to us and we’ll cancel it for you.',
       contactToCancel: 'To cancel your renewal, write to us and we will end your plan for you. If the subscription is billed by another company, we will tell you where the cancellation is done and pass your request on to them.',
+      // Bought on an external marketplace: that platform is the seller and
+      // holds the payment instrument, so this says where cancelling works
+      // rather than offering a cancellation we cannot perform.
+      cancelAtMarketplace: (seller: string) => `You bought this plan on ${seller}, and the billing runs there. You cancel the renewal in your ${seller} account, and your access stays active until the end of the period you have paid for. If you cannot reach ${seller}, write to us and we will end your plan on our side. Only ${seller} can stop the charge.`,
+      marketplacePolicyLink: (seller: string) => `${seller}'s terms and policies`,
       renewalAlreadyCancelled: 'Renewal has been cancelled. Your access remains active until',
     },
     paypal: {

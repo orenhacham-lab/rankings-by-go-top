@@ -119,8 +119,12 @@ const PUBLIC_MARKETING_SEGMENTS = new Set([
  * its language is a property of the URL, exactly like `/en/*`, and saying so
  * here is what lets the rest of the contract carry that fact outward instead of
  * inventing a second mechanism for it.
+ *
+ * `/go/*` is the same shape for the same reason: it is the sales page an
+ * external marketplace reviews and its affiliates send buyers to, written in
+ * English for a latin-script listing's audience, with no Hebrew counterpart.
  */
-const ENGLISH_ONLY_SEGMENTS = new Set(['shopify'])
+const ENGLISH_ONLY_SEGMENTS = new Set(['shopify', 'go'])
 
 /** Exposed so the QA can prove the list matches the real route tree. */
 export function englishOnlySegments(): string[] {
