@@ -304,7 +304,7 @@ export type AuthorPhotoCopy = (projectId: string, ownerId: string) => Promise<st
  * Everything the box is made from, for publishing AND for the settings
  * preview (./preview.ts): the owner's own name and link, the site's publishing
  * user (asked only when the owner typed no name), the business name, the
- * owner's own line, the description (never a store's), the about page and the
+ * owner's own line, the description (a store's too, since 2026-10-17), the about page and the
  * language. Every read
  * names the project and its owner. `articleId` null = the preview: the
  * language is the project's, else the description's.
@@ -335,8 +335,8 @@ export async function readAuthorBoxInputs(admin: SupabaseClient, req: {
     try { authorName = req.authorName ? await req.authorName() : null } catch { authorName = null }
   }
   const [description, aboutUrl, topicLanguage] = await Promise.all([
-    // A store's description is kept out of its articles (writing guidance), so out of the box too.
-    req.platform === 'shopify' ? Promise.resolve(null) : readDescription(admin, req.projectId, project.owner),
+    // The description reaches a store's articles too (lib/content/writing-guidance/store.ts, 2026-10-17), so it reaches its box.
+    readDescription(admin, req.projectId, project.owner),
     readAboutUrl(admin, req.projectId, project.owner, project.domain),
     req.articleId ? readTopicLanguage(admin, req.articleId, req.projectId) : Promise.resolve(null),
   ])

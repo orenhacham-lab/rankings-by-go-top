@@ -12,9 +12,12 @@
  *      not_found and nothing is written; the upsert names only the guidance
  *      column; a missing column makes the card read-only and generation
  *      unchanged; a rule keeps the time and article it came with;
- *   D) generation reads the context for the project's owner only, and a
- *      Shopify store's articles keep their defaults (no description, city or
- *      business name), failing closed;
+ *   D) generation reads the context for the project's owner only; a Shopify
+ *      store's articles leave out its city and do not name the business, but
+ *      DO carry the description the owner wrote (changed 2026-10-17 on the
+ *      owner's word: the settings ask every owner for a description and a
+ *      store owner's answer was being ignored); a failed read still gives
+ *      neither;
  *   E) every word on screen exists in all four languages, with no Hebrew left
  *      in the others;
  *   F) E-E-A-T: a topic the system created names the business (when its name
@@ -229,7 +232,8 @@ async function main() {
     shopify_connections: [{ project_id: PROJECT, archived_at: null }],
   })
   const shop = await readGenerationContext(shopDb as never, PROJECT, 'רמת גן')
-  check('D6: a Shopify store: no description, no city, but the owner\'s own guidance still applies', shop.shopify && shop.business.description === null && shop.business.city === null && shop.guidance.instructions === 'בלי מחירים')
+  check('D6: a Shopify store: the owner\'s description and guidance apply, the city does not, and the business is still not named',
+    shop.shopify && shop.business.description === 'חנות' && shop.business.city === null && shop.guidance.instructions === 'בלי מחירים')
   ;(shopDb.tables.shopify_connections as Record<string, unknown>[])[0].archived_at = '2026-10-01T00:00:00Z'
   shopDb.tables.billing_governance = [{ user_id: OWNER, billing_authority: 'shopify' }]
   // CHANGED 11 October 2026 (was: "an account Shopify bills counts as Shopify even without a live
@@ -245,10 +249,14 @@ async function main() {
     shopify_connections: [], billing_governance: [{ user_id: OWNER, billing_authority: 'shopify' }] }) as never, PROJECT, 'רמת גן')).shopify)
   const brokenDb = { from: (t: string) => (t === 'shopify_connections' ? { select: () => ({ eq: () => ({ is: () => ({ limit: async () => ({ data: null, error: { code: '500' } }) }) }) }) } : (genDb as FakeAdmin).from(t)) }
   check('D8: a read that fails counts as Shopify (fails closed)', (await readGenerationContext(brokenDb as never, PROJECT, 'רמת גן')).shopify)
-  const noShopCheck = await mutant<typeof import('../store')>('lib/content/writing-guidance/store.ts', (src) => src.replace("if (shopify) return { guidance: guidance.guidance, business: { description: null, city: null }, shopify: true }", ''))
-  check('MUTATION CONTROL: without the Shopify check a store gets the description and city (so D6 would fail)', (await noShopCheck.readGenerationContext(new FakeAdmin({
+  const noShopCheck = await mutant<typeof import('../store')>('lib/content/writing-guidance/store.ts', (src) => src.replace("if (shopify) return { guidance: guidance.guidance, business: { description: profile.description, city: null }, shopify: true }", ''))
+  check('MUTATION CONTROL: without the Shopify branch a store gets the city too (so D6 would fail)', (await noShopCheck.readGenerationContext(new FakeAdmin({
     projects: [{ id: PROJECT, user_id: OWNER }], project_profiles: [{ project_id: PROJECT, user_id: OWNER, description: 'חנות', is_local: true }],
-    shopify_connections: [{ project_id: PROJECT, archived_at: null }] }) as never, PROJECT, 'רמת גן')).business.description === 'חנות')
+    shopify_connections: [{ project_id: PROJECT, archived_at: null }] }) as never, PROJECT, 'רמת גן')).business.city === 'רמת גן')
+  const silentStore = await mutant<typeof import('../store')>('lib/content/writing-guidance/store.ts', (src) => src.replace('business: { description: profile.description, city: null }, shopify: true', 'business: { description: null, city: null }, shopify: true'))
+  check('MUTATION CONTROL: a store silenced again fails D6', (await silentStore.readGenerationContext(new FakeAdmin({
+    projects: [{ id: PROJECT, user_id: OWNER }], project_profiles: [{ project_id: PROJECT, user_id: OWNER, description: 'חנות', is_local: true }],
+    shopify_connections: [{ project_id: PROJECT, archived_at: null }] }) as never, PROJECT, 'רמת גן')).business.description === null)
   const anyLocal = await mutant<typeof import('../store')>('lib/content/writing-guidance/store.ts', (src) => src.replace('profile.isLocal === true && city?.trim()', 'city?.trim()'))
   check('MUTATION CONTROL: without the local check the city reaches a business not marked local (so D3 would fail)', (await anyLocal.readGenerationContext(genDb as never, PROJECT, 'רמת גן')).business.city === 'רמת גן')
 

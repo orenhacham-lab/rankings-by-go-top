@@ -300,8 +300,17 @@ async function main() {
     check('C18: Wix: never a box', out === BODY && f.calls.length === 0)
     const shop = await publish(db({ articles: [{ id: ART, project_id: PROJECT, shopify_article_url: `https://${DOMAIN}/blogs/news/old`, published_at: '2026-10-01T00:00:00Z' }] }), noBoxFetch(), BODY, 'shopify')
     check('C19: a Shopify store gets it like WordPress (its own published article is read)', count(shop) === 1 && shop.includes('Levi Bakery'))
-    // MUTATION CONTROL, run by hand: reading the description for Shopify too fails this check.
-    check('C19b: a store\'s box leaves out the business description, as its articles do', !shop.includes(DESCRIPTION.split('.')[0]))
+    // CHANGED 2026-10-17 on the owner's word: the description reaches a store's
+    // ARTICLES (lib/content/writing-guidance/store.ts), so a store's box carries
+    // it too. Before this a store owner who filled the description in the
+    // settings got a box with a name and nothing under it.
+    check('C19b: a store\'s box carries the business description, as its articles do', shop.includes(DESCRIPTION.split('.')[0]))
+    const silentStore = await mutant<typeof import('@/lib/content/author-box/store')>('lib/content/author-box/store.ts', (src) =>
+      src.replace('    readDescription(admin, req.projectId, project.owner),', "    req.platform === 'shopify' ? Promise.resolve(null) : readDescription(admin, req.projectId, project.owner),"))
+    const silenced = await silentStore.decideAuthorBox(
+      db({ articles: [{ id: ART, project_id: PROJECT, shopify_article_url: `https://${DOMAIN}/blogs/news/old`, published_at: '2026-10-01T00:00:00Z' }] }) as never,
+      { articleId: ART, projectId: PROJECT, platform: 'shopify', html: BODY }, { fetchHtml: noBoxFetch().fn, now: () => NOW })
+    check('MUTATION CONTROL: skipping the description for a store again fails C19b', silenced.add && silenced.content.line === '')
   }
   const unknownAsNo = await mutant<typeof import('@/lib/content/author-box/store')>('lib/content/author-box/store.ts', (s) => s.replace("if (answer !== 'no_box') return { add: false, reason: 'theme_unknown' }", "if (answer === 'has_box' && false) return { add: false, reason: 'theme_unknown' }"))
   {
@@ -544,7 +553,8 @@ async function main() {
       check('H17: another user\'s project (or a bad id) gets no preview', !other.ok && other.code === 'not_found' && !bad.ok)
       const shop = await previewAuthorBox(pdeps(d, 'Dana Levi'), PROJECT)
       const shopify = await previewAuthorBox(pdeps(d, 'Dana Levi', 'shopify'), PROJECT)
-      check('H18: a store is never asked for a WordPress user and gets no description, like its published box', shop.ok && shopify.ok && shopify.data.inputs.authorName === null && shopify.data.inputs.description === null && shopify.data.siteIconAvailable === false && shop.data.siteIconAvailable === true)
+      check('H18: a store is never asked for a WordPress user and is offered no site icon, but its description reaches the box like its articles',
+        shop.ok && shopify.ok && shopify.data.inputs.authorName === null && shopify.data.inputs.description === DESCRIPTION && shopify.data.siteIconAvailable === false && shop.data.siteIconAvailable === true)
       const slow = await previewAuthorBox({ ...pdeps(d, null), siteUserName: () => new Promise<string | null>(() => {}), timeoutMs: 50 }, PROJECT)
       check('H19: a site that does not answer: the preview still comes within the time cap, with the business name', slow.ok && slow.data.inputs.authorName === null && authorBoxContent(slow.data.inputs)?.name === 'Levi Bakery')
     }
