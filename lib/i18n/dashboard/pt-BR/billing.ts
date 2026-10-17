@@ -161,6 +161,15 @@ export const billingPtBR: DeepPartial<DashboardDictionary> = {
       activatedSuccess: 'Seu plano está ativo. Esta página será atualizada em instantes.',
       buttonError: 'Algo deu errado com o PayPal. Tente novamente em instantes ou fale com a gente que ajudamos você.',
     },
+    creem: {
+      payButton: 'Pagar com cartão',
+      starting: 'Abrindo a página de pagamento segura...',
+      error: 'Não conseguimos abrir a página de pagamento. Tente novamente em instantes ou fale com a gente que ajudamos você.',
+      changePlanNote: 'Para mudar de plano, fale com a gente que resolvemos para você.',
+      disclosure:
+        'O pagamento com cartão é feito pela Creem (Armitage Labs OÜ), a comerciante registrada: a Creem emite a fatura, acrescenta o imposto conforme o seu endereço de cobrança e a cobrança aparece na sua fatura em nome da Creem. O serviço em si continua sendo nosso.',
+      buyerTermsLabel: 'Termos de compra da Creem',
+    },
     shopify: {
       title: 'A cobrança é gerenciada pela Shopify',
       description: 'Esta conta é cobrada pelo Shopify App Pricing, não pelo PayPal. Conectar uma loja para publicar não muda isso por si só.',
@@ -200,6 +209,13 @@ export const billingPtBR: DeepPartial<DashboardDictionary> = {
     stepLabel: (n: number) => `Passo ${n}`,
     done: 'Concluído',
     running: 'Em andamento agora',
+    // The step the card's main button is for (owner's report, 10 October 2026).
+    next: 'Próximo passo',
+    // On every screen of a project whose site is not connected yet (components/layout/ConnectSiteBanner.tsx).
+    connectBanner: {
+      title: 'Seu site ainda não está conectado',
+      body: 'Este é o primeiro passo. Até o site estar conectado, você pode pesquisar e escrever, mas os artigos não podem ser publicados nele. A conexão é feita uma única vez.',
+    },
     steps: {
       scan: {
         title: 'Analise o seu site',

@@ -21,7 +21,8 @@ import { gbpErrorText, gbpFieldText } from './error-text'
 import type { GbpReadyStatus } from './types'
 
 type Source = 'article' | 'topic' | 'free'
-interface Picked { src: string; blob: Blob; w: number; h: number }
+/** `ai`: the photo was generated here, so the composer says so (Google shows it under the merchant's name). */
+interface Picked { src: string; blob: Blob; w: number; h: number; ai?: boolean }
 const DEFAULT_CROP: CropControls = { zoom: 1, px: 0.5, py: 0.5 }
 
 function loadPicked(blob: Blob): Promise<Picked> {
@@ -56,6 +57,7 @@ export default function PostComposer({ projectId, status, onPosted }: { projectI
   const [crop, setCrop] = useState<CropControls>(DEFAULT_CROP)
   const [prepared, setPrepared] = useState<{ path: string; url: string } | null>(null)
   const [preparing, setPreparing] = useState(false)
+  const [generating, setGenerating] = useState(false)
   const [ctaType, setCtaType] = useState<'' | GbpCtaType>('')
   const [ctaUrl, setCtaUrl] = useState('')
   const [allowOther, setAllowOther] = useState(false)
@@ -92,7 +94,9 @@ export default function PostComposer({ projectId, status, onPosted }: { projectI
     setDrafting(true); setNotice(null)
     const res = await fetch('/api/gbp/draft', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ projectId, language, ...(source === 'article' ? { articleId } : { topic }) }),
+      // The post is written in the language the merchant is using the dashboard in,
+      // which for a Spanish or Portuguese merchant is NOT `language` (he/en only).
+      body: JSON.stringify({ projectId, language: uiLocale, ...(source === 'article' ? { articleId } : { topic }) }),
     }).catch(() => null)
     const body = res ? await res.json().catch(() => ({})) : {}
     setDrafting(false)
@@ -102,12 +106,31 @@ export default function PostComposer({ projectId, status, onPosted }: { projectI
     setFieldErrors([])
   }
 
-  const choose = async (blob: Blob) => {
+  const choose = async (blob: Blob, ai = false) => {
     setNotice(null)
     try {
       const p = await loadPicked(blob)
-      setPicked(p); setCrop(DEFAULT_CROP); setPrepared(null)
+      setPicked({ ...p, ai }); setCrop(DEFAULT_CROP); setPrepared(null)
     } catch { setNotice({ tone: 'bad', text: t.errors.image_invalid }) }
+  }
+  /** Topic posts only: an AI photo about the topic, then the usual crop step. */
+  const generateImage = async () => {
+    if (source !== 'topic' || !topic.trim()) return
+    setGenerating(true); setNotice(null)
+    const res = await fetch('/api/gbp/image/generate', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ projectId, topic: topic.trim(), language: uiLocale }),
+    }).catch(() => null)
+    if (!res || !res.ok || !(res.headers.get('content-type') ?? '').startsWith('image/')) {
+      const body = res ? await res.json().catch(() => ({})) : {}
+      setGenerating(false)
+      setNotice({ tone: 'bad', text: gbpErrorText(t, body.error ?? 'image_generation_failed') })
+      return
+    }
+    const blob = await res.blob().catch(() => null)
+    setGenerating(false)
+    if (!blob) { setNotice({ tone: 'bad', text: gbpErrorText(t, 'image_generation_failed') }); return }
+    await choose(blob, true)
   }
   const fromArticle = async () => {
     if (!article?.imageUrl) return
@@ -150,7 +173,7 @@ export default function PostComposer({ projectId, status, onPosted }: { projectI
     const res = await fetch('/api/gbp/posts', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        projectId, language, summary, ctaType: ctaType || null, ctaUrl: ctaType === 'CALL' ? null : ctaUrl, allowOtherSite: allowOther,
+        projectId, language: uiLocale, summary, ctaType: ctaType || null, ctaUrl: ctaType === 'CALL' ? null : ctaUrl, allowOtherSite: allowOther,
         imagePath: image?.path ?? null, scheduledAt: local.value.scheduledAt, sourceArticleId: source === 'article' ? articleId || null : null,
       }),
     }).catch(() => null)
@@ -258,6 +281,12 @@ export default function PostComposer({ projectId, status, onPosted }: { projectI
                   <ImagePlus aria-hidden="true" className="size-4" />
                   {picked ? c.imageReplace : c.imageUpload}
                 </Button>
+                {source === 'topic' && (
+                  <Button variant="secondary" size="sm" onClick={() => void generateImage()} loading={generating} disabled={!topic.trim() || generating}>
+                    <Sparkles aria-hidden="true" className="size-4" />
+                    {generating ? c.imageGenerating : c.imageGenerate}
+                  </Button>
+                )}
                 {source === 'article' && article?.imageUrl && (
                   <Button variant="ghost" size="sm" onClick={fromArticle}>{c.imageFromArticle}</Button>
                 )}
@@ -270,6 +299,7 @@ export default function PostComposer({ projectId, status, onPosted }: { projectI
               </div>
             </div>
             <p className="text-caption text-muted">{c.imageHint}</p>
+            {picked?.ai && <p data-gbp-image-ai="" className="text-caption text-muted">{c.imageGeneratedHint}</p>}
             {picked && (
               <div className="grid gap-4 rounded-inset border border-line bg-sunk p-4 sm:grid-cols-[12rem_minmax(0,1fr)]">
                 <div className="relative aspect-[4/3] overflow-hidden rounded-control bg-surface">

@@ -3,7 +3,7 @@ title: Política de privacidad | Go Top SEO
 description: Política de privacidad de Go Top SEO: cómo recopilamos, utilizamos y protegemos sus datos.
 locale: es
 source: app/(public)/en/privacy/page.tsx
-lastUpdated: 2026-10-09
+lastUpdated: 2026-10-16
 register: usted
 ---
 
@@ -13,7 +13,7 @@ Política de privacidad de Go Top SEO
 
 ## Introducción
 
-GO TOP MARKETING GRUO LTD (número de empresa 517274346) («nosotros», «nuestro» o «la empresa») opera el servicio Go Top SEO en https://www.gotopseo.com (el «Servicio»). Esta política de privacidad describe nuestras prácticas relativas a la recopilación, el uso y la divulgación de información personal cuando usted utiliza nuestro Servicio.
+GO TOP DIGITAL MARKETING AND ADVERTISING LTD (número de empresa 517274346) («nosotros», «nuestro» o «la empresa») opera el servicio Go Top SEO en https://www.gotopseo.com (el «Servicio»). Esta política de privacidad describe nuestras prácticas relativas a la recopilación, el uso y la divulgación de información personal cuando usted utiliza nuestro Servicio.
 
 ## Información que recopilamos
 
@@ -31,6 +31,7 @@ Recopilamos distintos tipos de información, entre ellos:
 - **Una dirección para el seguimiento de posicionamiento local:** si usted escribió una dirección exacta, se almacena junto con las coordenadas obtenidas; véase «Conversión de una dirección en coordenadas» más abajo
 - **Red de enlaces:** su consentimiento de adhesión (quién lo aceptó, cuándo, el texto y el tipo de enlace) y el registro de colocaciones; véase «Red de enlaces» más abajo
 - **Resultados y contenido:** resultados de las comprobaciones de visibilidad en IA y el contenido generado para usted: temas, preguntas y artículos
+- **Foto de autor:** una foto que usted sube para una caja de autor, si eligió mostrarla; véase «Una foto de autor que usted sube» más abajo
 - **Preferencias de correo electrónico:** qué mensajes recibe y las cancelaciones de suscripción a los recordatorios
 - **Información de pago:** no almacenamos su instrumento de pago. Para las cuentas cuya autoridad de facturación es Shopify, incluidos los comerciantes que instalaron la aplicación a través de Shopify, el pago es procesado por Shopify conforme a Shopify App Pricing, y nunca los dirigimos a PayPal. Para los clientes que se registraron directamente en nuestro sitio web, cuya autoridad de facturación no es Shopify, el pago se procesa a través de PayPal
 
@@ -53,6 +54,7 @@ No compartimos su información personal con terceros, salvo con:
 
 - **Shopify:** para el procesamiento de pagos de las cuentas facturadas a través de Shopify App Pricing, y para publicar contenido en una tienda conectada
 - **PayPal:** para el procesamiento de pagos, únicamente de los clientes facturados a través del sitio web
+- **Creem:** para el procesamiento de pagos, cuando el pago de una cuenta pasa por él. Al abrir un pago le enviamos la dirección de correo electrónico de la cuenta, el identificador del plan elegido y nuestra propia referencia de esa solicitud, y recibimos un identificador de cliente en su sistema, un identificador de plan, el estado de la suscripción y las fechas del período de facturación. Los datos de la tarjeta, y cualquier otro instrumento de pago, no llegan a nosotros en ningún momento
 - **Supabase:** para el almacenamiento seguro de datos
 - **Serper:** para las consultas de búsqueda de Google y las comprobaciones de posicionamiento
 - **Resend:** para el envío de correo electrónico; véase «Mensajes de correo electrónico» más abajo
@@ -89,8 +91,12 @@ Permiso: **business.manage**, solicitado en un consentimiento aparte únicamente
 
 - **Qué leemos:** las cuentas de Business Profile que usted administra y sus ubicaciones comerciales: nombre del negocio, dirección, sitio web y enlace de Google Maps.
 - **Qué almacenamos:** la ubicación que usted elige para un proyecto (sus identificadores de Google, nombre, dirección, sitio web y enlace de Maps), y cada publicación que usted crea: su texto, botón, foto, hora programada, y el identificador, el enlace y el estado de revisión de la publicación en Google.
-- **Qué hacemos con ello:** creamos una publicación únicamente cuando usted pulsa publicar, o a la hora que usted programó, y después volvemos a leer esa publicación desde Google para mostrarle si está activa. No modificamos la información de su negocio y no leemos ni respondemos reseñas.
-- **Borradores de IA:** si usted solicita un borrador, el nombre del negocio y el artículo o tema que usted eligió se envían al modelo Gemini de Google. Un borrador nunca se publica hasta que usted lo revise y pulse publicar.
+- **Qué hacemos con ello:** creamos una publicación cuando usted pulsa publicar, a la hora que usted programó, o —**si usted activó la publicación automática**— cada vez que el sistema publica un artículo en su sitio, y después volvemos a leer esa publicación desde Google para mostrarle si está activa. No modificamos la información de su negocio.
+- **Publicación automática:** desactivada por defecto. Si usted la activó, cada artículo que el sistema publica en su sitio se publica también como publicación en la ficha de su negocio, **sin que usted lo lea antes**. Lo que se envía al modelo es el nombre del negocio, el título del artículo y su resumen, sin ningún nombre de persona. Una publicación automática se redacta en el idioma del proyecto. Puede desactivarla en cualquier momento, y se desactiva por sí sola si usted cambia el negocio al que está conectado el proyecto.
+- **Reseñas:** cuando usted abre la pantalla de reseñas leemos desde Google las reseñas de su negocio: el nombre visible del autor (o «anónimo»), la valoración, el texto, las fechas y la respuesta existente, si la hay. **No almacenamos ningún contenido de reseñas**: ni el texto, ni el nombre del autor, ni la valoración, ni la respuesta. Guardamos únicamente dos marcas de tiempo, para poder señalar una reseña que usted todavía no ha visto. La foto de perfil del autor no se lee.
+- **Responder a una reseña:** una respuesta se publica en su nombre únicamente después de que usted la haya escrito o aprobado y haya pulsado enviar, **y es pública: aparece en la ficha de su negocio en Google y cualquier persona puede verla**. Puede editarla o eliminarla desde la misma pantalla. Google puede retirar una respuesta conforme a sus propias políticas de contenido, y eso no está bajo nuestro control.
+- **Borradores de IA:** si usted solicita un borrador, el nombre del negocio y el artículo o tema que usted eligió se envían al modelo Gemini de Google. Si usted solicita un borrador de respuesta a una reseña, se envían también el texto de la reseña y su valoración, **sin el nombre del autor**. Un borrador que usted solicitó no se publica hasta que lo revise y pulse publicar. Lo único que se publica sin ser leído es una publicación creada por la publicación automática, si usted la activó.
+- **Una foto creada por IA para una publicación:** si usted solicita una foto para una publicación escrita a partir de un tema, al modelo Gemini de Google se envía únicamente el tema que usted escribió, **sin el nombre del negocio y sin el nombre de ninguna persona**. La foto vuelve a su pantalla, y no la conservamos hasta que usted la elija y publique la publicación.
 
 ### Uso limitado
 
@@ -158,7 +164,9 @@ Para hacer el seguimiento del posicionamiento desde un punto exacto, usted puede
 
 ## Conversión de un informe a PDF
 
-Cuando usted solicita descargar un informe como PDF, enviamos el contenido del informe tal como se muestra al servicio **PDFShift**, que nos devuelve el archivo. Esto ocurre únicamente cuando usted pulsó para descargar un informe, nunca de forma habitual ni programada, y el contenido se envía solo para la conversión. La conservación en PDFShift se rige por su propia política de privacidad y sus propios términos.
+Cuando usted solicita descargar un informe como PDF, enviamos el contenido del informe tal como se muestra al servicio **PDFShift**, que nos devuelve el archivo. Esto ocurre únicamente cuando usted pulsó para descargar un informe, nunca de forma habitual ni programada, y el contenido se envía solo para la conversión.
+
+Con PDFShift tenemos un acuerdo de tratamiento de datos conforme al artículo 28 del RGPD. Según su anexo, el contenido que enviamos se trata en memoria durante el tiempo de la conversión y no se conserva después. PDFShift ofrece un almacenamiento opcional del archivo generado, y nosotros no lo solicitamos. Sus servidores y su almacenamiento están en Francia, y su servicio de supervisión de errores está en los Estados Unidos, al amparo del Marco de Privacidad de Datos UE-EE. UU. y de las cláusulas contractuales tipo.
 
 ## Red de enlaces
 
@@ -179,6 +187,18 @@ El programa de socios está dirigido a quienes recomiendan el Servicio y reciben
 - **Atribución de una referencia:** el código del socio viaja en el propio enlace. No instalamos ninguna cookie para el programa ni guardamos nada en su dispositivo, de modo que lo que usted elija sobre las cookies no influye ni en un sentido ni en el otro. Si en algún momento acreditamos una visita que vuelve más tarde, lo que implicaría guardar algo, esta política lo dirá y se le pedirá su consentimiento antes. **Lo que se registra cuando un visitante sigue el enlace de un socio es un recuento: uno más en el total diario de ese socio, y ese es todo el registro**: sin dirección IP, sin navegador, sin el sitio del que llegó y sin ningún identificador. La atribución en sí se hace con el código que viaja en la dirección de la página, leído una sola vez en el momento en que se crea la cuenta.
 
 En la fecha de esta política el programa funciona así: la solicitud se envía desde este sitio, por correo electrónico o en el formulario, y la aprueba una persona; un socio aprobado tiene un código y un enlace; los clics se cuentan como un total diario por socio; una cuenta nueva que se registra con un código se atribuye a ese socio una vez y para siempre; la comisión se registra sobre cada pago efectivamente recibido, se retiene 30 días, que es la ventana de reembolso, y la aprueba una persona; y el pago en sí se realiza a mano contra un comprobante. **Un cliente facturado a través de Shopify no genera comisión automática**, porque Shopify nos informa de que un plan está activo y no de que se haya cobrado un cargo; esa comisión se registra a mano, al mismo porcentaje. Los términos están en el [Acuerdo del Programa de Socios](/es/affiliate-terms), que además obliga al socio a declarar abiertamente que está remunerado.
+
+## Una foto de autor que usted sube
+
+Si sube una foto para una caja de autor, el archivo se guarda en un almacenamiento propio dedicado mientras la foto esté configurada en el proyecto. Su ruta se compone del identificador del proyecto y de un identificador aleatorio, y nunca del nombre de una persona. No publicamos nuestra copia y el artículo no enlaza a ella.
+
+Al publicarse el artículo, la foto se copia en la biblioteca de medios de su sitio y el artículo enlaza a esa copia. Desde ese momento la foto es visible para cualquiera que visite su sitio, como cualquier otra imagen de un artículo. La subida solo se ofrece en un proyecto donde esa copia pueda hacerse.
+
+La foto no se envía a ningún proveedor de IA, no se utiliza para entrenar modelos y no ejecutamos sobre ella reconocimiento facial ni ningún otro tratamiento biométrico.
+
+Al eliminar la foto, o al pasar a ninguna foto o al icono del sitio, se borra el archivo de nuestro almacenamiento. Desactivar toda la caja de autor no borra la foto: se conserva hasta que usted la elimine o elija otra opción. Una copia ya colocada en su sitio no está bajo nuestro control, y solo quien administra ese sitio puede eliminarla allí.
+
+Respecto de la persona que aparece en la foto, el cliente que la subió es quien decide para qué se usa, y nosotros tratamos el archivo por cuenta suya. Si usted es la persona de la foto y no el cliente que la subió, escríbanos a la dirección que figura al final de esta política: borraremos el archivo de nuestro almacenamiento y nos dirigiremos al cliente para que retire la copia del sitio, pero no podemos eliminar nosotros mismos contenido en el sitio de un cliente.
 
 ## Proveedores de IA
 
@@ -319,6 +339,7 @@ Conservamos los datos únicamente durante el tiempo necesario para la finalidad 
 - **Credenciales de conexión** (WordPress, Shopify, Search Console): hasta que usted se desconecte o elimine la cuenta, y después se suprimen de inmediato.
 - **Verificación gratuita del sitio:** se almacena en caché hasta 24 horas y después se suprime si a partir de ella no se abrió una cuenta.
 - **Registro de decisiones sobre cookies:** hasta tres años desde la decisión, para que podamos demostrar lo que usted eligió. Esa es la base jurídica para conservarlo, razón por la cual no se suprime junto con la cuenta.
+- **Foto de autor:** mientras la foto esté configurada en el proyecto. Al eliminarla, o al pasar a ninguna foto o al icono del sitio, el archivo se borra de inmediato. Una copia ya colocada en su sitio permanece allí hasta que usted la elimine.
 - **Registros de seguridad y del servidor:** hasta 90 días.
 
 ## Transferencias internacionales
@@ -343,6 +364,26 @@ Si usted se encuentra en el Espacio Económico Europeo, Suiza o el Reino Unido, 
 Respondemos en un plazo de 30 días. No le cobraremos ni degradaremos su servicio por haber ejercido un derecho.
 
 **Derecho a presentar una reclamación:** si no está satisfecho con nuestra respuesta, puede presentar una reclamación ante la autoridad de control de su país de residencia, o ante la Autoridad de Protección de la Privacidad de Israel ([Privacy Protection Authority](https://www.gov.il/en/departments/the_privacy_protection_authority)). Contactarnos primero no es una condición para presentar una reclamación, aunque agradeceríamos la oportunidad de corregirlo.
+
+## Contacto comercial por correo electrónico
+
+Esta sección trata de alguien que ha recibido un correo nuestro y no es cliente nuestro. Si es su caso, usted no nos facilitó nada y no se registró en nada: obtuvimos la dirección de su empresa de fuentes públicas, y aquí decimos exactamente de cuáles, qué conservamos y cómo darse de baja con un solo clic.
+
+**Qué recogemos y de dónde.** El nombre de la empresa, la dirección de su sitio web, una dirección de correo de contacto que aparece en el propio sitio de la empresa o en un registro público de empresas, el nombre de la persona de contacto cuando el sitio lo publica junto a esa dirección, la dirección postal que la empresa publica (una empresa que no publica dirección nunca entra en la lista), el país en el que opera la empresa, y un solo hallazgo de una comprobación automática de las páginas públicas del sitio, con la fecha en que se comprobó. **No compramos listas de direcciones y no usamos intermediarios de datos.** No recogemos números de teléfono, no recogemos nada sobre una persona más allá del cargo con el que aparece publicada en la empresa y no entramos en ninguna parte de un sitio que no esté abierta a cualquier visitante.
+
+**Con qué finalidad.** Dirigirnos a la empresa una vez, con una oferta de nuestro servicio, y explicar qué encontramos en su sitio. Es un contacto comercial y lo decimos en el propio mensaje.
+
+**Para qué países.** Conservamos direcciones con esta finalidad solo de empresas que hemos verificado, a partir de dos fuentes independientes, que operan en los Estados Unidos. **No conservamos direcciones con esta finalidad de empresas en Israel, en el Espacio Económico Europeo ni en el Reino Unido**, y una empresa cuyo país no hayamos podido verificar nunca entra en la lista.
+
+**Cuántos mensajes.** Dos como máximo: un mensaje y, si no llega respuesta, un seguimiento una semana después. Después de eso la empresa sale de la lista aunque no lo haya pedido.
+
+**Qué conservamos y durante cuánto tiempo.** Cada empresa es un registro: el nombre de la empresa, su sitio, la plataforma sobre la que funciona el sitio, el país, la dirección de correo y el nombre de la persona de contacto si los encontramos, la dirección postal, las dos fuentes públicas de las que tomamos los datos, el único hallazgo con su fecha, cuál de los dos mensajes se ha enviado y cuándo, si llegó una respuesta o una solicitud de baja y cuándo, las fechas en que el registro se creó y se modificó por última vez, una huella unidireccional de la dirección de correo, un identificador aleatorio que hace funcionar el enlace de baja del mensaje y una nota interna breve sobre la empresa. **De un registro al que escribimos se borran la dirección de correo, el nombre de la persona de contacto y la dirección postal 30 días después del último mensaje que le enviamos**, o 30 días después de una respuesta o de una solicitud de baja si eso es posterior, y se anota la fecha del borrado. 30 días no es un número redondo: el enlace de baja de nuestro mensaje tiene que seguir funcionando al menos ese tiempo, y se resuelve contra este registro. Lo que queda después es todo lo demás del registro anterior, entre ello la huella unidireccional y el identificador de baja, para que el enlace siga funcionando. La huella es lo que nos permite saber que ya escribimos dos veces a esa empresa y evita que vuelva a añadirse. **Un registro al que nunca escribimos se elimina por completo 90 días después de haberse añadido.** La lista de exclusión es independiente de este registro y se conserva mientras enviemos correo, porque es la única manera de que una baja se mantenga.
+
+**Cómo detenerlo.** Cada mensaje lleva un enlace de baja que funciona con un solo clic, sin iniciar sesión y sin dar explicaciones. Se atiende de inmediato y de forma permanente. Para que la baja se mantenga, la dirección se conserva en una lista de exclusión **con la única finalidad de asegurarnos de no volver a contactarle**, no se usa para nada más, y se aplica a todos nuestros canales, no solo a aquel en el que usted lo pidió. Una respuesta que pida no volver a escribir se trata igual.
+
+**Si usted está en California.** La dirección de un contacto de empresa es información personal conforme a la ley de privacidad de California, por lo que usted tiene derecho a saber qué conservamos sobre usted, a recibir una copia, a solicitar la supresión, a corregir información inexacta y a no ser discriminado por ejercer un derecho. **No vendemos esta información y no la compartimos para publicidad conductual entre contextos.** Como no recogimos la información de usted directamente, esta sección es el aviso de recogida, incluido el plazo de conservación de cada dato, y un enlace a ella aparece en cada mensaje que enviamos. Las solicitudes se dirigen a la dirección indicada en «Contacto en materia de privacidad y representantes», y respondemos por escrito.
+
+Las mismas solicitudes —acceso, supresión y rectificación— se atienden también para quienes no están en California, en la misma dirección y del mismo modo. El responsable es GO TOP DIGITAL MARKETING AND ADVERTISING LTD, n.º de empresa 517274346, en Israel.
 
 ## Derechos de los residentes de Estados Unidos
 
@@ -382,4 +423,4 @@ Si tiene preguntas sobre esta política de privacidad, contacte con:
 
 **Teléfono:** 054-9489377
 
-Esta política se actualizó por última vez el 9 de octubre de 2026
+Esta política se actualizó por última vez el 16 de octubre de 2026

@@ -537,7 +537,14 @@ async function main() {
       try { d = execSync(`git diff -U0 8b468a8 -- ${file}`, { cwd: ROOT }).toString() } catch { return false }
       const added = d.split('\n').filter((l) => l.startsWith('+') && !l.startsWith('+++')).map((l) => l.slice(1).trim())
         .filter((l) => l && !l.startsWith('//') && !l.startsWith('*') && !l.startsWith('/*'))
-      return added.length > 0 && added.every((l) => /applyArticleDesign/.test(l))
+      // Owner 2026-10-16: the one-time empty-subheading repair adds ONE function here,
+      // updateShopifyArticleBodyOnly (only an article's body; the billing guard first — its own
+      // guards are lib/content/__qa__/empty-h3-repair.qa.ts C7). That block, signature to closing
+      // brace, is set aside; every other added line must still be the design step.
+      const i = added.findIndex((l) => l.startsWith('export async function updateShopifyArticleBodyOnly('))
+      const j = i < 0 ? -1 : added.indexOf('}', i)
+      const judged = j < 0 ? added : [...added.slice(0, i), ...added.slice(j + 1)]
+      return judged.length > 0 && judged.every((l) => /applyArticleDesign/.test(l))
     }
     untouched = untouched.split('\n').filter((f) => f && !(f === 'lib/shopify/publish-article.ts' && designOnly(f))).join('\n')
     // Owner 2026-10-05: the Shopify App Store connect deliberately finishes a
@@ -566,6 +573,15 @@ async function main() {
       'lib/billing/__qa__/billing-authority.qa.ts', 'lib/billing/__qa__/shopify-trial-usage-period.qa.ts',
     ])
     untouched = untouched.split('\n').filter((f) => f && !NO_DOUBLE_BILLING.has(f)).join('\n')
+    // Owner 2026-10-10: Creem as a second provider (9f1723e4). The one write that
+    // turns a verified payment into an entitlement MOVED from
+    // lib/paypal/activation-processing.ts to this file, unchanged in behaviour,
+    // because Creem needs the same write and a second copy of it is the last
+    // thing this table should have; the old path re-exports it. No plan, price
+    // or quota VALUE changes here — H3c above proves the catalog itself is
+    // untouched, and that is the number this check exists to protect.
+    const CREEM_PROVIDER = new Set(['lib/billing/entitlement-write.ts'])
+    untouched = untouched.split('\n').filter((f) => f && !CREEM_PROVIDER.has(f)).join('\n')
     check('H4: plans, prices, quotas, billing, entitlement and Shopify files are untouched', untouched === '', untouched)
     // lib/subscription.ts may differ from 8b468a8 ONLY on the display-only trial line (PLAN_FEATURES.trial); nothing of entitlement moved.
     let subDiff = ''

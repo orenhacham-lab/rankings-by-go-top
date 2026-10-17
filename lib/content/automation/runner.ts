@@ -11,16 +11,51 @@
  */
 
 import type { createAdminClient } from '@/lib/supabase/admin'
-import { generatePoolItem, AUTOMATION_MAX_ATTEMPTS } from '@/lib/content/automation/generate-item'
+import { generatePoolItem, AUTOMATION_MAX_ATTEMPTS, type GenerateItemResult } from '@/lib/content/automation/generate-item'
 import { publishPoolItem } from '@/lib/content/automation/publish-item'
 import { localWeekday, isNoPublishWeekday, makeSlotAfter, slotFitsRhythm, resolveIntervalDays, spreadNextPublishAt, DEFAULT_PUBLISH_TIME, DEFAULT_TIMEZONE, type Cadence } from '@/lib/content/automation/schedule'
 import { readPublishRhythmForProject } from '@/lib/content/automation/plan-rhythm'
+import { loadActivePlatform } from '@/lib/content/platform/load-active-platform'
 
 type Admin = ReturnType<typeof createAdminClient>
 
 const STALE_LOCK_MS = 45 * 60 * 1000 // 45 minutes
 const MAX_GENERATIONS_PER_RUN = Math.max(0, Number(process.env.AUTOMATION_MAX_GENERATIONS_PER_RUN) || 1)
 const DESIRED_READY_AHEAD = 1
+
+/**
+ * Attempts that stop before the article writer is called. They cost no model
+ * time, so they must not spend the run's generation budget.
+ *
+ * Production, 7 to 11 October 2026: the budget is one generation per run, and
+ * a trial pool whose allowance was spent answered `quota_exceeded` on every
+ * run. It came first in the pool list, took the one slot, and no other pool
+ * generated an article for four days, so nothing published anywhere.
+ */
+const NO_WRITE_REASONS = new Set([
+  'quota_exceeded', 'billing_required', 'entitlement_unavailable', 'usage_period_unavailable',
+  'generation_in_progress', 'reservation_error', 'project_owner_missing', 'topic_missing',
+])
+
+/**
+ * The order the pools are walked in moves by one every run. With one
+ * generation per run, a fixed order lets whichever pool comes first take the
+ * slot every time if it keeps failing in a way that does spend it (a writer
+ * that keeps timing out, say). Rotating means every pool is first within as
+ * many runs as there are pools, whatever goes wrong with any one of them.
+ */
+export function rotateForRun<T extends { id: string }>(pools: T[], nowMs: number, runMs = 15 * 60 * 1000): T[] {
+  if (pools.length < 2) return pools
+  const sorted = [...pools].sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0))
+  const k = Math.floor(nowMs / runMs) % sorted.length
+  return sorted.slice(k).concat(sorted.slice(0, k))
+}
+
+/** True only when the attempt reached the article writer. */
+export function spentGenerationBudget(res: Pick<GenerateItemResult, 'noop' | 'reason'>): boolean {
+  if (res.noop) return false
+  return !(res.reason && NO_WRITE_REASONS.has(res.reason))
+}
 
 export interface PoolDiagnostic {
   projectId: string
@@ -157,19 +192,25 @@ async function pickForPublish(admin: Admin, poolId: string): Promise<PickedItem 
   return withTitle(admin, row ? { id: row.id, topic_id: row.topic_id } : null)
 }
 
-export async function runAutomation(admin: Admin, opts: { projectId?: string; dryRun?: boolean; nowMs?: number } = {}): Promise<AutomationSummary> {
+export async function runAutomation(admin: Admin, opts: { projectId?: string; dryRun?: boolean; nowMs?: number; generate?: typeof generatePoolItem; platform?: (admin: Admin, projectId: string) => Promise<{ platform: string }> } = {}): Promise<AutomationSummary> {
   const started = Date.now()
   const dryRun = opts.dryRun === true
   const summary: AutomationSummary = { poolsChecked: 0, staleRecovered: 0, generated: 0, published: 0, skipped: 0, failures: 0, durationMs: 0, dryRun, details: [], diagnostics: [] }
   const nowMs = opts.nowMs ?? Date.now()
   const cutoffIso = new Date(nowMs - STALE_LOCK_MS).toISOString()
+  const platformOf = opts.platform ?? loadActivePlatform
+  /** 'none' or 'conflict' when the project cannot publish; null when it can, or the check failed. */
+  const publishBlocker = async (a: Admin, projectId: string): Promise<string | null> => {
+    const r = await platformOf(a, projectId).catch(() => null)
+    return r && (r.platform === 'none' || r.platform === 'conflict') ? `platform_${r.platform}` : null
+  }
 
   if (!dryRun) await recoverStaleLocks(admin, opts.projectId, cutoffIso, summary)
 
   let poolQ = admin.from('article_pools').select('id, project_id, cadence, interval_days, publish_time, timezone, next_publish_at, publish_days').eq('is_active', true)
   if (opts.projectId) poolQ = poolQ.eq('project_id', opts.projectId)
   const { data: pools } = await poolQ
-  const poolRows = (pools ?? []) as PoolRow[]
+  const poolRows = rotateForRun((pools ?? []) as PoolRow[], nowMs)
   summary.poolsChecked = poolRows.length
 
   // Diagnostic: an active project with NO active pool is a common "nothing runs"
@@ -184,6 +225,7 @@ export async function runAutomation(admin: Admin, opts: { projectId?: string; dr
   }
 
   let genBudget = MAX_GENERATIONS_PER_RUN
+  const generate = opts.generate ?? generatePoolItem
   const idleByNote: Record<string, number> = {}
 
   for (const pool of poolRows) {
@@ -228,13 +270,22 @@ export async function runAutomation(admin: Admin, opts: { projectId?: string; dr
         const need = due ? Math.max(DESIRED_READY_AHEAD, 1) : DESIRED_READY_AHEAD
         if (diag.generatedCount < need) {
           const q = await pickForGenerate(admin, pool.id)
-          if (q) {
+          // An article written for a project with nowhere to publish it is paused at
+          // publish time, which leaves the pool short of a ready article, so the next run
+          // wrote another: from 5 to 12 October 2026 one Google Maps project with no site
+          // connected got a fresh article on most runs, spending its allowance and the
+          // run's one generation. Nothing is written until a platform is connected.
+          const blocked = q ? await publishBlocker(admin, pool.project_id) : null
+          if (q && blocked) {
+            diag.note = 'held_no_publishing_platform'
+            summary.details.push(`pool ${pool.id}: generation held (${blocked})`)
+          } else if (q) {
             diag.selectedTopicId = q.topicId; diag.selectedTopicTitle = q.topicTitle; diag.generateAttempted = true
             // Phase 3G.2 — scheduled generation also auto-inserts the topic's APPROVED
             // internal links into the draft (only user-approved links are ever inserted).
-            const res = await generatePoolItem(admin, q.id, { allowRetry: true, autoApplyInternalLinks: true })
+            const res = await generate(admin, q.id, { allowRetry: true, autoApplyInternalLinks: true })
             diag.generateResult = res.status + (res.reason ? ` (${res.reason})` : '') + (res.noop ? ` [${res.noop}]` : '')
-            if (res.noop !== 'already_claimed' && res.noop !== 'max_attempts') genBudget--
+            if (spentGenerationBudget(res)) genBudget--
             if (res.status === 'generated') { summary.generated++; diag.generatedCount++ }
             else if (res.status === 'quality_check_failed' || res.status === 'failed') { summary.failures++; diag.error = res.reason ?? res.status }
             summary.details.push(`pool ${pool.id}: generate ${res.status}${res.reason ? ` (${res.reason})` : ''}`)
@@ -292,7 +343,7 @@ export async function runAutomation(admin: Admin, opts: { projectId?: string; dr
         } else {
           // Due but nothing generated (e.g. no queued items or generation failed).
           summary.skipped++
-          diag.note = diag.queuedCount === 0 ? 'due_but_no_queued_items' : 'due_but_generation_did_not_produce_item'
+          diag.note = diag.note ?? (diag.queuedCount === 0 ? 'due_but_no_queued_items' : 'due_but_generation_did_not_produce_item')
           summary.details.push(`pool ${pool.id}: due, no generated item ready`)
         }
       }

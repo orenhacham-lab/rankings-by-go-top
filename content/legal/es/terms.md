@@ -3,7 +3,7 @@ title: Términos de Uso | Go Top SEO
 description: Términos de uso de Go Top SEO: las condiciones que rigen el uso de nuestro servicio.
 locale: es
 source: app/(public)/en/terms/page.tsx
-lastUpdated: 2026-10-09
+lastUpdated: 2026-10-16
 register: usted
 ---
 
@@ -13,7 +13,7 @@ Go Top SEO
 
 ## 1. Introducción y definición del Servicio
 
-Go Top SEO (el «Servicio» o la «Plataforma») es un servicio SaaS operado por GO TOP MARKETING GRUO LTD (número de sociedad 517274346) (la «Empresa»). El Servicio permite a los clientes hacer un seguimiento del posicionamiento de palabras clave en la búsqueda de Google, supervisar la visibilidad en Google Maps, medir la visibilidad en motores de IA como ChatGPT, Gemini y Perplexity, realizar investigación de palabras clave y generar informes profesionales. El Servicio también incluye análisis de sitios web, conexiones con cuentas de Google y sitios de WordPress, correcciones del sitio que usted apruebe, contenido y mensajes de correo electrónico generados por IA, según se establece en las secciones 15A a 15G.
+Go Top SEO (el «Servicio» o la «Plataforma») es un servicio SaaS operado por GO TOP DIGITAL MARKETING AND ADVERTISING LTD (número de sociedad 517274346) (la «Empresa»). El Servicio permite a los clientes hacer un seguimiento del posicionamiento de palabras clave en la búsqueda de Google, supervisar la visibilidad en Google Maps, medir la visibilidad en motores de IA como ChatGPT, Gemini y Perplexity, realizar investigación de palabras clave y generar informes profesionales. El Servicio también incluye análisis de sitios web, conexiones con cuentas de Google y sitios de WordPress, correcciones del sitio que usted apruebe, contenido y mensajes de correo electrónico generados por IA, según se establece en las secciones 15A a 15G.
 
 ## 2. Aceptación de los Términos
 
@@ -31,6 +31,8 @@ El Servicio ofrece un período de prueba de 7 días para los clientes nuevos. Lo
 
 El Servicio funciona con un modelo de suscripción mensual. Mientras la suscripción permanezca activa, la facturación se renueva automáticamente cada mes según el plan seleccionado. Los precios, planes y límites pueden cambiar de vez en cuando, y las actualizaciones se reflejarán en el Servicio y en la página de precios.
 
+**Qué incluye el precio.** Un precio indicado en séqueles incluye el IVA israelí conforme a la ley, y es el importe que usted paga. Un precio indicado en dólares no incluye impuesto indirecto; en un pago con tarjeta ese impuesto lo calcula y lo cobra Creem según su dirección de facturación y se le muestra antes de pagar, según la sección 5A.
+
 **La forma en que se le factura depende de cómo se abrió su cuenta:**
 
 - **Los comerciantes que instalaron la aplicación a través de Shopify** (y cualquier cuenta cuya autoridad de facturación sea Shopify) son facturados exclusivamente a través de Shopify App Pricing, como parte de su factura de Shopify. Estos comerciantes nunca son dirigidos a PayPal ni a ningún otro proceso de pago ajeno a Shopify, y no se les cobra por un segundo canal.
@@ -39,9 +41,28 @@ El Servicio funciona con un modelo de suscripción mensual. Mientras la suscripc
 - **Un periodo ya pagado en el sitio web se mantiene hasta su fin.** Si en el momento de conectar la tienda la cuenta tiene un periodo de facturación ya pagado, el plan comprado en el sitio web sigue funcionando hasta que ese periodo termine, antes de esa fecha no se ofrece ni se cobra ningún plan de Shopify, y detenemos la renovación automática en PayPal para que no se cobre otro periodo. Si la renovación ya estaba en curso y el periodo se renovó una vez más, ese periodo también se respeta íntegramente. No hay reembolso por un periodo ya pagado ni se interrumpe el acceso antes de que termine. A partir de esa fecha, continuar con un plan de pago requiere elegir un plan en Shopify, y desde entonces la facturación se realiza a través de Shopify.
 - Si usted elige un plan directamente en las pantallas de facturación de Shopify durante un periodo ya pagado en el sitio web, Shopify le cobrará por él: nuestra aplicación no lo dirige a esas pantallas, y un cobro realizado por Shopify no es un cobro que podamos reembolsar.
 
+## 5A. Pago con tarjeta: Creem como comerciante registrado (merchant of record)
+
+Una cuenta que no se factura a través de Shopify puede pagar con tarjeta. En ese pago la venta no se realiza con nosotros, sino con Creem, que es la sociedad Armitage Labs OÜ (código de registro estonio 16977866, Rotermanni 14, Tallin 10111, Estonia). Creem actúa como comerciante registrado y revendedor contractual, y ejecuta la venta con usted en su propio nombre. Nosotros vendemos a Creem, y Creem le vende a usted.
+
+Lo que eso significa en la práctica:
+
+- **La factura.** Creem emite la factura en su propio nombre. Nosotros no emitimos ninguna factura ni recibo por esa transacción y no le cobramos por ella por ninguna otra vía.
+- **El impuesto.** El IVA, el impuesto sobre las ventas y cualquier otro impuesto indirecto son calculados, recaudados y declarados por Creem según su dirección de facturación, y el importe final se le muestra antes de pagar. El precio que figura en la página de precios no incluye ese impuesto.
+- **El Servicio en sí sigue siendo nuestra responsabilidad.** La prestación del Servicio, su calidad, su soporte y su conformidad con la ley son únicamente nuestras. Creem no asume responsabilidad alguna por ellas.
+- **Reembolsos.** Un reembolso o un contracargo sobre esa transacción los ejecuta únicamente Creem, conforme a las condiciones de elegibilidad de estos términos, es decir la sección 7, y a la ley aplicable. La solicitud de reembolso se dirige primero a nosotros, a la dirección de la sección 21 o mediante los datos del recibo que se le envió.
+- **El derecho de desistimiento de 14 días.** En ese pago, el consentimiento expreso de que el inicio inmediato de un servicio digital extingue el derecho de desistimiento se presta en la pantalla de pago de Creem. El efecto es el mismo que se describe en la sección 7.2.
+- **Los Términos de Comprador de Creem.** Además de estos términos, a usted le resultan aplicables los Términos de Comprador de Creem, disponibles en [creem.io/buyer-terms](https://www.creem.io/buyer-terms). Rigen la venta que ella ejecuta, no el Servicio que nosotros prestamos.
+
+El pago a través de PayPal y el pago a través de Shopify no cambian: allí el vendedor es la Empresa, como se describe en la sección 5.
+
 ## 6. Cancelación
 
 Usted puede cancelar la renovación de su suscripción en cualquier momento desde la configuración de su cuenta. El acceso al Servicio se mantendrá hasta el final del período de facturación que ya haya sido pagado. No se concederá la cancelación retroactiva de un período que ya haya sido pagado, salvo en los casos exigidos por la ley aplicable.
+
+## 6A. Una suscripción facturada por otra empresa
+
+Algunas suscripciones las factura otra empresa y no nosotros: una tienda facturada a través de Shopify, un pago con tarjeta en el que Creem es el vendedor, tal como se describe en la sección 5A, y un plan comprado en un mercado externo que revende el Servicio en su propio nombre. En esos casos la renovación se cancela ante esa empresa y no desde la configuración de su cuenta, porque es esa empresa la que tiene la suscripción y la que le cobra. Si usted nos envía una solicitud de cancelación, la trasladaremos a esa empresa, pero el cobro lo detiene esa empresa y no nosotros, y no emitimos un reembolso en su nombre. Si no sabe con certeza qué empresa factura su suscripción, escríbanos y se lo diremos. En todos los casos, el acceso al Servicio se mantiene hasta el final del período de facturación que ya haya sido pagado, igual que en la sección 6, y la política de reembolsos que se aplica a esa compra consta en nuestra Política de cancelación y reembolso.
 
 ## 7. Reembolsos
 
@@ -54,6 +75,8 @@ Las tarifas de suscripción no son reembolsables respecto de un período que ya 
 **7.3 Consumidores en Israel.** La Ley de Protección al Consumidor de Israel, 5741-1981 (Consumer Protection Law, 5741-1981), y los reglamentos dictados en virtud de ella confieren al consumidor —quien compra sin fines comerciales— derechos de cancelación en una venta a distancia y en una transacción continuada. Nada de lo dispuesto en estos términos menoscaba esos derechos.
 
 **7.4** Las secciones 7.1 a 7.3 se aplican únicamente a los consumidores particulares. Para los clientes empresariales, la política de reembolso de la sección 7 se aplica sin modificaciones.
+
+**7.5 Un pago realizado con tarjeta.** En una transacción ejecutada a través de Creem, el reembolso lo realiza Creem y no nosotros, conforme a las condiciones de elegibilidad de esta sección y a la ley. Véase la sección 5A.
 
 ## 8. Límites de uso
 
@@ -178,12 +201,15 @@ Además de las comprobaciones que usted inicie por sí mismo, el Servicio ejecut
 
 ## 15F. Contenido generado por IA
 
-El Servicio utiliza IA para producir temas de artículos, preguntas y artículos. Dicho contenido puede contener inexactitudes, y revisarlo antes de publicarlo —incluida su exactitud factual, su adecuación a su negocio y a la ley, y los derechos de terceros— es responsabilidad suya.
+El Servicio utiliza IA para producir temas de artículos, preguntas, artículos e imágenes. Dicho contenido puede contener inexactitudes, y revisarlo antes de publicarlo —incluida su exactitud factual, su adecuación a su negocio y a la ley, y los derechos de terceros— es responsabilidad suya.
 
 - **Temas automáticos.** En los proyectos activos con un plan de pago, el Servicio repone automáticamente temas de artículos para que la cola de contenido tenga temas. Un tema no se publica y no le compromete a nada.
 - **Enlaces internos.** El Servicio puede añadir automáticamente enlaces internos a otras páginas de su sitio dentro de los artículos.
 - **Cuadro de llamada a la acción.** Un cuadro de llamada a la acción al final de un artículo es opcional, y usted puede activarlo, desactivarlo y editar su texto.
 - **Aprobación y publicación.** El contenido se le muestra para su aprobación y se publica en su sitio de acuerdo con los ajustes de aprobación y publicación que usted eligió para el proyecto. Usted puede editar, rechazar o eliminar cualquier contenido.
+- **Responder a una reseña en su Perfil de Empresa de Google.** Si usted solicita un borrador de respuesta a una reseña, el borrador lo produce la IA y se le muestra antes de enviar nada. Una respuesta se envía únicamente después de que usted la haya escrito o aprobado y haya pulsado enviar, y se publica públicamente en la ficha de su negocio y en su nombre. **Usted es responsable del contenido de la respuesta**, incluso cuando el borrador haya sido producido por IA, lo que comprende la exactitud de los hechos, la difamación, los derechos de terceros y las políticas de contenido de Google. Google puede retirar una respuesta conforme a esas políticas, y no tenemos control sobre ello.
+- **Publicación automática en su Perfil de Empresa de Google.** Si usted activó la publicación automática, cada artículo que el sistema publica en su sitio se publica también como publicación en la ficha de su negocio en Google, **sin que usted lo lea antes**. **Usted es responsable del contenido publicado en su nombre**, tanto cuando el texto haya sido producido por IA como cuando usted no lo haya leído antes de su publicación, lo que comprende la exactitud de los hechos, la difamación, los derechos de terceros y las políticas de contenido de Google. Puede desactivar la publicación automática en cualquier momento, y se desactiva por sí sola si usted cambia el negocio al que está conectado el proyecto.
+- **Una foto creada por IA para una publicación en su Perfil de Empresa de Google.** Si usted solicita una foto para una publicación escrita a partir de un tema, la foto la produce la IA. Es una imagen genérica y **no es una fotografía de su negocio, de su local, de su personal ni de un producto real suyo**, y se le muestra antes de publicar nada. Una foto se publica únicamente después de que usted la haya elegido y haya pulsado publicar, y aparece públicamente en la ficha de su negocio y en su nombre. **Usted es responsable de la foto publicada en su nombre**, lo que comprende su correspondencia con la realidad, los derechos de terceros y las políticas de contenido y de fotos de Google, según las cuales el contenido de una ficha de negocio debe representar el negocio y el producto tal como son en realidad. No utilice una foto así como si fuera una fotografía del negocio, del local o de un producto que no existe: una foto engañosa puede llevar a Google a retirar el contenido o a restringir la ficha, y además puede inducir a engaño a los consumidores. El archivo de la imagen lleva los marcadores propios de Google (SynthID y C2PA), que permiten identificarla como generada por IA.
 
 ## 15G. Mensajes de correo electrónico
 
@@ -191,6 +217,12 @@ El Servicio utiliza IA para producir temas de artículos, preguntas y artículos
 - **Recordatorios.** Cuando haya contenido pendiente de su aprobación, es posible que se le envíe un correo electrónico de recordatorio. Cada recordatorio incluye un enlace para darse de baja con un solo clic que no requiere iniciar sesión.
 - **Correos de puesta en marcha.** Hasta dos correos sobre un proyecto sin sitio conectado, o con uno conectado y nada publicado, que explican cómo completar el paso. Sin oferta y sin precio, con un enlace de baja que detiene solo esos correos.
 - **Resumen semanal de progreso.** Un resumen del progreso del proyecto, para los proyectos en los que usted lo activó en la configuración, los domingos por la mañana y solo cuando hay algo que contar. Una semana en la que no pasó nada no recibe correo.
+
+## 15H. Foto del autor
+
+Si sube una foto para una caja de autor, usted confirma que dispone de todos los derechos necesarios para publicarla y que, si en ella aparece una persona — usted u otra —, esa persona ha consentido que la foto se publique en su sitio para promocionar un negocio, incluido el uso comercial. Si la persona que aparece en la foto es menor de edad, se requiere el consentimiento de su tutor.
+
+Si ese consentimiento se retira, usted debe eliminar la foto en el Servicio. Al eliminar la foto, o al pasar a una opción sin foto, se borra el archivo de nuestro almacenamiento, pero una copia que ya se haya colocado en la biblioteca de medios de su sitio está bajo su control y solo usted puede eliminarla allí. Podemos retirar una foto del Servicio si recibimos un aviso fundado de que se publicó sin autorización.
 
 ## 16. Privacidad
 
@@ -224,8 +256,8 @@ Estos términos se rigen por las leyes del Estado de Israel. La jurisdicción ex
 
 Para cualquier consulta sobre estos términos o sobre el Servicio, póngase en contacto con nosotros:
 
-**GO TOP MARKETING GRUO LTD**
+**GO TOP DIGITAL MARKETING AND ADVERTISING LTD**
 Número de sociedad: 517274346
 Correo electrónico: [oren@gotop.co.il](mailto:oren@gotop.co.il)
 
-Última actualización: 9 de octubre de 2026
+Última actualización: 16 de octubre de 2026

@@ -54,7 +54,7 @@ import type { Scope } from '@/lib/site-fix/store'
 import { versionAtLeast } from '@/lib/site-fix/types'
 import { loadConnectedPlugin, pluginCan, refreshedPlugin, type PluginCapability } from '@/lib/site-fix/plugin-capabilities'
 import {
-  pluginFix, pluginMedia, pluginPublish, pluginTerms,
+  pluginAuthors, pluginFix, pluginMedia, pluginPublish, pluginTerms,
   type PluginAnswer, type PluginLink, type PluginPost, type PluginPublishRequest,
 } from '@/lib/site-fix/plugin-client'
 import { CONTENT_IMAGE_BUCKET } from '@/lib/content/featured-image'
@@ -123,6 +123,24 @@ export async function loadWordPressPublisher(
 /** The project can publish to WordPress at all: an application-password row, or a plugin >= 3.0.0. */
 export async function hasPublishPlugin(admin: Admin, projectId: string, ownerId?: string | null): Promise<boolean> {
   return !!(await loadPublishPlugin(admin, projectId, { ownerId }))
+}
+
+/**
+ * The display name the plugin publishes a post as: the chosen author (author_id), else the
+ * plugin's default, from its signed /authors list. Null when the plugin cannot list authors or
+ * does not answer. Also what the settings card's author-box preview shows for a new post
+ * (lib/content/author-box/preview.ts), so the two never disagree.
+ */
+export async function pluginPublishingUserName(link: PluginLink, version: string, authorId?: number | null, post?: PluginPost): Promise<string | null> {
+  try {
+    if (!pluginCan(version, 'authors')) return null
+    const authors = await pluginAuthors(link, post)
+    if (!authors.ok) return null
+    const id = typeof authorId === 'number' ? authorId : authors.body.default
+    return authors.body.items.find((a) => a.id === id)?.name ?? null
+  } catch {
+    return null
+  }
 }
 
 // ── Values the plugin accepts (fixes.php gotop_seo_bridge_text_ok: no < >, length bounds) ─────
@@ -241,7 +259,11 @@ export async function pluginCreatePost(
     inlineImages = result
     if (result.failed.length > 0) imageWarning = true
   }
-  content = await applyArticleDesign(admin, articleId, content, 'wordpress')
+  // The author box's name, when one is added: the user the plugin publishes the post as
+  // (author_id, else the plugin's default), from its signed /authors list.
+  content = await applyArticleDesign(admin, articleId, content, 'wordpress', {
+    authorName: () => pluginPublishingUserName(link, plugin.version, opts.authorId, deps.post),
+  })
 
   let taxonomy: ResolvedTaxonomy | undefined
   const sel = {

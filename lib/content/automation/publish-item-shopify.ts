@@ -16,6 +16,7 @@ import { hasWriteContent } from '@/lib/shopify/constants'
 import { AUTOMATION_MAX_ATTEMPTS } from '@/lib/content/automation/generate-item'
 import { recordPublishFinalFailureAlert, recordPublishBlockedAlert, resolvePublishAlerts } from '@/lib/content/automation/alerts'
 import type { PublishItemResult } from '@/lib/content/automation/publish-item'
+import { enqueueGbpPostForPublishedArticle } from '@/lib/gbp/auto-post'
 
 type Admin = ReturnType<typeof createAdminClient>
 const nowIso = () => new Date().toISOString()
@@ -141,6 +142,13 @@ export async function publishShopifyPoolItem(admin: Admin, item: PoolItem): Prom
     await admin.from('generated_articles').update({ last_error: null, updated_at: nowIso() }).eq('id', articleId)
     await admin.from('article_pool_items').update({ status: 'published', published_at: nowIso(), last_error: null, locked_at: null, updated_at: nowIso() }).eq('id', item.id)
     await resolvePublishAlerts(admin, item.id, { articleId, channel: 'shopify' })
+    // Also a post on the business profile, when the owner connected Google
+    // Business Profile and approved automatic posting. Best-effort, no network
+    // call to Google or to a model here; never affects the publish outcome.
+    // (Added 13 October 2026 with the removal of the Shopify block on that
+    // feature — without it the switch would sit on the screen and do nothing
+    // on exactly the projects that had just been let in.)
+    await enqueueGbpPostForPublishedArticle(admin, articleId)
     return { itemId: item.id, status: 'published', articleId, wpPostUrl: result.url }
   } catch (e) {
     // Area E — this path previously had NO try/catch: an unexpected throw here

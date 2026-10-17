@@ -15,13 +15,12 @@ import { NoticeBox } from '@/components/ui/Notice'
 import { Table, TableHead, TableBody, TableRow, Th, Td } from '@/components/ui/Table'
 import { CalendarClock } from 'lucide-react'
 import { AddPlanRow, RowActions } from '@/components/admin/BlogPlanControls'
-import { LOCALE_BY_WEEKDAY, localeForDay } from '@/lib/blog/auto/rotation'
+import { BLOG_AUTO_LOCALES } from '@/lib/blog/auto/rotation'
 import { PLAN_TABLE } from '@/lib/blog/auto/store'
 
 export const dynamic = 'force-dynamic'
 
 const LOCALE_NAME: Record<string, string> = { he: 'עברית', en: 'אנגלית', es: 'ספרדית', 'pt-BR': 'פורטוגזית' }
-const DAY_NAME = ['ראשון', 'שני', 'שלישי', 'רביעי', 'חמישי', 'שישי', 'שבת']
 
 const STATUS_LABEL: Record<string, string> = {
   planned: 'בתור',
@@ -58,18 +57,20 @@ export default async function AdminBlogPlanPage() {
     .limit(200)
 
   const rows = (data ?? []) as Row[]
-  const today = localeForDay()
-  const pendingToday = rows.filter((r) => r.locale === today && r.status === 'planned')
+  const pendingByLocale = BLOG_AUTO_LOCALES.map((locale) => ({
+    locale,
+    pending: rows.filter((r) => r.locale === locale && r.status === 'planned').length,
+  }))
 
   return (
     <div dir="rtl" className="space-y-8">
       <div className="min-w-0">
         <h1 className="text-title font-bold tracking-tight text-ink">תור המאמרים של הבלוג</h1>
         <p className="mt-1.5 text-caption text-muted">
-          מאמר אחד ביום. השפה נקבעת לפי היום בשבוע: {DAY_NAME.map((d, i) => `${d} ${LOCALE_NAME[LOCALE_BY_WEEKDAY[i]]}`).join(' · ')}.
+          מאמר אחד ביום בכל שפה: {BLOG_AUTO_LOCALES.map((l) => LOCALE_NAME[l]).join(' · ')}. שפה שאין בתור שלה ביטוי שכדאי לכתוב עליו מדלגת על אותו יום.
         </p>
         <p className="mt-1 text-caption text-muted">
-          היום {LOCALE_NAME[today]}, ובתור {pendingToday.length} ביטויים בשפה הזו.
+          בתור: {pendingByLocale.map((p) => `${LOCALE_NAME[p.locale]} ${p.pending}`).join(' · ')}.
         </p>
       </div>
 

@@ -1,7 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useState } from 'react'
-import { MapPinOff, Store } from 'lucide-react'
+import { MapPinOff } from 'lucide-react'
 import Header from '@/components/layout/Header'
 import WorkspaceGate from '@/components/layout/WorkspaceGate'
 import EmptyState from '@/components/ui/EmptyState'
@@ -12,6 +12,7 @@ import { getDashboardDictionary } from '@/lib/i18n/dashboard/getDashboardDiction
 import { ConnectCard, LocationCard } from './ConnectCards'
 import PostComposer from './PostComposer'
 import PostsList from './PostsList'
+import ReviewsPanel from './ReviewsPanel'
 import type { GbpReadyStatus, GbpStatus } from './types'
 
 /** The result the OAuth callback appends (?gbp=…) → our sentence. Fixed set; anything else is "failed". */
@@ -72,7 +73,6 @@ function Screen({ projectId }: { projectId: string }) {
     return <Notice tone="bad" action={{ label: t.retry, onClick: () => void load() }}>{t.loadFailed}</Notice>
   }
   if (!status) return <ScreenSkeleton label={t.loading} />
-  if (status.state === 'shopify') return <EmptyState icon={<Store className="size-5" />} title={t.shopifyTitle} body={t.shopifyBody} />
   if (status.state === 'unavailable') return <EmptyState icon={<MapPinOff className="size-5" />} title={t.unavailableTitle} body={t.unavailableBody} />
   const shown = withAuthLost(status, authLost)
 
@@ -85,6 +85,7 @@ function Screen({ projectId }: { projectId: string }) {
       </div>
       <PostComposer key={shown.location?.locationName ?? 'none'} projectId={projectId} status={shown} onPosted={load} />
       <PostsList projectId={projectId} posts={status.posts} onChanged={load} />
+      <ReviewsPanel key={`reviews-${shown.location?.locationName ?? 'none'}`} projectId={projectId} status={shown} />
     </div>
   )
 }

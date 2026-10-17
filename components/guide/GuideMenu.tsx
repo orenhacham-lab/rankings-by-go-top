@@ -26,7 +26,7 @@ import { getDashboardDictionary } from '@/lib/i18n/dashboard/getDashboardDiction
 import { WHATSAPP_NUMBER } from '@/components/public/contact'
 import { DashboardOnboardingTour, type TourEnd, type TourRun } from '@/components/onboarding/DashboardOnboardingTour'
 import {
-  FULL_TOUR_HOME, autoTour, fullTourKey, isNewAccount, legacyStepKey, readFullTourState,
+  FULL_TOUR_HOME, arrivedAtSection, autoTour, fullTourKey, isNewAccount, legacyStepKey, readFullTourState,
   screenForPath, screenTourKey, showGuideDot, tourSteps, type AutoTour, type FullTourState, type ScreenKey,
 } from '@/lib/guide/tours'
 import { cn } from '@/lib/utils'
@@ -121,8 +121,13 @@ export default function GuideMenu({ userId, accountCreatedAt }: { userId: string
   useEffect(() => {
     if (run || pendingFull || fullState === null || !isResolved || !pathname) return
     if (autoTried.current.has(pathname)) return
+    // Arrived at a section (#platform from "connect the site", a notification): no
+    // tour now, and the screen is not marked as tried, so a plain visit later still gets it.
+    const hash = window.location.hash
+    if (arrivedAtSection(hash)) return
     const pick = autoTour({
       pathname,
+      hash,
       newAccount: isNewAccount(accountCreatedAt, new Date()),
       projectsResolved: isResolved,
       fullTour: fullState,

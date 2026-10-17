@@ -60,6 +60,7 @@ import { gscStatusUrl, readGscResponse } from '@/components/gsc/gsc-data'
 import { useGscEnabled } from '@/components/gsc/GscFeature'
 import { readKnown } from '@/lib/connection-status/useKnownRead'
 import { projectConnectionUrls } from '@/lib/connection-status/project-connections'
+import { CONNECT_FIRST_NONE, connectFirst, type ConnectFirst } from '@/lib/project-settings/connect-first'
 import type { Project, Client } from '@/lib/supabase/types'
 
 /** How long the settings skeleton waits for the connection reads beyond the settings' own. */
@@ -106,14 +107,22 @@ function ProjectSettings({ project, reload }: { project: Project; reload: () => 
   // connections section opens in its final size instead of growing under the reader.
   const gscEnabled = useGscEnabled()
   const [connectionsRead, setConnectionsRead] = useState(false)
+  // The connections not made yet lead the screen; decided once, from these same reads
+  // (lib/project-settings/connect-first.ts), and kept for the visit.
+  const [first, setFirst] = useState<ConnectFirst>(CONNECT_FIRST_NONE)
   useEffect(() => {
     const urls = projectConnectionUrls(project.id)
     let done = false
     const finish = () => { if (!done) { done = true; setConnectionsRead(true) } }
+    const value = <T,>(r: PromiseSettledResult<T>) => (r.status === 'fulfilled' ? r.value : null)
     void Promise.allSettled([
       readKnown(urls.wordpress), readKnown(urls.shopify), readKnown(urls.site),
       gscEnabled !== false ? readGscResponse(gscStatusUrl(project.id)) : null,
-    ]).then(finish)
+    ]).then(([wordpress, shopify, site, gsc]) => {
+      // Only before the screen first draws: once it has, nothing moves under the reader.
+      if (!done) setFirst(connectFirst({ wordpress: value(wordpress), shopify: value(shopify), site: value(site), gsc: value(gsc) }))
+      finish()
+    })
     const cap = window.setTimeout(finish, CONNECTIONS_WAIT_MS)
     return () => window.clearTimeout(cap)
   }, [project.id, gscEnabled])
@@ -213,7 +222,26 @@ function ProjectSettings({ project, reload }: { project: Project; reload: () => 
     locale: language,
   }
 
+  // Which connection blocks lead the screen, and whether any is left in the usual place.
+  const topPlatform = first.platform
+  const topGsc = first.gsc && gscEnabled !== false
+  const lowerEmpty = topPlatform && (topGsc || gscEnabled === false)
+  // The section at the top takes the usual id when it holds every connection, so a
+  // link to #connections (the site-health screen's) still lands on them.
+  const topId = lowerEmpty ? SECTION.connections : SECTION.connectFirst
+  const platformBlock = (
+    <div id={PROJECT_CONNECTION_ANCHOR} className="scroll-mt-20">
+      <ContentSection projectId={project.id} platformHint={platform} />
+    </div>
+  )
+  const gscBlock = (
+    <div id={SETTINGS_GSC_ANCHOR} className="scroll-mt-20">
+      <GscPanel projectId={project.id} />
+    </div>
+  )
+
   const index: { id: string; label: string }[] = []
+  if (topPlatform || topGsc) index.push({ id: topId, label: t.connectFirst.title })
   if (rescan) index.push({ id: SECTION.scan, label: t.scan.title })
   index.push({ id: SECTION.business, label: t.businessTitle })
   if (visibility.profileCard) index.push({ id: SECTION.profile, label: t.profile.title })
@@ -223,7 +251,7 @@ function ProjectSettings({ project, reload }: { project: Project; reload: () => 
   if (article.state.status !== 'loading') {
     index.push({ id: SECTION.articleDesign, label: t.articleStyle.title }, { id: SECTION.officialProfiles, label: t.officialProfiles.navLabel })
   }
-  index.push({ id: SECTION.connections, label: t.connectionsTitle })
+  if (!lowerEmpty) index.push({ id: SECTION.connections, label: t.connectionsTitle })
   // The card hides itself while its table is not installed; the index follows it.
   if (autoFixShown) index.push({ id: SECTION.siteAutoFix, label: dict.siteHealth.autofix.auto.title })
   index.push({ id: SECTION.danger, label: t.danger.title })
@@ -239,6 +267,15 @@ function ProjectSettings({ project, reload }: { project: Project; reload: () => 
               <Notice tone="bad" action={{ label: t.retry, onClick: () => void settings.reload() }}>
                 {t.loadFailed}
               </Notice>
+            )}
+
+            {(topPlatform || topGsc) && (
+              // Not connected yet: first on the screen (owner's report, 10 October 2026).
+              <section id={topId} data-connect-first="" aria-labelledby={`${topId}-title`} className="scroll-mt-20 space-y-4">
+                <ConnectionsHeading id={`${topId}-title`} title={t.connectFirst.title} body={t.connectFirst.body} tone="first" />
+                {topPlatform && platformBlock}
+                {topGsc && gscBlock}
+              </section>
             )}
 
             {rescan && (
@@ -306,33 +343,23 @@ function ProjectSettings({ project, reload }: { project: Project; reload: () => 
               </div>
             )}
 
-            <section id={SECTION.connections} aria-labelledby={`${SECTION.connections}-title`} className="scroll-mt-20 space-y-4">
-              <div className="flex items-start gap-3 pt-2">
-                <span aria-hidden className="grid h-9 w-9 shrink-0 place-items-center rounded-control bg-action-soft text-action">
-                  <Plug size={18} />
-                </span>
-                <div className="min-w-0">
-                  <h2 id={`${SECTION.connections}-title`} className="text-section font-semibold text-ink">{t.connectionsTitle}</h2>
-                  <p className="mt-0.5 text-copy text-muted">{t.connectionsBody}</p>
-                </div>
-              </div>
+            {!lowerEmpty && (
+              <section id={SECTION.connections} aria-labelledby={`${SECTION.connections}-title`} className="scroll-mt-20 space-y-4">
+                <ConnectionsHeading id={`${SECTION.connections}-title`} title={t.connectionsTitle} body={t.connectionsBody} />
 
-              {/* The publishing platform: WordPress or Shopify, one at a time. It owns
-                  its own connect/disconnect flow; this page only gives it a home, and
-                  the platform the scan read off the site as a hint. */}
-              <div id={PROJECT_CONNECTION_ANCHOR} className="scroll-mt-20">
-                <ContentSection projectId={project.id} platformHint={platform} />
-              </div>
+                {/* The publishing platform: WordPress or Shopify, one at a time. It owns
+                    its own connect/disconnect flow; this page only gives it a home, and
+                    the platform the scan read off the site as a hint. */}
+                {!topPlatform && platformBlock}
 
-              {/* Search Console: optional evidence, the same panel the content screens link to. */}
-              <div id={SETTINGS_GSC_ANCHOR} className="scroll-mt-20">
-                <GscPanel projectId={project.id} />
-              </div>
+                {/* Search Console: optional evidence, the same panel the content screens link to. */}
+                {!topGsc && gscBlock}
 
-              {/* Only what the merchant can act on. Google Ads (Go Top's own key for
-                  search volumes, not a project connection) and "Google Analytics 4
-                  is not available yet" were cards that led nowhere; they are gone. */}
-            </section>
+                {/* Only what the merchant can act on. Google Ads (Go Top's own key for
+                    search volumes, not a project connection) and "Google Analytics 4
+                    is not available yet" were cards that led nowhere; they are gone. */}
+              </section>
+            )}
 
             {/* Automatic site-health fixes: off by default, WordPress with the Go Top plugin only. */}
             <SiteAutoFixCard projectId={project.id} onShown={setAutoFixShown} />
@@ -351,6 +378,23 @@ function ProjectSettings({ project, reload }: { project: Project; reload: () => 
           </aside>
         </div>
       )}
+    </div>
+  )
+}
+
+/** A connections section's heading: the plug, the title and one line. */
+function ConnectionsHeading({ id, title, body, tone = 'usual' }: { id: string; title: string; body: string; tone?: 'usual' | 'first' }) {
+  return (
+    <div className="flex items-start gap-3 pt-2">
+      <span aria-hidden className={tone === 'first'
+        ? 'grid h-9 w-9 shrink-0 place-items-center rounded-control bg-action text-action-ink shadow-card'
+        : 'grid h-9 w-9 shrink-0 place-items-center rounded-control bg-action-soft text-action'}>
+        <Plug size={18} />
+      </span>
+      <div className="min-w-0">
+        <h2 id={id} className="text-section font-semibold text-ink">{title}</h2>
+        <p className="mt-0.5 text-copy text-muted">{body}</p>
+      </div>
     </div>
   )
 }

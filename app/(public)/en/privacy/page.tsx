@@ -23,7 +23,7 @@ export default function EnglishPrivacyPage() {
       <section>
         <h2>Introduction</h2>
         <p>
-          GO TOP MARKETING GRUO LTD (company number 517274346) (&ldquo;we&rdquo;, &ldquo;our&rdquo;, or &ldquo;the company&rdquo;) operates the Go Top SEO service
+          GO TOP DIGITAL MARKETING AND ADVERTISING LTD (company number 517274346) (&ldquo;we&rdquo;, &ldquo;our&rdquo;, or &ldquo;the company&rdquo;) operates the Go Top SEO service
           at https://www.gotopseo.com (the &ldquo;Service&rdquo;). This privacy policy describes our practices regarding the collection,
           use, and disclosure of personal information when you use our Service.
         </p>
@@ -58,6 +58,8 @@ export default function EnglishPrivacyPage() {
           type) and the placement log — see &ldquo;Link Network&rdquo; below</li>
           <li><strong>Results and content:</strong> AI visibility check results, and content generated for you:
           topics, questions and articles</li>
+          <li><strong>Author photo:</strong> a photo you upload for an author box, if you chose to show
+          one &mdash; see &ldquo;An Author Photo You Upload&rdquo; below</li>
           <li><strong>Email preferences:</strong> which messages you receive, and unsubscribes from reminders</li>
           <li><strong>Payment information:</strong> we do not store your payment instrument. For
           accounts whose billing authority is Shopify — including merchants who installed the app
@@ -88,6 +90,11 @@ export default function EnglishPrivacyPage() {
         <ul>
           <li><strong>Shopify:</strong> for payment processing for accounts billed through Shopify App Pricing, and for publishing content to a connected store</li>
           <li><strong>PayPal:</strong> for payment processing for website-billed customers only</li>
+          <li><strong>Creem:</strong> for payment processing, where an account&rsquo;s payment goes through it. To
+          open a payment we send the e-mail address of the account, the identifier of the plan chosen and our
+          own reference for that request, and we receive back a customer identifier held by them, a plan
+          identifier, the subscription status and the dates of the billing period. Card details, and any other
+          payment instrument, never reach us at any point</li>
           <li><strong>Supabase:</strong> for secure data storage</li>
           <li><strong>Serper:</strong> for Google search queries and rank checks</li>
           <li><strong>Resend:</strong> for sending email — see &ldquo;Email Messages&rdquo; below</li>
@@ -151,12 +158,33 @@ export default function EnglishPrivacyPage() {
           <li><strong>What we store:</strong> the location you choose for a project (its Google identifiers, name,
           address, website and Maps link), and each post you create: its text, button, photo, scheduled time, and
           Google&rsquo;s post identifier, link and review status.</li>
-          <li><strong>What we do with it:</strong> we create a post only when you press publish, or at the time you
-          scheduled it, and then read that post back from Google to show you whether it is live. We do not change
-          your business information and we do not read or reply to reviews.</li>
+          <li><strong>What we do with it:</strong> we create a post when you press publish, at the time you
+          scheduled it, or &ndash; <strong>if you turned automatic posting on</strong> &ndash; each time the system
+          publishes an article to your site, and then read that post back from Google to show you whether it is
+          live. We do not change your business information.</li>
+          <li><strong>Automatic posting:</strong> off by default. If you turned it on, every article the system
+          publishes to your site is also published as a post on your business listing, <strong>without you reading
+          it first</strong>. What is sent to the model is the business name, the article&rsquo;s title and its
+          summary, with no person&rsquo;s name. An automatic post is written in the project&rsquo;s language. You can turn it off at any time, and it turns itself off if you
+          change the business the project is connected to.</li>
+          <li><strong>Reviews:</strong> when you open the reviews screen we read your business&rsquo;s reviews from
+          Google: the reviewer&rsquo;s display name (or &ldquo;anonymous&rdquo;), the rating, the text, the times
+          and any existing reply. <strong>We store no review content</strong> &ndash; not the text, not the
+          reviewer&rsquo;s name, not the rating and not the reply. We keep two timestamps only, so we can mark a
+          review you have not seen yet. The reviewer&rsquo;s profile photo is not read.</li>
+          <li><strong>Replying to a review:</strong> a reply is published in your name only after you wrote or
+          approved it and pressed send, <strong>and it is public: it appears on your Google business listing and
+          anyone can see it</strong>. You can edit or delete it from the same screen. Google may remove a reply
+          under its own content policies, which is not something we control.</li>
           <li><strong>AI drafts:</strong> if you ask for a draft, the business name and the article or topic you
-          chose are sent to Google&rsquo;s Gemini model. A draft is never published until you review it and press
-          publish.</li>
+          chose are sent to Google&rsquo;s Gemini model. If you ask for a draft reply to a review, the
+          review&rsquo;s text and its rating are sent too, <strong>without the reviewer&rsquo;s name</strong>. A
+          draft you asked for is not published until you review it and press publish. The one thing published
+          without being read is a post created by automatic posting, if you turned it on.</li>
+          <li><strong>An AI photo for a post:</strong> if you ask for a photo for a post written from a topic,
+          only the topic you wrote is sent to Google&rsquo;s Gemini model, <strong>without the business name and
+          without any person&rsquo;s name</strong>. The photo comes back to your screen, and we do not store it
+          until you choose it and publish the post.</li>
         </ul>
 
         <h3>Limited Use</h3>
@@ -373,7 +401,14 @@ export default function EnglishPrivacyPage() {
           When you ask to download a report as a PDF, we send the report&rsquo;s content as displayed to the
           <strong> PDFShift</strong> service, which returns the file to us. This happens only when you pressed
           to download a report, never on a regular or scheduled basis, and the content is sent for the
-          conversion alone. Retention at PDFShift is governed by their own privacy policy and terms.
+          conversion alone.
+        </p>
+        <p>
+          We have a data processing agreement with PDFShift under Article 28 of the GDPR. Under its annex,
+          the content we send is processed in memory for the duration of the conversion alone and is not
+          retained afterwards. PDFShift offers optional storage of the generated file, and we do not ask for
+          it. Its servers and storage are in France, and its error-monitoring provider is in the United
+          States under the EU-US Data Privacy Framework and the standard contractual clauses.
         </p>
       </section>
 
@@ -448,6 +483,38 @@ export default function EnglishPrivacyPage() {
           the same rate. The terms themselves are in the{' '}
           <a href="/en/affiliate-terms">Partner Program Agreement</a>, which also requires a partner to say openly
           that they are paid.
+        </p>
+      </section>
+
+      <section>
+        <h2>An Author Photo You Upload</h2>
+        <p>
+          If you upload a photo for an author box, the file is kept in a dedicated storage bucket of ours
+          for as long as the photo is configured on the project. Its path is made of the project id and a
+          random id, and never of a person&rsquo;s name. We do not publish our copy and the article does not link to it.
+        </p>
+        <p>
+          When the article is published, the photo is copied into your site&rsquo;s media library, and the
+          article links to that copy. From then on the photo is visible to anyone who visits your site,
+          like any other image in an article. The upload is offered only on a project where that copy can
+          be made.
+        </p>
+        <p>
+          The photo is not sent to any AI provider, is not used to train models, and we do not run face
+          recognition or any other biometric processing on it.
+        </p>
+        <p>
+          Deleting the photo, or switching to no photo or to the site icon, erases the file from our
+          storage. Turning the whole author box off does not erase the photo: it is kept until you delete
+          it or choose another option. A copy already placed on your site is not under our control, and
+          only whoever administers that site can delete it there.
+        </p>
+        <p>
+          As to the person in the photo, the customer who uploaded it decides what it is used for, and we
+          process the file for them. If you are the person in the photo and not the customer who uploaded
+          it, write to us at the address at the end of this policy: we will erase the file from our
+          storage and approach the customer so that the copy on the site is taken down, but we cannot
+          ourselves delete content on a customer&rsquo;s site.
         </p>
       </section>
 
@@ -757,6 +824,9 @@ export default function EnglishPrivacyPage() {
           <li><strong>Cookie decision log:</strong> up to three years from the decision, so that we
           can demonstrate what you chose. That is the legal basis for keeping it, which is why it is
           not erased together with the account.</li>
+          <li><strong>Author photo:</strong> for as long as the photo is configured on the project.
+          Deleting it, or switching to no photo or to the site icon, erases the file immediately. A copy
+          already placed on your site stays there until you delete it.</li>
           <li><strong>Security and server logs:</strong> up to 90 days.</li>
         </ul>
       </section>
@@ -810,6 +880,88 @@ export default function EnglishPrivacyPage() {
             Privacy Protection Authority
           </a>). Contacting us first is not a condition of complaining, though we would welcome the
           chance to put it right.
+        </p>
+      </section>
+
+      <section>
+        <h2>Business Outreach by Email</h2>
+        <p>
+          This section is about someone who received an email from us and is not a customer of
+          ours. If that is you, you gave us nothing and signed up for nothing: we obtained your
+          business&rsquo;s address from public sources, and this section says exactly which, what we
+          hold, and how to take yourself out in one click.
+        </p>
+        <p className="mt-4">
+          <strong>What we collect and from where.</strong> The business&rsquo;s name, its website
+          address, a contact email address shown on the business&rsquo;s own site or in a public
+          business registry, the name of the contact person where the site publishes one next to
+          that address, the postal address the business publishes (a business that publishes no
+          address never enters the list), the country the business operates in, and one finding from an automated check of the site&rsquo;s public
+          pages, with the date it was checked. <strong>We do not buy contact lists and we do not use
+          data brokers.</strong> We do not collect a phone number, we collect nothing about a person
+          beyond the business role they are published in, and we do not enter any part of a site
+          that is not open to every visitor.
+        </p>
+        <p className="mt-4">
+          <strong>For what purpose.</strong> To approach the business once, with an offer of our
+          service, and to explain what we found on its site. It is a marketing approach and we say
+          so in the message itself.
+        </p>
+        <p className="mt-4">
+          <strong>For which countries.</strong> We hold addresses for this purpose only for
+          businesses we have verified, from two independent sources, to be operating in the United
+          States. <strong>We do not hold addresses for this purpose for businesses in Israel, the
+          European Economic Area or the United Kingdom</strong>, and a business whose country we
+          could not verify never enters the list at all.
+        </p>
+        <p className="mt-4">
+          <strong>How many messages.</strong> Two at most: one message, and, if no reply comes, one
+          follow-up a week later. After that the business leaves the list even without asking.
+        </p>
+        <p className="mt-4">
+          <strong>What we keep, and for how long.</strong> Each business is one record: the
+          business&rsquo;s name, its site, the platform the site runs on, the country, the contact
+          email address and the contact&rsquo;s name where we found them, the postal address, the two
+          public sources the details came from, the single finding with its date, which of the two
+          messages have been sent and when, whether a reply or a removal request came and when, the
+          dates the record was created and last changed, a one-way fingerprint of the email address, a random
+          identifier that makes the unsubscribe link in the message work, and a short internal note
+          about the business. <strong>From a record we wrote to, the email address, the
+          contact&rsquo;s name and the postal address are erased 30 days after the last message we
+          sent it</strong>, or 30 days after a reply or a removal request if that
+          is later, and the date of the erasure is recorded. 30 days is not a round number: the
+          unsubscribe link in our message has to keep working for at least that long, and it resolves
+          against this record. What remains afterwards is everything else in the record above,
+          among it the one-way fingerprint and the unsubscribe identifier, so the link keeps
+          working. The
+          fingerprint is what lets us know we already wrote to that business twice and keeps it from
+          being added again. <strong>A record we never
+          wrote to is deleted outright 90 days after it was added.</strong> The removal list is
+          separate from this record and is kept for as long as we send email at all, because that is
+          the only way a removal can hold.
+        </p>
+        <p className="mt-4">
+          <strong>How to stop it.</strong> Every message carries an unsubscribe link that works in
+          one click, with no signing in and no explanation. It is honoured immediately and
+          permanently. So that the removal holds, the address is kept on a removal list
+          <strong> for the single purpose of making sure we do not contact you again</strong>, it is
+          used for nothing else, and it applies across every channel of ours, not only the one you
+          asked in. A reply saying not to write again is treated the same way.
+        </p>
+        <p className="mt-4">
+          <strong>If you are in California.</strong> A business contact&rsquo;s address is personal
+          information under California privacy law, so you have the right to know what we hold about
+          you, to receive a copy, to request deletion, to correct inaccurate information, and not to
+          be discriminated against for exercising a right. <strong>We do not sell this information
+          and we do not share it for cross-context behavioural advertising.</strong> Because we did
+          not collect the information from you directly, this section is the notice of collection,
+          including how long each item is kept, and a link to it appears in every message we send. A request goes to the address in
+          &ldquo;Privacy Contact and Representatives&rdquo;, and we answer in writing.
+        </p>
+        <p className="mt-4">
+          The same requests &mdash; access, deletion and correction &mdash; are answered for people
+          who are not in California, at the same address and in the same way. The controller is
+          GO TOP DIGITAL MARKETING AND ADVERTISING LTD, company 517274346, in Israel.
         </p>
       </section>
 
@@ -903,7 +1055,7 @@ export default function EnglishPrivacyPage() {
 
       <section>
         <p className={LEGAL_FOOTNOTE}>
-          This policy was last updated on October 9, 2026
+          This policy was last updated on October 16, 2026
         </p>
       </section>
     </LegalDoc>

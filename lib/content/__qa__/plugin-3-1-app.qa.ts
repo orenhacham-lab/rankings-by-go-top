@@ -32,6 +32,7 @@ process.env.CONTENT_CREDENTIALS_ENCRYPTION_KEY = process.env.CONTENT_CREDENTIALS
 import { FakeAdmin } from '@/lib/__qa__/_fake-admin'
 import { encryptCredential } from '@/lib/security/credentials-crypto'
 import { generatePluginKey, pairingCode } from '@/lib/site-fix/plugin-auth'
+import { PLUGIN_LATEST_VERSION } from '@/lib/site-fix/types'
 import type { PluginLink } from '@/lib/site-fix/plugin-client'
 import type * as PublishModule from '../wordpress-plugin-publish'
 import type * as RefreshModule from '../wordpress-index-refresh'
@@ -297,7 +298,7 @@ async function main() {
       try {
         wp({ deactivate: true })
         const s = wp({ setup: true, code: pairingCode(ek) }) as Record<string, number | string | null>
-        check('E1: the plugin loads in WordPress as an active plugin does (after plugins_loaded), pairs with a code through its own route', s.paired === 200 && s.plugin === '3.1.0', JSON.stringify(s).slice(0, 300))
+        check('E1: the plugin loads in WordPress as an active plugin does (after plugins_loaded), pairs with a code through its own route', s.paired === 200 && s.plugin === PLUGIN_LATEST_VERSION, JSON.stringify(s).slice(0, 300))
         console.log(`  (WordPress ${s.version})`)
         const page = wp({ notices: true, admin: true }) as { notices?: string; routes?: string[]; settings_page?: boolean; version?: string }
         check('E2: Settings > GO TOP SEO opens with the pairing form; no "two copies" notice when it is alone; every signed route is registered',
@@ -311,7 +312,7 @@ async function main() {
           m.done()
         }
         const status = await (await import('@/lib/site-fix/plugin-client')).pluginStatus(ELINK, post)
-        check('E3: /status answers 3.1.0 and its capabilities, signed', status.ok && status.body.version === '3.1.0' && CAP.PLUGIN_CAPABILITIES.every((c) => (status.body.capabilities ?? []).includes(c)), JSON.stringify(status).slice(0, 300))
+        check('E3: /status answers the plugin\'s own version and its capabilities, signed', status.ok && status.body.version === PLUGIN_LATEST_VERSION && CAP.PLUGIN_CAPABILITIES.every((c) => (status.body.capabilities ?? []).includes(c)), JSON.stringify(status).slice(0, 300))
         const src = { ...RS.pluginReadSource(ELINK, post), discoverStoreEntities: NO_STORE }
         const posts = await src.getPosts({ page: 1, perPage: 50 })
         check('E4: the content list: published posts only (the draft is not there), with their addresses',

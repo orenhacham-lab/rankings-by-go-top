@@ -66,7 +66,8 @@ async function main() {
     const pools = [pool('acting', FUTURE), pool('idle', FUTURE)]
     const items = [item('q-1', 'acting', 'queued'), item('g-1', 'idle', 'generated')]
     const admin = new FakeAdmin({ article_pools: pools, article_pool_items: items })
-    const { lines, result } = await captured(() => runAutomation(admin as unknown as Admin))
+    // A connected site: a project with none holds its generation (generation-budget.qa.ts).
+    const { lines, result } = await captured(() => runAutomation(admin as unknown as Admin, { platform: async () => ({ platform: 'wordpress' }) }))
     const perPool = lines.filter((l) => l.tag === '[automation-runner] pool')
     const diag = (result as { diagnostics: { poolId: string; generateAttempted: boolean }[] }).diagnostics.find((d) => d.poolId === 'acting')
     check('the runner did attempt a generation on the acting pool', diag?.generateAttempted === true, JSON.stringify(diag))

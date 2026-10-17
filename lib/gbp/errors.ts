@@ -20,6 +20,9 @@ export const GBP_ERROR_CODES = [
   'image_too_small',
   'image_upload_failed',
   'draft_unavailable',
+  'image_generation_failed',
+  'review_not_found',
+  'reply_rejected',
   'not_available',
   'unexpected',
 ] as const

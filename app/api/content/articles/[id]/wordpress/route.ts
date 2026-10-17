@@ -21,6 +21,7 @@ import { authContentProject, isContentModuleEnabled } from '@/lib/content/api-au
 import { createAdminClient } from '@/lib/supabase/admin'
 import { WordPressClientError, type WordPressPostStatus, type WordPressErrorMeta } from '@/lib/wordpress/client'
 import { gmtDate, loadWordPressPublisher, publishArticleToWordPress, publishSeoFor } from '@/lib/content/wordpress-plugin-publish'
+import { enqueueGbpPostForPublishedArticle } from '@/lib/gbp/auto-post'
 import { ensureProjectKeywordFromPublishedArticle } from '@/lib/content/keyword-from-article'
 import { classifyWordPressError, hebrewMessageFor, httpStatusFor, safeRemoteDiagnostics, type WpFailureStage, type WpPublishErrorCode } from '@/lib/content/wordpress-error'
 import { currentGitSha, isPreviewEnv } from '@/lib/runtime-info'
@@ -416,6 +417,10 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     keywordAdded = kw.added
     keywordAddedText = kw.added ? (kw.keyword ?? null) : null
     if (!kw.ok) console.warn('[content-wp-export] keyword add failed', { ...logBase, reason: kw.reason })
+    // Also a post on the business profile, when the owner connected Google
+    // Business Profile and approved automatic posting. Best-effort, never blocks.
+    const gbp = await enqueueGbpPostForPublishedArticle(auth.admin, id)
+    if (!gbp.ok) console.warn('[content-wp-export] gbp auto post failed', { ...logBase, reason: gbp.reason })
   }
 
   console.log('[content-wp-export] done', { ...logBase, step: 'post_create', postVia: created.via, wpPostId: created.wpPostId, updated: created.updated, imageWarning: created.imageWarning, taxonomyWarning: created.taxonomyWarning, seoPlugin, seoStatus, keywordAdded })

@@ -33,6 +33,7 @@ import { PUBLIC_LOCALES } from '@/lib/i18n/locales'
 import { makeUnsubscribeToken, verifyUnsubscribeToken } from '@/lib/reminders/token'
 import { SETUP_UNSUBSCRIBE_SCOPE, unsubscribeUrlFor } from '@/lib/reminders/email'
 import { handlePreferencesPut, handleUnsubscribe, unsubscribeScope } from '@/lib/reminders/http'
+import { hashEmail } from '@/lib/email-suppression'
 import { withMutant } from '@/lib/reminders/__qa__/_mutant'
 import { decideOnboardingEmail, stageOf, type OnboardingState } from '../cadence'
 import { actionPathFor, buildOnboardingEmail } from '../email'
@@ -137,7 +138,7 @@ async function main() {
   console.log('\nC) The run')
   const project = (over: Record<string, unknown> = {}) =>
     ({ id: P1, user_id: OWNER, created_at: before(10 * D), target_domain: 'shop.example.com', business_name: null, is_active: true, ...over })
-  const owner = async () => ({ email: 'owner@example.com', locale: 'he' as const, firstName: 'דנה', shopify: false })
+  const owner = async () => ({ email: 'owner@example.com', locale: 'he' as const, firstName: 'דנה', shopifyAppStoreOrigin: false, staff: false })
   const deps = (admin: FakeAdmin, over: Partial<OnboardingDeps> = {}): OnboardingDeps => ({
     admin: admin as unknown as ServiceRoleClient, env: fullEnv, now: () => now, owner, send: async () => ({ ok: true }), ...over,
   })
@@ -228,10 +229,33 @@ async function main() {
   const r11 = await runOnboardingEmails(deps(a11, { send: async () => { offSwitch++; return { ok: true } } }))
   check('C12: an owner who unsubscribed gets nothing', r11.status === 'done' && offSwitch === 0)
 
+  let listedSends = 0
+  const aSup = new FakeAdmin({ projects: [project()], email_suppressions: [{ email_hash: hashEmail('owner@example.com'), source: 'hard_bounce', channel: 'system' }] })
+  const rSup = await runOnboardingEmails(deps(aSup, { send: async () => { listedSends++; return { ok: true } } }))
+  check('C13a: an address on the removal list gets no setup email and no stage recorded',
+    rSup.status === 'done' && listedSends === 0 && (aSup.tables.project_reminder_state ?? []).length === 0, rSup)
+
+  let unreadableSends = 0
+  const aUnread = new FakeAdmin({ projects: [project()] }, { email_suppressions: { select: () => ({ code: '08006', message: 'connection lost' }) } })
+  const rUnread = await runOnboardingEmails(deps(aUnread, { send: async () => { unreadableSends++; return { ok: true } } }))
+  check('C13b: a removal list we cannot read holds the setup email for the next tick',
+    rUnread.status === 'done' && unreadableSends === 0 && (aUnread.tables.project_reminder_state ?? []).length === 0)
+
+  const supMut = await withMutant<{ runOnboardingEmails: typeof runOnboardingEmails }, boolean>(
+    'lib/onboarding-emails/run.ts', [['if ((await isSuppressed(admin, who.email)).suppressed) { suppressed++; continue }', 'void suppressed']],
+    async (m) => {
+      let n = 0
+      const w = new FakeAdmin({ projects: [project()], email_suppressions: [{ email_hash: hashEmail('owner@example.com'), source: 'hard_bounce', channel: 'system' }] })
+      await m.runOnboardingEmails(deps(w, { send: async () => { n++; return { ok: true } } }))
+      return n === 1
+    },
+  )
+  check('C13-MUT: without the gate the setup email reaches a removed address (C13a would fail)', supMut)
+
   let noAddress = 0
   const a12 = new FakeAdmin({ projects: [project()] })
   const r12 = await runOnboardingEmails(deps(a12, {
-    owner: async () => ({ email: null, locale: null, firstName: null, shopify: false }),
+    owner: async () => ({ email: null, locale: null, firstName: null, shopifyAppStoreOrigin: false, staff: false }),
     send: async () => { noAddress++; return { ok: true } },
   }))
   check('C13: no address, no email and no claim', r12.status === 'done' && noAddress === 0 && (a12.tables.project_reminder_state ?? []).length === 0)
@@ -244,11 +268,53 @@ async function main() {
   let shopifyLocale: OutgoingOnboarding | undefined
   const a14 = new FakeAdmin({ projects: [project()] })
   await runOnboardingEmails(deps(a14, {
-    owner: async () => ({ email: 'store@example.com', locale: null, firstName: null, shopify: true }),
+    owner: async () => ({ email: 'store@example.com', locale: null, firstName: null, shopifyAppStoreOrigin: true, staff: false }),
     send: async (m) => { shopifyLocale = m; return { ok: true } },
   }))
-  check('C15: a Shopify owner with no stored language gets English',
+  check('C15: an account that CAME from the Shopify App Store, with no recorded language, gets English',
     /lang="en"/.test(shopifyLocale?.email.html ?? ''), shopifyLocale?.email.subject)
+
+  // The live bug: an Israeli owner who connected a client's Shopify store received every
+  // email in English, because the code read a connection record as a language.
+  let agency: OutgoingOnboarding | undefined
+  const a15 = new FakeAdmin({ projects: [project()], shopify_connections: [{ project_id: 'other', user_id: OWNER }] })
+  await runOnboardingEmails(deps(a15, {
+    owner: async () => ({ email: 'agency@example.co.il', locale: null, firstName: null, shopifyAppStoreOrigin: false, staff: false }),
+    send: async (m) => { agency = m; return { ok: true } },
+  }))
+  check('C15a: a website account with a connected Shopify store still gets Hebrew',
+    /lang="he"/.test(agency?.email.html ?? ''), agency?.email.subject)
+
+  let unreadableOrigin = 0
+  const a16 = new FakeAdmin({ projects: [project()] })
+  const rOrigin = await runOnboardingEmails(deps(a16, {
+    owner: async () => ({ email: 'owner@example.com', locale: null, firstName: null, shopifyAppStoreOrigin: null, staff: false }),
+    send: async () => { unreadableOrigin++; return { ok: true } },
+  }))
+  check('C15b: no recorded language and unreadable provenance: nothing is sent and no stage is claimed',
+    rOrigin.status === 'done' && unreadableOrigin === 0 && (a16.tables.project_reminder_state ?? []).length === 0)
+
+  let staffSends = 0
+  const a17 = new FakeAdmin({ projects: [project()] })
+  const rStaff = await runOnboardingEmails(deps(a17, {
+    owner: async () => ({ email: 'oren@example.com', locale: 'he' as const, firstName: null, shopifyAppStoreOrigin: false, staff: true }),
+    send: async () => { staffSends++; return { ok: true } },
+  }))
+  check('C15c: an administrator\u2019s own project gets no setup email',
+    rStaff.status === 'done' && staffSends === 0 && (a17.tables.project_reminder_state ?? []).length === 0)
+
+  const staffMut = await withMutant<{ runOnboardingEmails: typeof runOnboardingEmails }, boolean>(
+    'lib/onboarding-emails/run.ts', [['if (who.staff) continue', 'void who.staff']],
+    async (m) => {
+      let n = 0
+      await m.runOnboardingEmails(deps(new FakeAdmin({ projects: [project()] }), {
+        owner: async () => ({ email: 'oren@example.com', locale: 'he' as const, firstName: null, shopifyAppStoreOrigin: false, staff: true }),
+        send: async () => { n++; return { ok: true } },
+      }))
+      return n === 1
+    },
+  )
+  check('C15-MUT: without the staff check an administrator is mailed about his own sites (C15c would fail)', staffMut)
 
   // A CONNECTED project whose connection table cannot be read: the real code sends nothing,
   // a version that reads an error as "no row" tells a connected owner to connect.
@@ -447,7 +513,7 @@ async function main() {
     const outbox: OutgoingOnboarding[] = []
     const runRes = await runOnboardingEmails({
       admin: runOptedOut as unknown as ServiceRoleClient, env: fullEnv, now: () => now,
-      owner: async () => ({ email: 'owner@example.com', locale: 'he', firstName: null, shopify: false }),
+      owner: async () => ({ email: 'owner@example.com', locale: 'he', firstName: null, shopifyAppStoreOrigin: false, staff: false }),
       send: async (m) => { outbox.push(m); return { ok: true } },
     })
     check('G9: the run itself sends nothing to that owner', runRes.status === 'done' && outbox.length === 0, runRes)

@@ -129,7 +129,10 @@ function originOf(next: NextArticle): StrategyOrigin {
 export default function NextArticleCard({
   next, hasArticles, lang, dict, idea = null, act = null, insight = null, onOpenBrief, onCreateTopic, onGenerated, onError,
   automation = false, first = { kind: 'none' }, queuePaused = false, hasSite = null, connectHref = '/settings', publishing = false, onPublishFirst,
+  onTrial = false,
 }: {
+  /** The owner is on the free trial: the first article is included, not a spent allowance. */
+  onTrial?: boolean
   /** The publishing queue exists: approving schedules, and the first approval writes the first article. */
   automation?: boolean
   /** The project's first article (firstArticleView): the only one with "publish now". */
@@ -312,7 +315,11 @@ export default function NextArticleCard({
                   </button>
                 )}
                 {automation && !hasArticles && (
-                  <span data-approve-first-hint className="basis-full text-caption text-contrast-ink/60">{s.first.approveHint}</span>
+                  // On the trial the first article is the thing we promised and it costs
+                  // nothing more, so say that instead of naming the allowance it spends.
+                  <span data-approve-first-hint className="basis-full text-caption text-contrast-ink/60">
+                    {onTrial ? s.first.approveHintTrial : s.first.approveHint}
+                  </span>
                 )}
               </div>
             )}

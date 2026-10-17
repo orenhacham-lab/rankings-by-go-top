@@ -22,20 +22,24 @@ import { siteCta, type ArticleCta } from './cta'
 import { styleArticleHtml, type ArticleDesignOptions } from './html'
 import type { ArticleLanguage } from './labels'
 import { effectiveDesign, type ArticleStyle, type DesignPlatform } from './types'
+import type { AuthorBoxContent } from '@/lib/content/author-box/box'
 
 export type SiteDesignInput = {
   style: Pick<ArticleStyle, 'design' | 'brandColors'>
   cta: ArticleCta | null | undefined
   platform: DesignPlatform
   language?: ArticleLanguage
+  /** Publishing only (lib/content/author-box/store.ts decides): never on Wix. */
+  authorBox?: AuthorBoxContent | null
 }
 
 /** The design options a site receives, or null when the body goes out untouched. */
 export function siteDesignOptions(input: SiteDesignInput): ArticleDesignOptions | null {
   const design = effectiveDesign(input.style, input.platform)
   const cta = siteCta(input.cta, input.platform)
-  if (design !== 'formatted' && !cta) return null
-  return { design, colors: input.style.brandColors, cta, ...(input.language ? { language: input.language } : {}) }
+  const authorBox = input.platform === 'wix' ? null : input.authorBox ?? null
+  if (design !== 'formatted' && !cta && !authorBox) return null
+  return { design, colors: input.style.brandColors, cta, ...(authorBox ? { authorBox } : {}), ...(input.language ? { language: input.language } : {}) }
 }
 
 /** The body as the site shows it. */

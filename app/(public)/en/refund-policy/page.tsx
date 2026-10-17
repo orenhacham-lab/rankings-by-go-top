@@ -82,9 +82,21 @@ export default function EnglishRefundPolicyPage() {
       </section>
 
       <section>
+        <h2>6A. A purchase made through an external marketplace</h2>
+        <p>
+          If you bought your plan through an external marketplace that resells the Service in its
+          own name, the seller of that purchase is that marketplace: it charged you, it issued your
+          invoice, and cancellation is done there. <strong>Its own refund and return policy applies
+          to that purchase</strong>, even where that policy is wider than the refund policy in
+          section 4, and section 4 does not narrow it. The refund policy in section 4 applies to
+          purchases made from us. The page you bought from names the seller and links to its policy.
+        </p>
+      </section>
+
+      <section>
         <h2>7. Contact</h2>
         <p>
-          <strong>GO TOP MARKETING GRUO LTD</strong>
+          <strong>GO TOP DIGITAL MARKETING AND ADVERTISING LTD</strong>
           <br />
           Company number: 517274346
           <br />
@@ -94,7 +106,7 @@ export default function EnglishRefundPolicyPage() {
 
       <section>
         <p className={LEGAL_FOOTNOTE}>
-          Last updated: October 3, 2026
+          Last updated: October 16, 2026
         </p>
       </section>
     </LegalDoc>

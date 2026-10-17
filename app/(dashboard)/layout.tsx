@@ -6,6 +6,7 @@ import WorkspaceSwitcher from '@/components/layout/WorkspaceSwitcher'
 import GuideMenu from '@/components/guide/GuideMenu'
 import ContactMenu from '@/components/guide/ContactMenu'
 import DemoFloatApp from '@/components/guide/DemoFloatApp'
+import ConnectSiteBanner from '@/components/layout/ConnectSiteBanner'
 import SignupConversionReporter from '@/components/analytics/SignupConversionReporter'
 import TopBarActions from '@/components/layout/TopBarActions'
 import TrialBar from '@/components/layout/TrialBar'
@@ -106,7 +107,9 @@ export default async function DashboardLayout({
             <DocumentTitle />
             <SkipLink />
             <Sidebar isAdmin={isAdmin} />
-            <main className="flex-1 min-w-0 min-h-screen bg-no-repeat bg-[radial-gradient(64rem_26rem_at_50%_-8rem,rgb(0_112_214/0.06),transparent_70%)]">
+            {/* main's bottom padding (with the content's own) keeps a screen's last controls
+                clear of the floating demo pill in the end corner once scrolled to the end. */}
+            <main className="flex-1 min-w-0 min-h-screen pb-16 bg-no-repeat bg-[radial-gradient(64rem_26rem_at_50%_-8rem,rgb(0_112_214/0.06),transparent_70%)]">
               <DashboardDirectionWrapper>
                 {/* The top bar. Every screen shows the SAME workspace control, because
                     "which site am I looking at" is a question about the app, not about
@@ -131,7 +134,11 @@ export default async function DashboardLayout({
                 <Suspense fallback={null}>
                   <TrialBarSlot userId={user.id} />
                 </Suspense>
-                <div id={MAIN_CONTENT_ID} tabIndex={-1} className="mx-auto w-full max-w-[1280px] min-w-0 px-4 py-6 focus:outline-none md:px-8 md:py-8">{children}</div>
+                <div id={MAIN_CONTENT_ID} tabIndex={-1} className="mx-auto w-full max-w-[1280px] min-w-0 px-4 py-6 focus:outline-none md:px-8 md:py-8">
+                  {/* Until the project's site is connected, every screen of it says so first. */}
+                  <ConnectSiteBanner />
+                  {children}
+                </div>
               </DashboardDirectionWrapper>
             </main>
           </div>

@@ -386,8 +386,17 @@ async function main() {
     check('the route no longer contains a standalone "cancel prior" update BEFORE any insert (the old unsafe ordering)',
       !/status: 'cancelled' \}\)[\s\S]{0,80}\.eq\('user_id', user\.id\)[\s\S]{0,40}\.in\('status', \['trial', 'active'\]\)[\s\S]{0,200}insert\(/.test(activateStripped))
 
-    console.log('\nSOURCE) activation write-ordering (lib/paypal/activation-processing.ts)')
-    const activationProcessing = strip(read('lib/paypal/activation-processing.ts'))
+    console.log('\nSOURCE) activation write-ordering (lib/billing/entitlement-write.ts)')
+    // The write moved to lib/billing/entitlement-write.ts when Creem needed
+    // the same one; lib/paypal/activation-processing.ts re-exports it, so
+    // this guard follows the code rather than the filename — and asserts the
+    // re-export, so the PayPal path cannot quietly get a different write
+    // back.
+    const paypalReexport = strip(read('lib/paypal/activation-processing.ts'))
+    check('the PayPal activation module is the provider-neutral write, re-exported',
+      /export \{[\s\S]{0,200}transitionSubscriptionToActivePlan[\s\S]{0,200}from '@\/lib\/billing\/entitlement-write'/.test(paypalReexport)
+      && !/from\('subscriptions'\)/.test(paypalReexport))
+    const activationProcessing = strip(read('lib/billing/entitlement-write.ts'))
     check('no longer references the nonexistent plan/scans_* columns (current_period_start is now a REAL column — Phase 3)',
       !/\bplan:\s*plan\b|scans_this_period|scans_period_key/.test(activationProcessing))
     check('the best-effort cleanup step is GONE — no application-layer cancellation of other rows at all',

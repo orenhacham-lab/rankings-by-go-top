@@ -81,8 +81,8 @@ const TOPICS: Record<string, Record<Lang, Rule>> = {
     he: { terms: [/ChatGPT/, /Gemini/, /Google AI Mode/, /Perplexity/, /Copilot/, /Grok/, /ספק סריקה חיצוני/, /בדיקה חודשית אוטומטית/, /מכסת הבדיקות הקיימת/, /לכבות/], privacy: [/ChatGPT/, /Perplexity/, /Gemini/, /Microsoft Copilot/, /Grok/, /Google AI Mode/, /בדיקה חודשית אוטומטית/, /מכסת הבדיקות/, /לכבות/] },
   },
   '6 AI-generated content': {
-    en: { terms: [/AI-Generated Content/, /article topics, questions and articles/, /tops up article\s+topics automatically/, /paid plan/, /automatically add internal links/, /call-to-action box/i, /approval/, /your responsibility/], privacy: [/topics, questions and articles/, /questions, articles, images/] },
-    he: { terms: [/תוכן שנוצר באמצעות AI/, /נושאים למאמרים, שאלות ומאמרים/, /משלימה נושאים\s+למאמרים באופן אוטומטי/, /תוכנית בתשלום/, /קישורים פנימיים/, /קריאה לפעולה/, /לאישורכם/, /היא שלכם/], privacy: [/נושאים, שאלות ומאמרים/, /שאלות, מאמרים, תמונות/] },
+    en: { terms: [/AI-Generated Content/, /article topics, questions, articles and images/, /tops up article\s+topics automatically/, /paid plan/, /automatically add internal links/, /call-to-action box/i, /approval/, /your responsibility/], privacy: [/topics, questions and articles/, /questions, articles, images/] },
+    he: { terms: [/תוכן שנוצר באמצעות AI/, /נושאים למאמרים, שאלות, מאמרים ותמונות/, /משלימה נושאים\s+למאמרים באופן אוטומטי/, /תוכנית בתשלום/, /קישורים פנימיים/, /קריאה לפעולה/, /לאישורכם/, /היא שלכם/], privacy: [/נושאים, שאלות ומאמרים/, /שאלות, מאמרים, תמונות/] },
   },
   '7 emails': {
     en: { terms: [/Email Messages/, /reminder email/i, /one-click unsubscribe/, /Weekly progress summary/, /Setup emails/, /Account and service messages/], privacy: [/Email Messages/, /Resend/, /one-click unsubscribe/, /Weekly summary/, /Setup emails/, /Account and service messages/] },
@@ -148,19 +148,24 @@ for (const [topic, byLang] of Object.entries(TOPICS)) {
 
 // The product name and the last-updated line.
 const OLD_NAME = /Rankings by Go Top/i
+// Hebrew and English diverged on 13 October 2026, when Oren changed the
+// company's ENGLISH name: the English documents were revised and the Hebrew ones,
+// which carry the unchanged Hebrew name, were not. They meet again on 16 October
+// 2026, when the clause on an AI photo for a Business Profile post was added to
+// the terms and the privacy policy in all four languages. Each document's date
+// still belongs to that document, and the accessibility statement did not move.
 const LAST_UPDATED: Record<Doc, Record<Lang, RegExp>> = {
-  terms: { he: /9 באוקטובר 2026/, en: /October 9, 2026/ },
-  privacy: { he: /9 באוקטובר 2026/, en: /October 9, 2026/ },
+  terms: { he: /16 באוקטובר 2026/, en: /October 16, 2026/ },
+  privacy: { he: /16 באוקטובר 2026/, en: /October 16, 2026/ },
   a11y: { he: /5 באוקטובר 2026/, en: /October 5, 2026/ },
 }
 for (const lang of ['he', 'en'] as Lang[]) for (const doc of ['terms', 'privacy', 'a11y'] as Doc[]) {
   const p = pages[lang][doc]
   // The page body runs from its title to its last-updated line; the site shell (header, footer) around it is not these pages.
-  // The date is per document, not one date for all three: the terms and the
-  // privacy policy were last revised on 9 October 2026 — the policy for the
-  // conversion report sent to Meta from our server, and both of them for the
-  // weekly summary that replaced a monthly one and for the setup emails — and
-  // the accessibility statement on 5 October 2026. A page that is changed without its date
+  // The date is per document, not one date for all three: the privacy policy and
+  // the terms were both last revised on 10 October 2026 — the policy for the
+  // business-outreach section, the terms for Creem as the merchant of record on a
+  // card payment — and the accessibility statement on 5 October 2026. A page that is changed without its date
   // being moved is the failure this catches, which is why the expected date
   // lives here and has to be edited deliberately.
   const dated = LAST_UPDATED[doc][lang]
@@ -257,6 +262,12 @@ check('MUTATION — an English-only extra section is caught', pages.he.terms.h2 
     'partners.shopify.com': { en: /Shopify/, he: /Shopify/ },
     'supabase.com': { en: /Supabase/, he: /Supabase/ },
     'graph.facebook.com': { en: /Conversions API/, he: /Conversions API/ },
+    // Creem is a payment provider, so it is a recipient whatever the state of its
+    // off switch: the sharing list says what we send it when a payment goes through
+    // it. Both hosts are listed because the mode is an explicit variable
+    // (lib/creem/config.ts), and the sandbox host receives the same shape.
+    'api.creem.io': { en: /Creem/, he: /Creem/ },
+    'test-api.creem.io': { en: /Creem/, he: /Creem/ },
   }
   /**
    * Hosts that receive nothing about a customer, each with the reason it is
@@ -271,6 +282,15 @@ check('MUTATION — an English-only extra section is caught', pages.he.terms.h2 
     'www.w3.org': 'XML and sitemap namespaces written into markup; not fetched',
     'llmstxt.org': 'the llms.txt specification, named in generated files; not fetched',
     'developers.google.com': 'a documentation link shown to the owner',
+    // Creem is now a payment provider and api.creem.io is in RECIPIENTS above,
+    // which is what made this guard demand the disclosure before the integration
+    // could merge. These two hosts are the other kind: text a reader is pointed
+    // at. docs.creem.io is cited in a code comment. www.creem.io is Creem's own
+    // Buyer Terms, which Merchant Terms 3.8 obliges us to put in front of a buyer
+    // before a transaction, so the terms link it; the reader clicks it, and we
+    // send nothing of theirs to it.
+    'docs.creem.io': 'a documentation link cited in a code comment; not fetched',
+    'www.creem.io': 'Creem\u2019s own Buyer Terms, linked for the customer to read; not fetched',
     'help.shopify.com': 'a documentation link shown to a merchant',
     'search.google.com': 'a link a customer clicks to their own Search Console',
     'google.com': 'the search engine whose public results are read, with no customer data attached',
@@ -292,6 +312,18 @@ check('MUTATION — an English-only extra section is caught', pages.he.terms.h2 
     'www.bingplaces.com': 'a directory named in advice text; not contacted',
     'www.capterra.com': 'a directory named in advice text; not contacted',
     'www.tripadvisor.com': 'a directory named in advice text; not contacted',
+    // The public listings the prospect crawler reads (lib/outreach/topup.ts).
+    // They are FETCHED, unlike the directories above, so they are here on a
+    // different ground: the request is a plain GET for a page already open to
+    // every visitor, and nothing of any customer's travels with it. What the
+    // crawler takes from them is a business name and a website — never an
+    // address, which the published outreach section says comes only from the
+    // business's own site or a public registry.
+    'minnesotagrown.com': 'a public business directory whose open pages are read; no customer data is sent to it',
+    'georgiagrown.com': 'a public business directory whose open pages are read; no customer data is sent to it',
+    'findjerseyfresh.com': 'a public business directory whose open pages are read; no customer data is sent to it',
+    'www.michiganbusiness.org': 'a public business directory whose open pages are read; no customer data is sent to it',
+    'alabamafarmersmarket.org': 'a public business directory whose open pages are read; no customer data is sent to it',
     // Literals that are examples or test shapes even outside __qa__.
     'example.com': 'placeholder in a comment or default',
     'www.example.com': 'placeholder in a comment or default',

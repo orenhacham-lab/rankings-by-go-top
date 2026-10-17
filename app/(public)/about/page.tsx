@@ -1,12 +1,13 @@
 import { AboutPage as AboutLayout, type AboutCopy } from '@/components/public/AboutPage'
 import { FEATURE_COMMON } from '@/lib/i18n/public/feature-common'
+import { ABOUT_BREADCRUMB } from '@/lib/i18n/public/pages/breadcrumb-labels'
 
 export default function AboutPage() {
   return <AboutLayout locale="he" copy={COPY} />
 }
 
 const COPY: AboutCopy = {
-  breadcrumb: { label: 'אודות', href: '/about' },
+  breadcrumb: { label: ABOUT_BREADCRUMB['he'], href: '/about' },
   title: '11 שנה של קידום אתרים,',
   accent: 'במערכת אחת שעובדת בשבילכם.',
   subtitle: 'מערכת אחת שכותבת ומפרסמת מאמרים באתר, עוקבת אחרי המיקומים שלכם בגוגל ובגוגל מפות, ובודקת אם מנועי AI ממליצים עליכם. מבית Go Top, סוכנות דיגיטל עם ניסיון של מעל 11 שנה בקידום אתרים ובפרסום ממומן.',

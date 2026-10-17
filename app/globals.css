@@ -994,6 +994,17 @@ html.a11y-image-descriptions img[data-a11y-noalt='true'] {
   text-decoration: underline;
 }
 .dark .article-content a { color: #a5b4fc; }
+
+/* The "read also" block the daily article appends (lib/blog/auto/body-links.ts):
+   plain HTML, so it needs its own separation from the text above it. */
+.article-content .gt-related {
+  margin-top: 2rem;
+  padding-top: 1rem;
+  border-top: 1px solid #e2e8f0;
+}
+.article-content .gt-related p { margin: 0 0 0.25rem; }
+.article-content .gt-related ul { margin: 0; }
+.dark .article-content .gt-related { border-top-color: #334155; }
 .article-content blockquote {
   border-inline-start: 3px solid #cbd5e1;
   padding-inline-start: 0.75rem;
@@ -1044,9 +1055,12 @@ html.a11y-image-descriptions img[data-a11y-noalt='true'] {
    privacy notice) step aside so none of them covers the menu's "start free" button. PublicNav
    sets the attribute on <html> while its menu is open. */
 html[data-public-menu='open'] [data-public-float] { display: none !important; }
-/* The privacy card is tall and sits in the same corner as the demo pill, so the
-   pill steps aside until the visitor has answered it (w11, CookieConsent). */
-html[data-cookie-notice='open'] [data-demo-float] { display: none !important; }
+/* The privacy card sits at the bottom left in every language (left-24, 340px wide). In
+   Hebrew the demo pill floats at that same corner, above the WhatsApp circle, so while
+   the card is open the pill moves to its right on the same bottom line instead of
+   disappearing: the demo stays offered from the first second (CookieConsent). In
+   English the pill is at the other corner and never meets the card. */
+html[dir='rtl'][data-cookie-notice='open'] [data-demo-float] { left: calc(6rem + 340px + 1rem) !important; right: auto !important; bottom: 1.5rem !important; }
 
 /* ── The public blog's article body (.gt-article) ───────────────────
    Deliberately NOT `.article-content`. That class is defined twice —

@@ -25,7 +25,7 @@ export default function EnglishTermsPage() {
         <h2>1. Introduction and Service Definition</h2>
         <p>
           Go Top SEO (the &ldquo;Service&rdquo; or the &ldquo;Platform&rdquo;) is a SaaS service
-          operated by GO TOP MARKETING GRUO LTD (company number 517274346) (the &ldquo;Company&rdquo;). The
+          operated by GO TOP DIGITAL MARKETING AND ADVERTISING LTD (company number 517274346) (the &ldquo;Company&rdquo;). The
           Service allows customers to track keyword rankings on Google search, monitor Google Maps
           visibility, measure visibility on AI engines such as ChatGPT, Gemini and Perplexity, conduct
           keyword research, and generate professional reports. The Service also includes website scans,
@@ -72,6 +72,12 @@ export default function EnglishTermsPage() {
           and on the pricing page.
         </p>
         <p className="mt-3">
+          <strong>What the price includes.</strong> A price stated in shekels includes Israeli VAT as
+          required by law, and is the amount you pay. A price stated in dollars does not include
+          indirect tax; on a card payment such tax is calculated and collected by Creem on your
+          billing address and shown to you before you pay, as set out in section 5A.
+        </p>
+        <p className="mt-3">
           <strong>How you are billed depends on how your account was opened:</strong>
         </p>
         <ul>
@@ -111,12 +117,81 @@ export default function EnglishTermsPage() {
       </section>
 
       <section>
+        <h2>5A. Card payment: Creem as the merchant of record</h2>
+        <p>
+          An account that is not billed through Shopify may pay by card. In such a payment the sale
+          is not made with us but with Creem, which is the company Armitage Labs O&Uuml; (Estonian
+          registry code 16977866, Rotermanni 14, Tallinn 10111, Estonia). Creem acts as the merchant
+          of record and contractual reseller, and executes the sale with you in its own name. We sell
+          to Creem, and Creem sells to you.
+        </p>
+        <p className="mt-3">What that means in practice:</p>
+        <ul>
+          <li>
+            <strong>The invoice.</strong> Creem issues the invoice in its own name. We issue no
+            invoice or receipt for that transaction and collect no payment from you for it by any
+            other route.
+          </li>
+          <li>
+            <strong>Tax.</strong> VAT, sales tax and any other indirect tax are calculated, collected
+            and remitted by Creem according to your billing address, and the final amount is shown to
+            you before you pay. The price shown on the pricing page does not include such tax.
+          </li>
+          <li>
+            <strong>The service itself stays our responsibility.</strong> Providing the service, its
+            quality, its support and its compliance with the law are ours alone. Creem takes no
+            responsibility for those.
+          </li>
+          <li>
+            <strong>Refunds.</strong> A refund or a chargeback on such a transaction is carried out by
+            Creem alone, according to the eligibility terms in these terms &mdash; that is, section 7
+            &mdash; and applicable law. A refund request goes to us first, at the address in section 21
+            or through the details on the receipt sent to you.
+          </li>
+          <li>
+            <strong>The 14-day withdrawal right.</strong> In such a payment, the express consent that
+            immediate commencement of a digital service ends the withdrawal right is given in
+            Creem&rsquo;s checkout. The effect is the same as described in section 7.2.
+          </li>
+          <li>
+            <strong>Creem&rsquo;s Buyer Terms.</strong> In addition to these terms, Creem&rsquo;s Buyer
+            Terms apply to you, available at{' '}
+            <a href="https://www.creem.io/buyer-terms" rel="nofollow noopener" target="_blank">
+              creem.io/buyer-terms
+            </a>
+            . They govern the sale it executes, not the service we provide.
+          </li>
+        </ul>
+        <p className="mt-3">
+          Payment through PayPal and payment through Shopify do not change: there the seller is the
+          Company, as described in section 5.
+        </p>
+      </section>
+
+      <section>
         <h2>6. Cancellation</h2>
         <p>
           You may cancel renewal of your subscription at any time through your account settings.
           Access to the Service will be retained until the end of the billing period that has already
           been paid. No retroactive cancellation of a period that has already been paid will be granted,
           except as required by applicable law.
+        </p>
+      </section>
+
+      <section>
+        <h2>6A. A subscription billed by another company</h2>
+        <p>
+          Some subscriptions are billed by another company rather than by us: a store billed
+          through Shopify, a card payment in which Creem is the seller as described in section 5A,
+          and a plan bought on an external marketplace that resells the Service in its own name. In
+          those cases the renewal is cancelled with that company and not through your account
+          settings, because that company holds the subscription and charges you. If you send us a
+          cancellation request we will pass it on to that company, but the charge itself is stopped by that company and not by us, and we do not issue
+          a refund on its behalf. If you are not sure which company bills your subscription, write
+          to us and we will tell you. In every case, access to the Service is retained until the end
+          of the billing period that has already been paid, as in section 6, and the refund policy
+          that applies to such a purchase is set out in our{' '}
+          <Link href="/en/refund-policy">Cancellation and Refund Policy</Link>.
         </p>
       </section>
 
@@ -152,6 +227,11 @@ export default function EnglishTermsPage() {
         <p className="mt-4">
           <strong>7.4</strong> Sections 7.1 to 7.3 apply to private consumers only. For business
           customers, the refund policy in section 7 applies unchanged.
+        </p>
+        <p className="mt-4">
+          <strong>7.5 A payment made by card.</strong> On a transaction carried out through Creem, the
+          refund is carried out by Creem and not by us, according to the eligibility terms in this
+          section and to the law. See section 5A.
         </p>
       </section>
 
@@ -557,7 +637,7 @@ export default function EnglishTermsPage() {
       <section id="ai-content">
         <h2>15F. AI-Generated Content</h2>
         <p>
-          The Service uses AI to produce article topics, questions and articles. Such content may contain
+          The Service uses AI to produce article topics, questions, articles and images. Such content may contain
           inaccuracies, and reviewing it before publishing, including its factual accuracy, its fit to your
           business and to the law, and third-party rights, is your responsibility.
         </p>
@@ -579,6 +659,38 @@ export default function EnglishTermsPage() {
             <strong>Approval and publishing.</strong> Content is shown to you for approval and is published on
             your site according to the approval and publishing settings you chose for the project. You may edit,
             reject or delete any content.
+          </li>
+          <li>
+            <strong>Replying to a review on your Google Business Profile.</strong> If you ask for a draft reply
+            to a review, the draft is produced by AI and shown to you before anything is sent. A reply is sent
+            only after you wrote or approved it and pressed send, and it is published publicly on your business
+            listing and in your name. <strong>You are responsible for the content of the reply</strong>, even
+            where the draft was produced by AI, including the accuracy of facts, defamation, third-party rights
+            and Google&rsquo;s content policies. Google may remove a reply under those policies, and we have no
+            control over that.
+          </li>
+          <li>
+            <strong>Automatic posting to your Google Business Profile.</strong> If you turned automatic posting
+            on, every article the system publishes to your site is also published as a post on your Google
+            business listing, <strong>without you reading it first</strong>. <strong>You are responsible for the
+            content published in your name</strong>, both where the text was produced by AI and where you did not
+            read it before it went out, including the accuracy of facts, defamation, third-party rights and
+            Google&rsquo;s content policies. You can turn automatic posting off at any time, and it turns itself
+            off if you change the business the project is connected to.
+          </li>
+          <li>
+            <strong>An AI photo for a post on your Google Business Profile.</strong> If you ask for a photo for a
+            post written from a topic, the photo is produced by AI. It is a generic image and <strong>it is not a
+            photograph of your business, your premises, your staff or an actual product of yours</strong>, and it
+            is shown to you before anything is published. A photo is published only after you chose it and
+            pressed publish, and it appears publicly on your business listing and in your name. <strong>You are
+            responsible for the photo published in your name</strong>, including whether it reflects reality,
+            third-party rights and Google&rsquo;s content and photo policies, under which content on a business
+            listing has to represent the business and the product as they actually are. Do not use such a photo
+            as though it were a photograph of the business, of the premises or of a product that does not exist:
+            a misleading photo can lead Google to remove the content or restrict the listing, and may also be
+            misleading to consumers. The image file carries Google&rsquo;s own markers (SynthID and C2PA), which
+            make it identifiable as AI-generated.
           </li>
         </ul>
       </section>
@@ -605,6 +717,23 @@ export default function EnglishTermsPage() {
             with nothing in it gets no email.
           </li>
         </ul>
+      </section>
+
+      <section>
+        <h2>15H. Author Photo</h2>
+        <p>
+          If you upload a photo for an author box, you confirm that you hold every right needed to publish
+          it, and that if a person appears in it &mdash; you or someone else &mdash; that person has consented
+          to the photo being published on your site to promote a business, including commercial use. If the
+          person in the photo is a minor, their guardian&rsquo;s consent is required.
+        </p>
+        <p>
+          If that consent is withdrawn, you must remove the photo in the Service. Deleting the photo, or
+          switching to an option with no photo, erases the file from our storage, but a copy already
+          placed in your site&rsquo;s media library is under your control and only you can delete it
+          there. We may remove a photo from the Service if we receive a credible report that it was
+          published without permission.
+        </p>
       </section>
 
       <section>
@@ -684,7 +813,7 @@ export default function EnglishTermsPage() {
         <h2>21. Contact</h2>
         <p>For any question regarding these terms or the Service, please contact us:</p>
         <p className="mt-4">
-          <strong>GO TOP MARKETING GRUO LTD</strong>
+          <strong>GO TOP DIGITAL MARKETING AND ADVERTISING LTD</strong>
           <br />
           Company number: 517274346
           <br />
@@ -697,7 +826,7 @@ export default function EnglishTermsPage() {
 
       <section>
         <p className={LEGAL_FOOTNOTE}>
-          Last updated: October 9, 2026
+          Last updated: October 16, 2026
         </p>
       </section>
     </LegalDoc>

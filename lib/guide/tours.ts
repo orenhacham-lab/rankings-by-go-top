@@ -434,22 +434,35 @@ export function isNewAccount(createdAt: string | null | undefined, now: Date): b
   return now.getTime() - created < AUTO_TOUR_ACCOUNT_DAYS * DAY_MS
 }
 
+/** Whether the address points at a section of the screen (a non-empty `#fragment`). */
+export function arrivedAtSection(hash: string | null | undefined): boolean {
+  return !!hash && hash.replace(/^#/, '').trim().length > 0
+}
+
 export type AutoTour = { kind: 'full' } | { kind: 'screen'; screen: ScreenKey } | null
 
 /**
  * Which tour, if any, starts by itself on this screen:
  *   - never for an established account, and never while the project list is unknown;
  *   - the full tour once, on the dashboard, until it is finished or skipped;
- *   - after that, each screen's own tour the first time the screen is opened.
+ *   - after that, each screen's own tour the first time the screen is opened;
+ *   - and never when the address names a SECTION of the screen (#platform,
+ *     #search-console, #business…): the owner clicked "connect the site" or a
+ *     notification to reach that section, and a tour that opened first scrolled
+ *     the screen back to its title and talked about something else (owner's
+ *     report of 10 October 2026). The screen's tour waits for a plain visit.
  */
 export function autoTour(input: {
   pathname: string | null
+  /** `location.hash`, with or without its `#`; empty when the address names no section. */
+  hash?: string | null
   newAccount: boolean
   projectsResolved: boolean
   fullTour: FullTourState
   screenSeen: (screen: ScreenKey) => boolean
 }): AutoTour {
   if (!input.newAccount || !input.projectsResolved) return null
+  if (arrivedAtSection(input.hash)) return null
   const screen = screenForPath(input.pathname)
   if (input.fullTour === 'new') return screen === 'dashboard' ? { kind: 'full' } : null
   if (screen && !input.screenSeen(screen)) return { kind: 'screen', screen }

@@ -493,6 +493,16 @@ export default function Sidebar({ isAdmin = false }: SidebarProps) {
     pill.style.height = `${active.offsetHeight}px`
     pill.style.transform = `translateY(${active.offsetTop}px)`
     rail.dataset.pill = 'on'
+    // On a short screen the nav scrolls and its last entries (the project's
+    // settings) sit under the rail's foot: the screen that is open must be visible
+    // in its own nav. Only the nav scrolls, never the page.
+    const nav = rail.parentElement
+    if (nav && nav.scrollHeight > nav.clientHeight) {
+      const top = active.offsetTop + rail.offsetTop - nav.offsetTop
+      const bottom = top + active.offsetHeight
+      if (top < nav.scrollTop) nav.scrollTop = Math.max(0, top - 8)
+      else if (bottom > nav.scrollTop + nav.clientHeight) nav.scrollTop = bottom - nav.clientHeight + 8
+    }
     const frame = requestAnimationFrame(() => { pill.dataset.slide = 'on' })
     return () => cancelAnimationFrame(frame)
   }, [activeHref, isAdmin, language])

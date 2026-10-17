@@ -1,5 +1,5 @@
 /**
- * ONE ARTICLE A DAY ON gotopseo.com.
+ * ONE ARTICLE A DAY, IN EVERY LANGUAGE, ON gotopseo.com.
  *
  * The run, in order:
  *   1. free rows whose previous run died mid-generation;
@@ -23,8 +23,8 @@
 
 import type { createAdminClient } from '@/lib/supabase/admin'
 import { generateValidatedArticle } from '@/lib/content/gemini-article'
-import { runQualityGate } from '@/lib/content/automation/quality-gate'
-import { localeForDay, type BlogAutoLocale } from '@/lib/blog/auto/rotation'
+import { placeholderContext, runQualityGate } from '@/lib/content/automation/quality-gate'
+import { BLOG_AUTO_LOCALES, type BlogAutoLocale } from '@/lib/blog/auto/rotation'
 import { buildBlogBrief } from '@/lib/blog/auto/brief'
 import { checkTruthLimits } from '@/lib/blog/auto/truth-limits'
 import { researchKeywords, selectKeywords } from '@/lib/blog/auto/keyword-plan'
@@ -34,6 +34,7 @@ import {
   readTakenKeywords, recoverStaleLocks, releasePlanRow, MAX_ATTEMPTS,
 } from '@/lib/blog/auto/store'
 import { withArticleWidgets } from '@/lib/blog/auto/widgets'
+import { withBodyLinks, checkBodyLinks } from '@/lib/blog/auto/body-links'
 import type { ArticleBrief, ValidatedArticle, ValidatedArticleError } from '@/lib/content/gemini-article'
 import type { CoverResult } from '@/lib/blog/auto/cover'
 
@@ -54,8 +55,12 @@ export const REAL_BLOG_AUTO_DEPS: BlogAutoDeps = {
   cover: createBlogCover,
 }
 
-/** Below this many planned rows for a language, research runs for it. */
-export const TOPUP_FLOOR = 4
+/**
+ * Below this many planned rows for a language, research runs for it. A week's
+ * worth: every language publishes every day, so a queue of four used to be a
+ * rotation's fortnight and is now three days.
+ */
+export const TOPUP_FLOOR = 7
 /** How many rows one research run may add.  */
 export const TOPUP_BATCH = 8
 
@@ -91,7 +96,7 @@ export async function runBlogAutoPublish(
 ): Promise<BlogAutoSummary> {
   const started = Date.now()
   const now = opts.now ?? started
-  const locale = opts.locale ?? localeForDay(now)
+  const locale = opts.locale ?? BLOG_AUTO_LOCALES[0]
   const summary: BlogAutoSummary = {
     locale, staleRecovered: 0, topUpAdded: 0, topUpError: null, planned: 0,
     published: null, skipped: null, failure: null, durationMs: 0, dryRun: !!opts.dryRun,
@@ -138,7 +143,19 @@ export async function runBlogAutoPublish(
     content_html: generated.safeHtml,
     slug: generated.slug,
   })
-  if (!gate.ok) return fail(`quality:${gate.failures.join(',')}`)
+  if (!gate.ok) {
+    // The article is thrown away with the run, so whatever tripped the gate is
+    // gone unless it is logged here.
+    if (gate.failures.includes('placeholder_found')) {
+      console.warn('[blog-auto] placeholder in generated article', {
+        locale,
+        slug: generated.slug,
+        inTitle: placeholderContext(generated.article.title),
+        inBody: placeholderContext(generated.safeHtml),
+      })
+    }
+    return fail(`quality:${gate.failures.join(',')}`)
+  }
 
   const truth = checkTruthLimits({
     title: generated.article.title,
@@ -146,6 +163,14 @@ export async function runBlogAutoPublish(
     html: generated.safeHtml,
   })
   if (!truth.ok) return fail(`truth:${truth.failures.join(',')}`)
+
+  // The body's links: a bare URL becomes clickable, the product's first mention
+  // becomes a link into the trial, and our other articles of this language are
+  // offered at the end. The gate then refuses an article that never named the
+  // system or carries no way into it.
+  const linked = withBodyLinks(generated.safeHtml, { locale, internalTargets })
+  const links = checkBodyLinks(linked)
+  if (!links.ok) return fail(`links:${links.failures.join(',')}`)
 
   const cover: CoverResult = await deps.cover(admin, {
     slug: generated.slug,
@@ -166,7 +191,7 @@ export async function runBlogAutoPublish(
     // The plan cards and the trial band are appended here, not asked of the
     // model: a widget the article forgot is a page that ends on prose with no
     // way to act on it.
-    html: withArticleWidgets(generated.safeHtml),
+    html: withArticleWidgets(linked),
     featuredImageUrl: cover.url,
     featuredImageAlt: generated.article.title,
   })
@@ -175,4 +200,43 @@ export async function runBlogAutoPublish(
   summary.published = { slug: published.slug, title: generated.article.title }
   summary.durationMs = Date.now() - started
   return summary
+}
+
+/**
+ * HOW LONG ONE RUN MAY KEEP WRITING, when it covers every language itself.
+ *
+ * The route's `maxDuration` is 300s and one article — generation, audit, cover —
+ * took 108s on the first real run, so three languages do not reliably fit in
+ * one invocation. The scheduler therefore calls the route once per language
+ * (see vercel.json), and this budget is the safety net for a call that was
+ * given no language: it starts a language only while there is plausibly time
+ * for it, and reports the rest as skipped rather than being killed mid-publish.
+ */
+export const ALL_LOCALES_BUDGET_MS = 200_000
+
+/**
+ * One article per language, in order. Used by a call that names no language:
+ * each language gets its own run, its own gates and its own summary, so one
+ * language's failure never costs another its article.
+ */
+export async function runBlogAutoPublishAllLocales(
+  admin: Admin,
+  opts: { now?: number; dryRun?: boolean; budgetMs?: number } = {},
+  deps: BlogAutoDeps = REAL_BLOG_AUTO_DEPS,
+): Promise<BlogAutoSummary[]> {
+  const started = Date.now()
+  const budget = opts.budgetMs ?? ALL_LOCALES_BUDGET_MS
+  const summaries: BlogAutoSummary[] = []
+  for (const locale of BLOG_AUTO_LOCALES) {
+    if (summaries.length > 0 && Date.now() - started >= budget) {
+      summaries.push({
+        locale, staleRecovered: 0, topUpAdded: 0, topUpError: null, planned: 0,
+        published: null, skipped: 'time_budget', failure: null, durationMs: 0,
+        dryRun: !!opts.dryRun,
+      })
+      continue
+    }
+    summaries.push(await runBlogAutoPublish(admin, { ...opts, locale }, deps))
+  }
+  return summaries
 }

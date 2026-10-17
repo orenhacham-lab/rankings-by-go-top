@@ -428,12 +428,13 @@ async function main() {
     check('P-MUT: a scan widget shown without a run fails P2', !scanGated(page.replace('hold: !!hold', 'hold: true')))
     // One "Write the first article" button: a new project's is the start card's article
     // step and the hero is not there; later it is the hero's next step. The articles list
-    // is shown only once there are articles, and never carries its own.
+    // is shown only once there are articles, and never carries its own. (The "connect
+    // the site" banner above the hero, 10 October 2026, carries no article button.)
     const oneButton = (src: string) => /<RecentArticles\b[^>]*\bfirstArticleHref=\{null\}/.test(src)
-      && /\{startMode \? \(\s*<StartHere\b[\s\S]*?\) : \(\s*<>\s*<HeroCard\b/.test(src)
+      && /\{startMode \? \(\s*<StartHere\b[\s\S]*?\) : \(\s*<>\s*(\{\}\s*)?(<ConnectSiteBanner\b[^>]*\/>\s*)?<HeroCard\b/.test(src)
     check('P3: one "Write the first article" button on the screen', oneButton(page))
     check('P-MUT: a second one, on the articles list, fails P3', !oneButton(page.replace('firstArticleHref={null}', "firstArticleHref={strategyHref('board')}")))
-    check('P-MUT: the hero rendered beside the start card fails P3', !oneButton(page.replace(/\) : \(\s*<>\s*<HeroCard/, ')}\n<><HeroCard')))
+    check('P-MUT: the hero rendered beside the start card fails P3', !oneButton(page.replace(/\) : \(\s*<>\s*(\{\}\s*)?(<ConnectSiteBanner\b[^>]*\/>\s*)?<HeroCard/, ')}\n<><HeroCard')))
     const FORBIDDEN = /google-ads|googleads|serper|openai|anthropic|@ai-sdk|lib\/ai\/|lib\/llm|scrapellm|dataforseo|lib\/seed-scan\/(?!types)|lib\/free-check\/(?!copy)|usage-reservations|reserveUsage/i
     const dir = join(ROOT, 'components/dashboard')
     const files = ['app/(dashboard)/dashboard/page.tsx', 'lib/dashboard/seed.ts', 'lib/dashboard/rankings.ts', 'lib/dashboard/activity.ts', 'lib/dashboard/competitors.ts',

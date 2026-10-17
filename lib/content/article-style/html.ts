@@ -35,6 +35,7 @@ import { articlePalette, mix, type ArticlePalette } from './colors'
 import { ARTICLE_STYLE_LABELS, articleLanguage, type ArticleLanguage } from './labels'
 import { isCompleteCta, type ArticleCta } from './cta'
 import type { ArticleDesign } from './types'
+import { authorBoxStructure, bodyHasAuthorBox, placeAuthorBox, type AuthorBoxContent } from '@/lib/content/author-box/box'
 
 const HEX = /^#[0-9a-f]{6}$/
 const PX = '(?:0|\\d{1,2}px)'
@@ -82,6 +83,7 @@ type Role =
   | 'cta' | 'cta-text' | 'cta-link'
   | 'pcta' | 'pcta-title' | 'pcta-text' | 'pcta-action' | 'pcta-button'
   | 'table-wrap'
+  | 'author' | 'author-title' | 'author-name' | 'author-text' | 'author-action' | 'author-link' | 'author-photo' | 'author-image'
 
 const stripTags = (s: string) => s.replace(/<[^>]+>/g, ' ').replace(/&nbsp;/g, ' ').replace(/\s+/g, ' ').trim()
 const escText = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
@@ -230,6 +232,15 @@ function stylesFor(p: ArticlePalette, lang: ArticleLanguage) {
     'pcta-text': `margin:0 0 16px;font-size:17px;line-height:1.6;color:${p.brandInk}`,
     'pcta-action': 'margin:0',
     'pcta-button': `padding:10px 20px;background-color:${p.brandInk};color:${p.brand};border-radius:10px;font-weight:700;text-decoration:underline`,
+    'author': `margin:40px 0;padding:20px 24px;background-color:${p.soft};border:1px solid ${p.line};border-${start}:5px solid ${p.brand};border-radius:12px;text-align:${start}`,
+    'author-title': `margin:0 0 6px;font-size:13px;font-weight:700;color:${p.text}`,
+    'author-name': `margin:0 0 6px;font-size:18px;line-height:1.3;font-weight:700;color:${p.ink}`,
+    'author-text': `margin:0 0 8px;line-height:1.6;color:${p.muted}`,
+    'author-action': 'margin:0',
+    'author-link': `color:${p.text};font-weight:600;text-decoration:underline`,
+    // Round at the img's explicit 56 x 56 (box.ts AUTHOR_BOX_IMAGE_SIZE): half the size.
+    'author-photo': 'margin:0 0 10px',
+    'author-image': 'border-radius:28px',
   }
   const byTag: Record<string, string> = {
     h2: `margin:36px 0 14px;padding:0;padding-${start}:12px;border:0;border-${start}:4px solid ${p.brand};line-height:1.3;color:${p.ink}`,
@@ -295,6 +306,12 @@ export type ArticleDesignOptions = {
   language?: ArticleLanguage
   /** The project's own call to action (./cta.ts), when it is on; drawn in both designs. */
   cta?: ArticleCta | null
+  /**
+   * The author box (lib/content/author-box), only when the owner turned it on
+   * AND the site's theme has none; drawn in both designs, once (a body that
+   * already carries an author box gets no second one).
+   */
+  authorBox?: AuthorBoxContent | null
 }
 
 /** The minimal design's plain call to action: the same structure, no role markers, no style. */
@@ -310,8 +327,14 @@ export function styleArticleHtml(html: string, opts: ArticleDesignOptions): stri
   const base = sanitizeArticleHtml(String(html ?? ''))
   const cta = isCompleteCta(opts.cta) ? opts.cta : null
   if (!base) return base
-  if (opts.design !== 'formatted') return cta ? sanitizeArticleHtml(plainCta(withCta(base, cta))) : base
+  const box = opts.authorBox && !bodyHasAuthorBox(base) ? authorBoxStructure(opts.authorBox) : null
+  if (opts.design !== 'formatted') {
+    if (!cta && !box) return base
+    const withBoxes = box ? placeAuthorBox(cta ? withCta(base, cta) : base, `<hr>${box}`) : withCta(base, cta as ArticleCta)
+    return sanitizeArticleHtml(plainCta(withBoxes))
+  }
   const lang = opts.language ?? articleLanguage(base)
   const palette = articlePalette(opts.colors)
-  return sanitizeHtml(structure(base, lang, cta), designSanitizerOptions(palette, lang)).trim()
+  const structured = structure(base, lang, cta)
+  return sanitizeHtml(box ? placeAuthorBox(structured, box) : structured, designSanitizerOptions(palette, lang)).trim()
 }

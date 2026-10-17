@@ -23,7 +23,7 @@
  *
  * Run: npx tsx lib/gbp/__qa__/gbp-posts.qa.ts
  */
-import { readFileSync, readdirSync, statSync, writeFileSync, unlinkSync } from 'fs'
+import { readFileSync, readdirSync, statSync, writeFileSync, unlinkSync, mkdirSync } from 'fs'
 import { join, relative, dirname } from 'path'
 import crypto from 'crypto'
 import sharp from 'sharp'
@@ -58,16 +58,22 @@ const strip = (s: string) => s.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\{\/\*[
 const MUTANTS: string[] = []
 process.on('exit', () => { for (const f of MUTANTS) { try { unlinkSync(f) } catch { /* gone */ } } })
 /**
- * Load a mutated copy of a module. The copy sits NEXT TO the original (so its
- * relative and '@/' imports resolve the same way) under a throwaway name, and is
- * deleted when the suite exits.
+ * Load a mutated copy of a module. The copy goes in __qa__ rather than next to
+ * the original: around sixty suites run at once and several of them walk the
+ * source tree, so a temporary .ts in lib/gbp/ gets listed by one of them and
+ * deleted by us before it is read, which failed that suite and not this one.
+ * Its own relative imports move up one directory to compensate; '@/' imports
+ * are unaffected. The copy is deleted when the suite exits.
  */
 function mutant<T>(rel: string, from: string | RegExp, to: string): T {
   const src = read(rel)
   const out = src.replace(from, to)
   if (out === src) throw new Error(`mutation did not apply to ${rel}`)
-  const file = join(ROOT, dirname(rel), `.mut-${crypto.randomUUID()}.ts`)
-  writeFileSync(file, out)
+  const moved = out.replace(/(\sfrom\s*|\brequire\()'\.\//g, "$1'../")
+  const dir = join(ROOT, dirname(rel), '__qa__')
+  mkdirSync(dir, { recursive: true })
+  const file = join(dir, `.mut-${crypto.randomUUID()}.ts`)
+  writeFileSync(file, moved)
   MUTANTS.push(file)
   return require(file) as T
 }
@@ -260,7 +266,6 @@ function world(opts: { missing?: boolean } = {}) {
 function deps(admin: any, over: Partial<import('../http').GbpRouteDeps> = {}, as = OWNER): import('../http').GbpRouteDeps {
   return {
     auth: async (pid) => (!pid ? { error: 'x', status: 400 } : pid !== PROJECT ? { error: 'x', status: 404 } : as !== OWNER ? { error: 'x', status: 403 } : { user: { id: as }, admin, project: { id: PROJECT, user_id: OWNER } }) as any,
-    isShopifyProject: async () => false,
     ...over,
   }
 }
@@ -281,14 +286,25 @@ async function handlerChecks() {
     const admin = world()
     const r = await H.handleStatus(new Request(`https://app.test/api/gbp/status?projectId=${PROJECT}`), deps(admin, {}, OTHER))
     check('another user gets 403 and no data', r.status === 403 && !(await r.text()).includes('דנה'))
-    const s = await H.handleStatus(new Request(`https://app.test/api/gbp/status?projectId=${PROJECT}`), deps(admin, { isShopifyProject: async () => true }))
-    check('a Shopify project sees state "shopify" (feature hidden)', (await s.json()).state === 'shopify')
+    // CHANGED 13 October 2026. The feature used to be refused on a Shopify store,
+    // and the test asked who BILLS the account, so one owner's WordPress sites were
+    // refused because another project of theirs is a store. The post goes to the
+    // business profile on Google, not to the site, so the site's platform decides
+    // nothing here and no platform is consulted at all any more.
+    const store = world()
+    store.tables.shopify_connections = [{ project_id: PROJECT, archived_at: null }]
+    const s = await H.handleStatus(new Request(`https://app.test/api/gbp/status?projectId=${PROJECT}`), deps(store))
+    const sj = await s.json()
+    check('a project whose site is a Shopify store is treated like any other', s.status === 200 && sj.state === 'ready' && sj.connection === null)
     const m = await H.handleStatus(new Request(`https://app.test/api/gbp/status?projectId=${PROJECT}`), deps(world({ missing: true })))
     check('tables not applied → state "unavailable", not an error', m.status === 200 && (await m.json()).state === 'unavailable')
     const c = await H.handleConnect(post({ projectId: PROJECT }), deps(world({ missing: true })))
     check('connect while tables are missing → not_available', c.status === 409 && (await c.json()).error === 'not_available')
-    const sh = await H.handleCreatePost(post({ projectId: PROJECT, summary: 'x' }), deps(admin, { isShopifyProject: async () => true }))
-    check('a Shopify project cannot create a post', sh.status === 409)
+    const storePost = world()
+    storePost.tables.shopify_connections = [{ project_id: PROJECT, archived_at: null }]
+    await connectOwner(storePost)
+    const sh = await H.handleCreatePost(post({ projectId: PROJECT, summary: 'פתחנו גם בימי שישי' }), deps(storePost))
+    check('…and can publish a post from that project', sh.status === 200 && storePost.tables.gbp_posts.length === 1)
   }
   {
     // Callback: fixed redirect, scope check, encrypted storage.
@@ -365,6 +381,16 @@ async function handlerChecks() {
     const r = await H.handleDraft(post({ projectId: PROJECT, articleId: 'art-1' }), deps(admin, { generate: async (p) => { prompt = p; return JSON.stringify({ summary: `**לחם מחמצת** טרי.\nהתקשרו 050-1234567\n${'א'.repeat(2000)}\nhttps://evil.example.com` }) } }))
     const b = await r.json()
     check('the draft is clamped to 1,500, has no phone, no URL, no markdown', r.status === 200 && V.countPostChars(b.summary) <= 1500 && !V.containsPhoneNumber(b.summary) && !b.summary.includes('http') && !b.summary.includes('**'))
+    // The length the model is ASKED for. Google allows 1,500; asking for 400-900
+    // produced ~580-character drafts, which the owner flagged on 13 October 2026.
+    check('the draft asks for a length that uses Google\'s room and still leaves the owner some',
+      D.GBP_DRAFT_TARGET < V.GBP_SUMMARY_MAX && D.GBP_DRAFT_TARGET >= 1200 && D.GBP_DRAFT_MIN >= 700 && D.GBP_DRAFT_MIN < D.GBP_DRAFT_TARGET)
+    check('…and the prompt carries that band', prompt.includes(`Between ${D.GBP_DRAFT_MIN} and ${D.GBP_DRAFT_TARGET} characters`))
+    // Hebrew costs close to a token per character, so a budget that merely matches
+    // the character count comes back as MAX_TOKENS with an empty body.
+    const budget = Number(/answerBudget: (\d+)/.exec(strip(read('lib/gbp/draft.ts')))?.[1])
+    check('…and the token budget covers it with room for Hebrew', budget >= D.GBP_DRAFT_TARGET * 1.5)
+    check('MUTATION: a budget that only matches the character count is caught', !(D.GBP_DRAFT_TARGET >= D.GBP_DRAFT_TARGET * 1.5))
     check('the draft prompt is built from the article and the business, and nothing was posted', prompt.includes('לחם מחמצת') && prompt.includes('המאפייה של דנה') && admin.tables.gbp_posts.length === 0)
     const foreign = await H.handleDraft(post({ projectId: PROJECT, articleId: 'art-of-someone-else' }), deps(admin, { generate: async () => 'x' }))
     check('a draft from an article outside the project is refused', foreign.status === 404)
@@ -465,6 +491,25 @@ function sourceChecks() {
     if (/const (GET|POST) = run/.test(s)) return /async function run[\s\S]*?authorizeCronRequest\([\s\S]*?isGbpPostsEnabled\(\)/.test(s)
     return handlers.every((h) => /^[^{]*\{\s*if \(!isGbpPostsEnabled\(\)\) return Response\.json\(\{ error: 'Not found' \}, \{ status: 404 \}\)/.test(h[0].slice(h[0].indexOf('{', h[0].indexOf(')')))) || /\{\s*if \(!isGbpPostsEnabled\(\)\) return/.test(h[0]))
   }
+  // The model is RESOLVED, never pinned. `gemini-2.5-flash` answered 404 "no
+  // longer available to new users" for the live key, which is why
+  // model-availability.ts exists; both GBP drafts called generateContent with the
+  // pinned id and skipped it, so the composer failed in production on 12 October
+  // 2026 while articles kept generating. One module now speaks to Gemini for the
+  // whole feature, and it logs every failure with a typed reason.
+  const gbpModules = walk('lib/gbp').filter((f) => f.endsWith('.ts') && !f.includes('__qa__'))
+  const callers = gbpModules.filter((f) => /\bmodels\.generateContent\(/.test(strip(read(f))))
+  check('exactly one module in lib/gbp calls the model', callers.length === 1 && callers[0] === 'lib/gbp/generate.ts', callers.join(', '))
+  const gen = strip(read('lib/gbp/generate.ts'))
+  check('…and it asks which model the key actually offers first', /resolveAvailableRecommendationModel\(\)/.test(gen))
+  check('…and never sends the pinned id without that answer',
+    gen.indexOf('resolveAvailableRecommendationModel()') < gen.indexOf('models.generateContent('))
+  check('…and every way out of it is logged', (gen.match(/console\.error\('\[gbp-draft\]/g) ?? []).length >= 5)
+  check('…and no prompt, key or provider text reaches the log',
+    !/console\.error\([^)]*prompt/.test(gen) && /sanitizeProviderMessage\(message\)/.test(gen))
+  check('MUTATION: a draft that pins the model again is caught',
+    !/resolveAvailableRecommendationModel\(\)/.test(gen.replace(/resolveAvailableRecommendationModel\(\)/g, 'RECOMMENDATION_MODEL_PRIMARY')))
+
   const offenders = routes.filter((f) => !gated(read(f)))
   check(`all ${routes.length} /api/gbp routes answer 404 unless GBP_POSTS_ENABLED (cron: CRON_SECRET first)`, routes.length >= 9 && offenders.length === 0, offenders.join(', '))
   check('MUTATION: a route without the flag check is caught', !gated(read('app/api/gbp/draft/route.ts').replace("if (!isGbpPostsEnabled()) return Response.json({ error: 'Not found' }, { status: 404 })", '')))
@@ -484,8 +529,19 @@ function sourceChecks() {
   const raws = client.filter((f) => rawErr(read(f)))
   check('no confirm()/alert(), no raw server or provider message on screen', raws.length === 0, raws.join(', '))
   check('MUTATION: showing body.message is caught', rawErr('setError(body.message)'))
-  const gbpLib = walk('lib/gbp').map(read).join('\n')
+  // lib/gbp/generate.ts is the one exception, and a narrow one: it logs the
+  // provider's error through sanitizeProviderMessage (keys, tokens and URLs
+  // stripped), to a SERVER log the merchant never sees, because without it a
+  // failed draft was not diagnosable from production at all. Everywhere else the
+  // ban stands, and the guard below holds generate.ts to the sanitizer.
+  const gbpLib = walk('lib/gbp').filter((f) => f !== 'lib/gbp/generate.ts').map(read).join('\n')
   check('no provider text is logged or stored (no console.* with a response body in lib/gbp)', !/console\.(log|error|warn)\([^)]*(json|body|message|text)/.test(strip(gbpLib)))
+  // `\s*` would let the lookahead pass on the space itself, so the space is literal.
+  const logsRaw = (src: string) => /message: (?!sanitizeProviderMessage)/.test(src)
+  check('…and the one module that logs a provider error sanitizes it',
+    !logsRaw(gen) && /message: sanitizeProviderMessage\(message\)/.test(gen))
+  check('MUTATION: logging the provider message raw is caught',
+    logsRaw(gen.replace('sanitizeProviderMessage(message)', 'message')))
 
   const keys = (o: unknown, p = ''): string[] => typeof o === 'object' && o !== null && !Array.isArray(o) ? Object.entries(o).flatMap(([k, v]) => keys(v, `${p}.${k}`)) : [p]
   const he = keys(dashboardHe.mapsPosts).sort(), en = keys(dashboardEn.mapsPosts).sort()

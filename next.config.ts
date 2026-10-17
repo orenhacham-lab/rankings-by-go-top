@@ -9,6 +9,23 @@ const nextConfig: NextConfig = {
     '/es/*': ['./content/legal/es/**/*'],
     '/pt-BR/*': ['./content/legal/pt-BR/**/*'],
   },
+  // sharp ships one prebuilt libvips per platform AND per C library. npm
+  // installs both x64 Linux pairs, glibc and musl, but the runtime loads
+  // exactly one: Vercel's Node runtime is Amazon Linux, so it is always the
+  // glibc pair (@img/sharp-linux-x64 + @img/sharp-libvips-linux-x64).
+  // File tracing cannot tell which one will load, so it copies both into
+  // every function that reaches sharp. Thirty-two routes do, through
+  // lib/content/gemini-image.ts and lib/gbp/image.ts, and the musl pair is
+  // 18 MB of each of them: 585 MB of a deployment's function storage spent
+  // on binaries that are never opened. Excluding them touches the traced
+  // file lists only, so node_modules on disk and `next start` locally are
+  // unaffected. A guard locks this: lib/__qa__/function-storage.qa.ts.
+  outputFileTracingExcludes: {
+    '*': [
+      'node_modules/@img/sharp-libvips-linuxmusl-x64/**/*',
+      'node_modules/@img/sharp-linuxmusl-x64/**/*',
+    ],
+  },
   images: {
     remotePatterns: [
       {

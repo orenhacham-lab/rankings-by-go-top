@@ -211,7 +211,14 @@ export function readLegalDocument(slug: LegalSlug, language: LegalLanguage = 'es
   const cached = cache.get(key)
   if (cached) return cached
   const rel = `content/legal/${language}/${slug}.md`
-  const doc = parseLegalMarkdown(readFileSync(join(process.cwd(), ...rel.split('/')), 'utf8'), rel)
+  // Statically scoped to content/legal on purpose. Spreading a split path
+  // (join(process.cwd(), ...rel.split('/'))) reads to Turbopack as filesystem
+  // access it cannot bound, so it traced the WHOLE project into each of these
+  // ten pages — public/ and wordpress-plugin/ included, about 25 MB of
+  // function storage per page for files a legal document never opens. Naming
+  // the two folders as literals bounds the trace; next.config.ts supplies the
+  // markdown itself through outputFileTracingIncludes.
+  const doc = parseLegalMarkdown(readFileSync(join(process.cwd(), 'content', 'legal', language, `${slug}.md`), 'utf8'), rel)
   cache.set(key, doc)
   return doc
 }

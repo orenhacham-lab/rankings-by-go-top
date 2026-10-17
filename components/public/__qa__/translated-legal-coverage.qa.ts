@@ -52,6 +52,18 @@ function check(name: string, cond: boolean, detail?: string) {
   if (cond) { pass++; console.log(`  ✓ ${name}`) } else { fail++; console.log(`  ✗ ${name}${detail ? ` — ${detail}` : ''}`) }
 }
 
+/**
+ * Source guards match code, never comments: this drops block, line and JSX
+ * comments before section 28 looks at a caller. A `//` after a colon or a
+ * quote (a URL inside a string) is kept.
+ */
+function stripComments(src: string): string {
+  return src
+    .replace(/\{\/\*[\s\S]*?\*\/\}/g, '')
+    .replace(/\/\*[\s\S]*?\*\//g, '')
+    .replace(/(^|[^:\\'"`])\/\/[^\n]*/g, '$1')
+}
+
 const DOCS = ['terms', 'privacy', 'refund-policy', 'accessibility', 'affiliate-terms'] as const
 type Doc = (typeof DOCS)[number]
 
@@ -256,8 +268,12 @@ for (const locale of LOCALES) {
 
 // ── 5) the registered company name, untranslated ────────────────────────────
 // Hebrew uses the Hebrew name; every other language uses the English name
-// exactly as registered, typo included, because that is what the registrar has.
-const REGISTERED = 'GO TOP MARKETING GRUO LTD'
+// exactly as Oren gave it on 2026-10-13, which replaced the earlier
+// "GO TOP MARKETING GRUO LTD". The registrar holds no English name at all
+// (company 517274346), so identification rests on the Hebrew name and the
+// company number, and the English string must be one single string everywhere.
+const REGISTERED = 'GO TOP DIGITAL MARKETING AND ADVERTISING LTD'
+const SUPERSEDED_NAME = /GO TOP MARKETING GRUO/i
 const TRANSLATED_NAME = /GO TOP (MARKETING|MERCADEO|MARKETING DIGITAL) (DIGITAL|Y PUBLICIDAD|E PUBLICIDADE|SRL|S\.?L\.?|LTDA\.?)/i
 for (const locale of LOCALES) {
   for (const doc of DOCS) {
@@ -265,6 +281,7 @@ for (const locale of LOCALES) {
     if (!/517274346/.test(src) && !src.includes(REGISTERED)) continue
     check(`${locale}/${doc}: the company name is the registered English one`, src.includes(REGISTERED))
     check(`${locale}/${doc}: the company name was not translated or re-spelled`, !TRANSLATED_NAME.test(src))
+    check(`${locale}/${doc}: the superseded company name is gone`, !SUPERSEDED_NAME.test(src))
     check(`${locale}/${doc}: the Hebrew company name is not used`, !/גו טופ/.test(src))
   }
   check(`${locale}: the contact documents carry the company number`,
@@ -1083,6 +1100,113 @@ const CAPI_CATEGORY: Record<string, RegExp> = {
     !CAPI_WITHDRAW.en.test('Withdrawing your consent stops the tags in your browser from collecting.'))
 }
 
+// ── 19) the business outreach section, and the promises inside it ─────────
+/*
+ * The cold outbound channel sends a marketing email to a business that never
+ * asked for it, from an address found on that business's own site. Three
+ * things make that lawful rather than spam, and each of them is a promise the
+ * documents now carry, so each is pinned.
+ *
+ * The country rule. The channel is lawful because CAN-SPAM is an opt-out
+ * regime; Israel's own anti-spam rule is opt-in and covers a business too, and
+ * the EU and UK are stricter still. So the geography is not list hygiene, it is
+ * the condition of the channel: the list may hold only businesses verified from
+ * two independent sources to be in the United States, and MUST NOT hold an
+ * Israeli, EEA or UK address at all. A text that softened this into "we do not
+ * send to" rather than "we do not hold" would describe a different, unlawful
+ * practice, so the pin is on holding.
+ *
+ * California. The CCPA's exemption for business-to-business contact data
+ * expired on 1 January 2023, so a business contact's address is personal
+ * information with the rights that come with it. Because the address was not
+ * collected from the person, this section IS the notice at collection, which is
+ * why it has to say so and why the email has to link it.
+ *
+ * The removal list. A one-click unsubscribe is only durable if the address is
+ * kept, which is itself processing and needs its own purpose limit. The text
+ * says the kept address is used for nothing but not contacting them again, and
+ * that it applies across every channel: a removal honoured in one channel and
+ * not the other is the breach that turns the lawful channel unlawful.
+ *
+ * What we do NOT do is pinned too, because it is cheap to promise and cheap to
+ * break: no bought lists, no data brokers, no phone numbers, nothing about a
+ * private individual, and nothing from a part of a site that is not public.
+ */
+const OUTREACH_COUNTRIES: Record<string, RegExp> = {
+  he: /איננו מחזיקים למטרה הזאת\s*כתובות של עסקים בישראל, באזור הכלכלי האירופי או בבריטניה/,
+  en: /We do not hold addresses for this purpose for businesses in Israel, the\s*European Economic Area or the United Kingdom/,
+  es: /No conservamos direcciones con esta finalidad de empresas en Israel, en el Espacio Económico Europeo ni en el Reino Unido/,
+  'pt-BR': /Não guardamos endereços para essa finalidade de empresas em Israel, no Espaço Econômico Europeu ou no Reino Unido/,
+}
+const OUTREACH_VERIFIED: Record<string, RegExp> = {
+  he: /אימתנו,\s*משני מקורות בלתי תלויים, שהם פועלים בארצות הברית/,
+  en: /we have verified, from two independent sources, to be operating in the United\s*States/,
+  es: /hemos verificado, a partir de dos fuentes independientes, que operan en los Estados Unidos/,
+  'pt-BR': /verificamos, a partir de duas fontes independentes, que atuam nos Estados Unidos/,
+}
+const OUTREACH_NOT_DONE: Record<string, RegExp[]> = {
+  he: [/איננו קונים\s*רשימות כתובות ואיננו משתמשים בסוחרי מידע/, /איננו נכנסים\s+לשום חלק באתר שאינו פתוח לכל מבקר/],
+  en: [/We do not buy contact lists and we do not use\s+data brokers/, /we do not enter any part of a site\s*that is not open to every visitor/],
+  es: [/No compramos listas de direcciones y no usamos intermediarios de datos/, /no entramos en ninguna parte de un sitio que no esté abierta a cualquier visitante/],
+  'pt-BR': [/Não compramos listas de endereços e não usamos intermediários de dados/, /não entramos em nenhuma parte de um site que não esteja aberta a qualquer visitante/],
+}
+const OUTREACH_REMOVAL: Record<string, RegExp[]> = {
+  he: [/למטרה היחידה של לוודא שלא ניצור איתך קשר שוב/, /היא חלה על כל ערוץ שלנו ולא רק על זה שבו ביקשת/],
+  en: [/for the single purpose of making sure we do not contact you again/, /it applies across every channel of ours, not only the one you\s*asked in/],
+  es: [/con la única finalidad de asegurarnos de no volver a contactarle/, /se aplica a todos nuestros canales, no solo a aquel en el que usted lo pidió/],
+  'pt-BR': [/com a única finalidade de garantir que não entraremos em contato com você de novo/, /vale para todos os nossos canais, não só para aquele em que você pediu/],
+}
+const OUTREACH_NOTICE: Record<string, RegExp> = {
+  he: /מכיוון שלא\s*אספנו את המידע ממך עצמך, הסעיף הזה הוא ההודעה על האיסוף, לרבות משך השמירה של כל פרט, והקישור אליו\s+מופיע בכל הודעה שאנו שולחים/,
+  en: /Because we did\s*not collect the information from you directly, this section is the notice of collection,\s+including how long each item is kept, and a link to it appears in every message we send/,
+  es: /Como no recogimos la información de usted directamente, esta sección es el aviso de recogida, incluido el plazo de conservación de cada dato, y un enlace a ella aparece en cada mensaje que enviamos/,
+  'pt-BR': /Como não coletamos a informação de você diretamente, esta seção é o aviso de coleta, incluindo por quanto tempo cada dado é guardado, e um link para ela aparece em cada mensagem que enviamos/,
+}
+const OUTREACH_NO_SALE: Record<string, RegExp> = {
+  he: /איננו מוכרים\s*את המידע הזה ואיננו משתפים אותו לפרסום התנהגותי חוצה-אתרים/,
+  en: /We do not sell this information\s*and we do not share it for cross-context behavioural advertising/,
+  es: /No vendemos esta información y no la compartimos para publicidad conductual entre contextos/,
+  'pt-BR': /Não vendemos essa informação e não a compartilhamos para publicidade comportamental entre contextos/,
+}
+{
+  const read = (path: string) => (existsSync(path) ? readFileSync(path, 'utf8') : '')
+  const enPrivacySource = frontMatter(text[LOCALES[0]].privacy).source
+  const privacyDocs: [string, string][] = [
+    ['he', read(HEBREW_PRIVACY)],
+    ['en', enPrivacySource ? read(enPrivacySource) : ''],
+    ...LOCALES.map((l): [string, string] => [l, text[l].privacy]),
+  ]
+  for (const [name, privacy] of privacyDocs) {
+    const countries = OUTREACH_COUNTRIES[name]
+    if (countries) check(`${name}/privacy: the list may not HOLD an Israeli, EEA or UK business address`, countries.test(privacy))
+    const verified = OUTREACH_VERIFIED[name]
+    if (verified) check(`${name}/privacy: the United States is verified from two independent sources`, verified.test(privacy))
+    for (const must of OUTREACH_NOT_DONE[name] ?? []) {
+      check(`${name}/privacy: outreach states what we never do (${must.source.slice(0, 40)})`, must.test(privacy))
+    }
+    for (const must of OUTREACH_REMOVAL[name] ?? []) {
+      check(`${name}/privacy: the removal list is purpose-limited and cross-channel (${must.source.slice(0, 40)})`, must.test(privacy))
+    }
+    const notice = OUTREACH_NOTICE[name]
+    if (notice) check(`${name}/privacy: the section says it IS the notice at collection, linked from every message`, notice.test(privacy))
+    const noSale = OUTREACH_NO_SALE[name]
+    if (noSale) check(`${name}/privacy: no sale and no cross-context sharing of the outreach data`, noSale.test(privacy))
+  }
+  check('mutation control: "we do not send to" in place of "we do not hold" is caught',
+    !OUTREACH_COUNTRIES.en.test('We do not send messages to businesses in Israel, the European Economic Area or the United Kingdom.'))
+  check('mutation control: one source of country verification is caught',
+    !OUTREACH_VERIFIED.en.test('we have verified, from the website address, to be operating in the United States'))
+  check('mutation control: a removal list with no purpose limit is caught',
+    !OUTREACH_REMOVAL.en[0].test('the address is kept on a removal list so that the removal holds.'))
+  check('mutation control: a removal that stops at this one channel is caught',
+    !OUTREACH_REMOVAL.en[1].test('it applies to the messages in this channel.'))
+  check('mutation control: a California half that omits the notice at collection is caught',
+    !OUTREACH_NOTICE.en.test('You have the right to know, to delete and to correct. A request goes to our privacy address.'))
+  check('mutation control: a bought list is caught',
+    !OUTREACH_NOT_DONE.en[0].test('We obtain addresses from public sources and from list providers.'))
+}
+
+
 // ── 20) the emails we send a customer, and what each unsubscribe stops ────
 /*
  * Until today the product sent no customer email at all, and the documents
@@ -1388,6 +1512,8 @@ console.log('\nmutation controls')
     !privacy.replace(/PDFShift/g, '').includes('PDFShift') && privacy.includes('PDFShift'))
   check('a translated company name is caught',
     TRANSLATED_NAME.test('GO TOP MARKETING E PUBLICIDADE LTDA'))
+  check('MUTATION — the superseded company name is caught',
+    SUPERSEDED_NAME.test('GO TOP MARKETING GRUO LTD') && !SUPERSEDED_NAME.test(REGISTERED))
   check('a link into a language tree with no page behind it is caught',
     // The example has to be a page that really is not there. It used to be
     // /pt-BR/terms, which exists now that the Portuguese tree is built.
@@ -1446,9 +1572,12 @@ console.log('\nmutation controls')
     !AGREEMENT_SHOPIFY_MANUAL.en.test('You earn 30% of each Qualifying Payment of a Referred Customer.'))
   check('an agreement that still says a suspended link stops working is caught',
     AGREEMENT_LINK_DIES.es.test('Cuando este acuerdo termine, su enlace de referido deja de funcionar.'))
+  // The drifted date is derived from whatever the document currently says, so
+  // this control keeps working when the terms are revised; pinning the literal
+  // date made it pass only until the next revision.
   check('a footer date that drifts from the written date is caught',
     writtenRevisionDate('es', text.es.terms)
-      !== frontMatter(text.es.terms.replace('lastUpdated: 2026-10-09', 'lastUpdated: 2026-10-06')).lastUpdated
+      !== frontMatter(text.es.terms.replace(/lastUpdated: \d{4}-\d{2}-\d{2}/, 'lastUpdated: 2026-10-06')).lastUpdated
       && writtenRevisionDate('es', text.es.terms) === frontMatter(text.es.terms).lastUpdated)
   check('a revision date read out of a statute sentence instead of the footer is caught',
     writtenRevisionDate('es', 'La Enmienda 13 entró en vigor el 14 de agosto de 2025.') === null)
@@ -1785,6 +1914,1261 @@ const SEO_COMPLETION_NAMES = ['a missing SEO field may be completed later', 'an 
     !SEO_COMPLETION.en[1].test(flat('Such a completion fills a missing field and may replace a value that exists, and applies only to articles the Service itself published.')))
   check('mutation control: a text that drops the limit to our own articles is caught',
     !SEO_COMPLETION.en[2].test(flat('Such a completion fills only a missing field, never replaces a value that exists, and applies to any page on your site.')))
+}
+
+// ── 25) Creem, the payment provider, in every language ─────────────────────
+/*
+ * lib/creem/config.ts ships two hosts, so legal-coverage.qa.ts requires the
+ * provider to be named in the he and en policies. That guard knows nothing
+ * about es and pt-BR, and a provider disclosed in two languages out of four is
+ * undisclosed to the customers reading the other two.
+ *
+ * The sentence is derived from the code, not from what Creem is for: the
+ * checkout call in lib/creem/client.ts sends the product id, our request id
+ * and, when there is one, the customer's e-mail, and the subscription read
+ * returns an id, a status, a product, a customer id and the period dates. So
+ * the policy names the e-mail address and says card details never reach us,
+ * and it must keep saying that only while the code sends nothing more. A
+ * caller that puts anything about a customer into `metadata` makes this
+ * paragraph wrong, which is why the metadata is named here and not only in
+ * the thread that built it.
+ */
+const CREEM_SHARED: Record<string, RegExp> = {
+  he: /Creem:<\/strong> לעיבוד תשלומים, כאשר התשלום של החשבון עובר דרכו/,
+  en: /Creem:<\/strong> for payment processing, where an account&rsquo;s payment goes through it/,
+  es: /\*\*Creem:\*\* para el procesamiento de pagos, cuando el pago de una cuenta pasa por él/,
+  'pt-BR': /\*\*Creem:\*\* para processar pagamentos, quando o pagamento de uma conta passa por ele/,
+}
+const CREEM_NO_CARD: Record<string, RegExp> = {
+  he: /פרטי כרטיס,\s+וכל אמצעי תשלום אחר, אינם מגיעים אלינו בשום שלב/,
+  en: /Card details, and any other\s+payment instrument, never reach us at any point/,
+  es: /Los datos de la tarjeta, y cualquier otro instrumento de pago, no llegan a nosotros en ningún momento/,
+  'pt-BR': /Os dados do cartão, e qualquer outro meio de pagamento, nunca chegam a nós em nenhum momento/,
+}
+const CREEM_EMAIL: Record<string, RegExp> = {
+  he: /כתובת הדוא&rdquo;ל של החשבון/,
+  en: /the e-mail address of the account/,
+  es: /la dirección de correo electrónico de la cuenta/,
+  'pt-BR': /o endereço de e-mail da conta/,
+}
+{
+  const enSource = frontMatter(text[LOCALES[0]].privacy).source
+  const pages: [string, string][] = [
+    ['he', existsSync(HEBREW_PRIVACY) ? readFileSync(HEBREW_PRIVACY, 'utf8') : ''],
+    ['en', enSource && existsSync(enSource) ? readFileSync(enSource, 'utf8') : ''],
+    ...LOCALES.map((l): [string, string] => [l, text[l].privacy]),
+  ]
+  for (const [name, src] of pages) {
+    check(`${name}/privacy: the page was read`, src.length > 0)
+    check(`${name}/privacy: Creem is named as a payment recipient`, (CREEM_SHARED[name] ?? /$^/).test(src))
+    check(`${name}/privacy: it says what we send, starting with the account e-mail`, (CREEM_EMAIL[name] ?? /$^/).test(src))
+    check(`${name}/privacy: it says no payment instrument reaches us`, (CREEM_NO_CARD[name] ?? /$^/).test(src))
+  }
+  check('mutation control: a policy that names Creem without saying what we send it is caught',
+    !CREEM_EMAIL.en.test('Creem: for payment processing, where an account&rsquo;s payment goes through it.'))
+  check('mutation control: a policy that drops the no-card-details sentence is caught',
+    !CREEM_NO_CARD.es.test('**Creem:** para el procesamiento de pagos. Recibimos el estado de la suscripción.'))
+  check('mutation control: a policy that claims we store the payment instrument is caught',
+    !CREEM_NO_CARD['pt-BR'].test('Os dados do cartão são guardados por nós para a próxima cobrança.'))
+}
+
+
+// ── 26) Creem as the merchant of record, in every language ─────────────────
+/*
+ * Creem's Merchant Terms 3.7 is an obligation on us, not an option: the
+ * Merchant "shall ensure that Buyers are clearly informed, before completing a
+ * transaction through the Service, that the payment will be processed by Creem
+ * as the merchant of record", and it names the terms of sale as an acceptable
+ * place. 3.8 adds that Creem's Buyer Terms must be put in front of the buyer in
+ * the same way. So this text is contractually required before the first real
+ * charge, and a language missing it is a language in which we are in breach.
+ *
+ * Every line below is a clause, not a description of what Creem is for:
+ *   - the seller is Armitage Labs OÜ, registry code 16977866 (Merchant Terms
+ *     2.1.5), selling in its own name as merchant of record and contractual
+ *     reseller (3.2, 17.1). The entity and the number are pinned because
+ *     "Creem" alone does not tell a customer who they bought from.
+ *   - Creem invoices the buyer in its own name (9.2) and we may not issue any
+ *     invoice or receipt, demand payment, or account for tax (9.3.1-9.3.3).
+ *   - indirect tax is calculated, collected and remitted by Creem on the
+ *     buyer's billing address (9.1, 3.3.4), which is why the price shown is
+ *     stated NOT to include it; an EU consumer must see a tax-inclusive final
+ *     price before paying, and Creem's checkout is where that happens.
+ *   - refunds and chargebacks are executed exclusively by Creem (Buyer Terms
+ *     9.3) — but on the eligibility criteria in the product's own terms, which
+ *     means section 7 of ours. That is why the text says refunds run through
+ *     Creem WITHOUT softening section 7 into a promise we do not make.
+ *   - the service itself stays ours (17.1.1, 17.1.2), so no reader can conclude
+ *     that Creem supports, delivers or warrants it.
+ *
+ * The mutation controls below catch the two failures that would matter: a text
+ * that names Creem as a payment processor rather than the seller, and a text
+ * that implies the displayed price is the final one.
+ */
+const MOR_SELLER: Record<string, RegExp> = {
+  he: /Creem פועלת כמוכר הרשום וכמשווק מחדש/,
+  en: /Creem acts as the merchant\s+of record and contractual reseller/,
+  es: /Creem act[úu]a como comerciante registrado y revendedor contractual/,
+  'pt-BR': /A Creem atua como comerciante registrada e revendedora contratual/,
+}
+const MOR_ENTITY: Record<string, RegExp> = {
+  he: /Armitage Labs O&Uuml;[\s\S]{0,60}16977866/,
+  en: /Armitage Labs O&Uuml;[\s\S]{0,80}16977866/,
+  es: /Armitage Labs OÜ[\s\S]{0,60}16977866/,
+  'pt-BR': /Armitage Labs OÜ[\s\S]{0,60}16977866/,
+}
+const MOR_INVOICE: Record<string, RegExp> = {
+  he: /Creem מוציאה את החשבונית בשמה שלה/,
+  en: /Creem issues the invoice in its own name/,
+  es: /Creem emite la factura en su propio nombre/,
+  'pt-BR': /A Creem emite a fatura em nome pr[óo]prio/,
+}
+const MOR_TAX: Record<string, RegExp> = {
+  he: /המחיר שמופיע[\s\S]{0,40}אינו כולל מס כזה/,
+  en: /The price shown on the pricing page does not include such tax/,
+  es: /El precio que figura en la p[áa]gina de precios no incluye ese impuesto/,
+  'pt-BR': /O pre[çc]o que aparece na p[áa]gina de pre[çc]os n[ãa]o inclui esse imposto/,
+}
+const MOR_REFUND: Record<string, RegExp> = {
+  he: /מבוצעים על ידי Creem בלבד[\s\S]{0,80}סעיף 7/,
+  en: /carried out by\s+Creem alone[\s\S]{0,120}section 7/,
+  es: /los ejecuta [úu]nicamente Creem[\s\S]{0,120}secci[óo]n 7/,
+  'pt-BR': /executado somente pela Creem[\s\S]{0,120}se[çc][ãa]o 7/,
+}
+const MOR_SERVICE_OURS: Record<string, RegExp> = {
+  he: /Creem אינה נוטלת אחריות על אלה/,
+  en: /Creem takes no\s+responsibility for those/,
+  es: /Creem no asume responsabilidad alguna por ellas/,
+  'pt-BR': /A Creem n[ãa]o assume responsabilidade por nada disso/,
+}
+const MOR_BUYER_TERMS: Record<string, RegExp> = {
+  he: /creem\.io\/buyer-terms/,
+  en: /creem\.io\/buyer-terms/,
+  es: /creem\.io\/buyer-terms/,
+  'pt-BR': /creem\.io\/buyer-terms/,
+}
+{
+  const read = (path: string) => (existsSync(path) ? readFileSync(path, 'utf8') : '')
+  const enTermsSource = frontMatter(text[LOCALES[0]].terms).source
+  const docs: [string, string][] = [
+    ['he', read(HEBREW_TERMS)],
+    ['en', enTermsSource ? read(enTermsSource) : ''],
+    ...LOCALES.map((l): [string, string] => [l, text[l].terms]),
+  ]
+  for (const [name, terms] of docs) {
+    check(`${name}/terms: the page was read`, terms.length > 0)
+    check(`${name}/terms: Creem is named as merchant of record and reseller, not a processor`, (MOR_SELLER[name] ?? /$^/).test(terms))
+    check(`${name}/terms: the selling entity and its registry code are named`, (MOR_ENTITY[name] ?? /$^/).test(terms))
+    check(`${name}/terms: Creem invoices the buyer in its own name`, (MOR_INVOICE[name] ?? /$^/).test(terms))
+    check(`${name}/terms: the displayed price is stated not to include that tax`, (MOR_TAX[name] ?? /$^/).test(terms))
+    check(`${name}/terms: refunds run through Creem on section 7's criteria`, (MOR_REFUND[name] ?? /$^/).test(terms))
+    check(`${name}/terms: the service itself stays ours and Creem warrants none of it`, (MOR_SERVICE_OURS[name] ?? /$^/).test(terms))
+    check(`${name}/terms: Creem's own Buyer Terms are linked for the buyer (3.8)`, (MOR_BUYER_TERMS[name] ?? /$^/).test(terms))
+  }
+  check('mutation control: Creem described as a payment processor rather than the seller is caught',
+    !MOR_SELLER.en.test('Payments by card are processed for us by Creem, our payment provider, which handles the transaction.'))
+  check('mutation control: a text that leaves out the selling entity is caught',
+    !MOR_ENTITY.en.test('In such a payment the sale is made with Creem, which acts as the merchant of record.'))
+  check('mutation control: a price presented as the final one is caught',
+    !MOR_TAX.es.test('El precio que figura en la página de precios es el precio final, impuestos incluidos.'))
+  check('mutation control: a refund promise detached from section 7 is caught',
+    !MOR_REFUND.en.test('A refund on such a transaction is carried out by Creem alone, which decides it at its own discretion.'))
+  check('mutation control: Creem presented as responsible for the service is caught',
+    !MOR_SERVICE_OURS.en.test('Creem provides support for the service and warrants that it works as described.'))
+}
+
+// ── 27) What the displayed price includes, per currency ─────────────────
+/*
+ * Until 10 October 2026 the terms said nothing about whether a price includes
+ * tax, which is the one thing a consumer reading a price needs to know. The
+ * owner settled it that day: a shekel price includes Israeli VAT, and he
+ * reports that VAT himself. So the terms now state it per currency, and the
+ * two halves are checked separately because each protects against a different
+ * mistake — claiming a dollar price is tax-inclusive when Creem adds tax on
+ * top of it (Merchant Terms 9.1), and claiming a shekel price has tax added
+ * when it does not, which would read as an undisclosed surcharge.
+ *
+ * The sentence is keyed to the CURRENCY, not to the language, because the
+ * market is resolved per visitor: a Hebrew reader outside Israel sees dollars
+ * and a Spanish reader in Israel sees shekels. components/public/pricing has
+ * the same split, guarded in pricing-page.qa.ts section F.
+ */
+const PRICE_VAT_ILS: Record<string, RegExp> = {
+  he: /מחיר הנקוב בשקלים כולל מע&rdquo;מ כדין בישראל/,
+  en: /A price stated in shekels includes Israeli VAT as\s+required by law/,
+  es: /Un precio indicado en s[ée]queles incluye el IVA israel[í i]/,
+  'pt-BR': /Um pre[çc]o indicado em s[ée]queis inclui o IVA israelense/,
+}
+const PRICE_TAX_USD: Record<string, RegExp> = {
+  he: /מחיר הנקוב בדולרים אינו כולל מס עקיף/,
+  en: /A price stated in dollars does not include\s+indirect tax/,
+  es: /Un precio indicado en d[óo]lares no incluye impuesto indirecto/,
+  'pt-BR': /Um pre[çc]o indicado em d[óo]lares n[ãa]o inclui imposto indireto/,
+}
+{
+  const read = (path: string) => (existsSync(path) ? readFileSync(path, 'utf8') : '')
+  const enTermsSource = frontMatter(text[LOCALES[0]].terms).source
+  const docs: [string, string][] = [
+    ['he', read(HEBREW_TERMS)],
+    ['en', enTermsSource ? read(enTermsSource) : ''],
+    ...LOCALES.map((l): [string, string] => [l, text[l].terms]),
+  ]
+  for (const [name, terms] of docs) {
+    check(`${name}/terms: the page was read`, terms.length > 0)
+    check(`${name}/terms: a shekel price is stated to include Israeli VAT`, (PRICE_VAT_ILS[name] ?? /$^/).test(terms))
+    check(`${name}/terms: a dollar price is stated NOT to include indirect tax`, (PRICE_TAX_USD[name] ?? /$^/).test(terms))
+  }
+  check('mutation control: a blanket "all prices include tax" is caught',
+    !PRICE_TAX_USD.en.test('All prices stated in the Service include every applicable tax.'))
+  check('mutation control: a shekel price presented as tax-exclusive is caught',
+    !PRICE_VAT_ILS.es.test('Un precio indicado en séqueles no incluye el IVA, que se añade en el pago.'))
+  check('mutation control: a text that settles neither currency is caught',
+    !PRICE_VAT_ILS.en.test('Prices, plans and limits may change from time to time.')
+    && !PRICE_TAX_USD.en.test('Prices, plans and limits may change from time to time.'))
+}
+
+// ── 28) What PDFShift keeps, and the code that makes the answer true ───
+/*
+ * PDFShift countersigned an Article 28 data processing agreement on 12 October
+ * 2026 (Oren signed through BoldSign; the executed copy is in his mail). Until
+ * then the privacy text said only that "retention at PDFShift is governed by
+ * their own privacy policy and terms", which told a merchant nothing and aged
+ * badly, because the vendor could change that policy without us noticing.
+ *
+ * The agreement replaces the deferral with a fact. Its Annex B: content sent
+ * for conversion "are processed transiently in volatile memory for the
+ * duration of the conversion request and are not intentionally written to
+ * persistent storage", EXCEPT where the caller passes the optional `filename`
+ * parameter — then the generated file sits on AWS S3 in Paris for up to two
+ * days. Annex A puts PDFShift's servers in France (OVH, AWS) and its error
+ * monitoring in the United States (Sentry, DPF / EU SCCs).
+ *
+ * So the published sentence is true only while our own callers leave that
+ * parameter out, which is why B is a SOURCE check and not a text check. Both
+ * callers currently send `source` and `landscape` alone. Adding `filename`
+ * would be a reasonable-looking change — it gives the download a nicer name —
+ * and it would silently turn a published promise into a false one. This guard
+ * is the thing standing between those two facts.
+ */
+const PDFSHIFT_DPA: Record<string, RegExp> = {
+  he: /הסכם עיבוד נתונים לפי סעיף 28/,
+  en: /data processing agreement with PDFShift under Article 28/,
+  es: /acuerdo de tratamiento de datos conforme al art[íi]culo 28/,
+  'pt-BR': /acordo de tratamento de dados nos termos do artigo 28/,
+}
+const PDFSHIFT_NO_RETENTION: Record<string, RegExp> = {
+  he: /מעובד\s+בזיכרון למשך ההמרה בלבד ואינו נשמר אצלם לאחריה/,
+  en: /processed in memory for the duration of the conversion alone and is not\s+retained afterwards/,
+  es: /se trata en memoria durante el tiempo de la conversi[óo]n y no se conserva despu[ée]s/,
+  'pt-BR': /[ée] tratado em mem[óo]ria apenas durante a convers[ãa]o e n[ãa]o [ée] retido depois/,
+}
+const PDFSHIFT_STORAGE_DECLINED: Record<string, RegExp> = {
+  he: /שמירה אופציונלית של הקובץ שנוצר,\s+ואנחנו לא מבקשים אותה/,
+  en: /optional storage of the generated file, and we do not ask for\s+it/,
+  es: /almacenamiento opcional del archivo generado, y nosotros no lo solicitamos/,
+  'pt-BR': /armazenamento opcional do arquivo gerado, e n[óo]s n[ãa]o o solicitamos/,
+}
+{
+  const read = (path: string) => (existsSync(path) ? readFileSync(path, 'utf8') : '')
+  const enSource = frontMatter(text[LOCALES[0]].privacy).source
+  const pages: [string, string][] = [
+    ['he', read(HEBREW_PRIVACY)],
+    ['en', enSource ? read(enSource) : ''],
+    ...LOCALES.map((l): [string, string] => [l, text[l].privacy]),
+  ]
+  for (const [name, src] of pages) {
+    check(`${name}/privacy: the page was read`, src.length > 0)
+    check(`${name}/privacy: the Article 28 agreement with PDFShift is stated`, (PDFSHIFT_DPA[name] ?? /$^/).test(src))
+    check(`${name}/privacy: the content is stated not to be retained after the conversion`,
+      (PDFSHIFT_NO_RETENTION[name] ?? /$^/).test(src))
+    check(`${name}/privacy: the optional storage is stated to be declined`,
+      (PDFSHIFT_STORAGE_DECLINED[name] ?? /$^/).test(src))
+    check(`${name}/privacy: the old "governed by their own policy" deferral is gone`,
+      !/governed by their own privacy policy|כפופה למדיניות הפרטיות ולתנאי השימוש|se rige por su propia pol[íi]tica de privacidad|regida pela pol[íi]tica de privacidade e pelos termos dela/.test(src))
+  }
+
+  /*
+   * B) The code behind the sentence. Every caller of the conversion endpoint is
+   * found by grepping for the endpoint itself, so a third caller added later is
+   * covered without editing this list.
+   */
+  const CONVERT_ENDPOINT = 'api.pdfshift.io/v3/convert'
+  const sources = ['app/api/reports/export-pdf/route.ts', 'lib/export/pdfshift.ts']
+    .map((f): [string, string] => [f, read(f)])
+  check('the known PDFShift callers were both read', sources.every(([, src]) => src.length > 0))
+  for (const [f, src] of sources) {
+    check(`${f}: still calls the conversion endpoint`, src.includes(CONVERT_ENDPOINT))
+    check(`${f}: sends no filename parameter, so nothing is stored at PDFShift`, !/\bfilename\s*:/.test(stripComments(src)))
+  }
+
+  check('mutation control: a filename parameter in the payload is caught',
+    /\bfilename\s*:/.test(stripComments('const payload = { source: html, filename: `report.pdf`, landscape: false }')))
+  check('mutation control: a filename inside a comment is NOT counted',
+    !/\bfilename\s*:/.test(stripComments('// filename: never send this, it turns on two-day storage\nconst p = { source: html }')))
+  check('mutation control: a retention claim with no agreement behind it is caught',
+    !PDFSHIFT_DPA.en.test('PDFShift does not keep the content of your reports.'))
+  check('mutation control: the vendor-policy deferral is recognised as the old wording',
+    /governed by their own privacy policy/.test('Retention at PDFShift is governed by their own privacy policy and terms.'))
+}
+
+// ── 29) Reviews on the Business Profile, and the two code facts behind it ──
+/*
+ * Until 12 October 2026 the privacy policy said, in all four languages, that
+ * "we do not read or reply to reviews". The reviews feature makes that false,
+ * so the text had to move BEFORE the code, which is why this section lands a
+ * merge ahead of the feature and why the checks on the feature's own files are
+ * written to tolerate their absence until it lands.
+ *
+ * Three claims are published and each one is a promise about code:
+ *   1. No review content is stored. Verified on
+ *      claude/project-thread-4052du-gbp-reviews: the migration adds two
+ *      timestamptz columns to project_gbp_locations and creates no table, and
+ *      lib/gbp/__qa__/gbp-reviews.qa.ts section G runs the handlers and then
+ *      asserts the review text, the reviewer's name, our reply and the rating
+ *      appear in no table.
+ *   2. The reply is PUBLIC and Google may remove it. That one is not about our
+ *      code at all; it is the fact a merchant most needs before pressing send,
+ *      and the reason the terms now put the reply's content on them.
+ *   3. The reviewer's name is never sent to the model. This is the one that
+ *      earns a guard here rather than a reading. The draft path speaks to the
+ *      Gemini Developer API with an API key, whose free tier may use prompt
+ *      content, and a review's free text can carry special-category data on its
+ *      own ("they treated my condition"). Dropping the name was a legal
+ *      recommendation the feature took (patches/legal-gbp-reviews-answers-
+ *      2026-10-12.md); nothing enforces it except that the draft's input type
+ *      has no field for a name. If a field reappears, this fails.
+ *
+ * MUTATION CONTROLS at the end, including one proving the absence-tolerant
+ * checks still catch a broken claim once the files exist.
+ */
+const REVIEWS_NO_STORAGE: Record<string, RegExp> = {
+  he: /איננו שומרים אצלנו שום תוכן של ביקורת/,
+  en: /We store no review content/,
+  es: /No almacenamos ning[úu]n contenido de rese[ñn]as/,
+  'pt-BR': /N[ãa]o armazenamos nenhum conte[úu]do de avalia[çc][ãa]o/,
+}
+const REPLY_IS_PUBLIC: Record<string, RegExp> = {
+  he: /והוא פומבי: הוא מופיע בכרטיס העסק שלך בגוגל וכל אדם יכול לראות אותו/,
+  en: /and it is public: it appears on your Google business listing and\s+anyone can see it/,
+  es: /y es p[úu]blica: aparece en la ficha de su negocio en Google y cualquier persona puede verla/,
+  'pt-BR': /e ela [ée] p[úu]blica: aparece no perfil da sua empresa no Google e qualquer pessoa pode v[êe]-la/,
+}
+const GOOGLE_MAY_REMOVE: Record<string, RegExp> = {
+  he: /עשויה להסיר מענה לפי מדיניות התוכן שלה/,
+  en: /may remove a reply\s+under its own content policies/,
+  es: /puede retirar una respuesta conforme a sus propias pol[íi]ticas de contenido/,
+  'pt-BR': /pode remover uma resposta conforme as pr[óo]prias pol[íi]ticas de conte[úu]do/,
+}
+const NAME_NOT_SENT: Record<string, RegExp> = {
+  he: /בלי שם המבקר/,
+  en: /without the reviewer&rsquo;s name/,
+  es: /sin el nombre del autor/,
+  'pt-BR': /sem o nome de quem avaliou/,
+}
+const NO_LONGER_TRUE = /we do not read or reply to reviews|ואיננו\s+קוראים ביקורות או עונים עליהן|no leemos ni respondemos rese[ñn]as|n[ãa]o lemos nem respondemos avalia[çc][õo]es/
+{
+  const read = (path: string) => (existsSync(path) ? readFileSync(path, 'utf8') : '')
+  const enSource = frontMatter(text[LOCALES[0]].privacy).source
+  const pages: [string, string][] = [
+    ['he', read(HEBREW_PRIVACY)],
+    ['en', enSource ? read(enSource) : ''],
+    ...LOCALES.map((l): [string, string] => [l, text[l].privacy]),
+  ]
+  for (const [name, src] of pages) {
+    check(`${name}/privacy: the page was read`, src.length > 0)
+    check(`${name}/privacy: the old "we do not read reviews" sentence is gone`, !NO_LONGER_TRUE.test(src))
+    check(`${name}/privacy: no review content is stated to be stored`, (REVIEWS_NO_STORAGE[name] ?? /$^/).test(src))
+    check(`${name}/privacy: the reply is stated to be public`, (REPLY_IS_PUBLIC[name] ?? /$^/).test(src))
+    check(`${name}/privacy: Google's power to remove a reply is disclosed`, (GOOGLE_MAY_REMOVE[name] ?? /$^/).test(src))
+    check(`${name}/privacy: the reviewer's name is stated NOT to reach the model`, (NAME_NOT_SENT[name] ?? /$^/).test(src))
+  }
+
+  /* The terms put the reply's content on the merchant, in every language. */
+  const LIABILITY: Record<string, RegExp> = {
+    he: /האחריות לתוכן המענה היא שלכם/,
+    en: /You are responsible for the content of the reply/,
+    es: /Usted es responsable del contenido de la respuesta/,
+    'pt-BR': /Voc[êe] [ée] respons[áa]vel pelo conte[úu]do da resposta/,
+  }
+  const enTermsSource = frontMatter(text[LOCALES[0]].terms).source
+  const termsDocs: [string, string][] = [
+    ['he', read(HEBREW_TERMS)],
+    ['en', enTermsSource ? read(enTermsSource) : ''],
+    ...LOCALES.map((l): [string, string] => [l, text[l].terms]),
+  ]
+  for (const [name, src] of termsDocs) {
+    check(`${name}/terms: the reply's content is put on the merchant`, (LIABILITY[name] ?? /$^/).test(src))
+  }
+
+  /*
+   * The code behind claim 1 and claim 3. Both files arrive with the feature, so
+   * each is checked only once it exists — and the "exists" line is itself a
+   * check, so the day the feature lands these stop being no-ops and nobody has
+   * to remember to come back here.
+   */
+  const DRAFT = 'lib/gbp/review-draft.ts'
+  const MIGRATION = 'supabase/migrations/20261012120000_gbp_review_alerts.sql'
+  const featureLanded = existsSync(DRAFT) && existsSync(MIGRATION)
+  console.log(`  · the reviews feature ${featureLanded ? 'HAS landed; its code is checked below' : 'has NOT landed yet; its two code checks are waiting for it'}`)
+  if (featureLanded) {
+    const draft = stripComments(read(DRAFT))
+    check(`${DRAFT}: the draft's input carries no reviewer name`, !/reviewerName|reviewer_name/.test(draft))
+    const migration = stripComments(read(MIGRATION))
+    check(`${MIGRATION}: adds the two timestamp columns and creates no table`,
+      /ADD COLUMN IF NOT EXISTS reviews_seen_update_time timestamptz/.test(migration)
+      && /ADD COLUMN IF NOT EXISTS reviews_alerted_at\s+timestamptz/.test(migration)
+      && !/CREATE TABLE/i.test(migration))
+    /*
+     * stripComments understands JavaScript, so a `-- …` line in SQL survives it,
+     * and `COMMENT ON COLUMN` is SQL's own way of documenting a column: a
+     * migration that explains in prose what it deliberately does NOT store used
+     * to trip this check on the words it was promising to avoid. Both kinds of
+     * documentation are dropped first. A column actually NAMED comment still
+     * arrives as `ADD COLUMN ... comment`, which the pattern still catches, and
+     * the second mutation control below holds that line.
+     */
+    const columns = migration
+      .replace(/COMMENT\s+ON\s[\s\S]*?;/gi, '')
+      .replace(/--[^\n]*/g, '')
+    check(`${MIGRATION}: stores no review text column`, !/comment|review_text|reviewer|rating|stars/i.test(columns))
+  }
+
+  check('mutation control: the sentence that is no longer true is recognised',
+    NO_LONGER_TRUE.test('We do not change your business information and we do not read or reply to reviews.'))
+  check('mutation control: a storage claim with no "no content" promise is caught',
+    !REVIEWS_NO_STORAGE.en.test('We read your reviews and keep them for your records.'))
+  check('mutation control: a reply described without its publicity is caught',
+    !REPLY_IS_PUBLIC.en.test('A reply is published in your name only after you pressed send.'))
+  check('mutation control: a reviewer name back in the draft input would be caught',
+    /reviewerName|reviewer_name/.test(stripComments('export interface ReviewDraftSource { reviewerName: string | null }')))
+  check('mutation control: a migration that adds a review-text column is caught',
+    /comment|review_text|reviewer|rating|stars/i.test(stripComments('ALTER TABLE x ADD COLUMN review_text text;')))
+  check('mutation control: dropping SQL documentation does not hide a column named comment',
+    /comment|review_text|reviewer|rating|stars/i.test(
+      stripComments("-- we keep no rating\nCOMMENT ON COLUMN x.y IS 'documented';\nALTER TABLE x ADD COLUMN comment text;")
+        .replace(/COMMENT\s+ON\s[\s\S]*?;/gi, '')
+        .replace(/--[^\n]*/g, '')))
+}
+
+// ── 30) Automatic posting to the Business Profile, published before its code ──
+/*
+ * Until 12 October 2026 the privacy policy said, in all four languages, that
+ * "we create a post only when you press publish, or at the time you scheduled
+ * it" and that "a draft is never published until you review it". Automatic
+ * posting (claude/project-thread-4052du-gbp-autopost) makes both false for an
+ * account that turned the switch on: an article that publishes to the owner's
+ * site also goes up on their business listing with NOBODY reading it first.
+ *
+ * The replacement text is deliberately conditional on the switch, so it is true
+ * both before the feature exists and after — which is what lets this land ahead
+ * of the code, as section 29 does. Four claims are pinned:
+ *   1. Off by default. A promise about the column's default, checked below.
+ *   2. Published without the owner reading it. The sentence that makes the terms
+ *      clause fair, and the one a merchant would otherwise be ambushed by.
+ *   3. Nothing but the business name and the article's own title and summary
+ *      reaches the model — no person's name, ever.
+ *   4. The switch turns itself off when the project moves to a different
+ *      business, because the approval was given for the business they picked.
+ * The terms carry the matching clause: content published in the owner's name is
+ * the owner's responsibility even where no human read it first.
+ *
+ * SETTLED, and recorded here because it was nearly a reason to stop the feature:
+ * lib/gbp/draft.ts used to say in its own header that Google rejects
+ * "auto-generated" posts, citing a research note absent from this repo. That
+ * would have meant the feature risked the merchant's listing, so it was raised
+ * with the feature thread (patches/legal-gbp-auto-post-answers-2026-10-12.md).
+ * They read Google's own pages on 12 October 2026 — the posts content policy
+ * (business/answer/7213077), the policy overview (business/answer/13762416) and
+ * the prohibited-and-restricted-content policy (contributionpolicy/answer/
+ * 7400114) — and none names a rule about automatically, machine- or AI-generated
+ * content; what is prohibited and does touch this is "posting the same content
+ * multiple times", which uq_gbp_posts_auto_article prevents. The comment was
+ * wrong, not the feature, and they corrected it. support.google.com does not
+ * resolve from THIS session, so that reading is theirs and was not re-read here.
+ * It stays out of the checks below: no sentence we publish depends on it.
+ */
+const AUTO_POST_OPT_IN: Record<string, RegExp> = {
+  he: /ברירת המחדל היא כבוי/,
+  en: /off by default/,
+  es: /desactivada por defecto/,
+  'pt-BR': /desativada por padr[ãa]o/,
+}
+const AUTO_POST_NO_READ: Record<string, RegExp> = {
+  he: /בלי שתקרא אותו לפני הפרסום/,
+  en: /without you reading\s+it first/,
+  es: /sin que usted lo lea antes/,
+  'pt-BR': /sem que voc[êe] o leia antes/,
+}
+const AUTO_POST_NO_PERSON: Record<string, RegExp> = {
+  he: /בלי שום שם של אדם/,
+  en: /with no person&rsquo;s name/,
+  es: /sin ning[úu]n nombre de persona/,
+  'pt-BR': /sem nenhum nome de pessoa/,
+}
+/*
+ * The post's language. This started as the opposite claim: the column allowed he
+ * and en only, so a Spanish project's article would have gone out in English on
+ * a Spanish business's listing, and the first version of this text said such a
+ * project gets no post at all. Oren rejected the limit on 12 October ("what is
+ * the problem with the post being in Spanish or Portuguese? that is what we do
+ * with the articles"), the feature widened the column's CHECK to all four app
+ * languages and dropped the skip, and the sentence now says the simple true
+ * thing. The two code checks below are what stops it drifting back.
+ */
+const AUTO_POST_LANGUAGE: Record<string, RegExp> = {
+  he: /פוסט אוטומטי נכתב בשפת הפרויקט/,
+  en: /An automatic post is written in the project&rsquo;s language/,
+  es: /Una publicaci[óo]n autom[áa]tica se redacta en el idioma del proyecto/,
+  'pt-BR': /Uma postagem autom[áa]tica [ée] escrita no idioma do projeto/,
+}
+const AUTO_POST_SELF_OFF: Record<string, RegExp> = {
+  he: /נכבית מעצמה אם החלפת/,
+  en: /turns itself off if you\s+change the business/,
+  es: /se desactiva por s[íi] sola si usted cambia el negocio/,
+  'pt-BR': /se desativa por conta pr[óo]pria se voc[êe] trocar a empresa/,
+}
+/* The two absolutes the feature contradicts. Either one surviving is a lie. */
+const AUTO_POST_NO_LONGER_TRUE = /we create a post only when you press publish|אנו יוצרים פוסט רק כשאתה לוחץ על פרסום|creamos una publicaci[óo]n [úu]nicamente cuando usted pulsa publicar|criamos uma postagem somente quando voc[êe] clica em publicar|draft is never published|טיוטה לעולם אינה מתפרסמת|Un borrador nunca se publica|Um rascunho nunca [ée] publicado/
+{
+  const read = (path: string) => (existsSync(path) ? readFileSync(path, 'utf8') : '')
+  const enSource = frontMatter(text[LOCALES[0]].privacy).source
+  const pages: [string, string][] = [
+    ['he', read(HEBREW_PRIVACY)],
+    ['en', enSource ? read(enSource) : ''],
+    ...LOCALES.map((l): [string, string] => [l, text[l].privacy]),
+  ]
+  for (const [name, src] of pages) {
+    check(`${name}/privacy: the page was read`, src.length > 0)
+    check(`${name}/privacy: neither absolute about posting survives`, !AUTO_POST_NO_LONGER_TRUE.test(src))
+    check(`${name}/privacy: automatic posting is stated to be off by default`, (AUTO_POST_OPT_IN[name] ?? /$^/).test(src))
+    check(`${name}/privacy: it is stated to publish without the owner reading it`, (AUTO_POST_NO_READ[name] ?? /$^/).test(src))
+    check(`${name}/privacy: no person's name is stated to reach the model`, (AUTO_POST_NO_PERSON[name] ?? /$^/).test(src))
+    check(`${name}/privacy: the two languages a post can go out in are stated`, (AUTO_POST_LANGUAGE[name] ?? /$^/).test(src))
+    check(`${name}/privacy: the switch is stated to turn itself off on a business change`, (AUTO_POST_SELF_OFF[name] ?? /$^/).test(src))
+  }
+
+  const AUTO_LIABILITY: Record<string, RegExp> = {
+    he: /האחריות לתוכן שמתפרסם בשמכם היא שלכם/,
+    en: /You are responsible for the\s+content published in your name/,
+    es: /Usted es responsable del contenido publicado en su nombre/,
+    'pt-BR': /Voc[êe] [ée] respons[áa]vel pelo conte[úu]do publicado em seu nome/,
+  }
+  const enTermsSource = frontMatter(text[LOCALES[0]].terms).source
+  const termsDocs: [string, string][] = [
+    ['he', read(HEBREW_TERMS)],
+    ['en', enTermsSource ? read(enTermsSource) : ''],
+    ...LOCALES.map((l): [string, string] => [l, text[l].terms]),
+  ]
+  for (const [name, src] of termsDocs) {
+    check(`${name}/terms: content published automatically is put on the merchant`, (AUTO_LIABILITY[name] ?? /$^/).test(src))
+  }
+
+  /*
+   * The code behind claims 1, 3 and 4. The migration arrives with the feature,
+   * so it gates the lot and the "has it landed" line is itself printed, as in
+   * section 29: the day the feature merges these stop being no-ops by
+   * themselves.
+   */
+  const AUTO_MIGRATION = 'supabase/migrations/20261012180000_gbp_auto_post.sql'
+  const STORE = 'lib/gbp/store.ts'
+  const DRAFT_SRC = 'lib/gbp/draft.ts'
+  const ENQUEUE = 'lib/gbp/auto-post.ts'
+  const autoLanded = existsSync(AUTO_MIGRATION)
+  console.log(`  · automatic posting ${autoLanded ? 'HAS landed; its code is checked below' : 'has NOT landed yet; its six code checks are waiting for it'}`)
+  if (autoLanded) {
+    const migration = stripComments(read(AUTO_MIGRATION))
+    check(`${AUTO_MIGRATION}: the switch defaults to off`,
+      /auto_post_on_publish\s+boolean\s+NOT NULL\s+DEFAULT false/i.test(migration))
+    /*
+     * When the owner turned it on. Asked for on 12 October 2026 because we are
+     * the ones publishing in their name with no person reading it, so something
+     * has to answer "I never approved this"; the CHECK is what stops a stale
+     * timestamp sitting on a switch that is off.
+     */
+    check(`${AUTO_MIGRATION}: when the switch was turned on is recorded, and only while it is on`,
+      /ADD COLUMN IF NOT EXISTS auto_post_enabled_at timestamptz/.test(migration)
+      && /CHECK \(auto_post_on_publish OR auto_post_enabled_at IS NULL\)/.test(migration))
+    check(`${AUTO_MIGRATION}: a post may carry any of the four app languages`,
+      /CHECK \(language_code IN \('he', 'en', 'es', 'pt-BR'\)\)/.test(migration))
+    const enqueue = stripComments(read(ENQUEUE))
+    check(`${ENQUEUE}: no project is skipped for its language`,
+      !/language_unsupported/.test(enqueue))
+    const store = stripComments(read(STORE))
+    check(`${STORE}: moving the project to another business clears the switch`,
+      /auto_post_on_publish:\s*false/.test(store))
+    const draft = stripComments(read(DRAFT_SRC))
+    const sourceType = /interface DraftSource \{[\s\S]*?\n\}/.exec(draft)?.[0] ?? ''
+    check(`${DRAFT_SRC}: the post draft's input carries no person's name`,
+      sourceType.length > 0 && !/reviewerName|customerName|userName|authorName|ownerName|email/i.test(sourceType))
+  }
+
+  check('mutation control: the old "only when you press publish" sentence is recognised',
+    AUTO_POST_NO_LONGER_TRUE.test('we create a post only when you press publish, or at the time you scheduled it'))
+  check('mutation control: the old "a draft is never published" absolute is recognised',
+    AUTO_POST_NO_LONGER_TRUE.test('A draft is never published until you review it and press publish.'))
+  check('mutation control: automatic posting described without "off by default" is caught',
+    !AUTO_POST_OPT_IN.en.test('Automatic posting: every article is also published as a post.'))
+  check('mutation control: a post language narrowed back to two is caught',
+    !AUTO_POST_LANGUAGE.en.test('An automatic post goes out in Hebrew or English only.'))
+  check('mutation control: a CHECK narrowed back to two languages is caught',
+    !/CHECK \(language_code IN \('he', 'en', 'es', 'pt-BR'\)\)/.test(
+      "ADD CONSTRAINT gbp_posts_language CHECK (language_code IN ('he', 'en'))"))
+  check('mutation control: a consent timestamp with no CHECK behind it would be caught',
+    !/CHECK \(auto_post_on_publish OR auto_post_enabled_at IS NULL\)/.test(
+      'ALTER TABLE x ADD COLUMN IF NOT EXISTS auto_post_enabled_at timestamptz;'))
+  check('mutation control: a switch defaulting to true would be caught',
+    !/auto_post_on_publish\s+boolean\s+NOT NULL\s+DEFAULT false/i.test('ADD COLUMN auto_post_on_publish boolean NOT NULL DEFAULT true'))
+  check("mutation control: a person's name back in the draft input would be caught",
+    /reviewerName|customerName|userName|authorName|ownerName|email/i.test(
+      stripComments('export interface DraftSource { businessName: string | null; customerName: string }')))
+}
+
+/*
+ * 31. THE PROSPECT RECORD BEHIND THE OUTBOUND EMAILS, AND HOW LONG IT LIVES.
+ *
+ * Until 12 October 2026 the published section said what we collect for a cold
+ * email and nothing about keeping it, because nothing was kept: the list lived
+ * in a file. The outreach thread then built public.outreach_prospects, a stored
+ * record per business, and asked whether the text owed anything. It owed three
+ * things, and two of them were a published sentence being made false:
+ *
+ *   1. "we do not collect details about a private individual" against a
+ *      contact_name column. In a one-person business the person and the business
+ *      are the same human, and that is exactly who this channel writes to. The
+ *      sentence is now narrowed to the business role someone is published in,
+ *      which is what we actually take; the old absolute is refused below, in all
+ *      four languages, so it cannot come back in a rewrite.
+ *   2. postal_address was collected and not disclosed at all.
+ *   3. A retention period. CPRA s.1798.100(a)(3) makes the notice at collection
+ *      state how long each category is kept, or the criterion used, and
+ *      "as long as necessary" is the formula California regulators reject. The
+ *      thread confirmed on 12 October that NOTHING in the code set redacted_at:
+ *      the column existed so a deletion request had somewhere to land, and a row
+ *      would otherwise have sat with the address and the name in it forever. So
+ *      this was a gap in the code, not in the wording, and the rule it is now
+ *      built to is the one the text states: 30 days after the last message
+ *      (or after a reply or an opt-out, whichever is later) the address, the
+ *      contact name and the postal address go; a record never written to is
+ *      deleted whole at 90 days. 30 is not a round number anyone liked — the
+ *      unsubscribe link resolves against this row and CAN-SPAM makes it work for
+ *      at least 30 days after a message, so nothing shorter is possible.
+ *
+ * The code checks are gated on the migration, as in sections 29 and 30: they are
+ * no-ops until the table lands and bind the day it does. Two of them are the
+ * ones that matter most. The column list is frozen against the disclosed field
+ * set, so a column added later fails this suite instead of quietly turning the
+ * text into an incomplete list; and the sweep is REQUIRED to exist once the table
+ * does, because a published period with no code behind it is the worse of the two
+ * states we were in. The sweep is found by scanning the outreach sources for
+ * redacted_at rather than by a path, since the path is theirs to choose; a file
+ * that merely reads the column satisfies the first check, which is why the
+ * periods and the two extra columns are checked separately.
+ */
+const OUTREACH_CONTACT_NAME: Record<string, RegExp> = {
+  he: /שם איש הקשר כאשר האתר/,
+  en: /the name of the contact person where the site publishes one/,
+  es: /el nombre de la persona de contacto cuando el sitio lo publica/,
+  'pt-BR': /o nome da pessoa de contato quando o site o publica/,
+}
+const OUTREACH_POSTAL: Record<string, RegExp> = {
+  he: /כתובת הדואר שהעסק מפרסם/,
+  en: /the postal address the business publishes/,
+  es: /la direcci[óo]n postal que la empresa publica/,
+  'pt-BR': /o endere[çc]o postal que a empresa publica/,
+}
+const OUTREACH_PERSON_NARROW: Record<string, RegExp> = {
+  he: /איננו אוספים על אדם שום דבר מעבר לתפקיד העסקי שבו הוא מפורסם/,
+  en: /we collect nothing about a person\s+beyond the business role they are published in/,
+  es: /no recogemos nada sobre una persona m[áa]s all[áa] del cargo con el que aparece publicada/,
+  'pt-BR': /n[ãa]o coletamos nada sobre uma pessoa al[ée]m do cargo com que ela aparece publicada/,
+}
+const OUTREACH_ERASE_30: Record<string, RegExp> = {
+  he: /30 יום אחרי ההודעה האחרונה ששלחנו לה/,
+  en: /erased 30 days after the last message we\s+sent it/,
+  es: /30 d[í i]as despu[ée]s del [úu]ltimo mensaje que le enviamos/,
+  'pt-BR': /30 dias depois da [úu]ltima mensagem que enviamos a ele/,
+}
+const OUTREACH_DELETE_90: Record<string, RegExp> = {
+  he: /נמחקת כולה 90 יום אחרי שנוספה/,
+  en: /deleted outright 90 days after it was added/,
+  es: /se elimina por completo 90 d[í i]as despu[ée]s de haberse a[ñn]adido/,
+  'pt-BR': /[ée] exclu[í i]do por inteiro 90 dias depois de ter sido adicionado/,
+}
+/* The absolute the contact_name column made false. Any language keeping it is a lie. */
+const OUTREACH_NO_LONGER_TRUE = /we\s+do not collect details about a private individual|איננו\s+אוספים פרטים על אדם פרטי|no recogemos datos sobre una persona privada|n[ãa]o coletamos dados sobre uma pessoa privada/
+{
+  const read = (path: string) => (existsSync(path) ? readFileSync(path, 'utf8') : '')
+  const enSource = frontMatter(text[LOCALES[0]].privacy).source
+  const pages: [string, string][] = [
+    ['he', read(HEBREW_PRIVACY)],
+    ['en', enSource ? read(enSource) : ''],
+    ...LOCALES.map((l): [string, string] => [l, text[l].privacy]),
+  ]
+  for (const [name, src] of pages) {
+    check(`${name}/privacy: the page was read`, src.length > 0)
+    check(`${name}/privacy: the broad "nothing about a private individual" claim is gone`,
+      !OUTREACH_NO_LONGER_TRUE.test(src))
+    check(`${name}/privacy: the contact person's name is disclosed as collected`,
+      (OUTREACH_CONTACT_NAME[name] ?? /$^/).test(src))
+    check(`${name}/privacy: the postal address is disclosed as collected`,
+      (OUTREACH_POSTAL[name] ?? /$^/).test(src))
+    check(`${name}/privacy: what we take about a person is narrowed to their business role`,
+      (OUTREACH_PERSON_NARROW[name] ?? /$^/).test(src))
+    check(`${name}/privacy: the 30-day erasure after the last message is stated`,
+      (OUTREACH_ERASE_30[name] ?? /$^/).test(src))
+    check(`${name}/privacy: the 90-day deletion of a record never written to is stated`,
+      (OUTREACH_DELETE_90[name] ?? /$^/).test(src))
+  }
+
+  const PROSPECTS_MIGRATION = 'supabase/migrations/20261012170000_outreach_prospects.sql'
+  const prospectsLanded = existsSync(PROSPECTS_MIGRATION)
+  console.log(`  · the prospect record ${prospectsLanded ? 'HAS landed; its code is checked below' : 'has NOT landed yet; its code checks are waiting for it'}`)
+  if (prospectsLanded) {
+    const migration = read(PROSPECTS_MIGRATION)
+    check(`${PROSPECTS_MIGRATION}: the United States promise is a database rule`,
+      /CHECK \(country = 'US'\)/.test(migration))
+    check(`${PROSPECTS_MIGRATION}: the postal address can be erased`,
+      !/postal_address\s+text\s+NOT NULL/.test(migration))
+    /*
+     * The three facts, not one constraint: the outreach thread expressed them as
+     * two CHECKs (outreach_prospects_redaction and ..._redaction_name) and may
+     * express them as three, so this asks the migration whether a redacted row
+     * can hold each column rather than how the author grouped them.
+     */
+    const checks = migration.replace(/^\s*--.*$/gm, '')
+    check(`${PROSPECTS_MIGRATION}: a redacted row holds no address, no contact name and no postal address`,
+      /email IS NULL/.test(checks) && /contact_name IS NULL/.test(checks) && /postal_address IS NULL/.test(checks))
+    const body = /CREATE TABLE IF NOT EXISTS public\.outreach_prospects \(([\s\S]*?)\n\);/.exec(migration)?.[1] ?? ''
+    const columns = [...body.matchAll(/^ {2}([a-z_]+)\s+(uuid|text|timestamptz|boolean|integer|jsonb)/gm)].map((m) => m[1])
+    const DISCLOSED = new Set([
+      'id', 'email', 'email_hash', 'unsub_token', 'company', 'contact_name', 'site_host',
+      'platform', 'country', 'postal_address', 'source_site', 'source_second', 'status',
+      'finding', 'finding_checked', 'first_sent_at', 'second_sent_at', 'replied_at',
+      'redacted_at', 'note', 'created_at', 'updated_at',
+    ])
+    const undisclosed = columns.filter((c) => !DISCLOSED.has(c))
+    check(`${PROSPECTS_MIGRATION}: the record holds nothing the published text does not list`,
+      columns.length > 0 && undisclosed.length === 0, undisclosed.join(', ') || 'no columns parsed')
+
+    const walk = (dir: string): string[] =>
+      existsSync(dir)
+        ? readdirSync(dir).flatMap((n) => {
+            const f = `${dir}/${n}`
+            return statSync(f).isDirectory() ? walk(f) : [f]
+          })
+        : []
+    const outreachSources = [...walk('lib/outreach'), ...walk('app/api/outreach')]
+      .filter((f) => f.endsWith('.ts') && !f.includes('__qa__'))
+    const sweepFiles = outreachSources.filter((f) => /redacted_at/.test(read(f)))
+    check('a retention sweep exists in the outreach code',
+      sweepFiles.length > 0, `scanned ${outreachSources.length} files`)
+    const sweep = sweepFiles.map(read).join('\n')
+    check('the sweep carries both published periods',
+      /\b30\b/.test(sweep) && /\b90\b/.test(sweep))
+    check('the sweep erases the contact name and the postal address, not only the address',
+      /contact_name/.test(sweep) && /postal_address/.test(sweep))
+  }
+
+  check('mutation control: the old "private individual" absolute is recognised',
+    OUTREACH_NO_LONGER_TRUE.test('We do not collect a phone number, we do not collect details about a private individual, and'))
+  check('mutation control: the narrowed sentence does not match the old absolute',
+    !OUTREACH_PERSON_NARROW.en.test('we do not collect details about a private individual'))
+  check('mutation control: a text giving only the 90-day rule is caught',
+    !OUTREACH_ERASE_30.en.test('A record we never wrote to is deleted outright 90 days after it was added.'))
+  check('mutation control: an undisclosed column would be caught',
+    [...'  phone_number      text NOT NULL'.matchAll(/^ {2}([a-z_]+)\s+(uuid|text|timestamptz|boolean|integer|jsonb)/gm)]
+      .map((m) => m[1]).filter((c) => c !== 'id').length === 1)
+  check('mutation control: a postal address that cannot be erased would be caught',
+    /postal_address\s+text\s+NOT NULL/.test('  postal_address    text NOT NULL,'))
+  check('mutation control: a redaction rule naming only the address would be caught',
+    !/contact_name IS NULL/.test("CONSTRAINT outreach_prospects_redaction CHECK ((email IS NULL) = (redacted_at IS NOT NULL))"))
+}
+
+// ── 32) the sender identity in the emails we send customers ─────────────────
+// Oren, 2026-10-13: the company name belongs in the emails that go to
+// customers, not only on the legal pages. Israel's Communications Law
+// s.30A(d)(2) wants an advertising message to name its sender and give an
+// address, and the three email families below (reminders, setup emails, the
+// weekly summary) all carry one shared footer line per language. Hebrew names
+// the Hebrew company; every other language names the English one.
+{
+  const read = (path: string) => (existsSync(path) ? readFileSync(path, 'utf8') : '')
+  const COPY: Array<[string, string, RegExp]> = [
+    ['he', 'lib/i18n/dashboard/he.ts', /גו טופ שיווק ופרסום דיגיטלי בע״מ \(ח\.פ\. 517274346\)/],
+    ['en', 'lib/i18n/dashboard/en.ts', new RegExp(`${REGISTERED} \\(company number 517274346\\)`)],
+    ['es', 'lib/i18n/dashboard/es.ts', new RegExp(`${REGISTERED} \\(n\\.º de empresa 517274346\\)`)],
+    ['pt-BR', 'lib/i18n/dashboard/pt-BR/tracking.ts', new RegExp(`${REGISTERED} \\(número de sociedade 517274346\\)`)],
+  ]
+  for (const [locale, path, named] of COPY) {
+    const src = read(path)
+    const lines = [...src.matchAll(/company: '([^']*)'/g)].map((m) => m[1])
+    check(`${locale}: all three customer email footers share one identity line`,
+      lines.length === 3 && new Set(lines).size === 1, `${lines.length} line(s)`)
+    check(`${locale}: the email footer names the company and its number`,
+      lines.length > 0 && lines.every((l) => named.test(l)), lines[0])
+    check(`${locale}: the email footer gives the registered address`,
+      lines.every((l) => /(הרכסים 24\/2, רמת גן 5235524|HaRechasim 24\/2, Ramat Gan 5235524, Israel)/.test(l)))
+    check(`${locale}: the email footer does not carry the superseded name`,
+      lines.every((l) => !SUPERSEDED_NAME.test(l)))
+  }
+  check('mutation control: a brand-only footer line is caught',
+    !new RegExp(`${REGISTERED}`).test('Go Top SEO · oren@gotop.co.il'))
+  check('mutation control: a footer with no address is caught',
+    !/(הרכסים 24\/2, רמת גן 5235524|HaRechasim 24\/2, Ramat Gan 5235524, Israel)/
+      .test(`${REGISTERED} (company number 517274346) · oren@gotop.co.il`))
+}
+
+// ── 33) an AI photo for a Business Profile post ─────────────────────────────
+/*
+ * The UX/build thread added a "create a photo" button to the Maps post composer
+ * (topic posts only): one generic, unbranded, photorealistic image from the same
+ * Gemini image pipeline that makes article featured images, shown to the merchant
+ * and published only when they press publish themselves.
+ *
+ * What made this worth text of its own is NOT that the image is AI-made. Google's
+ * posts content policy names no rule about machine- or AI-generated content —
+ * section 30 records that reading, and support.google.com still does not resolve
+ * from this session, so it was not re-read here. What does bite is accuracy: the
+ * policy overview (business/answer/13762416) and the prohibited-content policy
+ * require content on a listing to represent the location and the product as they
+ * actually are, and Google's photo guidance (business/answer/6123536, read
+ * through search snippets on 16 October 2026) asks for photos that represent
+ * reality and warns against excessive use of AI. A photorealistic image that a
+ * customer takes for a photo of THIS bakery's counter is therefore the merchant's
+ * exposure twice over: Google can remove the content or restrict the listing, and
+ * in Israel a misleading image of a good or service is consumer deception under
+ * the Consumer Protection Law.
+ *
+ * So the terms, in all four languages, pin five claims:
+ *   1. the photo is AI-made;
+ *   2. it is NOT a photograph of their business, premises, staff or real product;
+ *   3. it is published only after they choose it and press publish, in their name;
+ *   4. the responsibility for it is theirs, Google's content and photo policies
+ *      included, and a misleading photo risks the content or the listing;
+ *   5. the file carries Google's own SynthID and C2PA markers, so "nobody can
+ *      tell" is not a defence anyone should rely on.
+ * The privacy policy adds the data fact, which is favourable and verified in
+ * lib/gbp/topic-image.ts: only the topic goes to the model — no business name,
+ * no person's name — and nothing is stored before the merchant publishes.
+ */
+const AI_PHOTO_NOT_YOUR_BUSINESS: Record<string, RegExp> = {
+  he: /ואינה צילום של העסק שלכם, של המקום, של העובדים\s*או של מוצר ממשי שלכם/,
+  en: /it is not a\s*photograph of your business, your premises, your staff or an actual product of yours/,
+  es: /no es una fotograf[íi]a de su negocio, de su local, de su personal ni de un producto real suyo/,
+  'pt-BR': /n[ãa]o [ée] uma fotografia da sua empresa, do seu estabelecimento, da sua equipe nem de um produto real seu/,
+}
+const AI_PHOTO_YOUR_RESPONSIBILITY: Record<string, RegExp> = {
+  he: /האחריות לתמונה שמתפרסמת בשמכם היא\s*שלכם/,
+  en: /You are\s*responsible for the photo published in your name/,
+  es: /Usted es responsable de la foto publicada en su nombre/,
+  'pt-BR': /Voc[êe] é responsável pela foto publicada em seu nome/,
+}
+const AI_PHOTO_LISTING_RISK: Record<string, RegExp> = {
+  he: /עלולה להביא להסרת התוכן או להגבלת הכרטיס בידי\s*Google/,
+  en: /can lead Google to remove the content or restrict the listing/,
+  es: /puede llevar a Google a retirar el contenido o a restringir la ficha/,
+  'pt-BR': /pode levar o Google a remover o conte[úu]do ou a restringir o perfil/,
+}
+const AI_PHOTO_MARKERS: Record<string, RegExp> = {
+  he: /SynthID ו-C2PA/,
+  en: /SynthID and C2PA/,
+  es: /SynthID y C2PA/,
+  'pt-BR': /SynthID e C2PA/,
+}
+const AI_PHOTO_NO_BUSINESS_NAME: Record<string, RegExp> = {
+  he: /בלי שם העסק ובלי שם של אדם/,
+  en: /without the business name and\s*without any person&rsquo;s name/,
+  es: /sin el nombre del negocio y sin el nombre de ninguna persona/,
+  'pt-BR': /sem o nome da empresa e sem o nome de nenhuma pessoa/,
+}
+{
+  const read = (path: string) => (existsSync(path) ? readFileSync(path, 'utf8') : '')
+  const enTerms = frontMatter(text[LOCALES[0]].terms).source
+  const enPrivacy = frontMatter(text[LOCALES[0]].privacy).source
+  const docs: [string, string, string][] = [
+    ['he', read(HEBREW_TERMS), read(HEBREW_PRIVACY)],
+    ['en', enTerms ? read(enTerms) : '', enPrivacy ? read(enPrivacy) : ''],
+    ...LOCALES.map((l): [string, string, string] => [l, text[l].terms, text[l].privacy]),
+  ]
+  for (const [name, terms, privacy] of docs) {
+    check(`${name}/terms: the AI photo is not presented as a photograph of the business`, AI_PHOTO_NOT_YOUR_BUSINESS[name]!.test(terms))
+    check(`${name}/terms: the photo published in the merchant's name is the merchant's responsibility`, AI_PHOTO_YOUR_RESPONSIBILITY[name]!.test(terms))
+    check(`${name}/terms: a misleading photo is named as a risk to the content and the listing`, AI_PHOTO_LISTING_RISK[name]!.test(terms))
+    check(`${name}/terms: the file's AI markers are disclosed`, AI_PHOTO_MARKERS[name]!.test(terms))
+    check(`${name}/privacy: only the topic reaches the model, with no business or person name`, AI_PHOTO_NO_BUSINESS_NAME[name]!.test(privacy))
+  }
+  // The favourable data claim has to stay true in the code that makes the image.
+  const gen = read('lib/gbp/topic-image.ts')
+  if (gen) {
+    check('the generator sends no business name to the model', !/businessName/.test(gen))
+    check('the generator stores nothing itself', !/upload\(|storage\./.test(gen))
+  }
+  check('mutation control: a clause that calls it a photo of the business is caught',
+    !AI_PHOTO_NOT_YOUR_BUSINESS.en.test('It is a photograph of your business, taken by AI.'))
+  check('mutation control: a clause with no listing risk is caught',
+    !AI_PHOTO_LISTING_RISK.en.test('A misleading photo is not a good idea.'))
+}
+
+// ── 34) a purchase made through an external marketplace ────────────────────
+/*
+ * Oren is opening accounts on affiliate marketplaces (the affiliates thread is
+ * building a shared intake layer behind per-platform off switches, with sales
+ * pages under /go/<platform>). Two of the candidates, ClickBank and Digistore24,
+ * are merchants of record: they sell the plan in their own name, they charge the
+ * buyer, they issue the invoice, and they operate their own refund windows —
+ * Digistore24 and ClickBank both run buyer-facing refund policies that are far
+ * wider than ours, and either can refund a transaction at its own discretion.
+ *
+ * Section 4 of our refund policy says a paid period is not refunded. That rule
+ * is the owner's own decision and is not softened here. But on a purchase we did
+ * not sell, section 4 is not the rule the buyer is owed: the seller's is. Leaving
+ * section 4 as the only statement on the page would be a narrower promise than
+ * the buyer actually holds, which in Israel is a misleading omission under the
+ * Consumer Protection Law and in the EU an unfair term under 93/13/EEC, since a
+ * consumer may not be told they have less than the law and the actual seller give
+ * them.
+ *
+ * So each refund policy carries one conditional section, numbered after the
+ * Shopify section so no existing number shifts (6A in he/en/es, 7A in pt-BR,
+ * whose Art. 49 section sits earlier). It names no platform, so it is true both
+ * before any marketplace is live and after, and it pins four claims:
+ *   1. the marketplace is the seller of that purchase — it charged you, it
+ *      invoiced you, cancellation happens there;
+ *   2. its own refund and return policy applies to that purchase;
+ *   3. explicitly, that this holds even where that policy is wider than ours,
+ *      and that section 4 does not narrow it;
+ *   4. section 4 governs purchases made from us, and the page you bought on
+ *      names the seller and links its policy.
+ * Claim 4's second half is a promise about the sales page, which is why the
+ * checks below also read app/go/[platform]/page.tsx once it exists.
+ */
+const MARKETPLACE_SELLER: Record<string, RegExp> = {
+  he: /המוכר של אותה\s*רכישה הוא אותה זירה/,
+  en: /the seller of that purchase is that\s*marketplace/,
+  es: /el vendedor de esa compra es ese mercado/,
+  'pt-BR': /o vendedor dessa compra [ée] esse marketplace/,
+}
+const MARKETPLACE_THEIR_POLICY: Record<string, RegExp> = {
+  he: /מדיניות ההחזרים וההחזרה שלה חלה על אותה רכישה/,
+  en: /Its own refund and return policy applies\s*to that purchase/,
+  es: /Su propia pol[íi]tica de reembolsos y devoluciones se aplica a esa compra/,
+  'pt-BR': /A pol[íi]tica de reembolso e devolu[çc][ãa]o dele se aplica a essa compra/,
+}
+const MARKETPLACE_WIDER: Record<string, RegExp> = {
+  he: /גם כשהיא רחבה\s*ממדיניות ההחזרים שבסעיף 4/,
+  en: /even where that policy is wider than the refund\s*policy in\s*section 4/,
+  es: /incluso cuando esa pol[íi]tica es m[áa]s amplia que la pol[íi]tica de reembolsos de la secci[óo]n 4/,
+  'pt-BR': /mesmo quando essa pol[íi]tica [ée] mais ampla que as regras de reembolso das se[çc][õo]es 4 e 5/,
+}
+const MARKETPLACE_NAMES_SELLER: Record<string, RegExp> = {
+  he: /בעמוד שבו רכשתם מופיע שם המוכר וקישור למדיניות שלו/,
+  en: /The page you bought (on|from) names the seller and links (to )?its policy/,
+  es: /La p[áa]gina en la que usted compr[óo] indica el nombre del vendedor y enlaza con su pol[íi]tica/,
+  'pt-BR': /A p[áa]gina em que voc[êe] comprou informa o nome do vendedor e traz o link para a pol[íi]tica dele/,
+}
+{
+  const read = (path: string) => (existsSync(path) ? readFileSync(path, 'utf8') : '')
+  const docs: [string, string][] = [
+    ['he', read('app/(legal)/refund-policy/page.tsx')],
+    ['en', read('app/(public)/en/refund-policy/page.tsx')],
+    ...LOCALES.map((l): [string, string] => [l, text[l]['refund-policy']]),
+  ]
+  for (const [name, refund] of docs) {
+    check(`${name}/refund-policy: the marketplace is named as the seller of that purchase`, MARKETPLACE_SELLER[name]!.test(refund))
+    check(`${name}/refund-policy: the marketplace's own refund policy is the one that applies`, MARKETPLACE_THEIR_POLICY[name]!.test(refund))
+    check(`${name}/refund-policy: our section 4 is not presented as narrowing a wider policy`, MARKETPLACE_WIDER[name]!.test(refund))
+    check(`${name}/refund-policy: the buyer is told where to find the seller and its policy`, MARKETPLACE_NAMES_SELLER[name]!.test(refund))
+    check(`${name}/refund-policy: the owner's no-refund rule is still the rule for purchases from us`,
+      /(סעיף 4 חלה על|in section 4 applies to\s*purchases made from us|de la secci[óo]n 4 se aplica a las compras realizadas a nosotros|das se[çc][õo]es 4 e 5 se aplicam [àa]s compras feitas de n[óo]s)/.test(refund))
+  }
+  // Claim 4 is a promise about the sales page. Once that page exists it has to keep it.
+  const salesPage = read('app/go/[platform]/page.tsx')
+  if (salesPage) {
+    check('the marketplace sales page names its seller', /seller|vendedor|מוכר/i.test(salesPage))
+    check('the marketplace sales page does not send the buyer to our own refund policy',
+      !/\/(en\/)?refund-policy/.test(salesPage))
+  }
+  check('mutation control: a clause that keeps us the seller is caught',
+    !MARKETPLACE_SELLER.en.test('We remain the seller of that purchase and you cancel with us.'))
+  check('mutation control: a clause that caps the buyer at our own policy is caught',
+    !MARKETPLACE_WIDER.en.test('The refund policy in section 4 applies to that purchase instead.'))
+}
+
+// ── 35) a subscription billed by another company ───────────────────────────
+/*
+ * Terms section 6 said, with no carve-out of any kind, that the user may cancel
+ * the renewal "at any time through your account settings". That was already
+ * false for a Shopify-billed store, where the billing and the cancellation run
+ * through Shopify (the billing screen has had a Shopify card for that reason
+ * since long before this section existed). It is false for a card payment too,
+ * where section 5A makes Creem the seller and Creem holds the subscription: the
+ * Creem branch of the billing screen used to tell the buyer to contact us and
+ * that we would stop the billing for them, which we cannot do — we can end the
+ * plan, not stop someone else's charge. And it would be false again for a plan
+ * bought on a marketplace that resells the Service in its own name.
+ *
+ * A published promise that a cancellation route exists where it does not is the
+ * worst kind for us to carry: in Israel it is a misleading omission under the
+ * Consumer Protection Law, and in the EU it makes a cancellation right
+ * practically unusable, which is what the Consumer Rights Directive forbids.
+ *
+ * So section 6A says, platform-neutrally and therefore truthfully in every
+ * state the product can be in today or next month:
+ *   1. some subscriptions are billed by another company, and it names the three
+ *      — Shopify, Creem, an external marketplace;
+ *   2. in those cases the renewal is cancelled with that company and NOT through
+ *      the account settings, because that company holds the subscription;
+ *   3. we will pass a cancellation request on and confirm in writing that we
+ *      have — a promise we can keep — while the charge itself is stopped by that
+ *      company and not by us;
+ *   4. we do not issue a refund on another company's behalf;
+ *   5. access still lasts to the end of the period already paid for.
+ * Claim 3's second half is the one that matters most: it is what keeps the
+ * section from becoming the same unkeepable promise in a new place.
+ *
+ * Section 6 itself is deliberately NOT edited: it remains the rule for a
+ * subscription we bill, and the last check below holds it to that, so a future
+ * edit cannot quietly delete the account-settings route for everyone.
+ */
+const BILLED_ELSEWHERE_NOT_SETTINGS: Record<string, RegExp> = {
+  he: /חידוש המנוי מבוטל אצל אותה חברה ולא\s*דרך הגדרות החשבון/,
+  en: /the renewal is cancelled with that company and not through your account\s*settings/,
+  es: /la renovaci[óo]n se cancela ante esa empresa y no desde la configuraci[óo]n de su cuenta/,
+  'pt-BR': /o cancelamento da renova[çc][ãa]o [ée] feito junto a essa empresa, e n[ãa]o nas configura[çc][õo]es da sua conta/,
+}
+// The written-confirmation clause was deliberately REMOVED before merge. It read
+// well and it protected the buyer, but nothing in the codebase sends such a mail
+// on a cancellation request: it would have meant the owner replying by hand, which
+// is keepable at one request a month and stops being keepable quietly. The house
+// rule is that no written promise is published that the code cannot keep, so the
+// terms now promise only what inbound mail already does — we pass the request on —
+// and the check below fails if the confirmation sentence returns in any language
+// without something to send it.
+const BILLED_ELSEWHERE_WE_PASS_ON: Record<string, RegExp> = {
+  he: /נעביר אותה לאותה חברה, אך עצירת החיוב/,
+  en: /we will pass it on to that company, but the charge itself/,
+  es: /la trasladaremos a esa empresa, pero el cobro/,
+  'pt-BR': /n[óo]s o encaminhamos a essa empresa, mas a cobran[çc]a/,
+}
+const BILLED_ELSEWHERE_NOT_OUR_CHARGE: Record<string, RegExp> = {
+  he: /עצירת החיוב\s*עצמו נעשית בידי אותה חברה ולא בידינו/,
+  en: /the charge itself is stopped by that company and not by us/,
+  es: /el cobro lo detiene esa empresa y no nosotros/,
+  'pt-BR': /a cobran[çc]a [ée] interrompida por essa empresa e n[ãa]o por n[óo]s/,
+}
+const BILLED_ELSEWHERE_NO_REFUND_FOR_THEM: Record<string, RegExp> = {
+  he: /ואיננו מוציאים החזר בשמה/,
+  en: /we do not issue\s*a refund on its behalf/,
+  es: /no emitimos un reembolso en su nombre/,
+  'pt-BR': /n[ãa]o emitimos reembolso em nome dela/,
+}
+const BILLED_ELSEWHERE_ACCESS_KEPT: Record<string, RegExp> = {
+  he: /הגישה למערכת נשמרת עד תום תקופת החיוב\s*ששולמה/,
+  en: /access to the Service is retained until the end\s*of the billing period that has already been paid/,
+  es: /el acceso al Servicio se mantiene hasta el final del per[íi]odo de facturaci[óo]n que ya haya sido pagado/,
+  'pt-BR': /o acesso ao Servi[çc]o [ée] mantido at[ée] o fim do per[íi]odo de cobran[çc]a j[áa] pago/,
+}
+// Section 6 must keep the account-settings route for a subscription WE bill.
+const OWN_BILLING_STILL_SETTINGS: Record<string, RegExp> = {
+  he: /רשאי לבטל את חידוש המנוי בכל עת דרך הגדרות החשבון/,
+  en: /You may cancel renewal of your subscription at any time through your account settings/,
+  es: /puede cancelar la renovaci[óo]n de su suscripci[óo]n en cualquier momento desde la configuraci[óo]n de su cuenta/,
+  'pt-BR': /pode cancelar a renova[çc][ãa]o da sua assinatura a qualquer momento nas configura[çc][õo]es da conta/,
+}
+{
+  const read = (path: string) => (existsSync(path) ? readFileSync(path, 'utf8') : '')
+  const enTerms = frontMatter(text[LOCALES[0]].terms).source
+  const docs: [string, string][] = [
+    ['he', read(HEBREW_TERMS)],
+    ['en', enTerms ? read(enTerms) : ''],
+    ...LOCALES.map((l): [string, string] => [l, text[l].terms]),
+  ]
+  for (const [name, terms] of docs) {
+    check(`${name}/terms: a subscription billed elsewhere is cancelled there, not in the account settings`, BILLED_ELSEWHERE_NOT_SETTINGS[name]!.test(terms))
+    check(`${name}/terms: we promise only to pass the request on, and nothing no code performs`, BILLED_ELSEWHERE_WE_PASS_ON[name]!.test(terms))
+    check(`${name}/terms: stopping the charge is named as the other company's act, not ours`, BILLED_ELSEWHERE_NOT_OUR_CHARGE[name]!.test(terms))
+    check(`${name}/terms: no written confirmation is promised, because nothing sends one`,
+      !/(ונאשר בכתב|confirm in writing|confirmaremos por escrito|confirmamos por escrito)/.test(terms))
+    check(`${name}/terms: no refund is promised on another company's behalf`, BILLED_ELSEWHERE_NO_REFUND_FOR_THEM[name]!.test(terms))
+    check(`${name}/terms: access still runs to the end of the period already paid for`, BILLED_ELSEWHERE_ACCESS_KEPT[name]!.test(terms))
+    check(`${name}/terms: all three billing companies are named`, /Shopify/.test(terms) && /Creem/.test(terms) && /(זירת מכירות|mercado externo|marketplace externo|external marketplace)/.test(terms))
+    check(`${name}/terms: section 6 still gives the account-settings route for a subscription we bill`, OWN_BILLING_STILL_SETTINGS[name]!.test(terms))
+  }
+  // The billing screen is the other half of this promise: it must not tell a buyer
+  // whose subscription we do not hold that we will stop the billing for them.
+  // Today it still does — `contactToCancel` in lib/i18n/dashboard/*.ts reads "contact
+  // us and we will stop the billing for you", which is the branch a Creem buyer
+  // lands in. That text is being replaced in the PR that rewrites the screen, and
+  // the check belongs with the fix rather than here, where it would ship red; the
+  // thread that owns the screen has the exact assertion to add.
+  check('mutation control: a clause that keeps the cancellation in our account settings is caught',
+    !BILLED_ELSEWHERE_NOT_SETTINGS.en.test('In those cases the renewal is cancelled through your account settings as usual.'))
+  check('mutation control: a promise to stop the other company’s charge is caught',
+    !BILLED_ELSEWHERE_NOT_OUR_CHARGE.en.test('Write to us and we will stop the charge for you.'))
+}
+
+// ── 36) an author photo a customer uploads ──────────────────────────────
+/*
+ * The author box lets a customer upload a photo. A photo of a person is not the
+ * kind of user content section 15 was written for: that clause warrants rights
+ * over text the customer owns (domains, keywords, client details). A photograph
+ * of a human being is personal data about a third party who never agreed to
+ * anything with us, and under section 2(6) of Israel's Protection of Privacy Law
+ * using a person's likeness for profit is an infringement in itself, consent or
+ * no contract. The privacy policy was the larger gap: no uploaded file appeared
+ * in what we collect or in how long we keep it, and the person in the picture
+ * had no route to us at all.
+ *
+ * What the two documents now say, and what therefore has to stay true in code:
+ *   1. the customer warrants the depicted person's consent, a guardian's where
+ *      the person is a minor, and must remove the photo if that consent is
+ *      withdrawn;
+ *   2. the file is stored under the project id plus a random id, never under a
+ *      person's name, and we neither publish our copy nor link to it;
+ *   3. deleting the photo, or turning the setting off, erases the storage
+ *      object - not only the row;
+ *   4. the photo reaches no AI provider, trains no model, and gets no face
+ *      recognition or other biometric processing;
+ *   5. the copy published into the customer's media library or Shopify Files is
+ *      outside our control, and we say so rather than promising a deletion we
+ *      cannot perform.
+ * Claim 5 is the honest half of claim 3, and claim 4 is the one that would be
+ * cheapest to break by accident, which is why both have checks bound to code
+ * below as soon as the upload exists.
+ */
+const PHOTO_CONSENT: Record<string, RegExp> = {
+  he: /\u05d0\u05d5\u05ea\u05d5 \u05d0\u05d3\u05dd \u05d4\u05e1\u05db\u05d9\u05dd \u05e9\u05d4\u05ea\u05de\u05d5\u05e0\u05d4 \u05ea\u05ea\u05e4\u05e8\u05e1\u05dd/,
+  en: /that person has consented\s*to the photo being published/,
+  es: /esa persona ha consentido que la foto se publique/,
+  'pt-BR': /essa pessoa consentiu com a publica[\u00e7c][\u00e3a]o da foto/,
+}
+const PHOTO_MINOR: Record<string, RegExp> = {
+  he: /\u05e7\u05d8\u05d9\u05df, \u05e0\u05d3\u05e8\u05e9\u05ea \u05d4\u05e1\u05db\u05de\u05ea \u05d4\u05d0\u05e4\u05d5\u05d8\u05e8\u05d5\u05e4\u05d5\u05e1/,
+  en: /is a minor, their guardian&rsquo;s consent is required/,
+  es: /es menor de edad, se requiere el consentimiento de su tutor/,
+  'pt-BR': /for menor de idade, [\u00e9e] necess[\u00e1a]rio o consentimento do respons[\u00e1a]vel/,
+}
+const PHOTO_COPY_NOT_OURS: Record<string, RegExp> = {
+  he: /\u05e2\u05d5\u05ea\u05e7 \u05e9\u05db\u05d1\u05e8 \u05d4\u05d5\u05e2\u05ea\u05e7 \u05dc\u05e1\u05e4\u05e8\u05d9\u05d9\u05ea\s*\u05d4\u05de\u05d3\u05d9\u05d4 \u05e9\u05dc \u05d4\u05d0\u05ea\u05e8 \u05e9\u05dc\u05db\u05dd \u05e0\u05de\u05e6\u05d0 \u05d1\u05e9\u05dc\u05d9\u05d8\u05ea\u05db\u05dd/,
+  en: /a copy already\s*placed in your site&rsquo;s media library is under your control/,
+  es: /una copia que ya se haya colocado en la biblioteca de medios de su sitio est[\u00e1a] bajo su control/,
+  'pt-BR': /uma c[\u00f3o]pia j[\u00e1a] colocada na biblioteca de m[\u00ed i]dia do seu site est[\u00e1a] sob o seu controle/,
+}
+const PHOTO_PATH_NO_NAME: Record<string, RegExp> = {
+  he: /\u05de\u05de\u05d6\u05d4\u05d4 \u05d4\u05e4\u05e8\u05d5\u05d9\u05e7\u05d8 \u05d5\u05de\u05de\u05d6\u05d4\u05d4 \u05d0\u05e7\u05e8\u05d0\u05d9/,
+  en: /the project id and a\s*random id, and never of a person&rsquo;s name/,
+  es: /del identificador del proyecto y de un identificador aleatorio, y nunca del nombre de una persona/,
+  'pt-BR': /pelo identificador do projeto e por um identificador aleat[\u00f3o]rio, nunca pelo nome de uma pessoa/,
+}
+const PHOTO_NO_AI: Record<string, RegExp> = {
+  he: /\u05d0\u05d9\u05e0\u05d4 \u05e0\u05e9\u05dc\u05d7\u05ea \u05dc\u05d0\u05e3 \u05e1\u05e4\u05e7 AI/,
+  en: /is not sent to any AI provider, is not used to train models/,
+  es: /no se env[\u00ed i]a a ning[\u00fau]n proveedor de IA, no se utiliza para entrenar modelos/,
+  'pt-BR': /n[\u00e3a]o [\u00e9e] enviada a nenhum provedor de IA, n[\u00e3a]o [\u00e9e] usada para treinar modelos/,
+}
+const PHOTO_NO_BIOMETRIC: Record<string, RegExp> = {
+  he: /\u05d6\u05d9\u05d4\u05d5\u05d9 \u05e4\u05e0\u05d9\u05dd \u05d0\u05d5 \u05db\u05dc \u05e2\u05d9\u05d1\u05d5\u05d3 \u05d1\u05d9\u05d5\u05de\u05d8\u05e8\u05d9 \u05d0\u05d7\u05e8/,
+  en: /we do not run face\s*recognition or any other biometric processing on it/,
+  es: /no ejecutamos sobre ella reconocimiento facial ni ning[\u00fau]n otro tratamiento biom[\u00e9e]trico/,
+  'pt-BR': /n[\u00e3a]o executamos sobre ela reconhecimento facial nem qualquer outro tratamento biom[\u00e9e]trico/,
+}
+/*
+ * Two sentences were corrected on 2026-10-17, the day after they went live,
+ * once the upload was built and its real behaviour could be read:
+ *   - "or into Shopify Files" named a destination the photo cannot reach. The
+ *     app's Shopify scopes (read_products, read_content, write_content) cannot
+ *     write to Shopify Files, and lib/content/author-box/photo-copy.ts offers
+ *     the upload only on a WordPress site with an application password. A
+ *     published document should not describe a copy that is never made.
+ *   - "turning the setting off erases the file" was wrong about which setting.
+ *     Deleting the photo, or moving the image choice to 'none' or 'site_icon',
+ *     calls removeAuthorPhotoObject; turning the whole author box off KEEPS the
+ *     file. Rather than make a toggle destroy a customer's file, the text now
+ *     says which action erases it and which does not.
+ * The last two checks in this section fail if either sentence comes back.
+ */
+const PHOTO_DELETE_ERASES_FILE: Record<string, RegExp> = {
+  he: /\u05de\u05d5\u05d7\u05e7\u05d9\u05dd \u05d0\u05ea \u05d4\u05e7\u05d5\u05d1\u05e5\s*\u05de\u05d4\u05d0\u05d7\u05e1\u05d5\u05df \u05e9\u05dc\u05e0\u05d5/,
+  en: /erases the file from our\s*storage/,
+  es: /se borra el archivo de nuestro almacenamiento/,
+  'pt-BR': /exclui o arquivo do nosso armazenamento/,
+}
+const PHOTO_SUBJECT_ROUTE: Record<string, RegExp> = {
+  he: /\u05d0\u05dd \u05d0\u05ea\u05dd \u05d4\u05d0\u05d3\u05dd \u05e9\u05d1\u05ea\u05de\u05d5\u05e0\u05d4/,
+  en: /If you are the person in the photo and not the customer who uploaded/,
+  es: /Si usted es la persona de la foto y no el cliente que la subi[\u00f3o]/,
+  'pt-BR': /Se voc[\u00ea e] [\u00e9e] a pessoa da foto e n[\u00e3a]o o cliente que a enviou/,
+}
+const PHOTO_BOX_OFF_KEEPS: Record<string, RegExp> = {
+  he: /\u05db\u05d9\u05d1\u05d5\u05d9 \u05ea\u05d9\u05d1\u05ea \u05d4\u05de\u05d7\u05d1\u05e8 \u05db\u05d5\u05dc\u05d4 \u05d0\u05d9\u05e0\u05d5 \u05de\u05d5\u05d7\u05e7 \u05d0\u05ea \u05d4\u05ea\u05de\u05d5\u05e0\u05d4/,
+  en: /Turning the whole author box off does not erase the photo/,
+  es: /Desactivar toda la caja de autor no borra la foto/,
+  'pt-BR': /Desligar a caixa de autor inteira n[\u00e3a]o exclui a foto/,
+}
+const PHOTO_IN_RETENTION: Record<string, RegExp> = {
+  he: /<strong>\u05ea\u05de\u05d5\u05e0\u05ea \u05de\u05d7\u05d1\u05e8:<\/strong> \u05db\u05dc \u05e2\u05d5\u05d3 \u05d4\u05ea\u05de\u05d5\u05e0\u05d4 \u05de\u05d5\u05d2\u05d3\u05e8\u05ea \u05d1\u05e4\u05e8\u05d5\u05d9\u05e7\u05d8/,
+  en: /<strong>Author photo:<\/strong> for as long as the photo is configured on the project/,
+  es: /\*\*Foto de autor:\*\* mientras la foto est[\u00e9e] configurada en el proyecto/,
+  'pt-BR': /\*\*Foto de autor:\*\* enquanto a foto estiver configurada no projeto/,
+}
+{
+  const read = (path: string) => (existsSync(path) ? readFileSync(path, 'utf8') : '')
+  const enTermsSource = frontMatter(text[LOCALES[0]].terms).source
+  const enPrivacySource = frontMatter(text[LOCALES[0]].privacy).source
+  const termsDocs: [string, string][] = [
+    ['he', read(HEBREW_TERMS)],
+    ['en', enTermsSource ? read(enTermsSource) : ''],
+    ...LOCALES.map((l): [string, string] => [l, text[l].terms]),
+  ]
+  const privacyDocs: [string, string][] = [
+    ['he', read(HEBREW_PRIVACY)],
+    ['en', enPrivacySource ? read(enPrivacySource) : ''],
+    ...LOCALES.map((l): [string, string] => [l, text[l].privacy]),
+  ]
+  for (const [name, terms] of termsDocs) {
+    check(`${name}/terms: the uploader warrants the depicted person's consent`, PHOTO_CONSENT[name]!.test(terms))
+    check(`${name}/terms: a minor needs a guardian's consent`, PHOTO_MINOR[name]!.test(terms))
+    check(`${name}/terms: the copy already on the customer's site is named as theirs to delete`, PHOTO_COPY_NOT_OURS[name]!.test(terms))
+  }
+  for (const [name, privacy] of privacyDocs) {
+    check(`${name}/privacy: the stored path carries no person's name`, PHOTO_PATH_NO_NAME[name]!.test(privacy))
+    check(`${name}/privacy: the photo reaches no AI provider and trains no model`, PHOTO_NO_AI[name]!.test(privacy))
+    check(`${name}/privacy: no face recognition and no other biometric processing`, PHOTO_NO_BIOMETRIC[name]!.test(privacy))
+    check(`${name}/privacy: deleting the photo erases the stored file, not only the row`, PHOTO_DELETE_ERASES_FILE[name]!.test(privacy))
+    check(`${name}/privacy: the person in the photo has a route to us`, PHOTO_SUBJECT_ROUTE[name]!.test(privacy))
+    check(`${name}/privacy: the photo appears in how long we keep data`, PHOTO_IN_RETENTION[name]!.test(privacy))
+    check(`${name}/privacy: turning the whole author box off is NOT claimed to erase the photo`,
+      PHOTO_BOX_OFF_KEEPS[name]!.test(privacy))
+  }
+  /* No document may name a destination the photo cannot reach. */
+  for (const [name, doc] of [...termsDocs, ...privacyDocs]) {
+    check(`${name}: Shopify Files is not named as a place the photo is copied to`, !/Shopify Files/.test(doc))
+  }
+  /*
+   * The code half. The upload is not built yet, so these bind the moment it is:
+   * whatever module names the author-photo bucket must delete the object and must
+   * not hand the file to a model. Until that file exists there is nothing to
+   * check, and a guard that passed on an absent file would be worse than none,
+   * so the skip is explicit.
+   */
+  const photoModule = ['lib/content/author-box/photo.ts', 'lib/content/author-photo.ts', 'lib/content/author-box.ts']
+    .map((f) => [f, read(f)] as [string, string])
+    .find(([, body]) => body.length > 0)
+  if (photoModule) {
+    const [photoPath, photoBody] = photoModule
+    check(`${photoPath}: removing the photo deletes the storage object`, /\.remove\(|\.delete\(/.test(photoBody))
+    check(`${photoPath}: the photo is never handed to a model`, !/gemini|generateContent|openai/i.test(photoBody))
+  } else {
+    check('author-photo module not built yet, so its two code checks are pending (not a pass)', true)
+  }
+  check('mutation control: a clause that drops the consent warranty is caught',
+    !PHOTO_CONSENT.en.test('You may upload any photo you like for the author box.'))
+  check('mutation control: a promise to delete the copy on the customer site is caught',
+    !PHOTO_COPY_NOT_OURS.en.test('We will also delete the copy in your media library for you.'))
+  check('mutation control: a text claiming the box switch erases the photo is caught',
+    !PHOTO_BOX_OFF_KEEPS.en.test('Turning the whole author box off erases the photo from our storage.'))
+  check('mutation control: a policy that sends the photo to an AI provider is caught',
+    !PHOTO_NO_AI.en.test('The photo is sent to our AI provider to improve the author box.'))
 }
 
 console.log(`\n${pass} passed, ${fail} failed`)

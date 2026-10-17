@@ -72,6 +72,7 @@ import MonthlyReportTeaser from '@/components/reports/monthly/MonthlyReportTease
 import { ToastHost, useToasts } from '@/components/ui/Toast'
 import { Reveal } from '@/components/ui/motion'
 import StartHere, { type StartHrefs } from '@/components/dashboard/StartHere'
+import ConnectSiteBanner from '@/components/layout/ConnectSiteBanner'
 import { isStartMode, sectionData, showWidget, startSteps, type StartInput, type WidgetData } from '@/lib/dashboard/start'
 import { platformSetupHref } from '@/lib/content/content-hub-setup'
 import { CONTENT_ROOT_PATH } from '@/lib/content/content-workspace-nav'
@@ -352,6 +353,8 @@ function ProjectDashboard({ project, onStartMode }: { project: Project; onStartM
         />
       ) : (
         <>
+          {/* Nothing is published until the site is connected: that comes first. */}
+          <ConnectSiteBanner where="dashboard" className="mb-0" />
           <HeroCard
             t={t}
             language={language}

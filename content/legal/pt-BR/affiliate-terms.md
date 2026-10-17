@@ -3,7 +3,7 @@ title: Contrato do Programa de Parceiros | Go Top SEO
 description: As condições que regem a participação no programa de parceiros da Go Top SEO: comissões, atribuição, pagamentos e deveres do parceiro.
 locale: pt-BR
 source: app/(public)/en/affiliate-terms/page.tsx
-lastUpdated: 2026-10-09
+lastUpdated: 2026-10-13
 register: voce
 ---
 
@@ -13,7 +13,7 @@ Go Top SEO
 
 ## 1. As partes e o que é este contrato
 
-Este contrato rege a participação no programa de parceiros da Go Top SEO (o «Programa»). É celebrado entre a GO TOP MARKETING GRUO LTD (número de sociedade 517274346) (a «Empresa», «nós») e a pessoa física ou jurídica cuja inscrição no Programa aprovarmos (o «Parceiro», «você»). Entra em vigor na data em que avisarmos que a sua inscrição foi aprovada e se aplica a toda indicação que você fizer a partir dessa data.
+Este contrato rege a participação no programa de parceiros da Go Top SEO (o «Programa»). É celebrado entre a GO TOP DIGITAL MARKETING AND ADVERTISING LTD (número de sociedade 517274346) (a «Empresa», «nós») e a pessoa física ou jurídica cuja inscrição no Programa aprovarmos (o «Parceiro», «você»). Entra em vigor na data em que avisarmos que a sua inscrição foi aprovada e se aplica a toda indicação que você fizer a partir dessa data.
 
 Este contrato se soma aos nossos [Termos de Uso](/pt-BR/terms) e à nossa [Política de Privacidade](/pt-BR/privacy), e não os altera. Se você também usa o Serviço como cliente, a sua relação de cliente é regida por aqueles documentos e nada aqui a afeta.
 

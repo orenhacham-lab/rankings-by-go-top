@@ -15,9 +15,12 @@
  * fold rise in, with prefers-reduced-motion respected.
  */
 import type { LucideIcon } from 'lucide-react'
+import { faqPageSchema } from '@/lib/seo/page-schema'
+import { jsonForScriptTag } from '@/lib/content/public-article-html'
 import {
   ChartColumn, FileText, Layers, LifeBuoy, LineChart, MapPin, Search, ShieldCheck, Sparkles, Unlock,
 } from 'lucide-react'
+import type { BillingMarket } from '@/lib/billing/market'
 import { cn } from '@/lib/utils'
 import { ButtonLink, CONTAINER, CtaBand, FaqList, IconSquircle, Section, SectionIntro } from '../marketing'
 import { Rise } from '../landing/motion'
@@ -36,6 +39,26 @@ export type PricingCopy = {
     noCard: string
     /** One plain sentence under the grid saying what a Google check and an AI check are. */
     checksNote: string
+    /**
+     * Under the grid: what the figure above does and does not include. It is
+     * keyed by the BILLING MARKET and not by the page's language, because the
+     * same Hebrew page shows ₪ to a visitor in Israel and $ to a visitor
+     * outside it (app/(public)/pricing/page.tsx resolves the market per
+     * request), so a single sentence would be wrong for half the readers.
+     *
+     *  - ILS: the shekel price INCLUDES Israeli VAT (the owner's own statement,
+     *    10 October 2026: he reports that VAT himself), so the figure in the
+     *    grid is the whole price. Israel pays through PayPal, never Creem.
+     *  - USD: on a card payment Creem is the merchant of record and adds
+     *    indirect tax on the buyer's billing address (Merchant Terms 9.1,
+     *    3.3.4), so the figure is not the final amount; an EU consumer must be
+     *    shown a tax-inclusive final price before paying, and Creem's checkout
+     *    is where that happens.
+     *
+     * Typed by BillingMarket so a third currency cannot ship without its own
+     * sentence, the same way the rest of lib/billing/market.ts works.
+     */
+    taxNote: Record<BillingMarket, string>
     everyPlanLabel: string
     everyPlan: string[]
   }
@@ -61,9 +84,12 @@ const USAGE_ICONS: LucideIcon[] = [FileText, Search, Sparkles]
 
 /** Under the grid: what a "check" in the plan lines is, in one visible sentence
  *  (no tooltip, so it works on a phone and with a keyboard). */
-export function PricingChecksNote({ copy }: { copy: PricingCopy }) {
+export function PricingChecksNote({ copy, market }: { copy: PricingCopy; market: BillingMarket }) {
   return (
-    <p className="mx-auto mt-8 max-w-3xl text-center text-caption text-muted" data-checks-note>{copy.plans.checksNote}</p>
+    <>
+      <p className="mx-auto mt-8 max-w-3xl text-center text-caption text-muted" data-checks-note>{copy.plans.checksNote}</p>
+      <p className="mx-auto mt-3 max-w-3xl text-center text-caption text-muted" data-tax-note>{copy.plans.taxNote[market]}</p>
+    </>
   )
 }
 
@@ -156,8 +182,14 @@ export function PricingUsage({ copy }: { copy: PricingCopy }) {
 
 export function PricingFaq({ copy }: { copy: PricingCopy }) {
   const c = copy.faq
+  // The answer TEXT only: the "read the policy" link some answers carry is a
+  // link, not part of the answer a crawler or an AI engine should quote.
+  const faq = faqPageSchema(c.items.map((item) => ({ q: item.q, a: item.a })))
   return (
     <Section tone="surface">
+      {faq && (
+        <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: jsonForScriptTag(faq) }} />
+      )}
       <div className="mx-auto max-w-3xl">
         <SectionIntro eyebrow={c.eyebrow} title={c.title} description={c.body} />
         <FaqList

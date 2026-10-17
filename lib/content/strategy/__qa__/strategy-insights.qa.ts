@@ -163,6 +163,19 @@ console.log('\nH) what happens from here')
   check('H4: an empty plan: nothing done, nothing now', st({ ideas: 0, planned: 0, written: 0, published: 0 }) === 'later,later,later,later')
   const naive = (c: { ideas: number; planned: number; written: number; published: number }) => [c.ideas, c.planned, c.written].map((w) => (w > 0 ? 'now' : 'done')).join()
   check('H-MUT: marking every step with work "now" (and every other "done") would call publishing done while topics wait', naive({ ideas: 3, planned: 2, written: 0, published: 1 }) === 'now,now,done')
+
+  // The top-up approves what the month needs by itself: the ideas it left in the plan
+  // are stock, not a queue the merchant is holding up.
+  const auto = (c: Parameters<typeof nextSteps>[0]) => nextSteps(c, true).map((s) => s.state).join()
+  check('H5: prepared for them: ideas in stock do not make approving "now"', auto({ ideas: 5, planned: 2, written: 0, published: 0 }) === 'done,now,later,later')
+  check('H6: prepared for them, nothing further yet: the stock still counts as past step one', auto({ ideas: 5, planned: 0, written: 0, published: 0 }) === 'done,later,later,later')
+  check('H7: the same counts WITHOUT the top-up put the merchant on step one', st({ ideas: 5, planned: 2, written: 0, published: 0 }) === 'now,later,later,later')
+  check('H8: an empty plan is not called done just because the top-up covers it', auto({ ideas: 0, planned: 0, written: 0, published: 0 }) === 'later,later,later,later')
+  const screenSrc = strip(read('components/content-strategy/ContentStrategyScreen.tsx'))
+  const bothNeeded = (x: string) => /autoApproves=\{strategy\.autoTopics && strategy\.queueActive === true\}/.test(x)
+  check('H9: the screen claims the topics are ours only when the queue that publishes them runs too', bothNeeded(screenSrc))
+  check('H-MUT2: claiming it from the entitlement alone, with the queue off, fails H9',
+    !bothNeeded(screenSrc.replace('strategy.autoTopics && strategy.queueActive === true', 'strategy.autoTopics')))
 }
 
 // ── S) the screen ───────────────────────────────────────────────────────────

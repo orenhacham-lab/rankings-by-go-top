@@ -4,7 +4,7 @@ Tags: seo, schema, publishing, content, ai
 Requires at least: 6.0
 Tested up to: 7.1
 Requires PHP: 7.4
-Stable tag: 3.1.0
+Stable tag: 3.1.1
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -56,7 +56,7 @@ Every request from GO TOP is signed with a key that only your site and your GO T
 == External services ==
 
 This plugin connects your site to GO TOP (https://gotopseo.com), a search-optimisation
-service operated by GO TOP MARKETING GRUO LTD, company number 517274346, Israel. You need
+service operated by GO TOP DIGITAL MARKETING AND ADVERTISING LTD, company number 517274346, Israel. You need
 a GO TOP account to use it. The plugin does nothing until you connect your site, and you
 connect it yourself with a pairing code from your GO TOP account.
 
@@ -152,7 +152,16 @@ Yes. Every fix can be undone from GO TOP, and WordPress keeps a revision of ever
 
 Settings > GO TOP SEO > Disconnect. GO TOP can no longer reach the site. Deleting the plugin also removes its settings; from 3.1.0 the connection key is kept while another copy of the plugin is still installed on the site, so that deleting one copy does not disconnect the other. Deleting an older copy still removes the shared key.
 
+== Screenshots ==
+
+1. Settings > GO TOP SEO after pairing: the connection, the user articles are published as, and recent activity.
+2. Connecting in GO TOP: install the plugin, get a one-time connection code, and check the connection.
+3. Site health in GO TOP with the plugin connected: findings that can be fixed in one click through the plugin.
+
 == Changelog ==
+
+= 3.1.1 =
+* The company name in English changed. The plugin now names the operator GO TOP DIGITAL MARKETING AND ADVERTISING LTD, in the plugin header and in the external-services section. The company, its number and the service are unchanged, and nothing else in the plugin changed.
 
 = 3.1.0 =
 * Everything GO TOP does now works with this plugin alone, without an application password: new signed routes list your published posts and pages (for the index of your existing content), read one published post or page as it is displayed (its HTML), list the users who may publish posts (id and display name), and find, read and set the alt text of Media Library images.
@@ -178,6 +187,9 @@ Settings > GO TOP SEO > Disconnect. GO TOP can no longer reach the site. Deletin
 * First release.
 
 == Upgrade Notice ==
+
+= 3.1.1 =
+The operator's name in English is updated. Nothing else changes and the connection is kept.
 
 = 3.1.0 =
 GO TOP no longer needs an application password for anything once the plugin is connected. The connection is kept.

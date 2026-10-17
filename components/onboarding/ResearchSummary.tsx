@@ -735,6 +735,7 @@ export default function ResearchSummary({
       {!preview && (
       <section
         data-summary-block="start"
+        data-float-clear=""
         data-stage-b={stageB ?? 'not_started'}
         aria-labelledby="seed-block-start"
         className={cn('mt-6 mb-4', (!started || stageB === 'running') && 'sticky bottom-3 z-20 md:bottom-5')}

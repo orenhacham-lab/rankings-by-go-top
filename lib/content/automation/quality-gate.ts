@@ -30,6 +30,20 @@ function textOf(html: string): string {
   return html.replace(/<[^>]+>/g, ' ').replace(/&[a-z#0-9]+;/gi, ' ').replace(/\s+/g, ' ').trim()
 }
 
+/**
+ * The placeholder this text contains, with a little of its surroundings, or
+ * null. `placeholder_found` on its own says nothing about WHICH word tripped
+ * it, and a run that fails this gate keeps no copy of the article (the blog's
+ * Spanish run, 12 Oct 2026), so the caller logs this instead of guessing.
+ */
+export function placeholderContext(text: string, around = 60): string | null {
+  const m = PLACEHOLDER_RE.exec(text || '')
+  if (!m) return null
+  const at = m.index
+  const from = Math.max(0, at - around)
+  return (text || '').slice(from, at + m[0].length + around).replace(/\s+/g, ' ').trim()
+}
+
 export function runQualityGate(article: QualityGateArticle): QualityGateResult {
   const failures: string[] = []
   const title = (article.title || '').trim()

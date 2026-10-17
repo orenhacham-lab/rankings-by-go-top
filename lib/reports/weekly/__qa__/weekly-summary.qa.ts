@@ -27,6 +27,7 @@ import { getDashboardDictionary } from '@/lib/i18n/dashboard/getDashboardDiction
 import { PUBLIC_LOCALES } from '@/lib/i18n/locales'
 import { makeUnsubscribeToken } from '@/lib/reminders/token'
 import { unsubscribeByToken } from '@/lib/reminders/http'
+import { hashEmail } from '@/lib/email-suppression'
 import { withMutant } from '@/lib/reminders/__qa__/_mutant'
 import { aggregateWeek, type WeeklyInputs } from '../aggregate'
 import { inWeeklyWindow, weekKeyOf, weekWindow } from '../period'
@@ -129,7 +130,7 @@ async function main() {
     generated_articles: [articleRow()],
     ...over,
   })
-  const owner = async () => ({ email: 'owner@example.com', locale: 'he' as const, firstName: 'דנה', shopify: false })
+  const owner = async () => ({ email: 'owner@example.com', locale: 'he' as const, firstName: 'דנה', shopifyAppStoreOrigin: false, staff: false })
   const deps = (admin: FakeAdmin, over: Partial<WeeklyDeps> = {}): WeeklyDeps => ({
     admin: admin as unknown as ServiceRoleClient, env: fullEnv, now: () => now, owner, send: async () => ({ ok: true }), ...over,
   })
@@ -201,10 +202,32 @@ async function main() {
   const r11 = await runWeeklySummaries(deps(a11, { send: async () => { unreadable++; return { ok: true } } }))
   check('D13: a week whose articles could not be read sends nothing', r11.status === 'done' && unreadable === 0, r11)
 
+  let listedSends = 0
+  const aSup = new FakeAdmin(tables({ email_suppressions: [{ email_hash: hashEmail('owner@example.com'), source: 'deletion_request', channel: 'system' }] }))
+  const rSup = await runWeeklySummaries(deps(aSup, { send: async () => { listedSends++; return { ok: true } } }))
+  check('D13a: an address on the removal list gets no summary and the week is not marked covered',
+    rSup.status === 'done' && listedSends === 0 && aSup.tables.project_report_preferences[0]?.weekly_last_week === null, rSup)
+
+  let unreadableList = 0
+  const aUnread = new FakeAdmin(tables(), { email_suppressions: { select: () => ({ code: '08006', message: 'reset' }) } })
+  const rUnread = await runWeeklySummaries(deps(aUnread, { send: async () => { unreadableList++; return { ok: true } } }))
+  check('D13b: a removal list we cannot read holds the summary for next week',
+    rUnread.status === 'done' && unreadableList === 0 && aUnread.tables.project_report_preferences[0]?.weekly_last_week === null)
+
+  await withMutant<{ runWeeklySummaries: typeof runWeeklySummaries }, void>(
+    'lib/reports/weekly/run.ts', [['if ((await isSuppressed(admin, who.email)).suppressed) { skipped++; continue }', 'void skipped']],
+    async (mod) => {
+      let n = 0
+      const w = new FakeAdmin(tables({ email_suppressions: [{ email_hash: hashEmail('owner@example.com'), source: 'deletion_request', channel: 'system' }] }))
+      await mod.runWeeklySummaries(deps(w, { send: async () => { n++; return { ok: true } } }))
+      check('D13-MUT: without the gate the summary reaches a removed address (D13a would fail)', n === 1)
+    },
+  )
+
   let noAddress = 0
   const a12 = new FakeAdmin(tables())
   await runWeeklySummaries(deps(a12, {
-    owner: async () => ({ email: null, locale: null, firstName: null, shopify: false }),
+    owner: async () => ({ email: null, locale: null, firstName: null, shopifyAppStoreOrigin: false, staff: false }),
     send: async () => { noAddress++; return { ok: true } },
   }))
   check('D14: no address, no email and no claim', noAddress === 0 && a12.tables.project_report_preferences[0]?.weekly_last_week === null)
@@ -340,6 +363,59 @@ async function main() {
       check('G-MUT: without the catch the cron would see the failure', threw)
     },
   )
+
+  // ── H) who it goes to, and in which language ─────────────────────────
+  console.log('\nH) The owner\u2019s own language, and never staff')
+  {
+    // The live bug, 11 October: three summaries reached an Israeli owner in English because
+    // his account had a client's Shopify store connected.
+    let agency: OutgoingWeekly | undefined
+    const aAgency = new FakeAdmin(tables({ shopify_connections: [{ project_id: 'other', user_id: OWNER }] }))
+    await runWeeklySummaries(deps(aAgency, {
+      owner: async () => ({ email: 'agency@example.co.il', locale: null, firstName: null, shopifyAppStoreOrigin: false, staff: false }),
+      send: async (m) => { agency = m; return { ok: true } },
+    }))
+    check('H1: no recorded language, website account: Hebrew, not English',
+      /lang="he"/.test(agency?.email.html ?? ''), agency?.email.subject)
+
+    let fromAppStore: OutgoingWeekly | undefined
+    await runWeeklySummaries(deps(new FakeAdmin(tables()), {
+      owner: async () => ({ email: 'store@example.com', locale: null, firstName: null, shopifyAppStoreOrigin: true, staff: false }),
+      send: async (m) => { fromAppStore = m; return { ok: true } },
+    }))
+    check('H2: an App Store account with no recorded language gets English',
+      /lang="en"/.test(fromAppStore?.email.html ?? ''), fromAppStore?.email.subject)
+
+    let heldBack = 0
+    const aHeld = new FakeAdmin(tables())
+    const held = await runWeeklySummaries(deps(aHeld, {
+      owner: async () => ({ email: 'owner@example.com', locale: null, firstName: null, shopifyAppStoreOrigin: null, staff: false }),
+      send: async () => { heldBack++; return { ok: true } },
+    }))
+    check('H3: no language and unreadable provenance: nothing sent, the week not marked covered',
+      held.status === 'done' && heldBack === 0 && aHeld.tables.project_report_preferences[0]?.weekly_last_week === null)
+
+    let staffSends = 0
+    const aStaff = new FakeAdmin(tables())
+    const staff = await runWeeklySummaries(deps(aStaff, {
+      owner: async () => ({ email: 'oren@example.com', locale: 'he' as const, firstName: null, shopifyAppStoreOrigin: false, staff: true }),
+      send: async () => { staffSends++; return { ok: true } },
+    }))
+    check('H4: an administrator\u2019s own project gets no weekly summary',
+      staff.status === 'done' && staffSends === 0 && aStaff.tables.project_report_preferences[0]?.weekly_last_week === null)
+
+    await withMutant<{ runWeeklySummaries: typeof runWeeklySummaries }, void>(
+      'lib/reports/weekly/run.ts', [['if (who.staff) continue', 'void who.staff']],
+      async (mod) => {
+        let n = 0
+        await mod.runWeeklySummaries(deps(new FakeAdmin(tables()), {
+          owner: async () => ({ email: 'oren@example.com', locale: 'he' as const, firstName: null, shopifyAppStoreOrigin: false, staff: true }),
+          send: async () => { n++; return { ok: true } },
+        }))
+        check('H-MUT: without the staff check our own administrator is mailed (H4 would fail)', n === 1)
+      },
+    )
+  }
 
   console.log(`\n${pass} passed, ${fail} failed`)
   if (fail > 0) process.exitCode = 1

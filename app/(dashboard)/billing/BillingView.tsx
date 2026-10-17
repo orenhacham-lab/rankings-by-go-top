@@ -14,6 +14,7 @@ import Notice from '@/components/ui/Notice'
 import { useConfirm } from '@/components/ui/ConfirmDialog'
 import { cn } from '@/lib/utils'
 import BillingClient from './client'
+import CreemCheckoutButton from './CreemCheckoutButton'
 import { INTL_LOCALE } from '@/lib/i18n/locales'
 import { SHOPIFY_APP_STORE_URL } from '@/lib/public-links/shopify-app-store'
 
@@ -60,6 +61,20 @@ interface BillingViewProps {
   marketLocked: boolean
   /** The plans' prices in `market`, from the plan catalog. */
   planPrices: Record<PlanKey, number>
+  /** Owner decision, 10 Oct 2026 — pay by card instead of PayPal, decided on
+   *  the server (app/(dashboard)/billing/page.tsx): only while CREEM_ENABLED
+   *  is on, only in USD, and only for an account that has never paid through
+   *  PayPal. An existing PayPal payer keeps the PayPal buttons exactly as they
+   *  are. When this is true the PayPal SDK is not loaded at all, so a plan
+   *  card has one way to pay and never two. */
+  creemCheckout?: boolean
+  /** This account's active plan is billed by Creem. Then NO checkout is
+   *  offered on any other plan: the Creem path has no change-plan flow yet,
+   *  and the PayPal buttons underneath would open a SECOND subscription at a
+   *  second provider while the first keeps billing — which is exactly what
+   *  the card button was gated to prevent. The cards say to contact us
+   *  instead, the same answer this screen already gives for cancelling. */
+  creemGoverned?: boolean
 }
 
 export default function BillingView({
@@ -78,6 +93,8 @@ export default function BillingView({
   market,
   marketLocked,
   planPrices,
+  creemCheckout = false,
+  creemGoverned = false,
 }: BillingViewProps) {
   const { language, uiLocale } = useDashboardLanguage()
   const dict = getDashboardDictionary(uiLocale)
@@ -88,6 +105,21 @@ export default function BillingView({
   const currencySymbol = BILLING_MARKETS[market].symbol
   // DISPLAY ONLY (w7 P2-13): the same grouping the public pricing page shows (₪1,999, not ₪1999).
   const numberLocale = INTL_LOCALE[uiLocale]
+
+  /**
+   * What one plan card offers, decided once for all four.
+   *
+   *  * the card button, when the server said this account may pay by card;
+   *  * the contact line, when Creem already bills this account — there is no
+   *    change-plan flow on that path yet, and the PayPal container under this
+   *    card would open a second subscription at a second provider;
+   *  * nothing, which lets the card render the PayPal container as before.
+   */
+  const checkoutActionFor = (plan: PlanKey): React.ReactNode => {
+    if (creemCheckout) return <CreemCheckoutButton plan={plan} />
+    if (creemGoverned) return <p className="text-caption text-muted">{t.creem.changePlanNote}</p>
+    return undefined
+  }
 
   const [cancelling, setCancelling] = useState(false)
   // Shown in the page in our words; the route's own error text never reaches the merchant.
@@ -290,6 +322,9 @@ export default function BillingView({
             currentLabel={t.currentPlan}
           />
 
+          {/* What a plan card offers, in one place: the card button, the
+              contact line for an account Creem already bills, or nothing —
+              in which case the card renders the PayPal container. */}
           <div className="grid grid-cols-1 gap-5 pt-3 md:grid-cols-2 xl:grid-cols-4">
             <PlanCard
               name={t.planLabels.regular}
@@ -300,6 +335,7 @@ export default function BillingView({
               isPopular={false}
               isCurrent={plan === 'regular' && hasActiveSubscription}
               plan="regular"
+              action={checkoutActionFor("regular")}
               audience={PLAN_AUDIENCE_LABEL.regular[language]}
               description={PLAN_AUDIENCE_DESCRIPTION.regular[language]}
               numberLocale={numberLocale}
@@ -315,6 +351,7 @@ export default function BillingView({
               isPopular={true}
               isCurrent={plan === 'advanced' && hasActiveSubscription}
               plan="advanced"
+              action={checkoutActionFor("advanced")}
               audience={PLAN_AUDIENCE_LABEL.advanced[language]}
               description={PLAN_AUDIENCE_DESCRIPTION.advanced[language]}
               numberLocale={numberLocale}
@@ -330,6 +367,7 @@ export default function BillingView({
               isPopular={false}
               isCurrent={plan === 'premium' && hasActiveSubscription}
               plan="premium"
+              action={checkoutActionFor("premium")}
               audience={PLAN_AUDIENCE_LABEL.premium[language]}
               description={PLAN_AUDIENCE_DESCRIPTION.premium[language]}
               numberLocale={numberLocale}
@@ -346,6 +384,7 @@ export default function BillingView({
                 isPopular={false}
                 isCurrent={plan === 'large_agency' && hasActiveSubscription}
                 plan="large_agency"
+                action={checkoutActionFor("large_agency")}
                 audience={PLAN_AUDIENCE_LABEL.large_agency[language]}
                 description={PLAN_AUDIENCE_DESCRIPTION.large_agency[language]}
                 numberLocale={numberLocale}
@@ -355,7 +394,9 @@ export default function BillingView({
             )}
           </div>
 
-          <BillingClient market={market} />
+          {/* The PayPal buttons, and the SDK behind them, only on the PayPal
+              path: a card never offers two ways to pay the same plan. */}
+          {!creemCheckout && !creemGoverned && <BillingClient market={market} />}
 
           <p className="mt-6 max-w-4xl text-caption text-muted">
             {t.keywordCheckNote}

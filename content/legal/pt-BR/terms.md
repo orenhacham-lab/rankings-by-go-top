@@ -3,7 +3,7 @@ title: Termos de Uso | Go Top SEO
 description: Termos de uso do Go Top SEO — as condições que regem o uso do nosso serviço.
 locale: pt-BR
 source: app/(public)/en/terms/page.tsx
-lastUpdated: 2026-10-09
+lastUpdated: 2026-10-16
 register: voce
 extraSections: 0
 extraReason: No extra section. What Brazilian law adds goes inside the sections it belongs to — the seven-day right of withdrawal as 7.5 in Refunds, and the Consumer Code's forum rule as 20.1 in Governing Law — so the heading structure stays identical to the English document.
@@ -11,7 +11,7 @@ extraReason: No extra section. What Brazilian law adds goes inside the sections 
 
 ## 1. Introdução e definição do Serviço
 
-O Go Top SEO (o «Serviço» ou a «Plataforma») é um serviço SaaS operado pela GO TOP MARKETING GRUO LTD (número de sociedade 517274346) (a «Empresa»). O Serviço permite que os clientes acompanhem posições de palavras-chave na busca do Google, monitorem a visibilidade no Google Maps, meçam a visibilidade em motores de IA como ChatGPT, Gemini e Perplexity, realizem pesquisa de palavras-chave e gerem relatórios profissionais. O Serviço inclui também análises de sites, conexões com contas Google e sites WordPress, correções no site aprovadas por você, conteúdo e mensagens de e-mail gerados por IA, conforme as seções 15A a 15G.
+O Go Top SEO (o «Serviço» ou a «Plataforma») é um serviço SaaS operado pela GO TOP DIGITAL MARKETING AND ADVERTISING LTD (número de sociedade 517274346) (a «Empresa»). O Serviço permite que os clientes acompanhem posições de palavras-chave na busca do Google, monitorem a visibilidade no Google Maps, meçam a visibilidade em motores de IA como ChatGPT, Gemini e Perplexity, realizem pesquisa de palavras-chave e gerem relatórios profissionais. O Serviço inclui também análises de sites, conexões com contas Google e sites WordPress, correções no site aprovadas por você, conteúdo e mensagens de e-mail gerados por IA, conforme as seções 15A a 15G.
 
 ## 2. Aceitação dos Termos
 
@@ -29,6 +29,8 @@ O Serviço oferece um período de teste de 7 dias para novos clientes. Os limite
 
 O Serviço funciona em um modelo de assinatura mensal. Enquanto a assinatura estiver ativa, a cobrança é renovada automaticamente a cada mês conforme o plano escolhido. Preços, planos e limites podem mudar de tempo em tempo, e as atualizações são refletidas no Serviço e na página de preços.
 
+**O que o preço inclui.** Um preço indicado em séqueis inclui o IVA israelense exigido por lei, e é o valor que você paga. Um preço indicado em dólares não inclui imposto indireto; em um pagamento com cartão esse imposto é calculado e cobrado pela Creem conforme o seu endereço de cobrança e mostrado a você antes do pagamento, conforme a seção 5A.
+
 **A forma de cobrança depende de como a sua conta foi aberta:**
 
 - **Comerciantes que instalaram o aplicativo pela Shopify** (e qualquer conta cuja autoridade de cobrança seja a Shopify) são cobrados exclusivamente pelo Shopify App Pricing, como parte da sua fatura da Shopify. Esses comerciantes nunca são direcionados ao PayPal nem a qualquer outro checkout fora da Shopify, e não os cobramos por um segundo canal.
@@ -37,9 +39,28 @@ O Serviço funciona em um modelo de assinatura mensal. Enquanto a assinatura est
 - **Um período já pago no site segue até o fim.** Se, no momento em que a loja é conectada, a conta tiver um período de cobrança já pago, o plano comprado no site continua funcionando até o fim desse período, nenhum plano da Shopify é oferecido ou cobrado antes dessa data, e interrompemos a renovação automática no PayPal para que outro período não seja cobrado. Se a renovação já estava em curso e o período foi renovado mais uma vez, esse período também é respeitado integralmente. Não há reembolso de um período já pago e o acesso não é interrompido antes do seu fim. A partir dessa data, continuar em um plano pago exige escolher um plano na Shopify, e desde então a cobrança é feita pela Shopify.
 - Se você escolher um plano diretamente nas telas de cobrança da própria Shopify durante um período já pago no site, a Shopify cobrará por ele: nosso aplicativo não o direciona a essas telas, e uma cobrança feita pela Shopify não é uma cobrança que possamos reembolsar.
 
+## 5A. Pagamento com cartão: a Creem como comerciante registrada (merchant of record)
+
+Uma conta que não é cobrada pela Shopify pode pagar com cartão. Nesse pagamento a venda não é feita com a gente, e sim com a Creem, que é a sociedade Armitage Labs OÜ (código de registro estoniano 16977866, Rotermanni 14, Tallinn 10111, Estônia). A Creem atua como comerciante registrada e revendedora contratual, e executa a venda com você em nome próprio. A gente vende para a Creem, e a Creem vende para você.
+
+O que isso significa na prática:
+
+- **A nota fiscal.** A Creem emite a fatura em nome próprio. A gente não emite nenhuma fatura ou recibo daquela transação e não cobra você por ela por nenhum outro caminho.
+- **O imposto.** IVA, imposto sobre vendas e qualquer outro imposto indireto são calculados, recolhidos e declarados pela Creem conforme o seu endereço de cobrança, e o valor final é mostrado a você antes do pagamento. O preço que aparece na página de preços não inclui esse imposto.
+- **O Serviço em si continua sendo responsabilidade nossa.** A prestação do Serviço, a sua qualidade, o seu suporte e a sua conformidade com a lei são só nossos. A Creem não assume responsabilidade por nada disso.
+- **Reembolsos.** Um reembolso ou um chargeback daquela transação é executado somente pela Creem, conforme as condições de elegibilidade destes termos, ou seja a seção 7, e a lei aplicável. O pedido de reembolso vai primeiro para a gente, no endereço da seção 21 ou pelos dados do recibo enviado a você.
+- **O direito de arrependimento.** Nesse pagamento, o consentimento expresso de que o início imediato de um serviço digital extingue o direito de arrependimento de 14 dias é dado na tela de pagamento da Creem. Esse consentimento é regra europeia, e o efeito é o mesmo descrito na seção 7.2. Ele **não** alcança o prazo de sete dias do art. 49 do Código de Defesa do Consumidor: o direito descrito na seção 7.5 continua inteiro, qualquer que seja a forma de pagamento, e nenhuma tela de pagamento o afasta.
+- **Os Termos de Comprador da Creem.** Além destes termos, aplicam-se a você os Termos de Comprador da Creem, disponíveis em [creem.io/buyer-terms](https://www.creem.io/buyer-terms). Eles regem a venda que ela executa, não o Serviço que a gente presta.
+
+O pagamento pelo PayPal e o pagamento pela Shopify não mudam: ali quem vende é a Empresa, como descrito na seção 5.
+
 ## 6. Cancelamento
 
 Você pode cancelar a renovação da sua assinatura a qualquer momento nas configurações da conta. O acesso ao Serviço é mantido até o fim do período de cobrança já pago. Não há cancelamento retroativo de um período já pago, exceto quando a lei aplicável exigir.
+
+## 6A. Uma assinatura cobrada por outra empresa
+
+Algumas assinaturas são cobradas por outra empresa e não por nós: uma loja cobrada pela Shopify, um pagamento com cartão em que a Creem é a vendedora, conforme descrito na seção 5A, e um plano comprado em um marketplace externo que revende o Serviço em nome próprio. Nesses casos o cancelamento da renovação é feito junto a essa empresa, e não nas configurações da sua conta, porque é essa empresa que detém a assinatura e que cobra você. Se você nos enviar um pedido de cancelamento, nós o encaminhamos a essa empresa, mas a cobrança é interrompida por essa empresa e não por nós, e não emitimos reembolso em nome dela. Se você não tiver certeza de qual empresa cobra a sua assinatura, escreva para nós e informaremos. Em todos os casos, o acesso ao Serviço é mantido até o fim do período de cobrança já pago, como na seção 6, e a política de reembolso que se aplica a essa compra está na nossa Política de Cancelamento e Reembolso.
 
 ## 7. Reembolsos
 
@@ -54,6 +75,8 @@ As taxas de assinatura não são reembolsáveis quanto a um período já iniciad
 **7.4** As seções 7.1 a 7.3 aplicam-se somente a consumidores pessoas físicas. Para clientes empresariais, a política de reembolso da seção 7 aplica-se sem alteração.
 
 **7.5 Consumidores no Brasil.** Se você contratou do Brasil como consumidor, o art. 49 do Código de Defesa do Consumidor (Lei nº 8.078/1990) lhe dá o direito de desistir da contratação, feita fora do estabelecimento comercial, no prazo de 7 dias corridos contados da aceitação destes termos ou do início do acesso, o que ocorrer primeiro, sem necessidade de justificar. Exercido o direito no prazo, os valores pagos são devolvidos integralmente e de imediato, monetariamente atualizados, sem nenhum custo pelo exercício do direito. A renúncia descrita na seção 7.2 é regra da legislação europeia e **não** se aplica a esse prazo de sete dias: no Brasil, iniciar o uso do Serviço não faz você perder o direito de arrependimento. Um pedido apresentado dentro dos sete dias é atendido, sem discussão sobre a sua condição de consumidor. Os detalhes estão na nossa Política de Cancelamento e Reembolso.
+
+**7.6 Um pagamento feito com cartão.** Em uma transação executada pela Creem, o reembolso é executado por ela e não pela gente, conforme as condições de elegibilidade desta seção e a lei. São estes termos que dizem quem tem direito a reembolso, e é por eles que a Creem decide. O prazo de sete dias da seção 7.5 é uma dessas condições: um pedido apresentado dentro dele é atendido, e a gente continua responsável por honrá-lo mesmo que o reembolso tenha de passar pela Creem. Veja a seção 5A.
 
 ## 8. Limites de uso
 
@@ -178,12 +201,15 @@ Além das verificações que você inicia, o Serviço executa uma verificação 
 
 ## 15F. Conteúdo gerado por IA
 
-O Serviço usa IA para produzir temas de artigos, perguntas e artigos. Esse conteúdo pode conter inexatidões, e revisá-lo antes de publicar — inclusive sua exatidão factual, sua adequação à sua empresa e à lei, e direitos de terceiros — é de sua responsabilidade.
+O Serviço usa IA para produzir temas de artigos, perguntas, artigos e imagens. Esse conteúdo pode conter inexatidões, e revisá-lo antes de publicar — inclusive sua exatidão factual, sua adequação à sua empresa e à lei, e direitos de terceiros — é de sua responsabilidade.
 
 - **Temas automáticos.** Em projetos ativos com plano pago, o Serviço repõe temas de artigos automaticamente para que a fila de conteúdo tenha temas. Um tema não é publicado e não compromete você com nada.
 - **Links internos.** O Serviço pode acrescentar automaticamente links internos para outras páginas do seu site dentro dos artigos.
 - **Caixa de chamada para ação.** A caixa de chamada para ação no fim de um artigo é opcional, e você pode ativá-la, desativá-la e editar seu texto.
 - **Aprovação e publicação.** O conteúdo é exibido a você para aprovação e é publicado no seu site conforme as configurações de aprovação e publicação que você escolheu para o projeto. Você pode editar, rejeitar ou excluir qualquer conteúdo.
+- **Responder a uma avaliação no seu Perfil da Empresa no Google.** Se você pedir um rascunho de resposta a uma avaliação, o rascunho é produzido por IA e exibido a você antes de qualquer envio. Uma resposta é enviada somente depois que você a escreveu ou aprovou e clicou em enviar, e ela é publicada publicamente no perfil da sua empresa e em seu nome. **Você é responsável pelo conteúdo da resposta**, mesmo quando o rascunho foi produzido por IA, o que inclui a exatidão dos fatos, a difamação, os direitos de terceiros e as políticas de conteúdo do Google. O Google pode remover uma resposta conforme essas políticas, e não temos controle sobre isso.
+- **Publicação automática no seu Perfil da Empresa no Google.** Se você ativou a publicação automática, cada artigo que o sistema publica no seu site também é publicado como postagem no perfil da sua empresa no Google, **sem que você o leia antes**. **Você é responsável pelo conteúdo publicado em seu nome**, tanto quando o texto foi produzido por IA como quando você não o leu antes da publicação, o que inclui a exatidão dos fatos, a difamação, os direitos de terceiros e as políticas de conteúdo do Google. Você pode desativar a publicação automática a qualquer momento, e ela se desativa por conta própria se você trocar a empresa à qual o projeto está conectado.
+- **Uma foto criada por IA para uma postagem no seu Perfil da Empresa no Google.** Se você pedir uma foto para uma postagem escrita a partir de um tema, a foto é produzida por IA. Ela é uma imagem genérica e **não é uma fotografia da sua empresa, do seu estabelecimento, da sua equipe nem de um produto real seu**, e é exibida a você antes de qualquer publicação. Uma foto é publicada somente depois que você a escolheu e clicou em publicar, e ela aparece publicamente no perfil da sua empresa e em seu nome. **Você é responsável pela foto publicada em seu nome**, o que inclui a correspondência com a realidade, os direitos de terceiros e as políticas de conteúdo e de fotos do Google, segundo as quais o conteúdo de um perfil de empresa deve representar a empresa e o produto como realmente são. Não use uma foto assim como se fosse uma fotografia da empresa, do estabelecimento ou de um produto que não existe: uma foto enganosa pode levar o Google a remover o conteúdo ou a restringir o perfil, e também pode induzir o consumidor a erro. O arquivo da imagem carrega os marcadores próprios do Google (SynthID e C2PA), que permitem identificá-la como gerada por IA.
 
 ## 15G. Mensagens de e-mail
 
@@ -191,6 +217,12 @@ O Serviço usa IA para produzir temas de artigos, perguntas e artigos. Esse cont
 - **Lembretes.** Quando há conteúdo aguardando a sua aprovação, um e-mail de lembrete pode ser enviado a você. Todo lembrete inclui um link de cancelamento em um clique que não exige login.
 - **E-mails de início.** Até dois e-mails sobre um projeto sem site conectado, ou com um conectado e nada publicado, explicando como concluir a etapa. Sem oferta e sem preço, com um link de cancelamento que interrompe somente esses e-mails.
 - **Resumo semanal de progresso.** Um resumo do progresso do projeto, para os projetos em que você o ativou nas configurações, no domingo pela manhã e somente quando há algo a contar. Uma semana em que nada aconteceu não recebe e-mail.
+
+## 15H. Foto do autor
+
+Se você enviar uma foto para uma caixa de autor, declara que possui todos os direitos necessários para publicá-la e que, se nela aparecer uma pessoa — você ou outra —, essa pessoa consentiu com a publicação da foto no seu site para divulgar um negócio, inclusive com uso comercial. Se a pessoa retratada for menor de idade, é necessário o consentimento do responsável por ela.
+
+Se esse consentimento for retirado, você deve remover a foto no Serviço. Apagar a foto, ou passar para uma opção sem foto, exclui o arquivo do nosso armazenamento, mas uma cópia já colocada na biblioteca de mídia do seu site está sob o seu controle e somente você pode excluí-la de lá. Podemos remover uma foto do Serviço se recebermos um aviso consistente de que ela foi publicada sem autorização.
 
 ## 16. Privacidade
 
@@ -224,8 +256,8 @@ Estes termos são regidos pelas leis do Estado de Israel. A competência exclusi
 
 Para qualquer dúvida sobre estes termos ou sobre o Serviço, fale com a gente:
 
-**GO TOP MARKETING GRUO LTD**  
+**GO TOP DIGITAL MARKETING AND ADVERTISING LTD**  
 Número da sociedade: 517274346  
 E-mail: [oren@gotop.co.il](mailto:oren@gotop.co.il)
 
-Última atualização: 9 de outubro de 2026
+Última atualização: 16 de outubro de 2026

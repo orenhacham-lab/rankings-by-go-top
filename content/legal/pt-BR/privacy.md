@@ -3,7 +3,7 @@ title: Política de Privacidade | Go Top SEO
 description: Política de privacidade do Go Top SEO.
 locale: pt-BR
 source: app/(public)/en/privacy/page.tsx
-lastUpdated: 2026-10-09
+lastUpdated: 2026-10-16
 register: voce
 extraSections: 1
 extraReason: One extra section, "Direitos de residentes no Brasil (LGPD)", placed beside the existing EEA/UK and United States rights sections, because the LGPD gives a different set of rights with a different deadline and a different authority to complain to. What the LGPD adds elsewhere goes inside the sections it belongs to - the legal bases of Art. 7, the international-transfer rule of Art. 33, and the communication channel that stands in for an appointed officer.
@@ -11,7 +11,7 @@ extraReason: One extra section, "Direitos de residentes no Brasil (LGPD)", place
 
 ## Introdução
 
-A GO TOP MARKETING GRUO LTD (número de sociedade 517274346) («nós», «nosso» ou «a empresa») opera o serviço Go Top SEO em https://www.gotopseo.com (o «Serviço»). Esta política de privacidade descreve nossas práticas de coleta, uso e divulgação de informações pessoais quando você usa o nosso Serviço.
+A GO TOP DIGITAL MARKETING AND ADVERTISING LTD (número de sociedade 517274346) («nós», «nosso» ou «a empresa») opera o serviço Go Top SEO em https://www.gotopseo.com (o «Serviço»). Esta política de privacidade descreve nossas práticas de coleta, uso e divulgação de informações pessoais quando você usa o nosso Serviço.
 
 ## Informações que coletamos
 
@@ -29,6 +29,7 @@ Coletamos diferentes tipos de informação, entre eles:
 - **Um endereço para acompanhamento local de posições:** se você digitou um endereço exato, ele é armazenado junto com as coordenadas retornadas — veja «Conversão de um endereço em coordenadas» abaixo
 - **Rede de links:** o seu consentimento de entrada (quem aceitou, quando, o texto e o tipo de link) e o log de inserções — veja «Rede de links» abaixo
 - **Resultados e conteúdo:** resultados das verificações de visibilidade em IA e o conteúdo gerado para você: temas, perguntas e artigos
+- **Foto de autor:** uma foto que você envia para uma caixa de autor, se tiver escolhido exibi-la — veja «Uma foto de autor que você envia» abaixo
 - **Preferências de e-mail:** quais mensagens você recebe e os cancelamentos de lembretes
 - **Informações de pagamento:** não armazenamos o seu meio de pagamento. Para contas cuja autoridade de cobrança é a Shopify — inclusive comerciantes que instalaram o aplicativo pela Shopify — o pagamento é processado pela Shopify sob o Shopify App Pricing, e nunca os direcionamos ao PayPal. Para clientes que se cadastraram diretamente no nosso site, cuja autoridade de cobrança não é a Shopify, o pagamento é processado pelo PayPal
 
@@ -51,6 +52,7 @@ Não compartilhamos as suas informações pessoais com terceiros, exceto:
 
 - **Shopify:** para processar o pagamento de contas cobradas pelo Shopify App Pricing e para publicar conteúdo em uma loja conectada
 - **PayPal:** para processar o pagamento somente de clientes cobrados pelo site
+- **Creem:** para processar pagamentos, quando o pagamento de uma conta passa por ele. Ao abrir um pagamento enviamos o endereço de e-mail da conta, o identificador do plano escolhido e a nossa própria referência daquela solicitação, e recebemos de volta um identificador de cliente no sistema deles, um identificador de plano, o status da assinatura e as datas do período de cobrança. Os dados do cartão, e qualquer outro meio de pagamento, nunca chegam a nós em nenhum momento
 - **Supabase:** para armazenamento seguro de dados
 - **Serper:** para consultas na busca do Google e verificações de posição
 - **Resend:** para o envio de e-mail — veja «Mensagens de e-mail» abaixo
@@ -87,8 +89,12 @@ Permissão: **business.manage**, pedida em um consentimento separado somente qua
 
 - **O que lemos:** as contas do Business Profile que você administra e seus locais: nome da empresa, endereço, site e link do Google Maps.
 - **O que armazenamos:** o local que você escolhe para um projeto (seus identificadores no Google, nome, endereço, site e link do Maps) e cada postagem que você cria: texto, botão, foto, horário agendado e o identificador, o link e o status de revisão da postagem no Google.
-- **O que fazemos com isso:** criamos uma postagem somente quando você clica em publicar, ou no horário que você agendou, e depois lemos essa postagem de volta no Google para mostrar se ela está ativa. Não alteramos as informações da sua empresa e não lemos nem respondemos avaliações.
-- **Rascunhos de IA:** se você pedir um rascunho, o nome da empresa e o artigo ou tema escolhido são enviados ao modelo Gemini do Google. Um rascunho nunca é publicado antes de você revisá-lo e clicar em publicar.
+- **O que fazemos com isso:** criamos uma postagem quando você clica em publicar, no horário que você agendou, ou —**se você ativou a publicação automática**— cada vez que o sistema publica um artigo no seu site, e depois lemos essa postagem de volta no Google para mostrar se ela está ativa. Não alteramos as informações da sua empresa.
+- **Publicação automática:** desativada por padrão. Se você a ativou, cada artigo que o sistema publica no seu site também é publicado como postagem no perfil da sua empresa, **sem que você o leia antes**. O que é enviado ao modelo é o nome da empresa, o título do artigo e o resumo dele, sem nenhum nome de pessoa. Uma postagem automática é escrita no idioma do projeto. Você pode desativá-la a qualquer momento, e ela se desativa por conta própria se você trocar a empresa à qual o projeto está conectado.
+- **Avaliações:** quando você abre a tela de avaliações, lemos no Google as avaliações da sua empresa: o nome de exibição de quem avaliou (ou "anônimo"), a nota, o texto, as datas e a resposta existente, se houver. **Não armazenamos nenhum conteúdo de avaliação**: nem o texto, nem o nome de quem avaliou, nem a nota, nem a resposta. Guardamos apenas duas marcas de tempo, para poder sinalizar uma avaliação que você ainda não viu. A foto de perfil de quem avaliou não é lida.
+- **Responder a uma avaliação:** uma resposta é publicada em seu nome somente depois que você a escreveu ou aprovou e clicou em enviar, **e ela é pública: aparece no perfil da sua empresa no Google e qualquer pessoa pode vê-la**. Você pode editá-la ou excluí-la na mesma tela. O Google pode remover uma resposta conforme as próprias políticas de conteúdo dele, e isso não está sob nosso controle.
+- **Rascunhos de IA:** se você pedir um rascunho, o nome da empresa e o artigo ou tema escolhido são enviados ao modelo Gemini do Google. Se você pedir um rascunho de resposta a uma avaliação, o texto da avaliação e a nota dela também são enviados, **sem o nome de quem avaliou**. Um rascunho que você pediu não é publicado antes de você revisá-lo e clicar em publicar. A única coisa publicada sem ser lida é uma postagem criada pela publicação automática, se você a ativou.
+- **Uma foto criada por IA para uma postagem:** se você pedir uma foto para uma postagem escrita a partir de um tema, ao modelo Gemini do Google é enviado somente o tema que você escreveu, **sem o nome da empresa e sem o nome de nenhuma pessoa**. A foto volta para a sua tela, e não a guardamos até você escolhê-la e publicar a postagem.
 
 ### Uso limitado
 
@@ -156,7 +162,9 @@ Para acompanhar posições a partir de um ponto exato, você pode digitar um end
 
 ## Conversão de um relatório em PDF
 
-Quando você pede para baixar um relatório em PDF, enviamos o conteúdo do relatório como exibido ao serviço **PDFShift**, que nos devolve o arquivo. Isso acontece somente quando você clicou para baixar um relatório, nunca de forma regular ou agendada, e o conteúdo é enviado apenas para a conversão. A retenção na PDFShift é regida pela política de privacidade e pelos termos dela.
+Quando você pede para baixar um relatório em PDF, enviamos o conteúdo do relatório como exibido ao serviço **PDFShift**, que nos devolve o arquivo. Isso acontece somente quando você clicou para baixar um relatório, nunca de forma regular ou agendada, e o conteúdo é enviado apenas para a conversão.
+
+Com a PDFShift temos um acordo de tratamento de dados nos termos do artigo 28 do RGPD. Conforme o anexo dele, o conteúdo que enviamos é tratado em memória apenas durante a conversão e não é retido depois. A PDFShift oferece um armazenamento opcional do arquivo gerado, e nós não o solicitamos. Os servidores e o armazenamento dela ficam na França, e o serviço de monitoramento de erros dela fica nos Estados Unidos, sob o Quadro de Privacidade de Dados UE-EUA e as cláusulas contratuais padrão.
 
 ## Rede de links
 
@@ -177,6 +185,18 @@ O programa de parceiros é para quem recomenda o Serviço e recebe uma comissão
 - **Atribuição de uma indicação:** o código do parceiro viaja no próprio link. Não gravamos nenhum cookie para o programa nem guardamos nada no seu dispositivo, de modo que o que você escolher sobre cookies não influencia nem para um lado nem para o outro. Se em algum momento creditarmos uma visita que volta mais tarde, o que implicaria guardar algo, esta política dirá isso e o seu consentimento será pedido antes. **O que é registrado quando um visitante segue o link de um parceiro é uma contagem: mais um no total diário daquele parceiro, e esse é todo o registro**: sem endereço IP, sem navegador, sem o site de onde você veio e sem nenhum identificador. A atribuição em si é feita com o código que viaja no endereço da página, lido uma única vez no momento em que a conta é criada.
 
 Na data desta política o programa funciona assim: a candidatura é enviada deste site, por e-mail ou no formulário, e é aprovada por uma pessoa; um parceiro aprovado tem um código e um link; os cliques são contados como um total diário por parceiro; uma conta nova que se cadastra com um código é atribuída àquele parceiro uma vez e para sempre; a comissão é registrada sobre cada pagamento efetivamente recebido, fica retida por 30 dias, que é a janela de reembolso, e é aprovada por uma pessoa; e o pagamento em si é feito manualmente contra um comprovante. **Um cliente cobrado pela Shopify não gera comissão automática**, porque a Shopify nos informa que um plano está ativo e não que uma cobrança foi feita; essa comissão é registrada manualmente, com o mesmo percentual. Os termos estão no [Contrato do Programa de Parceiros](/pt-BR/affiliate-terms), que também obriga o parceiro a declarar abertamente que é remunerado.
+
+## Uma foto de autor que você envia
+
+Se você enviar uma foto para uma caixa de autor, o arquivo fica guardado em um armazenamento nosso dedicado enquanto a foto estiver configurada no projeto. O caminho dele é formado pelo identificador do projeto e por um identificador aleatório, nunca pelo nome de uma pessoa. Não publicamos a nossa cópia e o artigo não aponta para ela.
+
+Na publicação do artigo, a foto é copiada para a biblioteca de mídia do seu site e o artigo aponta para essa cópia. A partir daí a foto fica visível para qualquer pessoa que acesse o seu site, como qualquer outra imagem de um artigo. O envio só é oferecido em um projeto onde essa cópia possa ser feita.
+
+A foto não é enviada a nenhum provedor de IA, não é usada para treinar modelos e não executamos sobre ela reconhecimento facial nem qualquer outro tratamento biométrico.
+
+Apagar a foto, ou passar para nenhuma foto ou para o ícone do site, exclui o arquivo do nosso armazenamento. Desligar a caixa de autor inteira não exclui a foto: ela fica guardada até que você a apague ou escolha outra opção. Uma cópia já colocada no seu site não está sob o nosso controle, e somente quem administra esse site pode excluí-la de lá.
+
+Quanto à pessoa retratada, o cliente que enviou a foto é quem decide para que ela é usada, e nós tratamos o arquivo por conta dele. Se você é a pessoa da foto e não o cliente que a enviou, escreva para o endereço que está no fim desta política: vamos apagar o arquivo do nosso armazenamento e procurar o cliente para que a cópia no site seja retirada, mas não podemos excluir por conta própria conteúdo no site de um cliente.
 
 ## Provedores de IA
 
@@ -317,6 +337,7 @@ Guardamos os dados apenas pelo tempo necessário à finalidade da coleta:
 - **Credenciais de conexão** (WordPress, Shopify, Search Console): até você desconectar ou excluir a conta, e então apagadas imediatamente.
 - **Verificação gratuita do site:** em cache por até 24 horas e então apagada, se nenhuma conta tiver sido aberta a partir dela.
 - **Registro das decisões de cookies:** até três anos a contar da decisão, para que possamos demonstrar o que você escolheu. Essa é a base legal da guarda, e é por isso que ele não é apagado junto com a conta.
+- **Foto de autor:** enquanto a foto estiver configurada no projeto. Apagá-la, ou passar para nenhuma foto ou para o ícone do site, exclui o arquivo imediatamente. Uma cópia já colocada no seu site permanece lá até que você a exclua.
 - **Logs de segurança e de servidor:** até 90 dias.
 
 ## Transferências internacionais
@@ -363,6 +384,26 @@ Respondemos aos pedidos em até 15 dias, prazo do art. 19, I, da LGPD, e sem cus
 
 **Reclamação.** Se a nossa resposta não resolver, você pode reclamar à Autoridade Nacional de Proteção de Dados ([ANPD](https://www.gov.br/anpd/pt-br)), e também procurar um órgão de defesa do consumidor ou o Ministério Público. Falar com a gente primeiro não é condição para nada disso.
 
+## Contato comercial por e-mail
+
+Esta seção trata de alguém que recebeu um e-mail nosso e não é nosso cliente. Se for o seu caso, você não nos forneceu nada e não se cadastrou em nada: obtivemos o endereço da sua empresa de fontes públicas, e aqui dizemos exatamente de quais, o que guardamos e como se descadastrar com um único clique.
+
+**O que coletamos e de onde.** O nome da empresa, o endereço do seu site, um endereço de e-mail de contato exibido no próprio site da empresa ou em um registro público de empresas, o nome da pessoa de contato quando o site o publica ao lado desse endereço, o endereço postal que a empresa publica (uma empresa que não publica endereço nunca entra na lista), o país em que a empresa atua, e um único achado de uma verificação automática das páginas públicas do site, com a data em que foi verificado. **Não compramos listas de endereços e não usamos intermediários de dados.** Não coletamos número de telefone, não coletamos nada sobre uma pessoa além do cargo com que ela aparece publicada na empresa e não entramos em nenhuma parte de um site que não esteja aberta a qualquer visitante.
+
+**Com qual finalidade.** Procurar a empresa uma vez, com uma oferta do nosso serviço, e explicar o que encontramos no site dela. É um contato comercial e dizemos isso na própria mensagem.
+
+**Para quais países.** Guardamos endereços para essa finalidade somente de empresas que verificamos, a partir de duas fontes independentes, que atuam nos Estados Unidos. **Não guardamos endereços para essa finalidade de empresas em Israel, no Espaço Econômico Europeu ou no Reino Unido**, e uma empresa cujo país não conseguimos verificar nunca entra na lista.
+
+**Quantas mensagens.** Duas no máximo: uma mensagem e, se não vier resposta, um acompanhamento uma semana depois. Depois disso a empresa sai da lista mesmo sem ter pedido.
+
+**O que guardamos e por quanto tempo.** Cada empresa é um registro: o nome da empresa, o site dela, a plataforma em que o site roda, o país, o endereço de e-mail e o nome da pessoa de contato se os encontramos, o endereço postal, as duas fontes públicas de onde tiramos os dados, o único achado com a data dele, qual das duas mensagens já foi enviada e quando, se chegou uma resposta ou um pedido de remoção e quando, as datas em que o registro foi criado e alterado pela última vez, uma impressão unidirecional do endereço de e-mail, um identificador aleatório que faz o link de descadastro da mensagem funcionar e uma nota interna curta sobre a empresa. **De um registro para o qual escrevemos, o endereço de e-mail, o nome da pessoa de contato e o endereço postal são apagados 30 dias depois da última mensagem que enviamos a ele**, ou 30 dias depois de uma resposta ou de um pedido de remoção se isso for posterior, e a data do apagamento é registrada. 30 dias não é um número redondo: o link de descadastro da nossa mensagem precisa continuar funcionando por pelo menos esse prazo, e ele se resolve contra este registro. O que sobra depois é todo o resto do registro acima, entre isso a impressão unidirecional e o identificador de descadastro, para que o link continue funcionando. A impressão é o que nos permite saber que já escrevemos duas vezes para aquela empresa e impede que ela seja adicionada de novo. **Um registro para o qual nunca escrevemos é excluído por inteiro 90 dias depois de ter sido adicionado.** A lista de exclusão é separada deste registro e é guardada por todo o tempo em que enviarmos e-mail, porque é a única forma de uma remoção se manter.
+
+**Como interromper.** Cada mensagem traz um link de descadastro que funciona com um único clique, sem login e sem explicações. Ele é atendido imediatamente e de forma permanente. Para que a remoção se mantenha, o endereço é guardado em uma lista de exclusão **com a única finalidade de garantir que não entraremos em contato com você de novo**, não é usado para mais nada, e vale para todos os nossos canais, não só para aquele em que você pediu. Uma resposta pedindo para não escrevermos mais é tratada do mesmo modo.
+
+**Se você está na Califórnia.** O endereço de um contato de empresa é informação pessoal conforme a lei de privacidade da Califórnia, portanto você tem o direito de saber o que guardamos sobre você, de receber uma cópia, de solicitar a exclusão, de corrigir informação incorreta e de não ser discriminado por exercer um direito. **Não vendemos essa informação e não a compartilhamos para publicidade comportamental entre contextos.** Como não coletamos a informação de você diretamente, esta seção é o aviso de coleta, incluindo por quanto tempo cada dado é guardado, e um link para ela aparece em cada mensagem que enviamos. Os pedidos vão para o endereço indicado em «Contato de privacidade e representantes», e respondemos por escrito.
+
+Os mesmos pedidos — acesso, exclusão e correção — são atendidos também para quem não está na Califórnia, no mesmo endereço e do mesmo modo. O controlador é a GO TOP DIGITAL MARKETING AND ADVERTISING LTD, empresa 517274346, em Israel.
+
 ## Direitos de residentes dos Estados Unidos
 
 Se você reside na Califórnia, ou em outro estado que aprovou uma lei estadual de privacidade, tem o direito de saber quais categorias de dados foram coletadas sobre você, de obter uma cópia, de pedir a exclusão, de corrigir dados inexatos e de não sofrer discriminação por exercer um direito.
@@ -401,4 +442,4 @@ Se você tiver dúvidas sobre esta política de privacidade, fale com a gente:
 
 **Telefone:** [054-9489377](tel:0549489377)
 
-Esta política foi atualizada pela última vez em 9 de outubro de 2026
+Esta política foi atualizada pela última vez em 16 de outubro de 2026
