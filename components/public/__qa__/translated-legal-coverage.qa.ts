@@ -3124,7 +3124,7 @@ const PHOTO_IN_RETENTION: Record<string, RegExp> = {
    * check, and a guard that passed on an absent file would be worse than none,
    * so the skip is explicit.
    */
-  const photoModule = ['lib/content/author-photo.ts', 'lib/content/author-box.ts']
+  const photoModule = ['lib/content/author-box/photo.ts', 'lib/content/author-photo.ts', 'lib/content/author-box.ts']
     .map((f) => [f, read(f)] as [string, string])
     .find(([, body]) => body.length > 0)
   if (photoModule) {
