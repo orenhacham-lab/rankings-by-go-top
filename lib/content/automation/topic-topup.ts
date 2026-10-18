@@ -68,6 +68,9 @@ import { isGscReadOnlyEnabled } from '@/lib/gsc/config'
 import { loadOverlapIndex } from '@/lib/content/cannibalization/load'
 import { checkOverlap, skipOverlapping, SITE_AND_PLAN_KINDS, type OverlapIndex, type OverlapKind } from '@/lib/content/cannibalization/check'
 import { mainPhrase, subjectWords } from '@/lib/content/cannibalization/normalize'
+import { buildSiteVocabulary } from '@/lib/content/recommendations/engine'
+import { readMerchantTrackedKeywords } from '@/lib/content/recommendations/site-subject'
+import { MIN_SITE_VOCAB_TOKENS, researchKeywordIssue } from '@/lib/content/recommendations/keyword-research'
 import { TOPUP_SOURCE_CONTEXT } from './topup-provenance'
 
 type Admin = ReturnType<typeof createAdminClient>
@@ -150,6 +153,12 @@ export interface TopUpDeps {
   loadIndex: (scope: { projectId: string; userId: string }) => Promise<OverlapIndex>
   /** One batch of the strategy engine, finalized by its own guards. */
   generate: (scope: { projectId: string; userId: string }) => Promise<GeneratedIdeas>
+  /**
+   * The site's OWN vocabulary (the merchant's pages and the tracked keywords
+   * that are not ours). An idea whose keyword these words say is off the site's
+   * subject is left in the plan instead of being queued.
+   */
+  siteVocab: (scope: { projectId: string; userId: string }) => Promise<Set<string>>
 }
 
 export interface TopUpSummary {
@@ -160,13 +169,15 @@ export interface TopUpSummary {
   promoted: number
   queued: number
   skippedOverlap: number
+  /** Ideas left in the plan because the site's own words say they are off its subject. */
+  skippedOffSubject: number
   modelProjects: number
   modelIdeas: number
   failures: number
 }
 
 const EMPTY = (state: TopUpSummary['state']): TopUpSummary =>
-  ({ state, projectsChecked: 0, notEntitled: 0, enough: 0, promoted: 0, queued: 0, skippedOverlap: 0, modelProjects: 0, modelIdeas: 0, failures: 0 })
+  ({ state, projectsChecked: 0, notEntitled: 0, enough: 0, promoted: 0, queued: 0, skippedOverlap: 0, skippedOffSubject: 0, modelProjects: 0, modelIdeas: 0, failures: 0 })
 
 function defaultDeps(admin: Admin): TopUpDeps {
   return {
@@ -180,6 +191,7 @@ function defaultDeps(admin: Admin): TopUpDeps {
     },
     modelAllowed: async (userId) => (await assertContentGenerationAllowedForUser(admin, userId)).allowed,
     loadIndex: (scope) => loadOverlapIndex(admin, scope, { gsc: isGscReadOnlyEnabled() }),
+    siteVocab: async (scope) => buildSiteVocabulary(admin, scope.projectId, await readMerchantTrackedKeywords(admin, scope.projectId), scope.userId),
     generate: async (scope) => {
       const controller = newRunCostController('standard', randomUUID(), MODEL_TARGET_COUNT)
       const run = await generateFromBriefs(admin, { projectId: scope.projectId, targetCount: MODEL_TARGET_COUNT, qualityMode: 'standard', userId: scope.userId }, controller)
@@ -286,6 +298,15 @@ async function refillFromIdeas(
   index: OverlapIndex, summary: TopUpSummary, opts: { deadlineAt: number; onlyIds?: Set<string> },
 ): Promise<number> {
   const ideas = (await loadPendingIdeas(admin, scope)).filter((r) => isArticleIdea(r) && (!opts.onlyIds || opts.onlyIds.has(r.id)))
+  // 18 October 2026 — THE SUBJECT GATE ON THE WAY INTO THE QUEUE. A plan keeps
+  // its ideas for months, so ideas saved before the relevance rules improved
+  // were still promoted and queued automatically: on one dog-products store the
+  // plan held adoption, dogs-for-sale and children's-toy keywords. The gate is
+  // the engine's own (researchKeywordIssue) with the site's own words, and it
+  // only ever LEAVES an idea in the plan — it deletes nothing and rejects
+  // nothing when the vocabulary is too small to judge.
+  const vocab = await deps.siteVocab(scope)
+  const subjectGate = vocab.size >= MIN_SITE_VOCAB_TOKENS ? vocab : null
   const position = { next: -1 }
   if (pool) {
     const { data } = await admin.from('article_pool_items').select('position').eq('pool_id', pool.id).eq('project_id', scope.projectId).eq('user_id', scope.userId)
@@ -299,6 +320,10 @@ async function refillFromIdeas(
     if (added >= PER_RUN_ADD_CAP || deps.now() > opts.deadlineAt) break
     const supply = await countSupply(admin, scope, pool)
     if (supply >= target) return 0
+    if (subjectGate && researchKeywordIssue((idea.primary_keyword ?? '').trim() || idea.title, { brandTokens: new Set<string>(), vocab: subjectGate })) {
+      summary.skippedOffSubject++
+      continue
+    }
     const candidate = { title: idea.title, keyword: idea.primary_keyword }
     if (checkOverlap(index, candidate, { kinds: SKIP_KINDS, excludeIdeaIds: [idea.id] }) || checkOverlap(planned, candidate)) { summary.skippedOverlap++; continue }
     const outcome = await promoteIdea(admin, scope, project, pool, idea, position)
@@ -409,8 +434,8 @@ export async function runTopicTopUp(
   }
 
   if (summary.promoted > 0 || summary.modelProjects > 0 || summary.failures > 0) {
-    const { projectsChecked, notEntitled, enough, promoted, queued, skippedOverlap, modelProjects, modelIdeas, failures } = summary
-    console.log('[topic-topup] run', { slot, projectsChecked, notEntitled, enough, promoted, queued, skippedOverlap, modelProjects, modelIdeas, failures })
+    const { projectsChecked, notEntitled, enough, promoted, queued, skippedOverlap, skippedOffSubject, modelProjects, modelIdeas, failures } = summary
+    console.log('[topic-topup] run', { slot, projectsChecked, notEntitled, enough, promoted, queued, skippedOverlap, skippedOffSubject, modelProjects, modelIdeas, failures })
   }
   return summary
 }

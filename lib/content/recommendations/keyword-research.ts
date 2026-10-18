@@ -46,13 +46,35 @@ const SUPPORT_TERMS = [
 // — a "noise" term that is part of the site's OWN vocabulary is NOT noise there
 // (e.g. "יד שנייה" is the core business of a second-hand fashion store), so the
 // caller passes the site vocabulary and overlapping terms are kept.
+// 18 October 2026 — the ACQUIRING-AN-ANIMAL / CLASSIFIEDS family joins the list
+// ('אימוץ', 'למכירה'): on a dog-PRODUCTS store the queue had "אימוץ כלבים
+// קטנים" and "כלבים לאימוץ בחינם", which share their other words with the
+// store's pages and so passed the alignment ratio. A business whose subject this
+// really is (a shelter, a second-hand shop) keeps them through the escape hatch
+// below, which asks for the TERM ITSELF on the site.
 const NOISE_TERMS = [
   'יד 2', 'יד2', 'יד שנייה', 'יד שניה', 'למסירה', 'מודעות', 'ביקורת', 'ביקורות',
   'קטלוג', 'טלפון', 'כתובת', 'שעות פתיחה', 'ביד2', 'yad2', 'used',
+  'אימוץ', 'למכירה', 'adoption', 'for sale',
 ]
-function isNoise(keyword: string): boolean {
+/** The noise term the keyword carries, if any. */
+function noiseTerm(keyword: string): string | null {
   const lower = keyword.toLowerCase()
-  return NOISE_TERMS.some((t) => lower.includes(t))
+  return NOISE_TERMS.find((t) => lower.includes(t)) ?? null
+}
+/**
+ * Is the noise TERM ITSELF the site's own word? The escape hatch used to ask
+ * whether ANY word of the keyword is on the site, which every keyword about the
+ * site's own subject satisfies: "כלבים לאימוץ בחינם" was kept on a dog-bed store
+ * because the store's pages say "כלבים". What makes a noise term legitimate is
+ * the term, not its neighbours — a shelter's pages say "אימוץ", a second-hand
+ * shop's say "יד שנייה". No vocabulary to judge by keeps the old answer: kept.
+ */
+export function siteOwnsTerm(term: string, vocab: Set<string> | null | undefined): boolean {
+  if (!vocab || vocab.size === 0) return true
+  const parts = Array.from(tokens(term))
+  if (parts.length === 0) return true
+  return parts.every((t) => vocab.has(t))
 }
 
 // ── Phase 3H — generic topic-quality rules (site-agnostic, multilingual) ──────
@@ -225,7 +247,8 @@ export type ResearchKeywordIssue = 'brand_or_support' | 'noise' | 'nav_commerce'
 export function researchKeywordIssue(keyword: string, ctx: { brandTokens: Set<string>; vocab: Set<string> | null }): ResearchKeywordIssue | null {
   const kw = keyword.trim()
   if (isBrandOrSupport(kw, ctx.brandTokens)) return 'brand_or_support'
-  if (isNoise(kw) && !(ctx.vocab && sharesSiteVocab(kw, ctx.vocab))) return 'noise'
+  const noise = noiseTerm(kw)
+  if (noise && !siteOwnsTerm(noise, ctx.vocab)) return 'noise'
   if (hasNavCommerceToken(kw)) return 'nav_commerce'
   if (isTooGeneric(kw)) return 'too_generic'
   if (ctx.vocab && !isVocabAligned(kw, ctx.vocab)) return 'unrelated'
@@ -454,14 +477,14 @@ export async function recommendFromKeywordResearch(
   const rawKeywords = merged.size
 
   // 2) Basic + noise filtering (brand/support/used-goods/competitor-support).
-  // Phase 3H — noise is RELEVANCE-AWARE: a "noise" term that overlaps the site's
-  // own vocabulary is the site's actual subject matter and is kept.
+  // Phase 3H — noise is RELEVANCE-AWARE: a "noise" term the SITE ITSELF uses is
+  // its actual subject matter and is kept (siteOwnsTerm).
   const brandTokens = tokens(input.businessName || '')
   const vocab = input.siteVocab && input.siteVocab.size >= MIN_SITE_VOCAB_TOKENS ? input.siteVocab : null
   const afterBrand = Array.from(merged.values()).filter((r) => !isBrandOrSupport(r.keyword, brandTokens))
   const afterBasicFilter = afterBrand.length
   const cleaned = afterBrand
-    .filter((r) => !(isNoise(r.keyword) && !(vocab && sharesSiteVocab(r.keyword, vocab))))
+    .filter((r) => { const n = noiseTerm(r.keyword); return !n || siteOwnsTerm(n, vocab) })
     .filter((r) => !hasNavCommerceToken(r.keyword))
     .sort((a, b) => (b.avgMonthlySearches ?? 0) - (a.avgMonthlySearches ?? 0))
   const afterNoiseFilter = cleaned.length

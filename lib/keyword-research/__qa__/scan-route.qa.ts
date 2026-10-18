@@ -287,11 +287,15 @@ async function main() {
     const adminOk = adminQueries.every((q) => {
       const e = eqs(q)
       if (q.table === 'site_crawl_index') return e.user_id === OWNER && e.project_id === PROJECT
+      // 18 Oct 2026 — the relevance vocabulary also reads the merchant's own
+      // mapped pages and, to leave our own articles out, this project's
+      // articles (lib/content/recommendations/site-subject.ts).
+      if (q.table === 'site_page_map' || q.table === 'generated_articles') return e.user_id === OWNER && e.project_id === PROJECT
       if (q.table === 'wordpress_content_index' || q.table === 'wordpress_connections' || q.table === 'shopify_entities') return e.project_id === PROJECT
       return false
     })
     const writes = all.flatMap((r) => r.log.flatMap((q) => q.calls.filter(([m]) => WRITES.has(m)).map(([m]) => `${q.client}:${q.table}.${m}`)))
-    check('A6: every read names the owner: the project (id and owner), the scan\'s research (owner, project, `seed:` rows), the project\'s own research (owner, project, every other row, 20 at most), the tracked keywords and the run; the service role reads the proven project\'s site index only, after ownership; nothing is written',
+    check('A6: every read names the owner: the project (id and owner), the scan\'s research (owner, project, `seed:` rows), the project\'s own research (owner, project, every other row, 20 at most), the tracked keywords and the run; the service role reads the proven project\'s site index and page mapping only, after ownership; nothing is written',
       project.id === PROJECT && project.user_id === OWNER
       && researchReads.length === 2
       && research.project_id === PROJECT && research.user_id === OWNER && show(like) === show(['seed_value', 'seed:%'])
