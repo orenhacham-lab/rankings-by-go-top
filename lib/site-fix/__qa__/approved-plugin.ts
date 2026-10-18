@@ -4,11 +4,11 @@
  * byte-for-byte this list (the repo-only README.md aside): a change to the PHP is a new plugin
  * release, and this list moves with it on purpose.
  *
- * 3.1.1 is live on WordPress.org (Oren uploaded it and confirmed the listing, 13 Oct 2026);
- * APPROVED_PLUGIN_VERSION is 3.1.2, the release in this folder, which is NOT on WordPress.org
- * yet. The two are allowed to differ in exactly this direction, and APPROVED_WPORG_VERSION
- * moves to 3.1.2 the day Oren commits the tag — never before, because it is what merchants
- * are offered. The app gates every 3.1 feature by `>=` the site's
+ * 3.1.2 is live on WordPress.org: Oren committed the tag on 18 Oct 2026 and the version was
+ * read back from api.wordpress.org, whose download for the slug unpacks into
+ * go-top-seo-bridge/ with the corrected links. So both constants are 3.1.2. They are allowed
+ * to differ only while the folder is ahead of WordPress.org, and APPROVED_WPORG_VERSION moves
+ * only once the tag is really there — it is what merchants are offered as an update. The app gates every 3.1 feature by `>=` the site's
  * plugin version (lib/site-fix/plugin-capabilities.ts), so a site still on 3.1.0 is unaffected and is
  * offered the update (PLUGIN_LATEST_VERSION in ../types.ts, which never runs ahead of this constant).
  *
@@ -20,7 +20,7 @@ import { existsSync, readFileSync } from 'fs'
 import { join } from 'path'
 
 /** The release on WordPress.org today (slug go-top-seo-bridge). */
-export const APPROVED_WPORG_VERSION = '3.1.1'
+export const APPROVED_WPORG_VERSION = '3.1.2'
 /** The release in this folder (pinned below). */
 export const APPROVED_PLUGIN_VERSION = '3.1.2'
 
