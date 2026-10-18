@@ -82,7 +82,19 @@ export const PUBLIC_SOURCES: readonly PublicSource[] = [
   // members are mostly neither Shopify nor WordPress, so nearly every one is
   // refused after three fetches. Manufacturers and chamber members are not.
   { name: 'newmfgalliance', url: 'https://newmfgalliance.org/manufacturers/alliance-members-websites/' },
-  { name: 'springfield-chamber', url: 'https://business.springfieldchamber.com/activememberdirectory/Search/manufacturing-128889' },
+  // THE CHAMBER IS READ THROUGH ITS MEMBER PAGES, not off the category page.
+  // Production, 17:00 UTC on 17 Oct: the category page's own footer links
+  // (springfieldregion.com, ozarkspartnership.org, springfieldmo.org,
+  // liveinspringfieldmo.com, thenetworkspringfield.com) were examined as if
+  // they were members, and thenetworkspringfield.com — the chamber's own
+  // networking programme, not a manufacturer — was added to the list. Every
+  // ChamberMaster directory names its members at /activememberdirectory/Details/,
+  // and the member hop already drops whatever the listing itself links to.
+  {
+    name: 'springfield-chamber',
+    url: 'https://business.springfieldchamber.com/activememberdirectory/Search/manufacturing-128889',
+    detailHint: '/activememberdirectory/Details/',
+  },
   { name: 'minnesota-grown', url: 'https://minnesotagrown.com/member/', detailHint: '/member/' },
   { name: 'georgia-grown', url: 'https://georgiagrown.com/membership/member-directory/', detailHint: '/member/' },
   // pride-of-ny, made-in-michigan and alabama-farmers are gone too: the pass at

@@ -46,6 +46,7 @@ import {
 import { CONTACT_PATHS, MAX_PAGES_PER_SITE, qualifyBusiness } from '../qualify'
 import {
   MAX_CANDIDATES_PER_PASS,
+  PUBLIC_SOURCES,
   MAX_DETAIL_PAGES,
   addProspect,
   detailPageWindow,
@@ -650,6 +651,25 @@ async function main() {
   )
   check('T12-MUT: without the window both passes refuse the same four for ever',
     JSON.stringify(mutWide[0]) === JSON.stringify(mutWide[1]))
+
+  // A ChamberMaster directory's category page carries the chamber's own footer
+  // programmes as off-site links, and on 17 Oct one of them was added to the
+  // list as if it were a manufacturer. Read through the member pages, where
+  // the hop drops whatever the listing itself links to, it cannot happen.
+  const chambers = PUBLIC_SOURCES.filter((s) => s.url.includes('/activememberdirectory/'))
+  check('T13: every chamber directory is read through its member pages',
+    chambers.length > 0
+    && chambers.every((s) => s.detailHint === '/activememberdirectory/Details/'))
+
+  const mutChamber = await withMutant<{ PUBLIC_SOURCES: typeof PUBLIC_SOURCES }, boolean>(
+    'lib/outreach/topup.ts',
+    [[/    detailHint: '\/activememberdirectory\/Details\/',\n/, '']],
+    async (m) => m.PUBLIC_SOURCES
+      .filter((s) => s.url.includes('/activememberdirectory/'))
+      .every((s) => s.detailHint === '/activememberdirectory/Details/'),
+  )
+  check('T13-MUT: without the hint the chamber is read off its category page again',
+    mutChamber === false)
 
   console.log('\n— G: the switches and the cron —')
 
