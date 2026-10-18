@@ -96,8 +96,14 @@ check('A3: and when its URL differs by www, a query or a trailing slash, the URL
   && urlKey('https://4dogsoriginal.co.il/toy-dogs-complete-guide-israel?utm_source=nl') === urlKey(`${SITE}/toy-dogs-complete-guide-israel/`))
 check('A4: and when only the title matches, the page is still ours',
   !titles.includes(OUR_ARTICLES[2].title) && titleKey('  שוקלים   אימוץ  ') === 'שוקלים אימוץ')
-check('A5: the merchant\'s own pages are all kept, in the mapping\'s order',
-  titles.length === MERCHANT_PAGES.length && titles[0] === MERCHANT_PAGES[0])
+// 18 Oct 2026: the mapping's utility pages (here 'צור קשר', 'אודות', 'חנות')
+// are left out too — they say nothing about what the merchant sells
+// (site-subject.ts isUtilityTitle, guarded in gate-precision.qa.ts).
+const UTILITY_IN_FIXTURE = ['צור קשר', 'אודות', 'חנות']
+check('A5: the merchant\'s own product pages are all kept, in the mapping\'s order',
+  titles.length === MERCHANT_PAGES.length - UTILITY_IN_FIXTURE.length && titles[0] === MERCHANT_PAGES[0])
+check('A5b: and the mapping\'s utility pages are the only ones left out',
+  UTILITY_IN_FIXTURE.every((t) => MERCHANT_PAGES.includes(t) && !titles.includes(t)))
 check('A6: an entity in a title is decoded, so its words are readable',
   titles.some((t) => t.includes('–') || t.includes('חטיף טבעי')) && !titles.some((t) => t.includes('&#8211;')))
 check('A7: a titleless page is not a title, and the number read is bounded',
