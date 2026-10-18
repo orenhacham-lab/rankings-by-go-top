@@ -61,8 +61,9 @@ check('MUTATION CONTROL A: the old field-only reading leaves the live projects u
 const genSrc = strip(read('lib/content/article-generation.ts'))
 check('A6: generation reads the project name and resolves it through projectBusinessName',
   /\.select\('name, business_name,/.test(genSrc) && /const businessName = projectBusinessName\(/.test(genSrc))
-check('A7: naming the business still needs the owner\'s switch and a non-store project',
-  /includeBrandName: decodedNotes\.brandChoiceSet \? decodedNotes\.flags\.includeBrandName : !generationContext\.shopify && generationContext\.guidance\.mentionBusiness && !!businessName\?\.trim\(\)/.test(genSrc))
+check('A7: naming the business still needs the owner\'s switch, and now covers a Shopify store',
+  /includeBrandName: decodedNotes\.brandChoiceSet \? decodedNotes\.flags\.includeBrandName : generationContext\.guidance\.mentionBusiness && !!businessName\?\.trim\(\)/.test(genSrc)
+  && !/!generationContext\.shopify/.test(genSrc))
 const mutGen = genSrc.replace(/\.select\('name, business_name,/, ".select('business_name,")
 check('MUTATION CONTROL A2: dropping the name column from the read is caught (so A6 would fail)',
   !/\.select\('name, business_name,/.test(mutGen))

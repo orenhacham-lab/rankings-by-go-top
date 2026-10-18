@@ -43,12 +43,12 @@ export type GenerationContext = {
   guidance: WritingGuidance
   business: BusinessContext
   /**
-   * A Shopify store (a live store connection on this project). The business is
-   * not named in its articles unless the brief says so, and its city is left
-   * out. The owner's own guidance (empty unless they wrote some) and, since
-   * 2026-10-17, the business DESCRIPTION do apply: the settings ask every owner
-   * for a description and a store owner's answer was silently ignored (Oren:
-   * "יש אופציה להוסיף תיאור, למה בעצם אין תיאור?").
+   * A Shopify store (a live store connection on this project). All that is left
+   * of the distinction is the CITY, which a store's articles leave out: they are
+   * not written to place a business in a town. The owner's own guidance, the
+   * business DESCRIPTION (since 2026-10-17) and the business NAME (since
+   * 2026-10-18, Oren: "כן שיופיע גם בחנות שופיפיי במאמר") all apply to a store
+   * exactly as they do to any other project.
    */
   shopify: boolean
 }

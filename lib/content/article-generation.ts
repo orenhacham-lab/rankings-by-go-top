@@ -260,10 +260,13 @@ export async function generateArticleForTopic(
     ctaUrl: decodedNotes.flags.cta.url || null,
     briefNotes: decodedNotes.notes || null,
     // E-E-A-T: the article is the business's own, so a topic the system created names the business
-    // (when its name is known). A choice the owner made in the brief form is kept as made.
-    // A Shopify store's articles keep their default (not named) until the owner decides otherwise;
-    // the owner can switch naming off for the project in the writing guidelines.
-    includeBrandName: decodedNotes.brandChoiceSet ? decodedNotes.flags.includeBrandName : !generationContext.shopify && generationContext.guidance.mentionBusiness && !!businessName?.trim(),
+    // (when its name is known). A choice the owner made in the brief form is kept as made, and the
+    // owner can switch naming off for the project in the writing guidelines.
+    // A SHOPIFY STORE IS NAMED TOO since 18 October 2026 (Oren: "כן שיופיע גם בחנות שופיפיי
+    // במאמר"). Until then a store's articles never named it, which is why an article on a store's
+    // own blog read as if it belonged to nobody. What stays store-specific is the city, which a
+    // store's articles still leave out (lib/content/writing-guidance/store.ts).
+    includeBrandName: decodedNotes.brandChoiceSet ? decodedNotes.flags.includeBrandName : generationContext.guidance.mentionBusiness && !!businessName?.trim(),
     brandNameToInclude: decodedNotes.flags.brandNameToInclude || businessName,
     includeManualToc: decodedNotes.flags.includeManualToc,
     anchors,
