@@ -1,18 +1,20 @@
-=== GO TOP SEO Bridge ===
+=== GO TOP SEO Bridge – AI SEO Autopilot: Articles & Schema ===
 Contributors: gotopil
-Tags: seo, schema, publishing, content, ai
+Tags: seo, ai seo, blog, content, schema
 Requires at least: 6.0
 Tested up to: 7.1
 Requires PHP: 7.4
-Stable tag: 3.1.2
+Stable tag: 3.1.3
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
-Connects your site to GO TOP: publishes the articles you send from GO TOP and applies the SEO fixes you approve there.
+Connects your site to GO TOP: publishes AI-written blog articles with images and internal links, and applies the SEO fixes and schema you approve.
 
 == Description ==
 
-GO TOP (https://www.gotopseo.com/en) plans and writes articles for your business and finds SEO problems on your site. This plugin is the connection between GO TOP and your WordPress site. It needs a GO TOP account; on its own it does nothing.
+GO TOP (https://www.gotopseo.com/en) does the SEO work of a small business in one place: it plans and writes articles with images and internal links, tracks every month where the business stands in Google, in AI assistants (ChatGPT, Gemini and Google's AI answers) and in Google Maps, publishes posts and handles reviews on the Google Business Profile, and sends a report.
+
+This plugin is the connection between GO TOP and your WordPress site, and it does two of those things on the site itself: it publishes the articles, and it applies the SEO fixes and schema you approve. The tracking, the Maps posts and the reviews happen in GO TOP, not in this plugin. It needs a GO TOP account; on its own it does nothing.
 
 = Publishing articles =
 
@@ -160,6 +162,9 @@ Settings > GO TOP SEO > Disconnect. GO TOP can no longer reach the site. Deletin
 
 == Changelog ==
 
+= 3.1.3 =
+* The plugin's name and description in the WordPress.org directory now say what it does, so it can be found by searching for it. The plugin's code, its routes and the connection are unchanged.
+
 = 3.1.2 =
 * The links to the GO TOP site now carry www and point at the English pages, which is the language this plugin and its readme are written in. The plugin's code, its routes and the connection are unchanged.
 
@@ -190,6 +195,9 @@ Settings > GO TOP SEO > Disconnect. GO TOP can no longer reach the site. Deletin
 * First release.
 
 == Upgrade Notice ==
+
+= 3.1.3 =
+Only the name and the description in the directory changed. The connection is kept.
 
 = 3.1.2 =
 Only the links to the GO TOP site changed. The connection is kept.

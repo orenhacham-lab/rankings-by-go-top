@@ -2,7 +2,7 @@
 /**
  * Plugin Name:       GO TOP SEO Bridge
  * Description:       Connects your site to GO TOP: publishes the articles you send from GO TOP and applies the SEO fixes you approve there, each one undoable.
- * Version:           3.1.2
+ * Version:           3.1.3
  * Requires at least: 6.0
  * Requires PHP:      7.4
  * Author:            GO TOP DIGITAL MARKETING AND ADVERTISING LTD
@@ -65,7 +65,7 @@ add_action('plugins_loaded', function () {
         return;
     }
 
-    define('GOTOP_SEO_BRIDGE_VERSION', '3.1.2');
+    define('GOTOP_SEO_BRIDGE_VERSION', '3.1.3');
     define('GOTOP_SEO_BRIDGE_DIR', __DIR__);
     define('GOTOP_SEO_BRIDGE_FILE', __FILE__);
 
