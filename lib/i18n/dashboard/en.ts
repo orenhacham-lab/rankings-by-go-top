@@ -2506,8 +2506,8 @@ export const dashboardEn = {
     // The monthly top-up's topics (components/content-strategy/TopUpNotice.tsx).
     topup: {
       title: 'New topics we prepared for you this month',
-      body: 'We added {count} topics to your plan, so you have topics for all of next month. We picked them from your content plan and checked that you do not already have a page or an article on the same subject. They are in the "Planned" column, and in the list view you can reject any that does not fit.',
-      bodyOne: 'We added one topic to your plan, so you have topics for all of next month. We picked it from your content plan and checked that you do not already have a page or an article on the same subject. It is in the "Planned" column, and in the list view you can reject it if it does not fit.',
+      body: 'We added {count} topics to your plan, so you have topics for all of next month. We picked them from your content plan and checked that you do not already have a page or an article on the same subject. They are in the "Planned" column, and you can remove any that does not fit.',
+      bodyOne: 'We added one topic to your plan, so you have topics for all of next month. We picked it from your content plan and checked that you do not already have a page or an article on the same subject. It is in the "Planned" column, and you can remove it if it does not fit.',
       origins: { scan: 'From your site scan', research: 'From keyword research', keywords: 'From your keywords', plan: 'From your content plan' },
     },
     loading: 'Loading the plan…',
@@ -2529,6 +2529,10 @@ export const dashboardEn = {
       rejected: 'Idea removed. It will not be suggested again.',
       approveError: 'We could not approve the idea. Try again in a moment.',
       rejectError: 'We could not remove the idea. Try again in a moment.',
+      remove: 'Not a fit',
+      removeAria: 'Remove the topic: {title}',
+      removed: 'The topic left the plan and the publishing queue.',
+      removeError: 'We could not remove the topic. Try again in a moment.',
       addKeyword: 'Add a keyword',
       keywordLabel: 'Keyword for a new topic',
       keywordPlaceholder: 'For example: running shoes for women',
