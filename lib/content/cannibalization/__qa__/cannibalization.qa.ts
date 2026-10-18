@@ -195,10 +195,13 @@ function wiring() {
   // W4 the monthly top-up: every promoted idea and every new idea is checked.
   const topup = code('lib/content/automation/topic-topup.ts')
   const topupOk = (s: string) => /checkOverlap\(index, candidate, \{ kinds: SKIP_KINDS, excludeIdeaIds: \[idea\.id\] \}\)[^\n]*continue/.test(s)
-    && s.indexOf('skipOverlapping(pick.index, generated.suggestions, SKIP_KINDS_NEW)') > 0
-    && s.indexOf('skipOverlapping(pick.index, generated.suggestions, SKIP_KINDS_NEW)') < s.indexOf('insertPendingIdeas(admin')
+    // 18 Oct 2026: the picked project's index is read lazily (a stale plan carries none), so the call takes `index`.
+    && s.indexOf('skipOverlapping(index, generated.suggestions, SKIP_KINDS_NEW)') > 0
+    && s.indexOf('const index = pick.index ?? await deps.loadIndex(scope)') > 0
+    && s.indexOf('skipOverlapping(index, generated.suggestions, SKIP_KINDS_NEW)') < s.indexOf('insertPendingIdeas(admin')
   check('W4 the top-up skips a promoted idea or a new idea the site or the plan already has', topupOk(topup))
   check('W4 MUTATION CONTROL: a top-up that promotes without the check is caught', !topupOk(topup.replace('checkOverlap(index, candidate, { kinds: SKIP_KINDS, excludeIdeaIds: [idea.id] })', 'false')))
+  check('W4 MUTATION CONTROL: a new idea stored before the skip is caught', !topupOk(topup.replace('const fresh = skipOverlapping(index, generated.suggestions, SKIP_KINDS_NEW)', 'const fresh = generated.suggestions')))
   // W5 the manual screens ask first and offer "improve", with "create anyway".
   const screens: [string, RegExp][] = [
     ['components/content/ArticleBriefModal.tsx', /fetchOverlap\(projectId, topic/],
