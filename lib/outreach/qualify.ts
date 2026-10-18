@@ -36,6 +36,7 @@ import {
   forbidsHarvesting,
   isEeaUkDomain,
   isOpenPage,
+  pageTitle,
   robotsAllows,
 } from './sourcing'
 
@@ -110,6 +111,31 @@ export type RefusalReason =
   | 'eea_uk_address'
   | 'no_contact_email'
   | 'harvesting_notice'
+  | 'off_target_sector'
+
+/**
+ * The sectors this channel does not write to, decided by Oren on 18 Oct 2026
+ * after a bank, a management consultancy and a chamber's own networking
+ * programme entered the list. None of them was a crawler error: a
+ * manufacturing alliance's member list and a chamber's directory carry service
+ * members beside the businesses that sell and publish, and nothing in a listing
+ * marks which is which.
+ *
+ * Matched on WHOLE WORDS, because "Riverbank Farms" and "Bank Street Bakery"
+ * are exactly the businesses this channel is looking for.
+ */
+const OFF_TARGET_TERMS = [
+  'bank', 'banks', 'banking', 'bancorp', 'bancshares', 'credit union', 'federal savings',
+  'consulting', 'consultancy', 'consultants', 'advisory', 'advisors', 'advisers',
+  'coaching', 'leadership group',
+  'chamber of commerce', 'economic development', 'workforce development',
+]
+
+/** The term that puts this name outside the channel's aim, or null. */
+export function offTargetSector(text: string): string | null {
+  const padded = ` ${text.toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim()} `
+  return OFF_TARGET_TERMS.find((term) => padded.includes(` ${term} `)) ?? null
+}
 
 export type Qualification =
   | { ok: true; draft: ProspectDraft; pagesRead: number }
@@ -144,6 +170,14 @@ export async function qualifyBusiness(input: QualifyInput, fetchPage: PageFetche
   // Nothing is requested from a European domain at all.
   if (isEeaUkDomain(host)) return { ok: false, reason: 'eea_uk_domain', pagesRead }
 
+  // And nothing is requested from a sector we do not write to. The cheapest
+  // refusal there is: the name the directory itself gave, and a .bank domain,
+  // which only a bank may hold.
+  const offTargetName = host.endsWith('.bank') ? '.bank' : offTargetSector(input.company)
+  if (offTargetName !== null) {
+    return { ok: false, reason: 'off_target_sector', detail: offTargetName, pagesRead }
+  }
+
   // robots.txt before the site. A refusal here costs the site one small file.
   const robots = await get(fetchPage, `https://${host}/robots.txt`)
   pagesRead += 1
@@ -157,6 +191,13 @@ export async function qualifyBusiness(input: QualifyInput, fetchPage: PageFetche
   pagesRead += 1
   if (home === null) return { ok: false, reason: 'home_unreachable', pagesRead }
   if (!isOpenPage(home)) return { ok: false, reason: 'not_open', detail: `status ${home.status}`, pagesRead }
+
+  // The listing's anchor text is sometimes shorter than the business's own
+  // name, so the site's own title gets the same reading.
+  const offTargetTitle = offTargetSector(pageTitle(home.body) ?? '')
+  if (offTargetTitle !== null) {
+    return { ok: false, reason: 'off_target_sector', detail: offTargetTitle, pagesRead }
+  }
 
   const platform = readPlatform(home.body)
   if (platform.platform === null) {
