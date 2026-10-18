@@ -74,7 +74,7 @@ export function siteOwnsTerm(term: string, vocab: Set<string> | null | undefined
   if (!vocab || vocab.size === 0) return true
   const parts = Array.from(tokens(term))
   if (parts.length === 0) return true
-  return parts.every((t) => vocab.has(t))
+  return parts.every((t) => tokenInVocab(t, vocab))
 }
 
 // ── Phase 3H — generic topic-quality rules (site-agnostic, multilingual) ──────
@@ -139,16 +139,72 @@ export const MIN_SITE_VOCAB_TOKENS = 25
 //   "ספורט 365 לייב"        → ≤1/2 ✗ (numerals never count as matches)
 
 const HE_TOKEN_PREFIX = /^[בלמהושכ]/
+const HE_LETTER = /[\u0590-\u05FF]/
+
+/**
+ * 18 October 2026 — HEBREW SPELLING AND PLURALS (from running the gate over
+ * 4dogsoriginal.co.il's own plan: "מזרון לכלבים גדולים" was rejected against a
+ * site whose pages say "מזרן" and "גדול", and six more good ideas with it).
+ *
+ * A light stem, not a morphological analyser: one leading prefix letter, then a
+ * plural or feminine ending, then the vowel letters ו and י, which Hebrew
+ * spells both ways (מזרן / מזרון, מיטה / מטה). Both sides of a comparison are
+ * stemmed, so a stem that merges two words can only make the gate MORE
+ * permissive — the safe direction, because the gate only ever rejects.
+ * Non-Hebrew tokens are returned unchanged.
+ */
+export function heStem(token: string): string {
+  if (!HE_LETTER.test(token)) return token
+  let t = token
+  const trimmed = t.replace(/(יות|ות|ים|יה|ה)$/u, '')
+  if (trimmed.length >= 3) t = trimmed
+  const skeleton = t.replace(/[וי]/gu, '')
+  return skeleton.length >= 3 ? skeleton : t
+}
+
 function tokenInVocab(tok: string, vocab: Set<string>): boolean {
   if (vocab.has(tok)) return true
   // Light Hebrew prefix slack (ל/ב/ה/ו/ש/כ/מ): "לכלבים" matches vocab "כלבים".
   if (tok.length >= 4 && HE_TOKEN_PREFIX.test(tok) && vocab.has(tok.slice(1))) return true
+  // The same word spelled or inflected differently (heStem); the vocabulary
+  // carries the stems of its own words (buildSiteVocabulary). The prefix letter
+  // is taken off here rather than inside the stem, because a root can begin with
+  // one of those letters ("כלבים" is not a prefixed "לבים").
+  for (const form of tok.length >= 4 && HE_TOKEN_PREFIX.test(tok) ? [tok, tok.slice(1)] : [tok]) {
+    const stem = heStem(form)
+    if (stem !== tok && vocab.has(stem)) return true
+  }
   return false
 }
 
+/**
+ * 18 October 2026 — STRUCTURAL WORDS DO NOT COUNT AGAINST A KEYWORD.
+ *
+ * The alignment rule asks that MOST of a keyword's words be the site's own, so
+ * the words that only shape a question or a comparison worked against it:
+ * "השוואת סוגי מיטות לכלבים" is a dog-bed comparison on a dog-bed store, and it
+ * was rejected at 2 of 4 (מיטות, כלבים matched; השוואת, סוגי did not). These
+ * words belong to no market, so they are left out of the count the way numerals
+ * already are. The keyword still needs two of its own words on the site.
+ */
+const STRUCTURAL_TOKENS = new Set([
+  // he
+  'השוואת', 'השוואה', 'סוגי', 'סוג', 'מדריך', 'טיפים', 'איך', 'כיצד', 'למה', 'מתי', 'איפה', 'מה',
+  'כמה', 'עולה', 'הטוב', 'הטובים', 'הטובות', 'ביותר', 'מומלץ', 'מומלצים', 'המלא', 'הכל', 'לבחור',
+  'בחירת', 'שלב', 'שלבים', 'רשימת', 'הדרך', 'דרכים', 'יתרונות', 'חסרונות', 'לעומת', 'מול', 'עם',
+  'בלי', 'ללא', 'הכי', 'הזול', 'הזולים', 'חדש', 'חדשים', 'שנה', 'השנה',
+  // en / es / pt
+  'how', 'what', 'why', 'when', 'where', 'which', 'guide', 'tips', 'best', 'top', 'compare',
+  'comparison', 'types', 'type', 'kind', 'kinds', 'list', 'step', 'steps', 'vs', 'versus',
+  'review', 'reviews', 'cheap', 'cheapest', 'new', 'complete', 'ultimate', 'choose', 'choosing',
+  'como', 'cómo', 'qué', 'que', 'mejor', 'mejores', 'guía', 'guia', 'tipos', 'comparación',
+  'comparacao', 'comparação', 'melhor', 'melhores', 'dicas', 'passo', 'lista',
+])
+
 /** Matched/total meaningful tokens of a keyword vs the site vocabulary. */
 export function vocabAlignment(keyword: string, vocab: Set<string>): { matched: number; total: number } {
-  const meaningful = Array.from(tokens(keyword)).filter((t) => !/^\d+$/.test(t))
+  const all = Array.from(tokens(keyword)).filter((t) => !/^\d+$/.test(t))
+  const meaningful = all.filter((t) => !STRUCTURAL_TOKENS.has(t))
   let matched = 0
   for (const t of meaningful) if (tokenInVocab(t, vocab)) matched++
   return { matched, total: meaningful.length }

@@ -53,6 +53,66 @@ export function titleKey(title: string | null | undefined): string {
   return decodeTitle(String(title || '')).toLowerCase().replace(/\s+/g, ' ').trim()
 }
 
+/**
+ * 18 October 2026 — A UTILITY PAGE IS NOT THE SITE'S SUBJECT.
+ *
+ * Running the gate over 4dogsoriginal.co.il's own plan showed "עגלת גלידה
+ * לילדים" — an ice-cream cart, a children's toy — passing as the site's own
+ * subject, because the mapping holds the shop's basket page, "עגלת הקניות", so
+ * "עגלה" was a site word. A cart, a checkout, an account, the terms and the
+ * accessibility statement say nothing about what the merchant sells, so their
+ * titles are left out of the vocabulary.
+ *
+ * The match is on the title's FIRST segment (the part before a separator such
+ * as "|" or "–", which usually carries the site's name), and only when that
+ * segment IS one of these phrases: an article named "מדיניות גזים: למה הכלב
+ * מגרד" or "Store your dog food properly" starts with one of these words and is
+ * not one of these pages.
+ */
+const UTILITY_TITLES: readonly string[] = [
+  // he
+  'עגלת הקניות', 'עגלת קניות', 'סל הקניות', 'עגלה', 'קופה', 'תשלום', 'סליקה', 'צ\'קאאוט',
+  'החשבון שלי', 'האזור האישי', 'כניסה', 'התחברות', 'הרשמה', 'התנתקות', 'הזמנות שלי', 'רשימת המשאלות',
+  'תנאי שימוש', 'תקנון', 'מדיניות פרטיות', 'מדיניות', 'הצהרת נגישות', 'נגישות', 'הצהרת פרטיות',
+  'צור קשר', 'יצירת קשר', 'דברו איתנו', 'אודות', 'אודותינו', 'עלינו', 'שאלות ותשובות', 'שאלות נפוצות',
+  'משלוחים', 'משלוח והחזרות', 'החזרות וביטולים', 'מדיניות משלוחים', 'מדיניות החזרות', 'מדיניות ביטולים',
+  'הרשמה לניוזלטר', 'ניוזלטר', 'חיפוש', 'תוצאות חיפוש', 'העמוד לא נמצא', 'דף הבית', 'הבלוג', 'בלוג',
+  'מפת האתר', 'כל המוצרים', 'החנות', 'חנות', 'הקטלוג', 'קטלוג',
+  // en
+  'cart', 'shopping cart', 'basket', 'checkout', 'my account', 'account', 'login', 'log in', 'sign in',
+  'sign up', 'register', 'logout', 'my orders', 'order tracking', 'wishlist',
+  'terms of service', 'terms and conditions', 'terms of use', 'terms', 'privacy policy', 'privacy',
+  'accessibility statement', 'accessibility', 'cookie policy', 'refund policy', 'return policy',
+  'shipping policy', 'shipping and returns', 'shipping', 'returns', 'contact', 'contact us', 'about',
+  'about us', 'faq', 'faqs', 'newsletter', 'search', 'search results', 'page not found', 'not found',
+  'home', 'blog', 'sitemap', 'all products', 'shop', 'store',
+  // es
+  'carrito', 'carrito de compra', 'cesta', 'finalizar compra', 'mi cuenta', 'cuenta', 'iniciar sesión',
+  'registro', 'términos y condiciones', 'términos de uso', 'política de privacidad', 'privacidad',
+  'accesibilidad', 'política de cookies', 'política de envíos', 'envíos', 'devoluciones', 'contacto',
+  'sobre nosotros', 'acerca de', 'preguntas frecuentes', 'boletín', 'buscar', 'resultados de búsqueda',
+  'página no encontrada', 'inicio', 'mapa del sitio', 'todos los productos', 'tienda',
+  // pt-BR
+  'carrinho', 'carrinho de compras', 'finalizar compra', 'minha conta', 'conta', 'entrar', 'cadastro',
+  'termos de uso', 'termos e condições', 'política de privacidade', 'privacidade', 'acessibilidade',
+  'política de cookies', 'política de envio', 'envio', 'trocas e devoluções', 'devoluções', 'contato',
+  'sobre nós', 'sobre', 'perguntas frequentes', 'buscar', 'resultados da busca',
+  'página não encontrada', 'início', 'mapa do site', 'todos os produtos', 'loja',
+]
+
+/** The part of a title before the separator that usually carries the site's name. */
+export function titleHead(title: string | null | undefined): string {
+  const first = titleKey(title).split(/\s*[|–—·•>»:]\s*/)[0] ?? ''
+  return first.replace(/[.,;!?]+$/, '').trim()
+}
+
+/** A cart, a checkout, the terms, an accessibility statement: not what the merchant sells. */
+export function isUtilityTitle(title: string | null | undefined): boolean {
+  const head = titleHead(title)
+  if (!head) return false
+  return UTILITY_TITLES.includes(head)
+}
+
 export interface MapEntryLite { u?: unknown; t?: unknown }
 export interface OurArticleLite { title?: string | null; urls?: (string | null | undefined)[] }
 
@@ -77,6 +137,7 @@ export function merchantTitles(entries: readonly MapEntryLite[] | null | undefin
     if (!title) continue
     const key = titleKey(title)
     if (seen.has(key) || ourTitles.has(key)) continue
+    if (isUtilityTitle(title)) continue
     if (ourUrls.has(urlKey(typeof e?.u === 'string' ? e.u : ''))) continue
     seen.add(key)
     out.push(title)

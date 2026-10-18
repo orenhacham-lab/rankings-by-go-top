@@ -25,7 +25,7 @@ import { RunCostController, newRunCostController } from './run-cost-controller'
 import { orderSourcesByEvidence, stage1Sources } from './hybrid-orchestration'
 import { recommendationGuidance, structuredOutputContract, pendingTopicsBlock, projectContextBlock, deriveProjectFocus, type PendingTopic } from './prompt-guidance'
 import { validateIdea } from './validate'
-import { recommendFromKeywordResearch, topicQualityIssue, researchKeywordIssue, MIN_SITE_VOCAB_TOKENS } from './keyword-research'
+import { recommendFromKeywordResearch, topicQualityIssue, researchKeywordIssue, heStem, MIN_SITE_VOCAB_TOKENS } from './keyword-research'
 import { recommendFromSiteScan } from './site-scan'
 import { mergeHybrid, hybridProvenanceReason } from './hybrid'
 import { slugFromUrl } from '@/lib/content/internal-links'
@@ -98,6 +98,11 @@ export async function buildSiteVocabulary(admin: Admin, projectId: string, extra
     for (const tk of tokens(s || '')) {
       vocab.add(tk)
       if (tk.length >= 4 && /^[בלמהושכ]/.test(tk)) vocab.add(tk.slice(1))
+      // 18 October 2026 — the stem too (heStem), so a keyword that spells or
+      // inflects the same word differently ("מזרון" where the site writes
+      // "מזרן", "גדולים" where it writes "גדול") still counts as the site's own.
+      const stem = heStem(tk)
+      if (stem && stem !== tk) vocab.add(stem)
     }
   }
   try {
