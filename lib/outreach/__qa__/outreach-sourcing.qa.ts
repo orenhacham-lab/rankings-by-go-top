@@ -43,7 +43,13 @@ import {
   pageTitle,
   robotsAllows,
 } from '../sourcing'
-import { CONTACT_PATHS, MAX_PAGES_PER_SITE, qualifyBusiness } from '../qualify'
+import {
+  CONTACT_PATHS,
+  MAX_PAGES_PER_SITE,
+  offTargetSector,
+  qualifyBusiness,
+  type Qualification,
+} from '../qualify'
 import {
   MAX_CANDIDATES_PER_PASS,
   PUBLIC_SOURCES,
@@ -284,6 +290,48 @@ async function main() {
   await qualifyBusiness(CANDIDATE, counting(site({ home: `<html>${SHOPIFY}</html>` })))
   check('Q8: one stranger\'s server is never asked for more than the budget',
     fetched.length <= MAX_PAGES_PER_SITE + 1 && CONTACT_PATHS.length > MAX_PAGES_PER_SITE)
+
+  // THE SECTORS THIS CHANNEL DOES NOT WRITE TO (Oren, 18 Oct). A directory of
+  // manufacturers lists its bank and its consultants too.
+  const bank = await qualifyBusiness(
+    { ...CANDIDATE, company: 'American National Bank Fox Cities' },
+    site({ home: `<html>${SHOPIFY}${US_ADDRESS}${CONTACT}</html>` }),
+  )
+  check('Q9: a bank is refused on its name, before its server is asked for anything',
+    bank.ok === false && bank.reason === 'off_target_sector' && bank.pagesRead === 0)
+
+  const dotBank = await qualifyBusiness(
+    { ...CANDIDATE, company: 'Fox Cities Savings', host: 'anbfc.bank' },
+    site({ home: `<html>${SHOPIFY}${US_ADDRESS}${CONTACT}</html>` }),
+  )
+  check('Q9b: and so is a .bank domain, which only a bank may hold',
+    dotBank.ok === false && dotBank.reason === 'off_target_sector' && dotBank.pagesRead === 0)
+
+  check('Q9c: but a farm with "bank" inside a word is exactly who we are looking for',
+    offTargetSector('Riverbank Farms') === null
+    && offTargetSector('Bank Street Bakery') !== null
+    && offTargetSector('Wisconsin Aluminum Foundry Co., Inc.') === null
+    && offTargetSector('Ascent Leadership Group') === 'leadership group'
+    && offTargetSector('Springfield Chamber of Commerce') === 'chamber of commerce')
+
+  const byTitle = await qualifyBusiness(
+    { ...CANDIDATE, company: 'Ascent' },
+    site({ home: `<html><title>Ascent Consulting Group</title>${SHOPIFY}${US_ADDRESS}${CONTACT}</html>` }),
+  )
+  check('Q9d: a name the listing shortened is read again off the site\'s own title',
+    byTitle.ok === false && byTitle.reason === 'off_target_sector')
+
+  const mutSector = await withMutant<{ qualifyBusiness: typeof qualifyBusiness }, Qualification>(
+    'lib/outreach/qualify.ts',
+    [[/  const offTargetName = host\.endsWith\('\.bank'\) \? '\.bank' : offTargetSector\(input\.company\)/,
+      '  const offTargetName: string | null = null']],
+    async (m) => m.qualifyBusiness(
+      { ...CANDIDATE, company: 'American National Bank Fox Cities' },
+      site({ home: `<html>${SHOPIFY}${US_ADDRESS}${CONTACT}</html>` }),
+    ),
+  )
+  check('Q9-MUT: without the rule the bank is written to the list',
+    mutSector.ok === true)
 
   console.log('\n— T: writing it down —')
 
