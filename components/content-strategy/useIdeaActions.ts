@@ -12,8 +12,9 @@
 import { useCallback, useMemo, useRef, useState } from 'react'
 import {
   applyIdeaOverrides, approveRequest, keywordRequest, normalizeKeyword, overrideSettled,
-  readApproveOutcome, readApprovedTopicId, readCreatedOverlap, readRejectOutcome, rejectRequest,
-  type IdeaOutcome, type IdeaOverride, type IdeaRequest, type IdeaTarget,
+  readApproveOutcome, readApprovedTopicId, readCreatedOverlap, readRejectOutcome, readRemovePlannedOutcome,
+  rejectRequest, removePlannedRequests,
+  type IdeaOutcome, type IdeaOverride, type IdeaRequest, type IdeaTarget, type PlannedTarget,
 } from '@/lib/content/strategy/ideas'
 import { sameTopicKey, type StrategyData } from '@/lib/content/strategy/board'
 import type { getDashboardDictionary } from '@/lib/i18n/dashboard/getDashboardDictionary'
@@ -28,7 +29,7 @@ const TIMEOUT_MS = 30_000
 /** A settled action whose effect a fresh read never showed (renamed on the server) stops standing in after this. */
 const STALE_MS = 30_000
 
-export type IdeaBusy = 'approve' | 'reject'
+export type IdeaBusy = 'approve' | 'reject' | 'remove'
 type Held = IdeaOverride & { doneAt?: number }
 type Scoped = {
   projectId: string
@@ -43,9 +44,11 @@ async function send(req: IdeaRequest): Promise<{ ok: boolean; body: unknown }> {
   const controller = new AbortController()
   const timer = window.setTimeout(() => controller.abort(), TIMEOUT_MS)
   try {
+    const method = req.method ?? 'POST'
     const res = await fetch(req.url, {
-      method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(req.body), signal: controller.signal,
+      method, headers: { 'Content-Type': 'application/json' },
+      ...(method === 'DELETE' ? {} : { body: JSON.stringify(req.body) }),
+      signal: controller.signal,
     })
     const body = await res.json().catch(() => null)
     return { ok: res.ok, body }
@@ -159,6 +162,34 @@ export function useIdeaActions({ projectId, automation, dict, toast, onChanged, 
     inFlight.current.delete(t.key)
   }, [projectId, a, ops, say, onChanged])
 
+  /**
+   * Take a planned topic out of the plan: out of the publishing queue first, then
+   * marked rejected (lib/content/strategy/ideas.ts removePlannedRequests). A failure
+   * on the queue stops there, so a topic that still publishes is never shown as gone.
+   */
+  const removePlanned = useCallback(async (t: PlannedTarget) => {
+    if (!projectId || inFlight.current.has(t.key)) return
+    inFlight.current.add(t.key)
+    ops.busy(t.key, 'remove')
+    ops.hold({ kind: 'removeTopic', key: t.key, topicId: t.topicId })
+    let ok = true
+    for (const req of removePlannedRequests(t, projectId)) {
+      const answer = await send(req)
+      ok = req.method === 'DELETE' ? answer.ok : readRemovePlannedOutcome(answer.ok, answer.body)
+      if (!ok) break
+    }
+    if (ok) {
+      ops.settle(t.key)
+      say(a.removed, 'success')
+      onChanged()
+    } else {
+      ops.drop(t.key)
+      say(a.removeError, 'error')
+    }
+    ops.busy(t.key, null)
+    inFlight.current.delete(t.key)
+  }, [projectId, a, ops, say, onChanged])
+
   /** `ok` when the field can close (added, or already there); otherwise the line to show under it. */
   const addKeyword = useCallback(async (raw: string): Promise<{ ok: boolean; error?: string }> => {
     const keyword = normalizeKeyword(raw)
@@ -196,7 +227,7 @@ export function useIdeaActions({ projectId, automation, dict, toast, onChanged, 
 
   const approvedNow = useMemo(() => new Set(scope.approvedNow), [scope.approvedNow])
 
-  return { approve, reject, addKeyword, view, prune, busy: scope.busy, approvedNow, announcement: scope.announcement }
+  return { approve, reject, removePlanned, addKeyword, view, prune, busy: scope.busy, approvedNow, announcement: scope.announcement }
 }
 
 export type IdeaActions = ReturnType<typeof useIdeaActions>

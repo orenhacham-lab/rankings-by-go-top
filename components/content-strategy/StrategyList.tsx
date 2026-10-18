@@ -18,7 +18,7 @@ import type { TopicInsight } from '@/lib/content/strategy/insights'
 import type { PublicLocale } from '@/lib/i18n/locales'
 import type { getDashboardDictionary } from '@/lib/i18n/dashboard/getDashboardDictionary'
 import TopicFacts from './TopicFacts'
-import { ACCENT, IdeaButtons, type BoardIdeaActions } from './StrategyBoard'
+import { ACCENT, IdeaButtons, RemovePlannedButton, type BoardIdeaActions } from './StrategyBoard'
 import { fill, shortDate } from './format'
 
 type Dict = ReturnType<typeof getDashboardDictionary>
@@ -70,6 +70,8 @@ function Row({ card, lang, dict, act, insight }: {
       <div className="mt-2 md:mt-0 md:justify-self-end">
         {card.column === 'ideas' && act ? (
           <IdeaButtons card={card} dict={dict} act={act} inline />
+        ) : card.column === 'planned' && act ? (
+          <RemovePlannedButton card={card} dict={dict} act={act} inline />
         ) : card.articleId ? (
           <Link
             href={`/content/articles/${encodeURIComponent(card.articleId)}`}
