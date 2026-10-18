@@ -11,6 +11,7 @@ import type { PublicLocale } from '@/lib/i18n/locales'
 import { useAuthServerLocale } from '@/components/auth/AuthLocaleProvider'
 import { DASHBOARD_LANGUAGE_STORAGE_KEY } from '@/lib/i18n/dashboard/useDashboardLanguage'
 import { keepSeedClaim, seedClaimDestination } from './claim-action'
+import { recordSignupSource } from './source-action'
 import { CLAIM_START_PATH } from '@/lib/onboarding/claim-start'
 import GoogleSignInButton from '@/components/auth/GoogleSignInButton'
 import AuthShell, { AUTH_LINK_CLASSES, AUTH_TITLE_CLASSES } from '@/components/auth/AuthShell'
@@ -444,6 +445,17 @@ export function SignupForm() {
         setLoading(false)
         return
       }
+
+      // Where this account came from, recorded once, before the paths below
+      // fork on whether a session came back — an account that still has to
+      // confirm its email came from a channel too. Nothing is stored on the
+      // device for this; see app/(auth)/signup/source-action.ts. Awaited but
+      // never able to throw, so a sign-up cannot fail over its attribution.
+      await recordSignupSource(authData.user.id, {
+        search: window.location.search,
+        referrer: document.referrer,
+        path: window.location.pathname,
+      })
 
       // Check if email confirmation is required (no session returned)
       if (!authData.session) {
