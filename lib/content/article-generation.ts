@@ -41,6 +41,21 @@ type Admin = ReturnType<typeof createAdminClient>
 // the model and was later skipped as "anchor not found").
 const MAX_PLANNED_ANCHOR_GUIDANCE = 6
 
+/** A value that is an address, not a name a reader would read in a sentence. */
+const LOOKS_LIKE_ADDRESS = /^(?:https?:\/\/|www\.)|\.(?:co\.il|com|net|org|io|shop|store|co)\b/i
+
+/**
+ * The business as the article names it: the settings' "business name", else the
+ * project's own name, which every other surface already falls back to. Exported
+ * for the guard (./__qa__/brand-mention.qa.ts).
+ */
+export function projectBusinessName(project: { name?: string | null; business_name?: string | null } | null): string | null {
+  const field = (project?.business_name ?? '').trim()
+  if (field) return field
+  const own = (project?.name ?? '').trim()
+  return own && !LOOKS_LIKE_ADDRESS.test(own) ? own : null
+}
+
 export interface GenerateForTopicSuccess {
   ok: true
   articleId: string
@@ -147,7 +162,7 @@ export async function generateArticleForTopic(
   // Project context (safe fields only).
   const { data: project } = await admin
     .from('projects')
-    .select('business_name, target_domain, ai_business_profile, city')
+    .select('name, business_name, target_domain, ai_business_profile, city')
     .eq('id', projectId)
     .maybeSingle()
   const category =
@@ -177,7 +192,15 @@ export async function generateArticleForTopic(
     if (!enough) return { ok: false, kind: 'cta_details_missing' }
   }
 
-  const businessName = (project as { business_name?: string } | null)?.business_name ?? null
+  // The business as the article names it. The settings' "business name" field
+  // first; when the owner never filled it, the project's OWN name, which is what
+  // the author box and the CTA have always fallen back to
+  // (lib/content/author-box/store.ts). Until 18 October 2026 only the field
+  // counted, so a project created without it kept the business out of the body
+  // while the author box named it in the same article (Oren: "אין אזכור של שם
+  // העסק למרות שזה מסומן בהגדרות פרוייקט"). A name that is just an address is
+  // not a name a reader would read, so it is not used.
+  const businessName = projectBusinessName(project as { name?: string | null; business_name?: string | null } | null)
 
   // Phase 3D — resolve article depth + target word range. Manual override
   // (brief_notes flag) wins; otherwise auto-classify from the topic. Drives length

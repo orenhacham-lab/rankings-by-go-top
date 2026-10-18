@@ -56,6 +56,13 @@ import { indexOfCaseInsensitive } from '@/lib/text/ci-index'
 
 export const AUTO_LINK_LIMITS = { max: 5, maxAnchorWords: 6, minParagraphGap: 2, maxCandidates: 2000 } as const
 
+/**
+ * How many mapped pages are read at all before the cap is applied. The cap
+ * itself stays at maxCandidates; this only decides how wide the net is cast
+ * when the pages are ranked against the article's topic (./select byTopicFirst).
+ */
+export const HARD_ENTRY_CEILING = 20_000
+
 export interface AutoLinkArticle {
   title: string
   slug: string | null
@@ -157,7 +164,7 @@ const pathKey = (u: string) => (pathSegments(u) ?? []).join('/')
 export function autoLinkCandidates(
   entries: readonly SiteMapEntry[] | null | undefined,
   site: { host: string; allowHttp?: boolean },
-  article: { title: string; slug: string | null },
+  article: { title: string; slug: string | null; primaryKeyword?: string | null; secondaryKeywords?: readonly string[] },
 ): AutoLinkTarget[] {
   const host = site.host.toLowerCase().replace(/^www\./, '')
   const slug = decodeSlug(article.slug)
@@ -165,7 +172,7 @@ export function autoLinkCandidates(
   const seen = new Set<string>()
   const out: AutoLinkTarget[] = []
   for (const e of entries ?? []) {
-    if (out.length >= AUTO_LINK_LIMITS.maxCandidates) break
+    if (out.length >= HARD_ENTRY_CEILING) break
     if (!e || typeof e.u !== 'string') continue
     const url = e.u.trim()
     // https only, unless the mapped site itself is http — an http-only site used
@@ -184,7 +191,32 @@ export function autoLinkCandidates(
     seen.add(key)
     out.push({ url, title })
   }
-  return out
+  return out.length > AUTO_LINK_LIMITS.maxCandidates ? byTopicFirst(out, article).slice(0, AUTO_LINK_LIMITS.maxCandidates) : out
+}
+
+/**
+ * A site with more pages than the cap used to lose everything past the cap in
+ * the MAPPING'S OWN ORDER, and a shop lists its catalogue long before the page
+ * the article is actually about: a store with 6,192 mapped pages had its ONE
+ * page on the article's subject at position 2,148, so that article got no links
+ * at all. Over the cap the pages that share a word with the article's own topic
+ * come first; under it nothing is reordered, so a site that fits is unchanged.
+ */
+function byTopicFirst(
+  targets: readonly AutoLinkTarget[],
+  article: { title: string; primaryKeyword?: string | null; secondaryKeywords?: readonly string[] },
+): AutoLinkTarget[] {
+  const topic = [article.title, article.primaryKeyword ?? '', ...(article.secondaryKeywords ?? [])].join(' ')
+  const topicToks = wordsOf(topic).filter((w) => !isFunctionWord(w)).map(tokenOf).filter((x): x is Tok => !!x)
+  if (!topicToks.length) return [...targets]
+  const score = (t: AutoLinkTarget) => {
+    const toks = wordsOf(headOf(t.title)).filter((w) => !isFunctionWord(w)).map(tokenOf).filter((x): x is Tok => !!x)
+    return toks.reduce((n, tok) => n + (inList(tok, topicToks) ? 1 : 0), 0)
+  }
+  return targets
+    .map((t, i) => ({ t, i, s: score(t) }))
+    .sort((a, b) => b.s - a.s || a.i - b.i)
+    .map((x) => x.t)
 }
 
 function decodeSlug(slug: string | null): string {
