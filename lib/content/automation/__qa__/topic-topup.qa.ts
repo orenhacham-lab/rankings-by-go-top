@@ -337,7 +337,11 @@ function sourceGuards() {
   }
   check('S4 kill switch, Production, window: all before the first read', gatesOk(fn))
   check('S4 MUTATION CONTROL: a run outside Production is caught', !gatesOk(fn.replace("if (options.env.VERCEL_ENV !== 'production') return EMPTY('not_production')", '')))
-  const modelOk = (f: string) => /if \(slot > 0 && stillShort\.length > 0\)/.test(f) && /timeLeft >= MIN_MS_FOR_MODEL && summary\.modelProjects < MODEL_PROJECTS_PER_RUN/.test(f)
+  // 18 Oct 2026: the candidates are the plans that ran dry, else the plans that hold
+  // old stock only (STALE_IDEA_DAYS); every other guard on the model is unchanged.
+  const modelOk = (f: string) => /if \(slot > 0 && candidates\.length > 0\)/.test(f)
+    && /const candidates = stillShort\.length > 0 \? stillShort : stalePlans/.test(f)
+    && /timeLeft >= MIN_MS_FOR_MODEL && summary\.modelProjects < MODEL_PROJECTS_PER_RUN/.test(f)
     && f.indexOf('await deps.modelAllowed(scope.userId)') > 0 && f.indexOf('await deps.modelAllowed(scope.userId)') < f.indexOf('await deps.generate(scope)')
   check('S5 the model: not in the first quarter hour, one project, time left, the AI gate first', modelOk(fn))
   check('S5 MUTATION CONTROL: a model call without the AI gate is caught', !modelOk(fn.replace('if (await deps.modelAllowed(scope.userId)) {', 'if (true) {')))

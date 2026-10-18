@@ -15,11 +15,16 @@
  *            of the plan's articles a month. At most PER_PROJECT_TARGET_CAP.
  *   supply   an active pool: its items still waiting (queued / scheduled /
  *            generated); without a pool: approved and suggested topics.
- *   refill   first from the ideas ALREADY in its plan (pending content_topic_ideas,
- *            best score first: free, no model); only when those run out, one batch of
+ *   refill   first from the ideas ALREADY in its plan (pending content_topic_ideas:
+ *            free, no model; the ideas saved within STALE_IDEA_DAYS first as a group,
+ *            then the plan's best score); only when those run out, one batch of
  *            the SAME engine the strategy tab uses (generateFromBriefs → the same
  *            finalization guards), for ONE project per run, whose leftovers stay in
- *            the plan as ideas for the next months.
+ *            the plan as ideas for the next months. When no plan has run dry, that
+ *            batch goes to a project whose plan is old stock only (no pending idea
+ *            newer than STALE_IDEA_DAYS), so the next months are planned from
+ *            research that knows the site as it is today; its old ideas are left
+ *            where they are and are still used, so no queue runs dry for this.
  *   guard    every candidate passes the cannibalization check (lib/content/
  *            cannibalization): a subject already on the site, ranking in Search
  *            Console, or planned, is SKIPPED (an automatic path never warns).
@@ -84,6 +89,20 @@ export const MAX_PROJECTS_PER_RUN = 60
 /** The active projects listed per run (ids and owners only). */
 export const MAX_PROJECT_ROWS = 2000
 export const MODEL_PROJECTS_PER_RUN = 1
+/**
+ * 18 October 2026 — AN IDEA OLDER THAN THIS IS OLD STOCK.
+ *
+ * The refill reads the plan's ideas first because they are free, and only asks the
+ * model when they run out. A plan that holds hundreds of ideas never runs out, so on
+ * 18 Oct 2026 fourteen active projects had no idea newer than 10 July while topics
+ * were still being prepared for them every day, all of them from that July batch —
+ * written before the relevance rules, the business profile and the site mapping
+ * improved, and before the merchant's own catalogue moved on. A plan whose newest
+ * idea is older than this gets the model's batch too, so the next months are planned
+ * from fresh research; its old ideas stay exactly where they are and are still used
+ * when nothing fresher covers the target, so no queue ever runs dry for this.
+ */
+export const STALE_IDEA_DAYS = 90
 export const MODEL_TARGET_COUNT = 12
 export const MIN_MS_FOR_MODEL = 150_000
 export const MIN_MS_FOR_PROJECT = 15_000
@@ -173,11 +192,13 @@ export interface TopUpSummary {
   skippedOffSubject: number
   modelProjects: number
   modelIdeas: number
+  /** Projects whose plan holds only ideas older than STALE_IDEA_DAYS. */
+  stalePlans: number
   failures: number
 }
 
 const EMPTY = (state: TopUpSummary['state']): TopUpSummary =>
-  ({ state, projectsChecked: 0, notEntitled: 0, enough: 0, promoted: 0, queued: 0, skippedOverlap: 0, skippedOffSubject: 0, modelProjects: 0, modelIdeas: 0, failures: 0 })
+  ({ state, projectsChecked: 0, notEntitled: 0, enough: 0, promoted: 0, queued: 0, skippedOverlap: 0, skippedOffSubject: 0, modelProjects: 0, modelIdeas: 0, stalePlans: 0, failures: 0 })
 
 function defaultDeps(admin: Admin): TopUpDeps {
   return {
@@ -228,13 +249,36 @@ async function countSupply(admin: Admin, scope: Scope, pool: PoolRow | null): Pr
   return count ?? 0
 }
 
-async function loadPendingIdeas(admin: Admin, scope: Scope): Promise<IdeaRow[]> {
-  const { data, error } = await admin.from('content_topic_ideas')
-    .select('id, title, primary_keyword, secondary_keywords, search_intent, angle, recommended_word_count, suggestion_reason, score, source, link_plan')
+/** Pending ideas of this plan saved within STALE_IDEA_DAYS. 0 = the plan is old stock only. */
+async function countFreshIdeas(admin: Admin, scope: Scope, nowMs: number): Promise<number> {
+  const cutoff = new Date(nowMs - STALE_IDEA_DAYS * 24 * 60 * 60 * 1000).toISOString()
+  const { count, error } = await admin.from('content_topic_ideas').select('id', { count: 'exact', head: true })
+    .eq('project_id', scope.projectId).eq('user_id', scope.userId).eq('status', 'pending').gte('created_at', cutoff)
+  if (error) return 1 // unreadable: behave exactly as before.
+  return count ?? 0
+}
+
+const IDEA_COLUMNS = 'id, title, primary_keyword, secondary_keywords, search_intent, angle, recommended_word_count, suggestion_reason, score, source, link_plan'
+
+/**
+ * The plan's ideas to promote from, best score first — but the ideas saved within
+ * STALE_IDEA_DAYS come first as a group, because the research behind a fresh idea
+ * knows the site as it is today, and a plan with hundreds of old ideas would
+ * otherwise never reach them. Two reads: the newest ideas, then the plan's best, so
+ * a high score from before is still used once the fresh ones are taken.
+ */
+async function loadPendingIdeas(admin: Admin, scope: Scope, nowMs: number): Promise<IdeaRow[]> {
+  const base = () => admin.from('content_topic_ideas').select(IDEA_COLUMNS)
     .eq('project_id', scope.projectId).eq('user_id', scope.userId).eq('status', 'pending')
-    .order('score', { ascending: false }).order('created_at', { ascending: false }).limit(80)
-  if (error) return []
-  return (data ?? []) as IdeaRow[]
+  const cutoff = new Date(nowMs - STALE_IDEA_DAYS * 24 * 60 * 60 * 1000).toISOString()
+  const [freshRes, bestRes] = await Promise.all([
+    base().gte('created_at', cutoff).order('score', { ascending: false }).order('created_at', { ascending: false }).limit(80),
+    base().order('score', { ascending: false }).order('created_at', { ascending: false }).limit(80),
+  ])
+  const fresh = (freshRes.error ? [] : (freshRes.data ?? [])) as IdeaRow[]
+  const best = (bestRes.error ? [] : (bestRes.data ?? [])) as IdeaRow[]
+  const seen = new Set(fresh.map((r) => r.id))
+  return [...fresh, ...best.filter((r) => !seen.has(r.id))]
 }
 
 const isArticleIdea = (r: IdeaRow) => {
@@ -297,7 +341,7 @@ async function refillFromIdeas(
   admin: Admin, deps: TopUpDeps, scope: Scope, project: ProjectRow, pool: PoolRow | null, target: number,
   index: OverlapIndex, summary: TopUpSummary, opts: { deadlineAt: number; onlyIds?: Set<string> },
 ): Promise<number> {
-  const ideas = (await loadPendingIdeas(admin, scope)).filter((r) => isArticleIdea(r) && (!opts.onlyIds || opts.onlyIds.has(r.id)))
+  const ideas = (await loadPendingIdeas(admin, scope, deps.now())).filter((r) => isArticleIdea(r) && (!opts.onlyIds || opts.onlyIds.has(r.id)))
   // 18 October 2026 — THE SUBJECT GATE ON THE WAY INTO THE QUEUE. A plan keeps
   // its ideas for months, so ideas saved before the relevance rules improved
   // were still promoted and queued automatically: on one dog-products store the
@@ -373,7 +417,10 @@ export async function runTopicTopUp(
     sharesByOwner.set(p.user_id, list)
   }
   const entitlement = new Map<string, { entitled: boolean; monthlyArticles: number; planRhythm?: boolean }>()
-  const stillShort: { project: ProjectRow; pool: PoolRow | null; target: number; index: OverlapIndex }[] = []
+  type Candidate = { project: ProjectRow; pool: PoolRow | null; target: number; index: OverlapIndex | null }
+  const stillShort: Candidate[] = []
+  /** Plans that filled the target from old stock only: fresh research for their next months. */
+  const stalePlans: Candidate[] = []
 
   // Projects with an active pool first: an empty queue stops publishing.
   // More than a run's share: each quarter hour starts further along, so all are reached in the day.
@@ -403,15 +450,24 @@ export async function runTopicTopUp(
       if (target === 0 || (await countSupply(admin, scope, pool)) >= target) { summary.enough++; continue }
       const index = await deps.loadIndex(scope)
       const missing = await refillFromIdeas(admin, deps, scope, project, pool, target, index, summary, { deadlineAt: options.deadlineAt - MIN_MS_FOR_PROJECT })
-      if (missing > 0) stillShort.push({ project, pool, target, index: await deps.loadIndex(scope) })
+      if (missing > 0) { stillShort.push({ project, pool, target, index: await deps.loadIndex(scope) }); continue }
+      // The target was met, but from a plan whose newest idea is old stock
+      // (STALE_IDEA_DAYS): the next months are planned from July research unless the
+      // model is asked. The index is read only for the one project that is picked.
+      if ((await countFreshIdeas(admin, scope, deps.now())) === 0) {
+        summary.stalePlans++
+        stalePlans.push({ project, pool, target, index: null })
+      }
     } catch {
       summary.failures++
     }
   }
 
-  // The model, for one project whose plan has run dry. Never in the first quarter hour.
-  if (slot > 0 && stillShort.length > 0) {
-    const pick = stillShort[slot % stillShort.length]
+  // The model, for one project whose plan has run dry, or, when none has, one whose
+  // plan is old stock only. Never in the first quarter hour.
+  const candidates = stillShort.length > 0 ? stillShort : stalePlans
+  if (slot > 0 && candidates.length > 0) {
+    const pick = candidates[slot % candidates.length]
     const scope = { projectId: pick.project.id, userId: pick.project.user_id }
     const timeLeft = options.deadlineAt - deps.now()
     if (timeLeft >= MIN_MS_FOR_MODEL && summary.modelProjects < MODEL_PROJECTS_PER_RUN) {
@@ -419,12 +475,13 @@ export async function runTopicTopUp(
         if (await deps.modelAllowed(scope.userId)) {
           summary.modelProjects++
           const generated = await deps.generate(scope)
-          const fresh = skipOverlapping(pick.index, generated.suggestions, SKIP_KINDS_NEW)
+          const index = pick.index ?? await deps.loadIndex(scope)
+          const fresh = skipOverlapping(index, generated.suggestions, SKIP_KINDS_NEW)
           summary.skippedOverlap += generated.suggestions.length - fresh.length
           if (fresh.length > 0) {
             const persisted = await insertPendingIdeas(admin, { projectId: scope.projectId, userId: scope.userId, batchId: randomUUID(), source: 'hybrid', suggestions: fresh, requestedTier: 'standard', modelUsed: generated.modelUsed })
             summary.modelIdeas += persisted?.inserted ?? 0
-            await refillFromIdeas(admin, deps, scope, pick.project, pick.pool, pick.target, pick.index, summary, { deadlineAt: options.deadlineAt })
+            await refillFromIdeas(admin, deps, scope, pick.project, pick.pool, pick.target, index, summary, { deadlineAt: options.deadlineAt })
           }
         }
       } catch {
@@ -434,8 +491,8 @@ export async function runTopicTopUp(
   }
 
   if (summary.promoted > 0 || summary.modelProjects > 0 || summary.failures > 0) {
-    const { projectsChecked, notEntitled, enough, promoted, queued, skippedOverlap, skippedOffSubject, modelProjects, modelIdeas, failures } = summary
-    console.log('[topic-topup] run', { slot, projectsChecked, notEntitled, enough, promoted, queued, skippedOverlap, skippedOffSubject, modelProjects, modelIdeas, failures })
+    const { projectsChecked, notEntitled, enough, promoted, queued, skippedOverlap, skippedOffSubject, modelProjects, modelIdeas, stalePlans, failures } = summary
+    console.log('[topic-topup] run', { slot, projectsChecked, notEntitled, enough, promoted, queued, skippedOverlap, skippedOffSubject, modelProjects, modelIdeas, stalePlans, failures })
   }
   return summary
 }
