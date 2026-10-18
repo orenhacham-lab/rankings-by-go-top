@@ -235,10 +235,13 @@ async function main() {
     const wired = (s: string) => /idea=\{nextIdea\}/.test(s) && /act=\{act\}/.test(s) && /<StrategyBoard [^>]*act=\{act\}/.test(s)
     check('U4: the screen hands the actions to the card and to the board', wired(screen))
     check('U4-MUT: a board without actions fails U4', !wired(screen.replace(/<StrategyBoard ([^>]*) act=\{act\}/, '<StrategyBoard $1')))
-    // Requests only from a click: the hook sends through one helper, called by the three actions, never from an effect.
+    // Requests only from a click: the hook sends through one helper, called by the four actions, never from an effect.
     // w13: approving also schedules (one more send, to the schedule route), and only
     // from inside the approve and add-keyword handlers (scheduleApproved).
-    const clickOnly = (s: string) => !/useEffect/.test(s) && (s.match(/await send\(/g) ?? []).length === 4
+    // 18 Oct 2026: removing a planned topic is the fourth action, and sends what
+    // removePlannedRequests returns (lib/content/strategy/ideas.ts) from its own handler.
+    const clickOnly = (s: string) => !/useEffect/.test(s) && (s.match(/await send\(/g) ?? []).length === 5
+      && /const answer = await send\(req\)/.test(s) && /for \(const req of removePlannedRequests\(t, projectId\)\)/.test(s)
       && (s.match(/fetch\(/g) ?? []).length === 1 && /fetch\(req\.url/.test(s)
       && /send\(req\)[\s\S]*send\(rejectRequest\(/.test(s)
       && /await send\(\{ url: STRATEGY_SCHEDULE_ENDPOINTS\.schedule/.test(s)
