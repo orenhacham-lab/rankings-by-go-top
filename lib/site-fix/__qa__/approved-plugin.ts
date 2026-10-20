@@ -4,13 +4,13 @@
  * byte-for-byte this list (the repo-only README.md aside): a change to the PHP is a new plugin
  * release, and this list moves with it on purpose.
  *
- * 3.1.2 is live on WordPress.org: Oren committed the tag on 18 Oct 2026 and the version was
- * read back from api.wordpress.org, whose download for the slug unpacks into
- * go-top-seo-bridge/ with the corrected links. The folder is now AHEAD at 3.1.3, which changes
- * only the name and the description the directory shows (the plugin could not be found by
- * searching for it, not even by its own name, with 0 active installs). The two constants are
- * allowed to differ exactly while the folder is ahead, and APPROVED_WPORG_VERSION moves
- * only once the tag is really there — it is what merchants are offered as an update. The app gates every 3.1 feature by `>=` the site's
+ * 3.1.3 is live on WordPress.org: Oren committed the tag on 20 Oct 2026 and api.wordpress.org
+ * answers 3.1.3 for the slug, under the new directory name. That release changed only the name,
+ * the tags and the description the directory shows (the plugin could not be found by searching
+ * for it, not even by its own name, with 0 active installs); the PHP is unchanged. The two
+ * constants may differ only while the folder is ahead of the directory, and
+ * APPROVED_WPORG_VERSION moves only once the tag is really there — it is what merchants are
+ * offered as an update. The app gates every 3.1 feature by `>=` the site's
  * plugin version (lib/site-fix/plugin-capabilities.ts), so a site still on 3.1.0 is unaffected and is
  * offered the update (PLUGIN_LATEST_VERSION in ../types.ts, which never runs ahead of this constant).
  *
@@ -22,7 +22,7 @@ import { existsSync, readFileSync } from 'fs'
 import { join } from 'path'
 
 /** The release on WordPress.org today (slug go-top-seo-bridge). */
-export const APPROVED_WPORG_VERSION = '3.1.2'
+export const APPROVED_WPORG_VERSION = '3.1.3'
 /** The release in this folder (pinned below). */
 export const APPROVED_PLUGIN_VERSION = '3.1.3'
 
