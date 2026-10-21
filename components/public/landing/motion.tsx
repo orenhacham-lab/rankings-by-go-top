@@ -99,10 +99,19 @@ export function Counter({ value, className }: { value: number; className?: strin
     raf = requestAnimationFrame(tick)
     return () => cancelAnimationFrame(raf)
   }, [state, value, reduced])
+  // ONE text node, not two. The figure used to be rendered twice — an aria-hidden
+  // animated span and an sr-only final value — so everything that reads the page as
+  // text, a crawler and an AI engine included, saw the digits doubled: "66" for 6.
+  // role="img" with the label carries the same promise to a screen reader (it hears
+  // the final figure, never the count) while the page holds the number once.
   return (
-    <span ref={ref} className={cn('tabular-nums', className)}>
-      <span aria-hidden="true">{shown}</span>
-      <span className="sr-only">{value}</span>
+    <span
+      ref={ref}
+      role="img"
+      aria-label={String(value)}
+      className={cn('tabular-nums', className)}
+    >
+      {shown}
     </span>
   )
 }
