@@ -41,7 +41,7 @@ const ICON_BUTTON = cn(
 )
 
 export default function TopBarActions() {
-  const { language, uiLocale } = useDashboardLanguage()
+  const { uiLocale } = useDashboardLanguage()
   const dict = getDashboardDictionary(uiLocale)
   const t = dict.topBarActions
   const { activeProjectId } = useActiveProject()
@@ -93,7 +93,7 @@ export default function TopBarActions() {
   }
 
   const settings = activeProjectId ? settingsHref(activeProjectId) : '/settings'
-  const date = formatDate(language).date
+  const date = formatDate(uiLocale).date
 
   return (
     <div className="ms-auto flex shrink-0 items-center gap-1" data-top-bar-actions="">

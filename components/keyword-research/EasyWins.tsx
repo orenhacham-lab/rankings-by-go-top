@@ -49,7 +49,7 @@ export default function EasyWins({
    */
   covered?: { row: ResearchRow; covered: OverlapPayload }[]
 }) {
-  const { language, uiLocale } = useDashboardLanguage()
+  const { uiLocale } = useDashboardLanguage()
   const t = getDashboardDictionary(uiLocale).keywordResearchScan.easyWins
   const row = (w: Win, i: number) => <WinRow key={keywordKey(w.row.keyword)} w={w} i={i} adding={adding} onTrack={onTrack} />
   const apart = (w: Win, i: number) => <WinRow key={keywordKey(w.row.keyword)} w={w} i={i} adding={adding} onTrack={onTrack} apart />
@@ -66,7 +66,7 @@ export default function EasyWins({
     <details data-less-related="" className="group/less border-t border-line">
       <summary className="flex cursor-pointer list-none items-center gap-2 px-4 py-3 text-copy font-semibold text-body transition-colors duration-150 ease-snappy hover:bg-sunk/60 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-action/20 sm:px-6 [&::-webkit-details-marker]:hidden">
         <ChevronDown size={16} strokeWidth={2.5} aria-hidden="true" className="shrink-0 text-muted transition-transform duration-150 motion-reduce:transition-none group-open/less:rotate-180" />
-        {t.lessRelated(formatCount(lessRelated.length, language))}
+        {t.lessRelated(formatCount(lessRelated.length, uiLocale))}
       </summary>
       <p className="px-4 pb-3 text-caption text-muted text-pretty sm:px-6">{t.lessRelatedHint}</p>
       {header}
@@ -78,7 +78,7 @@ export default function EasyWins({
       <summary className="flex cursor-pointer list-none items-center gap-2 px-4 py-3 text-copy font-semibold text-body transition-colors duration-150 ease-snappy hover:bg-sunk/60 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-action/20 sm:px-6 [&::-webkit-details-marker]:hidden">
         <ChevronDown size={16} strokeWidth={2.5} aria-hidden="true" className="shrink-0 text-muted transition-transform duration-150 motion-reduce:transition-none group-open/covered:rotate-180" />
         <FileCheck2 size={16} strokeWidth={2} aria-hidden="true" className="shrink-0 text-ok" />
-        {t.covered(formatCount(covered.length, language))}
+        {t.covered(formatCount(covered.length, uiLocale))}
       </summary>
       <p className="px-4 pb-3 text-caption text-muted text-pretty sm:px-6">{t.coveredHint}</p>
       <ul className="divide-y divide-line border-t border-line">
@@ -92,7 +92,7 @@ export default function EasyWins({
               <p className="mt-0.5 truncate text-caption text-muted" dir="auto" title={c.label}>{t.coveredPage(c.label)}</p>
             </div>
             {r.avgMonthlySearches !== null && r.avgMonthlySearches !== undefined && (
-              <span className="text-caption tabular-nums text-muted">{formatCount(r.avgMonthlySearches, language)} {t.searches}</span>
+              <span className="text-caption tabular-nums text-muted">{formatCount(r.avgMonthlySearches, uiLocale)} {t.searches}</span>
             )}
             <Link href={c.improveHref} aria-label={t.improveAria(r.keyword)} className="inline-flex h-8 items-center gap-1.5 rounded-control border border-line bg-surface px-3 text-caption font-semibold text-action shadow-control transition-colors duration-150 ease-snappy hover:bg-action-soft focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-action/20">
               {t.improve}
@@ -128,7 +128,7 @@ export default function EasyWins({
             {group}
             {coveredGroup}
             <footer className="flex flex-wrap items-center justify-between gap-2 border-t border-line bg-sunk/40 px-4 py-3 text-copy sm:px-6">
-              <span className="text-muted tabular-nums">{t.showing(formatCount(wins.length, language), formatCount(total, language))}</span>
+              <span className="text-muted tabular-nums">{t.showing(formatCount(wins.length, uiLocale), formatCount(total, uiLocale))}</span>
               {onShowAll && (
                 <button type="button" onClick={onShowAll} className="font-semibold text-action transition-colors hover:text-action-hover">
                   {t.showAll}
@@ -155,7 +155,7 @@ function WinRow({ w: { row, win }, i, adding, onTrack, apart = false }: {
   const t = getDashboardDictionary(uiLocale).keywordResearchScan.easyWins
   const key = keywordKey(row.keyword)
   const why = t.why({
-    volume: formatCount(win.volume, language),
+    volume: formatCount(win.volume, uiLocale),
     competition: win.competition,
     cpc: win.cpc !== null && win.currency ? formatMoney(win.cpc, win.currency, language) : null,
     cpcHigh: win.cpcAboveAverage,
@@ -182,7 +182,7 @@ function WinRow({ w: { row, win }, i, adding, onTrack, apart = false }: {
           <p className="mt-0.5 text-copy text-muted @3xl:sr-only">{why}</p>
         </div>
       </div>
-      <span className="hidden font-semibold text-copy text-body tabular-nums @3xl:block">{formatCount(win.volume, language)}</span>
+      <span className="hidden font-semibold text-copy text-body tabular-nums @3xl:block">{formatCount(win.volume, uiLocale)}</span>
       <span className="hidden @3xl:block" title={why} data-easy-win-badge="">
         <Badge variant={win.competition === 'low' ? 'success' : win.competition === 'medium' ? 'warning' : 'danger'}>
           {t.levels[win.competition]}

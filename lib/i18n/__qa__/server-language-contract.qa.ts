@@ -33,7 +33,14 @@ import { resolveDashboardLocale } from '../dashboard/locale'
 import { parseAcceptLanguage, localeFromAcceptLanguage } from '../accept-language'
 import { getSiteMetadata } from '../site-metadata'
 import { readdirSync } from 'fs'
-import { toBilingualLocale } from '../locales'
+import { toBilingualLocale, PUBLIC_LOCALES } from '../locales'
+
+/**
+ * The locale directories under app/(public): every public locale but Hebrew,
+ * which is the bare root and has no directory of its own. Two guards below need
+ * it, and both used to spell it out by hand.
+ */
+const NON_HEBREW_TREES = new Set<string>(PUBLIC_LOCALES.filter((l) => l !== 'he'))
 import { counterpartPath } from '../../../components/LanguageSwitcher'
 
 let pass = 0, fail = 0, blocked = 0
@@ -508,8 +515,12 @@ async function main() {
     const publicDirs = ['(public)', '(legal)'].flatMap((group) =>
       readdirSync(join(ROOT, 'app', group), { withFileTypes: true })
         // The non-Hebrew trees are covered by their own guards
-        // (8b, 8b1 and lib/i18n/__qa__/spanish-public-site.qa.ts).
-        .filter((d) => d.isDirectory() && d.name !== 'en' && d.name !== 'es' && d.name !== 'pt-BR')
+        // (8b, 8b1, spanish-public-site.qa.ts, portuguese-public-site.qa.ts and
+        // french-public-site.qa.ts). DERIVED from PUBLIC_LOCALES rather than
+        // listed: the hand-written list was missing 'fr' the day French was
+        // added, and this guard then reported the French tree as a Hebrew page
+        // that had lost its language — the exact opposite of the truth.
+        .filter((d) => d.isDirectory() && !NON_HEBREW_TREES.has(d.name))
         .map((d) => d.name))
     const missing = publicDirs.filter((d) => routeContentLocale(`/${d}`) !== 'he')
     check('8e: every directory in app/(public) AND app/(legal) is covered',
@@ -540,9 +551,11 @@ async function main() {
     const fs = require('fs') as typeof import('fs')
     const walk = (dir: string): string[] => fs.readdirSync(join(ROOT, dir), { withFileTypes: true })
       .flatMap((e) => e.isDirectory() ? walk(`${dir}/${e.name}`) : (e.name === 'page.tsx' ? [`${dir}/${e.name}`] : []))
-    const treeLocale = (file: string) => /^app\/\(public\)\/en\//.test(file) ? 'en'
-      : /^app\/\(public\)\/es\//.test(file) ? 'es'
-      : /^app\/\(public\)\/pt-BR\//.test(file) ? 'pt-BR' : 'he'
+    // Hebrew is the bare root, so a file in no locale directory is Hebrew.
+    // Derived, for the same reason 8e is: a list here that forgets a language
+    // measures that language's whole tree against the wrong locale.
+    const treeLocale = (file: string) =>
+      [...NON_HEBREW_TREES].find((l) => file.startsWith(`app/(public)/${l}/`)) ?? 'he'
     const offenders: string[] = []
     for (const file of walk('app/(public)')) {
       const src = fs.readFileSync(join(ROOT, file), 'utf8')

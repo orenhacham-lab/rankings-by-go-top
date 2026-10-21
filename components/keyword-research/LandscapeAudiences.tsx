@@ -62,9 +62,9 @@ export default function LandscapeAudiences({ id, audiences, mix, niche }: {
   mix: readonly IntentShare[]
   niche: string | null
 }) {
-  const { language, uiLocale } = useDashboardLanguage()
+  const { uiLocale } = useDashboardLanguage()
   const t = getDashboardDictionary(uiLocale).researchInsights.audiences
-  const n = (v: number) => formatCount(v, language)
+  const n = (v: number) => formatCount(v, uiLocale)
   // "What people look for" shows once the research splits by need. A mix of one grey
   // "general information" bar is an empty panel, not data (final review R18).
   const showMix = mix.some((m) => m.intent !== 'info' && m.searches > 0)

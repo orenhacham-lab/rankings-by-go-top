@@ -15,15 +15,15 @@ import { formatCompact, formatCount } from '@/components/gsc/format'
 import type { ResearchRow } from '@/lib/keyword-research/rows'
 
 export default function KeywordSourceLine({ row }: { row: ResearchRow }) {
-  const { language, uiLocale } = useDashboardLanguage()
+  const { uiLocale } = useDashboardLanguage()
   const t = getDashboardDictionary(uiLocale).keywordResearchScan.source
   const parts: { key: 'competitor' | 'google'; text: string; title?: string }[] = []
   if (row.competitors.length > 0) parts.push({ key: 'competitor', text: t.competitor(row.competitors[0], row.competitors.length - 1) })
   if (row.gsc) {
     parts.push({
       key: 'google',
-      text: t.google(formatCompact(row.gsc.clicks, language), formatCompact(row.gsc.impressions, language)),
-      title: t.google(formatCount(row.gsc.clicks, language), formatCount(row.gsc.impressions, language)),
+      text: t.google(formatCompact(row.gsc.clicks, uiLocale), formatCompact(row.gsc.impressions, uiLocale)),
+      title: t.google(formatCount(row.gsc.clicks, uiLocale), formatCount(row.gsc.impressions, uiLocale)),
     })
   }
   if (!row.tracked && parts.length === 0) return null

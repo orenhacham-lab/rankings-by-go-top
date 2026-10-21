@@ -40,7 +40,7 @@ function readyFrom(body: Answer, prev?: Ready): Ready {
 }
 
 export default function SiteAutoFixCard({ projectId, onShown }: { projectId: string; onShown?: (shown: boolean) => void }) {
-  const { language, uiLocale } = useDashboardLanguage()
+  const { uiLocale } = useDashboardLanguage()
   const t = getDashboardDictionary(uiLocale).siteHealth.autofix.auto
   const { confirm, dialog } = useConfirm()
   const [load, setLoad] = useState<Load>({ status: 'loading' })
@@ -64,7 +64,7 @@ export default function SiteAutoFixCard({ projectId, onShown }: { projectId: str
   useEffect(() => { onShown?.(shown) }, [shown, onShown])
 
   if (load.status !== 'ready') return null
-  const when = (iso: string) => formatDate(language).dateTime(iso)
+  const when = (iso: string) => formatDate(uiLocale).dateTime(iso)
 
   async function change(next: boolean) {
     if (load.status !== 'ready') return

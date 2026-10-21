@@ -75,10 +75,10 @@ export const siteHealthFr: DeepPartial<DashboardDictionary> = {
     hideSteps: 'Masquer les instructions',
     openInShopify: 'Ouvrir dans Shopify',
     inTheme: 'Le problème n’est pas dans le contenu de cette page, mais dans le thème de la boutique, son menu ou un produit : il n’y a donc pas de correction automatique ici. Les étapes ci-dessous montrent comment le corriger.',
-    inProduct: 'Ce sont les photos du produit lui-même : leurs descriptions se règlent sur le produit, dans ses médias. L’accès de Go Top à la boutique couvre les articles et les pages, celui-ci se corrige donc dans Shopify. Les étapes ci-dessous montrent comment.',
+    inProduct: 'Ce sont les photos du produit lui-même : leurs descriptions se règlent sur le produit, dans ses médias. L’accès de Go Top à la boutique couvre les articles et les pages : cette correction se fait donc dans Shopify. Les étapes ci-dessous montrent comment.',
     inBuilder: 'Cette page est construite avec un constructeur de pages (comme Elementor), qui l’affiche à partir de ses propres données. Une modification du texte de la page n’apparaîtrait pas sur le site, il n’y a donc pas de correction automatique ici. Vous pouvez la corriger dans le constructeur de pages avec les étapes ci-dessous.',
-    productPage: 'C’est une page produit. L’accès de Go Top à la boutique couvre les articles et les pages, celle-ci se corrige donc dans Shopify. Les étapes ci-dessous montrent comment.',
-    collectionPage: 'C’est une page de collection. L’accès de Go Top à la boutique couvre les articles et les pages, celle-ci se corrige donc dans Shopify. Les étapes ci-dessous montrent comment.',
+    productPage: 'C’est une page produit. L’accès de Go Top à la boutique couvre les articles et les pages : cette correction se fait donc dans Shopify. Les étapes ci-dessous montrent comment.',
+    collectionPage: 'C’est une page de collection. L’accès de Go Top à la boutique couvre les articles et les pages : cette correction se fait donc dans Shopify. Les étapes ci-dessous montrent comment.',
     schemaFromTheme: 'Sur une boutique Shopify, les données structurées viennent de son thème (ou d’une application de thème) : elles s’ajoutent donc dans les réglages du thème de la boutique ou par son développeur, pas sur cette page.',
     themeAltMedia: 'Certaines de ces images sont dans la médiathèque WordPress. Nous y écrivons leur description, et cela les corrige sur toutes les pages.',
     themeAlt: (pages: number, images: number) =>

@@ -21,6 +21,7 @@ import Badge from '@/components/ui/Badge'
 import { formatDate } from '@/lib/utils'
 import type { DashboardDictionary } from '@/lib/i18n/dashboard/he'
 import type { CitationMatch } from '@/lib/content/citation-match'
+import type { PublicLocale } from '@/lib/i18n/locales'
 
 type AiDict = DashboardDictionary['contentHub']['editor']['aiVisibility']
 
@@ -52,7 +53,8 @@ export function CitedBadge({ t, engines }: { t: AiDict; engines: string[] }) {
 
 export default function ArticleAiVisibilityCard({ t, language, projectId, data, onNotify, onTracked }: {
   t: AiDict
-  language: 'he' | 'en'
+  /** The reader's own locale — a formatted date below, not a bilingual surface. */
+  language: PublicLocale
   projectId: string | null
   data: ArticleVisibilityData
   onNotify: (text: string, ok: boolean) => void

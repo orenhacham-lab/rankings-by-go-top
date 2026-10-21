@@ -20,7 +20,7 @@ import EmptyState from '@/components/ui/EmptyState'
 import { useDashboardLanguage } from '@/lib/i18n/dashboard/useDashboardLanguage'
 import { getDashboardDictionary } from '@/lib/i18n/dashboard/getDashboardDictionary'
 import { formatDate } from '@/lib/i18n/format-date'
-import type { Locale, PublicLocale } from '@/lib/i18n/locales'
+import type { PublicLocale } from '@/lib/i18n/locales'
 import GscPerformance from '@/components/gsc/GscPerformance'
 import MonthlyReports from '@/components/reports/monthly/MonthlyReports'
 import ScanHistory from '@/components/scans/ScanHistory'
@@ -446,7 +446,7 @@ function ReportsContent() {
             sortOrder={sortOrder}
             setSortOrder={setSortOrder}
             t={t}
-            language={language}
+            uiLocale={uiLocale}
           />
         )}
 
@@ -458,7 +458,7 @@ function ReportsContent() {
             onExportPDF={handleExportPDF}
             onExportExcel={handleExportExcel}
             t={t}
-            language={language}
+            uiLocale={uiLocale}
           />
         )}
       </section>
@@ -476,10 +476,11 @@ function ReportsContent() {
  * Both downloads are secondary (the page's one primary is the monthly report's),
  * and with nothing in the report they are disabled, with the reason under them.
  */
-function ReportCard({ kind, project, language, exporting, onExportExcel, onExportPDF, empty, t }: {
+function ReportCard({ kind, project, uiLocale, exporting, onExportExcel, onExportPDF, empty, t }: {
   kind: string
   project: Project & { clients?: Client }
-  language: Locale
+  /** The reader's own locale: this card prints a DATE, which Intl writes in every language. */
+  uiLocale: PublicLocale
   exporting: 'excel' | 'pdf' | null
   onExportExcel: () => void
   onExportPDF: () => void
@@ -502,7 +503,7 @@ function ReportCard({ kind, project, language, exporting, onExportExcel, onExpor
             </p>
           )}
           <p className="mt-1 text-caption text-muted" data-report-date="">
-            {t.generatedOn} {formatDate(language).date(new Date())}
+            {t.generatedOn} {formatDate(uiLocale).date(new Date())}
           </p>
         </div>
         <div className="flex flex-col items-start gap-1.5 sm:items-end">
@@ -534,7 +535,7 @@ function GoogleReport({
   sortOrder,
   setSortOrder,
   t,
-  language,
+  uiLocale,
 }: any) {
   const foundCount = Object.values(reportData.latestResults).filter((r: any) => r.found).length
   const total = reportData.targets.length || 0
@@ -562,7 +563,7 @@ function GoogleReport({
       <ReportCard
         kind={t.googleReport}
         project={reportData.project}
-        language={language}
+        uiLocale={uiLocale}
         exporting={exporting}
         onExportExcel={onExportExcel}
         onExportPDF={onExportPDF}
@@ -651,7 +652,7 @@ function AIVisibilityReport({
   onExportPDF,
   onExportExcel,
   t,
-  language,
+  uiLocale,
 }: any) {
   const engines = ['chatgpt', 'perplexity', 'gemini', 'copilot', 'grok', 'google_ai_mode']
   const engineLabels: Record<string, string> = {
@@ -662,7 +663,7 @@ function AIVisibilityReport({
     grok: 'Grok',
     google_ai_mode: 'Google AI',
   }
-  const dates = formatDate(language)
+  const dates = formatDate(uiLocale)
   const engineCards = engines.filter((engine) => (reportData.summary.engineBreakdown[engine]?.scans ?? 0) > 0)
 
   return (
@@ -670,7 +671,7 @@ function AIVisibilityReport({
       <ReportCard
         kind={t.ai.aiVisibilityReport}
         project={reportData.project}
-        language={language}
+        uiLocale={uiLocale}
         exporting={exporting}
         onExportExcel={onExportExcel}
         onExportPDF={onExportPDF}

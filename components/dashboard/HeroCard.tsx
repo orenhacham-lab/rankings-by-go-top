@@ -19,6 +19,7 @@ import { formatCount } from '@/components/gsc/format'
 import SiteAvatar from '@/components/ui/SiteAvatar'
 import CountUp from '@/components/ui/CountUp'
 import { LinkButton } from './ui'
+import type { PublicLocale } from '@/lib/i18n/locales'
 
 export interface NextStep {
   href: string
@@ -35,7 +36,7 @@ export type HeroNews =
 
 export default function HeroCard({ t, language, domain, siteIcon, rankings, news, seedPhase, next }: {
   t: DashboardDictionary['dashboardHome']
-  language: 'he' | 'en'
+  language: PublicLocale
   domain: string
   /** The icon the site declares, from its scan (the switcher's list carries it); /favicon.ico otherwise. */
   siteIcon?: string | null

@@ -27,7 +27,7 @@ interface ProjectsTableProps {
 }
 
 export default function ProjectsTable({ projects, clients, showClient = true, onProjectsChange }: ProjectsTableProps) {
-  const { language, uiLocale } = useDashboardLanguage()
+  const { uiLocale } = useDashboardLanguage()
   const dict = getDashboardDictionary(uiLocale)
   // The top bar's switcher lists the active projects. Every change made here
   // (a rename, deactivating, reactivating, deleting) reloads that list, or the
@@ -148,7 +148,7 @@ export default function ProjectsTable({ projects, clients, showClient = true, on
               </Td>
               <Td className="hidden md:table-cell">
                 <span className="whitespace-nowrap text-caption text-muted">
-                  {project.last_scan_at ? formatDate(project.last_scan_at, language) : dict.projects.table.neverScanned}
+                  {project.last_scan_at ? formatDate(project.last_scan_at, uiLocale) : dict.projects.table.neverScanned}
                 </span>
               </Td>
               <Td>

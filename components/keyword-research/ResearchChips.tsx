@@ -27,7 +27,7 @@ export default function ResearchChips({
   onChange: (chip: ResearchChip) => void
   google: GoogleChip
 }) {
-  const { language, uiLocale } = useDashboardLanguage()
+  const { uiLocale } = useDashboardLanguage()
   const t = getDashboardDictionary(uiLocale).keywordResearchScan.chips
   const chips = RESEARCH_CHIPS.filter((c) => c !== 'google' || google !== 'hidden')
   const { containerRef, thumbRef } = useSlidingThumb('[aria-checked="true"]', [active, chips.length])
@@ -65,7 +65,7 @@ export default function ResearchChips({
             >
               {t[chip]}
               <span className={cn('tabular-nums', on ? 'text-muted' : 'text-muted/80')} aria-busy={loading || undefined}>
-                {loading ? '…' : formatCount(counts[chip], language)}
+                {loading ? '…' : formatCount(counts[chip], uiLocale)}
               </span>
             </button>
           )

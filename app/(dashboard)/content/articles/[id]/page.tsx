@@ -513,7 +513,7 @@ export default function ArticleEditorPage({ params }: { params: Promise<{ id: st
     <div className={editing ? 'mb-4' : ''}>
       <ArticleAiVisibilityCard
         t={e.aiVisibility}
-        language={language}
+        language={uiLocale}
         projectId={projectId}
         data={visibility}
         onNotify={(text, ok) => { if (ok) toast.success(text); else setMessage({ text, ok }) }}

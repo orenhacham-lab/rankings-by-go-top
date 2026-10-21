@@ -15,6 +15,7 @@ import type { RankingsView } from '@/lib/dashboard/rankings'
 import type { DashboardDictionary } from '@/lib/i18n/dashboard/he'
 import { formatCount } from '@/components/gsc/format'
 import { HeaderLink, LinkButton, Widget, WidgetEmpty } from './ui'
+import type { PublicLocale } from '@/lib/i18n/locales'
 
 /** The closer to the top of Google, the deeper the accent: one hue, read top to bottom. */
 const RANK_SHADES = ['bg-action', 'bg-action', 'bg-action/60', 'bg-action/60', 'bg-action/35'] as const
@@ -22,7 +23,7 @@ const RANK_SHADES = ['bg-action', 'bg-action', 'bg-action/60', 'bg-action/60', '
 export default function RankDistribution({ t, rankings, language }: {
   t: DashboardDictionary['dashboardHome']
   rankings: RankingsView
-  language: 'he' | 'en'
+  language: PublicLocale
 }) {
   const d = t.distribution
   const total = rankings.checked

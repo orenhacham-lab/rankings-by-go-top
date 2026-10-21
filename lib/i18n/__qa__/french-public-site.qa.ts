@@ -264,14 +264,25 @@ console.log('\nD) the locale tables and the copy')
    * word boundary in the middle of "êtes" and "vous êtes" was reported as the
    * pronoun "tes". Accented French needs Unicode letter boundaries, which is
    * what the lookarounds below are; \p{L} needs the u flag.
+   *
+   * `ton` and `ta` are matched only before one of the nouns this product
+   * addresses the reader about, which is the shape a real slip takes ("tu peux
+   * annuler ton abonnement"). A bare `ton` would also match the ordinary French
+   * noun for "tone" — the dashboard dictionary genuinely uses it, and this
+   * suite's twin (lib/i18n/dashboard/__qa__/french-dashboard.qa.ts) reported
+   * correct copy as a defect until the pattern was narrowed. The unambiguous
+   * forms need no such company.
    */
-  const TU = /(?<!\p{L})(?:tu|toi|ton|ta|tes)(?!\p{L})/iu
+  const TU = /(?<!\p{L})(?:tu|toi|tes|tien|tiens|tienne)(?!\p{L})|(?<!\p{L})(?:ton|ta)\s+(?:compte|site|sites|plan|projet|projets|mot|mots|article|articles|boutique|domaine|abonnement|essai|rapport|rapports|position|visibilit\u00e9|entreprise)(?!\p{L})/iu
   const tutoiement = all.filter((s) => TU.test(s.text) && notSwitcher(s.path))
   check('D8: the copy keeps one register throughout (vouvoiement)',
     tutoiement.length === 0, tutoiement.slice(0, 3).map((s) => `${s.path}: ${s.text.slice(0, 60)}`).join(' | '))
   check('D8-MUT: tutoiement is caught, and an accented word next to it is not',
     TU.test('Tu peux annuler ton abonnement.') && !TU.test('Un site qui travaille pendant que vous êtes occupé')
     && !TU.test('Dites-nous qui vous êtes') && !TU.test('les boutiques et les agences vous envoient'))
+  check('D8-MUT2: the possessive arm catches a slip on its own, and `ton` as the noun "tone" is not one',
+    TU.test('Connecte ton site pour commencer') && TU.test('Choisis ta boutique')
+    && !TU.test('Le ton de l’écriture reste le vôtre') && !TU.test('Ton de voix'))
 
   check('D9: the affiliate page promises the same two rates as every other language',
     JSON.stringify(AFFILIATES_COPY.fr).includes('30') && JSON.stringify(AFFILIATES_COPY.fr).includes('40'))
