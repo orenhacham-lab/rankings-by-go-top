@@ -21,6 +21,7 @@
  *
  * Run: npx tsx components/public/__qa__/comparison-pages.qa.ts
  */
+/* eslint-disable @typescript-eslint/no-require-imports */
 import { readdirSync, existsSync, readFileSync } from 'fs'
 import { join } from 'path'
 import { PUBLIC_LOCALES, LOCALE_PREFIX, type PublicLocale } from '@/lib/i18n/locales'
