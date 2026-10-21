@@ -625,7 +625,7 @@ async function main() {
      * GDPR Art. 7(4) makes that consent worthless. The OPTIONAL sentence is
      * where marketing and the withdrawal right live.
      */
-    for (const locale of ['he', 'en', 'es', 'pt-BR'] as const) {
+    for (const locale of ['he', 'en', 'es', 'pt-BR', 'fr'] as const) {
       const report = reportConsentText(locale)
       const marketing = marketingConsentText(locale)
       const expected = {
@@ -633,6 +633,7 @@ async function main() {
         en: '[report-email-v2]',
         es: '[report-email-es-v2]',
         'pt-BR': '[report-email-pt-v2]',
+        fr: '[report-email-fr-v1]',
       }[locale]
       check(`${locale}: the required sentence carries its own version id`,
         report.endsWith(expected), `${report.slice(-32)} vs ${expected}`)
@@ -641,7 +642,7 @@ async function main() {
         !/שיווקי|marketing|comercial/i.test(report), report)
       check(`${locale}: the optional sentence does ask for marketing, and says consent can be withdrawn`,
         /שיווקי|marketing|comercial/i.test(marketing)
-        && /להסיר|withdraw|retirar|retirar meu/i.test(marketing), marketing)
+        && /להסיר|withdraw|retirar|retirar meu|retirer/i.test(marketing), marketing)
       check(`${locale}: the two sentences carry different version ids`,
         report.slice(report.lastIndexOf('[')) !== marketing.slice(marketing.lastIndexOf('[')))
       // A refusal is recorded in words, and a grant is findable by its id.

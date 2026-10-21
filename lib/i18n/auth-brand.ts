@@ -1,6 +1,6 @@
 /**
  * The words of the brand panel beside the sign-in, sign-up and password forms
- * (components/auth/AuthShell.tsx), in both languages. The headline and the
+ * (components/auth/AuthShell.tsx), in every public language. The headline and the
  * trust line are the landing page's own (lib/i18n/public/landing-*.ts), so the
  * step from the landing page to the form reads as one product (w7 P1-9); what
  * is here is only what differs per form. Every line is something the product
@@ -131,5 +131,33 @@ export const AUTH_BRAND: Record<PublicLocale, Record<AuthBrandVariant, AuthBrand
     },
     glimpse: 'Palavras-chave em acompanhamento',
     mobileTrust: ['Sem cartão de crédito', 'Cancele quando quiser'],
+  },
+  fr: {
+    login: {
+      eyebrow: 'Bon retour',
+      points: [
+        'Vos positions dans Google et Google Maps, au même endroit',
+        'Votre plan de contenu et vos articles, prêts à reprendre',
+        'Ce que ChatGPT et Gemini disent de votre entreprise',
+      ],
+    },
+    signup: {
+      eyebrow: 'Google et la recherche par IA, dans un seul système',
+      points: [
+        'Une analyse complète de votre site en quelques minutes',
+        'Un mois de contenu, planifié pour votre secteur',
+        'Vos positions dans Google et votre visibilité dans les IA, suivies pour vous',
+      ],
+    },
+    recover: {
+      eyebrow: 'Retour à votre compte',
+      points: [
+        "Le lien n'est envoyé qu'à l'adresse enregistrée sur le compte",
+        'Il est valable une seule fois et pour une courte durée',
+        'Vos données et vos projets restent exactement comme ils sont',
+      ],
+    },
+    glimpse: 'Mots-clés suivis',
+    mobileTrust: ['Sans carte bancaire', 'Résiliable à tout moment'],
   },
 }

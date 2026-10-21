@@ -14,9 +14,9 @@
  * site can be managed from a Hebrew dashboard, and currency follows the country.
  */
 
-export type ContentLanguage = 'he' | 'en' | 'es' | 'pt-BR'
+export type ContentLanguage = 'he' | 'en' | 'es' | 'pt-BR' | 'fr'
 
-export const CONTENT_LANGUAGES: ContentLanguage[] = ['he', 'en', 'es', 'pt-BR']
+export const CONTENT_LANGUAGES: ContentLanguage[] = ['he', 'en', 'es', 'pt-BR', 'fr']
 
 export const DEFAULT_CONTENT_LANGUAGE: ContentLanguage = 'he'
 
@@ -30,6 +30,12 @@ export const DEFAULT_CONTENT_LANGUAGE: ContentLanguage = 'he'
  * does: the copy, the examples and the legal documents are Brazilian. A bare
  * 'pt' or 'pt-PT' still normalizes here, because the alternative — falling back
  * to Hebrew — is the worse answer for a Portuguese value.
+ *
+ * French is region-less, like Spanish: 'fr', 'fr-FR', 'fr-BE' and 'fr-CA' all
+ * normalize to the one content language, because what we write for a reader in
+ * Quebec and for a reader in Lyon is the same French. Where the region does
+ * change an answer it is a LEGAL question, not a content one, and the privacy
+ * policy says so in its own words.
  */
 export function normalizeContentLanguage(value: unknown): ContentLanguage {
   const s = String(value ?? '').toLowerCase().trim()
@@ -37,6 +43,7 @@ export function normalizeContentLanguage(value: unknown): ContentLanguage {
   if (s.startsWith('es') || s.startsWith('cas')) return 'es'
   if (s.startsWith('he') || s.startsWith('iw')) return 'he'
   if (s.startsWith('pt') || s.startsWith('portugu')) return 'pt-BR'
+  if (s.startsWith('fr') || s.startsWith('franc') || s.startsWith('français')) return 'fr'
   return DEFAULT_CONTENT_LANGUAGE
 }
 
@@ -46,6 +53,7 @@ const ENGLISH_NAME: Record<ContentLanguage, string> = {
   en: 'English',
   es: 'Spanish',
   'pt-BR': 'Brazilian Portuguese',
+  fr: 'French',
 }
 
 export function languageNameInEnglish(language: ContentLanguage): string {
@@ -60,7 +68,8 @@ export function contentDirection(language: ContentLanguage): 'rtl' | 'ltr' {
 /**
  * The script the language's own content is written in. Latin is FOREIGN to Hebrew
  * content (an unknown latin token is a model-invented brand name) and NATIVE to
- * English and Spanish, where the same rule would flag every ordinary word.
+ * every other content language, where the same rule would flag every ordinary
+ * word.
  */
 export function contentScript(language: ContentLanguage): 'hebrew' | 'latin' {
   return language === 'he' ? 'hebrew' : 'latin'
@@ -87,8 +96,8 @@ export function toHebrewOrEnglish(language: ContentLanguage): 'he' | 'en' {
  *
  * The keyword-research screen offers more languages than we write content in,
  * because the language only decides which keyword ideas Google returns.
- * Portuguese used to be the example and is now a content language of its own;
- * French, German and the rest are still research-only. Rendering a latin-script
+ * Portuguese and French used to be the examples and are now content languages
+ * of their own; German and the rest are still research-only. Rendering a latin-script
  * language's topics in Hebrew prose is worse than rendering them in English, so
  * this is the fallback for anything researched in a language we cannot write in
  * yet.
@@ -99,6 +108,6 @@ export function toHebrewOrEnglish(language: ContentLanguage): 'he' | 'en' {
 export function contentLanguageOrEnglish(value: unknown): ContentLanguage {
   const s = String(value ?? '').toLowerCase().trim()
   if (!s) return DEFAULT_CONTENT_LANGUAGE
-  const known = /^(en|es|cas|he|iw|pt|portugu)/.test(s)
+  const known = /^(en|es|cas|he|iw|pt|portugu|fr|franc)/.test(s)
   return known ? normalizeContentLanguage(s) : 'en'
 }

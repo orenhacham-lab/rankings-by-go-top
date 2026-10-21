@@ -20,7 +20,10 @@
  * calendar: a language that already published today (UTC) is done, and a
  * language whose plan row is claimed right now is in flight, so a second
  * invocation leaves both alone. At most ONE language is written per run, so a
- * morning fills in the order he, en, es, pt-BR, a quarter of an hour apart.
+ * morning fills in the order he, en, es, pt-BR, fr, a quarter of an hour apart
+ * — the order lib/blog/auto/rotation.ts declares, and it is last-pays-first: a
+ * language that keeps failing the quality gate spends the window's reserve, and
+ * the one that goes without is the last in that list, never an older one.
  *
  * Production only, and only in WINDOW_HOURS_UTC (04:00-07:59 UTC = 07:00-10:59
  * in Israel). The window held three hours while there were three languages, and

@@ -127,8 +127,22 @@ function main() {
 
   console.log('\nF. the database agrees with the code about the list of languages')
   const migration = read('supabase/migrations/20261009180750_articles_locale.sql')
-  const checkList = migration.match(/CHECK \(locale IN \(([^)]*)\)\)/)
-  const inCheck = (checkList?.[1] || '').split(',').map((v) => v.trim().replace(/^'|'$/g, ''))
+  /*
+   * F1 USED TO READ THAT ONE FILE, and so it reported the Hebrew-era list for
+   * two days after the French widening landed in a migration of its own
+   * (20261021180000). A CHECK is replaced by the next migration that declares
+   * it, so the only file that describes the live constraint is the LAST one
+   * that names it — which is what the database itself sees, in this same order.
+   */
+  const allMigrations = readdirSync(join(ROOT, 'supabase', 'migrations'))
+    .filter((f) => f.endsWith('.sql')).sort()
+  let inCheck: string[] = []
+  for (const file of allMigrations) {
+    const sql = read(`supabase/migrations/${file}`)
+    for (const m of sql.matchAll(/articles_locale_check[\s\S]{0,120}?CHECK\s*\(\s*locale\s+IN\s*\(([^)]*)\)/gi)) {
+      inCheck = m[1].split(',').map((v) => v.trim().replace(/^'|'$/g, ''))
+    }
+  }
   // MUTATION: add a language to PUBLIC_LOCALES without touching the migration
   // and this fails, which is the point: the row would be refused in production.
   check('F1. the CHECK lists exactly PUBLIC_LOCALES',
@@ -358,7 +372,7 @@ function main() {
   for (const locale of PUBLIC_LOCALES) {
     const role = articleAuthor('אורן חכם')?.role[locale] ?? ''
     check(`O16. ${locale}: the role names him as the founder`,
-      /מייסד|Founder|Fundador/.test(role), role)
+      /מייסד|Founder|Fundador|Fondateur/.test(role), role)
   }
   // MUTATION CONTROL for O11/O16: the Hebrew spelling and the Hebrew role are
   // still Hebrew, so these checks are not passing on an empty table.

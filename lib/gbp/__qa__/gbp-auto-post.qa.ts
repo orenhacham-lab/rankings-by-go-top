@@ -252,15 +252,19 @@ async function enqueueChecks() {
     const pt = world({ language: 'pt-BR' })
     await A.enqueueGbpPostForPublishedArticle(pt, ARTICLE)
     check('a Brazilian Portuguese project posts in pt-BR', posts(pt)[0]?.language_code === 'pt-BR')
+    const fr = world({ language: 'fr' })
+    await A.enqueueGbpPostForPublishedArticle(fr, ARTICLE)
+    check('a French project posts in French', posts(fr)[0]?.language_code === 'fr')
 
     check('the language rule is pure, so it can be read at a glance',
       A.postLanguageFor('he-IL') === 'he' && A.postLanguageFor('iw') === 'he'
       && A.postLanguageFor('en-US') === 'en' && A.postLanguageFor('es-MX') === 'es'
       && A.postLanguageFor('pt') === 'pt-BR' && A.postLanguageFor('pt-PT') === 'pt-BR'
+      && A.postLanguageFor('fr') === 'fr' && A.postLanguageFor('fr-CA') === 'fr'
       && A.postLanguageFor(null) === 'en' && A.postLanguageFor('sw') === 'en')
     check('whatever it returns is a language the database column accepts',
-      V.GBP_POST_LANGUAGES.length === 4
-      && ['he', 'en', 'es', 'pt-BR', 'he-IL', 'iw', 'pt', 'pt-PT', 'es-MX', 'en-GB', '', null, 42]
+      V.GBP_POST_LANGUAGES.length === 5
+      && ['he', 'en', 'es', 'pt-BR', 'fr', 'he-IL', 'iw', 'pt', 'pt-PT', 'es-MX', 'en-GB', 'fr-CA', '', null, 42]
         .every((l) => V.normalizePostLanguage(A.postLanguageFor(l)) !== null))
 
     // A regional tag is still that language, so a project recorded as es-MX posts in Spanish.

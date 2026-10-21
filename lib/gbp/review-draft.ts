@@ -43,7 +43,7 @@ export interface ReviewDraftSource {
  * `language === 'en' ? 'en' : 'he'`, which drafted a HEBREW reply for a Spanish
  * merchant's review; a Record cannot have a wrong else branch.
  */
-const LANGUAGE_NAME: Record<PublicLocale, string> = { he: 'Hebrew', en: 'English', es: 'Spanish', 'pt-BR': 'Brazilian Portuguese' }
+const LANGUAGE_NAME: Record<PublicLocale, string> = { he: 'Hebrew', en: 'English', es: 'Spanish', 'pt-BR': 'Brazilian Portuguese', fr: 'French' }
 
 export function buildReplyPrompt(src: ReviewDraftSource): string {
   const stars = src.review.stars

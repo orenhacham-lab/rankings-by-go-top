@@ -2,10 +2,10 @@
  * THE PUBLIC BLOG, IN EVERY LANGUAGE THE SITE HAS.
  *
  * The blog used to be Hebrew only: `app/(public)/articles` read the `articles`
- * table and rendered it, while `/en|/es|/pt-BR/articles` were hand-written
+ * table and rendered it, while the other languages' /articles were hand-written
  * "coming soon" pages with no list, no `[slug]` route and no way to publish.
  *
- * Adding three more copies of those two pages would have meant four copies of
+ * Adding a copy of those two pages per language would have meant one copy of
  * the same query, the same card grid, the same table of contents and the same
  * JSON-LD — four places for a fix to be forgotten. Instead the two pages are
  * one component each (`components/public/articles/`), and the words they
@@ -287,6 +287,59 @@ export const ARTICLES_COPY: Record<PublicLocale, ArticlesCopy> = {
         { title: 'Google orgânico', desc: 'Acompanhe suas posições nas páginas 1 e 2 do Google com resultados precisos' },
         { title: 'Google Maps', desc: 'Acompanhe sua posição por local: cidade, CEP ou ponto de referência' },
         { title: 'Relatórios profissionais', desc: 'Exporte relatórios em PDF e Excel com tendências, comparativos e análise avançada' },
+      ],
+    },
+  },
+  fr: {
+    index: {
+      title: 'Articles',
+      subtitle: 'Guides et analyses sur le suivi de position dans Google, le référencement naturel et la visibilité dans les IA',
+      breadcrumb: 'Articles',
+      empty: 'Des articles seront publiés ici très bientôt.',
+      readMore: 'Lire l\u2019article',
+    },
+    article: {
+      notFoundTitle: 'Article introuvable',
+      notFoundBody: 'L\u2019article que vous cherchez n\u2019existe pas ou a été retiré',
+      backToArticles: 'Retour aux articles',
+      backHome: 'Retour à l\u2019accueil',
+      toc: 'Sommaire',
+      readingTime: (m) => `${m} min de lecture`,
+      updated: 'Mis à jour',
+      aboutAuthor: 'À propos de l\u2019auteur',
+      aboutAuthorLink: 'En savoir plus sur Go Top',
+    },
+    widgets: {
+      plans: {
+        perMonth: 'par mois',
+        popular: 'Le plus choisi',
+        cta: 'Commencez 7 jours gratuits',
+        noCard: 'Sans carte bancaire. Annulable à tout moment.',
+        allPlans: 'Tous les détails sur la page des tarifs',
+      },
+      cta: {
+        title: 'Vous voulez voir cela sur votre propre site ?',
+        body: 'Sept jours gratuits, sans carte bancaire : connectez le site, recevez la recherche de mots-clés, lancez la vérification de visibilité dans les IA, et faites écrire et publier le premier article.',
+        primary: 'Commencez 7 jours gratuits',
+        secondary: 'Ou lancez une vérification gratuite de votre site',
+      },
+    },
+    promo: {
+      badge: 'Go Top SEO',
+      title: ['Suivez vos positions', 'dans Google quand vous en avez besoin'],
+      body: 'Plateforme professionnelle pour suivre vos positions dans Google organique et dans Google Maps. Lancez une analyse quand vous le souhaitez, ou laissez-la s\u2019exécuter seule une fois par mois. Rapports détaillés, suivi des tendances et accompagnement personnel.',
+      signup: { label: 'Commencer l\u2019essai gratuit', href: authHref('signup', 'fr') },
+      pricing: { label: 'Voir les tarifs', href: '/fr/pricing' },
+      stats: [
+        { num: '1000+', label: 'Mots-clés' },
+        { num: '2', label: 'Moteurs de position (Google + Maps)' },
+        { num: 'IA', label: 'Suivi de visibilité' },
+        { num: '7 jours', label: 'D\u2019essai gratuit' },
+      ],
+      features: [
+        { title: 'Google organique', desc: 'Suivez vos positions sur les pages 1 et 2 de Google avec des résultats précis' },
+        { title: 'Google Maps', desc: 'Suivez votre position par lieu : ville, code postal ou point de repère' },
+        { title: 'Rapports professionnels', desc: 'Exportez des rapports PDF et Excel avec tendances, comparatifs et analyse avancée' },
       ],
     },
   },

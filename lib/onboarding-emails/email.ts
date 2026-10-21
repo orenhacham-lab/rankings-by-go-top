@@ -23,7 +23,7 @@ import type { Stage } from './cadence'
 
 export interface OnboardingEmailInput {
   stage: Stage
-  /** All four published languages, not just the bilingual pair: the words are the dictionary's. */
+  /** All five published languages, not just the bilingual pair: the words are the dictionary's. */
   locale: PublicLocale
   /** The first name, or null when the account has none. */
   firstName: string | null

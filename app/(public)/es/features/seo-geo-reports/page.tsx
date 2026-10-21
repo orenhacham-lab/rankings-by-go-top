@@ -75,7 +75,11 @@ const CONTENT: FeaturePageContent = {
       title: 'Lo que se pregunta sobre los informes',
       items: [
         // Honest about what exists today: the export itself has no Spanish yet.
-        { q: '¿En qué idiomas salen los informes?', a: 'Por ahora puedes exportar un informe en inglés o en hebreo. El informe en español llegará con el panel en español.' },
+        // Every language the dashboard has, because lib/export/i18n.ts carries a
+        // complete label set for each of the five (verified key for key against
+        // English). This answer said "English or Hebrew" long after that stopped
+        // being true, which understated the product on three pages at once.
+        { q: '¿En qué idiomas salen los informes?', a: 'El informe sale en el idioma de tu panel, y el español es uno de ellos, junto con el hebreo, el inglés, el portugués y el francés.' },
         { q: '¿Puedo hacer un informe aparte para cada cliente?', a: 'Sí. Cada web es su propio proyecto, y cada proyecto tiene su propio informe. El número de proyectos de cada plan está en la página de precios.' },
         { q: '¿Los informes entran en todos los planes?', a: 'Sí. Los informes en PDF y Excel entran en todos los planes.' },
       ],

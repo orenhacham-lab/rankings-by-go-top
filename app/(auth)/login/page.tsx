@@ -116,6 +116,30 @@ const LOGIN_UI = {
       linkInvalid: 'Este link de confirmação não é válido ou expirou. Entre na sua conta, ou cadastre-se de novo para receber um novo.',
     },
   },
+  fr: {
+    subtitle: 'Suivi de position dans Google et visibilité dans les IA',
+    logoAlt: 'Logo de Go Top SEO',
+    heading: 'Connexion',
+    emailLabel: 'Adresse e-mail',
+    emailPlaceholder: 'vous@exemple.com',
+    passwordLabel: 'Mot de passe',
+    passwordPlaceholder: '\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022',
+    loginBtn: 'Se connecter',
+    forgotPassword: 'Mot de passe oublié ?',
+    dontHaveAccount: 'Vous n\u2019avez pas de compte ?',
+    startTrial: 'Commencez gratuitement',
+    accessibility: 'Accessibilité',
+    privacy: 'Confidentialité',
+    articles: 'Articles',
+    accessibilityHref: '/fr/accessibility',
+    privacyHref: '/fr/privacy',
+    articlesHref: '/fr/articles',
+    err: {
+      badCredentials: 'Adresse e-mail ou mot de passe incorrect',
+      emailNotConfirmed: 'Votre adresse e-mail n\u2019est pas encore confirmée. Ouvrez le message de confirmation que nous vous avons envoyé et cliquez sur le lien.',
+      linkInvalid: 'Ce lien de confirmation n\u2019est pas valide ou a expiré. Connectez-vous, ou inscrivez-vous à nouveau pour en recevoir un autre.',
+    },
+  },
 } as const
 
 export function AuthForm() {

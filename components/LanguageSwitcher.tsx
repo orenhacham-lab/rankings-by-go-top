@@ -4,10 +4,8 @@ import Link from 'next/link'
 import { useEffect, useRef, useState } from 'react'
 import { usePathname } from 'next/navigation'
 import { Check, ChevronDown, Languages } from 'lucide-react'
-import { LOCALE_PREFIX, PUBLIC_LOCALES, type PublicLocale } from '@/lib/i18n/locales'
+import { LOCALE_PREFIX, enabledPublicLocales, type PublicLocale } from '@/lib/i18n/locales'
 import { getPublicDictionary } from '@/lib/i18n/getPublicDictionary'
-import { spanishSiteEnabled } from '@/lib/i18n/spanish-site'
-import { portugueseSiteEnabled } from '@/lib/i18n/portuguese-site'
 import { cn } from '@/lib/utils'
 
 /**
@@ -35,20 +33,19 @@ export function counterpartPath(pathname: string, from: PublicLocale, to: Public
 }
 
 /**
- * The locales a visitor may switch to right now. A gated language appears only
- * while its own site is on, so the switcher can never offer a tree that 404s.
+ * The locales a visitor may switch to right now, from the one gate in
+ * lib/i18n/locales.ts. A gated language appears only while its own site is on,
+ * so the switcher can never offer a tree that 404s. Kept as a named export
+ * because the QA suites and the journeys call it by name.
  */
-export function availableLocales(
-  spanishOn = spanishSiteEnabled(),
-  portugueseOn = portugueseSiteEnabled(),
-): PublicLocale[] {
-  return PUBLIC_LOCALES.filter((l) => (l === 'es' ? spanishOn : l === 'pt-BR' ? portugueseOn : true))
+export function availableLocales(flags?: Partial<Record<PublicLocale, boolean>>): PublicLocale[] {
+  return enabledPublicLocales(flags)
 }
 
 /**
  * `inverse`: white ink, for the nav while it sits over a navy hero.
  *
- * With two languages this was one link; with three it is a small menu, because a
+ * With two languages this was one link; with more it is a small menu, because a
  * toggle cannot express "and also Spanish". It stays a list of real links, so it
  * works without JavaScript and a middle-click still opens the other language in
  * a new tab — and when only two languages are available it renders as the single

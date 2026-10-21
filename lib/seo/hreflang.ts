@@ -1,5 +1,4 @@
-import { spanishSiteEnabled } from '@/lib/i18n/spanish-site'
-import { portugueseSiteEnabled } from '@/lib/i18n/portuguese-site'
+import { publicLocaleEnabled } from '@/lib/i18n/locales'
 
 const SITE_URL = 'https://www.gotopseo.com'
 
@@ -14,6 +13,11 @@ const SITE_URL = 'https://www.gotopseo.com'
  */
 function portugueseTwin(esPath: string): string {
   return esPath === '/es' ? '/pt-BR' : esPath.replace(/^\/es(?=\/|$)/, '/pt-BR')
+}
+
+/** The French URL of a page, derived from its Spanish one, for the same reason. */
+function frenchTwin(esPath: string): string {
+  return esPath === '/es' ? '/fr' : esPath.replace(/^\/es(?=\/|$)/, '/fr')
 }
 
 /**
@@ -34,7 +38,8 @@ export function buildHreflangAlternates(hePath: string, enPath: string, esPath?:
   // A language is announced to search engines only once it exists. While its
   // flag is off its tree is a 404, so an hreflang pointing at it would
   // advertise a page that is not there.
-  if (esPath && spanishSiteEnabled()) alternates.es = `${SITE_URL}${esPath}`
-  if (esPath && portugueseSiteEnabled()) alternates['pt-BR'] = `${SITE_URL}${portugueseTwin(esPath)}`
+  if (esPath && publicLocaleEnabled('es')) alternates.es = `${SITE_URL}${esPath}`
+  if (esPath && publicLocaleEnabled('pt-BR')) alternates['pt-BR'] = `${SITE_URL}${portugueseTwin(esPath)}`
+  if (esPath && publicLocaleEnabled('fr')) alternates.fr = `${SITE_URL}${frenchTwin(esPath)}`
   return alternates
 }
