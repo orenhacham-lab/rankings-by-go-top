@@ -207,6 +207,30 @@ async function main() {
   check('B12: our own address is never read as the failed recipient',
     recipientIn('Final-Recipient: rfc822; oren@trygotopseo.com\nStatus: 5.1.1') === null)
 
+  // THE TWO REPORTS THIS CHANNEL REALLY RECEIVED, 19 and 21 Oct 2026. Both were
+  // real bounces on addresses we chose; both were recorded as not ours because
+  // the headers sat in an attachment the webhook does not hand us.
+  const postfixReport = [
+    'This is the mail system at host relay.mailchannels.net.',
+    '',
+    `<${PROSPECT}>: host example-com.mail.protection.outlook.com[52.101.8.35] said: 550 5.4.1`,
+    '    Recipient address rejected: Access denied. (in reply to RCPT TO command)',
+  ].join('\n')
+  check('B13: a Postfix transcript line names the recipient',
+    recipientIn(postfixReport) === PROSPECT)
+
+  const office365Report = [
+    `Your message to ${PROSPECT} couldn't be delivered.`,
+    'Security or policy settings at example.com have rejected your message.',
+    'Status code: 550 5.7.1',
+  ].join('\n')
+  check('B14: an Office 365 report names the recipient in prose',
+    recipientIn(office365Report) === PROSPECT)
+
+  // A bounce body quotes the original message whole, our own footer included.
+  check('B15: an address that is merely quoted in the body is not the recipient',
+    recipientIn(`550 rejected\n\n--- original message ---\nTo: ${PROSPECT}\nHello,`) === null)
+
   console.log('\n— S: the plan\'s stop rules —')
 
   const counts = (o: Partial<Parameters<typeof channelStop>[0]>) => channelStop({
@@ -436,6 +460,14 @@ Subject: a question about Store Example's organic traffic
   )
   check('S1-MUT: dropping the complaint rule would let three complaints pass',
     mutComplaint === true)
+
+  const mutProse = await withMutant<{ recipientIn: typeof recipientIn }, boolean>(
+    'lib/outreach/bounce.ts',
+    [[/  for \(const re of PROSE_RECIPIENT\) \{/, '  for (const re of []) {']],
+    (m) => m.recipientIn(postfixReport) === null && m.recipientIn(office365Report) === null,
+  )
+  check('B13-MUT: without the prose patterns both real bounces go unattributed',
+    mutProse === true)
 
   console.log(`\n${pass} passed, ${fail} failed`)
   if (fail > 0) process.exit(1)
