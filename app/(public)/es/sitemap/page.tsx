@@ -59,6 +59,13 @@ export default function SpanishSitemapPage() {
       ],
     },
     {
+      title: 'Comparativas',
+      links: [
+        { label: 'Go Top SEO frente a Semrush', href: '/es/compare/semrush' },
+        { label: 'Go Top SEO frente a Yoast', href: '/es/compare/yoast' },
+      ],
+    },
+    {
       title: 'Legal',
       links: [
         { label: 'Política de privacidad', href: '/es/privacy' },
