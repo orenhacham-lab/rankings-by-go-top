@@ -1,0 +1,17 @@
+{
+  "$schema": "https://playground.wordpress.net/blueprint-schema.json",
+  "meta": {
+    "title": "GO TOP SEO Bridge live preview",
+    "description": "Boots WordPress with GO TOP SEO Bridge active and opens its settings screen, so the plugin can be tried without installing anything.",
+    "author": "orenhacham-lab"
+  },
+  "landingPage": "/wp-admin/options-general.php?page=go-top-seo-bridge",
+  "preferredVersions": {
+    "php": "8.2",
+    "wp": "latest"
+  },
+  "features": {
+    "networking": true
+  },
+  "login": true
+}

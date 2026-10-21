@@ -311,6 +311,14 @@ check('MUTATION — an English-only extra section is caught', pages.he.terms.h2 
     'www.tiktok.com': 'a sameAs profile URL a customer may enter themselves',
     'x.com': 'a sameAs profile URL a customer may enter themselves',
     'apps.shopify.com': 'our own App Store listing, a plain nofollow link the visitor may follow; our code sends it nothing',
+    // The competitors a comparison page names (app/(public)/**/compare/*). Each
+    // row of the table links the vendor's OWN page, so a reader can check the
+    // claim themselves on the day they read it. The links are nofollow and open
+    // in a new tab; nothing of the visitor's is sent to them by us, and the
+    // visitor only reaches them by clicking.
+    'www.semrush.com': 'a competitor\u2019s own page, linked as the source of a dated claim about them; not fetched',
+    'yoast.com': 'a competitor\u2019s own page, linked as the source of a dated claim about them; not fetched',
+    'wordpress.org': 'a competitor\u2019s own plugin listing, linked as the source of a dated claim about them; not fetched',
     'biz.yelp.com': 'a directory named in advice text; not contacted',
     'business.trustpilot.com': 'a directory named in advice text; not contacted',
     'businessconnect.apple.com': 'a directory named in advice text; not contacted',

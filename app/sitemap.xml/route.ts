@@ -182,6 +182,19 @@ export async function GET() {
       changefreq: 'monthly',
       priority: '0.8',
     },
+    // Hebrew comparison pages
+    {
+      url: `${baseUrl}/compare/semrush`,
+      lastmod: today,
+      changefreq: 'monthly',
+      priority: '0.7',
+    },
+    {
+      url: `${baseUrl}/compare/yoast`,
+      lastmod: today,
+      changefreq: 'monthly',
+      priority: '0.7',
+    },
     // Hebrew legal pages
     // English site root and equivalents
     {
@@ -311,6 +324,19 @@ export async function GET() {
       changefreq: 'monthly',
       priority: '0.8',
     },
+    // English comparison pages
+    {
+      url: `${baseUrl}/en/compare/semrush`,
+      lastmod: today,
+      changefreq: 'monthly',
+      priority: '0.7',
+    },
+    {
+      url: `${baseUrl}/en/compare/yoast`,
+      lastmod: today,
+      changefreq: 'monthly',
+      priority: '0.7',
+    },
     // English legal pages
   ]
 
@@ -345,6 +371,8 @@ export async function GET() {
     { path: '/solutions/shopify', changefreq: 'monthly', priority: '0.7' },
     { path: '/features/site-links', changefreq: 'monthly', priority: '0.7' },
     { path: '/features/google-maps-posts', changefreq: 'monthly', priority: '0.7' },
+    { path: '/compare/semrush', changefreq: 'monthly', priority: '0.7' },
+    { path: '/compare/yoast', changefreq: 'monthly', priority: '0.7' },
   ]
 
   const treePages = (prefix: string) =>
