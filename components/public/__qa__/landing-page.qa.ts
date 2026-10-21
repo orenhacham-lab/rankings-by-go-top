@@ -15,7 +15,9 @@
  *      (3 + 2, then 2 + 3), and there are exactly three outcomes per language;
  *   D) honesty: the page's figures come from the product (six AI engines, the
  *      plan catalogue's trial and lowest price), the demo says its names and
- *      figures are illustrative, and no invented social proof appears.
+ *      figures are illustrative, and no invented social proof appears;
+ *   E) an animated figure is in the page's text once, so whatever reads the
+ *      page as text — a crawler, an AI engine — reads 6 and not 66.
  * Each group ends with a MUTATION CONTROL: the same check on a deliberately
  * broken copy must fail.
  *
@@ -207,6 +209,19 @@ async function main() {
   check('D4: no invented social proof, totals or press in either language', invented(copies.he).length === 0 && invented(copies.en).length === 0,
     [...invented(copies.he), ...invented(copies.en)].slice(0, 3).join(' | '))
   check('MUTATION CONTROL: a "1000+ customers" claim is caught', invented({ ...copies.en, hero: { ...copies.en.hero, eyebrow: 'Trusted by 1000+ businesses' } }).length === 1)
+
+  console.log('\nE) a figure is in the text once, not twice')
+  // The animated figures used to be rendered twice — an aria-hidden animated span
+  // and an sr-only final value — so everything that reads the page as text, a
+  // crawler and an AI engine included, saw "66" where the page shows 6.
+  const { Counter } = require(join(ROOT, 'components/public/landing/motion.tsx'))
+  const textOf = (markup: string) => unescape(markup.replace(/<[^>]*>/g, ''))
+  const figureOnce = (markup: string, value: number) => textOf(markup) === String(value)
+  check('E1: a counter puts its figure in the text once',
+    figureOnce(renderToStaticMarkup(createElement(Counter as never, { value: 6 })), 6),
+    textOf(renderToStaticMarkup(createElement(Counter as never, { value: 6 }))))
+  check('MUTATION CONTROL: the old two-node counter is caught',
+    !figureOnce('<span><span aria-hidden="true">6</span><span class="sr-only">6</span></span>', 6))
 
   console.log(`\n${pass} passed, ${fail} failed`)
   if (fail > 0) process.exit(1)
