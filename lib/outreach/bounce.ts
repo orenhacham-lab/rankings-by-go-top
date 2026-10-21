@@ -109,6 +109,33 @@ const FINAL_RECIPIENT = /^\s*(?:final-recipient|original-recipient|original-rcpt
 const FAILED_RECIPIENTS = /^\s*x-failed-recipients:\s*<?([^\s<>,;]+@[^\s<>,;]+)>?/im
 
 /**
+ * The address a report names in its PROSE, where no header carries it.
+ *
+ * Both reports this channel actually received on 19 and 21 Oct 2026 were real
+ * bounces on addresses we chose, and both were recorded as not ours because
+ * neither carried Final-Recipient in the part we read: Postfix put the address
+ * in its transcript line (`<addr>: host ... said: 550 ...`) and Office 365 in
+ * an English sentence. The headers were in the attached message/rfc822 part,
+ * which the webhook does not hand us. Two real bounces the rate rule could not
+ * see is the brake failing silently, which is worse than a brake that fires.
+ *
+ * These patterns are deliberately narrow. A bounce body quotes the whole
+ * original message, our footer and the recipient's own address included, so
+ * anything that merely takes the first address it finds would attribute a
+ * forwarder's failure to us — the db-toolco case in the header, with the
+ * protection removed.
+ */
+const PROSE_RECIPIENT = [
+  // Postfix / mailchannels transcript: `<sales@example.com>: host ... said: 550 ...`
+  /^\s*<([^\s<>,;]+@[^\s<>,;]+)>:\s*(?:host|.{0,80}?\bsaid:)/im,
+  // Office 365: `Your message to info@example.com couldn't be delivered.`
+  /\byour message to\s+<?([^\s<>,;]+@[^\s<>,;]+)>?\s+(?:couldn|could not|was|wasn|has)/i,
+  // Gmail and others: `The response was: ... to <addr>` is too loose; this is the
+  // one form that names the address as the delivery target.
+  /\bdelivery to the following recipients? failed permanently:\s*<?([^\s<>,;]+@[^\s<>,;]+)>?/i,
+]
+
+/**
  * What this inbound message is, if it is not a person writing back.
  *
  * Returns null for an ordinary reply, which is the common case and is somebody
@@ -155,7 +182,11 @@ export function classifyDelivery(message: InboundMessage): DeliveryReport | null
 
 /** The address a report names, normalized, or null when it names none. */
 export function recipientIn(body: string): string | null {
-  const match = FINAL_RECIPIENT.exec(body) ?? FAILED_RECIPIENTS.exec(body)
+  let match = FINAL_RECIPIENT.exec(body) ?? FAILED_RECIPIENTS.exec(body)
+  for (const re of PROSE_RECIPIENT) {
+    if (match !== null) break
+    match = re.exec(body)
+  }
   if (!match) return null
   const address = normalizeEmail(match[1])
   // Our own address appears all over a bounce body (we are the sender it is
