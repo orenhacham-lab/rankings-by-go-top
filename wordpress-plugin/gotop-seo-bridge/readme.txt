@@ -1,6 +1,6 @@
 === GO TOP SEO Bridge – AI SEO Autopilot: Articles & Schema ===
 Contributors: gotopil
-Tags: seo, ai seo, blog, content, schema
+Tags: seo, ai seo, schema, article generator, auto publish
 Requires at least: 6.0
 Tested up to: 7.1
 Requires PHP: 7.4
@@ -149,6 +149,22 @@ Yes. SEO titles, descriptions, canonical addresses and focus keyphrases are writ
 = Can I undo a fix? =
 
 Yes. Every fix can be undone from GO TOP, and WordPress keeps a revision of every content change.
+
+= Does it check whether ChatGPT or Gemini mentions my business? =
+
+GO TOP does, once a month, across ChatGPT, Gemini and Google's AI answers, and the result is in the monthly report. The check runs in GO TOP, not in this plugin, and this plugin does no tracking of any kind.
+
+= How often are rankings checked? =
+
+Once a month. GO TOP checks Google, Google Maps and the AI answers on a monthly cycle and sends a report. There is no daily or real-time tracking.
+
+= Can I see an article before it goes live? =
+
+Yes. In GO TOP you choose whether each article arrives as a draft, is published, or is scheduled for a date, and the plugin creates it that way. A draft stays a draft until you publish it yourself.
+
+= What does GO TOP cost? =
+
+The plugin is free and GPL. A GO TOP account starts with a 7-day trial and no credit card. After the trial it is from $79 per month plus tax, or from 249 ILS per month including VAT in Israel.
 
 = How do I disconnect? =
 
