@@ -88,8 +88,12 @@ function main() {
     // STRICT BY DESIGN: this reads values the code itself writes (the proxy
     // header, the cookie), so anything else falls back rather than being
     // guessed at. A near-miss is not a locale.
+    // 'fr' was the near-miss here until French shipped on 21 October 2026; a
+    // real locale as the example of "not a locale" is a guard asserting the
+    // opposite of the truth. 'de' is a language the keyword research offers and
+    // the site does not have.
     check('1e: anything else is NOT silently a locale',
-      normalizePublicLocale('fr') === null && normalizePublicLocale('') === null
+      normalizePublicLocale('de') === null && normalizePublicLocale('') === null
       && normalizePublicLocale('ES') === null && normalizePublicLocale(' es ') === null
       && normalizePublicLocale(null) === null && normalizePublicLocale(undefined) === null)
     // THE SEPARATION: Spanish degrades to English, never to Hebrew, because
@@ -137,8 +141,15 @@ function main() {
     check('2j: Hebrew stays x-default either way', off['x-default'] === on['x-default'] && off['x-default'] === 'https://www.gotopseo.com/pricing')
     // The sitemap is gated by the same flag, in the same expression.
     const sitemap = strip(read('app/sitemap.xml/route.ts'))
-    check('2k: the sitemap lists Spanish only behind the flag',
-      /spanishSiteEnabled\(\)\s*\?/.test(sitemap) && /\.\.\.spanishPages/.test(sitemap))
+    // The sitemap used to carry one `const` per language, each behind its own
+    // flag read. It now derives every translated tree from the one gate in
+    // lib/i18n/locales.ts, which is what stopped a fifth language from getting
+    // a route tree and no sitemap entry. So the guard is on the derivation.
+    check('2k: the sitemap lists a translated tree only behind the one gate',
+      /enabledPublicLocales\(\)/.test(sitemap) && /\.\.\.translatedTreePages/.test(sitemap)
+      && /flatMap\(\(l\) => treePages\(LOCALE_PREFIX\[l\]\)\)/.test(sitemap))
+    check('2k-a: and Spanish is one of the locales it iterates',
+      /const TRANSLATED_LOCALES: readonly PublicLocale\[\] = \[[^\]]*'es'/.test(sitemap))
     check('2l: …and it lists no Spanish LEGAL page (there is no Spanish version)',
       !/\/es\/(privacy|terms|refund-policy|accessibility)/.test(sitemap))
     // MUTATION CONTROL
@@ -276,10 +287,18 @@ function main() {
   // ── 6) The switcher and the links between the trees ─────────────────────────
   console.log('\n6) the switcher — three languages, counterpart URLs')
   {
-    check('6a: with the flag off, the switcher offers only Hebrew and English',
-      JSON.stringify(availableLocales(false, false)) === JSON.stringify(['he', 'en']))
-    check('6b: with it on, it offers all three',
-      JSON.stringify(availableLocales(true, false)) === JSON.stringify(['he', 'en', 'es']))
+    // availableLocales takes the gates as a map, not as positional booleans:
+    // positional arguments had to be reordered every time a language was added,
+    // and a call left with the old arity reads the real environment instead of
+    // the one the test means to describe — which is how 6a passed by accident
+    // for a while.
+    const allOff = { es: false, 'pt-BR': false, fr: false }
+    check('6a: with the flags off, the switcher offers only Hebrew and English',
+      JSON.stringify(availableLocales(allOff)) === JSON.stringify(['he', 'en']))
+    check('6b: with Spanish on, it offers exactly those three',
+      JSON.stringify(availableLocales({ ...allOff, es: true })) === JSON.stringify(['he', 'en', 'es']))
+    check('6b-a: and every language has its own switch, so one on does not turn another on',
+      JSON.stringify(availableLocales({ ...allOff, fr: true })) === JSON.stringify(['he', 'en', 'fr']))
     const cases: Array<[string, PublicLocale, PublicLocale, string]> = [
       ['/pricing', 'he', 'es', '/es/pricing'],
       ['/es/pricing', 'es', 'he', '/pricing'],
@@ -472,7 +491,7 @@ function main() {
     check('S1-MUT: a trigger with no chevron fails S1', !/<ChevronDown/.test(src.replace(/<ChevronDown[\s\S]*?\/>/, '')))
     // The two-language link is a link to the other language by name; it needs no chevron.
     check('S5: with two languages it is still one plain link, not a menu',
-      /if \(others\.length === 1\)/.test(src) && availableLocales(false, false).length === 2)
+      /if \(others\.length === 1\)/.test(src) && availableLocales({ es: false, 'pt-BR': false, fr: false }).length === 2)
   }
 
   // ---- The logo goes home in the language you are reading -------------------

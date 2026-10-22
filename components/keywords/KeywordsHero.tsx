@@ -81,7 +81,7 @@ export default function KeywordsHero({ project, standing, marketLine, frequency,
   const dict = getDashboardDictionary(uiLocale)
   const h = dict.keywordsPage.hero
   const k = dict.projectDetail
-  const count = (n: number) => formatCount(n, language)
+  const count = (n: number) => formatCount(n, uiLocale)
   const s = standing
   const page1 = s.buckets.top3 + s.buckets.page1
 
@@ -109,7 +109,7 @@ export default function KeywordsHero({ project, standing, marketLine, frequency,
               <span dir="ltr" className="truncate text-caption font-semibold">{project.target_domain}</span>
             </span>
             <HeroBadge tone={scanning ? 'action' : project.last_scan_at ? 'ok' : 'muted'} live={scanning}>
-              {scanning ? k.keywordsSection.scanning : project.last_scan_at ? h.lastCheck(formatDateTime(project.last_scan_at, language)) : h.neverChecked}
+              {scanning ? k.keywordsSection.scanning : project.last_scan_at ? h.lastCheck(formatDateTime(project.last_scan_at, uiLocale)) : h.neverChecked}
             </HeroBadge>
             <span className="min-w-0 truncate text-caption text-contrast-ink/70" title={marketLine}>
               {frequency}{marketLine ? ` · ${marketLine}` : ''}

@@ -78,7 +78,7 @@ export default function CompetitiveResearch({ projectId, siteIcon, suggested, on
   const [tracking, setTracking] = useState<Set<string>>(new Set())
   const [justTracked, setJustTracked] = useState<Set<string>>(new Set())
   const [addingCompetitor, setAddingCompetitor] = useState<string | null>(null)
-  const n = (v: number) => formatCount(v, language)
+  const n = (v: number) => formatCount(v, uiLocale)
 
   const track = useCallback(async (row: RankingRow) => {
     if (tracking.has(row.key)) return

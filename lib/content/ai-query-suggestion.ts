@@ -31,6 +31,7 @@ const QUESTION_START: Record<SuggestionLanguage, RegExp> = {
   en: /^(?:what|how|why|which|where|when|who|is|are|can|should|do|does)\b/i,
   es: /^(?:qu[ée]|c[oó]mo|por\s+qu[ée]|cu[áa]l|cu[áa]les|d[oó]nde|cu[áa]ndo|qui[ée]n|cu[áa]nto|cu[áa]nta|cu[áa]ntos|cu[áa]ntas|es|son|puedo|debo|hay|conviene|sirve|vale)\b/i,
   'pt-BR': /^(?:o\s+que|que|como|por\s+que|qual|quais|onde|quando|quem|quanto|quanta|quantos|quantas|[ée]|s[ãa]o|posso|devo|vale|existe|h[áa]|serve|precisa)\b/i,
+  fr: /^(?:qu['’]est-ce|que|quoi|comment|pourquoi|quel|quelle|quels|quelles|o[ùu]|quand|qui|combien|est-ce|sont|puis-je|dois-je|faut-il|y\s+a-t-il|vaut-il)\b/i,
 }
 
 /** "best / recommended" words: the question asks for a recommendation. */
@@ -39,6 +40,7 @@ const RECOMMEND: Record<SuggestionLanguage, RegExp> = {
   en: /\b(?:best|top|recommended)\b/i,
   es: /\b(?:mejor|mejores|recomendad\w*|top)\b/i,
   'pt-BR': /\b(?:melhor|melhores|recomendad\w*|top)\b/i,
+  fr: /\b(?:meilleur\w*|recommand\w*|top)\b/i,
 }
 
 /** A keyword that already names the act of buying ("buying X", "buy X"). */
@@ -47,6 +49,7 @@ const BUY: Record<SuggestionLanguage, RegExp> = {
   en: /^(?:buy|buying|order|ordering)\s/i,
   es: /^(?:comprar|compra de|comprando|pedir|encargar|contratar)\s/i,
   'pt-BR': /^(?:comprar|compra de|comprando|pedir|encomendar|contratar)\s/i,
+  fr: /^(?:acheter|achat d['’e]|commander|commande d['’e]|louer|souscrire)\s?/i,
 }
 
 const TEMPLATES: Record<SuggestionLanguage, { recommend: (k: string) => string; buy: (k: string) => string; general: (k: string) => string }> = {
@@ -69,6 +72,11 @@ const TEMPLATES: Record<SuggestionLanguage, { recommend: (k: string) => string; 
     recommend: (k) => `Estou procurando ${k.replace(/^o\s+|^a\s+|^os\s+|^as\s+/i, '')}. O que você recomenda?`,
     buy: (k) => `O que devo verificar antes de ${k.replace(/^compra de\s/i, 'comprar ')}?`,
     general: (k) => `O que devo saber sobre ${k}?`,
+  },
+  fr: {
+    recommend: (k) => `Je cherche ${k.replace(/^le\s+|^la\s+|^les\s+|^l['’]/i, '')}. Que me conseillez-vous ?`,
+    buy: (k) => `Que faut-il vérifier avant ${k.replace(/^achat d['’]/i, 'd’acheter ').replace(/^acheter\s/i, 'd’acheter ')} ?`,
+    general: (k) => `Que faut-il savoir sur ${k} ?`,
   },
 }
 

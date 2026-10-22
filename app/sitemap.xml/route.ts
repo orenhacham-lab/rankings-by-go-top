@@ -1,7 +1,5 @@
 import { createClient } from '@/lib/supabase/server'
-import { spanishSiteEnabled } from '@/lib/i18n/spanish-site'
-import { portugueseSiteEnabled } from '@/lib/i18n/portuguese-site'
-import { LOCALE_PREFIX, normalizePublicLocale } from '@/lib/i18n/locales'
+import { LOCALE_PREFIX, enabledPublicLocales, normalizePublicLocale, publicLocaleEnabled, type PublicLocale } from '@/lib/i18n/locales'
 
 interface Article {
   slug: string
@@ -345,9 +343,10 @@ export async function GET() {
   // so listing them here would submit 404s to Google. Legal pages are not
   // listed: the whole legal tree is noindex.
   //
-  // ONE list of paths for both languages, because the trees are mirrors: a page
-  // added to one and forgotten in the other would otherwise be a sitemap that
-  // disagrees with the hreflang built from the same mirror (lib/seo/hreflang.ts).
+  // ONE list of paths for every translated language, because the trees are
+  // mirrors: a page added to one and forgotten in another would otherwise be a
+  // sitemap that disagrees with the hreflang built from the same mirror
+  // (lib/seo/hreflang.ts).
   const translatedPaths: Array<{ path: string; changefreq: string; priority: string }> = [
     { path: '', changefreq: 'weekly', priority: '0.9' },
     { path: '/free-check', changefreq: 'monthly', priority: '0.8' },
@@ -378,8 +377,15 @@ export async function GET() {
   const treePages = (prefix: string) =>
     translatedPaths.map((p) => ({ url: `${baseUrl}${prefix}${p.path}`, lastmod: today, changefreq: p.changefreq, priority: p.priority }))
 
-  const spanishPages = spanishSiteEnabled() ? treePages('/es') : []
-  const portuguesePages = portugueseSiteEnabled() ? treePages('/pt-BR') : []
+  // Every translated tree, from the one gate (lib/i18n/locales.ts). Hebrew and
+  // English are the hand-written trees above, so they are not built from the
+  // mirror; everything after them is. This used to be one `const` per language,
+  // which is how a language gets a route tree and an hreflang set and no
+  // sitemap entry.
+  const TRANSLATED_LOCALES: readonly PublicLocale[] = ['es', 'pt-BR', 'fr']
+  const translatedTreePages = enabledPublicLocales()
+    .filter((l) => TRANSLATED_LOCALES.includes(l))
+    .flatMap((l) => treePages(LOCALE_PREFIX[l]))
 
   // Build article entries.
   //
@@ -390,8 +396,13 @@ export async function GET() {
   // and leave every translated article out of the sitemap entirely. A language
   // whose tree is behind an off flag contributes nothing, exactly as its static
   // pages do.
-  const articleLocaleEnabled = (locale: string) =>
-    locale === 'es' ? spanishSiteEnabled() : locale === 'pt-BR' ? portugueseSiteEnabled() : true
+  const articleLocaleEnabled = (locale: string) => {
+    const normalized = normalizePublicLocale(locale)
+    // An unrecognised value in the column is NOT a reason to drop the article:
+    // the URL below falls back to the Hebrew tree for it, so the entry is still
+    // a real page. An article is dropped only when its own language is off.
+    return normalized === null ? true : publicLocaleEnabled(normalized)
+  }
 
   const articleEntries = (articles || [])
     .filter((article: Article) => articleLocaleEnabled(article.locale))
@@ -403,7 +414,7 @@ export async function GET() {
     }))
 
   // Combine all entries
-  const allEntries = [...staticPages, ...spanishPages, ...portuguesePages, ...articleEntries]
+  const allEntries = [...staticPages, ...translatedTreePages, ...articleEntries]
 
   // Build XML
   const xml = `<?xml version="1.0" encoding="UTF-8"?>

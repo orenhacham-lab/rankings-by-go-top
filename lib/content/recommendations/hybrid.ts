@@ -98,6 +98,11 @@ const PROVENANCE: Record<ContentLanguage, {
     many: (n, names) => `Apoiado por ${n} fontes: ${names}`,
     one: (name) => `Apoiado apenas por: ${name}`,
   },
+  fr: {
+    label: { site_scan: 'Analyse du site', keyword_research_url: 'Recherche de mots-clés', project_data: 'Données du projet', keyword: 'Mot-clé', hybrid: 'Combiné' },
+    many: (n, names) => `Appuyé par ${n} sources : ${names}`,
+    one: (name) => `Appuyé uniquement par : ${name}`,
+  },
 }
 
 export function hybridProvenanceReason(sources: RecommendationSource[], language: ContentLanguage, repReason: string): string {

@@ -17,11 +17,21 @@ import { CONTENT_ROOT_PATH } from '@/lib/content/content-workspace-nav'
 import { strategyHref } from '@/lib/content/strategy/view'
 import { formatDate } from '@/lib/format/date'
 import { HeaderLink, LinkButton, StatusPill, Widget, WidgetEmpty, WidgetError, WidgetLoading } from './ui'
+import type { PublicLocale } from '@/lib/i18n/locales'
 
 type Copy = DashboardDictionary['dashboardHome']
 
-/** Cards say when relatively ("in 2 days", "3 days ago"); tables give the full date (lib/format/date.ts). */
-function formatDay(iso: string, language: 'he' | 'en'): string {
+/**
+ * Cards say when relatively ("dans 2 jours", "il y a 3 jours"); tables give the
+ * full date (lib/format/date.ts).
+ *
+ * The locale is the FULL PublicLocale, not the bilingual Locale the rest of the
+ * dashboard narrows to. A formatted date is not one of the surfaces
+ * lib/i18n/dashboard/locale.ts deliberately keeps bilingual: `Intl` writes it in
+ * every language we ship, so the narrowing bought nothing and printed
+ * "3 days ago" in the middle of French, Spanish and Portuguese prose.
+ */
+function formatDay(iso: string, language: PublicLocale): string {
   return formatDate(iso, language, 'relative')
 }
 
@@ -34,7 +44,7 @@ const ARTICLE_TONE: Record<ArticleStatus, 'ok' | 'info' | 'warn' | 'bad' | 'neut
 
 export function PublishingBoard({ t, language, section, retry }: {
   t: Copy
-  language: 'he' | 'en'
+  language: PublicLocale
   section: Section<BoardData> | null
   retry: () => void
 }) {
@@ -80,7 +90,7 @@ export function PublishingBoard({ t, language, section, retry }: {
 
 export function RecentArticles({ t, language, section, retry, firstArticleHref }: {
   t: Copy
-  language: 'he' | 'en'
+  language: PublicLocale
   section: Section<{ recent: ArticleLine[] }> | null
   retry: () => void
   /**

@@ -55,6 +55,15 @@ const PT_BASE = (kw: string): string[] => [
   `Melhor ${kw}: o que vale a pena comparar?`,
 ]
 
+const FR_BASE = (kw: string): string[] => [
+  `Comment choisir ${kw} ?`,
+  `${kw} : que vérifier avant de vous décider`,
+  `${kw} : le guide complet pour débuter`,
+  `Combien coûte ${kw} ?`,
+  `Les erreurs fréquentes au moment de choisir ${kw}`,
+  `Meilleur ${kw} : qu'est-ce qu'il vaut la peine de comparer ?`,
+]
+
 /** A couple of intent-flavoured extras so the list feels tailored. */
 const HE_INTENT: Partial<Record<SuggestionIntent, (kw: string) => string[]>> = {
   comparison: (kw) => [`${kw}: השוואה בין האפשרויות הפופולריות`, `מה ההבדל בין סוגי ${kw}?`],
@@ -89,9 +98,17 @@ const PT_INTENT: Partial<Record<SuggestionIntent, (kw: string) => string[]>> = {
   informational: (kw) => [`Tudo o que você precisa saber sobre ${kw}`],
 }
 
-const BASE: Record<SuggestionLanguage, (kw: string) => string[]> = { he: HE_BASE, en: EN_BASE, es: ES_BASE, 'pt-BR': PT_BASE }
+const FR_INTENT: Partial<Record<SuggestionIntent, (kw: string) => string[]>> = {
+  comparison: (kw) => [`${kw} : la comparaison des options les plus courantes`, `Quelle est la différence entre les types de ${kw} ?`],
+  commercial: (kw) => [`${kw} — comment bien choisir et ne pas le regretter`, `À quoi faire attention quand vous achetez ${kw} ?`],
+  local: (kw) => [`${kw} : comment choisir un prestataire local de confiance`],
+  transactional: (kw) => [`Quand faut-il commander ${kw} — et à qui ?`],
+  informational: (kw) => [`Tout ce qu'il faut savoir sur ${kw}`],
+}
+
+const BASE: Record<SuggestionLanguage, (kw: string) => string[]> = { he: HE_BASE, en: EN_BASE, es: ES_BASE, 'pt-BR': PT_BASE, fr: FR_BASE }
 const INTENT: Record<SuggestionLanguage, Partial<Record<SuggestionIntent, (kw: string) => string[]>>> =
-  { he: HE_INTENT, en: EN_INTENT, es: ES_INTENT, 'pt-BR': PT_INTENT }
+  { he: HE_INTENT, en: EN_INTENT, es: ES_INTENT, 'pt-BR': PT_INTENT, fr: FR_INTENT }
 
 /**
  * Return up to `max` distinct, natural topic suggestions for a keyword.

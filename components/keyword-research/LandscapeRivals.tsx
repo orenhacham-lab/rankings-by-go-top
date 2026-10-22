@@ -35,9 +35,9 @@ function Bar({ share, className }: { share: number; className: string }) {
 }
 
 function RivalCard({ c, max, index, phoneHidden = false }: { c: CompetitorInsight; max: number; index: number; phoneHidden?: boolean }) {
-  const { language, uiLocale } = useDashboardLanguage()
+  const { uiLocale } = useDashboardLanguage()
   const t = getDashboardDictionary(uiLocale).researchInsights.rivals
-  const n = (v: number) => formatCount(v, language)
+  const n = (v: number) => formatCount(v, uiLocale)
   const sharedPct = c.found > 0 ? (c.shared / c.found) * 100 : 0
   return (
     <li
@@ -160,10 +160,10 @@ export default function LandscapeRivals({ id, landscape, domain, siteIcon, gapSe
   /** The demand only competitors reach, each keyword once. */
   gapSearches: number
 }) {
-  const { language, uiLocale } = useDashboardLanguage()
+  const { uiLocale } = useDashboardLanguage()
   const dict = getDashboardDictionary(uiLocale).researchInsights
   const t = dict.rivals
-  const n = (v: number) => formatCount(v, language)
+  const n = (v: number) => formatCount(v, uiLocale)
   const [all, setAll] = useState(false)
   const list = all ? landscape.competitors : landscape.competitors.slice(0, RIVALS_SHOWN)
   const hidden = landscape.competitors.length - list.length

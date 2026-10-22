@@ -48,7 +48,7 @@ function VisibilityShare({ share, domain, siteIcon }: { share: CompetitiveShare;
   const { language, uiLocale } = useDashboardLanguage()
   const dict = getDashboardDictionary(uiLocale).researchCompetitive
   const t = dict.share
-  const n = (v: number) => formatCount(v, language)
+  const n = (v: number) => formatCount(v, uiLocale)
   const date = formatResearchDate(share.checkedAt, language) ?? ''
   const total = share.sites.reduce((s, x) => s + x.clicks, 0)
   const label = (s: CompetitiveShare['sites'][number]) => (s.own ? dict.you : s.domain)
@@ -131,7 +131,7 @@ function Battles({ model }: { model: CompetitiveModel }) {
   const { language, uiLocale } = useDashboardLanguage()
   const dict = getDashboardDictionary(uiLocale).researchCompetitive
   const t = dict.battles
-  const n = (v: number) => formatCount(v, language)
+  const n = (v: number) => formatCount(v, uiLocale)
   const [all, setAll] = useState(false)
   // The per-keyword table opens on demand: the tiles and each competitor's record
   // above it already say who is ahead, and the table is the longest part on a phone.

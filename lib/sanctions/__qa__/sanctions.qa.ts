@@ -88,11 +88,11 @@ chk('C9 CONTROL: a three-letter code is not accepted as alpha-2', normalizeCount
 const notices = PUBLIC_LOCALES.map((locale) => sanctionsNotice(locale))
 chk('D1 every published language has its own notice, and none repeats another',
   new Set(notices).size === PUBLIC_LOCALES.length, `${new Set(notices).size} distinct of ${PUBLIC_LOCALES.length}`)
-chk('D2 an unknown language still gets a notice', sanctionsNotice('fr').length > 0)
+chk('D2 an unknown language still gets a notice', sanctionsNotice('de').length > 0)
 for (const n of notices) {
   chk('D3 the notice names no country', !/Iran|Iraq|Syria|Lebanon|Cuba|Korea|איראן|עיראק|סוריה|לבנון/i.test(n))
   chk('D4 the notice names no statute or sanctions programme', !/Ordinance|OFAC|sanction|פקודת|סנקצ/i.test(n))
-  chk('D5 the notice offers a way to reach a person', /contact|escríbanos|escreva para nós|לכתוב לנו/i.test(n))
+  chk('D5 the notice offers a way to reach a person', /contact|escríbanos|escreva para nós|écrivez-nous|לכתוב לנו/i.test(n))
 }
 /*
  * D6 reads the language list rather than naming languages, because naming them

@@ -180,6 +180,12 @@ const ARTICLE_TEXT: Record<SuggestionLanguage, {
     anchorSentence: (link) => ` Nesse contexto, ${link} é uma das opções principais que vale a pena conhecer.`,
     phraseSentence: (phrase) => ` Nesse contexto, também vale a pena conhecer de perto ${phrase}.`,
   },
+  fr: {
+    toc: 'Sommaire',
+    faqHeading: 'Questions fréquentes',
+    anchorSentence: (link) => ` Dans ce contexte, ${link} est l'une des options clés à connaître.`,
+    phraseSentence: (phrase) => ` Dans ce contexte, il vaut aussi la peine de regarder de plus près ${phrase}.`,
+  },
 }
 
 /** Natural transition words to hand the model, in the language it writes in. */
@@ -188,6 +194,7 @@ const TRANSITION_HINT: Record<SuggestionLanguage, string> = {
   en: 'additionally, therefore, however, for example, in summary',
   es: 'además, por lo tanto, sin embargo, por ejemplo, en resumen',
   'pt-BR': 'além disso, portanto, no entanto, por exemplo, em resumo',
+  fr: 'de plus, par conséquent, cependant, par exemple, en résumé',
 }
 
 /** The filler opening to warn the model off, written in the language it writes in. */
@@ -196,6 +203,7 @@ const FILLER_EXAMPLE: Record<SuggestionLanguage, string> = {
   en: 'e.g. "In a world where everyone is looking for…"',
   es: 'e.g. "En un mundo donde todos buscan…"',
   'pt-BR': 'e.g. "Em um mundo onde todos procuram…"',
+  fr: 'e.g. "Dans un monde où tout le monde cherche…"',
 }
 
 /** Who the article is actually written for. A Spanish article is NOT for Israeli readers. */
@@ -204,6 +212,7 @@ const AUDIENCE_NOTE: Record<SuggestionLanguage, string> = {
   en: 'Write naturally for a general English-speaking audience.',
   es: 'Write naturally for Spanish-speaking readers in neutral Spanish that reads well in Spain and in Latin America alike.',
   'pt-BR': 'Write naturally for Brazilian readers in Brazilian Portuguese — not European Portuguese.',
+  fr: 'Write naturally for French-speaking readers in standard French that reads well in France and in the rest of French-speaking Europe alike.',
 }
 
 /** Per-language writing-quality notes. Empty for a language with nothing extra to say. */
@@ -220,6 +229,10 @@ const WRITING_QUALITY_LINES: Record<SuggestionLanguage, string[]> = {
   es: [
     `- Spanish writing quality: use NEUTRAL Latin-American-and-Spain Spanish and address the reader as "tú" consistently (never mix "tú" and "usted", never "vos"). Avoid regional slang and country-specific terms where a neutral word exists (prefer "teléfono" over "móvil"/"celular", "coche/auto" only when the topic requires it). VARY sentence and paragraph openings — do not start many consecutive sentences with the same word (avoid over-using "Además", "Por otro lado", "Es importante"); mix openings like "En la práctica", "Por eso", "En muchos casos", "Conviene recordar", "A la hora de decidir", "En resumen". Prefer clear, practical, promotional SEO writing over poetic language.`,
     `- Spanish typography: always use the opening marks "¿" and "¡" in questions and exclamations, keep accents and "ñ" correct (never write Spanish without accents), and keep brand/product names in their proper original casing (e.g. "Kingsmith WalkingPad X21").`,
+  ],
+  fr: [
+    `- French writing quality: address the reader as "vous" consistently — NEVER "tu", never "toi", never "ton/ta/tes". Use standard French that reads well in France and in the rest of French-speaking Europe; avoid regional slang and avoid needless anglicisms where a plain French word exists. VARY sentence and paragraph openings — do not start many consecutive sentences with the same word (avoid over-using "De plus", "Par ailleurs", "Il est important"); mix openings like "En pratique", "C'est pourquoi", "Dans bien des cas", "Il faut retenir", "Au moment de choisir", "En résumé". Prefer clear, practical, promotional SEO writing over poetic language.`,
+    `- French typography: keep the accents and the cedilla correct (é, è, ê, à, ù, î, ô, ç) — never write French without accents — use a non-breaking space before ":", ";", "?" and "!" where your output supports it, use the French quotation marks « … » for quotations, and keep brand/product names in their proper original casing (e.g. "Kingsmith WalkingPad X21").`,
   ],
 }
 

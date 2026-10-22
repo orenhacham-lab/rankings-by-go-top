@@ -485,7 +485,7 @@ function KeywordResearchScreen() {
   const copySelected = () => {
     const keywords = Array.from(selectedKeywords).join('\n')
     navigator.clipboard.writeText(keywords).then(() => {
-      gscToast.success(t.bulk.copied(formatCount(selectedKeywords.size, language)))
+      gscToast.success(t.bulk.copied(formatCount(selectedKeywords.size, uiLocale)))
     }).catch(() => {})
   }
 
@@ -1125,7 +1125,7 @@ function KeywordResearchScreen() {
                 }
               }}
               disabled={loading}
-              options={[{ value: '100', label: formatCount(100, language) }, { value: '250', label: formatCount(250, language) }]}
+              options={[{ value: '100', label: formatCount(100, uiLocale) }, { value: '250', label: formatCount(250, uiLocale) }]}
             />
           </div>
 
@@ -1194,7 +1194,7 @@ function KeywordResearchScreen() {
           {/* Results Toolbar: how many, and (for a research of its own) its suggestions. */}
           <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
             <p className="text-caption text-muted">
-              {t.results.resultsCount}: <span className="font-semibold text-ink tabular-nums">{formatCount(tableSource.length, language)}</span>
+              {t.results.resultsCount}: <span className="font-semibold text-ink tabular-nums">{formatCount(tableSource.length, uiLocale)}</span>
             </p>
             {!scanMode && topOpportunities.length > 0 && (
               <Button type="button" size="sm" variant="secondary" onClick={() => setOpportunitiesOpen((v) => !v)} aria-expanded={opportunitiesOpen}>
@@ -1216,10 +1216,10 @@ function KeywordResearchScreen() {
                   const c = competitionCell(r, t.results.competitionLevel, t.results.competitionIndex)
                   return (
                     <li key={r.keyword} className="flex min-h-12 flex-wrap items-center gap-x-3 gap-y-1 py-2 text-caption">
-                      <span className="w-5 shrink-0 text-muted tabular-nums">{formatCount(i + 1, language)}</span>
+                      <span className="w-5 shrink-0 text-muted tabular-nums">{formatCount(i + 1, uiLocale)}</span>
                       <span className="min-w-0 flex-1 truncate text-copy font-medium text-ink" title={r.keyword}>{r.keyword}</span>
                       <span className="whitespace-nowrap text-muted tabular-nums">
-                        {r.avgMonthlySearches !== null && r.avgMonthlySearches !== undefined ? formatCount(r.avgMonthlySearches, language) : '—'} {t.opportunities.searches}
+                        {r.avgMonthlySearches !== null && r.avgMonthlySearches !== undefined ? formatCount(r.avgMonthlySearches, uiLocale) : '—'} {t.opportunities.searches}
                       </span>
                       <CompetitionBadge c={c} />
                       {r.highTopOfPageBid !== null && r.highTopOfPageBid !== undefined && (
@@ -1311,7 +1311,7 @@ function KeywordResearchScreen() {
                     <td className="px-2.5 py-3 text-end tabular-nums text-body sm:px-4">
                       {result.avgMonthlySearches !== null && result.avgMonthlySearches !== undefined ? (
                         <span className="inline-flex flex-col items-end gap-1">
-                          <span className="font-semibold text-ink">{formatCount(result.avgMonthlySearches, language)}</span>
+                          <span className="font-semibold text-ink">{formatCount(result.avgMonthlySearches, uiLocale)}</span>
                           {/* The row's searches against the table's largest: a quiet bar under the figure. */}
                           <span aria-hidden="true" className="hidden h-1 w-16 overflow-hidden rounded-pill bg-sunk sm:block">
                             <span className="grow-x block h-full rounded-pill bg-action/60" style={{ width: `${Math.max(4, Math.round((result.avgMonthlySearches / maxVolume) * 100))}%` }} />
@@ -1373,8 +1373,8 @@ function KeywordResearchScreen() {
             <div className="mt-4 flex justify-center">
               <Button type="button" variant="secondary" onClick={() => setShownRows((n) => n + TABLE_PAGE)}>
                 {ts.table.showMore(
-                  formatCount(Math.min(TABLE_PAGE, sortedResults.length - shownRows), language),
-                  formatCount(sortedResults.length - shownRows, language),
+                  formatCount(Math.min(TABLE_PAGE, sortedResults.length - shownRows), uiLocale),
+                  formatCount(sortedResults.length - shownRows, uiLocale),
                 )}
               </Button>
             </div>
@@ -1413,7 +1413,7 @@ function KeywordResearchScreen() {
                       <X aria-hidden="true" className="size-4" />
                     </button>
                     <div className="min-w-0">
-                      <p className="text-copy font-semibold tabular-nums">{t.bulk.selected(formatCount(selectedKeywords.size, language))}</p>
+                      <p className="text-copy font-semibold tabular-nums">{t.bulk.selected(formatCount(selectedKeywords.size, uiLocale))}</p>
                       {activeProjectName && <p className="truncate text-caption text-contrast-ink/70">{t.bulk.project(activeProjectName)}</p>}
                     </div>
                   </div>

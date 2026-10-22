@@ -11,7 +11,7 @@
 import { AlertTriangle, FileCheck2, Lightbulb, LineChart, Plug, Wrench, type LucideIcon } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import type { DashboardDictionary } from '@/lib/i18n/dashboard/he'
-import type { Locale } from '@/lib/i18n/locales'
+import type { PublicLocale } from '@/lib/i18n/locales'
 import { formatDate } from '@/lib/i18n/format-date'
 import type { WaitingRow, WaitingRowKind } from '@/lib/nudges/rows'
 import { LinkButton } from './ui'
@@ -42,7 +42,7 @@ export function waitingAction(t: Copy, kind: WaitingRowKind): string {
   return { connection: t.connectionAction, site: t.siteAction, gsc: t.gscAction, articles: t.articlesAction, topics: t.topicsAction, fixes: t.fixesAction }[kind]
 }
 
-export default function WaitingCard({ t, rows, language }: { t: Copy; rows: readonly WaitingRow[]; language: Locale }) {
+export default function WaitingCard({ t, rows, language }: { t: Copy; rows: readonly WaitingRow[]; language: PublicLocale }) {
   if (rows.length === 0) return null
   return (
     <section

@@ -45,8 +45,11 @@ function main() {
     && normalizeContentLanguage('en-US') === 'en' && normalizeContentLanguage('es-MX') === 'es')
   check('1b. an unknown language still falls back to Hebrew (unchanged behavior)',
     normalizeContentLanguage('ar') === 'he' && normalizeContentLanguage('') === 'he' && normalizeContentLanguage(null) === 'he')
+  // 'de' stands in for a language the product does not write in. It used to be
+  // 'fr', which stopped being one the day French became a content language.
   check('1c. a research-only language still reads as English, not Hebrew',
-    contentLanguageOrEnglish('fr') === 'en' && contentLanguageOrEnglish('pt-BR') === 'pt-BR')
+    contentLanguageOrEnglish('de') === 'en' && contentLanguageOrEnglish('pt-BR') === 'pt-BR'
+    && contentLanguageOrEnglish('fr') === 'fr')
   // MUTATION CONTROL: the pre-wave rule sent Portuguese to Hebrew.
   check('1d. MUTATION CONTROL — the old rule (anything not en/es/he is Hebrew) would fail this suite',
     normalizeContentLanguage('pt-BR') !== 'he' && CONTENT_LANGUAGES.includes('pt-BR'))

@@ -16,4 +16,5 @@ export const ABOUT_BREADCRUMB: Record<PublicLocale, string> = {
   en: 'About',
   es: 'Quiénes somos',
   'pt-BR': 'Quem somos',
+  fr: 'À propos',
 }

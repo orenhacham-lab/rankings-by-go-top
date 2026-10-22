@@ -33,7 +33,7 @@ import { affiliateLinkUrl } from '@/lib/affiliate/link'
 import { AFFILIATE_TERMS } from '@/lib/affiliate/terms'
 import { AFFILIATE_DASHBOARD_COPY } from '@/lib/i18n/public/affiliate-dashboard'
 import { getServerPublicLocale } from '@/lib/i18n/server-locale'
-import { getLocaleConfig, LOCALE_PREFIX, toBilingualLocale } from '@/lib/i18n/locales'
+import { getLocaleConfig, LOCALE_PREFIX } from '@/lib/i18n/locales'
 import { formatDate } from '@/lib/i18n/format-date'
 
 export const dynamic = 'force-dynamic'
@@ -85,7 +85,7 @@ export default async function AffiliateDashboardPage() {
   const atTop = summary.affiliate.currentRate >= summary.affiliate.topRate
   // Dates in the bilingual pair the formatter speaks: a Spanish or Portuguese
   // partner reads the Latin-script form, which is the right one for both.
-  const dates = formatDate(toBilingualLocale(locale))
+  const dates = formatDate(locale)
   const payoutLabel: Record<string, string> = { draft: c.payoutDraft, paid: c.payoutPaid, cancelled: c.payoutCancelled }
 
   return (

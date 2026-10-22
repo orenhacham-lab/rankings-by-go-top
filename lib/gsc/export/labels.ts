@@ -1,5 +1,5 @@
 /**
- * The words of the Search Console positions report, in the three languages the
+ * The words of the Search Console positions report, in every language the
  * dashboard speaks.
  *
  * They live here rather than in lib/export/i18n.ts on purpose: that file is the
@@ -133,6 +133,35 @@ const LABELS: Record<ExportLanguage, GscExportLabels> = {
     positionNote: 'A posição deste relatório é a média do próprio Google ao longo do período, de qualquer lugar e dispositivo de onde as pessoas realmente buscaram. Não é a nossa verificação de posição, medida em um lugar, um dispositivo e um momento definidos, por isso os dois números não precisam coincidir.',
     noKeywordData: 'O Google não informou nada para esta palavra-chave',
   },
+  fr: {
+    summarySheet: 'Synthèse',
+    queriesSheet: 'Requêtes et pages',
+    pagesSheet: 'Pages',
+    keywordsSheet: 'Mots-clés suivis',
+    field: 'Donnée',
+    value: 'Valeur',
+    project: 'Projet',
+    domain: 'Domaine',
+    property: 'Propriété Search Console',
+    window: 'Période',
+    windowDays: (n) => `${n} derniers jours`,
+    range: 'Dates',
+    latestAvailable: 'Dernier jour couvert par Google',
+    syncedAt: 'Synchronisé le',
+    clicks: 'Clics',
+    impressions: 'Impressions',
+    ctr: 'CTR',
+    avgPosition: 'Position moyenne dans Google',
+    query: 'Requête de recherche',
+    page: 'Page',
+    keyword: 'Mot-clé suivi',
+    rowsIncluded: 'Lignes de ce rapport',
+    truncatedField: 'Données partielles',
+    truncatedYes: 'Oui, Google a renvoyé plus de lignes que celles enregistrées',
+    truncatedNo: 'Non',
+    positionNote: "La position de ce rapport est la moyenne calculée par Google sur la période, depuis tous les lieux et tous les appareils d'où les internautes ont réellement cherché. Ce n'est pas notre vérification de position, mesurée en un lieu, sur un appareil et à un moment précis : les deux chiffres n'ont donc pas à coïncider.",
+    noKeywordData: "Google n'a rien communiqué pour ce mot-clé",
+  },
 }
 
 export function gscExportLabels(language: unknown): GscExportLabels {
@@ -219,6 +248,24 @@ const PDF_LABELS: Record<ExportLanguage, GscPdfLabels> = {
     truncatedNote: 'O Google devolveu mais linhas do que esta sincronização guardou, portanto as tabelas cobrem a parte guardada.',
     nothingTitle: 'Ainda não há dados suficientes',
     nothingBody: (min) => `O Google não informou nenhuma consulta ou página com ${min} impressões ou mais neste período. Isso é normal em um site novo ou com pouco movimento, e os dados se acumulam com o tempo.`,
+  },
+  fr: {
+    title: 'Synthèse Search Console',
+    generatedOn: 'Généré le',
+    figuresTitle: 'Les chiffres',
+    opportunitiesTitle: 'Vos opportunités les plus proches',
+    opportunitiesSub: "Les requêtes pour lesquelles vous apparaissez déjà juste après la première page, classées selon le nombre de recherches. C'est là qu'un petit effort rapporte le plus de trafic.",
+    opportunitiesNone: "Aucune requête ne se situe dans cette plage pour le moment. Cela arrive quand les autres sont déjà en première page, ou encore loin de celle-ci.",
+    topQueriesTitle: 'Principales requêtes',
+    topQueriesSub: (n) => `Les ${n} requêtes qui ont le plus d'impressions sur la période.`,
+    topPagesTitle: 'Principales pages',
+    topPagesSub: (n) => `Les ${n} pages qui ont apporté le plus de clics.`,
+    keywordsTitle: 'Vos mots-clés suivis',
+    keywordsMore: (n) => `${n} autres mots-clés suivis figurent dans le tableur complet.`,
+    filterNote: (min, from, to) => `Ce que ce rapport filtre : une requête ou une page n'y figure qu'à partir de ${min} impressions sur la période, et une opportunité correspond à une position moyenne entre ${from} et ${to}. Toutes les lignes, y compris celles qui ont été filtrées, se trouvent dans le tableur.`,
+    truncatedNote: 'Google a renvoyé plus de lignes que cette synchronisation en a enregistré : les tableaux portent donc sur la partie enregistrée.',
+    nothingTitle: 'Pas encore assez de données',
+    nothingBody: (min) => `Google n'a communiqué aucune requête ni page atteignant ${min} impressions sur cette période. C'est normal sur un site récent ou peu visité, et les données s'accumulent avec le temps.`,
   },
 }
 

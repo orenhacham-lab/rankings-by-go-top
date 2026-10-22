@@ -18,11 +18,24 @@
  * tree is /pt-BR, the keyword research runs on the Brazilian market, and the
  * copy is Brazilian, not European, Portuguese.
  *
+ * `fr` joined on 21 Oct 2026 the same way, written for FRANCE: the public tree
+ * is /fr, the keyword research runs on the French market, and the legal pages
+ * behind it are written to French and European law.
+ *
+ * THE ORDER OF THIS LIST IS LOAD-BEARING, and French is last on purpose.
+ * lib/blog/auto/daily-window.ts writes at most one language per cron run and
+ * walks this list in order, inside a four-hour window of sixteen runs. Five
+ * languages publishing first time need five of them; the rest is reserve for a
+ * language that fails the quality gate and retries (on 17 Oct Spanish needed
+ * three passes). Adding a language therefore spends reserve, and the language
+ * that pays for a bad morning is the LAST one here. Putting French last is what
+ * keeps a new language from ever costing an existing one its article.
+ *
  * Pure: no I/O.
  */
 
 /** The languages this runner can write. A subset of PUBLIC_LOCALES. */
-export const BLOG_AUTO_LOCALES = ['he', 'en', 'es', 'pt-BR'] as const
+export const BLOG_AUTO_LOCALES = ['he', 'en', 'es', 'pt-BR', 'fr'] as const
 export type BlogAutoLocale = (typeof BLOG_AUTO_LOCALES)[number]
 
 export function isBlogAutoLocale(value: unknown): value is BlogAutoLocale {
@@ -36,5 +49,5 @@ export function localesForDay(): readonly BlogAutoLocale[] {
 
 /** How many articles a week each language gets — the queue's refill target reads this. */
 export function weeklyShare(): Record<BlogAutoLocale, number> {
-  return { he: 7, en: 7, es: 7, 'pt-BR': 7 }
+  return { he: 7, en: 7, es: 7, 'pt-BR': 7, fr: 7 }
 }

@@ -63,10 +63,10 @@ const stripComments = (src: string) => src.replace(/\/\*[\s\S]*?\*\//g, '').repl
 // ============================================================
 // A) THE LANGUAGES
 // ============================================================
-check('A1: four languages are written automatically', same([...BLOG_AUTO_LOCALES], ['he', 'en', 'es', 'pt-BR']))
+check('A1: five languages are written automatically', same([...BLOG_AUTO_LOCALES], ['he', 'en', 'es', 'pt-BR', 'fr']))
 check('A2: every language is due every day — there is no weekday rotation left',
   same([...localesForDay()], [...BLOG_AUTO_LOCALES]))
-check('A3: that is seven articles a week in each language', same(weeklyShare(), { he: 7, en: 7, es: 7, 'pt-BR': 7 }), weeklyShare())
+check('A3: that is seven articles a week in each language', same(weeklyShare(), { he: 7, en: 7, es: 7, 'pt-BR': 7, fr: 7 }), weeklyShare())
 check(
   'A4: Portuguese IS among them, now that the content layer writes it (lib/content/language.ts)',
   (BLOG_AUTO_LOCALES as readonly string[]).includes('pt-BR') && isBlogAutoLocale('pt-BR')
@@ -78,7 +78,12 @@ check(
   && !(BLOG_AUTO_LOCALES as readonly string[]).includes('pt') && !isBlogAutoLocale('pt'),
 )
 check('A5: the queue is refilled a week ahead, not three days', TOPUP_FLOOR >= 7)
-check('A6: an unknown language is not accepted as one', !isBlogAutoLocale('fr') && !isBlogAutoLocale('') && !isBlogAutoLocale(null))
+// 'fr' was the example of an unknown language here until French shipped on
+// 21 October 2026, at which point this check was asserting that a real blog
+// language is not one. German is the example now: the keyword research offers
+// it, the content layer cannot write it.
+check('A6: an unknown language is not accepted as one', !isBlogAutoLocale('de') && !isBlogAutoLocale('') && !isBlogAutoLocale(null))
+check('A6a: and French IS accepted, now that the content layer writes it', isBlogAutoLocale('fr'))
 // Mutation control for A2/A3: the rotation this replaced gave each language only
 // some of the week.
 const oldRotation = ['he', 'en', 'he', 'en', 'he', 'es', 'he'] as readonly string[]
@@ -87,10 +92,16 @@ check(
   oldRotation.filter((l) => l === 'en').length !== 7,
 )
 // Mutation control for A4: a language the content layer cannot write must not be
-// a blog language. French is the live example of one that is research-only.
+// a blog language. German is the live example of one that is research-only —
+// French was, until the content layer learnt it.
 check(
   'A8 (control): a research-only language is neither a content language nor a blog language',
-  !(CONTENT_LANGUAGES as readonly string[]).includes('fr') && !isBlogAutoLocale('fr'),
+  !(CONTENT_LANGUAGES as readonly string[]).includes('de') && !isBlogAutoLocale('de'),
+)
+check(
+  'A8a: French went the other way — the blog writes it because the content layer does',
+  (CONTENT_LANGUAGES as readonly string[]).includes('fr') && isBlogAutoLocale('fr')
+  && normalizeContentLanguage('fr-CA') === 'fr' && normalizeContentLanguage('fr-FR') === 'fr',
 )
 
 // ============================================================
@@ -355,12 +366,13 @@ async function main() {
   }
 
   {
-    // Every language in one call: three runs, three gates, three summaries.
+    // Every language in one call: one run, one gate and one summary each.
     const admin = fake([
       planned({ id: 'ph', locale: 'he' }),
       planned({ id: 'pe', locale: 'en', topic: 'rank check', primary_keyword: 'rank check' }),
       planned({ id: 'ps', locale: 'es', topic: 'posicion', primary_keyword: 'posicion' }),
       planned({ id: 'pp', locale: 'pt-BR', topic: 'posicionamento', primary_keyword: 'posicionamento' }),
+      planned({ id: 'pf', locale: 'fr', topic: 'suivi de position', primary_keyword: 'suivi de position' }),
     ])
     const summaries = await runBlogAutoPublishAllLocales(admin as unknown as Admin, {}, deps({
       generate: async (brief) => perLocale(brief.language),

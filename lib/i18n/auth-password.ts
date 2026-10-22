@@ -1,6 +1,6 @@
 /**
  * Copy for the password-reset pages (/forgot-password, /reset-password and
- * their /en and /es twins), all three languages. Every outcome of lib/auth/password-reset.ts
+ * their /en, /es, /pt-BR and /fr twins), every public language. Every outcome of lib/auth/password-reset.ts
  * has its own line here, so no provider text is ever shown.
  */
 import type { PublicLocale } from './locales'
@@ -175,6 +175,49 @@ export const PASSWORD_UI = {
         weak_password: 'Esta senha é fraca demais. Escolha uma mais longa, com letras e números.',
         link_expired: 'Este link não é válido ou expirou. Peça um novo.',
         failed: 'Não conseguimos salvar a senha. Tente de novo.',
+      },
+    },
+  },
+  fr: {
+    subtitle: 'Suivi des positions dans Google et de la visibilité dans les IA',
+    logoAlt: 'Logo Go Top SEO',
+    backToLogin: 'Retour à la connexion',
+    footer: {
+      accessibility: 'Accessibilité',
+      privacy: 'Confidentialité',
+      articles: 'Articles',
+      accessibilityHref: '/fr/accessibility',
+      privacyHref: '/fr/privacy',
+      articlesHref: '/fr/articles',
+    },
+    forgot: {
+      heading: 'Mot de passe oublié ?',
+      intro: "Saisissez l'adresse e-mail de votre compte et nous vous enverrons un lien pour choisir un nouveau mot de passe.",
+      emailLabel: 'Adresse e-mail',
+      emailPlaceholder: 'vous@exemple.com',
+      submit: 'Envoyer le lien',
+      sentHeading: 'Consultez votre boîte de réception',
+      sent: (email: string) => `Si un compte existe pour ${email}, nous y avons envoyé un lien pour choisir un nouveau mot de passe. Ce lien n'est valable que pendant un temps limité. Vous ne le trouvez pas ? Vérifiez aussi votre dossier de courrier indésirable.`,
+      sendAgain: 'Utiliser une autre adresse',
+      invalidEmail: "L'adresse e-mail n'est pas valide",
+      unavailable: "Nous n'avons pas pu envoyer la demande. Vérifiez votre connexion internet et réessayez.",
+      linkExpired: "Ce lien de réinitialisation n'est pas valide ou a expiré. Saisissez votre adresse e-mail pour en recevoir un nouveau.",
+    },
+    reset: {
+      heading: 'Choisissez un nouveau mot de passe',
+      passwordLabel: 'Nouveau mot de passe',
+      confirmLabel: 'Confirmez le nouveau mot de passe',
+      hint: 'Au moins 8 caractères',
+      submit: 'Enregistrer le mot de passe',
+      updated: 'Votre mot de passe a été mis à jour. Nous vous emmenons vers votre compte…',
+      requestNew: 'Demander un nouveau lien',
+      err: {
+        too_short: 'Le mot de passe doit comporter au moins 8 caractères',
+        mismatch: 'Les mots de passe ne correspondent pas',
+        same_password: "Le nouveau mot de passe est identique à l'ancien. Choisissez-en un autre.",
+        weak_password: 'Ce mot de passe est trop faible. Choisissez-en un plus long, avec des lettres et des chiffres.',
+        link_expired: "Ce lien de réinitialisation n'est pas valide ou a expiré. Demandez-en un nouveau.",
+        failed: "Nous n'avons pas pu enregistrer le mot de passe. Réessayez.",
       },
     },
   },

@@ -560,4 +560,136 @@ export const SEMRUSH_COMPARE: Record<PublicLocale, ComparisonCopy> = {
     },
     close: { title: 'Veja como o seu site está, sem se cadastrar' },
   },
+
+  fr: {
+    competitor: 'Semrush',
+    eyebrow: 'Go Top SEO face à Semrush',
+    metaTitle: 'Go Top SEO face à Semrush | Comparatif',
+    metaDescription:
+      'Go Top SEO comparé à Semrush : qui écrit et publie le contenu, qui s’occupe de la fiche Google Business, ce que chaque prix comprend et dans quels cas Semrush est le meilleur choix.',
+    hero: {
+      title: 'Semrush vous donne les outils.',
+      accent: 'Nous faisons le travail',
+      subtitle:
+        'Semrush s’appuie sur l’une des bases de données les plus profondes du secteur et vous montre ce qui ne va pas. Go Top SEO est conçu pour un dirigeant qui n’a pas le temps d’agir : le système écrit les articles, les publie sur le site, publie sur la fiche Google Business et suit vos positions.',
+    },
+    table: {
+      eyebrow: 'Le comparatif',
+      title: 'Ce que fait chacun, d’après les pages de Semrush elle-même',
+      checkedOn: CHECKED,
+      sources: SOURCES,
+      rows: [
+        {
+          label: 'Prix de départ',
+          ours: 'À partir de 79 dollars par mois hors taxes, tout dans un seul prix.',
+          theirs:
+            'Formule SEO à 139 dollars par mois (117,33 en paiement annuel), avec 5 sites et 500 mots-clés. Une formule gratuite limitée existe aussi.',
+        },
+        {
+          label: 'Qui fait le travail',
+          ours: 'Le système. Vous validez un sujet ; il écrit, ajoute les images et les liens internes, et publie.',
+          theirs:
+            'Les deux. Leur agent fiche Google Business publie seul, les articles se publient en un clic, et les corrections du site reviennent à vous ou à votre développeur.',
+        },
+        {
+          label: 'Articles',
+          ours: 'Planifiés et écrits automatiquement, avec images et liens internes, à partir d’un plan mensuel que vous validez.',
+          theirs:
+            'Leur extension WordPress fait de la recherche de sujets, rédige des brouillons longs et génère des images par IA. Elle demande un compte payant.',
+        },
+        {
+          label: 'Publication sur le site',
+          ours: 'Automatique vers WordPress et Shopify. Vous n’ouvrez jamais l’éditeur.',
+          theirs: 'Leur extension publie sur WordPress en un clic, via « Share » puis l’option WordPress.',
+        },
+        {
+          label: 'Fiche Google Business',
+          ours: 'Comprise dans le même prix : publications automatiques sur la fiche, avec votre accord.',
+          theirs:
+            'Le Local Toolkit s’achète à part et se paie par établissement : 30 dollars par mois et par établissement en Base, 60 en Pro. Leur agent publie des posts et répond aux nouveaux avis.',
+        },
+        {
+          label: 'Corrections sur le site',
+          ours: 'Une partie des corrections passe par notre extension WordPress, sans lire une ligne de code.',
+          theirs:
+            'Site Audit classe les problèmes par gravité et explique comment corriger chacun. Leur page n’affirme pas que Semrush modifie votre site.',
+        },
+        {
+          label: 'Suivi des positions',
+          ours:
+            'Une vérification mensuelle dans Google, dans Google Maps et dans les réponses des IA (dont ChatGPT, Gemini et Google AI), au même prix.',
+          theirs:
+            '500 mots-clés suivis chaque jour dans la formule SEO. Le suivi des réponses IA commence avec Starter, à 199 dollars par mois. Le suivi sur Maps fait partie du Local Toolkit, vendu à part.',
+        },
+        {
+          label: 'Essai',
+          ours: '7 jours, sans carte bancaire, résiliable à tout moment.',
+          theirs: '« Try Semrush free for seven days. Cancel anytime. » Les exports sont bloqués pendant l’essai.',
+        },
+      ],
+    },
+    theirStrengths: {
+      eyebrow: 'Quand Semrush vaut mieux',
+      title: 'Il y a des cas où Semrush est tout simplement la bonne réponse',
+      intro: 'Nous ne cherchons pas à être Semrush, et si c’est ce qu’il vous faut, autant le savoir maintenant.',
+      items: [
+        {
+          title: 'Quand vous voulez enquêter, pas être servi',
+          body:
+            'Analyse des concurrents et des mots-clés, données de backlinks, trafic et études de marché, données historiques et une API. Si vous ou votre agence voulez creuser un marché, ils répondent à des questions que nous ne traitons pas.',
+        },
+        {
+          title: 'Quand il faut un suivi quotidien et large',
+          body:
+            'Leur formule SEO suit 500 mots-clés chaque jour. Notre vérification est mensuelle. Si vous devez voir le mouvement au jour le jour, l’écart est réel et il est en leur faveur.',
+        },
+        {
+          title: 'Quand vous avez beaucoup d’établissements et voulez la diffusion dans les annuaires',
+          body: 'En Local Pro, ils envoient les informations de l’entreprise vers plus de 70 annuaires en un clic. Nous ne le faisons pas du tout.',
+        },
+      ],
+    },
+    ourStrengths: {
+      eyebrow: 'Quand nous convenons mieux',
+      title: 'Quand personne ne va s’asseoir devant le tableau de bord',
+      intro: 'La plupart des dirigeants qui nous parlent n’ont pas besoin d’un tableau de bord de plus. Ils ont besoin que le travail soit fait.',
+      items: [
+        {
+          title: 'Un seul prix, sans supplément par établissement',
+          body: 'Les articles, les publications sur la fiche Google Business et le suivi des positions sont dans le même prix, et non dans trois formules différentes.',
+        },
+        {
+          title: 'Le contenu se publie tout seul',
+          body: 'Vous validez les sujets une fois par mois et les articles paraissent avec images et liens internes sans que vous y touchiez.',
+        },
+        {
+          title: 'Pensé pour une petite équipe',
+          body: 'Rien à configurer au-delà de la connexion du site, et aucune routine hebdomadaire à tenir.',
+        },
+        {
+          title: 'Sans développeur',
+          body: 'L’installation est une extension WordPress ou une application Shopify. Il n’y a rien à intégrer et personne à briefer.',
+        },
+      ],
+    },
+    faq: {
+      eyebrow: 'Questions',
+      title: 'Ce que l’on demande avant de changer',
+      items: [
+        {
+          q: 'Peut-on utiliser les deux ?',
+          a: 'Oui, et beaucoup d’agences font exactement cela : Semrush pour la recherche, nous pour le travail qui doit avoir lieu chaque semaine. Rien ne se télescope techniquement.',
+        },
+        {
+          q: 'Mesurez-vous la visibilité dans les IA mieux qu’eux ?',
+          a: 'Non. Nous vérifions une fois par mois ; ils vérifient chaque jour à partir de leur formule Starter. Notre avantage est que la vérification est dans le prix de base et ne demande aucune montée en gamme.',
+        },
+        {
+          q: 'Les prix de cette page sont-ils à jour ?',
+          a: `Ils ont été lus sur les pages de Semrush le ${CHECKED}. Les entreprises changent leurs prix, et Semrush a récemment renommé ses formules : les liens sous le tableau sont la source.`,
+        },
+      ],
+    },
+    close: { title: 'Voyez où en est votre site, sans vous inscrire' },
+  },
 }

@@ -27,6 +27,7 @@ const CRUMB_KEY: Record<LegalSlug, 'terms' | 'privacy' | 'refundPolicy' | 'acces
 const UPDATED_LABEL: Record<LegalLanguage, string> = {
   es: 'Última actualización',
   'pt-BR': 'Última atualização',
+  fr: 'Dernière mise à jour',
 }
 
 function localeDate(iso: string, language: LegalLanguage): string {

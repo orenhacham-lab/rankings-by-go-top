@@ -73,4 +73,14 @@ export const MARKETPLACE_CLAIM_COPY: Record<PublicLocale, MarketplaceClaimCopy> 
     missingToken: 'Este link não traz um número de compra.',
     toDashboard: 'Ir para o aplicativo',
   },
+  fr: {
+    title: 'Votre achat',
+    claimed: 'Votre achat est rattaché à ce compte et votre offre est active. Vous pouvez commencer.',
+    alreadyClaimed: 'Cet achat est déjà rattaché à votre compte. Votre offre est active.',
+    unavailable: 'Ce lien n\'est pas actif. Si vous avez payé et n\'avez pas accès, contactez-nous depuis le site et nous réglerons cela.',
+    needsOperator: 'Nous avons bien votre achat, et un détail doit être finalisé manuellement de notre côté. Nous nous en occupons, et vous n\'avez rien à payer de nouveau.',
+    failed: 'Quelque chose a échoué de notre côté. Rechargez la page dans un instant.',
+    missingToken: 'Ce lien ne comporte aucun numéro d\'achat.',
+    toDashboard: 'Accéder à l\'application',
+  },
 }

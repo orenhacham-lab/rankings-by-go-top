@@ -106,6 +106,10 @@ const CTA_ACTION_HE = ['התקשרו', 'חייגו', 'שלחו', 'פנו אלי�
 const CTA_ACTION_ES = ['llama', 'llámanos', 'escribe', 'escríbenos', 'contacta', 'haz clic', 'pide', 'solicita', 'reserva', 'déjanos']
 const CTA_ACTION_PT = ['ligue', 'escreva', 'fale', 'entre em contato', 'clique', 'peça', 'solicite', 'agende', 'deixe', 'chame']
 const CTA_ACTION_EN = ['call', 'text', 'message', 'click', 'contact', 'reach out', 'book']
+const TRANSITIONS_FR = ['de plus', 'par ailleurs', 'donc', 'cependant', 'toutefois', 'en revanche', 'par exemple', 'en pratique', 'en résumé', 'il est important', 'il faut retenir', 'autrement dit', 'enfin', 'en premier lieu', 'en second lieu', 'c’est pourquoi', 'par conséquent', 'dans bien des cas', 'au moment de choisir', 'en conclusion', 'de la même manière', 'en comparaison']
+const START_STOPWORDS_FR = new Set(['le', 'la', 'les', 'un', 'une', 'des', 'si', 'quand', 'pour', 'par', 'avec', 'cela', 'ce', 'cette', 'il', 'elle', 'c’est', 'est', 'sont', 'de'])
+const CTA_STRONG_FR = ['contactez-nous', 'appelez maintenant', 'appelez-nous', 'cliquez ici', 'commandez maintenant', 'réservez maintenant', 'écrivez-nous', 'laissez-nous vos coordonnées', 'demandez un devis', 'demandez votre devis', 'écrivez-nous sur whatsapp', 'prenez rendez-vous', 'achetez maintenant']
+const CTA_ACTION_FR = ['appelez', 'écrivez', 'contactez', 'cliquez', 'commandez', 'demandez', 'réservez', 'laissez', 'envoyez']
 // A phone/WhatsApp number, WhatsApp/phone words, or a URL — the "target" of a CTA.
 const CTA_CHANNEL_RE = /(\d[\d\-\s]{5,}\d|וואטסאפ|whatsapp|טלפון|נייד|telefone|celular|https?:\/\/|www\.)/i
 
@@ -116,10 +120,10 @@ const CTA_CHANNEL_RE = /(\d[\d\-\s]{5,}\d|וואטסאפ|whatsapp|טלפון|נ�
  * everyday words like "הזמנה"/"משלוח"/"שירות" as CTAs.
  */
 /** The word lists, keyed by content language: adding a language stops compiling here. */
-const CTA_STRONG: Record<SuggestionLanguage, string[]> = { he: CTA_STRONG_HE, en: CTA_STRONG_EN, es: CTA_STRONG_ES, 'pt-BR': CTA_STRONG_PT }
-const CTA_ACTION: Record<SuggestionLanguage, string[]> = { he: CTA_ACTION_HE, en: CTA_ACTION_EN, es: CTA_ACTION_ES, 'pt-BR': CTA_ACTION_PT }
-const TRANSITIONS: Record<SuggestionLanguage, string[]> = { he: TRANSITIONS_HE, en: TRANSITIONS_EN, es: TRANSITIONS_ES, 'pt-BR': TRANSITIONS_PT }
-const START_STOPWORDS: Record<SuggestionLanguage, Set<string>> = { he: START_STOPWORDS_HE, en: new Set<string>(), es: START_STOPWORDS_ES, 'pt-BR': START_STOPWORDS_PT }
+const CTA_STRONG: Record<SuggestionLanguage, string[]> = { he: CTA_STRONG_HE, en: CTA_STRONG_EN, es: CTA_STRONG_ES, 'pt-BR': CTA_STRONG_PT, fr: CTA_STRONG_FR }
+const CTA_ACTION: Record<SuggestionLanguage, string[]> = { he: CTA_ACTION_HE, en: CTA_ACTION_EN, es: CTA_ACTION_ES, 'pt-BR': CTA_ACTION_PT, fr: CTA_ACTION_FR }
+const TRANSITIONS: Record<SuggestionLanguage, string[]> = { he: TRANSITIONS_HE, en: TRANSITIONS_EN, es: TRANSITIONS_ES, 'pt-BR': TRANSITIONS_PT, fr: TRANSITIONS_FR }
+const START_STOPWORDS: Record<SuggestionLanguage, Set<string>> = { he: START_STOPWORDS_HE, en: new Set<string>(), es: START_STOPWORDS_ES, 'pt-BR': START_STOPWORDS_PT, fr: START_STOPWORDS_FR }
 
 function detectCtaFirstWord(bodyText: string, lang: SuggestionLanguage): number {
   const low = bodyText.toLowerCase()
@@ -299,7 +303,8 @@ const TABLE_WORDS_HE = ['השווא', 'להשוו', 'מחיר', 'עלות', 'ע�
 const TABLE_WORDS_ES = ['compar', 'precio', 'coste', 'costo', 'cuánto cuesta', 'cuanto cuesta', 'mejor', 'mejores', 'tipos de', 'elegir', 'cómo elegir', 'ventajas', 'desventajas', 'guía de compra', 'tabla', ' vs ', 'más barato']
 const TABLE_WORDS_PT = ['compar', 'preço', 'preco', 'custo', 'quanto custa', 'melhor', 'melhores', 'tipos de', 'escolher', 'como escolher', 'vantagens', 'desvantagens', 'guia de compra', 'tabela', ' vs ', 'mais barato']
 const TABLE_WORDS_EN = ['compar', 'price', 'cost', 'best', ' vs', 'versus', 'types', 'choose', 'choosing', 'buying guide', 'pros and cons', 'pros/cons', 'cheapest']
-const TABLE_WORDS: Record<SuggestionLanguage, string[]> = { he: TABLE_WORDS_HE, en: TABLE_WORDS_EN, es: TABLE_WORDS_ES, 'pt-BR': TABLE_WORDS_PT }
+const TABLE_WORDS_FR = ['compar', 'prix', 'tarif', 'coût', 'cout', 'combien coûte', 'combien coute', 'meilleur', 'meilleurs', 'types de', 'choisir', 'comment choisir', 'avantages', 'inconvénients', 'guide d’achat', 'tableau', ' vs ', 'moins cher']
+const TABLE_WORDS: Record<SuggestionLanguage, string[]> = { he: TABLE_WORDS_HE, en: TABLE_WORDS_EN, es: TABLE_WORDS_ES, 'pt-BR': TABLE_WORDS_PT, fr: TABLE_WORDS_FR }
 function isTableWorthy(text: string, lang: SuggestionLanguage): boolean {
   const t = (text || '').toLowerCase()
   const words = TABLE_WORDS[lang]
@@ -311,7 +316,8 @@ const QUESTION_WORDS_HE = ['מה ', 'מהו', 'מהי', 'איך', 'כיצד', '�
 const QUESTION_WORDS_ES = ['qué ', 'que ', 'cómo ', 'como ', 'cuánto', 'cuanto', 'por qué', 'por que', 'cuál', 'cual', 'cuándo', 'cuando', 'dónde', 'donde', 'quién', 'quien', 'es ', 'son ', 'conviene', 'debo ', 'hay que', '¿']
 const QUESTION_WORDS_PT = ['o que ', 'que ', 'como ', 'quanto', 'por que', 'porque', 'qual', 'quais', 'quando', 'onde', 'quem', 'é ', 'são ', 'vale a pena', 'devo ', 'precisa ']
 const QUESTION_WORDS_EN = ['how ', 'what ', 'why ', 'when ', 'which ', 'where ', 'who ', 'is ', 'are ', 'should ', 'can ', 'do ']
-const QUESTION_WORDS: Record<SuggestionLanguage, string[]> = { he: QUESTION_WORDS_HE, en: QUESTION_WORDS_EN, es: QUESTION_WORDS_ES, 'pt-BR': QUESTION_WORDS_PT }
+const QUESTION_WORDS_FR = ['comment ', 'qu’est-ce', 'quest-ce', 'que ', 'quoi ', 'pourquoi', 'combien', 'quel ', 'quelle ', 'quels ', 'quelles ', 'quand ', 'où ', 'qui ', 'est-ce', 'faut-il', 'dois-je', 'peut-on', 'vaut-il']
+const QUESTION_WORDS: Record<SuggestionLanguage, string[]> = { he: QUESTION_WORDS_HE, en: QUESTION_WORDS_EN, es: QUESTION_WORDS_ES, 'pt-BR': QUESTION_WORDS_PT, fr: QUESTION_WORDS_FR }
 
 /**
  * E-E-A-T, the part a generated article can honestly carry: something the
@@ -328,7 +334,8 @@ const VERIFY_CUES_HE = ['בדקו', 'לבדוק', 'תבדקו', 'שאלו', 'ל�
 const VERIFY_CUES_EN = ['check ', 'check the', 'ask for', 'ask the', 'ask your', 'compare ', 'make sure', 'verify ', 'request ', 'confirm ', 'look for']
 const VERIFY_CUES_PT = ['verifique', 'verificar', 'confira', 'conferir', 'pergunte', 'perguntar', 'peça ', 'pedir ', 'compare', 'comparar', 'certifique-se', 'confirme', 'exija', 'observe']
 const VERIFY_CUES_ES = ['comprueba', 'compruebe', 'verifica', 'verifique', 'pregunta', 'pregunte', 'compara', 'compare ', 'asegúrate', 'asegúrese', 'solicita', 'solicite', 'confirma', 'fíjate']
-const VERIFY_CUES: Record<SuggestionLanguage, string[]> = { he: VERIFY_CUES_HE, en: VERIFY_CUES_EN, es: VERIFY_CUES_ES, 'pt-BR': VERIFY_CUES_PT }
+const VERIFY_CUES_FR = ['vérifiez', 'vérifier', 'demandez', 'demander', 'posez la question', 'comparez', 'comparer', 'assurez-vous', 'confirmez', 'exigez', 'contrôlez', 'regardez si']
+const VERIFY_CUES: Record<SuggestionLanguage, string[]> = { he: VERIFY_CUES_HE, en: VERIFY_CUES_EN, es: VERIFY_CUES_ES, 'pt-BR': VERIFY_CUES_PT, fr: VERIFY_CUES_FR }
 
 /** How many of the cues the body uses, counted once per cue. */
 export function readerVerifyCount(bodyText: string, lang: SuggestionLanguage): number {

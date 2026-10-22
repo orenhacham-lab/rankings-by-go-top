@@ -205,6 +205,7 @@ export const es = {
     en: 'English',
     es: 'Español',
     'pt-BR': 'Português (Brasil)',
+    fr: 'Français',
     aria: 'Cambiar el idioma del sitio',
   },
   cookie: {

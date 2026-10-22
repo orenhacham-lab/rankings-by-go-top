@@ -45,7 +45,7 @@ export default function ExistingRankings({ model, gsc, gscRun, projectId, onTrac
   const { language, uiLocale } = useDashboardLanguage()
   const dict = getDashboardDictionary(uiLocale).researchCompetitive
   const t = dict.rankings
-  const n = (v: number) => formatCount(v, language)
+  const n = (v: number) => formatCount(v, uiLocale)
   const [filter, setFilter] = useState<RankingsFilter>('all')
   const [all, setAll] = useState(false)
   const filtered = filterRankings(model.rankings, filter)

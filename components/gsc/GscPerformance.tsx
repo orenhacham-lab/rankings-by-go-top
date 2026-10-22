@@ -52,8 +52,8 @@ export default function GscPerformance({ projectId, className }: { projectId: st
   const retry = () => { status.reload(); trend.reload() }
 
   const tiles: { metric: PerformanceMetric; label: string; icon: React.ReactNode; value: number | null; series: (number | null)[]; format: (n: number) => string }[] = [
-    { metric: 'clicks', label: p.clicks, icon: <MousePointerClick size={16} strokeWidth={2} aria-hidden="true" />, value: summary?.clicks ?? null, series: points.map((x) => x.clicks), format: (n) => formatCount(n, language) },
-    { metric: 'impressions', label: p.impressions, icon: <Eye size={16} strokeWidth={2} aria-hidden="true" />, value: summary?.impressions ?? null, series: points.map((x) => x.impressions), format: (n) => formatCount(n, language) },
+    { metric: 'clicks', label: p.clicks, icon: <MousePointerClick size={16} strokeWidth={2} aria-hidden="true" />, value: summary?.clicks ?? null, series: points.map((x) => x.clicks), format: (n) => formatCount(n, uiLocale) },
+    { metric: 'impressions', label: p.impressions, icon: <Eye size={16} strokeWidth={2} aria-hidden="true" />, value: summary?.impressions ?? null, series: points.map((x) => x.impressions), format: (n) => formatCount(n, uiLocale) },
     { metric: 'position', label: p.position, icon: <ListOrdered size={16} strokeWidth={2} aria-hidden="true" />, value: summary?.avgPosition ?? null, series: points.map((x) => x.position), format: (n) => formatPosition(n, language) },
   ]
 

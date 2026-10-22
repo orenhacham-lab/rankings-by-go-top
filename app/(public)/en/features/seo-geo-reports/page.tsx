@@ -74,7 +74,11 @@ const CONTENT: FeaturePageContent = {
       eyebrow: 'Questions',
       title: 'What people ask about reports',
       items: [
-        { q: 'What languages are reports in?', a: 'You can export a report in English or Hebrew.' },
+        // Every language the dashboard has, because lib/export/i18n.ts carries a
+        // complete label set for each of the five (verified key for key against
+        // English). This answer said "English or Hebrew" long after that stopped
+        // being true, which understated the product on three pages at once.
+        { q: 'What languages are reports in?', a: 'The report comes out in the language of your dashboard: Hebrew, English, Spanish, Portuguese or French.' },
         { q: 'Can I make a separate report for each client?', a: 'Yes. Each site is its own project, and each project gets its own report. The number of projects in each plan is on the pricing page.' },
         { q: 'Are reports included in every plan?', a: 'Yes. PDF and Excel reports are included in every plan.' },
       ],

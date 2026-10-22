@@ -218,7 +218,7 @@ export default function SiteHealthScreen({ project }: { project: Project & { sit
 
   const onFix = useCallback((finding: Finding, page: FindingPage) => setTarget({ finding, page, type: finding.fixType ?? null }), [setTarget])
   const openInstall = useCallback(() => setInstallOpen(true), [setInstallOpen])
-  const when = useCallback((iso: string) => formatDate(language).dateTime(iso), [language])
+  const when = useCallback((iso: string) => formatDate(uiLocale).dateTime(iso), [uiLocale])
   // Closing the approval re-reads the queue, so a fix approved elsewhere (another tab, another
   // person, or an "already approved" answer) shows on its row at once.
   const reloadFixes = fixes.reload
@@ -270,7 +270,7 @@ export default function SiteHealthScreen({ project }: { project: Project & { sit
             copy={copy}
             domain={domain}
             siteIcon={icon}
-            checkedAt={copy.checkedAt(formatDate(language).dateTime(report.scannedAt))}
+            checkedAt={copy.checkedAt(formatDate(uiLocale).dateTime(report.scannedAt))}
             fixableCount={fixableCount}
             live={live}
             action={rescan}

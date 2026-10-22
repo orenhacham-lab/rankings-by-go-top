@@ -15,10 +15,11 @@ import { formatCount } from '@/components/gsc/format'
 import { cn } from '@/lib/utils'
 import CountUp from '@/components/ui/CountUp'
 import { HeaderLink, LinkButton, Widget, WidgetEmpty, WidgetError, WidgetLoading } from './ui'
+import type { PublicLocale } from '@/lib/i18n/locales'
 
 export default function AiVisibilityBrief({ t, language, section, retry, now }: {
   t: DashboardDictionary['dashboardHome']
-  language: 'he' | 'en'
+  language: PublicLocale
   section: Section<AiData> | null
   retry: () => void
   now: Date

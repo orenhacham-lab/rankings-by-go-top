@@ -348,6 +348,7 @@ check('MUTATION — an English-only extra section is caught', pages.he.terms.h2 
     'exemplo.com.br': 'the Portuguese placeholder, example.com’s counterpart in the Portuguese copy',
     'www.exemplo.com.br': 'the Portuguese placeholder, example.com’s counterpart in the Portuguese copy',
     'pt.wikipedia.org': 'named as the Portuguese Wikipedia in advice text; not contacted',
+    'fr.wikipedia.org': 'named as the French Wikipedia in advice text; not contacted',
     'app.example.com': 'placeholder in a comment or default',
     'shop.com': 'placeholder in a comment or default',
     'destination.com': 'placeholder in a comment or default',

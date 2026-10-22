@@ -253,23 +253,63 @@ const ES_CATEGORY_LABEL: Record<BusinessCategory, string> = {
   generic: 'negocio',
 }
 
+const FR_INTENT_LABEL: Record<PromptIntent, string> = {
+  recommendation: 'Recommandation',
+  comparison: 'Comparaison',
+  commercial: 'Prix',
+  pre_purchase: 'Avant-achat',
+  transactional: 'Choix',
+  local: 'Local',
+  brand: 'Marque',
+  informational: 'Info',
+  alternatives: 'Alternatives',
+  gift: 'Cadeau',
+}
+
+const FR_CATEGORY_LABEL: Record<BusinessCategory, string> = {
+  agency: 'agence de marketing ou SEO',
+  ecommerce: 'boutique en ligne',
+  perfume: 'parfumerie',
+  sports_store: 'magasin de sport',
+  gifts: 'boutique de cadeaux',
+  appliance_store: 'magasin d\'électroménager',
+  saas: 'produit SaaS',
+  product_brand: 'marque de produits',
+  local_service: 'service de proximité',
+  home_improvement_service: 'rénovation et travaux',
+  cleaning: 'entreprise de nettoyage',
+  florist: 'fleuriste',
+  restaurant: 'restaurant',
+  healthcare: 'service de santé',
+  legal: 'cabinet d\'avocats',
+  real_estate: 'agence immobilière',
+  fitness: 'fitness',
+  beauty: 'beauté et bien-être',
+  education: 'formation',
+  second_hand_fashion: 'mode de seconde main pour femme',
+  travel: 'voyage et tourisme',
+  generic: 'entreprise',
+}
+
 /**
- * The language a project's AI questions are GENERATED in. Three, not two: the
+ * The language a project's AI questions are GENERATED in. Four, not two: the
  * banks and every label below are keyed by it, so a language is added by adding
  * its copy rather than by a ternary that answers Hebrew for everything which is
- * not English.
+ * not English. French joined the same way Spanish did — its own bank, labels,
+ * reasons and filters — because a French business asked in English would be
+ * checked against the wrong question.
  */
-export type PromptLanguage = 'he' | 'en' | 'es'
+export type PromptLanguage = 'he' | 'en' | 'es' | 'fr'
 
 const INTENT_LABEL_BY_LANG: Record<PromptLanguage, Record<PromptIntent, string>> = {
-  he: HE_INTENT_LABEL, en: EN_INTENT_LABEL, es: ES_INTENT_LABEL,
+  he: HE_INTENT_LABEL, en: EN_INTENT_LABEL, es: ES_INTENT_LABEL, fr: FR_INTENT_LABEL,
 }
 const CATEGORY_LABEL_BY_LANG: Record<PromptLanguage, Record<BusinessCategory, string>> = {
-  he: HE_CATEGORY_LABEL, en: EN_CATEGORY_LABEL, es: ES_CATEGORY_LABEL,
+  he: HE_CATEGORY_LABEL, en: EN_CATEGORY_LABEL, es: ES_CATEGORY_LABEL, fr: FR_CATEGORY_LABEL,
 }
 
 /** Words that say a business is about travel: trips, tourism, holidays, flights. */
-export const TRAVEL_PATTERN = /(טיול|טיולים|מטייל|תיירות|תייר|נופש|חופשה|חופשות|סוכנות נסיעות|טיסה|טיסות|מלון|מלונות|travel|touris|\btours?\b|\btrips?\b|vacation|itinerar|\bhotels?\b|\bflights?\b)/i
+export const TRAVEL_PATTERN = /(טיול|טיולים|מטייל|תיירות|תייר|נופש|חופשה|חופשות|סוכנות נסיעות|טיסה|טיסות|מלון|מלונות|travel|touris|\btours?\b|\btrips?\b|vacation|itinerar|\bhotels?\b|\bflights?\b|voyages?|s[ée]jour|agence de voyages)/i
 
 /**
  * Niche detection from business name + domain + keywords.
@@ -286,10 +326,10 @@ export function detectCategory(
 
   // High-priority signals — check these FIRST to override weaker signals.
   // Flower/florist signals are high-priority; they override gift signals.
-  if (/(flower|florist|פרחים|זרים|זר|משלוח פרחים|משלוחי פרחים|זר פרחים|זרי פרחים|חנות פרחים|bouquets|flower delivery|erez-flowers)/.test(text))
+  if (/(flower|florist|fleuriste|fleurs|livraison de fleurs|פרחים|זרים|זר|משלוח פרחים|משלוחי פרחים|זר פרחים|זרי פרחים|חנות פרחים|bouquets|bouquet|flower delivery|erez-flowers)/.test(text))
     return 'florist'
 
-  if (/(perfume|fragrance|cologne|פרפיום|בושם|בשמים|או דה פרפיום|או דה טואלט)/.test(text)) return 'perfume'
+  if (/(perfume|fragrance|cologne|parfum|parfumerie|פרפיום|בושם|בשמים|או דה פרפיום|או דה טואלט)/.test(text)) return 'perfume'
   if (/(ניקיון|cleaner|cleaning|פוליש|נקיון|פוליסה|nettoyage)/.test(text)) return 'cleaning'
 
   // SaaS / platform brands — must come BEFORE product_brand so brand names like
@@ -317,9 +357,9 @@ export function detectCategory(
     return 'saas'
   if (/(saas|software as a service|cloud platform|api platform|developer tool|monitoring tool|analytics platform|business intelligence)/.test(text)) return 'saas'
 
-  if (/(seo|ppc|sem|google ads|adwords|agency|marketing|advertis|digital|קידום אתרים|ממומן|פרסום|שיווק|סוכנות|דיגיטל)/.test(text))
+  if (/(seo|ppc|sem|google ads|adwords|agency|agence|marketing|advertis|digital|référencement|referencement|קידום אתרים|ממומן|פרסום|שיווק|סוכנות|דיגיטל)/.test(text))
     return 'agency'
-  if (/(home improv|remodel|construc|contractor|kitchen|bathroom|design.build|plumb|electric|hvac|renov|cabinet|שיפוץ|קבלן|רימודל)/.test(text))
+  if (/(home improv|remodel|construc|contractor|kitchen|bathroom|design.build|plumb|electric|hvac|renov|rénov|travaux|cabinet|שיפוץ|קבלן|רימודל)/.test(text))
     return 'home_improvement_service'
 
   // Fitness equipment store — must come BEFORE generic fitness/gym so a store
@@ -327,10 +367,10 @@ export function detectCategory(
   if (/(ציוד כושר|מוצרי כושר|חנות ציוד|חנות ספורט|משקולות|fitness equipment|gym equipment|weights|dumbbell|treadmill|exercise bike|home gym)/.test(text))
     return 'sports_store'
 
-  if (/(sportwear|sportswear|sports|ספורט|נעלי ריצה|טייץ|adidas|nike|אדידס|נייקי|פומה|puma)/.test(text)) return 'sports_store'
+  if (/(sportwear|sportswear|sports|magasin de sport|vêtements de sport|ספורט|נעלי ריצה|טייץ|adidas|nike|אדידס|נייקי|פומה|puma)/.test(text)) return 'sports_store'
 
   // Gift signals — checked AFTER florist so flowers aren't misclassified as gifts.
-  if (/(matnot|מתנ|gift shop|gifts|presents|מתנות)/.test(text)) return 'gifts'
+  if (/(matnot|מתנ|gift shop|gifts|presents|cadeau|cadeaux|מתנות)/.test(text)) return 'gifts'
 
   // Apparel/fashion keywords → ecommerce (conservative pattern, excludes shoes/accessories
   // which may overlap with sports_store or other retail). Checked after sports_store
@@ -338,20 +378,20 @@ export function detectCategory(
   if (/(אופנה|בגדים|ביגוד|הלבשה|שמלה|שמלות|חולצה|חולצות|מכנסיים|ג'ינס|ג׳ינס|מעיל|חצאית|fashion|clothing|apparel|dress|shirt|jeans)/.test(text))
     return 'ecommerce'
 
-  if (/(appliance|מקרר|מכונת כביסה|תנור|מוצרי חשמל|חשמל ביתי|electrolux|whirlpool)/.test(text)) return 'appliance_store'
+  if (/(appliance|électroménager|electromenager|מקרר|מכונת כביסה|תנור|מוצרי חשמל|חשמל ביתי|electrolux|whirlpool)/.test(text)) return 'appliance_store'
   if (/\b(saas|software)\b/.test(text)) return 'saas'
   // Travel before restaurant: a travel site's keywords name the food of the
   // destination ("אוכל רחוב יפן"), and the destination is not a restaurant.
   if (TRAVEL_PATTERN.test(text)) return 'travel'
   if (/(restaurant|cafe|food|bistro|מסעדה|קפה|אוכל|פיצה)/.test(text)) return 'restaurant'
-  if (/(clinic|hospital|medical|doctor|dental|מרפאה|רופא|רפואה|שיניים)/.test(text)) return 'healthcare'
-  if (/(law|legal|attorney|lawyer|עורך דין|עורכי דין|משפט)/.test(text)) return 'legal'
-  if (/(realty|real.estate|properties|נדל"ן|נדלן|דירות|תיווך)/.test(text)) return 'real_estate'
-  if (/(gym|fitness|yoga|crossfit|כושר|יוגה)/.test(text)) return 'fitness'
-  if (/(salon|spa|beauty|hair|nails|מספרה|ספא|איפור)/.test(text)) return 'beauty'
-  if (/(school|academy|course|education|מכללה|בית ספר|קורס)/.test(text)) return 'education'
-  if (/(electrician|plumber|hvac|חשמלאי|אינסטלטור)/.test(text)) return 'local_service'
-  if (/(shop|store|ecommerce|חנות|קניות|אונליין|retail)/.test(text)) return 'ecommerce'
+  if (/(clinic|clinique|hospital|medical|doctor|médecin|medecin|dental|dentiste|מרפאה|רופא|רפואה|שיניים)/.test(text)) return 'healthcare'
+  if (/(law|legal|attorney|lawyer|avocat|avocats|juridique|עורך דין|עורכי דין|משפט)/.test(text)) return 'legal'
+  if (/(realty|real.estate|properties|immobilier|immobilière|נדל"ן|נדלן|דירות|תיווך)/.test(text)) return 'real_estate'
+  if (/(gym|fitness|yoga|crossfit|salle de sport|musculation|כושר|יוגה)/.test(text)) return 'fitness'
+  if (/(salon|spa|beauty|beauté|coiffure|coiffeur|esthétique|hair|nails|מספרה|ספא|איפור)/.test(text)) return 'beauty'
+  if (/(school|academy|course|education|formation|école|ecole|מכללה|בית ספר|קורס)/.test(text)) return 'education'
+  if (/(electrician|plumber|hvac|plombier|électricien|electricien|serrurier|חשמלאי|אינסטלטור)/.test(text)) return 'local_service'
+  if (/(shop|store|ecommerce|boutique|boutique en ligne|חנות|קניות|אונליין|retail)/.test(text)) return 'ecommerce'
 
   return 'generic'
 }
@@ -1184,17 +1224,206 @@ const COUNTRY_NAMES_EN: Record<string, string> = {
   FR: 'France',
 }
 
+/**
+ * French curated question banks per business category.
+ *
+ * Vouvoiement throughout, France first and neutral enough for Belgium, Suisse
+ * and Québec. Each entry is a question a real customer would type into ChatGPT
+ * or Gemini, never a keyword string.
+ */
+const FR_BANK: Record<BusinessCategory, QueryDef[]> = {
+  perfume: [
+    { intent: 'recommendation', text: 'Quel parfum offrir à une femme ?', score: 93, offering: 'primary', themeBoost: { audienceWomen: 5 } },
+    { intent: 'recommendation', text: 'Quel parfum offrir à un homme ?', score: 93, offering: 'primary', themeBoost: { audienceMen: 5 } },
+    { intent: 'pre_purchase', text: 'Comment choisir un parfum qui vous va ?', score: 87, offering: 'primary' },
+    { intent: 'recommendation', text: 'Meilleures parfumeries en {{country}}', score: 89, offering: 'primary' },
+    { intent: 'comparison', text: 'Différence entre eau de parfum et eau de toilette', score: 85, offering: 'primary' },
+    { intent: 'pre_purchase', text: 'Où acheter des parfums authentiques en ligne ?', score: 91, offering: 'primary', themeBoost: { online: 5 } },
+    { intent: 'local', text: 'Marques de parfums de niche qui valent le détour', score: 83, offering: 'local', themeBoost: { niche: 4 } },
+    { intent: 'gift', text: 'Quel parfum offrir en cadeau ?', score: 85, offering: 'secondary', themeBoost: { gift: 5 } },
+    { intent: 'commercial', text: 'Où acheter des parfums à prix réduit ?', score: 81, offering: 'secondary', themeBoost: { price: 4 } },
+    { intent: 'brand', text: 'Avis sur {{business}}', score: 74, offering: 'generic' },
+  ],
+
+  sports_store: [
+    { intent: 'recommendation', text: 'Meilleurs magasins de sport en {{country}}', score: 91, offering: 'primary' },
+    { intent: 'pre_purchase', text: 'Comment choisir des chaussures de running adaptées ?', score: 89, offering: 'primary' },
+    { intent: 'recommendation', text: 'Meilleures marques de vêtements de sport pour s\'entraîner tous les jours', score: 87, offering: 'primary' },
+    { intent: 'comparison', text: 'Chaussures de running ou de marche : quelle différence ?', score: 83, offering: 'primary' },
+    { intent: 'commercial', text: 'Magasin de sport le moins cher en {{country}}', score: 83, offering: 'secondary', themeBoost: { price: 3 } },
+    { intent: 'brand', text: 'Avis sur {{business}}', score: 74, offering: 'generic' },
+  ],
+
+  gifts: [
+    { intent: 'gift', text: 'Idées de cadeaux de mariage', score: 89, offering: 'primary' },
+    { intent: 'gift', text: 'Idées de cadeaux d\'anniversaire originales', score: 87, offering: 'primary' },
+    { intent: 'gift', text: 'Idées de cadeaux d\'entreprise pour les salariés', score: 85, offering: 'primary' },
+    { intent: 'recommendation', text: 'Où acheter des cadeaux originaux en {{country}} ?', score: 85, offering: 'primary' },
+    { intent: 'brand', text: 'Avis sur {{business}}', score: 74, offering: 'generic' },
+  ],
+
+  appliance_store: [
+    { intent: 'recommendation', text: 'Meilleurs magasins d\'électroménager en {{country}}', score: 89, offering: 'primary' },
+    { intent: 'pre_purchase', text: 'Comment choisir un lave-linge ?', score: 85, offering: 'primary' },
+    { intent: 'local', text: 'Où acheter de l\'électroménager au meilleur prix en ligne ?', score: 83, offering: 'local', themeBoost: { online: 3, price: 3 } },
+    { intent: 'brand', text: 'Avis sur {{business}}', score: 74, offering: 'generic' },
+  ],
+
+  agency: [
+    { intent: 'recommendation', text: 'Meilleures agences SEO en {{country}}', score: 93, offering: 'primary' },
+    { intent: 'recommendation', text: 'Meilleures agences de marketing digital en {{country}}', score: 91, offering: 'primary' },
+    { intent: 'pre_purchase', text: 'Comment choisir une agence de marketing digital ?', score: 87, offering: 'primary' },
+    { intent: 'comparison', text: 'SEO ou SEA : que choisir ?', score: 85, offering: 'primary' },
+    { intent: 'commercial', text: 'Combien coûte le SEO en {{country}} ?', score: 89, offering: 'secondary', themeBoost: { price: 3 } },
+    { intent: 'brand', text: 'Avis sur {{business}}', score: 74, offering: 'generic' },
+  ],
+
+  cleaning: [
+    { intent: 'recommendation', text: 'Meilleures entreprises de nettoyage de bureaux à {{city}}', score: 93, offering: 'primary', requiresCity: true },
+    { intent: 'pre_purchase', text: 'Comment choisir une entreprise de nettoyage fiable ?', score: 85, offering: 'primary' },
+    { intent: 'commercial', text: 'Combien coûte le nettoyage de bureaux par mois ?', score: 85, offering: 'secondary', themeBoost: { price: 3 } },
+    { intent: 'brand', text: 'Avis sur {{business}}', score: 74, offering: 'generic' },
+  ],
+
+  ecommerce: [
+    { intent: 'recommendation', text: 'Meilleures boutiques en ligne en {{country}}', score: 87, offering: 'primary' },
+    { intent: 'pre_purchase', text: 'Comment savoir si une boutique en ligne est fiable ?', score: 83, offering: 'primary' },
+    { intent: 'commercial', text: 'Où acheter au meilleur prix en ligne en {{country}} ?', score: 85, offering: 'secondary', themeBoost: { price: 3 } },
+    { intent: 'brand', text: 'Avis sur {{business}}', score: 74, offering: 'generic' },
+  ],
+
+  saas: [
+    { intent: 'pre_purchase', text: '{{business}} convient-il à une petite entreprise ?', score: 92, offering: 'primary' },
+    { intent: 'commercial', text: 'Combien coûte {{business}} ?', score: 90, offering: 'primary', themeBoost: { price: 4 } },
+    { intent: 'pre_purchase', text: 'Quels sont les avantages et les inconvénients de {{business}} ?', score: 88, offering: 'primary' },
+    { intent: 'informational', text: '{{business}} vaut-il son prix ?', score: 86, offering: 'primary', themeBoost: { price: 3 } },
+    { intent: 'pre_purchase', text: 'Comment démarrer avec {{business}} ?', score: 84, offering: 'primary' },
+    { intent: 'pre_purchase', text: 'À qui s\'adresse {{business}} ?', score: 82, offering: 'primary' },
+    { intent: 'brand', text: 'Avis sur {{business}}', score: 74, offering: 'generic' },
+  ],
+
+  product_brand: [
+    { intent: 'informational', text: 'Quels sont les avantages et les inconvénients des produits {{business}} ?', score: 92, offering: 'primary' },
+    { intent: 'local', text: 'Où acheter les produits {{business}} ?', score: 90, offering: 'primary' },
+    { intent: 'pre_purchase', text: 'Que vérifier avant d\'acheter un produit {{business}} ?', score: 88, offering: 'primary' },
+    { intent: 'commercial', text: 'Où les produits {{business}} sont-ils les moins chers ?', score: 86, offering: 'primary', themeBoost: { price: 4 } },
+    { intent: 'informational', text: 'Faut-il acheter les produits {{business}} neufs ou reconditionnés ?', score: 84, offering: 'primary' },
+    { intent: 'recommendation', text: 'Quels produits {{business}} sont recommandés cette année ?', score: 83, offering: 'primary' },
+    { intent: 'brand', text: 'Avis sur les produits {{business}}', score: 74, offering: 'generic' },
+  ],
+
+  florist: [
+    { intent: 'local', text: 'Livraison de fleurs le jour même à {{city}}', score: 87, offering: 'primary', requiresCity: true },
+    { intent: 'recommendation', text: 'Meilleur fleuriste à {{city}}', score: 89, offering: 'primary', requiresCity: true },
+    { intent: 'brand', text: 'Avis sur {{business}}', score: 74, offering: 'generic' },
+  ],
+
+  second_hand_fashion: [
+    { intent: 'recommendation', text: 'Où acheter des vêtements de seconde main pour femme ?', score: 94, offering: 'primary', themeBoost: { audienceWomen: 5 } },
+    { intent: 'recommendation', text: 'Meilleures boutiques de mode de seconde main pour femme', score: 93, offering: 'primary', themeBoost: { audienceWomen: 5 } },
+    { intent: 'recommendation', text: 'Où trouver des vêtements vintage pour femme ?', score: 92, offering: 'primary', themeBoost: { audienceWomen: 4 } },
+    { intent: 'pre_purchase', text: 'Comment reconnaître la qualité d\'un vêtement de seconde main ?', score: 91, offering: 'primary' },
+    { intent: 'pre_purchase', text: 'Est-il sûr d\'acheter des vêtements d\'occasion en ligne ?', score: 89, offering: 'primary' },
+    { intent: 'commercial', text: 'Où trouver des vêtements de seconde main pour femme pas chers ?', score: 90, offering: 'primary', themeBoost: { price: 5 } },
+    { intent: 'commercial', text: 'Combien faut-il dépenser pour de la seconde main de qualité ?', score: 88, offering: 'primary', themeBoost: { price: 4 } },
+    { intent: 'informational', text: 'Comment composer une garde-robe en seconde main ?', score: 87, offering: 'primary' },
+    { intent: 'informational', text: 'Où trouver des vêtements de créateurs en seconde main ?', score: 86, offering: 'primary' },
+    { intent: 'local', text: 'Boutiques de mode de seconde main à {{city}}', score: 88, offering: 'local', requiresCity: true, themeBoost: { audienceWomen: 3 } },
+    { intent: 'brand', text: '{{business}} est-elle une boutique de seconde main fiable ?', score: 84, offering: 'secondary' },
+  ],
+
+  restaurant: [
+    { intent: 'recommendation', text: 'Meilleurs restaurants à {{city}}', score: 91, offering: 'primary', requiresCity: true },
+    { intent: 'local', text: 'Où dîner en amoureux à {{city}} ?', score: 85, offering: 'local', requiresCity: true },
+    { intent: 'brand', text: 'Avis sur {{business}}', score: 74, offering: 'generic' },
+  ],
+
+  travel: [
+    { intent: 'recommendation', text: 'Quel site est le mieux pour organiser un voyage à l\'étranger ?', score: 92, offering: 'primary' },
+    { intent: 'pre_purchase', text: 'Comment organiser un voyage par soi-même ?', score: 90, offering: 'primary' },
+    { intent: 'comparison', text: 'Voyage organisé ou voyage en autonomie : que choisir ?', score: 88, offering: 'primary' },
+    { intent: 'informational', text: 'Quand les vols internationaux sont-ils les moins chers ?', score: 86, offering: 'primary' },
+    { intent: 'commercial', text: 'Combien coûte un voyage organisé à l\'étranger ?', score: 85, offering: 'secondary', themeBoost: { price: 4 } },
+    { intent: 'brand', text: 'Avis sur {{business}}', score: 74, offering: 'generic' },
+  ],
+
+  healthcare: [
+    { intent: 'recommendation', text: 'Meilleures cliniques privées à {{city}}', score: 89, offering: 'primary', requiresCity: true },
+    { intent: 'brand', text: 'Avis sur {{business}}', score: 74, offering: 'generic' },
+  ],
+
+  legal: [
+    { intent: 'recommendation', text: 'Meilleurs cabinets d\'avocats en {{country}}', score: 89, offering: 'primary' },
+    { intent: 'commercial', text: 'Combien coûte une consultation chez un avocat en {{country}} ?', score: 83, offering: 'secondary', themeBoost: { price: 3 } },
+    { intent: 'brand', text: 'Avis sur {{business}}', score: 74, offering: 'generic' },
+  ],
+
+  real_estate: [
+    { intent: 'recommendation', text: 'Meilleures agences immobilières à {{city}}', score: 89, offering: 'primary', requiresCity: true },
+    { intent: 'brand', text: 'Avis sur {{business}}', score: 74, offering: 'generic' },
+  ],
+
+  fitness: [
+    { intent: 'recommendation', text: 'Meilleures salles de sport à {{city}}', score: 89, offering: 'primary', requiresCity: true },
+    { intent: 'brand', text: 'Avis sur {{business}}', score: 74, offering: 'generic' },
+  ],
+
+  beauty: [
+    { intent: 'recommendation', text: 'Meilleurs salons de beauté à {{city}}', score: 89, offering: 'primary', requiresCity: true },
+    { intent: 'brand', text: 'Avis sur {{business}}', score: 74, offering: 'generic' },
+  ],
+
+  education: [
+    { intent: 'recommendation', text: 'Meilleures formations tech en {{country}}', score: 87, offering: 'primary' },
+    { intent: 'brand', text: 'Avis sur {{business}}', score: 74, offering: 'generic' },
+  ],
+
+  home_improvement_service: [
+    { intent: 'recommendation', text: 'Quelle entreprise choisir pour rénover une cuisine à {{city}} ?', score: 93, offering: 'primary', requiresCity: true },
+    { intent: 'recommendation', text: 'Meilleure entreprise pour rénover une salle de bain à {{city}}', score: 92, offering: 'primary', requiresCity: true },
+    { intent: 'pre_purchase', text: 'Que vérifier avant de confier des travaux à une entreprise de rénovation ?', score: 88, offering: 'primary' },
+    { intent: 'recommendation', text: 'Quelle entreprise de rénovation complète est recommandée à {{city}} ?', score: 90, offering: 'primary', requiresCity: true },
+    { intent: 'commercial', text: 'Combien coûte la rénovation d\'une maison à {{city}} ?', score: 89, offering: 'secondary', requiresCity: true, themeBoost: { price: 4 } },
+    { intent: 'transactional', text: 'Comment choisir une entreprise de travaux fiable ?', score: 85, offering: 'primary' },
+  ],
+
+  local_service: [
+    { intent: 'recommendation', text: 'Professionnels recommandés à {{city}}', score: 87, offering: 'primary', requiresCity: true },
+    { intent: 'pre_purchase', text: 'À quoi faire attention avant de faire appel à un professionnel ?', score: 81, offering: 'primary' },
+    { intent: 'commercial', text: 'Combien coûte l\'intervention d\'un professionnel à {{city}} ?', score: 79, offering: 'secondary', requiresCity: true, themeBoost: { price: 3 } },
+  ],
+
+  generic: [
+    { intent: 'recommendation', text: 'Que propose {{business}} et en quoi cela aide-t-il ?', score: 77, offering: 'primary' },
+    { intent: 'brand', text: 'Avis sur {{business}}', score: 74, offering: 'generic' },
+  ],
+}
+
+const COUNTRY_NAMES_FR: Record<string, string> = {
+  IL: 'Israël',
+  US: 'États-Unis',
+  GB: 'Royaume-Uni',
+  DE: 'Allemagne',
+  FR: 'France',
+  BE: 'Belgique',
+  CH: 'Suisse',
+  CA: 'Canada',
+  LU: 'Luxembourg',
+  MA: 'Maroc',
+}
+
 const BANK_BY_LANG: Record<PromptLanguage, Record<BusinessCategory, QueryDef[]>> = {
-  he: HE_BANK, en: EN_BANK, es: ES_BANK,
+  he: HE_BANK, en: EN_BANK, es: ES_BANK, fr: FR_BANK,
 }
 const COUNTRY_NAMES_BY_LANG: Record<PromptLanguage, Record<string, string>> = {
-  he: COUNTRY_NAMES_HE, en: COUNTRY_NAMES_EN, es: COUNTRY_NAMES_ES,
+  he: COUNTRY_NAMES_HE, en: COUNTRY_NAMES_EN, es: COUNTRY_NAMES_ES, fr: COUNTRY_NAMES_FR,
 }
 /** What stands in for a missing business name or city, per language. */
 const PLACEHOLDER_BY_LANG: Record<PromptLanguage, { business: string; city: string }> = {
   he: { business: 'העסק', city: 'אזורך' },
   en: { business: 'the business', city: 'your area' },
   es: { business: 'el negocio', city: 'tu zona' },
+  fr: { business: 'l\'entreprise', city: 'votre région' },
 }
 
 function fillTemplate(template: string, ctx: TemplateContext): string {
@@ -1264,6 +1493,9 @@ function getBrandComparisonQuestions(
     } else if (language === 'es') {
       out.push({ text: `${business} o ${competitor}: ¿cuál es mejor?`, intent: 'comparison', score: 90 })
       out.push({ text: `¿Qué diferencia hay entre ${business} y ${competitor}?`, intent: 'comparison', score: 88 })
+    } else if (language === 'fr') {
+      out.push({ text: `${business} ou ${competitor} : lequel choisir ?`, intent: 'comparison', score: 90 })
+      out.push({ text: `Quelle est la différence entre ${business} et ${competitor} ?`, intent: 'comparison', score: 88 })
     } else {
       out.push({ text: `${business} vs ${competitor}: which is better?`, intent: 'comparison', score: 90 })
       out.push({ text: `What is the difference between ${business} and ${competitor}?`, intent: 'comparison', score: 88 })
@@ -1499,6 +1731,17 @@ function getProductBrandQuestions(
         out.push({ text: `¿${term} sirve para trabajar?`, intent: 'pre_purchase', score: baseScore - 7 })
         out.push({ text: `¿${term} sirve para estudiar?`, intent: 'pre_purchase', score: baseScore - 8 })
       }
+    } else if (language === 'fr') {
+      out.push({ text: `Quel ${term} acheter ?`, intent: 'recommendation', score: baseScore })
+      out.push({ text: `Est-ce que ${term} vaut son prix ?`, intent: 'commercial', score: baseScore - 2 })
+      out.push({ text: `Combien coûte ${term} ?`, intent: 'commercial', score: baseScore - 3 })
+      out.push({ text: `Où acheter ${term} ?`, intent: 'local', score: baseScore - 4 })
+      out.push({ text: `Que vérifier avant d'acheter ${term} ?`, intent: 'pre_purchase', score: baseScore - 5 })
+      out.push({ text: `Quels sont les avantages et les inconvénients de ${term} ?`, intent: 'informational', score: baseScore - 6 })
+      if (t.specificity === 'variant' || t.source === 'manual') {
+        out.push({ text: `Est-ce que ${term} convient pour le travail ?`, intent: 'pre_purchase', score: baseScore - 7 })
+        out.push({ text: `Est-ce que ${term} convient pour les études ?`, intent: 'pre_purchase', score: baseScore - 8 })
+      }
     } else {
       out.push({ text: `Which ${term} should I buy?`, intent: 'recommendation', score: baseScore })
       out.push({ text: `Is ${term} worth the price?`, intent: 'commercial', score: baseScore - 2 })
@@ -1535,6 +1778,9 @@ function getProductBrandQuestions(
         } else if (language === 'es') {
           out.push({ text: `${a} o ${b}: ¿cuál comprar?`, intent: 'comparison', score: 97 })
           out.push({ text: `¿Qué diferencia hay entre ${a} y ${b}?`, intent: 'comparison', score: 95 })
+        } else if (language === 'fr') {
+          out.push({ text: `${a} ou ${b} : lequel acheter ?`, intent: 'comparison', score: 97 })
+          out.push({ text: `Quelle est la différence entre ${a} et ${b} ?`, intent: 'comparison', score: 95 })
         } else {
           out.push({ text: `${a} vs ${b}: which should I buy?`, intent: 'comparison', score: 97 })
           out.push({ text: `What is the difference between ${a} and ${b}?`, intent: 'comparison', score: 95 })
@@ -1555,6 +1801,9 @@ function getProductBrandQuestions(
       } else if (language === 'es') {
         out.push({ text: `${t.term} o ${comp}: ¿cuál es mejor?`, intent: 'comparison', score: 90 })
         out.push({ text: `¿Qué diferencia hay entre ${t.term} y ${comp}?`, intent: 'comparison', score: 88 })
+      } else if (language === 'fr') {
+        out.push({ text: `${t.term} ou ${comp} : lequel choisir ?`, intent: 'comparison', score: 90 })
+        out.push({ text: `Quelle est la différence entre ${t.term} et ${comp} ?`, intent: 'comparison', score: 88 })
       } else {
         out.push({ text: `${t.term} vs ${comp}: which is better?`, intent: 'comparison', score: 90 })
         out.push({ text: `What is the difference between ${t.term} and ${comp}?`, intent: 'comparison', score: 88 })
@@ -2069,6 +2318,20 @@ const REASON_COPY: Record<PromptLanguage, ReasonCopy> = {
       niche: 'Se detectó interés por marcas de lujo o de nicho',
     },
   },
+  fr: {
+    category: (v) => `D'après la catégorie de l'entreprise : ${v}`,
+    intent: (v) => `Intention de recherche : ${v}`,
+    location: (v) => `Localisation : ${v}`,
+    themes: {
+      gift: 'Intention de cadeau détectée dans les mots-clés',
+      online: 'Intention d\'achat en ligne détectée',
+      price: 'Sensibilité au prix détectée',
+      audienceMen: 'Public détecté : hommes',
+      audienceWomen: 'Public détecté : femmes',
+      audienceKids: 'Public détecté : enfants',
+      niche: 'Intérêt détecté pour les marques de luxe ou de niche',
+    },
+  },
 }
 
 /**
@@ -2360,6 +2623,19 @@ const ES_KEYWORD_INTENT_WORDS = new Set([
 ])
 const ES_KEYWORD_INTENT_PHRASES = ['en oferta', 'de oferta', 'mejor precio', 'buen precio']
 
+/** The same list for French, so a frame never says the keyword's own intent
+ * twice («Combien coûte prix d'un parfum ?»). */
+const FR_KEYWORD_INTENT_WORDS = new Set([
+  'prix', 'tarif', 'tarifs', 'coût', 'cout', 'coûts', 'couts', 'coûte', 'coute',
+  'combien', 'cher', 'chère', 'chere', 'chers', 'promo', 'promotion',
+  'promotions', 'solde', 'soldes', 'remise', 'réduction', 'reduction',
+  'acheter', 'achat', 'commander', 'meilleur', 'meilleure', 'meilleurs',
+  'meilleures', 'recommandé', 'recommande', 'recommandée', 'recommandes',
+  'recommandés', 'recommandées', 'avis', 'comparatif', 'comparer',
+  'comparaison', 'économique', 'economique', 'abordable',
+])
+const FR_KEYWORD_INTENT_PHRASES = ['pas cher', 'moins cher', 'meilleur prix', 'bon prix', 'en promo']
+
 /**
  * Clean a raw keyword for safe injection into question templates. Strips
  * intent-bearing words/phrases that would either duplicate the template's own
@@ -2402,18 +2678,37 @@ const KEYWORD_FRAMES: Record<PromptLanguage, {
     recommendation: (kw) => `¿Qué proveedor se recomienda para ${kw}?`,
     local: (kw, city) => `¿Qué proveedor se recomienda para ${kw} en ${city}?`,
   },
+  fr: {
+    price: (kw) => `Combien coûte ${kw} ?`,
+    review: (kw) => `Avis sur ${kw}`,
+    prePurchase: (kw) => `Que vérifier avant de choisir ${kw} ?`,
+    recommendation: (kw) => `Quel prestataire est recommandé pour ${kw} ?`,
+    local: (kw, city) => `Quel prestataire est recommandé pour ${kw} à ${city} ?`,
+  },
 }
 
 function cleanKeywordForQuestion(keyword: string, lang: PromptLanguage): string {
   if (!keyword) return ''
   let cleaned = keyword.trim()
 
-  const phrases = lang === 'he' ? HE_KEYWORD_INTENT_PHRASES : lang === 'es' ? ES_KEYWORD_INTENT_PHRASES : EN_KEYWORD_INTENT_PHRASES
+  const phrases = lang === 'he'
+    ? HE_KEYWORD_INTENT_PHRASES
+    : lang === 'es'
+    ? ES_KEYWORD_INTENT_PHRASES
+    : lang === 'fr'
+    ? FR_KEYWORD_INTENT_PHRASES
+    : EN_KEYWORD_INTENT_PHRASES
   for (const phrase of phrases) {
     cleaned = cleaned.replace(new RegExp(escapeRegex(phrase), 'gi'), ' ')
   }
 
-  const stopSet = lang === 'he' ? HE_KEYWORD_INTENT_WORDS : lang === 'es' ? ES_KEYWORD_INTENT_WORDS : EN_KEYWORD_INTENT_WORDS
+  const stopSet = lang === 'he'
+    ? HE_KEYWORD_INTENT_WORDS
+    : lang === 'es'
+    ? ES_KEYWORD_INTENT_WORDS
+    : lang === 'fr'
+    ? FR_KEYWORD_INTENT_WORDS
+    : EN_KEYWORD_INTENT_WORDS
   const words = cleaned.split(/\s+/).filter((w) => {
     if (!w) return false
     const wl = lang === 'he' ? w : w.toLowerCase()
@@ -2495,6 +2790,31 @@ function isAwkwardQuestion(
     ]
     const countEs = stackedModifiersEs.filter((m) => new RegExp(`\\b${m}\\b`, 'i').test(q)).length
     if (countEs >= 3) return true
+  } else if (lang === 'fr') {
+    // Doubled intent: the frame already carries one and the keyword brought
+    // another («Combien coûte prix d'un parfum ?», «Avis sur avis sur…»).
+    if (/(combien\s+co[ûu]te[\s\S]*\bprix\b|\bprix\b[\s\S]*combien\s+co[ûu]te|\btarif\b[\s\S]*combien\s+co[ûu]te)/i.test(q)) return true
+    if (/\bavis\b[\s\S]*\bavis\b/i.test(q)) return true
+    if (/\bmeilleur(?:e|s|es)?\b[\s\S]*\bmeilleur(?:e|s|es)?\b/i.test(q)) return true
+    if (/\bcomparer\b[\s\S]*\bcomparer\b|\bcomparatif\b[\s\S]*\bcomparatif\b/i.test(q)) return true
+    if (/\bpas\s+cher\b[\s\S]*\bpas\s+cher\b|\bpromo\b[\s\S]*\bpromo\b/i.test(q)) return true
+    // A keyword carrying its own intent word dropped into a frame that already
+    // has one: «Avis sur acheter un parfum de niche».
+    const KW_INTENT_FR = '(?:acheter|achat|commander|choisir|chercher|prix|tarifs?|co[ûu]ts?|avis|meilleur(?:e|s|es)?|pas\\s+cher|promo|promotion|remise|r[ée]duction)'
+    if (new RegExp(`^avis\\s+sur\\s+${KW_INTENT_FR}\\b`, 'i').test(q)) return true
+    if (new RegExp(`^combien\\s+co[ûu]te\\s+${KW_INTENT_FR}\\b`, 'i').test(q)) return true
+    if (new RegExp(`^que\\s+v[ée]rifier\\s+avant\\s+de\\s+choisir\\s+${KW_INTENT_FR}\\b`, 'i').test(q)) return true
+    if (new RegExp(`^quel\\s+prestataire\\s+est\\s+recommand[ée]\\s+pour\\s+${KW_INTENT_FR}\\b`, 'i').test(q)) return true
+
+    // A gift frame firing for a business that sells no gifts.
+    if (/\bcadeaux?\b|\boffrir\b/i.test(q) && !GIFT_CATEGORIES.includes(category)) return true
+
+    const stackedModifiersFr = [
+      'meilleur', 'meilleure', 'meilleurs', 'meilleures', 'pas cher',
+      'qualité', 'recommandé', 'économique', 'en promo', 'avec remise',
+    ]
+    const countFr = stackedModifiersFr.filter((m) => new RegExp(`\\b${m}\\b`, 'i').test(q)).length
+    if (countFr >= 3) return true
   } else {
     if (/\brecommended\b[\s\S]*\brecommended\b/i.test(q)) return true
     if (/\bbest\b[\s\S]*\bbest\b/i.test(q)) return true
@@ -2644,8 +2964,14 @@ function generateKeywordBasedQuestionsWithFallback({
   const trackedSet = new Set(trackedPrompts.map(normalizeForDedup))
   const generatedSet = new Set<string>()
 
-  // Try v2 first for each keyword
-  for (const keyword of keywords) {
+  // Try v2 first for each keyword. French is the exception: the semantic
+  // generator phrases a need in Hebrew, Spanish or English and has no French
+  // phrasings, so a French project would read «Reviews of livraison de fleurs»
+  // on an otherwise French screen. It therefore goes straight to v1 below,
+  // which wraps the keyword in KEYWORD_FRAMES.fr. Drop this guard the day
+  // semantic-generator-v2 gets a phraseNaturalFrenchQuestion.
+  const v2Language = normalizeLanguage(language)
+  for (const keyword of v2Language === 'fr' ? [] : keywords) {
     if (!keyword || keyword.length < 3) continue
 
     const v2Ctx: GeneratorContext = {
@@ -3017,6 +3343,44 @@ function generateSafeCuratedSuggestions({
         requiresLocation: true,
       })
     }
+  } else if (lang === 'fr') {
+    // French safe templates. The noun needs its article, and `quel`/`quelle`
+    // has to agree with it, so these read CATEGORY_SERVICE_LABELS (which keeps
+    // the gender in `frArt`) rather than the bare label.
+    const svc = CATEGORY_SERVICE_LABELS[category]
+    templates.push({
+      text: `Combien coûte ${isService ? 'ce service' : 'un service de ce type'} ?`,
+      intent: 'commercial',
+      category,
+    })
+
+    if (isService) {
+      templates.push({
+        text: `Comment choisir ${svc ? `${svc.frArt} ${svc.fr}` : 'un prestataire'} ?`,
+        intent: 'pre_purchase',
+        category,
+      })
+    }
+
+    if (hasBusinessName) {
+      templates.push({
+        text: `Avis sur ${businessName}`,
+        intent: 'brand',
+        category,
+        requiresBusinessName: true,
+      })
+    }
+
+    if (hasLocation && isService) {
+      templates.push({
+        text: svc
+          ? `${svc.frArt === 'une' ? 'Quelle' : 'Quel'} ${svc.fr} choisir à ${city} ?`
+          : `Quel prestataire choisir à ${city} ?`,
+        intent: 'local',
+        category,
+        requiresLocation: true,
+      })
+    }
   } else {
     // English safe templates
     templates.push({
@@ -3158,8 +3522,41 @@ function getCategoryLabel(category: BusinessCategory, lang: PromptLanguage): str
     generic: 'negocio',
   }
 
-  const labels = lang === 'he' ? heLabels : lang === 'es' ? esLabels : enLabels
-  return labels[category] || (lang === 'es' ? 'negocio' : 'business')
+  // The same short noun in French. Bare, with no article: the French callers
+  // that need one read `frArt` from CATEGORY_SERVICE_LABELS instead.
+  const frLabels: Record<BusinessCategory, string> = {
+    saas: 'logiciel',
+    agency: 'agence',
+    ecommerce: 'boutique',
+    local_service: 'service',
+    fitness: 'salle de sport',
+    restaurant: 'restaurant',
+    beauty: 'salon de beauté',
+    florist: 'fleuriste',
+    legal: 'cabinet d\'avocats',
+    healthcare: 'clinique',
+    real_estate: 'agence immobilière',
+    product_brand: 'produit',
+    cleaning: 'entreprise de nettoyage',
+    home_improvement_service: 'entreprise de rénovation',
+    sports_store: 'magasin de sport',
+    perfume: 'parfumerie',
+    appliance_store: 'magasin d\'électroménager',
+    gifts: 'cadeaux',
+    education: 'formation',
+    second_hand_fashion: 'mode',
+    travel: 'voyages',
+    generic: 'entreprise',
+  }
+
+  const labels = lang === 'he'
+    ? heLabels
+    : lang === 'es'
+    ? esLabels
+    : lang === 'fr'
+    ? frLabels
+    : enLabels
+  return labels[category] || (lang === 'es' ? 'negocio' : lang === 'fr' ? 'entreprise' : 'business')
 }
 
 /**
@@ -3311,6 +3708,12 @@ export function normalizeLanguage(
   // falling through to the Hebrew default: it shares English's latin script, so
   // the heuristics below behave, while a Hebrew bank would hand a Brazilian
   // reader questions in Hebrew letters. Same rule as `toHebrewOrEnglish`.
+  // French is a full site locale with its own bank, labels, reasons and
+  // filters below, so it resolves to itself the way Spanish does — never to
+  // English and never to the Hebrew default. 'fr-FR' and 'fr-CA' from stored
+  // project rows land here too, via normalizeContentLanguage's prefix test.
+  if (v === 'fr' || v.startsWith('french') || v.startsWith('français') ||
+      v.startsWith('francais') || normalizeContentLanguage(v) === 'fr') return 'fr'
   if (normalizeContentLanguage(v) === 'pt-BR') return 'en'
   // Anything else (e.g. 'ar') — default to the safe fallback, because a
   // language with no bank would otherwise get an empty one.
@@ -3322,11 +3725,12 @@ export function normalizeLanguage(
  * this module still have prompts for (the keyword-research seeds, the
  * search-object classifier, the seed scan's question step).
  *
- * Spanish becomes ENGLISH, never Hebrew: those seeds are written as
+ * Spanish and French become ENGLISH, never Hebrew: those seeds are written as
  * `language === 'en' ? english : hebrew`, so anything that is not English
- * falls to Hebrew there — a Spanish project would get Hebrew questions. Every
- * call site of this function is a place Spanish could still be translated
- * further, the same contract as `toBilingualLocale` in lib/i18n/locales.ts.
+ * falls to Hebrew there — a Spanish or French project would get Hebrew
+ * questions. Every call site of this function is a place Spanish and French
+ * could still be translated further, the same contract as `toBilingualLocale`
+ * in lib/i18n/locales.ts.
  */
 export function toBilingualPromptLanguage(lang: PromptLanguage): 'he' | 'en' {
   return lang === 'he' ? 'he' : 'en'
@@ -3360,6 +3764,14 @@ const GEN_COPY: Record<PromptLanguage, {
     starter: 'inicial',
     default_: 'por defecto',
     starterValue: 'Preguntas para empezar: completa el perfil para tener propuestas más precisas',
+  },
+  fr: {
+    insufficient: 'Pour générer des questions plus précises, complétez le profil IA de l\'entreprise.',
+    review: 'Vérification',
+    insufficientReason: 'contexte insuffisant',
+    starter: 'départ',
+    default_: 'par défaut',
+    starterValue: 'Questions de départ : complétez le profil pour des propositions plus précises',
   },
 }
 
@@ -3424,6 +3836,14 @@ type ServiceLabel = {
   esPlural: string
   esArt: 'un' | 'una'
   esPrice?: string
+  /** French keeps the noun and its article apart for the same reason Spanish
+   * does — `une agence`, `un restaurant` — and `frArt` is what the question
+   * frames read to make `quel` / `quelle` agree. `frPrice` carries its own
+   * article, the way `esPrice` and `enPrice` do. */
+  fr: string
+  frPlural: string
+  frArt: 'un' | 'une'
+  frPrice?: string
 }
 
 const CATEGORY_SERVICE_LABELS: Partial<Record<BusinessCategory, ServiceLabel>> = {
@@ -3433,6 +3853,8 @@ const CATEGORY_SERVICE_LABELS: Partial<Record<BusinessCategory, ServiceLabel>> =
     hePrice: 'קידום בגוגל', enPrice: 'digital marketing',
     es: 'agencia de marketing digital', esPlural: 'agencias de marketing digital', esArt: 'una',
     esPrice: 'el posicionamiento en Google',
+    fr: 'agence de marketing digital', frPlural: 'agences de marketing digital', frArt: 'une',
+    frPrice: 'le référencement sur Google',
   },
   cleaning: {
     he: 'חברת ניקיון', hePlural: 'חברות ניקיון',
@@ -3440,6 +3862,8 @@ const CATEGORY_SERVICE_LABELS: Partial<Record<BusinessCategory, ServiceLabel>> =
     hePrice: 'שירות ניקיון', enPrice: 'office cleaning',
     es: 'empresa de limpieza', esPlural: 'empresas de limpieza', esArt: 'una',
     esPrice: 'un servicio de limpieza de oficinas',
+    fr: 'entreprise de nettoyage', frPlural: 'entreprises de nettoyage', frArt: 'une',
+    frPrice: 'un service de nettoyage de bureaux',
   },
   home_improvement_service: {
     he: 'חברת שיפוצים', hePlural: 'חברות שיפוצים',
@@ -3447,6 +3871,8 @@ const CATEGORY_SERVICE_LABELS: Partial<Record<BusinessCategory, ServiceLabel>> =
     hePrice: 'שיפוץ', enPrice: 'a home remodel',
     es: 'empresa de reformas', esPlural: 'empresas de reformas', esArt: 'una',
     esPrice: 'una reforma del hogar',
+    fr: 'entreprise de rénovation', frPlural: 'entreprises de rénovation', frArt: 'une',
+    frPrice: 'la rénovation d\'une maison',
   },
   local_service: {
     he: 'בעל מקצוע', hePlural: 'בעלי מקצוע',
@@ -3454,6 +3880,8 @@ const CATEGORY_SERVICE_LABELS: Partial<Record<BusinessCategory, ServiceLabel>> =
     hePrice: 'שירות מקצועי', enPrice: 'the service',
     es: 'profesional de la zona', esPlural: 'profesionales de la zona', esArt: 'un',
     esPrice: 'el servicio',
+    fr: 'professionnel local', frPlural: 'professionnels locaux', frArt: 'un',
+    frPrice: 'la prestation',
   },
   legal: {
     he: 'משרד עורכי דין', hePlural: 'משרדי עורכי דין',
@@ -3461,11 +3889,14 @@ const CATEGORY_SERVICE_LABELS: Partial<Record<BusinessCategory, ServiceLabel>> =
     hePrice: 'ייעוץ משפטי', enPrice: 'legal consultation',
     es: 'despacho de abogados', esPlural: 'despachos de abogados', esArt: 'un',
     esPrice: 'una consulta con un abogado',
+    fr: 'cabinet d\'avocats', frPlural: 'cabinets d\'avocats', frArt: 'un',
+    frPrice: 'une consultation chez un avocat',
   },
   real_estate: {
     he: 'משרד תיווך', hePlural: 'משרדי תיווך',
     en: 'real estate agency', enPlural: 'real estate agencies',
     es: 'inmobiliaria', esPlural: 'inmobiliarias', esArt: 'una',
+    fr: 'agence immobilière', frPlural: 'agences immobilières', frArt: 'une',
   },
   healthcare: {
     he: 'מרפאה פרטית', hePlural: 'מרפאות פרטיות',
@@ -3473,6 +3904,8 @@ const CATEGORY_SERVICE_LABELS: Partial<Record<BusinessCategory, ServiceLabel>> =
     hePrice: 'טיפול פרטי', enPrice: 'private treatment',
     es: 'clínica privada', esPlural: 'clínicas privadas', esArt: 'una',
     esPrice: 'un tratamiento privado',
+    fr: 'clinique privée', frPlural: 'cliniques privées', frArt: 'une',
+    frPrice: 'un soin en clinique privée',
   },
   education: {
     he: 'מוסד לימודים', hePlural: 'מוסדות לימוד',
@@ -3480,6 +3913,8 @@ const CATEGORY_SERVICE_LABELS: Partial<Record<BusinessCategory, ServiceLabel>> =
     hePrice: 'קורס מקצועי', enPrice: 'a professional course',
     es: 'centro de formación', esPlural: 'centros de formación', esArt: 'un',
     esPrice: 'un curso profesional',
+    fr: 'organisme de formation', frPlural: 'organismes de formation', frArt: 'un',
+    frPrice: 'une formation professionnelle',
   },
   florist: {
     he: 'חנות פרחים', hePlural: 'חנויות פרחים',
@@ -3487,11 +3922,14 @@ const CATEGORY_SERVICE_LABELS: Partial<Record<BusinessCategory, ServiceLabel>> =
     hePrice: 'משלוח פרחים', enPrice: 'flower delivery',
     es: 'floristería', esPlural: 'floristerías', esArt: 'una',
     esPrice: 'un envío de flores',
+    fr: 'fleuriste', frPlural: 'fleuristes', frArt: 'un',
+    frPrice: 'une livraison de fleurs',
   },
   gifts: {
     he: 'חנות מתנות', hePlural: 'חנויות מתנות',
     en: 'gift shop', enPlural: 'gift shops',
     es: 'tienda de regalos', esPlural: 'tiendas de regalos', esArt: 'una',
+    fr: 'boutique de cadeaux', frPlural: 'boutiques de cadeaux', frArt: 'une',
   },
   perfume: {
     he: 'חנות בשמים', hePlural: 'חנויות בשמים',
@@ -3499,26 +3937,32 @@ const CATEGORY_SERVICE_LABELS: Partial<Record<BusinessCategory, ServiceLabel>> =
     hePrice: 'בושם איכותי', enPrice: 'a quality perfume',
     es: 'perfumería', esPlural: 'perfumerías', esArt: 'una',
     esPrice: 'un perfume de calidad',
+    fr: 'parfumerie', frPlural: 'parfumeries', frArt: 'une',
+    frPrice: 'un parfum de qualité',
   },
   sports_store: {
     he: 'חנות ספורט', hePlural: 'חנויות ספורט',
     en: 'sports store', enPlural: 'sports stores',
     es: 'tienda de deportes', esPlural: 'tiendas de deportes', esArt: 'una',
+    fr: 'magasin de sport', frPlural: 'magasins de sport', frArt: 'un',
   },
   appliance_store: {
     he: 'חנות מוצרי חשמל', hePlural: 'חנויות מוצרי חשמל',
     en: 'home appliance store', enPlural: 'home appliance stores',
     es: 'tienda de electrodomésticos', esPlural: 'tiendas de electrodomésticos', esArt: 'una',
+    fr: 'magasin d\'électroménager', frPlural: 'magasins d\'électroménager', frArt: 'un',
   },
   second_hand_fashion: {
     he: 'חנות יד שנייה', hePlural: 'חנויות יד שנייה',
     en: 'second-hand clothing store', enPlural: 'second-hand clothing stores',
     es: 'tienda de ropa de segunda mano', esPlural: 'tiendas de ropa de segunda mano', esArt: 'una',
+    fr: 'boutique de vêtements de seconde main', frPlural: 'boutiques de vêtements de seconde main', frArt: 'une',
   },
   restaurant: {
     he: 'מסעדה', hePlural: 'מסעדות',
     en: 'restaurant', enPlural: 'restaurants',
     es: 'restaurante', esPlural: 'restaurantes', esArt: 'un',
+    fr: 'restaurant', frPlural: 'restaurants', frArt: 'un',
   },
   travel: {
     he: 'שירות תכנון טיולים', hePlural: 'שירותי תכנון טיולים',
@@ -3526,6 +3970,8 @@ const CATEGORY_SERVICE_LABELS: Partial<Record<BusinessCategory, ServiceLabel>> =
     hePrice: 'תכנון טיול', enPrice: 'trip planning',
     es: 'servicio de planificación de viajes', esPlural: 'servicios de planificación de viajes', esArt: 'un',
     esPrice: 'planificar un viaje',
+    fr: 'service d\'organisation de voyages', frPlural: 'services d\'organisation de voyages', frArt: 'un',
+    frPrice: 'l\'organisation d\'un voyage',
   },
   fitness: {
     he: 'חדר כושר', hePlural: 'חדרי כושר',
@@ -3533,6 +3979,8 @@ const CATEGORY_SERVICE_LABELS: Partial<Record<BusinessCategory, ServiceLabel>> =
     hePrice: 'מנוי לחדר כושר', enPrice: 'a gym membership',
     es: 'gimnasio', esPlural: 'gimnasios', esArt: 'un',
     esPrice: 'una cuota de gimnasio',
+    fr: 'salle de sport', frPlural: 'salles de sport', frArt: 'une',
+    frPrice: 'un abonnement en salle de sport',
   },
   beauty: {
     he: 'מכון יופי', hePlural: 'מכוני יופי',
@@ -3540,16 +3988,20 @@ const CATEGORY_SERVICE_LABELS: Partial<Record<BusinessCategory, ServiceLabel>> =
     hePrice: 'טיפול יופי', enPrice: 'a beauty treatment',
     es: 'centro de belleza', esPlural: 'centros de belleza', esArt: 'un',
     esPrice: 'un tratamiento de belleza',
+    fr: 'salon de beauté', frPlural: 'salons de beauté', frArt: 'un',
+    frPrice: 'un soin de beauté',
   },
   ecommerce: {
     he: 'חנות אונליין', hePlural: 'חנויות אונליין',
     en: 'online store', enPlural: 'online stores',
     es: 'tienda online', esPlural: 'tiendas online', esArt: 'una',
+    fr: 'boutique en ligne', frPlural: 'boutiques en ligne', frArt: 'une',
   },
   saas: {
     he: 'תוכנה לעסקים', hePlural: 'מערכות תוכנה',
     en: 'software platform', enPlural: 'software platforms',
     es: 'plataforma de software', esPlural: 'plataformas de software', esArt: 'una',
+    fr: 'plateforme logicielle', frPlural: 'plateformes logicielles', frArt: 'une',
   },
 }
 
@@ -3642,7 +4094,13 @@ export function inferServiceLabel(
   if (!category) return null
   const label = CATEGORY_SERVICE_LABELS[category]
   if (!label) return null
-  return language === 'he' ? label.he : language === 'es' ? label.es : label.en
+  return language === 'he'
+    ? label.he
+    : language === 'es'
+    ? label.es
+    : language === 'fr'
+    ? label.fr
+    : label.en
 }
 
 /** Pick the correct English indefinite article for a noun phrase. */
@@ -3683,6 +4141,38 @@ function buildQuestionFromIntentEs(
 }
 
 /**
+ * The French half, kept apart for the same reason the Spanish one is: French
+ * needs the article the category's gender decides (`une agence`, `un
+ * restaurant`) where English needs only a/an and Hebrew needs none.
+ */
+function buildQuestionFromIntentFr(
+  intent: FallbackIntent,
+  label: ServiceLabel,
+  location: string | null
+): string | null {
+  const one = `${label.frArt} ${label.fr}`
+  switch (intent) {
+    case 'recommendation':
+      return `Comment choisir ${one} ?`
+    case 'decision':
+      return `Que vérifier avant de choisir ${one} ?`
+    case 'trust':
+      return `Comment savoir si ${one} est fiable ?`
+    case 'price':
+      return label.frPrice ? `Combien coûte ${label.frPrice} ?` : null
+    case 'local':
+      if (!location) return null
+      return `Où trouver ${one} à ${location} ?`
+    case 'comparison':
+      return `Comment comparer les ${label.frPlural} ?`
+    case 'alternatives':
+      return `Quelles sont les alternatives à ${one} ?`
+    default:
+      return null
+  }
+}
+
+/**
  * Build one natural question for a specific intent. Returns null when the
  * intent cannot be expressed naturally with the available context (e.g. price
  * for a category with no price subject, or local without a location).
@@ -3695,6 +4185,7 @@ export function buildQuestionFromIntent(
 ): string | null {
   if (!label) return null
   if (language === 'es') return buildQuestionFromIntentEs(intent, label, location)
+  if (language === 'fr') return buildQuestionFromIntentFr(intent, label, location)
   const he = language === 'he'
   switch (intent) {
     case 'recommendation':
@@ -3901,36 +4392,42 @@ export function buildFallbackSuggestions(
     for (const kw of keywords) {
       const kwLower = kw.toLowerCase()
       // Price intent
-      if (/(price|cost|precio|cuesta|coste|tarifa|כמה|עלות|תעריף|חיוב)/.test(kwLower)) {
+      if (/(price|cost|precio|cuesta|coste|tarifa|prix|tarif|co[ûu]t|combien|כמה|עלות|תעריף|חיוב)/.test(kwLower)) {
         if (labelObj && labelObj.hePrice && lang === 'he') {
           push(`כמה עולה ${labelObj.hePrice}?`, 'commercial')
         } else if (labelObj && labelObj.esPrice && lang === 'es') {
           push(`¿Cuánto cuesta ${labelObj.esPrice}?`, 'commercial')
+        } else if (labelObj && labelObj.frPrice && lang === 'fr') {
+          push(`Combien coûte ${labelObj.frPrice} ?`, 'commercial')
         } else if (labelObj && labelObj.enPrice && lang === 'en') {
           push(`How much does ${labelObj.enPrice} cost?`, 'commercial')
         }
       }
       // Local intent
-      if (/(near|local|cerca|cercano|en mi zona|מקומי|באזור|ב-|ניו יורק|לונדון)/.test(kwLower) && location) {
+      if (/(near|local|cerca|cercano|en mi zona|pr[èe]s de|[àa] proximit[ée]|dans ma ville|dans ma r[ée]gion|מקומי|באזור|ב-|ניו יורק|לונדון)/.test(kwLower) && location) {
         if (labelObj) {
           push(
             lang === 'he'
               ? `איך מוצאים ${labelObj.he} ב${location}?`
               : lang === 'es'
               ? `¿Dónde encontrar ${labelObj.esArt} ${labelObj.es} en ${location}?`
+              : lang === 'fr'
+              ? `Où trouver ${labelObj.frArt} ${labelObj.fr} à ${location} ?`
               : `Where can I find ${enArticle(labelObj.en)} ${labelObj.en} in ${location}?`,
             'local'
           )
         }
       }
       // Comparison intent
-      if (/(vs|compare|comparar|comparativa|diferencia|frente a|לעומת|השוואה|הבדל)/.test(kwLower)) {
+      if (/(vs|compare|comparar|comparativa|diferencia|frente a|comparer|comparatif|diff[ée]rence|לעומת|השוואה|הבדל)/.test(kwLower)) {
         if (labelObj) {
           push(
             lang === 'he'
               ? `איך משווים בין ${labelObj.hePlural}?`
               : lang === 'es'
               ? `¿Cómo comparar ${labelObj.esPlural}?`
+              : lang === 'fr'
+              ? `Comment comparer les ${labelObj.frPlural} ?`
               : `How do I compare different ${labelObj.enPlural}?`,
             'comparison'
           )
@@ -3957,6 +4454,16 @@ export function buildFallbackSuggestions(
       } else {
         push(`¿Qué dice la gente sobre ${cleanName}?`, 'recommendation')
       }
+    } else if (lang === 'fr') {
+      push(`Quels sont les avis sur ${cleanName} ?`, 'brand')
+      if (labelObj) {
+        // `Peut-on faire confiance à …` avoids agreeing an adjective with a
+        // brand name whose gender we do not know.
+        push(`Peut-on faire confiance à ${cleanName} ?`, 'pre_purchase')
+        push(`Comment comparer ${cleanName} aux autres ${labelObj.frPlural} ?`, 'comparison')
+      } else {
+        push(`Que pensent les clients de ${cleanName} ?`, 'recommendation')
+      }
     } else {
       push(`What are the reviews of ${cleanName}?`, 'brand')
       if (labelObj) {
@@ -3976,6 +4483,8 @@ export function buildFallbackSuggestions(
           ? `מה ההבדל בין ${cleanName} ל${competitors[0]}?`
           : lang === 'es'
           ? `¿Qué diferencia hay entre ${cleanName} y ${competitors[0]}?`
+          : lang === 'fr'
+          ? `Quelle est la différence entre ${cleanName} et ${competitors[0]} ?`
           : `What is the difference between ${cleanName} and ${competitors[0]}?`,
         'comparison'
       )
@@ -3986,6 +4495,8 @@ export function buildFallbackSuggestions(
           ? `מה ההבדל בין ${labelObj.he} ל${competitors[0]}?`
           : lang === 'es'
           ? `¿Qué diferencia hay entre ${labelObj.esArt} ${labelObj.es} y ${competitors[0]}?`
+          : lang === 'fr'
+          ? `Quelle est la différence entre ${labelObj.frArt} ${labelObj.fr} et ${competitors[0]} ?`
           : `What is the difference between ${enArticle(labelObj.en)} ${labelObj.en} and ${competitors[0]}?`,
         'comparison'
       )
@@ -4015,6 +4526,13 @@ export function buildFallbackSuggestions(
           '¿Qué conviene revisar antes de elegir un proveedor?',
           '¿Cómo comparar negocios del mismo sector?',
           '¿Qué es lo más importante antes de contratar a un proveedor?',
+        ]
+      : lang === 'fr'
+      ? [
+          'Comment choisir une entreprise fiable dans ce domaine ?',
+          'Que vérifier avant de choisir un prestataire ?',
+          'Comment comparer plusieurs entreprises du même domaine ?',
+          'Qu\'est-ce qui compte le plus avant de s\'engager avec un prestataire ?',
         ]
       : [
           'How do I choose a reliable business in this field?',
@@ -4344,12 +4862,13 @@ export function generatePromptSuggestions({
   // Bypasses semantic-generator-v2, safe mode placeholders, fallback mutation,
   // and aggressive template generation.
   // ========================================================================
-  // Spanish is the exception: the vNext intent engine has a Hebrew seed pool and
-  // an English one, and nothing in Spanish, so sending a Spanish project through
-  // it returns ENGLISH questions on a Spanish screen. Spanish therefore takes the
-  // template path below, which reads ES_BANK and the Spanish labels, reasons and
-  // value lines. The day the engine gets a Spanish seed pool, drop this guard.
-  if (USE_SMART_QUESTIONS_VNEXT && lang !== 'es') {
+  // Spanish and French are the exceptions: the vNext intent engine has a Hebrew
+  // seed pool and an English one, and nothing in either of them, so sending such
+  // a project through it returns ENGLISH questions on a Spanish or French screen.
+  // Both therefore take the template path below, which reads ES_BANK / FR_BANK and
+  // that language's labels, reasons and value lines. The day the engine gets a
+  // seed pool for a language, drop it from this guard.
+  if (USE_SMART_QUESTIONS_VNEXT && lang !== 'es' && lang !== 'fr') {
     // Resolve category the same way the legacy path does, so manual profile
     // overrides apply consistently.
     const hasManualEarly = manualProfile && manualProfile.mode === 'manual'
@@ -5214,6 +5733,34 @@ function classifyPhrasingPattern(prompt: string, lang: PromptLanguage): string {
       return 'es_where_to'
     }
     return 'es_other'
+  } else if (lang === 'fr') {
+    // French openers, bucketed exactly as the other three are. A bank entry may
+    // be a noun phrase («Meilleures parfumeries en France») rather than a
+    // question, so the interrogative opener is optional on purpose.
+    if (
+      /^(quelles?|quels?)\s+(?:entreprise|expert|prestataire|marque|mod[èe]le|boutique|magasin|option|service|cabinet|clinique|agence|salon|parfumerie)\s+(?:choisir|est\s+(?:le\s+meilleur|la\s+meilleure|recommand[ée]e?)|recommandez-vous)/i.test(p) ||
+      /^qui\s+est\s+(?:le\s+meilleur|la\s+meilleure|recommand[ée])/i.test(p) ||
+      /^meilleur(?:e|s|es)?\s+/i.test(p) ||
+      /^(quelles?|quels?)\s+\S+\s+(?:choisir|est\s+(?:le\s+meilleur|la\s+meilleure)|sont\s+recommand[ée]s?)/i.test(p)
+    ) {
+      return 'fr_recommendation_provider'
+    }
+    if (/^(combien\s+(?:co[ûu]te|co[ûu]tent|faut-il)|quel\s+(?:est\s+le\s+)?(?:prix|tarif|co[ûu]t)|quel\s+budget)/i.test(p)) {
+      return 'fr_price'
+    }
+    if (/^(comment\s+choisir|que\s+(?:v[ée]rifier|faut-il\s+v[ée]rifier|regarder)|[àa]\s+quoi\s+faire\s+attention|comment\s+savoir|comment\s+reconna[îi]tre)/i.test(p)) {
+      return 'fr_pre_purchase'
+    }
+    if (/^(quelle\s+(?:est\s+la\s+)?diff[ée]rence|diff[ée]rence\s+entre|comment\s+comparer|que\s+choisir)/i.test(p)) {
+      return 'fr_comparison'
+    }
+    if (/^(avis\s+sur|quels\s+sont\s+les\s+avis|que\s+pensent|peut-on\s+faire\s+confiance)/i.test(p)) {
+      return 'fr_reviews'
+    }
+    if (/^(o[ùu]\s+(?:acheter|trouver|commander|d[îi]ner)|comment\s+(?:trouver|acheter|commander))/i.test(p)) {
+      return 'fr_where_to'
+    }
+    return 'fr_other'
   } else {
     if (
       /^which\s+(?:company|expert|provider|brand|model|store|option|service)\s+(?:is\s+(?:recommended|best)|suits|fits)/i.test(
@@ -5275,6 +5822,20 @@ const ES_FAMILY_MODIFIERS = new Set([
   'comprar', 'compra', 'pedir', 'elegir', 'servicio', 'servicios', 'casa',
   'oficina', 'de', 'del', 'la', 'el', 'los', 'las', 'un', 'una', 'para', 'en',
   'y', 'o', 'que', 'con', 'por', 'a',
+])
+
+/** The French equivalents: words that describe a variant rather than name the
+ * thing, so «parfum de niche» and «parfum oriental» share one family. */
+const FR_FAMILY_MODIFIERS = new Set([
+  'meilleur', 'meilleure', 'meilleurs', 'meilleures', 'bon', 'bonne', 'bons',
+  'bonnes', 'cher', 'chère', 'chere', 'chers', 'petit', 'petite', 'grand',
+  'grande', 'professionnel', 'professionnelle', 'commercial', 'résidentiel',
+  'pliable', 'compact', 'moderne', 'classique', 'neuf', 'neuve', 'vieux',
+  'fiable', 'rapide', 'lent', 'qualité', 'qualite', 'recommandé', 'recommandée',
+  'économique', 'economique', 'abordable', 'acheter', 'achat', 'commander',
+  'choisir', 'service', 'services', 'maison', 'bureau', 'pas', 'de', 'du',
+  'des', 'le', 'la', 'les', 'un', 'une', 'pour', 'en', 'et', 'ou', 'que',
+  'avec', 'par', 'à', 'a', 'dans', 'sur',
 ])
 
 const EN_FAMILY_MODIFIERS = new Set([
@@ -5359,6 +5920,21 @@ function extractKeywordFamily(prompt: string, lang: PromptLanguage): string {
     core = core.replace(/\s+/g, ' ').trim()
 
     const words = core.split(' ').filter((w) => w && !ES_FAMILY_MODIFIERS.has(w))
+    return words.slice(0, 3).join(' ')
+  } else if (lang === 'fr') {
+    core = core.replace(
+      /^((?:quelles?|quels?)\s+(?:entreprise|expert|prestataire|marque|mod[èe]le|boutique|magasin|option|service|cabinet|clinique|agence|salon|parfumerie)\s+(?:choisir|est\s+(?:le\s+meilleur|la\s+meilleure|recommand[ée]e?)|recommandez-vous)\s*(?:pour|de|du|des|[àa]|en)?\s*|qui\s+est\s+(?:le\s+meilleur|la\s+meilleure|recommand[ée])\s*(?:pour|de|en)?\s*|meilleur(?:e|s|es)?\s+(?:entreprises?|prestataires?|boutiques?|magasins?|option|cliniques?|parfumeries?|agences?|salons?|fleuriste|restaurants?)?\s*(?:de|du|des|pour|[àa]|en)?\s*|combien\s+(?:co[ûu]te|co[ûu]tent|faut-il\s+(?:d[ée]penser|investir))\s*|quel\s+(?:est\s+le\s+)?(?:prix|tarif|co[ûu]t)\s*(?:de|du|des|d')?\s*|comment\s+(?:choisir|trouver|acheter|commander|savoir\s+si|comparer|reconna[îi]tre|organiser|composer)\s*|que\s+(?:v[ée]rifier|faut-il\s+v[ée]rifier|regarder)(?:\s+avant\s+(?:de|d')\s*(?:choisir|acheter|commander|confier))?\s*|quelle\s+(?:est\s+la\s+)?diff[ée]rence\s+entre\s*|diff[ée]rence\s+entre\s*|avis\s+sur\s*|quels\s+sont\s+les\s+avis\s+sur\s*|que\s+pensent\s+les\s+clients\s+de\s*|peut-on\s+faire\s+confiance\s+[àa]\s*|o[ùu]\s+(?:acheter|trouver|commander)\s*|quelles\s+sont\s+les\s+alternatives\s+[àa]\s*|quel\s+prestataire\s+est\s+recommand[ée]\s+pour\s*)/i,
+      ''
+    )
+    // Strip the trailing city and the trailing punctuation, the way the other
+    // branches do. The apostrophe becomes a space rather than vanishing, so
+    // «d'électroménager» does not collapse into one unreadable token.
+    core = core.replace(/\s+(?:[àa]|en|dans)\s+(?:ma\s+(?:ville|r[ée]gion|commune)|[a-zàâäçéèêëîïôöûùüÿñæœ][a-zàâäçéèêëîïôöûùüÿñæœ\s\-']*)\s*\??$/i, '')
+    core = core.replace(/['’]/g, ' ')
+    core = core.replace(/[?!.,;:"`\-–—]/g, '')
+    core = core.replace(/\s+/g, ' ').trim()
+
+    const words = core.split(' ').filter((w) => w && !FR_FAMILY_MODIFIERS.has(w))
     return words.slice(0, 3).join(' ')
   } else {
     core = core.replace(
@@ -5530,6 +6106,8 @@ export function generateSignalChips(
     ? /(מחיר|כמה\s+עולה|במבצע|בהנחה|לקנות|להזמין|זול|משתלם|טווח\s+מחירים|העלות)/.test(prompt)
     : lang === 'es'
     ? /(precio|cu[áa]nto\s+cuesta|coste|tarifa|comprar|contratar|barat[oa]|oferta|descuento|econ[óo]mic[oa])/i.test(prompt)
+    : lang === 'fr'
+    ? /(prix|combien\s+co[ûu]te|co[ûu]t|tarif|acheter|commander|pas\s+cher|moins\s+cher|promo|remise|r[ée]duction|[ée]conomique)/i.test(prompt)
     : /(price|cost|how\s+much|to\s+buy|order|cheap|discount|affordable|price\s+range)/i.test(prompt)
   if (isCommercialPhrase) {
     candidates.push({ chip: 'chip_commercial_phrase', priority: 11, isSignal: true })
@@ -5579,6 +6157,8 @@ export function generateSignalChips(
     ? /(תל\s+אביב|ירושלים|חיפה|ראשון|פתח\s+תקווה|רמת\s+גן|אילת|נתניה|רעננה|הרצליה|באר\s+שבע|כפר\s+סבא|בעיר\s+שלי|באזור)/.test(prompt)
     : lang === 'es'
     ? /(cerca\s+de\s+m[íi]|en\s+mi\s+(?:ciudad|zona|barrio)|cercan[oa])/i.test(prompt)
+    : lang === 'fr'
+    ? /(pr[èe]s\s+de\s+(?:moi|chez\s+moi)|dans\s+ma\s+(?:ville|r[ée]gion|commune)|[àa]\s+proximit[ée])/i.test(prompt)
     : /(near\s+me|in\s+my\s+(?:city|area)|nearby)/i.test(prompt)
   if (intent === 'local' || hasLocationToken) {
     candidates.push({ chip: 'chip_local_search', priority: 8, isSignal: true })
@@ -5635,11 +6215,15 @@ export function generateValueReason(
     ? /(מחיר|כמה\s+עולה|במבצע|בהנחה|לקנות|להזמין|זול|משתלם)/.test(prompt)
     : lang === 'es'
     ? /(precio|cu[áa]nto\s+cuesta|coste|tarifa|comprar|contratar|barat[oa]|oferta|descuento)/i.test(prompt)
+    : lang === 'fr'
+    ? /(prix|combien\s+co[ûu]te|co[ûu]t|tarif|acheter|commander|pas\s+cher|moins\s+cher|promo|remise)/i.test(prompt)
     : /(price|cost|how\s+much|to\s+buy|order|cheap|discount)/i.test(prompt)
   const hasLocation = lang === 'he'
     ? /(תל\s+אביב|ירושלים|חיפה|ראשון|פתח\s+תקווה|רמת\s+גן|אילת|נתניה|רעננה|הרצליה|באר\s+שבע|בעיר\s+שלי|באזור)/.test(prompt)
     : lang === 'es'
     ? /(cerca\s+de\s+m[íi]|en\s+mi\s+(?:ciudad|zona|barrio)|cercan[oa])/i.test(prompt)
+    : lang === 'fr'
+    ? /(pr[èe]s\s+de\s+(?:moi|chez\s+moi)|dans\s+ma\s+(?:ville|r[ée]gion|commune)|[àa]\s+proximit[ée])/i.test(prompt)
     : /(near\s+me|in\s+my\s+(?:city|area)|nearby)/i.test(prompt)
 
   if (lang === 'he') {
@@ -5686,6 +6270,28 @@ export function generateValueReason(
       return 'Es una pregunta frecuente en los motores de IA.'
     }
     return 'El negocio casi no aparece en preguntas de este tipo.'
+  }
+
+  if (lang === 'fr') {
+    if (isCommercial || intent === 'transactional' || intent === 'commercial') {
+      return 'Qui cherche cela est proche de l\'achat.'
+    }
+    if (intent === 'comparison' || intent === 'alternatives' || intent === 'brand') {
+      return 'Ici, les concurrents apparaissent plus que l\'entreprise.'
+    }
+    if (intent === 'local' || hasLocation) {
+      return 'Occasion d\'améliorer la visibilité locale.'
+    }
+    if (intent === 'pre_purchase') {
+      return 'C\'est une recherche à forte intention d\'achat.'
+    }
+    if (intent === 'recommendation' && score >= 85) {
+      return 'Bonne occasion d\'obtenir plus de clients de façon organique.'
+    }
+    if (score >= 88) {
+      return 'C\'est une question fréquente dans les moteurs d\'IA.'
+    }
+    return 'L\'entreprise apparaît très peu sur ce type de questions.'
   }
 
   if (isCommercial || intent === 'transactional' || intent === 'commercial') {

@@ -47,4 +47,11 @@ export const FEATURE_COMMON: Record<PublicLocale, FeatureCommon> = {
     trust: [`${DAYS} dias de teste grátis`, 'Sem cartão de crédito', 'Cancele quando quiser'],
     closeBody: `A análise gratuita mostra como seu site está hoje, sem cadastro. Ou abra um teste de ${DAYS} dias, sem cartão de crédito.`,
   },
+  fr: {
+    check: { label: 'Analysez votre site gratuitement', href: '/fr/free-check' },
+    trial: { label: `${DAYS} jours d'essai gratuit`, href: authHref('signup', 'fr') },
+    pricing: { label: 'Voir les tarifs', href: '/fr/pricing' },
+    trust: [`${DAYS} jours d'essai gratuit`, 'Sans carte bancaire', 'Annulation à tout moment'],
+    closeBody: `L'audit gratuit montre où en est votre site, sans inscription. Ou ouvrez un essai de ${DAYS} jours, sans carte bancaire.`,
+  },
 }

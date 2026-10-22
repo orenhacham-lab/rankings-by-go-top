@@ -9,8 +9,16 @@
  *
  * So this suite holds the launch order: every public language is recordable in the
  * code, and a language the database does not yet accept is a language whose public
- * site is OFF. Today that is exactly pt-BR, and the missing piece is one additive
- * line on consent_events, owned by the legal thread.
+ * site is OFF. It was pt-BR when this was written; both pt-BR and fr are now
+ * storable (20261005050636 and 20261021180000), so what the suite asserts today
+ * is that the prerequisite is MET for each of them and that C1 still reads the
+ * migrations rather than a constant.
+ *
+ * It reads the CHECK out of the migration FILES, by matching its text. That is
+ * why those migrations spell the constraint out literally instead of assembling
+ * it with format() in a loop: a constraint this guard cannot read is a language
+ * it cannot clear for launch, and it said so when the French migration was first
+ * written as a loop.
  *
  * Every guard has a MUTATION CONTROL.
  */
@@ -20,6 +28,7 @@ import { CONSENT_LOCALES, normalizeConsentLocale } from '../categories'
 import { PUBLIC_LOCALES, type PublicLocale } from '../../i18n/locales'
 import { spanishSiteEnabled } from '../../i18n/spanish-site'
 import { portugueseSiteEnabled } from '../../i18n/portuguese-site'
+import { frenchSiteEnabled } from '../../i18n/french-site'
 
 let pass = 0, fail = 0
 function check(name: string, cond: boolean, detail?: string) {
@@ -49,6 +58,7 @@ const ALLOWED = allowedByTheDatabase()
 const GATE: Partial<Record<PublicLocale, () => boolean>> = {
   es: () => spanishSiteEnabled('true'),
   'pt-BR': () => portugueseSiteEnabled(process.env.NEXT_PUBLIC_PORTUGUESE_SITE_ENABLED),
+  fr: () => frenchSiteEnabled(process.env.NEXT_PUBLIC_FRENCH_SITE_ENABLED),
 }
 
 console.log('A) the code knows every public language')
@@ -57,9 +67,15 @@ console.log('A) the code knows every public language')
   check('A1: every public language can be RECORDED as itself, never relabelled', missing.length === 0, missing.join(' '))
   check('A2: pt-BR is one of them, so a Brazilian decision is not filed as Hebrew',
     normalizeConsentLocale('pt-BR') === 'pt-BR')
-  check('A3: something that is not a language still records, under the default', normalizeConsentLocale('fr') === 'he')
+  // 'fr' used to be the example of "not a language" here, which is how a guard
+  // becomes wrong without failing: the day French shipped, this check was
+  // asserting that a real language falls back to Hebrew. German is the example
+  // now — a language the keyword research offers and the site does not have.
+  check('A3: something that is not a language still records, under the default',
+    normalizeConsentLocale('de') === 'he' && normalizeConsentLocale('') === 'he' && normalizeConsentLocale(null) === 'he')
+  check('A3a: and French does NOT fall back, now that it is one', normalizeConsentLocale('fr') === 'fr')
   check('A1-MUT: a public language absent from the list fails A1',
-    [...PUBLIC_LOCALES, 'fr'].filter((l) => !(CONSENT_LOCALES as readonly string[]).includes(l)).length > 0)
+    [...PUBLIC_LOCALES, 'de'].filter((l) => !(CONSENT_LOCALES as readonly string[]).includes(l)).length > 0)
 }
 
 console.log('\nB) the database is read from the migrations, not assumed')
@@ -85,6 +101,8 @@ console.log('\nC) the launch order')
   // to prove C1 still reads the constraint rather than a constant.
   check('C2: the Portuguese launch prerequisite is met — the log can store its rows',
     ALLOWED.has('pt-BR'), [...ALLOWED].join(' '))
+  check('C2a: and the French one — the constraint was widened before the code was',
+    ALLOWED.has('fr'), [...ALLOWED].join(' '))
   check('C3: the gate is a real gate — "true" and nothing else turns it on',
     portugueseSiteEnabled('true') && !portugueseSiteEnabled('TRUE') && !portugueseSiteEnabled('1') && !portugueseSiteEnabled('yes') && !portugueseSiteEnabled(''))
   // The case that actually occurs: the variable was never set. It cannot be

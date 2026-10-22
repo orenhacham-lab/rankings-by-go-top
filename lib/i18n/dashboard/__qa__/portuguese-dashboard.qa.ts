@@ -39,6 +39,8 @@ import { createI18n } from '../../../ai-visibility/i18n'
 import { monthlyCopy } from '../../../../components/reports/monthly/copy'
 import { getExportLabels } from '../../../export/i18n'
 import { researchCompetitivePtBR, researchCompetitiveEs } from '../research-competitive'
+import { landingPtBR } from '../../public/landing-pt-BR'
+import { landingEs } from '../../public/landing-es'
 
 let pass = 0, fail = 0
 function check(name: string, cond: boolean, detail?: string) {
@@ -129,8 +131,27 @@ check('4a: the plan and trial limit lines are Portuguese, not Hebrew',
   planLines.filter((l) => HEBREW.test(l))[0])
 check('4b: the "what a check is" sentence has its own Portuguese',
   !HEBREW.test(CHECKS_EXPLAINER['pt-BR']) && CHECKS_EXPLAINER['pt-BR'] !== CHECKS_EXPLAINER.es)
-check('4c: the auth pages take the PORTUGUESE landing copy, not the Hebrew one',
-  /locale === 'pt-BR' \? landingPtBR/.test(src('components/auth/AuthShell.tsx')))
+/*
+ * 4c used to assert the literal `locale === 'pt-BR' ? landingPtBR`, and that is
+ * the same trap 4e below describes: pinning one arm of a ternary chain freezes
+ * the shape instead of catching it. The chain's LAST branch was Hebrew, so
+ * every language it did not name — French, when French arrived — got a Hebrew
+ * right-to-left panel on its own login page while this guard stayed green.
+ * AuthShell now reads AUTH_LANDING, a Record<PublicLocale, …>, so a language
+ * added without its landing copy fails to compile. What is asserted is that
+ * shape, plus the behaviour itself: the Portuguese panel's copy is Portuguese.
+ */
+const shellSrc = src('components/auth/AuthShell.tsx')
+check('4c: the auth frame reads one exhaustive table, so no language falls through to Hebrew',
+  /const AUTH_LANDING: Record<PublicLocale, /.test(shellSrc)
+  && /const landing = AUTH_LANDING\[locale\]/.test(shellSrc)
+  && !/locale === '(?:es|pt-BR|en)' \?[^\n]*landing/.test(shellSrc))
+check('4c mutation: a ternary chain back in AuthShell fails 4c',
+  /locale === '(?:es|pt-BR|en)' \?[^\n]*landing/.test(
+    shellSrc.replace('const landing = AUTH_LANDING[locale]',
+      "const landing = locale === 'es' ? landingEs : landingHe")))
+check('4c1: and the Portuguese panel really carries Portuguese copy',
+  !HEBREW.test(landingPtBR.demo.rank.keyword) && landingPtBR.demo.rank.keyword !== landingEs.demo.rank.keyword)
 check('4d: the 451 notice does not answer Hebrew to a Portuguese visitor',
   !HEBREW.test(sanctionsNotice('pt-BR')))
 /*

@@ -122,12 +122,22 @@ console.log('\nC) reachable and listed')
   // Portuguese at once and the two cannot drift apart.
   check('C3: every language is in the sitemap', /\/affiliates`/.test(sitemap)
     && /\/en\/affiliates`/.test(sitemap) && /path: '\/affiliates'/.test(sitemap))
+  // This used to assert the two hand-written `spanishSiteEnabled() ? … : []`
+  // lines. French arrived and the sitemap stopped being written that way: the
+  // trees are now DERIVED from the one gate (`enabledPublicLocales()` filtered
+  // to the translated trees, then `treePages(LOCALE_PREFIX[l])`), which is what
+  // caught French missing from the sitemap in the first place. The guard asserts
+  // the derivation and that it goes through the gate — a shape that cannot leave
+  // a language out by forgetting a line.
   check('C4: a translated tree is listed only inside its own flag',
-    /const spanishPages = spanishSiteEnabled\(\) \? treePages\('\/es'\) : \[\]/.test(sitemap)
-    && /const portuguesePages = portugueseSiteEnabled\(\) \? treePages\('\/pt-BR'\) : \[\]/.test(sitemap))
+    /enabledPublicLocales\(\)/.test(sitemap)
+    && /TRANSLATED_LOCALES\.includes\(l\)/.test(sitemap)
+    && /flatMap\(\(l\) => treePages\(LOCALE_PREFIX\[l\]\)\)/.test(sitemap)
+    && /\.\.\.translatedTreePages/.test(sitemap))
   check('C4-MUT: a tree listed unconditionally fails C4',
-    !/const spanishPages = spanishSiteEnabled\(\) \? treePages\('\/es'\) : \[\]/
-      .test(sitemap.replace("const spanishPages = spanishSiteEnabled() ? treePages('/es') : []", "const spanishPages = treePages('/es')")))
+    !/enabledPublicLocales\(\)/.test(sitemap.replace(/enabledPublicLocales\(\)/g, 'PUBLIC_LOCALES')))
+  check('C4-a: and the Spanish tree is one of the derived ones',
+    /TRANSLATED_LOCALES[^\n]*'es'/.test(sitemap))
   check('C1-MUT: a footer without the link fails C1', !linked(footer.replace(/href=\{`\$\{prefix\}\/affiliates`\}/, 'href="/"')))
 }
 

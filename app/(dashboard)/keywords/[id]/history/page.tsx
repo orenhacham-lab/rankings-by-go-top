@@ -108,11 +108,11 @@ export default function KeywordHistoryPage({ params }: { params: Promise<{ id: s
       {/* Summary: the same tile as every other screen, plain figures (ok/bad are for up/down only). */}
       <div data-history-tiles="" className="stagger-in mb-8 grid grid-cols-2 gap-3 sm:gap-4 md:grid-cols-4">
         <StatTile label={t.currentPosition} icon={<Target />} value={latestResult?.found && latestResult.position !== null ? <PositionFigure n={latestResult.position} /> : '—'}
-          source={latestResult ? formatDateTime(latestResult.checked_at, language) : undefined} />
+          source={latestResult ? formatDateTime(latestResult.checked_at, uiLocale) : undefined} />
         <StatTile label={t.bestPosition} icon={<Crown />} value={bestPosition !== null ? <PositionFigure n={bestPosition} /> : '—'} />
         <StatTile label={t.worstPosition} icon={<ArrowDownToLine />} value={worstPosition !== null ? <PositionFigure n={worstPosition} /> : '—'} />
         <StatTile label={t.average} icon={<Sigma />} value={avgPosition !== null ? <PositionFigure n={avgPosition} /> : '—'}
-          source={`${formatCount(foundResults.length, language)} ${t.checks}`} />
+          source={`${formatCount(foundResults.length, uiLocale)} ${t.checks}`} />
       </div>
 
       {/* The position over time (§10), before the rows it is drawn from. */}
@@ -156,7 +156,7 @@ export default function KeywordHistoryPage({ params }: { params: Promise<{ id: s
           )}
           {results.map((result) => (
             <TableRow key={result.id} className="max-sm:[&>td]:px-3">
-              <Td className="whitespace-nowrap">{formatDateTime(result.checked_at, language)}</Td>
+              <Td className="whitespace-nowrap">{formatDateTime(result.checked_at, uiLocale)}</Td>
               <Td>
                 <div className="flex flex-col items-start gap-0.5">
                   <PositionChip position={result.position} found={result.found && result.position !== null} notFoundLabel={t.notFound} />

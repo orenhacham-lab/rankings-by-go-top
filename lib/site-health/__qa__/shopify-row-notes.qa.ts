@@ -192,8 +192,14 @@ function main() {
   const promises = PUBLIC_LOCALES.filter((l) => PROMISE.test(linesOf(l).schemaFromTheme)).map((l) => l)
   check('E4: the structured-data note promises nothing Go Top does', promises.length === 0, promises.join(','))
   check('MUTATION CONTROL: a promise is caught by E4', PROMISE.test('Go Top adds it for you on Shopify') && PROMISE.test('אנחנו נוסיף סימון מובנה'))
-  const THEME = /theme|תבנית|tema/i
-  check('E5: the structured-data note names the theme in every language', PUBLIC_LOCALES.every((l) => THEME.test(linesOf(l).schemaFromTheme)))
+  // `tema` does not match the French `thème`: the accent is the whole reason this
+  // pattern carries its own French alternative rather than a looser `th.me`.
+  const THEME = /theme|תבנית|tema|th[èe]me/i
+  check('E5: the structured-data note names the theme in every language',
+    PUBLIC_LOCALES.every((l) => THEME.test(linesOf(l).schemaFromTheme)),
+    PUBLIC_LOCALES.filter((l) => !THEME.test(linesOf(l).schemaFromTheme)).join(','))
+  check('MUTATION CONTROL: a note that stops naming the theme is caught by E5',
+    !THEME.test(linesOf('fr').schemaFromTheme.replace(/th[èe]me/gi, 'réglage')))
   // The product, collection and photo notes give the same reason in the same words.
   const reasonOf = (s: string) => s.slice(s.indexOf('Go Top'))
   const inconsistent = PUBLIC_LOCALES.filter((l) => {

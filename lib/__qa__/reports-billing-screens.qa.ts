@@ -80,8 +80,16 @@ console.log('\nB) Reports: surface card with a brand stripe, one date format, lo
     && /<p className="text-overline font-semibold text-action">\{kind\}<\/p>/.test(s)
   check('B2: the report head is a plain surface Card (no curved rail), its kind an action-coloured overline', plainHead(src))
   check('B2-MUT: the old 4px stripe back on the card fails B2', !plainHead(src.replace('<Card className="mb-6">', '<Card className="mb-6 border-s-4 border-s-action">')))
-  const oneDate = (s: string) => /formatDate\(language\)\.date\(/.test(s) && !/toLocaleDateString\(|toLocaleString\(|formatDateTime\(/.test(s)
-  check('B3: dates come from formatDate(language), none from toLocale*/formatDateTime', oneDate(src))
+  // `formatDate(uiLocale)`, not `formatDate(language)`: the bilingual `language`
+  // printed an English month and a 12-hour clock on the French, Spanish and
+  // Portuguese report headers. The guard names the variable deliberately — the
+  // point of this check is WHICH locale the one formatter is given, and
+  // lib/i18n/dashboard/__qa__/french-dashboard.qa.ts 4k enforces the same thing
+  // across every screen.
+  const oneDate = (s: string) => /formatDate\(uiLocale\)\.date\(/.test(s) && !/toLocaleDateString\(|toLocaleString\(|formatDateTime\(/.test(s)
+  check('B3: dates come from formatDate(uiLocale), none from toLocale*/formatDateTime', oneDate(src))
+  check('B3-MUT2: the bilingual `language` back in the formatter fails B3',
+    !oneDate(src.replace(/formatDate\(uiLocale\)/g, 'formatDate(language)')))
   check('B3-MUT: the old "new Date().toLocaleDateString(\'en-US\')" fails B3', !oneDate(src + "{new Date().toLocaleDateString('en-US')}"))
   const loadsOnChange = (s: string) => /onChange=\{\(e\) => handleReportTypeChange\(/.test(s) && !/t\.loadReport/.test(s)
   check('B4: the report type loads on change, with no "Load report" button', loadsOnChange(src))

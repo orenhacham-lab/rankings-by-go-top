@@ -46,6 +46,7 @@ const PROMPT_LANGUAGE: Record<PublicLocale, string> = {
   en: 'English',
   es: 'Spanish',
   'pt-BR': 'Brazilian Portuguese',
+  fr: 'French',
 }
 
 function buildPrompt(signals: SiteSignals, locale: PublicLocale): string {

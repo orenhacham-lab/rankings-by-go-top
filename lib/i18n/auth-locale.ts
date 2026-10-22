@@ -29,7 +29,7 @@
  */
 
 import type { PublicLocale } from './locales'
-import { isEnglishPath, isPortuguesePath, isSpanishPath } from './request-locale'
+import { isEnglishPath, isFrenchPath, isPortuguesePath, isSpanishPath } from './request-locale'
 import { normalizeDashboardUiLocale } from './dashboard/locale'
 
 /**
@@ -42,7 +42,10 @@ import { normalizeDashboardUiLocale } from './dashboard/locale'
  * Spanish site is off — so this can never label a 404 'es'.
  *
  * Brazilian Portuguese joins it on the same terms: `/pt-BR/login` is the
- * Portuguese route, gated by app/(auth)/pt-BR/layout.tsx.
+ * Portuguese route, gated by app/(auth)/pt-BR/layout.tsx, and French on the
+ * same terms again: `/fr/login` is the French route. Without the French branch
+ * the function compiled and answered Hebrew for every /fr auth URL that carried
+ * no `?lang=` — the exact break Spanish had, in a language the forms can read.
  */
 export function resolveAuthLocale(input: {
   pathname?: string | null
@@ -52,5 +55,6 @@ export function resolveAuthLocale(input: {
   if (isEnglishPath(input.pathname)) return 'en'
   if (isSpanishPath(input.pathname)) return 'es'
   if (isPortuguesePath(input.pathname)) return 'pt-BR'
+  if (isFrenchPath(input.pathname)) return 'fr'
   return normalizeDashboardUiLocale(input.langParam) ?? input.serverLocale ?? 'he'
 }

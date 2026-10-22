@@ -112,6 +112,27 @@ function limitLinesFor(code: PlanCode, locale: PublicLocale): LimitLines {
         : `Até ${c.maxAIChecksPerPeriodPerProject} verificações de visibilidade em IA por mês em cada site`,
     }
   }
+  // French, for the /fr pricing page and the French dashboard. Same five lines,
+  // same order, same numbers from the catalog; vouvoiement throughout, because a
+  // merchant is addressed as "vous". Without this branch the function fell
+  // through to Hebrew, the way /pt-BR once did.
+  if (locale === 'fr') {
+    return {
+      articles: single
+        ? `${c.maxArticlesPerPeriodAccountWide} articles par mois, rédigés et publiés automatiquement sur votre site`
+        : `${c.maxArticlesPerPeriodAccountWide} articles par mois, rédigés et publiés automatiquement, partagés entre tous vos sites, jusqu'à ${PER_SITE} par semaine et par site`,
+      projects: single ? '1 site' : `Jusqu'à ${c.maxProjects} sites`,
+      keywords: single
+        ? `Suivi de ${c.maxKeywordsPerProject} mots-clés au maximum`
+        : `Suivi de ${c.maxKeywordsPerProject} mots-clés au maximum par site`,
+      google: single
+        ? `Jusqu'à ${c.maxGoogleChecksPerPeriodPerProject} vérifications de position dans Google par mois`
+        : `Jusqu'à ${c.maxGoogleChecksPerPeriodPerProject} vérifications de position dans Google par mois et par site`,
+      ai: single
+        ? `Jusqu'à ${c.maxAIChecksPerPeriodPerProject} vérifications de visibilité dans les IA par mois`
+        : `Jusqu'à ${c.maxAIChecksPerPeriodPerProject} vérifications de visibilité dans les IA par mois et par site`,
+    }
+  }
   if (locale === 'en') {
     return {
       // THE MAIN VALUE, and the first line of every plan: articles written and
@@ -184,6 +205,7 @@ export const CHECKS_EXPLAINER: Record<PublicLocale, string> = {
   he: 'בדיקת מיקום בגוגל בודקת איפה מילת מפתח אחת מופיעה בגוגל או בגוגל מפות. בדיקת נראות ב-AI שואלת מנוע AI אחד שאלה אחת, למשל ChatGPT, ובודקת אם העסק שלכם מוזכר בתשובה.',
   es: 'Una comprobación de posición en Google mira en qué puesto aparece una palabra clave en Google o en Google Maps. Una comprobación de visibilidad en IA hace una pregunta a un motor de IA, por ejemplo ChatGPT, y comprueba si tu negocio se menciona en la respuesta.',
   'pt-BR': 'Uma verificação de posição no Google olha em que lugar uma palavra-chave aparece no Google ou no Google Maps. Uma verificação de visibilidade em IA faz uma pergunta a um motor de IA, por exemplo o ChatGPT, e vê se o seu negócio é mencionado na resposta.',
+  fr: "Une vérification de position dans Google regarde à quelle place un mot-clé apparaît dans Google ou dans Google Maps. Une vérification de visibilité dans les IA pose une question à un moteur d'IA, par exemple ChatGPT, et regarde si votre entreprise est citée dans la réponse.",
 }
 
 /**
@@ -211,6 +233,16 @@ export function trialLimitLines(locale: PublicLocale): string[] {
       `Até ${t.maxGoogleChecksLifetime} verificações de posição no Google durante o teste`,
       `Até ${t.maxAIChecksLifetime} verificações de visibilidade em IA durante o teste`,
       `${t.days} dias de teste`,
+    ]
+  }
+  if (locale === 'fr') {
+    return [
+      'Un article pour essayer, de la rédaction à la publication',
+      '1 site',
+      `Jusqu'à ${t.maxKeywordsPerProject} mots-clés`,
+      `Jusqu'à ${t.maxGoogleChecksLifetime} vérifications de position dans Google pendant l'essai`,
+      `Jusqu'à ${t.maxAIChecksLifetime} vérifications de visibilité dans les IA pendant l'essai`,
+      `${t.days} jours d'essai`,
     ]
   }
   if (locale === 'en') {
@@ -248,10 +280,10 @@ export function trialLimitLines(locale: PublicLocale): string[] {
  * persistence bought for nothing.
  */
 export const PLAN_AUDIENCE_LABEL: Record<PlanCode, Record<PublicLocale, string>> = {
-  regular: { en: 'One website', he: 'לאתר אחד', es: 'Para una web', 'pt-BR': 'Para um site' },
-  advanced: { en: 'One website', he: 'לאתר אחד', es: 'Para una web', 'pt-BR': 'Para um site' },
-  premium: { en: 'Multiple websites', he: 'למספר אתרים', es: 'Para varias webs', 'pt-BR': 'Para vários sites' },
-  large_agency: { en: 'Agencies', he: 'לסוכנויות', es: 'Para agencias', 'pt-BR': 'Para agências' },
+  regular: { en: 'One website', he: 'לאתר אחד', es: 'Para una web', 'pt-BR': 'Para um site', fr: 'Pour un site' },
+  advanced: { en: 'One website', he: 'לאתר אחד', es: 'Para una web', 'pt-BR': 'Para um site', fr: 'Pour un site' },
+  premium: { en: 'Multiple websites', he: 'למספר אתרים', es: 'Para varias webs', 'pt-BR': 'Para vários sites', fr: 'Pour plusieurs sites' },
+  large_agency: { en: 'Agencies', he: 'לסוכנויות', es: 'Para agencias', 'pt-BR': 'Para agências', fr: 'Pour les agences' },
 }
 
 /**
@@ -266,24 +298,28 @@ export const PLAN_AUDIENCE_DESCRIPTION: Record<PlanCode, Record<PublicLocale, st
     he: 'אתר אחד, התחלה פשוטה',
     es: 'Una web, un punto de partida sencillo',
     'pt-BR': 'Um site, um começo simples',
+    fr: 'Un site, un point de départ simple',
   },
   advanced: {
     en: 'For one website that needs more articles and more tracking',
     he: 'לאתר אחד שצריך יותר מאמרים ויותר מעקב',
     es: 'Para una web que necesita más artículos y más seguimiento',
     'pt-BR': 'Para um site que precisa de mais artigos e mais monitoramento',
+    fr: "Pour un site qui a besoin de plus d'articles et de plus de suivi",
   },
   premium: {
     en: 'For businesses and agencies running several websites',
     he: 'לעסקים ולסוכנויות שמנהלים כמה אתרים',
     es: 'Para empresas y agencias que gestionan varias webs',
     'pt-BR': 'Para empresas e agências que cuidam de vários sites',
+    fr: 'Pour les entreprises et les agences qui gèrent plusieurs sites',
   },
   large_agency: {
     en: 'For agencies with many clients',
     he: 'לסוכנויות עם הרבה לקוחות',
     es: 'Para agencias con muchos clientes',
     'pt-BR': 'Para agências com muitos clientes',
+    fr: 'Pour les agences qui ont beaucoup de clients',
   },
 }
 
@@ -297,10 +333,10 @@ export const PLAN_AUDIENCE_DESCRIPTION: Record<PlanCode, Record<PublicLocale, st
  * unchanged: Basic / Advanced / Premium / Agency, Hebrew in Hebrew.
  */
 export const PLAN_DISPLAY_NAME: Record<PlanCode, Record<PublicLocale, string>> = {
-  regular: { en: 'Basic', he: 'בייסיק', es: 'Basic', 'pt-BR': 'Basic' },
-  advanced: { en: 'Advanced', he: 'מתקדם', es: 'Advanced', 'pt-BR': 'Advanced' },
-  premium: { en: 'Premium', he: 'פרימיום', es: 'Premium', 'pt-BR': 'Premium' },
-  large_agency: { en: 'Agency', he: 'סוכנות', es: 'Agency', 'pt-BR': 'Agency' },
+  regular: { en: 'Basic', he: 'בייסיק', es: 'Basic', 'pt-BR': 'Basic', fr: 'Basic' },
+  advanced: { en: 'Advanced', he: 'מתקדם', es: 'Advanced', 'pt-BR': 'Advanced', fr: 'Advanced' },
+  premium: { en: 'Premium', he: 'פרימיום', es: 'Premium', 'pt-BR': 'Premium', fr: 'Premium' },
+  large_agency: { en: 'Agency', he: 'סוכנות', es: 'Agency', 'pt-BR': 'Agency', fr: 'Agency' },
 }
 
 /** The plan the pricing grid and the article widget both highlight. A UI
