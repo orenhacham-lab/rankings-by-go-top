@@ -63,6 +63,7 @@ export default function SpanishSitemapPage() {
       links: [
         { label: 'Go Top SEO frente a Semrush', href: '/es/compare/semrush' },
         { label: 'Go Top SEO frente a Yoast', href: '/es/compare/yoast' },
+        { label: 'Go Top SEO frente a Rank Math', href: '/es/compare/rankmath' },
       ],
     },
     {

@@ -59,6 +59,14 @@ export default function FrenchSitemapPage() {
       ],
     },
     {
+      title: 'Comparatifs',
+      links: [
+        { label: 'Go Top SEO face à Semrush', href: '/fr/compare/semrush' },
+        { label: 'Go Top SEO face à Yoast', href: '/fr/compare/yoast' },
+        { label: 'Go Top SEO face à Rank Math', href: '/fr/compare/rankmath' },
+      ],
+    },
+    {
       title: 'Mentions légales',
       links: [
         { label: 'Politique de confidentialité', href: '/fr/privacy' },
