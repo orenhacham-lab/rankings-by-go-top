@@ -552,4 +552,135 @@ export const YOAST_COMPARE: Record<PublicLocale, ComparisonCopy> = {
     },
   close: { title: 'Veja como o seu site está, sem se cadastrar' },
   },
+
+  fr: {
+    competitor: 'Yoast SEO',
+    eyebrow: 'Go Top SEO face à Yoast',
+    metaTitle: 'Go Top SEO face à Yoast SEO | Comparatif',
+    metaDescription:
+      'Go Top SEO comparé à Yoast SEO : qui écrit et publie le contenu, qui suit les positions, ce que chaque prix comprend et dans quels cas Yoast est le meilleur choix.',
+    hero: {
+      title: 'Yoast vous dit quoi corriger.',
+      accent: 'Nous corrigeons et nous écrivons',
+      subtitle:
+        'Yoast est le nom le plus ancien et le plus sûr du SEO sur WordPress, et il vous accompagne dans l’éditeur pendant que vous écrivez. Go Top SEO est conçu pour un dirigeant qui n’a personne pour écrire : le système planifie les sujets, écrit les articles, les publie et suit vos positions.',
+    },
+    table: {
+      eyebrow: 'Le comparatif',
+      title: 'Ce que fait chacun, d’après les pages de Yoast elle-même',
+      checkedOn: CHECKED,
+      sources: SOURCES,
+      rows: [
+        {
+          label: 'Prix',
+          ours: 'À partir de 79 dollars par mois hors taxes.',
+          theirs:
+            'Yoast SEO Premium à 118,80 dollars par an, hors taxes. Pour Shopify, 19 dollars tous les 30 jours, hors taxes. Une version gratuite existe aussi.',
+        },
+        {
+          label: 'Combien de sites',
+          ours: 'Ce que couvre votre formule, sur la page des tarifs.',
+          theirs: 'Un abonnement couvre un site ou un domaine. Un autre site, c’est un autre abonnement, avec une remise au volume.',
+        },
+        {
+          label: 'Qui écrit les articles',
+          ours: 'Le système. Sujets, texte, images et liens internes, après votre validation.',
+          theirs:
+            'Vous. Leur page décrit des titres et des méta-descriptions rédigés par IA, ainsi que des idées et des débuts de brouillon dans Content Planner. Elle ne promet pas d’article complet.',
+        },
+        {
+          label: 'Publication sur le site',
+          ours: 'Automatique vers WordPress et Shopify.',
+          theirs: 'Non décrite. C’est une extension dans votre propre éditeur WordPress.',
+        },
+        {
+          label: 'Suivi des positions',
+          ours: 'Une vérification mensuelle dans Google, dans Google Maps et dans les réponses des IA (dont ChatGPT, Gemini et Google AI).',
+          theirs: 'Aucune fonction de suivi des positions n’apparaît dans la liste des fonctions Premium de leur page produit.',
+        },
+        {
+          label: 'Fiche Google Business',
+          ours: 'Publications automatiques sur la fiche, avec votre accord.',
+          theirs:
+            'Absente de la liste des fonctions Premium. Une extension Local SEO distincte est incluse dans l’abonnement ; nous n’avons pas lu la liste de ses fonctions.',
+        },
+        {
+          label: 'Travail sur le site',
+          ours: 'Une partie des corrections passe par notre extension, sans lire une ligne de code.',
+          theirs:
+            'Conseils et outils manuels : gestion des redirections, y compris par import CSV, vérification d’un article face à cinq expressions clés, suggestions de liens internes, exercice sur le contenu orphelin et données structurées automatiques dans WordPress.',
+        },
+        {
+          label: 'Essai et remboursement',
+          ours: 'Un essai de 7 jours, sans carte bancaire, résiliable à tout moment.',
+          theirs:
+            'Leur page produit ne mentionne aucun essai gratuit. Un remboursement intégral est proposé dans les 30 jours suivant le premier achat, pas lors des renouvellements.',
+        },
+      ],
+    },
+    theirStrengths: {
+      eyebrow: 'Quand Yoast vaut mieux',
+      title: 'Dans ces cas-là, Yoast est la bonne réponse',
+      intro: 'Yoast est le produit qui a le moins de chances de casser quelque chose, et c’est parfois exactement ce qu’il faut.',
+      items: [
+        {
+          title: 'Quand quelqu’un écrit déjà',
+          body:
+            'Si vous avez un rédacteur ou une agence qui produit du contenu, Yoast le guide pendant l’écriture et c’est tout ce qui manquait. Payer pour un système qui écrit à votre place n’aurait pas de sens.',
+        },
+        {
+          title: 'Quand vous voulez un outil qui conseille et n’agit pas',
+          body:
+            'Yoast ne touche à rien sans qu’on le lui demande. Pour qui veut garder la main sur chaque mot publié, c’est un avantage et non un manque.',
+        },
+        {
+          title: 'Quand ce qui compte, c’est le prix et la tranquillité',
+          body:
+            '118,80 dollars par an, une version gratuite, un remboursement intégral sous 30 jours, une assistance 24/7 et les extensions Local, News et Video incluses. En valeur absolue, c’est un très bon achat.',
+        },
+      ],
+    },
+    ourStrengths: {
+      eyebrow: 'Quand nous convenons mieux',
+      title: 'Quand il n’y a personne pour écrire',
+      intro: 'La vraie différence n’est pas technique. Elle est dans qui s’assoit pour faire le travail.',
+      items: [
+        {
+          title: 'Des articles qui se publient sans vous',
+          body: 'Un plan mensuel de sujets que vous validez, puis des articles avec images et liens internes qui paraissent tout seuls.',
+        },
+        {
+          title: 'Vous voyez où vous en êtes',
+          body: 'Une vérification mensuelle dans Google, dans Maps et dans les réponses des IA, sans ajouter un autre outil.',
+        },
+        {
+          title: 'En dehors du site aussi',
+          body: 'Des publications sur votre fiche Google Business, avec votre accord, dans le même prix.',
+        },
+        {
+          title: 'Shopify en plus de WordPress',
+          body: 'Le même système sur les deux plateformes, avec le même rapport.',
+        },
+      ],
+    },
+    faq: {
+      eyebrow: 'Questions',
+      title: 'Ce que l’on demande avant de changer',
+      items: [
+        {
+          q: 'Peut-on garder Yoast et vous ajouter ?',
+          a: 'Oui. Yoast peut continuer à s’occuper des données structurées et des redirections pendant que nous écrivons et publions. Il vaut la peine de vérifier que les deux extensions n’émettent pas les mêmes données structurées en double.',
+        },
+        {
+          q: 'Yoast ne suit vraiment pas les positions ?',
+          a: 'Aucune fonction de ce type n’apparaît dans la liste des fonctions Premium de leur page produit. C’est ce que dit leur page, et non une affirmation de notre part sur ce que le produit sait faire.',
+        },
+        {
+          q: 'Remplacez-vous Yoast ?',
+          a: 'Pas nécessairement. Nous produisons et nous mesurons ; lui est un outil d’édition dans WordPress. Beaucoup de sites utilisent les deux.',
+        },
+      ],
+    },
+    close: { title: 'Voyez où en est votre site, sans vous inscrire' },
+  },
 }
