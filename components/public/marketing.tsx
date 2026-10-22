@@ -354,6 +354,22 @@ export function ProductFrame({ address, children, className }: { address?: strin
   )
 }
 
+/**
+ * A link inside a paragraph, in the action colour and underlined.
+ *
+ * It exists so that a page can link out in the middle of a sentence without
+ * writing a class string of its own: the Hebrew pages are checked word by word
+ * for stray English (components/public/__qa__/feature-pages.qa.ts), and a
+ * Tailwind string reads as English there.
+ */
+export function InlineLink({ href, children }: { href: string; children: React.ReactNode }) {
+  return (
+    <Link href={href} className="font-medium text-action underline underline-offset-4">
+      {children}
+    </Link>
+  )
+}
+
 /** A soft callout band inside a section (the "note" rows of the feature pages). */
 export function Callout({ icon, title, children, as: As = 'h3' }: { icon?: LucideIcon; title?: React.ReactNode; children: React.ReactNode; as?: 'h2' | 'h3' }) {
   return (

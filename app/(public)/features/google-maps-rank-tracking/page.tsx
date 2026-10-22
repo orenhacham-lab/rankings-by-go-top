@@ -1,7 +1,7 @@
 import { Metadata } from 'next'
-import Link from 'next/link'
 import { BookOpen, FileSpreadsheet, History, MapPin, Navigation, Phone, Search, Store, Users } from 'lucide-react'
 import { FeaturePage, type FeaturePageContent } from '@/components/public/FeaturePage'
+import { InlineLink } from '@/components/public/marketing'
 import { MapsVisual } from '@/components/public/feature-visuals'
 import { buildHreflangAlternates } from '@/lib/seo/hreflang'
 import { FEATURE_COMMON } from '@/lib/i18n/public/feature-common'
@@ -94,13 +94,13 @@ const CONTENT: FeaturePageContent = {
       title: 'מחפשים מיקומים בחיפוש ולא במפה?',
       body: (
         <>
-          <Link href="/articles/keywords-rankings-test" className="font-medium text-action underline underline-offset-4">
+          <InlineLink href="/articles/keywords-rankings-test">
             בדיקת מיקומים בגוגל
-          </Link>{' '}
+          </InlineLink>{' '}
           מסביר איך בודקים מיקום בתוצאות החיפוש הרגילות, ו
-          <Link href="/features/google-organic-rank-tracking" className="font-medium text-action underline underline-offset-4">
+          <InlineLink href="/features/google-organic-rank-tracking">
             מעקב מיקומים בגוגל חיפוש
-          </Link>{' '}
+          </InlineLink>{' '}
           הוא אותו מעקב, בתוצאות ולא במפה.
         </>
       ),

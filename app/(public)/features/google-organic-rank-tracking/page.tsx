@@ -1,7 +1,7 @@
 import { Metadata } from 'next'
-import Link from 'next/link'
 import { BookOpen, FileSpreadsheet, FileText, Globe, History, LineChart, Link2, MapPin, Smartphone, Target, TrendingUp } from 'lucide-react'
 import { FeaturePage, type FeaturePageContent } from '@/components/public/FeaturePage'
+import { InlineLink } from '@/components/public/marketing'
 import { RankVisual } from '@/components/public/landing/visuals'
 import { buildHreflangAlternates } from '@/lib/seo/hreflang'
 import { FEATURE_COMMON } from '@/lib/i18n/public/feature-common'
@@ -83,13 +83,13 @@ const CONTENT: FeaturePageContent = {
       body: (
         <>
           המדריך{' '}
-          <Link href="/articles/keywords-rankings-test" className="font-medium text-action underline underline-offset-4">
+          <InlineLink href="/articles/keywords-rankings-test">
             בדיקת מיקומים בגוגל
-          </Link>{' '}
+          </InlineLink>{' '}
           מסביר איך לבדוק מיקום נכון בלי להסתמך על מה שגוגל מראה לכם אישית, ו
-          <Link href="/articles/seo-keywords-ranking-software" className="font-medium text-action underline underline-offset-4">
+          <InlineLink href="/articles/seo-keywords-ranking-software">
             תוכנה לבדיקת מיקומים
-          </Link>{' '}
+          </InlineLink>{' '}
           משווה בין הדרכים לעשות את זה לאורך זמן.
         </>
       ),
