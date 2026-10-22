@@ -1,5 +1,6 @@
 import { Metadata } from 'next'
-import { FileSpreadsheet, History, MapPin, Navigation, Phone, Search, Store, Users } from 'lucide-react'
+import Link from 'next/link'
+import { BookOpen, FileSpreadsheet, History, MapPin, Navigation, Phone, Search, Store, Users } from 'lucide-react'
 import { FeaturePage, type FeaturePageContent } from '@/components/public/FeaturePage'
 import { MapsVisual } from '@/components/public/feature-visuals'
 import { buildHreflangAlternates } from '@/lib/seo/hreflang'
@@ -83,6 +84,26 @@ const CONTENT: FeaturePageContent = {
         { icon: Search, title: 'גם בחיפוש הרגיל', body: 'את אותם ביטויים אפשר לעקוב גם בתוצאות הרגילות של גוגל.' },
         { icon: FileSpreadsheet, title: 'דוח PDF ו-Excel', body: 'המיקומים במפות נכנסים לדוח שאפשר לשלוח הלאה.' },
       ],
+    },
+    {
+      // This page keeps showing up for the plain "בדיקת מיקומים בגוגל", which
+      // is about Google search and not about the map. The link hands that
+      // phrase to the article that answers it (Search Console, 21.10.2026).
+      kind: 'callout',
+      icon: BookOpen,
+      title: 'מחפשים מיקומים בחיפוש ולא במפה?',
+      body: (
+        <>
+          <Link href="/articles/keywords-rankings-test" className="font-medium text-action underline underline-offset-4">
+            בדיקת מיקומים בגוגל
+          </Link>{' '}
+          מסביר איך בודקים מיקום בתוצאות החיפוש הרגילות, ו
+          <Link href="/features/google-organic-rank-tracking" className="font-medium text-action underline underline-offset-4">
+            מעקב מיקומים בגוגל חיפוש
+          </Link>{' '}
+          הוא אותו מעקב, בתוצאות ולא במפה.
+        </>
+      ),
     },
     {
       kind: 'faq',
