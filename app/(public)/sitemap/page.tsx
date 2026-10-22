@@ -76,6 +76,7 @@ export default function SitemapPage() {
       links: [
         { label: 'Go Top SEO מול Semrush', href: '/compare/semrush' },
         { label: 'Go Top SEO מול Yoast', href: '/compare/yoast' },
+        { label: 'Go Top SEO מול Rank Math', href: '/compare/rankmath' },
       ],
     },
     {

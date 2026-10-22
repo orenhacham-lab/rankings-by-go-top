@@ -62,6 +62,7 @@ export default function EnglishSitemapPage() {
       links: [
         { label: 'Go Top SEO vs Semrush', href: '/en/compare/semrush' },
         { label: 'Go Top SEO vs Yoast', href: '/en/compare/yoast' },
+        { label: 'Go Top SEO vs Rank Math', href: '/en/compare/rankmath' },
       ],
     },
     {

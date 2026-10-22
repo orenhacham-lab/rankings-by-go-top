@@ -63,6 +63,7 @@ export default function PortugueseSitemapPage() {
       links: [
         { label: 'Go Top SEO x Semrush', href: '/pt-BR/compare/semrush' },
         { label: 'Go Top SEO x Yoast', href: '/pt-BR/compare/yoast' },
+        { label: 'Go Top SEO x Rank Math', href: '/pt-BR/compare/rankmath' },
       ],
     },
     {
