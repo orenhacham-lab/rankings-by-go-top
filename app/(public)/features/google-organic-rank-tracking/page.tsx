@@ -1,14 +1,17 @@
 import { Metadata } from 'next'
-import { FileSpreadsheet, FileText, Globe, History, LineChart, Link2, MapPin, Smartphone, Target, TrendingUp } from 'lucide-react'
+import { BookOpen, FileSpreadsheet, FileText, Globe, History, LineChart, Link2, MapPin, Smartphone, Target, TrendingUp } from 'lucide-react'
 import { FeaturePage, type FeaturePageContent } from '@/components/public/FeaturePage'
+import { InlineLink } from '@/components/public/marketing'
 import { RankVisual } from '@/components/public/landing/visuals'
 import { buildHreflangAlternates } from '@/lib/seo/hreflang'
 import { FEATURE_COMMON } from '@/lib/i18n/public/feature-common'
 import { landingHe } from '@/lib/i18n/public/landing-he'
 
 export const metadata: Metadata = {
-  title: 'מעקב דירוג בגוגל חיפוש | Go Top SEO',
-  description: 'עקבו אחרי דירוגים אורגניים בגוגל לפי ביטוי חיפוש, מדינה, שפה ומכשיר. סריקה ידנית בכל רגע וסריקה אוטומטית חודשית, דוחות מפורטים ומעקב מתחרים.',
+  // "מעקב מיקומים" is what people actually type (Search Console, 21.10.2026),
+  // and it keeps this page away from "בדיקת מיקומים", which two articles answer.
+  title: 'מעקב מיקומים בגוגל | Go Top SEO',
+  description: 'מעקב אחרי המיקומים שלכם בגוגל לפי ביטוי, מדינה, עיר, שפה ומכשיר. סריקה ידנית בכל רגע וסריקה אוטומטית חודשית, היסטוריה מלאה ודוחות.',
   alternates: {
     canonical: 'https://www.gotopseo.com/features/google-organic-rank-tracking',
     languages: buildHreflangAlternates('/features/google-organic-rank-tracking', '/en/features/google-organic-rank-tracking', '/es/features/google-organic-rank-tracking'),
@@ -68,6 +71,28 @@ const CONTENT: FeaturePageContent = {
         { icon: MapPin, title: 'גם בגוגל מפות', body: 'את אותם ביטויים אפשר לעקוב גם במפות, לפי עיר או אזור.' },
         { icon: FileSpreadsheet, title: 'דוח PDF ו-Excel', body: 'מיקומים, שינויים והיסטוריה בדוח שאפשר לשלוח הלאה.' },
       ],
+    },
+    {
+      // Search Console (21.10.2026) shows four of our own pages competing for
+      // "בדיקת מיקומים בגוגל", so none of them reaches the first page. The two
+      // articles carry that phrase in their own titles and answer it; this
+      // page answers the ongoing tracking. The links say so in the anchor.
+      kind: 'callout',
+      icon: BookOpen,
+      title: 'רוצים קודם לבדוק איפה אתם?',
+      body: (
+        <>
+          המדריך{' '}
+          <InlineLink href="/articles/keywords-rankings-test">
+            בדיקת מיקומים בגוגל
+          </InlineLink>{' '}
+          מסביר איך לבדוק מיקום נכון בלי להסתמך על מה שגוגל מראה לכם אישית, ו
+          <InlineLink href="/articles/seo-keywords-ranking-software">
+            תוכנה לבדיקת מיקומים
+          </InlineLink>{' '}
+          משווה בין הדרכים לעשות את זה לאורך זמן.
+        </>
+      ),
     },
     {
       kind: 'faq',
