@@ -37,7 +37,7 @@ export const APPROVED_PLUGIN_SHA256: Readonly<Record<string, string>> = {
   'includes/publish.php': '982c394fa3e669de7cae6a2bfe731aed976d16ef0f1c6c9c85a0b3efbaad03de',
   'includes/read.php': 'dead168a3ebcc214645d1778022ba3d9d1502caf18ed20ea72a4ed058fce5fa0',
   'includes/routes.php': 'd990b59fdff6b005adb16c75cd76da61739ca83d282fc0e4c2fa674b9befe4e2',
-  'readme.txt': '1ac0357ffd9c067bb4cbda65ee767f8731355020ea1109914504c2e8b3f9663d',
+  'readme.txt': '56cafa0970ab904d741d9b2f9754869091c95c9d42db52b40e6b248555624b9b',
   'uninstall.php': 'f938ecab70d2dbab268a2350bc7940db67f9054d0e3e497164b8cd2081e6cee1',
 }
 
