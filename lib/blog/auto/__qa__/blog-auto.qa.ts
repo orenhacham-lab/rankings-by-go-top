@@ -494,6 +494,35 @@ async function main() {
   check('I5 (control): without the context helper the reason is just the gate\u2019s code',
     runQualityGate({ title: 'כותרת', slug: 'a', content_html: `<p>${WORDS} placeholder</p>` }).failures.includes('placeholder_found'))
 
+  /*
+   * I6-I9: THE GATE MUST NOT REFUSE A LANGUAGE FOR SPEAKING ITS OWN WORDS.
+   * Both sentences below are real: they are what Spanish actually generated on
+   * the morning of 23 Oct 2026, read out of the runner's own warning, and the
+   * old `/\bTODO\b/i` refused both — "todo" is an everyday Spanish word, and
+   * JavaScript's ASCII `\b` finds a boundary inside "Método". Spanish spent
+   * every slot of that window on this and never published, which cost
+   * Portuguese and French their turn as well.
+   */
+  const SPANISH_PROSE = `<p>${WORDS}</p><p>Una agencia aporta experiencia y, sobre todo, te ahorra tiempo.</p><p>כך זה עובד ב-Go Top SEO.</p><ul><li>א</li></ul>`
+  const SPANISH_TABLE = `<p>${WORDS}</p><table><thead><tr><th>Característica</th><th>Método Manual</th></tr></thead></table><p>כך זה עובד ב-Go Top SEO.</p>`
+  check('I6: "sobre todo" in Spanish prose is not a placeholder',
+    !runQualityGate({ title: 'Guía', slug: 'a', content_html: SPANISH_PROSE }).failures.includes('placeholder_found'),
+    placeholderContext(SPANISH_PROSE))
+  check('I7: an accented word beside the marker ("Método") is not one either',
+    !runQualityGate({ title: 'Guía', slug: 'a', content_html: SPANISH_TABLE }).failures.includes('placeholder_found'),
+    placeholderContext(SPANISH_TABLE))
+  check('I8: a real marker is still caught, in the body and in the title',
+    runQualityGate({ title: 'Guía', slug: 'a', content_html: `<p>${WORDS} TODO: escribir aquí</p>` }).failures.includes('placeholder_found')
+    && runQualityGate({ title: 'TBD', slug: 'a', content_html: `<p>${WORDS}</p>` }).failures.includes('placeholder_found')
+    && runQualityGate({ title: 'Guía', slug: 'a', content_html: `<p>${WORDS} FIXME</p>` }).failures.includes('placeholder_found')
+    && runQualityGate({ title: 'Guía', slug: 'a', content_html: `<p>${WORDS} lorem ipsum dolor</p>` }).failures.includes('placeholder_found')
+    && runQualityGate({ title: 'Guía', slug: 'a', content_html: `<p>${WORDS} [insertar ciudad]</p>` }).failures.includes('placeholder_found')
+    && runQualityGate({ title: 'Guía', slug: 'a', content_html: `<p>${WORDS} {{name}}</p>` }).failures.includes('placeholder_found'))
+  check('I9 (mutation control): the lower-case word is what the old pattern caught, and the new one does not',
+    /\bTODO\b/i.test('sobre todo') && /\bTODO\b/i.test('Método')
+    && !/(?<!\p{L})(?:TODO|TBD|FIXME)(?!\p{L})/u.test('sobre todo')
+    && !/(?<!\p{L})(?:TODO|TBD|FIXME)(?!\p{L})/u.test('Método'))
+
   // ============================================================
   // H) THE BODY'S LINKS
   // ============================================================
