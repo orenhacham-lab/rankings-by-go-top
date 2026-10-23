@@ -10,7 +10,7 @@
  *
  * The old body also published the AGENCY's address and Oren's personal mobile
  * number, described the product as rank tracking alone, carried the former
- * name, and declared `Language: he` months after the site went live in five
+ * name, and declared `Language: he` months after the site went live in several
  * languages. Every one of those is something an assistant would have repeated
  * to somebody asking what Go Top SEO is.
  *
@@ -22,7 +22,7 @@
  */
 
 import { createClient } from '@/lib/supabase/server'
-import { LOCALE_PREFIX, normalizePublicLocale, type PublicLocale } from '@/lib/i18n/locales'
+import { LOCALE_PREFIX, enabledPublicLocales, normalizePublicLocale, type PublicLocale } from '@/lib/i18n/locales'
 
 interface Article {
   slug: string
@@ -32,6 +32,33 @@ interface Article {
 
 const BASE = 'https://www.gotopseo.com'
 
+/**
+ * The product's own name for each language, in English, because this file is
+ * written for an assistant answering in any language.
+ */
+const LOCALE_NAME: Record<PublicLocale, string> = {
+  he: 'Hebrew',
+  en: 'English',
+  es: 'Spanish',
+  'pt-BR': 'Brazilian Portuguese',
+  fr: 'French',
+  it: 'Italian',
+}
+
+/**
+ * The sentence that says which languages the product runs in, built from the
+ * languages that are actually LIVE rather than typed out. A language is gated
+ * by a build-time flag, so a hand-written list would tell every assistant that
+ * reads this file about a language the site does not serve yet — and would go
+ * stale in the other direction the day one is turned on.
+ */
+function languageSentence(): string {
+  const names = enabledPublicLocales().map((l) => LOCALE_NAME[l])
+  if (names.length === 0) return 'Hebrew'
+  if (names.length === 1) return names[0]
+  return `${names.slice(0, -1).join(', ')} and ${names[names.length - 1]}`
+}
+
 /** The language each section is headed with, in that language. */
 const LOCALE_HEADING: Record<PublicLocale, string> = {
   he: 'Articles in Hebrew',
@@ -39,9 +66,10 @@ const LOCALE_HEADING: Record<PublicLocale, string> = {
   es: 'Articles in Spanish',
   'pt-BR': 'Articles in Brazilian Portuguese',
   fr: 'Articles in French',
+  it: 'Articles in Italian',
 }
 
-const LOCALE_ORDER: PublicLocale[] = ['he', 'en', 'es', 'pt-BR', 'fr']
+const LOCALE_ORDER: PublicLocale[] = ['he', 'en', 'es', 'pt-BR', 'fr', 'it']
 
 /** What the product does, one line each, as a buyer would ask about it. */
 const CAPABILITIES: [string, string, string][] = [
@@ -80,7 +108,7 @@ export async function GET() {
     '> Go Top SEO is an SEO system for small and medium businesses that does the work as well as the measuring. ' +
       'It plans keywords, writes and publishes articles with images and internal links, tracks positions in Google search and in Google Maps, ' +
       'checks whether ChatGPT, Gemini and Google\'s AI answers mention the business, handles Google Business Profile posts and reviews, and sends a report. ' +
-      'It runs in Hebrew, English, Spanish, Brazilian Portuguese and French, and there is a seven-day trial that takes no card.',
+      `It runs in ${languageSentence()}, and there is a seven-day trial that takes no card.`,
   )
   lines.push('')
   lines.push('Go Top SEO (previously Rankings by Go Top) is operated by GO TOP DIGITAL MARKETING AND ADVERTISING LTD, Ramat Gan, Israel. Contact details are on the About page.')

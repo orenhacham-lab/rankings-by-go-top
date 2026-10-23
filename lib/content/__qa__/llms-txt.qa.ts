@@ -71,6 +71,20 @@ check(
   PUBLIC_LOCALES.every((l) => new RegExp(`LOCALE_ORDER[\\s\\S]*?'${l}'`).test(source)),
 )
 check('D3: the article prefix comes from the row\'s own locale', /LOCALE_PREFIX\[locale\]/.test(source))
+// D4/D5. The blockquote says which languages the product runs in. Typed out by
+// hand, that sentence lies in both directions: it names a language whose build
+// flag is still off, and it omits one the day the flag is turned on — to every
+// assistant that reads this file. So it is BUILT from enabledPublicLocales(),
+// and every public locale must have an English name to be built from.
+check(
+  'D4: the languages sentence is derived from the live locales, not typed out',
+  /It runs in \$\{languageSentence\(\)\}/.test(source) && /enabledPublicLocales\(\)/.test(source),
+)
+check(
+  'D5: every public locale has an English name for that sentence',
+  PUBLIC_LOCALES.every((l) => new RegExp(`'?${l}'?:\\s*'[A-Z]`).test(source.split('LOCALE_HEADING')[0])),
+  PUBLIC_LOCALES.join(','),
+)
 
 // E) One copy only.
 check('E1: the stale static copy is gone', !existsSync(join(ROOT, 'public/llms.txt')))
@@ -84,6 +98,12 @@ Phone: 054-9489377
 check('M1 (control): the phone guard catches the body that used to be served', PHONE.test(OLD_BODY))
 check('M1a (control): so does the agency-domain guard', /gotop\.co\.il/.test(OLD_BODY))
 check('M2 (control): the crawl-directive guard catches a robots.txt body', /User-agent:|Disallow:/.test('User-agent: *\nDisallow: /admin'))
+// The sentence D4 asks for is derived; this is the hand-typed sentence it
+// replaced, and the guard has to reject it or D4 is measuring nothing.
+check(
+  'M3 (control): D4 rejects a hand-typed list of languages',
+  !/It runs in \$\{languageSentence\(\)\}/.test("'It runs in Hebrew, English, Spanish, Brazilian Portuguese, French and Italian, and there is'"),
+)
 
 console.log(`\n${pass} passed, ${fail} failed\n`)
 if (fail) process.exit(1)
