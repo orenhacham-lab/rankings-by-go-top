@@ -186,6 +186,12 @@ const ARTICLE_TEXT: Record<SuggestionLanguage, {
     anchorSentence: (link) => ` Dans ce contexte, ${link} est l'une des options clés à connaître.`,
     phraseSentence: (phrase) => ` Dans ce contexte, il vaut aussi la peine de regarder de plus près ${phrase}.`,
   },
+  it: {
+    toc: 'Indice dei contenuti',
+    faqHeading: 'Domande frequenti',
+    anchorSentence: (link) => ` In questo contesto, ${link} è una delle opzioni principali che vale la pena conoscere.`,
+    phraseSentence: (phrase) => ` In questo contesto, vale la pena approfondire anche ${phrase}.`,
+  },
 }
 
 /** Natural transition words to hand the model, in the language it writes in. */
@@ -195,6 +201,7 @@ const TRANSITION_HINT: Record<SuggestionLanguage, string> = {
   es: 'además, por lo tanto, sin embargo, por ejemplo, en resumen',
   'pt-BR': 'além disso, portanto, no entanto, por exemplo, em resumo',
   fr: 'de plus, par conséquent, cependant, par exemple, en résumé',
+  it: 'inoltre, di conseguenza, tuttavia, per esempio, in sintesi',
 }
 
 /** The filler opening to warn the model off, written in the language it writes in. */
@@ -204,6 +211,7 @@ const FILLER_EXAMPLE: Record<SuggestionLanguage, string> = {
   es: 'e.g. "En un mundo donde todos buscan…"',
   'pt-BR': 'e.g. "Em um mundo onde todos procuram…"',
   fr: 'e.g. "Dans un monde où tout le monde cherche…"',
+  it: 'e.g. "In un mondo in cui tutti cercano…"',
 }
 
 /** Who the article is actually written for. A Spanish article is NOT for Israeli readers. */
@@ -213,6 +221,7 @@ const AUDIENCE_NOTE: Record<SuggestionLanguage, string> = {
   es: 'Write naturally for Spanish-speaking readers in neutral Spanish that reads well in Spain and in Latin America alike.',
   'pt-BR': 'Write naturally for Brazilian readers in Brazilian Portuguese — not European Portuguese.',
   fr: 'Write naturally for French-speaking readers in standard French that reads well in France and in the rest of French-speaking Europe alike.',
+  it: 'Write naturally for Italian-speaking readers in standard Italian that reads well in Italy and in Italian-speaking Switzerland alike.',
 }
 
 /** Per-language writing-quality notes. Empty for a language with nothing extra to say. */
@@ -233,6 +242,10 @@ const WRITING_QUALITY_LINES: Record<SuggestionLanguage, string[]> = {
   fr: [
     `- French writing quality: address the reader as "vous" consistently — NEVER "tu", never "toi", never "ton/ta/tes". Use standard French that reads well in France and in the rest of French-speaking Europe; avoid regional slang and avoid needless anglicisms where a plain French word exists. VARY sentence and paragraph openings — do not start many consecutive sentences with the same word (avoid over-using "De plus", "Par ailleurs", "Il est important"); mix openings like "En pratique", "C'est pourquoi", "Dans bien des cas", "Il faut retenir", "Au moment de choisir", "En résumé". Prefer clear, practical, promotional SEO writing over poetic language.`,
     `- French typography: keep the accents and the cedilla correct (é, è, ê, à, ù, î, ô, ç) — never write French without accents — use a non-breaking space before ":", ";", "?" and "!" where your output supports it, use the French quotation marks « … » for quotations, and keep brand/product names in their proper original casing (e.g. "Kingsmith WalkingPad X21").`,
+  ],
+  it: [
+    `- Italian writing quality: address the reader formally and impersonally — use "voi"/the impersonal "si" form, and NEVER the informal "tu" (no "tuo/tua/tuoi", no informal imperatives like "scopri", "clicca", "scegli"). Use standard Italian that reads well in Italy and in Italian-speaking Switzerland; avoid regional slang and avoid needless anglicisms where a plain Italian word exists. VARY sentence and paragraph openings — do not start many consecutive sentences with the same word (avoid over-using "Inoltre", "D'altra parte", "È importante"); mix openings like "In pratica", "Per questo motivo", "In molti casi", "Vale la pena ricordare", "Al momento della scelta", "In sintesi". Prefer clear, practical, promotional SEO writing over poetic language.`,
+    `- Italian typography: keep the accents correct (è, é, à, ò, ù, ì) — never write Italian without them — distinguish "è" (verb) from "e" (and), use the apostrophe correctly in elisions ("un'opzione", "dell'articolo"), use the Italian quotation marks « … » for quotations, and keep brand/product names in their proper original casing (e.g. "Kingsmith WalkingPad X21").`,
   ],
 }
 

@@ -92,7 +92,7 @@ chk('D2 an unknown language still gets a notice', sanctionsNotice('de').length >
 for (const n of notices) {
   chk('D3 the notice names no country', !/Iran|Iraq|Syria|Lebanon|Cuba|Korea|איראן|עיראק|סוריה|לבנון/i.test(n))
   chk('D4 the notice names no statute or sanctions programme', !/Ordinance|OFAC|sanction|פקודת|סנקצ/i.test(n))
-  chk('D5 the notice offers a way to reach a person', /contact|escríbanos|escreva para nós|écrivez-nous|לכתוב לנו/i.test(n))
+  chk('D5 the notice offers a way to reach a person', /contact|escríbanos|escreva para nós|écrivez-nous|scriverci|לכתוב לנו/i.test(n))
 }
 /*
  * D6 reads the language list rather than naming languages, because naming them

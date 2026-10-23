@@ -133,6 +133,31 @@ export const ERROR_PAGES_UI = {
       homeHref: '/fr',
     },
   },
+  it: {
+    logoAlt: 'Logo Go Top SEO',
+    notFound: {
+      code: '404',
+      title: 'Questa pagina non è stata trovata',
+      body: 'Il link potrebbe essere errato, oppure la pagina è stata spostata.',
+      home: 'Vai alla home page',
+      dashboard: 'Vai al pannello',
+      homeHref: '/it',
+    },
+    screenError: {
+      title: 'Questa schermata non è stata caricata',
+      body: 'Nulla è stato eliminato. Si consiglia di riprovare e, se il problema si ripete, di tornare al pannello.',
+      retry: 'Riprova',
+      dashboard: 'Vai al pannello',
+      reference: 'Riferimento da comunicare all\u2019assistenza:',
+    },
+    globalError: {
+      title: 'Si è verificato un errore',
+      body: 'Il sito ha riscontrato un problema inatteso. Si consiglia di ricaricare la pagina.',
+      retry: 'Ricarica',
+      home: 'Vai alla home page',
+      homeHref: '/it',
+    },
+  },
 } as const
 
 /**

@@ -160,4 +160,32 @@ export const AUTH_BRAND: Record<PublicLocale, Record<AuthBrandVariant, AuthBrand
     glimpse: 'Mots-clés suivis',
     mobileTrust: ['Sans carte bancaire', 'Résiliable à tout moment'],
   },
+  it: {
+    login: {
+      eyebrow: 'Bentornati',
+      points: [
+        'Le posizioni su Google e Google Maps, in un unico posto',
+        'Il piano dei contenuti e gli articoli, pronti da riprendere',
+        'Che cosa dicono ChatGPT e Gemini della propria attività',
+      ],
+    },
+    signup: {
+      eyebrow: 'Google e la ricerca con IA, in un solo sistema',
+      points: [
+        'Un\u2019analisi completa del sito in pochi minuti',
+        'Un mese di contenuti, pianificato per il proprio settore',
+        'Le posizioni su Google e la visibilità nelle IA, monitorate per voi',
+      ],
+    },
+    recover: {
+      eyebrow: 'Ritorno al proprio account',
+      points: [
+        'Il link viene inviato soltanto all\u2019indirizzo registrato sull\u2019account',
+        'È valido una sola volta e per un breve periodo',
+        'I dati e i progetti restano esattamente come sono',
+      ],
+    },
+    glimpse: 'Parole chiave monitorate',
+    mobileTrust: ['Senza carta di credito', 'Annullabile in qualsiasi momento'],
+  },
 }

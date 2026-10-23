@@ -64,6 +64,14 @@ const SITE_METADATA: Record<PublicLocale, SiteMetadataStrings> = {
     ogDescription: 'Créez, planifiez et publiez du contenu SEO et GEO depuis un seul endroit, avec suivi de position sur Google et visibilité dans les IA (ChatGPT, Gemini, Google AI)',
     ogLocale: 'fr_FR',
   },
+  it: {
+    title: 'Crea, pianifica e pubblica contenuti SEO e GEO | Go Top SEO',
+    description: 'Go Top SEO: creazione, pianificazione e pubblicazione di contenuti SEO e GEO, con monitoraggio mensile delle posizioni su Google e visibilità nelle IA. Per iniziare gratuitamente.',
+    keywords: 'creazione di contenuti SEO, pianificazione dei contenuti, pubblicazione dei contenuti, GEO, monitoraggio delle posizioni, posizionamento sui motori di ricerca, SEO, Google, classifica, Google Maps, visibilità nelle IA, ChatGPT, Gemini',
+    ogTitle: 'Crea, pianifica e pubblica contenuti SEO e GEO — Go Top SEO',
+    ogDescription: 'Creazione, pianificazione e pubblicazione di contenuti SEO e GEO da un unico punto, con monitoraggio mensile delle posizioni su Google e visibilità nelle IA (ChatGPT, Gemini, Google AI Mode)',
+    ogLocale: 'it_IT',
+  },
 }
 
 export function getSiteMetadata(locale: PublicLocale): SiteMetadataStrings {

@@ -29,7 +29,7 @@
  */
 
 import type { PublicLocale } from './locales'
-import { isEnglishPath, isFrenchPath, isPortuguesePath, isSpanishPath } from './request-locale'
+import { isEnglishPath, isFrenchPath, isItalianPath, isPortuguesePath, isSpanishPath } from './request-locale'
 import { normalizeDashboardUiLocale } from './dashboard/locale'
 
 /**
@@ -46,6 +46,11 @@ import { normalizeDashboardUiLocale } from './dashboard/locale'
  * same terms again: `/fr/login` is the French route. Without the French branch
  * the function compiled and answered Hebrew for every /fr auth URL that carried
  * no `?lang=` — the exact break Spanish had, in a language the forms can read.
+ *
+ * Italian is the sixth and arrives with the same branch, for the same reason:
+ * `/it/login` is the Italian route, gated by app/(auth)/it/layout.tsx. A
+ * missing branch here is not a compile error — it is an unsuffixed /it/login
+ * resolving to HEBREW, a right-to-left form on a left-to-right site.
  */
 export function resolveAuthLocale(input: {
   pathname?: string | null
@@ -56,5 +61,6 @@ export function resolveAuthLocale(input: {
   if (isSpanishPath(input.pathname)) return 'es'
   if (isPortuguesePath(input.pathname)) return 'pt-BR'
   if (isFrenchPath(input.pathname)) return 'fr'
+  if (isItalianPath(input.pathname)) return 'it'
   return normalizeDashboardUiLocale(input.langParam) ?? input.serverLocale ?? 'he'
 }

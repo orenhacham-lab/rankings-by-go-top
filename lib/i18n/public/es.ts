@@ -206,6 +206,7 @@ export const es = {
     es: 'Español',
     'pt-BR': 'Português (Brasil)',
     fr: 'Français',
+    it: 'Italiano',
     aria: 'Cambiar el idioma del sitio',
   },
   cookie: {

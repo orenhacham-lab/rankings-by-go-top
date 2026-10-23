@@ -3,6 +3,7 @@ import { dashboardEn } from './en'
 import { dashboardEs } from './es'
 import { dashboardPtBR } from './pt-BR'
 import { dashboardFr } from './fr'
+import { dashboardIt } from './it'
 import { deepMergeDictionary } from './merge'
 import type { PublicLocale } from '../locales'
 import type { DashboardDictionary } from './he'
@@ -29,6 +30,7 @@ import type { DashboardDictionary } from './he'
 const dashboardEsMerged = deepMergeDictionary(dashboardEn as unknown as DashboardDictionary, dashboardEs)
 const dashboardPtMerged = deepMergeDictionary(dashboardEn as unknown as DashboardDictionary, dashboardPtBR)
 const dashboardFrMerged = deepMergeDictionary(dashboardEn as unknown as DashboardDictionary, dashboardFr)
+const dashboardItMerged = deepMergeDictionary(dashboardEn as unknown as DashboardDictionary, dashboardIt)
 
 const DICTIONARIES = {
   he: dashboardHe,
@@ -36,6 +38,7 @@ const DICTIONARIES = {
   es: dashboardEsMerged,
   'pt-BR': dashboardPtMerged,
   fr: dashboardFrMerged,
+  it: dashboardItMerged,
 } satisfies Record<PublicLocale, DashboardDictionary>
 
 /**

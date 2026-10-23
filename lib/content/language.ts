@@ -14,9 +14,9 @@
  * site can be managed from a Hebrew dashboard, and currency follows the country.
  */
 
-export type ContentLanguage = 'he' | 'en' | 'es' | 'pt-BR' | 'fr'
+export type ContentLanguage = 'he' | 'en' | 'es' | 'pt-BR' | 'fr' | 'it'
 
-export const CONTENT_LANGUAGES: ContentLanguage[] = ['he', 'en', 'es', 'pt-BR', 'fr']
+export const CONTENT_LANGUAGES: ContentLanguage[] = ['he', 'en', 'es', 'pt-BR', 'fr', 'it']
 
 export const DEFAULT_CONTENT_LANGUAGE: ContentLanguage = 'he'
 
@@ -36,6 +36,9 @@ export const DEFAULT_CONTENT_LANGUAGE: ContentLanguage = 'he'
  * Quebec and for a reader in Lyon is the same French. Where the region does
  * change an answer it is a LEGAL question, not a content one, and the privacy
  * policy says so in its own words.
+ *
+ * Italian is region-less for the same reason: 'it', 'it-IT' and 'it-CH' all
+ * normalize to the one content language.
  */
 export function normalizeContentLanguage(value: unknown): ContentLanguage {
   const s = String(value ?? '').toLowerCase().trim()
@@ -44,6 +47,7 @@ export function normalizeContentLanguage(value: unknown): ContentLanguage {
   if (s.startsWith('he') || s.startsWith('iw')) return 'he'
   if (s.startsWith('pt') || s.startsWith('portugu')) return 'pt-BR'
   if (s.startsWith('fr') || s.startsWith('franc') || s.startsWith('français')) return 'fr'
+  if (s.startsWith('it') || s.startsWith('ital')) return 'it'
   return DEFAULT_CONTENT_LANGUAGE
 }
 
@@ -54,6 +58,7 @@ const ENGLISH_NAME: Record<ContentLanguage, string> = {
   es: 'Spanish',
   'pt-BR': 'Brazilian Portuguese',
   fr: 'French',
+  it: 'Italian',
 }
 
 export function languageNameInEnglish(language: ContentLanguage): string {
@@ -108,6 +113,6 @@ export function toHebrewOrEnglish(language: ContentLanguage): 'he' | 'en' {
 export function contentLanguageOrEnglish(value: unknown): ContentLanguage {
   const s = String(value ?? '').toLowerCase().trim()
   if (!s) return DEFAULT_CONTENT_LANGUAGE
-  const known = /^(en|es|cas|he|iw|pt|portugu|fr|franc)/.test(s)
+  const known = /^(en|es|cas|he|iw|pt|portugu|fr|franc|it|ital)/.test(s)
   return known ? normalizeContentLanguage(s) : 'en'
 }

@@ -343,4 +343,57 @@ export const ARTICLES_COPY: Record<PublicLocale, ArticlesCopy> = {
       ],
     },
   },
+  it: {
+    index: {
+      title: 'Articoli',
+      subtitle: 'Guide e analisi sul monitoraggio delle posizioni su Google, sulla SEO e sulla visibilità nelle IA',
+      breadcrumb: 'Articoli',
+      empty: 'Qui verranno pubblicati articoli molto presto.',
+      readMore: 'Leggi l\u2019articolo',
+    },
+    article: {
+      notFoundTitle: 'Articolo non trovato',
+      notFoundBody: 'L\u2019articolo cercato non esiste oppure è stato rimosso',
+      backToArticles: 'Torna agli articoli',
+      backHome: 'Torna alla home',
+      toc: 'Indice',
+      readingTime: (m) => `${m} min di lettura`,
+      updated: 'Aggiornato',
+      aboutAuthor: 'Informazioni sull\u2019autore',
+      aboutAuthorLink: 'Scopri di più su Go Top',
+    },
+    widgets: {
+      plans: {
+        perMonth: 'al mese',
+        popular: 'Il più scelto',
+        cta: 'Inizia 7 giorni gratuiti',
+        noCard: 'Senza carta di credito. Annullabile in qualsiasi momento.',
+        allPlans: 'Tutti i dettagli nella pagina dei prezzi',
+      },
+      cta: {
+        title: 'Desidera vedere tutto questo sul proprio sito?',
+        body: 'Sette giorni gratuiti, senza carta di credito: basta collegare il sito, ricevere la ricerca delle parole chiave, avviare il controllo di visibilità nelle IA e far scrivere e pubblicare il primo articolo.',
+        primary: 'Inizia 7 giorni gratuiti',
+        secondary: 'Oppure avvii un controllo gratuito del proprio sito',
+      },
+    },
+    promo: {
+      badge: 'Go Top SEO',
+      title: ['Monitori le proprie posizioni', 'su Google quando serve'],
+      body: 'Piattaforma professionale per monitorare le posizioni su Google organico e su Google Maps. L\u2019analisi può essere avviata in qualsiasi momento, oppure eseguita automaticamente una volta al mese. Report dettagliati, monitoraggio degli andamenti e assistenza personale.',
+      signup: { label: 'Inizia la prova gratuita', href: authHref('signup', 'it') },
+      pricing: { label: 'Vedi i prezzi', href: '/it/pricing' },
+      stats: [
+        { num: '1000+', label: 'Parole chiave' },
+        { num: '2', label: 'Motori di posizione (Google + Maps)' },
+        { num: 'IA', label: 'Monitoraggio della visibilità' },
+        { num: '7 giorni', label: 'Di prova gratuita' },
+      ],
+      features: [
+        { title: 'Google organico', desc: 'Monitori le posizioni nelle pagine 1 e 2 di Google con risultati precisi' },
+        { title: 'Google Maps', desc: 'Monitori la posizione per luogo: città, codice postale o punto di riferimento' },
+        { title: 'Report professionali', desc: 'Esporti report in PDF ed Excel con andamenti, confronti e analisi avanzata' },
+      ],
+    },
+  },
 }

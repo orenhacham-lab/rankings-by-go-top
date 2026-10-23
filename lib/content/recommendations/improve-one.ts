@@ -61,6 +61,7 @@ const LANG_LINE: Record<ContentLanguage, string> = {
   es: 'Escribe en español neutro, correcto y fluido, con acentos y signos de apertura (¿ ¡) correctos.',
   'pt-BR': 'Escreva em português do Brasil, correto e fluente, com a acentuação correta.',
   fr: 'Écrivez en français correct et fluide, avec les accents justes, et vouvoyez le lecteur.',
+  it: 'Scrivete in italiano corretto e scorrevole, con gli accenti giusti, rivolgendovi al lettore in forma impersonale o con il «voi», mai con il «tu».',
 }
 
 function buildPrompt(input: ImproveOneInput): string {

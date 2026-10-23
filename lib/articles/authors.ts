@@ -47,6 +47,7 @@ const OREN: ArticleAuthor = {
     es: 'Oren Hacham',
     'pt-BR': 'Oren Hacham',
     fr: 'Oren Hacham',
+    it: 'Oren Hacham',
   },
   role: {
     he: 'מייסד Go Top — קידום אתרים ודיגיטל',
@@ -54,6 +55,7 @@ const OREN: ArticleAuthor = {
     es: 'Fundador de Go Top — SEO y marketing digital',
     'pt-BR': 'Fundador da Go Top — SEO e marketing digital',
     fr: 'Fondateur de Go Top — référencement naturel et marketing digital',
+    it: 'Fondatore di Go Top — SEO e marketing digitale',
   },
   bio: {
     he: 'עומד מאחורי Go Top, סוכנות דיגיטל שעוסקת מעל 11 שנה בקידום אתרים אורגני ובפרסום ממומן לעסקים בישראל, ומאחורי המערכת Go Top SEO.',
@@ -61,6 +63,7 @@ const OREN: ArticleAuthor = {
     es: 'Detrás de Go Top, una agencia digital con más de 11 años en posicionamiento orgánico y publicidad de pago, y detrás de la plataforma Go Top SEO.',
     'pt-BR': 'Por trás da Go Top, agência digital com mais de 11 anos em busca orgânica e mídia paga, e por trás da plataforma Go Top SEO.',
     fr: 'Derrière Go Top, une agence digitale qui travaille depuis plus de 11 ans sur le référencement naturel et la publicité payante, et derrière la plateforme Go Top SEO.',
+    it: 'Dietro Go Top, agenzia digitale che da oltre 11 anni si occupa di ricerca organica e pubblicità a pagamento, e dietro la piattaforma Go Top SEO.',
   },
   articleNote: {
     he: 'מה שכתוב כאן מגיע מעבודה יומיומית על אתרים של לקוחות, לא מתיאוריה.',
@@ -68,8 +71,9 @@ const OREN: ArticleAuthor = {
     es: 'Lo que se escribe aquí viene del trabajo diario en sitios de clientes, no de la teoría.',
     'pt-BR': 'O que está escrito aqui vem do trabalho diário em sites de clientes, não da teoria.',
     fr: 'Ce qui est écrit ici vient du travail quotidien sur les sites de clients, pas de la théorie.',
+    it: 'Quanto scritto qui nasce dal lavoro quotidiano sui siti dei clienti, non dalla teoria.',
   },
-  href: { he: '/about', en: '/en/about', es: '/es/about', 'pt-BR': '/pt-BR/about', fr: '/fr/about' },
+  href: { he: '/about', en: '/en/about', es: '/es/about', 'pt-BR': '/pt-BR/about', fr: '/fr/about', it: '/it/about' },
   photo: '/authors/oren-hacham.jpg',
 }
 

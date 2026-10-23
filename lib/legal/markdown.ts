@@ -176,7 +176,7 @@ export function parseLegalMarkdown(raw: string, where = 'document'): LegalDocume
   const last = blocks[blocks.length - 1]
   if (last && last.kind === 'paragraph') {
     const text = last.children.map((n) => (n.kind === 'text' ? n.text : '')).join('')
-    const SAYS_THE_DATE = /^\s*(?:(?:Última|Ultima)\s+actualización|Esta\s+página\s+se\s+actualizó\s+por\s+última\s+vez|Derni[èe]re\s+mise\s+[àa]\s+jour)/i
+    const SAYS_THE_DATE = /^\s*(?:(?:Última|Ultima)\s+actualización|Esta\s+página\s+se\s+actualizó\s+por\s+última\s+vez|Derni[èe]re\s+mise\s+[àa]\s+jour|Ultimo\s+aggiornamento|Questa\s+pagina\s+è\s+stata\s+aggiornata\s+per\s+ultima)/i
     if (SAYS_THE_DATE.test(text)) blocks.pop()
   }
   return { frontMatter, blocks }
@@ -190,9 +190,9 @@ export const LEGAL_SLUGS: readonly LegalSlug[] = ['terms', 'privacy', 'refund-po
  * The languages whose legal documents are Markdown under content/legal/. Hebrew
  * and English are hand-written JSX and are not here.
  */
-export type LegalLanguage = 'es' | 'pt-BR' | 'fr'
+export type LegalLanguage = 'es' | 'pt-BR' | 'fr' | 'it'
 
-export const LEGAL_LANGUAGES: readonly LegalLanguage[] = ['es', 'pt-BR', 'fr']
+export const LEGAL_LANGUAGES: readonly LegalLanguage[] = ['es', 'pt-BR', 'fr', 'it']
 
 /**
  * Read one translated legal document from the repository.

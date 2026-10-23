@@ -110,6 +110,7 @@ export function postLanguageFor(projectLanguage: unknown): GbpPostLanguage {
   if (base === 'es') return 'es'
   if (base === 'pt') return 'pt-BR'
   if (base === 'fr') return 'fr'
+  if (base === 'it') return 'it'
   return 'en'
 }
 

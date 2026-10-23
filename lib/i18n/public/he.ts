@@ -196,6 +196,7 @@ export const he = {
     es: 'Español',
     'pt-BR': 'Português (Brasil)',
     fr: 'Français',
+    it: 'Italiano',
     aria: 'שינוי שפת האתר',
   },
   cookie: {
