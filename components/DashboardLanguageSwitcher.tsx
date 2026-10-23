@@ -5,6 +5,7 @@ import { cn } from '@/lib/utils'
 import { spanishSiteEnabled } from '@/lib/i18n/spanish-site'
 import { portugueseSiteEnabled } from '@/lib/i18n/portuguese-site'
 import { frenchSiteEnabled } from '@/lib/i18n/french-site'
+import { italianSiteEnabled } from '@/lib/i18n/italian-site'
 import type { PublicLocale } from '@/lib/i18n/locales'
 
 /**
@@ -29,6 +30,7 @@ export function DashboardLanguageSwitcher() {
     ...(spanishSiteEnabled() ? [{ locale: 'es' as PublicLocale, lang: 'es', label: 'ES' }] : []),
     ...(portugueseSiteEnabled() ? [{ locale: 'pt-BR' as PublicLocale, lang: 'pt-BR', label: 'PT' }] : []),
     ...(frenchSiteEnabled() ? [{ locale: 'fr' as PublicLocale, lang: 'fr', label: 'FR' }] : []),
+    ...(italianSiteEnabled() ? [{ locale: 'it' as PublicLocale, lang: 'it', label: 'IT' }] : []),
   ]
 
   // A segmented control on the sidebar's ink: one track, the chosen option

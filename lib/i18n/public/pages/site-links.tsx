@@ -68,6 +68,7 @@ const en = FEATURE_COMMON.en
 const es = FEATURE_COMMON.es
 const pt = FEATURE_COMMON['pt-BR']
 const fr = FEATURE_COMMON.fr
+const it = FEATURE_COMMON.it
 
 export const SITE_LINKS_PAGE: MarketingPage = {
   path: '/features/site-links',
@@ -91,6 +92,10 @@ export const SITE_LINKS_PAGE: MarketingPage = {
     fr: {
       title: 'Liens vers votre site | Go Top SEO',
       description: 'Des entreprises complémentaires qui utilisent Go Top SEO peuvent vous mentionner dans les articles rédigés pour elles, uniquement là où cela aide le lecteur. Sans échange, jamais un concurrent, en option et désactivé par défaut. Et aussi : maillage interne, pages orphelines et annuaires gratuits.',
+    },
+    it: {
+      title: 'Link verso il suo sito | Go Top SEO',
+      description: 'Aziende complementari che usano Go Top SEO possono citare il suo sito negli articoli scritti per loro, soltanto dove questo aiuta chi legge. Senza scambi, mai un concorrente, facoltativo e disattivato per impostazione predefinita. E inoltre: link interni, pagine orfane e directory gratuite.',
     },
   },
   content: {
@@ -635,6 +640,116 @@ export const SITE_LINKS_PAGE: MarketingPage = {
         },
       ],
       cta: { title: 'Laissez des entreprises complémentaires faire un lien vers vous', body: fr.closeBody, primary: fr.trial, secondary: fr.check },
+    },
+    it: {
+      hero: {
+        eyebrow: 'Link verso il suo sito',
+        eyebrowIcon: Link2,
+        title: 'Citazioni e link',
+        accent: 'nei contenuti di aziende complementari',
+        subtitle: 'Clienti Go Top SEO di settori complementari possono citare il suo sito negli articoli scritti per loro, là dove la sua pagina aiuta davvero chi legge quel paragrafo. Mai un concorrente, mai uno scambio reciproco. La partecipazione è facoltativa e disattivata per impostazione predefinita.',
+        trust: it.trust,
+        primary: it.trial,
+        secondary: it.check,
+        visual: (
+          <WorkListVisual
+            heading="Citazioni e link"
+            rows={[
+              { title: 'Link in entrata da un’azienda complementare', detail: 'Da un articolo del suo blog', icon: ArrowDownToLine, done: true, status: 'Pubblicato' },
+              { title: 'Link in uscita nel suo articolo', detail: 'Mostrato prima della pubblicazione, si può rimuovere', icon: ArrowUpFromLine, done: false, status: 'Da approvare' },
+              { title: 'Stesso settore di attività', detail: 'Non inserito, in nessuna delle due direzioni', icon: Ban, done: true, status: 'Bloccato' },
+              { title: '3 link interni aggiunti all’articolo', detail: 'Guida ai prezzi', icon: ArrowLeftRight, done: true, status: 'Aggiunto' },
+            ]}
+          />
+        ),
+      },
+      sections: [
+        {
+          kind: 'steps',
+          eyebrow: 'Aziende complementari',
+          title: 'Come funziona',
+          items: [
+            { title: 'L’attivazione', body: 'La partecipazione si decide sito per sito, da parte del proprietario del progetto, dopo l’accettazione delle condizioni mostrate a schermo. Disattivata per impostazione predefinita, e si può uscire quando si vuole.' },
+            { title: 'Soltanto siti reali', body: 'Un sito partecipa solo se il suo proprietario lo ha collegato nell’applicazione tramite WordPress o Search Console. Inserire un dominio non basta: il sito di uno sconosciuto non può quindi entrare.' },
+            { title: 'La citazione entra nell’articolo', body: 'Quando un articolo viene scritto per un’azienda complementare, può citare una delle sue pagine pertinenti, su parole già presenti nella frase. Non riscriviamo il testo e non aggiungiamo alcun paragrafo.' },
+            { title: 'Tutto resta visibile', body: 'Ogni inserimento viene registrato e mostrato a entrambe le parti. Un link che esce dal suo articolo compare prima della pubblicazione e si può rimuovere.' },
+          ],
+        },
+        {
+          kind: 'cards',
+          tone: 'contrast',
+          eyebrow: 'Le regole',
+          title: 'Come resta naturale',
+          items: [
+            { icon: Ban, title: 'Mai un concorrente', body: 'Mai lo stesso settore di attività, né un dominio che una delle due parti ha segnalato come concorrente. Un sito di cui non conosciamo il settore resta fuori; non tiriamo mai a indovinare.' },
+            { icon: ArrowLeftRight, title: 'Nessuno scambio', body: 'Non scambiamo: un sito che riceve una citazione non ricambia mai, e una coppia si incontra una sola volta. Anche un giro breve fra tre siti è bloccato.' },
+            { icon: ShieldCheck, title: 'Uno solo, e con parsimonia', body: 'Al massimo un link per articolo, e preferiamo astenerci piuttosto che infilarne un altro. Un sito appena avviato partecipa lentamente.' },
+            { icon: Network, title: 'Solo dove aiuta chi legge', body: 'Una citazione entra solo dove la pagina aiuta davvero chi legge quel paragrafo. Quando la pertinenza è scarsa, non viene inserito nulla. I siti recenti o troppo leggeri non partecipano.' },
+          ],
+        },
+        {
+          kind: 'callout',
+          icon: Info,
+          title: 'Che cosa non facciamo',
+          body: (
+            <>
+              <p>
+                Go Top SEO non vende link, non compra link e non promette alcun link dal sito di altri. Non c’è alcun
+                numero di link promesso né alcuna promessa di posizione.
+              </p>
+              <p>
+                La partecipazione è facoltativa, disattivata per impostazione predefinita, e si può uscire in qualsiasi
+                momento. Non fa parte di ciò che si paga e non è compresa in un piano come un impegno. Il tipo di link
+                è definito per tutta la rete, viene mostrato nella schermata di adesione e può cambiare per i link
+                futuri. Il testo completo si trova alla sezione 15A dei{' '}
+                <a className="underline" href="/it/terms">Termini di servizio</a>, con i rischi dell’adesione, e vale la
+                pena leggerlo prima di attivare questa opzione.
+              </p>
+              <p>
+                Non pubblichiamo alcun elenco dei siti partecipanti. La parte che riceve una citazione vede l’indirizzo
+                del sito che ha inserito il link. La responsabilità del contenuto del sito e del rispetto delle
+                indicazioni dei motori di ricerca resta al proprietario del sito, e possiamo sospendere o interrompere
+                il servizio.
+              </p>
+            </>
+          ),
+        },
+        {
+          kind: 'cards',
+          columns: 2,
+          eyebrow: 'Anche dentro il sito',
+          title: 'I link interni che tengono insieme un sito',
+          items: [
+            { icon: ArrowLeftRight, title: 'Link interni durante la scrittura', body: 'Mentre scrive, il sistema collega l’articolo alle pagine pertinenti del sito, soltanto dove l’espressione compare già naturalmente nel testo. L’articolo si rilegge prima della pubblicazione, come sempre.' },
+            { icon: Unlink, title: 'Pagine orfane', body: 'Le pagine verso cui nessun’altra pagina del sito punta: Google fa fatica a raggiungerle e a capire che contano. Le pagine collegate dal menu o dalla home non contano come orfane.' },
+            { icon: ListChecks, title: 'Directory gratuite in cui comparire', body: 'Un elenco verificato a mano di directory e schede aziendali per il paese e la lingua del progetto, con l’indicazione di dove l’azienda compare già.' },
+            { icon: MapPinned, title: 'Chi punta a che cosa', body: 'Per ogni articolo si vede verso che cosa punta e che cosa punta verso di lui. È ciò che spiega perché una pagina non si muove su Google mentre altre avanzano.' },
+          ],
+        },
+        {
+          kind: 'cards',
+          columns: 2,
+          eyebrow: 'Search Console',
+          title: 'I link che Google ha già trovato',
+          items: [
+            { icon: FileSearch, title: 'Un collegamento diretto al report di Google', body: 'Search Console non ha alcuna interfaccia che restituisca l’elenco dei link, quindi non ne inventiamo una. Un collegamento diretto porta al report su Google.' },
+            { icon: Search, title: 'Un’istantanea da un file esportato', body: 'Si può importare un CSV esportato da Search Console e consultarlo nel sistema. È un’istantanea del giorno dell’esportazione, che non si aggiorna da sé.' },
+          ],
+        },
+        {
+          kind: 'faq',
+          eyebrow: 'Domande frequenti',
+          title: 'Che cosa si chiede sui link',
+          items: [
+            { q: 'Quanti link arriveranno?', a: 'Non c’è alcun numero promesso, né alcuna quota che cerchiamo di riempire. Una citazione entra solo quando un articolo viene scritto e la sua pagina corrisponde davvero a uno dei suoi paragrafi, quindi accade con parsimonia.' },
+            { q: 'Qualcuno vedrà che partecipo?', a: 'Non pubblichiamo alcun elenco dei siti partecipanti. La parte che riceve una citazione vede l’indirizzo del sito che ha inserito il link e, dopo la pubblicazione, anche la pagina in cui il link è comparso.' },
+            { q: 'È obbligatorio partecipare?', a: 'No. È disattivato per impostazione predefinita, l’attivazione avviene sito per sito e si può uscire in qualsiasi momento. L’uscita ferma le nuove citazioni; i link già pubblicati restano sui siti.' },
+            { q: 'Funziona su un negozio Shopify?', a: 'Sì, con un’attivazione separata e volontaria. Le citazioni entrano solo negli articoli che scriviamo e pubblichiamo sul blog del negozio. Un articolo, una pagina, un prodotto o una collezione già presenti nel negozio non vengono modificati.' },
+            { q: 'E i link interni del mio sito?', a: 'Continuano a funzionare in modo indipendente: ogni articolo scritto riceve link verso le pagine pertinenti del sito, e l’articolo intero si approva prima della pubblicazione.' },
+          ],
+        },
+      ],
+      cta: { title: 'Lasci che aziende complementari rimandino al suo sito', body: it.closeBody, primary: it.trial, secondary: it.check },
     },
   },
 }

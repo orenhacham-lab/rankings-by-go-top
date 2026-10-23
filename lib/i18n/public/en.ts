@@ -198,6 +198,7 @@ export const en = {
     es: 'Español',
     'pt-BR': 'Português (Brasil)',
     fr: 'Français',
+    it: 'Italiano',
     aria: 'Change the site language',
   },
   cookie: {

@@ -29,13 +29,14 @@ export const RESEARCH_MARKET: Record<BlogAutoLocale, { country: string; language
   // Brazil, and Google's language code for Portuguese is the bare 'pt'.
   'pt-BR': { country: 'BR', language: 'pt' },
   fr: { country: 'FR', language: 'fr' },
+  it: { country: 'IT', language: 'it' },
 }
 
 /**
  * The floor for "somebody searches this". Hebrew is a 9-million-speaker market,
  * so the same floor as English would reject nearly every real Hebrew query.
  */
-export const MIN_MONTHLY_SEARCHES: Record<BlogAutoLocale, number> = { he: 20, en: 80, es: 50, 'pt-BR': 50, fr: 50 }
+export const MIN_MONTHLY_SEARCHES: Record<BlogAutoLocale, number> = { he: 20, en: 80, es: 50, 'pt-BR': 50, fr: 50, it: 50 }
 
 /** Seeds the research starts from — the subjects this product is actually about. */
 export const RESEARCH_SEEDS: Record<BlogAutoLocale, string[]> = {
@@ -60,6 +61,11 @@ export const RESEARCH_SEEDS: Record<BlogAutoLocale, string[]> = {
     'seo', 'référencement naturel', 'positionnement google',
     'recherche de mots-clés', 'seo technique', 'visibilité dans les ia',
     'google search console', 'seo pour petite entreprise', 'vitesse du site',
+  ],
+  it: [
+    'seo', 'posizionamento su google', 'ricerca parole chiave',
+    'seo tecnico', 'visibilità nelle ia', 'google search console',
+    'seo per piccole imprese', 'velocità del sito',
   ],
 }
 

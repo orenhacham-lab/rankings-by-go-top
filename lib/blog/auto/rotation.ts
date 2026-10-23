@@ -35,7 +35,7 @@
  */
 
 /** The languages this runner can write. A subset of PUBLIC_LOCALES. */
-export const BLOG_AUTO_LOCALES = ['he', 'en', 'es', 'pt-BR', 'fr'] as const
+export const BLOG_AUTO_LOCALES = ['he', 'en', 'es', 'pt-BR', 'fr', 'it'] as const
 export type BlogAutoLocale = (typeof BLOG_AUTO_LOCALES)[number]
 
 export function isBlogAutoLocale(value: unknown): value is BlogAutoLocale {
@@ -49,5 +49,5 @@ export function localesForDay(): readonly BlogAutoLocale[] {
 
 /** How many articles a week each language gets — the queue's refill target reads this. */
 export function weeklyShare(): Record<BlogAutoLocale, number> {
-  return { he: 7, en: 7, es: 7, 'pt-BR': 7, fr: 7 }
+  return { he: 7, en: 7, es: 7, 'pt-BR': 7, fr: 7, it: 7 }
 }

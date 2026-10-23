@@ -261,10 +261,11 @@ async function enqueueChecks() {
       && A.postLanguageFor('en-US') === 'en' && A.postLanguageFor('es-MX') === 'es'
       && A.postLanguageFor('pt') === 'pt-BR' && A.postLanguageFor('pt-PT') === 'pt-BR'
       && A.postLanguageFor('fr') === 'fr' && A.postLanguageFor('fr-CA') === 'fr'
+      && A.postLanguageFor('it') === 'it' && A.postLanguageFor('it-IT') === 'it'
       && A.postLanguageFor(null) === 'en' && A.postLanguageFor('sw') === 'en')
     check('whatever it returns is a language the database column accepts',
-      V.GBP_POST_LANGUAGES.length === 5
-      && ['he', 'en', 'es', 'pt-BR', 'fr', 'he-IL', 'iw', 'pt', 'pt-PT', 'es-MX', 'en-GB', 'fr-CA', '', null, 42]
+      V.GBP_POST_LANGUAGES.length === 6
+      && ['he', 'en', 'es', 'pt-BR', 'fr', 'it', 'he-IL', 'iw', 'pt', 'pt-PT', 'es-MX', 'en-GB', 'fr-CA', 'it-IT', '', null, 42]
         .every((l) => V.normalizePostLanguage(A.postLanguageFor(l)) !== null))
 
     // A regional tag is still that language, so a project recorded as es-MX posts in Spanish.

@@ -140,6 +140,30 @@ const LOGIN_UI = {
       linkInvalid: 'Ce lien de confirmation n\u2019est pas valide ou a expiré. Connectez-vous, ou inscrivez-vous à nouveau pour en recevoir un autre.',
     },
   },
+  it: {
+    subtitle: 'Monitoraggio delle posizioni su Google e visibilità nelle IA',
+    logoAlt: 'Logo di Go Top SEO',
+    heading: 'Accesso',
+    emailLabel: 'Indirizzo e-mail',
+    emailPlaceholder: 'nome@esempio.it',
+    passwordLabel: 'Password',
+    passwordPlaceholder: '\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022',
+    loginBtn: 'Accedere',
+    forgotPassword: 'Password dimenticata?',
+    dontHaveAccount: 'Non ha ancora un account?',
+    startTrial: 'Iniziare gratuitamente',
+    accessibility: 'Accessibilità',
+    privacy: 'Privacy',
+    articles: 'Articoli',
+    accessibilityHref: '/it/accessibility',
+    privacyHref: '/it/privacy',
+    articlesHref: '/it/articles',
+    err: {
+      badCredentials: 'Indirizzo e-mail o password non corretti',
+      emailNotConfirmed: 'L\u2019indirizzo e-mail non è ancora stato confermato. Apra il messaggio di conferma che le abbiamo inviato e faccia clic sul collegamento.',
+      linkInvalid: 'Questo collegamento di conferma non è valido o è scaduto. Effettui l\u2019accesso, oppure si registri di nuovo per riceverne un altro.',
+    },
+  },
 } as const
 
 export function AuthForm() {

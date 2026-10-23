@@ -28,6 +28,7 @@ const UPDATED_LABEL: Record<LegalLanguage, string> = {
   es: 'Última actualización',
   'pt-BR': 'Última atualização',
   fr: 'Dernière mise à jour',
+  it: 'Ultimo aggiornamento',
 }
 
 function localeDate(iso: string, language: LegalLanguage): string {
