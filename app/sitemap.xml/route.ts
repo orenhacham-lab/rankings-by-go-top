@@ -4,6 +4,8 @@ import { LOCALE_PREFIX, enabledPublicLocales, normalizePublicLocale, publicLocal
 interface Article {
   slug: string
   published_at: string
+  /** Null until an article is edited; the sitemap then dates it by the edit. */
+  updated_at: string | null
   locale: string
 }
 
@@ -38,7 +40,7 @@ export async function GET() {
   // Fetch all published articles
   const { data: articles } = await supabase
     .from('articles')
-    .select('slug, published_at, locale')
+    .select('slug, published_at, updated_at, locale')
     .eq('is_published', true)
     .order('published_at', { ascending: false })
 
@@ -421,7 +423,10 @@ export async function GET() {
     .filter((article: Article) => articleLocaleEnabled(article.locale))
     .map((article: Article) => ({
       url: `${baseUrl}${LOCALE_PREFIX[normalizePublicLocale(article.locale) ?? 'he']}/articles/${article.slug}`,
-      lastmod: article.published_at?.split('T')[0] || today,
+      // An edited article is dated by the edit: a crawler that has the page
+      // already has no reason to come back for an unchanged lastmod, which is
+      // exactly what a rewritten article needs it to do.
+      lastmod: (article.updated_at || article.published_at)?.split('T')[0] || today,
       changefreq: 'monthly',
       priority: '0.7',
     }))

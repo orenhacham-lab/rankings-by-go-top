@@ -123,7 +123,9 @@ function main() {
     /LOCALE_PREFIX\[/.test(sitemapSrc) && !/\$\{baseUrl\}\/articles\/\$\{article\.slug\}/.test(sitemapSrc))
   check('E2. llms.txt prefixes an article URL with its locale',
     /LOCALE_PREFIX\[/.test(llmsSrc) && !/\$\{baseUrl\}\/articles\/\$\{article\.slug\}/.test(llmsSrc))
-  check('E3. the sitemap still reads the locale column', /select\('slug, published_at, locale'\)/.test(sitemapSrc))
+  // The column list itself may grow (updated_at joined it so an edited article
+  // gets a fresh lastmod); what this guards is that `locale` stays in it.
+  check('E3. the sitemap still reads the locale column', /\.select\('[^']*\blocale\b[^']*'\)/.test(sitemapSrc))
 
   console.log('\nF. the database agrees with the code about the list of languages')
   const migration = read('supabase/migrations/20261009180750_articles_locale.sql')
