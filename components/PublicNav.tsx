@@ -161,7 +161,11 @@ export function PublicNav({ locale = 'he', tone = 'default' }: { locale?: Public
 
   const linkClass = (active: boolean) =>
     cn(
-      'inline-flex h-9 items-center gap-1.5 rounded-control px-3 text-copy font-medium transition-[background-color,color] duration-150 ease-snappy',
+      // px-2, not px-3: eight links plus the language control and two buttons
+      // have to live inside the hero's own max-w-7xl frame, and at px-3 they did
+      // not in any language but Hebrew and English (measured: the row came to
+      // 1274-1389px against a 1216px frame, and the right-hand button was cut).
+      'inline-flex h-9 items-center gap-1.5 rounded-control px-2 text-copy font-medium transition-[background-color,color] duration-150 ease-snappy',
       'focus-visible:outline-none focus-visible:ring-4',
       onDark
         ? cn('focus-visible:ring-white/40', active ? 'bg-white/15 text-contrast-ink' : 'text-contrast-ink/85 hover:bg-white/10 hover:text-contrast-ink')
@@ -235,7 +239,7 @@ export function PublicNav({ locale = 'he', tone = 'default' }: { locale?: Public
 
           {/* CTA Buttons + Language Switcher */}
           <div className="hidden items-center gap-1 lg:ms-auto lg:flex xl:ms-0">
-            <LanguageSwitcher locale={locale} inverse={onDark} />
+            <LanguageSwitcher locale={locale} inverse={onDark} compact />
             {!authChecked ? (
               <div className="h-10 w-40" />
             ) : isAuthed ? (
@@ -244,10 +248,13 @@ export function PublicNav({ locale = 'he', tone = 'default' }: { locale?: Public
               </Link>
             ) : (
               <>
-                <Link href={loginHref} className={buttonClasses(onDark ? 'ghost-inverse' : 'ghost', 'md')}>
+                {/* xl:px-3 — one notch tighter exactly where the eight nav links
+                    appear beside these two buttons; below xl the row is only the
+                    lockup and these, and they keep their full padding. */}
+                <Link href={loginHref} className={buttonClasses(onDark ? 'ghost-inverse' : 'ghost', 'md', 'xl:px-3')}>
                   {dict.nav.login}
                 </Link>
-                <Link href={signupHref} className={buttonClasses('primary', 'md', 'ms-1')}>
+                <Link href={signupHref} className={buttonClasses('primary', 'md', 'ms-1 xl:px-3')}>
                   {dict.nav.startFree}
                 </Link>
               </>

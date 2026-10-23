@@ -22,7 +22,7 @@ export const it = {
     pricing: 'Prezzi',
     features: 'Funzionalità',
     articles: 'Articoli',
-    freeCheck: 'Analisi gratuita del sito',
+    freeCheck: 'Analisi gratuita',
     about: 'Chi siamo',
     contact: 'Contatti',
     login: 'Accesso',

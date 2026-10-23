@@ -17,7 +17,7 @@ export const ptBR = {
     pricing: 'Preços',
     features: 'Recursos',
     articles: 'Artigos',
-    freeCheck: 'Análise gratuita do site',
+    freeCheck: 'Análise gratuita',
     about: 'Sobre nós',
     contact: 'Contato',
     login: 'Entrar',
