@@ -118,7 +118,10 @@ function main() {
       && /publisher: \{ '@type': 'Organization', name: 'GO TOP', url: 'https:\/\/www\.gotop\.co\.il' \}/.test(s)
     check('C3: schema — Go Top SEO with alternateName, publisher GO TOP (www.gotop.co.il)', schemaOk(schema) && schemaOk(layout))
     check('MUT: the old name as the schema name fails C3', !schemaOk(schema.replace(/name: 'Go Top SEO',(\s*)alternateName/g, "name: 'Rankings by Go Top',$1alternateName")))
-    check('C4: llms.txt says "Go Top SEO (previously Rankings by Go Top)"', llms.includes('Name: Go Top SEO (previously Rankings by Go Top)'))
+    // The line moved out of a `Name:` field when llms.txt stopped being a
+    // second robots.txt and became Markdown (23.10.2026); what has to survive
+    // is the former name, so somebody who searches it still finds us.
+    check('C4: llms.txt still names "Go Top SEO (previously Rankings by Go Top)"', llms.includes('Go Top SEO (previously Rankings by Go Top)'))
     const shopify = [read('app/shopify/app/ConnectorHomeClient.tsx'), read('app/shopify/link/page.tsx')]
     check('C5: the two Shopify embedded screens read "Go Top SEO" (text only, English)', />Go Top SEO<\/h1>/.test(shopify[0]) && /create a Go Top SEO account/.test(shopify[1]))
     check('C6: the agency credit stays "מבית GO TOP" / "By GO TOP"', read('lib/i18n/public/he.ts').includes("credit: 'מבית GO TOP'") && read('lib/i18n/public/en.ts').includes("credit: 'By GO TOP'"))
