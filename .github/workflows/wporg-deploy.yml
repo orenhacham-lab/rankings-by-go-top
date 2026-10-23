@@ -68,7 +68,10 @@ jobs:
         run: |
           set -euo pipefail
           # README.md is this repo's own note to itself; it is not shipped.
-          rsync -a --delete --exclude '.*' --exclude 'README.md' "$ASSETS_DIR/" svn/assets/
+          # No --delete here: a file that lives in the directory and not in this
+          # repository is left alone. The first run of this workflow deleted the
+          # plugin's two icons that way, and the directory page lost its image.
+          rsync -a --exclude '.*' --exclude 'README.md' "$ASSETS_DIR/" svn/assets/
           if [ "${{ inputs.mode }}" = "release" ]; then
             rsync -a --delete --exclude '.*' --exclude 'README.md' "$PLUGIN_DIR/" svn/trunk/
           else
@@ -89,8 +92,9 @@ jobs:
           fi
           cd svn
           svn add --force assets trunk > /dev/null
-          # Whatever rsync removed is deleted in SVN too.
-          svn status | awk '/^!/ {print $2}' | xargs -r svn rm --force
+          # Only under trunk, whose whole contents are this repository's; an
+          # asset is never removed just because it is absent here.
+          svn status trunk | awk '/^!/ {print $2}' | xargs -r svn rm --force
           if [ "$MODE" = "release" ]; then
             if svn ls "https://plugins.svn.wordpress.org/$SLUG/tags/$VERSION" > /dev/null 2>&1; then
               echo "Tag $VERSION already exists in the directory; bump the version first." >&2

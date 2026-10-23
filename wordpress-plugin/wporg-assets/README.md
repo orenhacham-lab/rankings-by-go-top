@@ -10,8 +10,15 @@ zip.
 | File | What it is |
 |---|---|
 | `banner-1544x500.png`, `banner-772x250.png` | the header on the directory page |
+| `icon-128x128.png`, `icon-256x256.png` | the plugin's icon, in the directory's listings and in the site's own plugin screen |
 | `screenshot-1.png`, `screenshot-2.png`, `screenshot-3.png` | numbered to the `== Screenshots ==` list in `readme.txt` |
 | `blueprints/blueprint.json` | the Live Preview (below) |
+
+The icons live here because the workflow that publishes this directory
+(`.github/workflows/wporg-deploy.yml`) keeps what is in SVN and adds what is
+here. They were committed to SVN by hand before that workflow existed, which
+is how a run that mirrored this directory with `--delete` removed them; they
+were restored from revision 3761427 and the mirroring no longer deletes.
 
 ## Live Preview
 
