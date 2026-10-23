@@ -107,6 +107,45 @@ export function keywordOverlap(a: string, b: string): number {
 /** At or above this, two keywords are the same article. */
 export const CANNIBAL_OVERLAP = 0.8
 
+/**
+ * WHICH OF THE SURVIVING KEYWORDS GETS WRITTEN FIRST.
+ *
+ * Until 23 Oct 2026 this was simply the biggest one: the ideas were sorted by
+ * monthly searches, descending. Search Console on 21.10.2026 shows what that
+ * bought. The three keywords with the most impressions on the site are
+ * "קידום אורגני בגוגל" at position 62, "קידום אתרים אורגני בגוגל" at 84 and
+ * "מחקר מילות מפתח" at 83; 11,008 of the day's 15,093 impressions sit at
+ * position 40 or worse, and the whole site took two clicks. Picking the
+ * highest-volume keyword in a niche is picking the one the oldest and
+ * best-linked sites in the country already own.
+ *
+ * So the queue is ordered by what this site can actually win: least
+ * advertiser competition first, and a long keyword before a short one, with
+ * volume left as the tie-breaker rather than the sort key. The floor above
+ * still guarantees somebody searches it.
+ *
+ * Two honest limits. Google's competition index measures ADVERTISER
+ * competition, not organic difficulty — it is a proxy, the best free one we
+ * have. And word count is a crude stand-in for specificity; it is right far
+ * more often than it is wrong in this niche, which is what it has to be.
+ */
+
+/** Advertiser competition on a 0..100 scale when Google sent only the bucket. */
+const COMPETITION_FALLBACK: Record<'LOW' | 'MEDIUM' | 'HIGH', number> = { LOW: 20, MEDIUM: 50, HIGH: 85 }
+
+/** How much one extra word in the keyword is worth, in competition-index points. */
+export const TAIL_BONUS = 10
+
+/** Beyond this many words, another word says nothing more about specificity. */
+export const TAIL_WORDS_CAP = 6
+
+/** Lower is more winnable for a site with little authority. Pure. */
+export function keywordDifficulty(idea: Pick<KeywordIdeaResult, 'keyword' | 'competition' | 'competitionIndex'>): number {
+  const ads = idea.competitionIndex ?? (idea.competition ? COMPETITION_FALLBACK[idea.competition] : 50)
+  const words = Math.min(keywordTokens(idea.keyword ?? '').length, TAIL_WORDS_CAP)
+  return ads - Math.max(words - 1, 0) * TAIL_BONUS
+}
+
 export interface SelectKeywordsInput {
   locale: BlogAutoLocale
   ideas: KeywordIdeaResult[]
@@ -128,7 +167,11 @@ export function selectKeywords(input: SelectKeywordsInput): SelectedKeyword[] {
   // response can be near-duplicates of each other.
   const blocking = [...input.taken]
 
-  const ranked = [...input.ideas].sort((a, b) => (b.avgMonthlySearches ?? 0) - (a.avgMonthlySearches ?? 0))
+  const ranked = [...input.ideas].sort((a, b) => {
+    const d = keywordDifficulty(a) - keywordDifficulty(b)
+    if (d !== 0) return d
+    return (b.avgMonthlySearches ?? 0) - (a.avgMonthlySearches ?? 0)
+  })
 
   for (const idea of ranked) {
     if (chosen.length >= input.limit) break

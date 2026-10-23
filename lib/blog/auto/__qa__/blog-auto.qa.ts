@@ -25,7 +25,7 @@ import { checkTruthLimits, plainText } from '@/lib/blog/auto/truth-limits'
 import { placeholderContext, runQualityGate } from '@/lib/content/automation/quality-gate'
 import {
   CANNIBAL_OVERLAP, EXCLUDED_PATTERNS, MIN_MONTHLY_SEARCHES, RESEARCH_MARKET, RESEARCH_SEEDS,
-  keywordOverlap, keywordTokens, selectKeywords,
+  keywordOverlap, keywordTokens, keywordDifficulty, selectKeywords,
 } from '@/lib/blog/auto/keyword-plan'
 import { CTA_WIDGET, PLANS_WIDGET, withArticleWidgets } from '@/lib/blog/auto/widgets'
 import { BLOG_AUTHOR, BLOG_GUIDANCE, articlePath, buildBlogBrief, internalAnchors } from '@/lib/blog/auto/brief'
@@ -172,7 +172,7 @@ const selected = selectKeywords({
   taken: [],
   limit: 10,
 })
-check('C1: the highest volume comes first', selected[0]?.keyword === 'בדיקת מיקום בגוגל', selected.map((s) => s.keyword))
+check('C1: with equal difficulty the bigger keyword comes first', selected[0]?.keyword === 'בדיקת מיקום בגוגל', selected.map((s) => s.keyword))
 check('C2: below the floor is dropped', !selected.some((s) => s.keyword === 'ביטוי נדיר מאוד'))
 check('C3: the volume is kept, so the screen can show it', selected[0]?.monthlySearches === 900)
 check(
@@ -190,6 +190,27 @@ check(
 check('C7: our own brand is navigational, not an article', !selectKeywords({ locale: 'he', ideas: [idea('go top seo', 900)], taken: [], limit: 5 }).length)
 check('C7a: the agency\'s services stay on the agency site', !selectKeywords({ locale: 'he', ideas: [idea('סוכנות קידום אתרים', 900)], taken: [], limit: 5 }).length)
 check('C8: the limit is honoured', selectKeywords({ locale: 'he', ideas: [idea('א ב ג', 900), idea('ד ה ו', 800), idea('ז ח ט', 700)], taken: [], limit: 2 }).length === 2)
+// A head keyword this site cannot win, against the long specific one it can.
+const headIdea: KeywordIdeaResult = {
+  keyword: 'קידום אתרים', avgMonthlySearches: 8000, competition: 'HIGH', competitionIndex: 90,
+  lowTopOfPageBid: null, highTopOfPageBid: null, currency: 'ILS',
+}
+const tailIdea: KeywordIdeaResult = {
+  keyword: 'איך לבדוק מיקום של אתר בגוגל', avgMonthlySearches: 40, competition: 'LOW', competitionIndex: 15,
+  lowTopOfPageBid: null, highTopOfPageBid: null, currency: 'ILS',
+}
+check(
+  'C8a: the winnable long keyword is written before the huge head term',
+  selectKeywords({ locale: 'he', ideas: [headIdea, tailIdea], taken: [], limit: 1 })[0]?.keyword === tailIdea.keyword,
+)
+check('C8b: more words mean a lower difficulty, all else equal', keywordDifficulty({ keyword: 'בדיקת מיקום בגוגל', competition: 'LOW', competitionIndex: 30 }) < keywordDifficulty({ keyword: 'קידום אתרים', competition: 'LOW', competitionIndex: 30 }))
+check('C8c: a missing index falls back to the bucket, not to zero', keywordDifficulty({ keyword: 'קידום', competition: 'HIGH', competitionIndex: null }) > keywordDifficulty({ keyword: 'קידום', competition: 'LOW', competitionIndex: null }))
+// Mutation control for C8a: by the old rule — volume, descending — the head
+// term would have been written first, which is the behaviour being replaced.
+check(
+  'C8d (control): sorted by volume alone the head term WOULD come first',
+  [headIdea, tailIdea].sort((a, b) => (b.avgMonthlySearches ?? 0) - (a.avgMonthlySearches ?? 0))[0]?.keyword === headIdea.keyword,
+)
 check('C9: overlap is 1 when one keyword contains the other\'s words', keywordOverlap('מחקר מילות מפתח', 'כלי למחקר מילות מפתח') === 1)
 check('C9a: unrelated keywords do not overlap', keywordOverlap('מהירות אתר', 'כתיבת תוכן') === 0)
 check('C9b: the threshold is strict enough to be a real test', CANNIBAL_OVERLAP >= 0.7 && CANNIBAL_OVERLAP <= 1)
