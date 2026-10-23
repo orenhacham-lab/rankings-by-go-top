@@ -117,7 +117,15 @@ export async function GET() {
   lines.push('## Start here')
   lines.push('')
   lines.push(`- [Home](${BASE}/): what the system does, in Hebrew.`)
-  lines.push(`- [Home in English](${BASE}/en): the same, in English. Spanish is at /es, Brazilian Portuguese at /pt-BR and French at /fr.`)
+  // The other trees, named from the gate rather than typed out. This line said
+  // "Spanish is at /es, Brazilian Portuguese at /pt-BR and French at /fr" and
+  // went stale the hour Italian launched — on the one file an assistant reads
+  // to learn what the product serves. Hebrew and English are the two named
+  // above, so they are left out here.
+  const othersSentence = enabledPublicLocales()
+    .filter((l) => l !== 'he' && l !== 'en')
+    .map((l) => `${LOCALE_NAME[l]} at ${LOCALE_PREFIX[l]}`)
+  lines.push(`- [Home in English](${BASE}/en): the same, in English.${othersSentence.length ? ` ${othersSentence.join(', ')}.` : ''}`)
   lines.push(`- [Pricing](${BASE}/pricing): four plans, each with a seven-day trial and no card. In Israel from 249 ILS a month including VAT; outside Israel from 79 USD a month plus tax.`)
   lines.push(`- [Free check](${BASE}/free-check): a first look at a site without an account.`)
   lines.push(`- [About](${BASE}/about): who runs it and how to reach them.`)
