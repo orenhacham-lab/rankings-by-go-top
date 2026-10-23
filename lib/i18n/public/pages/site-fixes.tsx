@@ -15,6 +15,7 @@ const en = FEATURE_COMMON.en
 const es = FEATURE_COMMON.es
 const pt = FEATURE_COMMON['pt-BR']
 const fr = FEATURE_COMMON.fr
+const it = FEATURE_COMMON.it
 
 export const SITE_FIXES_PAGE: MarketingPage = {
   path: '/features/site-health-fixes',
@@ -38,6 +39,10 @@ export const SITE_FIXES_PAGE: MarketingPage = {
     fr: {
       title: 'Corrections du site | Go Top SEO',
       description: 'Un audit du site qui trouve ce qui freine votre site dans Google et dans les moteurs d’IA : titres, descriptions, textes alternatifs, liens cassés et plus. Sur WordPress, chaque correction se fait en un clic après votre validation, et reste annulable.',
+    },
+    it: {
+      title: 'Correzioni del sito | Go Top SEO',
+      description: 'Un’analisi del sito che trova ciò che lo frena su Google e nei motori di IA: titoli, descrizioni, testi alternativi, link rotti e altro. Su WordPress ogni correzione si applica con un clic dopo l’approvazione, e resta annullabile.',
     },
   },
   content: {
@@ -385,6 +390,75 @@ export const SITE_FIXES_PAGE: MarketingPage = {
         },
       ],
       cta: { title: 'Voyez ce qui freine votre site', body: fr.closeBody, primary: fr.check, secondary: fr.trial },
+    },
+    it: {
+      hero: {
+        eyebrow: 'Correzioni del sito',
+        eyebrowIcon: Wrench,
+        title: 'Ciò che frena il sito,',
+        accent: 'corretto dopo l’approvazione',
+        subtitle: 'Il sistema analizza il sito e individua i titoli assenti o troppo lunghi, le descrizioni mancanti, le immagini senza testo alternativo, i link rotti e le pagine bloccate a Google o ai motori di IA. Su un sito WordPress collegato la maggior parte delle correzioni si applica con un clic, dopo aver visto esattamente che cosa cambierà.',
+        trust: it.trust,
+        primary: it.check,
+        secondary: it.trial,
+        visual: (
+          <WorkListVisual
+            heading="Correzioni del sito"
+            rows={[
+              { title: 'Titolo troppo lungo', detail: '', url: '/servizi/installazione-clima', icon: Type, done: true, status: 'Corretto' },
+              { title: 'Immagini senza testo alternativo', detail: '4 immagini', url: '/blog/guida-clima', icon: ImageIcon, done: true, status: 'Corretto' },
+              { title: 'Link rotto', detail: '', url: '/chi-siamo', icon: Link2, done: false, status: 'In attesa di approvazione' },
+              { title: 'Descrizione mancante', detail: '', url: '/contatti', icon: FileSearch, done: false, status: 'In attesa di approvazione' },
+            ]}
+          />
+        ),
+      },
+      sections: [
+        {
+          kind: 'cards',
+          tone: 'contrast',
+          eyebrow: 'Perché è importante',
+          title: 'Un buon contenuto non serve a nulla se il sito stesso fa da ostacolo',
+          intro: 'Un titolo tagliato nei risultati, un’immagine che Google non capisce, un link che finisce su una pagina di errore. Ognuno è piccolo. Insieme tirano il sito verso il basso.',
+          items: [
+            { icon: ScanSearch, title: 'Si vede che cosa blocca', body: 'Ogni problema è elencato con le pagine in cui compare, ordinato per gravità.' },
+            { icon: ShieldCheck, title: 'Nulla cambia senza approvazione', body: 'Ogni correzione ha un’anteprima: ciò che la pagina dice oggi e ciò che lo sostituirà.' },
+            { icon: RotateCcw, title: 'Annullabile in qualsiasi momento', body: 'Una correzione fatta dal sistema conserva il valore precedente, quindi si può tornare indietro.' },
+          ],
+        },
+        {
+          kind: 'steps',
+          eyebrow: 'Come funziona',
+          title: 'Dall’analisi al sito corretto',
+          items: [
+            { title: 'Analisi del sito', body: 'Il sistema percorre le pagine e restituisce un elenco di problemi per gravità.' },
+            { title: 'Esame della proposta', body: 'Ogni problema arriva con una correzione proposta, il valore attuale e quello nuovo affiancati.' },
+            { title: 'Approvazione', body: 'Su un sito WordPress collegato, e sugli articoli e sulle pagine di un negozio Shopify collegato, la correzione viene scritta sul sito. Altrimenti si ricevono istruzioni passo per passo.' },
+          ],
+        },
+        {
+          kind: 'cards',
+          eyebrow: 'Che cosa viene corretto su WordPress',
+          title: 'Le correzioni che il sistema fa da sé',
+          items: [
+            { icon: Type, title: 'Titoli SEO', body: 'Un titolo assente, troppo corto o troppo lungo viene riscritto. Con Yoast o Rank Math viene salvato nel loro campo.' },
+            { icon: FileSearch, title: 'Meta description', body: 'Una descrizione assente, o di lunghezza inadatta. Salvata nell’estensione SEO del sito, tramite l’estensione Go Top.' },
+            { icon: ImageIcon, title: 'Testo alternativo delle immagini', body: 'Solo le immagini del contenuto senza testo alternativo ne ricevono uno. Le altre non vengono toccate.' },
+            { icon: Link2, title: 'Link', body: 'Un link rotto viene sostituito o rimosso, e si aggiungono link interni fra pagine collegate.' },
+            { icon: Heading1, title: 'Titolo principale', body: 'Una pagina con più di un H1 mantiene un solo titolo principale, tramite l’estensione Go Top.' },
+            { icon: Code2, title: 'Domande frequenti e llms.txt', body: 'Un blocco di domande frequenti sulla pagina e un file llms.txt che descrive il sito ai motori di IA, tramite l’estensione Go Top.' },
+          ],
+        },
+        {
+          kind: 'callout',
+          icon: Info,
+          title: 'Su Shopify e sulle altre piattaforme',
+          body: (
+            <p>L’analisi funziona su qualsiasi sito. Su un negozio Shopify collegato il sistema corregge gli articoli del blog e le pagine del negozio dopo l’approvazione: il titolo e la descrizione che Google mostra, il testo alternativo delle immagini, un link rotto, un blocco di domande frequenti e un titolo principale in eccesso. Anche qui ogni correzione può essere annullata. I prodotti, le collezioni e le impostazioni del negozio non vengono mai modificati. Su Wix e sulle altre piattaforme il sistema non scrive sul sito: mostra brevi istruzioni per correggere ogni problema in autonomia.</p>
+          ),
+        },
+      ],
+      cta: { title: 'Scopra che cosa frena il suo sito', body: it.closeBody, primary: it.check, secondary: it.trial },
     },
   },
 }

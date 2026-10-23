@@ -54,6 +54,7 @@ import { localeFromAcceptLanguage } from './accept-language'
 import { spanishSiteEnabled } from './spanish-site'
 import { portugueseSiteEnabled } from './portuguese-site'
 import { frenchSiteEnabled } from './french-site'
+import { italianSiteEnabled } from './italian-site'
 
 /** Readable by the browser too: the client writes it when the switcher changes. */
 export const LANGUAGE_COOKIE = 'dashboard-language'
@@ -100,6 +101,13 @@ export function isFrenchPath(pathname: string | null | undefined, enabled = fren
   if (!enabled) return false
   const p = pathname || ''
   return p === '/fr' || p.startsWith('/fr/')
+}
+
+/** The same, for the Italian tree and its own flag. */
+export function isItalianPath(pathname: string | null | undefined, enabled = italianSiteEnabled()): boolean {
+  if (!enabled) return false
+  const p = pathname || ''
+  return p === '/it' || p.startsWith('/it/')
 }
 
 /**
@@ -152,6 +160,7 @@ export function routePublicLocale(pathname: string | null | undefined): PublicLo
   if (isSpanishPath(p)) return 'es'
   if (isPortuguesePath(p)) return 'pt-BR'
   if (isFrenchPath(p)) return 'fr'
+  if (isItalianPath(p)) return 'it'
   if (p === '/') return 'he'
   const segment = p.split('/')[1] ?? ''
   if (ENGLISH_ONLY_SEGMENTS.has(segment)) return 'en'

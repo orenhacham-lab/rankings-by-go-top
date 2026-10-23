@@ -23,12 +23,13 @@
 import { spanishSiteEnabled } from './spanish-site'
 import { portugueseSiteEnabled } from './portuguese-site'
 import { frenchSiteEnabled } from './french-site'
+import { italianSiteEnabled } from './italian-site'
 
 export type Locale = 'he' | 'en'
-export type PublicLocale = Locale | 'es' | 'pt-BR' | 'fr'
+export type PublicLocale = Locale | 'es' | 'pt-BR' | 'fr' | 'it'
 
 export const LOCALES: Locale[] = ['he', 'en']
-export const PUBLIC_LOCALES: PublicLocale[] = ['he', 'en', 'es', 'pt-BR', 'fr']
+export const PUBLIC_LOCALES: PublicLocale[] = ['he', 'en', 'es', 'pt-BR', 'fr', 'it']
 export const DEFAULT_LOCALE: Locale = 'he'
 
 /**
@@ -38,7 +39,7 @@ export const DEFAULT_LOCALE: Locale = 'he'
  * Brazilian law (the Consumer Code's seven-day withdrawal right, the LGPD), so a
  * bare '/pt' would promise European Portuguese readers rules that are not theirs.
  */
-export const LOCALE_PREFIX: Record<PublicLocale, string> = { he: '', en: '/en', es: '/es', 'pt-BR': '/pt-BR', fr: '/fr' }
+export const LOCALE_PREFIX: Record<PublicLocale, string> = { he: '', en: '/en', es: '/es', 'pt-BR': '/pt-BR', fr: '/fr', it: '/it' }
 
 export const LOCALE_CONFIG: Record<PublicLocale, { dir: 'rtl' | 'ltr'; lang: string; ogLocale: string }> = {
   he: { dir: 'rtl', lang: 'he', ogLocale: 'he_IL' },
@@ -54,6 +55,12 @@ export const LOCALE_CONFIG: Record<PublicLocale, { dir: 'rtl' | 'ltr'; lang: str
   // addressed in their language but under Loi 25 and the Civil Code, which the
   // privacy policy names where it differs rather than pretending otherwise.
   fr: { dir: 'ltr', lang: 'fr', ogLocale: 'fr_FR' },
+  // A bare 'it', like '/es' and '/fr': Italian is written for one legal
+  // framework, the EU's, which Italy, Ticino's readers in Switzerland and San
+  // Marino's businesses read the same way. Italy's own consumer code adds the
+  // fourteen-day withdrawal right the Codice del Consumo spells out, and the
+  // documents name it where it differs rather than pretending otherwise.
+  it: { dir: 'ltr', lang: 'it', ogLocale: 'it_IT' },
 }
 
 /**
@@ -66,10 +73,10 @@ export const LOCALE_CONFIG: Record<PublicLocale, { dir: 'rtl' | 'ltr'; lang: str
  * Spain is the first Spanish market, so es-ES; a Latin-American market gets its
  * own entry the day its currency is set, because that is the same decision.
  */
-export const INTL_LOCALE: Record<PublicLocale, string> = { he: 'he-IL', en: 'en-US', es: 'es-ES', 'pt-BR': 'pt-BR', fr: 'fr-FR' }
+export const INTL_LOCALE: Record<PublicLocale, string> = { he: 'he-IL', en: 'en-US', es: 'es-ES', 'pt-BR': 'pt-BR', fr: 'fr-FR', it: 'it-IT' }
 
 /** PayPal's own locale spelling, which uses an underscore and no others. */
-export const PAYPAL_LOCALE: Record<PublicLocale, string> = { he: 'he_IL', en: 'en_US', es: 'es_ES', 'pt-BR': 'pt_BR', fr: 'fr_FR' }
+export const PAYPAL_LOCALE: Record<PublicLocale, string> = { he: 'he_IL', en: 'en_US', es: 'es_ES', 'pt-BR': 'pt_BR', fr: 'fr_FR', it: 'it_IT' }
 
 /**
  * The `Intl` tag of a language that reached us as a plain string — a prop typed
@@ -131,6 +138,7 @@ export function publicLocaleEnabled(
     es: flags.es ?? spanishSiteEnabled(),
     'pt-BR': flags['pt-BR'] ?? portugueseSiteEnabled(),
     fr: flags.fr ?? frenchSiteEnabled(),
+    it: flags.it ?? italianSiteEnabled(),
   }
   return gates[locale]
 }
