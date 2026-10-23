@@ -45,6 +45,7 @@ import type { SiteSignals } from '../../free-check/html-signals'
 process.env.NEXT_PUBLIC_SPANISH_SITE_ENABLED = 'true'
 process.env.NEXT_PUBLIC_PORTUGUESE_SITE_ENABLED = 'true'
 process.env.NEXT_PUBLIC_FRENCH_SITE_ENABLED = 'true'
+process.env.NEXT_PUBLIC_ITALIAN_SITE_ENABLED = 'true'
 
 let pass = 0, fail = 0
 function check(name: string, cond: boolean, detail?: string) {
