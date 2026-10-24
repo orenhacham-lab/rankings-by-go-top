@@ -6080,6 +6080,7 @@ export const dashboardEs: DeepPartial<DashboardDictionary> = {
       phoneHint: 'Sin números de teléfono en el texto: Google los rechaza. Para las llamadas usa el botón «Llamar».',
       imageLabel: 'Foto',
       imageHint: 'Recortamos a 1200×900 (4:3), tal como lo muestra Google. JPG, PNG o WebP.',
+      imageConsent: 'Sube solo una foto que tengas derecho a publicar y, si aparece una persona, solo si aceptó que se publique en tu perfil de empresa en Google para promocionar el negocio (un menor necesita el consentimiento de su madre, padre o tutor).',
       imageUpload: 'Subir una foto',
       imageFromArticle: 'Imagen del artículo',
       imageGenerate: 'Crear una foto',
