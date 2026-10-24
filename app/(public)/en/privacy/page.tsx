@@ -93,7 +93,8 @@ export default function EnglishPrivacyPage() {
           <li><strong>Creem:</strong> for payment processing, where an account&rsquo;s payment goes through it. To
           open a payment we send the e-mail address of the account, the identifier of the plan chosen and our
           own reference for that request, and we receive back a customer identifier held by them, a plan
-          identifier, the subscription status and the dates of the billing period. Card details, and any other
+          identifier, the subscription status, the dates of the billing period, the amount of the payment taken and the
+          payment&rsquo;s own identifier. Card details, and any other
           payment instrument, never reach us at any point</li>
           <li><strong>Supabase:</strong> for secure data storage</li>
           <li><strong>Serper:</strong> for Google search queries and rank checks</li>

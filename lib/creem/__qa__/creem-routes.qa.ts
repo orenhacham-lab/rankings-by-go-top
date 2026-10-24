@@ -239,7 +239,14 @@ console.log('\nD) nothing a caller sends becomes a price or a redirect')
    * into the provider's body for the rest. Agreed with the legal thread on
    * 2026-10-10: this guard holds a sentence that is already published.
    */
-  const INBOUND_FIELDS = ['id', 'status', 'productId', 'customerId', 'currentPeriodStart', 'currentPeriodEnd', 'metadata']
+  // `lastTransaction` was added on 2026-10-24 with the affiliate bridge
+  // (lib/affiliate/creem-bridge.ts): a partner is paid 30% of what the
+  // customer ACTUALLY paid, so the payment's amount and its own id are read
+  // back too — and the published sentence was extended, in all six languages,
+  // in the same change rather than left behind by it. The field list stays
+  // closed: it is the buyer's identity that must never be read out of a
+  // provider's body, and D12-MUT below is the proof that it still cannot be.
+  const INBOUND_FIELDS = ['id', 'status', 'productId', 'customerId', 'currentPeriodStart', 'currentPeriodEnd', 'metadata', 'lastTransaction']
   const client = read('lib/creem/client.ts')
   const parsed = client.slice(client.lastIndexOf('    value: {'))
   // `[:,]` so a shorthand property (`status,`) counts like a written one.
@@ -250,6 +257,23 @@ console.log('\nD) nothing a caller sends becomes a price or a redirect')
   check('D12-MUT: reading the buyer\'s e-mail out of the response would be caught',
     [...`${parsed.slice(0, parsed.indexOf('\n    },'))}\n      email: stringOf(body.customer_email),`
       .matchAll(/^\s{6}([A-Za-z_][A-Za-z0-9_]*)[:,]/gm)].length !== INBOUND_FIELDS.length)
+
+  // The sentence is published in six languages. Code that reads an amount
+  // while a translation still says we receive only ids and dates is exactly
+  // the drift this guard exists to prevent.
+  const PRIVACY_AMOUNT: [string, string][] = [
+    ['app/(legal)/privacy/page.tsx', 'סכום התשלום שנגבה ומזהה התשלום'],
+    ['app/(public)/en/privacy/page.tsx', 'the amount of the payment taken'],
+    ['content/legal/es/privacy.md', 'el importe del pago cobrado'],
+    ['content/legal/fr/privacy.md', 'le montant du paiement prélevé'],
+    ['content/legal/it/privacy.md', "l'importo del pagamento riscosso"],
+    ['content/legal/pt-BR/privacy.md', 'o valor do pagamento cobrado'],
+  ]
+  const missing = PRIVACY_AMOUNT.filter(([file, phrase]) => !read(file).includes(phrase)).map(([file]) => file)
+  check('D12b: every language says the payment amount is received, as the client now reads it',
+    missing.length === 0, missing.join(','))
+  check('D12b-MUT: a language left behind would be caught',
+    PRIVACY_AMOUNT.filter(([, phrase]) => !'a text that says nothing of the sort'.includes(phrase)).length === PRIVACY_AMOUNT.length)
 
   // And nothing on the Creem path persists a buyer field, including the
   // customer id the client parses: it is read so a response can be matched,

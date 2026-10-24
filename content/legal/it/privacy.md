@@ -56,7 +56,7 @@ Non condividiamo le Sue informazioni personali con terzi, salvo con:
 
 - **Shopify:** per il trattamento dei pagamenti degli account fatturati tramite Shopify App Pricing, e per pubblicare contenuto in un negozio connesso
 - **PayPal:** per il trattamento dei pagamenti, unicamente dei clienti fatturati tramite il sito Web
-- **Creem:** per il trattamento dei pagamenti, quando il pagamento di un account passa attraverso di esso. All'apertura di un pagamento gli inviamo l'indirizzo di posta elettronica dell'account, l'identificatore del piano scelto e il nostro riferimento di quella richiesta, e riceviamo un identificatore di cliente nel suo sistema, un identificatore di piano, lo stato dell'abbonamento e le date del periodo di fatturazione. I dati della carta, e di qualsiasi altro mezzo di pagamento, non arrivano mai fino a noi, in nessun momento
+- **Creem:** per il trattamento dei pagamenti, quando il pagamento di un account passa attraverso di esso. All'apertura di un pagamento gli inviamo l'indirizzo di posta elettronica dell'account, l'identificatore del piano scelto e il nostro riferimento di quella richiesta, e riceviamo un identificatore di cliente nel suo sistema, un identificatore di piano, lo stato dell'abbonamento, le date del periodo di fatturazione, l'importo del pagamento riscosso e l'identificatore del pagamento. I dati della carta, e di qualsiasi altro mezzo di pagamento, non arrivano mai fino a noi, in nessun momento
 - **Supabase:** per la conservazione sicura dei dati
 - **Serper:** per le interrogazioni di ricerca Google e le verifiche di posizionamento
 - **Resend:** per l'invio di posta elettronica; si veda « Messaggi di posta elettronica » più in basso
