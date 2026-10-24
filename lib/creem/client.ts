@@ -48,6 +48,33 @@ export interface CreemCheckoutSession {
   checkoutUrl: string
 }
 
+/**
+ * The subscription's most recent transaction — the only place Creem reports a
+ * real amount per payment.
+ *
+ * Amounts are MINOR UNITS (cents), exactly as Creem sends them; converting
+ * them is the reader's job and is done in one place
+ * (lib/affiliate/creem-bridge.ts::commissionBase).
+ *
+ * `taxAmount` is reported separately because Creem is the merchant of record
+ * and collects the tax: tax is not our revenue, so it is not a partner's
+ * commission base either.
+ */
+export interface CreemTransactionSnapshot {
+  /** The payment's own id (`tran_…`) — unique per payment, which is what
+   *  makes it the idempotency key for a commission. The subscription id is
+   *  NOT: every renewal would look like the same payment. */
+  id: string
+  currency: string | null
+  /** What the customer was charged. */
+  amount: number | null
+  /** What was actually collected; equal to `amount` on an ordinary payment. */
+  amountPaid: number | null
+  taxAmount: number | null
+  refundedAmount: number | null
+  status: string | null
+}
+
 export interface CreemSubscriptionSnapshot {
   id: string
   status: string
@@ -61,6 +88,10 @@ export interface CreemSubscriptionSnapshot {
   /** What we attached at checkout, echoed back. Only ever read for OUR
    *  reference id, and never trusted as an authorisation on its own. */
   metadata: Record<string, unknown> | null
+  /** The last payment on this subscription, when Creem reported one. Read
+   *  only for affiliate bookkeeping; nothing about the entitlement depends
+   *  on it. */
+  lastTransaction: CreemTransactionSnapshot | null
 }
 
 /** An object field, whether Creem sends `product` as an id or as an object. */
@@ -75,6 +106,39 @@ function idOf(value: unknown): string | null {
 
 function stringOf(value: unknown): string | null {
   return typeof value === 'string' && value.trim() ? value.trim() : null
+}
+
+/** A money field as a finite number, or null. Never coerced from nonsense:
+ *  a commission is not computed from a figure we had to guess at. */
+function minorAmountOf(value: unknown): number | null {
+  if (typeof value === 'number') return Number.isFinite(value) ? value : null
+  if (typeof value === 'string' && value.trim()) {
+    const parsed = Number(value)
+    return Number.isFinite(parsed) ? parsed : null
+  }
+  return null
+}
+
+/**
+ * Creem's transaction object, as it appears on a subscription
+ * (`last_transaction`) and on an event body. Returns null unless it carries
+ * an id, because an amount without a payment id cannot be booked
+ * idempotently.
+ */
+export function creemTransactionOf(value: unknown): CreemTransactionSnapshot | null {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return null
+  const raw = value as Record<string, unknown>
+  const id = stringOf(raw.id)
+  if (!id) return null
+  return {
+    id,
+    currency: stringOf(raw.currency),
+    amount: minorAmountOf(raw.amount),
+    amountPaid: minorAmountOf(raw.amount_paid) ?? minorAmountOf(raw.amountPaid),
+    taxAmount: minorAmountOf(raw.tax_amount) ?? minorAmountOf(raw.taxAmount),
+    refundedAmount: minorAmountOf(raw.refunded_amount) ?? minorAmountOf(raw.refundedAmount),
+    status: stringOf(raw.status),
+  }
 }
 
 async function creemFetch(
@@ -210,6 +274,7 @@ export async function fetchCreemSubscription(
       currentPeriodStart: stringOf(body.current_period_start_date) ?? stringOf(body.current_period_start),
       currentPeriodEnd: stringOf(body.current_period_end_date) ?? stringOf(body.current_period_end),
       metadata,
+      lastTransaction: creemTransactionOf(body.last_transaction) ?? creemTransactionOf(body.lastTransaction),
     },
   }
 }
