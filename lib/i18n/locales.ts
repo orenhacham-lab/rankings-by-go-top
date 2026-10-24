@@ -75,6 +75,19 @@ export const LOCALE_CONFIG: Record<PublicLocale, { dir: 'rtl' | 'ltr'; lang: str
  */
 export const INTL_LOCALE: Record<PublicLocale, string> = { he: 'he-IL', en: 'en-US', es: 'es-ES', 'pt-BR': 'pt-BR', fr: 'fr-FR', it: 'it-IT' }
 
+/**
+ * The SHORT name of each language, in its own script, for a control too narrow
+ * for the full name.
+ *
+ * Hebrew keeps its whole name because that name is already short, and because
+ * "HE" is not what Hebrew calls itself; every other language is its two-letter
+ * code, which is what the dashboard's switcher has always shown. One map, used
+ * by both switchers (components/DashboardLanguageSwitcher.tsx and
+ * components/LanguageSwitcher.tsx in its compact form), so the two cannot drift
+ * apart and a seventh language is named once.
+ */
+export const LOCALE_SHORT_LABEL: Record<PublicLocale, string> = { he: 'עברית', en: 'EN', es: 'ES', 'pt-BR': 'PT', fr: 'FR', it: 'IT' }
+
 /** PayPal's own locale spelling, which uses an underscore and no others. */
 export const PAYPAL_LOCALE: Record<PublicLocale, string> = { he: 'he_IL', en: 'en_US', es: 'es_ES', 'pt-BR': 'pt_BR', fr: 'fr_FR', it: 'it_IT' }
 
