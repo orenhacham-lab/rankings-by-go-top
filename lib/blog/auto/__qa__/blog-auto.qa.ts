@@ -545,6 +545,23 @@ async function main() {
     && !/(?<!\p{L})(?:TODO|TBD|FIXME)(?!\p{L})/u.test('sobre todo')
     && !/(?<!\p{L})(?:TODO|TBD|FIXME)(?!\p{L})/u.test('Método'))
 
+  /*
+   * I10-I11: A LANGUAGE THAT CANNOT RESEARCH MUST SAY SO.
+   * French published nothing for its first four days. Every run reached it and
+   * answered `skipped: 'queue_empty'`, because the keyword research 404'd —
+   * 'FR' and 'fr' were missing from lib/google-ads/constants.ts and the request
+   * went out as `geoTargetConstants/undefined`. Both maps are
+   * `Record<string, number>`, so nothing failed to compile, and the only trace
+   * was in a runtime log this plan keeps for one hour.
+   */
+  check('I10: the window logs why the top-up added nothing, not just that the queue is empty',
+    /topUpError: summary\.topUpError/.test(windowSrc))
+  check('I11: an unknown market is refused by name instead of sent as "undefined"', (() => {
+    const src = stripComments(read('lib/google-ads/keyword-ideas.ts'))
+    return /unknown_geo_target/.test(src) && /unknown_language/.test(src)
+      && src.indexOf('unknown_geo_target') < src.indexOf('geoTargetConstants: [')
+  })())
+
   // ============================================================
   // H) THE BODY'S LINKS
   // ============================================================
