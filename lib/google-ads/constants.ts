@@ -19,6 +19,21 @@
  * The language chooses which keyword IDEAS Google returns; the country chooses
  * the search volumes. They are independent of the UI locale and of the project's
  * content language, which is lib/content/language.ts.
+ *
+ * France and Italy were added on 24 October 2026, read back from the API the
+ * same way (FR 2250, IT 2380, fr 1002, it 1004). They were missing while the
+ * blog already asked for them: lib/blog/auto/keyword-plan.ts declares
+ * `fr: { country: 'FR', language: 'fr' }`, both maps are `Record<string,
+ * number>` so nothing failed to compile, and the request went out as
+ * `geoTargetConstants/undefined`. Google answered 404 NOT_FOUND, the research
+ * returned no ideas, the French queue stayed empty, and the French blog never
+ * published a word — four days, with no error anywhere but the raw runtime log.
+ * markets.qa.ts pins these two as well, and blog-auto.qa.ts now asserts that
+ * every market the blog research asks for resolves in both maps.
+ *
+ * SUPPORTED_COUNTRIES and SUPPORTED_LANGUAGES below are deliberately NOT
+ * widened: they drive the keyword-research screen's pickers, whose labels are
+ * translated per locale, and the blog's own research does not go through them.
  */
 
 export const COUNTRY_GEO_TARGETS: Record<string, number> = {
@@ -32,6 +47,8 @@ export const COUNTRY_GEO_TARGETS: Record<string, number> = {
   AR: 2032, // Argentina
   BR: 2076, // Brazil
   PT: 2620, // Portugal
+  FR: 2250, // France
+  IT: 2380, // Italy
 }
 
 export const LANGUAGE_IDS: Record<string, number> = {
@@ -42,6 +59,8 @@ export const LANGUAGE_IDS: Record<string, number> = {
   ru: 1031, // Russian
   es: 1003, // Spanish
   pt: 1014, // Portuguese
+  fr: 1002, // French
+  it: 1004, // Italian
 }
 
 export const SUPPORTED_COUNTRIES = ['IL', 'US', 'GB', 'ES', 'MX', 'AR', 'BR', 'PT', 'GR', 'CY'] as const

@@ -108,6 +108,11 @@ export async function runBlogDailyWindow(
     published: summary.published?.slug ?? null,
     planned: summary.planned,
     topUpAdded: summary.topUpAdded,
+    // Without this a language whose research fails reads as a quiet
+    // `skipped: 'queue_empty'` forever: French published nothing for four days
+    // and the reason (a 404 from the keyword research) was only in the raw
+    // runtime log, which this plan keeps for one hour.
+    topUpError: summary.topUpError,
     skipped: summary.skipped,
     failure: summary.failure,
     durationMs: summary.durationMs,
