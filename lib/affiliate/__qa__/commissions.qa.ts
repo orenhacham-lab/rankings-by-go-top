@@ -409,6 +409,49 @@ async function main() {
       disputed.kind === 'reversal'
       && a.tables.affiliate_commissions.find((c) => c.external_payment_id === 'tran_2')?.reversed_reason === 'chargeback',
       JSON.stringify(disputed))
+    // `transaction_id` is the name Creem's own refund API uses for this
+    // reference (POST /v1/refunds), so it has to be the first one read.
+    const byApiName = books()
+    await recordCommissionForPayment(byApiName, { userId: 'cust-1', externalPaymentId: 'tran_7', amount: 79, currency: 'USD', source: 'creem', earnedAt: NOW })
+    const apiShape = await applyCreemEventToAffiliateBooks(byApiName, {
+      eventType: 'refund.created', object: { id: 'ref_11', transaction_id: 'tran_7', status: 'succeeded' },
+    }, creem(), NOW)
+    check('H8c: a refund naming the payment as transaction_id reverses it',
+      apiShape.kind === 'reversal' && apiShape.outcome.kind === 'reversed'
+      && byApiName.tables.affiliate_commissions[0]?.status === 'reversed', JSON.stringify(apiShape))
+
+    // Creem's refund status is an enum of five, and two of them mean no money
+    // went back. A commission must not be taken away for those.
+    for (const status of ['failed', 'canceled']) {
+      const kept = books()
+      await recordCommissionForPayment(kept, { userId: 'cust-1', externalPaymentId: 'tran_8', amount: 79, currency: 'USD', source: 'creem', earnedAt: NOW })
+      const untouched = await applyCreemEventToAffiliateBooks(kept, {
+        eventType: 'refund.created', object: { id: 'ref_12', transaction_id: 'tran_8', status },
+      }, creem(), NOW)
+      check(`H8d: a refund reported as ${status} takes nothing from the partner`,
+        untouched.kind === 'reversal_not_applicable' && kept.tables.affiliate_commissions[0]?.status === 'pending',
+        JSON.stringify(untouched))
+    }
+    const pendingRefund = books()
+    await recordCommissionForPayment(pendingRefund, { userId: 'cust-1', externalPaymentId: 'tran_9', amount: 79, currency: 'USD', source: 'creem', earnedAt: NOW })
+    const onPending = await applyCreemEventToAffiliateBooks(pendingRefund, {
+      eventType: 'refund.created', object: { id: 'ref_13', transaction_id: 'tran_9', status: 'pending' },
+    }, creem(), NOW)
+    check('H8e: a pending refund still reverses — Creem has no refund.succeeded event to wait for',
+      onPending.kind === 'reversal' && pendingRefund.tables.affiliate_commissions[0]?.status === 'reversed',
+      JSON.stringify(onPending))
+    /* H8d-MUT: a guard that read the status as a whole-string match against
+       'failed' only, or that let an unknown status through as refused, would
+       either take a commission on a cancelled refund or never reverse at all. */
+    check('H8d-MUT: an unrecognised status does not block the reversal',
+      (await (async () => {
+        const odd = books()
+        await recordCommissionForPayment(odd, { userId: 'cust-1', externalPaymentId: 'tran_10', amount: 79, currency: 'USD', source: 'creem', earnedAt: NOW })
+        return applyCreemEventToAffiliateBooks(odd, {
+          eventType: 'refund.created', object: { id: 'ref_14', transaction_id: 'tran_10', status: 'requiresAction' },
+        }, creem(), NOW)
+      })()).kind === 'reversal')
+
     const bareRefund = await applyCreemEventToAffiliateBooks(books(), {
       eventType: 'refund.created', object: { id: 'ref_10' },
     }, creem(), NOW)

@@ -30,10 +30,12 @@
  *                         payment, and a partner would be paid once and never
  *                         again — a failure nobody notices for months.
  *   refund.created        the money went back: reverse that payment's
- *   dispute.created       commission. Both carry the transaction they are
- *                         about; without it nothing is reversed and the event
- *                         is reported, because lib/creem/events.ts already
- *                         raises these two for a human.
+ *   dispute.created       commission, unless the provider reports the refund
+ *                         itself as failed or cancelled. Both carry the
+ *                         transaction they are about; without it nothing is
+ *                         reversed and the event is reported, because
+ *                         lib/creem/events.ts already raises these two for a
+ *                         human.
  *   subscription.canceled / expired / unpaid
  *                         the customer stopped paying: the referral stops
  *                         counting towards the partner's 40% tier. Commissions
@@ -81,6 +83,9 @@ export type CreemBridgeOutcome =
   | { kind: 'unusable_event'; eventType: string; reason: string }
   | { kind: 'commission'; outcome: CommissionOutcome }
   | { kind: 'reversal'; outcome: ReversalOutcome }
+  /** A refund the provider reports as failed or cancelled: no money went
+   *  back, so nothing is taken from the partner. */
+  | { kind: 'reversal_not_applicable'; eventType: string; status: string }
   | { kind: 'churn'; applied: boolean }
   /** A genuine event about a subscription that is not in our table (another
    *  environment's). Never creates anything. */
@@ -103,6 +108,10 @@ const CHURN_EVENTS = new Set(['subscription.canceled', 'subscription.expired', '
 /** Currencies a commission can be booked in (./commissions.ts), and the only
  *  ones whose minor unit is a hundredth. */
 const MINOR_UNIT_HUNDREDTHS = new Set(['ILS', 'USD'])
+
+function stringOf(value: unknown): string | null {
+  return typeof value === 'string' && value.trim() ? value.trim() : null
+}
 
 /** An id whether Creem sends the field as a string or as a nested object. */
 function idOf(value: unknown): string | null {
@@ -217,9 +226,27 @@ export async function applyCreemEventToAffiliateBooks(
   }
 
   if (REVERSAL_EVENTS.has(eventType)) {
+    // A refund that the provider says did not happen must not take a
+    // commission away. Creem's refund status is a five-value enum
+    // (POST /v1/refunds: pending, requiresAction, succeeded, failed,
+    // canceled), and only the last two mean no money went back. Everything
+    // else reverses, `pending` included: Creem's event table has no
+    // refund.succeeded to wait for (lib/creem/events.ts), so holding out for
+    // a terminal status would mean never reversing at all.
+    const refundStatus = (stringOf(object.status) ?? '').toLowerCase()
+    if (refundStatus === 'failed' || refundStatus === 'canceled' || refundStatus === 'cancelled') {
+      return { kind: 'reversal_not_applicable', eventType, status: refundStatus }
+    }
+
     // The refund's or dispute's OWN id is not the payment's: reversing by it
     // would look for a commission that never existed and reverse nothing.
-    const transactionId = idOf(object.transaction)
+    // `transaction_id` is the name Creem's own refund API gives this
+    // reference (POST /v1/refunds takes `transaction_id: tran_…`), so it is
+    // tried first; the others are the shapes the same reference takes
+    // elsewhere in Creem's bodies.
+    const transactionId = idOf(object.transaction_id)
+      ?? idOf(object.transactionId)
+      ?? idOf(object.transaction)
       ?? idOf(object.last_transaction)
       ?? idOf(object.payment)
     if (!transactionId) return { kind: 'unusable_event', eventType, reason: 'no_transaction_reference' }
@@ -249,5 +276,6 @@ export function creemBridgeOutcomeIsNotable(outcome: CreemBridgeOutcome): boolea
   if (outcome.kind === 'commission') return outcome.outcome.kind === 'recorded' || outcome.outcome.kind === 'failed'
   if (outcome.kind === 'reversal') return outcome.outcome.kind !== 'nothing_to_reverse'
   if (outcome.kind === 'churn') return true
-  return outcome.kind === 'failed' || outcome.kind === 'unusable_event' || outcome.kind === 'amount_unverifiable'
+  return outcome.kind === 'failed' || outcome.kind === 'unusable_event'
+    || outcome.kind === 'amount_unverifiable' || outcome.kind === 'reversal_not_applicable'
 }
