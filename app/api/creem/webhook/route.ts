@@ -6,6 +6,7 @@ import { lockBillingMarket } from '@/lib/billing/billing-market-selection'
 import { storedMarketOf, STORED_MARKET_KEY } from '@/lib/billing/server-market'
 import { isShopifyBillingRequiredForUser } from '@/lib/shopify/paypal-block'
 import { CREEM_MARKET } from '@/lib/creem/checkout-products'
+import { applyCreemEventToAffiliateBooks, creemBridgeOutcomeIsNotable } from '@/lib/affiliate/creem-bridge'
 import {
   httpStatusForCreemOutcome,
   processVerifiedCreemEvent,
@@ -100,6 +101,24 @@ async function handle(request: Request): Promise<Response> {
   // them the plan or make Creem retry an event whose real work succeeded.
   if (outcome.kind === 'activated') {
     await lockMarketForCreemPayer(admin, outcome.userId)
+  }
+
+  // The affiliate books, as a SEPARATE pass with its own failure handling,
+  // exactly as the PayPal route does it (app/api/paypal/webhook/route.ts).
+  // Creem is the merchant of record abroad, so without this a partner who
+  // sent us a paying customer earns nothing. It runs AFTER the entitlement is
+  // saved and cannot change this route's answer: the customer's plan is the
+  // product, the partner's commission is our bookkeeping, and a failure here
+  // must never make Creem retry a delivery whose real work succeeded.
+  try {
+    const books = await applyCreemEventToAffiliateBooks(admin, parsed as CreemWebhookEvent, {
+      fetchSubscription: (subscriptionId) => fetchCreemSubscription(subscriptionId),
+    })
+    if (creemBridgeOutcomeIsNotable(books)) console.log('[creem-webhook] affiliate books', books)
+  } catch (affiliateError) {
+    console.error('[creem-webhook] affiliate bookkeeping threw', {
+      name: affiliateError instanceof Error ? affiliateError.name : 'unknown',
+    })
   }
 
   const status = httpStatusForCreemOutcome(outcome)

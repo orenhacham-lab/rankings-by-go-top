@@ -3,8 +3,10 @@
  *
  * "30% of every payment, for as long as the customer keeps paying" is only true
  * if something runs on every payment. That something is here, called from the
- * PayPal webhook (app/api/paypal/webhook/route.ts) — the one place this app is
- * told that a customer has actually paid.
+ * two webhooks this app is told about a real payment by: PayPal
+ * (app/api/paypal/webhook/route.ts, via ./paypal-bridge.ts) and Creem
+ * (app/api/creem/webhook/route.ts, via ./creem-bridge.ts), which is the
+ * merchant of record for card payments outside Israel.
  *
  * DELIBERATELY NOT INSIDE lib/paypal/webhook-processing.ts. That module's
  * outcome contract and its QA suite are about `subscriptions`, and a commission
@@ -38,7 +40,7 @@ import { commissionAmount, effectiveRate, releaseAt } from './rates'
 type Admin = any
 
 export type CommissionCurrency = 'ILS' | 'USD'
-export type CommissionSource = 'paypal' | 'shopify' | 'manual'
+export type CommissionSource = 'paypal' | 'shopify' | 'creem' | 'manual'
 
 export interface PaymentCredit {
   /** The account that paid. */
