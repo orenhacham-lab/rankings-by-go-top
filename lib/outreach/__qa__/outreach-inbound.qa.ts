@@ -14,7 +14,8 @@
 import { FakeAdmin } from '@/lib/__qa__/_fake-admin'
 import { withMutant } from '@/lib/reminders/__qa__/_mutant'
 import { SUPPRESSION_TABLE, hashEmail } from '@/lib/email-suppression'
-import { handleInboundReply, isOptOut, messageText, ownWords, senderAddress } from '../inbound'
+import { recipientIn } from '../bounce'
+import { handleInboundReply, isOptOut, messageText, ownWords, payloadShape, senderAddress } from '../inbound'
 import { authorized, handleInbound } from '../inbound-http'
 
 let pass = 0
@@ -122,6 +123,28 @@ async function main() {
     messageText(delivery(ADDR, 'no', 'go away')).subject === 'go away'
     && messageText(delivery(ADDR, 'no')).body === 'no')
 
+  // THE REAL BOUNCE OF 23 OCT 2026, under field names this module did not read.
+  const realReport = "This is the mail system at host relay.mailchannels.net.\n\n<sales@velocitymachine.com>: host\n    d331210a.ess.barracudanetworks.com[209.222.82.252] said: 550 permanent\n    failure for one or more recipients (sales@velocitymachine.com:blocked)"
+  check('S7: the body is found under a name we did not know, as the longest prose',
+    messageText({ subject: 'Undelivered Mail Returned to Sender', detail: { rawMessage: realReport } }).body === realReport)
+  check('S8: and the report then names its recipient',
+    recipientIn(messageText({ detail: { rawMessage: realReport } }).body) === 'sales@velocitymachine.com')
+  check('S9: an HTML-only body is read as text',
+    messageText({ htmlBody: '<p>Your message to <b>info@example.com</b> couldn&#39;t be delivered.</p>' })
+      .body.includes("to info@example.com couldn't be delivered"))
+  check('S10: an encoded attachment is never mistaken for the message',
+    messageText({ attachment: 'QUJD'.repeat(60) }).body === '')
+  check('S11: a known name still wins over a longer stranger',
+    messageText({ text: 'no thanks', other: 'x'.repeat(50) + ' and more words here' }).body === 'no thanks')
+
+  const mutBody = await withMutant<{ messageText: typeof messageText }, boolean>(
+    'lib/outreach/inbound.ts',
+    [[/  const fallback = strings/, '  const fallback: string | undefined = undefined\n  const unusedStrings = strings']],
+    (m) => m.messageText({ detail: { rawMessage: realReport } }).body === '',
+  )
+  check('S7-MUT: without the fallback the real bounce body is lost again',
+    mutBody === true)
+
   // ── The decision ───────────────────────────────────────────────────────────
   const listA = emptyList()
   check('D1: a refusal puts the address on the list',
@@ -213,6 +236,24 @@ async function main() {
     (m) => m.authorized(post({}, null), {}),
   )
   check('A1-MUT: an endpoint that opened up when unconfigured would be caught', mutAuth)
+
+  // The shape is logged when a report names no recipient, so it must carry
+  // field names and nothing a business wrote or we sent.
+  const secretPayload = { message: { from: 'sales@example.com', text: 'Please remove me, 550 rejected', uid: 7 } }
+  const shape = payloadShape(secretPayload)
+  check('P1: the payload shape names the fields',
+    shape === '{message:{from:string,text:string,uid:number}}')
+  check('P2: and carries no value from the payload',
+    !shape.includes('example.com') && !shape.includes('remove') && !shape.includes('550') && !shape.includes('7'))
+
+  const mutShape = await withMutant<{ payloadShape: typeof payloadShape }, boolean>(
+    'lib/outreach/inbound.ts',
+    [[/if \(depth > 4 \|\| payload === null \|\| typeof payload !== 'object'\) return typeof payload/,
+      "if (depth > 4 || payload === null || typeof payload !== 'object') return String(payload)"]],
+    (m) => m.payloadShape(secretPayload).includes('sales@example.com'),
+  )
+  check('P2-MUT: a shape that printed values would leak the message',
+    mutShape === true)
 
   console.log(`\n${pass} passed, ${fail} failed`)
   if (fail > 0) process.exit(1)

@@ -157,6 +157,25 @@ const get = async (fetchPage: PageFetcher, url: string): Promise<FetchedPage | n
 }
 
 /**
+ * The name to address this business by.
+ *
+ * A member list gives a name a person wrote ("Dunn-Bybee Tool Company"), and
+ * that is always the best one. A search gives a domain, and a message that
+ * opens with "a question about valleytool.net's organic traffic" reads like
+ * what it is. So where the name we were handed is only the host, the business's
+ * own page title stands in: the part before its first separator, which is how
+ * nearly every small site writes its name before its tagline.
+ */
+export function companyName(given: string, title: string, host: string): string {
+  const looksLikeHost = given.trim().toLowerCase().replace(/^www\./, '') === host
+  if (!looksLikeHost) return given
+  const head = title.split(/\s[|\u2013\u2014\u00b7:]\s|\s-\s/)[0]?.replace(/\s+/g, ' ').trim() ?? ''
+  // "Home", "Welcome" and the like name nothing; the host is more honest.
+  if (head.length < 3 || head.length > 120 || /^(home|welcome|index|home page)$/i.test(head)) return given
+  return head
+}
+
+/**
  * Read the business's own site and decide.
  *
  * Returns the draft a writer may insert, or the reason it may not, and in both
@@ -194,7 +213,8 @@ export async function qualifyBusiness(input: QualifyInput, fetchPage: PageFetche
 
   // The listing's anchor text is sometimes shorter than the business's own
   // name, so the site's own title gets the same reading.
-  const offTargetTitle = offTargetSector(pageTitle(home.body) ?? '')
+  const title = pageTitle(home.body) ?? ''
+  const offTargetTitle = offTargetSector(title)
   if (offTargetTitle !== null) {
     return { ok: false, reason: 'off_target_sector', detail: offTargetTitle, pagesRead }
   }
@@ -258,7 +278,7 @@ export async function qualifyBusiness(input: QualifyInput, fetchPage: PageFetche
     ok: true,
     pagesRead,
     draft: {
-      company: input.company.slice(0, 120),
+      company: companyName(input.company, title, host).slice(0, 120),
       siteHost: host,
       email: email.toLowerCase(),
       platform: platform.platform,

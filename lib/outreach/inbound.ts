@@ -112,24 +112,80 @@ function addressIn(value: unknown): string | null {
   return null
 }
 
-/** Everything in the payload that could carry the person's words. */
+/** Keys a provider puts the message text under, best first. */
+const BODY_KEYS = [
+  'text', 'textBody', 'text_body', 'plain', 'plainBody', 'bodyPlain', 'body_plain',
+  'stripped-text', 'strippedText', 'body', 'content', 'message', 'snippet', 'preview',
+  'html', 'htmlBody', 'bodyHtml', 'body_html',
+]
+
+/**
+ * A mark that is really an HTML tag, not a bounce's `<address@host>`: a tag name
+ * is letters and digits, then whitespace, a slash or the closing bracket.
+ */
+const HTML_TAG = /<\/?[a-z][a-z0-9]*(?:\s[^>]*)?\/?>/i
+
+/** Tags out, entities in: an HTML-only part still has to be readable. */
+function asText(value: string): string {
+  if (!HTML_TAG.test(value) && !/&(nbsp|lt|gt|amp|quot|#39);/i.test(value)) return value
+  return value
+    .replace(/<(script|style)[\s\S]*?<\/\1>/gi, ' ')
+    .replace(/<br\s*\/?>|<\/p>|<\/div>|<\/tr>/gi, '\n')
+    .replace(/<[^>]+>/g, ' ')
+    .replace(/&nbsp;/gi, ' ')
+    .replace(/&lt;/gi, '<').replace(/&gt;/gi, '>').replace(/&amp;/gi, '&')
+    .replace(/&quot;/gi, '"').replace(/&#39;/gi, "'")
+    // Stripping tags leaves the gaps they stood in; a reader of this text
+    // matches on words, so the gaps must not become part of them.
+    .replace(/[^\S\n]{2,}/g, ' ')
+    .trim()
+}
+
+/** A string that could be a message rather than an id, a flag or an attachment. */
+function looksLikeProse(value: string): boolean {
+  if (value.length < 40) return false
+  // A long run with no whitespace is an encoded attachment or a token, never prose.
+  return /\s/.test(value.slice(0, 200))
+}
+
+/**
+ * Everything in the payload that could carry the person's words.
+ *
+ * WHY THIS IS NOT ONE FIELD LOOKUP. On 26 Oct 2026 every delivery report since
+ * 22 Oct was stored as "unreadable report" with no recipient, while the same
+ * bodies read straight from the mailbox parse correctly — so the field this
+ * read was looking in is not the field the provider fills. A brake that depends
+ * on one provider's spelling of "text" is a brake that disappears when the
+ * provider renames it, so this takes the known names first, then the longest
+ * piece of prose anywhere in the payload, and reads HTML as text either way.
+ */
 export function messageText(payload: unknown): { subject: string; body: string } {
-  const read = (keys: string[]): string => {
-    const seen = new Set<unknown>()
-    const walk = (node: unknown, depth: number): string | null => {
-      if (depth > 6 || node === null || typeof node !== 'object' || seen.has(node)) return null
-      seen.add(node)
-      const record = node as Record<string, unknown>
-      for (const key of keys) if (typeof record[key] === 'string' && record[key]) return record[key] as string
-      for (const value of Object.values(record)) {
-        const found = walk(value, depth + 1)
-        if (found) return found
-      }
-      return null
+  const strings: { key: string; value: string }[] = []
+  const seen = new Set<unknown>()
+  const walk = (node: unknown, depth: number): void => {
+    if (depth > 6 || node === null || typeof node !== 'object' || seen.has(node)) return
+    seen.add(node)
+    for (const [key, value] of Object.entries(node as Record<string, unknown>)) {
+      if (typeof value === 'string' && value) strings.push({ key, value })
+      else walk(value, depth + 1)
     }
-    return walk(payload, 0) ?? ''
   }
-  return { subject: read(['subject']), body: read(['text', 'textBody', 'body', 'plain', 'snippet']) }
+  walk(payload, 0)
+
+  const subject = strings.find((s) => s.key === 'subject')?.value ?? ''
+  const named = BODY_KEYS.map((key) => strings.filter((s) => s.key === key))
+    .flat()
+    .map((s) => asText(s.value))
+    .find((text) => text.trim().length > 0)
+  if (named !== undefined) return { subject, body: named }
+
+  // Nothing under a name we know: take the longest prose in the payload, which
+  // is the report or the reply itself, and never the subject we already have.
+  const fallback = strings
+    .filter((s) => s.key !== 'subject' && looksLikeProse(s.value))
+    .map((s) => asText(s.value))
+    .sort((a, b) => b.length - a.length)[0]
+  return { subject, body: fallback ?? '' }
 }
 
 export type InboundOutcome =
@@ -143,6 +199,19 @@ export type InboundOutcome =
   | { action: 'no_sender' }
   /** The person asked to stop and we could not record it: the provider should retry. */
   | { action: 'failed' }
+
+/**
+ * The payload's field names, nested, with no values: what a log may carry when
+ * a provider's shape turns out not to be the shape this module reads.
+ */
+export function payloadShape(payload: unknown, depth = 0): string {
+  if (depth > 4 || payload === null || typeof payload !== 'object') return typeof payload
+  if (Array.isArray(payload)) return payload.length === 0 ? '[]' : `[${payloadShape(payload[0], depth + 1)}]`
+  const parts = Object.entries(payload as Record<string, unknown>)
+    .slice(0, 24)
+    .map(([key, value]) => `${key}:${payloadShape(value, depth + 1)}`)
+  return `{${parts.join(',')}}`
+}
 
 /**
  * The decisions this endpoint makes, in the order that matters.
@@ -166,6 +235,23 @@ export async function handleInboundReply(
 
   const report = classifyDelivery({ sender: email, subject, body })
   if (report !== null) {
+    // A REPORT WE CANNOT NAME A RECIPIENT FOR IS A BRAKE THAT DID NOT ENGAGE.
+    // On 26 Oct 2026 every one of sixteen reports since 22 Oct was stored with
+    // no recipient and detail "unreadable report", while the same report bodies
+    // parse correctly when read straight from the mailbox. So the body the
+    // provider POSTs is not the body of the report, and the only way to tell
+    // which field carries it is to see the payload's shape. Keys and lengths
+    // only: a bounce body carries a business's address and our own message, and
+    // neither belongs in a log.
+    if (report.recipient === null) {
+      console.warn('[outreach-inbound] report with no recipient', {
+        kind: report.kind,
+        detail: report.detail,
+        subjectLength: subject.length,
+        bodyLength: body.length,
+        shape: payloadShape(payload),
+      })
+    }
     const recorded = await recordDeliveryReport(admin, report, now)
     // A report we could not write down is one the provider should deliver
     // again: these are the channel's brakes, and a lost bounce is a brake that
@@ -173,6 +259,18 @@ export async function handleInboundReply(
     if (recorded === null) return { action: 'failed' }
     if (recorded.kind === 'hard_bounce' && recorded.attributed && recorded.emailHash !== null) {
       await parkBouncedProspect(admin, recorded.emailHash)
+      // AND THE ADDRESS ITSELF, not just this one prospect row. A permanent
+      // failure means the address is dead or closed to us; parking the row
+      // stops this channel's second message, while the suppression list stops
+      // every sender in the product, which is what a dead address warrants.
+      if (report.recipient !== null) {
+        await suppress(admin, {
+          email: report.recipient,
+          source: 'hard_bounce',
+          channel: 'outbound_prospect',
+          note: recorded.detail,
+        })
+      }
     }
     return { action: 'delivery_report', kind: recorded.kind, attributed: recorded.attributed }
   }
