@@ -22,6 +22,7 @@
 import type { TopUpSummary } from './topup'
 import { runProspectTopUp } from './topup'
 import { fetchPublicPage } from './sender-isolated'
+import { createSerperSearch } from '@/lib/seed-scan/serper'
 
 export const SOURCING_FLAG = 'OUTREACH_SOURCING_ENABLED'
 
@@ -32,7 +33,15 @@ export type IsolatedTopUpOutcome =
 export async function runIsolatedProspectTopUp(
   run: () => Promise<TopUpSummary> = async () => {
     const { createAdminClient } = await import('@/lib/supabase/admin')
-    return runProspectTopUp(createAdminClient(), { fetchPage: fetchPublicPage, now: new Date() })
+    // The search the pass tries before the directories. It is the rank
+    // scanner's own provider and key; without a key every search answers
+    // `search_unavailable` and the pass is the directories alone, which is the
+    // same pass this cron ran before the search existed.
+    return runProspectTopUp(createAdminClient(), {
+      fetchPage: fetchPublicPage,
+      now: new Date(),
+      search: createSerperSearch(),
+    })
   },
   opts: { env?: Record<string, string | undefined> } = {},
 ): Promise<IsolatedTopUpOutcome> {

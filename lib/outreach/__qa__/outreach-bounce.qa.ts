@@ -270,8 +270,14 @@ async function main() {
     && events[0].attributed === true && events[0].kind === 'hard_bounce')
   check('I1b: and that address is parked, so the follow-up never goes to it',
     f.tables[PROSPECTS_TABLE][0].status === 'disqualified' && f.tables[PROSPECTS_TABLE][0].note === 'hard bounce')
-  check('I1c: a bounce is not an opt-out, so nothing is added to the suppression list',
-    f.tables[SUPPRESSION_TABLE].length === 0)
+  // A PERMANENT FAILURE ALSO CLOSES THE ADDRESS, product-wide. Parking the row
+  // stops this channel's follow-up; the suppression list stops every sender,
+  // which is what a dead or closed address warrants. It is recorded as a bounce
+  // and not as an opt-out, because nobody asked us for anything.
+  check('I1c: and the address itself goes on the suppression list as a bounce',
+    f.tables[SUPPRESSION_TABLE].length === 1
+    && f.tables[SUPPRESSION_TABLE][0].source === 'hard_bounce'
+    && f.tables[SUPPRESSION_TABLE][0].email === PROSPECT)
 
   // THE DB-TOOLCO CASE, end to end.
   f = world()
@@ -285,6 +291,8 @@ async function main() {
     && String(events[0].detail).includes('unmatched recipient'))
   check('I2b: and it leaves our own prospect alone',
     f.tables[PROSPECTS_TABLE][0].status === 'sent_first')
+  check('I2c: and suppresses nothing, because the address is not ours to close',
+    f.tables[SUPPRESSION_TABLE].length === 0)
 
   // Two of ours: the channel stops itself.
   f = world([prospectRow()], [event(), event({ id: 'e2', occurred_at: '2026-10-16T13:45:00Z' })])
@@ -399,8 +407,11 @@ Subject: a question about Store Example's organic traffic
   check('I8: a bounce whose text reads like a refusal is still counted as a bounce',
     outcome.action === 'delivery_report' && f.tables[DELIVERY_EVENTS_TABLE].length === 1
     && f.tables[DELIVERY_EVENTS_TABLE][0].attributed === true)
-  check('I8b: and the mail system\'s own address is not put on the suppression list',
-    f.tables[SUPPRESSION_TABLE].length === 0)
+  // The address closed is the business's, which the report names. The mail
+  // system's own address is the sender of the report and never its subject.
+  check('I8b: and the address closed is the business\'s, never the mail system\'s',
+    f.tables[SUPPRESSION_TABLE].length === 1
+    && f.tables[SUPPRESSION_TABLE][0].email === PROSPECT)
 
   const mutOrder = await withMutant<{ handleInboundReply: typeof handleInboundReply }, boolean>(
     'lib/outreach/inbound.ts',
@@ -468,6 +479,21 @@ Subject: a question about Store Example's organic traffic
   )
   check('B13-MUT: without the prose patterns both real bounces go unattributed',
     mutProse === true)
+
+  const mutClose = await withMutant<{ handleInboundReply: typeof handleInboundReply }, boolean>(
+    'lib/outreach/inbound.ts',
+    [[/      if \(report\.recipient !== null\) \{/, '      if (false) {']],
+    async (m) => {
+      const open = world()
+      await m.handleInboundReply(
+        delivery('MAILER-DAEMON@smtp.hostinger.com', 'Undelivered Mail Returned to Sender', bounceBody(PROSPECT)),
+        asAdmin(open), NOW,
+      )
+      return open.tables[SUPPRESSION_TABLE].length === 0
+    },
+  )
+  check('I1c-MUT: without that step a dead address stays open to every sender',
+    mutClose === true)
 
   console.log(`\n${pass} passed, ${fail} failed`)
   if (fail > 0) process.exit(1)

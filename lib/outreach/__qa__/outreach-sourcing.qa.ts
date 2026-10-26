@@ -61,6 +61,15 @@ import {
   type TopUpSummary,
 } from '../topup'
 import { SOURCING_FLAG, runIsolatedProspectTopUp } from '../topup-isolated'
+import {
+  AGGREGATOR_HOSTS,
+  PLACES,
+  TRADES,
+  isAggregator,
+  searchCandidates,
+  searchQuery,
+} from '../search-source'
+import type { SearchFn } from '@/lib/seed-scan/serper'
 
 let pass = 0
 let fail = 0
@@ -442,8 +451,10 @@ async function main() {
 
   const mutRotation = await withMutant<{ runProspectTopUp: typeof runProspectTopUp }, TopUpSummary>(
     'lib/outreach/topup.ts',
-    [[/      summary\.refusals\.push\(`\$\{candidate\.host\}: \$\{written\}`\)\n    \}\n  \}/,
-      '      summary.refusals.push(`${candidate.host}: ${written}`)\n    }\n    return summary\n  }']],
+    // The bug, in the shape it has now: a source that answered but added
+    // nothing ends the pass, because examine() reports the pass as over.
+    [[/    summary\.refusals\.push\(`\$\{candidate\.host\}: \$\{written\}`\)\n  \}\n  return false/,
+      '    summary.refusals.push(`${candidate.host}: ${written}`)\n  }\n  return true']],
     async (m) => m.runProspectTopUp(
       asAdmin(world()), { fetchPage: twoNet, now: NOW, startAt: 0, sources: TWO },
     ),
@@ -822,6 +833,92 @@ async function main() {
 
   check('T2-MUT: and without the suppression check somebody who opted out would come back',
     mutSuppression === true)
+
+  console.log('\n— W: the search that keeps the list filling —')
+
+  // The grid moves on every pass, and that is the whole point: a directory can
+  // only answer with the members it has, while a trade and a town is a new
+  // question every quarter hour.
+  const q1 = searchQuery(new Date('2026-10-26T15:00:00Z'))
+  const q2 = searchQuery(new Date('2026-10-26T15:15:00Z'))
+  check('W1: two passes a quarter hour apart ask different things',
+    q1 !== q2 && q1.length > 0)
+  check('W1b: and a query is a trade and a place, both from the grid',
+    TRADES.some((t) => q1.startsWith(t)) && PLACES.some((pl) => q1.endsWith(pl)))
+  const seenQueries = new Set<string>()
+  for (let i = 0; i < TRADES.length; i += 1) {
+    seenQueries.add(searchQuery(new Date(Date.parse('2026-10-26T15:00:00Z') + i * 15 * 60 * 1000)))
+  }
+  check('W1c: a full turn of the grid repeats nothing',
+    seenQueries.size === TRADES.length)
+
+  const searchOf = (domains: string[]): SearchFn => async () => ({ ok: true, domains })
+  const hits = await searchCandidates(searchOf(['store.example', 'www.store.example', 'yelp.com', 'bbb.org', 'indeed.com', 'mit.edu']), NOW)
+  check('W2: the search names the businesses it found',
+    hits.reachable && hits.candidates.length === 1 && hits.candidates[0].host === 'store.example')
+  check('W2b: and never a directory, a jobs board or a school',
+    !hits.candidates.some((c) => /yelp|bbb|indeed|mit/.test(c.host)))
+  check('W3: an aggregator is recognised with or without www, and by subdomain',
+    isAggregator('www.yelp.com') && isAggregator('biz.yelp.com') && isAggregator('HOUZZ.COM')
+    && !isAggregator('store.example'))
+  check('W3b: every host in the list is bare, so the subdomain rule can work',
+    AGGREGATOR_HOSTS.every((h) => h === h.toLowerCase() && !h.startsWith('www.') && h.includes('.')))
+
+  const failing: SearchFn = async () => ({ ok: false, code: 'search_unavailable' })
+  const noKey = await searchCandidates(failing, NOW)
+  check('W4: no key or no answer is not a pass spent',
+    noKey.reachable === false && noKey.candidates.length === 0)
+
+  // End to end: the search supplies the business and the pass writes it down.
+  const searched = world()
+  summary = await runProspectTopUp(asAdmin(searched), {
+    fetchPage: site({ home: `<html><title>Store Example LLC | Nashville</title>${SHOPIFY}${US_ADDRESS}${CONTACT}</html>` }),
+    now: NOW,
+    search: searchOf(['store.example']),
+    sources: [],
+  })
+  check('W5: a business the search named is qualified and added',
+    summary.added === 'store.example' && summary.source?.startsWith('search: ') === true)
+  check('W5b: and it is named as its own site names it, not by its domain',
+    searched.tables[PROSPECTS_TABLE][0].company === 'Store Example LLC')
+
+  // A search that answers nothing addable must not end the pass: the
+  // directories still get their turn, which is the T7 rule applied here.
+  const bothNet = async (url: string): Promise<FetchedPage> => {
+    if (url === 'https://good.example/directory/') {
+      return page('<a href="https://store.example">Store Example LLC</a>', 200, url)
+    }
+    return site({ home: `<html><title>Store Example LLC | Nashville</title>${SHOPIFY}${US_ADDRESS}${CONTACT}</html>` })(url)
+  }
+  summary = await runProspectTopUp(asAdmin(world()), {
+    fetchPage: bothNet,
+    now: NOW,
+    startAt: 0,
+    search: searchOf([]),
+    sources: [{ name: 'good-directory', url: 'https://good.example/directory/' }],
+  })
+  check('W6: a search that found nothing leaves the directories their turn',
+    summary.added === 'store.example')
+
+  const mutSearchFirst = await withMutant<{ runProspectTopUp: typeof runProspectTopUp }, TopUpSummary>(
+    'lib/outreach/topup.ts',
+    [[/  if \(deps\.search !== undefined\) \{/, '  if (false) {']],
+    async (m) => m.runProspectTopUp(asAdmin(world()), {
+      fetchPage: site({ home: `<html><title>Store Example LLC</title>${SHOPIFY}${US_ADDRESS}${CONTACT}</html>` }),
+      now: NOW,
+      search: searchOf(['store.example']),
+      sources: [],
+    }),
+  )
+  check('W5-MUT: without the search the pass has nothing but the directories',
+    mutSearchFirst.added === null)
+
+  // The cron's own wiring: the search must actually be handed to the pass, or
+  // everything above is a feature no deployment has.
+  const isolatedSource = readFileSync(join(__dirname, '..', 'topup-isolated.ts'), 'utf8')
+  check('W7: the cron hands the pass the Serper search',
+    /search:\s*createSerperSearch\(\)/.test(isolatedSource)
+    && /from '@\/lib\/seed-scan\/serper'/.test(isolatedSource))
 
   console.log(`\n${pass} passed, ${fail} failed`)
   if (fail > 0) process.exit(1)
