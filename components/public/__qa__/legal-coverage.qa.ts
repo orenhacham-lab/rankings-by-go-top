@@ -296,6 +296,12 @@ check('MUTATION — an English-only extra section is caught', pages.he.terms.h2 
     // send nothing of theirs to it.
     'docs.creem.io': 'a documentation link cited in a code comment; not fetched',
     'www.creem.io': 'Creem\u2019s own Buyer Terms, linked for the customer to read; not fetched',
+    // Our own listing on a third-party AI-tool index, named in the
+    // Organization's `sameAs` (lib/seo/organization.ts) so a resolver can tie
+    // the profile to this entity. A URL printed in markup for a reader to
+    // follow; nothing of a customer's is sent to it. apps.shopify.com,
+    // wordpress.org and www.youtube.com are in this list already, below.
+    'aitoolsatlas.ai': 'our own listing, named in Organization.sameAs; not fetched',
     'help.shopify.com': 'a documentation link shown to a merchant',
     'search.google.com': 'a link a customer clicks to their own Search Console',
     'google.com': 'the search engine whose public results are read, with no customer data attached',

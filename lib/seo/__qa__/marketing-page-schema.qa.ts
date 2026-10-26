@@ -9,6 +9,7 @@ import { readFileSync, readdirSync, statSync } from 'node:fs'
 import { join, dirname } from 'node:path'
 import { PLAN_CATALOG, PLAN_CODES } from '../../plans/catalog'
 import { LOCALE_PREFIX, type PublicLocale } from '../../i18n/locales'
+import { organizationSchema } from '../organization'
 import { faqPageSchema, marketingBreadcrumbSchema, websiteSchema } from '../page-schema'
 import { softwareOffer } from '../software-offer'
 
@@ -63,7 +64,11 @@ check('websiteSchema names the publishing Organization by id', site.publisher['@
 check('websiteSchema declares no SearchAction', !('potentialAction' in site))
 
 const layout = stripComments(read('app/layout.tsx'))
-check('the Organization declares the id the WebSite points at', layout.includes("'@id': 'https://www.gotopseo.com/#organization'"))
+// The literal used to sit inline in the layout; it now comes from the one
+// module both JSON-LD surfaces build from (lib/seo/organization.ts), so the
+// id the WebSite points at is asserted where it is actually defined.
+check('the Organization declares the id the WebSite points at',
+  organizationSchema('x')['@id'] === site.publisher['@id'] && layout.includes('organizationSchema('))
 check('the layout emits the WebSite', /websiteSchema\(locale, schema\.description\)/.test(layout))
 
 // ------------------------------------------------------------- the price range
