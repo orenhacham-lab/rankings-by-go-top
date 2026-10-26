@@ -201,6 +201,8 @@ export const projectSettingsFr: DeepPartial<DashboardDictionary> = {
       authorBoxImageSiteIcon: 'L’icône du site',
       authorBoxImageHint: 'La petite icône que votre site WordPress affiche dans l’onglet du navigateur, montrée en rond à côté du nom.',
       authorBoxImageMissing: 'Votre site n’a pas d’icône, l’encadré n’affichera donc aucune image.',
+      authorBoxImageNeedsSite: 'Une fois votre site WordPress connecté, vous pourrez choisir une image pour l’encadré, y compris la vôtre.',
+      authorBoxImageNotOnStore: 'Sur une boutique Shopify, l’encadré s’affiche sans image.',
       authorBoxOverridesUnavailable: 'Le nom, le lien et l’image ne sont pas encore modifiables sur votre compte.',
       authorBoxImageUpload: 'Une photo que j’envoie',
       authorBoxPhotoHint: 'JPEG, PNG ou WebP, jusqu’à 2 Mo. Nous conservons une copie sans ses données d’appareil et de localisation, et nous la copions dans la médiathèque de votre site WordPress lors de la publication d’un article.',

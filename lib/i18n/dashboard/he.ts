@@ -469,6 +469,8 @@ export const dashboardHe = {
       authorBoxImageSiteIcon: 'סמל האתר',
       authorBoxImageHint: 'הסמל הקטן שאתר הוורדפרס שלכם מציג בלשונית הדפדפן, בעיגול ליד השם.',
       authorBoxImageMissing: 'לאתר שלכם אין סמל אתר, לכן בתיבה לא תופיע תמונה.',
+      authorBoxImageNeedsSite: 'אחרי שתחברו את אתר הוורדפרס שלכם תוכלו לבחור תמונה לתיבה, כולל תמונה משלכם.',
+      authorBoxImageNotOnStore: 'בחנות שופיפיי התיבה מוצגת בלי תמונה.',
       authorBoxOverridesUnavailable: 'השם, הקישור והתמונה עוד לא פתוחים לעריכה בחשבון שלכם.',
       authorBoxImageUpload: 'תמונה שאעלה',
       authorBoxPhotoHint: 'JPEG, PNG או WebP, עד 2MB. נשמור עותק ללא נתוני המצלמה והמיקום, ובפרסום מאמר נעתיק אותו לספריית המדיה של אתר הוורדפרס שלכם.',
