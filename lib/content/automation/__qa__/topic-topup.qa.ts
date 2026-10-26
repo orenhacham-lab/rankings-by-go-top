@@ -205,14 +205,23 @@ async function main() {
     ['generated_articles', 'subscriptions', 'usage_reservations', 'ai_usage_logs', 'article_pools', 'projects'].every((k) => JSON.stringify(tb[k]) === JSON.stringify(before[k])))
   check('…and the merchant\'s own topic and queue item are as they were',
     JSON.stringify(tb.article_topics.find((r) => r.id === 'old1')) === JSON.stringify(before.article_topics[0]) && JSON.stringify(tb.article_pool_items.slice(0, 2)) === JSON.stringify(before.article_pool_items))
-  check('no model: the plan\'s own ideas were enough', calls.generate.length === 0 && s1.modelProjects === 0)
+  // 26 Oct 2026 — the queue is still filled from the plan itself, free. What changed is
+  // that a plan left with less than a month of ideas to APPROVE is now topped up too
+  // (thinPlans), so the model runs for ONE such project a run. See topup-idea-stock.qa.ts.
+  check('the queue was filled from the plan itself, not by the model', s1.promoted === 5 && s1.queued === 3)
+  check('…and the model ran only for the plan\'s own stock: one project, by name',
+    s1.thinPlans >= 1 && s1.modelProjects === 1 && calls.generate.length === 1, JSON.stringify(s1))
   check('the summary counts it', s1.state === 'ran' && s1.promoted === 5 && s1.queued === 3 && s1.notEntitled === 1 && s1.skippedOverlap >= 2, JSON.stringify(s1))
   check('one log line, with counts and no titles', l1.length === 1 && l1[0].startsWith('[topic-topup] run') && !l1[0].includes('האקונה'), l1.join(' | '))
 
   console.log('\nI) idempotent')
   const writesBefore = t.writes.length
   const { value: s2, lines: l2 } = await capture(() => runTopicTopUp(t.admin, { env: PROD, deadlineAt: T0 + 280_000, deps: deps({}, calls) }))
-  check('a second run finds enough everywhere: no write, no line', t.writes.length === writesBefore && s2.promoted === 0 && s2.enough === 2 && l2.length === 0, JSON.stringify(s2))
+  // The queues are covered, so nothing is promoted and no topic or queue item is
+  // written. The model may still stock a thin plan, which writes ideas only.
+  const topicWrites = (w: { table: string }[]) => w.filter((x) => x.table !== 'content_topic_ideas').length
+  check('a second run promotes nothing and writes no topic or queue item',
+    s2.promoted === 0 && topicWrites(t.writes.slice(writesBefore)) === 0, JSON.stringify(s2))
   const race = tracked(new FakeAdmin(world()))
   await capture(() => Promise.all([
     runTopicTopUp(race.admin, { env: PROD, deadlineAt: T0 + 280_000, deps: deps() }),
@@ -340,7 +349,7 @@ function sourceGuards() {
   // 18 Oct 2026: the candidates are the plans that ran dry, else the plans that hold
   // old stock only (STALE_IDEA_DAYS); every other guard on the model is unchanged.
   const modelOk = (f: string) => /if \(slot > 0 && candidates\.length > 0\)/.test(f)
-    && /const candidates = stillShort\.length > 0 \? stillShort : stalePlans/.test(f)
+    && /const candidates = stillShort\.length > 0 \? stillShort : thinPlans\.length > 0 \? thinPlans : stalePlans/.test(f)
     && /timeLeft >= MIN_MS_FOR_MODEL && summary\.modelProjects < MODEL_PROJECTS_PER_RUN/.test(f)
     && f.indexOf('await deps.modelAllowed(scope.userId)') > 0 && f.indexOf('await deps.modelAllowed(scope.userId)') < f.indexOf('await deps.generate(scope)')
   check('S5 the model: not in the first quarter hour, one project, time left, the AI gate first', modelOk(fn))

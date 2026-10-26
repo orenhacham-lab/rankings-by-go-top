@@ -194,11 +194,14 @@ export interface TopUpSummary {
   modelIdeas: number
   /** Projects whose plan holds only ideas older than STALE_IDEA_DAYS. */
   stalePlans: number
+  /** Projects whose PUBLISH queue is full but whose plan holds less than a month of
+   *  ideas for the merchant to approve (26 October 2026 — see thinPlans below). */
+  thinPlans: number
   failures: number
 }
 
 const EMPTY = (state: TopUpSummary['state']): TopUpSummary =>
-  ({ state, projectsChecked: 0, notEntitled: 0, enough: 0, promoted: 0, queued: 0, skippedOverlap: 0, skippedOffSubject: 0, modelProjects: 0, modelIdeas: 0, stalePlans: 0, failures: 0 })
+  ({ state, projectsChecked: 0, notEntitled: 0, enough: 0, promoted: 0, queued: 0, skippedOverlap: 0, skippedOffSubject: 0, modelProjects: 0, modelIdeas: 0, stalePlans: 0, thinPlans: 0, failures: 0 })
 
 function defaultDeps(admin: Admin): TopUpDeps {
   return {
@@ -246,6 +249,23 @@ async function countSupply(admin: Admin, scope: Scope, pool: PoolRow | null): Pr
   const { count, error } = await admin.from('article_topics').select('id', { count: 'exact', head: true })
     .eq('project_id', scope.projectId).eq('user_id', scope.userId).in('status', [...UNUSED_TOPIC_STATUSES])
   if (error) throw new Error('supply_read_failed')
+  return count ?? 0
+}
+
+/**
+ * IDEAS WAITING FOR THE MERCHANT'S APPROVAL, however old.
+ *
+ * (26 October 2026, Oren: "if topics were created and the customer does not approve
+ * them, it must create enough topics for approval to cover the month at least".)
+ * Until now the only thing measured was the PUBLISH queue, and the plan's pending
+ * ideas were the refill's source, never a target of their own. A merchant who
+ * rejected every idea while the queue was still full was therefore skipped after one
+ * count — the queue looked healthy — and the strategy tab had nothing to approve.
+ */
+async function countPendingIdeas(admin: Admin, scope: Scope): Promise<number> {
+  const { count, error } = await admin.from('content_topic_ideas').select('id', { count: 'exact', head: true })
+    .eq('project_id', scope.projectId).eq('user_id', scope.userId).eq('status', 'pending')
+  if (error) return Number.MAX_SAFE_INTEGER // unreadable: never ask the model on a guess.
   return count ?? 0
 }
 
@@ -421,6 +441,8 @@ export async function runTopicTopUp(
   const stillShort: Candidate[] = []
   /** Plans that filled the target from old stock only: fresh research for their next months. */
   const stalePlans: Candidate[] = []
+  /** Queue full, plan thin: nothing for the merchant to approve this month. */
+  const thinPlans: Candidate[] = []
 
   // Projects with an active pool first: an empty queue stops publishing.
   // More than a run's share: each quarter hour starts further along, so all are reached in the day.
@@ -447,14 +469,28 @@ export async function runTopicTopUp(
         monthlyArticles: ent.monthlyArticles, ownerProjects: ownerProjects.get(project.user_id) ?? 1, pool,
         planRhythm: ent.planRhythm ? { activeQueues: activeQueues.get(project.user_id) ?? 1, monthlyForThisSite } : null,
       })
-      if (target === 0 || (await countSupply(admin, scope, pool)) >= target) { summary.enough++; continue }
+      if (target === 0) { summary.enough++; continue }
+      if ((await countSupply(admin, scope, pool)) >= target) {
+        // The publish queue is covered. The IDEAS waiting for approval are a second,
+        // independent target: a merchant who rejects what we prepared must still find
+        // a month's worth to choose from. A rejected idea is never re-suggested (the
+        // keyword guard blocks its phrase), so the model is asked for other subjects.
+        if ((await countPendingIdeas(admin, scope)) < target) {
+          summary.thinPlans++
+          thinPlans.push({ project, pool, target, index: null })
+        } else summary.enough++
+        continue
+      }
       const index = await deps.loadIndex(scope)
       const missing = await refillFromIdeas(admin, deps, scope, project, pool, target, index, summary, { deadlineAt: options.deadlineAt - MIN_MS_FOR_PROJECT })
       if (missing > 0) { stillShort.push({ project, pool, target, index: await deps.loadIndex(scope) }); continue }
       // The target was met, but from a plan whose newest idea is old stock
       // (STALE_IDEA_DAYS): the next months are planned from July research unless the
       // model is asked. The index is read only for the one project that is picked.
-      if ((await countFreshIdeas(admin, scope, deps.now())) === 0) {
+      if ((await countPendingIdeas(admin, scope)) < target) {
+        summary.thinPlans++
+        thinPlans.push({ project, pool, target, index: null })
+      } else if ((await countFreshIdeas(admin, scope, deps.now())) === 0) {
         summary.stalePlans++
         stalePlans.push({ project, pool, target, index: null })
       }
@@ -465,7 +501,9 @@ export async function runTopicTopUp(
 
   // The model, for one project whose plan has run dry, or, when none has, one whose
   // plan is old stock only. Never in the first quarter hour.
-  const candidates = stillShort.length > 0 ? stillShort : stalePlans
+  // An empty queue first, then a plan with nothing left to approve, then a plan that
+  // is only old stock: each is a month the merchant would otherwise see nothing new in.
+  const candidates = stillShort.length > 0 ? stillShort : thinPlans.length > 0 ? thinPlans : stalePlans
   if (slot > 0 && candidates.length > 0) {
     const pick = candidates[slot % candidates.length]
     const scope = { projectId: pick.project.id, userId: pick.project.user_id }
@@ -491,8 +529,8 @@ export async function runTopicTopUp(
   }
 
   if (summary.promoted > 0 || summary.modelProjects > 0 || summary.failures > 0) {
-    const { projectsChecked, notEntitled, enough, promoted, queued, skippedOverlap, skippedOffSubject, modelProjects, modelIdeas, stalePlans, failures } = summary
-    console.log('[topic-topup] run', { slot, projectsChecked, notEntitled, enough, promoted, queued, skippedOverlap, skippedOffSubject, modelProjects, modelIdeas, stalePlans, failures })
+    const { projectsChecked, notEntitled, enough, promoted, queued, skippedOverlap, skippedOffSubject, modelProjects, modelIdeas, stalePlans, thinPlans, failures } = summary
+    console.log('[topic-topup] run', { slot, projectsChecked, notEntitled, enough, promoted, queued, skippedOverlap, skippedOffSubject, modelProjects, modelIdeas, stalePlans, thinPlans, failures })
   }
   return summary
 }
