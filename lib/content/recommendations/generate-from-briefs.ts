@@ -52,6 +52,7 @@ import { resolveRunModel, type ModelPath, type ModelTier } from './model-select'
 import { deriveProjectFocus, type ProjectContext } from './prompt-guidance'
 import { slugKey } from './dedupe'
 import { normalizeText } from './topic-idea-store'
+import { ownedServiceObjects, foreignServiceObject, serviceObjectLabels } from './service-object'
 import { buildBriefPool, buildBusinessPillars, prioritizeBriefsForSynthesis, type OpportunityBrief, type BriefPoolDiagnostics } from './opportunity-brief'
 import { integrateGscBriefs } from './gsc-briefs'
 import { isGscAutoRecommendationsEnabled } from '@/lib/gsc/config'
@@ -783,7 +784,15 @@ export async function prepareBriefRun(
   // GSC was integrated BEFORE discovery (§4a); record the post-discovery combined size.
   gscInput.combinedPoolSizeAfterDiscovery = workingPool.length
 
+  // THE SITE'S OWN SERVICE OBJECTS (26 October 2026 — see service-object.ts): the
+  // kinds of place the merchant's own pages say they serve. Read ONCE here so the
+  // deterministic gate and the prompt rule can never disagree, and EMPTY on a site
+  // that names none, which switches both off.
+  const servedObjects = ownedServiceObjects(entities.map((e) => e.name))
+
   return {
+    servedObjects,
+    servedObjectLabels: serviceObjectLabels(servedObjects),
     input,
     language,
     langLabel,
@@ -854,7 +863,7 @@ export async function synthesizeFromSnapshot(
     commercialEntityTokens, businessEvidenceTokens, evidenceProvenance,
     existingPageTitles, existingCoverageDocs, pendingExactKeys, pendingSignatures,
     pendingCoverageDocs, brandSafety, keywordResearch, ctx, year, modelPath, workingPool, briefPool,
-    discovery, evidenceInventory, tracked, projectFocus, attributeTokens,
+    discovery, evidenceInventory, tracked, projectFocus, attributeTokens, servedObjects, servedObjectLabels,
   } = snapshot
   // Synthesis model: the snapshot's resolved model by default. The QA/admin smart-run
   // harness (Increment 4) passes a modelOverride so a Flash attempt and a Pro attempt
@@ -1049,6 +1058,17 @@ export async function synthesizeFromSnapshot(
       primaryKeyword = fixedTo
       repaired = true
       intent = deriveIntent(primaryKeyword, t.title, intent)
+    }
+
+    // (2.9) SERVICE OBJECT — the candidate must be about a kind of place this site
+    // serves. Oren's report, 26 October 2026: an office-cleaning company was offered
+    // "שירותי ניקיון בתים בנתניה". The relevance vocabulary passed it because 3 of its
+    // 4 words are the site's own, so one foreign word rode in on the rest; this gate
+    // reads that one word class on its own. No repair: a different kind of customer is
+    // not a wording problem, and the aligned query would carry the same object.
+    const foreignObject = foreignServiceObject(`${primaryKeyword} ${t.title}`, servedObjects)
+    if (foreignObject) {
+      return rej('other_service_object', 'service_object', { blocker: { blockingSource: null, blockingRecordStatus: null, blockingTitle: t.title, blockingPrimaryKeyword: primaryKeyword, blockingUrl: null, matchType: `service_object:${foreignObject}` } })
     }
 
     // (3) SAFE brand gate — exact named-entity mutation only (hard, proven safe).
@@ -1571,7 +1591,7 @@ export async function synthesizeFromSnapshot(
     batch.forEach((bb, pos) => { if (!consumptionByBriefId.has(bb.opportunityId)) consumptionByBriefId.set(bb.opportunityId, { consumedRound: round, roundPosition: pos }) })
     batch.forEach((bb) => consumedIds.add(bb.opportunityId))
 
-    const prompt = buildBriefSynthesisPrompt(batch, langLabel, year)
+    const prompt = buildBriefSynthesisPrompt(batch, langLabel, year, servedObjectLabels)
     const res = await generateRecommendationJSON(
       prompt,
       { temperature: 0.4, maxOutputTokens: synthesisOutputBudget(batch.length), ...(effectiveModel ? { model: effectiveModel } : {}), responseSchema: briefSynthesisResponseSchema(batch.map((b) => b.opportunityId)) },

@@ -78,7 +78,7 @@ export function briefProvenanceBlock(): string {
 }
 
 /** Build the single batched polishing prompt. */
-export function buildBriefSynthesisPrompt(briefs: OpportunityBrief[], langLabel: string, year: number): string {
+export function buildBriefSynthesisPrompt(briefs: OpportunityBrief[], langLabel: string, year: number, servedObjects?: readonly string[]): string {
   return [
     `You are an SEO content editor. Today's year is ${year}. Return ALL text in ${langLabel}.`,
     briefProvenanceBlock(),
@@ -91,6 +91,12 @@ export function buildBriefSynthesisPrompt(briefs: OpportunityBrief[], langLabel:
     `- "must_be": "information_angle" — this brief's phrase names the business's OWN service or product, and the site already has the page that serves it, so this brief can only become an article that HELPS THE READER decide: how to choose a supplier, what to check in the contract or the quote, how often the work is needed, which standard or regulation applies, what equipment or materials are involved, how to prepare the place, what goes wrong and how to avoid it.`,
     `  Keep the subject's core words, and the "primaryKeyword" MUST also carry at least one CONTENT word of its own (a noun such as a contract, a quote, a standard or regulation, equipment, materials, preparation, a checklist, a common mistake) that appears NEITHER in the brief's "subject" NOR in its "entities". A question word alone ("מה", "איך") is NOT enough, because a phrase whose only real words are the service itself is the service page again. Never the bare service phrase, never a city-and-service phrase, and for THIS brief only, ignore the "use aligned_query verbatim" rule above.`,
     `  Do NOT skip such a brief: a reader question always exists around a service someone pays for.`,
+    ...(servedObjects && servedObjects.length > 0
+      // 26 October 2026 — the deterministic service-object gate (service-object.ts)
+      // rejects a topic about a kind of place this site does not serve, so the model
+      // is told which they are instead of spending a slot on a rejected candidate.
+      ? [`- THE SITE'S OWN CUSTOMERS: this site serves ${servedObjects.join(', ')}. Every "title" and "primaryKeyword" must be about one of those, or about no kind of place in particular. NEVER write about another kind of place or property (a private home where the site serves offices, a restaurant where it serves clinics): such a topic is about someone else's customer and is rejected.`]
+      : []),
     `- "secondaryKeywords": up to 3 phrases someone searching this exact article would use. No duplicates of the primary.`,
     `- "intent": keep the brief's intent unless it is clearly wrong for the title you wrote.`,
     `- NEVER mention search volume, demand, popularity, statistics or "many searches" anywhere.`,

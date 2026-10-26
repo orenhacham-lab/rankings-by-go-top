@@ -204,7 +204,7 @@ async function main() {
     const snap = await prepareBriefRun(fakeAdmin(tables()), { projectId: 'p1', targetCount: 8, qualityMode: 'premium' }, rr15.newRunCostController('premium', 'prep15', 8))
     const batchSize = Math.min(snap.workingPool.length, Math.max(4, Math.ceil(8 * 1.5)))
     const batch = snap.workingPool.slice(0, batchSize)
-    const exactPrompt = buildBriefSynthesisPrompt(batch, snap.langLabel, snap.year)
+    const exactPrompt = buildBriefSynthesisPrompt(batch, snap.langLabel, snap.year, snap.servedObjectLabels)
     const outputBudget = synthesisOutputBudget(batch.length)
     const measCtrl = rr15.newRunCostController('premium', 'meas15', 8)
     const exactEst = measCtrl.estimateNextCallUsd('gemini-2.5-flash', exactPrompt.length, outputBudget)
