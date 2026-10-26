@@ -582,10 +582,33 @@ function collectAllowedYears(brief: ArticleBrief): Set<string> {
   const hay = [brief.topic, brief.primaryKeyword || '', (brief.secondaryKeywords || []).join(' '), brief.briefNotes || ''].join(' ')
   return new Set(hay.match(/\b20\d{2}\b/g) || [])
 }
+/**
+ * Words whose only job is to introduce a year. Left behind when the year goes they
+ * read as a title cut off mid-sentence: a production article was titled "איך לבחור
+ * מנקה בתל אביב למשרד? המדריך המלא לשנת" because the model wrote "לשנת 2026", the
+ * year was not requested, and only the digits were removed. Every language the app
+ * writes in, longest phrase first so it wins the alternation.
+ */
+const YEAR_LEAD_WORDS = [
+  'לשנת', 'בשנת', 'לשנה', 'בשנה', 'שנת', 'שנה',
+  'for the year', 'in the year', 'the year', 'year', 'for', 'in',
+  'para el año', 'en el año', 'del año', 'para', 'año',
+  'para o ano', 'no ano', 'do ano', 'ano',
+  "pour l'année", "de l'année", 'année', 'pour',
+  "per l'anno", "nell'anno", 'anno', 'per', 'nel',
+].sort((a, b) => b.length - a.length)
+
+/** `lead? year`, where neither side may sit inside a longer word ("within 2026"). */
+function unrequestedYearRe(): RegExp {
+  const lead = YEAR_LEAD_WORDS.map((w) => w.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('|')
+  return new RegExp(`(?:(?<![\\p{L}\\p{N}])(?:${lead})[ \\u00A0]+)?(?<![\\p{L}\\p{N}])(20\\d{2})(?![\\p{L}\\p{N}])`, 'giu')
+}
+
 /** Remove any 20xx year the user did NOT request, then tidy leftover artifacts. */
-function stripUnrequestedYear(text: string, allowed: Set<string>): string {
+export function stripUnrequestedYear(text: string, allowed: Set<string>): string {
   if (!text) return text
-  let out = text.replace(/\b20\d{2}\b/g, (y) => (allowed.has(y) ? y : ''))
+  // The word that introduced the year goes with it, or the sentence reads as cut off.
+  let out = text.replace(unrequestedYearRe(), (m, y: string) => (allowed.has(y) ? m : ''))
   out = out
     .replace(/\s{2,}/g, ' ')
     .replace(/\s+([,.:;!?])/g, '$1')
