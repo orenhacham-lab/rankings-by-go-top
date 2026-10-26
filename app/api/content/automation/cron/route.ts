@@ -52,6 +52,11 @@
  * at most one project per run whose mapping is missing or ageing is mapped, so automatic
  * internal links have pages to point at. Started with the runner, awaited before the emails.
  *
+ * THEN, THE BUSINESS PROFILE POST QUEUE (lib/gbp/due-isolated.ts): the automatic posts whose
+ * article has published. Queuing happens in the publish path, but sending never can — that path
+ * is forbidden to call Google — so the queue is drained here, every fifteen minutes, instead of
+ * once a day at 07:30 UTC. The daily entry stays as a second chance at the same idempotent pass.
+ *
  * LAST OF ALL, THE REMINDER EMAIL. After the top-up, the "articles are waiting for your OK" reminder
  * (lib/reminders): OFF unless REMINDER_EMAILS_ENABLED is exactly "true", and then only at
  * 09:00 Asia/Jerusalem, Sunday to Thursday. Isolated the same way: it cannot change, delay
@@ -74,6 +79,7 @@ import { runIsolatedWeeklySummaries } from '@/lib/reports/weekly/isolated'
 import { checkPublishingStalls, isDailyStallCheckRun } from '@/lib/content/automation/stall-watch'
 import { runMapUpkeep, liveEnsure } from '@/lib/content/existing-content/map-upkeep'
 import { runBlogDailyWindow, startIsolatedBlogWindow } from '@/lib/blog/auto/daily-window'
+import { runIsolatedGbpDue } from '@/lib/gbp/due-isolated'
 
 // Generation can take a while; request a generous budget (platform clamps to the
 // plan's max — e.g. 60s on Hobby, up to 300s on Pro).
@@ -134,6 +140,12 @@ async function handle(request: Request): Promise<Response> {
     // awaited here, before the emails.
     await mapUpkeep
     await blogWindow
+    // Then the Business Profile post queue (lib/gbp/due-isolated.ts): an article that
+    // published queued its automatic post with the time set to now, and only the single
+    // daily /api/gbp/cron pass sent it, so a post queued at midday waited until the next
+    // morning. It rides this cron for the frequency, never the publish path itself, which
+    // is forbidden to call Google at all. Production only, isolated: it never throws.
+    await runIsolatedGbpDue()
     // Then the outbound-channel retention pass: it empties a prospect's address, name and
     // postal address 30 days after the last message, which the published privacy text
     // promises (lib/outreach/retention-isolated.ts). It rides this cron because a daily

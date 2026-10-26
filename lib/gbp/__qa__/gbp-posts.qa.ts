@@ -44,6 +44,7 @@ const P = require('../publish') as typeof import('../publish')
 const S = require('../store') as typeof import('../store')
 const I = require('../image') as typeof import('../image')
 const D = require('../draft') as typeof import('../draft')
+const DU = require('../due-isolated') as typeof import('../due-isolated')
 const C = require('../../../components/maps-posts/crop') as typeof import('../../../components/maps-posts/crop')
 const { dashboardHe } = require('../../i18n/dashboard/he')
 const { dashboardEn } = require('../../i18n/dashboard/en')
@@ -431,6 +432,61 @@ async function publishChecks() {
   const revoked: import('../publish').PublishDeps = { refresh: async () => { throw new E.GbpApiError('reauth_required') }, create: async () => { throw new Error('unreachable') } }
   await P.publishPost(admin, 'p4', revoked)
   check('a revoked grant marks the connection for reconnect', admin.tables.gbp_connections.find((c: any) => c.id === conn.id).status === 'reauth_required')
+
+  // ── The queue is drained every fifteen minutes, and a dead pass does not strand a post ──
+  // An automatic post is queued in the publish path with its time set to now, but the only
+  // thing that sent it was /api/gbp/cron's single daily pass at 07:30 UTC, so a post queued
+  // at midday waited for the next morning (proven in production 26 Oct 2026, a post queued
+  // at 14:16). It now also rides the 15-minute automation cron. Sending can never move INTO
+  // the publish path: lib/gbp/auto-post.ts is forbidden to call Google at all.
+  {
+    const ok: import('../publish').PublishDeps = { refresh: async () => ({ accessToken: 'at' }), create: async () => ({ name: 'accounts/111/locations/222/localPosts/9', state: 'LIVE', searchUrl: null }) }
+    const fresh = world()
+    await connectOwner(fresh)
+    const add = (id: string, patch: Record<string, unknown>) => fresh.tables.gbp_posts.push({ id, project_id: PROJECT, user_id: OWNER, summary: 'לחם', cta_type: null, cta_url: null, image_url: null, language_code: 'he', attempts: 0, scheduled_at: '2026-01-01T00:00:00.000Z', ...patch })
+    const at = (id: string) => fresh.tables.gbp_posts.find((p: any) => p.id === id)
+    const NOW = new Date('2026-10-26T15:00:00Z')
+    const stale = new Date(NOW.getTime() - S.STALE_PUBLISHING_MS - 1000).toISOString()
+    add('due', { status: 'scheduled' })
+    add('dead', { status: 'publishing', updated_at: stale })
+    add('live', { status: 'publishing', updated_at: new Date(NOW.getTime() - 1000).toISOString() })
+    const out = await P.publishDuePosts(fresh, { ...ok, now: () => NOW }, { pauseMs: 0 })
+    check('F10: one pass sends the due post AND takes over one a dead pass left claimed',
+      out.attempted === 2 && out.published === 2 && at('due').status === 'published' && at('dead').status === 'published',
+      JSON.stringify(out))
+    check('F11: a post another pass is publishing right now is left alone', at('live').status === 'publishing')
+
+    // The isolated rider the 15-minute cron calls.
+    const calls: string[] = []
+    const offProd = await DU.runIsolatedGbpDue(async () => { calls.push('ran'); return { ok: true, attempted: 0, published: 0, failed: 0 } }, { env: {}, enabled: () => true })
+    check('F12: outside Production it constructs nothing', offProd.status === 'not_production' && calls.length === 0)
+    const offFlag = await DU.runIsolatedGbpDue(async () => { calls.push('ran'); return { ok: true, attempted: 0, published: 0, failed: 0 } }, { env: { VERCEL_ENV: 'production' }, enabled: () => false })
+    check('F13: with the feature off it constructs nothing', offFlag.status === 'feature_off' && calls.length === 0)
+    const ran = await DU.runIsolatedGbpDue(async () => ({ ok: true, attempted: 2, published: 2, failed: 0 }), { env: { VERCEL_ENV: 'production' }, enabled: () => true })
+    check('F14: in Production with the flag on it drains and reports', ran.status === 'ran' && ran.attempted === 2 && ran.published === 2)
+    const threw = await DU.runIsolatedGbpDue(async () => { throw new Error('google down') }, { env: { VERCEL_ENV: 'production' }, enabled: () => true })
+    check('F15: a failure is swallowed, so it cannot delay or fail the cron', threw.status === 'error')
+
+    const cronSrc = readFileSync(join(ROOT, 'app/api/content/automation/cron/route.ts'), 'utf8').replace(/\/\*[\s\S]*?\*\/|\/\/[^\n]*/g, '')
+    check('F16: the 15-minute cron actually calls it', /runIsolatedGbpDue\(\)/.test(cronSrc))
+    const autoSrc = readFileSync(join(ROOT, 'lib/gbp/auto-post.ts'), 'utf8')
+    check('F17: and the publish path still calls neither Google nor the publisher',
+      !/publishPost|publishDuePosts|createLocalPost|\.\/publish'/.test(autoSrc))
+
+    // MUTATION: without the stale cut-off the post a dead pass left is stranded for ever.
+    add('dead2', { status: 'publishing', updated_at: stale })
+    const Sm = mutant<typeof S>('lib/gbp/store.ts', 'export const STALE_PUBLISHING_MS = 10 * 60 * 1000', 'export const STALE_PUBLISHING_MS = 10 * 60 * 1000 * 1000 * 1000')
+    // The same row, the same clock: with the real cut-off it is taken over, with a
+    // cut-off that never expires it is stranded exactly as it was before the fix.
+    const neverClaims = await Sm.claimPost(fresh, 'dead2', new Date(NOW.getTime() - Sm.STALE_PUBLISHING_MS).toISOString())
+    const reallyClaims = await S.claimPost(fresh, 'dead2', new Date(NOW.getTime() - S.STALE_PUBLISHING_MS).toISOString())
+    check('MUTATION: a cut-off that never expires leaves the dead claim unclaimable (so F10 would fail)',
+      neverClaims === null && reallyClaims?.id === 'dead2')
+    add('never_due', { status: 'scheduled', scheduled_at: '2099-01-01T00:00:00.000Z' })
+    const laterPass = await P.publishDuePosts(fresh, { ...ok, now: () => NOW }, { pauseMs: 0 })
+    check('F18: a post the merchant scheduled for later is not swept up by the pass',
+      laterPass.attempted === 0 && at('never_due').status === 'scheduled', JSON.stringify(laterPass))
+  }
 
   // MUTATION: the same three rate-limited attempts against a publisher whose bound is 30 must NOT stop.
   const Pm = mutant<typeof P>('lib/gbp/publish.ts', 'export const GBP_MAX_ATTEMPTS = 3', 'export const GBP_MAX_ATTEMPTS = 30')

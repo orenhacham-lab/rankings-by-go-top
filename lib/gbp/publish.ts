@@ -23,7 +23,7 @@ import type { LocalPostSpec } from './request'
 import { draftPost, type DraftSource } from './draft'
 import {
   applyAutoDraft, claimPost, finishPost, readGbpConnection, readProjectLocation, decryptRefreshToken, markGbpConnection,
-  duePostIds, updateGoogleState, type GbpConnectionRow, type GbpLocationRow, type GbpPostRow,
+  duePostIds, stalePublishingIds, STALE_PUBLISHING_MS, updateGoogleState, type GbpConnectionRow, type GbpLocationRow, type GbpPostRow,
 } from './store'
 
 type Admin = ReturnType<typeof createAdminClient>
@@ -102,7 +102,8 @@ export type PublishOutcome =
   | { ok: false; code: GbpErrorCode | 'not_claimable'; willRetry: boolean }
 
 export async function publishPost(admin: Admin, postId: string, deps: PublishDeps = defaultPublishDeps): Promise<PublishOutcome> {
-  const post = await claimPost(admin, postId)
+  const nowForClaim = (deps.now ?? (() => new Date()))()
+  const post = await claimPost(admin, postId, new Date(nowForClaim.getTime() - STALE_PUBLISHING_MS).toISOString())
   if (!post) return { ok: false, code: 'not_claimable', willRetry: false }
   const attempts = (post.attempts ?? 0) + 1
   const now = (deps.now ?? (() => new Date()))()
@@ -155,7 +156,13 @@ export async function publishPost(admin: Admin, postId: string, deps: PublishDep
 export async function publishDuePosts(admin: Admin, deps: PublishDeps = defaultPublishDeps, opts: { limit?: number; pauseMs?: number } = {}):
   Promise<{ attempted: number; published: number; failed: number }> {
   const now = (deps.now ?? (() => new Date()))()
-  const ids = await duePostIds(admin, now.toISOString(), opts.limit ?? 20)
+  const limit = opts.limit ?? 20
+  // Due posts first, then any a dead pass left claimed (claimPost takes those over).
+  const due = await duePostIds(admin, now.toISOString(), limit)
+  const stale = due.length < limit
+    ? (await stalePublishingIds(admin, new Date(now.getTime() - STALE_PUBLISHING_MS).toISOString(), limit - due.length)).filter((id) => !due.includes(id))
+    : []
+  const ids = [...due, ...stale]
   const sleep = deps.sleep ?? ((ms: number) => new Promise<void>((r) => setTimeout(r, ms)))
   let published = 0, failed = 0
   for (let i = 0; i < ids.length; i++) {
