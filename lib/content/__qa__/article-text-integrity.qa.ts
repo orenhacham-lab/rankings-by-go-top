@@ -19,7 +19,7 @@
  * Each group ends with a MUTATION CONTROL: the pre-fix code, proving the guard
  * fails when the bug is put back.
  */
-import { polishText, cleanMarkdown } from '../gemini-article'
+import { polishText, cleanMarkdown, stripUnrequestedYear } from '../gemini-article'
 import { indexOfCaseInsensitive } from '@/lib/text/ci-index'
 
 let pass = 0, fail = 0
@@ -93,6 +93,48 @@ async function main() {
     // MUTATION CONTROL — the pre-fix expression.
     const brokenAt = hay.toLowerCase().indexOf(needle.toLowerCase())
     check('MUTATION: the lowercased index slices a shifted, broken span (guard is real)', hay.slice(brokenAt, brokenAt + needle.length) !== needle)
+  }
+
+  console.log('\nD) removing an unrequested year never leaves a title cut off')
+  {
+    // D. A production article was titled "… המדריך המלא לשנת" — the model wrote
+    //    "לשנת 2026", the year was not requested so the digits were removed, and
+    //    the word that introduced them was left hanging. The word goes with it.
+    const none = new Set<string>()
+    const cut = 'איך לבחור מנקה בתל אביב למשרד? המדריך המלא לשנת 2026'
+    check('D1: the production title loses the year AND the word that introduced it',
+      stripUnrequestedYear(cut, none) === 'איך לבחור מנקה בתל אביב למשרד? המדריך המלא',
+      stripUnrequestedYear(cut, none))
+    check('D2: mid-sentence too, with the punctuation closing up',
+      stripUnrequestedYear('ניקיון משרדים בשנת 2026: מה חדש', none) === 'ניקיון משרדים: מה חדש',
+      stripUnrequestedYear('ניקיון משרדים בשנת 2026: מה חדש', none))
+    check('D3: a year the customer DID ask for keeps its introducing word',
+      stripUnrequestedYear('המדריך המלא לשנת 2026', new Set(['2026'])) === 'המדריך המלא לשנת 2026')
+    const langs: [string, string][] = [
+      ['Office cleaning: the complete guide for 2026', 'Office cleaning: the complete guide'],
+      ['Guía completa para el año 2026', 'Guía completa'],
+      ['Guia completo para o ano 2026', 'Guia completo'],
+      ["Le guide complet pour l'année 2026", 'Le guide complet'],
+      ["La guida completa per l'anno 2026", 'La guida completa'],
+    ]
+    for (const [src, want] of langs) {
+      check(`D4: ${src.split(' ')[0]} — the lead word goes too`, stripUnrequestedYear(src, none) === want, stripUnrequestedYear(src, none))
+    }
+    check('D5: a lead word INSIDE a longer word is untouched',
+      stripUnrequestedYear('What changed within 2026 offices', none) === 'What changed within offices',
+      stripUnrequestedYear('What changed within 2026 offices', none))
+    check('D6: a slug keeps its shape', stripUnrequestedYear('office-cleaning-guide-2026', none) === 'office-cleaning-guide')
+    check('D7: a year with no lead word before it is still removed on its own',
+      stripUnrequestedYear('Top 2026 tools', none) === 'Top tools')
+    check('D8: an allowed year and an unrequested one in the same string',
+      stripUnrequestedYear('Top 2026 tools, 2025 pricing', new Set(['2025'])) === 'Top tools, 2025 pricing',
+      stripUnrequestedYear('Top 2026 tools, 2025 pricing', new Set(['2025'])))
+
+    // MUTATION CONTROL — the pre-fix expression: the digits alone.
+    const digitsOnly = (text: string, allowed: Set<string>) => text.replace(/\b20\d{2}\b/g, (y) => (allowed.has(y) ? y : ''))
+      .replace(/\s{2,}/g, ' ').replace(/\s+([,.:;!?])/g, '$1').trim()
+    check('MUTATION: removing only the digits leaves the title cut off (so D1 would fail)',
+      digitsOnly(cut, none).endsWith('לשנת'), digitsOnly(cut, none))
   }
 
   console.log(`\n${pass} passed, ${fail} failed`)
