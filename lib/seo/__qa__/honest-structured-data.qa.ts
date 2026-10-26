@@ -7,6 +7,7 @@ import { readFileSync, readdirSync, statSync } from 'node:fs'
 import { join } from 'node:path'
 import { PLAN_CATALOG, PLAN_CODES } from '../../plans/catalog'
 import { SOFTWARE_OFFER, softwareOffer } from '../software-offer'
+import { BRAND_PROFILES, ORGANIZATION_ID, organizationSchema } from '../organization'
 
 let passed = 0
 let failed = 0
@@ -56,6 +57,49 @@ check('MUTATION CONTROL: the old layout rating is caught', hasHardcodedRating("a
 check('MUTATION CONTROL: the old /api/schema rating is caught', hasHardcodedRating("    aggregateRating: {\n      '@type': 'AggregateRating',\n      ratingValue: '5',\n      ratingCount: '100',\n    },"))
 check('MUTATION CONTROL: a commented-out rating is not counted', !hasHardcodedRating('// aggregateRating: { ratingValue: 5 }'))
 check('MUTATION CONTROL: a free-price offer is caught', /price:\s*['"]0['"]/.test("offers: { '@type': 'Offer', price: '0', priceCurrency: 'ILS' }"))
+
+// ---------------------------------------------------------------------------
+// THE ENTITY THE MARKUP NAMES IS THE PRODUCT, NOT THE AGENCY.
+//
+// gotop.co.il is a separate marketing agency that happens to share an owner.
+// When the SoftwareApplication's publisher/brand/author and the Organization's
+// parentOrganization/sameAs all pointed at it, every link and mention the SaaS
+// earned resolved to the agency's entity instead of ours.
+// ---------------------------------------------------------------------------
+const AGENCY = 'gotop.co.il'
+/** The agency named as an identity claim: brand, publisher, author, parent or sameAs. */
+const claimsAgencyIdentity = (src: string) =>
+  /(publisher|brand|author|parentOrganization)\s*:\s*\{[^}]*gotop\.co\.il/.test(src)
+  || /sameAs\s*:\s*\[[^\]]*gotop\.co\.il/.test(src)
+
+for (const [name, src] of [['app/layout.tsx', layout], ['app/api/schema/route.ts', schemaRoute]] as const) {
+  check(`${name} does not name the agency as the product's brand or publisher`, !claimsAgencyIdentity(src))
+}
+// The support address IS the agency mailbox, and the footer prints it on every
+// page, so a contactPoint naming it is honest and stays. Only identity claims
+// are the defect — this asserts the two are told apart.
+check('the agency support mailbox is still allowed as a contact', organizationSchema('x').contactPoint.email.includes(AGENCY))
+
+const org = organizationSchema('x')
+check('the organization carries the canonical @id', org['@id'] === ORGANIZATION_ID)
+check('sameAs names the product\'s own live profiles', org.sameAs.length === BRAND_PROFILES.length && org.sameAs.length >= 4)
+check('sameAs does not claim the agency site as the same entity', !org.sameAs.some((u) => u.includes(AGENCY)))
+check('every sameAs entry is an absolute https URL', org.sameAs.every((u) => u.startsWith('https://')))
+check('both surfaces reference the organization by its shared id', layout.includes('organizationSchema(') && schemaRoute.includes('organizationSchema('))
+// "Digital Marketing" is the agency's registered mark and never appears on a
+// SaaS-brand surface, legalName included.
+check('no "Digital Marketing" on the SaaS brand nodes', !/Digital Marketing/i.test(layout) && !/Digital Marketing/i.test(schemaRoute) && !/legalName/.test(JSON.stringify(org)))
+
+// MUTATION CONTROLS: break it on purpose and show the guard fails.
+check('MUTATION CONTROL: the live publisher claim is caught',
+  claimsAgencyIdentity("publisher: { '@type': 'Organization', name: 'GO TOP', url: 'https://www.gotop.co.il' },"))
+check('MUTATION CONTROL: the live parentOrganization claim is caught',
+  claimsAgencyIdentity("parentOrganization: {\n  '@type': 'Organization',\n  name: 'GO TOP',\n  url: 'https://www.gotop.co.il',\n},"))
+check('MUTATION CONTROL: the live sameAs claim is caught',
+  claimsAgencyIdentity("sameAs: ['https://www.gotop.co.il'],"))
+check('MUTATION CONTROL: a plain mailto contact is NOT caught as an identity claim',
+  !claimsAgencyIdentity("email: 'oren@gotop.co.il',"))
+
 
 console.log(`${passed} passed, ${failed} failed`)
 if (failed) process.exit(1)
