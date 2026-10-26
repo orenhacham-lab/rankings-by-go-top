@@ -26,9 +26,15 @@
  * ('upload') is drawn only as its copy in the site (authorPhoto, given by the
  * WordPress publishers: ./photo-copy.ts), never as our stored file.
  *
+ * THE PAGE THE TEST READS is one of our own published articles, or, when none
+ * is published yet, a post page of the site's own content from the cached
+ * index. A site with no post page anywhere has nothing that could show a
+ * theme's box, so the first article follows the switch and the answer is not
+ * cached: the next article tests that article's own page.
+ *
  * FAILS SAFE: no column yet (the migration is not applied), the setting off,
- * any read error, no published page, a page that could not be read or was cut
- * off: no box. Never fails a publish.
+ * any read error, a page that could not be read or was cut off: no box.
+ * Never fails a publish.
  */
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { normalizeCheckUrl } from '@/lib/free-check/url-guard'
@@ -156,6 +162,29 @@ export function isProjectPage(url: unknown, domain: unknown, platform: AuthorBox
 const URL_COLUMN: Record<AuthorBoxPlatform, string> = { wordpress: 'wp_post_url', shopify: 'shopify_article_url', webhook: 'site_post_url' }
 
 /**
+ * One post page of the SITE'S OWN content, from the cached content index: a
+ * real single-post page, which is where a theme draws its author box. Read
+ * only when none of our own articles is published yet, so a site with a blog
+ * of its own is still tested truthfully before its first article of ours.
+ * WordPress only (the index is a WordPress scan). Never throws.
+ */
+export async function findSitePostPage(admin: SupabaseClient, projectId: string, domain: string | null, platform: AuthorBoxPlatform): Promise<string | null> {
+  if (platform !== 'wordpress') return null
+  try {
+    const { data } = await admin.from('wordpress_content_index').select('project_id, targets').eq('project_id', projectId).maybeSingle()
+    const row = data as { project_id?: string; targets?: unknown } | null
+    if (!row || row.project_id !== projectId || !Array.isArray(row.targets)) return null
+    for (const t of row.targets as { targetUrl?: unknown; targetType?: unknown }[]) {
+      if (t?.targetType !== 'post') continue
+      if (isProjectPage(t.targetUrl, domain, platform)) return String(t.targetUrl)
+    }
+    return null
+  } catch {
+    return null
+  }
+}
+
+/**
  * One already-published post page of the project's site: this article's own
  * address when it has one, else the most recently published article's.
  */
@@ -180,6 +209,8 @@ export async function findPublishedPage(admin: SupabaseClient, projectId: string
 
 export type ThemeDeps = {
   fetchHtml?: typeof fetchSiteHtml
+  /** Tests only: the site's own post page (./store.ts findSitePostPage). */
+  sitePostPage?: typeof findSitePostPage
   /** The site icon's REST reads (./site-icon.ts). */
   fetchText?: FetchText
   now?: () => Date
@@ -369,11 +400,22 @@ export async function decideAuthorBox(admin: SupabaseClient, req: AuthorBoxReque
     const now = (deps.now ?? (() => new Date()))()
     let answer = cachedThemeAnswer(setting, now)
     if (answer === null) {
+      // A post page to test: ours first, else one of the site's own posts.
       const page = await findPublishedPage(admin, req.projectId, req.articleId, project.domain, req.platform)
-      // Nothing published yet: nothing to read, and nothing worth caching.
-      if (!page) return { add: false, reason: 'theme_unknown' }
-      answer = await testThemePage(page, deps.fetchHtml)
-      await storeThemeAnswer(admin, req.projectId, project.owner, answer, now)
+        ?? await (deps.sitePostPage ?? findSitePostPage)(admin, req.projectId, project.domain, req.platform)
+      if (page) {
+        answer = await testThemePage(page, deps.fetchHtml)
+        await storeThemeAnswer(admin, req.projectId, project.owner, answer, now)
+      } else {
+        // THE FIRST ARTICLE OF A SITE WITH NO POSTS AT ALL. There is no page in
+        // existence that could show a theme's author box, so the test cannot be
+        // run — and returning "unknown" here meant every new customer silently
+        // lost the box they had switched on, on their very first article. The
+        // test exists only to avoid a SECOND box, so with nothing to compare
+        // against the switch decides. Deliberately NOT cached: the next article
+        // tests this article's own published page and the real answer takes over.
+        answer = 'no_box'
+      }
     }
     if (answer === 'has_box') return { add: false, reason: 'theme_has_box' }
     if (answer !== 'no_box') return { add: false, reason: 'theme_unknown' }
