@@ -51,6 +51,15 @@ export interface OpportunityBrief {
   /** SOFT synthesis-batch priority (additive; set by prioritizeBriefsForSynthesis). Never
    *  affects pool membership — only the ORDER briefs are handed to synthesis rounds. */
   priority?: BriefPriority
+  /** TRUE when the subject expresses NOTHING the project's own pages do not already name
+   *  — every distinctive token belongs to an owned entity name or is a generic modifier.
+   *  Such a subject can only become an INFORMATION ANGLE around the service/product the
+   *  site already sells; polished as-is it is the service page re-worded, which the
+   *  worthiness gate rejects as source_only_entity_expansion and the blog gate as
+   *  commercial_page_not_blog. ADDITIVE and advisory: it changes the synthesis
+   *  INSTRUCTION only (see brief-synthesis.ts) and never pool membership, order,
+   *  score or intent. */
+  informationAngleOnly?: boolean
 }
 
 export type PillarType = 'tracked_keyword' | 'category' | 'service' | 'homepage' | 'corroborated_project_focus'
@@ -125,6 +134,8 @@ export interface BriefPoolDiagnostics {
   pool_size: number
   by_family: Record<string, number>
   with_demand: number
+  /** How many admitted briefs carry informationAngleOnly (observability only). */
+  information_angle_briefs?: number
 }
 
 const QUESTION_RE = /(?:^|\s)(?:איך|כיצד|מדוע|למה|מתי|האם|מה |מהו|מהי|כמה|how|what|when|why|which)/i
@@ -161,6 +172,46 @@ const GENERIC_CANON = new Set<string>()
 for (const g of GENERIC_TOKENS) for (const t of distinctiveTokensOf(g)) GENERIC_CANON.add(t)
 /** True when token `t` (or one of its canonical proclitic variants) is in `set`. */
 const tokenIn = (t: string, set: Set<string>): boolean => set.has(t) || canonicalVariants(t).some((v) => set.has(v))
+
+// ── INFORMATION-ANGLE briefs: a subject the site's own pages already name ──────
+// A service business's keyword research returns its own service, over and over, in
+// every city it serves: be-cln.co.il's 49 cached queries are ALL of the shape
+// "חברת ניקיון ב<city>" / "ניקיון משרדים ב<city>" (26 Oct 2026) and not one is a
+// question, a comparison or a how-to. Polished literally, each one becomes the
+// service page re-worded: evaluateArticleWorthiness rejects it as
+// source_only_entity_expansion (every token already belongs to an owned page name)
+// and decideBlogArticle rejects what survives as commercial_page_not_blog. The run
+// ends at zero while the engine reports plenty of evidence.
+//
+// The gates are RIGHT — a 20th "ניקיון משרדים ב<city>" page would cannibalize the
+// 19 the site has. What is missing is the instruction that such a brief's
+// deliverable is an INFORMATION ANGLE around that service, which is what a blog
+// article can legitimately be. So the brief is FLAGGED here and the flag travels
+// into the synthesis prompt; no gate is loosened and no brief is dropped, added or
+// re-ordered by it.
+
+/** Canonical-token union of every owned entity NAME (the same space
+ *  distinctiveTokensOf / tokenIn use). */
+export function ownedNameTokens(entities: { name: string }[]): Set<string> {
+  const out = new Set<string>()
+  for (const e of entities) for (const t of distinctiveTokensOf(e.name || '')) out.add(t)
+  return out
+}
+
+/**
+ * TRUE when the subject adds no need of its own over the project's own page names:
+ * it has at least two distinctive tokens and EVERY one of them is an owned-name
+ * token or a generic modifier. Same "all tokens known" shape the worthiness gate
+ * uses, so a flagged brief is exactly a brief whose literal polish that gate would
+ * reject. A single-token subject is never flagged (it never reaches the pool), and
+ * an empty owned-name set never flags anything.
+ */
+export function subjectAddsNothingOwned(subject: string, ownedTokens: Set<string>): boolean {
+  if (ownedTokens.size === 0) return false
+  const toks = distinctiveTokensOf(subject)
+  if (toks.length < 2) return false
+  return toks.every((t) => tokenIn(t, ownedTokens) || tokenIn(t, GENERIC_CANON))
+}
 
 export type CandidateSourceRole = 'article_candidate' | 'support_only_product'
 export interface SourceRoleClassification {
@@ -427,6 +478,9 @@ export function buildBriefPool(input: BriefPoolInput, opts?: { maxPerSubjectHead
   }
   const entityTokenIndex = buildEntityTokenIndex(input.entities)
   const coverageTokenIndex = buildCoverageTokenIndex(input.publishedCoverage)
+  // Computed ONCE for the whole pool: the owned-name token union the
+  // information-angle flag is measured against (see subjectAddsNothingOwned).
+  const ownedTokens = ownedNameTokens(input.entities)
 
   const candidates: OpportunityBrief[] = []
   let rawQuery = 0, rawTheme = 0, rawTracked = 0
@@ -449,7 +503,7 @@ export function buildBriefPool(input: BriefPoolInput, opts?: { maxPerSubjectHead
       need,
       evidence: [{ kind: 'keyword_research', text: q }],
       aligned: (kr.volume ?? 0) > 0 ? { query: q, volume: kr.volume as number } : null,
-      input, entityTokenIndex, coverageTokenIndex,
+      input, entityTokenIndex, coverageTokenIndex, ownedTokens,
     }))
   }
 
@@ -472,7 +526,7 @@ export function buildBriefPool(input: BriefPoolInput, opts?: { maxPerSubjectHead
       need: needOf(s),
       evidence: [{ kind: 'project_data', text: s }],
       aligned: exact && (exact.volume ?? 0) > 0 ? { query: exact.query, volume: exact.volume as number } : null,
-      input, entityTokenIndex, coverageTokenIndex,
+      input, entityTokenIndex, coverageTokenIndex, ownedTokens,
     }))
   }
 
@@ -489,7 +543,7 @@ export function buildBriefPool(input: BriefPoolInput, opts?: { maxPerSubjectHead
       evidence: th.entities.slice(0, 6).map((e) => ({ kind: 'site_scan' as EvidenceSourceKind, text: e.name })),
       aligned: null,
       relatedOverride: th.entities,
-      input, entityTokenIndex, coverageTokenIndex,
+      input, entityTokenIndex, coverageTokenIndex, ownedTokens,
     }))
   }
 
@@ -556,6 +610,7 @@ export function buildBriefPool(input: BriefPoolInput, opts?: { maxPerSubjectHead
       pool_size: interleaved.length,
       by_family,
       with_demand: interleaved.filter((b) => b.alignedDemandQuery).length,
+      information_angle_briefs: interleaved.filter((b) => b.informationAngleOnly).length,
     },
   }
 }
@@ -569,6 +624,8 @@ function makeBrief(args: {
   input: BriefPoolInput
   entityTokenIndex: Map<string, EntityNode[]>
   coverageTokenIndex: Map<string, string[]>
+  /** Owned-name token union for the information-angle flag; absent = no flag. */
+  ownedTokens?: Set<string>
 }): OpportunityBrief {
   const { subject, need, evidence, aligned, input } = args
   const toks = distinctiveTokensOf(subject)
@@ -594,6 +651,7 @@ function makeBrief(args: {
     publishedCoverage: covered.slice(0, 4),
     confidence,
     briefScore: Number((demandScore * 0.45 + multiSource * 0.2 + (gap ? 0.2 : 0) + confidence * 0.15).toFixed(4)),
+    ...(args.ownedTokens && subjectAddsNothingOwned(subject, args.ownedTokens) ? { informationAngleOnly: true } : {}),
   }
 }
 
