@@ -201,6 +201,8 @@ export const projectSettingsIt: DeepPartial<DashboardDictionary> = {
       authorBoxImageSiteIcon: 'L’icona del sito',
       authorBoxImageHint: 'La piccola icona che il sito WordPress mostra nella scheda del browser, visualizzata in tondo accanto al nome.',
       authorBoxImageMissing: 'Il sito non ha un’icona, quindi il riquadro non mostrerà alcuna immagine.',
+      authorBoxImageNeedsSite: 'Dopo aver collegato il sito WordPress potrai scegliere un’immagine per il riquadro, anche una tua.',
+      authorBoxImageNotOnStore: 'In un negozio Shopify il riquadro viene mostrato senza immagine.',
       authorBoxOverridesUnavailable: 'Il nome, il link e l’immagine non sono ancora modificabili su questo account.',
       authorBoxImageUpload: 'Una foto caricata da me',
       authorBoxPhotoHint: 'JPEG, PNG o WebP, fino a 2 MB. Conserviamo una copia priva dei dati di dispositivo e di posizione e la copiamo nella libreria media del sito WordPress alla pubblicazione di un articolo.',

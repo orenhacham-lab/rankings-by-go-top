@@ -337,6 +337,17 @@ function AuthorBoxFields({ projectId, disabled, unavailable, name, line, lineDis
   const choices = AUTHOR_BOX_IMAGE_CHOICES.filter(offered)
   const imageLabel: Record<AuthorBoxImageChoice, string> = { none: w.authorBoxImageNone, site_icon: w.authorBoxImageSiteIcon, upload: w.authorBoxImageUpload }
   const shown: AuthorBoxImageChoice = offered(image) ? image : 'none'
+  // WHY THERE IS NOTHING TO CHOOSE. Both images live in the customer's own site:
+  // the site icon is read from it and an uploaded photo is copied into its media
+  // library at publish time, so neither is possible before the site is connected.
+  // With only "no image" left, the whole fieldset used to disappear and the owner
+  // was left looking for an upload that no screen mentioned (be-cln.co.il, 26 Oct
+  // 2026: "it will not let me upload my own photo, something here is really broken").
+  // So the section stays, and says which case this is.
+  const imageNote = preview.status !== 'ready' || choices.length > 1 ? null
+    : preview.data.platform === 'shopify' ? w.authorBoxImageNotOnStore
+    : preview.data.platform === 'wordpress' ? w.authorBoxImageMissing
+    : w.authorBoxImageNeedsSite
   const photoUrl = preview.status === 'ready' ? preview.data.photoPreviewUrl : null
 
   return (
@@ -395,16 +406,19 @@ function AuthorBoxFields({ projectId, disabled, unavailable, name, line, lineDis
         />
         {urlInvalid && <p id="author-box-url-error" role="alert" className="mt-1 text-caption text-bad">{w.authorBoxUrlInvalid}</p>}
       </div>
-      {choices.length > 1 && (
+      {(choices.length > 1 || imageNote) && (
         <fieldset data-author-box-image="">
           <legend className="mb-1 text-copy font-semibold text-ink">{w.authorBoxImageLabel}</legend>
-          {shown !== 'upload' && <p className="mb-2 text-caption text-muted">{w.authorBoxImageHint}</p>}
-          <Segmented
-            ariaLabel={w.authorBoxImageLabel}
-            value={image}
-            onChange={onImage}
-            options={choices.map((c) => ({ value: c, label: imageLabel[c], disabled }))}
-          />
+          {choices.length > 1 && shown !== 'upload' && <p className="mb-2 text-caption text-muted">{w.authorBoxImageHint}</p>}
+          {imageNote && <p className="mb-2 text-caption text-muted" data-author-box-image-note="">{imageNote}</p>}
+          {choices.length > 1 && (
+            <Segmented
+              ariaLabel={w.authorBoxImageLabel}
+              value={image}
+              onChange={onImage}
+              options={choices.map((c) => ({ value: c, label: imageLabel[c], disabled }))}
+            />
+          )}
           {shown === 'upload' && (
             <AuthorPhotoControls projectId={projectId} disabled={disabled} stored={photo.stored} photoUrl={photoUrl}
               onView={(v) => { onPhotoView(v); setRound((n) => n + 1) }} w={w} />

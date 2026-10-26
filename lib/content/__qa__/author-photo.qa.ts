@@ -509,6 +509,36 @@ async function main() {
     check('M2: with the columns present the card can offer upload (photo editable)', loaded.ok && loaded.data.authorBoxPhotoEditable === true && loaded.data.authorBoxPhoto === false)
   }
 
+  // ── P) when there is nothing to choose, the screen says why ─────────────
+  // Both images live in the merchant's own site, so neither is possible before the
+  // site is connected. The fieldset used to vanish with only "no image" left, and
+  // the owner hunted for an upload no screen mentioned (be-cln.co.il, 26 Oct 2026).
+  console.log('\nP) nothing to choose, and the reason for it')
+  {
+    const card = strip(read('components/settings/WritingGuidanceCard.tsx'))
+    const section = (x: string) => /\{\(choices\.length > 1 \|\| imageNote\) && \(/.test(x)
+    check('P1: the image section is shown when there is a choice OR a reason to give', section(card))
+    check('MUTATION CONTROL: the old condition, which hid the section, fails P1',
+      !section(card.replace('{(choices.length > 1 || imageNote) && (', '{choices.length > 1 && (')))
+    const note = (x: string) => /const imageNote = preview\.status !== 'ready' \|\| choices\.length > 1 \? null/.test(x)
+      && /platform === 'shopify' \? w\.authorBoxImageNotOnStore/.test(x)
+      && /platform === 'wordpress' \? w\.authorBoxImageMissing/.test(x)
+      && /: w\.authorBoxImageNeedsSite/.test(x)
+    check('P2: the reason names this case: a Shopify store, a connected site with no icon, or a site not connected yet', note(card))
+    check('MUTATION CONTROL: telling a Shopify store to connect WordPress fails P2',
+      !note(card.replace("platform === 'shopify' ? w.authorBoxImageNotOnStore", "platform === 'shopify' ? w.authorBoxImageNeedsSite")))
+    check('P3: a choice of one draws no control to choose with',
+      /\{choices\.length > 1 && \(\s*<Segmented/.test(card))
+    const KEYS_P = ['authorBoxImageNeedsSite', 'authorBoxImageNotOnStore']
+    const dictAll = (l: 'he' | 'en' | 'es' | 'pt-BR') => getDashboardDictionary(l).projectSettings.writingGuidance as unknown as Record<string, string | undefined>
+    check('P4: both sentences exist in every dashboard language',
+      (['he', 'en', 'es', 'pt-BR'] as const).every((l) => KEYS_P.every((k) => {
+        const v = dictAll(l)[k]
+        return typeof v === 'string' && v.trim().length > 0
+      })))
+    check('P5: and the Hebrew one is Hebrew', /[\u0590-\u05FF]/.test(dictAll('he').authorBoxImageNeedsSite ?? ''))
+  }
+
   console.log(`\n${passed} passed, ${failed} failed`)
   if (failed) process.exit(1)
 }

@@ -199,6 +199,8 @@ export const projectSettingsPtBR: DeepPartial<DashboardDictionary> = {
       authorBoxImageSiteIcon: 'O ícone do site',
       authorBoxImageHint: 'O pequeno ícone que seu site WordPress mostra na aba do navegador, redondo ao lado do nome.',
       authorBoxImageMissing: 'Seu site não tem ícone, então a caixa não vai mostrar imagem.',
+      authorBoxImageNeedsSite: 'Depois de conectar seu site WordPress você pode escolher uma imagem para a caixa, inclusive uma sua.',
+      authorBoxImageNotOnStore: 'Em uma loja Shopify a caixa aparece sem imagem.',
       authorBoxOverridesUnavailable: 'O nome, o link e a imagem ainda não podem ser editados na sua conta.',
       authorBoxImageUpload: 'Uma foto que eu envio',
       authorBoxPhotoHint: 'JPEG, PNG ou WebP, até 2 MB. Guardamos uma cópia sem os dados da câmera e de localização e, ao publicar um artigo, a copiamos para a biblioteca de mídia do seu site WordPress.',
