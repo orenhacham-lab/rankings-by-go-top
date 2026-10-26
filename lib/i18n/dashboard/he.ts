@@ -900,6 +900,7 @@ export const dashboardHe = {
         unsafe_named_entity_mutation: 'הכותרת שינתה שם לשם שאינו בשימוש באתר שלך',
         title_named_external_business: 'הכותרת ציינה עסק שאינו שלך',
         title_unknown_latin_token: 'הכותרת השתמשה במותג או בשם שאינם בשימוש באתר שלך',
+        other_service_object: 'הנושא עסק בסוג מקום שהאתר שלך לא משרת',
         already_covered: 'האתר שלך כבר מכוון לביטוי החיפוש הזה',
         exact_existing_keyword_owner: 'עמוד קיים כבר מחזיק בביטוי החיפוש הזה',
         covered_by_existing_content: 'תוכן קיים באתר שלך כבר מכסה את זה',

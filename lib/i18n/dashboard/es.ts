@@ -1578,6 +1578,7 @@ export const dashboardEs: DeepPartial<DashboardDictionary> = {
         unsafe_named_entity_mutation: 'el título cambiaba un nombre por otro que tu web no usa',
         title_named_external_business: 'el título nombraba un negocio que no es el tuyo',
         title_unknown_latin_token: 'el título usaba una marca o un nombre que tu web no usa',
+        other_service_object: 'el tema trataba de un tipo de lugar que tu web no atiende',
         already_covered: 'tu web ya apunta a esta frase de búsqueda',
         exact_existing_keyword_owner: 'una página existente ya es dueña de esta frase de búsqueda',
         covered_by_existing_content: 'el contenido que ya tienes en la web lo cubre',

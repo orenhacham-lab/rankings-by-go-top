@@ -901,6 +901,7 @@ export const dashboardEn = {
         unsafe_named_entity_mutation: 'the title altered a name into one your site does not use',
         title_named_external_business: 'the title named a business that is not yours',
         title_unknown_latin_token: 'the title used a brand or name your site does not use',
+        other_service_object: 'the topic was about a kind of place your site does not serve',
         already_covered: 'your site already targets this search phrase',
         exact_existing_keyword_owner: 'an existing page already owns this search phrase',
         covered_by_existing_content: 'existing content on your site already covers it',

@@ -271,15 +271,15 @@ async function main() {
 
     // E.c — the site's OWN customers still come through on the guarded project, so the
     // gate costs nothing where the topic is legitimate.
-    const FRAMES = [
-      (s: string) => ['מה לבדוק בחוזה', 'לפני שחותמים'] as const,
-      (s: string) => ['תקנים ורגולציה ב', ''] as const,
-      (s: string) => ['ציוד וחומרים ל', ''] as const,
-      (s: string) => ['רשימת בדיקה ל', ''] as const,
-      (s: string) => ['הכנת המקום לפני', ''] as const,
+    const FRAMES: readonly (readonly [string, string])[] = [
+      ['מה לבדוק בחוזה', 'לפני שחותמים'],
+      ['תקנים ורגולציה ב', ''],
+      ['ציוד וחומרים ל', ''],
+      ['רשימת בדיקה ל', ''],
+      ['הכנת המקום לפני', ''],
     ]
     const angle = await engineRun('run-angle', PAGES, (b, i) => {
-      const [head, tail] = (FRAMES[i % FRAMES.length] as (s: string) => readonly [string, string])(b.subject)
+      const [head, tail] = FRAMES[i % FRAMES.length] as readonly [string, string]
       const kw = `${head} ${b.subject}`.replace(/\s+/g, ' ').trim()
       return { title: `${kw} ${tail}`.trim(), primaryKeyword: kw, secondaryKeywords: ['x'], intent: 'informational' }
     })

@@ -1514,6 +1514,7 @@ export const contentHubFr: DeepPartial<DashboardDictionary> = {
         unsafe_named_entity_mutation: 'le titre transformait un nom en un nom que votre site n’utilise pas',
         title_named_external_business: 'le titre nommait une entreprise qui n’est pas la vôtre',
         title_unknown_latin_token: 'le titre employait une marque ou un nom que votre site n’utilise pas',
+        other_service_object: 'le sujet portait sur un type de lieu que votre site ne sert pas',
         already_covered: 'votre site vise déjà cette expression de recherche',
         exact_existing_keyword_owner: 'une page existante détient déjà cette expression de recherche',
         covered_by_existing_content: 'du contenu déjà présent sur votre site la couvre',
