@@ -8,9 +8,9 @@
  * on its own storage, which is how the author photo the owner uploaded reaches a site connected by
  * the plugin alone (its bucket is private, so it has no public address), and a signed address is
  * imported once rather than once per signature. Its capability is reported as `author_photo`.
- * 3.1.3 is the release live on WordPress.org: Oren committed that tag on 20 Oct 2026 and
- * api.wordpress.org answers 3.1.3 for the slug. That release changed only the name, the tags and
- * the description the directory shows; its PHP is 3.1.2's. The two
+ * 3.2.0 is also the release live on WordPress.org: the tag was committed on 27 Oct 2026 by
+ * .github/workflows/wporg-deploy.yml in `release` mode, and api.wordpress.org answers 3.2.0 for
+ * the slug, so it is what a merchant installing or updating actually gets. The two
  * constants may differ only while the folder is ahead of the directory, and
  * APPROVED_WPORG_VERSION moves only once the tag is really there — it is what merchants are
  * offered as an update. The app gates every 3.1 feature by `>=` the site's
@@ -25,7 +25,7 @@ import { existsSync, readFileSync } from 'fs'
 import { join } from 'path'
 
 /** The release on WordPress.org today (slug go-top-seo-bridge). */
-export const APPROVED_WPORG_VERSION = '3.1.3'
+export const APPROVED_WPORG_VERSION = '3.2.0'
 /** The release in this folder (pinned below). */
 export const APPROVED_PLUGIN_VERSION = '3.2.0'
 
