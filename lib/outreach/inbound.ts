@@ -233,7 +233,7 @@ export async function handleInboundReply(
   const email = senderAddress(payload)
   const { subject, body } = messageText(payload)
 
-  const report = classifyDelivery({ sender: email, subject, body })
+  let report = classifyDelivery({ sender: email, subject, body })
   if (report !== null) {
     // A REPORT WE CANNOT NAME A RECIPIENT FOR IS A BRAKE THAT DID NOT ENGAGE.
     // On 26 Oct 2026 every one of sixteen reports since 22 Oct was stored with
@@ -244,6 +244,14 @@ export async function handleInboundReply(
     // only: a bounce body carries a business's address and our own message, and
     // neither belongs in a log.
     if (report.recipient === null) {
+      // AND THE SHAPE IS WRITTEN DOWN, not only logged. The log that this line
+      // printed on 26 Oct 2026 was gone before it could be read: Vercel keeps
+      // runtime logs for about fifty minutes, and a bounce arrives when it
+      // arrives. The event row is the only record that survives, so the field
+      // names ride along in its detail. Keys and lengths only — never a value,
+      // because a report's body carries a business's address and our own
+      // message.
+      const shape = `b${body.length} ${payloadShape(payload)}`
       console.warn('[outreach-inbound] report with no recipient', {
         kind: report.kind,
         detail: report.detail,
@@ -251,6 +259,7 @@ export async function handleInboundReply(
         bodyLength: body.length,
         shape: payloadShape(payload),
       })
+      report = { ...report, detail: `${report.detail}; ${shape}`.slice(0, 160) }
     }
     const recorded = await recordDeliveryReport(admin, report, now)
     // A report we could not write down is one the provider should deliver
