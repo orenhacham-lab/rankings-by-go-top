@@ -125,6 +125,44 @@ export function serviceObjectsNamed(text: string): Set<ServiceObject> {
 }
 
 /**
+ * A site is ORGANIZED AROUND the kinds of place it serves only when its own
+ * pages say so again and again: at least this many pages name an object, AND
+ * they are at least this share of its pages. Below either line the gate is off.
+ *
+ * Measured 27 October 2026 over every project that has pages, the seeding
+ * scan's own 25-page crawls and the WordPress indexes alike, which is exactly
+ * what a NEW customer's project starts from:
+ *   be-cln (office cleaning)        13 of 18 pages    72%   gate on
+ *   eyalock (locksmith)              9 of 32 pages    28%   gate on
+ *   officecleaning, jup              above a third          gate on
+ *   idosport (home gym equipment)   34 of 275 max     12%   gate OFF
+ *   nagler (news magazine)           2 of 24 pages     8%   gate OFF
+ *   arcmedia (marketing agency)      1 of 22 pages     5%   gate OFF
+ *   yaronplumber                     1 of 15 pages     7%   gate OFF
+ *   4dogs, gotop, matalon, mymarriage, erez-flowers, hasod-gifts, canary,
+ *   japan4u, naturalshop, Shashka    under 7%               gate OFF
+ * Nothing measured falls between 12% and 28%, so the share is set in the middle
+ * of an empty band rather than on a judgement call.
+ *
+ * WHY THIS LINE EXISTS AT ALL (Oren, 27 October: a new project's topics come
+ * from the site scan first, so the gate must not create a regression there).
+ * Without it a single incidental mention decides: yaronplumber, a plumber, owns
+ * only 'building' because one blog post is about a shared building, and every
+ * idea about a home or an office would have been blocked. japan4u, a travel
+ * site, owns only 'restaurant', so hotels would have been blocked. The failure
+ * is the same shape as the one this gate was built to fix, in the opposite
+ * direction, and it hits the thin new projects first.
+ *
+ * MEMBERSHIP STAYS GENEROUS on purpose: once the gate is on, ONE page naming an
+ * object is enough to own it (eyalock names homes on a single page out of 32,
+ * and a locksmith does open homes). A count applied to membership would have
+ * made the gate block the very objects a site serves least often, which is the
+ * dangerous direction.
+ */
+const MIN_OBJECT_PAGES = 3
+const MIN_OBJECT_SHARE = 0.2
+
+/**
  * The kinds of place the merchant's OWN pages name. Empty = the gate is off.
  *
  * A utility page is skipped (isUtilityTitle, site-subject.ts) for a concrete
@@ -136,10 +174,17 @@ export function serviceObjectsNamed(text: string): Set<ServiceObject> {
  */
 export function ownedServiceObjects(pageNames: readonly string[]): Set<ServiceObject> {
   const out = new Set<ServiceObject>()
+  let pages = 0
+  let naming = 0
   for (const name of pageNames) {
     if (isUtilityTitle(name)) continue
-    for (const k of serviceObjectsNamed(name)) out.add(k)
+    pages++
+    const named = serviceObjectsNamed(name)
+    if (named.size === 0) continue
+    naming++
+    for (const k of named) out.add(k)
   }
+  if (naming < MIN_OBJECT_PAGES || naming < pages * MIN_OBJECT_SHARE) return new Set<ServiceObject>()
   return out
 }
 

@@ -63,6 +63,60 @@ const OWNED = ownedServiceObjects(PAGES)
 /** A page set that names NO kind of place at all — the thin-site floor. */
 const THIN_PAGES = ['דף הבית', 'אודות', 'צור קשר', 'שירותי ניקיון', 'מאמרים', 'הצהרת נגישות']
 
+/**
+ * Four real projects whose pages name a kind of place only in PASSING, read from
+ * Production on 27 Oct 2026 — the regression the activation floor exists to
+ * prevent on a new customer's project (Oren, 27 Oct). Each one would have been
+ * gated by an incidental mention, and each is a business that serves anyone.
+ */
+/** yaronplumber.co.il, a plumber: ONE post of 14 pages is about a shared building. */
+const PLUMBER_PAGES = [
+  'concealed cisterns', 'איך איכות המים בישראל גורמת להצטברות אבנית בניאגרה סמויה ומה', 'בלוג', 'דף הבית',
+  'החלפת מנגנון ניאגרה סמויה גרואה: המדריך המלא לבחירת המומחה ה', 'החלפת ניאגרה סמויה בקיר גבס: מדריך מלא למניעת נזקים',
+  'חלקי חילוף לניאגרה סמויה: המדריך המלא לשמירה על תקינות ואמינ', 'לחץ מים חלש בניאגרה סמויה: מדריך לאיתור ותיקון הבעיה',
+  'למה המים ממשיכים לזרום בניאגרה סמויה — ואיך מתקנים', 'מנגנון פנאומטי לניאגרה סמויה: המדריך המלא להבדלים מול מנגנון',
+  'מתי לקרוא לאינסטלטור בהוד השרון? 5 סימנים שמצריכים טיפול דחו', 'שירותי אינסטלטור ברמת השרון: מתי להזמין ומה לצפות?',
+  'תחזוקה מונעת לניאגרה סמויה: המדריך השנתי לשמירה על המערכת', 'תיקון אסלות סמויות: המדריך המלא לפתרון תקלות',
+  'תיקון ניאגרה סמויה בבניין משותף: המדריך המלא לחלוקת אחריות',
+]
+/** www.arcmedia.co.il, a marketing agency: ONE blog post of 22 pages mentions clinics. */
+const AGENCY_PAGES = [
+  'חברת שיווק דיגיטלי', 'קידום אתרים אורגני בגוגל', 'חברת פרסום באינטרנט - Arc Media', 'בלוג שיווק דיגיטלי',
+  'איך לקדם יועץ עסקי בגוגל', 'החוליה החסרה במשפך השיווק: ניהול שיחות נכנסות', 'קידום אמנים בעידן הדיגיטלי',
+  'איך לבחור חברת קידום אתרים', 'איך מקדמים קליניקות ב-2026', 'כל היתרונות שיש בהזמנת מגשי פירות לכל סוגי האירועים',
+  'גוגל מפות תלת מימד', 'קידום אתרים לעסק חדש', 'שיווק דיגיטלי לעסקים קטנים', 'קידום אתרים לרופאים',
+  'בניית קישורים לקידום אורגני בגוגל: המפתחות להצלחה', 'בחירת חברת שיווק דיגיטלי לעסקים: מדריך מקיף להצלחה',
+  'כיצד ליצור מיתוג עסקי חזק וליצור תוכנית שיווק דיגיטלי', 'פרסום ממומן בגוגל', 'בניית דף נחיתה אפקטיבי לעסק',
+  'קידום אתרים מקצועי: המדריך המלא להצלחה בעולם הדיגיטלי', 'קטגוריה: מאמרי אורחים', 'קטגוריה: שיווק דיגיטלי',
+]
+/** www.nagler.co.il, a news magazine: a car-news category and one office post, of 24. */
+const MAGAZINE_PAGES = [
+  'מגזין חדשות', 'אקטואליה', 'מגזין כלכלה', 'מגזין טכנולוגיה', 'מדריך השקעות', 'מגזין בריאות',
+  'מגזין ספורט וכושר', 'מגזין אופנה ו-LIFE STYLE', 'חדשות רכב',
+  'הנדסה מדויקת וסטריליות מוחלטת: עקרונות התכנון של חדרים נקיים', 'למה כדאי לבחור בהתקנת גג סולארי',
+  'מה לארוז לטיול ביפן: רשימה חיונית לכל עונה', 'למה לא חייבים לשבור קירות כדי למצוא נזילה?',
+  'יישור שיניים invisalign מה חשוב לדעת לפני שמתחילים טיפול', 'מן החושך החרדי אל הברונזה',
+  'לא רק לבד: מתי קלנועית זוגית היא הבחירה הנכונה לניידות משותפת?', 'שינויי דיירים: איך להבטיח שהסכם המכר מגן',
+  'מערכות חימום מים מתקדמות למקוואות ומוסדות', 'אפליקציה לבדיקת מיקומים בגוגל – Rankings By Go Top',
+  'משלוחי פרחים בירושלים עם ארז פרחים', 'מתי כדאי לעשות עיסוי רפואי', 'מה היתרונות של גג סולארי',
+  'היתרונות של קורס פילאטיס', 'איך לבחור שירותי משרד',
+]
+/** eyalock.co.il, a locksmith: 9 of 32 pages name vehicles, exactly ONE names homes. */
+const LOCKSMITH_PAGES = [
+  'אייל שירותי פריצה ומנעולנות 24/7 ,זמינות ומקצועיות בכל רחבי הארץ.', 'מנעולן', 'מנעולן בצפון',
+  'פורץ מנעולים בחיפה והסביבה – שירות פריצה מורשה ללא נזק (24/7)', 'מנעולן בחיפה והסביבה 24/7',
+  'פורץ מנעולים, רכבים וכספות (בכל השכונות)', 'מנעולן בקריות ופורץ מנעולים 24/7 – תיקון דלתות ופריצה',
+  'מנעולן בקרית ביאליק', 'תיקון דלתות ופריצת מנעולים (ספק מורשה)', 'מנעולן בקרית אתא והקריות',
+  'תיקון דלתות ופריצת רכבים (24/7)', 'מנעולן בקרית ים 24/7', 'תיקון דלתות, החלפת צילינדר ורכבים',
+  'מנעולן בקרית חיים (מזרחית ומערבית)', 'תיקון דלתות ורכבים', 'מנעולן בקרית שמואל והסביבה',
+  'פורץ דלתות ומנעולים מוסמך', 'מנעולן בקרית טבעון והסביבה', 'פורץ מנעולים ורכבים (זמינות מידית)',
+  'מנעולן בקרית מוצקין 24/7', 'פורץ רכבים, מנעולים ותיקון דלתות', 'מנעולן בקרית אליעזר ובת גלים (ספק משטרה)',
+  'מנעולן בנווה שאנן חיפה', 'תיקון דלתות, החלפת צילינדר ופריצה (הגעה מהירה)', 'מנעולן בקצרין והסביבה',
+  'פורץ מנעולים ורכבים מוסמך (בירת הגולן)', 'מנעולן ברמת ישי והסביבה', 'פורץ מנעולים ורכבים (זמין עכשיו)',
+  'מנעולן ברמת הגולן והסביבה', 'פורץ רכבים ובתים (מגיע לכל יישוב)', 'מנעולן בצפון הארץ 24/7',
+  'שירותי פריצה ומנעולנות (גליל וגולן)',
+]
+
 const brief = (id: string, subject: string): OpportunityBrief => ({
   opportunityId: id, subject, searchNeed: 'informational', family: 'informational',
   sourceEvidence: [{ kind: 'keyword_research', text: subject }], alignedDemandQuery: { query: subject, volume: 90 },
@@ -168,6 +222,28 @@ async function main() {
     check('A11c. the same for a cart and the terms', ownedServiceObjects(['עגלת הקניות', 'תנאי שימוש']).size === 0)
     check('A11. a site that names no kind of place has an EMPTY owned set',
       ownedServiceObjects(THIN_PAGES).size === 0, Array.from(ownedServiceObjects(THIN_PAGES)).join(','))
+
+    // The ACTIVATION FLOOR, measured on real projects 27 Oct 2026. A site is
+    // gated only when at least 3 of its pages name a kind of place AND they are
+    // at least a fifth of its pages. Nothing measured sits between 12% and 28%.
+    check('A12. A PLUMBER is not gated by one post about a shared building',
+      ownedServiceObjects(PLUMBER_PAGES).size === 0, Array.from(ownedServiceObjects(PLUMBER_PAGES)).join(','))
+    check('A13. a MARKETING AGENCY is not gated by one post about clinics',
+      ownedServiceObjects(AGENCY_PAGES).size === 0, Array.from(ownedServiceObjects(AGENCY_PAGES)).join(','))
+    check('A14. a NEWS MAGAZINE is not gated by a car-news category and one office post',
+      ownedServiceObjects(MAGAZINE_PAGES).size === 0, Array.from(ownedServiceObjects(MAGAZINE_PAGES)).join(','))
+    check('A15. but a LOCKSMITH, 9 of whose 32 pages name vehicles, IS gated',
+      ownedServiceObjects(LOCKSMITH_PAGES).has('vehicle'))
+    check('A16. and membership stays generous: its ONE page about homes owns homes',
+      ownedServiceObjects(LOCKSMITH_PAGES).has('home'))
+    check('A17. so that locksmith blocks a restaurant and NOT a home',
+      foreignServiceObject('פריצת מנעול במסעדה', ownedServiceObjects(LOCKSMITH_PAGES)) === 'restaurant' &&
+      foreignServiceObject('פריצת דלת בדירה', ownedServiceObjects(LOCKSMITH_PAGES)) === null)
+    check('A18. three naming pages out of four pass the floor, two out of twenty do not',
+      ownedServiceObjects(['ניקיון משרדים', 'ניקיון משרדים בחיפה', 'ניקיון קליניקות', 'אודות']).size === 2 &&
+      ownedServiceObjects(['ניקיון משרדים', 'ניקיון קליניקות', ...Array.from({ length: 18 }, (_, i) => `מאמר ${i}`)]).size === 0)
+    check('A19. the be-cln project itself is still above the floor',
+      OWNED.size > 0 && OWNED.has('office'))
   }
 
   // ── B) the gate's decisions, on the real four ideas ─────────────────────────
