@@ -172,7 +172,7 @@ const MIN_OBJECT_SHARE = 0.2
  * blocked anything. A cart, the terms or an accessibility statement say nothing
  * about the customer either.
  */
-export function ownedServiceObjects(pageNames: readonly string[]): Set<ServiceObject> {
+export function ownedServiceObjects(pageNames: readonly string[], declared: readonly string[] = []): Set<ServiceObject> {
   const out = new Set<ServiceObject>()
   let pages = 0
   let naming = 0
@@ -185,6 +185,16 @@ export function ownedServiceObjects(pageNames: readonly string[]): Set<ServiceOb
     for (const k of named) out.add(k)
   }
   if (naming < MIN_OBJECT_PAGES || naming < pages * MIN_OBJECT_SHARE) return new Set<ServiceObject>()
+  // THE MERCHANT'S OWN WORDS WIDEN THE SET, AND NEVER TURN THE GATE ON. The
+  // pages decide whether this site is gated at all; the keywords the merchant
+  // chose to track say who they serve, and they are the better authority where
+  // the two disagree. Measured on be-cln 27 Oct 2026: it tracks ניקיון מבנים,
+  // and its 18 scanned pages never say מבנים, so a building topic was being
+  // blocked on a project that asked to rank for exactly that. The two private-home
+  // ideas stay blocked, because nothing it tracks is a home.
+  // Only membership, so a magazine that happens to track one keyword with a
+  // place in it still has no gate at all.
+  for (const text of declared) for (const k of serviceObjectsNamed(text)) out.add(k)
   return out
 }
 

@@ -39,17 +39,28 @@ const ROOT = join(__dirname, '..', '..', '..')
 const read = (rel: string) => readFileSync(join(ROOT, rel), 'utf8')
 const stripComments = (s: string) => s.replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[^:])\/\/.*$/gm, '$1')
 
-/** be-cln.co.il's own indexed pages, read from Production on 26 Oct 2026. */
+/**
+ * be-cln.co.il's own indexed pages: all 21 targets of its seeding-scan crawl,
+ * titles and eligibility exactly as Production holds them (27 Oct 2026). The
+ * three the scanner marked 'no' are here on purpose, because a utility page must
+ * not claim a customer.
+ */
 const PAGES = [
-  'אזורי השירות שלנו', 'מאמרים', 'אולם תצוגה נמדד בזכוכית, ברצפה ובתאורה',
-  'חברת ניקיון שמנוהלת על ידי מי שמגיע אליכם', 'ניקיון אחרי שיפוץ, עד שהמקום באמת מוכן לשימוש',
+  'אולם תצוגה נמדד בזכוכית, ברצפה ובתאורה', 'אזורי השירות שלנו',
+  'חברת ניקיון שמנוהלת על ידי מי שמגיע אליכם', 'מאמרים',
+  'ניקיון אחרי שיפוץ, עד שהמקום באמת מוכן לשימוש',
   'ניקיון משרדים בהרצליה ובהרצליה פיתוח', 'ניקיון משרדים ברמת גן ובאזור הבורסה',
   'ניקיון משרדים בתל אביב', 'ניקיון משרדים ואולמות תצוגה בנתניה',
   'ניקיון משרדים ואולמות תצוגה בפתח תקווה', 'ניקיון משרדים ועסקים בהוד השרון',
   'ניקיון משרדים וקליניקות בגבעתיים', 'ניקיון משרדים וקליניקות ברעננה',
   'ניקיון משרדים עם צוות קבוע שמכיר אתכם', 'ניקיון משרדים שמתחיל לפני שהעובדים מגיעים',
   'ניקיון משרדים, קליניקות ומרפאות בכפר סבא', 'ניקיון קליניקות ומרפאות לפי סטנדרט שמטופל מרגיש',
-  'ניקיון מבנים ואולמות תצוגה', 'שירותי ניקיון לעסקים', 'הצהרת נגישות', 'מדיניות פרטיות',
+  'שירותי ניקיון לעסקים', 'הצהרת נגישות', 'מדיניות פרטיות', 'נדבר על מה שהמקום שלכם צריך',
+]
+/** The same project's tracked keywords, read from Production on 27 Oct 2026. */
+const TRACKED = [
+  'חברת ניקיון למשרדים', 'ניקיון מבנים', 'ניקיון משרדים', 'ניקיון קליניקות',
+  'עבודות ניקיון משרדים', 'שירותי ניקיון לעסקים',
 ]
 /** The same project's cached queries — every one its own service. */
 const QUERIES = [
@@ -58,7 +69,8 @@ const QUERIES = [
   'ניקיון משרדים בכפר סבא', 'ניקיון משרד', 'ניקיון למשרד', 'ניקיון קליניקות',
   'ניקיון מבנים', 'ניקיון לפני אכלוס', 'עבודות ניקיון משרדים',
 ]
-const OWNED = ownedServiceObjects(PAGES)
+/** Exactly what the engine computes for this project: pages plus its tracked keywords. */
+const OWNED = ownedServiceObjects(PAGES, TRACKED)
 
 /** A page set that names NO kind of place at all — the thin-site floor. */
 const THIN_PAGES = ['דף הבית', 'אודות', 'צור קשר', 'שירותי ניקיון', 'מאמרים', 'הצהרת נגישות']
@@ -148,7 +160,7 @@ function fakeAdmin(tables: Record<string, Record<string, unknown>[]>) {
 function tablesFor(pages: string[]): Record<string, Record<string, unknown>[]> {
   return {
     projects: [{ id: 'p1', business_name: 'חברת ניקיון', target_domain: 'https://be-cln.co.il', language: 'he', country: 'IL' }],
-    tracking_targets: [{ project_id: 'p1', keyword: 'ניקיון משרדים' }, { project_id: 'p1', keyword: 'ניקיון קליניקות' }],
+    tracking_targets: TRACKED.map((keyword) => ({ project_id: 'p1', keyword })),
     keyword_research_cache: [{
       project_id: 'p1', created_at: '2026-10-01',
       results_json: QUERIES.map((keyword, i) => ({ keyword, avgMonthlySearches: 200 - i * 5 })),
@@ -244,6 +256,17 @@ async function main() {
       ownedServiceObjects(['ניקיון משרדים', 'ניקיון קליניקות', ...Array.from({ length: 18 }, (_, i) => `מאמר ${i}`)]).size === 0)
     check('A19. the be-cln project itself is still above the floor',
       OWNED.size > 0 && OWNED.has('office'))
+    // The merchant's own tracked keywords. be-cln tracks ניקיון מבנים while none
+    // of its 18 scanned pages says מבנים, so a building topic was blocked on a
+    // project that asked to rank for exactly that (measured 27 Oct 2026).
+    check('A20. a tracked keyword the pages never say still OWNS its kind of place',
+      !ownedServiceObjects(PAGES).has('building') && OWNED.has('building'))
+    check('A21. and the two private-home ideas are still blocked, because nothing tracked is a home',
+      foreignServiceObject('שירותי ניקיון בתים בנתניה', OWNED) === 'home')
+    check('A22. a tracked keyword can NEVER switch the gate on: the magazine stays ungated',
+      ownedServiceObjects(MAGAZINE_PAGES, ['ניקיון משרדים', 'ניקיון בתים', 'מסעדות']).size === 0)
+    check('A23. nor can it on a site with no pages at all',
+      ownedServiceObjects([], ['ניקיון משרדים', 'ניקיון מרפאות']).size === 0)
   }
 
   // ── B) the gate's decisions, on the real four ideas ─────────────────────────
@@ -309,7 +332,7 @@ async function main() {
       /return rej\('other_service_object', 'service_object'/.test(src) &&
       !/other_service_object[\s\S]{0,400}tryRepair\(\)/.test(src))
     check('D3. the owned set is read ONCE in preparation, so the gate and the prompt cannot disagree',
-      /const servedObjects = ownedServiceObjects\(entities\.map\(\(e\) => e\.name\)\)/.test(src))
+      /const servedObjects = ownedServiceObjects\(entities\.map\(\(e\) => e\.name\), tracked\)/.test(src))
     check('D4. the worthiness gate and the ownership gates are UNCHANGED',
       /const w = evaluateArticleWorthiness\(\{ primaryKeyword, title: t\.title/.test(src) &&
       /if \(ownedByExistingEntity\(guard, primaryKeyword\)\)/.test(src))
@@ -364,6 +387,17 @@ async function main() {
       angle.suggestions.length > 0, `accepted=${angle.suggestions.length}`)
     check('E6. and the object gate rejected none of them',
       (ar['other_service_object'] ?? 0) === 0, JSON.stringify(ar))
+
+    // End to end on the kind of place the merchant TRACKS and the pages never
+    // name: without its tracked keyword this is a foreign object and the whole
+    // run yields nothing (the regression this closes).
+    const building = await engineRun('run-building', PAGES, (b) => ({
+      title: `מה לבדוק בחוזה ניקיון מבנים ${b.subject}`.slice(0, 70),
+      primaryKeyword: 'ניקיון מבנים לפי תקן', secondaryKeywords: ['x'], intent: 'informational',
+    }))
+    const br = rejectedTotals(building.diagnostics)
+    check('E7. a topic about the kind of place the merchant TRACKS is accepted',
+      (br['other_service_object'] ?? 0) === 0, JSON.stringify(br))
   }
 
   console.log(`\n${pass} passed, ${fail} failed`)

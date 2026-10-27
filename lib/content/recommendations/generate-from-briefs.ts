@@ -788,7 +788,9 @@ export async function prepareBriefRun(
   // kinds of place the merchant's own pages say they serve. Read ONCE here so the
   // deterministic gate and the prompt rule can never disagree, and EMPTY on a site
   // that names none, which switches both off.
-  const servedObjects = ownedServiceObjects(entities.map((e) => e.name))
+  // The pages decide whether this project is gated; the merchant's own tracked
+  // keywords only widen which kinds of place count as theirs (service-object.ts).
+  const servedObjects = ownedServiceObjects(entities.map((e) => e.name), tracked)
 
   return {
     servedObjects,
