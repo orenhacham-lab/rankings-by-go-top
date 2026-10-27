@@ -203,7 +203,7 @@ export const projectSettingsIt: DeepPartial<DashboardDictionary> = {
       authorBoxImageMissing: 'Il sito non ha un’icona, quindi il riquadro non mostrerà alcuna immagine.',
       authorBoxImageNeedsSite: 'Dopo aver collegato il sito WordPress potrai scegliere un’immagine per il riquadro, anche una tua.',
       authorBoxImageNotOnStore: 'In un negozio Shopify il riquadro viene mostrato senza immagine.',
-      authorBoxImageOwnPhotoNeedsPassword: 'Per usare una foto tua, collega WordPress direttamente con una password per applicazioni. Un sito collegato solo tramite il nostro plugin può mostrare l’icona del sito.',
+      authorBoxImageOwnPhotoNeedsPassword: 'Per usare una foto tua, aggiorna il nostro plugin sul sito all’ultima versione oppure collega WordPress direttamente con una password per applicazioni. Fino ad allora si può mostrare l’icona del sito.',
       authorBoxOverridesUnavailable: 'Il nome, il link e l’immagine non sono ancora modificabili su questo account.',
       authorBoxImageUpload: 'Una foto caricata da me',
       authorBoxPhotoHint: 'JPEG, PNG o WebP, fino a 2 MB. Conserviamo una copia priva dei dati di dispositivo e di posizione e la copiamo nella libreria media del sito WordPress alla pubblicazione di un articolo.',

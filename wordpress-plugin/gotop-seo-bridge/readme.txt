@@ -4,7 +4,7 @@ Tags: seo, ai seo, schema, article generator, auto publish
 Requires at least: 6.0
 Tested up to: 7.1
 Requires PHP: 7.4
-Stable tag: 3.1.3
+Stable tag: 3.2.0
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -178,6 +178,10 @@ Settings > GO TOP SEO > Disconnect. GO TOP can no longer reach the site. Deletin
 
 == Changelog ==
 
+= 3.2.0 =
+* The author photo you uploaded in GO TOP now reaches this site's Media Library with the plugin alone, with no application password. GO TOP signs that one file for a few minutes and the plugin imports it, exactly as it already imports an article's images. Nothing else may be fetched: the address must still be on GO TOP's own storage.
+* An image whose address is signed is imported once rather than once per signature.
+
 = 3.1.3 =
 * The plugin's name and description in the WordPress.org directory now say what it does, so it can be found by searching for it. The plugin's code, its routes and the connection are unchanged.
 
@@ -211,6 +215,9 @@ Settings > GO TOP SEO > Disconnect. GO TOP can no longer reach the site. Deletin
 * First release.
 
 == Upgrade Notice ==
+
+= 3.2.0 =
+Adds the author photo you uploaded in GO TOP to the author box, without an application password. The connection is kept.
 
 = 3.1.3 =
 Only the name and the description in the directory changed. The connection is kept.
