@@ -102,7 +102,11 @@ async function main() {
     const calls = { generate: [] as string[] }
     const s = await run(fa, calls)
     check('A1: the target was met from the plan', s.promoted > 0 && s.queued > 0, JSON.stringify(s))
-    check('A2: the run names it an old-stock plan', s.stalePlans === 1, String(s.stalePlans))
+    // 26 Oct 2026 — six ideas against a target of four leave two for the merchant to
+    // approve, which is less than a month, so this plan is now counted as a THIN plan
+    // and the model runs for that reason first (topup-idea-stock.qa.ts). The old-stock
+    // rule still decides where a plan holds a month of ideas, as B) below proves.
+    check('A2: the run names it a plan with nothing left to approve', s.thinPlans === 1, JSON.stringify(s))
     check('A3: the model was asked anyway, for that project', calls.generate.length === 1 && calls.generate[0] === 'p1')
     check('A4: the fresh ideas are in the plan for the next months',
       (fa.tables.content_topic_ideas ?? []).some((r) => r.title === 'מזרן אורתופדי לכלבים' && r.status === 'pending'))
@@ -111,10 +115,20 @@ async function main() {
       && !(fa.tables.content_topic_ideas ?? []).some((r) => r.status === 'rejected'))
     // MUTATION CONTROL A — the very same plan, dated within the window, is the old
     // behaviour: its target is met and nothing asks the model.
-    const faB = new FakeAdmin(world(OLD_TITLES.map((t, n) => idea(`o${n + 1}`, 'p1', t, 0.9 - n / 100, NEW))))
+    // MUTATION CONTROL A — a month's worth of ideas, dated within the window: not old
+    // stock, nothing thin, and no model. Dating the SAME ideas before the window is
+    // what makes the run ask, which is the rule under test.
+    const monthOfIdeas = (when: string) => [...OLD_TITLES, ...FRESH_TITLES].map((t, n) => idea(`m${n + 1}`, 'p1', `${t} לכל ימות השנה`, 0.5 - n / 100, when))
+    const faB = new FakeAdmin(world(monthOfIdeas(NEW)))
     const callsB = { generate: [] as string[] }
     const sB = await run(faB, callsB)
-    check('A2-MUT: the same plan dated today is not old stock and asks no model', sB.stalePlans === 0 && callsB.generate.length === 0, JSON.stringify(sB))
+    check('A2-MUT: the same ideas dated today are not old stock and ask no model',
+      sB.stalePlans === 0 && sB.thinPlans === 0 && callsB.generate.length === 0, JSON.stringify(sB))
+    const faC = new FakeAdmin(world(monthOfIdeas(OLD)))
+    const callsC = { generate: [] as string[] }
+    const sC = await run(faC, callsC)
+    check('A2-MUT2: dated before the window, the very same plan IS old stock and asks',
+      sC.stalePlans === 1 && callsC.generate.length === 1, JSON.stringify(sC))
   }
 
   // ── B) a fresh plan is untouched ────────────────────────────────────────
@@ -182,7 +196,7 @@ async function main() {
     for (const [name, env, now, state] of [
       ['kill switch', { ...PROD, CONTENT_TOPUP_DISABLED: '1' }, T0, 'disabled'],
       ['Preview', { VERCEL_ENV: 'preview' }, T0, 'not_production'],
-      ['06:59 UTC', PROD, Date.parse('2026-10-18T06:59:00Z'), 'outside_window'],
+      ['04:59 UTC', PROD, Date.parse('2026-10-18T04:59:00Z'), 'outside_window'],
     ] as const) {
       const fa = new FakeAdmin(world(old))
       const calls = { generate: [] as string[] }
@@ -192,10 +206,10 @@ async function main() {
     const faSlot0 = new FakeAdmin(world(old))
     const calls0 = { generate: [] as string[] }
     const s0 = await quiet(() => runTopicTopUp(faSlot0 as never, {
-      env: PROD, deadlineAt: Date.parse('2026-10-18T07:00:00Z') + 280_000,
-      deps: deps(faSlot0, calls0, { now: () => Date.parse('2026-10-18T07:00:00Z') }),
+      env: PROD, deadlineAt: Date.parse('2026-10-18T05:00:00Z') + 280_000,
+      deps: deps(faSlot0, calls0, { now: () => Date.parse('2026-10-18T05:00:00Z') }),
     }))
-    check('F2: never in the window\'s first quarter hour', s0.stalePlans === 1 && calls0.generate.length === 0)
+    check('F2: never in the window\'s first quarter hour', s0.thinPlans === 1 && calls0.generate.length === 0)
     const faGate = new FakeAdmin(world(old))
     const callsG = { generate: [] as string[] }
     const sG = await run(faGate, callsG, { modelAllowed: async () => false })

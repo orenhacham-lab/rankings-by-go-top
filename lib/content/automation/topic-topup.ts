@@ -61,7 +61,7 @@ import type { createAdminClient, ServiceRoleClient } from '@/lib/supabase/admin'
 import { getUserEntitlement } from '@/lib/subscription'
 import { assertContentGenerationAllowedForUser } from '@/lib/content/entitlement-guard'
 import { articlesPerMonthForShare, articlesPerMonthPerSite, monthlyForSite, resolveIntervalDays, type Cadence } from '@/lib/content/automation/schedule'
-import { isPlanCode } from '@/lib/plans/catalog'
+import { isPlanCode, PLAN_CATALOG } from '@/lib/plans/catalog'
 import { encodeBriefSections } from '@/lib/content/brief-notes'
 import { insertPendingIdeas } from '@/lib/content/recommendations/topic-idea-store'
 import { buildKeywordGuard } from '@/lib/content/recommendations/keyword-guard'
@@ -81,7 +81,24 @@ import { TOPUP_SOURCE_CONTEXT } from './topup-provenance'
 type Admin = ReturnType<typeof createAdminClient>
 
 export { TOPUP_SOURCE_CONTEXT }
-export const WINDOW_HOURS_UTC: readonly number[] = [7, 8]
+/**
+ * THE WINDOW IS THE DAILY BUDGET. One project gets the model per run
+ * (MODEL_PROJECTS_PER_RUN), the cron fires every SLOT_MINUTES, and the window's
+ * first quarter hour never asks, so the number of batches a day is exactly the
+ * number of slots in this window minus one. No counter is needed and none can
+ * drift: widening the window is how the budget is raised.
+ *
+ * 27 October 2026, measured in Production, after Oren's requirement that a
+ * paying account always hold at least a month of topics to approve. Two hours
+ * gave 7 batches a day. There are 47 active projects, 29 of them below a
+ * month's target and 21 holding nothing at all, and one batch yields 1 to 3
+ * ideas, so filling a project from empty takes about six batches. At 7 a day a
+ * given project was reached roughly every four days and the backlog could not
+ * close at all: the arithmetic, not an opinion. Eight hours give 31 a day,
+ * which closes those 29 projects within a week and then runs well above the
+ * steady state (~12 a day: each project consumes only what it publishes).
+ */
+export const WINDOW_HOURS_UTC: readonly number[] = [5, 6, 7, 8, 9, 10, 11, 12]
 export const SLOT_MINUTES = 15
 export const PER_PROJECT_TARGET_CAP = 12
 export const PER_RUN_ADD_CAP = 12
@@ -104,6 +121,21 @@ export const MODEL_PROJECTS_PER_RUN = 1
  */
 export const STALE_IDEA_DAYS = 90
 export const MODEL_TARGET_COUNT = 12
+/**
+ * A FREE WEEK GETS A MONTH OF TOPICS TO APPROVE, AND NOT ONE BATCH MORE
+ * (Oren, 27 October 2026: "on a free week there is no need to fill another
+ * batch beyond the month, but it is obvious there must be at least a month's
+ * worth of topics").
+ *
+ * The trial's own article allowance is one article for its whole lifetime, so
+ * the existing target worked out at one topic and the account was skipped as
+ * not entitled before even that. Measured the same day: every project created
+ * in October got its ideas on the day it was created and never again, 3 to 7 of
+ * them, because the top-up asks for an active paid plan. What a trial should
+ * hold is what the entry plan publishes in a month, so the merchant sees the
+ * product rather than the trial's one-article cap.
+ */
+export const TRIAL_IDEA_TARGET = PLAN_CATALOG.regular.maxArticlesPerPeriodAccountWide
 export const MIN_MS_FOR_MODEL = 150_000
 export const MIN_MS_FOR_PROJECT = 15_000
 /** Pool items that will still publish. */
@@ -166,7 +198,7 @@ export interface GeneratedIdeas { suggestions: TopicSuggestion[]; modelUsed: str
 export interface TopUpDeps {
   now: () => number
   /** The existing entitlement, read only. Entitled = an admin or an active paid plan. */
-  entitlement: (userId: string) => Promise<{ entitled: boolean; monthlyArticles: number; planRhythm?: boolean }>
+  entitlement: (userId: string) => Promise<{ entitled: boolean; monthlyArticles: number; planRhythm?: boolean; trialActive?: boolean }>
   /** The existing AI-generation gate, asked before any model call. */
   modelAllowed: (userId: string) => Promise<boolean>
   loadIndex: (scope: { projectId: string; userId: string }) => Promise<OverlapIndex>
@@ -194,11 +226,14 @@ export interface TopUpSummary {
   modelIdeas: number
   /** Projects whose plan holds only ideas older than STALE_IDEA_DAYS. */
   stalePlans: number
+  /** Projects whose PUBLISH queue is full but whose plan holds less than a month of
+   *  ideas for the merchant to approve (26 October 2026 — see thinPlans below). */
+  thinPlans: number
   failures: number
 }
 
 const EMPTY = (state: TopUpSummary['state']): TopUpSummary =>
-  ({ state, projectsChecked: 0, notEntitled: 0, enough: 0, promoted: 0, queued: 0, skippedOverlap: 0, skippedOffSubject: 0, modelProjects: 0, modelIdeas: 0, stalePlans: 0, failures: 0 })
+  ({ state, projectsChecked: 0, notEntitled: 0, enough: 0, promoted: 0, queued: 0, skippedOverlap: 0, skippedOffSubject: 0, modelProjects: 0, modelIdeas: 0, stalePlans: 0, thinPlans: 0, failures: 0 })
 
 function defaultDeps(admin: Admin): TopUpDeps {
   return {
@@ -208,6 +243,7 @@ function defaultDeps(admin: Admin): TopUpDeps {
       return {
         entitled: e.isAdmin || e.hasActiveSubscription, monthlyArticles: e.limits.maxArticlesPerPeriodAccountWide,
         planRhythm: !e.isAdmin && isPlanCode(e.plan) && e.limits.maxArticlesPerPeriodAccountWide > 0,
+        trialActive: e.trialActive,
       }
     },
     modelAllowed: async (userId) => (await assertContentGenerationAllowedForUser(admin, userId)).allowed,
@@ -246,6 +282,23 @@ async function countSupply(admin: Admin, scope: Scope, pool: PoolRow | null): Pr
   const { count, error } = await admin.from('article_topics').select('id', { count: 'exact', head: true })
     .eq('project_id', scope.projectId).eq('user_id', scope.userId).in('status', [...UNUSED_TOPIC_STATUSES])
   if (error) throw new Error('supply_read_failed')
+  return count ?? 0
+}
+
+/**
+ * IDEAS WAITING FOR THE MERCHANT'S APPROVAL, however old.
+ *
+ * (26 October 2026, Oren: "if topics were created and the customer does not approve
+ * them, it must create enough topics for approval to cover the month at least".)
+ * Until now the only thing measured was the PUBLISH queue, and the plan's pending
+ * ideas were the refill's source, never a target of their own. A merchant who
+ * rejected every idea while the queue was still full was therefore skipped after one
+ * count — the queue looked healthy — and the strategy tab had nothing to approve.
+ */
+async function countPendingIdeas(admin: Admin, scope: Scope): Promise<number> {
+  const { count, error } = await admin.from('content_topic_ideas').select('id', { count: 'exact', head: true })
+    .eq('project_id', scope.projectId).eq('user_id', scope.userId).eq('status', 'pending')
+  if (error) return Number.MAX_SAFE_INTEGER // unreadable: never ask the model on a guess.
   return count ?? 0
 }
 
@@ -416,11 +469,13 @@ export async function runTopicTopUp(
     list.push({ projectId: p.project_id, share: p.monthly_share ?? null })
     sharesByOwner.set(p.user_id, list)
   }
-  const entitlement = new Map<string, { entitled: boolean; monthlyArticles: number; planRhythm?: boolean }>()
+  const entitlement = new Map<string, { entitled: boolean; monthlyArticles: number; planRhythm?: boolean; trialActive?: boolean }>()
   type Candidate = { project: ProjectRow; pool: PoolRow | null; target: number; index: OverlapIndex | null }
   const stillShort: Candidate[] = []
   /** Plans that filled the target from old stock only: fresh research for their next months. */
   const stalePlans: Candidate[] = []
+  /** Queue full, plan thin: nothing for the merchant to approve this month. */
+  const thinPlans: Candidate[] = []
 
   // Projects with an active pool first: an empty queue stops publishing.
   // More than a run's share: each quarter hour starts further along, so all are reached in the day.
@@ -434,7 +489,17 @@ export async function runTopicTopUp(
       summary.projectsChecked++
       let ent = entitlement.get(project.user_id)
       if (!ent) { ent = await deps.entitlement(project.user_id).catch(() => ({ entitled: false, monthlyArticles: 0 })); entitlement.set(project.user_id, ent) }
-      if (!ent.entitled) { summary.notEntitled++; continue }
+      if (!ent.entitled) {
+        if (!ent.trialActive) { summary.notEntitled++; continue }
+        // A trial publishes one article in its lifetime, so there is no queue to keep
+        // full and no second month to plan: the only target is a month of ideas to
+        // approve, and once it is reached this account is never asked for again.
+        if ((await countPendingIdeas(admin, scope)) < TRIAL_IDEA_TARGET) {
+          summary.thinPlans++
+          thinPlans.push({ project, pool: null, target: TRIAL_IDEA_TARGET, index: null })
+        } else summary.enough++
+        continue
+      }
       const pool = poolByProject.get(project.id) ?? null
       if (pool && pool.user_id !== project.user_id) continue // a pool must be its project owner's
       const owned = sharesByOwner.get(project.user_id) ?? []
@@ -447,14 +512,28 @@ export async function runTopicTopUp(
         monthlyArticles: ent.monthlyArticles, ownerProjects: ownerProjects.get(project.user_id) ?? 1, pool,
         planRhythm: ent.planRhythm ? { activeQueues: activeQueues.get(project.user_id) ?? 1, monthlyForThisSite } : null,
       })
-      if (target === 0 || (await countSupply(admin, scope, pool)) >= target) { summary.enough++; continue }
+      if (target === 0) { summary.enough++; continue }
+      if ((await countSupply(admin, scope, pool)) >= target) {
+        // The publish queue is covered. The IDEAS waiting for approval are a second,
+        // independent target: a merchant who rejects what we prepared must still find
+        // a month's worth to choose from. A rejected idea is never re-suggested (the
+        // keyword guard blocks its phrase), so the model is asked for other subjects.
+        if ((await countPendingIdeas(admin, scope)) < target) {
+          summary.thinPlans++
+          thinPlans.push({ project, pool, target, index: null })
+        } else summary.enough++
+        continue
+      }
       const index = await deps.loadIndex(scope)
       const missing = await refillFromIdeas(admin, deps, scope, project, pool, target, index, summary, { deadlineAt: options.deadlineAt - MIN_MS_FOR_PROJECT })
       if (missing > 0) { stillShort.push({ project, pool, target, index: await deps.loadIndex(scope) }); continue }
       // The target was met, but from a plan whose newest idea is old stock
       // (STALE_IDEA_DAYS): the next months are planned from July research unless the
       // model is asked. The index is read only for the one project that is picked.
-      if ((await countFreshIdeas(admin, scope, deps.now())) === 0) {
+      if ((await countPendingIdeas(admin, scope)) < target) {
+        summary.thinPlans++
+        thinPlans.push({ project, pool, target, index: null })
+      } else if ((await countFreshIdeas(admin, scope, deps.now())) === 0) {
         summary.stalePlans++
         stalePlans.push({ project, pool, target, index: null })
       }
@@ -465,7 +544,9 @@ export async function runTopicTopUp(
 
   // The model, for one project whose plan has run dry, or, when none has, one whose
   // plan is old stock only. Never in the first quarter hour.
-  const candidates = stillShort.length > 0 ? stillShort : stalePlans
+  // An empty queue first, then a plan with nothing left to approve, then a plan that
+  // is only old stock: each is a month the merchant would otherwise see nothing new in.
+  const candidates = stillShort.length > 0 ? stillShort : thinPlans.length > 0 ? thinPlans : stalePlans
   if (slot > 0 && candidates.length > 0) {
     const pick = candidates[slot % candidates.length]
     const scope = { projectId: pick.project.id, userId: pick.project.user_id }
@@ -491,8 +572,8 @@ export async function runTopicTopUp(
   }
 
   if (summary.promoted > 0 || summary.modelProjects > 0 || summary.failures > 0) {
-    const { projectsChecked, notEntitled, enough, promoted, queued, skippedOverlap, skippedOffSubject, modelProjects, modelIdeas, stalePlans, failures } = summary
-    console.log('[topic-topup] run', { slot, projectsChecked, notEntitled, enough, promoted, queued, skippedOverlap, skippedOffSubject, modelProjects, modelIdeas, stalePlans, failures })
+    const { projectsChecked, notEntitled, enough, promoted, queued, skippedOverlap, skippedOffSubject, modelProjects, modelIdeas, stalePlans, thinPlans, failures } = summary
+    console.log('[topic-topup] run', { slot, projectsChecked, notEntitled, enough, promoted, queued, skippedOverlap, skippedOffSubject, modelProjects, modelIdeas, stalePlans, thinPlans, failures })
   }
   return summary
 }
