@@ -415,8 +415,8 @@ Subject: a question about Store Example's organic traffic
 
   const mutOrder = await withMutant<{ handleInboundReply: typeof handleInboundReply }, boolean>(
     'lib/outreach/inbound.ts',
-    [[/  const report = classifyDelivery\(\{ sender: email, subject, body \}\)/,
-      '  const report: ReturnType<typeof classifyDelivery> = null']],
+    [[/  let report = classifyDelivery\(\{ sender: email, subject, body \}\)/,
+      '  let report: ReturnType<typeof classifyDelivery> = null']],
     async (m) => {
       const broken = world()
       const r = await m.handleInboundReply(

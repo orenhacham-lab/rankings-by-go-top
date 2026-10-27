@@ -14,7 +14,8 @@
 import { FakeAdmin } from '@/lib/__qa__/_fake-admin'
 import { withMutant } from '@/lib/reminders/__qa__/_mutant'
 import { SUPPRESSION_TABLE, hashEmail } from '@/lib/email-suppression'
-import { recipientIn } from '../bounce'
+import { PROSPECTS_TABLE } from '../prospects'
+import { DELIVERY_EVENTS_TABLE, recipientIn } from '../bounce'
 import { handleInboundReply, isOptOut, messageText, ownWords, payloadShape, senderAddress } from '../inbound'
 import { authorized, handleInbound } from '../inbound-http'
 
@@ -254,6 +255,40 @@ async function main() {
   )
   check('P2-MUT: a shape that printed values would leak the message',
     mutShape === true)
+
+  // P3: and the shape is WRITTEN DOWN, because the log it was printed to is
+  // kept for about fifty minutes and a bounce arrives when it arrives. The nine
+  // reports that came in after the 26 Oct deploy were all gone from the log
+  // before they could be read, which is why the event row has to carry it.
+  const blindReport = {
+    event: 'message.received',
+    data: { from: { address: 'MAILER-DAEMON@relay.example' }, subject: 'Undelivered Mail Returned to Sender', uid: 77 },
+  }
+  const blind = new FakeAdmin({ [DELIVERY_EVENTS_TABLE]: [], [PROSPECTS_TABLE]: [], [SUPPRESSION_TABLE]: [] })
+  const blindOutcome = await handleInboundReply(blindReport, asAdmin(blind))
+  const blindRows = blind.tables[DELIVERY_EVENTS_TABLE] as Record<string, unknown>[]
+  const blindDetail = String(blindRows[0]?.detail ?? '')
+  check('P3: a report naming no recipient stores the payload fields in its own row',
+    blindOutcome.action === 'delivery_report'
+    && blindRows.length === 1
+    && blindDetail.includes('no recipient named')
+    && blindDetail.includes('from:')
+    && blindDetail.includes('subject:'))
+  check('P3b: and still no value of the payload',
+    !blindDetail.includes('MAILER-DAEMON') && !blindDetail.includes('relay.example') && !blindDetail.includes('77'))
+
+  const mutWritten = await withMutant<{ handleInboundReply: typeof handleInboundReply }, boolean>(
+    'lib/outreach/inbound.ts',
+    [[/      report = \{ \.\.\.report, detail: `\$\{report\.detail\}; \$\{shape\}`\.slice\(0, 160\) \}/, '      void shape']],
+    async (m) => {
+      const f = new FakeAdmin({ [DELIVERY_EVENTS_TABLE]: [], [PROSPECTS_TABLE]: [], [SUPPRESSION_TABLE]: [] })
+      await m.handleInboundReply(blindReport, asAdmin(f))
+      const row = (f.tables[DELIVERY_EVENTS_TABLE] as Record<string, unknown>[])[0]
+      return !String(row?.detail ?? '').includes('subject:')
+    },
+  )
+  check('P3-MUT: logging the shape without storing it would lose it again',
+    mutWritten === true)
 
   console.log(`\n${pass} passed, ${fail} failed`)
   if (fail > 0) process.exit(1)
