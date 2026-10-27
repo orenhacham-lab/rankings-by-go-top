@@ -2895,6 +2895,7 @@ export const dashboardEs: DeepPartial<DashboardDictionary> = {
       authorBoxImageMissing: 'Tu sitio no tiene icono, así que el recuadro no mostrará imagen.',
       authorBoxImageNeedsSite: 'Cuando conectes tu sitio de WordPress podrás elegir una imagen para el recuadro, incluida una propia.',
       authorBoxImageNotOnStore: 'En una tienda de Shopify el recuadro se muestra sin imagen.',
+      authorBoxImageOwnPhotoNeedsPassword: 'Para usar una foto propia, conecta WordPress directamente con una contraseña de aplicación. Un sitio conectado solo con nuestro plugin puede mostrar el icono del sitio.',
       authorBoxOverridesUnavailable: 'El nombre, el enlace y la imagen todavía no se pueden editar en tu cuenta.',
       authorBoxImageUpload: 'Una foto que subo',
       authorBoxPhotoHint: 'JPEG, PNG o WebP, hasta 2 MB. Guardamos una copia sin los datos de la cámara ni de ubicación y, al publicar un artículo, la copiamos a la biblioteca de medios de tu sitio de WordPress.',

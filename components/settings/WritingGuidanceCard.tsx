@@ -344,10 +344,16 @@ function AuthorBoxFields({ projectId, disabled, unavailable, name, line, lineDis
   // was left looking for an upload that no screen mentioned (be-cln.co.il, 26 Oct
   // 2026: "it will not let me upload my own photo, something here is really broken").
   // So the section stays, and says which case this is.
-  const imageNote = preview.status !== 'ready' || choices.length > 1 ? null
-    : preview.data.platform === 'shopify' ? w.authorBoxImageNotOnStore
-    : preview.data.platform === 'wordpress' ? w.authorBoxImageMissing
-    : w.authorBoxImageNeedsSite
+  // A WordPress site connected through our plugin alone is the case that reads as
+  // a bug: the icon IS offered, so the fieldset appears with two choices and the
+  // owner's own photo is simply absent, with nothing saying why. The copy at
+  // publish time goes over an application password (lib/content/author-box/photo-copy.ts),
+  // which the plugin connection does not carry, so this note names that.
+  const imageNotes: string[] = preview.status !== 'ready' ? []
+    : preview.data.platform === 'shopify' ? (choices.length > 1 ? [] : [w.authorBoxImageNotOnStore])
+    : preview.data.platform === 'wordpress'
+      ? [...(iconOffered ? [] : [w.authorBoxImageMissing]), ...(photoOffered ? [] : [w.authorBoxImageOwnPhotoNeedsPassword])]
+      : choices.length > 1 ? [] : [w.authorBoxImageNeedsSite]
   const photoUrl = preview.status === 'ready' ? preview.data.photoPreviewUrl : null
 
   return (
@@ -406,11 +412,11 @@ function AuthorBoxFields({ projectId, disabled, unavailable, name, line, lineDis
         />
         {urlInvalid && <p id="author-box-url-error" role="alert" className="mt-1 text-caption text-bad">{w.authorBoxUrlInvalid}</p>}
       </div>
-      {(choices.length > 1 || imageNote) && (
+      {(choices.length > 1 || imageNotes.length > 0) && (
         <fieldset data-author-box-image="">
           <legend className="mb-1 text-copy font-semibold text-ink">{w.authorBoxImageLabel}</legend>
           {choices.length > 1 && shown !== 'upload' && <p className="mb-2 text-caption text-muted">{w.authorBoxImageHint}</p>}
-          {imageNote && <p className="mb-2 text-caption text-muted" data-author-box-image-note="">{imageNote}</p>}
+          {imageNotes.map((note) => <p key={note} className="mb-2 text-caption text-muted" data-author-box-image-note="">{note}</p>)}
           {choices.length > 1 && (
             <Segmented
               ariaLabel={w.authorBoxImageLabel}

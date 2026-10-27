@@ -473,6 +473,7 @@ export const dashboardEn = {
       authorBoxImageMissing: 'Your site has no site icon, so the box will show no image.',
       authorBoxImageNeedsSite: 'Once you connect your WordPress site you can choose an image for the box, including one of your own.',
       authorBoxImageNotOnStore: 'On a Shopify store the box is shown without an image.',
+      authorBoxImageOwnPhotoNeedsPassword: 'To use a photo of your own, connect WordPress directly with an application password. A site connected through our plugin alone can show the site icon.',
       authorBoxOverridesUnavailable: 'The name, link and image are not open for editing in your account yet.',
       authorBoxImageUpload: 'A photo I upload',
       authorBoxPhotoHint: 'JPEG, PNG or WebP, up to 2 MB. We keep a copy without its camera and location data, and copy it into your WordPress media library when an article is published.',
