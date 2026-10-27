@@ -61,7 +61,7 @@ import type { createAdminClient, ServiceRoleClient } from '@/lib/supabase/admin'
 import { getUserEntitlement } from '@/lib/subscription'
 import { assertContentGenerationAllowedForUser } from '@/lib/content/entitlement-guard'
 import { articlesPerMonthForShare, articlesPerMonthPerSite, monthlyForSite, resolveIntervalDays, type Cadence } from '@/lib/content/automation/schedule'
-import { isPlanCode } from '@/lib/plans/catalog'
+import { isPlanCode, PLAN_CATALOG } from '@/lib/plans/catalog'
 import { encodeBriefSections } from '@/lib/content/brief-notes'
 import { insertPendingIdeas } from '@/lib/content/recommendations/topic-idea-store'
 import { buildKeywordGuard } from '@/lib/content/recommendations/keyword-guard'
@@ -81,7 +81,24 @@ import { TOPUP_SOURCE_CONTEXT } from './topup-provenance'
 type Admin = ReturnType<typeof createAdminClient>
 
 export { TOPUP_SOURCE_CONTEXT }
-export const WINDOW_HOURS_UTC: readonly number[] = [7, 8]
+/**
+ * THE WINDOW IS THE DAILY BUDGET. One project gets the model per run
+ * (MODEL_PROJECTS_PER_RUN), the cron fires every SLOT_MINUTES, and the window's
+ * first quarter hour never asks, so the number of batches a day is exactly the
+ * number of slots in this window minus one. No counter is needed and none can
+ * drift: widening the window is how the budget is raised.
+ *
+ * 27 October 2026, measured in Production, after Oren's requirement that a
+ * paying account always hold at least a month of topics to approve. Two hours
+ * gave 7 batches a day. There are 47 active projects, 29 of them below a
+ * month's target and 21 holding nothing at all, and one batch yields 1 to 3
+ * ideas, so filling a project from empty takes about six batches. At 7 a day a
+ * given project was reached roughly every four days and the backlog could not
+ * close at all: the arithmetic, not an opinion. Eight hours give 31 a day,
+ * which closes those 29 projects within a week and then runs well above the
+ * steady state (~12 a day: each project consumes only what it publishes).
+ */
+export const WINDOW_HOURS_UTC: readonly number[] = [5, 6, 7, 8, 9, 10, 11, 12]
 export const SLOT_MINUTES = 15
 export const PER_PROJECT_TARGET_CAP = 12
 export const PER_RUN_ADD_CAP = 12
@@ -104,6 +121,21 @@ export const MODEL_PROJECTS_PER_RUN = 1
  */
 export const STALE_IDEA_DAYS = 90
 export const MODEL_TARGET_COUNT = 12
+/**
+ * A FREE WEEK GETS A MONTH OF TOPICS TO APPROVE, AND NOT ONE BATCH MORE
+ * (Oren, 27 October 2026: "on a free week there is no need to fill another
+ * batch beyond the month, but it is obvious there must be at least a month's
+ * worth of topics").
+ *
+ * The trial's own article allowance is one article for its whole lifetime, so
+ * the existing target worked out at one topic and the account was skipped as
+ * not entitled before even that. Measured the same day: every project created
+ * in October got its ideas on the day it was created and never again, 3 to 7 of
+ * them, because the top-up asks for an active paid plan. What a trial should
+ * hold is what the entry plan publishes in a month, so the merchant sees the
+ * product rather than the trial's one-article cap.
+ */
+export const TRIAL_IDEA_TARGET = PLAN_CATALOG.regular.maxArticlesPerPeriodAccountWide
 export const MIN_MS_FOR_MODEL = 150_000
 export const MIN_MS_FOR_PROJECT = 15_000
 /** Pool items that will still publish. */
@@ -166,7 +198,7 @@ export interface GeneratedIdeas { suggestions: TopicSuggestion[]; modelUsed: str
 export interface TopUpDeps {
   now: () => number
   /** The existing entitlement, read only. Entitled = an admin or an active paid plan. */
-  entitlement: (userId: string) => Promise<{ entitled: boolean; monthlyArticles: number; planRhythm?: boolean }>
+  entitlement: (userId: string) => Promise<{ entitled: boolean; monthlyArticles: number; planRhythm?: boolean; trialActive?: boolean }>
   /** The existing AI-generation gate, asked before any model call. */
   modelAllowed: (userId: string) => Promise<boolean>
   loadIndex: (scope: { projectId: string; userId: string }) => Promise<OverlapIndex>
@@ -211,6 +243,7 @@ function defaultDeps(admin: Admin): TopUpDeps {
       return {
         entitled: e.isAdmin || e.hasActiveSubscription, monthlyArticles: e.limits.maxArticlesPerPeriodAccountWide,
         planRhythm: !e.isAdmin && isPlanCode(e.plan) && e.limits.maxArticlesPerPeriodAccountWide > 0,
+        trialActive: e.trialActive,
       }
     },
     modelAllowed: async (userId) => (await assertContentGenerationAllowedForUser(admin, userId)).allowed,
@@ -436,7 +469,7 @@ export async function runTopicTopUp(
     list.push({ projectId: p.project_id, share: p.monthly_share ?? null })
     sharesByOwner.set(p.user_id, list)
   }
-  const entitlement = new Map<string, { entitled: boolean; monthlyArticles: number; planRhythm?: boolean }>()
+  const entitlement = new Map<string, { entitled: boolean; monthlyArticles: number; planRhythm?: boolean; trialActive?: boolean }>()
   type Candidate = { project: ProjectRow; pool: PoolRow | null; target: number; index: OverlapIndex | null }
   const stillShort: Candidate[] = []
   /** Plans that filled the target from old stock only: fresh research for their next months. */
@@ -456,7 +489,17 @@ export async function runTopicTopUp(
       summary.projectsChecked++
       let ent = entitlement.get(project.user_id)
       if (!ent) { ent = await deps.entitlement(project.user_id).catch(() => ({ entitled: false, monthlyArticles: 0 })); entitlement.set(project.user_id, ent) }
-      if (!ent.entitled) { summary.notEntitled++; continue }
+      if (!ent.entitled) {
+        if (!ent.trialActive) { summary.notEntitled++; continue }
+        // A trial publishes one article in its lifetime, so there is no queue to keep
+        // full and no second month to plan: the only target is a month of ideas to
+        // approve, and once it is reached this account is never asked for again.
+        if ((await countPendingIdeas(admin, scope)) < TRIAL_IDEA_TARGET) {
+          summary.thinPlans++
+          thinPlans.push({ project, pool: null, target: TRIAL_IDEA_TARGET, index: null })
+        } else summary.enough++
+        continue
+      }
       const pool = poolByProject.get(project.id) ?? null
       if (pool && pool.user_id !== project.user_id) continue // a pool must be its project owner's
       const owned = sharesByOwner.get(project.user_id) ?? []

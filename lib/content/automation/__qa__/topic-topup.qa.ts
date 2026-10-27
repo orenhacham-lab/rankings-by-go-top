@@ -24,6 +24,7 @@
 import { FakeAdmin } from '../../../__qa__/_fake-admin'
 import {
   poolMonthlyRate, topUpTarget, windowSlot, runTopicTopUp, startIsolatedTopUp, TOPUP_SOURCE_CONTEXT, MIN_MS_FOR_MODEL,
+  WINDOW_HOURS_UTC, SLOT_MINUTES, MODEL_PROJECTS_PER_RUN,
   type TopUpDeps, type GeneratedIdeas,
 } from '../topic-topup'
 import { buildOverlapIndex, type OverlapIndexData } from '../../cannibalization/check'
@@ -156,16 +157,20 @@ async function main() {
   check('no pool: the project\'s share of the plan (12 over 3 projects = 4)', topUpTarget({ monthlyArticles: 12, ownerProjects: 3, pool: null }) === 4)
   check('capped at 12 a project; at least 1; nothing without articles', topUpTarget({ monthlyArticles: 200, ownerProjects: 1, pool: { ...pool, cadence: 'daily', publish_days: null } }) === 12
     && topUpTarget({ monthlyArticles: 4, ownerProjects: 9, pool: null }) === 1 && topUpTarget({ monthlyArticles: 0, ownerProjects: 1, pool: null }) === 0)
-  check('the window: 07:00 is slot 0, 07:15 slot 1, 08:59 slot 7; 06:59 and 09:00 outside',
-    windowSlot(Date.parse('2026-09-29T07:00:00Z')) === 0 && windowSlot(Date.parse('2026-09-29T07:15:00Z')) === 1
-    && windowSlot(Date.parse('2026-09-29T08:59:59Z')) === 7 && windowSlot(Date.parse('2026-09-29T06:59:59Z')) === -1 && windowSlot(Date.parse('2026-09-29T09:00:00Z')) === -1)
+  // The window is the daily budget: slots minus one is the batches a day. Eight
+  // hours, 05:00-12:59 UTC, give 31 (27 Oct 2026, see WINDOW_HOURS_UTC).
+  check('the window: 05:00 is slot 0, 05:15 slot 1, 12:59 the last slot; 04:59 and 13:00 outside',
+    windowSlot(Date.parse('2026-09-29T05:00:00Z')) === 0 && windowSlot(Date.parse('2026-09-29T05:15:00Z')) === 1
+    && windowSlot(Date.parse('2026-09-29T12:59:59Z')) === 31 && windowSlot(Date.parse('2026-09-29T04:59:59Z')) === -1 && windowSlot(Date.parse('2026-09-29T13:00:00Z')) === -1)
+  check('and that is 31 model batches a day, one per slot after the first',
+    WINDOW_HOURS_UTC.length * (60 / SLOT_MINUTES) - 1 === 31 && MODEL_PROJECTS_PER_RUN === 1)
 
   console.log('\nG) the gates come before any read')
   for (const [name, env, now, state] of [
     ['kill switch', { ...PROD, CONTENT_TOPUP_DISABLED: '1' }, T0, 'disabled'],
     ['Preview', { VERCEL_ENV: 'preview' }, T0, 'not_production'],
     ['local (no VERCEL_ENV)', {}, T0, 'not_production'],
-    ['06:59 UTC', PROD, Date.parse('2026-09-29T06:59:00Z'), 'outside_window'],
+    ['04:59 UTC', PROD, Date.parse('2026-09-29T04:59:00Z'), 'outside_window'],
     ['13:00 UTC', PROD, Date.parse('2026-09-29T13:00:00Z'), 'outside_window'],
   ] as const) {
     const t = tracked(new FakeAdmin(world()))
@@ -276,7 +281,7 @@ async function main() {
   check('…the new ideas refill the queue like any idea, and are marked as the top-up\'s', newIdeas.every((r) => r.status === 'approved' && r.source_context === TOPUP_SOURCE_CONTEXT)
     && x1.fa.tables.article_pool_items.filter((r) => r.status === 'queued').length === 3)
   for (const [name, now, over] of [
-    ['07:05 (the first quarter hour, when both schedulers fire)', Date.parse('2026-09-29T07:05:00Z'), {}],
+    ['05:05 (the first quarter hour, when both schedulers fire)', Date.parse('2026-09-29T05:05:00Z'), {}],
     ['the AI gate says no', T0, { modelAllowed: async () => false }],
   ] as const) {
     const m = { generate: [] as string[], modelAsked: [] as string[] }

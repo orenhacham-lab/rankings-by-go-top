@@ -196,7 +196,7 @@ async function main() {
     for (const [name, env, now, state] of [
       ['kill switch', { ...PROD, CONTENT_TOPUP_DISABLED: '1' }, T0, 'disabled'],
       ['Preview', { VERCEL_ENV: 'preview' }, T0, 'not_production'],
-      ['06:59 UTC', PROD, Date.parse('2026-10-18T06:59:00Z'), 'outside_window'],
+      ['04:59 UTC', PROD, Date.parse('2026-10-18T04:59:00Z'), 'outside_window'],
     ] as const) {
       const fa = new FakeAdmin(world(old))
       const calls = { generate: [] as string[] }
@@ -206,8 +206,8 @@ async function main() {
     const faSlot0 = new FakeAdmin(world(old))
     const calls0 = { generate: [] as string[] }
     const s0 = await quiet(() => runTopicTopUp(faSlot0 as never, {
-      env: PROD, deadlineAt: Date.parse('2026-10-18T07:00:00Z') + 280_000,
-      deps: deps(faSlot0, calls0, { now: () => Date.parse('2026-10-18T07:00:00Z') }),
+      env: PROD, deadlineAt: Date.parse('2026-10-18T05:00:00Z') + 280_000,
+      deps: deps(faSlot0, calls0, { now: () => Date.parse('2026-10-18T05:00:00Z') }),
     }))
     check('F2: never in the window\'s first quarter hour', s0.thinPlans === 1 && calls0.generate.length === 0)
     const faGate = new FakeAdmin(world(old))

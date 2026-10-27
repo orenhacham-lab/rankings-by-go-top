@@ -26,7 +26,8 @@
  * Run: npx tsx lib/content/automation/__qa__/topup-idea-stock.qa.ts
  */
 import { FakeAdmin } from '../../../__qa__/_fake-admin'
-import { runTopicTopUp, type TopUpDeps, type TopUpSummary } from '../topic-topup'
+import { runTopicTopUp, TRIAL_IDEA_TARGET, type TopUpDeps, type TopUpSummary } from '../topic-topup'
+import { PLAN_CATALOG } from '../../../plans/catalog'
 import { buildOverlapIndex, type OverlapIndexData } from '../../cannibalization/check'
 import type { TopicSuggestion } from '../../recommendations/types'
 
@@ -195,7 +196,7 @@ async function main() {
     for (const [name, env, now, state] of [
       ['kill switch', { ...PROD, CONTENT_TOPUP_DISABLED: '1' }, T0, 'disabled'],
       ['Preview', { VERCEL_ENV: 'preview' }, T0, 'not_production'],
-      ['06:59 UTC', PROD, Date.parse('2026-10-26T06:59:00Z'), 'outside_window'],
+      ['04:59 UTC', PROD, Date.parse('2026-10-26T04:59:00Z'), 'outside_window'],
     ] as const) {
       const fa = thin()
       const calls = { generate: [] as string[] }
@@ -205,8 +206,8 @@ async function main() {
     const fa0 = thin()
     const calls0 = { generate: [] as string[] }
     const s0 = await quiet(() => runTopicTopUp(fa0 as never, {
-      env: PROD, deadlineAt: Date.parse('2026-10-26T07:00:00Z') + 280_000,
-      deps: deps(calls0, { now: () => Date.parse('2026-10-26T07:00:00Z') }),
+      env: PROD, deadlineAt: Date.parse('2026-10-26T05:00:00Z') + 280_000,
+      deps: deps(calls0, { now: () => Date.parse('2026-10-26T05:00:00Z') }),
     }))
     check('E2: never in the window\'s first quarter hour', s0.thinPlans === 1 && calls0.generate.length === 0)
     const faGate = thin()
@@ -227,6 +228,32 @@ async function main() {
     const sZ = await run(faZero, callsZ, { entitlement: async () => ({ entitled: true, monthlyArticles: 0 }) })
     check('E6: a plan with no articles a month has no target, so nothing is thin',
       sZ.thinPlans === 0 && callsZ.generate.length === 0, JSON.stringify(sZ))
+  }
+
+  // ── F) a free week: one month of ideas, and not one batch more ───────────
+  // Oren, 27 Oct 2026. The trial's own allowance is ONE article for its whole
+  // lifetime, so before this a trial account was skipped as not entitled and a
+  // new customer kept the 3 to 7 ideas of its signup day for ever.
+  console.log('\nF) the trial')
+  {
+    const TRIAL = { entitled: false, monthlyArticles: 1, trialActive: true } as const
+    const faThin = new FakeAdmin(world(SUBJECTS.slice(0, 2).map((t, n) => idea(`i${n + 1}`, t, 0.9))))
+    const callsA = { generate: [] as string[] }
+    const sA = await run(faThin, callsA, { entitlement: async () => TRIAL })
+    check('F1: a trial holding 2 ideas is asked for a month\'s worth',
+      callsA.generate.length === 1 && sA.modelProjects === 1, JSON.stringify({ g: callsA.generate, s: sA }))
+    const faFull = new FakeAdmin(world(SUBJECTS.slice(0, TRIAL_IDEA_TARGET).map((t, n) => idea(`i${n + 1}`, t, 0.9))))
+    const callsB = { generate: [] as string[] }
+    const sB = await run(faFull, callsB, { entitlement: async () => TRIAL })
+    check('F2: once it holds a month, the trial is never asked again',
+      callsB.generate.length === 0 && sB.modelProjects === 0 && sB.thinPlans === 0, JSON.stringify(sB))
+    check('F3: and a month for a trial is the entry plan\'s month, not the trial\'s one article',
+      TRIAL_IDEA_TARGET === PLAN_CATALOG.regular.maxArticlesPerPeriodAccountWide && TRIAL_IDEA_TARGET > 1)
+    const faOff = new FakeAdmin(world(SUBJECTS.slice(0, 2).map((t, n) => idea(`i${n + 1}`, t, 0.9))))
+    const callsC = { generate: [] as string[] }
+    const sC = await run(faOff, callsC, { entitlement: async () => ({ entitled: false, monthlyArticles: 0, trialActive: false }) })
+    check('F4: an expired trial, or an account that never had one, is still skipped',
+      sC.notEntitled === 1 && callsC.generate.length === 0 && sC.thinPlans === 0, JSON.stringify(sC))
   }
 
   console.log(`\n${pass} passed, ${fail} failed`)
