@@ -516,23 +516,35 @@ async function main() {
   console.log('\nP) nothing to choose, and the reason for it')
   {
     const card = strip(read('components/settings/WritingGuidanceCard.tsx'))
-    const section = (x: string) => /\{\(choices\.length > 1 \|\| imageNote\) && \(/.test(x)
+    const section = (x: string) => /\{\(choices\.length > 1 \|\| imageNotes\.length > 0\) && \(/.test(x)
     check('P1: the image section is shown when there is a choice OR a reason to give', section(card))
     check('MUTATION CONTROL: the old condition, which hid the section, fails P1',
-      !section(card.replace('{(choices.length > 1 || imageNote) && (', '{choices.length > 1 && (')))
-    const note = (x: string) => /const imageNote = preview\.status !== 'ready' \|\| choices\.length > 1 \? null/.test(x)
-      && /platform === 'shopify' \? w\.authorBoxImageNotOnStore/.test(x)
-      && /platform === 'wordpress' \? w\.authorBoxImageMissing/.test(x)
-      && /: w\.authorBoxImageNeedsSite/.test(x)
-    check('P2: the reason names this case: a Shopify store, a connected site with no icon, or a site not connected yet', note(card))
+      !section(card.replace('{(choices.length > 1 || imageNotes.length > 0) && (', '{choices.length > 1 && (')))
+    const note = (x: string) => /const imageNotes: string\[\] = preview\.status !== 'ready' \? \[\]/.test(x)
+      && /platform === 'shopify' \? \(choices\.length > 1 \? \[\] : \[w\.authorBoxImageNotOnStore\]\)/.test(x)
+      && /iconOffered \? \[\] : \[w\.authorBoxImageMissing\]/.test(x)
+      && /photoOffered \? \[\] : \[w\.authorBoxImageOwnPhotoNeedsPassword\]/.test(x)
+      && /\[w\.authorBoxImageNeedsSite\]/.test(x)
+    check('P2: the reason names this case: a Shopify store, a WordPress site with no icon, one whose connection cannot carry a photo, or a site not connected yet', note(card))
     check('MUTATION CONTROL: telling a Shopify store to connect WordPress fails P2',
-      !note(card.replace("platform === 'shopify' ? w.authorBoxImageNotOnStore", "platform === 'shopify' ? w.authorBoxImageNeedsSite")))
+      !note(card.replace("platform === 'shopify' ? (choices.length > 1 ? [] : [w.authorBoxImageNotOnStore])", "platform === 'shopify' ? (choices.length > 1 ? [] : [w.authorBoxImageNeedsSite])")))
+    // The case Oren hit on be-cln.co.il: WordPress connected through our plugin
+    // alone. The icon IS offered, so the fieldset appears with two choices and the
+    // owner's own photo is simply missing. The note must be given THERE too, not
+    // only when a single choice is left, because the copy at publish time needs an
+    // application password the plugin connection does not carry.
+    check('P2b: the photo note is given even when the icon leaves a choice on screen',
+      !/photoOffered \? \[\] : \[w\.authorBoxImageOwnPhotoNeedsPassword\][^]]*choices\.length > 1 \? \[\]/.test(card) &&
+      /\[\.\.\.\(iconOffered \? \[\] : \[w\.authorBoxImageMissing\]\), \.\.\.\(photoOffered \? \[\] : \[w\.authorBoxImageOwnPhotoNeedsPassword\]\)\]/.test(card))
+    check('MUTATION CONTROL: hiding that note behind a single choice fails P2b',
+      !/\[\.\.\.\(iconOffered \? \[\] : \[w\.authorBoxImageMissing\]\), \.\.\.\(photoOffered \? \[\] : \[w\.authorBoxImageOwnPhotoNeedsPassword\]\)\]/.test(
+        card.replace('[...(iconOffered ? [] : [w.authorBoxImageMissing]), ...(photoOffered ? [] : [w.authorBoxImageOwnPhotoNeedsPassword])]', '(choices.length > 1 ? [] : [w.authorBoxImageMissing])')))
     check('P3: a choice of one draws no control to choose with',
       /\{choices\.length > 1 && \(\s*<Segmented/.test(card))
-    const KEYS_P = ['authorBoxImageNeedsSite', 'authorBoxImageNotOnStore']
-    const dictAll = (l: 'he' | 'en' | 'es' | 'pt-BR') => getDashboardDictionary(l).projectSettings.writingGuidance as unknown as Record<string, string | undefined>
-    check('P4: both sentences exist in every dashboard language',
-      (['he', 'en', 'es', 'pt-BR'] as const).every((l) => KEYS_P.every((k) => {
+    const KEYS_P = ['authorBoxImageNeedsSite', 'authorBoxImageNotOnStore', 'authorBoxImageOwnPhotoNeedsPassword']
+    const dictAll = (l: 'he' | 'en' | 'es' | 'pt-BR' | 'fr' | 'it') => getDashboardDictionary(l).projectSettings.writingGuidance as unknown as Record<string, string | undefined>
+    check('P4: all three sentences exist in every dashboard language',
+      (['he', 'en', 'es', 'pt-BR', 'fr', 'it'] as const).every((l) => KEYS_P.every((k) => {
         const v = dictAll(l)[k]
         return typeof v === 'string' && v.trim().length > 0
       })))
