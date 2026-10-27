@@ -227,6 +227,27 @@ check('F4: a stored Wednesday on Basic does not fit the rhythm; a Sunday does; a
 
 // G) the runner, with a real entitlement read
 const H = 3_600_000
+const DAY = 86_400_000
+// THE RUNNER'S SCENARIOS MOVE WITH THE CALENDAR, AND MUST.
+// `getUserEntitlement` judges a subscription's billing period against the REAL
+// clock (`new Date()` in lib/subscription.ts), while `runAutomation` is driven
+// by the scenario's `nowMs`. Pinned to fixed dates in October 2026, the period
+// expired the moment the calendar passed it: every paid fixture here read as a
+// trial and ten checks in G and J failed for no reason but the date. Widening
+// the period alone is not the fix either, because `spreadNextPublishAt` divides
+// the articles left over the time left until `periodEnd`, so a longer cycle
+// moves the very slots G2 and G3 assert.
+// So the whole scenario is anchored on the first Sunday after today, and every
+// date is an offset from it. The weekdays the checks are about (a Friday held, a
+// Wednesday realigned to Thursday, a Tuesday published) are preserved exactly,
+// the billing period around them always contains today, and the distance from
+// `nowMs` to the period's end stays what it was.
+const SUN = (() => {
+  const d = new Date(Date.now())
+  d.setUTCHours(0, 0, 0, 0)
+  return d.getTime() + ((7 - d.getUTCDay()) % 7 || 7) * DAY
+})()
+const at = (days: number, hours = 0, minutes = 0) => new Date(SUN + days * DAY + hours * H + minutes * 60_000).toISOString()
 function seed(opts: { plan: string; role?: string; nextIso: string }) {
   const end = new Date(Date.parse(opts.nextIso) + 20 * 86_400_000).toISOString()
   return new FakeAdmin({
@@ -244,32 +265,41 @@ async function quiet<T>(fn: () => Promise<T>): Promise<T> {
   try { return await fn() } finally { console.log = l; console.error = e; console.warn = w }
 }
 async function runner() {
-  const r = await quiet(() => readPublishRhythm(seed({ plan: 'advanced', nextIso: '2026-10-07T06:00:00Z' }) as unknown as Admin, 'u1'))
+  const r = await quiet(() => readPublishRhythm(seed({ plan: 'advanced', nextIso: at(3, 6) }) as unknown as Admin, 'u1'))
   check('G0: an Advanced account reads as 3 a week on Sun/Tue/Thu', r.plan?.perWeek === 3 && same(r.plan?.perDay && rhythmWeekdays(r.plan.perDay), [0, 2, 4]) && r.plan?.intervalDays === null && !!r.allowance, r)
-  const adminR = await quiet(() => readPublishRhythm(seed({ plan: 'advanced', role: 'admin', nextIso: '2026-10-07T06:00:00Z' }) as unknown as Admin, 'u1'))
+  const adminR = await quiet(() => readPublishRhythm(seed({ plan: 'advanced', role: 'admin', nextIso: at(3, 6) }) as unknown as Admin, 'u1'))
   check('G0b: an admin has no plan rhythm (owner schedule)', adminR.plan === null, adminR)
+  // G0-MUT: the moving anchor must not paper over a subscription that really
+  // has run out. The same seed with a period that ended a week ago reads as no
+  // plan at all, which is exactly how the rotted checks used to fail.
+  const expired = seed({ plan: 'advanced', nextIso: at(3, 6) })
+  const expiredSub = expired.tables.subscriptions[0] as { current_period_start: string; current_period_end: string }
+  expiredSub.current_period_start = new Date(Date.now() - 37 * DAY).toISOString()
+  expiredSub.current_period_end = new Date(Date.now() - 7 * DAY).toISOString()
+  const expiredR = await quiet(() => readPublishRhythm(expired as unknown as Admin, 'u1'))
+  check('G0-MUT: a subscription whose period has ended reads as no plan rhythm', expiredR.plan === null, expiredR)
 
   // Friday: the stored slot is due (Thursday 23:00 run late), nothing is published.
-  const fri = seed({ plan: 'advanced', nextIso: '2026-10-01T20:00:00Z' })
-  const s1 = await quiet(() => runAutomation(fri as unknown as Admin, { nowMs: Date.parse('2026-10-02T06:00:00Z') }))
+  const fri = seed({ plan: 'advanced', nextIso: at(-3, 20) })
+  const s1 = await quiet(() => runAutomation(fri as unknown as Admin, { nowMs: Date.parse(at(-2, 6)) }))
   const p1 = (fri.tables.article_pools[0] as { next_publish_at: string }).next_publish_at
   check('G1: on Friday a due slot is held, not published', s1.published === 0 && s1.diagnostics[0]?.publishAttempted === false && s1.diagnostics[0]?.note === 'held_no_publish_day', s1.diagnostics[0])
   check('G2: …and moved to Sunday 09:00 Israel time', wd(p1) === 0 && hm(p1) === '09:00', p1)
 
   // Wednesday on Advanced (the owner had chosen Wednesday): realigned to Thursday.
-  const wed = seed({ plan: 'advanced', nextIso: '2026-10-07T06:00:00Z' })
-  const s2 = await quiet(() => runAutomation(wed as unknown as Admin, { nowMs: Date.parse('2026-10-07T06:05:00Z') }))
+  const wed = seed({ plan: 'advanced', nextIso: at(3, 6) })
+  const s2 = await quiet(() => runAutomation(wed as unknown as Admin, { nowMs: Date.parse(at(3, 6, 5)) }))
   const p2 = (wed.tables.article_pools[0] as { next_publish_at: string }).next_publish_at
-  check('G3: a stored Wednesday on Advanced is realigned to the plan\'s Thursday, not published', s2.diagnostics[0]?.note === 'held_realigned_to_plan_rhythm' && s2.diagnostics[0]?.publishAttempted === false && day(p2) === '2026-10-08', [s2.diagnostics[0], p2])
+  check('G3: a stored Wednesday on Advanced is realigned to the plan\'s Thursday, not published', s2.diagnostics[0]?.note === 'held_realigned_to_plan_rhythm' && s2.diagnostics[0]?.publishAttempted === false && day(p2) === day(at(4, 12)), [s2.diagnostics[0], p2])
 
   // Admin keeps the chosen Wednesday and publishes on it.
-  const adm = seed({ plan: 'advanced', role: 'admin', nextIso: '2026-10-07T06:00:00Z' })
-  const s3 = await quiet(() => runAutomation(adm as unknown as Admin, { nowMs: Date.parse('2026-10-07T06:05:00Z') }))
+  const adm = seed({ plan: 'advanced', role: 'admin', nextIso: at(3, 6) })
+  const s3 = await quiet(() => runAutomation(adm as unknown as Admin, { nowMs: Date.parse(at(3, 6, 5)) }))
   check('G4: an admin\'s chosen Wednesday is kept: the runner attempts the publish', s3.diagnostics[0]?.publishAttempted === true, s3.diagnostics[0])
 
   // A rhythm day: the publish is attempted.
-  const tue = seed({ plan: 'advanced', nextIso: '2026-10-06T06:00:00Z' })
-  const s4 = await quiet(() => runAutomation(tue as unknown as Admin, { nowMs: Date.parse('2026-10-06T06:05:00Z') + H }))
+  const tue = seed({ plan: 'advanced', nextIso: at(2, 6) })
+  const s4 = await quiet(() => runAutomation(tue as unknown as Admin, { nowMs: Date.parse(at(2, 6, 5)) + H }))
   check('G5: on the plan\'s Tuesday the runner publishes', s4.diagnostics[0]?.publishAttempted === true, s4.diagnostics[0])
 }
 
@@ -334,14 +364,14 @@ check('J-MUT: trusting the declared number alone over-schedules where J4 holds',
 async function shares() {
   // A Premium account (50 a month) with three websites: one given 30, the other
   // two on the even split of what is left.
-  const end = new Date(Date.parse('2026-10-07T06:00:00Z') + 20 * 86_400_000).toISOString()
+  const end = new Date(Date.parse(at(3, 6)) + 20 * 86_400_000).toISOString()
   const pool = (n: number, share: number | null, active = true) => ({
     id: `pool${n}`, project_id: `p${n}`, user_id: 'u1', is_active: active, cadence: 'weekly', interval_days: 7,
-    publish_time: '09:00', timezone: TZ, next_publish_at: '2026-10-07T06:00:00Z', publish_days: [3], monthly_share: share,
+    publish_time: '09:00', timezone: TZ, next_publish_at: at(3, 6), publish_days: [3], monthly_share: share,
   })
   const world = (pools: ReturnType<typeof pool>[]) => new FakeAdmin({
     profiles: [{ id: 'u1', role: 'user', email: 'u1@example.com' }],
-    subscriptions: [{ id: 's1', user_id: 'u1', plan_code: 'premium', status: 'active', trial_ends_at: null, current_period_start: '2026-09-27T06:00:00Z', current_period_end: end, created_at: '2026-09-01T00:00:00Z' }],
+    subscriptions: [{ id: 's1', user_id: 'u1', plan_code: 'premium', status: 'active', trial_ends_at: null, current_period_start: new Date(Date.parse(at(3, 6)) - 10 * 86_400_000).toISOString(), current_period_end: end, created_at: '2026-09-01T00:00:00Z' }],
     projects: [{ id: 'p1', user_id: 'u1' }, { id: 'p2', user_id: 'u1' }, { id: 'p3', user_id: 'u1' }],
     article_pools: pools,
     article_pool_items: [],
