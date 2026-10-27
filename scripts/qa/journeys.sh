@@ -14,12 +14,24 @@ LOG_DIR="${QA_LOG_DIR:-/tmp/qa-logs}"; mkdir -p "$LOG_DIR"
 BUILD=1; FILTER=""
 for a in "$@"; do case "$a" in --no-build) BUILD=0 ;; *) FILTER="$a" ;; esac; done
 
+# `npx next start` runs the server as a `next-server` child that outlives its
+# parent and keeps the port. A leftover one made `security-owasp` refuse to run
+# ("port 3991 is already serving") and, worse, SERVED ANOTHER BUILD to a journey
+# that then failed for reasons that had nothing to do with the code under test.
+# Both names go.
+kill_servers() {
+  pkill -9 -f "[n]ext start -p 39" 2>/dev/null
+  pkill -9 -f "[n]ext-server" 2>/dev/null
+  true
+}
+
 cleanup() {
   [ -n "${STUB_PID:-}" ] && kill "$STUB_PID" 2>/dev/null
-  pkill -9 -f "[n]ext start -p 39" 2>/dev/null
+  kill_servers
   true
 }
 trap cleanup EXIT
+kill_servers
 
 if curl -s -o /dev/null http://127.0.0.1:5555/__stub/db; then
   echo "stub: already running on :5555 — reusing it"
@@ -49,11 +61,11 @@ for j in lib/__qa__/reviewer-journey/*.js; do
   # permanently red. It still has to be run on its own; the log says how.
   if grep -q 'skipped (needs its own build)' "$LOG_DIR/journey-$name.log"; then
     echo "journey $name: SKIPPED — needs its own build, see $LOG_DIR/journey-$name.log"
-    pkill -9 -f "[n]ext start -p 39" 2>/dev/null
+    kill_servers
     continue
   fi
   echo "journey $name: ${summary:-NO SUMMARY — see $LOG_DIR/journey-$name.log}"
   [[ "$summary" =~ ^[0-9]+\ passed,\ 0\ failed$ ]] || FAIL=1
-  pkill -9 -f "[n]ext start -p 39" 2>/dev/null
+  kill_servers
 done
 exit $FAIL
