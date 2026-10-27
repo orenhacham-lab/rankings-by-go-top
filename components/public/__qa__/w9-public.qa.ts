@@ -114,9 +114,17 @@ function main() {
     check('C2: no "Rankings / by Go Top" logo text is left in the rail, the public nav, the footer or the demo', lockOk(lockups))
     check('MUT: a two-line "Rankings / by Go Top" lockup back is caught', !lockOk([...lockups, '<span>Rankings</span><span>by Go Top</span>']))
     const schema = strip(read('app/api/schema/route.ts')), layout = strip(read('app/layout.tsx')), llms = read('app/llms.txt/route.ts')
+    // The publisher used to be the agency, www.gotop.co.il, written out in
+    // both files. That pointed the whole entity at a different organization
+    // (lib/seo/organization.ts says why), so what C3 now requires is the
+    // product's own node, referenced by the id both surfaces share. The
+    // visible "מבית GO TOP" credit is a separate claim and C6 still holds it.
     const schemaOk = (s: string) => /name: 'Go Top SEO',\s*alternateName: \['Rankings by Go Top'\]/.test(s)
-      && /publisher: \{ '@type': 'Organization', name: 'GO TOP', url: 'https:\/\/www\.gotop\.co\.il' \}/.test(s)
-    check('C3: schema — Go Top SEO with alternateName, publisher GO TOP (www.gotop.co.il)', schemaOk(schema) && schemaOk(layout))
+      && /publisher: BRAND_REF,\s*brand: BRAND_REF,/.test(s)
+      && !/publisher:\s*\{[^}]*gotop\.co\.il/.test(s)
+    check('C3: schema — Go Top SEO with alternateName, publisher the product itself', schemaOk(schema) && schemaOk(layout))
+    check('MUT: the agency back as publisher fails C3',
+      !schemaOk(layout.replace(/publisher: BRAND_REF,/, "publisher: { '@type': 'Organization', name: 'GO TOP', url: 'https://www.gotop.co.il' },")))
     check('MUT: the old name as the schema name fails C3', !schemaOk(schema.replace(/name: 'Go Top SEO',(\s*)alternateName/g, "name: 'Rankings by Go Top',$1alternateName")))
     // The line moved out of a `Name:` field when llms.txt stopped being a
     // second robots.txt and became Markdown (23.10.2026); what has to survive

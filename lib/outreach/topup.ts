@@ -51,6 +51,8 @@ import {
   type ListingCandidate,
 } from './sourcing'
 import { CRAWLER_AGENT } from './qualify'
+import type { SearchFn } from '@/lib/seed-scan/serper'
+import { searchCandidates } from './search-source'
 
 export interface PublicSource {
   /** What the log line calls it. */
@@ -95,8 +97,11 @@ export const PUBLIC_SOURCES: readonly PublicSource[] = [
     url: 'https://business.springfieldchamber.com/activememberdirectory/Search/manufacturing-128889',
     detailHint: '/activememberdirectory/Details/',
   },
-  { name: 'minnesota-grown', url: 'https://minnesotagrown.com/member/', detailHint: '/member/' },
-  { name: 'georgia-grown', url: 'https://georgiagrown.com/membership/member-directory/', detailHint: '/member/' },
+  // minnesota-grown and georgia-grown are gone, and Production is why: in the
+  // week to 26 Oct 2026 the two of them added nothing at all, at twenty-odd
+  // fetches a pass, every candidate refused as `unrecognized_platform` or
+  // `other_platform`. A farm sells at a market, not from a Shopify store, so
+  // the ratio is not going to improve by reading more of them.
   // pride-of-ny, made-in-michigan and alabama-farmers are gone too: the pass at
   // 11:15 UTC on 17 Oct read all three and not one of them answered, which is
   // Production saying what a cloud container could only guess.
@@ -104,6 +109,13 @@ export const PUBLIC_SOURCES: readonly PublicSource[] = [
   // search form, its members are reachable only by submitting it, and the only
   // off-site links it carries are the state's other programmes.
 ]
+
+/**
+ * What `source_second` records for a business a search named. The row's own
+ * `source_site` and `postal_address_page` still name the business's own pages,
+ * which is where every published fact about it comes from.
+ */
+export const SEARCH_SOURCE_URL = 'https://www.google.com/search'
 
 /** Businesses examined in one pass before it gives up and waits for the next. */
 export const MAX_CANDIDATES_PER_PASS = 4
@@ -135,6 +147,11 @@ export interface TopUpDeps {
   /** Which source to start from. The pass rotates so one slow source cannot block the rest. */
   startAt?: number
   sources?: readonly PublicSource[]
+  /**
+   * The search the pass tries first. Omitted, or without a key, the pass is
+   * exactly what it was: the directories and nothing else.
+   */
+  search?: SearchFn
 }
 
 /**
@@ -150,7 +167,6 @@ export async function runProspectTopUp(
 ): Promise<TopUpSummary> {
   const sources = deps.sources ?? PUBLIC_SOURCES
   const summary: TopUpSummary = { source: null, examined: 0, fetched: 0, added: null, refusals: [] }
-  if (sources.length === 0) return summary
 
   // Rotate, so a source that is down or exhausted costs one pass rather than
   // every pass. The hour is the rotation, which needs nothing stored.
@@ -161,6 +177,22 @@ export async function runProspectTopUp(
   // refused, and the pass ended there, every quarter hour, while five usable
   // directories went unread. A source earns the rest of the pass by adding a
   // business, not by answering.
+  // THE SEARCH GOES FIRST, because it is the only supply that does not run out.
+  // A directory is a page someone maintains: it has as many members as it has,
+  // and once they are listed or refused it can only answer with the same ones.
+  // A trade and a town is a new question every quarter hour. The directories
+  // stay behind it: a member list is a name a person wrote and a business that
+  // chose to be found, which is still the better signal where it exists.
+  if (deps.search !== undefined) {
+    const found = await searchCandidates(deps.search, deps.now)
+    summary.fetched += 1
+    if (found.reachable) {
+      summary.source = `search: ${found.query}`
+      if (await examine(admin, found.candidates, SEARCH_SOURCE_URL, deps, summary)) return summary
+    }
+  }
+
+  if (sources.length === 0) return summary
   const start = deps.startAt ?? deps.now.getUTCHours()
   let listingsRead = 0
   for (let i = 0; i < sources.length; i += 1) {
@@ -184,33 +216,51 @@ export async function runProspectTopUp(
     if (candidates.length === 0) continue
     summary.source = source.name
 
-    for (const candidate of candidates) {
-      if (summary.examined >= MAX_CANDIDATES_PER_PASS) return summary
-      // Cheapest possible refusal: a business already on the list, decided from
-      // our own table before anyone's server is asked for anything.
-      if (await alreadyListed(admin, candidate.host)) {
-        summary.refusals.push(`${candidate.host}: already listed`)
-        continue
-      }
-      summary.examined += 1
-      const verdict = await qualifyBusiness(
-        { company: candidate.company, host: candidate.host, sourceSecond: source.url },
-        deps.fetchPage,
-      )
-      summary.fetched += verdict.pagesRead
-      if (!verdict.ok) {
-        summary.refusals.push(`${candidate.host}: ${verdict.reason}${verdict.detail ? ` (${verdict.detail})` : ''}`)
-        continue
-      }
-      const written = await addProspect(admin, verdict.draft)
-      if (written === 'added') {
-        summary.added = verdict.draft.siteHost
-        return summary
-      }
-      summary.refusals.push(`${candidate.host}: ${written}`)
-    }
+    if (await examine(admin, candidates, source.url, deps, summary)) return summary
   }
   return summary
+}
+
+/**
+ * Qualify candidates until one is added or the pass's budget is spent.
+ *
+ * Returns true when the pass is over: a business was added, or there is no
+ * examination left in it. Both sources of candidates run through this, so a
+ * search result is held to exactly what a member list's link is held to.
+ */
+async function examine(
+  admin: ServiceRoleClient,
+  candidates: readonly ListingCandidate[],
+  sourceUrl: string,
+  deps: TopUpDeps,
+  summary: TopUpSummary,
+): Promise<boolean> {
+  for (const candidate of candidates) {
+    if (summary.examined >= MAX_CANDIDATES_PER_PASS) return true
+    // Cheapest possible refusal: a business already on the list, decided from
+    // our own table before anyone's server is asked for anything.
+    if (await alreadyListed(admin, candidate.host)) {
+      summary.refusals.push(`${candidate.host}: already listed`)
+      continue
+    }
+    summary.examined += 1
+    const verdict = await qualifyBusiness(
+      { company: candidate.company, host: candidate.host, sourceSecond: sourceUrl },
+      deps.fetchPage,
+    )
+    summary.fetched += verdict.pagesRead
+    if (!verdict.ok) {
+      summary.refusals.push(`${candidate.host}: ${verdict.reason}${verdict.detail ? ` (${verdict.detail})` : ''}`)
+      continue
+    }
+    const written = await addProspect(admin, verdict.draft)
+    if (written === 'added') {
+      summary.added = verdict.draft.siteHost
+      return true
+    }
+    summary.refusals.push(`${candidate.host}: ${written}`)
+  }
+  return false
 }
 
 /**
