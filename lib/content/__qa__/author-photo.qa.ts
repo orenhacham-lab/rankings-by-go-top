@@ -17,6 +17,10 @@
  *      never links our storage, only the copy in the customer's site;
  *   C) the copy into WordPress: uploaded once per project and site, reused, a
  *      file name with no person in it; the published box draws that copy;
+ *   W) the plugin route (3.2.0): a site with no application password gets the
+ *      photo through the plugin's /media, from ONE address signed for five
+ *      minutes; the bucket stays private, an older plugin is not asked, and
+ *      the plugin's own allowlist is the two GO TOP storage prefixes;
  *   S) the Shopify gating: 'upload' is offered only on WordPress with an
  *      application password (the copy is possible), never on a store;
  *   N) the box: the name line is the link (the settings preview too);
@@ -39,7 +43,7 @@ import { authorBoxContent, authorBoxStructure } from '@/lib/content/author-box/b
 import { AUTHOR_PHOTO_PATH, authorPhotoPath, isAuthorPhotoPath } from '@/lib/content/author-box/photo-file'
 import type * as PhotoMod from '@/lib/content/author-box/photo'
 import type * as PhotoFileMod from '@/lib/content/author-box/photo-file'
-import { copyAuthorPhotoToWordPress } from '@/lib/content/author-box/photo-copy'
+import { AUTHOR_PHOTO_COPY_SECONDS, canCopyAuthorPhoto, copyAuthorPhoto, copyAuthorPhotoToWordPress, copyAuthorPhotoViaPlugin } from '@/lib/content/author-box/photo-copy'
 import { loadWritingGuidance, saveWritingGuidance, type GuidanceDeps } from '@/lib/content/writing-guidance/data'
 import type * as DataMod from '@/lib/content/writing-guidance/data'
 import type * as PreviewMod from '@/lib/content/author-box/preview'
@@ -408,7 +412,7 @@ async function main() {
       && (styleRow(d).author_box_photo_media as Row).media_id === 77 && styleRow(d, OTHER).author_box_photo_media === null)
     await copyAuthorPhotoToWordPress(d as never, { ...creds, siteUrl: 'https://other-site.example' }, PROJECT, OWNER, { upload })
     check('C2: another site gets its own upload', uploads.length === 2)
-    const noCache = await mutant<typeof import('@/lib/content/author-box/photo-copy')>('lib/content/author-box/photo-copy.ts', (x) => x.replace('if (photo.media && photo.media.site === site && photo.media.path === photo.path) return photo.media.url', ''))
+    const noCache = await mutant<typeof import('@/lib/content/author-box/photo-copy')>('lib/content/author-box/photo-copy.ts', (x) => x.replace('const done = photo.media && photo.media.site === site && photo.media.path === photo.path ? photo.media.url : null', 'const done = null'))
     const before = uploads.length
     await noCache.copyAuthorPhotoToWordPress(d as never, { ...creds, siteUrl: 'https://other-site.example' }, PROJECT, OWNER, { upload })
     check('MUTATION CONTROL: a copy step without the reuse uploads again for every article (C1/C2 would fail)', uploads.length === before + 1)
@@ -424,11 +428,111 @@ async function main() {
     const appSrc = strip(read('lib/content/wordpress-publish.ts'))
     const plugSrc = strip(read('lib/content/wordpress-plugin-publish.ts'))
     const wired = (a: string, p: string) => /authorPhoto: \(projectId, ownerId\) => copyAuthorPhotoToWordPress\(admin, creds, projectId, ownerId\)/.test(a)
-      && /opts\.photoCreds \? \{ authorPhoto: [^}]*copyAuthorPhotoToWordPress\(admin, opts\.photoCreds!, projectId, ownerId\)/.test(p) && /photoCreds: publisher\.creds/.test(p)
-    check('C4: both WordPress publishers copy through the application password (the existing media upload)', wired(appSrc, plugSrc))
+      && /authorPhoto: \(projectId: string, ownerId: string\) => copyAuthorPhoto\(admin, \{/.test(p)
+      && /creds: opts\.photoCreds \?\? null,/.test(p) && /plugin: pluginCan\(plugin\.version, 'author_photo'\) \? plugin : null,/.test(p)
+      && /photoCreds: publisher\.creds/.test(p)
+    check('C4: both WordPress publishers copy the photo; the plugin publisher takes the password AND the 3.2.0 plugin', wired(appSrc, plugSrc))
     check('MUTATION CONTROL: a publisher that drops the photo fails C4', !wired(appSrc.replace('authorPhoto: (projectId, ownerId) => copyAuthorPhotoToWordPress(admin, creds, projectId, ownerId)', ''), plugSrc))
+    check('MUTATION CONTROL: a plugin publisher that hands the photo to any plugin version fails C4',
+      !wired(appSrc, plugSrc.replace("plugin: pluginCan(plugin.version, 'author_photo') ? plugin : null,", 'plugin,')))
     const copySrc = strip(read('lib/content/author-box/photo-copy.ts'))
-    check('C5: the copy uses lib/wordpress/client uploadMedia, never the plugin\'s public-storage /media', /import \{ uploadMedia \} from '@\/lib\/wordpress\/client'/.test(copySrc) && !/pluginMedia|getPublicUrl/.test(copySrc))
+    check('C5: the copy never asks the bucket for a public address, in either route', !/getPublicUrl/.test(copySrc))
+    check('C6: the application-password route uploads the bytes through lib/wordpress/client, and the plugin route hands over a SIGNED address only',
+      /import \{ uploadMedia \} from '@\/lib\/wordpress\/client'/.test(copySrc)
+      && /createSignedUrl\(todo\.path, AUTHOR_PHOTO_COPY_SECONDS\)/.test(copySrc)
+      && /AUTHOR_PHOTO_COPY_SECONDS = 300\b/.test(copySrc)
+      && /\(deps\.media \?\? pluginMedia\)\(plugin\.link, \{ url, alt: '' \}\)/.test(copySrc))
+  }
+
+  // ── W) the plugin route (3.2.0) ─────────────────────────────────────────
+  console.log('\nW) the plugin route: a signed address, once, and only to a plugin that can take it')
+  {
+    const path = `${PROJECT}/${UUID1}.jpg`
+    const prepared = await photo.prepareAuthorPhoto(jpegWithExif)
+    const world = () => {
+      const d = db([baseRow({ author_box_image: 'upload', author_box_photo_path: path }), decoyRow()])
+      const st = fakeStorage(); st.objects.set(path, { bucket: 'author-photos', bytes: prepared.ok ? prepared.bytes : new Uint8Array() })
+      ;(d as unknown as { storage: unknown }).storage = st.storage
+      return { d, st }
+    }
+    const link = { siteUrl: `https://${DOMAIN}`, keyId: 'k', secret: 's' }
+    const asked: { url: string; alt: string }[] = []
+    const media = (async (_l: unknown, img: { url: string; alt: string }) => {
+      asked.push(img)
+      return { ok: true as const, body: { ok: true, status: 'applied', media_id: 91, url: `https://${DOMAIN}/wp-content/uploads/2026/10/author-photo.jpg` } }
+    }) as never
+
+    const w1 = world()
+    const first = await copyAuthorPhotoViaPlugin(w1.d as never, { link }, PROJECT, OWNER, { media })
+    const second = await copyAuthorPhotoViaPlugin(w1.d as never, { link }, PROJECT, OWNER, { media })
+    check('W1: the photo reaches the site once, through /media, and the copy is reused after that',
+      asked.length === 1 && first === second && first === `https://${DOMAIN}/wp-content/uploads/2026/10/author-photo.jpg`
+      && (styleRow(w1.d).author_box_photo_media as Row).media_id === 91 && styleRow(w1.d, OTHER).author_box_photo_media === null)
+    check('W2: what the site is given is one address signed on OUR storage, for five minutes, with no name in the alt text',
+      asked[0]!.url.includes('/storage/v1/object/sign/') && asked[0]!.alt === '' && AUTHOR_PHOTO_COPY_SECONDS === 300
+      && w1.st.calls.filter((c) => c.op === 'sign').length === 1
+      && w1.st.calls.every((c) => c.op !== 'public'))
+
+    // A refused /media (an older plugin answers off_site) leaves nothing behind.
+    const w2 = world()
+    const refused = (async () => ({ ok: false as const, code: 'plugin_refused', pluginCode: 'off_site' })) as never
+    const none = await copyAuthorPhotoViaPlugin(w2.d as never, { link }, PROJECT, OWNER, { media: refused })
+    check('W3: a refused import is null and records no copy', none === null && styleRow(w2.d).author_box_photo_media === null)
+
+    // The application password wins when the project has one; the plugin is the fallback.
+    const w3 = world()
+    const uploads: string[] = []
+    const upload = (async (_c: unknown, f: { filename: string }) => { uploads.push(f.filename); return { id: 5, sourceUrl: `https://${DOMAIN}/wp-content/uploads/pw.jpg` } }) as never
+    const viaPw = await copyAuthorPhoto(w3.d as never, { creds: { siteUrl: `https://${DOMAIN}`, username: 'u', applicationPassword: 'p' }, plugin: { link } }, PROJECT, OWNER, { upload, media })
+    const askedAfterPw = asked.length
+    const w4 = world()
+    const viaPlugin = await copyAuthorPhoto(w4.d as never, { creds: null, plugin: { link } }, PROJECT, OWNER, { upload, media })
+    check('W4: with an application password the bytes still go through it; without one the plugin route is used',
+      viaPw === `https://${DOMAIN}/wp-content/uploads/pw.jpg` && uploads.length === 1 && askedAfterPw === asked.length - 1
+      && viaPlugin === `https://${DOMAIN}/wp-content/uploads/2026/10/author-photo.jpg`)
+    const w5 = world()
+    const nothing = await copyAuthorPhoto(w5.d as never, { creds: null, plugin: null }, PROJECT, OWNER, { upload, media })
+    check('W5: no password and no plugin that can take it: no photo, and nothing asked of either', nothing === null)
+
+    // The card offers the choice on a plugin that can, and not on one that cannot.
+    const offers = async (can: boolean) => canCopyAuthorPhoto(world().d as never, PROJECT, { plugin: async () => (can ? { link } : null) })
+    check('W6: the settings card offers the upload wherever a copy can be made, and not where it cannot',
+      (await offers(true)) === true && (await offers(false)) === false)
+
+    // A route that asked the bucket for a public address instead of signing one.
+    const pub = await mutant<typeof import('@/lib/content/author-box/photo-copy')>('lib/content/author-box/photo-copy.ts',
+      (x) => x.replace('createSignedUrl(todo.path, AUTHOR_PHOTO_COPY_SECONDS)', 'getPublicUrl(todo.path)'))
+    const w6 = world()
+    await pub.copyAuthorPhotoViaPlugin(w6.d as never, { link }, PROJECT, OWNER, { media })
+    check('MUTATION CONTROL: a plugin route that asks for a public address makes the bucket public (W2 fails)',
+      w6.st.calls.some((c) => c.op === 'public') && !w6.st.calls.some((c) => c.op === 'sign'))
+
+    // A signature that outlived the import.
+    const longSign = await mutant<typeof import('@/lib/content/author-box/photo-copy')>('lib/content/author-box/photo-copy.ts',
+      (x) => x.replace('export const AUTHOR_PHOTO_COPY_SECONDS = 300', 'export const AUTHOR_PHOTO_COPY_SECONDS = 86_400'))
+    const w7 = world()
+    await longSign.copyAuthorPhotoViaPlugin(w7.d as never, { link }, PROJECT, OWNER, { media })
+    const secondsAsked = (w7.st.calls.find((c) => c.op === 'sign')?.arg as [string, number] | undefined)?.[1]
+    check('MUTATION CONTROL: a signature good for a day is not the five minutes W2 asks for', secondsAsked === 86_400)
+
+    // The plugin's own allowlist: the two GO TOP storage prefixes, nothing else.
+    const php = read('wordpress-plugin/gotop-seo-bridge/includes/publish.php')
+    const sources = php.slice(php.indexOf('function gotop_seo_bridge_image_sources'), php.indexOf('function gotop_seo_bridge_image_source_ok'))
+    check('W7: the plugin accepts GO TOP\'s public and signed storage addresses, both https, and nothing else',
+      /object\/public\//.test(sources) && /object\/sign\//.test(sources)
+      && (sources.match(/'https:\/\/pmzicbtulloeynsosseh\.supabase\.co\/storage\/v1\/object\/(public|sign)\/'/g) ?? []).length === 2
+      && /stripos\(\$p, 'https:\/\/'\) === 0/.test(sources))
+    check('W8: an address whose signature changed is still the same file (the import key drops the query)',
+      /\$q = strpos\(\$url, '\?'\);/.test(php) && /hash\('sha256', \$q === false \? \$url : substr\(\$url, 0, \$q\)\)/.test(php))
+    const capsPhp = read('wordpress-plugin/gotop-seo-bridge/includes/read.php')
+    check('W9: the plugin reports author_photo in its capabilities, and the app gate asks 3.2.0 for it',
+      /'author_photo'/.test(capsPhp) && /author_photo: '3\.2\.0'/.test(read('lib/site-fix/plugin-capabilities.ts')))
+    const zip = read('lib/site-fix/plugin-zip.generated.ts')
+    check('W10: the plugin we hand out is 3.2.0, and its header, its constant and readme.txt agree',
+      /PLUGIN_VERSION = '3\.2\.0'/.test(zip)
+      && /\* Version:\s+3\.2\.0/.test(read('wordpress-plugin/gotop-seo-bridge/gotop-seo-bridge.php'))
+      && /GOTOP_SEO_BRIDGE_VERSION', '3\.2\.0'/.test(read('wordpress-plugin/gotop-seo-bridge/gotop-seo-bridge.php'))
+      && /Stable tag: 3\.2\.0/.test(read('wordpress-plugin/gotop-seo-bridge/readme.txt')))
   }
 
   // ── S) Shopify gating ───────────────────────────────────────────────────

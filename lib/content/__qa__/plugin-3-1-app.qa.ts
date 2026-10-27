@@ -442,8 +442,12 @@ async function main() {
 
   // ── G) the gate ────────────────────────────────────────────────────────────
   console.log('\nG) the 3.1 gate')
-  check('G1: every 3.1 capability needs 3.1.0 by version; /status\'s own list wins when it is known',
-    CAP.PLUGIN_CAPABILITIES.every((c) => CAP.pluginCan('3.1.0', c) && CAP.pluginCan('3.2', c) && !CAP.pluginCan('3.0.0', c) && !CAP.pluginCan(null, c)) &&
+  // author_photo arrived in 3.2.0 (the signed address the private author-photo bucket needs);
+  // every other capability is 3.1.0. A version below its own line never has it.
+  const CAP_31 = CAP.PLUGIN_CAPABILITIES.filter((c) => c !== 'author_photo')
+  check('G1: every 3.1 capability needs 3.1.0 by version, author_photo needs 3.2.0; /status\'s own list wins when it is known',
+    CAP_31.every((c) => CAP.pluginCan('3.1.0', c) && CAP.pluginCan('3.2', c) && !CAP.pluginCan('3.0.0', c) && !CAP.pluginCan(null, c)) &&
+    CAP.pluginCan('3.2.0', 'author_photo') && !CAP.pluginCan('3.1.9', 'author_photo') && !CAP.pluginCan(null, 'author_photo') &&
     CAP.pluginCan('3.0.0', 'content', ['content']) && !CAP.pluginCan('3.1.0', 'authors', ['content']))
   {
     const scope = { projectId: PROJECT, userId: OWNER }

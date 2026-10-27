@@ -115,12 +115,20 @@ function gotop_seo_bridge_route_media(\WP_REST_Request $request) {
 }
 
 /**
- * Images come only from GO TOP's file storage (its public Supabase storage), so the plugin can
- * never be told to fetch another address. The filter exists for a GO TOP storage move or a test
- * site; it can narrow or replace the list, and every entry is still https only.
+ * Images come only from GO TOP's own file storage, so the plugin can never be told to fetch another
+ * address. Two prefixes, both on the same GO TOP storage host:
+ *   object/public/  the article's images, which live in a public bucket;
+ *   object/sign/    a single file GO TOP signed for a few minutes, which is how the author photo
+ *                   you uploaded in GO TOP reaches this site: its bucket is private, so it has no
+ *                   public address at all (3.2.0).
+ * The filter exists for a GO TOP storage move or a test site; it can narrow or replace the list,
+ * and every entry is still https only.
  */
 function gotop_seo_bridge_image_sources() {
-    $sources = apply_filters('gotop_seo_bridge_image_sources', array('https://pmzicbtulloeynsosseh.supabase.co/storage/v1/object/public/'));
+    $sources = apply_filters('gotop_seo_bridge_image_sources', array(
+        'https://pmzicbtulloeynsosseh.supabase.co/storage/v1/object/public/',
+        'https://pmzicbtulloeynsosseh.supabase.co/storage/v1/object/sign/',
+    ));
     return array_values(array_filter((array) $sources, function ($p) { return is_string($p) && stripos($p, 'https://') === 0; }));
 }
 
@@ -143,7 +151,11 @@ function gotop_seo_bridge_import_image($body) {
     if (!gotop_seo_bridge_image_source_ok($url)) { return array('ok' => false, 'code' => 'off_site'); }
     $alt = isset($body['alt']) ? gotop_seo_bridge_text_ok($body['alt'], 0, 250) : '';
     if ($alt === null) { return array('ok' => false, 'code' => 'value_invalid'); }
-    $source_key = hash('sha256', $url);
+    // The same file is imported once. A signed address carries a token that changes every time it
+    // is signed, so the key is the address WITHOUT its query: re-signing the same file is still
+    // the same file, and a public address has no query to drop.
+    $q = strpos($url, '?');
+    $source_key = hash('sha256', $q === false ? $url : substr($url, 0, $q));
 
     $existing = get_posts(array(
         'post_type'      => 'attachment',
