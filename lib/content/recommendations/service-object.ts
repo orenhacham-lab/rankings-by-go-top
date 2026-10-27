@@ -161,6 +161,15 @@ export function serviceObjectsNamed(text: string): Set<ServiceObject> {
  */
 const MIN_OBJECT_PAGES = 3
 const MIN_OBJECT_SHARE = 0.2
+/**
+ * And a site whose pages name only ONE kind of place is never gated either.
+ * A single-object owned set is the exact shape every false case measured had
+ * (a plumber's 'building', a travel site's 'restaurant'), while both real cases
+ * name several: be-cln offices, clinics and showrooms, the locksmith vehicles
+ * and homes. A business that genuinely serves one kind of place only loses
+ * nothing it has today, because the gate it loses is the one that never ran.
+ */
+const MIN_OBJECT_KINDS = 2
 
 /**
  * The kinds of place the merchant's OWN pages name. Empty = the gate is off.
@@ -184,7 +193,7 @@ export function ownedServiceObjects(pageNames: readonly string[], declared: read
     naming++
     for (const k of named) out.add(k)
   }
-  if (naming < MIN_OBJECT_PAGES || naming < pages * MIN_OBJECT_SHARE) return new Set<ServiceObject>()
+  if (naming < MIN_OBJECT_PAGES || naming < pages * MIN_OBJECT_SHARE || out.size < MIN_OBJECT_KINDS) return new Set<ServiceObject>()
   // THE MERCHANT'S OWN WORDS WIDEN THE SET, AND NEVER TURN THE GATE ON. The
   // pages decide whether this site is gated at all; the keywords the merchant
   // chose to track say who they serve, and they are the better authority where

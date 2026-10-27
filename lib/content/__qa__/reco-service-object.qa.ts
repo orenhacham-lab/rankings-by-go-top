@@ -263,6 +263,10 @@ async function main() {
       !ownedServiceObjects(PAGES).has('building') && OWNED.has('building'))
     check('A21. and the two private-home ideas are still blocked, because nothing tracked is a home',
       foreignServiceObject('שירותי ניקיון בתים בנתניה', OWNED) === 'home')
+    check('A21b. a site whose pages name ONE kind of place only is not gated, whatever the share',
+      ownedServiceObjects(['ניקיון בתים בתל אביב', 'ניקיון בתים בחיפה', 'ניקיון דירות', 'אודות']).size === 0)
+    check('A21c. and two kinds over the same pages ARE gated',
+      ownedServiceObjects(['ניקיון בתים בתל אביב', 'ניקיון משרדים', 'ניקיון דירות', 'אודות']).size === 2)
     check('A22. a tracked keyword can NEVER switch the gate on: the magazine stays ungated',
       ownedServiceObjects(MAGAZINE_PAGES, ['ניקיון משרדים', 'ניקיון בתים', 'מסעדות']).size === 0)
     check('A23. nor can it on a site with no pages at all',
