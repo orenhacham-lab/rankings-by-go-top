@@ -124,19 +124,36 @@ export default async function MarketplaceSalesPage({
         })}
       </section>
 
-      {/* Everything a buyer is owed before they are bound, in the words the
-          legal review wrote: who charges them and invoices them, that the
-          price is before tax, whose terms govern the purchase as opposed to
-          the account, that it renews, and where to stop it.
+      {/* Everything a buyer is owed before they are bound: who they are
+          buying FROM, who charges them, that the price is before tax, whose
+          terms govern the purchase as opposed to the account, that it renews,
+          and where to stop it.
           "Seller of record" is a term of art a buyer may not know, so the
-          sentence says what it means instead. */}
-      <p className="mt-6 text-copy text-muted">
-        You buy this plan from {provider.label}, which is the seller for this purchase: it
-        charges you, issues your invoice, calculates tax by your billing address and shows
-        the final amount before you pay. The prices above are before tax. {provider.label}&rsquo;s
-        own terms and return policy apply to this purchase; your Go Top SEO account is
-        governed by our Terms and Privacy Policy.
-      </p>
+          sentence says what it means instead.
+
+          WHICH SENTENCE IS PRINTED IS A LEGAL FACT, NOT A TEMPLATE CHOICE.
+          Telling a buyer the platform is their seller when the platform's own
+          vendor agreement makes us the seller is a misstatement about who
+          they contracted with and who owes the tax on the sale, published on
+          our own domain. So the wording follows provider.sellerOfRecord,
+          which is read from each platform's agreement and nowhere else. */}
+      {provider.sellerOfRecord ? (
+        <p className="mt-6 text-copy text-muted">
+          You buy this plan from {provider.label}, which is the seller for this purchase: it
+          charges you, issues your invoice, calculates tax by your billing address and shows
+          the final amount before you pay. The prices above are before tax. {provider.label}&rsquo;s
+          own terms and return policy apply to this purchase; your Go Top SEO account is
+          governed by our Terms and Privacy Policy.
+        </p>
+      ) : (
+        <p className="mt-6 text-copy text-muted">
+          Go Top SEO is the seller for this purchase and issues your invoice. {provider.label} runs
+          the checkout and takes the payment on our behalf; its own terms apply to the payment
+          itself. The prices above are before tax, and any tax due where you are is shown at
+          checkout before you pay. Your Go Top SEO account is governed by our Terms and Privacy
+          Policy.
+        </p>
+      )}
 
       <p className="mt-4 text-copy text-muted">
         The plan is a monthly subscription and renews every month until you cancel it. You
@@ -165,9 +182,16 @@ export default async function MarketplaceSalesPage({
       </nav>
 
       {/* Rendered only once the legal thread has passed the platform's exact
-          wording; see MarketplaceProvider.requiredDisclaimer. */}
+          wording; see MarketplaceProvider.requiredDisclaimer.
+
+          SET IN THE BODY SIZE ON PURPOSE. JVZoo's review states the condition
+          in the same breath as the text: it "must be clear and conspicuous
+          (no use of smaller font for the disclaimer)". text-caption is the
+          smaller font, so using it would fail the review while appearing to
+          satisfy it - the failure mode a reviewer is specifically looking
+          for. Bottom of the page is allowed; small is not. */}
       {provider.requiredDisclaimer ? (
-        <p className="mt-8 text-caption text-muted">{provider.requiredDisclaimer}</p>
+        <p className="mt-8 text-copy text-muted">{provider.requiredDisclaimer}</p>
       ) : null}
 
       {/* NO TRACKING PIXEL, DELIBERATELY. An affiliate platform's conversion

@@ -58,6 +58,19 @@ export interface MarketplaceProvider {
   /** null until the platform's documented scheme has been verified. */
   signature: MarketplaceSignatureScheme | null
   /**
+   * Whether the platform is the SELLER OF RECORD for the buyer's purchase —
+   * the party that contracts with the buyer, issues the invoice and owes the
+   * tax on the sale.
+   *
+   * This is not a presentational flag. It decides which of two legally
+   * different sentences the sales page prints about who the buyer is buying
+   * from, and printing the wrong one is a misrepresentation on our own
+   * domain. It is therefore set from the platform's own vendor agreement and
+   * nothing else; see the note above MARKETPLACE_PROVIDERS for the clause
+   * each value was read from.
+   */
+  sellerOfRecord: boolean
+  /**
    * Wording the platform requires on the sales page, once the legal thread
    * has passed it.
    *
@@ -77,17 +90,97 @@ export interface MarketplaceProvider {
  * delivery while its `signature` is null.
  */
 /*
- * JVZoo IS NOT A RESELLER, AND THAT IS A LEGAL DIFFERENCE, NOT A DETAIL. Its
- * terms leave us the seller with the money arriving through our own PayPal,
- * which brings back the EU VAT registration and the 14-day withdrawal right
- * that selling through a reseller avoids. It stays registered so the row can
- * be configured if the owner decides to accept that, and it stays off until he
- * does. ClickBank and Digistore24 are resellers and carry neither problem.
+ * JVZoo IS NOT A RESELLER, AND THAT IS A LEGAL DIFFERENCE, NOT A DETAIL. This
+ * was recorded here as a reading of its terms before anyone could reach the
+ * account; it has since been READ FROM THE SIGNED AGREEMENT ITSELF
+ * (https://www.jvzoo.com/vendoragreement, effective 03-28-2020), and the
+ * agreement settles it three times over:
+ *
+ *   s.11 Taxes and Related Charges - "You are solely responsible for ensuring
+ *        the collection and payment of any and all applicable state, local, or
+ *        other taxes or related charges arising from any customer purchasing
+ *        Your products or services. You agree to indemnify Us from any
+ *        liability connected with the same."
+ *   s.7  JVZoo takes "a commission fee of 5% of the gross selling price" - the
+ *        fee of a network, not the margin of a reseller.
+ *   s.9  the buyer "remits full payment for the product or service ordered
+ *        from You" - the order is placed with us.
+ *
+ * So the contract runs buyer-to-us, the invoice is ours, and the EU VAT and
+ * the 14-day withdrawal right come back to us. That is exactly what a
+ * merchant of record (Creem, Digistore24) exists to absorb.
+ *
+ * NOTE THE CONTRADICTION, because it is a trap: the disclaimer JVZoo's own
+ * compliance review REQUIRES on the sales page says "JVZoo serves as the
+ * retailer for the products featured on this site". That sentence cannot be
+ * reconciled with s.11 of the agreement we signed. We publish their mandated
+ * wording because they mandate it, and we state who the seller actually is in
+ * our own voice, in full size, directly above it - we do not let their
+ * boilerplate be the page's answer to "who am I buying from".
+ *
+ * ClickBank and Digistore24 are resellers and carry neither problem.
  */
 export const MARKETPLACE_PROVIDERS: readonly MarketplaceProvider[] = [
-  { slug: 'digistore24', label: 'Digistore24', signature: null, requiredDisclaimer: null },
-  { slug: 'clickbank', label: 'ClickBank', signature: null, requiredDisclaimer: null },
-  { slug: 'jvzoo', label: 'JVZoo', signature: null, requiredDisclaimer: null },
+  {
+    slug: 'digistore24',
+    label: 'Digistore24',
+    signature: null,
+    sellerOfRecord: true,
+    requiredDisclaimer: null,
+  },
+  {
+    slug: 'clickbank',
+    label: 'ClickBank',
+    signature: null,
+    sellerOfRecord: true,
+    requiredDisclaimer: null,
+  },
+  {
+    slug: 'jvzoo',
+    label: 'JVZoo',
+    /*
+     * STILL null, and not for want of documentation. JVZIPN v2 is now read and
+     * written down (docs/affiliate/jvzoo-webhook-docs.md), and it is NOT the
+     * shape MarketplaceSignatureScheme describes: it is not an HMAC over the
+     * raw body in a header, it is the first 8 characters, upper-cased, of
+     * SHA-1 over five NAMED FORM FIELDS joined by pipes with the account
+     * secret appended, arriving in the `cverify` field of the form body.
+     * Widening the scheme type to cover that is a change to
+     * lib/marketplace/signature.ts and its tests, not a value that can be
+     * filled in here, so this stays null and the webhook stays shut.
+     */
+    signature: null,
+    sellerOfRecord: false,
+    /*
+     * The exact words JVZoo compliance requires, copied character for
+     * character from the review notes on products 457483 / 457573 / 457575 /
+     * 457579 (review date 10/14/2026, issue 1 "Required JVZoo Disclaimer
+     * Missing"). Approved for publication by the owner.
+     *
+     * It is their text and not ours, so it is not edited, trimmed or
+     * paraphrased - a page that prints an approximation of a mandated
+     * disclaimer fails the review and has published a statement nobody
+     * authored. The income sentence reads oddly on a page that makes no
+     * income claim, which is the point of it: it denies a promise rather than
+     * implying one.
+     */
+    requiredDisclaimer:
+      'Disclaimer: Please note that this product does not provide any guarantee of income ' +
+      'or success. The results achieved by the product owner or any other individuals ' +
+      'mentioned are not indicative of future success or earnings. This website is not ' +
+      'affiliated with FaceBook or any of its associated entities. Once you navigate away ' +
+      'from FaceBook, the responsibility for the content and its usage lies solely with the ' +
+      'user. All content on this website, including but not limited to text, images, and ' +
+      'multimedia, is protected by copyright law and the Digital Millennium Copyright Act. ' +
+      'Unauthorized copying, duplication, modification, or theft, whether intentional or ' +
+      'unintentional, is strictly prohibited. Violators will be prosecuted to the fullest ' +
+      'extent of the law. We want to clarify that JVZoo serves as the retailer for the ' +
+      'products featured on this site. JVZoo\u00ae is a registered trademark of BBC Systems ' +
+      'Inc., a Florida corporation located at 1809 E. Broadway Street, Suite 125, Oviedo, FL ' +
+      '32765, USA, and is used with permission. The role of JVZoo as a retailer does not ' +
+      'constitute an endorsement, approval, or review of these products or any claims, ' +
+      'statements, or opinions used in their promotion.',
+  },
 ] as const
 
 /** The registered provider, or null for anything else. Never throws. */

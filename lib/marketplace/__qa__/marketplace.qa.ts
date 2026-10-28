@@ -63,8 +63,17 @@ check('A4: the lookup is case- and whitespace-tolerant, because an env var is ty
   marketplaceProvider(' Digistore24 ')?.slug === 'digistore24')
 check('A5: NO provider carries a signature scheme — none has been read from its own documentation',
   MARKETPLACE_PROVIDERS.every((p) => p.signature === null))
-check('A6: and none carries a required disclaimer, which is legal\'s to approve',
-  MARKETPLACE_PROVIDERS.every((p) => p.requiredDisclaimer === null))
+check('A6: a required disclaimer is carried only where the owner approved the platform\'s exact wording — JVZoo\'s is approved, the other two have none',
+  marketplaceProvider('jvzoo')?.requiredDisclaimer?.startsWith('Disclaimer: Please note that this product does not provide any guarantee of income') === true
+  && marketplaceProvider('digistore24')?.requiredDisclaimer === null
+  && marketplaceProvider('clickbank')?.requiredDisclaimer === null)
+check('A6b: JVZoo\'s approved disclaimer is the platform\'s text intact, naming JVZoo as retailer and BBC Systems Inc.',
+  marketplaceProvider('jvzoo')?.requiredDisclaimer?.includes('JVZoo serves as the retailer') === true
+  && marketplaceProvider('jvzoo')?.requiredDisclaimer?.includes('BBC Systems Inc.') === true)
+check('A6c: seller of record follows each platform\'s vendor agreement — JVZoo is NOT one (s.11 leaves the tax with us), the two resellers are',
+  marketplaceProvider('jvzoo')?.sellerOfRecord === false
+  && marketplaceProvider('digistore24')?.sellerOfRecord === true
+  && marketplaceProvider('clickbank')?.sellerOfRecord === true)
 check('A7: no provider has a parser either, so no body can be acted on',
   MARKETPLACE_PROVIDERS.every((p) => marketplaceParser(p.slug) === null))
 
