@@ -119,7 +119,16 @@ function shell(title: string, rows: Array<[string, string]>, accent = '#2563eb')
 
 export type FreeCheckAlertInput = {
   domain: string
+  /** The language of the free-check PAGE the visitor used, not the site's. */
   locale: string
+  /**
+   * The language the scan read off the site itself (result.business.language),
+   * when the model answered with one. A Portuguese site scanned from the English
+   * page reported "English" while the engine had it right as `pt-pt`, because the
+   * alert showed only the visitor's page. The two are different facts and the
+   * email now says which is which.
+   */
+  siteLanguage?: string | null
   when: Date
   /** The scan's own counters, when present. There is no single overall score; the GEO score is the headline one. */
   geoPassed?: number | null
@@ -135,10 +144,12 @@ const num = (v: unknown): number | null => (typeof v === 'number' && Number.isFi
 export function buildFreeCheckAlertHtml(i: FreeCheckAlertInput): string {
   const geoPassed = num(i.geoPassed)
   const geoTotal = num(i.geoTotal)
+  const site = typeof i.siteLanguage === 'string' && i.siteLanguage.trim() ? i.siteLanguage.trim() : null
   const rows: Array<[string, string]> = [
     ['אתר שנסרק', text(safeDomain(i.domain))],
     ['זמן', jerusalemTime(i.when)],
-    ['שפה', i.locale === 'en' ? 'English' : i.locale === 'he' ? 'עברית' : text(i.locale, 8)],
+    ['שפת האתר', site ? text(site, 16) : 'לא זוהתה'],
+    ['שפת העמוד שממנו נסרק', i.locale === 'en' ? 'English' : i.locale === 'he' ? 'עברית' : text(i.locale, 8)],
   ]
   if (geoPassed !== null && geoTotal !== null && geoTotal > 0) rows.push(['ציון (בדיקות GEO)', `${escapeEmailHtml(geoPassed)} מתוך ${escapeEmailHtml(geoTotal)}`])
   const findings = num(i.findings)
@@ -150,7 +161,12 @@ export function buildFreeCheckAlertHtml(i: FreeCheckAlertInput): string {
   return shell('🔎 נסרק אתר בבדיקה החינמית (לפני הרשמה)', rows, '#0d9488')
 }
 
-type FreeCheckResultLike = { counters?: { geoPassed?: unknown; geoTotal?: unknown }; geo?: { passed?: unknown; total?: unknown }; findings?: unknown }
+type FreeCheckResultLike = {
+  counters?: { geoPassed?: unknown; geoTotal?: unknown }
+  geo?: { passed?: unknown; total?: unknown }
+  findings?: unknown
+  business?: { language?: unknown } | null
+}
 
 /**
  * Tell the operator a visitor finished a free check, at most once per domain
@@ -193,6 +209,7 @@ export async function notifyFreeCheckCompleted(
         html: buildFreeCheckAlertHtml({
           domain,
           locale: args.locale,
+          siteLanguage: typeof r?.business?.language === 'string' ? r.business.language : null,
           when: now,
           geoPassed: num(r?.counters?.geoPassed) ?? num(r?.geo?.passed),
           geoTotal: num(r?.counters?.geoTotal) ?? num(r?.geo?.total),
