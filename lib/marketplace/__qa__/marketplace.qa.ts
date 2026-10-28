@@ -32,9 +32,10 @@ import {
   marketplaceWebhookSecret,
   planForMarketplaceProductId,
   providerReadiness,
-  type MarketplaceSignatureScheme,
+  JVZOO_IPN_V2_SCHEME,
+  type MarketplaceHmacHeaderScheme,
 } from '../config'
-import { marketplaceSignatureFor, verifyMarketplaceSignature } from '../signature'
+import { fieldDigestFor, marketplaceSignatureFor, verifyMarketplaceSignature } from '../signature'
 import {
   httpStatusForMarketplaceOutcome,
   marketplaceParser,
@@ -61,12 +62,24 @@ check('A3: nor is an empty or absent one',
   marketplaceProvider('') === null && marketplaceProvider(null) === null && marketplaceProvider(undefined) === null)
 check('A4: the lookup is case- and whitespace-tolerant, because an env var is typed by a person',
   marketplaceProvider(' Digistore24 ')?.slug === 'digistore24')
-check('A5: NO provider carries a signature scheme — none has been read from its own documentation',
-  MARKETPLACE_PROVIDERS.every((p) => p.signature === null))
+/**
+ * A5 used to read "no provider carries a signature scheme", which was true
+ * while no platform's documentation could be reached. JVZoo's was read inside
+ * the seller account on 2026-10-29, so the invariant that is actually worth
+ * holding is the one below: a scheme and a parser arrive TOGETHER. Either one
+ * alone is the half-configured provider this whole module exists to prevent —
+ * a verified body nothing can read, or a body read without being verified.
+ */
+check('A5: a provider has a signature scheme exactly when it has a parser',
+  MARKETPLACE_PROVIDERS.every((p) => (p.signature === null) === (marketplaceParser(p.slug) === null)))
 check('A6: and none carries a required disclaimer, which is legal\'s to approve',
   MARKETPLACE_PROVIDERS.every((p) => p.requiredDisclaimer === null))
-check('A7: no provider has a parser either, so no body can be acted on',
-  MARKETPLACE_PROVIDERS.every((p) => marketplaceParser(p.slug) === null))
+check('A7: a platform whose documentation has not been read carries neither',
+  ['digistore24', 'clickbank'].every((s) =>
+    marketplaceProvider(s)?.signature === null && marketplaceParser(s) === null))
+check('A-MUT1: a scheme without a parser would fail A5',
+  !([{ signature: {} }, { signature: null }] as { signature: unknown }[])
+    .every((p) => (p.signature === null) === true))
 
 // ── B. Off switches, and what readiness reports ─────────────────────────────
 console.log('\nB. off switches')
@@ -136,8 +149,8 @@ check('D8: and a value that would break out of the attribute is refused',
 console.log('\nE. signature')
 const BODY = '{"order":"A-1","product":"PROD-ADV"}'
 const SECRET = 'shhh'
-const hex256: MarketplaceSignatureScheme = { header: 'x-sig', algorithm: 'sha256', encoding: 'hex' }
-const b64512: MarketplaceSignatureScheme = { header: 'x-sig', algorithm: 'sha512', encoding: 'base64' }
+const hex256: MarketplaceHmacHeaderScheme = { kind: 'hmac_header', header: 'x-sig', algorithm: 'sha256', encoding: 'hex' }
+const b64512: MarketplaceHmacHeaderScheme = { kind: 'hmac_header', header: 'x-sig', algorithm: 'sha512', encoding: 'base64' }
 
 const goodHex = marketplaceSignatureFor(BODY, SECRET, hex256)
 const goodB64 = marketplaceSignatureFor(BODY, SECRET, b64512)
@@ -160,7 +173,7 @@ const failures = [
   ['no header', verifyMarketplaceSignature(BODY, '', SECRET, hex256), 'missing_signature'],
   ['short hex', verifyMarketplaceSignature(BODY, 'abc', SECRET, hex256), 'malformed_signature'],
   ['non-hex', verifyMarketplaceSignature(BODY, 'z'.repeat(64), SECRET, hex256), 'malformed_signature'],
-  ['sha512 digest offered to a sha256 scheme', verifyMarketplaceSignature(BODY, marketplaceSignatureFor(BODY, SECRET, { ...hex256, algorithm: 'sha512' }), SECRET, hex256), 'malformed_signature'],
+  ['sha512 digest offered to a sha256 scheme', verifyMarketplaceSignature(BODY, marketplaceSignatureFor(BODY, SECRET, { ...hex256, algorithm: 'sha512' as const }), SECRET, hex256), 'malformed_signature'],
   ['base64 of the wrong length', verifyMarketplaceSignature(BODY, Buffer.from('short').toString('base64'), SECRET, b64512), 'malformed_signature'],
 ] as const
 for (const [label, result, reason] of failures) {
@@ -177,6 +190,89 @@ const unkeyed = (body: string, header: string) =>
   createHmac('sha256', '').update(body).digest('hex') === header
 check('E-MUT2: a verifier that ignores the secret is caught',
   unkeyed(BODY, goodHex) === false)
+
+// ── K. JVZoo JVZIPN v2: a digest of five form fields, carried in the body ──
+// docs/affiliate/jvzoo-webhook-docs.md, copied from the seller account.
+console.log('\nK. jvzoo ipn v2')
+const JV_SECRET = 's3cr3t-key'
+/** The five signed fields, in the documented order, plus the rest of a sale. */
+const jvForm = (over: Record<string, string> = {}) =>
+  new URLSearchParams({
+    paykey: 'AP-ABC123XYZ',
+    customer_email: 'buyer@example.com',
+    product_name: 'Go Top SEO Advanced - 1 Site, 100 Keywords',
+    transaction_type: 'SALE',
+    date: '2026-10-29 09:15:00',
+    transaction_id: 'ABC123XYZ',
+    product_id: 'JV-ADV',
+    product_type: 'RECURRING',
+    total: '47.00',
+    next_payment_date: '2026-11-29 09:15:00',
+    ...over,
+  }).toString()
+
+/**
+ * The expected digest was computed OUTSIDE this code, with
+ *   printf '%s' 'AP-ABC123XYZ|buyer@example.com|Go Top SEO Advanced - 1 Site, 100 Keywords|SALE|2026-10-29 09:15:00|s3cr3t-key' | sha1sum
+ * so this is a real check of the algorithm rather than the implementation
+ * agreeing with itself.
+ */
+const JV_EXPECTED = '6D36EAAF'
+/** The refusal reason, or null when the delivery verified. */
+const reasonOf = (r: ReturnType<typeof verifyMarketplaceSignature>) => (r.ok ? null : r.reason)
+check('K1: cverify matches a digest computed outside this code',
+  fieldDigestFor(jvForm(), JV_SECRET, JVZOO_IPN_V2_SCHEME) === JV_EXPECTED)
+check('K2: a genuine delivery verifies, with the digest read from the BODY',
+  verifyMarketplaceSignature(jvForm({ cverify: JV_EXPECTED }), null, JV_SECRET, JVZOO_IPN_V2_SCHEME).ok === true)
+check('K3: lower case verifies, since the comparison upper-cases first',
+  verifyMarketplaceSignature(jvForm({ cverify: JV_EXPECTED.toLowerCase() }), null, JV_SECRET, JVZOO_IPN_V2_SCHEME).ok === true)
+check('K4: changing a SIGNED field (the email) is a mismatch',
+  reasonOf(verifyMarketplaceSignature(jvForm({ cverify: JV_EXPECTED, customer_email: 'thief@example.com' }), null, JV_SECRET, JVZOO_IPN_V2_SCHEME)) === 'mismatch')
+check('K5: the wrong secret is a mismatch',
+  reasonOf(verifyMarketplaceSignature(jvForm({ cverify: JV_EXPECTED }), null, 'other', JVZOO_IPN_V2_SCHEME)) === 'mismatch')
+check('K6: no cverify at all fails closed',
+  reasonOf(verifyMarketplaceSignature(jvForm(), null, JV_SECRET, JVZOO_IPN_V2_SCHEME)) === 'missing_signature')
+check('K7: a digest of the wrong length is refused before the comparison',
+  reasonOf(verifyMarketplaceSignature(jvForm({ cverify: 'ABC' }), null, JV_SECRET, JVZOO_IPN_V2_SCHEME)) === 'malformed_signature')
+check('K8: a non-hex digest is refused',
+  reasonOf(verifyMarketplaceSignature(jvForm({ cverify: 'ZZZZZZZZ' }), null, JV_SECRET, JVZOO_IPN_V2_SCHEME)) === 'malformed_signature')
+check('K9: a missing signed field counts as empty rather than shifting the rest',
+  fieldDigestFor(new URLSearchParams({ paykey: 'P', transaction_type: 'SALE' }).toString(), JV_SECRET, JVZOO_IPN_V2_SCHEME)
+    === fieldDigestFor(new URLSearchParams({ paykey: 'P', customer_email: '', product_name: '', transaction_type: 'SALE', date: '' }).toString(), JV_SECRET, JVZOO_IPN_V2_SCHEME))
+check('K10: the header argument is ignored — the digest is never taken from a header',
+  verifyMarketplaceSignature(jvForm(), JV_EXPECTED, JV_SECRET, JVZOO_IPN_V2_SCHEME).ok === false)
+check('K11: the registry now carries the scheme, so the provider is no longer unknown',
+  marketplaceProvider('jvzoo')?.signature?.kind === 'field_digest')
+
+// The parser.
+const jvParse = marketplaceParser('jvzoo')
+check('K12: jvzoo has a parser', typeof jvParse === 'function')
+const sale = jvParse?.(jvForm(), 'application/x-www-form-urlencoded') ?? null
+check('K13: a SALE is a paid order keyed on the transaction id',
+  sale?.kind === 'paid' && sale.externalOrderId === 'ABC123XYZ' && sale.externalProductId === 'JV-ADV')
+check('K14: total is DOLLARS in v2 and becomes minor units',
+  sale?.amountMinor === 4700)
+check('K15: no currency is claimed, because the payload carries none',
+  sale?.currency === null)
+check('K16: the period end is the next payment, as an instant',
+  sale?.currentPeriodEnd === '2026-11-29T09:15:00Z')
+const rebill = jvParse?.(jvForm({ transaction_type: 'BILL', transaction_id: 'ABC123XYZ-B001' }), null) ?? null
+check('K17: a rebill is a paid order with its OWN id, so idempotency does not swallow it',
+  rebill?.kind === 'paid' && rebill.externalOrderId === 'ABC123XYZ-B001')
+check('K18: RFND is a refund, which a person then decides about',
+  jvParse?.(jvForm({ transaction_type: 'RFND' }), null)?.kind === 'refunded')
+check('K19: an unknown transaction type is ignored rather than guessed at',
+  jvParse?.(jvForm({ transaction_type: 'CGBK' }), null) === null)
+check('K20: a one-off sale with no dates has no period end invented for it',
+  jvParse?.(jvForm({ product_type: 'STANDARD', next_payment_date: '' }), null)?.currentPeriodEnd === null)
+
+// MUTATION CONTROLS for J.
+check('K-MUT1: dropping the trailing separator before the secret changes the digest',
+  fieldDigestFor(jvForm(), JV_SECRET, { ...JVZOO_IPN_V2_SCHEME, trailingSeparator: false }) !== JV_EXPECTED)
+check('K-MUT2: signing the fields in a different order changes the digest',
+  fieldDigestFor(jvForm(), JV_SECRET, { ...JVZOO_IPN_V2_SCHEME, fields: ['customer_email', 'paykey', 'product_name', 'transaction_type', 'date'] }) !== JV_EXPECTED)
+check('K-MUT3: reading total as minor units would record 47 agorot instead of 47 dollars',
+  Number.parseFloat('47.00') !== 4700)
 
 // Sections F to I need await, and tsx compiles these suites as CommonJS,
 // where top-level await is not available. One async main, called at the end.

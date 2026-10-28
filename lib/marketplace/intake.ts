@@ -72,16 +72,77 @@ export interface MarketplaceOrderEvent {
  * A platform's parser: raw body in, normalised event out, null when the body
  * is not an event this code should act on.
  *
- * EMPTY ON PURPOSE. A parser can only be written from the platform's own
- * documentation — which field carries the order id, how it reports the period
- * end, which notification types mean "paid". The cloud sessions this project
- * is developed in cannot reach those platforms' sites, so no parser is
- * guessed at here; a provider with no parser refuses every delivery, exactly
- * as one with no signature scheme does.
+ * A parser can only be written from the platform's own documentation — which
+ * field carries the order id, how it reports the period end, which
+ * notification types mean "paid" — and never from a guess. JVZoo's is below,
+ * written from the IPN v2 spec read inside the seller account. ClickBank and
+ * Digistore24 have none yet, and a provider with no parser refuses every
+ * delivery, exactly as one with no signature scheme does.
  */
 export type MarketplaceParser = (rawBody: string, contentType: string | null) => MarketplaceOrderEvent | null
 
-export const MARKETPLACE_PARSERS: Readonly<Record<string, MarketplaceParser>> = {}
+/**
+ * JVZoo's timestamps, turned into the ISO-8601 instant this module stores.
+ *
+ * JVZIPN v2 sends `2024-04-06 14:30:00` and documents no timezone. Reading it
+ * as UTC is an assumption and is written down as one: the cost of being wrong
+ * is a period end a few hours out, while refusing the field outright would
+ * make every recurring order unclaimable, since the claim function requires a
+ * period end. Anything that is not one of the two documented shapes returns
+ * null rather than a guess.
+ */
+function jvzooInstant(raw: string | null): string | null {
+  const value = raw?.trim()
+  if (!value) return null
+  if (/^\d{4}-\d{2}-\d{2}$/.test(value)) return `${value}T00:00:00Z`
+  if (/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/.test(value)) return `${value.replace(' ', 'T')}Z`
+  return null
+}
+
+/**
+ * JVZoo JVZIPN v2 — docs/affiliate/jvzoo-webhook-docs.md, copied from the
+ * seller account on 2026-10-29.
+ *
+ * The body is form-encoded, not JSON. Three transaction types matter:
+ * `SALE` is a first purchase, `BILL` a rebill of a subscription, and `RFND`
+ * covers refunds AND chargebacks unless the per-product "send DISPUTE and
+ * ALERT instead" toggle is on, which it is not.
+ *
+ * A rebill gets its own order id (`transaction_id` gains `-B001`, `-B002`, …),
+ * which is what makes the UNIQUE (provider, external_order_id) idempotency
+ * correct for a subscription: the second month is a new order rather than a
+ * redelivery of the first.
+ *
+ * `total` is in DOLLARS in v2, where v1 used pennies, so it is multiplied
+ * here and never read as minor units. No currency field exists in the
+ * documented payload, so the currency stays null rather than being assumed
+ * to be USD.
+ */
+export const parseJvzooIpnV2: MarketplaceParser = (rawBody) => {
+  const form = new URLSearchParams(rawBody)
+  const type = (form.get('transaction_type') ?? '').trim().toUpperCase()
+  const kind = type === 'SALE' || type === 'BILL' ? 'paid' : type === 'RFND' ? 'refunded' : null
+  if (!kind) return null
+
+  const dollars = Number.parseFloat((form.get('total') ?? '').trim())
+  const amountMinor = Number.isFinite(dollars) ? Math.round(dollars * 100) : null
+
+  return {
+    kind,
+    externalOrderId: (form.get('transaction_id') ?? '').trim(),
+    externalProductId: (form.get('product_id') ?? '').trim() || null,
+    buyerEmail: (form.get('customer_email') ?? '').trim(),
+    amountMinor,
+    currency: null,
+    // A subscription's period runs to its next payment; `end_date` is only
+    // set when the subscription has a fixed end, and is empty open-ended.
+    currentPeriodEnd: jvzooInstant(form.get('next_payment_date')) ?? jvzooInstant(form.get('end_date')),
+  }
+}
+
+export const MARKETPLACE_PARSERS: Readonly<Record<string, MarketplaceParser>> = {
+  jvzoo: parseJvzooIpnV2,
+}
 
 export function marketplaceParser(slug: string): MarketplaceParser | null {
   return MARKETPLACE_PARSERS[slug] ?? null

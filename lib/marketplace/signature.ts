@@ -24,8 +24,12 @@
  * PURE: no request, env or database access. The scheme and secret are passed.
  */
 
-import { createHmac, timingSafeEqual } from 'crypto'
-import type { MarketplaceSignatureScheme } from './config'
+import { createHash, createHmac, timingSafeEqual } from 'crypto'
+import type {
+  MarketplaceFieldDigestScheme,
+  MarketplaceHmacHeaderScheme,
+  MarketplaceSignatureScheme,
+} from './config'
 
 export type MarketplaceSignatureFailure =
   | 'unknown_scheme'
@@ -44,15 +48,35 @@ export function marketplaceSignatureFor(
   secret: string,
   scheme: MarketplaceSignatureScheme,
 ): string {
+  if (scheme.kind === 'field_digest') return fieldDigestFor(rawBody, secret, scheme)
   const mac = createHmac(scheme.algorithm, secret).update(rawBody, 'utf8')
   return scheme.encoding === 'base64' ? mac.digest('base64') : mac.digest('hex')
 }
 
+/**
+ * The digest a field-digest scheme computes over a form-encoded body.
+ *
+ * A field the platform did not send counts as the empty string, exactly as
+ * the platform's own reference implementations do — dropping it instead would
+ * shift every later field across the separator and compute a digest for a
+ * different message.
+ */
+export function fieldDigestFor(
+  rawBody: string,
+  secret: string,
+  scheme: MarketplaceFieldDigestScheme,
+): string {
+  const form = new URLSearchParams(rawBody)
+  const joined = scheme.fields.map((name) => form.get(name) ?? '').join(scheme.separator)
+  const base = joined + (scheme.trailingSeparator ? scheme.separator : '') + secret
+  return createHash(scheme.algorithm).update(base, 'utf8').digest('hex').slice(0, scheme.length).toUpperCase()
+}
+
 /** Digest lengths in characters, so a wrong-length value is rejected before
  *  timingSafeEqual — which throws on a length mismatch — is reached. */
-const HEX_LENGTH: Record<MarketplaceSignatureScheme['algorithm'], number> = { sha256: 64, sha512: 128 }
+const HEX_LENGTH: Record<MarketplaceHmacHeaderScheme['algorithm'], number> = { sha256: 64, sha512: 128 }
 
-function wellFormed(received: string, scheme: MarketplaceSignatureScheme): boolean {
+function wellFormed(received: string, scheme: MarketplaceHmacHeaderScheme): boolean {
   if (scheme.encoding === 'hex') {
     return received.length === HEX_LENGTH[scheme.algorithm] && /^[0-9a-f]+$/.test(received)
   }
@@ -78,6 +102,7 @@ export function verifyMarketplaceSignature(
 ): MarketplaceSignatureResult {
   if (!scheme) return { ok: false, reason: 'unknown_scheme' }
   if (!secret) return { ok: false, reason: 'missing_secret' }
+  if (scheme.kind === 'field_digest') return verifyFieldDigest(rawBody, secret, scheme)
 
   const raw = (signatureHeader ?? '').trim()
   if (!raw) return { ok: false, reason: 'missing_signature' }
@@ -91,4 +116,27 @@ export function verifyMarketplaceSignature(
   const b = Buffer.from(received, scheme.encoding === 'hex' ? 'hex' : 'base64')
   if (a.length !== b.length) return { ok: false, reason: 'malformed_signature' }
   return timingSafeEqual(a, b) ? { ok: true } : { ok: false, reason: 'mismatch' }
+}
+
+/**
+ * A field-digest delivery carries its digest inside the body, so the header
+ * argument is ignored for it and the body is read twice: once by this check
+ * and once by the parser. That is deliberate — the parser still never runs
+ * on an unverified body.
+ */
+function verifyFieldDigest(
+  rawBody: string,
+  secret: string,
+  scheme: MarketplaceFieldDigestScheme,
+): MarketplaceSignatureResult {
+  const received = (new URLSearchParams(rawBody).get(scheme.field) ?? '').trim().toUpperCase()
+  if (!received) return { ok: false, reason: 'missing_signature' }
+  // Checked before timingSafeEqual, which throws on a length mismatch.
+  if (received.length !== scheme.length || !/^[0-9A-F]+$/.test(received)) {
+    return { ok: false, reason: 'malformed_signature' }
+  }
+  const expected = fieldDigestFor(rawBody, secret, scheme)
+  return timingSafeEqual(Buffer.from(expected), Buffer.from(received))
+    ? { ok: true }
+    : { ok: false, reason: 'mismatch' }
 }
