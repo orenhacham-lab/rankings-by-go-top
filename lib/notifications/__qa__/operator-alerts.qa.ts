@@ -106,7 +106,7 @@ async function main() {
 
   console.log('2. Free check: one email per domain per 24h, never blocks the scan')
   {
-    const result = { counters: { geoPassed: 4, geoTotal: 7 }, findings: [{}, {}, {}] }
+    const result = { counters: { geoPassed: 4, geoTotal: 7 }, findings: [{}, {}, {}], business: { language: 'pt-pt' } }
     const rows = () => ({ free_site_checks: [{ id: 'new', domain: 'shop.example.co.il', created_at: NOW.toISOString() }], free_check_report_requests: [] as any[] })
     const a = inbox()
     const r1 = await notifyFreeCheckCompleted({ admin: new FakeAdmin(rows()) as any, checkId: 'new', domain: 'shop.example.co.il', locale: 'he', result }, a.deps)
@@ -114,6 +114,21 @@ async function main() {
     const m = a.sent[0]
     check('email: domain, Jerusalem time, language, score', m.html.includes('shop.example.co.il') && m.html.includes('עברית') && m.html.includes('4 מתוך 7') && /\d{1,2}[./]\d{1,2}[./]\d{4}/.test(m.html) && /12:00/.test(m.html), m.html.slice(0, 400))
     check('email: no report address when the visitor gave none', !m.html.includes('דוא״ל לשליחת הדוח'))
+    // A Portuguese site scanned from the English page reported "English" and
+    // nothing else, because the only language row was the visitor's page. The
+    // site's own language is a different fact and the email names both.
+    check('email: the SITE language is the one the scan read, beside the page the visitor used',
+      m.html.includes('שפת האתר') && m.html.includes('pt-pt') && m.html.includes('שפת העמוד שממנו נסרק'), m.html.slice(0, 600))
+    const noLang = inbox()
+    await notifyFreeCheckCompleted({ admin: new FakeAdmin(rows()) as any, checkId: 'new', domain: 'shop.example.co.il', locale: 'he',
+      result: { counters: { geoPassed: 1, geoTotal: 4 }, findings: [], business: null } }, noLang.deps)
+    check('email: a scan that read no site language says so instead of guessing',
+      noLang.sent[0].html.includes('שפת האתר') && noLang.sent[0].html.includes('לא זוהתה'))
+    // Mutation control, run for real: dropping `siteLanguage` where the alert is
+    // built from the scan makes the check above fail (60 passed, 1 failed).
+    check('mutation control: an alert that is handed no site language cannot show one',
+      !buildFreeCheckAlertHtml({ domain: 'a.com', locale: 'en', when: NOW }).includes('pt-pt')
+      && buildFreeCheckAlertHtml({ domain: 'a.com', locale: 'en', when: NOW, siteLanguage: 'pt-pt' }).includes('pt-pt'))
     check('subject: Hebrew with the domain', m.subject === 'נסרק אתר בבדיקה החינמית: shop.example.co.il', m.subject)
 
     const withEmail = rows(); withEmail.free_check_report_requests.push({ check_id: 'new', email: 'visitor@mail.com' })
