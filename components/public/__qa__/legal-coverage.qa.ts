@@ -302,6 +302,8 @@ check('MUTATION — an English-only extra section is caught', pages.he.terms.h2 
     // follow; nothing of a customer's is sent to it. apps.shopify.com,
     // wordpress.org and www.youtube.com are in this list already, below.
     'aitoolsatlas.ai': 'our own listing, named in Organization.sameAs; not fetched',
+    'toolradar.com': 'our own claimed listing, named in Organization.sameAs; not fetched',
+    'www.vettoria.it': 'our own listing, named in Organization.sameAs; not fetched',
     'help.shopify.com': 'a documentation link shown to a merchant',
     'search.google.com': 'a link a customer clicks to their own Search Console',
     'google.com': 'the search engine whose public results are read, with no customer data attached',

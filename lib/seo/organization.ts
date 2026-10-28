@@ -18,7 +18,7 @@
  *    not the WordPress.org plugin, not the YouTube channel. Each of those is a
  *    verified, live profile, and listing them is how the four become one entity.
  *
- * Every URL below was fetched and returned 200 on 26 Oct 2026. A profile goes
+ * Every URL below was fetched and returned 200 on 28 Oct 2026. A profile goes
  * in this list only once it is live — `sameAs` pointing at a 404 is worse than
  * a short list, because it is the one claim a resolver can cheaply disprove.
  */
@@ -38,6 +38,8 @@ export const BRAND_PROFILES = [
   'https://wordpress.org/plugins/go-top-seo-bridge/',
   'https://www.youtube.com/@GoTopSEO',
   'https://aitoolsatlas.ai/tools/go-top-seo',
+  'https://toolradar.com/tools/go-top-seo',
+  'https://www.vettoria.it/prodotti/go-top-seo',
 ] as const
 
 /**
