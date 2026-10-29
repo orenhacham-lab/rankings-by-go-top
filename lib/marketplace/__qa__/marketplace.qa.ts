@@ -736,8 +736,6 @@ async function main() {
       inEntry(doc), clause)
     check(`L-MUT4 (${locale}): …and deleting that clause from the real document fails it`,
       !inEntry(doc.replace(clause, '')))
-    check(`L-MUT5 (${locale}): …and so does taking the platform's name out of the real document`,
-      !doc.replace(/JVZoo/g, 'the marketplace').includes('JVZoo'))
   }
   const consentPolicy = code('lib/consent/categories.ts')
   const policyVersion = consentPolicy.match(/CONSENT_POLICY_VERSION = '([^']+)'/)?.[1] ?? ''
@@ -745,8 +743,8 @@ async function main() {
     policyVersion >= '2026-10-29', policyVersion)
   // L1 and L3 are substring tests on the real files, so they cannot pass for
   // the wrong reason and their "controls" would only restate them; the two
-  // rules with indirection are controlled instead. L-MUT4 and L-MUT5 above
-  // break the real documents. This one is for the comparison itself, because
+  // one rule with indirection is controlled instead: L-MUT4 above deletes the
+  // clause from the real document. This one is for the comparison itself, because
   // the threshold is a date and the operator is lexicographic.
   check('L-MUT2: the version guard catches a deploy that widens the category without re-asking',
     !('2026-10-03' >= '2026-10-29') && '2026-11-01' >= '2026-10-29')
