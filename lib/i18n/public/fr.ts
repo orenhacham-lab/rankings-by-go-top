@@ -241,7 +241,7 @@ export const fr = {
       },
       marketing: {
         title: 'Marketing',
-        desc: 'Mesurer les performances de nos publicités et afficher des publicités pertinentes sur les réseaux de Google et de Meta. Refuser ne vous coûte rien dans le service.',
+        desc: 'Mesurer les performances de nos publicités, afficher des publicités pertinentes sur les réseaux de Google et de Meta, et attribuer un achat à l’affilié qui vous a orienté vers nous via la place de marché JVZoo. Refuser ne vous coûte rien dans le service.',
       },
     },
   },

@@ -64,6 +64,7 @@ Não compartilhamos as suas informações pessoais com terceiros, exceto:
 - **OpenStreetMap (Nominatim):** para converter um endereço em coordenadas, e somente quando você digitou um endereço exato para acompanhamento local de posições. São enviados o endereço digitado e o nome do país, nunca dados da conta
 - **ScrapeLLM:** para o acompanhamento de visibilidade em IA — veja «Provedores de IA» abaixo
 - **Outros sites da rede de links:** somente se você entrou na rede — veja «Rede de links» abaixo
+- **JVZoo:** somente se você abriu a nossa página de venda do marketplace JVZoo — uma imagem de rastreamento é carregada da JVZoo e recebe o seu endereço IP, o identificador do seu navegador e a página de onde você veio, para que uma compra possa ser atribuída ao afiliado que indicou você. A imagem é carregada apenas depois de você aceitar os cookies de marketing. Quanto a essa coleta e a essa transmissão, a JVZoo não trata os dados em nosso nome: ela é controladora conjunta junto com a gente, e o que ela faz com os dados depois é decidido pela JVZoo conforme a sua própria política de privacidade
 - **Meta (Facebook / Instagram):** para publicidade direcionada e para um relatório de cadastro concluído enviado do nosso servidor — veja a seção «Publicidade na Meta» abaixo. Quanto a esses eventos de conversão, a Meta não trata os dados em nosso nome: ela é controladora conjunta junto com a gente, como aquela seção explica. Os dados que recebemos das APIs do Google nunca são compartilhados com a Meta nem usados para publicidade
 - Quando exigido por lei
 

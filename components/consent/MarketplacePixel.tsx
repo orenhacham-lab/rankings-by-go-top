@@ -37,12 +37,29 @@
  */
 import { useEffect, useState } from 'react'
 import { CONSENT_CHANGED_EVENT, currentChoices } from '@/lib/consent/client-store'
+import type { ConsentChoices } from '@/lib/consent/categories'
+
+/**
+ * THE GATE ITSELF, as a function, so the denied case can be PROVEN rather than
+ * read off the source. A guard that greps this file for the word `marketing`
+ * passes for a gate that no longer gates; a guard that calls this with every
+ * consent state the store can hand back does not
+ * (lib/marketplace/__qa__/marketplace.qa.ts, H17f and its control).
+ *
+ * Only an explicit `true` opens it. `marketing` is a boolean in the record, but
+ * the record can be absent, stale against CONSENT_POLICY_VERSION or unreadable,
+ * and every one of those paths returns CONSENT_DENIED - so the identity check
+ * is what keeps "no decision yet" on the same side of the line as "no".
+ */
+export function marketingBeaconAllowed(choices: ConsentChoices): boolean {
+  return choices.marketing === true
+}
 
 export function MarketplacePixel({ src, alt }: { src: string; alt: string }) {
   const [allowed, setAllowed] = useState(false)
 
   useEffect(() => {
-    const apply = () => setAllowed(currentChoices().marketing === true)
+    const apply = () => setAllowed(marketingBeaconAllowed(currentChoices()))
     apply()
     window.addEventListener(CONSENT_CHANGED_EVENT, apply)
     return () => window.removeEventListener(CONSENT_CHANGED_EVENT, apply)

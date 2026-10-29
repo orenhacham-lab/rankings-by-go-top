@@ -20,6 +20,10 @@
  */
 import { readFileSync } from 'fs'
 import { createHmac } from 'crypto'
+import { createElement } from 'react'
+import { renderToStaticMarkup } from 'react-dom/server'
+import { CONSENT_DENIED, type ConsentChoices } from '../../consent/categories'
+import { MarketplacePixel, marketingBeaconAllowed } from '../../../components/consent/MarketplacePixel'
 import { FakeAdmin } from '../../__qa__/_fake-admin'
 import {
   MARKETPLACE_CLAIM_PATH,
@@ -611,14 +615,47 @@ async function main() {
     // The gate itself, read from the component rather than asserted about it.
     const pixelSrc = readFileSync('components/consent/MarketplacePixel.tsx', 'utf8')
     check('H17d: the component shows nothing until marketing has been granted',
-      /currentChoices\(\)\.marketing === true/.test(pixelSrc)
+      /marketingBeaconAllowed\(currentChoices\(\)\)/.test(pixelSrc)
+      && /choices\.marketing === true/.test(pixelSrc)
       && /if \(!allowed\) return null/.test(pixelSrc))
     check('H17e: …and re-reads the decision when it changes, so a withdrawal removes it',
       /addEventListener\(CONSENT_CHANGED_EVENT/.test(pixelSrc)
       && /removeEventListener\(CONSENT_CHANGED_EVENT/.test(pixelSrc))
-    check('H-MUT10: the gate guard catches the marketing check swapped for analytics',
-      !/currentChoices\(\)\.marketing === true/.test(
-        pixelSrc.replace('currentChoices().marketing === true', 'currentChoices().analytics === true')))
+    check('H-MUT13: the gate guard catches the marketing check swapped for analytics',
+      !/choices\.marketing === true/.test(
+        pixelSrc.replace('choices.marketing === true', 'choices.analytics === true')))
+
+    // H17f. THE DENIED CASE, PROVEN. Everything above reads the file; a gate
+    // can be deleted and a file still mention the word. These call the real
+    // gate with every state the consent store is able to hand a mount, and
+    // render the real component for the frame the visitor actually gets before
+    // any effect has run - which is the frame the beacon must not be in.
+    const state = (marketing: boolean, analytics = false): ConsentChoices =>
+      ({ necessary: true, analytics, marketing })
+    check('H17f: no decision yet - the store returns CONSENT_DENIED and the beacon is refused',
+      marketingBeaconAllowed(CONSENT_DENIED) === false)
+    check('H17g: a reject-all - refused',
+      marketingBeaconAllowed(state(false)) === false)
+    check('H17h: analytics allowed, marketing refused - still refused, because the categories are honoured apart',
+      marketingBeaconAllowed(state(false, true)) === false)
+    check('H17i: marketing granted - and only then is it allowed',
+      marketingBeaconAllowed(state(true)) === true)
+    check('H17j: a record with no marketing key at all is refused, not treated as a grant',
+      marketingBeaconAllowed({ necessary: true, analytics: true } as unknown as ConsentChoices) === false)
+    const firstPaint = renderToStaticMarkup(
+      createElement(MarketplacePixel, { src: 'https://i.jvzoo.com/0/457483/99', alt: '' }))
+    check('H17k: the component renders NOTHING on the pre-consent paint, so i.jvzoo.com is never in the document',
+      firstPaint === '' && !firstPaint.includes('jvzoo'))
+    check('H-MUT14: the denied-case guard catches a gate that was taken out',
+      renderToStaticMarkup(createElement(
+        function UngatedPixel({ src }: { src: string }) {
+          return createElement('img', { src, alt: '', width: 1, height: 1 })
+        }, { src: 'https://i.jvzoo.com/0/457483/99' })).includes('jvzoo'))
+    check('H-MUT15: …and the state guard catches a gate loosened to anything truthy',
+      ((choices: ConsentChoices) => Boolean(choices.marketing))(
+        { necessary: true, analytics: true, marketing: 1 as unknown as boolean }) === true
+      && marketingBeaconAllowed(
+        { necessary: true, analytics: true, marketing: 1 as unknown as boolean }) === false)
   }
   // Our refund policy says WE do not refund, which is not this buyer's
   // policy: their seller is the platform.

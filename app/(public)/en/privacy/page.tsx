@@ -107,6 +107,12 @@ export default function EnglishPrivacyPage() {
           <li><strong>OpenStreetMap (Nominatim):</strong> to turn an address into coordinates, and only when you typed an exact address for local rank tracking. The address you typed and the country name are sent, never account details</li>
           <li><strong>ScrapeLLM:</strong> for AI visibility tracking — see &ldquo;AI Providers&rdquo; below</li>
           <li><strong>Other sites in the link network:</strong> only if you joined the network — see &ldquo;Link Network&rdquo; below</li>
+          <li><strong>JVZoo:</strong> only if you opened our JVZoo marketplace sales page — a tracking
+          image is loaded from JVZoo which receives your IP address, your browser identifier and the page
+          you arrived from, so that a purchase can be attributed to the affiliate who referred you. The
+          image loads only after you have accepted marketing cookies. For that collection and transmission
+          JVZoo does not process data on our behalf: it is a joint controller with us, and what it does
+          with the data afterwards is decided by JVZoo under its own privacy policy</li>
           <li><strong>Meta (Facebook / Instagram):</strong> for targeted advertising, and for a report of a
           completed signup sent from our server — see the Meta Advertising section below. For those conversion
           events Meta does not process data on our behalf: it is a joint controller with us, as that section

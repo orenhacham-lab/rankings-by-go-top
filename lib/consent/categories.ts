@@ -86,7 +86,17 @@ export function normalizeConsentLocale(value: unknown): ConsentLocale {
  * than this is asked again instead of being counted as having agreed to
  * something they never read.
  */
-export const CONSENT_POLICY_VERSION = '2026-10-03'
+/*
+ * 2026-10-29: the marketing category gained a third recipient. It used to name
+ * the Google and Meta networks and nothing else, which is a closed list of
+ * two, so a visitor who allowed it did not allow JVZoo's affiliate beacon on
+ * /go/jvzoo. Widening what an existing grant covers is not consent, so the
+ * bump is what makes the new wording lawful rather than a formality - and it
+ * has to travel in the same deploy as the widened category text and the
+ * privacy-policy entry, because any one of the three alone leaves the beacon
+ * without a basis.
+ */
+export const CONSENT_POLICY_VERSION = '2026-10-29'
 
 /** Nothing optional. The state a visitor is in before they decide, and after "reject all". */
 export const CONSENT_DENIED: ConsentChoices = { necessary: true, analytics: false, marketing: false }
