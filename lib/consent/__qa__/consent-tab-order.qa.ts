@@ -68,7 +68,24 @@ check(
 check('PublicConsentNotice is exported', /export function PublicConsentNotice/.test(widgets))
 const noticeBody = widgets.slice(widgets.indexOf('export function PublicConsentNotice'))
 const bodyToNext = noticeBody.slice(0, noticeBody.indexOf('export function PublicSiteWidgets'))
-check('the notice keeps the public-area gate', /shouldRenderPublicWidgets\(isAuthenticated, pathname\)/.test(bodyToNext))
+/*
+ * The gate, stated as the rule rather than as one function call. The notice
+ * used to call `shouldRenderPublicWidgets` like the contact widgets do, and
+ * pinning that call was the same thing as pinning the rule. It is not any
+ * more: the marketplace sales pages at /go/<platform> drop the contact
+ * widgets - a WhatsApp button and a "free demo" float beside a platform's buy
+ * button is the alternative route a compliance review refuses - and KEEP this
+ * notice, because the platform's beacon there fires only on a marketing
+ * grant, which only this notice can collect. So what must hold is that the
+ * notice is still away from the signed-in application and the auth screens.
+ */
+check('the notice is still gated away from the app and the auth screens',
+  /isAuthenticated \|\| isNonPublicArea\(pathname\)/.test(bodyToNext))
+check('…and it is NOT gated by the marketplace rule, or the beacon could never be consented to',
+  !/isMarketplaceSalesArea/.test(bodyToNext))
+check('the contact widgets ARE gated by it, so nothing of ours sits beside the platform\'s buy button',
+  /if \(isMarketplaceSalesArea\(pathname\)\) return false/.test(
+    widgets.slice(widgets.indexOf('export function shouldRenderPublicWidgets'))))
 check('the notice renders CookieConsent', /<CookieConsent onOpenChange=\{setCookieOpen\}\s*\/>/.test(bodyToNext))
 check(
   'PublicSiteWidgets no longer renders the notice itself',
@@ -84,10 +101,16 @@ check(
   check('MUTATION: the notice after {children} fails the order check', !(n >= 0 && c >= 0 && n < c))
 }
 {
-  const ungated = bodyToNext.replace('shouldRenderPublicWidgets(isAuthenticated, pathname)', 'true')
+  const ungated = bodyToNext.replace('isAuthenticated || isNonPublicArea(pathname)', 'false')
   check(
     'MUTATION: dropping the public-area gate fails',
-    !/shouldRenderPublicWidgets\(isAuthenticated, pathname\)/.test(ungated),
+    !/isAuthenticated \|\| isNonPublicArea\(pathname\)/.test(ungated),
+  )
+  const widgetsBody = widgets.slice(widgets.indexOf('export function shouldRenderPublicWidgets'))
+  check(
+    'MUTATION: contact widgets left on the sales page fail their check',
+    !/if \(isMarketplaceSalesArea\(pathname\)\) return false/.test(
+      widgetsBody.replace('if (isMarketplaceSalesArea(pathname)) return false', '')),
   )
 }
 {

@@ -553,6 +553,44 @@ async function main() {
     /\{provider\.requiredDisclaimer \? \(/.test(salesSrc))
   check('H-MUT10: the attribution guard catches the block printed as our own words',
     !/Notice required by/.test('<p className="mt-8">{provider.requiredDisclaimer}</p>'))
+  /*
+   * WHAT THE ROOT LAYOUT PUTS ON THIS PAGE, which the guards above cannot see
+   * because they read the page's own source. H14 pins that the page links out
+   * only to our terms, our privacy and the platform's policy; that was false
+   * in production, because app/layout.tsx renders the public contact widgets
+   * around every unauthenticated page - a WhatsApp button, a "free demo"
+   * float and a mobile contact bar. Beside a platform's buy button those are
+   * the alternative route a compliance review refuses, and a visitor who came
+   * through an affiliate's link taking one of them is a sale the affiliate
+   * never gets credited for. Read from the widget module, not asserted about
+   * it.
+   */
+  {
+    // Comments stripped before matching, per the project's QA convention:
+    // the explanatory notes in that module name isMarketplaceSalesArea too.
+    const widgets = code('components/public/PublicSiteWidgets.tsx')
+    const gate = widgets.slice(widgets.indexOf('export function shouldRenderPublicWidgets'))
+    check('H19: the public contact widgets do not render on /go/<platform>',
+      /if \(isMarketplaceSalesArea\(pathname\)\) return false/.test(gate)
+      && /pathname\.startsWith\(`\$\{MARKETPLACE_SALES_PREFIX\}\/`\)/.test(widgets)
+      && /MARKETPLACE_SALES_PREFIX = '\/go'/.test(widgets))
+    check('H-MUT11: the guard catches the widgets being left on the page',
+      !/if \(isMarketplaceSalesArea\(pathname\)\) return false/.test(
+        gate.replace('if (isMarketplaceSalesArea(pathname)) return false', '')))
+    /*
+     * …and the cookie notice is the ONE thing that stays. The beacon fires
+     * only on a marketing grant, so a sales page with no way to answer the
+     * banner is a sales page whose beacon can never fire - which would satisfy
+     * the consent rule by making the platform's requirement impossible.
+     */
+    const notice = widgets.slice(widgets.indexOf('export function PublicConsentNotice'))
+    const noticeBody = notice.slice(0, notice.indexOf('export function PublicSiteWidgets'))
+    check('H19b: the cookie notice is NOT dropped with them, so the beacon can still be consented to',
+      !/isMarketplaceSalesArea/.test(noticeBody))
+    check('H-MUT12: the guard catches the notice being gated away too',
+      /isMarketplaceSalesArea/.test(
+        noticeBody.replace('isNonPublicArea(pathname)', 'isMarketplaceSalesArea(pathname)')))
+  }
   // A conversion pixel is a marketing tag, and marketing tags on this site
   // load only after consent (lib/consent/categories.ts). The page carried no
   // pixel at all until JVZoo's review made one a condition of listing; it now
