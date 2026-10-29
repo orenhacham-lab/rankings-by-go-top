@@ -303,9 +303,22 @@ function httpsUrlOrNull(raw: string | undefined): string | null {
  * replaced by our own checkout, which is exactly what a compliance review
  * refuses — and what would take the sale away from the affiliate who sent
  * the visitor.
+ *
+ * GATED ON `providerReadiness`, AND THAT IS THE POINT OF THIS FUNCTION.
+ * Configuring the buy URLs is one environment variable away from configuring
+ * the webhook, and the two used to be independent: setting
+ * `MARKETPLACE_<SLUG>_BUY_URL_*` alone put a live, payable button on a public
+ * page while the callback that records the purchase was still refusing every
+ * delivery for want of a secret, a signature scheme or the product ids. A
+ * buyer then pays the platform in full and NOTHING reaches us — not an
+ * account, not a plan, not even a receipt to reconcile by hand, because the
+ * refusal happens before anything is written. Taking money with no record of
+ * it is worse than being unavailable, so the button is shown only when the
+ * channel can actually record what it sells.
  */
 export function marketplaceBuyUrl(slug: string, plan: PlanCode): string | null {
   if (!marketplaceProvider(slug)) return null
+  if (!providerReadiness(slug).ready) return null
   return httpsUrlOrNull(process.env[`${envPrefix(slug)}BUY_URL_${plan.toUpperCase()}`])
 }
 
