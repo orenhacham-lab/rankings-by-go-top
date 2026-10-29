@@ -381,12 +381,34 @@ async function main() {
     /renews every month until you cancel/.test(salesSrc)
     && /cancel it at \{provider\.label\}/.test(salesSrc))
   // A conversion pixel is a marketing tag, and marketing tags on this site
-  // load only after consent (lib/consent/categories.ts). This page has no
-  // consent gate, so it carries no pixel at all.
+  // load only after consent (lib/consent/categories.ts). The page carried no
+  // pixel at all until JVZoo's review made one a condition of listing; it now
+  // carries exactly one, and only through the consent-gated component.
   check('H17: the page loads no third-party script, so nothing fires before consent',
-    !/<script/.test(salesSrc) && !/PIXEL/.test(salesSrc))
-  check('H-MUT7: the script guard catches a pixel added back to the page',
+    !/<script/.test(salesSrc))
+  check('H-MUT7: the script guard catches a script added to the page',
     /<script/.test(`${salesSrc}\n<script async src={pixel} />`))
+  check('H17b: the pixel is rendered only through the consent-gated component, never as a bare tag',
+    /<MarketplacePixel/.test(salesSrc)
+    && /from '@\/components\/consent\/MarketplacePixel'/.test(salesSrc)
+    && !/<img/.test(salesSrc))
+  check('H-MUT9: the bare-tag guard catches the platform snippet pasted straight in',
+    /<img/.test(`${salesSrc}\n<img src={pixelUrl} width={1} height={1} />`))
+  check('H17c: …and only when one is configured, so an unconfigured platform still renders nothing',
+    /pixelUrl \? \(/.test(salesSrc) && /marketplacePixelUrl\(provider\.slug\)/.test(salesSrc))
+  {
+    // The gate itself, read from the component rather than asserted about it.
+    const pixelSrc = readFileSync('components/consent/MarketplacePixel.tsx', 'utf8')
+    check('H17d: the component shows nothing until marketing has been granted',
+      /currentChoices\(\)\.marketing === true/.test(pixelSrc)
+      && /if \(!allowed\) return null/.test(pixelSrc))
+    check('H17e: …and re-reads the decision when it changes, so a withdrawal removes it',
+      /addEventListener\(CONSENT_CHANGED_EVENT/.test(pixelSrc)
+      && /removeEventListener\(CONSENT_CHANGED_EVENT/.test(pixelSrc))
+    check('H-MUT10: the gate guard catches the marketing check swapped for analytics',
+      !/currentChoices\(\)\.marketing === true/.test(
+        pixelSrc.replace('currentChoices().marketing === true', 'currentChoices().analytics === true')))
+  }
   // Our refund policy says WE do not refund, which is not this buyer's
   // policy: their seller is the platform.
   check('H18: it does not point the buyer at our refund policy, which is not theirs',

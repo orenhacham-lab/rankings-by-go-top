@@ -319,13 +319,37 @@ export function marketplaceBuyUrl(slug: string, plan: PlanCode): string | null {
  * pointing that buyer at ours would point them at the wrong document. An
  * unconfigured provider renders no link rather than a guessed one.
  *
- * There is deliberately no tracking-pixel setting here. A conversion pixel is
- * a marketing tag by this project's own classification, so it cannot fire
- * before consent, and it is not needed: the sale completes on the platform's
- * checkout, so the affiliate's credit rides the click id in the buy link and
- * the platform's server-side postback.
+ * The tracking pixel is configured separately, below.
  */
 export function marketplacePolicyUrl(slug: string): string | null {
   if (!marketplaceProvider(slug)) return null
   return httpsUrlOrNull(process.env[`${envPrefix(slug)}POLICY_URL`])
+}
+
+/**
+ * The platform's own 1x1 tracking beacon, as configured in
+ * `MARKETPLACE_<SLUG>_PIXEL_URL`.
+ *
+ * THIS SETTING DID NOT EXIST, AND THE REASON IT DIDN'T IS STILL TRUE. A
+ * conversion pixel is a marketing tag by this project's own classification
+ * (lib/consent/categories.ts), so it cannot fire before consent; and the sale
+ * completes on the platform's checkout, so the affiliate's credit rides the
+ * click id in the buy link and the platform's server-side postback. By that
+ * reasoning the page needs no pixel.
+ *
+ * The platform disagrees, and it is the one running the review. JVZoo's
+ * compliance refuses the listing without it (issue 3 on products 457483 /
+ * 457573 / 457575 / 457579: "Missing JVZoo buy button or tracking pixel").
+ * So the beacon is configurable, and rendered ONLY through
+ * components/consent/MarketplacePixel.tsx, which shows it when the marketing
+ * category has been granted and removes it on withdrawal. A platform with no
+ * configured URL renders nothing, which is still the default.
+ *
+ * It is a URL and not a snippet on purpose: the platform's HTML would be a
+ * string from configuration rendered into the document, and this page does not
+ * have a way to do that safely. Only an absolute https URL is accepted.
+ */
+export function marketplacePixelUrl(slug: string): string | null {
+  if (!marketplaceProvider(slug)) return null
+  return httpsUrlOrNull(process.env[`${envPrefix(slug)}PIXEL_URL`])
 }
