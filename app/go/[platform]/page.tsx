@@ -152,9 +152,8 @@ export default async function MarketplaceSalesPage({
         <p className="mt-6 text-copy text-muted">
           Go Top SEO is the seller for this purchase and issues your invoice. {provider.label} runs
           the checkout and takes the payment on our behalf; its own terms apply to the payment
-          itself. The prices above are before tax, and any tax due where you are is shown at
-          checkout before you pay. Your Go Top SEO account is governed by our Terms and Privacy
-          Policy.
+          itself. The prices above are in US dollars and do not include VAT or any other tax due
+          in your country. Your Go Top SEO account is governed by our Terms and Privacy Policy.
         </p>
       )}
 
@@ -192,9 +191,26 @@ export default async function MarketplaceSalesPage({
           (no use of smaller font for the disclaimer)". text-caption is the
           smaller font, so using it would fail the review while appearing to
           satisfy it - the failure mode a reviewer is specifically looking
-          for. Bottom of the page is allowed; small is not. */}
+          for. Bottom of the page is allowed; small is not.
+
+          THE ATTRIBUTION LINE IS LOAD-BEARING AND IS NOT DECORATION. JVZoo's
+          block contains "JVZoo serves as the retailer for the products
+          featured on this site", which contradicts s.11 of the agreement we
+          signed and the seller paragraph above. The first fix tried was our
+          own true sentence in full size above their block; legal rejected it,
+          because CRD Art. 6(1)(b)-(c) and UCPD Art. 6 judge what the average
+          consumer understands, and a page that answers "who am I buying
+          from" twice misleads at any font size. Naming the speaker is what
+          resolves it: their text is published unedited, as THEIR required
+          notice rather than as our statement. So the heading may not be
+          dropped while the block is rendered, and the block may not be
+          edited to agree with us - both would put us back in front of the
+          same article. */}
       {provider.requiredDisclaimer ? (
-        <p className="mt-8 text-copy text-muted">{provider.requiredDisclaimer}</p>
+        <section className="mt-8" data-required-disclaimer={provider.slug}>
+          <h2 className="text-copy text-body">Notice required by {provider.label}:</h2>
+          <p className="mt-2 text-copy text-muted">{provider.requiredDisclaimer}</p>
+        </section>
       ) : null}
 
       {/* THE PLATFORM'S TRACKING PIXEL, BEHIND THE CONSENT GATE.

@@ -518,6 +518,41 @@ async function main() {
   check('H16: it says the plan renews monthly and where to cancel it',
     /renews every month until you cancel/.test(salesSrc)
     && /cancel it at \{provider\.label\}/.test(salesSrc))
+  /*
+   * WHERE WE ARE THE SELLER, THE TAX SENTENCE IS OURS TO STAND BEHIND.
+   * The first version of this branch said any tax due "is shown at checkout
+   * before you pay" - a claim about JVZoo's checkout, which we have not read
+   * and do not control. If their checkout adds no EU VAT, we have told the
+   * buyer something untrue about a liability that s.11 of their own vendor
+   * agreement puts on us. Legal's approved wording states the price and
+   * nothing about anybody's checkout.
+   */
+  check('H15b: on a page where WE are the seller, the price is stated as excluding tax in the buyer\'s country',
+    /prices above are in US dollars and do not include VAT or any other tax due/.test(salesSrc))
+  // Matched against a whitespace-normalised copy, because JSX wraps a
+  // sentence across lines wherever the formatter chooses to.
+  const salesFlat = salesSrc.replace(/\s+/g, ' ')
+  check('H15c: \u2026and no sentence describes the platform\'s checkout behaviour, which we cannot vouch for',
+    !/shown at checkout before you pay/.test(salesFlat)
+    && !/takes the payment on our behalf[^.]*calculates tax/.test(salesFlat))
+  check('H-MUT6b: the guard catches the checkout claim coming back',
+    /shown at checkout before you pay/.test(
+      'any tax due where you are is shown at checkout before you pay'))
+  /*
+   * THE ATTRIBUTION LINE. A platform's mandated block may contradict the
+   * seller paragraph above it - JVZoo's says it "serves as the retailer" while
+   * its own agreement makes us the seller. Full size above it was not enough:
+   * a page that answers "who am I buying from" twice misleads under CRD
+   * Art. 6(1)(b)-(c) whatever the font. Naming the speaker resolves it, so the
+   * heading is part of the disclosure and not a label.
+   */
+  check('H18b: a mandated disclaimer is published under a line naming the platform as its author',
+    /Notice required by \{provider\.label\}:/.test(salesSrc)
+    && salesSrc.indexOf('Notice required by') < salesSrc.indexOf('{provider.requiredDisclaimer}'))
+  check('H18c: …and it is still rendered only when one exists, so a platform without one gets no empty heading',
+    /\{provider\.requiredDisclaimer \? \(/.test(salesSrc))
+  check('H-MUT10: the attribution guard catches the block printed as our own words',
+    !/Notice required by/.test('<p className="mt-8">{provider.requiredDisclaimer}</p>'))
   // A conversion pixel is a marketing tag, and marketing tags on this site
   // load only after consent (lib/consent/categories.ts). The page carried no
   // pixel at all until JVZoo's review made one a condition of listing; it now
