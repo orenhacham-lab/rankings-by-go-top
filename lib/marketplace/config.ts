@@ -24,13 +24,15 @@
  *      authentication, since proxy.ts does not cover /api/*;
  *   3. the platform's signature scheme is KNOWN (see below).
  *
- * WHY `signature: null` EXISTS. Each of these platforms signs its callbacks
- * differently, and this repo's rule is that nothing goes in as a guess: a
- * scheme must be read from the platform's own documentation before it is
- * written down here. The cloud sessions this project is developed in cannot
- * reach jvzoo.com, clickbank.com or digistore24.com (the egress proxy
- * refuses them), so the schemes are recorded as UNKNOWN rather than invented.
- * A provider whose scheme is null can be registered, priced and given a sales
+ * WHY `signature: null` STILL EXISTS. Each of these platforms signs its
+ * callbacks differently, and this repo's rule is that nothing goes in as a
+ * guess: a scheme must be read from the platform's own documentation before
+ * it is written down here. The cloud sessions this project is developed in
+ * cannot reach jvzoo.com, clickbank.com or digistore24.com (the egress proxy
+ * refuses them). JVZoo's was read inside the seller account on the owner's own
+ * machine and is recorded below (docs/affiliate/jvzoo-webhook-docs.md);
+ * ClickBank's and Digistore24's are still UNKNOWN rather than invented. A
+ * provider whose scheme is null can be registered, priced and given a sales
  * page, and its webhook refuses every delivery — which is the safe direction,
  * and a loud one: `providerReadiness` names exactly what is missing.
  *
@@ -41,13 +43,71 @@
 import type { PlanCode } from '@/lib/plans/catalog'
 import { PLAN_CODES } from '@/lib/plans/catalog'
 
-/** How a platform signs its callbacks, once that has been read from its own
- *  documentation. `header` is lower-case, as Headers.get expects. */
-export interface MarketplaceSignatureScheme {
+/**
+ * How a platform signs its callbacks, once that has been read from its own
+ * documentation.
+ *
+ * Two shapes, because the platforms genuinely differ. The HMAC-over-the-raw-
+ * body-in-a-header shape is what Creem and most modern APIs do. JVZoo does
+ * something older: a plain digest of five named FORM FIELDS with the secret
+ * appended, delivered in the body itself. A single interface could not
+ * describe both without a pile of nullable fields, so this is a union and the
+ * verifier branches on `kind`.
+ */
+export interface MarketplaceHmacHeaderScheme {
+  kind: 'hmac_header'
+  /** Lower-case, as Headers.get expects. */
   header: string
   algorithm: 'sha256' | 'sha512'
   /** Whether the digest arrives as lower-case hex or as base64. */
   encoding: 'hex' | 'base64'
+}
+
+/**
+ * A digest over named fields of a form-encoded body, with the shared secret
+ * appended rather than used as an HMAC key, and the result truncated.
+ *
+ * This is weaker than an HMAC and we do not get to choose: it is what the
+ * platform computes, and verifying it the platform's way is the only thing
+ * that distinguishes a real delivery from a forged one. The truncation is the
+ * reason `MARKETPLACE_<SLUG>_ENABLED` and the claim step still matter — a
+ * recorded order grants nothing by itself.
+ */
+export interface MarketplaceFieldDigestScheme {
+  kind: 'field_digest'
+  /** The form field carrying the digest. */
+  field: string
+  /** The fields that are concatenated, in this exact order. */
+  fields: readonly string[]
+  separator: string
+  /** Whether a separator also follows the LAST field, before the secret. */
+  trailingSeparator: boolean
+  algorithm: 'sha1'
+  /** How many leading hex characters are compared, upper-cased. */
+  length: number
+}
+
+export type MarketplaceSignatureScheme = MarketplaceHmacHeaderScheme | MarketplaceFieldDigestScheme
+
+/**
+ * JVZoo's JVZIPN v2 `cverify`, from the spec in the seller account
+ * (docs/affiliate/jvzoo-webhook-docs.md, captured 2026-10-29):
+ *
+ *   SHA-1( paykey|customer_email|product_name|transaction_type|date|<SECRET> )
+ *   → first 8 hex characters, upper-cased.
+ *
+ * The secret is the account-level key from My Account → Seller Settings, held
+ * here as MARKETPLACE_JVZOO_WEBHOOK_SECRET. `date` is compared exactly as
+ * received and must never be reformatted.
+ */
+export const JVZOO_IPN_V2_SCHEME: MarketplaceFieldDigestScheme = {
+  kind: 'field_digest',
+  field: 'cverify',
+  fields: ['paykey', 'customer_email', 'product_name', 'transaction_type', 'date'],
+  separator: '|',
+  trailingSeparator: true,
+  algorithm: 'sha1',
+  length: 8,
 }
 
 export interface MarketplaceProvider {
@@ -87,7 +147,9 @@ export interface MarketplaceProvider {
 /**
  * The three platforms Oren named. Each is present so that its configuration,
  * its sales page and its database rows are testable today; none can accept a
- * delivery while its `signature` is null.
+ * delivery while its `signature` is null, and JVZoo — the one that now has a
+ * scheme — still needs its env switch and its secret before anything reaches
+ * it.
  */
 /*
  * JVZoo IS NOT A RESELLER, AND THAT IS A LEGAL DIFFERENCE, NOT A DETAIL. This
@@ -139,17 +201,16 @@ export const MARKETPLACE_PROVIDERS: readonly MarketplaceProvider[] = [
     slug: 'jvzoo',
     label: 'JVZoo',
     /*
-     * STILL null, and not for want of documentation. JVZIPN v2 is now read and
-     * written down (docs/affiliate/jvzoo-webhook-docs.md), and it is NOT the
-     * shape MarketplaceSignatureScheme describes: it is not an HMAC over the
-     * raw body in a header, it is the first 8 characters, upper-cased, of
-     * SHA-1 over five NAMED FORM FIELDS joined by pipes with the account
-     * secret appended, arriving in the `cverify` field of the form body.
-     * Widening the scheme type to cover that is a change to
-     * lib/marketplace/signature.ts and its tests, not a value that can be
-     * filled in here, so this stays null and the webhook stays shut.
+     * JVZIPN v2, read inside the seller account and written down in
+     * docs/affiliate/jvzoo-webhook-docs.md. It is NOT the shape the original
+     * `MarketplaceSignatureScheme` described: not an HMAC over the raw body in
+     * a header, but the first 8 characters, upper-cased, of SHA-1 over five
+     * NAMED FORM FIELDS joined by pipes with the account secret appended,
+     * arriving in the `cverify` field of the form body itself. That is why the
+     * type is a union and the verifier branches on `kind`; see
+     * JVZOO_IPN_V2_SCHEME above.
      */
-    signature: null,
+    signature: JVZOO_IPN_V2_SCHEME,
     sellerOfRecord: false,
     /*
      * The exact words JVZoo compliance requires, copied character for
