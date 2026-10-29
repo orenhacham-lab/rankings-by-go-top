@@ -32,7 +32,18 @@
  * NOTHING IS GRANTED HERE. A paid order becomes a row awaiting its buyer; the
  * entitlement is written when the buyer claims it with an account of their
  * own. See the migration's header for why that is the design.
+ *
+ * AND THE BUYER HAS TO BE GIVEN THAT ROW. The claim token is useless to the
+ * person who paid for it unless something hands them the link, and until now
+ * nothing did: the order was recorded, `claimUrl` was returned here and
+ * discarded, and the buyer landed on the product's return URL with no plan.
+ * So a recorded order now sends the claim email (lib/marketplace/claim-email.ts)
+ * in `after()`, AFTER this route has already answered the platform — the
+ * delivery was processed either way, and a provider that refuses the email
+ * must not turn a correct row into a retried webhook. A send that fails
+ * alerts the operator with the order id, which is enough to resend by hand.
  */
+import { after } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import {
   marketplaceProvider,
@@ -45,6 +56,7 @@ import {
   marketplaceParser,
   recordMarketplaceOrder,
 } from '@/lib/marketplace/intake'
+import { alertClaimEmailFailed, sendClaimEmail } from '@/lib/marketplace/claim-email'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -116,6 +128,33 @@ async function handle(request: Request, slug: string): Promise<Response> {
       outcome: outcome.kind,
     })
   }
+
+  // A redelivery is deliberately NOT a second email: `already_recorded` means
+  // the first delivery minted the token the buyer was mailed, and this one
+  // has no URL to send.
+  if (outcome.kind === 'recorded') {
+    const orderId = outcome.orderId
+    const claimUrl = outcome.claimUrl
+    const plan = outcome.plan
+    const buyerEmail = event.buyerEmail ?? ''
+    after(async () => {
+      const result = await sendClaimEmail(buyerEmail, {
+        claimUrl,
+        plan,
+        providerLabel: provider.label,
+      })
+      if (result.sent) return
+      // The reason, the provider and the order id. Never the address and
+      // never the token.
+      console.error('[marketplace-webhook] claim email not sent', {
+        provider: provider.slug,
+        orderId,
+        reason: result.reason,
+      })
+      await alertClaimEmailFailed({ orderId, providerLabel: provider.label, reason: result.reason })
+    })
+  }
+
   return Response.json({ ok: outcome.kind !== 'write_failed', outcome: outcome.kind }, {
     status: httpStatusForMarketplaceOutcome(outcome),
   })
