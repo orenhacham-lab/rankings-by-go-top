@@ -42,8 +42,10 @@
 import type { Metadata } from 'next'
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
+import { MarketplacePixel } from '@/components/consent/MarketplacePixel'
 import {
   marketplaceBuyUrl,
+  marketplacePixelUrl,
   marketplacePolicyUrl,
   marketplaceProvider,
 } from '@/lib/marketplace/config'
@@ -74,6 +76,7 @@ export default async function MarketplaceSalesPage({
   if (!provider) notFound()
 
   const policyUrl = marketplacePolicyUrl(provider.slug)
+  const pixelUrl = marketplacePixelUrl(provider.slug)
 
   return (
     <main className="mx-auto max-w-3xl px-4 py-16">
@@ -194,14 +197,26 @@ export default async function MarketplaceSalesPage({
         <p className="mt-8 text-copy text-muted">{provider.requiredDisclaimer}</p>
       ) : null}
 
-      {/* NO TRACKING PIXEL, DELIBERATELY. An affiliate platform's conversion
-          pixel is a marketing tag by this project's own classification
-          (lib/consent/categories.ts), so it may not fire before a prior
-          affirmative act — and this page is read by buyers in the EU and the
-          UK. It is also unnecessary here: the purchase happens on the
+      {/* THE PLATFORM'S TRACKING PIXEL, BEHIND THE CONSENT GATE.
+
+          This page carried no pixel at all, and the reasoning held: an
+          affiliate platform's conversion pixel is a marketing tag by this
+          project's own classification (lib/consent/categories.ts), so it may
+          not fire before a prior affirmative act, and this page is read by
+          buyers in the EU and the UK. The purchase also happens on the
           platform's own checkout, so the affiliate's credit rides the click
-          id in the buy link and the platform's server-side postback, neither
-          of which needs a script on our domain. */}
+          id in the buy link and the platform's server-side postback.
+
+          JVZoo's compliance review does not accept that and makes the pixel a
+          condition of listing. So it is rendered — never unconditionally. The
+          component shows it only once the marketing category is granted and
+          removes it on withdrawal, and a platform with no configured URL
+          still renders nothing. If the review then reports the pixel missing,
+          the answer is a note to compliance, not a tag that fires before the
+          visitor has been asked. */}
+      {pixelUrl ? (
+        <MarketplacePixel src={pixelUrl} alt={`${provider.label} tracking`} />
+      ) : null}
     </main>
   )
 }
