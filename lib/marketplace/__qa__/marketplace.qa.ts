@@ -703,6 +703,15 @@ async function main() {
     const desc = dict.slice(at).match(/desc:\s*'((?:[^'\\]|\\.)*)'/)
     return desc?.[1] ?? ''
   }
+  /** The consent condition as each document actually words it, inside the JVZoo entry. */
+  const BEACON_CONSENT_CLAUSE: Record<string, string> = {
+    he: 'התמונה נטענת רק לאחר שאישרת עוגיות שיווק',
+    en: 'image loads only after you have accepted marketing cookies',
+    es: 'después de que usted haya aceptado las cookies de marketing',
+    'pt-BR': 'depois de você aceitar os cookies de marketing',
+    fr: 'après votre acceptation des cookies de marketing',
+    it: 'dopo che Lei ha accettato i cookie di marketing',
+  }
   for (const locale of CONSENT_LOCALES) {
     const desc = marketingDesc(locale)
     check(`L1 (${locale}): the marketing category names JVZoo, so the grant reaches the beacon`,
@@ -712,20 +721,35 @@ async function main() {
     const doc = read(PRIVACY_DOC[locale])
     check(`L3 (${locale}): the privacy document names JVZoo as a recipient`,
       doc.includes('JVZoo'))
-    check(`L4 (${locale}): …and says the image waits for the marketing consent`,
-      /JVZoo[\s\S]{0,1200}marketing|marketing[\s\S]{0,1200}JVZoo|JVZoo[\s\S]{0,1200}שיווק|שיווק[\s\S]{0,1200}JVZoo/.test(doc))
+    // The clause has to be found INSIDE the recipients entry, not merely
+    // somewhere near the word "marketing". The first version of this check
+    // looked for JVZoo within 1200 characters of "marketing" anywhere in the
+    // document, and the marketing CATEGORY — which names JVZoo twice and is
+    // called Marketing — satisfied that window on its own, so the check passed
+    // with the consent condition deleted from the entry. The legal thread
+    // reproduced it on the Spanish document. Bind it to the sentence instead,
+    // the way this repo's other legal guards do, and prove the deletion fails.
+    const clause = BEACON_CONSENT_CLAUSE[locale]
+    const inEntry = (text: string) =>
+      new RegExp(`JVZoo\\s*:[\\s\\S]{0,700}${clause.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}`).test(text)
+    check(`L4 (${locale}): the entry ITSELF says the image waits for the marketing consent`,
+      inEntry(doc), clause)
+    check(`L-MUT4 (${locale}): …and deleting that clause from the real document fails it`,
+      !inEntry(doc.replace(clause, '')))
+    check(`L-MUT5 (${locale}): …and so does taking the platform's name out of the real document`,
+      !doc.replace(/JVZoo/g, 'the marketplace').includes('JVZoo'))
   }
   const consentPolicy = code('lib/consent/categories.ts')
   const policyVersion = consentPolicy.match(/CONSENT_POLICY_VERSION = '([^']+)'/)?.[1] ?? ''
   check('L5: the policy version is later than the two-recipient wording, so stored grants are re-asked',
     policyVersion >= '2026-10-29', policyVersion)
-  check('L-MUT1: the category guard catches the old two-network wording coming back',
-    !'Measuring how our ads perform and showing relevant ads on the Google and Meta networks.'
-      .includes('JVZoo'))
+  // L1 and L3 are substring tests on the real files, so they cannot pass for
+  // the wrong reason and their "controls" would only restate them; the two
+  // rules with indirection are controlled instead. L-MUT4 and L-MUT5 above
+  // break the real documents. This one is for the comparison itself, because
+  // the threshold is a date and the operator is lexicographic.
   check('L-MUT2: the version guard catches a deploy that widens the category without re-asking',
-    !('2026-10-03' >= '2026-10-29'))
-  check('L-MUT3: the recipient guard catches a privacy document that never names the platform',
-    !'We share data with Google and with Meta, and with nobody else.'.includes('JVZoo'))
+    !('2026-10-03' >= '2026-10-29') && '2026-11-01' >= '2026-10-29')
 
   // ── J. The cancellation route the buyer is actually given ───────────────────
   console.log('\nJ. cancelling a marketplace plan')
