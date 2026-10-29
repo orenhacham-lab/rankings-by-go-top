@@ -305,6 +305,22 @@ check('MUTATION — an English-only extra section is caught', pages.he.terms.h2 
     'toolradar.com': 'our own claimed listing, named in Organization.sameAs; not fetched',
     'www.vettoria.it': 'our own listing, named in Organization.sameAs; not fetched',
     'help.shopify.com': 'a documentation link shown to a merchant',
+    // JVZoo's vendor agreement, cited in lib/marketplace/config.ts as the
+    // source of the clauses that decide who the seller of record is. A link in
+    // a comment, like docs.creem.io above: not fetched, and nothing of a
+    // customer's is sent to it.
+    //
+    // NOT the whole story once the channel is switched on, and it is off
+    // today. The buy links live in environment variables, so no host literal
+    // for i.jvzoo.com or the /b/ checkout reaches this guard, and the buyer
+    // reaches JVZoo's checkout only by clicking. But on JVZoo WE are the
+    // seller (vendor agreement s.11), so JVZoo collects the payment on our
+    // behalf rather than selling in its own name - which makes it look like a
+    // processor of ours and not an independent controller the way a reseller
+    // is. That is a privacy-policy and Art. 28 question for the legal thread,
+    // raised 2026-10-29, and it has to be answered before
+    // MARKETPLACE_JVZOO_ENABLED is ever set to 'true'.
+    'www.jvzoo.com': 'their vendor agreement, cited in a code comment; not fetched',
     'search.google.com': 'a link a customer clicks to their own Search Console',
     'google.com': 'the search engine whose public results are read, with no customer data attached',
     'www.google.com': 'the search engine whose public results are read, with no customer data attached',

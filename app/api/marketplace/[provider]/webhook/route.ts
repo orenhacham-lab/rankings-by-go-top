@@ -10,14 +10,17 @@
  * OFF MEANS OFF, AND UNCONFIGURED MEANS OFF. A provider must be registered,
  * switched on, hold a webhook secret, have a KNOWN signature scheme and have
  * a parser before a single delivery is looked at (lib/marketplace/config.ts,
- * lib/marketplace/intake.ts). No provider currently has a scheme or a parser,
- * because neither may be guessed — they are read from the platform's own
- * documentation — so today this route refuses every delivery, by design.
- * That is the safe direction: a half-configured marketplace must never
- * record an order it cannot describe.
+ * lib/marketplace/intake.ts). Only JVZoo has a scheme and a parser, both read
+ * from the IPN v2 spec inside the seller account; ClickBank and Digistore24
+ * have neither, because neither may be guessed, so this route refuses every
+ * one of their deliveries by design. That is the safe direction: a
+ * half-configured marketplace must never record an order it cannot describe.
  *
  * THE SIGNATURE IS OVER THE RAW BODY. `request.text()` is read once and that
- * exact string is what gets verified, never a re-serialised object.
+ * exact string is what gets verified, never a re-serialised object. Where a
+ * platform puts its digest in the body instead of a header (JVZoo's
+ * `cverify`), the verifier reads it out of that same raw string — the parser
+ * still never runs before the check passes.
  *
  * WHAT THE STATUS CODE MEANS TO THE PLATFORM. All of these platforms retry a
  * non-2xx on their own schedule, so 2xx is reserved for a delivery that was
@@ -83,7 +86,8 @@ async function handle(request: Request, slug: string): Promise<Response> {
   const scheme = provider.signature
   const verified = verifyMarketplaceSignature(
     rawBody,
-    scheme ? request.headers.get(scheme.header) : null,
+    // A field-digest scheme carries its digest in the body, not a header.
+    scheme && scheme.kind === 'hmac_header' ? request.headers.get(scheme.header) : null,
     marketplaceWebhookSecret(provider.slug),
     scheme,
   )

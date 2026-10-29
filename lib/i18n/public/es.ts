@@ -241,7 +241,7 @@ export const es = {
       },
       marketing: {
         title: 'Marketing',
-        desc: 'Medir el rendimiento de nuestros anuncios y mostrar anuncios relevantes en las redes de Google y Meta. Rechazarlas no te cuesta nada en el servicio.',
+        desc: 'Medir el rendimiento de nuestros anuncios, mostrar anuncios relevantes en las redes de Google y Meta, y atribuir una compra al afiliado que te remitió a través del marketplace JVZoo. Rechazarlas no te cuesta nada en el servicio.',
       },
     },
   },

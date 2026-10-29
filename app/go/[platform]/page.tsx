@@ -42,8 +42,10 @@
 import type { Metadata } from 'next'
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
+import { MarketplacePixel } from '@/components/consent/MarketplacePixel'
 import {
   marketplaceBuyUrl,
+  marketplacePixelUrl,
   marketplacePolicyUrl,
   marketplaceProvider,
 } from '@/lib/marketplace/config'
@@ -74,6 +76,7 @@ export default async function MarketplaceSalesPage({
   if (!provider) notFound()
 
   const policyUrl = marketplacePolicyUrl(provider.slug)
+  const pixelUrl = marketplacePixelUrl(provider.slug)
 
   return (
     <main className="mx-auto max-w-3xl px-4 py-16">
@@ -124,19 +127,35 @@ export default async function MarketplaceSalesPage({
         })}
       </section>
 
-      {/* Everything a buyer is owed before they are bound, in the words the
-          legal review wrote: who charges them and invoices them, that the
-          price is before tax, whose terms govern the purchase as opposed to
-          the account, that it renews, and where to stop it.
+      {/* Everything a buyer is owed before they are bound: who they are
+          buying FROM, who charges them, that the price is before tax, whose
+          terms govern the purchase as opposed to the account, that it renews,
+          and where to stop it.
           "Seller of record" is a term of art a buyer may not know, so the
-          sentence says what it means instead. */}
-      <p className="mt-6 text-copy text-muted">
-        You buy this plan from {provider.label}, which is the seller for this purchase: it
-        charges you, issues your invoice, calculates tax by your billing address and shows
-        the final amount before you pay. The prices above are before tax. {provider.label}&rsquo;s
-        own terms and return policy apply to this purchase; your Go Top SEO account is
-        governed by our Terms and Privacy Policy.
-      </p>
+          sentence says what it means instead.
+
+          WHICH SENTENCE IS PRINTED IS A LEGAL FACT, NOT A TEMPLATE CHOICE.
+          Telling a buyer the platform is their seller when the platform's own
+          vendor agreement makes us the seller is a misstatement about who
+          they contracted with and who owes the tax on the sale, published on
+          our own domain. So the wording follows provider.sellerOfRecord,
+          which is read from each platform's agreement and nowhere else. */}
+      {provider.sellerOfRecord ? (
+        <p className="mt-6 text-copy text-muted">
+          You buy this plan from {provider.label}, which is the seller for this purchase: it
+          charges you, issues your invoice, calculates tax by your billing address and shows
+          the final amount before you pay. The prices above are before tax. {provider.label}&rsquo;s
+          own terms and return policy apply to this purchase; your Go Top SEO account is
+          governed by our Terms and Privacy Policy.
+        </p>
+      ) : (
+        <p className="mt-6 text-copy text-muted">
+          Go Top SEO is the seller for this purchase and issues your invoice. {provider.label} runs
+          the checkout and takes the payment on our behalf; its own terms apply to the payment
+          itself. The prices above are in US dollars and do not include VAT or any other tax due
+          in your country. Your Go Top SEO account is governed by our Terms and Privacy Policy.
+        </p>
+      )}
 
       <p className="mt-4 text-copy text-muted">
         The plan is a monthly subscription and renews every month until you cancel it. You
@@ -165,19 +184,55 @@ export default async function MarketplaceSalesPage({
       </nav>
 
       {/* Rendered only once the legal thread has passed the platform's exact
-          wording; see MarketplaceProvider.requiredDisclaimer. */}
+          wording; see MarketplaceProvider.requiredDisclaimer.
+
+          SET IN THE BODY SIZE ON PURPOSE. JVZoo's review states the condition
+          in the same breath as the text: it "must be clear and conspicuous
+          (no use of smaller font for the disclaimer)". text-caption is the
+          smaller font, so using it would fail the review while appearing to
+          satisfy it - the failure mode a reviewer is specifically looking
+          for. Bottom of the page is allowed; small is not.
+
+          THE ATTRIBUTION LINE IS LOAD-BEARING AND IS NOT DECORATION. JVZoo's
+          block contains "JVZoo serves as the retailer for the products
+          featured on this site", which contradicts s.11 of the agreement we
+          signed and the seller paragraph above. The first fix tried was our
+          own true sentence in full size above their block; legal rejected it,
+          because CRD Art. 6(1)(b)-(c) and UCPD Art. 6 judge what the average
+          consumer understands, and a page that answers "who am I buying
+          from" twice misleads at any font size. Naming the speaker is what
+          resolves it: their text is published unedited, as THEIR required
+          notice rather than as our statement. So the heading may not be
+          dropped while the block is rendered, and the block may not be
+          edited to agree with us - both would put us back in front of the
+          same article. */}
       {provider.requiredDisclaimer ? (
-        <p className="mt-8 text-caption text-muted">{provider.requiredDisclaimer}</p>
+        <section className="mt-8" data-required-disclaimer={provider.slug}>
+          <h2 className="text-copy text-body">Notice required by {provider.label}:</h2>
+          <p className="mt-2 text-copy text-muted">{provider.requiredDisclaimer}</p>
+        </section>
       ) : null}
 
-      {/* NO TRACKING PIXEL, DELIBERATELY. An affiliate platform's conversion
-          pixel is a marketing tag by this project's own classification
-          (lib/consent/categories.ts), so it may not fire before a prior
-          affirmative act — and this page is read by buyers in the EU and the
-          UK. It is also unnecessary here: the purchase happens on the
+      {/* THE PLATFORM'S TRACKING PIXEL, BEHIND THE CONSENT GATE.
+
+          This page carried no pixel at all, and the reasoning held: an
+          affiliate platform's conversion pixel is a marketing tag by this
+          project's own classification (lib/consent/categories.ts), so it may
+          not fire before a prior affirmative act, and this page is read by
+          buyers in the EU and the UK. The purchase also happens on the
           platform's own checkout, so the affiliate's credit rides the click
-          id in the buy link and the platform's server-side postback, neither
-          of which needs a script on our domain. */}
+          id in the buy link and the platform's server-side postback.
+
+          JVZoo's compliance review does not accept that and makes the pixel a
+          condition of listing. So it is rendered — never unconditionally. The
+          component shows it only once the marketing category is granted and
+          removes it on withdrawal, and a platform with no configured URL
+          still renders nothing. If the review then reports the pixel missing,
+          the answer is a note to compliance, not a tag that fires before the
+          visitor has been asked. */}
+      {pixelUrl ? (
+        <MarketplacePixel src={pixelUrl} alt={`${provider.label} tracking`} />
+      ) : null}
     </main>
   )
 }

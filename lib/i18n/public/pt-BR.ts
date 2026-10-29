@@ -238,7 +238,7 @@ export const ptBR = {
       },
       marketing: {
         title: 'Marketing',
-        desc: 'Medir o desempenho dos nossos anúncios e mostrar anúncios relevantes nas redes do Google e da Meta. Rejeitar não custa nada a você no serviço.',
+        desc: 'Medir o desempenho dos nossos anúncios, mostrar anúncios relevantes nas redes do Google e da Meta e atribuir uma compra ao afiliado que indicou você pelo marketplace JVZoo. Rejeitar não custa nada a você no serviço.',
       },
     },
   },

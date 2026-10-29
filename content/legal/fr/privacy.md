@@ -68,6 +68,7 @@ Nous ne partageons pas vos informations personnelles avec des tiers, sauf avec :
 - **OpenStreetMap (Nominatim) :** pour convertir une adresse en coordonnées, et seulement lorsque vous avez saisi une adresse exacte pour le suivi du positionnement local. Sont envoyés l'adresse que vous avez saisie et le nom du pays, jamais de données du compte
 - **ScrapeLLM :** pour le suivi de la visibilité dans l'IA ; voir « Fournisseurs d'IA » plus bas
 - **D'autres sites du réseau de liens :** uniquement si vous avez rejoint le réseau ; voir « Réseau de liens » plus bas
+- **JVZoo :** uniquement si vous avez ouvert notre page de vente de la place de marché JVZoo — une image de suivi est chargée depuis JVZoo et reçoit votre adresse IP, l'identifiant de votre navigateur et la page depuis laquelle vous êtes arrivé, afin qu'un achat puisse être attribué à l'affilié qui vous a orienté vers nous. L'image n'est chargée qu'après votre acceptation des cookies de marketing. À l'égard de cette collecte et de cette transmission, JVZoo ne traite pas les données pour notre compte : elle est responsable conjointe du traitement avec nous, et ce qu'elle fait ensuite des données relève de sa décision et de sa propre politique de confidentialité
 - **Meta (Facebook / Instagram) :** pour la publicité ciblée et pour un rapport d'inscription terminée envoyé depuis notre serveur ; voir la section Publicité sur Meta plus bas. À l'égard de ces événements de conversion, Meta ne traite pas les données pour notre compte : elle est responsable conjointe du traitement avec nous, comme expliqué dans cette section. Les données que nous recevons des API de Google ne sont jamais partagées avec Meta ni utilisées pour de la publicité
 - Lorsque la loi l'exige
 
@@ -256,7 +257,7 @@ Nous classons les cookies en trois catégories, et nous vous consultons sur deux
 
 - **Strictement nécessaires :** connexion, mémorisation de la langue de votre interface, sécurité et prévention des abus. Le service ne peut pas fonctionner sans eux, ils ne nécessitent donc pas de consentement.
 - **Mesure :** combien de personnes ont visité le site, quelles pages elles ont lues et ce qui n'a pas fonctionné. Ils ne sont chargés que si vous l'autorisez.
-- **Marketing :** mesurer la performance de nos annonces et montrer des annonces pertinentes sur les réseaux de Google et de Meta. Ils ne sont chargés que si vous l'autorisez. Autoriser cette catégorie vaut aussi pour un rapport de conversion que nous envoyons à Meta depuis notre serveur, sans aucun cookie ; voir la section Publicité sur Meta.
+- **Marketing :** mesurer la performance de nos annonces, montrer des annonces pertinentes sur les réseaux de Google et de Meta, et attribuer un achat à l'affilié qui vous a orienté vers nous via la place de marché JVZoo. Ils ne sont chargés que si vous l'autorisez. Autoriser cette catégorie vaut aussi pour un rapport de conversion que nous envoyons à Meta depuis notre serveur, sans aucun cookie — voir la section Publicité sur Meta — et pour une image de suivi chargée depuis JVZoo sur la page de vente de la place de marché, qui n'enregistre rien sur votre appareil.
 
 **Avant que vous ne choisissiez, aucun cookie de mesure ni de marketing n'est déposé et aucune requête n'est faite vers les serveurs de Google.** Accepter et refuser sont deux boutons identiques dans le bandeau, et chaque catégorie peut être autorisée séparément.
 
@@ -276,7 +277,7 @@ Nos outils de mesure et de marketing sont gérés par Google Tag Manager, qui n'
 - **Google Ads :** mesure des conversions et publicité personnalisée (soumis au consentement de marketing)
 - **Meta Pixel :** mesure des conversions et publicité sur Facebook et Instagram (soumis au consentement de marketing)
 
-Les outils actifs changent de temps à autre. Ce qui ne change pas : aucun n'est chargé avant que vous n'ayez autorisé sa catégorie, et retirer votre consentement arrête la collecte. Outre ces outils, qui fonctionnent dans le navigateur, nous envoyons à Meta un rapport de conversion depuis notre serveur ; il est également soumis au consentement de marketing et il s'arrête lorsque vous le retirez.
+Les outils actifs changent de temps à autre. Ce qui ne change pas : aucun n'est chargé avant que vous n'ayez autorisé sa catégorie, et retirer votre consentement arrête la collecte. Outre ces outils, qui fonctionnent dans le navigateur, nous envoyons à Meta un rapport de conversion depuis notre serveur ; il est également soumis au consentement de marketing et il s'arrête lorsque vous le retirez. Une chose encore ne passe pas par Google Tag Manager : uniquement sur la page de vente de la place de marché JVZoo, une image de suivi d'un pixel est chargée depuis JVZoo, afin qu'un achat puisse être attribué à l'affilié qui vous a orienté vers nous. Elle n'enregistre rien sur votre appareil, elle n'est chargée qu'après que vous avez autorisé le marketing, et elle ne figure sur aucune autre page du site.
 
 Nous déclarons votre état de consentement à Google au moyen du protocole Consent Mode v2, de sorte que les outils restent soumis à votre choix même si nous ajoutons une nouvelle balise à l'avenir.
 

@@ -24,13 +24,15 @@
  *      authentication, since proxy.ts does not cover /api/*;
  *   3. the platform's signature scheme is KNOWN (see below).
  *
- * WHY `signature: null` EXISTS. Each of these platforms signs its callbacks
- * differently, and this repo's rule is that nothing goes in as a guess: a
- * scheme must be read from the platform's own documentation before it is
- * written down here. The cloud sessions this project is developed in cannot
- * reach jvzoo.com, clickbank.com or digistore24.com (the egress proxy
- * refuses them), so the schemes are recorded as UNKNOWN rather than invented.
- * A provider whose scheme is null can be registered, priced and given a sales
+ * WHY `signature: null` STILL EXISTS. Each of these platforms signs its
+ * callbacks differently, and this repo's rule is that nothing goes in as a
+ * guess: a scheme must be read from the platform's own documentation before
+ * it is written down here. The cloud sessions this project is developed in
+ * cannot reach jvzoo.com, clickbank.com or digistore24.com (the egress proxy
+ * refuses them). JVZoo's was read inside the seller account on the owner's own
+ * machine and is recorded below (docs/affiliate/jvzoo-webhook-docs.md);
+ * ClickBank's and Digistore24's are still UNKNOWN rather than invented. A
+ * provider whose scheme is null can be registered, priced and given a sales
  * page, and its webhook refuses every delivery — which is the safe direction,
  * and a loud one: `providerReadiness` names exactly what is missing.
  *
@@ -41,13 +43,71 @@
 import type { PlanCode } from '@/lib/plans/catalog'
 import { PLAN_CODES } from '@/lib/plans/catalog'
 
-/** How a platform signs its callbacks, once that has been read from its own
- *  documentation. `header` is lower-case, as Headers.get expects. */
-export interface MarketplaceSignatureScheme {
+/**
+ * How a platform signs its callbacks, once that has been read from its own
+ * documentation.
+ *
+ * Two shapes, because the platforms genuinely differ. The HMAC-over-the-raw-
+ * body-in-a-header shape is what Creem and most modern APIs do. JVZoo does
+ * something older: a plain digest of five named FORM FIELDS with the secret
+ * appended, delivered in the body itself. A single interface could not
+ * describe both without a pile of nullable fields, so this is a union and the
+ * verifier branches on `kind`.
+ */
+export interface MarketplaceHmacHeaderScheme {
+  kind: 'hmac_header'
+  /** Lower-case, as Headers.get expects. */
   header: string
   algorithm: 'sha256' | 'sha512'
   /** Whether the digest arrives as lower-case hex or as base64. */
   encoding: 'hex' | 'base64'
+}
+
+/**
+ * A digest over named fields of a form-encoded body, with the shared secret
+ * appended rather than used as an HMAC key, and the result truncated.
+ *
+ * This is weaker than an HMAC and we do not get to choose: it is what the
+ * platform computes, and verifying it the platform's way is the only thing
+ * that distinguishes a real delivery from a forged one. The truncation is the
+ * reason `MARKETPLACE_<SLUG>_ENABLED` and the claim step still matter — a
+ * recorded order grants nothing by itself.
+ */
+export interface MarketplaceFieldDigestScheme {
+  kind: 'field_digest'
+  /** The form field carrying the digest. */
+  field: string
+  /** The fields that are concatenated, in this exact order. */
+  fields: readonly string[]
+  separator: string
+  /** Whether a separator also follows the LAST field, before the secret. */
+  trailingSeparator: boolean
+  algorithm: 'sha1'
+  /** How many leading hex characters are compared, upper-cased. */
+  length: number
+}
+
+export type MarketplaceSignatureScheme = MarketplaceHmacHeaderScheme | MarketplaceFieldDigestScheme
+
+/**
+ * JVZoo's JVZIPN v2 `cverify`, from the spec in the seller account
+ * (docs/affiliate/jvzoo-webhook-docs.md, captured 2026-10-29):
+ *
+ *   SHA-1( paykey|customer_email|product_name|transaction_type|date|<SECRET> )
+ *   → first 8 hex characters, upper-cased.
+ *
+ * The secret is the account-level key from My Account → Seller Settings, held
+ * here as MARKETPLACE_JVZOO_WEBHOOK_SECRET. `date` is compared exactly as
+ * received and must never be reformatted.
+ */
+export const JVZOO_IPN_V2_SCHEME: MarketplaceFieldDigestScheme = {
+  kind: 'field_digest',
+  field: 'cverify',
+  fields: ['paykey', 'customer_email', 'product_name', 'transaction_type', 'date'],
+  separator: '|',
+  trailingSeparator: true,
+  algorithm: 'sha1',
+  length: 8,
 }
 
 export interface MarketplaceProvider {
@@ -57,6 +117,19 @@ export interface MarketplaceProvider {
   label: string
   /** null until the platform's documented scheme has been verified. */
   signature: MarketplaceSignatureScheme | null
+  /**
+   * Whether the platform is the SELLER OF RECORD for the buyer's purchase —
+   * the party that contracts with the buyer, issues the invoice and owes the
+   * tax on the sale.
+   *
+   * This is not a presentational flag. It decides which of two legally
+   * different sentences the sales page prints about who the buyer is buying
+   * from, and printing the wrong one is a misrepresentation on our own
+   * domain. It is therefore set from the platform's own vendor agreement and
+   * nothing else; see the note above MARKETPLACE_PROVIDERS for the clause
+   * each value was read from.
+   */
+  sellerOfRecord: boolean
   /**
    * Wording the platform requires on the sales page, once the legal thread
    * has passed it.
@@ -74,20 +147,101 @@ export interface MarketplaceProvider {
 /**
  * The three platforms Oren named. Each is present so that its configuration,
  * its sales page and its database rows are testable today; none can accept a
- * delivery while its `signature` is null.
+ * delivery while its `signature` is null, and JVZoo — the one that now has a
+ * scheme — still needs its env switch and its secret before anything reaches
+ * it.
  */
 /*
- * JVZoo IS NOT A RESELLER, AND THAT IS A LEGAL DIFFERENCE, NOT A DETAIL. Its
- * terms leave us the seller with the money arriving through our own PayPal,
- * which brings back the EU VAT registration and the 14-day withdrawal right
- * that selling through a reseller avoids. It stays registered so the row can
- * be configured if the owner decides to accept that, and it stays off until he
- * does. ClickBank and Digistore24 are resellers and carry neither problem.
+ * JVZoo IS NOT A RESELLER, AND THAT IS A LEGAL DIFFERENCE, NOT A DETAIL. This
+ * was recorded here as a reading of its terms before anyone could reach the
+ * account; it has since been READ FROM THE SIGNED AGREEMENT ITSELF
+ * (https://www.jvzoo.com/vendoragreement, effective 03-28-2020), and the
+ * agreement settles it three times over:
+ *
+ *   s.11 Taxes and Related Charges - "You are solely responsible for ensuring
+ *        the collection and payment of any and all applicable state, local, or
+ *        other taxes or related charges arising from any customer purchasing
+ *        Your products or services. You agree to indemnify Us from any
+ *        liability connected with the same."
+ *   s.7  JVZoo takes "a commission fee of 5% of the gross selling price" - the
+ *        fee of a network, not the margin of a reseller.
+ *   s.9  the buyer "remits full payment for the product or service ordered
+ *        from You" - the order is placed with us.
+ *
+ * So the contract runs buyer-to-us, the invoice is ours, and the EU VAT and
+ * the 14-day withdrawal right come back to us. That is exactly what a
+ * merchant of record (Creem, Digistore24) exists to absorb.
+ *
+ * NOTE THE CONTRADICTION, because it is a trap: the disclaimer JVZoo's own
+ * compliance review REQUIRES on the sales page says "JVZoo serves as the
+ * retailer for the products featured on this site". That sentence cannot be
+ * reconciled with s.11 of the agreement we signed. We publish their mandated
+ * wording because they mandate it, and we state who the seller actually is in
+ * our own voice, in full size, directly above it - we do not let their
+ * boilerplate be the page's answer to "who am I buying from".
+ *
+ * ClickBank and Digistore24 are resellers and carry neither problem.
  */
 export const MARKETPLACE_PROVIDERS: readonly MarketplaceProvider[] = [
-  { slug: 'digistore24', label: 'Digistore24', signature: null, requiredDisclaimer: null },
-  { slug: 'clickbank', label: 'ClickBank', signature: null, requiredDisclaimer: null },
-  { slug: 'jvzoo', label: 'JVZoo', signature: null, requiredDisclaimer: null },
+  {
+    slug: 'digistore24',
+    label: 'Digistore24',
+    signature: null,
+    sellerOfRecord: true,
+    requiredDisclaimer: null,
+  },
+  {
+    slug: 'clickbank',
+    label: 'ClickBank',
+    signature: null,
+    sellerOfRecord: true,
+    requiredDisclaimer: null,
+  },
+  {
+    slug: 'jvzoo',
+    label: 'JVZoo',
+    /*
+     * JVZIPN v2, read inside the seller account and written down in
+     * docs/affiliate/jvzoo-webhook-docs.md. It is NOT the shape the original
+     * `MarketplaceSignatureScheme` described: not an HMAC over the raw body in
+     * a header, but the first 8 characters, upper-cased, of SHA-1 over five
+     * NAMED FORM FIELDS joined by pipes with the account secret appended,
+     * arriving in the `cverify` field of the form body itself. That is why the
+     * type is a union and the verifier branches on `kind`; see
+     * JVZOO_IPN_V2_SCHEME above.
+     */
+    signature: JVZOO_IPN_V2_SCHEME,
+    sellerOfRecord: false,
+    /*
+     * The exact words JVZoo compliance requires, copied character for
+     * character from the review notes on products 457483 / 457573 / 457575 /
+     * 457579 (review date 10/14/2026, issue 1 "Required JVZoo Disclaimer
+     * Missing"). Approved for publication by the owner.
+     *
+     * It is their text and not ours, so it is not edited, trimmed or
+     * paraphrased - a page that prints an approximation of a mandated
+     * disclaimer fails the review and has published a statement nobody
+     * authored. The income sentence reads oddly on a page that makes no
+     * income claim, which is the point of it: it denies a promise rather than
+     * implying one.
+     */
+    requiredDisclaimer:
+      'Disclaimer: Please note that this product does not provide any guarantee of income ' +
+      'or success. The results achieved by the product owner or any other individuals ' +
+      'mentioned are not indicative of future success or earnings. This website is not ' +
+      'affiliated with FaceBook or any of its associated entities. Once you navigate away ' +
+      'from FaceBook, the responsibility for the content and its usage lies solely with the ' +
+      'user. All content on this website, including but not limited to text, images, and ' +
+      'multimedia, is protected by copyright law and the Digital Millennium Copyright Act. ' +
+      'Unauthorized copying, duplication, modification, or theft, whether intentional or ' +
+      'unintentional, is strictly prohibited. Violators will be prosecuted to the fullest ' +
+      'extent of the law. We want to clarify that JVZoo serves as the retailer for the ' +
+      'products featured on this site. JVZoo\u00ae is a registered trademark of BBC Systems ' +
+      'Inc., a Florida corporation located at 1809 E. Broadway Street, Suite 125, Oviedo, FL ' +
+      '32765, USA, and is used with permission. The role of JVZoo as a retailer does not ' +
+      'constitute an endorsement, approval, or review of these products or any claims, ' +
+      'statements, or opinions used in their promotion.',
+  },
 ] as const
 
 /** The registered provider, or null for anything else. Never throws. */
@@ -210,9 +364,22 @@ function httpsUrlOrNull(raw: string | undefined): string | null {
  * replaced by our own checkout, which is exactly what a compliance review
  * refuses — and what would take the sale away from the affiliate who sent
  * the visitor.
+ *
+ * GATED ON `providerReadiness`, AND THAT IS THE POINT OF THIS FUNCTION.
+ * Configuring the buy URLs is one environment variable away from configuring
+ * the webhook, and the two used to be independent: setting
+ * `MARKETPLACE_<SLUG>_BUY_URL_*` alone put a live, payable button on a public
+ * page while the callback that records the purchase was still refusing every
+ * delivery for want of a secret, a signature scheme or the product ids. A
+ * buyer then pays the platform in full and NOTHING reaches us — not an
+ * account, not a plan, not even a receipt to reconcile by hand, because the
+ * refusal happens before anything is written. Taking money with no record of
+ * it is worse than being unavailable, so the button is shown only when the
+ * channel can actually record what it sells.
  */
 export function marketplaceBuyUrl(slug: string, plan: PlanCode): string | null {
   if (!marketplaceProvider(slug)) return null
+  if (!providerReadiness(slug).ready) return null
   return httpsUrlOrNull(process.env[`${envPrefix(slug)}BUY_URL_${plan.toUpperCase()}`])
 }
 
@@ -226,13 +393,37 @@ export function marketplaceBuyUrl(slug: string, plan: PlanCode): string | null {
  * pointing that buyer at ours would point them at the wrong document. An
  * unconfigured provider renders no link rather than a guessed one.
  *
- * There is deliberately no tracking-pixel setting here. A conversion pixel is
- * a marketing tag by this project's own classification, so it cannot fire
- * before consent, and it is not needed: the sale completes on the platform's
- * checkout, so the affiliate's credit rides the click id in the buy link and
- * the platform's server-side postback.
+ * The tracking pixel is configured separately, below.
  */
 export function marketplacePolicyUrl(slug: string): string | null {
   if (!marketplaceProvider(slug)) return null
   return httpsUrlOrNull(process.env[`${envPrefix(slug)}POLICY_URL`])
+}
+
+/**
+ * The platform's own 1x1 tracking beacon, as configured in
+ * `MARKETPLACE_<SLUG>_PIXEL_URL`.
+ *
+ * THIS SETTING DID NOT EXIST, AND THE REASON IT DIDN'T IS STILL TRUE. A
+ * conversion pixel is a marketing tag by this project's own classification
+ * (lib/consent/categories.ts), so it cannot fire before consent; and the sale
+ * completes on the platform's checkout, so the affiliate's credit rides the
+ * click id in the buy link and the platform's server-side postback. By that
+ * reasoning the page needs no pixel.
+ *
+ * The platform disagrees, and it is the one running the review. JVZoo's
+ * compliance refuses the listing without it (issue 3 on products 457483 /
+ * 457573 / 457575 / 457579: "Missing JVZoo buy button or tracking pixel").
+ * So the beacon is configurable, and rendered ONLY through
+ * components/consent/MarketplacePixel.tsx, which shows it when the marketing
+ * category has been granted and removes it on withdrawal. A platform with no
+ * configured URL renders nothing, which is still the default.
+ *
+ * It is a URL and not a snippet on purpose: the platform's HTML would be a
+ * string from configuration rendered into the document, and this page does not
+ * have a way to do that safely. Only an absolute https URL is accepted.
+ */
+export function marketplacePixelUrl(slug: string): string | null {
+  if (!marketplaceProvider(slug)) return null
+  return httpsUrlOrNull(process.env[`${envPrefix(slug)}PIXEL_URL`])
 }

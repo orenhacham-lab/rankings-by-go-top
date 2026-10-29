@@ -245,7 +245,7 @@ export const it = {
       },
       marketing: {
         title: 'Marketing',
-        desc: 'Misurare il rendimento delle nostre inserzioni e mostrare annunci pertinenti sulle reti di Google e di Meta. Rifiutarli non costa nulla nel servizio.',
+        desc: 'Misurare il rendimento delle nostre inserzioni, mostrare annunci pertinenti sulle reti di Google e di Meta e attribuire un acquisto all’affiliato che ha indirizzato la Sua visita a noi tramite il marketplace JVZoo. Rifiutarli non costa nulla nel servizio.',
       },
     },
   },

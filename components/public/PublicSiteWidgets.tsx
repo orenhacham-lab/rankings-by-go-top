@@ -71,7 +71,35 @@ function isNonPublicArea(pathname: string | null): boolean {
  */
 export function shouldRenderPublicWidgets(isAuthenticated: boolean, pathname: string | null): boolean {
   if (isAuthenticated) return false
+  if (isMarketplaceSalesArea(pathname)) return false
   return !isNonPublicArea(pathname)
+}
+
+/**
+ * THE MARKETPLACE SALES PAGES, WHERE THE CONTACT WIDGETS MUST NOT APPEAR BUT
+ * THE COOKIE NOTICE MUST.
+ *
+ * `/go/<platform>` is reviewed by the platform before it will list us, and
+ * every one of them requires that its own buy button be the only way to buy
+ * on that page. The floating widgets put two other routes beside it: the
+ * WhatsApp button and the "free demo" float, both of which take a visitor who
+ * came through an affiliate's link into a conversation with us instead of
+ * through the affiliate's sale. That is the behaviour a compliance review
+ * refuses, and it is also what the sales page's own header comment claimed was
+ * not happening - the guards there read the page's source, which never
+ * mentioned the root layout.
+ *
+ * The cookie notice is the exception and is deliberately NOT gated with them:
+ * the platform's tracking beacon on that page fires only on a marketing grant
+ * (components/consent/MarketplacePixel.tsx), so a visitor with no way to
+ * answer the banner is a visitor the beacon can never fire for.
+ */
+const MARKETPLACE_SALES_PREFIX = '/go'
+
+function isMarketplaceSalesArea(pathname: string | null): boolean {
+  if (!pathname) return false
+  return pathname === MARKETPLACE_SALES_PREFIX
+    || pathname.startsWith(`${MARKETPLACE_SALES_PREFIX}/`)
 }
 
 /**
@@ -92,7 +120,12 @@ export function PublicConsentNotice({ isAuthenticated = false }: { isAuthenticat
   const pathname = usePathname()
   const [, setCookieOpen] = useState(false)
 
-  if (!shouldRenderPublicWidgets(isAuthenticated, pathname)) {
+  // Not `shouldRenderPublicWidgets`: the marketplace sales pages drop the
+  // contact widgets and KEEP this, because the platform's beacon there waits
+  // on a marketing grant that only this notice can collect. See
+  // isMarketplaceSalesArea.
+  const suppressed = isAuthenticated || isNonPublicArea(pathname)
+  if (suppressed) {
     return null
   }
 

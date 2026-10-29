@@ -20,6 +20,10 @@
  */
 import { readFileSync } from 'fs'
 import { createHmac } from 'crypto'
+import { createElement } from 'react'
+import { renderToStaticMarkup } from 'react-dom/server'
+import { CONSENT_DENIED, type ConsentChoices } from '../../consent/categories'
+import { MarketplacePixel, marketingBeaconAllowed } from '../../../components/consent/MarketplacePixel'
 import { FakeAdmin } from '../../__qa__/_fake-admin'
 import {
   MARKETPLACE_CLAIM_PATH,
@@ -32,9 +36,10 @@ import {
   marketplaceWebhookSecret,
   planForMarketplaceProductId,
   providerReadiness,
-  type MarketplaceSignatureScheme,
+  JVZOO_IPN_V2_SCHEME,
+  type MarketplaceHmacHeaderScheme,
 } from '../config'
-import { marketplaceSignatureFor, verifyMarketplaceSignature } from '../signature'
+import { fieldDigestFor, marketplaceSignatureFor, verifyMarketplaceSignature } from '../signature'
 import {
   httpStatusForMarketplaceOutcome,
   marketplaceParser,
@@ -61,12 +66,35 @@ check('A3: nor is an empty or absent one',
   marketplaceProvider('') === null && marketplaceProvider(null) === null && marketplaceProvider(undefined) === null)
 check('A4: the lookup is case- and whitespace-tolerant, because an env var is typed by a person',
   marketplaceProvider(' Digistore24 ')?.slug === 'digistore24')
-check('A5: NO provider carries a signature scheme — none has been read from its own documentation',
-  MARKETPLACE_PROVIDERS.every((p) => p.signature === null))
-check('A6: and none carries a required disclaimer, which is legal\'s to approve',
-  MARKETPLACE_PROVIDERS.every((p) => p.requiredDisclaimer === null))
-check('A7: no provider has a parser either, so no body can be acted on',
-  MARKETPLACE_PROVIDERS.every((p) => marketplaceParser(p.slug) === null))
+/**
+ * A5 used to read "no provider carries a signature scheme", which was true
+ * while no platform's documentation could be reached. JVZoo's was read inside
+ * the seller account, so the invariant that is actually worth holding is the
+ * one below: a scheme and a parser arrive TOGETHER. Either one alone is the
+ * half-configured provider this whole module exists to prevent - a verified
+ * body nothing can read, or a body read without being verified.
+ */
+check('A5: a provider has a signature scheme exactly when it has a parser',
+  MARKETPLACE_PROVIDERS.every((p) => (p.signature === null) === (marketplaceParser(p.slug) === null)))
+check('A5b: and JVZoo is the one that carries both, from its own IPN v2 spec',
+  marketplaceProvider('jvzoo')?.signature !== null && marketplaceParser('jvzoo') !== null)
+check('A6: a required disclaimer is carried only where the owner approved the platform\'s exact wording - JVZoo\'s is approved, the other two have none',
+  marketplaceProvider('jvzoo')?.requiredDisclaimer?.startsWith('Disclaimer: Please note that this product does not provide any guarantee of income') === true
+  && marketplaceProvider('digistore24')?.requiredDisclaimer === null
+  && marketplaceProvider('clickbank')?.requiredDisclaimer === null)
+check('A6b: JVZoo\'s approved disclaimer is the platform\'s text intact, naming JVZoo as retailer and BBC Systems Inc.',
+  marketplaceProvider('jvzoo')?.requiredDisclaimer?.includes('JVZoo serves as the retailer') === true
+  && marketplaceProvider('jvzoo')?.requiredDisclaimer?.includes('BBC Systems Inc.') === true)
+check('A6c: seller of record follows each platform\'s vendor agreement - JVZoo is NOT one (s.11 leaves the tax with us), the two resellers are',
+  marketplaceProvider('jvzoo')?.sellerOfRecord === false
+  && marketplaceProvider('digistore24')?.sellerOfRecord === true
+  && marketplaceProvider('clickbank')?.sellerOfRecord === true)
+check('A7: a platform whose documentation has not been read carries neither a scheme nor a parser',
+  ['digistore24', 'clickbank'].every((s) =>
+    marketplaceProvider(s)?.signature === null && marketplaceParser(s) === null))
+check('A-MUT1: a scheme without a parser would fail A5',
+  !([{ signature: {} }, { signature: null }] as { signature: unknown }[])
+    .every((p) => (p.signature === null) === true))
 
 // ── B. Off switches, and what readiness reports ─────────────────────────────
 console.log('\nB. off switches')
@@ -116,15 +144,55 @@ check('D1: the claim url is built from our own canonical origin and the fixed pa
   marketplaceClaimUrl('tok en/1').startsWith(`https://www.gotopseo.com${MARKETPLACE_CLAIM_PATH}?order=`))
 check('D2: and the token is encoded, so it cannot add a parameter of its own',
   marketplaceClaimUrl('a&b=c').endsWith('a%26b%3Dc'))
-process.env.MARKETPLACE_DIGISTORE24_BUY_URL_ADVANCED = 'http://example.com/buy'
+/*
+ * The buy url is gated on readiness, so these checks run against JVZoo, the
+ * one provider that CAN become ready (it is the only one whose signature
+ * scheme has been read). Digistore24 is used below for the gate itself,
+ * because a provider with no scheme can never be ready - which is the point.
+ */
+process.env.MARKETPLACE_JVZOO_ENABLED = 'true'
+process.env.MARKETPLACE_JVZOO_WEBHOOK_SECRET = 'jv-secret'
+process.env.MARKETPLACE_JVZOO_PRODUCT_ADVANCED = '457573'
+check('D3a: JVZoo is ready once its switch, secret and a product id are set',
+  providerReadiness('jvzoo').ready === true)
+process.env.MARKETPLACE_JVZOO_BUY_URL_ADVANCED = 'http://example.com/buy'
 check('D3: a plain-http buy url is treated as unset',
-  marketplaceBuyUrl('digistore24', 'advanced') === null)
-process.env.MARKETPLACE_DIGISTORE24_BUY_URL_ADVANCED = 'javascript:alert(1)'
+  marketplaceBuyUrl('jvzoo', 'advanced') === null)
+process.env.MARKETPLACE_JVZOO_BUY_URL_ADVANCED = 'javascript:alert(1)'
 check('D4: so is anything that is not a url at all',
-  marketplaceBuyUrl('digistore24', 'advanced') === null)
+  marketplaceBuyUrl('jvzoo', 'advanced') === null)
+process.env.MARKETPLACE_JVZOO_BUY_URL_ADVANCED = 'https://www.jvzoo.com/b/0/457573/99'
+check('D5: an https url is used', marketplaceBuyUrl('jvzoo', 'advanced') === 'https://www.jvzoo.com/b/0/457573/99')
+check('D6: a plan with no configured url has none', marketplaceBuyUrl('jvzoo', 'premium') === null)
+
+/*
+ * THE GATE. Configuring a buy url is one env var away from configuring the
+ * webhook, and before this gate existed the two were independent: the url
+ * alone put a live, payable button on a public page while the callback was
+ * still refusing every delivery, so a buyer could pay in full and leave no
+ * record at all - not an account, not a plan, not a receipt to reconcile by
+ * hand. Each check below turns exactly one readiness piece off.
+ */
 process.env.MARKETPLACE_DIGISTORE24_BUY_URL_ADVANCED = 'https://www.digistore24.com/product/123'
-check('D5: an https url is used', marketplaceBuyUrl('digistore24', 'advanced') === 'https://www.digistore24.com/product/123')
-check('D6: a plan with no configured url has none', marketplaceBuyUrl('digistore24', 'premium') === null)
+check('D6a: a provider with no signature scheme shows NO buy button, however its url is set',
+  providerReadiness('digistore24').ready === false
+  && marketplaceBuyUrl('digistore24', 'advanced') === null)
+process.env.MARKETPLACE_JVZOO_ENABLED = 'false'
+check('D6b: switching the channel off removes the button',
+  marketplaceBuyUrl('jvzoo', 'advanced') === null)
+process.env.MARKETPLACE_JVZOO_ENABLED = 'true'
+delete process.env.MARKETPLACE_JVZOO_WEBHOOK_SECRET
+check('D6c: so does losing the webhook secret, because a delivery could not be verified',
+  marketplaceBuyUrl('jvzoo', 'advanced') === null)
+process.env.MARKETPLACE_JVZOO_WEBHOOK_SECRET = 'jv-secret'
+delete process.env.MARKETPLACE_JVZOO_PRODUCT_ADVANCED
+check('D6d: and so does losing every product id, because a paid order could not be mapped to a plan',
+  marketplaceBuyUrl('jvzoo', 'advanced') === null)
+process.env.MARKETPLACE_JVZOO_PRODUCT_ADVANCED = '457573'
+check('D6e: with all of it back, the button returns',
+  marketplaceBuyUrl('jvzoo', 'advanced') === 'https://www.jvzoo.com/b/0/457573/99')
+check('D6-MUT: a gate that only checked the url would pass D6a, which is the bug this group pins',
+  marketplaceBuyUrl.toString().includes('providerReadiness'))
 process.env.MARKETPLACE_DIGISTORE24_POLICY_URL = 'https://www.digistore24.com/returns'
 check('D7: the platform\'s own policy page is read the same way',
   marketplacePolicyUrl('digistore24') === 'https://www.digistore24.com/returns')
@@ -136,8 +204,8 @@ check('D8: and a value that would break out of the attribute is refused',
 console.log('\nE. signature')
 const BODY = '{"order":"A-1","product":"PROD-ADV"}'
 const SECRET = 'shhh'
-const hex256: MarketplaceSignatureScheme = { header: 'x-sig', algorithm: 'sha256', encoding: 'hex' }
-const b64512: MarketplaceSignatureScheme = { header: 'x-sig', algorithm: 'sha512', encoding: 'base64' }
+const hex256: MarketplaceHmacHeaderScheme = { kind: 'hmac_header', header: 'x-sig', algorithm: 'sha256', encoding: 'hex' }
+const b64512: MarketplaceHmacHeaderScheme = { kind: 'hmac_header', header: 'x-sig', algorithm: 'sha512', encoding: 'base64' }
 
 const goodHex = marketplaceSignatureFor(BODY, SECRET, hex256)
 const goodB64 = marketplaceSignatureFor(BODY, SECRET, b64512)
@@ -160,7 +228,7 @@ const failures = [
   ['no header', verifyMarketplaceSignature(BODY, '', SECRET, hex256), 'missing_signature'],
   ['short hex', verifyMarketplaceSignature(BODY, 'abc', SECRET, hex256), 'malformed_signature'],
   ['non-hex', verifyMarketplaceSignature(BODY, 'z'.repeat(64), SECRET, hex256), 'malformed_signature'],
-  ['sha512 digest offered to a sha256 scheme', verifyMarketplaceSignature(BODY, marketplaceSignatureFor(BODY, SECRET, { ...hex256, algorithm: 'sha512' }), SECRET, hex256), 'malformed_signature'],
+  ['sha512 digest offered to a sha256 scheme', verifyMarketplaceSignature(BODY, marketplaceSignatureFor(BODY, SECRET, { ...hex256, algorithm: 'sha512' as const }), SECRET, hex256), 'malformed_signature'],
   ['base64 of the wrong length', verifyMarketplaceSignature(BODY, Buffer.from('short').toString('base64'), SECRET, b64512), 'malformed_signature'],
 ] as const
 for (const [label, result, reason] of failures) {
@@ -177,6 +245,89 @@ const unkeyed = (body: string, header: string) =>
   createHmac('sha256', '').update(body).digest('hex') === header
 check('E-MUT2: a verifier that ignores the secret is caught',
   unkeyed(BODY, goodHex) === false)
+
+// ── K. JVZoo JVZIPN v2: a digest of five form fields, carried in the body ──
+// docs/affiliate/jvzoo-webhook-docs.md, copied from the seller account.
+console.log('\nK. jvzoo ipn v2')
+const JV_SECRET = 's3cr3t-key'
+/** The five signed fields, in the documented order, plus the rest of a sale. */
+const jvForm = (over: Record<string, string> = {}) =>
+  new URLSearchParams({
+    paykey: 'AP-ABC123XYZ',
+    customer_email: 'buyer@example.com',
+    product_name: 'Go Top SEO Advanced - 1 Site, 100 Keywords',
+    transaction_type: 'SALE',
+    date: '2026-10-29 09:15:00',
+    transaction_id: 'ABC123XYZ',
+    product_id: 'JV-ADV',
+    product_type: 'RECURRING',
+    total: '47.00',
+    next_payment_date: '2026-11-29 09:15:00',
+    ...over,
+  }).toString()
+
+/**
+ * The expected digest was computed OUTSIDE this code, with
+ *   printf '%s' 'AP-ABC123XYZ|buyer@example.com|Go Top SEO Advanced - 1 Site, 100 Keywords|SALE|2026-10-29 09:15:00|s3cr3t-key' | sha1sum
+ * so this is a real check of the algorithm rather than the implementation
+ * agreeing with itself.
+ */
+const JV_EXPECTED = '6D36EAAF'
+/** The refusal reason, or null when the delivery verified. */
+const reasonOf = (r: ReturnType<typeof verifyMarketplaceSignature>) => (r.ok ? null : r.reason)
+check('K1: cverify matches a digest computed outside this code',
+  fieldDigestFor(jvForm(), JV_SECRET, JVZOO_IPN_V2_SCHEME) === JV_EXPECTED)
+check('K2: a genuine delivery verifies, with the digest read from the BODY',
+  verifyMarketplaceSignature(jvForm({ cverify: JV_EXPECTED }), null, JV_SECRET, JVZOO_IPN_V2_SCHEME).ok === true)
+check('K3: lower case verifies, since the comparison upper-cases first',
+  verifyMarketplaceSignature(jvForm({ cverify: JV_EXPECTED.toLowerCase() }), null, JV_SECRET, JVZOO_IPN_V2_SCHEME).ok === true)
+check('K4: changing a SIGNED field (the email) is a mismatch',
+  reasonOf(verifyMarketplaceSignature(jvForm({ cverify: JV_EXPECTED, customer_email: 'thief@example.com' }), null, JV_SECRET, JVZOO_IPN_V2_SCHEME)) === 'mismatch')
+check('K5: the wrong secret is a mismatch',
+  reasonOf(verifyMarketplaceSignature(jvForm({ cverify: JV_EXPECTED }), null, 'other', JVZOO_IPN_V2_SCHEME)) === 'mismatch')
+check('K6: no cverify at all fails closed',
+  reasonOf(verifyMarketplaceSignature(jvForm(), null, JV_SECRET, JVZOO_IPN_V2_SCHEME)) === 'missing_signature')
+check('K7: a digest of the wrong length is refused before the comparison',
+  reasonOf(verifyMarketplaceSignature(jvForm({ cverify: 'ABC' }), null, JV_SECRET, JVZOO_IPN_V2_SCHEME)) === 'malformed_signature')
+check('K8: a non-hex digest is refused',
+  reasonOf(verifyMarketplaceSignature(jvForm({ cverify: 'ZZZZZZZZ' }), null, JV_SECRET, JVZOO_IPN_V2_SCHEME)) === 'malformed_signature')
+check('K9: a missing signed field counts as empty rather than shifting the rest',
+  fieldDigestFor(new URLSearchParams({ paykey: 'P', transaction_type: 'SALE' }).toString(), JV_SECRET, JVZOO_IPN_V2_SCHEME)
+    === fieldDigestFor(new URLSearchParams({ paykey: 'P', customer_email: '', product_name: '', transaction_type: 'SALE', date: '' }).toString(), JV_SECRET, JVZOO_IPN_V2_SCHEME))
+check('K10: the header argument is ignored — the digest is never taken from a header',
+  verifyMarketplaceSignature(jvForm(), JV_EXPECTED, JV_SECRET, JVZOO_IPN_V2_SCHEME).ok === false)
+check('K11: the registry now carries the scheme, so the provider is no longer unknown',
+  marketplaceProvider('jvzoo')?.signature?.kind === 'field_digest')
+
+// The parser.
+const jvParse = marketplaceParser('jvzoo')
+check('K12: jvzoo has a parser', typeof jvParse === 'function')
+const sale = jvParse?.(jvForm(), 'application/x-www-form-urlencoded') ?? null
+check('K13: a SALE is a paid order keyed on the transaction id',
+  sale?.kind === 'paid' && sale.externalOrderId === 'ABC123XYZ' && sale.externalProductId === 'JV-ADV')
+check('K14: total is DOLLARS in v2 and becomes minor units',
+  sale?.amountMinor === 4700)
+check('K15: no currency is claimed, because the payload carries none',
+  sale?.currency === null)
+check('K16: the period end is the next payment, as an instant',
+  sale?.currentPeriodEnd === '2026-11-29T09:15:00Z')
+const rebill = jvParse?.(jvForm({ transaction_type: 'BILL', transaction_id: 'ABC123XYZ-B001' }), null) ?? null
+check('K17: a rebill is a paid order with its OWN id, so idempotency does not swallow it',
+  rebill?.kind === 'paid' && rebill.externalOrderId === 'ABC123XYZ-B001')
+check('K18: RFND is a refund, which a person then decides about',
+  jvParse?.(jvForm({ transaction_type: 'RFND' }), null)?.kind === 'refunded')
+check('K19: an unknown transaction type is ignored rather than guessed at',
+  jvParse?.(jvForm({ transaction_type: 'CGBK' }), null) === null)
+check('K20: a one-off sale with no dates has no period end invented for it',
+  jvParse?.(jvForm({ product_type: 'STANDARD', next_payment_date: '' }), null)?.currentPeriodEnd === null)
+
+// MUTATION CONTROLS for J.
+check('K-MUT1: dropping the trailing separator before the secret changes the digest',
+  fieldDigestFor(jvForm(), JV_SECRET, { ...JVZOO_IPN_V2_SCHEME, trailingSeparator: false }) !== JV_EXPECTED)
+check('K-MUT2: signing the fields in a different order changes the digest',
+  fieldDigestFor(jvForm(), JV_SECRET, { ...JVZOO_IPN_V2_SCHEME, fields: ['customer_email', 'paykey', 'product_name', 'transaction_type', 'date'] }) !== JV_EXPECTED)
+check('K-MUT3: reading total as minor units would record 47 agorot instead of 47 dollars',
+  Number.parseFloat('47.00') !== 4700)
 
 // Sections F to I need await, and tsx compiles these suites as CommonJS,
 // where top-level await is not available. One async main, called at the end.
@@ -371,13 +522,141 @@ async function main() {
   check('H16: it says the plan renews monthly and where to cancel it',
     /renews every month until you cancel/.test(salesSrc)
     && /cancel it at \{provider\.label\}/.test(salesSrc))
+  /*
+   * WHERE WE ARE THE SELLER, THE TAX SENTENCE IS OURS TO STAND BEHIND.
+   * The first version of this branch said any tax due "is shown at checkout
+   * before you pay" - a claim about JVZoo's checkout, which we have not read
+   * and do not control. If their checkout adds no EU VAT, we have told the
+   * buyer something untrue about a liability that s.11 of their own vendor
+   * agreement puts on us. Legal's approved wording states the price and
+   * nothing about anybody's checkout.
+   */
+  check('H15b: on a page where WE are the seller, the price is stated as excluding tax in the buyer\'s country',
+    /prices above are in US dollars and do not include VAT or any other tax due/.test(salesSrc))
+  // Matched against a whitespace-normalised copy, because JSX wraps a
+  // sentence across lines wherever the formatter chooses to.
+  const salesFlat = salesSrc.replace(/\s+/g, ' ')
+  check('H15c: \u2026and no sentence describes the platform\'s checkout behaviour, which we cannot vouch for',
+    !/shown at checkout before you pay/.test(salesFlat)
+    && !/takes the payment on our behalf[^.]*calculates tax/.test(salesFlat))
+  check('H-MUT6b: the guard catches the checkout claim coming back',
+    /shown at checkout before you pay/.test(
+      'any tax due where you are is shown at checkout before you pay'))
+  /*
+   * THE ATTRIBUTION LINE. A platform's mandated block may contradict the
+   * seller paragraph above it - JVZoo's says it "serves as the retailer" while
+   * its own agreement makes us the seller. Full size above it was not enough:
+   * a page that answers "who am I buying from" twice misleads under CRD
+   * Art. 6(1)(b)-(c) whatever the font. Naming the speaker resolves it, so the
+   * heading is part of the disclosure and not a label.
+   */
+  check('H18b: a mandated disclaimer is published under a line naming the platform as its author',
+    /Notice required by \{provider\.label\}:/.test(salesSrc)
+    && salesSrc.indexOf('Notice required by') < salesSrc.indexOf('{provider.requiredDisclaimer}'))
+  check('H18c: …and it is still rendered only when one exists, so a platform without one gets no empty heading',
+    /\{provider\.requiredDisclaimer \? \(/.test(salesSrc))
+  check('H-MUT10: the attribution guard catches the block printed as our own words',
+    !/Notice required by/.test('<p className="mt-8">{provider.requiredDisclaimer}</p>'))
+  /*
+   * WHAT THE ROOT LAYOUT PUTS ON THIS PAGE, which the guards above cannot see
+   * because they read the page's own source. H14 pins that the page links out
+   * only to our terms, our privacy and the platform's policy; that was false
+   * in production, because app/layout.tsx renders the public contact widgets
+   * around every unauthenticated page - a WhatsApp button, a "free demo"
+   * float and a mobile contact bar. Beside a platform's buy button those are
+   * the alternative route a compliance review refuses, and a visitor who came
+   * through an affiliate's link taking one of them is a sale the affiliate
+   * never gets credited for. Read from the widget module, not asserted about
+   * it.
+   */
+  {
+    // Comments stripped before matching, per the project's QA convention:
+    // the explanatory notes in that module name isMarketplaceSalesArea too.
+    const widgets = code('components/public/PublicSiteWidgets.tsx')
+    const gate = widgets.slice(widgets.indexOf('export function shouldRenderPublicWidgets'))
+    check('H19: the public contact widgets do not render on /go/<platform>',
+      /if \(isMarketplaceSalesArea\(pathname\)\) return false/.test(gate)
+      && /pathname\.startsWith\(`\$\{MARKETPLACE_SALES_PREFIX\}\/`\)/.test(widgets)
+      && /MARKETPLACE_SALES_PREFIX = '\/go'/.test(widgets))
+    check('H-MUT11: the guard catches the widgets being left on the page',
+      !/if \(isMarketplaceSalesArea\(pathname\)\) return false/.test(
+        gate.replace('if (isMarketplaceSalesArea(pathname)) return false', '')))
+    /*
+     * …and the cookie notice is the ONE thing that stays. The beacon fires
+     * only on a marketing grant, so a sales page with no way to answer the
+     * banner is a sales page whose beacon can never fire - which would satisfy
+     * the consent rule by making the platform's requirement impossible.
+     */
+    const notice = widgets.slice(widgets.indexOf('export function PublicConsentNotice'))
+    const noticeBody = notice.slice(0, notice.indexOf('export function PublicSiteWidgets'))
+    check('H19b: the cookie notice is NOT dropped with them, so the beacon can still be consented to',
+      !/isMarketplaceSalesArea/.test(noticeBody))
+    check('H-MUT12: the guard catches the notice being gated away too',
+      /isMarketplaceSalesArea/.test(
+        noticeBody.replace('isNonPublicArea(pathname)', 'isMarketplaceSalesArea(pathname)')))
+  }
   // A conversion pixel is a marketing tag, and marketing tags on this site
-  // load only after consent (lib/consent/categories.ts). This page has no
-  // consent gate, so it carries no pixel at all.
+  // load only after consent (lib/consent/categories.ts). The page carried no
+  // pixel at all until JVZoo's review made one a condition of listing; it now
+  // carries exactly one, and only through the consent-gated component.
   check('H17: the page loads no third-party script, so nothing fires before consent',
-    !/<script/.test(salesSrc) && !/PIXEL/.test(salesSrc))
-  check('H-MUT7: the script guard catches a pixel added back to the page',
+    !/<script/.test(salesSrc))
+  check('H-MUT7: the script guard catches a script added to the page',
     /<script/.test(`${salesSrc}\n<script async src={pixel} />`))
+  check('H17b: the pixel is rendered only through the consent-gated component, never as a bare tag',
+    /<MarketplacePixel/.test(salesSrc)
+    && /from '@\/components\/consent\/MarketplacePixel'/.test(salesSrc)
+    && !/<img/.test(salesSrc))
+  check('H-MUT9: the bare-tag guard catches the platform snippet pasted straight in',
+    /<img/.test(`${salesSrc}\n<img src={pixelUrl} width={1} height={1} />`))
+  check('H17c: …and only when one is configured, so an unconfigured platform still renders nothing',
+    /pixelUrl \? \(/.test(salesSrc) && /marketplacePixelUrl\(provider\.slug\)/.test(salesSrc))
+  {
+    // The gate itself, read from the component rather than asserted about it.
+    const pixelSrc = readFileSync('components/consent/MarketplacePixel.tsx', 'utf8')
+    check('H17d: the component shows nothing until marketing has been granted',
+      /marketingBeaconAllowed\(currentChoices\(\)\)/.test(pixelSrc)
+      && /choices\.marketing === true/.test(pixelSrc)
+      && /if \(!allowed\) return null/.test(pixelSrc))
+    check('H17e: …and re-reads the decision when it changes, so a withdrawal removes it',
+      /addEventListener\(CONSENT_CHANGED_EVENT/.test(pixelSrc)
+      && /removeEventListener\(CONSENT_CHANGED_EVENT/.test(pixelSrc))
+    check('H-MUT13: the gate guard catches the marketing check swapped for analytics',
+      !/choices\.marketing === true/.test(
+        pixelSrc.replace('choices.marketing === true', 'choices.analytics === true')))
+
+    // H17f. THE DENIED CASE, PROVEN. Everything above reads the file; a gate
+    // can be deleted and a file still mention the word. These call the real
+    // gate with every state the consent store is able to hand a mount, and
+    // render the real component for the frame the visitor actually gets before
+    // any effect has run - which is the frame the beacon must not be in.
+    const state = (marketing: boolean, analytics = false): ConsentChoices =>
+      ({ necessary: true, analytics, marketing })
+    check('H17f: no decision yet - the store returns CONSENT_DENIED and the beacon is refused',
+      marketingBeaconAllowed(CONSENT_DENIED) === false)
+    check('H17g: a reject-all - refused',
+      marketingBeaconAllowed(state(false)) === false)
+    check('H17h: analytics allowed, marketing refused - still refused, because the categories are honoured apart',
+      marketingBeaconAllowed(state(false, true)) === false)
+    check('H17i: marketing granted - and only then is it allowed',
+      marketingBeaconAllowed(state(true)) === true)
+    check('H17j: a record with no marketing key at all is refused, not treated as a grant',
+      marketingBeaconAllowed({ necessary: true, analytics: true } as unknown as ConsentChoices) === false)
+    const firstPaint = renderToStaticMarkup(
+      createElement(MarketplacePixel, { src: 'https://i.jvzoo.com/0/457483/99', alt: '' }))
+    check('H17k: the component renders NOTHING on the pre-consent paint, so i.jvzoo.com is never in the document',
+      firstPaint === '' && !firstPaint.includes('jvzoo'))
+    check('H-MUT14: the denied-case guard catches a gate that was taken out',
+      renderToStaticMarkup(createElement(
+        function UngatedPixel({ src }: { src: string }) {
+          return createElement('img', { src, alt: '', width: 1, height: 1 })
+        }, { src: 'https://i.jvzoo.com/0/457483/99' })).includes('jvzoo'))
+    check('H-MUT15: …and the state guard catches a gate loosened to anything truthy',
+      ((choices: ConsentChoices) => Boolean(choices.marketing))(
+        { necessary: true, analytics: true, marketing: 1 as unknown as boolean }) === true
+      && marketingBeaconAllowed(
+        { necessary: true, analytics: true, marketing: 1 as unknown as boolean }) === false)
+  }
   // Our refund policy says WE do not refund, which is not this buyer's
   // policy: their seller is the platform.
   check('H18: it does not point the buyer at our refund policy, which is not theirs',
@@ -393,6 +672,82 @@ async function main() {
   const brokenLinks = '<Link href="/en/pricing">Pricing</Link>'
   check('H-MUT4: the outbound-link guard catches a link the platforms forbid',
     !(brokenLinks.match(/<Link href="\/[^"]+"/g) ?? []).every((l) => /terms|privacy/.test(l)))
+
+  // ── L. The beacon's lawful basis, which is three files or none ──────────────
+  // The gate above proves the beacon waits for a marketing grant. It does not
+  // prove the grant COVERS it. Until 2026-10-29 the category named a closed
+  // list of two recipients, the Google and Meta networks, so a stored grant
+  // did not reach an affiliate marketplace; widening what an existing grant
+  // covers is not consent. Three things make the wording lawful and they are
+  // worthless apart: the category naming JVZoo in every language a visitor can
+  // decide in, the privacy document naming JVZoo as a recipient in that same
+  // language, and a policy version later than the old wording, which is what
+  // turns the old stored decisions back into questions. A deploy carrying any
+  // two of the three leaves the beacon firing on a grant nobody gave, so this
+  // section fails on the missing one rather than on the beacon.
+  console.log('\nL. the beacon\'s lawful basis across the six languages')
+  const CONSENT_LOCALES = ['he', 'en', 'es', 'pt-BR', 'fr', 'it'] as const
+  const PRIVACY_DOC: Record<string, string> = {
+    he: 'app/(legal)/privacy/page.tsx',
+    en: 'app/(public)/en/privacy/page.tsx',
+    es: 'content/legal/es/privacy.md',
+    'pt-BR': 'content/legal/pt-BR/privacy.md',
+    fr: 'content/legal/fr/privacy.md',
+    it: 'content/legal/it/privacy.md',
+  }
+  /** The marketing category's own description, cut out of the public dictionary. */
+  const marketingDesc = (locale: string): string => {
+    const dict = read(`lib/i18n/public/${locale}.ts`)
+    const at = dict.indexOf('marketing:')
+    if (at < 0) return ''
+    const desc = dict.slice(at).match(/desc:\s*'((?:[^'\\]|\\.)*)'/)
+    return desc?.[1] ?? ''
+  }
+  /** The consent condition as each document actually words it, inside the JVZoo entry. */
+  const BEACON_CONSENT_CLAUSE: Record<string, string> = {
+    he: 'התמונה נטענת רק לאחר שאישרת עוגיות שיווק',
+    en: 'image loads only after you have accepted marketing cookies',
+    es: 'después de que usted haya aceptado las cookies de marketing',
+    'pt-BR': 'depois de você aceitar os cookies de marketing',
+    fr: 'après votre acceptation des cookies de marketing',
+    it: 'dopo che Lei ha accettato i cookie di marketing',
+  }
+  for (const locale of CONSENT_LOCALES) {
+    const desc = marketingDesc(locale)
+    check(`L1 (${locale}): the marketing category names JVZoo, so the grant reaches the beacon`,
+      desc.includes('JVZoo'), desc.slice(0, 60))
+    check(`L2 (${locale}): …and it still names the two networks it always covered`,
+      /Google/.test(desc) && /Meta/.test(desc))
+    const doc = read(PRIVACY_DOC[locale])
+    check(`L3 (${locale}): the privacy document names JVZoo as a recipient`,
+      doc.includes('JVZoo'))
+    // The clause has to be found INSIDE the recipients entry, not merely
+    // somewhere near the word "marketing". The first version of this check
+    // looked for JVZoo within 1200 characters of "marketing" anywhere in the
+    // document, and the marketing CATEGORY — which names JVZoo twice and is
+    // called Marketing — satisfied that window on its own, so the check passed
+    // with the consent condition deleted from the entry. The legal thread
+    // reproduced it on the Spanish document. Bind it to the sentence instead,
+    // the way this repo's other legal guards do, and prove the deletion fails.
+    const clause = BEACON_CONSENT_CLAUSE[locale]
+    const inEntry = (text: string) =>
+      new RegExp(`JVZoo\\s*:[\\s\\S]{0,700}${clause.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}`).test(text)
+    check(`L4 (${locale}): the entry ITSELF says the image waits for the marketing consent`,
+      inEntry(doc), clause)
+    check(`L-MUT4 (${locale}): …and deleting that clause from the real document fails it`,
+      !inEntry(doc.replace(clause, '')))
+  }
+  const consentPolicy = code('lib/consent/categories.ts')
+  const policyVersion = consentPolicy.match(/CONSENT_POLICY_VERSION = '([^']+)'/)?.[1] ?? ''
+  check('L5: the policy version is later than the two-recipient wording, so stored grants are re-asked',
+    policyVersion >= '2026-10-29', policyVersion)
+  // L1 and L3 are substring tests on the real files, so they cannot pass for
+  // the wrong reason and their "controls" would only restate them; the two
+  // one rule with indirection is controlled instead: L-MUT4 above deletes the
+  // clause from the real document. This one is for the comparison itself, because
+  // the threshold is a date and the operator is lexicographic.
+  check('L-MUT2: the version guard catches a deploy that widens the category without re-asking',
+    !('2026-10-03' >= '2026-10-29') && '2026-11-01' >= '2026-10-29')
 
   // ── J. The cancellation route the buyer is actually given ───────────────────
   console.log('\nJ. cancelling a marketplace plan')
