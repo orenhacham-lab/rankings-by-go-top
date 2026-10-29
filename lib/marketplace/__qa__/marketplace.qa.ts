@@ -673,6 +673,60 @@ async function main() {
   check('H-MUT4: the outbound-link guard catches a link the platforms forbid',
     !(brokenLinks.match(/<Link href="\/[^"]+"/g) ?? []).every((l) => /terms|privacy/.test(l)))
 
+  // ── L. The beacon's lawful basis, which is three files or none ──────────────
+  // The gate above proves the beacon waits for a marketing grant. It does not
+  // prove the grant COVERS it. Until 2026-10-29 the category named a closed
+  // list of two recipients, the Google and Meta networks, so a stored grant
+  // did not reach an affiliate marketplace; widening what an existing grant
+  // covers is not consent. Three things make the wording lawful and they are
+  // worthless apart: the category naming JVZoo in every language a visitor can
+  // decide in, the privacy document naming JVZoo as a recipient in that same
+  // language, and a policy version later than the old wording, which is what
+  // turns the old stored decisions back into questions. A deploy carrying any
+  // two of the three leaves the beacon firing on a grant nobody gave, so this
+  // section fails on the missing one rather than on the beacon.
+  console.log('\nL. the beacon\'s lawful basis across the six languages')
+  const CONSENT_LOCALES = ['he', 'en', 'es', 'pt-BR', 'fr', 'it'] as const
+  const PRIVACY_DOC: Record<string, string> = {
+    he: 'app/(legal)/privacy/page.tsx',
+    en: 'app/(public)/en/privacy/page.tsx',
+    es: 'content/legal/es/privacy.md',
+    'pt-BR': 'content/legal/pt-BR/privacy.md',
+    fr: 'content/legal/fr/privacy.md',
+    it: 'content/legal/it/privacy.md',
+  }
+  /** The marketing category's own description, cut out of the public dictionary. */
+  const marketingDesc = (locale: string): string => {
+    const dict = read(`lib/i18n/public/${locale}.ts`)
+    const at = dict.indexOf('marketing:')
+    if (at < 0) return ''
+    const desc = dict.slice(at).match(/desc:\s*'((?:[^'\\]|\\.)*)'/)
+    return desc?.[1] ?? ''
+  }
+  for (const locale of CONSENT_LOCALES) {
+    const desc = marketingDesc(locale)
+    check(`L1 (${locale}): the marketing category names JVZoo, so the grant reaches the beacon`,
+      desc.includes('JVZoo'), desc.slice(0, 60))
+    check(`L2 (${locale}): …and it still names the two networks it always covered`,
+      /Google/.test(desc) && /Meta/.test(desc))
+    const doc = read(PRIVACY_DOC[locale])
+    check(`L3 (${locale}): the privacy document names JVZoo as a recipient`,
+      doc.includes('JVZoo'))
+    check(`L4 (${locale}): …and says the image waits for the marketing consent`,
+      /JVZoo[\s\S]{0,1200}marketing|marketing[\s\S]{0,1200}JVZoo|JVZoo[\s\S]{0,1200}שיווק|שיווק[\s\S]{0,1200}JVZoo/.test(doc))
+  }
+  const consentPolicy = code('lib/consent/categories.ts')
+  const policyVersion = consentPolicy.match(/CONSENT_POLICY_VERSION = '([^']+)'/)?.[1] ?? ''
+  check('L5: the policy version is later than the two-recipient wording, so stored grants are re-asked',
+    policyVersion >= '2026-10-29', policyVersion)
+  check('L-MUT1: the category guard catches the old two-network wording coming back',
+    !'Measuring how our ads perform and showing relevant ads on the Google and Meta networks.'
+      .includes('JVZoo'))
+  check('L-MUT2: the version guard catches a deploy that widens the category without re-asking',
+    !('2026-10-03' >= '2026-10-29'))
+  check('L-MUT3: the recipient guard catches a privacy document that never names the platform',
+    !'We share data with Google and with Meta, and with nobody else.'.includes('JVZoo'))
+
   // ── J. The cancellation route the buyer is actually given ───────────────────
   console.log('\nJ. cancelling a marketplace plan')
   const BILLING_PAGE = 'app/(dashboard)/billing/page.tsx'

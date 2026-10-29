@@ -255,7 +255,7 @@ Clasificamos las cookies en tres categorías, y le consultamos sobre dos de ella
 
 - **Estrictamente necesarias:** inicio de sesión, recordar el idioma de su interfaz, seguridad y prevención de abusos. El servicio no puede funcionar sin ellas, por lo que no requieren consentimiento.
 - **Medición:** cuántas personas visitaron el sitio, qué páginas leyeron y qué no funcionó. Se cargan solo si usted lo permite.
-- **Marketing:** medir el rendimiento de nuestros anuncios y mostrar anuncios relevantes en las redes de Google y Meta. Se cargan solo si usted lo permite. Permitir esta categoría cubre también un informe de conversión que enviamos a Meta desde nuestro servidor, sin ninguna cookie; véase la sección Publicidad en Meta.
+- **Marketing:** medir el rendimiento de nuestros anuncios, mostrar anuncios relevantes en las redes de Google y Meta, y atribuir una compra al afiliado que le remitió a través del marketplace JVZoo. Se cargan solo si usted lo permite. Permitir esta categoría cubre también un informe de conversión que enviamos a Meta desde nuestro servidor, sin ninguna cookie —véase la sección Publicidad en Meta—, y una imagen de seguimiento que se carga desde JVZoo en la página de venta del marketplace y que no almacena nada en su dispositivo.
 
 **Antes de que usted elija, no se instala ninguna cookie de medición ni de marketing y no se realiza ninguna solicitud a los servidores de Google.** Aceptar y rechazar son dos botones iguales en el aviso, y cada categoría puede permitirse por separado.
 
@@ -275,7 +275,7 @@ Nuestras herramientas de medición y marketing se gestionan a través de Google 
 - **Google Ads:** medición de conversiones y publicidad personalizada (sujeto al consentimiento de marketing)
 - **Meta Pixel:** medición de conversiones y publicidad en Facebook e Instagram (sujeto al consentimiento de marketing)
 
-Las herramientas activas cambian de vez en cuando. Lo que no cambia: ninguna se carga antes de que usted haya permitido su categoría, y retirar su consentimiento detiene la recopilación. Además de estas herramientas, que funcionan en el navegador, enviamos a Meta un informe de conversión desde nuestro servidor; también está sujeto al consentimiento de marketing y se detiene cuando usted lo retira.
+Las herramientas activas cambian de vez en cuando. Lo que no cambia: ninguna se carga antes de que usted haya permitido su categoría, y retirar su consentimiento detiene la recopilación. Además de estas herramientas, que funcionan en el navegador, enviamos a Meta un informe de conversión desde nuestro servidor; también está sujeto al consentimiento de marketing y se detiene cuando usted lo retira. Una cosa más no pasa por Google Tag Manager: únicamente en la página de venta del marketplace JVZoo se carga desde JVZoo una imagen de seguimiento de un píxel, para poder atribuir una compra al afiliado que le remitió. No almacena nada en su dispositivo, se carga solo después de que usted haya permitido el marketing y no aparece en ninguna otra página del sitio.
 
 Declaramos su estado de consentimiento a Google mediante el protocolo Consent Mode v2, de modo que las herramientas quedan sujetas a su elección incluso si en el futuro añadimos una etiqueta nueva.
 

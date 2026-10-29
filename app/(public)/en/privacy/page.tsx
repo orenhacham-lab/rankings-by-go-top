@@ -638,10 +638,12 @@ export default function EnglishPrivacyPage() {
           security and abuse prevention. The service cannot run without them, so they need no consent.</li>
           <li><strong>Measurement:</strong> how many people visited, which pages they read and what
           did not work. Loaded only if you allow it.</li>
-          <li><strong>Marketing:</strong> measuring how our ads perform and showing relevant ads on
-          the Google and Meta networks. Loaded only if you allow it. Allowing this category also covers
-          a conversion report we send to Meta from our server with no cookie at all — see the Meta
-          Advertising section.</li>
+          <li><strong>Marketing:</strong> measuring how our ads perform, showing relevant ads on
+          the Google and Meta networks, and attributing a purchase to the affiliate who referred
+          you through the JVZoo marketplace. Loaded only if you allow it. Allowing this category
+          also covers a conversion report we send to Meta from our server with no cookie at all
+          &mdash; see the Meta Advertising section &mdash; and a tracking image loaded from JVZoo
+          on the marketplace sales page, which stores nothing on your device.</li>
         </ul>
         <p className="mt-4">
           <strong>Before you choose, no measurement or marketing cookie is set and no request is
@@ -691,6 +693,11 @@ export default function EnglishPrivacyPage() {
           before you have allowed its category, and withdrawing your consent stops the collection.
           Besides these tools, which run in the browser, we send Meta a conversion report from our
           server; it too is subject to marketing consent and stops when that consent is withdrawn.
+          One further thing runs outside Google Tag Manager: on the JVZoo marketplace sales
+          page only, a one-pixel tracking image is loaded from JVZoo so that a purchase can be
+          attributed to the affiliate who referred you. It stores nothing on your device, it
+          loads only after you have allowed marketing, and it appears on no other page of the
+          site.
         </p>
         <p className="mt-4">
           We declare your consent state to Google through the Consent Mode v2 protocol, so the tools

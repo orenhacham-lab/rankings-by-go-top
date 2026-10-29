@@ -1248,7 +1248,7 @@ const CAPI_JOINT: Record<string, RegExp> = {
  * consent is not specific to what we then do with it (Art. 4(11)). */
 const CAPI_CATEGORY: Record<string, RegExp> = {
   he: /האישור בקטגוריה הזאת חל גם על דיווח המרה שאנו שולחים\s*ל-Meta מהשרת שלנו בלי עוגייה כלל/,
-  en: /Allowing this category also covers\s*a conversion report we send to Meta from our server with no cookie at all/,
+  en: /Allowing this category\s*also covers\s*a conversion report we send to Meta from our server with no cookie at all/,
   es: /Permitir esta categoría cubre también un informe de\s*conversión que enviamos a Meta desde nuestro servidor, sin ninguna cookie/,
   'pt-BR': /Permitir esta categoria vale também para um relatório de conversão que enviamos à Meta do nosso\s*servidor, sem cookie nenhum/,
   fr: /Autoriser cette cat[ée]gorie vaut aussi pour un rapport de conversion que nous envoyons [àa] Meta depuis notre serveur, sans aucun cookie/,
