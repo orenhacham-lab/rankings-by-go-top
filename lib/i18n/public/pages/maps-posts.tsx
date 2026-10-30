@@ -59,6 +59,7 @@ const es = FEATURE_COMMON.es
 const pt = FEATURE_COMMON['pt-BR']
 const fr = FEATURE_COMMON.fr
 const it = FEATURE_COMMON.it
+const ja = FEATURE_COMMON.ja
 
 export const MAPS_POSTS_PAGE: MarketingPage = {
   path: '/features/google-maps-posts',
@@ -86,6 +87,10 @@ export const MAPS_POSTS_PAGE: MarketingPage = {
     it: {
       title: 'Post Google Maps | Go Top SEO',
       description: 'Dall’applicazione si pubblicano novità con foto e pulsante sul profilo Google Business Profile: una prima bozza è pronta, si corregge e si pubblica subito o all’ora scelta. E nello stesso posto si risponde alle recensioni Google.',
+    },
+    ja: {
+      title: 'Googleマップの投稿 | Go Top SEO',
+      description: 'アプリから、写真とボタン付きのお知らせをGoogleビジネスプロフィールに公開できます。最初の下書きが用意されるので、手直ししてすぐに公開するか、お選びの時刻に公開します。Googleの口コミへの返信も同じ場所で行えます。',
     },
   },
   content: {
@@ -144,7 +149,7 @@ export const MAPS_POSTS_PAGE: MarketingPage = {
             { icon: MousePointerClick, title: 'כפתור שמוביל לפעולה', body: 'מידע נוסף, הזמנת תור, הזמנה אונליין, קנייה, הרשמה או התקשרו. הכפתור מוביל לעמוד באתר שלכם, ואפשר גם לאתר אחר כמו מערכת זימון תורים. "התקשרו" מחייג למספר שבפרופיל.' },
             { icon: Eye, title: 'רואים לפני שמפרסמים', body: 'לצד הכתיבה יש תצוגה מקדימה של הפוסט: שם העסק, התמונה, הטקסט והכפתור, כדי שלא יהיו הפתעות.' },
             { icon: Type, title: 'בתוך הכללים של גוגל', body: 'מונה תווים עד 1,500, המגבלה של גוגל. אם יש בטקסט מספר טלפון תקבלו התראה, כי גוגל מגבילה טלפונים בפוסטים, ולשיחות יש את הכפתור "התקשרו".' },
-            { icon: Languages, title: 'בשפה של הלקוחות', body: 'הטיוטה נכתבת בעברית, באנגלית, בספרדית או בפורטוגזית, ואתם תמיד יכולים לשנות כל מילה לפני הפרסום.' },
+            { icon: Languages, title: 'בשפה של הלקוחות', body: 'הטיוטה נכתבת בשפת הפרויקט, בכל אחת מהשפות שהמערכת תומכת בהן, ואתם תמיד יכולים לשנות כל מילה לפני הפרסום.' },
             { icon: ShieldCheck, title: 'רק מה שאישרתם', body: 'מתפרסמים רק פוסטים ותשובות שאישרתם, או פוסטים אוטומטיים אם הפעלתם אותם. שעות הפתיחה, הכתובת ושאר פרטי העסק לא משתנים.' },
           ],
         },
@@ -259,7 +264,7 @@ export const MAPS_POSTS_PAGE: MarketingPage = {
             { icon: MousePointerClick, title: 'A button that leads somewhere', body: 'Learn more, Book, Order online, Buy, Sign up or Call now. The button leads to a page on your site, or to another site such as a booking system if you allow it. Call now dials the number on your profile.' },
             { icon: Eye, title: 'See it before it goes out', body: 'Next to the editor there is a preview of the post: the business name, the photo, the text and the button, so nothing comes as a surprise.' },
             { icon: Type, title: 'Within Google’s rules', body: 'A character counter up to 1,500, Google’s limit. If the text has a phone number you get a warning, because Google restricts phone numbers in posts, and calls have the Call now button.' },
-            { icon: Languages, title: 'In your customers’ language', body: 'The draft is written in Hebrew, English, Spanish or Portuguese, and you can always change any word before publishing.' },
+            { icon: Languages, title: 'In your customers’ language', body: 'The draft is written in your project’s language, in any of the languages the app supports, and you can always change any word before publishing.' },
             { icon: ShieldCheck, title: 'Only what you approved', body: 'Only posts and replies you approved go out, plus automatic posts if you turned them on. Opening hours, address and the rest of the business details are never changed.' },
           ],
         },
@@ -375,7 +380,7 @@ export const MAPS_POSTS_PAGE: MarketingPage = {
             { icon: MousePointerClick, title: 'Un botón que lleva a la acción', body: 'Más información, Reservar, Pedir online, Comprar, Registrarse o Llamar ahora. El botón lleva a una página de tu sitio o, si lo permites, a otro sitio, como un sistema de citas. Llamar ahora marca el número de tu perfil.' },
             { icon: Eye, title: 'La ves antes de publicarla', body: 'Junto al editor hay una vista previa de la publicación: el nombre del negocio, la foto, el texto y el botón, para que no haya sorpresas.' },
             { icon: Type, title: 'Dentro de las reglas de Google', body: 'Un contador de caracteres hasta 1500, el límite de Google. Si el texto lleva un número de teléfono recibes un aviso, porque Google limita los teléfonos en las publicaciones, y para las llamadas está el botón Llamar ahora.' },
-            { icon: Languages, title: 'En el idioma de tus clientes', body: 'El borrador se escribe en hebreo, inglés, español o portugués, y siempre puedes cambiar cualquier palabra antes de publicar.' },
+            { icon: Languages, title: 'En el idioma de tus clientes', body: 'El borrador se escribe en el idioma de tu proyecto, en cualquiera de los idiomas que admite la aplicación, y siempre puedes cambiar cualquier palabra antes de publicar.' },
             { icon: ShieldCheck, title: 'Solo lo que apruebas', body: 'Solo salen las publicaciones y respuestas que apruebas, y las automáticas si las activaste. El horario, la dirección y el resto de los datos del negocio no se tocan.' },
           ],
         },
@@ -491,7 +496,7 @@ export const MAPS_POSTS_PAGE: MarketingPage = {
             { icon: MousePointerClick, title: 'Um botão que leva à ação', body: 'Saiba mais, Reservar, Pedir online, Comprar, Cadastrar-se ou Ligar agora. O botão leva a uma página do seu site ou, se você permitir, a outro site, como um sistema de agendamento. Ligar agora disca o número do seu perfil.' },
             { icon: Eye, title: 'Veja antes de publicar', body: 'Ao lado do editor há uma prévia do post: o nome do negócio, a foto, o texto e o botão, para não ter surpresas.' },
             { icon: Type, title: 'Dentro das regras do Google', body: 'Um contador de caracteres até 1.500, o limite do Google. Se o texto tiver um número de telefone, você recebe um aviso, porque o Google restringe telefones nos posts, e para ligações existe o botão Ligar agora.' },
-            { icon: Languages, title: 'No idioma dos seus clientes', body: 'O rascunho é escrito em hebraico, inglês, espanhol ou português, e você sempre pode mudar qualquer palavra antes de publicar.' },
+            { icon: Languages, title: 'No idioma dos seus clientes', body: 'O rascunho é escrito no idioma do seu projeto, em qualquer um dos idiomas que o aplicativo oferece, e você sempre pode mudar qualquer palavra antes de publicar.' },
             { icon: ShieldCheck, title: 'Só o que você aprovou', body: 'Só saem os posts e as respostas que você aprovou, e os automáticos se você os ativou. Horário de funcionamento, endereço e os outros dados do negócio não são alterados.' },
           ],
         },
@@ -607,7 +612,7 @@ export const MAPS_POSTS_PAGE: MarketingPage = {
             { icon: MousePointerClick, title: 'Un bouton qui mène à une action', body: 'En savoir plus, Réserver, Commander en ligne, Acheter, S’inscrire ou Appeler. Le bouton mène à une page de votre site ou, si vous l’autorisez, à un autre site comme un outil de réservation. Appeler compose le numéro de votre fiche.' },
             { icon: Eye, title: 'Voyez avant de publier', body: 'À côté de l’éditeur, un aperçu du post : le nom de l’établissement, la photo, le texte et le bouton, pour éviter toute surprise.' },
             { icon: Type, title: 'Dans les règles de Google', body: 'Un compteur de caractères jusqu’à 1 500, la limite de Google. Si le texte contient un numéro de téléphone, vous recevez un avertissement, car Google limite les numéros dans les posts, et pour les appels il y a le bouton Appeler.' },
-            { icon: Languages, title: 'Dans la langue de vos clients', body: 'Le brouillon est rédigé en français, en hébreu, en anglais, en espagnol ou en portugais, et vous pouvez toujours changer chaque mot avant de publier.' },
+            { icon: Languages, title: 'Dans la langue de vos clients', body: 'Le brouillon est rédigé dans la langue de votre projet, dans chacune des langues que prend en charge l’application, et vous pouvez toujours changer chaque mot avant de publier.' },
             { icon: ShieldCheck, title: 'Uniquement ce que vous avez validé', body: 'Seuls partent les posts et les réponses que vous avez validés, plus les posts automatiques si vous les avez activés. Les horaires, l’adresse et les autres informations de l’établissement ne sont jamais modifiés.' },
           ],
         },
@@ -723,7 +728,7 @@ export const MAPS_POSTS_PAGE: MarketingPage = {
             { icon: MousePointerClick, title: 'Un pulsante che porta a un’azione', body: 'Scopri di più, Prenota, Ordina online, Acquista, Iscriviti o Chiama. Il pulsante porta a una pagina del sito oppure, se autorizzato, a un altro sito come uno strumento di prenotazione. Chiama compone il numero del profilo.' },
             { icon: Eye, title: 'Si vede prima di pubblicare', body: 'Accanto all’editor, un’anteprima del post: il nome della sede, la foto, il testo e il pulsante, per evitare qualsiasi sorpresa.' },
             { icon: Type, title: 'Nelle regole di Google', body: 'Un contatore di caratteri fino a 1.500, il limite di Google. Se il testo contiene un numero di telefono compare un avviso, perché Google limita i numeri nei post, e per le chiamate c’è il pulsante Chiama.' },
-            { icon: Languages, title: 'Nella lingua dei clienti', body: 'La bozza viene scritta in italiano, ebraico, inglese, spagnolo, portoghese o francese, e ogni parola si può cambiare prima di pubblicare.' },
+            { icon: Languages, title: 'Nella lingua dei clienti', body: 'La bozza viene scritta nella lingua del progetto, in ognuna delle lingue che l’applicazione supporta, e ogni parola si può cambiare prima di pubblicare.' },
             { icon: ShieldCheck, title: 'Solo ciò che è stato approvato', body: 'Partono solo i post e le risposte approvati, più i post automatici se sono stati attivati. Gli orari, l’indirizzo e le altre informazioni della sede non vengono mai modificati.' },
           ],
         },
@@ -783,6 +788,128 @@ export const MAPS_POSTS_PAGE: MarketingPage = {
         },
       ],
       cta: { title: 'Mostri ai suoi clienti che cosa c’è di nuovo', body: it.closeBody, primary: it.trial, secondary: it.check },
+    },
+    // JAPANESE. The sample business, the review author and the class times are
+    // Japanese, because a Via Roma gym in a Japanese screenshot reads as a
+    // translation left half-finished. The two honest limits are kept word for
+    // word: the AI image is generic and never a photo of the business, and
+    // there is no promise of a position on Maps or in search — in Japanese that
+    // second one is also what 景品表示法 requires of a performance claim.
+    ja: {
+      hero: {
+        eyebrow: 'Googleマップの投稿',
+        eyebrowIcon: MapPinned,
+        title: 'Googleビジネスプロフィールを、',
+        accent: '時間がないときも最新の状態に',
+        subtitle: 'Googleマップでお店を見つけた人が、今何があるかを目にします。キャンペーン、新しいサービス、公開したばかりの記事などです。アプリから写真とボタン付きの投稿を書くと、最初の下書きが届きます。手直しして、すぐに公開するか、お選びの時刻に公開します。口コミへの返信も同じ場所で行えます。',
+        trust: ja.trust,
+        primary: ja.trial,
+        secondary: ja.check,
+        visual: (
+          <MapsPostVisual
+            business="青山スポーツジム"
+            kind="お知らせ · 木曜 10:00"
+            text="50歳以上の方向けの朝のグループレッスンを新設しました。月曜と水曜の7時からです。担当トレーナーが付き、少人数で、体験レッスンは無料、継続の縛りもありません。"
+            button="予約する"
+            queueHeading="投稿一覧"
+            queue={[
+              { title: '50歳以上の方向けの朝のレッスン', detail: '木曜10:00に予約', status: '予約済み', done: false },
+              { title: 'ガイド：ランニングシューズの選び方', detail: 'サイトの新しい記事から', status: '公開中', auto: true, done: true },
+            ]}
+            review={{
+              heading: '新しい口コミ',
+              author: '田中 ゆ.',
+              stars: 5,
+              starsLabel: '5つ星のうち5',
+              text: '清潔な施設で、トレーナーの方も丁寧、雰囲気もいいです。半年通っています。',
+              replyLabel: '返信の下書き',
+              reply: 'うれしいお言葉をありがとうございます。気持ちよくご利用いただけているようで何よりです。次回のレッスンでお待ちしております。',
+            }}
+          />
+        ),
+      },
+      sections: [
+        {
+          kind: 'steps',
+          eyebrow: '進め方',
+          title: '連携から公開まで',
+          items: [
+            { title: '連携は一度だけ', body: 'Googleビジネスプロフィールを管理しているGoogleアカウントでログインし、Googleの画面で承認します。権限はプロフィールの管理のみで、Search Consoleとは別です。いつでも解除できます。' },
+            { title: '店舗を選ぶ', body: 'アプリがGoogleで管理中の店舗を一覧表示しますので、このサイトの投稿先となる店舗をお選びください。' },
+            { title: '書く、または下書きから始める', body: 'システムがサイト向けに書いた記事から始める、ご自身で入力した題材から始める、白紙から始める、のいずれでも可能です。Googleの文字数制限の中で最初の下書きが届きますので、ご自由に手直しいただけます。' },
+            { title: '公開または予約', body: 'すぐに公開するか、お選びの日時に、最大1年先まで予約できます。投稿の一覧で、公開中のもの、予約済みのもの、Googleが審査中のものがわかります。' },
+          ],
+        },
+        {
+          kind: 'cards',
+          eyebrow: 'どの投稿にも',
+          title: '見栄えの整った投稿',
+          items: [
+            { icon: Crop, title: '適切なサイズの写真', body: '写真をアップロードし、Googleの表示に合わせて4:3で切り抜きます。拡大と位置の調整もできます。記事から書いた投稿では、その記事の画像をワンクリックで使えます。' },
+            { icon: ImagePlus, title: '題材から書く投稿用の画像', body: 'ご自身で入力した題材から投稿を書くとき、AIでイメージ画像を作成するようアプリに指示できます。これは一般的な画像で、その事業、従業員、商品の写真ではありません。お選びになった場合にのみ投稿に入ります。' },
+            { icon: MousePointerClick, title: '行動につながるボタン', body: '詳細、予約、オンライン注文、購入、登録、電話のいずれかです。ボタンはサイトのページに移動しますし、許可すれば予約システムなど別のサイトにも移動できます。「電話」はプロフィールに登録された番号に発信します。' },
+            { icon: Eye, title: '公開前に確認できます', body: '編集画面のとなりに投稿のプレビューがあります。店舗名、写真、本文、ボタンが表示されるので、思いがけない仕上がりになりません。' },
+            { icon: Type, title: 'Googleのルールの中で', body: '文字数は1,500字まで、Googleの制限に合わせて数えます。本文に電話番号が含まれていると注意が表示されます。Googleは投稿内の電話番号を制限しており、電話には「電話」ボタンがあるためです。' },
+            { icon: Languages, title: '顧客の言語で', body: '下書きはプロジェクトの言語、すなわちアプリが対応しているいずれの言語でも作成され、公開前にどの語句も変更できます。' },
+            { icon: ShieldCheck, title: 'ご承認いただいたものだけ', body: 'ご承認いただいた投稿と返信、そして自動投稿を有効にした場合の自動投稿だけが公開されます。営業時間、住所、そのほかの店舗情報は一切変更されません。' },
+          ],
+        },
+        {
+          kind: 'cards',
+          tone: 'contrast',
+          eyebrow: '自動投稿',
+          title: 'サイトに新しい記事が出れば、Googleにも新しい投稿',
+          items: [
+            { icon: Zap, title: '自動で行われます', body: '有効にすると、システムがサイトに公開した記事はすべて、Googleビジネスプロフィールの短い投稿にもなります。記事の画像と、その記事に移動する「詳細」ボタンが付きます。' },
+            { icon: ToggleLeft, title: '有効にするまでは無効です', body: '初期設定では無効で、サイトごとに設定します。自動投稿はお読みいただく前に公開されるため、判断はお客様にお任せしています。いつでも無効にでき、すでに公開された投稿はそのまま残ります。' },
+            { icon: Repeat, title: '1記事につき一度だけ', body: '同じ記事がプロフィールに二度公開されることはありません。サイトへの公開が再試行された場合も同じです。プロフィールが重複した投稿で埋まることはありません。' },
+          ],
+        },
+        {
+          kind: 'cards',
+          columns: 2,
+          eyebrow: 'Googleの口コミ',
+          title: 'すべての口コミに、一つの場所から返信',
+          items: [
+            { icon: MessageSquareText, title: 'すべての口コミが一覧できます', body: '店舗のGoogleの口コミを、平均評価、返信待ちの件数とともに表示し、新しいものには印が付きます。評価順に並べ替えられます。' },
+            { icon: Sparkles, title: 'ワンクリックで返信の下書き', body: '顧客が書いた言語で、礼儀正しく要点を押さえた返信案が届きます。手直しして送信すると、Googleの口コミの下に返信が表示されます。' },
+            { icon: PenLine, title: '編集も削除も', body: '公開済みの返信は編集も削除もできます。口コミ自体はそのまま残ります。' },
+            { icon: Lock, title: '口コミは当社に保存されません', body: '口コミは画面を開くたびにGoogleから読み取り、システムには保存しません。下書きの作成に顧客の名前は送信しませんので、名前で呼びかけたい場合はご自身で加えてください。' },
+          ],
+        },
+        {
+          kind: 'callout',
+          icon: Info,
+          title: '知っておいていただきたいこと',
+          body: (
+            <>
+              <p>
+                Googleは表示前にすべての投稿を審査し、ときに投稿を却下します。投稿の一覧では、却下されたものも含め、
+                それぞれの状況がわかります。連携には、Googleビジネスプロフィールのオーナーまたは管理者である
+                Googleアカウントが必要です。
+              </p>
+              <p>
+                Go Top SEOはGoogleとは関係のない独立した事業者です。投稿や口コミへの返信は、活動している事業だと
+                顧客に伝わる助けになりますが、Googleマップや検索での掲載順位をお約束するものではありません。
+              </p>
+            </>
+          ),
+        },
+        {
+          kind: 'faq',
+          eyebrow: 'よくある質問',
+          title: 'Googleマップの投稿について聞かれること',
+          items: [
+            { q: 'アプリが営業時間や住所を変更することはありますか', a: 'いいえ。当社が公開するのは投稿と口コミへの返信だけです。営業時間、住所、電話番号、そのほかのプロフィールの情報はそのまま残ります。' },
+            { q: '下書きが自動で公開されますか', a: '投稿を書く場合は公開されません。下書きは画面に表示され、ボタンを押したときにだけ公開されます。新しい記事についての投稿が自動で公開されるのは、自動投稿を有効にした場合だけです。' },
+            { q: '投稿を事前に予約できますか', a: 'はい。お選びの日時に、最大1年先まで予約できます。予約した投稿は、公開される前であれば取り消せます。' },
+            { q: 'Shopifyの店舗や、WordPress以外のサイトでも動きますか', a: 'はい。投稿はサイトではなくGoogleビジネスプロフィールに公開されるため、どのプラットフォームのどのプロジェクトでも動きます。' },
+            { q: '連携を解除するとどうなりますか', a: '予約した投稿は、再度連携するまで公開されません。すでに公開された投稿はGoogleに残ります。' },
+            { q: 'Googleで複数の店舗を管理しています。問題はありますか', a: 'いいえ。アプリはそのアカウントが管理するすべての店舗を表示し、システム内のサイトごとに、その投稿先となる店舗をお選びいただけます。' },
+          ],
+        },
+      ],
+      cta: { title: '今あるものを顧客に見てもらう', body: ja.closeBody, primary: ja.trial, secondary: ja.check },
     },
   },
 }

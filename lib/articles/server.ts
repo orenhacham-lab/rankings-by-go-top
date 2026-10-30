@@ -110,6 +110,7 @@ export const FAQ_HEADING: Record<PublicLocale, string> = {
   es: 'Preguntas frecuentes',
   'pt-BR': 'Perguntas frequentes',
   fr: 'Questions fréquentes',
+  ja: 'よくある質問',
   it: 'Domande frequenti',
 }
 

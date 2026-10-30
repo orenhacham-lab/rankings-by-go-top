@@ -813,4 +813,138 @@ export const YOAST_COMPARE: Record<PublicLocale, ComparisonCopy> = {
     },
     close: { title: 'Scopra a che punto è il suo sito, senza registrarsi' },
   },
+  // JAPANESE. Every claim about Yoast is a translation of the claim the other
+  // locales make from their pages read on CHECKED, not a fresh reading: the
+  // sources are the same pages, so the facts must not drift between languages.
+  // Prices stay in the currency Yoast publishes them in.
+  ja: {
+    competitor: 'Yoast SEO',
+    eyebrow: 'Go Top SEOとYoastの比較',
+    metaTitle: 'Go Top SEOとYoast SEOの比較 | 比較',
+    metaDescription:
+      'Go Top SEOとYoast SEOの比較です。コンテンツを書いて公開するのはどちらか、検索順位を計測するのはどちらか、それぞれの料金に何が含まれるか、そしてYoastのほうが適しているのはどのような場合かをまとめました。',
+    hero: {
+      title: 'Yoastは何を直すべきか教えてくれます。',
+      accent: '当社は直して、書きます',
+      subtitle:
+        'YoastはWordPressのSEOで最も歴史が長く、最も安心して使える名前であり、エディター内で書く人を助けてくれます。Go Top SEOは、会社を経営していて書く担当者がいない方のための製品です。システムが題材を計画し、記事を書き、公開し、検索順位を追います。',
+    },
+    table: {
+      eyebrow: '比較',
+      title: 'Yoast自身のページに書かれている内容にもとづく、それぞれの役割',
+      checkedOn: CHECKED,
+      sources: SOURCES,
+      rows: [
+        {
+          label: '料金',
+          ours: '月額79ドルから（税別）。',
+          theirs:
+            'Yoast SEO Premiumは年額118.80ドル（税別）。Shopify向けは30日ごとに19ドル（税別）。無料版もあります。',
+        },
+        {
+          label: '対応サイト数',
+          ours: 'お選びのプランに含まれる数で、料金ページに記載しています。',
+          theirs: '1つの契約で1サイトまたは1ドメインです。別のサイトには別の契約が必要で、まとめ買いの割引があります。',
+        },
+        {
+          label: '記事を書くのは誰か',
+          ours: 'システムです。題材、本文、画像、内部リンクまで、承認後に用意します。',
+          theirs:
+            'お客様です。同社のページには、AIが作成するタイトルとメタディスクリプション、Content Plannerでの着想や下書きの出だしが記載されています。記事を1本仕上げるとは書かれていません。',
+        },
+        {
+          label: 'サイトへの公開',
+          ours: 'WordPressとShopifyに自動で公開します。',
+          theirs: '記載がありません。ご自身のWordPressエディター内で動く拡張機能です。',
+        },
+        {
+          label: '検索順位の計測',
+          ours: 'Google、Googleマップ、そしてAIの回答（ChatGPT、Gemini、Google AIなど）について月に一度計測します。',
+          theirs: '同社の製品ページのPremium機能一覧に、検索順位を計測する機能は記載されていません。',
+        },
+        {
+          label: 'Googleビジネスプロフィール',
+          ours: '承認後、プロフィールへ自動で投稿します。',
+          theirs:
+            'Premium機能の一覧にはありません。別の拡張機能であるLocal SEOが契約に含まれていますが、その機能一覧は当社では確認していません。',
+        },
+        {
+          label: 'サイト側の作業',
+          ours: '修正の一部は当社の拡張機能から行われ、コードを1行も読む必要はありません。',
+          theirs:
+            '助言と手作業の機能です。リダイレクトの管理（CSVの取り込みにも対応）、1本の記事を5つのキーフレーズに照らして確認、内部リンクの提案、孤立コンテンツの洗い出し、WordPressでの構造化データの自動付与などがあります。',
+        },
+        {
+          label: 'トライアルと返金',
+          ours: '7日間のトライアル、クレジットカード不要、いつでも解約できます。',
+          theirs:
+            '同社の製品ページには無料トライアルの記載がありません。初回購入から30日以内であれば全額返金があり、更新時には適用されません。',
+        },
+      ],
+    },
+    theirStrengths: {
+      eyebrow: 'Yoastのほうがよい場合',
+      title: 'このような場合はYoastが正しい答えです',
+      intro: 'Yoastは何かを壊す可能性が最も低い製品で、それがまさに必要な場合もあります。',
+      items: [
+        {
+          title: 'すでに書いている人がいる場合',
+          body:
+            '社内にライターがいる、あるいはコンテンツを制作している代理店がいる場合、Yoastは書いている最中に助言してくれるので、足りなかったものはそれだけです。代わりに書いてくれるシステムに料金を払う意味はありません。',
+        },
+        {
+          title: '助言はしても手を出さない道具がほしい場合',
+          body:
+            'Yoastは、頼まない限り何にも手を加えません。公開するすべての言葉を自分で管理したい方にとっては、欠点ではなく長所です。',
+        },
+        {
+          title: '料金と安心を重視する場合',
+          body:
+            '年額118.80ドル、無料版、30日以内の全額返金、24時間365日のサポート、そしてLocal・News・Videoの各拡張機能が含まれます。金額だけを見れば、とてもよい買い物です。',
+        },
+      ],
+    },
+    ourStrengths: {
+      eyebrow: '当社のほうが適している場合',
+      title: '書く担当者がいない場合',
+      intro: '本当の違いは技術ではありません。誰が座って作業をするか、という点にあります。',
+      items: [
+        {
+          title: '自動で公開される記事',
+          body: '毎月の題材の計画をご承認いただくだけで、画像と内部リンクの入った記事が自動で公開されます。',
+        },
+        {
+          title: '現状がいつでもわかります',
+          body: 'Google、マップ、AIの回答について月に一度計測します。別の道具を増やす必要はありません。',
+        },
+        {
+          title: 'サイトの外も',
+          body: 'Googleビジネスプロフィールへの投稿も、承認後、同じ料金に含まれます。',
+        },
+        {
+          title: 'WordPressに加えてShopifyも',
+          body: '同じシステムが両方のプラットフォームで動き、レポートも同じです。',
+        },
+      ],
+    },
+    faq: {
+      eyebrow: 'よくある質問',
+      title: '乗り換える前に聞かれること',
+      items: [
+        {
+          q: 'Yoastを残したまま、御社を追加できますか',
+          a: 'はい。構造化データとリダイレクトはYoastに任せたまま、当社が記事を書いて公開することができます。2つの拡張機能が同じ構造化データを二重に出力していないかは、確認しておく価値があります。',
+        },
+        {
+          q: 'Yoastは本当に検索順位を計測しないのですか',
+          a: '同社の製品ページのPremium機能一覧に、その種の機能は記載されていません。これは同社のページに書かれている内容であり、製品の能力について当社が述べているものではありません。',
+        },
+        {
+          q: 'Yoastの代わりになりますか',
+          a: '必ずしもそうではありません。当社は制作して計測するものであり、YoastはWordPress内の執筆支援の道具です。両方を使っているサイトは少なくありません。',
+        },
+      ],
+    },
+    close: { title: 'ご自身のサイトの現状を、登録なしで確認する' },
+  },
 }

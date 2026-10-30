@@ -396,4 +396,61 @@ export const ARTICLES_COPY: Record<PublicLocale, ArticlesCopy> = {
       ],
     },
   },
+  // JAPANESE. Plain polite です/ます throughout, which is what a Japanese
+  // business audience reads on a product site; the heavier 謙譲語 of a sales
+  // letter would read as a translation. No space before or after a keyword, and
+  // the full-width colon and comma belong to the script.
+  ja: {
+    index: {
+      title: '記事',
+      subtitle: 'Googleの検索順位の計測、SEO、AIでの可視性についてのガイドと分析',
+      breadcrumb: '記事',
+      empty: '記事は近日公開します。',
+      readMore: '記事を読む',
+    },
+    article: {
+      notFoundTitle: '記事が見つかりません',
+      notFoundBody: 'お探しの記事は存在しないか、公開を終了しました',
+      backToArticles: '記事一覧に戻る',
+      backHome: 'ホームに戻る',
+      toc: '目次',
+      readingTime: (m) => `読了目安 ${m} 分`,
+      updated: '更新日',
+      aboutAuthor: '著者について',
+      aboutAuthorLink: 'Go Topについて詳しく見る',
+    },
+    widgets: {
+      plans: {
+        perMonth: '月額',
+        popular: '最も選ばれています',
+        cta: '7日間の無料トライアルを始める',
+        noCard: 'クレジットカードは不要です。いつでも解約できます。',
+        allPlans: '詳細は料金ページでご確認ください',
+      },
+      cta: {
+        title: 'これをご自身のサイトで試してみませんか',
+        body: '7日間無料、クレジットカードは不要です。サイトを登録すると、キーワード調査が届き、AIでの可視性チェックが始まり、最初の記事が自動で作成・公開されます。',
+        primary: '7日間の無料トライアルを始める',
+        secondary: 'まずはサイトの無料チェックから',
+      },
+    },
+    promo: {
+      badge: 'Go Top SEO',
+      title: ['必要なときに', 'Googleの検索順位を確認'],
+      body: 'Googleの自然検索とGoogleマップでの検索順位を計測する業務用のプラットフォームです。計測はいつでも実行できますし、月に一度自動で実行することもできます。詳細なレポート、推移の記録、担当者によるサポートが付きます。',
+      signup: { label: '無料トライアルを始める', href: authHref('signup', 'ja') },
+      pricing: { label: '料金を見る', href: '/ja/pricing' },
+      stats: [
+        { num: '1000+', label: 'キーワード' },
+        { num: '2', label: '順位の取得先（Google＋マップ）' },
+        { num: 'AI', label: '可視性の計測' },
+        { num: '7日間', label: '無料トライアル' },
+      ],
+      features: [
+        { title: 'Googleの自然検索', desc: 'Googleの1ページ目と2ページ目の順位を正確に計測します' },
+        { title: 'Googleマップ', desc: '市区町村、郵便番号、目印となる地点ごとに順位を計測します' },
+        { title: '業務用のレポート', desc: '推移、比較、詳細な分析を含むレポートをPDFとExcelで出力できます' },
+      ],
+    },
+  },
 }

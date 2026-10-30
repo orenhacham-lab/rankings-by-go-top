@@ -823,4 +823,140 @@ export const SEMRUSH_COMPARE: Record<PublicLocale, ComparisonCopy> = {
     },
     close: { title: 'Scopra a che punto è il suo sito, senza registrarsi' },
   },
+  // JAPANESE. Same discipline as the other two comparison pages: the facts are
+  // the ones read on CHECKED, the prices stay in dollars as Semrush publishes
+  // them, and their English trial sentence is quoted in English and then
+  // explained, rather than silently paraphrased into Japanese as if they had
+  // said it that way.
+  ja: {
+    competitor: 'Semrush',
+    eyebrow: 'Go Top SEOとSemrushの比較',
+    metaTitle: 'Go Top SEOとSemrushの比較 | 比較',
+    metaDescription:
+      'Go Top SEOとSemrushの比較です。コンテンツを書いて公開するのはどちらか、Googleビジネスプロフィールを担うのはどちらか、それぞれの料金に何が含まれるか、そしてSemrushのほうが適しているのはどのような場合かをまとめました。',
+    hero: {
+      title: 'Semrushは道具を提供します。',
+      accent: '当社は作業そのものを行います',
+      subtitle:
+        'Semrushは業界で最も充実したデータベースの一つを土台にしており、どこに問題があるかを示してくれます。Go Top SEOは、会社を経営していて手を動かす時間がない方のための製品です。システムが記事を書き、サイトに公開し、Googleビジネスプロフィールへ投稿し、検索順位を追います。',
+    },
+    table: {
+      eyebrow: '比較',
+      title: 'Semrush自身のページに書かれている内容にもとづく、それぞれの役割',
+      checkedOn: CHECKED,
+      sources: SOURCES,
+      rows: [
+        {
+          label: '開始料金',
+          ours: '月額79ドルから（税別）。すべてが1つの料金に含まれます。',
+          theirs:
+            'SEOプランは月額139ドル（年払いなら117.33ドル）で、5サイト、500キーワードです。機能が限られた無料プランもあります。',
+        },
+        {
+          label: '作業を行うのは誰か',
+          ours: 'システムです。題材をご承認いただくと、システムが本文を書き、画像と内部リンクを加えて公開します。',
+          theirs:
+            '双方です。同社のGoogleビジネスプロフィール用のエージェントは自動で投稿し、記事はワンクリックで公開でき、サイトの修正は会社またはその開発者が行います。',
+        },
+        {
+          label: '記事',
+          ours: '毎月ご承認いただく計画をもとに、自動で立案・執筆し、画像と内部リンクを付けます。',
+          theirs:
+            '同社のWordPress拡張機能は、題材の調査、長文の下書きの作成、AIによる画像生成を行います。有料アカウントが必要です。',
+        },
+        {
+          label: 'サイトへの公開',
+          ours: 'WordPressとShopifyに自動で公開します。エディターを開く必要はありません。',
+          theirs: '同社の拡張機能は、「Share」からWordPressを選ぶことで、ワンクリックでWordPressに公開します。',
+        },
+        {
+          label: 'Googleビジネスプロフィール',
+          ours: '同じ料金に含まれます。承認後、プロフィールへ自動で投稿します。',
+          theirs:
+            'Local Toolkitは別売りで、拠点ごとの課金です。Baseは1拠点あたり月額30ドル、Proは60ドルです。同社のエージェントが投稿し、新しい口コミに返信します。',
+        },
+        {
+          label: 'サイトの修正',
+          ours: '修正の一部は当社のWordPress拡張機能から行われ、コードを1行も読む必要はありません。',
+          theirs:
+            'Site Auditが問題を深刻度で並べ、それぞれの直し方を説明します。同社のページには、Semrushがサイトを変更するとは書かれていません。',
+        },
+        {
+          label: '検索順位の計測',
+          ours:
+            'Google、Googleマップ、そしてAIの回答（ChatGPT、Gemini、Google AIなど）について月に一度計測し、料金は同じです。',
+          theirs:
+            'SEOプランでは500キーワードを毎日計測します。AIの回答の計測はStarter（月額199ドル）からです。マップでの計測は別売りのLocal Toolkitに含まれます。',
+        },
+        {
+          label: 'トライアル',
+          ours: '7日間、クレジットカード不要、いつでも解約できます。',
+          theirs: '同社のページには「Try Semrush free for seven days. Cancel anytime.」とあります。トライアル中は書き出しが制限されます。',
+        },
+      ],
+    },
+    theirStrengths: {
+      eyebrow: 'Semrushのほうがよい場合',
+      title: 'Semrushがそのまま正しい答えになる場合もあります',
+      intro: '当社はSemrushになろうとはしていません。必要なのがそれであれば、早めに知っていただくほうがよいと考えています。',
+      items: [
+        {
+          title: '人に任せるのではなく、自分で調べたい場合',
+          body:
+            '競合とキーワードの分析、被リンクのデータ、トラフィックと市場の調査、過去データ、そしてAPIがあります。会社や代理店が市場を深く掘りたいのであれば、Semrushは当社が扱っていない問いに答えてくれます。',
+        },
+        {
+          title: '毎日、広く計測したい場合',
+          body:
+            '同社のSEOプランは500キーワードを毎日計測します。当社の計測は月に一度です。日ごとの動きを見る必要があるなら、その差は実際にあり、同社に有利です。',
+        },
+        {
+          title: '拠点が多く、ディレクトリへの一括登録が必要な場合',
+          body: 'Local Proでは、会社の情報を70以上のディレクトリへワンクリックで送ります。当社はこれをまったく行っていません。',
+        },
+      ],
+    },
+    ourStrengths: {
+      eyebrow: '当社のほうが適している場合',
+      title: 'ダッシュボードの前に座る人がいない場合',
+      intro: 'ご相談いただく経営者の多くは、もう一つダッシュボードが必要なのではなく、作業が終わっていることを必要としています。',
+      items: [
+        {
+          title: '1つの料金、拠点ごとの追加料金なし',
+          body: '記事、Googleビジネスプロフィールへの投稿、検索順位の計測が、3つの別のプランではなく同じ料金に入っています。',
+        },
+        {
+          title: 'コンテンツが自動で公開されます',
+          body: '月に一度題材をご承認いただくだけで、画像と内部リンクの入った記事が、何の操作もなく公開されます。',
+        },
+        {
+          title: '少人数の体制に合わせています',
+          body: 'サイトを登録する以外に設定するものはなく、毎週維持すべき作業もありません。',
+        },
+        {
+          title: '開発者は不要です',
+          body: '導入はWordPressの拡張機能、またはShopifyのアプリです。連携の作業も、使い方を教える相手もいません。',
+        },
+      ],
+    },
+    faq: {
+      eyebrow: 'よくある質問',
+      title: '乗り換える前に聞かれること',
+      items: [
+        {
+          q: '両方を使えますか',
+          a: 'はい。多くの代理店がまさにそうしています。調査にSemrush、毎週発生する作業に当社という組み合わせです。技術的に重なるところはありません。',
+        },
+        {
+          q: 'AIでの可視性の計測は、同社より優れていますか',
+          a: 'いいえ。当社は月に一度の計測で、同社はStarterプランから毎日計測します。当社の利点は、その計測が基本料金に含まれており、上位プランへの変更が不要なことです。',
+        },
+        {
+          q: 'このページの料金は最新ですか',
+          a: `${CHECKED}にSemrushのページで確認したものです。企業は料金を変更しますし、Semrushは最近プランの名称を変更しました。表の下のリンクが情報源です。`,
+        },
+      ],
+    },
+    close: { title: 'ご自身のサイトの現状を、登録なしで確認する' },
+  },
 }

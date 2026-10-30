@@ -93,4 +93,14 @@ export const MARKETPLACE_CLAIM_COPY: Record<PublicLocale, MarketplaceClaimCopy> 
     missingToken: 'Questo link non contiene alcun numero di acquisto.',
     toDashboard: 'Vai all\'applicazione',
   },
+  ja: {
+    title: 'ご購入について',
+    claimed: 'ご購入はこのアカウントに紐づけられ、プランが有効になりました。すぐにご利用いただけます。',
+    alreadyClaimed: 'このご購入はすでにお客様のアカウントに紐づいています。プランは有効です。',
+    unavailable: 'このリンクは有効ではありません。お支払いが完了しているのにご利用いただけない場合は、サイトからご連絡ください。こちらで対応いたします。',
+    needsOperator: 'ご購入は記録されました。一部の処理をこちらで手動で行う必要があります。対応を進めておりますので、再度のお支払いは不要です。',
+    failed: 'こちら側で問題が発生しました。しばらくしてからページを再読み込みしてください。',
+    missingToken: 'このリンクには購入番号が含まれていません。',
+    toDashboard: 'アプリへ進む',
+  },
 }

@@ -16,6 +16,7 @@ const es = FEATURE_COMMON.es
 const pt = FEATURE_COMMON['pt-BR']
 const fr = FEATURE_COMMON.fr
 const it = FEATURE_COMMON.it
+const ja = FEATURE_COMMON.ja
 
 export const SITE_FIXES_PAGE: MarketingPage = {
   path: '/features/site-health-fixes',
@@ -43,6 +44,10 @@ export const SITE_FIXES_PAGE: MarketingPage = {
     it: {
       title: 'Correzioni del sito | Go Top SEO',
       description: 'Un’analisi del sito che trova ciò che lo frena su Google e nei motori di IA: titoli, descrizioni, testi alternativi, link rotti e altro. Su WordPress ogni correzione si applica con un clic dopo l’approvazione, e resta annullabile.',
+    },
+    ja: {
+      title: 'サイトの修正 | Go Top SEO',
+      description: 'GoogleとAIエンジンに対してサイトの足を引っぱっている点を見つける診断です。タイトル、ディスクリプション、画像の代替テキスト、リンク切れなどを確認します。WordPressでは、ご承認後にワンクリックで修正でき、元に戻すこともできます。',
     },
   },
   content: {
@@ -459,6 +464,78 @@ export const SITE_FIXES_PAGE: MarketingPage = {
         },
       ],
       cta: { title: 'Scopra che cosa frena il suo sito', body: it.closeBody, primary: it.check, secondary: it.trial },
+    },
+    // JAPANESE. The example URLs in the visual are Japanese-site paths, because
+    // an Italian /chi-siamo in a Japanese screenshot reads as a mistake; the
+    // claims themselves are the same ones the code supports.
+    ja: {
+      hero: {
+        eyebrow: 'サイトの修正',
+        eyebrowIcon: Wrench,
+        title: 'サイトの足を引っぱっている点を、',
+        accent: 'ご承認後に修正します',
+        subtitle: 'システムがサイトを診断し、タイトルの欠落や長すぎるタイトル、ディスクリプションの欠落、代替テキストのない画像、リンク切れ、そしてGoogleやAIエンジンに対して閲覧を拒否しているページを見つけます。連携済みのWordPressサイトでは、何がどう変わるかをご確認いただいたうえで、ほとんどの修正をワンクリックで適用できます。',
+        trust: ja.trust,
+        primary: ja.check,
+        secondary: ja.trial,
+        visual: (
+          <WorkListVisual
+            heading="サイトの修正"
+            rows={[
+              { title: 'タイトルが長すぎます', detail: '', url: '/services/aircon-install', icon: Type, done: true, status: '修正済み' },
+              { title: '代替テキストのない画像', detail: '画像4枚', url: '/blog/aircon-guide', icon: ImageIcon, done: true, status: '修正済み' },
+              { title: 'リンク切れ', detail: '', url: '/about', icon: Link2, done: false, status: '承認待ち' },
+              { title: 'ディスクリプションの欠落', detail: '', url: '/contact', icon: FileSearch, done: false, status: '承認待ち' },
+            ]}
+          />
+        ),
+      },
+      sections: [
+        {
+          kind: 'cards',
+          tone: 'contrast',
+          eyebrow: 'なぜ重要なのか',
+          title: 'サイト自体が障害になっていると、よいコンテンツも効きません',
+          intro: '検索結果で切り詰められるタイトル、Googleが理解できない画像、エラーページに行き着くリンク。どれも小さなことですが、重なるとサイト全体を下に引っぱります。',
+          items: [
+            { icon: ScanSearch, title: '何が止めているかが見えます', body: 'それぞれの問題が、現れているページとともに、深刻な順に並びます。' },
+            { icon: ShieldCheck, title: '承認なしに何も変わりません', body: 'どの修正にもプレビューがあります。今ページに書かれている内容と、それに置き換わる内容です。' },
+            { icon: RotateCcw, title: 'いつでも元に戻せます', body: 'システムが行った修正は以前の値を保持しているため、元の状態に戻せます。' },
+          ],
+        },
+        {
+          kind: 'steps',
+          eyebrow: '進め方',
+          title: '診断から、修正されたサイトまで',
+          items: [
+            { title: 'サイトの診断', body: 'システムがページをたどり、問題の一覧を深刻な順に返します。' },
+            { title: '提案の確認', body: 'それぞれの問題に修正案が付き、現在の値と新しい値が並んで表示されます。' },
+            { title: 'ご承認', body: '連携済みのWordPressサイト、および連携済みのShopify店舗の記事とページでは、修正がサイトに書き込まれます。それ以外の場合は、手順をご案内します。' },
+          ],
+        },
+        {
+          kind: 'cards',
+          eyebrow: 'WordPressで修正される内容',
+          title: 'システムが自分で行う修正',
+          items: [
+            { icon: Type, title: 'SEOタイトル', body: 'タイトルがない、短すぎる、長すぎる場合に書き直します。YoastまたはRank Mathがある場合は、その項目に保存します。' },
+            { icon: FileSearch, title: 'メタディスクリプション', body: 'ディスクリプションがない場合、または長さが適切でない場合です。Go Topの拡張機能を通じて、サイトのSEOプラグインに保存します。' },
+            { icon: ImageIcon, title: '画像の代替テキスト', body: '代替テキストのない本文中の画像にのみ付与します。それ以外の画像には手を加えません。' },
+            { icon: Link2, title: 'リンク', body: 'リンク切れを差し替えまたは削除し、関連するページの間に内部リンクを追加します。' },
+            { icon: Heading1, title: '見出し', body: 'H1が複数あるページを、Go Topの拡張機能を通じて見出し1つに整えます。' },
+            { icon: Code2, title: 'よくある質問とllms.txt', body: 'ページ内のよくある質問のブロックと、サイトをAIエンジンに説明するllms.txtファイルを、Go Topの拡張機能を通じて用意します。' },
+          ],
+        },
+        {
+          kind: 'callout',
+          icon: Info,
+          title: 'Shopifyとそのほかのプラットフォームでは',
+          body: (
+            <p>診断はどのサイトでも動きます。連携済みのShopify店舗では、ご承認後にブログ記事と店舗のページを修正します。Googleが表示するタイトルとディスクリプション、画像の代替テキスト、リンク切れ、よくある質問のブロック、そして余分な見出しです。こちらでも、どの修正も元に戻せます。商品、コレクション、店舗の設定は一切変更しません。Wixやそのほかのプラットフォームでは、システムはサイトに書き込みません。それぞれの問題をご自身で直すための短い手順をお見せします。</p>
+          ),
+        },
+      ],
+      cta: { title: 'サイトの足を引っぱっている点を確認する', body: ja.closeBody, primary: ja.check, secondary: ja.trial },
     },
   },
 }

@@ -59,7 +59,8 @@ export type ConsentAction = (typeof CONSENT_ACTIONS)[number]
  * silently lost, which is the one failure this table exists to prevent. The
  * constraint comes FIRST (20261005050636_consent_events_locale_widen.sql for
  * 'pt-BR', 20261021180000_consent_events_locale_fr.sql for 'fr',
- * 20261023130000_locale_it.sql for 'it'), then this list; lib/consent/__qa__/consent-locale-contract.qa.ts
+ * 20261023130000_locale_it.sql for 'it', 20261030120000_locale_ja.sql for 'ja'),
+ * then this list; lib/consent/__qa__/consent-locale-contract.qa.ts
  * holds the two together, so a language added here and not there fails in CI
  * rather than losing a visitor's proof in production.
  *
@@ -68,7 +69,7 @@ export type ConsentAction = (typeof CONSENT_ACTIONS)[number]
  * migrations and fails if a language is live that the log cannot store, so the
  * flag cannot be turned on ahead of the constraint either.
  */
-export const CONSENT_LOCALES = ['he', 'en', 'es', 'pt-BR', 'fr', 'it'] as const
+export const CONSENT_LOCALES = ['he', 'en', 'es', 'pt-BR', 'fr', 'it', 'ja'] as const
 
 export type ConsentLocale = (typeof CONSENT_LOCALES)[number]
 

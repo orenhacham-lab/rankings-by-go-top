@@ -69,6 +69,7 @@ const es = FEATURE_COMMON.es
 const pt = FEATURE_COMMON['pt-BR']
 const fr = FEATURE_COMMON.fr
 const it = FEATURE_COMMON.it
+const ja = FEATURE_COMMON.ja
 
 export const SITE_LINKS_PAGE: MarketingPage = {
   path: '/features/site-links',
@@ -96,6 +97,10 @@ export const SITE_LINKS_PAGE: MarketingPage = {
     it: {
       title: 'Link verso il suo sito | Go Top SEO',
       description: 'Aziende complementari che usano Go Top SEO possono citare il suo sito negli articoli scritti per loro, soltanto dove questo aiuta chi legge. Senza scambi, mai un concorrente, facoltativo e disattivato per impostazione predefinita. E inoltre: link interni, pagine orfane e directory gratuite.',
+    },
+    ja: {
+      title: 'サイトへのリンク | Go Top SEO',
+      description: '補完関係にある企業のGo Top SEO利用者が、その企業向けに書かれた記事の中でお客様のサイトを言及できます。入るのは読者の役に立つ場所だけです。交換は行わず、競合には決して入らず、任意で初期設定では無効です。さらに内部リンク、孤立ページ、無料で掲載できるディレクトリも扱います。',
     },
   },
   content: {
@@ -750,6 +755,119 @@ export const SITE_LINKS_PAGE: MarketingPage = {
         },
       ],
       cta: { title: 'Lasci che aziende complementari rimandino al suo sito', body: it.closeBody, primary: it.trial, secondary: it.check },
+    },
+    // JAPANESE. The link to the terms points at /ja/terms, and clause 15A is
+    // the same clause in every language. Nothing here promises a number of
+    // links or a ranking, in Japanese either: 景品表示法 treats an unprovable
+    // performance claim as a misrepresentation, and the claim would be false
+    // anyway.
+    ja: {
+      hero: {
+        eyebrow: 'サイトへのリンク',
+        eyebrowIcon: Link2,
+        title: '補完関係にある企業の',
+        accent: 'コンテンツからの言及とリンク',
+        subtitle: '補完関係にある業種のGo Top SEOの利用者が、その企業向けに書かれた記事の中で、お客様のサイトを言及できます。入るのは、その段落の読者にとってお客様のページが実際に役立つ場合だけです。競合には決して入らず、相互リンクも行いません。参加は任意で、初期設定では無効です。',
+        trust: ja.trust,
+        primary: ja.trial,
+        secondary: ja.check,
+        visual: (
+          <WorkListVisual
+            heading="言及とリンク"
+            rows={[
+              { title: '補完関係にある企業からの被リンク', detail: '同社のブログ記事から', icon: ArrowDownToLine, done: true, status: '公開済み' },
+              { title: 'お客様の記事からの発リンク', detail: '公開前に表示され、削除できます', icon: ArrowUpFromLine, done: false, status: '承認待ち' },
+              { title: '同じ業種', detail: 'どちらの方向にも挿入しません', icon: Ban, done: true, status: '除外' },
+              { title: '記事に内部リンクを3件追加', detail: '料金ガイド', icon: ArrowLeftRight, done: true, status: '追加済み' },
+            ]}
+          />
+        ),
+      },
+      sections: [
+        {
+          kind: 'steps',
+          eyebrow: '補完関係にある企業',
+          title: '仕組み',
+          items: [
+            { title: '有効にする', body: '参加はサイトごとに、プロジェクトの所有者が、画面に表示される条件に同意したうえで決めます。初期設定では無効で、いつでも離脱できます。' },
+            { title: '実在するサイトのみ', body: 'サイトが参加できるのは、所有者がWordPressまたはSearch Consoleを通じてアプリに連携した場合だけです。ドメインを入力するだけでは足りないため、第三者のサイトが入ることはできません。' },
+            { title: '言及が記事に入ります', body: '補完関係にある企業向けに記事が書かれるとき、その文にすでに含まれている語の上に、お客様の関連ページへの言及が入ることがあります。本文を書き換えることはなく、段落を追加することもありません。' },
+            { title: 'すべて見える状態に保たれます', body: 'どの挿入も記録され、双方に表示されます。お客様の記事から出ていくリンクは公開前に表示され、削除できます。' },
+          ],
+        },
+        {
+          kind: 'cards',
+          tone: 'contrast',
+          eyebrow: 'ルール',
+          title: '自然さを保つための決まり',
+          items: [
+            { icon: Ban, title: '競合には入りません', body: '同じ業種、およびどちらかが競合として申告したドメインには入りません。業種が判明していないサイトは対象外で、推測は一切しません。' },
+            { icon: ArrowLeftRight, title: '相互リンクはしません', body: '交換は行いません。言及を受けたサイトが返礼することはなく、同じ組み合わせは一度だけです。3サイトの短い循環も遮断します。' },
+            { icon: ShieldCheck, title: '1本だけ、控えめに', body: '1記事につき最大1本で、もう1本入れるよりは入れないほうを選びます。公開して間もないサイトはゆっくり参加します。' },
+            { icon: Network, title: '読者の役に立つ場所だけ', body: '言及が入るのは、その段落の読者にとってページが実際に役立つ場合だけです。関連性が弱いときは何も挿入しません。公開して間もないサイトや内容の薄いサイトは参加しません。' },
+          ],
+        },
+        {
+          kind: 'callout',
+          icon: Info,
+          title: '当社が行わないこと',
+          body: (
+            <>
+              <p>
+                Go Top SEOはリンクを販売せず、購入せず、他社のサイトからのリンクを約束することもありません。
+                リンクの本数の約束も、検索順位の約束もありません。
+              </p>
+              <p>
+                参加は任意で、初期設定では無効であり、いつでも離脱できます。ご利用料金に含まれるものではなく、
+                プランの確約事項として含まれるものでもありません。リンクの種類はネットワーク全体で定められており、
+                参加の画面に表示され、今後のリンクについて変更されることがあります。全文は
+                <a className="underline" href="/ja/terms">利用規約</a>の第15A条にあり、参加に伴うリスクも記載しています。
+                この機能を有効にする前にお読みになることをおすすめします。
+              </p>
+              <p>
+                参加サイトの一覧は公開しません。言及を受けた側は、リンクを挿入したサイトのアドレスを確認できます。
+                サイトの内容、および検索エンジンのガイドラインの遵守についての責任はサイトの所有者にあり、
+                当社はこの機能を停止または終了することがあります。
+              </p>
+            </>
+          ),
+        },
+        {
+          kind: 'cards',
+          columns: 2,
+          eyebrow: 'サイトの内側でも',
+          title: 'サイトをまとめる内部リンク',
+          items: [
+            { icon: ArrowLeftRight, title: '執筆中の内部リンク', body: '執筆しながら、システムが記事をサイト内の関連ページへつなぎます。入るのは、その語句が本文にすでに自然な形で現れている場所だけです。記事は、いつもどおり公開前にお読みいただけます。' },
+            { icon: Unlink, title: '孤立ページ', body: 'サイト内のどのページからもリンクされていないページです。Googleはそこに到達しにくく、重要なページだと判断しにくくなります。メニューやトップページからリンクされているページは孤立とは数えません。' },
+            { icon: ListChecks, title: '無料で掲載できるディレクトリ', body: 'プロジェクトの国と言語に合わせて人の手で確認したディレクトリと事業者掲載先の一覧で、すでに掲載されている箇所も示します。' },
+            { icon: MapPinned, title: 'どこがどこを指しているか', body: '記事ごとに、どこを指していてどこから指されているかがわかります。あるページがGoogleで動かない一方でほかのページが伸びる理由は、ここで説明がつきます。' },
+          ],
+        },
+        {
+          kind: 'cards',
+          columns: 2,
+          eyebrow: 'Search Console',
+          title: 'Googleがすでに見つけているリンク',
+          items: [
+            { icon: FileSearch, title: 'Googleのレポートへの直接リンク', body: 'Search Consoleにはリンクの一覧を返すインターフェースがないため、当社が代わりのものを作ることはしません。直接リンクでGoogleのレポートに移動します。' },
+            { icon: Search, title: '書き出したファイルからの記録', body: 'Search Consoleから書き出したCSVを取り込み、システム内でご確認いただけます。書き出した日の記録であり、自動では更新されません。' },
+          ],
+        },
+        {
+          kind: 'faq',
+          eyebrow: 'よくある質問',
+          title: 'リンクについて聞かれること',
+          items: [
+            { q: 'リンクは何本くらい来ますか', a: '約束している本数はなく、埋めようとしている枠もありません。言及が入るのは、記事が書かれ、お客様のページがその段落に実際に合致したときだけですので、発生は控えめです。' },
+            { q: '参加していることは誰かに見えますか', a: '参加サイトの一覧は公開しません。言及を受けた側は、リンクを挿入したサイトのアドレスを確認でき、公開後はリンクが掲載されたページも確認できます。' },
+            { q: '参加は必須ですか', a: 'いいえ。初期設定では無効で、有効化はサイトごとに行い、いつでも離脱できます。離脱すると新しい言及は止まりますが、すでに公開されたリンクは各サイトに残ります。' },
+            { q: 'Shopifyの店舗でも動きますか', a: 'はい。別途、任意で有効にしていただきます。言及が入るのは、当社が書いて店舗のブログに公開する記事の中だけです。店舗にすでにある記事、ページ、商品、コレクションは変更しません。' },
+            { q: '自分のサイトの内部リンクはどうなりますか', a: 'それとは独立して動き続けます。作成する記事には、サイト内の関連ページへのリンクが入り、記事全体を公開前にご承認いただきます。' },
+          ],
+        },
+      ],
+      cta: { title: '補完関係にある企業からサイトへリンクしてもらう', body: ja.closeBody, primary: ja.trial, secondary: ja.check },
     },
   },
 }
