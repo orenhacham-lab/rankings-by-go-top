@@ -837,7 +837,8 @@ async function main() {
    * section where the territories are named, and in two of the six documents
    * the name it quoted was not the heading those documents actually carry:
    * the Hebrew pointed at "שירותי מדידה ושיווק" against a heading reading
-   * "שירותי ניתוח וערוץ שיווק", and the English at "Measurement and marketing
+   * "שירותי ניתוח וערוץ שיווק" (itself corrected to "שירותי ניתוח ושיווק" in
+   * the same commit), and the English at "Measurement and marketing
    * services" against "Analytics & Marketing Services". That is not a typo
    * where it sits. The sentence is the single exception to a bolded promise
    * that nothing loads before the visitor chooses, and the territories exist
