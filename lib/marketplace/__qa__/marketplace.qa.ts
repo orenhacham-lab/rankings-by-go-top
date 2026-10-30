@@ -573,6 +573,33 @@ async function main() {
     /shown at checkout before you pay/.test(
       'any tax due where you are is shown at checkout before you pay'))
   /*
+   * AND IT PROMISES NO INVOICE. JVZoo's Terms of Use s.5.3 allocate the
+   * merchant-of-record role per transaction flow, and the issuer of the tax
+   * document follows that role. We cannot read our flow from here, so a
+   * promise that WE issue the invoice may be false, and a hedge naming both
+   * possible issuers answers one question twice - the same CRD Art. 6 defect
+   * as the "serves as the retailer" line. Seller identity is a different
+   * question and is unaffected: s.5.2 puts the purchase contract between the
+   * customer and the vendor, so that sentence must stay.
+   */
+  // Scoped to OUR-seller paragraph alone: on a reseller page the platform
+  // really does issue the invoice, and H15 above requires it to say so.
+  const ourSellerParagraph = (src: string) =>
+    src.match(/Go Top SEO is the seller for this purchase[\s\S]*?<\/p>/)?.[0] ?? ''
+  check('H15d: on a page where WE are the seller, it still says so, and as a sentence of its own',
+    /Go Top SEO is the seller for this purchase\./.test(salesFlat))
+  check('H15e: …and that paragraph promises no invoice, by us or by anyone',
+    ourSellerParagraph(salesFlat) !== '' && !/invoice/i.test(ourSellerParagraph(salesFlat)))
+  check('H-MUT6c: the seller-identity guard catches the sentence being softened',
+    !/Go Top SEO is the seller for this purchase\./.test(
+      salesFlat.replace('Go Top SEO is the seller for this purchase.',
+        'Go Top SEO or JVZoo is the seller for this purchase.')))
+  check('H-MUT6d: the no-invoice guard catches the promise coming back, in either form',
+    [' and issues your invoice.', ' Go Top SEO or JVZoo issues your invoice.'].every((added) =>
+      /invoice/i.test(ourSellerParagraph(
+        salesFlat.replace('Go Top SEO is the seller for this purchase.',
+          `Go Top SEO is the seller for this purchase.${added}`)))))
+  /*
    * THE ATTRIBUTION LINE. A platform's mandated block may contradict the
    * seller paragraph above it - JVZoo's says it "serves as the retailer" while
    * its own agreement makes us the seller. Full size above it was not enough:
