@@ -23,7 +23,7 @@ import type { Stage } from './cadence'
 
 export interface OnboardingEmailInput {
   stage: Stage
-  /** All four published languages, not just the bilingual pair: the words are the dictionary's. */
+  /** All five published languages, not just the bilingual pair: the words are the dictionary's. */
   locale: PublicLocale
   /** The first name, or null when the account has none. */
   firstName: string | null
@@ -51,7 +51,10 @@ export function actionPathFor(stage: Stage, projectId: string): string {
 }
 
 export function actionUrlFor(origin: string, stage: Stage, projectId: string, locale: PublicLocale): string {
-  return `${origin}/login?next=${encodeURIComponent(actionPathFor(stage, projectId))}${locale === 'he' ? '' : '&lang=en'}`
+  // The email is written in the customer's language, so the link must open the
+  // dashboard in it too. This appended `&lang=en` for anything but Hebrew, so a
+  // Spanish customer read a Spanish email and landed on an English screen.
+  return `${origin}/login?next=${encodeURIComponent(actionPathFor(stage, projectId))}${locale === 'he' ? '' : `&lang=${locale}`}`
 }
 
 const BRAND = '#0070d6'

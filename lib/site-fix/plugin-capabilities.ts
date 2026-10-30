@@ -1,6 +1,10 @@
 /**
  * What the connected GO TOP SEO Bridge plugin can do, beyond site-health fixes. Server-side only.
  *
+ * 3.2.0 (includes/publish.php) imports a signed address on GO TOP's own storage, so the author
+ * photo the owner uploaded reaches the site's Media Library with the plugin alone; its bucket is
+ * private and has no public address, which is why 3.1.0 could not take it.
+ *
  * 3.1.0 (includes/read.php) does everything that needed a WordPress application password before:
  * the content list and one item's HTML (content index, internal-link scan, site map), the authors,
  * the Media Library alt text, and on /publish scheduling, a second post, an author and taking over
@@ -26,12 +30,15 @@ type Admin = ReturnType<typeof createAdminClient>
 export { READ_PLUGIN_MIN_VERSION } from './types'
 
 /** includes/read.php gotop_seo_bridge_capabilities(), in the same order. */
-export const PLUGIN_CAPABILITIES = ['content', 'content_item', 'authors', 'media_alt', 'terms_links', 'schedule', 'new_post', 'author', 'adopt'] as const
+export const PLUGIN_CAPABILITIES = ['content', 'content_item', 'authors', 'media_alt', 'terms_links', 'schedule', 'new_post', 'author', 'adopt', 'author_photo'] as const
 export type PluginCapability = (typeof PLUGIN_CAPABILITIES)[number]
 
 const MIN_VERSION: Record<PluginCapability, string> = {
   content: '3.1.0', content_item: '3.1.0', authors: '3.1.0', media_alt: '3.1.0', terms_links: '3.1.0',
   schedule: '3.1.0', new_post: '3.1.0', author: '3.1.0', adopt: '3.1.0',
+  // 3.2.0 accepts a signed address on GO TOP's own storage, which is the only kind the private
+  // author-photo bucket has (includes/publish.php gotop_seo_bridge_image_sources).
+  author_photo: '3.2.0',
 }
 
 /** The plugin can do this: its own list when known, otherwise its version. */

@@ -60,10 +60,10 @@ export default function KeywordMapping({ model, heading = true }: {
   /** False inside a Fold, whose button already is the title. */
   heading?: boolean
 }) {
-  const { language, uiLocale } = useDashboardLanguage()
+  const { uiLocale } = useDashboardLanguage()
   const dict = getDashboardDictionary(uiLocale).researchCompetitive
   const t = dict.mapping
-  const n = (v: number) => formatCount(v, language)
+  const n = (v: number) => formatCount(v, uiLocale)
   const [filter, setFilter] = useState<MappingFilter>('all')
   const [all, setAll] = useState(false)
   const filtered = filterMapping(model.mapping, filter)

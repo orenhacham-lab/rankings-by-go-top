@@ -17,6 +17,7 @@
  *
  * Run: npx tsx lib/google-ads/__qa__/markets.qa.ts
  */
+import { RESEARCH_MARKET } from '@/lib/blog/auto/keyword-plan'
 import {
   COUNTRY_GEO_TARGETS,
   LANGUAGE_IDS,
@@ -57,11 +58,14 @@ const GOOGLE_LANGUAGE_IDS: Record<string, number> = {
   el: 1022, // Greek
   iw: 1027, // Hebrew
   ru: 1031, // Russian
+  fr: 1002, // French
+  it: 1004, // Italian
 }
 const GOOGLE_COUNTRY_IDS: Record<string, number> = {
   AR: 2032, BR: 2076, CL: 2152, CO: 2170, CY: 2196,
   GR: 2300, IL: 2376, MX: 2484, PT: 2620, ES: 2724,
   GB: 2826, US: 2840,
+  FR: 2250, IT: 2380,
 }
 
 function main() {
@@ -95,10 +99,34 @@ function main() {
     check('B1: every offered language has an id', noId.length === 0, noId.join(', '))
     const noGeo = SUPPORTED_COUNTRIES.filter((c) => typeof COUNTRY_GEO_TARGETS[c] !== 'number')
     check('B2: every offered country has a geo target', noGeo.length === 0, noGeo.join(', '))
-    const orphanLang = Object.keys(LANGUAGE_IDS).filter((l) => !isValidLanguage(l))
-    check('B3: no id is carried for a language nobody can choose', orphanLang.length === 0, orphanLang.join(', '))
-    const orphanGeo = Object.keys(COUNTRY_GEO_TARGETS).filter((c) => !isValidCountry(c))
-    check('B4: no geo target is carried for a country nobody can choose', orphanGeo.length === 0, orphanGeo.join(', '))
+    /*
+     * B3/B4 keep DEAD ids out — an id nobody can reach is an id nobody checks.
+     * The blog's own research is the second way to reach one: it calls
+     * generateKeywordIdeas directly with the markets in RESEARCH_MARKET, which
+     * never pass through the pickers, so French and Italian are carried without
+     * being offered on the keyword-research screen. Anything neither offered nor
+     * researched is still dead and still fails.
+     */
+    const researched = Object.values(RESEARCH_MARKET)
+    const usedLang = new Set(researched.map((m) => m.language))
+    const usedCountry = new Set(researched.map((m) => m.country))
+    const orphanLang = Object.keys(LANGUAGE_IDS).filter((l) => !isValidLanguage(l) && !usedLang.has(l))
+    check('B3: no id is carried for a language that is neither offered nor researched', orphanLang.length === 0, orphanLang.join(', '))
+    const orphanGeo = Object.keys(COUNTRY_GEO_TARGETS).filter((c) => !isValidCountry(c) && !usedCountry.has(c))
+    check('B4: no geo target is carried for a country that is neither offered nor researched', orphanGeo.length === 0, orphanGeo.join(', '))
+    check('B3-MUT/B4-MUT: a code neither offered nor researched would fail both',
+      !isValidLanguage('zu') && !usedLang.has('zu') && !isValidCountry('ZW') && !usedCountry.has('ZW'))
+    // THE BUG THIS PAIR WAS WIDENED FOR, from the other side: every market the
+    // blog research names must resolve, or its language silently never publishes.
+    const unresolved = Object.entries(RESEARCH_MARKET).filter(
+      ([, m]) => typeof COUNTRY_GEO_TARGETS[m.country] !== 'number' || typeof LANGUAGE_IDS[m.language] !== 'number',
+    )
+    check('B8: every market the blog researches resolves in both maps', unresolved.length === 0,
+      unresolved.map(([l, m]) => `${l} (${m.country}/${m.language})`).join(', '))
+    check('B8-MUT: a market missing from either map is caught',
+      [['xx', { country: 'ZZ', language: 'zz' }]].some(
+        ([, m]) => typeof COUNTRY_GEO_TARGETS[(m as { country: string }).country] !== 'number',
+      ))
     check('B5: the languages the product ships in are all researchable',
       isValidLanguage('he') && isValidLanguage('en') && isValidLanguage('es') && isValidLanguage('pt'))
     check('B6: and their home markets are choosable', isValidCountry('ES') && isValidCountry('BR') && isValidCountry('PT') && isValidCountry('MX'))
@@ -130,9 +158,14 @@ function main() {
     // language list had no Spanish and the fallback was Hebrew: a Spanish site
     // was handed Hebrew topic titles.
     check('D1: Spanish is written in Spanish', contentLanguageOrEnglish('es') === 'es' && contentLanguageOrEnglish('es-MX') === 'es')
+    // Portuguese left this group on 17 Oct 2026: it is a content language of its
+    // own now (lib/content/__qa__/portuguese-content-language.qa.ts), so research
+    // in Portuguese is written in Portuguese, not in English.
     check('D2: a language we do not write in yet reads as English, not Hebrew',
-      contentLanguageOrEnglish('pt') === 'en' && contentLanguageOrEnglish('pt-BR') === 'en' && contentLanguageOrEnglish('el') === 'en'
-      && contentLanguageOrEnglish('ru') === 'en' && contentLanguageOrEnglish('ar') === 'en')
+      contentLanguageOrEnglish('el') === 'en' && contentLanguageOrEnglish('ru') === 'en'
+      && contentLanguageOrEnglish('ar') === 'en')
+    check('D2b: Portuguese research is written in Portuguese',
+      contentLanguageOrEnglish('pt') === 'pt-BR' && contentLanguageOrEnglish('pt-BR') === 'pt-BR')
     check('D3: Hebrew and the legacy code are still Hebrew', contentLanguageOrEnglish('he') === 'he' && contentLanguageOrEnglish('iw') === 'he')
     check('D4: no language at all keeps the Hebrew default', contentLanguageOrEnglish('') === 'he' && contentLanguageOrEnglish(null) === 'he' && contentLanguageOrEnglish(undefined) === 'he')
     check('D5: whatever it answers, the reason wording exists for it',

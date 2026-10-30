@@ -2,11 +2,11 @@
 /**
  * Plugin Name:       GO TOP SEO Bridge
  * Description:       Connects your site to GO TOP: publishes the articles you send from GO TOP and applies the SEO fixes you approve there, each one undoable.
- * Version:           3.1.1
+ * Version:           3.2.0
  * Requires at least: 6.0
  * Requires PHP:      7.4
  * Author:            GO TOP DIGITAL MARKETING AND ADVERTISING LTD
- * Author URI:        https://gotopseo.com
+ * Author URI:        https://www.gotopseo.com/en
  * License:           GPLv2 or later
  * License URI:       https://www.gnu.org/licenses/gpl-2.0.html
  * Text Domain:       go-top-seo-bridge
@@ -65,7 +65,7 @@ add_action('plugins_loaded', function () {
         return;
     }
 
-    define('GOTOP_SEO_BRIDGE_VERSION', '3.1.1');
+    define('GOTOP_SEO_BRIDGE_VERSION', '3.2.0');
     define('GOTOP_SEO_BRIDGE_DIR', __DIR__);
     define('GOTOP_SEO_BRIDGE_FILE', __FILE__);
 

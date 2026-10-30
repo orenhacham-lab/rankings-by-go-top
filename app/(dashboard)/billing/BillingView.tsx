@@ -76,6 +76,11 @@ interface BillingViewProps {
    *  the card button was gated to prevent. The cards say to contact us
    *  instead, the same answer this screen already gives for cancelling. */
   creemGoverned?: boolean
+  /** Set when this account's plan was bought on an external marketplace, which
+   *  is the seller and the only party that can stop the billing. We hold no
+   *  payment instrument for it, so the manage card names that seller and links
+   *  its own page instead of offering a cancellation we cannot perform. */
+  marketplaceSeller?: { label: string; policyUrl: string | null } | null
 }
 
 export default function BillingView({
@@ -96,6 +101,7 @@ export default function BillingView({
   planPrices,
   creemCheckout = false,
   creemGoverned = false,
+  marketplaceSeller = null,
 }: BillingViewProps) {
   const { language, uiLocale } = useDashboardLanguage()
   const dict = getDashboardDictionary(uiLocale)
@@ -268,6 +274,23 @@ export default function BillingView({
                     <span className="font-semibold">
                       {' '}{new Date(subscriptionEndsAt).toLocaleDateString(dateLocale)}
                     </span>
+                  )}
+                </p>
+              ) : marketplaceSeller ? (
+                <p className="text-copy text-body">
+                  {t.manage.cancelAtMarketplace(marketplaceSeller.label)}
+                  {marketplaceSeller.policyUrl && (
+                    <>
+                      {' '}
+                      <a
+                        href={marketplaceSeller.policyUrl}
+                        target="_blank"
+                        rel="noopener noreferrer nofollow"
+                        className="underline"
+                      >
+                        {t.manage.marketplacePolicyLink(marketplaceSeller.label)}
+                      </a>
+                    </>
                   )}
                 </p>
               ) : creemGoverned ? (

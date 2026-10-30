@@ -58,6 +58,36 @@ export const REASON_TEXT: Record<ContentLanguage, ReasonText> = {
     supportingTopic: 'Tema complementario según los datos del sitio',
     numberLocale: 'es-ES',
   },
+  'pt-BR': {
+    fillsGap: 'O tema preenche uma lacuna de conteúdo em uma área de atuação do negócio.',
+    freshAngle: 'O tema traz um ângulo novo ao lado do conteúdo que já existe no site.',
+    supportedByExisting: 'Ele se apoia em páginas e produtos que já existem no site.',
+    demand: (query, volume) => `Segundo a pesquisa de palavras-chave, "${query}" tem cerca de ${volume} buscas mensais.`,
+    neutral: 'O tema é relevante para a atividade do negócio e para os termos de busca encontrados na pesquisa.',
+    foundInSearchData: (volume) => `Encontrado nos dados de busca com cerca de ${volume} buscas mensais`,
+    supportingTopic: 'Tema complementar segundo os dados do site',
+    numberLocale: 'pt-BR',
+  },
+  fr: {
+    fillsGap: "Ce sujet comble un manque de contenu dans un domaine que l'entreprise couvre.",
+    freshAngle: 'Ce sujet apporte un angle nouveau à côté du contenu déjà présent sur le site.',
+    supportedByExisting: "Il s'appuie sur des pages et des produits qui existent déjà sur le site.",
+    demand: (query, volume) => `La recherche de mots-clés indique environ ${volume} recherches par mois pour « ${query} ».`,
+    neutral: "Le sujet est pertinent pour l'activité de l'entreprise et pour les termes de recherche trouvés lors de la recherche de mots-clés.",
+    foundInSearchData: (volume) => `Trouvé dans les données de recherche avec environ ${volume} recherches par mois`,
+    supportingTopic: 'Un sujet complémentaire, établi à partir des données du site',
+    numberLocale: 'fr-FR',
+  },
+  it: {
+    fillsGap: 'Questo argomento colma una lacuna di contenuto in un ambito di cui si occupa l’attività.',
+    freshAngle: 'Questo argomento aggiunge un punto di vista nuovo accanto ai contenuti già presenti sul sito.',
+    supportedByExisting: 'Si appoggia a pagine e prodotti già presenti sul sito.',
+    demand: (query, volume) => `La ricerca di parole chiave indica circa ${volume} ricerche al mese per «${query}».`,
+    neutral: 'L’argomento è pertinente all’attività dell’azienda e ai termini di ricerca individuati nella ricerca di parole chiave.',
+    foundInSearchData: (volume) => `Individuato nei dati di ricerca con circa ${volume} ricerche al mese`,
+    supportingTopic: 'Un argomento complementare, individuato dai dati del sito',
+    numberLocale: 'it-IT',
+  },
 }
 
 /**

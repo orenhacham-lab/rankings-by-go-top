@@ -53,6 +53,8 @@ import { normalizeLocale } from './dashboard/locale'
 import { localeFromAcceptLanguage } from './accept-language'
 import { spanishSiteEnabled } from './spanish-site'
 import { portugueseSiteEnabled } from './portuguese-site'
+import { frenchSiteEnabled } from './french-site'
+import { italianSiteEnabled } from './italian-site'
 
 /** Readable by the browser too: the client writes it when the switcher changes. */
 export const LANGUAGE_COOKIE = 'dashboard-language'
@@ -94,6 +96,20 @@ export function isPortuguesePath(pathname: string | null | undefined, enabled = 
   return p === '/pt-BR' || p.startsWith('/pt-BR/')
 }
 
+/** The same, for the French tree and its own flag. */
+export function isFrenchPath(pathname: string | null | undefined, enabled = frenchSiteEnabled()): boolean {
+  if (!enabled) return false
+  const p = pathname || ''
+  return p === '/fr' || p.startsWith('/fr/')
+}
+
+/** The same, for the Italian tree and its own flag. */
+export function isItalianPath(pathname: string | null | undefined, enabled = italianSiteEnabled()): boolean {
+  if (!enabled) return false
+  const p = pathname || ''
+  return p === '/it' || p.startsWith('/it/')
+}
+
 /**
  * First path segments of the HEBREW public tree — the `app/(public)` and
  * `app/(legal)` route groups plus the root. These pages contain Hebrew copy
@@ -106,8 +122,8 @@ export function isPortuguesePath(pathname: string | null | undefined, enabled = 
  * from it, so it cannot drift silently.
  */
 const PUBLIC_MARKETING_SEGMENTS = new Set([
-  'about', 'accessibility', 'affiliates', 'affiliate-terms', 'articles', 'features', 'free-check', 'pricing',
-  'privacy', 'refund-policy', 'sitemap', 'solutions', 'terms',
+  'about', 'accessibility', 'affiliates', 'affiliate-terms', 'articles', 'compare', 'features', 'free-check',
+  'pricing', 'privacy', 'refund-policy', 'sitemap', 'solutions', 'terms',
 ])
 
 /**
@@ -119,8 +135,12 @@ const PUBLIC_MARKETING_SEGMENTS = new Set([
  * its language is a property of the URL, exactly like `/en/*`, and saying so
  * here is what lets the rest of the contract carry that fact outward instead of
  * inventing a second mechanism for it.
+ *
+ * `/go/*` is the same shape for the same reason: it is the sales page an
+ * external marketplace reviews and its affiliates send buyers to, written in
+ * English for a latin-script listing's audience, with no Hebrew counterpart.
  */
-const ENGLISH_ONLY_SEGMENTS = new Set(['shopify'])
+const ENGLISH_ONLY_SEGMENTS = new Set(['shopify', 'go'])
 
 /** Exposed so the QA can prove the list matches the real route tree. */
 export function englishOnlySegments(): string[] {
@@ -139,6 +159,8 @@ export function routePublicLocale(pathname: string | null | undefined): PublicLo
   if (isEnglishPath(p)) return 'en'
   if (isSpanishPath(p)) return 'es'
   if (isPortuguesePath(p)) return 'pt-BR'
+  if (isFrenchPath(p)) return 'fr'
+  if (isItalianPath(p)) return 'it'
   if (p === '/') return 'he'
   const segment = p.split('/')[1] ?? ''
   if (ENGLISH_ONLY_SEGMENTS.has(segment)) return 'en'

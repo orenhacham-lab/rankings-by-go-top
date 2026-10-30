@@ -10,6 +10,8 @@
  * D) refusing is as easy as agreeing, and withdrawable from every page
  * E) the audit log can only be written, never read, and holds no address
  * F) the copy no longer claims that browsing is agreement
+ * G) the consent UPDATE reaches Google in the shape Google reads
+ * H) the Meta pixel is bound to the MARKETING grant, not to any grant
  *
  * Every check has a mutation control: the code is broken on purpose and the
  * guard is shown to fail. A guard that cannot fail proves nothing.
@@ -24,6 +26,7 @@ import {
   normalizeChoices,
 } from '../categories'
 import { GOOGLE_CONSENT_DEFAULT, GOOGLE_CONSENT_DEFAULT_SCRIPT, googleConsentFrom } from '../google-consent-mode'
+import { META_PIXEL_ID, META_PIXEL_SRC, META_SIGNUP_EVENT, metaPixelAllowed } from '../meta-pixel'
 import { he } from '../../i18n/public/he'
 import { en } from '../../i18n/public/en'
 
@@ -244,6 +247,80 @@ function main() {
     }
     check('MUT: the old "continued use is agreement" sentence is caught',
       /המשך השימוש/.test('אנו משתמשים בעוגיות. המשך השימוש באתר מהווה הסכמה'))
+  }
+
+  console.log('\nG) the consent UPDATE reaches Google in the shape Google reads')
+  {
+    // Measured live on 17 Oct 2026: with the update pushed as a plain ARRAY,
+    // the GA4 hit after "accept all" carried gcs=G100 — ad_storage and
+    // analytics_storage DENIED — so Google kept nothing. Google reads a consent
+    // command only as the `arguments` object that gtag() pushes; GTM never even
+    // stamped the array entries with gtm.uniqueEventId. The guard is on the
+    // shape, because the shape is the whole defect.
+    const tags = code('components/consent/GoogleTags.tsx')
+    check("G1: no consent command is pushed as an array literal",
+      !/dataLayer\s*\.\s*push\s*\(\s*\[\s*['\"]consent['\"]/.test(tags)
+      && !/push\s*\(\s*\[\s*['\"]consent['\"]/.test(tags), 'an array-shaped consent command is ignored by Google')
+    check('G2: the update goes through gtag when it is there',
+      /gtag\s*\(\s*['\"]consent['\"]\s*,\s*['\"]update['\"]/.test(tags))
+    check('G3: the fallback pushes the arguments OBJECT, not an array',
+      /\barguments\b/.test(tags) && /push\s*\(\s*arguments\s*\)/.test(tags))
+    // The default and the update must speak the same vocabulary, or a tag sees
+    // a signal declared in one and never updated in the other.
+    const defaults = Object.keys(GOOGLE_CONSENT_DEFAULT).sort()
+    const updated = Object.keys(googleConsentFrom({ necessary: true, analytics: true, marketing: true })).sort()
+    check('G4: the update names exactly the signals the default names',
+      JSON.stringify(defaults) === JSON.stringify(updated), { defaults, updated })
+    check('G5: accepting everything grants analytics_storage',
+      googleConsentFrom({ necessary: true, analytics: true, marketing: true }).analytics_storage === 'granted')
+    check('MUT: the array-shaped push this section exists for is caught',
+      /push\s*\(\s*\[\s*['\"]consent['\"]/.test("w.dataLayer.push(['consent', 'update', googleConsentFrom(choices)])"))
+  }
+
+
+  console.log('\nH) the Meta pixel is bound to the MARKETING grant, not to any grant')
+  {
+    // Measured live on 17 Oct 2026: with the pixel inside the GTM container,
+    // a visitor who allowed "measurement" and refused "marketing" still loaded
+    // connect.facebook.net and still had the pixel initialise, because the
+    // container's tags carry no consent settings and our loader fetches gtm.js
+    // when EITHER category is granted. The pixel is ours now, so the gate is a
+    // predicate and this section is what holds it in place.
+    check('H1: analytics alone does NOT allow the pixel',
+      metaPixelAllowed({ necessary: true, analytics: true, marketing: false }) === false)
+    check('H2: marketing allows it', metaPixelAllowed({ necessary: true, analytics: false, marketing: true }))
+    check('H3: a refusal allows nothing', metaPixelAllowed(CONSENT_DENIED) === false)
+    check('H4: accepting everything allows it', metaPixelAllowed(CONSENT_GRANTED))
+
+    const pixel = code('components/consent/MetaPixel.tsx')
+    check('H5: the component asks the gate rather than reading a category itself',
+      /metaPixelAllowed\s*\(\s*currentChoices\s*\(\s*\)\s*\)/.test(pixel)
+      && !/choices\.(analytics|marketing)/.test(pixel))
+    check('H6: the gate is consulted before the script element is built',
+      pixel.indexOf('metaPixelAllowed') < pixel.indexOf('createElement'),
+      { gate: pixel.indexOf('metaPixelAllowed'), script: pixel.indexOf('createElement') })
+    check('H7: the component loads the pixel from the one declared source',
+      pixel.includes('META_PIXEL_SRC') && META_PIXEL_SRC === 'https://connect.facebook.net/en_US/fbevents.js')
+    check('H8: a withdrawal revokes instead of hoping the script forgets',
+      /fbq\?\.\(\s*['\"]consent['\"]\s*,\s*['\"]revoke['\"]/.test(pixel) || /\(\s*['\"]consent['\"]\s*,\s*['\"]revoke['\"]/.test(pixel))
+    check('H9: only PageView and the signup conversion are ever tracked',
+      (pixel.match(/['\"]track['\"]\s*,\s*['\"]([A-Za-z]+)['\"]/g) || []).every((m) => /PageView/.test(m)), pixel.match(/['\"]track['\"][^)]*/g))
+
+    // Nothing may load the pixel outside that component: a second loader would
+    // not be bound by the gate, which is exactly how the container's tag broke.
+    for (const file of ['app/layout.tsx', 'components/consent/GoogleTags.tsx', 'app/(auth)/signup/page.tsx']) {
+      check(`H10 (${file}): does not fetch fbevents itself`, !/connect\.facebook\.net/.test(code(file)))
+    }
+    const signup = code('app/(auth)/signup/page.tsx')
+    check('H11: the signup conversion is gated on marketing too',
+      /metaPixelAllowed\s*\(\s*currentChoices\s*\(\s*\)\s*\)/.test(signup)
+      && new RegExp(`['\"]track['\"]\\s*,\\s*META_SIGNUP_EVENT`).test(signup))
+    check('H12: the signup event is the conversion Meta optimises on',
+      META_SIGNUP_EVENT === 'CompleteRegistration')
+    check('H13: the pixel id is the SaaS pixel, not the agency one',
+      META_PIXEL_ID === '1427506179136706')
+    check('MUT: a component that read the analytics flag directly is caught',
+      /choices\.(analytics|marketing)/.test('const allowed = choices.analytics || choices.marketing'))
   }
 
   console.log(`\n${pass} passed, ${fail} failed`)

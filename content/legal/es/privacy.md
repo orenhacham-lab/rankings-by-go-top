@@ -54,7 +54,7 @@ No compartimos su información personal con terceros, salvo con:
 
 - **Shopify:** para el procesamiento de pagos de las cuentas facturadas a través de Shopify App Pricing, y para publicar contenido en una tienda conectada
 - **PayPal:** para el procesamiento de pagos, únicamente de los clientes facturados a través del sitio web
-- **Creem:** para el procesamiento de pagos, cuando el pago de una cuenta pasa por él. Al abrir un pago le enviamos la dirección de correo electrónico de la cuenta, el identificador del plan elegido y nuestra propia referencia de esa solicitud, y recibimos un identificador de cliente en su sistema, un identificador de plan, el estado de la suscripción y las fechas del período de facturación. Los datos de la tarjeta, y cualquier otro instrumento de pago, no llegan a nosotros en ningún momento
+- **Creem:** para el procesamiento de pagos, cuando el pago de una cuenta pasa por él. Al abrir un pago le enviamos la dirección de correo electrónico de la cuenta, el identificador del plan elegido y nuestra propia referencia de esa solicitud, y recibimos un identificador de cliente en su sistema, un identificador de plan, el estado de la suscripción, las fechas del período de facturación, el importe del pago cobrado y el identificador del pago. Los datos de la tarjeta, y cualquier otro instrumento de pago, no llegan a nosotros en ningún momento
 - **Supabase:** para el almacenamiento seguro de datos
 - **Serper:** para las consultas de búsqueda de Google y las comprobaciones de posicionamiento
 - **Resend:** para el envío de correo electrónico; véase «Mensajes de correo electrónico» más abajo
@@ -66,6 +66,7 @@ No compartimos su información personal con terceros, salvo con:
 - **OpenStreetMap (Nominatim):** para convertir una dirección en coordenadas, y solo cuando usted haya escrito una dirección exacta para el seguimiento de posicionamiento local. Se envían la dirección que usted escribió y el nombre del país, nunca datos de la cuenta
 - **ScrapeLLM:** para el seguimiento de visibilidad en IA; véase «Proveedores de IA» más abajo
 - **Otros sitios de la red de enlaces:** únicamente si usted se unió a la red; véase «Red de enlaces» más abajo
+- **JVZoo:** solo si usted ha abierto nuestra página de venta del marketplace JVZoo: se carga desde JVZoo una imagen de seguimiento que recibe su dirección IP, el identificador de su navegador y la página de la que llegó, para poder atribuir una compra al afiliado que le remitió. La imagen se carga únicamente después de que usted haya aceptado las cookies de marketing. Respecto de esa recogida y esa transmisión, JVZoo no trata los datos por cuenta nuestra, sino que es corresponsable del tratamiento junto con nosotros; lo que haga con los datos después lo decide JVZoo conforme a su propia política de privacidad
 - **Meta (Facebook / Instagram):** para publicidad segmentada y para un informe de registro completado que se envía desde nuestro servidor; véase la sección Publicidad en Meta más abajo. Respecto de esos eventos de conversión, Meta no trata los datos por cuenta nuestra, sino que es corresponsable del tratamiento junto con nosotros, como se explica en esa sección. Los datos que recibimos de las API de Google nunca se comparten con Meta ni se usan para publicidad
 - Cuando lo exija la ley
 
@@ -254,7 +255,7 @@ Clasificamos las cookies en tres categorías, y le consultamos sobre dos de ella
 
 - **Estrictamente necesarias:** inicio de sesión, recordar el idioma de su interfaz, seguridad y prevención de abusos. El servicio no puede funcionar sin ellas, por lo que no requieren consentimiento.
 - **Medición:** cuántas personas visitaron el sitio, qué páginas leyeron y qué no funcionó. Se cargan solo si usted lo permite.
-- **Marketing:** medir el rendimiento de nuestros anuncios y mostrar anuncios relevantes en las redes de Google y Meta. Se cargan solo si usted lo permite. Permitir esta categoría cubre también un informe de conversión que enviamos a Meta desde nuestro servidor, sin ninguna cookie; véase la sección Publicidad en Meta.
+- **Marketing:** medir el rendimiento de nuestros anuncios, mostrar anuncios relevantes en las redes de Google y Meta, y atribuir una compra al afiliado que le remitió a través del marketplace JVZoo. Se cargan solo si usted lo permite. Permitir esta categoría cubre también un informe de conversión que enviamos a Meta desde nuestro servidor, sin ninguna cookie —véase la sección Publicidad en Meta—, y una imagen de seguimiento que se carga desde JVZoo en la página de venta del marketplace y que no almacena nada en su dispositivo.
 
 **Antes de que usted elija, no se instala ninguna cookie de medición ni de marketing y no se realiza ninguna solicitud a los servidores de Google.** Aceptar y rechazar son dos botones iguales en el aviso, y cada categoría puede permitirse por separado.
 
@@ -274,7 +275,7 @@ Nuestras herramientas de medición y marketing se gestionan a través de Google 
 - **Google Ads:** medición de conversiones y publicidad personalizada (sujeto al consentimiento de marketing)
 - **Meta Pixel:** medición de conversiones y publicidad en Facebook e Instagram (sujeto al consentimiento de marketing)
 
-Las herramientas activas cambian de vez en cuando. Lo que no cambia: ninguna se carga antes de que usted haya permitido su categoría, y retirar su consentimiento detiene la recopilación. Además de estas herramientas, que funcionan en el navegador, enviamos a Meta un informe de conversión desde nuestro servidor; también está sujeto al consentimiento de marketing y se detiene cuando usted lo retira.
+Las herramientas activas cambian de vez en cuando. Lo que no cambia: ninguna se carga antes de que usted haya permitido su categoría, y retirar su consentimiento detiene la recopilación. Además de estas herramientas, que funcionan en el navegador, enviamos a Meta un informe de conversión desde nuestro servidor; también está sujeto al consentimiento de marketing y se detiene cuando usted lo retira. Una cosa más no pasa por Google Tag Manager: únicamente en la página de venta del marketplace JVZoo se carga desde JVZoo una imagen de seguimiento de un píxel, para poder atribuir una compra al afiliado que le remitió. No almacena nada en su dispositivo, se carga solo después de que usted haya permitido el marketing y no aparece en ninguna otra página del sitio.
 
 Declaramos su estado de consentimiento a Google mediante el protocolo Consent Mode v2, de modo que las herramientas quedan sujetas a su elección incluso si en el futuro añadimos una etiqueta nueva.
 

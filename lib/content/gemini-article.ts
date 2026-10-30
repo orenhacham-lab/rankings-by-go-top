@@ -174,6 +174,24 @@ const ARTICLE_TEXT: Record<SuggestionLanguage, {
     anchorSentence: (link) => ` En este contexto, ${link} es una de las opciones clave que conviene conocer.`,
     phraseSentence: (phrase) => ` En este contexto, también conviene conocer de cerca ${phrase}.`,
   },
+  'pt-BR': {
+    toc: 'Índice',
+    faqHeading: 'Perguntas frequentes',
+    anchorSentence: (link) => ` Nesse contexto, ${link} é uma das opções principais que vale a pena conhecer.`,
+    phraseSentence: (phrase) => ` Nesse contexto, também vale a pena conhecer de perto ${phrase}.`,
+  },
+  fr: {
+    toc: 'Sommaire',
+    faqHeading: 'Questions fréquentes',
+    anchorSentence: (link) => ` Dans ce contexte, ${link} est l'une des options clés à connaître.`,
+    phraseSentence: (phrase) => ` Dans ce contexte, il vaut aussi la peine de regarder de plus près ${phrase}.`,
+  },
+  it: {
+    toc: 'Indice dei contenuti',
+    faqHeading: 'Domande frequenti',
+    anchorSentence: (link) => ` In questo contesto, ${link} è una delle opzioni principali che vale la pena conoscere.`,
+    phraseSentence: (phrase) => ` In questo contesto, vale la pena approfondire anche ${phrase}.`,
+  },
 }
 
 /** Natural transition words to hand the model, in the language it writes in. */
@@ -181,6 +199,9 @@ const TRANSITION_HINT: Record<SuggestionLanguage, string> = {
   he: 'בנוסף, לכן, עם זאת, למשל, לסיכום',
   en: 'additionally, therefore, however, for example, in summary',
   es: 'además, por lo tanto, sin embargo, por ejemplo, en resumen',
+  'pt-BR': 'além disso, portanto, no entanto, por exemplo, em resumo',
+  fr: 'de plus, par conséquent, cependant, par exemple, en résumé',
+  it: 'inoltre, di conseguenza, tuttavia, per esempio, in sintesi',
 }
 
 /** The filler opening to warn the model off, written in the language it writes in. */
@@ -188,6 +209,9 @@ const FILLER_EXAMPLE: Record<SuggestionLanguage, string> = {
   he: 'e.g. "בעולם שבו כולם מחפשים…"',
   en: 'e.g. "In a world where everyone is looking for…"',
   es: 'e.g. "En un mundo donde todos buscan…"',
+  'pt-BR': 'e.g. "Em um mundo onde todos procuram…"',
+  fr: 'e.g. "Dans un monde où tout le monde cherche…"',
+  it: 'e.g. "In un mondo in cui tutti cercano…"',
 }
 
 /** Who the article is actually written for. A Spanish article is NOT for Israeli readers. */
@@ -195,6 +219,9 @@ const AUDIENCE_NOTE: Record<SuggestionLanguage, string> = {
   he: 'In Hebrew, write naturally for Israeli readers.',
   en: 'Write naturally for a general English-speaking audience.',
   es: 'Write naturally for Spanish-speaking readers in neutral Spanish that reads well in Spain and in Latin America alike.',
+  'pt-BR': 'Write naturally for Brazilian readers in Brazilian Portuguese — not European Portuguese.',
+  fr: 'Write naturally for French-speaking readers in standard French that reads well in France and in the rest of French-speaking Europe alike.',
+  it: 'Write naturally for Italian-speaking readers in standard Italian that reads well in Italy and in Italian-speaking Switzerland alike.',
 }
 
 /** Per-language writing-quality notes. Empty for a language with nothing extra to say. */
@@ -204,9 +231,21 @@ const WRITING_QUALITY_LINES: Record<SuggestionLanguage, string[]> = {
     `- Keep brand/product names in their proper English casing (e.g. "Kingsmith WalkingPad X21", not "kingsmith walkingpad x21"). Never write the hyphenated Hebrew article before a name ("ה-Kingsmith", "ה-הליכון") — write "Kingsmith…", "הליכון…", or "דגם/מכשיר Kingsmith…".`,
   ],
   en: [],
+  'pt-BR': [
+    `- Brazilian Portuguese writing quality: write in BRAZILIAN Portuguese, not European — address the reader as "você" consistently (never "tu", never the European "si"), and prefer the Brazilian word where the two differ ("celular" not "telemóvel", "time" not "equipa", "ônibus" not "autocarro", "tela" not "ecrã"). Use the gerund where Brazilians use it ("estamos vendo", not "estamos a ver"). VARY sentence and paragraph openings — do not start many consecutive sentences with the same word (avoid over-using "Além disso", "Por outro lado", "É importante"); mix openings like "Na prática", "Por isso", "Em muitos casos", "Vale lembrar", "Na hora de decidir", "Em resumo". Prefer clear, practical, promotional SEO writing over poetic language.`,
+    `- Brazilian Portuguese typography: keep the accents and the cedilla correct (ç, ã, õ, é, ê, á, í, ó, ú) — never write Portuguese without accents — and keep brand/product names in their proper original casing (e.g. "Kingsmith WalkingPad X21").`,
+  ],
   es: [
     `- Spanish writing quality: use NEUTRAL Latin-American-and-Spain Spanish and address the reader as "tú" consistently (never mix "tú" and "usted", never "vos"). Avoid regional slang and country-specific terms where a neutral word exists (prefer "teléfono" over "móvil"/"celular", "coche/auto" only when the topic requires it). VARY sentence and paragraph openings — do not start many consecutive sentences with the same word (avoid over-using "Además", "Por otro lado", "Es importante"); mix openings like "En la práctica", "Por eso", "En muchos casos", "Conviene recordar", "A la hora de decidir", "En resumen". Prefer clear, practical, promotional SEO writing over poetic language.`,
     `- Spanish typography: always use the opening marks "¿" and "¡" in questions and exclamations, keep accents and "ñ" correct (never write Spanish without accents), and keep brand/product names in their proper original casing (e.g. "Kingsmith WalkingPad X21").`,
+  ],
+  fr: [
+    `- French writing quality: address the reader as "vous" consistently — NEVER "tu", never "toi", never "ton/ta/tes". Use standard French that reads well in France and in the rest of French-speaking Europe; avoid regional slang and avoid needless anglicisms where a plain French word exists. VARY sentence and paragraph openings — do not start many consecutive sentences with the same word (avoid over-using "De plus", "Par ailleurs", "Il est important"); mix openings like "En pratique", "C'est pourquoi", "Dans bien des cas", "Il faut retenir", "Au moment de choisir", "En résumé". Prefer clear, practical, promotional SEO writing over poetic language.`,
+    `- French typography: keep the accents and the cedilla correct (é, è, ê, à, ù, î, ô, ç) — never write French without accents — use a non-breaking space before ":", ";", "?" and "!" where your output supports it, use the French quotation marks « … » for quotations, and keep brand/product names in their proper original casing (e.g. "Kingsmith WalkingPad X21").`,
+  ],
+  it: [
+    `- Italian writing quality: address the reader formally and impersonally — use "voi"/the impersonal "si" form, and NEVER the informal "tu" (no "tuo/tua/tuoi", no informal imperatives like "scopri", "clicca", "scegli"). Use standard Italian that reads well in Italy and in Italian-speaking Switzerland; avoid regional slang and avoid needless anglicisms where a plain Italian word exists. VARY sentence and paragraph openings — do not start many consecutive sentences with the same word (avoid over-using "Inoltre", "D'altra parte", "È importante"); mix openings like "In pratica", "Per questo motivo", "In molti casi", "Vale la pena ricordare", "Al momento della scelta", "In sintesi". Prefer clear, practical, promotional SEO writing over poetic language.`,
+    `- Italian typography: keep the accents correct (è, é, à, ò, ù, ì) — never write Italian without them — distinguish "è" (verb) from "e" (and), use the apostrophe correctly in elisions ("un'opzione", "dell'articolo"), use the Italian quotation marks « … » for quotations, and keep brand/product names in their proper original casing (e.g. "Kingsmith WalkingPad X21").`,
   ],
 }
 
@@ -543,10 +582,33 @@ function collectAllowedYears(brief: ArticleBrief): Set<string> {
   const hay = [brief.topic, brief.primaryKeyword || '', (brief.secondaryKeywords || []).join(' '), brief.briefNotes || ''].join(' ')
   return new Set(hay.match(/\b20\d{2}\b/g) || [])
 }
+/**
+ * Words whose only job is to introduce a year. Left behind when the year goes they
+ * read as a title cut off mid-sentence: a production article was titled "איך לבחור
+ * מנקה בתל אביב למשרד? המדריך המלא לשנת" because the model wrote "לשנת 2026", the
+ * year was not requested, and only the digits were removed. Every language the app
+ * writes in, longest phrase first so it wins the alternation.
+ */
+const YEAR_LEAD_WORDS = [
+  'לשנת', 'בשנת', 'לשנה', 'בשנה', 'שנת', 'שנה',
+  'for the year', 'in the year', 'the year', 'year', 'for', 'in',
+  'para el año', 'en el año', 'del año', 'para', 'año',
+  'para o ano', 'no ano', 'do ano', 'ano',
+  "pour l'année", "de l'année", 'année', 'pour',
+  "per l'anno", "nell'anno", 'anno', 'per', 'nel',
+].sort((a, b) => b.length - a.length)
+
+/** `lead? year`, where neither side may sit inside a longer word ("within 2026"). */
+function unrequestedYearRe(): RegExp {
+  const lead = YEAR_LEAD_WORDS.map((w) => w.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('|')
+  return new RegExp(`(?:(?<![\\p{L}\\p{N}])(?:${lead})[ \\u00A0]+)?(?<![\\p{L}\\p{N}])(20\\d{2})(?![\\p{L}\\p{N}])`, 'giu')
+}
+
 /** Remove any 20xx year the user did NOT request, then tidy leftover artifacts. */
-function stripUnrequestedYear(text: string, allowed: Set<string>): string {
+export function stripUnrequestedYear(text: string, allowed: Set<string>): string {
   if (!text) return text
-  let out = text.replace(/\b20\d{2}\b/g, (y) => (allowed.has(y) ? y : ''))
+  // The word that introduced the year goes with it, or the sentence reads as cut off.
+  let out = text.replace(unrequestedYearRe(), (m, y: string) => (allowed.has(y) ? m : ''))
   out = out
     .replace(/\s{2,}/g, ' ')
     .replace(/\s+([,.:;!?])/g, '$1')

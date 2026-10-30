@@ -19,8 +19,8 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 import { ARTICLE_STYLE_TABLE, isMissingRelation } from '@/lib/content/article-style/store'
 import { parseGuidanceInput, parseRuleInput, toGuidanceRow, withRule, type GuidanceField, type WritingGuidance } from './guidance'
 import { readProjectWritingGuidance, WRITING_GUIDANCE_COLUMN } from './store'
-import { AUTHOR_BOX_COLUMN, AUTHOR_IMAGE_COLUMN, AUTHOR_NAME_COLUMN, AUTHOR_URL_COLUMN, readAuthorBoxOverrides, readAuthorBoxSetting } from '@/lib/content/author-box/store'
-import { AUTHOR_BOX_IMAGE_CHOICES, cleanAuthorBoxName, normalizeAuthorBoxUrl, type AuthorBoxImageChoice } from '@/lib/content/author-box/box'
+import { AUTHOR_BOX_COLUMN, AUTHOR_IMAGE_COLUMN, AUTHOR_LINE_COLUMN, AUTHOR_NAME_COLUMN, AUTHOR_URL_COLUMN, readAuthorBoxOverrides, readAuthorBoxSetting } from '@/lib/content/author-box/store'
+import { AUTHOR_BOX_IMAGE_CHOICES, cleanAuthorBoxLine, cleanAuthorBoxName, normalizeAuthorBoxUrl, type AuthorBoxImageChoice } from '@/lib/content/author-box/box'
 import { AUTHOR_PHOTO_MEDIA_COLUMN, AUTHOR_PHOTO_PATH_COLUMN, readAuthorPhoto, removeAuthorPhotoObject, type PhotoStorage } from '@/lib/content/author-box/photo'
 
 export type GuidanceSession = { userId: string | null; db: SupabaseClient }
@@ -54,9 +54,13 @@ export type GuidanceView = {
    * disabled while those do not exist, and the box works as before.
    */
   authorBoxName: string
+  /** The owner's own line about the author; '' = the description's first sentence. */
+  authorBoxLine: string
   authorBoxUrl: string
   authorBoxImage: AuthorBoxImageChoice
   authorBoxOverridesEditable: boolean
+  /** The line's own column exists (20261017140000_project_author_box_line.sql); false = the field is disabled. */
+  authorBoxLineEditable: boolean
   /** An uploaded author photo is stored (lib/content/author-box/photo.ts). */
   authorBoxPhoto: boolean
   /** Its columns exist (20261017120000_project_author_photo.sql); false = 'upload' is not offered. */
@@ -111,9 +115,9 @@ async function readView(o: Extract<Owner, { ok: true }>): Promise<LoadGuidanceRe
   return { ok: true, data: { guidance: read.guidance, editable: true, ...box } }
 }
 
-type AuthorBoxView = Pick<GuidanceView, 'authorBox' | 'authorBoxEditable' | 'authorBoxName' | 'authorBoxUrl' | 'authorBoxImage' | 'authorBoxOverridesEditable' | 'authorBoxPhoto' | 'authorBoxPhotoEditable'> & { photoPath: string | null }
+type AuthorBoxView = Pick<GuidanceView, 'authorBox' | 'authorBoxEditable' | 'authorBoxName' | 'authorBoxLine' | 'authorBoxUrl' | 'authorBoxImage' | 'authorBoxOverridesEditable' | 'authorBoxLineEditable' | 'authorBoxPhoto' | 'authorBoxPhotoEditable'> & { photoPath: string | null }
 
-/** The author-box switch, name, link and image: off / empty, and not editable, while their columns are missing or unreadable. */
+/** The author-box switch, name, line, link and image: off / empty, and not editable, while their columns are missing or unreadable. */
 async function readAuthorBox(o: Extract<Owner, { ok: true }>): Promise<AuthorBoxView> {
   const [s, v, ph] = await Promise.all([readAuthorBoxSetting(o.db, o.projectId, o.userId), readAuthorBoxOverrides(o.db, o.projectId, o.userId), readAuthorPhoto(o.db, o.projectId, o.userId)])
   const sw = s.state === 'saved' ? { authorBox: s.enabled, authorBoxEditable: true }
@@ -122,30 +126,40 @@ async function readAuthorBox(o: Extract<Owner, { ok: true }>): Promise<AuthorBox
   const editable = v.state === 'saved' ? true
     : v.state === 'default' ? await columnExists(o, `${AUTHOR_NAME_COLUMN}, ${AUTHOR_URL_COLUMN}, ${AUTHOR_IMAGE_COLUMN}`)
       : false
+  // The line has its own, later migration, so its field is offered on its own.
+  const lineEditable = editable && (v.state === 'saved' ? true : await columnExists(o, AUTHOR_LINE_COLUMN))
   const photoEditable = editable && (ph.state === 'saved' ? true : ph.state === 'default' ? await columnExists(o, `${AUTHOR_PHOTO_PATH_COLUMN}, ${AUTHOR_PHOTO_MEDIA_COLUMN}`) : false)
   // While the photo's columns are missing, an 'upload' read off the row cannot exist (the CHECK refuses it); shown as none.
   const image = v.image === 'upload' && !photoEditable ? 'none' : v.image
   return {
-    ...sw, authorBoxName: v.name, authorBoxUrl: v.url, authorBoxImage: image, authorBoxOverridesEditable: editable,
+    ...sw, authorBoxName: v.name, authorBoxLine: lineEditable ? v.line : '', authorBoxUrl: v.url, authorBoxImage: image,
+    authorBoxOverridesEditable: editable, authorBoxLineEditable: lineEditable,
     authorBoxPhoto: !!ph.path, authorBoxPhotoEditable: photoEditable, photoPath: ph.path,
   }
 }
 
 const publicBox = ({ photoPath: _p, ...view }: AuthorBoxView): Omit<AuthorBoxView, 'photoPath'> => { void _p; return view }
 
-type AuthorBoxWrite = { authorBox?: boolean; name?: string | null; url?: string | null; image?: AuthorBoxImageChoice; clearPhoto?: boolean }
+type AuthorBoxWrite = { authorBox?: boolean; name?: string | null; line?: string | null; url?: string | null; image?: AuthorBoxImageChoice; clearPhoto?: boolean }
 
 /**
  * The card's author-box fields, checked: the name cleaned exactly as a name is
- * (cleanAuthorBoxName), '' = none; the link http(s) only (normalizeAuthorBoxUrl),
+ * (cleanAuthorBoxName), '' = none; the owner's own line the same way, to its
+ * own limit; the link http(s) only (normalizeAuthorBoxUrl),
  * '' = none, anything else refused; the image one of the known choices.
  */
 export function parseAuthorBoxInput(input: Record<string, unknown>): { ok: true; value: Omit<AuthorBoxWrite, 'authorBox'> } | { ok: false; code: 'invalid_request' | 'invalid_author_link' } {
   const value: Omit<AuthorBoxWrite, 'authorBox'> = {}
-  const { authorBoxName: name, authorBoxUrl: url, authorBoxImage: image } = input
+  const { authorBoxName: name, authorBoxLine: line, authorBoxUrl: url, authorBoxImage: image } = input
   if (name !== undefined) {
     if (typeof name !== 'string') return { ok: false, code: 'invalid_request' }
     value.name = cleanAuthorBoxName(name) || null
+  }
+  if (line !== undefined) {
+    if (typeof line !== 'string') return { ok: false, code: 'invalid_request' }
+    // Cleaned, never refused: a line the cleaner empties is "no line", which is
+    // the description's first sentence again. NULL is how it is cleared.
+    value.line = cleanAuthorBoxLine(line) || null
   }
   if (url !== undefined) {
     if (typeof url !== 'string') return { ok: false, code: 'invalid_request' }
@@ -188,6 +202,7 @@ async function write(o: Extract<Owner, { ok: true }>, g: WritingGuidance, box: A
       ...(typeof box.authorBox === 'boolean' ? { [AUTHOR_BOX_COLUMN]: box.authorBox } : {}),
       // The same rule for the owner's own name, link and image (their own columns).
       ...(box.name !== undefined ? { [AUTHOR_NAME_COLUMN]: box.name } : {}),
+      ...(box.line !== undefined ? { [AUTHOR_LINE_COLUMN]: box.line } : {}),
       ...(box.url !== undefined ? { [AUTHOR_URL_COLUMN]: box.url } : {}),
       ...(box.image !== undefined ? { [AUTHOR_IMAGE_COLUMN]: box.image } : {}),
       // The photo's object was removed first (saveWritingGuidance); its pointer and site copy go with it.
@@ -218,6 +233,8 @@ export async function saveWritingGuidance(deps: GuidanceDeps, projectId: unknown
   const boxView = await readAuthorBox(o)
   const authorBox = typeof rawBox === 'boolean' && boxView.authorBoxEditable ? rawBox : undefined
   const overrides: AuthorBoxWrite = boxView.authorBoxOverridesEditable ? { ...parsedBox.value } : {}
+  // The line is written only where its own column exists.
+  if (!boxView.authorBoxLineEditable) delete overrides.line
   if (overrides.image === 'upload' && (!boxView.authorBoxPhotoEditable || !boxView.photoPath)) {
     // 'upload' is set by the upload itself (lib/content/author-box/photo.ts); never without a stored photo.
     return { ok: false, code: 'invalid_request' }

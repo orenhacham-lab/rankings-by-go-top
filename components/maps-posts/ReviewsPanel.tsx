@@ -53,9 +53,9 @@ function Stars({ stars, label }: { stars: number | null; label: string }) {
  * opening it again asks Google afresh.
  */
 export default function ReviewsPanel({ projectId, status }: { projectId: string; status: GbpReadyStatus }) {
-  const { language, uiLocale } = useDashboardLanguage()
+  const { uiLocale } = useDashboardLanguage()
   const t = getDashboardDictionary(uiLocale).mapsPosts
-  const fmt = formatDate(language)
+  const fmt = formatDate(uiLocale)
   const { confirm, dialog } = useConfirm()
 
   const connected = status.connection?.status === 'connected'

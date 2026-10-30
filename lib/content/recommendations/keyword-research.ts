@@ -46,13 +46,35 @@ const SUPPORT_TERMS = [
 // — a "noise" term that is part of the site's OWN vocabulary is NOT noise there
 // (e.g. "יד שנייה" is the core business of a second-hand fashion store), so the
 // caller passes the site vocabulary and overlapping terms are kept.
+// 18 October 2026 — the ACQUIRING-AN-ANIMAL / CLASSIFIEDS family joins the list
+// ('אימוץ', 'למכירה'): on a dog-PRODUCTS store the queue had "אימוץ כלבים
+// קטנים" and "כלבים לאימוץ בחינם", which share their other words with the
+// store's pages and so passed the alignment ratio. A business whose subject this
+// really is (a shelter, a second-hand shop) keeps them through the escape hatch
+// below, which asks for the TERM ITSELF on the site.
 const NOISE_TERMS = [
   'יד 2', 'יד2', 'יד שנייה', 'יד שניה', 'למסירה', 'מודעות', 'ביקורת', 'ביקורות',
   'קטלוג', 'טלפון', 'כתובת', 'שעות פתיחה', 'ביד2', 'yad2', 'used',
+  'אימוץ', 'למכירה', 'adoption', 'for sale',
 ]
-function isNoise(keyword: string): boolean {
+/** The noise term the keyword carries, if any. */
+function noiseTerm(keyword: string): string | null {
   const lower = keyword.toLowerCase()
-  return NOISE_TERMS.some((t) => lower.includes(t))
+  return NOISE_TERMS.find((t) => lower.includes(t)) ?? null
+}
+/**
+ * Is the noise TERM ITSELF the site's own word? The escape hatch used to ask
+ * whether ANY word of the keyword is on the site, which every keyword about the
+ * site's own subject satisfies: "כלבים לאימוץ בחינם" was kept on a dog-bed store
+ * because the store's pages say "כלבים". What makes a noise term legitimate is
+ * the term, not its neighbours — a shelter's pages say "אימוץ", a second-hand
+ * shop's say "יד שנייה". No vocabulary to judge by keeps the old answer: kept.
+ */
+export function siteOwnsTerm(term: string, vocab: Set<string> | null | undefined): boolean {
+  if (!vocab || vocab.size === 0) return true
+  const parts = Array.from(tokens(term))
+  if (parts.length === 0) return true
+  return parts.every((t) => tokenInVocab(t, vocab))
 }
 
 // ── Phase 3H — generic topic-quality rules (site-agnostic, multilingual) ──────
@@ -117,16 +139,72 @@ export const MIN_SITE_VOCAB_TOKENS = 25
 //   "ספורט 365 לייב"        → ≤1/2 ✗ (numerals never count as matches)
 
 const HE_TOKEN_PREFIX = /^[בלמהושכ]/
+const HE_LETTER = /[\u0590-\u05FF]/
+
+/**
+ * 18 October 2026 — HEBREW SPELLING AND PLURALS (from running the gate over
+ * 4dogsoriginal.co.il's own plan: "מזרון לכלבים גדולים" was rejected against a
+ * site whose pages say "מזרן" and "גדול", and six more good ideas with it).
+ *
+ * A light stem, not a morphological analyser: one leading prefix letter, then a
+ * plural or feminine ending, then the vowel letters ו and י, which Hebrew
+ * spells both ways (מזרן / מזרון, מיטה / מטה). Both sides of a comparison are
+ * stemmed, so a stem that merges two words can only make the gate MORE
+ * permissive — the safe direction, because the gate only ever rejects.
+ * Non-Hebrew tokens are returned unchanged.
+ */
+export function heStem(token: string): string {
+  if (!HE_LETTER.test(token)) return token
+  let t = token
+  const trimmed = t.replace(/(יות|ות|ים|יה|ה)$/u, '')
+  if (trimmed.length >= 3) t = trimmed
+  const skeleton = t.replace(/[וי]/gu, '')
+  return skeleton.length >= 3 ? skeleton : t
+}
+
 function tokenInVocab(tok: string, vocab: Set<string>): boolean {
   if (vocab.has(tok)) return true
   // Light Hebrew prefix slack (ל/ב/ה/ו/ש/כ/מ): "לכלבים" matches vocab "כלבים".
   if (tok.length >= 4 && HE_TOKEN_PREFIX.test(tok) && vocab.has(tok.slice(1))) return true
+  // The same word spelled or inflected differently (heStem); the vocabulary
+  // carries the stems of its own words (buildSiteVocabulary). The prefix letter
+  // is taken off here rather than inside the stem, because a root can begin with
+  // one of those letters ("כלבים" is not a prefixed "לבים").
+  for (const form of tok.length >= 4 && HE_TOKEN_PREFIX.test(tok) ? [tok, tok.slice(1)] : [tok]) {
+    const stem = heStem(form)
+    if (stem !== tok && vocab.has(stem)) return true
+  }
   return false
 }
 
+/**
+ * 18 October 2026 — STRUCTURAL WORDS DO NOT COUNT AGAINST A KEYWORD.
+ *
+ * The alignment rule asks that MOST of a keyword's words be the site's own, so
+ * the words that only shape a question or a comparison worked against it:
+ * "השוואת סוגי מיטות לכלבים" is a dog-bed comparison on a dog-bed store, and it
+ * was rejected at 2 of 4 (מיטות, כלבים matched; השוואת, סוגי did not). These
+ * words belong to no market, so they are left out of the count the way numerals
+ * already are. The keyword still needs two of its own words on the site.
+ */
+const STRUCTURAL_TOKENS = new Set([
+  // he
+  'השוואת', 'השוואה', 'סוגי', 'סוג', 'מדריך', 'טיפים', 'איך', 'כיצד', 'למה', 'מתי', 'איפה', 'מה',
+  'כמה', 'עולה', 'הטוב', 'הטובים', 'הטובות', 'ביותר', 'מומלץ', 'מומלצים', 'המלא', 'הכל', 'לבחור',
+  'בחירת', 'שלב', 'שלבים', 'רשימת', 'הדרך', 'דרכים', 'יתרונות', 'חסרונות', 'לעומת', 'מול', 'עם',
+  'בלי', 'ללא', 'הכי', 'הזול', 'הזולים', 'חדש', 'חדשים', 'שנה', 'השנה',
+  // en / es / pt
+  'how', 'what', 'why', 'when', 'where', 'which', 'guide', 'tips', 'best', 'top', 'compare',
+  'comparison', 'types', 'type', 'kind', 'kinds', 'list', 'step', 'steps', 'vs', 'versus',
+  'review', 'reviews', 'cheap', 'cheapest', 'new', 'complete', 'ultimate', 'choose', 'choosing',
+  'como', 'cómo', 'qué', 'que', 'mejor', 'mejores', 'guía', 'guia', 'tipos', 'comparación',
+  'comparacao', 'comparação', 'melhor', 'melhores', 'dicas', 'passo', 'lista',
+])
+
 /** Matched/total meaningful tokens of a keyword vs the site vocabulary. */
 export function vocabAlignment(keyword: string, vocab: Set<string>): { matched: number; total: number } {
-  const meaningful = Array.from(tokens(keyword)).filter((t) => !/^\d+$/.test(t))
+  const all = Array.from(tokens(keyword)).filter((t) => !/^\d+$/.test(t))
+  const meaningful = all.filter((t) => !STRUCTURAL_TOKENS.has(t))
   let matched = 0
   for (const t of meaningful) if (tokenInVocab(t, vocab)) matched++
   return { matched, total: meaningful.length }
@@ -225,7 +303,8 @@ export type ResearchKeywordIssue = 'brand_or_support' | 'noise' | 'nav_commerce'
 export function researchKeywordIssue(keyword: string, ctx: { brandTokens: Set<string>; vocab: Set<string> | null }): ResearchKeywordIssue | null {
   const kw = keyword.trim()
   if (isBrandOrSupport(kw, ctx.brandTokens)) return 'brand_or_support'
-  if (isNoise(kw) && !(ctx.vocab && sharesSiteVocab(kw, ctx.vocab))) return 'noise'
+  const noise = noiseTerm(kw)
+  if (noise && !siteOwnsTerm(noise, ctx.vocab)) return 'noise'
   if (hasNavCommerceToken(kw)) return 'nav_commerce'
   if (isTooGeneric(kw)) return 'too_generic'
   if (ctx.vocab && !isVocabAligned(kw, ctx.vocab)) return 'unrelated'
@@ -454,14 +533,14 @@ export async function recommendFromKeywordResearch(
   const rawKeywords = merged.size
 
   // 2) Basic + noise filtering (brand/support/used-goods/competitor-support).
-  // Phase 3H — noise is RELEVANCE-AWARE: a "noise" term that overlaps the site's
-  // own vocabulary is the site's actual subject matter and is kept.
+  // Phase 3H — noise is RELEVANCE-AWARE: a "noise" term the SITE ITSELF uses is
+  // its actual subject matter and is kept (siteOwnsTerm).
   const brandTokens = tokens(input.businessName || '')
   const vocab = input.siteVocab && input.siteVocab.size >= MIN_SITE_VOCAB_TOKENS ? input.siteVocab : null
   const afterBrand = Array.from(merged.values()).filter((r) => !isBrandOrSupport(r.keyword, brandTokens))
   const afterBasicFilter = afterBrand.length
   const cleaned = afterBrand
-    .filter((r) => !(isNoise(r.keyword) && !(vocab && sharesSiteVocab(r.keyword, vocab))))
+    .filter((r) => { const n = noiseTerm(r.keyword); return !n || siteOwnsTerm(n, vocab) })
     .filter((r) => !hasNavCommerceToken(r.keyword))
     .sort((a, b) => (b.avgMonthlySearches ?? 0) - (a.avgMonthlySearches ?? 0))
   const afterNoiseFilter = cleaned.length

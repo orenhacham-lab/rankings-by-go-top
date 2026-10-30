@@ -15,7 +15,7 @@
 import { getGeminiClient, GEMINI_REQUEST_TIMEOUT_MS } from '@/lib/ai-visibility/gemini-semantic-classifier'
 import type { SiteSignals } from './html-signals'
 import type { CommerceType, FreeCheckBusiness } from './types'
-import type { Locale } from '@/lib/i18n/locales'
+import type { PublicLocale } from '@/lib/i18n/locales'
 
 /** How much page text the prompt carries. Enough to characterise, cheap to send. */
 const TEXT_BUDGET = 6_000
@@ -34,8 +34,66 @@ export type BusinessInsight = {
 
 export type InsightResult = { ok: true; insight: BusinessInsight } | { ok: false; reason: string }
 
-function buildPrompt(signals: SiteSignals, locale: Locale): string {
-  const language = locale === 'en' ? 'English' : 'Hebrew'
+/**
+ * The language the model answers in, one entry per public locale. A two-way
+ * `locale === 'en' ? 'English' : 'Hebrew'` answered a Spanish visitor in one of
+ * the two languages that existed when it was written, and its else branch is a
+ * real language, so it failed silently. A Record over PublicLocale cannot: a
+ * fifth language is a type error here rather than a wrong answer in production.
+ */
+const PROMPT_LANGUAGE: Record<PublicLocale, string> = {
+  he: 'Hebrew',
+  en: 'English',
+  es: 'Spanish',
+  'pt-BR': 'Brazilian Portuguese',
+  fr: 'French',
+  it: 'Italian',
+}
+
+// ── The page's own language ──────────────────────────────────────────────────
+// The `lang` attribute is a DECLARATION, not evidence. A WordPress site whose
+// locale was never changed ships `lang="en-US"` while every word on the page is
+// Hebrew (measured on be-cln.co.il, 26 Oct 2026: `<html lang="en-US" dir="rtl">`
+// over a fully Hebrew page). Taking that attribute as the business's language
+// wrote 'en' onto an Israeli project, and the content engine then asked the model
+// for ENGLISH titles against HEBREW keyword research; its title-keyword alignment
+// gate cannot pass an English title over a Hebrew keyword, so every candidate was
+// rejected and the project got no topic ideas at all.
+//
+// So the page's own WORDS decide when they contradict the attribute, and only in
+// that direction: a page written in Hebrew is a Hebrew page whatever it declares.
+// Anything else — a latin-script page, a Hebrew page that already declares Hebrew,
+// a page with too little text to judge — keeps the declared value untouched, so
+// every other site answers exactly as before.
+
+/** Hebrew letters, and latin letters, as the share below counts them. */
+const HEBREW_LETTER_RE = /[\u0590-\u05FF]/g
+const LATIN_LETTER_RE = /[A-Za-z]/g
+/** Hebrew letters the page must hold before its words outrank its `lang` attribute. */
+export const HEBREW_TEXT_MIN_LETTERS = 50
+/** And the share of its letters they must be: a Hebrew page keeps latin brand and nav words. */
+export const HEBREW_TEXT_MIN_SHARE = 0.3
+
+/** Is the page itself written in Hebrew, by its own words? */
+export function siteTextIsHebrew(signals: Pick<SiteSignals, 'title' | 'metaDescription' | 'h1' | 'h2' | 'text'>): boolean {
+  const sample = [signals.title ?? '', signals.metaDescription ?? '', ...signals.h1, ...signals.h2, signals.text].join(' ')
+  const hebrew = (sample.match(HEBREW_LETTER_RE) ?? []).length
+  if (hebrew < HEBREW_TEXT_MIN_LETTERS) return false
+  const latin = (sample.match(LATIN_LETTER_RE) ?? []).length
+  return hebrew / (hebrew + latin) >= HEBREW_TEXT_MIN_SHARE
+}
+
+/** The language of the page: its declared one, unless its own words say Hebrew. */
+export function pageLanguage(signals: SiteSignals): string | null {
+  const declared = signals.htmlLang
+  if (!siteTextIsHebrew(signals)) return declared
+  const primary = (declared ?? '').trim().toLowerCase().split(/[-_]/)[0]
+  // 'iw' is the superseded ISO code for Hebrew; both already mean a Hebrew page.
+  return primary === 'he' || primary === 'iw' ? declared : 'he'
+}
+
+function buildPrompt(signals: SiteSignals, locale: PublicLocale): string {
+  const language = PROMPT_LANGUAGE[locale]
   return [
     'You are an SEO strategist reading one page of a real website.',
     `Answer in ${language}. Return JSON only, matching this shape exactly:`,
@@ -60,7 +118,7 @@ function buildPrompt(signals: SiteSignals, locale: Locale): string {
     `TITLE: ${signals.title ?? '(none)'}`,
     `DESCRIPTION: ${signals.metaDescription ?? '(none)'}`,
     `HEADINGS: ${[...signals.h1, ...signals.h2].slice(0, 25).join(' | ')}`,
-    `PAGE LANGUAGE: ${signals.htmlLang ?? 'unknown'}`,
+    `PAGE LANGUAGE: ${pageLanguage(signals) ?? 'unknown'}`,
     `PLATFORM DETECTED FROM MARKUP: ${signals.platform ?? '(none)'}`,
     `CONTACT IN STRUCTURED DATA: ${[signals.contact.address, signals.contact.phone].filter(Boolean).join(' · ') || '(none)'}`,
     `OUTBOUND DOMAINS: ${signals.externalDomains.slice(0, 10).join(', ') || '(none)'}`,
@@ -87,8 +145,9 @@ const COMMERCE_TYPES = new Set<CommerceType>(['product', 'service', 'content', '
 /**
  * Fold the model's answer together with what the page itself proved. The
  * deterministic facts WIN on every field they cover: the platform read off the
- * markup, the language from the `lang` attribute, the address and phone from
- * JSON-LD. The model only fills what markup cannot state.
+ * markup, the language of the page (its `lang` attribute, unless its own words
+ * contradict it — see pageLanguage), the address and phone from JSON-LD. The
+ * model only fills what markup cannot state.
  */
 function buildBusiness(parsed: Record<string, unknown>, summary: string, signals: SiteSignals): FreeCheckBusiness {
   const commerce = typeof parsed.commerceType === 'string' ? parsed.commerceType.trim().toLowerCase() : ''
@@ -103,7 +162,8 @@ function buildBusiness(parsed: Record<string, unknown>, summary: string, signals
     commerceType: COMMERCE_TYPES.has(commerce as CommerceType) ? (commerce as CommerceType) : 'other',
     isLocal: parsed.isLocal === true,
     country: /^[A-Z]{2}$/.test(country) ? country : null,
-    language: signals.htmlLang,
+    // The page's own words beat its `lang` attribute (see pageLanguage).
+    language: pageLanguage(signals),
     address: signals.contact.address,
     phone: signals.contact.phone,
   }
@@ -122,7 +182,7 @@ function cleanDomains(value: unknown, self: string): string[] {
     .filter((d) => /^[a-z0-9-]+(\.[a-z0-9-]+)*\.[a-z]{2,}$/.test(d) && d !== self && !d.endsWith(`.${self}`))
 }
 
-export async function fetchBusinessInsight(signals: SiteSignals, locale: Locale, selfDomain: string): Promise<InsightResult> {
+export async function fetchBusinessInsight(signals: SiteSignals, locale: PublicLocale, selfDomain: string): Promise<InsightResult> {
   const client = getGeminiClient()
   if (!client) return { ok: false, reason: process.env.GEMINI_API_KEY ? 'gemini_init_failed' : 'missing_gemini_api_key' }
 

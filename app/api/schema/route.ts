@@ -1,4 +1,5 @@
 import { createClient } from '@/lib/supabase/server'
+import { BRAND_REF, ORGANIZATION_ID, organizationSchema } from '@/lib/seo/organization'
 import { SOFTWARE_OFFER } from '@/lib/seo/software-offer'
 
 interface Article {
@@ -55,27 +56,13 @@ export async function GET() {
 
   const baseUrl = 'https://www.gotopseo.com'
 
-  // Organization schema
-  const organizationSchema = {
-    '@context': 'https://schema.org',
-    '@type': 'Organization',
-    name: 'Go Top SEO',
-    alternateName: ['Rankings by Go Top'],
-    url: baseUrl,
-    logo: `${baseUrl}/gotop-primary.png`,
-    description: 'Advanced location tracking system for SEO promotion - Google organic results and Google Maps rankings',
-    sameAs: [],
-    contactPoint: {
-      '@type': 'ContactPoint',
-      contactType: 'Customer Support',
-      email: 'oren@gotop.co.il',
-      telephone: '054-9489377',
-    },
-    address: {
-      '@type': 'PostalAddress',
-      addressCountry: 'IL',
-    },
-  }
+  // Organization schema — the SAME node app/layout.tsx serves, built from
+  // lib/seo/organization.ts. It used to be a second, drifting copy whose
+  // `sameAs` was empty, so this endpoint and the pages described two
+  // different organizations to anything that read both.
+  const organization = organizationSchema(
+    'Advanced location tracking system for SEO promotion - Google organic results and Google Maps rankings',
+  )
 
   // SoftwareApplication schema
   const softwareSchema = {
@@ -83,8 +70,8 @@ export async function GET() {
     '@type': 'SoftwareApplication',
     name: 'Go Top SEO',
     alternateName: ['Rankings by Go Top'],
-    publisher: { '@type': 'Organization', name: 'GO TOP', url: 'https://www.gotop.co.il' },
-    brand: { '@type': 'Organization', name: 'GO TOP', url: 'https://www.gotop.co.il' },
+    publisher: BRAND_REF,
+    brand: BRAND_REF,
     applicationCategory: 'BusinessApplication',
     description: 'Advanced SEO rank tracking system for monitoring Google search and Google Maps rankings',
     url: baseUrl,
@@ -113,8 +100,9 @@ export async function GET() {
     }),
     publisher: {
       '@type': 'Organization',
-      name: 'GO TOP',
-      url: 'https://www.gotop.co.il',
+      '@id': ORGANIZATION_ID,
+      name: 'Go Top SEO',
+      url: baseUrl,
       logo: {
         '@type': 'ImageObject',
         url: `${baseUrl}/gotop-primary.png`,
@@ -143,7 +131,7 @@ export async function GET() {
     '@context': 'https://schema.org',
     '@type': 'CollectionPage',
     '@graph': [
-      organizationSchema,
+      organization,
       softwareSchema,
       ...articleSchemas,
       ...faqSchemas,

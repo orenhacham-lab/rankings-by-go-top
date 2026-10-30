@@ -107,7 +107,7 @@ function fetcher(answer: Page | (() => Page)) {
 const page = (html: string, truncated = false): Page => ({ ok: true, url: `https://${DOMAIN}/blog/old`, status: 200, html, truncated })
 
 type Row = Record<string, unknown>
-function db(opts: { styles?: Row[]; articles?: Row[]; project?: Row; profiles?: Row[]; pageMap?: Row[] } = {}) {
+function db(opts: { styles?: Row[]; articles?: Row[]; project?: Row; profiles?: Row[]; pageMap?: Row[]; index?: Row[] } = {}) {
   return new FakeAdmin({
     projects: [opts.project ?? { id: PROJECT, user_id: OWNER, name: 'Bakery project', business_name: 'Levi Bakery', target_domain: DOMAIN, language: 'en' }],
     generated_articles: opts.articles ?? [
@@ -118,6 +118,7 @@ function db(opts: { styles?: Row[]; articles?: Row[]; project?: Row; profiles?: 
     project_profiles: opts.profiles ?? [{ project_id: PROJECT, user_id: OWNER, description: DESCRIPTION }],
     site_page_map: opts.pageMap ?? [{ project_id: PROJECT, user_id: OWNER, entries: [{ u: `https://${DOMAIN}/about-us/` }, { u: `https://${DOMAIN}/contact/` }] }],
     content_topics: [],
+    wordpress_content_index: opts.index ?? [],
   })
 }
 const NOW = new Date('2026-10-16T12:00:00Z')
@@ -284,10 +285,46 @@ async function main() {
     const out = await publish(db(), f)
     check('C15: a page cut off at the size cap with no box seen: not a clear "no", no box', out === BODY)
   }
+  // THE FIRST ARTICLE OF A NEW SITE. Before 2026-10-26 the theme test needed one
+  // of OUR articles to already be published, so the very first article of every new
+  // project answered 'theme_unknown' and silently lost the box the customer had
+  // switched on (proven in production: be-cln.co.il, `[author-box] not added
+  // { reason: 'theme_unknown' }`). The test exists only to avoid a SECOND box, so
+  // it now reads the site's OWN posts, and falls back to the switch.
+  const unpublished = [{ id: ART, project_id: PROJECT, wp_post_url: null, published_at: null }]
+  const indexRow = (targets: Row[]) => [{ project_id: PROJECT, user_id: OWNER, targets }]
+  const sitePost = { targetUrl: `https://${DOMAIN}/blog/their-own-post/`, targetType: 'post' }
+  {
+    const d = db({ articles: unpublished })
+    const f = noBoxFetch()
+    const out = await publish(d, f, BODY, 'wordpress', async () => 'Dana Levi')
+    check('C16: the first article of a site with no post anywhere: the box IS added, and nothing is fetched',
+      count(out) === 1 && out.includes('Dana Levi') && f.calls.length === 0)
+    check('C16b: that guess is NOT cached, so the next article runs the real test',
+      styleRow(d).theme_author_box === null && !styleRow(d).theme_author_box_checked_at)
+  }
+  {
+    const d = db({ articles: unpublished, index: indexRow([{ targetUrl: `https://${DOMAIN}/about/`, targetType: 'page' }, sitePost]) })
+    const f = fetcher(page(BOX_PAGE))
+    const out = await publish(d, f)
+    check('C16c: the site\'s own post is read instead, and a theme with a box still wins',
+      out === BODY && f.calls.length === 1 && f.calls[0] === sitePost.targetUrl)
+    check('C16d: and THAT answer is a real test, so it is cached', styleRow(d).theme_author_box === true)
+  }
   {
     const f = noBoxFetch()
-    const out = await publish(db({ articles: [{ id: ART, project_id: PROJECT, wp_post_url: null, published_at: null }] }), f)
-    check('C16: nothing published yet (no page to read): no box, nothing fetched', out === BODY && f.calls.length === 0)
+    const out = await publish(db({ articles: unpublished, index: indexRow([sitePost]) }), f, BODY, 'wordpress', async () => 'Dana Levi')
+    check('C16e: the site\'s own post with no box in its theme: one box', count(out) === 1 && f.calls.length === 1)
+  }
+  {
+    const f = noBoxFetch()
+    const out = await publish(db({ articles: unpublished, index: indexRow([{ targetUrl: 'https://someone-else.example/blog/post/', targetType: 'post' }]) }), f, BODY, 'wordpress', async () => 'Dana Levi')
+    check('C16f: a post on another host is never fetched (the box follows the switch)', count(out) === 1 && f.calls.length === 0)
+  }
+  {
+    const f = noBoxFetch()
+    const shop = await publish(db({ articles: [{ id: ART, project_id: PROJECT, shopify_article_url: null, published_at: null }], index: indexRow([sitePost]) }), f, BODY, 'shopify')
+    check('C16g: a Shopify store never reads the WordPress index', f.calls.length === 0 && count(shop) === 1)
   }
   {
     const f = fetcher(() => { throw new Error('boom') })
@@ -300,8 +337,36 @@ async function main() {
     check('C18: Wix: never a box', out === BODY && f.calls.length === 0)
     const shop = await publish(db({ articles: [{ id: ART, project_id: PROJECT, shopify_article_url: `https://${DOMAIN}/blogs/news/old`, published_at: '2026-10-01T00:00:00Z' }] }), noBoxFetch(), BODY, 'shopify')
     check('C19: a Shopify store gets it like WordPress (its own published article is read)', count(shop) === 1 && shop.includes('Levi Bakery'))
-    // MUTATION CONTROL, run by hand: reading the description for Shopify too fails this check.
-    check('C19b: a store\'s box leaves out the business description, as its articles do', !shop.includes(DESCRIPTION.split('.')[0]))
+    // CHANGED 2026-10-17 on the owner's word: the description reaches a store's
+    // ARTICLES (lib/content/writing-guidance/store.ts), so a store's box carries
+    // it too. Before this a store owner who filled the description in the
+    // settings got a box with a name and nothing under it.
+    check('C19b: a store\'s box carries the business description, as its articles do', shop.includes(DESCRIPTION.split('.')[0]))
+    const silentStore = await mutant<typeof import('@/lib/content/author-box/store')>('lib/content/author-box/store.ts', (src) =>
+      src.replace('    readDescription(admin, req.projectId, project.owner),', "    req.platform === 'shopify' ? Promise.resolve(null) : readDescription(admin, req.projectId, project.owner),"))
+    const silenced = await silentStore.decideAuthorBox(
+      db({ articles: [{ id: ART, project_id: PROJECT, shopify_article_url: `https://${DOMAIN}/blogs/news/old`, published_at: '2026-10-01T00:00:00Z' }] }) as never,
+      { articleId: ART, projectId: PROJECT, platform: 'shopify', html: BODY }, { fetchHtml: noBoxFetch().fn, now: () => NOW })
+    check('MUTATION CONTROL: skipping the description for a store again fails C19b', silenced.add && silenced.content.line === '')
+  }
+  const oldFirstArticle = await mutant<typeof import('@/lib/content/author-box/store')>('lib/content/author-box/store.ts', (src) =>
+    src.replace("      if (page) {", "      if (!page) return { add: false, reason: 'theme_unknown' }\n      if (page) {"))
+  {
+    const d = await oldFirstArticle.decideAuthorBox(db({ articles: unpublished }) as never,
+      { articleId: ART, projectId: PROJECT, platform: 'wordpress', html: BODY, authorName: async () => 'Dana Levi' },
+      { fetchHtml: noBoxFetch().fn, now: () => NOW })
+    check('MUTATION CONTROL: the old "no page, no box" rule put back loses the first article\'s box (so C16 would fail)',
+      d.add === false && !d.add && d.reason === 'theme_unknown')
+  }
+  const indexIgnored = await mutant<typeof import('@/lib/content/author-box/store')>('lib/content/author-box/store.ts', (src) =>
+    src.replace("    if (t?.targetType !== 'post') continue", '    continue'))
+  {
+    const f2 = fetcher(page(BOX_PAGE))
+    const d = await indexIgnored.decideAuthorBox(db({ articles: unpublished, index: indexRow([sitePost]) }) as never,
+      { articleId: ART, projectId: PROJECT, platform: 'wordpress', html: BODY, authorName: async () => 'Dana Levi' },
+      { fetchHtml: f2.fn, now: () => NOW })
+    check('MUTATION CONTROL: skipping every index entry stops reading the site\'s own post (so C16c would fail)',
+      d.add === true && f2.calls.length === 0)
   }
   const unknownAsNo = await mutant<typeof import('@/lib/content/author-box/store')>('lib/content/author-box/store.ts', (s) => s.replace("if (answer !== 'no_box') return { add: false, reason: 'theme_unknown' }", "if (answer === 'has_box' && false) return { add: false, reason: 'theme_unknown' }"))
   {
@@ -532,7 +597,7 @@ async function main() {
     const previewSrc = strip(read('lib/content/author-box/preview.ts'))
     const storeSrc2 = strip(read('lib/content/author-box/store.ts'))
     const sameResolver = (card: string) => /const content = authorBoxContent\(inputs\)/.test(card) && /const who = resolveAuthorName\(inputs\)/.test(card)
-      && /\.\.\.preview\.data\.inputs, nameOverride: name, linkUrl: url, imageChoice: image/.test(card)
+      && /\.\.\.preview\.data\.inputs, nameOverride: name, lineOverride: line, linkUrl: url, imageChoice: image/.test(card)
       && !/looksLikeLogin/.test(card) && /readAuthorBoxInputs\(admin, \{/.test(previewSrc)
       && /const inputs = await readAuthorBoxInputs\([\s\S]{0,200}\)\n\s*const content = authorBoxContent\(inputs\)/.test(storeSrc2)
     check('H16: the card draws the preview with authorBoxContent over the publisher\'s inputs; publishing reads and draws the same way', sameResolver(cardSrc2))
@@ -544,7 +609,8 @@ async function main() {
       check('H17: another user\'s project (or a bad id) gets no preview', !other.ok && other.code === 'not_found' && !bad.ok)
       const shop = await previewAuthorBox(pdeps(d, 'Dana Levi'), PROJECT)
       const shopify = await previewAuthorBox(pdeps(d, 'Dana Levi', 'shopify'), PROJECT)
-      check('H18: a store is never asked for a WordPress user and gets no description, like its published box', shop.ok && shopify.ok && shopify.data.inputs.authorName === null && shopify.data.inputs.description === null && shopify.data.siteIconAvailable === false && shop.data.siteIconAvailable === true)
+      check('H18: a store is never asked for a WordPress user and is offered no site icon, but its description reaches the box like its articles',
+        shop.ok && shopify.ok && shopify.data.inputs.authorName === null && shopify.data.inputs.description === DESCRIPTION && shopify.data.siteIconAvailable === false && shop.data.siteIconAvailable === true)
       const slow = await previewAuthorBox({ ...pdeps(d, null), siteUserName: () => new Promise<string | null>(() => {}), timeoutMs: 50 }, PROJECT)
       check('H19: a site that does not answer: the preview still comes within the time cap, with the business name', slow.ok && slow.data.inputs.authorName === null && authorBoxContent(slow.data.inputs)?.name === 'Levi Bakery')
     }

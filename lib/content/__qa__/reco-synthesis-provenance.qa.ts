@@ -81,7 +81,7 @@ function main() {
     check('B2. the prompts differ ONLY in their BRIEFS payload',
       buildBriefSynthesisPrompt(NAGLER, 'Hebrew', 2026) !== buildBriefSynthesisPrompt(FLORIST, 'Hebrew', 2026))
     check('B3. buildBriefSynthesisPrompt no longer takes a ProjectContext at all',
-      /export function buildBriefSynthesisPrompt\(briefs: OpportunityBrief\[\], langLabel: string, year: number\)/
+      /export function buildBriefSynthesisPrompt\(briefs: OpportunityBrief\[\], langLabel: string, year: number, servedObjects\?: readonly string\[\]\)/
         .test(stripComments(read('lib/content/recommendations/brief-synthesis.ts'))))
     check('B4. brief-synthesis.ts no longer imports projectContextBlock',
       !/projectContextBlock/.test(read('lib/content/recommendations/brief-synthesis.ts')))

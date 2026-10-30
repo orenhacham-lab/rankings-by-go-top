@@ -57,6 +57,8 @@ const he = FEATURE_COMMON.he
 const en = FEATURE_COMMON.en
 const es = FEATURE_COMMON.es
 const pt = FEATURE_COMMON['pt-BR']
+const fr = FEATURE_COMMON.fr
+const it = FEATURE_COMMON.it
 
 export const MAPS_POSTS_PAGE: MarketingPage = {
   path: '/features/google-maps-posts',
@@ -76,6 +78,14 @@ export const MAPS_POSTS_PAGE: MarketingPage = {
     'pt-BR': {
       title: 'Posts no Google Maps | Go Top SEO',
       description: 'Publique novidades com foto e botão no Perfil da Empresa no Google direto do aplicativo: o primeiro rascunho já vem pronto, você ajusta e publica agora ou no horário que escolher. E no mesmo lugar responde às suas avaliações do Google.',
+    },
+    fr: {
+      title: 'Posts Google Maps | Go Top SEO',
+      description: 'Publiez des actualités avec photo et bouton sur votre fiche Google Business Profile, depuis l’application : un premier brouillon est prêt, vous le corrigez et publiez tout de suite ou à l’heure choisie. Et au même endroit, vous répondez à vos avis Google.',
+    },
+    it: {
+      title: 'Post Google Maps | Go Top SEO',
+      description: 'Dall’applicazione si pubblicano novità con foto e pulsante sul profilo Google Business Profile: una prima bozza è pronta, si corregge e si pubblica subito o all’ora scelta. E nello stesso posto si risponde alle recensioni Google.',
     },
   },
   content: {
@@ -541,6 +551,238 @@ export const MAPS_POSTS_PAGE: MarketingPage = {
         },
       ],
       cta: { title: 'Deixe seus clientes verem o que há de novo', body: pt.closeBody, primary: pt.trial, secondary: pt.check },
+    },
+    fr: {
+      hero: {
+        eyebrow: 'Posts Google Maps',
+        eyebrowIcon: MapPinned,
+        title: 'Votre fiche Google Business Profile',
+        accent: 'à jour, même quand vous manquez de temps',
+        subtitle: 'Les personnes qui vous trouvent sur Google Maps voient ce qui est nouveau chez vous : une offre, un nouveau service, un article qui vient de paraître. Rédigez depuis l’application un post avec photo et bouton, recevez un premier brouillon, corrigez-le et publiez tout de suite ou à l’heure que vous choisissez. Et au même endroit, vous répondez à vos avis.',
+        trust: fr.trust,
+        primary: fr.trial,
+        secondary: fr.check,
+        visual: (
+          <MapsPostVisual
+            business="Salle de sport de la Grand-Rue"
+            kind="Actualité · jeudi 10:00"
+            text="Nous ouvrons un nouveau cours collectif du matin pour les 50 ans et plus, les lundis et mercredis à 7:00. Un coach dédié, un petit groupe et une séance d’essai gratuite, sans engagement."
+            button="Réserver"
+            queueHeading="Vos posts"
+            queue={[
+              { title: 'Cours du matin pour les 50 ans et plus', detail: 'Programmé pour jeudi 10:00', status: 'Programmé', done: false },
+              { title: 'Guide : bien choisir ses chaussures de running', detail: 'À partir d’un nouvel article du site', status: 'En ligne', auto: true, done: true },
+            ]}
+            review={{
+              heading: 'Nouvel avis',
+              author: 'Dana K.',
+              stars: 5,
+              starsLabel: '5 étoiles sur 5',
+              text: 'Lieu propre, coachs patients et bonne ambiance. J’y viens depuis six mois.',
+              replyLabel: 'Brouillon de réponse',
+              reply: 'Merci beaucoup pour ces mots ! Nous sommes ravis que vous vous y sentiez bien, à bientôt pour la prochaine séance.',
+            }}
+          />
+        ),
+      },
+      sections: [
+        {
+          kind: 'steps',
+          eyebrow: 'Comment ça marche',
+          title: 'De la connexion au post en ligne',
+          items: [
+            { title: 'Connectez-vous une fois', body: 'Connectez-vous avec le compte Google qui gère votre fiche Google Business Profile et validez sur l’écran de Google. L’autorisation ne couvre que la gestion de la fiche, et elle est distincte de Search Console. Vous pouvez vous déconnecter à tout moment.' },
+            { title: 'Choisissez l’établissement', body: 'L’application liste les établissements que vous gérez sur Google, et vous choisissez celui sur lequel les posts de ce site seront publiés.' },
+            { title: 'Rédigez, ou partez d’un brouillon', body: 'Partez d’un article que le système a écrit pour votre site, d’un sujet que vous saisissez, ou d’une page blanche. Vous obtenez un premier brouillon dans la limite de longueur de Google et vous le modifiez comme vous voulez.' },
+            { title: 'Publiez ou programmez', body: 'Tout de suite, ou à la date et à l’heure que vous choisissez, jusqu’à un an à l’avance. La liste des posts montre ce qui est en ligne, ce qui est programmé et ce que Google examine encore.' },
+          ],
+        },
+        {
+          kind: 'cards',
+          eyebrow: 'Dans chaque post',
+          title: 'Un post qui a l’air soigné',
+          items: [
+            { icon: Crop, title: 'La photo à la bonne taille', body: 'Importez une photo et recadrez-la en 4:3, comme Google l’affiche, avec zoom et position. Un post écrit à partir d’un article peut reprendre l’image de l’article en un clic.' },
+            { icon: ImagePlus, title: 'Une image prête pour un post par sujet', body: 'Quand vous écrivez un post à partir d’un sujet que vous avez saisi, vous pouvez demander à l’application de créer une image d’illustration par IA. C’est une image générique, pas une photo de votre entreprise, de votre équipe ou de vos produits, et elle n’entre dans le post que si vous la choisissez.' },
+            { icon: MousePointerClick, title: 'Un bouton qui mène à une action', body: 'En savoir plus, Réserver, Commander en ligne, Acheter, S’inscrire ou Appeler. Le bouton mène à une page de votre site ou, si vous l’autorisez, à un autre site comme un outil de réservation. Appeler compose le numéro de votre fiche.' },
+            { icon: Eye, title: 'Voyez avant de publier', body: 'À côté de l’éditeur, un aperçu du post : le nom de l’établissement, la photo, le texte et le bouton, pour éviter toute surprise.' },
+            { icon: Type, title: 'Dans les règles de Google', body: 'Un compteur de caractères jusqu’à 1 500, la limite de Google. Si le texte contient un numéro de téléphone, vous recevez un avertissement, car Google limite les numéros dans les posts, et pour les appels il y a le bouton Appeler.' },
+            { icon: Languages, title: 'Dans la langue de vos clients', body: 'Le brouillon est rédigé en français, en hébreu, en anglais, en espagnol ou en portugais, et vous pouvez toujours changer chaque mot avant de publier.' },
+            { icon: ShieldCheck, title: 'Uniquement ce que vous avez validé', body: 'Seuls partent les posts et les réponses que vous avez validés, plus les posts automatiques si vous les avez activés. Les horaires, l’adresse et les autres informations de l’établissement ne sont jamais modifiés.' },
+          ],
+        },
+        {
+          kind: 'cards',
+          tone: 'contrast',
+          eyebrow: 'Publication automatique',
+          title: 'Un nouvel article sur le site, un nouveau post sur Google',
+          items: [
+            { icon: Zap, title: 'Cela se fait tout seul', body: 'Si vous l’activez, chaque article que le système publie sur votre site devient aussi un post court sur votre fiche Google Business Profile, avec l’image de l’article et un bouton En savoir plus qui y mène.' },
+            { icon: ToggleLeft, title: 'Désactivé jusqu’à ce que vous l’activiez', body: 'C’est désactivé par défaut et réglé site par site. Un post automatique part sans que vous l’ayez relu, et c’est pourquoi la décision vous revient. Vous pouvez le désactiver à tout moment, et les posts déjà en ligne y restent.' },
+            { icon: Repeat, title: 'Une fois par article', body: 'Le même article ne part jamais deux fois sur la fiche, même si la publication sur votre site est relancée. La fiche ne se remplit donc pas de doublons.' },
+          ],
+        },
+        {
+          kind: 'cards',
+          columns: 2,
+          eyebrow: 'Avis Google',
+          title: 'Répondez à chaque avis, depuis un seul endroit',
+          items: [
+            { icon: MessageSquareText, title: 'Tous les avis sous les yeux', body: 'Les avis Google de votre établissement, avec la note moyenne, le nombre de ceux qui attendent encore une réponse, et les nouveaux signalés. Vous pouvez trier par note.' },
+            { icon: Sparkles, title: 'Un brouillon de réponse en un clic', body: 'Vous recevez une réponse suggérée, polie et précise, dans la langue où le client a écrit. Vous la modifiez et l’envoyez, et elle apparaît sur Google sous l’avis.' },
+            { icon: PenLine, title: 'Modifier ou supprimer', body: 'Vous pouvez modifier une réponse déjà publiée, ou la supprimer. L’avis lui-même reste tel quel.' },
+            { icon: Lock, title: 'Les avis ne sont pas conservés chez nous', body: 'Les avis sont lus depuis Google chaque fois que vous ouvrez l’écran et ne sont pas stockés dans le système. Le nom du client n’est pas envoyé pour rédiger le brouillon ; ajoutez-le vous-même si vous voulez l’appeler par son nom.' },
+          ],
+        },
+        {
+          kind: 'callout',
+          icon: Info,
+          title: 'Bon à savoir',
+          body: (
+            <>
+              <p>
+                Google examine chaque post avant de l’afficher et en refuse parfois un. La liste des posts montre où en
+                est chacun d’eux, y compris un post refusé. Pour vous connecter, il faut un compte Google propriétaire
+                ou gestionnaire de la fiche Google Business Profile.
+              </p>
+              <p>
+                Go Top SEO n’est pas affilié à Google. Les posts et les réponses aux avis aident les clients à voir une
+                entreprise active, mais il n’y a aucune promesse de position sur Google Maps ni dans la recherche.
+              </p>
+            </>
+          ),
+        },
+        {
+          kind: 'faq',
+          eyebrow: 'Questions fréquentes',
+          title: 'Ce que l’on demande sur les posts Google Maps',
+          items: [
+            { q: 'L’application peut-elle modifier mes horaires ou mon adresse ?', a: 'Non. Nous publions uniquement des posts et des réponses aux avis. Les horaires, l’adresse, le numéro de téléphone et les autres informations de la fiche restent exactement tels quels.' },
+            { q: 'Le brouillon se publie-t-il tout seul ?', a: 'Quand vous écrivez un post, non : le brouillon s’affiche à l’écran et n’est publié que lorsque vous appuyez sur le bouton. Les posts sur de nouveaux articles ne partent seuls que si vous avez activé la publication automatique.' },
+            { q: 'Puis-je programmer des posts à l’avance ?', a: 'Oui, à la date et à l’heure que vous choisissez, jusqu’à un an à l’avance. Un post programmé peut être annulé tant qu’il n’est pas parti.' },
+            { q: 'Cela fonctionne-t-il pour une boutique Shopify ou un site qui n’est pas sous WordPress ?', a: 'Oui. Le post part sur votre fiche Google Business Profile, pas sur votre site, donc cela fonctionne pour tous les projets, sur n’importe quelle plateforme.' },
+            { q: 'Que se passe-t-il si je me déconnecte ?', a: 'Les posts programmés ne seront pas publiés tant que vous ne vous reconnectez pas. Ceux déjà publiés restent sur Google.' },
+            { q: 'Je gère plusieurs établissements sur Google. Est-ce un problème ?', a: 'Non. L’application affiche tous les établissements que le compte gère, et pour chaque site du système vous choisissez celui sur lequel ses posts partent.' },
+          ],
+        },
+      ],
+      cta: { title: 'Montrez à vos clients ce qui est nouveau chez vous', body: fr.closeBody, primary: fr.trial, secondary: fr.check },
+    },
+    it: {
+      hero: {
+        eyebrow: 'Post Google Maps',
+        eyebrowIcon: MapPinned,
+        title: 'Il profilo Google Business Profile',
+        accent: 'aggiornato anche quando il tempo manca',
+        subtitle: 'Chi trova l’attività su Google Maps vede che cosa c’è di nuovo: un’offerta, un nuovo servizio, un articolo appena uscito. Dall’applicazione si scrive un post con foto e pulsante, si riceve una prima bozza, si corregge e si pubblica subito o all’ora scelta. E nello stesso posto si risponde alle recensioni.',
+        trust: it.trust,
+        primary: it.trial,
+        secondary: it.check,
+        visual: (
+          <MapsPostVisual
+            business="Palestra di Via Roma"
+            kind="Novità · giovedì 10:00"
+            text="Apriamo un nuovo corso collettivo del mattino per gli over 50, il lunedì e il mercoledì alle 7:00. Un istruttore dedicato, un gruppo piccolo e una lezione di prova gratuita, senza impegno."
+            button="Prenota"
+            queueHeading="I suoi post"
+            queue={[
+              { title: 'Corso del mattino per gli over 50', detail: 'Programmato per giovedì 10:00', status: 'Programmato', done: false },
+              { title: 'Guida: come scegliere le scarpe da running', detail: 'Da un nuovo articolo del sito', status: 'Online', auto: true, done: true },
+            ]}
+            review={{
+              heading: 'Nuova recensione',
+              author: 'Dana K.',
+              stars: 5,
+              starsLabel: '5 stelle su 5',
+              text: 'Locale pulito, istruttori pazienti e bella atmosfera. Ci vengo da sei mesi.',
+              replyLabel: 'Bozza di risposta',
+              reply: 'Grazie di cuore per queste parole! Siamo felici che si trovi bene da noi, a presto per la prossima lezione.',
+            }}
+          />
+        ),
+      },
+      sections: [
+        {
+          kind: 'steps',
+          eyebrow: 'Come funziona',
+          title: 'Dal collegamento al post online',
+          items: [
+            { title: 'Un solo collegamento', body: 'Si accede con l’account Google che gestisce il profilo Google Business Profile e si conferma nella schermata di Google. L’autorizzazione copre soltanto la gestione del profilo ed è distinta da Search Console. Si può scollegare in qualsiasi momento.' },
+            { title: 'Scelta della sede', body: 'L’applicazione elenca le sedi gestite su Google e si sceglie quella su cui verranno pubblicati i post di questo sito.' },
+            { title: 'Scrittura, o partenza da una bozza', body: 'Si parte da un articolo che il sistema ha scritto per il sito, da un argomento inserito a mano o da una pagina bianca. Si ottiene una prima bozza entro il limite di lunghezza di Google e si modifica a piacere.' },
+            { title: 'Pubblicazione o programmazione', body: 'Subito, oppure alla data e all’ora scelte, fino a un anno prima. L’elenco dei post mostra che cosa è online, che cosa è programmato e che cosa Google sta ancora esaminando.' },
+          ],
+        },
+        {
+          kind: 'cards',
+          eyebrow: 'In ogni post',
+          title: 'Un post dall’aspetto curato',
+          items: [
+            { icon: Crop, title: 'La foto nella misura giusta', body: 'Si carica una foto e si ritaglia in 4:3, come la mostra Google, con zoom e posizione. Un post scritto a partire da un articolo può riprenderne l’immagine con un clic.' },
+            { icon: ImagePlus, title: 'Un’immagine pronta per un post da argomento', body: 'Quando si scrive un post a partire da un argomento inserito a mano, si può chiedere all’applicazione di creare un’immagine illustrativa con l’IA. È un’immagine generica, non una foto dell’azienda, del team o dei prodotti, ed entra nel post solo se viene scelta.' },
+            { icon: MousePointerClick, title: 'Un pulsante che porta a un’azione', body: 'Scopri di più, Prenota, Ordina online, Acquista, Iscriviti o Chiama. Il pulsante porta a una pagina del sito oppure, se autorizzato, a un altro sito come uno strumento di prenotazione. Chiama compone il numero del profilo.' },
+            { icon: Eye, title: 'Si vede prima di pubblicare', body: 'Accanto all’editor, un’anteprima del post: il nome della sede, la foto, il testo e il pulsante, per evitare qualsiasi sorpresa.' },
+            { icon: Type, title: 'Nelle regole di Google', body: 'Un contatore di caratteri fino a 1.500, il limite di Google. Se il testo contiene un numero di telefono compare un avviso, perché Google limita i numeri nei post, e per le chiamate c’è il pulsante Chiama.' },
+            { icon: Languages, title: 'Nella lingua dei clienti', body: 'La bozza viene scritta in italiano, ebraico, inglese, spagnolo, portoghese o francese, e ogni parola si può cambiare prima di pubblicare.' },
+            { icon: ShieldCheck, title: 'Solo ciò che è stato approvato', body: 'Partono solo i post e le risposte approvati, più i post automatici se sono stati attivati. Gli orari, l’indirizzo e le altre informazioni della sede non vengono mai modificati.' },
+          ],
+        },
+        {
+          kind: 'cards',
+          tone: 'contrast',
+          eyebrow: 'Pubblicazione automatica',
+          title: 'Un nuovo articolo sul sito, un nuovo post su Google',
+          items: [
+            { icon: Zap, title: 'Avviene da sé', body: 'Se la si attiva, ogni articolo che il sistema pubblica sul sito diventa anche un post breve sul profilo Google Business Profile, con l’immagine dell’articolo e un pulsante Scopri di più che vi porta.' },
+            { icon: ToggleLeft, title: 'Disattivata finché non viene attivata', body: 'È disattivata per impostazione predefinita e si regola sito per sito. Un post automatico parte senza essere stato riletto, e per questo la decisione resta al cliente. Si può disattivare in qualsiasi momento, e i post già online restano.' },
+            { icon: Repeat, title: 'Una volta per articolo', body: 'Lo stesso articolo non parte mai due volte sul profilo, anche se la pubblicazione sul sito viene ripetuta. Il profilo non si riempie quindi di duplicati.' },
+          ],
+        },
+        {
+          kind: 'cards',
+          columns: 2,
+          eyebrow: 'Recensioni Google',
+          title: 'Rispondere a ogni recensione da un solo posto',
+          items: [
+            { icon: MessageSquareText, title: 'Tutte le recensioni sotto gli occhi', body: 'Le recensioni Google della sede, con il voto medio, il numero di quelle che attendono ancora una risposta e le nuove segnalate. Si può ordinare per voto.' },
+            { icon: Sparkles, title: 'Una bozza di risposta con un clic', body: 'Si riceve una risposta suggerita, cortese e precisa, nella lingua in cui il cliente ha scritto. Si modifica e si invia, e compare su Google sotto la recensione.' },
+            { icon: PenLine, title: 'Modificare o eliminare', body: 'Una risposta già pubblicata si può modificare o eliminare. La recensione in sé resta come è.' },
+            { icon: Lock, title: 'Le recensioni non restano da noi', body: 'Le recensioni vengono lette da Google ogni volta che si apre la schermata e non sono conservate nel sistema. Il nome del cliente non viene inviato per scrivere la bozza; si può aggiungere a mano per rivolgersi al cliente per nome.' },
+          ],
+        },
+        {
+          kind: 'callout',
+          icon: Info,
+          title: 'Buono a sapersi',
+          body: (
+            <>
+              <p>
+                Google esamina ogni post prima di mostrarlo e a volte ne rifiuta uno. L’elenco dei post mostra a che
+                punto è ciascuno, compreso un post rifiutato. Per collegarsi serve un account Google proprietario o
+                gestore del profilo Google Business Profile.
+              </p>
+              <p>
+                Go Top SEO non è affiliata a Google. I post e le risposte alle recensioni aiutano i clienti a vedere
+                un’azienda attiva, ma non c’è alcuna promessa di posizione su Google Maps né nella ricerca.
+              </p>
+            </>
+          ),
+        },
+        {
+          kind: 'faq',
+          eyebrow: 'Domande frequenti',
+          title: 'Che cosa si chiede sui post Google Maps',
+          items: [
+            { q: 'L’applicazione può modificare gli orari o l’indirizzo?', a: 'No. Pubblichiamo soltanto post e risposte alle recensioni. Gli orari, l’indirizzo, il numero di telefono e le altre informazioni del profilo restano esattamente come sono.' },
+            { q: 'La bozza si pubblica da sé?', a: 'Quando si scrive un post, no: la bozza compare sullo schermo e viene pubblicata solo premendo il pulsante. I post sui nuovi articoli partono da soli solo se la pubblicazione automatica è stata attivata.' },
+            { q: 'Si possono programmare post in anticipo?', a: 'Sì, alla data e all’ora scelte, fino a un anno prima. Un post programmato può essere annullato finché non è partito.' },
+            { q: 'Funziona per un negozio Shopify o per un sito che non è su WordPress?', a: 'Sì. Il post parte sul profilo Google Business Profile, non sul sito, quindi funziona per tutti i progetti, su qualsiasi piattaforma.' },
+            { q: 'Che cosa succede scollegando l’account?', a: 'I post programmati non verranno pubblicati fino a un nuovo collegamento. Quelli già pubblicati restano su Google.' },
+            { q: 'Gestisco più sedi su Google. È un problema?', a: 'No. L’applicazione mostra tutte le sedi gestite dall’account e, per ogni sito del sistema, si sceglie quella su cui partono i suoi post.' },
+          ],
+        },
+      ],
+      cta: { title: 'Mostri ai suoi clienti che cosa c’è di nuovo', body: it.closeBody, primary: it.trial, secondary: it.check },
     },
   },
 }

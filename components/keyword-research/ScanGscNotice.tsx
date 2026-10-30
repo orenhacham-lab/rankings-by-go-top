@@ -41,7 +41,7 @@ export default function ScanGscNotice({
   retry: () => void
   className?: string
 }) {
-  const { language, uiLocale } = useDashboardLanguage()
+  const { uiLocale } = useDashboardLanguage()
   const t = getDashboardDictionary(uiLocale).keywordResearchScan.gsc
   const state = data.state
   if (state === 'disabled') return null
@@ -61,8 +61,8 @@ export default function ScanGscNotice({
         <GscLoadError onRetry={retry} className="min-w-0 flex-1 basis-80" />
       ) : state === 'ready' ? (
         <p className="min-w-0 flex-1 basis-80 text-copy text-muted">{scope === 'search'
-          ? (count > 0 ? t.legendSearch(formatCount(count, language)) : t.noneInSearch)
-          : (count > 0 ? t.legend(formatCount(count, language)) : t.noneYet)}</p>
+          ? (count > 0 ? t.legendSearch(formatCount(count, uiLocale)) : t.noneInSearch)
+          : (count > 0 ? t.legend(formatCount(count, uiLocale)) : t.noneYet)}</p>
       ) : (
         <p className="min-w-0 flex-1 basis-80 text-copy text-muted" aria-busy="true">{t.loading}</p>
       )}

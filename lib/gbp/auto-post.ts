@@ -93,10 +93,10 @@ export function placeholderSummary(src: { title: string | null; description: str
 /**
  * The post is written in the project's own language, exactly as its articles are
  * (Oren, 2026-10-12: "what is the problem with the post being in Spanish or
- * Portuguese? that is what we do with the articles"). All four app languages, so
+ * Portuguese? that is what we do with the articles"). All five app languages, so
  * a Spanish business's customers read Spanish on its profile.
  *
- * A tag is matched by its language part, so 'es-MX' or 'pt-PT' still resolve;
+ * A tag is matched by its language part, so 'es-MX', 'pt-PT' or 'fr-CA' still resolve;
  * Portuguese resolves to the pt-BR text the app has. A project with no language
  * recorded (one that predates the column) gets English, the app's own fallback
  * for a non-Hebrew reader.
@@ -109,6 +109,8 @@ export function postLanguageFor(projectLanguage: unknown): GbpPostLanguage {
   if (base === 'he' || base === 'iw') return 'he'   // 'iw' is the old ISO code for Hebrew
   if (base === 'es') return 'es'
   if (base === 'pt') return 'pt-BR'
+  if (base === 'fr') return 'fr'
+  if (base === 'it') return 'it'
   return 'en'
 }
 

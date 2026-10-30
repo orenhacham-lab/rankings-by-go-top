@@ -63,7 +63,7 @@ import { applyArticleDesign } from '@/lib/content/article-style/publish'
 import { resolveTaxonomy, type ResolvedTaxonomy, type SeoPlugin } from '@/lib/content/wordpress-taxonomy'
 import { publishArticleSchemaToWordPress, type ArticleSchemaOutcome } from '@/lib/content/wordpress-schema'
 import { loadFocusKeyword, persistSeoOutcome, publishArticleSeo, type SeoPublishResult } from '@/lib/content/seo-publish'
-import { copyAuthorPhotoToWordPress } from '@/lib/content/author-box/photo-copy'
+import { copyAuthorPhoto } from '@/lib/content/author-box/photo-copy'
 import { wpCreatePost, type WpArticleForExport, type WpCreateError, type WpCreateResult } from '@/lib/content/wordpress-publish'
 
 type Admin = ReturnType<typeof createAdminClient>
@@ -221,9 +221,10 @@ export async function pluginCreatePost(
     forceNew?: boolean
     authorId?: number
     /**
-     * The project's application password, when it has one too: the only way the owner's
-     * uploaded author photo reaches the media library (the plugin's /media takes public
-     * GO TOP storage addresses only, and the photo's bucket is private).
+     * The project's application password, when it has one too. From plugin 3.2.0 the photo no
+     * longer needs it: /media also accepts the one address GO TOP signs on its own storage
+     * (lib/content/author-box/photo-copy.ts). A plugin older than that still cannot take the
+     * photo, because the bucket is private and has no public address.
      */
     photoCreds?: WordPressCredentials | null
   },
@@ -270,7 +271,10 @@ export async function pluginCreatePost(
   // (author_id, else the plugin's default), from its signed /authors list.
   content = await applyArticleDesign(admin, articleId, content, 'wordpress', {
     authorName: () => pluginPublishingUserName(link, plugin.version, opts.authorId, deps.post),
-    ...(opts.photoCreds ? { authorPhoto: (projectId: string, ownerId: string) => copyAuthorPhotoToWordPress(admin, opts.photoCreds!, projectId, ownerId) } : {}),
+    authorPhoto: (projectId: string, ownerId: string) => copyAuthorPhoto(admin, {
+      creds: opts.photoCreds ?? null,
+      plugin: pluginCan(plugin.version, 'author_photo') ? plugin : null,
+    }, projectId, ownerId),
   })
 
   let taxonomy: ResolvedTaxonomy | undefined

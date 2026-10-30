@@ -104,14 +104,14 @@ console.log('\nC) the flag decides every outward sign')
       home['pt-BR'] === 'https://www.gotopseo.com/pt-BR', home['pt-BR'])
     check('C4: a path that merely starts with the letters is not touched',
       buildHreflangAlternates('/espanol', '/en/espanol', '/espanol')['pt-BR'] === 'https://www.gotopseo.com/espanol')
-    check('C5: the switcher offers it', availableLocales(true, true).includes('pt-BR'))
+    check('C5: the switcher offers it', availableLocales({ es: true, 'pt-BR': true }).includes('pt-BR'))
     check('C6: a Portuguese path is a Portuguese document',
       isPortuguesePath('/pt-BR/pricing') && routePublicLocale('/pt-BR/pricing') === 'pt-BR'
       && resolveAuthLocale({ pathname: '/pt-BR/login' }) === 'pt-BR')
     process.env.NEXT_PUBLIC_PORTUGUESE_SITE_ENABLED = ''
     const off = buildHreflangAlternates('/pricing', '/en/pricing', '/es/pricing')
     check('C7: with the flag off, nothing advertises the language',
-      !('pt-BR' in off) && !availableLocales(true, false).includes('pt-BR'))
+      !('pt-BR' in off) && !availableLocales({ es: true, 'pt-BR': false }).includes('pt-BR'))
     check('C8: and a Portuguese URL is not even a locale, so nothing labels a 404 pt-BR',
       !isPortuguesePath('/pt-BR/pricing') && routePublicLocale('/pt-BR/pricing') !== 'pt-BR')
     check('C7-MUT: a switcher that ignores the flag fails C7',
@@ -120,8 +120,28 @@ console.log('\nC) the flag decides every outward sign')
     process.env.NEXT_PUBLIC_PORTUGUESE_SITE_ENABLED = was
     process.env.NEXT_PUBLIC_SPANISH_SITE_ENABLED = wasEs
   }
-  check('C9: the sitemap lists it only inside its own flag',
-    /const portuguesePages = portugueseSiteEnabled\(\) \? treePages\('\/pt-BR'\) : \[\]/.test(strip(read('app/sitemap.xml/route.ts'))))
+  /**
+   * C9: THE SITEMAP BUILDS EVERY TRANSLATED TREE FROM THE ONE GATE.
+   *
+   * This used to read `const portuguesePages = portugueseSiteEnabled() ? …`,
+   * one `const` per language, which is exactly how French arrived on 21 October
+   * 2026 with a route tree, an hreflang set, a switcher entry — and no sitemap
+   * entry at all. So the guard is no longer "Portuguese is behind its flag" but
+   * "no language can be left out": the list the sitemap iterates must be every
+   * public locale that has a prefix, i.e. all of them but Hebrew and English,
+   * which are the hand-written trees above it.
+   */
+  const sitemapSrc = strip(read('app/sitemap.xml/route.ts'))
+  const declared = /const TRANSLATED_LOCALES: readonly PublicLocale\[\] = \[([^\]]*)\]/.exec(sitemapSrc)
+  const sitemapLocales = (declared?.[1] ?? '').split(',').map((v) => v.trim().replace(/^'|'$/g, '')).filter(Boolean)
+  const prefixed = PUBLIC_LOCALES.filter((l) => LOCALE_PREFIX[l] !== '' && l !== 'en')
+  check('C9: the sitemap derives the translated trees from the enabled locales',
+    /enabledPublicLocales\(\)/.test(sitemapSrc) && /flatMap\(\(l\) => treePages\(LOCALE_PREFIX\[l\]\)\)/.test(sitemapSrc))
+  check('C9a: and the list it iterates is every prefixed locale, so none is forgotten',
+    prefixed.every((l) => sitemapLocales.includes(l)) && sitemapLocales.every((l) => (prefixed as string[]).includes(l)),
+    `sitemap ${sitemapLocales.join(' ')} vs locales ${prefixed.join(' ')}`)
+  check('C9-MUT: a prefixed locale missing from that list is caught',
+    !prefixed.every((l) => sitemapLocales.filter((x) => x !== 'pt-BR').includes(l)))
   // A file in public/ is served BEFORE a route of the same path. A stale
   // public/sitemap.xml shadowed this route until 5 October 2026, so Google was
   // being handed five URLs and never saw the Spanish tree at all. The route can

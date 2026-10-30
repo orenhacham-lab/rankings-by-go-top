@@ -58,7 +58,8 @@ export type ConsentAction = (typeof CONSENT_ACTIONS)[number]
  * fallback in normalizeConsentLocale below — or be rejected by the database and
  * silently lost, which is the one failure this table exists to prevent. The
  * constraint comes FIRST (20261005050636_consent_events_locale_widen.sql for
- * 'pt-BR'), then this list; lib/consent/__qa__/consent-locale-contract.qa.ts
+ * 'pt-BR', 20261021180000_consent_events_locale_fr.sql for 'fr',
+ * 20261023130000_locale_it.sql for 'it'), then this list; lib/consent/__qa__/consent-locale-contract.qa.ts
  * holds the two together, so a language added here and not there fails in CI
  * rather than losing a visitor's proof in production.
  *
@@ -67,7 +68,7 @@ export type ConsentAction = (typeof CONSENT_ACTIONS)[number]
  * migrations and fails if a language is live that the log cannot store, so the
  * flag cannot be turned on ahead of the constraint either.
  */
-export const CONSENT_LOCALES = ['he', 'en', 'es', 'pt-BR'] as const
+export const CONSENT_LOCALES = ['he', 'en', 'es', 'pt-BR', 'fr', 'it'] as const
 
 export type ConsentLocale = (typeof CONSENT_LOCALES)[number]
 
@@ -85,7 +86,17 @@ export function normalizeConsentLocale(value: unknown): ConsentLocale {
  * than this is asked again instead of being counted as having agreed to
  * something they never read.
  */
-export const CONSENT_POLICY_VERSION = '2026-10-03'
+/*
+ * 2026-10-29: the marketing category gained a third recipient. It used to name
+ * the Google and Meta networks and nothing else, which is a closed list of
+ * two, so a visitor who allowed it did not allow JVZoo's affiliate beacon on
+ * /go/jvzoo. Widening what an existing grant covers is not consent, so the
+ * bump is what makes the new wording lawful rather than a formality - and it
+ * has to travel in the same deploy as the widened category text and the
+ * privacy-policy entry, because any one of the three alone leaves the beacon
+ * without a basis.
+ */
+export const CONSENT_POLICY_VERSION = '2026-10-29'
 
 /** Nothing optional. The state a visitor is in before they decide, and after "reject all". */
 export const CONSENT_DENIED: ConsentChoices = { necessary: true, analytics: false, marketing: false }

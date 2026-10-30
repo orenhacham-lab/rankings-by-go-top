@@ -9,6 +9,7 @@ import { PublicNav } from '@/components/PublicNav'
 import { PageHero, Section } from '@/components/public/marketing'
 import { ArticlesPromo } from '@/components/public/ArticlesPromo'
 import { ARTICLES_COPY, articleHref, articlesIndexHref } from '@/lib/articles/i18n'
+import { authorDisplayName } from '@/lib/articles/authors'
 import { INTL_LOCALE, type PublicLocale } from '@/lib/i18n/locales'
 import { buildArticlesIndexSchema } from '@/lib/articles/server'
 import { jsonForScriptTag } from '@/lib/content/public-article-html'
@@ -112,7 +113,7 @@ export async function ArticlesIndex({ locale }: { locale: PublicLocale }) {
                         <div className="flex min-w-0 flex-col">
                           {article.author && (
                             <span className="truncate text-caption font-medium text-ink">
-                              {article.author}
+                              {authorDisplayName(article.author, locale)}
                             </span>
                           )}
                           {article.published_at && (

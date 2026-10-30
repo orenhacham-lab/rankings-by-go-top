@@ -56,7 +56,9 @@ export function safeLink(raw: string | null): string | null {
 
 export function reportsUrlFor(origin: string, projectId: string, locale: PublicLocale): string {
   const next = `${REPORTS_PATH}?projectId=${encodeURIComponent(projectId)}`
-  return `${origin}/login?next=${encodeURIComponent(next)}${locale === 'he' ? '' : '&lang=en'}`
+  // The summary is written in the customer's language; the link opens the
+  // reports screen in the same one. It used to force `&lang=en`.
+  return `${origin}/login?next=${encodeURIComponent(next)}${locale === 'he' ? '' : `&lang=${locale}`}`
 }
 
 const BRAND = '#0070d6'

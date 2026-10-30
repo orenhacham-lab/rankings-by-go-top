@@ -1,7 +1,8 @@
 /**
  * THE TWO LOCALE TYPES, and why they are not one.
  *
- * `PublicLocale` ('he' | 'en' | 'es') is the language of the WORDS on a screen.
+ * `PublicLocale` ('he' | 'en' | 'es' | 'pt-BR' | 'fr') is the language of the
+ * WORDS on a screen.
  * On the public site it is a property of the URL — `/` is Hebrew, `/en/…`
  * English, `/es/…` Spanish — and inside the dashboard it is what the switcher
  * sets and what `getDashboardDictionary` takes. Each locale's words come from
@@ -21,12 +22,14 @@
  */
 import { spanishSiteEnabled } from './spanish-site'
 import { portugueseSiteEnabled } from './portuguese-site'
+import { frenchSiteEnabled } from './french-site'
+import { italianSiteEnabled } from './italian-site'
 
 export type Locale = 'he' | 'en'
-export type PublicLocale = Locale | 'es' | 'pt-BR'
+export type PublicLocale = Locale | 'es' | 'pt-BR' | 'fr' | 'it'
 
 export const LOCALES: Locale[] = ['he', 'en']
-export const PUBLIC_LOCALES: PublicLocale[] = ['he', 'en', 'es', 'pt-BR']
+export const PUBLIC_LOCALES: PublicLocale[] = ['he', 'en', 'es', 'pt-BR', 'fr', 'it']
 export const DEFAULT_LOCALE: Locale = 'he'
 
 /**
@@ -36,7 +39,7 @@ export const DEFAULT_LOCALE: Locale = 'he'
  * Brazilian law (the Consumer Code's seven-day withdrawal right, the LGPD), so a
  * bare '/pt' would promise European Portuguese readers rules that are not theirs.
  */
-export const LOCALE_PREFIX: Record<PublicLocale, string> = { he: '', en: '/en', es: '/es', 'pt-BR': '/pt-BR' }
+export const LOCALE_PREFIX: Record<PublicLocale, string> = { he: '', en: '/en', es: '/es', 'pt-BR': '/pt-BR', fr: '/fr', it: '/it' }
 
 export const LOCALE_CONFIG: Record<PublicLocale, { dir: 'rtl' | 'ltr'; lang: string; ogLocale: string }> = {
   he: { dir: 'rtl', lang: 'he', ogLocale: 'he_IL' },
@@ -46,6 +49,18 @@ export const LOCALE_CONFIG: Record<PublicLocale, { dir: 'rtl' | 'ltr'; lang: str
   // dialect that is not theirs.
   es: { dir: 'ltr', lang: 'es', ogLocale: 'es_ES' },
   'pt-BR': { dir: 'ltr', lang: 'pt-BR', ogLocale: 'pt_BR' },
+  // A bare 'fr', not 'fr-FR', for the same reason '/es' is bare: the documents
+  // are written to French and European law, which is the framework Belgium,
+  // Luxembourg and the rest of French-speaking Europe share. A Quebec reader is
+  // addressed in their language but under Loi 25 and the Civil Code, which the
+  // privacy policy names where it differs rather than pretending otherwise.
+  fr: { dir: 'ltr', lang: 'fr', ogLocale: 'fr_FR' },
+  // A bare 'it', like '/es' and '/fr': Italian is written for one legal
+  // framework, the EU's, which Italy, Ticino's readers in Switzerland and San
+  // Marino's businesses read the same way. Italy's own consumer code adds the
+  // fourteen-day withdrawal right the Codice del Consumo spells out, and the
+  // documents name it where it differs rather than pretending otherwise.
+  it: { dir: 'ltr', lang: 'it', ogLocale: 'it_IT' },
 }
 
 /**
@@ -58,10 +73,23 @@ export const LOCALE_CONFIG: Record<PublicLocale, { dir: 'rtl' | 'ltr'; lang: str
  * Spain is the first Spanish market, so es-ES; a Latin-American market gets its
  * own entry the day its currency is set, because that is the same decision.
  */
-export const INTL_LOCALE: Record<PublicLocale, string> = { he: 'he-IL', en: 'en-US', es: 'es-ES', 'pt-BR': 'pt-BR' }
+export const INTL_LOCALE: Record<PublicLocale, string> = { he: 'he-IL', en: 'en-US', es: 'es-ES', 'pt-BR': 'pt-BR', fr: 'fr-FR', it: 'it-IT' }
+
+/**
+ * The SHORT name of each language, in its own script, for a control too narrow
+ * for the full name.
+ *
+ * Hebrew keeps its whole name because that name is already short, and because
+ * "HE" is not what Hebrew calls itself; every other language is its two-letter
+ * code, which is what the dashboard's switcher has always shown. One map, used
+ * by both switchers (components/DashboardLanguageSwitcher.tsx and
+ * components/LanguageSwitcher.tsx in its compact form), so the two cannot drift
+ * apart and a seventh language is named once.
+ */
+export const LOCALE_SHORT_LABEL: Record<PublicLocale, string> = { he: 'עברית', en: 'EN', es: 'ES', 'pt-BR': 'PT', fr: 'FR', it: 'IT' }
 
 /** PayPal's own locale spelling, which uses an underscore and no others. */
-export const PAYPAL_LOCALE: Record<PublicLocale, string> = { he: 'he_IL', en: 'en_US', es: 'es_ES', 'pt-BR': 'pt_BR' }
+export const PAYPAL_LOCALE: Record<PublicLocale, string> = { he: 'he_IL', en: 'en_US', es: 'es_ES', 'pt-BR': 'pt_BR', fr: 'fr_FR', it: 'it_IT' }
 
 /**
  * The `Intl` tag of a language that reached us as a plain string — a prop typed
@@ -93,6 +121,47 @@ export function normalizePublicLocale(value: unknown): PublicLocale | null {
 }
 
 /**
+ * IS THIS LOCALE LIVE RIGHT NOW? The one gate, read by everything that has to
+ * agree about which languages exist.
+ *
+ * Hebrew and English are the site itself and are always on. Every language
+ * added since is behind its own build-time flag, and "off" means absent rather
+ * than unlinked: the tree 404s, no hreflang names it, the sitemap omits it, the
+ * switcher does not offer it and a hand-edited cookie cannot select it.
+ *
+ * It is ONE function because it was four. The switcher filtered PUBLIC_LOCALES
+ * with a nested ternary, the sitemap had two of them (one for the static trees
+ * and one for articles), hreflang had a pair of `if`s, and normalizeStoredLocale
+ * another pair. Five places that each had to be edited in the same way when a
+ * language was added, and a language missed in one of them is not a compile
+ * error — it is a live 404 in a sitemap, or a switcher entry that leads nowhere.
+ * Adding French is what made that cost visible, so the list moved here, where
+ * the compiler asks for the new entry.
+ *
+ * The flags are parameters so a test can ask the question for any combination
+ * without touching the environment; the defaults read the real ones.
+ */
+export function publicLocaleEnabled(
+  locale: PublicLocale,
+  flags: Partial<Record<PublicLocale, boolean>> = {},
+): boolean {
+  const gates: Record<PublicLocale, boolean> = {
+    he: true,
+    en: true,
+    es: flags.es ?? spanishSiteEnabled(),
+    'pt-BR': flags['pt-BR'] ?? portugueseSiteEnabled(),
+    fr: flags.fr ?? frenchSiteEnabled(),
+    it: flags.it ?? italianSiteEnabled(),
+  }
+  return gates[locale]
+}
+
+/** The locales a visitor may be served right now, in PUBLIC_LOCALES order. */
+export function enabledPublicLocales(flags?: Partial<Record<PublicLocale, boolean>>): PublicLocale[] {
+  return PUBLIC_LOCALES.filter((l) => publicLocaleEnabled(l, flags))
+}
+
+/**
  * The STORED language preference — the `language` cookie and the localStorage
  * key beside it.
  *
@@ -108,9 +177,7 @@ export function normalizePublicLocale(value: unknown): PublicLocale | null {
  */
 export function normalizeStoredLocale(value: unknown): PublicLocale | null {
   const locale = normalizePublicLocale(value)
-  if (locale === 'es' && !spanishSiteEnabled()) return null
-  if (locale === 'pt-BR' && !portugueseSiteEnabled()) return null
-  return locale
+  return locale && publicLocaleEnabled(locale) ? locale : null
 }
 
 /**

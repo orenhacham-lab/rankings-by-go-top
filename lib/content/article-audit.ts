@@ -90,18 +90,32 @@ const TRANSITIONS_ES = ['además', 'por lo tanto', 'sin embargo', 'por otro lado
 /** Spanish function words that start a sentence without carrying meaning — the
  *  repetitive-opening check ignores them, as START_STOPWORDS_HE does in Hebrew. */
 const START_STOPWORDS_ES = new Set(['el', 'la', 'los', 'las', 'un', 'una', 'si', 'cuando', 'para', 'por', 'con', 'esto', 'esta', 'este', 'hay', 'es', 'son', 'además'])
+const TRANSITIONS_PT = ['além disso', 'portanto', 'no entanto', 'por outro lado', 'em contrapartida', 'por exemplo', 'na prática', 'em resumo', 'é importante', 'vale lembrar', 'em outras palavras', 'por fim', 'em primeiro lugar', 'em segundo lugar', 'por isso', 'como resultado', 'em muitos casos', 'na hora de decidir', 'em conclusão', 'de forma semelhante', 'em comparação']
+/** Brazilian Portuguese function words that open a sentence without carrying
+ *  meaning — the repetitive-opening check ignores them, as in Hebrew and Spanish. */
+const START_STOPWORDS_PT = new Set(['o', 'a', 'os', 'as', 'um', 'uma', 'se', 'quando', 'para', 'por', 'com', 'isso', 'essa', 'este', 'esta', 'há', 'é', 'são', 'além'])
 const TRANSITIONS_EN = ['additionally', 'therefore', 'however', 'on the other hand', 'for example', 'in practice', 'in summary', 'importantly', 'moreover', 'in other words', 'finally', 'first', 'second', 'meanwhile', 'in short']
 // Unambiguous, standalone CTA phrases (imperative action + intent). Natural
 // service words like "הזמנה"/"משלוח"/"שירות" are deliberately NOT here.
 const CTA_STRONG_HE = ['צרו קשר', 'צור קשר', 'צרו איתנו קשר', 'דברו איתנו', 'השאירו פרטים', 'לחצו כאן', 'להזמנה עכשיו', 'הזמינו עכשיו', 'לקבלת הצעת מחיר', 'שלחו הודעת וואטסאפ', 'שלחו לנו הודעה', 'חייגו עכשיו', 'התקשרו עכשיו', 'הזמינו כעת']
 const CTA_STRONG_ES = ['contáctanos', 'contacta con nosotros', 'llama ahora', 'haz clic aquí', 'pide ahora', 'solicita ahora', 'reserva ahora', 'escríbenos', 'déjanos tus datos', 'pide presupuesto', 'solicita presupuesto', 'escríbenos por whatsapp', 'llámanos ahora', 'compra ahora']
+const CTA_STRONG_PT = ['entre em contato', 'fale conosco', 'ligue agora', 'clique aqui', 'peça agora', 'solicite agora', 'agende agora', 'escreva para nós', 'deixe seus dados', 'peça um orçamento', 'solicite um orçamento', 'chame no whatsapp', 'ligue para nós', 'compre agora']
 const CTA_STRONG_EN = ['contact us', 'call now', 'click here', 'order now', 'get in touch', 'sign up now', 'book now', 'reach out to us', 'send us a message', 'leave your details', 'get a quote', 'whatsapp us', 'call us now', 'buy now']
 // Action imperatives that only count as a CTA when a contact CHANNEL is nearby.
 const CTA_ACTION_HE = ['התקשרו', 'חייגו', 'שלחו', 'פנו אלינו', 'לחצו', 'דברו', 'השאירו', 'כתבו לנו']
 const CTA_ACTION_ES = ['llama', 'llámanos', 'escribe', 'escríbenos', 'contacta', 'haz clic', 'pide', 'solicita', 'reserva', 'déjanos']
+const CTA_ACTION_PT = ['ligue', 'escreva', 'fale', 'entre em contato', 'clique', 'peça', 'solicite', 'agende', 'deixe', 'chame']
 const CTA_ACTION_EN = ['call', 'text', 'message', 'click', 'contact', 'reach out', 'book']
+const TRANSITIONS_FR = ['de plus', 'par ailleurs', 'donc', 'cependant', 'toutefois', 'en revanche', 'par exemple', 'en pratique', 'en résumé', 'il est important', 'il faut retenir', 'autrement dit', 'enfin', 'en premier lieu', 'en second lieu', 'c’est pourquoi', 'par conséquent', 'dans bien des cas', 'au moment de choisir', 'en conclusion', 'de la même manière', 'en comparaison']
+const START_STOPWORDS_FR = new Set(['le', 'la', 'les', 'un', 'une', 'des', 'si', 'quand', 'pour', 'par', 'avec', 'cela', 'ce', 'cette', 'il', 'elle', 'c’est', 'est', 'sont', 'de'])
+const CTA_STRONG_FR = ['contactez-nous', 'appelez maintenant', 'appelez-nous', 'cliquez ici', 'commandez maintenant', 'réservez maintenant', 'écrivez-nous', 'laissez-nous vos coordonnées', 'demandez un devis', 'demandez votre devis', 'écrivez-nous sur whatsapp', 'prenez rendez-vous', 'achetez maintenant']
+const CTA_ACTION_FR = ['appelez', 'écrivez', 'contactez', 'cliquez', 'commandez', 'demandez', 'réservez', 'laissez', 'envoyez']
+const TRANSITIONS_IT = ['inoltre', 'tuttavia', 'però', 'di conseguenza', 'quindi', 'd’altra parte', 'al contrario', 'per esempio', 'ad esempio', 'in pratica', 'in sintesi', 'è importante', 'vale la pena ricordare', 'in altre parole', 'infine', 'in primo luogo', 'in secondo luogo', 'per questo motivo', 'in molti casi', 'al momento della scelta', 'in conclusione', 'allo stesso modo', 'a confronto']
+const START_STOPWORDS_IT = new Set(['il', 'lo', 'la', 'i', 'gli', 'le', 'un', 'uno', 'una', 'se', 'quando', 'per', 'con', 'questo', 'questa', 'ci', 'è', 'sono', 'di', 'inoltre'])
+const CTA_STRONG_IT = ['contattateci', 'contattaci', 'chiamate ora', 'chiama ora', 'chiamateci', 'clicca qui', 'fai clic qui', 'ordina ora', 'ordinate ora', 'prenota ora', 'prenotate ora', 'scriveteci', 'scrivici', 'lasciate i vostri dati', 'richiedete un preventivo', 'richiedi un preventivo', 'scriveteci su whatsapp', 'acquista ora', 'fissate un appuntamento']
+const CTA_ACTION_IT = ['chiamate', 'chiama', 'scrivete', 'scrivi', 'contattate', 'contatta', 'cliccate', 'clicca', 'ordinate', 'richiedete', 'prenotate', 'lasciate', 'inviate']
 // A phone/WhatsApp number, WhatsApp/phone words, or a URL — the "target" of a CTA.
-const CTA_CHANNEL_RE = /(\d[\d\-\s]{5,}\d|וואטסאפ|whatsapp|טלפון|נייד|https?:\/\/|www\.)/i
+const CTA_CHANNEL_RE = /(\d[\d\-\s]{5,}\d|וואטסאפ|whatsapp|טלפון|נייד|telefone|celular|https?:\/\/|www\.)/i
 
 /**
  * Find the first REAL call-to-action in the text (word index), or -1. A CTA is
@@ -110,10 +124,10 @@ const CTA_CHANNEL_RE = /(\d[\d\-\s]{5,}\d|וואטסאפ|whatsapp|טלפון|נ�
  * everyday words like "הזמנה"/"משלוח"/"שירות" as CTAs.
  */
 /** The word lists, keyed by content language: adding a language stops compiling here. */
-const CTA_STRONG: Record<SuggestionLanguage, string[]> = { he: CTA_STRONG_HE, en: CTA_STRONG_EN, es: CTA_STRONG_ES }
-const CTA_ACTION: Record<SuggestionLanguage, string[]> = { he: CTA_ACTION_HE, en: CTA_ACTION_EN, es: CTA_ACTION_ES }
-const TRANSITIONS: Record<SuggestionLanguage, string[]> = { he: TRANSITIONS_HE, en: TRANSITIONS_EN, es: TRANSITIONS_ES }
-const START_STOPWORDS: Record<SuggestionLanguage, Set<string>> = { he: START_STOPWORDS_HE, en: new Set<string>(), es: START_STOPWORDS_ES }
+const CTA_STRONG: Record<SuggestionLanguage, string[]> = { he: CTA_STRONG_HE, en: CTA_STRONG_EN, es: CTA_STRONG_ES, 'pt-BR': CTA_STRONG_PT, fr: CTA_STRONG_FR, it: CTA_STRONG_IT }
+const CTA_ACTION: Record<SuggestionLanguage, string[]> = { he: CTA_ACTION_HE, en: CTA_ACTION_EN, es: CTA_ACTION_ES, 'pt-BR': CTA_ACTION_PT, fr: CTA_ACTION_FR, it: CTA_ACTION_IT }
+const TRANSITIONS: Record<SuggestionLanguage, string[]> = { he: TRANSITIONS_HE, en: TRANSITIONS_EN, es: TRANSITIONS_ES, 'pt-BR': TRANSITIONS_PT, fr: TRANSITIONS_FR, it: TRANSITIONS_IT }
+const START_STOPWORDS: Record<SuggestionLanguage, Set<string>> = { he: START_STOPWORDS_HE, en: new Set<string>(), es: START_STOPWORDS_ES, 'pt-BR': START_STOPWORDS_PT, fr: START_STOPWORDS_FR, it: START_STOPWORDS_IT }
 
 function detectCtaFirstWord(bodyText: string, lang: SuggestionLanguage): number {
   const low = bodyText.toLowerCase()
@@ -291,8 +305,11 @@ function isRealTable(t: TableShape): boolean { return t.cols >= 2 && t.rows >= 2
 // Topics that genuinely call for a comparison/data table.
 const TABLE_WORDS_HE = ['השווא', 'להשוו', 'מחיר', 'עלות', 'עלויות', 'כמה עולה', 'הכי טוב', 'סוגי', 'לבחור', 'בחירת', 'יתרונות', 'חסרונות', 'מדריך קנייה', 'טבלה']
 const TABLE_WORDS_ES = ['compar', 'precio', 'coste', 'costo', 'cuánto cuesta', 'cuanto cuesta', 'mejor', 'mejores', 'tipos de', 'elegir', 'cómo elegir', 'ventajas', 'desventajas', 'guía de compra', 'tabla', ' vs ', 'más barato']
+const TABLE_WORDS_PT = ['compar', 'preço', 'preco', 'custo', 'quanto custa', 'melhor', 'melhores', 'tipos de', 'escolher', 'como escolher', 'vantagens', 'desvantagens', 'guia de compra', 'tabela', ' vs ', 'mais barato']
 const TABLE_WORDS_EN = ['compar', 'price', 'cost', 'best', ' vs', 'versus', 'types', 'choose', 'choosing', 'buying guide', 'pros and cons', 'pros/cons', 'cheapest']
-const TABLE_WORDS: Record<SuggestionLanguage, string[]> = { he: TABLE_WORDS_HE, en: TABLE_WORDS_EN, es: TABLE_WORDS_ES }
+const TABLE_WORDS_FR = ['compar', 'prix', 'tarif', 'coût', 'cout', 'combien coûte', 'combien coute', 'meilleur', 'meilleurs', 'types de', 'choisir', 'comment choisir', 'avantages', 'inconvénients', 'guide d’achat', 'tableau', ' vs ', 'moins cher']
+const TABLE_WORDS_IT = ['confront', 'prezzo', 'prezzi', 'tariffa', 'costo', 'costi', 'quanto costa', 'migliore', 'migliori', 'tipi di', 'scegliere', 'come scegliere', 'vantaggi', 'svantaggi', 'guida all’acquisto', 'tabella', ' vs ', 'più economico']
+const TABLE_WORDS: Record<SuggestionLanguage, string[]> = { he: TABLE_WORDS_HE, en: TABLE_WORDS_EN, es: TABLE_WORDS_ES, 'pt-BR': TABLE_WORDS_PT, fr: TABLE_WORDS_FR, it: TABLE_WORDS_IT }
 function isTableWorthy(text: string, lang: SuggestionLanguage): boolean {
   const t = (text || '').toLowerCase()
   const words = TABLE_WORDS[lang]
@@ -302,8 +319,11 @@ function isTableWorthy(text: string, lang: SuggestionLanguage): boolean {
 // Question-style heading detection (so important questions live in the body too).
 const QUESTION_WORDS_HE = ['מה ', 'מהו', 'מהי', 'איך', 'כיצד', 'כמה', 'למה', 'מדוע', 'האם', 'מתי', 'איפה', 'היכן', 'מי ']
 const QUESTION_WORDS_ES = ['qué ', 'que ', 'cómo ', 'como ', 'cuánto', 'cuanto', 'por qué', 'por que', 'cuál', 'cual', 'cuándo', 'cuando', 'dónde', 'donde', 'quién', 'quien', 'es ', 'son ', 'conviene', 'debo ', 'hay que', '¿']
+const QUESTION_WORDS_PT = ['o que ', 'que ', 'como ', 'quanto', 'por que', 'porque', 'qual', 'quais', 'quando', 'onde', 'quem', 'é ', 'são ', 'vale a pena', 'devo ', 'precisa ']
 const QUESTION_WORDS_EN = ['how ', 'what ', 'why ', 'when ', 'which ', 'where ', 'who ', 'is ', 'are ', 'should ', 'can ', 'do ']
-const QUESTION_WORDS: Record<SuggestionLanguage, string[]> = { he: QUESTION_WORDS_HE, en: QUESTION_WORDS_EN, es: QUESTION_WORDS_ES }
+const QUESTION_WORDS_FR = ['comment ', 'qu’est-ce', 'quest-ce', 'que ', 'quoi ', 'pourquoi', 'combien', 'quel ', 'quelle ', 'quels ', 'quelles ', 'quand ', 'où ', 'qui ', 'est-ce', 'faut-il', 'dois-je', 'peut-on', 'vaut-il']
+const QUESTION_WORDS_IT = ['come ', 'che cosa', 'cosa ', 'perché', 'perche', 'quanto', 'quale ', 'quali ', 'quando ', 'dove ', 'chi ', 'è ', 'sono ', 'conviene', 'bisogna', 'vale la pena', 'si può', 'devo ']
+const QUESTION_WORDS: Record<SuggestionLanguage, string[]> = { he: QUESTION_WORDS_HE, en: QUESTION_WORDS_EN, es: QUESTION_WORDS_ES, 'pt-BR': QUESTION_WORDS_PT, fr: QUESTION_WORDS_FR, it: QUESTION_WORDS_IT }
 
 /**
  * E-E-A-T, the part a generated article can honestly carry: something the
@@ -318,8 +338,11 @@ const QUESTION_WORDS: Record<SuggestionLanguage, string[]> = { he: QUESTION_WORD
  */
 const VERIFY_CUES_HE = ['בדקו', 'לבדוק', 'תבדקו', 'שאלו', 'לשאול', 'תשאלו', 'בקשו', 'לבקש', 'תבקשו', 'השוו', 'להשוות', 'ודאו', 'לוודא', 'דרשו', 'לדרוש']
 const VERIFY_CUES_EN = ['check ', 'check the', 'ask for', 'ask the', 'ask your', 'compare ', 'make sure', 'verify ', 'request ', 'confirm ', 'look for']
+const VERIFY_CUES_PT = ['verifique', 'verificar', 'confira', 'conferir', 'pergunte', 'perguntar', 'peça ', 'pedir ', 'compare', 'comparar', 'certifique-se', 'confirme', 'exija', 'observe']
 const VERIFY_CUES_ES = ['comprueba', 'compruebe', 'verifica', 'verifique', 'pregunta', 'pregunte', 'compara', 'compare ', 'asegúrate', 'asegúrese', 'solicita', 'solicite', 'confirma', 'fíjate']
-const VERIFY_CUES: Record<SuggestionLanguage, string[]> = { he: VERIFY_CUES_HE, en: VERIFY_CUES_EN, es: VERIFY_CUES_ES }
+const VERIFY_CUES_FR = ['vérifiez', 'vérifier', 'demandez', 'demander', 'posez la question', 'comparez', 'comparer', 'assurez-vous', 'confirmez', 'exigez', 'contrôlez', 'regardez si']
+const VERIFY_CUES_IT = ['verificate', 'verificare', 'verifica', 'controllate', 'controllare', 'chiedete', 'chiedere', 'chiedi', 'richiedete', 'richiedere', 'confrontate', 'confrontare', 'assicuratevi', 'accertatevi', 'confermate', 'pretendete', 'osservate']
+const VERIFY_CUES: Record<SuggestionLanguage, string[]> = { he: VERIFY_CUES_HE, en: VERIFY_CUES_EN, es: VERIFY_CUES_ES, 'pt-BR': VERIFY_CUES_PT, fr: VERIFY_CUES_FR, it: VERIFY_CUES_IT }
 
 /** How many of the cues the body uses, counted once per cue. */
 export function readerVerifyCount(bodyText: string, lang: SuggestionLanguage): number {

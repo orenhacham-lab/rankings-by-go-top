@@ -20,11 +20,19 @@
  * calendar: a language that already published today (UTC) is done, and a
  * language whose plan row is claimed right now is in flight, so a second
  * invocation leaves both alone. At most ONE language is written per run, so a
- * morning fills in the order he, en, es, a quarter of an hour apart.
+ * morning fills in the order he, en, es, pt-BR, fr, a quarter of an hour apart
+ * — the order lib/blog/auto/rotation.ts declares, and it is last-pays-first: a
+ * language that keeps failing the quality gate spends the window's reserve, and
+ * the one that goes without is the last in that list, never an older one.
  *
- * Production only, and only in WINDOW_HOURS_UTC (04:00-06:59 UTC = 07:00-09:59
- * in Israel, the hours the three jobs used to hold). Outside it this returns at
- * once without a read or a log line.
+ * Production only, and only in WINDOW_HOURS_UTC (04:00-07:59 UTC = 07:00-10:59
+ * in Israel). The window held three hours while there were three languages, and
+ * a morning really does use them: on 17 Oct the Spanish article failed the
+ * quality gate twice and published on the third pass, at 06:47. A fourth
+ * language behind a morning like that would have run out of window, so the
+ * window grew with it — the last hour is a reserve for retries, not a later
+ * publishing time. Outside it this returns at once without a read or a log
+ * line.
  */
 
 import type { createAdminClient } from '@/lib/supabase/admin'
@@ -36,7 +44,7 @@ import { isBlogAutoPublishEnabled } from '@/lib/blog/auto/cron-run'
 type Admin = ReturnType<typeof createAdminClient>
 
 /** The UTC hours the morning run may write in. */
-export const WINDOW_HOURS_UTC: readonly number[] = [4, 5, 6]
+export const WINDOW_HOURS_UTC: readonly number[] = [4, 5, 6, 7]
 
 /** Left for the emails that follow in the cron's `after()`. */
 export const BLOG_WINDOW_MARGIN_MS = 15_000
@@ -100,6 +108,11 @@ export async function runBlogDailyWindow(
     published: summary.published?.slug ?? null,
     planned: summary.planned,
     topUpAdded: summary.topUpAdded,
+    // Without this a language whose research fails reads as a quiet
+    // `skipped: 'queue_empty'` forever: French published nothing for four days
+    // and the reason (a 404 from the keyword research) was only in the raw
+    // runtime log, which this plan keeps for one hour.
+    topUpError: summary.topUpError,
     skipped: summary.skipped,
     failure: summary.failure,
     durationMs: summary.durationMs,

@@ -51,6 +51,8 @@ import {
   type ListingCandidate,
 } from './sourcing'
 import { CRAWLER_AGENT } from './qualify'
+import type { SearchFn } from '@/lib/seed-scan/serper'
+import { searchCandidates } from './search-source'
 
 export interface PublicSource {
   /** What the log line calls it. */
@@ -73,19 +75,47 @@ export interface PublicSource {
  * and "made" programmes fit all three, which is why they lead.
  */
 export const PUBLIC_SOURCES: readonly PublicSource[] = [
-  // Both of these were checked against the live pages on 17 Oct 2026, by
-  // listing the member links each one actually serves. `minnesotagrown.com/directory/`
-  // is a landing page and `georgia-grown-members/` answers 404 — neither names
-  // a member, which is half of why the first day added nobody.
-  { name: 'minnesota-grown', url: 'https://minnesotagrown.com/member/', detailHint: '/member/' },
-  { name: 'georgia-grown', url: 'https://georgiagrown.com/membership/member-directory/', detailHint: '/member/' },
-  { name: 'pride-of-ny', url: 'https://certifiedny.agriculture.ny.gov/producers', detailHint: '/producer' },
-  { name: 'made-in-michigan', url: 'https://www.michiganbusiness.org/industries/food-agriculture/' },
-  { name: 'alabama-farmers', url: 'https://alabamafarmersmarket.org/vendors/' },
+  // MEASURED, 17 Oct 2026, by reading each page and judging a sample of the
+  // businesses it names (platform and a US address on their own site):
+  //   newmfgalliance   384 members on one page, 4 of 14 sampled usable
+  //   springfield      72 members, 6 of 14 usable
+  // That ratio is what decides how many directories the channel needs, and it
+  // is why the "grown" programmes below are no longer first: a farm directory's
+  // members are mostly neither Shopify nor WordPress, so nearly every one is
+  // refused after three fetches. Manufacturers and chamber members are not.
+  { name: 'newmfgalliance', url: 'https://newmfgalliance.org/manufacturers/alliance-members-websites/' },
+  // THE CHAMBER IS READ THROUGH ITS MEMBER PAGES, not off the category page.
+  // Production, 17:00 UTC on 17 Oct: the category page's own footer links
+  // (springfieldregion.com, ozarkspartnership.org, springfieldmo.org,
+  // liveinspringfieldmo.com, thenetworkspringfield.com) were examined as if
+  // they were members, and thenetworkspringfield.com — the chamber's own
+  // networking programme, not a manufacturer — was added to the list. Every
+  // ChamberMaster directory names its members at /activememberdirectory/Details/,
+  // and the member hop already drops whatever the listing itself links to.
+  {
+    name: 'springfield-chamber',
+    url: 'https://business.springfieldchamber.com/activememberdirectory/Search/manufacturing-128889',
+    detailHint: '/activememberdirectory/Details/',
+  },
+  // minnesota-grown and georgia-grown are gone, and Production is why: in the
+  // week to 26 Oct 2026 the two of them added nothing at all, at twenty-odd
+  // fetches a pass, every candidate refused as `unrecognized_platform` or
+  // `other_platform`. A farm sells at a market, not from a Shopify store, so
+  // the ratio is not going to improve by reading more of them.
+  // pride-of-ny, made-in-michigan and alabama-farmers are gone too: the pass at
+  // 11:15 UTC on 17 Oct read all three and not one of them answered, which is
+  // Production saying what a cloud container could only guess.
   // jersey-fresh is deliberately gone: findjerseyfresh.com/directory/ is a
   // search form, its members are reachable only by submitting it, and the only
   // off-site links it carries are the state's other programmes.
 ]
+
+/**
+ * What `source_second` records for a business a search named. The row's own
+ * `source_site` and `postal_address_page` still name the business's own pages,
+ * which is where every published fact about it comes from.
+ */
+export const SEARCH_SOURCE_URL = 'https://www.google.com/search'
 
 /** Businesses examined in one pass before it gives up and waits for the next. */
 export const MAX_CANDIDATES_PER_PASS = 4
@@ -117,6 +147,11 @@ export interface TopUpDeps {
   /** Which source to start from. The pass rotates so one slow source cannot block the rest. */
   startAt?: number
   sources?: readonly PublicSource[]
+  /**
+   * The search the pass tries first. Omitted, or without a key, the pass is
+   * exactly what it was: the directories and nothing else.
+   */
+  search?: SearchFn
 }
 
 /**
@@ -132,7 +167,6 @@ export async function runProspectTopUp(
 ): Promise<TopUpSummary> {
   const sources = deps.sources ?? PUBLIC_SOURCES
   const summary: TopUpSummary = { source: null, examined: 0, fetched: 0, added: null, refusals: [] }
-  if (sources.length === 0) return summary
 
   // Rotate, so a source that is down or exhausted costs one pass rather than
   // every pass. The hour is the rotation, which needs nothing stored.
@@ -143,55 +177,111 @@ export async function runProspectTopUp(
   // refused, and the pass ended there, every quarter hour, while five usable
   // directories went unread. A source earns the rest of the pass by adding a
   // business, not by answering.
+  // THE SEARCH GOES FIRST, because it is the only supply that does not run out.
+  // A directory is a page someone maintains: it has as many members as it has,
+  // and once they are listed or refused it can only answer with the same ones.
+  // A trade and a town is a new question every quarter hour. The directories
+  // stay behind it: a member list is a name a person wrote and a business that
+  // chose to be found, which is still the better signal where it exists.
+  if (deps.search !== undefined) {
+    const found = await searchCandidates(deps.search, deps.now)
+    summary.fetched += 1
+    if (found.reachable) {
+      summary.source = `search: ${found.query}`
+      if (await examine(admin, found.candidates, SEARCH_SOURCE_URL, deps, summary)) return summary
+    }
+  }
+
+  if (sources.length === 0) return summary
   const start = deps.startAt ?? deps.now.getUTCHours()
   let listingsRead = 0
   for (let i = 0; i < sources.length; i += 1) {
     if (summary.examined >= MAX_CANDIDATES_PER_PASS) return summary
     if (listingsRead >= MAX_SOURCES_PER_PASS) return summary
     const source = sources[(start + i) % sources.length]
-    const candidates = await readListing(source, deps, summary)
-    listingsRead += 1
+    const listing = await readListing(source, deps, summary)
+    // A SOURCE THAT DID NOT ANSWER DOES NOT SPEND A SLOT. The pass at 11:15 UTC
+    // on 17 Oct started, by the hour, at the three directories that answer
+    // nothing, and the budget of three was gone before it reached a working
+    // one: three fetches, nothing examined. An unreachable listing costs one
+    // request, which is the honest price of it, not a third of the pass.
+    if (listing.reachable) listingsRead += 1
+    // AND THE SAME WINDOW OVER A FLAT LISTING'S CANDIDATES. Production, 14:15
+    // and 14:30 UTC on 17 Oct: the same four businesses of a 384-member
+    // directory, examined twice, refused twice, with 380 members never reached.
+    // A candidate is skipped from our own table only once it was ADDED; one
+    // that was refused (a 403, no contact address, an unrecognised platform)
+    // sits at the head of the list for ever. So the window moves.
+    const candidates = passWindow(listing.candidates, deps.now, MAX_CANDIDATES_PER_PASS)
     if (candidates.length === 0) continue
     summary.source = source.name
 
-    for (const candidate of candidates) {
-      if (summary.examined >= MAX_CANDIDATES_PER_PASS) return summary
-      // Cheapest possible refusal: a business already on the list, decided from
-      // our own table before anyone's server is asked for anything.
-      if (await alreadyListed(admin, candidate.host)) {
-        summary.refusals.push(`${candidate.host}: already listed`)
-        continue
-      }
-      summary.examined += 1
-      const verdict = await qualifyBusiness(
-        { company: candidate.company, host: candidate.host, sourceSecond: source.url },
-        deps.fetchPage,
-      )
-      summary.fetched += verdict.pagesRead
-      if (!verdict.ok) {
-        summary.refusals.push(`${candidate.host}: ${verdict.reason}${verdict.detail ? ` (${verdict.detail})` : ''}`)
-        continue
-      }
-      const written = await addProspect(admin, verdict.draft)
-      if (written === 'added') {
-        summary.added = verdict.draft.siteHost
-        return summary
-      }
-      summary.refusals.push(`${candidate.host}: ${written}`)
-    }
+    if (await examine(admin, candidates, source.url, deps, summary)) return summary
   }
   return summary
 }
 
-/** The businesses one source names, following one hop where it needs to. */
+/**
+ * Qualify candidates until one is added or the pass's budget is spent.
+ *
+ * Returns true when the pass is over: a business was added, or there is no
+ * examination left in it. Both sources of candidates run through this, so a
+ * search result is held to exactly what a member list's link is held to.
+ */
+async function examine(
+  admin: ServiceRoleClient,
+  candidates: readonly ListingCandidate[],
+  sourceUrl: string,
+  deps: TopUpDeps,
+  summary: TopUpSummary,
+): Promise<boolean> {
+  for (const candidate of candidates) {
+    if (summary.examined >= MAX_CANDIDATES_PER_PASS) return true
+    // Cheapest possible refusal: a business already on the list, decided from
+    // our own table before anyone's server is asked for anything.
+    if (await alreadyListed(admin, candidate.host)) {
+      summary.refusals.push(`${candidate.host}: already listed`)
+      continue
+    }
+    summary.examined += 1
+    const verdict = await qualifyBusiness(
+      { company: candidate.company, host: candidate.host, sourceSecond: sourceUrl },
+      deps.fetchPage,
+    )
+    summary.fetched += verdict.pagesRead
+    if (!verdict.ok) {
+      summary.refusals.push(`${candidate.host}: ${verdict.reason}${verdict.detail ? ` (${verdict.detail})` : ''}`)
+      continue
+    }
+    const written = await addProspect(admin, verdict.draft)
+    if (written === 'added') {
+      summary.added = verdict.draft.siteHost
+      return true
+    }
+    summary.refusals.push(`${candidate.host}: ${written}`)
+  }
+  return false
+}
+
+/**
+ * The businesses one source names, following one hop where it needs to, and
+ * whether the listing answered at all — which decides whether this source
+ * spent one of the pass's slots.
+ */
+interface ListingRead {
+  candidates: ListingCandidate[]
+  /** False when the listing could not be fetched or was not an open page. */
+  reachable: boolean
+}
+
 async function readListing(
   source: PublicSource,
   deps: TopUpDeps,
   summary: TopUpSummary,
-): Promise<ListingCandidate[]> {
+): Promise<ListingRead> {
   const listing = await fetchOrNull(deps.fetchPage, source.url)
   summary.fetched += 1
-  if (listing === null || !isOpenPage(listing)) return []
+  if (listing === null || !isOpenPage(listing)) return { candidates: [], reachable: false }
 
   // Their robots.txt decides, on the listing as on anything else.
   const origin = (() => { try { return new URL(source.url).origin } catch { return null } })()
@@ -199,7 +289,9 @@ async function readListing(
     const robots = await fetchOrNull(deps.fetchPage, `${origin}/robots.txt`)
     summary.fetched += 1
     const path = (() => { try { return new URL(source.url).pathname } catch { return '/' } })()
-    if (robots !== null && robots.status === 200 && !robotsAllows(robots.body, path, CRAWLER_AGENT)) return []
+    if (robots !== null && robots.status === 200 && !robotsAllows(robots.body, path, CRAWLER_AGENT)) {
+      return { candidates: [], reachable: true }
+    }
   }
 
   // THE MEMBER PAGES COME FIRST where the source declares them. A directory
@@ -210,12 +302,26 @@ async function readListing(
   // directories that have no hop.
   if (source.detailHint !== undefined) {
     const members = await readDetailPages(listing.body, source.url, source.detailHint, deps, summary)
-    if (members.length > 0) return members
+    if (members.length > 0) return { candidates: members, reachable: true }
   }
-  return listingCandidates(listing.body, source.url)
+  return { candidates: listingCandidates(listing.body, source.url), reachable: true }
 }
 
-/** One hop in: the member's own page, where the member's website is. */
+/**
+ * One hop in: the member's own page, where the member's website is.
+ *
+ * THE SECOND HALF OF THE SAME BUG. The first pass after the fix read four
+ * Minnesota Grown member pages and examined `bonfire.com` four times: the
+ * directory's own merch store, which sits in the site-wide header of every
+ * member page and is therefore the first off-site link on each. So the links
+ * the LISTING page carries are the navigation by definition, and a member page
+ * is read for what it has that the listing does not. A host that shows up on
+ * more than one member page is the same thing one level down, since each member
+ * page names a different business.
+ *
+ * A member with no website of its own then yields nothing, which is the right
+ * answer: there is nothing for the product to act on.
+ */
 async function readDetailPages(
   listingBody: string,
   listingUrl: string,
@@ -223,20 +329,55 @@ async function readDetailPages(
   deps: TopUpDeps,
   summary: TopUpSummary,
 ): Promise<ListingCandidate[]> {
-  const out: ListingCandidate[] = []
-  const pages = detailLinks(listingBody, listingUrl, hint).slice(0, MAX_DETAIL_PAGES)
+  const navigation = new Set(listingCandidates(listingBody, listingUrl).map((c) => c.host))
+  const read: { company: string | null; hosts: string[] }[] = []
+  const pages = detailPageWindow(detailLinks(listingBody, listingUrl, hint), deps.now)
   for (const url of pages) {
     const page = await fetchOrNull(deps.fetchPage, url)
     summary.fetched += 1
     if (page === null || !isOpenPage(page)) continue
-    const links = listingCandidates(page.body, url)
+    const links = listingCandidates(page.body, url).filter((c) => !navigation.has(c.host))
     if (links.length === 0) continue
     // The member page names one business; its own heading is that business's
     // name, which reads better in a subject line than a link's anchor text.
-    const named = pageTitle(page.body)
-    out.push({ company: named ?? links[0].company, host: links[0].host })
+    read.push({ company: pageTitle(page.body), hosts: links.map((c) => c.host) })
+  }
+
+  const seenOn = new Map<string, number>()
+  for (const { hosts } of read) {
+    for (const host of new Set(hosts)) seenOn.set(host, (seenOn.get(host) ?? 0) + 1)
+  }
+  const out: ListingCandidate[] = []
+  const taken = new Set<string>()
+  for (const { company, hosts } of read) {
+    const host = hosts.find((h) => seenOn.get(h) === 1 && !taken.has(h))
+    if (host === undefined) continue
+    taken.add(host)
+    out.push({ company: company ?? host, host })
   }
   return out
+}
+
+/**
+ * The slice of a long list this pass works on, out of however many it holds.
+ *
+ * The window MOVES, and that is the whole point: a fixed first four would be
+ * the same four every quarter hour for ever, so a directory of hundreds would
+ * yield at most four and then nothing. It moves by a whole window, not by one,
+ * so consecutive passes do not re-read three quarters of the same slice.
+ */
+export function passWindow<T>(items: T[], now: Date, size: number): T[] {
+  if (items.length <= size) return items
+  const quarterHours = Math.floor(now.getTime() / (15 * 60 * 1000))
+  const start = (((quarterHours * size) % items.length) + items.length) % items.length
+  const out: T[] = []
+  for (let i = 0; i < size; i += 1) out.push(items[(start + i) % items.length])
+  return out
+}
+
+/** The member pages this pass reads. */
+export function detailPageWindow(pages: string[], now: Date): string[] {
+  return passWindow(pages, now, MAX_DETAIL_PAGES)
 }
 
 async function fetchOrNull(fetchPage: PageFetcher, url: string) {

@@ -34,7 +34,7 @@ function ScanDetailsContent({ params }: { params: Promise<{ id: string }> }) {
   const searchParams = useSearchParams()
   const resultId = searchParams.get('resultId')
   const targetId = searchParams.get('targetId')
-  const { language, uiLocale } = useDashboardLanguage()
+  const { uiLocale } = useDashboardLanguage()
   const dict = getDashboardDictionary(uiLocale)
   const t = dict.scans.details
 
@@ -140,7 +140,7 @@ function ScanDetailsContent({ params }: { params: Promise<{ id: string }> }) {
                     </span>
                   </Td>
                   <Td className="hidden sm:table-cell"><EngineChip engine={result.engine_type} /></Td>
-                  <Td className="hidden whitespace-nowrap text-caption text-muted tabular-nums md:table-cell">{formatDateTime(result.checked_at, language)}</Td>
+                  <Td className="hidden whitespace-nowrap text-caption text-muted tabular-nums md:table-cell">{formatDateTime(result.checked_at, uiLocale)}</Td>
                   <Td className="text-end">
                     {/* A failed check says so in words, never the provider's. */}
                     <Badge variant={result.found ? 'success' : 'neutral'}>

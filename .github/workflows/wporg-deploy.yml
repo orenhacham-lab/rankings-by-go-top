@@ -1,0 +1,115 @@
+name: Publish to WordPress.org
+
+# Pushes the plugin to https://wordpress.org/plugins/go-top-seo-bridge/ over SVN,
+# so a readme or asset change in this repo does not need a manual checkout.
+#
+# Run it from the Actions tab, or through the API, and pick a mode:
+#   assets   readme.txt, the banners, the screenshots and the Live Preview
+#            blueprint only. Nothing inside the zip changes and no version is
+#            released, so the directory page refreshes without asking anyone
+#            to upgrade.
+#   release  the whole plugin: trunk is replaced and a tag is cut for the
+#            version in readme.txt. Only after the version was bumped.
+#
+# Two secrets are required, both under Settings > Secrets and variables > Actions:
+#   WPORG_SVN_USERNAME  the WordPress.org account that may commit
+#   WPORG_SVN_PASSWORD  that account's password
+
+on:
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: What to publish
+        type: choice
+        required: true
+        default: assets
+        options: [assets, release]
+
+concurrency: wporg-deploy
+
+permissions:
+  contents: read
+
+env:
+  SLUG: go-top-seo-bridge
+  PLUGIN_DIR: wordpress-plugin/gotop-seo-bridge
+  ASSETS_DIR: wordpress-plugin/wporg-assets
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Read the version, and refuse a mismatch
+        id: version
+        run: |
+          set -euo pipefail
+          header=$(grep -m1 -oP '^\s*\*\s*Version:\s*\K[0-9][0-9.]*' "$PLUGIN_DIR/gotop-seo-bridge.php")
+          stable=$(grep -m1 -oP '^Stable tag:\s*\K[0-9][0-9.]*' "$PLUGIN_DIR/readme.txt")
+          if [ "$header" != "$stable" ]; then
+            echo "Version: $header in the plugin header, Stable tag: $stable in readme.txt" >&2
+            exit 1
+          fi
+          echo "version=$stable" >> "$GITHUB_OUTPUT"
+
+      - name: Install subversion
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq subversion
+
+      - name: Check out the directory's SVN repository
+        run: |
+          set -euo pipefail
+          svn checkout --depth immediates "https://plugins.svn.wordpress.org/$SLUG/" svn
+          svn update --set-depth infinity svn/assets
+          svn update --set-depth infinity svn/trunk
+          svn update --set-depth immediates svn/tags
+
+      - name: Stage the files
+        run: |
+          set -euo pipefail
+          # README.md is this repo's own note to itself; it is not shipped.
+          # No --delete here: a file that lives in the directory and not in this
+          # repository is left alone. The first run of this workflow deleted the
+          # plugin's two icons that way, and the directory page lost its image.
+          rsync -a --exclude '.*' --exclude 'README.md' "$ASSETS_DIR/" svn/assets/
+          if [ "${{ inputs.mode }}" = "release" ]; then
+            rsync -a --delete --exclude '.*' --exclude 'README.md' "$PLUGIN_DIR/" svn/trunk/
+          else
+            cp "$PLUGIN_DIR/readme.txt" svn/trunk/readme.txt
+          fi
+
+      - name: Commit
+        env:
+          SVN_USERNAME: ${{ secrets.WPORG_SVN_USERNAME }}
+          SVN_PASSWORD: ${{ secrets.WPORG_SVN_PASSWORD }}
+          VERSION: ${{ steps.version.outputs.version }}
+          MODE: ${{ inputs.mode }}
+        run: |
+          set -euo pipefail
+          if [ -z "${SVN_USERNAME:-}" ] || [ -z "${SVN_PASSWORD:-}" ]; then
+            echo "WPORG_SVN_USERNAME and WPORG_SVN_PASSWORD are not set on this repository." >&2
+            exit 1
+          fi
+          cd svn
+          svn add --force assets trunk > /dev/null
+          # Only under trunk, whose whole contents are this repository's; an
+          # asset is never removed just because it is absent here.
+          svn status trunk | awk '/^!/ {print $2}' | xargs -r svn rm --force
+          if [ "$MODE" = "release" ]; then
+            if svn ls "https://plugins.svn.wordpress.org/$SLUG/tags/$VERSION" > /dev/null 2>&1; then
+              echo "Tag $VERSION already exists in the directory; bump the version first." >&2
+              exit 1
+            fi
+            svn cp trunk "tags/$VERSION"
+            message="release $VERSION"
+          else
+            message="readme and assets"
+          fi
+          if [ -z "$(svn status)" ]; then
+            echo "Nothing to commit: the directory already matches this repository."
+            exit 0
+          fi
+          svn status
+          svn commit -m "$message" \
+            --username "$SVN_USERNAME" --password "$SVN_PASSWORD" \
+            --no-auth-cache --non-interactive

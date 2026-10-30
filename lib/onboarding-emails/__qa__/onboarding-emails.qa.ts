@@ -399,7 +399,7 @@ async function main() {
   for (const locale of PUBLIC_LOCALES) {
     const d = getDashboardDictionary(locale)
     const text = d.reminders.settingsDescription + d.reminders.unsubscribePage.body
-    const marker = { he: 'מיילי התחלה', en: 'setup email', es: 'puesta en marcha', 'pt-BR': 'e-mails de início' }[locale]
+    const marker = { he: 'מיילי התחלה', en: 'setup email', es: 'puesta en marcha', 'pt-BR': 'e-mails de início', fr: 'e-mails de démarrage', it: 'e-mail di avvio' }[locale]
     check(`E2: ${locale} says the one switch and the one link cover the setup emails too`,
       text.toLowerCase().includes(marker.toLowerCase()), marker)
   }

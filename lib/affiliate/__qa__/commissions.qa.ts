@@ -21,6 +21,9 @@ import { AFFILIATE_TERMS } from '../terms'
 import { effectiveRate, commissionAmount, releaseAt, released, payable } from '../rates'
 import { recordCommissionForPayment, reverseCommissionForPayment, markReferralChurned, recordManualCommission, countActivePayingReferrals } from '../commissions'
 import { applyPayPalEventToAffiliateBooks, saleAmount, bridgeOutcomeIsNotable } from '../paypal-bridge'
+import { applyCreemEventToAffiliateBooks, commissionBase, creemBridgeOutcomeIsNotable } from '../creem-bridge'
+import { creemTransactionOf, type CreemResult, type CreemSubscriptionSnapshot } from '../../creem/client'
+import { EVENT_EFFECTS } from '../../creem/events'
 
 let pass = 0, fail = 0
 function check(name: string, cond: boolean, detail?: string) {
@@ -45,7 +48,7 @@ function books({ payingReferrals = 0, status = 'approved' }: { payingReferrals?:
     affiliates: [{ id: 'aff-1', user_id: 'partner-user', code: 'dana', status, base_rate: 30, top_rate: 40, top_rate_from: 10 }],
     affiliate_referrals: referrals,
     affiliate_commissions: [],
-    subscriptions: [{ user_id: 'cust-1', paypal_subscription_id: 'I-SUB-1' }],
+    subscriptions: [{ user_id: 'cust-1', paypal_subscription_id: 'I-SUB-1', creem_subscription_id: 'sub_1' }],
   })
 }
 
@@ -298,6 +301,238 @@ async function main() {
         .test(route.replace('} catch (affiliateError)', '} catch (other)')))
     check('G3-MUT: a commission import in the subscription module is caught',
       /affiliate/i.test('import { recordCommissionForPayment } from "@/lib/affiliate/commissions"'))
+  }
+
+  console.log('\nH) the Creem bridge')
+  {
+    // Creem is the merchant of record for every card payment outside Israel,
+    // so this is the ONLY path by which a partner is paid on a customer from
+    // abroad. Amounts are minor units, and Creem reports the tax it collects
+    // as merchant of record separately — tax is not our revenue.
+    const tran = (over: Record<string, unknown> = {}) => ({
+      id: 'tran_1', object: 'transaction', amount: 8690, amount_paid: 8690, tax_amount: 790,
+      currency: 'USD', status: 'paid', ...over,
+    })
+    const snap = (over: Partial<CreemSubscriptionSnapshot> = {}): CreemSubscriptionSnapshot => ({
+      id: 'sub_1', status: 'active', productId: 'prod_x', customerId: 'cus_1',
+      currentPeriodStart: '2026-10-24T00:00:00Z', currentPeriodEnd: '2026-11-24T00:00:00Z',
+      metadata: null, lastTransaction: creemTransactionOf(tran()), ...over,
+    })
+    const creem = (answer: CreemResult<CreemSubscriptionSnapshot> = { ok: true, value: snap() }) => {
+      const calls: string[] = []
+      return { calls, fetchSubscription: async (id: string) => { calls.push(id); return answer } }
+    }
+
+    const a = books()
+    const paid = await applyCreemEventToAffiliateBooks(a, {
+      eventType: 'subscription.paid',
+      object: { id: 'sub_1', last_transaction: tran() },
+    }, creem(), NOW)
+    check('H1: a Creem payment earns 30% of what the customer paid, net of the tax Creem collects',
+      paid.kind === 'commission' && paid.outcome.kind === 'recorded'
+      && paid.outcome.currency === 'USD' && paid.outcome.amount === 23.7, JSON.stringify(paid))
+    check('H1b: the PAYMENT’s own id is the idempotency key, never the subscription’s', (() => {
+      const row = a.tables.affiliate_commissions[0]
+      return row?.external_payment_id === 'tran_1' && row.source === 'creem' && row.payment_amount === 79
+    })(), JSON.stringify(a.tables.affiliate_commissions[0]))
+    check('H1c: and the referral is recorded as billed through Creem',
+      a.tables.affiliate_referrals.find((r) => r.id === 'ref-1')?.billing_source === 'creem')
+
+    // The event body carried the transaction above. A checkout.completed does
+    // not, so the amount comes from the same server-side read the entitlement
+    // is granted from — never from our own price list.
+    const first = books()
+    const fake = creem()
+    const checkout = await applyCreemEventToAffiliateBooks(first, {
+      eventType: 'checkout.completed',
+      object: { id: 'ch_1', subscription: 'sub_1', request_id: 'cust-1' },
+    }, fake, NOW)
+    check('H2: a first payment earns, with the amount read back from Creem',
+      checkout.kind === 'commission' && checkout.outcome.kind === 'recorded'
+      && checkout.outcome.amount === 23.7 && fake.calls.length === 1, JSON.stringify(checkout))
+    check('H2b: the subscription is taken from the checkout’s subscription field, not its own id',
+      fake.calls[0] === 'sub_1')
+
+    // The first payment can arrive as BOTH events. Both name the same
+    // transaction, so the (source, external_payment_id) uniqueness makes the
+    // second a no-op — which is why keying on the payment is what makes
+    // earning on both events safe.
+    const twice = new FakeAdmin({ ...books().tables }, { affiliate_commissions: { insert: () => ({ code: '23505' }) } })
+    const again = await applyCreemEventToAffiliateBooks(twice, {
+      eventType: 'subscription.paid', object: { id: 'sub_1', last_transaction: tran() },
+    }, creem(), NOW)
+    check('H3: the same payment arriving as both events earns once',
+      again.kind === 'commission' && again.outcome.kind === 'already_recorded', JSON.stringify(again))
+
+    const renewal = await applyCreemEventToAffiliateBooks(a, {
+      eventType: 'subscription.paid',
+      object: { id: 'sub_1', last_transaction: tran({ id: 'tran_2' }) },
+    }, creem(), NOW)
+    check('H4: next month’s payment earns again — "for as long as they keep paying"',
+      renewal.kind === 'commission' && renewal.outcome.kind === 'recorded'
+      && a.tables.affiliate_commissions.length === 2)
+    /* H4-MUT: the failure this key exists to prevent. Keying on the
+       SUBSCRIPTION id would make every renewal look like the same payment, and
+       the partner would be paid once and never again — months before anyone
+       noticed. */
+    check('H4-MUT: the subscription id is the SAME across the two payments, the transaction id is not',
+      a.tables.affiliate_commissions[0].external_payment_id !== a.tables.affiliate_commissions[1].external_payment_id
+      && !a.tables.affiliate_commissions.some((c) => c.external_payment_id === 'sub_1'))
+
+    const noTran = await applyCreemEventToAffiliateBooks(books(), {
+      eventType: 'subscription.paid', object: { id: 'sub_1' },
+    }, creem({ ok: true, value: snap({ lastTransaction: null }) }), NOW)
+    check('H5: a payment with no amount anywhere is refused, never priced from our own plan list',
+      noTran.kind === 'unusable_event', JSON.stringify(noTran))
+    const unreachable = await applyCreemEventToAffiliateBooks(books(), {
+      eventType: 'subscription.paid', object: { id: 'sub_1' },
+    }, creem({ ok: false, reason: 'timeout' }), NOW)
+    check('H6: an unreachable Creem is reported as unverifiable, not guessed at',
+      unreachable.kind === 'amount_unverifiable', JSON.stringify(unreachable))
+    const foreign = await applyCreemEventToAffiliateBooks(books(), {
+      eventType: 'subscription.paid', object: { id: 'sub_nobody', last_transaction: tran() },
+    }, creem(), NOW)
+    check('H7: a subscription we do not hold credits nobody and is reported',
+      foreign.kind === 'unknown_subscription', JSON.stringify(foreign))
+
+    const refunded = await applyCreemEventToAffiliateBooks(a, {
+      eventType: 'refund.created', object: { id: 'ref_9', transaction: 'tran_1', subscription: 'sub_1' },
+    }, creem(), NOW)
+    check('H8: a refund reverses the PAYMENT it points at',
+      refunded.kind === 'reversal' && refunded.outcome.kind === 'reversed'
+      && a.tables.affiliate_commissions.find((c) => c.external_payment_id === 'tran_1')?.status === 'reversed',
+      JSON.stringify(refunded))
+    const disputed = await applyCreemEventToAffiliateBooks(a, {
+      eventType: 'dispute.created', object: { id: 'dis_9', transaction: 'tran_2' },
+    }, creem(), NOW)
+    check('H8b: a dispute reverses it as a chargeback',
+      disputed.kind === 'reversal'
+      && a.tables.affiliate_commissions.find((c) => c.external_payment_id === 'tran_2')?.reversed_reason === 'chargeback',
+      JSON.stringify(disputed))
+    // `transaction_id` is the name Creem's own refund API uses for this
+    // reference (POST /v1/refunds), so it has to be the first one read.
+    const byApiName = books()
+    await recordCommissionForPayment(byApiName, { userId: 'cust-1', externalPaymentId: 'tran_7', amount: 79, currency: 'USD', source: 'creem', earnedAt: NOW })
+    const apiShape = await applyCreemEventToAffiliateBooks(byApiName, {
+      eventType: 'refund.created', object: { id: 'ref_11', transaction_id: 'tran_7', status: 'succeeded' },
+    }, creem(), NOW)
+    check('H8c: a refund naming the payment as transaction_id reverses it',
+      apiShape.kind === 'reversal' && apiShape.outcome.kind === 'reversed'
+      && byApiName.tables.affiliate_commissions[0]?.status === 'reversed', JSON.stringify(apiShape))
+
+    // Creem's refund status is an enum of five, and two of them mean no money
+    // went back. A commission must not be taken away for those.
+    for (const status of ['failed', 'canceled']) {
+      const kept = books()
+      await recordCommissionForPayment(kept, { userId: 'cust-1', externalPaymentId: 'tran_8', amount: 79, currency: 'USD', source: 'creem', earnedAt: NOW })
+      const untouched = await applyCreemEventToAffiliateBooks(kept, {
+        eventType: 'refund.created', object: { id: 'ref_12', transaction_id: 'tran_8', status },
+      }, creem(), NOW)
+      check(`H8d: a refund reported as ${status} takes nothing from the partner`,
+        untouched.kind === 'reversal_not_applicable' && kept.tables.affiliate_commissions[0]?.status === 'pending',
+        JSON.stringify(untouched))
+    }
+    const pendingRefund = books()
+    await recordCommissionForPayment(pendingRefund, { userId: 'cust-1', externalPaymentId: 'tran_9', amount: 79, currency: 'USD', source: 'creem', earnedAt: NOW })
+    const onPending = await applyCreemEventToAffiliateBooks(pendingRefund, {
+      eventType: 'refund.created', object: { id: 'ref_13', transaction_id: 'tran_9', status: 'pending' },
+    }, creem(), NOW)
+    check('H8e: a pending refund still reverses — Creem has no refund.succeeded event to wait for',
+      onPending.kind === 'reversal' && pendingRefund.tables.affiliate_commissions[0]?.status === 'reversed',
+      JSON.stringify(onPending))
+    /* H8d-MUT: a guard that read the status as a whole-string match against
+       'failed' only, or that let an unknown status through as refused, would
+       either take a commission on a cancelled refund or never reverse at all. */
+    check('H8d-MUT: an unrecognised status does not block the reversal',
+      (await (async () => {
+        const odd = books()
+        await recordCommissionForPayment(odd, { userId: 'cust-1', externalPaymentId: 'tran_10', amount: 79, currency: 'USD', source: 'creem', earnedAt: NOW })
+        return applyCreemEventToAffiliateBooks(odd, {
+          eventType: 'refund.created', object: { id: 'ref_14', transaction_id: 'tran_10', status: 'requiresAction' },
+        }, creem(), NOW)
+      })()).kind === 'reversal')
+
+    const bareRefund = await applyCreemEventToAffiliateBooks(books(), {
+      eventType: 'refund.created', object: { id: 'ref_10' },
+    }, creem(), NOW)
+    check('H9: a refund naming no payment is reported, never applied to the refund’s own id',
+      bareRefund.kind === 'unusable_event', JSON.stringify(bareRefund))
+    /* H9-MUT: reversing by the refund's own id reverses nothing at all. */
+    const wrongKey = books()
+    await recordCommissionForPayment(wrongKey, { userId: 'cust-1', externalPaymentId: 'tran_1', amount: 79, currency: 'USD', source: 'creem', earnedAt: NOW })
+    const missed = await reverseCommissionForPayment(wrongKey, { source: 'creem', externalPaymentId: 'ref_9', reason: 'refund', now: NOW })
+    check('H9-MUT: reversing by the refund’s own id reverses nothing', missed.kind === 'nothing_to_reverse')
+
+    for (const event of ['subscription.canceled', 'subscription.expired', 'subscription.unpaid']) {
+      const churning = books()
+      churning.tables.affiliate_referrals[0].status = 'paying'
+      const churned = await applyCreemEventToAffiliateBooks(churning, { eventType: event, object: { id: 'sub_1' } }, creem(), NOW)
+      check(`H10: ${event} stops the referral counting towards the 40% tier`,
+        churned.kind === 'churn' && churning.tables.affiliate_referrals[0].status === 'churned', JSON.stringify(churned))
+    }
+    const stillTrying = books()
+    stillTrying.tables.affiliate_referrals[0].status = 'paying'
+    const pastDue = await applyCreemEventToAffiliateBooks(stillTrying, { eventType: 'subscription.past_due', object: { id: 'sub_1' } }, creem(), NOW)
+    check('H10b: a charge Creem is still retrying does NOT churn the referral',
+      pastDue.kind === 'not_an_affiliate_event' && stillTrying.tables.affiliate_referrals[0].status === 'paying', JSON.stringify(pastDue))
+    check('H10c: every other event costs not a single query',
+      (await applyCreemEventToAffiliateBooks(books(), { eventType: 'subscription.update', object: { id: 'sub_1' } }, creem(), NOW)).kind === 'not_an_affiliate_event'
+      && (await applyCreemEventToAffiliateBooks(books(), {}, creem(), NOW)).kind === 'not_an_affiliate_event')
+
+    check('H11: the commission base is minor units, net of tax, and never a guess', (() => {
+      const base = (over: Record<string, unknown>) => commissionBase(creemTransactionOf(tran(over))!)
+      return base({})?.amount === 79
+        && base({ tax_amount: 0 })?.amount === 86.9
+        // amount_paid is what was collected; `amount` is only the fallback.
+        && base({ amount_paid: 2000, amount: 9999, tax_amount: 0 })?.amount === 20
+        && base({ currency: 'EUR' }) === null
+        && base({ currency: 'JPY' }) === null
+        && base({ currency: null }) === null
+        && base({ amount_paid: 0, amount: 0 }) === null
+        && base({ amount_paid: -500, amount: -500 }) === null
+        // Two fields that are not the pair we think they are: never a negative base.
+        && base({ amount_paid: 790, tax_amount: 8690 })?.amount === 7.9
+    })())
+    check('H11b: a transaction with no id is not a transaction, whatever amount it carries',
+      creemTransactionOf({ amount: 7900, currency: 'USD' }) === null && creemTransactionOf(null) === null)
+    check('H12: only the outcomes worth reading are logged',
+      creemBridgeOutcomeIsNotable({ kind: 'commission', outcome: { kind: 'recorded', commissionId: 'c', affiliateId: 'a', amount: 1, currency: 'USD', rate: 30 } })
+      && creemBridgeOutcomeIsNotable({ kind: 'amount_unverifiable', eventType: 'subscription.paid', reason: 'timeout' })
+      && !creemBridgeOutcomeIsNotable({ kind: 'not_an_affiliate_event', eventType: 'credits.granted' })
+      && !creemBridgeOutcomeIsNotable({ kind: 'commission', outcome: { kind: 'not_referred' } }))
+
+    // The two event sets are not a second opinion about Creem's event table:
+    // every event this bridge earns on is one lib/creem/events.ts treats as a
+    // live subscription, and every event it churns on is one that ends access.
+    check('H13: the bridge’s event sets agree with the entitlement policy', (() => {
+      const bridge = strip(read('lib/affiliate/creem-bridge.ts'))
+      const earns = ['checkout.completed', 'subscription.paid']
+      const churns = ['subscription.canceled', 'subscription.expired', 'subscription.unpaid']
+      const effects = EVENT_EFFECTS as Record<string, { kind: string; status?: string }>
+      return earns.every((e) => bridge.includes(`'${e}'`) && (effects[e].kind === 'activate' || effects[e].status === 'active'))
+        && churns.every((e) => bridge.includes(`'${e}'`) && effects[e].kind === 'status' && effects[e].status !== 'active')
+        && effects['subscription.past_due'].status === 'active' && !new RegExp("CHURN_EVENTS[^)]*past_due").test(bridge)
+    })())
+
+    const route = strip(read('app/api/creem/webhook/route.ts'))
+    // The CALL sites, not the imports: the import order says nothing.
+    check('H14: the webhook applies the entitlement FIRST, then the books',
+      route.indexOf('processVerifiedCreemEvent(admin') > 0
+      && route.indexOf('processVerifiedCreemEvent(admin') < route.indexOf('applyCreemEventToAffiliateBooks(admin'))
+    check('H15: a bookkeeping failure cannot change the webhook’s verdict',
+      /try \{[\s\S]{0,900}applyCreemEventToAffiliateBooks[\s\S]{0,900}\} catch \(affiliateError\)/.test(route)
+      && route.indexOf('applyCreemEventToAffiliateBooks(admin') < route.indexOf('httpStatusForCreemOutcome(outcome)'))
+    check('H16: the entitlement module itself knows nothing about commissions',
+      !/affiliate/i.test(strip(read('lib/creem/webhook-processing.ts'))))
+    /* H15-MUT: the call outside a try would turn a bookkeeping error into a 500,
+       and Creem would retry a delivery whose real work already succeeded. */
+    check('H15-MUT: an unguarded bridge call is caught',
+      !/try \{[\s\S]{0,900}applyCreemEventToAffiliateBooks[\s\S]{0,900}\} catch \(affiliateError\)/
+        .test(route.replace('} catch (affiliateError)', '} catch (other)')))
+    /* H13-MUT: an earn list that included an event carrying no payment would
+       book a commission on a status change. */
+    check('H13-MUT: an event with no payment behind it is not in the earn list',
+      !/EARN_EVENTS[\s\S]{0,120}subscription\.active/.test(strip(read('lib/affiliate/creem-bridge.ts'))))
   }
 
   console.log(`\n${pass} passed, ${fail} failed`)

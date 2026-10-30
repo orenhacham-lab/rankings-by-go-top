@@ -36,7 +36,7 @@ export const META_FIX_TYPES: readonly FixType[] = ['seo_title', 'meta_descriptio
 export const SITE_FIX_TYPES: readonly FixType[] = ['llms_txt']
 
 /** The latest plugin this app ships (wordpress-plugin/gotop-seo-bridge; a guard pins it to the PHP). */
-export const PLUGIN_LATEST_VERSION = '3.1.1'
+export const PLUGIN_LATEST_VERSION = '3.2.0'
 /** The first plugin that needs no application password for anything (./plugin-capabilities.ts). */
 export const READ_PLUGIN_MIN_VERSION = '3.1.0'
 /**

@@ -53,7 +53,7 @@ type Counts = { product: number; collection: number; page: number; blog: number;
 const ZERO: Counts = { product: 0, collection: 0, page: 0, blog: 0, article: 0 }
 
 export default function ContentHubPlatformCard({ projectId, children }: { projectId: string; children: React.ReactNode }) {
-  const { language, uiLocale } = useDashboardLanguage()
+  const { uiLocale } = useDashboardLanguage()
   const cs = useMemo(() => getDashboardDictionary(uiLocale).projectDetail.contentSection, [uiLocale])
   const t = cs.shopify
 
@@ -189,7 +189,7 @@ export default function ContentHubPlatformCard({ projectId, children }: { projec
       </div>
 
       <div className="text-caption text-muted mb-2">
-        {shopify.last_synced_at ? `${t.lastSync}: ${formatDateTime(shopify.last_synced_at, language)}` : t.neverSynced}
+        {shopify.last_synced_at ? `${t.lastSync}: ${formatDateTime(shopify.last_synced_at, uiLocale)}` : t.neverSynced}
       </div>
       {/* The store's own error text is never shown (design contract §8). */}
       {shopify.last_error && (

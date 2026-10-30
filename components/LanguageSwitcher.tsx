@@ -4,10 +4,8 @@ import Link from 'next/link'
 import { useEffect, useRef, useState } from 'react'
 import { usePathname } from 'next/navigation'
 import { Check, ChevronDown, Languages } from 'lucide-react'
-import { LOCALE_PREFIX, PUBLIC_LOCALES, type PublicLocale } from '@/lib/i18n/locales'
+import { LOCALE_PREFIX, LOCALE_SHORT_LABEL, enabledPublicLocales, type PublicLocale } from '@/lib/i18n/locales'
 import { getPublicDictionary } from '@/lib/i18n/getPublicDictionary'
-import { spanishSiteEnabled } from '@/lib/i18n/spanish-site'
-import { portugueseSiteEnabled } from '@/lib/i18n/portuguese-site'
 import { cn } from '@/lib/utils'
 
 /**
@@ -35,26 +33,25 @@ export function counterpartPath(pathname: string, from: PublicLocale, to: Public
 }
 
 /**
- * The locales a visitor may switch to right now. A gated language appears only
- * while its own site is on, so the switcher can never offer a tree that 404s.
+ * The locales a visitor may switch to right now, from the one gate in
+ * lib/i18n/locales.ts. A gated language appears only while its own site is on,
+ * so the switcher can never offer a tree that 404s. Kept as a named export
+ * because the QA suites and the journeys call it by name.
  */
-export function availableLocales(
-  spanishOn = spanishSiteEnabled(),
-  portugueseOn = portugueseSiteEnabled(),
-): PublicLocale[] {
-  return PUBLIC_LOCALES.filter((l) => (l === 'es' ? spanishOn : l === 'pt-BR' ? portugueseOn : true))
+export function availableLocales(flags?: Partial<Record<PublicLocale, boolean>>): PublicLocale[] {
+  return enabledPublicLocales(flags)
 }
 
 /**
  * `inverse`: white ink, for the nav while it sits over a navy hero.
  *
- * With two languages this was one link; with three it is a small menu, because a
+ * With two languages this was one link; with more it is a small menu, because a
  * toggle cannot express "and also Spanish". It stays a list of real links, so it
  * works without JavaScript and a middle-click still opens the other language in
  * a new tab — and when only two languages are available it renders as the single
  * link it used to be.
  */
-export function LanguageSwitcher({ locale, className, inverse = false }: { locale: PublicLocale; className?: string; inverse?: boolean }) {
+export function LanguageSwitcher({ locale, className, inverse = false, compact = false }: { locale: PublicLocale; className?: string; inverse?: boolean; compact?: boolean }) {
   const pathname = usePathname() ?? '/'
   const dict = getPublicDictionary(locale)
   const locales = availableLocales()
@@ -108,7 +105,18 @@ export function LanguageSwitcher({ locale, className, inverse = false }: { local
         aria-expanded={open}
       >
         <Languages className={cn('size-4', inverse ? 'text-contrast-ink/70' : 'text-muted')} aria-hidden="true" />
-        {dict.languageSwitcher[locale]}
+        {/*
+          `compact` names the language SHORT in the desktop header and in full
+          everywhere else. Measured at 1440×900: "Português (Brasil)" makes the
+          trigger 135px wide and "Français" 123px, and with eight nav links
+          beside them the header's row came to 1389px inside a 1216px frame —
+          so the trial button was cut off on the right in Spanish, Portuguese,
+          French and Italian. The open menu below still names every language in
+          full, the aria-label is unchanged, and the full name is also what the
+          mobile menu shows, where there is room for it.
+        */}
+        <span className={compact ? 'xl:hidden' : undefined}>{dict.languageSwitcher[locale]}</span>
+        {compact && <span className="hidden xl:inline">{LOCALE_SHORT_LABEL[locale]}</span>}
         {/* The globe alone read as a label rather than a control: a visitor had no
             reason to think the language could be changed (owner, 5 October 2026).
             The chevron is what says "this opens", and it turns when it is open. */}

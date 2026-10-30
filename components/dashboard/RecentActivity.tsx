@@ -12,6 +12,7 @@ import type { ReactNode } from 'react'
 import { relativeTime, type FeedItem } from '@/lib/dashboard/activity'
 import type { DashboardDictionary } from '@/lib/i18n/dashboard/he'
 import { LinkButton, Widget, WidgetEmpty, WidgetError, WidgetLoading } from './ui'
+import type { PublicLocale } from '@/lib/i18n/locales'
 
 type Copy = DashboardDictionary['dashboardHome']
 
@@ -49,7 +50,7 @@ export default function RecentActivity({ t, model, now, language, emptyHref }: {
   t: Copy
   model: ActivityModel
   now: Date
-  language: 'he' | 'en'
+  language: PublicLocale
   emptyHref: string
 }) {
   const a = t.activity

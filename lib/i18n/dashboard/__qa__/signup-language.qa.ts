@@ -60,8 +60,14 @@ function main() {
   // 4 — emailRedirectTo carries ?lang so the confirmation hop preserves the choice.
   check('signup emailRedirectTo carries &lang=${lang}', /emailRedirectTo:[^\n]*&lang=\$\{lang\}/.test(signup))
   // callback preserves a validated lang on the redirect.
+  // It used to validate with `lang === 'en' || lang === 'he'`, which DROPPED a
+  // Spanish or Portuguese language on the confirmation hop and landed the new
+  // customer in Hebrew. It now validates through normalizeStoredLocale, so
+  // every public locale survives and a hand-edited one still cannot.
   check('callback reads + validates lang and sets it on the redirect',
-    /searchParams\.get\('lang'\)/.test(callback) && /lang === 'en' \|\| lang === 'he'/.test(callback) && /dest\.searchParams\.set\('lang', lang\)/.test(callback))
+    /searchParams\.get\('lang'\)/.test(callback) && /normalizeStoredLocale\(lang\)/.test(callback) && /dest\.searchParams\.set\('lang', keptLang\)/.test(callback))
+  check('CONTROL: the old two-language filter fails this guard',
+    !/normalizeStoredLocale\(lang\)/.test(callback.replace(/normalizeStoredLocale\(lang\)/g, "(lang === 'en' || lang === 'he')")))
   const rootLayout = read('app/layout.tsx')
   // 3 — the layout still seeds from auth metadata, now THROUGH the server locale
   // resolver (cookie first, metadata as the fresh-device seed). The shape changed

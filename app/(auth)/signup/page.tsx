@@ -11,6 +11,7 @@ import type { PublicLocale } from '@/lib/i18n/locales'
 import { useAuthServerLocale } from '@/components/auth/AuthLocaleProvider'
 import { DASHBOARD_LANGUAGE_STORAGE_KEY } from '@/lib/i18n/dashboard/useDashboardLanguage'
 import { keepSeedClaim, seedClaimDestination } from './claim-action'
+import { recordSignupSource } from './source-action'
 import { CLAIM_START_PATH } from '@/lib/onboarding/claim-start'
 import GoogleSignInButton from '@/components/auth/GoogleSignInButton'
 import AuthShell, { AUTH_LINK_CLASSES, AUTH_TITLE_CLASSES } from '@/components/auth/AuthShell'
@@ -19,6 +20,8 @@ import { NoticeBox } from '@/components/ui/Notice'
 import PasswordField from '@/components/auth/PasswordField'
 import { authHref, withLocaleParam } from '@/lib/i18n/auth-href'
 import { REFERRAL_PARAM, normalizeReferralCode, withReferral } from '@/lib/affiliate/referral'
+import { currentChoices } from '@/lib/consent/client-store'
+import { META_SIGNUP_EVENT, metaPixelAllowed } from '@/lib/consent/meta-pixel'
 
 const SIGNUP_UI = {
   he: {
@@ -261,6 +264,126 @@ const SIGNUP_UI = {
       emailConfirmationRequired: 'Sua conta foi criada. Verifique seu e-mail para confirmar o cadastro.',
     },
   },
+  fr: {
+    subtitle: 'Suivi de position dans Google et visibilité dans les IA',
+    logoAlt: 'Logo de Go Top SEO',
+    heading: 'Créez votre compte gratuitement',
+    intro: 'Quelques informations et vous êtes dedans. Les informations de votre entreprise, nous les lisons sur votre site à l’étape suivante.',
+    fullName: 'Nom et prénom',
+    fullNamePlaceholder: 'Camille Durand',
+    company: 'Entreprise',
+    companyOptional: '(facultatif)',
+    companyPlaceholder: 'Le nom de votre activité ou de votre entreprise',
+    phone: 'Téléphone',
+    phonePlaceholder: '+33 6 12 34 56 78',
+    email: 'Adresse e-mail',
+    emailPlaceholder: 'vous@exemple.com',
+    password: 'Mot de passe',
+    passwordPlaceholder: '••••••••',
+    passwordHint: '8 caractères au minimum',
+    confirmPassword: 'Confirmez le mot de passe',
+    confirmPasswordPlaceholder: 'Saisissez le mot de passe une seconde fois',
+    showPassword: 'Afficher le mot de passe',
+    hidePassword: 'Masquer le mot de passe',
+    consentBefore: 'En créant un compte, vous acceptez les ',
+    terms: 'Conditions d’utilisation',
+    consentMiddle: ' et la ',
+    privacyPolicy: 'Politique de confidentialité',
+    consentAfter: '.',
+    termsHref: '/fr/terms',
+    privacyPolicyHref: '/fr/privacy',
+    signupBtn: 'Créer un compte gratuit',
+    trialBadge: '7 jours d’essai gratuit',
+    alreadyHaveAccount: 'Vous avez déjà un compte ?',
+    signIn: 'Se connecter',
+    accessibility: 'Accessibilité',
+    privacy: 'Confidentialité',
+    articles: 'Articles',
+    accessibilityHref: '/fr/accessibility',
+    privacyHref: '/fr/privacy',
+    articlesHref: '/fr/articles',
+    err: {
+      invalidEmail: 'L’adresse e-mail n’est pas valide',
+      passwordTooShort: 'Le mot de passe doit contenir au moins 8 caractères',
+      fieldRequired: 'Ce champ est obligatoire',
+      fullNameInvalid: 'Saisissez votre nom complet (au moins 2 caractères)',
+      phoneInvalid: 'Saisissez un numéro de téléphone valide',
+      passwordMismatch: 'Les mots de passe ne correspondent pas. Saisissez le même dans les deux champs.',
+      emailExists: 'Cette adresse e-mail est déjà enregistrée. Connectez-vous.',
+      emailRateLimit: 'Trop de demandes d’inscription ont été envoyées en peu de temps. Réessayez dans quelques minutes ou utilisez une autre adresse e-mail.',
+      signupFailed: 'Une erreur est survenue lors de la création du compte. Réessayez.',
+      weakPasswordLength: (min: number) => `Le mot de passe doit contenir au moins ${min} caractères`,
+      weakPasswordCharacters: 'Le mot de passe doit contenir des minuscules, des majuscules, des chiffres et des symboles, conformément aux exigences de sécurité',
+      weakPasswordPwned: 'Ce mot de passe est apparu dans des fuites de données connues. Choisissez-en un autre.',
+      weakPassword: 'Ce mot de passe ne respecte pas les exigences de sécurité. Choisissez-en un plus robuste.',
+      createTrialFailed: 'Une erreur est survenue lors de l’activation de votre essai. Réessayez.',
+    },
+    success: {
+      accountCreated: 'Compte créé ! Nous vous emmenons vers le tableau de bord…',
+      accountCreatedFromScan: 'Votre compte est prêt. Nous ouvrons le projet de votre analyse…',
+      emailConfirmationRequired: 'Votre compte a été créé. Consultez votre boîte e-mail pour confirmer l’inscription.',
+    },
+  },
+  it: {
+    subtitle: 'Monitoraggio delle posizioni su Google e visibilità nelle IA',
+    logoAlt: 'Logo di Go Top SEO',
+    heading: 'Crei il suo account gratuito',
+    intro: 'Pochi dati e si comincia. I dati dell’azienda li leggiamo dal sito nel passaggio successivo.',
+    fullName: 'Nome e cognome',
+    fullNamePlaceholder: 'Giulia Rossi',
+    company: 'Azienda',
+    companyOptional: '(facoltativo)',
+    companyPlaceholder: 'Il nome della sua attività o della sua azienda',
+    phone: 'Telefono',
+    phonePlaceholder: '+39 320 000 0000',
+    email: 'Indirizzo e-mail',
+    emailPlaceholder: 'nome@esempio.it',
+    password: 'Password',
+    passwordPlaceholder: '••••••••',
+    passwordHint: 'Almeno 8 caratteri',
+    confirmPassword: 'Confermi la password',
+    confirmPasswordPlaceholder: 'Inserisca la password una seconda volta',
+    showPassword: 'Mostrare la password',
+    hidePassword: 'Nascondere la password',
+    consentBefore: 'Creando un account, accetta le ',
+    terms: 'Condizioni d’uso',
+    consentMiddle: ' e l’',
+    privacyPolicy: 'Informativa sulla privacy',
+    consentAfter: '.',
+    termsHref: '/it/terms',
+    privacyPolicyHref: '/it/privacy',
+    signupBtn: 'Creare un account gratuito',
+    trialBadge: '7 giorni di prova gratuita',
+    alreadyHaveAccount: 'Ha già un account?',
+    signIn: 'Accedere',
+    accessibility: 'Accessibilità',
+    privacy: 'Privacy',
+    articles: 'Articoli',
+    accessibilityHref: '/it/accessibility',
+    privacyHref: '/it/privacy',
+    articlesHref: '/it/articles',
+    err: {
+      invalidEmail: 'L’indirizzo e-mail non è valido',
+      passwordTooShort: 'La password deve contenere almeno 8 caratteri',
+      fieldRequired: 'Questo campo è obbligatorio',
+      fullNameInvalid: 'Inserisca il nome completo (almeno 2 caratteri)',
+      phoneInvalid: 'Inserisca un numero di telefono valido',
+      passwordMismatch: 'Le password non corrispondono. Inserisca la stessa in entrambi i campi.',
+      emailExists: 'Questo indirizzo e-mail è già registrato. Effettui l’accesso.',
+      emailRateLimit: 'Sono state inviate troppe richieste di registrazione in poco tempo. Riprovi tra qualche minuto oppure utilizzi un altro indirizzo e-mail.',
+      signupFailed: 'Si è verificato un errore durante la creazione dell’account. Riprovi.',
+      weakPasswordLength: (min: number) => `La password deve contenere almeno ${min} caratteri`,
+      weakPasswordCharacters: 'La password deve contenere lettere minuscole, lettere maiuscole, cifre e simboli, secondo i requisiti di sicurezza',
+      weakPasswordPwned: 'Questa password è comparsa in violazioni di dati note. Ne scelga un’altra.',
+      weakPassword: 'Questa password non soddisfa i requisiti di sicurezza. Ne scelga una più robusta.',
+      createTrialFailed: 'Si è verificato un errore durante l’attivazione della prova. Riprovi.',
+    },
+    success: {
+      accountCreated: 'Account creato. La portiamo alla dashboard…',
+      accountCreatedFromScan: 'Il suo account è pronto. Apriamo il progetto della sua analisi…',
+      emailConfirmationRequired: 'L’account è stato creato. Controlli la casella e-mail per confermare la registrazione.',
+    },
+  },
 } as const
 
 export function SignupForm() {
@@ -443,6 +566,17 @@ export function SignupForm() {
         return
       }
 
+      // Where this account came from, recorded once, before the paths below
+      // fork on whether a session came back — an account that still has to
+      // confirm its email came from a channel too. Nothing is stored on the
+      // device for this; see app/(auth)/signup/source-action.ts. Awaited but
+      // never able to throw, so a sign-up cannot fail over its attribution.
+      await recordSignupSource(authData.user.id, {
+        search: window.location.search,
+        referrer: document.referrer,
+        path: window.location.pathname,
+      })
+
       // Check if email confirmation is required (no session returned)
       if (!authData.session) {
         console.log('Email confirmation required — no session in signup response')
@@ -545,13 +679,14 @@ export function SignupForm() {
         // Don't block signup if email fails
       }
 
-      // Track signup success in Google Tag Manager (for Meta Pixel via GTM)
-      if (typeof window !== 'undefined') {
-        (window as any).dataLayer = (window as any).dataLayer || []
-        ;(window as any).dataLayer.push({
-          event: 'signup_success',
-          product: 'rankings_by_go_top',
-        })
+      // The conversion Meta's ad sets optimise on. It used to be a dataLayer
+      // event read by a tag inside the GTM container; the pixel is ours now
+      // (lib/consent/meta-pixel.ts), so the event is sent here — and only for a
+      // visitor who allowed marketing, which is the gate the container tag
+      // never had.
+      if (typeof window !== 'undefined' && metaPixelAllowed(currentChoices())) {
+        const fbq = (window as Window & { fbq?: (...args: unknown[]) => void }).fbq
+        fbq?.('track', META_SIGNUP_EVENT)
       }
 
       // Area G — immediate-session path: seed the EXISTING dashboard-language store so the

@@ -19,34 +19,44 @@
  * free check's guarded fetcher (normalizeCheckUrl + fetchSiteHtml: public
  * hosts only, every redirect re-admitted, size and time capped).
  *
- * THE OWNER'S OWN NAME, LINK AND IMAGE (author_box_name, author_box_url,
- * author_box_image) are read on their own (readAuthorBoxOverrides): while their
- * migration is not applied the box is exactly as before. The uploaded photo
+ * THE OWNER'S OWN NAME, LINE, LINK AND IMAGE (author_box_name,
+ * author_box_line, author_box_url, author_box_image) are read on their own
+ * (readAuthorBoxOverrides): while their migration is not applied the box is
+ * exactly as before. The uploaded photo
  * ('upload') is drawn only as its copy in the site (authorPhoto, given by the
  * WordPress publishers: ./photo-copy.ts), never as our stored file.
  *
+ * THE PAGE THE TEST READS is one of our own published articles, or, when none
+ * is published yet, a post page of the site's own content from the cached
+ * index. A site with no post page anywhere has nothing that could show a
+ * theme's box, so the first article follows the switch and the answer is not
+ * cached: the next article tests that article's own page.
+ *
  * FAILS SAFE: no column yet (the migration is not applied), the setting off,
- * any read error, no published page, a page that could not be read or was cut
- * off: no box. Never fails a publish.
+ * any read error, a page that could not be read or was cut off: no box.
+ * Never fails a publish.
  */
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { normalizeCheckUrl } from '@/lib/free-check/url-guard'
 import { fetchSiteHtml } from '@/lib/free-check/site-fetch'
 import { ARTICLE_STYLE_TABLE, isMissingRelation } from '@/lib/content/article-style/store'
 import { articleLanguage } from '@/lib/content/article-style/labels'
-import { authorBoxContent, authorBoxImageChoice, authorBoxLanguage, cleanAuthorBoxName, normalizeAuthorBoxUrl, themeHasAuthorBox, type AuthorBoxContent, type AuthorBoxImageChoice, type AuthorBoxInputs } from './box'
+import { authorBoxContent, authorBoxImageChoice, authorBoxLanguage, cleanAuthorBoxLine, cleanAuthorBoxName, normalizeAuthorBoxUrl, themeHasAuthorBox, type AuthorBoxContent, type AuthorBoxImageChoice, type AuthorBoxInputs } from './box'
 import { readWordPressSiteIcon, type FetchText } from './site-icon'
 
 export const AUTHOR_BOX_COLUMN = 'author_box'
 export const THEME_BOX_COLUMN = 'theme_author_box'
 export const THEME_CHECKED_COLUMN = 'theme_author_box_checked_at'
 /**
- * The owner's own name and link for the box (supabase/migrations/
- * 20261016180000_project_author_box_overrides.sql). Read on their own, never
- * with the switch: while that migration is not applied, the box works exactly
- * as before (the resolved name, the about or home page).
+ * The owner's own name, line and link for the box (supabase/migrations/
+ * 20261016180000_project_author_box_overrides.sql, and
+ * 20261017140000_project_author_box_line.sql for the line). Read on their own,
+ * never with the switch: while those migrations are not applied, the box works
+ * exactly as before (the resolved name, the description's first sentence, the
+ * about or home page).
  */
 export const AUTHOR_NAME_COLUMN = 'author_box_name'
+export const AUTHOR_LINE_COLUMN = 'author_box_line'
 export const AUTHOR_URL_COLUMN = 'author_box_url'
 export const AUTHOR_IMAGE_COLUMN = 'author_box_image'
 
@@ -94,19 +104,21 @@ export type AuthorBoxOverrides = {
   state: 'saved' | 'default' | 'missing_column' | 'error'
   /** '' when the owner left it empty: the resolver picks the name. */
   name: string
+  /** '' when the owner left it empty: the description's first sentence. */
+  line: string
   /** '' when the owner left it empty: the about page, else the home page. */
   url: string
   /** 'none' (the default) draws no image. */
   image: AuthorBoxImageChoice
 }
 
-/** The owner's own name and link for the box, read for its owner. Empty on any failure (today's behaviour). */
+/** The owner's own name, line and link for the box, read for its owner. Empty on any failure (today's behaviour). */
 export async function readAuthorBoxOverrides(db: SupabaseClient, projectId: string, ownerId: string): Promise<AuthorBoxOverrides> {
-  const none = (state: AuthorBoxOverrides['state']): AuthorBoxOverrides => ({ state, name: '', url: '', image: 'none' })
+  const none = (state: AuthorBoxOverrides['state']): AuthorBoxOverrides => ({ state, name: '', line: '', url: '', image: 'none' })
   try {
     const { data, error } = await db
       .from(ARTICLE_STYLE_TABLE)
-      .select(`project_id, user_id, ${AUTHOR_NAME_COLUMN}, ${AUTHOR_URL_COLUMN}, ${AUTHOR_IMAGE_COLUMN}`)
+      .select(`project_id, user_id, ${AUTHOR_NAME_COLUMN}, ${AUTHOR_LINE_COLUMN}, ${AUTHOR_URL_COLUMN}, ${AUTHOR_IMAGE_COLUMN}`)
       .eq('project_id', projectId)
       .eq('user_id', ownerId)
       .maybeSingle()
@@ -114,7 +126,7 @@ export async function readAuthorBoxOverrides(db: SupabaseClient, projectId: stri
     const row = data as Record<string, unknown> | null
     if (!row || row.project_id !== projectId || row.user_id !== ownerId) return none('default')
     // Checked again on the way out: a value that does not pass is treated as empty.
-    return { state: 'saved', name: cleanAuthorBoxName(row[AUTHOR_NAME_COLUMN]), url: normalizeAuthorBoxUrl(row[AUTHOR_URL_COLUMN]) ?? '', image: authorBoxImageChoice(row[AUTHOR_IMAGE_COLUMN]) }
+    return { state: 'saved', name: cleanAuthorBoxName(row[AUTHOR_NAME_COLUMN]), line: cleanAuthorBoxLine(row[AUTHOR_LINE_COLUMN]), url: normalizeAuthorBoxUrl(row[AUTHOR_URL_COLUMN]) ?? '', image: authorBoxImageChoice(row[AUTHOR_IMAGE_COLUMN]) }
   } catch {
     return none('error')
   }
@@ -150,6 +162,29 @@ export function isProjectPage(url: unknown, domain: unknown, platform: AuthorBox
 const URL_COLUMN: Record<AuthorBoxPlatform, string> = { wordpress: 'wp_post_url', shopify: 'shopify_article_url', webhook: 'site_post_url' }
 
 /**
+ * One post page of the SITE'S OWN content, from the cached content index: a
+ * real single-post page, which is where a theme draws its author box. Read
+ * only when none of our own articles is published yet, so a site with a blog
+ * of its own is still tested truthfully before its first article of ours.
+ * WordPress only (the index is a WordPress scan). Never throws.
+ */
+export async function findSitePostPage(admin: SupabaseClient, projectId: string, domain: string | null, platform: AuthorBoxPlatform): Promise<string | null> {
+  if (platform !== 'wordpress') return null
+  try {
+    const { data } = await admin.from('wordpress_content_index').select('project_id, targets').eq('project_id', projectId).maybeSingle()
+    const row = data as { project_id?: string; targets?: unknown } | null
+    if (!row || row.project_id !== projectId || !Array.isArray(row.targets)) return null
+    for (const t of row.targets as { targetUrl?: unknown; targetType?: unknown }[]) {
+      if (t?.targetType !== 'post') continue
+      if (isProjectPage(t.targetUrl, domain, platform)) return String(t.targetUrl)
+    }
+    return null
+  } catch {
+    return null
+  }
+}
+
+/**
  * One already-published post page of the project's site: this article's own
  * address when it has one, else the most recently published article's.
  */
@@ -174,6 +209,8 @@ export async function findPublishedPage(admin: SupabaseClient, projectId: string
 
 export type ThemeDeps = {
   fetchHtml?: typeof fetchSiteHtml
+  /** Tests only: the site's own post page (./store.ts findSitePostPage). */
+  sitePostPage?: typeof findSitePostPage
   /** The site icon's REST reads (./site-icon.ts). */
   fetchText?: FetchText
   now?: () => Date
@@ -298,7 +335,8 @@ export type AuthorPhotoCopy = (projectId: string, ownerId: string) => Promise<st
  * Everything the box is made from, for publishing AND for the settings
  * preview (./preview.ts): the owner's own name and link, the site's publishing
  * user (asked only when the owner typed no name), the business name, the
- * description (never a store's), the about page and the language. Every read
+ * owner's own line, the description (a store's too, since 2026-10-17), the about page and the
+ * language. Every read
  * names the project and its owner. `articleId` null = the preview: the
  * language is the project's, else the description's.
  */
@@ -328,8 +366,8 @@ export async function readAuthorBoxInputs(admin: SupabaseClient, req: {
     try { authorName = req.authorName ? await req.authorName() : null } catch { authorName = null }
   }
   const [description, aboutUrl, topicLanguage] = await Promise.all([
-    // A store's description is kept out of its articles (writing guidance), so out of the box too.
-    req.platform === 'shopify' ? Promise.resolve(null) : readDescription(admin, req.projectId, project.owner),
+    // The description reaches a store's articles too (lib/content/writing-guidance/store.ts, 2026-10-17), so it reaches its box.
+    readDescription(admin, req.projectId, project.owner),
     readAboutUrl(admin, req.projectId, project.owner, project.domain),
     req.articleId ? readTopicLanguage(admin, req.articleId, req.projectId) : Promise.resolve(null),
   ])
@@ -341,6 +379,7 @@ export async function readAuthorBoxInputs(admin: SupabaseClient, req: {
     authorName,
     businessName: project.name,
     description,
+    lineOverride: overrides.line || null,
     domain: project.domain,
     aboutUrl,
     linkUrl: overrides.url || null,
@@ -361,11 +400,22 @@ export async function decideAuthorBox(admin: SupabaseClient, req: AuthorBoxReque
     const now = (deps.now ?? (() => new Date()))()
     let answer = cachedThemeAnswer(setting, now)
     if (answer === null) {
+      // A post page to test: ours first, else one of the site's own posts.
       const page = await findPublishedPage(admin, req.projectId, req.articleId, project.domain, req.platform)
-      // Nothing published yet: nothing to read, and nothing worth caching.
-      if (!page) return { add: false, reason: 'theme_unknown' }
-      answer = await testThemePage(page, deps.fetchHtml)
-      await storeThemeAnswer(admin, req.projectId, project.owner, answer, now)
+        ?? await (deps.sitePostPage ?? findSitePostPage)(admin, req.projectId, project.domain, req.platform)
+      if (page) {
+        answer = await testThemePage(page, deps.fetchHtml)
+        await storeThemeAnswer(admin, req.projectId, project.owner, answer, now)
+      } else {
+        // THE FIRST ARTICLE OF A SITE WITH NO POSTS AT ALL. There is no page in
+        // existence that could show a theme's author box, so the test cannot be
+        // run — and returning "unknown" here meant every new customer silently
+        // lost the box they had switched on, on their very first article. The
+        // test exists only to avoid a SECOND box, so with nothing to compare
+        // against the switch decides. Deliberately NOT cached: the next article
+        // tests this article's own published page and the real answer takes over.
+        answer = 'no_box'
+      }
     }
     if (answer === 'has_box') return { add: false, reason: 'theme_has_box' }
     if (answer !== 'no_box') return { add: false, reason: 'theme_unknown' }

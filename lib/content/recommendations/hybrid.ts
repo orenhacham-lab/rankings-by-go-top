@@ -93,6 +93,21 @@ const PROVENANCE: Record<ContentLanguage, {
     many: (n, names) => `Respaldado por ${n} fuentes: ${names}`,
     one: (name) => `Respaldado solo por: ${name}`,
   },
+  'pt-BR': {
+    label: { site_scan: 'Análise do site', keyword_research_url: 'Pesquisa de palavras-chave', project_data: 'Dados do projeto', keyword: 'Palavra-chave', hybrid: 'Combinado' },
+    many: (n, names) => `Apoiado por ${n} fontes: ${names}`,
+    one: (name) => `Apoiado apenas por: ${name}`,
+  },
+  fr: {
+    label: { site_scan: 'Analyse du site', keyword_research_url: 'Recherche de mots-clés', project_data: 'Données du projet', keyword: 'Mot-clé', hybrid: 'Combiné' },
+    many: (n, names) => `Appuyé par ${n} sources : ${names}`,
+    one: (name) => `Appuyé uniquement par : ${name}`,
+  },
+  it: {
+    label: { site_scan: 'Analisi del sito', keyword_research_url: 'Ricerca di parole chiave', project_data: 'Dati del progetto', keyword: 'Parola chiave', hybrid: 'Combinato' },
+    many: (n, names) => `Supportato da ${n} fonti: ${names}`,
+    one: (name) => `Supportato solo da: ${name}`,
+  },
 }
 
 export function hybridProvenanceReason(sources: RecommendationSource[], language: ContentLanguage, repReason: string): string {

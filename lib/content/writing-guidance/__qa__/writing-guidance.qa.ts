@@ -12,9 +12,12 @@
  *      not_found and nothing is written; the upsert names only the guidance
  *      column; a missing column makes the card read-only and generation
  *      unchanged; a rule keeps the time and article it came with;
- *   D) generation reads the context for the project's owner only, and a
- *      Shopify store's articles keep their defaults (no description, city or
- *      business name), failing closed;
+ *   D) generation reads the context for the project's owner only; a Shopify
+ *      store's articles leave out its city and do not name the business, but
+ *      DO carry the description the owner wrote (changed 2026-10-17 on the
+ *      owner's word: the settings ask every owner for a description and a
+ *      store owner's answer was being ignored); a failed read still gives
+ *      neither;
  *   E) every word on screen exists in all four languages, with no Hebrew left
  *      in the others;
  *   F) E-E-A-T: a topic the system created names the business (when its name
@@ -229,7 +232,8 @@ async function main() {
     shopify_connections: [{ project_id: PROJECT, archived_at: null }],
   })
   const shop = await readGenerationContext(shopDb as never, PROJECT, 'רמת גן')
-  check('D6: a Shopify store: no description, no city, but the owner\'s own guidance still applies', shop.shopify && shop.business.description === null && shop.business.city === null && shop.guidance.instructions === 'בלי מחירים')
+  check('D6: a Shopify store: the owner\'s description and guidance apply, the city does not, and the business is still not named',
+    shop.shopify && shop.business.description === 'חנות' && shop.business.city === null && shop.guidance.instructions === 'בלי מחירים')
   ;(shopDb.tables.shopify_connections as Record<string, unknown>[])[0].archived_at = '2026-10-01T00:00:00Z'
   shopDb.tables.billing_governance = [{ user_id: OWNER, billing_authority: 'shopify' }]
   // CHANGED 11 October 2026 (was: "an account Shopify bills counts as Shopify even without a live
@@ -245,10 +249,14 @@ async function main() {
     shopify_connections: [], billing_governance: [{ user_id: OWNER, billing_authority: 'shopify' }] }) as never, PROJECT, 'רמת גן')).shopify)
   const brokenDb = { from: (t: string) => (t === 'shopify_connections' ? { select: () => ({ eq: () => ({ is: () => ({ limit: async () => ({ data: null, error: { code: '500' } }) }) }) }) } : (genDb as FakeAdmin).from(t)) }
   check('D8: a read that fails counts as Shopify (fails closed)', (await readGenerationContext(brokenDb as never, PROJECT, 'רמת גן')).shopify)
-  const noShopCheck = await mutant<typeof import('../store')>('lib/content/writing-guidance/store.ts', (src) => src.replace("if (shopify) return { guidance: guidance.guidance, business: { description: null, city: null }, shopify: true }", ''))
-  check('MUTATION CONTROL: without the Shopify check a store gets the description and city (so D6 would fail)', (await noShopCheck.readGenerationContext(new FakeAdmin({
+  const noShopCheck = await mutant<typeof import('../store')>('lib/content/writing-guidance/store.ts', (src) => src.replace("if (shopify) return { guidance: guidance.guidance, business: { description: profile.description, city: null }, shopify: true }", ''))
+  check('MUTATION CONTROL: without the Shopify branch a store gets the city too (so D6 would fail)', (await noShopCheck.readGenerationContext(new FakeAdmin({
     projects: [{ id: PROJECT, user_id: OWNER }], project_profiles: [{ project_id: PROJECT, user_id: OWNER, description: 'חנות', is_local: true }],
-    shopify_connections: [{ project_id: PROJECT, archived_at: null }] }) as never, PROJECT, 'רמת גן')).business.description === 'חנות')
+    shopify_connections: [{ project_id: PROJECT, archived_at: null }] }) as never, PROJECT, 'רמת גן')).business.city === 'רמת גן')
+  const silentStore = await mutant<typeof import('../store')>('lib/content/writing-guidance/store.ts', (src) => src.replace('business: { description: profile.description, city: null }, shopify: true', 'business: { description: null, city: null }, shopify: true'))
+  check('MUTATION CONTROL: a store silenced again fails D6', (await silentStore.readGenerationContext(new FakeAdmin({
+    projects: [{ id: PROJECT, user_id: OWNER }], project_profiles: [{ project_id: PROJECT, user_id: OWNER, description: 'חנות', is_local: true }],
+    shopify_connections: [{ project_id: PROJECT, archived_at: null }] }) as never, PROJECT, 'רמת גן')).business.description === null)
   const anyLocal = await mutant<typeof import('../store')>('lib/content/writing-guidance/store.ts', (src) => src.replace('profile.isLocal === true && city?.trim()', 'city?.trim()'))
   check('MUTATION CONTROL: without the local check the city reaches a business not marked local (so D3 would fail)', (await anyLocal.readGenerationContext(genDb as never, PROJECT, 'רמת גן')).business.city === 'רמת גן')
 
@@ -278,16 +286,16 @@ async function main() {
   check('F1: a topic the system created (no brief marker) carries no brand choice', decodeBriefNotes(null).brandChoiceSet === false && decodeBriefNotes('some notes').brandChoiceSet === false)
   check('F2: the brief form\'s "off" is a choice, and kept', decodeBriefNotes(encodeBriefNotes('x', flagsOff)).brandChoiceSet === true && decodeBriefNotes(encodeBriefNotes('x', flagsOff)).flags.includeBrandName === false)
   const genSrc = strip(read('lib/content/article-generation.ts'))
-  const brandWired = (src: string) => /includeBrandName: decodedNotes\.brandChoiceSet \? decodedNotes\.flags\.includeBrandName : !generationContext\.shopify && (generationContext\.guidance\.mentionBusiness && )?!!businessName\?\.trim\(\)/.test(src)
-  check('F3: generation names the business unless the owner chose otherwise or it is a Shopify store', brandWired(genSrc))
-  check('MUTATION CONTROL: naming the business on a Shopify store too is caught', !brandWired(genSrc.replace('!generationContext.shopify && ', '')))
+  const brandWired = (src: string) => /includeBrandName: decodedNotes\.brandChoiceSet \? decodedNotes\.flags\.includeBrandName : generationContext\.guidance\.mentionBusiness && !!businessName\?\.trim\(\)/.test(src)
+  check('F3: generation names the business unless the owner chose otherwise, a Shopify store included', brandWired(genSrc) && !/!generationContext\.shopify && generationContext\.guidance\.mentionBusiness/.test(genSrc))
+  check('MUTATION CONTROL: leaving a store out of the naming again is caught', !brandWired(genSrc.replace('includeBrandName: decodedNotes.brandChoiceSet ? decodedNotes.flags.includeBrandName : generationContext.guidance.mentionBusiness', 'includeBrandName: decodedNotes.brandChoiceSet ? decodedNotes.flags.includeBrandName : !generationContext.shopify && generationContext.guidance.mentionBusiness')))
   check('MUTATION CONTROL: the old default (never name it) is caught', !brandWired(genSrc.replace(/includeBrandName: decodedNotes\.brandChoiceSet[^,]*,/, 'includeBrandName: decodedNotes.flags.includeBrandName,')))
   const named = buildPrompt(brief({ includeBrandName: true, brandNameToInclude: 'שיפוצי כהן' }), {})
   check('F4b: when naming is on, the business is named at least once (in the conclusion if nowhere else), not left out', /name it AT LEAST ONCE/.test(named) && /once in the conclusion as the natural next step/.test(named) && !/mention it once at most/.test(named))
   check('F4: the business is named only where it adds E-E-A-T value, at most 2-3 times, never in the title or as praise', named.includes('Name "שיפוצי כהן" ONLY where it adds E-E-A-T value') && /At most 2-3 mentions/.test(named) && /Never in the title/.test(named) && /never as a sales slogan or praise/.test(named))
   check('F5: …and never invents experience, numbers, certifications or awards', /do NOT invent experience, years in business, customer numbers, certifications, awards/.test(named) && /Ground every statement about the business ONLY/.test(named))
   check('F6: with the choice off the old rule stands', before.includes('Do NOT mention any business or brand name'))
-  const switched = (src: string) => /!generationContext\.shopify && generationContext\.guidance\.mentionBusiness && !!businessName/.test(src)
+  const switched = (src: string) => /generationContext\.guidance\.mentionBusiness && !!businessName/.test(src)
   check('F7: the owner\'s switch in the writing guidelines turns naming off for the project', switched(genSrc))
   check('MUTATION CONTROL: generation that ignores the switch is caught', !switched(genSrc.replace('generationContext.guidance.mentionBusiness && ', '')))
   check('F8: the switch is on unless saved off; a saved "off" reads off', toWritingGuidance({}).mentionBusiness === true && toWritingGuidance({ mention_business: false }).mentionBusiness === false)

@@ -31,7 +31,7 @@ import { withHeadingIds } from '@/lib/articles/headings'
 import { linkifyBareUrls } from '@/lib/articles/bare-urls'
 import { readingMinutes } from '@/lib/articles/reading-time'
 import { articlePublishBlockReason } from '@/lib/articles/publish-rules'
-import { articleAuthor, authorPersonSchema } from '@/lib/articles/authors'
+import { articleAuthor, authorDisplayName, authorPersonSchema } from '@/lib/articles/authors'
 import { sanitizePublicArticleHtml } from '@/lib/content/public-article-html'
 
 const ROOT = join(__dirname, '..', '..', '..')
@@ -123,12 +123,28 @@ function main() {
     /LOCALE_PREFIX\[/.test(sitemapSrc) && !/\$\{baseUrl\}\/articles\/\$\{article\.slug\}/.test(sitemapSrc))
   check('E2. llms.txt prefixes an article URL with its locale',
     /LOCALE_PREFIX\[/.test(llmsSrc) && !/\$\{baseUrl\}\/articles\/\$\{article\.slug\}/.test(llmsSrc))
-  check('E3. the sitemap still reads the locale column', /select\('slug, published_at, locale'\)/.test(sitemapSrc))
+  // The column list itself may grow (updated_at joined it so an edited article
+  // gets a fresh lastmod); what this guards is that `locale` stays in it.
+  check('E3. the sitemap still reads the locale column', /\.select\('[^']*\blocale\b[^']*'\)/.test(sitemapSrc))
 
   console.log('\nF. the database agrees with the code about the list of languages')
   const migration = read('supabase/migrations/20261009180750_articles_locale.sql')
-  const checkList = migration.match(/CHECK \(locale IN \(([^)]*)\)\)/)
-  const inCheck = (checkList?.[1] || '').split(',').map((v) => v.trim().replace(/^'|'$/g, ''))
+  /*
+   * F1 USED TO READ THAT ONE FILE, and so it reported the Hebrew-era list for
+   * two days after the French widening landed in a migration of its own
+   * (20261021180000). A CHECK is replaced by the next migration that declares
+   * it, so the only file that describes the live constraint is the LAST one
+   * that names it — which is what the database itself sees, in this same order.
+   */
+  const allMigrations = readdirSync(join(ROOT, 'supabase', 'migrations'))
+    .filter((f) => f.endsWith('.sql')).sort()
+  let inCheck: string[] = []
+  for (const file of allMigrations) {
+    const sql = read(`supabase/migrations/${file}`)
+    for (const m of sql.matchAll(/articles_locale_check[\s\S]{0,120}?CHECK\s*\(\s*locale\s+IN\s*\(([^)]*)\)/gi)) {
+      inCheck = m[1].split(',').map((v) => v.trim().replace(/^'|'$/g, ''))
+    }
+  }
   // MUTATION: add a language to PUBLIC_LOCALES without touching the migration
   // and this fails, which is the point: the row would be refused in production.
   check('F1. the CHECK lists exactly PUBLIC_LOCALES',
@@ -330,6 +346,41 @@ function main() {
   check('O10. the Person in the schema carries the same photograph',
     /articleAuthor\(article\.author\)\?\.photo/.test(serverSrc)
     && /image: `\$\{SITE_URL\}\$\{articleAuthor\(article\.author\)\?\.photo\}`/.test(serverSrc))
+
+  // O11-O15: the byline is the LANGUAGE'S spelling of the name, not the
+  // `author` column's. The column holds 'אורן חכם' for every article, so the
+  // foreign pages used to print a Hebrew name above an English article, and
+  // again on the card in the index, while the author box under the same
+  // article had it right.
+  const HEBREW_LETTER = /\p{Script=Hebrew}/u
+  for (const locale of PUBLIC_LOCALES) {
+    const shown = authorDisplayName('אורן חכם', locale)
+    check(`O11. ${locale}: the byline is written in the page's own language`,
+      locale === 'he' ? HEBREW_LETTER.test(shown) : !HEBREW_LETTER.test(shown) && shown === 'Oren Hacham', shown)
+  }
+  check('O12. an author with no profile keeps the name the article carries',
+    authorDisplayName('Someone Else', 'en') === 'Someone Else' && authorDisplayName(null, 'en') === '')
+  // MUTATION: print `article.author` in either surface and this fails — that
+  // is the bug itself.
+  check('O13. the article headline byline and its initial go through the helper',
+    /authorDisplayName\(article\.author, locale\)/.test(viewSrc)
+    && /authorInitial\(authorDisplayName\(article\.author, locale\)\)/.test(viewSrc)
+    && !/>\s*\{article\.author\}\s*</.test(viewSrc) && !/\{article\.author\.charAt\(0\)\}/.test(viewSrc))
+  check('O14. the index card byline goes through the helper',
+    /authorDisplayName\(article\.author, locale\)/.test(indexSrc) && !/>\s*\{article\.author\}\s*</.test(indexSrc))
+  check('O15. the page metadata names the author in the page\'s language',
+    /authors: \[authorDisplayName\(article\.author, locale\)\]/.test(serverSrc))
+  // O16: the role Oren approved on 17 Oct 2026 — he is named as the founder.
+  for (const locale of PUBLIC_LOCALES) {
+    const role = articleAuthor('אורן חכם')?.role[locale] ?? ''
+    check(`O16. ${locale}: the role names him as the founder`,
+      /מייסד|Founder|Fundador|Fondateur|Fondatore/.test(role), role)
+  }
+  // MUTATION CONTROL for O11/O16: the Hebrew spelling and the Hebrew role are
+  // still Hebrew, so these checks are not passing on an empty table.
+  check('O17 (control): Hebrew is unchanged',
+    HEBREW_LETTER.test(authorDisplayName('אורן חכם', 'he'))
+    && HEBREW_LETTER.test(articleAuthor('אורן חכם')?.role.he ?? ''))
 
   // The blog editor keeps only what TipTap's schema knows. Registered against
   // a measured loss: with StarterKit and Link alone, loading an article with a

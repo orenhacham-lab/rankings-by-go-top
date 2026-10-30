@@ -197,6 +197,8 @@ export const en = {
     en: 'English',
     es: 'Español',
     'pt-BR': 'Português (Brasil)',
+    fr: 'Français',
+    it: 'Italiano',
     aria: 'Change the site language',
   },
   cookie: {
@@ -231,7 +233,7 @@ export const en = {
       },
       marketing: {
         title: 'Marketing',
-        desc: 'Measuring how our ads perform and showing relevant ads on the Google and Meta networks. Refusing costs you nothing in the service.',
+        desc: 'Measuring how our ads perform, showing relevant ads on the Google and Meta networks, and attributing a purchase to the affiliate who referred you through the JVZoo marketplace. Refusing costs you nothing in the service.',
       },
     },
   },

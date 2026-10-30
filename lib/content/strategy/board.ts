@@ -152,6 +152,13 @@ export type StrategyCard = {
   articleId: string | null
   /** The topic waits in the publishing queue. */
   queued: boolean
+  /**
+   * For a planned topic that waits in the publishing queue: the queue item, so the
+   * card can take the topic out of the queue as well as out of the plan. Its status
+   * is the item's own, because an item already being written is not removed.
+   */
+  queueItemId?: string | null
+  queueStatus?: string | null
   /** For an idea from the rankings: where the site stands on its keyword today. */
   position?: number
   /** For an idea of the content plan: the stored idea, its score and source (what approving it sends). */
@@ -483,6 +490,8 @@ export function buildStrategyBoard(input: {
       topicId: t.id,
       articleId: null,
       queued: !!slot,
+      queueItemId: slot?.id ?? null,
+      queueStatus: slot?.status ?? null,
     })
   }
 

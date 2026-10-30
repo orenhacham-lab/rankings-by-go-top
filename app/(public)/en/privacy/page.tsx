@@ -93,7 +93,8 @@ export default function EnglishPrivacyPage() {
           <li><strong>Creem:</strong> for payment processing, where an account&rsquo;s payment goes through it. To
           open a payment we send the e-mail address of the account, the identifier of the plan chosen and our
           own reference for that request, and we receive back a customer identifier held by them, a plan
-          identifier, the subscription status and the dates of the billing period. Card details, and any other
+          identifier, the subscription status, the dates of the billing period, the amount of the payment taken and the
+          payment&rsquo;s own identifier. Card details, and any other
           payment instrument, never reach us at any point</li>
           <li><strong>Supabase:</strong> for secure data storage</li>
           <li><strong>Serper:</strong> for Google search queries and rank checks</li>
@@ -106,6 +107,12 @@ export default function EnglishPrivacyPage() {
           <li><strong>OpenStreetMap (Nominatim):</strong> to turn an address into coordinates, and only when you typed an exact address for local rank tracking. The address you typed and the country name are sent, never account details</li>
           <li><strong>ScrapeLLM:</strong> for AI visibility tracking — see &ldquo;AI Providers&rdquo; below</li>
           <li><strong>Other sites in the link network:</strong> only if you joined the network — see &ldquo;Link Network&rdquo; below</li>
+          <li><strong>JVZoo:</strong> only if you opened our JVZoo marketplace sales page — a tracking
+          image is loaded from JVZoo which receives your IP address, your browser identifier and the page
+          you arrived from, so that a purchase can be attributed to the affiliate who referred you. The
+          image loads only after you have accepted marketing cookies. For that collection and transmission
+          JVZoo does not process data on our behalf: it is a joint controller with us, and what it does
+          with the data afterwards is decided by JVZoo under its own privacy policy</li>
           <li><strong>Meta (Facebook / Instagram):</strong> for targeted advertising, and for a report of a
           completed signup sent from our server — see the Meta Advertising section below. For those conversion
           events Meta does not process data on our behalf: it is a joint controller with us, as that section
@@ -631,10 +638,12 @@ export default function EnglishPrivacyPage() {
           security and abuse prevention. The service cannot run without them, so they need no consent.</li>
           <li><strong>Measurement:</strong> how many people visited, which pages they read and what
           did not work. Loaded only if you allow it.</li>
-          <li><strong>Marketing:</strong> measuring how our ads perform and showing relevant ads on
-          the Google and Meta networks. Loaded only if you allow it. Allowing this category also covers
-          a conversion report we send to Meta from our server with no cookie at all — see the Meta
-          Advertising section.</li>
+          <li><strong>Marketing:</strong> measuring how our ads perform, showing relevant ads on
+          the Google and Meta networks, and attributing a purchase to the affiliate who referred
+          you through the JVZoo marketplace. Loaded only if you allow it. Allowing this category
+          also covers a conversion report we send to Meta from our server with no cookie at all
+          &mdash; see the Meta Advertising section &mdash; and a tracking image loaded from JVZoo
+          on the marketplace sales page, which stores nothing on your device.</li>
         </ul>
         <p className="mt-4">
           <strong>Before you choose, no measurement or marketing cookie is set and no request is
@@ -684,6 +693,11 @@ export default function EnglishPrivacyPage() {
           before you have allowed its category, and withdrawing your consent stops the collection.
           Besides these tools, which run in the browser, we send Meta a conversion report from our
           server; it too is subject to marketing consent and stops when that consent is withdrawn.
+          One further thing runs outside Google Tag Manager: on the JVZoo marketplace sales
+          page only, a one-pixel tracking image is loaded from JVZoo so that a purchase can be
+          attributed to the affiliate who referred you. It stores nothing on your device, it
+          loads only after you have allowed marketing, and it appears on no other page of the
+          site.
         </p>
         <p className="mt-4">
           We declare your consent state to Google through the Consent Mode v2 protocol, so the tools

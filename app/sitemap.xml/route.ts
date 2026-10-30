@@ -1,11 +1,11 @@
 import { createClient } from '@/lib/supabase/server'
-import { spanishSiteEnabled } from '@/lib/i18n/spanish-site'
-import { portugueseSiteEnabled } from '@/lib/i18n/portuguese-site'
-import { LOCALE_PREFIX, normalizePublicLocale } from '@/lib/i18n/locales'
+import { LOCALE_PREFIX, enabledPublicLocales, normalizePublicLocale, publicLocaleEnabled, type PublicLocale } from '@/lib/i18n/locales'
 
 interface Article {
   slug: string
   published_at: string
+  /** Null until an article is edited; the sitemap then dates it by the edit. */
+  updated_at: string | null
   locale: string
 }
 
@@ -40,7 +40,7 @@ export async function GET() {
   // Fetch all published articles
   const { data: articles } = await supabase
     .from('articles')
-    .select('slug, published_at, locale')
+    .select('slug, published_at, updated_at, locale')
     .eq('is_published', true)
     .order('published_at', { ascending: false })
 
@@ -182,6 +182,25 @@ export async function GET() {
       changefreq: 'monthly',
       priority: '0.8',
     },
+    // Hebrew comparison pages
+    {
+      url: `${baseUrl}/compare/semrush`,
+      lastmod: today,
+      changefreq: 'monthly',
+      priority: '0.7',
+    },
+    {
+      url: `${baseUrl}/compare/yoast`,
+      lastmod: today,
+      changefreq: 'monthly',
+      priority: '0.7',
+    },
+    {
+      url: `${baseUrl}/compare/rankmath`,
+      lastmod: today,
+      changefreq: 'monthly',
+      priority: '0.7',
+    },
     // Hebrew legal pages
     // English site root and equivalents
     {
@@ -311,6 +330,25 @@ export async function GET() {
       changefreq: 'monthly',
       priority: '0.8',
     },
+    // English comparison pages
+    {
+      url: `${baseUrl}/en/compare/semrush`,
+      lastmod: today,
+      changefreq: 'monthly',
+      priority: '0.7',
+    },
+    {
+      url: `${baseUrl}/en/compare/yoast`,
+      lastmod: today,
+      changefreq: 'monthly',
+      priority: '0.7',
+    },
+    {
+      url: `${baseUrl}/en/compare/rankmath`,
+      lastmod: today,
+      changefreq: 'monthly',
+      priority: '0.7',
+    },
     // English legal pages
   ]
 
@@ -319,9 +357,10 @@ export async function GET() {
   // so listing them here would submit 404s to Google. Legal pages are not
   // listed: the whole legal tree is noindex.
   //
-  // ONE list of paths for both languages, because the trees are mirrors: a page
-  // added to one and forgotten in the other would otherwise be a sitemap that
-  // disagrees with the hreflang built from the same mirror (lib/seo/hreflang.ts).
+  // ONE list of paths for every translated language, because the trees are
+  // mirrors: a page added to one and forgotten in another would otherwise be a
+  // sitemap that disagrees with the hreflang built from the same mirror
+  // (lib/seo/hreflang.ts).
   const translatedPaths: Array<{ path: string; changefreq: string; priority: string }> = [
     { path: '', changefreq: 'weekly', priority: '0.9' },
     { path: '/free-check', changefreq: 'monthly', priority: '0.8' },
@@ -345,13 +384,23 @@ export async function GET() {
     { path: '/solutions/shopify', changefreq: 'monthly', priority: '0.7' },
     { path: '/features/site-links', changefreq: 'monthly', priority: '0.7' },
     { path: '/features/google-maps-posts', changefreq: 'monthly', priority: '0.7' },
+    { path: '/compare/semrush', changefreq: 'monthly', priority: '0.7' },
+    { path: '/compare/yoast', changefreq: 'monthly', priority: '0.7' },
+    { path: '/compare/rankmath', changefreq: 'monthly', priority: '0.7' },
   ]
 
   const treePages = (prefix: string) =>
     translatedPaths.map((p) => ({ url: `${baseUrl}${prefix}${p.path}`, lastmod: today, changefreq: p.changefreq, priority: p.priority }))
 
-  const spanishPages = spanishSiteEnabled() ? treePages('/es') : []
-  const portuguesePages = portugueseSiteEnabled() ? treePages('/pt-BR') : []
+  // Every translated tree, from the one gate (lib/i18n/locales.ts). Hebrew and
+  // English are the hand-written trees above, so they are not built from the
+  // mirror; everything after them is. This used to be one `const` per language,
+  // which is how a language gets a route tree and an hreflang set and no
+  // sitemap entry.
+  const TRANSLATED_LOCALES: readonly PublicLocale[] = ['es', 'pt-BR', 'fr', 'it']
+  const translatedTreePages = enabledPublicLocales()
+    .filter((l) => TRANSLATED_LOCALES.includes(l))
+    .flatMap((l) => treePages(LOCALE_PREFIX[l]))
 
   // Build article entries.
   //
@@ -362,20 +411,28 @@ export async function GET() {
   // and leave every translated article out of the sitemap entirely. A language
   // whose tree is behind an off flag contributes nothing, exactly as its static
   // pages do.
-  const articleLocaleEnabled = (locale: string) =>
-    locale === 'es' ? spanishSiteEnabled() : locale === 'pt-BR' ? portugueseSiteEnabled() : true
+  const articleLocaleEnabled = (locale: string) => {
+    const normalized = normalizePublicLocale(locale)
+    // An unrecognised value in the column is NOT a reason to drop the article:
+    // the URL below falls back to the Hebrew tree for it, so the entry is still
+    // a real page. An article is dropped only when its own language is off.
+    return normalized === null ? true : publicLocaleEnabled(normalized)
+  }
 
   const articleEntries = (articles || [])
     .filter((article: Article) => articleLocaleEnabled(article.locale))
     .map((article: Article) => ({
       url: `${baseUrl}${LOCALE_PREFIX[normalizePublicLocale(article.locale) ?? 'he']}/articles/${article.slug}`,
-      lastmod: article.published_at?.split('T')[0] || today,
+      // An edited article is dated by the edit: a crawler that has the page
+      // already has no reason to come back for an unchanged lastmod, which is
+      // exactly what a rewritten article needs it to do.
+      lastmod: (article.updated_at || article.published_at)?.split('T')[0] || today,
       changefreq: 'monthly',
       priority: '0.7',
     }))
 
   // Combine all entries
-  const allEntries = [...staticPages, ...spanishPages, ...portuguesePages, ...articleEntries]
+  const allEntries = [...staticPages, ...translatedTreePages, ...articleEntries]
 
   // Build XML
   const xml = `<?xml version="1.0" encoding="UTF-8"?>

@@ -82,10 +82,11 @@ function GuidanceForm({ projectId, view, onData, t }: { projectId: string; view:
   const [tooLong, setTooLong] = useState(false)
   const [authorBox, setAuthorBox] = useState(view.authorBox)
   const [boxName, setBoxName] = useState(view.authorBoxName)
+  const [boxLine, setBoxLine] = useState(view.authorBoxLine)
   const [boxUrl, setBoxUrl] = useState(view.authorBoxUrl)
   const [boxImage, setBoxImage] = useState<AuthorBoxImageChoice>(view.authorBoxImage)
   const [urlInvalid, setUrlInvalid] = useState(false)
-  const boxDirty = authorBox !== view.authorBox || boxName !== view.authorBoxName || boxUrl !== view.authorBoxUrl || boxImage !== view.authorBoxImage
+  const boxDirty = authorBox !== view.authorBox || boxName !== view.authorBoxName || boxLine !== view.authorBoxLine || boxUrl !== view.authorBoxUrl || boxImage !== view.authorBoxImage
   const dirty = !sameGuidance(draft, saved) || boxDirty
   const disabled = !view.editable
 
@@ -115,6 +116,7 @@ function GuidanceForm({ projectId, view, onData, t }: { projectId: string; view:
       rules: draft.rules.map((r) => ({ text: r.text })),
       ...(view.authorBoxEditable ? { authorBox } : {}),
       // 'upload' is set by the upload itself; chosen without a photo, the saved choice stays.
+      ...(view.authorBoxLineEditable ? { authorBoxLine: boxLine } : {}),
       ...(view.authorBoxOverridesEditable ? { authorBoxName: boxName, authorBoxUrl: boxUrl, authorBoxImage: boxImage === 'upload' && !view.authorBoxPhoto ? view.authorBoxImage : boxImage } : {}),
     })
     if (res.ok) {
@@ -122,6 +124,7 @@ function GuidanceForm({ projectId, view, onData, t }: { projectId: string; view:
       setDraft(res.data.guidance)
       setAuthorBox(res.data.authorBox)
       setBoxName(res.data.authorBoxName)
+      setBoxLine(res.data.authorBoxLine)
       setBoxUrl(res.data.authorBoxUrl)
       setBoxImage(res.data.authorBoxImage)
       onData(res.data)
@@ -153,7 +156,7 @@ function GuidanceForm({ projectId, view, onData, t }: { projectId: string; view:
           note={tooLong ? w.errors.invalid_guidance : null}
           onSave={() => void onSave()}
           onDiscard={() => {
-            setDraft(saved); setAuthorBox(view.authorBox); setBoxName(view.authorBoxName); setBoxUrl(view.authorBoxUrl); setBoxImage(view.authorBoxImage)
+            setDraft(saved); setAuthorBox(view.authorBox); setBoxName(view.authorBoxName); setBoxLine(view.authorBoxLine); setBoxUrl(view.authorBoxUrl); setBoxImage(view.authorBoxImage)
             setSave({ kind: 'idle' }); setTooLong(false); setUrlInvalid(false)
           }}
           t={t}
@@ -186,10 +189,13 @@ function GuidanceForm({ projectId, view, onData, t }: { projectId: string; view:
             disabled={disabled || !view.authorBoxOverridesEditable}
             unavailable={!disabled && !view.authorBoxOverridesEditable}
             name={boxName}
+            line={boxLine}
+            lineDisabled={disabled || !view.authorBoxLineEditable}
             url={boxUrl}
             image={boxImage}
             urlInvalid={urlInvalid}
             onName={setBoxName}
+            onLine={setBoxLine}
             onUrl={(v) => { setBoxUrl(v); setUrlInvalid(false) }}
             onImage={setBoxImage}
             photo={{ stored: view.authorBoxPhoto, editable: view.authorBoxPhotoEditable, savedImage: view.authorBoxImage }}
@@ -307,9 +313,10 @@ type Copy = Props['t']['writingGuidance']
  */
 type PhotoState = { stored: boolean; editable: boolean; savedImage: AuthorBoxImageChoice }
 
-function AuthorBoxFields({ projectId, disabled, unavailable, name, url, image, urlInvalid, onName, onUrl, onImage, photo, onPhotoView, w }: {
-  projectId: string; disabled: boolean; unavailable: boolean; name: string; url: string; image: AuthorBoxImageChoice; urlInvalid: boolean
-  onName: (v: string) => void; onUrl: (v: string) => void; onImage: (v: AuthorBoxImageChoice) => void
+function AuthorBoxFields({ projectId, disabled, unavailable, name, line, lineDisabled, url, image, urlInvalid, onName, onLine, onUrl, onImage, photo, onPhotoView, w }: {
+  projectId: string; disabled: boolean; unavailable: boolean; name: string; line: string; lineDisabled: boolean
+  url: string; image: AuthorBoxImageChoice; urlInvalid: boolean
+  onName: (v: string) => void; onLine: (v: string) => void; onUrl: (v: string) => void; onImage: (v: AuthorBoxImageChoice) => void
   photo: PhotoState; onPhotoView: (v: GuidanceView) => void; w: Copy
 }) {
   const [preview, setPreview] = useState<{ status: 'loading' } | { status: 'ready'; data: AuthorBoxPreview } | { status: 'failed' }>({ status: 'loading' })
@@ -330,11 +337,28 @@ function AuthorBoxFields({ projectId, disabled, unavailable, name, url, image, u
   const choices = AUTHOR_BOX_IMAGE_CHOICES.filter(offered)
   const imageLabel: Record<AuthorBoxImageChoice, string> = { none: w.authorBoxImageNone, site_icon: w.authorBoxImageSiteIcon, upload: w.authorBoxImageUpload }
   const shown: AuthorBoxImageChoice = offered(image) ? image : 'none'
+  // WHY THERE IS NOTHING TO CHOOSE. Both images live in the customer's own site:
+  // the site icon is read from it and an uploaded photo is copied into its media
+  // library at publish time, so neither is possible before the site is connected.
+  // With only "no image" left, the whole fieldset used to disappear and the owner
+  // was left looking for an upload that no screen mentioned (be-cln.co.il, 26 Oct
+  // 2026: "it will not let me upload my own photo, something here is really broken").
+  // So the section stays, and says which case this is.
+  // A WordPress site connected through our plugin alone is the case that reads as
+  // a bug: the icon IS offered, so the fieldset appears with two choices and the
+  // owner's own photo is simply absent, with nothing saying why. The copy at
+  // publish time goes over an application password (lib/content/author-box/photo-copy.ts),
+  // which the plugin connection does not carry, so this note names that.
+  const imageNotes: string[] = preview.status !== 'ready' ? []
+    : preview.data.platform === 'shopify' ? (choices.length > 1 ? [] : [w.authorBoxImageNotOnStore])
+    : preview.data.platform === 'wordpress'
+      ? [...(iconOffered ? [] : [w.authorBoxImageMissing]), ...(photoOffered ? [] : [w.authorBoxImageOwnPhotoNeedsPassword])]
+      : choices.length > 1 ? [] : [w.authorBoxImageNeedsSite]
   const photoUrl = preview.status === 'ready' ? preview.data.photoPreviewUrl : null
 
   return (
     <div className="mt-4 space-y-4 rounded-inset border border-line p-4" data-author-box-fields="">
-      <AuthorBoxPreviewPane preview={preview} name={name} url={url} image={shown} photoUrl={photoUrl} w={w} />
+      <AuthorBoxPreviewPane preview={preview} name={name} line={line} url={url} image={shown} photoUrl={photoUrl} w={w} />
       {unavailable && <p className="text-caption text-muted">{w.authorBoxOverridesUnavailable}</p>}
       <div>
         <FieldLabel htmlFor="author-box-name">{w.authorBoxNameLabel}</FieldLabel>
@@ -348,6 +372,26 @@ function AuthorBoxFields({ projectId, disabled, unavailable, name, url, image, u
           value={name}
           onChange={(e) => onName(e.target.value)}
           {...bidiField(name)}
+        />
+      </div>
+      <div>
+        <FieldLabel
+          htmlFor="author-box-line"
+          aside={<span className="text-caption text-muted tabular-nums">{fill(w.count, { n: line.length, max: AUTHOR_BOX_LIMITS.ownLine })}</span>}
+        >
+          {w.authorBoxLineLabel}
+        </FieldLabel>
+        <p id="author-box-line-hint" className="mb-2 text-caption text-muted">{w.authorBoxLineHint}</p>
+        <textarea
+          id="author-box-line"
+          rows={2}
+          aria-describedby="author-box-line-hint"
+          className={fieldClass}
+          maxLength={AUTHOR_BOX_LIMITS.ownLine}
+          disabled={lineDisabled}
+          value={line}
+          onChange={(e) => onLine(e.target.value)}
+          {...bidiField(line)}
         />
       </div>
       <div>
@@ -368,16 +412,19 @@ function AuthorBoxFields({ projectId, disabled, unavailable, name, url, image, u
         />
         {urlInvalid && <p id="author-box-url-error" role="alert" className="mt-1 text-caption text-bad">{w.authorBoxUrlInvalid}</p>}
       </div>
-      {choices.length > 1 && (
+      {(choices.length > 1 || imageNotes.length > 0) && (
         <fieldset data-author-box-image="">
           <legend className="mb-1 text-copy font-semibold text-ink">{w.authorBoxImageLabel}</legend>
-          {shown !== 'upload' && <p className="mb-2 text-caption text-muted">{w.authorBoxImageHint}</p>}
-          <Segmented
-            ariaLabel={w.authorBoxImageLabel}
-            value={image}
-            onChange={onImage}
-            options={choices.map((c) => ({ value: c, label: imageLabel[c], disabled }))}
-          />
+          {choices.length > 1 && shown !== 'upload' && <p className="mb-2 text-caption text-muted">{w.authorBoxImageHint}</p>}
+          {imageNotes.map((note) => <p key={note} className="mb-2 text-caption text-muted" data-author-box-image-note="">{note}</p>)}
+          {choices.length > 1 && (
+            <Segmented
+              ariaLabel={w.authorBoxImageLabel}
+              value={image}
+              onChange={onImage}
+              options={choices.map((c) => ({ value: c, label: imageLabel[c], disabled }))}
+            />
+          )}
           {shown === 'upload' && (
             <AuthorPhotoControls projectId={projectId} disabled={disabled} stored={photo.stored} photoUrl={photoUrl}
               onView={(v) => { onPhotoView(v); setRound((n) => n + 1) }} w={w} />
@@ -456,15 +503,15 @@ function AuthorPhotoControls({ projectId, disabled, stored, photoUrl, onView, w 
   )
 }
 
-function AuthorBoxPreviewPane({ preview, name, url, image, photoUrl, w }: {
+function AuthorBoxPreviewPane({ preview, name, line, url, image, photoUrl, w }: {
   preview: { status: 'loading' } | { status: 'ready'; data: AuthorBoxPreview } | { status: 'failed' }
-  name: string; url: string; image: AuthorBoxImageChoice; photoUrl: string | null; w: Copy
+  name: string; line: string; url: string; image: AuthorBoxImageChoice; photoUrl: string | null; w: Copy
 }) {
   if (preview.status === 'loading') return <Skeleton className="h-24 w-full" />
   if (preview.status === 'failed') return <p className="text-caption text-muted" data-author-box-preview="failed">{w.authorBoxPreviewFailed}</p>
   if (preview.data.platform === 'wix') return <p className="text-caption text-muted" data-author-box-preview="wix">{w.authorBoxPreviewWix}</p>
   // The draft in place of the saved choices; an invalid link is ignored here, exactly as it would be at publish time.
-  const inputs = { ...preview.data.inputs, nameOverride: name, linkUrl: url, imageChoice: image }
+  const inputs = { ...preview.data.inputs, nameOverride: name, lineOverride: line, linkUrl: url, imageChoice: image }
   const content = authorBoxContent(inputs)
   const who = resolveAuthorName(inputs)
   const source = who.source === 'override' ? w.authorBoxSourceOverride

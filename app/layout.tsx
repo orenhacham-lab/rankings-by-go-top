@@ -9,11 +9,13 @@ import { getRootRequestContext } from '@/lib/i18n/root-request'
 import { getSiteMetadata } from '@/lib/i18n/site-metadata'
 import { softwareOffer } from '@/lib/seo/software-offer'
 import { websiteSchema } from '@/lib/seo/page-schema'
+import { BRAND_REF, organizationSchema } from '@/lib/seo/organization'
 import { localeHomeHref } from '@/lib/i18n/locales'
 import { marketForCountry } from '@/lib/billing/market'
 import { requestCountry } from '@/lib/billing/server-market'
 import { GOOGLE_CONSENT_DEFAULT_SCRIPT } from '@/lib/consent/google-consent-mode'
 import { GoogleTags } from '@/components/consent/GoogleTags'
+import { MetaPixel } from '@/components/consent/MetaPixel'
 import { DocumentLocaleSync } from '@/components/DocumentLocaleSync'
 
 /**
@@ -126,38 +128,21 @@ export default async function RootLayout({
           dangerouslySetInnerHTML={{
             __html: JSON.stringify([
               websiteSchema(locale, schema.description),
-              {
-                '@context': 'https://schema.org',
-                '@type': 'Organization',
-                // The id the WebSite above names as its publisher, so the two
-                // are one graph rather than two unrelated nodes repeated on
-                // every URL.
-                '@id': 'https://www.gotopseo.com/#organization',
-                name: 'Go Top SEO',
-                alternateName: ['Rankings by Go Top'],
-                url: 'https://www.gotopseo.com',
-                logo: 'https://www.gotopseo.com/gotop-primary.png',
-                description: schema.description,
-                sameAs: ['https://www.gotop.co.il'],
-                contactPoint: {
-                  '@type': 'ContactPoint',
-                  telephone: '054-9489377',
-                  contactType: 'Customer Support',
-                  email: 'oren@gotop.co.il',
-                },
-                parentOrganization: {
-                  '@type': 'Organization',
-                  name: 'GO TOP',
-                  url: 'https://www.gotop.co.il',
-                },
-              },
+              // The id the WebSite above names as its publisher, so the two
+              // are one graph rather than two unrelated nodes repeated on
+              // every URL. Built in lib/seo/organization.ts, which /api/schema
+              // reads too: the product's identity is stated in ONE place.
+              organizationSchema(schema.description),
               {
                 '@context': 'https://schema.org',
                 '@type': 'SoftwareApplication',
                 name: 'Go Top SEO',
                 alternateName: ['Rankings by Go Top'],
-                publisher: { '@type': 'Organization', name: 'GO TOP', url: 'https://www.gotop.co.il' },
-                brand: { '@type': 'Organization', name: 'GO TOP', url: 'https://www.gotop.co.il' },
+                // By reference to the Organization node above, not a second
+                // copy of it: the publisher of this software is the entity
+                // that owns the site, which is the whole point of the @id.
+                publisher: BRAND_REF,
+                brand: BRAND_REF,
                 description: schema.description,
                 url: localeHome,
                 applicationCategory: 'BusinessApplication',
@@ -166,11 +151,7 @@ export default async function RootLayout({
                 // reviews (Google's review-snippet policy; FTC fake-review rule).
                 // The offer is the real plan range from the catalog.
                 offers: softwareOffer(market),
-                author: {
-                  '@type': 'Organization',
-                  name: 'GO TOP',
-                  url: 'https://www.gotop.co.il',
-                },
+                author: BRAND_REF,
               },
             ]),
           }}
@@ -183,6 +164,7 @@ export default async function RootLayout({
           who can neither be asked for consent nor withdraw it.
         */}
         <GoogleTags />
+        <MetaPixel />
         {/* <html lang/dir> is rendered once, above every changing segment; this
             re-states it after a client-side navigation into another language. */}
         <DocumentLocaleSync />

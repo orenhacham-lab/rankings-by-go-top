@@ -131,9 +131,39 @@ async function main() {
   check('runs that spent nothing do not count toward the cap', notCapped.allowed && notCapped.allowAi === true)
   delete process.env.FREE_CHECK_DAILY_AI_CAP
 
-  console.log('\nFAIL CLOSED) an unreadable ledger refuses the run')
-  const broken = await checkGate({ domain: 'example.co.il', locale: 'he', clientHash: CLIENT }, admin([], { select: () => ({ code: '42501' }) }), NOW)
+  console.log('\nFAIL CLOSED) an unreadable ledger refuses the run, and says why in the logs')
+  const captureErrors = async <T>(fn: () => Promise<T>): Promise<{ value: T; logs: unknown[][] }> => {
+    const logs: unknown[][] = []
+    const real = console.error
+    console.error = (...args: unknown[]) => { logs.push(args) }
+    try {
+      return { value: await fn(), logs }
+    } finally {
+      console.error = real
+    }
+  }
+
+  const { value: broken, logs: permissionLogs } = await captureErrors(() =>
+    checkGate({ domain: 'example.co.il', locale: 'he', clientHash: CLIENT }, admin([], { select: () => ({ code: '42501' }) }), NOW))
   check('a ledger read error is internal, never an allow', !broken.allowed && broken.reason === 'internal')
+
+  // A silent refusal and a broken feature look identical from the outside: the
+  // route answers with the same generic copy either way. The log is the only
+  // place that separates them, so it is part of the contract.
+  check('the refusal is logged rather than swallowed', permissionLogs.length === 1, JSON.stringify(permissionLogs))
+  const permissionFields = permissionLogs[0]?.[1] as { stage?: string; code?: string; migrationMissing?: boolean } | undefined
+  check('it names the stage and the Postgres code',
+    permissionFields?.stage === 'rate' && permissionFields?.code === '42501', JSON.stringify(permissionFields))
+  check('a permission error is NOT reported as a missing migration', permissionFields?.migrationMissing === false)
+
+  // 42P01 is undefined_table: the migration has not been applied. That is the
+  // one cause an operator can fix in a minute, so it must be unmistakable.
+  const { logs: missingTableLogs } = await captureErrors(() =>
+    checkGate({ domain: 'example.co.il', locale: 'he', clientHash: CLIENT }, admin([], { select: () => ({ code: '42P01' }) }), NOW))
+  const missingFields = missingTableLogs[0]?.[1] as { migrationMissing?: boolean } | undefined
+  check('an undefined table is called out as the migration not having run', missingFields?.migrationMissing === true)
+  check('no provider or database message text is logged',
+    !JSON.stringify([...permissionLogs, ...missingTableLogs]).toLowerCase().includes('message'))
 
   console.log('\nLEDGER WRITE) a failed insert never fails the response')
   let threw = false
@@ -169,7 +199,12 @@ async function main() {
     })
     const res = new Response(body, { status: 200, headers: { 'content-type': 'text/html' } })
     const { fetchSiteHtml } = await import('../site-fetch')
-    return fetchSiteHtml(new URL('https://example.co.il/'), { fetchImpl: async () => res })
+    // A fixed resolver, so this case is about the BODY dying mid-stream and not
+    // about whether a public hostname resolves from wherever the suite runs.
+    return fetchSiteHtml(new URL('https://example.co.il/'), {
+      fetchImpl: async () => res,
+      resolver: async () => [{ address: '93.184.216.34', family: 4 }],
+    })
   })()
   check('a stream that dies with nothing usable is a fetch failure, not an exception',
     !brokenStream.ok && brokenStream.reason === 'timeout', JSON.stringify(brokenStream))
@@ -250,18 +285,23 @@ async function main() {
   check('CONTROL: a locale-blind cache would hit for the English visitor', !!localeBlindHit)
   check('CONTROL: the real gate misses, so English copy is generated', otherLocale.allowed && !otherLocale.cached)
 
-  // ── The page's language, since the Spanish site went live ───────────────
-  // The route read the posted language as he|en, so /es/free-check — which
-  // posts locale 'es' — fell through to HEBREW and a Spanish visitor was
-  // handed a Hebrew check. The findings are built from bilingual copy, so
-  // Spanish is checked in English, which is what the Spanish screen already
-  // renders around the result.
+  // ── The page's language ─────────────────────────────────────────────────
+  // Twice wrong here. First the route read the posted language as he|en, so
+  // /es/free-check fell through to HEBREW. Then it narrowed through
+  // `toBilingualLocale`, so a Spanish visitor was checked in ENGLISH although
+  // lib/free-check/copy.ts has every finding in all four locales (Oren,
+  // 2026-10-17). It now keeps the posted locale as it came, and narrows
+  // NOWHERE. lib/i18n/__qa__/language-stays-in-language.qa.ts owns the
+  // behavioural side: four locales, four different findings texts.
   const routeSrc = read('../../../app/api/free-check/route.ts').replace(/\/\*[\s\S]*?\*\/|\/\/[^\n]*/g, '')
   const localeGuard = (c: string) => /\(PUBLIC_LOCALES as string\[\]\)\.includes\(payload\.locale\)/.test(c)
-    && /const locale: Locale = toBilingualLocale\(publicLocale\)/.test(c)
-  check('the route reads the page\'s language as a public locale and narrows it for the check', localeGuard(routeSrc))
+    && /const locale: PublicLocale =/.test(c)
+    && !/toBilingualLocale/.test(c)
+  check('the route keeps the page\'s own language, all four of them', localeGuard(routeSrc))
   check('CONTROL: the old he|en read fails the guard',
     !localeGuard(routeSrc.replace('(PUBLIC_LOCALES as string[]).includes(payload.locale)', '(LOCALES as string[]).includes(payload.locale)')))
+  check('CONTROL: a reintroduced narrowing fails the guard',
+    !localeGuard(`${routeSrc}\nconst l = toBilingualLocale(publicLocale)`))
 
   console.log(`\n${pass} passed, ${fail} failed`)
   if (fail > 0) process.exit(1)

@@ -38,7 +38,7 @@ function describePage(url: string, homePage: string): { label: string; isPath: b
 
 /** `onlyWithData`: render only pages that were found (or a failed read's retry): no setup prompt, no loading card. */
 export default function GscTopPages({ projectId, className, onlyWithData = false }: { projectId: string | null | undefined; className?: string; onlyWithData?: boolean }) {
-  const { language, uiLocale } = useDashboardLanguage()
+  const { uiLocale } = useDashboardLanguage()
   const t = getDashboardDictionary(uiLocale).gscWidgets
   const status = useGscStatus(projectId)
   const pages = useGscMetrics(projectId, status.view, 'pages', pickPages)
@@ -73,7 +73,7 @@ export default function GscTopPages({ projectId, className, onlyWithData = false
                           ) : text}
                         </span>
                         <span className="shrink-0 text-copy font-semibold tabular-nums text-ink">
-                          {t.topPages.clicks(formatCount(p.clicks, language))}
+                          {t.topPages.clicks(formatCount(p.clicks, uiLocale))}
                         </span>
                       </div>
                       {/* §10 bar: the action colour on a sunk track, the figure in words beside it. */}

@@ -15,6 +15,7 @@ import { generateFromBriefs } from '@/lib/content/recommendations/generate-from-
 import { buildFinalCandidateOutcomes, applyFinalOutcomesToGscDetails } from '@/lib/content/recommendations/final-outcomes'
 import { buildScanSources, buildGscRunSummary } from '@/lib/content/recommendations/customer-run-summary'
 import { buildEngineRejectionSummary } from '@/lib/content/recommendations/funnel-summary'
+import { logRecoFunnel } from '@/lib/content/recommendations/funnel-log'
 import { runProFirstProduction, type ProductionProvenance, type ProFirstProductionResult } from '@/lib/content/recommendations/production-run'
 import { decideBlogArticle } from '@/lib/content/recommendations/blog-article-acceptance'
 import type { SearchIntent } from '@/lib/content/recommendations/opportunity'
@@ -172,6 +173,8 @@ export async function POST(request: Request) {
     let recoveryTierUsed: number | null = null
     let discoveryUsed = false
     let fallbackReason: string | null = null
+    /** How many topics THIS run asked the engine for — recorded for the funnel log. */
+    let engineTargetCount = 0
     let result: Awaited<ReturnType<typeof generateRecommendations>>
     // Stage D — the GLOBAL Pro-first production controller. When enabled it fully owns
     // the normal recommendation flow: one snapshot, real Pro once, Flash only as a
@@ -195,6 +198,7 @@ export async function POST(request: Request) {
       // usual, so only the selected finalized batch is stored.
       const controller = newRunCostController('premium', generationRunId, 12)
       const prod = await runProFirstProduction(auth.admin, { projectId: auth.project.id, targetCount: 12, userId: auth.user.id }, controller)
+      engineTargetCount = 12
       proFirstResult = prod
       proFirstProvenance = prod.provenance
       briefDiagnostics = prod.briefDiagnostics
@@ -218,6 +222,7 @@ export async function POST(request: Request) {
       // ROLLBACK — the previous tiered opportunity generator (flag-gated).
       const controller = newRunCostController('standard', generationRunId, 15)
       const opp = await generateOpportunities(auth.admin, { projectId: auth.project.id, targetCount: 15, maxClusters: 12 }, controller)
+      engineTargetCount = 15
       opportunityDiagnostics = opp.diagnostics
       recoveryTierUsed = opp.diagnostics.recoveryTierUsed
       discoveryUsed = opp.diagnostics.discoveryUsed
@@ -228,6 +233,7 @@ export async function POST(request: Request) {
       // premium mode may use a validated Pro-class model for the synthesis call.
       const controller = newRunCostController(qualityMode, generationRunId, 12)
       const run = await generateFromBriefs(auth.admin, { projectId: auth.project.id, targetCount: 12, qualityMode, userId: auth.user.id }, controller)
+      engineTargetCount = 12
       briefDiagnostics = run.diagnostics
       fallbackReason = run.diagnostics.insufficient_inventory ? 'insufficient_inventory' : null
       result = { suggestions: run.suggestions, meta: { source, generated: run.diagnostics.generated_opportunities, skippedDuplicates: 0, finalCount: run.suggestions.length, attempts: run.diagnostics.rounds.length, reason: run.suggestions.length === 0 ? (run.diagnostics.insufficient_inventory ? 'insufficient_inventory' : 'no_safe_opportunities') : undefined, runtimeDiag: diagnostics ? { totalCalls: run.diagnostics.model_calls, rawCandidates: run.diagnostics.generated_opportunities, path: 'evidence_first_briefs', modelPath: run.diagnostics.modelPath, stopReason: run.diagnostics.stop_reason } : undefined } }
@@ -476,6 +482,30 @@ export async function POST(request: Request) {
       pipeline: { raw_generated_count: rawGeneratedCount, engine_accepted_count: engineAcceptedCount, engine_rejected_by_reason: engineRejectedByReason, engine_shadow_rejected_by_reason: briefDiagnostics?.shadow_rejected_by_reason ?? opportunityDiagnostics?.shadow_rejected_by_reason ?? {}, model_path: proFirstResult ? proFirstResult.selectedModelPath : (briefDiagnostics?.modelPath ?? null), route_fresh_count: fresh.length, route_rejected_by_reason: routeRejectedByReason(), persistence_attempted_count: persistOutcome?.attempted ?? fresh.length, persistence_inserted_count: persistOutcome?.inserted ?? 0, persistence_duplicate_count: persistOutcome?.duplicate ?? 0, persistence_failed_count: persistOutcome?.failed ?? 0 },
       contentPlan: contentPlanDiag ?? null,
     } : undefined
+
+    // THE FUNNEL, IN THE RUNTIME LOG. The engine's own rejection ledger used to exist
+    // only inside the response, so a run that returned 3 topics out of a 26-brief pool
+    // left no trace of which gate removed the rest (the diagnostics dry-run that would
+    // answer it is refused in production, by design). One line per run, counts and OUR
+    // OWN reason codes only — no title, keyword, URL or any other merchant text.
+    logRecoFunnel({
+      projectId: auth.project.id,
+      runId: generationRunId,
+      path: proFirstResult ? 'pro_first_production' : generationPath,
+      model: briefDiagnostics?.modelPath?.model ?? null,
+      target: engineTargetCount,
+      rawBriefCandidates: briefDiagnostics?.brief_pool?.total_raw_candidates ?? 0,
+      briefPool: briefDiagnostics?.brief_pool?.pool_size ?? 0,
+      briefPoolRejected: briefDiagnostics?.brief_pool?.rejected_by_reason,
+      generated: rawGeneratedCount,
+      engineAccepted: engineAcceptedCount,
+      engineRejected: engineRejectedByReason,
+      routeRejected: routeRejectedByReason(),
+      blogRejected: blogReport.rejectedByReason,
+      fresh: fresh.length,
+      persisted: persistOutcome?.inserted ?? 0,
+      stopReason: briefDiagnostics?.stop_reason ?? null,
+    })
 
     const filteredExisting = result.suggestions.length - fresh.length
     // Phase 3I.6 — in PRODUCTION, a run that added nothing new returns the

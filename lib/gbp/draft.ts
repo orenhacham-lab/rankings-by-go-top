@@ -49,6 +49,8 @@ const LANGUAGE_NAME: Record<GbpPostLanguage, string> = {
   en: 'English',
   es: 'Spanish',
   'pt-BR': 'Brazilian Portuguese',
+  fr: 'French',
+  it: 'Italian',
 }
 
 export function buildDraftPrompt(src: DraftSource): string {

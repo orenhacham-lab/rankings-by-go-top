@@ -42,7 +42,7 @@ function defaultLater(): { date: string; time: string } {
 }
 
 export default function PostComposer({ projectId, status, onPosted }: { projectId: string; status: GbpReadyStatus; onPosted: () => void }) {
-  const { language, uiLocale } = useDashboardLanguage()
+  const { uiLocale } = useDashboardLanguage()
   const t = getDashboardDictionary(uiLocale).mapsPosts
   const c = t.composer
   const canPublish = status.connection?.status === 'connected' && !!status.location
@@ -186,7 +186,7 @@ export default function PostComposer({ projectId, status, onPosted }: { projectI
     }
     if (body.outcome === 'failed') setNotice({ tone: 'bad', text: gbpErrorText(t, body.errorCode) })
     else if (body.outcome === 'retrying') setNotice({ tone: 'info', text: c.retrying })
-    else if (body.outcome === 'scheduled') setNotice({ tone: 'ok', text: c.scheduled(formatDate(language).dateTime(local.value.scheduledAt)) })
+    else if (body.outcome === 'scheduled') setNotice({ tone: 'ok', text: c.scheduled(formatDate(uiLocale).dateTime(local.value.scheduledAt)) })
     else setNotice({ tone: 'ok', text: c.published })
     if (body.outcome !== 'failed') {
       setSummary(''); setDrafted(false); setPicked(null); setPrepared(null); setTopic('')

@@ -43,9 +43,12 @@ export type GenerationContext = {
   guidance: WritingGuidance
   business: BusinessContext
   /**
-   * A Shopify store (a live store connection on this project). Its articles keep the defaults they had: no business description or
-   * city in the prompt, and the business is not named unless the brief says so.
-   * The owner's own guidance (empty unless they wrote some) still applies.
+   * A Shopify store (a live store connection on this project). All that is left
+   * of the distinction is the CITY, which a store's articles leave out: they are
+   * not written to place a business in a town. The owner's own guidance, the
+   * business DESCRIPTION (since 2026-10-17) and the business NAME (since
+   * 2026-10-18, Oren: "כן שיופיע גם בחנות שופיפיי במאמר") all apply to a store
+   * exactly as they do to any other project.
    */
   shopify: boolean
 }
@@ -74,8 +77,11 @@ export async function isShopifyProject(admin: SupabaseClient, projectId: string)
 /**
  * Everything generation reads about the business, for the project's owner.
  * `city` is the project's own city, used only when the settings mark the
- * business as local (project_profiles.is_local = true). Neither reaches a
- * Shopify store's articles (see GenerationContext.shopify).
+ * business as local (project_profiles.is_local = true) and never for a Shopify
+ * store, whose articles are not written to place a business in a town. The
+ * description does reach a store's articles (see GenerationContext.shopify); a
+ * read that FAILED still gives neither, so a store is never changed by an
+ * unanswered read.
  */
 export async function readGenerationContext(admin: SupabaseClient, projectId: string, city: string | null): Promise<GenerationContext> {
   const empty: GenerationContext = { guidance: none(), business: { description: null, city: null }, shopify: true }
@@ -86,7 +92,7 @@ export async function readGenerationContext(admin: SupabaseClient, projectId: st
     readProfile(admin, projectId, owner),
     isShopifyProject(admin, projectId),
   ])
-  if (shopify) return { guidance: guidance.guidance, business: { description: null, city: null }, shopify: true }
+  if (shopify) return { guidance: guidance.guidance, business: { description: profile.description, city: null }, shopify: true }
   return {
     guidance: guidance.guidance,
     business: { description: profile.description, city: profile.isLocal === true && city?.trim() ? city.trim() : null },

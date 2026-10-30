@@ -2,6 +2,8 @@ import { dashboardHe } from './he'
 import { dashboardEn } from './en'
 import { dashboardEs } from './es'
 import { dashboardPtBR } from './pt-BR'
+import { dashboardFr } from './fr'
+import { dashboardIt } from './it'
 import { deepMergeDictionary } from './merge'
 import type { PublicLocale } from '../locales'
 import type { DashboardDictionary } from './he'
@@ -18,15 +20,25 @@ import type { DashboardDictionary } from './he'
  * answers, so the English underneath is a safety net rather than something a
  * Portuguese reader meets. lib/i18n/dashboard/__qa__/portuguese-dashboard.qa.ts
  * holds that claim, leaf for leaf.
+ *
+ * French is the same arrangement again, assembled the same way from fr/ and
+ * held to the same leaf-for-leaf claim by
+ * lib/i18n/dashboard/__qa__/french-dashboard.qa.ts. Deriving each language from
+ * English rather than from the language beside it is what keeps a translation
+ * from being a translation of a translation.
  */
 const dashboardEsMerged = deepMergeDictionary(dashboardEn as unknown as DashboardDictionary, dashboardEs)
 const dashboardPtMerged = deepMergeDictionary(dashboardEn as unknown as DashboardDictionary, dashboardPtBR)
+const dashboardFrMerged = deepMergeDictionary(dashboardEn as unknown as DashboardDictionary, dashboardFr)
+const dashboardItMerged = deepMergeDictionary(dashboardEn as unknown as DashboardDictionary, dashboardIt)
 
 const DICTIONARIES = {
   he: dashboardHe,
   en: dashboardEn as unknown as DashboardDictionary,
   es: dashboardEsMerged,
   'pt-BR': dashboardPtMerged,
+  fr: dashboardFrMerged,
+  it: dashboardItMerged,
 } satisfies Record<PublicLocale, DashboardDictionary>
 
 /**

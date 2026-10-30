@@ -43,9 +43,33 @@ import {
   pageTitle,
   robotsAllows,
 } from '../sourcing'
-import { CONTACT_PATHS, MAX_PAGES_PER_SITE, qualifyBusiness } from '../qualify'
-import { addProspect, runProspectTopUp, type PublicSource, type TopUpSummary } from '../topup'
+import {
+  CONTACT_PATHS,
+  MAX_PAGES_PER_SITE,
+  offTargetSector,
+  qualifyBusiness,
+  type Qualification,
+} from '../qualify'
+import {
+  MAX_CANDIDATES_PER_PASS,
+  PUBLIC_SOURCES,
+  MAX_DETAIL_PAGES,
+  addProspect,
+  detailPageWindow,
+  runProspectTopUp,
+  type PublicSource,
+  type TopUpSummary,
+} from '../topup'
 import { SOURCING_FLAG, runIsolatedProspectTopUp } from '../topup-isolated'
+import {
+  AGGREGATOR_HOSTS,
+  PLACES,
+  TRADES,
+  isAggregator,
+  searchCandidates,
+  searchQuery,
+} from '../search-source'
+import type { SearchFn } from '@/lib/seed-scan/serper'
 
 let pass = 0
 let fail = 0
@@ -276,6 +300,48 @@ async function main() {
   check('Q8: one stranger\'s server is never asked for more than the budget',
     fetched.length <= MAX_PAGES_PER_SITE + 1 && CONTACT_PATHS.length > MAX_PAGES_PER_SITE)
 
+  // THE SECTORS THIS CHANNEL DOES NOT WRITE TO (Oren, 18 Oct). A directory of
+  // manufacturers lists its bank and its consultants too.
+  const bank = await qualifyBusiness(
+    { ...CANDIDATE, company: 'American National Bank Fox Cities' },
+    site({ home: `<html>${SHOPIFY}${US_ADDRESS}${CONTACT}</html>` }),
+  )
+  check('Q9: a bank is refused on its name, before its server is asked for anything',
+    bank.ok === false && bank.reason === 'off_target_sector' && bank.pagesRead === 0)
+
+  const dotBank = await qualifyBusiness(
+    { ...CANDIDATE, company: 'Fox Cities Savings', host: 'anbfc.bank' },
+    site({ home: `<html>${SHOPIFY}${US_ADDRESS}${CONTACT}</html>` }),
+  )
+  check('Q9b: and so is a .bank domain, which only a bank may hold',
+    dotBank.ok === false && dotBank.reason === 'off_target_sector' && dotBank.pagesRead === 0)
+
+  check('Q9c: but a farm with "bank" inside a word is exactly who we are looking for',
+    offTargetSector('Riverbank Farms') === null
+    && offTargetSector('Bank Street Bakery') !== null
+    && offTargetSector('Wisconsin Aluminum Foundry Co., Inc.') === null
+    && offTargetSector('Ascent Leadership Group') === 'leadership group'
+    && offTargetSector('Springfield Chamber of Commerce') === 'chamber of commerce')
+
+  const byTitle = await qualifyBusiness(
+    { ...CANDIDATE, company: 'Ascent' },
+    site({ home: `<html><title>Ascent Consulting Group</title>${SHOPIFY}${US_ADDRESS}${CONTACT}</html>` }),
+  )
+  check('Q9d: a name the listing shortened is read again off the site\'s own title',
+    byTitle.ok === false && byTitle.reason === 'off_target_sector')
+
+  const mutSector = await withMutant<{ qualifyBusiness: typeof qualifyBusiness }, Qualification>(
+    'lib/outreach/qualify.ts',
+    [[/  const offTargetName = host\.endsWith\('\.bank'\) \? '\.bank' : offTargetSector\(input\.company\)/,
+      '  const offTargetName: string | null = null']],
+    async (m) => m.qualifyBusiness(
+      { ...CANDIDATE, company: 'American National Bank Fox Cities' },
+      site({ home: `<html>${SHOPIFY}${US_ADDRESS}${CONTACT}</html>` }),
+    ),
+  )
+  check('Q9-MUT: without the rule the bank is written to the list',
+    mutSector.ok === true)
+
   console.log('\n— T: writing it down —')
 
   const draft = {
@@ -385,8 +451,10 @@ async function main() {
 
   const mutRotation = await withMutant<{ runProspectTopUp: typeof runProspectTopUp }, TopUpSummary>(
     'lib/outreach/topup.ts',
-    [[/      summary\.refusals\.push\(`\$\{candidate\.host\}: \$\{written\}`\)\n    \}\n  \}/,
-      '      summary.refusals.push(`${candidate.host}: ${written}`)\n    }\n    return summary\n  }']],
+    // The bug, in the shape it has now: a source that answered but added
+    // nothing ends the pass, because examine() reports the pass as over.
+    [[/    summary\.refusals\.push\(`\$\{candidate\.host\}: \$\{written\}`\)\n  \}\n  return false/,
+      '    summary.refusals.push(`${candidate.host}: ${written}`)\n  }\n  return true']],
     async (m) => m.runProspectTopUp(
       asAdmin(world()), { fetchPage: twoNet, now: NOW, startAt: 0, sources: TWO },
     ),
@@ -428,8 +496,8 @@ async function main() {
 
   const mutHop = await withMutant<{ runProspectTopUp: typeof runProspectTopUp }, string[]>(
     'lib/outreach/topup.ts',
-    [[/  if \(source\.detailHint !== undefined\) \{\n    const members = await readDetailPages\(listing\.body, source\.url, source\.detailHint, deps, summary\)\n    if \(members\.length > 0\) return members\n  \}\n  return listingCandidates\(listing\.body, source\.url\)/,
-      '  const direct = listingCandidates(listing.body, source.url)\n  if (direct.length > 0) return direct\n  if (source.detailHint === undefined) return []\n  return readDetailPages(listing.body, source.url, source.detailHint, deps, summary)']],
+    [[/  if \(source\.detailHint !== undefined\) \{\n    const members = await readDetailPages\(listing\.body, source\.url, source\.detailHint, deps, summary\)\n    if \(members\.length > 0\) return \{ candidates: members, reachable: true \}\n  \}\n  return \{ candidates: listingCandidates\(listing\.body, source\.url\), reachable: true \}/,
+      '  const direct = listingCandidates(listing.body, source.url)\n  if (direct.length > 0) return { candidates: direct, reachable: true }\n  if (source.detailHint === undefined) return { candidates: [], reachable: true }\n  const members = await readDetailPages(listing.body, source.url, source.detailHint, deps, summary)\n  return { candidates: members, reachable: true }']],
     async (m) => {
       const seen: string[] = []
       await m.runProspectTopUp(asAdmin(world()), {
@@ -441,6 +509,226 @@ async function main() {
   )
   check('T8-MUT: reading the listing\'s own links first spends the pass on its navigation',
     mutHop.some((url) => url.includes('partner.example')))
+
+  // THE SECOND HALF OF THE SAME BUG, from the first pass after the fix: four
+  // member pages, four examinations of bonfire.com, the directory's own merch
+  // store in the header of every member page.
+  const NAV: PublicSource[] = [
+    { name: 'nav-directory', url: 'https://grown.example/member/', detailHint: '/member/' },
+  ]
+  const MERCH = '<a href="https://merch.example/store/grown">Shop our merch</a>'
+  const navNet = async (url: string): Promise<FetchedPage> => {
+    if (url === 'https://grown.example/member/') {
+      return page(
+        MERCH + '<a href="/member/albers/">Albers</a><a href="/member/store-example/">Store</a>',
+        200, url,
+      )
+    }
+    // The member with no website of its own: nothing but the navigation.
+    if (url === 'https://grown.example/member/albers/') {
+      return page('<title>Albers Acres - Grown</title>' + MERCH, 200, url)
+    }
+    if (url === 'https://grown.example/member/store-example/') {
+      return page('<title>Store Example LLC - Grown</title>' + MERCH
+        + '<a href="https://store.example">Website</a>', 200, url)
+    }
+    if (url === 'https://grown.example/robots.txt') return page('User-agent: *\nDisallow: /wp-admin/', 200, url)
+    if (url.startsWith('https://merch.example')) return page('<html><body>a merch store</body></html>', 200, url)
+    return net(url)
+  }
+
+  f = world()
+  const navSeen: string[] = []
+  summary = await runProspectTopUp(asAdmin(f), {
+    fetchPage: async (url) => { navSeen.push(url); return navNet(url) },
+    now: NOW, startAt: 0, sources: NAV,
+  })
+  check('T9: a link the listing page also carries is the directory\'s navigation, not a member\'s site',
+    summary.added === 'store.example'
+    && !navSeen.some((url) => url.includes('merch.example'))
+    && summary.examined === 1)
+
+  // One member page only, so the cross-page rule below cannot be what saves it:
+  // this is the listing's own links doing the work, on its own.
+  const ONE: PublicSource[] = [
+    { name: 'one-member', url: 'https://grown.example/member/', detailHint: '/member/' },
+  ]
+  const oneNet = async (url: string): Promise<FetchedPage> => {
+    if (url === 'https://grown.example/member/') {
+      return page(MERCH + '<a href="/member/store-example/">Store</a>', 200, url)
+    }
+    return navNet(url)
+  }
+  f = world()
+  summary = await runProspectTopUp(asAdmin(f), { fetchPage: oneNet, now: NOW, startAt: 0, sources: ONE })
+  check('T9b: which holds with a single member page, where only the listing\'s own links can tell',
+    summary.added === 'store.example')
+
+  const mutNav = await withMutant<{ runProspectTopUp: typeof runProspectTopUp }, string[]>(
+    'lib/outreach/topup.ts',
+    [[/\.filter\(\(c\) => !navigation\.has\(c\.host\)\)/, '']],
+    async (m) => {
+      const seen: string[] = []
+      await m.runProspectTopUp(asAdmin(world()), {
+        fetchPage: async (url: string) => { seen.push(url); return oneNet(url) },
+        now: NOW, startAt: 0, sources: ONE,
+      })
+      return seen
+    },
+  )
+  check('T9b-MUT: without that the merch store is examined instead of the member',
+    mutNav.some((url) => url.includes('merch.example')))
+
+  // And the same thing one level down: a host on several member pages is shared
+  // furniture, whatever the listing page shows.
+  const SHARED: PublicSource[] = [
+    { name: 'shared-link', url: 'https://grown.example/member/', detailHint: '/member/' },
+  ]
+  const sharedNet = async (url: string): Promise<FetchedPage> => {
+    if (url === 'https://grown.example/member/') {
+      return page('<a href="/member/albers/">Albers</a><a href="/member/store-example/">Store</a>', 200, url)
+    }
+    if (url === 'https://grown.example/member/albers/') {
+      return page('<title>Albers Acres - Grown</title><a href="https://coop.example">Our co-op</a>', 200, url)
+    }
+    if (url === 'https://grown.example/member/store-example/') {
+      return page('<title>Store Example LLC - Grown</title><a href="https://coop.example">Our co-op</a>'
+        + '<a href="https://store.example">Website</a>', 200, url)
+    }
+    if (url.startsWith('https://coop.example')) return page('<html><body>a co-op</body></html>', 200, url)
+    return navNet(url)
+  }
+  f = world()
+  const sharedSeen: string[] = []
+  summary = await runProspectTopUp(asAdmin(f), {
+    fetchPage: async (url) => { sharedSeen.push(url); return sharedNet(url) },
+    now: NOW, startAt: 0, sources: SHARED,
+  })
+  check('T9c: a host several member pages share is not any one of their businesses',
+    summary.added === 'store.example' && !sharedSeen.some((url) => url.includes('coop.example')))
+
+  const mutShared = await withMutant<{ runProspectTopUp: typeof runProspectTopUp }, string[]>(
+    'lib/outreach/topup.ts',
+    [[/seenOn\.get\(h\) === 1 && /, '']],
+    async (m) => {
+      const seen: string[] = []
+      await m.runProspectTopUp(asAdmin(world()), {
+        fetchPage: async (url: string) => { seen.push(url); return sharedNet(url) },
+        now: NOW, startAt: 0, sources: SHARED,
+      })
+      return seen
+    },
+  )
+  check('T9c-MUT: without it the shared link is examined as if it were a member',
+    mutShared.some((url) => url.includes('coop.example')))
+
+  // A fixed first four member pages would be the same four businesses every
+  // quarter hour for ever, so a directory would add four and then nothing.
+  const many = Array.from({ length: 10 }, (_, i) => `https://grown.example/member/m${i}/`)
+  const at = (iso: string) => detailPageWindow(many, new Date(iso))
+  check('T10: the member pages this pass reads move with the quarter hour',
+    at('2026-10-17T10:00:00Z').length === MAX_DETAIL_PAGES
+    && JSON.stringify(at('2026-10-17T10:00:00Z')) !== JSON.stringify(at('2026-10-17T10:15:00Z'))
+    && JSON.stringify(at('2026-10-17T10:00:00Z')) === JSON.stringify(at('2026-10-17T10:14:59Z')))
+  check('T10b: the window wraps, so every member page comes up in turn',
+    new Set(Array.from({ length: 10 }, (_, i) =>
+      at(new Date(Date.parse('2026-10-17T10:00:00Z') + i * 15 * 60 * 1000).toISOString()))
+      .flat()).size === many.length)
+  check('T10c: and a directory with few member pages is read whole',
+    JSON.stringify(detailPageWindow(many.slice(0, 3), new Date('2026-10-17T10:00:00Z')))
+      === JSON.stringify(many.slice(0, 3)))
+
+  // The 11:15 UTC pass: the hour started it at three directories that answer
+  // nothing, and the budget of three sources was gone before it reached one
+  // that works.
+  const DEAD_THEN_GOOD: PublicSource[] = [
+    { name: 'dead-1', url: 'https://dead1.example/list/' },
+    { name: 'dead-2', url: 'https://dead2.example/list/' },
+    { name: 'dead-3', url: 'https://dead3.example/list/' },
+    { name: 'good-directory', url: 'https://grown.example/directory/' },
+  ]
+  const deadNet = async (url: string): Promise<FetchedPage> => {
+    if (/^https:\/\/dead[123]\.example/.test(url)) throw new Error('unreachable')
+    return net(url)
+  }
+  f = world()
+  summary = await runProspectTopUp(asAdmin(f), {
+    fetchPage: deadNet, now: NOW, startAt: 0, sources: DEAD_THEN_GOOD,
+  })
+  check('T11: three sources that cannot be reached do not spend the pass',
+    summary.added === 'store.example' && summary.source === 'good-directory')
+
+  const mutBudget = await withMutant<{ runProspectTopUp: typeof runProspectTopUp }, TopUpSummary>(
+    'lib/outreach/topup.ts',
+    [[/    if \(listing\.reachable\) listingsRead \+= 1/, '    listingsRead += 1']],
+    async (m) => m.runProspectTopUp(asAdmin(world()), {
+      fetchPage: deadNet, now: NOW, startAt: 0, sources: DEAD_THEN_GOOD,
+    }),
+  )
+  check('T11-MUT: counting them would end the pass before the working directory',
+    mutBudget.added === null)
+
+  // THE SAME BUG ON A FLAT LISTING, from Production at 14:15 and 14:30 UTC on
+  // 17 Oct: the identical four businesses of a 384-member directory, examined
+  // twice, refused twice, 380 members never reached.
+  const WIDE: PublicSource[] = [{ name: 'wide-directory', url: 'https://wide.example/list/' }]
+  const wideListing = Array.from({ length: 12 }, (_, i) =>
+    `<a href="https://biz${i}.example">Business ${i}</a>`).join('')
+  const wideNet = async (url: string): Promise<FetchedPage> => {
+    if (url === 'https://wide.example/list/') return page(wideListing, 200, url)
+    if (url === 'https://wide.example/robots.txt') return page('User-agent: *\nDisallow: /wp-admin/', 200, url)
+    // Every business refuses, so nothing is ever added and nothing is skipped
+    // from our own table: only the window can move the pass along.
+    throw new Error('unreachable')
+  }
+  const hostsExamined = async (iso: string): Promise<string[]> => {
+    const s = await runProspectTopUp(asAdmin(world()), {
+      fetchPage: wideNet, now: new Date(iso), startAt: 0, sources: WIDE,
+    })
+    return s.refusals.map((r) => r.split(':')[0])
+  }
+  const firstPass = await hostsExamined('2026-10-17T14:15:00Z')
+  const secondPass = await hostsExamined('2026-10-17T14:30:00Z')
+  check('T12: consecutive passes over one flat listing examine different businesses',
+    firstPass.length === MAX_CANDIDATES_PER_PASS
+    && secondPass.length === MAX_CANDIDATES_PER_PASS
+    && firstPass.every((h) => !secondPass.includes(h)))
+
+  const mutWide = await withMutant<{ runProspectTopUp: typeof runProspectTopUp }, string[][]>(
+    'lib/outreach/topup.ts',
+    [[/    const candidates = passWindow\(listing\.candidates, deps\.now, MAX_CANDIDATES_PER_PASS\)/,
+      '    const candidates = listing.candidates']],
+    async (m) => {
+      const run = async (iso: string) => {
+        const s = await m.runProspectTopUp(asAdmin(world()), {
+          fetchPage: wideNet, now: new Date(iso), startAt: 0, sources: WIDE,
+        })
+        return s.refusals.map((r: string) => r.split(':')[0])
+      }
+      return [await run('2026-10-17T14:15:00Z'), await run('2026-10-17T14:30:00Z')]
+    },
+  )
+  check('T12-MUT: without the window both passes refuse the same four for ever',
+    JSON.stringify(mutWide[0]) === JSON.stringify(mutWide[1]))
+
+  // A ChamberMaster directory's category page carries the chamber's own footer
+  // programmes as off-site links, and on 17 Oct one of them was added to the
+  // list as if it were a manufacturer. Read through the member pages, where
+  // the hop drops whatever the listing itself links to, it cannot happen.
+  const chambers = PUBLIC_SOURCES.filter((s) => s.url.includes('/activememberdirectory/'))
+  check('T13: every chamber directory is read through its member pages',
+    chambers.length > 0
+    && chambers.every((s) => s.detailHint === '/activememberdirectory/Details/'))
+
+  const mutChamber = await withMutant<{ PUBLIC_SOURCES: typeof PUBLIC_SOURCES }, boolean>(
+    'lib/outreach/topup.ts',
+    [[/    detailHint: '\/activememberdirectory\/Details\/',\n/, '']],
+    async (m) => m.PUBLIC_SOURCES
+      .filter((s) => s.url.includes('/activememberdirectory/'))
+      .every((s) => s.detailHint === '/activememberdirectory/Details/'),
+  )
+  check('T13-MUT: without the hint the chamber is read off its category page again',
+    mutChamber === false)
 
   console.log('\n— G: the switches and the cron —')
 
@@ -545,6 +833,92 @@ async function main() {
 
   check('T2-MUT: and without the suppression check somebody who opted out would come back',
     mutSuppression === true)
+
+  console.log('\n— W: the search that keeps the list filling —')
+
+  // The grid moves on every pass, and that is the whole point: a directory can
+  // only answer with the members it has, while a trade and a town is a new
+  // question every quarter hour.
+  const q1 = searchQuery(new Date('2026-10-26T15:00:00Z'))
+  const q2 = searchQuery(new Date('2026-10-26T15:15:00Z'))
+  check('W1: two passes a quarter hour apart ask different things',
+    q1 !== q2 && q1.length > 0)
+  check('W1b: and a query is a trade and a place, both from the grid',
+    TRADES.some((t) => q1.startsWith(t)) && PLACES.some((pl) => q1.endsWith(pl)))
+  const seenQueries = new Set<string>()
+  for (let i = 0; i < TRADES.length; i += 1) {
+    seenQueries.add(searchQuery(new Date(Date.parse('2026-10-26T15:00:00Z') + i * 15 * 60 * 1000)))
+  }
+  check('W1c: a full turn of the grid repeats nothing',
+    seenQueries.size === TRADES.length)
+
+  const searchOf = (domains: string[]): SearchFn => async () => ({ ok: true, domains })
+  const hits = await searchCandidates(searchOf(['store.example', 'www.store.example', 'yelp.com', 'bbb.org', 'indeed.com', 'mit.edu']), NOW)
+  check('W2: the search names the businesses it found',
+    hits.reachable && hits.candidates.length === 1 && hits.candidates[0].host === 'store.example')
+  check('W2b: and never a directory, a jobs board or a school',
+    !hits.candidates.some((c) => /yelp|bbb|indeed|mit/.test(c.host)))
+  check('W3: an aggregator is recognised with or without www, and by subdomain',
+    isAggregator('www.yelp.com') && isAggregator('biz.yelp.com') && isAggregator('HOUZZ.COM')
+    && !isAggregator('store.example'))
+  check('W3b: every host in the list is bare, so the subdomain rule can work',
+    AGGREGATOR_HOSTS.every((h) => h === h.toLowerCase() && !h.startsWith('www.') && h.includes('.')))
+
+  const failing: SearchFn = async () => ({ ok: false, code: 'search_unavailable' })
+  const noKey = await searchCandidates(failing, NOW)
+  check('W4: no key or no answer is not a pass spent',
+    noKey.reachable === false && noKey.candidates.length === 0)
+
+  // End to end: the search supplies the business and the pass writes it down.
+  const searched = world()
+  summary = await runProspectTopUp(asAdmin(searched), {
+    fetchPage: site({ home: `<html><title>Store Example LLC | Nashville</title>${SHOPIFY}${US_ADDRESS}${CONTACT}</html>` }),
+    now: NOW,
+    search: searchOf(['store.example']),
+    sources: [],
+  })
+  check('W5: a business the search named is qualified and added',
+    summary.added === 'store.example' && summary.source?.startsWith('search: ') === true)
+  check('W5b: and it is named as its own site names it, not by its domain',
+    searched.tables[PROSPECTS_TABLE][0].company === 'Store Example LLC')
+
+  // A search that answers nothing addable must not end the pass: the
+  // directories still get their turn, which is the T7 rule applied here.
+  const bothNet = async (url: string): Promise<FetchedPage> => {
+    if (url === 'https://good.example/directory/') {
+      return page('<a href="https://store.example">Store Example LLC</a>', 200, url)
+    }
+    return site({ home: `<html><title>Store Example LLC | Nashville</title>${SHOPIFY}${US_ADDRESS}${CONTACT}</html>` })(url)
+  }
+  summary = await runProspectTopUp(asAdmin(world()), {
+    fetchPage: bothNet,
+    now: NOW,
+    startAt: 0,
+    search: searchOf([]),
+    sources: [{ name: 'good-directory', url: 'https://good.example/directory/' }],
+  })
+  check('W6: a search that found nothing leaves the directories their turn',
+    summary.added === 'store.example')
+
+  const mutSearchFirst = await withMutant<{ runProspectTopUp: typeof runProspectTopUp }, TopUpSummary>(
+    'lib/outreach/topup.ts',
+    [[/  if \(deps\.search !== undefined\) \{/, '  if (false) {']],
+    async (m) => m.runProspectTopUp(asAdmin(world()), {
+      fetchPage: site({ home: `<html><title>Store Example LLC</title>${SHOPIFY}${US_ADDRESS}${CONTACT}</html>` }),
+      now: NOW,
+      search: searchOf(['store.example']),
+      sources: [],
+    }),
+  )
+  check('W5-MUT: without the search the pass has nothing but the directories',
+    mutSearchFirst.added === null)
+
+  // The cron's own wiring: the search must actually be handed to the pass, or
+  // everything above is a feature no deployment has.
+  const isolatedSource = readFileSync(join(__dirname, '..', 'topup-isolated.ts'), 'utf8')
+  check('W7: the cron hands the pass the Serper search',
+    /search:\s*createSerperSearch\(\)/.test(isolatedSource)
+    && /from '@\/lib\/seed-scan\/serper'/.test(isolatedSource))
 
   console.log(`\n${pass} passed, ${fail} failed`)
   if (fail > 0) process.exit(1)

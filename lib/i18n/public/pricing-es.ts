@@ -160,9 +160,13 @@ export const pricingEs: PricingCopy = {
       {
         q: '¿Cómo se protegen nuestros datos?',
         a: 'Todo el tráfico va cifrado (SSL/TLS), las contraseñas se guardan cifradas y cada cuenta ve solo sus propios datos. La información se comparte únicamente con los proveedores sobre los que funciona la plataforma, como alojamiento, pagos y datos de búsqueda, según la política de privacidad.',
-        // The Spanish privacy policy is owned by the legal thread; until it
-        // exists this link points at the English one, which is live.
-        link: { label: 'Leer la política de privacidad', href: '/en/privacy' },
+        // The privacy policy exists in this language (content/legal/es, rendered
+        // by app/(public)/es/privacy), so the link stays inside the language the
+        // reader chose. It used to point at /en/privacy, left over from the
+        // months when only the English document existed — which meant a reader
+        // on this page was handed an English policy, the one thing the site's
+        // language rule forbids.
+        link: { label: 'Leer la política de privacidad', href: '/es/privacy' },
       },
     ],
   },

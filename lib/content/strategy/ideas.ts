@@ -48,7 +48,7 @@ export type IdeaTarget = {
   source: string | null
 }
 
-export type IdeaRequest = { url: string; body: Record<string, unknown> }
+export type IdeaRequest = { url: string; body: Record<string, unknown>; method?: 'POST' | 'PATCH' | 'DELETE' }
 
 export function ideaTargetFromCard(card: StrategyCard): IdeaTarget | null {
   if (card.column !== 'ideas') return null
@@ -93,6 +93,62 @@ export function approveRequest(t: IdeaTarget, projectId: string, automation: boo
 
 export function rejectRequest(ideaId: string, projectId: string): IdeaRequest {
   return { url: IDEA_ENDPOINTS.reject, body: { projectId, ideaIds: [ideaId] } }
+}
+
+// ── Taking a planned topic out again ──────────────────────────────────────
+
+/**
+ * 18 October 2026 — A PLANNED TOPIC CAN BE REMOVED.
+ *
+ * "Not a fit" existed only on an idea. Once a topic was planned nothing on the
+ * board touched it, and the reject route only ever moves a PENDING idea, so a
+ * topic the monthly top-up approved by itself could not be removed at all —
+ * while the top-up's own notice told the merchant it could. A planned card now
+ * carries the same action, and because approving IS queueing, it takes the topic
+ * out of the publishing queue FIRST and only then marks it rejected: the other
+ * order would leave a rejected topic in the queue, which still publishes.
+ *
+ * Both routes exist and both check the session and the project's owner:
+ *   DELETE /api/content/automation/items/:itemId   (authItem, via the item's project)
+ *   PATCH  /api/content/topics/:id { status: 'rejected' }   (authContentProject)
+ */
+export const PLANNED_ENDPOINTS = {
+  topic: (topicId: string) => `/api/content/topics/${encodeURIComponent(topicId)}`,
+  queueItem: (itemId: string) => `/api/content/automation/items/${encodeURIComponent(itemId)}`,
+} as const
+
+/** Queue states in which an item is only waiting, so removing it writes nothing. */
+export const REMOVABLE_QUEUE_STATUSES: readonly string[] = ['queued', 'scheduled']
+
+export type PlannedTarget = { key: string; topicId: string; title: string; queueItemId: string | null }
+
+/**
+ * The planned topic a card stands for, or null when the card is not one that may be
+ * removed: an optimistic stand-in (no stored topic yet), or a topic whose article is
+ * already being written (a queue item past 'scheduled').
+ */
+export function plannedTargetFromCard(card: StrategyCard): PlannedTarget | null {
+  if (card.column !== 'planned' || card.articleId) return null
+  const topicId = card.topicId
+  if (!topicId || topicId.startsWith(PENDING_TOPIC_PREFIX)) return null
+  const status = card.queueStatus ?? null
+  if (card.queueItemId && status && !REMOVABLE_QUEUE_STATUSES.includes(status)) return null
+  return { key: card.key, topicId, title: card.title, queueItemId: card.queueItemId ?? null }
+}
+
+/** The queue item first, then the topic. Order matters (see above). */
+export function removePlannedRequests(t: PlannedTarget, projectId: string): IdeaRequest[] {
+  const out: IdeaRequest[] = []
+  if (t.queueItemId) out.push({ url: PLANNED_ENDPOINTS.queueItem(t.queueItemId), body: {}, method: 'DELETE' })
+  out.push({ url: PLANNED_ENDPOINTS.topic(t.topicId), body: { projectId, status: 'rejected' }, method: 'PATCH' })
+  return out
+}
+
+/** The topic is out of the plan: the topics route answers with the row it changed. */
+export function readRemovePlannedOutcome(ok: boolean, body: unknown): boolean {
+  if (!ok || !body || typeof body !== 'object') return false
+  const topic = (body as { topic?: unknown }).topic
+  return !!topic && typeof topic === 'object' && (topic as { status?: unknown }).status === 'rejected'
 }
 
 export const KEYWORD_MIN = 2
@@ -164,6 +220,7 @@ export function readRejectOutcome(ok: boolean, body: unknown): boolean {
 export type IdeaOverride =
   | { kind: 'approve'; key: string; ideaId: string | null; title: string; keyword: string | null; reason: string | null; at: string }
   | { kind: 'reject'; key: string; ideaId: string }
+  | { kind: 'removeTopic'; key: string; topicId: string }
   | { kind: 'keyword'; key: string; title: string; at: string }
 
 export const PENDING_TOPIC_PREFIX = 'pending:'
@@ -181,6 +238,11 @@ export function applyIdeaOverrides(data: StrategyData, overrides: readonly IdeaO
     if ((o.kind === 'approve' || o.kind === 'reject') && o.ideaId) {
       const id = o.ideaId
       ideas = ideas.filter((i) => i.id !== id)
+    }
+    if (o.kind === 'removeTopic') {
+      const id = o.topicId
+      topics = topics.filter((t) => t.id !== id)
+      continue
     }
     if (o.kind === 'approve' || o.kind === 'keyword') {
       if (hasTopic({ ideas, topics, articles: data.articles }, o.title)) continue
@@ -200,6 +262,10 @@ export function applyIdeaOverrides(data: StrategyData, overrides: readonly IdeaO
 
 /** Whether the rows the server sent already show what the override stands in for. */
 export function overrideSettled(data: StrategyData, o: IdeaOverride): boolean {
+  if (o.kind === 'removeTopic') {
+    const t = data.topics.find((x) => x.id === o.topicId)
+    return !t || t.status === 'rejected'
+  }
   const ideaGone = !('ideaId' in o) || !o.ideaId || !data.ideas.some((i) => i.id === o.ideaId)
   if (o.kind === 'reject') return ideaGone
   return ideaGone && hasTopic(data, o.title)

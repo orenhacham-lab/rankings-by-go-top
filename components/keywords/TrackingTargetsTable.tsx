@@ -348,7 +348,7 @@ export default function TrackingTargetsTable({
                       <Sparkline
                         values={history}
                         invert
-                        label={kp.trendLabel(target.keyword, formatCount(history.length, language))}
+                        label={kp.trendLabel(target.keyword, formatCount(history.length, uiLocale))}
                         className="hidden md:block"
                       />
                       <PositionChange change={result.change_value} />
@@ -358,7 +358,7 @@ export default function TrackingTargetsTable({
                 <Td className="hidden whitespace-nowrap lg:table-cell">
                   {result ? (
                     <div>
-                      <span className="text-caption text-muted">{formatDateTime(result.checked_at, language)}</span>
+                      <span className="text-caption text-muted">{formatDateTime(result.checked_at, uiLocale)}</span>
                       {result.result_url && (
                         <a
                           href={result.result_url}

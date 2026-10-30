@@ -461,6 +461,8 @@ export const dashboardEn = {
       authorBoxNoLink: 'No link: there is no site address in your settings.',
       authorBoxNameLabel: 'Author name to show (optional)',
       authorBoxNameHint: 'Leave empty to use the name picked automatically.',
+      authorBoxLineLabel: 'A line about the author (optional)',
+      authorBoxLineHint: 'What you write here appears under the name. Leave it empty to use the first sentence of the business description.',
       authorBoxUrlLabel: 'Author link (optional)',
       authorBoxUrlHint: 'A full address starting with http:// or https://. Leave empty to link to your about page, or to your home page if there is none.',
       authorBoxUrlInvalid: 'Enter a full address that starts with http:// or https://.',
@@ -469,6 +471,9 @@ export const dashboardEn = {
       authorBoxImageSiteIcon: 'The site icon',
       authorBoxImageHint: 'The small icon your WordPress site shows in the browser tab, shown round next to the name.',
       authorBoxImageMissing: 'Your site has no site icon, so the box will show no image.',
+      authorBoxImageNeedsSite: 'Once you connect your WordPress site you can choose an image for the box, including one of your own.',
+      authorBoxImageNotOnStore: 'On a Shopify store the box is shown without an image.',
+      authorBoxImageOwnPhotoNeedsPassword: 'To use a photo of your own, update our plugin on the site to the newest version, or connect WordPress directly with an application password. Until then the site icon can be shown.',
       authorBoxOverridesUnavailable: 'The name, link and image are not open for editing in your account yet.',
       authorBoxImageUpload: 'A photo I upload',
       authorBoxPhotoHint: 'JPEG, PNG or WebP, up to 2 MB. We keep a copy without its camera and location data, and copy it into your WordPress media library when an article is published.',
@@ -897,6 +902,7 @@ export const dashboardEn = {
         unsafe_named_entity_mutation: 'the title altered a name into one your site does not use',
         title_named_external_business: 'the title named a business that is not yours',
         title_unknown_latin_token: 'the title used a brand or name your site does not use',
+        other_service_object: 'the topic was about a kind of place your site does not serve',
         already_covered: 'your site already targets this search phrase',
         exact_existing_keyword_owner: 'an existing page already owns this search phrase',
         covered_by_existing_content: 'existing content on your site already covers it',
@@ -2504,8 +2510,8 @@ export const dashboardEn = {
     // The monthly top-up's topics (components/content-strategy/TopUpNotice.tsx).
     topup: {
       title: 'New topics we prepared for you this month',
-      body: 'We added {count} topics to your plan, so you have topics for all of next month. We picked them from your content plan and checked that you do not already have a page or an article on the same subject. They are in the "Planned" column, and in the list view you can reject any that does not fit.',
-      bodyOne: 'We added one topic to your plan, so you have topics for all of next month. We picked it from your content plan and checked that you do not already have a page or an article on the same subject. It is in the "Planned" column, and in the list view you can reject it if it does not fit.',
+      body: 'We added {count} topics to your plan, so you have topics for all of next month. We picked them from your content plan and checked that you do not already have a page or an article on the same subject. They are in the "Planned" column, and you can remove any that does not fit.',
+      bodyOne: 'We added one topic to your plan, so you have topics for all of next month. We picked it from your content plan and checked that you do not already have a page or an article on the same subject. It is in the "Planned" column, and you can remove it if it does not fit.',
       origins: { scan: 'From your site scan', research: 'From keyword research', keywords: 'From your keywords', plan: 'From your content plan' },
     },
     loading: 'Loading the plan…',
@@ -2527,6 +2533,10 @@ export const dashboardEn = {
       rejected: 'Idea removed. It will not be suggested again.',
       approveError: 'We could not approve the idea. Try again in a moment.',
       rejectError: 'We could not remove the idea. Try again in a moment.',
+      remove: 'Not a fit',
+      removeAria: 'Remove the topic: {title}',
+      removed: 'The topic left the plan and the publishing queue.',
+      removeError: 'We could not remove the topic. Try again in a moment.',
       addKeyword: 'Add a keyword',
       keywordLabel: 'Keyword for a new topic',
       keywordPlaceholder: 'For example: running shoes for women',
@@ -6058,6 +6068,11 @@ export const dashboardEn = {
       cancelSuccess: 'Subscription renewal was canceled. Your access will remain active until the end of the billing period.',
       cancelError: 'We couldn’t cancel your renewal. Try again in a moment, or write to us and we’ll cancel it for you.',
       contactToCancel: 'To cancel your renewal, write to us and we will end your plan for you. If the subscription is billed by another company, we will tell you where the cancellation is done and pass your request on to them.',
+      // Bought on an external marketplace: that platform is the seller and
+      // holds the payment instrument, so this says where cancelling works
+      // rather than offering a cancellation we cannot perform.
+      cancelAtMarketplace: (seller: string) => `You bought this plan on ${seller}, and the billing runs there. You cancel the renewal in your ${seller} account, and your access stays active until the end of the period you have paid for. If you cannot reach ${seller}, write to us and we will end your plan on our side. Only ${seller} can stop the charge.`,
+      marketplacePolicyLink: (seller: string) => `${seller}'s terms and policies`,
       renewalAlreadyCancelled: 'Renewal has been cancelled. Your access remains active until',
     },
     paypal: {

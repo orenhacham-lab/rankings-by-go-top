@@ -276,6 +276,10 @@ export function isInvalidPriceQuestion(prompt: string, language: PromptLanguage)
   // service lists below are its own too; without them a Spanish question would
   // match neither branch and this filter would never fire.
   if (language === 'es') return isInvalidPriceQuestionEs(prompt)
+  // French asks the price with its own words too, and the entity and service
+  // lists below are Hebrew/English only, so without this branch a French
+  // question would match neither and the filter would never fire.
+  if (language === 'fr') return isInvalidPriceQuestionFr(prompt)
   // Only check price questions
   const isPriceQuestion =
     language === 'he'
@@ -341,6 +345,27 @@ function isInvalidPriceQuestionEs(prompt: string): boolean {
   // comes first and no business word follows it immediately.
   const serviceFirst = new RegExp(
     `(cu[áa]nto\\s+(?:cuesta|vale|cuestan|valen)|precio\\s+de)\\s+(?:el\\s+|la\\s+|los\\s+|las\\s+|un\\s+|una\\s+)?[\\w\\s]*${service.source}(?!\\s+(?:de\\s+)?(?:una?\\s+)?${businessType.source})`,
+    'i',
+  )
+  return !serviceFirst.test(text)
+}
+
+/**
+ * The French twin of `isInvalidPriceQuestionEs`: same rule, French words.
+ * "Combien coûte une entreprise de nettoyage ?" prices a company (invalid),
+ * "Combien coûte le nettoyage de bureaux ?" prices a service (valid).
+ */
+function isInvalidPriceQuestionFr(prompt: string): boolean {
+  const text = normalizePrompt(prompt)
+  if (!/(combien\s+co[\u00fbu]te(?:nt)?|prix\s+d['\u2019]?(?:un|une|e)?)/i.test(text)) return false
+  const businessType = /(entreprise|soci[\u00e9e]t[\u00e9e]|agence|cabinet|boutique|magasin|commerce|marque|prestataire|fournisseur|site|cat[\u00e9e]gorie)/i
+  const service = /(nettoyage|r[\u00e9e]novation|r[\u00e9e]paration|d[\u00e9e]pannage|conseil|accompagnement|publicit[\u00e9e]|service|prestation|installation|livraison|d[\u00e9e]m[\u00e9e]nagement)/i
+  if (!businessType.test(text)) return false
+  if (!service.test(text)) return true
+  // Both appear: valid only when the SERVICE is what is being priced, i.e. it
+  // comes first and no business word follows it immediately.
+  const serviceFirst = new RegExp(
+    `(combien\\s+co[\u00fbu]te(?:nt)?|prix\\s+d['\u2019]?(?:un|une|e)?)\\s+(?:le\\s+|la\\s+|les\\s+|un\\s+|une\\s+|des\\s+)?[\\w\\s]*${service.source}(?!\\s+(?:d['\u2019]?|de\\s+)?(?:une?\\s+)?${businessType.source})`,
     'i',
   )
   return !serviceFirst.test(text)

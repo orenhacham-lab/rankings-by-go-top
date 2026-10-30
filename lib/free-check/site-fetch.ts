@@ -39,7 +39,16 @@ export type FetchedText = { ok: true; url: string; status: number; text: string 
 
 export type FetchResult<T> = T | { ok: false; reason: FetchFailure; status?: number }
 
-type Deps = { fetchImpl?: typeof fetch }
+/**
+ * `resolver` exists so a test can admit a host without a live DNS answer. The
+ * default is the real lookup, and no caller in app code passes one — without it
+ * a case about the BODY of a response silently depended on a public hostname
+ * still resolving from wherever the suite happened to run.
+ */
+type Deps = {
+  fetchImpl?: typeof fetch
+  resolver?: (h: string) => Promise<{ address: string; family: number }[]>
+}
 
 /**
  * Read a response body under a cap, and never throw.
@@ -96,7 +105,7 @@ async function guardedGet(
   accept: string,
   deps: Deps,
 ): Promise<FetchResult<{ ok: true; res: Response; url: URL; done: () => void }>> {
-  const host = await assertPublicHost(url.hostname)
+  const host = await assertPublicHost(url.hostname, deps.resolver)
   if (!host.ok) return { ok: false, reason: host.reason === 'dns' ? 'dns' : 'blocked' }
 
   const controller = new AbortController()

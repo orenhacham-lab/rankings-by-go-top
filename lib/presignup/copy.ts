@@ -40,10 +40,26 @@ export const REPORT_CONSENT_VERSION_ES = 'report-email-es-v2'
 /** Portuguese likewise. The wording is the legal thread's, reviewed in PR #97. */
 export const REPORT_CONSENT_VERSION_PT = 'report-email-pt-v2'
 
+/**
+ * French likewise, and it starts at v1 because the French sentence has never
+ * been shown before: there is no earlier French wording for a record to be
+ * confused with.
+ */
+export const REPORT_CONSENT_VERSION_FR = 'report-email-fr-v1'
+
+/**
+ * Italian likewise, and it starts at v1 because the Italian sentence has never
+ * been shown before: there is no earlier Italian wording for a record to be
+ * confused with.
+ */
+export const REPORT_CONSENT_VERSION_IT = 'report-email-it-v1'
+
 /** The optional second decision, versioned the same way and never shared with the first. */
 export const MARKETING_CONSENT_VERSION = 'marketing-email-v1'
 export const MARKETING_CONSENT_VERSION_ES = 'marketing-email-es-v1'
 export const MARKETING_CONSENT_VERSION_PT = 'marketing-email-pt-v1'
+export const MARKETING_CONSENT_VERSION_FR = 'marketing-email-fr-v1'
+export const MARKETING_CONSENT_VERSION_IT = 'marketing-email-it-v1'
 
 /**
  * One id for a refusal in every language. A refusal has no wording to prove —
@@ -60,6 +76,8 @@ const CONSENT: Record<PublicLocale, string> = {
   en: 'I agree to receive this site research report from Go Top by email.',
   es: 'Acepto recibir de Go Top por correo electrónico el informe de investigación de este sitio.',
   'pt-BR': 'Concordo em receber da Go Top, por e-mail, o relatório de pesquisa deste site.',
+  fr: "J'accepte de recevoir de Go Top, par e-mail, le rapport d'analyse de ce site.",
+  it: 'Acconsento a ricevere da Go Top, per e-mail, il report di analisi di questo sito.',
 }
 
 /** What the optional box says. Ticking it is the only way marketing is allowed. */
@@ -68,6 +86,8 @@ const MARKETING: Record<PublicLocale, string> = {
   en: 'I also agree to receive updates and marketing content from Go Top by email. I can withdraw consent at any time using the link in every email.',
   es: 'Acepto también recibir de Go Top novedades y contenido comercial por correo electrónico. Puedo retirar mi consentimiento en cualquier momento con el enlace que incluye cada correo.',
   'pt-BR': 'Concordo também em receber da Go Top novidades e conteúdo comercial por e-mail. Posso retirar meu consentimento a qualquer momento pelo link que acompanha cada mensagem.',
+  fr: "J'accepte également de recevoir de Go Top des actualités et du contenu marketing par e-mail. Je peux retirer mon consentement à tout moment grâce au lien présent dans chaque e-mail.",
+  it: 'Acconsento inoltre a ricevere da Go Top aggiornamenti e contenuti di marketing per e-mail. Il consenso può essere revocato in qualsiasi momento tramite il link presente in ogni e-mail.',
 }
 
 /** What the record says when the optional box was left unticked. */
@@ -76,6 +96,8 @@ const MARKETING_DECLINED: Record<PublicLocale, string> = {
   en: 'Updates and marketing content were offered and not agreed to.',
   es: 'Se ofrecieron novedades y contenido comercial y no se aceptaron.',
   'pt-BR': 'Novidades e conteúdo comercial foram oferecidos e não foram aceitos.',
+  fr: "Des actualités et du contenu marketing ont été proposés et n'ont pas été acceptés.",
+  it: 'Aggiornamenti e contenuti di marketing sono stati proposti e non sono stati accettati.',
 }
 
 const CONSENT_VERSION: Record<PublicLocale, string> = {
@@ -83,6 +105,8 @@ const CONSENT_VERSION: Record<PublicLocale, string> = {
   en: REPORT_CONSENT_VERSION,
   es: REPORT_CONSENT_VERSION_ES,
   'pt-BR': REPORT_CONSENT_VERSION_PT,
+  fr: REPORT_CONSENT_VERSION_FR,
+  it: REPORT_CONSENT_VERSION_IT,
 }
 
 const MARKETING_VERSION: Record<PublicLocale, string> = {
@@ -90,6 +114,8 @@ const MARKETING_VERSION: Record<PublicLocale, string> = {
   en: MARKETING_CONSENT_VERSION,
   es: MARKETING_CONSENT_VERSION_ES,
   'pt-BR': MARKETING_CONSENT_VERSION_PT,
+  fr: MARKETING_CONSENT_VERSION_FR,
+  it: MARKETING_CONSENT_VERSION_IT,
 }
 
 export function reportConsentText(locale: PublicLocale): string {
@@ -287,7 +313,83 @@ const ptBR: ResearchScreenCopy = {
   },
 }
 
-const SCREEN: Record<PublicLocale, ResearchScreenCopy> = { he, en, es, 'pt-BR': ptBR }
+const fr: ResearchScreenCopy = {
+  errors: {
+    not_found: "L'analyse complète n'est pas disponible ici.",
+    invalid_url: "Cette adresse ne semble pas correcte. Réessayez, par exemple exemple.fr",
+    blocked_url: "Seuls les sites publics peuvent être analysés. Les adresses internes, les adresses IP et les redirections vers un autre site ne sont pas prises en charge.",
+    unreachable: "Nous n'avons pas réussi à joindre le site. Vérifiez l'adresse et réessayez.",
+    not_html: "Cette adresse ne renvoie pas de page web que nous puissions lire.",
+    forbidden: "Le site bloque les lecteurs automatiques, et Google n'affiche aucune de ses pages non plus. Essayez une autre adresse du site.",
+    rate_limited: "Vous avez lancé plusieurs analyses à la suite. Réessayez dans quelques minutes.",
+    daily_cap: "L'analyse gratuite est très demandée aujourd'hui. Réessayez plus tard, ou ouvrez un compte et l'analyse sera lancée dans votre projet.",
+    unavailable: "L'analyse complète n'est pas disponible pour le moment.",
+    internal: "Quelque chose a bloqué de notre côté. Réessayez dans un instant.",
+  },
+  unavailableTitle: "L'analyse complète n'est pas disponible pour le moment",
+  unavailableBody: 'En attendant, nous avons lancé la vérification rapide de votre site.',
+  report: {
+    link: 'Recevoir le rapport par e-mail',
+    title: 'Recevoir le rapport par e-mail',
+    body: "Laissez-nous une adresse et nous vous envoyons le rapport d'analyse du site.",
+    emailLabel: 'Adresse e-mail',
+    emailPlaceholder: 'vous@exemple.com',
+    consent: CONSENT.fr,
+    marketing: MARKETING.fr,
+    privacy: 'Politique de confidentialité',
+    submit: 'Enregistrer ma demande',
+    sending: 'Enregistrement…',
+    saved: "C'est noté. Le rapport d'analyse sera envoyé à cette adresse.",
+    errors: {
+      consent_required: "Pour que nous puissions vous envoyer le rapport, cochez la case de consentement.",
+      invalid_email: "Cette adresse e-mail ne semble pas correcte.",
+      invalid_claim: 'Cette analyse ne peut plus être envoyée. Relancez-la.',
+      rate_limited: 'Vous avez envoyé plusieurs demandes à la suite. Réessayez plus tard.',
+      unavailable: "Nous n'avons pas réussi à enregistrer votre demande pour le moment. Réessayez plus tard.",
+      internal: 'Quelque chose a bloqué de notre côté. Réessayez dans un instant.',
+    },
+  },
+}
+
+const it: ResearchScreenCopy = {
+  errors: {
+    not_found: 'L\u2019analisi completa non è disponibile qui.',
+    invalid_url: 'Questo indirizzo non sembra corretto. Si consiglia di riprovare, per esempio esempio.it',
+    blocked_url: 'Possono essere analizzati soltanto i siti pubblici. Gli indirizzi interni, gli indirizzi IP e i reindirizzamenti verso un altro sito non sono supportati.',
+    unreachable: 'Non è stato possibile raggiungere il sito. Si consiglia di verificare l\u2019indirizzo e riprovare.',
+    not_html: 'Questo indirizzo non restituisce una pagina web leggibile.',
+    forbidden: 'Il sito blocca i lettori automatici e Google non mostra nemmeno una delle sue pagine. Si consiglia di provare un altro indirizzo dello stesso sito.',
+    rate_limited: 'Sono state avviate diverse analisi di seguito. Si consiglia di riprovare tra qualche minuto.',
+    daily_cap: 'L\u2019analisi gratuita è molto richiesta oggi. Si consiglia di riprovare più tardi, oppure di aprire un account: l\u2019analisi verrà eseguita nel proprio progetto.',
+    unavailable: 'L\u2019analisi completa non è disponibile al momento.',
+    internal: 'Qualcosa si è bloccato da parte nostra. Si consiglia di riprovare tra un istante.',
+  },
+  unavailableTitle: 'L\u2019analisi completa non è disponibile al momento',
+  unavailableBody: 'Nel frattempo è stato avviato il controllo rapido del sito.',
+  report: {
+    link: 'Ricevi il report per e-mail',
+    title: 'Ricevi il report per e-mail',
+    body: 'È sufficiente lasciare un indirizzo: il report di analisi del sito verrà inviato lì.',
+    emailLabel: 'Indirizzo e-mail',
+    emailPlaceholder: 'nome@esempio.com',
+    consent: CONSENT.it,
+    marketing: MARKETING.it,
+    privacy: 'Informativa sulla privacy',
+    submit: 'Registra la richiesta',
+    sending: 'Registrazione…',
+    saved: 'Richiesta registrata. Il report di analisi verrà inviato a questo indirizzo.',
+    errors: {
+      consent_required: 'Per poter inviare il report occorre selezionare la casella di consenso.',
+      invalid_email: 'Questo indirizzo e-mail non sembra corretto.',
+      invalid_claim: 'Questa analisi non può più essere inviata. Si consiglia di avviarla di nuovo.',
+      rate_limited: 'Sono state inviate diverse richieste di seguito. Si consiglia di riprovare più tardi.',
+      unavailable: 'Non è stato possibile registrare la richiesta in questo momento. Si consiglia di riprovare più tardi.',
+      internal: 'Qualcosa si è bloccato da parte nostra. Si consiglia di riprovare tra un istante.',
+    },
+  },
+}
+
+const SCREEN: Record<PublicLocale, ResearchScreenCopy> = { he, en, es, 'pt-BR': ptBR, fr, it }
 
 export function researchScreenCopy(locale: PublicLocale): ResearchScreenCopy {
   return SCREEN[locale] ?? he

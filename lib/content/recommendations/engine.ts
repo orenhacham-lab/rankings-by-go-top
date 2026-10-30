@@ -25,10 +25,11 @@ import { RunCostController, newRunCostController } from './run-cost-controller'
 import { orderSourcesByEvidence, stage1Sources } from './hybrid-orchestration'
 import { recommendationGuidance, structuredOutputContract, pendingTopicsBlock, projectContextBlock, deriveProjectFocus, type PendingTopic } from './prompt-guidance'
 import { validateIdea } from './validate'
-import { recommendFromKeywordResearch, topicQualityIssue } from './keyword-research'
+import { recommendFromKeywordResearch, topicQualityIssue, researchKeywordIssue, heStem, MIN_SITE_VOCAB_TOKENS } from './keyword-research'
 import { recommendFromSiteScan } from './site-scan'
 import { mergeHybrid, hybridProvenanceReason } from './hybrid'
 import { slugFromUrl } from '@/lib/content/internal-links'
+import { readMerchantTitles, readMerchantTrackedKeywords } from './site-subject'
 import { reassembleReport, isStale, isVersionStale } from '@/lib/content/wordpress-content-index'
 import { getContentIndex } from '@/lib/content/content-index'
 import { previewStructuredLinks } from '@/lib/content/internal-link-idea-plan'
@@ -47,26 +48,37 @@ type Admin = ReturnType<typeof createAdminClient>
  * rescan. Never hardcoded — purely project-derived.
  */
 async function deriveScanSeedConcepts(admin: Admin, projectId: string, userId?: string | null): Promise<string[]> {
+  const out: string[] = []
+  const seen = new Set<string>()
+  const push = (raw: string | null | undefined) => {
+    const v = (raw || '').trim()
+    const key = v.toLowerCase()
+    if (v && v.length >= 3 && v.length <= 40 && !seen.has(key)) { seen.add(key); out.push(v) }
+  }
   try {
     const cacheRow = await getContentIndex(projectId, userId, admin)
-    if (!cacheRow) return []
-    const report = reassembleReport(cacheRow)
-    const targets = (report.targets ?? []) as ScannedTarget[]
-    const out: string[] = []
-    const seen = new Set<string>()
-    const push = (raw: string | null | undefined) => {
-      const v = (raw || '').trim()
-      const key = v.toLowerCase()
-      if (v && v.length >= 3 && v.length <= 40 && !seen.has(key)) { seen.add(key); out.push(v) }
-    }
-    for (const t of targets) {
-      if (t.targetType === 'category' || t.targetType === 'tag' || t.targetType === 'product') {
-        push(t.targetTitle)
-        if (t.keywordAvailable) push(t.primaryKeywordCandidate)
+    if (cacheRow) {
+      const report = reassembleReport(cacheRow)
+      for (const t of (report.targets ?? []) as ScannedTarget[]) {
+        if (t.targetType === 'category' || t.targetType === 'tag' || t.targetType === 'product') {
+          push(t.targetTitle)
+          if (t.keywordAvailable) push(t.primaryKeywordCandidate)
+        }
       }
     }
-    return out.slice(0, 20)
-  } catch { return [] }
+  } catch { /* no index → the merchant's own mapped pages, below */ }
+  // 18 October 2026 — this list IS the site's offering in every prompt
+  // (offerContext, ownedCategories, the project focus). 43 of the 51 live
+  // projects have no index row, so it was empty and the model had nothing but
+  // the business name: that is how a dog-bed store was given children's toys.
+  // The merchant's own mapped pages (site-subject.ts) fill it.
+  if (out.length === 0) {
+    for (const t of await readMerchantTitles(admin, { projectId, userId })) {
+      push(t)
+      if (out.length >= 20) break
+    }
+  }
+  return out.slice(0, 20)
 }
 
 /**
@@ -86,6 +98,11 @@ export async function buildSiteVocabulary(admin: Admin, projectId: string, extra
     for (const tk of tokens(s || '')) {
       vocab.add(tk)
       if (tk.length >= 4 && /^[בלמהושכ]/.test(tk)) vocab.add(tk.slice(1))
+      // 18 October 2026 — the stem too (heStem), so a keyword that spells or
+      // inflects the same word differently ("מזרון" where the site writes
+      // "מזרן", "גדולים" where it writes "גדול") still counts as the site's own.
+      const stem = heStem(tk)
+      if (stem && stem !== tk) vocab.add(stem)
     }
   }
   try {
@@ -99,7 +116,13 @@ export async function buildSiteVocabulary(admin: Admin, projectId: string, extra
         if (/[֐-׿]/.test(slug)) absorb(slug)
       }
     }
-  } catch { /* no scan → vocabulary from extras only */ }
+  } catch { /* no scan → the merchant's mapped pages and the extras */ }
+  // 18 October 2026 — THE MERCHANT'S OWN PAGES (site-subject.ts). Without them a
+  // project with no index row had a vocabulary of its business name and its
+  // tracked keywords, and those keywords are written by our own articles: a
+  // drifted article taught the gate its own words. The mapping holds the real
+  // catalogue (131 pages for the store that drifted), our own articles excluded.
+  for (const t of await readMerchantTitles(admin, { projectId, userId })) absorb(t)
   for (const e of extras) absorb(e)
   return vocab
 }
@@ -414,6 +437,19 @@ export async function generateRecommendations(admin: Admin, input: GenerateInput
     ownedCategories, existingTopics: existingTitles.slice(0, 15),
   })
 
+  // 2c) THE SITE'S OWN VOCABULARY, read once and shared by the sources that are
+  // gated by it (keyword research, project data). Its words come from the
+  // merchant's own pages and the tracked keywords that are not ours
+  // (site-subject.ts), so a drifted article of ours can never widen it.
+  let siteVocabCache: Set<string> | null = null
+  const siteVocabulary = async (): Promise<Set<string>> => {
+    if (!siteVocabCache) {
+      const merchantKeywords = await readMerchantTrackedKeywords(admin, input.projectId)
+      siteVocabCache = await buildSiteVocabulary(admin, input.projectId, [project.business_name || '', ...merchantKeywords], input.userId)
+    }
+    return siteVocabCache
+  }
+
   // 3) Internal-link candidates (for "suggested internal links" enrichment).
   let linkCandidates: { url: string; title: string; keyword: string | null; historicalAnchors: string[] }[] = []
   try {
@@ -545,6 +581,16 @@ export async function generateRecommendations(admin: Admin, input: GenerateInput
     modelErrorType = lastErrorType
     meta = { source: 'keyword', generated: raw, skippedDuplicates: dupes, finalCount: acc.length, attempts, reason, debug: process.env.NODE_ENV !== 'production' ? { modelUsed, modelErrorType: lastErrorType, validationRejects: rejects, pendingInAvoid: pendingAvoidCount, pending_context_count: pendingTopics.length, pending_context_with_secondary_keywords_count: pendingWithSecondary, model_returned_count: raw } : undefined }
   } else if (input.source === 'project_data') {
+    // 18 October 2026 — THE RELEVANCE GATE COVERS THIS SOURCE TOO. It existed
+    // only in the keyword-research path, and the children's-toy topics on a
+    // dog-products store ("צעצועים מונטסוריים", "משחקים מעץ לילדים") came in
+    // here, where the model invents the subject from the project's context and
+    // nothing asked whether the site is about it. The same predicates, the same
+    // vocabulary, and the same floor: below MIN_SITE_VOCAB_TOKENS the
+    // vocabulary cannot judge, so nothing is rejected.
+    const pdVocab = await siteVocabulary()
+    const pdGate = pdVocab.size >= MIN_SITE_VOCAB_TOKENS ? pdVocab : null
+    const pdBrandTokens = tokens(project.business_name || '')
     const { acc, raw, dupes, attempts, reason, lastErrorType } = await accumulate(
       async (avoid) => {
         const { ideas, ok, modelUsed: m, retryable, errorType } = await callGeminiIdeas(projectDataPrompt(langLabel, srcTarget, avoid, pendingBlock, projectBlock), srcTarget, controller, 'project_data')
@@ -552,6 +598,10 @@ export async function generateRecommendations(admin: Admin, input: GenerateInput
         const items = keepValid(ideas).map((g) => {
           const s = mapIdea(g, 'project_data', 0, modelUsed)
           if (!s) return null
+          if (pdGate) {
+            const issue = researchKeywordIssue(s.primaryKeyword, { brandTokens: pdBrandTokens, vocab: pdGate })
+            if (issue) { const k = `off_subject_${issue}`; rejects[k] = (rejects[k] ?? 0) + 1; return null }
+          }
           const fit = assessProjectKeywordFit(s.primaryKeyword, { businessName: project.business_name, category: null })
           s.suggestionScore = Number(Math.min(1, 0.6 + (fit === 'aligned' ? 0.2 : fit === 'weak' ? 0.1 : 0)).toFixed(2))
           if (!s.suggestionReason) s.suggestionReason = REASON_TEXT[language].supportingTopic
@@ -649,19 +699,17 @@ export async function generateRecommendations(admin: Admin, input: GenerateInput
     // topics, then dedupe. Phase 3F.3.1: widen with project tracked keywords as
     // extra seeds and skip already-covered clusters so "find more" keeps working.
     const seedUrls = [homepageFromDomain(project.target_domain), ...linkCandidates.map((c) => c.url)].filter((u): u is string => !!u)
-    const { data: kwSeedRows } = await admin
-      .from('tracking_targets').select('keyword, avg_monthly_searches')
-      .eq('project_id', input.projectId)
-      .order('avg_monthly_searches', { ascending: false, nullsFirst: false })
-      .limit(20)
-    const trackingSeeds = ((kwSeedRows ?? []) as { keyword: string }[]).map((r) => r.keyword).filter(Boolean)
+    // 18 October 2026 — the merchant's OWN tracked keywords only: a keyword one
+    // of our articles created (tracking_targets.notes = 'source=generated_article')
+    // seeded Google with our own drift and then counted as a site word.
+    const trackingSeeds = await readMerchantTrackedKeywords(admin, input.projectId)
     // Phase 3F.3.1e — DERIVE extra seed concepts from the site's own taxonomy
     // (category/tag/product target titles + reliable focus keywords) so the raw
     // keyword pool spans the whole catalogue, not just the homepage's terms.
     const scanSeeds = await deriveScanSeedConcepts(admin, input.projectId, input.userId)
     const seedKeywords = Array.from(new Set([...trackingSeeds, ...scanSeeds].map((s) => s.trim()).filter(Boolean)))
     // Phase 3H — the site's own vocabulary gates Google's associative URL ideas.
-    const siteVocab = await buildSiteVocabulary(admin, input.projectId, [project.business_name || '', ...trackingSeeds], input.userId)
+    const siteVocab = await siteVocabulary()
     const res = await recommendFromKeywordResearch(admin, {
       userId: input.userId, projectId: input.projectId, seedUrls, country, language, businessName: project.business_name, category: null,
       seedKeywords, avoid: [...existingTitles, ...(input.avoidKeywords ?? [])], siteVocab,

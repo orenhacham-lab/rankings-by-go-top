@@ -1,18 +1,20 @@
-=== GO TOP SEO Bridge ===
+=== GO TOP SEO Bridge – AI SEO Autopilot: Articles & Schema ===
 Contributors: gotopil
-Tags: seo, schema, publishing, content, ai
+Tags: seo, ai seo, schema, article generator, auto publish
 Requires at least: 6.0
 Tested up to: 7.1
 Requires PHP: 7.4
-Stable tag: 3.1.1
+Stable tag: 3.2.0
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
-Connects your site to GO TOP: publishes the articles you send from GO TOP and applies the SEO fixes you approve there.
+Connects your site to GO TOP: publishes AI-written blog articles with images and internal links, and applies the SEO fixes and schema you approve.
 
 == Description ==
 
-GO TOP (https://gotopseo.com) plans and writes articles for your business and finds SEO problems on your site. This plugin is the connection between GO TOP and your WordPress site. It needs a GO TOP account; on its own it does nothing.
+GO TOP (https://www.gotopseo.com/en) does the SEO work of a small business in one place: it plans and writes articles with images and internal links, tracks every month where the business stands in Google, in AI assistants (ChatGPT, Gemini and Google's AI answers) and in Google Maps, publishes posts and handles reviews on the Google Business Profile, and sends a report.
+
+This plugin is the connection between GO TOP and your WordPress site, and it does two of those things on the site itself: it publishes the articles, and it applies the SEO fixes and schema you approve. The tracking, the Maps posts and the reviews happen in GO TOP, not in this plugin. It needs a GO TOP account; on its own it does nothing.
 
 = Publishing articles =
 
@@ -55,7 +57,7 @@ Every request from GO TOP is signed with a key that only your site and your GO T
 
 == External services ==
 
-This plugin connects your site to GO TOP (https://gotopseo.com), a search-optimisation
+This plugin connects your site to GO TOP (https://www.gotopseo.com/en), a search-optimisation
 service operated by GO TOP DIGITAL MARKETING AND ADVERTISING LTD, company number 517274346, Israel. You need
 a GO TOP account to use it. The plugin does nothing until you connect your site, and you
 connect it yourself with a pairing code from your GO TOP account.
@@ -120,8 +122,8 @@ The one address your site contacts by itself: GO TOP's file storage, hosted on S
 The plugin adds no tracking, no analytics and no script to your site's pages, and it sends
 nothing about your visitors anywhere.
 
-GO TOP terms of service: https://gotopseo.com/en/terms
-GO TOP privacy policy: https://gotopseo.com/en/privacy
+GO TOP terms of service: https://www.gotopseo.com/en/terms
+GO TOP privacy policy: https://www.gotopseo.com/en/privacy
 
 == Installation ==
 
@@ -148,6 +150,22 @@ Yes. SEO titles, descriptions, canonical addresses and focus keyphrases are writ
 
 Yes. Every fix can be undone from GO TOP, and WordPress keeps a revision of every content change.
 
+= Does it check whether ChatGPT or Gemini mentions my business? =
+
+GO TOP does, once a month, across ChatGPT, Gemini and Google's AI answers, and the result is in the monthly report. The check runs in GO TOP, not in this plugin, and this plugin does no tracking of any kind.
+
+= How often are rankings checked? =
+
+Once a month. GO TOP checks Google, Google Maps and the AI answers on a monthly cycle and sends a report. There is no daily or real-time tracking.
+
+= Can I see an article before it goes live? =
+
+Yes. In GO TOP you choose whether each article arrives as a draft, is published, or is scheduled for a date, and the plugin creates it that way. A draft stays a draft until you publish it yourself.
+
+= What does GO TOP cost? =
+
+The plugin is free and GPL. A GO TOP account starts with a 7-day trial and no credit card. After the trial it is from $79 per month plus tax, or from 249 ILS per month including VAT in Israel.
+
 = How do I disconnect? =
 
 Settings > GO TOP SEO > Disconnect. GO TOP can no longer reach the site. Deleting the plugin also removes its settings; from 3.1.0 the connection key is kept while another copy of the plugin is still installed on the site, so that deleting one copy does not disconnect the other. Deleting an older copy still removes the shared key.
@@ -159,6 +177,16 @@ Settings > GO TOP SEO > Disconnect. GO TOP can no longer reach the site. Deletin
 3. Site health in GO TOP with the plugin connected: findings that can be fixed in one click through the plugin.
 
 == Changelog ==
+
+= 3.2.0 =
+* The author photo you uploaded in GO TOP now reaches this site's Media Library with the plugin alone, with no application password. GO TOP signs that one file for a few minutes and the plugin imports it, exactly as it already imports an article's images. Nothing else may be fetched: the address must still be on GO TOP's own storage.
+* An image whose address is signed is imported once rather than once per signature.
+
+= 3.1.3 =
+* The plugin's name and description in the WordPress.org directory now say what it does, so it can be found by searching for it. The plugin's code, its routes and the connection are unchanged.
+
+= 3.1.2 =
+* The links to the GO TOP site now carry www and point at the English pages, which is the language this plugin and its readme are written in. The plugin's code, its routes and the connection are unchanged.
 
 = 3.1.1 =
 * The company name in English changed. The plugin now names the operator GO TOP DIGITAL MARKETING AND ADVERTISING LTD, in the plugin header and in the external-services section. The company, its number and the service are unchanged, and nothing else in the plugin changed.
@@ -187,6 +215,15 @@ Settings > GO TOP SEO > Disconnect. GO TOP can no longer reach the site. Deletin
 * First release.
 
 == Upgrade Notice ==
+
+= 3.2.0 =
+Adds the author photo you uploaded in GO TOP to the author box, without an application password. The connection is kept.
+
+= 3.1.3 =
+Only the name and the description in the directory changed. The connection is kept.
+
+= 3.1.2 =
+Only the links to the GO TOP site changed. The connection is kept.
 
 = 3.1.1 =
 The operator's name in English is updated. Nothing else changes and the connection is kept.

@@ -262,6 +262,11 @@ check('MUTATION — an English-only extra section is caught', pages.he.terms.h2 
     'partners.shopify.com': { en: /Shopify/, he: /Shopify/ },
     'supabase.com': { en: /Supabase/, he: /Supabase/ },
     'graph.facebook.com': { en: /Conversions API/, he: /Conversions API/ },
+    // The browser pixel. It used to be a tag inside the GTM container, where no
+    // host literal reached this guard; it is our code now, so the guard sees it
+    // and both policies have to keep naming it. They already do: the pixel has
+    // its own section in each, and the marketing category names Meta.
+    'connect.facebook.net': { en: /Meta Pixel/, he: /Meta Pixel/ },
     // Creem is a payment provider, so it is a recipient whatever the state of its
     // off switch: the sharing list says what we send it when a payment goes through
     // it. Both hosts are listed because the mode is an explicit variable
@@ -291,7 +296,31 @@ check('MUTATION — an English-only extra section is caught', pages.he.terms.h2 
     // send nothing of theirs to it.
     'docs.creem.io': 'a documentation link cited in a code comment; not fetched',
     'www.creem.io': 'Creem\u2019s own Buyer Terms, linked for the customer to read; not fetched',
+    // Our own listing on a third-party AI-tool index, named in the
+    // Organization's `sameAs` (lib/seo/organization.ts) so a resolver can tie
+    // the profile to this entity. A URL printed in markup for a reader to
+    // follow; nothing of a customer's is sent to it. apps.shopify.com,
+    // wordpress.org and www.youtube.com are in this list already, below.
+    'aitoolsatlas.ai': 'our own listing, named in Organization.sameAs; not fetched',
+    'toolradar.com': 'our own claimed listing, named in Organization.sameAs; not fetched',
+    'www.vettoria.it': 'our own listing, named in Organization.sameAs; not fetched',
     'help.shopify.com': 'a documentation link shown to a merchant',
+    // JVZoo's vendor agreement, cited in lib/marketplace/config.ts as the
+    // source of the clauses that decide who the seller of record is. A link in
+    // a comment, like docs.creem.io above: not fetched, and nothing of a
+    // customer's is sent to it.
+    //
+    // NOT the whole story once the channel is switched on, and it is off
+    // today. The buy links live in environment variables, so no host literal
+    // for i.jvzoo.com or the /b/ checkout reaches this guard, and the buyer
+    // reaches JVZoo's checkout only by clicking. But on JVZoo WE are the
+    // seller (vendor agreement s.11), so JVZoo collects the payment on our
+    // behalf rather than selling in its own name - which makes it look like a
+    // processor of ours and not an independent controller the way a reseller
+    // is. That is a privacy-policy and Art. 28 question for the legal thread,
+    // raised 2026-10-29, and it has to be answered before
+    // MARKETPLACE_JVZOO_ENABLED is ever set to 'true'.
+    'www.jvzoo.com': 'their vendor agreement, cited in a code comment; not fetched',
     'search.google.com': 'a link a customer clicks to their own Search Console',
     'google.com': 'the search engine whose public results are read, with no customer data attached',
     'www.google.com': 'the search engine whose public results are read, with no customer data attached',
@@ -306,6 +335,15 @@ check('MUTATION — an English-only extra section is caught', pages.he.terms.h2 
     'www.tiktok.com': 'a sameAs profile URL a customer may enter themselves',
     'x.com': 'a sameAs profile URL a customer may enter themselves',
     'apps.shopify.com': 'our own App Store listing, a plain nofollow link the visitor may follow; our code sends it nothing',
+    // The competitors a comparison page names (app/(public)/**/compare/*). Each
+    // row of the table links the vendor's OWN page, so a reader can check the
+    // claim themselves on the day they read it. The links are nofollow and open
+    // in a new tab; nothing of the visitor's is sent to them by us, and the
+    // visitor only reaches them by clicking.
+    'www.semrush.com': 'a competitor\u2019s own page, linked as the source of a dated claim about them; not fetched',
+    'yoast.com': 'a competitor\u2019s own page, linked as the source of a dated claim about them; not fetched',
+    'rankmath.com': 'a competitor\u2019s own page, linked as the source of a dated claim about them; not fetched',
+    'wordpress.org': 'a competitor\u2019s own plugin listing, linked as the source of a dated claim about them; not fetched',
     'biz.yelp.com': 'a directory named in advice text; not contacted',
     'business.trustpilot.com': 'a directory named in advice text; not contacted',
     'businessconnect.apple.com': 'a directory named in advice text; not contacted',
@@ -319,9 +357,10 @@ check('MUTATION — an English-only extra section is caught', pages.he.terms.h2 
     // crawler takes from them is a business name and a website — never an
     // address, which the published outreach section says comes only from the
     // business's own site or a public registry.
+    'newmfgalliance.org': 'a public business directory whose open pages are read; no customer data is sent to it',
+    'business.springfieldchamber.com': 'a public business directory whose open pages are read; no customer data is sent to it',
     'minnesotagrown.com': 'a public business directory whose open pages are read; no customer data is sent to it',
     'georgiagrown.com': 'a public business directory whose open pages are read; no customer data is sent to it',
-    'findjerseyfresh.com': 'a public business directory whose open pages are read; no customer data is sent to it',
     'www.michiganbusiness.org': 'a public business directory whose open pages are read; no customer data is sent to it',
     'alabamafarmersmarket.org': 'a public business directory whose open pages are read; no customer data is sent to it',
     // Literals that are examples or test shapes even outside __qa__.
@@ -334,6 +373,8 @@ check('MUTATION — an English-only extra section is caught', pages.he.terms.h2 
     'exemplo.com.br': 'the Portuguese placeholder, example.com’s counterpart in the Portuguese copy',
     'www.exemplo.com.br': 'the Portuguese placeholder, example.com’s counterpart in the Portuguese copy',
     'pt.wikipedia.org': 'named as the Portuguese Wikipedia in advice text; not contacted',
+    'fr.wikipedia.org': 'named as the French Wikipedia in advice text; not contacted',
+    'it.wikipedia.org': 'named as the Italian Wikipedia in the sameAs example placeholder of the Italian project settings; the owner types their own URL and our code sends it nothing',
     'app.example.com': 'placeholder in a comment or default',
     'shop.com': 'placeholder in a comment or default',
     'destination.com': 'placeholder in a comment or default',

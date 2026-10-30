@@ -52,7 +52,7 @@ Não compartilhamos as suas informações pessoais com terceiros, exceto:
 
 - **Shopify:** para processar o pagamento de contas cobradas pelo Shopify App Pricing e para publicar conteúdo em uma loja conectada
 - **PayPal:** para processar o pagamento somente de clientes cobrados pelo site
-- **Creem:** para processar pagamentos, quando o pagamento de uma conta passa por ele. Ao abrir um pagamento enviamos o endereço de e-mail da conta, o identificador do plano escolhido e a nossa própria referência daquela solicitação, e recebemos de volta um identificador de cliente no sistema deles, um identificador de plano, o status da assinatura e as datas do período de cobrança. Os dados do cartão, e qualquer outro meio de pagamento, nunca chegam a nós em nenhum momento
+- **Creem:** para processar pagamentos, quando o pagamento de uma conta passa por ele. Ao abrir um pagamento enviamos o endereço de e-mail da conta, o identificador do plano escolhido e a nossa própria referência daquela solicitação, e recebemos de volta um identificador de cliente no sistema deles, um identificador de plano, o status da assinatura, as datas do período de cobrança, o valor do pagamento cobrado e o identificador do pagamento. Os dados do cartão, e qualquer outro meio de pagamento, nunca chegam a nós em nenhum momento
 - **Supabase:** para armazenamento seguro de dados
 - **Serper:** para consultas na busca do Google e verificações de posição
 - **Resend:** para o envio de e-mail — veja «Mensagens de e-mail» abaixo
@@ -64,6 +64,7 @@ Não compartilhamos as suas informações pessoais com terceiros, exceto:
 - **OpenStreetMap (Nominatim):** para converter um endereço em coordenadas, e somente quando você digitou um endereço exato para acompanhamento local de posições. São enviados o endereço digitado e o nome do país, nunca dados da conta
 - **ScrapeLLM:** para o acompanhamento de visibilidade em IA — veja «Provedores de IA» abaixo
 - **Outros sites da rede de links:** somente se você entrou na rede — veja «Rede de links» abaixo
+- **JVZoo:** somente se você abriu a nossa página de venda do marketplace JVZoo — uma imagem de rastreamento é carregada da JVZoo e recebe o seu endereço IP, o identificador do seu navegador e a página de onde você veio, para que uma compra possa ser atribuída ao afiliado que indicou você. A imagem é carregada apenas depois de você aceitar os cookies de marketing. Quanto a essa coleta e a essa transmissão, a JVZoo não trata os dados em nosso nome: ela é controladora conjunta junto com a gente, e o que ela faz com os dados depois é decidido pela JVZoo conforme a sua própria política de privacidade
 - **Meta (Facebook / Instagram):** para publicidade direcionada e para um relatório de cadastro concluído enviado do nosso servidor — veja a seção «Publicidade na Meta» abaixo. Quanto a esses eventos de conversão, a Meta não trata os dados em nosso nome: ela é controladora conjunta junto com a gente, como aquela seção explica. Os dados que recebemos das APIs do Google nunca são compartilhados com a Meta nem usados para publicidade
 - Quando exigido por lei
 
@@ -252,7 +253,7 @@ Dividimos os cookies em três categorias, e perguntamos a você sobre duas delas
 
 - **Estritamente necessários:** login, memória do idioma da interface, segurança e prevenção de abusos. O serviço não funciona sem eles, portanto não exigem consentimento.
 - **Medição:** quantas pessoas visitaram, quais páginas leram e o que não funcionou. Carregados somente se você permitir.
-- **Marketing:** medição do desempenho dos nossos anúncios e exibição de anúncios relevantes nas redes do Google e da Meta. Carregados somente se você permitir. Permitir esta categoria vale também para um relatório de conversão que enviamos à Meta do nosso servidor, sem cookie nenhum — veja a seção «Publicidade na Meta».
+- **Marketing:** medição do desempenho dos nossos anúncios, exibição de anúncios relevantes nas redes do Google e da Meta e atribuição de uma compra ao afiliado que indicou você pelo marketplace JVZoo. Carregados somente se você permitir. Permitir esta categoria vale também para um relatório de conversão que enviamos à Meta do nosso servidor, sem cookie nenhum — veja a seção «Publicidade na Meta» — e para uma imagem de rastreamento carregada da JVZoo na página de venda do marketplace, que não guarda nada no seu dispositivo.
 
 **Antes da sua escolha, nenhum cookie de medição ou de marketing é gravado e nenhuma requisição é feita aos servidores do Google.** Aceitar e recusar são dois botões equivalentes no aviso, e cada categoria pode ser permitida separadamente.
 
@@ -272,7 +273,7 @@ As nossas ferramentas de medição e marketing são gerenciadas pelo Google Tag 
 - **Google Ads:** medição de conversões e publicidade personalizada (sujeito ao consentimento de marketing)
 - **Meta Pixel:** medição de conversões e publicidade no Facebook e no Instagram (sujeito ao consentimento de marketing)
 
-Quais ferramentas estão ativas muda de tempo em tempo. O que não muda: nenhuma delas é carregada antes de você permitir a sua categoria, e retirar o consentimento interrompe a coleta. Além dessas ferramentas, que funcionam no navegador, enviamos à Meta um relatório de conversão do nosso servidor; ele também depende do consentimento de marketing e cessa quando você o retira.
+Quais ferramentas estão ativas muda de tempo em tempo. O que não muda: nenhuma delas é carregada antes de você permitir a sua categoria, e retirar o consentimento interrompe a coleta. Além dessas ferramentas, que funcionam no navegador, enviamos à Meta um relatório de conversão do nosso servidor; ele também depende do consentimento de marketing e cessa quando você o retira. Mais uma coisa não passa pelo Google Tag Manager: somente na página de venda do marketplace JVZoo é carregada da JVZoo uma imagem de rastreamento de um pixel, para que uma compra possa ser atribuída ao afiliado que indicou você. Ela não guarda nada no seu dispositivo, é carregada apenas depois de você permitir o marketing e não aparece em nenhuma outra página do site.
 
 Declaramos o seu estado de consentimento ao Google pelo protocolo Consent Mode v2, para que as ferramentas fiquem vinculadas à sua escolha mesmo se acrescentarmos uma nova tag no futuro.
 

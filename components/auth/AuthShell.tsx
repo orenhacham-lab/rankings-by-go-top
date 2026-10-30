@@ -10,8 +10,20 @@ import { landingHe } from '@/lib/i18n/public/landing-he'
 import { landingEn } from '@/lib/i18n/public/landing-en'
 import { landingEs } from '@/lib/i18n/public/landing-es'
 import { landingPtBR } from '@/lib/i18n/public/landing-pt-BR'
+import { landingFr } from '@/lib/i18n/public/landing-fr'
+import { landingIt } from '@/lib/i18n/public/landing-it'
 import HeroBackdrop from '@/components/public/HeroBackdrop'
 import { cn } from '@/lib/utils'
+
+/** Every public language's own landing copy. Exhaustive by type, on purpose. */
+const AUTH_LANDING: Record<PublicLocale, typeof landingHe> = {
+  he: landingHe,
+  en: landingEn,
+  es: landingEs,
+  'pt-BR': landingPtBR,
+  fr: landingFr,
+  it: landingIt,
+}
 
 export interface AuthFooterCopy {
   accessibility: string
@@ -83,10 +95,14 @@ export default function AuthShell({
 }) {
   const brand = AUTH_BRAND[locale]
   const copy = brand[variant]
-  // Each language's own landing copy and its own home, from one table — a
-  // two-way ternary here is what gave the Spanish forms an English panel.
-  const landing =
-    locale === 'es' ? landingEs : locale === 'pt-BR' ? landingPtBR : locale === 'en' ? landingEn : landingHe
+  // Each language's own landing copy and its own home, from one table. This
+  // said "from one table" while being a chain of ternaries: a two-way one gave
+  // the Spanish forms an English panel, and the four-way one that replaced it
+  // gave the FRENCH forms a HEBREW panel — right-to-left copy on /fr/login —
+  // because every language it does not name falls to its last branch. A
+  // Record<PublicLocale, …> cannot do that: a language added without its
+  // landing copy stops compiling here.
+  const landing = AUTH_LANDING[locale]
   const homeHref = LOCALE_PREFIX[locale] || '/'
   const rank = landing.demo.rank
   const rows = [{ keyword: rank.keyword, from: rank.from, to: rank.to }, ...rank.rows].slice(0, 4)

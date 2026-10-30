@@ -108,6 +108,56 @@ export const ERROR_PAGES_UI = {
       homeHref: '/pt-BR',
     },
   },
+  fr: {
+    logoAlt: 'Logo Go Top SEO',
+    notFound: {
+      code: '404',
+      title: "Nous n'avons pas trouvé cette page",
+      body: 'Le lien est peut-être incorrect, ou la page a été déplacée.',
+      home: "Aller à la page d'accueil",
+      dashboard: 'Aller au tableau de bord',
+      homeHref: '/fr',
+    },
+    screenError: {
+      title: "Cet écran ne s'est pas chargé",
+      body: "Rien n'a été supprimé. Réessayez et, si cela se reproduit, revenez au tableau de bord.",
+      retry: 'Réessayer',
+      dashboard: 'Aller au tableau de bord',
+      reference: 'Référence à donner au support :',
+    },
+    globalError: {
+      title: "Une erreur s'est produite",
+      body: 'Le site a rencontré un problème inattendu. Essayez de recharger la page.',
+      retry: 'Recharger',
+      home: "Aller à la page d'accueil",
+      homeHref: '/fr',
+    },
+  },
+  it: {
+    logoAlt: 'Logo Go Top SEO',
+    notFound: {
+      code: '404',
+      title: 'Questa pagina non è stata trovata',
+      body: 'Il link potrebbe essere errato, oppure la pagina è stata spostata.',
+      home: 'Vai alla home page',
+      dashboard: 'Vai al pannello',
+      homeHref: '/it',
+    },
+    screenError: {
+      title: 'Questa schermata non è stata caricata',
+      body: 'Nulla è stato eliminato. Si consiglia di riprovare e, se il problema si ripete, di tornare al pannello.',
+      retry: 'Riprova',
+      dashboard: 'Vai al pannello',
+      reference: 'Riferimento da comunicare all\u2019assistenza:',
+    },
+    globalError: {
+      title: 'Si è verificato un errore',
+      body: 'Il sito ha riscontrato un problema inatteso. Si consiglia di ricaricare la pagina.',
+      retry: 'Ricarica',
+      home: 'Vai alla home page',
+      homeHref: '/it',
+    },
+  },
 } as const
 
 /**

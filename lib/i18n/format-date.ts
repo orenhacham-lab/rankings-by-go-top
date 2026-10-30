@@ -3,6 +3,7 @@
  *
  *   he  27.09.2026            27.09.2026 · 17:09
  *   en  Sep 27, 2026          Sep 27, 2026 · 5:09 PM
+ *   fr  27 sept. 2026         27 sept. 2026 · 17:09
  *
  * The Hebrew screens used to show four formats side by side, among them the
  * American "9/27/2026" (`toLocaleDateString('en-US')`), which a Hebrew reader
@@ -17,8 +18,18 @@
  * a table cell, a title attribute or an export alike.
  *
  * The clock is the viewer's own: these helpers never pin a time zone.
+ *
+ * EVERY PUBLIC LOCALE, not the bilingual Locale the dashboard narrows to. This
+ * took `Locale` and branched `he-IL` or `en-US`, so a French, Spanish or
+ * Brazilian screen read an English month name and a 12-hour clock in the middle
+ * of its own prose — "Audité Sep 27, 2026 · 5:09 PM". A formatted date is not
+ * one of the surfaces lib/i18n/dashboard/locale.ts deliberately keeps
+ * bilingual: `Intl` writes it in every language we ship, so there was nothing
+ * for the narrowing to protect. Hebrew keeps the numeric form Israelis read on
+ * every form; every other language gets its own month name from `Intl`, which
+ * is the same rule lib/format/date.ts follows.
  */
-import type { Locale } from './locales'
+import { intlLocaleOf, type PublicLocale } from './locales'
 
 type DateInput = string | number | Date | null | undefined
 
@@ -39,14 +50,13 @@ export interface DateFormatter {
   dateTime(value: DateInput): string
 }
 
-export function formatDate(lang: Locale): DateFormatter {
+export function formatDate(lang: PublicLocale): DateFormatter {
   const he = lang === 'he'
+  const intl = intlLocaleOf(lang)
   const dateFmt = he
     ? new Intl.DateTimeFormat('he-IL', { day: '2-digit', month: '2-digit', year: 'numeric' })
-    : new Intl.DateTimeFormat('en-US', { day: 'numeric', month: 'short', year: 'numeric' })
-  const timeFmt = he
-    ? new Intl.DateTimeFormat('he-IL', { hour: '2-digit', minute: '2-digit', hourCycle: 'h23' })
-    : new Intl.DateTimeFormat('en-US', { hour: 'numeric', minute: '2-digit' })
+    : new Intl.DateTimeFormat(intl, { day: 'numeric', month: 'short', year: 'numeric' })
+  const timeFmt = new Intl.DateTimeFormat(intl, he ? { hour: '2-digit', minute: '2-digit', hourCycle: 'h23' } : { hour: 'numeric', minute: '2-digit' })
   const iso = (s: string) => (he ? `${LRI}${s}${PDI}` : s)
   return {
     date(value) {

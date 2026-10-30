@@ -184,17 +184,17 @@ export default function GscUntrackedQueries({ loading, insights, onTrack, tracke
               <span dir="auto" className="min-w-0 truncate text-start text-copy font-semibold text-ink" title={q.query}>{q.query}</span>
               {/* On a phone the figures sit on one line under the query, each with its name. */}
               <span className="col-start-1 row-start-2 flex flex-wrap items-center gap-x-3 gap-y-0.5 text-caption text-muted md:hidden">
-                <span className="tabular-nums">{t.impressions} {formatCompact(q.impressions, language)}</span>
-                <span className="tabular-nums">{t.clicks} {formatCompact(q.clicks, language)}</span>
+                <span className="tabular-nums">{t.impressions} {formatCompact(q.impressions, uiLocale)}</span>
+                <span className="tabular-nums">{t.clicks} {formatCompact(q.clicks, uiLocale)}</span>
                 {q.position != null && <span className="tabular-nums">{t.position} {formatWholePosition(q.position, language)}</span>}
               </span>
               <span className="hidden flex-col gap-1 md:flex">
-                <span className="text-copy tabular-nums text-body">{formatCount(q.impressions, language)}</span>
+                <span className="text-copy tabular-nums text-body">{formatCount(q.impressions, uiLocale)}</span>
                 <span aria-hidden="true" className="h-1 w-full overflow-hidden rounded-pill bg-sunk">
                   <span className="block h-full rounded-pill bg-action/60" style={{ width: `${share}%` }} />
                 </span>
               </span>
-              <span className="hidden text-copy tabular-nums text-body md:block">{formatCount(q.clicks, language)}</span>
+              <span className="hidden text-copy tabular-nums text-body md:block">{formatCount(q.clicks, uiLocale)}</span>
               <span className="hidden text-copy tabular-nums text-body md:block">{q.position == null ? '—' : formatWholePosition(q.position, language)}</span>
               <span className="col-start-2 row-span-2 row-start-1 justify-self-end md:col-start-auto md:row-span-1 md:row-start-auto">
                 {isAdded ? (
@@ -225,8 +225,8 @@ export default function GscUntrackedQueries({ loading, insights, onTrack, tracke
         <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 border-t border-line px-4 py-3 sm:px-6">
           <p className="text-caption text-muted">
             {trackedCount > 0
-              ? t.shownOfAll(formatCount(shown.length, language), formatCount(insights.untrackedTotal + trackedCount, language))
-              : t.shownOf(formatCount(shown.length, language), formatCount(insights.untrackedTotal, language))}
+              ? t.shownOfAll(formatCount(shown.length, uiLocale), formatCount(insights.untrackedTotal + trackedCount, uiLocale))
+              : t.shownOf(formatCount(shown.length, uiLocale), formatCount(insights.untrackedTotal, uiLocale))}
           </p>
           {rows.length > UNTRACKED_VISIBLE && (
             <button
@@ -235,7 +235,7 @@ export default function GscUntrackedQueries({ loading, insights, onTrack, tracke
               aria-expanded={expanded}
               className="text-copy font-medium text-action transition-colors hover:text-action-hover focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-action/20 rounded-control"
             >
-              {expanded ? t.less : t.more(formatCount(rows.length - UNTRACKED_VISIBLE, language))}
+              {expanded ? t.less : t.more(formatCount(rows.length - UNTRACKED_VISIBLE, uiLocale))}
             </button>
           )}
         </div>

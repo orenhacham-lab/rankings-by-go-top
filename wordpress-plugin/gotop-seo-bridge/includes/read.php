@@ -29,7 +29,7 @@ define('GOTOP_SEO_BRIDGE_ITEM_MAX', 1500000);
 
 /** What this copy of the plugin can do (POST /status, `capabilities`). */
 function gotop_seo_bridge_capabilities() {
-    return array('content', 'content_item', 'authors', 'media_alt', 'terms_links', 'schedule', 'new_post', 'author', 'adopt');
+    return array('content', 'content_item', 'authors', 'media_alt', 'terms_links', 'schedule', 'new_post', 'author', 'adopt', 'author_photo');
 }
 
 /** The SEO plugin's focus keyphrase of a post, and where it came from, or array('', null). */

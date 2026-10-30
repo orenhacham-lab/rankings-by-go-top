@@ -33,7 +33,7 @@ import {
 import type { TopicInsight } from '@/lib/content/strategy/insights'
 import { formatCount } from '@/components/gsc/format'
 import TopicFacts from './TopicFacts'
-import { canRejectIdea, ideaTargetFromCard } from '@/lib/content/strategy/ideas'
+import { canRejectIdea, ideaTargetFromCard, plannedTargetFromCard } from '@/lib/content/strategy/ideas'
 import type { IdeaActions } from './useIdeaActions'
 import type { PublicLocale } from '@/lib/i18n/locales'
 import type { getDashboardDictionary } from '@/lib/i18n/dashboard/getDashboardDictionary'
@@ -58,6 +58,26 @@ export const ACCENT: Record<StrategyColumn, { dot: string; count: string }> = {
 
 /** What the board needs to act on an idea; absent, the cards only show. */
 export type BoardIdeaActions = { actions: IdeaActions; automation: boolean }
+
+/**
+ * The same "not a fit" on a topic that is already planned: it leaves the plan and the
+ * publishing queue (useIdeaActions.removePlanned). Shown only where there is something
+ * to remove — never on an optimistic stand-in, never once its article is being written.
+ */
+export function RemovePlannedButton({ card, dict, act, inline = false }: { card: StrategyCard; dict: Dict; act: BoardIdeaActions; inline?: boolean }) {
+  const a = dict.contentStrategy.ideaActions
+  const target = plannedTargetFromCard(card)
+  if (!target) return null
+  const busy = act.actions.busy[card.key]
+  return (
+    <div className={cn('flex flex-wrap items-center gap-1', !inline && 'mt-3 border-t border-line pt-3')}>
+      <Button size="sm" variant="ghost" className="px-2.5" onClick={() => void act.actions.removePlanned(target)} loading={busy === 'remove'} disabled={!!busy}
+        aria-label={fill(a.removeAria, { title: card.title })} data-idea-action="remove">
+        {a.remove}
+      </Button>
+    </div>
+  )
+}
 
 export function IdeaButtons({ card, dict, act, inline = false }: { card: StrategyCard; dict: Dict; act: BoardIdeaActions; inline?: boolean }) {
   const a = dict.contentStrategy.ideaActions
@@ -123,6 +143,7 @@ function BoardCard({ card, lang, dict, act, insight }: { card: StrategyCard; lan
         )}
       </div>
       {card.column === 'ideas' && act && <IdeaButtons card={card} dict={dict} act={act} />}
+      {card.column === 'planned' && act && <RemovePlannedButton card={card} dict={dict} act={act} />}
     </>
   )
   const frame = 'block rounded-inset border border-line bg-surface p-3 transition-colors duration-150 ease-snappy'

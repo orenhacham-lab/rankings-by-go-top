@@ -22,14 +22,14 @@ export type GbpCtaType = typeof GBP_CTA_TYPES[number]
 
 /**
  * The language a post is written in, sent to Google as localPosts.languageCode
- * (a BCP-47 tag). These are the app's own four languages: a business is written
+ * (a BCP-47 tag). These are the app's own five languages: a business is written
  * to its own customers, so a Spanish business gets a Spanish post, the same way
  * its articles are written in Spanish.
  *
  * Deliberately PublicLocale and not the two-language `Locale`: posts used to be
  * he/en only, which quietly gave a Spanish business an English post.
  */
-export const GBP_POST_LANGUAGES = ['he', 'en', 'es', 'pt-BR'] as const
+export const GBP_POST_LANGUAGES = ['he', 'en', 'es', 'pt-BR', 'fr', 'it'] as const
 export type GbpPostLanguage = typeof GBP_POST_LANGUAGES[number]
 
 /** An untrusted value to a language we can post in, or null. */

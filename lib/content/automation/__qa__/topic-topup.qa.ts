@@ -24,6 +24,7 @@
 import { FakeAdmin } from '../../../__qa__/_fake-admin'
 import {
   poolMonthlyRate, topUpTarget, windowSlot, runTopicTopUp, startIsolatedTopUp, TOPUP_SOURCE_CONTEXT, MIN_MS_FOR_MODEL,
+  WINDOW_HOURS_UTC, SLOT_MINUTES, MODEL_PROJECTS_PER_RUN,
   type TopUpDeps, type GeneratedIdeas,
 } from '../topic-topup'
 import { buildOverlapIndex, type OverlapIndexData } from '../../cannibalization/check'
@@ -156,16 +157,20 @@ async function main() {
   check('no pool: the project\'s share of the plan (12 over 3 projects = 4)', topUpTarget({ monthlyArticles: 12, ownerProjects: 3, pool: null }) === 4)
   check('capped at 12 a project; at least 1; nothing without articles', topUpTarget({ monthlyArticles: 200, ownerProjects: 1, pool: { ...pool, cadence: 'daily', publish_days: null } }) === 12
     && topUpTarget({ monthlyArticles: 4, ownerProjects: 9, pool: null }) === 1 && topUpTarget({ monthlyArticles: 0, ownerProjects: 1, pool: null }) === 0)
-  check('the window: 07:00 is slot 0, 07:15 slot 1, 08:59 slot 7; 06:59 and 09:00 outside',
-    windowSlot(Date.parse('2026-09-29T07:00:00Z')) === 0 && windowSlot(Date.parse('2026-09-29T07:15:00Z')) === 1
-    && windowSlot(Date.parse('2026-09-29T08:59:59Z')) === 7 && windowSlot(Date.parse('2026-09-29T06:59:59Z')) === -1 && windowSlot(Date.parse('2026-09-29T09:00:00Z')) === -1)
+  // The window is the daily budget: slots minus one is the batches a day. Eight
+  // hours, 05:00-12:59 UTC, give 31 (27 Oct 2026, see WINDOW_HOURS_UTC).
+  check('the window: 05:00 is slot 0, 05:15 slot 1, 12:59 the last slot; 04:59 and 13:00 outside',
+    windowSlot(Date.parse('2026-09-29T05:00:00Z')) === 0 && windowSlot(Date.parse('2026-09-29T05:15:00Z')) === 1
+    && windowSlot(Date.parse('2026-09-29T12:59:59Z')) === 31 && windowSlot(Date.parse('2026-09-29T04:59:59Z')) === -1 && windowSlot(Date.parse('2026-09-29T13:00:00Z')) === -1)
+  check('and that is 31 model batches a day, one per slot after the first',
+    WINDOW_HOURS_UTC.length * (60 / SLOT_MINUTES) - 1 === 31 && MODEL_PROJECTS_PER_RUN === 1)
 
   console.log('\nG) the gates come before any read')
   for (const [name, env, now, state] of [
     ['kill switch', { ...PROD, CONTENT_TOPUP_DISABLED: '1' }, T0, 'disabled'],
     ['Preview', { VERCEL_ENV: 'preview' }, T0, 'not_production'],
     ['local (no VERCEL_ENV)', {}, T0, 'not_production'],
-    ['06:59 UTC', PROD, Date.parse('2026-09-29T06:59:00Z'), 'outside_window'],
+    ['04:59 UTC', PROD, Date.parse('2026-09-29T04:59:00Z'), 'outside_window'],
     ['13:00 UTC', PROD, Date.parse('2026-09-29T13:00:00Z'), 'outside_window'],
   ] as const) {
     const t = tracked(new FakeAdmin(world()))
@@ -205,14 +210,23 @@ async function main() {
     ['generated_articles', 'subscriptions', 'usage_reservations', 'ai_usage_logs', 'article_pools', 'projects'].every((k) => JSON.stringify(tb[k]) === JSON.stringify(before[k])))
   check('…and the merchant\'s own topic and queue item are as they were',
     JSON.stringify(tb.article_topics.find((r) => r.id === 'old1')) === JSON.stringify(before.article_topics[0]) && JSON.stringify(tb.article_pool_items.slice(0, 2)) === JSON.stringify(before.article_pool_items))
-  check('no model: the plan\'s own ideas were enough', calls.generate.length === 0 && s1.modelProjects === 0)
+  // 26 Oct 2026 — the queue is still filled from the plan itself, free. What changed is
+  // that a plan left with less than a month of ideas to APPROVE is now topped up too
+  // (thinPlans), so the model runs for ONE such project a run. See topup-idea-stock.qa.ts.
+  check('the queue was filled from the plan itself, not by the model', s1.promoted === 5 && s1.queued === 3)
+  check('…and the model ran only for the plan\'s own stock: one project, by name',
+    s1.thinPlans >= 1 && s1.modelProjects === 1 && calls.generate.length === 1, JSON.stringify(s1))
   check('the summary counts it', s1.state === 'ran' && s1.promoted === 5 && s1.queued === 3 && s1.notEntitled === 1 && s1.skippedOverlap >= 2, JSON.stringify(s1))
   check('one log line, with counts and no titles', l1.length === 1 && l1[0].startsWith('[topic-topup] run') && !l1[0].includes('האקונה'), l1.join(' | '))
 
   console.log('\nI) idempotent')
   const writesBefore = t.writes.length
   const { value: s2, lines: l2 } = await capture(() => runTopicTopUp(t.admin, { env: PROD, deadlineAt: T0 + 280_000, deps: deps({}, calls) }))
-  check('a second run finds enough everywhere: no write, no line', t.writes.length === writesBefore && s2.promoted === 0 && s2.enough === 2 && l2.length === 0, JSON.stringify(s2))
+  // The queues are covered, so nothing is promoted and no topic or queue item is
+  // written. The model may still stock a thin plan, which writes ideas only.
+  const topicWrites = (w: { table: string }[]) => w.filter((x) => x.table !== 'content_topic_ideas').length
+  check('a second run promotes nothing and writes no topic or queue item',
+    s2.promoted === 0 && topicWrites(t.writes.slice(writesBefore)) === 0, JSON.stringify(s2))
   const race = tracked(new FakeAdmin(world()))
   await capture(() => Promise.all([
     runTopicTopUp(race.admin, { env: PROD, deadlineAt: T0 + 280_000, deps: deps() }),
@@ -267,7 +281,7 @@ async function main() {
   check('…the new ideas refill the queue like any idea, and are marked as the top-up\'s', newIdeas.every((r) => r.status === 'approved' && r.source_context === TOPUP_SOURCE_CONTEXT)
     && x1.fa.tables.article_pool_items.filter((r) => r.status === 'queued').length === 3)
   for (const [name, now, over] of [
-    ['07:05 (the first quarter hour, when both schedulers fire)', Date.parse('2026-09-29T07:05:00Z'), {}],
+    ['05:05 (the first quarter hour, when both schedulers fire)', Date.parse('2026-09-29T05:05:00Z'), {}],
     ['the AI gate says no', T0, { modelAllowed: async () => false }],
   ] as const) {
     const m = { generate: [] as string[], modelAsked: [] as string[] }
@@ -337,7 +351,11 @@ function sourceGuards() {
   }
   check('S4 kill switch, Production, window: all before the first read', gatesOk(fn))
   check('S4 MUTATION CONTROL: a run outside Production is caught', !gatesOk(fn.replace("if (options.env.VERCEL_ENV !== 'production') return EMPTY('not_production')", '')))
-  const modelOk = (f: string) => /if \(slot > 0 && stillShort\.length > 0\)/.test(f) && /timeLeft >= MIN_MS_FOR_MODEL && summary\.modelProjects < MODEL_PROJECTS_PER_RUN/.test(f)
+  // 18 Oct 2026: the candidates are the plans that ran dry, else the plans that hold
+  // old stock only (STALE_IDEA_DAYS); every other guard on the model is unchanged.
+  const modelOk = (f: string) => /if \(slot > 0 && candidates\.length > 0\)/.test(f)
+    && /const candidates = stillShort\.length > 0 \? stillShort : thinPlans\.length > 0 \? thinPlans : stalePlans/.test(f)
+    && /timeLeft >= MIN_MS_FOR_MODEL && summary\.modelProjects < MODEL_PROJECTS_PER_RUN/.test(f)
     && f.indexOf('await deps.modelAllowed(scope.userId)') > 0 && f.indexOf('await deps.modelAllowed(scope.userId)') < f.indexOf('await deps.generate(scope)')
   check('S5 the model: not in the first quarter hour, one project, time left, the AI gate first', modelOk(fn))
   check('S5 MUTATION CONTROL: a model call without the AI gate is caught', !modelOk(fn.replace('if (await deps.modelAllowed(scope.userId)) {', 'if (true) {')))

@@ -13,6 +13,7 @@ import { resolveBillingMarket } from '@/lib/billing/server-market'
 import { planPriceIn } from '@/lib/billing/market'
 import { PLAN_CATALOG } from '@/lib/plans/catalog'
 import { creemMayWriteToAccount, isCreemEnabled } from '@/lib/creem/config'
+import { marketplacePolicyUrl, marketplaceProvider } from '@/lib/marketplace/config'
 import BillingView from './BillingView'
 import AdminBillingView from './AdminBillingView'
 
@@ -44,7 +45,7 @@ export default async function BillingPage() {
 
   const { data: activeSub } = await supabase
     .from('subscriptions')
-    .select('status, paypal_subscription_id, creem_subscription_id')
+    .select('status, paypal_subscription_id, creem_subscription_id, marketplace_order_id')
     .eq('user_id', user.id)
     .in('status', ['active', 'cancelled'])
     .order('created_at', { ascending: false })
@@ -72,6 +73,35 @@ export default async function BillingPage() {
   // When governance cannot be read, neither provider's mutations are offered:
   // the page says so rather than guessing a provider.
   const admin = createAdminClient()
+  // WHO CAN ACTUALLY STOP THIS BILLING.
+  //
+  // A plan bought on an external marketplace is billed by that marketplace:
+  // we hold no payment instrument for it and cannot cancel it. Without this,
+  // the screen fell through to "contact us and we will stop the billing for
+  // you" — an offer we cannot honour, which is worse than saying nothing,
+  // because the buyer stops looking for the route that does work.
+  //
+  // The provider name is read with the service role because marketplace_orders
+  // is server-only (RLS on, no policies), and filtered by the owner as well as
+  // by the id: the service role bypasses RLS, so the ownership check is this
+  // query's job (CLAUDE.md).
+  let marketplaceSeller: { label: string; policyUrl: string | null } | null = null
+  if (activeSub?.marketplace_order_id) {
+    const { data: order } = await admin
+      .from('marketplace_orders')
+      .select('provider')
+      .eq('id', activeSub.marketplace_order_id)
+      .eq('claimed_by', user.id)
+      .maybeSingle()
+    const provider = marketplaceProvider(order?.provider)
+    if (provider) {
+      marketplaceSeller = {
+        label: provider.label,
+        policyUrl: marketplacePolicyUrl(provider.slug),
+      }
+    }
+  }
+
   const shopifyConfig = getShopifyOAuthConfig()
   const cookieStore = await cookies()
   const pendingLinkCookie = cookieStore.get(PENDING_LINK_COOKIE)?.value
@@ -175,6 +205,7 @@ export default async function BillingPage() {
       trialEndsAt={entitlement.trialEndsAt}
       subscriptionEndsAt={entitlement.subscriptionEndsAt}
       hasPaypalSubscriptionId={!!activeSub?.paypal_subscription_id}
+      marketplaceSeller={marketplaceSeller}
       renewalCancelled={renewalCancelled}
       shopifyConnected={shopifyConnected}
       billingStateUnavailable={governanceUnavailable}

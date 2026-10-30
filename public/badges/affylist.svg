@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="200" height="54" viewBox="0 0 200 54" role="img" aria-label="Listed on AffyList">
+<title>Listed on AffyList</title>
+<rect x="0.5" y="0.5" width="199" height="53" rx="10" fill="#ffffff" stroke="#e5e5e5"/>
+<rect x="10" y="9" width="36" height="36" rx="8.5" fill="#0a0a0a"/>
+<path d="M33.96 13.21A15.05 15.05 0 1 0 42.95 27.91H35.57A7.7 7.7 0 1 1 30.39 19.7Z" fill="#ffffff"/>
+<path d="M37.41 12.44A15.05 15.05 0 0 1 45.16 25.77H37.81A7.7 7.7 0 0 0 33.87 18.88Z" fill="#43e176"/>
+<g font-family="Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif">
+<text x="56" y="22" font-size="9" font-weight="600" letter-spacing="1.2" fill="#737373">LISTED ON</text>
+<text x="55.5" y="41" font-size="20" font-weight="700" letter-spacing="-0.3" fill="#0a0a0a">AffyList</text>
+</g>
+<path d="M175.75 31.25L184.25 22.75M177.25 22.75H184.25V29.75" fill="none" stroke="#737373" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>

@@ -293,13 +293,31 @@ export async function applyAutoDraft(admin: Admin, postId: string, summary: stri
  * Claim a due post for publishing: scheduled → publishing, atomically. Two
  * runners racing (the button and the cron) cannot both win.
  */
-export async function claimPost(admin: Admin, postId: string): Promise<GbpPostRow | null> {
-  const { data, error } = await admin.from('gbp_posts')
-    .update({ status: 'publishing', updated_at: new Date().toISOString() })
-    .eq('id', postId).eq('status', 'scheduled')
-    .select('*')
-  if (error || !data || data.length === 0) return null
-  return data[0] as GbpPostRow
+/**
+ * How long a row may sit in 'publishing' before another pass may take it over.
+ * A pass that dies mid-publish (a function timeout, a lost container) used to
+ * leave the row claimed for ever, and nothing selects 'publishing', so the post
+ * was never sent and never reported. Publishing immediately on an article's
+ * publish makes that window matter, so the claim now expires.
+ */
+export const STALE_PUBLISHING_MS = 10 * 60 * 1000
+
+/**
+ * Claim one post for publishing. A 'scheduled' row is claimed outright; with
+ * `staleBefore`, a row left in 'publishing' since before that moment is taken
+ * over too. Two statements rather than one OR, so the common path is unchanged
+ * and the takeover is explicit.
+ */
+export async function claimPost(admin: Admin, postId: string, staleBefore?: string): Promise<GbpPostRow | null> {
+  const claim = async (apply: (q: ReturnType<ReturnType<Admin['from']>['update']>) => unknown) => {
+    const q = admin.from('gbp_posts').update({ status: 'publishing', updated_at: new Date().toISOString() }).eq('id', postId)
+    const { data, error } = await (apply(q) as ReturnType<typeof q.select>)
+    if (error || !data || data.length === 0) return null
+    return data[0] as GbpPostRow
+  }
+  const fresh = await claim((q) => q.eq('status', 'scheduled').select('*'))
+  if (fresh || !staleBefore) return fresh
+  return claim((q) => q.eq('status', 'publishing').lt('updated_at', staleBefore).select('*'))
 }
 
 export async function finishPost(admin: Admin, postId: string, patch:
@@ -325,6 +343,14 @@ export async function cancelPost(admin: Admin, projectId: string, postId: string
 
 export async function duePostIds(admin: Admin, nowIso: string, limit: number): Promise<string[]> {
   const { data, error } = await admin.from('gbp_posts').select('id').eq('status', 'scheduled').lte('scheduled_at', nowIso).order('scheduled_at', { ascending: true }).limit(limit)
+  if (error) throw fail(error)
+  return ((data as { id: string }[] | null) ?? []).map((r) => r.id)
+}
+
+/** Posts stuck in 'publishing' since before `beforeIso`: a pass died holding them. */
+export async function stalePublishingIds(admin: Admin, beforeIso: string, limit: number): Promise<string[]> {
+  const { data, error } = await admin.from('gbp_posts').select('id').eq('status', 'publishing').lt('updated_at', beforeIso)
+    .order('updated_at', { ascending: true }).limit(limit)
   if (error) throw fail(error)
   return ((data as { id: string }[] | null) ?? []).map((r) => r.id)
 }

@@ -25,7 +25,7 @@ import { checkTruthLimits, plainText } from '@/lib/blog/auto/truth-limits'
 import { placeholderContext, runQualityGate } from '@/lib/content/automation/quality-gate'
 import {
   CANNIBAL_OVERLAP, EXCLUDED_PATTERNS, MIN_MONTHLY_SEARCHES, RESEARCH_MARKET, RESEARCH_SEEDS,
-  keywordOverlap, keywordTokens, selectKeywords,
+  keywordOverlap, keywordTokens, keywordDifficulty, selectKeywords,
 } from '@/lib/blog/auto/keyword-plan'
 import { CTA_WIDGET, PLANS_WIDGET, withArticleWidgets } from '@/lib/blog/auto/widgets'
 import { BLOG_AUTHOR, BLOG_GUIDANCE, articlePath, buildBlogBrief, internalAnchors } from '@/lib/blog/auto/brief'
@@ -40,8 +40,10 @@ import {
 import { MAX_ATTEMPTS, PLAN_TABLE, STALE_LOCK_MS } from '@/lib/blog/auto/store'
 import { FakeAdmin } from '@/lib/__qa__/_fake-admin'
 import {
+  WINDOW_HOURS_UTC,
   isInWindow, startOfUtcDay, nextLocaleToWrite, runBlogDailyWindow, startIsolatedBlogWindow,
 } from '@/lib/blog/auto/daily-window'
+import { CONTENT_LANGUAGES, normalizeContentLanguage } from '@/lib/content/language'
 import type { createAdminClient } from '@/lib/supabase/admin'
 import type { KeywordIdeaResult } from '@/lib/google-ads/keyword-ideas'
 import type { ValidatedArticle } from '@/lib/content/gemini-article'
@@ -61,22 +63,45 @@ const stripComments = (src: string) => src.replace(/\/\*[\s\S]*?\*\//g, '').repl
 // ============================================================
 // A) THE LANGUAGES
 // ============================================================
-check('A1: three languages are written automatically', same([...BLOG_AUTO_LOCALES], ['he', 'en', 'es']))
+check('A1: six languages are written automatically', same([...BLOG_AUTO_LOCALES], ['he', 'en', 'es', 'pt-BR', 'fr', 'it']))
 check('A2: every language is due every day — there is no weekday rotation left',
   same([...localesForDay()], [...BLOG_AUTO_LOCALES]))
-check('A3: that is seven articles a week in each language', same(weeklyShare(), { he: 7, en: 7, es: 7 }), weeklyShare())
+check('A3: that is seven articles a week in each language', same(weeklyShare(), { he: 7, en: 7, es: 7, 'pt-BR': 7, fr: 7, it: 7 }), weeklyShare())
 check(
-  'A4: Portuguese is NOT among them — the generator has no Portuguese (lib/content/language.ts)',
-  !(BLOG_AUTO_LOCALES as readonly string[]).includes('pt-BR') && !isBlogAutoLocale('pt-BR'),
+  'A4: Portuguese IS among them, now that the content layer writes it (lib/content/language.ts)',
+  (BLOG_AUTO_LOCALES as readonly string[]).includes('pt-BR') && isBlogAutoLocale('pt-BR')
+  && (CONTENT_LANGUAGES as readonly string[]).includes('pt-BR'),
+)
+check(
+  'A4b: the Portuguese the blog names is the one the content layer knows — no bare "pt" anywhere',
+  normalizeContentLanguage('pt-BR') === 'pt-BR' && normalizeContentLanguage('pt') === 'pt-BR'
+  && !(BLOG_AUTO_LOCALES as readonly string[]).includes('pt') && !isBlogAutoLocale('pt'),
 )
 check('A5: the queue is refilled a week ahead, not three days', TOPUP_FLOOR >= 7)
-check('A6: an unknown language is not accepted as one', !isBlogAutoLocale('fr') && !isBlogAutoLocale('') && !isBlogAutoLocale(null))
+// 'fr' was the example of an unknown language here until French shipped on
+// 21 October 2026, at which point this check was asserting that a real blog
+// language is not one. German is the example now: the keyword research offers
+// it, the content layer cannot write it.
+check('A6: an unknown language is not accepted as one', !isBlogAutoLocale('de') && !isBlogAutoLocale('') && !isBlogAutoLocale(null))
+check('A6a: and French IS accepted, now that the content layer writes it', isBlogAutoLocale('fr'))
 // Mutation control for A2/A3: the rotation this replaced gave each language only
-// some of the week, and Portuguese a day it could not write.
-const oldRotation = ['he', 'en', 'he', 'en', 'he', 'es', 'pt-BR'] as readonly string[]
+// some of the week.
+const oldRotation = ['he', 'en', 'he', 'en', 'he', 'es', 'he'] as readonly string[]
 check(
-  'A7 (control): the old weekday rotation fails both checks',
-  oldRotation.filter((l) => l === 'en').length !== 7 && oldRotation.includes('pt-BR'),
+  'A7 (control): the old weekday rotation fails the every-language-every-day check',
+  oldRotation.filter((l) => l === 'en').length !== 7,
+)
+// Mutation control for A4: a language the content layer cannot write must not be
+// a blog language. German is the live example of one that is research-only —
+// French was, until the content layer learnt it.
+check(
+  'A8 (control): a research-only language is neither a content language nor a blog language',
+  !(CONTENT_LANGUAGES as readonly string[]).includes('de') && !isBlogAutoLocale('de'),
+)
+check(
+  'A8a: French went the other way — the blog writes it because the content layer does',
+  (CONTENT_LANGUAGES as readonly string[]).includes('fr') && isBlogAutoLocale('fr')
+  && normalizeContentLanguage('fr-CA') === 'fr' && normalizeContentLanguage('fr-FR') === 'fr',
 )
 
 // ============================================================
@@ -147,7 +172,7 @@ const selected = selectKeywords({
   taken: [],
   limit: 10,
 })
-check('C1: the highest volume comes first', selected[0]?.keyword === 'בדיקת מיקום בגוגל', selected.map((s) => s.keyword))
+check('C1: with equal difficulty the bigger keyword comes first', selected[0]?.keyword === 'בדיקת מיקום בגוגל', selected.map((s) => s.keyword))
 check('C2: below the floor is dropped', !selected.some((s) => s.keyword === 'ביטוי נדיר מאוד'))
 check('C3: the volume is kept, so the screen can show it', selected[0]?.monthlySearches === 900)
 check(
@@ -165,6 +190,27 @@ check(
 check('C7: our own brand is navigational, not an article', !selectKeywords({ locale: 'he', ideas: [idea('go top seo', 900)], taken: [], limit: 5 }).length)
 check('C7a: the agency\'s services stay on the agency site', !selectKeywords({ locale: 'he', ideas: [idea('סוכנות קידום אתרים', 900)], taken: [], limit: 5 }).length)
 check('C8: the limit is honoured', selectKeywords({ locale: 'he', ideas: [idea('א ב ג', 900), idea('ד ה ו', 800), idea('ז ח ט', 700)], taken: [], limit: 2 }).length === 2)
+// A head keyword this site cannot win, against the long specific one it can.
+const headIdea: KeywordIdeaResult = {
+  keyword: 'קידום אתרים', avgMonthlySearches: 8000, competition: 'HIGH', competitionIndex: 90,
+  lowTopOfPageBid: null, highTopOfPageBid: null, currency: 'ILS',
+}
+const tailIdea: KeywordIdeaResult = {
+  keyword: 'איך לבדוק מיקום של אתר בגוגל', avgMonthlySearches: 40, competition: 'LOW', competitionIndex: 15,
+  lowTopOfPageBid: null, highTopOfPageBid: null, currency: 'ILS',
+}
+check(
+  'C8a: the winnable long keyword is written before the huge head term',
+  selectKeywords({ locale: 'he', ideas: [headIdea, tailIdea], taken: [], limit: 1 })[0]?.keyword === tailIdea.keyword,
+)
+check('C8b: more words mean a lower difficulty, all else equal', keywordDifficulty({ keyword: 'בדיקת מיקום בגוגל', competition: 'LOW', competitionIndex: 30 }) < keywordDifficulty({ keyword: 'קידום אתרים', competition: 'LOW', competitionIndex: 30 }))
+check('C8c: a missing index falls back to the bucket, not to zero', keywordDifficulty({ keyword: 'קידום', competition: 'HIGH', competitionIndex: null }) > keywordDifficulty({ keyword: 'קידום', competition: 'LOW', competitionIndex: null }))
+// Mutation control for C8a: by the old rule — volume, descending — the head
+// term would have been written first, which is the behaviour being replaced.
+check(
+  'C8d (control): sorted by volume alone the head term WOULD come first',
+  [headIdea, tailIdea].sort((a, b) => (b.avgMonthlySearches ?? 0) - (a.avgMonthlySearches ?? 0))[0]?.keyword === headIdea.keyword,
+)
 check('C9: overlap is 1 when one keyword contains the other\'s words', keywordOverlap('מחקר מילות מפתח', 'כלי למחקר מילות מפתח') === 1)
 check('C9a: unrelated keywords do not overlap', keywordOverlap('מהירות אתר', 'כתיבת תוכן') === 0)
 check('C9b: the threshold is strict enough to be a real test', CANNIBAL_OVERLAP >= 0.7 && CANNIBAL_OVERLAP <= 1)
@@ -228,10 +274,12 @@ async function main() {
     audit: { score: 90, blockers: [], warnings: [], passes: [], counts: {} } as unknown as ValidatedArticle['audit'],
     model: 'test',
   })
-  /** The same article under a slug of its own, so three languages do not collide. */
+  /** The same article under a slug of its own, so the languages do not collide.
+   *  Lower-cased: 'pt-BR' carries a capital region, and a slug may not. */
   const perLocale = (language: string): ValidatedArticle => {
     const base = okArticle()
-    return { ...base, slug: `rank-check-${language}`, article: { ...base.article, slug: `rank-check-${language}` } }
+    const slug = `rank-check-${language.toLowerCase()}`
+    return { ...base, slug, article: { ...base.article, slug } }
   }
   const deps = (over: Partial<BlogAutoDeps> = {}): BlogAutoDeps => ({
     generate: async () => okArticle(),
@@ -339,11 +387,14 @@ async function main() {
   }
 
   {
-    // Every language in one call: three runs, three gates, three summaries.
+    // Every language in one call: one run, one gate and one summary each.
     const admin = fake([
       planned({ id: 'ph', locale: 'he' }),
       planned({ id: 'pe', locale: 'en', topic: 'rank check', primary_keyword: 'rank check' }),
       planned({ id: 'ps', locale: 'es', topic: 'posicion', primary_keyword: 'posicion' }),
+      planned({ id: 'pp', locale: 'pt-BR', topic: 'posicionamento', primary_keyword: 'posicionamento' }),
+      planned({ id: 'pf', locale: 'fr', topic: 'suivi de position', primary_keyword: 'suivi de position' }),
+      planned({ id: 'pi', locale: 'it', topic: 'posizionamento su google', primary_keyword: 'posizionamento su google' }),
     ])
     const summaries = await runBlogAutoPublishAllLocales(admin as unknown as Admin, {}, deps({
       generate: async (brief) => perLocale(brief.language),
@@ -465,6 +516,52 @@ async function main() {
   check('I5 (control): without the context helper the reason is just the gate\u2019s code',
     runQualityGate({ title: 'כותרת', slug: 'a', content_html: `<p>${WORDS} placeholder</p>` }).failures.includes('placeholder_found'))
 
+  /*
+   * I6-I9: THE GATE MUST NOT REFUSE A LANGUAGE FOR SPEAKING ITS OWN WORDS.
+   * Both sentences below are real: they are what Spanish actually generated on
+   * the morning of 23 Oct 2026, read out of the runner's own warning, and the
+   * old `/\bTODO\b/i` refused both — "todo" is an everyday Spanish word, and
+   * JavaScript's ASCII `\b` finds a boundary inside "Método". Spanish spent
+   * every slot of that window on this and never published, which cost
+   * Portuguese and French their turn as well.
+   */
+  const SPANISH_PROSE = `<p>${WORDS}</p><p>Una agencia aporta experiencia y, sobre todo, te ahorra tiempo.</p><p>כך זה עובד ב-Go Top SEO.</p><ul><li>א</li></ul>`
+  const SPANISH_TABLE = `<p>${WORDS}</p><table><thead><tr><th>Característica</th><th>Método Manual</th></tr></thead></table><p>כך זה עובד ב-Go Top SEO.</p>`
+  check('I6: "sobre todo" in Spanish prose is not a placeholder',
+    !runQualityGate({ title: 'Guía', slug: 'a', content_html: SPANISH_PROSE }).failures.includes('placeholder_found'),
+    placeholderContext(SPANISH_PROSE))
+  check('I7: an accented word beside the marker ("Método") is not one either',
+    !runQualityGate({ title: 'Guía', slug: 'a', content_html: SPANISH_TABLE }).failures.includes('placeholder_found'),
+    placeholderContext(SPANISH_TABLE))
+  check('I8: a real marker is still caught, in the body and in the title',
+    runQualityGate({ title: 'Guía', slug: 'a', content_html: `<p>${WORDS} TODO: escribir aquí</p>` }).failures.includes('placeholder_found')
+    && runQualityGate({ title: 'TBD', slug: 'a', content_html: `<p>${WORDS}</p>` }).failures.includes('placeholder_found')
+    && runQualityGate({ title: 'Guía', slug: 'a', content_html: `<p>${WORDS} FIXME</p>` }).failures.includes('placeholder_found')
+    && runQualityGate({ title: 'Guía', slug: 'a', content_html: `<p>${WORDS} lorem ipsum dolor</p>` }).failures.includes('placeholder_found')
+    && runQualityGate({ title: 'Guía', slug: 'a', content_html: `<p>${WORDS} [insertar ciudad]</p>` }).failures.includes('placeholder_found')
+    && runQualityGate({ title: 'Guía', slug: 'a', content_html: `<p>${WORDS} {{name}}</p>` }).failures.includes('placeholder_found'))
+  check('I9 (mutation control): the lower-case word is what the old pattern caught, and the new one does not',
+    /\bTODO\b/i.test('sobre todo') && /\bTODO\b/i.test('Método')
+    && !/(?<!\p{L})(?:TODO|TBD|FIXME)(?!\p{L})/u.test('sobre todo')
+    && !/(?<!\p{L})(?:TODO|TBD|FIXME)(?!\p{L})/u.test('Método'))
+
+  /*
+   * I10-I11: A LANGUAGE THAT CANNOT RESEARCH MUST SAY SO.
+   * French published nothing for its first four days. Every run reached it and
+   * answered `skipped: 'queue_empty'`, because the keyword research 404'd —
+   * 'FR' and 'fr' were missing from lib/google-ads/constants.ts and the request
+   * went out as `geoTargetConstants/undefined`. Both maps are
+   * `Record<string, number>`, so nothing failed to compile, and the only trace
+   * was in a runtime log this plan keeps for one hour.
+   */
+  check('I10: the window logs why the top-up added nothing, not just that the queue is empty',
+    /topUpError: summary\.topUpError/.test(windowSrc))
+  check('I11: an unknown market is refused by name instead of sent as "undefined"', (() => {
+    const src = stripComments(read('lib/google-ads/keyword-ideas.ts'))
+    return /unknown_geo_target/.test(src) && /unknown_language/.test(src)
+      && src.indexOf('unknown_geo_target') < src.indexOf('geoTargetConstants: [')
+  })())
+
   // ============================================================
   // H) THE BODY'S LINKS
   // ============================================================
@@ -556,9 +653,11 @@ async function main() {
     const far = () => Date.now() + 120_000
     const article = (locale: string, publishedAt: string) => ({ locale, is_published: true, published_at: publishedAt })
 
-    check('J1: the morning window is 04:00-06:59 UTC and nothing else',
-      [4, 5, 6].every((h) => isInWindow(Date.parse(`2026-10-14T0${h}:30:00Z`)))
-      && ![3, 7, 12, 23].some((h) => isInWindow(Date.parse(`2026-10-14T${String(h).padStart(2, '0')}:30:00Z`))))
+    check('J1: the morning window is 04:00-07:59 UTC and nothing else',
+      [4, 5, 6, 7].every((h) => isInWindow(Date.parse(`2026-10-14T0${h}:30:00Z`)))
+      && ![3, 8, 12, 23].some((h) => isInWindow(Date.parse(`2026-10-14T${String(h).padStart(2, '0')}:30:00Z`))))
+    check('J1b: the window holds a pass for every language, with retries to spare',
+      WINDOW_HOURS_UTC.length * 4 >= BLOG_AUTO_LOCALES.length * 2, WINDOW_HOURS_UTC.length)
     check('J2: "today" starts at midnight UTC', startOfUtcDay(inWindow) === '2026-10-14T00:00:00.000Z')
 
     const fresh = await nextLocaleToWrite(fake([]) as unknown as Admin, inWindow)

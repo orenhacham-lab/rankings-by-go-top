@@ -20,6 +20,7 @@
  * identifying a third party enters the AI path at all.
  * Server-only. The generator is injected so a guard runs it without a network.
  */
+import type { PublicLocale } from '@/lib/i18n/locales'
 import { generateGbpDraft } from './generate'
 import { clampReply, GBP_REPLY_MAX } from './review-validate'
 import type { Generate } from './draft'
@@ -30,14 +31,19 @@ export const GBP_REPLY_DRAFT_TARGET = 450
 export interface ReviewDraftSource {
   businessName: string | null
   /** The project's language, used only when the review has no text. */
-  language: 'he' | 'en'
+  language: PublicLocale
   review: {
     stars: number | null
     comment: string | null
   }
 }
 
-const LANGUAGE_NAME: Record<ReviewDraftSource['language'], string> = { he: 'Hebrew', en: 'English' }
+/**
+ * One entry per public locale. The caller used to narrow with
+ * `language === 'en' ? 'en' : 'he'`, which drafted a HEBREW reply for a Spanish
+ * merchant's review; a Record cannot have a wrong else branch.
+ */
+const LANGUAGE_NAME: Record<PublicLocale, string> = { he: 'Hebrew', en: 'English', es: 'Spanish', 'pt-BR': 'Brazilian Portuguese', fr: 'French', it: 'Italian' }
 
 export function buildReplyPrompt(src: ReviewDraftSource): string {
   const stars = src.review.stars

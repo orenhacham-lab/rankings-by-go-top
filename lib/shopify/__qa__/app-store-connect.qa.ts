@@ -105,10 +105,19 @@ async function main() {
       return { l, note: s.appStoreExplain, cta: s.installFromAppStore, none: s.appStoreUnavailable, steps: s.guide.steps.join(' '), warn: s.guide.warnings.join(' ') }
     })
     const complete = (rows: { note: string; cta: string; none: string }[]) => rows.every((r) => [r.note, r.cta, r.none].every((v) => typeof v === 'string' && v.trim().length > 0))
-    check('A2: the note, the button and the no-listing line exist in he, en, es and pt-BR', complete(texts), JSON.stringify(texts.map((r) => r.l)))
+    check(`A2: the note, the button and the no-listing line exist in all ${PUBLIC_LOCALES.length} languages (${PUBLIC_LOCALES.join(', ')})`,
+      complete(texts), JSON.stringify(texts.map((r) => r.l)))
     check('A3: …and are real translations, not copies of English',
       texts.filter((r) => r.l !== 'en').every((r) => r.note !== texts.find((x) => x.l === 'en')!.note))
-    check('A4: every note says to sign in with the same account', texts.every((r) => /same account|החשבון הזה עצמו|misma cuenta|mesma conta/i.test(r.note)))
+    // One alternative per language, never a shared loose pattern: a language
+    // whose phrasing is missing here must FAIL, which is the only way this guard
+    // notices a note that forgot to say which account. French is `ce même
+    // compte`; the accent is why the pattern is written with `m[êe]me`.
+    const SAME_ACCOUNT = /same account|החשבון הזה עצמו|misma cuenta|mesma conta|m[êe]me compte|stesso account/i
+    check('A4: every note says to sign in with the same account',
+      texts.every((r) => SAME_ACCOUNT.test(r.note)), texts.filter((r) => !SAME_ACCOUNT.test(r.note)).map((r) => r.l).join(' '))
+    check('A4-MUT: a note that drops the account sentence fails A4',
+      !SAME_ACCOUNT.test(texts.find((r) => r.l === 'fr')!.note.replace(/ce m[êe]me compte/i, 'un compte')))
     check('A5: the guide no longer tells anyone to type a .myshopify.com domain', texts.every((r) => !/myshopify\.com/.test(r.steps) && !/myshopify\.com/.test(r.warn)))
     check('A6: the Hebrew dashboard copy carries Hebrew (the panel follows the user\'s language)', /[֐-׿]/.test(texts.find((r) => r.l === 'he')!.note))
     check('A-MUT: an empty translation is caught', !complete([{ ...texts[0], note: ' ' }]))

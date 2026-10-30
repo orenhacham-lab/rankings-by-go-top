@@ -126,8 +126,15 @@ export async function generateKeywordIdeas(input: KeywordIdeasInput): Promise<Ke
   const config = getGoogleAdsConfig() // throws not_configured
   const accessToken = await getGoogleAdsAccessToken() // throws reauth_required / client_credentials_invalid / oauth_token_failed
 
+  // A market missing from either map used to be sent as the STRING "undefined"
+  // inside the resource name, which Google answers with a flat 404 NOT_FOUND —
+  // the French blog spent four days on that, and nothing in the error said
+  // which of the two was wrong. The routes validate their input before they get
+  // here, so this can only be an internal caller naming a market nobody added.
   const geoTargetId = COUNTRY_GEO_TARGETS[country]
+  if (geoTargetId === undefined) throw new Error(`unknown_geo_target:${country}`)
   const languageId = LANGUAGE_IDS[language]
+  if (languageId === undefined) throw new Error(`unknown_language:${language}`)
 
   let seed: SeedField
   let seedType: 'keywordSeed' | 'urlSeed' | 'keywordAndUrlSeed' | 'siteSeed'

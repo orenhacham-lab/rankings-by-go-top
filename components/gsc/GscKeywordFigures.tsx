@@ -195,9 +195,9 @@ export function GscGoogleAverage({ view, targetId }: { view: GscKeywordsView; ta
       </span>
     )
   }
-  const synced = syncedDay(data.data.syncedAt, language) ?? '—'
+  const synced = syncedDay(data.data.syncedAt, uiLocale) ?? '—'
   const position = a.position == null ? t.noPosition : formatPosition(a.position, language)
-  const full = t.full(position, formatCount(a.clicks, language), formatCount(a.impressions, language), synced)
+  const full = t.full(position, formatCount(a.clicks, uiLocale), formatCount(a.impressions, uiLocale), synced)
   return (
     <span className={LINE} data-gsc-keyword="figures" title={full}>
       {/* Two groups that wrap as wholes: the label, then the figures (no stray "·" at a line's start). */}
@@ -209,8 +209,8 @@ export function GscGoogleAverage({ view, targetId }: { view: GscKeywordsView; ta
       </span>
       <span className="inline-flex flex-wrap items-center gap-x-2 gap-y-0.5 tabular-nums sm:flex-nowrap" aria-hidden="true">
         <span className="whitespace-nowrap rounded-control bg-sunk px-1.5 font-semibold text-ink">{a.position == null ? t.noPosition : t.position(position)}</span>
-        <span className="whitespace-nowrap">{t.clicks(formatCompact(a.clicks, language))}</span>
-        <span className="whitespace-nowrap">{t.impressions(formatCompact(a.impressions, language))}</span>
+        <span className="whitespace-nowrap">{t.clicks(formatCompact(a.clicks, uiLocale))}</span>
+        <span className="whitespace-nowrap">{t.impressions(formatCompact(a.impressions, uiLocale))}</span>
       </span>
       <span className="sr-only">{full}</span>
     </span>
@@ -219,12 +219,12 @@ export function GscGoogleAverage({ view, targetId }: { view: GscKeywordsView; ta
 
 /** One caption above the table, once the figures are there: what the line is, and its date. */
 export function GscKeywordsLegend({ view, className }: { view: GscKeywordsView; className?: string }) {
-  const { language, uiLocale } = useDashboardLanguage()
+  const { uiLocale } = useDashboardLanguage()
   const t = getDashboardDictionary(uiLocale).gscWidgets.googleAverage
   const data = view.data
   // A caption for the lines, not a widget: the widget is the notice under the table,
   // which is always mounted. Without figures there is nothing to caption.
-  const synced = data.state === 'ready' ? syncedDay(data.data.syncedAt, language) : null
+  const synced = data.state === 'ready' ? syncedDay(data.data.syncedAt, uiLocale) : null
   return data.state === 'ready' && synced ? (
     <p data-gsc-legend="" className={cn('flex items-center gap-2 text-caption text-muted', className)}>
       <GoogleMark />
@@ -262,7 +262,7 @@ export function GscKeywordsNotice({ projectId, view, onTrack, targets, slot, cla
     return <GscConnectCard state={data.state} projectId={projectId} className={className} />
   }
   if (slot === 'bottom') return null
-  const synced = data.state === 'ready' ? syncedDay(data.data.syncedAt, language) : null
+  const synced = data.state === 'ready' ? syncedDay(data.data.syncedAt, uiLocale) : null
   const range = data.state === 'ready' && data.data.windowStart && data.data.windowEnd
     ? t.keywords.range(formatDay(data.data.windowStart, language), formatDay(data.data.windowEnd, language))
     : null

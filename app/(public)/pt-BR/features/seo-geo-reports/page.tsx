@@ -75,7 +75,11 @@ const CONTENT: FeaturePageContent = {
       title: 'O que se pergunta sobre os relatórios',
       items: [
         // Honest about what exists today: the export itself has no Portuguese yet.
-        { q: 'Em quais idiomas saem os relatórios?', a: 'Por enquanto você pode exportar um relatório em inglês ou em hebraico. O relatório em português chegará com o painel em português.' },
+        // Every language the dashboard has, because lib/export/i18n.ts carries a
+        // complete label set for each of the five (verified key for key against
+        // English). This answer said "English or Hebrew" long after that stopped
+        // being true, which understated the product on three pages at once.
+        { q: 'Em quais idiomas saem os relatórios?', a: 'O relatório sai no idioma do seu painel, e o português é um deles, ao lado do hebraico, do inglês, do espanhol e do francês.' },
         { q: 'Posso fazer um relatório separado para cada cliente?', a: 'Sim. Cada site é o seu próprio projeto, e cada projeto tem o seu próprio relatório. O número de projetos de cada plano está na página de preços.' },
         { q: 'Os relatórios estão em todos os planos?', a: 'Sim. Os relatórios em PDF e Excel estão em todos os planos.' },
       ],

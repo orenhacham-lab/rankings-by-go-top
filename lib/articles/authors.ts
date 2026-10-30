@@ -46,26 +46,34 @@ const OREN: ArticleAuthor = {
     en: 'Oren Hacham',
     es: 'Oren Hacham',
     'pt-BR': 'Oren Hacham',
+    fr: 'Oren Hacham',
+    it: 'Oren Hacham',
   },
   role: {
-    he: 'Go Top — קידום אתרים ודיגיטל',
-    en: 'Go Top — SEO and digital marketing',
-    es: 'Go Top — SEO y marketing digital',
-    'pt-BR': 'Go Top — SEO e marketing digital',
+    he: 'מייסד Go Top — קידום אתרים ודיגיטל',
+    en: 'Founder of Go Top — SEO and digital marketing',
+    es: 'Fundador de Go Top — SEO y marketing digital',
+    'pt-BR': 'Fundador da Go Top — SEO e marketing digital',
+    fr: 'Fondateur de Go Top — référencement naturel et marketing digital',
+    it: 'Fondatore di Go Top — SEO e marketing digitale',
   },
   bio: {
     he: 'עומד מאחורי Go Top, סוכנות דיגיטל שעוסקת מעל 11 שנה בקידום אתרים אורגני ובפרסום ממומן לעסקים בישראל, ומאחורי המערכת Go Top SEO.',
     en: 'Behind Go Top, a digital agency that has worked in organic search and paid media for over 11 years, and behind the Go Top SEO platform.',
     es: 'Detrás de Go Top, una agencia digital con más de 11 años en posicionamiento orgánico y publicidad de pago, y detrás de la plataforma Go Top SEO.',
     'pt-BR': 'Por trás da Go Top, agência digital com mais de 11 anos em busca orgânica e mídia paga, e por trás da plataforma Go Top SEO.',
+    fr: 'Derrière Go Top, une agence digitale qui travaille depuis plus de 11 ans sur le référencement naturel et la publicité payante, et derrière la plateforme Go Top SEO.',
+    it: 'Dietro Go Top, agenzia digitale che da oltre 11 anni si occupa di ricerca organica e pubblicità a pagamento, e dietro la piattaforma Go Top SEO.',
   },
   articleNote: {
     he: 'מה שכתוב כאן מגיע מעבודה יומיומית על אתרים של לקוחות, לא מתיאוריה.',
     en: 'What is written here comes from daily work on client sites, not from theory.',
     es: 'Lo que se escribe aquí viene del trabajo diario en sitios de clientes, no de la teoría.',
     'pt-BR': 'O que está escrito aqui vem do trabalho diário em sites de clientes, não da teoria.',
+    fr: 'Ce qui est écrit ici vient du travail quotidien sur les sites de clients, pas de la théorie.',
+    it: 'Quanto scritto qui nasce dal lavoro quotidiano sui siti dei clienti, non dalla teoria.',
   },
-  href: { he: '/about', en: '/en/about', es: '/es/about', 'pt-BR': '/pt-BR/about' },
+  href: { he: '/about', en: '/en/about', es: '/es/about', 'pt-BR': '/pt-BR/about', fr: '/fr/about', it: '/it/about' },
   photo: '/authors/oren-hacham.jpg',
 }
 
@@ -79,6 +87,24 @@ const BY_NAME: Record<string, ArticleAuthor> = {
 export function articleAuthor(author: string | null | undefined): ArticleAuthor | null {
   if (!author) return null
   return BY_NAME[author.trim().toLowerCase()] ?? null
+}
+
+/**
+ * The byline as the page's own language writes it.
+ *
+ * The `author` column holds ONE spelling — 'אורן חכם' — because it is what
+ * matches the profile and what the WordPress bridge and the admin form write.
+ * Rendering that column directly put a Hebrew name on the English, Spanish and
+ * Portuguese pages: the author box resolved the locale and the headline byline
+ * beside it did not, so one page showed the name twice, in two alphabets. Every
+ * surface that shows a byline goes through here.
+ *
+ * An author with no profile keeps the column's own text: it is the only name we
+ * have, and dropping it would leave the article unsigned.
+ */
+export function authorDisplayName(author: string | null | undefined, locale: PublicLocale): string {
+  if (!author) return ''
+  return articleAuthor(author)?.name[locale] ?? author
 }
 
 /** The initials for the avatar, for an author with no photo on file. */

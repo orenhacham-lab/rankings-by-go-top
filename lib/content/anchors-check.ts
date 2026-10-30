@@ -132,10 +132,14 @@ export const ANCHOR_MIN_PARAGRAPH_GAP = 2
 
 const MECHANICAL_HE = ['למידע נוסף', 'מידע נוסף', 'לחצו כאן', 'לחץ כאן', 'קראו עוד', 'קרא עוד', 'אתר כמו', 'אתרים כמו', 'אפשר למצוא מידע', 'ניתן למצוא מידע', 'להמשך קריאה', 'ראו כאן', 'ראה כאן']
 const MECHANICAL_ES = ['más información', 'mas informacion', 'haz clic aquí', 'haga clic aquí', 'clic aquí', 'leer más', 'lee más', 'un sitio como', 'sitios como', 'una web como', 'para más información', 'ver aquí', 'ver más', 'sigue leyendo']
+const MECHANICAL_PT = ['mais informações', 'mais informacoes', 'clique aqui', 'leia mais', 'saiba mais', 'um site como', 'sites como', 'para mais informações', 'veja aqui', 'veja mais', 'continue lendo', 'confira aqui']
 const MECHANICAL_EN = ['read more', 'click here', 'learn more', 'for more information', 'more information', 'a site like', 'sites like', 'website like', 'find out more', 'more info', 'visit this site', 'see here']
 
+const MECHANICAL_FR = ['plus d’informations', 'pour plus d’informations', 'cliquez ici', 'lire la suite', 'en savoir plus', 'un site comme', 'des sites comme', 'un site tel que', 'voir ici', 'voir plus', 'poursuivez votre lecture', 'découvrez ici']
+const MECHANICAL_IT = ['maggiori informazioni', 'per maggiori informazioni', 'più informazioni', 'clicca qui', 'fai clic qui', 'leggi di più', 'leggi tutto', 'scopri di più', 'un sito come', 'siti come', 'un sito tipo', 'vedi qui', 'vedi di più', 'continua a leggere']
+
 /** Mechanical anchor phrases keyed by content language. */
-const MECHANICAL: Record<SuggestionLanguage, string[]> = { he: MECHANICAL_HE, en: MECHANICAL_EN, es: MECHANICAL_ES }
+const MECHANICAL: Record<SuggestionLanguage, string[]> = { he: MECHANICAL_HE, en: MECHANICAL_EN, es: MECHANICAL_ES, 'pt-BR': MECHANICAL_PT, fr: MECHANICAL_FR, it: MECHANICAL_IT }
 
 export interface AnchorHit {
   href: string

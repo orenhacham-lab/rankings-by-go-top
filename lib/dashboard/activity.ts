@@ -7,6 +7,7 @@
  * the dictionary; this module decides only WHICH lines and in what order.
  */
 import { formatDate } from '@/lib/format/date'
+import type { PublicLocale } from '@/lib/i18n/locales'
 import type { ActivityEvent } from './overview'
 import type { SeedFeedLine } from './seed'
 
@@ -31,10 +32,16 @@ export function mergeFeed(events: readonly ActivityEvent[], seedLines: readonly 
 }
 
 /**
- * "3 minutes ago", in the merchant's language, from two instants. Future times
- * (a clock a little ahead) read as "now", never as "in 2 minutes".
- */
-export function relativeTime(at: string, now: Date, locale: 'he' | 'en'): string {
+  * "3 minutes ago", in the merchant's language, from two instants. Future times
+  * (a clock a little ahead) read as "now", never as "in 2 minutes".
+  *
+  * PublicLocale, not the bilingual Locale. A date is not one of the surfaces
+  * lib/i18n/dashboard/locale.ts deliberately keeps bilingual: `Intl` formats it
+  * for every language we have, so narrowing here bought nothing and cost a
+  * French screen the line "Audité 3 days ago" in the middle of French prose —
+  * and had been doing the same to Spanish and Portuguese since those shipped.
+  */
+export function relativeTime(at: string, now: Date, locale: PublicLocale): string {
   // The one date formatter (lib/format/date.ts), with the future clamped to now.
   const ms = Date.parse(at)
   return formatDate(Number.isFinite(ms) ? Math.min(ms, now.getTime()) : null, locale, 'relative', now)
