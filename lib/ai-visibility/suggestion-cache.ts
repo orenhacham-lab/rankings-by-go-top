@@ -792,6 +792,7 @@ const COUNTRY_CODE_TO_DISPLAY_NAME: Record<string, string> = {
   'de': 'Germany',
   'fr': 'France',
   'it': 'Italy',
+  'ja': 'Japan',
   'es': 'Spain',
   'pt': 'Portugal',
   'nl': 'Netherlands',

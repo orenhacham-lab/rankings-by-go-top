@@ -44,6 +44,7 @@ const { dashboardEs } = require('../../i18n/dashboard/es')
 const { dashboardPtBR } = require('../../i18n/dashboard/pt-BR')
 const { dashboardFr } = require('../../i18n/dashboard/fr')
 const { dashboardIt } = require('../../i18n/dashboard/it')
+const { dashboardJa } = require('../../i18n/dashboard/ja')
 
 let pass = 0, fail = 0
 function check(name: string, cond: boolean, detail?: string) {
@@ -315,13 +316,13 @@ function composerChecks() {
   // EVERY dashboard language, not the four that existed when this was written. fr and it
   // arrived afterwards, and a locale added later is exactly the one that silently falls back
   // to English for a sentence the merchant is supposed to read before uploading a photo.
-  const dicts: [string, any][] = [['he', dashboardHe], ['en', dashboardEn], ['es', dashboardEs], ['pt-BR', dashboardPtBR], ['fr', dashboardFr], ['it', dashboardIt]]
+  const dicts: [string, any][] = [['he', dashboardHe], ['en', dashboardEn], ['es', dashboardEs], ['pt-BR', dashboardPtBR], ['fr', dashboardFr], ['it', dashboardIt], ['ja', dashboardJa]]
   const missing = (ds: [string, any][]) => ds.flatMap(([n, d]) => [
     ...KEYS.filter((k) => typeof d?.mapsPosts?.composer?.[k] !== 'string' || !d.mapsPosts.composer[k].trim()).map((k) => `${n}.composer.${k}`),
     ...(typeof d?.mapsPosts?.errors?.image_generation_failed === 'string' ? [] : [`${n}.errors.image_generation_failed`]),
   ])
   const m = missing(dicts)
-  check('every new string is in all six dictionaries (he, en, es, pt-BR, fr, it), not left to the English fallback', m.length === 0, m.join(', '))
+  check('every new string is in all seven dictionaries (he, en, es, pt-BR, fr, it, ja), not left to the English fallback', m.length === 0, m.join(', '))
   const noPt = JSON.parse(JSON.stringify(dashboardPtBR))
   delete noPt.mapsPosts.composer.imageGeneratedHint
   check('MUTATION: a dictionary without one of them is caught', missing([...dicts.slice(0, 3), ['pt-BR', noPt]]).length > 0)
@@ -335,12 +336,24 @@ function composerChecks() {
   // publicly, so each language must carry the right to publish, the person's agreement and the minor.
   const consents: [string, string][] = dicts
     .map(([n, d]) => [n, (d as any).mapsPosts?.composer?.imageConsent as string])
-  // 'minore' contains 'minor', so Italian needs no alternative of its own; French does.
-  const MINOR = /קטין|minor|menor|mineur/i
-  const thin = consents.filter(([, v]) => typeof v !== 'string' || v.length < 60 || !MINOR.test(v))
-  check('the consent line names the right to publish, the person\'s agreement and a minor, in all six languages', thin.length === 0, thin.map(([n]) => n).join(', '))
+  // 'minore' contains 'minor', so Italian needs no alternative of its own; French
+  // does, and Japanese is written in its own script: 未成年者 is the word, and the
+  // sentence names the parent or guardian beside it.
+  const MINOR = /קטין|minor|menor|mineur|未成年/i
+  // The 60-character floor is a floor on SUBSTANCE, and a character is not the same
+  // amount of substance in every script: Japanese writes this same sentence in about
+  // half the characters, with no spaces and one character per word stem. So the floor
+  // is read in the units the language is written in — 40 for Japanese, 60 for the
+  // rest — rather than failing a complete sentence for being efficient.
+  const floor = (n: string) => (n === 'ja' ? 40 : 60)
+  const thin = consents.filter(([n, v]) => typeof v !== 'string' || v.length < floor(n) || !MINOR.test(v))
+  check('the consent line names the right to publish, the person\'s agreement and a minor, in all seven languages', thin.length === 0, thin.map(([n]) => n).join(', '))
   check('MUTATION: a consent line that drops the minor is caught',
     ['he', 'en'].map((n) => n === 'he' ? 'העלו רק תמונה שיש לכם זכות לפרסם ושהאדם שבה הסכים לפרסום בכרטיס העסק בגוגל.' : '').filter((v) => v && (v.length < 60 || !MINOR.test(v))).length > 0)
+  check('MUTATION: a Japanese consent line that drops the minor is caught',
+    !MINOR.test('公開する権利をお持ちの写真のみアップロードしてください。人が写っている場合は、その人が公開に同意している場合のみです。'))
+  check('MUTATION: a one-clause Japanese consent line is too thin for its own floor',
+    '写真をアップロードしてください。'.length < floor('ja'))
   check('the Hebrew words are Hebrew', [...KEYS.map((k) => dashboardHe.mapsPosts.composer[k]), dashboardHe.mapsPosts.errors.image_generation_failed].every((v: string) => /[֐-׿]/.test(v) && !/[A-Za-z]{3,}/.test(v)))
 }
 

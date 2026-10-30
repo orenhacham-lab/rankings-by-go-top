@@ -44,6 +44,7 @@ const RELATED_HEADING: Record<BlogAutoLocale, string> = {
   'pt-BR': 'Leia também',
   fr: 'À lire aussi',
   it: 'Da leggere anche',
+  ja: 'あわせて読みたい',
 }
 
 /** Where the in-body product link goes: the free trial, in the article's language. */

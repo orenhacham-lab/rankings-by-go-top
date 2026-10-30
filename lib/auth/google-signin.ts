@@ -78,6 +78,7 @@ const COPY = {
   'pt-BR': { label: 'Continuar com o Google', or: 'ou', failed: 'Não conseguimos iniciar o acesso com o Google. Tente novamente ou continue com seu e-mail.', returnFailed: 'O acesso com o Google não foi concluído. Tente novamente ou continue com seu e-mail.' },
   fr: { label: 'Continuer avec Google', or: 'ou', failed: "Nous n'avons pas pu lancer la connexion avec Google. Réessayez, ou continuez avec votre adresse e-mail.", returnFailed: "La connexion avec Google n'a pas abouti. Réessayez, ou continuez avec votre adresse e-mail." },
   it: { label: 'Continua con Google', or: 'oppure', failed: "Non è stato possibile avviare l'accesso con Google. Si consiglia di riprovare oppure di continuare con il proprio indirizzo e-mail.", returnFailed: "L'accesso con Google non è stato completato. Si consiglia di riprovare oppure di continuare con il proprio indirizzo e-mail." },
+  ja: { label: 'Googleで続ける', or: 'または', failed: 'Googleでのログインを開始できませんでした。もう一度お試しいただくか、メールアドレスで続けてください。', returnFailed: 'Googleでのログインが完了しませんでした。もう一度お試しいただくか、メールアドレスで続けてください。' },
 } as const
 
 export function googleSignInCopy(lang: PublicLocale): (typeof COPY)[PublicLocale] {

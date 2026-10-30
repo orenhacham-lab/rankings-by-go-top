@@ -79,4 +79,13 @@ export const COMPARE_COMMON: Record<PublicLocale, CompareCommon> = {
     fairness: (c) =>
       `${c} è un buon prodotto e per alcune aziende è la scelta giusta. Questa pagina non vuole dire il contrario: mostra i punti di forza di ciascuno, così da capire quale sia più adatto.`,
   },
+  ja: {
+    column: '比較する項目',
+    ours: 'Go Top SEO',
+    tableCaption: (c) => `Go Top SEO と ${c} の比較`,
+    checkedOn: (c, date) =>
+      `${c} の列は ${c} 自身のページを ${date} に確認した内容です。価格や機能は変更されることがあります。ここに古い記述があった場合は、下のリンクが出典ですので、そちらをご確認ください。`,
+    fairness: (c) =>
+      `${c} は優れた製品で、企業によっては ${c} が最適な選択です。このページはその逆を主張するものではありません。それぞれの強みを示し、どちらが自社に合うかを判断していただくためのものです。`,
+  },
 }

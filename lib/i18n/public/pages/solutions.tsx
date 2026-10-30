@@ -28,6 +28,7 @@ const es = FEATURE_COMMON.es
 const pt = FEATURE_COMMON['pt-BR']
 const fr = FEATURE_COMMON.fr
 const it = FEATURE_COMMON.it
+const ja = FEATURE_COMMON.ja
 
 // ── Business owners ───────────────────────────────────────────────────────────
 
@@ -57,6 +58,10 @@ export const BUSINESSES_PAGE: MarketingPage = {
     it: {
       title: 'Per i titolari d’azienda | Go Top SEO',
       description: 'Un solo sistema che scrive e pubblica articoli sul sito, controlla dove l’azienda compare su Google e su Google Maps e se ChatGPT, Gemini e Google AI la citano.',
+    },
+    ja: {
+      title: '事業者の方へ | Go Top SEO',
+      description: '記事を書いてサイトに公開し、GoogleとGoogleマップで自社がどこに出ているかを計測し、ChatGPT、Gemini、Google AIが自社を引用しているかを確認する、一つのシステムです。',
     },
   },
   content: {
@@ -402,6 +407,63 @@ export const BUSINESSES_PAGE: MarketingPage = {
       ],
       cta: { title: 'Cominci dal vedere che cosa il sistema vede sul suo sito', body: it.closeBody, primary: it.check, secondary: it.trial },
     },
+    ja: {
+      hero: {
+        eyebrow: '事業者の方へ',
+        eyebrowIcon: Store,
+        title: '書いて、公開して、計測します。',
+        accent: 'それを毎月',
+        subtitle: '顧客が検索している内容について記事を書き、サイトに直接公開します。GoogleとGoogleマップでの自社の位置、そしてChatGPT、Gemini、Google AIが自社について何を述べているかを計測します。業者の管理も、SEOの勉強も必要ありません。',
+        trust: ja.trust,
+        primary: ja.check,
+        secondary: ja.trial,
+        visual: (
+          <WorkListVisual
+            heading="システム内のひと月"
+            rows={[
+              { title: '新しい記事を公開', detail: 'リビング用のエアコンの選び方', icon: FileText, done: true, status: '公開済み' },
+              { title: '検索順位の計測', detail: 'GoogleとGoogleマップ', icon: Search, done: true, status: '完了' },
+              { title: 'AIでの可視性の計測', detail: 'ChatGPT、Gemini、Google AI', icon: Sparkles, done: true, status: '完了' },
+              { title: '次の記事', detail: 'エアコン工事の費用', icon: CalendarClock, done: false, status: '予定' },
+            ]}
+          />
+        ),
+      },
+      sections: [
+        {
+          kind: 'cards',
+          tone: 'contrast',
+          eyebrow: 'システムが行うこと',
+          title: '通常は複数の業者に分かれる作業を',
+          items: [
+            { icon: FileText, title: '検索を集めるコンテンツ', body: 'その業種で何が検索されているかにもとづいて題材を選び、記事を書き、プランの想定する頻度でサイトに公開します。' },
+            { icon: MapPin, title: '頼れる計測', body: 'キーワードごとに、GoogleとGoogleマップでサイトがどこに出ているか、そしてAIエンジンが自社を引用しているかがわかります。' },
+            { icon: Wrench, title: '障害のないサイト', body: 'サイトの診断が、Googleに対して足を引っぱっている点を見つけます。WordPressでは、ご承認後にワンクリックで修正できます。' },
+          ],
+        },
+        {
+          kind: 'steps',
+          eyebrow: '始め方',
+          title: '3つの手順で、システムが動き出します',
+          items: [
+            { title: 'サイトのアドレスを入力する', body: 'システムがサイトを読み取り、設定、コンテンツ戦略、キーワードの案を用意します。' },
+            { title: 'サイトを連携する', body: 'WordPress、Shopify、Wixのいずれかです。記事はそこへ直接公開されます。' },
+            { title: '結果を読む', body: '順位と可視性の計測は、月に一度自動で実行され、必要なときは手動でも実行できます。すべて同じ場所にまとまります。' },
+          ],
+        },
+        {
+          kind: 'faq',
+          eyebrow: 'よくある質問',
+          title: '事業者の方から聞かれること',
+          items: [
+            { q: 'SEOの知識は必要ですか', a: 'いいえ。システムが題材を提案し、執筆し、公開します。記事はどれも、公開前にお読みいただき、修正できます。' },
+            { q: '地域のお店にも向いていますか', a: 'はい。Googleマップでの順位の計測が、市区町村や地域ごとに、ローカル検索で自社がどこに出ているかを確認します。' },
+            { q: '記事は月に何本ですか', a: 'プランによって異なります。すべてのプランと本数は料金ページに記載しています。' },
+          ],
+        },
+      ],
+      cta: { title: 'まずはシステムがサイトで何を見ているかを確認する', body: ja.closeBody, primary: ja.check, secondary: ja.trial },
+    },
   },
 }
 
@@ -433,6 +495,10 @@ export const AGENCIES_PAGE: MarketingPage = {
     it: {
       title: 'Per le agenzie | Go Top SEO',
       description: 'Un progetto distinto per ogni sito cliente, con articoli, monitoraggio delle posizioni, visibilità nelle IA e report in PDF ed Excel. Tutti i clienti si gestiscono da un solo account.',
+    },
+    ja: {
+      title: '制作会社・代理店の方へ | Go Top SEO',
+      description: '取引先のサイトごとに別のプロジェクトを持ち、記事、順位の計測、AIでの可視性、PDFとExcelのレポートをご利用いただけます。すべての取引先を一つのアカウントで管理できます。',
     },
   },
   content: {
@@ -748,6 +814,58 @@ export const AGENCIES_PAGE: MarketingPage = {
       ],
       cta: { title: 'Provi il sistema sul sito di un cliente', body: it.closeBody, primary: it.trial, secondary: it.pricing },
     },
+    ja: {
+      hero: {
+        eyebrow: '制作会社・代理店の方へ',
+        eyebrowIcon: Briefcase,
+        title: '取引先のすべてのサイトを、',
+        accent: '一つのシステムで',
+        subtitle: '取引先ごとに別のプロジェクトを持ち、それぞれに記事、順位の計測、AIでの可視性、レポートがあります。すべてを一つのアカウントで管理し、その月に何を行ったかを示すPDFレポートを取引先にお渡しいただけます。',
+        trust: ja.trust,
+        primary: ja.trial,
+        secondary: ja.pricing,
+        visual: (
+          <WorkListVisual
+            heading="取引先"
+            rows={[
+              { title: '歯科医院', detail: '今月の記事3本', url: 'example-dental.jp', icon: FolderKanban, done: true, status: 'レポート完成' },
+              { title: '法律事務所', detail: '今月の記事2本', url: 'example-law.jp', icon: FolderKanban, done: true, status: 'レポート完成' },
+              { title: '家具店', detail: '診断中', url: 'example-furniture.jp', icon: FolderKanban, done: false, status: '進行中' },
+            ]}
+          />
+        ),
+      },
+      sections: [
+        {
+          kind: 'cards',
+          tone: 'contrast',
+          eyebrow: '得られるもの',
+          title: '多数のサイトを並行して進めるための道具',
+          items: [
+            { icon: FolderKanban, title: 'サイトごとに1プロジェクト', body: '設定、キーワード、戦略、記事がサイトごとに分かれ、プロジェクトは取引先ごとにまとめられます。' },
+            { icon: BarChart3, title: 'そのまま送れるレポート', body: '順位、AIでの可視性、Search Consoleのデータについて、PDFとExcelのレポートを、プロジェクト名とサイトのロゴ付きで出力できます。' },
+            { icon: PieChart, title: '配分できる本数', body: '記事の本数はすべてのサイトで共有され、どのサイトに何本配分するかをお決めいただけます。' },
+          ],
+        },
+        {
+          kind: 'steps',
+          eyebrow: '進め方',
+          title: '新しい取引先から最初のレポートまで',
+          items: [
+            { title: '取引先のプロジェクトを作る', body: 'サイトのアドレスを入力すると、システムが設定、戦略、キーワードの案を用意します。' },
+            { title: 'サイトを連携する', body: 'WordPress、Shopify、Wixのいずれかで、記事はそこへ公開されます。' },
+            { title: 'レポートを作成する', body: '何を書いたか、サイトがどこに出ているか、何が変わったかをまとめた取引先向けのPDFレポートです。' },
+          ],
+        },
+        {
+          kind: 'callout',
+          icon: Info,
+          title: 'どのプランが合うか',
+          body: <p>プレミアムプランは複数のサイトを運営する方向け、エージェンシープランは取引先のサイトを運用する方向けです。各プランの本数は料金ページに記載しています。</p>,
+        },
+      ],
+      cta: { title: '取引先のサイトでシステムを試す', body: ja.closeBody, primary: ja.trial, secondary: ja.pricing },
+    },
   },
 }
 
@@ -779,6 +897,10 @@ export const WORDPRESS_PAGE: MarketingPage = {
     it: {
       title: 'Per i siti WordPress | Go Top SEO',
       description: 'Si collega il sito WordPress una volta e gli articoli vengono pubblicati lì con immagine in evidenza, categorie e tag. L’analisi del sito trova i problemi e la maggior parte si corregge con un clic dopo l’approvazione.',
+    },
+    ja: {
+      title: 'WordPressのサイトをお持ちの方へ | Go Top SEO',
+      description: 'WordPressサイトを一度連携すれば、記事がアイキャッチ画像、カテゴリー、タグ付きでそこへ公開されます。サイトの診断が問題を見つけ、その多くはご承認後にワンクリックで修正できます。',
     },
   },
   content: {
@@ -1124,6 +1246,63 @@ export const WORDPRESS_PAGE: MarketingPage = {
       ],
       cta: { title: 'Colleghi il suo sito WordPress', body: it.closeBody, primary: it.trial, secondary: it.check },
     },
+    ja: {
+      hero: {
+        eyebrow: 'WordPressのサイトをお持ちの方へ',
+        eyebrowIcon: Blocks,
+        title: '記事が',
+        accent: 'サイトに直接公開されます',
+        subtitle: 'WordPressサイトを一度連携すれば、以後は記事がアイキャッチ画像、カテゴリー、タグ付きで、ご指定の日に公開されます。サイトの診断が問題を見つけ、その多くはご承認後にワンクリックで修正できます。',
+        trust: ja.trust,
+        primary: ja.trial,
+        secondary: ja.check,
+        visual: (
+          <WorkListVisual
+            heading="お客様のWordPressサイト"
+            rows={[
+              { title: '記事を公開', detail: '料金ガイド · アイキャッチ画像付き', icon: FileText, done: true, status: '公開済み' },
+              { title: 'SEOタイトルを修正', detail: '', url: '/services', icon: Type, done: true, status: '修正済み' },
+              { title: '画像6枚に代替テキスト', detail: '', url: '/gallery', icon: ImageIcon, done: true, status: '修正済み' },
+              { title: '次の記事', detail: '木曜 09:00', icon: CalendarClock, done: false, status: '予約済み' },
+            ]}
+          />
+        ),
+      },
+      sections: [
+        {
+          kind: 'cards',
+          tone: 'contrast',
+          eyebrow: 'WordPressで得られるもの',
+          title: '管理画面を開かずに、公開と修正',
+          items: [
+            { icon: Tags, title: '一通りそろった公開', body: 'アイキャッチ画像、本文中の画像、カテゴリー、タグの付いた記事を、すぐに、またはご予約の日に公開します。' },
+            { icon: Wrench, title: 'ワンクリックの修正', body: 'タイトル、ディスクリプション、代替テキスト、リンクです。どの修正も書き込む前に表示され、元に戻せます。' },
+            { icon: ShieldCheck, title: 'YoastとRank Mathに対応', body: 'タイトルとディスクリプションはSEOプラグインの項目に保存します。そのプラグインがすでに構造化データを出力している場合は、よくある質問だけを追加し、重複は作りません。' },
+          ],
+        },
+        {
+          kind: 'steps',
+          eyebrow: '連携の手順',
+          title: '連携は一度だけ',
+          items: [
+            { title: 'アプリケーションパスワードを作る', body: 'WordPressのユーザープロフィールで作成します。システムが手順をご案内します。' },
+            { title: 'プロジェクトの設定で連携する', body: 'サイトのアドレス、ユーザー名、アプリケーションパスワードを入力します。システムが接続を確認します。' },
+            { title: 'Go Topの拡張機能を追加する', body: '任意です。サイトの健全性のページからダウンロードできる拡張機能で、メタディスクリプション、構造化データ、llms.txtファイルを追加します。' },
+          ],
+        },
+        {
+          kind: 'faq',
+          eyebrow: 'よくある質問',
+          title: '連携の前に聞かれること',
+          items: [
+            { q: '安全ですか', a: 'アプリケーションパスワードは暗号化して保管し、WordPressのプロフィールからいつでも無効にできます。サイトへの修正の書き込みは、ご承認後にのみ行われます。' },
+            { q: 'SEOプラグインは必要ですか', a: 'いいえ。YoastまたはRank Mathがある場合は、その項目に書き込みます。メタディスクリプションについては、サイトにSEOプラグインが必要です。' },
+            { q: '公開前に記事を編集できますか', a: 'はい。どの記事も、公開前に開いて変更し、予約し直すことができます。' },
+          ],
+        },
+      ],
+      cta: { title: 'WordPressサイトを連携する', body: ja.closeBody, primary: ja.trial, secondary: ja.check },
+    },
   },
 }
 
@@ -1203,6 +1382,10 @@ export const SHOPIFY_PAGE: MarketingPage = {
     it: {
       title: 'Per i negozi Shopify | Go Top SEO',
       description: 'Si installa l’applicazione dallo Shopify App Store: gli articoli vengono scritti e pubblicati sul blog del negozio. L’analisi trova i problemi negli articoli e nelle pagine, e ogni correzione viene approvata dal negozio.',
+    },
+    ja: {
+      title: 'Shopifyの店舗をお持ちの方へ | Go Top SEO',
+      description: 'Shopify App Storeからアプリをインストールすると、記事が作成され、店舗のブログに公開されます。診断が記事とページの問題を見つけ、どの修正も店舗のご承認を経て適用されます。',
     },
   },
   content: {
@@ -1685,6 +1868,86 @@ export const SHOPIFY_PAGE: MarketingPage = {
         },
       ],
       cta: { title: 'Cominci con il suo negozio', body: it.closeBody, primary: shopifyInstallCta('Installa l’applicazione su Shopify', it.trial), secondary: it.check },
+    },
+    ja: {
+      hero: {
+        eyebrow: 'Shopifyの店舗をお持ちの方へ',
+        eyebrowIcon: Store,
+        title: '店舗のコンテンツを書いて、',
+        accent: '公開して、計測します',
+        subtitle: 'Shopify App Storeからアプリをインストールすると、以後はシステムが顧客の検索内容について記事を書き、店舗のブログに公開し、Google、Googleマップ、そしてChatGPT、Gemini、Google AIの回答で店舗がどこに出ているかをお見せします。',
+        trust: ja.trust,
+        primary: shopifyInstallCta('Shopifyにアプリをインストール', ja.trial),
+        secondary: ja.check,
+        visual: (
+          <WorkListVisual
+            heading="お客様のShopify店舗"
+            rows={[
+              { title: 'ブログに記事を公開', detail: '購入ガイド · 画像付き', icon: FileText, done: true, status: '公開済み' },
+              { title: '検索結果の表示を修正', detail: '', url: '/pages/about', icon: Type, done: true, status: '承認済み' },
+              { title: '記事内の画像の代替テキスト', detail: '', url: '/blogs/news', icon: ImageIcon, done: true, status: '承認済み' },
+              { title: '次の記事', detail: '月曜 09:00', icon: CalendarClock, done: false, status: '予約済み' },
+            ]}
+          />
+        ),
+      },
+      sections: [
+        {
+          kind: 'callout',
+          icon: Store,
+          title: 'インストールはShopify App Storeから',
+          body: (
+            <>
+              {'どの店舗も公式のページからインストールします。'}
+              {shopifyAppStoreLink('Shopify App StoreのGo Top SEO')}
+              {'。ワンクリックで完了し、請求はShopify経由で、店舗のコードに貼り付けるものは何もありません。'}
+            </>
+          ),
+        },
+        {
+          kind: 'cards',
+          tone: 'contrast',
+          eyebrow: 'システムが店舗で行うこと',
+          title: 'テーマに触れずに、執筆、公開、修正',
+          items: [
+            { icon: Tags, title: '店舗のブログの記事', body: 'どの記事も実際の検索をもとに構成し、画像、よくある質問のセクション、内部リンクを付けて、ご指定の日にブログへ公開します。' },
+            { icon: Wrench, title: 'ご承認いただく修正', body: '検索結果に表示されるタイトルとディスクリプション、画像の代替テキスト、リンク切れ、よくある質問のセクションを、店舗の記事とページについて扱います。どの修正も書き込む前に表示され、一つずつご承認いただき、あとから元に戻せます。' },
+            { icon: BarChart3, title: 'GoogleとAIでの計測', body: 'GoogleとGoogleマップでの順位、そしてChatGPT、Gemini、Google AIが店舗について何を述べているかを毎月自動で計測します。ほかの3つのエンジンもワンクリックで確認できます。' },
+          ],
+        },
+        {
+          kind: 'steps',
+          eyebrow: '始め方',
+          title: '3つの手順、開発者は不要',
+          items: [
+            { title: 'App Storeからインストール', body: <>{shopifyAppStoreLink('Go Top SEOのページ')}{'を開き、店舗へのインストールを承認します。'}</> },
+            { title: 'システムが店舗を診断します', body: '記事とページを読み取り、何が足りないか、何を直す価値があるかを、重要な順にお見せします。' },
+            { title: 'コンテンツと修正をご承認いただきます', body: '何を書くかをお選びいただき、修正は一つずつご承認いただきます。ブログへの公開は、定めた予定に沿って行われます。' },
+          ],
+        },
+        {
+          kind: 'cards',
+          columns: 2,
+          eyebrow: '制限事項（但し書きではありません）',
+          title: 'システムが店舗で決して触れないもの',
+          items: [
+            { icon: ShieldCheck, title: 'テーマにもコードにも触れません', body: 'システムが書き込むのは、店舗の記事とページの中だけです。テーマ、コード、設定、価格、注文には触れません。' },
+            { icon: Info, title: '商品とコレクションは、表示のみで変更しません', body: 'アプリの商品とコレクションへのアクセスは読み取り専用です。商品ページで直すべき点はお見せしますが、修正はShopify側で行っていただきます。自動で修正するには、アプリの新しいバージョンが必要になります。' },
+          ],
+        },
+        {
+          kind: 'faq',
+          eyebrow: 'よくある質問',
+          title: 'インストール前に店舗から聞かれること',
+          items: [
+            { q: '承認なしに店舗の何かが変更されることはありますか', a: 'いいえ。Shopifyの店舗では、どの修正も書き込む前に表示され、一つずつご承認いただきます。ご承認後も元に戻せます。修正の自動承認があるのはWordPressのサイトだけです。' },
+            { q: '記事はどこに公開されますか', a: '店舗のブログに、ほかの記事と同じように公開されます。どの記事も、公開前に開いて変更し、予約し直すことができます。' },
+            { q: 'コードやapp embedの追加は必要ですか', a: 'いいえ。インストールはShopify App Storeから行い、システムはテーマを変更せずに店舗と連携します。' },
+            { q: '店舗の構造化データはどうなりますか', a: 'Shopifyのテーマは構造化データの一部をすでに出力しており、システムは独自のものを追加しません。当社が書き込む構造化データは、Go Topの拡張機能を入れたWordPressのサイトにのみ存在します。サイトの健全性のページでは、テーマがすでに賄っている項目は表示しません。' },
+          ],
+        },
+      ],
+      cta: { title: '店舗から始める', body: ja.closeBody, primary: shopifyInstallCta('Shopifyにアプリをインストール', ja.trial), secondary: ja.check },
     },
   },
 }

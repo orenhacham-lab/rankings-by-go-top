@@ -72,6 +72,14 @@ const SITE_METADATA: Record<PublicLocale, SiteMetadataStrings> = {
     ogDescription: 'Creazione, pianificazione e pubblicazione di contenuti SEO e GEO da un unico punto, con monitoraggio mensile delle posizioni su Google e visibilità nelle IA (ChatGPT, Gemini, Google AI Mode)',
     ogLocale: 'it_IT',
   },
+  ja: {
+    title: 'SEO・GEOコンテンツの作成、計画、公開 | Go Top SEO',
+    description: 'Go Top SEO は、SEOとGEOのコンテンツ作成・計画・公開を一つのシステムで行い、Googleの検索順位とAIでの見え方を毎月記録します。無料でお試しいただけます。',
+    keywords: 'SEOコンテンツ作成, コンテンツ計画, 記事の自動公開, GEO, 検索順位の計測, 検索エンジン最適化, SEO, Google, 順位, Googleマップ, AIでの見え方, ChatGPT, Gemini',
+    ogTitle: 'SEO・GEOコンテンツの作成、計画、公開 — Go Top SEO',
+    ogDescription: 'SEOとGEOのコンテンツ作成・計画・公開を一つの画面から。Googleの検索順位とAI（ChatGPT、Gemini、Google AI モード）での見え方を毎月記録します。',
+    ogLocale: 'ja_JP',
+  },
 }
 
 export function getSiteMetadata(locale: PublicLocale): SiteMetadataStrings {

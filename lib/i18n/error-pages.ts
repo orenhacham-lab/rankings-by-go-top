@@ -158,6 +158,31 @@ export const ERROR_PAGES_UI = {
       homeHref: '/it',
     },
   },
+  ja: {
+    logoAlt: 'Go Top SEO のロゴ',
+    notFound: {
+      code: '404',
+      title: 'このページは見つかりませんでした',
+      body: 'リンクが間違っているか、ページが移動した可能性があります。',
+      home: 'トップページへ',
+      dashboard: '管理画面へ',
+      homeHref: '/ja',
+    },
+    screenError: {
+      title: 'この画面を読み込めませんでした',
+      body: 'データが消えたわけではありません。もう一度お試しいただき、繰り返し発生する場合は管理画面にお戻りください。',
+      retry: '再試行',
+      dashboard: '管理画面へ',
+      reference: 'サポートにお伝えいただく参照番号：',
+    },
+    globalError: {
+      title: 'エラーが発生しました',
+      body: '予期しない問題が発生しました。ページを再読み込みしてください。',
+      retry: '再読み込み',
+      home: 'トップページへ',
+      homeHref: '/ja',
+    },
+  },
 } as const
 
 /**

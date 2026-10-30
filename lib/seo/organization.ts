@@ -72,7 +72,7 @@ export function organizationSchema(description: string) {
       contactType: 'Customer Support',
       email: SUPPORT_EMAIL,
       telephone: SUPPORT_PHONE,
-      availableLanguage: ['he', 'en', 'es', 'pt', 'fr', 'it'],
+      availableLanguage: ['he', 'en', 'es', 'pt', 'fr', 'it', 'ja'],
     },
     address: {
       '@type': 'PostalAddress',

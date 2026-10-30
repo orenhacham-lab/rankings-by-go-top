@@ -188,4 +188,32 @@ export const AUTH_BRAND: Record<PublicLocale, Record<AuthBrandVariant, AuthBrand
     glimpse: 'Parole chiave monitorate',
     mobileTrust: ['Senza carta di credito', 'Annullabile in qualsiasi momento'],
   },
+  ja: {
+    login: {
+      eyebrow: 'おかえりなさい',
+      points: [
+        'Googleとマップの検索順位を、ひとつの画面で',
+        'コンテンツの計画と記事は、そのまま続きから',
+        'ChatGPTやGeminiが自社について何と答えているか',
+      ],
+    },
+    signup: {
+      eyebrow: 'Google検索とAI検索を、ひとつのシステムで',
+      points: [
+        'サイト全体の診断が数分で完了します',
+        '自社の分野に合わせた1か月分のコンテンツ計画',
+        'Googleの順位とAIでの見え方を自動で記録します',
+      ],
+    },
+    recover: {
+      eyebrow: 'アカウントへの復帰',
+      points: [
+        'リンクはアカウントに登録されたアドレスにのみ送られます',
+        '有効なのは一度だけ、短い時間に限られます',
+        'データとプロジェクトはそのまま残ります',
+      ],
+    },
+    glimpse: '計測中のキーワード',
+    mobileTrust: ['クレジットカード不要', 'いつでも解約可能'],
+  },
 }

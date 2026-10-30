@@ -31,6 +31,12 @@
  * markets.qa.ts pins these two as well, and blog-auto.qa.ts now asserts that
  * every market the blog research asks for resolves in both maps.
  *
+ * Japan was added on 30 October 2026, with the Japanese blog, and both values
+ * were read back from the live API rather than inferred from the pattern:
+ * `geoTargetConstants/2392` answers name "Japan", countryCode JP, targetType
+ * Country, status ENABLED, and `languageConstants/1005` answers code "ja",
+ * name "Japanese", targetable true.
+ *
  * SUPPORTED_COUNTRIES and SUPPORTED_LANGUAGES below are deliberately NOT
  * widened: they drive the keyword-research screen's pickers, whose labels are
  * translated per locale, and the blog's own research does not go through them.
@@ -49,6 +55,7 @@ export const COUNTRY_GEO_TARGETS: Record<string, number> = {
   PT: 2620, // Portugal
   FR: 2250, // France
   IT: 2380, // Italy
+  JP: 2392, // Japan
 }
 
 export const LANGUAGE_IDS: Record<string, number> = {
@@ -61,6 +68,7 @@ export const LANGUAGE_IDS: Record<string, number> = {
   pt: 1014, // Portuguese
   fr: 1002, // French
   it: 1004, // Italian
+  ja: 1005, // Japanese
 }
 
 export const SUPPORTED_COUNTRIES = ['IL', 'US', 'GB', 'ES', 'MX', 'AR', 'BR', 'PT', 'GR', 'CY'] as const

@@ -29,6 +29,21 @@ const UPDATED_LABEL: Record<LegalLanguage, string> = {
   'pt-BR': 'Última atualização',
   fr: 'Dernière mise à jour',
   it: 'Ultimo aggiornamento',
+  ja: '最終更新',
+}
+
+/**
+ * What stands between the label and the date. Japanese writes a full-width
+ * colon and takes no space after it; every other language here writes the
+ * ASCII colon and a space. The documents' own closing sentences do the same,
+ * so the footer and the body read alike.
+ */
+const UPDATED_SEPARATOR: Record<LegalLanguage, string> = {
+  es: ': ',
+  'pt-BR': ': ',
+  fr: ': ',
+  it: ': ',
+  ja: '：',
 }
 
 function localeDate(iso: string, language: LegalLanguage): string {
@@ -74,7 +89,7 @@ export function TranslatedLegalPage({ slug, language }: { slug: LegalSlug; langu
       <LegalMarkdown blocks={blocks} />
       <section>
         <p className={LEGAL_FOOTNOTE}>
-          {UPDATED_LABEL[language]}: {localeDate(frontMatter.lastUpdated, language)}
+          {UPDATED_LABEL[language]}{UPDATED_SEPARATOR[language]}{localeDate(frontMatter.lastUpdated, language)}
         </p>
       </section>
     </LegalDoc>

@@ -199,6 +199,7 @@ export const en = {
     'pt-BR': 'Português (Brasil)',
     fr: 'Français',
     it: 'Italiano',
+    ja: '日本語',
     aria: 'Change the site language',
   },
   cookie: {

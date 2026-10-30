@@ -164,6 +164,30 @@ const LOGIN_UI = {
       linkInvalid: 'Questo collegamento di conferma non è valido o è scaduto. Effettui l\u2019accesso, oppure si registri di nuovo per riceverne un altro.',
     },
   },
+  ja: {
+    subtitle: 'Google での検索順位の計測と AIでの可視性',
+    logoAlt: 'Go Top SEO のロゴ',
+    heading: 'ログイン',
+    emailLabel: 'メールアドレス',
+    emailPlaceholder: 'name@example.jp',
+    passwordLabel: 'パスワード',
+    passwordPlaceholder: '\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022',
+    loginBtn: 'ログイン',
+    forgotPassword: 'パスワードをお忘れですか？',
+    dontHaveAccount: 'アカウントをお持ちでないですか？',
+    startTrial: '無料で始める',
+    accessibility: 'アクセシビリティ',
+    privacy: 'プライバシー',
+    articles: '記事',
+    accessibilityHref: '/ja/accessibility',
+    privacyHref: '/ja/privacy',
+    articlesHref: '/ja/articles',
+    err: {
+      badCredentials: 'メールアドレスまたはパスワードが正しくありません',
+      emailNotConfirmed: 'メールアドレスがまだ確認されていません。お送りした確認メールを開いて、リンクをクリックしてください。',
+      linkInvalid: 'この確認リンクは無効か、有効期限が切れています。ログインするか、もう一度登録して新しいリンクを受け取ってください。',
+    },
+  },
 } as const
 
 export function AuthForm() {

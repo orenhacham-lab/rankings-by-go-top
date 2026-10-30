@@ -29,7 +29,7 @@ export type GbpCtaType = typeof GBP_CTA_TYPES[number]
  * Deliberately PublicLocale and not the two-language `Locale`: posts used to be
  * he/en only, which quietly gave a Spanish business an English post.
  */
-export const GBP_POST_LANGUAGES = ['he', 'en', 'es', 'pt-BR', 'fr', 'it'] as const
+export const GBP_POST_LANGUAGES = ['he', 'en', 'es', 'pt-BR', 'fr', 'it', 'ja'] as const
 export type GbpPostLanguage = typeof GBP_POST_LANGUAGES[number]
 
 /** An untrusted value to a language we can post in, or null. */

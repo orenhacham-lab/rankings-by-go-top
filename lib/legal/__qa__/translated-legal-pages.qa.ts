@@ -35,6 +35,7 @@ import {
 import { portugueseSiteEnabled } from '@/lib/i18n/portuguese-site'
 import { spanishSiteEnabled } from '@/lib/i18n/spanish-site'
 import { italianSiteEnabled } from '../../i18n/italian-site'
+import { japaneseSiteEnabled } from '../../i18n/japanese-site'
 import { frenchSiteEnabled } from '@/lib/i18n/french-site'
 
 let pass = 0, fail = 0
@@ -54,6 +55,7 @@ const LIVE: Record<LegalLanguage, boolean> = {
   'pt-BR': portugueseSiteEnabled(process.env.NEXT_PUBLIC_PORTUGUESE_SITE_ENABLED),
   fr: frenchSiteEnabled(process.env.NEXT_PUBLIC_FRENCH_SITE_ENABLED),
   it: italianSiteEnabled(process.env.NEXT_PUBLIC_ITALIAN_SITE_ENABLED),
+  ja: japaneseSiteEnabled(process.env.NEXT_PUBLIC_JAPANESE_SITE_ENABLED),
 }
 const owed: string[] = []
 
@@ -173,6 +175,7 @@ console.log('\nC) the routes, the gate and the links')
     'pt-BR': { prefix: '/pt-BR', gate: 'portugueseSiteEnabled' },
     fr: { prefix: '/fr', gate: 'frenchSiteEnabled' },
     it: { prefix: '/it', gate: 'italianSiteEnabled' },
+    ja: { prefix: '/ja', gate: 'japaneseSiteEnabled' },
   }
 
   for (const language of LEGAL_LANGUAGES) {
@@ -238,7 +241,7 @@ console.log('\nC) the routes, the gate and the links')
 
 console.log('\nD) the real documents, in every language')
 {
-  const PREFIX: Record<LegalLanguage, string> = { es: '/es', 'pt-BR': '/pt-BR', fr: '/fr', it: '/it' }
+  const PREFIX: Record<LegalLanguage, string> = { es: '/es', 'pt-BR': '/pt-BR', fr: '/fr', it: '/it', ja: '/ja' }
   /** A translation of the registered company name is a mistake in any language. */
   const TRANSLATED_NAME = [
     /GO TOP (?:MARKETING|MARKETING Y|DE MARKETING)[^.]*(?:DIGITAL|S\.L|SL)\b/i,

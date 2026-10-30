@@ -2,6 +2,7 @@
 
 import Link from 'next/link'
 import { LOCALE_PREFIX, localeHomeHref, type PublicLocale } from '@/lib/i18n/locales'
+import { JAPANESE_TOKUSHO_LINK } from '@/lib/i18n/japanese-site'
 import { getPublicDictionary } from '@/lib/i18n/getPublicDictionary'
 import GoTopMark from '@/components/brand/GoTopMark'
 import WhatsAppGlyph from '@/components/brand/WhatsAppGlyph'
@@ -106,6 +107,21 @@ export function Footer({ locale = 'he' }: { locale?: PublicLocale } = {}) {
                   {dict.footer.accessibility}
                 </Link>
               </li>
+              {/*
+                特定商取引法第11条 asks a mail-order advertisement to display the
+                seller, the price, the payment and the cancellation terms where
+                the buyer finds them before paying. Japan is the only locale
+                whose law asks for that page, so the link appears in that
+                footer only — the other six trees have no such route, and a
+                link to one would be a dead link.
+              */}
+              {locale === 'ja' && (
+                <li>
+                  <Link href={JAPANESE_TOKUSHO_LINK.href} className={linkClass}>
+                    {JAPANESE_TOKUSHO_LINK.label}
+                  </Link>
+                </li>
+              )}
               {/*
                 GDPR Art. 7(3): withdrawing consent has to be as easy as giving
                 it. This is the standing way back into the preferences dialog,

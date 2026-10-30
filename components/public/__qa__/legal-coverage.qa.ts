@@ -383,6 +383,7 @@ check('MUTATION — an English-only extra section is caught', pages.he.terms.h2 
     'pt.wikipedia.org': 'named as the Portuguese Wikipedia in advice text; not contacted',
     'fr.wikipedia.org': 'named as the French Wikipedia in advice text; not contacted',
     'it.wikipedia.org': 'named as the Italian Wikipedia in the sameAs example placeholder of the Italian project settings; the owner types their own URL and our code sends it nothing',
+    'ja.wikipedia.org': 'named as the Japanese Wikipedia in the sameAs example placeholder of the Japanese project settings; the owner types their own URL and our code sends it nothing',
     'app.example.com': 'placeholder in a comment or default',
     'shop.com': 'placeholder in a comment or default',
     'destination.com': 'placeholder in a comment or default',

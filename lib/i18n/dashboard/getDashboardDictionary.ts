@@ -4,6 +4,7 @@ import { dashboardEs } from './es'
 import { dashboardPtBR } from './pt-BR'
 import { dashboardFr } from './fr'
 import { dashboardIt } from './it'
+import { dashboardJa } from './ja'
 import { deepMergeDictionary } from './merge'
 import type { PublicLocale } from '../locales'
 import type { DashboardDictionary } from './he'
@@ -26,11 +27,17 @@ import type { DashboardDictionary } from './he'
  * lib/i18n/dashboard/__qa__/french-dashboard.qa.ts. Deriving each language from
  * English rather than from the language beside it is what keeps a translation
  * from being a translation of a translation.
+ *
+ * Italian and JAPANESE are that same arrangement once more, from it/ and ja/,
+ * each held leaf for leaf by its own suite. Japanese is the first locale here
+ * whose script has no spaces, so the words are read from the dictionary and the
+ * measuring is done by lib/text/segment.ts, never by splitting on a space.
  */
 const dashboardEsMerged = deepMergeDictionary(dashboardEn as unknown as DashboardDictionary, dashboardEs)
 const dashboardPtMerged = deepMergeDictionary(dashboardEn as unknown as DashboardDictionary, dashboardPtBR)
 const dashboardFrMerged = deepMergeDictionary(dashboardEn as unknown as DashboardDictionary, dashboardFr)
 const dashboardItMerged = deepMergeDictionary(dashboardEn as unknown as DashboardDictionary, dashboardIt)
+const dashboardJaMerged = deepMergeDictionary(dashboardEn as unknown as DashboardDictionary, dashboardJa)
 
 const DICTIONARIES = {
   he: dashboardHe,
@@ -39,6 +46,7 @@ const DICTIONARIES = {
   'pt-BR': dashboardPtMerged,
   fr: dashboardFrMerged,
   it: dashboardItMerged,
+  ja: dashboardJaMerged,
 } satisfies Record<PublicLocale, DashboardDictionary>
 
 /**

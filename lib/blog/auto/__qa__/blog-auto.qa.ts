@@ -16,11 +16,26 @@
  *      linked to the trial, our other articles offered at the end, and the gate
  *      that refuses an article which never named the system.
  */
+/**
+ * EVERY LANGUAGE'S FLAG IS ON FOR THIS SUITE. `localesForDay()` publishes only
+ * the languages whose public tree a reader can open, which is what keeps a
+ * gated language from taking a slot in the morning's sixteen runs. The question
+ * here is whether a language that IS live publishes correctly, so the flags are
+ * turned on before the modules under test read them; section A keeps the gate
+ * itself honest by comparing the day's list against publicLocaleEnabled.
+ */
+process.env.NEXT_PUBLIC_SPANISH_SITE_ENABLED = 'true'
+process.env.NEXT_PUBLIC_PORTUGUESE_SITE_ENABLED = 'true'
+process.env.NEXT_PUBLIC_FRENCH_SITE_ENABLED = 'true'
+process.env.NEXT_PUBLIC_ITALIAN_SITE_ENABLED = 'true'
+process.env.NEXT_PUBLIC_JAPANESE_SITE_ENABLED = 'true'
+
 import { existsSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import {
   BLOG_AUTO_LOCALES, isBlogAutoLocale, localesForDay, weeklyShare,
 } from '@/lib/blog/auto/rotation'
+import { publicLocaleEnabled } from '@/lib/i18n/locales'
 import { checkTruthLimits, plainText } from '@/lib/blog/auto/truth-limits'
 import { placeholderContext, runQualityGate } from '@/lib/content/automation/quality-gate'
 import {
@@ -63,10 +78,22 @@ const stripComments = (src: string) => src.replace(/\/\*[\s\S]*?\*\//g, '').repl
 // ============================================================
 // A) THE LANGUAGES
 // ============================================================
-check('A1: six languages are written automatically', same([...BLOG_AUTO_LOCALES], ['he', 'en', 'es', 'pt-BR', 'fr', 'it']))
-check('A2: every language is due every day — there is no weekday rotation left',
-  same([...localesForDay()], [...BLOG_AUTO_LOCALES]))
-check('A3: that is seven articles a week in each language', same(weeklyShare(), { he: 7, en: 7, es: 7, 'pt-BR': 7, fr: 7, it: 7 }), weeklyShare())
+check('A1: seven languages are written automatically', same([...BLOG_AUTO_LOCALES], ['he', 'en', 'es', 'pt-BR', 'fr', 'it', 'ja']))
+// A2 USED TO BE localesForDay() === BLOG_AUTO_LOCALES. Japanese joined the list
+// on 30 Oct 2026 while its public tree was still behind
+// NEXT_PUBLIC_JAPANESE_SITE_ENABLED, so the day's languages are the ones a
+// reader can actually open: every language is still due every day, and a
+// language with nowhere to publish to does not take a slot in the morning's
+// sixteen runs. The check is therefore "no weekday rotation left, and the day's
+// list is exactly the enabled languages, in the list's own order".
+check('A2: every enabled language is due every day — there is no weekday rotation left',
+  same([...localesForDay()], BLOG_AUTO_LOCALES.filter((l) => publicLocaleEnabled(l))))
+check('A2a: a language still behind its flag is not due, and an enabled one is',
+  localesForDay().includes('he') && localesForDay().includes('en')
+  && localesForDay().includes('ja') === publicLocaleEnabled('ja'))
+check('A2b (control): the day\'s list is a filter, not the whole list, when a flag is off',
+  publicLocaleEnabled('ja') || !localesForDay().includes('ja'))
+check('A3: that is seven articles a week in each language', same(weeklyShare(), { he: 7, en: 7, es: 7, 'pt-BR': 7, fr: 7, it: 7, ja: 7 }), weeklyShare())
 check(
   'A4: Portuguese IS among them, now that the content layer writes it (lib/content/language.ts)',
   (BLOG_AUTO_LOCALES as readonly string[]).includes('pt-BR') && isBlogAutoLocale('pt-BR')
@@ -395,6 +422,7 @@ async function main() {
       planned({ id: 'pp', locale: 'pt-BR', topic: 'posicionamento', primary_keyword: 'posicionamento' }),
       planned({ id: 'pf', locale: 'fr', topic: 'suivi de position', primary_keyword: 'suivi de position' }),
       planned({ id: 'pi', locale: 'it', topic: 'posizionamento su google', primary_keyword: 'posizionamento su google' }),
+      planned({ id: 'pj', locale: 'ja', topic: '検索順位の計測', primary_keyword: '検索順位 チェック' }),
     ])
     const summaries = await runBlogAutoPublishAllLocales(admin as unknown as Admin, {}, deps({
       generate: async (brief) => perLocale(brief.language),
