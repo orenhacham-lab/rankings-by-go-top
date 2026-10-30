@@ -110,7 +110,11 @@ export default function EnglishPrivacyPage() {
           <li><strong>JVZoo:</strong> only if you opened our JVZoo marketplace sales page — a tracking
           image is loaded from JVZoo which receives your IP address, your browser identifier and the page
           you arrived from, so that a purchase can be attributed to the affiliate who referred you. The
-          image loads only after you have accepted marketing cookies. For that collection and transmission
+          request also stores JVZoo&rsquo;s own cookies on your device, so it is governed by consent wherever
+          the law requires consent for such storage: in the EEA, the United Kingdom, Switzerland and Canada,
+          and whenever we cannot determine which country the request came from, the image loads only after
+          you have accepted marketing cookies; outside those territories it loads when the page opens. For
+          that collection and transmission
           JVZoo does not process data on our behalf: it is a joint controller with us, and what it does
           with the data afterwards is decided by JVZoo under its own privacy policy</li>
           <li><strong>Meta (Facebook / Instagram):</strong> for targeted advertising, and for a report of a
@@ -643,13 +647,16 @@ export default function EnglishPrivacyPage() {
           you through the JVZoo marketplace. Loaded only if you allow it. Allowing this category
           also covers a conversion report we send to Meta from our server with no cookie at all
           &mdash; see the Meta Advertising section &mdash; and a tracking image loaded from JVZoo
-          on the marketplace sales page, which stores nothing on your device.</li>
+          on the marketplace sales page, which stores cookies of its own on your device.</li>
         </ul>
         <p className="mt-4">
           <strong>Before you choose, no measurement or marketing cookie is set and no request is
           made to Google&rsquo;s servers.</strong>{' '}
           Accepting and refusing are two equal buttons on the notice, and each category can be
-          allowed on its own.
+          allowed on its own. There is one exception: on the JVZoo marketplace sales page, and only
+          for visitors from outside the territories listed under &ldquo;Measurement and marketing
+          services&rdquo; below, the marketplace&rsquo;s tracking image and the cookies it stores
+          load with the page.
         </p>
         <p className="mt-4">
           <strong>Changing or withdrawing your consent:</strong> at any time, through the
@@ -695,9 +702,10 @@ export default function EnglishPrivacyPage() {
           server; it too is subject to marketing consent and stops when that consent is withdrawn.
           One further thing runs outside Google Tag Manager: on the JVZoo marketplace sales
           page only, a one-pixel tracking image is loaded from JVZoo so that a purchase can be
-          attributed to the affiliate who referred you. It stores nothing on your device, it
-          loads only after you have allowed marketing, and it appears on no other page of the
-          site.
+          attributed to the affiliate who referred you. The request stores JVZoo&rsquo;s cookies on
+          your device, so in the EEA, the United Kingdom, Switzerland and Canada, and whenever we
+          cannot determine the country, it loads only after you have allowed marketing; outside
+          those territories it loads when the page opens. It appears on no other page of the site.
         </p>
         <p className="mt-4">
           We declare your consent state to Google through the Consent Mode v2 protocol, so the tools
