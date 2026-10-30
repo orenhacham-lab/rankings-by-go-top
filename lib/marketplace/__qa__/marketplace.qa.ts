@@ -40,6 +40,7 @@ import {
   JVZOO_IPN_V2_SCHEME,
   type MarketplaceHmacHeaderScheme,
 } from '../config'
+import { CONSENT_REQUIRED_COUNTRIES, consentRequiredForCountry } from '../../consent/eprivacy-territory'
 import { fieldDigestFor, marketplaceSignatureFor, verifyMarketplaceSignature } from '../signature'
 import {
   httpStatusForMarketplaceOutcome,
@@ -767,13 +768,74 @@ async function main() {
     // reproduced it on the Spanish document. Bind it to the sentence instead,
     // the way this repo's other legal guards do, and prove the deletion fails.
     const clause = BEACON_CONSENT_CLAUSE[locale]
+    // Whitespace-insensitive, because these documents are JSX and Markdown:
+    // the same sentence is one line in one locale and wrapped across three in
+    // another, so a literal space would fail on formatting rather than on
+    // meaning.
+    const loose = clause.replace(/[.*+?^${}()|[\]\\]/g, '\\$&').replace(/\s+/g, '\\s+')
     const inEntry = (text: string) =>
-      new RegExp(`JVZoo\\s*:[\\s\\S]{0,700}${clause.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}`).test(text)
+      new RegExp(`JVZoo\\s*:[\\s\\S]{0,1400}${loose}`).test(text)
     check(`L4 (${locale}): the entry ITSELF says the image waits for the marketing consent`,
       inEntry(doc), clause)
     check(`L-MUT4 (${locale}): …and deleting that clause from the real document fails it`,
-      !inEntry(doc.replace(clause, '')))
+      // Deleted by the same loose pattern the check uses, because the literal
+      // sentence is wrapped across lines in several of these documents and a
+      // literal replace would delete nothing and prove nothing.
+      !inEntry(doc.replace(new RegExp(loose, 'g'), '')))
   }
+  /*
+   * THE TEXT'S LIST OF TERRITORIES MUST BE THE CODE'S LIST.
+   *
+   * The gate is per country and the privacy documents are per locale, so no
+   * sentence about behaviour can be true for every reader of one page: an
+   * English page is read in Dublin and in Denver. The documents therefore
+   * state the RULE and name the territories, and a reader works out which
+   * side they are on. That only holds while the two lists agree — a split
+   * whose text and code disagree is worse than no split, because each looks
+   * verified on its own. So the code's list is pinned here as a set, and each
+   * document is required to name all four territories AND the fail-closed
+   * case, which is what makes "whenever we cannot determine the country" a
+   * description rather than a decoration.
+   */
+  const EU_27 = [
+    'AT', 'BE', 'BG', 'CY', 'CZ', 'DE', 'DK', 'EE', 'ES', 'FI', 'FR', 'GR',
+    'HR', 'HU', 'IE', 'IT', 'LT', 'LU', 'LV', 'MT', 'NL', 'PL', 'PT', 'RO',
+    'SE', 'SI', 'SK',
+  ]
+  const EXPECTED_TERRITORY = [...EU_27, 'IS', 'LI', 'NO', 'GB', 'CH', 'CA'].sort()
+  const sameList = (a: readonly string[], b: readonly string[]) =>
+    a.length === b.length && [...a].sort().every((v, i) => v === b[i])
+  check('L6: the gate reads exactly the EEA, the UK, Switzerland and Canada',
+    sameList(CONSENT_REQUIRED_COUNTRIES, EXPECTED_TERRITORY),
+    [...CONSENT_REQUIRED_COUNTRIES].sort().join(','))
+  check('L6b: and the United States is not among them, which is the whole point of the split',
+    consentRequiredForCountry('US') === false)
+  check('L6c: an unknown country is treated as a consent territory, as the documents say',
+    consentRequiredForCountry(null) === true && consentRequiredForCountry('XX') === true)
+  /** The four territories and the fail-closed case, as each document words them. */
+  const TERRITORY_WORDS: Record<string, readonly string[]> = {
+    he: ['באזור הכלכלי האירופי', 'בבריטניה', 'בשווייץ', 'ובקנדה', 'איננו'],
+    en: ['EEA', 'United Kingdom', 'Switzerland', 'Canada', 'cannot determine'],
+    es: ['Espacio Económico Europeo', 'Reino Unido', 'Suiza', 'Canadá', 'no podamos determinar'],
+    'pt-BR': ['Espaço Econômico Europeu', 'Reino Unido', 'Suíça', 'Canadá', 'não conseguirmos determinar'],
+    fr: ['Espace économique européen', 'Royaume-Uni', 'Suisse', 'Canada', 'ne parvenons pas à déterminer'],
+    it: ['Spazio economico europeo', 'Regno Unito', 'Svizzera', 'Canada', 'non riusciamo a determinare'],
+  }
+  for (const locale of CONSENT_LOCALES) {
+    const doc = read(PRIVACY_DOC[locale])
+    const words = TERRITORY_WORDS[locale]
+    const missing = words.filter((w) => !doc.includes(w))
+    check(`L7 (${locale}): the document names the four territories and the unknown-country case`,
+      missing.length === 0, missing.join(' | '))
+    check(`L8 (${locale}): and it no longer claims the beacon stores nothing on the device`,
+      !/stores nothing on your device|אינה שומרת דבר במכשיר/.test(doc))
+  }
+  check('L-MUT6: the list guard fails when the code and the text diverge by one territory',
+    !sameList([...EXPECTED_TERRITORY, 'US'], EXPECTED_TERRITORY)
+    && !sameList(EXPECTED_TERRITORY.filter((c) => c !== 'CA'), EXPECTED_TERRITORY))
+  check('L-MUT7: the territory-wording guard fails on a document with a territory removed',
+    TERRITORY_WORDS.en.some((w) => !read(PRIVACY_DOC.en).replaceAll('Switzerland', '').includes(w)))
+
   const consentPolicy = code('lib/consent/categories.ts')
   const policyVersion = consentPolicy.match(/CONSENT_POLICY_VERSION = '([^']+)'/)?.[1] ?? ''
   check('L5: the policy version is later than the two-recipient wording, so stored grants are re-asked',

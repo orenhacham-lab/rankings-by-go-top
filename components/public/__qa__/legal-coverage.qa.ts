@@ -273,6 +273,14 @@ check('MUTATION — an English-only extra section is caught', pages.he.terms.h2 
     // (lib/creem/config.ts), and the sandbox host receives the same shape.
     'api.creem.io': { en: /Creem/, he: /Creem/ },
     'test-api.creem.io': { en: /Creem/, he: /Creem/ },
+    // The marketplace beacon on /go/jvzoo. It is a recipient and not a
+    // documentation link: the request carries the visitor's IP address and
+    // user-agent, and JVZoo's response stores a session cookie holding both
+    // (lib/consent/eprivacy-territory.ts records the headers). That is the
+    // whole reason the beacon is consent-gated in Europe, so a policy that
+    // did not name JVZoo would be describing a different page than the one
+    // we ship.
+    'i.jvzoo.com': { en: /JVZoo/, he: /JVZoo/ },
   }
   /**
    * Hosts that receive nothing about a customer, each with the reason it is

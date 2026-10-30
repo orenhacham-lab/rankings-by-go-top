@@ -41,8 +41,11 @@
  */
 import type { Metadata } from 'next'
 import Link from 'next/link'
+import { headers } from 'next/headers'
 import { notFound } from 'next/navigation'
 import { MarketplacePixel } from '@/components/consent/MarketplacePixel'
+import { MarketplacePixelUnconditional } from '@/components/consent/MarketplacePixelUnconditional'
+import { consentRequiredForRequest } from '@/lib/consent/eprivacy-territory'
 import {
   marketplaceBuyUrl,
   marketplacePixelUrl,
@@ -86,6 +89,13 @@ export default async function MarketplaceSalesPage({
         .filter((url): url is string => url !== null),
     ),
   ]
+  // WHERE the beacon may fire without being asked first, decided on the
+  // server from the CDN's country header and nowhere else. A browser-side
+  // guess here would write a cookie we could not recall whenever it guessed
+  // wrong, and the whole point of this check is that the write is the thing
+  // consent protects. See lib/consent/eprivacy-territory.ts for why the
+  // beacon counts as storage at all.
+  const consentRequired = consentRequiredForRequest(await headers())
 
   return (
     <main className="mx-auto max-w-3xl px-4 py-16">
@@ -239,9 +249,13 @@ export default async function MarketplaceSalesPage({
           still renders nothing. If the review then reports the pixel missing,
           the answer is a note to compliance, not a tag that fires before the
           visitor has been asked. */}
-      {pixelUrls.map((url) => (
-        <MarketplacePixel key={url} src={url} alt={`${provider.label} tracking`} />
-      ))}
+      {pixelUrls.map((url) =>
+        consentRequired ? (
+          <MarketplacePixel key={url} src={url} alt={`${provider.label} tracking`} />
+        ) : (
+          <MarketplacePixelUnconditional key={url} src={url} alt={`${provider.label} tracking`} />
+        ),
+      )}
     </main>
   )
 }
