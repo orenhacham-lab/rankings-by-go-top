@@ -411,7 +411,7 @@ export const BUSINESSES_PAGE: MarketingPage = {
       hero: {
         eyebrow: '事業者の方へ',
         eyebrowIcon: Store,
-        title: '書いて、公開して、計測する。',
+        title: '書いて、公開して、計測します。',
         accent: 'それを毎月',
         subtitle: '顧客が検索している内容について記事を書き、サイトに直接公開します。GoogleとGoogleマップでの自社の位置、そしてChatGPT、Gemini、Google AIが自社について何を述べているかを計測します。業者の管理も、SEOの勉強も必要ありません。',
         trust: ja.trust,

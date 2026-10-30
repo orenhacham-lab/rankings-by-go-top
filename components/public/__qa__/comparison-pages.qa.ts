@@ -26,6 +26,7 @@ import { readdirSync, existsSync, readFileSync } from 'fs'
 import { join } from 'path'
 import { PUBLIC_LOCALES, LOCALE_PREFIX, type PublicLocale } from '@/lib/i18n/locales'
 import type { ComparisonCopy } from '@/lib/i18n/public/compare/types'
+import { wordCount, maxPhraseWords } from '@/lib/text/segment'
 
 let pass = 0, fail = 0
 function check(name: string, cond: boolean, detail?: string) {
@@ -118,15 +119,27 @@ function main() {
   for (const { slug, copy } of COMPARISONS) {
     for (const locale of PUBLIC_LOCALES) {
       const s = copy[locale].theirStrengths
-      const words = s.items.map((i) => i.body).join(' ').split(/\s+/).filter(Boolean).length
+      const body = s.items.map((i) => i.body).join(' ')
+      // COUNTED THROUGH THE SEGMENTER, not by splitting on spaces. Japanese is
+      // written without word spaces, so a space split reads 「検索順位の計測が
+      // 得意です」 as one word and reported the Japanese pages as three-word
+      // gestures while they were the longest copy on the site. `wordCount`
+      // whitespace-splits a spaced language and ICU-segments Japanese, and
+      // `maxPhraseWords` restates the floor in the units THIS text is measured
+      // in — a segmented Japanese text yields about 1.7 tokens per spaced word.
+      const words = wordCount(body)
       // Three reasons is the shape every page uses; 60 words is the floor below
       // which "they are also good" stops being a reason and becomes a gesture.
-      if (s.items.length < 2 || words < 60) thin.push(`${slug}/${locale} (${s.items.length} items, ${words} words)`)
+      if (s.items.length < 2 || words < maxPhraseWords(body, 60)) thin.push(`${slug}/${locale} (${s.items.length} items, ${words} words)`)
     }
   }
   check('D1: each page gives at least two substantive reasons to buy theirs', thin.length === 0, thin.join(', '))
   check('MUTATION CONTROL: a single one-line nod is caught',
-    ['They are fine too.'].join(' ').split(/\s+/).length < 60)
+    wordCount('They are fine too.') < maxPhraseWords('They are fine too.', 60))
+  // The same control in Japanese: a one-line nod must still be caught, which is
+  // what proves the scaled floor did not simply switch the check off for ja.
+  check('MUTATION CONTROL: a one-line Japanese nod is caught',
+    wordCount('こちらも良い製品です。') < maxPhraseWords('こちらも良い製品です。', 60))
 
   console.log(`\n${pass} passed, ${fail} failed`)
   if (fail > 0) process.exitCode = 1

@@ -625,7 +625,7 @@ async function main() {
      * GDPR Art. 7(4) makes that consent worthless. The OPTIONAL sentence is
      * where marketing and the withdrawal right live.
      */
-    for (const locale of ['he', 'en', 'es', 'pt-BR', 'fr', 'it'] as const) {
+    for (const locale of ['he', 'en', 'es', 'pt-BR', 'fr', 'it', 'ja'] as const) {
       const report = reportConsentText(locale)
       const marketing = marketingConsentText(locale)
       const expected = {
@@ -635,19 +635,24 @@ async function main() {
         'pt-BR': '[report-email-pt-v2]',
         fr: '[report-email-fr-v1]',
         it: '[report-email-it-v1]',
+        ja: '[report-email-ja-v1]',
       }[locale]
       check(`${locale}: the required sentence carries its own version id`,
         report.endsWith(expected), `${report.slice(-32)} vs ${expected}`)
       check(`${locale}: the required sentence names Go Top as the sender`, /Go Top/.test(report))
       check(`${locale}: the required sentence does NOT ask for marketing`,
-        !/שיווקי|marketing|comercial/i.test(report), report)
+        !/שיווקי|marketing|comercial|マーケティング/i.test(report), report)
       check(`${locale}: the optional sentence does ask for marketing, and says consent can be withdrawn`,
-        /שיווקי|marketing|comercial/i.test(marketing)
+        // Japanese writes the word in katakana (マーケティング) and the GDPR verb as
+        // 撤回, so both alternations carry a Japanese branch. The sentence is the
+        // ordinary Japanese wording; the pattern grew to it rather than the other
+        // way round, as it did for Italian below.
+        /שיווקי|marketing|comercial|マーケティング/i.test(marketing)
         // Italian's standard GDPR verb is `revocare il consenso`, so the Italian
         // sentence says `revocato` — no existing alternative matches it, and the
         // copy is what the law's own wording is, so the pattern grew rather than
         // the sentence being bent to fit it.
-        && /להסיר|withdraw|retirar|retirar meu|retirer|revocat/i.test(marketing), marketing)
+        && /להסיר|withdraw|retirar|retirar meu|retirer|revocat|撤回/i.test(marketing), marketing)
       check(`${locale}: the two sentences carry different version ids`,
         report.slice(report.lastIndexOf('[')) !== marketing.slice(marketing.lastIndexOf('[')))
       // A refusal is recorded in words, and a grant is findable by its id.

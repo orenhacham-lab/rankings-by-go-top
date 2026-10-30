@@ -16,6 +16,20 @@
  *      linked to the trial, our other articles offered at the end, and the gate
  *      that refuses an article which never named the system.
  */
+/**
+ * EVERY LANGUAGE'S FLAG IS ON FOR THIS SUITE. `localesForDay()` publishes only
+ * the languages whose public tree a reader can open, which is what keeps a
+ * gated language from taking a slot in the morning's sixteen runs. The question
+ * here is whether a language that IS live publishes correctly, so the flags are
+ * turned on before the modules under test read them; section A keeps the gate
+ * itself honest by comparing the day's list against publicLocaleEnabled.
+ */
+process.env.NEXT_PUBLIC_SPANISH_SITE_ENABLED = 'true'
+process.env.NEXT_PUBLIC_PORTUGUESE_SITE_ENABLED = 'true'
+process.env.NEXT_PUBLIC_FRENCH_SITE_ENABLED = 'true'
+process.env.NEXT_PUBLIC_ITALIAN_SITE_ENABLED = 'true'
+process.env.NEXT_PUBLIC_JAPANESE_SITE_ENABLED = 'true'
+
 import { existsSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import {
@@ -408,6 +422,7 @@ async function main() {
       planned({ id: 'pp', locale: 'pt-BR', topic: 'posicionamento', primary_keyword: 'posicionamento' }),
       planned({ id: 'pf', locale: 'fr', topic: 'suivi de position', primary_keyword: 'suivi de position' }),
       planned({ id: 'pi', locale: 'it', topic: 'posizionamento su google', primary_keyword: 'posizionamento su google' }),
+      planned({ id: 'pj', locale: 'ja', topic: '検索順位の計測', primary_keyword: '検索順位 チェック' }),
     ])
     const summaries = await runBlogAutoPublishAllLocales(admin as unknown as Admin, {}, deps({
       generate: async (brief) => perLocale(brief.language),

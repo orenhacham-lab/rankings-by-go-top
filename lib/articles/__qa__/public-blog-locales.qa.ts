@@ -374,7 +374,7 @@ function main() {
   for (const locale of PUBLIC_LOCALES) {
     const role = articleAuthor('אורן חכם')?.role[locale] ?? ''
     check(`O16. ${locale}: the role names him as the founder`,
-      /מייסד|Founder|Fundador|Fondateur|Fondatore/.test(role), role)
+      /מייסד|Founder|Fundador|Fondateur|Fondatore|創業者/.test(role), role)
   }
   // MUTATION CONTROL for O11/O16: the Hebrew spelling and the Hebrew role are
   // still Hebrew, so these checks are not passing on an empty table.

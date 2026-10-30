@@ -215,7 +215,11 @@ export const billingJa: DeepPartial<DashboardDictionary> = {
     },
   },
   trialBar: {
-    daysLeft: (n: number): readonly [string, string] => ['無料トライアルは残り', '日'],
+    // Japanese has no plural agreement and no 1-vs-many wording here, so the day
+    // count is not read: 「無料トライアルは残り 3 日」 and 「残り 1 日」 are the same
+    // sentence. The parameter is dropped rather than ignored, which a zero-argument
+    // function may do against this signature.
+    daysLeft: (): readonly [string, string] => ['無料トライアルは残り', '日'],
     lastDay: '本日が無料トライアルの最終日です',
     expired: '無料トライアルは終了しました',
     upgrade: '今すぐプランを変更',

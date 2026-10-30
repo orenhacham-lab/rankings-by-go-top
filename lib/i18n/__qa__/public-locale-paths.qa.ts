@@ -62,7 +62,7 @@ function walk(dir: string, out: string[] = []): string[] {
     /freeCheckPath\(locale\)/.test(expr) && !/locale ===/.test(expr), expr.trim())
 
   // The real function the component ships, once per locale.
-  const expected: Record<string, string> = { he: '/free-check', en: '/en/free-check', es: '/es/free-check', 'pt-BR': '/pt-BR/free-check', fr: '/fr/free-check', it: '/it/free-check' }
+  const expected: Record<string, string> = { he: '/free-check', en: '/en/free-check', es: '/es/free-check', 'pt-BR': '/pt-BR/free-check', fr: '/fr/free-check', it: '/it/free-check', ja: '/ja/free-check' }
   const wrong = PUBLIC_LOCALES.filter((l) => freeCheckPath(l) !== expected[l])
   check(`1b: all ${PUBLIC_LOCALES.length} public locales land on their own /free-check`,
     wrong.length === 0, wrong.map((l) => `${l}:${freeCheckPath(l)}`).join(' '))

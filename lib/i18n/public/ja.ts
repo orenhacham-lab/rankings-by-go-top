@@ -98,7 +98,7 @@ export const ja = {
     solutionsMenu: {
       businesses: {
         label: '事業者の方',
-        description: '書いて、公開して、計測する。業者の管理が不要な一つのシステムです。',
+        description: '書いて、公開して、計測します。業者の管理が不要な一つのシステムです。',
       },
       agencies: {
         label: '制作会社・代理店',

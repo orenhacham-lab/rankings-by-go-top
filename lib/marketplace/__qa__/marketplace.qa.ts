@@ -750,8 +750,8 @@ async function main() {
   // turns the old stored decisions back into questions. A deploy carrying any
   // two of the three leaves the beacon firing on a grant nobody gave, so this
   // section fails on the missing one rather than on the beacon.
-  console.log('\nL. the beacon\'s lawful basis across the six languages')
-  const CONSENT_LOCALES = ['he', 'en', 'es', 'pt-BR', 'fr', 'it'] as const
+  console.log('\nL. the beacon\'s lawful basis across the seven languages')
+  const CONSENT_LOCALES = ['he', 'en', 'es', 'pt-BR', 'fr', 'it', 'ja'] as const
   const PRIVACY_DOC: Record<string, string> = {
     he: 'app/(legal)/privacy/page.tsx',
     en: 'app/(public)/en/privacy/page.tsx',
@@ -759,6 +759,7 @@ async function main() {
     'pt-BR': 'content/legal/pt-BR/privacy.md',
     fr: 'content/legal/fr/privacy.md',
     it: 'content/legal/it/privacy.md',
+    ja: 'content/legal/ja/privacy.md',
   }
   /** The marketing category's own description, cut out of the public dictionary. */
   const marketingDesc = (locale: string): string => {
@@ -776,6 +777,7 @@ async function main() {
     'pt-BR': 'depois de você aceitar os cookies de marketing',
     fr: 'après votre acceptation des cookies de marketing',
     it: 'dopo che Lei ha accettato i cookie di marketing',
+    ja: 'お客様がマーケティングの Cookie に同意された後にのみ読み込まれます',
   }
   for (const locale of CONSENT_LOCALES) {
     const desc = marketingDesc(locale)
@@ -801,7 +803,11 @@ async function main() {
     // meaning.
     const loose = clause.replace(/[.*+?^${}()|[\]\\]/g, '\\$&').replace(/\s+/g, '\\s+')
     const inEntry = (text: string) =>
-      new RegExp(`JVZoo\\s*:[\\s\\S]{0,1400}${loose}`).test(text)
+      // `[:：]`, because Japanese punctuation is full width: the entry opens
+      // 「**JVZoo：**」, and an ASCII-only colon here would have read the Japanese
+      // document as having no JVZoo entry at all — which is the silent pass this
+      // whole section exists to prevent.
+      new RegExp(`JVZoo\\s*[:：][\\s\\S]{0,1400}${loose}`).test(text)
     check(`L4 (${locale}): the entry ITSELF says the image waits for the marketing consent`,
       inEntry(doc), clause)
     check(`L-MUT4 (${locale}): …and deleting that clause from the real document fails it`,
@@ -847,6 +853,7 @@ async function main() {
     'pt-BR': ['Espaço Econômico Europeu', 'Reino Unido', 'Suíça', 'Canadá', 'não conseguirmos determinar'],
     fr: ['Espace économique européen', 'Royaume-Uni', 'Suisse', 'Canada', 'ne parvenons pas à déterminer'],
     it: ['Spazio economico europeo', 'Regno Unito', 'Svizzera', 'Canada', 'non riusciamo a determinare'],
+    ja: ['欧州経済領域', '英国', 'スイス', 'カナダ', '判定できなかった場合'],
   }
   for (const locale of CONSENT_LOCALES) {
     const doc = read(PRIVACY_DOC[locale])
@@ -885,6 +892,10 @@ async function main() {
     'pt-BR': /listados em\s*«([\s\S]*?)»/g,
     fr: /énumérés dans\s*«([\s\S]*?)»/g,
     it: /elencati in\s*«([\s\S]*?)»/g,
+    // Japanese points forward with 後述の and quotes the name in corner brackets,
+    // which is the one pointer phrase this document uses; 「…」の条 appears too and
+    // names the same kind of heading, so both shapes are read.
+    ja: /(?:後述の|前述の)「([^」]+)」/g,
   }
   const flat = (v: string) => v.replace(/\s+/g, ' ').trim()
   /** Every heading the document carries, JSX and Markdown alike. */

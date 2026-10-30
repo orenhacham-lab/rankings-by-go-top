@@ -107,6 +107,7 @@ const STRINGS = {
     'pt-BR': 'Uma pergunta é o que um cliente escreveria no ChatGPT ou no Gemini ao buscar o que você oferece, por exemplo pedir a recomendação de um negócio da sua área. Fazemos essa pergunta aos motores e verificamos se o seu negócio aparece na resposta. As boas perguntas são as que os clientes realmente fazem, sem o nome do seu negócio.',
     fr: 'Une question, c\'est ce qu\'un client taperait dans ChatGPT ou Gemini en cherchant ce que vous proposez, par exemple en demandant une entreprise recommandée dans votre domaine. Nous posons cette question aux moteurs et vérifions si votre entreprise apparaît dans la réponse. Les bonnes questions sont celles que de vrais clients posent, sans le nom de votre entreprise.',
     it: 'Una domanda è ciò che un cliente digiterebbe su ChatGPT o Gemini cercando quello che offrite, per esempio chiedendo un\'attività consigliata nel vostro settore. La domanda viene posta ai motori e viene verificato se la vostra attività compare nella risposta. Le domande valide sono quelle che i clienti reali pongono, senza il nome della vostra attività.',
+    ja: '質問とは、お客様が探しているものを ChatGPT や Gemini に入力するときの言葉です。たとえば、その分野でおすすめの事業を尋ねる言葉です。その質問を各エンジンに尋ねて、回答のなかに事業が出てくるかどうかを確認します。良い質問は、実際のお客様が尋ねる言葉で、事業名を含みません。',
   },
   no_queries_title: { he: 'עוד אין שאלות במעקב', en: 'No questions tracked yet', es: 'Todavía no hay preguntas en seguimiento', 'pt-BR': 'Ainda não há perguntas em acompanhamento', fr: 'Aucune question suivie pour l\'instant', it: 'Nessuna domanda monitorata per il momento', ja: '計測している質問はまだありません' },
   no_queries_body: {
@@ -116,6 +117,7 @@ const STRINGS = {
     'pt-BR': 'Primeiro passo: escolha uma ou duas perguntas que os seus clientes fazem. Escolha entre as sugestões abaixo ou escreva a sua. Adicionar uma pergunta não custa nada; só as verificações contam no seu limite.',
     fr: 'Première étape : choisissez une ou deux questions que vos clients posent. Prenez-les dans les suggestions ci-dessous ou écrivez les vôtres. Ajouter une question ne coûte rien ; seule une vérification est décomptée de votre quota.',
     it: 'Primo passo: scegliere una o due domande che i vostri clienti pongono. Si possono prendere dai suggerimenti qui sotto oppure scrivere le proprie. Aggiungere una domanda non costa nulla; solo una verifica viene scalata dalla vostra quota.',
+    ja: '最初の一歩は、お客様が尋ねる質問を1つか2つ選ぶことです。下の候補から選ぶか、自分で書いてください。質問の追加は無料で、確認だけが上限に数えられます。',
   },
   no_queries_pick: { he: 'בחירה מהשאלות המוצעות', en: 'Pick a suggested question', es: 'Elegir una pregunta propuesta', 'pt-BR': 'Escolher uma pergunta sugerida', fr: 'Choisir une question suggérée', it: 'Scegliere una domanda suggerita', ja: 'おすすめの質問を選ぶ' },
   no_queries_write: { he: 'כתיבת שאלה משלכם', en: 'Write your own question', es: 'Escribir tu propia pregunta', 'pt-BR': 'Escrever a sua própria pergunta', fr: 'Écrire votre propre question', it: 'Scrivere una domanda propria', ja: '自分で質問を書く' },
@@ -126,6 +128,7 @@ const STRINGS = {
     'pt-BR': 'Gere perguntas inteligentes sob medida para o seu negócio, ou crie uma manualmente.',
     fr: 'Générez des questions d\'IA adaptées à votre entreprise, ou créez-en une manuellement.',
     it: 'Si possono generare domande di IA adatte alla vostra attività oppure crearne una manualmente.',
+    ja: '事業に合わせたAIの質問を自動で作るか、手で1件ずつ追加してください。',
   },
   no_scans: { he: 'אין סריקות עדיין', en: 'No scans yet', es: 'Todavía no hay comprobaciones', 'pt-BR': 'Ainda não há verificações', fr: 'Aucune vérification pour l\'instant', it: 'Nessuna verifica per il momento', ja: '確認はまだありません' },
   no_scans_help: {
@@ -135,6 +138,7 @@ const STRINGS = {
     'pt-BR': 'Verifique uma pergunta em um motor de IA para começar a acompanhá-la.',
     fr: 'Vérifiez une question d\'IA sur un moteur pour commencer à suivre l\'activité.',
     it: 'Verificare una domanda di IA su un motore per iniziare a seguire l\'attività.',
+    ja: 'AIの質問をエンジンで確認すると、計測が始まります。',
   },
 
   // Scan history
@@ -156,6 +160,7 @@ const STRINGS = {
     'pt-BR': 'O resultado da verificação, a resposta e todas as citações serão excluídos definitivamente. Isso não pode ser desfeito.',
     fr: 'Cela supprimera définitivement le résultat de la vérification d\'IA, la réponse et toutes les citations associées. Cette action est irréversible.',
     it: 'Il risultato della verifica di IA, la risposta e tutte le citazioni associate verranno eliminati definitivamente. L\'operazione è irreversibile.',
+    ja: 'AIの確認結果、回答、関連するすべての引用が完全に削除されます。この操作は取り消せません。',
   },
 
   // Smart AI questions modal
@@ -167,6 +172,7 @@ const STRINGS = {
     'pt-BR': 'Apenas perguntas que o negócio pode vencer: da sua área, feitas por alguém prestes a decidir, e com uma página que responde ou um artigo que pode ser escrito. Só é verificada uma pergunta que você tenha adicionado.',
     fr: 'Uniquement des questions que l\'entreprise peut gagner : dans son domaine, posées par quelqu\'un sur le point de décider, avec une page qui y répond ou un article à écrire. Une vérification ne part que sur une question que vous ajoutez.',
     it: 'Solo domande che l\'attività può vincere: nel suo settore, poste da chi è sul punto di decidere, con una pagina che risponde o un articolo da scrivere. Una verifica parte solo su una domanda che viene aggiunta.',
+    ja: '事業が勝てる質問だけを挙げます。その分野の質問で、これから決める人が尋ねる質問で、答えるページがあるか記事を書ける質問です。確認は、追加した質問にだけ実行されます。',
   },
   smart_questions_help: {
     he: 'שאלות מוכנות מותאמות לעסק שלך. בחר מרובה, ערוך, או הוסף בודד.',
@@ -175,6 +181,7 @@ const STRINGS = {
     'pt-BR': 'Perguntas de IA sob medida para o seu negócio. Selecione várias, edite-as ou adicione-as uma a uma.',
     fr: 'Des questions d\'IA adaptées à votre entreprise. Sélectionnez-en plusieurs, modifiez-les ou ajoutez-les une à une.',
     it: 'Domande di IA adatte alla vostra attività. Si possono selezionare più domande, modificarle oppure aggiungerle una alla volta.',
+    ja: '事業に合わせたAIの質問です。まとめて選ぶことも、編集することも、1件ずつ追加することもできます。',
   },
   add_question_label: { he: 'הוסף שאלה למעקב', en: 'Add question to tracking', es: 'Añadir la pregunta al seguimiento', 'pt-BR': 'Adicionar a pergunta ao acompanhamento', fr: 'Ajouter la question au suivi', it: 'Aggiungere la domanda al monitoraggio', ja: '質問を計測に追加' },
   already_tracked: { he: 'כבר במעקב', en: 'Already tracked', es: 'Ya está en seguimiento', 'pt-BR': 'Já está em acompanhamento', fr: 'Déjà suivie', it: 'Già monitorata', ja: 'すでに計測中' },
@@ -186,6 +193,7 @@ const STRINGS = {
     'pt-BR': 'Carregando as perguntas recomendadas…',
     fr: 'Chargement des questions suggérées...',
     it: 'Caricamento delle domande suggerite...',
+    ja: 'おすすめの質問を読み込んでいます…',
   },
   no_new_suggestions: {
     he: 'לא נמצאו שאלות מומלצות חדשות כרגע.',
@@ -194,6 +202,7 @@ const STRINGS = {
     'pt-BR': 'No momento, não encontramos novas perguntas recomendadas.',
     fr: 'Aucune nouvelle question suggérée pour le moment.',
     it: 'Nessuna nuova domanda suggerita per il momento.',
+    ja: '今のところ、新しいおすすめの質問は見つかりません。',
   },
   no_diverse_suggestions: {
     he: 'לא נמצאו כרגע עוד שאלות מגוונות. כדי לקבל עוד המלצות, הוסיפו מילות מפתח נוספות, שירותים או קטגוריות.',
@@ -202,6 +211,7 @@ const STRINGS = {
     'pt-BR': 'No momento, não há mais perguntas variadas. Para receber mais sugestões, adicione palavras-chave, serviços ou categorias.',
     fr: 'Aucune question plus variée n\'a été trouvée pour le moment. Ajoutez des mots-clés, des services ou des catégories pour obtenir plus de suggestions.',
     it: 'Per il momento non sono state trovate domande più varie. Aggiungere parole chiave, servizi o categorie per ottenere più suggerimenti.',
+    ja: '今のところ、これ以上ちがう質問は見つかりません。キーワード、サービス、カテゴリを増やすと、候補が増えます。',
   },
   pool_exhausted_rich: {
     he: 'כל השאלות האיכותיות הזמינות כבר מוצגות. ניתן להוסיף שאלות ידנית או להרחיב את קטגוריות השירות בפרופיל.',
@@ -210,6 +220,7 @@ const STRINGS = {
     'pt-BR': 'Todas as perguntas de qualidade disponíveis já estão sendo exibidas. Você pode adicionar perguntas manualmente ou ampliar as categorias de serviço no perfil.',
     fr: 'Toutes les questions de qualité disponibles sont déjà affichées. Vous pouvez ajouter des questions manuellement ou élargir les catégories de services dans le profil.',
     it: 'Tutte le domande di qualità disponibili sono già visualizzate. Si possono aggiungere domande manualmente oppure ampliare le categorie di servizi nel profilo.',
+    ja: '質の高い質問はすべて表示されています。質問を手で追加するか、プロフィールのサービスのカテゴリを広げてください。',
   },
   pool_exhausted_thin: {
     he: 'כדי לקבל עוד שאלות, הוסיפו מילות מפתח, שירותים או קטגוריות בפרופיל.',
@@ -218,6 +229,7 @@ const STRINGS = {
     'pt-BR': 'Para receber mais perguntas, adicione palavras-chave, serviços ou categorias no perfil.',
     fr: 'Pour obtenir plus de questions, ajoutez des mots-clés, des services ou des catégories au profil.',
     it: 'Per ottenere più domande, aggiungere parole chiave, servizi o categorie al profilo.',
+    ja: '質問を増やすには、プロフィールにキーワード、サービス、カテゴリを追加してください。',
   },
   refresh_suggestions: { he: 'רענן', en: 'Refresh', es: 'Actualizar', 'pt-BR': 'Atualizar', fr: 'Actualiser', it: 'Aggiornare', ja: '更新' },
   generate_more_suggestions: { he: 'צור עוד שאלות', en: 'Generate more questions', es: 'Generar más preguntas', 'pt-BR': 'Gerar mais perguntas', fr: 'Générer plus de questions', it: 'Generare più domande', ja: '質問をさらに生成' },
@@ -238,6 +250,7 @@ const STRINGS = {
     'pt-BR': 'Cada pergunta é verificada no ChatGPT, no Gemini e no Google AI com um único clique. A verificação em um único motor, ou em mais motores (Perplexity, Copilot, Grok), fica no menu ⋯ da pergunta. Cada motor conta como uma verificação do seu limite.',
     fr: 'Chaque question est vérifiée sur ChatGPT, Gemini et Google AI en un clic. Une vérification sur un seul moteur, ou sur d\'autres moteurs (Perplexity, Copilot, Grok), se trouve dans le menu ⋯ de la question. Chaque moteur compte pour une vérification de votre quota.',
     it: 'Ogni domanda viene verificata su ChatGPT, Gemini e Google AI con un clic. La verifica su un solo motore, o su altri motori (Perplexity, Copilot, Grok), si trova nel menu ⋯ della domanda. Ogni motore conta come una verifica della vostra quota.',
+    ja: 'それぞれの質問は、ワンクリックで ChatGPT、Gemini、Google AI で確認されます。1つのエンジンだけで確認する場合や、ほかのエンジン（Perplexity、Copilot、Grok）でも確認する場合は、質問の ⋯ メニューから選べます。エンジン1つにつき、上限から1回分が使われます。',
   },
   check_question_all: { he: 'בדיקה עכשיו ({n} בדיקות)', en: 'Check now ({n} checks)', es: 'Comprobar ahora ({n} comprobaciones)', 'pt-BR': 'Verificar agora ({n} verificações)', fr: 'Vérifier maintenant ({n} vérifications)', it: 'Verificare ora ({n} verifiche)', ja: '今すぐ確認（{n}回）' },
   recheck_question_all: { he: 'בדיקה חוזרת ({n} בדיקות)', en: 'Recheck ({n} checks)', es: 'Volver a comprobar ({n} comprobaciones)', 'pt-BR': 'Verificar novamente ({n} verificações)', fr: 'Vérifier à nouveau ({n} vérifications)', it: 'Verificare di nuovo ({n} verifiche)', ja: '再確認（{n}回）' },
@@ -260,6 +273,7 @@ const STRINGS = {
     'pt-BR': 'Você usou todas as verificações de IA incluídas no seu plano',
     fr: 'Vous avez utilisé toutes les vérifications d\'IA incluses dans votre forfait',
     it: 'Sono state utilizzate tutte le verifiche di IA incluse nel vostro piano',
+    ja: 'プランに含まれるAIの確認をすべて使いました',
   },
   ai_allowance_not_included: { he: 'לא כלולות בחבילה', en: 'not included in your plan', es: 'no están incluidas en tu plan', 'pt-BR': 'não estão incluídas no seu plano', fr: 'non inclus dans votre forfait', it: 'non incluse nel vostro piano', ja: 'お使いのプランには含まれていません' },
   ai_allowance_none_body: {
@@ -269,6 +283,7 @@ const STRINGS = {
     'pt-BR': 'Seu plano atual não inclui verificações de IA, então no momento não é possível fazer nenhuma. Você já pode adicionar perguntas e verificá-las depois de trocar de plano.',
     fr: 'Votre forfait actuel n\'inclut pas de vérifications d\'IA, une vérification ne peut donc pas être lancée pour le moment. Vous pouvez ajouter des questions dès maintenant et les vérifier après un changement de forfait.',
     it: 'Il vostro piano attuale non include verifiche di IA, quindi per il momento non è possibile lanciare una verifica. Si possono aggiungere domande subito e verificarle dopo il passaggio a un altro piano.',
+    ja: '現在のプランにはAIの確認が含まれていないため、今は確認を実行できません。質問は今のうちに追加して、プランを上げたあとに確認できます。',
   },
   ai_allowance_upgrade: { he: 'לשדרוג החבילה', en: 'Upgrade your plan', es: 'Cambiar de plan', 'pt-BR': 'Trocar de plano', fr: 'Changer de forfait', it: 'Cambiare piano', ja: 'プランを変更' },
   chip_legend: {
@@ -278,6 +293,7 @@ const STRINGS = {
     'pt-BR': 'Um ✓ ao lado de um motor: mencionou você na última verificação. Um –: verificamos e não mencionou você. Sem marca: ainda não verificado.',
     fr: 'Un ✓ à côté d\'un moteur : il vous a mentionné lors de la dernière vérification. Un – : vérifié, et il ne vous a pas mentionné. Aucune marque : pas encore vérifié.',
     it: 'Un ✓ accanto a un motore: vi ha menzionati nell\'ultima verifica. Un –: verificato, e non vi ha menzionati. Nessun segno: non ancora verificato.',
+    ja: 'エンジンの横の ✓ は、前回の確認で言及されたことを示します。– は、確認したものの言及がなかったことを示します。印がない場合は、まだ確認していません。',
   },
   chip_mentioned: { he: 'הזכיר אתכם', en: 'mentioned you', es: 'te mencionó', 'pt-BR': 'mencionou você', fr: 'vous a mentionné', it: 'vi ha menzionati', ja: '言及されました' },
   chip_not_mentioned: { he: 'נבדק, לא הזכיר אתכם', en: 'checked, did not mention you', es: 'comprobado, no te mencionó', 'pt-BR': 'verificado, não mencionou você', fr: 'vérifié, ne vous a pas mentionné', it: 'verificato, non vi ha menzionati', ja: '確認済み、言及なし' },
@@ -355,6 +371,7 @@ const STRINGS = {
     'pt-BR': 'A pergunta será excluída. Os resultados que já existem ficam arquivados, mas deixam de aparecer aqui.',
     fr: 'Cela supprimera la question. Les résultats déjà obtenus restent archivés mais n\'apparaîtront plus ici.',
     it: 'La domanda verrà eliminata. I risultati già ottenuti restano archiviati ma non compariranno più qui.',
+    ja: '質問が削除されます。これまでの確認結果は保管されますが、ここには表示されなくなります。',
   },
 
   // Multi-question input
@@ -365,6 +382,7 @@ const STRINGS = {
     'pt-BR': 'Uma pergunta por linha',
     fr: 'Une question par ligne',
     it: 'Una domanda per riga',
+    ja: '1行に1つの質問',
   },
   multi_query_help: {
     he: 'הפרד כל שאלה בשורה חדשה',
@@ -373,6 +391,7 @@ const STRINGS = {
     'pt-BR': 'Separe cada pergunta com uma quebra de linha',
     fr: 'Séparez chaque question par un retour à la ligne',
     it: 'Separare ogni domanda con un ritorno a capo',
+    ja: '質問は改行で区切ってください',
   },
   will_create_n_queries: {
     he: 'ייווצרו {count} שאלות AI',
@@ -381,6 +400,7 @@ const STRINGS = {
     'pt-BR': 'Serão criadas {count} perguntas de IA',
     fr: '{count} questions d\'IA seront créées',
     it: 'Verranno create {count} domande di IA',
+    ja: 'AIの質問が{count}件作成されます',
   },
   will_create_one_query: {
     he: 'תיווצר שאלת AI אחת',
@@ -389,6 +409,7 @@ const STRINGS = {
     'pt-BR': 'Será criada 1 pergunta de IA',
     fr: '1 question d\'IA sera créée',
     it: 'Verrà creata 1 domanda di IA',
+    ja: 'AIの質問が1件作成されます',
   },
 
   // Result row enrichments
@@ -416,6 +437,7 @@ const STRINGS = {
     'pt-BR': 'Este perfil afeta apenas as perguntas de IA recomendadas, não as verificações.',
     fr: 'Ce profil n\'influence que les questions d\'IA recommandées, pas les vérifications elles-mêmes.',
     it: 'Questo profilo influisce solo sulle domande di IA consigliate, non sulle verifiche stesse.',
+    ja: 'このプロフィールは、おすすめのAIの質問にだけ影響し、確認そのものには影響しません。',
   },
   primary_category: { he: 'קטגוריה ראשית', en: 'Primary category', es: 'Categoría principal', 'pt-BR': 'Categoria principal', fr: 'Catégorie principale', it: 'Categoria principale', ja: '主なカテゴリー' },
   secondary_categories: { he: 'קטגוריות משניות', en: 'Secondary categories', es: 'Categorías secundarias', 'pt-BR': 'Categorias secundárias', fr: 'Catégories secondaires', it: 'Categorie secondarie', ja: 'そのほかのカテゴリー' },
@@ -435,6 +457,7 @@ const STRINGS = {
     'pt-BR': 'Adicione uma categoria secundária e pressione Enter',
     fr: 'Ajoutez une catégorie secondaire puis Entrée',
     it: 'Aggiungere una categoria secondaria e premere Invio',
+    ja: 'サブのカテゴリを入力して Enter を押してください',
   },
   add_excluded_placeholder: {
     he: 'הוסף נושא לא רצוי ולחץ Enter',
@@ -443,6 +466,7 @@ const STRINGS = {
     'pt-BR': 'Adicione um tema excluído e pressione Enter',
     fr: 'Ajoutez un sujet exclu puis Entrée',
     it: 'Aggiungere un argomento escluso e premere Invio',
+    ja: '除外するトピックを入力して Enter を押してください',
   },
   primary_category_placeholder: {
     he: 'כתוב קטגוריה (לדוגמה: משלוחי פרחים) או בחר מהרשימה',
@@ -451,6 +475,7 @@ const STRINGS = {
     'pt-BR': 'Digite uma categoria (por exemplo: entrega de flores) ou escolha uma',
     fr: 'Saisissez une catégorie (ex. livraison de fleurs) ou choisissez-en une',
     it: 'Inserire una categoria (es. consegna di fiori) oppure scegliere una di quelle proposte',
+    ja: 'カテゴリを入力（例：花の配達）、または一覧から選んでください',
   },
   profile_saved: { he: 'פרופיל AI נשמר בהצלחה', en: 'AI profile saved', es: 'Perfil de IA guardado', 'pt-BR': 'Perfil de IA salvo', fr: 'Profil IA enregistré', it: 'Profilo IA salvato', ja: 'AIプロフィールを保存しました' },
   profile_reset: { he: 'הפרופיל חזר לזיהוי מסריקת האתר', en: 'Profile is back to the site scan', es: 'El perfil ha vuelto al análisis de la web', 'pt-BR': 'O perfil voltou à análise do site', fr: 'Le profil est revenu à l\'analyse du site', it: 'Il profilo è tornato all\'analisi del sito', ja: 'プロフィールをサイトの診断の内容に戻しました' },
@@ -473,6 +498,7 @@ const STRINGS = {
     'pt-BR': 'Conte com as suas palavras o que o negócio faz, e as perguntas sugeridas se ajustarão a ele em vez de a uma suposição.',
     fr: 'Dites avec vos mots ce que fait l\'entreprise, pour que les questions suggérées lui correspondent au lieu d\'une supposition.',
     it: 'Indicare con parole proprie di che cosa si occupa l\'attività, così le domande suggerite le corrispondono invece di basarsi su un\'ipotesi.',
+    ja: '事業の内容を自分の言葉で書いてください。推測ではなく、その内容に合った質問が提案されます。',
   },
   profile_set: { he: 'הגדרת העסק', en: 'Describe the business', es: 'Describir el negocio', 'pt-BR': 'Descrever o negócio', fr: 'Décrire l\'entreprise', it: 'Descrivere l\'attività', ja: '事業の内容を入力' },
   profile_scan_found: { he: 'מה הסריקה מצאה באתר', en: 'What the site scan found', es: 'Lo que el análisis ha encontrado en la web', 'pt-BR': 'O que a análise encontrou no site', fr: 'Ce que l\'analyse du site a trouvé', it: 'Che cosa ha trovato l\'analisi del sito', ja: 'サイトの診断で見つかった内容' },
@@ -484,6 +510,7 @@ const STRINGS = {
     'pt-BR': 'por exemplo: guia de viagens para o Japão, entrega de flores, limpeza de escritórios',
     fr: 'ex. guide de voyage au Japon, livraison de fleurs, nettoyage de bureaux',
     it: 'es. guida di viaggio in Giappone, consegna di fiori, pulizia di uffici',
+    ja: '例：日本旅行のガイド、花の配達、オフィスの清掃',
   },
   profile_more_topics: { he: 'תחומים נוספים ונושאים לא רצויים', en: 'More topics and excluded topics', es: 'Más temas y temas excluidos', 'pt-BR': 'Mais temas e temas excluídos', fr: 'Autres sujets et sujets exclus', it: 'Altri argomenti e argomenti esclusi', ja: 'そのほかのテーマと除外するテーマ' },
   profile_saved_questions: {
@@ -493,6 +520,7 @@ const STRINGS = {
     'pt-BR': 'Perfil salvo. As perguntas sugeridas já o seguem.',
     fr: 'Profil enregistré. Les questions suggérées le suivent désormais.',
     it: 'Profilo salvato. Le domande suggerite lo seguono da ora.',
+    ja: 'プロフィールを保存しました。おすすめの質問はこの内容に沿って提案されます。',
   },
   profile_regenerate: { he: 'יצירת שאלות חדשות', en: 'Generate new questions', es: 'Generar preguntas nuevas', 'pt-BR': 'Gerar novas perguntas', fr: 'Générer de nouvelles questions', it: 'Generare nuove domande', ja: '質問を新しく生成' },
   profile_loading: { he: 'בודקים במה העסק עוסק', en: 'Checking what the business does', es: 'Comprobando a qué se dedica el negocio', 'pt-BR': 'Verificando o que o negócio faz', fr: 'Analyse de ce que fait l\'entreprise', it: 'Analisi di che cosa si occupa l\'attività', ja: '事業の内容を確認しています' },
@@ -520,6 +548,7 @@ const STRINGS = {
     'pt-BR': 'Não encontramos nenhuma página do seu site que a responda',
     fr: 'Nous n\'avons trouvé aucune page de votre site qui y réponde',
     it: 'Non è stata trovata nessuna pagina del vostro sito che risponda alla domanda',
+    ja: 'この質問に答えるページは、サイトのなかに見つかりませんでした',
   },
   qa_improve_page: { he: 'שיפור העמוד הקיים', en: 'Improve that page', es: 'Mejorar esa página', 'pt-BR': 'Melhorar essa página', fr: 'Améliorer cette page', it: 'Migliorare questa pagina', ja: 'そのページを改善' },
   qa_status_topic: { he: 'נושא נוצר באסטרטגיית התוכן', en: 'Topic created in the content strategy', es: 'Tema creado en la estrategia de contenidos', 'pt-BR': 'Tema criado na estratégia de conteúdo', fr: 'Sujet créé dans la stratégie de contenu', it: 'Argomento creato nella strategia di contenuti', ja: 'コンテンツ戦略にテーマを作成しました' },
@@ -535,6 +564,7 @@ const STRINGS = {
     'pt-BR': 'O artigo precisa responder à pergunta «{q}» de forma direta e clara, já no primeiro parágrafo, para que os motores de IA o citem como fonte.',
     fr: 'L\'article doit répondre à la question « {q} » de façon directe et claire, dès son premier paragraphe, pour que les moteurs d\'IA le citent comme source.',
     it: 'L\'articolo deve rispondere alla domanda «{q}» in modo diretto e chiaro, già nel primo paragrafo, affinché i motori di IA lo citino come fonte.',
+    ja: '記事は、最初の段落で「{q}」という質問に直接はっきりと答える必要があります。そうすることで、AIエンジンが情報源として引用します。',
   },
   worth_ask_business: {
     he: 'כדי להציע רק שאלות שהעסק יכול לזכות בהן, ספרו לנו למעלה במה העסק עוסק.',
@@ -543,6 +573,7 @@ const STRINGS = {
     'pt-BR': 'Para sugerir apenas perguntas que o negócio pode vencer, conte acima o que ele faz.',
     fr: 'Pour ne proposer que des questions que l\'entreprise peut gagner, indiquez ci-dessus ce qu\'elle fait.',
     it: 'Per proporre solo domande che l\'attività può vincere, indicare qui sopra di che cosa si occupa.',
+    ja: '事業が勝てる質問だけを提案するために、事業の内容を上に書いてください。',
   },
 
   // Misc UI labels
@@ -583,6 +614,7 @@ const STRINGS = {
     'pt-BR': 'Como os assistentes de IA respondem às perguntas da sua área, e se mencionam e citam o seu site',
     fr: 'Comment les assistants d\'IA répondent aux questions de votre domaine, et s\'ils mentionnent et citent votre site',
     it: 'Come gli assistenti di IA rispondono alle domande del vostro settore e se menzionano e citano il vostro sito',
+    ja: 'その分野の質問にAIアシスタントがどう答えるか、そしてサイトに言及し引用しているかどうか',
   },
   not_available: { he: 'נראות ב-AI לא זמינה בחשבון הזה.', en: 'AI visibility is not available on this account.', es: 'La visibilidad en IA no está disponible en esta cuenta.', 'pt-BR': 'A visibilidade em IA não está disponível nesta conta.', fr: 'La visibilité dans les IA n\'est pas disponible sur ce compte.', it: 'La visibilità nelle IA non è disponibile su questo account.', ja: 'このアカウントではAIでの可視性をご利用になれません。' },
   no_data: { he: 'אין נתונים', en: 'No data', es: 'Sin datos', 'pt-BR': 'Sem dados', fr: 'Aucune donnée', it: 'Nessun dato', ja: 'データがありません' },
@@ -623,6 +655,7 @@ const STRINGS = {
     'pt-BR': 'Defina até 5 concorrentes que você queira acompanhar nas respostas de IA.',
     fr: 'Définissez jusqu\'à 5 concurrents à suivre dans les réponses des IA.',
     it: 'Si possono definire fino a 5 concorrenti da monitorare nelle risposte delle IA.',
+    ja: 'AIの回答のなかで計測したい競合を、5件まで指定してください。',
   },
   competitor_name: { he: 'שם המתחרה', en: 'Competitor name', es: 'Nombre del competidor', 'pt-BR': 'Nome do concorrente', fr: 'Nom du concurrent', it: 'Nome del concorrente', ja: '競合の名称' },
   competitor_name_placeholder: { he: 'לדוגמה: Adidas', en: 'e.g. Adidas', es: 'por ejemplo: Adidas', 'pt-BR': 'por exemplo: Adidas', fr: 'ex. Adidas', it: 'es. Adidas', ja: '例：Adidas' },
@@ -636,6 +669,7 @@ const STRINGS = {
     'pt-BR': 'Outros nomes a detectar, separados por vírgulas',
     fr: 'Autres noms à détecter, séparés par des virgules',
     it: 'Altri nomi da rilevare, separati da virgole',
+    ja: '検出する別の名前を、コンマで区切って入力してください',
   },
   competitor_aliases_placeholder: { he: 'אדידאס, adidas, ‎ADIDAS', en: 'adidas, ADIDAS', es: 'adidas, ADIDAS', 'pt-BR': 'adidas, ADIDAS', fr: 'adidas, ADIDAS', it: 'adidas, ADIDAS', ja: 'adidas, ADIDAS' },
   competitor_add: { he: 'הוספת מתחרה', en: 'Add competitor', es: 'Añadir competidor', 'pt-BR': 'Adicionar concorrente', fr: 'Ajouter un concurrent', it: 'Aggiungere un concorrente', ja: '競合を追加' },
@@ -650,6 +684,7 @@ const STRINGS = {
     'pt-BR': 'Você atingiu o limite de 5 concorrentes ativos. Desative um para adicionar outro.',
     fr: 'Vous avez atteint la limite de 5 concurrents actifs. Désactivez-en un pour en ajouter un autre.',
     it: 'È stato raggiunto il limite di 5 concorrenti attivi. Disattivarne uno per aggiungerne un altro.',
+    ja: '有効な競合は5件までです。別の競合を追加するには、1件を無効にしてください。',
   },
   competitor_empty: {
     he: 'עדיין לא הוגדרו מתחרים. הוסיפו מתחרה ראשון כדי להתחיל.',
@@ -658,6 +693,7 @@ const STRINGS = {
     'pt-BR': 'Você ainda não definiu nenhum concorrente. Adicione o primeiro para começar.',
     fr: 'Aucun concurrent défini pour l\'instant. Ajoutez votre premier concurrent pour commencer.',
     it: 'Nessun concorrente definito per il momento. Aggiungere il primo concorrente per iniziare.',
+    ja: '競合はまだ指定されていません。最初の競合を追加してください。',
   },
   competitor_delete_confirm: {
     he: 'הוא יפסיק להופיע בהשוואות של הבדיקות הבאות. התוצאות שכבר נאספו נשמרות.',
@@ -666,6 +702,7 @@ const STRINGS = {
     'pt-BR': 'Deixará de aparecer nas comparações das próximas verificações. Os resultados já coletados são mantidos.',
     fr: 'Il n\'apparaîtra plus dans les comparaisons des prochaines vérifications. Les résultats déjà obtenus sont conservés.',
     it: 'Non comparirà più nei confronti delle verifiche successive. I risultati già ottenuti vengono conservati.',
+    ja: '今後の確認の比較には表示されなくなります。すでに集めた結果は残ります。',
   },
   competitor_loading: { he: 'טוען מתחרים…', en: 'Loading competitors…', es: 'Cargando los competidores…', 'pt-BR': 'Carregando os concorrentes…', fr: 'Chargement des concurrents…', it: 'Caricamento dei concorrenti…', ja: '競合を読み込んでいます…' },
   competitor_load_failed: { he: 'טעינת המתחרים נכשלה.', en: 'Failed to load competitors.', es: 'No se han podido cargar los competidores.', 'pt-BR': 'Não foi possível carregar os concorrentes.', fr: 'Le chargement des concurrents a échoué.', it: 'Il caricamento dei concorrenti non è riuscito.', ja: '競合を読み込めませんでした。' },
@@ -687,6 +724,7 @@ const STRINGS = {
     'pt-BR': 'Para cada negócio separadamente: quantas das respostas verificadas o citaram. Cada um é medido sobre todas as respostas, então vários negócios podem chegar a 100%.',
     fr: 'Pour chaque entreprise séparément : combien de réponses vérifiées l\'ont nommée. Chacune est mesurée sur l\'ensemble des réponses, plusieurs entreprises peuvent donc atteindre 100 % chacune.',
     it: 'Per ogni attività separatamente: quante risposte verificate l\'hanno nominata. Ciascuna è misurata sull\'insieme delle risposte, quindi più attività possono raggiungere il 100% ognuna.',
+    ja: '事業ごとに、確認した回答のうち何件がその事業に言及したかを示します。それぞれが回答全体に対して測られるため、複数の事業がそれぞれ100%になることもあります。',
   },
   competitor_analysis_no_competitors: {
     he: 'הוסיפו מתחרים כדי להשוות את הנראות שלכם במנועי AI.',
@@ -695,6 +733,7 @@ const STRINGS = {
     'pt-BR': 'Adicione concorrentes para comparar a sua visibilidade em IA.',
     fr: 'Ajoutez des concurrents pour comparer votre visibilité dans les IA.',
     it: 'Aggiungere dei concorrenti per confrontare la vostra visibilità nelle IA.',
+    ja: '競合を追加すると、AIでの可視性を比べられます。',
   },
   competitor_analysis_no_scan: {
     he: 'אין עדיין סריקה זמינה להשוואת מתחרים. הריצו סריקת AI תחילה.',
@@ -703,6 +742,7 @@ const STRINGS = {
     'pt-BR': 'Ainda não há nenhuma verificação com a qual comparar concorrentes. Faça antes uma verificação de IA.',
     fr: 'Aucune vérification n\'est encore disponible pour la comparaison des concurrents. Lancez d\'abord une vérification d\'IA.',
     it: 'Non è ancora disponibile nessuna verifica per il confronto con i concorrenti. Lanciare prima una verifica di IA.',
+    ja: '競合の比較に使える確認がまだありません。先にAIの確認を実行してください。',
   },
   competitor_analysis_no_mentions: {
     he: 'לא נמצאו אזכורים למתחרים בסריקה האחרונה.',
@@ -711,6 +751,7 @@ const STRINGS = {
     'pt-BR': 'Na última verificação, nenhuma menção aos concorrentes foi encontrada.',
     fr: 'Aucune mention de concurrent n\'a été trouvée dans la dernière vérification.',
     it: 'Nell\'ultima verifica non è stata trovata nessuna menzione dei concorrenti.',
+    ja: '直近の確認では、競合への言及は見つかりませんでした。',
   },
   competitor_analysis_loading: { he: 'טוען נתונים…', en: 'Loading…', es: 'Cargando…', 'pt-BR': 'Carregando…', fr: 'Chargement…', it: 'Caricamento…', ja: '読み込み中…' },
   competitor_analysis_failed: { he: 'טעינת הנתונים נכשלה.', en: 'Failed to load data.', es: 'No se han podido cargar los datos.', 'pt-BR': 'Não foi possível carregar os dados.', fr: 'Le chargement des données a échoué.', it: 'Il caricamento dei dati non è riuscito.', ja: 'データを読み込めませんでした。' },
@@ -729,6 +770,7 @@ const STRINGS = {
     'pt-BR': 'Cada resposta que cita um negócio conta uma vez para ele. A porcentagem é a parte de cada negócio sobre o total de menções, então as porcentagens aqui somam 100%.',
     fr: 'Chaque réponse qui nomme une entreprise compte une fois pour elle. Le pourcentage est la part de chaque entreprise dans l\'ensemble des mentions, les pourcentages ici totalisent donc 100 %.',
     it: 'Ogni risposta che nomina un\'attività conta una volta per quell\'attività. La percentuale è la quota di ciascuna attività sull\'insieme delle menzioni, quindi le percentuali qui sommano al 100%.',
+    ja: '事業に言及した回答は、その事業に1回として数えられます。割合は、言及の全体に対する各事業の取り分なので、ここでの割合を合わせると100%になります。',
   },
   share_of_voice_empty: {
     he: 'עדיין אף תשובה לא הזכירה את העסק או מתחרה. בדקו עוד שאלות כדי לראות מי מוזכר יותר.',
@@ -737,6 +779,7 @@ const STRINGS = {
     'pt-BR': 'Ainda nenhuma resposta citou o seu negócio nem um concorrente. Verifique mais perguntas para ver quem é mais citado.',
     fr: 'Aucune réponse n\'a encore nommé votre entreprise ni un concurrent. Vérifiez plus de questions pour voir qui est le plus nommé.',
     it: 'Nessuna risposta ha ancora nominato la vostra attività né un concorrente. Verificare più domande per vedere chi viene nominato di più.',
+    ja: '事業や競合に言及した回答はまだありません。質問をさらに確認すると、誰がより多く言及されているかが分かります。',
   },
   share_of_voice_mentions: { he: 'אזכורים', en: 'mentions', es: 'menciones', 'pt-BR': 'menções', fr: 'mentions', it: 'menzioni', ja: '件の言及' },
 
@@ -749,6 +792,7 @@ const STRINGS = {
     'pt-BR': 'A pontuação vem da porcentagem de respostas de IA em que o negócio aparece.',
     fr: 'Le score repose sur le pourcentage de réponses d\'IA où l\'entreprise est apparue.',
     it: 'Il punteggio si basa sulla percentuale di risposte di IA in cui l\'attività è comparsa.',
+    ja: 'スコアは、事業が現れたAIの回答の割合をもとにしています。',
   },
   score_subtext: {
     he: 'מבוסס על אחוז התשובות שבהן העסק הופיע במנועי AI.',
@@ -757,6 +801,7 @@ const STRINGS = {
     'pt-BR': 'A partir da porcentagem de respostas de IA em que o negócio aparece.',
     fr: 'Basé sur le pourcentage de réponses d\'IA où l\'entreprise est apparue.',
     it: 'Basato sulla percentuale di risposte di IA in cui l\'attività è comparsa.',
+    ja: '事業が現れたAIの回答の割合をもとにしています。',
   },
   score_low: { he: 'נמוך', en: 'Low', es: 'Baja', 'pt-BR': 'Baixa', fr: 'Faible', it: 'Basso', ja: '低い' },
   score_medium: { he: 'בינוני', en: 'Medium', es: 'Media', 'pt-BR': 'Média', fr: 'Moyen', it: 'Medio', ja: '中くらい' },
@@ -771,6 +816,7 @@ const STRINGS = {
     'pt-BR': 'Avisos sobre concorrentes que aparecem nas respostas de IA mais vezes que o negócio',
     fr: 'Alertes sur les concurrents qui apparaissent plus souvent que l\'entreprise dans les réponses des IA',
     it: 'Avvisi sui concorrenti che compaiono più spesso dell\'attività nelle risposte delle IA',
+    ja: 'AIの回答のなかで、事業より多く現れる競合についての通知',
   },
   recommendations_none: {
     he: 'לא נמצאו המלצות דחופות כרגע. המשיכו לעקוב אחרי הסריקות הבאות.',
@@ -779,6 +825,7 @@ const STRINGS = {
     'pt-BR': 'No momento, não há recomendações urgentes. Continue acompanhando as próximas verificações.',
     fr: 'Aucune recommandation urgente pour le moment. Continuez à suivre les prochaines vérifications.',
     it: 'Nessuna raccomandazione urgente per il momento. Continuare a seguire le verifiche successive.',
+    ja: '今のところ、急ぎの推奨はありません。今後の確認を見守ってください。',
   },
   recommendations_none_specific: {
     he: 'כל השאלות מכוסות ולעסק נראות טובה בכל המנועים.',
@@ -787,6 +834,7 @@ const STRINGS = {
     'pt-BR': 'Todas as perguntas estão cobertas e o negócio tem boa visibilidade em todos os motores.',
     fr: 'Toutes les questions sont couvertes et l\'entreprise a une bonne visibilité sur tous les moteurs.',
     it: 'Tutte le domande sono coperte e l\'attività ha una buona visibilità su tutti i motori.',
+    ja: 'すべての質問が押さえられていて、事業はすべてのエンジンで良い可視性を保っています。',
   },
   rec_severity_high: { he: 'דחוף', en: 'High', es: 'Alta', 'pt-BR': 'Alta', fr: 'Élevée', it: 'Alta', ja: '高' },
   rec_severity_medium: { he: 'בינוני', en: 'Medium', es: 'Media', 'pt-BR': 'Média', fr: 'Moyenne', it: 'Media', ja: '中' },
@@ -801,6 +849,7 @@ const STRINGS = {
     'pt-BR': 'O negócio não apareceu em {engines}.\nRevise as perguntas testadas nesses motores e reforce as respostas sobre os temas que se repetem na verificação.',
     fr: 'L\'entreprise n\'est pas apparue dans {engines}.\nPassez en revue les questions testées sur ces moteurs et renforcez les réponses autour des sujets récurrents de la vérification.',
     it: 'L\'attività non è comparsa in {engines}.\nSi consiglia di rivedere le domande testate su questi motori e di rafforzare le risposte sugli argomenti ricorrenti della verifica.',
+    ja: '事業は{engines}に現れませんでした。\nそれらのエンジンで試した質問を見直して、確認に繰り返し出てくるトピックの答えを強めてください。',
   },
 
   // Recommendation 2: Weak questions — questions with low visibility
@@ -814,6 +863,7 @@ const STRINGS = {
     'pt-BR': 'O negócio não apareceu na pergunta:\n{question}\n\nCrie uma seção de conteúdo ou um FAQ que a responda diretamente e destaque as vantagens do negócio.',
     fr: 'L\'entreprise n\'est pas apparue pour la question :\n{question}\n\nCréez une section de contenu ou une FAQ qui y répond directement et met en avant les atouts de l\'entreprise.',
     it: 'L\'attività non è comparsa per la domanda:\n{question}\n\nSi consiglia di creare una sezione di contenuto o una FAQ che risponda direttamente alla domanda e metta in evidenza i punti di forza dell\'attività.',
+    ja: '次の質問で事業は現れませんでした。\n{question}\n\nこの質問に直接答えて、事業の強みを示す本文の節かFAQを作ってください。',
   },
   rec_weak_questions_zero_multi: {
     he: 'העסק לא הופיע בשאלות:\n{questions}\n\nמומלץ ליצור עמוד תוכן או פסקת FAQ שעונה ישירות על השאלות ומבליטה את יתרונות העסק.',
@@ -822,6 +872,7 @@ const STRINGS = {
     'pt-BR': 'O negócio não apareceu nas perguntas:\n{questions}\n\nCrie conteúdos ou seções de FAQ que as respondam diretamente e destaquem as vantagens do negócio.',
     fr: 'L\'entreprise n\'est pas apparue pour les questions :\n{questions}\n\nCréez des contenus ou des sections FAQ qui y répondent directement et mettent en avant les atouts de l\'entreprise.',
     it: 'L\'attività non è comparsa per le domande:\n{questions}\n\nSi consiglia di creare contenuti o sezioni FAQ che rispondano direttamente alle domande e mettano in evidenza i punti di forza dell\'attività.',
+    ja: '次の質問で事業は現れませんでした。\n{questions}\n\nこれらの質問に直接答えて、事業の強みを示す本文の節かFAQを作ってください。',
   },
 
   // Weak visibility: business appeared but rarely (< 0.25 rate)
@@ -832,6 +883,7 @@ const STRINGS = {
     'pt-BR': 'O negócio teve pouca visibilidade na pergunta:\n{question}\n\nCrie uma seção de conteúdo ou um FAQ que a responda diretamente e destaque as vantagens do negócio.',
     fr: 'L\'entreprise avait une visibilité faible pour la question :\n{question}\n\nCréez une section de contenu ou une FAQ qui y répond directement et met en avant les atouts de l\'entreprise.',
     it: 'L\'attività aveva una visibilità bassa per la domanda:\n{question}\n\nSi consiglia di creare una sezione di contenuto o una FAQ che risponda direttamente alla domanda e metta in evidenza i punti di forza dell\'attività.',
+    ja: '次の質問で、事業の可視性は低いままでした。\n{question}\n\nこの質問に直接答えて、事業の強みを示す本文の節かFAQを作ってください。',
   },
   rec_weak_questions_weak_multi: {
     he: 'העסק כמעט לא הופיע בשאלות:\n{questions}\n\nמומלץ ליצור עמוד תוכן או פסקת FAQ שעונה ישירות על השאלות ומבליטה את יתרונות העסק.',
@@ -840,6 +892,7 @@ const STRINGS = {
     'pt-BR': 'O negócio teve pouca visibilidade nas perguntas:\n{questions}\n\nCrie conteúdos ou seções de FAQ que as respondam diretamente e destaquem as vantagens do negócio.',
     fr: 'L\'entreprise avait une visibilité faible pour les questions :\n{questions}\n\nCréez des contenus ou des sections FAQ qui y répondent directement et mettent en avant les atouts de l\'entreprise.',
     it: 'L\'attività aveva una visibilità bassa per le domande:\n{questions}\n\nSi consiglia di creare contenuti o sezioni FAQ che rispondano direttamente alle domande e mettano in evidenza i punti di forza dell\'attività.',
+    ja: '次の質問で、事業の可視性は低いままでした。\n{questions}\n\nこれらの質問に直接答えて、事業の強みを示す本文の節かFAQを作ってください。',
   },
 
   // Recommendation 3: Competitor leading — competitor has more mentions than project
@@ -851,6 +904,7 @@ const STRINGS = {
     'pt-BR': '{competitorName} apareceu em {gap} respostas a mais que o seu negócio. Revise as perguntas em que ele aparece e você não, e crie conteúdo focado nessas perguntas.',
     fr: '{competitorName} est apparu dans {gap} réponses de plus que votre entreprise. Examinez les questions où il apparaît et où votre entreprise est absente, puis créez du contenu ciblé autour de ces questions.',
     it: '{competitorName} è comparso in {gap} risposte in più rispetto alla vostra attività. Si consiglia di esaminare le domande in cui compare e in cui la vostra attività è assente, e di creare contenuti dedicati a quelle domande.',
+    ja: '{competitorName}は、事業より{gap}件多くの回答に現れました。相手が現れて事業が現れない質問を見直して、それらの質問に向けた本文を作ってください。',
   },
 
   // Phase 6 — Per-question insights (Queries tab)
@@ -882,6 +936,7 @@ const STRINGS = {
     'pt-BR': 'Não há sinais suficientes para explicar este resultado com confiabilidade.',
     fr: 'Pas assez de signaux pour expliquer ce résultat de façon fiable.',
     it: 'Non ci sono abbastanza segnali per spiegare questo risultato in modo affidabile.',
+    ja: 'この結果を確かに説明できるだけの手がかりがありません。',
   },
 
   // GEO Recommendations (Phase 1C — what can be improved)
@@ -893,6 +948,7 @@ const STRINGS = {
     'pt-BR': 'Nenhuma lacuna clara foi detectada neste resultado. Continue assim.',
     fr: 'Aucun écart clair détecté dans ce résultat. Continuez ainsi.',
     it: 'Nessuno scarto evidente rilevato in questo risultato. Si consiglia di continuare così.',
+    ja: 'この結果に目立った弱点は見つかりません。今の進め方を続けてください。',
   },
 
   // GEO Insights collapsible label (Phase 1C — technical details)
@@ -907,6 +963,7 @@ const STRINGS = {
     'pt-BR': 'Uma visão rápida e a próxima ação recomendada',
     fr: 'Un bref aperçu et la prochaine action recommandée',
     it: 'Una breve panoramica e la prossima azione consigliata',
+    ja: '短いまとめと、次におすすめする一手',
   },
   ai_summary_status_high: { he: 'העסק מופיע ברוב תשובות ה־AI שנבדקו.', en: 'The business appears in most of the tested results.', es: 'El negocio aparece en la mayoría de los resultados comprobados.', 'pt-BR': 'O negócio aparece na maioria dos resultados verificados.', fr: 'L\'entreprise apparaît dans la plupart des résultats testés.', it: 'L\'attività compare nella maggior parte dei risultati testati.', ja: '確認した結果のほとんどに事業が出てきています。' },
   ai_summary_status_medium: { he: 'העסק מופיע בחלק מהתוצאות, אבל יש עדיין מקום לשיפור.', en: 'The business appears in some results, but there is still room for improvement.', es: 'El negocio aparece en algunos resultados, pero todavía hay margen de mejora.', 'pt-BR': 'O negócio aparece em alguns resultados, mas ainda há espaço para melhorar.', fr: 'L\'entreprise apparaît dans certains résultats, mais il reste de la marge.', it: 'L\'attività compare in alcuni risultati, ma c\'è ancora margine di miglioramento.', ja: '一部の結果に事業が出てきていますが、まだ改善の余地があります。' },
@@ -931,6 +988,7 @@ const STRINGS = {
     'pt-BR': 'Recomendações para o negócio aparecer mais nas respostas de IA',
     fr: 'Recommandations pour améliorer la visibilité de l\'entreprise dans les réponses des IA',
     it: 'Raccomandazioni per migliorare la visibilità dell\'attività nelle risposte delle IA',
+    ja: 'AIの回答のなかでの事業の可視性を高めるための推奨',
   },
   geo_opp_empty: {
     he: 'אין עדיין מספיק סריקות להפקת תובנות מצטברות. הריצו עוד סריקות כדי לקבל מיפוי מלא.',
@@ -939,6 +997,7 @@ const STRINGS = {
     'pt-BR': 'Ainda não há verificações suficientes para tirar conclusões gerais. Faça mais verificações para ver o quadro completo.',
     fr: 'Pas encore assez de vérifications pour produire des analyses agrégées. Lancez plus de vérifications pour voir la cartographie complète.',
     it: 'Non ci sono ancora abbastanza verifiche per produrre analisi aggregate. Lanciare più verifiche per vedere la mappatura completa.',
+    ja: 'まとめた知見を出すには、確認の数がまだ足りません。確認を増やすと、全体像が見えます。',
   },
   geo_opp_card_content: { he: 'דפוסי תוכן שמחזקים חשיפה', en: 'Content patterns that strengthen visibility', es: 'Patrones de contenido que refuerzan la visibilidad', 'pt-BR': 'Padrões de conteúdo que reforçam a visibilidade', fr: 'Motifs de contenu qui renforcent la visibilité', it: 'Caratteristiche di contenuto che rafforzano la visibilità', ja: '可視性を高めるコンテンツの傾向' },
   geo_opp_card_citations: { he: 'מקורות שמחזקים חשיפה', en: 'Sources that strengthen visibility', es: 'Fuentes que refuerzan la visibilidad', 'pt-BR': 'Fontes que reforçam a visibilidade', fr: 'Sources qui renforcent la visibilité', it: 'Fonti che rafforzano la visibilità', ja: '可視性を高める情報源' },
@@ -958,6 +1017,7 @@ const STRINGS = {
     'pt-BR': 'Uma visão geral dos sites, dos tipos de conteúdo e dos negócios que aparecem nas respostas de IA',
     fr: 'Un aperçu des sites, des types de contenu et des entreprises qui apparaissent dans les réponses des IA',
     it: 'Una panoramica dei siti, dei tipi di contenuto e delle attività che compaiono nelle risposte delle IA',
+    ja: 'AIの回答に現れるサイト、本文の種類、事業の概要',
   },
   geo_comp_card_sources: { he: 'אתרים שחוזרים בתשובות AI', en: 'Websites that keep appearing', fr: 'Sites qui reviennent souvent', it: 'Siti che compaiono spesso', ja: '繰り返し出てくるサイト' },
   geo_comp_card_content: { he: 'איזה תוכן מופיע יותר בתשובות AI', en: 'What content appears most in AI answers', es: 'Qué contenido aparece más en las respuestas de IA', 'pt-BR': 'Qual conteúdo mais aparece nas respostas de IA', fr: 'Quel contenu apparaît le plus dans les réponses des IA', it: 'Quale contenuto compare di più nelle risposte delle IA', ja: 'AIの回答に最も多く出てくるコンテンツ' },
@@ -968,6 +1028,7 @@ const STRINGS = {
     en: 'Examples of recurring sites:',
     fr: 'Exemples de sites récurrents :',
     it: 'Esempi di siti ricorrenti:',
+    ja: '繰り返し現れるサイトの例：',
   },
   geo_comp_pills_label_competitors: {
     he: 'מתחרים שזוהו בתשובות:',
@@ -976,12 +1037,14 @@ const STRINGS = {
     'pt-BR': 'Concorrentes detectados nas respostas:',
     fr: 'Concurrents détectés dans les réponses :',
     it: 'Concorrenti rilevati nelle risposte:',
+    ja: '回答のなかで検出された競合：',
   },
   geo_comp_no_data_sources: {
     he: 'אין עדיין מספיק סריקות כדי לזהות אתרים שחוזרים על עצמם.',
     en: 'Not enough scans yet to identify recurring sites.',
     fr: 'Pas encore assez de vérifications pour identifier les sites récurrents.',
     it: 'Non ci sono ancora abbastanza verifiche per individuare i siti ricorrenti.',
+    ja: '繰り返し現れるサイトを見分けるには、確認の数がまだ足りません。',
   },
   geo_comp_no_data_content: {
     he: 'עדיין אין מספיק נתונים כדי לזהות אילו סוגי תוכן בולטים יותר בתשובות AI.',
@@ -990,12 +1053,14 @@ const STRINGS = {
     'pt-BR': 'Ainda não há dados suficientes para saber quais tipos de conteúdo se destacam.',
     fr: 'Pas encore assez de données pour identifier les types de contenu qui se distinguent.',
     it: 'Non ci sono ancora abbastanza dati per individuare i tipi di contenuto che si distinguono.',
+    ja: 'どの本文の種類が目立つかを見分けるには、データがまだ足りません。',
   },
   geo_comp_no_data_engines: {
     he: 'יידרשו עוד סריקות במגוון מנועים כדי לזהות העדפות.',
     en: 'More scans across engines needed to identify preferences.',
     fr: 'Il faut plus de vérifications sur les différents moteurs pour identifier leurs préférences.',
     it: 'Servono più verifiche sui diversi motori per individuare le loro preferenze.',
+    ja: '傾向を見分けるには、複数のエンジンでの確認がさらに必要です。',
   },
   geo_comp_no_data_loss: {
     he: 'לא זוהו מתחרים שהוגדרו מראש בתשובות שבהן העסק לא הופיע. הגדירו רשימת מתחרים או הריצו עוד סריקות.',
@@ -1004,6 +1069,7 @@ const STRINGS = {
     'pt-BR': 'Nenhum dos seus concorrentes foi detectado quando o negócio não apareceu. Defina concorrentes ou faça mais verificações.',
     fr: 'Aucun concurrent de la liste n\'a été détecté en l\'absence de l\'entreprise. Définissez des concurrents ou lancez plus de vérifications.',
     it: 'In assenza dell\'attività non è stato rilevato nessun concorrente dell\'elenco. Definire dei concorrenti oppure lanciare più verifiche.',
+    ja: '事業が現れなかったとき、指定した競合は検出されませんでした。競合を指定するか、確認を増やしてください。',
   },
 
   // Category language (varied, not "ecosystem"-heavy)
@@ -1024,6 +1090,7 @@ const STRINGS = {
     'pt-BR': 'Quais negócios e concorrentes foram realmente mencionados',
     fr: 'Quelles entreprises et quels concurrents ont été réellement mentionnés',
     it: 'Quali attività e quali concorrenti sono stati effettivamente menzionati',
+    ja: '実際に言及された事業と競合',
   },
   geo_biz_when_absent: { he: 'עסקים שהופיעו כשאתה לא הופעת', en: 'Competitors when you\'re absent', es: 'Competidores cuando tú no apareces', 'pt-BR': 'Concorrentes quando você não aparece', fr: 'Concurrents quand vous êtes absent', it: 'Concorrenti quando la vostra attività è assente', ja: 'お客様が出てこないときの競合' },
   geo_biz_mentioned: { he: '{name} הוזכר ב-{count} תוצאות בתשובות AI.', en: '{name} was mentioned in {count} AI responses.', es: '{name} se mencionó en {count} respuestas de IA.', 'pt-BR': '{name} foi mencionado em {count} respostas de IA.', fr: '{name} a été mentionné dans {count} réponses d\'IA.', it: '{name} è stato menzionato in {count} risposte di IA.', ja: '{name} は {count} 件のAIの回答で言及されました。' },
@@ -1034,6 +1101,7 @@ const STRINGS = {
     'pt-BR': 'Ainda não há verificações suficientes para identificar negócios mencionados.',
     fr: 'Pas encore assez de vérifications pour identifier les entreprises mentionnées.',
     it: 'Non ci sono ancora abbastanza verifiche per individuare le attività menzionate.',
+    ja: '言及された事業を見分けるには、確認の数がまだ足りません。',
   },
   geo_biz_none_found: {
     he: 'אף עסק מהרשימה לא הוזכר בתשובות.',
@@ -1042,6 +1110,7 @@ const STRINGS = {
     'pt-BR': 'Nenhum dos seus concorrentes foi mencionado.',
     fr: 'Aucun des concurrents de la liste n\'a été mentionné.',
     it: 'Nessuno dei concorrenti dell\'elenco è stato menzionato.',
+    ja: '指定した競合は、どれも言及されませんでした。',
   },
 
   geo_opp_visibility_rate: { he: 'נראות', en: 'visibility', es: 'de visibilidad', 'pt-BR': 'de visibilidade', fr: 'visibilité', it: 'visibilità', ja: '可視性' },
@@ -1053,6 +1122,7 @@ const STRINGS = {
     'pt-BR': 'Estas conclusões vêm de uma amostra pequena. Verifique mais perguntas e mais motores para ganhar precisão.',
     fr: 'Ces analyses reposent sur un petit échantillon. Lancez plus de questions et de moteurs pour plus de précision.',
     it: 'Queste analisi si basano su un campione ridotto. Lanciare più domande e più motori per una maggiore precisione.',
+    ja: 'これらの知見は少ない標本にもとづいています。質問とエンジンを増やすと、精度が上がります。',
   },
 
   // Content signal short labels (used inside aggregation sentences)
@@ -1160,6 +1230,7 @@ const STRINGS = {
     'pt-BR': '{success} de {total} respostas mencionaram o negócio ou citaram o site',
     fr: '{success} réponses sur {total} ont mentionné l\'entreprise ou cité le site',
     it: '{success} risposte su {total} hanno menzionato l\'attività o citato il sito',
+    ja: '{total}件の回答のうち{success}件が、事業に言及するかサイトを引用しました',
   },
   geo_comp_loss_badge: { he: 'דורש תשומת לב', en: 'Needs attention', es: 'Requiere atención', 'pt-BR': 'Requer atenção', fr: 'À surveiller', it: 'Da tenere d\'occhio', ja: '要対応' },
   geo_card_content: { he: 'תוכן שכדאי לחזק', en: 'Content to strengthen', es: 'Contenido que hay que reforzar', 'pt-BR': 'Conteúdo a reforçar', fr: 'Contenu à renforcer', it: 'Contenuti da rafforzare', ja: '強化したいコンテンツ' },
@@ -1173,6 +1244,7 @@ const STRINGS = {
     'pt-BR': 'No momento, nenhuma fraqueza clara foi detectada. Para ter recomendações mais precisas, verifique mais perguntas e mais motores.',
     fr: 'Aucune faiblesse claire détectée pour le moment. Pour des recommandations plus précises, lancez plus de questions et de moteurs.',
     it: 'Per il momento non è stata rilevata nessuna debolezza evidente. Per raccomandazioni più precise, lanciare più domande e più motori.',
+    ja: '今のところ、はっきりした弱点は見つかりません。より正確な推奨を得るには、質問とエンジンを増やしてください。',
   },
   no_recommended_yet: { he: 'עדיין אין שאלות מומלצות לפרויקט הזה', en: 'No recommended questions yet for this project', es: 'Todavía no hay preguntas recomendadas para este proyecto', 'pt-BR': 'Ainda não há perguntas recomendadas para este projeto', fr: 'Aucune question recommandée pour ce projet pour l\'instant', it: 'Nessuna domanda consigliata per questo progetto per il momento', ja: 'このプロジェクトにはおすすめの質問がまだありません' },
   generate_recommended: { he: 'יצירת שאלות מומלצות', en: 'Generate recommended questions', es: 'Generar preguntas recomendadas', 'pt-BR': 'Gerar perguntas recomendadas', fr: 'Générer des questions recommandées', it: 'Generare domande consigliate', ja: 'おすすめの質問を生成' },
@@ -1184,6 +1256,7 @@ const STRINGS = {
     'pt-BR': 'No momento, não foi possível gerar perguntas de IA, então estas são perguntas básicas para começar.',
     fr: 'Nous n\'avons pas pu générer de questions d\'IA pour le moment, voici donc des questions de départ de base.',
     it: 'Per il momento non è stato possibile generare domande di IA, quindi queste sono domande di partenza di base.',
+    ja: '今はAIの質問を作れなかったため、これは基本的な出発点の質問です。',
   },
   more_questions_short: { he: 'עוד שאלות', en: 'More questions', es: 'Más preguntas', 'pt-BR': 'Mais perguntas', fr: 'Plus de questions', it: 'Altre domande', ja: 'ほかの質問' },
   competitor_results_of: { he: '{mentions} מתוך {total} תשובות', en: '{mentions} of {total} answers', es: '{mentions} de {total} respuestas', 'pt-BR': '{mentions} de {total} respostas', fr: '{mentions} réponses sur {total}', it: '{mentions} risposte su {total}', ja: '回答{total}件のうち{mentions}件' },
@@ -1197,6 +1270,7 @@ const STRINGS = {
     'pt-BR': 'Esta comparação se apoia em poucas respostas. Adicione perguntas de IA e faça mais verificações para ter um quadro completo.',
     fr: 'Cette comparaison repose sur peu de réponses. Ajoutez des questions d\'IA et lancez plus de vérifications pour avoir une image complète.',
     it: 'Questo confronto si basa su poche risposte. Si consiglia di aggiungere domande di IA e di lanciare più verifiche per avere un quadro completo.',
+    ja: 'この比較は少数の回答にもとづいています。AIの質問を追加して確認を増やすと、全体像がはっきりします。',
   },
   drawer_summary_both: { he: 'העסק אוזכר בתשובה, והאתר הופיע כמקור.', en: 'The business was mentioned in the answer, and the site was cited as a source.', es: 'El negocio se mencionó en la respuesta y la web se citó como fuente.', 'pt-BR': 'O negócio foi mencionado na resposta e o site foi citado como fonte.', fr: 'L\'entreprise a été mentionnée dans la réponse, et le site a été cité comme source.', it: 'L\'attività è stata menzionata nella risposta e il sito è stato citato come fonte.', ja: '回答のなかで事業が言及され、サイトも情報源として引用されました。' },
   drawer_summary_mentioned: { he: 'העסק אוזכר בתשובה, אבל האתר לא הופיע כמקור.', en: 'The business was mentioned in the answer, but the site was not cited as a source.', es: 'El negocio se mencionó en la respuesta, pero la web no se citó como fuente.', 'pt-BR': 'O negócio foi mencionado na resposta, mas o site não foi citado como fonte.', fr: 'L\'entreprise a été mentionnée dans la réponse, mais le site n\'a pas été cité comme source.', it: 'L\'attività è stata menzionata nella risposta, ma il sito non è stato citato come fonte.', ja: '回答のなかで事業は言及されましたが、サイトは情報源として引用されませんでした。' },
@@ -1209,6 +1283,7 @@ const STRINGS = {
     'pt-BR': 'Mantenha o seu conteúdo claro, com preços, avaliações e recomendações, para reforçar a sua presença em perguntas parecidas.',
     fr: 'Gardez un contenu clair, avec les prix, les avis et les recommandations, pour renforcer votre présence sur des questions similaires.',
     it: 'Si consiglia di mantenere un contenuto chiaro, con i prezzi, le recensioni e le raccomandazioni, per rafforzare la presenza su domande simili.',
+    ja: '価格、口コミ、おすすめを本文にはっきり書いておくと、似たような質問での可視性が強まります。',
   },
   drawer_no_improvements: { he: 'לא זוהו פעולות שיפור ברורות בתוצאה הזו.', en: 'No clear improvements were detected in this result.', es: 'No se han detectado mejoras claras en este resultado.', 'pt-BR': 'Nenhuma melhoria clara foi detectada neste resultado.', fr: 'Aucune amélioration claire n\'a été détectée dans ce résultat.', it: 'In questo risultato non è stato rilevato nessun miglioramento evidente da apportare.', ja: 'この結果からは、はっきりした改善点は見つかりませんでした。' },
   ai_summary_strong_low: { he: 'העסק הופיע בעיקר ב־{names}.', en: 'The business did appear mainly on {names}.', es: 'El negocio sí apareció, sobre todo en {names}.', 'pt-BR': 'O negócio de fato apareceu, principalmente em {names}.', fr: 'L\'entreprise est bien apparue, surtout sur {names}.', it: 'L\'attività è comparsa soprattutto su {names}.', ja: '事業が出てきたのは主に {names} です。' },
