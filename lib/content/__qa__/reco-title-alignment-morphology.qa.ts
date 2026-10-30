@@ -87,9 +87,13 @@ function main() {
   check('E2. the 0.6 threshold itself is UNCHANGED', /< 0\.6/.test(cov))
   check('E3. sharesSubjectHead remains the second, independent guard',
     /return sharesSubjectHead\(primaryKeyword, title\)/.test(cov))
-  check('E4. A2 uses MAX_SEARCH_TOKENS, not a literal 5',
-    /if \(toks\.length > MAX_SEARCH_TOKENS\) return false/.test(sp) && !/if \(toks\.length > 5\) return false/.test(sp))
-  check('E5. the general cap is untouched', /if \(toks\.length > MAX_SEARCH_TOKENS \+ 1\) return false/.test(sp))
+  // Both caps now read the same budget — maxPhraseWords(k, MAX_SEARCH_TOKENS),
+  // which is MAX_SEARCH_TOKENS itself in every spaced language — so the opener is
+  // still not punished for its phrasing and the general cap is still one above it.
+  check('E4. A2 uses the shared budget, not a literal 5',
+    /if \(toks\.length > budget\) return false/.test(sp) && !/if \(toks\.length > 5\) return false/.test(sp)
+    && /const budget = maxPhraseWords\(k, MAX_SEARCH_TOKENS\)/.test(sp))
+  check('E5. the general cap is still one above the opener cap', /if \(toks\.length > budget \+ 1\) return false/.test(sp))
   check('E6. neither function takes project state (system-wide, no per-project branching)',
     /export function isTitleKeywordAligned\(primaryKeyword: string, title: string\): boolean/.test(cov)
     && /export function isSearchPhraseQuality\(keyword: string\): boolean/.test(sp))

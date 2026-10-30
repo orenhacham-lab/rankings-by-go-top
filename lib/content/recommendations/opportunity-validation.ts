@@ -13,6 +13,8 @@
  * Hebrew-aware tokenizer and the generic-modifier set.
  */
 
+import { maxPhraseWords } from '@/lib/text/segment'
+
 import { contentTokens } from './evidence-cluster'
 import { GENERIC_TOKENS } from './opportunity'
 import { incompatibleActionNeed, searchNeedOf } from './coverage'
@@ -602,7 +604,11 @@ export function filterSecondaryKeywords(primaryKeyword: string, title: string, s
     seen.add(n)
     if (n === primNorm) { rejected.push({ keyword: s, reason: 'duplicate_of_primary' }); continue }
     // Malformed: too long, or almost no real content tokens.
-    if (n.split(' ').length > 8) { rejected.push({ keyword: s, reason: 'malformed' }); continue }
+    // maxPhraseWords, not a bare 8: a Japanese phrase segments finer than its
+    // Latin translation (「サイトの表示速度を改善する方法」 is seven tokens where
+    // "how to improve site speed" is five), so a cap written for spaced text
+    // would reject ordinary Japanese secondaries as malformed.
+    if (n.split(' ').length > maxPhraseWords(n, 8)) { rejected.push({ keyword: s, reason: 'malformed' }); continue }
     const st = toks(s)
     if (st.length <= 1) { rejected.push({ keyword: s, reason: 'too_short' }); continue }
     if (st.every((t) => primSet.has(t))) { rejected.push({ keyword: s, reason: 'subset_of_primary' }); continue }

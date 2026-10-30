@@ -10,6 +10,7 @@
 
 import type { SuggestionLanguage } from '@/lib/content/topic-suggestions'
 import { contentScript } from '@/lib/content/language'
+import { segmentWords, maxPhraseWords } from '@/lib/text/segment'
 import type { ArticleTopicAnchor } from '@/lib/supabase/types'
 import { validateAnchorPlacement, analyzeAnchorQuality, brandMentionedOutsideAnchors, type AnchorQuality } from '@/lib/content/anchors-check'
 import type { CtaDetails } from '@/lib/content/brief-notes'
@@ -114,6 +115,16 @@ const TRANSITIONS_IT = ['inoltre', 'tuttavia', 'però', 'di conseguenza', 'quind
 const START_STOPWORDS_IT = new Set(['il', 'lo', 'la', 'i', 'gli', 'le', 'un', 'uno', 'una', 'se', 'quando', 'per', 'con', 'questo', 'questa', 'ci', 'è', 'sono', 'di', 'inoltre'])
 const CTA_STRONG_IT = ['contattateci', 'contattaci', 'chiamate ora', 'chiama ora', 'chiamateci', 'clicca qui', 'fai clic qui', 'ordina ora', 'ordinate ora', 'prenota ora', 'prenotate ora', 'scriveteci', 'scrivici', 'lasciate i vostri dati', 'richiedete un preventivo', 'richiedi un preventivo', 'scriveteci su whatsapp', 'acquista ora', 'fissate un appuntamento']
 const CTA_ACTION_IT = ['chiamate', 'chiama', 'scrivete', 'scrivi', 'contattate', 'contatta', 'cliccate', 'clicca', 'ordinate', 'richiedete', 'prenotate', 'lasciate', 'inviate']
+// JAPANESE. The transitions are the written-register connectives a business
+// article uses (接続詞); the openers are the particles and demonstratives a
+// sentence may start with without that start being a repetition worth flagging;
+// the CTAs are the keigo imperative forms a Japanese site actually prints on a
+// button or at the end of a section (「お問い合わせください」), which is why every
+// one of them carries ください or 下さい rather than a bare verb stem.
+const TRANSITIONS_JA = ['また', 'さらに', 'そのため', 'したがって', 'しかし', 'ただし', '一方', '逆に', '例えば', 'たとえば', '実際に', 'まとめると', '重要なのは', '覚えておきたいのは', '言い換えると', '最後に', 'まず', '次に', 'そのうえで', 'このため', '多くの場合', '選ぶ際には', '結論として', '同様に', '比較すると', 'なお', 'つまり']
+const START_STOPWORDS_JA = new Set(['また', 'そして', 'この', 'その', 'これ', 'それ', 'もし', 'ただし', 'しかし', 'さらに', 'なお', 'つまり', 'まず', '次に', '一方'])
+const CTA_STRONG_JA = ['お問い合わせください', 'お問い合わせ下さい', 'お気軽にご相談ください', 'ご相談ください', 'お電話ください', '今すぐお電話', 'こちらをクリック', 'ご注文ください', '今すぐご注文', 'ご予約ください', '今すぐご予約', 'メッセージをお送りください', 'ご連絡ください', 'お見積もりをご依頼ください', '無料見積もりをご依頼', 'lineでお問い合わせ', 'whatsappでご連絡', '今すぐ購入']
+const CTA_ACTION_JA = ['お電話', 'ご連絡', 'ご相談', 'お問い合わせ', 'クリック', 'ご注文', 'ご予約', 'ご依頼', 'お送りください']
 // A phone/WhatsApp number, WhatsApp/phone words, or a URL — the "target" of a CTA.
 const CTA_CHANNEL_RE = /(\d[\d\-\s]{5,}\d|וואטסאפ|whatsapp|טלפון|נייד|telefone|celular|https?:\/\/|www\.)/i
 
@@ -124,10 +135,10 @@ const CTA_CHANNEL_RE = /(\d[\d\-\s]{5,}\d|וואטסאפ|whatsapp|טלפון|נ�
  * everyday words like "הזמנה"/"משלוח"/"שירות" as CTAs.
  */
 /** The word lists, keyed by content language: adding a language stops compiling here. */
-const CTA_STRONG: Record<SuggestionLanguage, string[]> = { he: CTA_STRONG_HE, en: CTA_STRONG_EN, es: CTA_STRONG_ES, 'pt-BR': CTA_STRONG_PT, fr: CTA_STRONG_FR, it: CTA_STRONG_IT }
-const CTA_ACTION: Record<SuggestionLanguage, string[]> = { he: CTA_ACTION_HE, en: CTA_ACTION_EN, es: CTA_ACTION_ES, 'pt-BR': CTA_ACTION_PT, fr: CTA_ACTION_FR, it: CTA_ACTION_IT }
-const TRANSITIONS: Record<SuggestionLanguage, string[]> = { he: TRANSITIONS_HE, en: TRANSITIONS_EN, es: TRANSITIONS_ES, 'pt-BR': TRANSITIONS_PT, fr: TRANSITIONS_FR, it: TRANSITIONS_IT }
-const START_STOPWORDS: Record<SuggestionLanguage, Set<string>> = { he: START_STOPWORDS_HE, en: new Set<string>(), es: START_STOPWORDS_ES, 'pt-BR': START_STOPWORDS_PT, fr: START_STOPWORDS_FR, it: START_STOPWORDS_IT }
+const CTA_STRONG: Record<SuggestionLanguage, string[]> = { he: CTA_STRONG_HE, en: CTA_STRONG_EN, es: CTA_STRONG_ES, 'pt-BR': CTA_STRONG_PT, fr: CTA_STRONG_FR, it: CTA_STRONG_IT, ja: CTA_STRONG_JA }
+const CTA_ACTION: Record<SuggestionLanguage, string[]> = { he: CTA_ACTION_HE, en: CTA_ACTION_EN, es: CTA_ACTION_ES, 'pt-BR': CTA_ACTION_PT, fr: CTA_ACTION_FR, it: CTA_ACTION_IT, ja: CTA_ACTION_JA }
+const TRANSITIONS: Record<SuggestionLanguage, string[]> = { he: TRANSITIONS_HE, en: TRANSITIONS_EN, es: TRANSITIONS_ES, 'pt-BR': TRANSITIONS_PT, fr: TRANSITIONS_FR, it: TRANSITIONS_IT, ja: TRANSITIONS_JA }
+const START_STOPWORDS: Record<SuggestionLanguage, Set<string>> = { he: START_STOPWORDS_HE, en: new Set<string>(), es: START_STOPWORDS_ES, 'pt-BR': START_STOPWORDS_PT, fr: START_STOPWORDS_FR, it: START_STOPWORDS_IT, ja: START_STOPWORDS_JA }
 
 function detectCtaFirstWord(bodyText: string, lang: SuggestionLanguage): number {
   const low = bodyText.toLowerCase()
@@ -187,8 +198,16 @@ function paragraphs(html: string): string[] {
   return out.filter(Boolean)
 }
 function textOf(html: string): string { return html.replace(/<[^>]+>/g, ' ').replace(/&[a-z]+;/gi, ' ').replace(/\s+/g, ' ').trim() }
-function words(text: string): string[] { return text ? text.split(/\s+/).filter(Boolean) : [] }
-function sentences(text: string): string[] { return text.split(/(?<=[.!?])\s+|(?<=[\.।])\s+/).map((s) => s.trim()).filter((s) => s.length > 0) }
+// A Japanese paragraph has no spaces in it, so a whitespace split would count
+// the whole paragraph as one word: every length, density and average below would
+// read 1. segmentWords is the whitespace split for every other language.
+function words(text: string): string[] { return text ? segmentWords(text) : [] }
+// 。！？ are the Japanese sentence enders, and they are NOT followed by a space,
+// so the lookbehind+\s+ rule finds no boundary in a Japanese paragraph and the
+// article reads as one enormous sentence (avg sentence length, long paragraphs,
+// the repeated-opening check). Both rules live in one split: the spaced one needs
+// its whitespace, the Japanese one must not require it.
+function sentences(text: string): string[] { return text.split(/(?<=[.!?])\s+|(?<=[\.।])\s+|(?<=[。！？])/).map((s) => s.trim()).filter((s) => s.length > 0) }
 export function includesKw(haystack: string, kw: string): boolean {
   const h = (haystack || '').toLowerCase(); const k = (kw || '').trim().toLowerCase()
   if (!k) return true
@@ -309,7 +328,8 @@ const TABLE_WORDS_PT = ['compar', 'preço', 'preco', 'custo', 'quanto custa', 'm
 const TABLE_WORDS_EN = ['compar', 'price', 'cost', 'best', ' vs', 'versus', 'types', 'choose', 'choosing', 'buying guide', 'pros and cons', 'pros/cons', 'cheapest']
 const TABLE_WORDS_FR = ['compar', 'prix', 'tarif', 'coût', 'cout', 'combien coûte', 'combien coute', 'meilleur', 'meilleurs', 'types de', 'choisir', 'comment choisir', 'avantages', 'inconvénients', 'guide d’achat', 'tableau', ' vs ', 'moins cher']
 const TABLE_WORDS_IT = ['confront', 'prezzo', 'prezzi', 'tariffa', 'costo', 'costi', 'quanto costa', 'migliore', 'migliori', 'tipi di', 'scegliere', 'come scegliere', 'vantaggi', 'svantaggi', 'guida all’acquisto', 'tabella', ' vs ', 'più economico']
-const TABLE_WORDS: Record<SuggestionLanguage, string[]> = { he: TABLE_WORDS_HE, en: TABLE_WORDS_EN, es: TABLE_WORDS_ES, 'pt-BR': TABLE_WORDS_PT, fr: TABLE_WORDS_FR, it: TABLE_WORDS_IT }
+const TABLE_WORDS_JA = ['比較', '比べ', '価格', '料金', '費用', '相場', 'いくら', 'おすすめ', '人気', '種類', '選び方', '選ぶ', 'メリット', 'デメリット', '購入ガイド', '一覧', '違い', '安い', '最安']
+const TABLE_WORDS: Record<SuggestionLanguage, string[]> = { he: TABLE_WORDS_HE, en: TABLE_WORDS_EN, es: TABLE_WORDS_ES, 'pt-BR': TABLE_WORDS_PT, fr: TABLE_WORDS_FR, it: TABLE_WORDS_IT, ja: TABLE_WORDS_JA }
 function isTableWorthy(text: string, lang: SuggestionLanguage): boolean {
   const t = (text || '').toLowerCase()
   const words = TABLE_WORDS[lang]
@@ -323,7 +343,11 @@ const QUESTION_WORDS_PT = ['o que ', 'que ', 'como ', 'quanto', 'por que', 'porq
 const QUESTION_WORDS_EN = ['how ', 'what ', 'why ', 'when ', 'which ', 'where ', 'who ', 'is ', 'are ', 'should ', 'can ', 'do ']
 const QUESTION_WORDS_FR = ['comment ', 'qu’est-ce', 'quest-ce', 'que ', 'quoi ', 'pourquoi', 'combien', 'quel ', 'quelle ', 'quels ', 'quelles ', 'quand ', 'où ', 'qui ', 'est-ce', 'faut-il', 'dois-je', 'peut-on', 'vaut-il']
 const QUESTION_WORDS_IT = ['come ', 'che cosa', 'cosa ', 'perché', 'perche', 'quanto', 'quale ', 'quali ', 'quando ', 'dove ', 'chi ', 'è ', 'sono ', 'conviene', 'bisogna', 'vale la pena', 'si può', 'devo ']
-const QUESTION_WORDS: Record<SuggestionLanguage, string[]> = { he: QUESTION_WORDS_HE, en: QUESTION_WORDS_EN, es: QUESTION_WORDS_ES, 'pt-BR': QUESTION_WORDS_PT, fr: QUESTION_WORDS_FR, it: QUESTION_WORDS_IT }
+// Japanese marks a question at the END of the clause, not at its start — 「か」,
+// 「ですか」, 「とは」 and the full-width 「？」 — so this list is read by `includes`
+// exactly like the others and needs no leading-space forms.
+const QUESTION_WORDS_JA = ['ですか', 'ますか', 'でしょうか', 'とは', 'なぜ', 'どう', 'どうやって', 'どのように', 'いくら', 'どこ', 'いつ', 'どれ', 'どの', '何', 'なに', ' べき', '必要ですか', '？', '?']
+const QUESTION_WORDS: Record<SuggestionLanguage, string[]> = { he: QUESTION_WORDS_HE, en: QUESTION_WORDS_EN, es: QUESTION_WORDS_ES, 'pt-BR': QUESTION_WORDS_PT, fr: QUESTION_WORDS_FR, it: QUESTION_WORDS_IT, ja: QUESTION_WORDS_JA }
 
 /**
  * E-E-A-T, the part a generated article can honestly carry: something the
@@ -342,7 +366,11 @@ const VERIFY_CUES_PT = ['verifique', 'verificar', 'confira', 'conferir', 'pergun
 const VERIFY_CUES_ES = ['comprueba', 'compruebe', 'verifica', 'verifique', 'pregunta', 'pregunte', 'compara', 'compare ', 'asegúrate', 'asegúrese', 'solicita', 'solicite', 'confirma', 'fíjate']
 const VERIFY_CUES_FR = ['vérifiez', 'vérifier', 'demandez', 'demander', 'posez la question', 'comparez', 'comparer', 'assurez-vous', 'confirmez', 'exigez', 'contrôlez', 'regardez si']
 const VERIFY_CUES_IT = ['verificate', 'verificare', 'verifica', 'controllate', 'controllare', 'chiedete', 'chiedere', 'chiedi', 'richiedete', 'richiedere', 'confrontate', 'confrontare', 'assicuratevi', 'accertatevi', 'confermate', 'pretendete', 'osservate']
-const VERIFY_CUES: Record<SuggestionLanguage, string[]> = { he: VERIFY_CUES_HE, en: VERIFY_CUES_EN, es: VERIFY_CUES_ES, 'pt-BR': VERIFY_CUES_PT, fr: VERIFY_CUES_FR, it: VERIFY_CUES_IT }
+// Japanese: the polite imperative forms only, for the reason the Hebrew comment
+// gives — 「確認」 as a bare noun appears in ordinary prose and would pass the
+// check without telling the reader to do anything.
+const VERIFY_CUES_JA = ['確認してください', '確認しましょう', 'ご確認ください', '確認しておき', '聞いてみましょう', '質問してください', '尋ねてください', '比較してください', '比較しましょう', '必ず確認', '見積もりを取り', '依頼してください', 'チェックしましょう', 'チェックしてください', '確かめてください']
+const VERIFY_CUES: Record<SuggestionLanguage, string[]> = { he: VERIFY_CUES_HE, en: VERIFY_CUES_EN, es: VERIFY_CUES_ES, 'pt-BR': VERIFY_CUES_PT, fr: VERIFY_CUES_FR, it: VERIFY_CUES_IT, ja: VERIFY_CUES_JA }
 
 /** How many of the cues the body uses, counted once per cue. */
 export function readerVerifyCount(bodyText: string, lang: SuggestionLanguage): number {
@@ -386,8 +414,12 @@ function norm(s: string): string {
 function looksLikeQuestion(text: string, lang: SuggestionLanguage): boolean {
   const t = (text || '').trim().toLowerCase()
   if (!t) return false
-  if (t.includes('?')) return true
+  if (t.includes('?') || t.includes('？')) return true
   const words = QUESTION_WORDS[lang]
+  // A Japanese question is marked at the END of the clause — 「…ですか」,
+  // 「…とは」 — and only some of its interrogatives open one (「なぜ…」), so a
+  // startsWith test alone finds no question in a Japanese heading at all.
+  if (lang === 'ja') return words.some((w) => t.endsWith(w) || t.startsWith(w))
   return words.some((w) => t.startsWith(w))
 }
 function headingTexts(html: string, tag: 'h2' | 'h3'): string[] {
@@ -445,7 +477,9 @@ export function runArticleAudit(input: AuditInput): AuditResult {
     if (transitions.some((w) => low.includes(w))) transitionParagraphs++
     const sents = sentences(p)
     totalSentences += sents.length
-    if (words(p).length > 90 || sents.length > 6) longParagraphs++
+    // 90 words of Hebrew or English prose; the same amount of Japanese prose is
+    // ~1.7x as many tokens, so the budget is converted rather than compared raw.
+    if (words(p).length > maxPhraseWords(p, 90) || sents.length > 6) longParagraphs++
     for (const s of sents) {
       const first = (s.split(/\s+/)[0] || '').toLowerCase().replace(/[^a-zא-ת]/g, '')
       // Don't penalize repetition of natural/common openers.
@@ -526,7 +560,7 @@ export function runArticleAudit(input: AuditInput): AuditResult {
 
   // --- Readability ---
   add('paragraphs_not_too_long', 'readability', 'warning', longParagraphs <= Math.max(1, Math.round(pCount * 0.2)))
-  add('sentence_length_ok', 'readability', 'warning', avgSentenceWords === 0 || avgSentenceWords <= 26)
+  add('sentence_length_ok', 'readability', 'warning', avgSentenceWords === 0 || avgSentenceWords <= maxPhraseWords(bodyText, 26))
   // Enough transition phrases anywhere in the article → no warning. Soft, count-
   // based threshold: >=5 for long articles (>1500w), >=4 for ~1000-1500, >=3 short.
   const minTransitions = input.desiredWordCount > 1500 ? 5 : input.desiredWordCount >= 1000 ? 4 : 3
@@ -558,11 +592,17 @@ export function runArticleAudit(input: AuditInput): AuditResult {
   // mostly Hebrew letters; a latin-script language (English, Spanish) is mostly
   // latin letters — an article returned in the wrong language fails here instead
   // of saving, which is what used to happen to any language that was not Hebrew.
+  // Japanese prose is mostly kana and kanji and legitimately carries latin words
+  // (SEO, Google), so neither side of the hebrew/latin comparison answers it: a
+  // Japanese article is checked for Japanese characters outnumbering latin ones,
+  // which is what fails when the model answers an order in English.
   {
     const hebrew = (bodyText.match(/[֐-׿]/g) || []).length
     const latin = (bodyText.match(/[A-Za-z]/g) || []).length
+    const japanese = (bodyText.match(/[\u3040-\u30ff\u3400-\u4dbf\u4e00-\u9fff]/g) || []).length
+    const script = contentScript(lang)
     add('language_matches', 'technical', 'blocker',
-      contentScript(lang) === 'hebrew' ? hebrew >= latin : latin >= hebrew)
+      script === 'hebrew' ? hebrew >= latin : script === 'japanese' ? japanese >= latin : latin >= hebrew)
   }
 
   // --- brand / CTA rules ---

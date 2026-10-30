@@ -153,8 +153,15 @@ function main() {
     // A2 raised the opener cap from a literal 5 to MAX_SEARCH_TOKENS — an opener-led
     // query now gets the same budget as any other. The constant itself is unchanged and
     // the cap still EXISTS; only the asymmetry is gone.
-    check('E7. MAX_SEARCH_TOKENS unchanged; the opener cap now equals it (A2)',
-      /const MAX_SEARCH_TOKENS = 7\b/.test(sp) && /if \(toks\.length > MAX_SEARCH_TOKENS\) return false/.test(sp))
+    // The cap is now written as maxPhraseWords(k, MAX_SEARCH_TOKENS) — the same
+    // number for every language the site publishes in, and the measured multiple of
+    // it for a language written without word spaces, where seven tokens is an
+    // ordinary keyword. The constant is unchanged and the opener still shares the
+    // general budget, which is what A2 decided.
+    check('E7. MAX_SEARCH_TOKENS unchanged; the opener cap now equals the general budget (A2)',
+      /const MAX_SEARCH_TOKENS = 7\b/.test(sp)
+      && /const budget = maxPhraseWords\(k, MAX_SEARCH_TOKENS\)/.test(sp)
+      && /if \(toks\.length > budget\) return false/.test(sp))
   }
 
   console.log(`\n${pass} passed, ${fail} failed`)

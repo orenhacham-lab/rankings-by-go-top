@@ -16,6 +16,8 @@
  * against existing page titles / focus keywords / slugs.
  */
 
+import { segmentToSpaces } from '@/lib/text/segment'
+
 import { constructStateVariants, distinctiveTokensOf, canonicalToken, canonicalVariants, topicSignature, isHighConfidenceDuplicate } from './semantic-dup'
 import { normalizePhrase } from './keyword-guard'
 import { sharesSubjectHead, coversAllSubjectHeads, subjectTokensOf, isModifierToken } from './link-relevance'
@@ -211,7 +213,7 @@ function concreteSubject(p: string, typeWords?: Set<string>): string[] {
  *  pair. Conditions ("יד שנייה") are excluded so a shared condition never counts. */
 function themeKeys(p: string): Set<string> {
   const out = new Set<string>()
-  for (const w of (p || '').toLowerCase().replace(WORD_SPLIT_RE, ' ').split(/\s+/).filter(Boolean)) {
+  for (const w of segmentToSpaces((p || '').toLowerCase().replace(WORD_SPLIT_RE, ' ')).split(/\s+/).filter(Boolean)) {
     const c = canonicalToken(w)
     if (!c || isConditionOrQuantity(c) || isConditionOrQuantity(w)) continue
     if (!isModifierToken(w) && !isModifierToken(c)) continue

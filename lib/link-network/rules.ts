@@ -37,6 +37,8 @@
  * Guarded, each rule with a mutation control, by
  * lib/link-network/__qa__/link-network.qa.ts.
  */
+
+import { segmentToSpaces, isShortToken } from '@/lib/text/segment'
 import { bareDomain, isCompetitorDomain } from '@/lib/site-links/classify'
 import { isUnverifiedPermission, propertyCoversProjectUrl } from '@/lib/gsc/property-match'
 
@@ -188,7 +190,7 @@ export function readinessGap(site: NetworkSite, now: Date): ReadinessGap | null 
 }
 
 const normalizeCategory = (s: string) =>
-  s.toLowerCase().normalize('NFKC').replace(/[^\p{L}\p{N}\s]/gu, ' ').replace(/\s+/g, ' ').trim()
+  segmentToSpaces(s.toLowerCase().normalize('NFKC').replace(/[^\p{L}\p{N}\s]/gu, ' '))
 
 /**
  * The same line of business: equal, one containing the other ("אינסטלציה" and
@@ -198,7 +200,7 @@ export function sameCategory(a: string, b: string): boolean {
   const x = normalizeCategory(a), y = normalizeCategory(b)
   if (!x || !y) return false
   if (x === y || x.includes(y) || y.includes(x)) return true
-  const wx = new Set(x.split(' ').filter((w) => w.length > 2)), wy = new Set(y.split(' ').filter((w) => w.length > 2))
+  const wx = new Set(x.split(' ').filter((w) => !isShortToken(w, 3))), wy = new Set(y.split(' ').filter((w) => !isShortToken(w, 3)))
   if (!wx.size || !wy.size) return false
   let shared = 0
   for (const w of wx) if (wy.has(w)) shared++

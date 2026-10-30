@@ -15,6 +15,8 @@
  * the acceptance rule can re-check EVERY accepted link, not just token presence.
  */
 
+import { segmentToSpaces } from '@/lib/text/segment'
+
 import { distinctiveTokensOf, canonicalToken, canonicalVariants } from './semantic-dup'
 import { GENERIC_TOKENS } from './opportunity'
 import type { LinkPlan, LinkTarget } from './types'
@@ -65,6 +67,23 @@ const ATTRIBUTE_LEXICON_RAW = [
   'יעיל', 'יעילה', 'יעילים', 'יעילות', 'ממש', 'ממשי', 'פייק', 'הופך', 'עובד',
   // Product-CONDITION markers (second-hand / used) — a condition, not a subject.
   'יד', 'שני', 'שניה', 'שנייה', 'משומש', 'משומשת', 'משומשים', 'יד2',
+  // ── JAPANESE ───────────────────────────────────────────────────────────────
+  // The same grammar-level vocabulary, in the one language whose words this
+  // file's Hebrew and English entries cannot reach. Colours, sizes, quality and
+  // recommendation words, the generic design/type/collection nouns, the business
+  // containers, the price and question framing, and the second-hand condition —
+  // each of them a modifier that may never establish a link on its own.
+  '白', '黒', '赤', '青', '緑', '黄色', 'オレンジ', '紫', 'ピンク', '茶色', 'グレー', '金', '銀', 'カラフル',
+  '小さい', '大きい', '中型', '小型', '大型', '長い', '短い', '広い', '狭い',
+  'おすすめ', 'オススメ', '人気', '高品質', '良い', '最高', '最適', '完璧', '有名', '定番', '新しい', '最新',
+  'モダン', 'クラシック', '高級', '激安', '安い', 'ロマンチック', '特別', '独自',
+  'デザイン', 'スタイル', '種類', 'タイプ', 'コレクション', '品揃え', 'モデル', '商品', '製品', 'アイテム',
+  '解決', '解決策', 'アイデア', 'ヒント', 'コツ', 'ポイント',
+  '会社', '企業', '事業', 'ビジネス', 'サービス', 'システム', '分野', '事務所', '店',
+  '価格', '料金', '費用', 'コスト', '予算', 'いくら', '値段', '相場',
+  '重要', '大切', '必要', '健康', '生活', '本物', '効果的', '便利', '基本', '一般',
+  '方法', 'やり方', '手順', 'ガイド', '一覧', 'まとめ', 'リスト', 'レビュー', '口コミ', '比較', '違い',
+  '中古', '新品', '未使用',
 ]
 const ATTRIBUTE_LEXICON = new Set(ATTRIBUTE_LEXICON_RAW.map((w) => canonicalToken(w)).filter(Boolean))
 
@@ -88,7 +107,7 @@ export function isModifierToken(tok: string, extraTypeWords?: Set<string>): bool
  *  it bypasses the modifier filter and falsely bridges two products. */
 export function subjectTokensOf(phrase: string, extraTypeWords?: Set<string>): string[] {
   const out: string[] = []
-  for (const w of (phrase || '').toLowerCase().replace(/[?!.,:;"'“”׳״()\-–—/|]/g, ' ').split(/\s+/).filter(Boolean)) {
+  for (const w of segmentToSpaces((phrase || '').toLowerCase().replace(/[?!.,:;"'“”׳״()\-–—/|]/g, ' ')).split(/\s+/).filter(Boolean)) {
     if (/^[a-z]$/.test(w)) { out.push(w); continue } // keep a single vitamin letter C / D
     if (/\d/.test(w)) {
       // keep real alphanumeric specifics (B12/K2/D3/VO2/1000mg) but drop a

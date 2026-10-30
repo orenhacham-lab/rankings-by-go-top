@@ -15,6 +15,8 @@
  * as the niche itself, says nothing about who is searching).
  */
 
+import { segmentToSpaces, isShortToken, wordCount } from '@/lib/text/segment'
+
 // ── Words ───────────────────────────────────────────────────────────────────
 
 /** Words that carry no subject: Hebrew and English function words, and the generic words of a title. */
@@ -32,14 +34,17 @@ const STOPWORDS = new Set([
 const HEB_PREFIX = /^[והבלמשכ]/
 
 export function normalizeText(s: string | null | undefined): string {
-  return (s ?? '').toLowerCase().normalize('NFKC').replace(/[\p{P}\p{S}]+/gu, ' ').replace(/\s+/g, ' ').trim()
+  // segmentToSpaces collapses whitespace for a spaced language and segments one
+  // written without spaces, so every `split(' ')` below counts words in Japanese
+  // too. See lib/text/segment.ts.
+  return segmentToSpaces((s ?? '').toLowerCase().normalize('NFKC').replace(/[\p{P}\p{S}]+/gu, ' '))
 }
 
 /** The subject words of a text, each with its prefix-less form when it has a Hebrew prefix. */
 export function subjectWords(s: string | null | undefined): string[] {
   const out: string[] = []
   for (const w of normalizeText(s).split(' ')) {
-    if (w.length < 3 || STOPWORDS.has(w)) continue
+    if (isShortToken(w, 3) || STOPWORDS.has(w)) continue
     out.push(w)
     if (w.length >= 5 && HEB_PREFIX.test(w)) {
       const bare = w.slice(1)
@@ -51,7 +56,7 @@ export function subjectWords(s: string | null | undefined): string[] {
 
 /** The same keyword written a little differently ("נעלי ריצה נשים" / "נעלי ריצה לנשים"): one key. */
 export function variantKey(keyword: string): string {
-  const words = normalizeText(keyword).split(' ').filter((w) => w.length > 1 && !STOPWORDS.has(w))
+  const words = normalizeText(keyword).split(' ').filter((w) => !isShortToken(w, 2) && !STOPWORDS.has(w))
     .map((w) => (w.length >= 5 && HEB_PREFIX.test(w) ? w.slice(1) : w))
   return [...new Set(words)].sort().join(' ')
 }
@@ -210,9 +215,9 @@ const NICHE_SHARE = 0.5
 
 function phrasesOf(item: ClusterItem): { unigrams: Set<string>; bigrams: Set<string>; first: string | null } {
   const text = item.keyword || item.title
-  const words = normalizeText(text).split(' ').filter((w) => w.length >= 2 && !STOPWORDS.has(w))
+  const words = normalizeText(text).split(' ').filter((w) => !isShortToken(w, 2) && !STOPWORDS.has(w))
   const bare = (w: string) => (w.length >= 5 && HEB_PREFIX.test(w) ? w.slice(1) : w)
-  const unigrams = new Set(words.filter((w) => w.length >= 3).map(bare))
+  const unigrams = new Set(words.filter((w) => !isShortToken(w, 3)).map(bare))
   const bigrams = new Set<string>()
   for (let i = 0; i + 1 < words.length; i++) bigrams.add(`${bare(words[i])} ${bare(words[i + 1])}`)
   return { unigrams, bigrams, first: words.length >= 2 ? `${bare(words[0])} ${bare(words[1])}` : null }
@@ -223,11 +228,11 @@ function phrasesOf(item: ClusterItem): { unigrams: Set<string>; bigrams: Set<str
  * one-word subject, the shortest keyword that carries it (one word alone says too little).
  */
 function clusterName(phrase: string, two: boolean, items: readonly ClusterItem[]): string {
-  const texts = items.map((it) => it.keyword || it.title).sort((a, b) => a.split(' ').length - b.split(' ').length || a.length - b.length)
+  const texts = items.map((it) => it.keyword || it.title).sort((a, b) => wordCount(a) - wordCount(b) || a.length - b.length)
   if (two) {
     const bare = (w: string) => (w.length >= 5 && HEB_PREFIX.test(w) ? w.slice(1) : w)
     for (const t of texts) {
-      const words = normalizeText(t).split(' ').filter((w) => w.length >= 2 && !STOPWORDS.has(w))
+      const words = normalizeText(t).split(' ').filter((w) => !isShortToken(w, 2) && !STOPWORDS.has(w))
       for (let i = 0; i + 1 < words.length; i++) if (`${bare(words[i])} ${bare(words[i + 1])}` === phrase) return `${words[i]} ${words[i + 1]}`
     }
   }

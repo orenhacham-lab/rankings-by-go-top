@@ -33,6 +33,10 @@ const QUESTION_START: Record<SuggestionLanguage, RegExp> = {
   'pt-BR': /^(?:o\s+que|que|como|por\s+que|qual|quais|onde|quando|quem|quanto|quanta|quantos|quantas|[ée]|s[ãa]o|posso|devo|vale|existe|h[áa]|serve|precisa)\b/i,
   fr: /^(?:qu['’]est-ce|que|quoi|comment|pourquoi|quel|quelle|quels|quelles|o[ùu]|quand|qui|combien|est-ce|sont|puis-je|dois-je|faut-il|y\s+a-t-il|vaut-il)\b/i,
   it: /^(?:che\s+cosa|cosa|che|come|perch[éè]|quale|quali|dove|quando|chi|quanto|quanta|quanti|quante|[èe]|sono|posso|devo|bisogna|conviene|serve|vale|esiste|ci\s+sono)\b/i,
+  // Japanese asks at the END of the clause, so this one is anchored at the end:
+  // 「か」「ですか」「とは」「？」. The leading interrogatives are listed too, because
+  // 「なぜ…」 and 「どのように…」 do open a question.
+  ja: /(?:か|ですか|ますか|でしょうか|とは|？|\?)\s*$|^(?:なぜ|どう|どのように|どうやって|いくら|どこ|いつ|どれ|どの|何|なに)/,
 }
 
 /** "best / recommended" words: the question asks for a recommendation. */
@@ -43,6 +47,8 @@ const RECOMMEND: Record<SuggestionLanguage, RegExp> = {
   'pt-BR': /\b(?:melhor|melhores|recomendad\w*|top)\b/i,
   fr: /\b(?:meilleur\w*|recommand\w*|top)\b/i,
   it: /\b(?:migliore|migliori|miglior|consigliat\w*|raccomandat\w*|top)\b/i,
+  // No \b in Japanese: there is no word boundary to anchor to.
+  ja: /(?:おすすめ|オススメ|お勧め|お薦め|人気|最適|ベスト|一番|最高)/,
 }
 
 /** A keyword that already names the act of buying ("buying X", "buy X"). */
@@ -53,6 +59,10 @@ const BUY: Record<SuggestionLanguage, RegExp> = {
   'pt-BR': /^(?:comprar|compra de|comprando|pedir|encomendar|contratar)\s/i,
   fr: /^(?:acheter|achat d['’e]|commander|commande d['’e]|louer|souscrire)\s?/i,
   it: /^(?:comprare|acquistare|acquisto di|ordinare|ordine di|noleggiare|sottoscrivere)\s/i,
+  // Japanese names the act of buying as a SUFFIX on the noun (「ノートパソコンの
+  // 購入」, 「車を買う」), never as a word before it, so this pattern is anchored at
+  // the end where the others are anchored at the start.
+  ja: /(?:の購入|を購入|購入|を買う|の注文|を注文|のレンタル|を借りる|の申し込み|を申し込む)\s*$/,
 }
 
 const TEMPLATES: Record<SuggestionLanguage, { recommend: (k: string) => string; buy: (k: string) => string; general: (k: string) => string }> = {
@@ -75,6 +85,14 @@ const TEMPLATES: Record<SuggestionLanguage, { recommend: (k: string) => string; 
     recommend: (k) => `Estou procurando ${k.replace(/^o\s+|^a\s+|^os\s+|^as\s+/i, '')}. O que você recomenda?`,
     buy: (k) => `O que devo verificar antes de ${k.replace(/^compra de\s/i, 'comprar ')}?`,
     general: (k) => `O que devo saber sobre ${k}?`,
+  },
+  ja: {
+    // Plain 丁寧体 questions, the way a Japanese user actually types one into an
+    // assistant: no particle is inserted before the keyword, because a Japanese
+    // noun needs none, and the question word ends the sentence.
+    recommend: (k) => `${k}を探しています。おすすめはどれですか？`,
+    buy: (k) => `${k}の前に確認しておくべきことは何ですか？`,
+    general: (k) => `${k}について知っておくべきことは何ですか？`,
   },
   fr: {
     recommend: (k) => `Je cherche ${k.replace(/^le\s+|^la\s+|^les\s+|^l['’]/i, '')}. Que me conseillez-vous ?`,

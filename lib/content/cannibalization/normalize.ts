@@ -21,6 +21,8 @@
  * stay different words; it only folds the forms a writer uses for the same word.
  */
 
+import { segmentToSpaces, isScriptless, isScriptlessNoise } from '@/lib/text/segment'
+
 const NIQQUD = /[֑-ֽֿ-ׇ]/g
 const MAQAF = /־/g
 const HE_FINALS: Record<string, string> = { ך: 'כ', ם: 'מ', ן: 'נ', ף: 'פ', ץ: 'צ' }
@@ -65,10 +67,17 @@ export function fold(word: string): string {
 
 const STOP = new Set(STOP_RAW.map(fold))
 
-/** Is this (folded) word a year, a bare number, or a stop/generic word? */
+/** Is this (folded) word a year, a bare number, or a stop/generic word?
+ *
+ *  A Japanese word is weighed against the scriptless noise list instead of the
+ *  two lists above:
+ *  its particles and its article-framing words (「の」, 「方法」, 「おすすめ」) are
+ *  that language's version of "של" and "המדריך המלא", and they are kept beside
+ *  the tokenizer that produces them. */
 function isNoise(w: string): boolean {
   if (w.length === 0) return true
   if (/^\d+$/.test(w)) return true
+  if (isScriptless(w)) return isScriptlessNoise(w)
   if (STOP.has(w)) return true
   // A stop word behind a one-letter prefix ("והמדריך", "למתחילים", "בכל").
   if (w.length > 2 && /^[והבלמשכ]/.test(w) && STOP.has(w.slice(1))) return true
@@ -77,9 +86,9 @@ function isNoise(w: string): boolean {
 
 /** Words of a text, before noise removal: decoded, split on anything that is not a letter or digit. */
 export function rawWords(text: string | null | undefined): string[] {
-  const s = decodeEntities(String(text ?? ''))
+  const s = segmentToSpaces(decodeEntities(String(text ?? ''))
     .replace(MAQAF, ' ')
-    .replace(/["'“”‘’׳״`]/g, '')
+    .replace(/["'“”‘’׳״`]/g, ''))
   return s.split(/[^\p{L}\p{N}]+/u).map(fold).filter(Boolean)
 }
 
@@ -87,7 +96,10 @@ export function rawWords(text: string | null | undefined): string[] {
 export function subjectWords(text: string | null | undefined): string[] {
   const out: string[] = []
   for (const w of rawWords(text)) {
-    if (w.length < 2 || isNoise(w)) continue
+    // The length floor drops the one-letter Hebrew and English words that carry
+    // no subject. It does NOT apply to a Japanese word: 店, 車 and 鍵 are whole
+    // nouns, and 「の」 is dropped by isNoise instead.
+    if ((w.length < 2 && !isScriptless(w)) || isNoise(w)) continue
     if (!out.includes(w)) out.push(w)
   }
   return out
@@ -104,6 +116,9 @@ const MIN_STEM = 3
  */
 export function tokenForms(word: string): string[] {
   const forms = new Set<string>([word])
+  // Japanese has no prefix to strip and no plural to fold: a word is its own
+  // only form, and the Latin s/es/ies branch below would corrupt a kana ending.
+  if (isScriptless(word)) return [...forms]
   const isHebrew = /[א-ת]/.test(word)
   const bases = [word]
   if (isHebrew) {

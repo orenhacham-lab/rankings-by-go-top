@@ -127,8 +127,14 @@ function main() {
     const sd = stripComments(read('lib/content/recommendations/semantic-dup.ts'))
     check('E1. constructStateVariants takes ONE string param — no project/tenant/config',
       /export function constructStateVariants\(raw: string\): string\[\]/.test(sd))
-    check('E2. semantic-dup.ts imports nothing (no project-aware module reachable)',
-      !/^import /m.test(sd))
+    // E2 asked for NO imports at all, which was the cheapest way to say "nothing
+    // project-aware is reachable from here". The Japanese word-segmentation seam
+    // (lib/text/segment.ts) is now imported: it is pure, takes no project, reads
+    // no environment and answers from the TEXT's own characters, so the property
+    // E2 protects is intact. The guard now names the one allowed import instead of
+    // forbidding all of them.
+    check('E2. semantic-dup.ts imports nothing but the tokenizer seam (no project-aware module reachable)',
+      (sd.match(/^import .*/gm) ?? []).every((line) => line.includes("from '@/lib/text/segment'")))
     check('E3. opportunity-validation.ts has NO projectId / env flag / allowlist',
       !/projectId|project_id|process\.env|allowlist|ALLOWLIST/.test(ov))
     check('E4. validateIntentKeywordConsistency signature is unchanged (no per-project arg)',

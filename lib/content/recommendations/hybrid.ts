@@ -108,6 +108,11 @@ const PROVENANCE: Record<ContentLanguage, {
     many: (n, names) => `Supportato da ${n} fonti: ${names}`,
     one: (name) => `Supportato solo da: ${name}`,
   },
+  ja: {
+    label: { site_scan: 'サイト診断', keyword_research_url: 'キーワード調査', project_data: 'プロジェクトのデータ', keyword: 'キーワード', hybrid: '複合' },
+    many: (n, names) => `${n}件の情報源にもとづく根拠：${names}`,
+    one: (name) => `根拠となる情報源：${name}`,
+  },
 }
 
 export function hybridProvenanceReason(sources: RecommendationSource[], language: ContentLanguage, repReason: string): string {
