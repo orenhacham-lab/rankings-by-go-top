@@ -3,14 +3,16 @@
  * No AI. Token-set Jaccard over normalized Hebrew/English text.
  */
 
+import { segmentToSpaces, isShortToken } from '@/lib/text/segment'
+
 /** Word tokens (len>1), lowercased, punctuation-stripped. */
 export function tokens(s: string): Set<string> {
   return new Set(
-    (s || '')
+    segmentToSpaces((s || '')
       .toLowerCase()
-      .replace(/[?!.,:;"'“”׳״()\-–—/|]/g, ' ')
+      .replace(/[?!.,:;"'“”׳״()\-–—/|]/g, ' '))
       .split(/\s+/)
-      .filter((w) => w.length > 1),
+      .filter((w) => !isShortToken(w, 2)),
   )
 }
 

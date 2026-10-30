@@ -13,6 +13,8 @@
  * isSearchPhraseQuality is the acceptance gate over the FINAL keyword.
  */
 
+import { segmentWords, maxPhraseWords } from '@/lib/text/segment'
+
 import { normalizePhrase } from './keyword-guard'
 import { subjectTokensOf, sharesSubjectHead } from './link-relevance'
 
@@ -165,8 +167,8 @@ export function normalizeToSearchPhrase(
 /** A concise subject from a (possibly long) subject/title — strip framing, cap. */
 export function conciseSubject(subject: string): string {
   const s = stripHeadlineFraming(subject)
-  const toks = s.split(/\s+/).filter(Boolean)
-  return toks.length <= MAX_SEARCH_TOKENS ? s : ''
+  const toks = segmentWords(s)
+  return toks.length <= maxPhraseWords(s, MAX_SEARCH_TOKENS) ? s : ''
 }
 
 /**
@@ -182,8 +184,9 @@ export function isSearchPhraseQuality(keyword: string): boolean {
   if (HEADLINE_TAIL_RE.test(k)) return false
   if (DANGLING_TAIL_RE.test(k)) return false
   // A leading opener is allowed ONLY for a short, self-contained question query.
-  const toks = k.split(/\s+/).filter(Boolean)
-  if (toks.length > MAX_SEARCH_TOKENS + 1) return false
+  const toks = segmentWords(k)
+  const budget = maxPhraseWords(k, MAX_SEARCH_TOKENS)
+  if (toks.length > budget + 1) return false
   if (OPENERS_RE.test(k)) {
     // A2 — an opener-led query gets the SAME budget as any other. The cap was 5 while
     // everything else got MAX_SEARCH_TOKENS + 1, so an identical query failed or passed
@@ -193,7 +196,7 @@ export function isSearchPhraseQuality(keyword: string): boolean {
     // Same meaning, same length. Opener-led phrasing is one of the most common Hebrew
     // search forms; the two-clause / colon / dangling-tail rules above still reject a
     // genuine headline regardless of how it opens.
-    if (toks.length > MAX_SEARCH_TOKENS) return false
+    if (toks.length > budget) return false
   }
   if (HOW_MUCH_RE.test(k)) return false // "כמה עולה …" is a headline form → "מחיר …"
   return true

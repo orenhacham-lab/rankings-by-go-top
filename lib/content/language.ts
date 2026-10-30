@@ -14,9 +14,9 @@
  * site can be managed from a Hebrew dashboard, and currency follows the country.
  */
 
-export type ContentLanguage = 'he' | 'en' | 'es' | 'pt-BR' | 'fr' | 'it'
+export type ContentLanguage = 'he' | 'en' | 'es' | 'pt-BR' | 'fr' | 'it' | 'ja'
 
-export const CONTENT_LANGUAGES: ContentLanguage[] = ['he', 'en', 'es', 'pt-BR', 'fr', 'it']
+export const CONTENT_LANGUAGES: ContentLanguage[] = ['he', 'en', 'es', 'pt-BR', 'fr', 'it', 'ja']
 
 export const DEFAULT_CONTENT_LANGUAGE: ContentLanguage = 'he'
 
@@ -39,6 +39,13 @@ export const DEFAULT_CONTENT_LANGUAGE: ContentLanguage = 'he'
  *
  * Italian is region-less for the same reason: 'it', 'it-IT' and 'it-CH' all
  * normalize to the one content language.
+ *
+ * Japanese is region-less because the language has one market, and it is the
+ * first content language written WITHOUT WORD SPACES: everything that measures a
+ * Japanese text — a keyword's word count, the cannibalization word sets, the
+ * internal-link overlap — goes through lib/text/segment.ts rather than a space
+ * split. The legacy 'jp' is accepted beside 'ja' because it is what a WordPress
+ * site and a Google Search Console property both sometimes report.
  */
 export function normalizeContentLanguage(value: unknown): ContentLanguage {
   const s = String(value ?? '').toLowerCase().trim()
@@ -48,6 +55,7 @@ export function normalizeContentLanguage(value: unknown): ContentLanguage {
   if (s.startsWith('pt') || s.startsWith('portugu')) return 'pt-BR'
   if (s.startsWith('fr') || s.startsWith('franc') || s.startsWith('français')) return 'fr'
   if (s.startsWith('it') || s.startsWith('ital')) return 'it'
+  if (s.startsWith('ja') || s.startsWith('jp') || s.startsWith('japan') || s.startsWith('日本')) return 'ja'
   return DEFAULT_CONTENT_LANGUAGE
 }
 
@@ -59,6 +67,7 @@ const ENGLISH_NAME: Record<ContentLanguage, string> = {
   'pt-BR': 'Brazilian Portuguese',
   fr: 'French',
   it: 'Italian',
+  ja: 'Japanese',
 }
 
 export function languageNameInEnglish(language: ContentLanguage): string {
@@ -75,9 +84,21 @@ export function contentDirection(language: ContentLanguage): 'rtl' | 'ltr' {
  * content (an unknown latin token is a model-invented brand name) and NATIVE to
  * every other content language, where the same rule would flag every ordinary
  * word.
+ *
+ * Japanese answers 'japanese', not 'latin': a latin token inside Japanese prose
+ * is ordinary (SEO, Google, Core Web Vitals are written in latin letters even in
+ * a Japanese sentence), so the invented-brand-name rule must not fire on it, and
+ * the language check that asks whether an article came back in the language it
+ * was ordered in has to look for kana rather than for latin letters.
  */
-export function contentScript(language: ContentLanguage): 'hebrew' | 'latin' {
-  return language === 'he' ? 'hebrew' : 'latin'
+export function contentScript(language: ContentLanguage): 'hebrew' | 'latin' | 'japanese' {
+  if (language === 'he') return 'hebrew'
+  return language === 'ja' ? 'japanese' : 'latin'
+}
+
+/** Is this language written without spaces between its words? */
+export function isUnspacedLanguage(language: ContentLanguage): boolean {
+  return language === 'ja'
 }
 
 /**
@@ -113,6 +134,6 @@ export function toHebrewOrEnglish(language: ContentLanguage): 'he' | 'en' {
 export function contentLanguageOrEnglish(value: unknown): ContentLanguage {
   const s = String(value ?? '').toLowerCase().trim()
   if (!s) return DEFAULT_CONTENT_LANGUAGE
-  const known = /^(en|es|cas|he|iw|pt|portugu|fr|franc|it|ital)/.test(s)
+  const known = /^(en|es|cas|he|iw|pt|portugu|fr|franc|it|ital|ja|jp|japan|日本)/.test(s)
   return known ? normalizeContentLanguage(s) : 'en'
 }

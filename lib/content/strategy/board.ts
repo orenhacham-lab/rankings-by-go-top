@@ -25,6 +25,8 @@
  * month of the plan, so it is shown under every month chip (see "Months" below).
  */
 
+import { segmentToSpaces } from '@/lib/text/segment'
+
 export type StrategyColumn = 'ideas' | 'planned' | 'written' | 'published'
 export const STRATEGY_COLUMNS: readonly StrategyColumn[] = ['ideas', 'planned', 'written', 'published']
 
@@ -422,7 +424,7 @@ export function monthPlan(cards: readonly StrategyCard[], timeZone?: string): Mo
 
 /** Case, spacing and punctuation do not make two topics different. */
 export function sameTopicKey(s: string | null | undefined): string {
-  return (s ?? '').toLowerCase().normalize('NFKC').replace(/[\p{P}\p{S}]+/gu, ' ').replace(/\s+/g, ' ').trim()
+  return segmentToSpaces((s ?? '').toLowerCase().normalize('NFKC').replace(/[\p{P}\p{S}]+/gu, ' '))
 }
 
 const byTime = (a: string | null, b: string | null) => (Date.parse(a ?? '') || 0) - (Date.parse(b ?? '') || 0)

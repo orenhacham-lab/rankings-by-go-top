@@ -22,6 +22,7 @@ import { slugFromUrl } from '@/lib/content/internal-links'
 import type { ScannedTarget } from '@/lib/content/wordpress-content-scan'
 import type { ContentTopicIdeaRow } from '@/lib/supabase/types'
 import { normalizeText } from './topic-idea-store'
+import { segmentToSpaces } from '@/lib/text/segment'
 
 // ── Phase 3G.7 — phrase-level coverage of EXISTING SITE CONTENT ────────────────
 // The exact title/keyword guard misses the common real-world case: an existing
@@ -37,14 +38,17 @@ import { normalizeText } from './topic-idea-store'
 
 const HE_FINALS_MAP: Record<string, string> = { ך: 'כ', ם: 'מ', ן: 'נ', ף: 'פ', ץ: 'צ' }
 /** Aggressive phrase normalization: lowercase, strip ALL punctuation/separators,
- *  fold Hebrew final letters, collapse whitespace. For phrase-set comparison only. */
+ *  fold Hebrew final letters, collapse whitespace. For phrase-set comparison only.
+ *
+ *  A phrase written WITHOUT word spaces (Japanese) comes out space-separated, so
+ *  that every "≥2 words" test below — and every one downstream that splits this
+ *  function's output — asks about the words of the phrase rather than about the
+ *  single token a Japanese keyword would otherwise be. See lib/text/segment.ts. */
 export function normalizePhrase(s: string | null | undefined): string {
-  const t = (s || '')
+  const t = segmentToSpaces((s || '')
     .toLowerCase()
     .replace(/["'“”‘’׳״`]+/g, '')
-    .replace(/[?!.,:;|()[\]{}<>«»/\\_\-–—…]+/g, ' ')
-    .replace(/\s+/g, ' ')
-    .trim()
+    .replace(/[?!.,:;|()[\]{}<>«»/\\_\-–—…]+/g, ' '))
   return Array.from(t, (c) => HE_FINALS_MAP[c] ?? c).join('')
 }
 

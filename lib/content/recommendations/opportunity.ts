@@ -67,7 +67,13 @@ export const GENERIC_TOKENS = new Set<string>(
   ['best', 'guide', 'price', 'buy', 'cheap', 'top', 'online', 'review', 'reviews',
    'מדריך', 'מומלץ', 'מומלצת', 'מומלצים', 'איכותי', 'איכותית', 'מחיר', 'מחירים',
    'משלוח', 'הטוב', 'ביותר', 'הכי', 'טוב', 'טובה', 'זול', 'זולה', 'לקנות', 'קניה',
-   'קנייה', 'אונליין'].map((t) => normalizePhrase(t)).filter(Boolean),
+   'קנייה', 'אונליין',
+   // Japanese: the same list of words a page may not be about. Without them a
+   // keyword whose only distinctive token is 「おすすめ」 or 「価格」 reads as a real
+   // subject, which is how an attribute-only internal link gets accepted.
+   'おすすめ', 'オススメ', 'ガイド', '比較', '違い', '価格', '料金', '安い', '激安', '購入',
+   '通販', '口コミ', '評判', 'レビュー', '人気', '最安', '最安値', '選び方', '一覧', 'まとめ',
+   '無料', '送料無料', '方法', 'やり方'].map((t) => normalizePhrase(t)).filter(Boolean),
 )
 const kwTokens = (s: string | null | undefined): string[] => Array.from(tokens(normalizePhrase(s || '')))
 

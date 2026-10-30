@@ -161,7 +161,7 @@ const LATIN_TOKEN_RE = /^[a-z][a-z0-9'.-]*$/
  * below is only meaningful when latin is FOREIGN to that content, so every caller
  * must say which case it is in; nothing about this is inferable from the text alone.
  */
-export type ContentScript = 'hebrew' | 'latin'
+export type ContentScript = 'hebrew' | 'latin' | 'japanese'
 
 /** Map a project's language code to the script its content is written in. Mirrors
  *  the engine's own `language` derivation (anything starting 'en' is English). */
@@ -235,7 +235,14 @@ export function unknownLatinTokens(
   // PRECONDITION (see above): a latin token only carries a foreign-name signal when
   // the surrounding content is NOT latin. On a latin-script project it is ordinary
   // prose, so the rule is inert — never "relaxed", simply inapplicable.
-  if (contentScript === 'latin') return []
+  //
+  // Japanese is the same case for a different reason: latin words are ordinary
+  // INSIDE Japanese prose (SEO, Google, Core Web Vitals are written in latin
+  // letters in a Japanese sentence), so a latin token there carries no signal
+  // either. A brand the model invented for a Japanese article would be written in
+  // katakana, which this rule has never looked for and still does not — the
+  // comment above about PARTIAL containment covers that case too.
+  if (contentScript === 'latin' || contentScript === 'japanese') return []
   const allow = new Set(allowed ?? [])
   return unknownTokens(toks(text), bs).filter((t) => LATIN_TOKEN_RE.test(t) && !allow.has(t))
 }

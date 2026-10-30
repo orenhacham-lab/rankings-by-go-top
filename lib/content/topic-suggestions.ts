@@ -123,9 +123,29 @@ const IT_INTENT: Partial<Record<SuggestionIntent, (kw: string) => string[]>> = {
   informational: (kw) => [`Tutto quello che è utile sapere su ${kw}`],
 }
 
-const BASE: Record<SuggestionLanguage, (kw: string) => string[]> = { he: HE_BASE, en: EN_BASE, es: ES_BASE, 'pt-BR': PT_BASE, fr: FR_BASE, it: IT_BASE }
+// JAPANESE. No particle is inserted before the keyword beyond the one the
+// sentence itself needs, and no space anywhere: a Japanese title that carried a
+// space between the keyword and the next word would read as a typo.
+const JA_BASE = (kw: string): string[] => [
+  `${kw}の選び方`,
+  `${kw}を決める前に確認しておきたいこと`,
+  `${kw}の基本がわかる完全ガイド`,
+  `${kw}の費用はいくらかかるのか`,
+  `${kw}選びでよくある失敗`,
+  `おすすめの${kw}：比較しておきたいポイント`,
+]
+
+const JA_INTENT: Partial<Record<SuggestionIntent, (kw: string) => string[]>> = {
+  comparison: (kw) => [`${kw}：主な選択肢の比較`, `${kw}の種類ごとの違いとは`],
+  commercial: (kw) => [`${kw} — 後悔しない選び方`, `${kw}を購入する際に注意したい点`],
+  local: (kw) => [`${kw}：信頼できる地元の業者の選び方`],
+  transactional: (kw) => [`${kw}はいつ、どこに依頼するのがよいのか`],
+  informational: (kw) => [`${kw}について知っておきたいこと`],
+}
+
+const BASE: Record<SuggestionLanguage, (kw: string) => string[]> = { he: HE_BASE, en: EN_BASE, es: ES_BASE, 'pt-BR': PT_BASE, fr: FR_BASE, it: IT_BASE, ja: JA_BASE }
 const INTENT: Record<SuggestionLanguage, Partial<Record<SuggestionIntent, (kw: string) => string[]>>> =
-  { he: HE_INTENT, en: EN_INTENT, es: ES_INTENT, 'pt-BR': PT_INTENT, fr: FR_INTENT, it: IT_INTENT }
+  { he: HE_INTENT, en: EN_INTENT, es: ES_INTENT, 'pt-BR': PT_INTENT, fr: FR_INTENT, it: IT_INTENT, ja: JA_INTENT }
 
 /**
  * Return up to `max` distinct, natural topic suggestions for a keyword.
