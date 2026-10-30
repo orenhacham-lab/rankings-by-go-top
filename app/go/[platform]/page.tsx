@@ -76,7 +76,16 @@ export default async function MarketplaceSalesPage({
   if (!provider) notFound()
 
   const policyUrl = marketplacePolicyUrl(provider.slug)
-  const pixelUrl = marketplacePixelUrl(provider.slug)
+  // One beacon per plan the page actually offers, de-duplicated: a platform
+  // whose pixel is per product (JVZoo) needs each listed product's own URL,
+  // and a platform with one provider-wide URL still contributes exactly one.
+  const pixelUrls = [
+    ...new Set(
+      PLAN_CODES.filter((code) => marketplaceBuyUrl(provider.slug, code))
+        .map((code) => marketplacePixelUrl(provider.slug, code))
+        .filter((url): url is string => url !== null),
+    ),
+  ]
 
   return (
     <main className="mx-auto max-w-3xl px-4 py-16">
@@ -230,9 +239,9 @@ export default async function MarketplaceSalesPage({
           still renders nothing. If the review then reports the pixel missing,
           the answer is a note to compliance, not a tag that fires before the
           visitor has been asked. */}
-      {pixelUrl ? (
-        <MarketplacePixel src={pixelUrl} alt={`${provider.label} tracking`} />
-      ) : null}
+      {pixelUrls.map((url) => (
+        <MarketplacePixel key={url} src={url} alt={`${provider.label} tracking`} />
+      ))}
     </main>
   )
 }

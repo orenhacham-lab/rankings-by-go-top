@@ -422,8 +422,23 @@ export function marketplacePolicyUrl(slug: string): string | null {
  * It is a URL and not a snippet on purpose: the platform's HTML would be a
  * string from configuration rendered into the document, and this page does not
  * have a way to do that safely. Only an absolute https URL is accepted.
+ *
+ * ONE BEACON PER PLAN, BECAUSE THE BEACON IDENTIFIES THE PRODUCT. JVZoo's
+ * pixel URL carries the product id (`i.jvzoo.com/0/<product>/99`), and the
+ * note that demands it says why it matters: a missing or wrong pixel
+ * "corrupts the product's stats and is unfair to affiliates". A single
+ * provider-wide URL meant every visitor to this page, whichever plan they
+ * came for, was counted against ONE product - the first one configured - so
+ * three of the four listings would have shown an affiliate no traffic at all
+ * while the fourth showed traffic it never received. So the plan's own
+ * `MARKETPLACE_<SLUG>_PIXEL_URL_<PLAN>` is read first; the bare
+ * `MARKETPLACE_<SLUG>_PIXEL_URL` remains as the provider-wide fallback for a
+ * platform whose beacon is not per product, and a plan with neither
+ * configured renders nothing.
  */
-export function marketplacePixelUrl(slug: string): string | null {
+export function marketplacePixelUrl(slug: string, plan?: PlanCode): string | null {
   if (!marketplaceProvider(slug)) return null
-  return httpsUrlOrNull(process.env[`${envPrefix(slug)}PIXEL_URL`])
+  const prefix = envPrefix(slug)
+  const perPlan = plan ? httpsUrlOrNull(process.env[`${prefix}PIXEL_URL_${plan.toUpperCase()}`]) : null
+  return perPlan ?? httpsUrlOrNull(process.env[`${prefix}PIXEL_URL`])
 }
