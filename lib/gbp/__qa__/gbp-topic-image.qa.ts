@@ -42,6 +42,8 @@ const { dashboardHe } = require('../../i18n/dashboard/he')
 const { dashboardEn } = require('../../i18n/dashboard/en')
 const { dashboardEs } = require('../../i18n/dashboard/es')
 const { dashboardPtBR } = require('../../i18n/dashboard/pt-BR')
+const { dashboardFr } = require('../../i18n/dashboard/fr')
+const { dashboardIt } = require('../../i18n/dashboard/it')
 
 let pass = 0, fail = 0
 function check(name: string, cond: boolean, detail?: string) {
@@ -290,6 +292,10 @@ function composerFailures(src: string): string[] {
   if (!/gbpErrorText\(t, body\.error \?\? 'image_generation_failed'\)/.test(fn)) bad.push('a failure is not shown through gbpErrorText')
   if (!/await choose\(blob, true\)/.test(fn)) bad.push('the photo does not go through choose()')
   if (!/\{picked\?\.ai && <p[^>]*>\{c\.imageGeneratedHint\}<\/p>\}/.test(s)) bad.push('no AI hint on a generated photo')
+  // The merchant's own upload goes public on their profile under their name, so the rights and
+  // consent sentence stands next to the upload control, always, exactly as the author box does.
+  if (!/<p[^>]*data-gbp-image-consent=""[^>]*>\{c\.imageConsent\}<\/p>/.test(s)) bad.push('the upload carries no rights and consent line')
+  if (/\{[^}]*&& <p[^>]*data-gbp-image-consent=""/.test(s)) bad.push('the consent line is conditional')
   return bad
 }
 function composerChecks() {
@@ -301,21 +307,40 @@ function composerChecks() {
   check('MUTATION: the button in the article branch is caught', composerFailures(src.replace("{source === 'topic' && (\n                  <Button variant=\"secondary\" size=\"sm\" onClick={() => void generateImage()}", "{source === 'article' && (\n                  <Button variant=\"secondary\" size=\"sm\" onClick={() => void generateImage()}")).length > 0)
   check('MUTATION: a comment cannot satisfy the guard', composerFailures(src.replace(/\{source === 'topic' && \(\n(\s*<Button variant="secondary" size="sm" onClick=\{\(\) => void generateImage\(\)\})/, "{/* {source === 'topic' && ( */}{(\n$1")).length > 0)
   check('MUTATION: a generated photo without the AI hint is caught', composerFailures(src.replace('{picked?.ai && ', '{false && ')).length > 0)
+  check('MUTATION: dropping the rights and consent line is caught', composerFailures(src.replace(/<p[^>]*data-gbp-image-consent=""[^>]*>\{c\.imageConsent\}<\/p>/, '')).length > 0)
+  check('MUTATION: hiding the consent line behind a condition is caught',
+    composerFailures(src.replace('<p className="text-caption text-muted" data-gbp-image-consent="">{c.imageConsent}</p>', '{picked && <p className="text-caption text-muted" data-gbp-image-consent="">{c.imageConsent}</p>}')).length > 0)
 
-  const KEYS = ['imageGenerate', 'imageGenerating', 'imageGeneratedHint'] as const
-  const dicts: [string, any][] = [['he', dashboardHe], ['en', dashboardEn], ['es', dashboardEs], ['pt-BR', dashboardPtBR]]
+  const KEYS = ['imageGenerate', 'imageGenerating', 'imageGeneratedHint', 'imageConsent'] as const
+  // EVERY dashboard language, not the four that existed when this was written. fr and it
+  // arrived afterwards, and a locale added later is exactly the one that silently falls back
+  // to English for a sentence the merchant is supposed to read before uploading a photo.
+  const dicts: [string, any][] = [['he', dashboardHe], ['en', dashboardEn], ['es', dashboardEs], ['pt-BR', dashboardPtBR], ['fr', dashboardFr], ['it', dashboardIt]]
   const missing = (ds: [string, any][]) => ds.flatMap(([n, d]) => [
     ...KEYS.filter((k) => typeof d?.mapsPosts?.composer?.[k] !== 'string' || !d.mapsPosts.composer[k].trim()).map((k) => `${n}.composer.${k}`),
     ...(typeof d?.mapsPosts?.errors?.image_generation_failed === 'string' ? [] : [`${n}.errors.image_generation_failed`]),
   ])
   const m = missing(dicts)
-  check('every new string is in all four dictionaries (he, en, es, pt-BR), not left to the English fallback', m.length === 0, m.join(', '))
+  check('every new string is in all six dictionaries (he, en, es, pt-BR, fr, it), not left to the English fallback', m.length === 0, m.join(', '))
   const noPt = JSON.parse(JSON.stringify(dashboardPtBR))
   delete noPt.mapsPosts.composer.imageGeneratedHint
   check('MUTATION: a dictionary without one of them is caught', missing([...dicts.slice(0, 3), ['pt-BR', noPt]]).length > 0)
+  const noFr = JSON.parse(JSON.stringify(dashboardFr))
+  delete noFr.mapsPosts.composer.imageConsent
+  check('MUTATION: a LATER-ADDED dictionary missing the consent line is caught', missing([...dicts.slice(0, 4), ['fr', noFr]]).length > 0)
   check('the Hebrew hint says the photo is AI-made and that Google shows it under the business name',
     /בינה מלאכותית/.test(dashboardHe.mapsPosts.composer.imageGeneratedHint) && /גוגל/.test(dashboardHe.mapsPosts.composer.imageGeneratedHint)
     && /\bAI\b/.test(dashboardEn.mapsPosts.composer.imageGeneratedHint) && /\bIA\b/.test(dashboardEs.mapsPosts.composer.imageGeneratedHint) && /\bIA\b/.test(dashboardPtBR.mapsPosts.composer.imageGeneratedHint))
+  // Terms 15H asks the same of an author photo; an uploaded profile photo is published just as
+  // publicly, so each language must carry the right to publish, the person's agreement and the minor.
+  const consents: [string, string][] = dicts
+    .map(([n, d]) => [n, (d as any).mapsPosts?.composer?.imageConsent as string])
+  // 'minore' contains 'minor', so Italian needs no alternative of its own; French does.
+  const MINOR = /קטין|minor|menor|mineur/i
+  const thin = consents.filter(([, v]) => typeof v !== 'string' || v.length < 60 || !MINOR.test(v))
+  check('the consent line names the right to publish, the person\'s agreement and a minor, in all six languages', thin.length === 0, thin.map(([n]) => n).join(', '))
+  check('MUTATION: a consent line that drops the minor is caught',
+    ['he', 'en'].map((n) => n === 'he' ? 'העלו רק תמונה שיש לכם זכות לפרסם ושהאדם שבה הסכים לפרסום בכרטיס העסק בגוגל.' : '').filter((v) => v && (v.length < 60 || !MINOR.test(v))).length > 0)
   check('the Hebrew words are Hebrew', [...KEYS.map((k) => dashboardHe.mapsPosts.composer[k]), dashboardHe.mapsPosts.errors.image_generation_failed].every((v: string) => /[֐-׿]/.test(v) && !/[A-Za-z]{3,}/.test(v)))
 }
 
