@@ -367,6 +367,7 @@ export const aiVisibilityFr: DeepPartial<DashboardDictionary> = {
       phoneHint: 'Pas de numéro de téléphone dans le texte : Google les rejette. Pour les appels, utilisez le bouton « Appeler maintenant ».',
       imageLabel: 'Photo',
       imageHint: 'Nous recadrons en 1200×900 (4:3), comme Google l’affiche. JPG, PNG ou WebP.',
+      imageConsent: 'N’envoyez qu’une photo que vous avez le droit de publier et, si une personne y figure, seulement si elle a accepté qu’elle soit publiée sur votre fiche d’établissement Google pour promouvoir l’entreprise (pour un mineur, le consentement d’un parent ou du tuteur est requis).',
       imageUpload: 'Envoyer une photo',
       imageFromArticle: 'Image de l’article',
       imageGenerate: 'Créer une photo',
