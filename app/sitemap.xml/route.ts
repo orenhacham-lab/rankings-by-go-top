@@ -62,6 +62,12 @@ export async function GET() {
       priority: '0.9',
     },
     {
+      url: `${baseUrl}/ai-crawlers`,
+      lastmod: today,
+      changefreq: 'monthly',
+      priority: '0.8',
+    },
+    {
       url: `${baseUrl}/pricing`,
       lastmod: today,
       changefreq: 'monthly',
@@ -216,6 +222,12 @@ export async function GET() {
       priority: '0.8',
     },
     {
+      url: `${baseUrl}/en/ai-crawlers`,
+      lastmod: today,
+      changefreq: 'monthly',
+      priority: '0.8',
+    },
+    {
       url: `${baseUrl}/en/pricing`,
       lastmod: today,
       changefreq: 'monthly',
@@ -364,6 +376,7 @@ export async function GET() {
   const translatedPaths: Array<{ path: string; changefreq: string; priority: string }> = [
     { path: '', changefreq: 'weekly', priority: '0.9' },
     { path: '/free-check', changefreq: 'monthly', priority: '0.8' },
+    { path: '/ai-crawlers', changefreq: 'monthly', priority: '0.8' },
     { path: '/pricing', changefreq: 'monthly', priority: '0.8' },
     { path: '/about', changefreq: 'monthly', priority: '0.7' },
     { path: '/affiliates', changefreq: 'monthly', priority: '0.6' },
