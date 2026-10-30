@@ -30,6 +30,7 @@ import {
   MARKETPLACE_PROVIDERS,
   marketplaceBuyUrl,
   marketplaceClaimUrl,
+  marketplacePixelUrl,
   marketplacePolicyUrl,
   marketplaceProvider,
   isMarketplaceProviderEnabled,
@@ -199,6 +200,34 @@ check('D7: the platform\'s own policy page is read the same way',
 process.env.MARKETPLACE_DIGISTORE24_POLICY_URL = '" onclick="evil()'
 check('D8: and a value that would break out of the attribute is refused',
   marketplacePolicyUrl('digistore24') === null)
+
+/*
+ * THE BEACON IS PER PRODUCT, AND THAT IS NOT COSMETIC. JVZoo's pixel URL
+ * carries the product id, and the compliance note that demands it says why:
+ * a wrong one "corrupts the product's stats and is unfair to affiliates".
+ * One provider-wide URL counted every visitor, whichever plan they came for,
+ * against a single product - so three of four listings showed an affiliate no
+ * traffic while the fourth showed traffic it never received.
+ */
+process.env.MARKETPLACE_JVZOO_PIXEL_URL = 'https://i.jvzoo.com/0/457483/99'
+check('D9: a plan with no beacon of its own falls back to the provider-wide one',
+  marketplacePixelUrl('jvzoo', 'advanced') === 'https://i.jvzoo.com/0/457483/99')
+process.env.MARKETPLACE_JVZOO_PIXEL_URL_ADVANCED = 'https://i.jvzoo.com/0/457573/99'
+check('D10: a plan with its own beacon uses it, not the provider-wide one',
+  marketplacePixelUrl('jvzoo', 'advanced') === 'https://i.jvzoo.com/0/457573/99')
+check('D11: …and the other plans are unaffected by it',
+  marketplacePixelUrl('jvzoo', 'premium') === 'https://i.jvzoo.com/0/457483/99')
+process.env.MARKETPLACE_JVZOO_PIXEL_URL_ADVANCED = 'http://i.jvzoo.com/0/457573/99'
+check('D12: a plain-http beacon is treated as unset and falls back',
+  marketplacePixelUrl('jvzoo', 'advanced') === 'https://i.jvzoo.com/0/457483/99')
+process.env.MARKETPLACE_JVZOO_PIXEL_URL_ADVANCED = 'https://i.jvzoo.com/0/457573/99'
+check('D-MUT10: a resolver that ignored the plan would fail D10, which is the bug this group pins',
+  marketplacePixelUrl.toString().includes('PIXEL_URL_'))
+delete process.env.MARKETPLACE_JVZOO_PIXEL_URL
+check('D13: with no provider-wide beacon, an unconfigured plan has none at all',
+  marketplacePixelUrl('jvzoo', 'premium') === null
+  && marketplacePixelUrl('jvzoo', 'advanced') === 'https://i.jvzoo.com/0/457573/99')
+delete process.env.MARKETPLACE_JVZOO_PIXEL_URL_ADVANCED
 
 // ── E. The signature, which is the only authentication ──────────────────────
 console.log('\nE. signature')
@@ -609,8 +638,16 @@ async function main() {
     && !/<img/.test(salesSrc))
   check('H-MUT9: the bare-tag guard catches the platform snippet pasted straight in',
     /<img/.test(`${salesSrc}\n<img src={pixelUrl} width={1} height={1} />`))
-  check('H17c: …and only when one is configured, so an unconfigured platform still renders nothing',
-    /pixelUrl \? \(/.test(salesSrc) && /marketplacePixelUrl\(provider\.slug\)/.test(salesSrc))
+  check('H17c: …and only for a configured beacon, so an unconfigured platform still renders nothing',
+    /pixelUrls\.map\(/.test(salesSrc)
+    && /\.filter\(\(url\): url is string => url !== null\)/.test(salesSrc))
+  check('H17c2: one beacon per plan the page actually offers, so each product gets its own stats',
+    /marketplacePixelUrl\(provider\.slug, code\)/.test(salesSrc)
+    && /marketplaceBuyUrl\(provider\.slug, code\)\)/.test(salesSrc)
+    && /new Set\(/.test(salesSrc))
+  check('H-MUT9b: the per-plan guard catches a page that resolves one provider-wide beacon again',
+    !/marketplacePixelUrl\(provider\.slug, code\)/.test(
+      salesSrc.replace(/marketplacePixelUrl\(provider\.slug, code\)/g, 'marketplacePixelUrl(provider.slug)')))
   {
     // The gate itself, read from the component rather than asserted about it.
     const pixelSrc = readFileSync('components/consent/MarketplacePixel.tsx', 'utf8')
