@@ -830,6 +830,56 @@ async function main() {
     check(`L8 (${locale}): and it no longer claims the beacon stores nothing on the device`,
       !/stores nothing on your device|אינה שומרת דבר במכשיר/.test(doc))
   }
+  /*
+   * A SECTION NAME A DOCUMENT QUOTES MUST BE A HEADING THAT DOCUMENT HAS.
+   *
+   * The exception sentence added for the split points the reader at the
+   * section where the territories are named, and in two of the six documents
+   * the name it quoted was not the heading those documents actually carry:
+   * the Hebrew pointed at "שירותי מדידה ושיווק" against a heading reading
+   * "שירותי ניתוח וערוץ שיווק" (itself corrected to "שירותי ניתוח ושיווק" in
+   * the same commit), and the English at "Measurement and marketing
+   * services" against "Analytics & Marketing Services". That is not a typo
+   * where it sits. The sentence is the single exception to a bolded promise
+   * that nothing loads before the visitor chooses, and the territories exist
+   * only in the section it points at, so a reader who follows the pointer and
+   * finds no such section cannot tell which side of the rule they are on -
+   * an Art. 12 intelligibility problem rather than a style one.
+   *
+   * It is also a class and not one slip, so the rule is checked rather than
+   * the two sentences: every name quoted after a "see the section" phrase has
+   * to match one of that document's own headings, in all six languages.
+   */
+  const SECTION_POINTER: Record<string, RegExp> = {
+    // Each captures the quoted name that follows the locale's own pointer phrase.
+    he: /בסעיף\s*&ldquo;([\s\S]*?)&rdquo;/g,
+    en: /listed under\s*&ldquo;([\s\S]*?)&rdquo;/g,
+    es: /enumerados en\s*«([\s\S]*?)»/g,
+    'pt-BR': /listados em\s*«([\s\S]*?)»/g,
+    fr: /énumérés dans\s*«([\s\S]*?)»/g,
+    it: /elencati in\s*«([\s\S]*?)»/g,
+  }
+  const flat = (v: string) => v.replace(/\s+/g, ' ').trim()
+  /** Every heading the document carries, JSX and Markdown alike. */
+  const headingsOf = (doc: string): string[] => [
+    ...[...doc.matchAll(/<h[1-6][^>]*>([\s\S]*?)<\/h[1-6]>/g)].map((m) => flat(m[1])),
+    ...[...doc.matchAll(/^#{1,6}\s+(.+)$/gm)].map((m) => flat(m[1])),
+  ]
+  for (const locale of CONSENT_LOCALES) {
+    const doc = read(PRIVACY_DOC[locale])
+    const headings = headingsOf(doc)
+    const quoted = [...doc.matchAll(SECTION_POINTER[locale])].map((m) => flat(m[1]))
+    check(`L9 (${locale}): the document points at a section at all, so the rule has something to check`,
+      quoted.length > 0 && headings.length > 0, `${quoted.length} pointers, ${headings.length} headings`)
+    const unresolved = quoted.filter((name) => !headings.includes(name))
+    check(`L10 (${locale}): every section name it quotes is a heading it actually has`,
+      unresolved.length === 0, unresolved.join(' | '))
+  }
+  check('L-MUT8: the pointer guard fails on a name no heading has',
+    !headingsOf(read(PRIVACY_DOC.en)).includes('Measurement and marketing services'))
+  check('L-MUT9: …and it is not passing because it finds no pointers to check',
+    [...read(PRIVACY_DOC.he).matchAll(SECTION_POINTER.he)].length > 0)
+
   check('L-MUT6: the list guard fails when the code and the text diverge by one territory',
     !sameList([...EXPECTED_TERRITORY, 'US'], EXPECTED_TERRITORY)
     && !sameList(EXPECTED_TERRITORY.filter((c) => c !== 'CA'), EXPECTED_TERRITORY))
