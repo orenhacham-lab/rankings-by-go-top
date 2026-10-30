@@ -153,6 +153,24 @@ function limitLinesFor(code: PlanCode, locale: PublicLocale): LimitLines {
         : `Fino a ${c.maxAIChecksPerPeriodPerProject} controlli di visibilità nelle IA al mese per sito`,
     }
   }
+  // Japanese, for the /ja pricing page. Counters take their Japanese counter
+  // word: 本 for articles, 件 for keywords and checks, サイト for websites, so
+  // a plan card reads the way a Japanese price list reads.
+  if (locale === 'ja') {
+    return {
+      articles: single
+        ? `月${c.maxArticlesPerPeriodAccountWide}本の記事を作成し、サイトへ自動で公開`
+        : `月${c.maxArticlesPerPeriodAccountWide}本の記事を作成し、自動で公開。すべてのサイトで共有し、1サイトあたり週${PER_SITE}本まで`,
+      projects: single ? 'サイト1件' : `サイト${c.maxProjects}件まで`,
+      keywords: single ? `キーワード${c.maxKeywordsPerProject}件まで計測` : `1サイトあたりキーワード${c.maxKeywordsPerProject}件まで計測`,
+      google: single
+        ? `月${c.maxGoogleChecksPerPeriodPerProject}件までのGoogle順位チェック`
+        : `1サイトあたり月${c.maxGoogleChecksPerPeriodPerProject}件までのGoogle順位チェック`,
+      ai: single
+        ? `月${c.maxAIChecksPerPeriodPerProject}件までのAI可視性チェック`
+        : `1サイトあたり月${c.maxAIChecksPerPeriodPerProject}件までのAI可視性チェック`,
+    }
+  }
   if (locale === 'en') {
     return {
       // THE MAIN VALUE, and the first line of every plan: articles written and
@@ -227,7 +245,7 @@ export const CHECKS_EXPLAINER: Record<PublicLocale, string> = {
   'pt-BR': 'Uma verificação de posição no Google olha em que lugar uma palavra-chave aparece no Google ou no Google Maps. Uma verificação de visibilidade em IA faz uma pergunta a um motor de IA, por exemplo o ChatGPT, e vê se o seu negócio é mencionado na resposta.',
   fr: "Une vérification de position dans Google regarde à quelle place un mot-clé apparaît dans Google ou dans Google Maps. Une vérification de visibilité dans les IA pose une question à un moteur d'IA, par exemple ChatGPT, et regarde si votre entreprise est citée dans la réponse.",
   it: 'Un controllo di posizione su Google verifica in quale posizione compare una parola chiave su Google o su Google Maps. Un controllo di visibilità nelle IA pone una domanda a un motore di IA, per esempio ChatGPT, e verifica se l\u2019attività viene citata nella risposta.',
-  ja: 'Google順位チェックは、1つのキーワードがGoogleまたはGoogleマップの何位に表示されているかを調べます。AI可視性チェックは、ChatGPTなどのAIエンジン1つに質問を1件送り、その回答でお客様のビジネスが言及されているかを確認します。',
+  ja: 'Google順位チェックは、1つのキーワードがGoogleまたはGoogleマップの何位に表示されているかを調べます。AI可視性チェックは、ChatGPTなどのAIエンジン1つに質問を1件送り、その回答でお客様の事業が言及されているかを確認します。',
 }
 
 /**
@@ -275,6 +293,16 @@ export function trialLimitLines(locale: PublicLocale): string[] {
       `Fino a ${t.maxGoogleChecksLifetime} controlli di posizione su Google durante la prova`,
       `Fino a ${t.maxAIChecksLifetime} controlli di visibilità nelle IA durante la prova`,
       `${t.days} giorni di prova`,
+    ]
+  }
+  if (locale === 'ja') {
+    return [
+      '記事1本をお試し。作成から公開まで',
+      'サイト1件',
+      `キーワード${t.maxKeywordsPerProject}件まで`,
+      `トライアル期間中にGoogle順位チェック${t.maxGoogleChecksLifetime}件まで`,
+      `トライアル期間中にAI可視性チェック${t.maxAIChecksLifetime}件まで`,
+      `${t.days}日間のトライアル`,
     ]
   }
   if (locale === 'en') {
