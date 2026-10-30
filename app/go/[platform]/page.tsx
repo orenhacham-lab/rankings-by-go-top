@@ -168,8 +168,20 @@ export default async function MarketplaceSalesPage({
           governed by our Terms and Privacy Policy.
         </p>
       ) : (
+        /* NO INVOICE PROMISE HERE, AND NOTHING TAKES ITS PLACE.
+           This branch used to add "and issues your invoice". JVZoo's Terms of
+           Use s.5.3 allocate the merchant-of-record role per transaction flow,
+           and where it is theirs they issue the tax document for that sale. We
+           cannot read our own flow from here, so the sentence promised a
+           document we may not be the one to issue. A hedge is worse than
+           silence: "Go Top SEO or JVZoo issues your invoice" answers one
+           question twice, which is what CRD Art. 6 and UCPD Art. 6 judge as
+           misleading however small the print. Who the SELLER is does not
+           depend on the flow - Terms s.5.2 puts the purchase contract between
+           the customer and the vendor and says JVZoo is not a party - so that
+           half of the sentence stays exactly as it was. */
         <p className="mt-6 text-copy text-muted">
-          Go Top SEO is the seller for this purchase and issues your invoice. {provider.label} runs
+          Go Top SEO is the seller for this purchase. {provider.label} runs
           the checkout and takes the payment on our behalf; its own terms apply to the payment
           itself. The prices above are in US dollars and do not include VAT or any other tax due
           in your country. Your Go Top SEO account is governed by our Terms and Privacy Policy.
