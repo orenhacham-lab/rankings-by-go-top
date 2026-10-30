@@ -654,8 +654,8 @@ export default function EnglishPrivacyPage() {
           made to Google&rsquo;s servers.</strong>{' '}
           Accepting and refusing are two equal buttons on the notice, and each category can be
           allowed on its own. There is one exception: on the JVZoo marketplace sales page, and only
-          for visitors from outside the territories listed under &ldquo;Measurement and marketing
-          services&rdquo; below, the marketplace&rsquo;s tracking image and the cookies it stores
+          for visitors from outside the territories listed under &ldquo;Analytics &amp; Marketing
+          Services&rdquo; below, the marketplace&rsquo;s tracking image and the cookies it stores
           load with the page.
         </p>
         <p className="mt-4">
