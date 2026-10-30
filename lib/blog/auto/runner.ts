@@ -24,7 +24,7 @@
 import type { createAdminClient } from '@/lib/supabase/admin'
 import { generateValidatedArticle } from '@/lib/content/gemini-article'
 import { placeholderContext, runQualityGate } from '@/lib/content/automation/quality-gate'
-import { BLOG_AUTO_LOCALES, type BlogAutoLocale } from '@/lib/blog/auto/rotation'
+import { BLOG_AUTO_LOCALES, localesForDay, type BlogAutoLocale } from '@/lib/blog/auto/rotation'
 import { buildBlogBrief } from '@/lib/blog/auto/brief'
 import { checkTruthLimits } from '@/lib/blog/auto/truth-limits'
 import { researchKeywords, selectKeywords } from '@/lib/blog/auto/keyword-plan'
@@ -227,7 +227,7 @@ export async function runBlogAutoPublishAllLocales(
   const started = Date.now()
   const budget = opts.budgetMs ?? ALL_LOCALES_BUDGET_MS
   const summaries: BlogAutoSummary[] = []
-  for (const locale of BLOG_AUTO_LOCALES) {
+  for (const locale of localesForDay()) {
     if (summaries.length > 0 && Date.now() - started >= budget) {
       summaries.push({
         locale, staleRecovered: 0, topUpAdded: 0, topUpError: null, planned: 0,

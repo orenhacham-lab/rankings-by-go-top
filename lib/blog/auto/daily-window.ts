@@ -36,7 +36,7 @@
  */
 
 import type { createAdminClient } from '@/lib/supabase/admin'
-import { BLOG_AUTO_LOCALES, type BlogAutoLocale } from '@/lib/blog/auto/rotation'
+import { localesForDay, type BlogAutoLocale } from '@/lib/blog/auto/rotation'
 import { localesPublishedSince, isLocaleGenerating } from '@/lib/blog/auto/store'
 import { runBlogAutoPublish, type BlogAutoSummary } from '@/lib/blog/auto/runner'
 import { isBlogAutoPublishEnabled } from '@/lib/blog/auto/cron-run'
@@ -78,7 +78,10 @@ export async function nextLocaleToWrite(
   nowMs: number,
 ): Promise<{ locale: BlogAutoLocale | null; busy: boolean }> {
   const published = new Set(await localesPublishedSince(admin, startOfUtcDay(nowMs)))
-  for (const locale of BLOG_AUTO_LOCALES) {
+  // localesForDay(), not the whole list: a language whose public tree is still
+  // behind its flag has nowhere to publish to, and claiming its slot would end
+  // the morning before the languages that do.
+  for (const locale of localesForDay()) {
     if (published.has(locale)) continue
     if (await isLocaleGenerating(admin, locale)) return { locale: null, busy: true }
     return { locale, busy: false }

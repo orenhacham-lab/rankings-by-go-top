@@ -29,7 +29,7 @@
  */
 
 import type { PublicLocale } from './locales'
-import { isEnglishPath, isFrenchPath, isItalianPath, isPortuguesePath, isSpanishPath } from './request-locale'
+import { isEnglishPath, isFrenchPath, isItalianPath, isJapanesePath, isPortuguesePath, isSpanishPath } from './request-locale'
 import { normalizeDashboardUiLocale } from './dashboard/locale'
 
 /**
@@ -51,6 +51,12 @@ import { normalizeDashboardUiLocale } from './dashboard/locale'
  * `/it/login` is the Italian route, gated by app/(auth)/it/layout.tsx. A
  * missing branch here is not a compile error — it is an unsuffixed /it/login
  * resolving to HEBREW, a right-to-left form on a left-to-right site.
+ *
+ * Japanese is the seventh, on the same terms once more: `/ja/login` is the
+ * Japanese route, gated by app/(auth)/ja/layout.tsx. The branch matters here for
+ * one reason beyond the others — the Japanese forms are the first whose words
+ * cannot be measured by splitting on a space (lib/text/segment.ts), so a form
+ * that fell back to Hebrew would be wrong in both direction and measurement.
  */
 export function resolveAuthLocale(input: {
   pathname?: string | null
@@ -62,5 +68,6 @@ export function resolveAuthLocale(input: {
   if (isPortuguesePath(input.pathname)) return 'pt-BR'
   if (isFrenchPath(input.pathname)) return 'fr'
   if (isItalianPath(input.pathname)) return 'it'
+  if (isJapanesePath(input.pathname)) return 'ja'
   return normalizeDashboardUiLocale(input.langParam) ?? input.serverLocale ?? 'he'
 }

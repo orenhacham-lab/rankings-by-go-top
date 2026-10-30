@@ -20,3 +20,16 @@
 export function japaneseSiteEnabled(value: string | undefined = process.env.NEXT_PUBLIC_JAPANESE_SITE_ENABLED): boolean {
   return value === 'true'
 }
+
+/**
+ * The footer entry for the 特定商取引法 disclosure, which only Japanese has.
+ *
+ * It lives here rather than in the public dictionary because the dictionary's
+ * type is `typeof he` (lib/i18n/public/he.ts), so a key that exists in one
+ * language only has nowhere to go in it; and it lives here rather than inline in
+ * components/Footer.tsx because the footer is shared by seven languages and
+ * carries no literal text of its own. The Act asks that the disclosure be where
+ * the buyer can find it before paying, which is what the footer of every
+ * Japanese page is.
+ */
+export const JAPANESE_TOKUSHO_LINK = { href: '/ja/tokusho', label: '特定商取引法に基づく表記' } as const
