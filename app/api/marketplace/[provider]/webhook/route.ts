@@ -127,8 +127,14 @@ async function handle(request: Request, slug: string): Promise<Response> {
   // one we were described, and that the published sentence is wrong — so it
   // is reported at the first sale rather than discovered in an audit. It
   // changes nothing about the order itself, which is why it only logs.
+  //
+  // AFTER VERIFICATION DELIBERATELY: an unsigned body must not be able to
+  // raise this. A log line saying our published page may be false is exactly
+  // what someone would want to trigger at will, and in the parser or ahead of
+  // the signature check anyone who could POST here could make us doubt our
+  // own text. It does not move for tidiness.
   if (event.taxMinor !== null && event.taxMinor !== 0) {
-    console.error('[marketplace-webhook] platform reported tax on a flow where it should report none', {
+    console.error('[marketplace-webhook] platform reported tax: the sales page tells buyers the price excludes tax, so that sentence may now be false', {
       provider: provider.slug,
       externalOrderId: event.externalOrderId,
       taxMinor: event.taxMinor,

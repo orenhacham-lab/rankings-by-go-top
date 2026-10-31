@@ -368,15 +368,18 @@ check('K22: a reported zero is read as zero',
   jvParse?.(jvForm({ tax_total: '0.00' }), null)?.taxMinor === 0)
 check('K23: tax_total is dollars and becomes minor units',
   jvParse?.(jvForm({ tax_total: '8.46' }), null)?.taxMinor === 846)
-check('K24: components are summed when no total is sent, so tax cannot hide behind a missing total',
-  jvParse?.(jvForm({ vat_tax: '7.00', national_sales_tax: '1.46' }), null)?.taxMinor === 846)
+check('K24: all three components are summed when no total is sent, so tax cannot hide behind a missing total',
+  jvParse?.(jvForm({ vat_tax: '7.00', national_sales_tax: '1.46', international_sales_tax: '2.00' }), null)?.taxMinor === 1046)
+check('K24b: international_sales_tax alone is read — the field whose name carries the case this exists to catch',
+  jvParse?.(jvForm({ international_sales_tax: '2.00' }), null)?.taxMinor === 200)
 check('K25: a total is believed over the components rather than added to them',
   jvParse?.(jvForm({ tax_total: '8.46', vat_tax: '8.46' }), null)?.taxMinor === 846)
 check('K26: reading the tax fields does not disturb the amount or the order id',
   jvParse?.(jvForm({ tax_total: '8.46' }), null)?.amountMinor === 4700 &&
   jvParse?.(jvForm({ tax_total: '8.46' }), null)?.externalOrderId === 'ABC123XYZ')
 
-// MUTATION CONTROLS for the tax fields.
+// MUTATION CONTROL for the tax fields. K-MUT6 below is the mutation; these
+// two are differential assertions over the real parser rather than controls.
 check('K-MUT4: absent tax and a reported zero are different values, so a parser defaulting to 0 would fail K21',
   sale?.taxMinor === null && jvParse?.(jvForm({ tax_total: '0.00' }), null)?.taxMinor === 0)
 check('K-MUT5: a tax_total-only parser would report NO tax on this payload, which carries none',
