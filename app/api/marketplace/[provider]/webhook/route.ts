@@ -119,6 +119,22 @@ async function handle(request: Request, slug: string): Promise<Response> {
   // send notification types we have no business acting on.
   if (!event) return Response.json({ ok: true, ignored: true }, { status: 200 })
 
+  // THE TAX FIELDS ARE A CONTRADICTION DETECTOR, NOT BOOKKEEPING.
+  // Our products run on the own-payment-processor flow, where JVZoo told us
+  // in writing (30 Oct 2026) that it neither calculates nor remits tax, and
+  // the sales page tells the buyer the price excludes any tax due in their
+  // country. A delivery that arrives carrying tax means the flow is not the
+  // one we were described, and that the published sentence is wrong — so it
+  // is reported at the first sale rather than discovered in an audit. It
+  // changes nothing about the order itself, which is why it only logs.
+  if (event.taxMinor !== null && event.taxMinor !== 0) {
+    console.error('[marketplace-webhook] platform reported tax on a flow where it should report none', {
+      provider: provider.slug,
+      externalOrderId: event.externalOrderId,
+      taxMinor: event.taxMinor,
+    })
+  }
+
   const outcome = await recordMarketplaceOrder(createAdminClient(), provider.slug, event)
   if (outcome.kind !== 'recorded' && outcome.kind !== 'already_recorded') {
     // Logged with the outcome and the platform's own order id, and nothing

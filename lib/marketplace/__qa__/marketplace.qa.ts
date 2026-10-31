@@ -359,6 +359,38 @@ check('K-MUT2: signing the fields in a different order changes the digest',
 check('K-MUT3: reading total as minor units would record 47 agorot instead of 47 dollars',
   Number.parseFloat('47.00') !== 4700)
 
+// The tax fields. On our flow these must arrive zero or absent; the route
+// reports anything else, because a non-zero value contradicts the sentence
+// the sales page publishes about who owes the tax.
+check('K21: a payload with no tax field at all reports null, not a reassuring zero',
+  sale?.taxMinor === null)
+check('K22: a reported zero is read as zero',
+  jvParse?.(jvForm({ tax_total: '0.00' }), null)?.taxMinor === 0)
+check('K23: tax_total is dollars and becomes minor units',
+  jvParse?.(jvForm({ tax_total: '8.46' }), null)?.taxMinor === 846)
+check('K24: components are summed when no total is sent, so tax cannot hide behind a missing total',
+  jvParse?.(jvForm({ vat_tax: '7.00', national_sales_tax: '1.46' }), null)?.taxMinor === 846)
+check('K25: a total is believed over the components rather than added to them',
+  jvParse?.(jvForm({ tax_total: '8.46', vat_tax: '8.46' }), null)?.taxMinor === 846)
+check('K26: reading the tax fields does not disturb the amount or the order id',
+  jvParse?.(jvForm({ tax_total: '8.46' }), null)?.amountMinor === 4700 &&
+  jvParse?.(jvForm({ tax_total: '8.46' }), null)?.externalOrderId === 'ABC123XYZ')
+
+// MUTATION CONTROLS for the tax fields.
+check('K-MUT4: absent tax and a reported zero are different values, so a parser defaulting to 0 would fail K21',
+  sale?.taxMinor === null && jvParse?.(jvForm({ tax_total: '0.00' }), null)?.taxMinor === 0)
+check('K-MUT5: a tax_total-only parser would report NO tax on this payload, which carries none',
+  jvForm({ vat_tax: '7.00' }).includes('tax_total') === false &&
+  jvParse?.(jvForm({ vat_tax: '7.00' }), null)?.taxMinor === 700)
+
+// And the report itself, in the route's own source.
+const marketplaceRouteSrc = read('app/api/marketplace/[provider]/webhook/route.ts')
+check('K27: the route reports a non-zero tax, and tests for zero as well as for null',
+  /event\.taxMinor !== null && event\.taxMinor !== 0/.test(marketplaceRouteSrc))
+check('K-MUT6: dropping the zero test is caught — it would fire on every clean sale',
+  !/event\.taxMinor !== null && event\.taxMinor !== 0/.test(
+    marketplaceRouteSrc.replace('event.taxMinor !== null && event.taxMinor !== 0', 'event.taxMinor !== null')))
+
 // Sections F to I need await, and tsx compiles these suites as CommonJS,
 // where top-level await is not available. One async main, called at the end.
 async function main() {
@@ -373,6 +405,7 @@ async function main() {
     amountMinor: 17900,
     currency: 'USD',
     currentPeriodEnd: '2026-11-15T00:00:00.000Z',
+    taxMinor: 0,
     ...over,
   })
 
