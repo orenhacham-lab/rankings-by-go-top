@@ -21,7 +21,7 @@
 import type { PublicLocale } from '@/lib/i18n/locales'
 import type { ComparisonCopy } from './types'
 
-const CHECKED = '2026-10-21'
+const CHECKED = '2026-10-31'
 
 const SOURCES = [
   { label: 'semrush.com/pricing', href: 'https://www.semrush.com/pricing/' },

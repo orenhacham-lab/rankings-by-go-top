@@ -207,6 +207,24 @@ export async function GET() {
       changefreq: 'monthly',
       priority: '0.7',
     },
+    {
+      url: `${baseUrl}/compare/surfer`,
+      lastmod: today,
+      changefreq: 'monthly',
+      priority: '0.7',
+    },
+    {
+      url: `${baseUrl}/compare/brightlocal`,
+      lastmod: today,
+      changefreq: 'monthly',
+      priority: '0.7',
+    },
+    {
+      url: `${baseUrl}/compare/writesonic`,
+      lastmod: today,
+      changefreq: 'monthly',
+      priority: '0.7',
+    },
     // Hebrew legal pages
     // English site root and equivalents
     {
@@ -361,6 +379,24 @@ export async function GET() {
       changefreq: 'monthly',
       priority: '0.7',
     },
+    {
+      url: `${baseUrl}/en/compare/surfer`,
+      lastmod: today,
+      changefreq: 'monthly',
+      priority: '0.7',
+    },
+    {
+      url: `${baseUrl}/en/compare/brightlocal`,
+      lastmod: today,
+      changefreq: 'monthly',
+      priority: '0.7',
+    },
+    {
+      url: `${baseUrl}/en/compare/writesonic`,
+      lastmod: today,
+      changefreq: 'monthly',
+      priority: '0.7',
+    },
     // English legal pages
   ]
 
@@ -400,6 +436,9 @@ export async function GET() {
     { path: '/compare/semrush', changefreq: 'monthly', priority: '0.7' },
     { path: '/compare/yoast', changefreq: 'monthly', priority: '0.7' },
     { path: '/compare/rankmath', changefreq: 'monthly', priority: '0.7' },
+    { path: '/compare/surfer', changefreq: 'monthly', priority: '0.7' },
+    { path: '/compare/brightlocal', changefreq: 'monthly', priority: '0.7' },
+    { path: '/compare/writesonic', changefreq: 'monthly', priority: '0.7' },
   ]
 
   const treePages = (prefix: string) =>
