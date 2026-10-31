@@ -138,7 +138,12 @@ export default function ResearchSummary({
   const dict = getDashboardDictionary(uiLocale).seedOnboarding
   const t = dict.summary
   const p = dict.preview
-  const checks = freeCheckCopy(language)
+  // The short check's own copy follows the INTERFACE language, not the
+  // bilingual narrowing: `language` is toBilingualLocale(uiLocale), so it is
+  // 'en' for es, pt-BR, fr, it and ja, and this block used to come out in
+  // English on a page that was otherwise in the visitor's language.
+  // freeCheckCopy takes a PublicLocale and has a block for every one of them.
+  const checks = freeCheckCopy(uiLocale)
   const Arrow = language === 'he' ? ArrowLeft : ArrowRight
 
   const [selected, setSelected] = useState<string[]>(() => initialSelection(summary.seedKeywords))

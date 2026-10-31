@@ -333,6 +333,86 @@ console.log('\nD) the locale tables and the copy')
     `${wordCount(hero)} segmented vs ${hero.split(/\s+/).length} space-split`)
   check('D9-MUT: a space split would have called the Japanese hero a handful of words',
     wordCount('検索順位の計測とAIでの可視性') > 4 && '検索順位の計測とAIでの可視性'.split(/\s+/).length === 1)
+
+  /*
+   * D10: THE PAGE FILES THEMSELVES, NOT ONLY THE DICTIONARIES.
+   *
+   * D4 reads the dictionaries. On 2026-10-31 it was green while ten pages of the
+   * LIVE Japanese site were showing ITALIAN: twelve route files under
+   * app/(public)/ja carried their copy inline, had been copied from
+   * app/(public)/it, and were never translated. No dictionary was involved, so
+   * no dictionary guard could see it. This one reads the route files — their
+   * string literals AND their JSX text — and asks D4's question of each.
+   *
+   * It is stricter than D4 in one place on purpose. D4 lets a short Latin string
+   * through as a brand or a label, and '11 anni di SEO,' is fifteen characters:
+   * it was the HEADLINE of /ja/about and it would have passed. So here a Latin
+   * string is prose, however short, when it has four or more words, or three
+   * with a lower-case word among them — which 'Go Top SEO' and 'Shopify App
+   * Store' do not have, and 'Prezzi - Go Top SEO' does.
+   */
+  const pageStrings = (src: string): string[] => {
+    const body = strip(src)
+    const out: string[] = []
+    for (const m of body.matchAll(/'((?:[^'\\\n]|\\.)*)'|"((?:[^"\\\n]|\\.)*)"/g)) out.push((m[1] ?? m[2] ?? '').trim())
+    for (const m of body.matchAll(/>([^<>{}]+)</g)) out.push(m[1].trim())
+    return out.filter(Boolean)
+  }
+  // Tailwind lives in these files too. A class list is Latin on purpose and is
+  // never prose, so it is excluded by SHAPE before the language question.
+  const CLASS_LIST = (t: string) => /^[a-z0-9\-:[\]./ %_,()&>#+*='"]+$/.test(t)
+  const LATIN_ONLY = (t: string) => !/[\u3040-\u30ff\u3400-\u4dbf\u4e00-\u9fff]/.test(t)
+  const LATIN_PROSE = (t: string) => {
+    if (!LATIN_ONLY(t)) return false
+    const words = t.split(/\s+/).filter(Boolean)
+    return words.length >= 4 || (words.length === 3 && words.some((w) => /^[a-zà-ÿ]{2,}$/.test(w)))
+  }
+  /*
+   * The 特商法 page prints the seller's REGISTERED details, which exist only in
+   * their Latin form: the company as it is registered, the person responsible,
+   * and the registered address. 特定商取引法第11条 asks for those details as they
+   * are, so they are named here rather than pattern-matched — a fourth Latin
+   * line on that page should take a decision, not slip through a rule.
+   */
+  const REGISTERED = [
+    'Oren Hacham',
+    'HaRechasim 24/2, Ramat Gan 5235524, Israel',
+    // The author of the articles, as the Person their JSON-LD points at. It is
+    // the same Hebrew string in every tree, because it is his name.
+    'אורן חכם',
+  ]
+  // A module specifier and an e-mail address are code and contact details, not
+  // copy. Both are anchored, so an English SENTENCE with an address in it is
+  // still prose.
+  const NOT_COPY = (t: string) =>
+    /^[@.][\w@./-]*$/.test(t)
+    || /^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$/.test(t)
+  const foreignOnPage = (text: string) =>
+    !REGISTERED.includes(text) && !CLASS_LIST(text) && !NOT_COPY(text)
+    && (LATIN_PROSE(text) || (!LOOKS_TECHNICAL(text) && textScript(text) !== 'ja'))
+  const pageLeaks = routes('app/(public)/ja').flatMap((r) =>
+    pageStrings(read(`app/(public)/ja/${r}`)).filter(foreignOnPage).map((t) => `${r}: ${t.slice(0, 45)}`))
+  check('D10: every sentence the Japanese PAGE FILES print is written in Japanese',
+    pageLeaks.length === 0, `${pageLeaks.length}: ${pageLeaks.slice(0, 5).join(' | ')}`)
+
+  const MUT_ITALIAN = `const COPY = {
+    title: '11 anni di SEO,',
+    className: 'flex min-h-screen flex-col bg-canvas',
+  }
+  export default function P() { return <p>I dati vengono dall&rsquo;API di Google Ads.</p> }`
+  const MUT_JAPANESE = `const COPY = {
+    title: 'SEOの11年の実務を、',
+    className: 'flex min-h-screen flex-col bg-canvas',
+  }
+  export default function P() { return <p>データはGoogle AdsのAPIから取得しています。</p> }`
+  check('D10-MUT: an Italian headline and an Italian JSX line are both caught, and the Japanese page and its class lists are not',
+    pageStrings(MUT_ITALIAN).filter(foreignOnPage).length === 2
+    && pageStrings(MUT_JAPANESE).filter(foreignOnPage).length === 0
+    && !foreignOnPage('Go Top SEO') && !foreignOnPage('flex min-h-screen flex-col bg-canvas')
+    && !foreignOnPage('@/components/public/FeaturePage') && !foreignOnPage('oren@gotop.co.il')
+    && foreignOnPage('Mappa del sito | Go Top SEO')
+    && foreignOnPage('Write to oren@gotop.co.il and we will answer you shortly'),
+    `${pageStrings(MUT_ITALIAN).filter(foreignOnPage).join(' | ')} / ${pageStrings(MUT_JAPANESE).filter(foreignOnPage).join(' | ')}`)
 }
 
 console.log('\nE) the reader never changes language')

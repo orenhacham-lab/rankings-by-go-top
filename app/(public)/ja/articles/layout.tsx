@@ -2,11 +2,11 @@ import { buildHreflangAlternates } from '@/lib/seo/hreflang'
 import { LOCALE_CONFIG } from '@/lib/i18n/locales'
 
 export const metadata = {
-  title: 'Articoli su SEO, posizionamento e visibilità nelle IA | Go Top SEO',
-  description: 'Articoli, guide e consigli sul monitoraggio della posizione in Google, sul posizionamento organico e sulla visibilità in ChatGPT, Gemini e Google AI Mode.',
+  title: 'SEO、検索順位、AIでの可視性についての記事 | Go Top SEO',
+  description: 'Googleでの検索順位の計測、自然検索での集客、そしてChatGPT、Gemini、Google AI Modeでの可視性についての記事、ガイド、アドバイスです。',
   openGraph: {
-    title: 'Articoli su SEO, posizionamento e visibilità nelle IA | Go Top SEO',
-    description: 'Articoli e guide sul monitoraggio della posizione, sul posizionamento organico e sulla visibilità nelle IA',
+    title: 'SEO、検索順位、AIでの可視性についての記事 | Go Top SEO',
+    description: '検索順位の計測、自然検索での集客、AIでの可視性についての記事とガイドです',
     url: 'https://www.gotopseo.com/ja/articles',
     type: 'website',
     locale: LOCALE_CONFIG['ja'].ogLocale,
