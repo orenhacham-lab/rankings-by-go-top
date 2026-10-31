@@ -130,8 +130,8 @@ export function isJapanesePath(pathname: string | null | undefined, enabled = ja
  * from it, so it cannot drift silently.
  */
 const PUBLIC_MARKETING_SEGMENTS = new Set([
-  'about', 'accessibility', 'affiliates', 'affiliate-terms', 'articles', 'compare', 'features', 'free-check',
-  'pricing', 'privacy', 'refund-policy', 'sitemap', 'solutions', 'terms',
+  'about', 'accessibility', 'affiliates', 'affiliate-terms', 'ai-crawlers', 'articles', 'compare', 'features',
+  'free-check', 'pricing', 'privacy', 'refund-policy', 'sitemap', 'solutions', 'terms',
 ])
 
 /**
