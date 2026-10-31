@@ -3,11 +3,11 @@ import { marketingBreadcrumbSchema } from '@/lib/seo/page-schema'
 import { getPublicDictionary } from '@/lib/i18n/getPublicDictionary'
 
 export const metadata = {
-  title: 'Prezzi - Go Top SEO',
-  description: 'Piani flessibili per il monitoraggio della posizione in Google e la visibilità nelle IA. Prova gratuita di 7 giorni, senza vincoli.',
+  title: '料金 - Go Top SEO',
+  description: 'Googleでの検索順位とAIでの可視性を計測するための、柔軟なプランです。7日間の無料トライアルがあり、継続の縛りはありません。',
   openGraph: {
-    title: 'Prezzi - Go Top SEO',
-    description: 'Piani flessibili per il monitoraggio della posizione in Google e la visibilità nelle IA',
+    title: '料金 - Go Top SEO',
+    description: 'Googleでの検索順位とAIでの可視性を計測するための、柔軟なプランです',
     url: 'https://www.gotopseo.com/ja/pricing',
     type: 'website',
   },

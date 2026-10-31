@@ -4,11 +4,11 @@ import { marketingBreadcrumbSchema } from '@/lib/seo/page-schema'
 import { ABOUT_BREADCRUMB } from '@/lib/i18n/public/pages/breadcrumb-labels'
 
 export const metadata = {
-  title: 'Chi siamo - Go Top SEO',
-  description: 'La storia di Go Top SEO: una piattaforma per il monitoraggio della posizione in Google e della visibilità nelle IA, costruita su oltre 11 anni di esperienza nel digitale.',
+  title: '会社情報 - Go Top SEO',
+  description: 'Go Top SEOのこれまで。Googleでの検索順位とAIでの可視性を計測するプラットフォームで、デジタル領域での11年以上の実務の上に作られています。',
   openGraph: {
-    title: 'Chi siamo - Go Top SEO',
-    description: 'Piattaforma per il monitoraggio della posizione in Google e della visibilità nelle IA, con oltre 11 anni di esperienza nel digitale alle spalle',
+    title: '会社情報 - Go Top SEO',
+    description: 'Googleでの検索順位とAIでの可視性を計測するプラットフォームです。デジタル領域での11年以上の実務があります',
     url: 'https://www.gotopseo.com/ja/about',
     type: 'website',
   },

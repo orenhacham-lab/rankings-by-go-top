@@ -17,6 +17,7 @@ import { readFileSync } from 'fs'
 import { join } from 'path'
 import { FakeAdmin } from '@/lib/__qa__/_fake-admin'
 import { consumeClaimToken, hashClaimToken } from '@/lib/free-check'
+import { freeCheckCopy } from '@/lib/free-check/copy'
 import { issueClaimToken } from '@/lib/free-check/claim'
 import { recordRun } from '@/lib/free-check/store'
 import { googleRedirectTo, googleSignInEnabled, googleSignInVisible } from '@/lib/auth/google-signin'
@@ -700,6 +701,40 @@ async function main() {
       // same-origin next, and the callback takes the code off the path.
       && signup.includes(`<GoogleSignInButton lang={lang} nextPath={withReferral('/dashboard', referralCode)} disabled={searchParams.has('claim')} />`)
       && back(`/dashboard?ref=dana`).searchParams.get('next') === '/dashboard?ref=dana')
+  }
+
+  /*
+   * THE SUMMARY SCREEN READS THE INTERFACE LANGUAGE, NOT THE BILINGUAL ONE.
+   *
+   * useDashboardLanguage answers two things: `uiLocale`, the PublicLocale the
+   * reader chose, and `language`, toBilingualLocale(uiLocale) — 'he' or 'en' and
+   * nothing else. ResearchSummary read the short check's copy off `language`, so
+   * that block came out in ENGLISH on /es, /pt-BR, /fr, /it and /ja while the
+   * rest of the screen was in the reader's language. Found on /ja/free-check on
+   * 2026-10-31. freeCheckCopy takes a PublicLocale and has a block for every one
+   * of them, so the copy follows uiLocale; `language` stays where the question
+   * really is bilingual — the snapshot's own prose, which is written he or en.
+   */
+  {
+    const summary = code(read('components/onboarding/ResearchSummary.tsx'))
+    check('the research summary takes the short check\'s copy from the INTERFACE locale',
+      /freeCheckCopy\(uiLocale\)/.test(summary) && !/freeCheckCopy\(language\)/.test(summary))
+    check('MUT: reading it off the bilingual narrowing is caught',
+      !/freeCheckCopy\(uiLocale\)/.test('const checks = freeCheckCopy(language)')
+      && /freeCheckCopy\(language\)/.test('const checks = freeCheckCopy(language)'))
+    // The one place `language` is still right: SeedSummary.locale is a bilingual
+    // Locale (lib/seed-scan/types.ts), so comparing the two is the real question.
+    check('and the snapshot-language comparison still uses the bilingual locale',
+      /summary\.locale === language/.test(summary))
+    /*
+     * And the copy really exists in all seven. `freeCheckCopy` ends in
+     * `?? COPY.he`, a default that is itself a real language, so a missing block
+     * would have shown HEBREW rather than failing. Each locale's own title is
+     * compared, which is the string the reader meets first.
+     */
+    const titles = PUBLIC_LOCALES.map((l) => freeCheckCopy(l).page.title)
+    check('every public locale has its own free-check copy, with no silent fall back to Hebrew',
+      new Set(titles).size === PUBLIC_LOCALES.length, titles.join(' | '))
   }
 
   check(`${SECRET} appears in no log line of the whole suite`, !allLogs.includes(SECRET) && allLogs.includes('[presignup] research ended'))

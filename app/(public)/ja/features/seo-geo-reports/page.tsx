@@ -7,8 +7,8 @@ import { FEATURE_COMMON } from '@/lib/i18n/public/feature-common'
 import { landingJa } from '@/lib/i18n/public/landing-ja'
 
 export const metadata: Metadata = {
-  title: 'Report SEO e GEO | Go Top SEO',
-  description: 'Report PDF ed Excel professionali con le vostre posizioni, i vostri andamenti e l’analisi dei concorrenti, pronti da inviare a un cliente in pochi secondi.',
+  title: 'SEOとGEOのレポート | Go Top SEO',
+  description: '順位、推移、競合の分析を収めた業務用のPDFとExcelのレポートです。数秒で取引先に送れる形で用意されます。',
   alternates: {
     canonical: 'https://www.gotopseo.com/ja/features/seo-geo-reports',
     languages: buildHreflangAlternates('/features/seo-geo-reports', '/en/features/seo-geo-reports', '/es/features/seo-geo-reports'),
@@ -23,11 +23,11 @@ const C = FEATURE_COMMON['ja']
 
 const CONTENT: FeaturePageContent = {
   hero: {
-    eyebrow: 'Report',
+    eyebrow: 'レポート',
     eyebrowIcon: ChartColumn,
-    title: 'Un report che mostra che cosa è cambiato,',
-    accent: 'con un clic',
-    subtitle: 'Le vostre posizioni in Google e in Maps e la vostra visibilità nei motori di IA, in un report PDF o Excel pronto da inviare a un cliente, alla vostra direzione, o a voi stessi.',
+    title: '何が変わったかを示すレポートが、',
+    accent: 'ワンクリックで',
+    subtitle: 'GoogleとGoogleマップでの順位、そしてAIエンジンでの可視性を、PDFまたはExcelのレポートにまとめます。取引先、社内、ご自身のいずれにもそのまま送れます。',
     trust: C.trust,
     primary: C.check,
     secondary: C.trial,
@@ -37,54 +37,54 @@ const CONTENT: FeaturePageContent = {
     {
       kind: 'cards',
       tone: 'contrast',
-      eyebrow: 'Perché un report',
-      title: 'Il buon lavoro si deve vedere',
-      intro: 'Un report chiaro evita le spiegazioni e mostra che il sito sta avanzando.',
+      eyebrow: 'レポートが必要な理由',
+      title: 'よい仕事は、見える形にする必要があります',
+      intro: 'わかりやすいレポートがあれば、説明の手間が要らず、サイトが前に進んでいることが伝わります。',
       items: [
-        { icon: Eye, title: 'Il quadro completo', body: 'Google, Maps e le IA nello stesso posto, invece di schermate prese da più strumenti.' },
-        { icon: Clock, title: 'Nulla da assemblare a mano', body: 'I dati sono già nella piattaforma. Il report si costruisce da quei dati con un clic.' },
-        { icon: Handshake, title: 'La fiducia del cliente', body: 'Per le agenzie: un report regolare mostra al cliente che cosa è cambiato e perché continuare.' },
+        { icon: Eye, title: '全体像', body: 'Google、Googleマップ、AIが同じ場所にまとまります。複数のツールの画面を貼り合わせる必要はありません。' },
+        { icon: Clock, title: '手で組み立てるものはありません', body: 'データはすでにプラットフォームの中にあります。レポートはそのデータからワンクリックで作られます。' },
+        { icon: Handshake, title: '取引先の信頼', body: '制作会社や代理店の方へ。定期的なレポートは、何が変わったか、なぜ続ける価値があるかを取引先に示します。' },
       ],
     },
     {
       kind: 'steps',
-      eyebrow: 'Come funziona',
-      title: 'Dai dati al report in tre passaggi',
+      eyebrow: '仕組み',
+      title: 'データからレポートまで三つの手順',
       items: [
-        { title: 'Scegliete un progetto', body: 'Ogni sito è un progetto a sé, con i propri report.' },
-        { title: 'Esportate', body: 'Un PDF da inviare, oppure un Excel per lavorare i dati.' },
-        { title: 'Inviate', body: 'A un cliente, alla vostra direzione o a un socio, senza nulla da impaginare.' },
+        { title: 'プロジェクトを選びます', body: 'サイトごとに一つのプロジェクトがあり、それぞれに自分のレポートがあります。' },
+        { title: '書き出します', body: '送るためのPDFか、データを加工するためのExcelです。' },
+        { title: '送ります', body: '取引先、社内、共同経営者のいずれにも、体裁を整える作業なしで送れます。' },
       ],
     },
     {
       kind: 'cards',
-      eyebrow: 'Che cosa contiene il report',
-      title: 'Tutto quello che conta, nulla di quello che non conta',
+      eyebrow: 'レポートに入るもの',
+      title: '意味のあるものだけを、意味のないものは入れずに',
       items: [
-        { icon: TrendingUp, title: 'Posizioni e variazioni', body: 'Per ogni espressione: la posizione di oggi, quella precedente, e la differenza fra le due.' },
-        { icon: ArrowUpDown, title: 'La pagina che si posiziona', body: 'Quale pagina del vostro sito emerge su ogni espressione.' },
-        { icon: ChartColumn, title: 'Traffico stimato', body: 'Una stima delle visite arrivate da Google, in base al volume di ricerca e alla posizione attuale.' },
-        { icon: Sparkles, title: 'Visibilità nelle IA', body: 'Le menzioni e le citazioni del vostro sito, motore di IA per motore di IA.' },
-        { icon: History, title: 'Storico completo', body: 'Nel file Excel: tutte le verifiche nel tempo, non soltanto l’ultima.' },
-        { icon: FileSpreadsheet, title: 'PDF ed Excel', body: 'Un PDF curato da inviare, e un Excel per chi vuole lavorare sui numeri.' },
+        { icon: TrendingUp, title: '順位と変化', body: 'キーワードごとに、今日の順位、前回の順位、その差です。' },
+        { icon: ArrowUpDown, title: '上位に出ているページ', body: 'キーワードごとに、サイトのどのページが出ているかです。' },
+        { icon: ChartColumn, title: '推定の流入', body: '検索ボリュームと現在の順位から見た、Googleからの訪問の推定値です。' },
+        { icon: Sparkles, title: 'AIでの可視性', body: 'サイトへの言及と引用を、AIエンジンごとに示します。' },
+        { icon: History, title: '完全な履歴', body: 'Excelのファイルには、直近の一回だけでなく、これまでのすべての計測が入ります。' },
+        { icon: FileSpreadsheet, title: 'PDFとExcel', body: '送るための整ったPDFと、数字を加工したい方のためのExcelです。' },
       ],
     },
     {
       kind: 'faq',
-      eyebrow: 'Domande',
-      title: 'Quello che ci si chiede sui report',
+      eyebrow: 'よくある質問',
+      title: 'レポートについて尋ねられること',
       items: [
         // Checked against lib/export/i18n.ts and lib/gsc/export/labels.ts: both
         // now carry a complete Japanese block, so the export really does come out
         // in Japanese. Keep this answer and those two files in step.
-        { q: 'In quali lingue escono i report?', a: 'Il report esce nella lingua della vostra dashboard, e l’japaneseo è una di queste, accanto all’ebraico, all’inglese, allo spagnolo, al portoghese e al francese.' },
-        { q: 'Posso fare un report distinto per ogni cliente?', a: 'Sì. Ogni sito è un progetto a sé, e ogni progetto ha il proprio report. Il numero di progetti di ogni piano è indicato nella pagina dei prezzi.' },
-        { q: 'I report sono inclusi in tutti i piani?', a: 'Sì. I report PDF ed Excel sono inclusi in tutti i piani.' },
+        { q: 'レポートはどの言語で出ますか', a: 'レポートはダッシュボードの言語で出ます。日本語もその一つで、ほかにヘブライ語、英語、スペイン語、ポルトガル語、フランス語、イタリア語があります。' },
+        { q: '取引先ごとに別のレポートを作れますか', a: 'はい。サイトごとに一つのプロジェクトがあり、プロジェクトごとに自分のレポートがあります。プランごとのプロジェクト数は料金のページに記載しています。' },
+        { q: 'レポートはどのプランにも含まれますか', a: 'はい。PDFとExcelのレポートは、どのプランにも含まれます。' },
       ],
     },
   ],
   cta: {
-    title: 'Il vostro primo report è a pochi giorni di distanza',
+    title: '最初のレポートまで、あと数日です',
     body: C.closeBody,
     primary: C.check,
     secondary: C.trial,
