@@ -78,6 +78,29 @@ async function main() {
       .then((r) => r.status, () => 0)
     check('B1: it answers 500 rather than nothing', broken === 500, `answered ${broken}`)
     check('B2: the stub is STILL serving after it', await alive())
+
+    console.log('\nB2) the schema facts the stub now mirrors')
+    // A journey can only exercise code whose ANSWER is a constraint violation
+    // if the store actually refuses one. These two checks are the control for
+    // that: break either in the stub and marketplace-sale reads a product bug.
+    const insertOrder = (externalOrderId: string) =>
+      fetch(`${BASE}/rest/v1/marketplace_orders`, {
+        method: 'POST',
+        headers: { ...SERVICE, 'content-type': 'application/json', prefer: 'return=representation' },
+        body: JSON.stringify([{ provider: 'jvzoo', external_order_id: externalOrderId, plan_code: 'advanced',
+          buyer_email: 'stub@example.com', claim_token: 'x'.repeat(43) }]),
+      }).then(async (r) => ({ status: r.status, body: await r.json().catch(() => null) }))
+    await fetch(`${BASE}/__stub/reset`, { headers: SERVICE })
+    const first = await insertOrder('STUB-TX-1')
+    check('B3: an order inserts, carrying the status the real column defaults to',
+      first.status === 201 && (Array.isArray(first.body) ? first.body[0]?.status : null) === 'paid',
+      JSON.stringify(first))
+    const duplicate = await insertOrder('STUB-TX-1')
+    check('B4: the same (provider, external_order_id) is refused as a unique violation',
+      duplicate.status === 409 && (duplicate.body as { code?: string } | null)?.code === '23505', JSON.stringify(duplicate))
+    const other = await insertOrder('STUB-TX-2')
+    check('B5: a different order id still inserts, so the constraint is the key and not the table',
+      other.status === 201, JSON.stringify(other))
   })
 
   console.log('\nC) the shape that makes A and B true')
