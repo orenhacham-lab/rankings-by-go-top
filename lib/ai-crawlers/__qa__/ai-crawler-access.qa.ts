@@ -13,8 +13,8 @@
  *   B) the matcher — the four rules, each with its control
  *   C) the run — what a missing, unreadable or lying robots.txt produces
  *   D) the rate limiter — a window that actually closes
- *   E) the locales — six complete copies, no untranslated keys
- *   F) the surfaces — six pages, the API's own guard, the sitemap
+ *   E) the locales — seven complete copies, no untranslated keys
+ *   F) the surfaces — seven pages, the API's own guard, the sitemap
  */
 import { readFileSync, existsSync } from 'fs'
 import { join } from 'path'
@@ -197,22 +197,22 @@ function main() {
     resetRateLimiter()
   }
 
-  // ── E) six complete locales ───────────────────────────────────────────────
-  console.log('\nE) the copy, in all six public locales')
+  // ── E) seven complete locales ─────────────────────────────────────────────
+  console.log('\nE) the copy, in all seven public locales')
   {
-    const LATIN: PublicLocale[] = ['en', 'es', 'pt-BR', 'fr', 'it']
+    const NON_HEBREW: PublicLocale[] = ['en', 'es', 'pt-BR', 'fr', 'it', 'ja']
     const heKeys = strings(aiCrawlerCopy('he')).map((s) => s.path).sort()
     for (const locale of PUBLIC_LOCALES) {
       const keys = strings(aiCrawlerCopy(locale)).map((s) => s.path).sort()
       check(`E1 (${locale}): the same keys as Hebrew, none missing`, keys.join('|') === heKeys.join('|'))
       check(`E2 (${locale}): no empty string anywhere`, strings(aiCrawlerCopy(locale)).every((s) => s.text.trim().length > 0))
     }
-    for (const locale of LATIN) {
+    for (const locale of NON_HEBREW) {
       const hebrew = strings(aiCrawlerCopy(locale)).filter((s) => HEBREW.test(s.text))
       check(`E3 (${locale}): no Hebrew leaked into it`, hebrew.length === 0, hebrew[0]?.path)
     }
-    // Spanish, Portuguese, French and Italian must not be the English copy.
-    for (const locale of ['es', 'pt-BR', 'fr', 'it'] as PublicLocale[]) {
+    // Spanish, Portuguese, French, Italian and Japanese must not be the English copy.
+    for (const locale of ['es', 'pt-BR', 'fr', 'it', 'ja'] as PublicLocale[]) {
       const same = strings(aiCrawlerCopy(locale)).filter((s, i) => s.text === strings(aiCrawlerCopy('en'))[i]?.text)
       // Product names and the User-agent column legitimately match, so the bar
       // is that the PROSE differs, not that every string does.
@@ -226,7 +226,7 @@ function main() {
     const everyString = PUBLIC_LOCALES.flatMap((l) => strings(aiCrawlerCopy(l)).map((s) => s.text))
     check('E6: no percentage is claimed anywhere', !everyString.some((t) => /\d\s?%/.test(t)))
     check('E7: the trial is stated as 7 days with no card, or not at all',
-      everyString.filter((t) => /\b(7|siete|sete|sept|sieben|שבוע)\b/i.test(t)).every((t) => /card|tarjeta|cartão|carte|carta|אשראי/i.test(t)))
+      everyString.filter((t) => /\b(7|siete|sete|sept|sieben|שבוע)\b/i.test(t)).every((t) => /card|tarjeta|cartão|carte|carta|אשראי|カード/i.test(t)))
     // MUTATION CONTROL for E1: a key check that compares only the COUNT of
     // strings — the shortcut — passes while a locale has the wrong keys, so
     // E1's full path comparison is doing real work. Build a French copy with
@@ -250,6 +250,7 @@ function main() {
       ['pt-BR', 'app/(public)/pt-BR/ai-crawlers/page.tsx'],
       ['fr', 'app/(public)/fr/ai-crawlers/page.tsx'],
       ['it', 'app/(public)/it/ai-crawlers/page.tsx'],
+      ['ja', 'app/(public)/ja/ai-crawlers/page.tsx'],
     ]
     for (const [locale, rel] of PAGES) {
       check(`F1 (${locale}): the page exists`, existsSync(join(ROOT, rel)))

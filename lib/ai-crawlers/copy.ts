@@ -1,9 +1,9 @@
 /**
- * Every visitor-facing string of the AI crawler checker, in all six public
+ * Every visitor-facing string of the AI crawler checker, in all seven public
  * locales.
  *
  * Same shape as lib/free-check/copy.ts and for the same reason: one structural
- * type, six objects, so a locale cannot quietly lose a key and fall through to
+ * type, seven objects, so a locale cannot quietly lose a key and fall through to
  * Hebrew. The whole asset is self-contained, so its words live beside its logic
  * rather than in the public dictionary.
  *
@@ -504,7 +504,82 @@ const it: AiCrawlerCopy = {
   },
 }
 
-const COPY: Record<PublicLocale, AiCrawlerCopy> = { he, en, es, 'pt-BR': ptBR, fr, it }
+const ja: AiCrawlerCopy = {
+  meta: {
+    title: 'robots.txt のAIクローラー許可状況チェック - Go Top SEO',
+    description:
+      'ドメインをご記入ください。GPTBot、ClaudeBot、PerplexityBot、Google-Extended などのAIクローラーのうち、robots.txt がどれを拒否しているかと、そう判定した行そのものをお見せします。登録不要。',
+  },
+  page: {
+    badge: '無料ツール',
+    title: 'サイトはどのAIクローラーを拒否していますか',
+    subtitle:
+      'robots.txt を読み取り、AIクローラーごとに許可か拒否かをお見せします。あわせて、ファイルのどの行がそう判定したかもお示しします。',
+    trust: ['登録不要、メールアドレスも不要', '1つのファイルを1回読み取るだけ', 'トップページだけでなく、特定のパスも確認できます'],
+  },
+  form: {
+    urlLabel: 'サイトのアドレス',
+    urlPlaceholder: 'example.com',
+    pathLabel: '確認するパス（任意）',
+    pathPlaceholder: '/blog/',
+    pathHint: '空欄のままにすると、トップページを確認します。robots.txt の指定はパスごとに変わります。',
+    submit: 'クローラーを確認する',
+    submitting: 'robots.txt を読み取っています…',
+    errors: {
+      invalid_url: 'このアドレスは正しくないようです。example.com のような形でお試しください。',
+      blocked_url: '確認できるのは公開されているサイトのみです。',
+      unreachable: 'ただ今そのサイトに接続できませんでした。少し時間をおいてもう一度お試しください。',
+      rate_limited: '短い間に多くのサイトが確認されました。1分ほどおいてもう一度お試しください。',
+      internal: '当社側で処理が完了しませんでした。少し時間をおいてもう一度お試しください。',
+    },
+  },
+  results: {
+    heading: '確認の対象',
+    forPath: '対象のパス',
+    robotsFound: 'robots.txt を読み取りました',
+    robotsAbsent: 'このサイトは robots.txt を返していないため、このファイルによる拒否はありません。',
+    robotsUnreadable: 'サイトがファイルを返さなかったため、そこから方針を読み取ることはできません。以下の結果は、何も拒否されていないものとして扱っています。',
+    allowedCount: '許可',
+    blockedCount: '拒否',
+    allowed: '許可',
+    blocked: '拒否',
+    decidedBy: '判定した行',
+    noRule: '該当する指定がありません。既定では許可です',
+    viaWildcard: '全体向けのグループによる判定',
+    ignoresRobots: 'このクローラーは robots.txt を尊重すると明言していません',
+    sitemapsTitle: 'ファイル内で宣言されているサイトマップ',
+    again: 'ほかのサイトを確認する',
+  },
+  purposes: {
+    train: { label: '学習', blurb: 'モデルの学習のためにページを収集します。拒否すると、次のモデルに載らなくなります。' },
+    answer: { label: 'その場での回答', blurb: '誰かが質問したその時にページを取得し、回答の中でリンク付きで引用します。' },
+    search: { label: '検索インデックス', blurb: '検索インデックスを作ります。AIの回答もこの上に成り立っています。' },
+  },
+  groups: { ai: 'AIクローラー', classic: '従来の検索クローラー' },
+  reference: {
+    title: 'それぞれの正体',
+    intro: 'この表は単体で読めます。User-agent の行に現れるクローラー名、運営元、そして何のためのものかです。',
+    colAgent: 'User-agent',
+    colOperator: '運営元',
+    colPurpose: '何のためか',
+  },
+  limits: {
+    title: 'この確認では分からないこと',
+    items: [
+      'robots.txt はお願いであって、壁ではありません。クローラーは無視できます。',
+      'robots.txt が許可しているクローラーを、ファイアウォールやCDNが拒否していることがあります。',
+      'この確認は、ある一瞬の状態を示すものです。ファイルを書き換えれば、答えはすぐ変わります。',
+      '学習クローラーを拒否することと、その場で回答するクローラーを拒否することは、まったく別の判断です。',
+    ],
+  },
+  cta: {
+    title: 'AIが実際に自社に言及しているかを確かめる',
+    body: 'アクセスできるかどうかは最初の一歩にすぎません。Go Top SEOは、ChatGPT、Gemini、Google AIの回答に自社が出てくるかを自動で確認し、GoogleとGoogleマップでの順位を毎月追跡します。',
+    button: '7日間の無料トライアル、クレジットカードは不要',
+  },
+}
+
+const COPY: Record<PublicLocale, AiCrawlerCopy> = { he, en, es, 'pt-BR': ptBR, fr, it, ja }
 
 export function aiCrawlerCopy(locale: PublicLocale): AiCrawlerCopy {
   return COPY[locale] ?? he
