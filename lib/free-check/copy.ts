@@ -734,7 +734,124 @@ const it: FreeCheckCopy = {
   },
 }
 
-const COPY: Record<PublicLocale, FreeCheckCopy> = { he, en, es, 'pt-BR': ptBR, fr, it }
+// JAPANESE. Marketing voice in です/ます, never a raw provider error, and no
+// claim the scan does not make. `evidence.words` says 語 rather than 単語 and
+// counts what lib/text/segment.ts segmented, which is the only number this
+// locale actually has: a Japanese page has no spaces to count.
+const ja: FreeCheckCopy = {
+  page: {
+    badge: '無料チェック、お申し込み不要',
+    title: 'サイトのSEOとAI対応を',
+    titleAccent: '1分以内に診断',
+    subtitle: 'サイトのアドレスをご記入ください。実際にサイトを読み取り、事業の内容を把握したうえで、Googleの検索結果とAIの回答で不利になっている点をお見せします。',
+    trust: ['無料、クレジットカード不要', 'インストール不要', '登録不要'],
+    expect: [
+      { title: '読み取れた内容', body: 'サイト自身が示している、事業の内容と顧客像です。' },
+      { title: 'サイトの弱点', body: 'ページ上で、GoogleとAIエンジンが事業を理解するのを妨げている点を、重要な順に並べます。' },
+      { title: 'AIへの対応状況', body: 'ChatGPTやGeminiがサイトを読み取り、引用できる状態かどうかです。' },
+    ],
+  },
+  form: {
+    label: 'サイトのアドレス',
+    placeholder: 'example.com',
+    submit: 'サイトを診断する',
+    hint: '入力はこの1項目だけです。',
+    errors: {
+      invalid_url: 'このアドレスは正しくないようです。example.com のような形でもう一度お試しください。',
+      blocked_url: '診断できるのは公開されているサイトのみです。社内アドレスとIPアドレスには対応していません。',
+      unreachable: 'サイトに接続できませんでした。アドレスをご確認のうえ、もう一度お試しください。',
+      not_html: 'このアドレスからは、読み取れるウェブページが返ってきません。',
+      rate_limited: '短い間に何度も診断が実行されました。1分ほどおいてもう一度お試しください。',
+      daily_cap: 'ただ今、無料チェックのご利用が集中しています。時間をおいてお試しいただくか、アカウントを作成して詳細な分析をご利用ください。',
+      internal: '当社側で処理が完了しませんでした。少し時間をおいてもう一度お試しください。',
+    },
+  },
+  loading: {
+    title: 'サイトとページ構成を読み取っています',
+    sub: '1分もかかりません。推測ではなく、実際にサイトを読み取っています。',
+    footer: '処理中です。まとめがもうすぐ完成します',
+    steps: [
+      'サイトとページ構成の読み取り',
+      '事業の内容と顧客像の把握',
+      'Googleで不利になっている点の確認',
+      '競合サイトの調査',
+    ],
+  },
+  results: {
+    heading: '最初の診断まとめ',
+    scanned: '診断の対象',
+    countersTitle: '見つかった内容',
+    counters: { keywords: '狙えるキーワード', fixes: 'サイトで直すべき点', geo: 'AIの回答への対応', articles: 'すぐ書ける記事' },
+    businessTitle: '事業について読み取れた内容',
+    audienceTitle: '顧客像',
+    competitorsTitle: '競合サイト',
+    competitorsLocked: 'ほかの競合サイトと全体像をご覧になるには、無料アカウントを作成してください',
+    findingsTitle: '現在サイトの足を引っぱっている点',
+    findingsEmpty: '当社が確認するすべての項目で問題はありませんでした。見事な状態です。',
+    findingsLocked: 'ほかの指摘はアカウント内でご覧いただけます',
+    geoTitle: 'AIの回答への対応状況',
+    geoIntro: 'ChatGPTやPerplexityのようなAIは、サイトに順位を付けるのではなく引用します。引用されやすい状態かどうかを確認しました。',
+    geoScore: '良好なシグナル',
+    articlesTitle: '当社が作成する記事の案',
+    articlesNote: '記事は、キーワードの中でも見込みの大きいものから組み立てたコンテンツ戦略にもとづいて作られます。',
+    gateTitle: 'ここまでは下見です。本格的な分析はログイン後に始まります',
+    gateBody: '無料アカウントを作成すると、システムがサイトに対して作業を始めます。',
+    gateBullets: [
+      '実際の検索ボリュームを含む詳細な分析',
+      '業種に合わせて組み立てた、四半期分のコンテンツ計画',
+      '最初の記事の作成',
+      '競合の全体像と、AIによる引用状況の計測',
+    ],
+    gateCta: '無料アカウントを作成',
+    gateSecondary: 'すでにアカウントをお持ちの方はログイン',
+    gateTerms: '続行することで、利用規約とプライバシーポリシーに同意したものとみなされます。',
+    again: '別のサイトを診断する',
+    aiUnavailable: '技術的なチェックは完了しました。事業のまとめとキーワードは、アカウント内でご覧いただけます。',
+  },
+  findings: {
+    title_missing: { title: 'ページにtitleタグがありません', detail: 'titleはGoogleが検索結果に表示する見出しです。無い場合、Googleが事業者の代わりに見出しを作ります。' },
+    title_short: { title: 'ページのtitleが短すぎます', detail: '30文字未満では、Googleが与えてくれる表示枠を使い切れず、検索されている語を含め損なうのが通例です。' },
+    title_long: { title: 'ページのtitleが長すぎます', detail: '65文字を超えると、Googleは文の途中でtitleを切り詰めます。' },
+    description_missing: { title: 'meta descriptionがありません', detail: 'descriptionは検索結果に出る紹介文です。無い場合、Googleがページから任意の一文を抜き出します。' },
+    description_length: { title: 'meta descriptionの長さが適切ではありません', detail: '70文字未満または165文字超では、切り詰められるか、枠を活かせません。' },
+    h1_missing: { title: 'ページにH1がありません', detail: 'H1はページの主題をGoogleとAIに伝えます。無い場合、本文から推測されます。' },
+    h1_multiple: { title: 'ページにH1が複数あります', detail: 'H1が複数あるとページの主題が分散し、それぞれの働きが弱くなります。' },
+    images_alt: { title: '代替テキストのない画像があります', detail: 'Googleは画像を見るのではなく代替テキストを読みます。無い場合、画像は流入につながらず、アクセシビリティも損なわれます。' },
+    thin_content: { title: 'ページの本文が少なすぎます', detail: '本文が薄いページは、GoogleやAIエンジンが順位付けや引用の判断をする材料に乏しくなります。' },
+    no_schema: { title: '構造化データ（Schema）がありません', detail: 'Schemaが無いと、GoogleとAIエンジンは、その事業者が誰で何をしているのかを確信できません。' },
+    no_canonical: { title: 'canonicalタグがありません', detail: 'canonicalが無いと、同じページが重複して数えられ、自サイト内で競合することがあります。' },
+    no_viewport: { title: 'モバイル用のviewportが設定されていません', detail: 'Googleはモバイル版を評価します。viewportが無いと、スマートフォンで表示が崩れます。' },
+    no_open_graph: { title: '共有用のタグ（Open Graph）がありません', detail: 'LINEやFacebookで共有したときに、画像も正しいタイトルも表示されません。' },
+    robots_blocks_all: { title: 'robots.txtがすべてのクローラーを拒否しています', detail: 'このファイルがすべてのクローラーに巡回しないよう求めているため、サイトはGoogleに載りません。' },
+    robots_blocks_ai: { title: 'robots.txtがAIのクローラーを拒否しています', detail: '拒否されたクローラーは、ChatGPTのような回答の中で事業者を引用できません。' },
+    no_faq: { title: 'よくある質問のセクションがありません', detail: 'AIは質問に答えるものなので、質問に答えているページを引用します。' },
+  },
+  geo: {
+    schema: {
+      pass: { title: '構造化データが事業者を特定しています', detail: 'AIエンジンが、その事業者が誰で何をしているのかを把握できます。' },
+      fail: { title: '事業者を特定する構造化データがありません', detail: '事業者のSchemaが無いと、AIエンジンは誰のことなのかを正確に判断できません。' },
+    },
+    faq: {
+      pass: { title: 'よくある質問のセクションがあります', detail: '質問に答えているページは、引用される頻度が大きく上がります。' },
+      fail: { title: 'よくある質問のセクションがありません', detail: 'AIは質問に答えるものなので、質問に答えているページを引用します。質問の無いページはほとんど引用されません。' },
+    },
+    robots: {
+      pass: { title: 'AIがサイトを読み取れます', detail: 'robots.txtはAIのクローラーを拒否していません。' },
+      fail: { title: 'robots.txtがAIのクローラーを拒否しています', detail: '拒否されたクローラーは、事業者を引用できません。' },
+    },
+    llms: {
+      pass: { title: 'llms.txtファイルがあります', detail: 'サイトがAIに向けて自身の見取り図を示しています。市場の大半に対する優位点です。' },
+      fail: { title: 'llms.txtファイルがありません', detail: 'llms.txtファイルは、サイトの見取り図をAIに示します。市場の大半はまだ用意していません。' },
+    },
+  },
+  evidence: {
+    images: (missing, total) => `${total}枚のうち${missing}枚の画像`,
+    words: (n) => `ページ内${n}語`,
+    h1: (n) => `H1見出し${n}件`,
+  },
+}
+
+const COPY: Record<PublicLocale, FreeCheckCopy> = { he, en, es, 'pt-BR': ptBR, fr, it, ja }
 
 export function freeCheckCopy(locale: PublicLocale): FreeCheckCopy {
   return COPY[locale] ?? COPY.he

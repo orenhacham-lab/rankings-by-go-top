@@ -646,9 +646,9 @@ async function main() {
     check('P3: a choice of one draws no control to choose with',
       /\{choices\.length > 1 && \(\s*<Segmented/.test(card))
     const KEYS_P = ['authorBoxImageNeedsSite', 'authorBoxImageNotOnStore', 'authorBoxImageOwnPhotoNeedsPassword']
-    const dictAll = (l: 'he' | 'en' | 'es' | 'pt-BR' | 'fr' | 'it') => getDashboardDictionary(l).projectSettings.writingGuidance as unknown as Record<string, string | undefined>
+    const dictAll = (l: 'he' | 'en' | 'es' | 'pt-BR' | 'fr' | 'it' | 'ja') => getDashboardDictionary(l).projectSettings.writingGuidance as unknown as Record<string, string | undefined>
     check('P4: all three sentences exist in every dashboard language',
-      (['he', 'en', 'es', 'pt-BR', 'fr', 'it'] as const).every((l) => KEYS_P.every((k) => {
+      (['he', 'en', 'es', 'pt-BR', 'fr', 'it', 'ja'] as const).every((l) => KEYS_P.every((k) => {
         const v = dictAll(l)[k]
         return typeof v === 'string' && v.trim().length > 0
       })))

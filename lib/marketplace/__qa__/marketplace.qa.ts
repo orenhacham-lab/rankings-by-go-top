@@ -359,6 +359,41 @@ check('K-MUT2: signing the fields in a different order changes the digest',
 check('K-MUT3: reading total as minor units would record 47 agorot instead of 47 dollars',
   Number.parseFloat('47.00') !== 4700)
 
+// The tax fields. On our flow these must arrive zero or absent; the route
+// reports anything else, because a non-zero value contradicts the sentence
+// the sales page publishes about who owes the tax.
+check('K21: a payload with no tax field at all reports null, not a reassuring zero',
+  sale?.taxMinor === null)
+check('K22: a reported zero is read as zero',
+  jvParse?.(jvForm({ tax_total: '0.00' }), null)?.taxMinor === 0)
+check('K23: tax_total is dollars and becomes minor units',
+  jvParse?.(jvForm({ tax_total: '8.46' }), null)?.taxMinor === 846)
+check('K24: all three components are summed when no total is sent, so tax cannot hide behind a missing total',
+  jvParse?.(jvForm({ vat_tax: '7.00', national_sales_tax: '1.46', international_sales_tax: '2.00' }), null)?.taxMinor === 1046)
+check('K24b: international_sales_tax alone is read — the field whose name carries the case this exists to catch',
+  jvParse?.(jvForm({ international_sales_tax: '2.00' }), null)?.taxMinor === 200)
+check('K25: a total is believed over the components rather than added to them',
+  jvParse?.(jvForm({ tax_total: '8.46', vat_tax: '8.46' }), null)?.taxMinor === 846)
+check('K26: reading the tax fields does not disturb the amount or the order id',
+  jvParse?.(jvForm({ tax_total: '8.46' }), null)?.amountMinor === 4700 &&
+  jvParse?.(jvForm({ tax_total: '8.46' }), null)?.externalOrderId === 'ABC123XYZ')
+
+// MUTATION CONTROL for the tax fields. K-MUT6 below is the mutation; these
+// two are differential assertions over the real parser rather than controls.
+check('K-MUT4: absent tax and a reported zero are different values, so a parser defaulting to 0 would fail K21',
+  sale?.taxMinor === null && jvParse?.(jvForm({ tax_total: '0.00' }), null)?.taxMinor === 0)
+check('K-MUT5: a tax_total-only parser would report NO tax on this payload, which carries none',
+  jvForm({ vat_tax: '7.00' }).includes('tax_total') === false &&
+  jvParse?.(jvForm({ vat_tax: '7.00' }), null)?.taxMinor === 700)
+
+// And the report itself, in the route's own source.
+const marketplaceRouteSrc = read('app/api/marketplace/[provider]/webhook/route.ts')
+check('K27: the route reports a non-zero tax, and tests for zero as well as for null',
+  /event\.taxMinor !== null && event\.taxMinor !== 0/.test(marketplaceRouteSrc))
+check('K-MUT6: dropping the zero test is caught — it would fire on every clean sale',
+  !/event\.taxMinor !== null && event\.taxMinor !== 0/.test(
+    marketplaceRouteSrc.replace('event.taxMinor !== null && event.taxMinor !== 0', 'event.taxMinor !== null')))
+
 // Sections F to I need await, and tsx compiles these suites as CommonJS,
 // where top-level await is not available. One async main, called at the end.
 async function main() {
@@ -373,6 +408,7 @@ async function main() {
     amountMinor: 17900,
     currency: 'USD',
     currentPeriodEnd: '2026-11-15T00:00:00.000Z',
+    taxMinor: 0,
     ...over,
   })
 
@@ -573,6 +609,33 @@ async function main() {
     /shown at checkout before you pay/.test(
       'any tax due where you are is shown at checkout before you pay'))
   /*
+   * AND IT PROMISES NO INVOICE. JVZoo's Terms of Use s.5.3 allocate the
+   * merchant-of-record role per transaction flow, and the issuer of the tax
+   * document follows that role. We cannot read our flow from here, so a
+   * promise that WE issue the invoice may be false, and a hedge naming both
+   * possible issuers answers one question twice - the same CRD Art. 6 defect
+   * as the "serves as the retailer" line. Seller identity is a different
+   * question and is unaffected: s.5.2 puts the purchase contract between the
+   * customer and the vendor, so that sentence must stay.
+   */
+  // Scoped to OUR-seller paragraph alone: on a reseller page the platform
+  // really does issue the invoice, and H15 above requires it to say so.
+  const ourSellerParagraph = (src: string) =>
+    src.match(/Go Top SEO is the seller for this purchase[\s\S]*?<\/p>/)?.[0] ?? ''
+  check('H15d: on a page where WE are the seller, it still says so, and as a sentence of its own',
+    /Go Top SEO is the seller for this purchase\./.test(salesFlat))
+  check('H15e: …and that paragraph promises no invoice, by us or by anyone',
+    ourSellerParagraph(salesFlat) !== '' && !/invoice/i.test(ourSellerParagraph(salesFlat)))
+  check('H-MUT6c: the seller-identity guard catches the sentence being softened',
+    !/Go Top SEO is the seller for this purchase\./.test(
+      salesFlat.replace('Go Top SEO is the seller for this purchase.',
+        'Go Top SEO or JVZoo is the seller for this purchase.')))
+  check('H-MUT6d: the no-invoice guard catches the promise coming back, in either form',
+    [' and issues your invoice.', ' Go Top SEO or JVZoo issues your invoice.'].every((added) =>
+      /invoice/i.test(ourSellerParagraph(
+        salesFlat.replace('Go Top SEO is the seller for this purchase.',
+          `Go Top SEO is the seller for this purchase.${added}`)))))
+  /*
    * THE ATTRIBUTION LINE. A platform's mandated block may contradict the
    * seller paragraph above it - JVZoo's says it "serves as the retailer" while
    * its own agreement makes us the seller. Full size above it was not enough:
@@ -723,8 +786,8 @@ async function main() {
   // turns the old stored decisions back into questions. A deploy carrying any
   // two of the three leaves the beacon firing on a grant nobody gave, so this
   // section fails on the missing one rather than on the beacon.
-  console.log('\nL. the beacon\'s lawful basis across the six languages')
-  const CONSENT_LOCALES = ['he', 'en', 'es', 'pt-BR', 'fr', 'it'] as const
+  console.log('\nL. the beacon\'s lawful basis across the seven languages')
+  const CONSENT_LOCALES = ['he', 'en', 'es', 'pt-BR', 'fr', 'it', 'ja'] as const
   const PRIVACY_DOC: Record<string, string> = {
     he: 'app/(legal)/privacy/page.tsx',
     en: 'app/(public)/en/privacy/page.tsx',
@@ -732,6 +795,7 @@ async function main() {
     'pt-BR': 'content/legal/pt-BR/privacy.md',
     fr: 'content/legal/fr/privacy.md',
     it: 'content/legal/it/privacy.md',
+    ja: 'content/legal/ja/privacy.md',
   }
   /** The marketing category's own description, cut out of the public dictionary. */
   const marketingDesc = (locale: string): string => {
@@ -749,6 +813,7 @@ async function main() {
     'pt-BR': 'depois de você aceitar os cookies de marketing',
     fr: 'après votre acceptation des cookies de marketing',
     it: 'dopo che Lei ha accettato i cookie di marketing',
+    ja: 'お客様がマーケティングの Cookie に同意された後にのみ読み込まれます',
   }
   for (const locale of CONSENT_LOCALES) {
     const desc = marketingDesc(locale)
@@ -774,7 +839,11 @@ async function main() {
     // meaning.
     const loose = clause.replace(/[.*+?^${}()|[\]\\]/g, '\\$&').replace(/\s+/g, '\\s+')
     const inEntry = (text: string) =>
-      new RegExp(`JVZoo\\s*:[\\s\\S]{0,1400}${loose}`).test(text)
+      // `[:：]`, because Japanese punctuation is full width: the entry opens
+      // 「**JVZoo：**」, and an ASCII-only colon here would have read the Japanese
+      // document as having no JVZoo entry at all — which is the silent pass this
+      // whole section exists to prevent.
+      new RegExp(`JVZoo\\s*[:：][\\s\\S]{0,1400}${loose}`).test(text)
     check(`L4 (${locale}): the entry ITSELF says the image waits for the marketing consent`,
       inEntry(doc), clause)
     check(`L-MUT4 (${locale}): …and deleting that clause from the real document fails it`,
@@ -820,6 +889,7 @@ async function main() {
     'pt-BR': ['Espaço Econômico Europeu', 'Reino Unido', 'Suíça', 'Canadá', 'não conseguirmos determinar'],
     fr: ['Espace économique européen', 'Royaume-Uni', 'Suisse', 'Canada', 'ne parvenons pas à déterminer'],
     it: ['Spazio economico europeo', 'Regno Unito', 'Svizzera', 'Canada', 'non riusciamo a determinare'],
+    ja: ['欧州経済領域', '英国', 'スイス', 'カナダ', '判定できなかった場合'],
   }
   for (const locale of CONSENT_LOCALES) {
     const doc = read(PRIVACY_DOC[locale])
@@ -858,6 +928,10 @@ async function main() {
     'pt-BR': /listados em\s*«([\s\S]*?)»/g,
     fr: /énumérés dans\s*«([\s\S]*?)»/g,
     it: /elencati in\s*«([\s\S]*?)»/g,
+    // Japanese points forward with 後述の and quotes the name in corner brackets,
+    // which is the one pointer phrase this document uses; 「…」の条 appears too and
+    // names the same kind of heading, so both shapes are read.
+    ja: /(?:後述の|前述の)「([^」]+)」/g,
   }
   const flat = (v: string) => v.replace(/\s+/g, ' ').trim()
   /** Every heading the document carries, JSX and Markdown alike. */

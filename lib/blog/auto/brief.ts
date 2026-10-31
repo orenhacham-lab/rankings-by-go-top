@@ -36,6 +36,7 @@ const AUDIENCE: Record<BlogAutoLocale, string> = {
   'pt-BR': 'o dono de um negócio ou responsável por marketing no Brasil que quer aparecer no Google e nos assistentes de IA',
   fr: 'le dirigeant d\u2019une petite entreprise ou le responsable marketing en France qui veut être trouvé dans Google et dans les assistants d\u2019IA',
   it: 'il titolare di una piccola impresa o il responsabile marketing in Italia che vuole essere trovato su Google e negli assistenti di IA',
+  ja: '日本で事業を営む経営者、またはマーケティングの担当者で、自社のサイトが Google と AI のアシスタントでどう見つかるかを知りたい方',
 }
 
 /**

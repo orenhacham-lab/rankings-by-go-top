@@ -25,6 +25,11 @@ function italianTwin(esPath: string): string {
   return esPath === '/es' ? '/it' : esPath.replace(/^\/es(?=\/|$)/, '/it')
 }
 
+/** The Japanese URL of a page, derived from its Spanish one, for the same reason. */
+function japaneseTwin(esPath: string): string {
+  return esPath === '/es' ? '/ja' : esPath.replace(/^\/es(?=\/|$)/, '/ja')
+}
+
 /**
  * Builds the `alternates.languages` object for the Next.js Metadata API, given
  * the Hebrew (default locale, no prefix) and English (`/en` prefix) paths for
@@ -47,5 +52,6 @@ export function buildHreflangAlternates(hePath: string, enPath: string, esPath?:
   if (esPath && publicLocaleEnabled('pt-BR')) alternates['pt-BR'] = `${SITE_URL}${portugueseTwin(esPath)}`
   if (esPath && publicLocaleEnabled('fr')) alternates.fr = `${SITE_URL}${frenchTwin(esPath)}`
   if (esPath && publicLocaleEnabled('it')) alternates.it = `${SITE_URL}${italianTwin(esPath)}`
+  if (esPath && publicLocaleEnabled('ja')) alternates.ja = `${SITE_URL}${japaneseTwin(esPath)}`
   return alternates
 }

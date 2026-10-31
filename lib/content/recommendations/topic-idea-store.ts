@@ -16,6 +16,7 @@
 import type { createAdminClient } from '@/lib/supabase/admin'
 import type { ContentTopicIdeaRow } from '@/lib/supabase/types'
 import type { TopicSuggestion, RecommendationSource, LinkPlan } from './types'
+import { segmentToSpaces } from '@/lib/text/segment'
 
 type Admin = ReturnType<typeof createAdminClient>
 
@@ -56,7 +57,11 @@ interface PersistedPlan {
  */
 export function normalizeText(s: string | null | undefined): string {
   const edge = /^[\s"'“”׳״.,:;!?()[\]{}\-–—/|]+|[\s"'“”׳״.,:;!?()[\]{}\-–—/|]+$/g
-  return (s || '').toLowerCase().replace(/\s+/g, ' ').trim().replace(edge, '').trim()
+  // segmentToSpaces is the whitespace collapse for every language the site has
+  // published in so far, and the ICU word segmentation for one written without
+  // spaces — so the fingerprints and word counts built on this output mean the
+  // same thing in Japanese as in Hebrew. See lib/text/segment.ts.
+  return segmentToSpaces((s || '').toLowerCase()).replace(edge, '').trim()
 }
 
 /** Fingerprint (insert unique key) from primary_keyword (preferred) or title. */

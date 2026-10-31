@@ -53,6 +53,7 @@ export const REPORT_CONSENT_VERSION_FR = 'report-email-fr-v1'
  * confused with.
  */
 export const REPORT_CONSENT_VERSION_IT = 'report-email-it-v1'
+export const REPORT_CONSENT_VERSION_JA = 'report-email-ja-v1'
 
 /** The optional second decision, versioned the same way and never shared with the first. */
 export const MARKETING_CONSENT_VERSION = 'marketing-email-v1'
@@ -60,6 +61,7 @@ export const MARKETING_CONSENT_VERSION_ES = 'marketing-email-es-v1'
 export const MARKETING_CONSENT_VERSION_PT = 'marketing-email-pt-v1'
 export const MARKETING_CONSENT_VERSION_FR = 'marketing-email-fr-v1'
 export const MARKETING_CONSENT_VERSION_IT = 'marketing-email-it-v1'
+export const MARKETING_CONSENT_VERSION_JA = 'marketing-email-ja-v1'
 
 /**
  * One id for a refusal in every language. A refusal has no wording to prove —
@@ -78,6 +80,7 @@ const CONSENT: Record<PublicLocale, string> = {
   'pt-BR': 'Concordo em receber da Go Top, por e-mail, o relatório de pesquisa deste site.',
   fr: "J'accepte de recevoir de Go Top, par e-mail, le rapport d'analyse de ce site.",
   it: 'Acconsento a ricevere da Go Top, per e-mail, il report di analisi di questo sito.',
+  ja: 'Go Topから、このサイトの調査レポートをメールで受け取ることに同意します。',
 }
 
 /** What the optional box says. Ticking it is the only way marketing is allowed. */
@@ -88,6 +91,9 @@ const MARKETING: Record<PublicLocale, string> = {
   'pt-BR': 'Concordo também em receber da Go Top novidades e conteúdo comercial por e-mail. Posso retirar meu consentimento a qualquer momento pelo link que acompanha cada mensagem.',
   fr: "J'accepte également de recevoir de Go Top des actualités et du contenu marketing par e-mail. Je peux retirer mon consentement à tout moment grâce au lien présent dans chaque e-mail.",
   it: 'Acconsento inoltre a ricevere da Go Top aggiornamenti e contenuti di marketing per e-mail. Il consenso può essere revocato in qualsiasi momento tramite il link presente in ogni e-mail.',
+  // Japan: 特定電子メール法 requires this to be a separate opt-in that is not
+  // bundled with the report, and an unsubscribe route in every message.
+  ja: 'Go Topからのお知らせやマーケティング情報もメールで受け取ることに同意します。同意は、各メールに記載されたリンクからいつでも撤回できます。',
 }
 
 /** What the record says when the optional box was left unticked. */
@@ -98,6 +104,7 @@ const MARKETING_DECLINED: Record<PublicLocale, string> = {
   'pt-BR': 'Novidades e conteúdo comercial foram oferecidos e não foram aceitos.',
   fr: "Des actualités et du contenu marketing ont été proposés et n'ont pas été acceptés.",
   it: 'Aggiornamenti e contenuti di marketing sono stati proposti e non sono stati accettati.',
+  ja: 'お知らせおよびマーケティング情報の受信をご案内しましたが、同意されませんでした。',
 }
 
 const CONSENT_VERSION: Record<PublicLocale, string> = {
@@ -107,6 +114,7 @@ const CONSENT_VERSION: Record<PublicLocale, string> = {
   'pt-BR': REPORT_CONSENT_VERSION_PT,
   fr: REPORT_CONSENT_VERSION_FR,
   it: REPORT_CONSENT_VERSION_IT,
+  ja: REPORT_CONSENT_VERSION_JA,
 }
 
 const MARKETING_VERSION: Record<PublicLocale, string> = {
@@ -116,6 +124,7 @@ const MARKETING_VERSION: Record<PublicLocale, string> = {
   'pt-BR': MARKETING_CONSENT_VERSION_PT,
   fr: MARKETING_CONSENT_VERSION_FR,
   it: MARKETING_CONSENT_VERSION_IT,
+  ja: MARKETING_CONSENT_VERSION_JA,
 }
 
 export function reportConsentText(locale: PublicLocale): string {
@@ -389,7 +398,49 @@ const it: ResearchScreenCopy = {
   },
 }
 
-const SCREEN: Record<PublicLocale, ResearchScreenCopy> = { he, en, es, 'pt-BR': ptBR, fr, it }
+// JAPANESE. Merchant-safe wording in です/ます, and never the provider's own
+// error: 'forbidden' says the site blocks automated readers, not what the
+// fetcher saw. 'esempio.it' becomes a .jp example, because an address a
+// Japanese visitor would actually type is the point of the hint.
+const ja: ResearchScreenCopy = {
+  errors: {
+    not_found: '詳細な分析はこちらではご利用いただけません。',
+    invalid_url: 'このアドレスは正しくないようです。example.jp のような形でもう一度お試しください。',
+    blocked_url: '分析できるのは公開されているサイトのみです。社内アドレス、IPアドレス、別のサイトへ転送されるアドレスには対応していません。',
+    unreachable: 'サイトに接続できませんでした。アドレスをご確認のうえ、もう一度お試しください。',
+    not_html: 'このアドレスからは、読み取れるウェブページが返ってきません。',
+    forbidden: 'このサイトは自動的な読み取りを拒否しており、Googleにもページが1件も表示されていません。同じサイトの別のアドレスでお試しください。',
+    rate_limited: '短い間に何度も分析が実行されました。数分後にもう一度お試しください。',
+    daily_cap: '本日は無料分析のご利用が集中しています。時間をおいてお試しいただくか、アカウントを作成してください。ご自身のプロジェクト内で分析を実行できます。',
+    unavailable: '詳細な分析は現在ご利用いただけません。',
+    internal: '当社側で処理が止まりました。少し時間をおいてもう一度お試しください。',
+  },
+  unavailableTitle: '詳細な分析は現在ご利用いただけません',
+  unavailableBody: 'その間に、サイトの簡易チェックを開始しました。',
+  report: {
+    link: 'レポートをメールで受け取る',
+    title: 'レポートをメールで受け取る',
+    body: 'メールアドレスをご記入いただくだけで、サイトの調査レポートをそのアドレスへお送りします。',
+    emailLabel: 'メールアドレス',
+    emailPlaceholder: 'name@example.com',
+    consent: CONSENT.ja,
+    marketing: MARKETING.ja,
+    privacy: 'プライバシーポリシー',
+    submit: '申し込みを登録する',
+    sending: '登録中…',
+    saved: '申し込みを登録しました。調査レポートはこのアドレスへお送りします。',
+    errors: {
+      consent_required: 'レポートをお送りするには、同意のチェックボックスを選択してください。',
+      invalid_email: 'このメールアドレスは正しくないようです。',
+      invalid_claim: 'この分析はお送りできなくなりました。もう一度分析を実行してください。',
+      rate_limited: '短い間に何度も申し込みが送信されました。時間をおいてもう一度お試しください。',
+      unavailable: '現在、申し込みを登録できませんでした。時間をおいてもう一度お試しください。',
+      internal: '当社側で処理が止まりました。少し時間をおいてもう一度お試しください。',
+    },
+  },
+}
+
+const SCREEN: Record<PublicLocale, ResearchScreenCopy> = { he, en, es, 'pt-BR': ptBR, fr, it, ja }
 
 export function researchScreenCopy(locale: PublicLocale): ResearchScreenCopy {
   return SCREEN[locale] ?? he

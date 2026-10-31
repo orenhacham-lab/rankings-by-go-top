@@ -194,7 +194,8 @@ function main() {
   check('MUTATION CONTROL: a promise is caught by E4', PROMISE.test('Go Top adds it for you on Shopify') && PROMISE.test('אנחנו נוסיף סימון מובנה'))
   // `tema` does not match the French `thème`: the accent is the whole reason this
   // pattern carries its own French alternative rather than a looser `th.me`.
-  const THEME = /theme|תבנית|tema|th[èe]me/i
+  // Japanese writes the loanword in katakana, テーマ.
+  const THEME = /theme|תבנית|tema|th[èe]me|テーマ/i
   check('E5: the structured-data note names the theme in every language',
     PUBLIC_LOCALES.every((l) => THEME.test(linesOf(l).schemaFromTheme)),
     PUBLIC_LOCALES.filter((l) => !THEME.test(linesOf(l).schemaFromTheme)).join(','))

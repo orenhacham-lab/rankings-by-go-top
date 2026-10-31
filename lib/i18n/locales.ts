@@ -24,12 +24,13 @@ import { spanishSiteEnabled } from './spanish-site'
 import { portugueseSiteEnabled } from './portuguese-site'
 import { frenchSiteEnabled } from './french-site'
 import { italianSiteEnabled } from './italian-site'
+import { japaneseSiteEnabled } from './japanese-site'
 
 export type Locale = 'he' | 'en'
-export type PublicLocale = Locale | 'es' | 'pt-BR' | 'fr' | 'it'
+export type PublicLocale = Locale | 'es' | 'pt-BR' | 'fr' | 'it' | 'ja'
 
 export const LOCALES: Locale[] = ['he', 'en']
-export const PUBLIC_LOCALES: PublicLocale[] = ['he', 'en', 'es', 'pt-BR', 'fr', 'it']
+export const PUBLIC_LOCALES: PublicLocale[] = ['he', 'en', 'es', 'pt-BR', 'fr', 'it', 'ja']
 export const DEFAULT_LOCALE: Locale = 'he'
 
 /**
@@ -39,7 +40,7 @@ export const DEFAULT_LOCALE: Locale = 'he'
  * Brazilian law (the Consumer Code's seven-day withdrawal right, the LGPD), so a
  * bare '/pt' would promise European Portuguese readers rules that are not theirs.
  */
-export const LOCALE_PREFIX: Record<PublicLocale, string> = { he: '', en: '/en', es: '/es', 'pt-BR': '/pt-BR', fr: '/fr', it: '/it' }
+export const LOCALE_PREFIX: Record<PublicLocale, string> = { he: '', en: '/en', es: '/es', 'pt-BR': '/pt-BR', fr: '/fr', it: '/it', ja: '/ja' }
 
 export const LOCALE_CONFIG: Record<PublicLocale, { dir: 'rtl' | 'ltr'; lang: string; ogLocale: string }> = {
   he: { dir: 'rtl', lang: 'he', ogLocale: 'he_IL' },
@@ -61,6 +62,12 @@ export const LOCALE_CONFIG: Record<PublicLocale, { dir: 'rtl' | 'ltr'; lang: str
   // fourteen-day withdrawal right the Codice del Consumo spells out, and the
   // documents name it where it differs rather than pretending otherwise.
   it: { dir: 'ltr', lang: 'it', ogLocale: 'it_IT' },
+  // 'ja', with no region, because the language has one market and one legal
+  // framework: Japan's. It is left-to-right like the latin locales — Japanese can
+  // be set vertically, but a marketing site is not, and nothing in the layout
+  // changes. What DOES change is invisible here and lives in lib/text/segment.ts:
+  // Japanese is the first locale whose words are not separated by spaces.
+  ja: { dir: 'ltr', lang: 'ja', ogLocale: 'ja_JP' },
 }
 
 /**
@@ -73,23 +80,24 @@ export const LOCALE_CONFIG: Record<PublicLocale, { dir: 'rtl' | 'ltr'; lang: str
  * Spain is the first Spanish market, so es-ES; a Latin-American market gets its
  * own entry the day its currency is set, because that is the same decision.
  */
-export const INTL_LOCALE: Record<PublicLocale, string> = { he: 'he-IL', en: 'en-US', es: 'es-ES', 'pt-BR': 'pt-BR', fr: 'fr-FR', it: 'it-IT' }
+export const INTL_LOCALE: Record<PublicLocale, string> = { he: 'he-IL', en: 'en-US', es: 'es-ES', 'pt-BR': 'pt-BR', fr: 'fr-FR', it: 'it-IT', ja: 'ja-JP' }
 
 /**
  * The SHORT name of each language, in its own script, for a control too narrow
  * for the full name.
  *
  * Hebrew keeps its whole name because that name is already short, and because
- * "HE" is not what Hebrew calls itself; every other language is its two-letter
- * code, which is what the dashboard's switcher has always shown. One map, used
+ * "HE" is not what Hebrew calls itself; Japanese keeps 日本語 for the same reason,
+ * and it is three characters wide. Every other language is its two-letter code,
+ * which is what the dashboard's switcher has always shown. One map, used
  * by both switchers (components/DashboardLanguageSwitcher.tsx and
  * components/LanguageSwitcher.tsx in its compact form), so the two cannot drift
  * apart and a seventh language is named once.
  */
-export const LOCALE_SHORT_LABEL: Record<PublicLocale, string> = { he: 'עברית', en: 'EN', es: 'ES', 'pt-BR': 'PT', fr: 'FR', it: 'IT' }
+export const LOCALE_SHORT_LABEL: Record<PublicLocale, string> = { he: 'עברית', en: 'EN', es: 'ES', 'pt-BR': 'PT', fr: 'FR', it: 'IT', ja: '日本語' }
 
 /** PayPal's own locale spelling, which uses an underscore and no others. */
-export const PAYPAL_LOCALE: Record<PublicLocale, string> = { he: 'he_IL', en: 'en_US', es: 'es_ES', 'pt-BR': 'pt_BR', fr: 'fr_FR', it: 'it_IT' }
+export const PAYPAL_LOCALE: Record<PublicLocale, string> = { he: 'he_IL', en: 'en_US', es: 'es_ES', 'pt-BR': 'pt_BR', fr: 'fr_FR', it: 'it_IT', ja: 'ja_JP' }
 
 /**
  * The `Intl` tag of a language that reached us as a plain string — a prop typed
@@ -152,6 +160,7 @@ export function publicLocaleEnabled(
     'pt-BR': flags['pt-BR'] ?? portugueseSiteEnabled(),
     fr: flags.fr ?? frenchSiteEnabled(),
     it: flags.it ?? italianSiteEnabled(),
+    ja: flags.ja ?? japaneseSiteEnabled(),
   }
   return gates[locale]
 }

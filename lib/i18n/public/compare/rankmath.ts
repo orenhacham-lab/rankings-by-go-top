@@ -813,4 +813,137 @@ export const RANKMATH_COMPARE: Record<PublicLocale, ComparisonCopy> = {
     },
     close: { title: 'Scopra a che punto è il suo sito, senza registrazione' },
   },
+  // JAPANESE. As in the Yoast page: the claims about Rank Math are translations
+  // of the same reading made on CHECKED, with their prices left in euros as they
+  // publish them, and the closing FAQ still points the reader at the links under
+  // the table rather than at a number written here.
+  ja: {
+    competitor: 'Rank Math',
+    eyebrow: 'Go Top SEOとRank Mathの比較',
+    metaTitle: 'Go Top SEOとRank Mathの比較 | 比較',
+    metaDescription:
+      'Go Top SEOとRank Mathの比較です。WordPress以外でも動くのはどちらか、Googleビジネスプロフィールに投稿するのはどちらか、それぞれの料金に何が含まれるか、そしてRank Mathが適しているのはどのような場合かをまとめました。',
+    hero: {
+      title: 'Rank MathはWordPressの優れた拡張機能です。',
+      accent: '当社は作業そのものを行うシステムです',
+      subtitle:
+        'Rank MathはWordPressのエディター内で動き、執筆とページの適切なマークアップを助け、現在はAIアシスタントがブランドをどう引用しているかも追跡します。Go Top SEOはShopifyでも動き、Googleビジネスプロフィールへ投稿し、毎月のコンテンツ計画を自動で公開します。',
+    },
+    table: {
+      eyebrow: '比較',
+      title: 'Rank Math自身のページに書かれている内容にもとづく、それぞれの役割',
+      checkedOn: CHECKED,
+      sources: SOURCES,
+      rows: [
+        {
+          label: '開始料金',
+          ours: 'イスラエル国外では月額79ドルから（税別）。',
+          theirs:
+            '無料の拡張機能があり、PROは年払いで月額7.99ユーロ（付加価値税別、更新時は8.99ユーロ）。Businessは月額24.99ユーロ、更新時は27.99ユーロです。',
+        },
+        {
+          label: '対応プラットフォーム',
+          ours: 'WordPressとShopifyを、同じアカウントで。',
+          theirs: '同社のページに記載されているのはWordPressの拡張機能です。',
+        },
+        {
+          label: '作業を行うのは誰か',
+          ours: 'システムです。題材をご承認いただくと、システムが本文を書き、画像と内部リンクを加えて公開します。',
+          theirs:
+            'お客様が、エディター内で行います。Content AIには40種類以上の執筆用ツールとテンプレートがあり、ご自身で動かして公開します。',
+        },
+        {
+          label: '毎月のコンテンツ計画',
+          ours: 'システムが毎月題材を提案し、ご承認または削除いただくと、記事が予定どおりに公開されます。',
+          theirs:
+            '当社が読んだページに記載されているのは、エディター内で必要なときに書く機能であり、自動で公開される月次の計画ではありません。',
+        },
+        {
+          label: 'Googleビジネスプロフィール',
+          ours: '同じ料金に含まれます。承認後の自動投稿と、口コミへの返信の下書きです。',
+          theirs: '当社が読んだページはサイト自体に関するもので、Googleビジネスプロフィールへの投稿については触れられていません。',
+        },
+        {
+          label: 'AIエンジンでの可視性',
+          ours: 'ChatGPT、Gemini、Google AIについて月に一度計測し、基本料金に含まれます。',
+          theirs:
+            'AI Visibilityを提供しています。可視性のスコア、ChatGPTとGeminiがブランドをどう引用しているかの追跡、センチメント、競合との比較、回答全文、国別の計測があります。Rank Math AIの一部として販売されています。',
+        },
+        {
+          label: '検索順位の計測',
+          ours: 'GoogleとGoogleマップについて月に一度計測し、料金は同じです。',
+          theirs: 'PROで500キーワード、Businessで10,000キーワード。順位の履歴は12か月分です。',
+        },
+        {
+          label: 'トライアル',
+          ours: '7日間、クレジットカード不要、いつでも解約できます。',
+          theirs: '基本の拡張機能は無料で、PROのプランにはRank Math AIの15日間のトライアルが含まれます。',
+        },
+      ],
+    },
+    theirStrengths: {
+      eyebrow: 'Rank Mathのほうがよい場合',
+      title: 'Rank Mathが正しい選択になる場合もあります',
+      intro: '成熟していて評価の高い製品です。当社の話を読む前に、これを知っておいていただくほうがよいと考えています。',
+      items: [
+        {
+          title: '予算がまったくない場合',
+          body:
+            '基本の拡張機能は無料で、同社自身の数値によれば400万以上のWordPressサイトで動いています。毎月の予算なしで始める会社にとっては、反論しにくい出発点です。マークアップ、サイトマップ、ページの分析までを無料で賄えます。',
+        },
+        {
+          title: 'エディター内で主導権を持ちたい場合',
+          body:
+            'ご自身で書き、入力しながらSEOのスコアが動くのを見たい方にとっては、当社よりも同社のほうが快適です。当社は自動化を中心に作られており、同社は座って作業をする人を中心に作られています。',
+        },
+        {
+          title: '内部リンクを大規模に管理する場合',
+          body:
+            'AI Link Geniusは、サイト内のすべてのリンクを1つのダッシュボードで表示し、数百件を一度に更新し、執筆中にリンクを提案し、誰からも参照されていないページを洗い出します。数百ページある歴史の長いサイトでは、当社に同等のものはありません。',
+        },
+      ],
+    },
+    ourStrengths: {
+      eyebrow: '当社のほうが適している場合',
+      title: '道具の前に座る人がいない場合',
+      intro: '違いは、どちらがSEOに詳しいかではなく、毎月誰が作業をするかです。',
+      items: [
+        {
+          title: 'WordPressだけでなくShopifyも',
+          body: 'Shopifyの店舗でも、同じシステム、同じコンテンツ計画、同じ計測をご利用いただけます。',
+        },
+        {
+          title: 'コンテンツが自動で公開されます',
+          body: '月に一度題材をご承認いただくだけで、画像と内部リンクの入った記事が、エディターを開かずに公開されます。',
+        },
+        {
+          title: '地域での露出が含まれます',
+          body: 'Googleビジネスプロフィールへの投稿、口コミへの返信の下書き、Googleマップでの順位の計測が、同じ料金に含まれます。',
+        },
+        {
+          title: '1つの料金、1つの場所',
+          body: '執筆、公開、地域での露出、月次レポートが、別々の製品ではなく同じ契約に入っています。',
+        },
+      ],
+    },
+    faq: {
+      eyebrow: 'よくある質問',
+      title: '乗り換える前に聞かれること',
+      items: [
+        {
+          q: '両方を使えますか',
+          a: 'はい。Rank MathがWordPress内のマークアップ、サイトマップ、最適化を担い、当社がコンテンツを書いて公開し、地域での露出を担います。技術的な競合はありません。',
+        },
+        {
+          q: 'AIでの可視性の計測は、同社より優れていますか',
+          a: '必ずしもそうではありません。同社のAI Visibilityにはセンチメント、競合との比較、回答全文があり、当社はそれらを行っていません。当社のものは、別売りではなく基本料金に含まれる月次の計測です。',
+        },
+        {
+          q: 'このページの料金は最新ですか',
+          a: `${CHECKED}にRank Mathのページで確認したものです。企業は料金を変更しますので、表の下のリンクが正式な情報です。`,
+        },
+      ],
+    },
+    close: { title: 'ご自身のサイトの現状を、登録なしで確認する' },
+  },
 }

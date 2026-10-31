@@ -17,6 +17,7 @@ import { readFileSync } from 'fs'
 import { join } from 'path'
 import { FakeAdmin } from '@/lib/__qa__/_fake-admin'
 import { consumeClaimToken, hashClaimToken } from '@/lib/free-check'
+import { freeCheckCopy } from '@/lib/free-check/copy'
 import { issueClaimToken } from '@/lib/free-check/claim'
 import { recordRun } from '@/lib/free-check/store'
 import { googleRedirectTo, googleSignInEnabled, googleSignInVisible } from '@/lib/auth/google-signin'
@@ -625,7 +626,7 @@ async function main() {
      * GDPR Art. 7(4) makes that consent worthless. The OPTIONAL sentence is
      * where marketing and the withdrawal right live.
      */
-    for (const locale of ['he', 'en', 'es', 'pt-BR', 'fr', 'it'] as const) {
+    for (const locale of ['he', 'en', 'es', 'pt-BR', 'fr', 'it', 'ja'] as const) {
       const report = reportConsentText(locale)
       const marketing = marketingConsentText(locale)
       const expected = {
@@ -635,19 +636,24 @@ async function main() {
         'pt-BR': '[report-email-pt-v2]',
         fr: '[report-email-fr-v1]',
         it: '[report-email-it-v1]',
+        ja: '[report-email-ja-v1]',
       }[locale]
       check(`${locale}: the required sentence carries its own version id`,
         report.endsWith(expected), `${report.slice(-32)} vs ${expected}`)
       check(`${locale}: the required sentence names Go Top as the sender`, /Go Top/.test(report))
       check(`${locale}: the required sentence does NOT ask for marketing`,
-        !/שיווקי|marketing|comercial/i.test(report), report)
+        !/שיווקי|marketing|comercial|マーケティング/i.test(report), report)
       check(`${locale}: the optional sentence does ask for marketing, and says consent can be withdrawn`,
-        /שיווקי|marketing|comercial/i.test(marketing)
+        // Japanese writes the word in katakana (マーケティング) and the GDPR verb as
+        // 撤回, so both alternations carry a Japanese branch. The sentence is the
+        // ordinary Japanese wording; the pattern grew to it rather than the other
+        // way round, as it did for Italian below.
+        /שיווקי|marketing|comercial|マーケティング/i.test(marketing)
         // Italian's standard GDPR verb is `revocare il consenso`, so the Italian
         // sentence says `revocato` — no existing alternative matches it, and the
         // copy is what the law's own wording is, so the pattern grew rather than
         // the sentence being bent to fit it.
-        && /להסיר|withdraw|retirar|retirar meu|retirer|revocat/i.test(marketing), marketing)
+        && /להסיר|withdraw|retirar|retirar meu|retirer|revocat|撤回/i.test(marketing), marketing)
       check(`${locale}: the two sentences carry different version ids`,
         report.slice(report.lastIndexOf('[')) !== marketing.slice(marketing.lastIndexOf('[')))
       // A refusal is recorded in words, and a grant is findable by its id.
@@ -695,6 +701,40 @@ async function main() {
       // same-origin next, and the callback takes the code off the path.
       && signup.includes(`<GoogleSignInButton lang={lang} nextPath={withReferral('/dashboard', referralCode)} disabled={searchParams.has('claim')} />`)
       && back(`/dashboard?ref=dana`).searchParams.get('next') === '/dashboard?ref=dana')
+  }
+
+  /*
+   * THE SUMMARY SCREEN READS THE INTERFACE LANGUAGE, NOT THE BILINGUAL ONE.
+   *
+   * useDashboardLanguage answers two things: `uiLocale`, the PublicLocale the
+   * reader chose, and `language`, toBilingualLocale(uiLocale) — 'he' or 'en' and
+   * nothing else. ResearchSummary read the short check's copy off `language`, so
+   * that block came out in ENGLISH on /es, /pt-BR, /fr, /it and /ja while the
+   * rest of the screen was in the reader's language. Found on /ja/free-check on
+   * 2026-10-31. freeCheckCopy takes a PublicLocale and has a block for every one
+   * of them, so the copy follows uiLocale; `language` stays where the question
+   * really is bilingual — the snapshot's own prose, which is written he or en.
+   */
+  {
+    const summary = code(read('components/onboarding/ResearchSummary.tsx'))
+    check('the research summary takes the short check\'s copy from the INTERFACE locale',
+      /freeCheckCopy\(uiLocale\)/.test(summary) && !/freeCheckCopy\(language\)/.test(summary))
+    check('MUT: reading it off the bilingual narrowing is caught',
+      !/freeCheckCopy\(uiLocale\)/.test('const checks = freeCheckCopy(language)')
+      && /freeCheckCopy\(language\)/.test('const checks = freeCheckCopy(language)'))
+    // The one place `language` is still right: SeedSummary.locale is a bilingual
+    // Locale (lib/seed-scan/types.ts), so comparing the two is the real question.
+    check('and the snapshot-language comparison still uses the bilingual locale',
+      /summary\.locale === language/.test(summary))
+    /*
+     * And the copy really exists in all seven. `freeCheckCopy` ends in
+     * `?? COPY.he`, a default that is itself a real language, so a missing block
+     * would have shown HEBREW rather than failing. Each locale's own title is
+     * compared, which is the string the reader meets first.
+     */
+    const titles = PUBLIC_LOCALES.map((l) => freeCheckCopy(l).page.title)
+    check('every public locale has its own free-check copy, with no silent fall back to Hebrew',
+      new Set(titles).size === PUBLIC_LOCALES.length, titles.join(' | '))
   }
 
   check(`${SECRET} appears in no log line of the whole suite`, !allLogs.includes(SECRET) && allLogs.includes('[presignup] research ended'))

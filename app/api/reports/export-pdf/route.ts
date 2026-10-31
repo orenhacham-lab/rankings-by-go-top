@@ -1,6 +1,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { generateReportHTML, generateAIReportHTML } from '@/lib/export/pdf'
 import { normalizeExportLanguage } from '@/lib/export/i18n'
+import { withJapaneseFont } from '@/lib/export/cjk-font'
 import { reportSiteIcon } from '@/lib/reports/report-site-icon'
 import { Project, Client, TrackingTarget, ScanResult } from '@/lib/supabase/types'
 
@@ -147,7 +148,10 @@ export async function POST(req: Request) {
     }
 
     const requestPayload = {
-      source: html,
+      // A Japanese face only when the document has Japanese text in it; see
+      // lib/export/cjk-font.ts. This route predates lib/export/pdfshift.ts and
+      // still calls PDFShift itself, so it has to ask for the font itself too.
+      source: withJapaneseFont(html),
       landscape: false,
     }
 

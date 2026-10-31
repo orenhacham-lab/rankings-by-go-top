@@ -19,6 +19,8 @@
  * (see semantic-dup QA).
  */
 
+import { segmentToSpaces, isShortToken } from '@/lib/text/segment'
+
 const HE = /[א-ת]/
 const FINAL_FOLD: Record<string, string> = { 'ך': 'כ', 'ם': 'מ', 'ן': 'נ', 'ף': 'פ', 'ץ': 'צ' }
 const PROCLITICS = new Set(['ו', 'ה', 'ב', 'ל', 'מ', 'ש', 'כ'])
@@ -86,10 +88,10 @@ export function constructStateVariants(raw: string): string[] {
  *  Order-preserving (the FIRST token is the construct-state head candidate). */
 export function distinctiveTokensOf(s: string): string[] {
   const out: string[] = []
-  for (const w of (s || '').toLowerCase().replace(/[?!.,:;"'“”׳״()\-–—/|]/g, ' ').split(/\s+/)) {
-    if (w.length <= 1) continue
+  for (const w of segmentToSpaces((s || '').toLowerCase().replace(/[?!.,:;"'“”׳״()\-–—/|]/g, ' ')).split(/\s+/)) {
+    if (isShortToken(w, 2)) continue
     const c = canonicalToken(w)
-    if (!c || c.length <= 1 || STOPWORDS.has(w) || STOPWORDS.has(c)) continue
+    if (!c || isShortToken(c, 2) || STOPWORDS.has(w) || STOPWORDS.has(c)) continue
     out.push(c)
   }
   return out

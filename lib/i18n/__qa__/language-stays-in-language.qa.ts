@@ -37,15 +37,16 @@ import { reportsUrlFor } from '../../reports/weekly/email'
 import type { SiteSignals } from '../../free-check/html-signals'
 
 /**
- * Spanish, Portuguese and French are flag-gated (`normalizeStoredLocale` answers
- * null while their build is off), so the suite turns all three on: the question
- * here is whether a language SURVIVES its hops, not whether it is launched.
- * Section B also pins the off state, because that gating is deliberate.
+ * Every translated language is flag-gated (`normalizeStoredLocale` answers null
+ * while its build is off), so the suite turns them all on: the question here is
+ * whether a language SURVIVES its hops, not whether it is launched. Section B
+ * also pins the off state, because that gating is deliberate.
  */
 process.env.NEXT_PUBLIC_SPANISH_SITE_ENABLED = 'true'
 process.env.NEXT_PUBLIC_PORTUGUESE_SITE_ENABLED = 'true'
 process.env.NEXT_PUBLIC_FRENCH_SITE_ENABLED = 'true'
 process.env.NEXT_PUBLIC_ITALIAN_SITE_ENABLED = 'true'
+process.env.NEXT_PUBLIC_JAPANESE_SITE_ENABLED = 'true'
 
 let pass = 0, fail = 0
 function check(name: string, cond: boolean, detail?: string) {

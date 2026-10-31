@@ -23,6 +23,7 @@ const es = FEATURE_COMMON.es
 const pt = FEATURE_COMMON['pt-BR']
 const fr = FEATURE_COMMON.fr
 const it = FEATURE_COMMON.it
+const ja = FEATURE_COMMON.ja
 
 // ── You vs. competitors ───────────────────────────────────────────────────────
 
@@ -52,6 +53,10 @@ export const COMPETITORS_PAGE: MarketingPage = {
     it: {
       title: 'Lei e i suoi concorrenti | Go Top SEO',
       description: 'Si aggiungono i concorrenti e si vede su quante parole chiave ciascuno passa davanti al suo sito su Google, e chi citano ChatGPT, Gemini e Google AI quando non citano lei.',
+    },
+    ja: {
+      title: '自社と競合 | Go Top SEO',
+      description: '競合を登録すると、Googleでいくつのキーワードでそれぞれが自社サイトより上位にいるかがわかります。自社が引用されていないとき、ChatGPT、Gemini、Google AIが誰を引用しているかも確認できます。',
     },
   },
   content: {
@@ -373,6 +378,61 @@ export const COMPETITORS_PAGE: MarketingPage = {
       ],
       cta: { title: 'Scopra chi è davanti a lei su Google', body: it.closeBody, primary: it.check, secondary: it.trial },
     },
+    // JAPANESE. The example competitor domains stay on example.com, which is
+    // reserved for documentation, so a screenshot never names a real business.
+    ja: {
+      hero: {
+        eyebrow: '自社と競合',
+        eyebrowIcon: Users,
+        title: '競合が上に出ている箇所が',
+        accent: 'いつでもわかります',
+        subtitle: '競合はプロジェクトの設定で登録します。順位を計測するたびに、Googleでいくつのキーワードでそれぞれの競合が自社サイトより上位にいるかが表示されます。AIでの可視性の計測では、自社が引用されていないときにChatGPT、Gemini、Google AIが誰を引用しているかがわかります。',
+        trust: ja.trust,
+        primary: ja.check,
+        secondary: ja.trial,
+        visual: (
+          <WorkListVisual
+            heading="自社と競合"
+            rows={[
+              { title: '競合A', detail: '24キーワードのうち6件で上位', url: 'example-a.com', icon: Users, done: false, status: '自社より上位' },
+              { title: '競合B', detail: '24キーワードのうち2件で上位', url: 'example-b.com', icon: Users, done: true, status: '自社が上位' },
+              { title: '競合C', detail: '上位20件に入っていません', url: 'example-c.com', icon: Users, done: true, status: '自社が上位' },
+            ]}
+          />
+        ),
+      },
+      sections: [
+        {
+          kind: 'cards',
+          tone: 'contrast',
+          eyebrow: 'なぜ重要なのか',
+          title: '順位だけでは全体像がわかりません',
+          intro: '5位は成果かもしれませんし、問題かもしれません。それは上に誰がいるかで決まります。',
+          items: [
+            { icon: Target, title: 'どこで上に出られているか', body: '競合ごとに、直近の計測で自社のキーワードのうちいくつで上位に出たかがわかります。' },
+            { icon: Sparkles, title: '自社の代わりに引用されているのは誰か', body: 'AIエンジンの回答で、自社が出てこないときにどの企業とどのサイトが現れるかがわかります。' },
+            { icon: FileText, title: '次に何を書くか', body: '競合が上位にいるキーワードは、次の記事の題材として有望です。' },
+          ],
+        },
+        {
+          kind: 'steps',
+          eyebrow: '進め方',
+          title: '3つの手順',
+          items: [
+            { title: '競合を登録する', body: 'プロジェクトの設定で、競合の名称とサイトを入力します。' },
+            { title: 'システムが計測する', body: '順位を計測するたびに、同じキーワードで競合がどこにいるかも記録します。' },
+            { title: '比較を読む', body: 'キーワードの表の上部とダッシュボードで、誰が上位にいて、いくつのキーワードでそうなっているかがわかります。' },
+          ],
+        },
+        {
+          kind: 'callout',
+          icon: Info,
+          title: 'データについて',
+          body: <p>比較は、計測中のキーワードについて当社の計測がGoogleで実際に見つけた内容だけで作られます。計測のあとに登録した競合は、次回の計測から表示されます。</p>,
+        },
+      ],
+      cta: { title: 'Googleで自社より上位にいるのは誰かを確認する', body: ja.closeBody, primary: ja.check, secondary: ja.trial },
+    },
   },
 }
 
@@ -404,6 +464,10 @@ export const SEARCH_CONSOLE_PAGE: MarketingPage = {
     it: {
       title: 'Dati Search Console | Go Top SEO',
       description: 'Si collega Google Search Console e si vedono clic, impressioni e posizione media degli ultimi 28 giorni, le pagine principali e le ricerche in cui il sito compare già. Esportazione in PDF o Excel.',
+    },
+    ja: {
+      title: 'Search Consoleのデータ | Go Top SEO',
+      description: 'Google Search Consoleを連携すると、直近28日間のクリック数、表示回数、平均掲載順位、主なページ、そしてサイトがすでに表示されている検索語がわかります。PDFまたはExcelで書き出せます。',
     },
   },
   content: {
@@ -718,6 +782,58 @@ export const SEARCH_CONSOLE_PAGE: MarketingPage = {
         },
       ],
       cta: { title: 'Colleghi Search Console al suo progetto', body: it.closeBody, primary: it.trial, secondary: it.check },
+    },
+    ja: {
+      hero: {
+        eyebrow: 'Search Consoleのデータ',
+        eyebrowIcon: LineChart,
+        title: 'Google自身が',
+        accent: 'サイトについて語っている内容',
+        subtitle: 'Google Search Consoleを連携すると、直近28日間にサイトが得たクリック数と表示回数、そして平均掲載順位をシステム内でご確認いただけます。どの数値にも、その前の28日間と比べた推移が表示されます。',
+        trust: ja.trust,
+        primary: ja.check,
+        secondary: ja.trial,
+        visual: (
+          <WorkListVisual
+            heading="直近28日間"
+            rows={[
+              { title: 'Googleからのクリック数', detail: '前の28日間との比較', icon: MousePointerClick, done: true, status: '増加' },
+              { title: '検索結果での表示回数', detail: '前の28日間との比較', icon: Eye, done: true, status: '増加' },
+              { title: '平均掲載順位', detail: '前の28日間との比較', icon: Search, done: false, status: '横ばい' },
+            ]}
+          />
+        ),
+      },
+      sections: [
+        {
+          kind: 'cards',
+          tone: 'contrast',
+          eyebrow: '見られる内容',
+          title: 'Googleの数値を、作業する場所で',
+          items: [
+            { icon: LineChart, title: '推移', body: 'クリック数、表示回数、平均掲載順位と、前の期間からの変化です。' },
+            { icon: BarChart3, title: '主なページ', body: 'Googleが最も多くクリックを送っているページ5件です。' },
+            { icon: Plus, title: 'すでに表示されている検索語', body: 'Googleがすでにサイトを表示していて、まだ計測していない検索語です。ワンクリックで計測に追加できます。' },
+          ],
+        },
+        {
+          kind: 'steps',
+          eyebrow: '連携',
+          title: 'Googleアカウントとの連携は一度だけ',
+          items: [
+            { title: 'Googleでログイン', body: 'プロジェクトの設定で、Search Consoleのデータの読み取りをシステムに許可します。' },
+            { title: 'サイトを選ぶ', body: 'プロジェクトに対応するSearch Consoleのプロパティを選択します。' },
+            { title: '数値が更新されます', body: 'システムが自動でデータを取得し、レポートの画面に表示されます。' },
+          ],
+        },
+        {
+          kind: 'callout',
+          icon: FileDown,
+          title: 'ダウンロードと共有',
+          body: <p>数値は2ページのPDFサマリーとして、または全行をExcelかCSVとしてダウンロードできます。</p>,
+        },
+      ],
+      cta: { title: 'Search Consoleをプロジェクトに連携する', body: ja.closeBody, primary: ja.trial, secondary: ja.check },
     },
   },
 }

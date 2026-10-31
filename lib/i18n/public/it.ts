@@ -214,6 +214,7 @@ export const it = {
     'pt-BR': 'Português (Brasil)',
     fr: 'Français',
     it: 'Italiano',
+    ja: '日本語',
     aria: 'Cambio della lingua del sito',
   },
   cookie: {

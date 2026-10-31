@@ -55,6 +55,7 @@ import { spanishSiteEnabled } from './spanish-site'
 import { portugueseSiteEnabled } from './portuguese-site'
 import { frenchSiteEnabled } from './french-site'
 import { italianSiteEnabled } from './italian-site'
+import { japaneseSiteEnabled } from './japanese-site'
 
 /** Readable by the browser too: the client writes it when the switcher changes. */
 export const LANGUAGE_COOKIE = 'dashboard-language'
@@ -110,6 +111,13 @@ export function isItalianPath(pathname: string | null | undefined, enabled = ita
   return p === '/it' || p.startsWith('/it/')
 }
 
+/** The same, for the Japanese tree and its own flag. */
+export function isJapanesePath(pathname: string | null | undefined, enabled = japaneseSiteEnabled()): boolean {
+  if (!enabled) return false
+  const p = pathname || ''
+  return p === '/ja' || p.startsWith('/ja/')
+}
+
 /**
  * First path segments of the HEBREW public tree — the `app/(public)` and
  * `app/(legal)` route groups plus the root. These pages contain Hebrew copy
@@ -161,6 +169,7 @@ export function routePublicLocale(pathname: string | null | undefined): PublicLo
   if (isPortuguesePath(p)) return 'pt-BR'
   if (isFrenchPath(p)) return 'fr'
   if (isItalianPath(p)) return 'it'
+  if (isJapanesePath(p)) return 'ja'
   if (p === '/') return 'he'
   const segment = p.split('/')[1] ?? ''
   if (ENGLISH_ONLY_SEGMENTS.has(segment)) return 'en'

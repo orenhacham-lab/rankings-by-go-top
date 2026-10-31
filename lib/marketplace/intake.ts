@@ -66,6 +66,26 @@ export interface MarketplaceOrderEvent {
   currency: string | null
   /** The ABSOLUTE period end the platform reported, ISO-8601, or null. */
   currentPeriodEnd: string | null
+  /**
+   * TAX THE PLATFORM SAYS IT ADDED AT CHECKOUT, minor units, or null when the
+   * payload carries no tax field at all.
+   *
+   * It is read, and nothing is done with it, for one reason: it is the only
+   * signal in a delivery that tells us which tax flow a sale actually ran
+   * through. JVZoo support confirmed in writing on 2026-10-30 that on the
+   * own-payment-processor flow — which is ours, PayPal through our own
+   * account — JVZoo neither calculates nor remits the tax, and the sales page
+   * tells the buyer exactly that ("the prices above ... do not include VAT or
+   * any other tax due in your country"). A delivery that arrives carrying tax
+   * would mean the flow is not the one described to us, and that published
+   * sentence is wrong. So the route reports a non-zero value loudly instead of
+   * letting the first such sale pass unnoticed.
+   *
+   * It is deliberately NOT stored: the column does not exist, the figure is
+   * not ours to account for on this flow, and inventing a migration for a
+   * number that should always be zero would be the wrong order of work.
+   */
+  taxMinor: number | null
 }
 
 /**
@@ -80,6 +100,32 @@ export interface MarketplaceOrderEvent {
  * delivery, exactly as one with no signature scheme does.
  */
 export type MarketplaceParser = (rawBody: string, contentType: string | null) => MarketplaceOrderEvent | null
+
+/** Dollars in a form field, as minor units; null when the field is absent or unusable. */
+function dollarsToMinor(raw: string | null): number | null {
+  const value = raw?.trim()
+  if (!value) return null
+  const dollars = Number.parseFloat(value)
+  return Number.isFinite(dollars) ? Math.round(dollars * 100) : null
+}
+
+/**
+ * The tax JVZIPN v2 reports on one delivery.
+ *
+ * `tax_total` is the documented total and is believed when present. The three
+ * component fields are summed only as a fallback, because a payload that
+ * carries components without a total would otherwise read as no tax at all —
+ * the exact case this value exists to catch. Null means the payload named no
+ * tax field whatsoever, which is not the same as a reported zero.
+ */
+function jvzooTaxMinor(form: URLSearchParams): number | null {
+  const total = dollarsToMinor(form.get('tax_total'))
+  if (total !== null) return total
+  const parts = ['vat_tax', 'national_sales_tax', 'international_sales_tax']
+    .map((field) => dollarsToMinor(form.get(field)))
+    .filter((minor): minor is number => minor !== null)
+  return parts.length ? parts.reduce((sum, minor) => sum + minor, 0) : null
+}
 
 /**
  * JVZoo's timestamps, turned into the ISO-8601 instant this module stores.
@@ -124,16 +170,14 @@ export const parseJvzooIpnV2: MarketplaceParser = (rawBody) => {
   const kind = type === 'SALE' || type === 'BILL' ? 'paid' : type === 'RFND' ? 'refunded' : null
   if (!kind) return null
 
-  const dollars = Number.parseFloat((form.get('total') ?? '').trim())
-  const amountMinor = Number.isFinite(dollars) ? Math.round(dollars * 100) : null
-
   return {
     kind,
     externalOrderId: (form.get('transaction_id') ?? '').trim(),
     externalProductId: (form.get('product_id') ?? '').trim() || null,
     buyerEmail: (form.get('customer_email') ?? '').trim(),
-    amountMinor,
+    amountMinor: dollarsToMinor(form.get('total')),
     currency: null,
+    taxMinor: jvzooTaxMinor(form),
     // A subscription's period runs to its next payment; `end_date` is only
     // set when the subscription has a fixed end, and is empty open-ended.
     currentPeriodEnd: jvzooInstant(form.get('next_payment_date')) ?? jvzooInstant(form.get('end_date')),

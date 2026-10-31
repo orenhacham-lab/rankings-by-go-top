@@ -8,8 +8,8 @@
  * Greek asked Google for Brazilian Portuguese keyword ideas. The id for Greek is
  * 1022. Every number below was read back from the live Google Ads API with a
  * read-only GAQL query (`language_constant`, `geo_target_constant`) on
- * 4 October 2026, and is pinned here so the next wrong digit fails a test
- * instead of shipping.
+ * 4 October 2026 — and France, Italy and Japan on the days they were added —
+ * and is pinned here so the next wrong digit fails a test instead of shipping.
  *
  * It also holds the two lists closed: a code offered in the picker with no id
  * behind it would send `undefined` to Google, and a code with no label would
@@ -60,12 +60,18 @@ const GOOGLE_LANGUAGE_IDS: Record<string, number> = {
   ru: 1031, // Russian
   fr: 1002, // French
   it: 1004, // Italian
+  // Read back on 30 October 2026, with the Japanese blog: languageConstants/1005
+  // answers code "ja", name "Japanese", targetable true.
+  ja: 1005, // Japanese
 }
 const GOOGLE_COUNTRY_IDS: Record<string, number> = {
   AR: 2032, BR: 2076, CL: 2152, CO: 2170, CY: 2196,
   GR: 2300, IL: 2376, MX: 2484, PT: 2620, ES: 2724,
   GB: 2826, US: 2840,
   FR: 2250, IT: 2380,
+  // geoTargetConstants/2392 answers name "Japan", countryCode JP, targetType
+  // Country, status ENABLED. Read back the same day as the language above.
+  JP: 2392,
 }
 
 function main() {

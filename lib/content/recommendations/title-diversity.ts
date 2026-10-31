@@ -17,12 +17,14 @@
  * (the acceptance rule reports it instead).
  */
 
+import { segmentToSpaces } from '@/lib/text/segment'
+
 /** Normalize a title for skeleton comparison: lowercase, punctuation folded to
  *  spaces, leading definite-article ה folded per word (המדריך≈מדריך). */
 export function normalizeTitleForSkeleton(title: string): string {
-  const words = (title || '')
+  const words = segmentToSpaces((title || '')
     .toLowerCase()
-    .replace(/[?!.,:;"'“”׳״()\-–—/|]/g, ' ')
+    .replace(/[?!.,:;"'“”׳״()\-–—/|]/g, ' '))
     .split(/\s+/)
     .filter(Boolean)
     .map((w) => (/^ה[א-ת]{2,}$/.test(w) ? w.slice(1) : w))

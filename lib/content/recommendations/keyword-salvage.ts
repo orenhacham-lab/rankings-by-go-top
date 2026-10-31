@@ -10,6 +10,8 @@
  * no filler — if nothing distinct and supported is found, the candidate is rejected.
  */
 
+import { isShortToken } from '@/lib/text/segment'
+
 import { normalizePhrase } from './keyword-guard'
 
 export interface SalvageCandidate {
@@ -49,9 +51,9 @@ const SEGMENT_SPLIT = /\s+[–—-]\s+|\s*\|\s*|:\s+/
  */
 export function salvageLongTailKeyword(candidate: SalvageCandidate, checks: SalvageChecks): SalvageResult {
   const broad = normalizePhrase(candidate.primaryKeyword)
-  const titleToks = new Set(normalizePhrase(candidate.title).split(' ').filter((t) => t.length > 2))
+  const titleToks = new Set(normalizePhrase(candidate.title).split(' ').filter((t) => !isShortToken(t, 3)))
   const sharesTitle = (kw: string): boolean => {
-    const ts = normalizePhrase(kw).split(' ').filter((t) => t.length > 2)
+    const ts = normalizePhrase(kw).split(' ').filter((t) => !isShortToken(t, 3))
     return ts.length === 0 || ts.some((t) => titleToks.has(t))
   }
   const acceptable = (kw: string): boolean => {

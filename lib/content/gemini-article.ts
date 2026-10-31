@@ -192,6 +192,15 @@ const ARTICLE_TEXT: Record<SuggestionLanguage, {
     anchorSentence: (link) => ` In questo contesto, ${link} è una delle opzioni principali che vale la pena conoscere.`,
     phraseSentence: (phrase) => ` In questo contesto, vale la pena approfondire anche ${phrase}.`,
   },
+  ja: {
+    toc: '目次',
+    faqHeading: 'よくある質問',
+    // No space before the inserted sentence and no space around the link: a
+    // Japanese sentence runs on from the previous one, and a space inside it
+    // would be a visible error rather than a word break.
+    anchorSentence: (link) => `この点では、${link}が押さえておきたい主要な選択肢の一つです。`,
+    phraseSentence: (phrase) => `この点では、${phrase}についても併せて確認しておくとよいでしょう。`,
+  },
 }
 
 /** Natural transition words to hand the model, in the language it writes in. */
@@ -202,6 +211,7 @@ const TRANSITION_HINT: Record<SuggestionLanguage, string> = {
   'pt-BR': 'além disso, portanto, no entanto, por exemplo, em resumo',
   fr: 'de plus, par conséquent, cependant, par exemple, en résumé',
   it: 'inoltre, di conseguenza, tuttavia, per esempio, in sintesi',
+  ja: 'また、さらに、そのため、しかし、例えば、まとめると',
 }
 
 /** The filler opening to warn the model off, written in the language it writes in. */
@@ -212,6 +222,7 @@ const FILLER_EXAMPLE: Record<SuggestionLanguage, string> = {
   'pt-BR': 'e.g. "Em um mundo onde todos procuram…"',
   fr: 'e.g. "Dans un monde où tout le monde cherche…"',
   it: 'e.g. "In un mondo in cui tutti cercano…"',
+  ja: 'e.g. 「誰もが〜を求める時代において…」',
 }
 
 /** Who the article is actually written for. A Spanish article is NOT for Israeli readers. */
@@ -222,6 +233,7 @@ const AUDIENCE_NOTE: Record<SuggestionLanguage, string> = {
   'pt-BR': 'Write naturally for Brazilian readers in Brazilian Portuguese — not European Portuguese.',
   fr: 'Write naturally for French-speaking readers in standard French that reads well in France and in the rest of French-speaking Europe alike.',
   it: 'Write naturally for Italian-speaking readers in standard Italian that reads well in Italy and in Italian-speaking Switzerland alike.',
+  ja: 'Write naturally for Japanese readers in standard business Japanese (です・ます調), the register a Japanese company website uses.',
 }
 
 /** Per-language writing-quality notes. Empty for a language with nothing extra to say. */
@@ -243,6 +255,10 @@ const WRITING_QUALITY_LINES: Record<SuggestionLanguage, string[]> = {
     `- French writing quality: address the reader as "vous" consistently — NEVER "tu", never "toi", never "ton/ta/tes". Use standard French that reads well in France and in the rest of French-speaking Europe; avoid regional slang and avoid needless anglicisms where a plain French word exists. VARY sentence and paragraph openings — do not start many consecutive sentences with the same word (avoid over-using "De plus", "Par ailleurs", "Il est important"); mix openings like "En pratique", "C'est pourquoi", "Dans bien des cas", "Il faut retenir", "Au moment de choisir", "En résumé". Prefer clear, practical, promotional SEO writing over poetic language.`,
     `- French typography: keep the accents and the cedilla correct (é, è, ê, à, ù, î, ô, ç) — never write French without accents — use a non-breaking space before ":", ";", "?" and "!" where your output supports it, use the French quotation marks « … » for quotations, and keep brand/product names in their proper original casing (e.g. "Kingsmith WalkingPad X21").`,
   ],
+  ja: [
+    `- Japanese writing quality: write in です・ます調 (polite form) and keep it consistent for the WHOLE article — never mix in だ・である調, and never switch register between sections. Address the reader impersonally; do NOT use 君/あなた repeatedly (Japanese business writing drops the pronoun), and never use casual sentence endings (〜だよ, 〜だね, 〜しよう). VARY sentence and paragraph openings — do not begin many consecutive sentences with the same connective (avoid over-using 「また」, 「さらに」, 「そのため」); mix openings like 「実際に」, 「一方」, 「選ぶ際には」, 「多くの場合」, 「次に」, 「結論として」, naturally and NOT in every sentence. Prefer clear, practical, promotional SEO writing over poetic language.`,
+    `- Japanese typography: use FULL-WIDTH punctuation 。 、 「 」 （ ） ・ and NEVER a latin period or comma in Japanese prose; never put a space between Japanese words (the language has none) and never put a space before 。 or 、; a single space around a latin word or a number inside Japanese text is fine. Write loanwords in katakana (「ウェブサイト」, 「キーワード」), keep brand and product names in their proper original casing (e.g. "Kingsmith WalkingPad X21", "Google Search Console"), use half-width arabic numerals for figures and prices (「3つの方法」, 「1,200円」), and keep 漢字 for words normally written in 漢字 rather than spelling them out in kana.`,
+  ],
   it: [
     `- Italian writing quality: address the reader formally and impersonally — use "voi"/the impersonal "si" form, and NEVER the informal "tu" (no "tuo/tua/tuoi", no informal imperatives like "scopri", "clicca", "scegli"). Use standard Italian that reads well in Italy and in Italian-speaking Switzerland; avoid regional slang and avoid needless anglicisms where a plain Italian word exists. VARY sentence and paragraph openings — do not start many consecutive sentences with the same word (avoid over-using "Inoltre", "D'altra parte", "È importante"); mix openings like "In pratica", "Per questo motivo", "In molti casi", "Vale la pena ricordare", "Al momento della scelta", "In sintesi". Prefer clear, practical, promotional SEO writing over poetic language.`,
     `- Italian typography: keep the accents correct (è, é, à, ò, ù, ì) — never write Italian without them — distinguish "è" (verb) from "e" (and), use the apostrophe correctly in elisions ("un'opzione", "dell'articolo"), use the Italian quotation marks « … » for quotations, and keep brand/product names in their proper original casing (e.g. "Kingsmith WalkingPad X21").`,
@@ -257,6 +273,15 @@ export function buildPrompt(brief: ArticleBrief, opts: GenOpts): string {
   const wMin = brief.targetWordMin ?? (brief.desiredWordCount || 1000)
   const wMax = brief.targetWordMax ?? Math.round((brief.desiredWordCount || 1000) * 1.2)
   const words = Math.round((wMin + wMax) / 2)
+  // A LENGTH IN WORDS MEANS NOTHING IN JAPANESE. Japanese has no word spaces, so
+  // a Japanese writer — and a model writing Japanese — counts 文字, characters.
+  // The conversion is the measured ratio of our own copy (lib/text/segment.ts):
+  // a spaced word is ~5.5 characters of English and the same content is ~2.2
+  // Japanese characters per English word, so the band is expressed in characters
+  // for Japanese and left in words for every other language.
+  const lengthTarget = brief.language === 'ja'
+    ? `${Math.round(wMin * 2.2 / 100) * 100}〜${Math.round(wMax * 2.2 / 100) * 100}文字`
+    : `${wMin}–${wMax} words`
   const th = thresholdsFor(words)
   const depthKind = brief.depthKind ?? null
   const ctaEnabled = !(brief.ctaPreference === 'none' || !brief.ctaPreference)
@@ -298,8 +323,8 @@ export function buildPrompt(brief: ArticleBrief, opts: GenOpts): string {
     brief.briefNotes ? `- Treat [ARTICLE ANGLE] as the STRATEGIC angle of the whole article — make it less generic and focus the piece around it.` : '',
     brief.briefNotes ? `- Treat [MUST INCLUDE] items as important content requirements: don't mention them once and move on — turn them into sections, bullet points, examples, FAQ answers, or comparison-table rows, woven naturally and prominently.` : '',
     brief.briefNotes ? `- Treat [MUST AVOID] items as hard negative constraints: never make those claims or use those phrases.` : '',
-    `Tone: ${tone}. Total length: ${wMin}–${wMax} words${brief.depthLabel ? ` — ${brief.depthLabel}` : ''}.`,
-    `- LENGTH & DEPTH: reach ${wMin}–${wMax} words ONLY by adding genuinely useful content — concrete examples, comparisons, practical tips, decision criteria, common mistakes, a real comparison TABLE where relevant, and specific FAQs. Do NOT pad, repeat, or add filler to hit the count. A shorter, complete article is better than a padded one.`,
+    `Tone: ${tone}. Total length: ${lengthTarget}${brief.depthLabel ? ` — ${brief.depthLabel}` : ''}.`,
+    `- LENGTH & DEPTH: reach ${lengthTarget} ONLY by adding genuinely useful content — concrete examples, comparisons, practical tips, decision criteria, common mistakes, a real comparison TABLE where relevant, and specific FAQs. Do NOT pad, repeat, or add filler to hit the count. A shorter, complete article is better than a padded one.`,
     (depthKind === 'deep' || depthKind === 'commercial') ? `- This is ${brief.depthLabel}: be genuinely comprehensive — include clear decision criteria, practical examples, at least one comparison, "how to choose"/"what to check" guidance, and buyer/traveler guidance where relevant.` : '',
     depthKind === 'commercial' ? `- Purchase-intent: cover price/value considerations, what to look for before buying, and a comparison of options — practical and specific, never generic sales copy.` : '',
     depthKind === 'support' ? `- This is a concise supporting article: stay focused and tight; cover the essentials well without over-expanding.` : '',
