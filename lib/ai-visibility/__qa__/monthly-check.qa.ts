@@ -80,28 +80,38 @@ type World = { tables: Record<string, any[]>; admin: any; calls: string[] }
 function world(opts: {
   plan?: string; status?: string; periodStartDaysAgo?: number; admin?: boolean; prompts?: number; country?: string
   setting?: boolean | 'missing'; periodStartNull?: boolean; paypal?: boolean
+  /**
+   * The moment this world is built around. NOW by default, which is what every
+   * case that passes `deps()` wants, because deps() freezes the runner's clock
+   * to the same instant. A case that goes through a ROUTE must pass Date.now()
+   * instead: the route takes no clock, so its runner reads the real one, and a
+   * world pinned to NOW looked to it like a subscription that ended on
+   * 2026-10-18 — F7 went red that day, with nothing wrong in the route.
+   */
+  nowMs?: number
 } = {}): World {
-  const start = NOW - (opts.periodStartDaysAgo ?? 5) * DAY
+  const at = opts.nowMs ?? NOW
+  const start = at - (opts.periodStartDaysAgo ?? 5) * DAY
   const tables: Record<string, any[]> = {
     profiles: [{ id: USER, role: opts.admin ? 'admin' : 'user' }, { id: OTHER, role: 'user' }],
     billing_governance: [{ user_id: USER, signup_origin: 'website', billing_authority: 'website', authority_reason: 'website_signup' }],
     shopify_connections: [], shopify_billing_migrations: [],
     subscriptions: [{
       id: 'sub-1', user_id: USER, status: opts.status ?? 'active', plan_code: opts.status === 'trial' ? null : (opts.plan ?? 'regular'),
-      trial_ends_at: opts.status === 'trial' ? iso(NOW + 5 * DAY) : null,
+      trial_ends_at: opts.status === 'trial' ? iso(at + 5 * DAY) : null,
       current_period_start: opts.periodStartNull ? null : iso(start), current_period_end: opts.periodStartNull && !opts.paypal ? null : iso(start + 30 * DAY),
-      paypal_subscription_id: opts.paypal === false ? null : 'I-QA', created_at: iso(NOW - 90 * DAY),
+      paypal_subscription_id: opts.paypal === false ? null : 'I-QA', created_at: iso(at - 90 * DAY),
     }],
     projects: [{ id: PROJECT, user_id: USER, name: 'Plumber', target_domain: 'plumber.co.il', business_name: 'אינסטלטור השרון',
-      country: opts.country ?? 'IL', language: 'he', is_active: true, created_at: iso(NOW - 60 * DAY),
+      country: opts.country ?? 'IL', language: 'he', is_active: true, created_at: iso(at - 60 * DAY),
       ...(opts.setting === 'missing' ? {} : { ai_auto_check_enabled: opts.setting ?? true }) }],
     ai_prompts: Array.from({ length: opts.prompts ?? 3 }, (_, i) => ({ id: `p${i + 1}`, project_id: PROJECT, prompt: [
       'איך לבחור אינסטלטור בשרון', 'כמה עולה אינסטלטור לתיקון נזילה', 'מה זה צנרת'][i] ?? `שאלה ${i}`, is_active: true,
-      created_at: iso(NOW - (30 - i) * DAY) })),
+      created_at: iso(at - (30 - i) * DAY) })),
     ai_scan_runs: [], ai_scan_results: [], ai_citations: [], usage_reservations: [], operation_claims: [],
     tracking_targets: [{ project_id: PROJECT, keyword: 'אינסטלטור בשרון' }], project_profiles: [], article_topics: [],
   }
-  const admin = new FakeAdmin(tables, {}, () => NOW)
+  const admin = new FakeAdmin(tables, {}, () => at)
   return { tables, admin, calls: [] }
 }
 function deps(w: World, extra: Record<string, any> = {}) {
@@ -377,6 +387,12 @@ async function main() {
     quiet(); const sk2 = await R.readMonthlyCheckStatus(s.admin, s.tables.projects[0], deps(s, { lastSignInAt: async () => iso(NOW - 45 * DAY) })); loud()
     check('F6b: another project\'s automatic check does not make this project\'s month "ran" (still inactive, no last date)', sk2.state === 'skipped' && sk2.skippedBecause === 'inactive' && sk2.lastAt === null && sk2.autoUsed === 1, show(sk2))
     s.tables.usage_reservations.pop()
+    // "Run now" goes through the ROUTE, which gives its runner no clock, so the
+    // world it reads has to be built around the real one. Everything else about
+    // this case is unchanged: the period began 20 days ago, so the check is long
+    // due and nothing has run it.
+    const rt = world({ periodStartDaysAgo: 20, nowMs: Date.now() })
+    ADMIN_CLIENT = rt.admin
     const n0 = ROUTE_SCANS
     quiet(); const now1 = await M.POST(new Request('http://localhost/api/ai-visibility/monthly', { method: 'POST', body: JSON.stringify({ projectId: PROJECT }) })); const now2 = await M.POST(new Request('http://localhost/api/ai-visibility/monthly', { method: 'POST', body: JSON.stringify({ projectId: PROJECT }) })); loud()
     check('F7: "run now" runs the skipped checks once; pressing it again runs nothing', now1.status === 200 && ROUTE_SCANS - n0 === 3 && now2.status === 409, show({ a: now1.status, b: now2.status, n: ROUTE_SCANS - n0 }))

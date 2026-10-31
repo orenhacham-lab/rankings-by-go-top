@@ -55,8 +55,15 @@ process.env.PAYPAL_API_URL ||= 'https://paypal.invalid'
 const USER = 'user-paypal'
 const SUB = 'I-SYNTHETIC-1'
 const NOW = new Date('2026-10-09T12:00:00.000Z')
-const FUTURE = '2026-10-30T00:00:00.000Z'
-const PAST = '2026-10-01T00:00:00.000Z'
+const DAY = 86_400_000
+// FUTURE and PAST must sit on the right side of BOTH clocks: the pinned NOW the
+// direct calls are given, and the real one, because checkShopifyPublishEntitlement
+// (F4) takes no `now` and reads new Date(). A literal date here rots: FUTURE was
+// '2026-10-30T00:00:00.000Z', so on 2026-10-31 the paid period had quietly ended
+// for the real clock and F4 fell through to the Partner API (missing_config),
+// with nothing wrong in the code it guards.
+const FUTURE = new Date(Math.max(NOW.getTime(), Date.now()) + 21 * DAY).toISOString()
+const PAST = new Date(Math.min(NOW.getTime(), Date.now()) - 8 * DAY).toISOString()
 const dbDown = () => ({ code: '08006', message: 'connection refused' })
 
 /** PayPal stub. `calls` counts cancels and subscription reads separately. */
@@ -192,7 +199,9 @@ async function main() {
     check('C1: renewal stopped: one PayPal cancel, row mirrored as cancelled, end date unchanged', out === 'stopped' && pp.calls.cancel === 1 && sub(a).status === 'cancelled' && sub(a).current_period_end === FUTURE, out)
     const ent = await getUserEntitlement(USER, a as never, () => NOW)
     check('C2: …and the plan stays active until that date', ent.plan === 'advanced' && ent.hasActiveSubscription === true)
-    const later = await getUserEntitlement(USER, a as never, () => new Date('2026-11-01T00:00:00Z'))
+    // A day past the period's own end, read off FUTURE rather than written out,
+    // so this case keeps asking "after it" when FUTURE moves.
+    const later = await getUserEntitlement(USER, a as never, () => new Date(Date.parse(FUTURE) + DAY))
     check('C3: …and ends after it', later.hasActiveSubscription === false)
     check('C4: the migration is still pending (billing has not moved)', mig(a).status === 'pending' && gov(a).billing_authority === 'website')
     const again = await stopPayPalRenewalForMigration(a as Admin, USER, { fetchImpl: pp.fetchImpl, now: () => NOW })
