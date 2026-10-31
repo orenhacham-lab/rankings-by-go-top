@@ -442,3 +442,53 @@ export function marketplacePixelUrl(slug: string, plan?: PlanCode): string | nul
   const perPlan = plan ? httpsUrlOrNull(process.env[`${prefix}PIXEL_URL_${plan.toUpperCase()}`]) : null
   return perPlan ?? httpsUrlOrNull(process.env[`${prefix}PIXEL_URL`])
 }
+
+/**
+ * A trial the platform's own checkout charges before the subscription starts.
+ *
+ * WHY THIS IS CONFIGURATION AND NOT A CONSTANT. The trial is set up inside
+ * the platform's product, not here: the platform decides what it charges and
+ * for how long, and it is the one that takes the money. Anything this page
+ * says about it is therefore a CLAIM ABOUT SOMEBODY ELSE'S CHECKOUT, and a
+ * page that promises "$1 for 7 days" while the product is configured
+ * differently is an incorrect price display on our own domain — which is the
+ * exact failure that had the earlier $0 trial removed from this page rather
+ * than described (CRD Art. 6(1)(e) and the Omnibus price-display rules judge
+ * the total price the consumer will pay, not the headline).
+ *
+ * So a trial exists on this page only where somebody has written down what
+ * the platform is actually configured to charge, per provider and per plan,
+ * as `MARKETPLACE_<SLUG>_TRIAL_<PLAN>` in the form `<priceUSD>/<days>`:
+ *
+ *   MARKETPLACE_JVZOO_TRIAL_REGULAR=1.00/7
+ *
+ * UNSET IS THE DEFAULT AND MEANS NO TRIAL, so every plan that nobody has
+ * configured keeps the plain monthly price it has today. A malformed value is
+ * treated as unset rather than guessed at, for the same reason
+ * `httpsUrlOrNull` refuses a non-URL: a typo must not become a published
+ * price.
+ *
+ * ZERO IS REFUSED ON PURPOSE. A free trial is not merely a cheaper one here:
+ * it produces a sale notification with a total of zero, which would record an
+ * order and grant a full plan with no renewal behind it if the buyer cancels
+ * before the first rebill. That is the defect that removed the old 7-day $0
+ * trial, and it is not reintroduced through configuration.
+ */
+export interface MarketplaceTrial {
+  /** What the platform charges once, up front, in whole US dollars and cents. */
+  priceUSD: number
+  /** How many days that payment covers before the first full-price renewal. */
+  days: number
+}
+
+export function marketplaceTrial(slug: string, plan: PlanCode): MarketplaceTrial | null {
+  if (!marketplaceProvider(slug)) return null
+  if (!providerReadiness(slug).ready) return null
+  const raw = process.env[`${envPrefix(slug)}TRIAL_${plan.toUpperCase()}`]?.trim()
+  const match = raw ? /^(\d+(?:\.\d{1,2})?)\/(\d+)$/.exec(raw) : null
+  if (!match) return null
+  const priceUSD = Number.parseFloat(match[1])
+  const days = Number.parseInt(match[2], 10)
+  if (!(priceUSD > 0) || !(days > 0)) return null
+  return { priceUSD, days }
+}
