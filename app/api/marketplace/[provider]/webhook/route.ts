@@ -22,12 +22,22 @@
  * `cverify`), the verifier reads it out of that same raw string — the parser
  * still never runs before the check passes.
  *
- * WHAT THE STATUS CODE MEANS TO THE PLATFORM. All of these platforms retry a
- * non-2xx on their own schedule, so 2xx is reserved for a delivery that was
- * processed or that we deliberately did nothing about. A refused signature
- * answers 401 — no retry will fix it, and it must never read as handled. A
- * provider that is off answers 503, because a retry after it is switched on
- * SHOULD succeed. A failed write answers 500 so the retry can recover it.
+ * WHAT THE STATUS CODE MEANS TO THE PLATFORM. 2xx is reserved for a delivery
+ * that was processed or that we deliberately did nothing about. A refused
+ * signature answers 401 — no retry will fix it, and it must never read as
+ * handled. A provider that is off answers 503, because a retry after it is
+ * switched on SHOULD succeed. A failed write answers 500 so a retry can
+ * recover it.
+ *
+ * BUT JVZOO DOES NOT RETRY, and that changes what a non-2xx costs.
+ * docs/affiliate/jvzoo-webhook-docs.md, copied from the seller account: "No
+ * retry on failure — if the endpoint is down the notification is lost",
+ * recovered only by reconciling against JVZoo's own records. So every
+ * non-2xx this route returns to JVZoo is a notification thrown away, and the
+ * status code is a statement for the record rather than a request to come
+ * back later. That is why a refused digest below logs what it was refusing:
+ * the 401 is still correct, and the log line is the only thing left to
+ * reconcile from.
  *
  * NOTHING IS GRANTED HERE. A paid order becomes a row awaiting its buyer; the
  * entitlement is written when the buyer claims it with an account of their
@@ -55,6 +65,7 @@ import {
   httpStatusForMarketplaceOutcome,
   marketplaceParser,
   recordMarketplaceOrder,
+  unverifiedDeliveryTrace,
 } from '@/lib/marketplace/intake'
 import { alertClaimEmailFailed, sendClaimEmail } from '@/lib/marketplace/claim-email'
 
@@ -104,10 +115,31 @@ async function handle(request: Request, slug: string): Promise<Response> {
     scheme,
   )
   if (!verified.ok) {
-    console.warn('[marketplace-webhook] delivery refused', {
-      provider: provider.slug,
-      reason: verified.reason,
-    })
+    // A MISMATCH IS REPORTED LOUDLY AND WITH ENOUGH TO RECOVER BY.
+    // JVZoo does not retry (docs/affiliate/jvzoo-webhook-docs.md), so a
+    // signing key that disagrees with ours means the buyer paid and the
+    // notification is gone. `console.warn` with the provider alone could not
+    // tell anyone a sale had happened, so a refused DIGEST — our key against
+    // theirs — is an error carrying the platform's own transaction id, which
+    // is the key to the record that can be fulfilled by hand. The values are
+    // from an unauthenticated body and are whitelisted, stripped and
+    // truncated by `unverifiedDeliveryTrace`, which parses nothing.
+    //
+    // The other reasons stay a warning: a missing signature or a missing
+    // secret is not a sale we lost, it is scanning traffic or our own
+    // configuration, and raising those to errors would bury the one that
+    // matters.
+    if (verified.reason === 'mismatch') {
+      console.error('[marketplace-webhook] SIGNATURE MISMATCH: our key and the platform\'s disagree, so a real payment may have been refused and will not be retried', {
+        provider: provider.slug,
+        unverified: unverifiedDeliveryTrace(rawBody),
+      })
+    } else {
+      console.warn('[marketplace-webhook] delivery refused', {
+        provider: provider.slug,
+        reason: verified.reason,
+      })
+    }
     // Our own misconfiguration is not the caller's fault and a retry may
     // succeed; a bad or absent signature is final.
     const status = verified.reason === 'missing_secret' || verified.reason === 'unknown_scheme' ? 503 : 401

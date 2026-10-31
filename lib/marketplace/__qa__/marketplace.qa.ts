@@ -46,6 +46,7 @@ import {
   httpStatusForMarketplaceOutcome,
   marketplaceParser,
   recordMarketplaceOrder,
+  unverifiedDeliveryTrace,
   type MarketplaceOrderEvent,
 } from '../intake'
 import { claimMarketplaceOrder } from '../claim'
@@ -1076,6 +1077,99 @@ async function main() {
     /subscriptions_marketplace_order_id_unique/.test(migSrc))
   check('I10: and a row can still carry only one provider',
     /subscriptions_one_provider_per_row[\s\S]*?marketplace_order_id\s+IS NOT NULL THEN 1 ELSE 0 END\) <= 1/.test(migSrc))
+  // ── M. What a refused delivery leaves behind ────────────────────────────────
+  // JVZoo does not retry, so a signing key that disagrees with ours charges
+  // the buyer and loses the notification for good. These checks are about the
+  // only thing left to recover from: the log line.
+  console.log('\nM. refused-delivery trace')
+  const SALE_BODY = new URLSearchParams({
+    transaction_id: 'TX-1001',
+    product_id: '457483',
+    transaction_type: 'SALE',
+    total: '79.00',
+    date: '2026-11-04 16:00:00',
+    customer_email: 'buyer@example.com',
+    customer_first_name: 'Dana',
+    customer_last_name: 'Levi',
+    cverify: 'DEADBEEF',
+  }).toString()
+
+  const trace = unverifiedDeliveryTrace(SALE_BODY)
+  check('M1: the trace carries the platform’s own transaction id, which is what an order is recovered by',
+    trace.transaction === 'TX-1001')
+  check('M2: and the product, the type, the amount and the date',
+    trace.product === '457483' && trace.type === 'SALE' && trace.total === '79.00'
+    && trace.date === '2026-11-04 16:00:00')
+  check('M3: the buyer is absent — no address and no name, as everywhere else in this module',
+    !JSON.stringify(trace).includes('buyer@example.com')
+    && !JSON.stringify(trace).includes('Dana') && !JSON.stringify(trace).includes('Levi'))
+  check('M4: and so is the digest the caller sent, which is not evidence of anything',
+    !JSON.stringify(trace).includes('DEADBEEF'))
+
+  // v1 names for the same five things, because a v1 delivery that mismatches
+  // must be just as recoverable.
+  const V1_BODY = new URLSearchParams({
+    ctransreceipt: 'TX-V1',
+    cproditem: '457573',
+    ctransaction: 'SALE',
+    ctransamount: '17900',
+    ctranstime: '1793000000',
+  }).toString()
+  const v1Trace = unverifiedDeliveryTrace(V1_BODY)
+  check('M5: a v1 body traces through its own field names',
+    v1Trace.transaction === 'TX-V1' && v1Trace.product === '457573'
+    && v1Trace.type === 'SALE' && v1Trace.total === '17900' && v1Trace.ctranstime === undefined
+    && v1Trace.date === '1793000000')
+
+  check('M6: a field the body did not carry is omitted, never reported as empty',
+    unverifiedDeliveryTrace('transaction_id=TX-9').product === undefined
+    && Object.keys(unverifiedDeliveryTrace('transaction_id=TX-9')).length === 1)
+  check('M7: an empty field is the same as an absent one',
+    Object.keys(unverifiedDeliveryTrace('transaction_id=&product_id=   ')).length === 0)
+  check('M8: a body that is not a form at all traces to nothing rather than throwing',
+    Object.keys(unverifiedDeliveryTrace('{"transaction_id":"TX-1"}')).length === 0
+    && Object.keys(unverifiedDeliveryTrace('')).length === 0)
+
+  // THE INJECTION CASE. The body failed authentication, so every value in it
+  // was chosen by an anonymous caller. A newline would let that caller write
+  // its own log line.
+  const forged = unverifiedDeliveryTrace(new URLSearchParams({
+    transaction_id: 'TX-1\n[marketplace-webhook] order recorded {"outcome":"recorded"}',
+  }).toString())
+  check('M9: a newline in a traced value cannot forge a second log line',
+    !forged.transaction.includes('\n') && !forged.transaction.includes('\r'))
+  check('M10: nor can a carriage return or a tab',
+    !unverifiedDeliveryTrace('transaction_id=a%0D%0Ab%09c').transaction.match(/[\r\n\t]/))
+  check('M11: a very long value is truncated, so a crafted body cannot flood the log',
+    unverifiedDeliveryTrace(`transaction_id=${'A'.repeat(4000)}`).transaction.length === 64)
+
+  check('M12: the trace reaches no database and builds no event',
+    !/createAdminClient|from\(|recordMarketplaceOrder/.test(
+      code('lib/marketplace/intake.ts').split('export function unverifiedDeliveryTrace')[1] ?? ''))
+
+  const routeSrcM = code(ROUTE)
+  check('M13: the route traces ONLY on a digest mismatch, not on a missing signature or our own missing secret',
+    /verified\.reason === 'mismatch'/.test(routeSrcM)
+    && routeSrcM.indexOf('unverifiedDeliveryTrace(rawBody)') > routeSrcM.indexOf("verified.reason === 'mismatch'"))
+  check('M14: a mismatch is an error, so it is not buried among the warnings',
+    /console\.error\('\[marketplace-webhook\] SIGNATURE MISMATCH/.test(routeSrcM))
+  check('M15: and the trace still happens after verification, never before it',
+    routeSrcM.indexOf('unverifiedDeliveryTrace') > routeSrcM.indexOf('verifyMarketplaceSignature'))
+  check('M16: tracing did not turn a refused delivery into a 2xx',
+    /\? 503 : 401/.test(routeSrcM))
+
+  check('M-MUT1: a trace that kept the buyer’s address would be caught',
+    JSON.stringify({ ...trace, email: 'buyer@example.com' }).includes('buyer@example.com'))
+  check('M-MUT2: a sanitiser that left newlines alone would be caught',
+    'TX-1\n[marketplace-webhook] order recorded'.includes('\n'))
+  check('M-MUT3: a route that traced every refusal, not only a mismatch, would be caught',
+    !/verified\.reason === 'mismatch'/.test(
+      routeSrcM.replace("verified.reason === 'mismatch'", 'true')))
+  check('M-MUT4: and one that traced before verifying would be caught',
+    (() => {
+      const moved = `unverifiedDeliveryTrace\n${routeSrcM.replace('unverifiedDeliveryTrace(rawBody)', 'x')}`
+      return !(moved.indexOf('unverifiedDeliveryTrace') > moved.indexOf('verifyMarketplaceSignature'))
+    })())
 }
 
 main().then(() => {
