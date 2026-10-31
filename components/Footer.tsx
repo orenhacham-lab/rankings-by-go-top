@@ -174,44 +174,6 @@ export function Footer({ locale = 'he' }: { locale?: PublicLocale } = {}) {
           </div>
         </div>
 
-        {/*
-          The two affiliate-program directories that list us (AffyList and
-          SaaSAffiliate.net) give a free listing in exchange for their badge on
-          the site, so the badge being here is what keeps those listings alive —
-          remove it and the listing is dropped or turned nofollow on their next
-          weekly check. __qa__/footer-directory-badges.qa.ts fails if either
-          link or image goes missing.
-
-          Both images are SELF-HOSTED under public/badges. Their own snippets
-          point at an <img> on their domain, which would send every visitor's IP
-          to two third parties on every page, before consent, and would mean
-          naming both of them in the privacy policy in six languages. The link
-          is what the directories check; the picture does not have to come from
-          them. Our outgoing link is nofollow, so no ranking strength leaves.
-        */}
-        <div className="mt-12 flex flex-wrap items-center justify-center gap-4 sm:justify-start" dir="ltr" data-footer-directory-badges>
-          <a
-            href="https://affylist.com/"
-            title="Listed on AffyList"
-            target="_blank"
-            rel="nofollow noopener noreferrer"
-            className="rounded-control opacity-70 transition-opacity duration-150 ease-snappy hover:opacity-100 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-white/20"
-          >
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src="/badges/affylist.svg" alt="Listed on AffyList" width={160} height={43} loading="lazy" />
-          </a>
-          <a
-            href="https://saasaffiliate.net/"
-            title="Featured on SaaSAffiliate.net"
-            target="_blank"
-            rel="nofollow noopener noreferrer"
-            className="rounded-control opacity-70 transition-opacity duration-150 ease-snappy hover:opacity-100 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-white/20"
-          >
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src="/badges/saasaffiliate.svg" alt="Featured on SaaSAffiliate.net" width={153} height={44} loading="lazy" />
-          </a>
-        </div>
-
         {/* Bottom */}
         <div className="mt-8 flex flex-col items-center gap-2 border-t border-white/10 pt-6 sm:flex-row sm:justify-between">
           <p className="text-center text-caption text-contrast-ink/60">
