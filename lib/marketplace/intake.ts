@@ -326,3 +326,61 @@ export function httpStatusForMarketplaceOutcome(outcome: MarketplaceIntakeOutcom
       return 200
   }
 }
+
+/**
+ * WHAT A REFUSED DELIVERY LEAVES BEHIND, so a paid order is never lost in silence.
+ *
+ * THIS IS NOT A PARSER AND IT MUST NEVER BECOME ONE. It builds no event,
+ * reaches no database, grants nothing and decides nothing. Its entire output
+ * is a handful of strings for one log line, and the route calls it only on a
+ * signature that was already refused.
+ *
+ * WHY IT EXISTS. JVZoo does not retry a failed notification — the captured
+ * documentation is explicit (docs/affiliate/jvzoo-webhook-docs.md: "No retry
+ * on failure — if the endpoint is down the notification is lost"), and the
+ * documented recovery is to reconcile against JVZoo's own records. So if the
+ * account's signing key and ours ever disagree, the buyer is charged, this
+ * route answers 401, and the notification is gone for good. Until now the log
+ * line said only which provider refused and why, which is not enough to know
+ * that a sale happened at all, let alone which one. That turns a recoverable
+ * configuration error into a paying customer with nothing to show for it.
+ *
+ * THE BUYER IS DELIBERATELY ABSENT. No address and no name, matching the rest
+ * of this module. The platform's own transaction id is the key to the
+ * platform's own record, which already holds the buyer — so the id is all an
+ * operator needs to find the order and fulfil it by hand, and logging the
+ * customer would add exposure without adding recovery.
+ *
+ * EVERY VALUE HERE IS HOSTILE INPUT. The body failed authentication, so these
+ * are strings an anonymous caller chose. They are read from a fixed whitelist
+ * of field names, stripped of control characters and newlines so nothing can
+ * forge a second log line, and truncated. An absent field is omitted rather
+ * than reported as empty, so the line never implies a value the body did not
+ * carry.
+ */
+const UNVERIFIED_TRACE_FIELDS: ReadonlyArray<readonly [key: string, ...names: string[]]> = [
+  // v2 name first, then the v1 name for the same thing.
+  ['transaction', 'transaction_id', 'ctransreceipt'],
+  ['product', 'product_id', 'cproditem'],
+  ['type', 'transaction_type', 'ctransaction'],
+  ['total', 'total', 'ctransamount'],
+  ['date', 'date', 'ctranstime'],
+]
+
+/** The longest a traced value may be. Long enough for any documented value,
+ *  short enough that a crafted body cannot flood the log. */
+const UNVERIFIED_TRACE_MAX = 64
+
+export function unverifiedDeliveryTrace(rawBody: string): Record<string, string> {
+  const form = new URLSearchParams(rawBody)
+  const trace: Record<string, string> = {}
+  for (const [key, ...names] of UNVERIFIED_TRACE_FIELDS) {
+    const raw = names.map((name) => form.get(name)).find((value) => value !== null && value.trim() !== '')
+    if (raw === undefined || raw === null) continue
+    // Control characters — newlines above all — would let a caller write its
+    // own log line, so they go before anything else happens to the value.
+    const safe = raw.replace(/[\u0000-\u001f\u007f]+/g, ' ').trim().slice(0, UNVERIFIED_TRACE_MAX)
+    if (safe) trace[key] = safe
+  }
+  return trace
+}
