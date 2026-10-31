@@ -25,7 +25,7 @@
 import type { PublicLocale } from '@/lib/i18n/locales'
 import type { ComparisonCopy } from './types'
 
-const CHECKED = '2026-10-22'
+const CHECKED = '2026-10-31'
 
 const SOURCES = [
   { label: 'rankmath.com/pricing', href: 'https://rankmath.com/pricing/' },
@@ -56,7 +56,7 @@ export const RANKMATH_COMPARE: Record<PublicLocale, ComparisonCopy> = {
           label: 'מחיר התחלתי',
           ours: 'בישראל החל מ-249 ש״ח לחודש כולל מע״מ. מחוץ לישראל מ-79 דולר לחודש בתוספת מס.',
           theirs:
-            'תוסף חינמי, ו-PRO ב-7.99 אירו לחודש בתשלום שנתי לפני מע״מ (מתחדש ב-8.99). Business ב-24.99 אירו לחודש, מתחדש ב-27.99.',
+            'תוסף חינמי, ו-PRO מוצג ב-5.59 אירו לחודש בתשלום שנתי לפני מע״מ במסגרת מבצע — קודם 8.99 — ומתחדש ב-8.99. Business מוצג ב-17.59 אירו, קודם 27.99, ומתחדש ב-27.99.',
         },
         {
           label: 'פלטפורמות',
@@ -90,7 +90,7 @@ export const RANKMATH_COMPARE: Record<PublicLocale, ComparisonCopy> = {
           label: 'מעקב דירוגים',
           ours: 'בדיקה חודשית בגוגל וב-Google Maps, באותו מחיר.',
           theirs:
-            '500 ביטויים ב-PRO ו-10,000 ב-Business, עם היסטוריית מיקומים של שנים עשר חודשים אחורה.',
+            'PRO מציג 1,000 ביטויים ו-Business 20,000, כל אחד לצד מספר קודם נמוך יותר (500 ו-10,000), עם היסטוריית מיקומים של שנים עשר חודשים אחורה.',
         },
         {
           label: 'ניסיון',
@@ -187,7 +187,7 @@ export const RANKMATH_COMPARE: Record<PublicLocale, ComparisonCopy> = {
           label: 'Starting price',
           ours: 'From $79/month plus tax outside Israel; from 249 ILS/month including VAT in Israel.',
           theirs:
-            'Free plugin, then PRO at €7.99/month billed annually ex VAT (renews at €8.99). Business is €24.99/month, renewing at €27.99.',
+            'Free plugin, then PRO shown at €5.59/month billed annually ex VAT in a sale — previously €8.99 — and renewing at €8.99. Business is shown at €17.59, previously €27.99, renewing at €27.99.',
         },
         {
           label: 'Platforms',
@@ -220,7 +220,7 @@ export const RANKMATH_COMPARE: Record<PublicLocale, ComparisonCopy> = {
         {
           label: 'Rank tracking',
           ours: 'A monthly check in Google and in Google Maps, at the same price.',
-          theirs: '500 keywords on PRO and 10,000 on Business, with twelve months of position history.',
+          theirs: 'PRO now shows 1,000 keywords and Business 20,000, each beside a lower earlier figure (500 and 10,000), with twelve months of position history.',
         },
         {
           label: 'Trial',
@@ -317,7 +317,7 @@ export const RANKMATH_COMPARE: Record<PublicLocale, ComparisonCopy> = {
           label: 'Precio inicial',
           ours: 'Desde 79 dólares al mes más impuestos fuera de Israel.',
           theirs:
-            'Plugin gratuito y PRO a 7,99 euros al mes con pago anual sin IVA (se renueva a 8,99). Business a 24,99 euros al mes, con renovación a 27,99.',
+            'Plugin gratuito y PRO mostrado a 5,59 euros al mes con pago anual sin IVA en una promoción —antes 8,99— y con renovación a 8,99. Business se muestra a 17,59 euros, antes 27,99, con renovación a 27,99.',
         },
         {
           label: 'Plataformas',
@@ -350,7 +350,7 @@ export const RANKMATH_COMPARE: Record<PublicLocale, ComparisonCopy> = {
         {
           label: 'Seguimiento de posiciones',
           ours: 'Revisión mensual en Google y en Google Maps, al mismo precio.',
-          theirs: '500 palabras clave en PRO y 10.000 en Business, con doce meses de historial de posiciones.',
+          theirs: 'PRO muestra ahora 1.000 palabras clave y Business 20.000, cada una junto a una cifra anterior más baja (500 y 10.000), con doce meses de historial de posiciones.',
         },
         {
           label: 'Prueba',
@@ -447,7 +447,7 @@ export const RANKMATH_COMPARE: Record<PublicLocale, ComparisonCopy> = {
           label: 'Preço inicial',
           ours: 'A partir de 79 dólares por mês mais impostos fora de Israel.',
           theirs:
-            'Plugin gratuito e PRO por 7,99 euros por mês no pagamento anual sem impostos (renova por 8,99). Business por 24,99 euros por mês, com renovação por 27,99.',
+            'Plugin gratuito e PRO exibido por 5,59 euros por mês no pagamento anual sem impostos em uma promoção — antes 8,99 — e com renovação por 8,99. O Business aparece por 17,59 euros, antes 27,99, com renovação por 27,99.',
         },
         {
           label: 'Plataformas',
@@ -480,7 +480,7 @@ export const RANKMATH_COMPARE: Record<PublicLocale, ComparisonCopy> = {
         {
           label: 'Acompanhamento de posições',
           ours: 'Verificação mensal no Google e no Google Maps, pelo mesmo preço.',
-          theirs: '500 palavras-chave no PRO e 10.000 no Business, com doze meses de histórico de posições.',
+          theirs: 'O PRO agora mostra 1.000 palavras-chave e o Business 20.000, cada um ao lado de um número anterior menor (500 e 10.000), com doze meses de histórico de posições.',
         },
         {
           label: 'Teste',
@@ -577,7 +577,7 @@ export const RANKMATH_COMPARE: Record<PublicLocale, ComparisonCopy> = {
           label: 'Prix de départ',
           ours: 'À partir de 79 dollars par mois hors taxes en dehors d’Israël.',
           theirs:
-            'Extension gratuite, puis PRO à 7,99 euros par mois en paiement annuel hors TVA (renouvellement à 8,99). Business à 24,99 euros par mois, renouvelé à 27,99.',
+            'Extension gratuite, puis PRO affiché à 5,59 euros par mois en paiement annuel hors TVA dans le cadre d’une promotion — auparavant 8,99 — et renouvelé à 8,99. Business est affiché à 17,59 euros, auparavant 27,99, renouvelé à 27,99.',
         },
         {
           label: 'Plateformes',
@@ -610,7 +610,7 @@ export const RANKMATH_COMPARE: Record<PublicLocale, ComparisonCopy> = {
         {
           label: 'Suivi de positions',
           ours: 'Une vérification mensuelle dans Google et dans Google Maps, au même prix.',
-          theirs: '500 mots-clés en PRO et 10 000 en Business, avec douze mois d’historique de positions.',
+          theirs: 'PRO affiche désormais 1 000 mots-clés et Business 20 000, chacun à côté d’un chiffre antérieur plus bas (500 et 10 000), avec douze mois d’historique de positions.',
         },
         {
           label: 'Essai',
@@ -706,7 +706,7 @@ export const RANKMATH_COMPARE: Record<PublicLocale, ComparisonCopy> = {
           label: 'Prezzo di partenza',
           ours: 'A partire da 79 dollari al mese più imposte fuori da Israele.',
           theirs:
-            'Estensione gratuita e poi PRO a 7,99 euro al mese con pagamento annuale senza IVA (si rinnova a 8,99). Business a 24,99 euro al mese, con rinnovo a 27,99.',
+            'Estensione gratuita e poi PRO mostrato a 5,59 euro al mese con pagamento annuale senza IVA in una promozione — prima 8,99 — e con rinnovo a 8,99. Business è mostrato a 17,59 euro, prima 27,99, con rinnovo a 27,99.',
         },
         {
           label: 'Piattaforme',
@@ -739,7 +739,7 @@ export const RANKMATH_COMPARE: Record<PublicLocale, ComparisonCopy> = {
         {
           label: 'Monitoraggio delle posizioni',
           ours: 'Un controllo mensile su Google e su Google Maps, allo stesso prezzo.',
-          theirs: '500 parole chiave in PRO e 10.000 in Business, con dodici mesi di storico delle posizioni.',
+          theirs: 'PRO ora mostra 1.000 parole chiave e Business 20.000, ciascuno accanto a una cifra precedente più bassa (500 e 10.000), con dodici mesi di storico delle posizioni.',
         },
         {
           label: 'Prova',
@@ -839,7 +839,7 @@ export const RANKMATH_COMPARE: Record<PublicLocale, ComparisonCopy> = {
           label: '開始料金',
           ours: 'イスラエル国外では月額79ドルから（税別）。',
           theirs:
-            '無料の拡張機能があり、PROは年払いで月額7.99ユーロ（付加価値税別、更新時は8.99ユーロ）。Businessは月額24.99ユーロ、更新時は27.99ユーロです。',
+            '無料の拡張機能があり、PROはセール中の表示として年払いで月額5.59ユーロ（付加価値税別、以前は8.99ユーロ、更新時は8.99ユーロ）。Businessは月額17.59ユーロと表示され、以前は27.99ユーロ、更新時は27.99ユーロです。',
         },
         {
           label: '対応プラットフォーム',
@@ -872,7 +872,7 @@ export const RANKMATH_COMPARE: Record<PublicLocale, ComparisonCopy> = {
         {
           label: '検索順位の計測',
           ours: 'GoogleとGoogleマップについて月に一度計測し、料金は同じです。',
-          theirs: 'PROで500キーワード、Businessで10,000キーワード。順位の履歴は12か月分です。',
+          theirs: 'PROは現在1,000キーワード、Businessは20,000キーワードと表示され、それぞれの横に以前の小さい数字（500と10,000）が添えられています。順位の履歴は12か月分です。',
         },
         {
           label: 'トライアル',

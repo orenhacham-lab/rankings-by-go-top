@@ -9,8 +9,26 @@
  *      competitor owns, so a claim about them can be checked by the reader;
  *   C) nothing flatly denies a capability on a competitor's behalf, and no page
  *      promises a result or invents proof about us;
- *   D) every comparison says what the other product is better at.
+ *   D) every comparison says what the other product is better at;
+ *   E) no outbound link a comparison page renders is dofollow, and no copy
+ *      module smuggles a competitor URL in beside the sourced ones.
  * Each group ends with a MUTATION CONTROL.
+ *
+ * Group E is the one that pins a promise made to the owner rather than a
+ * property of the copy. These pages are the only ones on the site that link OUT
+ * to a named competitor, and they were approved to go live on the condition
+ * that those links pass no ranking signal to them: every source link is
+ * rendered `rel="nofollow noopener noreferrer"` and opens in a new tab. Nothing
+ * in the type system says so, so a refactor of `ComparisonTable` — or a new
+ * anchor added to `ComparisonPage` — could turn six dofollow links to
+ * competitors on without a single test going red. E1 reads the components
+ * themselves and requires `nofollow` on every anchor they render. E3 closes the
+ * other door: a URL pasted into a hero, a table cell or an FAQ answer would be
+ * rendered as text today, but it is the raw material of a link and it bypasses
+ * the dated `sources` list that makes a claim about a competitor checkable, so
+ * a URL is allowed in `table.sources` and nowhere else. A bare hostname in
+ * prose is NOT a URL and stays allowed — `/compare/surfer` has to be able to
+ * say that surferseo.com now redirects to surfer.ai.
  *
  * Group D is the one worth explaining. A page that lists only what a named
  * competitor lacks is an advert, and the visitor reading it typed that
@@ -140,6 +158,48 @@ function main() {
   // what proves the scaled floor did not simply switch the check off for ja.
   check('MUTATION CONTROL: a one-line Japanese nod is caught',
     wordCount('こちらも良い製品です。') < maxPhraseWords('こちらも良い製品です。', 60))
+
+  console.log('\nE) no outbound link is dofollow, and no URL hides in the copy')
+  // Source guards strip comments first: a `nofollow` named in a comment is a
+  // note about the code, not the code.
+  const stripComments = (src: string) => src.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '')
+  /** The attributes of every `<a …>` a file opens. */
+  const anchors = (src: string) => [...stripComments(src).matchAll(/<a\b([^>]*)>/g)].map((m) => m[1])
+  const hasNofollow = (attrs: string) => /rel=\{?["'][^"']*\bnofollow\b/.test(attrs)
+  const COMPONENTS = ['components/public/ComparisonTable.tsx', 'components/public/ComparisonPage.tsx']
+  const followed: string[] = []
+  for (const rel of COMPONENTS) {
+    const src = readFileSync(join(ROOT, rel), 'utf8')
+    for (const attrs of anchors(src)) if (!hasNofollow(attrs)) followed.push(`${rel}: <a${attrs.trim().slice(0, 60)}>`)
+  }
+  check('E1: every <a> a comparison component renders is rel="nofollow"', followed.length === 0, followed.join(' | '))
+  const tableSrc = stripComments(readFileSync(join(ROOT, 'components/public/ComparisonTable.tsx'), 'utf8'))
+  check('E2: the source links also carry noopener noreferrer and open in a new tab',
+    /rel="nofollow noopener noreferrer"/.test(tableSrc) && /target="_blank"/.test(tableSrc))
+  // A scheme, or a bare `www.` host. NOT a hostname in prose: saying that
+  // surferseo.com redirects to surfer.ai is a dated fact about a competitor,
+  // and it is not a link.
+  const URLISH = /https?:\/\/|\bwww\.[a-z0-9-]+\.[a-z]{2,}/i
+  const inlineUrls: string[] = []
+  for (const { slug, copy } of COMPARISONS) {
+    for (const locale of PUBLIC_LOCALES) {
+      const c = copy[locale]
+      const exceptSources = JSON.stringify({ ...c, table: { ...c.table, sources: [] } })
+      if (URLISH.test(exceptSources)) inlineUrls.push(`${slug}/${locale}`)
+    }
+  }
+  check('E3: a URL appears only in `table.sources`, never loose in the copy', inlineUrls.length === 0, inlineUrls.join(', '))
+  check('MUTATION CONTROL: an anchor that lost nofollow is caught, and the real one is not',
+    anchors('<a href={s.href} rel="noopener noreferrer" target="_blank">').every((a) => !hasNofollow(a))
+    && anchors('<a href={s.href} rel="nofollow noopener noreferrer" target="_blank">').every(hasNofollow))
+  check('MUTATION CONTROL: a nofollow named only in a comment does not count',
+    anchors('/* rel="nofollow" is required */\n<a href="https://surfer.ai/" target="_blank">').every((a) => !hasNofollow(a)))
+  check('MUTATION CONTROL: ComparisonTable with nofollow deleted fails E1',
+    anchors(tableSrc.replace('rel="nofollow noopener noreferrer"', 'rel="noopener noreferrer"')).some((a) => !hasNofollow(a)))
+  check('MUTATION CONTROL: a URL pasted into an FAQ answer is caught, and a bare hostname is not',
+    URLISH.test(JSON.stringify({ faq: { items: [{ q: 'Where?', a: 'See https://surfer.ai/pricing/ for the list.' }] } }))
+    && URLISH.test(JSON.stringify({ hero: { subtitle: 'Read more at www.brightlocal.com today.' } }))
+    && !URLISH.test(JSON.stringify({ faq: { items: [{ q: 'Same product?', a: 'Yes — surferseo.com redirects to surfer.ai.' }] } })))
 
   console.log(`\n${pass} passed, ${fail} failed`)
   if (fail > 0) process.exitCode = 1
