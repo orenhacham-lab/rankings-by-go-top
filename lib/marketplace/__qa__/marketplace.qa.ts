@@ -29,6 +29,7 @@ import {
   MARKETPLACE_CLAIM_PATH,
   MARKETPLACE_PROVIDERS,
   marketplaceBuyUrl,
+  marketplaceTrial,
   marketplaceClaimUrl,
   marketplacePixelUrl,
   marketplacePolicyUrl,
@@ -1076,6 +1077,77 @@ async function main() {
     /subscriptions_marketplace_order_id_unique/.test(migSrc))
   check('I10: and a row can still carry only one provider',
     /subscriptions_one_provider_per_row[\s\S]*?marketplace_order_id\s+IS NOT NULL THEN 1 ELSE 0 END\) <= 1/.test(migSrc))
+
+  // ── T. The trial price, which is a claim about SOMEBODY ELSE'S checkout ────
+  //
+  // The platform's product decides what the buyer is charged first and for how
+  // long; this page only reports it. So every check below is about the page
+  // being unable to state a trial that nobody configured, and being unable to
+  // state one WITHOUT the price it renews at - the two ways a trial headline
+  // becomes an incomplete price display, which is what had the earlier $0
+  // trial removed from this page rather than described.
+  console.log('\nT. the trial price')
+  process.env.MARKETPLACE_JVZOO_ENABLED = 'true'
+  process.env.MARKETPLACE_JVZOO_WEBHOOK_SECRET = 'jv-secret'
+  process.env.MARKETPLACE_JVZOO_PRODUCT_ADVANCED = '457573'
+  delete process.env.MARKETPLACE_JVZOO_TRIAL_ADVANCED
+  check('T1: a plan nobody configured a trial for has none, so the page keeps its plain monthly price',
+    marketplaceTrial('jvzoo', 'advanced') === null)
+
+  process.env.MARKETPLACE_JVZOO_TRIAL_ADVANCED = '1.00/7'
+  const trial = marketplaceTrial('jvzoo', 'advanced')
+  check('T2: a configured trial is read as its price and its length',
+    trial?.priceUSD === 1 && trial?.days === 7, JSON.stringify(trial))
+
+  process.env.MARKETPLACE_JVZOO_TRIAL_ADVANCED = '0/7'
+  check('T3: a ZERO trial is refused — a free period produces a sale notification with no money in it, '
+    + 'which is the defect that removed the old $0 trial',
+    marketplaceTrial('jvzoo', 'advanced') === null)
+
+  process.env.MARKETPLACE_JVZOO_TRIAL_ADVANCED = '1.00/0'
+  check('T4: and so is a trial of no days', marketplaceTrial('jvzoo', 'advanced') === null)
+
+  for (const typo of ['1.00', '7', '1.00/7d', '$1/7', '1.005/7', 'free', '1.00/7/9', '']) {
+    process.env.MARKETPLACE_JVZOO_TRIAL_ADVANCED = typo
+    check(`T5: a malformed value (${JSON.stringify(typo)}) is treated as NO trial, never guessed at`,
+      marketplaceTrial('jvzoo', 'advanced') === null)
+  }
+
+  // T6. THE SAME GATE THE BUY BUTTON HAS. A provider that cannot record what
+  // it sells must not advertise an introductory price either: the trial would
+  // be the most persuasive number on a page whose purchases reach nobody.
+  process.env.MARKETPLACE_JVZOO_TRIAL_ADVANCED = '1.00/7'
+  process.env.MARKETPLACE_JVZOO_ENABLED = 'false'
+  check('T6: an unready provider states no trial, exactly as it shows no buy button',
+    marketplaceTrial('jvzoo', 'advanced') === null && marketplaceBuyUrl('jvzoo', 'advanced') === null)
+  process.env.MARKETPLACE_JVZOO_ENABLED = 'true'
+
+  check('T7: an unregistered platform has no trial either', marketplaceTrial('paddle' as string, 'advanced') === null)
+  delete process.env.MARKETPLACE_JVZOO_TRIAL_ADVANCED
+
+  // Source guards: what the page prints once a trial exists.
+  check('T8: the page reads the trial from configuration rather than printing a constant',
+    /marketplaceTrial\(provider\.slug, code\)/.test(salesSrc))
+  check('T9: a trial headline always carries the price it renews at, in the same block',
+    /for the first \{trial\.days\} days/.test(salesSrc)
+    && /then \$\{plan\.priceUSD\} \/ month, every month, until you cancel\./.test(salesSrc))
+  check('T10: and the page explains that the trial amount is charged, not free, and renews automatically',
+    /that amount is charged once when you buy/.test(salesSrc)
+    && /renews\s*\n?\s*automatically at the full monthly price/.test(salesSrc))
+  check('T11: the explanation is printed only where a trial actually exists',
+    /\{anyTrial \? \(/.test(salesSrc)
+    && /const anyTrial = PLAN_CODES\.some\(/.test(salesSrc))
+
+  // T-MUT. THE MUTATION CONTROL. A trial headline with no renewal price is
+  // the failure this section exists to prevent, so the guard is shown failing
+  // on a page that has exactly that defect.
+  const trialHeadlineOnly = salesSrc.replace(
+    'then ${plan.priceUSD} / month, every month, until you cancel.', '')
+  check('T-MUT1: dropping the renewal price from the trial block is caught',
+    !(/for the first \{trial\.days\} days/.test(trialHeadlineOnly)
+      && /then \$\{plan\.priceUSD\} \/ month, every month, until you cancel\./.test(trialHeadlineOnly)))
+  check('T-MUT2: and a page that prints the trial unconditionally is caught',
+    !/\{anyTrial \? \(/.test(salesSrc.replace('{anyTrial ? (', '{true ? (')))
 }
 
 main().then(() => {

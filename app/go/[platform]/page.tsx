@@ -51,6 +51,7 @@ import {
   marketplacePixelUrl,
   marketplacePolicyUrl,
   marketplaceProvider,
+  marketplaceTrial,
 } from '@/lib/marketplace/config'
 import { PLAN_CATALOG, PLAN_CODES } from '@/lib/plans/catalog'
 
@@ -79,6 +80,10 @@ export default async function MarketplaceSalesPage({
   if (!provider) notFound()
 
   const policyUrl = marketplacePolicyUrl(provider.slug)
+  // Whether ANY plan on this page carries a trial, which decides whether the
+  // paragraph explaining introductory pricing is printed at all. A page with
+  // no trial says nothing about one.
+  const anyTrial = PLAN_CODES.some((code) => marketplaceTrial(provider.slug, code) !== null)
   // One beacon per plan the page actually offers, de-duplicated: a platform
   // whose pixel is per product (JVZoo) needs each listed product's own URL,
   // and a platform with one provider-wide URL still contributes exactly one.
@@ -120,12 +125,33 @@ export default async function MarketplaceSalesPage({
         {PLAN_CODES.map((code) => {
           const plan = PLAN_CATALOG[code]
           const buyUrl = marketplaceBuyUrl(provider.slug, code)
+          const trial = marketplaceTrial(provider.slug, code)
           return (
             <div key={code} className="rounded-card border border-line bg-surface p-5">
               <h2 className="text-section capitalize text-ink">{plan.displayNameKey}</h2>
-              <p className="mt-1 text-metric text-ink">${plan.priceUSD}
-                <span className="text-copy text-muted"> / month</span>
-              </p>
+              {/* THE PRICE A TRIAL BUYER ACTUALLY PAYS COMES FIRST, AND THE
+                  PRICE THEY WILL PAY AFTERWARDS IS BESIDE IT, NOT BELOW THE
+                  FOLD. A trial headline with the renewal price somewhere else
+                  on the page is the pattern the Omnibus price-display rules
+                  exist to stop: the consumer has to be able to read the total
+                  commitment where the number is. Both sentences are in the
+                  same block, in the same size, for that reason. */}
+              {trial ? (
+                <>
+                  <p className="mt-1 text-metric text-ink">${trial.priceUSD.toFixed(2)}
+                    <span className="text-copy text-muted">
+                      {' '}for the first {trial.days} days
+                    </span>
+                  </p>
+                  <p className="mt-1 text-copy text-body">
+                    then ${plan.priceUSD} / month, every month, until you cancel.
+                  </p>
+                </>
+              ) : (
+                <p className="mt-1 text-metric text-ink">${plan.priceUSD}
+                  <span className="text-copy text-muted"> / month</span>
+                </p>
+              )}
               <p className="mt-2 text-copy text-body">
                 {plan.maxProjects === 1 ? 'One website' : `${plan.maxProjects} websites`},{' '}
                 {plan.maxKeywordsPerProject} keywords, {plan.maxArticlesPerPeriodAccountWide} articles a month.
@@ -193,6 +219,24 @@ export default async function MarketplaceSalesPage({
         cancel it at {provider.label}, where you bought it, and the plan stays active until
         the end of the period you have paid for.
       </p>
+
+      {/* SAID ONCE, IN OUR OWN VOICE, FOR WHICHEVER PLANS CARRY A TRIAL.
+          A trial price is an introductory price, so what the buyer is owed
+          before being bound is the whole shape of it: that the first payment
+          is a real charge and not a free period, when the full price starts,
+          that it keeps recurring, and that stopping it is the same single
+          action as cancelling any other plan here. Rendered only where a
+          trial is actually configured, so a page with none says nothing
+          about one. */}
+      {anyTrial ? (
+        <p className="mt-4 text-copy text-muted">
+          Where a trial price is shown above, that amount is charged once when you buy, and it
+          covers the number of days stated. At the end of those days the subscription renews
+          automatically at the full monthly price shown beside it, and every month after that,
+          until you cancel it. Cancelling during the trial stops the renewal and the trial
+          payment itself is not refunded.
+        </p>
+      ) : null}
 
       <p className="mt-10 text-copy text-body">
         After payment you will be sent back here to open your account and the plan becomes
