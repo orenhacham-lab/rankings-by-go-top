@@ -8,7 +8,19 @@
  * Returns blocking failures only. Featured-image + planned-anchor presence are
  * NOT blockers here (draft behavior never required an image; publish-time in
  * Phase 6 enforces the image) — the caller may treat them as advisory.
+ *
+ * The length check counts words through lib/text/segment.ts, like the
+ * generator's own audit does (article-audit.ts `words()`). It used to split on
+ * whitespace, and Japanese is written WITHOUT WORD SPACES: a full-length
+ * Japanese article came through as a handful of tokens, so this gate answered
+ * `content_too_short` for every one of them. The blog's Japanese queue held
+ * eight researched topics on 1 Nov 2026 and had published nothing, with
+ * `quality:content_too_short` on all three attempts, while the generator's
+ * audit — which already segmented — had passed the same body. For a spaced
+ * language `wordCount` IS this whitespace split, down to the empty-token
+ * filtering, so nothing else changes.
  */
+import { wordCount } from '@/lib/text/segment'
 
 export interface QualityGateArticle {
   title: string | null
@@ -97,7 +109,7 @@ export function runQualityGate(article: QualityGateArticle): QualityGateResult {
 
   if (html) {
     const text = textOf(html)
-    const words = text ? text.split(/\s+/).filter(Boolean).length : 0
+    const words = wordCount(text)
     if (words < 150) failures.push('content_too_short')
     if (!BLOCK_TAG_RE.test(html)) failures.push('broken_html')
     if (hasPlaceholder(html) || hasPlaceholder(title)) failures.push('placeholder_found')
