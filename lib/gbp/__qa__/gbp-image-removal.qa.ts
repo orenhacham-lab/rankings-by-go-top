@@ -68,7 +68,7 @@ const PHOTO = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa'
 const PATH = `${PROJECT}/gbp/${PHOTO}.jpg`
 
 /** The service role's storage, recording every call; each operation can be made to fail. */
-function fakeStorage(opts: { objects?: string[]; failRemove?: boolean; failList?: boolean; pageOf?: number } = {}) {
+function fakeStorage(opts: { objects?: string[]; failRemove?: boolean; failList?: boolean; pageOf?: number; badPublicUrl?: boolean } = {}) {
   const objects = new Set(opts.objects ?? [])
   const calls: { op: string; bucket: string; arg: unknown }[] = []
   const from = (bucket: string) => ({
@@ -85,7 +85,7 @@ function fakeStorage(opts: { objects?: string[]; failRemove?: boolean; failList?
       return { data: here.slice(0, opts.pageOf ?? o?.limit ?? 100), error: null }
     },
     upload: async (path: string) => { calls.push({ op: 'upload', bucket, arg: path }); objects.add(path); return { data: { path }, error: null } },
-    getPublicUrl: (path: string) => ({ data: { publicUrl: `https://x.supabase.co/storage/v1/object/public/${bucket}/${path}` } }),
+    getPublicUrl: (path: string) => ({ data: { publicUrl: `${opts.badPublicUrl ? 'http' : 'https'}://x.supabase.co/storage/v1/object/public/${bucket}/${path}` } }),
   })
   return { storage: { from } as any, objects, calls }
 }
@@ -149,6 +149,12 @@ async function main() {
   const leaked = refused.filter(([, p]) => M.isPostImagePath(PROJECT, p)).map(([n]) => n)
   check(`A3: all ${refused.length} paths that are not this project's photos are refused`, leaked.length === 0, leaked.join(', '))
   check('A4: no project id means no path matches', !M.isPostImagePath('', PATH))
+  check('A5: a project id carrying regex metacharacters matches nothing, however it is spelled',
+    !M.isPostImagePath('.*', `${FOREIGN}/gbp/${PHOTO}.jpg`) && !M.isPostImagePath(`${PROJECT}|${FOREIGN}`, `${FOREIGN}/gbp/${PHOTO}.jpg`))
+  const anyId = mutant<typeof M>('lib/gbp/image-store.ts', (s) =>
+    s.replace('  if (!UUID.test(projectId)) return false\n', ''))
+  check('A-MUT2: without the uuid assertion an id of `.*` reaches every project\'s photos',
+    anyId.isPostImagePath('.*', `${FOREIGN}/gbp/${PHOTO}.jpg`))
   const loose = mutant<typeof M>('lib/gbp/image-store.ts', (s) =>
     s.replace('return new RegExp(`^${projectId}/gbp/[0-9a-f-]{36}\\\\.jpg$`).test(path)', 'return path.includes(`${projectId}/gbp/`)'))
   check('A-MUT: an unanchored match lets a traversal and another project through',
@@ -239,6 +245,24 @@ async function main() {
     const { out } = await captureErrors(() => M.removeAllPostImages(stuck, PROJECT))
     check('C10: a listing that never empties ends, reported as a failure', out.failed === true)
   }
+  {
+    // The project delete is the complete erasure route: the removal is driven by the
+    // LISTING, so a published post's photo — the one copy a cancel never reaches — is
+    // in the set like any other.
+    const published = `${PROJECT}/gbp/cccccccc-cccc-4ccc-8ccc-cccccccccccc.jpg`
+    const st = fakeStorage({ objects: [published, PATH] })
+    const out = await M.removeAllPostImages(st, PROJECT)
+    check('C11: a published post\'s photo is removed with the rest of the folder',
+      out.removed === 2 && !st.objects.has(published), JSON.stringify(out))
+  }
+  const narrowed = mutant<typeof M>('lib/gbp/image-store.ts', (s) =>
+    s.replace('.list(folder, { limit: PAGE })', '.list(`${folder}/scheduled`, { limit: PAGE })'))
+  {
+    const published = `${PROJECT}/gbp/cccccccc-cccc-4ccc-8ccc-cccccccccccc.jpg`
+    const st = fakeStorage({ objects: [published, PATH] })
+    const out = await narrowed.removeAllPostImages(st, PROJECT)
+    check('C-MUT2: a narrower listing leaves a published post\'s photo served', out.removed === 0 && st.objects.has(published))
+  }
   const onePage = mutant<typeof M>('lib/gbp/image-store.ts', (s) =>
     s.replace('      if (names.length < PAGE) return { removed, failed: false }\n', '      return { removed, failed: false }\n'))
   {
@@ -287,6 +311,30 @@ async function main() {
     }), deps(admin))
     check('D5: a photo path from another project is refused, and nothing of ours is removed for it',
       res.status === 400 && st.objects.has(PATH) && st.calls.filter((c) => c.op === 'remove').length === 0, String(res.status))
+  }
+  {
+    // A public url that is not https is refused — and that refusal comes AFTER the
+    // upload, so it is an abandoned photo like any other way out.
+    const st = fakeStorage({ objects: [PATH], badPublicUrl: true })
+    const admin = world([], st)
+    const res = await H.handleCreatePost(new Request('https://app.test/api/gbp/posts', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ projectId: PROJECT, summary: 'שלום לכולם', imagePath: PATH, language: 'he' }),
+    }), deps(admin))
+    check('D6: a photo whose public url is not https is refused AND not left served',
+      res.status === 400 && !st.objects.has(PATH), `${res.status}, objects ${[...st.objects].join()}`)
+  }
+  const earlyLeak = mutant<typeof H>('lib/gbp/http.ts', (s) =>
+    s.replace("    if (!/^https:\\/\\//.test(imageUrl)) return abandon(err('image_invalid', 400))",
+      "    if (!/^https:\\/\\//.test(imageUrl)) return err('image_invalid', 400)"))
+  {
+    const st = fakeStorage({ objects: [PATH], badPublicUrl: true })
+    const admin = world([], st)
+    await earlyLeak.handleCreatePost(new Request('https://app.test/api/gbp/posts', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ projectId: PROJECT, summary: 'שלום לכולם', imagePath: PATH, language: 'he' }),
+    }), deps(admin))
+    check('D-MUT2: a refusal that does not compensate leaves the photo served', st.objects.has(PATH))
   }
   const noAbandon = mutant<typeof H>('lib/gbp/http.ts', (s) =>
     s.replace("  if (!location) return abandon(err('no_location', 409))", "  if (!location) return err('no_location', 409)"))

@@ -17,6 +17,13 @@
  * image lives beside it), or any traversal cannot match, so a caller who owns
  * project A can never reach project B's objects or A's other images.
  *
+ * WHAT SURVIVES, EXACTLY. A cancel reaches only a SCHEDULED post (cancelPost
+ * filters on that status) and no route deletes a single published post, so the
+ * one copy that outlives its post is a published post's — and only while its
+ * project exists, because `removeAllPostImages` lists the whole folder and takes
+ * published posts' photos with it. Deleting the project is therefore the complete
+ * erasure route, and it is the route a merchant actually uses.
+ *
  * REMOVAL IS BEST-EFFORT, AND SAYS SO. Storage is not in the database's
  * transaction and has no foreign key, so a removal can fail on its own. Each
  * function here answers whether it removed what it was asked to and never
@@ -32,6 +39,8 @@ type Admin = ReturnType<typeof createAdminClient>
 /** Just the storage corner of the admin client, so a caller can pass a stub. */
 type Storage = { storage: Admin['storage'] }
 
+/** What a project id must look like before it is put into a pattern. */
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 /** The one folder a project's post photos live in. Public, hence everything above. */
 export const postImageFolder = (projectId: string) => `${projectId}/gbp`
 /** The path of a new post photo. The only place one is composed. */
@@ -44,7 +53,12 @@ export const postImagePath = (projectId: string, id: string) => `${postImageFold
  * `<project>/gbp/../featured/x.jpg` are all refused.
  */
 export function isPostImagePath(projectId: string, path: unknown): path is string {
-  if (typeof path !== 'string' || !projectId) return false
+  if (typeof path !== 'string') return false
+  // The project id is interpolated into a pattern, so it is asserted to BE a uuid
+  // rather than trusted to be one. Every caller passes a value from our own database
+  // today; a value carrying `.`, `*` or `|` would widen the pattern instead of
+  // narrowing it, and this closes that by construction rather than by call site.
+  if (!UUID.test(projectId)) return false
   return new RegExp(`^${projectId}/gbp/[0-9a-f-]{36}\\.jpg$`).test(path)
 }
 

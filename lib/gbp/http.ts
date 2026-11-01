@@ -543,11 +543,18 @@ export async function handleCreatePost(req: Request, deps: GbpRouteDeps): Promis
   // The image must be one we prepared for THIS project; its public URL is rebuilt from the path, never taken from the request.
   let imagePath: string | null = null
   let imageUrl: string | null = null
+  // Once imagePath is set the photo is already in storage, at a PUBLIC url, while the
+  // post that would justify it may never exist. EVERY way out of this handler from that
+  // point on that leaves no row behind takes our copy with it; otherwise the first upload
+  // of a merchant who hit a 409 would sit there, served, forever. This is declared before
+  // the block that sets imagePath so that the block's own refusal is covered too: a
+  // refusal after the upload is still an abandoned photo, however unlikely it is.
+  const abandon = async (res: Response) => { if (imagePath) await removePostImage(g.admin, g.project.id, imagePath); return res }
   if (typeof body.imagePath === 'string' && body.imagePath) {
     if (!isPostImagePath(g.project.id, body.imagePath)) return err('image_invalid', 400)
     imagePath = body.imagePath
     imageUrl = g.admin.storage.from(CONTENT_IMAGE_BUCKET).getPublicUrl(imagePath).data.publicUrl
-    if (!/^https:\/\//.test(imageUrl)) return err('image_invalid', 400)
+    if (!/^https:\/\//.test(imageUrl)) return abandon(err('image_invalid', 400))
   }
 
   let sourceArticleId: string | null = null
@@ -555,12 +562,6 @@ export async function handleCreatePost(req: Request, deps: GbpRouteDeps): Promis
     const { data } = await g.admin.from('generated_articles').select('id').eq('id', body.sourceArticleId).eq('project_id', g.project.id).maybeSingle()
     sourceArticleId = data ? String((data as { id: string }).id) : null
   }
-
-  // From here on the photo is already in storage, at a PUBLIC url, while the post
-  // that would justify it may never exist. Every way out of this handler that
-  // leaves no row behind takes our copy with it; otherwise the first upload of a
-  // merchant who hit a 409 would sit there, served, forever.
-  const abandon = async (res: Response) => { if (imagePath) await removePostImage(g.admin, g.project.id, imagePath); return res }
 
   let location
   try { location = await readProjectLocation(g.admin, g.project.id) } catch (e) { return abandon(storeFail(e)) }
@@ -589,8 +590,10 @@ export async function handleCancelPost(req: Request, postId: string, deps: GbpRo
   if (!/^[0-9a-f-]{36}$/.test(postId)) return err('not_found', 404)
   try {
     // Read the photo's path BEFORE the cancel: once the row says cancelled there
-    // is nothing left that needs it, and a cancelled post was never published, so
-    // Google never fetched it and our copy is the only one there is.
+    // is nothing left that needs it. Only a SCHEDULED post can be cancelled, so the
+    // post was never published, Google never fetched the url, and our copy is the
+    // only one there is. A published post's copy outlives it here and goes when the
+    // project does (lib/gbp/image-store.ts).
     const existing = await readProjectPost(g.admin, g.project.id, postId).catch(() => null)
     const ok = await cancelPost(g.admin, g.project.id, postId)
     if (!ok) return err('not_found', 404)
