@@ -437,6 +437,28 @@ export const projectSettingsPtBR: DeepPartial<DashboardDictionary> = {
       deleteBody: 'O site e todos os seus dados são excluídos: palavras-chave, verificações, artigos e dados do Google Search Console. Não é possível desfazer.',
       delete: 'Excluir definitivamente',
     },
+    account: {
+      title: 'Excluir sua conta',
+      body: 'Uma ação sobre a conta inteira, não sobre um único site.',
+      deleteTitle: 'Excluir a conta e todos os seus sites',
+      deleteBody: 'Todos os sites da conta e os dados deles são excluídos, junto com o acesso e o próprio endereço de e-mail. A exclusão é imediata e não pode ser desfeita.',
+      externalNote: 'O conteúdo já publicado, um artigo no seu próprio site, uma postagem no seu Perfil da Empresa no Google ou uma postagem na sua loja Shopify, continua onde foi publicado e precisa ser removido lá.',
+      delete: 'Excluir a conta',
+      confirmTitle: 'Excluir esta conta?',
+      confirmBody: 'Todos os sites e todos os dados deles são excluídos na hora: palavras-chave, verificações, artigos, as imagens que você enviou e os dados do Search Console. O acesso vai junto, e nada pode ser restaurado.',
+      confirmPrompt: 'Para confirmar, digite o endereço de e-mail da conta: {email}',
+      confirm: 'Excluir definitivamente',
+      deleting: 'Excluindo…',
+      cancel: 'Cancelar',
+      errors: {
+        not_signed_in: 'A sessão expirou. Entre novamente e tente de novo.',
+        confirmation_mismatch: 'O endereço de e-mail não confere. Digite exatamente como aparece acima.',
+        subscription_active: 'Esta conta tem uma assinatura ativa. Cancele primeiro na tela de cobrança ou, se a cobrança for pela Shopify, desinstale o app da sua loja. Depois disso a conta pode ser excluída.',
+        admin_account: 'Uma conta de administração não pode ser excluída nesta tela.',
+        storage_incomplete: 'Não foi possível remover alguns arquivos, por isso nada foi excluído. Tente de novo em alguns minutos.',
+        delete_failed: 'A exclusão falhou e nada foi excluído. Tente de novo em alguns minutos.',
+      },
+    },
   },
 }
 

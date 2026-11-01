@@ -3,7 +3,7 @@ title: Informativa sulla privacy | Go Top SEO
 description: Informativa sulla privacy di Go Top SEO: come raccogliamo, utilizziamo e proteggiamo i Suoi dati.
 locale: it
 source: app/(public)/en/privacy/page.tsx
-lastUpdated: 2026-10-21
+lastUpdated: 2026-11-01
 register: lei
 extraSections: 1
 extraReason: One extra section, "Diritti dei residenti in Italia e nell'Unione europea (GDPR)", placed beside the existing EEA/UK and United States rights sections, because Italian readers are owed the one-month deadline of Art. 12(3), the Garante per la protezione dei dati personali as their own supervisory authority, the Codice in materia di protezione dei dati personali as the national law that completes the GDPR in Italy, and a plain statement about the officer and the representative we have not appointed. What the GDPR adds elsewhere stays inside the sections it belongs to - the legal bases of Art. 6 and the international-transfer rule of Chapter V. The French document carries a second extra section for Quebec (Law 25), which is a different statute reached through the French language and has no Italian counterpart: an Italian reader is governed by the GDPR and by Italian law, so that section is not translated into a jurisdiction it does not apply to.
@@ -245,6 +245,8 @@ Conformemente alla legislazione applicabile in materia di riservatezza, Lei ha i
 - Opporsi a determinati trattamenti
 - Chiedere la portabilità dei dati
 
+**Cancellare l'account da sé.** In fondo alla schermata delle impostazioni c'è un pulsante che cancella l'account per intero: tutti i siti, i loro dati, i file che Lei ha caricato e l'accesso stesso. La cancellazione è immediata e non si può annullare. Se l'account ha un abbonamento attivo, lo annulli prima presso chi Le fattura e, per un negozio Shopify, disinstalli l'applicazione, perché noi non possiamo fermare un addebito in Suo nome. Il contenuto già pubblicato sul Suo sito, sul Suo profilo dell'attività su Google o nel Suo negozio resta dove è stato pubblicato e va rimosso lì. Quello che non viene eliminato insieme all'account è indicato nella sezione «Per quanto tempo conserviamo i dati»: le fatture che la legge ci obbliga a conservare per sette anni, il registro delle scelte sui cookie e l'elenco di esclusione dalla posta, che è conservato proprio perché non Le scriviamo più.
+
 Per esercitare quei diritti, ci contatti a:
 
 **Posta elettronica:** [oren@gotop.co.il](mailto:oren@gotop.co.il)
@@ -337,7 +339,7 @@ In Israele siamo soggetti alla legge sulla protezione della privacy, 5741-1981, 
 
 Conserviamo i dati unicamente per il tempo necessario alla finalità per la quale sono stati raccolti:
 
-- **Account e contenuto prodotto per Lei:** per la vita dell'account, e fino a 90 giorni dopo la sua cancellazione, perché una cancellazione accidentale possa essere annullata. In seguito sono eliminati.
+- **Account e contenuto prodotto per Lei:** per la vita dell'account. La cancellazione dell'account dalla schermata delle impostazioni elimina subito tutti i siti, i loro dati, i file che Lei ha caricato e l'accesso stesso. Non c'è alcun periodo di attesa e nulla può essere ripristinato.
 - **Scritture di fatturazione e fatture:** sette anni, come esige la legislazione fiscale israeliana. Non abbiamo alcun margine di apprezzamento al riguardo, anche se Lei chiede la cancellazione.
 - **Credenziali di connessione** (WordPress, Shopify, Search Console): fino a quando Lei si disconnette o cancella l'account, e sono poi eliminate immediatamente.
 - **Verifica gratuita del sito:** conservata in cache fino a 24 ore, poi eliminata se da essa non è stato aperto alcun account.
@@ -438,4 +440,4 @@ Se Lei ha domande sulla presente informativa sulla privacy, ci contatti:
 
 **Telefono:** 054-9489377
 
-Ultimo aggiornamento: 21 ottobre 2026
+Ultimo aggiornamento: 1 novembre 2026

@@ -3,7 +3,7 @@ title: Politique de confidentialité | Go Top SEO
 description: Politique de confidentialité de Go Top SEO : comment nous collectons, utilisons et protégeons vos données.
 locale: fr
 source: app/(public)/en/privacy/page.tsx
-lastUpdated: 2026-10-21
+lastUpdated: 2026-11-01
 register: vous
 extraSections: 2
 extraReason: Two extra sections. The first, "Droits des résidents en France et dans l'Union européenne (RGPD)", placed beside the existing EEA/UK and United States rights sections, because French readers are owed the one-month deadline of Art. 12(3), the CNIL as their own supervisory authority, and a plain statement about the officer and the representative we have not appointed. What the RGPD adds elsewhere stays inside the sections it belongs to - the legal bases of Art. 6 and the international-transfer rule of Chapter V. The second, "Droits des résidents du Québec (Loi 25)", is a different statute and not a dialect of the first: a reader in Quebec is governed by the Act respecting the protection of personal information in the private sector (P-39.1) as amended by Law 25, which requires a person in charge of the protection of personal information who is not an RGPD data protection officer, an assessment before any communication outside Quebec, information at the time an automated decision is made, portability since September 2024 and notice of a confidentiality incident to the Commission d'acces a l'information du Quebec - none of which an RGPD-shaped section covers. One document, two sections, because splitting them would leave a Quebec reader reading French law that does not govern them.
@@ -245,6 +245,8 @@ Conformément à la législation applicable en matière de vie privée, vous ave
 - Vous opposer à certains traitements
 - Demander la portabilité des données
 
+**Supprimer le compte vous-même.** Au bas de l'écran des réglages se trouve un bouton qui supprime tout le compte : tous les sites, leurs données, les fichiers que vous avez importés et l'accès lui-même. La suppression est immédiate et irréversible. Si le compte a un abonnement actif, annulez-le d'abord auprès de celui qui vous facture et, pour une boutique Shopify, désinstallez l'application, parce que nous ne pouvons pas arrêter un prélèvement à votre place. Le contenu déjà publié sur votre propre site, sur votre fiche d'établissement Google ou dans votre boutique reste là où il a été publié et doit y être supprimé. Ce qui n'est pas effacé avec le compte figure dans la section « Combien de temps nous conservons les données » : les factures que la loi nous oblige à conserver sept ans, le journal des choix de cookies et la liste d'exclusion du courrier, qui est conservée précisément pour que nous ne vous écrivions plus jamais.
+
 Pour exercer ces droits, contactez-nous à :
 
 **Courriel :** [oren@gotop.co.il](mailto:oren@gotop.co.il)
@@ -337,7 +339,7 @@ En Israël, nous sommes soumis à la loi sur la protection de la vie privée, 57
 
 Nous conservons les données uniquement pendant la durée nécessaire à la finalité pour laquelle elles ont été collectées :
 
-- **Compte et contenu produit pour vous :** pendant la vie du compte, et jusqu'à 90 jours après sa suppression, pour qu'une suppression accidentelle puisse être annulée. Ensuite, elles sont effacées.
+- **Compte et contenu produit pour vous :** pendant la vie du compte. La suppression du compte depuis l'écran des réglages efface immédiatement tous les sites, leurs données, les fichiers que vous avez importés et l'accès lui-même. Il n'y a pas de délai d'attente et rien ne peut être rétabli.
 - **Registres de facturation et factures :** sept ans, comme l'exige la législation fiscale israélienne. Nous n'avons aucune marge d'appréciation à ce sujet, même si vous demandez l'effacement.
 - **Identifiants de connexion** (WordPress, Shopify, Search Console) : jusqu'à ce que vous vous déconnectiez ou que vous supprimiez le compte, et ils sont ensuite effacés immédiatement.
 - **Vérification gratuite du site :** mise en cache jusqu'à 24 heures, puis effacée si aucun compte n'a été ouvert à partir d'elle.
@@ -454,4 +456,4 @@ Si vous avez des questions sur la présente politique de confidentialité, conta
 
 **Téléphone :** 054-9489377
 
-Dernière mise à jour le 21 octobre 2026
+Dernière mise à jour le 1er novembre 2026

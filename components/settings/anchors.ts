@@ -19,6 +19,8 @@ export const SECTION = {
   siteAutoFix: 'site-auto-fix',
   googleAds: 'google-ads',
   danger: 'danger',
+  /** The ACCOUNT, not the project: the last card on the screen (components/settings/AccountDeleteCard.tsx). */
+  account: 'account',
 } as const
 
 /**

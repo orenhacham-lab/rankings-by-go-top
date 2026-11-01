@@ -439,6 +439,28 @@ export const projectSettingsIt: DeepPartial<DashboardDictionary> = {
       deleteBody: 'Il sito e tutti i suoi dati vengono eliminati: parole chiave, rilevamenti, articoli e dati di Search Console. L’operazione è irreversibile.',
       delete: 'Eliminare definitivamente',
     },
+    account: {
+      title: 'Eliminare il Suo account',
+      body: 'Un’azione su tutto l’account, non su un singolo sito.',
+      deleteTitle: 'Eliminare l’account e tutti i suoi siti',
+      deleteBody: 'Tutti i siti dell’account e i loro dati vengono eliminati, insieme all’accesso e all’indirizzo e-mail stesso. L’eliminazione è immediata e non si può annullare.',
+      externalNote: 'I contenuti già pubblicati, un articolo sul Suo sito, un post sul Suo profilo dell’attività su Google o un post nel Suo negozio Shopify, restano dove sono stati pubblicati e vanno rimossi lì.',
+      delete: 'Eliminare l’account',
+      confirmTitle: 'Eliminare questo account?',
+      confirmBody: 'Tutti i siti e tutti i loro dati vengono eliminati subito: parole chiave, scansioni, articoli, le immagini che ha caricato e i dati di Search Console. Anche l’accesso viene eliminato e nulla può essere ripristinato.',
+      confirmPrompt: 'Per confermare, digiti l’indirizzo e-mail dell’account: {email}',
+      confirm: 'Eliminare definitivamente',
+      deleting: 'Eliminazione…',
+      cancel: 'Annulla',
+      errors: {
+        not_signed_in: 'La sessione è scaduta. Acceda di nuovo e riprovi.',
+        confirmation_mismatch: 'L’indirizzo e-mail non corrisponde. Lo digiti esattamente come appare sopra.',
+        subscription_active: 'Questo account ha un abbonamento attivo. Lo annulli prima dalla schermata di fatturazione oppure, se la fatturazione passa da Shopify, disinstalli l’app dal Suo negozio. Dopo potrà eliminare l’account.',
+        admin_account: 'Un account di amministrazione non può essere eliminato da questa schermata.',
+        storage_incomplete: 'Non è stato possibile rimuovere alcuni file, quindi non è stato eliminato nulla. Riprovi tra qualche minuto.',
+        delete_failed: 'L’eliminazione non è riuscita e non è stato eliminato nulla. Riprovi tra qualche minuto.',
+      },
+    },
   },
 }
 

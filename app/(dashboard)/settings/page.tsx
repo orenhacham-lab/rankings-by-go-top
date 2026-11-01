@@ -35,6 +35,7 @@ import OfficialProfilesCard from '@/components/settings/OfficialProfilesCard'
 import { useArticleSettings } from '@/components/settings/useArticleSettings'
 import type { RedetectChain } from '@/components/settings/useRedetect'
 import type { RedetectSection } from '@/lib/project-settings/types'
+import AccountDeleteCard from '@/components/settings/AccountDeleteCard'
 import DangerZone from '@/components/settings/DangerZone'
 import Notice from '@/components/settings/Notice'
 import ProfileCard from '@/components/settings/ProfileCard'
@@ -255,6 +256,8 @@ function ProjectSettings({ project, reload }: { project: Project; reload: () => 
   // The card hides itself while its table is not installed; the index follows it.
   if (autoFixShown) index.push({ id: SECTION.siteAutoFix, label: dict.siteHealth.autofix.auto.title })
   index.push({ id: SECTION.danger, label: t.danger.title })
+  // The account itself, after the project: the widest action on the screen comes last.
+  index.push({ id: SECTION.account, label: t.account.title })
 
   return (
     <div ref={rootRef}>
@@ -369,6 +372,9 @@ function ProjectSettings({ project, reload }: { project: Project; reload: () => 
             <ReminderEmailsCard projectId={project.id} uiLocale={uiLocale} />
 
             <DangerZone project={project} deleteLabels={dict.projects.deleteDialog} t={t} />
+
+            {/* The whole account, every project with it: the merchant's own erasure right. */}
+            <AccountDeleteCard t={t.account} />
           </div>
 
           <aside className="hidden xl:block">

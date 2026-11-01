@@ -3,7 +3,7 @@ title: Política de Privacidade | Go Top SEO
 description: Política de privacidade do Go Top SEO.
 locale: pt-BR
 source: app/(public)/en/privacy/page.tsx
-lastUpdated: 2026-10-16
+lastUpdated: 2026-11-01
 register: voce
 extraSections: 1
 extraReason: One extra section, "Direitos de residentes no Brasil (LGPD)", placed beside the existing EEA/UK and United States rights sections, because the LGPD gives a different set of rights with a different deadline and a different authority to complain to. What the LGPD adds elsewhere goes inside the sections it belongs to - the legal bases of Art. 7, the international-transfer rule of Art. 33, and the communication channel that stands in for an appointed officer.
@@ -241,6 +241,8 @@ Conforme a legislação de privacidade aplicável, você tem direito a:
 - Opor-se a determinados tratamentos
 - Solicitar a portabilidade dos dados
 
+**Excluir a conta você mesmo.** No fim da tela de configurações há um botão que exclui a conta inteira: todos os sites, os dados deles, os arquivos que você enviou e o próprio acesso. A exclusão é imediata e não pode ser desfeita. Se a conta tiver uma assinatura ativa, cancele primeiro com quem cobra de você e, no caso de uma loja Shopify, desinstale o app, porque não podemos interromper uma cobrança no seu lugar. O conteúdo já publicado no seu site, no seu Perfil da Empresa no Google ou na sua loja continua onde foi publicado e precisa ser removido lá. O que não é apagado junto com a conta está na seção "Por quanto tempo guardamos os dados": as notas fiscais que a lei nos obriga a guardar por sete anos, o registro das escolhas de cookies e a lista de exclusão de e-mail, que é guardada justamente para que nunca escrevamos para você de novo.
+
 Para exercer esses direitos, fale com a gente:
 
 **E-mail:** [oren@gotop.co.il](mailto:oren@gotop.co.il)
@@ -333,7 +335,7 @@ Em Israel, estamos sujeitos à Lei de Proteção da Privacidade, 5741-1981, incl
 
 Guardamos os dados apenas pelo tempo necessário à finalidade da coleta:
 
-- **Conta e conteúdo gerado para você:** durante a vida da conta e até 90 dias depois da exclusão, para que uma exclusão acidental possa ser desfeita. Depois, apagados.
+- **Conta e conteúdo gerado para você:** durante a vida da conta. Excluir a conta na tela de configurações apaga na hora todos os sites, os dados deles, os arquivos que você enviou e o próprio acesso. Não há prazo de espera e nada pode ser restaurado.
 - **Registros de faturamento e notas:** sete anos, como a lei tributária de Israel exige. Aqui não temos discricionariedade, mesmo se você pedir a eliminação.
 - **Credenciais de conexão** (WordPress, Shopify, Search Console): até você desconectar ou excluir a conta, e então apagadas imediatamente.
 - **Verificação gratuita do site:** em cache por até 24 horas e então apagada, se nenhuma conta tiver sido aberta a partir dela.
@@ -443,4 +445,4 @@ Se você tiver dúvidas sobre esta política de privacidade, fale com a gente:
 
 **Telefone:** [054-9489377](tel:0549489377)
 
-Esta política foi atualizada pela última vez em 16 de outubro de 2026
+Esta política foi atualizada pela última vez em 1º de novembro de 2026

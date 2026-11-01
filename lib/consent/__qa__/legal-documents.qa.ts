@@ -126,9 +126,12 @@ function main() {
     // company's English name, while the Hebrew ones stayed at 12 October. On
     // 16 October 2026 both the terms and the privacy policy moved again, in all
     // four languages, for the clause on an AI photo in a Business Profile post;
-    // the accessibility statement did not change. The dates are per document.
+    // the accessibility statement did not change. On 1 November 2026 the privacy
+    // policy alone moved, for the account-deletion route: its retention section
+    // had promised a 90-day undo window for a deletion that had no route at all.
+    // The dates are per document.
     check('D2: every document that was changed carries the new date',
-      /16 באוקטובר 2026/.test(read(HE_PRIVACY)) && /October 16, 2026/.test(read(EN_PRIVACY))
+      /1 בנובמבר 2026/.test(read(HE_PRIVACY)) && /November 1, 2026/.test(read(EN_PRIVACY))
       && /16 באוקטובר 2026/.test(read(HE_TERMS)) && /October 16, 2026/.test(read(EN_TERMS))
       && /5 באוקטובר 2026/.test(read(HE_A11Y)) && /October 5, 2026/.test(read(EN_A11Y)))
   }
