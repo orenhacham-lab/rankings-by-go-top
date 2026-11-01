@@ -317,6 +317,27 @@ check('MUTATION — an English-only extra section is caught', pages.he.terms.h2 
     'toolradar.com': 'our own claimed listing, named in Organization.sameAs; not fetched',
     'www.vettoria.it': 'our own listing, named in Organization.sameAs; not fetched',
     'help.shopify.com': 'a documentation link shown to a merchant',
+    // The operator documentation each row of the open AI-crawler dataset
+    // (lib/ai-crawlers/dataset.ts) cites, so a consumer of
+    // /api/public/ai-crawlers can check the claim at its source. Every one is
+    // a URL printed in a JSON payload for a reader to follow; the route makes
+    // no outbound request at all (pinned by lib/ai-crawlers/__qa__/
+    // public-dataset.qa.ts, guard C1), so nothing of anyone's is sent to any
+    // of them. developers.google.com and wordpress.org are already in this
+    // list.
+    'developers.openai.com': 'operator documentation cited by the open crawler dataset; not fetched',
+    'support.claude.com': 'operator documentation cited by the open crawler dataset; not fetched',
+    'docs.perplexity.ai': 'operator documentation cited by the open crawler dataset; not fetched',
+    'support.apple.com': 'operator documentation cited by the open crawler dataset; not fetched',
+    'developers.facebook.com': 'operator documentation cited by the open crawler dataset; not fetched',
+    'developer.amazon.com': 'operator documentation cited by the open crawler dataset; not fetched',
+    'www.bing.com': 'operator documentation cited by the open crawler dataset; not fetched',
+    'commoncrawl.org': 'operator documentation cited by the open crawler dataset; not fetched',
+    'allenai.org': 'operator documentation cited by the open crawler dataset; not fetched',
+    'www.diffbot.com': 'operator documentation cited by the open crawler dataset; not fetched',
+    // The licence the dataset is published under, named in the payload so a
+    // consumer knows what attribution it owes. A link, not a fetch.
+    'creativecommons.org': 'the CC BY 4.0 licence the open dataset names; not fetched',
     // JVZoo's vendor agreement, cited in lib/marketplace/config.ts as the
     // source of the clauses that decide who the seller of record is. A link in
     // a comment, like docs.creem.io above: not fetched, and nothing of a
