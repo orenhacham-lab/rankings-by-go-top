@@ -18,8 +18,8 @@
  * semantics) through injected dependencies. Run:
  *   npx tsx lib/reports/monthly/__qa__/monthly-report.qa.ts
  */
-import { readFileSync, readdirSync, statSync } from 'fs'
-import { join, relative } from 'path'
+import { readFileSync, readdirSync, statSync, unlinkSync, writeFileSync } from 'fs'
+import { join, relative, sep } from 'path'
 import { createElement } from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
 import { FakeAdmin } from '../../../__qa__/_fake-admin'
@@ -49,6 +49,12 @@ function check(name: string, cond: boolean, detail?: string) {
 }
 const ROOT = join(__dirname, '..', '..', '..', '..')
 const read = (p: string) => readFileSync(join(ROOT, p), 'utf8')
+/** A mutation-control copy another suite is holding open — see the walk in section M. */
+const MUTANT = /\.mut\d+\.tsx?$/
+/** The file's text, or null when it is no longer on disk. */
+const readIfThere = (p: string): string | null => {
+  try { return read(p) } catch (err) { if ((err as { code?: string }).code === 'ENOENT') return null; throw err }
+}
 const strip = (s: string) => s.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\{\/\*[\s\S]*?\*\/\}/g, '').replace(/(^|[^:'"`])\/\/.*$/gm, '$1')
 
 // Every fetch made during this suite is recorded: the report must reach nothing.
@@ -539,10 +545,27 @@ async function main() {
     check('M6: the switch no longer claims sending is off, in any language',
       (['he', 'en', 'es', 'pt-BR'] as const).every((l) => !/not switched on|todavía no está activado|ainda não está ativado|עוד לא הופעלה/.test(monthlyCopy(l).email.cadence)))
 
+    // A mutant is put on disk FIRST, so the walk below runs against the exact state that
+    // ended this suite on 1 November 2026: a *.mutN.ts beside a real module, written by
+    // weekly-summary.qa.ts and deleted the moment its check is done.
+    const DECOY = 'lib/reports/weekly/run.mut99.ts'
+    writeFileSync(join(ROOT, DECOY), "export const runWeeklySummaries = 0\n")
+    // Whatever happens between here and the delete below, the decoy does not survive this
+    // process: a *.mutN.ts left in the tree is exactly the confusion this section is about.
+    process.on('exit', () => { try { unlinkSync(join(ROOT, DECOY)) } catch { /* already gone */ } })
+
     const files: string[] = []
     const walk = (dir: string) => {
       for (const f of readdirSync(join(ROOT, dir))) {
         if (f === 'node_modules' || f.startsWith('.')) continue
+        // A MUTANT another suite is holding open. lib/reminders/__qa__/_mutant.ts writes a
+        // broken copy of a source file NEXT TO the original, so its relative imports still
+        // resolve, and deletes it when its check is done. verify runs suites in parallel, so
+        // weekly-summary.qa.ts's lib/reports/weekly/run.mut7.ts existed when this walk listed
+        // it and was gone by the time the read below reached it, which ended this whole suite
+        // on an ENOENT and reported it as a NEW failure that said nothing about the code.
+        // A mutant is never source, so it is skipped here rather than read and forgiven.
+        if (MUTANT.test(f)) continue
         const rel = join(dir, f)
         if (statSync(join(ROOT, rel)).isDirectory()) walk(rel)
         else if (/\.(ts|tsx)$/.test(f) && !rel.includes('__qa__')) files.push(rel)
@@ -554,7 +577,10 @@ async function main() {
     const importers = (list: { f: string; s: string }[]) => list
       .filter(({ f, s }) => !f.replace(/\\/g, '/').startsWith('lib/reports/weekly/') && /from ['"][^'"]*reports\/weekly\/(run|live|store|email)['"]/.test(s))
       .map(({ f }) => f)
-    const sources = files.map((f) => ({ f, s: strip(read(f)) }))
+    // Even with mutants skipped, a file listed by the walk can be gone by the time it is
+    // read — a sibling suite's temp file, or a checkout underneath us. A file that is no
+    // longer there cannot import anything, so it is dropped instead of ending the suite.
+    const sources = files.flatMap((f) => { const s2 = readIfThere(f); return s2 === null ? [] : [{ f, s: strip(s2) }] })
     // lib/reminders/http.ts is the one exception, and only for the unsubscribe write.
     const outside = importers(sources).filter((f) => !f.replace(/\\/g, '/').endsWith('lib/reminders/http.ts'))
     check('M7: only the weekly module and the unsubscribe route reach the weekly sender', outside.length === 0, outside.join())
@@ -563,6 +589,20 @@ async function main() {
         .filter((f) => !f.replace(/\\/g, '/').endsWith('lib/reminders/http.ts')).length === 1)
     const own = files.filter((f) => /lib\/reports\/monthly\/|components\/reports\/monthly\/|app\/api\/reports\/monthly\//.test(f.replace(/\\/g, '/')))
     const mails = (s: string) => /resend|nodemailer|sendgrid|postmark|mailgun|smtp|signup-email/i.test(s)
+    // The race itself, with the decoy still on disk.
+    check('M9: a mutant another suite is holding open is skipped by the walk, and the suite lives',
+      !files.includes(DECOY.replace(/\//g, sep)) && !files.some((f) => MUTANT.test(f)) && sources.length > 100, `${files.length} files, ${sources.length} read`)
+    check('M-MUT3: without the mutant filter the decoy WOULD be walked',
+      readdirSync(join(ROOT, 'lib/reports/weekly')).some((f) => /\.mut\d+\.tsx?$/.test(f)))
+    check('M-MUT4: the filter matches a mutant and spares the module it was copied from',
+      MUTANT.test('run.mut7.ts') && MUTANT.test('photo.mut12.tsx') && !MUTANT.test('run.ts') && !MUTANT.test('mutate.ts'))
+    unlinkSync(join(ROOT, DECOY))
+    // A file listed and then deleted: the read must give up on that file, not on the suite.
+    check('M10: a file that vanished between the walk and the read is dropped', readIfThere(DECOY) === null)
+    check('M-MUT5: a read error that is NOT a missing file still throws', (() => {
+      try { readIfThere('lib'); return false } catch { return true }
+    })())
+
     check(`M8: none of the report's ${own.length} files reaches an email provider`, own.length >= 12 && own.every((f) => !mails(strip(read(f)))), own.filter((f) => mails(strip(read(f)))).join())
     check('M-MUT2: a monthly file that loads resend fails M8', mails(strip(read('lib/reports/monthly/store.ts')) + "\nconst { Resend } = await import('resend')"))
   }
