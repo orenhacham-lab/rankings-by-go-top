@@ -19,6 +19,7 @@ import { buildGbpAuthUrl, createPkcePair, exchangeGbpCode, grantIncludesGbpScope
 import { listAllLocations, type GbpLocation } from './api'
 import { validatePostInput, GBP_CTA_TYPES, normalizePostLanguage } from './validate'
 import { preparePostImage, GBP_SOURCE_TYPES, GBP_SOURCE_MAX_BYTES, type CropBox } from './image'
+import { postImagePath, isPostImagePath, removePostImage } from './image-store'
 import { draftPost, type Generate } from './draft'
 import { generateTopicImage, GBP_TOPIC_MAX, type GenerateTopicImage } from './topic-image'
 import { imageGenerationHttpStatus } from '@/lib/content/image-generation-http'
@@ -514,7 +515,7 @@ export async function handleImage(req: Request, deps: GbpRouteDeps & { newId?: (
   const prepared = await preparePostImage(Buffer.from(await file.arrayBuffer()), crop)
   if (!prepared.ok) return err(prepared.code, 400)
   const id = (deps.newId ?? (() => crypto.randomUUID()))()
-  const path = `${g.project.id}/gbp/${id}.jpg`
+  const path = postImagePath(g.project.id, id)
   const up = await g.admin.storage.from(CONTENT_IMAGE_BUCKET).upload(path, prepared.bytes, { contentType: 'image/jpeg', upsert: false })
   if (up.error) return err('image_upload_failed', 500)
   const { data: pub } = g.admin.storage.from(CONTENT_IMAGE_BUCKET).getPublicUrl(path)
@@ -543,7 +544,7 @@ export async function handleCreatePost(req: Request, deps: GbpRouteDeps): Promis
   let imagePath: string | null = null
   let imageUrl: string | null = null
   if (typeof body.imagePath === 'string' && body.imagePath) {
-    if (!new RegExp(`^${g.project.id}/gbp/[0-9a-f-]{36}\\.jpg$`).test(body.imagePath)) return err('image_invalid', 400)
+    if (!isPostImagePath(g.project.id, body.imagePath)) return err('image_invalid', 400)
     imagePath = body.imagePath
     imageUrl = g.admin.storage.from(CONTENT_IMAGE_BUCKET).getPublicUrl(imagePath).data.publicUrl
     if (!/^https:\/\//.test(imageUrl)) return err('image_invalid', 400)
@@ -555,9 +556,15 @@ export async function handleCreatePost(req: Request, deps: GbpRouteDeps): Promis
     sourceArticleId = data ? String((data as { id: string }).id) : null
   }
 
+  // From here on the photo is already in storage, at a PUBLIC url, while the post
+  // that would justify it may never exist. Every way out of this handler that
+  // leaves no row behind takes our copy with it; otherwise the first upload of a
+  // merchant who hit a 409 would sit there, served, forever.
+  const abandon = async (res: Response) => { if (imagePath) await removePostImage(g.admin, g.project.id, imagePath); return res }
+
   let location
-  try { location = await readProjectLocation(g.admin, g.project.id) } catch (e) { return storeFail(e) }
-  if (!location) return err('no_location', 409)
+  try { location = await readProjectLocation(g.admin, g.project.id) } catch (e) { return abandon(storeFail(e)) }
+  if (!location) return abandon(err('no_location', 409))
 
   let row: GbpPostRow
   try {
@@ -567,7 +574,7 @@ export async function handleCreatePost(req: Request, deps: GbpRouteDeps): Promis
       image_url: imageUrl, image_path: imagePath, language_code: normalizePostLanguage(body.language) ?? 'he',
       scheduled_at: checked.value.scheduledAt ?? new Date().toISOString(),
     })
-  } catch (e) { return storeFail(e) }
+  } catch (e) { return abandon(storeFail(e)) }
 
   if (checked.value.scheduledAt) return json({ ok: true, post: sanitizePost(row), outcome: 'scheduled' })
   const out = await publishPost(g.admin, row.id, deps.publish ?? defaultPublishDeps)
@@ -581,8 +588,16 @@ export async function handleCancelPost(req: Request, postId: string, deps: GbpRo
   if (g instanceof Response) return g
   if (!/^[0-9a-f-]{36}$/.test(postId)) return err('not_found', 404)
   try {
+    // Read the photo's path BEFORE the cancel: once the row says cancelled there
+    // is nothing left that needs it, and a cancelled post was never published, so
+    // Google never fetched it and our copy is the only one there is.
+    const existing = await readProjectPost(g.admin, g.project.id, postId).catch(() => null)
     const ok = await cancelPost(g.admin, g.project.id, postId)
-    return ok ? json({ ok: true }) : err('not_found', 404)
+    if (!ok) return err('not_found', 404)
+    // The cancel is what the merchant asked for and it has happened. A photo we
+    // could not remove is logged by removePostImage and does not fail their request.
+    if (existing?.image_path) await removePostImage(g.admin, g.project.id, existing.image_path)
+    return json({ ok: true })
   } catch (e) { return storeFail(e) }
 }
 

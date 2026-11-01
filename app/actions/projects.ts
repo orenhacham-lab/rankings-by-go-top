@@ -9,6 +9,7 @@ import { buildQuotaError, EntitlementUnavailableError, isEntitlementUnknown } fr
 import { actionMessages, asActionResult, type ActionResult } from '@/lib/i18n/action-messages'
 import { UserFacingError } from '@/lib/i18n/user-facing-error'
 import { deleteOwnedRecord, type DeleteOwnedResult } from '@/lib/data/delete-owned-record'
+import { removeAllPostImages } from '@/lib/gbp/image-store'
 
 // Note: createProjectAction is deprecated - project creation now uses API route /api/projects/create
 // Kept here for backwards compatibility if needed
@@ -122,6 +123,16 @@ export async function toggleProjectActiveAction(id: string, isActive: boolean) {
  * GSC per-project data, …). The per-user gsc_connections is NOT FK'd to projects
  * and is deliberately left intact. No remote WordPress/Shopify article is touched.
  * Reversible deactivation stays a separate action (toggleProjectActiveAction).
+ *
+ * STORAGE IS NOT CASCADED. A foreign key reaches rows, not objects, so deleting
+ * the project leaves its files where they are. For a Maps-post photo that is not
+ * merely untidy: our copy sits at a public url that we keep serving (see
+ * lib/gbp/image-store.ts), so a merchant-uploaded photo of a person would stay
+ * published by us after the project it belonged to is gone. The removal runs
+ * AFTER the row delete, which is what proves the project was the caller's — the
+ * admin client used for storage enforces nothing by itself — and a removal that
+ * fails is logged without turning a completed delete into an error the merchant
+ * must act on.
  */
 export async function deleteProjectAction(id: string): Promise<DeleteOwnedResult | { ok: false; error: 'not_authenticated' }> {
   const supabase = await createClient()
@@ -129,6 +140,7 @@ export async function deleteProjectAction(id: string): Promise<DeleteOwnedResult
   if (!user) return { ok: false, error: 'not_authenticated' }
   const res = await deleteOwnedRecord(supabase, 'projects', id, user.id)
   if (res.ok) {
+    await removeAllPostImages(createAdminClient(), id)
     revalidatePath('/projects')
     revalidatePath('/dashboard')
   }
