@@ -38,6 +38,7 @@ import {
 import { publicLocaleEnabled } from '@/lib/i18n/locales'
 import { checkTruthLimits, plainText } from '@/lib/blog/auto/truth-limits'
 import { placeholderContext, runQualityGate } from '@/lib/content/automation/quality-gate'
+import { wordCount } from '@/lib/text/segment'
 import {
   CANNIBAL_OVERLAP, EXCLUDED_PATTERNS, MIN_MONTHLY_SEARCHES, RESEARCH_MARKET, RESEARCH_SEEDS,
   keywordOverlap, keywordTokens, keywordDifficulty, selectKeywords,
@@ -572,6 +573,45 @@ async function main() {
     /\bTODO\b/i.test('sobre todo') && /\bTODO\b/i.test('Método')
     && !/(?<!\p{L})(?:TODO|TBD|FIXME)(?!\p{L})/u.test('sobre todo')
     && !/(?<!\p{L})(?:TODO|TBD|FIXME)(?!\p{L})/u.test('Método'))
+
+  /*
+   * I9b-I9e: THE GATE MUST NOT REFUSE A LANGUAGE FOR WRITING WITHOUT SPACES.
+   * The same shape as I6-I9, one measurement further on. The length check split
+   * on whitespace, and a full-length Japanese article is a handful of
+   * whitespace tokens, so the gate answered `content_too_short` for every one —
+   * while the generator's own audit, which segments (article-audit.ts
+   * `words()`), had already passed the very same body. Measured on production on
+   * 1 Nov 2026: eight researched Japanese topics planned, nothing published,
+   * `quality:content_too_short` on all three attempts.
+   * The body below is ordinary Japanese prose of a normal article's length.
+   */
+  const JA_BODY = [
+    '<p>検索順位を上げるために何から始めればよいのか、迷う方は多いです。この記事では、サイトの現状を確かめる手順から、改善の優先順位の決め方までを順番に説明します。</p>',
+    '<h2>まず現状を数字で確かめます</h2>',
+    '<p>最初に行うのは、いまどのキーワードで何位に表示されているかの確認です。順位は毎日変わりますので、月に一度の計測でも傾向はつかめます。計測していない状態で施策を増やしても、何が効いたのか分かりません。</p>',
+    '<p>表示速度も同じです。画像の容量が大きいだけで、読み込みに数秒かかることがあります。訪問者は待ってくれませんので、速度の改善は内容の改善と同じくらい重要です。</p>',
+    '<h2>キーワードは検索されている言葉を選びます</h2>',
+    '<p>社内で使っている言い方と、実際に検索されている言い方は違うことがよくあります。月間の検索数を確かめてから記事の題材を決めると、読まれない記事を書く時間を減らせます。</p>',
+    '<p>すでに上位に表示されている自社の記事と似た題材を選ぶと、二つの記事が互いに順位を奪い合います。新しい記事を書く前に、同じ主題の記事がないかを確かめてください。</p>',
+    '<h2>内部リンクで記事をつなぎます</h2>',
+    '<p>関連する記事どうしをつなぐと、読者は次に読むものを見つけやすくなり、検索エンジンもサイトの構造を理解しやすくなります。文章の流れに合う場所に、自然な言葉で入れることが大切です。</p>',
+    '<p>Go Top SEO では、ここまでの手順を自動で進めます。順位の計測、記事の作成、内部リンクの設置までを一つの画面で管理できます。</p>',
+  ].join('')
+  const JA_TEXT = JA_BODY.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim()
+  check('I9b: a full-length Japanese article passes the gate',
+    runQualityGate({ title: 'SEOの始め方', slug: 'ja-seo-start', content_html: JA_BODY }).ok,
+    JSON.stringify(runQualityGate({ title: 'SEOの始め方', slug: 'ja-seo-start', content_html: JA_BODY }).failures))
+  check('I9c (mutation control): the whitespace split is what refused it — 13 tokens against 382 words',
+    JA_TEXT.split(/\s+/).filter(Boolean).length < 150 && wordCount(JA_TEXT) >= 150,
+    JSON.stringify({ spaced: JA_TEXT.split(/\s+/).filter(Boolean).length, segmented: wordCount(JA_TEXT) }))
+  check('I9d: a genuinely short Japanese body is still refused',
+    runQualityGate({ title: '表示速度の改善', slug: 'ja-short', content_html: '<p>短い本文です。これだけでは足りません。</p>' })
+      .failures.includes('content_too_short'))
+  check('I9e: the spaced languages are measured exactly as before',
+    !runQualityGate({ title: 'כותרת', slug: 'a', content_html: `<p>${WORDS}</p>` }).failures.includes('content_too_short')
+    && runQualityGate({ title: 'כותרת', slug: 'a', content_html: '<p>שלוש מילים בלבד</p>' }).failures.includes('content_too_short')
+    && /wordCount\(/.test(stripComments(read('lib/content/automation/quality-gate.ts')))
+    && !/split\(\/\\s\+\//.test(stripComments(read('lib/content/automation/quality-gate.ts'))))
 
   /*
    * I10-I11: A LANGUAGE THAT CANNOT RESEARCH MUST SAY SO.
