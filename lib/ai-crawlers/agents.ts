@@ -79,7 +79,10 @@ export const AI_CRAWLERS: readonly AiCrawler[] = [
   // ── Microsoft / Apple / Meta / Amazon ─────────────────────────────────────
   { token: 'Applebot-Extended', operator: 'Apple', purpose: 'train', respectsRobots: true },
   { token: 'Meta-ExternalAgent', operator: 'Meta', purpose: 'train', respectsRobots: true },
-  { token: 'meta-externalfetcher', operator: 'Meta', purpose: 'answer', respectsRobots: true },
+  // Meta's own crawler page: "The Meta-ExternalFetcher crawler may bypass
+  // robots.txt because it performs fetches that were requested by the user."
+  // Read 01.11.2026 at developers.facebook.com/docs/sharing/webmasters/web-crawlers/
+  { token: 'meta-externalfetcher', operator: 'Meta', purpose: 'answer', respectsRobots: false },
   { token: 'Amazonbot', operator: 'Amazon', purpose: 'answer', respectsRobots: true },
 
   // ── The corpus and long-tail crawlers ─────────────────────────────────────
