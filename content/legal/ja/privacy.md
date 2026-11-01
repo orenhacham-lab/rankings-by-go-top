@@ -3,7 +3,7 @@ title: プライバシーポリシー | Go Top SEO
 description: Go Top SEO のプライバシーポリシー。お客様のデータをどのように取得し、利用し、保護するかについて。
 locale: ja
 source: app/(public)/en/privacy/page.tsx
-lastUpdated: 2026-10-30
+lastUpdated: 2026-11-01
 register: desumasu
 extraSections: 1
 extraReason: One extra section, "日本の居住者の権利（個人情報保護法）", placed beside the existing EEA/UK and United States rights sections, because a Japanese reader is owed the publication items of Article 32 of the Act on the Protection of Personal Information, the disclosure, correction and cease-of-use procedures of Articles 33 to 35, the rule of Article 28 on providing data to a third party in a foreign country, the complaint desk, and a plain statement that no personal information protection officer is appointed. What the Act adds elsewhere stays inside the sections it belongs to - the purposes of use in "お客様のデータの利用方法" and the international-transfer rule in "国際的な移転". The Italian document carries its extra section for the GDPR, which is a different statute reached through a different language and has no Japanese counterpart, so it is not translated into a jurisdiction it does not govern.
@@ -245,6 +245,8 @@ PDFShift とは GDPR 第28条に基づくデータ処理の取り決めを結ん
 - 一定の処理に異議を述べること
 - データの可搬性を求めること
 
+**お客様ご自身によるアカウントの削除。** 設定画面の下部に、アカウント全体を削除するボタンがあります。すべてのサイト、そのデータ、お客様がアップロードしたファイル、およびログイン情報そのものが対象です。削除はただちに実行され、取り消すことはできません。アカウントに有効なサブスクリプションがある場合は、まず課金を行っている事業者のもとで解約してください。Shopify ストアの場合はアプリをアンインストールしてください。当社がお客様に代わって課金を止めることはできないからです。お客様のサイト、Google ビジネス プロフィール、またはストアにすでに公開された内容は公開先に残るため、そちらで削除してください。アカウントとともに消去されないものは「データをどれだけの期間保管するか」の章に記載しています。法令により7年間保管する義務のある請求書、クッキーの選択の記録、および配信停止の一覧であり、配信停止の一覧は当社が二度とご連絡しないために保管します。
+
 これらの権利を行使される場合は、次の連絡先までご連絡ください。
 
 **メール：** [oren@gotop.co.il](mailto:oren@gotop.co.il)
@@ -339,7 +341,7 @@ WhatsApp の利用は、WhatsApp および Meta の利用規約とプライバ�
 
 当社は、取得した目的のために必要な期間に限ってデータを保管します。
 
-- **アカウントとお客様のために作成したコンテンツ：** アカウントが存続するあいだ、および誤った削除を取り消せるようにするため、削除後90日まで。その後は消去します。
+- **アカウントとお客様のために作成したコンテンツ：** アカウントが存続するあいだ。設定画面からアカウントを削除すると、すべてのサイト、そのデータ、お客様がアップロードしたファイル、およびログイン情報そのものをただちに消去します。待機期間はなく、復元はできません。
 - **請求の記録と請求書：** イスラエルの税法が求めるとおり7年間。この点について当社に裁量はなく、削除をご依頼いただいた場合も同様です。
 - **接続の認証情報**（WordPress、Shopify、Search Console）：お客様が切断されるかアカウントを削除されるまで。その後は直ちに消去します。
 - **無料のサイト診断：** 最大24時間キャッシュに保管し、そこからアカウントが開設されなかった場合は消去します。
@@ -460,4 +462,4 @@ WhatsApp の利用は、WhatsApp および Meta の利用規約とプライバ�
 
 **電話：** +972-54-9489377
 
-最終更新：2026年10月30日
+最終更新：2026年11月1日

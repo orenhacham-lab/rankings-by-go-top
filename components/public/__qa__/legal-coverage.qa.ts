@@ -152,11 +152,15 @@ const OLD_NAME = /Rankings by Go Top/i
 // company's ENGLISH name: the English documents were revised and the Hebrew ones,
 // which carry the unchanged Hebrew name, were not. They meet again on 16 October
 // 2026, when the clause on an AI photo for a Business Profile post was added to
-// the terms and the privacy policy in all four languages. Each document's date
-// still belongs to that document, and the accessibility statement did not move.
+// the terms and the privacy policy in all four languages. The privacy policy moved
+// on to 1 November 2026, when the account-deletion route was built: the retention
+// section had promised a 90-day undo window for a deletion nobody could perform,
+// and now states that deleting the account erases everything at once. Each
+// document's date still belongs to that document, and neither the terms nor the
+// accessibility statement moved with it.
 const LAST_UPDATED: Record<Doc, Record<Lang, RegExp>> = {
   terms: { he: /16 באוקטובר 2026/, en: /October 16, 2026/ },
-  privacy: { he: /16 באוקטובר 2026/, en: /October 16, 2026/ },
+  privacy: { he: /1 בנובמבר 2026/, en: /November 1, 2026/ },
   a11y: { he: /5 באוקטובר 2026/, en: /October 5, 2026/ },
 }
 for (const lang of ['he', 'en'] as Lang[]) for (const doc of ['terms', 'privacy', 'a11y'] as Doc[]) {

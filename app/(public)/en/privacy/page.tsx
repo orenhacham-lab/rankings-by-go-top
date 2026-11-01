@@ -619,6 +619,18 @@ export default function EnglishPrivacyPage() {
           <li>Object to certain processing</li>
           <li>Request data portability</li>
         </ul>
+        <p className="mt-4">
+          <strong>Deleting the account yourself.</strong> At the bottom of the settings screen is a
+          button that deletes the whole account: every site, its data, the files you uploaded and
+          the login itself. The deletion is immediate and cannot be undone. If the account has an
+          active subscription, cancel it first with whoever bills you, and for a Shopify store
+          uninstall the app, because we cannot stop a charge on your behalf. Content already
+          published on your own site, on your Google Business Profile or in your store stays where
+          it was published and has to be removed there. What is not erased with the account is
+          listed under &ldquo;How Long We Keep Data&rdquo;: invoices the law requires us to keep for
+          seven years, the cookie-choice log, and the email suppression list, which is kept
+          precisely so that we never write to you again.
+        </p>
         <p className="mt-4">To exercise these rights, contact us at:</p>
         <p className="mt-2">
           <strong>Email:</strong>{' '}
@@ -835,8 +847,9 @@ export default function EnglishPrivacyPage() {
         <p>We keep data only as long as it is needed for the purpose it was collected for:</p>
         <ul>
           <li><strong>Account and the content generated for you:</strong> for the life of the
-          account, and up to 90 days after it is deleted so an accidental deletion can be undone.
-          Then erased.</li>
+          account. Deleting the account from the settings screen erases every site, its data, the
+          files you uploaded and the login itself straight away. There is no waiting period, and
+          nothing can be restored.</li>
           <li><strong>Billing records and invoices:</strong> seven years, as Israeli tax law
           requires. We have no discretion here, even if you ask for erasure.</li>
           <li><strong>Connection credentials</strong> (WordPress, Shopify, Search Console): until you
@@ -1077,7 +1090,7 @@ export default function EnglishPrivacyPage() {
 
       <section>
         <p className={LEGAL_FOOTNOTE}>
-          This policy was last updated on October 16, 2026
+          This policy was last updated on November 1, 2026
         </p>
       </section>
     </LegalDoc>

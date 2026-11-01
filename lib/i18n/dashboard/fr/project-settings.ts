@@ -439,6 +439,28 @@ export const projectSettingsFr: DeepPartial<DashboardDictionary> = {
       deleteBody: 'Le site et toutes ses données sont supprimés : mots-clés, relevés, articles et données Search Console. Cette action est irréversible.',
       delete: 'Supprimer définitivement',
     },
+    account: {
+      title: 'Supprimer votre compte',
+      body: 'Une action sur tout le compte, et non sur un seul site.',
+      deleteTitle: 'Supprimer le compte et tous ses sites',
+      deleteBody: 'Tous les sites du compte et leurs données sont supprimés, ainsi que l’accès et l’adresse e-mail elle-même. La suppression est immédiate et irréversible.',
+      externalNote: 'Le contenu déjà publié, un article sur votre propre site, une publication sur votre fiche d’établissement Google ou une publication dans votre boutique Shopify, reste là où il a été publié et doit y être supprimé.',
+      delete: 'Supprimer le compte',
+      confirmTitle: 'Supprimer ce compte ?',
+      confirmBody: 'Tous les sites et toutes leurs données sont supprimés immédiatement : mots-clés, relevés, articles, les images que vous avez importées et les données Search Console. L’accès disparaît avec eux et rien ne peut être restauré.',
+      confirmPrompt: 'Pour confirmer, saisissez l’adresse e-mail du compte : {email}',
+      confirm: 'Supprimer définitivement',
+      deleting: 'Suppression…',
+      cancel: 'Annuler',
+      errors: {
+        not_signed_in: 'La session a expiré. Reconnectez-vous puis réessayez.',
+        confirmation_mismatch: 'L’adresse e-mail ne correspond pas. Saisissez-la exactement comme elle apparaît ci-dessus.',
+        subscription_active: 'Ce compte a un abonnement actif. Annulez-le d’abord depuis l’écran de facturation ou, si Shopify vous facture, désinstallez l’application de votre boutique. Vous pourrez ensuite supprimer le compte.',
+        admin_account: 'Un compte d’administration ne peut pas être supprimé depuis cet écran.',
+        storage_incomplete: 'Certains fichiers n’ont pas pu être supprimés, donc rien n’a été supprimé. Veuillez réessayer dans quelques minutes.',
+        delete_failed: 'La suppression a échoué et rien n’a été supprimé. Veuillez réessayer dans quelques minutes.',
+      },
+    },
   },
 }
 

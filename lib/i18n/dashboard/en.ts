@@ -710,6 +710,28 @@ export const dashboardEn = {
       deleteBody: 'The project and all of its data are deleted: keywords, scans, articles and Search Console data. This cannot be undone.',
       delete: 'Delete permanently',
     },
+    account: {
+      title: 'Delete your account',
+      body: 'An action on the whole account, not on one site.',
+      deleteTitle: 'Delete the account and every site in it',
+      deleteBody: 'Every site in this account and all of its data are deleted, along with the login and the email address itself. The deletion is immediate and cannot be undone.',
+      externalNote: 'Content already published, an article on your own site, a post on your Google Business Profile or a post in your Shopify store, stays where it was published and has to be removed there.',
+      delete: 'Delete account',
+      confirmTitle: 'Delete this account?',
+      confirmBody: 'Every site and all of its data are deleted right away: keywords, scans, articles, the images you uploaded and Search Console data. The login goes with them, and nothing can be restored.',
+      confirmPrompt: 'To confirm, type the account email address: {email}',
+      confirm: 'Delete permanently',
+      deleting: 'Deleting…',
+      cancel: 'Cancel',
+      errors: {
+        not_signed_in: 'The session has expired. Sign in again and retry.',
+        confirmation_mismatch: 'The email address does not match. Type it exactly as it appears above.',
+        subscription_active: 'This account has an active subscription. Cancel it first on the billing screen, or, if Shopify bills you, uninstall the app from your store. After that the account can be deleted.',
+        admin_account: 'An operator account cannot be deleted from this screen.',
+        storage_incomplete: 'Some of the files could not be removed, so nothing was deleted. Please try again in a few minutes.',
+        delete_failed: 'The deletion failed and nothing was deleted. Please try again in a few minutes.',
+      },
+    },
   },
   // The cannibalization check's warning on a manual path (components/content/OverlapHint.tsx).
   topicOverlap: {

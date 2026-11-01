@@ -3,7 +3,7 @@ title: Política de privacidad | Go Top SEO
 description: Política de privacidad de Go Top SEO: cómo recopilamos, utilizamos y protegemos sus datos.
 locale: es
 source: app/(public)/en/privacy/page.tsx
-lastUpdated: 2026-10-16
+lastUpdated: 2026-11-01
 register: usted
 ---
 
@@ -243,6 +243,8 @@ Conforme a la legislación de privacidad aplicable, usted tiene derecho a:
 - Oponerse a determinados tratamientos
 - Solicitar la portabilidad de los datos
 
+**Eliminar la cuenta usted mismo.** Al final de la pantalla de configuración hay un botón que elimina toda la cuenta: todas las webs, sus datos, los archivos que usted haya subido y el propio acceso. La eliminación es inmediata y no se puede deshacer. Si la cuenta tiene una suscripción activa, cancélela primero con quien le factura y, en el caso de una tienda Shopify, desinstale la aplicación, porque nosotros no podemos detener un cobro en su nombre. El contenido ya publicado en su propia web, en su Perfil de Empresa de Google o en su tienda permanece donde se publicó y debe eliminarlo allí. Lo que no se suprime junto con la cuenta figura en la sección «Cuánto tiempo conservamos los datos»: las facturas que la ley nos obliga a conservar siete años, el registro de las decisiones sobre cookies y la lista de exclusión del correo, que se conserva precisamente para que no volvamos a escribirle.
+
 Para ejercer estos derechos, contáctenos en:
 
 **Correo electrónico:** [oren@gotop.co.il](mailto:oren@gotop.co.il)
@@ -335,7 +337,7 @@ En Israel estamos sujetos a la Ley de Protección de la Privacidad, 5741-1981, i
 
 Conservamos los datos únicamente durante el tiempo necesario para la finalidad para la que se recopilaron:
 
-- **Cuenta y contenido generado para usted:** durante la vida de la cuenta, y hasta 90 días después de su eliminación, para que una eliminación accidental pueda deshacerse. Después se suprimen.
+- **Cuenta y contenido generado para usted:** durante la vida de la cuenta. Eliminar la cuenta desde la pantalla de configuración suprime de inmediato todas las webs, sus datos, los archivos que usted haya subido y el propio acceso. No hay periodo de espera y nada se puede recuperar.
 - **Registros de facturación y facturas:** siete años, según lo exige la legislación tributaria israelí. No tenemos discrecionalidad al respecto, incluso si usted solicita la supresión.
 - **Credenciales de conexión** (WordPress, Shopify, Search Console): hasta que usted se desconecte o elimine la cuenta, y después se suprimen de inmediato.
 - **Verificación gratuita del sitio:** se almacena en caché hasta 24 horas y después se suprime si a partir de ella no se abrió una cuenta.
@@ -424,4 +426,4 @@ Si tiene preguntas sobre esta política de privacidad, contacte con:
 
 **Teléfono:** 054-9489377
 
-Esta política se actualizó por última vez el 16 de octubre de 2026
+Esta política se actualizó por última vez el 1 de noviembre de 2026
