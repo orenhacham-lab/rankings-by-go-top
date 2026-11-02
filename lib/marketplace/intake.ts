@@ -44,6 +44,7 @@
 
 import { randomBytes } from 'crypto'
 import { planForMarketplaceProductId, marketplaceClaimUrl } from './config'
+import { phpFormValue } from './signature'
 import type { PlanCode } from '@/lib/plans/catalog'
 
 // `any` deliberately — the convention this repo uses for anything called with
@@ -184,13 +185,6 @@ export const parseJvzooIpnV2: MarketplaceParser = (rawBody) => {
   }
 }
 
-export const MARKETPLACE_PARSERS: Readonly<Record<string, MarketplaceParser>> = {
-  jvzoo: parseJvzooIpnV2,
-}
-
-export function marketplaceParser(slug: string): MarketplaceParser | null {
-  return MARKETPLACE_PARSERS[slug] ?? null
-}
 
 export type MarketplaceIntakeOutcome =
   /** The event is structurally unusable — no order id, no usable email. */
@@ -383,4 +377,102 @@ export function unverifiedDeliveryTrace(rawBody: string): Record<string, string>
     if (safe) trace[key] = safe
   }
   return trace
+}
+
+/**
+ * Digistore24 IPN — docs/affiliate/digistore24-ipn-docs.md, fetched from
+ * their own public URLs on 2026-11-02 and checked against the digest they
+ * publish in their own guide.
+ *
+ * THE ORDER KEY IS `order_item_id`, AND THAT CHOICE HAS CONSEQUENCES.
+ * Digistore24 models an order as up to four order items, one per product,
+ * with one transaction per item per event: a payment, a refund and a
+ * chargeback on the same purchase are three transactions with three
+ * `transaction_id`s but one `order_item_id`, which their guide calls
+ * "globally unique". Keying on the item is therefore what makes a refund find
+ * the row it refunds — `recordMarketplaceOrder` matches a refund by
+ * `external_order_id`, so a per-transaction key would make every refund an
+ * `order_unknown` and leave a refunded buyer's access untouched. That is the
+ * failure that matters, so the item id wins.
+ *
+ * THE COST, STATED RATHER THAN HIDDEN: a monthly renewal is another
+ * transaction on the SAME order item, so it arrives as `already_recorded` and
+ * does NOT extend `current_period_end` on its own. A renewal that fails to
+ * extend access is a customer who complains; the alternative reading, where a
+ * refunded order keeps its access, is a customer who paid nothing and keeps
+ * everything. Until renewal handling exists, the first Digistore24
+ * subscription month is correct and the second needs a person. This is
+ * tracked, not forgotten.
+ *
+ * A TEST ORDER MUST NOT BECOME A REAL PLAN, but only an EXPLICIT `test`
+ * refuses: `api_mode` absent is treated as live. Failing closed on a missing
+ * field would mean that the day they stop sending it, every genuine sale is
+ * dropped in silence — and a dropped sale is worse than a test order we can
+ * see and delete.
+ *
+ * `amount_brutto` is the gross amount in major units, like JVZoo's v2 `total`
+ * and unlike its v1 pennies. `next_payment_at` is a date with no time, so the
+ * period ends at the start of that day rather than at a guessed hour.
+ */
+export const parseDigistore24Ipn: MarketplaceParser = (rawBody) => {
+  const value = (name: string) => phpFormValue(rawBody, name)?.trim() ?? ''
+
+  if (value('api_mode').toLowerCase() === 'test') return null
+
+  const event = value('event').toLowerCase()
+  const kind =
+    event === 'on_payment' ? 'paid' : event === 'on_refund' || event === 'on_chargeback' ? 'refunded' : null
+  // connection_test, on_payment_missed, on_rebill_cancelled, on_rebill_resumed,
+  // last_paid_day, on_affiliation, customform and eticket all land here. A
+  // cancellation deliberately among them: their guide is explicit that the
+  // buyer keeps the product until the paid period ends, so cancelling is not
+  // an event that touches an entitlement.
+  if (!kind) return null
+
+  return {
+    kind,
+    externalOrderId: value('order_item_id') || value('transaction_id'),
+    externalProductId: value('product_id') || null,
+    buyerEmail: value('buyer_email') || value('email'),
+    amountMinor: dollarsToMinor(value('amount_brutto') || null),
+    currency: /^[A-Za-z]{3}$/.test(value('currency')) ? value('currency').toUpperCase() : null,
+    // Digistore24 is the seller of record and charges the buyer's tax itself,
+    // so tax arriving here is expected and is NOT the contradiction it is on
+    // the JVZoo flow. It is still carried so the webhook's report stays one
+    // code path for every provider.
+    taxMinor: dollarsToMinor(value('amount_vat') || null),
+    currentPeriodEnd: digistore24Date(value('next_payment_at')),
+  }
+}
+
+/**
+ * A Digistore24 date, as the ISO-8601 instant this module stores.
+ *
+ * `next_payment_at` is documented as a date alone (2016-03-30). It becomes
+ * the START of that day in UTC: the buyer has paid for the period up to the
+ * next payment, and ending it at midnight is the reading that never grants an
+ * hour nobody paid for. Anything that is not one of the two documented shapes
+ * returns null rather than a guess, which makes the order unclaimable
+ * (`period_end_unknown`) instead of claimable for an invented period.
+ */
+function digistore24Date(raw: string | null): string | null {
+  const value = raw?.trim()
+  if (!value) return null
+  if (/^\d{4}-\d{2}-\d{2}$/.test(value)) return `${value}T00:00:00Z`
+  if (/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/.test(value)) return `${value.replace(' ', 'T')}Z`
+  return null
+}
+
+/*
+ * The registry sits at the end of the file so it can name every parser
+ * above it: these are `const` arrow functions, which are not hoisted, and a
+ * registry declared before them reads an unassigned binding.
+ */
+export const MARKETPLACE_PARSERS: Readonly<Record<string, MarketplaceParser>> = {
+  jvzoo: parseJvzooIpnV2,
+  digistore24: parseDigistore24Ipn,
+}
+
+export function marketplaceParser(slug: string): MarketplaceParser | null {
+  return MARKETPLACE_PARSERS[slug] ?? null
 }

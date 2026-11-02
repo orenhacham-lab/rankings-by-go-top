@@ -29,6 +29,7 @@ import type {
   MarketplaceFieldDigestScheme,
   MarketplaceHmacHeaderScheme,
   MarketplaceSignatureScheme,
+  MarketplaceSortedParamsDigestScheme,
 } from './config'
 
 export type MarketplaceSignatureFailure =
@@ -49,6 +50,7 @@ export function marketplaceSignatureFor(
   scheme: MarketplaceSignatureScheme,
 ): string {
   if (scheme.kind === 'field_digest') return fieldDigestFor(rawBody, secret, scheme)
+  if (scheme.kind === 'sorted_params_digest') return sortedParamsDigestFor(rawBody, secret, scheme)
   const mac = createHmac(scheme.algorithm, secret).update(rawBody, 'utf8')
   return scheme.encoding === 'base64' ? mac.digest('base64') : mac.digest('hex')
 }
@@ -70,6 +72,112 @@ export function fieldDigestFor(
   const joined = scheme.fields.map((name) => form.get(name) ?? '').join(scheme.separator)
   const base = joined + (scheme.trailingSeparator ? scheme.separator : '') + secret
   return createHash(scheme.algorithm).update(base, 'utf8').digest('hex').slice(0, scheme.length).toUpperCase()
+}
+
+/**
+ * THE PARAMETERS OF A FORM BODY AS THE SENDER'S OWN PHP SAW THEM.
+ *
+ * This exists because a digest over "every parameter" is only reproducible if
+ * we group and order them the way the sender did, and the sender is PHP. Two
+ * of its behaviours are load-bearing:
+ *
+ *  1. A REPEATED BRACKET-FREE KEY KEEPS ITS LAST VALUE. `$_POST` is a map, so
+ *     `product_id=A&product_id=B` is just `B` there, while
+ *     `URLSearchParams.get()` would answer `A`. If the digest covered one and
+ *     the order were granted on the other, a body could be signed for one
+ *     product and redeemed for another — so the digest and the parser read
+ *     this same view, and neither calls `.get()` on a signed body.
+ *  2. A BRACKETED KEY IS ONE ARRAY, NOT SEVERAL PARAMETERS. `addons[0][id]`
+ *     and `addons[1][id]` are one `addons` entry in `$_POST`, which the
+ *     reference implementation re-serialises and emits as consecutive
+ *     `key=value` parts. So they sort together, under `addons`, in body
+ *     order, rather than each sorting on its own full name.
+ *
+ * Returns the groups in body order; the caller sorts them. Each group is a
+ * top-level name and the `name=value` parts belonging to it, already decoded.
+ */
+interface FormParameterGroup {
+  /** The name the group sorts by: everything before the first `[`. */
+  key: string
+  /** `name=value` strings, in the order PHP would emit them. */
+  parts: readonly string[]
+}
+
+export function phpFormParameterGroups(rawBody: string): FormParameterGroup[] {
+  const groups: FormParameterGroup[] = []
+  const byKey = new Map<string, FormParameterGroup>()
+  // Scalars are collected separately because a later occurrence REPLACES an
+  // earlier one, while array parts accumulate.
+  const scalarIndex = new Map<string, number>()
+
+  for (const [name, value] of new URLSearchParams(rawBody)) {
+    const bracket = name.indexOf('[')
+    const key = bracket === -1 ? name : name.slice(0, bracket)
+    if (bracket === -1) {
+      const at = scalarIndex.get(key)
+      if (at !== undefined) {
+        // Last value wins, in the position the key first appeared — PHP keeps
+        // one entry per key and its insertion order.
+        groups[at] = { key, parts: [`${name}=${value}`] }
+        continue
+      }
+      scalarIndex.set(key, groups.length)
+      groups.push({ key, parts: [`${name}=${value}`] })
+      continue
+    }
+    const existing = byKey.get(key)
+    if (existing) {
+      byKey.set(key, { key, parts: [...existing.parts, `${name}=${value}`] })
+      groups[groups.findIndex((group) => group === existing)] = byKey.get(key)!
+      continue
+    }
+    const group = { key, parts: [`${name}=${value}`] }
+    byKey.set(key, group)
+    groups.push(group)
+  }
+  return groups
+}
+
+/**
+ * One scalar parameter, read the way the sender's PHP read it: LAST value
+ * wins. A parser must use this and never `URLSearchParams.get()` on a signed
+ * body, so that the value it acts on is the value that was signed.
+ */
+export function phpFormValue(rawBody: string, name: string): string | null {
+  const values = new URLSearchParams(rawBody).getAll(name)
+  return values.length ? values[values.length - 1] : null
+}
+
+/**
+ * The digest a sorted-parameters scheme computes over a form-encoded body.
+ *
+ * An EMPTY VALUE IS SKIPPED, not signed as empty — the reference
+ * implementation's `$is_empty` test — so a parameter present with no value
+ * contributes nothing and a body that drops it entirely produces the same
+ * digest. Reproducing that is not optional: signing `name=` where they signed
+ * nothing rejects every delivery that carries one blank field.
+ */
+export function sortedParamsDigestFor(
+  rawBody: string,
+  secret: string,
+  scheme: MarketplaceSortedParamsDigestScheme,
+): string {
+  const excluded = new Set(scheme.excluded)
+  const groups = phpFormParameterGroups(rawBody)
+    .filter((group) => !excluded.has(group.key))
+    .map((group) => ({
+      // The sort key, folded only when the scheme says names sort that way.
+      sortKey: scheme.caseSensitiveSort ? group.key : group.key.toUpperCase(),
+      parts: group.parts.filter((part) => !part.endsWith('=')),
+    }))
+    .filter((group) => group.parts.length > 0)
+  // Byte-wise comparison, which is what PHP's SORT_STRING does and what
+  // JavaScript's default string comparison does for the ASCII names these
+  // platforms use.
+  groups.sort((a, b) => (a.sortKey < b.sortKey ? -1 : a.sortKey > b.sortKey ? 1 : 0))
+
+  const base = groups.flatMap((group) => group.parts).map((part) => part + secret).join('')
+  return createHash(scheme.algorithm).update(base, 'utf8').digest('hex').toUpperCase()
 }
 
 /** Digest lengths in characters, so a wrong-length value is rejected before
@@ -103,6 +211,7 @@ export function verifyMarketplaceSignature(
   if (!scheme) return { ok: false, reason: 'unknown_scheme' }
   if (!secret) return { ok: false, reason: 'missing_secret' }
   if (scheme.kind === 'field_digest') return verifyFieldDigest(rawBody, secret, scheme)
+  if (scheme.kind === 'sorted_params_digest') return verifySortedParamsDigest(rawBody, secret, scheme)
 
   const raw = (signatureHeader ?? '').trim()
   if (!raw) return { ok: false, reason: 'missing_signature' }
@@ -136,6 +245,35 @@ function verifyFieldDigest(
     return { ok: false, reason: 'malformed_signature' }
   }
   const expected = fieldDigestFor(rawBody, secret, scheme)
+  return timingSafeEqual(Buffer.from(expected), Buffer.from(received))
+    ? { ok: true }
+    : { ok: false, reason: 'mismatch' }
+}
+
+/**
+ * A sorted-parameters delivery carries its digest in the body, like a
+ * field-digest one, so the header argument is ignored and the body is read
+ * twice — once here and once by the parser, which still never runs on an
+ * unverified body.
+ *
+ * THE DIGEST FIELD IS READ FROM THE PHP VIEW TOO. Reading it with `.get()`
+ * would take the FIRST `sha_sign` of a body carrying two, while the sender
+ * signed with the last; an attacker could then prepend a digest of their own
+ * choosing. Both sides read the same last-wins view.
+ */
+function verifySortedParamsDigest(
+  rawBody: string,
+  secret: string,
+  scheme: MarketplaceSortedParamsDigestScheme,
+): MarketplaceSignatureResult {
+  const field = phpFormParameterGroups(rawBody).find((group) => group.key === scheme.field)
+  const received = (field?.parts[0]?.slice(scheme.field.length + 1) ?? '').trim().toUpperCase()
+  if (!received) return { ok: false, reason: 'missing_signature' }
+  const expected = sortedParamsDigestFor(rawBody, secret, scheme)
+  // Checked before timingSafeEqual, which throws on a length mismatch.
+  if (received.length !== expected.length || !/^[0-9A-F]+$/.test(received)) {
+    return { ok: false, reason: 'malformed_signature' }
+  }
   return timingSafeEqual(Buffer.from(expected), Buffer.from(received))
     ? { ok: true }
     : { ok: false, reason: 'mismatch' }

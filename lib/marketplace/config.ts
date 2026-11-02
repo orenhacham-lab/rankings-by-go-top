@@ -28,10 +28,13 @@
  * callbacks differently, and this repo's rule is that nothing goes in as a
  * guess: a scheme must be read from the platform's own documentation before
  * it is written down here. The cloud sessions this project is developed in
- * cannot reach jvzoo.com, clickbank.com or digistore24.com (the egress proxy
- * refuses them). JVZoo's was read inside the seller account on the owner's own
- * machine and is recorded below (docs/affiliate/jvzoo-webhook-docs.md);
- * ClickBank's and Digistore24's are still UNKNOWN rather than invented. A
+ * cannot reach every vendor's documentation. JVZoo's was read inside the
+ * seller account on the owner's own machine (docs/affiliate/jvzoo-webhook-docs.md).
+ * Digistore24 publish theirs at a public URL that IS reachable from a cloud
+ * session, so it was fetched directly and verified against their own worked
+ * example (docs/affiliate/digistore24-ipn-docs.md); the earlier note here
+ * that the proxy refuses digistore24.com was wrong. ClickBank's is still
+ * UNKNOWN rather than invented. A
  * provider whose scheme is null can be registered, priced and given a sales
  * page, and its webhook refuses every delivery — which is the safe direction,
  * and a loud one: `providerReadiness` names exactly what is missing.
@@ -87,7 +90,63 @@ export interface MarketplaceFieldDigestScheme {
   length: number
 }
 
-export type MarketplaceSignatureScheme = MarketplaceHmacHeaderScheme | MarketplaceFieldDigestScheme
+/**
+ * A digest over EVERY parameter the body carries, not a named few.
+ *
+ * Digistore24's scheme. The parameters are sorted by name, each one is
+ * rendered as `name=value` with the passphrase appended, the lot is hashed,
+ * and the result arrives upper-cased in a field of the body itself. Because
+ * the signed set is "whatever was sent", a scheme of this kind covers fields
+ * this code has never heard of, which is the opposite trade-off from
+ * `field_digest`: nothing can be appended to a signed body unnoticed, but the
+ * verifier has to reproduce the sender's own parameter handling exactly.
+ *
+ * See docs/affiliate/digistore24-ipn-docs.md, which records the algorithm,
+ * the PHP semantics it depends on, and the published digest it was checked
+ * against.
+ */
+export interface MarketplaceSortedParamsDigestScheme {
+  kind: 'sorted_params_digest'
+  /** The form field carrying the digest. */
+  field: string
+  /** Fields excluded from the digest, the digest field itself included. */
+  excluded: readonly string[]
+  algorithm: 'sha512'
+  /** Whether names sort by raw bytes or case-insensitively. */
+  caseSensitiveSort: boolean
+}
+
+export type MarketplaceSignatureScheme =
+  | MarketplaceHmacHeaderScheme
+  | MarketplaceFieldDigestScheme
+  | MarketplaceSortedParamsDigestScheme
+
+/**
+ * Digistore24 IPN, from their own published guide and reference
+ * implementation (docs/affiliate/digistore24-ipn-docs.md), both fetched from
+ * public URLs on 2026-11-02.
+ *
+ * `excluded` holds both spellings the reference implementation unsets, not
+ * just the one it documents: it removes `sha_sign` AND `SHASIGN`, so a body
+ * carrying the upper-case spelling must have it excluded too or our digest
+ * would cover a field theirs did not.
+ *
+ * The sort is case-sensitive because the 2026 reference implementation sorts
+ * that way by default, even though the 2018 guide's prose says otherwise.
+ * Every documented parameter name is lower-case, so the two cannot disagree
+ * on real traffic; where they could, the newer code wins.
+ *
+ * The secret is the SHA512 passphrase from Settings → IPN, which the vendor
+ * chooses, held as MARKETPLACE_DIGISTORE24_WEBHOOK_SECRET. It is NOT the
+ * thank-you page key, whatever the public example script suggests.
+ */
+export const DIGISTORE24_IPN_SCHEME: MarketplaceSortedParamsDigestScheme = {
+  kind: 'sorted_params_digest',
+  field: 'sha_sign',
+  excluded: ['sha_sign', 'SHASIGN'],
+  algorithm: 'sha512',
+  caseSensitiveSort: true,
+}
 
 /**
  * JVZoo's JVZIPN v2 `cverify`, from the spec in the seller account
@@ -142,6 +201,25 @@ export interface MarketplaceProvider {
    * approximation of one.
    */
   requiredDisclaimer: string | null
+  /**
+   * What this platform accepts as "I handled it".
+   *
+   * 'json' is the default shape: a 2xx with a JSON body, which every platform
+   * here reads as success except one.
+   *
+   * 'ok_text' exists because Digistore24 does not read the status code. Their
+   * guide is explicit: "An IPN call is considered a success, if the DigiStore
+   * server receives the text 'OK' (upper case, without the quotes) from your
+   * server." A 200 carrying JSON is logged as a FAILED delivery in their IPN
+   * log even though the order was recorded, and their "Test connection"
+   * button reports the integration broken. So the acknowledgement body is a
+   * property of the platform, not of our preferred response format.
+   *
+   * It changes only the body of a response we already decided to send. A
+   * refused signature still answers 401 and still carries no 'OK', because a
+   * delivery we did not accept must never read as handled.
+   */
+  acknowledgement: 'json' | 'ok_text'
 }
 
 /**
@@ -186,9 +264,16 @@ export const MARKETPLACE_PROVIDERS: readonly MarketplaceProvider[] = [
   {
     slug: 'digistore24',
     label: 'Digistore24',
-    signature: null,
+    /*
+     * Their IPN scheme, verified against the digest Digistore24 publish in
+     * their own guide rather than taken on trust from this code agreeing with
+     * itself. See DIGISTORE24_IPN_SCHEME above.
+     */
+    signature: DIGISTORE24_IPN_SCHEME,
     sellerOfRecord: true,
     requiredDisclaimer: null,
+    /* Their guide: only the literal text OK counts as a handled delivery. */
+    acknowledgement: 'ok_text',
   },
   {
     slug: 'clickbank',
@@ -196,6 +281,7 @@ export const MARKETPLACE_PROVIDERS: readonly MarketplaceProvider[] = [
     signature: null,
     sellerOfRecord: true,
     requiredDisclaimer: null,
+    acknowledgement: 'json',
   },
   {
     slug: 'jvzoo',
@@ -241,6 +327,7 @@ export const MARKETPLACE_PROVIDERS: readonly MarketplaceProvider[] = [
       '32765, USA, and is used with permission. The role of JVZoo as a retailer does not ' +
       'constitute an endorsement, approval, or review of these products or any claims, ' +
       'statements, or opinions used in their promotion.',
+    acknowledgement: 'json',
   },
 ] as const
 
