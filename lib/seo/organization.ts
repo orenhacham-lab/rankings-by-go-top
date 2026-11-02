@@ -49,6 +49,12 @@ export const BRAND_PROFILES = [
   // mention of us, so it is a soft 404 and is deliberately NOT here.
   'https://ainave.com/products/go-top-seo',
   'https://biz100.co.il/listing/go-top-seo/',
+  // Published 2 Nov 2026 by AI BEST SEARCH's own editors from our public pages.
+  // Read in full before it went in here: monthly tracking, the three engines
+  // checked automatically against the six the pricing page offers, $79 + tax,
+  // the seven languages, WordPress/Shopify/Wix. Nothing in it needed a
+  // correction, which is why it can be claimed as the same entity.
+  'https://ai-best-search.com/products/go-top-seo',
 ] as const
 
 /**
