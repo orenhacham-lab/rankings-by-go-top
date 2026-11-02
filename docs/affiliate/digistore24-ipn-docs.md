@@ -11,6 +11,36 @@ Sources, both fetched directly on 2026-11-02 and both public — no seller accou
 centre (`help.digistore24.com`, `dev.digistore24.com`) answers 403 to a
 datacenter IP, which is what made this look unreachable before.
 
+## Which connection type — and the one that has NO signature
+
+Everything below describes the connection type Digistore24 calls **Generic**
+(Settings → Integrations (IPN) → Add new connection → Generic). That is the
+one this repo implements and the one the live connection uses.
+
+The same screen offers a type literally named **Webhook**, and it is a trap
+worth naming here so nobody switches to it later for the friendlier-looking
+form. Read inside the seller account on 2026-11-02: it sends only the GET
+parameters you hand-map in its UI, and it carries **no signature of any
+kind** — no `sha_sign`, no passphrase field. Its only optional protection is
+a custom `X-` header, which is a bearer token in a URL rather than something
+bound to the message.
+
+`proxy.ts`'s matcher excludes `/api/*`, so the signature check in
+`lib/marketplace/signature.ts` is this route's ONLY authentication. Pointed at
+a "Webhook" connection, anything that could reach the URL could post a paid
+order for any product and any email address. `verifyMarketplaceSignature`
+would refuse those deliveries anyway, since the provider's scheme expects
+`sha_sign` — so the practical result of switching is not a security hole but a
+channel that silently refuses every real sale. Either way: Generic.
+
+The live connection is **357299** ("Go Top SEO"), POST, IPN timing "Before
+forwarding to the thank you page", retries on, and success validation left on
+their **Default (expects text: OK)** rather than the laxer "HTTP code"
+option — because this route really does answer the literal `OK`
+(`acknowledgement: 'ok_text'`), and the default setting is the one that
+actually checks it. "HTTP code" would count any 2xx as handled, including a
+2xx carrying the wrong body.
+
 ## The signature, and how it was verified
 
 Every IPN call carries a SHA-512 digest in the parameter `sha_sign`. The
