@@ -423,6 +423,14 @@ check('K27: the route reports a non-zero tax, and tests for zero as well as for 
 check('K-MUT6: dropping the zero test is caught — it would fire on every clean sale',
   !/event\.taxMinor !== null && event\.taxMinor !== 0/.test(
     marketplaceRouteSrc.replace('event.taxMinor !== null && event.taxMinor !== 0', 'event.taxMinor !== null')))
+check('K28: and only where WE are the seller — a merchant of record charging tax is the channel working',
+  /!provider\.sellerOfRecord && event\.taxMinor !== null/.test(marketplaceRouteSrc))
+check('K-MUT7: dropping that scope is caught — it would file one error per Digistore24 sale',
+  !/!provider\.sellerOfRecord && event\.taxMinor !== null/.test(
+    marketplaceRouteSrc.replace('!provider.sellerOfRecord && event.taxMinor !== null', 'event.taxMinor !== null')))
+check('K29: and the platforms it is scoped against are the ones that are the seller of record',
+  marketplaceProvider('digistore24')?.sellerOfRecord === true
+  && marketplaceProvider('jvzoo')?.sellerOfRecord === false)
 
 // Sections F to I need await, and tsx compiles these suites as CommonJS,
 // where top-level await is not available. One async main, called at the end.

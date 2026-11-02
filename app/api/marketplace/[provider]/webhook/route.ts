@@ -174,7 +174,15 @@ async function handle(request: Request, slug: string): Promise<Response> {
   // what someone would want to trigger at will, and in the parser or ahead of
   // the signature check anyone who could POST here could make us doubt our
   // own text. It does not move for tidiness.
-  if (event.taxMinor !== null && event.taxMinor !== 0) {
+  //
+  // AND IT IS SCOPED TO THE PLATFORMS WHERE WE ARE THE SELLER. On a merchant
+  // of record - Digistore24, which contracts with the buyer, issues the
+  // invoice and remits the tax - a populated tax figure is not a
+  // contradiction, it is the channel working as intended, and that platform's
+  // own sales page says so. Logging it there would file one error per sale
+  // and bury the JVZoo case, which is the only one where a tax figure means a
+  // published statement of ours has gone false.
+  if (!provider.sellerOfRecord && event.taxMinor !== null && event.taxMinor !== 0) {
     console.error('[marketplace-webhook] platform reported tax: the sales page tells buyers the price excludes tax, so that sentence may now be false', {
       provider: provider.slug,
       externalOrderId: event.externalOrderId,
