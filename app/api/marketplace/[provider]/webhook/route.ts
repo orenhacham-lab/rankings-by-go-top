@@ -29,6 +29,12 @@
  * switched on SHOULD succeed. A failed write answers 500 so a retry can
  * recover it.
  *
+ * AND ONE PLATFORM DOES NOT READ THE STATUS CODE AT ALL. Digistore24 counts a
+ * delivery as handled only if the body is the literal text `OK`, so the
+ * acknowledgement body is per-provider (`acknowledgement` in
+ * lib/marketplace/config.ts) and `acknowledge()` below sends it. A refusal
+ * never carries it.
+ *
  * BUT JVZOO DOES NOT RETRY, and that changes what a non-2xx costs.
  * docs/affiliate/jvzoo-webhook-docs.md, copied from the seller account: "No
  * retry on failure — if the endpoint is down the notification is lost",
@@ -148,8 +154,11 @@ async function handle(request: Request, slug: string): Promise<Response> {
 
   const event = parser(rawBody, request.headers.get('content-type'))
   // A body the parser does not recognise is not an error: these platforms
-  // send notification types we have no business acting on.
-  if (!event) return Response.json({ ok: true, ignored: true }, { status: 200 })
+  // send notification types we have no business acting on. It still has to be
+  // ACKNOWLEDGED in the platform's own terms, because an ignored notification
+  // that reads as a failed delivery is how a working integration looks broken
+  // — Digistore24's own "Test connection" button sends one of these.
+  if (!event) return acknowledge(provider, { ok: true, ignored: true }, 200)
 
   // THE TAX FIELDS ARE A CONTRADICTION DETECTOR, NOT BOOKKEEPING.
   // Our products run on the own-payment-processor flow, where JVZoo told us
@@ -209,7 +218,36 @@ async function handle(request: Request, slug: string): Promise<Response> {
     })
   }
 
-  return Response.json({ ok: outcome.kind !== 'write_failed', outcome: outcome.kind }, {
-    status: httpStatusForMarketplaceOutcome(outcome),
-  })
+  const status = httpStatusForMarketplaceOutcome(outcome)
+  return acknowledge(
+    provider,
+    { ok: outcome.kind !== 'write_failed', outcome: outcome.kind },
+    status,
+  )
+}
+
+/**
+ * The answer a platform understands, for a delivery we are not refusing.
+ *
+ * ONLY A 2xx MAY CARRY AN 'OK'. Digistore24 reads the body and not the status
+ * code, so the literal text is what marks the delivery handled in their IPN
+ * log; sending it alongside a 5xx would tell them a failed write succeeded
+ * and lose the one notification they will never resend. The status decides,
+ * the body only speaks.
+ *
+ * Every other provider keeps the JSON body, which is what their retries and
+ * our own operators read.
+ */
+function acknowledge(
+  provider: { acknowledgement: 'json' | 'ok_text' },
+  body: Record<string, unknown>,
+  status: number,
+): Response {
+  if (provider.acknowledgement === 'ok_text' && status >= 200 && status < 300) {
+    return new Response('OK', {
+      status,
+      headers: { 'content-type': 'text/plain; charset=utf-8' },
+    })
+  }
+  return Response.json(body, { status })
 }
