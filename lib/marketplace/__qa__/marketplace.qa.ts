@@ -1207,6 +1207,71 @@ async function main() {
       const moved = `unverifiedDeliveryTrace\n${routeSrcM.replace('unverifiedDeliveryTrace(rawBody)', 'x')}`
       return !(moved.indexOf('unverifiedDeliveryTrace') > moved.indexOf('verifyMarketplaceSignature'))
     })())
+  // ── TY. The thank-you page a marketplace reviews after the sale ─────────────
+  // Digistore24 review this page with the product. Their guidance asks it to
+  // say what was bought and in what form, what happens next, who took the
+  // money and how to reach support — the last two because a buyer who cannot
+  // place the name on their statement disputes the charge.
+  console.log('\nTY. thank-you page')
+  const THANKS = 'app/go/[platform]/thanks/page.tsx'
+  const thanksSrc = code(THANKS)
+  const MarketplaceThanksPage = (await import('../../../app/go/[platform]/thanks/page')).default
+
+  const renderThanks = async (platform: string) =>
+    renderToStaticMarkup(await MarketplaceThanksPage({ params: Promise.resolve({ platform }) }))
+
+  check('TY1: the page is noindex, like every other thin per-platform page',
+    /robots: \{ index: false, follow: false \}/.test(thanksSrc))
+  check('TY2: an unregistered platform is a 404 rather than a blank thank-you',
+    /if \(!provider\) notFound\(\)/.test(thanksSrc))
+
+  // IT READS NOTHING FROM THE QUERY STRING. Digistore24 append order_id,
+  // product_id and email to this URL, and all three are values a stranger can
+  // type. Rendering one publishes whatever was supplied; branching on
+  // product_id would let a visitor choose which plan the page describes.
+  check('TY3: the page takes no searchParams at all',
+    !/searchParams/.test(thanksSrc))
+  check('TY4: and names none of the parameters they append',
+    !/order_id|product_id|buyer_email|\bemail\b.*=.*param/.test(thanksSrc))
+
+  const dsThanks = await renderThanks('digistore24')
+  check('TY5: it tells the buyer the delivery is software they use in the browser',
+    /nothing to download/i.test(dsThanks))
+  check('TY6: it says an activation link was emailed, which is how delivery actually works',
+    /activation link/i.test(dsThanks) && dsThanks.includes(MARKETPLACE_CLAIM_PATH))
+  check('TY7: it says what to do when that email does not arrive',
+    /spam/i.test(dsThanks) && /support@gotopseo\.com/.test(dsThanks))
+  check('TY8: for a seller-of-record platform it says WHO debits the card, by name',
+    /The debiting is performed by Digistore24/.test(dsThanks)
+    && /appears on your card or bank statement/i.test(dsThanks))
+  check('TY9: and that the invoice and any refund come from them',
+    /issues your invoice/.test(dsThanks) && /refund or cancellation/i.test(dsThanks))
+  check('TY10: it names the operating company and address, so support is reachable',
+    /GO TOP DIGITAL MARKETING AND ADVERTISING LTD/.test(dsThanks) && /Ramat Gan/.test(dsThanks))
+
+  // Where WE are the seller, the debiting sentence would be false. It is left
+  // out rather than adapted — the same rule the sales page follows.
+  const jvThanks = await renderThanks('jvzoo')
+  check('TY11: on a platform that is NOT the seller of record, the debiting claim is absent',
+    !/The debiting is performed by/.test(jvThanks))
+  check('TY12: while the delivery steps are still there for that buyer',
+    /activation link/i.test(jvThanks))
+
+  // The platforms require their button to be the only way to pay, and that
+  // rule does not stop at the sales page.
+  check('TY13: the page offers no checkout of our own and no pricing',
+    !/\/billing|\/checkout|\/pricing|stripe|paypal|creem/i.test(thanksSrc))
+  check('TY14: the only external link is the platform’s own policy url',
+    (thanksSrc.match(/href=\{?"?https?:/g) ?? []).length === 0)
+
+  check('TY-MUT1: a page that read the query string would be caught',
+    /searchParams/.test(thanksSrc.replace('params,', 'params, searchParams,')))
+  check('TY-MUT2: dropping the debiting sentence would be caught',
+    !/The debiting is performed by Digistore24/.test(
+      dsThanks.replace('The debiting is performed by Digistore24', 'Thank you')))
+  check('TY-MUT3: printing the debiting sentence for a non-seller platform would be caught',
+    /The debiting is performed by/.test(`${jvThanks}The debiting is performed by JVZoo`))
+
   // ── DS. Digistore24: the scheme, checked against Digistore24's own digest ──
   console.log('\nDS. digistore24')
 
