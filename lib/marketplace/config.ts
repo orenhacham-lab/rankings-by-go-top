@@ -29,9 +29,10 @@
  * guess: a scheme must be read from the platform's own documentation before
  * it is written down here. The cloud sessions this project is developed in
  * cannot reach jvzoo.com, clickbank.com or digistore24.com (the egress proxy
- * refuses them). JVZoo's was read inside the seller account on the owner's own
- * machine and is recorded below (docs/affiliate/jvzoo-webhook-docs.md);
- * ClickBank's and Digistore24's are still UNKNOWN rather than invented. A
+ * refuses them). JVZoo's and Digistore24's were read on the owner's own
+ * machine and are recorded below, each against a transcription of the
+ * platform's own words under docs/affiliate/; ClickBank's is still UNKNOWN
+ * rather than invented. A
  * provider whose scheme is null can be registered, priced and given a sales
  * page, and its webhook refuses every delivery — which is the safe direction,
  * and a loud one: `providerReadiness` names exactly what is missing.
@@ -47,12 +48,13 @@ import { PLAN_CODES } from '@/lib/plans/catalog'
  * How a platform signs its callbacks, once that has been read from its own
  * documentation.
  *
- * Two shapes, because the platforms genuinely differ. The HMAC-over-the-raw-
+ * Three shapes, because the platforms genuinely differ. The HMAC-over-the-raw-
  * body-in-a-header shape is what Creem and most modern APIs do. JVZoo does
  * something older: a plain digest of five named FORM FIELDS with the secret
- * appended, delivered in the body itself. A single interface could not
- * describe both without a pile of nullable fields, so this is a union and the
- * verifier branches on `kind`.
+ * appended, delivered in the body itself. Digistore24 does a third thing
+ * again: a digest of EVERY parameter it happened to send, sorted by key. A
+ * single interface could not describe all three without a pile of nullable
+ * fields, so this is a union and the verifier branches on `kind`.
  */
 export interface MarketplaceHmacHeaderScheme {
   kind: 'hmac_header'
@@ -87,7 +89,60 @@ export interface MarketplaceFieldDigestScheme {
   length: number
 }
 
-export type MarketplaceSignatureScheme = MarketplaceHmacHeaderScheme | MarketplaceFieldDigestScheme
+/**
+ * A digest over EVERY posted parameter of a form-encoded body, sorted by key,
+ * with the shared secret appended after each one, delivered in the body.
+ *
+ * The third shape, and it is genuinely a third: the field-digest scheme above
+ * signs a FIXED, ORDERED list of five fields, which is what makes JVZoo's
+ * `cverify` describable as `fields: [...]`. Digistore24 signs whatever it
+ * sent — the parameter set varies with the product, the billing type, coupons,
+ * licences and e-tickets — so the list cannot be written down in advance and
+ * the verifier has to derive it from the body itself. Trying to express that
+ * as a `fields` array would mean enumerating every optional parameter
+ * Digistore24 might one day add, and being wrong about one would reject real
+ * payments.
+ *
+ * See docs/affiliate/digistore24-webhook-docs.md for the transcription of the
+ * platform's own reference implementation this describes.
+ */
+export interface MarketplaceSortedParamDigestScheme {
+  kind: 'sorted_param_digest'
+  /** The form field carrying the digest. */
+  field: string
+  /** Fields removed before signing, including the digest field itself. */
+  excludedFields: readonly string[]
+  algorithm: 'sha512'
+}
+
+export type MarketplaceSignatureScheme =
+  | MarketplaceHmacHeaderScheme
+  | MarketplaceFieldDigestScheme
+  | MarketplaceSortedParamDigestScheme
+
+/**
+ * Digistore24's `sha_sign`, from its developer documentation and its own
+ * reference receiver (docs/affiliate/digistore24-webhook-docs.md, captured
+ * 2026-11-02):
+ *
+ *   SHA-512 over `key=value<PASSPHRASE>` for every non-empty parameter,
+ *   keys sorted case-sensitively, `sha_sign` and `SHASIGN` removed first
+ *   → full-length hex, upper-cased.
+ *
+ * The passphrase is the connection's IPN password, held here as
+ * MARKETPLACE_DIGISTORE24_WEBHOOK_SECRET.
+ *
+ * THIS IS THE "GENERIC" CONNECTION TYPE AND IT HAS TO BE. Digistore24's other
+ * candidate, the one actually called "Webhook", sends only hand-mapped GET
+ * parameters and carries no signature at all — anything that could reach the
+ * URL could forge a paid order, and this route has nothing in front of it.
+ */
+export const DIGISTORE24_IPN_SCHEME: MarketplaceSortedParamDigestScheme = {
+  kind: 'sorted_param_digest',
+  field: 'sha_sign',
+  excludedFields: ['sha_sign', 'SHASIGN'],
+  algorithm: 'sha512',
+}
 
 /**
  * JVZoo's JVZIPN v2 `cverify`, from the spec in the seller account
@@ -147,9 +202,9 @@ export interface MarketplaceProvider {
 /**
  * The three platforms Oren named. Each is present so that its configuration,
  * its sales page and its database rows are testable today; none can accept a
- * delivery while its `signature` is null, and JVZoo — the one that now has a
- * scheme — still needs its env switch and its secret before anything reaches
- * it.
+ * delivery while its `signature` is null, and the two that now have schemes —
+ * JVZoo and Digistore24 — still need their env switch, their secret and their
+ * product ids before anything reaches them.
  */
 /*
  * JVZoo IS NOT A RESELLER, AND THAT IS A LEGAL DIFFERENCE, NOT A DETAIL. This
@@ -186,7 +241,14 @@ export const MARKETPLACE_PROVIDERS: readonly MarketplaceProvider[] = [
   {
     slug: 'digistore24',
     label: 'Digistore24',
-    signature: null,
+    /*
+     * Read from Digistore24's own developer documentation and reference
+     * receiver on the owner's machine, and written down in
+     * docs/affiliate/digistore24-webhook-docs.md. SHA-512 over every
+     * non-empty parameter rather than a fixed list, which is why the scheme
+     * union has a third member; see DIGISTORE24_IPN_SCHEME above.
+     */
+    signature: DIGISTORE24_IPN_SCHEME,
     sellerOfRecord: true,
     requiredDisclaimer: null,
   },

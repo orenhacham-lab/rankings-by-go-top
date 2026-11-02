@@ -94,10 +94,10 @@ export interface MarketplaceOrderEvent {
  *
  * A parser can only be written from the platform's own documentation — which
  * field carries the order id, how it reports the period end, which
- * notification types mean "paid" — and never from a guess. JVZoo's is below,
- * written from the IPN v2 spec read inside the seller account. ClickBank and
- * Digistore24 have none yet, and a provider with no parser refuses every
- * delivery, exactly as one with no signature scheme does.
+ * notification types mean "paid" — and never from a guess. JVZoo's and
+ * Digistore24's are below, each written from that platform's own spec
+ * (docs/affiliate/). ClickBank has none yet, and a provider with no parser
+ * refuses every delivery, exactly as one with no signature scheme does.
  */
 export type MarketplaceParser = (rawBody: string, contentType: string | null) => MarketplaceOrderEvent | null
 
@@ -184,8 +184,103 @@ export const parseJvzooIpnV2: MarketplaceParser = (rawBody) => {
   }
 }
 
+/**
+ * A Digistore24 date field, as the ISO-8601 instant this module stores.
+ *
+ * `next_payment_at` and `is_cancelled_for` are documented as dates
+ * (`2016-03-30`), with no time and no timezone. Reading midnight UTC is an
+ * assumption and is written down as one, exactly as it is for JVZoo: a period
+ * end a few hours out is cheap, while refusing the field would make every
+ * subscription unclaimable, since the claim function requires a period end.
+ * The documentation shows `order_date_time` in `YYYY-MM-DD HH:MM:SS`, so that
+ * shape is accepted too. Anything else is null rather than a guess.
+ */
+function digistoreInstant(raw: string | null): string | null {
+  const value = raw?.trim()
+  if (!value) return null
+  if (/^\d{4}-\d{2}-\d{2}$/.test(value)) return `${value}T00:00:00Z`
+  if (/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/.test(value)) return `${value.replace(' ', 'T')}Z`
+  return null
+}
+
+/**
+ * How each Digistore24 `event` maps onto the three states a marketplace order
+ * can be in. Anything absent from this map is ignored, which is the safe
+ * default for a platform that sends e-ticket, custom-form, affiliation and
+ * connection-test notifications down the same channel.
+ *
+ * TWO OF THESE ARE JUDGEMENT CALLS AND BOTH ARE THE PLATFORM'S OWN WORDS:
+ *
+ *  - `last_paid_day` → cancelled. "The last paid billing period has ended...
+ *    Use this event to permanently revoke access, as no further payments will
+ *    be collected."
+ *  - `on_payment_missed` → DELIBERATELY ABSENT. The documentation says it
+ *    means a TEMPORARY suspension, that Digistore24 will retry, and that "an
+ *    on_payment event may occur if the buyer succeeds in payment... In that
+ *    case, access should be granted again." This repo has no suspend-and-
+ *    restore state for a marketplace order, so mapping it to `cancelled`
+ *    would revoke a plan from a buyer who is still paying for it. The
+ *    permanent version of the same situation arrives as `last_paid_day`,
+ *    which is handled. The cost is access through at most one retry window;
+ *    the gain is that nobody loses a plan they kept.
+ *
+ * `on_rebill_resumed` is also absent on the documentation's own warning that
+ * it "does not mean, that a payment has been completed".
+ */
+const DIGISTORE24_EVENT_KINDS: Readonly<Record<string, MarketplaceOrderEvent['kind']>> = {
+  on_payment: 'paid',
+  on_refund: 'refunded',
+  on_chargeback: 'refunded',
+  on_rebill_cancelled: 'cancelled',
+  last_paid_day: 'cancelled',
+}
+
+/**
+ * Digistore24's Generic IPN — docs/affiliate/digistore24-webhook-docs.md,
+ * read from the platform's own developer documentation on 2026-11-02.
+ *
+ * The body is form-encoded, like JVZoo's and unlike a modern JSON webhook.
+ *
+ * `transaction_id` IS THE EXTERNAL ORDER ID, AND `order_id` IS NOT. The
+ * documentation is explicit that "Multiple transactions of the same order have
+ * the same order-ID" while `transaction_id` is unique per transaction, so
+ * `order_id` as the key would make month two of a subscription collide with
+ * month one and be dropped as a redelivery. This is the same trap JVZoo avoids
+ * by suffixing `-B001` onto its own transaction id.
+ *
+ * Amounts are in MAJOR units (`37.99`), so they are multiplied here.
+ *
+ * `amount_vat` IS READ AND IS EXPECTED TO BE NON-ZERO, which is the opposite
+ * of what it means on JVZoo. Digistore24 is the merchant of record: it
+ * invoices the buyer and remits the tax. The route's contradiction check is
+ * therefore scoped to providers where we are the seller.
+ */
+export const parseDigistore24Ipn: MarketplaceParser = (rawBody) => {
+  const form = new URLSearchParams(rawBody)
+  const kind = DIGISTORE24_EVENT_KINDS[(form.get('event') ?? '').trim()]
+  if (!kind) return null
+
+  const currency = (form.get('currency') ?? '').trim().toUpperCase()
+
+  return {
+    kind,
+    externalOrderId: (form.get('transaction_id') ?? '').trim(),
+    externalProductId: (form.get('product_id') ?? '').trim() || null,
+    buyerEmail: (form.get('email') ?? '').trim(),
+    amountMinor: dollarsToMinor(form.get('amount_brutto')),
+    currency: /^[A-Z]{3}$/.test(currency) ? currency : null,
+    taxMinor: dollarsToMinor(form.get('amount_vat')),
+    // A live subscription runs to its next payment. A cancelled one has no
+    // next payment and carries the day access should stop instead
+    // ("the order is cancelled for this date").
+    currentPeriodEnd:
+      digistoreInstant(form.get('next_payment_at')) ?? digistoreInstant(form.get('is_cancelled_for')),
+  }
+}
+
 export const MARKETPLACE_PARSERS: Readonly<Record<string, MarketplaceParser>> = {
   jvzoo: parseJvzooIpnV2,
+  digistore24: parseDigistore24Ipn,
 }
 
 export function marketplaceParser(slug: string): MarketplaceParser | null {

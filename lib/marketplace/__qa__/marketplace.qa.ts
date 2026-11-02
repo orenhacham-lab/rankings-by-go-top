@@ -19,7 +19,7 @@
  * Run: npx tsx lib/marketplace/__qa__/marketplace.qa.ts
  */
 import { readFileSync } from 'fs'
-import { createHmac } from 'crypto'
+import { createHash, createHmac } from 'crypto'
 import { createElement } from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
 import { CONSENT_DENIED, type ConsentChoices } from '../../consent/categories'
@@ -38,10 +38,11 @@ import {
   planForMarketplaceProductId,
   providerReadiness,
   JVZOO_IPN_V2_SCHEME,
+  DIGISTORE24_IPN_SCHEME,
   type MarketplaceHmacHeaderScheme,
 } from '../config'
 import { CONSENT_REQUIRED_COUNTRIES, consentRequiredForCountry } from '../../consent/eprivacy-territory'
-import { fieldDigestFor, marketplaceSignatureFor, verifyMarketplaceSignature } from '../signature'
+import { fieldDigestFor, marketplaceSignatureFor, sortedParamDigestFor, verifyMarketplaceSignature } from '../signature'
 import {
   httpStatusForMarketplaceOutcome,
   marketplaceParser,
@@ -93,8 +94,11 @@ check('A6c: seller of record follows each platform\'s vendor agreement - JVZoo i
   && marketplaceProvider('digistore24')?.sellerOfRecord === true
   && marketplaceProvider('clickbank')?.sellerOfRecord === true)
 check('A7: a platform whose documentation has not been read carries neither a scheme nor a parser',
-  ['digistore24', 'clickbank'].every((s) =>
+  ['clickbank'].every((s) =>
     marketplaceProvider(s)?.signature === null && marketplaceParser(s) === null))
+check('A7b: and the two that HAVE been read carry both, so nothing is half-wired',
+  ['jvzoo', 'digistore24'].every((s) =>
+    marketplaceProvider(s)?.signature !== null && marketplaceParser(s) !== null))
 check('A-MUT1: a scheme without a parser would fail A5',
   !([{ signature: {} }, { signature: null }] as { signature: unknown }[])
     .every((p) => (p.signature === null) === true))
@@ -115,15 +119,18 @@ check('B4: an unregistered slug is off even with its env var set',
 let readiness = providerReadiness('digistore24')
 check('B5: with the switch on but nothing else, readiness is false',
   readiness.ready === false)
-check('B6: and it names the secret, the scheme and the product ids — by NAME, not value',
+check('B6: and it names the secret and the product ids — by NAME, not value',
   readiness.missing.includes('webhook_secret')
-  && readiness.missing.includes('signature_scheme')
   && readiness.missing.includes('product_ids'))
+check('B6b: the scheme is NOT among them for this provider, because Digistore24\'s has been read',
+  !readiness.missing.includes('signature_scheme'))
+check('B6c: ClickBank\'s has not, and its readiness still says so — the piece is reported per provider',
+  providerReadiness('clickbank').missing.includes('signature_scheme'))
 process.env.MARKETPLACE_DIGISTORE24_WEBHOOK_SECRET = 'top-secret'
 process.env.MARKETPLACE_DIGISTORE24_PRODUCT_ADVANCED = 'PROD-ADV'
 readiness = providerReadiness('digistore24')
-check('B7: with a secret and a product the only thing left is the scheme',
-  readiness.ready === false && readiness.missing.join(',') === 'signature_scheme')
+check('B7: with the switch, a secret, a product id and a scheme, nothing is left',
+  readiness.ready === true && readiness.missing.length === 0)
 check('B8: an unregistered provider is reported as unregistered, not merely disabled',
   providerReadiness('paddle').missing.join(',') === 'unregistered_provider')
 check('B9: the secret is readable by the server and only for a registered provider',
@@ -176,10 +183,13 @@ check('D6: a plan with no configured url has none', marketplaceBuyUrl('jvzoo', '
  * record at all - not an account, not a plan, not a receipt to reconcile by
  * hand. Each check below turns exactly one readiness piece off.
  */
-process.env.MARKETPLACE_DIGISTORE24_BUY_URL_ADVANCED = 'https://www.digistore24.com/product/123'
+process.env.MARKETPLACE_CLICKBANK_ENABLED = 'true'
+process.env.MARKETPLACE_CLICKBANK_WEBHOOK_SECRET = 'top-secret'
+process.env.MARKETPLACE_CLICKBANK_PRODUCT_ADVANCED = 'PROD-ADV'
+process.env.MARKETPLACE_CLICKBANK_BUY_URL_ADVANCED = 'https://www.clickbank.net/product/123'
 check('D6a: a provider with no signature scheme shows NO buy button, however its url is set',
-  providerReadiness('digistore24').ready === false
-  && marketplaceBuyUrl('digistore24', 'advanced') === null)
+  providerReadiness('clickbank').missing.join(',') === 'signature_scheme'
+  && marketplaceBuyUrl('clickbank', 'advanced') === null)
 process.env.MARKETPLACE_JVZOO_ENABLED = 'false'
 check('D6b: switching the channel off removes the button',
   marketplaceBuyUrl('jvzoo', 'advanced') === null)
@@ -394,6 +404,161 @@ check('K27: the route reports a non-zero tax, and tests for zero as well as for 
 check('K-MUT6: dropping the zero test is caught — it would fire on every clean sale',
   !/event\.taxMinor !== null && event\.taxMinor !== 0/.test(
     marketplaceRouteSrc.replace('event.taxMinor !== null && event.taxMinor !== 0', 'event.taxMinor !== null')))
+
+// ── N. Digistore24: a SHA-512 digest of every parameter, carried in the body ──
+// docs/affiliate/digistore24-webhook-docs.md, read from the platform's own
+// developer documentation and reference receiver.
+console.log('\nN. digistore24 generic ipn')
+const DS_SECRET = 'ds24-passphrase'
+/** A subscription payment, including an EMPTY field and a literal "0". */
+const dsForm = (over: Record<string, string> = {}) =>
+  new URLSearchParams({
+    event: 'on_payment',
+    api_mode: 'live',
+    order_id: '34DEFS45DE2',
+    transaction_id: '3999938',
+    product_id: 'DS-ADV',
+    email: 'buyer@example.com',
+    currency: 'USD',
+    amount_brutto: '179.00',
+    amount_vat: '28.58',
+    vat_rate: '19.00',
+    billing_type: 'subscription',
+    pay_sequence_no: '1',
+    next_payment_at: '2026-12-02',
+    // Documented as empty when the country has no state. Must be SKIPPED.
+    address_state: '',
+    // Must be KEPT: the platform's test is `=== ""`, not PHP's empty().
+    quantity: '0',
+    ...over,
+  }).toString()
+
+/**
+ * Computed OUTSIDE this code, so this is a check of the algorithm and not of
+ * the implementation agreeing with itself:
+ *
+ *   P='ds24-passphrase'
+ *   printf '%s' "amount_brutto=179.00${P}amount_vat=28.58${P}api_mode=live${P}\
+ *   billing_type=subscription${P}currency=USD${P}email=buyer@example.com${P}\
+ *   event=on_payment${P}next_payment_at=2026-12-02${P}order_id=34DEFS45DE2${P}\
+ *   pay_sequence_no=1${P}product_id=DS-ADV${P}quantity=0${P}\
+ *   transaction_id=3999938${P}vat_rate=19.00${P}" | shasum -a 512
+ *
+ * Note what that string proves: address_state is absent, quantity=0 is
+ * present, the keys are sorted, and the passphrase follows EVERY parameter.
+ */
+const DS_EXPECTED =
+  'DC238B17DE46A3DBB4235FF9860B523ED1DE80285DABA0744A62BE70697955107A69F7CA469B37BFE0846808156F4B7DE46C0E01B6F6A1FA605DC33A6795D456'
+
+check('N1: sha_sign matches a digest computed outside this code',
+  sortedParamDigestFor(dsForm(), DS_SECRET, DIGISTORE24_IPN_SCHEME) === DS_EXPECTED)
+check('N2: a genuine delivery verifies, with the digest read from the BODY',
+  verifyMarketplaceSignature(dsForm({ sha_sign: DS_EXPECTED }), null, DS_SECRET, DIGISTORE24_IPN_SCHEME).ok === true)
+check('N3: lower case verifies, since the comparison upper-cases first',
+  verifyMarketplaceSignature(dsForm({ sha_sign: DS_EXPECTED.toLowerCase() }), null, DS_SECRET, DIGISTORE24_IPN_SCHEME).ok === true)
+check('N4: the digest covers EVERY parameter, so changing the amount is a mismatch',
+  reasonOf(verifyMarketplaceSignature(dsForm({ sha_sign: DS_EXPECTED, amount_brutto: '0.01' }), null, DS_SECRET, DIGISTORE24_IPN_SCHEME)) === 'mismatch')
+check('N5: and so is changing the buyer, which a fixed-field scheme might not have covered',
+  reasonOf(verifyMarketplaceSignature(dsForm({ sha_sign: DS_EXPECTED, email: 'thief@example.com' }), null, DS_SECRET, DIGISTORE24_IPN_SCHEME)) === 'mismatch')
+check('N6: ADDING an unsigned parameter is a mismatch too — the list comes from the body',
+  reasonOf(verifyMarketplaceSignature(dsForm({ sha_sign: DS_EXPECTED, trackingkey: 'injected' }), null, DS_SECRET, DIGISTORE24_IPN_SCHEME)) === 'mismatch')
+check('N7: the wrong passphrase is a mismatch',
+  reasonOf(verifyMarketplaceSignature(dsForm({ sha_sign: DS_EXPECTED }), null, 'other', DIGISTORE24_IPN_SCHEME)) === 'mismatch')
+check('N8: no sha_sign at all fails closed',
+  reasonOf(verifyMarketplaceSignature(dsForm(), null, DS_SECRET, DIGISTORE24_IPN_SCHEME)) === 'missing_signature')
+check('N9: a digest of the wrong length is refused before the comparison, which would throw',
+  reasonOf(verifyMarketplaceSignature(dsForm({ sha_sign: 'ABC' }), null, DS_SECRET, DIGISTORE24_IPN_SCHEME)) === 'malformed_signature')
+check('N10: a non-hex digest of the right length is refused',
+  reasonOf(verifyMarketplaceSignature(dsForm({ sha_sign: 'Z'.repeat(128) }), null, DS_SECRET, DIGISTORE24_IPN_SCHEME)) === 'malformed_signature')
+check('N11: an empty value is skipped — a delivery whose empty field was signed would not verify',
+  sortedParamDigestFor(dsForm({ address_state: 'NY' }), DS_SECRET, DIGISTORE24_IPN_SCHEME) !== DS_EXPECTED
+  && sortedParamDigestFor(dsForm(), DS_SECRET, DIGISTORE24_IPN_SCHEME) === DS_EXPECTED)
+check('N12: "0" is NOT empty and is signed, so a parser using PHP-style empty() would reject real deliveries',
+  sortedParamDigestFor(dsForm({ quantity: '' }), DS_SECRET, DIGISTORE24_IPN_SCHEME) !== DS_EXPECTED)
+check('N13: the registry carries the scheme, so the provider is no longer unknown',
+  marketplaceProvider('digistore24')?.signature?.kind === 'sorted_param_digest')
+check('N14: and it is the SIGNED connection type — the one Digistore24 calls "Webhook" has no signature at all',
+  read('docs/affiliate/digistore24-webhook-docs.md').includes('no signature of any kind'))
+
+// The parser.
+const dsParse = marketplaceParser('digistore24')
+check('N15: digistore24 has a parser', typeof dsParse === 'function')
+const dsSale = dsParse?.(dsForm(), 'application/x-www-form-urlencoded') ?? null
+check('N16: on_payment is a paid order keyed on the TRANSACTION id, not the order id',
+  dsSale?.kind === 'paid' && dsSale.externalOrderId === '3999938' && dsSale.externalProductId === 'DS-ADV')
+check('N17: and that is the point — month two shares the order_id, so order_id would swallow it',
+  (dsParse?.(dsForm({ transaction_id: '4000001', pay_sequence_no: '2' }), null)?.externalOrderId) === '4000001'
+  && dsForm().includes('order_id=34DEFS45DE2'))
+check('N18: amount_brutto is major units and becomes minor units',
+  dsSale?.amountMinor === 17900)
+check('N19: the currency IS reported by this platform, unlike JVZoo',
+  dsSale?.currency === 'USD')
+check('N20: a currency that is not three letters is dropped rather than stored',
+  dsParse?.(dsForm({ currency: 'dollars' }), null)?.currency === null)
+check('N21: the period end is the next payment, as an instant',
+  dsSale?.currentPeriodEnd === '2026-12-02T00:00:00Z')
+check('N22: a cancelled order falls back to the day access should stop',
+  dsParse?.(dsForm({ event: 'last_paid_day', next_payment_at: '', is_cancelled_for: '2026-12-31' }), null)?.currentPeriodEnd === '2026-12-31T00:00:00Z')
+check('N23: on_refund and on_chargeback are both refunds',
+  dsParse?.(dsForm({ event: 'on_refund' }), null)?.kind === 'refunded'
+  && dsParse?.(dsForm({ event: 'on_chargeback' }), null)?.kind === 'refunded')
+check('N24: last_paid_day is a cancellation — the platform says to revoke access permanently',
+  dsParse?.(dsForm({ event: 'last_paid_day' }), null)?.kind === 'cancelled')
+check('N25: on_rebill_cancelled is a cancellation',
+  dsParse?.(dsForm({ event: 'on_rebill_cancelled' }), null)?.kind === 'cancelled')
+check('N26: on_payment_missed is IGNORED, not cancelled — it is documented as a TEMPORARY suspension and the buyer may still pay',
+  dsParse?.(dsForm({ event: 'on_payment_missed' }), null) === null)
+check('N27: on_rebill_resumed is ignored — the platform warns it does not mean a payment completed',
+  dsParse?.(dsForm({ event: 'on_rebill_resumed' }), null) === null)
+check('N28: connection_test is ignored, so the route answers 200 to the Test connection button',
+  dsParse?.(dsForm({ event: 'connection_test' }), null) === null)
+check('N29: an affiliation notification is not an order',
+  dsParse?.(dsForm({ event: 'on_affiliation' }), null) === null)
+check('N30: amount_vat is read, because Digistore24 charges and remits it',
+  dsSale?.taxMinor === 2858)
+
+// VAT, and why it must NOT be reported as a contradiction on this platform.
+check('N31: Digistore24 is the seller of record, so the tax is its own',
+  marketplaceProvider('digistore24')?.sellerOfRecord === true)
+check('N32: JVZoo is not, which is the case the contradiction report exists for',
+  marketplaceProvider('jvzoo')?.sellerOfRecord === false)
+const routeSrcN = code('app/api/marketplace/[provider]/webhook/route.ts')
+check('N33: the route scopes the tax report to platforms where WE are the seller',
+  /!provider\.sellerOfRecord && event\.taxMinor !== null/.test(routeSrcN))
+check('N-MUT1: an unscoped report would be caught — it would log an error on every single Digistore24 sale',
+  !/!provider\.sellerOfRecord && event\.taxMinor !== null/.test(
+    routeSrcN.replace('!provider.sellerOfRecord && event.taxMinor !== null', 'event.taxMinor !== null')))
+
+// MUTATION CONTROLS for N.
+check('N-MUT2: appending the passphrase once at the end, instead of after every parameter, changes the digest',
+  (() => {
+    const form = new URLSearchParams(dsForm())
+    form.delete('sha_sign')
+    const pairs = [...form].filter(([, v]) => v !== '').map(([k, v]) => `${k}=${v}`).sort().join('')
+    return createHash('sha512').update(pairs + DS_SECRET, 'utf8').digest('hex').toUpperCase() !== DS_EXPECTED
+  })())
+check('N-MUT3: leaving the keys in the order they arrived, unsorted, changes the digest',
+  (() => {
+    const form = new URLSearchParams(dsForm())
+    form.delete('sha_sign')
+    const base = [...form].filter(([, v]) => v !== '').map(([k, v]) => `${k}=${v}${DS_SECRET}`).join('')
+    return createHash('sha512').update(base, 'utf8').digest('hex').toUpperCase() !== DS_EXPECTED
+  })())
+check('N-MUT4: signing sha_sign itself would change the digest, so excluding it is load-bearing',
+  sortedParamDigestFor(dsForm({ sha_sign: DS_EXPECTED }), DS_SECRET, { ...DIGISTORE24_IPN_SCHEME, excludedFields: [] }) !== DS_EXPECTED)
+check('N-MUT5: a parser keyed on order_id would make month two a redelivery of month one',
+  (() => {
+    const monthOne = dsForm()
+    const monthTwo = dsForm({ transaction_id: '4000001', pay_sequence_no: '2' })
+    return new URLSearchParams(monthOne).get('order_id') === new URLSearchParams(monthTwo).get('order_id')
+      && dsParse?.(monthOne, null)?.externalOrderId !== dsParse?.(monthTwo, null)?.externalOrderId
+  })())
+check('N-MUT6: reading amount_brutto as minor units would record 179 cents instead of 179 dollars',
+  Number.parseFloat('179.00') !== 17900)
+check('N-MUT7: mapping on_payment_missed to cancelled would be caught by N26',
+  (['on_payment', 'on_refund', 'on_chargeback', 'on_rebill_cancelled', 'last_paid_day'] as const)
+    .every((e) => dsParse?.(dsForm({ event: e }), null) !== null)
+  && dsParse?.(dsForm({ event: 'on_payment_missed' }), null) === null)
 
 // Sections F to I need await, and tsx compiles these suites as CommonJS,
 // where top-level await is not available. One async main, called at the end.

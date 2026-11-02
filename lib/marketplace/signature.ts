@@ -29,6 +29,7 @@ import type {
   MarketplaceFieldDigestScheme,
   MarketplaceHmacHeaderScheme,
   MarketplaceSignatureScheme,
+  MarketplaceSortedParamDigestScheme,
 } from './config'
 
 export type MarketplaceSignatureFailure =
@@ -49,6 +50,7 @@ export function marketplaceSignatureFor(
   scheme: MarketplaceSignatureScheme,
 ): string {
   if (scheme.kind === 'field_digest') return fieldDigestFor(rawBody, secret, scheme)
+  if (scheme.kind === 'sorted_param_digest') return sortedParamDigestFor(rawBody, secret, scheme)
   const mac = createHmac(scheme.algorithm, secret).update(rawBody, 'utf8')
   return scheme.encoding === 'base64' ? mac.digest('base64') : mac.digest('hex')
 }
@@ -70,6 +72,50 @@ export function fieldDigestFor(
   const joined = scheme.fields.map((name) => form.get(name) ?? '').join(scheme.separator)
   const base = joined + (scheme.trailingSeparator ? scheme.separator : '') + secret
   return createHash(scheme.algorithm).update(base, 'utf8').digest('hex').slice(0, scheme.length).toUpperCase()
+}
+
+/**
+ * The digest a sorted-param scheme computes over a form-encoded body.
+ *
+ * Digistore24's `sha_sign`, transcribed from the platform's own reference
+ * receiver (docs/affiliate/digistore24-webhook-docs.md). Four decisions here
+ * are the platform's and not ours, and each one silently breaks the digest if
+ * changed:
+ *
+ *  1. THE PARAMETER LIST COMES FROM THE BODY, not from configuration. The set
+ *     varies per delivery, so anything we failed to anticipate would be
+ *     excluded from our digest and included in theirs.
+ *  2. AN EMPTY VALUE IS SKIPPED ENTIRELY — the platform's test is
+ *     `$value === ""`, so `"0"` is kept. Treating `"0"` as empty, as PHP's own
+ *     `empty()` would, rejects every delivery that reports a zero amount.
+ *  3. THE KEYS SORT CASE-SENSITIVELY, by byte. The reference script's default
+ *     is `$convert_keys_to_uppercase = false`, which sets
+ *     `$sort_case_sensitive = true`. Every documented key is ASCII
+ *     snake_case, so a default JavaScript sort agrees byte for byte.
+ *  4. THE SECRET FOLLOWS EVERY PARAMETER, not just the last one.
+ *
+ * A repeated key keeps its LAST value, which is what PHP's `$_POST` hands the
+ * platform's own code. No documented parameter repeats, so this only decides
+ * the behaviour on malformed input — where failing closed is correct anyway.
+ */
+export function sortedParamDigestFor(
+  rawBody: string,
+  secret: string,
+  scheme: MarketplaceSortedParamDigestScheme,
+): string {
+  const form = new URLSearchParams(rawBody)
+  const excluded = new Set<string>(scheme.excludedFields)
+  // Last value wins, as PHP's $_POST does on the platform's own side.
+  const values = new Map<string, string>()
+  for (const [key, value] of form) {
+    if (excluded.has(key) || value === '') continue
+    values.set(key, value)
+  }
+  const base = [...values.keys()]
+    .sort()
+    .map((key) => `${key}=${values.get(key)}${secret}`)
+    .join('')
+  return createHash(scheme.algorithm).update(base, 'utf8').digest('hex').toUpperCase()
 }
 
 /** Digest lengths in characters, so a wrong-length value is rejected before
@@ -103,6 +149,7 @@ export function verifyMarketplaceSignature(
   if (!scheme) return { ok: false, reason: 'unknown_scheme' }
   if (!secret) return { ok: false, reason: 'missing_secret' }
   if (scheme.kind === 'field_digest') return verifyFieldDigest(rawBody, secret, scheme)
+  if (scheme.kind === 'sorted_param_digest') return verifySortedParamDigest(rawBody, secret, scheme)
 
   const raw = (signatureHeader ?? '').trim()
   if (!raw) return { ok: false, reason: 'missing_signature' }
@@ -136,6 +183,31 @@ function verifyFieldDigest(
     return { ok: false, reason: 'malformed_signature' }
   }
   const expected = fieldDigestFor(rawBody, secret, scheme)
+  return timingSafeEqual(Buffer.from(expected), Buffer.from(received))
+    ? { ok: true }
+    : { ok: false, reason: 'mismatch' }
+}
+
+/** SHA-512 hex, in characters. A wrong-length value is refused before
+ *  timingSafeEqual, which throws on a length mismatch. */
+const SORTED_PARAM_DIGEST_LENGTH = 128
+
+/**
+ * Like the field-digest check: the digest rides in the body, so the header
+ * argument is irrelevant and the body is read once by this check and again by
+ * the parser, which still never runs on an unverified body.
+ */
+function verifySortedParamDigest(
+  rawBody: string,
+  secret: string,
+  scheme: MarketplaceSortedParamDigestScheme,
+): MarketplaceSignatureResult {
+  const received = (new URLSearchParams(rawBody).get(scheme.field) ?? '').trim().toUpperCase()
+  if (!received) return { ok: false, reason: 'missing_signature' }
+  if (received.length !== SORTED_PARAM_DIGEST_LENGTH || !/^[0-9A-F]+$/.test(received)) {
+    return { ok: false, reason: 'malformed_signature' }
+  }
+  const expected = sortedParamDigestFor(rawBody, secret, scheme)
   return timingSafeEqual(Buffer.from(expected), Buffer.from(received))
     ? { ok: true }
     : { ok: false, reason: 'mismatch' }

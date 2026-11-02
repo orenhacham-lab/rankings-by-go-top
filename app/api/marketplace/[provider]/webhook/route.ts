@@ -10,10 +10,10 @@
  * OFF MEANS OFF, AND UNCONFIGURED MEANS OFF. A provider must be registered,
  * switched on, hold a webhook secret, have a KNOWN signature scheme and have
  * a parser before a single delivery is looked at (lib/marketplace/config.ts,
- * lib/marketplace/intake.ts). Only JVZoo has a scheme and a parser, both read
- * from the IPN v2 spec inside the seller account; ClickBank and Digistore24
- * have neither, because neither may be guessed, so this route refuses every
- * one of their deliveries by design. That is the safe direction: a
+ * lib/marketplace/intake.ts). JVZoo and Digistore24 have both, each read from
+ * the platform's own spec and written down under docs/affiliate/; ClickBank
+ * has neither, because neither may be guessed, so this route refuses every
+ * one of its deliveries by design. That is the safe direction: a
  * half-configured marketplace must never record an order it cannot describe.
  *
  * THE SIGNATURE IS OVER THE RAW BODY. `request.text()` is read once and that
@@ -28,6 +28,11 @@
  * handled. A provider that is off answers 503, because a retry after it is
  * switched on SHOULD succeed. A failed write answers 500 so a retry can
  * recover it.
+ *
+ * AND WHETHER A NON-2XX IS RECOVERABLE DEPENDS ON THE PLATFORM. Digistore24
+ * retries a failed call "up to 5 times with in 2 days" when its connection has
+ * the option on (docs/affiliate/digistore24-webhook-docs.md), so a 5xx to it
+ * is a delay. JVZoo is the opposite, and the paragraph below is about JVZoo.
  *
  * BUT JVZOO DOES NOT RETRY, and that changes what a non-2xx costs.
  * docs/affiliate/jvzoo-webhook-docs.md, copied from the seller account: "No
@@ -165,7 +170,15 @@ async function handle(request: Request, slug: string): Promise<Response> {
   // what someone would want to trigger at will, and in the parser or ahead of
   // the signature check anyone who could POST here could make us doubt our
   // own text. It does not move for tidiness.
-  if (event.taxMinor !== null && event.taxMinor !== 0) {
+  //
+  // AND IT IS SCOPED TO THE PLATFORMS WHERE WE ARE THE SELLER. On a merchant
+  // of record — Digistore24, which contracts with the buyer, issues the
+  // invoice and remits the tax — a populated `amount_vat` is not a
+  // contradiction, it is the channel working as intended, and the sales page
+  // prints the sentence that says so. Logging it as an error there would file
+  // one error per sale and bury the JVZoo case, which is the only one where a
+  // tax figure means a published statement of ours has gone false.
+  if (!provider.sellerOfRecord && event.taxMinor !== null && event.taxMinor !== 0) {
     console.error('[marketplace-webhook] platform reported tax: the sales page tells buyers the price excludes tax, so that sentence may now be false', {
       provider: provider.slug,
       externalOrderId: event.externalOrderId,
