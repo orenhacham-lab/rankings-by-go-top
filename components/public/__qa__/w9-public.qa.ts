@@ -114,18 +114,30 @@ function main() {
     check('C2: no "Rankings / by Go Top" logo text is left in the rail, the public nav, the footer or the demo', lockOk(lockups))
     check('MUT: a two-line "Rankings / by Go Top" lockup back is caught', !lockOk([...lockups, '<span>Rankings</span><span>by Go Top</span>']))
     const schema = strip(read('app/api/schema/route.ts')), layout = strip(read('app/layout.tsx')), llms = read('app/llms.txt/route.ts')
+    // The product node moved out of the two surfaces and into one builder, so
+    // that they describe ONE SoftwareApplication by one `@id` instead of two
+    // anonymous literals (lib/seo/software-application.ts says why). C3 reads
+    // the builder for the shape, and still reads both surfaces for the defect
+    // it was written against: the agency named as the publisher.
+    const software = strip(read('lib/seo/software-application.ts'))
     // The publisher used to be the agency, www.gotop.co.il, written out in
     // both files. That pointed the whole entity at a different organization
     // (lib/seo/organization.ts says why), so what C3 now requires is the
     // product's own node, referenced by the id both surfaces share. The
     // visible "מבית GO TOP" credit is a separate claim and C6 still holds it.
+    const noAgencyPublisher = (s: string) => !/publisher:\s*\{[^}]*gotop\.co\.il/.test(s)
     const schemaOk = (s: string) => /name: 'Go Top SEO',\s*alternateName: \['Rankings by Go Top'\]/.test(s)
       && /publisher: BRAND_REF,\s*brand: BRAND_REF,/.test(s)
-      && !/publisher:\s*\{[^}]*gotop\.co\.il/.test(s)
-    check('C3: schema — Go Top SEO with alternateName, publisher the product itself', schemaOk(schema) && schemaOk(layout))
+      && noAgencyPublisher(s)
+    check('C3: schema — Go Top SEO with alternateName, publisher the product itself',
+      schemaOk(software) && noAgencyPublisher(schema) && noAgencyPublisher(layout))
+    check('C3b: both surfaces build that one node rather than their own',
+      schema.includes('softwareApplicationSchema(') && layout.includes('softwareApplicationSchema('))
     check('MUT: the agency back as publisher fails C3',
-      !schemaOk(layout.replace(/publisher: BRAND_REF,/, "publisher: { '@type': 'Organization', name: 'GO TOP', url: 'https://www.gotop.co.il' },")))
-    check('MUT: the old name as the schema name fails C3', !schemaOk(schema.replace(/name: 'Go Top SEO',(\s*)alternateName/g, "name: 'Rankings by Go Top',$1alternateName")))
+      !schemaOk(software.replace(/publisher: BRAND_REF,/, "publisher: { '@type': 'Organization', name: 'GO TOP', url: 'https://www.gotop.co.il' },")))
+    check('MUT: the old name as the schema name fails C3', !schemaOk(software.replace(/name: 'Go Top SEO',(\s*)alternateName/g, "name: 'Rankings by Go Top',$1alternateName")))
+    check('MUT: a surface writing its own node again fails C3b',
+      !layout.replace(/softwareApplicationSchema\(/g, 'x(').includes('softwareApplicationSchema('))
     // The line moved out of a `Name:` field when llms.txt stopped being a
     // second robots.txt and became Markdown (23.10.2026); what has to survive
     // is the former name, so somebody who searches it still finds us.

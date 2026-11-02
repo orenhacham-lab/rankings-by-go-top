@@ -1,6 +1,7 @@
 import { createClient } from '@/lib/supabase/server'
-import { BRAND_REF, ORGANIZATION_ID, organizationSchema } from '@/lib/seo/organization'
-import { SOFTWARE_OFFER } from '@/lib/seo/software-offer'
+import { ORGANIZATION_ID, organizationSchema } from '@/lib/seo/organization'
+import { softwareApplicationSchema } from '@/lib/seo/software-application'
+import { getSiteMetadata } from '@/lib/i18n/site-metadata'
 
 interface Article {
   id: string
@@ -60,24 +61,25 @@ export async function GET() {
   // lib/seo/organization.ts. It used to be a second, drifting copy whose
   // `sameAs` was empty, so this endpoint and the pages described two
   // different organizations to anything that read both.
-  const organization = organizationSchema(
-    'Advanced location tracking system for SEO promotion - Google organic results and Google Maps rankings',
-  )
+  //
+  // The description is the one the English pages show, not a third sentence
+  // written for this endpoint. The two it replaces ("Advanced location tracking
+  // system for SEO promotion…" and "Advanced SEO rank tracking system…") appear
+  // on no page of the site, and this endpoint shares the Organization's `@id`
+  // with every one of those pages — so one node was being served two
+  // descriptions, which is the drift an `@id` exists to prevent.
+  const description = getSiteMetadata('en').description
+  const organization = organizationSchema(description)
 
-  // SoftwareApplication schema
-  const softwareSchema = {
-    '@context': 'https://schema.org',
-    '@type': 'SoftwareApplication',
-    name: 'Go Top SEO',
-    alternateName: ['Rankings by Go Top'],
-    publisher: BRAND_REF,
-    brand: BRAND_REF,
-    applicationCategory: 'BusinessApplication',
-    description: 'Advanced SEO rank tracking system for monitoring Google search and Google Maps rankings',
+  // SoftwareApplication schema — the SAME node, by the same `@id`, that
+  // app/layout.tsx serves on every page (lib/seo/software-application.ts).
+  // This endpoint has no language and serves the Israeli catalogue, so the
+  // offer it carries is the shekel range, as before.
+  const softwareSchema = softwareApplicationSchema({
     url: baseUrl,
-    // No aggregateRating: only real, collected reviews may be marked up.
-    offers: SOFTWARE_OFFER,
-  }
+    market: 'ILS',
+    description,
+  })
 
   // Generate article schemas
   const articleSchemas = (articles || []).map((article: Article) => ({
