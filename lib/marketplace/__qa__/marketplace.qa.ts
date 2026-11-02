@@ -19,7 +19,7 @@
  * Run: npx tsx lib/marketplace/__qa__/marketplace.qa.ts
  */
 import { readFileSync } from 'fs'
-import { createHmac } from 'crypto'
+import { createHash, createHmac } from 'crypto'
 import { createElement } from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
 import { CONSENT_DENIED, type ConsentChoices } from '../../consent/categories'
@@ -38,13 +38,21 @@ import {
   planForMarketplaceProductId,
   providerReadiness,
   JVZOO_IPN_V2_SCHEME,
+  DIGISTORE24_IPN_SCHEME,
   type MarketplaceHmacHeaderScheme,
 } from '../config'
 import { CONSENT_REQUIRED_COUNTRIES, consentRequiredForCountry } from '../../consent/eprivacy-territory'
-import { fieldDigestFor, marketplaceSignatureFor, verifyMarketplaceSignature } from '../signature'
+import {
+  fieldDigestFor,
+  marketplaceSignatureFor,
+  phpFormValue,
+  sortedParamsDigestFor,
+  verifyMarketplaceSignature,
+} from '../signature'
 import {
   httpStatusForMarketplaceOutcome,
   marketplaceParser,
+  parseDigistore24Ipn,
   recordMarketplaceOrder,
   unverifiedDeliveryTrace,
   type MarketplaceOrderEvent,
@@ -92,9 +100,14 @@ check('A6c: seller of record follows each platform\'s vendor agreement - JVZoo i
   marketplaceProvider('jvzoo')?.sellerOfRecord === false
   && marketplaceProvider('digistore24')?.sellerOfRecord === true
   && marketplaceProvider('clickbank')?.sellerOfRecord === true)
+// ClickBank alone now. Digistore24's documentation turned out to be PUBLIC
+// (docs/affiliate/digistore24-ipn-docs.md), so it has a verified scheme and a
+// parser; ClickBank's is still unread, and unread still means neither.
 check('A7: a platform whose documentation has not been read carries neither a scheme nor a parser',
-  ['digistore24', 'clickbank'].every((s) =>
-    marketplaceProvider(s)?.signature === null && marketplaceParser(s) === null))
+  marketplaceProvider('clickbank')?.signature === null && marketplaceParser('clickbank') === null)
+check('A7b: and a platform whose documentation HAS been read carries both',
+  ['digistore24', 'jvzoo'].every((s) =>
+    marketplaceProvider(s)?.signature !== null && marketplaceParser(s) !== null))
 check('A-MUT1: a scheme without a parser would fail A5',
   !([{ signature: {} }, { signature: null }] as { signature: unknown }[])
     .every((p) => (p.signature === null) === true))
@@ -115,15 +128,28 @@ check('B4: an unregistered slug is off even with its env var set',
 let readiness = providerReadiness('digistore24')
 check('B5: with the switch on but nothing else, readiness is false',
   readiness.ready === false)
-check('B6: and it names the secret, the scheme and the product ids — by NAME, not value',
+check('B6: and it names what is missing — by NAME, not value',
   readiness.missing.includes('webhook_secret')
-  && readiness.missing.includes('signature_scheme')
   && readiness.missing.includes('product_ids'))
+check('B6b: the scheme is NOT among them for a platform whose scheme is known',
+  readiness.missing.includes('signature_scheme') === false
+  && providerReadiness('clickbank').missing.includes('signature_scheme'))
 process.env.MARKETPLACE_DIGISTORE24_WEBHOOK_SECRET = 'top-secret'
 process.env.MARKETPLACE_DIGISTORE24_PRODUCT_ADVANCED = 'PROD-ADV'
 readiness = providerReadiness('digistore24')
-check('B7: with a secret and a product the only thing left is the scheme',
-  readiness.ready === false && readiness.missing.join(',') === 'signature_scheme')
+check('B7: with the switch on, a secret, a product and a known scheme, it is ready',
+  readiness.ready === true && readiness.missing.length === 0)
+check('B7b: and the same configuration on a platform with NO scheme is still not ready',
+  (() => {
+    process.env.MARKETPLACE_CLICKBANK_ENABLED = 'true'
+    process.env.MARKETPLACE_CLICKBANK_WEBHOOK_SECRET = 'top-secret'
+    process.env.MARKETPLACE_CLICKBANK_PRODUCT_ADVANCED = 'PROD-ADV'
+    const cb = providerReadiness('clickbank')
+    delete process.env.MARKETPLACE_CLICKBANK_ENABLED
+    delete process.env.MARKETPLACE_CLICKBANK_WEBHOOK_SECRET
+    delete process.env.MARKETPLACE_CLICKBANK_PRODUCT_ADVANCED
+    return cb.ready === false && cb.missing.join(',') === 'signature_scheme'
+  })())
 check('B8: an unregistered provider is reported as unregistered, not merely disabled',
   providerReadiness('paddle').missing.join(',') === 'unregistered_provider')
 check('B9: the secret is readable by the server and only for a registered provider',
@@ -176,10 +202,13 @@ check('D6: a plan with no configured url has none', marketplaceBuyUrl('jvzoo', '
  * record at all - not an account, not a plan, not a receipt to reconcile by
  * hand. Each check below turns exactly one readiness piece off.
  */
-process.env.MARKETPLACE_DIGISTORE24_BUY_URL_ADVANCED = 'https://www.digistore24.com/product/123'
+process.env.MARKETPLACE_CLICKBANK_BUY_URL_ADVANCED = 'https://www.clickbank.com/product/123'
+process.env.MARKETPLACE_CLICKBANK_ENABLED = 'true'
+process.env.MARKETPLACE_CLICKBANK_WEBHOOK_SECRET = 'top-secret'
+process.env.MARKETPLACE_CLICKBANK_PRODUCT_ADVANCED = 'PROD-ADV'
 check('D6a: a provider with no signature scheme shows NO buy button, however its url is set',
-  providerReadiness('digistore24').ready === false
-  && marketplaceBuyUrl('digistore24', 'advanced') === null)
+  providerReadiness('clickbank').ready === false
+  && marketplaceBuyUrl('clickbank', 'advanced') === null)
 process.env.MARKETPLACE_JVZOO_ENABLED = 'false'
 check('D6b: switching the channel off removes the button',
   marketplaceBuyUrl('jvzoo', 'advanced') === null)
@@ -394,6 +423,14 @@ check('K27: the route reports a non-zero tax, and tests for zero as well as for 
 check('K-MUT6: dropping the zero test is caught — it would fire on every clean sale',
   !/event\.taxMinor !== null && event\.taxMinor !== 0/.test(
     marketplaceRouteSrc.replace('event.taxMinor !== null && event.taxMinor !== 0', 'event.taxMinor !== null')))
+check('K28: and only where WE are the seller — a merchant of record charging tax is the channel working',
+  /!provider\.sellerOfRecord && event\.taxMinor !== null/.test(marketplaceRouteSrc))
+check('K-MUT7: dropping that scope is caught — it would file one error per Digistore24 sale',
+  !/!provider\.sellerOfRecord && event\.taxMinor !== null/.test(
+    marketplaceRouteSrc.replace('!provider.sellerOfRecord && event.taxMinor !== null', 'event.taxMinor !== null')))
+check('K29: and the platforms it is scoped against are the ones that are the seller of record',
+  marketplaceProvider('digistore24')?.sellerOfRecord === true
+  && marketplaceProvider('jvzoo')?.sellerOfRecord === false)
 
 // Sections F to I need await, and tsx compiles these suites as CommonJS,
 // where top-level await is not available. One async main, called at the end.
@@ -1170,6 +1207,173 @@ async function main() {
       const moved = `unverifiedDeliveryTrace\n${routeSrcM.replace('unverifiedDeliveryTrace(rawBody)', 'x')}`
       return !(moved.indexOf('unverifiedDeliveryTrace') > moved.indexOf('verifyMarketplaceSignature'))
     })())
+  // ── DS. Digistore24: the scheme, checked against Digistore24's own digest ──
+  console.log('\nDS. digistore24')
+
+  // THE EXTERNAL CHECK. Their own guide prints these five parameters, this
+  // passphrase and this signature. Nothing below is worth anything if our
+  // code only agrees with itself, so the published string is the fixture.
+  const DS_EXAMPLE = new URLSearchParams({
+    buyer_email: 'claus@domain-xyz.de',
+    payment_id: 'PAYID-39-22012',
+    order_id: '273732',
+    transaction_amount: '17.00',
+    transaction_currency: 'USD',
+  }).toString()
+  const DS_PUBLISHED =
+    '342770076245D14ED7DF4D2E5D82216D7EDF8F9E7969B5964C9C5DCB53E962BBECD545E9042' +
+    '2B5329C69554FD8B1A7E7410736615FCA7FB5CBB3624CC016E4BC'
+  check('DS1: our digest reproduces the signature Digistore24 publish in their own guide',
+    sortedParamsDigestFor(DS_EXAMPLE, 'xxxxx', DIGISTORE24_IPN_SCHEME) === DS_PUBLISHED)
+
+  const dsSign = (body: string, secret = 'ipn-passphrase') =>
+    `${body}&sha_sign=${sortedParamsDigestFor(body, secret, DIGISTORE24_IPN_SCHEME)}`
+  const dsVerify = (signed: string, secret = 'ipn-passphrase') =>
+    verifyMarketplaceSignature(signed, null, secret, DIGISTORE24_IPN_SCHEME)
+
+  const DS_SALE = new URLSearchParams({
+    ipn_version: '1.2',
+    api_mode: 'live',
+    event: 'on_payment',
+    order_id: 'A3NXHEHF',
+    order_item_id: '33299237',
+    transaction_id: '3999938',
+    product_id: '3323323',
+    buyer_email: 'Buyer@Example.COM',
+    amount_brutto: '79.00',
+    amount_vat: '0.00',
+    currency: 'usd',
+    billing_type: 'subscription',
+    next_payment_at: '2026-12-02',
+  }).toString()
+
+  check('DS2: a genuine delivery verifies', dsVerify(dsSign(DS_SALE)).ok)
+  check('DS3: the wrong passphrase is a mismatch',
+    dsVerify(dsSign(DS_SALE), 'not-the-passphrase').ok === false)
+  check('DS4: changing ANY field is a mismatch, because every field is signed',
+    dsVerify(dsSign(DS_SALE).replace('product_id=3323323', 'product_id=9999999')).ok === false)
+  check('DS5: a field the body does not mention at all is a mismatch too',
+    dsVerify(`${dsSign(DS_SALE)}&amount_vendor=51.00`).ok === false)
+  const dsFailure = (signed: string, secret?: string) => {
+    const result = secret === undefined ? dsVerify(signed) : dsVerify(signed, secret)
+    return result.ok ? null : result.reason
+  }
+  check('DS6: no signature at all is refused as missing, not as a mismatch',
+    dsFailure(DS_SALE) === 'missing_signature')
+  check('DS7: a digest of the wrong length is malformed rather than compared',
+    dsFailure(`${DS_SALE}&sha_sign=ABCD`) === 'malformed_signature')
+
+  // AN EMPTY VALUE IS SKIPPED, which is the reference implementation's
+  // `$is_empty`. If we signed `note=` where they signed nothing, every
+  // delivery carrying one blank field would be refused.
+  check('DS8: a parameter present but empty is skipped, so it cannot change the digest',
+    sortedParamsDigestFor(`${DS_SALE}&note=`, 'ipn-passphrase', DIGISTORE24_IPN_SCHEME)
+    === sortedParamsDigestFor(DS_SALE, 'ipn-passphrase', DIGISTORE24_IPN_SCHEME))
+  check('DS9: and a delivery carrying that empty field still verifies',
+    dsVerify(`${dsSign(DS_SALE)}&note=`).ok)
+
+  // PHP KEEPS THE LAST VALUE OF A REPEATED KEY. The digest and the parser
+  // must read the same one, or a body signed for one product could be
+  // redeemed for another.
+  const DS_DOUBLED = 'event=on_payment&api_mode=live&order_item_id=1&product_id=AAA&product_id=BBB'
+  check('DS10: a repeated key signs its LAST value, as the sender’s PHP does',
+    sortedParamsDigestFor(DS_DOUBLED, 'p', DIGISTORE24_IPN_SCHEME)
+    === sortedParamsDigestFor('event=on_payment&api_mode=live&order_item_id=1&product_id=BBB', 'p', DIGISTORE24_IPN_SCHEME))
+  check('DS11: and the parser reads that same last value, never the first',
+    parseDigistore24Ipn(DS_DOUBLED, null)?.externalProductId === 'BBB')
+  check('DS12: phpFormValue is the shared reader that makes those two agree',
+    phpFormValue(DS_DOUBLED, 'product_id') === 'BBB')
+  // THE DIGEST FIELD OBEYS THE SAME LAST-WINS RULE as every other key, which
+  // is the only reading that agrees with the sender: PHP's `unset` removes
+  // whichever value its map kept, and that is the last one. Reading the first
+  // instead — which is what `URLSearchParams.get()` does — would refuse every
+  // delivery that happened to carry the field twice.
+  check('DS13: the LAST sha_sign decides, so a value appended after the genuine one is the one compared',
+    dsVerify(`${dsSign(DS_SALE)}&sha_sign=00000000`).ok === false)
+  check('DS13b: and a value sent BEFORE the genuine one cannot displace it',
+    dsVerify(`sha_sign=00000000&${dsSign(DS_SALE)}`).ok === true)
+
+  // Bracketed keys are ONE array to PHP, so they sort under the top-level
+  // name and keep body order inside it.
+  const DS_ARRAY = 'event=on_payment&zz=last&addons%5B0%5D%5Bid%5D=7&addons%5B1%5D%5Bid%5D=8&aa=first'
+  check('DS14: an array parameter sorts under its top-level name, not its full name',
+    sortedParamsDigestFor(DS_ARRAY, 'p', DIGISTORE24_IPN_SCHEME)
+    === (() => {
+      const base = ['aa=first', 'addons[0][id]=7', 'addons[1][id]=8', 'event=on_payment', 'zz=last']
+        .map((part) => part + 'p').join('')
+      return createHash('sha512').update(base, 'utf8').digest('hex').toUpperCase()
+    })())
+
+  // ── The parser ──
+  const dsSale = parseDigistore24Ipn(DS_SALE, null)
+  check('DS15: on_payment is a paid order', dsSale?.kind === 'paid')
+  check('DS16: keyed on order_item_id, which is what a refund of it also carries',
+    dsSale?.externalOrderId === '33299237')
+  check('DS17: amount_brutto is MAJOR units and becomes minor units',
+    dsSale?.amountMinor === 7900)
+  check('DS18: the currency is upper-cased', dsSale?.currency === 'USD')
+  check('DS19: next_payment_at is the period end, at the START of that day',
+    dsSale?.currentPeriodEnd === '2026-12-02T00:00:00Z')
+  check('DS20: a refund is a refund, and a chargeback is one too',
+    parseDigistore24Ipn(DS_SALE.replace('event=on_payment', 'event=on_refund'), null)?.kind === 'refunded'
+    && parseDigistore24Ipn(DS_SALE.replace('event=on_payment', 'event=on_chargeback'), null)?.kind === 'refunded')
+  check('DS21: a cancellation touches nothing, because the buyer keeps the paid period',
+    parseDigistore24Ipn(DS_SALE.replace('event=on_payment', 'event=on_rebill_cancelled'), null) === null)
+  check('DS22: and neither does a missed payment, a resume, a last paid day or an affiliation',
+    ['on_payment_missed', 'on_rebill_resumed', 'last_paid_day', 'on_affiliation', 'customform', 'eticket']
+      .every((event) => parseDigistore24Ipn(DS_SALE.replace('event=on_payment', `event=${event}`), null) === null))
+  check('DS23: their connection test is acknowledged and records nothing',
+    parseDigistore24Ipn('event=connection_test&api_mode=live', null) === null)
+  check('DS24: a TEST order never becomes a real plan',
+    parseDigistore24Ipn(DS_SALE.replace('api_mode=live', 'api_mode=test'), null) === null)
+  check('DS25: but a MISSING api_mode is treated as live, so a real sale is never dropped in silence',
+    parseDigistore24Ipn(DS_SALE.replace('api_mode=live&', ''), null)?.kind === 'paid')
+  check('DS26: a date it does not recognise leaves the period UNKNOWN rather than invented',
+    parseDigistore24Ipn(DS_SALE.replace('next_payment_at=2026-12-02', 'next_payment_at=02.12.2026'), null)
+      ?.currentPeriodEnd === null)
+  check('DS27: with no order_item_id it falls back to the transaction id',
+    parseDigistore24Ipn(DS_SALE.replace('order_item_id=33299237&', ''), null)?.externalOrderId === '3999938')
+  check('DS28: a renewal carries the SAME order key, which is why it cannot be mistaken for a new order',
+    parseDigistore24Ipn(DS_SALE.replace('transaction_id=3999938', 'transaction_id=4000000'), null)
+      ?.externalOrderId === '33299237')
+  check('DS29: the parser is registered for the slug', marketplaceParser('digistore24') !== null)
+
+  // ── The acknowledgement Digistore24 demands ──
+  check('DS30: Digistore24 is acknowledged with text, every other platform with JSON',
+    marketplaceProvider('digistore24')?.acknowledgement === 'ok_text'
+    && marketplaceProvider('jvzoo')?.acknowledgement === 'json'
+    && marketplaceProvider('clickbank')?.acknowledgement === 'json')
+  const routeSrcD = code(ROUTE)
+  check('DS31: the route sends the literal OK, upper case',
+    /new Response\('OK'/.test(routeSrcD))
+  check('DS32: and only on a 2xx, so a failed write can never read as handled',
+    /status >= 200 && status < 300/.test(routeSrcD))
+  check('DS33: a refused signature answers before any acknowledgement is reached',
+    routeSrcD.indexOf('acknowledge(') > routeSrcD.indexOf("status: 401")
+    || routeSrcD.indexOf('verified.ok') < routeSrcD.indexOf('acknowledge('))
+  check('DS34: an ignored notification is still acknowledged, because their own test sends one',
+    /if \(!event\) return acknowledge\(/.test(routeSrcD))
+
+  check('DS35: the captured documentation records the source and the verified example',
+    (() => {
+      const docs = read('docs/affiliate/digistore24-ipn-docs.md')
+      return docs.includes('digistore_ipn.pdf') && docs.includes('sha_sign.php')
+        && docs.includes(DS_PUBLISHED.slice(0, 40))
+        && /OK/.test(docs)
+    })())
+
+  check('DS-MUT1: a case-insensitive sort would be caught where names differ in case',
+    sortedParamsDigestFor('B=2&a=1', 'p', DIGISTORE24_IPN_SCHEME)
+    !== sortedParamsDigestFor('B=2&a=1', 'p', { ...DIGISTORE24_IPN_SCHEME, caseSensitiveSort: false }))
+  check('DS-MUT2: signing an empty value instead of skipping it would change the digest',
+    sortedParamsDigestFor('a=1&note=', 'p', DIGISTORE24_IPN_SCHEME)
+    !== createHash('sha512').update('a=1pnote=p', 'utf8').digest('hex').toUpperCase())
+  check('DS-MUT3: reading the FIRST repeated value instead of the last would be caught',
+    new URLSearchParams(DS_DOUBLED).get('product_id') === 'AAA'
+    && phpFormValue(DS_DOUBLED, 'product_id') === 'BBB')
+  check('DS-MUT4: forgetting to exclude the digest field would break every delivery',
+    verifyMarketplaceSignature(dsSign(DS_SALE), null, 'ipn-passphrase',
+      { ...DIGISTORE24_IPN_SCHEME, excluded: [] }).ok === false)
 }
 
 main().then(() => {
