@@ -529,3 +529,38 @@ export function marketplacePixelUrl(slug: string, plan?: PlanCode): string | nul
   const perPlan = plan ? httpsUrlOrNull(process.env[`${prefix}PIXEL_URL_${plan.toUpperCase()}`]) : null
   return perPlan ?? httpsUrlOrNull(process.env[`${prefix}PIXEL_URL`])
 }
+
+/**
+ * The platform's own TRUST BADGE for the sales page, as configured in
+ * `MARKETPLACE_<SLUG>_BADGE_URL`.
+ *
+ * A CONDITION OF LISTING, LIKE THE PIXEL, AND FOR THE SAME KIND OF REASON.
+ * Digistore24's pre-submission checklist ("Checklist Digistore24 Inc. (US)",
+ * read in the seller account on 2026-11-02) makes the vendor confirm that
+ * "Your sales page trust badge and footer badge are both added to your sales
+ * page" before a product may even be submitted for review. The badge is
+ * generated per vendor in Conversion tools -> Trust-Badges and delivered as a
+ * script URL carrying the badge id and a token.
+ *
+ * IT IS A SCRIPT, NOT A BEACON, AND THAT IS THE DIFFERENCE THAT MATTERS.
+ * `marketplacePixelUrl` points at a 1x1 image; this points at executable
+ * JavaScript that loads a second script from the platform and renders a
+ * sticky banner into our page. So the URL is held in configuration rather
+ * than the snippet being pasted into a component: a URL can be checked
+ * (https only, no quotes or angle brackets), and a snippet is third-party
+ * HTML rendered into our document from an environment variable, which this
+ * file has refused since `requiredDisclaimer` was written.
+ *
+ * AND IT STORES, so it is gated exactly as the beacon is. The response to
+ * `https://www.digistore24.com/trusted-badge/<id>/<token>/salespage` carries
+ * `set-cookie: ds_gb_id=<identifier>; Max-Age=604800` - a week-long
+ * identifier written to the visitor's device. ePrivacy Art. 5(3) therefore
+ * applies on its own terms, the same analysis lib/consent/eprivacy-territory
+ * .ts sets out for JVZoo's pixel, and the same territorial split follows: the
+ * badge is behind the marketing category where consent is required, and in
+ * the document on page load where it is not.
+ */
+export function marketplaceBadgeUrl(slug: string): string | null {
+  if (!marketplaceProvider(slug)) return null
+  return httpsUrlOrNull(process.env[`${envPrefix(slug)}BADGE_URL`])
+}

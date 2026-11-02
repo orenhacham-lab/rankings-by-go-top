@@ -117,6 +117,16 @@ export default function EnglishPrivacyPage() {
           that collection and transmission
           JVZoo does not process data on our behalf: it is a joint controller with us, and what it does
           with the data afterwards is decided by JVZoo under its own privacy policy</li>
+          <li><strong>Digistore24:</strong> only if you opened our Digistore24 marketplace sales page — a
+          trust-badge script is loaded from Digistore24, which receives your IP address, your browser
+          identifier and the page you arrived from, and which names Digistore24 as the reseller for that
+          purchase. The request also stores a Digistore24 cookie on your device for one week, so it is
+          governed by consent wherever the law requires consent for such storage: in the EEA, the United
+          Kingdom, Switzerland and Canada, and whenever we cannot determine which country the request came
+          from, the badge loads only after you have accepted marketing cookies; outside those territories
+          it loads when the page opens. If you then buy through that page, Digistore24 is the seller: it
+          takes your payment, issues your invoice and decides what it does with your data under its own
+          privacy policy, as an independent controller and not a processor acting on our behalf</li>
           <li><strong>Meta (Facebook / Instagram):</strong> for targeted advertising, and for a report of a
           completed signup sent from our server — see the Meta Advertising section below. For those conversion
           events Meta does not process data on our behalf: it is a joint controller with us, as that section

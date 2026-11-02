@@ -43,10 +43,13 @@ import type { Metadata } from 'next'
 import Link from 'next/link'
 import { headers } from 'next/headers'
 import { notFound } from 'next/navigation'
+import { MarketplaceBadge } from '@/components/consent/MarketplaceBadge'
+import { MarketplaceBadgeUnconditional } from '@/components/consent/MarketplaceBadgeUnconditional'
 import { MarketplacePixel } from '@/components/consent/MarketplacePixel'
 import { MarketplacePixelUnconditional } from '@/components/consent/MarketplacePixelUnconditional'
 import { consentRequiredForRequest } from '@/lib/consent/eprivacy-territory'
 import {
+  marketplaceBadgeUrl,
   marketplaceBuyUrl,
   marketplacePixelUrl,
   marketplacePolicyUrl,
@@ -95,6 +98,11 @@ export default async function MarketplaceSalesPage({
   // wrong, and the whole point of this check is that the write is the thing
   // consent protects. See lib/consent/eprivacy-territory.ts for why the
   // beacon counts as storage at all.
+  // The platform's own trust badge, which Digistore24's pre-submission
+  // checklist requires on the sales page. It is a script and it sets a
+  // week-long cookie, so it rides the SAME territorial decision as the
+  // beacon rather than a second one of its own.
+  const badgeUrl = marketplaceBadgeUrl(provider.slug)
   const consentRequired = consentRequiredForRequest(await headers())
 
   return (
@@ -268,6 +276,19 @@ export default async function MarketplaceSalesPage({
           <MarketplacePixelUnconditional key={url} src={url} alt={`${provider.label} tracking`} />
         ),
       )}
+
+      {/* The trust badge, on the same terms as the beacon above and for a
+          stricter reason: without it the product cannot even be SUBMITTED,
+          because Digistore24 make the vendor confirm it is present before
+          review. A platform with no configured BADGE_URL renders nothing,
+          which is still the default for ClickBank and JVZoo. */}
+      {badgeUrl ? (
+        consentRequired ? (
+          <MarketplaceBadge src={badgeUrl} />
+        ) : (
+          <MarketplaceBadgeUnconditional src={badgeUrl} />
+        )
+      ) : null}
     </main>
   )
 }

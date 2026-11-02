@@ -24,6 +24,7 @@ import { createElement } from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
 import { CONSENT_DENIED, type ConsentChoices } from '../../consent/categories'
 import { MarketplacePixel, marketingBeaconAllowed } from '../../../components/consent/MarketplacePixel'
+import { marketplaceBadgeUrl } from '../config'
 import { FakeAdmin } from '../../__qa__/_fake-admin'
 import {
   MARKETPLACE_CLAIM_PATH,
@@ -1439,6 +1440,73 @@ async function main() {
   check('DS-MUT4: forgetting to exclude the digest field would break every delivery',
     verifyMarketplaceSignature(dsSign(DS_SALE), null, 'ipn-passphrase',
       { ...DIGISTORE24_IPN_SCHEME, excluded: [] }).ok === false)
+
+  // ── BADGE. The trust badge Digistore24 require before a product may even
+  // be submitted — a SCRIPT, not a beacon, and it writes a week-long cookie.
+  console.log('\nBADGE. digistore24 trust badge')
+  const BADGE = 'MARKETPLACE_DIGISTORE24_BADGE_URL'
+  const badgeSrc = code('components/consent/MarketplaceBadge.tsx')
+  const badgeUncondSrc = code('components/consent/MarketplaceBadgeUnconditional.tsx')
+  const badgeSalesSrc = code(SALES)
+
+  delete process.env[BADGE]
+  check('BADGE1: with nothing configured the page renders no badge at all',
+    marketplaceBadgeUrl('digistore24') === null)
+  process.env[BADGE] = 'http://www.digistore24.com/trusted-badge/1/t/salespage'
+  check('BADGE2: plain http is refused, like every other configured URL',
+    marketplaceBadgeUrl('digistore24') === null)
+  process.env[BADGE] = 'https://www.digistore24.com/trusted-badge/49077/tok/salespage'
+  check('BADGE3: an https url is accepted',
+    marketplaceBadgeUrl('digistore24') === 'https://www.digistore24.com/trusted-badge/49077/tok/salespage')
+  check('BADGE4: and only for a registered provider',
+    marketplaceBadgeUrl('paddle') === null)
+  check('BADGE5: a url carrying a quote or an angle bracket is refused, because it becomes a src',
+    (() => {
+      process.env[BADGE] = 'https://x.test/a"><script>alert(1)</script>'
+      const bad = marketplaceBadgeUrl('digistore24')
+      process.env[BADGE] = 'https://www.digistore24.com/trusted-badge/49077/tok/salespage'
+      return bad === null
+    })())
+
+  // The gate itself, and that it is the SAME gate as the beacon's.
+  check('BADGE6: the gated component asks marketingBeaconAllowed, not a second rule of its own',
+    /marketingBeaconAllowed\(currentChoices\(\)\)/.test(badgeSrc))
+  check('BADGE7: and it is proven denied for every state the store can return',
+    marketingBeaconAllowed(CONSENT_DENIED) === false
+    && marketingBeaconAllowed({ ...CONSENT_DENIED, marketing: false }) === false)
+  check('BADGE8: the script is appended only inside the allowed branch',
+    /if \(allowed && !script\)/.test(badgeSrc) && /appendChild\(script\)/.test(badgeSrc))
+  check('BADGE9: withdrawal removes the script AND the nodes their loader added',
+    /if \(!allowed\) removeBadge\(\)/.test(badgeSrc) && /querySelectorAll\(BADGE_NODE_SELECTOR\)/.test(badgeSrc))
+  check('BADGE10: it listens for consent changes, so a later grant or withdrawal is honoured',
+    /addEventListener\(CONSENT_CHANGED_EVENT/.test(badgeSrc))
+  check('BADGE11: the gated component renders nothing itself — the element is appended, never JSX',
+    /return null/.test(badgeSrc) && !/<script/.test(badgeSrc))
+  check('BADGE12: the unconditional one DOES put the script in the server response',
+    /<script src=\{src\}/.test(badgeUncondSrc))
+  check('BADGE13: and it takes no consent decision of its own',
+    !/marketingBeaconAllowed|currentChoices|CONSENT/.test(badgeUncondSrc))
+
+  // The page wiring: one territorial decision, shared with the beacon.
+  check('BADGE14: the page picks the branch from consentRequired, not from a second check',
+    /badgeUrl \?\s*\(\s*consentRequired \?/.test(badgeSalesSrc.replace(/\s+/g, ' ').replace(/ \?/g, ' ?')) 
+    || /consentRequired \? \( <MarketplaceBadge/.test(badgeSalesSrc.replace(/\s+/g, ' ')))
+  check('BADGE15: an unconfigured platform renders no badge element at all',
+    /badgeUrl \?/.test(badgeSalesSrc))
+  check('BADGE16: the badge reads the SAME territorial call the beacon does — one headers() read, not two',
+    (badgeSalesSrc.match(/consentRequiredForRequest\(/g) || []).length === 1)
+
+  // MUTATION CONTROLS.
+  check('BADGE-MUT1: a component that appended the script before checking consent would be caught',
+    !/if \(allowed && !script\)/.test(badgeSrc.replace('if (allowed && !script)', 'if (!script)')))
+  check('BADGE-MUT2: dropping the withdrawal path would be caught',
+    !/if \(!allowed\) removeBadge\(\)/.test(badgeSrc.replace('if (!allowed) removeBadge()', '')))
+  check('BADGE-MUT3: an http url would be accepted by a check that forgot the scheme',
+    /^https:/.test('https://www.digistore24.com/trusted-badge/49077/tok/salespage')
+    && !/^https:/.test('http://www.digistore24.com/trusted-badge/49077/tok/salespage'))
+  check('BADGE-MUT4: a second territorial read in the page would be caught by BADGE16',
+    ((badgeSalesSrc + 'consentRequiredForRequest(await headers())').match(/consentRequiredForRequest\(/g) || []).length !== 1)
+  delete process.env[BADGE]
 }
 
 main().then(() => {

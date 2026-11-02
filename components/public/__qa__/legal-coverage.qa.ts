@@ -285,6 +285,14 @@ check('MUTATION — an English-only extra section is caught', pages.he.terms.h2 
     // did not name JVZoo would be describing a different page than the one
     // we ship.
     'i.jvzoo.com': { en: /JVZoo/, he: /JVZoo/ },
+    // The trust badge on /go/digistore24, required by Digistore24's own
+    // pre-submission checklist before a product may be reviewed at all. It is
+    // a recipient on the same facts as the JVZoo beacon and then some: the
+    // request carries the visitor's IP and user-agent, and the response sets
+    // `ds_gb_id` for a week (lib/marketplace/config.ts records the header).
+    // It is also a script rather than an image, so the host executes code in
+    // our page. Both policies name it.
+    'www.digistore24.com': { en: /Digistore24/, he: /Digistore24/ },
   }
   /**
    * Hosts that receive nothing about a customer, each with the reason it is
