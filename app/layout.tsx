@@ -7,9 +7,9 @@ import { buildHreflangAlternates } from '@/lib/seo/hreflang'
 import { documentLocaleAttributes } from '@/lib/i18n/document-locale'
 import { getRootRequestContext } from '@/lib/i18n/root-request'
 import { getSiteMetadata } from '@/lib/i18n/site-metadata'
-import { softwareOffer } from '@/lib/seo/software-offer'
+import { softwareApplicationSchema } from '@/lib/seo/software-application'
 import { websiteSchema } from '@/lib/seo/page-schema'
-import { BRAND_REF, organizationSchema } from '@/lib/seo/organization'
+import { organizationSchema } from '@/lib/seo/organization'
 import { localeHomeHref } from '@/lib/i18n/locales'
 import { marketForCountry } from '@/lib/billing/market'
 import { requestCountry } from '@/lib/billing/server-market'
@@ -133,26 +133,15 @@ export default async function RootLayout({
               // every URL. Built in lib/seo/organization.ts, which /api/schema
               // reads too: the product's identity is stated in ONE place.
               organizationSchema(schema.description),
-              {
-                '@context': 'https://schema.org',
-                '@type': 'SoftwareApplication',
-                name: 'Go Top SEO',
-                alternateName: ['Rankings by Go Top'],
-                // By reference to the Organization node above, not a second
-                // copy of it: the publisher of this software is the entity
-                // that owns the site, which is the whole point of the @id.
-                publisher: BRAND_REF,
-                brand: BRAND_REF,
-                description: schema.description,
+              // The SAME product node /api/schema serves, by the id it names
+              // there too: built in lib/seo/software-application.ts, so the
+              // two surfaces describe one SoftwareApplication rather than two
+              // anonymous ones that happen to share a name.
+              softwareApplicationSchema({
                 url: localeHome,
-                applicationCategory: 'BusinessApplication',
-                operatingSystem: 'Web',
-                // No aggregateRating: a rating may only describe real, collected
-                // reviews (Google's review-snippet policy; FTC fake-review rule).
-                // The offer is the real plan range from the catalog.
-                offers: softwareOffer(market),
-                author: BRAND_REF,
-              },
+                market,
+                description: schema.description,
+              }),
             ]),
           }}
         />

@@ -83,7 +83,11 @@ check('dollar low price = cheapest dollar plan', softwareOffer('USD').lowPrice =
 check('dollar high price = dearest dollar plan', softwareOffer('USD').highPrice === String(Math.max(...usd)))
 // By LANGUAGE the markup would still contradict the page for an Israeli
 // reading the English one: the pricing page prices by country.
-check('the layout offer follows the visitor\'s market, not the language', /offers:\s*softwareOffer\(market\)/.test(layout))
+// The offer itself is built inside lib/seo/software-application.ts now, so what
+// the layout is asserted on is the market it hands that builder — the visitor's
+// own, resolved by country just below.
+check('the layout offer follows the visitor\'s market, not the language',
+  /softwareApplicationSchema\(\{[\s\S]*?market,[\s\S]*?\}\)/.test(layout))
 check('the market comes from the same country basis the pricing page uses', /marketForCountry\(await requestCountry\(\)\)/.test(layout))
 check('the layout url follows the language', /url:\s*localeHome,/.test(layout))
 

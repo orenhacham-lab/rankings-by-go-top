@@ -8,6 +8,10 @@ import { join } from 'node:path'
 import { PLAN_CATALOG, PLAN_CODES } from '../../plans/catalog'
 import { SOFTWARE_OFFER, softwareOffer } from '../software-offer'
 import { BRAND_PROFILES, ORGANIZATION_ID, organizationSchema } from '../organization'
+import { PLATFORM_LISTINGS, SOFTWARE_ID, softwareApplicationSchema } from '../software-application'
+import { publicSiteLanguages } from '../site-languages'
+import { PUBLIC_LOCALES, LOCALE_CONFIG, enabledPublicLocales } from '../../i18n/locales'
+import { getSiteMetadata } from '../../i18n/site-metadata'
 
 let passed = 0
 let failed = 0
@@ -38,8 +42,14 @@ check(`no hard-coded aggregateRating anywhere (found: ${offenders.map((f) => f.s
 
 const layout = stripComments(readFileSync(join(ROOT, 'app/layout.tsx'), 'utf8'))
 const schemaRoute = stripComments(readFileSync(join(ROOT, 'app/api/schema/route.ts'), 'utf8'))
-check('layout uses the catalog offer, in the visitor\'s currency', /offers:\s*softwareOffer\(market\)/.test(layout))
-check('/api/schema uses the catalog offer', /offers:\s*SOFTWARE_OFFER/.test(schemaRoute))
+// The offer is no longer written at either call site: both surfaces build the
+// product node through one builder, which reads the catalog by market. What the
+// call sites are asserted on is the market they ask for.
+check('layout asks for the visitor\'s own market', /softwareApplicationSchema\(\{[\s\S]*?market,/.test(layout))
+check('/api/schema asks for the Israeli catalogue it serves', /softwareApplicationSchema\(\{[\s\S]*?market:\s*'ILS'/.test(schemaRoute))
+check('the builder returns the catalog offer, in the market asked for',
+  softwareApplicationSchema({ url: 'https://www.gotopseo.com', market: 'USD', description: 'x' }).offers === softwareOffer('USD')
+  && softwareApplicationSchema({ url: 'https://www.gotopseo.com', market: 'ILS', description: 'x' }).offers === SOFTWARE_OFFER)
 check('no "free" price claim in the layout markup', !/price:\s*['"]0['"]/.test(layout))
 check('no invalid "varies" price in /api/schema', !/['"]varies['"]/.test(schemaRoute))
 
@@ -100,6 +110,89 @@ check('MUTATION CONTROL: the live sameAs claim is caught',
 check('MUTATION CONTROL: a plain mailto contact is NOT caught as an identity claim',
   !claimsAgencyIdentity("email: 'oren@gotop.co.il',"))
 
+
+// ---------------------------------------------------------------------------
+// THE SOFTWARE IS ONE NODE, NOT TWO ANONYMOUS ONES.
+//
+// app/layout.tsx and /api/schema both publish a SoftwareApplication for the
+// same product. Neither used to give it an `@id`, and each wrote its own
+// literal, so the two drifted (operatingSystem and author on one only) and a
+// resolver reading both had nothing but the name to join them by.
+// ---------------------------------------------------------------------------
+const software = softwareApplicationSchema({
+  url: 'https://www.gotopseo.com/en',
+  market: 'USD',
+  description: 'what the page says',
+})
+
+check('the software carries the canonical @id', software['@id'] === SOFTWARE_ID)
+check('the @id is a fragment of the site, not another origin', SOFTWARE_ID.startsWith('https://www.gotopseo.com/#'))
+check('it is not the organization\'s id', String(SOFTWARE_ID) !== String(ORGANIZATION_ID))
+check('publisher, brand and author all point at the organization node',
+  [software.publisher, software.brand, software.author].every((ref) => ref['@id'] === ORGANIZATION_ID))
+check('the description is the page\'s own, passed in, not written here', software.description === 'what the page says')
+check('the url is the page passed in, not always the Hebrew root', software.url === 'https://www.gotopseo.com/en')
+check('still no aggregateRating on the product node', !('aggregateRating' in software))
+
+/** Both surfaces build the node through the one builder. */
+for (const [name, src] of [['app/layout.tsx', layout], ['app/api/schema/route.ts', schemaRoute]] as const) {
+  check(`${name} builds the product node through the shared builder`, src.includes('softwareApplicationSchema('))
+  check(`${name} does not write its own SoftwareApplication literal`, !/'@type':\s*'SoftwareApplication'/.test(src))
+}
+// The endpoint's two hand-written descriptions appear on no page of the site,
+// and it shares the Organization's @id with every page that does.
+check('/api/schema describes the product in copy a page actually shows',
+  schemaRoute.includes("getSiteMetadata('en').description")
+  && !/Advanced (location|SEO rank) tracking system/.test(schemaRoute))
+check('that description is the English site description', getSiteMetadata('en').description.startsWith('Go Top SEO'))
+
+// `sameAs` on the product names the product's platform records; the company's
+// profiles stay on the Organization. Neither list may point at the agency.
+check('the product names its platform records', software.sameAs.length === PLATFORM_LISTINGS.length && software.sameAs.length >= 2)
+check('every platform record is an absolute https URL', software.sameAs.every((u) => u.startsWith('https://')))
+check('the platform records are the Shopify app and the WordPress.org plugin',
+  software.sameAs.some((u) => u.startsWith('https://apps.shopify.com/'))
+  && software.sameAs.some((u) => u.startsWith('https://wordpress.org/plugins/')))
+check('no agency URL among the platform records', !software.sameAs.some((u) => u.includes(AGENCY)))
+
+// ---------------------------------------------------------------------------
+// THE LANGUAGE CLAIM IS THE LANGUAGES THE SITE ACTUALLY SERVES.
+// ---------------------------------------------------------------------------
+const langs = publicSiteLanguages()
+check('the language list is read from the routing gate',
+  langs.join(',') === enabledPublicLocales().map((l) => LOCALE_CONFIG[l].lang).join(','))
+check('every tag is a tag the document itself ships in <html lang>',
+  langs.every((l) => PUBLIC_LOCALES.some((p) => LOCALE_CONFIG[p].lang === l)))
+// With every flag on — which is production (all five NEXT_PUBLIC_*_SITE_ENABLED
+// are "true" there) — it is the seven live languages, and Portuguese is the
+// Brazilian Portuguese the site actually serves.
+const ALL_ON = { es: true, 'pt-BR': true, fr: true, it: true, ja: true } as const
+const allLangs = publicSiteLanguages(ALL_ON)
+check('with every locale on it is the seven live languages',
+  allLangs.join(',') === 'he,en,es,pt-BR,fr,it,ja')
+check('Portuguese is claimed as pt-BR, never bare pt', allLangs.includes('pt-BR') && !allLangs.includes('pt'))
+// And a locale behind its flag is NOT claimed: a language claim an hreflang can
+// disprove is worse than one language fewer.
+check('a switched-off locale is not claimed', !publicSiteLanguages({}).includes('ja'))
+check('the product node and the organization agree on the languages',
+  JSON.stringify(software.inLanguage) === JSON.stringify(organizationSchema('x').contactPoint.availableLanguage))
+check('both read the one helper, so they cannot drift',
+  readFileSync(join(ROOT, 'lib/seo/organization.ts'), 'utf8').includes('publicSiteLanguages()')
+  && readFileSync(join(ROOT, 'lib/seo/software-application.ts'), 'utf8').includes('publicSiteLanguages()'))
+
+// MUTATION CONTROLS: break it on purpose and show each guard fails.
+check('MUTATION CONTROL: an id-less product node is caught',
+  !({ '@type': 'SoftwareApplication', name: 'Go Top SEO' } as Record<string, unknown>)['@id'])
+check('MUTATION CONTROL: a surface writing its own literal is caught',
+  /'@type':\s*'SoftwareApplication'/.test("const n = { '@context': 'https://schema.org', '@type': 'SoftwareApplication', name: 'Go Top SEO' }"))
+check('MUTATION CONTROL: the endpoint\'s old hand-written description is caught',
+  /Advanced (location|SEO rank) tracking system/.test("description: 'Advanced SEO rank tracking system for monitoring Google search and Google Maps rankings',"))
+check('MUTATION CONTROL: a bare-pt language claim is caught',
+  ['he', 'en', 'es', 'pt', 'fr', 'it', 'ja'].includes('pt'))
+check('MUTATION CONTROL: a seventh language missing from the list is caught',
+  ['he', 'en', 'es', 'pt-BR', 'fr', 'it'].join(',') !== 'he,en,es,pt-BR,fr,it,ja')
+check('MUTATION CONTROL: a sameAs on the agency site is caught',
+  ['https://www.gotop.co.il'].some((u) => u.includes(AGENCY)))
 
 console.log(`${passed} passed, ${failed} failed`)
 if (failed) process.exit(1)

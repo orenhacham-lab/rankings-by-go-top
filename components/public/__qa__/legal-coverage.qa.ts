@@ -316,6 +316,10 @@ check('MUTATION — an English-only extra section is caught', pages.he.terms.h2 
     'aitoolsatlas.ai': 'our own listing, named in Organization.sameAs; not fetched',
     'toolradar.com': 'our own claimed listing, named in Organization.sameAs; not fetched',
     'www.vettoria.it': 'our own listing, named in Organization.sameAs; not fetched',
+    // Added to Organization.sameAs on 2 Nov 2026, both verified live that day.
+    'ainave.com': 'our own listing, named in Organization.sameAs; not fetched',
+    'biz100.co.il': 'our own listing, named in Organization.sameAs; not fetched',
+    'ai-best-search.com': 'our own listing, named in Organization.sameAs; not fetched',
     'help.shopify.com': 'a documentation link shown to a merchant',
     // The operator documentation each row of the open AI-crawler dataset
     // (lib/ai-crawlers/dataset.ts) cites, so a consumer of

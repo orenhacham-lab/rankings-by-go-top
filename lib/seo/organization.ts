@@ -23,6 +23,8 @@
  * a short list, because it is the one claim a resolver can cheaply disprove.
  */
 
+import { publicSiteLanguages } from './site-languages'
+
 export const SITE_URL = 'https://www.gotopseo.com'
 
 /** The organization node every other node points at, by id. */
@@ -40,6 +42,19 @@ export const BRAND_PROFILES = [
   'https://aitoolsatlas.ai/tools/go-top-seo',
   'https://toolradar.com/tools/go-top-seo',
   'https://www.vettoria.it/prodotti/go-top-seo',
+  // Published since the list was written, and re-checked with the six above on
+  // 2 Nov 2026: every entry returned 200 AND its page names the product. That
+  // second half matters — addonbiz.com/job/go-top-seo/ also answers 200, but
+  // the page it serves is their generic "add your business" page with no
+  // mention of us, so it is a soft 404 and is deliberately NOT here.
+  'https://ainave.com/products/go-top-seo',
+  'https://biz100.co.il/listing/go-top-seo/',
+  // Published 2 Nov 2026 by AI BEST SEARCH's own editors from our public pages.
+  // Read in full before it went in here: monthly tracking, the three engines
+  // checked automatically against the six the pricing page offers, $79 + tax,
+  // the seven languages, WordPress/Shopify/Wix. Nothing in it needed a
+  // correction, which is why it can be claimed as the same entity.
+  'https://ai-best-search.com/products/go-top-seo',
 ] as const
 
 /**
@@ -72,7 +87,10 @@ export function organizationSchema(description: string) {
       contactType: 'Customer Support',
       email: SUPPORT_EMAIL,
       telephone: SUPPORT_PHONE,
-      availableLanguage: ['he', 'en', 'es', 'pt', 'fr', 'it', 'ja'],
+      // The live locales, read from the routing gate rather than listed here:
+      // the hand-written list said bare `pt`, which is not the Portuguese this
+      // site serves. See lib/seo/site-languages.ts.
+      availableLanguage: publicSiteLanguages(),
     },
     address: {
       '@type': 'PostalAddress',
