@@ -8,31 +8,31 @@ Stable tag: 3.2.0
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
-Connects your site to GO TOP: publishes AI-written blog articles with images and internal links, and applies the SEO fixes and schema you approve.
+Connects your site to Go Top SEO: publishes AI-written blog articles with images and internal links, and applies the SEO fixes and schema you approve.
 
 == Description ==
 
-GO TOP (https://www.gotopseo.com/en) does the SEO work of a small business in one place: it plans and writes articles with images and internal links, tracks every month where the business stands in Google, in AI assistants (ChatGPT, Gemini and Google's AI answers) and in Google Maps, publishes posts and handles reviews on the Google Business Profile, and sends a report.
+Go Top SEO (https://www.gotopseo.com/en) does the SEO work of a small business in one place: it plans and writes articles with images and internal links, tracks every month where the business stands in Google, in AI assistants (ChatGPT, Gemini and Google's AI answers) and in Google Maps, publishes posts and handles reviews on the Google Business Profile, and sends a report.
 
-This plugin is the connection between GO TOP and your WordPress site, and it does two of those things on the site itself: it publishes the articles, and it applies the SEO fixes and schema you approve. The tracking, the Maps posts and the reviews happen in GO TOP, not in this plugin. It needs a GO TOP account; on its own it does nothing.
+This plugin is the connection between Go Top SEO and your WordPress site, and it does two of those things on the site itself: it publishes the articles, and it applies the SEO fixes and schema you approve. The tracking, the Maps posts and the reviews happen in Go Top SEO, not in this plugin. It needs a Go Top SEO account; on its own it does nothing.
 
 = Publishing articles =
 
-When you publish an article from GO TOP, the plugin:
+When you publish an article from Go Top SEO, the plugin:
 
-* creates the post (or updates the post GO TOP recorded earlier for the same article), as a draft, published, or scheduled for a date you chose in GO TOP;
+* creates the post (or updates the post Go Top SEO recorded earlier for the same article), as a draft, published, or scheduled for a date you chose in Go Top SEO;
 * adds the article's images to your Media Library, with their alt text, and sets the featured image;
 * sets the categories and tags you chose from your site's own list.
 
-You can also publish a second, separate post for the same article, and publish a given article as another user who may publish, chosen in GO TOP from your site's own list.
+You can also publish a second, separate post for the same article, and publish a given article as another user who may publish, chosen in Go Top SEO from your site's own list.
 
-Posts are published as the user you choose in Settings > GO TOP SEO (by default the administrator who connected the site), or as another user who may publish, chosen per article in GO TOP. The content passes through WordPress's own filter for post HTML.
+Posts are published as the user you choose in Settings > GO TOP SEO (by default the administrator who connected the site), or as another user who may publish, chosen per article in Go Top SEO. The content passes through WordPress's own filter for post HTML.
 
-Other than the fixes below, the plugin changes only the post GO TOP recorded for an article. That is normally a post this plugin created; it can also be one GO TOP published on your site before the plugin was installed, using an application password. In that case the plugin takes that post over for the article, and only that one post: never a page, never a post in the trash, and never a post already tied to another GO TOP article.
+Other than the fixes below, the plugin changes only the post Go Top SEO recorded for an article. That is normally a post this plugin created; it can also be one Go Top SEO published on your site before the plugin was installed, using an application password. In that case the plugin takes that post over for the article, and only that one post: never a page, never a post in the trash, and never a post already tied to another Go Top SEO article.
 
 = SEO fixes you approve =
 
-When you approve a fix in GO TOP, the plugin writes exactly that one element on a post or page:
+When you approve a fix in Go Top SEO, the plugin writes exactly that one element on a post or page:
 
 * SEO title and meta description (in Yoast SEO or Rank Math when one is active, otherwise printed by this plugin)
 * Canonical address
@@ -45,7 +45,7 @@ When you approve a fix in GO TOP, the plugin writes exactly that one element on 
 * An extra main heading (H1) in the content turned into a subheading (H2), words unchanged
 * An llms.txt for AI assistants, answered at /llms.txt only while your site has no llms.txt file
 
-The previous value is stored before every fix, and "Undo" in GO TOP restores it. WordPress also keeps a revision of every content change.
+The previous value is stored before every fix, and "Undo" in Go Top SEO restores it. WordPress also keeps a revision of every content change.
 
 = What it never does =
 
@@ -53,46 +53,46 @@ It never deletes or trashes anything, and never changes prices, products, the th
 
 = Security =
 
-Every request from GO TOP is signed with a key that only your site and your GO TOP project share (HMAC-SHA256, a single-use nonce, a five-minute window). Requests without a valid signature are refused. "Disconnect" in Settings > GO TOP SEO removes the key at once.
+Every request from Go Top SEO is signed with a key that only your site and your Go Top SEO project share (HMAC-SHA256, a single-use nonce, a five-minute window). Requests without a valid signature are refused. "Disconnect" in Settings > GO TOP SEO removes the key at once.
 
 == External services ==
 
-This plugin connects your site to GO TOP (https://www.gotopseo.com/en), a search-optimisation
+This plugin connects your site to Go Top SEO (https://www.gotopseo.com/en), a search-optimisation
 service operated by GO TOP DIGITAL MARKETING AND ADVERTISING LTD, company number 517274346, Israel. You need
-a GO TOP account to use it. The plugin does nothing until you connect your site, and you
-connect it yourself with a pairing code from your GO TOP account.
+a Go Top SEO account to use it. The plugin does nothing until you connect your site, and you
+connect it yourself with a pairing code from your Go Top SEO account.
 
-What GO TOP asks your site for, once it is connected. Every request is signed with the key
+What Go Top SEO asks your site for, once it is connected. Every request is signed with the key
 created at pairing, and your site refuses anything it cannot verify:
 
-* Publishing: the articles you choose to publish in GO TOP, which your site saves as posts. A publish may
+* Publishing: the articles you choose to publish in Go Top SEO, which your site saves as posts. A publish may
   name a date in the future, another user who may publish, a second post for the same article, or the post
-  GO TOP recorded for that article.
-* Fixes: the changes you approve in GO TOP, from a closed list (SEO title, meta description,
+  Go Top SEO recorded for that article.
+* Fixes: the changes you approve in Go Top SEO, from a closed list (SEO title, meta description,
   canonical address, focus keyword, image alternative text, FAQ block, JSON-LD schema,
   internal links, broken-link repair, duplicate H1 demotion, llms.txt).
-* Reading a post or page, by its address or by its id, so GO TOP can show you what is there now and what a
+* Reading a post or page, by its address or by its id, so Go Top SEO can show you what is there now and what a
   fix would change: its title, address, content as WordPress displays it, headings and SEO fields.
 * Listing your published posts and pages, which answers for each one with its id, type, address, slug,
   title, publication date, last modified date, and the focus keyphrase recorded for it in your SEO plugin.
   A post or page that is not published, or that is password protected, is not listed, and products are
-  never listed. GO TOP uses this for its content index, its internal-link scan and its site map.
+  never listed. Go Top SEO uses this for its content index, its internal-link scan and its site map.
 * Listing the users who may publish posts, which answers with each one's WordPress user id and display
   name, and the id of the user set for publishing. No e-mail address, login name, role or anything else
-  about them is sent. GO TOP uses this only so you can choose whose name an article is published under.
+  about them is sent. Go Top SEO uses this only so you can choose whose name an article is published under.
 * Finding, reading and setting Media Library alt text: a search by a word in a file name, title or slug
   answers with each image's id, the address of the file and of its resized copies, its alt text and its
   title; setting writes only the alt-text field, and an empty value removes it, which is how undo works.
 * Your categories, tags and WooCommerce product categories, which answer with each term's id, name, slug,
   address and post count.
-* Searching your published posts and pages by a word GO TOP sends, which answers with the id,
-  address and title of up to ten matches. GO TOP uses this to find the page an internal link
+* Searching your published posts and pages by a word Go Top SEO sends, which answers with the id,
+  address and title of up to ten matches. Go Top SEO uses this to find the page an internal link
   should point at.
 * A status check, which answers with the plugin's version, which SEO plugin your site uses, whether an
   author is set for publishing, and which of the features above this copy of the plugin supports.
 
 What leaves your site. Your site replies to each of those requests, and the reply is what is
-sent to GO TOP: the new post's id, address and status; the details of a post or page GO TOP
+sent to Go Top SEO: the new post's id, address and status; the details of a post or page Go Top SEO
 asked to read, which includes its content; the list of your published posts and pages with the
 fields named above; the ids and display names of the users who may publish; the Media Library
 items a search matched; and your terms with their addresses and counts. Nothing beyond the
@@ -100,12 +100,12 @@ replies to those requests is sent. The plugin starts no request of its own, with
 described next: downloading the images of an article you publish. It reports nothing in the
 background.
 
-The one address your site contacts by itself: GO TOP's file storage, hosted on Supabase.
+The one address your site contacts by itself: Go Top SEO's file storage, hosted on Supabase.
 
-* What it is and why: the images of the articles you publish from GO TOP are kept in GO TOP's
+* What it is and why: the images of the articles you publish from Go Top SEO are kept in Go Top SEO's
   file storage. Your site downloads each image into its own Media Library so the published post
   shows it from your site.
-* When: only while an article you chose to publish in GO TOP is being saved as a post, and only
+* When: only while an article you chose to publish in Go Top SEO is being saved as a post, and only
   for the images that article carries. Never in the background and never for your visitors.
 * Where: https://pmzicbtulloeynsosseh.supabase.co/storage/v1/object/public/. By default the
   plugin accepts images from this address only and refuses any other, and only JPEG, PNG, WebP
@@ -116,31 +116,31 @@ The one address your site contacts by itself: GO TOP's file storage, hosted on S
   names your WordPress version and your site's address. No content, user data or visitor data
   of your site is sent.
 * The storage is provided by Supabase, Inc.: terms of service https://supabase.com/terms,
-  privacy policy https://supabase.com/privacy. GO TOP's own terms and privacy policy, below,
-  cover how GO TOP uses it.
+  privacy policy https://supabase.com/privacy. Go Top SEO's own terms and privacy policy, below,
+  cover how Go Top SEO uses it.
 
 The plugin adds no tracking, no analytics and no script to your site's pages, and it sends
 nothing about your visitors anywhere.
 
-GO TOP terms of service: https://www.gotopseo.com/en/terms
-GO TOP privacy policy: https://www.gotopseo.com/en/privacy
+Go Top SEO terms of service: https://www.gotopseo.com/en/terms
+Go Top SEO privacy policy: https://www.gotopseo.com/en/privacy
 
 == Installation ==
 
 1. Install and activate the plugin (Plugins > Add New, search for "GO TOP SEO Bridge").
-2. In GO TOP, open your project's settings, go to Connections and choose WordPress. Click "Get a connection code" and copy it.
+2. In Go Top SEO, open your project's settings, go to Connections and choose WordPress. Click "Get a connection code" and copy it.
 3. In WordPress, open Settings > GO TOP SEO, paste the code and press "Connect".
 4. Optional: in the same screen, choose the user articles are published as.
 
 == Frequently Asked Questions ==
 
-= Do I need a GO TOP account? =
+= Do I need a Go Top SEO account? =
 
-Yes. The plugin only carries out what you do in GO TOP.
+Yes. The plugin only carries out what you do in Go Top SEO.
 
 = Do I still need an application password? =
 
-No. Once the plugin is connected, GO TOP publishes and applies fixes through it. A password you gave us earlier stays stored and is used in one case only: when the plugin refuses to update the post GO TOP recorded for an article.
+No. Once the plugin is connected, Go Top SEO publishes and applies fixes through it. A password you gave us earlier stays stored and is used in one case only: when the plugin refuses to update the post Go Top SEO recorded for an article.
 
 = Does it work with Yoast SEO or Rank Math? =
 
@@ -148,52 +148,52 @@ Yes. SEO titles, descriptions, canonical addresses and focus keyphrases are writ
 
 = Can I undo a fix? =
 
-Yes. Every fix can be undone from GO TOP, and WordPress keeps a revision of every content change.
+Yes. Every fix can be undone from Go Top SEO, and WordPress keeps a revision of every content change.
 
 = Does it check whether ChatGPT or Gemini mentions my business? =
 
-GO TOP does, once a month, across ChatGPT, Gemini and Google's AI answers, and the result is in the monthly report. The check runs in GO TOP, not in this plugin, and this plugin does no tracking of any kind.
+Go Top SEO does, once a month, across ChatGPT, Gemini and Google's AI answers, and the result is in the monthly report. The check runs in Go Top SEO, not in this plugin, and this plugin does no tracking of any kind.
 
 = How often are rankings checked? =
 
-Once a month. GO TOP checks Google, Google Maps and the AI answers on a monthly cycle and sends a report. There is no daily or real-time tracking.
+Once a month. Go Top SEO checks Google, Google Maps and the AI answers on a monthly cycle and sends a report. There is no daily or real-time tracking.
 
 = Can I see an article before it goes live? =
 
-Yes. In GO TOP you choose whether each article arrives as a draft, is published, or is scheduled for a date, and the plugin creates it that way. A draft stays a draft until you publish it yourself.
+Yes. In Go Top SEO you choose whether each article arrives as a draft, is published, or is scheduled for a date, and the plugin creates it that way. A draft stays a draft until you publish it yourself.
 
-= What does GO TOP cost? =
+= What does Go Top SEO cost? =
 
-The plugin is free and GPL. A GO TOP account starts with a 7-day trial and no credit card. After the trial it is from $79 per month plus tax, or from 249 ILS per month including VAT in Israel.
+The plugin is free and GPL. A Go Top SEO account starts with a 7-day trial and no credit card. After the trial it is from $79 per month plus tax, or from 249 ILS per month including VAT in Israel.
 
 = How do I disconnect? =
 
-Settings > GO TOP SEO > Disconnect. GO TOP can no longer reach the site. Deleting the plugin also removes its settings; from 3.1.0 the connection key is kept while another copy of the plugin is still installed on the site, so that deleting one copy does not disconnect the other. Deleting an older copy still removes the shared key.
+Settings > GO TOP SEO > Disconnect. Go Top SEO can no longer reach the site. Deleting the plugin also removes its settings; from 3.1.0 the connection key is kept while another copy of the plugin is still installed on the site, so that deleting one copy does not disconnect the other. Deleting an older copy still removes the shared key.
 
 == Screenshots ==
 
 1. Settings > GO TOP SEO after pairing: the connection, the user articles are published as, and recent activity.
-2. Connecting in GO TOP: install the plugin, get a one-time connection code, and check the connection.
-3. Site health in GO TOP with the plugin connected: findings that can be fixed in one click through the plugin.
+2. Connecting in Go Top SEO: install the plugin, get a one-time connection code, and check the connection.
+3. Site health in Go Top SEO with the plugin connected: findings that can be fixed in one click through the plugin.
 
 == Changelog ==
 
 = 3.2.0 =
-* The author photo you uploaded in GO TOP now reaches this site's Media Library with the plugin alone, with no application password. GO TOP signs that one file for a few minutes and the plugin imports it, exactly as it already imports an article's images. Nothing else may be fetched: the address must still be on GO TOP's own storage.
+* The author photo you uploaded in Go Top SEO now reaches this site's Media Library with the plugin alone, with no application password. Go Top SEO signs that one file for a few minutes and the plugin imports it, exactly as it already imports an article's images. Nothing else may be fetched: the address must still be on Go Top SEO's own storage.
 * An image whose address is signed is imported once rather than once per signature.
 
 = 3.1.3 =
 * The plugin's name and description in the WordPress.org directory now say what it does, so it can be found by searching for it. The plugin's code, its routes and the connection are unchanged.
 
 = 3.1.2 =
-* The links to the GO TOP site now carry www and point at the English pages, which is the language this plugin and its readme are written in. The plugin's code, its routes and the connection are unchanged.
+* The links to the Go Top SEO site now carry www and point at the English pages, which is the language this plugin and its readme are written in. The plugin's code, its routes and the connection are unchanged.
 
 = 3.1.1 =
 * The company name in English changed. The plugin now names the operator GO TOP DIGITAL MARKETING AND ADVERTISING LTD, in the plugin header and in the external-services section. The company, its number and the service are unchanged, and nothing else in the plugin changed.
 
 = 3.1.0 =
-* Everything GO TOP does now works with this plugin alone, without an application password: new signed routes list your published posts and pages (for the index of your existing content), read one published post or page as it is displayed (its HTML), list the users who may publish posts (id and display name), and find, read and set the alt text of Media Library images.
-* Publishing: schedule a post for a date, publish a second separate post for an article when you ask for it, choose the author of each article (only users who may publish posts), and update the post GO TOP published for the same article before the plugin was installed.
+* Everything Go Top SEO does now works with this plugin alone, without an application password: new signed routes list your published posts and pages (for the index of your existing content), read one published post or page as it is displayed (its HTML), list the users who may publish posts (id and display name), and find, read and set the alt text of Media Library images.
+* Publishing: schedule a post for a date, publish a second separate post for an article when you ask for it, choose the author of each article (only users who may publish posts), and update the post Go Top SEO published for the same article before the plugin was installed.
 * Categories, tags and WooCommerce product categories are listed with their address and post count.
 * Two copies of the plugin active at once (the older one and the WordPress.org one) no longer stop the site: the second one stays off and shows a notice. Deleting one copy keeps the connection while the other copy is installed.
 * The Settings link and the messages after Connect, Save and Disconnect open the right settings page.
@@ -217,19 +217,19 @@ Settings > GO TOP SEO > Disconnect. GO TOP can no longer reach the site. Deletin
 == Upgrade Notice ==
 
 = 3.2.0 =
-Adds the author photo you uploaded in GO TOP to the author box, without an application password. The connection is kept.
+Adds the author photo you uploaded in Go Top SEO to the author box, without an application password. The connection is kept.
 
 = 3.1.3 =
 Only the name and the description in the directory changed. The connection is kept.
 
 = 3.1.2 =
-Only the links to the GO TOP site changed. The connection is kept.
+Only the links to the Go Top SEO site changed. The connection is kept.
 
 = 3.1.1 =
 The operator's name in English is updated. Nothing else changes and the connection is kept.
 
 = 3.1.0 =
-GO TOP no longer needs an application password for anything once the plugin is connected. The connection is kept.
+Go Top SEO no longer needs an application password for anything once the plugin is connected. The connection is kept.
 
 = 3.0.0 =
-Adds publishing articles from GO TOP without an application password. The connection is kept.
+Adds publishing articles from Go Top SEO without an application password. The connection is kept.

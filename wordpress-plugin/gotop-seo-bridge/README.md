@@ -16,10 +16,10 @@ Four jobs, all authenticated, all narrow:
 1. **1.x, unchanged:** `POST /wp-json/gotop/v1/seo-meta` writes allowlisted Yoast / Rank Math
    keys when WordPress core REST silently drops protected SEO meta while publishing an article.
    Auth: the WordPress application password of a user who can edit the post.
-2. **2.0, site-health fixes:** applies ONE fix the merchant approved in the GO TOP app, per
+2. **2.0, site-health fixes:** applies ONE fix the merchant approved in the Go Top SEO app, per
    request, and can undo it.
 3. **3.0, publishing** (`includes/publish.php`, signed like 2.0): `POST /terms` (categories or
-   tags), `POST /media` (one image, from GO TOP's public storage only, once per address),
+   tags), `POST /media` (one image, from Go Top SEO's public storage only, once per address),
    `POST /publish` (one article: a new post, or an update of the post made for the same article
    id, `_gotop_article_id`; any other post is `not_ours`). The app publishes through these when
    the link is connected and reports >= 3.0.0 (`lib/content/wordpress-plugin-publish.ts`),
