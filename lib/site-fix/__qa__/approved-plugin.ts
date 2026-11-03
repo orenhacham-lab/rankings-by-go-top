@@ -17,6 +17,12 @@
  * plugin version (lib/site-fix/plugin-capabilities.ts), so a site still on 3.1.0 is unaffected and is
  * offered the update (PLUGIN_LATEST_VERSION in ../types.ts, which never runs ahead of this constant).
  *
+ * readme.txt moves without a version bump, and only readme.txt may. The directory page is served
+ * from trunk's readme, and .github/workflows/wporg-deploy.yml in `assets` mode copies that one file
+ * across: nothing inside the zip changes, no tag is cut, and no site is offered an upgrade. So a
+ * correction to the text WordPress.org shows is not a release, and neither constant above moves for
+ * it. A change to any PHP file still is a release, and still moves both.
+ *
  * Not a suite (no .qa.ts): imported by lib/content/__qa__/wordpress-plugin-publish.qa.ts and
  * lib/content/__qa__/wordpress-schema.qa.ts.
  */
@@ -40,7 +46,7 @@ export const APPROVED_PLUGIN_SHA256: Readonly<Record<string, string>> = {
   'includes/publish.php': '671bb0cf93a91f6a2abf05fb5789f30448b7b62481e4ba4ed992bc77cd8639cd',
   'includes/read.php': '8d13be08d47369d2bd4715971d034c1d335568918cb8a807c5c2da3f79a8faae',
   'includes/routes.php': 'd990b59fdff6b005adb16c75cd76da61739ca83d282fc0e4c2fa674b9befe4e2',
-  'readme.txt': 'efdac9fb57dc427ff35785002631175cba10e47f034320c75dcbdc52d59219ba',
+  'readme.txt': '19bd694b082c5f609a7bafeb1e85047dc4a2b61f5084e3fa9e9fb9a95e01e27f',
   'uninstall.php': 'f938ecab70d2dbab268a2350bc7940db67f9054d0e3e497164b8cd2081e6cee1',
 }
 
