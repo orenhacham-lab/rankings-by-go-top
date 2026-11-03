@@ -5,9 +5,11 @@ name: Publish to WordPress.org
 #
 # Run it from the Actions tab, or through the API, and pick a mode:
 #   assets   readme.txt, the banners, the screenshots and the Live Preview
-#            blueprint only. Nothing inside the zip changes and no version is
-#            released, so the directory page refreshes without asking anyone
-#            to upgrade.
+#            blueprint only. The readme goes to trunk AND to the tag that
+#            Stable tag names, because the directory page is rendered from the
+#            tag's readme and a commit to trunk alone changes nothing a visitor
+#            sees. Nothing else in the tag is touched, no version is released,
+#            and no site is offered an upgrade.
 #   release  the whole plugin: trunk is replaced and a tag is cut for the
 #            version in readme.txt. Only after the version was bumped.
 #
@@ -57,14 +59,27 @@ jobs:
         run: sudo apt-get update -qq && sudo apt-get install -y -qq subversion
 
       - name: Check out the directory's SVN repository
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
         run: |
           set -euo pipefail
           svn checkout --depth immediates "https://plugins.svn.wordpress.org/$SLUG/" svn
           svn update --set-depth infinity svn/assets
           svn update --set-depth infinity svn/trunk
           svn update --set-depth immediates svn/tags
+          # The directory page is rendered from the STABLE TAG's readme, not from
+          # trunk's, whenever Stable tag names a version. So `assets` mode needs
+          # that tag's working copy as well, or the readme it commits to trunk
+          # changes nothing a visitor sees. (03.11.2026: a readme correction went
+          # to trunk and api.wordpress.org still served the old text from
+          # tags/3.2.0 — the whole run looked successful and published nothing.)
+          if [ "${{ inputs.mode }}" != "release" ] && svn ls "svn/tags/$VERSION" > /dev/null 2>&1; then
+            svn update --set-depth infinity "svn/tags/$VERSION"
+          fi
 
       - name: Stage the files
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
         run: |
           set -euo pipefail
           # README.md is this repo's own note to itself; it is not shipped.
@@ -76,6 +91,12 @@ jobs:
             rsync -a --delete --exclude '.*' --exclude 'README.md' "$PLUGIN_DIR/" svn/trunk/
           else
             cp "$PLUGIN_DIR/readme.txt" svn/trunk/readme.txt
+            # readme.txt only, and only into the tag Stable tag already names:
+            # nothing else in a released tag is touched, so the zip a merchant
+            # downloads is byte-for-byte the one they already have.
+            if [ -f "svn/tags/$VERSION/readme.txt" ]; then
+              cp "$PLUGIN_DIR/readme.txt" "svn/tags/$VERSION/readme.txt"
+            fi
           fi
 
       - name: Commit

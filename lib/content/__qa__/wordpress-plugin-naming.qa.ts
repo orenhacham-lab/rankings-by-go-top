@@ -108,6 +108,25 @@ function main() {
   check('C3: the readme still says the tracking is monthly, not daily',
     /tracks every month/.test(description) && !/every day|daily rank|tracks daily/i.test(description))
 
+  console.log('\nD) the correction actually reaches the page')
+
+  // 03.11.2026: the first run of this looked like a success and published
+  // nothing. WordPress.org renders the plugin page from the STABLE TAG's
+  // readme whenever Stable tag names a version, and `assets` mode was copying
+  // the file to trunk only. api.wordpress.org went on serving the old text out
+  // of tags/3.2.0 while trunk held the corrected one.
+  const workflow = readFileSync(join(ROOT, '.github', 'workflows', 'wporg-deploy.yml'), 'utf8')
+  const copiesIntoTheTag = (s: string) => /cp "\$PLUGIN_DIR\/readme\.txt" "svn\/tags\/\$VERSION\/readme\.txt"/.test(s)
+    && /svn update --set-depth infinity "svn\/tags\/\$VERSION"/.test(s)
+  check('D1: `assets` mode copies the readme into the tag Stable tag names, not only into trunk', copiesIntoTheTag(workflow))
+  check('MUT D1: dropping the tag copy fails D1',
+    !copiesIntoTheTag(workflow.replace('cp "$PLUGIN_DIR/readme.txt" "svn/tags/$VERSION/readme.txt"', 'true')))
+
+  // And only the readme: a released tag's zip is what merchants already have.
+  const tagBlock = workflow.slice(workflow.indexOf('cp "$PLUGIN_DIR/readme.txt" svn/trunk/readme.txt'))
+  check('D2: nothing but readme.txt is written into an existing tag',
+    !/rsync[^\n]*svn\/tags/.test(tagBlock) && (tagBlock.match(/svn\/tags\/\$VERSION\/[a-z.]+/g) ?? []).every((p) => p.endsWith('readme.txt')))
+
   console.log(`\n${pass} passed, ${fail} failed`)
   if (fail > 0) process.exitCode = 1
 }
