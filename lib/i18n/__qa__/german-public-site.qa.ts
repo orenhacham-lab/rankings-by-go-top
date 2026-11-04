@@ -166,9 +166,16 @@ console.log('\nB) one gate per tree')
 
 console.log('\nC) one gate, and it decides every outward sign')
 {
+  // The no-argument call reads process.env, so the unset case is checked with
+  // the variable actually cleared. Otherwise this one line would pass or fail
+  // by whatever the shell that started the suite happened to export.
+  const ambient = process.env.NEXT_PUBLIC_GERMAN_SITE_ENABLED
+  delete process.env.NEXT_PUBLIC_GERMAN_SITE_ENABLED
+  const unsetIsOff = !germanSiteEnabled(undefined) && !germanSiteEnabled()
+  if (ambient !== undefined) process.env.NEXT_PUBLIC_GERMAN_SITE_ENABLED = ambient
   check('C1: "true" and nothing else turns it on',
     germanSiteEnabled('true') && !germanSiteEnabled('TRUE') && !germanSiteEnabled('1')
-    && !germanSiteEnabled('') && !germanSiteEnabled('yes') && !germanSiteEnabled(undefined))
+    && !germanSiteEnabled('') && !germanSiteEnabled('yes') && unsetIsOff)
 
   const was = process.env.NEXT_PUBLIC_GERMAN_SITE_ENABLED
   const wasEs = process.env.NEXT_PUBLIC_SPANISH_SITE_ENABLED

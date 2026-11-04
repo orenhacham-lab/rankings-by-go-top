@@ -4,11 +4,11 @@ import { authHref } from '@/lib/i18n/auth-href'
 import { LOCALE_CONFIG } from '@/lib/i18n/locales'
 
 export const metadata = {
-  title: 'サイトマップ | Go Top SEO',
-  description: 'Go Top SEOのサイトマップです。すべてのページを一つの場所にまとめています。',
+  title: 'Sitemap | Go Top SEO',
+  description: 'Die Sitemap von Go Top SEO. Alle Seiten an einem Ort.',
   openGraph: {
-    title: 'サイトマップ | Go Top SEO',
-    description: 'Go Top SEOのサイトマップ',
+    title: 'Sitemap | Go Top SEO',
+    description: 'Die Sitemap von Go Top SEO',
     url: 'https://www.gotopseo.com/de/sitemap',
     locale: LOCALE_CONFIG['de'].ogLocale,
   },
@@ -19,80 +19,80 @@ type SitemapSection = { title: string; description?: string; links: Array<{ labe
 export default function GermanSitemapPage() {
   const sections: SitemapSection[] = [
     {
-      title: 'ページ',
+      title: 'Seiten',
       links: [
-        { label: 'ホーム', href: '/de' },
-        { label: '料金', href: '/de/pricing' },
-        { label: '会社情報', href: '/de/about' },
-        { label: '記事', href: '/de/articles' },
+        { label: 'Startseite', href: '/de' },
+        { label: 'Preise', href: '/de/pricing' },
+        { label: 'Über uns', href: '/de/about' },
+        { label: 'Artikel', href: '/de/articles' },
       ],
     },
     {
-      title: 'アカウント',
+      title: 'Konto',
       links: [
-        { label: 'ログイン', href: authHref('login', 'de') },
-        { label: '無料トライアルを始める', href: authHref('signup', 'de') },
+        { label: 'Anmelden', href: authHref('login', 'de') },
+        { label: 'Kostenlose Testphase starten', href: authHref('signup', 'de') },
       ],
     },
     {
-      title: '機能',
+      title: 'Funktionen',
       links: [
-        { label: 'コンテンツの作成と公開', href: '/de/features/seo-geo-content-publishing' },
-        { label: 'Googleでの検索順位の計測', href: '/de/features/google-organic-rank-tracking' },
-        { label: 'Googleマップでの検索順位の計測', href: '/de/features/google-maps-rank-tracking' },
-        { label: 'AIでの可視性の計測', href: '/de/features/ai-visibility-tracking' },
-        { label: 'SEOとGEOのレポート', href: '/de/features/seo-geo-reports' },
-        { label: 'キーワード調査', href: '/de/features/keyword-research' },
-        { label: 'サイトの修正', href: '/de/features/site-health-fixes' },
-        { label: 'サイトへのリンク', href: '/de/features/site-links' },
-        { label: 'Googleマップへの投稿', href: '/de/features/google-maps-posts' },
-        { label: '自社と競合', href: '/de/features/competitor-tracking' },
-        { label: 'Search Consoleのデータ', href: '/de/features/search-console' },
+        { label: 'Inhalte schreiben und veröffentlichen', href: '/de/features/seo-geo-content-publishing' },
+        { label: 'Positionen bei Google messen', href: '/de/features/google-organic-rank-tracking' },
+        { label: 'Positionen in Google Maps messen', href: '/de/features/google-maps-rank-tracking' },
+        { label: 'Sichtbarkeit in der KI messen', href: '/de/features/ai-visibility-tracking' },
+        { label: 'Berichte zu SEO und GEO', href: '/de/features/seo-geo-reports' },
+        { label: 'Keyword-Recherche', href: '/de/features/keyword-research' },
+        { label: 'Korrekturen an der Website', href: '/de/features/site-health-fixes' },
+        { label: 'Links auf die Website', href: '/de/features/site-links' },
+        { label: 'Beiträge für Google Maps', href: '/de/features/google-maps-posts' },
+        { label: 'Ihr Unternehmen und die Wettbewerber', href: '/de/features/competitor-tracking' },
+        { label: 'Die Daten der Search Console', href: '/de/features/search-console' },
       ],
     },
     {
-      title: 'ご利用の方へ',
+      title: 'Für wen',
       links: [
-        { label: '事業者の方', href: '/de/solutions/businesses' },
-        { label: '制作会社・代理店', href: '/de/solutions/agencies' },
-        { label: 'WordPressのサイト', href: '/de/solutions/wordpress' },
-        { label: 'Shopifyの店舗', href: '/de/solutions/shopify' },
+        { label: 'Unternehmen', href: '/de/solutions/businesses' },
+        { label: 'Agenturen und Dienstleister', href: '/de/solutions/agencies' },
+        { label: 'Websites mit WordPress', href: '/de/solutions/wordpress' },
+        { label: 'Shops mit Shopify', href: '/de/solutions/shopify' },
       ],
     },
     {
-      title: '他のツールとの比較',
+      title: 'Vergleich mit anderen Werkzeugen',
       links: [
-        { label: 'Go Top SEOとSemrushの比較', href: '/de/compare/semrush' },
-        { label: 'Go Top SEOとYoastの比較', href: '/de/compare/yoast' },
-        { label: 'Go Top SEOとRank Mathの比較', href: '/de/compare/rankmath' },
+        { label: 'Go Top SEO im Vergleich mit Semrush', href: '/de/compare/semrush' },
+        { label: 'Go Top SEO im Vergleich mit Yoast', href: '/de/compare/yoast' },
+        { label: 'Go Top SEO im Vergleich mit Rank Math', href: '/de/compare/rankmath' },
       ],
     },
     {
-      title: '法的事項',
+      title: 'Rechtliches',
       links: [
-        { label: 'プライバシーポリシー', href: '/de/privacy' },
-        { label: '利用規約', href: '/de/terms' },
-        { label: '解約・返金ポリシー', href: '/de/refund-policy' },
-        { label: 'アクセシビリティ', href: '/de/accessibility' },
-        { label: 'パートナープログラム契約', href: '/de/affiliate-terms' },
+        { label: 'Datenschutzerklärung', href: '/de/privacy' },
+        { label: 'Nutzungsbedingungen', href: '/de/terms' },
+        { label: 'Kündigungs- und Rückerstattungsrichtlinie', href: '/de/refund-policy' },
+        { label: 'Barrierefreiheit', href: '/de/accessibility' },
+        { label: 'Vereinbarung des Partnerprogramms', href: '/de/affiliate-terms' },
       ],
     },
   ]
 
   return (
-    <LegalFrame locale="de" breadcrumbs={[{ label: 'サイトマップ', href: '/de/sitemap' }]}>
-      <LegalHeader title="サイトマップ" subtitle="Go Top SEOのすべてのページと項目をここにまとめています" />
+    <LegalFrame locale="de" breadcrumbs={[{ label: 'Sitemap', href: '/de/sitemap' }]}>
+      <LegalHeader title="Sitemap" subtitle="Alle Seiten und Bereiche von Go Top SEO an einem Ort" />
 
       <SitemapGroups groups={sections} />
 
       <p className={`mt-10 ${LEGAL_FOOTNOTE}`}>
-        詳しくは{' '}
+        Mehr über uns steht auf der{' '}
         <Link href="/de/about" className={`${LEGAL_LINK} mx-1`}>
-          会社情報のページ
+          Seite „Über uns“
         </Link>
-        をご覧ください。ご質問は{' '}
+        . Fragen beantworten wir{' '}
         <a href="mailto:oren@gotop.co.il" className={LEGAL_LINK}>
-          メールでどうぞ
+          per E-Mail
         </a>
       </p>
     </LegalFrame>

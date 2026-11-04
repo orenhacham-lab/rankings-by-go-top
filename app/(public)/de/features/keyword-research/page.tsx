@@ -6,8 +6,8 @@ import { buildHreflangAlternates } from '@/lib/seo/hreflang'
 import { FEATURE_COMMON } from '@/lib/i18n/public/feature-common'
 
 export const metadata: Metadata = {
-  title: 'キーワード調査 | Go Top SEO',
-  description: 'Google Adsのデータでキーワードの案を見つけます。検索ボリューム、競合性、推定クリック単価がわかります。検索順位の計測に追加することも、AI向けの質問に変えることもできます。',
+  title: 'Keyword-Recherche | Go Top SEO',
+  description: 'Keyword-Ideen aus den Daten von Google Ads. Mit Suchvolumen, Wettbewerb und geschätztem Klickpreis. Jedes Keyword lässt sich in die Messung der Positionen übernehmen oder in eine Frage für die KI verwandeln.',
   alternates: {
     canonical: 'https://www.gotopseo.com/de/features/keyword-research',
     languages: buildHreflangAlternates('/features/keyword-research', '/en/features/keyword-research', '/es/features/keyword-research'),
@@ -22,23 +22,23 @@ const C = FEATURE_COMMON['de']
 
 const CONTENT: FeaturePageContent = {
   hero: {
-    eyebrow: 'キーワード調査',
+    eyebrow: 'Keyword-Recherche',
     eyebrowIcon: Search,
-    title: '顧客が本当に検索していることを、',
-    accent: '記事にします',
-    subtitle: 'Google Adsのデータによるキーワードの案です。月間の検索ボリューム、競合性、推定クリック単価がわかります。合うものを計測に追加したり、ワンクリックでAI向けの質問に変えたりできます。',
+    title: 'Was Ihre Kunden wirklich suchen,',
+    accent: 'wird zu Artikeln',
+    subtitle: 'Keyword-Ideen aus den Daten von Google Ads. Mit dem monatlichen Suchvolumen, dem Wettbewerb und dem geschätzten Klickpreis. Was passt, übernehmen Sie in die Messung, oder Sie verwandeln es mit einem Klick in eine Frage für die KI.',
     trust: C.trust,
     primary: C.check,
     secondary: C.trial,
     visual: (
       <KeywordIdeasVisual
-        seed="エアコン取り付け"
-        headers={['キーワード', '月間検索数', '競合性']}
+        seed="Klimaanlage Montage"
+        headers={['Keyword', 'Suchen im Monat', 'Wettbewerb']}
         rows={[
-          { keyword: '業務用エアコン 取り付け', volume: '1,900', competition: '中', level: 'medium', added: true },
-          { keyword: 'エアコン 取り付け 費用', volume: '1,300', competition: '低', level: 'low' },
-          { keyword: '天井埋め込み エアコン', volume: '590', competition: '高', level: 'high' },
-          { keyword: 'エアコン修理 世田谷', volume: '320', competition: '低', level: 'low', added: true },
+          { keyword: 'klimaanlage montage firma', volume: '1.900', competition: 'Mittel', level: 'medium', added: true },
+          { keyword: 'klimaanlage einbauen kosten', volume: '1.300', competition: 'Niedrig', level: 'low' },
+          { keyword: 'deckenklimagerät', volume: '590', competition: 'Hoch', level: 'high' },
+          { keyword: 'klimaanlage reparatur münchen', volume: '320', competition: 'Niedrig', level: 'low', added: true },
         ]}
       />
     ),
@@ -47,52 +47,52 @@ const CONTENT: FeaturePageContent = {
     {
       kind: 'cards',
       tone: 'contrast',
-      eyebrow: 'ここから始める理由',
-      title: '誰も検索していないキーワードの名記事は、誰も連れてきません',
-      intro: '一語も書き始める前に、人が何を検索しているか、どのくらいの頻度で検索しているか、競うのがどれだけ難しいかがわかります。',
+      eyebrow: 'Warum hier anfangen',
+      title: 'Der beste Artikel zu einem Keyword, das niemand sucht, bringt niemanden',
+      intro: 'Noch bevor das erste Wort geschrieben ist, sehen Sie, wonach Menschen suchen, wie oft sie danach suchen und wie schwer es ist, darum mitzuhalten.',
       items: [
-        { icon: TrendingUp, title: '実際の需要', body: 'キーワードごとの月間検索ボリュームの推定値です。Googleのデータによります。' },
-        { icon: Target, title: '勝てるところ', body: 'キーワードごとの競合性です。本当に上位を取れるものを選べます。' },
-        { icon: Coins, title: 'クリック一回の価値', body: '広告主がクリックに払っている金額です。そのキーワードが事業にとってどれだけの価値があるかの手がかりになります。' },
+        { icon: TrendingUp, title: 'Die wirkliche Nachfrage', body: 'Das geschätzte monatliche Suchvolumen je Keyword, nach den Daten von Google.' },
+        { icon: Target, title: 'Wo Sie gewinnen können', body: 'Der Wettbewerb je Keyword, damit Sie die wählen, bei denen eine vordere Position wirklich erreichbar ist.' },
+        { icon: Coins, title: 'Was ein Klick wert ist', body: 'Was Werbetreibende für einen Klick zahlen. Das ist ein Hinweis darauf, wie viel dieses Keyword für das Unternehmen wert ist.' },
       ],
     },
     {
       kind: 'steps',
-      eyebrow: '仕組み',
-      title: '思いつきから作業の一覧へ',
+      eyebrow: 'Wie es funktioniert',
+      title: 'Von einem Einfall zu einer Liste von Aufgaben',
       items: [
-        { title: 'キーワードかサイトから始めます', body: 'キーワードか、サイトのアドレスを入力し、国と言語を選びます。' },
-        { title: '数字つきの案を受け取ります', body: '近いキーワードの一覧が、検索ボリューム、競合性、推定クリック単価とともに出ます。' },
-        { title: 'そのまま使い始めます', body: 'キーワードを検索順位の計測に追加するか、AIでの可視性の計測のための質問に変えます。' },
+        { title: 'Sie beginnen mit einem Keyword oder einer Website', body: 'Geben Sie ein Keyword oder die Adresse einer Website ein und wählen Sie Land und Sprache.' },
+        { title: 'Sie erhalten Ideen mit Zahlen', body: 'Eine Liste verwandter Keywords, jeweils mit Suchvolumen, Wettbewerb und geschätztem Klickpreis.' },
+        { title: 'Sie arbeiten unmittelbar weiter', body: 'Übernehmen Sie das Keyword in die Messung der Positionen oder verwandeln Sie es in eine Frage für die Messung der Sichtbarkeit in der KI.' },
       ],
     },
     {
       kind: 'cards',
-      eyebrow: 'できること',
-      title: '合うキーワードを選ぶために必要なものがそろっています',
+      eyebrow: 'Was Sie tun können',
+      title: 'Alles, was es braucht, um die passenden Keywords zu wählen',
       items: [
-        { icon: Lightbulb, title: 'キーワードかサイトからの案', body: '一つのキーワードから、またはサイトのアドレスから、近いキーワードを出します。' },
-        { icon: TrendingUp, title: '検索ボリューム', body: 'キーワードごとに、月に何回検索されているかのGoogleの推定値です。' },
-        { icon: Target, title: '競合性', body: 'キーワードごとに、低い、中くらい、高いのいずれかです。' },
-        { icon: Coins, title: '推定クリック単価', body: '検索広告でページ上部に出すための入札額の範囲です。' },
-        { icon: Plus, title: 'ワンクリックで計測に', body: '選んだキーワードが、そのプロジェクトの検索順位の計測にそのまま入ります。' },
-        { icon: Sparkles, title: 'AIでの計測のための質問', body: 'キーワードを自然な言葉の質問に変え、AIエンジンが自社をおすすめするかを確認できます。' },
+        { icon: Lightbulb, title: 'Ideen aus einem Keyword oder einer Website', body: 'Aus einem einzelnen Keyword oder aus der Adresse einer Website entstehen verwandte Keywords.' },
+        { icon: TrendingUp, title: 'Suchvolumen', body: 'Je Keyword die Schätzung von Google, wie oft es im Monat gesucht wird.' },
+        { icon: Target, title: 'Wettbewerb', body: 'Je Keyword niedrig, mittel oder hoch.' },
+        { icon: Coins, title: 'Geschätzter Klickpreis', body: 'Die Spanne der Gebote, mit denen eine Anzeige oben auf der Seite erscheint.' },
+        { icon: Plus, title: 'Mit einem Klick in die Messung', body: 'Das gewählte Keyword geht unmittelbar in die Messung der Positionen dieses Projekts ein.' },
+        { icon: Sparkles, title: 'Fragen für die Messung in der KI', body: 'Ein Keyword wird zu einer Frage in natürlicher Sprache, mit der Sie prüfen, ob die KI-Dienste Ihr Unternehmen empfehlen.' },
       ],
     },
     {
       kind: 'callout',
       icon: Info,
-      title: 'データについて',
+      title: 'Über die Daten',
       body: (
         <>
-          <p>データはGoogle AdsのAPIから取得しています。検索ボリューム、競合性、クリック単価はGoogleの推定値で、業種、季節、地域によって変わります。</p>
-          <p>テーマを選ぶための出発点としては十分です。実際の成果は、検索順位の計測で測ります。</p>
+          <p>Die Daten kommen aus der API von Google Ads. Suchvolumen, Wettbewerb und Klickpreis sind Schätzungen von Google und ändern sich mit der Branche, der Jahreszeit und der Region.</p>
+          <p>Als Ausgangspunkt für die Wahl eines Themas genügt das. Das wirkliche Ergebnis messen wir mit der Messung der Positionen.</p>
         </>
       ),
     },
   ],
   cta: {
-    title: '手間をかける価値のあるキーワードを見つけませんか',
+    title: 'Finden Sie die Keywords, für die sich die Arbeit lohnt',
     body: C.closeBody,
     primary: C.check,
     secondary: C.trial,

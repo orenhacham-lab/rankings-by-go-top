@@ -6,12 +6,12 @@ import { presignupResearchOn } from '@/lib/onboarding/availability'
 import { buildHreflangAlternates } from '@/lib/seo/hreflang'
 
 export const metadata = {
-  title: 'SEOとAIの無料診断 - Go Top SEO',
+  title: 'Kostenlose SEO- und KI-Prüfung - Go Top SEO',
   description:
-    'サイトの無料診断です。サイトを実際に読み取り、その事業が何をしているかを把握して、Googleの検索結果とAIの回答で何が妨げになっているかをお見せします。クレジットカードの登録も、継続の縛りもありません。',
+    'Eine kostenlose Prüfung Ihrer Website. Wir lesen die Website wirklich, erfassen, was das Unternehmen tut, und zeigen Ihnen, was in den Suchergebnissen von Google und in den Antworten der KI im Weg steht. Ohne Zahlungskarte und ohne Bindung.',
   openGraph: {
-    title: 'SEOとAIの無料診断',
-    description: 'サイトを読み取り、Googleの検索結果とAIの回答で何が妨げになっているかをお見せする無料の診断です',
+    title: 'Kostenlose SEO- und KI-Prüfung',
+    description: 'Eine kostenlose Prüfung, die Ihre Website liest und Ihnen zeigt, was in den Suchergebnissen von Google und in den Antworten der KI im Weg steht',
     url: 'https://www.gotopseo.com/de/free-check',
     type: 'website',
   },

@@ -6,8 +6,8 @@ import { buildHreflangAlternates } from '@/lib/seo/hreflang'
 import { FEATURE_COMMON } from '@/lib/i18n/public/feature-common'
 
 export const metadata: Metadata = {
-  title: 'Googleマップでの検索順位の計測 | Go Top SEO',
-  description: 'Googleマップでのローカルな露出を計測します。市区町村ごと、地域ごとの順位を確認できます。ローカル検索での集客はここから始まります。',
+  title: 'Positionen in Google Maps messen | Go Top SEO',
+  description: 'Messen Sie Ihre Sichtbarkeit in Google Maps. Die Position je Stadt und je Gebiet. Die Gewinnung von Kunden aus der Suche in der Nähe beginnt hier.',
   alternates: {
     canonical: 'https://www.gotopseo.com/de/features/google-maps-rank-tracking',
     languages: buildHreflangAlternates('/features/google-maps-rank-tracking', '/en/features/google-maps-rank-tracking', '/es/features/google-maps-rank-tracking'),
@@ -22,33 +22,34 @@ const C = FEATURE_COMMON['de']
 
 const CONTENT: FeaturePageContent = {
   hero: {
-    eyebrow: 'Googleマップ',
+    eyebrow: 'Google Maps',
     eyebrowIcon: MapPin,
-    title: '近くで自社のような会社を探している人がいるとき、',
-    accent: '地図上のどこにいるかがわかります',
-    subtitle: 'Googleマップでの順位を、キーワードごと、地域ごとに計測します。市区町村単位でも、地図上の正確な地点からでも計測できます。自社より上にいる相手と、順位が時間とともにどう動いたかがわかります。',
+    title: 'Wenn jemand in der Nähe ein Unternehmen wie Ihres sucht,',
+    accent: 'sehen Sie, wo Sie auf der Karte stehen',
+    subtitle: 'Wir messen Ihre Position in Google Maps, je Keyword und je Gebiet. Auf die Stadt genau oder von einem genauen Punkt auf der Karte aus. Sie sehen, wer über Ihnen steht und wie sich die Position über die Zeit bewegt hat.',
     trust: C.trust,
     primary: C.check,
     secondary: C.trial,
-    // The example is the German market, not a translated American or Italian
-    // one: the same demo world as the German landing page (Tokyo, air
-    // conditioning, 青山エアコンサービス and its neighbours). The figures are the
-    // sample ones the English, Spanish and French pages already show, so no new
-    // rating or review count is invented here.
+    // Das Beispiel ist der deutsche Markt, keine übersetzte amerikanische oder
+    // japanische Fassung: dieselbe Beispielwelt wie auf der deutschen
+    // Keyword-Seite (München, Klimaanlagen, Südstadt Klima und die Nachbarn).
+    // Die Zahlen sind die Beispielwerte, die die englische, spanische und
+    // französische Seite schon zeigen, es wird also keine neue Bewertung und
+    // keine neue Zahl an Bewertungen erfunden.
     visual: (
       <MapsVisual
-        positionLabel="自社の順位"
+        positionLabel="Ihre Position"
         position="3"
-        positionSub="東京、「エアコン取り付け」"
-        changeLabel="今月"
+        positionSub="München, „Klimaanlage Montage“"
+        changeLabel="Diesen Monat"
         change="2"
-        changeSub="順位上昇"
-        reviewsLabel="件の口コミ"
+        changeSub="Plätze gestiegen"
+        reviewsLabel="Bewertungen"
         rows={[
-          { rank: 1, name: '青山エアコンサービス', stars: 4.8, reviews: 212 },
-          { rank: 2, name: '東京コンフォート設備', stars: 4.6, reviews: 174 },
-          { rank: 3, name: 'ご自身の会社', stars: 4.7, reviews: 131, highlight: true },
-          { rank: 4, name: 'クリマポイント', stars: 4.4, reviews: 98 },
+          { rank: 1, name: 'Südstadt Klima GmbH', stars: 4.8, reviews: 212 },
+          { rank: 2, name: 'Isar Kältetechnik', stars: 4.6, reviews: 174 },
+          { rank: 3, name: 'Ihr Unternehmen', stars: 4.7, reviews: 131, highlight: true },
+          { rank: 4, name: 'Klimapunkt München', stars: 4.4, reviews: 98 },
         ]}
       />
     ),
@@ -57,51 +58,51 @@ const CONTENT: FeaturePageContent = {
     {
       kind: 'cards',
       tone: 'contrast',
-      eyebrow: '地図が大事な理由',
-      title: 'ローカル検索では、地図が店先です',
-      intro: '近くでサービスを探すとき、Googleはまず地図の上にいくつかの会社を見せます。どこに電話するかは、そこで決まります。',
+      eyebrow: 'Warum die Karte zählt',
+      title: 'In der Suche in der Nähe ist die Karte das Schaufenster',
+      intro: 'Wer in der Nähe eine Dienstleistung sucht, bekommt von Google zuerst einige Unternehmen auf der Karte gezeigt. Dort entscheidet sich, wen der Kunde anruft.',
       items: [
-        { icon: Phone, title: 'そこから電話が来ます', body: '地図の検索結果では、ひと操作で電話をかけ、経路を調べ、サイトを開きます。' },
-        { icon: Users, title: '枠は少なく、競合は多い', body: '上位の枠を占めるのは数社だけです。その中に自社がいるかを知る必要があります。' },
-        { icon: MapPin, title: '地域ごとに別の勝負です', body: 'ある市では1位でも、隣の市では出ていないことがあります。地域ごとの計測はそれを示します。' },
+        { icon: Phone, title: 'Von dort kommen die Anrufe', body: 'In den Ergebnissen auf der Karte genügt ein Tippen, um anzurufen, den Weg zu suchen oder die Website zu öffnen.' },
+        { icon: Users, title: 'Wenige Plätze, viele Wettbewerber', body: 'Die vorderen Plätze besetzen nur einige Unternehmen. Sie müssen wissen, ob Ihres dabei ist.' },
+        { icon: MapPin, title: 'Jedes Gebiet ist ein eigenes Rennen', body: 'In einer Stadt stehen Sie auf dem ersten Platz, in der Nachbarstadt erscheinen Sie gar nicht. Die Messung je Gebiet zeigt das.' },
       ],
     },
     {
       kind: 'steps',
-      eyebrow: '仕組み',
-      title: '三つの手順で地図の状況がはっきりします',
+      eyebrow: 'Wie es funktioniert',
+      title: 'Drei Schritte, und das Bild auf der Karte ist klar',
       items: [
-        { title: '自社を登録します', body: '自社と、対応している地域を登録します。' },
-        { title: 'キーワードと地域を選びます', body: 'たとえば東京での「エアコン取り付け」、あるいは地図上の正確な地点からです。' },
-        { title: '推移を追います', body: 'いつでも手動で計測でき、月に一度自動で計測することもできます。変化はすべて履歴に残ります。' },
+        { title: 'Sie tragen Ihr Unternehmen ein', body: 'Tragen Sie Ihr Unternehmen und die Gebiete ein, in denen Sie arbeiten.' },
+        { title: 'Sie wählen Keywords und Gebiet', body: 'Zum Beispiel „Klimaanlage Montage“ in München, oder von einem genauen Punkt auf der Karte aus.' },
+        { title: 'Sie verfolgen die Bewegung', body: 'Sie können jederzeit von Hand messen und einmal im Monat automatisch messen lassen. Jede Veränderung bleibt im Verlauf.' },
       ],
     },
     {
       kind: 'cards',
-      eyebrow: '受け取れるもの',
-      title: '推測ではなく、地図上の自社の位置です',
+      eyebrow: 'Was Sie erhalten',
+      title: 'Nicht geschätzt, sondern Ihre Position auf der Karte',
       items: [
-        { icon: MapPin, title: '市区町村別、地域別', body: '顧客がいる地域で、キーワードごとに確認します。' },
-        { icon: Navigation, title: '地図上の正確な地点', body: '指定した座標から確認するので、ちょうどそこにいる顧客に何が見えているかがわかります。' },
-        { icon: Store, title: '自社より上にいる相手', body: '検索結果で自社より上に出ている会社と、そのGoogleでの評価です。' },
-        { icon: History, title: '順位の履歴', body: '前回の計測から順位がどう変わったかがわかります。' },
-        { icon: Search, title: '通常の検索も', body: '同じキーワードをGoogleの通常の検索結果でも計測します。' },
-        { icon: FileSpreadsheet, title: 'PDFとExcelのレポート', body: 'Googleマップでの順位もレポートに入り、必要な相手にお渡しいただけます。' },
+        { icon: MapPin, title: 'Nach Stadt und nach Gebiet', body: 'Je Keyword, in dem Gebiet, in dem Ihre Kunden sind.' },
+        { icon: Navigation, title: 'Ein genauer Punkt auf der Karte', body: 'Wir prüfen von den Koordinaten aus, die Sie angeben, sodass Sie sehen, was ein Kunde genau dort sieht.' },
+        { icon: Store, title: 'Wer über Ihnen steht', body: 'Die Unternehmen, die in den Ergebnissen über Ihnen erscheinen, und ihre Bewertung bei Google.' },
+        { icon: History, title: 'Der Verlauf der Positionen', body: 'Sie sehen, wie sich die Position seit der vorigen Messung verändert hat.' },
+        { icon: Search, title: 'Die gewöhnliche Suche ebenso', body: 'Dieselben Keywords messen wir auch in den gewöhnlichen Suchergebnissen von Google.' },
+        { icon: FileSpreadsheet, title: 'Berichte als PDF und Excel', body: 'Die Positionen in Google Maps stehen ebenfalls im Bericht, den Sie weitergeben können, wem Sie wollen.' },
       ],
     },
     {
       kind: 'faq',
-      eyebrow: 'よくある質問',
-      title: 'Googleマップでの計測について尋ねられること',
+      eyebrow: 'Häufige Fragen',
+      title: 'Was zur Messung in Google Maps gefragt wird',
       items: [
-        { q: 'Googleビジネスプロフィールは必要ですか', a: 'Googleマップに表示されるには、Googleビジネスプロフィールの登録が必要です。計測では、その登録情報がどこに出ているか、あるいは出ていないかがわかります。' },
-        { q: '順位はどのくらいの頻度で計測されますか', a: '手動で計測を始めたときに毎回計測され、月に一度の自動計測も設定できます。今のところ、毎日や毎週の自動計測はありません。' },
-        { q: 'Googleマップのキーワードは別の一回として数えますか', a: 'はい。Googleでの一回の確認は、一つの地域での一つのキーワードです。同じキーワードを通常の検索とGoogleマップで計測すると、二回になります。' },
+        { q: 'Brauche ich ein Google-Unternehmensprofil?', a: 'Um in Google Maps zu erscheinen, brauchen Sie einen Eintrag im Google-Unternehmensprofil. Die Messung zeigt Ihnen, wo dieser Eintrag erscheint und wo nicht.' },
+        { q: 'Wie oft werden die Positionen gemessen?', a: 'Jedes Mal, wenn Sie eine Messung von Hand starten, und einmal im Monat automatisch, wenn Sie das einrichten. Eine tägliche oder wöchentliche automatische Messung gibt es derzeit nicht.' },
+        { q: 'Zählt ein Keyword in Google Maps als eigene Prüfung?', a: 'Ja. Eine Prüfung bei Google ist ein Keyword in einem Gebiet. Wenn Sie dasselbe Keyword in der gewöhnlichen Suche und in Google Maps messen, sind das zwei Prüfungen.' },
       ],
     },
   ],
   cta: {
-    title: '自分の地域で電話を受けているのは誰かを確かめませんか',
+    title: 'Finden Sie heraus, wer in Ihrem Gebiet die Anrufe bekommt',
     body: C.closeBody,
     primary: C.check,
     secondary: C.trial,

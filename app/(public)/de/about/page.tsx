@@ -7,94 +7,95 @@ export default function GermanAboutPage() {
 }
 
 /**
- * The same page as the Hebrew, English, Spanish and French ones, in German.
+ * The same page as the Hebrew, English, Spanish, French, Italian and
+ * Japanese ones, in German.
  * Every claim here is one the others already make: the years of experience, who
  * builds the platform, and what it does. Nothing is added for the German
  * market, because nothing new is true of it yet.
  */
 const COPY: AboutCopy = {
   breadcrumb: { label: ABOUT_BREADCRUMB['de'], href: '/de/about' },
-  title: 'SEOの11年の実務を、',
-  accent: 'ひとつのプラットフォームにまとめました。',
-  subtitle: 'サイトに記事を書いて公開し、GoogleとGoogleマップでの検索順位を計測し、AIエンジンが自社をおすすめしているかを確認する、ひとつのプラットフォームです。自然検索での集客と広告運用で11年以上の実務があるデジタルマーケティング会社、Go Topが作っています。',
+  title: 'Elf Jahre SEO-Praxis,',
+  accent: 'in einer Plattform zusammengeführt.',
+  subtitle: 'Eine Plattform, die Artikel für Ihre Website schreibt und veröffentlicht, die Positionen bei Google und in Google Maps misst und prüft, ob die KI-Dienste Ihr Unternehmen empfehlen. Gebaut von Go Top, einer Agentur für digitales Marketing mit mehr als elf Jahren Arbeit in der organischen Gewinnung von Besuchern und in der Anzeigenschaltung.',
   who: {
-    title: 'このプラットフォームを作っている会社',
+    title: 'Das Unternehmen, das diese Plattform baut',
     paragraphs: [
-      'Go Top SEOは、Go Topが作っています。イスラエルと海外の企業に向けて、自然検索での集客、オンライン広告、サイト制作を11年以上続けてきたデジタルマーケティング会社です。',
-      'このプラットフォームは、取引先との日々の仕事から生まれました。どのレポートなら本当に伝わるのか、どのデータが判断の助けになるのか、どこで時間が失われているのかを見てきました。そこで、コンテンツを書き、公開し、Googleでも、AIエンジンでも計測する場所を、一つにまとめました。',
+      'Go Top SEO wird von Go Top gebaut, einer Agentur für digitales Marketing, die seit mehr als elf Jahren für Unternehmen in Israel und im Ausland organische Sichtbarkeit, Onlinewerbung und Websites betreut.',
+      'Die Plattform ist aus der täglichen Arbeit mit diesen Kunden entstanden. Wir haben gesehen, welcher Bericht wirklich etwas sagt, welche Daten bei einer Entscheidung helfen und wo die Zeit verloren geht. Also haben wir einen Ort gebaut, an dem Inhalte geschrieben, veröffentlicht und gemessen werden — bei Google und in den KI-Diensten.',
     ],
   },
-  founderEyebrow: 'このプロジェクトを進めている人',
+  founderEyebrow: 'Die Person, die dieses Projekt führt',
   gaps: {
-    title: '足りなかったもの、そして代わりに作ったもの',
-    body: '自然検索の仕組みを学ばなくても、見つけてもらうために必要なことを同じ場所ですべて行えるようにしたい、と考えました。',
-    missingLabel: '足りなかったもの',
-    builtLabel: '作ったもの',
+    title: 'Was gefehlt hat, und was wir stattdessen gebaut haben',
+    body: 'Wir wollten, dass sich alles, was zum Gefundenwerden nötig ist, an einem Ort tun lässt, ohne vorher zu lernen, wie organische Suche funktioniert.',
+    missingLabel: 'Was gefehlt hat',
+    builtLabel: 'Was wir gebaut haben',
     rows: [
       {
-        pain: { title: '順位を手で確認するには時間がかかりすぎます', description: '同じキーワードを何度も確認し、いくつもの検索結果の画面を開き、手で計算する作業が、一日の時間を奪います。' },
-        answer: { title: 'GoogleとGoogleマップでの検索順位', description: '自然検索とGoogleマップでの順位を、キーワードごとに、地域別、端末別に計測し、変化の履歴を残します。' },
+        pain: { title: 'Positionen von Hand zu prüfen dauert zu lange', description: 'Dasselbe Keyword wieder und wieder nachsehen, eine Suchergebnisseite nach der anderen öffnen und von Hand rechnen — das kostet den halben Tag.' },
+        answer: { title: 'Positionen bei Google und in Google Maps', description: 'Die Positionen in der organischen Suche und in Google Maps, je Keyword, nach Ort und nach Gerät gemessen, mit dem Verlauf der Veränderungen.' },
       },
       {
-        pain: { title: 'データが複数のツールに散らばっています', description: 'Googleでの順位、Googleマップでの順位、AIエンジンでの可視性がそれぞれ別の場所にあり、全体像が一つにまとまりません。' },
-        answer: { title: 'すべてが同じ場所に', description: 'キーワード調査、検索順位、AIでの可視性、そして記事が互いにつながっていて、四つの別のツールに分かれていません。' },
+        pain: { title: 'Die Daten liegen über mehrere Werkzeuge verstreut', description: 'Die Position bei Google, die Position in Google Maps und die Sichtbarkeit in den KI-Diensten stehen jeweils an einem anderen Ort, und kein Bild fügt sich zusammen.' },
+        answer: { title: 'Alles an einem Ort', description: 'Keyword-Recherche, Positionen, Sichtbarkeit in der KI und die Artikel hängen miteinander zusammen, statt in vier getrennten Werkzeugen zu liegen.' },
       },
       {
-        pain: { title: 'AIエンジンはすでに検索の一部です', description: 'ChatGPT、Gemini、Google AI Modeに質問する顧客が増えています。その回答に自社が現れているかを知る必要があります。' },
-        answer: { title: 'AIでの可視性の計測', description: 'ChatGPT、Gemini、Google AI Modeの回答で、自社が言及されているか、出典として示されているか、おすすめされているかを確認できます。' },
+        pain: { title: 'Die KI-Dienste sind schon Teil der Suche', description: 'Immer mehr Kunden fragen ChatGPT, Gemini und Google AI Mode. Sie müssen wissen, ob Ihr Unternehmen in diesen Antworten vorkommt.' },
+        answer: { title: 'Messung der Sichtbarkeit in der KI', description: 'Sie sehen, ob Ihr Unternehmen in den Antworten von ChatGPT, Gemini und Google AI Mode genannt, als Quelle angegeben oder empfohlen wird.' },
       },
       {
-        pain: { title: '途中で止まってしまうコンテンツ', description: '何について書くかを知ることは、仕事の半分です。残りは、書いて、公開して、計測することです。' },
-        answer: { title: '記事の作成と公開', description: 'ご承認いただいたテーマについて、画像、質問と回答の章、内部リンクを含む記事を仕上げ、WordPressまたはShopifyに公開します。' },
+        pain: { title: 'Inhalte, die auf halbem Weg stehen bleiben', description: 'Zu wissen, worüber zu schreiben ist, ist die halbe Arbeit. Der Rest ist schreiben, veröffentlichen und messen.' },
+        answer: { title: 'Artikel schreiben und veröffentlichen', description: 'Zu den Themen, die Sie freigeben, entsteht ein fertiger Artikel mit Bildern, einem Abschnitt mit Fragen und Antworten und internen Links, veröffentlicht in WordPress oder Shopify.' },
       },
     ],
   },
   approach: {
-    title: '私たちの仕事の進め方',
+    title: 'Wie wir arbeiten',
     items: [
       {
-        title: '透明性',
-        description: '何を計測しているか、データがどこから来ているか、それが何を意味するかをお伝えします。水増しした指標はありません。',
+        title: 'Transparenz',
+        description: 'Wir sagen Ihnen, was wir messen, woher die Daten kommen und was sie bedeuten. Keine aufgeblähten Kennzahlen.',
       },
       {
-        title: '役に立つデータ',
-        description: '見栄えのよい数字ではなく、事業として筋の通った話を伝えるレポートです。',
+        title: 'Daten, die etwas nützen',
+        description: 'Berichte, die eine Geschichte erzählen, die betriebswirtschaftlich Sinn ergibt, statt gut aussehender Zahlen.',
       },
       {
-        title: 'わかりやすい画面',
-        description: 'コンテンツ、GoogleとGoogleマップでの順位、AIでの可視性を一つの画面にまとめ、余計なものを置きません。',
+        title: 'Eine verständliche Oberfläche',
+        description: 'Inhalte, Positionen bei Google und in Google Maps und die Sichtbarkeit in der KI auf einem Bildschirm, ohne alles Überflüssige.',
       },
       {
-        title: 'SEOとGEOを一緒に',
-        description: 'Googleに向けたコンテンツとAIエンジンに向けたコンテンツ、そしてその両方の計測です。',
+        title: 'SEO und GEO zusammen',
+        description: 'Inhalte für Google und Inhalte für die KI-Dienste, und die Messung von beidem.',
       },
     ],
   },
   choose: {
-    title: 'Go Top SEOを選ぶ理由',
+    title: 'Warum Go Top SEO',
     items: [
       {
-        title: '担当者が直接、妥協なく対応します',
-        description: '毎月変わる「アカウントマネージャー」はいません。その事業を把握している同じ担当者が対応します。',
+        title: 'Eine Person, die unmittelbar und ohne Abstriche antwortet',
+        description: 'Kein „Account Manager“, der jeden Monat wechselt. Dieselbe Person, die Ihr Unternehmen kennt, antwortet Ihnen.',
       },
       {
-        title: '完全な透明性',
-        description: 'ご自身のアカウントで何が起きているか、何が効いて何が効かなかったか、次にどう進めるかが、いつでもわかります。',
+        title: 'Vollständige Transparenz',
+        description: 'Sie sehen jederzeit, was in Ihrem Konto geschieht, was gewirkt hat und was nicht, und wie es weitergeht.',
       },
       {
-        title: '専門用語を使わない専門性',
-        description: '難しい言葉は並べません。計測できて理解できる成果について話します。',
+        title: 'Fachliche Tiefe ohne Fachjargon',
+        description: 'Wir reihen keine schwierigen Wörter aneinander. Wir sprechen über Ergebnisse, die messbar und verständlich sind.',
       },
       {
-        title: '私たちも一つの会社です',
-        description: '重圧、限られた予算、成果を見たい気持ちが理解できます。私たちもそれを経験しているからです。',
+        title: 'Wir sind selbst ein Unternehmen',
+        description: 'Wir kennen den Druck, das begrenzte Budget und den Wunsch, Ergebnisse zu sehen, weil wir dasselbe erleben.',
       },
     ],
   },
   cta: {
-    title: 'このプラットフォームでサイトがどう変わるかを見てみませんか',
+    title: 'Sehen Sie, was diese Plattform an Ihrer Website ändert',
     body: FEATURE_COMMON['de'].closeBody,
-    contact: 'ご質問はこちらへ：',
-    updated: 'このページの最終更新は2026年9月です',
+    contact: 'Fragen richten Sie an:',
+    updated: 'Diese Seite wurde im September 2026 zuletzt aktualisiert',
   },
 }

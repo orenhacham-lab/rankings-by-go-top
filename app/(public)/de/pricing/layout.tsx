@@ -3,11 +3,11 @@ import { marketingBreadcrumbSchema } from '@/lib/seo/page-schema'
 import { getPublicDictionary } from '@/lib/i18n/getPublicDictionary'
 
 export const metadata = {
-  title: '料金 - Go Top SEO',
-  description: 'Googleでの検索順位とAIでの可視性を計測するための、柔軟なプランです。7日間の無料トライアルがあり、継続の縛りはありません。',
+  title: 'Preise - Go Top SEO',
+  description: 'Flexible Tarife, um die Positionen bei Google und die Sichtbarkeit in der KI zu messen. Mit sieben Tagen kostenloser Testphase und ohne Bindung.',
   openGraph: {
-    title: '料金 - Go Top SEO',
-    description: 'Googleでの検索順位とAIでの可視性を計測するための、柔軟なプランです',
+    title: 'Preise - Go Top SEO',
+    description: 'Flexible Tarife, um die Positionen bei Google und die Sichtbarkeit in der KI zu messen',
     url: 'https://www.gotopseo.com/de/pricing',
     type: 'website',
   },
