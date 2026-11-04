@@ -2,6 +2,7 @@
 
 import Link from 'next/link'
 import { LOCALE_PREFIX, localeHomeHref, type PublicLocale } from '@/lib/i18n/locales'
+import { GERMAN_IMPRESSUM_LINK } from '@/lib/i18n/german-site'
 import { JAPANESE_TOKUSHO_LINK } from '@/lib/i18n/japanese-site'
 import { getPublicDictionary } from '@/lib/i18n/getPublicDictionary'
 import GoTopMark from '@/components/brand/GoTopMark'
@@ -119,6 +120,20 @@ export function Footer({ locale = 'he' }: { locale?: PublicLocale } = {}) {
                 <li>
                   <Link href={JAPANESE_TOKUSHO_LINK.href} className={linkClass}>
                     {JAPANESE_TOKUSHO_LINK.label}
+                  </Link>
+                </li>
+              )}
+              {/*
+                §5 DDG asks a commercially operated digital service to keep the
+                provider's identity and contact details easily recognizable and
+                directly reachable from anywhere in the service. Germany is the
+                only locale whose law asks for that page, so the link appears in
+                that footer only — the other seven trees have no such route.
+              */}
+              {locale === 'de' && (
+                <li>
+                  <Link href={GERMAN_IMPRESSUM_LINK.href} className={linkClass}>
+                    {GERMAN_IMPRESSUM_LINK.label}
                   </Link>
                 </li>
               )}

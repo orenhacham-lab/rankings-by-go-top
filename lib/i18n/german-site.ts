@@ -20,3 +20,11 @@
 export function germanSiteEnabled(value: string | undefined = process.env.NEXT_PUBLIC_GERMAN_SITE_ENABLED): boolean {
   return value === 'true'
 }
+
+/**
+ * The Impressum link, which §5 DDG requires to be "leicht erkennbar und
+ * unmittelbar erreichbar" — so it sits in the footer of every German page, the
+ * same way /ja/tokusho does for Japan. German is the only locale whose law asks
+ * for this page; a link to it from any other tree would be a dead link.
+ */
+export const GERMAN_IMPRESSUM_LINK = { href: '/de/impressum', label: 'Impressum' } as const
