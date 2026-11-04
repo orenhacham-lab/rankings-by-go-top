@@ -88,7 +88,7 @@ check('A1: eight languages are written automatically', same([...BLOG_AUTO_LOCALE
 check('A1a: German is last in the order, so a bad morning costs the newest language',
   BLOG_AUTO_LOCALES[BLOG_AUTO_LOCALES.length - 1] === 'de')
 check('A1a-MUT: a list whose last entry is not the newest language fails A1a',
-  (['he', 'de', 'en'] as const)[2] !== 'de')
+  (() => { const reordered: readonly string[] = ['he', 'de', 'en']; return reordered[reordered.length - 1] !== 'de' })())
 // A2 USED TO BE localesForDay() === BLOG_AUTO_LOCALES. Japanese joined the list
 // on 30 Oct 2026 while its public tree was still behind
 // NEXT_PUBLIC_JAPANESE_SITE_ENABLED, so the day's languages are the ones a
