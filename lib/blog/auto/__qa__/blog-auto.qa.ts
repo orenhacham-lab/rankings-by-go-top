@@ -29,6 +29,7 @@ process.env.NEXT_PUBLIC_PORTUGUESE_SITE_ENABLED = 'true'
 process.env.NEXT_PUBLIC_FRENCH_SITE_ENABLED = 'true'
 process.env.NEXT_PUBLIC_ITALIAN_SITE_ENABLED = 'true'
 process.env.NEXT_PUBLIC_JAPANESE_SITE_ENABLED = 'true'
+process.env.NEXT_PUBLIC_GERMAN_SITE_ENABLED = 'true'
 
 import { existsSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
@@ -79,7 +80,15 @@ const stripComments = (src: string) => src.replace(/\/\*[\s\S]*?\*\//g, '').repl
 // ============================================================
 // A) THE LANGUAGES
 // ============================================================
-check('A1: seven languages are written automatically', same([...BLOG_AUTO_LOCALES], ['he', 'en', 'es', 'pt-BR', 'fr', 'it', 'ja']))
+check('A1: eight languages are written automatically', same([...BLOG_AUTO_LOCALES], ['he', 'en', 'es', 'pt-BR', 'fr', 'it', 'ja', 'de']))
+// German is LAST, and that is the contract daily-window.ts depends on: it
+// walks this list in order and the language that goes without on a morning of
+// retries is the last one. A reorder that puts German ahead of an older
+// language would make the new language cost an existing one its article.
+check('A1a: German is last in the order, so a bad morning costs the newest language',
+  BLOG_AUTO_LOCALES[BLOG_AUTO_LOCALES.length - 1] === 'de')
+check('A1a-MUT: a list whose last entry is not the newest language fails A1a',
+  (['he', 'de', 'en'] as const)[2] !== 'de')
 // A2 USED TO BE localesForDay() === BLOG_AUTO_LOCALES. Japanese joined the list
 // on 30 Oct 2026 while its public tree was still behind
 // NEXT_PUBLIC_JAPANESE_SITE_ENABLED, so the day's languages are the ones a
@@ -91,10 +100,13 @@ check('A2: every enabled language is due every day — there is no weekday rotat
   same([...localesForDay()], BLOG_AUTO_LOCALES.filter((l) => publicLocaleEnabled(l))))
 check('A2a: a language still behind its flag is not due, and an enabled one is',
   localesForDay().includes('he') && localesForDay().includes('en')
-  && localesForDay().includes('ja') === publicLocaleEnabled('ja'))
+  && localesForDay().includes('ja') === publicLocaleEnabled('ja')
+  && localesForDay().includes('de') === publicLocaleEnabled('de'))
 check('A2b (control): the day\'s list is a filter, not the whole list, when a flag is off',
   publicLocaleEnabled('ja') || !localesForDay().includes('ja'))
-check('A3: that is seven articles a week in each language', same(weeklyShare(), { he: 7, en: 7, es: 7, 'pt-BR': 7, fr: 7, it: 7, ja: 7 }), weeklyShare())
+check('A2c (control): the same holds for German while its flag is off',
+  publicLocaleEnabled('de') || !localesForDay().includes('de'))
+check('A3: that is seven articles a week in each language', same(weeklyShare(), { he: 7, en: 7, es: 7, 'pt-BR': 7, fr: 7, it: 7, ja: 7, de: 7 }), weeklyShare())
 check(
   'A4: Portuguese IS among them, now that the content layer writes it (lib/content/language.ts)',
   (BLOG_AUTO_LOCALES as readonly string[]).includes('pt-BR') && isBlogAutoLocale('pt-BR')
@@ -424,12 +436,23 @@ async function main() {
       planned({ id: 'pf', locale: 'fr', topic: 'suivi de position', primary_keyword: 'suivi de position' }),
       planned({ id: 'pi', locale: 'it', topic: 'posizionamento su google', primary_keyword: 'posizionamento su google' }),
       planned({ id: 'pj', locale: 'ja', topic: '検索順位の計測', primary_keyword: '検索順位 チェック' }),
+      planned({ id: 'pd', locale: 'de', topic: 'Google Ranking prüfen', primary_keyword: 'google ranking prüfen' }),
     ])
     const summaries = await runBlogAutoPublishAllLocales(admin as unknown as Admin, {}, deps({
       generate: async (brief) => perLocale(brief.language),
     }))
-    check('F20: a call with no language covers every language', same(summaries.map((s) => s.locale), [...BLOG_AUTO_LOCALES]), summaries.map((s) => s.locale))
-    check('F21: each language published its own article', admin.tables.articles.length === BLOG_AUTO_LOCALES.length, admin.tables.articles.length)
+    // localesForDay(), not BLOG_AUTO_LOCALES: the runner walks the day's list,
+    // which is the languages whose public tree a reader can open. Asserting the
+    // whole list only passed while every flag happened to be on, and would have
+    // failed the moment any language sat behind its flag — which is the normal
+    // state of a language on the day it is added.
+    const due = [...localesForDay()]
+    check('F20: a call with no language covers every language due today', same(summaries.map((s) => s.locale), due), summaries.map((s) => s.locale))
+    check('F21: each language due today published its own article', admin.tables.articles.length === due.length, admin.tables.articles.length)
+    check('F21a (control): a language behind its flag is skipped, and the queue row it would have used is left planned',
+      due.length === BLOG_AUTO_LOCALES.length
+      || BLOG_AUTO_LOCALES.filter((l) => !due.includes(l))
+        .every((l) => !summaries.some((s) => s.locale === l)))
     check('F22: the budget leaves room for the first language whatever it is', ALL_LOCALES_BUDGET_MS > 0)
   }
   {

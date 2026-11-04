@@ -31,13 +31,19 @@ export const RESEARCH_MARKET: Record<BlogAutoLocale, { country: string; language
   fr: { country: 'FR', language: 'fr' },
   it: { country: 'IT', language: 'it' },
   ja: { country: 'JP', language: 'ja' },
+  // Germany, not the whole German-speaking area. Austria (2040) and Switzerland
+  // (2756) are in COUNTRY_GEO_TARGETS and can be researched, but Keyword Planner
+  // takes ONE country per call, and DE is ~85% of the German-speaking search
+  // market. A keyword with volume in Germany has volume in Vienna and Zurich;
+  // the reverse does not hold, so researching DE is the superset.
+  de: { country: 'DE', language: 'de' },
 }
 
 /**
  * The floor for "somebody searches this". Hebrew is a 9-million-speaker market,
  * so the same floor as English would reject nearly every real Hebrew query.
  */
-export const MIN_MONTHLY_SEARCHES: Record<BlogAutoLocale, number> = { he: 20, en: 80, es: 50, 'pt-BR': 50, fr: 50, it: 50, ja: 50 }
+export const MIN_MONTHLY_SEARCHES: Record<BlogAutoLocale, number> = { he: 20, en: 80, es: 50, 'pt-BR': 50, fr: 50, it: 50, ja: 50, de: 50 }
 
 /** Seeds the research starts from — the subjects this product is actually about. */
 export const RESEARCH_SEEDS: Record<BlogAutoLocale, string[]> = {
@@ -72,6 +78,21 @@ export const RESEARCH_SEEDS: Record<BlogAutoLocale, string[]> = {
     'SEO対策', '検索順位 チェック', 'キーワード選定', 'SEO 内部対策',
     'seo', 'AI検索 対策', 'Google 検索順位', 'サイト 表示速度', 'オウンドメディア 記事',
     'サーチコンソール 使い方', '被リンク 調べ方', 'ローカルSEO', 'Googleビジネスプロフィール 活用',
+  ],
+  // These are not translations of the English seeds. They are the terms that
+  // came back WITH VOLUME when the language choice was measured in Keyword
+  // Planner on 3-4 Nov 2026 (growth/next-language.md): SEO Tool 8,100/mo,
+  // SEO Analyse Tool 260, Keyword Recherche Tool 260, Backlink Tool 140,
+  // Local SEO Tool 110, Google Unternehmensprofil optimieren 90, Google Ranking
+  // prüfen 70, Keyword Ranking Tool 70. German SEO vocabulary keeps the English
+  // loanwords — a German owner searches "Keyword Recherche", never
+  // "Schlüsselwortrecherche" — so seeding with the native-sounding compound
+  // would have returned nothing.
+  de: [
+    'seo', 'seo tool', 'seo analyse tool', 'keyword recherche',
+    'google ranking prüfen', 'keyword ranking tool', 'backlink tool',
+    'local seo', 'google unternehmensprofil optimieren', 'google search console',
+    'seo für kleine unternehmen', 'website geschwindigkeit', 'sichtbarkeit in ki',
   ],
 }
 

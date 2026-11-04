@@ -22,14 +22,27 @@
  * is /fr, the keyword research runs on the French market, and the legal pages
  * behind it are written to French and European law.
  *
- * THE ORDER OF THIS LIST IS LOAD-BEARING, and French is last on purpose.
+ * `it` joined on 23 Oct 2026 and `ja` on 31 Oct 2026, each the same way and
+ * each written for its own market.
+ *
+ * `de` joined on 4 Nov 2026, written for GERMANY: the public tree is /de, the
+ * keyword research runs on the German market (geo 2276, language 1001), and the
+ * legal pages behind it are written to German and European law. German was
+ * chosen over Dutch and Taiwanese Mandarin on measured Keyword Planner volume —
+ * about 9,100 monthly searches on the ten core queries, against 2,460 and 280 —
+ * so it is the language with the most to publish for, not the easiest to
+ * translate into.
+ *
+ * THE ORDER OF THIS LIST IS LOAD-BEARING, and German is last on purpose.
  * lib/blog/auto/daily-window.ts writes at most one language per cron run and
- * walks this list in order, inside a four-hour window of sixteen runs. Five
- * languages publishing first time need five of them; the rest is reserve for a
+ * walks this list in order, inside a four-hour window of sixteen runs. Eight
+ * languages publishing first time need eight of them; the rest is reserve for a
  * language that fails the quality gate and retries (on 17 Oct Spanish needed
- * three passes). Adding a language therefore spends reserve, and the language
- * that pays for a bad morning is the LAST one here. Putting French last is what
- * keeps a new language from ever costing an existing one its article.
+ * three passes). Adding a language therefore spends reserve — with eight
+ * languages the window keeps eight runs of reserve, half of what it held with
+ * five — and the language that pays for a bad morning is the LAST one here.
+ * Putting German last is what keeps a new language from ever costing an
+ * existing one its article.
  *
  * Pure: no I/O. `localesForDay()` reads the public-language flags, which Next
  * inlines at build time, and nothing else.
@@ -37,7 +50,7 @@
 import { publicLocaleEnabled } from '@/lib/i18n/locales'
 
 /** The languages this runner can write. A subset of PUBLIC_LOCALES. */
-export const BLOG_AUTO_LOCALES = ['he', 'en', 'es', 'pt-BR', 'fr', 'it', 'ja'] as const
+export const BLOG_AUTO_LOCALES = ['he', 'en', 'es', 'pt-BR', 'fr', 'it', 'ja', 'de'] as const
 export type BlogAutoLocale = (typeof BLOG_AUTO_LOCALES)[number]
 
 export function isBlogAutoLocale(value: unknown): value is BlogAutoLocale {
@@ -47,12 +60,13 @@ export function isBlogAutoLocale(value: unknown): value is BlogAutoLocale {
 /**
  * The languages due today: all of them whose public tree a reader can open.
  *
- * Japanese is in the list above and is skipped here while its flag is off, for
- * two reasons that both point the same way. The `/ja` tree answers 404 until the
- * flag flips (lib/i18n/japanese-site.ts), so an article written today would be
- * written for nobody; and `articles.locale` and `blog_plan.locale` do not accept
- * 'ja' until 20261030120000_locale_ja.sql runs, so the write would fail in the
- * database rather than in a place anyone would look. The language therefore
+ * A language is in the list above and skipped here while its flag is off, for
+ * two reasons that both point the same way. Its tree answers 404 until the flag
+ * flips (lib/i18n/german-site.ts for German), so an article written today would
+ * be written for nobody; and `articles.locale` and `blog_plan.locale` do not
+ * accept the code until its migration runs (20261030120000_locale_ja.sql for
+ * Japanese, 20261104120000_locale_de.sql for German), so the write would fail in
+ * the database rather than in a place anyone would look. A language therefore
  * starts publishing on the deploy that turns it on, which is the same moment its
  * pages become readable.
  */
@@ -62,5 +76,5 @@ export function localesForDay(): readonly BlogAutoLocale[] {
 
 /** How many articles a week each language gets — the queue's refill target reads this. */
 export function weeklyShare(): Record<BlogAutoLocale, number> {
-  return { he: 7, en: 7, es: 7, 'pt-BR': 7, fr: 7, it: 7, ja: 7 }
+  return { he: 7, en: 7, es: 7, 'pt-BR': 7, fr: 7, it: 7, ja: 7, de: 7 }
 }
