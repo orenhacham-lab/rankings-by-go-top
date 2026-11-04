@@ -14,7 +14,9 @@
  *   C) the run — what a missing, unreadable or lying robots.txt produces
  *   D) the rate limiter — a window that actually closes
  *   E) the locales — seven complete copies, no untranslated keys
- *   F) the surfaces — seven pages, the API's own guard, the sitemap
+ *   F) the surfaces — seven pages, the API's own guard, the sitemap, and the
+ *      registry itself: no duplicate token, every purpose translated
+ *      everywhere, and nothing on the page that the open dataset lacks
  */
 import { readFileSync, existsSync } from 'fs'
 import { join } from 'path'
@@ -23,6 +25,7 @@ import { isAllowed, matchLength, normalizeCheckPath, parseRobots, rulesFor } fro
 import { verdictsFor } from '../check'
 import { LIMIT, WINDOW_MS, resetRateLimiter, takeToken } from '../rate-limit'
 import { aiCrawlerCopy } from '../copy'
+import { AI_CRAWLER_CANDIDATES, AI_CRAWLER_DATASET } from '../dataset'
 import { PUBLIC_LOCALES, type PublicLocale } from '../../i18n/locales'
 
 let pass = 0,
@@ -288,11 +291,45 @@ function main() {
     // and double-count the summary.
     check('F13: no duplicate user-agent token', new Set(AI_CRAWLER_TOKENS.map((t) => t.toLowerCase())).size === AI_CRAWLER_TOKENS.length)
     check('F14: every agent names an operator and a purpose',
-      AI_CRAWLERS.every((c) => c.operator.length > 0 && ['train', 'answer', 'search'].includes(c.purpose)))
+      AI_CRAWLERS.every((c) => c.operator.length > 0 && ['train', 'answer', 'search', 'ads'].includes(c.purpose)))
     // MUTATION CONTROL for F13.
     const dupes = [...AI_CRAWLER_TOKENS, 'gptbot']
     check('F13-MUT: adding a case-variant duplicate would fail F13',
       new Set(dupes.map((t) => t.toLowerCase())).size !== dupes.length)
+
+    // Every purpose the page renders needs a label AND a blurb in all seven
+    // languages: `copy.purposes[verdict.purpose].label` would throw on a
+    // purpose a locale has not got, taking the whole page down in that
+    // language only — the failure a reviewer reading Hebrew never sees.
+    const usedPurposes = [...new Set(AI_CRAWLERS.map((c) => c.purpose))]
+    const purposeGaps = PUBLIC_LOCALES.flatMap((l: PublicLocale) =>
+      usedPurposes
+        .filter((p) => !(aiCrawlerCopy(l).purposes[p]?.label && aiCrawlerCopy(l).purposes[p]?.blurb))
+        .map((p) => `${l}:${p}`))
+    check(`F15: all ${usedPurposes.length} purposes are translated in all seven languages`,
+      purposeGaps.length === 0, purposeGaps.join(', '))
+    // MUTATION CONTROL for F15.
+    check('F15-MUT: a purpose no locale translates would fail F15',
+      PUBLIC_LOCALES.some((l: PublicLocale) => !(aiCrawlerCopy(l).purposes as Record<string, unknown>)['preview']))
+
+    // agents.ts is the curated reader-facing list and dataset.ts the complete
+    // one, so the dataset is a superset by design — but a token on the PAGE
+    // that the OPEN DATASET does not carry means the two drifted, and the
+    // dataset is the half other people are invited to consume.
+    // (Five of the page's long-tail tokens — Bytespider, cohere-ai, Timpibot,
+    // omgili, MistralAI-User — sit in the dataset's `candidates`, because no
+    // operator page could be found that names them. The page renders them as
+    // ordinary rows, which its own header says it does not do; that is a copy
+    // decision in seven languages and is recorded in the channel file, not
+    // silently fixed here. Until then the union is what "in step" means.)
+    const datasetTokens = new Set(
+      [...AI_CRAWLER_DATASET.map((c) => c.token), ...AI_CRAWLER_CANDIDATES.map((c) => c.token)]
+        .map((t) => t.toLowerCase()))
+    const notInDataset = AI_CRAWLER_TOKENS.filter((t) => !datasetTokens.has(t.toLowerCase()))
+    check('F16: every agent the page renders is in the open dataset too',
+      notInDataset.length === 0, notInDataset.join(', '))
+    // MUTATION CONTROL for F16.
+    check('F16-MUT: a page-only token would fail F16', !datasetTokens.has('gotopbot'))
   }
 
   console.log(`\n${pass} passed, ${fail} failed`)

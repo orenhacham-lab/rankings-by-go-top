@@ -82,12 +82,17 @@ export type DatasetCandidate = {
 const OPENAI_DOCS = 'https://developers.openai.com/api/docs/bots'
 const ANTHROPIC_DOCS =
   'https://support.claude.com/en/articles/8896518-does-anthropic-crawl-data-from-the-web-and-how-can-site-owners-block-the-crawler'
-const GOOGLE_DOCS = 'https://developers.google.com/search/docs/crawling-indexing/google-common-crawlers'
-const PERPLEXITY_DOCS = 'https://docs.perplexity.ai/guides/bots'
+const GOOGLE_DOCS = 'https://developers.google.com/crawling/docs/crawlers-fetchers/google-common-crawlers'
+const PERPLEXITY_DOCS = 'https://docs.perplexity.ai/docs/resources/perplexity-crawlers'
 const APPLE_DOCS = 'https://support.apple.com/en-us/119829'
-const META_DOCS = 'https://developers.facebook.com/docs/sharing/webmasters/web-crawlers/'
+const META_DOCS = 'https://developers.facebook.com/documentation/sharing/webmasters/web-crawlers'
 
 /** Every row read on this date, from the `docs` page named on the row. */
+// 04.11.2026: the Google, Perplexity and Meta pages had all been moved and
+// answered 301/308 at the addresses recorded on 01.11. A `docs` link that
+// redirects is the first thing a consumer of a CC BY dataset stops trusting,
+// so the three constants above are the addresses that answer 200 today. The
+// facts each row states were re-read at the new Google and Meta pages.
 const READ_ON = '2026-11-01'
 
 export const AI_CRAWLER_DATASET: readonly DatasetCrawler[] = [

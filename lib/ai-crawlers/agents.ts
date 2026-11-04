@@ -28,6 +28,8 @@ export type CrawlerPurpose =
   | 'answer'
   /** Building a search index. */
   | 'search'
+  /** Checking the landing page of an advert. */
+  | 'ads'
 
 export type AiCrawler = {
   /** The exact product token sent in `User-agent`, in its published spelling. */
@@ -58,6 +60,11 @@ export const AI_CRAWLERS: readonly AiCrawler[] = [
   { token: 'GPTBot', operator: 'OpenAI', purpose: 'train', respectsRobots: true },
   { token: 'OAI-SearchBot', operator: 'OpenAI', purpose: 'search', respectsRobots: true },
   { token: 'ChatGPT-User', operator: 'OpenAI', purpose: 'answer', respectsRobots: true },
+  // Visits only the landing pages submitted as adverts in ChatGPT. OpenAI
+  // documents that what it fetches does not train their foundation models, so
+  // blocking it is not a training decision.
+  // Read 04.11.2026 at platform.openai.com/docs/bots
+  { token: 'OAI-AdsBot', operator: 'OpenAI', purpose: 'ads', respectsRobots: true },
 
   // ── Anthropic ─────────────────────────────────────────────────────────────
   { token: 'ClaudeBot', operator: 'Anthropic', purpose: 'train', respectsRobots: true },
@@ -69,6 +76,11 @@ export const AI_CRAWLERS: readonly AiCrawler[] = [
   // fetch honours, deciding whether what was already crawled may be used for
   // Gemini and for grounding. Blocking it does NOT remove you from Search.
   { token: 'Google-Extended', operator: 'Google', purpose: 'train', respectsRobots: true },
+  // A generic crawler any Google product team may use, including one-off
+  // research crawls. Google documents that a rule for it affects no named
+  // product, which is why it belongs beside Google-Extended and not in Search.
+  // Read 04.11.2026 at developers.google.com/crawling/docs/crawlers-fetchers/google-common-crawlers
+  { token: 'GoogleOther', operator: 'Google', purpose: 'train', respectsRobots: true },
 
   // ── Perplexity ────────────────────────────────────────────────────────────
   { token: 'PerplexityBot', operator: 'Perplexity', purpose: 'search', respectsRobots: true },
@@ -79,10 +91,17 @@ export const AI_CRAWLERS: readonly AiCrawler[] = [
   // ── Microsoft / Apple / Meta / Amazon ─────────────────────────────────────
   { token: 'Applebot-Extended', operator: 'Apple', purpose: 'train', respectsRobots: true },
   { token: 'Meta-ExternalAgent', operator: 'Meta', purpose: 'train', respectsRobots: true },
+  // Meta's own crawler page: "Allowing Meta-WebIndexer in your robots.txt file
+  // helps us cite and link to your content in Meta AI's responses." Blocking
+  // Meta-ExternalAgent does not block it.
+  { token: 'Meta-WebIndexer', operator: 'Meta', purpose: 'search', respectsRobots: true },
   // Meta's own crawler page: "The Meta-ExternalFetcher crawler may bypass
   // robots.txt because it performs fetches that were requested by the user."
-  // Read 01.11.2026 at developers.facebook.com/docs/sharing/webmasters/web-crawlers/
+  // Read again 04.11.2026 at developers.facebook.com/documentation/sharing/webmasters/web-crawlers
   { token: 'meta-externalfetcher', operator: 'Meta', purpose: 'answer', respectsRobots: false },
+  // "Crawls the web for use cases such as improving advertising and other
+  // business-related products and services." Not an AI decision at all.
+  { token: 'Meta-ExternalAds', operator: 'Meta', purpose: 'ads', respectsRobots: true },
   { token: 'Amazonbot', operator: 'Amazon', purpose: 'answer', respectsRobots: true },
 
   // ── The corpus and long-tail crawlers ─────────────────────────────────────
