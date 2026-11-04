@@ -31,11 +31,12 @@ export const RESEARCH_MARKET: Record<BlogAutoLocale, { country: string; language
   fr: { country: 'FR', language: 'fr' },
   it: { country: 'IT', language: 'it' },
   ja: { country: 'JP', language: 'ja' },
-  // Germany, not the whole German-speaking area. Austria (2040) and Switzerland
-  // (2756) are in COUNTRY_GEO_TARGETS and can be researched, but Keyword Planner
-  // takes ONE country per call, and DE is ~85% of the German-speaking search
-  // market. A keyword with volume in Germany has volume in Vienna and Zurich;
-  // the reverse does not hold, so researching DE is the superset.
+  // Germany, not the whole German-speaking area. Keyword Planner takes ONE
+  // country per call, and DE is ~85% of the German-speaking search market, so
+  // DE is not a choice against Austria and Switzerland: a keyword with volume
+  // in Germany has volume in Vienna and Zurich, and the reverse does not hold.
+  // COUNTRY_GEO_TARGETS carries DE alone for the same reason — Germany is the
+  // market that was researched and the one the pricing is offered in.
   de: { country: 'DE', language: 'de' },
 }
 
