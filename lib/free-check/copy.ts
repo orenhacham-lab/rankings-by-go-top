@@ -851,7 +851,124 @@ const ja: FreeCheckCopy = {
   },
 }
 
-const COPY: Record<PublicLocale, FreeCheckCopy> = { he, en, es, 'pt-BR': ptBR, fr, it, ja }
+// GERMAN. Sie-form throughout, nouns capitalized, and never a raw provider
+// error: a failed fetch says the site could not be reached, not what the
+// fetcher saw. The example address is a .de one, because an address a German
+// visitor would actually type is the point of the hint.
+const de: FreeCheckCopy = {
+  page: {
+    badge: 'Kostenlose Analyse, ohne Verpflichtung',
+    title: 'Eine SEO- und KI-Analyse Ihrer Website,',
+    titleAccent: 'in weniger als einer Minute',
+    subtitle: 'Sie geben nur die Adresse Ihrer Website ein. Wir lesen die Website wirklich, erkennen, was das Unternehmen tut, und zeigen, was es in Google und in KI-Antworten zurückhält.',
+    trust: ['Kostenlos, ohne Kreditkarte', 'Nichts zu installieren', 'Ohne Anmeldung'],
+    expect: [
+      { title: 'Was wir verstanden haben', body: 'Was das Unternehmen tut und wer seine Kunden sind, so wie die Website es selbst darstellt.' },
+      { title: 'Was die Website zurückhält', body: 'Was auf der Seite Google und die KI-Engines daran hindert, das Geschäft zu verstehen — vom Wichtigsten zum Unwichtigsten.' },
+      { title: 'Wie bereit die Website für KI ist', body: 'Ob ChatGPT und Gemini die Website lesen und sie nennen können.' },
+    ],
+  },
+  form: {
+    label: 'Adresse der Website',
+    placeholder: 'beispiel.de',
+    submit: 'Website analysieren',
+    hint: 'Ein einziges Feld. Mehr ist nicht auszufüllen.',
+    errors: {
+      invalid_url: 'Diese Adresse sieht nicht richtig aus. Versuchen Sie es erneut, zum Beispiel beispiel.de',
+      blocked_url: 'Analysiert werden können nur öffentlich erreichbare Websites. Interne Adressen und IP-Adressen werden nicht unterstützt.',
+      unreachable: 'Die Website war nicht erreichbar. Prüfen Sie die Adresse und versuchen Sie es erneut.',
+      not_html: 'Diese Adresse liefert keine Webseite, die wir lesen können.',
+      rate_limited: 'Es wurden mehrere Analysen in kurzer Folge gestartet. Versuchen Sie es in einer Minute erneut.',
+      daily_cap: 'Die kostenlose Analyse ist gerade stark nachgefragt. Versuchen Sie es später erneut, oder eröffnen Sie ein Konto für die vollständige Analyse.',
+      internal: 'Bei uns ist etwas nicht durchgelaufen. Versuchen Sie es in einem Moment erneut.',
+    },
+  },
+  loading: {
+    title: 'Wir lesen die Website und den Aufbau ihrer Seiten',
+    sub: 'Das dauert weniger als eine Minute. Wir lesen die Website wirklich, wir raten nicht.',
+    footer: 'Wird verarbeitet, die Zusammenfassung ist fast fertig',
+    steps: [
+      'Die Website und den Aufbau ihrer Seiten lesen',
+      'Erkennen, was das Unternehmen tut und wer seine Kunden sind',
+      'Prüfen, was die Website in Google zurückhält',
+      'Nach Wettbewerbern suchen',
+    ],
+  },
+  results: {
+    heading: 'Die erste Analyse-Zusammenfassung',
+    scanned: 'Analysiert haben wir',
+    countersTitle: 'Was wir gefunden haben',
+    counters: { keywords: 'Keywords, die sich lohnen', fixes: 'Punkte, die auf der Website zu korrigieren sind', geo: 'Bereit für KI-Antworten', articles: 'Artikel, die bereit sind, geschrieben zu werden' },
+    businessTitle: 'Was wir über das Unternehmen verstanden haben',
+    audienceTitle: 'Wer die Kunden sind',
+    competitorsTitle: 'Wer die Wettbewerber sind',
+    competitorsLocked: 'Für weitere Wettbewerber und die vollständige Übersicht genügt ein kostenloses Konto',
+    findingsTitle: 'Was die Website gerade zurückhält',
+    findingsEmpty: 'Die Website ist bei allem, was wir prüfen, tadellos. Gratulation.',
+    findingsLocked: 'Weitere Befunde warten in Ihrem Konto',
+    geoTitle: 'Wie bereit die Website für KI-Antworten ist',
+    geoIntro: 'KI-Engines wie ChatGPT und Perplexity erstellen keine Rangliste, sie nennen Quellen. Wir haben geprüft, wie leicht diese Website zu nennen ist.',
+    geoScore: 'Signale in gutem Zustand',
+    articlesTitle: 'Die Artikel, die wir schreiben würden',
+    articlesNote: 'Die Artikel entstehen aus einer Content-Strategie, die auf den besten Keyword-Chancen aufbaut.',
+    gateTitle: 'Das war nur eine Vorschau. Die eigentliche Analyse beginnt nach der Anmeldung',
+    gateBody: 'Eröffnen Sie ein kostenloses Konto, und das System macht sich an Ihre Website.',
+    gateBullets: [
+      'Die vollständige Analyse, mit echten Suchvolumen',
+      'Ein Content-Plan für ein ganzes Quartal, auf Ihre Branche gebaut',
+      'Der erste Artikel, von uns geschrieben',
+      'Eine vollständige Wettbewerberübersicht und die Überwachung der Nennungen in KI-Antworten',
+    ],
+    gateCta: 'Kostenloses Konto eröffnen',
+    gateSecondary: 'Sie haben schon ein Konto? Anmelden',
+    gateTerms: 'Wenn Sie fortfahren, stimmen Sie den Nutzungsbedingungen und der Datenschutzerklärung zu.',
+    again: 'Eine andere Website analysieren',
+    aiUnavailable: 'Die technische Prüfung ist fertig. Die Zusammenfassung zum Unternehmen und die Keywords stehen in Ihrem Konto bereit.',
+  },
+  findings: {
+    title_missing: { title: 'Der Seite fehlt ein Title-Tag', detail: 'Der Title ist das, was Google in seinen Ergebnissen anzeigt. Ohne ihn erfindet Google einen anstelle des Unternehmens.' },
+    title_short: { title: 'Der Title der Seite ist zu kurz', detail: 'Unter 30 Zeichen bleibt der Platz, den Google gewährt, ungenutzt, und die gesuchten Begriffe fehlen meist.' },
+    title_long: { title: 'Der Title der Seite ist zu lang', detail: 'Über 65 Zeichen schneidet Google den Title mitten im Satz ab.' },
+    description_missing: { title: 'Keine Meta-Description', detail: 'Die Description ist der Werbesatz in den Suchergebnissen. Ohne sie nimmt Google irgendeinen Satz von der Seite.' },
+    description_length: { title: 'Die Meta-Description hat nicht die richtige Länge', detail: 'Unter 70 oder über 165 Zeichen wird sie abgeschnitten oder schlecht genutzt angezeigt.' },
+    h1_missing: { title: 'Der Seite fehlt eine H1', detail: 'Die H1 sagt Google und den KI-Engines, worum es auf der Seite geht. Ohne sie leiten sie es aus dem Text ab.' },
+    h1_multiple: { title: 'Mehr als eine H1 auf der Seite', detail: 'Mehrere H1 teilen die Aussage der Seite auf und schwächen jede einzelne.' },
+    images_alt: { title: 'Einigen Bildern fehlt der Alternativtext', detail: 'Google sieht keine Bilder, es liest den Alternativtext. Ohne ihn bringen die Bilder keine Besucher, und die Barrierefreiheit leidet.' },
+    thin_content: { title: 'Zu wenig Text auf der Seite', detail: 'Eine dünne Seite gibt Google und den KI-Engines zu wenig, um sie einzuordnen oder zu nennen.' },
+    no_schema: { title: 'Keine strukturierten Daten (Schema)', detail: 'Ohne Schema können Google und die KI-Engines nicht sicher sein, wer das Unternehmen ist und was es tut.' },
+    no_canonical: { title: 'Kein Canonical-Tag', detail: 'Ohne Canonical kann dieselbe Seite mehrfach gezählt werden und sich selbst Konkurrenz machen.' },
+    no_viewport: { title: 'Kein mobiles Viewport definiert', detail: 'Google bewertet die mobile Version. Ohne Viewport sieht die Seite auf dem Telefon kaputt aus.' },
+    no_open_graph: { title: 'Keine Sharing-Tags (Open Graph)', detail: 'Geteilte Links in WhatsApp und Facebook zeigen weder Bild noch den richtigen Titel.' },
+    robots_blocks_all: { title: 'robots.txt sperrt alle Crawler aus', detail: 'Die Datei bittet alle Crawler, die Website nicht zu erfassen, was sie aus Google heraushält.' },
+    robots_blocks_ai: { title: 'robots.txt sperrt die Crawler der KI-Engines aus', detail: 'Ausgesperrte Crawler können das Unternehmen in Antworten wie denen von ChatGPT nicht nennen.' },
+    no_faq: { title: 'Kein Fragen-und-Antworten-Abschnitt', detail: 'KI-Engines beantworten Fragen, deshalb nennen sie Seiten, die Fragen beantworten.' },
+  },
+  geo: {
+    schema: {
+      pass: { title: 'Die strukturierten Daten benennen das Unternehmen', detail: 'Die KI-Engines wissen, wer das Unternehmen ist und was es tut.' },
+      fail: { title: 'Keine strukturierten Daten benennen das Unternehmen', detail: 'Ohne ein Schema für das Unternehmen wissen die KI-Engines nicht genau, um wen es sich handelt.' },
+    },
+    faq: {
+      pass: { title: 'Es gibt einen Fragen-und-Antworten-Abschnitt', detail: 'Eine Seite, die Fragen beantwortet, wird deutlich häufiger genannt.' },
+      fail: { title: 'Kein Fragen-und-Antworten-Abschnitt', detail: 'KI-Engines beantworten Fragen, deshalb nennen sie Seiten, die Fragen beantworten. Eine Seite ohne Fragen wird selten genannt.' },
+    },
+    robots: {
+      pass: { title: 'Die KI-Engines dürfen die Website lesen', detail: 'robots.txt sperrt keinen Crawler der KI-Engines aus.' },
+      fail: { title: 'robots.txt sperrt die Crawler der KI-Engines aus', detail: 'Ausgesperrte Crawler können das Unternehmen nicht nennen.' },
+    },
+    llms: {
+      pass: { title: 'Es gibt eine llms.txt-Datei', detail: 'Die Website gibt den KI-Engines eine klare Karte von sich — ein Vorsprung gegenüber dem größten Teil des Marktes.' },
+      fail: { title: 'Keine llms.txt-Datei', detail: 'Eine llms.txt-Datei gibt den KI-Engines eine klare Karte der Website. Der größte Teil des Marktes hat sie noch nicht.' },
+    },
+  },
+  evidence: {
+    images: (missing, total) => `${missing} von ${total} Bildern`,
+    words: (n) => `${n} Wörter auf der Seite`,
+    h1: (n) => `${n} H1-Überschriften`,
+  },
+}
+
+const COPY: Record<PublicLocale, FreeCheckCopy> = { he, en, es, 'pt-BR': ptBR, fr, it, ja, de }
 
 export function freeCheckCopy(locale: PublicLocale): FreeCheckCopy {
   return COPY[locale] ?? COPY.he

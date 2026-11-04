@@ -212,6 +212,7 @@ export const fr = {
     fr: 'Français',
     it: 'Italiano',
     ja: '日本語',
+    de: 'Deutsch',
     aria: 'Changer la langue du site',
   },
   cookie: {

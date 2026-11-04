@@ -125,6 +125,17 @@ const TRANSITIONS_JA = ['また', 'さらに', 'そのため', 'したがって'
 const START_STOPWORDS_JA = new Set(['また', 'そして', 'この', 'その', 'これ', 'それ', 'もし', 'ただし', 'しかし', 'さらに', 'なお', 'つまり', 'まず', '次に', '一方'])
 const CTA_STRONG_JA = ['お問い合わせください', 'お問い合わせ下さい', 'お気軽にご相談ください', 'ご相談ください', 'お電話ください', '今すぐお電話', 'こちらをクリック', 'ご注文ください', '今すぐご注文', 'ご予約ください', '今すぐご予約', 'メッセージをお送りください', 'ご連絡ください', 'お見積もりをご依頼ください', '無料見積もりをご依頼', 'lineでお問い合わせ', 'whatsappでご連絡', '今すぐ購入']
 const CTA_ACTION_JA = ['お電話', 'ご連絡', 'ご相談', 'お問い合わせ', 'クリック', 'ご注文', 'ご予約', 'ご依頼', 'お送りください']
+// GERMAN. The transitions are the connectives a German business article really
+// writes (and the ones a reader skims for); the openers are the words a sentence
+// may begin with without that beginning counting as a repetition, which in German
+// means the articles and the demonstratives, since nearly every sentence can
+// legitimately start with one. The CTAs are the Sie-form imperatives a German
+// site prints on a button or at the end of a section — the register decision for
+// the whole locale is Sie, never du, so "ruf an" is deliberately absent.
+const TRANSITIONS_DE = ['außerdem', 'darüber hinaus', 'zudem', 'deshalb', 'daher', 'deswegen', 'allerdings', 'jedoch', 'dennoch', 'andererseits', 'im gegensatz dazu', 'zum beispiel', 'beispielsweise', 'in der praxis', 'zusammengefasst', 'kurz gesagt', 'wichtig zu wissen', 'wichtig ist', 'das heißt', 'mit anderen worten', 'letztlich', 'zunächst', 'anschließend', 'in vielen fällen', 'im ergebnis', 'folglich', 'im nächsten schritt', 'im vergleich dazu', 'ähnlich', 'gleichzeitig']
+const START_STOPWORDS_DE = new Set(['der', 'die', 'das', 'ein', 'eine', 'einen', 'einem', 'dieser', 'diese', 'dieses', 'wenn', 'wer', 'wie', 'um', 'es', 'und', 'auch', 'damit', 'dabei', 'nach', 'bei', 'für', 'mit'])
+const CTA_STRONG_DE = ['kontaktieren sie uns', 'nehmen sie kontakt auf', 'rufen sie uns an', 'rufen sie jetzt an', 'jetzt anrufen', 'schreiben sie uns', 'senden sie uns eine nachricht', 'hinterlassen sie ihre daten', 'hier klicken', 'klicken sie hier', 'jetzt bestellen', 'bestellen sie jetzt', 'jetzt buchen', 'buchen sie jetzt', 'jetzt anfragen', 'angebot anfordern', 'fordern sie ein angebot an', 'kostenloses angebot anfordern', 'termin vereinbaren', 'vereinbaren sie einen termin', 'jetzt kaufen', 'schreiben sie uns per whatsapp']
+const CTA_ACTION_DE = ['rufen sie', 'anrufen', 'schreiben sie', 'senden sie', 'klicken sie', 'bestellen sie', 'buchen sie', 'fragen sie', 'kontaktieren sie', 'melden sie sich', 'hinterlassen sie']
 // A phone/WhatsApp number, WhatsApp/phone words, or a URL — the "target" of a CTA.
 const CTA_CHANNEL_RE = /(\d[\d\-\s]{5,}\d|וואטסאפ|whatsapp|טלפון|נייד|telefone|celular|https?:\/\/|www\.)/i
 
@@ -135,10 +146,10 @@ const CTA_CHANNEL_RE = /(\d[\d\-\s]{5,}\d|וואטסאפ|whatsapp|טלפון|נ�
  * everyday words like "הזמנה"/"משלוח"/"שירות" as CTAs.
  */
 /** The word lists, keyed by content language: adding a language stops compiling here. */
-const CTA_STRONG: Record<SuggestionLanguage, string[]> = { he: CTA_STRONG_HE, en: CTA_STRONG_EN, es: CTA_STRONG_ES, 'pt-BR': CTA_STRONG_PT, fr: CTA_STRONG_FR, it: CTA_STRONG_IT, ja: CTA_STRONG_JA }
-const CTA_ACTION: Record<SuggestionLanguage, string[]> = { he: CTA_ACTION_HE, en: CTA_ACTION_EN, es: CTA_ACTION_ES, 'pt-BR': CTA_ACTION_PT, fr: CTA_ACTION_FR, it: CTA_ACTION_IT, ja: CTA_ACTION_JA }
-const TRANSITIONS: Record<SuggestionLanguage, string[]> = { he: TRANSITIONS_HE, en: TRANSITIONS_EN, es: TRANSITIONS_ES, 'pt-BR': TRANSITIONS_PT, fr: TRANSITIONS_FR, it: TRANSITIONS_IT, ja: TRANSITIONS_JA }
-const START_STOPWORDS: Record<SuggestionLanguage, Set<string>> = { he: START_STOPWORDS_HE, en: new Set<string>(), es: START_STOPWORDS_ES, 'pt-BR': START_STOPWORDS_PT, fr: START_STOPWORDS_FR, it: START_STOPWORDS_IT, ja: START_STOPWORDS_JA }
+const CTA_STRONG: Record<SuggestionLanguage, string[]> = { he: CTA_STRONG_HE, en: CTA_STRONG_EN, es: CTA_STRONG_ES, 'pt-BR': CTA_STRONG_PT, fr: CTA_STRONG_FR, it: CTA_STRONG_IT, ja: CTA_STRONG_JA, de: CTA_STRONG_DE }
+const CTA_ACTION: Record<SuggestionLanguage, string[]> = { he: CTA_ACTION_HE, en: CTA_ACTION_EN, es: CTA_ACTION_ES, 'pt-BR': CTA_ACTION_PT, fr: CTA_ACTION_FR, it: CTA_ACTION_IT, ja: CTA_ACTION_JA, de: CTA_ACTION_DE }
+const TRANSITIONS: Record<SuggestionLanguage, string[]> = { he: TRANSITIONS_HE, en: TRANSITIONS_EN, es: TRANSITIONS_ES, 'pt-BR': TRANSITIONS_PT, fr: TRANSITIONS_FR, it: TRANSITIONS_IT, ja: TRANSITIONS_JA, de: TRANSITIONS_DE }
+const START_STOPWORDS: Record<SuggestionLanguage, Set<string>> = { he: START_STOPWORDS_HE, en: new Set<string>(), es: START_STOPWORDS_ES, 'pt-BR': START_STOPWORDS_PT, fr: START_STOPWORDS_FR, it: START_STOPWORDS_IT, ja: START_STOPWORDS_JA, de: START_STOPWORDS_DE }
 
 function detectCtaFirstWord(bodyText: string, lang: SuggestionLanguage): number {
   const low = bodyText.toLowerCase()
@@ -329,7 +340,8 @@ const TABLE_WORDS_EN = ['compar', 'price', 'cost', 'best', ' vs', 'versus', 'typ
 const TABLE_WORDS_FR = ['compar', 'prix', 'tarif', 'coût', 'cout', 'combien coûte', 'combien coute', 'meilleur', 'meilleurs', 'types de', 'choisir', 'comment choisir', 'avantages', 'inconvénients', 'guide d’achat', 'tableau', ' vs ', 'moins cher']
 const TABLE_WORDS_IT = ['confront', 'prezzo', 'prezzi', 'tariffa', 'costo', 'costi', 'quanto costa', 'migliore', 'migliori', 'tipi di', 'scegliere', 'come scegliere', 'vantaggi', 'svantaggi', 'guida all’acquisto', 'tabella', ' vs ', 'più economico']
 const TABLE_WORDS_JA = ['比較', '比べ', '価格', '料金', '費用', '相場', 'いくら', 'おすすめ', '人気', '種類', '選び方', '選ぶ', 'メリット', 'デメリット', '購入ガイド', '一覧', '違い', '安い', '最安']
-const TABLE_WORDS: Record<SuggestionLanguage, string[]> = { he: TABLE_WORDS_HE, en: TABLE_WORDS_EN, es: TABLE_WORDS_ES, 'pt-BR': TABLE_WORDS_PT, fr: TABLE_WORDS_FR, it: TABLE_WORDS_IT, ja: TABLE_WORDS_JA }
+const TABLE_WORDS_DE = ['vergleich', 'vergleichen', 'preis', 'preise', 'kosten', 'was kostet', 'wie viel kostet', 'beste', 'besten', 'arten', 'typen', 'auswählen', 'auswahl', 'worauf achten', 'vorteile', 'nachteile', 'kaufberatung', 'tabelle', 'übersicht', 'unterschied', 'unterschiede', 'günstig']
+const TABLE_WORDS: Record<SuggestionLanguage, string[]> = { he: TABLE_WORDS_HE, en: TABLE_WORDS_EN, es: TABLE_WORDS_ES, 'pt-BR': TABLE_WORDS_PT, fr: TABLE_WORDS_FR, it: TABLE_WORDS_IT, ja: TABLE_WORDS_JA, de: TABLE_WORDS_DE }
 function isTableWorthy(text: string, lang: SuggestionLanguage): boolean {
   const t = (text || '').toLowerCase()
   const words = TABLE_WORDS[lang]
@@ -347,7 +359,8 @@ const QUESTION_WORDS_IT = ['come ', 'che cosa', 'cosa ', 'perché', 'perche', 'q
 // 「ですか」, 「とは」 and the full-width 「？」 — so this list is read by `includes`
 // exactly like the others and needs no leading-space forms.
 const QUESTION_WORDS_JA = ['ですか', 'ますか', 'でしょうか', 'とは', 'なぜ', 'どう', 'どうやって', 'どのように', 'いくら', 'どこ', 'いつ', 'どれ', 'どの', '何', 'なに', ' べき', '必要ですか', '？', '?']
-const QUESTION_WORDS: Record<SuggestionLanguage, string[]> = { he: QUESTION_WORDS_HE, en: QUESTION_WORDS_EN, es: QUESTION_WORDS_ES, 'pt-BR': QUESTION_WORDS_PT, fr: QUESTION_WORDS_FR, it: QUESTION_WORDS_IT, ja: QUESTION_WORDS_JA }
+const QUESTION_WORDS_DE = ['was ', 'was kostet', 'wie ', 'wie viel', 'wie lange', 'warum', 'wieso', 'weshalb', 'wann', 'wo ', 'woher', 'wer ', 'welche', 'welcher', 'welches', 'wofür', 'lohnt sich', 'braucht man', 'muss man', 'kann man', '?']
+const QUESTION_WORDS: Record<SuggestionLanguage, string[]> = { he: QUESTION_WORDS_HE, en: QUESTION_WORDS_EN, es: QUESTION_WORDS_ES, 'pt-BR': QUESTION_WORDS_PT, fr: QUESTION_WORDS_FR, it: QUESTION_WORDS_IT, ja: QUESTION_WORDS_JA, de: QUESTION_WORDS_DE }
 
 /**
  * E-E-A-T, the part a generated article can honestly carry: something the
@@ -370,7 +383,11 @@ const VERIFY_CUES_IT = ['verificate', 'verificare', 'verifica', 'controllate', '
 // gives — 「確認」 as a bare noun appears in ordinary prose and would pass the
 // check without telling the reader to do anything.
 const VERIFY_CUES_JA = ['確認してください', '確認しましょう', 'ご確認ください', '確認しておき', '聞いてみましょう', '質問してください', '尋ねてください', '比較してください', '比較しましょう', '必ず確認', '見積もりを取り', '依頼してください', 'チェックしましょう', 'チェックしてください', '確かめてください']
-const VERIFY_CUES: Record<SuggestionLanguage, string[]> = { he: VERIFY_CUES_HE, en: VERIFY_CUES_EN, es: VERIFY_CUES_ES, 'pt-BR': VERIFY_CUES_PT, fr: VERIFY_CUES_FR, it: VERIFY_CUES_IT, ja: VERIFY_CUES_JA }
+// Imperative and infinitive forms only: a bare noun like 'Angebot' appears in
+// ordinary prose and would pass the check without telling the reader to do
+// anything. Sie-form throughout, as everywhere else in the German locale.
+const VERIFY_CUES_DE = ['prüfen sie', 'überprüfen sie', 'zu prüfen', 'fragen sie', 'fragen sie nach', 'nachfragen', 'erkundigen sie sich', 'vergleichen sie', 'zu vergleichen', 'achten sie darauf', 'stellen sie sicher', 'lassen sie sich', 'fordern sie', 'verlangen sie', 'kontrollieren sie', 'sehen sie nach']
+const VERIFY_CUES: Record<SuggestionLanguage, string[]> = { he: VERIFY_CUES_HE, en: VERIFY_CUES_EN, es: VERIFY_CUES_ES, 'pt-BR': VERIFY_CUES_PT, fr: VERIFY_CUES_FR, it: VERIFY_CUES_IT, ja: VERIFY_CUES_JA, de: VERIFY_CUES_DE }
 
 /** How many of the cues the body uses, counted once per cue. */
 export function readerVerifyCount(bodyText: string, lang: SuggestionLanguage): number {

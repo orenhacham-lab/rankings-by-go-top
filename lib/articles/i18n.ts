@@ -453,4 +453,57 @@ export const ARTICLES_COPY: Record<PublicLocale, ArticlesCopy> = {
       ],
     },
   },
+  de: {
+    index: {
+      title: 'Artikel',
+      subtitle: 'Leitfäden und Analysen zu Ranking-Tracking, SEO und der Sichtbarkeit in KI-Antworten',
+      breadcrumb: 'Artikel',
+      empty: 'Artikel folgen in Kürze.',
+      readMore: 'Artikel lesen',
+    },
+    article: {
+      notFoundTitle: 'Artikel nicht gefunden',
+      notFoundBody: 'Der gesuchte Artikel existiert nicht oder wurde nicht mehr veröffentlicht',
+      backToArticles: 'Zurück zur Artikelübersicht',
+      backHome: 'Zurück zur Startseite',
+      toc: 'Inhalt',
+      readingTime: (m) => `${m} Min. Lesezeit`,
+      updated: 'Aktualisiert',
+      aboutAuthor: 'Über die Autorin bzw. den Autor',
+      aboutAuthorLink: 'Mehr über Go Top erfahren',
+    },
+    widgets: {
+      plans: {
+        perMonth: 'pro Monat',
+        popular: 'Am häufigsten gewählt',
+        cta: '7 Tage kostenlos testen',
+        noCard: 'Ohne Kreditkarte. Jederzeit kündbar.',
+        allPlans: 'Alle Details auf der Preisseite',
+      },
+      cta: {
+        title: 'Möchten Sie das auf Ihrer eigenen Website sehen?',
+        body: '7 Tage kostenlos, ohne Kreditkarte. Sobald Sie Ihre Website hinterlegen, erhalten Sie eine Keyword-Recherche, die Prüfung der Sichtbarkeit in KI-Antworten beginnt, und der erste Artikel wird automatisch geschrieben und veröffentlicht.',
+        primary: '7 Tage kostenlos testen',
+        secondary: 'Mit der kostenlosen Website-Analyse beginnen',
+      },
+    },
+    promo: {
+      badge: 'Go Top SEO',
+      title: ['Ihr Google-Ranking prüfen,', 'wann Sie wollen'],
+      body: 'Eine professionelle Plattform für das Tracking der Positionen im organischen Google und in Google Maps. Sie können eine Messung jederzeit starten, oder sie einmal im Monat automatisch laufen lassen. Mit ausführlichen Berichten, der Entwicklung im Zeitverlauf und persönlicher Betreuung.',
+      signup: { label: 'Kostenlose Testphase starten', href: authHref('signup', 'de') },
+      pricing: { label: 'Preise ansehen', href: '/de/pricing' },
+      stats: [
+        { num: '1000+', label: 'Keywords' },
+        { num: '2', label: 'Tracking-Quellen (Google + Maps)' },
+        { num: 'KI', label: 'Sichtbarkeit messen' },
+        { num: '7 Tage', label: 'Kostenlos testen' },
+      ],
+      features: [
+        { title: 'Organisches Google', desc: 'Positionen auf Seite 1 und 2 von Google, genau gemessen' },
+        { title: 'Google Maps', desc: 'Positionen je Stadt, Postleitzahl oder Standort' },
+        { title: 'Professionelle Berichte', desc: 'Berichte als PDF und Excel, mit Entwicklungen, Vergleichen und ausführlichen Auswertungen' },
+      ],
+    },
+  },
 }

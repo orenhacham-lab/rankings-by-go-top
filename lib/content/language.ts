@@ -14,9 +14,9 @@
  * site can be managed from a Hebrew dashboard, and currency follows the country.
  */
 
-export type ContentLanguage = 'he' | 'en' | 'es' | 'pt-BR' | 'fr' | 'it' | 'ja'
+export type ContentLanguage = 'he' | 'en' | 'es' | 'pt-BR' | 'fr' | 'it' | 'ja' | 'de'
 
-export const CONTENT_LANGUAGES: ContentLanguage[] = ['he', 'en', 'es', 'pt-BR', 'fr', 'it', 'ja']
+export const CONTENT_LANGUAGES: ContentLanguage[] = ['he', 'en', 'es', 'pt-BR', 'fr', 'it', 'ja', 'de']
 
 export const DEFAULT_CONTENT_LANGUAGE: ContentLanguage = 'he'
 
@@ -46,6 +46,13 @@ export const DEFAULT_CONTENT_LANGUAGE: ContentLanguage = 'he'
  * internal-link overlap — goes through lib/text/segment.ts rather than a space
  * split. The legacy 'jp' is accepted beside 'ja' because it is what a WordPress
  * site and a Google Search Console property both sometimes report.
+ *
+ * German is region-less for the same reason Spanish, French and Italian are:
+ * 'de', 'de-DE', 'de-AT' and 'de-CH' all normalize to the one content language,
+ * because what we write for a reader in Hamburg, in Graz and in Zurich is the
+ * same German. Where the region changes an answer it is a LEGAL question — the
+ * Swiss reader is outside the EU — and the legal documents say so themselves.
+ * German is space-delimited, so nothing here goes through lib/text/segment.ts.
  */
 export function normalizeContentLanguage(value: unknown): ContentLanguage {
   const s = String(value ?? '').toLowerCase().trim()
@@ -56,6 +63,7 @@ export function normalizeContentLanguage(value: unknown): ContentLanguage {
   if (s.startsWith('fr') || s.startsWith('franc') || s.startsWith('français')) return 'fr'
   if (s.startsWith('it') || s.startsWith('ital')) return 'it'
   if (s.startsWith('ja') || s.startsWith('jp') || s.startsWith('japan') || s.startsWith('日本')) return 'ja'
+  if (s.startsWith('de') || s.startsWith('ger') || s.startsWith('deutsch')) return 'de'
   return DEFAULT_CONTENT_LANGUAGE
 }
 
@@ -68,6 +76,7 @@ const ENGLISH_NAME: Record<ContentLanguage, string> = {
   fr: 'French',
   it: 'Italian',
   ja: 'Japanese',
+  de: 'German',
 }
 
 export function languageNameInEnglish(language: ContentLanguage): string {

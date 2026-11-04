@@ -110,7 +110,7 @@ check('A5: the queue is refilled a week ahead, not three days', TOPUP_FLOOR >= 7
 // 21 October 2026, at which point this check was asserting that a real blog
 // language is not one. German is the example now: the keyword research offers
 // it, the content layer cannot write it.
-check('A6: an unknown language is not accepted as one', !isBlogAutoLocale('de') && !isBlogAutoLocale('') && !isBlogAutoLocale(null))
+check('A6: an unknown language is not accepted as one', !isBlogAutoLocale('el') && !isBlogAutoLocale('') && !isBlogAutoLocale(null))
 check('A6a: and French IS accepted, now that the content layer writes it', isBlogAutoLocale('fr'))
 // Mutation control for A2/A3: the rotation this replaced gave each language only
 // some of the week.
@@ -124,7 +124,7 @@ check(
 // French was, until the content layer learnt it.
 check(
   'A8 (control): a research-only language is neither a content language nor a blog language',
-  !(CONTENT_LANGUAGES as readonly string[]).includes('de') && !isBlogAutoLocale('de'),
+  !(CONTENT_LANGUAGES as readonly string[]).includes('el') && !isBlogAutoLocale('el'),
 )
 check(
   'A8a: French went the other way — the blog writes it because the content layer does',

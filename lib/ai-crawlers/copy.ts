@@ -586,7 +586,83 @@ const ja: AiCrawlerCopy = {
   },
 }
 
-const COPY: Record<PublicLocale, AiCrawlerCopy> = { he, en, es, 'pt-BR': ptBR, fr, it, ja }
+const de: AiCrawlerCopy = {
+  meta: {
+    title: 'Welche KI-Crawler blockiert Ihre robots.txt? – Go Top SEO',
+    description:
+      'Domain eingeben und sehen, welche KI-Crawler — GPTBot, ClaudeBot, PerplexityBot, Google-Extended und weitere — Ihre robots.txt blockiert, und welche Zeile das jeweils entscheidet. Ohne Anmeldung.',
+  },
+  page: {
+    badge: 'Kostenloses Tool',
+    title: 'Welche KI-Crawler blockiert Ihre Website?',
+    subtitle:
+      'Wir lesen Ihre robots.txt und zeigen für jeden KI-Crawler, ob er erlaubt oder blockiert ist — und welche Zeile der Datei das entscheidet.',
+    trust: ['Ohne Anmeldung, ohne E-Mail-Adresse', 'Eine Datei, einmal gelesen', 'Prüft nicht nur die Startseite, sondern auch einen einzelnen Pfad'],
+  },
+  form: {
+    urlLabel: 'Adresse der Website',
+    urlPlaceholder: 'beispiel.de',
+    pathLabel: 'Zu prüfender Pfad (optional)',
+    pathPlaceholder: '/blog/',
+    pathHint: 'Leer lassen, um die Startseite zu prüfen. Die Regeln in der robots.txt können sich je Pfad unterscheiden.',
+    submit: 'Crawler prüfen',
+    submitting: 'robots.txt wird gelesen …',
+    errors: {
+      invalid_url: 'Diese Adresse sieht nicht richtig aus. Versuchen Sie es in der Form beispiel.de.',
+      blocked_url: 'Es lassen sich nur öffentlich erreichbare Websites prüfen.',
+      unreachable: 'Diese Website war gerade nicht erreichbar. Bitte versuchen Sie es später erneut.',
+      rate_limited: 'In kurzer Zeit wurden viele Websites geprüft. Bitte warten Sie eine Minute und versuchen Sie es erneut.',
+      internal: 'Die Prüfung ist auf unserer Seite nicht durchgelaufen. Bitte versuchen Sie es später erneut.',
+    },
+  },
+  results: {
+    heading: 'Geprüft wurde',
+    forPath: 'Geprüfter Pfad',
+    robotsFound: 'robots.txt gelesen',
+    robotsAbsent: 'Diese Website liefert keine robots.txt aus, daher blockiert diese Datei nichts.',
+    robotsUnreadable: 'Die Website hat die Datei nicht ausgeliefert, daher lässt sich daraus keine Regel lesen. Die Ergebnisse unten behandeln nichts als blockiert.',
+    allowedCount: 'Erlaubt',
+    blockedCount: 'Blockiert',
+    allowed: 'Erlaubt',
+    blocked: 'Blockiert',
+    decidedBy: 'Entscheidende Zeile',
+    noRule: 'Keine passende Regel. Standardmäßig erlaubt',
+    viaWildcard: 'Entschieden durch die Gruppe für alle Crawler',
+    ignoresRobots: 'Dieser Crawler sagt nicht zu, die robots.txt zu beachten',
+    sitemapsTitle: 'In der Datei angegebene Sitemaps',
+    again: 'Eine andere Website prüfen',
+  },
+  purposes: {
+    train: { label: 'Training', blurb: 'Sammelt Seiten, um ein Modell zu trainieren. Wer ihn blockiert, kommt im nächsten Modell nicht vor.' },
+    answer: { label: 'Antwort in Echtzeit', blurb: 'Holt die Seite in dem Moment, in dem jemand fragt, und zitiert sie mit Link in der Antwort.' },
+    search: { label: 'Suchindex', blurb: 'Baut den Suchindex, auf dem auch die KI-Antworten aufsetzen.' },
+    ads: { label: 'Werbung', blurb: 'Prüft die Zielseiten von Anzeigen. Eine Blockade wirkt sich weder auf Antworten noch auf den Suchindex aus.' },
+  },
+  groups: { ai: 'KI-Crawler', classic: 'Klassische Suchmaschinen-Crawler' },
+  reference: {
+    title: 'Wer dahintersteht',
+    intro: 'Diese Tabelle lässt sich auch für sich lesen: der Name, der in der User-agent-Zeile steht, der Betreiber und der Zweck.',
+    colAgent: 'User-agent',
+    colOperator: 'Betreiber',
+    colPurpose: 'Zweck',
+  },
+  limits: {
+    title: 'Was diese Prüfung nicht zeigt',
+    items: [
+      'Die robots.txt ist eine Bitte, keine Mauer. Ein Crawler kann sie ignorieren.',
+      'Eine Firewall oder ein CDN kann einen Crawler blockieren, den die robots.txt erlaubt.',
+      'Die Prüfung beschreibt einen Augenblick. Wer die Datei ändert, ändert die Antwort sofort.',
+      'Einen Trainings-Crawler zu blockieren und einen Crawler zu blockieren, der live antwortet, sind zwei völlig verschiedene Entscheidungen.',
+    ],
+  },
+  cta: {
+    title: 'Herausfinden, ob die KI Ihr Unternehmen wirklich nennt',
+    body: 'Der Zugang ist nur der erste Schritt. Go Top SEO prüft automatisch, ob Ihr Unternehmen in den Antworten von ChatGPT, Gemini und Google AI vorkommt, und verfolgt Ihre Positionen bei Google und in Google Maps monatlich.',
+    button: '7 Tage kostenlos testen, ohne Kreditkarte',
+  },
+}
+
+const COPY: Record<PublicLocale, AiCrawlerCopy> = { he, en, es, 'pt-BR': ptBR, fr, it, ja, de }
 
 export function aiCrawlerCopy(locale: PublicLocale): AiCrawlerCopy {
   return COPY[locale] ?? he

@@ -817,6 +817,135 @@ export const RANKMATH_COMPARE: Record<PublicLocale, ComparisonCopy> = {
   // of the same reading made on CHECKED, with their prices left in euros as they
   // publish them, and the closing FAQ still points the reader at the links under
   // the table rather than at a number written here.
+  de: {
+    competitor: 'Rank Math',
+    eyebrow: 'Go Top SEO vs. Rank Math',
+    metaTitle: 'Go Top SEO vs. Rank Math | Vergleich',
+    metaDescription:
+      'Go Top SEO im Vergleich mit Rank Math: wer außerhalb von WordPress arbeitet, wer im Google Unternehmensprofil postet, was im jeweiligen Preis steckt und wann Rank Math die bessere Wahl ist.',
+    hero: {
+      title: 'Rank Math ist ein ausgezeichnetes WordPress-Plugin.',
+      accent: 'Wir sind ein System, das die Arbeit macht',
+      subtitle:
+        'Rank Math sitzt im WordPress-Editor, hilft beim Schreiben und beim korrekten Auszeichnen einer Seite und verfolgt inzwischen auch, wie KI-Assistenten Ihre Marke nennen. Go Top SEO arbeitet zusätzlich auf Shopify, postet im Google Unternehmensprofil und führt einen Monatsplan für Inhalte, der sich selbst veröffentlicht.',
+    },
+    table: {
+      eyebrow: 'Der Vergleich',
+      title: 'Was jedes von beiden tut, aus Rank Maths eigenen Seiten',
+      checkedOn: CHECKED,
+      sources: SOURCES,
+      rows: [
+        {
+          label: 'Einstiegspreis',
+          ours: 'Außerhalb Israels ab 79 USD/Monat zuzüglich Steuern; in Israel ab 249 ILS/Monat inklusive Mehrwertsteuer.',
+          theirs:
+            'Kostenloses Plugin, dann PRO für 8,99 €/Monat bei jährlicher Zahlung zzgl. MwSt. zum Verlängerungspreis, und Business für 27,99 €. Von Zeit zu Zeit wird ein günstigerer Aktionspreis für das erste Jahr angezeigt.',
+        },
+        {
+          label: 'Plattformen',
+          ours: 'WordPress und Shopify, in einem Konto.',
+          theirs: 'Ihre Seiten beschreiben ein WordPress-Plugin.',
+        },
+        {
+          label: 'Wer die Arbeit macht',
+          ours: 'Das System. Sie geben ein Thema frei; es schreibt, ergänzt Bilder und interne Links und veröffentlicht.',
+          theirs:
+            'Sie selbst, im Editor. Content AI gibt Ihnen über 40 Schreibwerkzeuge und Vorlagen; Sie führen sie aus und veröffentlichen.',
+        },
+        {
+          label: 'Monatlicher Content-Plan',
+          ours: 'Das System schlägt jeden Monat Themen vor, Sie geben sie frei oder entfernen sie, und die Artikel werden nach Plan veröffentlicht.',
+          theirs:
+            'Die Seiten, die wir gelesen haben, beschreiben das Schreiben auf Abruf im Editor, nicht einen Monatsplan, der sich selbst veröffentlicht.',
+        },
+        {
+          label: 'Google Unternehmensprofil',
+          ours: 'Im selben Preis enthalten: automatische Beiträge mit Ihrer Einwilligung und vorbereitete Antworten auf Bewertungen.',
+          theirs: 'Die Seiten, die wir gelesen haben, drehen sich um die Website selbst und erwähnen keine Beiträge in einem Google Unternehmensprofil.',
+        },
+        {
+          label: 'Sichtbarkeit in KI-Diensten',
+          ours: 'Eine monatliche Prüfung gegen ChatGPT, Gemini und Google AI, im Grundpreis enthalten.',
+          theirs:
+            'Sie bieten AI Visibility: einen Sichtbarkeitswert, das Verfolgen, wie ChatGPT und Gemini die Marke nennen, Tonalität, Wettbewerbsvergleich, vollständige Antwortprotokolle und Prüfungen je Land. Verkauft als Teil von Rank Math AI.',
+        },
+        {
+          label: 'Ranking-Tracking',
+          ours: 'Eine monatliche Prüfung in Google und in Google Maps, im selben Preis.',
+          theirs: 'PRO erfasst 1.000 Keywords, Business 20.000, mit zwölf Monaten Positionsverlauf.',
+        },
+        {
+          label: 'Testphase',
+          ours: '7 Tage, ohne Kreditkarte, jederzeit kündbar.',
+          theirs: 'Das Kern-Plugin ist kostenlos, und die PRO-Tarife enthalten eine 15-tägige Testphase von Rank Math AI.',
+        },
+      ],
+    },
+    theirStrengths: {
+      eyebrow: 'Wann Rank Math gewinnt',
+      title: 'Es gibt Fälle, in denen Rank Math die richtige Wahl ist',
+      intro: 'Rank Math ist ein ausgereiftes, beliebtes Produkt, und das sollten Sie wissen, bevor Sie unsere Seite lesen.',
+      items: [
+        {
+          title: 'Wenn das Budget bei null liegt',
+          body:
+            'Das Kern-Plugin ist kostenlos und läuft nach ihrer eigenen Angabe auf mehr als vier Millionen WordPress-Websites. Für ein Unternehmen, das gerade anfängt und kein monatliches Budget hat, ist das ein schwer zu widerlegender Ausgangspunkt: strukturierte Daten, Sitemaps und die Onpage-Analyse sind ohne Zahlung dabei.',
+        },
+        {
+          title: 'Wenn Sie im Editor selbst steuern wollen',
+          body:
+            'Wenn Sie Ihre Beiträge selbst schreiben und es mögen, einen SEO-Wert beim Tippen mitlaufen zu sehen, ist ihre Umgebung besser als unsere. Wir sind um Automatisierung gebaut, Rank Math um die Person, die davor sitzt und arbeitet.',
+        },
+        {
+          title: 'Wenn interne Links in großer Zahl verwaltet werden müssen',
+          body:
+            'AI Link Genius zeigt jeden Link der Website in einem Dashboard, aktualisiert hunderte auf einmal, schlägt beim Schreiben Links vor und findet Seiten, auf die nichts verlinkt. Auf einer älteren Website mit hunderten Seiten haben wir dazu kein Gegenstück.',
+        },
+      ],
+    },
+    ourStrengths: {
+      eyebrow: 'Wann wir besser passen',
+      title: 'Wenn niemand vor dem Tool sitzen wird',
+      intro: 'Der Unterschied liegt nicht darin, wer mehr von SEO versteht, sondern darin, wer die Arbeit jeden Monat tatsächlich macht.',
+      items: [
+        {
+          title: 'Auch Shopify, nicht nur WordPress',
+          body: 'Ein Shopify-Shop bekommt dasselbe System, denselben Content-Plan und dasselbe Tracking.',
+        },
+        {
+          title: 'Die Inhalte veröffentlichen sich selbst',
+          body: 'Sie geben einmal im Monat Themen frei, und die Artikel gehen mit Bildern und internen Links online, ohne dass Sie den Editor öffnen.',
+        },
+        {
+          title: 'Die lokale Präsenz ist enthalten',
+          body: 'Beiträge im Google Unternehmensprofil, vorbereitete Antworten auf Bewertungen und das Tracking der Positionen in Google Maps, im selben Preis.',
+        },
+        {
+          title: 'Ein Preis, ein Ort',
+          body: 'Schreiben, Veröffentlichen, lokale Beiträge und der Monatsbericht liegen im selben Tarif statt in getrennten Produkten.',
+        },
+      ],
+    },
+    faq: {
+      eyebrow: 'Fragen',
+      title: 'Was vor einem Wechsel gefragt wird',
+      items: [
+        {
+          q: 'Kann ich beides nutzen?',
+          a: 'Ja. Rank Math übernimmt strukturierte Daten, Sitemaps und die Onpage-Auszeichnung innerhalb von WordPress; wir schreiben und veröffentlichen die Inhalte und kümmern uns um die lokale Präsenz. Technisch gibt es keinen Konflikt.',
+        },
+        {
+          q: 'Messen Sie die KI-Sichtbarkeit besser als Rank Math?',
+          a: 'Nicht zwangsläufig. Ihr AI Visibility berichtet Tonalität, Wettbewerbsvergleich und Protokolle, was wir nicht tun. Unsere Prüfung ist eine monatliche, im Grundpreis enthaltene, statt eines separaten Kaufs.',
+        },
+        {
+          q: 'Sind die Preise auf dieser Seite aktuell?',
+          a: `Sie wurden am ${CHECKED} von Rank Maths eigenen Seiten gelesen. Unternehmen ändern Preise, daher sind die Links unter der Tabelle die Quelle.`,
+        },
+      ],
+    },
+    close: { title: 'Sehen Sie ohne Anmeldung, wo Ihre Website steht' },
+  },
   ja: {
     competitor: 'Rank Math',
     eyebrow: 'Go Top SEOとRank Mathの比較',

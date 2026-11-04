@@ -90,10 +90,10 @@ function main() {
     // guessed at. A near-miss is not a locale.
     // 'fr' was the near-miss here until French shipped on 21 October 2026; a
     // real locale as the example of "not a locale" is a guard asserting the
-    // opposite of the truth. 'de' is a language the keyword research offers and
+    // opposite of the truth. 'el' is a language the keyword research offers and
     // the site does not have.
     check('1e: anything else is NOT silently a locale',
-      normalizePublicLocale('de') === null && normalizePublicLocale('') === null
+      normalizePublicLocale('el') === null && normalizePublicLocale('') === null
       && normalizePublicLocale('ES') === null && normalizePublicLocale(' es ') === null
       && normalizePublicLocale(null) === null && normalizePublicLocale(undefined) === null)
     // THE SEPARATION: Spanish degrades to English, never to Hebrew, because

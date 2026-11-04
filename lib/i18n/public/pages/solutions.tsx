@@ -29,6 +29,7 @@ const pt = FEATURE_COMMON['pt-BR']
 const fr = FEATURE_COMMON.fr
 const it = FEATURE_COMMON.it
 const ja = FEATURE_COMMON.ja
+const de = FEATURE_COMMON.de
 
 // ── Business owners ───────────────────────────────────────────────────────────
 
@@ -62,6 +63,10 @@ export const BUSINESSES_PAGE: MarketingPage = {
     ja: {
       title: '事業者の方へ | Go Top SEO',
       description: '記事を書いてサイトに公開し、GoogleとGoogleマップで自社がどこに出ているかを計測し、ChatGPT、Gemini、Google AIが自社を引用しているかを確認する、一つのシステムです。',
+    },
+    de: {
+      title: 'Für Unternehmen | Go Top SEO',
+      description: 'Ein System, das Artikel schreibt und auf Ihrer Website veröffentlicht, prüft, wo Ihr Unternehmen in Google und Google Maps erscheint, und nachsieht, ob ChatGPT, Gemini und Google AI es nennen.',
     },
   },
   content: {
@@ -407,6 +412,63 @@ export const BUSINESSES_PAGE: MarketingPage = {
       ],
       cta: { title: 'Cominci dal vedere che cosa il sistema vede sul suo sito', body: it.closeBody, primary: it.check, secondary: it.trial },
     },
+    de: {
+      hero: {
+        eyebrow: 'Für Unternehmen',
+        eyebrowIcon: Store,
+        title: 'Geschrieben, veröffentlicht und gemessen,',
+        accent: 'für Sie, jeden Monat',
+        subtitle: 'Artikel über das, wonach Ihre Kunden suchen, direkt auf Ihrer Website veröffentlicht. Eine Prüfung, wo Ihr Unternehmen in Google und Google Maps erscheint, und ob ChatGPT, Gemini und Google AI es nennen. Keine Dienstleister zu koordinieren und kein SEO zu lernen.',
+        trust: de.trust,
+        primary: de.check,
+        secondary: de.trial,
+        visual: (
+          <WorkListVisual
+            heading="Ihr Monat im System"
+            rows={[
+              { title: 'Neuer Artikel veröffentlicht', detail: 'Klimagerät für das Wohnzimmer auswählen', icon: FileText, done: true, status: 'Veröffentlicht' },
+              { title: 'Ranking-Prüfung', detail: 'Google und Google Maps', icon: Search, done: true, status: 'Erledigt' },
+              { title: 'Prüfung der KI-Sichtbarkeit', detail: 'ChatGPT, Gemini, Google AI', icon: Sparkles, done: true, status: 'Erledigt' },
+              { title: 'Nächster Artikel', detail: 'Was kostet der Einbau einer Klimaanlage', icon: CalendarClock, done: false, status: 'Geplant' },
+            ]}
+          />
+        ),
+      },
+      sections: [
+        {
+          kind: 'cards',
+          tone: 'contrast',
+          eyebrow: 'Was das System für Sie tut',
+          title: 'Die Arbeit, die sonst auf mehrere Dienstleister verteilt ist',
+          items: [
+            { icon: FileText, title: 'Inhalte, die Suchanfragen bringen', body: 'Das System wählt Themen danach aus, wonach in Ihrer Branche gesucht wird, schreibt die Artikel und veröffentlicht sie im Takt Ihres Tarifs auf Ihrer Website.' },
+            { icon: MapPin, title: 'Eine Messung, auf die Sie sich verlassen können', body: 'Wo Ihre Website für jedes Keyword in Google und Google Maps erscheint, und ob die KI-Dienste Ihr Unternehmen nennen.' },
+            { icon: Wrench, title: 'Eine Website ohne Bremsen', body: 'Die Website-Analyse findet, was Sie in Google zurückhält. In WordPress beheben Sie es nach Ihrer Freigabe mit einem Klick.' },
+          ],
+        },
+        {
+          kind: 'steps',
+          eyebrow: 'So fangen Sie an',
+          title: 'Drei Schritte, und das System arbeitet',
+          items: [
+            { title: 'Adresse Ihrer Website eingeben', body: 'Das System liest Ihre Website und legt Einstellungen, eine Content-Strategie und Keyword-Ideen bereit.' },
+            { title: 'Website verbinden', body: 'WordPress, Shopify oder Wix. Die Artikel werden direkt dorthin veröffentlicht.' },
+            { title: 'Ergebnisse verfolgen', body: 'Die Prüfungen von Ranking und Sichtbarkeit laufen einmal im Monat automatisch, und von Hand jederzeit. Alles an einer Stelle.' },
+          ],
+        },
+        {
+          kind: 'faq',
+          eyebrow: 'Häufige Fragen',
+          title: 'Was Unternehmen fragen',
+          items: [
+            { q: 'Muss ich mich mit SEO auskennen?', a: 'Nein. Das System schlägt Themen vor, schreibt und veröffentlicht. Sie können jeden Artikel vor der Veröffentlichung lesen und ändern.' },
+            { q: 'Passt das auch für ein lokales Unternehmen?', a: 'Ja. Das Ranking-Tracking in Google Maps prüft, wo Ihr Unternehmen in der lokalen Suche erscheint, je Stadt oder Gebiet.' },
+            { q: 'Wie viele Artikel bekomme ich im Monat?', a: 'Das hängt vom Tarif ab. Alle Tarife und ihre Mengen stehen auf der Preisseite.' },
+          ],
+        },
+      ],
+      cta: { title: 'Sehen Sie erst, was das System auf Ihrer Website sieht', body: de.closeBody, primary: de.check, secondary: de.trial },
+    },
     ja: {
       hero: {
         eyebrow: '事業者の方へ',
@@ -499,6 +561,10 @@ export const AGENCIES_PAGE: MarketingPage = {
     ja: {
       title: '制作会社・代理店の方へ | Go Top SEO',
       description: '取引先のサイトごとに別のプロジェクトを持ち、記事、順位の計測、AIでの可視性、PDFとExcelのレポートをご利用いただけます。すべての取引先を一つのアカウントで管理できます。',
+    },
+    de: {
+      title: 'Für Agenturen | Go Top SEO',
+      description: 'Ein eigenes Projekt für jede Kundenwebsite, mit Artikeln, Ranking-Tracking, KI-Sichtbarkeit und Berichten als PDF und Excel. Alle Kunden aus einem Konto verwalten.',
     },
   },
   content: {
@@ -814,6 +880,58 @@ export const AGENCIES_PAGE: MarketingPage = {
       ],
       cta: { title: 'Provi il sistema sul sito di un cliente', body: it.closeBody, primary: it.trial, secondary: it.pricing },
     },
+    de: {
+      hero: {
+        eyebrow: 'Für Agenturen',
+        eyebrowIcon: Briefcase,
+        title: 'Jede Kundenwebsite,',
+        accent: 'in einem System',
+        subtitle: 'Jeder Kunde bekommt ein eigenes Projekt mit eigenen Artikeln, eigenem Ranking-Tracking, eigener KI-Sichtbarkeit und eigenen Berichten. Verwalten Sie alles aus einem Konto und geben Sie dem Kunden einen PDF-Bericht, der zeigt, was in diesem Monat getan wurde.',
+        trust: de.trust,
+        primary: de.trial,
+        secondary: de.pricing,
+        visual: (
+          <WorkListVisual
+            heading="Ihre Kunden"
+            rows={[
+              { title: 'Zahnarztpraxis', detail: '3 Artikel in diesem Monat', url: 'example-dental.com', icon: FolderKanban, done: true, status: 'Bericht fertig' },
+              { title: 'Anwaltskanzlei', detail: '2 Artikel in diesem Monat', url: 'example-law.com', icon: FolderKanban, done: true, status: 'Bericht fertig' },
+              { title: 'Möbelhaus', detail: 'Analyse läuft', url: 'example-furniture.com', icon: FolderKanban, done: false, status: 'In Arbeit' },
+            ]}
+          />
+        ),
+      },
+      sections: [
+        {
+          kind: 'cards',
+          tone: 'contrast',
+          eyebrow: 'Was Sie bekommen',
+          title: 'Werkzeuge für die Arbeit an vielen Websites gleichzeitig',
+          items: [
+            { icon: FolderKanban, title: 'Ein Projekt je Website', body: 'Eigene Einstellungen, Keywords, Strategie und Artikel für jede Website, mit Projekten nach Kunden gruppiert.' },
+            { icon: BarChart3, title: 'Berichte, die Sie weitergeben können', body: 'Berichte als PDF und Excel zu Rankings, KI-Sichtbarkeit und Search-Console-Daten, mit dem Projektnamen und dem Logo der Website.' },
+            { icon: PieChart, title: 'Eine Menge, die sich fair aufteilt', body: 'Die Artikelmenge gilt für alle Websites gemeinsam, und Sie entscheiden, wie viele Artikel jede Website erhält.' },
+          ],
+        },
+        {
+          kind: 'steps',
+          eyebrow: 'So läuft es',
+          title: 'Vom neuen Kunden zum ersten Bericht',
+          items: [
+            { title: 'Projekt für den Kunden anlegen', body: 'Adresse der Website eingeben, und das System legt Einstellungen, eine Strategie und Keyword-Ideen bereit.' },
+            { title: 'Website verbinden', body: 'WordPress, Shopify oder Wix, und die Artikel werden dorthin veröffentlicht.' },
+            { title: 'Bericht erzeugen', body: 'Ein PDF-Bericht für den Kunden mit dem, was geschrieben wurde, wo die Website erscheint und was sich verändert hat.' },
+          ],
+        },
+        {
+          kind: 'callout',
+          icon: Info,
+          title: 'Welcher Tarif passt',
+          body: <p>Premium ist für die Verwaltung mehrerer eigener Websites gedacht, Agency für die Verwaltung von Kundenwebsites. Die Mengen jedes Tarifs stehen auf der Preisseite.</p>,
+        },
+      ],
+      cta: { title: 'Testen Sie das System an einer Kundenwebsite', body: de.closeBody, primary: de.trial, secondary: de.pricing },
+    },
     ja: {
       hero: {
         eyebrow: '制作会社・代理店の方へ',
@@ -901,6 +1019,10 @@ export const WORDPRESS_PAGE: MarketingPage = {
     ja: {
       title: 'WordPressのサイトをお持ちの方へ | Go Top SEO',
       description: 'WordPressサイトを一度連携すれば、記事がアイキャッチ画像、カテゴリー、タグ付きでそこへ公開されます。サイトの診断が問題を見つけ、その多くはご承認後にワンクリックで修正できます。',
+    },
+    de: {
+      title: 'Für WordPress-Websites | Go Top SEO',
+      description: 'Verbinden Sie Ihre WordPress-Website einmal, und Artikel werden dort mit Beitragsbild, Kategorien und Schlagwörtern veröffentlicht. Die Website-Analyse findet Probleme, und die meisten werden nach Ihrer Freigabe mit einem Klick behoben.',
     },
   },
   content: {
@@ -1246,6 +1368,63 @@ export const WORDPRESS_PAGE: MarketingPage = {
       ],
       cta: { title: 'Colleghi il suo sito WordPress', body: it.closeBody, primary: it.trial, secondary: it.check },
     },
+    de: {
+      hero: {
+        eyebrow: 'Für WordPress-Websites',
+        eyebrowIcon: Blocks,
+        title: 'Artikel, die veröffentlicht werden',
+        accent: 'direkt auf Ihrer Website',
+        subtitle: 'Verbinden Sie Ihre WordPress-Website einmal, und von da an gehen Artikel mit Beitragsbild, Kategorien und Schlagwörtern am von Ihnen gesetzten Termin online. Die Website-Analyse findet Probleme, und die meisten werden nach Ihrer Freigabe mit einem Klick behoben.',
+        trust: de.trust,
+        primary: de.trial,
+        secondary: de.check,
+        visual: (
+          <WorkListVisual
+            heading="Ihre WordPress-Website"
+            rows={[
+              { title: 'Artikel veröffentlicht', detail: 'Preisratgeber · mit Beitragsbild', icon: FileText, done: true, status: 'Veröffentlicht' },
+              { title: 'SEO-Titel korrigiert', detail: '', url: '/leistungen', icon: Type, done: true, status: 'Korrigiert' },
+              { title: 'Alternativtext für 6 Bilder', detail: '', url: '/galerie', icon: ImageIcon, done: true, status: 'Korrigiert' },
+              { title: 'Nächster Artikel', detail: 'Donnerstag um 09:00', icon: CalendarClock, done: false, status: 'Geplant' },
+            ]}
+          />
+        ),
+      },
+      sections: [
+        {
+          kind: 'cards',
+          tone: 'contrast',
+          eyebrow: 'Was Sie auf WordPress bekommen',
+          title: 'Veröffentlichen und korrigieren, ohne das Backend zu öffnen',
+          items: [
+            { icon: Tags, title: 'Vollständige Veröffentlichung', body: 'Ein Artikel mit Beitragsbild, Bildern im Text, Kategorien und Schlagwörtern, sofort oder am geplanten Termin.' },
+            { icon: Wrench, title: 'Korrekturen mit einem Klick', body: 'Titel, Beschreibungen, Alternativtexte und Links. Jede Korrektur wird gezeigt, bevor sie geschrieben wird, und lässt sich zurücknehmen.' },
+            { icon: ShieldCheck, title: 'Funktioniert mit Yoast und Rank Math', body: 'Titel und Beschreibungen werden in die Felder des SEO-Plugins geschrieben. Gibt es dort schon strukturierte Daten, ergänzen wir nur die FAQ, ohne Dubletten.' },
+          ],
+        },
+        {
+          kind: 'steps',
+          eyebrow: 'Verbinden',
+          title: 'Eine Verbindung, und das war es',
+          items: [
+            { title: 'Anwendungspasswort erzeugen', body: 'In Ihrem WordPress-Benutzerprofil. Das System führt Sie Schritt für Schritt hin.' },
+            { title: 'In den Projekteinstellungen verbinden', body: 'Adresse der Website, Benutzername und Anwendungspasswort eingeben. Das System prüft, dass die Verbindung steht.' },
+            { title: 'Go-Top-Plugin hinzufügen', body: 'Optional. Das Plugin, das Sie auf der Seite «Website-Gesundheit» herunterladen, ergänzt Meta-Beschreibungen, strukturierte Daten und eine llms.txt-Datei.' },
+          ],
+        },
+        {
+          kind: 'faq',
+          eyebrow: 'Häufige Fragen',
+          title: 'Was vor dem Verbinden gefragt wird',
+          items: [
+            { q: 'Ist das sicher?', a: 'Das Anwendungspasswort wird verschlüsselt gespeichert, und Sie können es jederzeit in Ihrem WordPress-Benutzerprofil widerrufen. Eine Korrektur wird erst nach Ihrer Freigabe auf die Website geschrieben.' },
+            { q: 'Brauche ich ein SEO-Plugin?', a: 'Nein. Mit Yoast oder Rank Math schreibt das System in deren Felder. Meta-Beschreibungen setzen ein SEO-Plugin auf der Website voraus.' },
+            { q: 'Kann ich einen Artikel vor der Veröffentlichung bearbeiten?', a: 'Ja. Sie können jeden Artikel vor der Veröffentlichung öffnen, ändern und neu terminieren.' },
+          ],
+        },
+      ],
+      cta: { title: 'Verbinden Sie Ihre WordPress-Website', body: de.closeBody, primary: de.trial, secondary: de.check },
+    },
     ja: {
       hero: {
         eyebrow: 'WordPressのサイトをお持ちの方へ',
@@ -1386,6 +1565,10 @@ export const SHOPIFY_PAGE: MarketingPage = {
     ja: {
       title: 'Shopifyの店舗をお持ちの方へ | Go Top SEO',
       description: 'Shopify App Storeからアプリをインストールすると、記事が作成され、店舗のブログに公開されます。診断が記事とページの問題を見つけ、どの修正も店舗のご承認を経て適用されます。',
+    },
+    de: {
+      title: 'Für Shopify-Shops | Go Top SEO',
+      description: 'Installieren Sie die App aus dem Shopify App Store, und Artikel werden geschrieben und im Blog Ihres Shops veröffentlicht. Die Shop-Analyse findet Probleme in Artikeln und Seiten, und Sie geben jede Korrektur frei.',
     },
   },
   content: {
@@ -1868,6 +2051,86 @@ export const SHOPIFY_PAGE: MarketingPage = {
         },
       ],
       cta: { title: 'Cominci con il suo negozio', body: it.closeBody, primary: shopifyInstallCta('Installa l’applicazione su Shopify', it.trial), secondary: it.check },
+    },
+    de: {
+      hero: {
+        eyebrow: 'Für Shopify-Shops',
+        eyebrowIcon: Store,
+        title: 'Die Inhalte Ihres Shops werden geschrieben,',
+        accent: 'veröffentlicht und gemessen',
+        subtitle: 'Installieren Sie die App aus dem Shopify App Store, und von da an schreibt das System Artikel über das, wonach Ihre Kunden suchen, veröffentlicht sie im Blog Ihres Shops und zeigt Ihnen, wo der Shop in Google, in Google Maps und in den Antworten von ChatGPT, Gemini und Google AI erscheint.',
+        trust: de.trust,
+        primary: shopifyInstallCta('App bei Shopify installieren', de.trial),
+        secondary: de.check,
+        visual: (
+          <WorkListVisual
+            heading="Ihr Shopify-Shop"
+            rows={[
+              { title: 'Artikel im Blog veröffentlicht', detail: 'Kaufberatung · mit Bildern', icon: FileText, done: true, status: 'Veröffentlicht' },
+              { title: 'Suchmaschinen-Eintrag korrigiert', detail: '', url: '/pages/about', icon: Type, done: true, status: 'Freigegeben' },
+              { title: 'Alternativtext für Artikelbilder', detail: '', url: '/blogs/news', icon: ImageIcon, done: true, status: 'Freigegeben' },
+              { title: 'Nächster Artikel', detail: 'Montag um 09:00', icon: CalendarClock, done: false, status: 'Geplant' },
+            ]}
+          />
+        ),
+      },
+      sections: [
+        {
+          kind: 'callout',
+          icon: Store,
+          title: 'Die Installation läuft über den Shopify App Store',
+          body: (
+            <>
+              {'Jeder Shop installiert über den offiziellen Eintrag: '}
+              {shopifyAppStoreLink('Go Top SEO im Shopify App Store')}
+              {'. Es ist ein Klick, die Abrechnung läuft über Shopify, und es gibt nichts, was Sie in den Code Ihres Shops einfügen müssten.'}
+            </>
+          ),
+        },
+        {
+          kind: 'cards',
+          tone: 'contrast',
+          eyebrow: 'Was das System in Ihrem Shop tut',
+          title: 'Schreiben, veröffentlichen und korrigieren, ohne das Theme anzufassen',
+          items: [
+            { icon: Tags, title: 'Artikel im Blog Ihres Shops', body: 'Jeder Artikel ist um eine echte Suchanfrage gebaut, mit Bildern, einem FAQ-Abschnitt und internen Links, und geht am von Ihnen gesetzten Termin im Blog online.' },
+            { icon: Wrench, title: 'Korrekturen, die Sie freigeben', body: 'Titel und Beschreibung für den Suchmaschinen-Eintrag, Alternativtexte von Bildern, ein defekter Link und ein FAQ-Abschnitt, in den Artikeln und Seiten Ihres Shops. Jede Korrektur wird gezeigt, bevor sie geschrieben wird, einzeln freigegeben und lässt sich zurücknehmen.' },
+            { icon: BarChart3, title: 'Tracking in Google und in der KI', body: 'Positionen in Google und Google Maps, dazu eine automatische monatliche Prüfung, ob ChatGPT, Gemini und Google AI den Shop nennen. Drei weitere Dienste sind einen Klick entfernt.' },
+          ],
+        },
+        {
+          kind: 'steps',
+          eyebrow: 'So fangen Sie an',
+          title: 'Drei Schritte, keine Entwicklung',
+          items: [
+            { title: 'Aus dem App Store installieren', body: <>{'Öffnen Sie '}{shopifyAppStoreLink('den Eintrag von Go Top SEO')}{' und geben Sie die Installation in Ihrem Shop frei.'}</> },
+            { title: 'Das System analysiert den Shop', body: 'Ihre Artikel und Seiten werden gelesen, und das System zeigt, was fehlt und was sich zu korrigieren lohnt, nach Wichtigkeit geordnet.' },
+            { title: 'Inhalte und Korrekturen freigeben', body: 'Sie wählen, was geschrieben wird, geben jede Korrektur einzeln frei, und die Veröffentlichung im Blog folgt dem Zeitplan, den Sie setzen.' },
+          ],
+        },
+        {
+          kind: 'cards',
+          columns: 2,
+          eyebrow: 'Die Grenzen, ohne Kleingedrucktes',
+          title: 'Was das System in Ihrem Shop nie anfasst',
+          items: [
+            { icon: ShieldCheck, title: 'Nicht das Theme, nicht den Code', body: 'Das System schreibt ausschließlich in den Artikeln und Seiten Ihres Shops. Es fasst weder Theme noch Code, Einstellungen, Preise oder Bestellungen an.' },
+            { icon: Info, title: 'Produkte und Kategorien: gezeigt, nicht geschrieben', body: 'Der Zugriff der App auf Produkte und Kategorien ist lesend, daher zeigt das System Ihnen, was auf einer Produktseite zu korrigieren ist, und Sie korrigieren es in Shopify. Das automatisch zu korrigieren bräuchte eine neue Version der App.' },
+          ],
+        },
+        {
+          kind: 'faq',
+          eyebrow: 'Häufige Fragen',
+          title: 'Was Shops vor der Installation fragen',
+          items: [
+            { q: 'Ändert das System ohne meine Freigabe etwas in meinem Shop?', a: 'Nein. In einem Shopify-Shop wird jede Korrektur gezeigt, bevor sie geschrieben wird, und einzeln freigegeben; auch nach der Freigabe lässt sie sich zurücknehmen. Eine automatische Freigabe von Korrekturen gibt es nur auf WordPress-Websites.' },
+            { q: 'Wo werden die Artikel veröffentlicht?', a: 'Im Blog Ihres Shops, wie jeder andere Artikel von Ihnen. Sie können jeden Artikel vor der Veröffentlichung öffnen, bearbeiten und neu terminieren.' },
+            { q: 'Muss ich Code oder ein App-Embed einbauen?', a: 'Nein. Die Installation läuft über den Shopify App Store, und das System arbeitet mit Ihrem Shop, ohne das Theme zu verändern.' },
+            { q: 'Was ist mit strukturierten Daten im Shop?', a: 'Ein Shopify-Theme gibt bereits einen Teil der strukturierten Daten aus, und das System ergänzt dort keine eigenen. Strukturierte Daten, die wir schreiben, gibt es nur auf WordPress-Websites mit dem Go-Top-Plugin. Auf der Seite «Website-Gesundheit» blenden wir die Zeilen aus, die Ihr Theme schon abdeckt.' },
+          ],
+        },
+      ],
+      cta: { title: 'Fangen Sie mit Ihrem Shop an', body: de.closeBody, primary: shopifyInstallCta('App bei Shopify installieren', de.trial), secondary: de.check },
     },
     ja: {
       hero: {

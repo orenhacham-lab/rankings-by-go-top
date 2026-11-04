@@ -143,9 +143,28 @@ const JA_INTENT: Partial<Record<SuggestionIntent, (kw: string) => string[]>> = {
   informational: (kw) => [`${kw}について知っておきたいこと`],
 }
 
-const BASE: Record<SuggestionLanguage, (kw: string) => string[]> = { he: HE_BASE, en: EN_BASE, es: ES_BASE, 'pt-BR': PT_BASE, fr: FR_BASE, it: IT_BASE, ja: JA_BASE }
+// GERMAN. Sie-form, nouns capitalized, and the colon-subtitle shape a German
+// SEO headline actually uses ("Keyword: worauf es ankommt").
+const DE_BASE = (kw: string): string[] => [
+  `Wie wählt man ${kw} richtig aus?`,
+  `${kw}: Was Sie vor der Entscheidung prüfen sollten`,
+  `${kw}: der komplette Leitfaden für den Einstieg`,
+  `Was kostet ${kw}?`,
+  `Die häufigsten Fehler bei der Auswahl von ${kw}`,
+  `Beste ${kw}: Was lohnt sich zu vergleichen?`,
+]
+
+const DE_INTENT: Partial<Record<SuggestionIntent, (kw: string) => string[]>> = {
+  comparison: (kw) => [`${kw}: der Vergleich der gängigen Optionen`, `Worin unterscheiden sich die Arten von ${kw}?`],
+  commercial: (kw) => [`${kw} — richtig wählen und es nicht bereuen`, `Worauf sollten Sie beim Kauf von ${kw} achten?`],
+  local: (kw) => [`${kw}: So finden Sie einen verlässlichen Anbieter vor Ort`],
+  transactional: (kw) => [`Wann sollten Sie ${kw} bestellen — und bei wem?`],
+  informational: (kw) => [`Alles, was Sie über ${kw} wissen sollten`],
+}
+
+const BASE: Record<SuggestionLanguage, (kw: string) => string[]> = { he: HE_BASE, en: EN_BASE, es: ES_BASE, 'pt-BR': PT_BASE, fr: FR_BASE, it: IT_BASE, ja: JA_BASE, de: DE_BASE }
 const INTENT: Record<SuggestionLanguage, Partial<Record<SuggestionIntent, (kw: string) => string[]>>> =
-  { he: HE_INTENT, en: EN_INTENT, es: ES_INTENT, 'pt-BR': PT_INTENT, fr: FR_INTENT, it: IT_INTENT, ja: JA_INTENT }
+  { he: HE_INTENT, en: EN_INTENT, es: ES_INTENT, 'pt-BR': PT_INTENT, fr: FR_INTENT, it: IT_INTENT, ja: JA_INTENT, de: DE_INTENT }
 
 /**
  * Return up to `max` distinct, natural topic suggestions for a keyword.

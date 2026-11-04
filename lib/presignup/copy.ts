@@ -55,6 +55,15 @@ export const REPORT_CONSENT_VERSION_FR = 'report-email-fr-v1'
 export const REPORT_CONSENT_VERSION_IT = 'report-email-it-v1'
 export const REPORT_CONSENT_VERSION_JA = 'report-email-ja-v1'
 
+/**
+ * German likewise, at v1: the German sentence has never been shown, so no
+ * earlier German record can be confused with it. The wording follows DSGVO
+ * Art. 7(2) — plain language, one purpose per box — and the marketing box is
+ * separate for Art. 7(4) and sec. 7 UWG, which in Germany wants express prior
+ * consent for advertising e-mail.
+ */
+export const REPORT_CONSENT_VERSION_DE = 'report-email-de-v1'
+
 /** The optional second decision, versioned the same way and never shared with the first. */
 export const MARKETING_CONSENT_VERSION = 'marketing-email-v1'
 export const MARKETING_CONSENT_VERSION_ES = 'marketing-email-es-v1'
@@ -62,6 +71,7 @@ export const MARKETING_CONSENT_VERSION_PT = 'marketing-email-pt-v1'
 export const MARKETING_CONSENT_VERSION_FR = 'marketing-email-fr-v1'
 export const MARKETING_CONSENT_VERSION_IT = 'marketing-email-it-v1'
 export const MARKETING_CONSENT_VERSION_JA = 'marketing-email-ja-v1'
+export const MARKETING_CONSENT_VERSION_DE = 'marketing-email-de-v1'
 
 /**
  * One id for a refusal in every language. A refusal has no wording to prove —
@@ -81,6 +91,7 @@ const CONSENT: Record<PublicLocale, string> = {
   fr: "J'accepte de recevoir de Go Top, par e-mail, le rapport d'analyse de ce site.",
   it: 'Acconsento a ricevere da Go Top, per e-mail, il report di analisi di questo sito.',
   ja: 'Go Topから、このサイトの調査レポートをメールで受け取ることに同意します。',
+  de: 'Ich bin damit einverstanden, den Analysebericht zu dieser Website von Go Top per E-Mail zu erhalten.',
 }
 
 /** What the optional box says. Ticking it is the only way marketing is allowed. */
@@ -94,6 +105,9 @@ const MARKETING: Record<PublicLocale, string> = {
   // Japan: 特定電子メール法 requires this to be a separate opt-in that is not
   // bundled with the report, and an unsubscribe route in every message.
   ja: 'Go Topからのお知らせやマーケティング情報もメールで受け取ることに同意します。同意は、各メールに記載されたリンクからいつでも撤回できます。',
+  // Germany: sec. 7(2) UWG requires express prior consent for advertising
+  // e-mail, and the withdrawal route has to be named where consent is given.
+  de: 'Ich bin außerdem damit einverstanden, von Go Top Neuigkeiten und Marketinginhalte per E-Mail zu erhalten. Die Einwilligung kann jederzeit über den Link in jeder E-Mail widerrufen werden.',
 }
 
 /** What the record says when the optional box was left unticked. */
@@ -105,6 +119,7 @@ const MARKETING_DECLINED: Record<PublicLocale, string> = {
   fr: "Des actualités et du contenu marketing ont été proposés et n'ont pas été acceptés.",
   it: 'Aggiornamenti e contenuti di marketing sono stati proposti e non sono stati accettati.',
   ja: 'お知らせおよびマーケティング情報の受信をご案内しましたが、同意されませんでした。',
+  de: 'Neuigkeiten und Marketinginhalte wurden angeboten und nicht eingewilligt.',
 }
 
 const CONSENT_VERSION: Record<PublicLocale, string> = {
@@ -115,6 +130,7 @@ const CONSENT_VERSION: Record<PublicLocale, string> = {
   fr: REPORT_CONSENT_VERSION_FR,
   it: REPORT_CONSENT_VERSION_IT,
   ja: REPORT_CONSENT_VERSION_JA,
+  de: REPORT_CONSENT_VERSION_DE,
 }
 
 const MARKETING_VERSION: Record<PublicLocale, string> = {
@@ -125,6 +141,7 @@ const MARKETING_VERSION: Record<PublicLocale, string> = {
   fr: MARKETING_CONSENT_VERSION_FR,
   it: MARKETING_CONSENT_VERSION_IT,
   ja: MARKETING_CONSENT_VERSION_JA,
+  de: MARKETING_CONSENT_VERSION_DE,
 }
 
 export function reportConsentText(locale: PublicLocale): string {
@@ -440,7 +457,49 @@ const ja: ResearchScreenCopy = {
   },
 }
 
-const SCREEN: Record<PublicLocale, ResearchScreenCopy> = { he, en, es, 'pt-BR': ptBR, fr, it, ja }
+// GERMAN. Sie-form throughout, as everywhere else in the locale, and never the
+// provider's own error: 'forbidden' says the site refuses automated readers,
+// not what the fetcher saw. The example address is a .de one, because an
+// address a German visitor would actually type is the point of the hint.
+const de: ResearchScreenCopy = {
+  errors: {
+    not_found: 'Die vollständige Analyse ist hier nicht verfügbar.',
+    invalid_url: 'Diese Adresse sieht nicht richtig aus. Versuchen Sie es erneut, zum Beispiel beispiel.de',
+    blocked_url: 'Analysiert werden können nur öffentlich erreichbare Websites. Interne Adressen, IP-Adressen und Weiterleitungen auf eine andere Website werden nicht unterstützt.',
+    unreachable: 'Die Website war nicht erreichbar. Prüfen Sie die Adresse und versuchen Sie es erneut.',
+    not_html: 'Diese Adresse liefert keine Webseite, die wir lesen können.',
+    forbidden: 'Die Website sperrt automatische Leser aus, und Google zeigt ebenfalls keine ihrer Seiten. Versuchen Sie eine andere Adresse derselben Website.',
+    rate_limited: 'Es wurden mehrere Analysen in kurzer Folge gestartet. Versuchen Sie es in einigen Minuten erneut.',
+    daily_cap: 'Die kostenlose Analyse ist heute stark nachgefragt. Versuchen Sie es später erneut, oder eröffnen Sie ein Konto: dann läuft die Analyse in Ihrem eigenen Projekt.',
+    unavailable: 'Die vollständige Analyse ist derzeit nicht verfügbar.',
+    internal: 'Bei uns ist etwas hängen geblieben. Versuchen Sie es in einem Moment erneut.',
+  },
+  unavailableTitle: 'Die vollständige Analyse ist derzeit nicht verfügbar',
+  unavailableBody: 'In der Zwischenzeit haben wir die schnelle Prüfung Ihrer Website gestartet.',
+  report: {
+    link: 'Bericht per E-Mail erhalten',
+    title: 'Bericht per E-Mail erhalten',
+    body: 'Hinterlassen Sie eine Adresse, und wir senden Ihnen den Analysebericht der Website dorthin.',
+    emailLabel: 'E-Mail-Adresse',
+    emailPlaceholder: 'name@beispiel.de',
+    consent: CONSENT.de,
+    marketing: MARKETING.de,
+    privacy: 'Datenschutzerklärung',
+    submit: 'Anfrage speichern',
+    sending: 'Wird gespeichert…',
+    saved: 'Notiert. Der Analysebericht geht an diese Adresse.',
+    errors: {
+      consent_required: 'Damit wir den Bericht senden können, setzen Sie bitte das Häkchen zur Einwilligung.',
+      invalid_email: 'Diese E-Mail-Adresse sieht nicht richtig aus.',
+      invalid_claim: 'Diese Analyse kann nicht mehr versendet werden. Starten Sie sie erneut.',
+      rate_limited: 'Es wurden mehrere Anfragen in kurzer Folge gesendet. Versuchen Sie es später erneut.',
+      unavailable: 'Ihre Anfrage konnte gerade nicht gespeichert werden. Versuchen Sie es später erneut.',
+      internal: 'Bei uns ist etwas hängen geblieben. Versuchen Sie es in einem Moment erneut.',
+    },
+  },
+}
+
+const SCREEN: Record<PublicLocale, ResearchScreenCopy> = { he, en, es, 'pt-BR': ptBR, fr, it, ja, de }
 
 export function researchScreenCopy(locale: PublicLocale): ResearchScreenCopy {
   return SCREEN[locale] ?? he

@@ -188,6 +188,30 @@ const LOGIN_UI = {
       linkInvalid: 'この確認リンクは無効か、有効期限が切れています。ログインするか、もう一度登録して新しいリンクを受け取ってください。',
     },
   },
+  de: {
+    subtitle: 'Rankings in Google und Sichtbarkeit in KI-Antworten',
+    logoAlt: 'Das Logo von Go Top SEO',
+    heading: 'Anmelden',
+    emailLabel: 'E-Mail-Adresse',
+    emailPlaceholder: 'name@beispiel.de',
+    passwordLabel: 'Passwort',
+    passwordPlaceholder: '\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022',
+    loginBtn: 'Anmelden',
+    forgotPassword: 'Passwort vergessen?',
+    dontHaveAccount: 'Noch kein Konto?',
+    startTrial: 'Kostenlos starten',
+    accessibility: 'Barrierefreiheit',
+    privacy: 'Datenschutz',
+    articles: 'Artikel',
+    accessibilityHref: '/de/accessibility',
+    privacyHref: '/de/privacy',
+    articlesHref: '/de/articles',
+    err: {
+      badCredentials: 'E-Mail-Adresse oder Passwort sind nicht korrekt',
+      emailNotConfirmed: 'Die E-Mail-Adresse ist noch nicht bestätigt. Öffnen Sie die Bestätigungsmail, die wir Ihnen gesendet haben, und klicken Sie auf den Link.',
+      linkInvalid: 'Dieser Bestätigungslink ist ungültig oder abgelaufen. Melden Sie sich an, oder registrieren Sie sich erneut, um einen neuen zu erhalten.',
+    },
+  },
 } as const
 
 export function AuthForm() {

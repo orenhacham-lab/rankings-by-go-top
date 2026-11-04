@@ -37,6 +37,7 @@ const QUESTION_START: Record<SuggestionLanguage, RegExp> = {
   // 「か」「ですか」「とは」「？」. The leading interrogatives are listed too, because
   // 「なぜ…」 and 「どのように…」 do open a question.
   ja: /(?:か|ですか|ますか|でしょうか|とは|？|\?)\s*$|^(?:なぜ|どう|どのように|どうやって|いくら|どこ|いつ|どれ|どの|何|なに)/,
+  de: /^(?:was|wie|warum|wieso|weshalb|welche|welcher|welches|wo|woher|wann|wer|wie\s+viel|wie\s+viele|wie\s+lange|ist|sind|kann|kann\s+man|muss|muss\s+man|soll|sollte|darf|lohnt|braucht|gibt)\b/i,
 }
 
 /** "best / recommended" words: the question asks for a recommendation. */
@@ -49,6 +50,7 @@ const RECOMMEND: Record<SuggestionLanguage, RegExp> = {
   it: /\b(?:migliore|migliori|miglior|consigliat\w*|raccomandat\w*|top)\b/i,
   // No \b in Japanese: there is no word boundary to anchor to.
   ja: /(?:おすすめ|オススメ|お勧め|お薦め|人気|最適|ベスト|一番|最高)/,
+  de: /\b(?:best\w*|empfehl\w*|empfohlen\w*|top|testsieger)\b/i,
 }
 
 /** A keyword that already names the act of buying ("buying X", "buy X"). */
@@ -63,6 +65,11 @@ const BUY: Record<SuggestionLanguage, RegExp> = {
   // 購入」, 「車を買う」), never as a word before it, so this pattern is anchored at
   // the end where the others are anchored at the start.
   ja: /(?:の購入|を購入|購入|を買う|の注文|を注文|のレンタル|を借りる|の申し込み|を申し込む)\s*$/,
+  // German names the act of buying either as a verb before the noun ("Laptop
+  // kaufen" puts it AFTER, "Kauf eines Laptops" before), so both ends are
+  // covered: the separable-verb form that ends the phrase, and the noun form
+  // that opens it.
+  de: /^(?:kaufen|kauf\s+(?:von|eines|einer)|bestellen|bestellung\s+(?:von|eines|einer)|mieten|miete\s+(?:von|eines|einer)|buchen)\s|\s(?:kaufen|bestellen|mieten|buchen)\s*$/i,
 }
 
 const TEMPLATES: Record<SuggestionLanguage, { recommend: (k: string) => string; buy: (k: string) => string; general: (k: string) => string }> = {
@@ -103,6 +110,11 @@ const TEMPLATES: Record<SuggestionLanguage, { recommend: (k: string) => string; 
     recommend: (k) => `Sto cercando ${k.replace(/^il\s+|^lo\s+|^la\s+|^i\s+|^gli\s+|^le\s+|^l['’]/i, '')}. Che cosa consigliate?`,
     buy: (k) => `Che cosa conviene verificare prima di ${k.replace(/^acquisto di\s/i, 'acquistare ').replace(/^ordine di\s/i, 'ordinare ')}?`,
     general: (k) => `Che cosa è utile sapere su ${k}?`,
+  },
+  de: {
+    recommend: (k) => `Ich suche ${k.replace(/^der\s+|^die\s+|^das\s+|^ein\s+|^eine\s+/i, '')}. Was würden Sie empfehlen?`,
+    buy: (k) => `Was sollte ich prüfen, bevor ich ${k.replace(/^kauf\s+(?:von|eines|einer)\s/i, '').replace(/\skaufen\s*$/i, '')} kaufe?`,
+    general: (k) => `Was sollte ich über ${k} wissen?`,
   },
 }
 

@@ -80,6 +80,14 @@ const SITE_METADATA: Record<PublicLocale, SiteMetadataStrings> = {
     ogDescription: 'SEOとGEOのコンテンツ作成・計画・公開を一つの画面から。Googleの検索順位とAI（ChatGPT、Gemini、Google AI モード）での見え方を毎月記録します。',
     ogLocale: 'ja_JP',
   },
+  de: {
+    title: 'SEO- und GEO-Inhalte erstellen, planen und veröffentlichen | Go Top SEO',
+    description: 'Go Top SEO: SEO- und GEO-Inhalte an einer Stelle erstellen, planen und automatisch veröffentlichen, dazu monatliches Ranking-Tracking bei Google und die Sichtbarkeit in KI-Antworten. Kostenlos starten.',
+    keywords: 'SEO Inhalte erstellen, Content-Planung, Beiträge automatisch veröffentlichen, GEO, Ranking prüfen, Suchmaschinenoptimierung, SEO, Google, Ranking, Google Maps, Google Unternehmensprofil optimieren, Local SEO, Sichtbarkeit in KI, ChatGPT, Gemini',
+    ogTitle: 'SEO- und GEO-Inhalte erstellen, planen und veröffentlichen — Go Top SEO',
+    ogDescription: 'SEO- und GEO-Inhalte an einer Stelle erstellen, planen und automatisch veröffentlichen, mit monatlichem Ranking-Tracking bei Google und der Sichtbarkeit in KI-Antworten (ChatGPT, Gemini, Google AI Modus)',
+    ogLocale: 'de_DE',
+  },
 }
 
 export function getSiteMetadata(locale: PublicLocale): SiteMetadataStrings {
