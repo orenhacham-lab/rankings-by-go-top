@@ -287,7 +287,9 @@ async function main() {
   // ── D) the allowance ──────────────────────────────────────────────────────
   say('\nD) the allowance')
   {
-    const used = (w: World, n: number) => { for (let i = 0; i < n; i++) w.tables.usage_reservations.push({ id: `m${i}`, user_id: USER, project_id: PROJECT, usage_type: 'ai_check', reserved_amount: 1, consumed_amount: 1, period_start: iso(NOW - 5 * DAY), period_end: iso(NOW + 25 * DAY), idempotency_key: `manual:${i}`, status: 'consumed', reserved_at: iso(NOW - DAY), consumed_at: iso(NOW - DAY), created_at: iso(NOW - DAY) }) }
+    // `base` is the instant the world was built around: NOW for every pinned case,
+    // the real clock for D7, whose subject reads it.
+    const used = (w: World, n: number, base: number = NOW) => { for (let i = 0; i < n; i++) w.tables.usage_reservations.push({ id: `m${i}`, user_id: USER, project_id: PROJECT, usage_type: 'ai_check', reserved_amount: 1, consumed_amount: 1, period_start: iso(base - 5 * DAY), period_end: iso(base + 25 * DAY), idempotency_key: `manual:${i}`, status: 'consumed', reserved_at: iso(base - DAY), consumed_at: iso(base - DAY), created_at: iso(base - DAY) }) }
     let w = world(); used(w, 6); quiet(); let s = await cron(w); loud()
     check('D1: 6 of 10 used: only 2 fit before the last two, so 2 run', w.calls.length === 2 && consumed(w) === 8, show({ calls: w.calls.length, s }))
     w = world(); used(w, 8); quiet(); s = await cron(w); loud()
@@ -305,9 +307,19 @@ async function main() {
     check('D6: X is the manual route\'s own (maxAIScansPerPeriodPerProject)', /const limit = entitlement\.limits\.maxAIScansPerPeriodPerProject/.test(src)
       && /const limit = entitlement\.limits\.maxAIScansPerPeriodPerProject/.test(code('app/api/ai-visibility/runs/route.ts')))
     const { readUsageAllowance } = require('../../billing/usage-allowance.ts')
-    w = world(); used(w, 4); quiet(); await cron(w); const a = await readUsageAllowance(w.admin, { userId: USER, usageType: 'ai_check', limitFor: (l: any) => l.maxAIScansPerPeriodPerProject, nowMs: NOW }); loud()
+    // readUsageAllowance passes its `nowMs` to the lease math but NOT to
+    // getUserEntitlement, which therefore reads the real clock — so this case's
+    // world has to be built around the real one, like F7's. Pinned to NOW, the
+    // subscription's period ended on 2026-11-02 and from 11-03 the entitlement
+    // read it as a trial: limit 0, "not included", with nothing wrong in the
+    // product. Everything else here is unchanged: 4 manual checks, then the
+    // automatic run's 3, counted on one period.
+    const REAL = Date.now()
+    w = world({ nowMs: REAL }); used(w, 4, REAL)
+    quiet(); await cron(w, { now: () => new Date(REAL), lastSignInAt: async () => iso(REAL - 3 * DAY) })
+    const a = await readUsageAllowance(w.admin, { userId: USER, usageType: 'ai_check', limitFor: (l: any) => l.maxAIScansPerPeriodPerProject, nowMs: REAL }); loud()
     check('D7: the allowance the tab reads counts the automatic checks exactly like manual ones (4 + 3 = 7 of 10)', a.state === 'known' && a.used === 7 && a.remaining === 3, show(a))
-    check('D8: the runner\'s count and the allowance reader\'s agree', R.ledgerUsed(w.tables.usage_reservations, NOW) === a.used)
+    check('D8: the runner\'s count and the allowance reader\'s agree', R.ledgerUsed(w.tables.usage_reservations, REAL) === a.used)
   }
 
   // ── E) isolation and auth ─────────────────────────────────────────────────
@@ -359,7 +371,10 @@ async function main() {
   say('\nF) GET/POST/PUT /api/ai-visibility/monthly')
   {
     const M = require('../../../app/api/ai-visibility/monthly/route.ts')
-    const w = world()
+    // Everything in this block goes through the ROUTE, which gives its readers no
+    // clock, so this world is built around the real one (see F7's note). Pinned to
+    // NOW, F3 read a subscription whose period had ended and reported a trial.
+    const w = world({ nowMs: Date.now() })
     ADMIN_CLIENT = w.admin
     USER_CLIENT = { auth: { getUser: async () => ({ data: { user: null } }) } }
     let res = await M.GET(new Request(`http://localhost/api/ai-visibility/monthly?projectId=${PROJECT}`))
