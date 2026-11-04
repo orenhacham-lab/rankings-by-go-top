@@ -171,6 +171,27 @@ function limitLinesFor(code: PlanCode, locale: PublicLocale): LimitLines {
         : `1サイトあたり月${c.maxAIChecksPerPeriodPerProject}件までのAI可視性チェック`,
     }
   }
+  // German, for the /de pricing page and the German dashboard. Same five lines,
+  // same order, same numbers from the catalog; Sie throughout and nouns
+  // capitalized. Without this branch the function fell through to HEBREW, which
+  // is what the live /pt-BR pricing page once showed — the same bug, in German.
+  if (locale === 'de') {
+    return {
+      articles: single
+        ? `${c.maxArticlesPerPeriodAccountWide} Artikel pro Monat, automatisch geschrieben und auf Ihrer Website veröffentlicht`
+        : `${c.maxArticlesPerPeriodAccountWide} Artikel pro Monat, automatisch geschrieben und veröffentlicht, von allen Ihren Websites gemeinsam genutzt, bis zu ${PER_SITE} pro Woche und Website`,
+      projects: single ? '1 Website' : `Bis zu ${c.maxProjects} Websites`,
+      keywords: single
+        ? `Überwachung von bis zu ${c.maxKeywordsPerProject} Keywords`
+        : `Überwachung von bis zu ${c.maxKeywordsPerProject} Keywords pro Website`,
+      google: single
+        ? `Bis zu ${c.maxGoogleChecksPerPeriodPerProject} Positionsprüfungen bei Google pro Monat`
+        : `Bis zu ${c.maxGoogleChecksPerPeriodPerProject} Positionsprüfungen bei Google pro Monat und Website`,
+      ai: single
+        ? `Bis zu ${c.maxAIChecksPerPeriodPerProject} Prüfungen der Sichtbarkeit in KI-Antworten pro Monat`
+        : `Bis zu ${c.maxAIChecksPerPeriodPerProject} Prüfungen der Sichtbarkeit in KI-Antworten pro Monat und Website`,
+    }
+  }
   if (locale === 'en') {
     return {
       // THE MAIN VALUE, and the first line of every plan: articles written and
@@ -304,6 +325,16 @@ export function trialLimitLines(locale: PublicLocale): string[] {
       `トライアル期間中にGoogle順位チェック${t.maxGoogleChecksLifetime}件まで`,
       `トライアル期間中にAI可視性チェック${t.maxAIChecksLifetime}件まで`,
       `${t.days}日間のトライアル`,
+    ]
+  }
+  if (locale === 'de') {
+    return [
+      'Ein Artikel zum Ausprobieren, vom Schreiben bis zur Veröffentlichung',
+      '1 Website',
+      `Bis zu ${t.maxKeywordsPerProject} Keywords`,
+      `Bis zu ${t.maxGoogleChecksLifetime} Positionsprüfungen bei Google während des Tests`,
+      `Bis zu ${t.maxAIChecksLifetime} Prüfungen der Sichtbarkeit in KI-Antworten während des Tests`,
+      `${t.days} Tage Test`,
     ]
   }
   if (locale === 'en') {
