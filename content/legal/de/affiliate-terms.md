@@ -47,7 +47,7 @@ Wir handeln nach unseren Aufzeichnungen. Halten Sie eine Empfehlung für falsch 
 
 ## 5. Die Provision
 
-Ihnen stehen **30 %** jeder gültigen Zahlung eines empfohlenen Kunden zu, solange das Abonnement dieses Kunden weiter bezahlt wird. Haben Sie zehn oder mehr empfohlene Kunden mit einem aktiven, bezahlten Abonnement zur gleichen Zeit, so beträgt der Anteil an den gültigen Zahlungen ab diesem Zeitpunkt **40 %**. Eine Änderung des Anteils wirkt nicht rückwirkend.
+Ihnen stehen **30%** jeder gültigen Zahlung eines empfohlenen Kunden zu, solange das Abonnement dieses Kunden weiter bezahlt wird. Haben Sie zehn oder mehr empfohlene Kunden mit einem aktiven, bezahlten Abonnement zur gleichen Zeit, so beträgt der Anteil an den gültigen Zahlungen ab diesem Zeitpunkt **40%**. Eine Änderung des Anteils wirkt nicht rückwirkend.
 
 Die Provision wird auf den Betrag berechnet, der bei uns tatsächlich eingegangen ist, ohne Umsatzsteuer und jede weitere Steuer und nach jedem Rabatt, Guthaben oder Gutschein, der auf diese Zahlung angewendet wurde. Die Provision wird in der Währung berechnet, in der der Kunde gezahlt hat, und in dieser Währung oder in der Währung Ihres Zahlungswegs ausgezahlt, zu dem Kurs, den unser Zahlungsdienstleister am Tag der Auszahlung anwendet.
 

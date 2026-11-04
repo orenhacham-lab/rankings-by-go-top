@@ -63,7 +63,7 @@ Wir geben Ihre personenbezogenen Daten nicht an Dritte weiter, außer an:
 - **Vercel:** für das Hosting der Website und des Dienstes
 - **Google (Gemini-API, Search Console, Unternehmensprofil, Google-Ads-API):** unser KI-Anbieter zur Erzeugung von Text und Bildern, die Verbindungen, die Sie herstellen wollen, und die Google-Ads-API, an die wir Keywords senden, um Suchvolumen und weitere Keyword-Ideen zu erhalten. Diese Schnittstelle ist ein Konto der Gesellschaft und kein Werbekonto, das Ihnen gehört; wir schalten keine Kampagnen in Ihrem Namen; siehe „KI-Anbieter“ und „Daten, die wir von Google erhalten“ weiter unten
 - **Wix:** allein wenn Sie eine Wix-Website verbunden haben, um den Inhalt der Website zu lesen und Artikel in deren Blog zu veröffentlichen
-- **Der von Ihnen eingerichtete Endpunkt (Webhook):** allein wenn Sie eine Website einer anderen Plattform verbunden haben; der Artikel wird in einer signierten Anfrage an die von Ihnen genannte Adresse gesendet
+- **Der von Ihnen eingerichtete Endpunkt (ein Webhook, englisch „webhook“):** allein wenn Sie eine Website einer anderen Plattform verbunden haben; der Artikel wird in einer signierten Anfrage an die von Ihnen genannte Adresse gesendet
 - **PDFShift:** zur Umwandlung eines Berichts in ein PDF, und nur dann, wenn Sie das Herunterladen verlangt haben. Wir senden den Inhalt des Berichts so, wie er gezeigt wird, und erhalten dafür die PDF-Datei
 - **OpenStreetMap (Nominatim):** zur Umwandlung einer Adresse in Koordinaten, und nur dann, wenn Sie für die Beobachtung lokaler Positionen eine genaue Adresse angegeben haben. Gesendet werden die von Ihnen angegebene Adresse und der Name des Landes, niemals Daten des Kontos
 - **ScrapeLLM:** für die Beobachtung der Sichtbarkeit in KI-Antworten; siehe „KI-Anbieter“ weiter unten
@@ -88,7 +88,7 @@ Erlaubnis: lesender Zugriff auf die Search Console (**webmasters.readonly**). Wi
 - **Was wir aufbewahren:** die jedem Projekt zugeordnete Property und Ihre Berechtigungsstufe darauf sowie die Leistungsdaten jeder Synchronisierung (die letzten 28 und 90 Tage). Die Daten werden synchronisiert, wenn Sie auf Synchronisieren klicken, und automatisch etwa einmal in der Woche.
 - **Wie wir sie nutzen:** um Ihnen die Suchleistung Ihrer Website zu zeigen, um Gelegenheiten für Inhalte zu finden, um Suchzahlen in Ihre Berichte aufzunehmen und um Artikelthemen vorzuschlagen. Für die Themenvorschläge können aus diesen Daten stammende Suchabfragen an das Modell Gemini von Google gesendet werden (siehe „KI-Anbieter“ weiter unten).
 
-### Google Unternehmensprofil (Beiträge auf Google Maps)
+### Google Unternehmensprofil (Google Business Profile, Beiträge auf Google Maps)
 
 Erlaubnis: **business.manage**, in einer gesonderten Einwilligung allein dann verlangt, wenn Sie diese Funktion verbinden. Google bietet keine engere Erlaubnis an, mit der sich Beiträge erstellen lassen.
 

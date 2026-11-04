@@ -114,7 +114,7 @@ async function main() {
     // notices a note that forgot to say which account. French is `ce même
     // compte`; the accent is why the pattern is written with `m[êe]me`. Japanese
     // writes it as 同じアカウント, with no space between the words.
-    const SAME_ACCOUNT = /same account|החשבון הזה עצמו|misma cuenta|mesma conta|m[êe]me compte|stesso account|同じアカウント/i
+    const SAME_ACCOUNT = /same account|החשבון הזה עצמו|misma cuenta|mesma conta|m[êe]me compte|stesso account|genau diesem Konto|同じアカウント/i
     check('A4: every note says to sign in with the same account',
       texts.every((r) => SAME_ACCOUNT.test(r.note)), texts.filter((r) => !SAME_ACCOUNT.test(r.note)).map((r) => r.l).join(' '))
     check('A4-MUT: a note that drops the account sentence fails A4',

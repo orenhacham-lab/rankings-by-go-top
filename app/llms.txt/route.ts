@@ -73,7 +73,7 @@ const LOCALE_HEADING: Record<PublicLocale, string> = {
   de: 'Articles in German',
 }
 
-const LOCALE_ORDER: PublicLocale[] = ['he', 'en', 'es', 'pt-BR', 'fr', 'it', 'ja']
+const LOCALE_ORDER: PublicLocale[] = ['he', 'en', 'es', 'pt-BR', 'fr', 'it', 'ja', 'de']
 
 /** What the product does, one line each, as a buyer would ask about it. */
 const CAPABILITIES: [string, string, string][] = [

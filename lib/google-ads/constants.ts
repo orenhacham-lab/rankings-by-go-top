@@ -57,8 +57,6 @@ export const COUNTRY_GEO_TARGETS: Record<string, number> = {
   IT: 2380, // Italy
   JP: 2392, // Japan
   DE: 2276, // Germany
-  AT: 2040, // Austria
-  CH: 2756, // Switzerland
 }
 
 export const LANGUAGE_IDS: Record<string, number> = {

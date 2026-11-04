@@ -63,6 +63,9 @@ const GOOGLE_LANGUAGE_IDS: Record<string, number> = {
   // Read back on 30 October 2026, with the Japanese blog: languageConstants/1005
   // answers code "ja", name "Japanese", targetable true.
   ja: 1005, // Japanese
+  // Read back on 4 November 2026, with the German locale: languageConstants/1001
+  // answers code "de", name "German", targetable true.
+  de: 1001, // German
 }
 const GOOGLE_COUNTRY_IDS: Record<string, number> = {
   AR: 2032, BR: 2076, CL: 2152, CO: 2170, CY: 2196,
@@ -72,6 +75,9 @@ const GOOGLE_COUNTRY_IDS: Record<string, number> = {
   // geoTargetConstants/2392 answers name "Japan", countryCode JP, targetType
   // Country, status ENABLED. Read back the same day as the language above.
   JP: 2392,
+  // geoTargetConstants/2276 answers name "Germany", countryCode DE, targetType
+  // Country, status ENABLED. Read back the same day as the language above.
+  DE: 2276,
 }
 
 function main() {
