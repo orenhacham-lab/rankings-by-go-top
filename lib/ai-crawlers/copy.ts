@@ -104,6 +104,7 @@ const he: AiCrawlerCopy = {
     train: { label: 'אימון', blurb: 'אוסף דפים כדי לאמן מודל. חסימה משאירה אתכם מחוץ למודל הבא.' },
     answer: { label: 'תשובה חיה', blurb: 'מביא את הדף ברגע שמישהו שואל, כדי לצטט אתכם בתשובה עם קישור.' },
     search: { label: 'אינדקס', blurb: 'בונה אינדקס חיפוש, שממנו נשענות גם תשובות ה-AI.' },
+    ads: { label: 'מודעות', blurb: 'בודק דפי נחיתה של מודעות. חסימה שלו לא משפיעה על תשובות ולא על האינדקס.' },
   },
   groups: { ai: 'סורקי AI', classic: 'סורקי חיפוש קלאסיים' },
   reference: {
@@ -179,6 +180,7 @@ const en: AiCrawlerCopy = {
     train: { label: 'Training', blurb: 'Collects pages to train a model. Blocking it keeps you out of the next model.' },
     answer: { label: 'Live answer', blurb: 'Fetches the page the moment someone asks, to cite you in an answer with a link.' },
     search: { label: 'Index', blurb: 'Builds a search index, which AI answers are built on top of.' },
+    ads: { label: 'Adverts', blurb: 'Checks the landing pages of adverts. Blocking it affects neither answers nor the index.' },
   },
   groups: { ai: 'AI crawlers', classic: 'Classic search crawlers' },
   reference: {
@@ -254,6 +256,7 @@ const es: AiCrawlerCopy = {
     train: { label: 'Entrenamiento', blurb: 'Recopila páginas para entrenar un modelo. Bloquearlo te deja fuera del próximo modelo.' },
     answer: { label: 'Respuesta en vivo', blurb: 'Carga la página en el momento en que alguien pregunta, para citarte en la respuesta con un enlace.' },
     search: { label: 'Índice', blurb: 'Construye un índice de búsqueda, sobre el que se apoyan también las respuestas de IA.' },
+    ads: { label: 'Anuncios', blurb: 'Revisa las páginas de destino de los anuncios. Bloquearlo no afecta ni a las respuestas ni al índice.' },
   },
   groups: { ai: 'Rastreadores de IA', classic: 'Rastreadores de búsqueda clásicos' },
   reference: {
@@ -329,6 +332,7 @@ const ptBR: AiCrawlerCopy = {
     train: { label: 'Treinamento', blurb: 'Reúne páginas para treinar um modelo. Bloquear deixa você fora do próximo modelo.' },
     answer: { label: 'Resposta ao vivo', blurb: 'Carrega a página no momento em que alguém pergunta, para citar você na resposta com um link.' },
     search: { label: 'Índice', blurb: 'Constrói um índice de busca, no qual as respostas de IA também se apoiam.' },
+    ads: { label: 'Anúncios', blurb: 'Verifica as páginas de destino dos anúncios. Bloquear não afeta nem as respostas nem o índice.' },
   },
   groups: { ai: 'Rastreadores de IA', classic: 'Rastreadores de busca clássicos' },
   reference: {
@@ -404,6 +408,7 @@ const fr: AiCrawlerCopy = {
     train: { label: 'Entraînement', blurb: "Rassemble des pages pour entraîner un modèle. Le bloquer vous laisse hors du prochain modèle." },
     answer: { label: 'Réponse en direct', blurb: "Charge la page au moment où quelqu'un pose une question, pour vous citer dans la réponse avec un lien." },
     search: { label: 'Index', blurb: "Construit un index de recherche, sur lequel s'appuient aussi les réponses d'IA." },
+    ads: { label: 'Publicités', blurb: "Vérifie les pages de destination des publicités. Le bloquer n'affecte ni les réponses ni l'index." },
   },
   groups: { ai: "Robots d'IA", classic: 'Robots de recherche classiques' },
   reference: {
@@ -479,6 +484,7 @@ const it: AiCrawlerCopy = {
     train: { label: 'Addestramento', blurb: 'Raccoglie pagine per addestrare un modello. Bloccarlo ti lascia fuori dal prossimo modello.' },
     answer: { label: 'Risposta dal vivo', blurb: 'Carica la pagina nel momento in cui qualcuno fa una domanda, per citarti nella risposta con un collegamento.' },
     search: { label: 'Indice', blurb: 'Costruisce un indice di ricerca, su cui si appoggiano anche le risposte IA.' },
+    ads: { label: 'Annunci', blurb: 'Controlla le pagine di destinazione degli annunci. Bloccarlo non influisce né sulle risposte né sull’indice.' },
   },
   groups: { ai: 'Crawler IA', classic: 'Crawler di ricerca classici' },
   reference: {
@@ -554,6 +560,7 @@ const ja: AiCrawlerCopy = {
     train: { label: '学習', blurb: 'モデルの学習のためにページを収集します。拒否すると、次のモデルに載らなくなります。' },
     answer: { label: 'その場での回答', blurb: '誰かが質問したその時にページを取得し、回答の中でリンク付きで引用します。' },
     search: { label: '検索インデックス', blurb: '検索インデックスを作ります。AIの回答もこの上に成り立っています。' },
+    ads: { label: '広告', blurb: '広告のリンク先ページを確認します。拒否しても、回答にも検索インデックスにも影響しません。' },
   },
   groups: { ai: 'AIクローラー', classic: '従来の検索クローラー' },
   reference: {
