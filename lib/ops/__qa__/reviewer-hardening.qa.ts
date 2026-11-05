@@ -390,9 +390,16 @@ async function main() {
     })
     check('C2: a LIVE one is — so the two rules are genuinely distinguished',
       b.state === 'known' && b.used === 5, JSON.stringify(b))
+    // This case is about the LEASE boundary, so the account has to be entitled at
+    // the moment it asks about: readUsageAllowance resolves the entitlement on the
+    // clock it is given, and a Shopify billing cache is trusted for five minutes
+    // (CACHE_FRESHNESS_MS), so a verification stamped two hours earlier would read
+    // as "entitlement unavailable" and say nothing about the lease.
+    const later = now() + 2 * 60 * 60_000
+    t.shopify_connections[0].shopify_billing_verified_at = new Date(later - 60_000).toISOString()
     const c = await readUsageAllowance(ADMIN_CLIENT, {
       userId: USER, usageType: 'ai_check',
-      limitFor: (l: any) => l.maxAIScansPerPeriodPerProject, nowMs: now() + 2 * 60 * 60_000,
+      limitFor: (l: any) => l.maxAIScansPerPeriodPerProject, nowMs: later,
     })
     check('C3: and the boundary is the clock, not a constant — two hours later it has lapsed',
       c.state === 'known' && c.used === 0, JSON.stringify(c))

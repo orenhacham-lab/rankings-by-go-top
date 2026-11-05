@@ -17,6 +17,9 @@
  *   C) the hero's next step: with nothing left it leads to /billing with an
  *      upgrade label, never to "run more checks"; otherwise it stays the run step.
  *   D) the tab's rows enter with the shared motion helper (P2-17, AI part).
+ *   E) one clock: `nowMs` reaches the entitlement and the period, not only the
+ *      lease arithmetic. Added 2026-11-05, after a pinned QA fixture went red
+ *      on the day its period ended while the product was fine.
  *
  * Nothing here changes a limit, a plan or an entitlement: the runs route is the
  * reference and is only called.
@@ -244,6 +247,47 @@ async function main() {
     const css = read('app/globals.css')
     check('D2: the entrance is defined only for prefers-reduced-motion: no-preference',
       /@media \(prefers-reduced-motion: no-preference\) \{\s*\.reveal\[data-reveal='wait'\]/.test(css))
+  }
+
+  say('\nE) one clock: a caller that passes `nowMs` gets the whole answer on it')
+  {
+    const { readUsageAllowance } = require('../../billing/usage-allowance.ts')
+    const { writeFileSync, unlinkSync } = require('fs')
+    // A paid period that ENDED before today and contains the moment the caller
+    // names. Read on the real clock this subscription is over, so the
+    // entitlement calls it a trial (limit 0, "not included"); read on the
+    // caller's clock it is the Basic plan it is.
+    const ENDED = Date.now() - 10 * DAY
+    const t = base()
+    t.billing_governance = [{ user_id: USER, signup_origin: 'website', billing_authority: 'website', authority_reason: 'website_signup' }]
+    t.subscriptions = [{ id: 'sub-9', user_id: USER, status: 'active', plan_code: 'regular', trial_ends_at: null,
+      current_period_start: iso(ENDED - 20 * DAY), current_period_end: iso(ENDED), created_at: iso(ENDED - 50 * DAY) }]
+    clients(t)
+    const args = { userId: USER, usageType: 'ai_check', limitFor: (l: any) => l.maxAIScansPerPeriodPerProject }
+    quiet()
+    const onClock = await readUsageAllowance(ADMIN_CLIENT, { ...args, nowMs: ENDED - DAY })
+    const onRealClock = await readUsageAllowance(ADMIN_CLIENT, args)
+    loud()
+    check('E1: the plan and the period are resolved on the clock the caller passed',
+      onClock.state === 'known' && onClock.plan === 'regular' && onClock.limit > 0
+      && onClock.periodStart === iso(ENDED - 20 * DAY), JSON.stringify(onClock))
+    check('E2: and without one, on the real clock — an ended subscription is not a current plan',
+      onRealClock.state !== 'known' || onRealClock.plan !== 'regular', JSON.stringify(onRealClock))
+    // MUTATION CONTROL: the read as it was, with `nowMs` reaching only the lease
+    // arithmetic. The same call then answers from two moments at once.
+    const src = read('lib/billing/usage-allowance.ts')
+    const broken = src
+      .replace('getUserEntitlement(args.userId, admin, nowFn)', 'getUserEntitlement(args.userId, admin)')
+      .replace('resolveCurrentUsagePeriod(admin, args.userId, nowFn)', 'resolveCurrentUsagePeriod(admin, args.userId)')
+    if (broken === src) { check('E-MUT: (the clock is not threaded where this expects)', false, 'both calls unchanged') } else {
+      const file = join(ROOT, 'lib/billing/__qa__/usage-allowance.mut-clock.ts')
+      writeFileSync(file, broken.replace(/@\/lib\//g, '../../'))
+      try {
+        quiet(); const mut = await require(file).readUsageAllowance(ADMIN_CLIENT, { ...args, nowMs: ENDED - DAY }); loud()
+        check('E-MUT: without the threading the same call reads the plan on today\'s clock and fails E1',
+          !(mut.state === 'known' && mut.plan === 'regular'), JSON.stringify(mut))
+      } finally { try { unlinkSync(file) } catch { /* gone */ } }
+    }
   }
 
   say(`\n${pass} passed, ${fail} failed`)
