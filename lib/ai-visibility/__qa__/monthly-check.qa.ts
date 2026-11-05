@@ -591,7 +591,27 @@ async function main() {
     // untouched, and that is the number this check exists to protect.
     const CREEM_PROVIDER = new Set(['lib/billing/entitlement-write.ts'])
     untouched = untouched.split('\n').filter((f) => f && !CREEM_PROVIDER.has(f)).join('\n')
+    // Owner 2026-11-05: readUsageAllowance resolves the whole answer on ONE clock.
+    // It already took `nowMs` and passed it only to the reservation-lease
+    // arithmetic, so a caller that gave it a clock got the plan and the period as
+    // of today instead. No plan, price, quota or limit VALUE changes, and no real
+    // caller passes `nowMs`: production reads the same numbers it always did. Kept
+    // out of the set below and checked line by line in H4c instead, so the file
+    // stays protected against anything but the clock.
+    const ONE_CLOCK = new Set(['lib/billing/usage-allowance.ts'])
+    untouched = untouched.split('\n').filter((f) => f && !ONE_CLOCK.has(f)).join('\n')
     check('H4: plans, prices, quotas, billing, entitlement and Shopify files are untouched', untouched === '', untouched)
+    let allowDiff = ''
+    try { allowDiff = execSync('git diff -U0 8b468a8 -- lib/billing/usage-allowance.ts', { cwd: ROOT }).toString() } catch { allowDiff = 'git unavailable' }
+    const allowChanged = allowDiff.split('\n').filter((l: string) => /^[+-]/.test(l) && !/^(\+\+\+|---)/.test(l))
+      // The added comment that explains the threading is not a change to the read.
+      .filter((l: string) => !/^[+-]\s*(\/\/|\*|\/\*)/.test(l))
+    check('H4c: lib/billing/usage-allowance.ts changed only by threading one clock into its two readers',
+      allowChanged.length > 0 && allowChanged.every((l: string) => /nowFn|getUserEntitlement\(args\.userId, admin|resolveCurrentUsagePeriod\(admin, args\.userId/.test(l)),
+      allowChanged.join(' ;; ').slice(0, 300))
+    const clockOnly = (ls: string[]) => ls.every((l: string) => /nowFn|getUserEntitlement\(args\.userId, admin|resolveCurrentUsagePeriod\(admin, args\.userId/.test(l))
+    check('H4c-MUT: a line that changes anything else in that file fails H4c',
+      !clockOnly([...allowChanged, "+  const limit = 20"]))
     // lib/subscription.ts may differ from 8b468a8 ONLY on the display-only trial line (PLAN_FEATURES.trial); nothing of entitlement moved.
     let subDiff = ''
     try { subDiff = execSync('git diff -U0 8b468a8 -- lib/subscription.ts', { cwd: ROOT }).toString() } catch { subDiff = 'git unavailable' }
