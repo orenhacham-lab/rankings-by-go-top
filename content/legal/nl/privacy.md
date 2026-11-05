@@ -430,7 +430,7 @@ Voor elke vraag over privacy, daaronder begrepen het uitoefenen van de hierboven
 
 Wij zijn op grond van wijziging 13 van de Israëlische wet op de bescherming van de persoonlijke levenssfeer niet verplicht een functionaris voor de gegevensbescherming aan te wijzen, en wij hebben er geen aangewezen. Voor Nederland en de Europese Unie zijn het ontbreken van een aanwijzing volgens artikel 37 AVG en het kanaal dat daarvoor in de plaats komt beschreven in het onderdeel 'Rechten van personen in Nederland en in de Europese Unie (AVG)'. De verzoeken behandelt het hierboven genoemde contact.
 
-De identificatiegegevens van de vennootschap die artikel 3:15d BW verlangt, staan in de voettekst van de website en in de [gebruiksvoorwaarden](/nl/terms). Er is geen afzonderlijke impressumpagina, omdat het Nederlandse recht die niet voorschrijft.
+De identificatiegegevens van de vennootschap die artikel 3:15d lid 1 BW verlangt, staan bij elkaar op de pagina [Bedrijfsgegevens](/nl/bedrijfsgegevens), waarnaar de voettekst van elke Nederlandse pagina verwijst, en daarnaast in de [gebruiksvoorwaarden](/nl/terms).
 
 ## Bijwerkingen van deze verklaring
 

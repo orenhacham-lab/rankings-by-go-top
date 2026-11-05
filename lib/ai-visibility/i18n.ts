@@ -1370,7 +1370,15 @@ const STRINGS = {
   ai_summary_weak: { he: 'החולשה המרכזית היא ב־{names}.', en: 'The main weakness is on {names}.', es: 'La mayor debilidad está en {names}.', 'pt-BR': 'A maior fraqueza está em {names}.', fr: 'La principale faiblesse se situe sur {names}.', it: 'La debolezza principale riguarda {names}.', ja: '主な弱点は {names} です。', de: 'Die größte Schwäche liegt bei {names}.', nl: 'De grootste zwakte zit op {names}.' },
   competitors_used_for: { he: 'המתחרים ישמשו להשוואת נראות בתשובות AI.', en: 'These competitors are used to compare AI visibility.', es: 'Estos competidores se usan para comparar la visibilidad en IA.', 'pt-BR': 'Estes concorrentes são usados para comparar a visibilidade em IA.', fr: 'Ces concurrents servent à comparer la visibilité dans les IA.', it: 'Questi concorrenti servono a confrontare la visibilità nelle IA.', ja: 'これらの競合は、AIでの可視性を比べるために使います。', de: 'Diese Wettbewerber werden zum Vergleich der Sichtbarkeit in der KI verwendet.', nl: 'Deze concurrenten worden gebruikt om de zichtbaarheid in de AI te vergelijken.' },
   open_source: { he: 'פתיחת המקור בכרטיסייה חדשה', en: 'Open the source in a new tab', es: 'Abrir la fuente en una pestaña nueva', 'pt-BR': 'Abrir a fonte em uma nova aba', fr: 'Ouvrir la source dans un nouvel onglet', it: 'Aprire la fonte in una nuova scheda', ja: '情報源を新しいタブで開く', de: 'Die Quelle in einem neuen Tab öffnen', nl: 'De bron in een nieuw tabblad openen' },
-} as const
+}
+/*
+ * NOT `as const`. With nine locales and 552 entries, `as const` asked the
+ * compiler to infer about five thousand distinct string LITERAL types, and
+ * `tsc --noEmit` ran out of heap at 2 GB the moment Dutch was added — which
+ * would have failed the production build, not just this check. Nothing needs
+ * the literal values: `StringKey` only needs the KEYS, and those are still
+ * literal without it, because an object literal's keys always are.
+ */
 
 type StringKey = keyof typeof STRINGS
 

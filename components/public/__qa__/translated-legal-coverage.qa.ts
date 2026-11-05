@@ -205,7 +205,7 @@ const LAW: Record<string, { doc: Doc; name: string; must: RegExp }[]> = {
     { doc: 'accessibility', name: 'the micro-enterprise exemption of the Dutch EAA implementation act', must: /Implementatiewet toegankelijkheidsvoorschriften producten en diensten[\s\S]{0,200}micro-onderneming/ },
     { doc: 'affiliate-terms', name: 'the Dutch prohibition of hiding a commercial purpose, by article', must: /artikel 6:193d BW/ },
     { doc: 'affiliate-terms', name: 'the editorial-content rule a paid partner is judged against', must: /artikel 6:193g, onder k, BW/ },
-    { doc: 'affiliate-terms', name: 'the BW rule that a commercial communication must be identifiable', must: /[Aa]rtikel 3:15e BW/ },
+    { doc: 'affiliate-terms', name: 'the BW rule that a commercial communication must be identifiable', must: /[Aa]rtikel 3:15e lid 1 sub a BW/ },
     { doc: 'affiliate-terms', name: 'the Telecommunicatiewet rule on unsolicited advertising email', must: /[Aa]rtikel 11\.7 van de Telecommunicatiewet/ },
     { doc: 'affiliate-terms', name: 'the FTC endorsement guides, by citation', must: /16 CFR/ },
     { doc: 'affiliate-terms', name: 'the European consumer forum rule in the partner agreement too', must: /1215\/2012/ },

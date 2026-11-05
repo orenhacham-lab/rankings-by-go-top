@@ -141,21 +141,30 @@ console.log('A) the trees are mirrors, which is what hreflang rests on')
     check(`A1 app/${group}: the Dutch tree has every Spanish route`,
       es.every((r) => nl.includes(r)), es.filter((r) => !nl.includes(r)).join(' '))
     /*
-     * A2 allows NO extra route, in either tree. German gets /de/impressum and
-     * Japanese /ja/tokusho because their own law asks for that page; Dutch law
-     * does not, so an extra route here is a page copied from the German tree by
-     * reflex, which is exactly what this check is for.
+     * A2 allows EXACTLY ONE extra route, and names it: bedrijfsgegevens, the
+     * identity page artikel 3:15d lid 1 BW asks for, the Dutch counterpart of
+     * /de/impressum and /ja/tokusho. Anything else in the Dutch tree that the
+     * Spanish tree does not have is a page copied from another locale by
+     * reflex, which is what this check is for — and the page must NOT be called
+     * impressum, because that is a German word for a German statute (E9).
      */
-    const extras = nl.filter((r) => !es.includes(r))
-    check(`A2 app/${group}: and no route the Spanish tree does not have — Dutch law adds no page`,
+    const ALLOWED_EXTRA = group === '(public)' ? ['bedrijfsgegevens/page.tsx'] : []
+    const extras = nl.filter((r) => !es.includes(r) && !ALLOWED_EXTRA.includes(r))
+    check(`A2 app/${group}: and no route beyond the Spanish tree except ${ALLOWED_EXTRA.join(', ') || 'none'}`,
       extras.length === 0, extras.join(' '))
+    if (ALLOWED_EXTRA.length) {
+      check(`A2a app/${group}: the identity page artikel 3:15d BW asks for IS there`,
+        ALLOWED_EXTRA.every((r) => nl.includes(r)), ALLOWED_EXTRA.filter((r) => !nl.includes(r)).join(' '))
+    }
     check(`A3 app/${group}: and it is not empty`, nl.length > 0)
   }
   const es = routes('app/(public)/es')
   check('A1-MUT: a Spanish route with no Dutch twin fails A1',
     ![...es, 'press-kit/page.tsx'].every((r) => routes('app/(public)/nl').includes(r)))
   check('A2-MUT: an impressum copied into the Dutch tree fails A2',
-    ['impressum/page.tsx'].filter((r) => !es.includes(r)).length === 1)
+    ['impressum/page.tsx'].filter((r) => !es.includes(r) && r !== 'bedrijfsgegevens/page.tsx').length === 1)
+  check('A2a-MUT: a Dutch tree without the identity page fails A2a',
+    !['bedrijfsgegevens/page.tsx'].every((r) => es.includes(r)))
 }
 
 console.log('\nB) one gate per tree')
@@ -473,43 +482,73 @@ console.log('\nE) the reader never changes language, and Dutch adds no page of i
   check('E8: every path the sitemap advertises has a Dutch page', missing.length === 0, missing.join(' '))
 
   /*
-   * E9: THERE IS NO DUTCH IMPRESSUM, AND NOTHING POINTS AT ONE.
+   * E9: THE IDENTITY PAGE EXISTS, IS DUTCH, AND IS NOT CALLED IMPRESSUM.
    *
-   * This is the inverse of the German suite's E9, and it is a real guard rather
-   * than a formality: /nl was copied from /de, the German tree has that page,
-   * and the five Dutch legal documents were translated from the German ones,
-   * four of which end by pointing the reader at /de/impressum. A copy left
-   * behind would both add a page Dutch law does not ask for and send a Dutch
-   * reader into the German tree. What Art. 3:15d BW does ask for — the
-   * provider's identity, address and contact, easily and permanently accessible
-   * — is carried by the footer and by the terms, so E9b checks it is actually
-   * named there rather than merely not-missing.
+   * Artikel 3:15d lid 1 BW is the Dutch counterpart of §5 DDG, and it carries no
+   * establishment qualifier, so Dutch owes the same content German does: the
+   * provider's identity and address (sub a), the contact including the e-mail
+   * (sub b), the REGISTER it is entered in and its number (sub c — the register
+   * NAMED, not only the number) and the VAT identification number (sub f),
+   * which we do not have in the Netherlands and therefore have to say so about.
+   * The legal thread read the statute and ruled on 5 Nov 2026; the earlier
+   * reading in this suite, that Dutch law asks for no such page, was wrong.
+   *
+   * What the page must NOT be is a copy of the German one. Two things are
+   * checked for that: its slug is Dutch (impressum is a German word for a German
+   * statute, and lid 1 prescribes no title at all), and the German MStV line
+   * naming a person responsible for journalistic-editorial content is absent,
+   * because the Netherlands has no MStV analogue and presenting one as required
+   * would be a false claim about the law.
    */
-  check('E9: the Dutch tree has no impressum page',
-    !existsSync(join(ROOT, 'app/(public)/nl/impressum/page.tsx')))
-  const legal = ['terms', 'privacy', 'refund-policy', 'affiliate-terms', 'accessibility']
+  const INFO = 'app/(public)/nl/bedrijfsgegevens/page.tsx'
+  check('E9: the Dutch tree carries the artikel 3:15d BW identity page', existsSync(join(ROOT, INFO)))
+  check('E9a: and it is not called impressum', !existsSync(join(ROOT, 'app/(public)/nl/impressum/page.tsx')))
+  const info = existsSync(join(ROOT, INFO)) ? read(INFO) : ''
+  check('E9b: it names the register, not only the number',
+    /Registrar of Companies/.test(info) && /517274346/.test(info))
+  check('E9c: it says we have no Dutch VAT identification number, and who the seller of record is',
+    /geen Nederlands btw-identificatienummer/.test(info) && /merchant of record/.test(info))
+  check('E9d: it carries the identity, the address and the e-mail',
+    /GO TOP DIGITAL MARKETING AND ADVERTISING LTD/.test(info)
+    && /HaRechasim 24\/2/.test(info) && /oren@gotop\.co\.il/.test(info))
+  check('E9e: and it cites the article it answers',
+    /3:15d/.test(info))
+  check('E9f: it does NOT claim a Dutch duty to name someone responsible for editorial content',
+    !/Medienstaatsvertrag|MStV|verantwoordelijk voor journalistiek/i.test(strip(info)))
+  check('E9f-MUT: the German line is what that check rejects',
+    /Medienstaatsvertrag|MStV|verantwoordelijk voor journalistiek/i.test('Verantwortlich nach § 18 Absatz 2 des Medienstaatsvertrags (MStV)'))
+  // The same two detectors sections D uses, applied to this one page: the copy
+  // is Dutch, it keeps the formal `u`, and it names no price in euros.
+  const JE_FORM = /(?<!\p{L})(?:je|jij|jou|jouw|jullie)(?!\p{L})/iu
+  const EURO_PRICE = /€|(?<!\p{L})EUR(?!\p{L})|\d+(?:[.,]\d+)?\s*euro/iu
+  check('E9g: the copy is Dutch, in the u register, and names no euro price',
+    HAS_DUTCH(info) && !JE_FORM.test(info) && !EURO_PRICE.test(info))
+  check('E9g-MUT: the detectors fire on je-form and on a euro price',
+    JE_FORM.test('Hier zijn jouw gegevens') && EURO_PRICE.test('79 € per maand'))
+
   /*
-   * A LINK, not the word: every Dutch document says in prose that there is no
-   * separate impressum page and why, which is the sentence that replaces the
-   * German pointer. What must not survive is a href into one.
+   * E9h: NO DUTCH DOCUMENT SENDS THE READER INTO THE GERMAN TREE. The five
+   * Dutch documents were translated from the German ones, four of which end by
+   * pointing at /de/impressum, so a surviving href is a live defect.
    */
   const IMPRESSUM_LINK = /\]\(\s*\/[a-z-]{2,5}\/impressum|href=["']\/[a-z-]{2,5}\/impressum/i
-  const pointing = legal.filter((d) => IMPRESSUM_LINK.test(read(`content/legal/nl/${d}.md`)))
-  check('E9a: and no Dutch legal document links the reader to one',
-    pointing.length === 0, pointing.join(' '))
-  check('E9b: instead the terms and the privacy statement name the Art. 3:15d BW details themselves',
-    ['terms', 'privacy'].every((d) => /3:15d BW/.test(read(`content/legal/nl/${d}.md`)))
-    && /517274346/.test(read('content/legal/nl/terms.md'))
-    && /HaRechasim 24\/2/.test(read('content/legal/nl/terms.md')))
-  check('E9-MUT: a document that still linked the German Impressum would be caught, and the Dutch sentence that replaces it would not',
+  const LEGAL_DOCS = ['terms', 'privacy', 'refund-policy', 'affiliate-terms', 'accessibility']
+  const pointing = LEGAL_DOCS.filter((d) => IMPRESSUM_LINK.test(read(`content/legal/nl/${d}.md`)))
+  check('E9h: no Dutch legal document links a /xx/impressum', pointing.length === 0, pointing.join(' '))
+  check('E9h-MUT: a document that still linked the German Impressum would be caught, and the Dutch pointer would not',
     IMPRESSUM_LINK.test('Die vollständigen Angaben stehen im [Impressum](/de/impressum).')
-    && !IMPRESSUM_LINK.test('Er is geen afzonderlijke impressumpagina, omdat het Nederlandse recht die niet voorschrijft.'))
+    && !IMPRESSUM_LINK.test('Alle gegevens staan op de pagina [Bedrijfsgegevens](/nl/bedrijfsgegevens).'))
+  check('E9i: and the terms and the privacy statement point at the Dutch page instead',
+    ['terms', 'privacy'].every((d) => /\]\(\/nl\/bedrijfsgegevens\)/.test(read(`content/legal/nl/${d}.md`))))
 
   check('E10: the sitemap does not advertise an impressum for Dutch',
     !/nl\/impressum/.test(read('app/sitemap.xml/route.ts')))
-  check('E11: and the footer links the Impressum for German readers only, never for Dutch',
-    /locale === 'de' &&/.test(strip(read('components/Footer.tsx')))
+  check('E11: the footer links the German Impressum for German readers and the Dutch page for Dutch ones',
+    /locale === 'de' &&[\s\S]{0,200}GERMAN_IMPRESSUM_LINK\.href/.test(strip(read('components/Footer.tsx')))
+    && /locale === 'nl' &&[\s\S]{0,200}DUTCH_COMPANY_INFO_LINK\.href/.test(strip(read('components/Footer.tsx')))
     && !/locale === 'nl' &&[\s\S]{0,200}IMPRESSUM/i.test(strip(read('components/Footer.tsx'))))
+  check('E11-MUT: a Dutch footer that linked the GERMAN page is caught',
+    /locale === 'nl' &&[\s\S]{0,200}IMPRESSUM/i.test("{locale === 'nl' && <Link href={GERMAN_IMPRESSUM_LINK.href}/>}"))
 }
 
 console.log(`\n${pass} passed, ${fail} failed`)

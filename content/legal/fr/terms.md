@@ -15,7 +15,7 @@ Go Top SEO
 
 ## 1. Introduction et définition du Service
 
-Go Top SEO (le « Service » ou la « Plateforme ») est un service SaaS exploité par GO TOP DIGITAL MARKETING AND ADVERTISING LTD (numéro de société 517274346) (la « Société »). Le Service permet aux clients de suivre le positionnement de mots-clés dans la recherche Google, de surveiller la visibilité sur Google Maps, de mesurer la visibilité dans les moteurs d'IA comme ChatGPT, Gemini et Perplexity, de faire de la recherche de mots-clés et de produire des rapports professionnels. Le Service comprend également l'analyse de sites Web, les connexions à des comptes Google et à des sites WordPress, les corrections du site que vous approuvez, ainsi que du contenu et des courriels produits par IA, comme indiqué aux sections 15A à 15G.
+Go Top SEO (le « Service » ou la « Plateforme ») est un service SaaS exploité par GO TOP DIGITAL MARKETING AND ADVERTISING LTD (numéro de société 517274346) (la « Société »). Le Service permet aux clients de suivre le positionnement de mots-clés dans la recherche Google, de surveiller la visibilité sur Google Maps, de mesurer la visibilité dans les moteurs d'IA comme ChatGPT, Gemini et Perplexity, de faire de la recherche de mots-clés et de produire des rapports professionnels. Le Service comprend également l'analyse de sites Web, les connexions à des comptes Google et à des sites WordPress, les corrections du site que vous approuvez, ainsi que du contenu et des courriels produits par IA, comme indiqué aux sections 15A à 15H.
 
 ## 2. Acceptation des Conditions
 
