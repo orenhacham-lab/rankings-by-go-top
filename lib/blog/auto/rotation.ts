@@ -33,16 +33,23 @@
  * so it is the language with the most to publish for, not the easiest to
  * translate into.
  *
- * THE ORDER OF THIS LIST IS LOAD-BEARING, and German is last on purpose.
+ * `nl` joined on 5 Nov 2026, written for the NETHERLANDS alone: the public tree
+ * is /nl, the keyword research runs on the Dutch market (geo 2528, language
+ * 1010) and NOT on Belgium, and the legal pages behind it are written to Dutch
+ * and European law. It is the language measured second in the comparison above,
+ * and its two strongest terms were measured on their own: `backlinks checken`
+ * at 4,400 a month with low competition, and `lokale seo` with `seo lokaal` at
+ * 520 together.
+ *
+ * THE ORDER OF THIS LIST IS LOAD-BEARING, and Dutch is last on purpose.
  * lib/blog/auto/daily-window.ts writes at most one language per cron run and
- * walks this list in order, inside a four-hour window of sixteen runs. Eight
- * languages publishing first time need eight of them; the rest is reserve for a
+ * walks this list in order, inside a six-hour window of twenty-four runs. Nine
+ * languages publishing first time need nine of them; the rest is reserve for a
  * language that fails the quality gate and retries (on 17 Oct Spanish needed
- * three passes). Adding a language therefore spends reserve — with eight
- * languages the window keeps eight runs of reserve, half of what it held with
- * five — and the language that pays for a bad morning is the LAST one here.
- * Putting German last is what keeps a new language from ever costing an
- * existing one its article.
+ * three passes). Adding a language therefore spends reserve — with nine
+ * languages the window keeps fifteen runs of it — and the language that pays
+ * for a bad morning is the LAST one here. Putting Dutch last is what keeps a
+ * new language from ever costing an existing one its article.
  *
  * Pure: no I/O. `localesForDay()` reads the public-language flags, which Next
  * inlines at build time, and nothing else.
@@ -50,7 +57,7 @@
 import { publicLocaleEnabled } from '@/lib/i18n/locales'
 
 /** The languages this runner can write. A subset of PUBLIC_LOCALES. */
-export const BLOG_AUTO_LOCALES = ['he', 'en', 'es', 'pt-BR', 'fr', 'it', 'ja', 'de'] as const
+export const BLOG_AUTO_LOCALES = ['he', 'en', 'es', 'pt-BR', 'fr', 'it', 'ja', 'de', 'nl'] as const
 export type BlogAutoLocale = (typeof BLOG_AUTO_LOCALES)[number]
 
 export function isBlogAutoLocale(value: unknown): value is BlogAutoLocale {
@@ -76,5 +83,5 @@ export function localesForDay(): readonly BlogAutoLocale[] {
 
 /** How many articles a week each language gets — the queue's refill target reads this. */
 export function weeklyShare(): Record<BlogAutoLocale, number> {
-  return { he: 7, en: 7, es: 7, 'pt-BR': 7, fr: 7, it: 7, ja: 7, de: 7 }
+  return { he: 7, en: 7, es: 7, 'pt-BR': 7, fr: 7, it: 7, ja: 7, de: 7, nl: 7 }
 }

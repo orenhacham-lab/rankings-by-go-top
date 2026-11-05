@@ -425,6 +425,7 @@ check('MUTATION — an English-only extra section is caught', pages.he.terms.h2 
     'it.wikipedia.org': 'named as the Italian Wikipedia in the sameAs example placeholder of the Italian project settings; the owner types their own URL and our code sends it nothing',
     'ja.wikipedia.org': 'named as the Japanese Wikipedia in the sameAs example placeholder of the Japanese project settings; the owner types their own URL and our code sends it nothing',
     'de.wikipedia.org': 'named as the German Wikipedia in the sameAs example placeholder of the German project settings; the owner types their own URL and our code sends it nothing',
+    'nl.wikipedia.org': 'named as the Dutch Wikipedia in the sameAs example placeholder of the Dutch project settings; the owner types their own URL and our code sends it nothing',
     'app.example.com': 'placeholder in a comment or default',
     'shop.com': 'placeholder in a comment or default',
     'destination.com': 'placeholder in a comment or default',

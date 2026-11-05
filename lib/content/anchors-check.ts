@@ -140,10 +140,12 @@ const MECHANICAL_IT = ['maggiori informazioni', 'per maggiori informazioni', 'pi
 
 const MECHANICAL_JA = ['詳細はこちら', '詳しくはこちら', 'こちらをクリック', 'こちらから', '続きを読む', 'もっと読む', 'もっと見る', '詳細情報', '詳しい情報はこちら', 'このようなサイト', '〜のようなサイト', 'こちらをご覧ください', 'ここをクリック', '詳しくは以下']
 
+const MECHANICAL_NL = ['meer informatie', 'voor meer informatie', 'klik hier', 'hier klikken', 'lees meer', 'meer lezen', 'lees verder', 'een pagina zoals', 'pagina\u2019s zoals', 'een website zoals', 'bekijk hier', 'kijk hier', 'zie hier', 'hier vindt u meer', 'lees hier meer']
+
 const MECHANICAL_DE = ['mehr informationen', 'weitere informationen', 'für weitere informationen', 'hier klicken', 'klicken sie hier', 'mehr lesen', 'weiterlesen', 'mehr erfahren', 'eine seite wie', 'seiten wie', 'eine website wie', 'hier ansehen', 'mehr dazu', 'siehe hier', 'hier geht es weiter']
 
 /** Mechanical anchor phrases keyed by content language. */
-const MECHANICAL: Record<SuggestionLanguage, string[]> = { he: MECHANICAL_HE, en: MECHANICAL_EN, es: MECHANICAL_ES, 'pt-BR': MECHANICAL_PT, fr: MECHANICAL_FR, it: MECHANICAL_IT, ja: MECHANICAL_JA, de: MECHANICAL_DE }
+const MECHANICAL: Record<SuggestionLanguage, string[]> = { he: MECHANICAL_HE, en: MECHANICAL_EN, es: MECHANICAL_ES, 'pt-BR': MECHANICAL_PT, fr: MECHANICAL_FR, it: MECHANICAL_IT, ja: MECHANICAL_JA, de: MECHANICAL_DE, nl: MECHANICAL_NL }
 
 export interface AnchorHit {
   href: string

@@ -98,6 +98,16 @@ export const REASON_TEXT: Record<ContentLanguage, ReasonText> = {
     supportingTopic: 'サイトのデータにもとづく補完テーマ',
     numberLocale: 'ja-JP',
   },
+  nl: {
+    fillsGap: 'Het onderwerp vult een hiaat in de content op een gebied waarop het bedrijf actief is.',
+    freshAngle: 'Het onderwerp voegt een nieuwe invalshoek toe aan de bestaande content van de website.',
+    supportedByExisting: 'Het wordt ondersteund door pagina\u2019s en producten die al op de website staan.',
+    demand: (query, volume) => `Het zoekwoordenonderzoek laat voor \u201e${query}\u201d ongeveer ${volume} zoekopdrachten per maand zien.`,
+    neutral: 'Het onderwerp past bij het werkterrein van het bedrijf en bij de zoektermen die in het onderzoek gevonden zijn.',
+    foundInSearchData: (volume) => `Gevonden in de zoekdata, met ongeveer ${volume} zoekopdrachten per maand`,
+    supportingTopic: 'Aanvullend onderwerp op basis van de websitegegevens',
+    numberLocale: 'nl-NL',
+  },
   de: {
     fillsGap: 'Das Thema schließt eine Inhaltslücke in einem Bereich, in dem das Unternehmen tätig ist.',
     freshAngle: 'Das Thema ergänzt die vorhandenen Inhalte der Website um eine neue Perspektive.',

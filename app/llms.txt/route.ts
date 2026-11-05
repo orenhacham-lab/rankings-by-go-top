@@ -45,6 +45,7 @@ const LOCALE_NAME: Record<PublicLocale, string> = {
   it: 'Italian',
   ja: 'Japanese',
   de: 'German',
+  nl: 'Dutch',
 }
 
 /**
@@ -71,9 +72,10 @@ const LOCALE_HEADING: Record<PublicLocale, string> = {
   it: 'Articles in Italian',
   ja: 'Articles in Japanese',
   de: 'Articles in German',
+  nl: 'Articles in Dutch',
 }
 
-const LOCALE_ORDER: PublicLocale[] = ['he', 'en', 'es', 'pt-BR', 'fr', 'it', 'ja', 'de']
+const LOCALE_ORDER: PublicLocale[] = ['he', 'en', 'es', 'pt-BR', 'fr', 'it', 'ja', 'de', 'nl']
 
 /** What the product does, one line each, as a buyer would ask about it. */
 const CAPABILITIES: [string, string, string][] = [

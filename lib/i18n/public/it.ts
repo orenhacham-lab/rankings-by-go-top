@@ -216,6 +216,7 @@ export const it = {
     it: 'Italiano',
     ja: '日本語',
     de: 'Deutsch',
+    nl: 'Nederlands',
     aria: 'Cambio della lingua del sito',
   },
   cookie: {

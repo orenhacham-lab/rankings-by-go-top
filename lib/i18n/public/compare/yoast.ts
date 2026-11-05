@@ -1077,4 +1077,134 @@ export const YOAST_COMPARE: Record<PublicLocale, ComparisonCopy> = {
     },
     close: { title: 'ご自身のサイトの現状を、登録なしで確認する' },
   },
+  nl: {
+    competitor: 'Yoast SEO',
+    eyebrow: 'Go Top SEO tegenover Yoast',
+    metaTitle: 'Go Top SEO tegenover Yoast SEO | vergelijking',
+    metaDescription:
+      'Go Top SEO vergeleken met Yoast SEO: wie de content schrijft en publiceert, wie de posities volgt, wat er in elke prijs zit en wanneer Yoast de betere keuze is.',
+    hero: {
+      title: 'Yoast vertelt u wat er te herstellen valt.',
+      accent: 'Wij herstellen het en schrijven het',
+      subtitle:
+        'Yoast is de oudste en meest vertrouwde naam in SEO voor WordPress en begeleidt u bij het schrijven, in de editor zelf. Go Top SEO is gebouwd voor bedrijven waar niemand het schrijven op zich neemt: het systeem plant de onderwerpen, schrijft de artikelen, publiceert ze en volgt waar u staat.',
+    },
+    table: {
+      eyebrow: 'De vergelijking',
+      title: 'Wat elk van beide doet, overgenomen uit Yoasts eigen pagina’s',
+      checkedOn: CHECKED,
+      sources: SOURCES,
+      rows: [
+        {
+          label: 'Prijs',
+          ours: 'Vanaf 79 USD per maand plus belasting. In Israël vanaf 249 ILS per maand inclusief btw.',
+          theirs:
+            'Yoast SEO Premium voor 118,80 USD per jaar, exclusief btw. Voor Shopify 19 USD per 30 dagen, exclusief btw. Er is daarnaast een gratis versie.',
+        },
+        {
+          label: 'Hoeveel websites',
+          ours: 'Zoveel als uw pakket dekt; zie de prijspagina.',
+          theirs: 'Eén abonnement dekt één website of domein. Een extra website is een extra abonnement, met staffelkorting.',
+        },
+        {
+          label: 'Wie de artikelen schrijft',
+          ours: 'Het systeem. Onderwerpen, tekst, afbeeldingen en interne links, nadat u ze hebt goedgekeurd.',
+          theirs:
+            'U zelf. Hun pagina beschrijft AI-voorstellen voor titels en meta descriptions en ideeën voor onderwerpen met eerste concepten in de Content Planner. Een artikel dat volledig wordt gemaakt, wordt daar niet beweerd.',
+        },
+        {
+          label: 'Publicatie op de website',
+          ours: 'Automatisch in WordPress en Shopify.',
+          theirs: 'Niet beschreven. Het is een plug-in in uw eigen WordPress-editor.',
+        },
+        {
+          label: 'Positiemeting',
+          ours: 'Een maandelijkse controle in Google, in Google Maps en in AI-antwoorden (waaronder ChatGPT, Gemini en Google AI).',
+          theirs: 'In de lijst met premiumfuncties op hun productpagina staat geen functie voor positiemeting.',
+        },
+        {
+          label: 'Google-bedrijfsprofiel',
+          ours: 'Automatische berichten in het profiel, met uw toestemming.',
+          theirs:
+            'Niet in de lijst met premiumfuncties. Een aparte plug-in voor lokale SEO zit bij het abonnement; wat die precies doet, hebben wij niet gelezen.',
+        },
+        {
+          label: 'Werk aan de website',
+          ours: 'Een deel van de correcties wordt via onze plug-in doorgevoerd, zonder dat u code hoeft te lezen.',
+          theirs:
+            'Aanwijzingen en handmatige hulpmiddelen: het beheer van doorverwijzingen met een massa-import uit csv, het nalopen van een bericht tegenover maximaal vijf kernzinnen, voorstellen voor interne links, de workout voor verweesde content en automatische structured data in WordPress.',
+        },
+        {
+          label: 'Proefperiode en terugbetaling',
+          ours: '7 dagen uitproberen, zonder creditcard, altijd op te zeggen.',
+          theirs:
+            'Op hun productpagina staat geen gratis proefperiode. Binnen 30 dagen na een eerste aankoop wordt het hele bedrag terugbetaald, bij verlengingen niet.',
+        },
+      ],
+    },
+    theirStrengths: {
+      eyebrow: 'Wanneer Yoast de betere keuze is',
+      title: 'In deze gevallen is Yoast het juiste antwoord',
+      intro: 'Yoast is het product dat het minst waarschijnlijk iets stuk maakt dat u al hebt — en soms is dat precies wat er wordt gevraagd.',
+      items: [
+        {
+          title: 'Als er al iemand schrijft',
+          body:
+            'Hebt u een redactie of een bureau dat content maakt, dan begeleidt Yoast hen bij het schrijven, en meer ontbrak er niet. Dan is er geen reden om een systeem te betalen dat in uw plaats schrijft.',
+        },
+        {
+          title: 'Als een hulpmiddel moet adviseren en nooit handelen',
+          body:
+            'Yoast verandert niets zonder dat erom is gevraagd. Wie de regie wil houden over elk woord dat online gaat, ziet daarin een sterk punt en geen beperking.',
+        },
+        {
+          title: 'Als prijs en betrouwbaarheid de doorslag geven',
+          body:
+            '118,80 USD per jaar, een gratis versie, 30 dagen volledige terugbetaling, ondersteuning de klok rond en de plug-ins voor lokale, nieuws- en video-SEO erbij. In absolute cijfers is dat een heel goed aanbod.',
+        },
+      ],
+    },
+    ourStrengths: {
+      eyebrow: 'Wanneer wij beter passen',
+      title: 'Als er niemand is die schrijft',
+      intro: 'Het echte verschil is niet technisch. Het gaat erom wie gaat zitten en het werk doet.',
+      items: [
+        {
+          title: 'Artikelen die zonder u online gaan',
+          body: 'Een maandelijks plan met onderwerpen dat u goedkeurt, en daarna artikelen met afbeeldingen en interne links die van zichzelf worden gepubliceerd.',
+        },
+        {
+          title: 'U ziet waar u staat',
+          body: 'Een maandelijkse controle in Google, in Maps en in AI-antwoorden, zonder een tweede hulpmiddel.',
+        },
+        {
+          title: 'Ook buiten de website',
+          body: 'Berichten in uw Google-bedrijfsprofiel, met uw toestemming, in dezelfde prijs.',
+        },
+        {
+          title: 'Shopify net zo goed als WordPress',
+          body: 'Hetzelfde systeem op beide platforms, met hetzelfde rapport.',
+        },
+      ],
+    },
+    faq: {
+      eyebrow: 'Vragen',
+      title: 'Wat er voor een overstap wordt gevraagd',
+      items: [
+        {
+          q: 'Kan ik Yoast houden en jullie eráást gebruiken?',
+          a: 'Ja. Yoast kan uw structured data en doorverwijzingen blijven doen, terwijl wij schrijven en publiceren. Het is de moeite waard na te gaan dat niet beide plug-ins dezelfde structured data dubbel uitgeven.',
+        },
+        {
+          q: 'Volgt Yoast werkelijk geen posities?',
+          a: 'In de lijst met premiumfuncties op hun productpagina staat geen functie voor positiemeting. Dat staat op hun pagina; het is geen uitspraak van ons over wat het product kan.',
+        },
+        {
+          q: 'Vervangen jullie Yoast?',
+          a: 'Niet per se. Wij maken en meten; Yoast is een hulpmiddel om binnen WordPress te redigeren. Veel websites gebruiken beide.',
+        },
+      ],
+    },
+    close: { title: 'Zie zonder aanmelden waar uw website staat' },
+  },
 }

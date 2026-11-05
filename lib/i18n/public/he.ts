@@ -199,6 +199,7 @@ export const he = {
     it: 'Italiano',
     ja: '日本語',
     de: 'Deutsch',
+    nl: 'Nederlands',
     aria: 'שינוי שפת האתר',
   },
   cookie: {

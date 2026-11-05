@@ -201,6 +201,7 @@ export const en = {
     it: 'Italiano',
     ja: '日本語',
     de: 'Deutsch',
+    nl: 'Nederlands',
     aria: 'Change the site language',
   },
   cookie: {

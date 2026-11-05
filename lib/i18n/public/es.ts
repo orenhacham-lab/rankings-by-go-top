@@ -209,6 +209,7 @@ export const es = {
     it: 'Italiano',
     ja: '日本語',
     de: 'Deutsch',
+    nl: 'Nederlands',
     aria: 'Cambiar el idioma del sitio',
   },
   cookie: {

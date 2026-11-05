@@ -107,6 +107,7 @@ const BRAND_FALLBACK: Record<BlogAutoLocale, (link: string) => string> = {
   it: (l) => `${l} riunisce questo lavoro in un unico posto, e puoi iniziare con una prova gratuita.`,
   ja: (l) => `${l} はこうした作業を一つの場所にまとめており、無料トライアルから始められます。`,
   de: (l) => `${l} bündelt diese Arbeit an einer Stelle, und Sie können kostenlos testen.`,
+  nl: (l) => `${l} brengt dit werk op één plek samen, en u kunt beginnen met een gratis proefperiode.`,
 }
 
 /** Append that sentence when, and only when, the body never named the product. */
@@ -125,6 +126,7 @@ const RELATED_HEADING: Record<BlogAutoLocale, string> = {
   it: 'Da leggere anche',
   ja: 'あわせて読みたい',
   de: 'Auch lesenswert',
+  nl: 'Ook interessant',
 }
 
 /** Where the in-body product link goes: the free trial, in the article's language. */

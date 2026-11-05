@@ -71,6 +71,7 @@ const fr = FEATURE_COMMON.fr
 const it = FEATURE_COMMON.it
 const ja = FEATURE_COMMON.ja
 const de = FEATURE_COMMON.de
+const nl = FEATURE_COMMON.nl
 
 export const SITE_LINKS_PAGE: MarketingPage = {
   path: '/features/site-links',
@@ -102,6 +103,10 @@ export const SITE_LINKS_PAGE: MarketingPage = {
     ja: {
       title: 'サイトへのリンク | Go Top SEO',
       description: '補完関係にある企業のGo Top SEO利用者が、その企業向けに書かれた記事の中でお客様のサイトを言及できます。入るのは読者の役に立つ場所だけです。交換は行わず、競合には決して入らず、任意で初期設定では無効です。さらに内部リンク、孤立ページ、無料で掲載できるディレクトリも扱います。',
+    },
+    nl: {
+      title: 'Links naar uw website | Go Top SEO',
+      description: 'Bedrijven met een aanvullend aanbod die Go Top SEO gebruiken, kunnen u noemen in de artikelen die voor hen geschreven worden — alleen daar waar het de lezer helpt. Geen ruil, nooit een concurrent, vrijwillig en standaard uit. Daarnaast interne links, pagina\u2019s zonder links en gratis vermeldingen.',
     },
     de: {
       title: 'Links auf Ihre Website | Go Top SEO',
@@ -766,6 +771,116 @@ export const SITE_LINKS_PAGE: MarketingPage = {
     // links or a ranking, in Japanese either: 景品表示法 treats an unprovable
     // performance claim as a misrepresentation, and the claim would be false
     // anyway.
+    nl: {
+      hero: {
+        eyebrow: 'Links naar uw website',
+        eyebrowIcon: Link2,
+        title: 'Vermeldingen en links',
+        accent: 'in content van bedrijven met een aanvullend aanbod',
+        subtitle: 'Klanten van Go Top SEO uit aanvullende branches kunnen u noemen in de artikelen die voor hen geschreven worden, daar waar uw pagina de lezer van die alinea werkelijk helpt. Nooit een concurrent, nooit een ruil op wederzijdse basis. Deelname is vrijwillig en staat standaard uit.',
+        trust: nl.trust,
+        primary: nl.trial,
+        secondary: nl.check,
+        visual: (
+          <WorkListVisual
+            heading="Vermeldingen en links"
+            rows={[
+              { title: 'Inkomende link van een aanvullend bedrijf', detail: 'Uit een artikel op zijn blog', icon: ArrowDownToLine, done: true, status: 'Gepubliceerd' },
+              { title: 'Uitgaande link in uw artikel', detail: 'Voor de publicatie getoond, u kunt hem verwijderen', icon: ArrowUpFromLine, done: false, status: 'Te beoordelen' },
+              { title: 'Zelfde branche', detail: 'Wordt in geen enkele richting geplaatst', icon: Ban, done: true, status: 'Geblokkeerd' },
+              { title: '3 interne links in het artikel toegevoegd', detail: 'Prijzengids', icon: ArrowLeftRight, done: true, status: 'Toegevoegd' },
+            ]}
+          />
+        ),
+      },
+      sections: [
+        {
+          kind: 'steps',
+          eyebrow: 'Bedrijven met een aanvullend aanbod',
+          title: 'Zo gaat het',
+          items: [
+            { title: 'U zet het aan', body: 'Deelname geldt per website en wordt door de eigenaar van het project aangezet na het aanvaarden van de voorwaarden op het scherm. Standaard uit, en u kunt wanneer u wilt stoppen.' },
+            { title: 'Alleen echte websites', body: 'Een website doet alleen mee als haar eigenaar haar in de app verbonden heeft via WordPress of Search Console. Een domein intypen is niet genoeg, dus de website van een onbekende komt er niet in.' },
+            { title: 'De vermelding staat in het artikel', body: 'Wordt een artikel voor een aanvullend bedrijf geschreven, dan kan het een passende pagina van u noemen, op woorden die al in de zin staan. Wij herschrijven de tekst niet en voegen geen alinea\u2019s toe.' },
+            { title: 'U ziet alles', body: 'Elke plaatsing wordt vastgelegd en aan beide partijen getoond. Een link die uit uw artikel naar buiten leidt, verschijnt voor de publicatie, en u kunt hem verwijderen.' },
+          ],
+        },
+        {
+          kind: 'cards',
+          tone: 'contrast',
+          eyebrow: 'De regels',
+          title: 'Hoe het natuurlijk blijft',
+          items: [
+            { icon: Ban, title: 'Nooit een concurrent', body: 'Niet dezelfde branche, en geen domein dat een van beide partijen als concurrent heeft gemarkeerd. Een website waarvan wij de branche niet kennen, blijft erbuiten; wij gokken nooit.' },
+            { icon: ArrowLeftRight, title: 'Geen ruil', body: 'Wij ruilen niet: een website die een vermelding van u krijgt, noemt u nooit terug, en een paar komt elkaar maar één keer tegen. Ook een korte lus over drie websites wordt geblokkeerd.' },
+            { icon: ShieldCheck, title: 'Eén, en spaarzaam', body: 'Hoogstens één link per artikel, en wij laten het liever weg dan er nog een in te duwen. Een website die net begonnen is, doet langzaam mee.' },
+            { icon: Network, title: 'Alleen waar het de lezer helpt', body: 'Een vermelding komt alleen daar waar de pagina de lezer van die alinea werkelijk helpt. Past het maar zwak, dan komt er niets in. Nieuwe of dunne websites doen niet mee.' },
+          ],
+        },
+        {
+          kind: 'callout',
+          icon: Info,
+          title: 'Wat wij niet doen',
+          body: (
+            <>
+              <p>
+                Wij verkopen geen links, kopen geen links en beloven geen links van de websites van anderen. Er is
+                geen beloofd aantal links en geen belofte over posities.
+              </p>
+              <p>
+                Deelname is vrijwillig, staat standaard uit, en u kunt wanneer u wilt stoppen. Zij is geen onderdeel
+                van wat u betaalt en in geen enkel pakket als toezegging opgenomen. Het soort link geldt voor het hele
+                netwerk, wordt u op het aanmeldscherm getoond en kan voor toekomstige links wijzigen. De volledige
+                tekst staat in{' '}
+                <a className="underline" href="/nl/terms#link-network">artikel 15A van de algemene voorwaarden</a>,
+                samen met de risico\u2019s van deelname, en die is het lezen waard voordat u dit aanzet.
+              </p>
+              <p>
+                Wij publiceren geen lijst van deelnemende websites. De ontvangende partij ziet het adres van de
+                website die naar haar gelinkt heeft. De verantwoordelijkheid voor de inhoud van de website en voor het
+                naleven van de richtlijnen van de zoekmachines blijft bij de websitebeheerder, en wij kunnen de dienst
+                opschorten of beëindigen.
+              </p>
+            </>
+          ),
+        },
+        {
+          kind: 'cards',
+          columns: 2,
+          eyebrow: 'Ook binnen uw website',
+          title: 'De links die een website samenhouden',
+          items: [
+            { icon: ArrowLeftRight, title: 'Interne links tijdens het schrijven', body: 'Terwijl het artikel ontstaat, verbindt het systeem het met de passende pagina\u2019s van uw website, alleen daar waar de formulering al natuurlijk in de tekst voorkomt. U leest het artikel voor de publicatie, zoals altijd.' },
+            { icon: Unlink, title: 'Pagina\u2019s zonder links', body: 'Pagina\u2019s waarnaar geen andere pagina van de website linkt, zodat Google ze moeilijk bereikt en hun belang niet ziet. Pagina\u2019s waarnaar het menu of de startpagina linkt, gelden niet als zodanig.' },
+            { icon: ListChecks, title: 'Gratis vermeldingen', body: 'Een met de hand gecontroleerde lijst van gidsen en bedrijfsprofielen voor het land en de taal van het project, met de melding waar het bedrijf al verschijnt.' },
+            { icon: MapPinned, title: 'Wat naar wat linkt', body: 'Voor elk artikel ziet u waarnaar het linkt en wat naar het artikel linkt. Dat verklaart waarom een pagina in Google niet beweegt terwijl andere dat wel doen.' },
+          ],
+        },
+        {
+          kind: 'cards',
+          columns: 2,
+          eyebrow: 'Search Console',
+          title: 'De links die Google al gevonden heeft',
+          items: [
+            { icon: FileSearch, title: 'Een directe link naar het rapport van Google', body: 'Search Console heeft geen interface die de lijst met links teruggeeft, dus wij verzinnen er geen. Er is een directe link naar het rapport bij Google.' },
+            { icon: Search, title: 'Een momentopname uit een exportbestand', body: 'U kunt een CSV-bestand uploaden dat u uit Search Console geëxporteerd hebt, en het in het systeem bekijken. Het is de momentopname van de exportdag en werkt zich niet van zelf bij.' },
+          ],
+        },
+        {
+          kind: 'faq',
+          eyebrow: 'Veelgestelde vragen',
+          title: 'Wat er over links gevraagd wordt',
+          items: [
+            { q: 'Hoeveel links krijg ik?', a: 'Er is geen beloofd aantal en geen quotum dat wij proberen te vullen. Een vermelding komt er alleen in wanneer een artikel geschreven wordt waarvan de alinea werkelijk bij uw pagina past — dat gebeurt dus spaarzaam.' },
+            { q: 'Ziet iemand dat ik meedoe?', a: 'Wij publiceren geen lijst van deelnemende websites. De partij die een vermelding krijgt, ziet het adres van de website die naar haar gelinkt heeft, en na de publicatie ook de pagina waarop de link verschenen is.' },
+            { q: 'Moet ik meedoen?', a: 'Nee. Het staat standaard uit, het aanzetten geldt per website, en u kunt wanneer u wilt stoppen. Stoppen beëindigt nieuwe vermeldingen; al gepubliceerde links blijven op de websites staan.' },
+            { q: 'Werkt dit in een Shopify-webshop?', a: 'Ja, door het afzonderlijk en vrijwillig aan te zetten. Vermeldingen komen alleen in artikelen die wij schrijven en op de blog van de webshop publiceren. Een artikel, pagina, product of categorie die al in de webshop bestaat, wordt niet bewerkt.' },
+            { q: 'Hoe zit het met de interne links op mijn website?', a: 'Die werken daar onafhankelijk van verder: elk geschreven artikel krijgt links naar de passende pagina\u2019s van uw website, en u keurt het hele artikel voor de publicatie goed.' },
+          ],
+        },
+      ],
+      cta: { title: 'Laat bedrijven met een aanvullend aanbod naar u linken', body: nl.closeBody, primary: nl.trial, secondary: nl.check },
+    },
     de: {
       hero: {
         eyebrow: 'Links auf Ihre Website',

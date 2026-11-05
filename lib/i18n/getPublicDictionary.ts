@@ -6,6 +6,7 @@ import { fr } from './public/fr'
 import { it } from './public/it'
 import { ja } from './public/ja'
 import { de } from './public/de'
+import { nl } from './public/nl'
 import type { PublicLocale } from './locales'
 
 const DICTIONARIES: Record<PublicLocale, PublicDictionary> = {
@@ -17,6 +18,7 @@ const DICTIONARIES: Record<PublicLocale, PublicDictionary> = {
   it: it as unknown as PublicDictionary,
   ja: ja as unknown as PublicDictionary,
   de: de as unknown as PublicDictionary,
+  nl: nl as unknown as PublicDictionary,
 }
 
 export function getPublicDictionary(locale: PublicLocale): PublicDictionary {
