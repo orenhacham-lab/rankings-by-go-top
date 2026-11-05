@@ -30,6 +30,7 @@ const fr = FEATURE_COMMON.fr
 const it = FEATURE_COMMON.it
 const ja = FEATURE_COMMON.ja
 const de = FEATURE_COMMON.de
+const nl = FEATURE_COMMON.nl
 
 // ── Business owners ───────────────────────────────────────────────────────────
 
@@ -63,6 +64,10 @@ export const BUSINESSES_PAGE: MarketingPage = {
     ja: {
       title: '事業者の方へ | Go Top SEO',
       description: '記事を書いてサイトに公開し、GoogleとGoogleマップで自社がどこに出ているかを計測し、ChatGPT、Gemini、Google AIが自社を引用しているかを確認する、一つのシステムです。',
+    },
+    nl: {
+      title: 'Voor ondernemers | Go Top SEO',
+      description: 'Eén systeem dat artikelen schrijft en op uw website publiceert, controleert waar uw bedrijf in Google en Google Maps verschijnt, en nakijkt of ChatGPT, Gemini en Google AI het noemen.',
     },
     de: {
       title: 'Für Unternehmen | Go Top SEO',
@@ -412,6 +417,63 @@ export const BUSINESSES_PAGE: MarketingPage = {
       ],
       cta: { title: 'Cominci dal vedere che cosa il sistema vede sul suo sito', body: it.closeBody, primary: it.check, secondary: it.trial },
     },
+    nl: {
+      hero: {
+        eyebrow: 'Voor ondernemers',
+        eyebrowIcon: Store,
+        title: 'Geschreven, gepubliceerd en gemeten,',
+        accent: 'voor u, elke maand',
+        subtitle: 'Artikelen over waar uw klanten naar zoeken, rechtstreeks op uw website gepubliceerd. Een controle van waar uw bedrijf in Google en Google Maps verschijnt, en of ChatGPT, Gemini en Google AI het noemen. Geen dienstverleners aansturen en geen SEO leren.',
+        trust: nl.trust,
+        primary: nl.check,
+        secondary: nl.trial,
+        visual: (
+          <WorkListVisual
+            heading="Uw maand in het systeem"
+            rows={[
+              { title: 'Nieuw artikel gepubliceerd', detail: 'Een airco voor de woonkamer kiezen', icon: FileText, done: true, status: 'Gepubliceerd' },
+              { title: 'Positiecontrole', detail: 'Google en Google Maps', icon: Search, done: true, status: 'Klaar' },
+              { title: 'Controle van de AI-zichtbaarheid', detail: 'ChatGPT, Gemini, Google AI', icon: Sparkles, done: true, status: 'Klaar' },
+              { title: 'Volgend artikel', detail: 'Wat kost het installeren van een airco', icon: CalendarClock, done: false, status: 'Gepland' },
+            ]}
+          />
+        ),
+      },
+      sections: [
+        {
+          kind: 'cards',
+          tone: 'contrast',
+          eyebrow: 'Wat het systeem voor u doet',
+          title: 'Het werk dat anders over meerdere dienstverleners verdeeld is',
+          items: [
+            { icon: FileText, title: 'Content die aanvragen oplevert', body: 'Het systeem kiest onderwerpen op grond van waar in uw branche naar gezocht wordt, schrijft de artikelen en publiceert ze op uw website in het ritme van uw pakket.' },
+            { icon: MapPin, title: 'Een meting waarop u kunt vertrouwen', body: 'Waar uw website voor elk zoekwoord in Google en Google Maps verschijnt, en of de AI-diensten uw bedrijf noemen.' },
+            { icon: Wrench, title: 'Een website zonder rem', body: 'De websiteanalyse vindt wat u tegenhoudt in Google. In WordPress verhelpt u het na uw goedkeuring met één klik.' },
+          ],
+        },
+        {
+          kind: 'steps',
+          eyebrow: 'Zo begint u',
+          title: 'Drie stappen, en het systeem werkt',
+          items: [
+            { title: 'Het adres van uw website invoeren', body: 'Het systeem leest uw website en zet instellingen, een contentstrategie en zoekwoordideeën klaar.' },
+            { title: 'Website verbinden', body: 'WordPress, Shopify of Wix. De artikelen worden daar rechtstreeks gepubliceerd.' },
+            { title: 'Resultaten volgen', body: 'De controles van posities en zichtbaarheid lopen één keer per maand automatisch, en met de hand wanneer u wilt. Alles op één plek.' },
+          ],
+        },
+        {
+          kind: 'faq',
+          eyebrow: 'Veelgestelde vragen',
+          title: 'Wat ondernemers vragen',
+          items: [
+            { q: 'Moet ik verstand van SEO hebben?', a: 'Nee. Het systeem stelt onderwerpen voor, schrijft en publiceert. U kunt elk artikel voor de publicatie lezen en wijzigen.' },
+            { q: 'Past dit ook bij een lokaal bedrijf?', a: 'Ja. De positiemonitoring in Google Maps controleert waar uw bedrijf in de lokale zoekresultaten verschijnt, per stad of gebied.' },
+            { q: 'Hoeveel artikelen krijg ik per maand?', a: 'Dat hangt van het pakket af. Alle pakketten en hun aantallen staan op de prijzenpagina.' },
+          ],
+        },
+      ],
+      cta: { title: 'Begin met zien wat het systeem op uw website ziet', body: nl.closeBody, primary: nl.check, secondary: nl.trial },
+    },
     de: {
       hero: {
         eyebrow: 'Für Unternehmen',
@@ -561,6 +623,10 @@ export const AGENCIES_PAGE: MarketingPage = {
     ja: {
       title: '制作会社・代理店の方へ | Go Top SEO',
       description: '取引先のサイトごとに別のプロジェクトを持ち、記事、順位の計測、AIでの可視性、PDFとExcelのレポートをご利用いただけます。すべての取引先を一つのアカウントで管理できます。',
+    },
+    nl: {
+      title: 'Voor bureaus | Go Top SEO',
+      description: 'Een eigen project voor elke website van een klant, met artikelen, positiemonitoring, AI-zichtbaarheid en rapporten in pdf en Excel. Al uw klanten beheren uit één account.',
     },
     de: {
       title: 'Für Agenturen | Go Top SEO',
@@ -880,6 +946,58 @@ export const AGENCIES_PAGE: MarketingPage = {
       ],
       cta: { title: 'Provi il sistema sul sito di un cliente', body: it.closeBody, primary: it.trial, secondary: it.pricing },
     },
+    nl: {
+      hero: {
+        eyebrow: 'Voor bureaus',
+        eyebrowIcon: Briefcase,
+        title: 'Elke website van een klant,',
+        accent: 'in één systeem',
+        subtitle: 'Elke klant krijgt een eigen project met eigen artikelen, eigen positiemonitoring, eigen AI-zichtbaarheid en eigen rapporten. Beheer alles uit één account en geef de klant een pdf-rapport dat laat zien wat er deze maand gedaan is.',
+        trust: nl.trust,
+        primary: nl.trial,
+        secondary: nl.pricing,
+        visual: (
+          <WorkListVisual
+            heading="Uw klanten"
+            rows={[
+              { title: 'Tandartspraktijk', detail: '3 artikelen deze maand', url: 'example-dental.com', icon: FolderKanban, done: true, status: 'Rapport klaar' },
+              { title: 'Advocatenkantoor', detail: '2 artikelen deze maand', url: 'example-law.com', icon: FolderKanban, done: true, status: 'Rapport klaar' },
+              { title: 'Meubelzaak', detail: 'Analyse loopt', url: 'example-furniture.com', icon: FolderKanban, done: false, status: 'Bezig' },
+            ]}
+          />
+        ),
+      },
+      sections: [
+        {
+          kind: 'cards',
+          tone: 'contrast',
+          eyebrow: 'Wat u krijgt',
+          title: 'Gereedschap om aan veel websites tegelijk te werken',
+          items: [
+            { icon: FolderKanban, title: 'Eén project per website', body: 'Eigen instellingen, zoekwoorden, strategie en artikelen voor elke website, met projecten gegroepeerd per klant.' },
+            { icon: BarChart3, title: 'Rapporten die u kunt doorgeven', body: 'Rapporten in pdf en Excel over posities, AI-zichtbaarheid en Search Console-gegevens, met de projectnaam en het logo van de website.' },
+            { icon: PieChart, title: 'Een tegoed dat eerlijk verdeeld wordt', body: 'Het artikeltegoed geldt voor alle websites samen, en u beslist hoeveel artikelen elke website krijgt.' },
+          ],
+        },
+        {
+          kind: 'steps',
+          eyebrow: 'Zo gaat het',
+          title: 'Van nieuwe klant naar eerste rapport',
+          items: [
+            { title: 'Een project voor de klant aanmaken', body: 'Het adres van de website invoeren, en het systeem zet instellingen, een strategie en zoekwoordideeën klaar.' },
+            { title: 'Website verbinden', body: 'WordPress, Shopify of Wix, en de artikelen worden daar gepubliceerd.' },
+            { title: 'Rapport maken', body: 'Een pdf-rapport voor de klant met wat er geschreven is, waar de website verschijnt en wat er veranderd is.' },
+          ],
+        },
+        {
+          kind: 'callout',
+          icon: Info,
+          title: 'Welk pakket past',
+          body: <p>Premium is bedoeld voor het beheren van meerdere eigen websites, Agency voor het beheren van websites van klanten. De aantallen van elk pakket staan op de prijzenpagina.</p>,
+        },
+      ],
+      cta: { title: 'Probeer het systeem op de website van een klant', body: nl.closeBody, primary: nl.trial, secondary: nl.pricing },
+    },
     de: {
       hero: {
         eyebrow: 'Für Agenturen',
@@ -1019,6 +1137,10 @@ export const WORDPRESS_PAGE: MarketingPage = {
     ja: {
       title: 'WordPressのサイトをお持ちの方へ | Go Top SEO',
       description: 'WordPressサイトを一度連携すれば、記事がアイキャッチ画像、カテゴリー、タグ付きでそこへ公開されます。サイトの診断が問題を見つけ、その多くはご承認後にワンクリックで修正できます。',
+    },
+    nl: {
+      title: 'Voor WordPress-websites | Go Top SEO',
+      description: 'Verbind uw WordPress-website één keer, en artikelen worden daar gepubliceerd met uitgelichte afbeelding, categorieën en tags. De websiteanalyse vindt problemen, en de meeste worden na uw goedkeuring met één klik verholpen.',
     },
     de: {
       title: 'Für WordPress-Websites | Go Top SEO',
@@ -1368,6 +1490,63 @@ export const WORDPRESS_PAGE: MarketingPage = {
       ],
       cta: { title: 'Colleghi il suo sito WordPress', body: it.closeBody, primary: it.trial, secondary: it.check },
     },
+    nl: {
+      hero: {
+        eyebrow: 'Voor WordPress-websites',
+        eyebrowIcon: Blocks,
+        title: 'Artikelen die gepubliceerd worden',
+        accent: 'rechtstreeks op uw website',
+        subtitle: 'Verbind uw WordPress-website één keer, en vanaf dan gaan artikelen met uitgelichte afbeelding, categorieën en tags online op het moment dat u vastlegt. De websiteanalyse vindt problemen, en de meeste worden na uw goedkeuring met één klik verholpen.',
+        trust: nl.trust,
+        primary: nl.trial,
+        secondary: nl.check,
+        visual: (
+          <WorkListVisual
+            heading="Uw WordPress-website"
+            rows={[
+              { title: 'Artikel gepubliceerd', detail: 'Prijzengids · met uitgelichte afbeelding', icon: FileText, done: true, status: 'Gepubliceerd' },
+              { title: 'SEO-titel verbeterd', detail: '', url: '/diensten', icon: Type, done: true, status: 'Verbeterd' },
+              { title: 'Alt-tekst voor 6 afbeeldingen', detail: '', url: '/galerij', icon: ImageIcon, done: true, status: 'Verbeterd' },
+              { title: 'Volgend artikel', detail: 'Donderdag om 09:00', icon: CalendarClock, done: false, status: 'Gepland' },
+            ]}
+          />
+        ),
+      },
+      sections: [
+        {
+          kind: 'cards',
+          tone: 'contrast',
+          eyebrow: 'Wat u op WordPress krijgt',
+          title: 'Publiceren en verbeteren, zonder de beheeromgeving te openen',
+          items: [
+            { icon: Tags, title: 'Volledige publicatie', body: 'Een artikel met uitgelichte afbeelding, afbeeldingen in de tekst, categorieën en tags, direct of op het geplande moment.' },
+            { icon: Wrench, title: 'Verbeteringen met één klik', body: 'Titels, beschrijvingen, alt-teksten en links. Elke verbetering wordt getoond voordat zij geschreven wordt, en is terug te draaien.' },
+            { icon: ShieldCheck, title: 'Werkt met Yoast en Rank Math', body: 'Titels en beschrijvingen worden in de velden van de SEO-plug-in geschreven. Staan daar al structured data, dan vullen wij alleen de FAQ aan, zonder dubbele vermeldingen.' },
+          ],
+        },
+        {
+          kind: 'steps',
+          eyebrow: 'Verbinden',
+          title: 'Eén verbinding, en dat is het',
+          items: [
+            { title: 'Een applicatiewachtwoord aanmaken', body: 'In uw WordPress-gebruikersprofiel. Het systeem leidt u er stap voor stap naartoe.' },
+            { title: 'Verbinden in de projectinstellingen', body: 'Het adres van de website, de gebruikersnaam en het applicatiewachtwoord invoeren. Het systeem controleert of de verbinding staat.' },
+            { title: 'De Go Top-plug-in toevoegen', body: 'Optioneel. De plug-in die u downloadt op de pagina «Websitegezondheid» vult metabeschrijvingen, structured data en een llms.txt-bestand aan.' },
+          ],
+        },
+        {
+          kind: 'faq',
+          eyebrow: 'Veelgestelde vragen',
+          title: 'Wat er gevraagd wordt voor het verbinden',
+          items: [
+            { q: 'Is dit veilig?', a: 'Het applicatiewachtwoord wordt versleuteld opgeslagen, en u kunt het wanneer u wilt intrekken in uw WordPress-gebruikersprofiel. Een verbetering wordt pas na uw goedkeuring naar de website geschreven.' },
+            { q: 'Heb ik een SEO-plug-in nodig?', a: 'Nee. Met Yoast of Rank Math schrijft het systeem in hun velden. Metabeschrijvingen vragen wel een SEO-plug-in op de website.' },
+            { q: 'Kan ik een artikel voor de publicatie bewerken?', a: 'Ja. U kunt elk artikel voor de publicatie openen, wijzigen en opnieuw inplannen.' },
+          ],
+        },
+      ],
+      cta: { title: 'Verbind uw WordPress-website', body: nl.closeBody, primary: nl.trial, secondary: nl.check },
+    },
     de: {
       hero: {
         eyebrow: 'Für WordPress-Websites',
@@ -1565,6 +1744,10 @@ export const SHOPIFY_PAGE: MarketingPage = {
     ja: {
       title: 'Shopifyの店舗をお持ちの方へ | Go Top SEO',
       description: 'Shopify App Storeからアプリをインストールすると、記事が作成され、店舗のブログに公開されます。診断が記事とページの問題を見つけ、どの修正も店舗のご承認を経て適用されます。',
+    },
+    nl: {
+      title: 'Voor Shopify-webshops | Go Top SEO',
+      description: 'Installeer de app uit de Shopify App Store, en artikelen worden geschreven en op de blog van uw webshop gepubliceerd. De analyse vindt problemen in artikelen en pagina\u2019s, en u keurt elke verbetering goed.',
     },
     de: {
       title: 'Für Shopify-Shops | Go Top SEO',
@@ -2051,6 +2234,86 @@ export const SHOPIFY_PAGE: MarketingPage = {
         },
       ],
       cta: { title: 'Cominci con il suo negozio', body: it.closeBody, primary: shopifyInstallCta('Installa l’applicazione su Shopify', it.trial), secondary: it.check },
+    },
+    nl: {
+      hero: {
+        eyebrow: 'Voor Shopify-webshops',
+        eyebrowIcon: Store,
+        title: 'De content van uw webshop wordt geschreven,',
+        accent: 'gepubliceerd en gemeten',
+        subtitle: 'Installeer de app uit de Shopify App Store, en vanaf dan schrijft het systeem artikelen over waar uw klanten naar zoeken, publiceert ze op de blog van uw webshop en laat u zien waar de webshop verschijnt in Google, in Google Maps en in de antwoorden van ChatGPT, Gemini en Google AI.',
+        trust: nl.trust,
+        primary: shopifyInstallCta('De app installeren in Shopify', nl.trial),
+        secondary: nl.check,
+        visual: (
+          <WorkListVisual
+            heading="Uw Shopify-webshop"
+            rows={[
+              { title: 'Artikel op de blog gepubliceerd', detail: 'Aankoopgids · met afbeeldingen', icon: FileText, done: true, status: 'Gepubliceerd' },
+              { title: 'Vermelding in zoekmachines verbeterd', detail: '', url: '/pages/about', icon: Type, done: true, status: 'Goedgekeurd' },
+              { title: 'Alt-tekst voor artikelafbeeldingen', detail: '', url: '/blogs/news', icon: ImageIcon, done: true, status: 'Goedgekeurd' },
+              { title: 'Volgend artikel', detail: 'Maandag om 09:00', icon: CalendarClock, done: false, status: 'Gepland' },
+            ]}
+          />
+        ),
+      },
+      sections: [
+        {
+          kind: 'callout',
+          icon: Store,
+          title: 'De installatie loopt via de Shopify App Store',
+          body: (
+            <>
+              {'Elke webshop installeert via de officiële vermelding: '}
+              {shopifyAppStoreLink('Go Top SEO in de Shopify App Store')}
+              {'. Het is één klik, de facturatie loopt via Shopify, en er is niets dat u in de code van uw webshop hoeft te zetten.'}
+            </>
+          ),
+        },
+        {
+          kind: 'cards',
+          tone: 'contrast',
+          eyebrow: 'Wat het systeem in uw webshop doet',
+          title: 'Schrijven, publiceren en verbeteren, zonder het thema aan te raken',
+          items: [
+            { icon: Tags, title: 'Artikelen op de blog van uw webshop', body: 'Elk artikel is om een echte zoekopdracht heen gebouwd, met afbeeldingen, een FAQ-blok en interne links, en gaat op het moment dat u vastlegt online op de blog.' },
+            { icon: Wrench, title: 'Verbeteringen die u goedkeurt', body: 'Titel en beschrijving voor de vermelding in zoekmachines, alt-teksten van afbeeldingen, een gebroken link en een FAQ-blok, in de artikelen en pagina\u2019s van uw webshop. Elke verbetering wordt getoond voordat zij geschreven wordt, afzonderlijk goedgekeurd en is terug te draaien.' },
+            { icon: BarChart3, title: 'Monitoring in Google en in de AI', body: 'Posities in Google en Google Maps, plus een automatische maandelijkse controle of ChatGPT, Gemini en Google AI de webshop noemen. Nog drie diensten zijn één klik verwijderd.' },
+          ],
+        },
+        {
+          kind: 'steps',
+          eyebrow: 'Zo begint u',
+          title: 'Drie stappen, geen ontwikkeling',
+          items: [
+            { title: 'Installeren uit de App Store', body: <>{'Open '}{shopifyAppStoreLink('de vermelding van Go Top SEO')}{' en keur de installatie in uw webshop goed.'}</> },
+            { title: 'Het systeem analyseert de webshop', body: 'Uw artikelen en pagina\u2019s worden gelezen, en het systeem laat zien wat ontbreekt en wat de moeite van verbeteren waard is, op belangrijkheid geordend.' },
+            { title: 'Content en verbeteringen goedkeuren', body: 'U kiest wat er geschreven wordt, keurt elke verbetering afzonderlijk goed, en de publicatie op de blog volgt het schema dat u vastlegt.' },
+          ],
+        },
+        {
+          kind: 'cards',
+          columns: 2,
+          eyebrow: 'De grenzen, zonder kleine lettertjes',
+          title: 'Wat het systeem in uw webshop nooit aanraakt',
+          items: [
+            { icon: ShieldCheck, title: 'Niet het thema, niet de code', body: 'Het systeem schrijft uitsluitend in de artikelen en pagina\u2019s van uw webshop. Het raakt thema noch code, instellingen, prijzen of bestellingen aan.' },
+            { icon: Info, title: 'Producten en categorieën: getoond, niet geschreven', body: 'De toegang van de app tot producten en categorieën is alleen lezend, dus het systeem laat u zien wat er op een productpagina te verbeteren is, en u verbetert het in Shopify. Dat automatisch verbeteren zou een nieuwe versie van de app vragen.' },
+          ],
+        },
+        {
+          kind: 'faq',
+          eyebrow: 'Veelgestelde vragen',
+          title: 'Wat webshops voor de installatie vragen',
+          items: [
+            { q: 'Verandert het systeem iets in mijn webshop zonder mijn goedkeuring?', a: 'Nee. In een Shopify-webshop wordt elke verbetering getoond voordat zij geschreven wordt, en afzonderlijk goedgekeurd; ook na de goedkeuring is zij terug te draaien. Automatisch goedkeuren van verbeteringen bestaat alleen op WordPress-websites.' },
+            { q: 'Waar worden de artikelen gepubliceerd?', a: 'Op de blog van uw webshop, zoals elk ander artikel van u. U kunt elk artikel voor de publicatie openen, bewerken en opnieuw inplannen.' },
+            { q: 'Moet ik code of een app-embed inbouwen?', a: 'Nee. De installatie loopt via de Shopify App Store, en het systeem werkt met uw webshop zonder het thema te wijzigen.' },
+            { q: 'Hoe zit het met structured data in de webshop?', a: 'Een Shopify-thema geeft al een deel van de structured data uit, en het systeem voegt daar niets eigens aan toe. Structured data die wij schrijven bestaan alleen op WordPress-websites met de Go Top-plug-in. Op de pagina «Websitegezondheid» verbergen wij de regels die uw thema al dekt.' },
+          ],
+        },
+      ],
+      cta: { title: 'Begin met uw webshop', body: nl.closeBody, primary: shopifyInstallCta('De app installeren in Shopify', nl.trial), secondary: nl.check },
     },
     de: {
       hero: {

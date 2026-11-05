@@ -29,7 +29,7 @@
  */
 
 import type { PublicLocale } from './locales'
-import { isEnglishPath, isFrenchPath, isItalianPath, isJapanesePath, isGermanPath, isPortuguesePath, isSpanishPath } from './request-locale'
+import { isEnglishPath, isFrenchPath, isItalianPath, isJapanesePath, isGermanPath, isDutchPath, isPortuguesePath, isSpanishPath } from './request-locale'
 import { normalizeDashboardUiLocale } from './dashboard/locale'
 
 /**
@@ -62,6 +62,9 @@ import { normalizeDashboardUiLocale } from './dashboard/locale'
  * German route, gated by app/(auth)/de/layout.tsx. A missing branch is not a
  * compile error here either — it is a German sign-up form rendered
  * right-to-left in Hebrew, which is the failure this list exists to prevent.
+ *
+ * Dutch is the ninth, and `/nl/login` arrives the same way, gated by
+ * app/(auth)/nl/layout.tsx.
  */
 export function resolveAuthLocale(input: {
   pathname?: string | null
@@ -75,5 +78,6 @@ export function resolveAuthLocale(input: {
   if (isItalianPath(input.pathname)) return 'it'
   if (isJapanesePath(input.pathname)) return 'ja'
   if (isGermanPath(input.pathname)) return 'de'
+  if (isDutchPath(input.pathname)) return 'nl'
   return normalizeDashboardUiLocale(input.langParam) ?? input.serverLocale ?? 'he'
 }

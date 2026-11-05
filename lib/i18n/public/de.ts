@@ -221,6 +221,7 @@ export const de = {
     it: 'Italiano',
     ja: '日本語',
     de: 'Deutsch',
+    nl: 'Nederlands',
     aria: 'Sprache der Website wechseln',
   },
   cookie: {

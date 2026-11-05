@@ -1,0 +1,262 @@
+/**
+ * The new-project onboarding in DUTCH: the "which site do we start with"
+ * screen, the live scan progress, the first-look summary of the site, the
+ * free-check preview, the first-article button and every notice, action and
+ * wait phrase those screens show.
+ *
+ * Register as set out in chrome.ts. The trial line keeps the English promise
+ * exactly: seven days, no card.
+ */
+import type { DashboardDictionary } from '../he'
+import type { DeepPartial } from '../merge'
+
+export const seedOnboardingNl: DeepPartial<DashboardDictionary> = {
+  seedOnboarding: {
+    newProject: {
+      eyebrow: 'Nieuwe website',
+      title: 'Met welke website beginnen we?',
+      subtitle: 'Eén adres is genoeg. We lezen de website, begrijpen het bedrijf en maken een eerste balans.',
+      urlLabel: 'Adres van de website',
+      urlPlaceholder: 'voorbeeld.nl',
+      submit: 'Website scannen',
+      creating: 'De website wordt aangemaakt…',
+      starting: 'De scan start…',
+      promise: 'Ongeveer een minuut. U kunt ondertussen doorwerken',
+      noConnection: 'Zonder Search Console, zonder verbinding met de website',
+      fromFreeCheck: (domain: string) => `We gaan verder met uw gratis analyse van ${domain}`,
+      fromScanTitle: (domain: string) => `Uw website voor ${domain} wordt klaargezet`,
+      fromScanBody: 'We maken de website aan uit de analyse die u heeft gestart, met alles wat we over het bedrijf, zijn zoekwoorden en zijn onderwerpen hebben geleerd, en openen hem. Dat duurt een paar seconden.',
+      errorEmpty: 'Voer het adres van de website in',
+      errorInvalid: 'Dit lijkt niet op het adres van een website. Bijvoorbeeld: voorbeeld.nl',
+      planTitle: 'Wat er nu gebeurt',
+      afterTitle: 'En daarna',
+      afterBody: 'U kiest de zoekwoorden die worden gevolgd, en het volledige onderzoek loopt op de achtergrond door: zoekwoorden met hun zoekvolume, de zoekwoorden van uw concurrenten en een contentplan.',
+    },
+    progress: {
+      eyebrow: 'Eerste balans van de website',
+      title: (domain: string) => `${domain} wordt gescand`,
+      fromFreeCheck: 'We gaan verder met de uitkomsten van uw gratis analyse',
+      promise: 'Ongeveer een minuut. U kunt ondertussen doorwerken',
+      stepOf: (n: number, total: number) => `Stap ${n} van ${total}`,
+      nowLabel: 'Bezig',
+      stepsLabel: 'Stappen',
+      finishingTitle: 'De bevindingen worden samengevoegd',
+      finishingLine: 'De balans is bijna klaar',
+      steps: {
+        a1: { title: 'De pagina’s worden geanalyseerd', lines: ['De homepage wordt gelezen', 'De toegang van de AI-crawlers wordt gecontroleerd', 'De adressen in de sitemap worden geteld'] },
+        a2: { title: 'Diensten en gebied', lines: ['Er wordt vastgesteld wat het bedrijf aanbiedt', 'De doelgroepen worden herkend', 'De eerste zoekwoorden worden gekozen'] },
+        a3: { title: 'Tags en content worden nagekeken', lines: ['Titels, beschrijvingen en afbeeldingen worden nagekeken', 'Vier signalen van gereedheid voor AI worden gecontroleerd'] },
+        a4: { title: 'Concurrenten bij Google', lines: ['Uw zoekwoorden worden bij Google gezocht', 'Er wordt gekeken wie er naast u opduikt'] },
+      },
+      claimLines: {
+        a1: ['De uitkomsten van uw gratis analyse worden geopend'],
+        a2: ['Wat we over het bedrijf hebben geleerd wordt overgenomen'],
+        a3: ['De bevindingen en de AI-controles worden overgenomen'],
+      },
+      state: { done: 'Klaar', running: 'Nu', pending: 'Daarna', skipped: 'Overgeslagen', failed: 'Niet afgerond' },
+      stalledTitle: 'Dit duurt langer dan gewoonlijk',
+      stalledBody: 'De scan loopt op de achtergrond door, ook als u deze pagina verlaat, en de balans wacht hier op u.',
+      reconnecting: 'De verbinding wordt hersteld…',
+    },
+    summary: {
+      badge: 'Eerste balans van de website',
+      title: (name: string) => `${name}: wat we van de website hebben geleerd`,
+      scannedJustNow: (domain: string) => `${domain} net gescand`,
+      scannedHoursAgo: (domain: string, hours: number) =>
+        hours === 1 ? `${domain} een uur geleden gescand` : `${domain} ${hours} uur geleden gescand`,
+      scannedDaysAgo: (domain: string, days: number) =>
+        days === 1 ? `${domain} gisteren gescand` : `${domain} ${days} dagen geleden gescand`,
+      fromFreeCheck: 'Op basis van uw gratis analyse',
+      fromSearchIndex: (domain: string) => `We hebben dit onderzoek gebouwd op wat Google van ${domain} laat zien`,
+      firewall: {
+        title: 'De website sluit automatisch lezen buiten',
+        body: 'De firewall van de website sluit automatische lezers zoals de onze buiten: we hebben dit onderzoek daarom gebouwd op wat Google van de website laat zien. WordPress of Shopify verbinden, of onze crawler bij uw hostingpartij toelaten, maakt een vollediger onderzoek mogelijk.',
+      },
+      edit: 'Bewerken',
+      editLabel: (section: string) => `Bewerken: ${section}`,
+      tiles: {
+        keywords: 'Aanbevolen zoekwoorden',
+        fixes: 'Herstelpunten op de website',
+        geo: 'Klaar voor de AI-engines',
+        articles: 'Artikelideeën',
+        notChecked: 'Niet gecontroleerd',
+        pending: 'Wacht',
+      },
+      business: {
+        title: 'Uw bedrijf, zoals uw website het laat zien',
+        niche: 'Niche',
+        commerceType: 'Soort bedrijf',
+        platform: 'Platform',
+        local: 'Lokaal bedrijf',
+        notLocal: 'Niet lokaal',
+        commerce: { product: 'Producten', service: 'Diensten', content: 'Content', other: 'Anders' },
+        empty: 'We konden op de website niet lezen wat het bedrijf aanbiedt. U kunt het invullen bij de instellingen.',
+        locked: 'De winkel is met een wachtwoord beschermd: we hebben nog niet gelezen wat hij aanbiedt.',
+      },
+      audiences: {
+        title: 'Wie u bedient',
+        empty: 'We hebben nog geen doelgroepen herkend. U kunt ze toevoegen bij de instellingen.',
+      },
+      competitors: {
+        title: 'Wie u bij Google concurrentie geeft',
+        seenIn: (n: number) => (n === 1 ? 'Opgedoken in één van onze zoekopdrachten in Google' : `Opgedoken in ${n} van onze zoekopdrachten in Google`),
+        suggested: 'Voorgesteld door de analyse van de website',
+        empty: 'Deze keer hebben we geen concurrenten gevonden. Het volledige onderzoek zoekt opnieuw.',
+      },
+      findings: {
+        title: 'Wat de website tegenhoudt',
+        clean: 'Bij onze controles is geen probleem opgevallen',
+        locked: 'Niet gecontroleerd: de winkel is met een wachtwoord beschermd',
+        firewall: 'Niet gecontroleerd: de website sluit automatisch lezen buiten',
+        failed: 'Deze controle konden we niet afronden',
+        pending: 'Deze controle is nog niet klaar',
+        omitted: (n: number) =>
+          n === 1
+            ? 'Uit de gratis analyse is er nog één bevinding. Een nieuwe scan van de website laat die in de lijst verschijnen.'
+            : `Uit de gratis analyse zijn er nog ${n} bevindingen. Een nieuwe scan van de website laat ze allemaal verschijnen.`,
+        severity: { blocker: 'Blokkerend', warning: 'Te herstellen', info: 'Goed om te weten' },
+      },
+      keywords: {
+        title: 'Zoekwoorden die het waard zijn',
+        hint: 'Alles is aangevinkt. Wat aangevinkt blijft wordt gevolgd en telt mee voor de grens aan zoekwoorden van uw plan.',
+        selected: (n: number, total: number) => `${n} van ${total} aangevinkt`,
+        limit: (max: number) => `U kunt tot ${max} zoekwoorden aanvinken`,
+        empty: 'We hebben nog geen zoekwoorden gevonden. Het volledige onderzoek stelt er een paar voor.',
+        tracked: 'Het volledige onderzoek loopt al. Meer zoekwoorden verschijnen bij het zoekwoordenonderzoek.',
+        reasons: {
+          brand: 'Uw eigen naam: zo zoeken de mensen die u al kennen',
+          question: 'Een vraag: een artikel dat die beantwoordt kan bij Google en in AI-antwoorden opduiken',
+          local: 'Een lokale zoekopdracht: mensen in uw omgeving zoeken hierop',
+          buying: 'Dicht bij de aankoop: wie hierop zoekt is klaar om te handelen',
+          niche: 'Noemt uw niche',
+          specific: 'Een precieze term: minder websites strijden om de plek',
+          core: 'Beschrijft wat u aanbiedt, met de woorden die mensen bij het zoeken gebruiken',
+        },
+      },
+      geo: {
+        title: 'Klaar voor de AI-engines',
+        intro: 'AI-engines zoals ChatGPT en Perplexity maken geen ranglijst, ze noemen bronnen. Deze vier signalen bepalen hoe makkelijk ze u kunnen noemen.',
+        score: (passed: number, total: number) => `${passed} van ${total} controles gehaald`,
+        locked: 'Niet gecontroleerd: de winkel is met een wachtwoord beschermd',
+        lockedBody: 'We controleren deze signalen zodra de winkel openbaar is.',
+        firewall: 'Niet gecontroleerd: de website sluit automatisch lezen buiten',
+        firewallBody: 'Deze controle moet de website zelf lezen. We controleren deze signalen zodra de website verbonden is of onze crawler toelaat.',
+        notChecked: 'Niet gecontroleerd',
+        notCheckedBody: 'Deze controle is op deze website niet uitgevoerd.',
+        pending: 'Wacht op de controle',
+        pendingBody: 'Deze controle is nog niet uitgevoerd.',
+        failed: 'Deze controle konden we niet afronden',
+        pass: 'Aanwezig',
+        fail: 'Ontbreekt',
+      },
+      articles: {
+        title: 'Artikelen die bezoekers kunnen brengen',
+        empty: 'Nog geen onderwerp. Het volledige onderzoek maakt een contentplan.',
+      },
+      start: {
+        title: 'Klaar om te beginnen?',
+        body: (n: number) =>
+          n === 0
+            ? 'Het volledige onderzoek loopt op de achtergrond door: zoekwoorden met hun zoekvolume, de zoekwoorden van uw concurrenten en een contentplan.'
+            : n === 1
+              ? 'Er wordt één zoekwoord gevolgd, en het volledige onderzoek loopt op de achtergrond door: zoekwoorden met hun zoekvolume, de zoekwoorden van uw concurrenten en een contentplan.'
+              : `Er worden ${n} zoekwoorden gevolgd, en het volledige onderzoek loopt op de achtergrond door: zoekwoorden met hun zoekvolume, de zoekwoorden van uw concurrenten en een contentplan.`,
+        button: 'Beginnen',
+        starting: 'Start…',
+        runningTitle: 'Het volledige onderzoek loopt op de achtergrond',
+        runningBody: 'Elke stap verschijnt in het dashboard zodra die klaar is.',
+        readyTitle: 'Het volledige onderzoek is klaar',
+        readyBody: 'De zoekwoorden, de concurrenten en het contentplan wachten in het dashboard op u.',
+        failedTitle: 'Het volledige onderzoek is niet afgerond',
+        failedBody: 'Een paar stappen zijn niet doorgelopen. Wat al gevonden is, is opgeslagen en verschijnt in het dashboard.',
+        openDashboard: 'Dashboard openen',
+      },
+    },
+    preview: {
+      badge: 'Gratis onderzoek',
+      competitorsLocked: (n: number) => (n === 1 ? 'Nog 1 concurrent in het volledige onderzoek' : `Nog ${n} concurrenten in het volledige onderzoek`),
+      keywordsLocked: (n: number) => (n === 1 ? 'Nog 1 zoekwoord in het volledige onderzoek' : `Nog ${n} zoekwoorden in het volledige onderzoek`),
+      volumeLocked: 'Zoekvolume',
+      volumeLockedLabel: 'Het zoekvolume komt vrij in het volledige onderzoek',
+      keywordsHint: 'De zoekvolumes van alle zoekwoorden en het volgen van de posities komen vrij in het volledige onderzoek.',
+      ctaTitle: 'Zet het volledige onderzoek vrij, gratis',
+      ctaBody: 'Alle concurrenten, het zoekvolume van elk zoekwoord en het volgen van de posities. Het onderzoek wacht al in uw account, zonder een tweede scan.',
+      cta: 'Het volledige onderzoek gratis vrijzetten',
+      haveAccount: 'Heeft u al een account?',
+      login: 'Aanmelden',
+      terms: '7 dagen gratis uitproberen, zonder creditcard.',
+    },
+    firstArticle: {
+      button: 'Het eerste artikel schrijven',
+      hint: 'Telt mee voor het aantal artikelen van uw plan',
+      writing: 'Het eerste artikel wordt geschreven…',
+      writingHint: 'Dat kan een paar minuten duren. U kunt op deze pagina blijven.',
+      ready: 'Het eerste artikel is klaar',
+      open: 'Artikel openen',
+      retry: 'Opnieuw proberen',
+      errors: {
+        quota: 'U heeft alle artikelen van de huidige facturatieperiode gebruikt.',
+        billing: 'Om artikelen te schrijven is een actief Shopify-plan nodig.',
+        unavailable: 'We konden het aantal artikelen van uw plan niet nagaan. Probeer het over een minuut opnieuw.',
+        inProgress: 'Dit artikel wordt al geschreven. Het verschijnt op het tabblad Content.',
+        quality: 'Het artikel is niet door onze kwaliteitscontroles gekomen. Probeer het opnieuw.',
+        details: 'In de call-to-action van het artikel ontbreken gegevens. U kunt ze op het tabblad Content bij het onderwerp aanvullen.',
+        generic: 'We konden het artikel niet schrijven. Probeer het opnieuw.',
+        timeout: 'Het schrijven duurt langer dan gewoonlijk. Het artikel verschijnt op het tabblad Content zodra het klaar is.',
+      },
+    },
+    noRun: {
+      title: 'Deze website hebben we nog niet gescand',
+      body: 'De scan leest de website en maakt een eerste balans. Dat duurt tot een minuut.',
+      action: 'Website scannen',
+    },
+    notices: {
+      signedOut: { title: 'Uw sessie is beëindigd', body: 'Meld u opnieuw aan om verder te gaan waar u was gebleven.' },
+      notAvailable: { title: 'Het onderzoek is voor deze website niet beschikbaar', body: 'U kunt in het dashboard verder werken aan de website.' },
+      planRequired: { title: 'De scan hoort bij de proefperiode of bij een actief plan', body: 'Kies een plan om de website te scannen.' },
+      planUnavailable: { title: 'We konden uw plan niet nagaan', body: 'Dat is tijdelijk. Probeer het over een minuut opnieuw.' },
+      runInProgress: { title: 'Er loopt al een scan van deze website', body: 'Laad opnieuw om te zien waar die staat.' },
+      rescanTooSoon: { title: 'Deze website is in de laatste 24 uur gescand', body: (wait: string) => `U kunt haar ${wait} opnieuw scannen.` },
+      userDailyCap: { title: 'U heeft het aantal scans voor vandaag bereikt', body: (wait: string) => `Een nieuwe scan kunt u ${wait} starten.` },
+      globalDailyCap: { title: 'We hebben de grens aan scans voor vandaag bereikt', body: (wait: string) => `Probeer het ${wait} opnieuw.` },
+      claimExpired: { title: 'De uitkomsten van uw gratis analyse zijn niet meer beschikbaar', body: 'We scannen de website opnieuw. Dat duurt tot een minuut.' },
+      busy: { title: 'Er is nu veel vraag naar de dienst', body: 'Probeer het over een minuut opnieuw.' },
+      failed: { title: 'Bij ons is iets misgegaan', body: 'Probeer het over een ogenblik opnieuw.' },
+      offline: { title: 'We bereiken de server niet', body: 'Controleer uw internetverbinding en probeer het opnieuw.' },
+      projectQuota: { title: 'U heeft het aantal websites van uw plan bereikt', body: 'Wissel van plan om nog een website toe te voegen.' },
+      createFailed: { title: 'We konden de website niet aanmaken', body: 'Probeer het over een ogenblik opnieuw.' },
+      noClient: { title: 'Uw account is nog niet klaar voor een nieuwe website', body: 'Voeg een klant toe en maak daarna de website aan.' },
+      notReady: { title: 'Het onderzoek is nog niet klaar om verder te gaan', body: 'Laad opnieuw om te zien waar het staat.' },
+      keywordsChanged: { title: 'De lijst met zoekwoorden is veranderd', body: 'Laad de pagina opnieuw en probeer het nog eens.' },
+      keywordQuota: { title: 'Het volledige onderzoek is gestart, maar de zoekwoorden zijn niet toegevoegd', body: 'U heeft de grens aan zoekwoorden van uw plan bereikt. Op het tabblad Zoekwoorden kunt u ruimte maken.' },
+      keywordsNotAdded: { title: 'Het volledige onderzoek is gestart, maar de zoekwoorden zijn nog niet toegevoegd', body: 'U kunt ze toevoegen op het tabblad Zoekwoorden.' },
+      siteUnreachable: { title: 'We konden de website niet bereiken', body: 'Controleer of de website in een browser opent en probeer het opnieuw.' },
+      siteBlocked: { title: 'De website heeft onze lezer buitengesloten', body: 'Misschien sluit een beveiligingsinstelling automatische lezers buiten. U kunt het later opnieuw proberen.' },
+      siteForbidden: {
+        title: 'De firewall van de website sluit automatisch lezen buiten',
+        body: 'De website sluit automatische lezers zoals de onze buiten: we konden haar daarom niet scannen. U kunt de website via haar platform verbinden, zonder scan verder gaan en de gegevens van het bedrijf zelf invullen, of erover met ons praten.',
+      },
+      siteAddress: { title: 'Het adres van de website leidt niet naar een website die we kunnen lezen', body: 'Controleer het adres bij de instellingen van de website.' },
+      scanStopped: { title: 'De scan is voor het eind afgebroken', body: 'Probeer het opnieuw. Dat duurt tot een minuut.' },
+    },
+    actions: {
+      retry: 'Opnieuw proberen',
+      refresh: 'Opnieuw laden',
+      billing: 'Plannen bekijken',
+      signin: 'Aanmelden',
+      dashboard: 'Dashboard openen',
+      settings: 'Instellingen van de website openen',
+      clients: 'Klanten openen',
+      connectPlatform: 'Een platform verbinden',
+      continueWithoutScan: 'Zonder scan verder gaan',
+      talkToUs: 'Met ons praten',
+    },
+    wait: {
+      minutes: (n: number) => (n === 1 ? 'over een minuut' : `over ${n} minuten`),
+      hours: (n: number) => (n === 1 ? 'over een uur' : `over ${n} uur`),
+      later: 'later',
+    },
+  },
+}
+
+export {}

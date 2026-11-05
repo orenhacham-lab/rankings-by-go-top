@@ -18,6 +18,7 @@ const fr = FEATURE_COMMON.fr
 const it = FEATURE_COMMON.it
 const ja = FEATURE_COMMON.ja
 const de = FEATURE_COMMON.de
+const nl = FEATURE_COMMON.nl
 
 export const SITE_FIXES_PAGE: MarketingPage = {
   path: '/features/site-health-fixes',
@@ -49,6 +50,10 @@ export const SITE_FIXES_PAGE: MarketingPage = {
     ja: {
       title: 'サイトの修正 | Go Top SEO',
       description: 'GoogleとAIエンジンに対してサイトの足を引っぱっている点を見つける診断です。タイトル、ディスクリプション、画像の代替テキスト、リンク切れなどを確認します。WordPressでは、ご承認後にワンクリックで修正でき、元に戻すこともできます。',
+    },
+    nl: {
+      title: 'Verbeteringen aan de website | Go Top SEO',
+      description: 'Een analyse die vindt wat uw website tegenhoudt in Google en in AI-diensten: titels, beschrijvingen, alt-teksten, gebroken links en meer. In WordPress is elke verbetering na uw goedkeuring één klik, en zij is terug te draaien.',
     },
     de: {
       title: 'Korrekturen an der Website | Go Top SEO',
@@ -473,6 +478,75 @@ export const SITE_FIXES_PAGE: MarketingPage = {
     // JAPANESE. The example URLs in the visual are Japanese-site paths, because
     // an Italian /chi-siamo in a Japanese screenshot reads as a mistake; the
     // claims themselves are the same ones the code supports.
+    nl: {
+      hero: {
+        eyebrow: 'Verbeteringen aan de website',
+        eyebrowIcon: Wrench,
+        title: 'Wat uw website tegenhoudt,',
+        accent: 'verholpen zodra u goedkeurt',
+        subtitle: 'Het systeem analyseert uw website en vindt ontbrekende of te lange titels, ontbrekende beschrijvingen, afbeeldingen zonder alt-tekst, gebroken links en pagina\u2019s die voor Google of voor AI-diensten geblokkeerd zijn. Op een verbonden WordPress-website zijn de meeste verbeteringen één klik, nadat u precies gezien hebt wat er verandert.',
+        trust: nl.trust,
+        primary: nl.check,
+        secondary: nl.trial,
+        visual: (
+          <WorkListVisual
+            heading="Verbeteringen aan de website"
+            rows={[
+              { title: 'Titel te lang', detail: '', url: '/diensten/airco-installatie', icon: Type, done: true, status: 'Verbeterd' },
+              { title: 'Afbeeldingen zonder alt-tekst', detail: '4 afbeeldingen', url: '/blog/airco-gids', icon: ImageIcon, done: true, status: 'Verbeterd' },
+              { title: 'Gebroken link', detail: '', url: '/over-ons', icon: Link2, done: false, status: 'Wacht op goedkeuring' },
+              { title: 'Beschrijving ontbreekt', detail: '', url: '/contact', icon: FileSearch, done: false, status: 'Wacht op goedkeuring' },
+            ]}
+          />
+        ),
+      },
+      sections: [
+        {
+          kind: 'cards',
+          tone: 'contrast',
+          eyebrow: 'Waarom dit telt',
+          title: 'Goede content helpt een website niet die zichzelf in de weg staat',
+          intro: 'Een titel die in de resultaten wordt afgekapt, een afbeelding die Google niet kan lezen, een link die op een foutpagina eindigt. Elk daarvan is klein. Samen trekken zij de website naar beneden.',
+          items: [
+            { icon: ScanSearch, title: 'Zien wat vastzit', body: 'Elk probleem wordt vermeld met de pagina\u2019s waarop het voorkomt, op ernst geordend.' },
+            { icon: ShieldCheck, title: 'Niets verandert zonder u', body: 'Bij elke verbetering hoort een voorbeeld: wat de pagina vandaag zegt en wat ervoor in de plaats komt.' },
+            { icon: RotateCcw, title: 'Wanneer u wilt terugdraaien', body: 'Een verbetering via het systeem bewaart de vorige waarde, zodat u haar kunt terugdraaien.' },
+          ],
+        },
+        {
+          kind: 'steps',
+          eyebrow: 'Zo gaat het',
+          title: 'Van de analyse naar een verbeterde website',
+          items: [
+            { title: 'Website analyseren', body: 'Het systeem loopt uw pagina\u2019s door en geeft een op ernst geordende lijst problemen terug.' },
+            { title: 'Voorstel bekijken', body: 'Bij elk probleem hoort een voorgestelde verbetering, met de huidige en de nieuwe waarde naast elkaar.' },
+            { title: 'Goedkeuren', body: 'Op een verbonden WordPress-website en in de artikelen en pagina\u2019s van een verbonden Shopify-webshop wordt de verbetering naar de website geschreven. Anders krijgt u een stap-voor-stap-instructie.' },
+          ],
+        },
+        {
+          kind: 'cards',
+          eyebrow: 'Wat er in WordPress verbeterd wordt',
+          title: 'De verbeteringen die het systeem zelf uitvoert',
+          items: [
+            { icon: Type, title: 'SEO-titels', body: 'Een ontbrekende, te korte of te lange titel wordt opnieuw geschreven. Met Yoast of Rank Math wordt hij in hun veld opgeslagen.' },
+            { icon: FileSearch, title: 'Metabeschrijvingen', body: 'Een ontbrekende beschrijving of een met de verkeerde lengte. Opgeslagen in de SEO-plug-in van de website, via de Go Top-plug-in.' },
+            { icon: ImageIcon, title: 'Alt-teksten van afbeeldingen', body: 'Alleen afbeeldingen in de content die geen alt-tekst hebben, krijgen er een. Alle overige afbeeldingen blijven onaangeroerd.' },
+            { icon: Link2, title: 'Links', body: 'Een gebroken link wordt vervangen of verwijderd, en tussen verwante pagina\u2019s worden interne links toegevoegd.' },
+            { icon: Heading1, title: 'Hoofdkop', body: 'Een pagina met meer dan één H1 houdt via de Go Top-plug-in één enkele hoofdkop.' },
+            { icon: Code2, title: 'FAQ en llms.txt', body: 'Een FAQ-blok op de pagina en een llms.txt-bestand dat de website beschrijft voor AI-diensten, via de Go Top-plug-in.' },
+          ],
+        },
+        {
+          kind: 'callout',
+          icon: Info,
+          title: 'In Shopify en op andere platformen',
+          body: (
+            <p>De analyse werkt op elke website. In een verbonden Shopify-webshop verbetert het systeem na uw goedkeuring de blogartikelen en pagina\u2019s van de webshop: de titel en de beschrijving die Google toont, alt-teksten van afbeeldingen, een gebroken link, een FAQ-blok en een extra hoofdkop. Ook hier is elke verbetering terug te draaien. Producten, categorieën en webshopinstellingen worden nooit gewijzigd. In Wix en op andere platformen schrijft het systeem niet naar de website; het laat bij elk probleem een korte instructie zien om het zelf te verhelpen.</p>
+          ),
+        },
+      ],
+      cta: { title: 'Zie wat uw website tegenhoudt', body: nl.closeBody, primary: nl.check, secondary: nl.trial },
+    },
     de: {
       hero: {
         eyebrow: 'Korrekturen an der Website',

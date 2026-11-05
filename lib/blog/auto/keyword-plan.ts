@@ -38,13 +38,18 @@ export const RESEARCH_MARKET: Record<BlogAutoLocale, { country: string; language
   // COUNTRY_GEO_TARGETS carries DE alone for the same reason — Germany is the
   // market that was researched and the one the pricing is offered in.
   de: { country: 'DE', language: 'de' },
+  // The Netherlands, and ONLY the Netherlands. Belgium (geo 2056) is not here
+  // and must not be: Flemish readers read these pages, but Belgium was never
+  // measured in Keyword Planner and its prices were never set, which is exactly
+  // why Austria and Switzerland had to be taken out again after German shipped.
+  nl: { country: 'NL', language: 'nl' },
 }
 
 /**
  * The floor for "somebody searches this". Hebrew is a 9-million-speaker market,
  * so the same floor as English would reject nearly every real Hebrew query.
  */
-export const MIN_MONTHLY_SEARCHES: Record<BlogAutoLocale, number> = { he: 20, en: 80, es: 50, 'pt-BR': 50, fr: 50, it: 50, ja: 50, de: 50 }
+export const MIN_MONTHLY_SEARCHES: Record<BlogAutoLocale, number> = { he: 20, en: 80, es: 50, 'pt-BR': 50, fr: 50, it: 50, ja: 50, de: 50, nl: 50 }
 
 /** Seeds the research starts from — the subjects this product is actually about. */
 export const RESEARCH_SEEDS: Record<BlogAutoLocale, string[]> = {
@@ -89,6 +94,28 @@ export const RESEARCH_SEEDS: Record<BlogAutoLocale, string[]> = {
   // loanwords — a German owner searches "Keyword Recherche", never
   // "Schlüsselwortrecherche" — so seeding with the native-sounding compound
   // would have returned nothing.
+  // These are not translations of the English seeds, and they are not translations
+  // of the German ones either. They are the terms Keyword Planner returned WITH
+  // VOLUME when the Netherlands was measured on 5 Nov 2026
+  // (growth/next-language.md, Addendum 5): backlinks checken 4,400/mo at low
+  // competition, seo tool 2,400, seo check 1,600, sitecheck seo 590,
+  // zoekwoordplanner 480, seo test 390, seo analyse 320, lokale seo 260 and
+  // seo lokaal 260, seo scan 260, seo check google 210, zoekwoorden analyse 170.
+  //
+  // Dutch SEO vocabulary is NOT the English one with a Dutch article in front:
+  // `zoekwoord` is what a Dutch owner types, not `keyword` — zoekwoordplanner
+  // alone carries the most valuable clicks of the whole Dutch list. The one
+  // place English wins is `backlinks`, which has no Dutch equivalent in use.
+  // Seeding this list with calques from the German seeds would have returned
+  // nothing, which is the mistake the Dutch measurement itself corrected: an
+  // earlier hand-written list made this market look dead.
+  nl: [
+    'seo', 'seo tool', 'seo check', 'seo analyse',
+    'backlinks checken', 'zoekwoordplanner', 'zoekwoorden analyse',
+    'lokale seo', 'seo lokaal', 'google bedrijfsprofiel',
+    'google search console', 'seo voor kleine bedrijven',
+    'website snelheid', 'zichtbaarheid in ai',
+  ],
   de: [
     'seo', 'seo tool', 'seo analyse tool', 'keyword recherche',
     'google ranking prüfen', 'keyword ranking tool', 'backlink tool',

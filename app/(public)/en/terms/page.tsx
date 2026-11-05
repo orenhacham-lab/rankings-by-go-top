@@ -30,7 +30,7 @@ export default function EnglishTermsPage() {
           visibility, measure visibility on AI engines such as ChatGPT, Gemini and Perplexity, conduct
           keyword research, and generate professional reports. The Service also includes website scans,
           connections to Google accounts and WordPress sites, site fixes you approve, AI-generated content and
-          email messages, as set out in sections 15A to 15G.
+          email messages, as set out in sections 15A to 15H.
         </p>
       </section>
 

@@ -1075,4 +1075,133 @@ export const RANKMATH_COMPARE: Record<PublicLocale, ComparisonCopy> = {
     },
     close: { title: 'ご自身のサイトの現状を、登録なしで確認する' },
   },
+  nl: {
+    competitor: 'Rank Math',
+    eyebrow: 'Go Top SEO tegenover Rank Math',
+    metaTitle: 'Go Top SEO tegenover Rank Math | vergelijking',
+    metaDescription:
+      'Go Top SEO vergeleken met Rank Math: wie buiten WordPress werkt, wie in het Google-bedrijfsprofiel publiceert, wat er in elke prijs zit en wanneer Rank Math de betere keuze is.',
+    hero: {
+      title: 'Rank Math is een uitstekende WordPress-plug-in.',
+      accent: 'Wij zijn een systeem dat het werk doet',
+      subtitle:
+        'Rank Math zit in de WordPress-editor, helpt bij het schrijven en bij het goed opmaken van een pagina, en volgt inmiddels ook hoe AI-assistenten uw merk noemen. Go Top SEO werkt daarnaast op Shopify, publiceert in het Google-bedrijfsprofiel en houdt een maandplan voor content bij dat zichzelf publiceert.',
+    },
+    table: {
+      eyebrow: 'De vergelijking',
+      title: 'Wat elk van beide doet, uit Rank Maths eigen pagina’s',
+      checkedOn: CHECKED,
+      sources: SOURCES,
+      rows: [
+        {
+          label: 'Instapprijs',
+          ours: 'Buiten Israël vanaf 79 USD per maand plus belasting; in Israël vanaf 249 ILS per maand inclusief btw.',
+          theirs:
+            'Gratis plug-in, daarna PRO voor € 8,99 per maand bij jaarlijkse betaling, exclusief btw, tegen de verlengprijs, en Business voor € 27,99. Van tijd tot tijd staat er een lagere actieprijs voor het eerste jaar.',
+        },
+        {
+          label: 'Platforms',
+          ours: 'WordPress en Shopify, in één account.',
+          theirs: 'Hun pagina’s beschrijven een WordPress-plug-in.',
+        },
+        {
+          label: 'Wie het werk doet',
+          ours: 'Het systeem. U keurt een onderwerp goed; het schrijft, voegt afbeeldingen en interne links toe en publiceert.',
+          theirs:
+            'U zelf, in de editor. Content AI geeft u meer dan 40 schrijfhulpmiddelen en sjablonen; u voert ze uit en publiceert.',
+        },
+        {
+          label: 'Maandelijks contentplan',
+          ours: 'Het systeem stelt elke maand onderwerpen voor, u keurt ze goed of haalt ze weg, en de artikelen worden volgens plan gepubliceerd.',
+          theirs:
+            'De pagina’s die wij hebben gelezen, beschrijven het schrijven op verzoek in de editor, niet een maandplan dat zichzelf publiceert.',
+        },
+        {
+          label: 'Google-bedrijfsprofiel',
+          ours: 'In dezelfde prijs begrepen: automatische berichten met uw toestemming en voorbereide antwoorden op beoordelingen.',
+          theirs: 'De pagina’s die wij hebben gelezen, gaan over de website zelf en vermelden geen berichten in een Google-bedrijfsprofiel.',
+        },
+        {
+          label: 'Zichtbaarheid in AI-diensten',
+          ours: 'Een maandelijkse controle tegenover ChatGPT, Gemini en Google AI, in de basisprijs begrepen.',
+          theirs:
+            'Zij bieden AI Visibility: een zichtbaarheidsscore, het volgen van hoe ChatGPT en Gemini het merk noemen, toon, vergelijking met concurrenten, volledige antwoordlogboeken en controles per land. Verkocht als deel van Rank Math AI.',
+        },
+        {
+          label: 'Positiemeting',
+          ours: 'Een maandelijkse controle in Google en in Google Maps, in dezelfde prijs.',
+          theirs: 'PRO volgt 1.000 zoekwoorden, Business 20.000, met twaalf maanden positiegeschiedenis.',
+        },
+        {
+          label: 'Proefperiode',
+          ours: '7 dagen, zonder creditcard, altijd op te zeggen.',
+          theirs: 'De kernplug-in is gratis, en de PRO-pakketten bevatten een proefperiode van 15 dagen op Rank Math AI.',
+        },
+      ],
+    },
+    theirStrengths: {
+      eyebrow: 'Wanneer Rank Math wint',
+      title: 'Er zijn gevallen waarin Rank Math de juiste keuze is',
+      intro: 'Rank Math is een volgroeid, geliefd product, en dat hoort u te weten voordat u ons verhaal leest.',
+      items: [
+        {
+          title: 'Als het budget op nul staat',
+          body:
+            'De kernplug-in is gratis en loopt naar hun eigen opgave op meer dan vier miljoen WordPress-websites. Voor een bedrijf dat net begint en geen maandbudget heeft, is dat een moeilijk te weerleggen startpunt: structured data, sitemaps en de analyse op de pagina zitten er zonder betaling bij.',
+        },
+        {
+          title: 'Als u in de editor zelf de leiding wilt houden',
+          body:
+            'Schrijft u uw berichten zelf en ziet u graag een SEO-score meelopen terwijl u typt, dan is hun omgeving prettiger dan de onze. Wij zijn om automatisering heen gebouwd, Rank Math om de persoon die ervoor zit en het werk doet.',
+        },
+        {
+          title: 'Als interne links in grote hoeveelheden beheerd moeten worden',
+          body:
+            'AI Link Genius laat elke link van de website in één dashboard zien, werkt er honderden in één keer bij, stelt tijdens het schrijven links voor en vindt pagina’s waar niets naar verwijst. Op een oudere website met honderden pagina’s hebben wij daar geen tegenhanger voor.',
+        },
+      ],
+    },
+    ourStrengths: {
+      eyebrow: 'Wanneer wij beter passen',
+      title: 'Als er niemand voor het hulpmiddel gaat zitten',
+      intro: 'Het verschil zit niet in wie meer van SEO begrijpt, maar in wie het werk elke maand daadwerkelijk doet.',
+      items: [
+        {
+          title: 'Ook Shopify, niet alleen WordPress',
+          body: 'Een Shopify-winkel krijgt hetzelfde systeem, hetzelfde contentplan en dezelfde meting.',
+        },
+        {
+          title: 'De content publiceert zichzelf',
+          body: 'U keurt één keer per maand onderwerpen goed, en de artikelen gaan met afbeeldingen en interne links online zonder dat u de editor opent.',
+        },
+        {
+          title: 'De plaatselijke aanwezigheid zit erin',
+          body: 'Berichten in het Google-bedrijfsprofiel, voorbereide antwoorden op beoordelingen en het volgen van de posities in Google Maps, in dezelfde prijs.',
+        },
+        {
+          title: 'Één prijs, één plek',
+          body: 'Schrijven, publiceren, plaatselijke berichten en het maandrapport zitten in hetzelfde pakket in plaats van in losse producten.',
+        },
+      ],
+    },
+    faq: {
+      eyebrow: 'Vragen',
+      title: 'Wat er voor een overstap wordt gevraagd',
+      items: [
+        {
+          q: 'Kan ik beide gebruiken?',
+          a: 'Ja. Rank Math neemt structured data, sitemaps en de opmaak binnen WordPress op zich; wij schrijven en publiceren de content en zorgen voor de plaatselijke aanwezigheid. Technisch is er geen conflict.',
+        },
+        {
+          q: 'Meten jullie de zichtbaarheid in AI beter dan Rank Math?',
+          a: 'Niet per se. Hun AI Visibility rapporteert toon, vergelijking met concurrenten en logboeken, wat wij niet doen. Onze controle is een maandelijkse die in de basisprijs zit, in plaats van een aparte aankoop.',
+        },
+        {
+          q: 'Zijn de prijzen op deze pagina actueel?',
+          a: `Ze zijn op ${CHECKED} gelezen van Rank Maths eigen pagina’s. Bedrijven veranderen prijzen, dus de links onder de tabel zijn de bron.`,
+        },
+      ],
+    },
+    close: { title: 'Zie zonder aanmelden waar uw website staat' },
+  },
 }

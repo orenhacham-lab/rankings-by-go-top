@@ -212,6 +212,30 @@ const LOGIN_UI = {
       linkInvalid: 'Dieser Bestätigungslink ist ungültig oder abgelaufen. Melden Sie sich an, oder registrieren Sie sich erneut, um einen neuen zu erhalten.',
     },
   },
+  nl: {
+    subtitle: 'Posities in Google en zichtbaarheid in AI-antwoorden',
+    logoAlt: 'Het logo van Go Top SEO',
+    heading: 'Inloggen',
+    emailLabel: 'E-mailadres',
+    emailPlaceholder: 'naam@voorbeeld.nl',
+    passwordLabel: 'Wachtwoord',
+    passwordPlaceholder: '\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022',
+    loginBtn: 'Inloggen',
+    forgotPassword: 'Wachtwoord vergeten?',
+    dontHaveAccount: 'Nog geen account?',
+    startTrial: 'Gratis beginnen',
+    accessibility: 'Toegankelijkheid',
+    privacy: 'Privacy',
+    articles: 'Artikelen',
+    accessibilityHref: '/nl/accessibility',
+    privacyHref: '/nl/privacy',
+    articlesHref: '/nl/articles',
+    err: {
+      badCredentials: 'Het e-mailadres of het wachtwoord is niet juist',
+      emailNotConfirmed: 'Het e-mailadres is nog niet bevestigd. Open de bevestigingsmail die wij u hebben gestuurd en klik op de link.',
+      linkInvalid: 'Deze bevestigingslink is ongeldig of verlopen. Log in, of meld u opnieuw aan om een nieuwe te krijgen.',
+    },
+  },
 } as const
 
 export function AuthForm() {

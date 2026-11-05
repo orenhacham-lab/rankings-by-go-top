@@ -213,6 +213,7 @@ export const fr = {
     it: 'Italiano',
     ja: '日本語',
     de: 'Deutsch',
+    nl: 'Nederlands',
     aria: 'Changer la langue du site',
   },
   cookie: {

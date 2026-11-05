@@ -38,6 +38,7 @@ const QUESTION_START: Record<SuggestionLanguage, RegExp> = {
   // 「なぜ…」 and 「どのように…」 do open a question.
   ja: /(?:か|ですか|ますか|でしょうか|とは|？|\?)\s*$|^(?:なぜ|どう|どのように|どうやって|いくら|どこ|いつ|どれ|どの|何|なに)/,
   de: /^(?:was|wie|warum|wieso|weshalb|welche|welcher|welches|wo|woher|wann|wer|wie\s+viel|wie\s+viele|wie\s+lange|ist|sind|kann|kann\s+man|muss|muss\s+man|soll|sollte|darf|lohnt|braucht|gibt)\b/i,
+  nl: /^(?:wat|hoe|hoeveel|hoelang|hoe\s+lang|hoe\s+veel|waarom|waardoor|waarvoor|welke|welk|waar|waarvandaan|wanneer|wie|is|zijn|kan|kun\s+je|kan\s+je|moet|moet\s+je|mag|loont|heb\s+je|bestaat|bestaan)\b/i,
 }
 
 /** "best / recommended" words: the question asks for a recommendation. */
@@ -51,6 +52,10 @@ const RECOMMEND: Record<SuggestionLanguage, RegExp> = {
   // No \b in Japanese: there is no word boundary to anchor to.
   ja: /(?:おすすめ|オススメ|お勧め|お薦め|人気|最適|ベスト|一番|最高)/,
   de: /\b(?:best\w*|empfehl\w*|empfohlen\w*|top|testsieger)\b/i,
+  // Dutch superlatives inflect ('beste', 'beter'), and 'aanrader' is the noun a
+  // Dutch reviewer reaches for where English says "a must". 'tip' is deliberately
+  // absent: it is also the ordinary word for a hint and would match everywhere.
+  nl: /\b(?:best\w*|beter\w*|aanbevol\w*|aanbevel\w*|aanrader\w*|aanraden|top|getest)\b/i,
 }
 
 /** A keyword that already names the act of buying ("buying X", "buy X"). */
@@ -70,6 +75,11 @@ const BUY: Record<SuggestionLanguage, RegExp> = {
   // covered: the separable-verb form that ends the phrase, and the noun form
   // that opens it.
   de: /^(?:kaufen|kauf\s+(?:von|eines|einer)|bestellen|bestellung\s+(?:von|eines|einer)|mieten|miete\s+(?:von|eines|einer)|buchen)\s|\s(?:kaufen|bestellen|mieten|buchen)\s*$/i,
+  // Dutch puts the buying verb at the END of the phrase ('laptop kopen'), the way
+  // German's separable form does, and the noun form at the front ('koop van',
+  // 'huur van'). Both ends are covered, and 'laten installeren' is included
+  // because a Dutch service query is almost always phrased that way.
+  nl: /^(?:kopen|koop\s+van|bestellen|bestelling\s+van|huren|huur\s+van|boeken|aanschaffen)\s|\s(?:kopen|bestellen|huren|boeken|aanschaffen|laten\s+installeren|laten\s+plaatsen)\s*$/i,
 }
 
 const TEMPLATES: Record<SuggestionLanguage, { recommend: (k: string) => string; buy: (k: string) => string; general: (k: string) => string }> = {
@@ -110,6 +120,11 @@ const TEMPLATES: Record<SuggestionLanguage, { recommend: (k: string) => string; 
     recommend: (k) => `Sto cercando ${k.replace(/^il\s+|^lo\s+|^la\s+|^i\s+|^gli\s+|^le\s+|^l['’]/i, '')}. Che cosa consigliate?`,
     buy: (k) => `Che cosa conviene verificare prima di ${k.replace(/^acquisto di\s/i, 'acquistare ').replace(/^ordine di\s/i, 'ordinare ')}?`,
     general: (k) => `Che cosa è utile sapere su ${k}?`,
+  },
+  nl: {
+    recommend: (k) => `Ik zoek ${k.replace(/^de\s+|^het\s+|^een\s+/i, '')}. Wat zou u aanraden?`,
+    buy: (k) => `Waar moet ik op letten voordat ik ${k.replace(/^koop\s+van\s/i, '').replace(/\skopen\s*$/i, '')} koop?`,
+    general: (k) => `Wat moet ik weten over ${k}?`,
   },
   de: {
     recommend: (k) => `Ich suche ${k.replace(/^der\s+|^die\s+|^das\s+|^ein\s+|^eine\s+/i, '')}. Was würden Sie empfehlen?`,

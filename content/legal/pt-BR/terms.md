@@ -11,7 +11,7 @@ extraReason: No extra section. What Brazilian law adds goes inside the sections 
 
 ## 1. Introdução e definição do Serviço
 
-O Go Top SEO (o «Serviço» ou a «Plataforma») é um serviço SaaS operado pela GO TOP DIGITAL MARKETING AND ADVERTISING LTD (número de sociedade 517274346) (a «Empresa»). O Serviço permite que os clientes acompanhem posições de palavras-chave na busca do Google, monitorem a visibilidade no Google Maps, meçam a visibilidade em motores de IA como ChatGPT, Gemini e Perplexity, realizem pesquisa de palavras-chave e gerem relatórios profissionais. O Serviço inclui também análises de sites, conexões com contas Google e sites WordPress, correções no site aprovadas por você, conteúdo e mensagens de e-mail gerados por IA, conforme as seções 15A a 15G.
+O Go Top SEO (o «Serviço» ou a «Plataforma») é um serviço SaaS operado pela GO TOP DIGITAL MARKETING AND ADVERTISING LTD (número de sociedade 517274346) (a «Empresa»). O Serviço permite que os clientes acompanhem posições de palavras-chave na busca do Google, monitorem a visibilidade no Google Maps, meçam a visibilidade em motores de IA como ChatGPT, Gemini e Perplexity, realizem pesquisa de palavras-chave e gerem relatórios profissionais. O Serviço inclui também análises de sites, conexões com contas Google e sites WordPress, correções no site aprovadas por você, conteúdo e mensagens de e-mail gerados por IA, conforme as seções 15A a 15H.
 
 ## 2. Aceitação dos Termos
 

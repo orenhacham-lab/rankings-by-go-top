@@ -6,6 +6,7 @@ import { dashboardFr } from './fr'
 import { dashboardIt } from './it'
 import { dashboardJa } from './ja'
 import { dashboardDe } from './de'
+import { dashboardNl } from './nl'
 import { deepMergeDictionary } from './merge'
 import type { PublicLocale } from '../locales'
 import type { DashboardDictionary } from './he'
@@ -41,6 +42,14 @@ import type { DashboardDictionary } from './he'
  * named in dollars rather than euros, because outside Israel this product
  * charges in USD and a euro figure on screen would be a price it does not
  * charge).
+ *
+ * DUTCH is the ninth locale and the same arrangement once more, from nl/, held
+ * leaf for leaf by lib/i18n/dashboard/__qa__/dutch-dashboard.qa.ts. The USD
+ * rule is the same as German's and matters as much: a Dutch consumer price has
+ * to be the total payable, so a euro figure here would be a price this product
+ * does not charge. What is specific to Dutch is in the words: formal "u"
+ * throughout, common nouns in lower case (the opposite of German) and closed
+ * compounds.
  */
 const dashboardEsMerged = deepMergeDictionary(dashboardEn as unknown as DashboardDictionary, dashboardEs)
 const dashboardPtMerged = deepMergeDictionary(dashboardEn as unknown as DashboardDictionary, dashboardPtBR)
@@ -48,6 +57,7 @@ const dashboardFrMerged = deepMergeDictionary(dashboardEn as unknown as Dashboar
 const dashboardItMerged = deepMergeDictionary(dashboardEn as unknown as DashboardDictionary, dashboardIt)
 const dashboardJaMerged = deepMergeDictionary(dashboardEn as unknown as DashboardDictionary, dashboardJa)
 const dashboardDeMerged = deepMergeDictionary(dashboardEn as unknown as DashboardDictionary, dashboardDe)
+const dashboardNlMerged = deepMergeDictionary(dashboardEn as unknown as DashboardDictionary, dashboardNl)
 
 const DICTIONARIES = {
   he: dashboardHe,
@@ -58,6 +68,7 @@ const DICTIONARIES = {
   it: dashboardItMerged,
   ja: dashboardJaMerged,
   de: dashboardDeMerged,
+  nl: dashboardNlMerged,
 } satisfies Record<PublicLocale, DashboardDictionary>
 
 /**

@@ -662,7 +662,83 @@ const de: AiCrawlerCopy = {
   },
 }
 
-const COPY: Record<PublicLocale, AiCrawlerCopy> = { he, en, es, 'pt-BR': ptBR, fr, it, ja, de }
+const nl: AiCrawlerCopy = {
+  meta: {
+    title: 'Welke AI-crawlers blokkeert uw robots.txt? – Go Top SEO',
+    description:
+      'Vul een domein in en zie welke AI-crawlers — GPTBot, ClaudeBot, PerplexityBot, Google-Extended en meer — uw robots.txt blokkeert, en welke regel dat per crawler beslist. Zonder aanmelden.',
+  },
+  page: {
+    badge: 'Gratis tool',
+    title: 'Welke AI-crawlers blokkeert uw website?',
+    subtitle:
+      'Wij lezen uw robots.txt en laten voor elke AI-crawler zien of die is toegestaan of geblokkeerd — en welke regel van het bestand dat beslist.',
+    trust: ['Zonder aanmelden, zonder e-mailadres', 'Één bestand, één keer gelezen', 'Controleert niet alleen de startpagina, maar ook een afzonderlijk pad'],
+  },
+  form: {
+    urlLabel: 'Adres van de website',
+    urlPlaceholder: 'voorbeeld.nl',
+    pathLabel: 'Te controleren pad (optioneel)',
+    pathPlaceholder: '/blog/',
+    pathHint: 'Laat dit leeg om de startpagina te controleren. De regels in de robots.txt kunnen per pad verschillen.',
+    submit: 'Crawlers controleren',
+    submitting: 'robots.txt wordt gelezen…',
+    errors: {
+      invalid_url: 'Dit adres ziet er niet goed uit. Probeer het in de vorm voorbeeld.nl.',
+      blocked_url: 'Alleen openbaar bereikbare websites kunnen worden gecontroleerd.',
+      unreachable: 'Deze website was net niet bereikbaar. Probeer het later opnieuw.',
+      rate_limited: 'Er zijn in korte tijd veel websites gecontroleerd. Wacht een minuut en probeer het opnieuw.',
+      internal: 'De controle is aan onze kant niet doorgelopen. Probeer het later opnieuw.',
+    },
+  },
+  results: {
+    heading: 'Gecontroleerd is',
+    forPath: 'Gecontroleerd pad',
+    robotsFound: 'robots.txt gelezen',
+    robotsAbsent: 'Deze website levert geen robots.txt, dus dit bestand blokkeert niets.',
+    robotsUnreadable: 'De website heeft het bestand niet geleverd, dus daaruit valt geen regel te lezen. De resultaten hieronder behandelen niets als geblokkeerd.',
+    allowedCount: 'Toegestaan',
+    blockedCount: 'Geblokkeerd',
+    allowed: 'Toegestaan',
+    blocked: 'Geblokkeerd',
+    decidedBy: 'Beslissende regel',
+    noRule: 'Geen passende regel. Standaard toegestaan',
+    viaWildcard: 'Beslist door de groep voor alle crawlers',
+    ignoresRobots: 'Deze crawler zegt niet toe de robots.txt te volgen',
+    sitemapsTitle: 'In het bestand opgegeven sitemaps',
+    again: 'Een andere website controleren',
+  },
+  purposes: {
+    train: { label: 'Training', blurb: 'Verzamelt pagina’s om een model te trainen. Wie hem blokkeert, komt in het volgende model niet voor.' },
+    answer: { label: 'Antwoord in real time', blurb: 'Haalt de pagina op het moment dat iemand iets vraagt, en citeert die met een link in het antwoord.' },
+    search: { label: 'Zoekindex', blurb: 'Bouwt de zoekindex waarop ook de AI-antwoorden rusten.' },
+    ads: { label: 'Advertenties', blurb: 'Controleert de bestemmingspagina’s van advertenties. Een blokkade heeft geen gevolgen voor antwoorden of voor de zoekindex.' },
+  },
+  groups: { ai: 'AI-crawlers', classic: 'Klassieke zoekmachinecrawlers' },
+  reference: {
+    title: 'Wie erachter zit',
+    intro: 'Deze tabel is ook los te lezen: de naam die in de User-agent-regel staat, de eigenaar en het doel.',
+    colAgent: 'User-agent',
+    colOperator: 'Eigenaar',
+    colPurpose: 'Doel',
+  },
+  limits: {
+    title: 'Wat deze controle niet laat zien',
+    items: [
+      'De robots.txt is een verzoek, geen muur. Een crawler kan hem negeren.',
+      'Een firewall of een CDN kan een crawler blokkeren die de robots.txt toestaat.',
+      'De controle beschrijft één moment. Wie het bestand aanpast, verandert het antwoord direct.',
+      'Een trainingscrawler blokkeren en een crawler blokkeren die live antwoordt, zijn twee volstrekt verschillende beslissingen.',
+    ],
+  },
+  cta: {
+    title: 'Uitzoeken of de AI uw bedrijf echt noemt',
+    body: 'De toegang is pas de eerste stap. Go Top SEO controleert automatisch of uw bedrijf voorkomt in de antwoorden van ChatGPT, Gemini en Google AI, en volgt uw posities in Google en in Google Maps maandelijks.',
+    button: '7 dagen gratis uitproberen, zonder creditcard',
+  },
+}
+
+const COPY: Record<PublicLocale, AiCrawlerCopy> = { he, en, es, 'pt-BR': ptBR, fr, it, ja, de, nl }
 
 export function aiCrawlerCopy(locale: PublicLocale): AiCrawlerCopy {
   return COPY[locale] ?? he

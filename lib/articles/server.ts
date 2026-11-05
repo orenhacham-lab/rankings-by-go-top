@@ -113,6 +113,7 @@ export const FAQ_HEADING: Record<PublicLocale, string> = {
   ja: 'よくある質問',
   it: 'Domande frequenti',
   de: 'Häufige Fragen',
+  nl: 'Veelgestelde vragen',
 }
 
 const SITE_NAME = 'Go Top SEO'
