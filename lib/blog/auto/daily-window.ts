@@ -20,12 +20,13 @@
  * calendar: a language that already published today (UTC) is done, and a
  * language whose plan row is claimed right now is in flight, so a second
  * invocation leaves both alone. At most ONE language is written per run, so a
- * morning fills in the order he, en, es, pt-BR, fr, a quarter of an hour apart
- * — the order lib/blog/auto/rotation.ts declares, and it is last-pays-first: a
- * language that keeps failing the quality gate spends the window's reserve, and
- * the one that goes without is the last in that list, never an older one.
+ * morning fills one language a quarter of an hour, HUNGRIEST FIRST: the language
+ * that has gone longest without an article goes before the rest, and the order
+ * lib/blog/auto/rotation.ts declares only breaks a tie. Until 5 Nov 2026 this
+ * walked that list in order and it was last-pays-first, which is how Italian
+ * and Japanese lost days to the retries of the languages ahead of them.
  *
- * Production only, and only in WINDOW_HOURS_UTC (04:00-07:59 UTC = 07:00-10:59
+ * Production only, and only in WINDOW_HOURS_UTC (04:00-09:59 UTC = 07:00-12:59
  * in Israel). The window held three hours while there were three languages, and
  * a morning really does use them: on 17 Oct the Spanish article failed the
  * quality gate twice and published on the third pass, at 06:47. A fourth
@@ -37,14 +38,21 @@
 
 import type { createAdminClient } from '@/lib/supabase/admin'
 import { localesForDay, type BlogAutoLocale } from '@/lib/blog/auto/rotation'
-import { localesPublishedSince, isLocaleGenerating } from '@/lib/blog/auto/store'
+import { localesPublishedSince, isLocaleGenerating, lastPublishedByLocale } from '@/lib/blog/auto/store'
 import { runBlogAutoPublish, type BlogAutoSummary } from '@/lib/blog/auto/runner'
 import { isBlogAutoPublishEnabled } from '@/lib/blog/auto/cron-run'
 
 type Admin = ReturnType<typeof createAdminClient>
 
-/** The UTC hours the morning run may write in. */
-export const WINDOW_HOURS_UTC: readonly number[] = [4, 5, 6, 7]
+/**
+ * The UTC hours the morning run may write in. Four hours held five languages;
+ * eight languages need six (04:00-09:59 UTC = 07:00-12:59 Israel), because the
+ * window is sixteen runs of which eight go on first passes and the rest is
+ * reserve for a language that fails a gate and retries. On 4 Nov 2026 the
+ * window ran out at 07:59 with Italian still unwritten and German, live that
+ * day, never reached at all.
+ */
+export const WINDOW_HOURS_UTC: readonly number[] = [4, 5, 6, 7, 8, 9]
 
 /** Left for the emails that follow in the cron's `after()`. */
 export const BLOG_WINDOW_MARGIN_MS = 15_000
@@ -73,15 +81,37 @@ export function isInWindow(nowMs: number): boolean {
  * The first language of the day's order that has neither published today nor a
  * run in flight. `null` means the morning is done, or someone else is writing.
  */
+/**
+ * The day's languages, hungriest first: the one that has gone longest without an
+ * article, and the list's own order between two that are equally hungry. A
+ * language that has never published sorts first of all.
+ *
+ * This is what keeps the last language in the list from paying for the ones
+ * ahead of it. Walking the list in order meant Spanish retrying three times, or
+ * French twice, spent the window and Italian, Japanese and German — the last
+ * three — simply never got a turn. Ordering by hunger cannot starve anyone two
+ * days running: a language that missed yesterday is first today.
+ */
+export function starvationOrder(
+  locales: readonly BlogAutoLocale[],
+  lastPublished: Record<string, string | undefined>,
+): BlogAutoLocale[] {
+  return locales
+    .map((locale, index) => ({ locale, index, at: lastPublished[locale] ?? '' }))
+    .sort((a, b) => (a.at < b.at ? -1 : a.at > b.at ? 1 : a.index - b.index))
+    .map((entry) => entry.locale)
+}
+
 export async function nextLocaleToWrite(
   admin: Admin,
   nowMs: number,
 ): Promise<{ locale: BlogAutoLocale | null; busy: boolean }> {
   const published = new Set(await localesPublishedSince(admin, startOfUtcDay(nowMs)))
+  const lastPublished = await lastPublishedByLocale(admin)
   // localesForDay(), not the whole list: a language whose public tree is still
   // behind its flag has nowhere to publish to, and claiming its slot would end
   // the morning before the languages that do.
-  for (const locale of localesForDay()) {
+  for (const locale of starvationOrder(localesForDay(), lastPublished)) {
     if (published.has(locale)) continue
     if (await isLocaleGenerating(admin, locale)) return { locale: null, busy: true }
     return { locale, busy: false }

@@ -37,6 +37,85 @@ export { linkifyBareUrls }
 /** The product's one name, as the brief instructs the model to write it. */
 export const BRAND = 'Go Top SEO'
 
+/**
+ * THE BRAND, AS A LANGUAGE THAT IS NOT ENGLISH ACTUALLY WRITES IT.
+ *
+ * `checkBodyLinks` used to ask `html.includes('Go Top SEO')` and nothing else,
+ * and that one exact match is what stopped the Italian and Japanese articles on
+ * 2 and 3 Nov 2026: five of six runs failed `links:brand_not_mentioned`, the
+ * article was discarded, and Japanese went three days without a page. A model
+ * writing Japanese renders a Latin name in forms that are the same name to a
+ * reader and a different string to `includes`: full-width letters (Ｇｏ Ｔｏｐ
+ * ＳＥＯ), an ideographic space between the words, a no-break space, a stray
+ * zero-width space from the tokenizer. Italian trips a plainer version of it,
+ * such as "GO TOP SEO" in a heading-like sentence.
+ *
+ * So the name is matched on a normalised copy of the text — full-width Latin
+ * folded to ASCII, the exotic spaces folded to a plain one, case ignored — and
+ * whatever form the model used is rewritten to the canonical ASCII name, which
+ * is what the trial link then wraps and what the reader sees.
+ */
+const FULL_WIDTH_OFFSET = 0xfee0
+
+export function foldBrandText(text: string): string {
+  return text
+    .replace(/[\uff01-\uff5e]/g, (c) => String.fromCharCode(c.charCodeAt(0) - FULL_WIDTH_OFFSET))
+    .replace(/[\u3000\u00a0\u2007\u202f\u200b]/g, ' ')
+}
+
+/** The name in any of those forms, as written text. */
+const BRAND_VARIANT_RE = /[Gg\uff27\uff47]\s*[Oo\uff2f\uff4f]\s*[\s\u3000\u00a0]*[Tt\uff34\uff54]\s*[Oo\uff2f\uff4f]\s*[Pp\uff30\uff50]\s*[\s\u3000\u00a0]*[Ss\uff33\uff53]\s*[Ee\uff25\uff45]\s*[Oo\uff2f\uff4f]/g
+
+/** Does this body name the product at all, in any form a reader would accept? */
+export function mentionsBrand(html: string): boolean {
+  return /go\s*top\s*seo/i.test(foldBrandText(html || ''))
+}
+
+/**
+ * Rewrite whatever form the model used into the canonical ASCII name, in prose
+ * only — a tag, an attribute and an existing link are left untouched. Runs
+ * before the link pass, so the link wraps the canonical name.
+ */
+export function canonicalizeBrand(html: string): string {
+  if (!html || html.includes(BRAND)) return html
+  const tokens = tokenizeHtml(html)
+  for (const run of textRuns(tokens)) {
+    if (!isLinkableRun(run)) continue
+    const folded = foldBrandText(run.text)
+    if (!/go\s*top\s*seo/i.test(folded)) continue
+    tokens[run.token] = run.text.replace(BRAND_VARIANT_RE, BRAND)
+  }
+  return tokens.join('')
+}
+
+/**
+ * THE SENTENCE AN ARTICLE THAT NEVER NAMED US GETS INSTEAD OF BEING BINNED.
+ *
+ * A discarded article is a day with no page in that language, which is the
+ * costlier of the two failures: the gate below exists to stop a page that says
+ * nothing about the system, and one deterministic closing sentence satisfies it
+ * without asking the model for anything. It is appended the way the plan cards
+ * and the trial band already are (lib/blog/auto/widgets.ts) — plain, factual,
+ * inside the truth limits, and in the article's own language.
+ */
+const BRAND_FALLBACK: Record<BlogAutoLocale, (link: string) => string> = {
+  he: (l) => `${l} מרכז את העבודה הזו במקום אחד, ואפשר להתחיל בניסיון חינם.`,
+  en: (l) => `${l} brings this work together in one place, and you can start with a free trial.`,
+  es: (l) => `${l} reúne este trabajo en un solo lugar y puedes empezar con una prueba gratuita.`,
+  'pt-BR': (l) => `O ${l} reúne esse trabalho em um só lugar, e você pode começar com um teste gratuito.`,
+  fr: (l) => `${l} réunit ce travail en un seul endroit, et vous pouvez commencer par un essai gratuit.`,
+  it: (l) => `${l} riunisce questo lavoro in un unico posto, e puoi iniziare con una prova gratuita.`,
+  ja: (l) => `${l} はこうした作業を一つの場所にまとめており、無料トライアルから始められます。`,
+  de: (l) => `${l} bündelt diese Arbeit an einer Stelle, und Sie können kostenlos testen.`,
+}
+
+/** Append that sentence when, and only when, the body never named the product. */
+export function ensureBrandSentence(html: string, locale: BlogAutoLocale): string {
+  if (mentionsBrand(html)) return html
+  const link = `<a href="${trialHref(locale)}">${BRAND}</a>`
+  return `${(html || '').trimEnd()}\n<p>${BRAND_FALLBACK[locale](link)}</p>`
+}
+
 const RELATED_HEADING: Record<BlogAutoLocale, string> = {
   he: 'קראו גם',
   en: 'Read also',
@@ -121,7 +200,10 @@ export function withBodyLinks(
   input: { locale: BlogAutoLocale; internalTargets: InternalLinkTarget[] },
 ): string {
   const linkified = linkifyBareUrls(html)
-  const branded = linkBrandMention(linkified, input.locale)
+  // The name as the model wrote it becomes the name as we write it, and a body
+  // that never named us gets the one deterministic sentence that does.
+  const named = ensureBrandSentence(canonicalizeBrand(linkified), input.locale)
+  const branded = linkBrandMention(named, input.locale)
   return relatedReading(branded, input.locale, input.internalTargets)
 }
 
@@ -138,7 +220,7 @@ export interface BodyLinksResult {
  */
 export function checkBodyLinks(html: string): BodyLinksResult {
   const failures: string[] = []
-  if (!html?.includes(BRAND)) failures.push('brand_not_mentioned')
+  if (!mentionsBrand(html)) failures.push('brand_not_mentioned')
   if (!hasOwnLink(html || '')) failures.push('no_link_to_product')
   return { ok: failures.length === 0, failures }
 }

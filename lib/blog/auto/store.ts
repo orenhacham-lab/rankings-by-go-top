@@ -228,6 +228,28 @@ export async function localesPublishedSince(admin: Admin, sinceIso: string): Pro
 }
 
 /**
+ * WHEN EACH LANGUAGE LAST GOT AN ARTICLE, so the morning can serve the hungriest
+ * one first. Walking lib/blog/auto/rotation.ts in order alone is what left
+ * Italian and Japanese without a page: the languages ahead of them retried and
+ * spent the window. Never published reads as the empty string, which sorts
+ * before every date — a brand-new language goes first.
+ */
+export async function lastPublishedByLocale(admin: Admin): Promise<Record<string, string>> {
+  const { data } = await admin
+    .from('articles')
+    .select('locale, published_at')
+    .eq('is_published', true)
+    .order('published_at', { ascending: false })
+    .limit(500)
+  const out: Record<string, string> = {}
+  for (const row of (data ?? []) as { locale: string | null; published_at: string | null }[]) {
+    if (!row.locale || !row.published_at) continue
+    if (!(row.locale in out)) out[row.locale] = row.published_at
+  }
+  return out
+}
+
+/**
  * Is a run of this language in flight? A claimed row means another invocation
  * is generating right now, and a second one would publish a second article.
  * A row claimed longer than STALE_LOCK_MS is not counted: recoverStaleLocks
