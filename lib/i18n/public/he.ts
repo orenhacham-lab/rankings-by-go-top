@@ -200,6 +200,7 @@ export const he = {
     ja: '日本語',
     de: 'Deutsch',
     nl: 'Nederlands',
+    pl: 'Polski',
     aria: 'שינוי שפת האתר',
   },
   cookie: {

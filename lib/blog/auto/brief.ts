@@ -38,6 +38,7 @@ const AUDIENCE: Record<BlogAutoLocale, string> = {
   it: 'il titolare di una piccola impresa o il responsabile marketing in Italia che vuole essere trovato su Google e negli assistenti di IA',
   ja: '日本で事業を営む経営者、またはマーケティングの担当者で、自社のサイトが Google と AI のアシスタントでどう見つかるかを知りたい方',
   de: 'der Inhaber eines kleinen Unternehmens oder die für das Marketing verantwortliche Person in Deutschland, die wissen will, wie das eigene Unternehmen bei Google und in den KI-Assistenten gefunden wird',
+  pl: 'właściciel małej firmy albo osoba odpowiedzialna za marketing w Polsce, która chce wiedzieć, jak jej firmę znajduje się w Google i w asystentach AI',
   nl: 'de eigenaar van een klein bedrijf of de persoon die in Nederland voor de marketing verantwoordelijk is, en wil weten hoe het eigen bedrijf gevonden wordt in Google en in de AI-assistenten',
 }
 

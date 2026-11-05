@@ -210,6 +210,7 @@ export const es = {
     ja: '日本語',
     de: 'Deutsch',
     nl: 'Nederlands',
+    pl: 'Polski',
     aria: 'Cambiar el idioma del sitio',
   },
   cookie: {

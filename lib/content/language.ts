@@ -14,9 +14,9 @@
  * site can be managed from a Hebrew dashboard, and currency follows the country.
  */
 
-export type ContentLanguage = 'he' | 'en' | 'es' | 'pt-BR' | 'fr' | 'it' | 'ja' | 'de' | 'nl'
+export type ContentLanguage = 'he' | 'en' | 'es' | 'pt-BR' | 'fr' | 'it' | 'ja' | 'de' | 'nl' | 'pl'
 
-export const CONTENT_LANGUAGES: ContentLanguage[] = ['he', 'en', 'es', 'pt-BR', 'fr', 'it', 'ja', 'de', 'nl']
+export const CONTENT_LANGUAGES: ContentLanguage[] = ['he', 'en', 'es', 'pt-BR', 'fr', 'it', 'ja', 'de', 'nl', 'pl']
 
 export const DEFAULT_CONTENT_LANGUAGE: ContentLanguage = 'he'
 
@@ -62,6 +62,14 @@ export const DEFAULT_CONTENT_LANGUAGE: ContentLanguage = 'he'
  * Belgium is not a market we priced. 'dutch' cannot be confused with German
  * despite what the English word suggests, because the test above it matches on
  * 'de'/'ger'/'deutsch' and none of those is a prefix of 'dutch'.
+ *
+ * Polish is region-less too, and it has only ever had one region. The accepted
+ * spellings are 'pl', 'pol', 'polish' and 'polski' — the last because a value
+ * that reached us from a Polish-language form or a Polish WordPress install is
+ * spelled in Polish, and without it that row would have answered Hebrew. The
+ * test order matters here as it does for Dutch: 'pl' is checked after 'pt', so
+ * Brazilian Portuguese is never swallowed by it, and no accepted Polish
+ * spelling is a prefix of any earlier language's.
  */
 export function normalizeContentLanguage(value: unknown): ContentLanguage {
   const s = String(value ?? '').toLowerCase().trim()
@@ -73,6 +81,7 @@ export function normalizeContentLanguage(value: unknown): ContentLanguage {
   if (s.startsWith('it') || s.startsWith('ital')) return 'it'
   if (s.startsWith('ja') || s.startsWith('jp') || s.startsWith('japan') || s.startsWith('日本')) return 'ja'
   if (s.startsWith('de') || s.startsWith('ger') || s.startsWith('deutsch')) return 'de'
+  if (s.startsWith('pl') || s.startsWith('pol') || s.startsWith('polski')) return 'pl'
   if (s.startsWith('nl') || s.startsWith('dutch') || s.startsWith('nederland') || s.startsWith('vlaams') || s.startsWith('flemish')) return 'nl'
   return DEFAULT_CONTENT_LANGUAGE
 }
@@ -88,6 +97,7 @@ const ENGLISH_NAME: Record<ContentLanguage, string> = {
   ja: 'Japanese',
   de: 'German',
   nl: 'Dutch',
+  pl: 'Polish',
 }
 
 export function languageNameInEnglish(language: ContentLanguage): string {

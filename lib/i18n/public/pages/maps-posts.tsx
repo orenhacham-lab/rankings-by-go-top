@@ -62,6 +62,7 @@ const it = FEATURE_COMMON.it
 const ja = FEATURE_COMMON.ja
 const de = FEATURE_COMMON.de
 const nl = FEATURE_COMMON.nl
+const pl = FEATURE_COMMON.pl
 
 export const MAPS_POSTS_PAGE: MarketingPage = {
   path: '/features/google-maps-posts',
@@ -101,6 +102,10 @@ export const MAPS_POSTS_PAGE: MarketingPage = {
     de: {
       title: 'Beiträge im Google Unternehmensprofil | Go Top SEO',
       description: 'Veröffentlichen Sie Neuigkeiten mit Foto und Button direkt aus der App in Ihrem Google Unternehmensprofil: ein erster Entwurf liegt bereit, Sie bearbeiten ihn und veröffentlichen sofort oder zu einem Zeitpunkt Ihrer Wahl. Antworten auf Ihre Google-Bewertungen an derselben Stelle.',
+    },
+    pl: {
+      title: 'Wpisy w Profilu Firmy w Google | Go Top SEO',
+      description: 'Nowości ze zdjęciem i przyciskiem publikowane wprost z aplikacji w Profilu Firmy w Google: pierwsza wersja czeka gotowa, można ją poprawić i opublikować od razu albo w wybranym momencie. Odpowiedzi na opinie w Google w tym samym miejscu.',
     },
   },
   content: {
@@ -1154,6 +1159,123 @@ export const MAPS_POSTS_PAGE: MarketingPage = {
         },
       ],
       cta: { title: '今あるものを顧客に見てもらう', body: ja.closeBody, primary: ja.trial, secondary: ja.check },
+    },
+    pl: {
+      hero: {
+        eyebrow: 'Wpisy w Profilu Firmy w Google',
+        eyebrowIcon: MapPinned,
+        title: 'Profil Firmy w Google',
+        accent: 'pozostaje aktualny, nawet bez czasu',
+        subtitle: 'Kto znajdzie firmę w Google Maps, widzi, co jest u Państwa nowego: ofertę, nową usługę, artykuł, który właśnie się ukazał. W aplikacji piszą Państwo wpis ze zdjęciem i przyciskiem, dostają pierwszą wersję, poprawiają ją i publikują od razu albo w wybranym momencie. Na opinie odpowiadają Państwo w tym samym miejscu.',
+        trust: pl.trust,
+        primary: pl.trial,
+        secondary: pl.check,
+        visual: (
+          <MapsPostVisual
+            business="Fitness na Rynku"
+            kind="Nowość · czwartek 10:00"
+            text="Uruchomiliśmy nową grupę poranną 50+, w poniedziałki i środy o 7:00. Z opieką trenera, w małej grupie i z bezpłatnymi zajęciami próbnymi, bez zobowiązań."
+            button="Zarezerwuj termin"
+            queueHeading="Państwa wpisy"
+            queue={[
+              { title: 'Grupa poranna 50+', detail: 'Zaplanowane na czwartek 10:00', status: 'Zaplanowane', done: false },
+              { title: 'Poradnik: jak wybrać buty do biegania', detail: 'Z nowego artykułu na stronie', status: 'Opublikowane', auto: true, done: true },
+            ]}
+            review={{
+              heading: 'Nowa opinia',
+              author: 'Anna K.',
+              stars: 5,
+              starsLabel: '5 z 5 gwiazdek',
+              text: 'Czysto, cierpliwi trenerzy i dobra atmosfera. Przychodzę już pół roku.',
+              replyLabel: 'Szkic odpowiedzi',
+              reply: 'Serdecznie dziękujemy za miłe słowa. Cieszymy się, że dobrze się u nas czujesz, i do zobaczenia na kolejnych zajęciach.',
+            }}
+          />
+        ),
+      },
+      sections: [
+        {
+          kind: 'steps',
+          eyebrow: 'Jak to przebiega',
+          title: 'Od połączenia do opublikowanego wpisu',
+          items: [
+            { title: 'Jedno połączenie', body: 'Logują się Państwo kontem Google, które zarządza Profilem Firmy, i zatwierdzają zgodę na ekranie Google. Uprawnienie obejmuje wyłącznie zarządzanie profilem i jest niezależne od Search Console. Połączenie można rozwiązać w każdej chwili.' },
+            { title: 'Wybór firmy', body: 'Aplikacja pokazuje firmy, którymi Państwo zarządzają w Google, i wybierają Państwo, do której firmy mają trafiać wpisy z tej strony.' },
+            { title: 'Pisanie albo gotowy szkic', body: 'Można zacząć od artykułu, który system napisał dla Państwa strony, od wpisanego tematu albo od pustej kartki. Pierwsza wersja mieści się w limicie długości Google i można ją dowolnie poprawić.' },
+            { title: 'Publikacja albo zaplanowanie', body: 'Od razu albo w wybranym dniu i o wybranej godzinie, nawet rok naprzód. Lista wpisów pokazuje, co jest opublikowane, co zaplanowane, a co Google jeszcze sprawdza.' },
+          ],
+        },
+        {
+          kind: 'cards',
+          eyebrow: 'W każdym wpisie',
+          title: 'Wpis, który dobrze wygląda',
+          items: [
+            { icon: Crop, title: 'Właściwy format obrazu', body: 'Wgrywają Państwo zdjęcie i przycinają je do 4:3, tak jak pokazuje je Google, z przybliżeniem i przesunięciem. Wpis powstający z artykułu może przejąć jego obraz jednym kliknięciem.' },
+            { icon: ImagePlus, title: 'Gotowy obraz do wpisu tematycznego', body: 'Przy wpisie pisanym na podstawie wpisanego tematu aplikacja może wygenerować obraz ilustracyjny przez AI. Jest to obraz ogólny, a nie zdjęcie Państwa firmy, zespołu czy produktów, i trafia do wpisu tylko wtedy, gdy Państwo go wybiorą.' },
+            { icon: MousePointerClick, title: 'Przycisk, który gdzieś prowadzi', body: 'Więcej informacji, Zarezerwuj termin, Zamów online, Kup, Zapisz się albo Zadzwoń teraz. Przycisk prowadzi na podstronę Państwa witryny albo, za Państwa zgodą, na inną stronę, na przykład do systemu rezerwacji. „Zadzwoń teraz” wybiera numer z profilu.' },
+            { icon: Eye, title: 'Podgląd przed publikacją', body: 'Obok edytora jest podgląd wpisu: nazwa firmy, zdjęcie, tekst i przycisk, żeby nic Państwa nie zaskoczyło.' },
+            { icon: Type, title: 'W granicach zasad Google', body: 'Licznik znaków do 1500, czyli do limitu Google. Jeśli w tekście pojawi się numer telefonu, dostaną Państwo ostrzeżenie, bo Google ogranicza numery telefonu we wpisach. Do dzwonienia służy przycisk „Zadzwoń teraz”.' },
+            { icon: Languages, title: 'W języku Państwa klientów', body: 'Szkic jest pisany w języku projektu, w każdym języku, który aplikacja obsługuje, i przed publikacją można zmienić każde słowo.' },
+            { icon: ShieldCheck, title: 'Tylko to, co Państwo zatwierdzą', body: 'Wychodzą wyłącznie wpisy i odpowiedzi zatwierdzone przez Państwa, a poza tym wpisy automatyczne, jeśli zostały włączone. Godziny otwarcia, adres i pozostałe dane firmy nigdy nie są zmieniane.' },
+          ],
+        },
+        {
+          kind: 'cards',
+          tone: 'contrast',
+          eyebrow: 'Wpisy automatyczne',
+          title: 'Nowy artykuł na stronie, nowy wpis w Google',
+          items: [
+            { icon: Zap, title: 'Dzieje się samo', body: 'Po włączeniu z każdego artykułu, który system opublikuje na Państwa stronie, powstaje też krótki wpis w Profilu Firmy, z obrazem artykułu i przyciskiem „Więcej informacji”, który do niego prowadzi.' },
+            { icon: ToggleLeft, title: 'Wyłączone, dopóki Państwo nie włączą', body: 'Domyślnie wyłączone i ustawiane osobno dla każdej strony. Wpis automatyczny wychodzi bez wcześniejszego przeczytania, dlatego to Państwa decyzja. Można to wyłączyć w każdej chwili, a już opublikowane wpisy zostają.' },
+            { icon: Repeat, title: 'Raz na artykuł', body: 'Ten sam artykuł nigdy nie trafia do profilu dwa razy, także wtedy, gdy publikacja na stronie się powtórzy. Profil nie zapełnia się więc duplikatami.' },
+          ],
+        },
+        {
+          kind: 'cards',
+          columns: 2,
+          eyebrow: 'Opinie w Google',
+          title: 'Odpowiedź na każdą opinię, z jednego miejsca',
+          items: [
+            { icon: MessageSquareText, title: 'Każda opinia pod ręką', body: 'Opinie firmy w Google, ze średnią oceną, liczbą opinii czekających na odpowiedź i oznaczeniem nowych. Można sortować według oceny.' },
+            { icon: Sparkles, title: 'Szkic odpowiedzi jednym kliknięciem', body: 'Dostają Państwo propozycję odpowiedzi, uprzejmą i na temat, w języku, w którym napisał klient. Po poprawieniu i wysłaniu odpowiedź pojawia się w Google pod opinią.' },
+            { icon: PenLine, title: 'Zmiana albo usunięcie', body: 'Już opublikowaną odpowiedź można zmienić albo usunąć. Sama opinia zostaje bez zmian.' },
+            { icon: Lock, title: 'Opinii nie przechowujemy', body: 'Opinie są czytane z Google przy każdym otwarciu listy i nie są zapisywane w systemie. Imię klienta nie jest przekazywane do przygotowania szkicu. Jeśli chcą Państwo zwrócić się do kogoś po imieniu, prosimy dopisać je samodzielnie.' },
+          ],
+        },
+        {
+          kind: 'callout',
+          icon: Info,
+          title: 'Warto wiedzieć',
+          body: (
+            <>
+              <p>
+                Google sprawdza każdy wpis przed wyświetleniem i czasem go odrzuca. Lista wpisów pokazuje stan
+                każdego z nich, również wpisu odrzuconego. Do połączenia potrzebne jest konto Google, które jest
+                właścicielem Profilu Firmy albo nim zarządza.
+              </p>
+              <p>
+                Go Top SEO nie jest w żaden sposób powiązany z Google. Wpisy i odpowiedzi na opinie pomagają
+                klientom zobaczyć działającą firmę, ale nie są obietnicą pozycji w Google Maps ani w wynikach
+                wyszukiwania Google.
+              </p>
+            </>
+          ),
+        },
+        {
+          kind: 'faq',
+          eyebrow: 'Często zadawane pytania',
+          title: 'O co pytają w sprawie wpisów w Profilu Firmy',
+          items: [
+            { q: 'Czy aplikacja może zmienić moje godziny otwarcia albo adres?', a: 'Nie. Publikujemy wyłącznie wpisy i odpowiedzi na opinie. Godziny otwarcia, adres, numer telefonu i pozostałe dane profilu zostają dokładnie takie, jakie są.' },
+            { q: 'Czy szkic publikuje się sam?', a: 'Przy wpisie pisanym przez Państwa nie: szkic pojawia się na ekranie i zostaje opublikowany dopiero po naciśnięciu przycisku. Wpisy o nowych artykułach wychodzą same tylko wtedy, gdy włączone są wpisy automatyczne.' },
+            { q: 'Czy mogę planować wpisy naprzód?', a: 'Tak, na wybrany dzień i godzinę, nawet rok naprzód. Zaplanowany wpis można anulować, dopóki nie został wysłany.' },
+            { q: 'Czy to działa dla sklepu Shopify albo strony, która nie stoi na WordPressie?', a: 'Tak. Wpis trafia do Profilu Firmy w Google, a nie na Państwa stronę, więc działa dla każdego projektu na każdej platformie.' },
+            { q: 'Co się stanie, jeśli rozwiążę połączenie?', a: 'Zaplanowane wpisy nie zostaną opublikowane, dopóki połączenie nie wróci. Już opublikowane wpisy zostają w Google.' },
+            { q: 'Zarządzam kilkoma firmami w Google. Czy to problem?', a: 'Nie. Aplikacja pokazuje każdą firmę, którą zarządza konto, a dla każdej strony w systemie wybierają Państwo firmę, do której mają trafiać jej wpisy.' },
+          ],
+        },
+      ],
+      cta: { title: 'Proszę pokazać klientom, co jest u Państwa nowego', body: pl.closeBody, primary: pl.trial, secondary: pl.check },
     },
   },
 }

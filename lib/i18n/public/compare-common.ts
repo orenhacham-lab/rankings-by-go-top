@@ -79,6 +79,15 @@ export const COMPARE_COMMON: Record<PublicLocale, CompareCommon> = {
     fairness: (c) =>
       `${c} è un buon prodotto e per alcune aziende è la scelta giusta. Questa pagina non vuole dire il contrario: mostra i punti di forza di ciascuno, così da capire quale sia più adatto.`,
   },
+  pl: {
+    column: 'Co porównujemy',
+    ours: 'Go Top SEO',
+    tableCaption: (c) => `Go Top SEO w porównaniu z ${c}`,
+    checkedOn: (c, date) =>
+      `Kolumna o ${c} pochodzi ze stron samego ${c}, przeczytanych ${date}. Firmy zmieniają ceny i funkcje: jeśli coś przestało się tu zgadzać, linki na dole są źródłem i warto do nich zajrzeć.`,
+    fairness: (c) =>
+      `${c} to dobry produkt i dla części firm jest właściwym wyborem. Ta strona nie twierdzi niczego przeciwnego. Pokazuje, gdzie leżą mocne strony każdego z nich, żeby widać było, co pasuje do Państwa.`,
+  },
   nl: {
     column: 'Wat wij vergelijken',
     ours: 'Go Top SEO',

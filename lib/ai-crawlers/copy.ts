@@ -662,6 +662,82 @@ const de: AiCrawlerCopy = {
   },
 }
 
+const pl: AiCrawlerCopy = {
+  meta: {
+    title: 'Które roboty AI blokuje Państwa robots.txt? – Go Top SEO',
+    description:
+      'Prosimy podać domenę, a pokażemy, które roboty AI — GPTBot, ClaudeBot, PerplexityBot, Google-Extended i inne — blokuje Państwa plik robots.txt oraz która reguła o tym decyduje dla każdego z nich. Bez rejestracji.',
+  },
+  page: {
+    badge: 'Narzędzie bezpłatne',
+    title: 'Które roboty AI blokuje Państwa witryna?',
+    subtitle:
+      'Czytamy Państwa plik robots.txt i dla każdego robota AI pokazujemy, czy jest dopuszczony czy zablokowany — oraz która reguła pliku o tym decyduje.',
+    trust: ['Bez rejestracji i bez adresu e-mail', 'Jeden plik, czytany jeden raz', 'Sprawdza nie tylko stronę główną, lecz także wskazaną ścieżkę'],
+  },
+  form: {
+    urlLabel: 'Adres witryny',
+    urlPlaceholder: 'przyklad.pl',
+    pathLabel: 'Ścieżka do sprawdzenia (opcjonalnie)',
+    pathPlaceholder: '/blog/',
+    pathHint: 'Pozostawione puste oznacza sprawdzenie strony głównej. Reguły w pliku robots.txt mogą różnić się dla różnych ścieżek.',
+    submit: 'Sprawdź roboty',
+    submitting: 'Czytamy plik robots.txt\u2026',
+    errors: {
+      invalid_url: 'Ten adres nie wygląda poprawnie. Prosimy podać go w postaci przyklad.pl.',
+      blocked_url: 'Sprawdzić można wyłącznie witryny dostępne publicznie.',
+      unreachable: 'Ta witryna była właśnie nieosiągalna. Prosimy spróbować później.',
+      rate_limited: 'W krótkim czasie sprawdzono wiele witryn. Prosimy odczekać minutę i spróbować ponownie.',
+      internal: 'Sprawdzenie nie zakończyło się po naszej stronie. Prosimy spróbować później.',
+    },
+  },
+  results: {
+    heading: 'Sprawdzono',
+    forPath: 'Sprawdzona ścieżka',
+    robotsFound: 'Plik robots.txt przeczytany',
+    robotsAbsent: 'Ta witryna nie udostępnia pliku robots.txt, więc ten plik niczego nie blokuje.',
+    robotsUnreadable: 'Witryna nie udostępniła pliku, więc nie da się z niego odczytać żadnej reguły. Wyniki poniżej nie traktują niczego jako zablokowane.',
+    allowedCount: 'Dopuszczone',
+    blockedCount: 'Zablokowane',
+    allowed: 'Dopuszczony',
+    blocked: 'Zablokowany',
+    decidedBy: 'Decydująca reguła',
+    noRule: 'Brak pasującej reguły. Domyślnie dopuszczony',
+    viaWildcard: 'Zdecydowała grupa dla wszystkich robotów',
+    ignoresRobots: 'Ten robot nie zobowiązuje się do przestrzegania pliku robots.txt',
+    sitemapsTitle: 'Mapy witryny wskazane w pliku',
+    again: 'Sprawdź inną witrynę',
+  },
+  purposes: {
+    train: { label: 'Trenowanie', blurb: 'Zbiera strony, by wytrenować model. Kto go zablokuje, nie trafi do kolejnego modelu.' },
+    answer: { label: 'Odpowiedź w czasie rzeczywistym', blurb: 'Pobiera stronę w chwili, gdy ktoś o coś pyta, i przytacza ją z linkiem w odpowiedzi.' },
+    search: { label: 'Indeks wyszukiwania', blurb: 'Buduje indeks wyszukiwania, na którym opierają się także odpowiedzi AI.' },
+    ads: { label: 'Reklamy', blurb: 'Sprawdza strony docelowe reklam. Zablokowanie go nie ma wpływu na odpowiedzi ani na indeks wyszukiwania.' },
+  },
+  groups: { ai: 'Roboty AI', classic: 'Klasyczne roboty wyszukiwarek' },
+  reference: {
+    title: 'Kto za tym stoi',
+    intro: 'Tę tabelę można czytać także osobno: nazwa występująca w wierszu User-agent, właściciel i cel.',
+    colAgent: 'User-agent',
+    colOperator: 'Właściciel',
+    colPurpose: 'Cel',
+  },
+  limits: {
+    title: 'Czego to sprawdzenie nie pokazuje',
+    items: [
+      'Plik robots.txt jest prośbą, nie murem. Robot może go zignorować.',
+      'Zapora sieciowa albo CDN mogą zablokować robota, którego robots.txt dopuszcza.',
+      'Sprawdzenie opisuje jedną chwilę. Kto zmieni plik, od razu zmieni odpowiedź.',
+      'Zablokowanie robota trenującego i zablokowanie robota, który odpowiada na żywo, to dwie całkowicie różne decyzje.',
+    ],
+  },
+  cta: {
+    title: 'Sprawdźmy, czy AI naprawdę wymienia Państwa firmę',
+    body: 'Dostęp to dopiero pierwszy krok. Go Top SEO automatycznie sprawdza, czy Państwa firma pojawia się w odpowiedziach ChatGPT, Gemini i Google AI, i co miesiąc monitoruje pozycje w Google oraz w Mapach Google.',
+    button: 'Wypróbuj 7 dni bezpłatnie, bez karty kredytowej',
+  },
+}
+
 const nl: AiCrawlerCopy = {
   meta: {
     title: 'Welke AI-crawlers blokkeert uw robots.txt? – Go Top SEO',
@@ -738,7 +814,7 @@ const nl: AiCrawlerCopy = {
   },
 }
 
-const COPY: Record<PublicLocale, AiCrawlerCopy> = { he, en, es, 'pt-BR': ptBR, fr, it, ja, de, nl }
+const COPY: Record<PublicLocale, AiCrawlerCopy> = { he, en, es, 'pt-BR': ptBR, fr, it, ja, de, nl, pl }
 
 export function aiCrawlerCopy(locale: PublicLocale): AiCrawlerCopy {
   return COPY[locale] ?? he

@@ -43,13 +43,19 @@ export const RESEARCH_MARKET: Record<BlogAutoLocale, { country: string; language
   // measured in Keyword Planner and its prices were never set, which is exactly
   // why Austria and Switzerland had to be taken out again after German shipped.
   nl: { country: 'NL', language: 'nl' },
+  // Poland, and ONLY Poland. Polish is spoken by diasporas large enough to be
+  // tempting (Germany, the UK, Chicago), but a market goes into
+  // COUNTRY_GEO_TARGETS when it is researched and priced, never when its
+  // language is spoken somewhere — the Austria/Switzerland revert after German
+  // shipped is the precedent.
+  pl: { country: 'PL', language: 'pl' },
 }
 
 /**
  * The floor for "somebody searches this". Hebrew is a 9-million-speaker market,
  * so the same floor as English would reject nearly every real Hebrew query.
  */
-export const MIN_MONTHLY_SEARCHES: Record<BlogAutoLocale, number> = { he: 20, en: 80, es: 50, 'pt-BR': 50, fr: 50, it: 50, ja: 50, de: 50, nl: 50 }
+export const MIN_MONTHLY_SEARCHES: Record<BlogAutoLocale, number> = { he: 20, en: 80, es: 50, 'pt-BR': 50, fr: 50, it: 50, ja: 50, de: 50, nl: 50, pl: 50 }
 
 /** Seeds the research starts from — the subjects this product is actually about. */
 export const RESEARCH_SEEDS: Record<BlogAutoLocale, string[]> = {
@@ -109,6 +115,35 @@ export const RESEARCH_SEEDS: Record<BlogAutoLocale, string[]> = {
   // Seeding this list with calques from the German seeds would have returned
   // nothing, which is the mistake the Dutch measurement itself corrected: an
   // earlier hand-written list made this market look dead.
+  // POLISH IS THE FIRST LOCALE WHOSE SEEDS WERE NOT MEASURED IN KEYWORD PLANNER.
+  // German (04.11) and Dutch (05.11) were both measured before they shipped;
+  // this session has read-only GAQL access and no KeywordPlanIdeaService, so the
+  // Polish volumes are an OPEN ITEM for the growth thread, recorded in
+  // polish/HANDOFF.md. Nothing downstream depends on a volume — guard B8 in
+  // markets.qa.ts only asks that the market resolve — so the locale is correct
+  // without it; what is unmeasured is which of these terms deserves the launch
+  // content, and the list must be re-cut once Keyword Planner has spoken.
+  //
+  // What IS grounded is the vocabulary, and it is the one thing a translation of
+  // the English or German seeds would have got wrong. Polish does not borrow the
+  // category name: the word a Polish owner types is `pozycjonowanie` — literally
+  // "positioning" — and it is used interchangeably with SEO by the Polish trade
+  // itself, while `pozycjonowanie stron` is the standard name of the service.
+  // `wizytówka Google` is what the Google Business Profile is called in Polish
+  // usage (the official name, `Profil Firmy w Google`, is the one the pages use
+  // and the one nobody searches for), and `linki zwrotne` is the native word for
+  // backlinks, which Dutch had no equivalent for at all. Google holds over 97%
+  // of search in Poland, so Keyword Planner's Polish numbers will be the whole
+  // market rather than a slice of it.
+  pl: [
+    'seo', 'pozycjonowanie', 'pozycjonowanie stron',
+    'audyt seo', 'analiza seo', 'narzędzie seo',
+    'sprawdzenie pozycji w google', 'monitorowanie pozycji',
+    'słowa kluczowe', 'analiza słów kluczowych',
+    'linki zwrotne', 'wizytówka google',
+    'google search console', 'seo lokalne',
+    'widoczność w ai',
+  ],
   nl: [
     'seo', 'seo tool', 'seo check', 'seo analyse',
     'backlinks checken', 'zoekwoordplanner', 'zoekwoorden analyse',

@@ -32,6 +32,7 @@ const UPDATED_LABEL: Record<LegalLanguage, string> = {
   ja: '最終更新',
   de: 'Letzte Aktualisierung',
   nl: 'Laatst bijgewerkt',
+  pl: 'Ostatnia aktualizacja',
 }
 
 /**
@@ -48,6 +49,7 @@ const UPDATED_SEPARATOR: Record<LegalLanguage, string> = {
   ja: '：',
   de: ': ',
   nl: ': ',
+  pl: ': ',
 }
 
 function localeDate(iso: string, language: LegalLanguage): string {

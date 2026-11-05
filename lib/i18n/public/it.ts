@@ -217,6 +217,7 @@ export const it = {
     ja: '日本語',
     de: 'Deutsch',
     nl: 'Nederlands',
+    pl: 'Polski',
     aria: 'Cambio della lingua del sito',
   },
   cookie: {

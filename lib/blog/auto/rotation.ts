@@ -41,15 +41,27 @@
  * at 4,400 a month with low competition, and `lokale seo` with `seo lokaal` at
  * 520 together.
  *
- * THE ORDER OF THIS LIST IS LOAD-BEARING, and Dutch is last on purpose.
+ * `pl` joined on 5 Nov 2026, written for POLAND alone: the public tree is /pl,
+ * the keyword research runs on the Polish market (geo 2616, language 1030, both
+ * read back from the live Google Ads API), and the legal pages behind it are
+ * written to Polish and European law — RODO rather than GDPR, the fourteen-day
+ * withdrawal right of art. 27 ustawy o prawach konsumenta, and the information
+ * duty of that same Act, which /pl/dane-firmy answers — not the e-services act,
+ * whose country-of-origin rule does not reach a provider seated outside the EU.
+ *
+ * THE ORDER OF THIS LIST IS LOAD-BEARING, and Polish is last on purpose.
  * lib/blog/auto/daily-window.ts writes at most one language per cron run and
- * walks this list in order, inside a six-hour window of twenty-four runs. Nine
- * languages publishing first time need nine of them; the rest is reserve for a
+ * walks this list in order, inside a six-hour window of twenty-four runs. Ten
+ * languages publishing first time need ten of them; the rest is reserve for a
  * language that fails the quality gate and retries (on 17 Oct Spanish needed
- * three passes). Adding a language therefore spends reserve — with nine
- * languages the window keeps fifteen runs of it — and the language that pays
- * for a bad morning is the LAST one here. Putting Dutch last is what keeps a
+ * three passes). Adding a language therefore spends reserve — with ten
+ * languages the window keeps fourteen runs of it — and the language that pays
+ * for a bad morning is the LAST one here. Putting Polish last is what keeps a
  * new language from ever costing an existing one its article.
+ *
+ * Fourteen runs of reserve for ten languages is the narrowest this has been
+ * since the window was widened; an eleventh language should come with the
+ * seventh hour rather than after it.
  *
  * Pure: no I/O. `localesForDay()` reads the public-language flags, which Next
  * inlines at build time, and nothing else.
@@ -57,7 +69,7 @@
 import { publicLocaleEnabled } from '@/lib/i18n/locales'
 
 /** The languages this runner can write. A subset of PUBLIC_LOCALES. */
-export const BLOG_AUTO_LOCALES = ['he', 'en', 'es', 'pt-BR', 'fr', 'it', 'ja', 'de', 'nl'] as const
+export const BLOG_AUTO_LOCALES = ['he', 'en', 'es', 'pt-BR', 'fr', 'it', 'ja', 'de', 'nl', 'pl'] as const
 export type BlogAutoLocale = (typeof BLOG_AUTO_LOCALES)[number]
 
 export function isBlogAutoLocale(value: unknown): value is BlogAutoLocale {
@@ -83,5 +95,5 @@ export function localesForDay(): readonly BlogAutoLocale[] {
 
 /** How many articles a week each language gets — the queue's refill target reads this. */
 export function weeklyShare(): Record<BlogAutoLocale, number> {
-  return { he: 7, en: 7, es: 7, 'pt-BR': 7, fr: 7, it: 7, ja: 7, de: 7, nl: 7 }
+  return { he: 7, en: 7, es: 7, 'pt-BR': 7, fr: 7, it: 7, ja: 7, de: 7, nl: 7, pl: 7 }
 }

@@ -183,6 +183,31 @@ export const ERROR_PAGES_UI = {
       homeHref: '/ja',
     },
   },
+  pl: {
+    logoAlt: 'Logo Go Top SEO',
+    notFound: {
+      code: '404',
+      title: 'Nie znaleźliśmy tej strony',
+      body: 'Być może link jest nieprawidłowy albo strona została przeniesiona.',
+      home: 'Na stronę główną',
+      dashboard: 'Do panelu',
+      homeHref: '/pl',
+    },
+    screenError: {
+      title: 'Ten ekran się nie wczytał',
+      body: 'Nic nie zostało usunięte. Prosimy spróbować ponownie, a jeśli to się powtórzy — wrócić do panelu.',
+      retry: 'Spróbuj ponownie',
+      dashboard: 'Do panelu',
+      reference: 'Numer referencyjny dla pomocy technicznej:',
+    },
+    globalError: {
+      title: 'Coś poszło nie tak',
+      body: 'W serwisie wystąpił nieoczekiwany problem. Prosimy wczytać stronę ponownie.',
+      retry: 'Wczytaj ponownie',
+      home: 'Na stronę główną',
+      homeHref: '/pl',
+    },
+  },
   nl: {
     logoAlt: 'Het logo van Go Top SEO',
     notFound: {

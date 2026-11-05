@@ -1,7 +1,7 @@
 /**
  * THE TWO LOCALE TYPES, and why they are not one.
  *
- * `PublicLocale` ('he' | 'en' | 'es' | 'pt-BR' | 'fr') is the language of the
+ * `PublicLocale` ('he' | 'en' | 'es' | 'pt-BR' | 'fr' | … | 'pl') is the language of the
  * WORDS on a screen.
  * On the public site it is a property of the URL — `/` is Hebrew, `/en/…`
  * English, `/es/…` Spanish — and inside the dashboard it is what the switcher
@@ -27,12 +27,13 @@ import { italianSiteEnabled } from './italian-site'
 import { japaneseSiteEnabled } from './japanese-site'
 import { germanSiteEnabled } from './german-site'
 import { dutchSiteEnabled } from './dutch-site'
+import { polishSiteEnabled } from './polish-site'
 
 export type Locale = 'he' | 'en'
-export type PublicLocale = Locale | 'es' | 'pt-BR' | 'fr' | 'it' | 'ja' | 'de' | 'nl'
+export type PublicLocale = Locale | 'es' | 'pt-BR' | 'fr' | 'it' | 'ja' | 'de' | 'nl' | 'pl'
 
 export const LOCALES: Locale[] = ['he', 'en']
-export const PUBLIC_LOCALES: PublicLocale[] = ['he', 'en', 'es', 'pt-BR', 'fr', 'it', 'ja', 'de', 'nl']
+export const PUBLIC_LOCALES: PublicLocale[] = ['he', 'en', 'es', 'pt-BR', 'fr', 'it', 'ja', 'de', 'nl', 'pl']
 export const DEFAULT_LOCALE: Locale = 'he'
 
 /**
@@ -42,7 +43,7 @@ export const DEFAULT_LOCALE: Locale = 'he'
  * Brazilian law (the Consumer Code's seven-day withdrawal right, the LGPD), so a
  * bare '/pt' would promise European Portuguese readers rules that are not theirs.
  */
-export const LOCALE_PREFIX: Record<PublicLocale, string> = { he: '', en: '/en', es: '/es', 'pt-BR': '/pt-BR', fr: '/fr', it: '/it', ja: '/ja', de: '/de', nl: '/nl' }
+export const LOCALE_PREFIX: Record<PublicLocale, string> = { he: '', en: '/en', es: '/es', 'pt-BR': '/pt-BR', fr: '/fr', it: '/it', ja: '/ja', de: '/de', nl: '/nl', pl: '/pl' }
 
 export const LOCALE_CONFIG: Record<PublicLocale, { dir: 'rtl' | 'ltr'; lang: string; ogLocale: string }> = {
   he: { dir: 'rtl', lang: 'he', ogLocale: 'he_IL' },
@@ -92,6 +93,21 @@ export const LOCALE_CONFIG: Record<PublicLocale, { dir: 'rtl' | 'ltr'; lang: str
   // competition, with `lokale seo` and `seo lokaal` behind it at 520 combined on
   // the most valuable clicks of the eight candidates.
   nl: { dir: 'ltr', lang: 'nl', ogLocale: 'nl_NL' },
+  // A bare 'pl', because Polish has one market and one legal framework: Poland's
+  // implementation of the EU's. The documents name the RODO (which is what
+  // Polish calls the GDPR), the fourteen-day withdrawal right of art. 27 ustawy
+  // o prawach konsumenta, and the information duty of that same Act — which is
+  // why /pl, like /de and /nl, carries one page the other trees do not. The
+  // e-services act, which looks like the anchor and is the Dutch page's cousin,
+  // does NOT reach us: its country-of-origin rule is keyed to a seat inside the
+  // EU, and this seller is seated in Israel.
+  //
+  // Polish is the first locale added on top of a measured European pair rather
+  // than on its own account: it is the largest single-language search market in
+  // the EU that the eight languages before it did not already reach, and the
+  // terms it is built against are the local-business mid-tail, the same shape as
+  // German's `Google Unternehmensprofil optimieren` finding.
+  pl: { dir: 'ltr', lang: 'pl', ogLocale: 'pl_PL' },
 }
 
 /**
@@ -104,7 +120,7 @@ export const LOCALE_CONFIG: Record<PublicLocale, { dir: 'rtl' | 'ltr'; lang: str
  * Spain is the first Spanish market, so es-ES; a Latin-American market gets its
  * own entry the day its currency is set, because that is the same decision.
  */
-export const INTL_LOCALE: Record<PublicLocale, string> = { he: 'he-IL', en: 'en-US', es: 'es-ES', 'pt-BR': 'pt-BR', fr: 'fr-FR', it: 'it-IT', ja: 'ja-JP', de: 'de-DE', nl: 'nl-NL' }
+export const INTL_LOCALE: Record<PublicLocale, string> = { he: 'he-IL', en: 'en-US', es: 'es-ES', 'pt-BR': 'pt-BR', fr: 'fr-FR', it: 'it-IT', ja: 'ja-JP', de: 'de-DE', nl: 'nl-NL', pl: 'pl-PL' }
 
 /**
  * The SHORT name of each language, in its own script, for a control too narrow
@@ -118,10 +134,10 @@ export const INTL_LOCALE: Record<PublicLocale, string> = { he: 'he-IL', en: 'en-
  * components/LanguageSwitcher.tsx in its compact form), so the two cannot drift
  * apart and a seventh language is named once.
  */
-export const LOCALE_SHORT_LABEL: Record<PublicLocale, string> = { he: 'עברית', en: 'EN', es: 'ES', 'pt-BR': 'PT', fr: 'FR', it: 'IT', ja: '日本語', de: 'DE', nl: 'NL' }
+export const LOCALE_SHORT_LABEL: Record<PublicLocale, string> = { he: 'עברית', en: 'EN', es: 'ES', 'pt-BR': 'PT', fr: 'FR', it: 'IT', ja: '日本語', de: 'DE', nl: 'NL', pl: 'PL' }
 
 /** PayPal's own locale spelling, which uses an underscore and no others. */
-export const PAYPAL_LOCALE: Record<PublicLocale, string> = { he: 'he_IL', en: 'en_US', es: 'es_ES', 'pt-BR': 'pt_BR', fr: 'fr_FR', it: 'it_IT', ja: 'ja_JP', de: 'de_DE', nl: 'nl_NL' }
+export const PAYPAL_LOCALE: Record<PublicLocale, string> = { he: 'he_IL', en: 'en_US', es: 'es_ES', 'pt-BR': 'pt_BR', fr: 'fr_FR', it: 'it_IT', ja: 'ja_JP', de: 'de_DE', nl: 'nl_NL', pl: 'pl_PL' }
 
 /**
  * The `Intl` tag of a language that reached us as a plain string — a prop typed
@@ -187,6 +203,7 @@ export function publicLocaleEnabled(
     ja: flags.ja ?? japaneseSiteEnabled(),
     de: flags.de ?? germanSiteEnabled(),
     nl: flags.nl ?? dutchSiteEnabled(),
+    pl: flags.pl ?? polishSiteEnabled(),
   }
   return gates[locale]
 }
