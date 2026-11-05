@@ -1,0 +1,21 @@
+-- The published base commission rises from 30% to 35%.
+--
+-- WHY A NEW MIGRATION AND NOT AN EDIT. 20261009190000_affiliate_program.sql is
+-- already registered in production; rewriting its text would change what this
+-- repository claims was applied without changing the database, and the next
+-- person reading the two would believe the wrong thing. So the original keeps
+-- saying DEFAULT 30, which is what it really did, and the current default is
+-- the one set here.
+--
+-- WHAT THIS DOES AND DELIBERATELY DOES NOT DO. It moves the DEFAULT, so every
+-- partner approved from now on is seeded at 35. It does NOT touch the rows
+-- already in the table: a partner row carries its own base_rate, the commission
+-- engine pays that figure and not this default (lib/affiliate/rates.ts), and
+-- rewriting a live partner's agreed rate is a change to production data and to
+-- somebody's money. The one approved partner on file is still at 30 and is
+-- raised, if at all, by a person who decides to.
+--
+-- lib/affiliate/terms.ts holds the same 35 for the page, the dashboard and the
+-- engine; lib/affiliate/__qa__/surfaces.qa.ts fails if the two ever disagree.
+
+ALTER TABLE public.affiliates ALTER COLUMN base_rate SET DEFAULT 35;

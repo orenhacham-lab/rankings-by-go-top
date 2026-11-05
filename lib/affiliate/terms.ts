@@ -14,8 +14,15 @@
  * holds these numbers to the table's defaults and to the public copy.
  */
 export const AFFILIATE_TERMS = {
-  /** Commission on every payment, for as long as the customer keeps paying. */
-  baseRate: 30,
+  /**
+   * Commission on every payment, for as long as the customer keeps paying.
+   *
+   * 35 since 2026-11-05, raised from 30 so the three channels promise one
+   * number: this page, JVZoo (where the four products pay 35% recurring) and
+   * Digistore24 (35%). An affiliate comparing two of them was being shown two
+   * different offers, which is the one thing a published rate may not do.
+   */
+  baseRate: 35,
   /** The higher rate, from this many ACTIVE PAYING referrals onwards. */
   topRate: 40,
   topRateFrom: 10,

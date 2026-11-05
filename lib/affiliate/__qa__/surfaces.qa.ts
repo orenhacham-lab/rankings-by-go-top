@@ -183,11 +183,37 @@ async function main() {
   console.log('\nE) the numbers on the screen are the numbers in the table')
   {
     const sql = strip(read('supabase/migrations/20261009190000_affiliate_program.sql'))
+    /**
+     * THE DEFAULT THAT COUNTS IS THE LAST ONE SET, NOT THE FIRST.
+     *
+     * This used to read the CREATE TABLE in 20261009190000 alone, which was
+     * right while nothing had changed it. A rate change cannot edit that file -
+     * it is already registered in production, and rewriting it would make the
+     * repository describe an apply that never happened - so the current default
+     * lives in a later ALTER. Reading only the original would now hold the
+     * published rate to a number the table stopped using.
+     */
+    const effectiveDefault = (column: string): string | null => {
+      const files = readdirSync(join(ROOT, 'supabase/migrations'))
+        .filter((f) => /^\d{14}_.+\.sql$/.test(f))
+        .sort()
+      let value: string | null = null
+      for (const file of files) {
+        const text = strip(read(`supabase/migrations/${file}`))
+        const created = new RegExp(`${column}\\s+(?:numeric|integer)[^\\n]*DEFAULT\\s+(\\d+)`).exec(text)
+        if (created) value = created[1]
+        const altered = new RegExp(`ALTER COLUMN ${column} SET DEFAULT\\s+(\\d+)`).exec(text)
+        if (altered) value = altered[1]
+      }
+      return value
+    }
     check('E1: the table’s defaults are the published rates',
-      new RegExp(`base_rate\\s+numeric[^\\n]*DEFAULT ${AFFILIATE_TERMS.baseRate}`).test(sql)
-      && new RegExp(`top_rate\\s+numeric[^\\n]*DEFAULT ${AFFILIATE_TERMS.topRate}`).test(sql)
-      && new RegExp(`top_rate_from\\s+integer[^\\n]*DEFAULT ${AFFILIATE_TERMS.topRateFrom}`).test(sql),
-      sql.match(/base_rate[^\n]*/)?.[0] ?? '')
+      effectiveDefault('base_rate') === String(AFFILIATE_TERMS.baseRate)
+      && effectiveDefault('top_rate') === String(AFFILIATE_TERMS.topRate)
+      && effectiveDefault('top_rate_from') === String(AFFILIATE_TERMS.topRateFrom),
+      `base_rate default=${effectiveDefault('base_rate')} terms=${AFFILIATE_TERMS.baseRate}`)
+    check('E1b: the original migration still records what it actually applied',
+      /base_rate\s+numeric[^\n]*DEFAULT 30/.test(sql))
     check('E2: the dashboard reads the terms, never a second copy of the numbers', (() => {
       const page = strip(read('app/(dashboard)/affiliate/page.tsx'))
       return /AFFILIATE_TERMS/.test(page) && !/holdDays: \d+|baseRate: \d+|minPayout(Ils|Usd): \d+/.test(page)
@@ -228,7 +254,9 @@ async function main() {
       return versions.filter((v) => (seen.has(v) ? true : (seen.add(v), false))).length === 1
     })())
     check('E1-MUT: a default drifting from the published rate is caught',
-      !new RegExp(`base_rate\\s+numeric[^\\n]*DEFAULT ${AFFILIATE_TERMS.baseRate + 1}`).test(sql))
+      effectiveDefault('base_rate') !== String(AFFILIATE_TERMS.baseRate + 1))
+    check('E1-MUT2: reading only the FIRST migration would now miss the change, which is why it reads the last',
+      /base_rate\s+numeric[^\n]*DEFAULT 30/.test(sql) && effectiveDefault('base_rate') === '35')
   }
 
   console.log('\nF) a partner reaches their own page')

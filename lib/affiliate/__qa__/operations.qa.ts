@@ -86,10 +86,17 @@ async function main() {
       rates.map((r) => (r.kind === 'invalid' ? r.reason : r.kind)).join(',') === 'base_rate,top_rate,top_below_base,top_rate_from',
       JSON.stringify(rates))
     const negotiated = world()
-    await approveApplication(negotiated, { affiliateId: 'app-1', code: 'dana', decidedBy: ADMIN, baseRate: 35, topRate: 45, topRateFrom: 5, now: NOW })
+    // The figures are deliberately NOT the program's, and are derived from it
+    // rather than written as literals: this check once used a hard-coded 35
+    // against a hard-coded default of 30, and when the published base rate rose
+    // to 35 the "negotiated" card became the default and the check started
+    // failing for a reason that had nothing to do with what it tests.
+    const NEG_BASE = AFFILIATE_TERMS.baseRate + 10
+    const NEG_TOP = AFFILIATE_TERMS.topRate + 10
+    await approveApplication(negotiated, { affiliateId: 'app-1', code: 'dana', decidedBy: ADMIN, baseRate: NEG_BASE, topRate: NEG_TOP, topRateFrom: 5, now: NOW })
     check('A5c: a negotiated card is stored on the partner, not on the program',
-      negotiated.tables.affiliates[0].base_rate === 35 && negotiated.tables.affiliates[0].top_rate === 45
-      && AFFILIATE_TERMS.baseRate === 30)
+      negotiated.tables.affiliates[0].base_rate === NEG_BASE && negotiated.tables.affiliates[0].top_rate === NEG_TOP
+      && NEG_BASE !== AFFILIATE_TERMS.baseRate && NEG_TOP !== AFFILIATE_TERMS.topRate)
 
     const rejected = world()
     const no = await rejectApplication(rejected, { affiliateId: 'app-1', decidedBy: ADMIN, notes: 'לא רלוונטי', now: NOW })
