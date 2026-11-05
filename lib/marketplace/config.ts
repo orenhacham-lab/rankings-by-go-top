@@ -564,3 +564,71 @@ export function marketplaceBadgeUrl(slug: string): string | null {
   if (!marketplaceProvider(slug)) return null
   return httpsUrlOrNull(process.env[`${envPrefix(slug)}BADGE_URL`])
 }
+
+/**
+ * The platform's own affiliate-signup page for one plan, as configured in
+ * `MARKETPLACE_<SLUG>_AFFILIATE_URL_<PLAN>`.
+ *
+ * WHY THIS EXISTS AT ALL. The JVZoo launch of 2026-11-04 sold nothing, and
+ * the reason was not our side: JVZoo hides a new product from its affiliate
+ * search until it has ten or more sales, and a search for the product name
+ * that day returned "No products matching your search were found". So the
+ * first affiliates cannot find us and have to be recruited by hand, and a
+ * recruitment page needs the one link that actually starts the relationship
+ * — the platform's own "request approval" page for the product.
+ *
+ * IT IS NOT DERIVED FROM THE PRODUCT ID, although it could be today. The
+ * path `jvzoo.com/affiliate/affiliateinfonew/index/<id>` is a shape of their
+ * current site, not a documented contract, and building it here would make
+ * this file assert a URL the platform never gave us. Configuration says what
+ * the platform actually serves, and an unconfigured plan links nothing.
+ *
+ * Unlike the buy URL this does NOT wait on `providerReadiness`: an affiliate
+ * reading the page is being recruited, not charged, and nothing is recorded
+ * when they sign up. The readiness gate protects a buyer from paying with no
+ * order row; it has nothing to say about a signup on the platform's own site.
+ */
+export function marketplaceAffiliateUrl(slug: string, plan: PlanCode): string | null {
+  if (!marketplaceProvider(slug)) return null
+  return httpsUrlOrNull(process.env[`${envPrefix(slug)}AFFILIATE_URL_${plan.toUpperCase()}`])
+}
+
+/**
+ * What the platform pays an affiliate, as configured in
+ * `MARKETPLACE_<SLUG>_COMMISSION_FIRST` and `..._COMMISSION_REBILL`.
+ *
+ * A NUMBER WE PUBLISH TO AFFILIATES IS A PROMISE, AND THE ACCOUNT OWNS IT.
+ * The rate an affiliate is actually paid is set in the platform's seller
+ * account, not here, so a rate hard-coded in this repository would keep
+ * paying whatever the account says while our page advertised something else.
+ * Printing "35%" to someone who is then paid 25% is a misstatement about
+ * their earnings made on our own domain. Configuration keeps the two in step
+ * by a human act — the same act that changes it in the account — and a
+ * provider with neither value set gets NO commission block on the page
+ * rather than a guess.
+ *
+ * `rebill` is optional on its own: a one-off product has no renewal to pay a
+ * rate on, and a provider that sets only `first` is a complete answer.
+ * Anything that is not a whole 1-100 is treated as unset, because a rate of
+ * 0, 140 or "thirty" is a configuration error and silence is the safe
+ * reading of one.
+ */
+export interface MarketplaceCommission {
+  first: number
+  rebill: number | null
+}
+
+export function marketplaceCommission(slug: string): MarketplaceCommission | null {
+  if (!marketplaceProvider(slug)) return null
+  const prefix = envPrefix(slug)
+  const first = percentOrNull(process.env[`${prefix}COMMISSION_FIRST`])
+  if (first === null) return null
+  return { first, rebill: percentOrNull(process.env[`${prefix}COMMISSION_REBILL`]) }
+}
+
+function percentOrNull(raw: string | undefined): number | null {
+  const value = raw?.trim()
+  if (!value || !/^\d{1,3}$/.test(value)) return null
+  const n = Number(value)
+  return n >= 1 && n <= 100 ? n : null
+}
