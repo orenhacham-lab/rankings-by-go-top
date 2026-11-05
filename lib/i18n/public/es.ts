@@ -208,6 +208,7 @@ export const es = {
     fr: 'Français',
     it: 'Italiano',
     ja: '日本語',
+    de: 'Deutsch',
     aria: 'Cambiar el idioma del sitio',
   },
   cookie: {

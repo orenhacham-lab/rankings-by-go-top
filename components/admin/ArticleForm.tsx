@@ -44,10 +44,10 @@ interface Props {
 
 /** The admin's own language names, and the path each language's blog lives at. */
 const LOCALE_LABEL: Record<PublicLocale, string> = {
-  he: 'עברית', en: 'אנגלית', es: 'ספרדית', 'pt-BR': 'פורטוגזית (ברזיל)', fr: 'צרפתית', it: 'איטלקית', ja: 'יפנית',
+  he: 'עברית', en: 'אנגלית', es: 'ספרדית', 'pt-BR': 'פורטוגזית (ברזיל)', fr: 'צרפתית', it: 'איטלקית', ja: 'יפנית', de: 'גרמנית',
 }
 const ARTICLE_PATH_PREFIX: Record<PublicLocale, string> = {
-  he: '/articles', en: '/en/articles', es: '/es/articles', 'pt-BR': '/pt-BR/articles', fr: '/fr/articles', it: '/it/articles', ja: '/ja/articles',
+  he: '/articles', en: '/en/articles', es: '/es/articles', 'pt-BR': '/pt-BR/articles', fr: '/fr/articles', it: '/it/articles', ja: '/ja/articles', de: '/de/articles',
 }
 
 /** Our words for a failed save; the route's own `error` text is never shown. */

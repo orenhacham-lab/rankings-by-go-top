@@ -317,8 +317,8 @@ async function main() {
   {
     check('4a: EN maps to lang=en dir=ltr', JSON.stringify(documentLocaleAttributes('en')) === JSON.stringify({ lang: 'en', dir: 'ltr' }))
     check('4b: HE maps to lang=he dir=rtl', JSON.stringify(documentLocaleAttributes('he')) === JSON.stringify({ lang: 'he', dir: 'rtl' }))
-    // 'de' is the unknown value here; 'fr' was, until French became a public locale.
-    for (const v of [null, undefined, '', 'de', 'EN']) {
+    // 'el' is the unknown value here; 'de' was, until German became a public locale.
+    for (const v of [null, undefined, '', 'el', 'EN']) {
       check(`4c: ${JSON.stringify(v)} falls back to Hebrew/RTL, never to a broken value`,
         JSON.stringify(documentLocaleAttributes(v as any)) === JSON.stringify({ lang: 'he', dir: 'rtl' }))
     }

@@ -68,4 +68,11 @@ export const FEATURE_COMMON: Record<PublicLocale, FeatureCommon> = {
     trust: [`${DAYS}日間の無料トライアル`, 'クレジットカード不要', 'いつでも解約可能'],
     closeBody: `無料診断では、登録なしでサイトの現状をご確認いただけます。${DAYS}日間の無料トライアルもクレジットカードなしでお試しいただけます。`,
   },
+  de: {
+    check: { label: 'Website kostenlos prüfen', href: '/de/free-check' },
+    trial: { label: `${DAYS} Tage kostenlos testen`, href: authHref('signup', 'de') },
+    pricing: { label: 'Preise und Tarife', href: '/de/pricing' },
+    trust: [`${DAYS} Tage kostenlos testen`, 'Ohne Kreditkarte', 'Jederzeit kündbar'],
+    closeBody: `Die kostenlose Analyse zeigt ohne Anmeldung, wo Ihre Website steht. Oder Sie starten ${DAYS} Tage kostenlos, ohne Kreditkarte.`,
+  },
 }

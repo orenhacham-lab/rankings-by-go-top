@@ -201,6 +201,12 @@ const ARTICLE_TEXT: Record<SuggestionLanguage, {
     anchorSentence: (link) => `この点では、${link}が押さえておきたい主要な選択肢の一つです。`,
     phraseSentence: (phrase) => `この点では、${phrase}についても併せて確認しておくとよいでしょう。`,
   },
+  de: {
+    toc: 'Inhaltsverzeichnis',
+    faqHeading: 'Häufige Fragen',
+    anchorSentence: (link) => ` In diesem Zusammenhang ist ${link} eine der wichtigsten Optionen, die man kennen sollte.`,
+    phraseSentence: (phrase) => ` In diesem Zusammenhang lohnt sich auch ein genauerer Blick auf ${phrase}.`,
+  },
 }
 
 /** Natural transition words to hand the model, in the language it writes in. */
@@ -212,6 +218,7 @@ const TRANSITION_HINT: Record<SuggestionLanguage, string> = {
   fr: 'de plus, par conséquent, cependant, par exemple, en résumé',
   it: 'inoltre, di conseguenza, tuttavia, per esempio, in sintesi',
   ja: 'また、さらに、そのため、しかし、例えば、まとめると',
+  de: 'außerdem, daher, allerdings, zum Beispiel, zusammengefasst',
 }
 
 /** The filler opening to warn the model off, written in the language it writes in. */
@@ -223,6 +230,7 @@ const FILLER_EXAMPLE: Record<SuggestionLanguage, string> = {
   fr: 'e.g. "Dans un monde où tout le monde cherche…"',
   it: 'e.g. "In un mondo in cui tutti cercano…"',
   ja: 'e.g. 「誰もが〜を求める時代において…」',
+  de: 'e.g. "In einer Welt, in der alle nach … suchen"',
 }
 
 /** Who the article is actually written for. A Spanish article is NOT for Israeli readers. */
@@ -234,6 +242,7 @@ const AUDIENCE_NOTE: Record<SuggestionLanguage, string> = {
   fr: 'Write naturally for French-speaking readers in standard French that reads well in France and in the rest of French-speaking Europe alike.',
   it: 'Write naturally for Italian-speaking readers in standard Italian that reads well in Italy and in Italian-speaking Switzerland alike.',
   ja: 'Write naturally for Japanese readers in standard business Japanese (です・ます調), the register a Japanese company website uses.',
+  de: 'Write naturally for German-speaking readers in standard German that reads well in Germany, Austria and German-speaking Switzerland alike.',
 }
 
 /** Per-language writing-quality notes. Empty for a language with nothing extra to say. */
@@ -262,6 +271,10 @@ const WRITING_QUALITY_LINES: Record<SuggestionLanguage, string[]> = {
   it: [
     `- Italian writing quality: address the reader formally and impersonally — use "voi"/the impersonal "si" form, and NEVER the informal "tu" (no "tuo/tua/tuoi", no informal imperatives like "scopri", "clicca", "scegli"). Use standard Italian that reads well in Italy and in Italian-speaking Switzerland; avoid regional slang and avoid needless anglicisms where a plain Italian word exists. VARY sentence and paragraph openings — do not start many consecutive sentences with the same word (avoid over-using "Inoltre", "D'altra parte", "È importante"); mix openings like "In pratica", "Per questo motivo", "In molti casi", "Vale la pena ricordare", "Al momento della scelta", "In sintesi". Prefer clear, practical, promotional SEO writing over poetic language.`,
     `- Italian typography: keep the accents correct (è, é, à, ò, ù, ì) — never write Italian without them — distinguish "è" (verb) from "e" (and), use the apostrophe correctly in elisions ("un'opzione", "dell'articolo"), use the Italian quotation marks « … » for quotations, and keep brand/product names in their proper original casing (e.g. "Kingsmith WalkingPad X21").`,
+  ],
+  de: [
+    `- German writing quality: address the reader as "Sie" consistently — NEVER "du", never "dein/deine", never an informal imperative ("entdecke", "klicke", "wähle"); the Sie-imperative is "entdecken Sie", "klicken Sie", "wählen Sie". Use standard German that reads well in Germany, Austria and German-speaking Switzerland; avoid regional slang and avoid needless anglicisms where a plain German word exists — but KEEP the established SEO vocabulary a German reader expects ("Keywords", "Keyword-Recherche", "Rankings", "Backlinks", "Content", "Snippet"), which is what the industry actually writes. VARY sentence and paragraph openings — do not start many consecutive sentences with the same word (avoid over-using "Außerdem", "Darüber hinaus", "Es ist wichtig"); mix openings like "In der Praxis", "Deshalb", "In vielen Fällen", "Wichtig zu wissen", "Bei der Auswahl", "Zusammengefasst". Prefer clear, practical, promotional SEO writing over poetic language.`,
+    `- German typography and grammar: capitalize every noun (German nouns are always capitalized — "die Website", "der Preis", "das Angebot"), keep the umlauts and the ß correct (ä, ö, ü, ß) and never transliterate them to ae/oe/ue/ss, use the German quotation marks „ … " for quotations, write prices and figures the German way (1.200 € with a dot as the thousands separator and a comma for decimals, the currency sign AFTER the number), and keep brand/product names in their proper original casing (e.g. "Kingsmith WalkingPad X21", "Google Search Console"). Join compounds as German does ("Suchmaschinenoptimierung", "Keyword-Recherche" with the hyphen only where one part is a loanword), and never a stray apostrophe in a plural or a genitive ("Preise", not "Preis's"; "Googles Index", not "Google's Index").`,
   ],
 }
 

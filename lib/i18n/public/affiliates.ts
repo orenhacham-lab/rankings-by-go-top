@@ -400,4 +400,61 @@ export const AFFILIATES_COPY: Record<PublicLocale, AffiliateCopy> = {
     closeTitle: '当てはまりそうですか',
     closeBody: 'ご自身がどなたで、読者・視聴者がどこにいるかをご記入ください。すべての申し込みにご返信します。',
   },
+  // GERMAN. The percentages, the hold period and the payout floor all come from
+  // T, never from a number written here, so this locale cannot drift from the
+  // contract. The tax rule is translated, not localized: the substance —
+  // Israeli partners invoice us and we withhold unless exempt, partners outside
+  // Israel follow their own country's rules and we may withhold where the law
+  // requires it — is the same obligation in every language, and clause 13 of the
+  // agreement governs. 'Quellensteuerabzug' is the German term for that
+  // withholding. The disclosure rule is not a courtesy in Germany: sec. 5a(6)
+  // UWG makes an undisclosed commercial purpose an unfair practice, so the
+  // sentence says it is required, not merely decent.
+  de: {
+    metaTitle: 'Partnerprogramm | Go Top SEO',
+    metaDescription: `Sie erhalten ${T.baseRate} % jeder Zahlung, solange der Kunde bleibt, und bis zu ${T.topRate} % ab ${T.topRateFrom} Kunden. Das Partnerprogramm von Go Top SEO.`,
+    eyebrow: 'Partnerprogramm',
+    title: 'Empfehlen Sie uns schon?',
+    accent: `Nehmen Sie ${T.baseRate} % jeder Zahlung`,
+    subtitle: `Für jeden Kunden, der über Ihren Link kommt, erhalten Sie ${T.baseRate} % jeder seiner Zahlungen — nicht nur der ersten — solange er bleibt. Ab ${T.topRateFrom} aktiven zahlenden Kunden werden es ${T.topRate} %.`,
+    trust: [`${T.baseRate} % jeder Zahlung`, `Bis zu ${T.topRate} %`, 'Jeden Monat wiederkehrend'],
+    apply: 'Bewerbung senden',
+    talk: 'Schreiben Sie uns über WhatsApp',
+    whatsappMessage: 'Guten Tag, ich möchte am Partnerprogramm teilnehmen',
+    whyTitle: 'Warum sich die Arbeit lohnt',
+    whyIntro: 'Die meisten Programme der Branche zahlen einmal pro Kunde. Hier kommt die Zahlung jeden Monat wieder.',
+    why: [
+      { title: 'Wiederkehrend, ohne Obergrenze', body: `${T.baseRate} % jeder Zahlung, jeden Monat, solange der Kunde bleibt. Keine Zwölf-Monats-Grenze und kein Ablaufdatum.` },
+      { title: 'Ein Produkt, das bleibt', body: 'Das System schreibt und veröffentlicht jeden Monat Inhalte, deshalb bleibt ein Kunde, der kommt, in der Regel auch. Eine wiederkehrende Provision ist nur dann etwas wert, wenn das Produkt es auch ist.' },
+      { title: 'Ein Publikum, das längst um Rat fragt', body: 'Website-Betreiber, Onlineshops und Agenturen fragen ohnehin, was für ihre Sichtbarkeit zu tun ist. Das hier ist die Antwort, und sie wird vergütet.' },
+      ],
+    howTitle: 'So läuft es',
+    how: [
+      { title: 'Bewerbung', body: 'Sagen Sie uns, wer Sie sind und wo Ihr Publikum ist: eine Website, eine Liste, ein Kanal oder Ihre eigenen Kunden. Jede Bewerbung wird bei uns von einem Menschen gelesen, bevor sie freigegeben wird.' },
+      { title: 'Link erhalten', body: 'Der Link funktioniert auf jeder Seite der Website. Wer sich über diesen Link registriert, wird dem Partner zugeordnet.' },
+      { title: 'Auszahlung', body: `Die Provision wächst mit jeder Zahlung. Sie wird ${T.holdDays} Tage nachdem die Zahlung des Kunden endgültig ist freigegeben und ausgezahlt, sobald das Guthaben ${T.minPayoutUsd} $ übersteigt.` },
+    ],
+    rulesTitle: 'Die Regeln, ohne Kleingedrucktes',
+    rulesIntro: 'Besser jetzt bekannt als nach getaner Arbeit.',
+    rules: [
+      { title: 'Nicht auf sich selbst', body: 'Keine Provision auf Ihr eigenes Konto, Ihr eigenes Unternehmen oder einen seiner Mitarbeiter. Eine Agentur, die einen echten Kunden registriert, wird normal vergütet — und das ist genau das Publikum, das wir suchen.' },
+      { title: 'Keine Werbung auf unseren Namen', body: 'Keine bezahlte Werbung auf die Marke Go Top oder ihre Schreibvarianten.' },
+      { title: 'Keine Gutschein- und Rabattseiten', body: 'Und kein Angebot der Art „registrieren Sie sich über mich, ich gebe Ihnen einen Teil zurück".' },
+      { title: 'Die Provision offenlegen', body: 'In Deutschland verlangt § 5a Abs. 6 UWG, den kommerziellen Zweck einer Empfehlung kenntlich zu machen; in anderen Ländern gilt Ähnliches. Und gegenüber jemandem, der Ihnen vertraut, ist es ohnehin das Richtige.' },
+      { title: 'Eine Rückerstattung hebt sie auf', body: 'Die Provision für einen Kunden, dem erstattet wurde oder der die Zahlung bestreitet, wird aufgehoben und von der nächsten Auszahlung abgezogen.' },
+      { title: 'Rechnung und Steuern', body: 'Partner in Israel stellen uns eine Rechnung, und wir nehmen den Quellensteuerabzug vor, es sei denn, eine Bescheinigung über die Befreiung vom Quellensteuerabzug und eine Bescheinigung über ordnungsgemäße Buchführung liegen vor und sind am Tag der Auszahlung gültig. Außerhalb Israels richtet sich die Rechnungsstellung nach den Regeln Ihres Landes; vor der ersten Auszahlung können wir die in Ihrem Land vorgeschriebenen steuerlichen Angaben verlangen und dort einen Abzug vornehmen, wo das Gesetz es fordert. Wer keine aktive steuerliche Registrierung hat, kann die Provision stattdessen als Guthaben im Konto erhalten: das ist ein anderer Auszahlungsweg, keine andere steuerliche Behandlung. Ziffer 13 des Vertrags regelt die Einzelheiten.' },
+    ],
+    faqTitle: 'Fragen',
+    faq: [
+      { q: 'Wann wird ausgezahlt?', a: `Die Provision wächst sofort, wird ${T.holdDays} Tage nachdem die Zahlung des Kunden endgültig ist freigegeben — so lange braucht die Rückerstattungsfrist — und ausgezahlt, sobald das Guthaben ${T.minPayoutUsd} $ übersteigt. Über PayPal, Wise oder Banküberweisung, ganz wie Sie möchten.` },
+      { q: 'Und wenn der Kunde im Test ist?', a: 'Der Test dauert sieben Tage und bringt nichts ein, weil nichts gezahlt wird. Sobald daraus ein zahlender Kunde wird, beginnt die Provision mit seiner ersten Zahlung.' },
+      { q: 'Woran wird festgestellt, dass der Kunde über meinen Link kam?', a: 'Am letzten Klick auf den Link vor der Registrierung. Jede Bewerbung und jede Provision wird von einem Menschen geprüft, deshalb wird ein unklarer Fall untersucht und nicht zu Lasten des Partners entschieden. Sollten wir die Zuordnung auf einen Klick ausweiten, der Wochen später zurückkommt, erfahren die Partner das vorher schriftlich.' },
+      { q: 'Ich bin schon Kunde. Bekomme ich eine Provision auf mich selbst?', a: 'Nein. Ein Link verbindet sich nur mit einem neuen Konto, und Ihr eigenes Konto und Ihre eigenen Projekte sind ausgenommen. Uns anderen zu empfehlen und dafür vergütet zu werden, ist dagegen völlig in Ordnung.' },
+      { q: 'Gibt es eine Mindestzahl an Kunden?', a: `Keine. Ausgezahlt wird, sobald das Guthaben ${T.minPayoutUsd} $ übersteigt, und bis dahin wächst es einfach weiter.` },
+    ],
+    termsNote: 'Diese Regeln und die vollständigen Bedingungen des Programms — wie eine Empfehlung zugeordnet wird, wann die Provision gezahlt wird und in welchen Fällen sie entfällt — stehen im Vertrag.',
+    termsLink: 'Den Vertrag des Partnerprogramms lesen',
+    closeTitle: 'Könnte das passen?',
+    closeBody: 'Sagen Sie uns, wer Sie sind und wo Ihr Publikum ist. Wir antworten auf jede Bewerbung.',
+  },
 }

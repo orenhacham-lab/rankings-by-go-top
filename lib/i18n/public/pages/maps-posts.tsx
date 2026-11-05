@@ -60,6 +60,7 @@ const pt = FEATURE_COMMON['pt-BR']
 const fr = FEATURE_COMMON.fr
 const it = FEATURE_COMMON.it
 const ja = FEATURE_COMMON.ja
+const de = FEATURE_COMMON.de
 
 export const MAPS_POSTS_PAGE: MarketingPage = {
   path: '/features/google-maps-posts',
@@ -91,6 +92,10 @@ export const MAPS_POSTS_PAGE: MarketingPage = {
     ja: {
       title: 'Googleマップの投稿 | Go Top SEO',
       description: 'アプリから、写真とボタン付きのお知らせをGoogleビジネスプロフィールに公開できます。最初の下書きが用意されるので、手直ししてすぐに公開するか、お選びの時刻に公開します。Googleの口コミへの返信も同じ場所で行えます。',
+    },
+    de: {
+      title: 'Beiträge im Google Unternehmensprofil | Go Top SEO',
+      description: 'Veröffentlichen Sie Neuigkeiten mit Foto und Button direkt aus der App in Ihrem Google Unternehmensprofil: ein erster Entwurf liegt bereit, Sie bearbeiten ihn und veröffentlichen sofort oder zu einem Zeitpunkt Ihrer Wahl. Antworten auf Ihre Google-Bewertungen an derselben Stelle.',
     },
   },
   content: {
@@ -795,6 +800,123 @@ export const MAPS_POSTS_PAGE: MarketingPage = {
     // word: the AI image is generic and never a photo of the business, and
     // there is no promise of a position on Maps or in search — in Japanese that
     // second one is also what 景品表示法 requires of a performance claim.
+    de: {
+      hero: {
+        eyebrow: 'Beiträge im Google Unternehmensprofil',
+        eyebrowIcon: MapPinned,
+        title: 'Ihr Google Unternehmensprofil',
+        accent: 'bleibt aktuell, auch wenn Sie keine Zeit haben',
+        subtitle: 'Wer Sie in Google Maps findet, sieht, was bei Ihnen neu ist: ein Angebot, eine neue Leistung, ein Artikel, der gerade online ging. Schreiben Sie in der App einen Beitrag mit Foto und Button, bekommen Sie einen ersten Entwurf, bearbeiten ihn und veröffentlichen sofort oder zu einem Zeitpunkt Ihrer Wahl. Auf Ihre Bewertungen antworten Sie an derselben Stelle.',
+        trust: de.trust,
+        primary: de.trial,
+        secondary: de.check,
+        visual: (
+          <MapsPostVisual
+            business="Fitness am Hauptplatz"
+            kind="Neuigkeit · Donnerstag 10:00"
+            text="Wir haben eine neue Morgengruppe ab 50 eröffnet, montags und mittwochs um 7:00. Mit persönlicher Betreuung, kleiner Gruppe und einer kostenlosen Probestunde, ohne Verpflichtung."
+            button="Termin buchen"
+            queueHeading="Ihre Beiträge"
+            queue={[
+              { title: 'Morgengruppe ab 50', detail: 'Geplant für Donnerstag 10:00', status: 'Geplant', done: false },
+              { title: 'Ratgeber: Laufschuhe auswählen', detail: 'Aus einem neuen Artikel auf der Website', status: 'Online', auto: true, done: true },
+            ]}
+            review={{
+              heading: 'Neue Bewertung',
+              author: 'Dana K.',
+              stars: 5,
+              starsLabel: '5 von 5 Sternen',
+              text: 'Sauberer Ort, geduldige Trainer und eine gute Stimmung. Ich komme seit einem halben Jahr.',
+              replyLabel: 'Antwortentwurf',
+              reply: 'Vielen Dank für die freundlichen Worte! Wir freuen uns, dass es Ihnen bei uns gefällt — bis zur nächsten Stunde.',
+            }}
+          />
+        ),
+      },
+      sections: [
+        {
+          kind: 'steps',
+          eyebrow: 'So läuft es',
+          title: 'Vom Verbinden zum veröffentlichten Beitrag',
+          items: [
+            { title: 'Einmal verbinden', body: 'Melden Sie sich mit dem Google-Konto an, das Ihr Unternehmensprofil verwaltet, und geben Sie es auf Googles Bildschirm frei. Die Berechtigung deckt nur die Verwaltung des Profils ab und ist von der Search Console getrennt. Sie können die Verbindung jederzeit trennen.' },
+            { title: 'Unternehmen auswählen', body: 'Die App listet die Unternehmen auf, die Sie bei Google verwalten, und Sie wählen, zu welchem die Beiträge dieser Website gehen.' },
+            { title: 'Schreiben, oder einen Entwurf bekommen', body: 'Beginnen Sie mit einem Artikel, den das System für Ihre Website geschrieben hat, mit einem Thema, das Sie eingeben, oder mit einer leeren Seite. Sie erhalten einen ersten Entwurf innerhalb der Längenbegrenzung von Google und bearbeiten ihn nach Belieben.' },
+            { title: 'Veröffentlichen oder planen', body: 'Sofort oder zu einem Datum und einer Uhrzeit Ihrer Wahl, bis zu ein Jahr im Voraus. Die Liste der Beiträge zeigt, was online ist, was geplant ist und was Google noch prüft.' },
+          ],
+        },
+        {
+          kind: 'cards',
+          eyebrow: 'In jedem Beitrag',
+          title: 'Ein Beitrag, der richtig aussieht',
+          items: [
+            { icon: Crop, title: 'Das richtige Bildformat', body: 'Laden Sie ein Foto hoch und schneiden Sie es auf 4:3 zu, so wie Google es zeigt, mit Zoom und Position. Ein Beitrag, der aus einem Artikel entsteht, kann dessen Bild mit einem Klick übernehmen.' },
+            { icon: ImagePlus, title: 'Ein fertiges Bild für einen Themenbeitrag', body: 'Wenn Sie einen Beitrag aus einem eingegebenen Thema schreiben, kann die App ein illustrierendes Bild mit KI erzeugen. Es ist ein allgemeines Bild, kein Foto Ihres Unternehmens, Ihres Teams oder Ihrer Produkte, und es kommt nur in den Beitrag, wenn Sie es auswählen.' },
+            { icon: MousePointerClick, title: 'Ein Button, der irgendwohin führt', body: 'Mehr erfahren, Termin buchen, Online bestellen, Kaufen, Anmelden oder Jetzt anrufen. Der Button führt auf eine Seite Ihrer Website oder, wenn Sie das erlauben, auf eine andere Website wie ein Buchungssystem. «Jetzt anrufen» wählt die Nummer in Ihrem Profil.' },
+            { icon: Eye, title: 'Vorher ansehen', body: 'Neben dem Editor liegt eine Vorschau des Beitrags: Unternehmensname, Foto, Text und Button, damit nichts überrascht.' },
+            { icon: Type, title: 'Innerhalb der Regeln von Google', body: 'Ein Zeichenzähler bis 1.500, der Grenze von Google. Steht eine Telefonnummer im Text, erhalten Sie einen Hinweis, weil Google Telefonnummern in Beiträgen einschränkt — für Anrufe gibt es den Button «Jetzt anrufen».' },
+            { icon: Languages, title: 'In der Sprache Ihrer Kunden', body: 'Der Entwurf wird in der Sprache Ihres Projekts geschrieben, in jeder von der App unterstützten Sprache, und Sie können vor der Veröffentlichung jedes Wort ändern.' },
+            { icon: ShieldCheck, title: 'Nur, was Sie freigegeben haben', body: 'Es gehen nur Beiträge und Antworten hinaus, die Sie freigegeben haben, plus automatische Beiträge, wenn Sie diese eingeschaltet haben. Öffnungszeiten, Adresse und die übrigen Unternehmensdaten werden nie verändert.' },
+          ],
+        },
+        {
+          kind: 'cards',
+          tone: 'contrast',
+          eyebrow: 'Automatische Beiträge',
+          title: 'Ein neuer Artikel auf Ihrer Website, ein neuer Beitrag bei Google',
+          items: [
+            { icon: Zap, title: 'Es passiert von selbst', body: 'Wenn Sie es einschalten, wird aus jedem Artikel, den das System auf Ihrer Website veröffentlicht, auch ein kurzer Beitrag in Ihrem Unternehmensprofil, mit dem Bild des Artikels und einem Button «Mehr erfahren», der dorthin führt.' },
+            { icon: ToggleLeft, title: 'Aus, bis Sie es einschalten', body: 'Standardmäßig aus und je Website einstellbar. Ein automatischer Beitrag geht hinaus, ohne dass Sie ihn vorher lesen — darum ist das Ihre Entscheidung. Sie können es jederzeit ausschalten, und bereits veröffentlichte Beiträge bleiben stehen.' },
+            { icon: Repeat, title: 'Einmal je Artikel', body: 'Derselbe Artikel geht nie zweimal in das Profil, auch wenn die Veröffentlichung auf Ihrer Website wiederholt wird. So füllt sich das Profil nicht mit doppelten Beiträgen.' },
+          ],
+        },
+        {
+          kind: 'cards',
+          columns: 2,
+          eyebrow: 'Google-Bewertungen',
+          title: 'Auf jede Bewertung antworten, von einer Stelle aus',
+          items: [
+            { icon: MessageSquareText, title: 'Jede Bewertung im Blick', body: 'Die Google-Bewertungen Ihres Unternehmens, mit der Durchschnittsbewertung, wie viele noch auf eine Antwort warten, und neue markiert. Sie können nach Bewertung sortieren.' },
+            { icon: Sparkles, title: 'Ein Antwortentwurf mit einem Klick', body: 'Sie erhalten einen Antwortvorschlag, höflich und auf den Punkt, in der Sprache, in der die Kundin oder der Kunde geschrieben hat. Sie bearbeiten ihn und senden ihn ab, und die Antwort erscheint bei Google unter der Bewertung.' },
+            { icon: PenLine, title: 'Bearbeiten oder löschen', body: 'Sie können eine bereits veröffentlichte Antwort bearbeiten oder löschen. Die Bewertung selbst bleibt, wie sie ist.' },
+            { icon: Lock, title: 'Bewertungen werden bei uns nicht gespeichert', body: 'Bewertungen werden bei jedem Öffnen der Ansicht von Google gelesen und nicht im System gespeichert. Der Name der Kundin oder des Kunden wird nicht zum Erstellen des Entwurfs übermittelt; fügen Sie ihn selbst ein, wenn Sie namentlich ansprechen möchten.' },
+          ],
+        },
+        {
+          kind: 'callout',
+          icon: Info,
+          title: 'Gut zu wissen',
+          body: (
+            <>
+              <p>
+                Google prüft jeden Beitrag, bevor er gezeigt wird, und lehnt gelegentlich einen ab. Die Liste der
+                Beiträge zeigt, wo jeder einzelne steht, auch ein abgelehnter. Zum Verbinden brauchen Sie ein
+                Google-Konto, das das Unternehmensprofil besitzt oder verwaltet.
+              </p>
+              <p>
+                Go Top SEO steht in keiner Verbindung zu Google. Beiträge und Antworten auf Bewertungen helfen
+                Kunden, ein aktives Unternehmen zu sehen, aber es gibt kein Ranking-Versprechen für Google Maps oder
+                die Google-Suche.
+              </p>
+            </>
+          ),
+        },
+        {
+          kind: 'faq',
+          eyebrow: 'Häufige Fragen',
+          title: 'Was zu Beiträgen im Unternehmensprofil gefragt wird',
+          items: [
+            { q: 'Kann die App meine Öffnungszeiten oder meine Adresse ändern?', a: 'Nein. Wir veröffentlichen ausschließlich Beiträge und Antworten auf Bewertungen. Öffnungszeiten, Adresse, Telefonnummer und die übrigen Profildaten bleiben genau so, wie sie sind.' },
+            { q: 'Veröffentlicht sich der Entwurf von selbst?', a: 'Wenn Sie einen Beitrag schreiben, nein: der Entwurf erscheint auf dem Bildschirm und wird erst veröffentlicht, wenn Sie den Button drücken. Beiträge über neue Artikel gehen nur dann von selbst hinaus, wenn Sie die automatischen Beiträge eingeschaltet haben.' },
+            { q: 'Kann ich Beiträge im Voraus planen?', a: 'Ja, auf ein Datum und eine Uhrzeit Ihrer Wahl, bis zu ein Jahr im Voraus. Ein geplanter Beitrag lässt sich abbrechen, solange er nicht hinausgegangen ist.' },
+            { q: 'Funktioniert das für einen Shopify-Shop oder eine Website, die nicht auf WordPress läuft?', a: 'Ja. Der Beitrag geht in Ihr Unternehmensprofil bei Google, nicht auf Ihre Website, daher funktioniert er für jedes Projekt auf jeder Plattform.' },
+            { q: 'Was passiert, wenn ich die Verbindung trenne?', a: 'Geplante Beiträge werden nicht veröffentlicht, bis Sie wieder verbinden. Bereits veröffentlichte Beiträge bleiben bei Google.' },
+            { q: 'Ich verwalte mehrere Unternehmen bei Google. Ist das ein Problem?', a: 'Nein. Die App zeigt jedes Unternehmen, das das Konto verwaltet, und für jede Website im System wählen Sie das Unternehmen, zu dem ihre Beiträge gehen.' },
+          ],
+        },
+      ],
+      cta: { title: 'Lassen Sie Kunden sehen, was bei Ihnen neu ist', body: de.closeBody, primary: de.trial, secondary: de.check },
+    },
     ja: {
       hero: {
         eyebrow: 'Googleマップの投稿',

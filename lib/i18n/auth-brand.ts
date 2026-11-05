@@ -216,4 +216,32 @@ export const AUTH_BRAND: Record<PublicLocale, Record<AuthBrandVariant, AuthBrand
     glimpse: '計測中のキーワード',
     mobileTrust: ['クレジットカード不要', 'いつでも解約可能'],
   },
+  de: {
+    login: {
+      eyebrow: 'Willkommen zurück',
+      points: [
+        'Ihre Positionen bei Google und Google Maps, an einer Stelle',
+        'Ihr Content-Plan und Ihre Artikel, bereit zum Weitermachen',
+        'Was ChatGPT und Gemini über Ihr Unternehmen sagen',
+      ],
+    },
+    signup: {
+      eyebrow: 'Google und KI-Suche in einem System',
+      points: [
+        'Eine vollständige Analyse Ihrer Website in wenigen Minuten',
+        'Ein Monat Inhalte, geplant für Ihre Branche',
+        'Google-Rankings und KI-Sichtbarkeit, für Sie monatlich erfasst',
+      ],
+    },
+    recover: {
+      eyebrow: 'Zurück zu Ihrem Konto',
+      points: [
+        'Der Link geht ausschließlich an die im Konto hinterlegte Adresse',
+        'Er gilt einmalig und nur für kurze Zeit',
+        'Ihre Daten und Projekte bleiben genau so, wie sie sind',
+      ],
+    },
+    glimpse: 'Erfasste Keywords',
+    mobileTrust: ['Ohne Kreditkarte', 'Jederzeit kündbar'],
+  },
 }

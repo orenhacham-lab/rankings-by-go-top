@@ -5,6 +5,7 @@ import { dashboardPtBR } from './pt-BR'
 import { dashboardFr } from './fr'
 import { dashboardIt } from './it'
 import { dashboardJa } from './ja'
+import { dashboardDe } from './de'
 import { deepMergeDictionary } from './merge'
 import type { PublicLocale } from '../locales'
 import type { DashboardDictionary } from './he'
@@ -32,12 +33,21 @@ import type { DashboardDictionary } from './he'
  * each held leaf for leaf by its own suite. Japanese is the first locale here
  * whose script has no spaces, so the words are read from the dictionary and the
  * measuring is done by lib/text/segment.ts, never by splitting on a space.
+ *
+ * GERMAN is the eighth locale and the same arrangement again, from de/, held
+ * leaf for leaf by lib/i18n/dashboard/__qa__/german-dashboard.qa.ts. Its script
+ * is Latin, so nothing in lib/text/segment.ts changes for it; what is specific
+ * to German lives in the words themselves (formal Sie throughout, and prices
+ * named in dollars rather than euros, because outside Israel this product
+ * charges in USD and a euro figure on screen would be a price it does not
+ * charge).
  */
 const dashboardEsMerged = deepMergeDictionary(dashboardEn as unknown as DashboardDictionary, dashboardEs)
 const dashboardPtMerged = deepMergeDictionary(dashboardEn as unknown as DashboardDictionary, dashboardPtBR)
 const dashboardFrMerged = deepMergeDictionary(dashboardEn as unknown as DashboardDictionary, dashboardFr)
 const dashboardItMerged = deepMergeDictionary(dashboardEn as unknown as DashboardDictionary, dashboardIt)
 const dashboardJaMerged = deepMergeDictionary(dashboardEn as unknown as DashboardDictionary, dashboardJa)
+const dashboardDeMerged = deepMergeDictionary(dashboardEn as unknown as DashboardDictionary, dashboardDe)
 
 const DICTIONARIES = {
   he: dashboardHe,
@@ -47,6 +57,7 @@ const DICTIONARIES = {
   fr: dashboardFrMerged,
   it: dashboardItMerged,
   ja: dashboardJaMerged,
+  de: dashboardDeMerged,
 } satisfies Record<PublicLocale, DashboardDictionary>
 
 /**

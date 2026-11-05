@@ -25,12 +25,13 @@ import { portugueseSiteEnabled } from './portuguese-site'
 import { frenchSiteEnabled } from './french-site'
 import { italianSiteEnabled } from './italian-site'
 import { japaneseSiteEnabled } from './japanese-site'
+import { germanSiteEnabled } from './german-site'
 
 export type Locale = 'he' | 'en'
-export type PublicLocale = Locale | 'es' | 'pt-BR' | 'fr' | 'it' | 'ja'
+export type PublicLocale = Locale | 'es' | 'pt-BR' | 'fr' | 'it' | 'ja' | 'de'
 
 export const LOCALES: Locale[] = ['he', 'en']
-export const PUBLIC_LOCALES: PublicLocale[] = ['he', 'en', 'es', 'pt-BR', 'fr', 'it', 'ja']
+export const PUBLIC_LOCALES: PublicLocale[] = ['he', 'en', 'es', 'pt-BR', 'fr', 'it', 'ja', 'de']
 export const DEFAULT_LOCALE: Locale = 'he'
 
 /**
@@ -40,7 +41,7 @@ export const DEFAULT_LOCALE: Locale = 'he'
  * Brazilian law (the Consumer Code's seven-day withdrawal right, the LGPD), so a
  * bare '/pt' would promise European Portuguese readers rules that are not theirs.
  */
-export const LOCALE_PREFIX: Record<PublicLocale, string> = { he: '', en: '/en', es: '/es', 'pt-BR': '/pt-BR', fr: '/fr', it: '/it', ja: '/ja' }
+export const LOCALE_PREFIX: Record<PublicLocale, string> = { he: '', en: '/en', es: '/es', 'pt-BR': '/pt-BR', fr: '/fr', it: '/it', ja: '/ja', de: '/de' }
 
 export const LOCALE_CONFIG: Record<PublicLocale, { dir: 'rtl' | 'ltr'; lang: string; ogLocale: string }> = {
   he: { dir: 'rtl', lang: 'he', ogLocale: 'he_IL' },
@@ -68,6 +69,15 @@ export const LOCALE_CONFIG: Record<PublicLocale, { dir: 'rtl' | 'ltr'; lang: str
   // changes. What DOES change is invisible here and lives in lib/text/segment.ts:
   // Japanese is the first locale whose words are not separated by spaces.
   ja: { dir: 'ltr', lang: 'ja', ogLocale: 'ja_JP' },
+  // A bare 'de', not 'de-DE', because the documents are written to the law the
+  // whole German-speaking EU reads the same way: the DSGVO, the fourteen-day
+  // Widerrufsrecht of §§355 and 356 BGB, the Preisangabenverordnung. Austria's
+  // readers are addressed under the same framework, and Switzerland's — outside
+  // the EU — are told where a rule is not theirs rather than being promised one
+  // that is. The §5 DDG Impressum is German law specifically, and it is served
+  // to every reader of this locale because the duty follows the market we sell
+  // into, not the reader's own address.
+  de: { dir: 'ltr', lang: 'de', ogLocale: 'de_DE' },
 }
 
 /**
@@ -80,7 +90,7 @@ export const LOCALE_CONFIG: Record<PublicLocale, { dir: 'rtl' | 'ltr'; lang: str
  * Spain is the first Spanish market, so es-ES; a Latin-American market gets its
  * own entry the day its currency is set, because that is the same decision.
  */
-export const INTL_LOCALE: Record<PublicLocale, string> = { he: 'he-IL', en: 'en-US', es: 'es-ES', 'pt-BR': 'pt-BR', fr: 'fr-FR', it: 'it-IT', ja: 'ja-JP' }
+export const INTL_LOCALE: Record<PublicLocale, string> = { he: 'he-IL', en: 'en-US', es: 'es-ES', 'pt-BR': 'pt-BR', fr: 'fr-FR', it: 'it-IT', ja: 'ja-JP', de: 'de-DE' }
 
 /**
  * The SHORT name of each language, in its own script, for a control too narrow
@@ -94,10 +104,10 @@ export const INTL_LOCALE: Record<PublicLocale, string> = { he: 'he-IL', en: 'en-
  * components/LanguageSwitcher.tsx in its compact form), so the two cannot drift
  * apart and a seventh language is named once.
  */
-export const LOCALE_SHORT_LABEL: Record<PublicLocale, string> = { he: 'עברית', en: 'EN', es: 'ES', 'pt-BR': 'PT', fr: 'FR', it: 'IT', ja: '日本語' }
+export const LOCALE_SHORT_LABEL: Record<PublicLocale, string> = { he: 'עברית', en: 'EN', es: 'ES', 'pt-BR': 'PT', fr: 'FR', it: 'IT', ja: '日本語', de: 'DE' }
 
 /** PayPal's own locale spelling, which uses an underscore and no others. */
-export const PAYPAL_LOCALE: Record<PublicLocale, string> = { he: 'he_IL', en: 'en_US', es: 'es_ES', 'pt-BR': 'pt_BR', fr: 'fr_FR', it: 'it_IT', ja: 'ja_JP' }
+export const PAYPAL_LOCALE: Record<PublicLocale, string> = { he: 'he_IL', en: 'en_US', es: 'es_ES', 'pt-BR': 'pt_BR', fr: 'fr_FR', it: 'it_IT', ja: 'ja_JP', de: 'de_DE' }
 
 /**
  * The `Intl` tag of a language that reached us as a plain string — a prop typed
@@ -161,6 +171,7 @@ export function publicLocaleEnabled(
     fr: flags.fr ?? frenchSiteEnabled(),
     it: flags.it ?? italianSiteEnabled(),
     ja: flags.ja ?? japaneseSiteEnabled(),
+    de: flags.de ?? germanSiteEnabled(),
   }
   return gates[locale]
 }

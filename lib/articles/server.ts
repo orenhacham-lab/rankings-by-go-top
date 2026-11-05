@@ -112,6 +112,7 @@ export const FAQ_HEADING: Record<PublicLocale, string> = {
   fr: 'Questions fréquentes',
   ja: 'よくある質問',
   it: 'Domande frequenti',
+  de: 'Häufige Fragen',
 }
 
 const SITE_NAME = 'Go Top SEO'

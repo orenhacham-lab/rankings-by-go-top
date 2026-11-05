@@ -17,6 +17,7 @@ const pt = FEATURE_COMMON['pt-BR']
 const fr = FEATURE_COMMON.fr
 const it = FEATURE_COMMON.it
 const ja = FEATURE_COMMON.ja
+const de = FEATURE_COMMON.de
 
 export const SITE_FIXES_PAGE: MarketingPage = {
   path: '/features/site-health-fixes',
@@ -48,6 +49,10 @@ export const SITE_FIXES_PAGE: MarketingPage = {
     ja: {
       title: 'サイトの修正 | Go Top SEO',
       description: 'GoogleとAIエンジンに対してサイトの足を引っぱっている点を見つける診断です。タイトル、ディスクリプション、画像の代替テキスト、リンク切れなどを確認します。WordPressでは、ご承認後にワンクリックで修正でき、元に戻すこともできます。',
+    },
+    de: {
+      title: 'Korrekturen an der Website | Go Top SEO',
+      description: 'Eine Analyse, die findet, was Ihre Website in Google und in KI-Diensten zurückhält: Titel, Beschreibungen, Alternativtexte, defekte Links und mehr. In WordPress ist jede Korrektur nach Ihrer Freigabe ein Klick, und sie lässt sich zurücknehmen.',
     },
   },
   content: {
@@ -468,6 +473,75 @@ export const SITE_FIXES_PAGE: MarketingPage = {
     // JAPANESE. The example URLs in the visual are Japanese-site paths, because
     // an Italian /chi-siamo in a Japanese screenshot reads as a mistake; the
     // claims themselves are the same ones the code supports.
+    de: {
+      hero: {
+        eyebrow: 'Korrekturen an der Website',
+        eyebrowIcon: Wrench,
+        title: 'Was Ihre Website zurückhält,',
+        accent: 'behoben, sobald Sie freigeben',
+        subtitle: 'Das System analysiert Ihre Website und findet fehlende oder zu lange Titel, fehlende Beschreibungen, Bilder ohne Alternativtext, defekte Links und Seiten, die für Google oder für KI-Dienste gesperrt sind. Auf einer verbundenen WordPress-Website sind die meisten Korrekturen ein Klick, nachdem Sie genau gesehen haben, was sich ändert.',
+        trust: de.trust,
+        primary: de.check,
+        secondary: de.trial,
+        visual: (
+          <WorkListVisual
+            heading="Korrekturen an der Website"
+            rows={[
+              { title: 'Titel zu lang', detail: '', url: '/leistungen/klimaanlage-einbau', icon: Type, done: true, status: 'Korrigiert' },
+              { title: 'Bilder ohne Alternativtext', detail: '4 Bilder', url: '/blog/klimaanlage-ratgeber', icon: ImageIcon, done: true, status: 'Korrigiert' },
+              { title: 'Defekter Link', detail: '', url: '/ueber-uns', icon: Link2, done: false, status: 'Warte auf Freigabe' },
+              { title: 'Beschreibung fehlt', detail: '', url: '/kontakt', icon: FileSearch, done: false, status: 'Warte auf Freigabe' },
+            ]}
+          />
+        ),
+      },
+      sections: [
+        {
+          kind: 'cards',
+          tone: 'contrast',
+          eyebrow: 'Warum das zählt',
+          title: 'Gute Inhalte helfen einer Website nicht, die sich selbst im Weg steht',
+          intro: 'Ein Titel, der in den Ergebnissen abgeschnitten wird, ein Bild, das Google nicht lesen kann, ein Link, der auf einer Fehlerseite endet. Jedes davon ist klein. Zusammen ziehen sie die Website nach unten.',
+          items: [
+            { icon: ScanSearch, title: 'Sehen, was feststeckt', body: 'Jedes Problem wird mit den Seiten aufgeführt, auf denen es auftritt, nach Schweregrad geordnet.' },
+            { icon: ShieldCheck, title: 'Nichts ändert sich ohne Sie', body: 'Zu jeder Korrektur gibt es eine Vorschau: was die Seite heute sagt und was an die Stelle tritt.' },
+            { icon: RotateCcw, title: 'Jederzeit zurücknehmen', body: 'Eine Korrektur über das System bewahrt den vorherigen Wert, sodass Sie sie zurückrollen können.' },
+          ],
+        },
+        {
+          kind: 'steps',
+          eyebrow: 'So läuft es',
+          title: 'Von der Analyse zur korrigierten Website',
+          items: [
+            { title: 'Website analysieren', body: 'Das System geht Ihre Seiten durch und gibt eine nach Schweregrad geordnete Liste von Problemen zurück.' },
+            { title: 'Vorschlag ansehen', body: 'Zu jedem Problem gehört eine vorgeschlagene Korrektur, mit dem aktuellen und dem neuen Wert nebeneinander.' },
+            { title: 'Freigeben', body: 'Auf einer verbundenen WordPress-Website und in den Artikeln und Seiten eines verbundenen Shopify-Shops wird die Korrektur auf die Website geschrieben. Sonst erhalten Sie eine Anleitung Schritt für Schritt.' },
+          ],
+        },
+        {
+          kind: 'cards',
+          eyebrow: 'Was in WordPress korrigiert wird',
+          title: 'Die Korrekturen, die das System selbst vornimmt',
+          items: [
+            { icon: Type, title: 'SEO-Titel', body: 'Ein fehlender, zu kurzer oder zu langer Titel wird neu geschrieben. Mit Yoast oder Rank Math wird er in deren Feld gespeichert.' },
+            { icon: FileSearch, title: 'Meta-Beschreibungen', body: 'Eine fehlende Beschreibung oder eine mit falscher Länge. Gespeichert im SEO-Plugin der Website, über das Go-Top-Plugin.' },
+            { icon: ImageIcon, title: 'Alternativtexte von Bildern', body: 'Nur Bilder im Inhalt, die keinen Alternativtext haben, bekommen einen. Alle übrigen Bilder bleiben unberührt.' },
+            { icon: Link2, title: 'Links', body: 'Ein defekter Link wird ersetzt oder entfernt, und zwischen verwandten Seiten werden interne Links ergänzt.' },
+            { icon: Heading1, title: 'Hauptüberschrift', body: 'Eine Seite mit mehr als einer H1 behält über das Go-Top-Plugin eine einzige Hauptüberschrift.' },
+            { icon: Code2, title: 'FAQ und llms.txt', body: 'Ein FAQ-Block auf der Seite und eine llms.txt-Datei, die die Website für KI-Dienste beschreibt, über das Go-Top-Plugin.' },
+          ],
+        },
+        {
+          kind: 'callout',
+          icon: Info,
+          title: 'In Shopify und auf anderen Plattformen',
+          body: (
+            <p>Die Analyse funktioniert auf jeder Website. In einem verbundenen Shopify-Shop korrigiert das System nach Ihrer Freigabe die Blogartikel und Seiten des Shops: den Titel und die Beschreibung, die Google zeigt, Alternativtexte von Bildern, einen defekten Link, einen FAQ-Block und eine zusätzliche Hauptüberschrift. Auch hier lässt sich jede Korrektur zurücknehmen. Produkte, Kategorien und Shop-Einstellungen werden nie verändert. In Wix und auf anderen Plattformen schreibt das System nicht auf die Website; es zeigt zu jedem Problem eine kurze Anleitung, wie Sie es selbst beheben.</p>
+          ),
+        },
+      ],
+      cta: { title: 'Sehen Sie, was Ihre Website zurückhält', body: de.closeBody, primary: de.check, secondary: de.trial },
+    },
     ja: {
       hero: {
         eyebrow: 'サイトの修正',

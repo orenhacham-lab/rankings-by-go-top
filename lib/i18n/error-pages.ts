@@ -183,6 +183,31 @@ export const ERROR_PAGES_UI = {
       homeHref: '/ja',
     },
   },
+  de: {
+    logoAlt: 'Logo von Go Top SEO',
+    notFound: {
+      code: '404',
+      title: 'Diese Seite konnten wir nicht finden',
+      body: 'Der Link ist möglicherweise falsch, oder die Seite wurde verschoben.',
+      home: 'Zur Startseite',
+      dashboard: 'Zum Dashboard',
+      homeHref: '/de',
+    },
+    screenError: {
+      title: 'Diese Ansicht wurde nicht geladen',
+      body: 'Es wurde nichts gelöscht. Bitte versuchen Sie es erneut; wenn es wieder auftritt, kehren Sie zum Dashboard zurück.',
+      retry: 'Erneut versuchen',
+      dashboard: 'Zum Dashboard',
+      reference: 'Referenz für den Support:',
+    },
+    globalError: {
+      title: 'Etwas ist schiefgelaufen',
+      body: 'Auf der Website ist ein unerwartetes Problem aufgetreten. Bitte laden Sie die Seite neu.',
+      retry: 'Neu laden',
+      home: 'Zur Startseite',
+      homeHref: '/de',
+    },
+  },
 } as const
 
 /**

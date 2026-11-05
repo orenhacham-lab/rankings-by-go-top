@@ -47,6 +47,7 @@ process.env.NEXT_PUBLIC_PORTUGUESE_SITE_ENABLED = 'true'
 process.env.NEXT_PUBLIC_FRENCH_SITE_ENABLED = 'true'
 process.env.NEXT_PUBLIC_ITALIAN_SITE_ENABLED = 'true'
 process.env.NEXT_PUBLIC_JAPANESE_SITE_ENABLED = 'true'
+process.env.NEXT_PUBLIC_GERMAN_SITE_ENABLED = 'true'
 
 let pass = 0, fail = 0
 function check(name: string, cond: boolean, detail?: string) {
@@ -133,7 +134,7 @@ function signInChecks() {
     check(`${locale}: the Google flow keeps it`, newGoogleFlow('/dashboard', locale).lang === locale)
   }
   check('an absent language is still Hebrew', newGoogleFlow('/dashboard', null).lang === 'he')
-  check('an unknown language is still Hebrew', newGoogleFlow('/dashboard', 'de').lang === 'he')
+  check('an unknown language is still Hebrew', newGoogleFlow('/dashboard', 'el').lang === 'he')
 
   // With the Spanish build off, a hand-edited value still changes nothing.
   const wasEs = process.env.NEXT_PUBLIC_SPANISH_SITE_ENABLED

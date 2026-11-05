@@ -30,6 +30,7 @@ const UPDATED_LABEL: Record<LegalLanguage, string> = {
   fr: 'Dernière mise à jour',
   it: 'Ultimo aggiornamento',
   ja: '最終更新',
+  de: 'Letzte Aktualisierung',
 }
 
 /**
@@ -44,6 +45,7 @@ const UPDATED_SEPARATOR: Record<LegalLanguage, string> = {
   fr: ': ',
   it: ': ',
   ja: '：',
+  de: ': ',
 }
 
 function localeDate(iso: string, language: LegalLanguage): string {

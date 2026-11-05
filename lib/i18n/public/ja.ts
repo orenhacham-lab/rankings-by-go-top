@@ -226,6 +226,7 @@ export const ja = {
     fr: 'Français',
     it: 'Italiano',
     ja: '日本語',
+    de: 'Deutsch',
     aria: 'サイトの言語を切り替える',
   },
   cookie: {
