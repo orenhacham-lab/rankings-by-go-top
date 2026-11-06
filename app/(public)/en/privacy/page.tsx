@@ -873,6 +873,12 @@ export default function EnglishPrivacyPage() {
           <li><strong>Author photo:</strong> for as long as the photo is configured on the project.
           Deleting it, or switching to no photo or to the site icon, erases the file immediately. A copy
           already placed on your site stays there until you delete it.</li>
+          <li><strong>Partner application data:</strong> 12 months from the application. A rejected
+          application is then deleted in full, and in every other case the IP address the application
+          arrived from is then erased. That address is recorded only to tell a swarm of invented
+          applications from a real agency, and to hold the limit of three applications an hour. The
+          record of referrals, commissions and payouts is our bookkeeping and stays for the period the
+          law requires us to keep the books.</li>
           <li><strong>Security and server logs:</strong> up to 90 days.</li>
         </ul>
       </section>
@@ -892,6 +898,21 @@ export default function EnglishPrivacyPage() {
           protection, so a transfer to us requires no further instrument. For transfers to providers
           outside the EU in countries without an adequacy decision we rely on the European
           Commission&rsquo;s Standard Contractual Clauses, within those providers&rsquo; own terms.
+        </p>
+        <p className="mt-4">
+          Not every recipient named above is a provider of ours, and the instrument above does not reach
+          all of them. <strong>JVZoo, and Digistore24 Inc. of St. Petersburg, Florida, on our Digistore24
+          sales page, each decide for themselves what they do with the data</strong>: for the collection
+          and the transmission of the request made from our page we are a joint controller with each of
+          them, and neither transmission is governed by a processing agreement or by Standard Contractual
+          Clauses. In the European Economic Area, the United Kingdom, Switzerland and Canada, and whenever
+          we cannot determine which country the request came from, the request is made only after you have
+          accepted marketing cookies, and <strong>that consent of yours is the instrument</strong>: Article
+          49(1)(a) of the GDPR permits a transfer to a country without an adequacy decision where the data
+          subject has explicitly consented after being informed of the risks. The risk here is that your IP
+          address and your browser identifier reach a company in the United States, where the protection of
+          the GDPR does not apply of itself. If you do not accept marketing cookies, nothing is transmitted
+          to them.
         </p>
         <p className="mt-4">
           You may ask us which instrument we rely on for a particular transfer, and we will answer in
