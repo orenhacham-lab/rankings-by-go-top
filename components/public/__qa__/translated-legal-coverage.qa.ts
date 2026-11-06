@@ -4501,6 +4501,125 @@ const PHOTO_IN_RETENTION: Record<string, RegExp> = {
     'x'.concat(text.ja!.privacy).split(/メールでの連絡/).length > 1)
 }
 
+// ── 26) the transfer instrument for recipients that are NOT our processors ──
+/*
+ * Every privacy document names JVZoo under Information Sharing and says, in
+ * that same section, that JVZoo does NOT process the data on our behalf: it is
+ * an independent controller, and for the collection and transmission of the
+ * request made from our page we are a joint controller with it. The Hebrew and
+ * English documents say the same of Digistore24 Inc.
+ *
+ * The International Transfers section, in every language, used to offer one
+ * instrument only: Standard Contractual Clauses, "for transfers to providers".
+ * A joint controller is not a provider and not a processor, so that sentence
+ * never reached the two recipients the same document had just described as
+ * controllers of their own — and both sit in the United States, which has no
+ * adequacy decision for us to rely on either.
+ *
+ * The instrument that does apply is the visitor's own consent. The request is
+ * made only after marketing cookies are accepted in the EEA, the UK,
+ * Switzerland and Canada (and wherever the country cannot be determined), and
+ * Article 49(1)(a) GDPR allows a transfer to a third country on the data
+ * subject's explicit consent, given after being informed of the risks. So the
+ * paragraph must do three things, and each is pinned here: say the preceding
+ * instrument does not reach every recipient, name the consent as the
+ * instrument with its article, and name the risk it is consent to — that the
+ * IP address and browser identifier reach a company in the United States.
+ */
+const TRANSFER_NOT_ALL: Record<string, RegExp> = {
+  he: /לא כל נמען שנמנה למעלה הוא ספק שלנו, והמכשיר שלמעלה אינו חל על כולם/,
+  en: /Not every recipient named above is a provider of ours, and the instrument above does not reach\s*all of them/,
+  de: /Nicht jeder oben genannte Empfänger ist unser Anbieter, und das vorstehende Instrument reicht nicht an alle heran/,
+  nl: /Niet elke hierboven genoemde ontvanger is onze leverancier, en het voorgaande instrument reikt niet tot allen/,
+  fr: /Tous les destinataires nommés ci-dessus ne sont pas nos fournisseurs, et l'instrument qui précède ne les atteint pas tous/,
+  it: /Non tutti i destinatari indicati sopra sono nostri fornitori, e lo strumento che precede non li raggiunge tutti/,
+  es: /No todos los destinatarios indicados arriba son nuestros proveedores, y el instrumento anterior no alcanza a todos/,
+  'pt-BR': /Nem todos os destinatários indicados acima são nossos fornecedores, e o instrumento anterior não alcança todos eles/,
+  ja: /上記の受領者のすべてが当社の提供事業者であるわけではなく、前記の措置はそのすべてに及ぶものではありません/,
+}
+/* No processing agreement and no Standard Contractual Clauses govern that transmission. */
+const TRANSFER_NO_SCC: Record<string, RegExp> = {
+  he: /לא חל הסכם עיבוד נתונים ולא חלים\s*סעיפי חוזה תקניים/,
+  en: /neither transmission is governed by a processing agreement or by Standard Contractual\s*Clauses/,
+  de: /gilt weder ein Auftragsverarbeitungsvertrag noch gelten Standardvertragsklauseln/,
+  nl: /geldt geen verwerkersovereenkomst en gelden geen standaardcontractbepalingen/,
+  fr: /n'est régie ni par un contrat de sous-traitance ni par des clauses contractuelles types/,
+  it: /non è retta né da un contratto di responsabile del trattamento né da clausole contrattuali standard/,
+  es: /no se rige ni por un contrato de encargo del tratamiento ni por cláusulas contractuales tipo/,
+  'pt-BR': /não é regida nem por um contrato de operador nem por cláusulas-padrão contratuais/,
+  ja: /その送信には処理者契約も標準契約条項も適用されません/,
+}
+/* The consent is the instrument, and Article 49(1)(a) is named. */
+const TRANSFER_DEROGATION: Record<string, RegExp> = {
+  he: /וההסכמה הזאת שלך היא המכשיר[\s\S]{0,120}סעיף 49\(1\)\(א\) ל-GDPR/,
+  en: /that consent of yours is the instrument[\s\S]{0,140}Article\s*49\(1\)\(a\) of the GDPR/,
+  de: /diese Einwilligung ist das Instrument[\s\S]{0,140}Artikel 49 Absatz 1 Buchstabe a DSGVO/,
+  nl: /die toestemming van u is het instrument[\s\S]{0,140}artikel 49 lid 1 onder a AVG/,
+  fr: /ce consentement est l'instrument[\s\S]{0,140}l'article 49, paragraphe 1, point a\), du RGPD/,
+  it: /quel Suo consenso è lo strumento[\s\S]{0,140}l'articolo 49, paragrafo 1, lettera a\), del GDPR/,
+  es: /ese consentimiento suyo es el instrumento[\s\S]{0,140}el artículo 49, apartado 1, letra a\), del RGPD/,
+  'pt-BR': /esse seu consentimento é o instrumento[\s\S]{0,140}o artigo 49, 1, alínea a, do RGPD/,
+  ja: /その同意こそがその措置です[\s\S]{0,140}GDPR 第49条第1項\(a\)/,
+}
+/* The risk the consent is consent TO must be stated, or it is not informed. */
+const TRANSFER_RISK: Record<string, RegExp> = {
+  he: /מגיעים לחברה בארצות הברית/,
+  en: /reach a company in the United States/,
+  de: /ein\s*Unternehmen in den Vereinigten Staaten erreichen/,
+  nl: /bij een onderneming in de Verenigde Staten aankomen/,
+  fr: /parviennent à une société située aux États-Unis/,
+  it: /giungano a una società stabilita negli Stati\s*Uniti/,
+  es: /lleguen a una sociedad establecida en los\s*Estados Unidos/,
+  'pt-BR': /cheguem a uma empresa estabelecida nos\s*Estados Unidos/,
+  ja: /米国に所在する会社に届くこと/,
+}
+{
+  const read = (path: string) => (existsSync(path) ? readFileSync(path, 'utf8') : '')
+  const enPrivacySource = frontMatter(text[LOCALES[0]].privacy).source
+  const enPrivacy = enPrivacySource ? read(enPrivacySource) : ''
+  const hePrivacy = read(HEBREW_PRIVACY)
+  const privacyDocs: [string, string][] = [
+    ['he', hePrivacy],
+    ['en', enPrivacy],
+    ...LOCALES.map((l): [string, string] => [l, text[l].privacy]),
+  ]
+  for (const [name, privacy] of privacyDocs) {
+    check(`${name}/privacy: the transfers section says the instrument does not reach every recipient`,
+      (TRANSFER_NOT_ALL[name] ?? /$^/).test(privacy))
+    check(`${name}/privacy: that transmission is covered by no processing agreement and no SCCs`,
+      (TRANSFER_NO_SCC[name] ?? /$^/).test(privacy))
+    check(`${name}/privacy: the consent is named as the instrument, with Article 49(1)(a)`,
+      (TRANSFER_DEROGATION[name] ?? /$^/).test(privacy))
+    check(`${name}/privacy: the risk the consent is consent to is stated`,
+      (TRANSFER_RISK[name] ?? /$^/).test(privacy))
+  }
+  /* Mutation controls break the REAL documents, not a string literal: strip the
+   * paragraph out of the live text and show that each check fails. */
+  const strip = (doc: string, from: RegExp) => {
+    const at = doc.search(from)
+    return at < 0 ? doc : doc.slice(0, at) + doc.slice(at + 1400)
+  }
+  const enStripped = strip(enPrivacy, TRANSFER_NOT_ALL.en)
+  const heStripped = strip(hePrivacy, TRANSFER_NOT_ALL.he)
+  const itStripped = strip(text.it!.privacy, TRANSFER_NOT_ALL.it)
+  check('mutation control: the English document without the paragraph fails all four checks',
+    enPrivacy !== '' && enStripped !== enPrivacy
+    && !TRANSFER_NOT_ALL.en.test(enStripped) && !TRANSFER_NO_SCC.en.test(enStripped)
+    && !TRANSFER_DEROGATION.en.test(enStripped) && !TRANSFER_RISK.en.test(enStripped))
+  check('mutation control: the Hebrew document without the paragraph fails all four checks',
+    hePrivacy !== '' && heStripped !== hePrivacy
+    && !TRANSFER_NOT_ALL.he.test(heStripped) && !TRANSFER_NO_SCC.he.test(heStripped)
+    && !TRANSFER_DEROGATION.he.test(heStripped) && !TRANSFER_RISK.he.test(heStripped))
+  check('mutation control: a translated document without the paragraph fails all four checks',
+    itStripped !== text.it!.privacy
+    && !TRANSFER_NOT_ALL.it.test(itStripped) && !TRANSFER_NO_SCC.it.test(itStripped)
+    && !TRANSFER_DEROGATION.it.test(itStripped) && !TRANSFER_RISK.it.test(itStripped))
+  check('mutation control: consent named as the instrument without its article is caught',
+    !TRANSFER_DEROGATION.en.test('that consent of yours is the instrument, and we rely on it.'))
+  check('mutation control: an SCC sentence that still speaks only of providers is caught',
+    !TRANSFER_NO_SCC.en.test('For transfers to providers outside the EU we rely on Standard Contractual Clauses.'))
+}
+
 /**
  * THE INTRO'S "SECTIONS 15A TO 15H" MUST NAME THE SECTIONS THE DOCUMENT HAS.
  *
