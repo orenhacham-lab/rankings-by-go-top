@@ -1,6 +1,7 @@
 import { ScanInput, ScanOutput, ScanAudit, ScanAttempt } from './types'
 import { US_ZIP_CODES, type USZIPCode } from './us-zip-codes'
 import { generateRadiusPoints, aggregateRadiusResults, type RadiusPointResult } from './radius-scan'
+import { serperBody } from './serper-payload'
 
 const SERPER_MAPS_URL = 'https://google.serper.dev/maps'
 const REQUEST_TIMEOUT_MS = 15_000
@@ -322,7 +323,7 @@ async function querySerperMaps(
         'X-API-KEY': apiKey,
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify(body),
+      body: serperBody(body, 'Maps'),
       signal: controller.signal,
     })
 
