@@ -3,7 +3,7 @@ title: Informativa sulla privacy | Go Top SEO
 description: Informativa sulla privacy di Go Top SEO: come raccogliamo, utilizziamo e proteggiamo i Suoi dati.
 locale: it
 source: app/(public)/en/privacy/page.tsx
-lastUpdated: 2026-11-01
+lastUpdated: 2026-11-06
 register: lei
 extraSections: 1
 extraReason: One extra section, "Diritti dei residenti in Italia e nell'Unione europea (GDPR)", placed beside the existing EEA/UK and United States rights sections, because Italian readers are owed the one-month deadline of Art. 12(3), the Garante per la protezione dei dati personali as their own supervisory authority, the Codice in materia di protezione dei dati personali as the national law that completes the GDPR in Italy, and a plain statement about the officer and the representative we have not appointed. What the GDPR adds elsewhere stays inside the sections it belongs to - the legal bases of Art. 6 and the international-transfer rule of Chapter V. The French document carries a second extra section for Quebec (Law 25), which is a different statute reached through the French language and has no Italian counterpart: an Italian reader is governed by the GDPR and by Italian law, so that section is not translated into a jurisdiction it does not apply to.
@@ -263,7 +263,7 @@ Classifichiamo i cookie in tre categorie, e La consultiamo su due di esse prima 
 
 **Prima che Lei scelga, nessun cookie di misurazione né di marketing è depositato e nessuna richiesta è fatta verso i server di Google.** Accettare e rifiutare sono due pulsanti identici nel banner, e ciascuna categoria può essere autorizzata separatamente. Esiste un'eccezione: nella pagina di vendita del marketplace JVZoo, e soltanto per chi arriva da fuori dei territori elencati in «Servizi di misurazione e di marketing» più in basso, l'immagine di tracciamento del marketplace e i cookie che essa deposita sono caricati insieme alla pagina.
 
-**Cambiare o ritirare il Suo consenso:** in qualsiasi momento, attraverso il link « Impostazioni dei cookie » nel piè di pagina di ciascuna pagina. Ritirare il consenso è esattamente tanto facile quanto darlo, e non Le costa nulla nel servizio.
+**Cambiare o ritirare il Suo consenso:** in qualsiasi momento, attraverso il link « Impostazioni dei cookie » nel piè di pagina di ciascuna pagina. Ritirare il consenso è esattamente tanto facile quanto darlo, e non Le costa nulla nel servizio. Le condizioni della conservazione e della lettura sul Suo dispositivo Lei può stabilirle anche da sé, nelle impostazioni del Suo browser; un blocco nel browser da solo non sostituisce però la revoca del consenso presso di noi, perché il nostro varco di marketing e il rapporto che inviamo a Meta dal nostro server leggono soltanto il nostro stesso registro dei consensi.
 
 **Il programma partner:** esso non deposita alcun cookie. Se Lei arriva sul sito attraverso il link di un partner, il codice di quel partner viaggia nel link stesso e nulla è scritto sul Suo dispositivo. È per questo che il programma non figura tra le categorie di cui sopra, ed è per questo che quello che Lei sceglie in quel banner non lo aiuta né lo ostacola. Un cookie che conservasse il codice di un partner non è strettamente necessario al funzionamento del sito, perciò avremmo avuto bisogno del Suo consenso per depositarlo: abbiamo scelto di non averne bisogno. Quello che è registrato con il clic è un conteggio: uno in più nel totale giornaliero di quel partner, senza alcun dato su di Lei.
 
@@ -440,4 +440,4 @@ Se Lei ha domande sulla presente informativa sulla privacy, ci contatti:
 
 **Telefono:** 054-9489377
 
-Ultimo aggiornamento: 1 novembre 2026
+Ultimo aggiornamento: 6 novembre 2026

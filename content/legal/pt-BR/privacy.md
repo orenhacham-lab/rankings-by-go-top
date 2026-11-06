@@ -3,7 +3,7 @@ title: Política de Privacidade | Go Top SEO
 description: Política de privacidade do Go Top SEO.
 locale: pt-BR
 source: app/(public)/en/privacy/page.tsx
-lastUpdated: 2026-11-01
+lastUpdated: 2026-11-06
 register: voce
 extraSections: 1
 extraReason: One extra section, "Direitos de residentes no Brasil (LGPD)", placed beside the existing EEA/UK and United States rights sections, because the LGPD gives a different set of rights with a different deadline and a different authority to complain to. What the LGPD adds elsewhere goes inside the sections it belongs to - the legal bases of Art. 7, the international-transfer rule of Art. 33, and the communication channel that stands in for an appointed officer.
@@ -259,7 +259,7 @@ Dividimos os cookies em três categorias, e perguntamos a você sobre duas delas
 
 **Antes da sua escolha, nenhum cookie de medição ou de marketing é gravado e nenhuma requisição é feita aos servidores do Google.** Aceitar e recusar são dois botões equivalentes no aviso, e cada categoria pode ser permitida separadamente. Há uma exceção: na página de venda do marketplace JVZoo, e apenas para quem chega de fora dos territórios listados em «Serviços de análise e marketing» abaixo, a imagem de rastreamento do marketplace e os cookies que ela guarda são carregados junto com a página.
 
-**Alterar ou retirar o consentimento:** a qualquer momento, pelo link «Configurações de cookies» no final de cada página. Retirar é exatamente tão fácil quanto consentir e não lhe custa nada no serviço.
+**Alterar ou retirar o consentimento:** a qualquer momento, pelo link «Configurações de cookies» no final de cada página. Retirar é exatamente tão fácil quanto consentir e não lhe custa nada no serviço. As condições do armazenamento e da leitura no seu dispositivo você também pode definir por conta própria, nas configurações do seu navegador; um bloqueio no navegador por si só não substitui a retirada do consentimento junto a nós, porque a nossa porta de marketing e o relatório que enviamos à Meta do nosso servidor leem apenas o nosso próprio registro de consentimentos.
 
 **O programa de parceiros:** não grava nenhum cookie. Se você chegar ao site pelo link de um parceiro, o código desse parceiro vai no próprio link e nada é escrito no seu dispositivo. É por isso que o programa não aparece entre as categorias acima, e é por isso que o que você escolhe neste aviso nem o ajuda nem o atrapalha. Um cookie que guarde o código de um parceiro não é estritamente necessário para o site funcionar, então teríamos precisado do seu consentimento para gravá-lo: escolhemos não precisar dele. O que é registrado no clique é uma contagem: mais um no total diário daquele parceiro, sem nenhum dado sobre você.
 
@@ -445,4 +445,4 @@ Se você tiver dúvidas sobre esta política de privacidade, fale com a gente:
 
 **Telefone:** [054-9489377](tel:0549489377)
 
-Esta política foi atualizada pela última vez em 1º de novembro de 2026
+Esta política foi atualizada pela última vez em 6 de novembro de 2026

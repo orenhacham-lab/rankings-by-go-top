@@ -3,7 +3,7 @@ title: Politique de confidentialité | Go Top SEO
 description: Politique de confidentialité de Go Top SEO : comment nous collectons, utilisons et protégeons vos données.
 locale: fr
 source: app/(public)/en/privacy/page.tsx
-lastUpdated: 2026-11-01
+lastUpdated: 2026-11-06
 register: vous
 extraSections: 2
 extraReason: Two extra sections. The first, "Droits des résidents en France et dans l'Union européenne (RGPD)", placed beside the existing EEA/UK and United States rights sections, because French readers are owed the one-month deadline of Art. 12(3), the CNIL as their own supervisory authority, and a plain statement about the officer and the representative we have not appointed. What the RGPD adds elsewhere stays inside the sections it belongs to - the legal bases of Art. 6 and the international-transfer rule of Chapter V. The second, "Droits des résidents du Québec (Loi 25)", is a different statute and not a dialect of the first: a reader in Quebec is governed by the Act respecting the protection of personal information in the private sector (P-39.1) as amended by Law 25, which requires a person in charge of the protection of personal information who is not an RGPD data protection officer, an assessment before any communication outside Quebec, information at the time an automated decision is made, portability since September 2024 and notice of a confidentiality incident to the Commission d'acces a l'information du Quebec - none of which an RGPD-shaped section covers. One document, two sections, because splitting them would leave a Quebec reader reading French law that does not govern them.
@@ -263,7 +263,7 @@ Nous classons les cookies en trois catégories, et nous vous consultons sur deux
 
 **Avant que vous ne choisissiez, aucun cookie de mesure ni de marketing n'est déposé et aucune requête n'est faite vers les serveurs de Google.** Accepter et refuser sont deux boutons identiques dans le bandeau, et chaque catégorie peut être autorisée séparément. Il existe une exception : sur la page de vente de la place de marché JVZoo, et uniquement pour les visiteurs venant de l'extérieur des territoires énumérés dans « Services de mesure et de marketing » plus bas, l'image de suivi de la place de marché et les cookies qu'elle dépose sont chargés avec la page.
 
-**Changer ou retirer votre consentement :** à tout moment, par le lien « Réglages des cookies » au pied de chaque page. Retirer le consentement est exactement aussi facile que de le donner, et cela ne vous coûte rien dans le service.
+**Changer ou retirer votre consentement :** à tout moment, par le lien « Réglages des cookies » au pied de chaque page. Retirer le consentement est exactement aussi facile que de le donner, et cela ne vous coûte rien dans le service. Vous pouvez aussi définir vous-même les conditions de l’enregistrement et de la lecture sur votre appareil, dans les réglages de votre navigateur ; un blocage dans le navigateur ne remplace toutefois pas le retrait du consentement chez nous, car notre porte de marketing et le rapport que nous envoyons à Meta depuis notre serveur ne lisent que notre propre registre des consentements.
 
 **Le programme de partenaires :** il ne dépose aucun cookie. Si vous arrivez sur le site par le lien d'un partenaire, le code de ce partenaire voyage dans le lien lui-même et rien n'est écrit sur votre appareil. C'est pourquoi le programme ne figure pas parmi les catégories ci-dessus, et c'est pourquoi ce que vous choisissez dans ce bandeau ne l'aide ni ne le gêne. Un cookie qui conserverait le code d'un partenaire n'est pas strictement nécessaire au fonctionnement du site, nous aurions donc eu besoin de votre consentement pour le déposer : nous avons choisi de ne pas en avoir besoin. Ce qui est enregistré avec le clic est un comptage : un de plus dans le total quotidien de ce partenaire, sans aucune donnée sur vous.
 
@@ -456,4 +456,4 @@ Si vous avez des questions sur la présente politique de confidentialité, conta
 
 **Téléphone :** 054-9489377
 
-Dernière mise à jour le 1er novembre 2026
+Dernière mise à jour le 6 novembre 2026

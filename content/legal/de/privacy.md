@@ -3,7 +3,7 @@ title: Datenschutzerklärung | Go Top SEO
 description: Datenschutzerklärung von Go Top SEO: wie wir Ihre Daten erheben, nutzen und schützen.
 locale: de
 source: app/(public)/en/privacy/page.tsx
-lastUpdated: 2026-11-04
+lastUpdated: 2026-11-06
 register: sie
 extraSections: 1
 extraReason: One extra section, "Rechte von Personen in Deutschland und in der Europäischen Union (DSGVO)", placed beside the existing EEA/UK and United States rights sections, because German readers are owed the one-month deadline of Art. 12(3), the data protection authority of their own Land as their supervisory authority, the Bundesdatenschutzgesetz as the national law that completes the DSGVO in Germany, and a plain statement about the data protection officer we have not appointed — which in Germany turns on § 38 BDSG, a stricter threshold than Art. 37 DSGVO, and so cannot simply be translated from the Italian document. § 25 TDDDG replaces the generic reference to the ePrivacy rules wherever consent for storage on the device is named. What the DSGVO adds elsewhere stays inside the sections it belongs to — the legal bases of Art. 6 and the international-transfer rule of Chapter V. The French document carries a second extra section for Quebec (Law 25), which is a different statute reached through the French language and has no German counterpart.
@@ -263,7 +263,7 @@ Wir teilen Cookies in drei Kategorien ein und fragen Sie bei zwei davon, bevor s
 
 **Bevor Sie wählen, wird kein Mess- und kein Marketing-Cookie abgelegt, und es geht keine Anfrage an die Server von Google.** Annehmen und Ablehnen sind zwei gleich gestaltete Schaltflächen im Banner, und jede Kategorie kann gesondert erlaubt werden. Es gibt eine Ausnahme: auf der Verkaufsseite des Marktplatzes JVZoo, und nur für Besucher von außerhalb der im Abschnitt „Mess- und Marketingdienste“ aufgeführten Gebiete, werden das Zählpixel des Marktplatzes und die Cookies, die es ablegt, zusammen mit der Seite geladen.
 
-**Ihre Einwilligung ändern oder widerrufen:** jederzeit über den Link „Cookie-Einstellungen“ in der Fußzeile jeder Seite. Die Einwilligung zu widerrufen ist genauso einfach, wie sie zu geben, und kostet Sie im Dienst nichts.
+**Ihre Einwilligung ändern oder widerrufen:** jederzeit über den Link „Cookie-Einstellungen“ in der Fußzeile jeder Seite. Die Einwilligung zu widerrufen ist genauso einfach, wie sie zu geben, und kostet Sie im Dienst nichts. Die Bedingungen der Speicherung und des Auslesens auf Ihrem Gerät können Sie auch selbst festlegen, in den Einstellungen Ihres Browsers; eine Sperre im Browser allein ersetzt jedoch nicht den Widerruf der Einwilligung bei uns, denn unser Marketing-Schalter und der Bericht, den wir Meta von unserem Server aus senden, lesen allein unser eigenes Verzeichnis der Einwilligungen.
 
 **Das Partnerprogramm:** es legt keinen Cookie ab. Wenn Sie über den Link eines Partners auf die Website kommen, reist der Code dieses Partners im Link selbst, und auf Ihrem Gerät wird nichts geschrieben. Deshalb erscheint das Programm nicht unter den Kategorien oben, und deshalb hilft oder hindert Ihre Wahl in diesem Banner es nicht. Ein Cookie, der den Code eines Partners aufbewahrt, ist für den Betrieb der Website nicht unbedingt erforderlich, sodass wir für sein Ablegen Ihre Einwilligung gebraucht hätten: wir haben uns dafür entschieden, sie nicht zu brauchen. Was mit dem Klick erfasst wird, ist eine Zählung: eins mehr in der Tagessumme dieses Partners, ohne jedes Datum über Sie.
 
@@ -444,4 +444,4 @@ Wenn Sie Fragen zu dieser Datenschutzerklärung haben, wenden Sie sich an uns:
 
 **Telefon:** +972-54-9489377
 
-Letzte Aktualisierung: 4. November 2026
+Letzte Aktualisierung: 6. November 2026

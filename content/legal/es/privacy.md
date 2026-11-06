@@ -3,7 +3,7 @@ title: Política de privacidad | Go Top SEO
 description: Política de privacidad de Go Top SEO: cómo recopilamos, utilizamos y protegemos sus datos.
 locale: es
 source: app/(public)/en/privacy/page.tsx
-lastUpdated: 2026-11-01
+lastUpdated: 2026-11-06
 register: usted
 ---
 
@@ -261,7 +261,7 @@ Clasificamos las cookies en tres categorías, y le consultamos sobre dos de ella
 
 **Antes de que usted elija, no se instala ninguna cookie de medición ni de marketing y no se realiza ninguna solicitud a los servidores de Google.** Aceptar y rechazar son dos botones iguales en el aviso, y cada categoría puede permitirse por separado. Hay una excepción: en la página de venta del marketplace JVZoo, y solo para quien llega desde fuera de los territorios enumerados en «Servicios de análisis y marketing» más abajo, la imagen de seguimiento del marketplace y las cookies que almacena se cargan junto con la página.
 
-**Cambiar o retirar su consentimiento:** en cualquier momento, mediante el enlace «Configuración de cookies» al pie de cada página. Retirar el consentimiento es exactamente tan fácil como darlo, y no le supone ningún costo en el servicio.
+**Cambiar o retirar su consentimiento:** en cualquier momento, mediante el enlace «Configuración de cookies» al pie de cada página. Retirar el consentimiento es exactamente tan fácil como darlo, y no le supone ningún costo en el servicio. Las condiciones del almacenamiento y de la lectura en su dispositivo también puede fijarlas usted, en la configuración de su navegador; un bloqueo en el navegador por sí solo no sustituye la retirada del consentimiento ante nosotros, porque nuestra puerta de marketing y el informe que enviamos a Meta desde nuestro servidor leen únicamente nuestro propio registro de consentimientos.
 
 **El programa de socios:** no instala ninguna cookie. Si usted llega al sitio a través del enlace de un socio, el código de ese socio va en el propio enlace y nada se escribe en su dispositivo. Por eso el programa no figura entre las categorías anteriores, y por eso lo que usted elija en este aviso ni lo ayuda ni lo estorba. Una cookie que conserve el código de un socio no es estrictamente necesaria para que el sitio funcione, así que habríamos necesitado su consentimiento para instalarla: elegimos no necesitarla. Lo que sí se registra con el clic es un recuento: uno más en el total diario de ese socio, sin ningún dato sobre usted.
 
@@ -426,4 +426,4 @@ Si tiene preguntas sobre esta política de privacidad, contacte con:
 
 **Teléfono:** 054-9489377
 
-Esta política se actualizó por última vez el 1 de noviembre de 2026
+Esta política se actualizó por última vez el 6 de noviembre de 2026

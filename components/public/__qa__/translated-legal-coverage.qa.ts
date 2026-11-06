@@ -4501,6 +4501,141 @@ const PHOTO_IN_RETENTION: Record<string, RegExp> = {
     'x'.concat(text.ja!.privacy).split(/メールでの連絡/).length > 1)
 }
 
+/**
+ * THE VISITOR'S OWN BROWSER IS A CONTROL OVER STORAGE, AND IT IS NOT A WAY OF
+ * CONSENTING, AND IT IS NOT A WITHDRAWAL WITH US. ALL THREE, IN ALL NINE.
+ *
+ * Raised from the Polish build: art. 399 ust. 1 pkt 1 lit. b PKE makes the
+ * Polish reader's right to set the conditions of storage and access in their
+ * own software an operative information duty. That is Poland's wording of
+ * RECITAL 66 of Directive 2009/136/EC, not of Art. 5(3)'s operative text, so
+ * the other eight implementations may or may not carry an equivalent, and
+ * nobody here has read eight statutes to find out. The sentence is added
+ * anyway, because it is TRUE and useful, and the honest reason is recorded
+ * rather than a borrowed Polish citation.
+ *
+ * Two things it must never say, and both are checked:
+ *
+ *   1. NOT A ROUTE TO CONSENT. After Planet49 (C-673/17) a browser setting
+ *      cannot constitute consent. Polish art. 399 ust. 2 does let settings
+ *      express it; that is a Polish peculiarity and copying it outward would
+ *      publish a wrong statement in eight languages. So the sentence is framed
+ *      as control over storage, and a wording that offers the browser as a way
+ *      of giving or granting consent fails here.
+ *   2. NOT A WITHDRAWAL WITH US. Our marketing gate and the Meta server-side
+ *      conversion report are keyed on OUR consent record, not on what the
+ *      browser does, so a visitor who blocks cookies in Chrome and never
+ *      touches our banner has not stopped the server report. A sentence that
+ *      blurred that would be a false statement about a transfer, which is why
+ *      the second half is required and not optional.
+ *
+ * Checked in both surfaces, as the Polish build did it: `cookie.withdrawHint`
+ * in lib/i18n/public/<locale>.ts, which is what the preferences screen renders,
+ * and the cookie section of each privacy document, which is the durable record.
+ */
+{
+  const read = (path: string) => (existsSync(path) ? readFileSync(path, 'utf8') : '')
+  const enPrivacySource = frontMatter(text[LOCALES[0]].privacy).source
+  const privacyDocs: [string, string][] = [
+    ['he', read(HEBREW_PRIVACY)],
+    ['en', enPrivacySource ? read(enPrivacySource) : ''],
+    ...LOCALES.map((l): [string, string] => [l, text[l].privacy]),
+  ]
+
+  /** The browser sets the conditions of storage on the device. */
+  const BROWSER_CONTROL: Record<string, RegExp> = {
+    he: /בהגדרות הדפדפן/,
+    en: /in your browser settings/,
+    de: /in den Einstellungen Ihres Browsers/,
+    nl: /in de instellingen van uw browser/,
+    fr: /dans les réglages de votre navigateur/,
+    it: /nelle impostazioni del Suo browser/,
+    es: /en la configuración de su navegador|en la configuración de tu navegador/,
+    'pt-BR': /nas configurações do seu navegador/,
+    ja: /ブラウザーの設定でお客様ご自身が定めることもできます/,
+  }
+
+  /** A block in the browser is not a withdrawal of consent with us. */
+  const NOT_A_WITHDRAWAL: Record<string, RegExp> = {
+    he: /חסימה בדפדפן לבדה אינה מחליפה ביטול\s*הסכמה אצלנו/,
+    en: /a block in the\s*browser alone is not a withdrawal of consent with us|block in the browser alone is not a withdrawal of consent with us/,
+    de: /eine Sperre im Browser allein ersetzt jedoch nicht den Widerruf der Einwilligung bei uns/,
+    nl: /een blokkade in de browser alleen vervangt echter niet het intrekken van de instemming bij ons/,
+    fr: /un blocage dans le navigateur ne remplace toutefois pas le retrait du consentement chez nous/,
+    it: /un blocco nel browser da solo non sostituisce però la revoca del consenso presso di noi/,
+    es: /un bloqueo en el navegador por sí solo no sustituye la retirada del consentimiento ante nosotros/,
+    'pt-BR': /um bloqueio no navegador por si só não substitui a retirada do consentimento junto a nós/,
+    ja: /ブラウザーでの遮断だけでは、当社に対する同意の撤回には代わりません/,
+  }
+
+  /**
+   * The Planet49 trap: a wording that offers the browser as a way of GIVING
+   * consent. Read one sentence at a time, and flagged only when that sentence
+   * carries all three of a consent word, a word for giving or expressing it,
+   * and a word for the browser. Our own sentence carries the first and third
+   * ("a block in the browser alone is not a withdrawal of consent with us") and
+   * must not trip it, which is the last mutation control below.
+   */
+  const CONSENT_WORD = /consent|Einwilligung|instemming|consentement|consenso|consentimiento|同意/i
+  const GIVING_WORD =
+    /\bgiv(e|ing|en)\b|\bgrant(ing|ed)?\b|\bexpress(ing|ed)?\b|erteil|\bgeben\b|\bgeven\b|donner|exprimer|\bdare\b|esprimere|prestar|expresar|manifestar|表明|与え/i
+  const BROWSER_WORD = /browser|Browser|navigateur|navegador|ブラウザ/i
+  const offersConsentByBrowser = (value: string): boolean =>
+    value
+      .split(/(?<=[.。;；])\s*/)
+      .some((s) => CONSENT_WORD.test(s) && GIVING_WORD.test(s) && BROWSER_WORD.test(s))
+
+  for (const [name, doc] of privacyDocs) {
+    if (!doc) { check(`${name}/privacy: document is readable`, false); continue }
+    check(`${name}/privacy: says the browser sets the conditions of storage on the device`,
+      (BROWSER_CONTROL[name] ?? /$^/).test(doc))
+    check(`${name}/privacy: says a browser block is not a withdrawal of consent with us`,
+      (NOT_A_WITHDRAWAL[name] ?? /$^/).test(doc))
+  }
+
+  for (const name of ['he', 'en', ...LOCALES]) {
+    const dict = read(`lib/i18n/public/${name}.ts`)
+    check(`${name}: the locale dictionary is readable`, dict.length > 0)
+    if (!dict) continue
+    const hint = /^ {4}withdrawHint: '([^']*)'/m.exec(stripComments(dict))
+    check(`${name}: cookie.withdrawHint is readable`, hint !== null)
+    if (!hint) continue
+    const value = hint[1]!
+    check(`${name}: withdrawHint offers the browser as a control over storage`,
+      (BROWSER_CONTROL[name] ?? /$^/).test(value))
+    check(`${name}: withdrawHint says a browser block is not a withdrawal with us`,
+      (NOT_A_WITHDRAWAL[name] ?? /$^/).test(value))
+    check(`${name}: withdrawHint never offers the browser as a way of GIVING consent (Planet49)`,
+      !offersConsentByBrowser(value), value.slice(0, 80))
+  }
+
+  // MUTATION CONTROLS, against the real text.
+  {
+    const en = enPrivacySource ? read(enPrivacySource) : ''
+    const de = text.de ? text.de.privacy : ''
+    const enDict = read('lib/i18n/public/en.ts')
+    if (en) {
+      const half = en.replace(/ a block in the\s*\n?\s*browser alone is not a withdrawal of consent with us[^.]*\./, '.')
+      check('mutation control (en): the sentence with only its first half is caught',
+        BROWSER_CONTROL.en!.test(half) && !NOT_A_WITHDRAWAL.en!.test(half))
+    }
+    if (de) {
+      const gone = de.replace('in den Einstellungen Ihres Browsers', 'über den Link in der Fußzeile')
+      check('mutation control (de): a document that drops the browser half is caught',
+        !BROWSER_CONTROL.de!.test(gone))
+    }
+    if (enDict) {
+      const hint = /^ {4}withdrawHint: '([^']*)'/m.exec(stripComments(enDict))
+      const planet49 = (hint ? hint[1]! : '')
+        + ' You may also give your consent by using the appropriate settings of your browser.'
+      check('mutation control (en): consent offered through the browser is caught by the Planet49 check',
+        offersConsentByBrowser(planet49))
+      check('mutation control (en): the real withdrawHint is NOT caught by that check',
+        hint !== null && !offersConsentByBrowser(hint[1]!))
+    }
+  }
+}
+
 console.log(`\n${pass} passed, ${fail} failed`)
 if (fail > 0) process.exit(1)
 

@@ -3,7 +3,7 @@ title: プライバシーポリシー | Go Top SEO
 description: Go Top SEO のプライバシーポリシー。お客様のデータをどのように取得し、利用し、保護するかについて。
 locale: ja
 source: app/(public)/en/privacy/page.tsx
-lastUpdated: 2026-11-01
+lastUpdated: 2026-11-06
 register: desumasu
 extraSections: 1
 extraReason: One extra section, "日本の居住者の権利（個人情報保護法）", placed beside the existing EEA/UK and United States rights sections, because a Japanese reader is owed the publication items of Article 32 of the Act on the Protection of Personal Information, the disclosure, correction and cease-of-use procedures of Articles 33 to 35, the rule of Article 28 on providing data to a third party in a foreign country, the complaint desk, and a plain statement that no personal information protection officer is appointed. What the Act adds elsewhere stays inside the sections it belongs to - the purposes of use in "お客様のデータの利用方法" and the international-transfer rule in "国際的な移転". The Italian document carries its extra section for the GDPR, which is a different statute reached through a different language and has no Japanese counterpart, so it is not translated into a jurisdiction it does not govern.
@@ -263,7 +263,7 @@ PDFShift とは GDPR 第28条に基づくデータ処理の取り決めを結ん
 
 **お客様が選択される前は、計測もマーケティングの Cookie も保存せず、Google のサーバーへのリクエストも行いません。** バナーの「同意する」と「拒否する」は同じ大きさの二つのボタンであり、各区分を別々に許可できます。一つ例外があります。JVZoo のマーケットプレイスの販売ページでは、後述の「計測およびマーケティングのサービス」に挙げる地域の外から来られた方に限り、マーケットプレイスのトラッキング用の画像とそれが保存する Cookie がページと一緒に読み込まれます。
 
-**同意の変更と撤回：** 各ページのフッターの「Cookie の設定」のリンクから、いつでも行えます。同意の撤回は同意と全く同じだけ簡単で、サービス上の不利益はありません。
+**同意の変更と撤回：** 各ページのフッターの「Cookie の設定」のリンクから、いつでも行えます。同意の撤回は同意と全く同じだけ簡単で、サービス上の不利益はありません。お客様の端末での保存と読み取りの条件は、ブラウザーの設定でお客様ご自身が定めることもできます。ただし、ブラウザーでの遮断だけでは、当社に対する同意の撤回には代わりません。当社のマーケティングの蓋と、当社のサーバーから Meta へ送る報告は、当社自身の同意の記録のみを読むためです。
 
 **パートナープログラム：** これは Cookie を一切保存しません。パートナーのリンクからサイトに来られた場合、そのパートナーのコードはリンクそのものに入って運ばれ、お客様の端末には何も書き込まれません。だからこそ本プログラムは上の区分に現れず、だからこそバナーでのお客様の選択は本プログラムを助けも妨げもしません。パートナーのコードを保存する Cookie はサイトの動作に必須ではないため、保存するにはお客様の同意が必要だったはずです。当社はそれを必要としない方法を選びました。クリックとともに記録されるのは件数であり、そのパートナーの一日の合計に一つ加えるだけで、お客様についてのデータはありません。
 
@@ -462,4 +462,4 @@ WhatsApp の利用は、WhatsApp および Meta の利用規約とプライバ�
 
 **電話：** +972-54-9489377
 
-最終更新：2026年11月1日
+最終更新：2026年11月6日

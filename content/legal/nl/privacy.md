@@ -3,7 +3,7 @@ title: Privacyverklaring | Go Top SEO
 description: "Privacyverklaring van Go Top SEO: hoe wij uw gegevens verzamelen, gebruiken en beschermen."
 locale: nl
 source: app/(public)/en/privacy/page.tsx
-lastUpdated: 2026-11-05
+lastUpdated: 2026-11-06
 register: u
 extraSections: 1
 extraReason: One extra section, "Rechten van personen in Nederland en in de Europese Unie (AVG)", placed beside the existing EEA/UK and United States rights sections, because Dutch readers are owed the one-month deadline of Art. 12(3), the Autoriteit Persoonsgegevens as their supervisory authority, the Uitvoeringswet Algemene verordening gegevensbescherming (UAVG) as the national law that completes the AVG in the Netherlands, and a plain statement about the data protection officer we have not appointed. That last point is the opposite of the German case: § 38 BDSG adds a headcount threshold stricter than Art. 37 DSGVO, while the UAVG adds no such threshold, so the Dutch document says that the duty here follows Art. 37 AVG alone and must not be copied from the German one. Artikel 11.7a Telecommunicatiewet replaces the generic reference to the ePrivacy rules wherever consent for storage on the device is named, and AVG is used throughout because that is the name Dutch law and Dutch readers give the GDPR. What the AVG adds elsewhere stays inside the sections it belongs to — the legal bases of Art. 6 and the international-transfer rule of Chapter V. The French document carries a second extra section for Quebec (Law 25), which is a different statute reached through the French language and has no Dutch counterpart.
@@ -263,7 +263,7 @@ Wij verdelen cookies in drie categorieën en vragen u bij twee daarvan iets voor
 
 **Voordat u kiest wordt geen cookie voor meting en geen cookie voor marketing geplaatst, en gaat er geen verzoek naar de servers van Google.** Aannemen en afwijzen zijn twee gelijk vormgegeven knoppen in de balk, en elke categorie kan afzonderlijk worden toegestaan. Er is één uitzondering: op de verkooppagina van de marktplaats JVZoo, en alleen voor bezoekers van buiten de gebieden die in het onderdeel 'Diensten voor meting en marketing' worden genoemd, worden de telpixel van de marktplaats en de cookies die zij plaatst samen met de pagina geladen.
 
-**Uw instemming veranderen of intrekken:** op elk moment via de link 'Cookie-instellingen' in de voettekst van elke pagina. De instemming intrekken is net zo eenvoudig als die geven, en kost u in de dienst niets.
+**Uw instemming veranderen of intrekken:** op elk moment via de link 'Cookie-instellingen' in de voettekst van elke pagina. De instemming intrekken is net zo eenvoudig als die geven, en kost u in de dienst niets. De voorwaarden van het opslaan en het uitlezen op uw apparaat kunt u ook zelf bepalen, in de instellingen van uw browser; een blokkade in de browser alleen vervangt echter niet het intrekken van de instemming bij ons, want onze marketingpoort en het bericht dat wij vanaf onze server aan Meta sturen lezen alleen ons eigen register van de instemmingen.
 
 **Het partnerprogramma:** dat plaatst geen cookie. Komt u via de link van een partner op de website, dan reist de code van die partner in de link zelf, en op uw apparaat wordt niets geschreven. Daarom komt het programma niet voor onder de categorieën hierboven, en daarom helpt of hindert uw keuze in die balk het niet. Een cookie die de code van een partner bewaart, is voor het werken van de website niet strikt noodzakelijk, zodat wij voor het plaatsen daarvan uw instemming nodig zouden hebben gehad: wij hebben ervoor gekozen die niet nodig te hebben. Wat met de klik wordt vastgelegd is een telling: één meer in het dagtotaal van die partner, zonder enig gegeven over u.
 
@@ -444,4 +444,4 @@ Hebt u vragen over deze privacyverklaring, neem dan contact met ons op:
 
 **Telefoon:** +972-54-9489377
 
-Laatst bijgewerkt: 5 november 2026
+Laatst bijgewerkt: 6 november 2026
