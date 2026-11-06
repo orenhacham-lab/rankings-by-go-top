@@ -3,7 +3,7 @@ title: Politique de confidentialité | Go Top SEO
 description: Politique de confidentialité de Go Top SEO : comment nous collectons, utilisons et protégeons vos données.
 locale: fr
 source: app/(public)/en/privacy/page.tsx
-lastUpdated: 2026-11-01
+lastUpdated: 2026-11-05
 register: vous
 extraSections: 2
 extraReason: Two extra sections. The first, "Droits des résidents en France et dans l'Union européenne (RGPD)", placed beside the existing EEA/UK and United States rights sections, because French readers are owed the one-month deadline of Art. 12(3), the CNIL as their own supervisory authority, and a plain statement about the officer and the representative we have not appointed. What the RGPD adds elsewhere stays inside the sections it belongs to - the legal bases of Art. 6 and the international-transfer rule of Chapter V. The second, "Droits des résidents du Québec (Loi 25)", is a different statute and not a dialect of the first: a reader in Quebec is governed by the Act respecting the protection of personal information in the private sector (P-39.1) as amended by Law 25, which requires a person in charge of the protection of personal information who is not an RGPD data protection officer, an assessment before any communication outside Quebec, information at the time an automated decision is made, portability since September 2024 and notice of a confidentiality incident to the Commission d'acces a l'information du Quebec - none of which an RGPD-shaped section covers. One document, two sections, because splitting them would leave a Quebec reader reading French law that does not govern them.
@@ -355,6 +355,8 @@ Pour les données concernant des résidents de l'Espace économique européen, d
 
 Pour les transferts vers des fournisseurs établis hors de l'Union dans des pays sans décision d'adéquation, nous nous appuyons sur les clauses contractuelles types de la Commission européenne, dans les propres conditions de traitement de données de ces fournisseurs. **Nous ne prétendons pas ici avoir signé des clauses contractuelles types avec chacun de nos sous-traitants.** Ce que nous pouvons dire précisément à la date de la présente politique : nous avons un accord de traitement des données au titre de l'article 28 avec PDFShift, décrit dans la section « Conversion d'un rapport en PDF » ; pour Vercel, Supabase, Google, Resend, Meta et Shopify, nous nous appuyons sur les addenda de traitement de données et les clauses types que ces fournisseurs intègrent à leurs propres conditions, que nous avons acceptées ; et **avec Serper, ScrapeLLM, PDFShift mis à part, et le service Nominatim d'OpenStreetMap, nous n'avons pas signé de clauses contractuelles types négociées** — l'usage y repose sur les conditions publiques du fournisseur, et le travail contractuel est en cours. Nous préférons le dire plutôt que de laisser croire que cette question est réglée.
 
+Tous les destinataires nommés ci-dessus ne sont pas nos fournisseurs, et l'instrument qui précède ne les atteint pas tous. **JVZoo décide lui-même de ce qu'il fait des données** : pour la collecte et la transmission de la requête faite depuis notre page, nous sommes responsable conjoint avec JVZoo, et cette transmission n'est régie ni par un contrat de sous-traitance ni par des clauses contractuelles types. Dans l'Espace économique européen, au Royaume-Uni, en Suisse et au Canada, ainsi que chaque fois que nous ne parvenons pas à déterminer le pays d'où vient la requête, celle-ci n'est faite qu'après votre acceptation des cookies de marketing, et **ce consentement est l'instrument** : l'article 49, paragraphe 1, point a), du RGPD permet un transfert vers un pays sans décision d'adéquation lorsque la personne concernée y a consenti explicitement après avoir été informée des risques. Le risque est ici que votre adresse IP et l'identifiant de votre navigateur parviennent à une société située aux États-Unis, où la protection du RGPD ne s'applique pas d'elle-même. Si vous n'acceptez pas les cookies de marketing, rien ne leur est transmis.
+
 Vous pouvez nous demander sur quel instrument nous nous appuyons pour un transfert donné, et nous vous répondrons par écrit en nommant le fournisseur et la base.
 
 ## Droits des résidents de l'EEE, de la Suisse et du Royaume-Uni
@@ -456,4 +458,4 @@ Si vous avez des questions sur la présente politique de confidentialité, conta
 
 **Téléphone :** 054-9489377
 
-Dernière mise à jour le 1er novembre 2026
+Dernière mise à jour le 5 novembre 2026

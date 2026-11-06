@@ -3,7 +3,7 @@ title: Política de Privacidade | Go Top SEO
 description: Política de privacidade do Go Top SEO.
 locale: pt-BR
 source: app/(public)/en/privacy/page.tsx
-lastUpdated: 2026-11-01
+lastUpdated: 2026-11-05
 register: voce
 extraSections: 1
 extraReason: One extra section, "Direitos de residentes no Brasil (LGPD)", placed beside the existing EEA/UK and United States rights sections, because the LGPD gives a different set of rights with a different deadline and a different authority to complain to. What the LGPD adds elsewhere goes inside the sections it belongs to - the legal bases of Art. 7, the international-transfer rule of Art. 33, and the communication channel that stands in for an appointed officer.
@@ -351,6 +351,8 @@ Quanto a dados de residentes do Espaço Econômico Europeu, da Suíça ou do Rei
 
 Quanto a dados de residentes no Brasil: a transferência internacional é regida pelo art. 33 da LGPD, e a Resolução CD/ANPD nº 19/2024 aprovou as cláusulas-padrão contratuais brasileiras. Os dados saem do Brasil porque o serviço é operado de Israel e executado sobre os provedores listados acima; o instrumento em que nos apoiamos para cada transferência depende do provedor e dos termos de tratamento de dados dele. **Não afirmamos aqui ter firmado as cláusulas-padrão da ANPD com cada provedor; esse é um trabalho contratual em curso.** Se você quiser saber em que instrumento nos apoiamos para uma transferência específica, pergunte e responderemos por escrito, nomeando o provedor e a base.
 
+Nem todos os destinatários indicados acima são nossos fornecedores, e o instrumento anterior não alcança todos eles. **A JVZoo decide por si mesma o que faz com os dados**: quanto à coleta e à transmissão da requisição feita a partir da nossa página, somos controladores conjuntos junto com a JVZoo, e essa transmissão não é regida nem por um contrato de operador nem por cláusulas-padrão contratuais. No Espaço Econômico Europeu, no Reino Unido, na Suíça e no Canadá, e sempre que não conseguirmos determinar de qual país veio a requisição, ela é feita apenas depois de você aceitar os cookies de marketing, e **esse seu consentimento é o instrumento**: o artigo 49, 1, alínea a, do RGPD permite uma transferência para um país sem decisão de adequação quando o titular consentiu explicitamente após ter sido informado dos riscos. O risco aqui é que o seu endereço IP e o identificador do seu navegador cheguem a uma empresa estabelecida nos Estados Unidos, onde a proteção do RGPD não se aplica por si só. Se você não aceitar os cookies de marketing, nada lhes é transmitido.
+
 ## Direitos de residentes do EEE, da Suíça e do Reino Unido
 
 Se você está no Espaço Econômico Europeu, na Suíça ou no Reino Unido, você tem também os seguintes direitos, conforme o RGPD e o RGPD do Reino Unido:
@@ -445,4 +447,4 @@ Se você tiver dúvidas sobre esta política de privacidade, fale com a gente:
 
 **Telefone:** [054-9489377](tel:0549489377)
 
-Esta política foi atualizada pela última vez em 1º de novembro de 2026
+Esta política foi atualizada pela última vez em 5 de novembro de 2026

@@ -3,7 +3,7 @@ title: Informativa sulla privacy | Go Top SEO
 description: Informativa sulla privacy di Go Top SEO: come raccogliamo, utilizziamo e proteggiamo i Suoi dati.
 locale: it
 source: app/(public)/en/privacy/page.tsx
-lastUpdated: 2026-11-01
+lastUpdated: 2026-11-05
 register: lei
 extraSections: 1
 extraReason: One extra section, "Diritti dei residenti in Italia e nell'Unione europea (GDPR)", placed beside the existing EEA/UK and United States rights sections, because Italian readers are owed the one-month deadline of Art. 12(3), the Garante per la protezione dei dati personali as their own supervisory authority, the Codice in materia di protezione dei dati personali as the national law that completes the GDPR in Italy, and a plain statement about the officer and the representative we have not appointed. What the GDPR adds elsewhere stays inside the sections it belongs to - the legal bases of Art. 6 and the international-transfer rule of Chapter V. The French document carries a second extra section for Quebec (Law 25), which is a different statute reached through the French language and has no Italian counterpart: an Italian reader is governed by the GDPR and by Italian law, so that section is not translated into a jurisdiction it does not apply to.
@@ -355,6 +355,8 @@ Per i dati relativi a residenti dello Spazio economico europeo, della Svizzera o
 
 Per i trasferimenti verso fornitori stabiliti fuori dall'Unione in Paesi senza decisione di adeguatezza, ci fondiamo sulle clausole contrattuali tipo della Commissione europea, nelle condizioni di trattamento dei dati proprie di quei fornitori. **Non pretendiamo qui di aver firmato clausole contrattuali tipo con ciascuno dei nostri responsabili del trattamento.** Quello che possiamo dire con precisione alla data della presente informativa: abbiamo un accordo sul trattamento dei dati ai sensi dell'articolo 28 con PDFShift, descritto nella sezione « Conversione di un report in PDF »; per Vercel, Supabase, Google, Resend, Meta e Shopify ci fondiamo sulle appendici di trattamento dei dati e sulle clausole tipo che quei fornitori integrano nelle proprie condizioni, che abbiamo accettato; e **con Serper, ScrapeLLM, PDFShift a parte, e il servizio Nominatim di OpenStreetMap, non abbiamo firmato clausole contrattuali tipo negoziate** — l'uso si fonda là sulle condizioni pubbliche del fornitore, e il lavoro contrattuale è in corso. Preferiamo dirlo piuttosto che lasciar credere che la questione sia risolta.
 
+Non tutti i destinatari indicati sopra sono nostri fornitori, e lo strumento che precede non li raggiunge tutti. **JVZoo decide da sé che cosa fa dei dati**: per la raccolta e la trasmissione della richiesta effettuata dalla nostra pagina siamo contitolari con JVZoo, e quella trasmissione non è retta né da un contratto di responsabile del trattamento né da clausole contrattuali standard. Nello Spazio economico europeo, nel Regno Unito, in Svizzera e in Canada, nonché ogni volta che non riusciamo a determinare da quale paese provenga la richiesta, la richiesta viene effettuata solo dopo che Lei ha accettato i cookie di marketing, e **quel Suo consenso è lo strumento**: l'articolo 49, paragrafo 1, lettera a), del GDPR consente un trasferimento verso un paese senza decisione di adeguatezza quando l'interessato ha prestato il proprio consenso esplicito dopo essere stato informato dei rischi. Il rischio è qui che il Suo indirizzo IP e l'identificativo del Suo browser giungano a una società stabilita negli Stati Uniti, dove la protezione del GDPR non si applica da sé. Se Lei non accetta i cookie di marketing, nulla viene loro trasmesso.
+
 Lei può chiederci su quale strumento ci fondiamo per un dato trasferimento, e Le risponderemo per iscritto indicando il fornitore e la base.
 
 ## Diritti dei residenti nello SEE, in Svizzera e nel Regno Unito
@@ -440,4 +442,4 @@ Se Lei ha domande sulla presente informativa sulla privacy, ci contatti:
 
 **Telefono:** 054-9489377
 
-Ultimo aggiornamento: 1 novembre 2026
+Ultimo aggiornamento: 5 novembre 2026

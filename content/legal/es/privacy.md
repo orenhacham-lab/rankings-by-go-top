@@ -3,7 +3,7 @@ title: Política de privacidad | Go Top SEO
 description: Política de privacidad de Go Top SEO: cómo recopilamos, utilizamos y protegemos sus datos.
 locale: es
 source: app/(public)/en/privacy/page.tsx
-lastUpdated: 2026-11-01
+lastUpdated: 2026-11-05
 register: usted
 ---
 
@@ -351,6 +351,8 @@ El servicio funciona sobre proveedores internacionales de nube e infraestructura
 
 Para los datos sobre residentes del Espacio Económico Europeo, Suiza o el Reino Unido: la Comisión Europea ha reconocido que Israel ofrece un nivel adecuado de protección, por lo que una transferencia hacia nosotros no requiere ningún instrumento adicional. Para las transferencias a proveedores fuera de la UE en países sin decisión de adecuación, nos basamos en las Cláusulas Contractuales Tipo de la Comisión Europea, dentro de los propios términos de esos proveedores.
 
+No todos los destinatarios indicados arriba son nuestros proveedores, y el instrumento anterior no alcanza a todos. **JVZoo decide por sí mismo qué hace con los datos**: respecto de la recogida y la transmisión de la solicitud realizada desde nuestra página somos corresponsables del tratamiento junto con JVZoo, y esa transmisión no se rige ni por un contrato de encargo del tratamiento ni por cláusulas contractuales tipo. En el Espacio Económico Europeo, el Reino Unido, Suiza y Canadá, y siempre que no podamos determinar de qué país proviene la solicitud, esta se realiza únicamente después de que usted haya aceptado las cookies de marketing, y **ese consentimiento suyo es el instrumento**: el artículo 49, apartado 1, letra a), del RGPD permite una transferencia a un país sin decisión de adecuación cuando el interesado ha consentido explícitamente después de haber sido informado de los riesgos. El riesgo aquí es que su dirección IP y el identificador de su navegador lleguen a una sociedad establecida en los Estados Unidos, donde la protección del RGPD no se aplica por sí sola. Si usted no acepta las cookies de marketing, nada se les transmite.
+
 Usted puede preguntarnos en qué instrumento nos basamos para una transferencia determinada, y le responderemos por escrito.
 
 ## Derechos de los residentes del EEE, Suiza y el Reino Unido
@@ -426,4 +428,4 @@ Si tiene preguntas sobre esta política de privacidad, contacte con:
 
 **Teléfono:** 054-9489377
 
-Esta política se actualizó por última vez el 1 de noviembre de 2026
+Esta política se actualizó por última vez el 5 de noviembre de 2026

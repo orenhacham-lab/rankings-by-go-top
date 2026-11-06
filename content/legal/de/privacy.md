@@ -3,7 +3,7 @@ title: Datenschutzerklärung | Go Top SEO
 description: Datenschutzerklärung von Go Top SEO: wie wir Ihre Daten erheben, nutzen und schützen.
 locale: de
 source: app/(public)/en/privacy/page.tsx
-lastUpdated: 2026-11-04
+lastUpdated: 2026-11-05
 register: sie
 extraSections: 1
 extraReason: One extra section, "Rechte von Personen in Deutschland und in der Europäischen Union (DSGVO)", placed beside the existing EEA/UK and United States rights sections, because German readers are owed the one-month deadline of Art. 12(3), the data protection authority of their own Land as their supervisory authority, the Bundesdatenschutzgesetz as the national law that completes the DSGVO in Germany, and a plain statement about the data protection officer we have not appointed — which in Germany turns on § 38 BDSG, a stricter threshold than Art. 37 DSGVO, and so cannot simply be translated from the Italian document. § 25 TDDDG replaces the generic reference to the ePrivacy rules wherever consent for storage on the device is named. What the DSGVO adds elsewhere stays inside the sections it belongs to — the legal bases of Art. 6 and the international-transfer rule of Chapter V. The French document carries a second extra section for Quebec (Law 25), which is a different statute reached through the French language and has no German counterpart.
@@ -357,6 +357,8 @@ Für Daten von Personen im Europäischen Wirtschaftsraum, in der Schweiz oder im
 
 Für Übermittlungen an Anbieter, die außerhalb der Union in Ländern ohne Angemessenheitsbeschluss ansässig sind, stützen wir uns auf die Standardvertragsklauseln der Europäischen Kommission, in den Bedingungen zur Datenverarbeitung dieser Anbieter. **Wir behaupten hier nicht, mit jedem unserer Auftragsverarbeiter Standardvertragsklauseln unterzeichnet zu haben.** Was wir zum Datum dieser Erklärung genau sagen können: wir haben mit PDFShift einen Auftragsverarbeitungsvertrag nach Artikel 28 DSGVO, beschrieben im Abschnitt „Umwandlung eines Berichts in ein PDF“; für Vercel, Supabase, Google, Resend, Meta und Shopify stützen wir uns auf die Anhänge zur Datenverarbeitung und die Standardklauseln, die diese Anbieter in ihre Bedingungen aufnehmen und die wir angenommen haben; und **mit Serper, ScrapeLLM, von PDFShift abgesehen, und dem Dienst Nominatim von OpenStreetMap haben wir keine verhandelten Standardvertragsklauseln unterzeichnet** — die Nutzung stützt sich dort auf die öffentlichen Bedingungen des Anbieters, und die vertragliche Arbeit läuft. Wir sagen das lieber, als den Eindruck zu lassen, die Frage sei geklärt.
 
+Nicht jeder oben genannte Empfänger ist unser Anbieter, und das vorstehende Instrument reicht nicht an alle heran. **JVZoo entscheidet selbst, was es mit den Daten tut**: für die Erhebung und die Übermittlung der Anfrage, die von unserer Seite aus gestellt wird, sind wir mit JVZoo gemeinsam Verantwortlicher, und für diese Übermittlung gilt weder ein Auftragsverarbeitungsvertrag noch gelten Standardvertragsklauseln. Im Europäischen Wirtschaftsraum, im Vereinigten Königreich, in der Schweiz und in Kanada, und immer dann, wenn wir das Land der Anfrage nicht bestimmen können, wird die Anfrage erst gestellt, nachdem Sie Marketing-Cookies angenommen haben, und **diese Einwilligung ist das Instrument**: Artikel 49 Absatz 1 Buchstabe a DSGVO erlaubt eine Übermittlung in ein Land ohne Angemessenheitsbeschluss, wenn die betroffene Person ausdrücklich eingewilligt hat, nachdem sie über die Risiken unterrichtet wurde. Das Risiko hier ist, dass Ihre IP-Adresse und Ihre Browser-Kennung ein Unternehmen in den Vereinigten Staaten erreichen, wo der Schutz der DSGVO nicht von selbst gilt. Nehmen Sie Marketing-Cookies nicht an, so wird nichts an sie übermittelt.
+
 Sie können uns fragen, auf welches Instrument wir uns für eine bestimmte Übermittlung stützen, und wir antworten Ihnen schriftlich und nennen den Anbieter und die Grundlage.
 
 ## Rechte von Personen im EWR, in der Schweiz und im Vereinigten Königreich
@@ -444,4 +446,4 @@ Wenn Sie Fragen zu dieser Datenschutzerklärung haben, wenden Sie sich an uns:
 
 **Telefon:** +972-54-9489377
 
-Letzte Aktualisierung: 4. November 2026
+Letzte Aktualisierung: 5. November 2026

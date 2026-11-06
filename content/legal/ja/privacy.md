@@ -3,7 +3,7 @@ title: プライバシーポリシー | Go Top SEO
 description: Go Top SEO のプライバシーポリシー。お客様のデータをどのように取得し、利用し、保護するかについて。
 locale: ja
 source: app/(public)/en/privacy/page.tsx
-lastUpdated: 2026-11-01
+lastUpdated: 2026-11-05
 register: desumasu
 extraSections: 1
 extraReason: One extra section, "日本の居住者の権利（個人情報保護法）", placed beside the existing EEA/UK and United States rights sections, because a Japanese reader is owed the publication items of Article 32 of the Act on the Protection of Personal Information, the disclosure, correction and cease-of-use procedures of Articles 33 to 35, the rule of Article 28 on providing data to a third party in a foreign country, the complaint desk, and a plain statement that no personal information protection officer is appointed. What the Act adds elsewhere stays inside the sections it belongs to - the purposes of use in "お客様のデータの利用方法" and the international-transfer rule in "国際的な移転". The Italian document carries its extra section for the GDPR, which is a different statute reached through a different language and has no Japanese counterpart, so it is not translated into a jurisdiction it does not govern.
@@ -357,6 +357,8 @@ WhatsApp の利用は、WhatsApp および Meta の利用規約とプライバ�
 
 十分性認定のない国に所在する提供事業者への移転については、当社は、それらの提供事業者自身のデータ処理の条件に含まれる欧州委員会の標準契約条項に依拠しています。**当社は、すべての処理者と標準契約条項を締結していると主張するものではありません。** 本ポリシーの日付の時点で正確に申し上げられるのは次のことです。PDFShift とは第28条に基づくデータ処理の取り決めがあり、「レポートの PDF への変換」の条に記載しています。Vercel、Supabase、Google、Resend、Meta および Shopify については、それらの提供事業者が自らの規約に組み込み、当社が同意したデータ処理の付属文書と標準条項に依拠しています。そして **Serper、ScrapeLLM、別枠の PDFShift、および OpenStreetMap の Nominatim のサービスとは、交渉のうえ署名した標準契約条項はありません。** これらについての利用は提供事業者の公開の条件に基づいており、契約の作業は進行中です。解決済みであるかのように思わせるよりも、申し上げる方を選びます。
 
+上記の受領者のすべてが当社の提供事業者であるわけではなく、前記の措置はそのすべてに及ぶものではありません。**JVZoo は、データをどう扱うかを自ら決めます。**当社のページから行われる読み込みの取得および送信について、当社は JVZoo と共同の管理者であり、その送信には処理者契約も標準契約条項も適用されません。欧州経済領域、英国、スイスおよびカナダ、ならびに当社がどの国からの送信かを判定できなかった場合には、お客様がマーケティングの Cookie に同意された後にのみ読み込みが行われ、**その同意こそがその措置です。**GDPR 第49条第1項(a)は、十分性認定のない国への移転を、データ主体がリスクについて知らされた上で明確に同意した場合に認めています。ここでのリスクは、お客様の IP アドレスとブラウザの識別子が米国に所在する会社に届くこと、そして米国では GDPR の保護がそれ自体として及ばないことです。マーケティングの Cookie に同意されない場合、同社には何も送信されません。
+
 ある移転についてどの措置に依拠しているかは、お尋ねいただければ、提供事業者とその根拠を書面でお答えします。
 
 ## 欧州経済領域、スイスおよび英国の居住者の権利
@@ -462,4 +464,4 @@ WhatsApp の利用は、WhatsApp および Meta の利用規約とプライバ�
 
 **電話：** +972-54-9489377
 
-最終更新：2026年11月1日
+最終更新：2026年11月5日
