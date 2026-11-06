@@ -271,6 +271,23 @@ const LAW: Record<string, { doc: Doc; name: string; must: RegExp }[]> = {
     { doc: 'privacy', name: 'and the no-configuration-change condition of ust. 1 pkt 3', must: /art\. 399 ust\. 1 pkt 3/i },
     { doc: 'privacy', name: 'and rests the necessary cookies on ust. 3 pkt 2, not on ust. 3 flatly', must: /art\. 399 ust\. 3 pkt 2/i },
     { doc: 'privacy', name: 'and names art. 400, which makes the RODO consent standard the standard here', must: /art\. 400/ },
+    /* Art. 399 ust. 2 PKE lets device settings express consent, which is a Polish
+     * peculiarity. It is not a route OUT: our own consent record is what the
+     * marketing gate and the Meta server-side report read, so a browser block
+     * stops nothing we decide. The document must say that in those words. */
+    { doc: 'privacy', name: 'and says a browser block is not a withdrawal of consent with us',
+      must: /nie jest jednak wycofaniem zgody u nas/ },
+    /* Transfers: JVZoo is a joint controller, not a provider, so the SCC sentence
+     * never reached it. The instrument is the visitor's own consent, art. 49
+     * ust. 1 lit. a RODO, and the risk it is consent TO must be named. */
+    { doc: 'privacy', name: 'the transfers section says the SCC instrument does not reach every recipient',
+      must: /Nie ka[żz]dy wymieniony powy[żz]ej odbiorca jest naszym dostawc[ąa]/ },
+    { doc: 'privacy', name: 'and that that transmission has no processing agreement and no SCCs',
+      must: /nie stosuje si[ęe] ani umowy powierzenia przetwarzania,\s*ani standardowych klauzul umownych/ },
+    { doc: 'privacy', name: 'and names the consent as the instrument, with art. 49 ust. 1 lit. a',
+      must: /ta Pa[ńn]stwa zgoda jest tym instrumentem[\s\S]{0,160}art\. 49 ust\. 1 lit\. a RODO/ },
+    { doc: 'privacy', name: 'and states the risk that consent is consent to',
+      must: /docieraj[ąa] do sp[óo][łl]ki w Stanach Zjednoczonych/ },
     { doc: 'refund-policy', name: 'the model withdrawal form of załącznik nr 2, offered on request', must: /za[łl][ąa]cznika nr 2 do tej ustawy/ },
     { doc: 'refund-policy', name: 'the price law that is why no złoty figure is shown', must: /ustawy o informowaniu o cenach towar[óo]w i us[łl]ug/ },
     { doc: 'terms', name: 'the same withdrawal right in the terms', must: /art\. 27 ustawy z dnia 30 maja 2014 r\. o prawach konsumenta/i },
@@ -4803,6 +4820,16 @@ const PHOTO_IN_RETENTION: Record<string, RegExp> = {
     !law('privacy', 'Prezesa Urz').must.test('Skargę można złożyć do europejskiego organu nadzorczego.'))
   check('mutation control (pl): a transfers section that claims SCCs with everyone is caught',
     !law('privacy', 'Nie twierdzimy tutaj').must.test('Z każdym podmiotem przetwarzającym podpisaliśmy standardowe klauzule umowne.'))
+  check('mutation control (pl): a banner sentence that offers the browser as a route out is caught',
+    !law('privacy', 'wycofaniem zgody u nas').must.test('Zgodę mogą Państwo wycofać także przez zablokowanie plików cookie w przeglądarce.'))
+  check('mutation control (pl): a transfers section that treats every recipient as a provider is caught',
+    !law('privacy', 'wymieniony powy').must.test('Dla przekazań do dostawców opieramy się na standardowych klauzulach umownych.'))
+  check('mutation control (pl): a joint-controller transmission left under the SCC sentence is caught',
+    !law('privacy', 'nie stosuje si').must.test('Do tego przekazania stosujemy standardowe klauzule umowne JVZoo.'))
+  check('mutation control (pl): consent named as the instrument without its article is caught',
+    !law('privacy', 'tym instrumentem').must.test('Ta Państwa zgoda jest tym instrumentem, i na niej się opieramy.'))
+  check('mutation control (pl): a derogation paragraph that never names the risk is caught',
+    !law('privacy', 'Stanach Zjednoczonych').must.test('Ryzyko polega na tym, że dane docierają do państwa trzeciego.'))
   check('mutation control (pl): an accessibility statement that claims conformance with the Polish act is caught',
     !law('accessibility', 'wiadczamy zgodno').must.test('Oświadczamy zgodność z ustawą o dostępności cyfrowej.'))
   check('mutation control (pl): a partner agreement with no kryptoreklama rule is caught',

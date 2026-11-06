@@ -243,6 +243,17 @@ console.log('\nC) one gate, and it decides every outward sign')
       /ustawieni\p{L}+ (?:swojej )?przegl\p{L}+/iu.test(getPublicDictionary('pl').cookie.withdrawHint))
     check('C5a-MUT: a notice that only names our own settings link is caught',
       !/ustawieni\p{L}+ (?:swojej )?przegl\p{L}+/iu.test('Aby zmienić zgodę, na dole strony jest link „Ustawienia plików cookie”.'))
+    /* Art. 399 ust. 2 PKE lets device settings express CONSENT in Poland, which
+     * no other locale of ours has. It says nothing about taking consent back:
+     * our marketing gate and the Meta server-side report read our own consent
+     * record, so a browser block stops nothing we decide. The banner must name
+     * the browser as control over storage and say so in the same breath. */
+    check('C5b: the Polish notice says a browser block does not replace withdrawing consent with us',
+      /blokada w przegl\p{L}+ nie zast\p{L}+ jednak wycofania zgody u nas/u
+        .test(getPublicDictionary('pl').cookie.withdrawHint))
+    check('C5b-MUT: a notice that offers the browser as a route out is caught',
+      !/blokada w przegl\p{L}+ nie zast\p{L}+ jednak wycofania zgody u nas/u
+        .test('Zgodę mogą Państwo wycofać także w ustawieniach swojej przeglądarki.'))
     check('C6: a Polish path is a Polish document',
       isPolishPath('/pl/pricing') && routePublicLocale('/pl/pricing') === 'pl'
       && resolveAuthLocale({ pathname: '/pl/login' }) === 'pl')

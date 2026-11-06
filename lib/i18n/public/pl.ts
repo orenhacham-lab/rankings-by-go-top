@@ -259,7 +259,7 @@ export const pl = {
     settingsTitle: 'Wybór plików cookie',
     settingsIntro: 'Każdą kategorię można zaakceptować albo odrzucić osobno, a wybór zmienić w dowolnej chwili.',
     always: 'Zawsze aktywne',
-    withdrawHint: 'Aby w dowolnej chwili zmienić albo wycofać zgodę, na dole każdej strony znajduje się link „Ustawienia plików cookie”. Warunki przechowywania i odczytu mogą Państwo określić także samodzielnie, w ustawieniach swojej przeglądarki.',
+    withdrawHint: 'Aby w dowolnej chwili zmienić albo wycofać zgodę, na dole każdej strony znajduje się link „Ustawienia plików cookie”. Warunki przechowywania i odczytu na swoim urządzeniu mogą Państwo określić także samodzielnie, w ustawieniach swojej przeglądarki; sama blokada w przeglądarce nie zastępuje jednak wycofania zgody u nas.',
     gpcTitle: 'Zgoda odrzucona automatycznie',
     gpcBody: 'Państwa przeglądarka wysyła sygnał Global Privacy Control, dlatego nie wczytaliśmy żadnych plików cookie do pomiaru ani do marketingu. Państwa wybór został zapisany.',
     categories: {

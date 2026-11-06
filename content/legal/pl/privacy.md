@@ -3,7 +3,7 @@ title: Polityka prywatności | Go Top SEO
 description: "Polityka prywatności Go Top SEO: jak zbieramy, wykorzystujemy i chronimy Państwa dane."
 locale: pl
 source: app/(public)/en/privacy/page.tsx
-lastUpdated: 2026-11-05
+lastUpdated: 2026-11-06
 register: panstwo
 extraSections: 1
 extraReason: One extra section, "Prawa osób w Polsce i w Unii Europejskiej (RODO)", placed beside the existing EEA/UK and United States rights sections, because Polish readers are owed the one-month deadline of Art. 12(3), the Prezes Urzędu Ochrony Danych Osobowych as their supervisory authority, the ustawa z dnia 10 maja 2018 r. o ochronie danych osobowych as the national law that completes RODO in Poland, and a plain statement about the data protection officer we have not appointed. On that last point Poland is like the Netherlands and unlike Germany: § 38 BDSG adds a headcount threshold stricter than Art. 37 RODO, while the Polish act adds no such threshold, so this document says the duty here follows Art. 37 RODO alone and must not be copied from the German one. The Prawo komunikacji elektronicznej replaces the generic reference to the ePrivacy rules wherever consent for storage on the device is named, and RODO is used throughout because that is the name Polish law and Polish readers give the GDPR. What RODO adds elsewhere stays inside the sections it belongs to — the legal bases of Art. 6 and the international-transfer rule of Chapter V. The French document carries a second extra section for Quebec (Law 25), which is a different statute reached through the French language and has no Polish counterpart.
@@ -263,7 +263,7 @@ Dzielimy pliki cookie na trzy kategorie i przy dwóch z nich o coś Państwa pyt
 
 **Przed Państwa wyborem nie jest umieszczany żaden plik cookie pomiarowy ani marketingowy, i żadne żądanie nie idzie do serwerów Google.** Przyjęcie i odrzucenie to dwa jednakowo zaprojektowane przyciski na pasku, a każdą kategorię można dopuścić osobno. Jest jeden wyjątek: na stronie sprzedaży serwisu JVZoo, i tylko dla odwiedzających spoza obszarów wymienionych w części „Usługi pomiaru i marketingu”, piksel liczący serwisu i umieszczane przez niego pliki cookie są ładowane razem ze stroną.
 
-**Zmiana albo wycofanie Państwa zgody:** w każdej chwili przez link „Ustawienia plików cookie” w stopce każdej strony. Wycofanie zgody jest tak samo łatwe jak jej udzielenie i nic Państwa w usłudze nie kosztuje.
+**Zmiana albo wycofanie Państwa zgody:** w każdej chwili przez link „Ustawienia plików cookie” w stopce każdej strony. Wycofanie zgody jest tak samo łatwe jak jej udzielenie i nic Państwa w usłudze nie kosztuje. Niezależnie od tego warunki przechowywania i odczytu na swoim urządzeniu mogą Państwo określić w ustawieniach swojej przeglądarki, i o tej możliwości mówi Państwu nasz komunikat; **sama blokada albo usunięcie plików cookie w przeglądarce nie jest jednak wycofaniem zgody u nas**, bo tym, czy ładujemy pomiar i marketing i czy przesyłamy zgłoszenie konwersji do Meta, kieruje wyłącznie Państwa wybór zapisany pod tym linkiem. Dlatego wycofanie zgody działa pewnie tylko tam.
 
 **Program partnerski:** on nie umieszcza pliku cookie. Jeśli Państwo przyjdą na witrynę przez link partnera, kod tego partnera podróżuje w samym linku, a na Państwa urządzeniu nic nie jest zapisywane. Dlatego program nie występuje w kategoriach powyżej, i dlatego Państwa wybór na tym pasku mu nie pomaga ani nie przeszkadza. Plik cookie przechowujący kod partnera nie jest niezbędny do działania witryny, więc do jego umieszczenia potrzebowalibyśmy Państwa zgody: wybraliśmy, żeby jej nie potrzebować. To, co jest zapisywane przy kliknięciu, jest liczeniem: jeden więcej w dziennej sumie tego partnera, bez żadnej danej o Państwu.
 
@@ -357,6 +357,8 @@ Dla danych osób w Europejskim Obszarze Gospodarczym, w Szwajcarii albo w Zjedno
 
 Dla przekazań do dostawców mających siedzibę poza Unią w państwach bez decyzji o adekwatności opieramy się na standardowych klauzulach umownych Komisji Europejskiej, zawartych w warunkach przetwarzania danych tych dostawców. **Nie twierdzimy tutaj, że z każdym z naszych podmiotów przetwarzających podpisaliśmy standardowe klauzule umowne.** Co dokładnie możemy powiedzieć w dniu tej polityki: z PDFShift mamy umowę powierzenia przetwarzania zgodnie z art. 28 RODO, opisaną w części „Zamiana raportu w plik PDF”; dla Vercel, Supabase, Google, Resend, Meta i Shopify opieramy się na załącznikach o przetwarzaniu danych i na standardowych klauzulach, które ci dostawcy zawierają w swoich warunkach i które przyjęliśmy; a **z Serper, ze ScrapeLLM, z wyjątkiem PDFShift, i z usługą Nominatim OpenStreetMap nie podpisaliśmy wynegocjowanych standardowych klauzul umownych** — korzystanie opiera się tam na publicznych warunkach dostawcy, a praca nad umowami trwa. Wolimy to powiedzieć, niż zostawić wrażenie, że sprawa jest zamknięta.
 
+Nie każdy wymieniony powyżej odbiorca jest naszym dostawcą, i instrument opisany powyżej nie obejmuje wszystkich. **JVZoo sam decyduje, co robi z danymi**: dla zbierania i przekazywania żądania, które jest wykonywane z naszej strony, jesteśmy współadministratorem razem z JVZoo, a do tego przekazania nie stosuje się ani umowy powierzenia przetwarzania, ani standardowych klauzul umownych. W Europejskim Obszarze Gospodarczym, w Zjednoczonym Królestwie, w Szwajcarii i w Kanadzie, a także zawsze wtedy, gdy nie możemy ustalić kraju, z którego przychodzi żądanie, żądanie jest wykonywane dopiero po przyjęciu przez Państwa plików cookie marketingowych, i **ta Państwa zgoda jest tym instrumentem**: art. 49 ust. 1 lit. a RODO pozwala na przekazanie do państwa bez decyzji o adekwatności, gdy osoba, której dane dotyczą, wyraźnie na to zgodę wyraziła, po uprzednim poinformowaniu jej o ryzyku. Ryzyko polega tutaj na tym, że Państwa adres IP i kod wyróżniający Państwa przeglądarki docierają do spółki w Stanach Zjednoczonych, gdzie ochrona RODO sama z siebie nie obowiązuje. Jeśli Państwo nie przyjmą plików cookie marketingowych, nic do niej nie jest przekazywane.
+
 Mogą Państwo zapytać nas, na jakim instrumencie opieramy określone przekazanie, a my odpowiemy na piśmie i podamy dostawcę i podstawę.
 
 ## Prawa osób w EOG, w Szwajcarii i w Zjednoczonym Królestwie
@@ -443,4 +445,4 @@ Jeśli mają Państwo pytania o tę politykę prywatności, prosimy się z nami 
 
 **Telefon:** +972-54-9489377
 
-Ostatnia aktualizacja: 5 listopada 2026
+Ostatnia aktualizacja: 6 listopada 2026
