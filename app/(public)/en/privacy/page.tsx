@@ -684,7 +684,10 @@ export default function EnglishPrivacyPage() {
         <p className="mt-4">
           <strong>Changing or withdrawing your consent:</strong> at any time, through the
           &ldquo;Cookie settings&rdquo; link at the bottom of every page. Withdrawing is exactly as
-          easy as giving consent, and costs you nothing in the service.
+          easy as giving consent, and costs you nothing in the service. You can also set the conditions
+          of storage and reading on your own device yourself, in your browser settings; a block in the
+          browser alone is not a withdrawal of consent with us, because our marketing gate and the report
+          we send Meta from our server read only our own record of consents.
         </p>
         <p className="mt-3">
             <strong>The partner program:</strong> it sets no cookie at all. If you reach the site through a
