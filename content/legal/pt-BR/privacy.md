@@ -3,7 +3,7 @@ title: Política de Privacidade | Go Top SEO
 description: Política de privacidade do Go Top SEO.
 locale: pt-BR
 source: app/(public)/en/privacy/page.tsx
-lastUpdated: 2026-11-01
+lastUpdated: 2026-11-06
 register: voce
 extraSections: 1
 extraReason: One extra section, "Direitos de residentes no Brasil (LGPD)", placed beside the existing EEA/UK and United States rights sections, because the LGPD gives a different set of rights with a different deadline and a different authority to complain to. What the LGPD adds elsewhere goes inside the sections it belongs to - the legal bases of Art. 7, the international-transfer rule of Art. 33, and the communication channel that stands in for an appointed officer.
@@ -341,6 +341,7 @@ Guardamos os dados apenas pelo tempo necessário à finalidade da coleta:
 - **Verificação gratuita do site:** em cache por até 24 horas e então apagada, se nenhuma conta tiver sido aberta a partir dela.
 - **Registro das decisões de cookies:** até três anos a contar da decisão, para que possamos demonstrar o que você escolheu. Essa é a base legal da guarda, e é por isso que ele não é apagado junto com a conta.
 - **Foto de autor:** enquanto a foto estiver configurada no projeto. Apagá-la, ou passar para nenhuma foto ou para o ícone do site, exclui o arquivo imediatamente. Uma cópia já colocada no seu site permanece lá até que você a exclua.
+- **Dados de uma inscrição de parceiro:** 12 meses a contar da inscrição. Uma inscrição recusada é depois excluída por inteiro e, em qualquer outro caso, o endereço IP de onde a inscrição veio é depois apagado. Esse endereço é registrado apenas para distinguir uma enxurrada de inscrições inventadas de uma agência real e para manter o limite de três inscrições por hora. O registro das indicações, das comissões e dos pagamentos é a nossa contabilidade e permanece pelo prazo em que a lei nos obriga a guardar os livros.
 - **Logs de segurança e de servidor:** até 90 dias.
 
 ## Transferências internacionais
@@ -445,4 +446,4 @@ Se você tiver dúvidas sobre esta política de privacidade, fale com a gente:
 
 **Telefone:** [054-9489377](tel:0549489377)
 
-Esta política foi atualizada pela última vez em 1º de novembro de 2026
+Esta política foi atualizada pela última vez em 6 de novembro de 2026

@@ -872,6 +872,12 @@ export default function EnglishPrivacyPage() {
           <li><strong>Author photo:</strong> for as long as the photo is configured on the project.
           Deleting it, or switching to no photo or to the site icon, erases the file immediately. A copy
           already placed on your site stays there until you delete it.</li>
+          <li><strong>Partner application data:</strong> 12 months from the application. A rejected
+          application is then deleted in full, and in every other case the IP address the application
+          arrived from is then erased. That address is recorded only to tell a swarm of invented
+          applications from a real agency, and to hold the limit of three applications an hour. The
+          record of referrals, commissions and payouts is our bookkeeping and stays for the period the
+          law requires us to keep the books.</li>
           <li><strong>Security and server logs:</strong> up to 90 days.</li>
         </ul>
       </section>
@@ -1100,7 +1106,7 @@ export default function EnglishPrivacyPage() {
 
       <section>
         <p className={LEGAL_FOOTNOTE}>
-          This policy was last updated on November 1, 2026
+          This policy was last updated on November 6, 2026
         </p>
       </section>
     </LegalDoc>

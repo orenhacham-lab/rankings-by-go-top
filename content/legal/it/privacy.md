@@ -3,7 +3,7 @@ title: Informativa sulla privacy | Go Top SEO
 description: Informativa sulla privacy di Go Top SEO: come raccogliamo, utilizziamo e proteggiamo i Suoi dati.
 locale: it
 source: app/(public)/en/privacy/page.tsx
-lastUpdated: 2026-11-01
+lastUpdated: 2026-11-06
 register: lei
 extraSections: 1
 extraReason: One extra section, "Diritti dei residenti in Italia e nell'Unione europea (GDPR)", placed beside the existing EEA/UK and United States rights sections, because Italian readers are owed the one-month deadline of Art. 12(3), the Garante per la protezione dei dati personali as their own supervisory authority, the Codice in materia di protezione dei dati personali as the national law that completes the GDPR in Italy, and a plain statement about the officer and the representative we have not appointed. What the GDPR adds elsewhere stays inside the sections it belongs to - the legal bases of Art. 6 and the international-transfer rule of Chapter V. The French document carries a second extra section for Quebec (Law 25), which is a different statute reached through the French language and has no Italian counterpart: an Italian reader is governed by the GDPR and by Italian law, so that section is not translated into a jurisdiction it does not apply to.
@@ -345,6 +345,7 @@ Conserviamo i dati unicamente per il tempo necessario alla finalità per la qual
 - **Verifica gratuita del sito:** conservata in cache fino a 24 ore, poi eliminata se da essa non è stato aperto alcun account.
 - **Registro delle decisioni sui cookie:** fino a tre anni dalla decisione, perché possiamo provare quello che Lei ha scelto. È questa la base giuridica della sua conservazione, ed è per questo che non è eliminato insieme all'account.
 - **Foto dell'autore:** per tutto il tempo in cui la foto è configurata sul progetto. Cancellandola, o passando a nessuna foto o all'icona del sito, il file è eliminato immediatamente. Una copia già collocata sul Suo sito vi resta fino a quando Lei la cancella.
+- **Dati di una domanda di partner:** 12 mesi dalla domanda. Una domanda rifiutata è poi cancellata per intero, e in ogni altro caso l'indirizzo IP dal quale la domanda è arrivata è poi eliminato. Quell'indirizzo è registrato unicamente per distinguere uno sciame di domande inventate da una vera agenzia e per tenere il limite di tre domande per ora. La registrazione delle segnalazioni, delle commissioni e dei pagamenti è la nostra contabilità e resta per il periodo durante il quale la legge ci obbliga a conservare le scritture.
 - **Registri di sicurezza e del server:** fino a 90 giorni.
 
 ## Trasferimenti internazionali
@@ -440,4 +441,4 @@ Se Lei ha domande sulla presente informativa sulla privacy, ci contatti:
 
 **Telefono:** 054-9489377
 
-Ultimo aggiornamento: 1 novembre 2026
+Ultimo aggiornamento: 6 novembre 2026
