@@ -4501,6 +4501,116 @@ const PHOTO_IN_RETENTION: Record<string, RegExp> = {
     'x'.concat(text.ja!.privacy).split(/メールでの連絡/).length > 1)
 }
 
+/**
+ * THE INTRO'S "SECTIONS 15A TO 15H" MUST NAME THE SECTIONS THE DOCUMENT HAS.
+ *
+ * Every terms document opens by telling the reader that the service includes
+ * the site analysis, the account connections, the site fixes and the AI
+ * content "as described in sections 15A to 15H". That range is a promise about
+ * the document's own shape, and it is correct in all nine today. Nothing stops
+ * it drifting: the next feature that earns a section becomes 15I, eight
+ * documents gain a heading, and nine intros go on saying the list ends at 15H.
+ * A reader is then told the AI-content terms are inside a range that excludes
+ * them, which is the kind of error that is invisible on a read-through and
+ * obvious to anyone who follows the reference.
+ *
+ * The check reads BOTH ENDS out of the document rather than pinning the letter
+ * H: it collects the 15-suffix headings the document actually carries, and
+ * compares the range expression's two ends against the first and last of them.
+ * So adding 15I passes the moment every intro is updated, and fails until then,
+ * which is the whole point.
+ *
+ * Two alphabets, because Hebrew numbers its sub-sections in Hebrew letters
+ * (15א to 15ח) and the other eight in Latin (15A to 15H). The range expression
+ * itself is matched language-agnostically — "to", "bis", "à", "a", "tot en
+ * met", 「から第」 — as the two section labels with a short run of connecting
+ * text between them.
+ *
+ * It also checks the set is CONTIGUOUS from its first label. A range claim over
+ * a gapped set (15A, 15B, 15D described as "15A to 15D") is false in a second
+ * way that comparing only the two ends would not catch.
+ */
+{
+  const read = (path: string) => (existsSync(path) ? readFileSync(path, 'utf8') : '')
+  const enTermsSource = frontMatter(text[LOCALES[0]].terms).source
+  const termsDocs: [string, string][] = [
+    ['he', read(HEBREW_TERMS)],
+    ['en', enTermsSource ? read(enTermsSource) : ''],
+    ...LOCALES.map((l): [string, string] => [l, text[l].terms]),
+  ]
+
+  const LATIN = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'
+  const HEBREW = 'אבגדהוזחטיכלמנסעפצקרשת'
+  const alphabetFor = (locale: string) => (locale === 'he' ? HEBREW : LATIN)
+
+  for (const [name, terms] of termsDocs) {
+    if (!terms) { check(`${name}/terms: document is readable`, false); continue }
+    const alphabet = alphabetFor(name)
+    const suffixClass = name === 'he' ? '[\\u05d0-\\u05ea]' : '[A-Z]'
+
+    // The sub-section headings the document actually carries, in alphabet order.
+    const headings = [...terms.matchAll(new RegExp(`(?:^##\\s*|<h2>)15(${suffixClass})\\.`, 'gm'))]
+      .map((m) => m[1]!)
+    const present = [...new Set(headings)].sort((a, b) => alphabet.indexOf(a) - alphabet.indexOf(b))
+    check(`${name}/terms: carries a run of 15-suffix sections`, present.length >= 2,
+      `found ${present.length}`)
+    if (present.length < 2) continue
+
+    const first = present[0]!
+    const last = present[present.length - 1]!
+    const startAt = alphabet.indexOf(first)
+    const expected = alphabet.slice(startAt, startAt + present.length).split('')
+    check(`${name}/terms: the 15-suffix sections run without a gap (15${first} to 15${last})`,
+      present.join('') === expected.join(''), `found ${present.join(',')}`)
+
+    // The intro's range expression: the two labels with connecting words between.
+    const range = new RegExp(`15(${suffixClass})[^.]{1,40}?15(${suffixClass})`).exec(terms)
+    check(`${name}/terms: the intro states a range of 15-suffix sections`, range !== null)
+    if (!range) continue
+    check(`${name}/terms: the range starts at the first section the document has (15${first})`,
+      range[1] === first, `intro says 15${range[1]}`)
+    check(`${name}/terms: the range ends at the last section the document has (15${last})`,
+      range[2] === last, `intro says 15${range[2]}, document ends at 15${last}`)
+  }
+
+  // MUTATION CONTROLS, against the real documents.
+  {
+    const en = enTermsSource ? read(enTermsSource) : ''
+    const de = text.de ? text.de.terms : ''
+    const he = read(HEBREW_TERMS)
+    const endOf = (doc: string, suffixClass: string) => {
+      const r = new RegExp(`15(${suffixClass})[^.]{1,40}?15(${suffixClass})`).exec(doc)
+      return r ? r[2]! : null
+    }
+    if (en) {
+      // A ninth section added to the body and not to the intro must be caught.
+      const grown = en.replace('<h2>15H.', '<h2>15I. Something new</h2>\n        <h2>15H.')
+      const present = [...new Set([...grown.matchAll(/<h2>15([A-Z])\./g)].map((m) => m[1]!))]
+        .sort((a, b) => LATIN.indexOf(a) - LATIN.indexOf(b))
+      check('mutation control (en): a 15I added to the body with the intro left at 15H is caught',
+        endOf(grown, '[A-Z]') !== present[present.length - 1])
+    }
+    if (de) {
+      // An intro that overstates the range must be caught.
+      const overstated = de.replace('15A bis 15H', '15A bis 15J')
+      const present = [...new Set([...overstated.matchAll(/^##\s*15([A-Z])\./gm)].map((m) => m[1]!))]
+        .sort((a, b) => LATIN.indexOf(a) - LATIN.indexOf(b))
+      check('mutation control (de): an intro claiming 15J over a document ending at 15H is caught',
+        endOf(overstated, '[A-Z]') !== present[present.length - 1])
+    }
+    if (he) {
+      // A gap in the run must be caught even when both ends still match.
+      const gapped = he.replace('<h2>15ג.', '<h2>15ט.')
+      const present = [...new Set([...gapped.matchAll(/<h2>15([א-ת])\./g)].map((m) => m[1]!))]
+        .sort((a, b) => HEBREW.indexOf(a) - HEBREW.indexOf(b))
+      const startAt = HEBREW.indexOf(present[0]!)
+      const expected = HEBREW.slice(startAt, startAt + present.length).split('')
+      check('mutation control (he): a gap in the 15-suffix run is caught',
+        present.join('') !== expected.join(''))
+    }
+  }
+}
+
 console.log(`\n${pass} passed, ${fail} failed`)
 if (fail > 0) process.exit(1)
 
