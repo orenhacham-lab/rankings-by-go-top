@@ -3,7 +3,7 @@ title: Política de Privacidade | Go Top SEO
 description: Política de privacidade do Go Top SEO.
 locale: pt-BR
 source: app/(public)/en/privacy/page.tsx
-lastUpdated: 2026-11-01
+lastUpdated: 2026-11-06
 register: voce
 extraSections: 1
 extraReason: One extra section, "Direitos de residentes no Brasil (LGPD)", placed beside the existing EEA/UK and United States rights sections, because the LGPD gives a different set of rights with a different deadline and a different authority to complain to. What the LGPD adds elsewhere goes inside the sections it belongs to - the legal bases of Art. 7, the international-transfer rule of Art. 33, and the communication channel that stands in for an appointed officer.
@@ -65,6 +65,7 @@ Não compartilhamos as suas informações pessoais com terceiros, exceto:
 - **ScrapeLLM:** para o acompanhamento de visibilidade em IA — veja «Provedores de IA» abaixo
 - **Outros sites da rede de links:** somente se você entrou na rede — veja «Rede de links» abaixo
 - **JVZoo:** somente se você abriu a nossa página de venda do marketplace JVZoo — uma imagem de rastreamento é carregada da JVZoo e recebe o seu endereço IP, o identificador do seu navegador e a página de onde você veio, para que uma compra possa ser atribuída ao afiliado que indicou você. Essa requisição também guarda no seu dispositivo cookies próprios da JVZoo, por isso ela depende de consentimento onde a lei exige consentimento para esse armazenamento: no Espaço Econômico Europeu, no Reino Unido, na Suíça e no Canadá, e sempre que não conseguirmos determinar de qual país veio a requisição, a imagem é carregada apenas depois de você aceitar os cookies de marketing; fora desses territórios ela é carregada quando a página abre. Quanto a essa coleta e a essa transmissão, a JVZoo não trata os dados em nosso nome: ela é controladora conjunta junto com a gente, e o que ela faz com os dados depois é decidido pela JVZoo conforme a sua própria política de privacidade
+- **Digistore24:** somente se você abriu a nossa página de venda do marketplace Digistore24 — um script de selo de confiança é carregado da Digistore24 e recebe o seu endereço IP, o identificador do seu navegador e a página de onde você veio, e indica a Digistore24 como a revendedora daquela compra. Essa requisição também guarda no seu dispositivo, por uma semana, um cookie da Digistore24, por isso ela depende de consentimento onde a lei exige consentimento para esse armazenamento: no Espaço Econômico Europeu, no Reino Unido, na Suíça e no Canadá, e sempre que não conseguirmos determinar de qual país veio a requisição, o selo é carregado apenas depois de você aceitar os cookies de marketing; fora desses territórios ele é carregado quando a página abre. Se você então comprar por aquela página, a Digistore24 é a vendedora: a **Digistore24 Inc., 360 Central Avenue, Suite 800, St. Petersburg, FL 33701, Estados Unidos** recebe o seu pagamento, emite a sua nota e decide, conforme a sua própria política de privacidade, o que faz com os seus dados, como controladora independente e não como operadora agindo em nosso nome
 - **Meta (Facebook / Instagram):** para publicidade direcionada e para um relatório de cadastro concluído enviado do nosso servidor — veja a seção «Publicidade na Meta» abaixo. Quanto a esses eventos de conversão, a Meta não trata os dados em nosso nome: ela é controladora conjunta junto com a gente, como aquela seção explica. Os dados que recebemos das APIs do Google nunca são compartilhados com a Meta nem usados para publicidade
 - Quando exigido por lei
 
@@ -445,4 +446,4 @@ Se você tiver dúvidas sobre esta política de privacidade, fale com a gente:
 
 **Telefone:** [054-9489377](tel:0549489377)
 
-Esta política foi atualizada pela última vez em 1º de novembro de 2026
+Esta política foi atualizada pela última vez em 6 de novembro de 2026

@@ -4501,6 +4501,114 @@ const PHOTO_IN_RETENTION: Record<string, RegExp> = {
     'x'.concat(text.ja!.privacy).split(/メールでの連絡/).length > 1)
 }
 
+/**
+ * DIGISTORE24 MUST BE NAMED WHEREVER JVZOO IS, AND WITH THE SAME FACTS.
+ *
+ * `/go/*` serves both marketplaces and is registered in ENGLISH_ONLY_SEGMENTS,
+ * so the sales journey closes at /en/terms and /en/privacy. That made it
+ * coherent — not a gap — for the Digistore24 recipient entry to live only in
+ * the he and en documents while JVZoo was named in all nine. Coherent is not
+ * the same as right: the privacy policy is read on its own, in the reader's own
+ * language, by people who never open /go, and a document that names one US
+ * marketplace recipient and not the other tells them the sharing list is
+ * shorter than it is.
+ *
+ * So the asymmetry is closed, and this is what holds it closed. For each of
+ * the nine documents:
+ *   - Digistore24 is named at all;
+ *   - the full US entity is given — Digistore24 Inc., 360 Central Avenue,
+ *     Suite 800, St. Petersburg, FL 33701 — verified on 2026-11-05 from both
+ *     language versions of the company's own Legal Notice. THERE IS NO GmbH
+ *     ANYWHERE IN THIS CHAIN, and a document naming a German entity would be
+ *     wrong, so that is checked for and must be absent;
+ *   - the badge is described as storing on the device, because it is a script
+ *     that sets a week-long cookie and that is why it sits behind consent;
+ *   - Digistore24 is the seller and an independent controller, not a processor
+ *     acting for us.
+ *
+ * The last one is the claim that matters legally, and it is the reason the
+ * Art. 49(1)(a) paragraph exists: no processor contract reaches a recipient
+ * that is not a processor.
+ */
+{
+  const read = (path: string) => (existsSync(path) ? readFileSync(path, 'utf8') : '')
+  const enPrivacySource = frontMatter(text[LOCALES[0]].privacy).source
+  const privacyDocs: [string, string][] = [
+    ['he', read(HEBREW_PRIVACY)],
+    ['en', enPrivacySource ? read(enPrivacySource) : ''],
+    ...LOCALES.map((l): [string, string] => [l, text[l].privacy]),
+  ]
+
+  /** The verified US entity, which every document must carry in full. */
+  const DS24_ADDRESS = /Digistore24 Inc\.,\s*360 Central Avenue,\s*Suite 800,\s*St\.\s*Petersburg,\s*FL 33701/
+  /** A German entity would be a wrong fact, not a translation choice. */
+  const DS24_GMBH = /Digistore24\s+GmbH/i
+
+  /** The badge stores on the device — the reason it is behind consent. */
+  const DS24_STORES: Record<string, RegExp> = {
+    he: /Digistore24[\s\S]{0,900}?(עוגייה|עוגיית)/,
+    en: /stores a Digistore24 cookie on your device/,
+    de: /Cookie von Digistore24 auf Ihrem Gerät/,
+    nl: /cookie van Digistore24 op uw apparaat/,
+    fr: /un cookie de Digistore24/,
+    it: /un cookie di Digistore24/,
+    es: /una cookie de Digistore24/,
+    'pt-BR': /um cookie da Digistore24/,
+    ja: /Digistore24 の Cookie を1週間/,
+  }
+
+  /** Seller and independent controller, not our processor. */
+  const DS24_NOT_PROCESSOR: Record<string, RegExp> = {
+    he: /Digistore24[\s\S]{0,1400}?(ולא כמעבדת|אינה מעבדת|לא כמעבדת)/,
+    en: /as an independent controller and not a processor acting on our behalf/,
+    de: /als eigener Verantwortlicher und nicht als Auftragsverarbeiter für uns/,
+    nl: /als zelfstandig verwerkingsverantwoordelijke en niet als verwerker in onze opdracht/,
+    fr: /en qualité de responsable du traitement distinct et non de sous-traitant agissant pour notre compte/,
+    it: /in qualità di titolare autonomo del trattamento e non di responsabile che agisce per nostro conto/,
+    es: /como responsable del tratamiento independiente y no como encargado que actúa por cuenta nuestra/,
+    'pt-BR': /como controladora independente e não como operadora agindo em nosso nome/,
+    ja: /当社の委託先としてではなく、独立した管理者として/,
+  }
+
+  for (const [name, privacy] of privacyDocs) {
+    if (!privacy) { check(`${name}/privacy: document is readable`, false); continue }
+    // The premise: this document names JVZoo, so it owes the other marketplace too.
+    check(`${name}/privacy: names JVZoo (the premise of the parity check)`, /JVZoo/.test(privacy))
+    check(`${name}/privacy: names Digistore24 as a recipient`, /Digistore24/.test(privacy))
+    check(`${name}/privacy: gives the verified US entity in full`, DS24_ADDRESS.test(privacy))
+    check(`${name}/privacy: names no Digistore24 GmbH, which does not exist in this chain`,
+      !DS24_GMBH.test(privacy))
+    check(`${name}/privacy: says the badge stores on the device`,
+      (DS24_STORES[name] ?? /$^/).test(privacy))
+    check(`${name}/privacy: Digistore24 is an independent controller and not our processor`,
+      (DS24_NOT_PROCESSOR[name] ?? /$^/).test(privacy))
+  }
+
+  // MUTATION CONTROLS, against the real documents.
+  {
+    const de = text.de ? text.de.privacy : ''
+    const en = enPrivacySource ? read(enPrivacySource) : ''
+    if (de) {
+      const without = de.replace(/^- \*\*Digistore24:[^\n]*\n/m, '')
+      check('mutation control (de): a document with the Digistore24 entry removed is caught',
+        !/Digistore24/.test(without) || !DS24_ADDRESS.test(without))
+      const gmbh = de.replace('Digistore24 Inc., 360 Central Avenue', 'Digistore24 GmbH, Sankt Augustin')
+      check('mutation control (de): a German entity invented for Digistore24 is caught',
+        DS24_GMBH.test(gmbh) && !DS24_ADDRESS.test(gmbh))
+      const processor = de.replace('als eigener Verantwortlicher und nicht als Auftragsverarbeiter für uns',
+        'als Auftragsverarbeiter in unserem Auftrag')
+      check('mutation control (de): Digistore24 described as our processor is caught',
+        !DS24_NOT_PROCESSOR.de!.test(processor))
+    }
+    if (en) {
+      const noStore = en.replace('stores a Digistore24 cookie on your device',
+        'stores nothing on your device')
+      check('mutation control (en): a badge described as storing nothing is caught',
+        !DS24_STORES.en!.test(noStore))
+    }
+  }
+}
+
 console.log(`\n${pass} passed, ${fail} failed`)
 if (fail > 0) process.exit(1)
 

@@ -3,7 +3,7 @@ title: Política de privacidad | Go Top SEO
 description: Política de privacidad de Go Top SEO: cómo recopilamos, utilizamos y protegemos sus datos.
 locale: es
 source: app/(public)/en/privacy/page.tsx
-lastUpdated: 2026-11-01
+lastUpdated: 2026-11-06
 register: usted
 ---
 
@@ -67,6 +67,7 @@ No compartimos su información personal con terceros, salvo con:
 - **ScrapeLLM:** para el seguimiento de visibilidad en IA; véase «Proveedores de IA» más abajo
 - **Otros sitios de la red de enlaces:** únicamente si usted se unió a la red; véase «Red de enlaces» más abajo
 - **JVZoo:** solo si usted ha abierto nuestra página de venta del marketplace JVZoo: se carga desde JVZoo una imagen de seguimiento que recibe su dirección IP, el identificador de su navegador y la página de la que llegó, para poder atribuir una compra al afiliado que le remitió. Esa solicitud también almacena en su dispositivo cookies propias de JVZoo, por lo que se rige por el consentimiento allí donde la ley lo exige para ese almacenamiento: en el Espacio Económico Europeo, el Reino Unido, Suiza y Canadá, y siempre que no podamos determinar de qué país proviene la solicitud, la imagen se carga únicamente después de que usted haya aceptado las cookies de marketing; fuera de esos territorios se carga al abrirse la página. Respecto de esa recogida y esa transmisión, JVZoo no trata los datos por cuenta nuestra, sino que es corresponsable del tratamiento junto con nosotros; lo que haga con los datos después lo decide JVZoo conforme a su propia política de privacidad
+- **Digistore24:** solo si usted ha abierto nuestra página de venta del marketplace Digistore24: se carga desde Digistore24 un script de un sello de confianza que recibe su dirección IP, el identificador de su navegador y la página de la que llegó, y que indica a Digistore24 como el revendedor de esa compra. Esa solicitud también almacena en su dispositivo, durante una semana, una cookie de Digistore24, por lo que se rige por el consentimiento allí donde la ley lo exige para ese almacenamiento: en el Espacio Económico Europeo, el Reino Unido, Suiza y Canadá, y siempre que no podamos determinar de qué país proviene la solicitud, el sello se carga únicamente después de que usted haya aceptado las cookies de marketing; fuera de esos territorios se carga al abrirse la página. Si después compra a través de esa página, Digistore24 es el vendedor: **Digistore24 Inc., 360 Central Avenue, Suite 800, St. Petersburg, FL 33701, Estados Unidos** cobra su pago, emite su factura y decide, conforme a su propia política de privacidad, qué hace con sus datos, como responsable del tratamiento independiente y no como encargado que actúa por cuenta nuestra
 - **Meta (Facebook / Instagram):** para publicidad segmentada y para un informe de registro completado que se envía desde nuestro servidor; véase la sección Publicidad en Meta más abajo. Respecto de esos eventos de conversión, Meta no trata los datos por cuenta nuestra, sino que es corresponsable del tratamiento junto con nosotros, como se explica en esa sección. Los datos que recibimos de las API de Google nunca se comparten con Meta ni se usan para publicidad
 - Cuando lo exija la ley
 
@@ -426,4 +427,4 @@ Si tiene preguntas sobre esta política de privacidad, contacte con:
 
 **Teléfono:** 054-9489377
 
-Esta política se actualizó por última vez el 1 de noviembre de 2026
+Esta política se actualizó por última vez el 6 de noviembre de 2026

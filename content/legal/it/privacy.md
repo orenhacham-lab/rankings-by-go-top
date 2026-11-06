@@ -3,7 +3,7 @@ title: Informativa sulla privacy | Go Top SEO
 description: Informativa sulla privacy di Go Top SEO: come raccogliamo, utilizziamo e proteggiamo i Suoi dati.
 locale: it
 source: app/(public)/en/privacy/page.tsx
-lastUpdated: 2026-11-01
+lastUpdated: 2026-11-06
 register: lei
 extraSections: 1
 extraReason: One extra section, "Diritti dei residenti in Italia e nell'Unione europea (GDPR)", placed beside the existing EEA/UK and United States rights sections, because Italian readers are owed the one-month deadline of Art. 12(3), the Garante per la protezione dei dati personali as their own supervisory authority, the Codice in materia di protezione dei dati personali as the national law that completes the GDPR in Italy, and a plain statement about the officer and the representative we have not appointed. What the GDPR adds elsewhere stays inside the sections it belongs to - the legal bases of Art. 6 and the international-transfer rule of Chapter V. The French document carries a second extra section for Quebec (Law 25), which is a different statute reached through the French language and has no Italian counterpart: an Italian reader is governed by the GDPR and by Italian law, so that section is not translated into a jurisdiction it does not apply to.
@@ -69,6 +69,7 @@ Non condividiamo le Sue informazioni personali con terzi, salvo con:
 - **ScrapeLLM:** per il monitoraggio della visibilità nell'IA; si veda « Fornitori di IA » più in basso
 - **Altri siti della rete di link:** unicamente se Lei ha aderito alla rete; si veda « Rete di link » più in basso
 - **JVZoo:** soltanto se Lei ha aperto la nostra pagina di vendita del marketplace JVZoo — da JVZoo viene caricata un'immagine di tracciamento che riceve il Suo indirizzo IP, l'identificativo del Suo browser e la pagina di provenienza, affinché un acquisto possa essere attribuito all'affiliato che ha indirizzato la Sua visita a noi. Quella richiesta conserva anche sul Suo dispositivo cookie propri di JVZoo, perciò è soggetta al consenso dove la legge lo richiede per tale conservazione: nello Spazio economico europeo, nel Regno Unito, in Svizzera e in Canada, nonché ogni volta che non riusciamo a determinare da quale paese provenga la richiesta, l'immagine viene caricata solo dopo che Lei ha accettato i cookie di marketing; fuori da quei territori viene caricata all'apertura della pagina. Riguardo a quella raccolta e a quella trasmissione, JVZoo non tratta i dati per nostro conto: è contitolare del trattamento con noi, e ciò che fa dei dati in seguito è deciso da JVZoo in base alla propria informativa sulla privacy
+- **Digistore24:** soltanto se Lei ha aperto la nostra pagina di vendita del marketplace Digistore24 — da Digistore24 viene caricato uno script di un sigillo di fiducia che riceve il Suo indirizzo IP, l'identificativo del Suo browser e la pagina di provenienza, e che indica Digistore24 come il rivenditore di quell'acquisto. Quella richiesta conserva anche sul Suo dispositivo, per una settimana, un cookie di Digistore24, perciò è soggetta al consenso dove la legge lo richiede per tale conservazione: nello Spazio economico europeo, nel Regno Unito, in Svizzera e in Canada, nonché ogni volta che non riusciamo a determinare da quale paese provenga la richiesta, il sigillo viene caricato solo dopo che Lei ha accettato i cookie di marketing; fuori da quei territori viene caricato all'apertura della pagina. Se Lei acquista poi attraverso quella pagina, Digistore24 è il venditore: **Digistore24 Inc., 360 Central Avenue, Suite 800, St. Petersburg, FL 33701, Stati Uniti** incassa il Suo pagamento, emette la Sua fattura e decide, in base alla propria informativa sulla privacy, che cosa fa dei Suoi dati, in qualità di titolare autonomo del trattamento e non di responsabile che agisce per nostro conto
 - **Meta (Facebook / Instagram):** per la pubblicità mirata e per un rapporto di iscrizione completata inviato dal nostro server; si veda la sezione Pubblicità su Meta più in basso. Riguardo a quegli eventi di conversione, Meta non tratta i dati per nostro conto: è contitolare del trattamento con noi, come spiegato in quella sezione. I dati che riceviamo dalle API di Google non sono mai condivisi con Meta né utilizzati per pubblicità
 - Quando la legge lo esige
 
@@ -440,4 +441,4 @@ Se Lei ha domande sulla presente informativa sulla privacy, ci contatti:
 
 **Telefono:** 054-9489377
 
-Ultimo aggiornamento: 1 novembre 2026
+Ultimo aggiornamento: 6 novembre 2026

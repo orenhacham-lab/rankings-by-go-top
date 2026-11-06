@@ -3,7 +3,7 @@ title: プライバシーポリシー | Go Top SEO
 description: Go Top SEO のプライバシーポリシー。お客様のデータをどのように取得し、利用し、保護するかについて。
 locale: ja
 source: app/(public)/en/privacy/page.tsx
-lastUpdated: 2026-11-01
+lastUpdated: 2026-11-06
 register: desumasu
 extraSections: 1
 extraReason: One extra section, "日本の居住者の権利（個人情報保護法）", placed beside the existing EEA/UK and United States rights sections, because a Japanese reader is owed the publication items of Article 32 of the Act on the Protection of Personal Information, the disclosure, correction and cease-of-use procedures of Articles 33 to 35, the rule of Article 28 on providing data to a third party in a foreign country, the complaint desk, and a plain statement that no personal information protection officer is appointed. What the Act adds elsewhere stays inside the sections it belongs to - the purposes of use in "お客様のデータの利用方法" and the international-transfer rule in "国際的な移転". The Italian document carries its extra section for the GDPR, which is a different statute reached through a different language and has no Japanese counterpart, so it is not translated into a jurisdiction it does not govern.
@@ -69,6 +69,7 @@ GO TOP DIGITAL MARKETING AND ADVERTISING LTD（会社登録番号 517274346）�
 - **ScrapeLLM：** AIでの可視性の計測のため。後述の「AI の提供事業者」をご覧ください
 - **リンクネットワークの他のサイト：** お客様がネットワークに参加された場合に限ります。後述の「リンクネットワーク」をご覧ください
 - **JVZoo：** お客様が JVZoo のマーケットプレイスにある当社の販売ページを開かれた場合に限ります。そのページでは JVZoo からトラッキング用の画像が読み込まれ、JVZoo はお客様の IP アドレス、ブラウザーの識別情報および流入元のページを受け取ります。これは、お客様の訪問を当社に紹介したアフィリエイトに購入を帰属させるためのものです。その読み込みは JVZoo 自身の Cookie をお客様の端末に保存するため、その保存に同意が必要とされる地域、すなわち欧州経済領域、英国、スイスおよびカナダ、ならびに当社がどの国からの送信かを判定できなかった場合には、お客様がマーケティングの Cookie に同意された後にのみ読み込まれます。それ以外の地域ではページを開いた時点で読み込まれます。この取得と送信について、JVZoo は当社の委託先として扱うのではなく、当社との共同の管理者であり、その後そのデータをどう扱うかは JVZoo が自らのプライバシーポリシーに基づいて決定します
+- **Digistore24：** お客様が Digistore24 のマーケットプレイスにある当社の販売ページを開かれた場合に限ります。そのページでは Digistore24 から信頼のバッジのスクリプトが読み込まれ、Digistore24 はお客様の IP アドレス、ブラウザーの識別情報および流入元のページを受け取ります。このバッジは、その購入の再販売者が Digistore24 であることを示すものです。その読み込みは Digistore24 の Cookie を1週間お客様の端末に保存するため、その保存に同意が必要とされる地域、すなわち欧州経済領域、英国、スイスおよびカナダ、ならびに当社がどの国からの送信かを判定できなかった場合には、お客様がマーケティングの Cookie に同意された後にのみ読み込まれます。それ以外の地域ではページを開いた時点で読み込まれます。その後そのページを通じてご購入された場合、販売者は Digistore24 です。**Digistore24 Inc., 360 Central Avenue, Suite 800, St. Petersburg, FL 33701, アメリカ合衆国** がお客様のお支払いを受け取り、請求書を発行し、お客様のデータをどう扱うかを自らのプライバシーポリシーに基づいて決定します。当社の委託先としてではなく、独立した管理者としてです
 - **Meta（Facebook / Instagram）：** ターゲティング広告のため、および当社のサーバーから送信する「申し込みの完了」の報告のため。後述の「Meta（Facebook / Instagram）での広告」の条をご覧ください。これらのコンバージョンのイベントについて、Meta は当社の委託先として扱うのではなく、その条で説明するとおり当社との共同の管理者です。Google の API から受け取ったデータは、Meta と共有することも、広告のために利用することもありません
 - 法令により求められる場合
 
@@ -462,4 +463,4 @@ WhatsApp の利用は、WhatsApp および Meta の利用規約とプライバ�
 
 **電話：** +972-54-9489377
 
-最終更新：2026年11月1日
+最終更新：2026年11月6日

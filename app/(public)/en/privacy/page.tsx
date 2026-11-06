@@ -117,7 +117,8 @@ export default function EnglishPrivacyPage() {
           that collection and transmission
           JVZoo does not process data on our behalf: it is a joint controller with us, and what it does
           with the data afterwards is decided by JVZoo under its own privacy policy</li>
-          <li><strong>Digistore24:</strong> only if you opened our Digistore24 marketplace sales page — a
+          <li><strong>Digistore24</strong> (Digistore24 Inc., 360 Central Avenue, Suite 800, St. Petersburg,
+          FL 33701, United States)<strong>:</strong> only if you opened our Digistore24 marketplace sales page — a
           trust-badge script is loaded from Digistore24, which receives your IP address, your browser
           identifier and the page you arrived from, and which names Digistore24 as the reseller for that
           purchase. The request also stores a Digistore24 cookie on your device for one week, so it is
@@ -1100,7 +1101,7 @@ export default function EnglishPrivacyPage() {
 
       <section>
         <p className={LEGAL_FOOTNOTE}>
-          This policy was last updated on November 1, 2026
+          This policy was last updated on November 6, 2026
         </p>
       </section>
     </LegalDoc>
