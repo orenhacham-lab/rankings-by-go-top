@@ -131,7 +131,7 @@ function main() {
     // had promised a 90-day undo window for a deletion that had no route at all.
     // The dates are per document.
     check('D2: every document that was changed carries the new date',
-      /1 בנובמבר 2026/.test(read(HE_PRIVACY)) && /November 1, 2026/.test(read(EN_PRIVACY))
+      /6 בנובמבר 2026/.test(read(HE_PRIVACY)) && /November 6, 2026/.test(read(EN_PRIVACY))
       && /16 באוקטובר 2026/.test(read(HE_TERMS)) && /October 16, 2026/.test(read(EN_TERMS))
       && /5 באוקטובר 2026/.test(read(HE_A11Y)) && /October 5, 2026/.test(read(EN_A11Y)))
   }

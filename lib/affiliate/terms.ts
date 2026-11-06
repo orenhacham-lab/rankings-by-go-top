@@ -15,7 +15,7 @@
  */
 export const AFFILIATE_TERMS = {
   /** Commission on every payment, for as long as the customer keeps paying. */
-  baseRate: 30,
+  baseRate: 35,
   /** The higher rate, from this many ACTIVE PAYING referrals onwards. */
   topRate: 40,
   topRateFrom: 10,

@@ -276,7 +276,7 @@ const LAW: Record<string, { doc: Doc; name: string; must: RegExp }[]> = {
      * marketing gate and the Meta server-side report read, so a browser block
      * stops nothing we decide. The document must say that in those words. */
     { doc: 'privacy', name: 'and says a browser block is not a withdrawal of consent with us',
-      must: /nie jest jednak wycofaniem zgody u nas/ },
+      must: /nie zast[ęe]puje jednak wycofania zgody u nas/ },
     /* Transfers: JVZoo is a joint controller, not a provider, so the SCC sentence
      * never reached it. The instrument is the visitor's own consent, art. 49
      * ust. 1 lit. a RODO, and the risk it is consent TO must be named. */
@@ -4821,7 +4821,7 @@ const PHOTO_IN_RETENTION: Record<string, RegExp> = {
   check('mutation control (pl): a transfers section that claims SCCs with everyone is caught',
     !law('privacy', 'Nie twierdzimy tutaj').must.test('Z każdym podmiotem przetwarzającym podpisaliśmy standardowe klauzule umowne.'))
   check('mutation control (pl): a banner sentence that offers the browser as a route out is caught',
-    !law('privacy', 'wycofaniem zgody u nas').must.test('Zgodę mogą Państwo wycofać także przez zablokowanie plików cookie w przeglądarce.'))
+    !law('privacy', 'wycofania zgody u nas').must.test('Zgodę mogą Państwo wycofać także przez zablokowanie plików cookie w przeglądarce.'))
   check('mutation control (pl): a transfers section that treats every recipient as a provider is caught',
     !law('privacy', 'wymieniony powy').must.test('Dla przekazań do dostawców opieramy się na standardowych klauzulach umownych.'))
   check('mutation control (pl): a joint-controller transmission left under the SCC sentence is caught',
@@ -4843,6 +4843,714 @@ const PHOTO_IN_RETENTION: Record<string, RegExp> = {
     !PARTNER_NOT_BUILT.pl!.test('Strony dla partnerów są już zbudowane i gotowe do użycia.'))
   check('mutation control (pl): a referral link promised to outlive the agreement is caught',
     !AGREEMENT_LINK_DIES.pl!.test('Państwa link polecający działa dalej po rozwiązaniu umowy.'))
+}
+
+/**
+ * THE COOKIE-SETTINGS LINK A PRIVACY DOCUMENT TELLS THE READER TO LOOK FOR
+ * MUST BE THE LINK THE FOOTER ACTUALLY RENDERS.
+ *
+ * Every privacy document in all nine languages carries the sentence that says
+ * how to change or withdraw cookie consent, and each one names the footer link
+ * by its label. That sentence is not decoration: GDPR Art. 7(3) requires that
+ * withdrawal be as easy as consent, and the information duties that sit on a
+ * cookie banner (ePrivacy Art. 5(3) with GDPR Art. 13, PECR reg. 6 in the UK,
+ * art. 399 ust. 1 pkt 1 lit. b PKE in Poland) are satisfied by telling the
+ * visitor the method, not merely that a right exists. A document that names a
+ * label the footer does not render tells the visitor to look for something
+ * that is not there, which is the one way this sentence can be false while
+ * still being present.
+ *
+ * It had gone wrong in two languages at once, undetected, because nothing
+ * compared the two places. The French document said « Réglages des cookies »
+ * where the footer renders « Paramètres des cookies », and the Japanese said
+ * 「Cookie の設定」 where the footer renders 「クッキーの設定」. Both were
+ * fixed with this guard.
+ *
+ * The label is READ FROM THE DICTIONARY, never written here as a literal: the
+ * footer renders `dict.cookie.settings` (components/Footer.tsx), so the
+ * dictionary is the only thing that can be called right, and a guard holding
+ * its own copy would pass a renamed link.
+ */
+{
+  const read = (path: string) => (existsSync(path) ? readFileSync(path, 'utf8') : '')
+  const enPrivacySource = frontMatter(text[LOCALES[0]].privacy).source
+  const privacyDocs: [string, string][] = [
+    ['he', read(HEBREW_PRIVACY)],
+    ['en', enPrivacySource ? read(enPrivacySource) : ''],
+    ...LOCALES.map((l): [string, string] => [l, text[l].privacy]),
+  ]
+
+  /** The footer's own label for a locale, out of lib/i18n/public/<locale>.ts. */
+  const footerLabel = (locale: string): string | null => {
+    const src = read(`lib/i18n/public/${locale}.ts`)
+    if (!src) return null
+    const m = /^ {4}settings: '([^']+)'/m.exec(stripComments(src))
+    return m ? m[1]! : null
+  }
+
+  /**
+   * Any quoted run that looks like it is naming a cookie-settings link: the
+   * quote styles the documents use (guillemets, curly quotes, ASCII quotes,
+   * Japanese corner brackets) around a short phrase that mentions cookies.
+   */
+  const QUOTED = /[«„"'‘“「]\s*([^«»„""'’”」\n]{3,40}?)\s*[»"'’”」]/g
+  const MENTIONS_COOKIES = /cookie|Cookie|עוגיות|クッキー/
+
+  for (const [name, privacy] of privacyDocs) {
+    const label = footerLabel(name)
+    check(`${name}: the footer's cookie-settings label is readable from the dictionary`, label !== null, name)
+    if (!label || !privacy) continue
+    check(`${name}/privacy: names the footer link by the label the footer renders (${label})`,
+      privacy.includes(label), `expected ${JSON.stringify(label)}`)
+    const wrong = [...privacy.matchAll(QUOTED)]
+      .map((m) => m[1]!)
+      .filter((q) => MENTIONS_COOKIES.test(q) && q !== label)
+    check(`${name}/privacy: names no other label for that link`,
+      wrong.length === 0, wrong.length ? `found ${JSON.stringify(wrong)}` : undefined)
+  }
+
+  // MUTATION CONTROLS, against the real files and the real dictionaries.
+  const frReal = text.fr ? text.fr.privacy : ''
+  const jaReal = text.ja ? text.ja.privacy : ''
+  const frLabel = footerLabel('fr')
+  const jaLabel = footerLabel('ja')
+  if (frReal && frLabel) {
+    const broken = frReal.replace(frLabel, 'Réglages des cookies')
+    check('mutation control (fr): the old wrong label is caught by the "names the footer link" check',
+      !broken.includes(frLabel))
+    check('mutation control (fr): the old wrong label is caught by the "no other label" check',
+      [...broken.matchAll(QUOTED)].map((m) => m[1]!)
+        .some((q) => MENTIONS_COOKIES.test(q) && q !== frLabel))
+  }
+  if (jaReal && jaLabel) {
+    const broken = jaReal.replace(jaLabel, 'Cookie の設定')
+    check('mutation control (ja): the old wrong label is caught by the "names the footer link" check',
+      !broken.includes(jaLabel))
+    check('mutation control (ja): the old wrong label is caught by the "no other label" check',
+      [...broken.matchAll(QUOTED)].map((m) => m[1]!)
+        .some((q) => MENTIONS_COOKIES.test(q) && q !== jaLabel))
+  }
+  const deLabel = footerLabel('de')
+  if (deLabel) {
+    check('mutation control: a renamed dictionary label is not matched by the old document text',
+      !'den Link „Cookie-Schalter“ in der Fußzeile'.includes(deLabel))
+  }
+}
+
+// ── 26) the transfer instrument for recipients that are NOT our processors ──
+/*
+ * Every privacy document names JVZoo under Information Sharing and says, in
+ * that same section, that JVZoo does NOT process the data on our behalf: it is
+ * an independent controller, and for the collection and transmission of the
+ * request made from our page we are a joint controller with it. The Hebrew and
+ * English documents say the same of Digistore24 Inc.
+ *
+ * The International Transfers section, in every language, used to offer one
+ * instrument only: Standard Contractual Clauses, "for transfers to providers".
+ * A joint controller is not a provider and not a processor, so that sentence
+ * never reached the two recipients the same document had just described as
+ * controllers of their own — and both sit in the United States, which has no
+ * adequacy decision for us to rely on either.
+ *
+ * The instrument that does apply is the visitor's own consent. The request is
+ * made only after marketing cookies are accepted in the EEA, the UK,
+ * Switzerland and Canada (and wherever the country cannot be determined), and
+ * Article 49(1)(a) GDPR allows a transfer to a third country on the data
+ * subject's explicit consent, given after being informed of the risks. So the
+ * paragraph must do three things, and each is pinned here: say the preceding
+ * instrument does not reach every recipient, name the consent as the
+ * instrument with its article, and name the risk it is consent to — that the
+ * IP address and browser identifier reach a company in the United States.
+ */
+const TRANSFER_NOT_ALL: Record<string, RegExp> = {
+  he: /לא כל נמען שנמנה למעלה הוא ספק שלנו, והמכשיר שלמעלה אינו חל על כולם/,
+  en: /Not every recipient named above is a provider of ours, and the instrument above does not reach\s*all of them/,
+  de: /Nicht jeder oben genannte Empfänger ist unser Anbieter, und das vorstehende Instrument reicht nicht an alle heran/,
+  nl: /Niet elke hierboven genoemde ontvanger is onze leverancier, en het voorgaande instrument reikt niet tot allen/,
+  fr: /Tous les destinataires nommés ci-dessus ne sont pas nos fournisseurs, et l'instrument qui précède ne les atteint pas tous/,
+  it: /Non tutti i destinatari indicati sopra sono nostri fornitori, e lo strumento che precede non li raggiunge tutti/,
+  es: /No todos los destinatarios indicados arriba son nuestros proveedores, y el instrumento anterior no alcanza a todos/,
+  'pt-BR': /Nem todos os destinatários indicados acima são nossos fornecedores, e o instrumento anterior não alcança todos eles/,
+  ja: /上記の受領者のすべてが当社の提供事業者であるわけではなく、前記の措置はそのすべてに及ぶものではありません/,
+  pl: /Nie ka[żz]dy wymieniony powy[żz]ej odbiorca jest naszym dostawc[ąa]/,
+}
+/* No processing agreement and no Standard Contractual Clauses govern that transmission. */
+const TRANSFER_NO_SCC: Record<string, RegExp> = {
+  he: /לא חל הסכם עיבוד נתונים ולא חלים\s*סעיפי חוזה תקניים/,
+  en: /neither transmission is governed by a processing agreement or by Standard Contractual\s*Clauses/,
+  de: /gilt weder ein Auftragsverarbeitungsvertrag noch gelten Standardvertragsklauseln/,
+  nl: /geldt geen verwerkersovereenkomst en gelden geen standaardcontractbepalingen/,
+  fr: /n'est régie ni par un contrat de sous-traitance ni par des clauses contractuelles types/,
+  it: /non è retta né da un contratto di responsabile del trattamento né da clausole contrattuali standard/,
+  es: /no se rige ni por un contrato de encargo del tratamiento ni por cláusulas contractuales tipo/,
+  'pt-BR': /não é regida nem por um contrato de operador nem por cláusulas-padrão contratuais/,
+  ja: /その送信には処理者契約も標準契約条項も適用されません/,
+  pl: /nie stosuje si[ęe] ani umowy powierzenia przetwarzania,\s*ani standardowych klauzul umownych/,
+}
+/* The consent is the instrument, and Article 49(1)(a) is named. */
+const TRANSFER_DEROGATION: Record<string, RegExp> = {
+  he: /וההסכמה הזאת שלך היא המכשיר[\s\S]{0,120}סעיף 49\(1\)\(א\) ל-GDPR/,
+  en: /that consent of yours is the instrument[\s\S]{0,140}Article\s*49\(1\)\(a\) of the GDPR/,
+  de: /diese Einwilligung ist das Instrument[\s\S]{0,140}Artikel 49 Absatz 1 Buchstabe a DSGVO/,
+  nl: /die toestemming van u is het instrument[\s\S]{0,140}artikel 49 lid 1 onder a AVG/,
+  fr: /ce consentement est l'instrument[\s\S]{0,140}l'article 49, paragraphe 1, point a\), du RGPD/,
+  it: /quel Suo consenso è lo strumento[\s\S]{0,140}l'articolo 49, paragrafo 1, lettera a\), del GDPR/,
+  es: /ese consentimiento suyo es el instrumento[\s\S]{0,140}el artículo 49, apartado 1, letra a\), del RGPD/,
+  'pt-BR': /esse seu consentimento é o instrumento[\s\S]{0,140}o artigo 49, 1, alínea a, do RGPD/,
+  ja: /その同意こそがその措置です[\s\S]{0,140}GDPR 第49条第1項\(a\)/,
+  pl: /ta Pa[ńn]stwa zgoda jest tym instrumentem[\s\S]{0,160}art\. 49 ust\. 1 lit\. a RODO/,
+}
+/* The risk the consent is consent TO must be stated, or it is not informed. */
+const TRANSFER_RISK: Record<string, RegExp> = {
+  he: /מגיעים לחברה בארצות הברית/,
+  en: /reach a company in the United States/,
+  de: /ein\s*Unternehmen in den Vereinigten Staaten erreichen/,
+  nl: /bij een onderneming in de Verenigde Staten aankomen/,
+  fr: /parviennent à une société située aux États-Unis/,
+  it: /giungano a una società stabilita negli Stati\s*Uniti/,
+  es: /lleguen a una sociedad establecida en los\s*Estados Unidos/,
+  'pt-BR': /cheguem a uma empresa estabelecida nos\s*Estados Unidos/,
+  ja: /米国に所在する会社に届くこと/,
+  pl: /docieraj[ąa] do sp[óo][łl]ki w Stanach Zjednoczonych/,
+}
+{
+  const read = (path: string) => (existsSync(path) ? readFileSync(path, 'utf8') : '')
+  const enPrivacySource = frontMatter(text[LOCALES[0]].privacy).source
+  const enPrivacy = enPrivacySource ? read(enPrivacySource) : ''
+  const hePrivacy = read(HEBREW_PRIVACY)
+  const privacyDocs: [string, string][] = [
+    ['he', hePrivacy],
+    ['en', enPrivacy],
+    ...LOCALES.map((l): [string, string] => [l, text[l].privacy]),
+  ]
+  for (const [name, privacy] of privacyDocs) {
+    check(`${name}/privacy: the transfers section says the instrument does not reach every recipient`,
+      (TRANSFER_NOT_ALL[name] ?? /$^/).test(privacy))
+    check(`${name}/privacy: that transmission is covered by no processing agreement and no SCCs`,
+      (TRANSFER_NO_SCC[name] ?? /$^/).test(privacy))
+    check(`${name}/privacy: the consent is named as the instrument, with Article 49(1)(a)`,
+      (TRANSFER_DEROGATION[name] ?? /$^/).test(privacy))
+    check(`${name}/privacy: the risk the consent is consent to is stated`,
+      (TRANSFER_RISK[name] ?? /$^/).test(privacy))
+  }
+  /* Mutation controls break the REAL documents, not a string literal: strip the
+   * paragraph out of the live text and show that each check fails. */
+  const strip = (doc: string, from: RegExp) => {
+    const at = doc.search(from)
+    return at < 0 ? doc : doc.slice(0, at) + doc.slice(at + 1400)
+  }
+  const enStripped = strip(enPrivacy, TRANSFER_NOT_ALL.en)
+  const heStripped = strip(hePrivacy, TRANSFER_NOT_ALL.he)
+  const itStripped = strip(text.it!.privacy, TRANSFER_NOT_ALL.it)
+  check('mutation control: the English document without the paragraph fails all four checks',
+    enPrivacy !== '' && enStripped !== enPrivacy
+    && !TRANSFER_NOT_ALL.en.test(enStripped) && !TRANSFER_NO_SCC.en.test(enStripped)
+    && !TRANSFER_DEROGATION.en.test(enStripped) && !TRANSFER_RISK.en.test(enStripped))
+  check('mutation control: the Hebrew document without the paragraph fails all four checks',
+    hePrivacy !== '' && heStripped !== hePrivacy
+    && !TRANSFER_NOT_ALL.he.test(heStripped) && !TRANSFER_NO_SCC.he.test(heStripped)
+    && !TRANSFER_DEROGATION.he.test(heStripped) && !TRANSFER_RISK.he.test(heStripped))
+  check('mutation control: a translated document without the paragraph fails all four checks',
+    itStripped !== text.it!.privacy
+    && !TRANSFER_NOT_ALL.it.test(itStripped) && !TRANSFER_NO_SCC.it.test(itStripped)
+    && !TRANSFER_DEROGATION.it.test(itStripped) && !TRANSFER_RISK.it.test(itStripped))
+  check('mutation control: consent named as the instrument without its article is caught',
+    !TRANSFER_DEROGATION.en.test('that consent of yours is the instrument, and we rely on it.'))
+  check('mutation control: an SCC sentence that still speaks only of providers is caught',
+    !TRANSFER_NO_SCC.en.test('For transfers to providers outside the EU we rely on Standard Contractual Clauses.'))
+}
+
+/**
+ * THE INTRO'S "SECTIONS 15A TO 15H" MUST NAME THE SECTIONS THE DOCUMENT HAS.
+ *
+ * Every terms document opens by telling the reader that the service includes
+ * the site analysis, the account connections, the site fixes and the AI
+ * content "as described in sections 15A to 15H". That range is a promise about
+ * the document's own shape, and it is correct in all nine today. Nothing stops
+ * it drifting: the next feature that earns a section becomes 15I, eight
+ * documents gain a heading, and nine intros go on saying the list ends at 15H.
+ * A reader is then told the AI-content terms are inside a range that excludes
+ * them, which is the kind of error that is invisible on a read-through and
+ * obvious to anyone who follows the reference.
+ *
+ * The check reads BOTH ENDS out of the document rather than pinning the letter
+ * H: it collects the 15-suffix headings the document actually carries, and
+ * compares the range expression's two ends against the first and last of them.
+ * So adding 15I passes the moment every intro is updated, and fails until then,
+ * which is the whole point.
+ *
+ * Two alphabets, because Hebrew numbers its sub-sections in Hebrew letters
+ * (15א to 15ח) and the other eight in Latin (15A to 15H). The range expression
+ * itself is matched language-agnostically — "to", "bis", "à", "a", "tot en
+ * met", 「から第」 — as the two section labels with a short run of connecting
+ * text between them.
+ *
+ * It also checks the set is CONTIGUOUS from its first label. A range claim over
+ * a gapped set (15A, 15B, 15D described as "15A to 15D") is false in a second
+ * way that comparing only the two ends would not catch.
+ */
+{
+  const read = (path: string) => (existsSync(path) ? readFileSync(path, 'utf8') : '')
+  const enTermsSource = frontMatter(text[LOCALES[0]].terms).source
+  const termsDocs: [string, string][] = [
+    ['he', read(HEBREW_TERMS)],
+    ['en', enTermsSource ? read(enTermsSource) : ''],
+    ...LOCALES.map((l): [string, string] => [l, text[l].terms]),
+  ]
+
+  const LATIN = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'
+  const HEBREW = 'אבגדהוזחטיכלמנסעפצקרשת'
+  const alphabetFor = (locale: string) => (locale === 'he' ? HEBREW : LATIN)
+
+  for (const [name, terms] of termsDocs) {
+    if (!terms) { check(`${name}/terms: document is readable`, false); continue }
+    const alphabet = alphabetFor(name)
+    const suffixClass = name === 'he' ? '[\\u05d0-\\u05ea]' : '[A-Z]'
+
+    // The sub-section headings the document actually carries, in alphabet order.
+    const headings = [...terms.matchAll(new RegExp(`(?:^##\\s*|<h2>)15(${suffixClass})\\.`, 'gm'))]
+      .map((m) => m[1]!)
+    const present = [...new Set(headings)].sort((a, b) => alphabet.indexOf(a) - alphabet.indexOf(b))
+    check(`${name}/terms: carries a run of 15-suffix sections`, present.length >= 2,
+      `found ${present.length}`)
+    if (present.length < 2) continue
+
+    const first = present[0]!
+    const last = present[present.length - 1]!
+    const startAt = alphabet.indexOf(first)
+    const expected = alphabet.slice(startAt, startAt + present.length).split('')
+    check(`${name}/terms: the 15-suffix sections run without a gap (15${first} to 15${last})`,
+      present.join('') === expected.join(''), `found ${present.join(',')}`)
+
+    // The intro's range expression: the two labels with connecting words between.
+    const range = new RegExp(`15(${suffixClass})[^.]{1,40}?15(${suffixClass})`).exec(terms)
+    check(`${name}/terms: the intro states a range of 15-suffix sections`, range !== null)
+    if (!range) continue
+    check(`${name}/terms: the range starts at the first section the document has (15${first})`,
+      range[1] === first, `intro says 15${range[1]}`)
+    check(`${name}/terms: the range ends at the last section the document has (15${last})`,
+      range[2] === last, `intro says 15${range[2]}, document ends at 15${last}`)
+  }
+
+  // MUTATION CONTROLS, against the real documents.
+  {
+    const en = enTermsSource ? read(enTermsSource) : ''
+    const de = text.de ? text.de.terms : ''
+    const he = read(HEBREW_TERMS)
+    const endOf = (doc: string, suffixClass: string) => {
+      const r = new RegExp(`15(${suffixClass})[^.]{1,40}?15(${suffixClass})`).exec(doc)
+      return r ? r[2]! : null
+    }
+    if (en) {
+      // A ninth section added to the body and not to the intro must be caught.
+      const grown = en.replace('<h2>15H.', '<h2>15I. Something new</h2>\n        <h2>15H.')
+      const present = [...new Set([...grown.matchAll(/<h2>15([A-Z])\./g)].map((m) => m[1]!))]
+        .sort((a, b) => LATIN.indexOf(a) - LATIN.indexOf(b))
+      check('mutation control (en): a 15I added to the body with the intro left at 15H is caught',
+        endOf(grown, '[A-Z]') !== present[present.length - 1])
+    }
+    if (de) {
+      // An intro that overstates the range must be caught.
+      const overstated = de.replace('15A bis 15H', '15A bis 15J')
+      const present = [...new Set([...overstated.matchAll(/^##\s*15([A-Z])\./gm)].map((m) => m[1]!))]
+        .sort((a, b) => LATIN.indexOf(a) - LATIN.indexOf(b))
+      check('mutation control (de): an intro claiming 15J over a document ending at 15H is caught',
+        endOf(overstated, '[A-Z]') !== present[present.length - 1])
+    }
+    if (he) {
+      // A gap in the run must be caught even when both ends still match.
+      const gapped = he.replace('<h2>15ג.', '<h2>15ט.')
+      const present = [...new Set([...gapped.matchAll(/<h2>15([א-ת])\./g)].map((m) => m[1]!))]
+        .sort((a, b) => HEBREW.indexOf(a) - HEBREW.indexOf(b))
+      const startAt = HEBREW.indexOf(present[0]!)
+      const expected = HEBREW.slice(startAt, startAt + present.length).split('')
+      check('mutation control (he): a gap in the 15-suffix run is caught',
+        present.join('') !== expected.join(''))
+    }
+  }
+}
+/**
+ * THE RETENTION LIST MUST BE THE WHOLE LIST, AND THE SAME LIST IN EVERY
+ * LANGUAGE.
+ *
+ * "How Long We Keep Data" is the section a reader goes to for retention
+ * periods, and a list that looks complete and is not is worse than no list.
+ * It had nine rows and no row for the affiliate programme, although the
+ * programme's own bullet, three sections earlier, states the 12 months. That
+ * is not a disclosure gap — the period was disclosed — but it is the kind of
+ * gap that makes a reader who trusts the list wrong, and the kind that grows:
+ * the next data store with a period of its own goes in whichever section its
+ * author was editing.
+ *
+ * So two checks per locale, and one across them:
+ *   - the affiliate row is present and names its period;
+ *   - the row counts agree across all nine, so a row added in one language is
+ *     added in all. That is the check that catches the NEXT omission rather
+ *     than this one, which is the only reason to write it.
+ *
+ * Counting crosses two formats: the he and en documents are TSX and list with
+ * <li>, the other seven are Markdown and list with "- **". The section is read
+ * between its own heading and the next, per locale, so a bullet elsewhere in
+ * the document is not counted.
+ */
+{
+  const read = (path: string) => (existsSync(path) ? readFileSync(path, 'utf8') : '')
+  const enPrivacySource = frontMatter(text[LOCALES[0]].privacy).source
+  const privacyDocs: [string, string][] = [
+    ['he', read(HEBREW_PRIVACY)],
+    ['en', enPrivacySource ? read(enPrivacySource) : ''],
+    ...LOCALES.map((l): [string, string] => [l, text[l].privacy]),
+  ]
+
+  /** The retention section's own heading, per locale. */
+  const HEADING: Record<string, RegExp> = {
+    he: /<h2>כמה זמן[^<]*<\/h2>/,
+    en: /<h2>How Long We Keep Data<\/h2>/,
+    de: /^## Wie lange wir Daten aufbewahren$/m,
+    nl: /^## Hoe lang wij gegevens bewaren$/m,
+    fr: /^## Combien de temps nous conservons les données$/m,
+    it: /^## Per quanto tempo conserviamo i dati$/m,
+    es: /^## Cuánto tiempo conservamos los datos$/m,
+    'pt-BR': /^## Por quanto tempo guardamos os dados$/m,
+    ja: /^## データの保存期間$/m,
+    pl: /^## Jak długo przechowujemy dane$/m,
+  }
+
+  /** The affiliate row, which must name 12 months in the locale's own words. */
+  const AFFILIATE_ROW: Record<string, RegExp> = {
+    he: /נתוני בקשת שותף:[\s\S]{0,80}12 חודשים/,
+    en: /Partner application data:<\/strong>\s*12 months/,
+    de: /Daten eines Partnerantrags:\*\*\s*12 Monate/,
+    nl: /Gegevens van een aanvraag als partner:\*\*\s*12 maanden/,
+    fr: /Données d'une demande de partenariat :\*\*\s*12 mois/,
+    it: /Dati di una domanda di partner:\*\*\s*12 mesi/,
+    es: /Datos de una solicitud de socio:\*\*\s*12 meses/,
+    'pt-BR': /Dados de uma inscrição de parceiro:\*\*\s*12 meses/,
+    ja: /パートナーのお申し込みのデータ：\*\*[\s\S]{0,40}12か月/,
+    pl: /Dane wniosku partnera:\*\*\s*12 miesi[ęe]cy/,
+  }
+
+  /** The section's text, from its heading to the next heading of the same kind. */
+  const sectionOf = (name: string, doc: string): string | null => {
+    const heading = HEADING[name]
+    if (!heading) return null
+    const at = doc.search(heading)
+    if (at < 0) return null
+    const rest = doc.slice(at + 4)
+    const next = name === 'he' || name === 'en' ? rest.search(/<h2>/) : rest.search(/^## /m)
+    return next < 0 ? rest : rest.slice(0, next)
+  }
+
+  const counts: Record<string, number> = {}
+  for (const [name, privacy] of privacyDocs) {
+    if (!privacy) { check(`${name}/privacy: document is readable`, false); continue }
+    const section = sectionOf(name, privacy)
+    check(`${name}/privacy: the retention section is found by its heading`, section !== null)
+    if (!section) continue
+
+    const row = AFFILIATE_ROW[name]
+    check(`${name}/privacy: the retention list carries the affiliate application row, with its period`,
+      row !== undefined && row.test(section))
+
+    const bullets = name === 'he' || name === 'en'
+      ? [...section.matchAll(/<li>/g)].length
+      : [...section.matchAll(/^- \*\*/gm)].length
+    counts[name] = bullets
+    check(`${name}/privacy: the retention list has rows to count (${bullets})`, bullets > 0)
+  }
+
+  const values = [...new Set(Object.values(counts))]
+  check('every language\'s retention list has the same number of rows',
+    values.length === 1,
+    `counts ${Object.entries(counts).map(([k, v]) => `${k}=${v}`).join(' ')}`)
+
+  // MUTATION CONTROLS, against the real documents.
+  {
+    const de = text.de ? text.de.privacy : ''
+    const en = enPrivacySource ? read(enPrivacySource) : ''
+    if (de) {
+      const without = de.replace(/^- \*\*Daten eines Partnerantrags:[^\n]*\n/m, '')
+      const section = sectionOf('de', without)
+      check('mutation control (de): a retention list with the affiliate row removed is caught',
+        section !== null && !AFFILIATE_ROW.de!.test(section))
+      check('mutation control (de): and its row count then differs from the others',
+        section !== null
+          && [...section.matchAll(/^- \*\*/gm)].length !== (counts.en ?? -1))
+    }
+    if (en) {
+      const period = en.replace('Partner application data:</strong> 12 months',
+        'Partner application data:</strong> as long as we like')
+      const section = sectionOf('en', period)
+      check('mutation control (en): a row that drops its period is caught',
+        section !== null && !AFFILIATE_ROW.en!.test(section))
+    }
+    if (de && en) {
+      const extra = de.replace(/^(- \*\*Daten eines Partnerantrags:)/m,
+        '- **Etwas Neues:** für immer.\n$1')
+      const section = sectionOf('de', extra)
+      check('mutation control (de): a row added in one language only is caught by the count',
+        section !== null
+          && [...section.matchAll(/^- \*\*/gm)].length !== (counts.en ?? -1))
+    }
+  }
+}
+/**
+ * DIGISTORE24 MUST BE NAMED WHEREVER JVZOO IS, AND WITH THE SAME FACTS.
+ *
+ * `/go/*` serves both marketplaces and is registered in ENGLISH_ONLY_SEGMENTS,
+ * so the sales journey closes at /en/terms and /en/privacy. That made it
+ * coherent — not a gap — for the Digistore24 recipient entry to live only in
+ * the he and en documents while JVZoo was named in all nine. Coherent is not
+ * the same as right: the privacy policy is read on its own, in the reader's own
+ * language, by people who never open /go, and a document that names one US
+ * marketplace recipient and not the other tells them the sharing list is
+ * shorter than it is.
+ *
+ * So the asymmetry is closed, and this is what holds it closed. For each of
+ * the nine documents:
+ *   - Digistore24 is named at all;
+ *   - the full US entity is given — Digistore24 Inc., 360 Central Avenue,
+ *     Suite 800, St. Petersburg, FL 33701 — verified on 2026-11-05 from both
+ *     language versions of the company's own Legal Notice. THERE IS NO GmbH
+ *     ANYWHERE IN THIS CHAIN, and a document naming a German entity would be
+ *     wrong, so that is checked for and must be absent;
+ *   - the badge is described as storing on the device, because it is a script
+ *     that sets a week-long cookie and that is why it sits behind consent;
+ *   - Digistore24 is the seller and an independent controller, not a processor
+ *     acting for us.
+ *
+ * The last one is the claim that matters legally, and it is the reason the
+ * Art. 49(1)(a) paragraph exists: no processor contract reaches a recipient
+ * that is not a processor.
+ */
+{
+  const read = (path: string) => (existsSync(path) ? readFileSync(path, 'utf8') : '')
+  const enPrivacySource = frontMatter(text[LOCALES[0]].privacy).source
+  const privacyDocs: [string, string][] = [
+    ['he', read(HEBREW_PRIVACY)],
+    ['en', enPrivacySource ? read(enPrivacySource) : ''],
+    ...LOCALES.map((l): [string, string] => [l, text[l].privacy]),
+  ]
+
+  /** The verified US entity, which every document must carry in full. */
+  const DS24_ADDRESS = /Digistore24 Inc\.,\s*360 Central Avenue,\s*Suite 800,\s*St\.\s*Petersburg,\s*FL 33701/
+  /** A German entity would be a wrong fact, not a translation choice. */
+  const DS24_GMBH = /Digistore24\s+GmbH/i
+
+  /** The badge stores on the device — the reason it is behind consent. */
+  const DS24_STORES: Record<string, RegExp> = {
+    he: /Digistore24[\s\S]{0,900}?(עוגייה|עוגיית)/,
+    en: /stores a Digistore24 cookie on your device/,
+    de: /Cookie von Digistore24 auf Ihrem Gerät/,
+    nl: /cookie van Digistore24 op uw apparaat/,
+    fr: /un cookie de Digistore24/,
+    it: /un cookie di Digistore24/,
+    es: /una cookie de Digistore24/,
+    'pt-BR': /um cookie da Digistore24/,
+    ja: /Digistore24 の Cookie を1週間/,
+    pl: /plik cookie\s*Digistore24 na Pa[ńn]stwa urz[ąa]dzeniu/,
+  }
+
+  /** Seller and independent controller, not our processor. */
+  const DS24_NOT_PROCESSOR: Record<string, RegExp> = {
+    he: /Digistore24[\s\S]{0,1400}?(ולא כמעבדת|אינה מעבדת|לא כמעבדת)/,
+    en: /as an independent controller and not a processor acting on our behalf/,
+    de: /als eigener Verantwortlicher und nicht als Auftragsverarbeiter für uns/,
+    nl: /als zelfstandig verwerkingsverantwoordelijke en niet als verwerker in onze opdracht/,
+    fr: /en qualité de responsable du traitement distinct et non de sous-traitant agissant pour notre compte/,
+    it: /in qualità di titolare autonomo del trattamento e non di responsabile che agisce per nostro conto/,
+    es: /como responsable del tratamiento independiente y no como encargado que actúa por cuenta nuestra/,
+    'pt-BR': /como controladora independente e não como operadora agindo em nosso nome/,
+    ja: /当社の委託先としてではなく、独立した管理者として/,
+    pl: /jako odr[ęe]bny administrator, a nie jako podmiot przetwarzaj[ąa]cy dzia[łl]aj[ąa]cy na nasze zlecenie/,
+  }
+
+  for (const [name, privacy] of privacyDocs) {
+    if (!privacy) { check(`${name}/privacy: document is readable`, false); continue }
+    // The premise: this document names JVZoo, so it owes the other marketplace too.
+    check(`${name}/privacy: names JVZoo (the premise of the parity check)`, /JVZoo/.test(privacy))
+    check(`${name}/privacy: names Digistore24 as a recipient`, /Digistore24/.test(privacy))
+    check(`${name}/privacy: gives the verified US entity in full`, DS24_ADDRESS.test(privacy))
+    check(`${name}/privacy: names no Digistore24 GmbH, which does not exist in this chain`,
+      !DS24_GMBH.test(privacy))
+    check(`${name}/privacy: says the badge stores on the device`,
+      (DS24_STORES[name] ?? /$^/).test(privacy))
+    check(`${name}/privacy: Digistore24 is an independent controller and not our processor`,
+      (DS24_NOT_PROCESSOR[name] ?? /$^/).test(privacy))
+  }
+
+  // MUTATION CONTROLS, against the real documents.
+  {
+    const de = text.de ? text.de.privacy : ''
+    const en = enPrivacySource ? read(enPrivacySource) : ''
+    if (de) {
+      const without = de.replace(/^- \*\*Digistore24:[^\n]*\n/m, '')
+      check('mutation control (de): a document with the Digistore24 entry removed is caught',
+        !/Digistore24/.test(without) || !DS24_ADDRESS.test(without))
+      const gmbh = de.replace('Digistore24 Inc., 360 Central Avenue', 'Digistore24 GmbH, Sankt Augustin')
+      check('mutation control (de): a German entity invented for Digistore24 is caught',
+        DS24_GMBH.test(gmbh) && !DS24_ADDRESS.test(gmbh))
+      const processor = de.replace('als eigener Verantwortlicher und nicht als Auftragsverarbeiter für uns',
+        'als Auftragsverarbeiter in unserem Auftrag')
+      check('mutation control (de): Digistore24 described as our processor is caught',
+        !DS24_NOT_PROCESSOR.de!.test(processor))
+    }
+    if (en) {
+      const noStore = en.replace('stores a Digistore24 cookie on your device',
+        'stores nothing on your device')
+      check('mutation control (en): a badge described as storing nothing is caught',
+        !DS24_STORES.en!.test(noStore))
+    }
+  }
+}
+/**
+ * THE VISITOR'S OWN BROWSER IS A CONTROL OVER STORAGE, AND IT IS NOT A WAY OF
+ * CONSENTING, AND IT IS NOT A WITHDRAWAL WITH US. ALL THREE, IN ALL NINE.
+ *
+ * Raised from the Polish build: art. 399 ust. 1 pkt 1 lit. b PKE makes the
+ * Polish reader's right to set the conditions of storage and access in their
+ * own software an operative information duty. That is Poland's wording of
+ * RECITAL 66 of Directive 2009/136/EC, not of Art. 5(3)'s operative text, so
+ * the other eight implementations may or may not carry an equivalent, and
+ * nobody here has read eight statutes to find out. The sentence is added
+ * anyway, because it is TRUE and useful, and the honest reason is recorded
+ * rather than a borrowed Polish citation.
+ *
+ * Two things it must never say, and both are checked:
+ *
+ *   1. NOT A ROUTE TO CONSENT. After Planet49 (C-673/17) a browser setting
+ *      cannot constitute consent. Polish art. 399 ust. 2 does let settings
+ *      express it; that is a Polish peculiarity and copying it outward would
+ *      publish a wrong statement in eight languages. So the sentence is framed
+ *      as control over storage, and a wording that offers the browser as a way
+ *      of giving or granting consent fails here.
+ *   2. NOT A WITHDRAWAL WITH US. Our marketing gate and the Meta server-side
+ *      conversion report are keyed on OUR consent record, not on what the
+ *      browser does, so a visitor who blocks cookies in Chrome and never
+ *      touches our banner has not stopped the server report. A sentence that
+ *      blurred that would be a false statement about a transfer, which is why
+ *      the second half is required and not optional.
+ *
+ * Checked in both surfaces, as the Polish build did it: `cookie.withdrawHint`
+ * in lib/i18n/public/<locale>.ts, which is what the preferences screen renders,
+ * and the cookie section of each privacy document, which is the durable record.
+ */
+{
+  const read = (path: string) => (existsSync(path) ? readFileSync(path, 'utf8') : '')
+  const enPrivacySource = frontMatter(text[LOCALES[0]].privacy).source
+  const privacyDocs: [string, string][] = [
+    ['he', read(HEBREW_PRIVACY)],
+    ['en', enPrivacySource ? read(enPrivacySource) : ''],
+    ...LOCALES.map((l): [string, string] => [l, text[l].privacy]),
+  ]
+
+  /** The browser sets the conditions of storage on the device. */
+  const BROWSER_CONTROL: Record<string, RegExp> = {
+    he: /בהגדרות הדפדפן/,
+    en: /in your browser settings/,
+    de: /in den Einstellungen Ihres Browsers/,
+    nl: /in de instellingen van uw browser/,
+    fr: /dans les réglages de votre navigateur/,
+    it: /nelle impostazioni del Suo browser/,
+    es: /en la configuración de su navegador|en la configuración de tu navegador/,
+    'pt-BR': /nas configurações do seu navegador/,
+    ja: /ブラウザーの設定でお客様ご自身が定めることもできます/,
+    pl: /w ustawieniach swojej przegl[ąa]darki/,
+  }
+
+  /** A block in the browser is not a withdrawal of consent with us. */
+  const NOT_A_WITHDRAWAL: Record<string, RegExp> = {
+    he: /חסימה בדפדפן לבדה אינה מחליפה ביטול\s*הסכמה אצלנו/,
+    en: /a block in the\s*browser alone is not a withdrawal of consent with us|block in the browser alone is not a withdrawal of consent with us/,
+    de: /eine Sperre im Browser allein ersetzt jedoch nicht den Widerruf der Einwilligung bei uns/,
+    nl: /een blokkade in de browser alleen vervangt echter niet het intrekken van de instemming bij ons/,
+    fr: /un blocage dans le navigateur ne remplace toutefois pas le retrait du consentement chez nous/,
+    it: /un blocco nel browser da solo non sostituisce però la revoca del consenso presso di noi/,
+    es: /un bloqueo en el navegador por sí solo no sustituye la retirada del consentimiento ante nosotros/,
+    'pt-BR': /um bloqueio no navegador por si só não substitui a retirada do consentimento junto a nós/,
+    ja: /ブラウザーでの遮断だけでは、当社に対する同意の撤回には代わりません/,
+    pl: /sama blokada w przegl[ąa]darce nie zast[ęe]puje jednak wycofania zgody u nas/,
+  }
+
+  /**
+   * The Planet49 trap: a wording that offers the browser as a way of GIVING
+   * consent. Read one sentence at a time, and flagged only when that sentence
+   * carries all three of a consent word, a word for giving or expressing it,
+   * and a word for the browser. Our own sentence carries the first and third
+   * ("a block in the browser alone is not a withdrawal of consent with us") and
+   * must not trip it, which is the last mutation control below.
+   */
+  const CONSENT_WORD = /consent|Einwilligung|instemming|consentement|consenso|consentimiento|zgod|同意/i
+  const GIVING_WORD =
+    /\bgiv(e|ing|en)\b|\bgrant(ing|ed)?\b|\bexpress(ing|ed)?\b|erteil|\bgeben\b|\bgeven\b|donner|exprimer|\bdare\b|esprimere|prestar|expresar|manifestar|wyra[zż]|udziel|表明|与え/i
+  const BROWSER_WORD = /browser|Browser|navigateur|navegador|przegl[ąa]dar|ブラウザ/i
+  const offersConsentByBrowser = (value: string): boolean =>
+    value
+      .split(/(?<=[.。;；])\s*/)
+      .some((s) => CONSENT_WORD.test(s) && GIVING_WORD.test(s) && BROWSER_WORD.test(s))
+
+  for (const [name, doc] of privacyDocs) {
+    if (!doc) { check(`${name}/privacy: document is readable`, false); continue }
+    check(`${name}/privacy: says the browser sets the conditions of storage on the device`,
+      (BROWSER_CONTROL[name] ?? /$^/).test(doc))
+    check(`${name}/privacy: says a browser block is not a withdrawal of consent with us`,
+      (NOT_A_WITHDRAWAL[name] ?? /$^/).test(doc))
+  }
+
+  for (const name of ['he', 'en', ...LOCALES]) {
+    const dict = read(`lib/i18n/public/${name}.ts`)
+    check(`${name}: the locale dictionary is readable`, dict.length > 0)
+    if (!dict) continue
+    const hint = /^ {4}withdrawHint: '([^']*)'/m.exec(stripComments(dict))
+    check(`${name}: cookie.withdrawHint is readable`, hint !== null)
+    if (!hint) continue
+    const value = hint[1]!
+    check(`${name}: withdrawHint offers the browser as a control over storage`,
+      (BROWSER_CONTROL[name] ?? /$^/).test(value))
+    check(`${name}: withdrawHint says a browser block is not a withdrawal with us`,
+      (NOT_A_WITHDRAWAL[name] ?? /$^/).test(value))
+    check(`${name}: withdrawHint never offers the browser as a way of GIVING consent (Planet49)`,
+      !offersConsentByBrowser(value), value.slice(0, 80))
+  }
+
+  // MUTATION CONTROLS, against the real text.
+  {
+    const en = enPrivacySource ? read(enPrivacySource) : ''
+    const de = text.de ? text.de.privacy : ''
+    const enDict = read('lib/i18n/public/en.ts')
+    if (en) {
+      const half = en.replace(/ a block in the\s*\n?\s*browser alone is not a withdrawal of consent with us[^.]*\./, '.')
+      check('mutation control (en): the sentence with only its first half is caught',
+        BROWSER_CONTROL.en!.test(half) && !NOT_A_WITHDRAWAL.en!.test(half))
+    }
+    if (de) {
+      const gone = de.replace('in den Einstellungen Ihres Browsers', 'über den Link in der Fußzeile')
+      check('mutation control (de): a document that drops the browser half is caught',
+        !BROWSER_CONTROL.de!.test(gone))
+    }
+    if (enDict) {
+      const hint = /^ {4}withdrawHint: '([^']*)'/m.exec(stripComments(enDict))
+      const planet49 = (hint ? hint[1]! : '')
+        + ' You may also give your consent by using the appropriate settings of your browser.'
+      check('mutation control (en): consent offered through the browser is caught by the Planet49 check',
+        offersConsentByBrowser(planet49))
+      check('mutation control (en): the real withdrawHint is NOT caught by that check',
+        hint !== null && !offersConsentByBrowser(hint[1]!))
+    }
+    /* Polish was outside all three word lists, so the Planet49 trap could not
+     * fire for it at all: a Polish sentence offering the browser as a way of
+     * GIVING consent would have passed. Art. 399 ust. 2 PKE is exactly why it
+     * must not — Polish law does let device settings express consent, and that
+     * is the one locale where someone might be tempted to write it. */
+    const plDict = read('lib/i18n/public/pl.ts')
+    if (plDict) {
+      const hint = /^ {4}withdrawHint: '([^']*)'/m.exec(stripComments(plDict))
+      check('mutation control (pl): consent offered through the browser is caught by the Planet49 check',
+        offersConsentByBrowser('Zgodę mogą Państwo wyrazić także w ustawieniach swojej przeglądarki.'))
+      check('mutation control (pl): the real Polish withdrawHint is NOT caught by that check',
+        hint !== null && !offersConsentByBrowser(hint[1]!))
+    }
+  }
 }
 
 console.log(`\n${pass} passed, ${fail} failed`)

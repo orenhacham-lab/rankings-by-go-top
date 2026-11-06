@@ -249,7 +249,7 @@ export const nl = {
     settingsTitle: 'Cookies kiezen',
     settingsIntro: 'Elke categorie kunt u afzonderlijk accepteren of weigeren, en uw keuze op elk moment wijzigen.',
     always: 'Altijd actief',
-    withdrawHint: 'Om uw toestemming op elk moment te wijzigen of in te trekken, vindt u onderaan elke pagina de link «Cookie-instellingen».',
+    withdrawHint: 'Om uw toestemming op elk moment te wijzigen of in te trekken, vindt u onderaan elke pagina de link «Cookie-instellingen». De voorwaarden van het opslaan en het uitlezen op uw apparaat kunt u ook zelf bepalen, in de instellingen van uw browser; een blokkade in de browser alleen vervangt echter niet het intrekken van de instemming bij ons.',
     gpcTitle: 'Toestemming automatisch geweigerd',
     gpcBody: 'Uw browser stuurt het Global Privacy Control-signaal, daarom zijn er geen cookies voor meting of marketing geladen. Uw keuze is vastgelegd.',
     categories: {

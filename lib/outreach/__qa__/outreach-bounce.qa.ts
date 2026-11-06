@@ -33,6 +33,7 @@ import {
   recipientIn,
   recordDeliveryReport,
 } from '../bounce'
+import { allowedBodyUrl } from '../inbound-body'
 import { handleInboundReply } from '../inbound'
 import { dailyQuota } from '../schedule'
 import { PROSPECTS_TABLE } from '../prospects'
@@ -494,6 +495,135 @@ Subject: a question about Store Example's organic traffic
   )
   check('I1c-MUT: without that step a dead address stays open to every sender',
     mutClose === true)
+
+  // ── The body the webhook does not send ────────────────────────────────────
+  // Every report this channel recorded between 19 Oct and 5 Nov 2026 was stored
+  // "unreadable report, no recipient named". The payload shape written into
+  // those rows says why: a 200-character preview plus a `bodyUrl`. A bounce
+  // names its recipient in a transcript line long past the 200th character, so
+  // the body has to be fetched or the brake can never engage.
+  const fullBounce = bounceBody(PROSPECT)
+  const previewOf = (text: string) => text.slice(0, 200)
+  const withBodyUrl = (url: string, text: string) => ({
+    id: 'm1',
+    event: 'message.received',
+    timestamp: NOW.toISOString(),
+    data: {
+      attachments: [],
+      bodyUrl: url,
+      cc: [],
+      from: 'MAILER-DAEMON@smtp.hostinger.com',
+      subject: 'Undelivered Mail Returned to Sender',
+      textBody: previewOf(text),
+    },
+  })
+  const serving = (text: string, status = 200) => {
+    const calls: string[] = []
+    return {
+      calls,
+      fetch: async (url: string) => { calls.push(url); return { status, text } },
+    }
+  }
+
+  const good = serving(fullBounce)
+  f = world()
+  outcome = await handleInboundReply(
+    withBodyUrl('https://api.hostinger.com/mail/bodies/abc?token=secret', fullBounce),
+    asAdmin(f), NOW, good.fetch,
+  )
+  check('F1: a report whose preview names nobody is attributed once the body is fetched',
+    outcome.action === 'delivery_report'
+    && f.tables[DELIVERY_EVENTS_TABLE].length === 1
+    && f.tables[DELIVERY_EVENTS_TABLE][0].attributed === true
+    && String(f.tables[DELIVERY_EVENTS_TABLE][0].detail).startsWith('dsn 5.1.1'))
+  check('F1b: and the dead address is closed for every sender',
+    f.tables[SUPPRESSION_TABLE].length === 1 && f.tables[SUPPRESSION_TABLE][0].email === PROSPECT)
+  check('F1c: the fetch happened exactly once', good.calls.length === 1)
+
+  // The preview alone is what the channel had until now, and it must stay
+  // unattributed rather than be guessed at.
+  f = world()
+  outcome = await handleInboundReply(
+    withBodyUrl('https://api.hostinger.com/mail/bodies/abc', fullBounce),
+    asAdmin(f), NOW, async () => { throw new Error('storage down') },
+  )
+  check('F2: a fetch that fails leaves the report unattributed rather than guessed at',
+    outcome.action === 'delivery_report'
+    && f.tables[DELIVERY_EVENTS_TABLE][0].attributed === false
+    && String(f.tables[DELIVERY_EVENTS_TABLE][0].detail).includes('bodyUrl unreachable'))
+
+  const strangerHost = serving(fullBounce)
+  f = world()
+  await handleInboundReply(
+    withBodyUrl('https://evil.example/bodies/abc', fullBounce),
+    asAdmin(f), NOW, strangerHost.fetch,
+  )
+  check('F3: a URL on a host we do not serve bodies from is never fetched',
+    strangerHost.calls.length === 0
+    && f.tables[DELIVERY_EVENTS_TABLE][0].attributed === false
+    && String(f.tables[DELIVERY_EVENTS_TABLE][0].detail).includes('bodyUrl host evil.example'))
+
+  const plain = serving(fullBounce)
+  f = world()
+  await handleInboundReply(
+    withBodyUrl('http://api.hostinger.com/bodies/abc', fullBounce),
+    asAdmin(f), NOW, plain.fetch,
+  )
+  check('F3b: nor is one that is not https', plain.calls.length === 0)
+
+  check('F4: the note a failed read leaves carries no URL and no token',
+    !String(f.tables[DELIVERY_EVENTS_TABLE][0].detail).includes('token')
+    && !String(f.tables[DELIVERY_EVENTS_TABLE][0].detail).includes('/bodies/'))
+
+  const notTheBody = serving('', 404)
+  f = world()
+  await handleInboundReply(
+    withBodyUrl('https://api.hostinger.com/bodies/gone', fullBounce),
+    asAdmin(f), NOW, notTheBody.fetch,
+  )
+  check('F5: a provider that answers something other than the body says so in the row',
+    String(f.tables[DELIVERY_EVENTS_TABLE][0].detail).includes('bodyUrl status 404'))
+
+  // The same fetch serves the promise we made in writing: a refusal written
+  // past the 200th character of a long reply is still a refusal.
+  const longNo = `${'Thank you for the note. '.repeat(12)}\nPlease remove me from your list.`
+  const replying = serving(longNo)
+  f = world()
+  outcome = await handleInboundReply(
+    {
+      id: 'm2',
+      event: 'message.received',
+      data: { bodyUrl: 'https://api.hostinger.com/bodies/reply', from: PROSPECT, subject: 're: your organic traffic', textBody: previewOf(longNo) },
+    },
+    asAdmin(f), NOW, replying.fetch,
+  )
+  check('F6: an opt-out beyond the preview is acted on',
+    outcome.action === 'suppressed' && f.tables[SUPPRESSION_TABLE].length === 1)
+
+  const mutFetch = await withMutant<{ handleInboundReply: typeof handleInboundReply }, boolean>(
+    'lib/outreach/inbound.ts',
+    [[/  const body = read\.ok && read\.text\.length > preview\.body\.length \? read\.text : preview\.body/,
+      '  const body = preview.body']],
+    async (m) => {
+      const blind = world()
+      await m.handleInboundReply(
+        withBodyUrl('https://api.hostinger.com/bodies/abc', fullBounce),
+        asAdmin(blind), NOW, serving(fullBounce).fetch,
+      )
+      return blind.tables[DELIVERY_EVENTS_TABLE][0].attributed === false
+    },
+  )
+  check('F1-MUT: on the preview alone the bounce goes uncounted, as it did for three weeks',
+    mutFetch === true)
+
+  const mutHost = await withMutant<{ allowedBodyUrl: typeof allowedBodyUrl }, boolean>(
+    'lib/outreach/inbound-body.ts',
+    [[/  return BODY_URL_HOSTS\.some\(\(allowed\) => host === allowed \|\| host\.endsWith\(`\.\$\{allowed\}`\)\)/,
+      '  return true']],
+    (m) => m.allowedBodyUrl('https://evil.example/bodies/abc'),
+  )
+  check('F3-MUT: an allowlist that allowed anything would fetch a stranger\'s URL',
+    mutHost === true)
 
   console.log(`\n${pass} passed, ${fail} failed`)
   if (fail > 0) process.exit(1)

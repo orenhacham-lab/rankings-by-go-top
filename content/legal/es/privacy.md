@@ -3,7 +3,7 @@ title: Política de privacidad | Go Top SEO
 description: Política de privacidad de Go Top SEO: cómo recopilamos, utilizamos y protegemos sus datos.
 locale: es
 source: app/(public)/en/privacy/page.tsx
-lastUpdated: 2026-11-01
+lastUpdated: 2026-11-06
 register: usted
 ---
 
@@ -67,6 +67,7 @@ No compartimos su información personal con terceros, salvo con:
 - **ScrapeLLM:** para el seguimiento de visibilidad en IA; véase «Proveedores de IA» más abajo
 - **Otros sitios de la red de enlaces:** únicamente si usted se unió a la red; véase «Red de enlaces» más abajo
 - **JVZoo:** solo si usted ha abierto nuestra página de venta del marketplace JVZoo: se carga desde JVZoo una imagen de seguimiento que recibe su dirección IP, el identificador de su navegador y la página de la que llegó, para poder atribuir una compra al afiliado que le remitió. Esa solicitud también almacena en su dispositivo cookies propias de JVZoo, por lo que se rige por el consentimiento allí donde la ley lo exige para ese almacenamiento: en el Espacio Económico Europeo, el Reino Unido, Suiza y Canadá, y siempre que no podamos determinar de qué país proviene la solicitud, la imagen se carga únicamente después de que usted haya aceptado las cookies de marketing; fuera de esos territorios se carga al abrirse la página. Respecto de esa recogida y esa transmisión, JVZoo no trata los datos por cuenta nuestra, sino que es corresponsable del tratamiento junto con nosotros; lo que haga con los datos después lo decide JVZoo conforme a su propia política de privacidad
+- **Digistore24:** solo si usted ha abierto nuestra página de venta del marketplace Digistore24: se carga desde Digistore24 un script de un sello de confianza que recibe su dirección IP, el identificador de su navegador y la página de la que llegó, y que indica a Digistore24 como el revendedor de esa compra. Esa solicitud también almacena en su dispositivo, durante una semana, una cookie de Digistore24, por lo que se rige por el consentimiento allí donde la ley lo exige para ese almacenamiento: en el Espacio Económico Europeo, el Reino Unido, Suiza y Canadá, y siempre que no podamos determinar de qué país proviene la solicitud, el sello se carga únicamente después de que usted haya aceptado las cookies de marketing; fuera de esos territorios se carga al abrirse la página. Si después compra a través de esa página, Digistore24 es el vendedor: **Digistore24 Inc., 360 Central Avenue, Suite 800, St. Petersburg, FL 33701, Estados Unidos** cobra su pago, emite su factura y decide, conforme a su propia política de privacidad, qué hace con sus datos, como responsable del tratamiento independiente y no como encargado que actúa por cuenta nuestra
 - **Meta (Facebook / Instagram):** para publicidad segmentada y para un informe de registro completado que se envía desde nuestro servidor; véase la sección Publicidad en Meta más abajo. Respecto de esos eventos de conversión, Meta no trata los datos por cuenta nuestra, sino que es corresponsable del tratamiento junto con nosotros, como se explica en esa sección. Los datos que recibimos de las API de Google nunca se comparten con Meta ni se usan para publicidad
 - Cuando lo exija la ley
 
@@ -261,7 +262,7 @@ Clasificamos las cookies en tres categorías, y le consultamos sobre dos de ella
 
 **Antes de que usted elija, no se instala ninguna cookie de medición ni de marketing y no se realiza ninguna solicitud a los servidores de Google.** Aceptar y rechazar son dos botones iguales en el aviso, y cada categoría puede permitirse por separado. Hay una excepción: en la página de venta del marketplace JVZoo, y solo para quien llega desde fuera de los territorios enumerados en «Servicios de análisis y marketing» más abajo, la imagen de seguimiento del marketplace y las cookies que almacena se cargan junto con la página.
 
-**Cambiar o retirar su consentimiento:** en cualquier momento, mediante el enlace «Configuración de cookies» al pie de cada página. Retirar el consentimiento es exactamente tan fácil como darlo, y no le supone ningún costo en el servicio.
+**Cambiar o retirar su consentimiento:** en cualquier momento, mediante el enlace «Configuración de cookies» al pie de cada página. Retirar el consentimiento es exactamente tan fácil como darlo, y no le supone ningún costo en el servicio. Las condiciones del almacenamiento y de la lectura en su dispositivo también puede fijarlas usted, en la configuración de su navegador; un bloqueo en el navegador por sí solo no sustituye la retirada del consentimiento ante nosotros, porque nuestra puerta de marketing y el informe que enviamos a Meta desde nuestro servidor leen únicamente nuestro propio registro de consentimientos.
 
 **El programa de socios:** no instala ninguna cookie. Si usted llega al sitio a través del enlace de un socio, el código de ese socio va en el propio enlace y nada se escribe en su dispositivo. Por eso el programa no figura entre las categorías anteriores, y por eso lo que usted elija en este aviso ni lo ayuda ni lo estorba. Una cookie que conserve el código de un socio no es estrictamente necesaria para que el sitio funcione, así que habríamos necesitado su consentimiento para instalarla: elegimos no necesitarla. Lo que sí se registra con el clic es un recuento: uno más en el total diario de ese socio, sin ningún dato sobre usted.
 
@@ -343,6 +344,7 @@ Conservamos los datos únicamente durante el tiempo necesario para la finalidad 
 - **Verificación gratuita del sitio:** se almacena en caché hasta 24 horas y después se suprime si a partir de ella no se abrió una cuenta.
 - **Registro de decisiones sobre cookies:** hasta tres años desde la decisión, para que podamos demostrar lo que usted eligió. Esa es la base jurídica para conservarlo, razón por la cual no se suprime junto con la cuenta.
 - **Foto de autor:** mientras la foto esté configurada en el proyecto. Al eliminarla, o al pasar a ninguna foto o al icono del sitio, el archivo se borra de inmediato. Una copia ya colocada en su sitio permanece allí hasta que usted la elimine.
+- **Datos de una solicitud de socio:** 12 meses desde la solicitud. Una solicitud rechazada se elimina después por completo y, en cualquier otro caso, la dirección IP desde la que llegó la solicitud se suprime después. Esa dirección se registra únicamente para distinguir una oleada de solicitudes inventadas de una agencia real y para mantener el límite de tres solicitudes por hora. El registro de las referencias, de las comisiones y de los pagos es nuestra contabilidad y permanece durante el plazo que la ley nos obliga a conservar los libros.
 - **Registros de seguridad y del servidor:** hasta 90 días.
 
 ## Transferencias internacionales
@@ -350,6 +352,8 @@ Conservamos los datos únicamente durante el tiempo necesario para la finalidad 
 El servicio funciona sobre proveedores internacionales de nube e infraestructura, por lo que los datos pueden almacenarse o tratarse fuera de su país de residencia. Los principales proveedores: Vercel (alojamiento de la aplicación), Supabase (la base de datos, en la región de Mumbai, en la India) y todos los demás proveedores enumerados en «Intercambio de información» más arriba, entre ellos los proveedores de IA y de búsqueda, el proveedor de conversión a PDF y el servicio de búsqueda de direcciones.
 
 Para los datos sobre residentes del Espacio Económico Europeo, Suiza o el Reino Unido: la Comisión Europea ha reconocido que Israel ofrece un nivel adecuado de protección, por lo que una transferencia hacia nosotros no requiere ningún instrumento adicional. Para las transferencias a proveedores fuera de la UE en países sin decisión de adecuación, nos basamos en las Cláusulas Contractuales Tipo de la Comisión Europea, dentro de los propios términos de esos proveedores.
+
+No todos los destinatarios indicados arriba son nuestros proveedores, y el instrumento anterior no alcanza a todos. **JVZoo decide por sí mismo qué hace con los datos**: respecto de la recogida y la transmisión de la solicitud realizada desde nuestra página somos corresponsables del tratamiento junto con JVZoo, y esa transmisión no se rige ni por un contrato de encargo del tratamiento ni por cláusulas contractuales tipo. En el Espacio Económico Europeo, el Reino Unido, Suiza y Canadá, y siempre que no podamos determinar de qué país proviene la solicitud, esta se realiza únicamente después de que usted haya aceptado las cookies de marketing, y **ese consentimiento suyo es el instrumento**: el artículo 49, apartado 1, letra a), del RGPD permite una transferencia a un país sin decisión de adecuación cuando el interesado ha consentido explícitamente después de haber sido informado de los riesgos. El riesgo aquí es que su dirección IP y el identificador de su navegador lleguen a una sociedad establecida en los Estados Unidos, donde la protección del RGPD no se aplica por sí sola. Si usted no acepta las cookies de marketing, nada se les transmite.
 
 Usted puede preguntarnos en qué instrumento nos basamos para una transferencia determinada, y le responderemos por escrito.
 
@@ -426,4 +430,4 @@ Si tiene preguntas sobre esta política de privacidad, contacte con:
 
 **Teléfono:** 054-9489377
 
-Esta política se actualizó por última vez el 1 de noviembre de 2026
+Esta política se actualizó por última vez el 6 de noviembre de 2026

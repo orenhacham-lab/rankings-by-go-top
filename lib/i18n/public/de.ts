@@ -240,7 +240,7 @@ export const de = {
     settingsTitle: 'Cookies auswählen',
     settingsIntro: 'Jede Kategorie können Sie einzeln annehmen oder ablehnen, und Ihre Auswahl jederzeit ändern.',
     always: 'Immer aktiv',
-    withdrawHint: 'Um Ihre Einwilligung jederzeit zu ändern oder zu widerrufen, finden Sie am Fuß jeder Seite den Link «Cookie-Einstellungen».',
+    withdrawHint: 'Um Ihre Einwilligung jederzeit zu ändern oder zu widerrufen, finden Sie am Fuß jeder Seite den Link «Cookie-Einstellungen». Die Bedingungen der Speicherung und des Auslesens auf Ihrem Gerät können Sie auch selbst festlegen, in den Einstellungen Ihres Browsers; eine Sperre im Browser allein ersetzt jedoch nicht den Widerruf der Einwilligung bei uns.',
     gpcTitle: 'Einwilligung automatisch abgelehnt',
     gpcBody: 'Ihr Browser sendet das Signal Global Privacy Control, daher wurden keine Cookies für Messung oder Marketing geladen. Ihre Entscheidung wurde festgehalten.',
     categories: {

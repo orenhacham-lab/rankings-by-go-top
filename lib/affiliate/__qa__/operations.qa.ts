@@ -85,11 +85,22 @@ async function main() {
     check('A5b: every impossible rate card is refused with its own reason',
       rates.map((r) => (r.kind === 'invalid' ? r.reason : r.kind)).join(',') === 'base_rate,top_rate,top_below_base,top_rate_from',
       JSON.stringify(rates))
+    /*
+     * The negotiated rates are derived from the published ones rather than
+     * typed, so this case keeps asking its question when the programme's rate
+     * changes. It was written as a literal 35 while the programme paid 30, and
+     * on 2026-11-05 the programme moved TO 35 — at which point "stored on the
+     * partner, not on the program" would have passed without testing anything,
+     * because the two numbers had become the same number.
+     */
+    const negotiatedBase = AFFILIATE_TERMS.baseRate + 5
+    const negotiatedTop = AFFILIATE_TERMS.topRate + 5
     const negotiated = world()
-    await approveApplication(negotiated, { affiliateId: 'app-1', code: 'dana', decidedBy: ADMIN, baseRate: 35, topRate: 45, topRateFrom: 5, now: NOW })
+    await approveApplication(negotiated, { affiliateId: 'app-1', code: 'dana', decidedBy: ADMIN, baseRate: negotiatedBase, topRate: negotiatedTop, topRateFrom: 5, now: NOW })
     check('A5c: a negotiated card is stored on the partner, not on the program',
-      negotiated.tables.affiliates[0].base_rate === 35 && negotiated.tables.affiliates[0].top_rate === 45
-      && AFFILIATE_TERMS.baseRate === 30)
+      negotiated.tables.affiliates[0].base_rate === negotiatedBase
+      && negotiated.tables.affiliates[0].top_rate === negotiatedTop
+      && negotiatedBase !== AFFILIATE_TERMS.baseRate)
 
     const rejected = world()
     const no = await rejectApplication(rejected, { affiliateId: 'app-1', decidedBy: ADMIN, notes: 'לא רלוונטי', now: NOW })
