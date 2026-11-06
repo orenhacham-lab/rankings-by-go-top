@@ -16,6 +16,8 @@
  * logged.
  */
 
+import { serperBody } from '@/lib/scanner/serper-payload'
+
 const SERPER_API_URL = 'https://google.serper.dev/search'
 /** Per request. The three a4 queries run in parallel, so this is a4's whole budget. */
 export const SEARCH_TIMEOUT_MS = 6_000
@@ -150,7 +152,7 @@ export function createSerperSearch(options: { apiKey?: string | null; fetchImpl?
       const res = await fetchImpl(SERPER_API_URL, {
         method: 'POST',
         headers: { 'X-API-KEY': apiKey, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ q: query, gl: market.gl, hl: market.hl, type: 'search', num: RESULTS_PER_QUERY, page: 1 }),
+        body: serperBody({ q: query, gl: market.gl, hl: market.hl, type: 'search', num: RESULTS_PER_QUERY, page: 1 }, 'SeedScan'),
         signal: controller.signal,
       })
       // The status line and body of a refusal are the provider's words: not read.
