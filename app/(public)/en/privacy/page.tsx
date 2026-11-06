@@ -117,7 +117,8 @@ export default function EnglishPrivacyPage() {
           that collection and transmission
           JVZoo does not process data on our behalf: it is a joint controller with us, and what it does
           with the data afterwards is decided by JVZoo under its own privacy policy</li>
-          <li><strong>Digistore24:</strong> only if you opened our Digistore24 marketplace sales page — a
+          <li><strong>Digistore24</strong> (Digistore24 Inc., 360 Central Avenue, Suite 800, St. Petersburg,
+          FL 33701, United States)<strong>:</strong> only if you opened our Digistore24 marketplace sales page — a
           trust-badge script is loaded from Digistore24, which receives your IP address, your browser
           identifier and the page you arrived from, and which names Digistore24 as the reseller for that
           purchase. The request also stores a Digistore24 cookie on your device for one week, so it is
@@ -897,6 +898,21 @@ export default function EnglishPrivacyPage() {
           protection, so a transfer to us requires no further instrument. For transfers to providers
           outside the EU in countries without an adequacy decision we rely on the European
           Commission&rsquo;s Standard Contractual Clauses, within those providers&rsquo; own terms.
+        </p>
+        <p className="mt-4">
+          Not every recipient named above is a provider of ours, and the instrument above does not reach
+          all of them. <strong>JVZoo, and Digistore24 Inc. of St. Petersburg, Florida, on our Digistore24
+          sales page, each decide for themselves what they do with the data</strong>: for the collection
+          and the transmission of the request made from our page we are a joint controller with each of
+          them, and neither transmission is governed by a processing agreement or by Standard Contractual
+          Clauses. In the European Economic Area, the United Kingdom, Switzerland and Canada, and whenever
+          we cannot determine which country the request came from, the request is made only after you have
+          accepted marketing cookies, and <strong>that consent of yours is the instrument</strong>: Article
+          49(1)(a) of the GDPR permits a transfer to a country without an adequacy decision where the data
+          subject has explicitly consented after being informed of the risks. The risk here is that your IP
+          address and your browser identifier reach a company in the United States, where the protection of
+          the GDPR does not apply of itself. If you do not accept marketing cookies, nothing is transmitted
+          to them.
         </p>
         <p className="mt-4">
           You may ask us which instrument we rely on for a particular transfer, and we will answer in

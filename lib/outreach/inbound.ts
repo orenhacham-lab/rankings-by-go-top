@@ -27,6 +27,12 @@ import {
   recordDeliveryReport,
   type DeliveryKind,
 } from './bounce'
+import {
+  bodyReadNote,
+  fetchBodyOverHttp,
+  readReportBody,
+  type BodyFetcher,
+} from './inbound-body'
 
 /** Where a reply stops being the person's own words and starts being ours, quoted back. */
 const QUOTE_MARKERS = [
@@ -229,9 +235,20 @@ export async function handleInboundReply(
   payload: unknown,
   admin: ServiceRoleClient,
   now: Date = new Date(),
+  fetchBody: BodyFetcher = fetchBodyOverHttp,
 ): Promise<InboundOutcome> {
   const email = senderAddress(payload)
-  const { subject, body } = messageText(payload)
+  const preview = messageText(payload)
+  // THE BODY IS FETCHED, because the webhook sends a 200-character preview and
+  // a `bodyUrl` for the rest (lib/outreach/inbound-body.ts has the evidence). A
+  // bounce names the address it failed to reach in a transcript line far past
+  // the 200th character, so every report this channel ever recorded was stored
+  // "no recipient named" and the brake counted none of them. A failed fetch is
+  // not a failed delivery: the preview stays, and the note says why.
+  const read = await readReportBody(payload, fetchBody)
+  const subject = preview.subject
+  const body = read.ok && read.text.length > preview.body.length ? read.text : preview.body
+  const readNote = bodyReadNote(read)
 
   let report = classifyDelivery({ sender: email, subject, body })
   if (report !== null) {
@@ -251,12 +268,13 @@ export async function handleInboundReply(
       // names ride along in its detail. Keys and lengths only — never a value,
       // because a report's body carries a business's address and our own
       // message.
-      const shape = `b${body.length} ${payloadShape(payload)}`
+      const shape = `${readNote ?? 'fetched'} b${body.length} ${payloadShape(payload)}`
       console.warn('[outreach-inbound] report with no recipient', {
         kind: report.kind,
         detail: report.detail,
         subjectLength: subject.length,
         bodyLength: body.length,
+        bodyRead: readNote ?? 'fetched',
         shape: payloadShape(payload),
       })
       report = { ...report, detail: `${report.detail}; ${shape}`.slice(0, 160) }

@@ -4502,6 +4502,326 @@ const PHOTO_IN_RETENTION: Record<string, RegExp> = {
 }
 
 /**
+ * THE COOKIE-SETTINGS LINK A PRIVACY DOCUMENT TELLS THE READER TO LOOK FOR
+ * MUST BE THE LINK THE FOOTER ACTUALLY RENDERS.
+ *
+ * Every privacy document in all nine languages carries the sentence that says
+ * how to change or withdraw cookie consent, and each one names the footer link
+ * by its label. That sentence is not decoration: GDPR Art. 7(3) requires that
+ * withdrawal be as easy as consent, and the information duties that sit on a
+ * cookie banner (ePrivacy Art. 5(3) with GDPR Art. 13, PECR reg. 6 in the UK,
+ * art. 399 ust. 1 pkt 1 lit. b PKE in Poland) are satisfied by telling the
+ * visitor the method, not merely that a right exists. A document that names a
+ * label the footer does not render tells the visitor to look for something
+ * that is not there, which is the one way this sentence can be false while
+ * still being present.
+ *
+ * It had gone wrong in two languages at once, undetected, because nothing
+ * compared the two places. The French document said « Réglages des cookies »
+ * where the footer renders « Paramètres des cookies », and the Japanese said
+ * 「Cookie の設定」 where the footer renders 「クッキーの設定」. Both were
+ * fixed with this guard.
+ *
+ * The label is READ FROM THE DICTIONARY, never written here as a literal: the
+ * footer renders `dict.cookie.settings` (components/Footer.tsx), so the
+ * dictionary is the only thing that can be called right, and a guard holding
+ * its own copy would pass a renamed link.
+ */
+{
+  const read = (path: string) => (existsSync(path) ? readFileSync(path, 'utf8') : '')
+  const enPrivacySource = frontMatter(text[LOCALES[0]].privacy).source
+  const privacyDocs: [string, string][] = [
+    ['he', read(HEBREW_PRIVACY)],
+    ['en', enPrivacySource ? read(enPrivacySource) : ''],
+    ...LOCALES.map((l): [string, string] => [l, text[l].privacy]),
+  ]
+
+  /** The footer's own label for a locale, out of lib/i18n/public/<locale>.ts. */
+  const footerLabel = (locale: string): string | null => {
+    const src = read(`lib/i18n/public/${locale}.ts`)
+    if (!src) return null
+    const m = /^ {4}settings: '([^']+)'/m.exec(stripComments(src))
+    return m ? m[1]! : null
+  }
+
+  /**
+   * Any quoted run that looks like it is naming a cookie-settings link: the
+   * quote styles the documents use (guillemets, curly quotes, ASCII quotes,
+   * Japanese corner brackets) around a short phrase that mentions cookies.
+   */
+  const QUOTED = /[«„"'‘“「]\s*([^«»„""'’”」\n]{3,40}?)\s*[»"'’”」]/g
+  const MENTIONS_COOKIES = /cookie|Cookie|עוגיות|クッキー/
+
+  for (const [name, privacy] of privacyDocs) {
+    const label = footerLabel(name)
+    check(`${name}: the footer's cookie-settings label is readable from the dictionary`, label !== null, name)
+    if (!label || !privacy) continue
+    check(`${name}/privacy: names the footer link by the label the footer renders (${label})`,
+      privacy.includes(label), `expected ${JSON.stringify(label)}`)
+    const wrong = [...privacy.matchAll(QUOTED)]
+      .map((m) => m[1]!)
+      .filter((q) => MENTIONS_COOKIES.test(q) && q !== label)
+    check(`${name}/privacy: names no other label for that link`,
+      wrong.length === 0, wrong.length ? `found ${JSON.stringify(wrong)}` : undefined)
+  }
+
+  // MUTATION CONTROLS, against the real files and the real dictionaries.
+  const frReal = text.fr ? text.fr.privacy : ''
+  const jaReal = text.ja ? text.ja.privacy : ''
+  const frLabel = footerLabel('fr')
+  const jaLabel = footerLabel('ja')
+  if (frReal && frLabel) {
+    const broken = frReal.replace(frLabel, 'Réglages des cookies')
+    check('mutation control (fr): the old wrong label is caught by the "names the footer link" check',
+      !broken.includes(frLabel))
+    check('mutation control (fr): the old wrong label is caught by the "no other label" check',
+      [...broken.matchAll(QUOTED)].map((m) => m[1]!)
+        .some((q) => MENTIONS_COOKIES.test(q) && q !== frLabel))
+  }
+  if (jaReal && jaLabel) {
+    const broken = jaReal.replace(jaLabel, 'Cookie の設定')
+    check('mutation control (ja): the old wrong label is caught by the "names the footer link" check',
+      !broken.includes(jaLabel))
+    check('mutation control (ja): the old wrong label is caught by the "no other label" check',
+      [...broken.matchAll(QUOTED)].map((m) => m[1]!)
+        .some((q) => MENTIONS_COOKIES.test(q) && q !== jaLabel))
+  }
+  const deLabel = footerLabel('de')
+  if (deLabel) {
+    check('mutation control: a renamed dictionary label is not matched by the old document text',
+      !'den Link „Cookie-Schalter“ in der Fußzeile'.includes(deLabel))
+  }
+}
+
+// ── 26) the transfer instrument for recipients that are NOT our processors ──
+/*
+ * Every privacy document names JVZoo under Information Sharing and says, in
+ * that same section, that JVZoo does NOT process the data on our behalf: it is
+ * an independent controller, and for the collection and transmission of the
+ * request made from our page we are a joint controller with it. The Hebrew and
+ * English documents say the same of Digistore24 Inc.
+ *
+ * The International Transfers section, in every language, used to offer one
+ * instrument only: Standard Contractual Clauses, "for transfers to providers".
+ * A joint controller is not a provider and not a processor, so that sentence
+ * never reached the two recipients the same document had just described as
+ * controllers of their own — and both sit in the United States, which has no
+ * adequacy decision for us to rely on either.
+ *
+ * The instrument that does apply is the visitor's own consent. The request is
+ * made only after marketing cookies are accepted in the EEA, the UK,
+ * Switzerland and Canada (and wherever the country cannot be determined), and
+ * Article 49(1)(a) GDPR allows a transfer to a third country on the data
+ * subject's explicit consent, given after being informed of the risks. So the
+ * paragraph must do three things, and each is pinned here: say the preceding
+ * instrument does not reach every recipient, name the consent as the
+ * instrument with its article, and name the risk it is consent to — that the
+ * IP address and browser identifier reach a company in the United States.
+ */
+const TRANSFER_NOT_ALL: Record<string, RegExp> = {
+  he: /לא כל נמען שנמנה למעלה הוא ספק שלנו, והמכשיר שלמעלה אינו חל על כולם/,
+  en: /Not every recipient named above is a provider of ours, and the instrument above does not reach\s*all of them/,
+  de: /Nicht jeder oben genannte Empfänger ist unser Anbieter, und das vorstehende Instrument reicht nicht an alle heran/,
+  nl: /Niet elke hierboven genoemde ontvanger is onze leverancier, en het voorgaande instrument reikt niet tot allen/,
+  fr: /Tous les destinataires nommés ci-dessus ne sont pas nos fournisseurs, et l'instrument qui précède ne les atteint pas tous/,
+  it: /Non tutti i destinatari indicati sopra sono nostri fornitori, e lo strumento che precede non li raggiunge tutti/,
+  es: /No todos los destinatarios indicados arriba son nuestros proveedores, y el instrumento anterior no alcanza a todos/,
+  'pt-BR': /Nem todos os destinatários indicados acima são nossos fornecedores, e o instrumento anterior não alcança todos eles/,
+  ja: /上記の受領者のすべてが当社の提供事業者であるわけではなく、前記の措置はそのすべてに及ぶものではありません/,
+}
+/* No processing agreement and no Standard Contractual Clauses govern that transmission. */
+const TRANSFER_NO_SCC: Record<string, RegExp> = {
+  he: /לא חל הסכם עיבוד נתונים ולא חלים\s*סעיפי חוזה תקניים/,
+  en: /neither transmission is governed by a processing agreement or by Standard Contractual\s*Clauses/,
+  de: /gilt weder ein Auftragsverarbeitungsvertrag noch gelten Standardvertragsklauseln/,
+  nl: /geldt geen verwerkersovereenkomst en gelden geen standaardcontractbepalingen/,
+  fr: /n'est régie ni par un contrat de sous-traitance ni par des clauses contractuelles types/,
+  it: /non è retta né da un contratto di responsabile del trattamento né da clausole contrattuali standard/,
+  es: /no se rige ni por un contrato de encargo del tratamiento ni por cláusulas contractuales tipo/,
+  'pt-BR': /não é regida nem por um contrato de operador nem por cláusulas-padrão contratuais/,
+  ja: /その送信には処理者契約も標準契約条項も適用されません/,
+}
+/* The consent is the instrument, and Article 49(1)(a) is named. */
+const TRANSFER_DEROGATION: Record<string, RegExp> = {
+  he: /וההסכמה הזאת שלך היא המכשיר[\s\S]{0,120}סעיף 49\(1\)\(א\) ל-GDPR/,
+  en: /that consent of yours is the instrument[\s\S]{0,140}Article\s*49\(1\)\(a\) of the GDPR/,
+  de: /diese Einwilligung ist das Instrument[\s\S]{0,140}Artikel 49 Absatz 1 Buchstabe a DSGVO/,
+  nl: /die toestemming van u is het instrument[\s\S]{0,140}artikel 49 lid 1 onder a AVG/,
+  fr: /ce consentement est l'instrument[\s\S]{0,140}l'article 49, paragraphe 1, point a\), du RGPD/,
+  it: /quel Suo consenso è lo strumento[\s\S]{0,140}l'articolo 49, paragrafo 1, lettera a\), del GDPR/,
+  es: /ese consentimiento suyo es el instrumento[\s\S]{0,140}el artículo 49, apartado 1, letra a\), del RGPD/,
+  'pt-BR': /esse seu consentimento é o instrumento[\s\S]{0,140}o artigo 49, 1, alínea a, do RGPD/,
+  ja: /その同意こそがその措置です[\s\S]{0,140}GDPR 第49条第1項\(a\)/,
+}
+/* The risk the consent is consent TO must be stated, or it is not informed. */
+const TRANSFER_RISK: Record<string, RegExp> = {
+  he: /מגיעים לחברה בארצות הברית/,
+  en: /reach a company in the United States/,
+  de: /ein\s*Unternehmen in den Vereinigten Staaten erreichen/,
+  nl: /bij een onderneming in de Verenigde Staten aankomen/,
+  fr: /parviennent à une société située aux États-Unis/,
+  it: /giungano a una società stabilita negli Stati\s*Uniti/,
+  es: /lleguen a una sociedad establecida en los\s*Estados Unidos/,
+  'pt-BR': /cheguem a uma empresa estabelecida nos\s*Estados Unidos/,
+  ja: /米国に所在する会社に届くこと/,
+}
+{
+  const read = (path: string) => (existsSync(path) ? readFileSync(path, 'utf8') : '')
+  const enPrivacySource = frontMatter(text[LOCALES[0]].privacy).source
+  const enPrivacy = enPrivacySource ? read(enPrivacySource) : ''
+  const hePrivacy = read(HEBREW_PRIVACY)
+  const privacyDocs: [string, string][] = [
+    ['he', hePrivacy],
+    ['en', enPrivacy],
+    ...LOCALES.map((l): [string, string] => [l, text[l].privacy]),
+  ]
+  for (const [name, privacy] of privacyDocs) {
+    check(`${name}/privacy: the transfers section says the instrument does not reach every recipient`,
+      (TRANSFER_NOT_ALL[name] ?? /$^/).test(privacy))
+    check(`${name}/privacy: that transmission is covered by no processing agreement and no SCCs`,
+      (TRANSFER_NO_SCC[name] ?? /$^/).test(privacy))
+    check(`${name}/privacy: the consent is named as the instrument, with Article 49(1)(a)`,
+      (TRANSFER_DEROGATION[name] ?? /$^/).test(privacy))
+    check(`${name}/privacy: the risk the consent is consent to is stated`,
+      (TRANSFER_RISK[name] ?? /$^/).test(privacy))
+  }
+  /* Mutation controls break the REAL documents, not a string literal: strip the
+   * paragraph out of the live text and show that each check fails. */
+  const strip = (doc: string, from: RegExp) => {
+    const at = doc.search(from)
+    return at < 0 ? doc : doc.slice(0, at) + doc.slice(at + 1400)
+  }
+  const enStripped = strip(enPrivacy, TRANSFER_NOT_ALL.en)
+  const heStripped = strip(hePrivacy, TRANSFER_NOT_ALL.he)
+  const itStripped = strip(text.it!.privacy, TRANSFER_NOT_ALL.it)
+  check('mutation control: the English document without the paragraph fails all four checks',
+    enPrivacy !== '' && enStripped !== enPrivacy
+    && !TRANSFER_NOT_ALL.en.test(enStripped) && !TRANSFER_NO_SCC.en.test(enStripped)
+    && !TRANSFER_DEROGATION.en.test(enStripped) && !TRANSFER_RISK.en.test(enStripped))
+  check('mutation control: the Hebrew document without the paragraph fails all four checks',
+    hePrivacy !== '' && heStripped !== hePrivacy
+    && !TRANSFER_NOT_ALL.he.test(heStripped) && !TRANSFER_NO_SCC.he.test(heStripped)
+    && !TRANSFER_DEROGATION.he.test(heStripped) && !TRANSFER_RISK.he.test(heStripped))
+  check('mutation control: a translated document without the paragraph fails all four checks',
+    itStripped !== text.it!.privacy
+    && !TRANSFER_NOT_ALL.it.test(itStripped) && !TRANSFER_NO_SCC.it.test(itStripped)
+    && !TRANSFER_DEROGATION.it.test(itStripped) && !TRANSFER_RISK.it.test(itStripped))
+  check('mutation control: consent named as the instrument without its article is caught',
+    !TRANSFER_DEROGATION.en.test('that consent of yours is the instrument, and we rely on it.'))
+  check('mutation control: an SCC sentence that still speaks only of providers is caught',
+    !TRANSFER_NO_SCC.en.test('For transfers to providers outside the EU we rely on Standard Contractual Clauses.'))
+}
+
+/**
+ * THE INTRO'S "SECTIONS 15A TO 15H" MUST NAME THE SECTIONS THE DOCUMENT HAS.
+ *
+ * Every terms document opens by telling the reader that the service includes
+ * the site analysis, the account connections, the site fixes and the AI
+ * content "as described in sections 15A to 15H". That range is a promise about
+ * the document's own shape, and it is correct in all nine today. Nothing stops
+ * it drifting: the next feature that earns a section becomes 15I, eight
+ * documents gain a heading, and nine intros go on saying the list ends at 15H.
+ * A reader is then told the AI-content terms are inside a range that excludes
+ * them, which is the kind of error that is invisible on a read-through and
+ * obvious to anyone who follows the reference.
+ *
+ * The check reads BOTH ENDS out of the document rather than pinning the letter
+ * H: it collects the 15-suffix headings the document actually carries, and
+ * compares the range expression's two ends against the first and last of them.
+ * So adding 15I passes the moment every intro is updated, and fails until then,
+ * which is the whole point.
+ *
+ * Two alphabets, because Hebrew numbers its sub-sections in Hebrew letters
+ * (15א to 15ח) and the other eight in Latin (15A to 15H). The range expression
+ * itself is matched language-agnostically — "to", "bis", "à", "a", "tot en
+ * met", 「から第」 — as the two section labels with a short run of connecting
+ * text between them.
+ *
+ * It also checks the set is CONTIGUOUS from its first label. A range claim over
+ * a gapped set (15A, 15B, 15D described as "15A to 15D") is false in a second
+ * way that comparing only the two ends would not catch.
+ */
+{
+  const read = (path: string) => (existsSync(path) ? readFileSync(path, 'utf8') : '')
+  const enTermsSource = frontMatter(text[LOCALES[0]].terms).source
+  const termsDocs: [string, string][] = [
+    ['he', read(HEBREW_TERMS)],
+    ['en', enTermsSource ? read(enTermsSource) : ''],
+    ...LOCALES.map((l): [string, string] => [l, text[l].terms]),
+  ]
+
+  const LATIN = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'
+  const HEBREW = 'אבגדהוזחטיכלמנסעפצקרשת'
+  const alphabetFor = (locale: string) => (locale === 'he' ? HEBREW : LATIN)
+
+  for (const [name, terms] of termsDocs) {
+    if (!terms) { check(`${name}/terms: document is readable`, false); continue }
+    const alphabet = alphabetFor(name)
+    const suffixClass = name === 'he' ? '[\\u05d0-\\u05ea]' : '[A-Z]'
+
+    // The sub-section headings the document actually carries, in alphabet order.
+    const headings = [...terms.matchAll(new RegExp(`(?:^##\\s*|<h2>)15(${suffixClass})\\.`, 'gm'))]
+      .map((m) => m[1]!)
+    const present = [...new Set(headings)].sort((a, b) => alphabet.indexOf(a) - alphabet.indexOf(b))
+    check(`${name}/terms: carries a run of 15-suffix sections`, present.length >= 2,
+      `found ${present.length}`)
+    if (present.length < 2) continue
+
+    const first = present[0]!
+    const last = present[present.length - 1]!
+    const startAt = alphabet.indexOf(first)
+    const expected = alphabet.slice(startAt, startAt + present.length).split('')
+    check(`${name}/terms: the 15-suffix sections run without a gap (15${first} to 15${last})`,
+      present.join('') === expected.join(''), `found ${present.join(',')}`)
+
+    // The intro's range expression: the two labels with connecting words between.
+    const range = new RegExp(`15(${suffixClass})[^.]{1,40}?15(${suffixClass})`).exec(terms)
+    check(`${name}/terms: the intro states a range of 15-suffix sections`, range !== null)
+    if (!range) continue
+    check(`${name}/terms: the range starts at the first section the document has (15${first})`,
+      range[1] === first, `intro says 15${range[1]}`)
+    check(`${name}/terms: the range ends at the last section the document has (15${last})`,
+      range[2] === last, `intro says 15${range[2]}, document ends at 15${last}`)
+  }
+
+  // MUTATION CONTROLS, against the real documents.
+  {
+    const en = enTermsSource ? read(enTermsSource) : ''
+    const de = text.de ? text.de.terms : ''
+    const he = read(HEBREW_TERMS)
+    const endOf = (doc: string, suffixClass: string) => {
+      const r = new RegExp(`15(${suffixClass})[^.]{1,40}?15(${suffixClass})`).exec(doc)
+      return r ? r[2]! : null
+    }
+    if (en) {
+      // A ninth section added to the body and not to the intro must be caught.
+      const grown = en.replace('<h2>15H.', '<h2>15I. Something new</h2>\n        <h2>15H.')
+      const present = [...new Set([...grown.matchAll(/<h2>15([A-Z])\./g)].map((m) => m[1]!))]
+        .sort((a, b) => LATIN.indexOf(a) - LATIN.indexOf(b))
+      check('mutation control (en): a 15I added to the body with the intro left at 15H is caught',
+        endOf(grown, '[A-Z]') !== present[present.length - 1])
+    }
+    if (de) {
+      // An intro that overstates the range must be caught.
+      const overstated = de.replace('15A bis 15H', '15A bis 15J')
+      const present = [...new Set([...overstated.matchAll(/^##\s*15([A-Z])\./gm)].map((m) => m[1]!))]
+        .sort((a, b) => LATIN.indexOf(a) - LATIN.indexOf(b))
+      check('mutation control (de): an intro claiming 15J over a document ending at 15H is caught',
+        endOf(overstated, '[A-Z]') !== present[present.length - 1])
+    }
+    if (he) {
+      // A gap in the run must be caught even when both ends still match.
+      const gapped = he.replace('<h2>15ג.', '<h2>15ט.')
+      const present = [...new Set([...gapped.matchAll(/<h2>15([א-ת])\./g)].map((m) => m[1]!))]
+        .sort((a, b) => HEBREW.indexOf(a) - HEBREW.indexOf(b))
+      const startAt = HEBREW.indexOf(present[0]!)
+      const expected = HEBREW.slice(startAt, startAt + present.length).split('')
+      check('mutation control (he): a gap in the 15-suffix run is caught',
+        present.join('') !== expected.join(''))
+    }
+  }
+}
+/**
  * THE RETENTION LIST MUST BE THE WHOLE LIST, AND THE SAME LIST IN EVERY
  * LANGUAGE.
  *
