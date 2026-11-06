@@ -4501,6 +4501,98 @@ const PHOTO_IN_RETENTION: Record<string, RegExp> = {
     'x'.concat(text.ja!.privacy).split(/メールでの連絡/).length > 1)
 }
 
+/**
+ * THE COOKIE-SETTINGS LINK A PRIVACY DOCUMENT TELLS THE READER TO LOOK FOR
+ * MUST BE THE LINK THE FOOTER ACTUALLY RENDERS.
+ *
+ * Every privacy document in all nine languages carries the sentence that says
+ * how to change or withdraw cookie consent, and each one names the footer link
+ * by its label. That sentence is not decoration: GDPR Art. 7(3) requires that
+ * withdrawal be as easy as consent, and the information duties that sit on a
+ * cookie banner (ePrivacy Art. 5(3) with GDPR Art. 13, PECR reg. 6 in the UK,
+ * art. 399 ust. 1 pkt 1 lit. b PKE in Poland) are satisfied by telling the
+ * visitor the method, not merely that a right exists. A document that names a
+ * label the footer does not render tells the visitor to look for something
+ * that is not there, which is the one way this sentence can be false while
+ * still being present.
+ *
+ * It had gone wrong in two languages at once, undetected, because nothing
+ * compared the two places. The French document said « Réglages des cookies »
+ * where the footer renders « Paramètres des cookies », and the Japanese said
+ * 「Cookie の設定」 where the footer renders 「クッキーの設定」. Both were
+ * fixed with this guard.
+ *
+ * The label is READ FROM THE DICTIONARY, never written here as a literal: the
+ * footer renders `dict.cookie.settings` (components/Footer.tsx), so the
+ * dictionary is the only thing that can be called right, and a guard holding
+ * its own copy would pass a renamed link.
+ */
+{
+  const read = (path: string) => (existsSync(path) ? readFileSync(path, 'utf8') : '')
+  const enPrivacySource = frontMatter(text[LOCALES[0]].privacy).source
+  const privacyDocs: [string, string][] = [
+    ['he', read(HEBREW_PRIVACY)],
+    ['en', enPrivacySource ? read(enPrivacySource) : ''],
+    ...LOCALES.map((l): [string, string] => [l, text[l].privacy]),
+  ]
+
+  /** The footer's own label for a locale, out of lib/i18n/public/<locale>.ts. */
+  const footerLabel = (locale: string): string | null => {
+    const src = read(`lib/i18n/public/${locale}.ts`)
+    if (!src) return null
+    const m = /^ {4}settings: '([^']+)'/m.exec(stripComments(src))
+    return m ? m[1]! : null
+  }
+
+  /**
+   * Any quoted run that looks like it is naming a cookie-settings link: the
+   * quote styles the documents use (guillemets, curly quotes, ASCII quotes,
+   * Japanese corner brackets) around a short phrase that mentions cookies.
+   */
+  const QUOTED = /[«„"'‘“「]\s*([^«»„""'’”」\n]{3,40}?)\s*[»"'’”」]/g
+  const MENTIONS_COOKIES = /cookie|Cookie|עוגיות|クッキー/
+
+  for (const [name, privacy] of privacyDocs) {
+    const label = footerLabel(name)
+    check(`${name}: the footer's cookie-settings label is readable from the dictionary`, label !== null, name)
+    if (!label || !privacy) continue
+    check(`${name}/privacy: names the footer link by the label the footer renders (${label})`,
+      privacy.includes(label), `expected ${JSON.stringify(label)}`)
+    const wrong = [...privacy.matchAll(QUOTED)]
+      .map((m) => m[1]!)
+      .filter((q) => MENTIONS_COOKIES.test(q) && q !== label)
+    check(`${name}/privacy: names no other label for that link`,
+      wrong.length === 0, wrong.length ? `found ${JSON.stringify(wrong)}` : undefined)
+  }
+
+  // MUTATION CONTROLS, against the real files and the real dictionaries.
+  const frReal = text.fr ? text.fr.privacy : ''
+  const jaReal = text.ja ? text.ja.privacy : ''
+  const frLabel = footerLabel('fr')
+  const jaLabel = footerLabel('ja')
+  if (frReal && frLabel) {
+    const broken = frReal.replace(frLabel, 'Réglages des cookies')
+    check('mutation control (fr): the old wrong label is caught by the "names the footer link" check',
+      !broken.includes(frLabel))
+    check('mutation control (fr): the old wrong label is caught by the "no other label" check',
+      [...broken.matchAll(QUOTED)].map((m) => m[1]!)
+        .some((q) => MENTIONS_COOKIES.test(q) && q !== frLabel))
+  }
+  if (jaReal && jaLabel) {
+    const broken = jaReal.replace(jaLabel, 'Cookie の設定')
+    check('mutation control (ja): the old wrong label is caught by the "names the footer link" check',
+      !broken.includes(jaLabel))
+    check('mutation control (ja): the old wrong label is caught by the "no other label" check',
+      [...broken.matchAll(QUOTED)].map((m) => m[1]!)
+        .some((q) => MENTIONS_COOKIES.test(q) && q !== jaLabel))
+  }
+  const deLabel = footerLabel('de')
+  if (deLabel) {
+    check('mutation control: a renamed dictionary label is not matched by the old document text',
+      !'den Link „Cookie-Schalter“ in der Fußzeile'.includes(deLabel))
+  }
+}
+
 // ── 26) the transfer instrument for recipients that are NOT our processors ──
 /*
  * Every privacy document names JVZoo under Information Sharing and says, in
