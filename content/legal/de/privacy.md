@@ -3,7 +3,7 @@ title: Datenschutzerklärung | Go Top SEO
 description: Datenschutzerklärung von Go Top SEO: wie wir Ihre Daten erheben, nutzen und schützen.
 locale: de
 source: app/(public)/en/privacy/page.tsx
-lastUpdated: 2026-11-05
+lastUpdated: 2026-11-06
 register: sie
 extraSections: 1
 extraReason: One extra section, "Rechte von Personen in Deutschland und in der Europäischen Union (DSGVO)", placed beside the existing EEA/UK and United States rights sections, because German readers are owed the one-month deadline of Art. 12(3), the data protection authority of their own Land as their supervisory authority, the Bundesdatenschutzgesetz as the national law that completes the DSGVO in Germany, and a plain statement about the data protection officer we have not appointed — which in Germany turns on § 38 BDSG, a stricter threshold than Art. 37 DSGVO, and so cannot simply be translated from the Italian document. § 25 TDDDG replaces the generic reference to the ePrivacy rules wherever consent for storage on the device is named. What the DSGVO adds elsewhere stays inside the sections it belongs to — the legal bases of Art. 6 and the international-transfer rule of Chapter V. The French document carries a second extra section for Quebec (Law 25), which is a different statute reached through the French language and has no German counterpart.
@@ -347,6 +347,7 @@ Wir bewahren Daten allein so lange auf, wie es für den Zweck nötig ist, zu dem
 - **Kostenlose Prüfung der Website:** bis zu 24 Stunden im Zwischenspeicher aufbewahrt und dann entfernt, wenn daraus kein Konto eröffnet wurde.
 - **Verzeichnis der Cookie-Entscheidungen:** bis zu drei Jahre ab der Entscheidung, damit wir beweisen können, was Sie gewählt haben. Das ist die Rechtsgrundlage seiner Aufbewahrung, und deshalb wird es nicht mit dem Konto entfernt.
 - **Autorenfoto:** so lange, wie das Foto am Projekt eingerichtet ist. Es zu löschen oder auf kein Foto oder das Symbol der Website zu wechseln entfernt die Datei unmittelbar. Eine Kopie, die schon auf Ihrer Website liegt, bleibt dort, bis Sie sie löschen.
+- **Daten eines Partnerantrags:** 12 Monate ab dem Antrag. Ein abgelehnter Antrag wird danach vollständig gelöscht, und in jedem anderen Fall wird die IP-Adresse, von der der Antrag kam, danach gelöscht. Diese Adresse wird allein erfasst, um einen Schwarm erfundener Anträge von einer wirklichen Agentur zu unterscheiden und um die Grenze von drei Anträgen je Stunde zu halten. Die Erfassung der Empfehlungen, der Provisionen und der Auszahlungen ist unsere Buchführung und bleibt für den Zeitraum, für den das Gesetz uns die Aufbewahrung der Bücher vorschreibt.
 - **Sicherheits- und Serverprotokolle:** bis zu 90 Tage.
 
 ## Internationale Übermittlungen
@@ -446,4 +447,4 @@ Wenn Sie Fragen zu dieser Datenschutzerklärung haben, wenden Sie sich an uns:
 
 **Telefon:** +972-54-9489377
 
-Letzte Aktualisierung: 5. November 2026
+Letzte Aktualisierung: 6. November 2026

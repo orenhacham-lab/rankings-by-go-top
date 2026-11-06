@@ -3,7 +3,7 @@ title: Politique de confidentialité | Go Top SEO
 description: Politique de confidentialité de Go Top SEO : comment nous collectons, utilisons et protégeons vos données.
 locale: fr
 source: app/(public)/en/privacy/page.tsx
-lastUpdated: 2026-11-05
+lastUpdated: 2026-11-06
 register: vous
 extraSections: 2
 extraReason: Two extra sections. The first, "Droits des résidents en France et dans l'Union européenne (RGPD)", placed beside the existing EEA/UK and United States rights sections, because French readers are owed the one-month deadline of Art. 12(3), the CNIL as their own supervisory authority, and a plain statement about the officer and the representative we have not appointed. What the RGPD adds elsewhere stays inside the sections it belongs to - the legal bases of Art. 6 and the international-transfer rule of Chapter V. The second, "Droits des résidents du Québec (Loi 25)", is a different statute and not a dialect of the first: a reader in Quebec is governed by the Act respecting the protection of personal information in the private sector (P-39.1) as amended by Law 25, which requires a person in charge of the protection of personal information who is not an RGPD data protection officer, an assessment before any communication outside Quebec, information at the time an automated decision is made, portability since September 2024 and notice of a confidentiality incident to the Commission d'acces a l'information du Quebec - none of which an RGPD-shaped section covers. One document, two sections, because splitting them would leave a Quebec reader reading French law that does not govern them.
@@ -345,6 +345,7 @@ Nous conservons les données uniquement pendant la durée nécessaire à la fina
 - **Vérification gratuite du site :** mise en cache jusqu'à 24 heures, puis effacée si aucun compte n'a été ouvert à partir d'elle.
 - **Journal des décisions sur les cookies :** jusqu'à trois ans à compter de la décision, pour que nous puissions prouver ce que vous avez choisi. C'est la base légale de sa conservation, raison pour laquelle il n'est pas effacé avec le compte.
 - **Photo d'auteur :** tant que la photo est configurée sur le projet. En la supprimant, ou en passant à aucune photo ou à l'icône du site, le fichier est effacé immédiatement. Une copie déjà placée sur votre site y reste jusqu'à ce que vous la supprimiez.
+- **Données d'une demande de partenariat :** 12 mois à compter de la demande. Une demande refusée est ensuite supprimée en totalité, et dans tout autre cas l'adresse IP depuis laquelle la demande est arrivée est ensuite effacée. Cette adresse n'est enregistrée que pour distinguer une volée de demandes inventées d'une véritable agence et pour tenir la limite de trois demandes par heure. L'enregistrement des recommandations, des commissions et des versements est notre comptabilité et demeure pendant la durée pendant laquelle la loi nous oblige à conserver les registres.
 - **Journaux de sécurité et du serveur :** jusqu'à 90 jours.
 
 ## Transferts internationaux
@@ -458,4 +459,4 @@ Si vous avez des questions sur la présente politique de confidentialité, conta
 
 **Téléphone :** 054-9489377
 
-Dernière mise à jour le 5 novembre 2026
+Dernière mise à jour le 6 novembre 2026

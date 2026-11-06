@@ -160,7 +160,7 @@ const OLD_NAME = /Rankings by Go Top/i
 // accessibility statement moved with it.
 const LAST_UPDATED: Record<Doc, Record<Lang, RegExp>> = {
   terms: { he: /16 באוקטובר 2026/, en: /October 16, 2026/ },
-  privacy: { he: /5 בנובמבר 2026/, en: /November 5, 2026/ },
+  privacy: { he: /6 בנובמבר 2026/, en: /November 6, 2026/ },
   a11y: { he: /5 באוקטובר 2026/, en: /October 5, 2026/ },
 }
 for (const lang of ['he', 'en'] as Lang[]) for (const doc of ['terms', 'privacy', 'a11y'] as Doc[]) {

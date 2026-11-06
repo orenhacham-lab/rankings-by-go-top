@@ -4821,6 +4821,129 @@ const TRANSFER_RISK: Record<string, RegExp> = {
     }
   }
 }
+/**
+ * THE RETENTION LIST MUST BE THE WHOLE LIST, AND THE SAME LIST IN EVERY
+ * LANGUAGE.
+ *
+ * "How Long We Keep Data" is the section a reader goes to for retention
+ * periods, and a list that looks complete and is not is worse than no list.
+ * It had nine rows and no row for the affiliate programme, although the
+ * programme's own bullet, three sections earlier, states the 12 months. That
+ * is not a disclosure gap — the period was disclosed — but it is the kind of
+ * gap that makes a reader who trusts the list wrong, and the kind that grows:
+ * the next data store with a period of its own goes in whichever section its
+ * author was editing.
+ *
+ * So two checks per locale, and one across them:
+ *   - the affiliate row is present and names its period;
+ *   - the row counts agree across all nine, so a row added in one language is
+ *     added in all. That is the check that catches the NEXT omission rather
+ *     than this one, which is the only reason to write it.
+ *
+ * Counting crosses two formats: the he and en documents are TSX and list with
+ * <li>, the other seven are Markdown and list with "- **". The section is read
+ * between its own heading and the next, per locale, so a bullet elsewhere in
+ * the document is not counted.
+ */
+{
+  const read = (path: string) => (existsSync(path) ? readFileSync(path, 'utf8') : '')
+  const enPrivacySource = frontMatter(text[LOCALES[0]].privacy).source
+  const privacyDocs: [string, string][] = [
+    ['he', read(HEBREW_PRIVACY)],
+    ['en', enPrivacySource ? read(enPrivacySource) : ''],
+    ...LOCALES.map((l): [string, string] => [l, text[l].privacy]),
+  ]
+
+  /** The retention section's own heading, per locale. */
+  const HEADING: Record<string, RegExp> = {
+    he: /<h2>כמה זמן[^<]*<\/h2>/,
+    en: /<h2>How Long We Keep Data<\/h2>/,
+    de: /^## Wie lange wir Daten aufbewahren$/m,
+    nl: /^## Hoe lang wij gegevens bewaren$/m,
+    fr: /^## Combien de temps nous conservons les données$/m,
+    it: /^## Per quanto tempo conserviamo i dati$/m,
+    es: /^## Cuánto tiempo conservamos los datos$/m,
+    'pt-BR': /^## Por quanto tempo guardamos os dados$/m,
+    ja: /^## データの保存期間$/m,
+  }
+
+  /** The affiliate row, which must name 12 months in the locale's own words. */
+  const AFFILIATE_ROW: Record<string, RegExp> = {
+    he: /נתוני בקשת שותף:[\s\S]{0,80}12 חודשים/,
+    en: /Partner application data:<\/strong>\s*12 months/,
+    de: /Daten eines Partnerantrags:\*\*\s*12 Monate/,
+    nl: /Gegevens van een aanvraag als partner:\*\*\s*12 maanden/,
+    fr: /Données d'une demande de partenariat :\*\*\s*12 mois/,
+    it: /Dati di una domanda di partner:\*\*\s*12 mesi/,
+    es: /Datos de una solicitud de socio:\*\*\s*12 meses/,
+    'pt-BR': /Dados de uma inscrição de parceiro:\*\*\s*12 meses/,
+    ja: /パートナーのお申し込みのデータ：\*\*[\s\S]{0,40}12か月/,
+  }
+
+  /** The section's text, from its heading to the next heading of the same kind. */
+  const sectionOf = (name: string, doc: string): string | null => {
+    const heading = HEADING[name]
+    if (!heading) return null
+    const at = doc.search(heading)
+    if (at < 0) return null
+    const rest = doc.slice(at + 4)
+    const next = name === 'he' || name === 'en' ? rest.search(/<h2>/) : rest.search(/^## /m)
+    return next < 0 ? rest : rest.slice(0, next)
+  }
+
+  const counts: Record<string, number> = {}
+  for (const [name, privacy] of privacyDocs) {
+    if (!privacy) { check(`${name}/privacy: document is readable`, false); continue }
+    const section = sectionOf(name, privacy)
+    check(`${name}/privacy: the retention section is found by its heading`, section !== null)
+    if (!section) continue
+
+    const row = AFFILIATE_ROW[name]
+    check(`${name}/privacy: the retention list carries the affiliate application row, with its period`,
+      row !== undefined && row.test(section))
+
+    const bullets = name === 'he' || name === 'en'
+      ? [...section.matchAll(/<li>/g)].length
+      : [...section.matchAll(/^- \*\*/gm)].length
+    counts[name] = bullets
+    check(`${name}/privacy: the retention list has rows to count (${bullets})`, bullets > 0)
+  }
+
+  const values = [...new Set(Object.values(counts))]
+  check('every language\'s retention list has the same number of rows',
+    values.length === 1,
+    `counts ${Object.entries(counts).map(([k, v]) => `${k}=${v}`).join(' ')}`)
+
+  // MUTATION CONTROLS, against the real documents.
+  {
+    const de = text.de ? text.de.privacy : ''
+    const en = enPrivacySource ? read(enPrivacySource) : ''
+    if (de) {
+      const without = de.replace(/^- \*\*Daten eines Partnerantrags:[^\n]*\n/m, '')
+      const section = sectionOf('de', without)
+      check('mutation control (de): a retention list with the affiliate row removed is caught',
+        section !== null && !AFFILIATE_ROW.de!.test(section))
+      check('mutation control (de): and its row count then differs from the others',
+        section !== null
+          && [...section.matchAll(/^- \*\*/gm)].length !== (counts.en ?? -1))
+    }
+    if (en) {
+      const period = en.replace('Partner application data:</strong> 12 months',
+        'Partner application data:</strong> as long as we like')
+      const section = sectionOf('en', period)
+      check('mutation control (en): a row that drops its period is caught',
+        section !== null && !AFFILIATE_ROW.en!.test(section))
+    }
+    if (de && en) {
+      const extra = de.replace(/^(- \*\*Daten eines Partnerantrags:)/m,
+        '- **Etwas Neues:** für immer.\n$1')
+      const section = sectionOf('de', extra)
+      check('mutation control (de): a row added in one language only is caught by the count',
+        section !== null
+          && [...section.matchAll(/^- \*\*/gm)].length !== (counts.en ?? -1))
+    }
+  }
+}
 
 console.log(`\n${pass} passed, ${fail} failed`)
 if (fail > 0) process.exit(1)

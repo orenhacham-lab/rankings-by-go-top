@@ -3,7 +3,7 @@ title: Privacyverklaring | Go Top SEO
 description: "Privacyverklaring van Go Top SEO: hoe wij uw gegevens verzamelen, gebruiken en beschermen."
 locale: nl
 source: app/(public)/en/privacy/page.tsx
-lastUpdated: 2026-11-05
+lastUpdated: 2026-11-06
 register: u
 extraSections: 1
 extraReason: One extra section, "Rechten van personen in Nederland en in de Europese Unie (AVG)", placed beside the existing EEA/UK and United States rights sections, because Dutch readers are owed the one-month deadline of Art. 12(3), the Autoriteit Persoonsgegevens as their supervisory authority, the Uitvoeringswet Algemene verordening gegevensbescherming (UAVG) as the national law that completes the AVG in the Netherlands, and a plain statement about the data protection officer we have not appointed. That last point is the opposite of the German case: § 38 BDSG adds a headcount threshold stricter than Art. 37 DSGVO, while the UAVG adds no such threshold, so the Dutch document says that the duty here follows Art. 37 AVG alone and must not be copied from the German one. Artikel 11.7a Telecommunicatiewet replaces the generic reference to the ePrivacy rules wherever consent for storage on the device is named, and AVG is used throughout because that is the name Dutch law and Dutch readers give the GDPR. What the AVG adds elsewhere stays inside the sections it belongs to — the legal bases of Art. 6 and the international-transfer rule of Chapter V. The French document carries a second extra section for Quebec (Law 25), which is a different statute reached through the French language and has no Dutch counterpart.
@@ -347,6 +347,7 @@ Wij bewaren gegevens alleen zolang dat nodig is voor het doel waarvoor zij zijn 
 - **Gratis controle van de website:** tot 24 uur in de tussenopslag bewaard en daarna weggehaald, wanneer daaruit geen account is geopend.
 - **Register van de beslissingen over cookies:** tot drie jaar vanaf de beslissing, zodat wij kunnen bewijzen wat u hebt gekozen. Dat is de grondslag van het bewaren daarvan, en daarom wordt het niet met het account weggehaald.
 - **Auteursfoto:** zolang de foto bij het project is ingesteld. Die verwijderen of overstappen op geen foto of op het pictogram van de website haalt het bestand onmiddellijk weg. Een kopie die al op uw website staat, blijft daar totdat u die verwijdert.
+- **Gegevens van een aanvraag als partner:** 12 maanden vanaf de aanvraag. Een afgewezen aanvraag wordt daarna volledig verwijderd, en in elk ander geval wordt het IP-adres waarvan de aanvraag kwam daarna weggehaald. Dat adres wordt alleen vastgelegd om een zwerm verzonnen aanvragen te onderscheiden van een werkelijk bureau en om de grens van drie aanvragen per uur te houden. Het register van de verwijzingen, de commissies en de uitbetalingen is onze boekhouding en blijft voor de termijn waarvoor het recht ons verplicht de boeken te bewaren.
 - **Logboeken van de beveiliging en van de servers:** tot 90 dagen.
 
 ## Doorgifte naar het buitenland
@@ -446,4 +447,4 @@ Hebt u vragen over deze privacyverklaring, neem dan contact met ons op:
 
 **Telefoon:** +972-54-9489377
 
-Laatst bijgewerkt: 5 november 2026
+Laatst bijgewerkt: 6 november 2026

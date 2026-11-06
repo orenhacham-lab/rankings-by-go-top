@@ -3,7 +3,7 @@ title: Política de privacidad | Go Top SEO
 description: Política de privacidad de Go Top SEO: cómo recopilamos, utilizamos y protegemos sus datos.
 locale: es
 source: app/(public)/en/privacy/page.tsx
-lastUpdated: 2026-11-05
+lastUpdated: 2026-11-06
 register: usted
 ---
 
@@ -343,6 +343,7 @@ Conservamos los datos únicamente durante el tiempo necesario para la finalidad 
 - **Verificación gratuita del sitio:** se almacena en caché hasta 24 horas y después se suprime si a partir de ella no se abrió una cuenta.
 - **Registro de decisiones sobre cookies:** hasta tres años desde la decisión, para que podamos demostrar lo que usted eligió. Esa es la base jurídica para conservarlo, razón por la cual no se suprime junto con la cuenta.
 - **Foto de autor:** mientras la foto esté configurada en el proyecto. Al eliminarla, o al pasar a ninguna foto o al icono del sitio, el archivo se borra de inmediato. Una copia ya colocada en su sitio permanece allí hasta que usted la elimine.
+- **Datos de una solicitud de socio:** 12 meses desde la solicitud. Una solicitud rechazada se elimina después por completo y, en cualquier otro caso, la dirección IP desde la que llegó la solicitud se suprime después. Esa dirección se registra únicamente para distinguir una oleada de solicitudes inventadas de una agencia real y para mantener el límite de tres solicitudes por hora. El registro de las referencias, de las comisiones y de los pagos es nuestra contabilidad y permanece durante el plazo que la ley nos obliga a conservar los libros.
 - **Registros de seguridad y del servidor:** hasta 90 días.
 
 ## Transferencias internacionales
@@ -428,4 +429,4 @@ Si tiene preguntas sobre esta política de privacidad, contacte con:
 
 **Teléfono:** 054-9489377
 
-Esta política se actualizó por última vez el 5 de noviembre de 2026
+Esta política se actualizó por última vez el 6 de noviembre de 2026

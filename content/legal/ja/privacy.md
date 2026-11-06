@@ -3,7 +3,7 @@ title: プライバシーポリシー | Go Top SEO
 description: Go Top SEO のプライバシーポリシー。お客様のデータをどのように取得し、利用し、保護するかについて。
 locale: ja
 source: app/(public)/en/privacy/page.tsx
-lastUpdated: 2026-11-05
+lastUpdated: 2026-11-06
 register: desumasu
 extraSections: 1
 extraReason: One extra section, "日本の居住者の権利（個人情報保護法）", placed beside the existing EEA/UK and United States rights sections, because a Japanese reader is owed the publication items of Article 32 of the Act on the Protection of Personal Information, the disclosure, correction and cease-of-use procedures of Articles 33 to 35, the rule of Article 28 on providing data to a third party in a foreign country, the complaint desk, and a plain statement that no personal information protection officer is appointed. What the Act adds elsewhere stays inside the sections it belongs to - the purposes of use in "お客様のデータの利用方法" and the international-transfer rule in "国際的な移転". The Italian document carries its extra section for the GDPR, which is a different statute reached through a different language and has no Japanese counterpart, so it is not translated into a jurisdiction it does not govern.
@@ -347,6 +347,7 @@ WhatsApp の利用は、WhatsApp および Meta の利用規約とプライバ�
 - **無料のサイト診断：** 最大24時間キャッシュに保管し、そこからアカウントが開設されなかった場合は消去します。
 - **Cookie の決定の記録：** 決定から最大3年間。お客様が何を選ばれたかを当社が証明できるようにするためです。これがその保管の法的な根拠であり、だからこそアカウントと一緒には消去されません。
 - **著者の写真：** 写真がプロジェクトに設定されているあいだ。削除されるか、写真なしまたはサイトのアイコンに切り替えられると、ファイルは直ちに消去されます。すでにお客様のサイトに置かれたコピーは、お客様が削除されるまでそこに残ります。
+- **パートナーのお申し込みのデータ：** お申し込みから12か月です。お断りしたお申し込みはその後その全体を削除し、それ以外の場合も、お申し込みが届いた IP アドレスはその後削除します。そのアドレスを記録するのは、作られたお申し込みの群れを実在の代理店と区別するため、および1時間に3件という上限を保つためだけです。紹介、報酬および支払いの記録は当社の会計であり、法令が帳簿の保管を義務づける期間保管します。
 - **セキュリティとサーバーの記録：** 最大90日。
 
 ## 国際的な移転
@@ -464,4 +465,4 @@ WhatsApp の利用は、WhatsApp および Meta の利用規約とプライバ�
 
 **電話：** +972-54-9489377
 
-最終更新：2026年11月5日
+最終更新：2026年11月6日
