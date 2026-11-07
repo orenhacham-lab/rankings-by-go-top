@@ -46,7 +46,7 @@ export function aiCrawlerDatasetSchema(locale: PublicLocale) {
     '@context': 'https://schema.org',
     '@type': 'Dataset',
     '@id': `${SITE_URL}/en/ai-crawlers#dataset`,
-    name: copy.reference.title,
+    name: copy.reference.datasetName,
     // schema.org wants 50–5000 characters, and the page's own meta description
     // is the sentence a reader is shown, so it is the sentence a crawler gets.
     description: copy.meta.description,
