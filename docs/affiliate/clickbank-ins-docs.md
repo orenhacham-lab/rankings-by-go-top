@@ -167,3 +167,45 @@ Nothing can be set here until that request is approved, so the Secret Key is
 left empty rather than half-configured: a key saved in the account while
 `MARKETPLACE_CLICKBANK_WEBHOOK_SECRET` is still unset would be a secret living
 in exactly one of the two places that have to agree.
+
+### Configured and verified, 2026-11-07
+
+The access request was **granted immediately** — no waiting period. Answering
+the seven questions and accepting the Instant Notification Terms of Use
+returned the account with `apiEnabled=true`, and the single `(request access)`
+link was replaced by ten URL rows, each with a version selector defaulting to
+**8.0** and its own `TEST IPN` button.
+
+Live configuration:
+
+```
+Secret Key:               16 characters, generated for this purpose
+Instant Notification URL: https://www.gotopseo.com/api/marketplace/clickbank/webhook
+version:                  8.0        Verified
+```
+
+Saving the URL leaves it reading *"Unverified. You must test this IPN to
+enable functionality"* — a saved URL is inert until their own test passes, so
+the test is not a formality to skip.
+
+**WHY "Verified" IS THE PROOF THE KEY MATCHES, and not merely their label.**
+Their response-code rule is that a notification counts as delivered only on a
+2xx within three seconds. This repo answers 401 to any envelope it could not
+decrypt, and never lets a refusal read as handled. Those two facts together
+mean the badge cannot turn green under a mismatched key: a wrong
+`MARKETPLACE_CLICKBANK_WEBHOOK_SECRET` produces a 401, and the row stays
+Unverified. So `Verified` is an end-to-end decryption check, not a reachability
+check — it says their ciphertext opened with our key.
+
+It was confirmed from this side as well rather than taken on trust. Production
+runtime logs across the test window hold exactly one webhook error, and it is a
+deliberate probe sent beforehand with a forged envelope to prove rejection
+works; ClickBank's own test produced none. And `marketplace_orders` gained no
+row — a test notification must not create an order, which is the same
+behaviour Digistore24's test showed.
+
+The six Production environment variables (`_ENABLED`, the four `_PRODUCT_*`
+SKUs, `_WEBHOOK_SECRET`) were checked against the running server, not just the
+dashboard: `POST /api/marketplace/clickbank/webhook` answers 401 while an
+unregistered provider answers 503, which distinguishes "enabled with a secret,
+refusing a bad envelope" from "not switched on".

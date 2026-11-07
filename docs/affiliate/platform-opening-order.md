@@ -10,7 +10,7 @@ reached that is said rather than filled in.
 | --- | --- | --- | --- |
 | JVZoo | Live since 2026-11-04. 4 products approved. **0 sales.** | **We are.** Their vendor agreement s.11 leaves the tax with us. | 35% / 35% |
 | Digistore24 | 4 products submitted 2026-11-02, **still pending** on 11-07 | **They are.** Merchant of record. | 35% |
-| ClickBank | Account opened 2026-11-07. Nickname `gtopseo`, four products **submitted, Pending Review**. INS verifier landed (#346); INS itself **not yet requested**. | They are. | 50% first / 35% rebill |
+| ClickBank | Account opened 2026-11-07. Nickname `gtopseo`, four products **submitted, Pending Review**. INS **configured and Verified** at v8.0. | They are. | 50% first / 35% rebill |
 
 The bottleneck is not the number of platforms. Two are open and both have sold
 nothing, because at zero sales a product is invisible in JVZoo's affiliate
@@ -123,17 +123,21 @@ the product**, and it defaults to yes. It was answered **no** — truthfully: th
 trial is seven days with no credit card and a reviewer can open one
 unaided — rather than putting an account password into a vendor form.
 
-**What is left, and why it is not done.** The Instant Notification URL cannot
-be entered: the field is replaced by a `(request access)` link, and the request
-requires accepting the separate **ClickBank Instant Notification Terms of
-Use** — not the Client Contract, not the product terms. It is free today but
-clause 4 reserves the right to charge later. That acceptance is the owner's to
-give, so the Secret Key was also left empty rather than configuring one side of
-a two-sided secret. Details in `clickbank-ins-docs.md`.
+**The notification channel is live.** Entering the Instant Notification URL
+first required accepting the separate **ClickBank Instant Notification Terms of
+Use** — not the Client Contract, not the product terms. The owner approved that
+on 2026-11-07; it is free today, though clause 4 reserves the right to charge
+later and clause 1 lets ClickBank withdraw access at any time. Access was then
+granted instantly, and the URL is registered at version 8.0 and reads
+**Verified**, which is an end-to-end proof that their ciphertext opens with our
+key. The reasoning, and the checks made from this side rather than trusting
+their badge, are in `clickbank-ins-docs.md`.
 
-`MARKETPLACE_CLICKBANK_ENABLED` stays unset and the buy-URL variables stay
-unset too, because a paylink for a product still in review is a button that
-cannot take money.
+The six Production environment variables are set: `MARKETPLACE_CLICKBANK_ENABLED`,
+the four `_PRODUCT_*` SKUs and `_WEBHOOK_SECRET`. The **buy-URL variables stay
+unset**, because a paylink for a product still in review is a button that
+cannot take money; they go in when the products are approved, along with the
+$49.95 that is charged on the first approval.
 
 ### 2. WarriorPlus — only after a question is answered
 
