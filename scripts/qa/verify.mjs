@@ -38,11 +38,26 @@ const lines = []
 const say = (s) => { lines.push(s); console.log(s) }
 
 // ── 1. TypeScript ────────────────────────────────────────────────────────────
+/*
+ * A CRASHED tsc USED TO READ AS A CLEAN ONE. This step counted `error TS\d+`
+ * lines, and a run that died before type-checking anything emits none of them
+ * — so a V8 out-of-memory abort printed "tsc: 0 error(s)" and a real type
+ * error reached CI, where the build had the heap to find it. The heap is now
+ * raised, and a non-zero exit with no error lines is reported as what it is:
+ * a run that proved nothing.
+ */
 {
-  const r = sh('npx', ['tsc', '--noEmit'])
+  const r = sh('npx', ['tsc', '--noEmit'], {
+    env: { ...process.env, NODE_OPTIONS: `${process.env.NODE_OPTIONS ?? ''} --max-old-space-size=6144`.trim() },
+  })
   const errs = r.out.split('\n').filter((l) => /error TS\d+/.test(l))
   writeFileSync(join(LOG_DIR, 'tsc.log'), r.out)
-  say(`tsc: ${errs.length} error(s)${errs.length ? ` — first: ${errs.slice(0, 3).join(' | ')}` : ''}`)
+  if (r.code !== 0 && errs.length === 0) {
+    say(`tsc: DID NOT RUN (exit ${r.code}, no type errors reported) — ${join(LOG_DIR, 'tsc.log')}`)
+    process.exitCode = 1
+  } else {
+    say(`tsc: ${errs.length} error(s)${errs.length ? ` — first: ${errs.slice(0, 3).join(' | ')}` : ''}`)
+  }
 }
 
 // ── 2. ESLint, only on lines this branch touches ─────────────────────────────

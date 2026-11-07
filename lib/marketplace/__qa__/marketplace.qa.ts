@@ -1514,20 +1514,26 @@ async function main() {
 
   const cbVerify = (rawBody: string, secret: string | null = CB_SECRET) =>
     verifyMarketplaceSignature(rawBody, null, secret, CLICKBANK_INS_SCHEME)
+  /** The refusal reason, or null for a delivery that verified. The result is a
+   *  discriminated union, so `.reason` has to be reached through `ok`. */
+  const cbReason = (rawBody: string, secret: string | null = CB_SECRET) => {
+    const result = cbVerify(rawBody, secret)
+    return result.ok ? null : result.reason
+  }
 
   check('CB4: an envelope encrypted with our key verifies',
     cbVerify(cbEnvelope(CB_SALE)).ok === true)
   check('CB5: the same envelope under ANOTHER key is refused as a mismatch — the case the route logs loudly',
-    cbVerify(cbEnvelope(CB_SALE, 'someone-elses')).reason === 'mismatch')
+    cbReason(cbEnvelope(CB_SALE, 'someone-elses')) === 'mismatch')
   check('CB6: a body that is not JSON at all is refused, and never throws',
-    cbVerify('not json').reason === 'mismatch')
+    cbReason('not json') === 'mismatch')
   check('CB7: an envelope missing either field is refused',
     cbVerify(JSON.stringify({ notification: 'abc' })).ok === false
     && cbVerify(JSON.stringify({ iv: 'abc' })).ok === false)
   check('CB8: ciphertext that decrypts into something that is NOT JSON is refused — their own sample\'s test',
-    cbVerify(cbEnvelope('plain text, padded correctly')).reason === 'mismatch')
+    cbReason(cbEnvelope('plain text, padded correctly')) === 'mismatch')
   check('CB9: no secret is OUR misconfiguration and says so, which is what makes it a 503',
-    cbVerify(cbEnvelope(CB_SALE), null).reason === 'missing_secret')
+    cbReason(cbEnvelope(CB_SALE), null) === 'missing_secret')
   check('CB10: decryption returns the EXACT plaintext, byte for byte',
     decryptMarketplaceEnvelope(cbEnvelope(CB_SALE), CB_SECRET, CLICKBANK_INS_SCHEME)
       === JSON.stringify(CB_SALE))
