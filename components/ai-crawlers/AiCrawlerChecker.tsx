@@ -271,6 +271,15 @@ export function AiCrawlerChecker({ locale, initialUrl = '' }: { locale: PublicLo
                 <tr key={c.token} className="border-b border-line/60 last:border-0">
                   <td className="px-4 py-2 align-top">
                     <code dir="ltr" className="font-semibold text-ink">{c.token}</code>
+                    {/* A token no operator documents is marked where it is read,
+                        not only explained in prose further down. The dagger is
+                        tied to the footnote below the table by aria-describedby,
+                        so it is not a decoration a screen reader skips. */}
+                    {!c.documented && (
+                      <span dir="ltr" className="text-ink" aria-describedby="ai-crawlers-undocumented">
+                        {' '}†
+                      </span>
+                    )}
                   </td>
                   <td className="px-4 py-2 align-top text-body">{c.operator}</td>
                   <td className="px-4 py-2 align-top text-body">
@@ -282,6 +291,13 @@ export function AiCrawlerChecker({ locale, initialUrl = '' }: { locale: PublicLo
             </tbody>
           </table>
         </div>
+        {/* Rendered only while such a row exists, so the footnote can never
+            explain a dagger that is not on the page. */}
+        {AI_CRAWLERS.some((c) => !c.documented) && (
+          <p id="ai-crawlers-undocumented" className="mt-3 max-w-2xl text-caption text-muted">
+            <span dir="ltr">†</span> {copy.reference.undocumented}
+          </p>
+        )}
       </section>
 
       <section className="mt-12 rounded-card border border-line bg-sunk/50 p-5">

@@ -3,13 +3,14 @@
  * table as a thing other people's sites and scripts can consume, under CC BY
  * 4.0, with no key and no sign-up.
  *
- * WHY THIS EXISTS SEPARATELY FROM agents.ts. `agents.ts` is the list the
- * public checker iterates and renders in seven languages: every token in it
- * costs seven strings of copy, so it is deliberately the short, reader-facing
- * list. This file is the full reference: every token whose operator documents
- * it, with the link to that documentation and the date it was read. Nothing
- * here feeds the checker or the page, so adding a row costs no translation —
- * which is exactly why the dataset can be complete where the page is curated.
+ * THIS FILE IS THE ONE SOURCE. Since 07.11.2026 `agents.ts` derives the list
+ * the public checker iterates and the page renders from these two constants,
+ * so the table a reader sees and the table other people consume cannot
+ * disagree about which crawlers exist. Before that each was written by hand and
+ * they had already drifted. Adding a row here therefore reaches the page: a new
+ * `purpose` costs a label and a blurb in every public language, and a token
+ * with no operator page belongs in `AI_CRAWLER_CANDIDATES`, which the page
+ * renders last, marked, under a footnote.
  *
  * THE BAR FOR A ROW, and it does not bend: a page published by the crawler's
  * OWN OPERATOR that names the product token. Not another list, not a blog
