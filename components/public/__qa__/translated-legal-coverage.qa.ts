@@ -187,7 +187,15 @@ const REGISTER_FORBIDS: Record<string, { label: string; patterns: RegExp[] }> = 
 }
 
 /** What a statute, not a translator, requires of a document in this language. */
-const LAW: Record<string, { doc: Doc; name: string; must: RegExp }[]> = {
+/**
+ * A row is either something the document MUST say or something it must NOT.
+ * `mustNot` earns its place with the Spanish stale cross-reference: art. 97.1.l)
+ * TRLGDCU still points at "artículo 108.3" for the proportional payment, which
+ * Real Decreto-ley 24/2021 moved to 108.4, so the wrong number is one a careful
+ * reader of the statute would copy in good faith. A row that forbids it is the
+ * only kind of guard that catches that.
+ */
+const LAW: Record<string, { doc: Doc; name: string; must?: RegExp; mustNot?: RegExp }[]> = {
   nl: [
     { doc: 'refund-policy', name: 'the fourteen-day right of withdrawal of the BW, by article', must: /artikel 6:230o lid 1 van het Burgerlijk Wetboek/i },
     { doc: 'refund-policy', name: 'the BW by its full name', must: /Burgerlijk Wetboek \(BW\)/ },
@@ -369,6 +377,26 @@ const LAW: Record<string, { doc: Doc; name: string; must: RegExp }[]> = {
     { doc: 'affiliate-terms', name: 'that the partner gets no personal data of the customers they refer', must: /Sie erhalten keine personenbezogenen Daten/i },
   ],
   es: [
+    // THE SPANISH DOCUMENT HAD NO WITHDRAWAL SECTION AT ALL until 2026-11-07,
+    // while German, French, Italian, Dutch and Polish each had one. Spanish is
+    // the locale this keeps happening to (it was also the only EU language
+    // silent on the Art. 27 representative), so these rows exist to make the
+    // silence fail a guard instead of passing unnoticed. The article numbers
+    // are the BOE consolidated text's, checked the day they were written.
+    { doc: 'refund-policy', name: 'the fourteen-day right of withdrawal of the TRLGDCU, by article', must: /art[íi]culo 102\.1 del texto refundido/ },
+    { doc: 'refund-policy', name: 'the TRLGDCU by its decree number', must: /Real Decreto Legislativo 1\/2007/ },
+    { doc: 'refund-policy', name: 'the fourteen days in words', must: /catorce d[íi]as naturales/ },
+    { doc: 'refund-policy', name: 'the pre-contractual information duty that makes the right real, letter j) and not i)', must: /art[íi]culo 97\.1\.j\)/ },
+    { doc: 'refund-policy', name: 'the twelve-month extension that answers a failure to inform', must: /art[íi]culo 105\.1[\s\S]{0,160}doce meses/ },
+    { doc: 'refund-policy', name: 'the article that obliges us to ASK for the express request', must: /art[íi]culo 98\.8/ },
+    { doc: 'refund-policy', name: 'what an express request to start the service before the period ends forfeits', must: /art[íi]culos 103\.a\) y 108\.4/ },
+    { doc: 'refund-policy', name: 'NOT the stale cross-reference to art. 108.3 that art. 97.1.l) still carries', mustNot: /art[íi]culo 108\.3/ },
+    { doc: 'refund-policy', name: 'the day the withdrawal period starts for a service', must: /art[íi]culo 104\.a\)/ },
+    { doc: 'refund-policy', name: 'the refund deadline', must: /art[íi]culo 107\.1/ },
+    { doc: 'refund-policy', name: 'the model withdrawal form, offered on request', must: /art[íi]culo 106\.1/ },
+    { doc: 'refund-policy', name: 'that a month in progress is not a fully performed service', must: /no est[áa] completamente ejecutada por el solo hecho de que la cuenta est[ée] abierta/ },
+    { doc: 'refund-policy', name: "that the right is the consumer's and not a business's", must: /no es consumidor a efectos de ese art[íi]culo/ },
+    { doc: 'refund-policy', name: 'the acknowledgement the paid checkout now actually collects', must: /Antes de pagar una suscripci[óo]n, la pantalla/ },
     { doc: 'affiliate-terms', name: 'the Spanish rule that a commercial communication must be identifiable', must: /art[íi]culo 20 de la Ley 34\/2002/ },
     { doc: 'affiliate-terms', name: 'the FTC endorsement guides, by citation', must: /16 CFR/ },
     { doc: 'affiliate-terms', name: 'that the partner gets no personal data of the customers they refer', must: /No recibe datos personales/i },
@@ -792,7 +820,9 @@ for (const locale of LOCALES) {
 // ── 8) what the law of the language's country requires ──────────────────────
 for (const locale of LOCALES) {
   for (const item of LAW[locale] ?? []) {
-    check(`${locale}/${item.doc}: ${item.name}`, item.must.test(text[locale][item.doc]), item.must.source)
+    const body = text[locale][item.doc]
+    if (item.must) check(`${locale}/${item.doc}: ${item.name}`, item.must.test(body), item.must.source)
+    if (item.mustNot) check(`${locale}/${item.doc}: ${item.name}`, !item.mustNot.test(body), item.mustNot.source)
   }
 }
 
@@ -4479,7 +4509,10 @@ const PHOTO_IN_RETENTION: Record<string, RegExp> = {
   check('mutation control (fr): a date inside a statute is not read as the revision date',
     writtenRevisionDate('fr', "la loi n° 2023-451 du 9 juin 2023 visant à encadrer l'influence commerciale") === null)
 
-  const law = (doc: Doc, needle: string) => LAW.fr!.find((l) => l.doc === doc && l.must.source.includes(needle))!
+  // Only the rows that assert something: a `mustNot` row has no `must` to read.
+  const law = (doc: Doc, needle: string) =>
+    LAW.fr!.find((l): l is { doc: Doc; name: string; must: RegExp } =>
+      l.doc === doc && !!l.must && l.must.source.includes(needle))!
   check('mutation control (fr): a refund policy that promises the fourteen days without the article is caught',
     !law('refund-policy', 'L221-18').must.test('Vous disposez d\'un droit de rétractation de quatorze jours.'))
   check('mutation control (fr): a privacy policy that answers in thirty days instead of one month is caught',
@@ -4583,7 +4616,10 @@ const PHOTO_IN_RETENTION: Record<string, RegExp> = {
   check('mutation control (it): a date inside a statute is not read as the revision date',
     writtenRevisionDate('it', 'la legge 9 gennaio 2004, n. 4 (la « legge Stanca »)') === null)
 
-  const law = (doc: Doc, needle: string) => LAW.it!.find((l) => l.doc === doc && l.must.source.includes(needle))!
+  // Only the rows that assert something: a `mustNot` row has no `must` to read.
+  const law = (doc: Doc, needle: string) =>
+    LAW.it!.find((l): l is { doc: Doc; name: string; must: RegExp } =>
+      l.doc === doc && !!l.must && l.must.source.includes(needle))!
   check('mutation control (it): a refund policy that promises the fourteen days without the article is caught',
     !law('refund-policy', 'articolo 52').must.test('Lei dispone di un diritto di recesso di quattordici giorni.'))
   check('mutation control (it): a refund policy that treats an open account as full performance is caught',
@@ -4695,7 +4731,10 @@ const PHOTO_IN_RETENTION: Record<string, RegExp> = {
   check('mutation control (ja): a date inside a statute is not read as the revision date',
     writtenRevisionDate('ja', '令和5年3月28日内閣府告示第19号は2023年10月1日に施行されました。') === null)
 
-  const law = (doc: Doc, needle: string) => LAW.ja!.find((l) => l.doc === doc && l.must.source.includes(needle))!
+  // Only the rows that assert something: a `mustNot` row has no `must` to read.
+  const law = (doc: Doc, needle: string) =>
+    LAW.ja!.find((l): l is { doc: Doc; name: string; must: RegExp } =>
+      l.doc === doc && !!l.must && l.must.source.includes(needle))!
   check('mutation control (ja): a refund policy that grants a cooling-off period is caught',
     !law('refund-policy', 'この制度そのものがありません').must.test('通信販売では8日間のクーリング・オフをご利用いただけます。'))
   check('mutation control (ja): a refund policy with no 返品特約 display is caught',
@@ -4790,7 +4829,10 @@ const PHOTO_IN_RETENTION: Record<string, RegExp> = {
   check('mutation control (pl): a date inside a statute is not read as the revision date',
     writtenRevisionDate('pl', 'ustawa z dnia 30 maja 2014 r. o prawach konsumenta') === null)
 
-  const law = (doc: Doc, needle: string) => LAW.pl!.find((l) => l.doc === doc && l.must.source.includes(needle))!
+  // Only the rows that assert something: a `mustNot` row has no `must` to read.
+  const law = (doc: Doc, needle: string) =>
+    LAW.pl!.find((l): l is { doc: Doc; name: string; must: RegExp } =>
+      l.doc === doc && !!l.must && l.must.source.includes(needle))!
   check('mutation control (pl): a refund policy that promises the fourteen days without the article is caught',
     !law('refund-policy', 'art\\. 27 ustawy z dnia').must.test('Mają Państwo prawo odstąpienia w ciągu czternastu dni.'))
   check('mutation control (pl): a refund policy that treats an open account as full performance is caught',

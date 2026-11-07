@@ -180,6 +180,12 @@ export const billingJa: DeepPartial<DashboardDictionary> = {
       activatedSuccess: 'プランが有効になりました。このページはまもなく更新されます。',
       buttonError: 'PayPal で問題が起きました。少ししてからもう一度お試しいただくか、ご連絡ください。',
     },
+    withdrawal: {
+      label:
+        '欧州連合および英国の消費者法が消費者に認める14日間の撤回期間の満了前に、Go Top SEO が直ちにサービスの提供を開始することを求めます。また、サービスが完全に履行された時点でその権利を失うとの説明を受けたことを確認します。',
+      requiredNote: '上の行を確認すると、お支払い方法が表示されます。それまでは請求は発生しません。',
+      policyLabel: 'キャンセル・返金ポリシーに記載された撤回権の全文',
+    },
     creem: {
       payButton: 'カードでお支払い',
       starting: '安全なお支払いページを開いています...',

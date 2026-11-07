@@ -25,7 +25,23 @@ interface PayPalWindow extends Window {
   }
 }
 
-export default function BillingClient({ market }: { market: BillingMarket }) {
+export default function BillingClient({
+  market,
+  acknowledged = true,
+}: {
+  market: BillingMarket
+  /**
+   * The withdrawal acknowledgement above the plan cards. While it is false the
+   * PayPal SDK is not even requested and no button is rendered into any plan
+   * container, so a subscription cannot be started without it. The gate is
+   * structural rather than a refusal inside createSubscription: a button that
+   * opens PayPal and then declines would have taken the buyer into a payment
+   * flow we were always going to stop. Defaults to true so the ILS path, which
+   * is not asked for this acknowledgement at all, behaves exactly as before
+   * (lib/compliance/withdrawal-acknowledgement.ts).
+   */
+  acknowledged?: boolean
+}) {
   const { uiLocale } = useDashboardLanguage()
   const dict = getDashboardDictionary(uiLocale)
   const t = dict.billing.paypal
@@ -148,6 +164,13 @@ export default function BillingClient({ market }: { market: BillingMarket }) {
   }, [t, market])
 
   useEffect(() => {
+    // Not acknowledged yet: request nothing. `loading` is deliberately NOT
+    // touched here — a setState inside an effect is what react-hooks warns
+    // about, and there is nothing to resolve: the render below returns null
+    // before the loading line is reached, and this effect runs for real the
+    // moment the box is ticked.
+    if (!acknowledged) return
+
     const clientId = process.env.NEXT_PUBLIC_PAYPAL_CLIENT_ID
 
     if (!clientId) {
@@ -185,7 +208,13 @@ export default function BillingClient({ market }: { market: BillingMarket }) {
     return () => {
       if (script.parentNode) script.parentNode.removeChild(script)
     }
-  }, [initPayPalButtons, t.notConfigured, t.sdkLoadFailed, paypalLocale])
+  }, [acknowledged, initPayPalButtons, t.notConfigured, t.sdkLoadFailed, paypalLocale])
+
+  // Before the acknowledgement there is nothing to show and nothing loading:
+  // the checkbox above the plans carries the explanation, and "Loading
+  // PayPal..." under an empty plan card would be describing work we have
+  // deliberately not started.
+  if (!acknowledged) return null
 
   if (loading) {
     return (
