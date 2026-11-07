@@ -95,6 +95,11 @@ export interface BlogBriefInput {
   secondaryKeywords: string[]
   /** Published articles of the same language, newest first. */
   internalTargets: InternalLinkTarget[]
+  /**
+   * The gate verdict that refused the previous attempt at this same row, as
+   * stored in blog_plan.last_error. Turned into [MUST AVOID] lines below.
+   */
+  previousFailure?: string | null
 }
 
 /** `/articles/<slug>` under the language's own tree. */
@@ -136,7 +141,7 @@ export function buildBlogBrief(input: BlogBriefInput): ArticleBrief {
     ctaPhone: null,
     ctaWhatsApp: null,
     ctaUrl: `${SITE_URL}${authHref('signup', input.locale)}`,
-    briefNotes: null,
+    briefNotes: retryBriefNotes(input.previousFailure),
     includeBrandName: true,
     brandNameToInclude: 'Go Top SEO',
     // The page builds the table of contents from the headings itself
@@ -150,4 +155,90 @@ export function buildBlogBrief(input: BlogBriefInput): ArticleBrief {
     writingGuidance: BLOG_GUIDANCE,
     businessContext: { description: PRODUCT_FACTS.join(' '), city: null },
   }
+}
+
+/**
+ * WHAT THE NEXT ATTEMPT IS TOLD ABOUT THE ONE THAT FAILED.
+ *
+ * A row gets three attempts (MAX_ATTEMPTS in lib/blog/auto/store.ts), and until
+ * 7 Nov 2026 all three were the same roll of the dice: the gate's verdict was
+ * written to `last_error` and read by nobody, so the brief handed to attempt two
+ * was byte-for-byte the brief that had just been refused. On a topic that
+ * invites a forbidden claim the model makes it again, and the row dies having
+ * spent three Gemini calls to produce nothing.
+ *
+ * Measured on the English queue, 7 Nov 2026: "keyword tracker" (1,600/mo) was
+ * refused at 05:02 UTC for `truth:tracking_cadence_claim` and again at 05:16 for
+ * `truth:tracking_cadence_claim,ranking_guarantee`. A keyword whose subject IS
+ * rank tracking pulls the model towards "daily rank tracking" — which is false,
+ * ours runs monthly — and nothing in the second brief said so any louder than
+ * the first. Three English rows ("seo" at 90,500/mo among them) are already
+ * parked as failed the same way.
+ *
+ * So the failure codes become [MUST AVOID] lines, which the generator treats as
+ * hard negative constraints (lib/content/gemini-article.ts). The sentence names
+ * the rule AND the fact that replaces it, because "do not say daily" without
+ * "it is monthly" leaves the model nothing to write.
+ *
+ * Only content failures are worth repeating back. A quota error, a cover
+ * failure or a malformed JSON response says nothing about the text, and a line
+ * about it would just crowd the brief.
+ *
+ * No line here may contain a year: a year in briefNotes is read as a year the
+ * brief asked for (`collectAllowedYears`), which would let the model date the
+ * article.
+ */
+const RETRY_RULES: Record<string, string> = {
+  percentage_claim:
+    'any percentage, success rate, growth figure or "x times" result — we have no such number and may not invent one',
+  customer_count_claim:
+    'any count of customers, users or businesses using the platform — we publish no such number',
+  tracking_cadence_claim:
+    'calling the automatic position tracking daily or weekly. It runs automatically ONCE A MONTH, and a scan can be run by hand at any time. Say monthly, or say "whenever you want to, by hand"',
+  rating_claim:
+    'star ratings and review counts of any kind, ours or a competitor’s',
+  ranking_guarantee:
+    'any promise, guarantee or assurance of a ranking, a position or a place in Google. Describe what the work does, never what it will achieve',
+  ai_engine_coverage_claim:
+    'naming Perplexity, Copilot or Grok as part of what is checked automatically. The automatic AI check covers ChatGPT, Gemini and Google AI; the others are answered for a single question on request',
+  shopify_schema_claim:
+    'structured data as something the Shopify app produces or provides',
+  shopify_link_not_listing:
+    'any Shopify link other than https://apps.shopify.com/go-top-seo',
+  shopify_link_not_nofollow:
+    'a Shopify link without rel="nofollow"',
+  placeholder_found:
+    'every placeholder marker, including the word "placeholder" itself even when describing the HTML attribute — name the attribute in this article’s own language instead',
+  content_too_short:
+    'stopping short: the article was refused as too thin, so write the full length the brief asks for',
+  brand_not_mentioned:
+    'leaving Go Top SEO unnamed: name it at least once, where it genuinely helps the reader',
+  no_link_to_product:
+    'ending with no way for the reader to act: the conclusion must name Go Top SEO as the next step',
+}
+
+/**
+ * The [MUST AVOID] lines for a `last_error` such as
+ * `truth:tracking_cadence_claim,ranking_guarantee`. Unknown or non-content
+ * codes produce nothing. Pure.
+ */
+export function retryAvoidances(lastError: string | null | undefined): string[] {
+  if (!lastError) return []
+  const codes = lastError.split(':').slice(1).join(':').split(',')
+  const out: string[] = []
+  for (const raw of codes) {
+    const rule = RETRY_RULES[raw.trim()]
+    if (rule && !out.includes(rule)) out.push(rule)
+  }
+  return out
+}
+
+/** The brief note that carries them, or null when there is nothing to say. */
+export function retryBriefNotes(lastError: string | null | undefined): string | null {
+  const avoid = retryAvoidances(lastError)
+  if (avoid.length === 0) return null
+  return [
+    'A previous attempt at this exact article was REFUSED before publication and thrown away. It broke the rules below. Write the article again without them.',
+    ...avoid.map((a) => `[MUST AVOID] ${a}`),
+  ].join('\n')
 }
