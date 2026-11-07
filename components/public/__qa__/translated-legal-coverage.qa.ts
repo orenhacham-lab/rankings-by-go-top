@@ -5553,6 +5553,153 @@ const TRANSFER_RISK: Record<string, RegExp> = {
   }
 }
 
+/**
+ * THE ARTICLE 27 REPRESENTATIVE: WHAT WE RELY ON, WHY, AND WHEN IT ENDS, IN
+ * EVERY EU-LANGUAGE DOCUMENT.
+ *
+ * Decided by the owner on 2026-11-07. The duty in Art. 27(1) GDPR, and in
+ * UK GDPR Art. 27, reaches us: Art. 3(2)(a) turns on OFFERING a service, and a
+ * live trial funnel in six EU languages offers one, whatever the revenue.
+ * Appointing two representatives costs about EUR 798 a year, and with no
+ * paying customer anywhere that money does not exist. So we rely on the
+ * exemption in Art. 27(2)(a) instead, which is available because the
+ * processing of data about people in the territory is in fact OCCASIONAL, and
+ * we say so in the open rather than staying silent about it.
+ *
+ * Three things each of the six documents must carry, and each one is checked:
+ *
+ *   1. THAT NO REPRESENTATIVE IS DESIGNATED. Art. 13(1)(a) makes the
+ *      representative's identity an information duty where one exists. None
+ *      does, and a document that omits the subject leaves a reader unable to
+ *      tell whether the representative is missing or merely unmentioned.
+ *   2. THAT WE RELY ON ART. 27(2)(a), AND ON WHICH FACTS. Not "the duty does
+ *      not apply to us", which is a legal assertion nobody here is entitled to
+ *      publish, but the narrow factual claim the exemption actually turns on:
+ *      occasional, no large-scale special-category or criminal-conviction
+ *      data, and a risk to rights and freedoms that is unlikely given the
+ *      nature, context, scope and purposes of the processing. Each document
+ *      cites the provision, so a reader can check our reasoning rather than
+ *      take our word.
+ *   3. WHEN IT ENDS, AND THAT WE WILL KNOW. A factual claim with no stated
+ *      end is a claim nobody can hold us to. The documents name the event that
+ *      ends it, the first account opened from the EEA or the United Kingdom,
+ *      promise a designation and the name and address at that point, and say
+ *      that such an account raises an alert here the same day. That alert is
+ *      real code with its own suite: lib/compliance/gdpr-territory-alert.ts
+ *      and lib/compliance/__qa__/gdpr-territory.qa.ts. If the promise is ever
+ *      made without the machinery, this file and that suite disagree, which is
+ *      the point of writing it twice.
+ *
+ * AND THE SENTENCE IT MUST NOT CARRY. "Insofar as this designation falls on
+ * us, it is an open point we are working on" was the honest statement while no
+ * decision had been taken. It is no longer true: a decision was taken, and a
+ * document that still says the question is open understates what we have
+ * concluded. The last check of each language fails on that wording.
+ *
+ * Checked only where the GDPR or the UK GDPR is the reader's own law. he, en,
+ * pt-BR and ja are out of scope on purpose: their documents address Israel,
+ * the United States, Brazil and Japan.
+ */
+{
+  /** We have not designated a representative in the Union under Art. 27. */
+  const NO_REPRESENTATIVE: Record<string, RegExp> = {
+    de: /haben (wir )?keinen Vertreter in der Union nach Artikel 27 DSGVO benannt/,
+    nl: /hebben wij geen vertegenwoordiger in de Unie aangewezen volgens artikel 27 AVG/,
+    fr: /n'avons pas désigné de représentant dans l'Union au sens de l'article 27 du RGPD/,
+    it: /non abbiamo designato un rappresentante nell'Unione ai sensi dell'articolo 27 del GDPR/,
+    es: /no hemos designado un representante en la Unión conforme al artículo 27 del RGPD/,
+    pl: /nie wyznaczyli[śs]my przedstawiciela w Unii zgodnie z art\. 27 RODO/,
+  }
+
+  /** Because we rely on the Art. 27(2)(a) exemption, and the provision is cited. */
+  const RELIES_ON_THE_EXEMPTION: Record<string, RegExp> = {
+    de: /Ausnahme des Artikels 27 Absatz 2 Buchstabe a DSGVO stützen/,
+    nl: /uitzondering van artikel 27, lid 2, onder a, AVG/,
+    fr: /l'exception de l'article 27, paragraphe 2, point a\) du RGPD/,
+    it: /eccezione dell'articolo 27, paragrafo 2, lettera a\) del GDPR/,
+    es: /excepción del artículo 27, apartado 2, letra a\) del RGPD/,
+    pl: /wyj[ąa]tku z art\. 27 ust\. 2 lit\. a RODO/,
+  }
+
+  /** On the one fact it turns on: the processing is occasional. */
+  const OCCASIONAL: Record<string, RegExp> = {
+    de: /ist nur gelegentlich/,
+    nl: /is slechts incidenteel/,
+    fr: /est seulement occasionnel/,
+    it: /è soltanto occasionale/,
+    es: /es\s+solo ocasional/,
+    pl: /ma charakter wy[łl][ąa]cznie okazjonalny/,
+  }
+
+  /** And it ends with the first account from the territory, when one is designated. */
+  const ENDS_ON_THE_FIRST_ACCOUNT: Record<string, RegExp> = {
+    de: /sobald wir ein Konto aus dem Europäischen Wirtschaftsraum oder dem Vereinigten Königreich haben, benennen wir einen Vertreter/,
+    nl: /zodra wij een account hebben dat vanuit de Europese Economische Ruimte of het Verenigd Koninkrijk is geopend, wijzen wij een vertegenwoordiger aan/,
+    fr: /dès que nous aurons un compte ouvert depuis l'Espace économique européen ou le Royaume-Uni, nous désignerons un représentant/,
+    it: /dal momento in cui avremo un account aperto dallo Spazio economico europeo o dal Regno Unito, designeremo un rappresentante/,
+    es: /desde el momento en que tengamos una cuenta abierta desde el Espacio Económico Europeo o el Reino Unido, designaremos un representante/,
+    pl: /od chwili, gdy b[ęe]dziemy mie[ćc] konto otwarte z Europejskiego Obszaru Gospodarczego lub ze Zjednoczonego Królestwa, wyznaczymy przedstawiciela/,
+  }
+
+  /** The wording the decision replaced, which must be gone. */
+  const STILL_AN_OPEN_POINT: Record<string, RegExp> = {
+    de: /ein offener Punkt, an dem wir arbeiten/,
+    nl: /een open punt waaraan wij werken/,
+    fr: /un point ouvert que nous traitons/,
+    it: /un punto aperto che stiamo trattando/,
+    es: /un punto abierto en el que estamos trabajando/,
+    pl: /punkt otwarty, nad którym pracujemy/,
+  }
+
+  const EU_LOCALES = ['de', 'nl', 'fr', 'it', 'es', 'pl']
+  for (const locale of EU_LOCALES) {
+    const doc = text[locale] ? text[locale].privacy : ''
+    check(`${locale}/privacy: the document is readable`, doc.length > 0)
+    if (!doc) continue
+    check(`${locale}/privacy: says no Art. 27 representative in the Union is designated`,
+      NO_REPRESENTATIVE[locale]!.test(doc))
+    check(`${locale}/privacy: names Art. 27(2)(a) as what it relies on`,
+      RELIES_ON_THE_EXEMPTION[locale]!.test(doc))
+    check(`${locale}/privacy: and the fact it turns on, that the processing is occasional`,
+      OCCASIONAL[locale]!.test(doc))
+    check(`${locale}/privacy: and says the reliance ends with the first account from the territory`,
+      ENDS_ON_THE_FIRST_ACCOUNT[locale]!.test(doc))
+    check(`${locale}/privacy: and no longer calls the question an open point`,
+      !STILL_AN_OPEN_POINT[locale]!.test(doc))
+  }
+
+  /* The promise in the documents is kept by code, so the code has to be there. */
+  {
+    const read = (path: string) => (existsSync(path) ? readFileSync(path, 'utf8') : '')
+    const alert = read('lib/compliance/gdpr-territory-alert.ts')
+    const territory = read('lib/compliance/gdpr-territory.ts')
+    check('the alert the documents promise exists', alert.length > 0 && /notifyGdprTerritorySignup/.test(alert))
+    check('and it is wired to the GDPR territory, not to the consent territory',
+      /inGdprTerritory/.test(alert) && /GDPR_TERRITORY_COUNTRIES/.test(territory))
+    check('and the sign-in funnel calls it',
+      /notifyGdprTerritorySignup/.test(read('app/api/auth/callback/route.ts')))
+  }
+
+  // MUTATION CONTROLS, against the real German and Spanish documents.
+  {
+    const de = text.de ? text.de.privacy : ''
+    const es = text.es ? text.es.privacy : ''
+    if (de) {
+      const denied = de.replace(RELIES_ON_THE_EXEMPTION.de!, 'Artikel 27 DSGVO auf uns nicht anwendbar ist')
+      check('mutation control (de): a reliance turned into a denial of the duty is caught',
+        NO_REPRESENTATIVE.de!.test(denied) && !RELIES_ON_THE_EXEMPTION.de!.test(denied))
+      const endless = de.replace(ENDS_ON_THE_FIRST_ACCOUNT.de!, 'wir prüfen das weiter')
+      check('mutation control (de): a claim with no stated end is caught',
+        RELIES_ON_THE_EXEMPTION.de!.test(endless) && !ENDS_ON_THE_FIRST_ACCOUNT.de!.test(endless))
+    } else check('mutation control (de): the German document is readable', false)
+    if (es) {
+      const reverted = es.replace(RELIES_ON_THE_EXEMPTION.es!, 'es un punto abierto en el que estamos trabajando')
+      check('mutation control (es): a document that goes back to the old wording is caught',
+        STILL_AN_OPEN_POINT.es!.test(reverted) && !RELIES_ON_THE_EXEMPTION.es!.test(reverted))
+    } else check('mutation control (es): the Spanish document is readable', false)
+  }
+}
+
 console.log(`\n${pass} passed, ${fail} failed`)
 if (fail > 0) process.exit(1)
 

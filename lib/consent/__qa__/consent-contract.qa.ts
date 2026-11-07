@@ -50,7 +50,18 @@ function main() {
     // The old layout had BOTH an unconditional gtm.js <script> and a <noscript>
     // ns.html iframe. Neither may come back: a tag that loads before the
     // question is asked makes the answer decorative (ePrivacy Art. 5(3)).
-    const layoutClean = (s: string) => !/googletagmanager\.com/.test(s) && !/ns\.html/.test(s) && /<GoogleTags \/>/.test(s)
+    // The loader now takes one prop. From 2026-11-07 the layout passes
+    // `gdprTerritory`, and inside the EEA and the United Kingdom the loader
+    // renders nothing at all: we rely on the Art. 27(2)(a) GDPR exemption,
+    // which holds only while the processing of data about people there stays
+    // occasional, and a measurement tag is what would make it regular
+    // (lib/compliance/gdpr-territory.ts). That is strictly less tag loading
+    // than before, so this contract is not weakened by it, but the element
+    // has to be matched in its current shape or this check passes on a
+    // layout that renders no loader at all.
+    const layoutClean = (s: string) =>
+      !/googletagmanager\.com/.test(s) && !/ns\.html/.test(s)
+      && /<GoogleTags gdprTerritory=\{gdprTerritory\} \/>/.test(s)
     check('A1: the root layout requests no tag itself, and defers to the gated loader', layoutClean(layout))
     check('MUT: the unconditional gtm.js script back in the layout is caught',
       !layoutClean(`${layout}\n<script async src="https://www.googletagmanager.com/gtm.js?id=GTM-PC29G3NQ"></script>`))

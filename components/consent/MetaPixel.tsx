@@ -74,7 +74,27 @@ function alreadyRegistered(fbq: Fbq): boolean {
   }
 }
 
-export function MetaPixel() {
+/**
+ * INSIDE THE EEA AND THE UNITED KINGDOM THIS LOADER IS NOT RENDERED AT ALL.
+ *
+ * Not a weakened gate and not a consent decision: app/layout.tsx passes
+ * `gdprTerritory`, and in the territory there is no tag to consent to. The
+ * reason is Art. 27(2)(a) GDPR — the exemption from designating a
+ * representative in the Union holds only while the processing of data about
+ * people there stays occasional, and a measurement or advertising tag is the
+ * one thing that would make it regular. lib/compliance/gdpr-territory.ts
+ * carries the whole reasoning. Everywhere else nothing changes: the loader
+ * below behaves exactly as it did.
+ *
+ * The prop defaults to false so a caller that does not pass it keeps the old
+ * behaviour rather than silently going dark.
+ */
+export function MetaPixel({ gdprTerritory = false }: { gdprTerritory?: boolean }) {
+  if (gdprTerritory) return null
+  return <MetaPixelLoader />
+}
+
+function MetaPixelLoader() {
   const initialised = useRef(false)
   const lastViewed = useRef<string | null>(null)
   const pathname = usePathname()
