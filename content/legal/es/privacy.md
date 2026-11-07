@@ -3,7 +3,7 @@ title: Política de privacidad | Go Top SEO
 description: Política de privacidad de Go Top SEO: cómo recopilamos, utilizamos y protegemos sus datos.
 locale: es
 source: app/(public)/en/privacy/page.tsx
-lastUpdated: 2026-11-06
+lastUpdated: 2026-11-07
 register: usted
 ---
 
@@ -418,6 +418,8 @@ Para cualquier asunto de privacidad, incluido el ejercicio de los derechos anter
 
 No estamos obligados a designar un delegado de protección de datos conforme a la Enmienda 13 a la Ley israelí de Protección de la Privacidad, y no hemos designado ninguno. Las solicitudes se gestionan a través del contacto indicado anteriormente.
 
+En el Espacio Económico Europeo tampoco estamos obligados a designar un delegado de protección de datos conforme al artículo 37 del RGPD: no somos una autoridad pública, nuestra actividad principal no es el tratamiento a gran escala de datos sensibles o relativos a condenas penales, y no realizamos una observación sistemática a gran escala de personas. Lo que ocupa su lugar es el canal indicado arriba, que atiende la misma persona que explota el Servicio y que responde en español. Igualmente, **no hemos designado un representante en la Unión conforme al artículo 27 del RGPD**; en la medida en que esa designación nos corresponda, es un punto abierto en el que estamos trabajando, y lo diremos aquí cuando quede resuelto, en lugar de anunciar un representante que no existe.
+
 ## Actualizaciones de esta política
 
 Podemos actualizar esta política de vez en cuando. Los cambios surten efecto inmediatamente tras su publicación. Le recomendamos revisar esta política con regularidad.
@@ -430,4 +432,4 @@ Si tiene preguntas sobre esta política de privacidad, contacte con:
 
 **Teléfono:** 054-9489377
 
-Esta política se actualizó por última vez el 6 de noviembre de 2026
+Esta política se actualizó por última vez el 7 de noviembre de 2026

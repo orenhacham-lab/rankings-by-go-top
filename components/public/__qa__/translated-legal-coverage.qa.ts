@@ -5553,6 +5553,90 @@ const TRANSFER_RISK: Record<string, RegExp> = {
   }
 }
 
+/**
+ * THE ARTICLE 27 REPRESENTATIVE: EVERY EU-LANGUAGE DOCUMENT SAYS THE SAME THING
+ * ABOUT IT, AND SAYS IT AS AN OPEN DUTY RATHER THAN AS A DENIAL.
+ *
+ * Raised on 2026-11-07. Five of the six EU-language documents (de, fr, it, nl,
+ * pl) already stated where we stand on Art. 27 GDPR; the Spanish one said
+ * nothing at all, so a reader in Spain got the Israeli DPO sentence and no word
+ * on the Union representative. One language silent while five speak is the
+ * exact drift this suite exists to catch, and the gap was invisible because no
+ * check looked for it.
+ *
+ * What a document must carry, and why each half is load-bearing:
+ *
+ *   1. THAT WE HAVE NOT DESIGNATED ONE. Art. 13(1)(a) GDPR makes the
+ *      representative's identity an information duty where one exists. None
+ *      exists, so there is nothing to name — but a document that simply omits
+ *      the subject leaves a reader unable to tell whether the representative is
+ *      missing or merely unmentioned. The sentence says it outright.
+ *   2. THAT THE DUTY IS OPEN, NOT DENIED. Art. 27(2)(a) exempts only
+ *      processing that is occasional. A live trial funnel served in six EU
+ *      languages is not occasional, so the exemption is unlikely to cover us
+ *      and the honest statement is "insofar as this designation falls on us,
+ *      it is an open point we are working on". A bare "we have no
+ *      representative" would read as a claim that the duty does not apply,
+ *      which is a legal assertion nobody here is entitled to publish. The
+ *      second half is therefore required, not decorative.
+ *
+ * Checked only where the GDPR is the reader's own law. he, en, pt-BR and ja are
+ * out of scope on purpose: their documents address Israel, the United States,
+ * Brazil and Japan, and bolting a Union-representative paragraph onto them
+ * would be text nobody there needs. If an EEA-specific section is ever added to
+ * the Hebrew or English page, the locale belongs in this list.
+ *
+ * MUTATION CONTROLS at the end: the Spanish text with the statement removed
+ * must fail the first check, and the Spanish text with its second half removed
+ * must pass the first and fail the second.
+ */
+{
+  /** We have not designated a representative in the Union under Art. 27. */
+  const NO_REPRESENTATIVE: Record<string, RegExp> = {
+    de: /haben (wir )?keinen Vertreter in der Union nach Artikel 27 DSGVO benannt/,
+    nl: /hebben wij geen vertegenwoordiger in de Unie aangewezen volgens artikel 27 AVG/,
+    fr: /n'avons pas désigné de représentant dans l'Union au sens de l'article 27 du RGPD/,
+    it: /non abbiamo designato un rappresentante nell'Unione ai sensi dell'articolo 27 del GDPR/,
+    es: /no hemos designado un representante en la Unión conforme al artículo 27 del RGPD/,
+    pl: /nie wyznaczyli[śs]my przedstawiciela w Unii zgodnie z art\. 27 RODO/,
+  }
+
+  /** And the duty is treated as open, not as inapplicable. */
+  const AN_OPEN_POINT: Record<string, RegExp> = {
+    de: /soweit diese Benennung uns obliegt, ist das ein offener Punkt, an dem wir arbeiten/,
+    nl: /voor zover die aanwijzing op ons rust, is dat een open punt waaraan wij werken/,
+    fr: /si cette désignation nous est due, c'est un point ouvert que nous traitons/,
+    it: /se quella designazione ci è dovuta, è un punto aperto che stiamo trattando/,
+    es: /en la medida en que esa designación nos corresponda, es un punto abierto en el que estamos trabajando/,
+    pl: /w zakresie, w jakim ten obowi[ąa]zek na nas spoczywa, jest to punkt otwarty, nad kt[óo]rym pracujemy/,
+  }
+
+  const EU_LOCALES = ['de', 'nl', 'fr', 'it', 'es', 'pl']
+  for (const locale of EU_LOCALES) {
+    const doc = text[locale] ? text[locale].privacy : ''
+    check(`${locale}/privacy: the document is readable`, doc.length > 0)
+    if (!doc) continue
+    check(`${locale}/privacy: says no Art. 27 representative in the Union has been designated`,
+      NO_REPRESENTATIVE[locale]!.test(doc))
+    check(`${locale}/privacy: and says that designation is an open point, not a duty denied`,
+      AN_OPEN_POINT[locale]!.test(doc))
+  }
+
+  // MUTATION CONTROLS, against the real Spanish document.
+  {
+    const es = text.es ? text.es.privacy : ''
+    if (!es) check('mutation control (es): the Spanish document is readable', false)
+    else {
+      const gone = es.replace(NO_REPRESENTATIVE.es!, 'hemos designado un representante en la Unión')
+      check('mutation control (es): a document that drops the statement is caught',
+        !NO_REPRESENTATIVE.es!.test(gone))
+      const halved = es.replace(AN_OPEN_POINT.es!, 'no nos corresponde esa designación')
+      check('mutation control (es): a statement turned into a denial of the duty is caught',
+        NO_REPRESENTATIVE.es!.test(halved) && !AN_OPEN_POINT.es!.test(halved))
+    }
+  }
+}
+
 console.log(`\n${pass} passed, ${fail} failed`)
 if (fail > 0) process.exit(1)
 
