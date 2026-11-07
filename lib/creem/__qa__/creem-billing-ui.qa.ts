@@ -120,10 +120,14 @@ console.log('\nC) one plan card, one way to pay')
   check('C1-MUT: a card wired straight to the button is caught',
     !view.replace('action={checkoutActionFor("regular")}', 'action={<CreemCheckoutButton plan="regular" />}')
       .includes('action={checkoutActionFor("regular")}'))
+  // The button gained `disabled` on 2026-11-07: the withdrawal acknowledgement
+  // gate (lib/compliance/withdrawal-acknowledgement.ts). C1b is about the SERVER
+  // deciding whether a card button exists at all, which is unchanged; the gate
+  // decides only whether the one that exists can be pressed.
   check('C1b: the helper hands out the card button only when the server said so',
-    /if \(creemCheckout\) return <CreemCheckoutButton plan=\{plan\} \/>/.test(view))
+    /if \(creemCheckout\) return <CreemCheckoutButton plan=\{plan\} disabled=\{!checkoutUnlocked\} \/>/.test(view))
   check('C1b-MUT: an unconditional button in the helper is caught',
-    !/if \(creemCheckout\) return <CreemCheckoutButton/.test(view.replace('if (creemCheckout) return <CreemCheckoutButton plan={plan} />', 'return <CreemCheckoutButton plan={plan} />')))
+    !/if \(creemCheckout\) return <CreemCheckoutButton/.test(view.replace('if (creemCheckout) return <CreemCheckoutButton plan={plan} disabled={!checkoutUnlocked} />', 'return <CreemCheckoutButton plan={plan} disabled={!checkoutUnlocked} />')))
 
   // PlanCard renders `action` INSTEAD of the PayPal container, so a card that
   // has one cannot show both.
@@ -133,9 +137,9 @@ console.log('\nC) one plan card, one way to pay')
     !/\) : action \? \(\s*action\s*\) : \(/.test(view.replace(') : action ? (\n        action\n      ) : (', ') : (')))
 
   check('C3: the PayPal SDK is not loaded on either Creem path',
-    /\{!creemCheckout && !creemGoverned && <BillingClient market=\{market\} \/>\}/.test(view))
+    /\{!creemCheckout && !creemGoverned && <BillingClient market=\{market\} acknowledged=\{checkoutUnlocked\} \/>\}/.test(view))
   check('C3-MUT: loading it anyway is caught',
-    !/!creemCheckout && !creemGoverned && <BillingClient/.test(view.replace('{!creemCheckout && !creemGoverned && <BillingClient market={market} />}', '<BillingClient market={market} />')))
+    !/!creemCheckout && !creemGoverned && <BillingClient/.test(view.replace('{!creemCheckout && !creemGoverned && <BillingClient market={market} acknowledged={checkoutUnlocked} />}', '<BillingClient market={market} acknowledged={checkoutUnlocked} />')))
   check('C3-MUT2: dropping only the governed half is caught',
     !/!creemCheckout && !creemGoverned && <BillingClient/.test(view.replace('!creemCheckout && !creemGoverned &&', '!creemCheckout &&')))
 

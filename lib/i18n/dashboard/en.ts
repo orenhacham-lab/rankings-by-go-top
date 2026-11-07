@@ -6107,6 +6107,20 @@ export const dashboardEn = {
       activatedSuccess: 'Your plan is active. This page will refresh in a moment.',
       buttonError: 'Something went wrong with PayPal. Try again in a moment, or write to us and we’ll help.',
     },
+    /**
+     * THE WITHDRAWAL ACKNOWLEDGEMENT, and why it gates the pay button.
+     * lib/compliance/withdrawal-acknowledgement.ts carries the whole reasoning:
+     * the refund policy in five languages already states that the buyer made
+     * this express request and this acknowledgement, and until this control
+     * existed the product collected neither. Both halves are in one sentence
+     * because both are conditions, not one condition and one warning.
+     */
+    withdrawal: {
+      label:
+        'I ask Go Top SEO to start the service immediately, before the end of the fourteen-day withdrawal period that consumer law in the European Union and the United Kingdom gives a consumer, and I confirm I have been told that I lose that right once the service has been fully performed.',
+      requiredNote: 'The payment options appear once you confirm the line above. Nothing is charged before that.',
+      policyLabel: 'The withdrawal right in full, in the cancellation and refund policy',
+    },
     creem: {
       payButton: 'Pay by card',
       starting: 'Opening the secure payment page...',

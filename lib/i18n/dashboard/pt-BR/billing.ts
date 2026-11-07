@@ -163,6 +163,12 @@ export const billingPtBR: DeepPartial<DashboardDictionary> = {
       activatedSuccess: 'Seu plano está ativo. Esta página será atualizada em instantes.',
       buttonError: 'Algo deu errado com o PayPal. Tente novamente em instantes ou fale com a gente que ajudamos você.',
     },
+    withdrawal: {
+      label:
+        'Peço à Go Top SEO que inicie o serviço imediatamente, antes do fim do prazo de desistência de quatorze dias que o direito do consumidor da União Europeia e do Reino Unido concede ao consumidor, e confirmo que fui informado de que perco esse direito quando o serviço tiver sido integralmente prestado.',
+      requiredNote: 'As formas de pagamento aparecem quando você confirmar a linha acima. Antes disso nada é cobrado.',
+      policyLabel: 'O direito de desistência por inteiro, na política de cancelamento e reembolso',
+    },
     creem: {
       payButton: 'Pagar com cartão',
       starting: 'Abrindo a página de pagamento segura...',

@@ -2398,6 +2398,12 @@ export const dashboardEs: DeepPartial<DashboardDictionary> = {
       activatedSuccess: 'Tu plan está activo. Esta página se actualizará en un momento.',
       buttonError: 'Algo ha fallado con PayPal. Vuelve a intentarlo en un momento o escríbenos y te ayudamos.',
     },
+    withdrawal: {
+      label:
+        'Pido a Go Top SEO que inicie el servicio de inmediato, antes de que termine el plazo de desistimiento de catorce días que el derecho de consumo de la Unión Europea y del Reino Unido reconoce al consumidor, y confirmo que se me ha informado de que pierdo ese derecho una vez que el servicio haya sido completamente ejecutado.',
+      requiredNote: 'Las opciones de pago aparecen cuando usted confirma la línea anterior. Antes de eso no se cobra nada.',
+      policyLabel: 'El derecho de desistimiento completo, en la política de cancelación y reembolso',
+    },
     creem: {
       payButton: 'Pagar con tarjeta',
       starting: 'Abriendo la página de pago segura...',

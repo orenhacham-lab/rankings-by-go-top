@@ -34,7 +34,17 @@ import { CREEM_BUYER_TERMS_URL } from '@/lib/public-links/creem-buyer-terms'
  */
 /** Creem's own buyer terms. A fixed, absolute URL — never built from input. */
 
-export default function CreemCheckoutButton({ plan }: { plan: string }) {
+export default function CreemCheckoutButton({
+  plan,
+  disabled = false,
+}: {
+  plan: string
+  /** True while the withdrawal acknowledgement above the plans is unticked.
+   *  The route re-checks nothing here: this is the buyer's own statement, and
+   *  the screen must not let a subscription start without it
+   *  (lib/compliance/withdrawal-acknowledgement.ts). */
+  disabled?: boolean
+}) {
   const { uiLocale } = useDashboardLanguage()
   const t = getDashboardDictionary(uiLocale).billing.creem
 
@@ -77,6 +87,7 @@ export default function CreemCheckoutButton({ plan }: { plan: string }) {
         variant="commit"
         className="w-full"
         loading={starting}
+        disabled={disabled}
         onClick={startCheckout}
         data-creem-checkout={plan}
       >

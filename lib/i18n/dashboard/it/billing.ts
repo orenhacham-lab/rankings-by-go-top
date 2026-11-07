@@ -172,6 +172,12 @@ export const billingIt: DeepPartial<DashboardDictionary> = {
       activatedSuccess: 'Il piano è attivo. Questa pagina si aggiorna tra un momento.',
       buttonError: 'Si è verificato un problema con PayPal. Riprovi tra un momento, oppure ci scriva e l’aiuteremo.',
     },
+    withdrawal: {
+      label:
+        'Chiedo a Go Top SEO di cominciare il servizio immediatamente, prima della fine del termine di recesso di quattordici giorni che il diritto dei consumatori dell’Unione europea e del Regno Unito riconosce al consumatore, e confermo di essere stato informato che perdo quel diritto una volta che il servizio sia stato pienamente eseguito.',
+      requiredNote: 'Le modalità di pagamento compaiono quando Lei conferma la riga qui sopra. Prima di allora non viene addebitato nulla.',
+      policyLabel: 'Il diritto di recesso per intero, nella politica di cancellazione e rimborso',
+    },
     creem: {
       payButton: 'Pagare con carta',
       starting: 'Apertura della pagina di pagamento sicura...',
