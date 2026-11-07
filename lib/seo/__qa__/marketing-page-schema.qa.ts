@@ -88,7 +88,14 @@ check('dollar high price = dearest dollar plan', softwareOffer('USD').highPrice 
 // own, resolved by country just below.
 check('the layout offer follows the visitor\'s market, not the language',
   /softwareApplicationSchema\(\{[\s\S]*?market,[\s\S]*?\}\)/.test(layout))
-check('the market comes from the same country basis the pricing page uses', /marketForCountry\(await requestCountry\(\)\)/.test(layout))
+// The one expression became two on 2026-11-07: the same country now also
+// answers whether the visitor is in the territory where we rely on the
+// Art. 27(2)(a) GDPR exemption (lib/compliance/gdpr-territory.ts), and the
+// header is read ONCE for both. What matters here is unchanged, that the
+// market is derived from the request's country and not from the language, so
+// that is what this asserts, in the two steps it is now written in.
+check('the market comes from the same country basis the pricing page uses',
+  /const country = await requestCountry\(\)/.test(layout) && /marketForCountry\(country\)/.test(layout))
 check('the layout url follows the language', /url:\s*localeHome,/.test(layout))
 
 // ------------------------------------------------- every marketing page is placed

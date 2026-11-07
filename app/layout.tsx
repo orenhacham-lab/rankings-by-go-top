@@ -14,6 +14,7 @@ import { localeHomeHref } from '@/lib/i18n/locales'
 import { marketForCountry } from '@/lib/billing/market'
 import { requestCountry } from '@/lib/billing/server-market'
 import { GOOGLE_CONSENT_DEFAULT_SCRIPT } from '@/lib/consent/google-consent-mode'
+import { inGdprTerritory } from '@/lib/compliance/gdpr-territory'
 import { GoogleTags } from '@/components/consent/GoogleTags'
 import { MetaPixel } from '@/components/consent/MetaPixel'
 import { DocumentLocaleSync } from '@/components/DocumentLocaleSync'
@@ -98,7 +99,19 @@ export default async function RootLayout({
   // would still contradict the page for an Israeli reading the English one.
   // Header-only, so no auth read and no query: a crawler and an anonymous
   // visitor get exactly what the pricing page would show them.
-  const market = marketForCountry(await requestCountry())
+  const country = await requestCountry()
+  const market = marketForCountry(country)
+  // ART. 27(2)(a) GDPR, AND THE ONE THING THAT KEEPS IT AVAILABLE.
+  // We rely on the exemption from designating a representative in the Union,
+  // which holds only while the processing of data about people there stays
+  // occasional. A measurement or advertising tag is the one thing that would
+  // make it regular and deliberate, and it is also the Art. 3(2)(b) monitoring
+  // hook, so inside the territory the two loaders below are not rendered at
+  // all. lib/compliance/gdpr-territory.ts carries the whole reasoning,
+  // including why an unplaceable country counts as OUTSIDE here and INSIDE in
+  // lib/consent/eprivacy-territory.ts. Nothing is withheld from the visitor: a
+  // measurement tag is for us.
+  const gdprTerritory = inGdprTerritory(country)
 
   return (
     <html lang={lang} dir={dir} className={`h-full ${inter.variable} ${heebo.variable}`} suppressHydrationWarning>
@@ -152,8 +165,8 @@ export default async function RootLayout({
           container for every visitor with JavaScript disabled — the one visitor
           who can neither be asked for consent nor withdraw it.
         */}
-        <GoogleTags />
-        <MetaPixel />
+        <GoogleTags gdprTerritory={gdprTerritory} />
+        <MetaPixel gdprTerritory={gdprTerritory} />
         {/* <html lang/dir> is rendered once, above every changing segment; this
             re-states it after a client-side navigation into another language. */}
         <DocumentLocaleSync />
