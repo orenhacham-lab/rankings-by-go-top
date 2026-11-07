@@ -33,8 +33,12 @@
  * Digistore24 publish theirs at a public URL that IS reachable from a cloud
  * session, so it was fetched directly and verified against their own worked
  * example (docs/affiliate/digistore24-ipn-docs.md); the earlier note here
- * that the proxy refuses digistore24.com was wrong. ClickBank's is still
- * UNKNOWN rather than invented. A
+ * that the proxy refuses digistore24.com was wrong. ClickBank's was UNKNOWN
+ * rather than invented until their own support page could be read
+ * (docs/affiliate/clickbank-ins-docs.md, 2026-11-07), and it is now wired as
+ * CLICKBANK_INS_SCHEME, so no provider in the registry carries null today. The
+ * field stays nullable and this paragraph stays, because the next platform
+ * added will carry null until its scheme is read from its own documentation. A
  * provider whose scheme is null can be registered, priced and given a sales
  * page, and its webhook refuses every delivery — which is the safe direction,
  * and a loud one: `providerReadiness` names exactly what is missing.
