@@ -49,7 +49,10 @@ export type AiCrawlerCopy = {
   }
   purposes: Record<CrawlerPurpose, { label: string; blurb: string }>
   groups: { ai: string; classic: string }
-  reference: { title: string; intro: string; colAgent: string; colOperator: string; colPurpose: string }
+  // `title` is the heading above the table; `datasetName` NAMES the table as a
+  // dataset, which is what the schema.org Dataset node needs. A heading like
+  // "Who each one is" is not a name a catalogue can list.
+  reference: { title: string; datasetName: string; intro: string; colAgent: string; colOperator: string; colPurpose: string }
   limits: { title: string; items: string[] }
   cta: { title: string; body: string; button: string }
 }
@@ -109,6 +112,7 @@ const he: AiCrawlerCopy = {
   groups: { ai: 'סורקי AI', classic: 'סורקי חיפוש קלאסיים' },
   reference: {
     title: 'מי כל אחד מהם',
+    datasetName: 'מאגר סורקי ה-AI',
     intro: 'הטבלה הזו עומדת בפני עצמה: שם הסורק כפי שהוא מופיע בשורת User-agent, מי מפעיל אותו, ולשם מה.',
     colAgent: 'User-agent',
     colOperator: 'מופעל על ידי',
@@ -185,6 +189,7 @@ const en: AiCrawlerCopy = {
   groups: { ai: 'AI crawlers', classic: 'Classic search crawlers' },
   reference: {
     title: 'Who each one is',
+    datasetName: 'AI crawler reference table',
     intro: 'This table stands on its own: the crawler name as it appears in the User-agent line, who operates it, and what for.',
     colAgent: 'User-agent',
     colOperator: 'Operated by',
@@ -261,6 +266,7 @@ const es: AiCrawlerCopy = {
   groups: { ai: 'Rastreadores de IA', classic: 'Rastreadores de búsqueda clásicos' },
   reference: {
     title: 'Quién es cada uno',
+    datasetName: 'Tabla de referencia de rastreadores de IA',
     intro: 'Esta tabla se sostiene sola: el nombre del rastreador tal como aparece en la línea User-agent, quién lo opera y para qué.',
     colAgent: 'User-agent',
     colOperator: 'Operado por',
@@ -337,6 +343,7 @@ const ptBR: AiCrawlerCopy = {
   groups: { ai: 'Rastreadores de IA', classic: 'Rastreadores de busca clássicos' },
   reference: {
     title: 'Quem é cada um',
+    datasetName: 'Tabela de referência de rastreadores de IA',
     intro: 'Esta tabela se sustenta sozinha: o nome do rastreador como aparece na linha User-agent, quem o opera e para quê.',
     colAgent: 'User-agent',
     colOperator: 'Operado por',
@@ -413,6 +420,7 @@ const fr: AiCrawlerCopy = {
   groups: { ai: "Robots d'IA", classic: 'Robots de recherche classiques' },
   reference: {
     title: 'Qui est qui',
+    datasetName: "Table de référence des robots d'IA",
     intro: "Ce tableau se suffit à lui-même : le nom du robot tel qu'il apparaît dans la ligne User-agent, qui l'exploite et pour quoi faire.",
     colAgent: 'User-agent',
     colOperator: 'Exploité par',
@@ -489,6 +497,7 @@ const it: AiCrawlerCopy = {
   groups: { ai: 'Crawler IA', classic: 'Crawler di ricerca classici' },
   reference: {
     title: 'Chi è ciascuno',
+    datasetName: 'Tabella di riferimento dei crawler IA',
     intro: 'Questa tabella si regge da sola: il nome del crawler così come compare nella riga User-agent, chi lo gestisce e a quale scopo.',
     colAgent: 'User-agent',
     colOperator: 'Gestito da',
@@ -565,6 +574,7 @@ const ja: AiCrawlerCopy = {
   groups: { ai: 'AIクローラー', classic: '従来の検索クローラー' },
   reference: {
     title: 'それぞれの正体',
+    datasetName: 'AI クローラー リファレンス表',
     intro: 'この表は単体で読めます。User-agent の行に現れるクローラー名、運営元、そして何のためのものかです。',
     colAgent: 'User-agent',
     colOperator: '運営元',
@@ -641,6 +651,7 @@ const de: AiCrawlerCopy = {
   groups: { ai: 'KI-Crawler', classic: 'Klassische Suchmaschinen-Crawler' },
   reference: {
     title: 'Wer dahintersteht',
+    datasetName: 'Referenztabelle der KI-Crawler',
     intro: 'Diese Tabelle lässt sich auch für sich lesen: der Name, der in der User-agent-Zeile steht, der Betreiber und der Zweck.',
     colAgent: 'User-agent',
     colOperator: 'Betreiber',
@@ -717,6 +728,7 @@ const pl: AiCrawlerCopy = {
   groups: { ai: 'Roboty AI', classic: 'Klasyczne roboty wyszukiwarek' },
   reference: {
     title: 'Kto za tym stoi',
+    datasetName: 'Tabela referencyjna crawlerów AI',
     intro: 'Tę tabelę można czytać także osobno: nazwa występująca w wierszu User-agent, właściciel i cel.',
     colAgent: 'User-agent',
     colOperator: 'Właściciel',
@@ -793,6 +805,7 @@ const nl: AiCrawlerCopy = {
   groups: { ai: 'AI-crawlers', classic: 'Klassieke zoekmachinecrawlers' },
   reference: {
     title: 'Wie erachter zit',
+    datasetName: 'Referentietabel van AI-crawlers',
     intro: 'Deze tabel is ook los te lezen: de naam die in de User-agent-regel staat, de eigenaar en het doel.',
     colAgent: 'User-agent',
     colOperator: 'Eigenaar',
