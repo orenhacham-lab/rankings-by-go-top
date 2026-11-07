@@ -132,3 +132,38 @@ URL has to be tested from that screen before it is enabled, and the key is up
 to 16 characters that the vendor chooses. Both are the account owner's to
 enter — this repo only needs `MARKETPLACE_CLICKBANK_WEBHOOK_SECRET` to hold
 the same value.
+
+### What the screen actually looks like, read on 2026-11-07
+
+Vendor Settings → My Site → **Advanced Tools** → EDIT
+(`/account/siteEdit.htm?action=general`) holds four things: two
+"Encrypt Transaction URLs" switches, a plain `secretKey` text input, and the
+**Instant Notification URL**. The first three are editable immediately. The
+notification URL is NOT: it renders as the label plus a `(request access)`
+link, and there is no field to type into until access is granted.
+
+**So INS is gated behind its own application, not just a form.** The link opens
+an in-page request that asks seven yes/no questions (release notes read,
+programming access, HTML FORM POST, URL parameters, Secret Key, Response Code
+Monitoring, SSL) and then requires a separate checkbox: *"I understand and
+agree to the Terms of Use."* That is the **ClickBank Instant Notification Terms
+of Use**, a document distinct from the Client Contract and from the product
+submission terms. Two clauses are worth knowing before accepting:
+
+- **1.b Abuse / 1.a Termination** — access continues "until terminated by
+  either party", and ClickBank may discontinue it "at any time and for any
+  reason".
+- **4 Possible Fees and Payments** — "ClickBank reserves the right to charge
+  fees for future use of or access to the Instant Notification service…
+  Any such charges will be disclosed to you prior to being instituted."
+  Free today; not contractually free forever.
+
+Clause 1.c also says the notification is "for your convenience only" and that
+final ClickBank payments govern what we are owed, not what INS reported —
+which is the same reason our own intake treats a delivery as a claim to be
+granted rather than as settled money.
+
+Nothing can be set here until that request is approved, so the Secret Key is
+left empty rather than half-configured: a key saved in the account while
+`MARKETPLACE_CLICKBANK_WEBHOOK_SECRET` is still unset would be a secret living
+in exactly one of the two places that have to agree.
