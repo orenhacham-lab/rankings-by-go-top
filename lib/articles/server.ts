@@ -17,6 +17,7 @@ import { ARTICLES_COPY, articleHref, articlesIndexHref } from '@/lib/articles/i1
 import { localeHomeHref, LOCALE_CONFIG, type PublicLocale } from '@/lib/i18n/locales'
 import { getPublicDictionary } from '@/lib/i18n/getPublicDictionary'
 import { articleAuthor, authorDisplayName } from '@/lib/articles/authors'
+import { canonicalizeArticleHtml, canonicalizeHeadline, canonicalizeKnownTerms } from '@/lib/content/canonical-case'
 
 export const SITE_URL = 'https://www.gotopseo.com'
 
@@ -59,7 +60,21 @@ export const getPublicArticle = cache(async (slug: string, locale: PublicLocale)
     .eq('locale', locale)
     .single()
 
-  return (data as PublicArticle | null) ?? null
+  const row = (data as PublicArticle | null) ?? null
+  if (!row) return null
+  // A product name is shown in the case the world writes it, whatever the row
+  // holds: the articles published before 5 Nov 2026 carry the keyword exactly as
+  // Keyword Planner returned it, in lower case, in the title and every heading.
+  // Read-side only — nothing is written back (lib/content/canonical-case.ts).
+  return {
+    ...row,
+    title: canonicalizeHeadline(row.title),
+    meta_title: row.meta_title ? canonicalizeHeadline(row.meta_title) : row.meta_title,
+    meta_description: row.meta_description ? canonicalizeKnownTerms(row.meta_description) : row.meta_description,
+    excerpt: row.excerpt ? canonicalizeKnownTerms(row.excerpt) : row.excerpt,
+    featured_image_alt: row.featured_image_alt ? canonicalizeKnownTerms(row.featured_image_alt) : row.featured_image_alt,
+    content: canonicalizeArticleHtml(row.content),
+  }
 })
 
 /**
@@ -114,6 +129,7 @@ export const FAQ_HEADING: Record<PublicLocale, string> = {
   it: 'Domande frequenti',
   de: 'Häufige Fragen',
   nl: 'Veelgestelde vragen',
+  pl: 'Najczęściej zadawane pytania',
 }
 
 const SITE_NAME = 'Go Top SEO'

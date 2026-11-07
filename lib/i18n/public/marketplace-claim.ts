@@ -103,6 +103,16 @@ export const MARKETPLACE_CLAIM_COPY: Record<PublicLocale, MarketplaceClaimCopy> 
     missingToken: 'このリンクには購入番号が含まれていません。',
     toDashboard: 'アプリへ進む',
   },
+  pl: {
+    title: 'Państwa zakup',
+    claimed: 'Zakup został przypisany do Państwa konta, a pakiet jest aktywny. Można zaczynać.',
+    alreadyClaimed: 'Ten zakup jest już przypisany do Państwa konta. Pakiet jest aktywny.',
+    unavailable: 'Ten link nie jest aktywny. Jeśli zapłacili Państwo i nie otrzymali dostępu, prosimy napisać do nas przez witrynę — rozwiążemy to.',
+    needsOperator: 'Państwa zakup został zapisany. Część z niego musimy dokończyć u nas ręcznie. Zajmujemy się tym; druga płatność nie jest potrzebna.',
+    failed: 'Po naszej stronie coś poszło nie tak. Prosimy wczytać stronę ponownie za chwilę.',
+    missingToken: 'Ten link nie zawiera numeru zakupu.',
+    toDashboard: 'Przejdź do aplikacji',
+  },
   nl: {
     title: 'Uw aankoop',
     claimed: 'De aankoop is aan uw account toegewezen en het pakket is actief. U kunt beginnen.',

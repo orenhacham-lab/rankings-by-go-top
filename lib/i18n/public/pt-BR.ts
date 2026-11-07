@@ -210,6 +210,7 @@ export const ptBR = {
     ja: '日本語',
     de: 'Deutsch',
     nl: 'Nederlands',
+    pl: 'Polski',
     aria: 'Mudar o idioma do site',
   },
   cookie: {
@@ -227,7 +228,7 @@ export const ptBR = {
     settingsTitle: 'Escolha seus cookies',
     settingsIntro: 'Você pode aceitar ou rejeitar cada tipo separadamente, e mudar de ideia quando quiser.',
     always: 'Sempre ativos',
-    withdrawHint: 'Para mudar ou retirar seu consentimento a qualquer momento, use o link «Configurações de cookies» no fim de cada página.',
+    withdrawHint: 'Para mudar ou retirar seu consentimento a qualquer momento, use o link «Configurações de cookies» no fim de cada página. As condições do armazenamento e da leitura no seu dispositivo você também pode definir por conta própria, nas configurações do seu navegador; um bloqueio no navegador por si só não substitui a retirada do consentimento junto a nós.',
     gpcTitle: 'Consentimento rejeitado automaticamente',
     gpcBody: 'Seu navegador envia o sinal Global Privacy Control, por isso nenhum cookie de medição ou de marketing foi carregado. Sua escolha ficou registrada.',
     categories: {

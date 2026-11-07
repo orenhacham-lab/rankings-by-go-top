@@ -39,6 +39,12 @@ const QUESTION_START: Record<SuggestionLanguage, RegExp> = {
   ja: /(?:か|ですか|ますか|でしょうか|とは|？|\?)\s*$|^(?:なぜ|どう|どのように|どうやって|いくら|どこ|いつ|どれ|どの|何|なに)/,
   de: /^(?:was|wie|warum|wieso|weshalb|welche|welcher|welches|wo|woher|wann|wer|wie\s+viel|wie\s+viele|wie\s+lange|ist|sind|kann|kann\s+man|muss|muss\s+man|soll|sollte|darf|lohnt|braucht|gibt)\b/i,
   nl: /^(?:wat|hoe|hoeveel|hoelang|hoe\s+lang|hoe\s+veel|waarom|waardoor|waarvoor|welke|welk|waar|waarvandaan|wanneer|wie|is|zijn|kan|kun\s+je|kan\s+je|moet|moet\s+je|mag|loont|heb\s+je|bestaat|bestaan)\b/i,
+  // Polish inflects its interrogatives by case and gender, so the stems are
+  // listed with \w*: "jaki/jaka/jakie/jakiego", "ktory/ktora/ktore/ktorego",
+  // "ile/ilu". "czy" is the yes-no particle that opens a Polish question with no
+  // English counterpart, and "warto" / "mozna" / "trzeba" open the impersonal
+  // questions a Polish searcher actually types ("warto kupic...").
+  pl: /^(?:co|jak|jaki\w*|jaka|jakie\w*|dlaczego|czemu|kt[óo]r\w+|gdzie|sk[ąa]d|kiedy|kto|kogo|komu|ile|ilu|czy|po\s+co|na\s+co|warto|czy\s+warto|mo[żz]na|trzeba|opłaca)\b/i,
 }
 
 /** "best / recommended" words: the question asks for a recommendation. */
@@ -56,6 +62,11 @@ const RECOMMEND: Record<SuggestionLanguage, RegExp> = {
   // Dutch reviewer reaches for where English says "a must". 'tip' is deliberately
   // absent: it is also the ordinary word for a hint and would match everywhere.
   nl: /\b(?:best\w*|beter\w*|aanbevol\w*|aanbevel\w*|aanrader\w*|aanraden|top|getest)\b/i,
+  // "najlepszy" inflects in every case and gender, hence the stem. "polec\w*"
+  // covers "polecany", "polecane" and "godny polecenia"; it also catches
+  // "polecenie" in its unrelated sense of an instruction, which costs nothing
+  // here because a false positive only picks the recommendation template.
+  pl: /\b(?:najleps\w*|polec\w*|rekomend\w*|ranking|top|testowan\w*)\b/i,
 }
 
 /** A keyword that already names the act of buying ("buying X", "buy X"). */
@@ -80,6 +91,10 @@ const BUY: Record<SuggestionLanguage, RegExp> = {
   // 'huur van'). Both ends are covered, and 'laten installeren' is included
   // because a Dutch service query is almost always phrased that way.
   nl: /^(?:kopen|koop\s+van|bestellen|bestelling\s+van|huren|huur\s+van|boeken|aanschaffen)\s|\s(?:kopen|bestellen|huren|boeken|aanschaffen|laten\s+installeren|laten\s+plaatsen)\s*$/i,
+  // Polish keeps the buying word FIRST, unlike German and Dutch: "zakup
+  // laptopa", "kupno mieszkania", "kupic laptopa". The noun that follows is in
+  // the genitive, which is why nothing here tries to rebuild the phrase.
+  pl: /^(?:kupi[ćc]|kupno|zakup\w*|zam[óo]wi[ćc]|zam[óo]wienie|wynaj[ąa][ćc]|wynajem|wypo[żz]yczy[ćc]|montaż|instalacja)\s/i,
 }
 
 const TEMPLATES: Record<SuggestionLanguage, { recommend: (k: string) => string; buy: (k: string) => string; general: (k: string) => string }> = {
@@ -130,6 +145,17 @@ const TEMPLATES: Record<SuggestionLanguage, { recommend: (k: string) => string; 
     recommend: (k) => `Ich suche ${k.replace(/^der\s+|^die\s+|^das\s+|^ein\s+|^eine\s+/i, '')}. Was würden Sie empfehlen?`,
     buy: (k) => `Was sollte ich prüfen, bevor ich ${k.replace(/^kauf\s+(?:von|eines|einer)\s/i, '').replace(/\skaufen\s*$/i, '')} kaufe?`,
     general: (k) => `Was sollte ich über ${k} wissen?`,
+  },
+  // Polish is the one language here where a template cannot put the keyword
+  // inside a sentence: "o X" asks for the locative, "szukam X" for the
+  // genitive, and the keyword arrives in the nominative. Declining it would
+  // need a morphological analyser. So the keyword stays untouched before a
+  // colon, which is how a Polish search query is written anyway, and the
+  // question after the colon carries the whole grammar.
+  pl: {
+    recommend: (k) => `${k}: co warto wybrać?`,
+    buy: (k) => `${k}: na co zwrócić uwagę przed zakupem?`,
+    general: (k) => `${k}: co warto wiedzieć?`,
   },
 }
 

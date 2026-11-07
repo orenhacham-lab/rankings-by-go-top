@@ -160,7 +160,7 @@ const OLD_NAME = /Rankings by Go Top/i
 // accessibility statement moved with it.
 const LAST_UPDATED: Record<Doc, Record<Lang, RegExp>> = {
   terms: { he: /16 באוקטובר 2026/, en: /October 16, 2026/ },
-  privacy: { he: /1 בנובמבר 2026/, en: /November 1, 2026/ },
+  privacy: { he: /6 בנובמבר 2026/, en: /November 6, 2026/ },
   a11y: { he: /5 באוקטובר 2026/, en: /October 5, 2026/ },
 }
 for (const lang of ['he', 'en'] as Lang[]) for (const doc of ['terms', 'privacy', 'a11y'] as Doc[]) {
@@ -426,6 +426,7 @@ check('MUTATION — an English-only extra section is caught', pages.he.terms.h2 
     'ja.wikipedia.org': 'named as the Japanese Wikipedia in the sameAs example placeholder of the Japanese project settings; the owner types their own URL and our code sends it nothing',
     'de.wikipedia.org': 'named as the German Wikipedia in the sameAs example placeholder of the German project settings; the owner types their own URL and our code sends it nothing',
     'nl.wikipedia.org': 'named as the Dutch Wikipedia in the sameAs example placeholder of the Dutch project settings; the owner types their own URL and our code sends it nothing',
+    'pl.wikipedia.org': 'named as the Polish Wikipedia in the sameAs example placeholder of the Polish project settings; the owner types their own URL and our code sends it nothing',
     'app.example.com': 'placeholder in a comment or default',
     'shop.com': 'placeholder in a comment or default',
     'destination.com': 'placeholder in a comment or default',

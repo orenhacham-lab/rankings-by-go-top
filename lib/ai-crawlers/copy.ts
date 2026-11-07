@@ -49,7 +49,10 @@ export type AiCrawlerCopy = {
   }
   purposes: Record<CrawlerPurpose, { label: string; blurb: string }>
   groups: { ai: string; classic: string }
-  reference: { title: string; intro: string; colAgent: string; colOperator: string; colPurpose: string }
+  // `title` is the heading above the table; `datasetName` NAMES the table as a
+  // dataset, which is what the schema.org Dataset node needs. A heading like
+  // "Who each one is" is not a name a catalogue can list.
+  reference: { title: string; datasetName: string; intro: string; colAgent: string; colOperator: string; colPurpose: string }
   limits: { title: string; items: string[] }
   cta: { title: string; body: string; button: string }
 }
@@ -109,6 +112,7 @@ const he: AiCrawlerCopy = {
   groups: { ai: 'סורקי AI', classic: 'סורקי חיפוש קלאסיים' },
   reference: {
     title: 'מי כל אחד מהם',
+    datasetName: 'מאגר סורקי ה-AI',
     intro: 'הטבלה הזו עומדת בפני עצמה: שם הסורק כפי שהוא מופיע בשורת User-agent, מי מפעיל אותו, ולשם מה.',
     colAgent: 'User-agent',
     colOperator: 'מופעל על ידי',
@@ -185,6 +189,7 @@ const en: AiCrawlerCopy = {
   groups: { ai: 'AI crawlers', classic: 'Classic search crawlers' },
   reference: {
     title: 'Who each one is',
+    datasetName: 'AI crawler reference table',
     intro: 'This table stands on its own: the crawler name as it appears in the User-agent line, who operates it, and what for.',
     colAgent: 'User-agent',
     colOperator: 'Operated by',
@@ -261,6 +266,7 @@ const es: AiCrawlerCopy = {
   groups: { ai: 'Rastreadores de IA', classic: 'Rastreadores de búsqueda clásicos' },
   reference: {
     title: 'Quién es cada uno',
+    datasetName: 'Tabla de referencia de rastreadores de IA',
     intro: 'Esta tabla se sostiene sola: el nombre del rastreador tal como aparece en la línea User-agent, quién lo opera y para qué.',
     colAgent: 'User-agent',
     colOperator: 'Operado por',
@@ -337,6 +343,7 @@ const ptBR: AiCrawlerCopy = {
   groups: { ai: 'Rastreadores de IA', classic: 'Rastreadores de busca clássicos' },
   reference: {
     title: 'Quem é cada um',
+    datasetName: 'Tabela de referência de rastreadores de IA',
     intro: 'Esta tabela se sustenta sozinha: o nome do rastreador como aparece na linha User-agent, quem o opera e para quê.',
     colAgent: 'User-agent',
     colOperator: 'Operado por',
@@ -413,6 +420,7 @@ const fr: AiCrawlerCopy = {
   groups: { ai: "Robots d'IA", classic: 'Robots de recherche classiques' },
   reference: {
     title: 'Qui est qui',
+    datasetName: "Table de référence des robots d'IA",
     intro: "Ce tableau se suffit à lui-même : le nom du robot tel qu'il apparaît dans la ligne User-agent, qui l'exploite et pour quoi faire.",
     colAgent: 'User-agent',
     colOperator: 'Exploité par',
@@ -489,6 +497,7 @@ const it: AiCrawlerCopy = {
   groups: { ai: 'Crawler IA', classic: 'Crawler di ricerca classici' },
   reference: {
     title: 'Chi è ciascuno',
+    datasetName: 'Tabella di riferimento dei crawler IA',
     intro: 'Questa tabella si regge da sola: il nome del crawler così come compare nella riga User-agent, chi lo gestisce e a quale scopo.',
     colAgent: 'User-agent',
     colOperator: 'Gestito da',
@@ -565,6 +574,7 @@ const ja: AiCrawlerCopy = {
   groups: { ai: 'AIクローラー', classic: '従来の検索クローラー' },
   reference: {
     title: 'それぞれの正体',
+    datasetName: 'AI クローラー リファレンス表',
     intro: 'この表は単体で読めます。User-agent の行に現れるクローラー名、運営元、そして何のためのものかです。',
     colAgent: 'User-agent',
     colOperator: '運営元',
@@ -641,6 +651,7 @@ const de: AiCrawlerCopy = {
   groups: { ai: 'KI-Crawler', classic: 'Klassische Suchmaschinen-Crawler' },
   reference: {
     title: 'Wer dahintersteht',
+    datasetName: 'Referenztabelle der KI-Crawler',
     intro: 'Diese Tabelle lässt sich auch für sich lesen: der Name, der in der User-agent-Zeile steht, der Betreiber und der Zweck.',
     colAgent: 'User-agent',
     colOperator: 'Betreiber',
@@ -659,6 +670,83 @@ const de: AiCrawlerCopy = {
     title: 'Herausfinden, ob die KI Ihr Unternehmen wirklich nennt',
     body: 'Der Zugang ist nur der erste Schritt. Go Top SEO prüft automatisch, ob Ihr Unternehmen in den Antworten von ChatGPT, Gemini und Google AI vorkommt, und verfolgt Ihre Positionen bei Google und in Google Maps monatlich.',
     button: '7 Tage kostenlos testen, ohne Kreditkarte',
+  },
+}
+
+const pl: AiCrawlerCopy = {
+  meta: {
+    title: 'Które roboty AI blokuje Państwa robots.txt? – Go Top SEO',
+    description:
+      'Prosimy podać domenę, a pokażemy, które roboty AI — GPTBot, ClaudeBot, PerplexityBot, Google-Extended i inne — blokuje Państwa plik robots.txt oraz która reguła o tym decyduje dla każdego z nich. Bez rejestracji.',
+  },
+  page: {
+    badge: 'Narzędzie bezpłatne',
+    title: 'Które roboty AI blokuje Państwa witryna?',
+    subtitle:
+      'Czytamy Państwa plik robots.txt i dla każdego robota AI pokazujemy, czy jest dopuszczony czy zablokowany — oraz która reguła pliku o tym decyduje.',
+    trust: ['Bez rejestracji i bez adresu e-mail', 'Jeden plik, czytany jeden raz', 'Sprawdza nie tylko stronę główną, lecz także wskazaną ścieżkę'],
+  },
+  form: {
+    urlLabel: 'Adres witryny',
+    urlPlaceholder: 'przyklad.pl',
+    pathLabel: 'Ścieżka do sprawdzenia (opcjonalnie)',
+    pathPlaceholder: '/blog/',
+    pathHint: 'Pozostawione puste oznacza sprawdzenie strony głównej. Reguły w pliku robots.txt mogą różnić się dla różnych ścieżek.',
+    submit: 'Sprawdź roboty',
+    submitting: 'Czytamy plik robots.txt\u2026',
+    errors: {
+      invalid_url: 'Ten adres nie wygląda poprawnie. Prosimy podać go w postaci przyklad.pl.',
+      blocked_url: 'Sprawdzić można wyłącznie witryny dostępne publicznie.',
+      unreachable: 'Ta witryna była właśnie nieosiągalna. Prosimy spróbować później.',
+      rate_limited: 'W krótkim czasie sprawdzono wiele witryn. Prosimy odczekać minutę i spróbować ponownie.',
+      internal: 'Sprawdzenie nie zakończyło się po naszej stronie. Prosimy spróbować później.',
+    },
+  },
+  results: {
+    heading: 'Sprawdzono',
+    forPath: 'Sprawdzona ścieżka',
+    robotsFound: 'Plik robots.txt przeczytany',
+    robotsAbsent: 'Ta witryna nie udostępnia pliku robots.txt, więc ten plik niczego nie blokuje.',
+    robotsUnreadable: 'Witryna nie udostępniła pliku, więc nie da się z niego odczytać żadnej reguły. Wyniki poniżej nie traktują niczego jako zablokowane.',
+    allowedCount: 'Dopuszczone',
+    blockedCount: 'Zablokowane',
+    allowed: 'Dopuszczony',
+    blocked: 'Zablokowany',
+    decidedBy: 'Decydująca reguła',
+    noRule: 'Brak pasującej reguły. Domyślnie dopuszczony',
+    viaWildcard: 'Zdecydowała grupa dla wszystkich robotów',
+    ignoresRobots: 'Ten robot nie zobowiązuje się do przestrzegania pliku robots.txt',
+    sitemapsTitle: 'Mapy witryny wskazane w pliku',
+    again: 'Sprawdź inną witrynę',
+  },
+  purposes: {
+    train: { label: 'Trenowanie', blurb: 'Zbiera strony, by wytrenować model. Kto go zablokuje, nie trafi do kolejnego modelu.' },
+    answer: { label: 'Odpowiedź w czasie rzeczywistym', blurb: 'Pobiera stronę w chwili, gdy ktoś o coś pyta, i przytacza ją z linkiem w odpowiedzi.' },
+    search: { label: 'Indeks wyszukiwania', blurb: 'Buduje indeks wyszukiwania, na którym opierają się także odpowiedzi AI.' },
+    ads: { label: 'Reklamy', blurb: 'Sprawdza strony docelowe reklam. Zablokowanie go nie ma wpływu na odpowiedzi ani na indeks wyszukiwania.' },
+  },
+  groups: { ai: 'Roboty AI', classic: 'Klasyczne roboty wyszukiwarek' },
+  reference: {
+    title: 'Kto za tym stoi',
+    datasetName: 'Tabela referencyjna crawlerów AI',
+    intro: 'Tę tabelę można czytać także osobno: nazwa występująca w wierszu User-agent, właściciel i cel.',
+    colAgent: 'User-agent',
+    colOperator: 'Właściciel',
+    colPurpose: 'Cel',
+  },
+  limits: {
+    title: 'Czego to sprawdzenie nie pokazuje',
+    items: [
+      'Plik robots.txt jest prośbą, nie murem. Robot może go zignorować.',
+      'Zapora sieciowa albo CDN mogą zablokować robota, którego robots.txt dopuszcza.',
+      'Sprawdzenie opisuje jedną chwilę. Kto zmieni plik, od razu zmieni odpowiedź.',
+      'Zablokowanie robota trenującego i zablokowanie robota, który odpowiada na żywo, to dwie całkowicie różne decyzje.',
+    ],
+  },
+  cta: {
+    title: 'Sprawdźmy, czy AI naprawdę wymienia Państwa firmę',
+    body: 'Dostęp to dopiero pierwszy krok. Go Top SEO automatycznie sprawdza, czy Państwa firma pojawia się w odpowiedziach ChatGPT, Gemini i Google AI, i co miesiąc monitoruje pozycje w Google oraz w Mapach Google.',
+    button: 'Wypróbuj 7 dni bezpłatnie, bez karty kredytowej',
   },
 }
 
@@ -717,6 +805,7 @@ const nl: AiCrawlerCopy = {
   groups: { ai: 'AI-crawlers', classic: 'Klassieke zoekmachinecrawlers' },
   reference: {
     title: 'Wie erachter zit',
+    datasetName: 'Referentietabel van AI-crawlers',
     intro: 'Deze tabel is ook los te lezen: de naam die in de User-agent-regel staat, de eigenaar en het doel.',
     colAgent: 'User-agent',
     colOperator: 'Eigenaar',
@@ -738,7 +827,7 @@ const nl: AiCrawlerCopy = {
   },
 }
 
-const COPY: Record<PublicLocale, AiCrawlerCopy> = { he, en, es, 'pt-BR': ptBR, fr, it, ja, de, nl }
+const COPY: Record<PublicLocale, AiCrawlerCopy> = { he, en, es, 'pt-BR': ptBR, fr, it, ja, de, nl, pl }
 
 export function aiCrawlerCopy(locale: PublicLocale): AiCrawlerCopy {
   return COPY[locale] ?? he

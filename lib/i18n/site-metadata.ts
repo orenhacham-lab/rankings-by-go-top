@@ -88,6 +88,14 @@ const SITE_METADATA: Record<PublicLocale, SiteMetadataStrings> = {
     ogDescription: 'SEO- en GEO-content op één plek maken, plannen en automatisch publiceren, met maandelijkse monitoring van uw Google-posities en uw zichtbaarheid in AI-antwoorden (ChatGPT, Gemini, Google AI-modus)',
     ogLocale: 'nl_NL',
   },
+  pl: {
+    title: 'Tworzenie, planowanie i publikowanie treści SEO i GEO | Go Top SEO',
+    description: 'Go Top SEO: tworzenie, planowanie i automatyczne publikowanie treści SEO i GEO w jednym miejscu, a do tego comiesięczne monitorowanie pozycji w Google i widoczności w odpowiedziach AI. Zacznij bezpłatnie.',
+    keywords: 'tworzenie treści SEO, planowanie treści, automatyczne publikowanie artykułów, GEO, sprawdzanie pozycji, pozycjonowanie stron, SEO, Google, pozycje w Google, Mapy Google, Profil Firmy w Google, wizytówka Google, SEO lokalne, widoczność w AI, ChatGPT, Gemini, linki zwrotne, analiza słów kluczowych',
+    ogTitle: 'Tworzenie, planowanie i publikowanie treści SEO i GEO — Go Top SEO',
+    ogDescription: 'Tworzenie, planowanie i automatyczne publikowanie treści SEO i GEO w jednym miejscu, z comiesięcznym monitorowaniem pozycji w Google i widoczności w odpowiedziach AI (ChatGPT, Gemini, tryb AI w Google)',
+    ogLocale: 'pl_PL',
+  },
   de: {
     title: 'SEO- und GEO-Inhalte erstellen, planen und veröffentlichen | Go Top SEO',
     description: 'Go Top SEO: SEO- und GEO-Inhalte an einer Stelle erstellen, planen und automatisch veröffentlichen, dazu monatliches Ranking-Tracking bei Google und die Sichtbarkeit in KI-Antworten. Kostenlos starten.',

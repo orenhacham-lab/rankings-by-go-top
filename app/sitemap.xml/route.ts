@@ -449,7 +449,7 @@ export async function GET() {
   // mirror; everything after them is. This used to be one `const` per language,
   // which is how a language gets a route tree and an hreflang set and no
   // sitemap entry.
-  const TRANSLATED_LOCALES: readonly PublicLocale[] = ['es', 'pt-BR', 'fr', 'it', 'ja', 'de', 'nl']
+  const TRANSLATED_LOCALES: readonly PublicLocale[] = ['es', 'pt-BR', 'fr', 'it', 'ja', 'de', 'nl', 'pl']
   const translatedTreePages = enabledPublicLocales()
     .filter((l) => TRANSLATED_LOCALES.includes(l))
     .flatMap((l) => treePages(LOCALE_PREFIX[l]))

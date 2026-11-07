@@ -61,7 +61,8 @@ export type ConsentAction = (typeof CONSENT_ACTIONS)[number]
  * 'pt-BR', 20261021180000_consent_events_locale_fr.sql for 'fr',
  * 20261023130000_locale_it.sql for 'it', 20261030120000_locale_ja.sql for 'ja',
  * 20261104120000_locale_de.sql for 'de',
- * 20261105140000_locale_nl.sql for 'nl'),
+ * 20261105140000_locale_nl.sql for 'nl',
+ * 20261105180000_locale_pl.sql for 'pl'),
  * then this list; lib/consent/__qa__/consent-locale-contract.qa.ts
  * holds the two together, so a language added here and not there fails in CI
  * rather than losing a visitor's proof in production.
@@ -71,7 +72,7 @@ export type ConsentAction = (typeof CONSENT_ACTIONS)[number]
  * migrations and fails if a language is live that the log cannot store, so the
  * flag cannot be turned on ahead of the constraint either.
  */
-export const CONSENT_LOCALES = ['he', 'en', 'es', 'pt-BR', 'fr', 'it', 'ja', 'de', 'nl'] as const
+export const CONSENT_LOCALES = ['he', 'en', 'es', 'pt-BR', 'fr', 'it', 'ja', 'de', 'nl', 'pl'] as const
 
 export type ConsentLocale = (typeof CONSENT_LOCALES)[number]
 

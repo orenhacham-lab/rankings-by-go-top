@@ -22,6 +22,7 @@ import type { SuggestionLanguage } from '@/lib/content/topic-suggestions'
 import { contentDirection, languageNameInEnglish } from '@/lib/content/language'
 import { businessContextLines, guidancePromptLines, type BusinessContext, type WritingGuidance } from '@/lib/content/writing-guidance/guidance'
 import { indexOfCaseInsensitive } from '@/lib/text/ci-index'
+import { canonicalizeHeadline, canonicalizeKnownTerms } from '@/lib/content/canonical-case'
 
 export interface ArticleBrief {
   language: SuggestionLanguage
@@ -213,6 +214,16 @@ const ARTICLE_TEXT: Record<SuggestionLanguage, {
     anchorSentence: (link) => ` In diesem Zusammenhang ist ${link} eine der wichtigsten Optionen, die man kennen sollte.`,
     phraseSentence: (phrase) => ` In diesem Zusammenhang lohnt sich auch ein genauerer Blick auf ${phrase}.`,
   },
+  // "w tym kontekście" takes the locative, which the inserted link or phrase
+  // cannot be put into, so the sentence is built so that the inserted part
+  // stands in the nominative as its subject: "W tym kontekście <link> to jedna
+  // z..." is ordinary Polish and needs no declension of the insert.
+  pl: {
+    toc: 'Spis treści',
+    faqHeading: 'Często zadawane pytania',
+    anchorSentence: (link) => ` W tym kontekście ${link} to jedna z najważniejszych opcji, które warto poznać.`,
+    phraseSentence: (phrase) => ` W tym kontekście warto bliżej poznać także ${phrase}.`,
+  },
 }
 
 /** Natural transition words to hand the model, in the language it writes in. */
@@ -226,6 +237,7 @@ const TRANSITION_HINT: Record<SuggestionLanguage, string> = {
   ja: 'また、さらに、そのため、しかし、例えば、まとめると',
   de: 'außerdem, daher, allerdings, zum Beispiel, zusammengefasst',
   nl: 'daarnaast, daarom, echter, bijvoorbeeld, kortom',
+  pl: 'poza tym, dlatego, jednak, na przykład, podsumowując',
 }
 
 /** The filler opening to warn the model off, written in the language it writes in. */
@@ -239,6 +251,7 @@ const FILLER_EXAMPLE: Record<SuggestionLanguage, string> = {
   ja: 'e.g. 「誰もが〜を求める時代において…」',
   de: 'e.g. "In einer Welt, in der alle nach … suchen"',
   nl: 'e.g. "In een wereld waarin iedereen zoekt naar …"',
+  pl: 'e.g. "W świecie, w którym wszyscy szukają…"',
 }
 
 /** Who the article is actually written for. A Spanish article is NOT for Israeli readers. */
@@ -252,6 +265,7 @@ const AUDIENCE_NOTE: Record<SuggestionLanguage, string> = {
   ja: 'Write naturally for Japanese readers in standard business Japanese (です・ます調), the register a Japanese company website uses.',
   de: 'Write naturally for German-speaking readers in standard German that reads well in Germany, Austria and German-speaking Switzerland alike.',
   nl: 'Write naturally for Dutch-speaking readers in standard Dutch that reads well in the Netherlands and in Flanders alike.',
+  pl: 'Write naturally for Polish readers in standard Polish, the register a Polish company website uses.',
 }
 
 /** Per-language writing-quality notes. Empty for a language with nothing extra to say. */
@@ -288,6 +302,10 @@ const WRITING_QUALITY_LINES: Record<SuggestionLanguage, string[]> = {
   de: [
     `- German writing quality: address the reader as "Sie" consistently — NEVER "du", never "dein/deine", never an informal imperative ("entdecke", "klicke", "wähle"); the Sie-imperative is "entdecken Sie", "klicken Sie", "wählen Sie". Use standard German that reads well in Germany, Austria and German-speaking Switzerland; avoid regional slang and avoid needless anglicisms where a plain German word exists — but KEEP the established SEO vocabulary a German reader expects ("Keywords", "Keyword-Recherche", "Rankings", "Backlinks", "Content", "Snippet"), which is what the industry actually writes. VARY sentence and paragraph openings — do not start many consecutive sentences with the same word (avoid over-using "Außerdem", "Darüber hinaus", "Es ist wichtig"); mix openings like "In der Praxis", "Deshalb", "In vielen Fällen", "Wichtig zu wissen", "Bei der Auswahl", "Zusammengefasst". Prefer clear, practical, promotional SEO writing over poetic language.`,
     `- German typography and grammar: capitalize every noun (German nouns are always capitalized — "die Website", "der Preis", "das Angebot"), keep the umlauts and the ß correct (ä, ö, ü, ß) and never transliterate them to ae/oe/ue/ss, use the German quotation marks „ … " for quotations, write prices and figures the German way (1.200 € with a dot as the thousands separator and a comma for decimals, the currency sign AFTER the number), and keep brand/product names in their proper original casing (e.g. "Kingsmith WalkingPad X21", "Google Search Console"). Join compounds as German does ("Suchmaschinenoptimierung", "Keyword-Recherche" with the hyphen only where one part is a loanword), and never a stray apostrophe in a plural or a genitive ("Preise", not "Preis's"; "Googles Index", not "Google's Index").`,
+  ],
+  pl: [
+    `- Polish writing quality: address the reader in the third-person courtesy form with "Państwo" ("Państwa strona", "mogą Państwo"), which is how a Polish company writes to a client — NEVER "ty"/"twój", and never an informal imperative aimed at one reader inside the prose; a polite request is "prosimy" + the infinitive ("prosimy sprawdzić"), while a short button label may stay in the bare imperative ("Zaloguj się", "Sprawdź"). Use standard Polish and avoid needless anglicisms where a plain Polish word exists — but KEEP the SEO vocabulary a Polish reader actually searches for: "pozycjonowanie" and "pozycjonowanie stron" for SEO work, "słowa kluczowe" and "analiza słów kluczowych" (never "keywords"/"keyword research"), "pozycje" for rankings, "linki zwrotne" for backlinks, "linkowanie wewnętrzne" for internal links, and "Profil Firmy w Google" for the official product name (a sentence about what people search for may say "wizytówka Google", which is the term they type). VARY sentence and paragraph openings — do not start many consecutive sentences with the same word (avoid over-using "Ponadto", "Z drugiej strony", "Warto pamiętać"); mix openings like "W praktyce", "Dlatego", "W wielu przypadkach", "Warto wiedzieć", "Przy wyborze", "Podsumowując". Prefer clear, practical, promotional SEO writing over poetic language.`,
+    `- Polish typography and grammar: keep the diacritics correct (ą, ć, ę, ł, ń, ó, ś, ź, ż) and NEVER transliterate them away, which is the clearest sign of machine-translated Polish. Polish does NOT weld compounds together the way German and Dutch do — write "analiza słów kluczowych" and "optymalizacja stron internetowych", never a single joined word. Decline every word the sentence requires to be declined, including after a preposition and after a number ("dwa artykuły", "pięć artykułów", "o pozycjonowaniu"), and never leave a keyword in the nominative inside a sentence that calls for another case. Use the Polish quotation marks „ … ” for quotations, write figures the Polish way (1 200 zł, a comma for decimals, the currency AFTER the number), and keep brand/product names in their proper original casing (e.g. "Kingsmith WalkingPad X21", "Google Search Console"). Common nouns stay lower case — Polish capitalizes far less than English, so write "strona internetowa", "cena", "oferta" in lower case, and do not capitalize a word in the middle of a heading.`,
   ],
 }
 
@@ -338,9 +356,10 @@ export function buildPrompt(brief: ArticleBrief, opts: GenOpts): string {
     repairLines.length ? '' : '',
     `You are a top SEO/GEO content writer. Write a COMPLETE, premium, PROMOTIONAL-yet-credible article in ${lang} that would score high in Yoast / Rank Math and be quoted by AI answer engines.`,
     ``,
-    `Topic: ${brief.topic}`,
-    brief.primaryKeyword ? `Primary keyword: "${brief.primaryKeyword}" — MUST appear in title, metaTitle, metaDescription, the first paragraph, and at least one <h2>; used naturally throughout (no stuffing, ~0.8-1.5% density).` : '',
-    brief.secondaryKeywords.length ? `Secondary keywords (weave in naturally): ${brief.secondaryKeywords.join(', ')}.` : '',
+    `Topic: ${canonicalizeKnownTerms(brief.topic)}`,
+    brief.primaryKeyword ? `Primary keyword: "${canonicalizeKnownTerms(brief.primaryKeyword)}" — MUST appear in title, metaTitle, metaDescription, the first paragraph, and at least one <h2>; used naturally throughout (no stuffing, ~0.8-1.5% density).` : '',
+    brief.primaryKeyword ? `- The keyword is a SEARCH PHRASE, not a spelling to copy: write it with the capitalization ${lang} requires. A product, brand or company name keeps its own capitalization ("Google Search Console", "WordPress", "ChatGPT"), a title or heading never begins in lower case, and the keyword is never pasted in all-lowercase into the title, the H1 or an <h2>.` : '',
+    brief.secondaryKeywords.length ? `Secondary keywords (weave in naturally): ${brief.secondaryKeywords.map(canonicalizeKnownTerms).join(', ')}.` : '',
     brief.searchIntent ? `Search intent: ${brief.searchIntent}.` : '',
     brief.targetAudience ? `Target audience: ${brief.targetAudience}.` : '',
     brief.category ? `Field: ${brief.category}.` : '',
@@ -572,13 +591,17 @@ interface CasingTerm { re: RegExp; replacement: string }
  * ("Kingsmith WalkingPad X21"). Longest phrases first so multi-word names win.
  */
 function buildCasingTerms(brief: ArticleBrief): CasingTerm[] {
+  // Canonicalised FIRST, or the rules built here enforce the casing of their
+  // source: Keyword Planner returns every keyword lower-cased, which is how
+  // "Google Search Console" was being rewritten DOWN to "google search console"
+  // throughout the German article of 5 Nov 2026.
   const sources = [
     brief.topic,
     brief.primaryKeyword || '',
     ...(brief.secondaryKeywords || []),
     ...(brief.anchors || []).map((a) => a.anchor_text || ''),
     brief.brandNameToInclude || '',
-  ]
+  ].map(canonicalizeKnownTerms)
   const map = new Map<string, string>() // lowercase → original casing (first wins)
   for (const src of sources) {
     for (const phrase of extractLatinPhrases(src)) {
@@ -607,6 +630,9 @@ export function polishText(s: string, terms: CasingTerm[]): string {
   // hyphenated compound and welded the two halves into a nonsense word
   // ("חברה-בת" → "חברבת", "שאלה-תשובה" → "שאלתשובה").
   out = out.replace(/(?<![א-ת])ה-(?=[A-Za-zא-ת])/g, '')
+  // Last word on casing: a known product name is written the way the world
+  // writes it, whatever the brief's own sources said (lib/content/canonical-case.ts).
+  out = canonicalizeKnownTerms(out)
   return out
 }
 
@@ -616,16 +642,18 @@ function polishTable(t: ArticleTable, terms: CasingTerm[]): ArticleTable {
 /** Apply brand-casing + "ה-" cleanup to every text field of the article. */
 function polishStructured(a: StructuredArticle, terms: CasingTerm[]): void {
   const f = (s: string) => polishText(s, terms)
-  a.title = f(a.title); a.metaTitle = f(a.metaTitle); a.metaDescription = f(a.metaDescription)
+  /** A headline also never begins in lower case. */
+  const h = (s: string) => canonicalizeHeadline(f(s))
+  a.title = h(a.title); a.metaTitle = h(a.metaTitle); a.metaDescription = f(a.metaDescription)
   a.excerpt = f(a.excerpt); a.directAnswer = f(a.directAnswer); a.imagePrompt = f(a.imagePrompt)
   a.intro = a.intro.map(f)
   a.sections = a.sections.map((s) => ({
-    ...s, heading: f(s.heading), answerFirst: f(s.answerFirst), paragraphs: s.paragraphs.map(f), bullets: s.bullets.map(f),
+    ...s, heading: h(s.heading), answerFirst: f(s.answerFirst), paragraphs: s.paragraphs.map(f), bullets: s.bullets.map(f),
     table: s.table ? polishTable(s.table, terms) : null,
-    subsections: s.subsections.map((ss) => ({ heading: f(ss.heading), paragraphs: ss.paragraphs.map(f), bullets: ss.bullets.map(f) })),
+    subsections: s.subsections.map((ss) => ({ heading: h(ss.heading), paragraphs: ss.paragraphs.map(f), bullets: ss.bullets.map(f) })),
   }))
   a.comparisonTables = a.comparisonTables.map((t) => polishTable(t, terms))
-  a.faq = a.faq.map((x) => ({ question: f(x.question), answer: f(x.answer) }))
+  a.faq = a.faq.map((x) => ({ question: h(x.question), answer: f(x.answer) }))
 }
 
 /** Years the user explicitly asked for (topic/keyword/secondary/brief). */
@@ -894,7 +922,9 @@ export function fitMetaDescription(current: string, fallbacks: (string | null | 
  */
 export function applyBasicSeoAutofix(brief: ArticleBrief, a: StructuredArticle, audit: AuditResult): { changed: boolean; fixes: string[] } {
   const fixes: string[] = []
-  const kw = (brief.primaryKeyword || '').trim()
+  // Canonical case: this keyword is prefixed into the metaTitle below, and
+  // Keyword Planner hands it over lower-cased.
+  const kw = canonicalizeKnownTerms((brief.primaryKeyword || '').trim())
 
   // 1) Primary keyword must appear in the H1/title OR the metaTitle. When both
   //    miss it, prefix the metaTitle with the keyword (≤60 chars kept).

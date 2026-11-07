@@ -13,6 +13,7 @@ import { authorDisplayName } from '@/lib/articles/authors'
 import { INTL_LOCALE, type PublicLocale } from '@/lib/i18n/locales'
 import { buildArticlesIndexSchema } from '@/lib/articles/server'
 import { jsonForScriptTag } from '@/lib/content/public-article-html'
+import { canonicalizeHeadline, canonicalizeKnownTerms } from '@/lib/content/canonical-case'
 
 interface Article {
   id: string
@@ -46,7 +47,13 @@ export async function ArticlesIndex({ locale }: { locale: PublicLocale }) {
     .eq('is_published', true)
     .eq('locale', locale)
     .order('published_at', { ascending: false })
-  const articles: Article[] = data ?? []
+  // Same read-side casing repair the article page applies (lib/content/canonical-case.ts):
+  // a card's title is the same string as the H1 it leads to.
+  const articles: Article[] = (data ?? []).map((a) => ({
+    ...a,
+    title: canonicalizeHeadline(a.title),
+    excerpt: a.excerpt ? canonicalizeKnownTerms(a.excerpt) : a.excerpt,
+  }))
 
   return (
     <div className="flex min-h-screen flex-col bg-canvas">

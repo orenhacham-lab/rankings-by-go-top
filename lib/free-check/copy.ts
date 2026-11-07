@@ -968,6 +968,119 @@ const de: FreeCheckCopy = {
   },
 }
 
+const pl: FreeCheckCopy = {
+  page: {
+    badge: 'Bezpłatna analiza, bez zobowiązań',
+    title: 'Analiza SEO i AI Państwa witryny,',
+    titleAccent: 'w mniej niż minutę',
+    subtitle: 'Wystarczy podać adres witryny. Czytamy ją naprawdę, rozpoznajemy, czym firma się zajmuje, i pokazujemy, co ją powstrzymuje w Google i w odpowiedziach AI.',
+    trust: ['Bezpłatnie, bez karty kredytowej', 'Nic do instalowania', 'Bez rejestracji'],
+    expect: [
+      { title: 'Co zrozumieliśmy', body: 'Czym firma się zajmuje i kim są jej klienci — tak, jak pokazuje to sama witryna.' },
+      { title: 'Co powstrzymuje witrynę', body: 'Co na stronie nie pozwala Google i asystentom AI zrozumieć tej firmy — od najważniejszego do najmniej ważnego.' },
+      { title: 'Na ile witryna jest gotowa na AI', body: 'Czy ChatGPT i Gemini mogą ją przeczytać i wymienić.' },
+    ],
+  },
+  form: {
+    label: 'Adres witryny',
+    placeholder: 'przyklad.pl',
+    submit: 'Analizuj witrynę',
+    hint: 'Jedno pole. Nic więcej nie trzeba wypełniać.',
+    errors: {
+      invalid_url: 'Ten adres nie wygląda poprawnie. Prosimy spróbować ponownie, na przykład przyklad.pl',
+      blocked_url: 'Analizować można wyłącznie witryny dostępne publicznie. Adresy wewnętrzne i adresy IP nie są obsługiwane.',
+      unreachable: 'Witryna była nieosiągalna. Prosimy sprawdzić adres i spróbować ponownie.',
+      not_html: 'Pod tym adresem nie ma strony internetowej, którą moglibyśmy przeczytać.',
+      rate_limited: 'W krótkim czasie uruchomiono kilka analiz. Prosimy spróbować ponownie za minutę.',
+      daily_cap: 'Bezpłatna analiza jest w tej chwili bardzo obciążona. Prosimy spróbować później albo utworzyć konto, żeby otrzymać pełną analizę.',
+      internal: 'Po naszej stronie coś nie przeszło do końca. Prosimy spróbować ponownie za chwilę.',
+    },
+  },
+  loading: {
+    title: 'Czytamy witrynę i budowę jej stron',
+    sub: 'Zajmie to mniej niż minutę. Czytamy witrynę naprawdę, nie zgadujemy.',
+    footer: 'Przetwarzamy, podsumowanie jest już prawie gotowe',
+    steps: [
+      'Czytanie witryny i budowy jej stron',
+      'Rozpoznanie, czym firma się zajmuje i kim są jej klienci',
+      'Sprawdzenie, co powstrzymuje witrynę w Google',
+      'Szukanie konkurentów',
+    ],
+  },
+  results: {
+    heading: 'Pierwsze podsumowanie analizy',
+    scanned: 'Przeanalizowaliśmy',
+    countersTitle: 'Co znaleźliśmy',
+    counters: { keywords: 'Słowa kluczowe warte uwagi', fixes: 'Rzeczy do poprawienia na witrynie', geo: 'Gotowość na odpowiedzi AI', articles: 'Artykuły gotowe do napisania' },
+    businessTitle: 'Co zrozumieliśmy o firmie',
+    audienceTitle: 'Kim są klienci',
+    competitorsTitle: 'Kim są konkurenci',
+    competitorsLocked: 'Po więcej konkurentów i pełny przegląd wystarczy bezpłatne konto',
+    findingsTitle: 'Co w tej chwili powstrzymuje witrynę',
+    findingsEmpty: 'Witryna jest bez zarzutu we wszystkim, co sprawdzamy. Gratulacje.',
+    findingsLocked: 'Kolejne ustalenia czekają na Państwa koncie',
+    geoTitle: 'Na ile witryna jest gotowa na odpowiedzi AI',
+    geoIntro: 'Asystenci AI, tacy jak ChatGPT i Perplexity, nie tworzą rankingu — podają źródła. Sprawdziliśmy, jak łatwo tę witrynę wskazać jako źródło.',
+    geoScore: 'Sygnały w dobrym stanie',
+    articlesTitle: 'Artykuły, które napisalibyśmy',
+    articlesNote: 'Artykuły wynikają ze strategii treści zbudowanej na najlepszych szansach w słowach kluczowych.',
+    gateTitle: 'To była dopiero próbka. Prawdziwa analiza zaczyna się po rejestracji',
+    gateBody: 'Wystarczy bezpłatne konto, a system weźmie się do pracy nad Państwa witryną.',
+    gateBullets: [
+      'Pełna analiza, z prawdziwymi liczbami wyszukiwań',
+      'Plan treści na cały kwartał, zbudowany dla Państwa branży',
+      'Pierwszy artykuł, napisany przez nas',
+      'Pełny przegląd konkurencji i monitorowanie wzmianek w odpowiedziach AI',
+    ],
+    gateCta: 'Utwórz bezpłatne konto',
+    gateSecondary: 'Mają już Państwo konto? Zaloguj się',
+    gateTerms: 'Kontynuując, akceptują Państwo regulamin i politykę prywatności.',
+    again: 'Przeanalizuj inną witrynę',
+    aiUnavailable: 'Kontrola techniczna jest gotowa. Podsumowanie o firmie i słowa kluczowe czekają na Państwa koncie.',
+  },
+  findings: {
+    title_missing: { title: 'Strona nie ma znacznika title', detail: 'Title to to, co Google pokazuje w swoich wynikach. Bez tego znacznika Google wymyśla go sam, zamiast firmy.' },
+    title_short: { title: 'Title strony jest zbyt krótki', detail: 'Poniżej 30 znaków miejsce, które daje Google, pozostaje niewykorzystane, a szukanych wyrażeń zwykle brakuje.' },
+    title_long: { title: 'Title strony jest zbyt długi', detail: 'Powyżej 65 znaków Google ucina title w środku zdania.' },
+    description_missing: { title: 'Brak znacznika meta description', detail: 'Description to zdanie zachęcające w wynikach wyszukiwania. Bez tego znacznika Google bierze dowolne zdanie ze strony.' },
+    description_length: { title: 'Meta description nie ma właściwej długości', detail: 'Poniżej 70 lub powyżej 165 znaków zostaje ucięty albo źle wykorzystany.' },
+    h1_missing: { title: 'Strona nie ma nagłówka H1', detail: 'H1 mówi Google i asystentom AI, o czym jest ta strona. Bez tego nagłówka muszą to wywnioskować z tekstu.' },
+    h1_multiple: { title: 'Na stronie jest więcej niż jeden H1', detail: 'Kilka nagłówków H1 rozdziela przekaz strony i osłabia każdy z nich.' },
+    images_alt: { title: 'Przy części obrazów brakuje tekstu alternatywnego', detail: 'Google nie widzi obrazów, lecz czyta tekst alternatywny. Bez niego obrazy nie przynoszą wejść, a dostępność na tym traci.' },
+    thin_content: { title: 'Zbyt mało tekstu na stronie', detail: 'Uboga strona daje Google i asystentom AI zbyt mało, by ją umiejscowić albo wskazać.' },
+    no_schema: { title: 'Brak danych strukturalnych (schema)', detail: 'Bez danych strukturalnych Google i asystenci AI nie mogą być pewni, kim jest ta firma i czym się zajmuje.' },
+    no_canonical: { title: 'Brak znacznika canonical', detail: 'Bez znacznika canonical ta sama strona może być liczona wielokrotnie i konkurować sama ze sobą.' },
+    no_viewport: { title: 'Nie zdefiniowano mobilnego viewportu', detail: 'Google ocenia wersję mobilną. Bez viewportu strona wygląda na telefonie jak zepsuta.' },
+    no_open_graph: { title: 'Brak znaczników udostępniania (Open Graph)', detail: 'Udostępnione linki w WhatsAppie i na Facebooku nie pokazują obrazu ani właściwego tytułu.' },
+    robots_blocks_all: { title: 'Plik robots.txt wyklucza wszystkie roboty', detail: 'Plik prosi wszystkie roboty, by nie uwzględniały tej witryny, co trzyma ją poza Google.' },
+    robots_blocks_ai: { title: 'Plik robots.txt wyklucza roboty asystentów AI', detail: 'Wykluczone roboty nie mogą wymienić tej firmy w odpowiedziach takich jak te z ChatGPT.' },
+    no_faq: { title: 'Brak bloku pytań i odpowiedzi', detail: 'Asystenci AI odpowiadają na pytania i dlatego wskazują strony, które na pytania odpowiadają.' },
+  },
+  geo: {
+    schema: {
+      pass: { title: 'Dane strukturalne nazywają firmę', detail: 'Asystenci AI wiedzą, kim jest ta firma i czym się zajmuje.' },
+      fail: { title: 'Żadne dane strukturalne nie nazywają firmy', detail: 'Bez danych strukturalnych o firmie asystenci AI nie wiedzą dokładnie, o kogo chodzi.' },
+    },
+    faq: {
+      pass: { title: 'Jest blok pytań i odpowiedzi', detail: 'Strona, która odpowiada na pytania, jest wskazywana wyraźnie częściej.' },
+      fail: { title: 'Brak bloku pytań i odpowiedzi', detail: 'Asystenci AI odpowiadają na pytania i dlatego wskazują strony, które na pytania odpowiadają. Strona bez pytań bywa wskazywana rzadko.' },
+    },
+    robots: {
+      pass: { title: 'Asystenci AI mogą czytać tę witrynę', detail: 'Plik robots.txt nie wyklucza żadnego robota asystentów AI.' },
+      fail: { title: 'Plik robots.txt wyklucza roboty asystentów AI', detail: 'Wykluczone roboty nie mogą wymienić tej firmy.' },
+    },
+    llms: {
+      pass: { title: 'Jest plik llms.txt', detail: 'Witryna daje asystentom AI wyraźną mapę samej siebie — przewagę nad większością rynku.' },
+      fail: { title: 'Brak pliku llms.txt', detail: 'Plik llms.txt daje asystentom AI wyraźną mapę witryny. Większość rynku go jeszcze nie ma.' },
+    },
+  },
+  evidence: {
+    images: (missing, total) => `${missing} z ${total} obrazów`,
+    words: (n) => `${n} słów na stronie`,
+    h1: (n) => `${n} nagłówków H1`,
+  },
+}
+
 const nl: FreeCheckCopy = {
   page: {
     badge: 'Gratis analyse, zonder verplichting',
@@ -1081,7 +1194,7 @@ const nl: FreeCheckCopy = {
   },
 }
 
-const COPY: Record<PublicLocale, FreeCheckCopy> = { he, en, es, 'pt-BR': ptBR, fr, it, ja, de, nl }
+const COPY: Record<PublicLocale, FreeCheckCopy> = { he, en, es, 'pt-BR': ptBR, fr, it, ja, de, nl, pl }
 
 export function freeCheckCopy(locale: PublicLocale): FreeCheckCopy {
   return COPY[locale] ?? COPY.he

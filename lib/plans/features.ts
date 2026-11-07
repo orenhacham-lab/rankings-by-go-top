@@ -171,6 +171,29 @@ function limitLinesFor(code: PlanCode, locale: PublicLocale): LimitLines {
         : `1サイトあたり月${c.maxAIChecksPerPeriodPerProject}件までのAI可視性チェック`,
     }
   }
+  // Polish, for the /pl pricing page and the Polish dashboard. Same five lines,
+  // same order, same numbers from the catalog. The register is "Państwa", the
+  // third-person plural Polish uses for a formal "your", and the vocabulary is
+  // native: słowa kluczowe for keywords, witryna for website, pozycja for a
+  // ranking position. Without this branch the function fell through to HEBREW,
+  // which is what the live /pt-BR pricing page once showed.
+  if (locale === 'pl') {
+    return {
+      articles: single
+        ? `${c.maxArticlesPerPeriodAccountWide} artykułów miesięcznie, pisanych automatycznie i publikowanych na Państwa witrynie`
+        : `${c.maxArticlesPerPeriodAccountWide} artykułów miesięcznie, pisanych i publikowanych automatycznie, wspólnie dla wszystkich Państwa witryn, do ${PER_SITE} tygodniowo na witrynę`,
+      projects: single ? '1 witryna' : `Do ${c.maxProjects} witryn`,
+      keywords: single
+        ? `Monitorowanie do ${c.maxKeywordsPerProject} słów kluczowych`
+        : `Monitorowanie do ${c.maxKeywordsPerProject} słów kluczowych na witrynę`,
+      google: single
+        ? `Do ${c.maxGoogleChecksPerPeriodPerProject} sprawdzeń pozycji w Google miesięcznie`
+        : `Do ${c.maxGoogleChecksPerPeriodPerProject} sprawdzeń pozycji w Google miesięcznie na witrynę`,
+      ai: single
+        ? `Do ${c.maxAIChecksPerPeriodPerProject} sprawdzeń widoczności w odpowiedziach AI miesięcznie`
+        : `Do ${c.maxAIChecksPerPeriodPerProject} sprawdzeń widoczności w odpowiedziach AI miesięcznie na witrynę`,
+    }
+  }
   // Dutch, for the /nl pricing page and the Dutch dashboard. Same five lines,
   // same order, same numbers from the catalog; "u" throughout and the Dutch
   // word for keywords, zoekwoorden, which is what Dutch searchers type. Without
@@ -290,6 +313,7 @@ export const CHECKS_EXPLAINER: Record<PublicLocale, string> = {
   it: 'Un controllo di posizione su Google verifica in quale posizione compare una parola chiave su Google o su Google Maps. Un controllo di visibilità nelle IA pone una domanda a un motore di IA, per esempio ChatGPT, e verifica se l\u2019attività viene citata nella risposta.',
   ja: 'Google順位チェックは、1つのキーワードがGoogleまたはGoogleマップの何位に表示されているかを調べます。AI可視性チェックは、ChatGPTなどのAIエンジン1つに質問を1件送り、その回答でお客様の事業が言及されているかを確認します。',
   de: 'Eine Google-Ranking-Prüfung sieht nach, auf welcher Position ein Keyword in Google oder in Google Maps erscheint. Eine Prüfung der KI-Sichtbarkeit stellt einem KI-Dienst, zum Beispiel ChatGPT, eine Frage und sieht nach, ob Ihr Unternehmen in der Antwort genannt wird.',
+  pl: 'Sprawdzenie pozycji w Google ustala, na której pozycji dane słowo kluczowe pojawia się w Google lub w Mapach Google. Sprawdzenie widoczności w AI zadaje jednemu silnikowi AI, na przykład ChatGPT, jedno pytanie i sprawdza, czy w odpowiedzi wymieniona jest Państwa firma.',
   nl: 'Een positiecontrole in Google kijkt op welke positie een zoekwoord in Google of in Google Maps verschijnt. Een controle van de AI-zichtbaarheid stelt één AI-engine, bijvoorbeeld ChatGPT, één vraag en kijkt of uw bedrijf in het antwoord genoemd wordt.',
 }
 
@@ -350,6 +374,16 @@ export function trialLimitLines(locale: PublicLocale): string[] {
       `${t.days}日間のトライアル`,
     ]
   }
+  if (locale === 'pl') {
+    return [
+      'Jeden artykuł na próbę, od napisania do publikacji',
+      '1 witryna',
+      `Do ${t.maxKeywordsPerProject} słów kluczowych`,
+      `Do ${t.maxGoogleChecksLifetime} sprawdzeń pozycji w Google w okresie próbnym`,
+      `Do ${t.maxAIChecksLifetime} sprawdzeń widoczności w odpowiedziach AI w okresie próbnym`,
+      `${t.days} dni okresu próbnego`,
+    ]
+  }
   if (locale === 'nl') {
     return [
       'Eén artikel om te proberen, van het schrijven tot de publicatie',
@@ -405,10 +439,10 @@ export function trialLimitLines(locale: PublicLocale): string[] {
  * persistence bought for nothing.
  */
 export const PLAN_AUDIENCE_LABEL: Record<PlanCode, Record<PublicLocale, string>> = {
-  regular: { en: 'One website', he: 'לאתר אחד', es: 'Para una web', 'pt-BR': 'Para um site', fr: 'Pour un site', it: 'Per un sito', ja: 'サイト1件向け', de: 'Eine Website', nl: 'Eén website' },
-  advanced: { en: 'One website', he: 'לאתר אחד', es: 'Para una web', 'pt-BR': 'Para um site', fr: 'Pour un site', it: 'Per un sito', ja: 'サイト1件向け', de: 'Eine Website', nl: 'Eén website' },
-  premium: { en: 'Multiple websites', he: 'למספר אתרים', es: 'Para varias webs', 'pt-BR': 'Para vários sites', fr: 'Pour plusieurs sites', it: 'Per più siti', ja: '複数サイト向け', de: 'Mehrere Websites', nl: 'Meerdere websites' },
-  large_agency: { en: 'Agencies', he: 'לסוכנויות', es: 'Para agencias', 'pt-BR': 'Para agências', fr: 'Pour les agences', it: 'Per le agenzie', ja: '代理店向け', de: 'Agenturen', nl: 'Bureaus' },
+  regular: { en: 'One website', he: 'לאתר אחד', es: 'Para una web', 'pt-BR': 'Para um site', fr: 'Pour un site', it: 'Per un sito', ja: 'サイト1件向け', de: 'Eine Website', nl: 'Eén website', pl: 'Jedna witryna' },
+  advanced: { en: 'One website', he: 'לאתר אחד', es: 'Para una web', 'pt-BR': 'Para um site', fr: 'Pour un site', it: 'Per un sito', ja: 'サイト1件向け', de: 'Eine Website', nl: 'Eén website', pl: 'Jedna witryna' },
+  premium: { en: 'Multiple websites', he: 'למספר אתרים', es: 'Para varias webs', 'pt-BR': 'Para vários sites', fr: 'Pour plusieurs sites', it: 'Per più siti', ja: '複数サイト向け', de: 'Mehrere Websites', nl: 'Meerdere websites', pl: 'Wiele witryn' },
+  large_agency: { en: 'Agencies', he: 'לסוכנויות', es: 'Para agencias', 'pt-BR': 'Para agências', fr: 'Pour les agences', it: 'Per le agenzie', ja: '代理店向け', de: 'Agenturen', nl: 'Bureaus', pl: 'Agencje' },
 }
 
 /**
@@ -428,6 +462,7 @@ export const PLAN_AUDIENCE_DESCRIPTION: Record<PlanCode, Record<PublicLocale, st
     ja: 'サイト1件、まず始めるためのプラン',
     de: 'Eine Website, ein einfacher Anfang',
     nl: 'Eén website, een eenvoudig begin',
+    pl: 'Jedna witryna, prosty początek',
   },
   advanced: {
     en: 'For one website that needs more articles and more tracking',
@@ -439,6 +474,7 @@ export const PLAN_AUDIENCE_DESCRIPTION: Record<PlanCode, Record<PublicLocale, st
     ja: '記事数と計測をもっと増やしたいサイト1件向け',
     de: 'Für eine Website, die mehr Artikel und mehr Tracking braucht',
     nl: 'Voor één website die meer artikelen en meer monitoring nodig heeft',
+    pl: 'Dla jednej witryny, która potrzebuje więcej artykułów i więcej monitorowania',
   },
   premium: {
     en: 'For businesses and agencies running several websites',
@@ -450,6 +486,7 @@ export const PLAN_AUDIENCE_DESCRIPTION: Record<PlanCode, Record<PublicLocale, st
     ja: '複数のサイトを運用する企業・代理店向け',
     de: 'Für Unternehmen und Agenturen mit mehreren Websites',
     nl: 'Voor bedrijven en bureaus die meerdere websites beheren',
+    pl: 'Dla firm i agencji prowadzących wiele witryn',
   },
   large_agency: {
     en: 'For agencies with many clients',
@@ -461,6 +498,7 @@ export const PLAN_AUDIENCE_DESCRIPTION: Record<PlanCode, Record<PublicLocale, st
     ja: '多くのクライアントを担当する代理店向け',
     de: 'Für Agenturen mit vielen Kunden',
     nl: 'Voor bureaus met veel klanten',
+    pl: 'Dla agencji z dużą liczbą klientów',
   },
 }
 
@@ -474,10 +512,10 @@ export const PLAN_AUDIENCE_DESCRIPTION: Record<PlanCode, Record<PublicLocale, st
  * unchanged: Basic / Advanced / Premium / Agency, Hebrew in Hebrew.
  */
 export const PLAN_DISPLAY_NAME: Record<PlanCode, Record<PublicLocale, string>> = {
-  regular: { en: 'Basic', he: 'בייסיק', es: 'Basic', 'pt-BR': 'Basic', fr: 'Basic', it: 'Basic', ja: 'Basic', de: 'Basic', nl: 'Basic' },
-  advanced: { en: 'Advanced', he: 'מתקדם', es: 'Advanced', 'pt-BR': 'Advanced', fr: 'Advanced', it: 'Advanced', ja: 'Advanced', de: 'Advanced', nl: 'Advanced' },
-  premium: { en: 'Premium', he: 'פרימיום', es: 'Premium', 'pt-BR': 'Premium', fr: 'Premium', it: 'Premium', ja: 'Premium', de: 'Premium', nl: 'Premium' },
-  large_agency: { en: 'Agency', he: 'סוכנות', es: 'Agency', 'pt-BR': 'Agency', fr: 'Agency', it: 'Agency', ja: 'Agency', de: 'Agency', nl: 'Agency' },
+  regular: { en: 'Basic', he: 'בייסיק', es: 'Basic', 'pt-BR': 'Basic', fr: 'Basic', it: 'Basic', ja: 'Basic', de: 'Basic', nl: 'Basic', pl: 'Basic' },
+  advanced: { en: 'Advanced', he: 'מתקדם', es: 'Advanced', 'pt-BR': 'Advanced', fr: 'Advanced', it: 'Advanced', ja: 'Advanced', de: 'Advanced', nl: 'Advanced', pl: 'Advanced' },
+  premium: { en: 'Premium', he: 'פרימיום', es: 'Premium', 'pt-BR': 'Premium', fr: 'Premium', it: 'Premium', ja: 'Premium', de: 'Premium', nl: 'Premium', pl: 'Premium' },
+  large_agency: { en: 'Agency', he: 'סוכנות', es: 'Agency', 'pt-BR': 'Agency', fr: 'Agency', it: 'Agency', ja: 'Agency', de: 'Agency', nl: 'Agency', pl: 'Agency' },
 }
 
 /** The plan the pricing grid and the article widget both highlight. A UI

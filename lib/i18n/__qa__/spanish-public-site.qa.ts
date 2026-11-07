@@ -292,7 +292,15 @@ function main() {
     // and a call left with the old arity reads the real environment instead of
     // the one the test means to describe — which is how 6a passed by accident
     // for a while.
-    const allOff = { es: false, 'pt-BR': false, fr: false }
+    // EVERY gated locale has to be named: a locale left out of the map falls
+    // back to the real environment, so these three checks quietly described
+    // whichever flags the runner happened to set and went stale on the day a
+    // language was added (they were still three locales wide after German,
+    // Dutch and Polish shipped). Derived from PUBLIC_LOCALES so it cannot go
+    // stale again — the next language is off here the moment it is declared.
+    const allOff = Object.fromEntries(
+      PUBLIC_LOCALES.filter((l) => l !== 'he' && l !== 'en').map((l) => [l, false]),
+    ) as Partial<Record<PublicLocale, boolean>>
     check('6a: with the flags off, the switcher offers only Hebrew and English',
       JSON.stringify(availableLocales(allOff)) === JSON.stringify(['he', 'en']))
     check('6b: with Spanish on, it offers exactly those three',
@@ -491,7 +499,9 @@ function main() {
     check('S1-MUT: a trigger with no chevron fails S1', !/<ChevronDown/.test(src.replace(/<ChevronDown[\s\S]*?\/>/, '')))
     // The two-language link is a link to the other language by name; it needs no chevron.
     check('S5: with two languages it is still one plain link, not a menu',
-      /if \(others\.length === 1\)/.test(src) && availableLocales({ es: false, 'pt-BR': false, fr: false }).length === 2)
+      /if \(others\.length === 1\)/.test(src) && availableLocales(
+        Object.fromEntries(PUBLIC_LOCALES.filter((l) => l !== 'he' && l !== 'en').map((l) => [l, false])),
+      ).length === 2)
   }
 
   // ---- The logo goes home in the language you are reading -------------------

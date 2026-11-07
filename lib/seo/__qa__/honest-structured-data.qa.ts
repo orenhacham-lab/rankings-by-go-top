@@ -163,13 +163,16 @@ check('the language list is read from the routing gate',
   langs.join(',') === enabledPublicLocales().map((l) => LOCALE_CONFIG[l].lang).join(','))
 check('every tag is a tag the document itself ships in <html lang>',
   langs.every((l) => PUBLIC_LOCALES.some((p) => LOCALE_CONFIG[p].lang === l)))
-// With every flag on — which is production (all five NEXT_PUBLIC_*_SITE_ENABLED
-// are "true" there) — it is the seven live languages, and Portuguese is the
-// Brazilian Portuguese the site actually serves.
-const ALL_ON = { es: true, 'pt-BR': true, fr: true, it: true, ja: true } as const
+// With every flag on — which is production — it is the ten live languages, and
+// Portuguese is the Brazilian Portuguese the site actually serves. The override
+// map has to name EVERY gated locale: one left out falls back to the ambient
+// env, so the expectation silently depended on which flags the runner happened
+// to set, and the list went stale the moment a locale was added (it was still
+// seven here after German and Dutch shipped).
+const ALL_ON = { es: true, 'pt-BR': true, fr: true, it: true, ja: true, de: true, nl: true, pl: true } as const
 const allLangs = publicSiteLanguages(ALL_ON)
-check('with every locale on it is the seven live languages',
-  allLangs.join(',') === 'he,en,es,pt-BR,fr,it,ja')
+check('with every locale on it is the ten live languages',
+  allLangs.join(',') === 'he,en,es,pt-BR,fr,it,ja,de,nl,pl')
 check('Portuguese is claimed as pt-BR, never bare pt', allLangs.includes('pt-BR') && !allLangs.includes('pt'))
 // And a locale behind its flag is NOT claimed: a language claim an hreflang can
 // disprove is worse than one language fewer.

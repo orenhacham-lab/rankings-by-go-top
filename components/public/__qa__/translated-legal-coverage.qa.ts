@@ -148,6 +148,23 @@ const REGISTER_FORBIDS: Record<string, { label: string; patterns: RegExp[] }> = 
     patterns: [/(?<!\p{L})je(?!\p{L})/iu, /(?<!\p{L})jij(?!\p{L})/iu, /(?<!\p{L})jou(?:w|we)?(?!\p{L})/iu,
       /(?<!\p{L})jullie(?!\p{L})/iu, /(?<!\p{L})(?:kan|heb|moet|wil|mag) je(?!\p{L})/iu],
   },
+  panstwo: {
+    // Polish: the "ty" address anywhere in a document written to Państwo.
+    // Polish consumer contracts and privacy policies are written in the third
+    // person to Państwo, and a single "możesz" or "twoje konto" in a policy is
+    // the tell that one paragraph came from marketing copy, which does use ty.
+    // The verb forms are listed because a Polish sentence can switch register
+    // without naming the pronoun at all: "możesz", "musisz", "masz".
+    label: 'ty-form address in a document written to Państwo',
+    // NOT the bare dative "ci": it is spelled exactly like the masculine
+    // personal plural demonstrative ("ci dostawcy" = those providers), which is
+    // correct Państwo prose, so matching it would make the guard lie. The
+    // unambiguous oblique forms are cię, ciebie, tobie, tobą.
+    patterns: [/(?<!\p{L})ty(?!\p{L})/iu, /(?<!\p{L})(?:cię|ciebie|tobie|tobą)(?!\p{L})/iu,
+      /(?<!\p{L})tw[oó]j(?!\p{L})/iu, /(?<!\p{L})twoj(?:a|e|ego|emu|ej|ich|im|ą|ym)?(?!\p{L})/iu,
+      /(?<!\p{L})mo[żz]esz(?!\p{L})/iu, /(?<!\p{L})musisz(?!\p{L})/iu,
+      /(?<!\p{L})masz(?!\p{L})/iu, /(?<!\p{L})chcesz(?!\p{L})/iu],
+  },
   desumasu: {
     // Japanese: plain polite です・ます throughout, and NOT 謙譲語 (humble
     // self-reference). A Japanese policy written with 弊社 / いたします /
@@ -210,6 +227,106 @@ const LAW: Record<string, { doc: Doc; name: string; must: RegExp }[]> = {
     { doc: 'affiliate-terms', name: 'the FTC endorsement guides, by citation', must: /16 CFR/ },
     { doc: 'affiliate-terms', name: 'the European consumer forum rule in the partner agreement too', must: /1215\/2012/ },
     { doc: 'affiliate-terms', name: 'that the partner gets no personal data of the customers they refer', must: /U ontvangt geen persoonsgegevens/i },
+  ],
+  pl: [
+    { doc: 'refund-policy', name: 'the fourteen-day right of withdrawal of the ustawa o prawach konsumenta, by article', must: /art\. 27 ustawy z dnia 30 maja 2014 r\. o prawach konsumenta/i },
+    { doc: 'refund-policy', name: 'the fourteen days in words', must: /czternastu dni/ },
+    { doc: 'refund-policy', name: 'the pre-contractual information duty that makes the right real', must: /art\. 12 ust\. 1 pkt 9 ustawy o prawach konsumenta/i },
+    { doc: 'refund-policy', name: 'what an express request to start the service before the period ends forfeits', must: /art\. 38 ust\. 1 pkt 1 i art\. 35/i },
+    { doc: 'refund-policy', name: 'that the consumer bears no cost at all where we failed to inform or they did not ask', must: /art\. 36 ustawy o prawach konsumenta nie ponosz[ąa] Pa[nń]stwo/ },
+    { doc: 'refund-policy', name: 'that a month in progress is not a fully performed service', must: /nie jest wykonany w pe[łl]ni tylko dlatego, [żz]e konto jest otwarte/ },
+    { doc: 'refund-policy', name: "that the right is the consumer's and not a business's", must: /nie jest w my[śs]l tego przepisu konsumentem/ },
+    // art. 38a is REPEALED (uchylony in the consolidated text, Dz.U. 2026 poz.
+    // 1244). The provision that extends the consumer chapters — chapter 4 is
+    // the right of withdrawal — to a sole trader whose contract is not of a
+    // professional character for them is art. 7aa ust. 1. An earlier draft of
+    // this guard demanded the repealed article, which is how a document can
+    // pass a coverage suite while citing law that no longer exists.
+    { doc: 'refund-policy', name: 'art. 7aa ust. 1, which in Poland extends the right to a sole trader whose contract is not professional for them', must: /art\. 7aa ust\. 1 ustawy o prawach konsumenta/ },
+    // The express request to begin before the fourteen days is art. 21 ust. 2,
+    // the DISTANCE article. art. 15 ust. 3 is its off-premises twin and
+    // additionally demands a declaration on a durable medium, so citing it for
+    // an online sale states a duty we do not have and omits the one we do.
+    { doc: 'refund-policy', name: 'the express request is the distance one, art. 21 ust. 2', must: /art\. 21 ust\. 2 ustawy o prawach konsumenta/ },
+    { doc: 'terms', name: 'the express request is the distance one, art. 21 ust. 2', must: /art\. 21 ust\. 2 tej ustawy/ },
+    // pkt 11 is the duty to pay the reasonable costs of a service already
+    // begun; pkt 10 is the cost of returning GOODS and has no place here.
+    { doc: 'refund-policy', name: 'the reasonable-costs information item is pkt 11', must: /pkt 9 i pkt 11/ },
+    // art. 7aa ust. 2 binds a SCREEN, not only a document: where the contract
+    // does not show whether it is professional for that person, they may
+    // declare either way, and "druga strona umowy nie może jednak uzależnić
+    // zawarcia umowy od złożenia takiego oświadczenia". Signup must therefore
+    // never gate account creation on that answer, and the terms say so, which
+    // is the only place a reader can check it.
+    { doc: 'terms', name: 'art. 7aa ust. 2: the contract is never conditioned on the professional-character declaration', must: /art\. 7aa ust\. 2[\s\S]{0,300}nie b[ęe]dzie od tego zale[żz]e[ćc]/ },
+    // art. 385(5) KC is the abusive-clause twin of art. 7aa upk: two acts, two
+    // provisions, each extending to the same non-professional sole trader.
+    { doc: 'terms', name: 'art. 385(5) KC extends the abusive-clause limits to a non-professional sole trader', must: /art\. 385\(5\) tego kodeksu/ },
+    // The cookie basis is cited at the UNIT, not flatly at art. 399: lit. b is
+    // the device-settings information most policies miss, ust. 1 pkt 3 is the
+    // no-configuration-change condition, ust. 3 pkt 2 is the carve-out the
+    // strictly-necessary cookies actually rest on, and art. 400 is what makes
+    // the RODO consent standard the standard here.
+    { doc: 'privacy', name: 'the cookie consent cites art. 399 ust. 1 pkt 1 lit. b, the device settings', must: /ust\. 1 pkt 1[\s\S]{0,400}ustawieniach oprogramowania/i },
+    { doc: 'privacy', name: 'and the no-configuration-change condition of ust. 1 pkt 3', must: /art\. 399 ust\. 1 pkt 3/i },
+    { doc: 'privacy', name: 'and rests the necessary cookies on ust. 3 pkt 2, not on ust. 3 flatly', must: /art\. 399 ust\. 3 pkt 2/i },
+    { doc: 'privacy', name: 'and names art. 400, which makes the RODO consent standard the standard here', must: /art\. 400/ },
+    /* Art. 399 ust. 2 PKE lets device settings express consent, which is a Polish
+     * peculiarity. It is not a route OUT: our own consent record is what the
+     * marketing gate and the Meta server-side report read, so a browser block
+     * stops nothing we decide. The document must say that in those words. */
+    { doc: 'privacy', name: 'and says a browser block is not a withdrawal of consent with us',
+      must: /nie zast[ęe]puje jednak wycofania zgody u nas/ },
+    /* Transfers: JVZoo is a joint controller, not a provider, so the SCC sentence
+     * never reached it. The instrument is the visitor's own consent, art. 49
+     * ust. 1 lit. a RODO, and the risk it is consent TO must be named. */
+    { doc: 'privacy', name: 'the transfers section says the SCC instrument does not reach every recipient',
+      must: /Nie ka[żz]dy wymieniony powy[żz]ej odbiorca jest naszym dostawc[ąa]/ },
+    { doc: 'privacy', name: 'and that that transmission has no processing agreement and no SCCs',
+      must: /nie stosuje si[ęe] ani umowy powierzenia przetwarzania,\s*ani standardowych klauzul umownych/ },
+    { doc: 'privacy', name: 'and names the consent as the instrument, with art. 49 ust. 1 lit. a',
+      must: /ta Pa[ńn]stwa zgoda jest tym instrumentem[\s\S]{0,160}art\. 49 ust\. 1 lit\. a RODO/ },
+    { doc: 'privacy', name: 'and states the risk that consent is consent to',
+      must: /docieraj[ąa] do sp[óo][łl]ki w Stanach Zjednoczonych/ },
+    { doc: 'refund-policy', name: 'the model withdrawal form of załącznik nr 2, offered on request', must: /za[łl][ąa]cznika nr 2 do tej ustawy/ },
+    { doc: 'refund-policy', name: 'the price law that is why no złoty figure is shown', must: /ustawy o informowaniu o cenach towar[óo]w i us[łl]ug/ },
+    { doc: 'terms', name: 'the same withdrawal right in the terms', must: /art\. 27 ustawy z dnia 30 maja 2014 r\. o prawach konsumenta/i },
+    { doc: 'terms', name: 'the express-request articles in the terms too', must: /art\. 38 ust\. 1 pkt 1 i art\. 35/i },
+    { doc: 'terms', name: 'the order-with-payment-obligation rule, which is why we show no such button ourselves', must: /art\. 17 ustawy o prawach konsumenta/i },
+    { doc: 'terms', name: 'the European consumer forum rule, so the Israeli-courts clause is not read as absolute', must: /1215\/2012/ },
+    { doc: 'terms', name: 'the limits art. 385(1) kc sets on a standard term', must: /art\. 385\(1\) Kodeksu cywilnego/ },
+    // ust. 5, not ust. 1: ust. 1 binds the place of retail sale and service
+    // provision, and ust. 5 extends the duty to advertising a service together
+    // with its price, which is what a pricing page is.
+    { doc: 'terms', name: 'the price-display rule that is why no złoty figure is shown', must: /art\. 4 ust\. 5 (?:tej ustawy|ustawy o informowaniu o cenach)/ },
+    { doc: 'terms', name: 'and the sanction that makes it bite', must: /art\. 6 ust\. 1 i 2/ },
+    { doc: 'privacy', name: 'the GDPR by name and regulation number', must: /rozporz[ąa]dzenie \(UE\) 2016\/679/ },
+    { doc: 'privacy', name: 'the GDPR by the name Polish readers use', must: /RODO/ },
+    { doc: 'privacy', name: 'the national law that completes RODO in Poland', must: /ustawa z dnia 10 maja 2018 r\. o ochronie danych osobowych/ },
+    { doc: 'privacy', name: 'the one-month answer deadline of Article 12(3), neither fifteen days nor thirty', must: /\*\*w ci[ąa]gu miesi[ąa]ca\*\* od jego otrzymania, jak [żz][ąa]da art\. 12 ust\. 3 RODO/ },
+    { doc: 'privacy', name: 'the one-month deadline said plainly against the other two', must: /Nie bierzemy trzydziestu dni ani pi[ęe]tnastu/ },
+    { doc: 'privacy', name: 'that the Polish act adds no DPO threshold of its own, unlike the German BDSG', must: /nie dodaje do tego [żz]adnego progu/ },
+    { doc: 'privacy', name: 'that no data protection officer is appointed', must: /nie wyznaczyli[śs]my inspektora ochrony danych/ },
+    { doc: 'privacy', name: 'the communication channel that stands in for an appointed officer', must: /Co w to miejsce wchodzi, to kana[łl]/ },
+    { doc: 'privacy', name: 'that no Article 27 representative in the Union is claimed either', must: /art\. 27 RODO/ },
+    { doc: 'privacy', name: 'the Prezes UODO as the authority to complain to', must: /Prezesa Urz[ęe]du Ochrony Danych Osobowych/ },
+    { doc: 'privacy', name: 'the court route of Article 79, which is the Polish alternative to naming a second authority', must: /art\. 79 RODO/ },
+    { doc: 'privacy', name: 'the Israeli adequacy decision, by number, for the transfer', must: /2011\/61\/UE/ },
+    { doc: 'privacy', name: 'that standard contractual clauses are not claimed with every sub-processor', must: /Nie twierdzimy tutaj, [żz]e z ka[żz]dym z naszych podmiot[óo]w przetwarzaj[ąa]cych podpisali[śs]my standardowe klauzule umowne/ },
+    { doc: 'privacy', name: 'the Prawo komunikacji elektronicznej as the consent rule for storage on the device', must: /Podstaw[ąa] umieszczania na Pa[nń]stwa urz[ąa]dzeniu[\s\S]{0,80}Prawo komunikacji elektronicznej/ },
+    { doc: 'privacy', name: 'the two rules that are why no Polish business is emailed', must: /art\. 10 ustawy o [śs]wiadczeniu us[łl]ug drog[ąa] elektroniczn[ąa][\s\S]{0,200}art\. 398 Prawa komunikacji elektronicznej/ },
+    { doc: 'privacy', name: "that a partner is not given a referred customer's address, site or plan", must: /nie otrzymuje adresu e-mail, witryny, pakietu/ },
+    { doc: 'accessibility', name: 'the Polish accessibility act and the European standard behind it', must: /ustawa z dnia 4 kwietnia 2019 r\. o dost[ęe]pno[śs]ci cyfrowej[\s\S]{0,500}EN 301 549/ },
+    { doc: 'accessibility', name: 'that no conformity with that act is claimed, with the reason', must: /nie o[śs]wiadczamy zgodno[śs]ci z t[ąa] ustaw[ąa]/ },
+    { doc: 'accessibility', name: 'the micro-enterprise exemption of the Polish EAA implementation act, by article', must: /art\. 4 pkt 1 tej ustawy wy[łl][ąa]cza/ },
+    { doc: 'affiliate-terms', name: 'the Polish prohibition of hiding a commercial purpose, by article', must: /art\. 6 ust\. 3 pkt 2 ustawy o przeciwdzia[łl]aniu nieuczciwym praktykom rynkowym/ },
+    { doc: 'affiliate-terms', name: 'kryptoreklama, the editorial-content rule a paid partner is judged against', must: /art\. 7 pkt 11 tej ustawy uznaje kryptoreklam[ęe]/ },
+    { doc: 'affiliate-terms', name: 'the rule that a commercial communication must be identifiable', must: /[Aa]rt\. 9 ustawy o [śs]wiadczeniu us[łl]ug drog[ąa] elektroniczn[ąa]/ },
+    { doc: 'affiliate-terms', name: 'the rules on unsolicited advertising messages', must: /art\. 398 ustawy z dnia 12 lipca 2024 r\. Prawo komunikacji elektronicznej/ },
+    { doc: 'affiliate-terms', name: 'UOKiK, which is who actually enforces this against a Polish partner', must: /UOKiK/ },
+    { doc: 'affiliate-terms', name: 'the FTC endorsement guides, by citation', must: /16 CFR/ },
+    { doc: 'affiliate-terms', name: 'the European consumer forum rule in the partner agreement too', must: /1215\/2012/ },
+    { doc: 'affiliate-terms', name: 'that the partner gets no personal data of the customers they refer', must: /Nie dostaj[ąa] Pa[nń]stwo danych osobowych/i },
   ],
   de: [
     { doc: 'refund-policy', name: 'the fourteen-day right of withdrawal of the BGB, by section', must: /§ 312g Absatz 1 in Verbindung mit § 355/ },
@@ -442,6 +559,10 @@ const MONTHS: Record<string, string[]> = {
   es: ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre'],
   'pt-BR': ['janeiro', 'fevereiro', 'março', 'abril', 'maio', 'junho', 'julho', 'agosto', 'setembro', 'outubro', 'novembro', 'dezembro'],
   fr: ['janvier', 'février', 'mars', 'avril', 'mai', 'juin', 'juillet', 'août', 'septembre', 'octobre', 'novembre', 'décembre'],
+  // Polish writes the month in the GENITIVE ("5 listopada 2026"), never the
+  // nominative "listopad", so these are the genitive forms and nothing else
+  // will parse out of a real Polish date line.
+  pl: ['stycznia', 'lutego', 'marca', 'kwietnia', 'maja', 'czerwca', 'lipca', 'sierpnia', 'września', 'października', 'listopada', 'grudnia'],
   it: ['gennaio', 'febbraio', 'marzo', 'aprile', 'maggio', 'giugno', 'luglio', 'agosto', 'settembre', 'ottobre', 'novembre', 'dicembre'],
   // Japanese writes the month as a NUMBER (10月), so there are no month names to
   // list. The array is the numerals in order, which keeps `MONTHS[locale]` the
@@ -470,7 +591,15 @@ function writtenRevisionDate(locale: string, src: string): string | null {
     if (!last) return null
     return `${last[1]}-${String(Number(last[2])).padStart(2, '0')}-${String(Number(last[3])).padStart(2, '0')}`
   }
-  const line = locale === 'fr'
+  // Polish writes it as "Ostatnia aktualizacja: 5 listopada 2026": no "de" and
+  // no "le", the month in the genitive, and only a line about updating counts,
+  // so the dates inside the statutes it cites (ustawa z dnia 30 maja 2014 r.)
+  // are not read as this one. "aktualizacj" is the stem shared by
+  // aktualizacja/aktualizacji, and it does not appear in those statute names.
+  const line = locale === 'pl'
+    ? /[^\n]*(aktualizacj)[^\n]*\b(\d{1,2}) ([A-Za-ząćęłńóśźż]+) (\d{4})/gi
+    : locale === 'fr'
+
     ? /[^\n]*(mise [àa] jour)[^\n]*\ble (\d{1,2})(?:er)? ([A-Za-zéûôàçî]+) (\d{4})/gi
     : locale === 'it'
     // Italian writes it as "Ultimo aggiornamento: 21 ottobre 2026": no "de"
@@ -603,6 +732,12 @@ for (const locale of LOCALES) {
 // made — which is why the 14-day check is per language and allows the European
 // right where the English page itself grants it.
 const REFUND: Record<string, { name: string; must: RegExp }[]> = {
+  pl: [
+    { name: 'says subscription payments are not refunded', must: /nie zwracamy/i },
+    { name: 'keeps the only exception being the law', must: /zwrotu [żz][ąa]da prawo/i },
+    { name: 'keeps cancellation at any time', must: /w ka[żz]dej chwili/i },
+    { name: 'keeps access to the end of the paid period', must: /do ko[nń]ca okresu/i },
+  ],
   nl: [
     { name: 'says subscription payments are not refunded', must: /worden niet terugbetaald/i },
     { name: 'keeps the only exception being the law', must: /de wet de terugbetaling verlangt/i },
@@ -709,6 +844,7 @@ const PROGRAM_NUMBERS = ['30%', '40%', '90', '30', '100', '350'] as const
  * commit, with the consent ask, and this section is what makes that unavoidable.
  */
 const NO_REFERRAL_STORAGE: Record<string, RegExp[]> = {
+  pl: [/nie umieszcza pliku cookie/, /kod tego partnera podr[óo][żz]uje w samym linku/],
   nl: [/plaatst geen cookie/, /reist de code van die partner in de link zelf/],
   de: [/legt keinen Cookie ab/, /reist der Code dieses Partners im Link selbst/],
   he: [/אינה שומרת עוגייה כלל/, /נוסע בקישור/],
@@ -766,6 +902,7 @@ const HEBREW_PRIVACY = 'app/(legal)/privacy/page.tsx'
  */
 const HEBREW_A11Y = 'app/(legal)/accessibility/page.tsx'
 const A11Y_METHOD: Record<string, RegExp[]> = {
+  pl: [/Jak jeste[śs]my sprawdzani/, /WCAG 2\.1/, /technologii wspomagaj[ąa]cej/, /jeszcze nie przeprowadzono/, /cz[ęe][śs]ciowo/i],
   nl: [/Hoe wij worden gecontroleerd/, /WCAG 2\.1/, /hulptechniek/, /is hier nog niet uitgevoerd/, /gedeeltelijk/i],
   de: [/Wie wir geprüft werden/, /WCAG 2\.1/, /assistive Technologie/, /noch nicht durchgeführt worden/, /teilweise/i],
   he: [/כיצד נבדקנו/, /WCAG 2\.1/, /טכנולוגיה\s*\n?\s*מסייעת/, /טרם נעשתה/, /חלקית/],
@@ -812,6 +949,7 @@ const A11Y_METHOD: Record<string, RegExp[]> = {
  * absolute right to tell us to stop, in any channel.
  */
 const OUTBOUND_CONTACT: Record<string, RegExp[]> = {
+  pl: [/skontaktowa[ćc] si[ęe] z firm[ąa], kt[óo]rej witryna zosta[łl]a sprawdzona/, /kt[óo]re ta firma publikuje na swojej w[łl]asnej witrynie/, /art\. 6 ust\. 1 lit\. f/, /prawo bezwzgl[ęe]dne/, /art\. 21 ust\. 2/],
   nl: [/contact opnemen met het bedrijf waarvan de website is gecontroleerd/, /op zijn eigen website publiceert/, /artikel 6, lid 1, onder f/, /een absoluut recht/, /artikel 21, lid 2/],
   de: [/das Unternehmen kontaktieren, dessen Website geprüft wurde/, /auf seiner eigenen Website veröffentlicht/, /Artikel 6 Absatz 1 Buchstabe f/, /ein absolutes Recht/, /Artikel 21 Absatz 2/],
   he: [/עשויים גם לפנות לעסק/, /מפרסם באתר שלו/, /6\(1\)\(ו\)/, /זכות מוחלטת/, /21\(2\)/],
@@ -837,7 +975,7 @@ const OUTBOUND_CONTACT: Record<string, RegExp[]> = {
     // is what the form now does. A policy still describing one bundled tick
     // would be a disclosure of something that no longer happens.
     check(`${name}/privacy: marketing is described as a separate box`,
-      /בתיבה נפרדת|separate box|casilla aparte|caixa separada|case s[ée]par[ée]e|casella separata|gesonderte[nmrs]? Kästchen|別のチェックボックス|afzonderlijke vakje/i.test(src))
+      /בתיבה נפרדת|separate box|casilla aparte|caixa separada|case s[ée]par[ée]e|casella separata|gesonderte[nmrs]? Kästchen|別のチェックボックス|afzonderlijke vakje|osobnym polu/i.test(src))
   }
 }
 
@@ -867,6 +1005,10 @@ const OUTBOUND_CONTACT: Record<string, RegExp[]> = {
  * what we read from it.
  */
 const SHOPIFY_FIXES: Record<string, { terms: RegExp[]; privacy: RegExp[] }> = {
+  pl: {
+    terms: [/W po[łl][ąa]czonym sklepie Shopify/, /dotyczy wy[łl][ąa]cznie artyku[łl][óo]w i stron sklepu/, /nie dotyka produkt[óo]w/, /Pa[nń]stwa zatwierdzeniem ka[żz]dej osobnej poprawki/, /poprzedni[ąa] i now[ąa] warto[śs]ci[ąa]/],
+    privacy: [/zapisujemy poprawki w artyku[łl]ach i stronach sklepu/, /zatwierdzeniem ka[żz]dej osobnej poprawki/, /adres IP, z kt[óo]rego zosta[łl]o dane/, /poprzednia i nowa warto[śs][ćc]/],
+  },
   nl: {
     terms: [/In een verbonden Shopify-winkel/, /betreft alleen de artikelen en pagina's van de winkel/, /raakt de producten/, /uw goedkeuring van elke afzonderlijke correctie/, /de vorige en de nieuwe waarde/],
     privacy: [/schrijven wij correcties in de artikelen en pagina's van de winkel/, /goedkeuring van elke afzonderlijke correctie/, /het IP-adres waarvandaan zij is gegeven/, /de vorige en de nieuwe waarde/],
@@ -911,6 +1053,7 @@ const SHOPIFY_FIXES: Record<string, { terms: RegExp[]; privacy: RegExp[] }> = {
  * WordPress fix log gets the same disclosure, held here per language.
  */
 const FIX_LOG_IP: Record<string, RegExp> = {
+  pl: /Historia poprawek:\*\* ka[żz]da poprawka jest zapisywana w naszej historii, z osob[ąa], kt[óo]ra j[ąa] zatwierdzi[łl]a/,
   nl: /Verloop van de correcties:\*\* elke correctie wordt in ons verloop vastgelegd, met de persoon die haar heeft goedgekeurd/,
   de: /Verlauf der Korrekturen:\*\* jede Korrektur wird in unserem Verlauf erfasst, mit der Person, die sie freigegeben hat/,
   he: /יומן תיקונים:<\/strong> כל תיקון נרשם ביומן שלנו יחד עם מי אישר אותו/,
@@ -988,6 +1131,10 @@ const HEBREW_TERMS = 'app/(public)/terms/page.tsx'
  * running a service the text denies.
  */
 const SHOPIFY_NETWORK: Record<string, { terms: RegExp[]; privacy: RegExp[] }> = {
+  pl: {
+    terms: [/Sklep mo[żz]e ponadto przyst[ąa]pi[ćc] do sieci link[óo]w z cz[ęe][śs]ci 15A/, /publikuje na blogu sklepu/, /osobnym i dobrowolnym przyst[ąa]pieniem/, /warunki Shopify pozwalaj[ąa] Pa[nń]stwu/],
+    privacy: [/Po[łl][ąa]czony sklep Shopify te[żz] mo[żz]e przyst[ąa]pi[ćc]/, /adresu myshopify sklepu/],
+  },
   nl: {
     terms: [/De winkel kan daarnaast deelnemen aan het linknetwerk uit onderdeel 15A/, /de blog van de winkel te publiceren/, /afzonderlijke en vrijwillige/, /voorwaarden van Shopify u toestaan/],
     privacy: [/Een verbonden Shopify-winkel kan ook toetreden/, /myshopify-adres van de winkel/],
@@ -1090,6 +1237,7 @@ const NETWORK_DENIED = /אינו זמין לחנויות Shopify|אינה זמי
  * store's code, and whatever is written stays inside that item's own body.
  */
 const SHOPIFY_NO_SCHEMA: Record<string, RegExp> = {
+  pl: /us[łl]uga nie dodaje schematu JSON-LD, nie dodaje skrypt[óo]w i nie dotyka kodu motywu/,
   nl: /voegt de dienst geen JSON-LD-schema toe, voegt hij geen scripts toe en raakt hij de code van het thema/,
   de: /In einem Shopify-Shop fügt der Dienst kein JSON-LD-Schema hinzu, fügt keine Skripte hinzu und berührt weder den Code des Themes/,
   he: /בחנות\n?\s*Shopify השירות אינו מוסיף סכמת JSON-LD, אינו מוסיף סקריפטים ואינו נוגע בקוד של ערכת העיצוב/,
@@ -1102,6 +1250,7 @@ const SHOPIFY_NO_SCHEMA: Record<string, RegExp> = {
 }
 /* And it must keep saying where what it writes lands: the item's own body. */
 const SHOPIFY_BODY_ONLY: Record<string, RegExp> = {
+  pl: /wszystko, co pisze, jest tre[śs]ci[ąa] i formatowaniem w tek[śs]cie g[łl][óo]wnym tego artyku[łl]u albo tej strony/,
   nl: /alles wat hij schrijft, is content en opmaak binnen de hoofdtekst van dat artikel of die pagina/,
   de: /alles, was er schreibt, ist Inhalt und Formatierung innerhalb des Textkörpers dieses Artikels oder dieser Seite/,
   he: /כל מה שנכתב הוא תוכן ועיצוב בתוך גוף אותו מאמר או עמוד/,
@@ -1113,6 +1262,7 @@ const SHOPIFY_BODY_ONLY: Record<string, RegExp> = {
   ja: /書き込むものはすべて、その記事またはページの本文の中のコンテンツと書式です/,
 }
 const FIX_SCOPE: Record<string, RegExp[]> = {
+  pl: [/tylko dla obrazu, kt[óo]ry tekstu alternatywnego nie ma/, /Nie dotykamy pliku obrazu/, /Jedno zatwierdzenie dla grupy poprawek/, /najwy[żz]ej 25 stron naraz, i nigdy dla strony g[łl][óo]wnej/, /w terminie 14 dni/],
   nl: [/alleen voor een afbeelding die geen alternatieve tekst heeft/, /Wij raken het afbeeldingsbestand/, /E[ée]n enkele goedkeuring voor een groep correcties/, /maximaal 25 pagina's in [ée][ée]n keer, en nooit de startpagina/, /binnen een termijn van 14 dagen/],
   de: [/allein für ein Bild, das keinen Alternativtext hat/, /Wir berühren nicht die Bilddatei/, /Eine einzige Freigabe für eine Gruppe von Korrekturen/, /bis zu 25 Seiten auf einmal, und niemals die Startseite/, /innerhalb einer Frist von 14 Tagen/],
   he: [/טקסט חלופי\s+לתמונה הראשית של מאמר שאין לה טקסט חלופי/, /איננו נוגעים בקובץ התמונה ואיננו מחליפים אותה/, /אישור אחד לקבוצת תיקונים/, /עד 25 עמודים בכל פעם, ולא עמוד הבית/, /בתוך 14 ימים/],
@@ -1179,6 +1329,7 @@ const FIX_SCOPE: Record<string, RegExp[]> = {
  * and the text may promise nothing else.
  */
 const AUTO_APPROVE_TERMS: Record<string, RegExp[]> = {
+  pl: [/Automatyczne zatwierdzanie poprawek \(tylko WordPress\)/, /W sklepie Shopify zatwierdzania automatycznego nie ma/, /Tekst alternatywny obrazu, kt[óo]ry nie ma atrybutu alt/, /tylko gdy zwraca 404 albo 410/, /opis samej strony s[ąa] oba puste/, /nie czytamy i nie przechowujemy nowego adresu IP/, /dzia[łl]a to natychmiast/, /E-maila o tym nie wysy[łl]amy/, /nie logowali si[ęe] w ostatnich trzydziestu dniach/],
   nl: [/Automatische goedkeuring van de correcties \(alleen WordPress\)/, /In een Shopify-winkel bestaat geen automatische goedkeuring/, /De alternatieve tekst van een afbeelding die geen alt-attribuut heeft/, /alleen als die 404 of 410 teruggeeft/, /de beschrijving van de pagina zelf beide leeg zijn/, /lezen en bewaren wij geen nieuw IP-adres/, /dat werkt onmiddellijk/, /Wij sturen daarover geen e-mail/, /Hebt u zich in de laatste dertig dagen niet aangemeld/],
   de: [
     /Automatische Freigabe der Korrekturen \(nur WordPress\)/,
@@ -1271,6 +1422,7 @@ const AUTO_APPROVE_TERMS: Record<string, RegExp[]> = {
 }
 /* The Shopify half of 15C must still promise a click for every single fix. */
 const SHOPIFY_STILL_PER_FIX: Record<string, RegExp> = {
+  pl: /W po[łl][ąa]czonym sklepie Shopify us[łl]uga mo[żz]e proponowa[ćc] poprawki na witrynie i stosowa[ćc] je przez aplikacj[ęe], wy[łl][ąa]cznie za Pa[nń]stwa zgod[ąa] i z Pa[nń]stwa zatwierdzeniem ka[żz]dej osobnej poprawki/,
   nl: /In een verbonden Shopify-winkel kan de dienst correcties aan de website voorstellen en ze via de app toepassen, alleen met uw toestemming en met uw goedkeuring van elke afzonderlijke correctie/,
   de: /In einem verbundenen Shopify-Shop kann der Dienst Korrekturen an der Website vorschlagen und sie über die App anwenden, allein mit Ihrer Einwilligung und mit Ihrer Freigabe jeder einzelnen Korrektur/,
   he: /בחנות Shopify מחוברת, השירות יכול להציע תיקוני אתר ולבצעם דרך האפליקציה, אך ורק בהסכמתכם ובאישור\s+שלכם לכל תיקון/,
@@ -1283,6 +1435,7 @@ const SHOPIFY_STILL_PER_FIX: Record<string, RegExp> = {
 }
 /* And the privacy policy has to say what the act of switching on stores. */
 const AUTO_APPROVE_PRIVACY: Record<string, RegExp[]> = {
+  pl: [/Zatwierdzanie automatyczne poprawek:\*\*/, /adres IP, z kt[óo]rego w[łl][ąa]czy[łl]/, /nie czytamy i nie przechowujemy nowego adresu IP/],
   nl: [/Automatische goedkeuring van de correcties:\*\*/, /het IP-adres waarvandaan het is aangezet/, /lezen en bewaren wij geen nieuw IP-adres/],
   de: [/Automatische Freigabe der Korrekturen:\*\*/, /die IP-Adresse, von der aus sie aktiviert wurde/, /lesen und speichern wir keine neue IP-Adresse/],
   he: [/אישור אוטומטי לתיקונים:/, /כתובת ה-IP שממנה נעשתה\s+ההפעלה/, /איננו קוראים ואיננו שומרים כתובת IP חדשה/],
@@ -1359,6 +1512,7 @@ const AUTO_APPROVE_PRIVACY: Record<string, RegExp[]> = {
  * never in a batch and never under automatic approval.
  */
 const WP_CHANNEL_TERMS: Record<string, RegExp> = {
+  pl: /na witrynie bez wtyczki, przez has[łl]o aplikacji, kt[óo]re Pa[nń]stwo utworzyli, i przez samo REST API WordPressa/,
   nl: /op een website zonder de plug-in, via het applicatiewachtwoord dat u hebt aangemaakt en de REST-interface van WordPress zelf/,
   de: /auf einer Website ohne das Plugin, über das von Ihnen erstellte Anwendungspasswort und die REST-Schnittstelle von WordPress selbst/,
   he: /באתר\s+שאין בו התוסף, דרך סיסמת האפליקציה שיצרתם וממשק ה-REST של וורדפרס עצמה/,
@@ -1370,6 +1524,7 @@ const WP_CHANNEL_TERMS: Record<string, RegExp> = {
   ja: /プラグインのないサイトではお客様が作成されたアプリケーションパスワードと WordPress 自身の REST インターフェースを通じて/,
 }
 const WP_CHANNEL_PRIVACY: Record<string, RegExp> = {
+  pl: /Na witrynie bez wtyczki poprawki, na kt[óo]re pozwala REST API WordPressa, s[ąa] zapisywane przechowywanym przez nas has[łl]em aplikacji/,
   nl: /Op een website zonder de plug-in worden de correcties die de REST-koppeling van WordPress toestaat geschreven met het door ons bewaarde toepassingswachtwoord/,
   de: /Auf einer Website ohne das Plugin werden die Korrekturen, die die REST-Schnittstelle von WordPress zulässt, mit dem von uns aufbewahrten Anwendungspasswort geschrieben/,
   he: /באתר\s+שאין בו התוסף, התיקונים שממשק ה-REST של וורדפרס מאפשר נכתבים דרך סיסמת האפליקציה ששמרנו/,
@@ -1382,6 +1537,7 @@ const WP_CHANNEL_PRIVACY: Record<string, RegExp> = {
 }
 /* The site-wide effect is the fact a merchant cannot guess; it may never be dropped. */
 const MEDIA_ALT_SITEWIDE: Record<string, RegExp> = {
+  pl: /jedno takie zapisanie obowi[ąa]zuje dla wszystkich stron witryny|[żz]eby obowi[ąa]zywa[łl] dla wszystkich stron, kt[óo]re obraz pokazuj[ąa]/,
   nl: /zo'n schrijfactie geldt voor alle pagina's van de website|zodat zij geldt voor alle pagina's die de afbeelding tonen/,
   de: /ein einziger solcher Schreibvorgang für alle Seiten der Website gilt|sodass er für alle Seiten gilt, die es zeigen/,
   he: /כתיבה אחת כזאת חלה על כל עמוד באתר שמציג את אותה תמונה/,
@@ -1394,6 +1550,7 @@ const MEDIA_ALT_SITEWIDE: Record<string, RegExp> = {
 }
 /* And its narrowings: only an empty one, nothing else about the image, approved on its own. */
 const MEDIA_ALT_LIMITS: Record<string, RegExp[]> = {
+  pl: [/tylko dla obrazu, kt[óo]ry tekstu alternatywnego nie ma/, /Nie dotykamy pliku obrazu, jego nazwy ani (?:jego )?podpisu/, /nigdy w grupie poprawek i nigdy pod zatwierdzaniem automatycznym/],
   nl: [/alleen voor een afbeelding die geen alternatieve tekst heeft/, /Wij raken het afbeeldingsbestand niet aan, niet de naam daarvan en niet het bijschrift/, /nooit binnen een groep correcties en nooit onder automatische goedkeuring/],
   de: [/allein für ein Bild, das keinen Alternativtext hat/, /Wir berühren nicht die Bilddatei, nicht ihren Namen und nicht ihre Bildunterschrift/, /niemals im Rahmen einer Gruppe von Korrekturen und niemals unter automatischer Freigabe/],
   he: [/ורק לתמונה שאין לה\s+טקסט חלופי כלל/, /איננו נוגעים\s+בקובץ התמונה, בשמה או בכיתוב שלה/, /לעולם לא כחלק מקבוצת תיקונים\s+ולא במסגרת אישור אוטומטי/],
@@ -1474,6 +1631,7 @@ const MEDIA_ALT_LIMITS: Record<string, RegExp[]> = {
  * processor acting on our behalf, and must point the reader at Meta directly.
  */
 const CAPI_GATE: Record<string, RegExp> = {
+  pl: /Zg[łl]oszenie jest przesy[łl]ane \*\*tylko\*\* wtedy, gdy Pa[nń]stwo dopu[śs]cili kategori[ęe] marketing na pasku plik[óo]w cookie/,
   nl: /Het rapport wordt \*\*alleen\*\* verstuurd wanneer u de categorie marketing in de cookiebalk hebt toegestaan/,
   de: /Der Bericht wird \*\*allein\*\* dann gesendet, wenn Sie die Kategorie Marketing im Cookie-Banner erlaubt haben[\s\S]{0,140}Haben Sie sie abgelehnt oder noch nicht gewählt, wird nichts gesendet/,
   he: /הדיווח נשלח <strong>רק<\/strong> אם אישרת את קטגוריית השיווק[\s\S]{0,120}אם סירבת, או אם עדיין לא בחרת, לא נשלח דבר/,
@@ -1485,6 +1643,7 @@ const CAPI_GATE: Record<string, RegExp> = {
   ja: /マーケティングの区分を許可された場合に \*\*限って\*\* 送信されます[\s\S]{0,140}拒否された場合、またはまだ選択されていない場合は、何も送信されません/,
 }
 const CAPI_WITHDRAW: Record<string, RegExp> = {
+  pl: /Wycofanie zgody na marketing ko[nń]czy przysz[łl]e zg[łl]oszenia natychmiast/,
   nl: /De instemming met de marketing intrekken be[ëe]indigt toekomstige rapporten onmiddellijk/,
   de: /Die Einwilligung zum Marketing zu widerrufen beendet künftige Berichte unmittelbar/,
   he: /ביטול ההסכמה לשיווק מפסיק מיד דיווחים עתידיים/,
@@ -1496,6 +1655,7 @@ const CAPI_WITHDRAW: Record<string, RegExp> = {
   ja: /マーケティングの同意を撤回されると、以後の報告は直ちに止まります/,
 }
 const CAPI_HASH: Record<string, RegExp[]> = {
+  pl: [/jednostronny odcisk \(skr[óo]t SHA-256\) adresu e-mail, kt[óo]rym Pa[nń]stwo si[ęe] zarejestrowali/, /skr[óo]t nie czyni informacji anonimow[ąa]/],
   nl: [/eenzijdige afdruk \(SHA-256-hash\) van het e-mailadres waarmee u zich hebt aangemeld/, /de hash maakt de informatie niet anoniem/],
   de: [/einwegigen Abdruck \(SHA-256-Hash\) der E-Mail-Adresse, mit der Sie sich angemeldet haben/, /der Hash macht die Information nicht anonym/],
   he: [/תמצית חד-כיוונית \(hash בשיטת SHA-256\) של כתובת הדוא&rdquo;ל/, /התמצית אינה הופכת את המידע לאנונימי/],
@@ -1509,6 +1669,7 @@ const CAPI_HASH: Record<string, RegExp[]> = {
 /* The code also sends a hash of the account id and the signup page's address, and those are
  * identifiers too: a list that stops at the email understates what leaves us. */
 const CAPI_IDS: Record<string, RegExp[]> = {
+  pl: [/jednostronny odcisk, wed[łl]ug tego samego sposobu, kodu Pa[nń]stwa konta u nas/, /adres strony, z kt[óo]rej Pa[nń]stwo si[ęe] zarejestrowali, bez wszystkiego, co stoi po znaku zapytania/],
   nl: [/een eenzijdige afdruk, volgens dezelfde werkwijze, van de code van uw account bij ons/, /het adres van de pagina waarvandaan u zich hebt aangemeld, zonder alles wat na het vraagteken staat/],
   de: [/einen einwegigen Abdruck, nach demselben Verfahren, der Kennung Ihres Kontos bei uns/, /die Adresse der Seite, von der aus Sie sich angemeldet haben, ohne alles, was nach dem Fragezeichen steht/],
   he: [/תמצית חד-כיוונית באותה שיטה של מזהה החשבון שלך אצלנו/, /כתובת העמוד שממנו נרשמת, בלי הפרמטרים שאחרי סימן השאלה/],
@@ -1520,6 +1681,7 @@ const CAPI_IDS: Record<string, RegExp[]> = {
   ja: [/同じ方法で作成した、当社におけるお客様のアカウントの識別子の一方向のハッシュ/, /お申し込みをされたページの URL（疑問符より後の部分は含みません）/],
 }
 const CAPI_NOT_SENT: Record<string, RegExp> = {
+  pl: /nie przesy[łl]amy Pa[nń]stwa adresu IP, danych Pa[nń]stwa przegl[ąa]darki, [żz]adnego pliku cookie Meta/,
   nl: /sturen wij niet uw IP-adres, niet de gegevens van uw browser, geen cookie van Meta/,
   de: /senden wir weder Ihre IP-Adresse noch die Daten Ihres Browsers noch einen Cookie von Meta/,
   he: /איננו שולחים את כתובת ה-IP שלך, את פרטי\s*הדפדפן שלך או עוגייה של Meta/,
@@ -1531,6 +1693,7 @@ const CAPI_NOT_SENT: Record<string, RegExp> = {
   ja: /お客様の IP アドレス、ブラウザーのデータ、Meta の Cookie、お名前、電話番号のいずれも送信せず/,
 }
 const CAPI_JOINT: Record<string, RegExp> = {
+  pl: /jeste[śs]my wsp[óo][łl]administratorami \(joint controllers\)[\s\S]{0,260}Meta Platforms, Inc\./,
   nl: /zijn wij en Meta gezamenlijk verwerkingsverantwoordelijken \(joint controllers\)[\s\S]{0,260}Meta Platforms, Inc\./,
   de: /sind wir und Meta gemeinsam Verantwortliche \(joint controllers\)[\s\S]{0,260}Meta Platforms, Inc\./,
   he: /אנחנו\s*ו-Meta בעלי שליטה משותפים \(joint controllers\)[\s\S]{0,160}Meta Platforms Ireland Limited[\s\S]{0,120}Meta Platforms, Inc\./,
@@ -1544,6 +1707,7 @@ const CAPI_JOINT: Record<string, RegExp> = {
 /* The marketing category has to say the consent covers a cookieless server report, or the
  * consent is not specific to what we then do with it (Art. 4(11)). */
 const CAPI_CATEGORY: Record<string, RegExp> = {
+  pl: /Pozwolenie na t[ęe] kategori[ęe] obejmuje te[żz] zg[łl]oszenie konwersji, kt[óo]re przesy[łl]amy z naszego serwera do Meta/,
   nl: /Deze categorie toestaan geldt ook voor een rapport over een omzetting dat wij van onze server naar Meta sturen/,
   de: /Diese Kategorie zu erlauben gilt auch für einen Konversionsbericht, den wir von unserem Server an Meta senden, ohne jeden Cookie/,
   he: /האישור בקטגוריה הזאת חל גם על דיווח המרה שאנו שולחים\s*ל-Meta מהשרת שלנו בלי עוגייה כלל/,
@@ -1631,6 +1795,7 @@ const CAPI_CATEGORY: Record<string, RegExp> = {
  * private individual, and nothing from a part of a site that is not public.
  */
 const OUTREACH_COUNTRIES: Record<string, RegExp> = {
+  pl: /Nie przechowujemy w tym celu adres[óo]w firm w Izraelu, w Europejskim Obszarze Gospodarczym ani w Zjednoczonym Kr[óo]lestwie/,
   nl: /Wij bewaren met dat doel geen adressen van bedrijven in Isra[ëe]l, in de Europese Economische Ruimte of in het Verenigd Koninkrijk/,
   de: /Wir bewahren zu diesem Zweck keine Adressen von Unternehmen in Israel, im Europäischen Wirtschaftsraum oder im Vereinigten Königreich auf/,
   he: /איננו מחזיקים למטרה הזאת\s*כתובות של עסקים בישראל, באזור הכלכלי האירופי או בבריטניה/,
@@ -1642,6 +1807,7 @@ const OUTREACH_COUNTRIES: Record<string, RegExp> = {
   ja: /この目的で、イスラエル、欧州経済領域、英国の事業者のアドレスを保管することはありません/,
 }
 const OUTREACH_VERIFIED: Record<string, RegExp> = {
+  pl: /z dw[óo]ch niezale[żz]nych [źz]r[óo]de[łl], [żz]e dzia[łl]aj[ąa] w Stanach Zjednoczonych/,
   nl: /uit twee onafhankelijke bronnen hebben vastgesteld dat zij in de Verenigde Staten werken/,
   de: /aus zwei unabhängigen Quellen geprüft haben, dass sie in den Vereinigten Staaten arbeiten/,
   he: /אימתנו,\s*משני מקורות בלתי תלויים, שהם פועלים בארצות הברית/,
@@ -1653,6 +1819,7 @@ const OUTREACH_VERIFIED: Record<string, RegExp> = {
   ja: /独立した二つの情報源から米国で営業していることを確認した事業者についてのみ/,
 }
 const OUTREACH_NOT_DONE: Record<string, RegExp[]> = {
+  pl: [/Nie kupujemy list adresowych i nie korzystamy z handlarzy danymi/, /nie wchodzimy do [żz]adnej cz[ęe][śs]ci witryny, kt[óo]ra nie stoi otwarta dla ka[żz]dego odwiedzaj[ąa]cego/],
   nl: [/Wij kopen geen adreslijsten en gebruiken geen gegevenshandelaren/, /betreden geen deel van een website dat niet voor elke bezoeker openstaat/],
   de: [/Wir kaufen keine Adresslisten und nutzen keine Datenhändler/, /betreten keinen Teil einer Website, der nicht jedem Besucher offensteht/],
   he: [/איננו קונים\s*רשימות כתובות ואיננו משתמשים בסוחרי מידע/, /איננו נכנסים\s+לשום חלק באתר שאינו פתוח לכל מבקר/],
@@ -1664,6 +1831,7 @@ const OUTREACH_NOT_DONE: Record<string, RegExp[]> = {
   ja: [/当社はアドレスの一覧を購入せず、データブローカーも利用しません/, /どの訪問者にも開かれていないサイトの部分に立ち入ることもありません/],
 }
 const OUTREACH_REMOVAL: Record<string, RegExp[]> = {
+  pl: [/wy[łl][ąa]cznie w celu zapewnienia, [żz]e ju[żz] si[ęe] z Pa[nń]stwem nie kontaktujemy/, /obowi[ąa]zuje dla wszystkich naszych kana[łl][óo]w, a nie tylko dla kana[łl]u, w kt[óo]rym Pa[nń]stwo o to poprosili/],
   nl: [/alleen met het doel zeker te stellen dat wij geen contact meer met u opnemen/, /zij geldt voor al onze kanalen, niet alleen voor het kanaal waarin u het hebt gevraagd/],
   de: [/allein zu dem Zweck, sicherzustellen, dass wir Sie nicht mehr kontaktieren/, /sie gilt für alle unsere Kanäle, nicht nur für den, in dem Sie sie verlangt haben/],
   he: [/למטרה היחידה של לוודא שלא ניצור איתך קשר שוב/, /היא חלה על כל ערוץ שלנו ולא רק על זה שבו ביקשת/],
@@ -1675,6 +1843,7 @@ const OUTREACH_REMOVAL: Record<string, RegExp[]> = {
   ja: [/二度とご連絡しないことを確実にするためだけに/, /お申し出いただいた手段だけでなく当社のすべての手段に及びます/],
 }
 const OUTREACH_NOTICE: Record<string, RegExp> = {
+  pl: /Poniewa[żz] informacji nie zebrali[śs]my od Pa[nń]stwa samych, ta cz[ęe][śs][ćc] jest zawiadomieniem przy zbieraniu/,
   nl: /Omdat wij de informatie niet bij u zelf hebben verzameld, is dit onderdeel de mededeling bij het verzamelen/,
   de: /Da wir die Information nicht bei Ihnen selbst erhoben haben, ist dieser Abschnitt der Hinweis bei der Erhebung, einschließlich der Aufbewahrungsdauer jedes Datums, und ein Link darauf steht in jeder Nachricht/,
   he: /מכיוון שלא\s*אספנו את המידע ממך עצמך, הסעיף הזה הוא ההודעה על האיסוף, לרבות משך השמירה של כל פרט, והקישור אליו\s+מופיע בכל הודעה שאנו שולחים/,
@@ -1686,6 +1855,7 @@ const OUTREACH_NOTICE: Record<string, RegExp> = {
   ja: /当社はその情報をお客様から直接取得したのではありませんので、この条が取得の通知であり、各データの保存期間も含んでいます/,
 }
 const OUTREACH_NO_SALE: Record<string, RegExp> = {
+  pl: /Nie sprzedajemy tych informacji i nie przekazujemy ich do reklamy behawioralnej w r[óo][żz]nych kontekstach/,
   nl: /Wij verkopen die informatie niet en geven die niet door voor gedragsgerichte advertenties over verschillende contexten heen/,
   de: /Wir verkaufen diese Information nicht und geben sie nicht für kontextübergreifende verhaltensbasierte Werbung weiter/,
   he: /איננו מוכרים\s*את המידע הזה ואיננו משתפים אותו לפרסום התנהגותי חוצה-אתרים/,
@@ -1768,6 +1938,7 @@ const OUTREACH_NO_SALE: Record<string, RegExp> = {
  * tracking, no rewritten links.
  */
 const EMAIL_WEEKLY: Record<string, RegExp[]> = {
+  pl: [/\*\*Podsumowanie tygodniowe:\*\*/, /i tylko wtedy, gdy jest o czym m[óo]wi[ćc]; tydzie[nń], w kt[óo]rym nic si[ęe] nie sta[łl]o, nie daje wiadomo[śs]ci/],
   nl: [/\*\*Weekoverzicht:\*\*/, /en alleen wanneer er iets te melden is; een week waarin niets is gebeurd, levert geen bericht op/],
   de: [/\*\*Wochenübersicht:\*\*/, /und nur, wenn es etwas zu berichten gibt; eine Woche, in der nichts geschehen ist, führt zu keiner Nachricht/],
   he: [/<strong>סיכום שבועי:<\/strong>/, /ורק כשיש מה לספר; בשבוע שבו לא קרה כלום לא יישלח מייל/],
@@ -1783,6 +1954,7 @@ const EMAIL_NO_MONTHLY: Record<string, RegExp> = {
   // Narrow for the same reason the Hebrew one is: "maandelijks" on its own also
   // matches the monthly subscription and the monthly AI check, both of which are
   // true and stay.
+  pl: /[Pp]odsumowanie miesi[ęe]czne|[Mm]iesi[ęe]czn(?:y|e) (?:raport|podsumowanie|przegl[ąa]d)/,
   nl: /[Mm]aandoverzicht|[Mm]aandelijks(e)? (?:rapport|overzicht|samenvatting)/,
   de: /[Mm]onatsbericht|[Mm]onatliche[rn]? (?:Bericht|Übersicht|Zusammenfassung)/,
   // Narrow on purpose: a bare /חודשי/ also matches "מנוי חודשי", the monthly
@@ -1798,6 +1970,7 @@ const EMAIL_NO_MONTHLY: Record<string, RegExp> = {
   ja: /月次の(進捗の)?(レポート|報告|まとめ)/,
 }
 const EMAIL_SETUP_NO_OFFER: Record<string, RegExp> = {
+  pl: /Nie zawieraj[ąa] one oferty, ceny, rabatu ani przej[śs]cia na wy[żz]szy pakiet/,
   nl: /Zij bevatten geen aanbod, geen prijs, geen korting en geen overstap naar een hoger pakket/,
   de: /Sie enthalten kein Angebot, keinen Preis, keinen Rabatt und keinen Wechsel in einen höheren Tarif/,
   he: /אין בהם הצעה, אין מחיר, אין הנחה ואין שדרוג/,
@@ -1809,6 +1982,7 @@ const EMAIL_SETUP_NO_OFFER: Record<string, RegExp> = {
   ja: /そこにはお勧め、価格、割引、上位のプランへの移行はありません/,
 }
 const EMAIL_SCOPE_NARROW: Record<string, RegExp> = {
+  pl: /Link do rezygnacji z wiadomo[śs]ci konfiguracyjnej ko[nń]czy tylko te wiadomo[śs]ci/,
   nl: /De afmeldlink van een bericht bij de start be[ëe]indigt alleen die berichten/,
   de: /Der Abmeldelink einer Nachricht zum Start beendet nur diese Nachrichten/,
   he: /קישור ההסרה במייל הקמה מפסיק את מיילי ההקמה בלבד/,
@@ -1820,6 +1994,7 @@ const EMAIL_SCOPE_NARROW: Record<string, RegExp> = {
   ja: /立ち上げのお知らせの配信停止のリンクはそのメールだけを止めます/,
 }
 const EMAIL_SCOPE_WIDE: Record<string, RegExp> = {
+  pl: /Link do rezygnacji z przypomnienia albo z podsumowania tygodniowego ko[nń]czy wszystkie wiadomo[śs]ci o tym projekcie/,
   nl: /De afmeldlink van een herinnering of van het weekoverzicht be[ëe]indigt alle berichten over dat project/,
   de: /Der Abmeldelink einer Erinnerung oder der Wochenübersicht beendet alle Nachrichten zu diesem Projekt/,
   he: /קישור ההסרה בתזכורת או בסיכום השבועי מפסיק כל מייל על אותו פרויקט/,
@@ -1831,6 +2006,7 @@ const EMAIL_SCOPE_WIDE: Record<string, RegExp> = {
   ja: /承認のお知らせまたは週次のまとめの配信停止のリンクは、そのプロジェクトに関するすべてのメールを止めます/,
 }
 const EMAIL_SWITCH_TRUTH: Record<string, RegExp> = {
+  pl: /prze[łl][ąa]cznik, kt[óo]ry Pa[nń]stwo widz[ąa] w ustawieniach, by[łl] pe[łl]nym obrazem/,
   nl: /de schakelaar die u in de instellingen ziet het volledige beeld is/,
   de: /der Schalter, den Sie in den Einstellungen sehen, das vollständige Bild ist/,
   he: /המתג שאתה רואה בהגדרות הוא התמונה\s*המלאה/,
@@ -1842,6 +2018,7 @@ const EMAIL_SWITCH_TRUTH: Record<string, RegExp> = {
   ja: /設定でご覧になるスイッチが全体の状態です/,
 }
 const EMAIL_NO_FAKE_ZERO: Record<string, RegExp> = {
+  pl: /Cz[ęe][śs][ćc], kt[óo]rej nie mogli[śs]my przeczyta[ćc], jest w wiadomo[śs]ci pomijana, a nie pokazywana jako zero/,
   nl: /Een onderdeel dat wij niet konden lezen, wordt in het bericht weggelaten in plaats van als nul te worden weergegeven/,
   de: /Ein Abschnitt, den wir nicht lesen konnten, wird in der Nachricht weggelassen, statt als Null dargestellt zu werden/,
   he: /סעיף שלא הצלחנו לקרוא מושמט מהמייל ואינו מדווח כאפס/,
@@ -1853,6 +2030,7 @@ const EMAIL_NO_FAKE_ZERO: Record<string, RegExp> = {
   ja: /読み取れなかった項目は、ゼロとして記載するのではなくメールから省きます/,
 }
 const EMAIL_NO_TRACKING: Record<string, RegExp> = {
+  pl: /Nasze wiadomo[śs]ci nie zawieraj[ąa] piksela zg[łl]aszaj[ąa]cego otwarcie, nie [śs]ledzimy klikni[ęe][ćc]/,
   nl: /Onze berichten bevatten geen pixel die een opening meldt, wij volgen geen kliks/,
   de: /Unsere Nachrichten enthalten kein Pixel, das eine Öffnung meldet, wir verfolgen keine Klicks/,
   he: /אין בהודעות שלנו פיקסל שמדווח על פתיחה, איננו\s*עוקבים אחרי לחיצות/,
@@ -1898,7 +2076,7 @@ const EMAIL_NO_TRACKING: Record<string, RegExp> = {
   for (const [name, doc] of [...privacyDocs, ...termsDocs]) {
     const monthly = EMAIL_NO_MONTHLY[name]
     if (!monthly || !doc) continue
-    const emailHalf = doc.split(/Email Messages|הודעות דוא|Mensajes de correo|Mensagens de e-mail|Messages de courrier [ée]lectronique|Messaggi di posta elettronica|メールでの連絡|15G\. メール/)[1] ?? ''
+    const emailHalf = doc.split(/Email Messages|הודעות דוא|Mensajes de correo|Mensagens de e-mail|Messages de courrier [ée]lectronique|Messaggi di posta elettronica|メールでの連絡|15G\. メール|15G\. E-maile|## E-maile/)[1] ?? ''
     const half = emailHalf.slice(0, 3000)
     check(`${name}: the email section no longer promises a monthly report`, !monthly.test(half))
   }
@@ -1964,6 +2142,7 @@ const EMAIL_NO_TRACKING: Record<string, RegExp> = {
 // policy that describes a mechanism that is not live yet is as wrong as one
 // that hides a mechanism that is.
 const PARTNER_FORM: Record<string, RegExp> = {
+  pl: /zg[łl]oszenie dociera do nas przez t[ęe] witryn[ęe], e-mailem albo przez formularz rejestracyjny/,
   nl: /de aanvraag bereikt ons via deze website, per e-mail of via het aanmeldingsformulier/,
   de: /der Antrag erreicht uns über diese Website, per E-Mail oder über das Bewerbungsformular/,
   he: /הבקשה מגיעה אלינו מהאתר[\s\S]{0,20}ל או בטופס ההרשמה/,
@@ -1977,6 +2156,7 @@ const PARTNER_FORM: Record<string, RegExp> = {
 // And the IP is taken only on the form path, so the sentence that discloses it
 // has to say so.
 const PARTNER_IP_ON_FORM: Record<string, RegExp> = {
+  pl: /Je[śs]li zg[łl]oszenie przychodzi przez formularz, zapisujemy dodatkowo adres IP/,
   nl: /Komt de aanvraag via het formulier, dan leggen wij daarnaast het IP-adres vast/,
   de: /Kommt der Antrag über das Formular, erfassen wir außerdem die IP-Adresse/,
   he: /כשהבקשה מגיעה בטופס נרשמת גם כתובת ה-IP/,
@@ -1988,6 +2168,7 @@ const PARTNER_IP_ON_FORM: Record<string, RegExp> = {
   ja: /フォームから申し込みが届いた場合は、送信された IP アドレスも記録します/,
 }
 const PARTNER_IP_PURPOSE: Record<string, RegExp> = {
+  pl: /[żz]eby rozpozna[ćc] fal[ęe] fa[łl]szywych zg[łl]osze[nń] od prawdziwej agencji i [żz]eby z tego samego adresu dopuszcza[ćc] trzy zg[łl]oszenia na godzin[ęe]/,
   nl: /een golf valse aanvragen van een echt bureau kunnen onderscheiden en van hetzelfde adres drie aanvragen per uur toelaten/,
   de: /eine Welle gefälschter Anträge von einer echten Agentur zu unterscheiden und von derselben Adresse drei Anträge in der Stunde zuzulassen/,
   he: /לזהות גל של בקשות מזויפות,\s*ולהגביל שלוש בקשות לשעה מאותה כתובת/,
@@ -1999,6 +2180,7 @@ const PARTNER_IP_PURPOSE: Record<string, RegExp> = {
   ja: /偽装された申し込みの波を本物の事業者と区別すること、そして同じアドレスからの申し込みを一時間に三件までに制限すること/,
 }
 const PARTNER_IP_RETENTION: Record<string, RegExp> = {
+  pl: /Zg[łl]oszenie odrzucone jest po dwunastu miesi[ąa]cach usuwane w ca[łl]o[śs]ci/,
   nl: /Een afgewezen aanvraag wordt na twaalf maanden volledig verwijderd/,
   de: /Ein abgelehnter Antrag wird nach 12 Monaten vollständig gelöscht/,
   he: /בקשה שנדחתה נמחקת כולה כעבור 12\s*חודשים/,
@@ -2011,6 +2193,7 @@ const PARTNER_IP_RETENTION: Record<string, RegExp> = {
 }
 /* A click is a number. The four nothings are the whole point of the sentence. */
 const PARTNER_CLICK_COUNT: Record<string, RegExp> = {
+  pl: /jeden wi[ęe]cej w dziennej sumie tego partnera/,
   nl: /[ée][ée]n meer in het dagtotaal van die partner/,
   de: /eins mehr in der Tagessumme dieses Partners/,
   he: /אחד למונה היומי של אותו\s*שותף/,
@@ -2022,6 +2205,7 @@ const PARTNER_CLICK_COUNT: Record<string, RegExp> = {
   ja: /そのパートナーの一日の合計に一つ加えるだけで、記録はそれだけです/,
 }
 const PARTNER_CLICK_NOTHING: Record<string, RegExp> = {
+  pl: /bez adresu IP, bez przegl[ąa]darki, bez witryny, z kt[óo]rej Pa[nń]stwo przyszli, i bez [żz]adnego kodu wyr[óo][żz]niaj[ąa]cego/,
   nl: /zonder IP-adres, zonder browser, zonder de website waarvandaan u kwam en zonder enige kenmerkende code/,
   de: /ohne IP-Adresse, ohne Browser, ohne die Website, von der Sie kamen, und ohne jede Kennung/,
   he: /בלי כתובת IP, בלי סוג דפדפן, בלי האתר שממנו הגעת ובלי\s*מזהה כלשהו/,
@@ -2033,6 +2217,7 @@ const PARTNER_CLICK_NOTHING: Record<string, RegExp> = {
   ja: /IP アドレスも、ブラウザーも、流入元のサイトも、いかなる識別子もありません/,
 }
 const PARTNER_REVIEW_FLAG: Record<string, RegExp> = {
+  pl: /To oznaczenie wymaga, [żz]eby cz[łl]owiek oceni[łl], zanim prowizja zostanie zatwierdzona; samo niczego nie blokuje/,
   nl: /Die aanmerking verlangt dat een mens beoordeelt voordat een commissie wordt goedgekeurd; zij blokkeert zelf niets/,
   de: /Diese Markierung verlangt, dass ein Mensch prüft, bevor eine Provision genehmigt wird; sie allein blockiert nichts/,
   he: /סימון כזה מבקש מאדם להסתכל לפני אישור עמלה, ואינו חוסם\s*דבר מעצמו/,
@@ -2044,6 +2229,7 @@ const PARTNER_REVIEW_FLAG: Record<string, RegExp> = {
   ja: /その印は、報酬を承認する前に人が確認することを求めるものであり、それ自体が何かを止めるものではありません/,
 }
 const PARTNER_SHOPIFY: Record<string, RegExp> = {
+  pl: /Klient rozliczany przez Shopify nie daje prowizji automatycznej/,
   nl: /Een via Shopify afgerekende klant levert geen automatische commissie op/,
   de: /Ein über Shopify abgerechneter Kunde erzeugt keine automatische Provision/,
   he: /לקוח שמחויב דרך Shopify אינו מייצר עמלה אוטומטית/,
@@ -2056,6 +2242,7 @@ const PARTNER_SHOPIFY: Record<string, RegExp> = {
 }
 /* The sentence the policy may no longer carry: the three things now exist. */
 const PARTNER_NOT_BUILT: Record<string, RegExp> = {
+  pl: /nie (?:zosta[łl]y|s[ąa]) jeszcze zbudowane|jeszcze nie zbudowano/,
   nl: /zijn nog niet gebouwd/,
   de: /sind noch nicht gebaut worden/,
   he: /עדיין לא\s*נבנו מעקב הפניות/,
@@ -2068,6 +2255,7 @@ const PARTNER_NOT_BUILT: Record<string, RegExp> = {
 }
 /* In the AGREEMENT: how a Shopify referral is recorded, and what suspension does not stop. */
 const AGREEMENT_SHOPIFY_MANUAL: Record<string, RegExp> = {
+  pl: /Klienta rozliczanego przez Shopify zapisujemy r[ęe]cznie/,
   nl: /Een via Shopify afgerekende klant wordt met de hand vastgelegd/,
   de: /Ein über Shopify abgerechneter Kunde wird von Hand erfasst/,
   he: /לקוח שמחויב דרך Shopify נרשם ידנית/,
@@ -2079,6 +2267,7 @@ const AGREEMENT_SHOPIFY_MANUAL: Record<string, RegExp> = {
   ja: /Shopify 経由で請求されるお客様は手作業で記録します/,
 }
 const AGREEMENT_LINK_LIVES: Record<string, RegExp> = {
+  pl: /opublikowany przez Pa[nń]stwa link dalej prowadzi na nasz[ąa] witryn[ęe], a klikni[ęe]cia tego linku s[ąa] dalej liczone/,
   nl: /leidt de door u gepubliceerde link verder naar onze website, en worden de kliks op die link verder geteld/,
   de: /führt der von Ihnen veröffentlichte Link weiter zu unserer Website, und die Klicks auf diesen Link werden weiter gezählt/,
   he: /הקישור שפרסמת ממשיך להוביל לאתר שלנו והקליקים עליו ממשיכים\s*להיספר/,
@@ -2091,6 +2280,7 @@ const AGREEMENT_LINK_LIVES: Record<string, RegExp> = {
 }
 /* And the claim it replaced may not come back: it was never true of the code. */
 const AGREEMENT_LINK_DIES: Record<string, RegExp> = {
+  pl: /Pa[nń]stwa link polecaj[ąa]cy (?:przestaje dzia[łl]a[ćc]|ju[żz] nie dzia[łl]a)/,
   nl: /uw aanbevelingslink (?:stopt met werken|werkt niet meer)/,
   de: /Ihr Empfehlungslink (?:hört auf zu funktionieren|funktioniert nicht mehr)/,
   he: /קישור ההפניה שלך מפסיק לעבוד/,
@@ -2270,6 +2460,7 @@ console.log('\nmutation controls')
  * broader collection for both.
  */
 const PLUGIN_DOES: Record<string, RegExp[]> = {
+  pl: [/Artyku[łl]y, kt[óo]re Pa[nń]stwo publikuj[ąa]/, /biblioteki medi[óo]w|bibliotece medi[óo]w/, /wy[łl][ąa]cznie z naszego adresu magazynu/, /wyniki wyszukania s[łl]owa w opublikowanych wpisach i stronach/, /dwa sposoby po[łl][ąa]czenia witryny WordPress/, /nie zostaje [żz]adne Pa[nń]stwa has[łl]o/, /Sama publikacja zapisuje ponadto tytu[łl] SEO, meta description, s[łl]owo kluczowe g[łl][óo]wne/, /Od wersji 3\.1\.0 wtyczki ju[żz] do niczego/, /Na witrynie z wcze[śs]niejsz[ąa] wersj[ąa] wtyczki/, /list[ęe] opublikowanych wpis[óo]w i stron witryny/, /kod i wy[śs]wietlan[ąa] nazw[ęe] ka[żz]dego u[żz]ytkownika, kt[óo]ry mo[żz]e publikowa[ćc] wpisy/, /Nie otrzymujemy ich adres[óo]w e-mail/, /wtyczka zapisuje j[ąa] przy samym obrazie w bibliotece medi[óo]w/, /ani wpisu nale[żz][ąa]cego do innego artyku[łl]u/, /Ten wpis jest zawsze wpisem, kt[óo]ry GO TOP sam opublikowa[łl]/, /Jest jeden przypadek, w kt[óo]rym has[łl]o aplikacji przechowane z wcze[śs]niejszego po[łl][ąa]czenia jest dalej u[żz]ywane/],
   nl: [/De artikelen die u publiceert/, /mediabibliotheek/, /alleen van ons opslagadres aan/, /de resultaten van een in de gepubliceerde berichten en pagina's gezocht woord/, /twee manieren om een WordPress-website te verbinden/, /blijft geen wachtwoord van u achter/, /De publicatie zelf schrijft daarnaast de SEO-titel, de meta description, het focuszoekwoord/, /Sinds versie 3\.1\.0 van de plug-in voor niets meer/, /Op een website met een eerdere versie van de plug-in/, /de lijst met gepubliceerde berichten en pagina's van de website/, /de code en de weergegeven naam terug van elke gebruiker die berichten mag publiceren/, /Wij ontvangen niet hun e-mailadres/, /dan schrijft de plug-in die bij de afbeelding zelf in de mediabibliotheek/, /voor een bericht dat bij een ander artikel hoort/, /Dat bericht is altijd een bericht dat GO TOP zelf heeft gepubliceerd/, /Er is [ée][ée]n geval waarin een van een eerdere verbinding bewaard toepassingswachtwoord verder wordt gebruikt terwijl de plug-in is ge[ïi]nstalleerd/],
   de: [
     /Die Artikel, die Sie veröffentlichen/,
@@ -2496,6 +2687,7 @@ const PLUGIN_DOES: Record<string, RegExp[]> = {
  * say so rather than leave the merchant to discover it.
  */
 const NO_DOUBLE_BILLING: Record<string, RegExp[]> = {
+  pl: [/Dop[óo]ki aplikacja jest zainstalowana w po[łl][ąa]czonym sklepie, nie mo[żz]na kupi[ćc] ani zmieni[ćc] pakietu przez PayPal/, /p[łl]atno[śs][ćc] przez PayPal jest zn[óo]w dost[ęe]pna/, /pakiet kupiony na witrynie trwa do ko[nń]ca tego okresu/, /ko[nń]czymy automatyczne odnowienie w PayPal/, /tak[żz]e ten okres zostaje wykonany w ca[łl]o[śs]ci/, /Okresu ju[żz] op[łl]aconego nie zwracamy, a dost[ęe]pu nie ko[nń]czymy przed jego ko[nń]cem/, /pakiet p[łl]atny wymaga wybrania pakietu w Shopify/, /Shopify Pa[nń]stwa za to rozliczy/],
   nl: [/Zolang de app in de verbonden winkel is ge[ïi]nstalleerd, kan met PayPal geen pakket worden gekocht of gewisseld/, /is de betaling via PayPal weer beschikbaar/, /dan loopt het op de website gekochte pakket tot het einde van die periode door/, /be[ëe]indigen wij de automatische verlenging bij PayPal/, /wordt ook die periode volledig nagekomen/, /Een al betaalde periode wordt niet terugbetaald, en de toegang wordt niet voor het einde daarvan be[ëe]indigd/, /veronderstelt een betaald pakket dat u in Shopify een pakket kiest/, /dan rekent Shopify dat aan u af/],
   de: [
     /Solange die App im verbundenen Shop installiert ist, lässt sich mit PayPal kein Tarif kaufen oder wechseln/,
@@ -2635,6 +2827,7 @@ const NO_DOUBLE_BILLING_NAMES = [
  * it is limited to our own articles — three separate promises per language.
  */
 const SEO_COMPLETION: Record<string, RegExp[]> = {
+  pl: [/mo[żz]emy brakuj[ąa]ce pole uzupe[łl]ni[ćc] p[óo][źz]niej dok[łl]adnie w tym artykule/, /nigdy nie zast[ęe]puje istniej[ąa]cej warto[śs]ci/, /obowi[ąa]zuje tylko dla artyku[łl][óo]w, kt[óo]re us[łl]uga sama opublikowa[łl]a/],
   nl: [/kunnen wij het ontbrekende veld later bij precies dat artikel aanvullen/, /vervangt nooit een bestaande waarde/, /geldt alleen voor artikelen die de dienst zelf heeft gepubliceerd/],
   de: [/können wir das fehlende Feld später bei genau diesem Artikel ergänzen/, /ersetzt niemals einen vorhandenen Wert/, /gilt allein für Artikel, die der Dienst selbst veröffentlicht hat/],
   he: [/נוכל להשלים לאחר מכן את השדה החסר/, /לעולם אינה מחליפה ערך קיים/, /וחלה רק על מאמרים שהשירות עצמו פרסם/],
@@ -2686,6 +2879,7 @@ const SEO_COMPLETION_NAMES = ['a missing SEO field may be completed later', 'an 
  * the thread that built it.
  */
 const CREEM_SHARED: Record<string, RegExp> = {
+  pl: /\*\*Creem:\*\* do obs[łl]ugi p[łl]atno[śs]ci, gdy p[łl]atno[śs][ćc] konta idzie przez Creem/,
   nl: /\*\*Creem:\*\* voor het afhandelen van de betalingen, wanneer de betaling van een account via Creem loopt/,
   de: /\*\*Creem:\*\* zur Abwicklung der Zahlungen, wenn die Zahlung eines Kontos über Creem läuft/,
   he: /Creem:<\/strong> לעיבוד תשלומים, כאשר התשלום של החשבון עובר דרכו/,
@@ -2697,6 +2891,7 @@ const CREEM_SHARED: Record<string, RegExp> = {
   ja: /\*\*Creem：\*\* アカウントのお支払いが Creem を経由する場合のお支払いの処理のため/,
 }
 const CREEM_NO_CARD: Record<string, RegExp> = {
+  pl: /Dane karty ani [żz]adnego innego sposobu p[łl]atno[śs]ci w [żz]adnym momencie do nas nie docieraj[ąa]/,
   nl: /De gegevens van de kaart en van elke andere betaalwijze bereiken ons op geen enkel moment/,
   de: /Die Daten der Karte und jedes anderen Zahlungswegs erreichen uns zu keinem Zeitpunkt/,
   he: /פרטי כרטיס,\s+וכל אמצעי תשלום אחר, אינם מגיעים אלינו בשום שלב/,
@@ -2708,6 +2903,7 @@ const CREEM_NO_CARD: Record<string, RegExp> = {
   ja: /カードのデータ、その他いかなるお支払い手段のデータも、いかなる時点においても当社に届くことはありません/,
 }
 const CREEM_EMAIL: Record<string, RegExp> = {
+  pl: /adres e-mail konta/,
   nl: /het e-mailadres van het account/,
   de: /die E-Mail-Adresse des Kontos/,
   he: /כתובת הדוא&rdquo;ל של החשבון/,
@@ -2773,6 +2969,7 @@ const CREEM_EMAIL: Record<string, RegExp> = {
  * that implies the displayed price is the final one.
  */
 const MOR_SELLER: Record<string, RegExp> = {
+  pl: /Creem dzia[łl]a jako sprzedawca b[ęe]d[ąa]cy podatnikiem i umowny odsprzedawca/,
   nl: /Creem handelt als verkoper van record en contractuele doorverkoper/,
   de: /Creem handelt als registrierter Verkäufer und vertraglicher Weiterverkäufer/,
   he: /Creem פועלת כמוכר הרשום וכמשווק מחדש/,
@@ -2784,6 +2981,7 @@ const MOR_SELLER: Record<string, RegExp> = {
   ja: /Creem は登録販売者および契約上の再販事業者として、自らの名義でお客様との売買契約を締結します/,
 }
 const MOR_ENTITY: Record<string, RegExp> = {
+  pl: /Armitage Labs O[ÜU][\s\S]{0,80}16977866/,
   nl: /Armitage Labs O[ÜU][\s\S]{0,80}16977866/,
   de: /Armitage Labs OÜ[\s\S]{0,80}16977866/,
   he: /Armitage Labs O&Uuml;[\s\S]{0,60}16977866/,
@@ -2795,6 +2993,7 @@ const MOR_ENTITY: Record<string, RegExp> = {
   ja: /Armitage Labs OÜ[\s\S]{0,60}16977866/,
 }
 const MOR_INVOICE: Record<string, RegExp> = {
+  pl: /Creem wystawia faktur[ęe] w swoim imieniu/,
   nl: /Creem stelt de factuur in eigen naam op/,
   de: /Creem stellt die Rechnung in eigenem Namen aus/,
   he: /Creem מוציאה את החשבונית בשמה שלה/,
@@ -2806,6 +3005,7 @@ const MOR_INVOICE: Record<string, RegExp> = {
   ja: /Creem が自らの名義で請求書を発行します/,
 }
 const MOR_TAX: Record<string, RegExp> = {
+  pl: /Cena podana na stronie cennika tego podatku nie zawiera/,
   nl: /De prijs die op de prijspagina staat, bevat die belasting niet/,
   de: /Der auf der Preisseite genannte Preis enthält diese Steuer nicht/,
   he: /המחיר שמופיע[\s\S]{0,40}אינו כולל מס כזה/,
@@ -2817,6 +3017,7 @@ const MOR_TAX: Record<string, RegExp> = {
   ja: /料金ページに表示された価格はその税を含みません/,
 }
 const MOR_REFUND: Record<string, RegExp> = {
+  pl: /wykonuje wy[łl][ąa]cznie Creem[\s\S]{0,120}cz[ęe][śs]ci 7/,
   nl: /alleen door Creem uitgevoerd[\s\S]{0,120}onderdeel 7/,
   de: /allein von Creem ausgeführt[\s\S]{0,120}Abschnitt 7/,
   he: /מבוצעים על ידי Creem בלבד[\s\S]{0,80}סעיף 7/,
@@ -2828,6 +3029,7 @@ const MOR_REFUND: Record<string, RegExp> = {
   ja: /Creem のみが実行します[\s\S]{0,120}第7条|第7条[\s\S]{0,120}Creem のみが実行します/,
 }
 const MOR_SERVICE_OURS: Record<string, RegExp> = {
+  pl: /Creem nie bierze za to odpowiedzialno[śs]ci/,
   nl: /Creem neemt daarvoor geen verantwoordelijkheid/,
   de: /Creem übernimmt dafür keine Verantwortung/,
   he: /Creem אינה נוטלת אחריות על אלה/,
@@ -2839,6 +3041,7 @@ const MOR_SERVICE_OURS: Record<string, RegExp> = {
   ja: /Creem はこれらについて一切の責任を負いません/,
 }
 const MOR_BUYER_TERMS: Record<string, RegExp> = {
+  pl: /creem\.io\/buyer-terms/,
   nl: /creem\.io\/buyer-terms/,
   de: /creem\.io\/buyer-terms/,
   he: /creem\.io\/buyer-terms/,
@@ -2896,6 +3099,7 @@ const MOR_BUYER_TERMS: Record<string, RegExp> = {
  * the same split, guarded in pricing-page.qa.ts section F.
  */
 const PRICE_VAT_ILS: Record<string, RegExp> = {
+  pl: /Cena podana w szeklach zawiera izraelski podatek od towar[óo]w i us[łl]ug/,
   nl: /Een in sjekel opgegeven prijs bevat de Isra[ëe]lische btw/,
   de: /Ein in Schekel angegebener Preis enthält die israelische Mehrwertsteuer/,
   he: /מחיר הנקוב בשקלים כולל מע&rdquo;מ כדין בישראל/,
@@ -2907,6 +3111,7 @@ const PRICE_VAT_ILS: Record<string, RegExp> = {
   ja: /シェケル建てで表示された料金は、法令に従いイスラエルの付加価値税を含み/,
 }
 const PRICE_TAX_USD: Record<string, RegExp> = {
+  pl: /Cena podana w dolarach nie zawiera podatku po[śs]redniego/,
   nl: /Een in dollars opgegeven prijs bevat de indirecte belasting niet/,
   de: /Ein in Dollar angegebener Preis enthält die indirekte Steuer nicht/,
   he: /מחיר הנקוב בדולרים אינו כולל מס עקיף/,
@@ -2963,6 +3168,7 @@ const PRICE_TAX_USD: Record<string, RegExp> = {
  * is the thing standing between those two facts.
  */
 const PDFSHIFT_DPA: Record<string, RegExp> = {
+  pl: /umow[ęe] powierzenia przetwarzania zgodnie z art\. 28/,
   nl: /verwerkersovereenkomst volgens artikel 28/,
   de: /Vertrag über die Auftragsverarbeitung nach Artikel 28/,
   he: /הסכם עיבוד נתונים לפי סעיף 28/,
@@ -2974,6 +3180,7 @@ const PDFSHIFT_DPA: Record<string, RegExp> = {
   ja: /PDFShift とは GDPR 第28条に基づくデータ処理の取り決めを結んでいます/,
 }
 const PDFSHIFT_NO_RETENTION: Record<string, RegExp> = {
+  pl: /wy[łl][ąa]cznie w pami[ęe]ci na czas zamiany i potem nie jest przechowywana/,
   nl: /alleen voor de duur van de omzetting in het geheugen verwerkt en daarna niet bewaard/,
   de: /allein für die Dauer der Umwandlung im Speicher verarbeitet und danach nicht aufbewahrt/,
   he: /מעובד\s+בזיכרון למשך ההמרה בלבד ואינו נשמר אצלם לאחריה/,
@@ -2985,6 +3192,7 @@ const PDFSHIFT_NO_RETENTION: Record<string, RegExp> = {
   ja: /変換のあいだだけメモリ上で処理され、その後は保存されません/,
 }
 const PDFSHIFT_STORAGE_DECLINED: Record<string, RegExp> = {
+  pl: /dobrowolne przechowywanie utworzonego pliku, a my o to nie prosimy/,
   nl: /vrijwillig bewaren van het gemaakte bestand aan, en wij vragen dat niet/,
   de: /freiwillige Aufbewahrung der erzeugten Datei an, und wir verlangen sie nicht/,
   he: /שמירה אופציונלית של הקובץ שנוצר,\s+ואנחנו לא מבקשים אותה/,
@@ -3069,6 +3277,7 @@ const PDFSHIFT_STORAGE_DECLINED: Record<string, RegExp> = {
  * checks still catch a broken claim once the files exist.
  */
 const REVIEWS_NO_STORAGE: Record<string, RegExp> = {
+  pl: /Nie przechowujemy tre[śs]ci opinii/,
   nl: /Wij bewaren geen inhoud van een beoordeling/,
   de: /Wir bewahren keinen Inhalt einer Bewertung auf/,
   he: /איננו שומרים אצלנו שום תוכן של ביקורת/,
@@ -3080,6 +3289,7 @@ const REVIEWS_NO_STORAGE: Record<string, RegExp> = {
   ja: /レビューの内容は一切保管しません/,
 }
 const REPLY_IS_PUBLIC: Record<string, RegExp> = {
+  pl: /i jest publiczna: pojawia si[ęe] w profilu Pa[nń]stwa firmy u Google, i ka[żz]dy mo[żz]e j[ąa] zobaczy[ćc]/,
   nl: /en het is openbaar: het verschijnt in het profiel van uw bedrijf bij Google, en iedereen kan het zien/,
   de: /und sie ist öffentlich: sie erscheint im Profil Ihres Unternehmens bei Google, und jeder kann sie sehen/,
   he: /והוא פומבי: הוא מופיע בכרטיס העסק שלך בגוגל וכל אדם יכול לראות אותו/,
@@ -3091,6 +3301,7 @@ const REPLY_IS_PUBLIC: Record<string, RegExp> = {
   ja: /Google 上のお客様の事業のプロフィールに表示され、誰でも見ることができます/,
 }
 const GOOGLE_MAY_REMOVE: Record<string, RegExp> = {
+  pl: /mo[żz]e odpowied[źz] na podstawie (?:tych zasad|w[łl]asnych zasad tre[śs]ci) usun[ąa][ćc]/,
   nl: /kan een antwoord op grond van (?:dat beleid|zijn eigen contentbeleid) weghalen/,
   de: /kann eine Antwort nach (?:seinen eigenen Inhaltsrichtlinien|diesen Richtlinien) entfernen/,
   he: /עשויה להסיר מענה לפי מדיניות התוכן שלה/,
@@ -3102,6 +3313,7 @@ const GOOGLE_MAY_REMOVE: Record<string, RegExp> = {
   ja: /Google が自らのコンテンツポリシーに従って返信を削除することがあり/,
 }
 const NAME_NOT_SENT: Record<string, RegExp> = {
+  pl: /bez nazwy autora/,
   nl: /zonder de naam van de schrijver/,
   de: /ohne den Namen des Verfassers/,
   he: /בלי שם המבקר/,
@@ -3139,6 +3351,7 @@ const NO_LONGER_TRUE = /we do not read or reply to reviews|ואיננו\s+קור
     fr: /Vous [êe]tes responsable du contenu de la r[ée]ponse/,
     it: /Lei [èe] responsabile del contenuto della risposta/,
   nl: /U bent verantwoordelijk voor de inhoud van het antwoord/,
+    pl: /Pa[nń]stwo odpowiadaj[ąa] za tre[śs][ćc] odpowiedzi/,
     de: /Sie sind für den Inhalt der Antwort verantwortlich/,
     ja: /返信の内容についてはお客様が責任を負います/,
   }
@@ -3240,6 +3453,7 @@ const NO_LONGER_TRUE = /we do not read or reply to reviews|ואיננו\s+קור
  * It stays out of the checks below: no sentence we publish depends on it.
  */
 const AUTO_POST_OPT_IN: Record<string, RegExp> = {
+  pl: /domy[śs]lnie wy[łl][ąa]czone/,
   nl: /standaard uit/,
   de: /standardmäßig ausgeschaltet/,
   he: /ברירת המחדל היא כבוי/,
@@ -3251,6 +3465,7 @@ const AUTO_POST_OPT_IN: Record<string, RegExp> = {
   ja: /既定では無効です/,
 }
 const AUTO_POST_NO_READ: Record<string, RegExp> = {
+  pl: /bez tego, [żz]eby Pa[nń]stwo go wcze[śs]niej przeczytali/,
   nl: /zonder dat u het eerst leest/,
   de: /ohne dass Sie ihn vorher lesen/,
   he: /בלי שתקרא אותו לפני הפרסום/,
@@ -3262,6 +3477,7 @@ const AUTO_POST_NO_READ: Record<string, RegExp> = {
   ja: /お客様が事前に読むことなく|お客様が事前にお読みになることなく/,
 }
 const AUTO_POST_NO_PERSON: Record<string, RegExp> = {
+  pl: /bez imienia i nazwiska [żz]adnej osoby/,
   nl: /zonder de naam van een persoon/,
   de: /ohne den Namen einer Person/,
   he: /בלי שום שם של אדם/,
@@ -3283,6 +3499,7 @@ const AUTO_POST_NO_PERSON: Record<string, RegExp> = {
  * thing. The two code checks below are what stops it drifting back.
  */
 const AUTO_POST_LANGUAGE: Record<string, RegExp> = {
+  pl: /Publikacja automatyczna jest pisana w j[ęe]zyku projektu/,
   nl: /Een automatische publicatie wordt in de taal van het project geschreven/,
   de: /Eine automatische Veröffentlichung wird in der Sprache des Projekts geschrieben/,
   he: /פוסט אוטומטי נכתב בשפת הפרויקט/,
@@ -3294,6 +3511,7 @@ const AUTO_POST_LANGUAGE: Record<string, RegExp> = {
   ja: /自動公開の文面はプロジェクトの言語で書かれます/,
 }
 const AUTO_POST_SELF_OFF: Record<string, RegExp> = {
+  pl: /wy[łl][ąa]cza si[ęe] sama, gdy Pa[nń]stwo zmieni[ąa] firm[ęe]/,
   nl: /het zet zichzelf uit wanneer u het bedrijf wisselt/,
   de: /sie schaltet sich selbst ab, wenn Sie das Unternehmen wechseln/,
   he: /נכבית מעצמה אם החלפת/,
@@ -3332,6 +3550,7 @@ const AUTO_POST_NO_LONGER_TRUE = /we create a post only when you press publish|�
     fr: /Vous [êe]tes responsable du contenu publi[ée] en votre nom/,
     it: /Lei [èe] responsabile del contenuto pubblicato a Suo nome/,
   nl: /U bent verantwoordelijk voor de content die in uw naam wordt gepubliceerd/,
+    pl: /Pa[nń]stwo odpowiadaj[ąa] za tre[śs][ćc] publikowan[ąa] w Pa[nń]stwa imieniu/,
     de: /Sie sind für den in Ihrem Namen veröffentlichten Inhalt verantwortlich/,
     ja: /お客様の名義で公開される内容についてはお客様が責任を負います/,
   }
@@ -3447,6 +3666,7 @@ const AUTO_POST_NO_LONGER_TRUE = /we create a post only when you press publish|�
  * periods and the two extra columns are checked separately.
  */
 const OUTREACH_CONTACT_NAME: Record<string, RegExp> = {
+  pl: /imi[ęe] i nazwisko osoby kontaktowej, gdy witryna publikuje je obok tego adresu/,
   nl: /de naam van de contactpersoon wanneer de website die naast dat adres publiceert/,
   de: /den Namen der Kontaktperson, wenn die Website ihn neben dieser Adresse veröffentlicht/,
   he: /שם איש הקשר כאשר האתר/,
@@ -3458,6 +3678,7 @@ const OUTREACH_CONTACT_NAME: Record<string, RegExp> = {
   ja: /サイトがそのアドレスの横に公開している場合は担当者の氏名/,
 }
 const OUTREACH_POSTAL: Record<string, RegExp> = {
+  pl: /adres pocztowy, kt[óo]ry firma publikuje/,
   nl: /het postadres dat het bedrijf publiceert/,
   de: /die Postadresse, die das Unternehmen veröffentlicht/,
   he: /כתובת הדואר שהעסק מפרסם/,
@@ -3469,6 +3690,7 @@ const OUTREACH_POSTAL: Record<string, RegExp> = {
   ja: /事業者が公開している所在地/,
 }
 const OUTREACH_PERSON_NARROW: Record<string, RegExp> = {
+  pl: /nie zbieramy o osobie niczego poza funkcj[ąa] zawodow[ąa], z kt[óo]r[ąa] zosta[łl]a opublikowana/,
   nl: /verzamelen over een persoon niets buiten de beroepsfunctie waarmee zij is gepubliceerd/,
   de: /erheben über eine Person nichts über die berufliche Funktion hinaus, mit der sie veröffentlicht ist/,
   he: /איננו אוספים על אדם שום דבר מעבר לתפקיד העסקי שבו הוא מפורסם/,
@@ -3480,6 +3702,7 @@ const OUTREACH_PERSON_NARROW: Record<string, RegExp> = {
   ja: /公開されている職務上の立場を超えて個人について取得することもなく/,
 }
 const OUTREACH_ERASE_30: Record<string, RegExp> = {
+  pl: /s[ąa] usuwane trzydzie[śs]ci dni po ostatniej wiadomo[śs]ci/,
   nl: /dertig dagen na het laatste bericht verwijderd/,
   de: /30 Tage nach der letzten Nachricht gelöscht/,
   he: /30 יום אחרי ההודעה האחרונה ששלחנו לה/,
@@ -3491,6 +3714,7 @@ const OUTREACH_ERASE_30: Record<string, RegExp> = {
   ja: /最後に送ったメールから30日後に削除します/,
 }
 const OUTREACH_DELETE_90: Record<string, RegExp> = {
+  pl: /jest dziewi[ęe][ćc]dziesi[ąa]t dni po utworzeniu usuwany w ca[łl]o[śs]ci/,
   nl: /wordt negentig dagen na het aanmaken daarvan volledig verwijderd/,
   de: /wird 90 Tage nach seiner Anlage vollständig gelöscht/,
   he: /נמחקת כולה 90 יום אחרי שנוספה/,
@@ -3659,6 +3883,7 @@ const OUTREACH_NO_LONGER_TRUE = /we\s+do not collect details about a private ind
  * no person's name — and nothing is stored before the merchant publishes.
  */
 const AI_PHOTO_NOT_YOUR_BUSINESS: Record<string, RegExp> = {
+  pl: /nie jest zdj[ęe]ciem Pa[nń]stwa firmy, Pa[nń]stwa lokalu, Pa[nń]stwa pracownik[óo]w ani rzeczywistego produktu Pa[nń]stwa/,
   nl: /geen foto van uw bedrijf, uw ruimten, uw personeel of een werkelijk product van u/,
   de: /keine Fotografie Ihres Unternehmens, Ihrer Räume, Ihres Personals oder eines wirklichen Produkts von Ihnen/,
   he: /ואינה צילום של העסק שלכם, של המקום, של העובדים\s*או של מוצר ממשי שלכם/,
@@ -3670,6 +3895,7 @@ const AI_PHOTO_NOT_YOUR_BUSINESS: Record<string, RegExp> = {
   ja: /お客様の事業、店舗、従業員、または実在するお客様の商品の写真ではありません/,
 }
 const AI_PHOTO_YOUR_RESPONSIBILITY: Record<string, RegExp> = {
+  pl: /Pa[nń]stwo odpowiadaj[ąa] za zdj[ęe]cie publikowane w Pa[nń]stwa imieniu/,
   nl: /U bent verantwoordelijk voor de foto die in uw naam wordt gepubliceerd/,
   de: /Sie sind für das in Ihrem Namen veröffentlichte Foto verantwortlich/,
   he: /האחריות לתמונה שמתפרסמת בשמכם היא\s*שלכם/,
@@ -3681,6 +3907,7 @@ const AI_PHOTO_YOUR_RESPONSIBILITY: Record<string, RegExp> = {
   ja: /お客様の名義で公開される写真についてはお客様が責任を負います/,
 }
 const AI_PHOTO_LISTING_RISK: Record<string, RegExp> = {
+  pl: /mo[żz]e sk[łl]oni[ćc] Google do usuni[ęe]cia tre[śs]ci albo ograniczenia profilu/,
   nl: /kan Google ertoe brengen de content weg te halen of het profiel te beperken/,
   de: /kann Google dazu bringen, den Inhalt zu entfernen oder das Profil einzuschränken/,
   he: /עלולה להביא להסרת התוכן או להגבלת הכרטיס בידי\s*Google/,
@@ -3692,6 +3919,7 @@ const AI_PHOTO_LISTING_RISK: Record<string, RegExp> = {
   ja: /Google によるコンテンツの削除や情報の制限につながることがあり/,
 }
 const AI_PHOTO_MARKERS: Record<string, RegExp> = {
+  pl: /SynthID i C2PA/,
   nl: /SynthID en C2PA/,
   de: /SynthID und C2PA/,
   he: /SynthID ו-C2PA/,
@@ -3703,6 +3931,7 @@ const AI_PHOTO_MARKERS: Record<string, RegExp> = {
   ja: /SynthID および C2PA/,
 }
 const AI_PHOTO_NO_BUSINESS_NAME: Record<string, RegExp> = {
+  pl: /bez nazwy firmy i bez imienia i nazwiska [żz]adnej osoby/,
   nl: /zonder de naam van het bedrijf en zonder de naam van enige persoon/,
   de: /ohne den Namen des Unternehmens und ohne den Namen irgendeiner Person/,
   he: /בלי שם העסק ובלי שם של אדם/,
@@ -3775,6 +4004,7 @@ const AI_PHOTO_NO_BUSINESS_NAME: Record<string, RegExp> = {
  * checks below also read app/go/[platform]/page.tsx once it exists.
  */
 const MARKETPLACE_SELLER: Record<string, RegExp> = {
+  pl: /sprzedawc[ąa] tego zakupu jest ten serwis/,
   nl: /is de verkoper van die aankoop die marktplaats/,
   de: /ist der Verkäufer dieses Kaufs dieser Marktplatz/,
   he: /המוכר של אותה\s*רכישה הוא אותה זירה/,
@@ -3786,6 +4016,7 @@ const MARKETPLACE_SELLER: Record<string, RegExp> = {
   ja: /その購入の販売者はそのマーケットプレイスです/,
 }
 const MARKETPLACE_THEIR_POLICY: Record<string, RegExp> = {
+  pl: /Jego polityka zwrot[óo]w obowi[ąa]zuje dla tego zakupu/,
   nl: /Haar beleid voor terugbetaling en retour geldt voor die aankoop/,
   de: /Seine Rückerstattungs- und Rückgaberichtlinie gilt für diesen Kauf/,
   he: /מדיניות ההחזרים וההחזרה שלה חלה על אותה רכישה/,
@@ -3797,6 +4028,7 @@ const MARKETPLACE_THEIR_POLICY: Record<string, RegExp> = {
   ja: /その購入には、そのマーケットプレイスの返金・返品ポリシーが適用されます/,
 }
 const MARKETPLACE_WIDER: Record<string, RegExp> = {
+  pl: /tak[żz]e gdy idzie dalej ni[żz] zasady zwrot[óo]w z cz[ęe][śs]ci 4 i 5/,
   nl: /ook als het verder reikt dan de regels over terugbetaling van de onderdelen 4 en 5/,
   de: /auch wenn sie weiter reicht als die Rückerstattungsregeln der Abschnitte 4 und 5/,
   he: /גם כשהיא רחבה\s*ממדיניות ההחזרים שבסעיף 4/,
@@ -3808,6 +4040,7 @@ const MARKETPLACE_WIDER: Record<string, RegExp> = {
   ja: /そのポリシーが第4条と第5条の定めより広い場合も同様で/,
 }
 const MARKETPLACE_NAMES_SELLER: Record<string, RegExp> = {
+  pl: /Strona, na kt[óo]rej Pa[nń]stwo kupili, podaje nazw[ęe] sprzedawcy i wskazuje jego polityk[ęe]/,
   nl: /De pagina waarop u hebt gekocht, noemt de naam van de verkoper en verwijst naar zijn beleid/,
   de: /Die Seite, auf der Sie gekauft haben, nennt den Namen des Verkäufers und verweist auf seine Richtlinie/,
   he: /בעמוד שבו רכשתם מופיע שם המוכר וקישור למדיניות שלו/,
@@ -3831,7 +4064,7 @@ const MARKETPLACE_NAMES_SELLER: Record<string, RegExp> = {
     check(`${name}/refund-policy: our section 4 is not presented as narrowing a wider policy`, MARKETPLACE_WIDER[name]!.test(refund))
     check(`${name}/refund-policy: the buyer is told where to find the seller and its policy`, MARKETPLACE_NAMES_SELLER[name]!.test(refund))
     check(`${name}/refund-policy: the owner's no-refund rule is still the rule for purchases from us`,
-      /(סעיף 4 חלה על|in section 4 applies to\s*purchases made from us|de la secci[óo]n 4 se aplica a las compras realizadas a nosotros|das se[çc][õo]es 4 e 5 se aplicam [àa]s compras feitas de n[óo]s|des sections 4 et 5 s'appliquent aux achats effectu[ée]s aupr[èe]s de nous|delle sezioni 4 e 5 si applicano agli acquisti effettuati presso di noi|der Abschnitte 4 und 5 gelten für Käufe bei uns|van de onderdelen 4 en 5 gelden voor aankopen bij ons|第4条と第5条の定めは、当社から直接ご購入いただいた場合に適用されます)/.test(refund))
+      /(סעיף 4 חלה על|in section 4 applies to\s*purchases made from us|de la secci[óo]n 4 se aplica a las compras realizadas a nosotros|das se[çc][õo]es 4 e 5 se aplicam [àa]s compras feitas de n[óo]s|des sections 4 et 5 s'appliquent aux achats effectu[ée]s aupr[èe]s de nous|delle sezioni 4 e 5 si applicano agli acquisti effettuati presso di noi|der Abschnitte 4 und 5 gelten für Käufe bei uns|van de onderdelen 4 en 5 gelden voor aankopen bij ons|cz[ęe][śs]ci 4 i 5 obowi[ąa]zuj[ąa] dla zakup[óo]w u nas|第4条と第5条の定めは、当社から直接ご購入いただいた場合に適用されます)/.test(refund))
   }
   // Claim 4 is a promise about the sales page. Once that page exists it has to keep it.
   const salesPage = read('app/go/[platform]/page.tsx')
@@ -3883,6 +4116,7 @@ const MARKETPLACE_NAMES_SELLER: Record<string, RegExp> = {
  * edit cannot quietly delete the account-settings route for everyone.
  */
 const BILLED_ELSEWHERE_NOT_SETTINGS: Record<string, RegExp> = {
+  pl: /odnowienie wypowiada si[ęe] u tej firmy, a nie w ustawieniach Pa[nń]stwa konta/,
   nl: /wordt de verlenging bij dat bedrijf opgezegd en niet in de instellingen van uw account/,
   de: /wird die Verlängerung bei diesem Unternehmen gekündigt und nicht in den Einstellungen Ihres Kontos/,
   he: /חידוש המנוי מבוטל אצל אותה חברה ולא\s*דרך הגדרות החשבון/,
@@ -3902,6 +4136,7 @@ const BILLED_ELSEWHERE_NOT_SETTINGS: Record<string, RegExp> = {
 // and the check below fails if the confirmation sentence returns in any language
 // without something to send it.
 const BILLED_ELSEWHERE_WE_PASS_ON: Record<string, RegExp> = {
+  pl: /przeka[żz]emy j[ąa] tej firmie, ale zako[nń]czenie pobrania/,
   nl: /dan geven wij die aan dat bedrijf door, maar het be[ëe]indigen van de afschrijving/,
   de: /so leiten wir sie an dieses Unternehmen weiter, aber das Beenden der Abbuchung/,
   he: /נעביר אותה לאותה חברה, אך עצירת החיוב/,
@@ -3913,6 +4148,7 @@ const BILLED_ELSEWHERE_WE_PASS_ON: Record<string, RegExp> = {
   ja: /当社はその会社に取り次ぎますが/,
 }
 const BILLED_ELSEWHERE_NOT_OUR_CHARGE: Record<string, RegExp> = {
+  pl: /zako[nń]czenie pobrania jest czynno[śs]ci[ąa] tej firmy, a nie nasz[ąa]/,
   nl: /het be[ëe]indigen van de afschrijving is de handeling van dat bedrijf en niet de onze/,
   de: /das Beenden der Abbuchung ist die Handlung dieses Unternehmens und nicht unsere/,
   he: /עצירת החיוב\s*עצמו נעשית בידי אותה חברה ולא בידינו/,
@@ -3924,6 +4160,7 @@ const BILLED_ELSEWHERE_NOT_OUR_CHARGE: Record<string, RegExp> = {
   ja: /請求を停止するのはその会社であって当社ではなく/,
 }
 const BILLED_ELSEWHERE_NO_REFUND_FOR_THEM: Record<string, RegExp> = {
+  pl: /nie zwracamy pieni[ęe]dzy w jej imieniu/,
   nl: /wij betalen niet in zijn naam terug/,
   de: /wir erstatten nicht in seinem Namen/,
   he: /ואיננו מוציאים החזר בשמה/,
@@ -3935,6 +4172,7 @@ const BILLED_ELSEWHERE_NO_REFUND_FOR_THEM: Record<string, RegExp> = {
   ja: /当社がその会社の名義で返金を行うことはありません/,
 }
 const BILLED_ELSEWHERE_ACCESS_KEPT: Record<string, RegExp> = {
+  pl: /dost[ęe]p do us[łl]ugi zostaje do ko[nń]ca ju[żz] op[łl]aconego okresu rozliczeniowego/,
   nl: /blijft de toegang tot de dienst bestaan tot het einde van de al betaalde factureringsperiode/,
   de: /bleibt der Zugang zum Dienst bis zum Ende des schon bezahlten Abrechnungszeitraums bestehen/,
   he: /הגישה למערכת נשמרת עד תום תקופת החיוב\s*ששולמה/,
@@ -3947,6 +4185,7 @@ const BILLED_ELSEWHERE_ACCESS_KEPT: Record<string, RegExp> = {
 }
 // Section 6 must keep the account-settings route for a subscription WE bill.
 const OWN_BILLING_STILL_SETTINGS: Record<string, RegExp> = {
+  pl: /Odnowienie abonamentu mo[żz]na wypowiedzie[ćc] w ka[żz]dej chwili w ustawieniach konta/,
   nl: /U kunt de verlenging van uw abonnement op elk moment opzeggen in de instellingen van uw account/,
   de: /Sie können die Verlängerung Ihres Abonnements jederzeit in den Einstellungen Ihres Kontos kündigen/,
   he: /רשאי לבטל את חידוש המנוי בכל עת דרך הגדרות החשבון/,
@@ -3973,7 +4212,7 @@ const OWN_BILLING_STILL_SETTINGS: Record<string, RegExp> = {
       !/(ונאשר בכתב|confirm in writing|confirmaremos por escrito|confirmamos por escrito|nous (le )?confirmerons par [ée]crit|lo confermeremo per iscritto|書面で(ご)?確認いたします|書面でお知らせします)/.test(terms))
     check(`${name}/terms: no refund is promised on another company's behalf`, BILLED_ELSEWHERE_NO_REFUND_FOR_THEM[name]!.test(terms))
     check(`${name}/terms: access still runs to the end of the period already paid for`, BILLED_ELSEWHERE_ACCESS_KEPT[name]!.test(terms))
-    check(`${name}/terms: all three billing companies are named`, /Shopify/.test(terms) && /Creem/.test(terms) && /(זירת מכירות|mercado externo|marketplace externo|external marketplace|place de march[ée] externe|marketplace esterno|externen Marktplatz|externe marktplaats|外部マーケットプレイス)/.test(terms))
+    check(`${name}/terms: all three billing companies are named`, /Shopify/.test(terms) && /Creem/.test(terms) && /(זירת מכירות|mercado externo|marketplace externo|external marketplace|place de march[ée] externe|marketplace esterno|externen Marktplatz|externe marktplaats|zewnętrzny serwis sprzedaży|外部マーケットプレイス)/.test(terms))
     check(`${name}/terms: section 6 still gives the account-settings route for a subscription we bill`, OWN_BILLING_STILL_SETTINGS[name]!.test(terms))
   }
   // The billing screen is the other half of this promise: it must not tell a buyer
@@ -4019,6 +4258,7 @@ const OWN_BILLING_STILL_SETTINGS: Record<string, RegExp> = {
  * below as soon as the upload exists.
  */
 const PHOTO_CONSENT: Record<string, RegExp> = {
+  pl: /ta osoba zgodzi[łl]a si[ęe] na publikacj[ęe] zdj[ęe]cia na Pa[nń]stwa witrynie/,
   nl: /die persoon ermee heeft ingestemd dat de foto op uw website wordt gepubliceerd/,
   de: /diese Person eingewilligt hat, dass das Foto auf Ihrer Website veröffentlicht wird/,
   he: /\u05d0\u05d5\u05ea\u05d5 \u05d0\u05d3\u05dd \u05d4\u05e1\u05db\u05d9\u05dd \u05e9\u05d4\u05ea\u05de\u05d5\u05e0\u05d4 \u05ea\u05ea\u05e4\u05e8\u05e1\u05dd/,
@@ -4030,6 +4270,7 @@ const PHOTO_CONSENT: Record<string, RegExp> = {
   ja: /事業の宣伝のためにお客様のサイトで写真を公開することに同意している/,
 }
 const PHOTO_MINOR: Record<string, RegExp> = {
+  pl: /nieletnia, potrzebna jest zgoda jej przedstawiciela ustawowego/,
   nl: /minderjarig, dan is de instemming van zijn wettelijke vertegenwoordiger nodig/,
   de: /minderjährig, so ist die Einwilligung ihres gesetzlichen Vertreters erforderlich/,
   he: /\u05e7\u05d8\u05d9\u05df, \u05e0\u05d3\u05e8\u05e9\u05ea \u05d4\u05e1\u05db\u05de\u05ea \u05d4\u05d0\u05e4\u05d5\u05d8\u05e8\u05d5\u05e4\u05d5\u05e1/,
@@ -4041,6 +4282,7 @@ const PHOTO_MINOR: Record<string, RegExp> = {
   ja: /未成年者である場合は、その法定代理人の同意が必要です/,
 }
 const PHOTO_COPY_NOT_OURS: Record<string, RegExp> = {
+  pl: /kopia, kt[óo]ra stoi ju[żz] w bibliotece medi[óo]w Pa[nń]stwa witryny, jest pod Pa[nń]stwa kontrol[ąa]|Kopia, kt[óo]ra stoi ju[żz] na Pa[nń]stwa witrynie, nie jest pod nasz[ąa] kontrol[ąa]/,
   nl: /een kopie die al in de mediabibliotheek van uw website staat, valt onder uw zeggenschap|Een kopie die al op uw website staat, valt niet onder onze zeggenschap/,
   de: /eine Kopie, die schon in der Mediathek Ihrer Website liegt, steht unter Ihrer Kontrolle|Eine Kopie, die schon auf Ihrer Website liegt, steht nicht unter unserer Kontrolle/,
   he: /\u05e2\u05d5\u05ea\u05e7 \u05e9\u05db\u05d1\u05e8 \u05d4\u05d5\u05e2\u05ea\u05e7 \u05dc\u05e1\u05e4\u05e8\u05d9\u05d9\u05ea\s*\u05d4\u05de\u05d3\u05d9\u05d4 \u05e9\u05dc \u05d4\u05d0\u05ea\u05e8 \u05e9\u05dc\u05db\u05dd \u05e0\u05de\u05e6\u05d0 \u05d1\u05e9\u05dc\u05d9\u05d8\u05ea\u05db\u05dd/,
@@ -4052,6 +4294,7 @@ const PHOTO_COPY_NOT_OURS: Record<string, RegExp> = {
   ja: /すでにお客様のサイトのメディアライブラリに置かれた複製はお客様の管理のもとにあり/,
 }
 const PHOTO_PATH_NO_NAME: Record<string, RegExp> = {
+  pl: /sk[łl]ada si[ęe] z kodu projektu i kodu losowego, i nigdy z imienia ani nazwiska osoby/,
   nl: /bestaat uit de code van het project en een willekeurige code en nooit uit de naam van een persoon/,
   de: /aus der Kennung des Projekts und einer zufälligen Kennung zusammen und niemals aus dem Namen einer Person/,
   he: /\u05de\u05de\u05d6\u05d4\u05d4 \u05d4\u05e4\u05e8\u05d5\u05d9\u05e7\u05d8 \u05d5\u05de\u05de\u05d6\u05d4\u05d4 \u05d0\u05e7\u05e8\u05d0\u05d9/,
@@ -4063,6 +4306,7 @@ const PHOTO_PATH_NO_NAME: Record<string, RegExp> = {
   ja: /プロジェクトの識別子とランダムな識別子から作られ、個人の氏名は決して含みません/,
 }
 const PHOTO_NO_AI: Record<string, RegExp> = {
+  pl: /nie jest przesy[łl]ane do [żz]adnego dostawcy AI, nie jest u[żz]ywane do trenowania modeli/,
   nl: /wordt naar geen enkele AI-leverancier gestuurd, niet voor het trainen van modellen gebruikt/,
   de: /wird an keinen KI-Anbieter gesendet, nicht zum Training von Modellen verwendet/,
   he: /\u05d0\u05d9\u05e0\u05d4 \u05e0\u05e9\u05dc\u05d7\u05ea \u05dc\u05d0\u05e3 \u05e1\u05e4\u05e7 AI/,
@@ -4074,6 +4318,7 @@ const PHOTO_NO_AI: Record<string, RegExp> = {
   ja: /いかなる AI の提供事業者にも送らず、モデルの学習にも使わず/,
 }
 const PHOTO_NO_BIOMETRIC: Record<string, RegExp> = {
+  pl: /nie prowadzimy na nim rozpoznawania twarzy ani [żz]adnego innego przetwarzania biometrycznego/,
   nl: /voeren daarop geen gezichtsherkenning en geen andere biometrische verwerking uit/,
   de: /führen daran weder eine Gesichtserkennung noch eine andere biometrische Verarbeitung durch/,
   he: /\u05d6\u05d9\u05d4\u05d5\u05d9 \u05e4\u05e0\u05d9\u05dd \u05d0\u05d5 \u05db\u05dc \u05e2\u05d9\u05d1\u05d5\u05d3 \u05d1\u05d9\u05d5\u05de\u05d8\u05e8\u05d9 \u05d0\u05d7\u05e8/,
@@ -4100,6 +4345,7 @@ const PHOTO_NO_BIOMETRIC: Record<string, RegExp> = {
  * The last two checks in this section fail if either sentence comes back.
  */
 const PHOTO_DELETE_ERASES_FILE: Record<string, RegExp> = {
+  pl: /(?:wyjmuje plik z naszego magazynu|zabiera plik natychmiast)/,
   nl: /haalt het bestand (?:uit onze opslag|onmiddellijk weg)/,
   de: /entfernt die Datei aus unserem Speicher/,
   he: /\u05de\u05d5\u05d7\u05e7\u05d9\u05dd \u05d0\u05ea \u05d4\u05e7\u05d5\u05d1\u05e5\s*\u05de\u05d4\u05d0\u05d7\u05e1\u05d5\u05df \u05e9\u05dc\u05e0\u05d5/,
@@ -4111,6 +4357,7 @@ const PHOTO_DELETE_ERASES_FILE: Record<string, RegExp> = {
   ja: /ファイルは当社の保管場所から消去されます/,
 }
 const PHOTO_SUBJECT_ROUTE: Record<string, RegExp> = {
+  pl: /Je[śs]li Pa[nń]stwo s[ąa] osob[ąa] na zdj[ęe]ciu, a nie klientem, kt[óo]ry je wgra[łl]/,
   nl: /Bent u de persoon op de foto en niet de klant die haar heeft ge[üu]pload/,
   de: /Wenn Sie die Person auf dem Foto sind und nicht der Kunde, der es hochgeladen hat/,
   he: /\u05d0\u05dd \u05d0\u05ea\u05dd \u05d4\u05d0\u05d3\u05dd \u05e9\u05d1\u05ea\u05de\u05d5\u05e0\u05d4/,
@@ -4122,6 +4369,7 @@ const PHOTO_SUBJECT_ROUTE: Record<string, RegExp> = {
   ja: /お客様が写真に写っている方であって、送信されたお客様ご本人でない場合/,
 }
 const PHOTO_BOX_OFF_KEEPS: Record<string, RegExp> = {
+  pl: /Wy[łl][ąa]czenie ca[łl]ego bloku autora nie usuwa zdj[ęe]cia/,
   nl: /Het hele auteursblok uitzetten verwijdert de foto niet/,
   de: /Den ganzen Autorenkasten abzuschalten löscht das Foto nicht/,
   he: /\u05db\u05d9\u05d1\u05d5\u05d9 \u05ea\u05d9\u05d1\u05ea \u05d4\u05de\u05d7\u05d1\u05e8 \u05db\u05d5\u05dc\u05d4 \u05d0\u05d9\u05e0\u05d5 \u05de\u05d5\u05d7\u05e7 \u05d0\u05ea \u05d4\u05ea\u05de\u05d5\u05e0\u05d4/,
@@ -4133,6 +4381,7 @@ const PHOTO_BOX_OFF_KEEPS: Record<string, RegExp> = {
   ja: /著者欄そのものを無効にしても写真は消去されません/,
 }
 const PHOTO_IN_RETENTION: Record<string, RegExp> = {
+  pl: /\*\*Zdj[ęe]cie autora:\*\* tak d[łl]ugo, jak zdj[ęe]cie jest ustawione w projekcie/,
   nl: /\*\*Auteursfoto:\*\* zolang de foto bij het project is ingesteld/,
   de: /\*\*Autorenfoto:\*\* so lange, wie das Foto am Projekt eingerichtet ist/,
   he: /<strong>\u05ea\u05de\u05d5\u05e0\u05ea \u05de\u05d7\u05d1\u05e8:<\/strong> \u05db\u05dc \u05e2\u05d5\u05d3 \u05d4\u05ea\u05de\u05d5\u05e0\u05d4 \u05de\u05d5\u05d2\u05d3\u05e8\u05ea \u05d1\u05e4\u05e8\u05d5\u05d9\u05e7\u05d8/,
@@ -4499,6 +4748,956 @@ const PHOTO_IN_RETENTION: Record<string, RegExp> = {
     NETWORK_DENIED.test('既定では無効であり、Shopify のストアではご利用いただけません。'))
   check('mutation control (ja): the Japanese email section is found by the split',
     'x'.concat(text.ja!.privacy).split(/メールでの連絡/).length > 1)
+}
+
+// ── 38) Polish: a mutation control for every new class of Polish check ────
+/*
+ * The Polish documents landed on 2026-11-05 and brought four new classes of
+ * check with them: the Państwo register, a revision date written the Polish
+ * way (the month in the GENITIVE, which is why MONTHS.pl is not the dictionary
+ * form), the Polish and European statutes of LAW.pl, and the Polish entry added
+ * to each shared per-language table.
+ *
+ * Each is broken on purpose below and the guard has to fail on the broken text.
+ * A Polish table that matched nothing would otherwise pass in silence, because
+ * a missing locale key is skipped rather than failed in most sections above.
+ *
+ * WHAT IS DELIBERATELY NOT CONTROLLED HERE: the four inverted single-regex
+ * unions (NO_LONGER_TRUE, AUTO_POST_NO_LONGER_TRUE, OUTREACH_NO_LONGER_TRUE,
+ * NETWORK_DENIED) carry no Polish alternative, exactly as they carry no Dutch
+ * or German one. They guard against sentences that were REMOVED from the older
+ * documents; a Polish document written after the removal never held them, so a
+ * Polish alternative would be a translation of a sentence that never existed.
+ */
+{
+  const panstwo = REGISTER_FORBIDS.panstwo!
+  check('mutation control (pl): the ty form in a Państwo document is caught',
+    panstwo.patterns.some((p) => p.test('Jeśli chcesz przestać, możesz w każdej chwili zamknąć swoje konto.')))
+  check('mutation control (pl): the register check passes clean Państwo prose',
+    !panstwo.patterns.some((p) => p.test('Jeśli Państwo chcą przestać, mogą Państwo w każdej chwili zamknąć konto.')))
+  // The reason the bare dative "ci" is not among the forbidden patterns: it is
+  // spelled exactly like the masculine personal plural demonstrative, which is
+  // correct Państwo prose and appears in the privacy policy.
+  check('mutation control (pl): the demonstrative "ci" is not read as the dative',
+    !panstwo.patterns.some((p) => p.test('standardowe klauzule, które ci dostawcy zawierają w swoich umowach')))
+
+  check('mutation control (pl): the Polish revision sentence is actually parsed',
+    writtenRevisionDate('pl', 'Ostatnia aktualizacja: 5 listopada 2026') === '2026-11-05')
+  check('mutation control (pl): the nominative month name is not accepted as the genitive one',
+    writtenRevisionDate('pl', 'Ostatnia aktualizacja: 5 listopad 2026') === null)
+  check('mutation control (pl): a footer date that disagrees with the written one is caught',
+    writtenRevisionDate('pl', 'Ostatnia aktualizacja: 9 października 2026') !== '2026-11-05')
+  check('mutation control (pl): a date inside a statute is not read as the revision date',
+    writtenRevisionDate('pl', 'ustawa z dnia 30 maja 2014 r. o prawach konsumenta') === null)
+
+  const law = (doc: Doc, needle: string) => LAW.pl!.find((l) => l.doc === doc && l.must.source.includes(needle))!
+  check('mutation control (pl): a refund policy that promises the fourteen days without the article is caught',
+    !law('refund-policy', 'art\\. 27 ustawy z dnia').must.test('Mają Państwo prawo odstąpienia w ciągu czternastu dni.'))
+  check('mutation control (pl): a refund policy that treats an open account as full performance is caught',
+    !law('refund-policy', 'wykonany w pe').must.test('Usługa jest wykonana w pełni, gdy konto jest otwarte.'))
+  check('mutation control (pl): a refund policy that drops art. 7aa ust. 1, which in Poland reaches a sole trader, is caught',
+    !law('refund-policy', 'art\\. 7aa ust\\. 1').must.test('Prawo odstąpienia ma wyłącznie konsument będący osobą fizyczną.'))
+  // art. 38a is repealed, so NO Polish document may cite it. This is the one
+  // negative guard in the Polish set, written as its own check because the LAW
+  // table only holds positive ones.
+  {
+    const REPEALED = /art\. 38a/
+    for (const doc of ['terms', 'privacy', 'refund-policy', 'accessibility', 'affiliate-terms'] as Doc[]) {
+      check(`pl/${doc}: never cites the repealed art. 38a upk`, !REPEALED.test(text.pl[doc]))
+    }
+    check('mutation control (pl): a document that cited the repealed art. 38a would be caught',
+      REPEALED.test('art. 38a tej ustawy rozciąga to prawo na jednoosobową firmę.'))
+  }
+  check('mutation control (pl): terms that place the order-with-payment-obligation on our own screen are caught',
+    !law('terms', 'art\\. 17 ustawy').must.test('Zamówienie z obowiązkiem zapłaty składają Państwo na naszym ekranie.'))
+  check('mutation control (pl): a privacy policy that answers in thirty days instead of one month is caught',
+    !law('privacy', 'art\\. 12 ust\\. 3 RODO').must.test('Odpowiadamy na wniosek **w ciągu trzydziestu dni** od jego otrzymania.'))
+  check('mutation control (pl): a privacy policy that claims an appointed officer is caught',
+    !law('privacy', 'nie wyznaczyli').must.test('Wyznaczyliśmy inspektora ochrony danych, z którym można się skontaktować pod tym adresem.'))
+  check('mutation control (pl): a privacy policy that claims the Polish act adds a DPO threshold is caught',
+    !law('privacy', 'nie dodaje do tego').must.test('Polska ustawa dodaje do tego próg dwudziestu osób przetwarzających dane.'))
+  check('mutation control (pl): a privacy policy that names no Polish authority is caught',
+    !law('privacy', 'Prezesa Urz').must.test('Skargę można złożyć do europejskiego organu nadzorczego.'))
+  check('mutation control (pl): a transfers section that claims SCCs with everyone is caught',
+    !law('privacy', 'Nie twierdzimy tutaj').must.test('Z każdym podmiotem przetwarzającym podpisaliśmy standardowe klauzule umowne.'))
+  check('mutation control (pl): a banner sentence that offers the browser as a route out is caught',
+    !law('privacy', 'wycofania zgody u nas').must.test('Zgodę mogą Państwo wycofać także przez zablokowanie plików cookie w przeglądarce.'))
+  check('mutation control (pl): a transfers section that treats every recipient as a provider is caught',
+    !law('privacy', 'wymieniony powy').must.test('Dla przekazań do dostawców opieramy się na standardowych klauzulach umownych.'))
+  check('mutation control (pl): a joint-controller transmission left under the SCC sentence is caught',
+    !law('privacy', 'nie stosuje si').must.test('Do tego przekazania stosujemy standardowe klauzule umowne JVZoo.'))
+  check('mutation control (pl): consent named as the instrument without its article is caught',
+    !law('privacy', 'tym instrumentem').must.test('Ta Państwa zgoda jest tym instrumentem, i na niej się opieramy.'))
+  check('mutation control (pl): a derogation paragraph that never names the risk is caught',
+    !law('privacy', 'Stanach Zjednoczonych').must.test('Ryzyko polega na tym, że dane docierają do państwa trzeciego.'))
+  check('mutation control (pl): an accessibility statement that claims conformance with the Polish act is caught',
+    !law('accessibility', 'wiadczamy zgodno').must.test('Oświadczamy zgodność z ustawą o dostępności cyfrowej.'))
+  check('mutation control (pl): a partner agreement with no kryptoreklama rule is caught',
+    !law('affiliate-terms', 'kryptoreklam').must.test('Prosimy oznaczać treści reklamowe tam, gdzie prawo tego wymaga.'))
+
+  check('mutation control (pl): a monthly report left in the email section is caught',
+    EMAIL_NO_MONTHLY.pl!.test('Raz w miesiącu wysyłamy podsumowanie miesięczne wyniku.'))
+  check('mutation control (pl): the Polish email section is found by the split',
+    'x'.concat(text.pl!.privacy).split(/## E-maile/).length > 1)
+  check('mutation control (pl): a partner page described as already built is caught',
+    !PARTNER_NOT_BUILT.pl!.test('Strony dla partnerów są już zbudowane i gotowe do użycia.'))
+  check('mutation control (pl): a referral link promised to outlive the agreement is caught',
+    !AGREEMENT_LINK_DIES.pl!.test('Państwa link polecający działa dalej po rozwiązaniu umowy.'))
+}
+
+/**
+ * THE COOKIE-SETTINGS LINK A PRIVACY DOCUMENT TELLS THE READER TO LOOK FOR
+ * MUST BE THE LINK THE FOOTER ACTUALLY RENDERS.
+ *
+ * Every privacy document in all nine languages carries the sentence that says
+ * how to change or withdraw cookie consent, and each one names the footer link
+ * by its label. That sentence is not decoration: GDPR Art. 7(3) requires that
+ * withdrawal be as easy as consent, and the information duties that sit on a
+ * cookie banner (ePrivacy Art. 5(3) with GDPR Art. 13, PECR reg. 6 in the UK,
+ * art. 399 ust. 1 pkt 1 lit. b PKE in Poland) are satisfied by telling the
+ * visitor the method, not merely that a right exists. A document that names a
+ * label the footer does not render tells the visitor to look for something
+ * that is not there, which is the one way this sentence can be false while
+ * still being present.
+ *
+ * It had gone wrong in two languages at once, undetected, because nothing
+ * compared the two places. The French document said « Réglages des cookies »
+ * where the footer renders « Paramètres des cookies », and the Japanese said
+ * 「Cookie の設定」 where the footer renders 「クッキーの設定」. Both were
+ * fixed with this guard.
+ *
+ * The label is READ FROM THE DICTIONARY, never written here as a literal: the
+ * footer renders `dict.cookie.settings` (components/Footer.tsx), so the
+ * dictionary is the only thing that can be called right, and a guard holding
+ * its own copy would pass a renamed link.
+ */
+{
+  const read = (path: string) => (existsSync(path) ? readFileSync(path, 'utf8') : '')
+  const enPrivacySource = frontMatter(text[LOCALES[0]].privacy).source
+  const privacyDocs: [string, string][] = [
+    ['he', read(HEBREW_PRIVACY)],
+    ['en', enPrivacySource ? read(enPrivacySource) : ''],
+    ...LOCALES.map((l): [string, string] => [l, text[l].privacy]),
+  ]
+
+  /** The footer's own label for a locale, out of lib/i18n/public/<locale>.ts. */
+  const footerLabel = (locale: string): string | null => {
+    const src = read(`lib/i18n/public/${locale}.ts`)
+    if (!src) return null
+    const m = /^ {4}settings: '([^']+)'/m.exec(stripComments(src))
+    return m ? m[1]! : null
+  }
+
+  /**
+   * Any quoted run that looks like it is naming a cookie-settings link: the
+   * quote styles the documents use (guillemets, curly quotes, ASCII quotes,
+   * Japanese corner brackets) around a short phrase that mentions cookies.
+   */
+  const QUOTED = /[«„"'‘“「]\s*([^«»„""'’”」\n]{3,40}?)\s*[»"'’”」]/g
+  const MENTIONS_COOKIES = /cookie|Cookie|עוגיות|クッキー/
+
+  for (const [name, privacy] of privacyDocs) {
+    const label = footerLabel(name)
+    check(`${name}: the footer's cookie-settings label is readable from the dictionary`, label !== null, name)
+    if (!label || !privacy) continue
+    check(`${name}/privacy: names the footer link by the label the footer renders (${label})`,
+      privacy.includes(label), `expected ${JSON.stringify(label)}`)
+    const wrong = [...privacy.matchAll(QUOTED)]
+      .map((m) => m[1]!)
+      .filter((q) => MENTIONS_COOKIES.test(q) && q !== label)
+    check(`${name}/privacy: names no other label for that link`,
+      wrong.length === 0, wrong.length ? `found ${JSON.stringify(wrong)}` : undefined)
+  }
+
+  // MUTATION CONTROLS, against the real files and the real dictionaries.
+  const frReal = text.fr ? text.fr.privacy : ''
+  const jaReal = text.ja ? text.ja.privacy : ''
+  const frLabel = footerLabel('fr')
+  const jaLabel = footerLabel('ja')
+  if (frReal && frLabel) {
+    const broken = frReal.replace(frLabel, 'Réglages des cookies')
+    check('mutation control (fr): the old wrong label is caught by the "names the footer link" check',
+      !broken.includes(frLabel))
+    check('mutation control (fr): the old wrong label is caught by the "no other label" check',
+      [...broken.matchAll(QUOTED)].map((m) => m[1]!)
+        .some((q) => MENTIONS_COOKIES.test(q) && q !== frLabel))
+  }
+  if (jaReal && jaLabel) {
+    const broken = jaReal.replace(jaLabel, 'Cookie の設定')
+    check('mutation control (ja): the old wrong label is caught by the "names the footer link" check',
+      !broken.includes(jaLabel))
+    check('mutation control (ja): the old wrong label is caught by the "no other label" check',
+      [...broken.matchAll(QUOTED)].map((m) => m[1]!)
+        .some((q) => MENTIONS_COOKIES.test(q) && q !== jaLabel))
+  }
+  const deLabel = footerLabel('de')
+  if (deLabel) {
+    check('mutation control: a renamed dictionary label is not matched by the old document text',
+      !'den Link „Cookie-Schalter“ in der Fußzeile'.includes(deLabel))
+  }
+}
+
+// ── 26) the transfer instrument for recipients that are NOT our processors ──
+/*
+ * Every privacy document names JVZoo under Information Sharing and says, in
+ * that same section, that JVZoo does NOT process the data on our behalf: it is
+ * an independent controller, and for the collection and transmission of the
+ * request made from our page we are a joint controller with it. The Hebrew and
+ * English documents say the same of Digistore24 Inc.
+ *
+ * The International Transfers section, in every language, used to offer one
+ * instrument only: Standard Contractual Clauses, "for transfers to providers".
+ * A joint controller is not a provider and not a processor, so that sentence
+ * never reached the two recipients the same document had just described as
+ * controllers of their own — and both sit in the United States, which has no
+ * adequacy decision for us to rely on either.
+ *
+ * The instrument that does apply is the visitor's own consent. The request is
+ * made only after marketing cookies are accepted in the EEA, the UK,
+ * Switzerland and Canada (and wherever the country cannot be determined), and
+ * Article 49(1)(a) GDPR allows a transfer to a third country on the data
+ * subject's explicit consent, given after being informed of the risks. So the
+ * paragraph must do three things, and each is pinned here: say the preceding
+ * instrument does not reach every recipient, name the consent as the
+ * instrument with its article, and name the risk it is consent to — that the
+ * IP address and browser identifier reach a company in the United States.
+ */
+const TRANSFER_NOT_ALL: Record<string, RegExp> = {
+  he: /לא כל נמען שנמנה למעלה הוא ספק שלנו, והמכשיר שלמעלה אינו חל על כולם/,
+  en: /Not every recipient named above is a provider of ours, and the instrument above does not reach\s*all of them/,
+  de: /Nicht jeder oben genannte Empfänger ist unser Anbieter, und das vorstehende Instrument reicht nicht an alle heran/,
+  nl: /Niet elke hierboven genoemde ontvanger is onze leverancier, en het voorgaande instrument reikt niet tot allen/,
+  fr: /Tous les destinataires nommés ci-dessus ne sont pas nos fournisseurs, et l'instrument qui précède ne les atteint pas tous/,
+  it: /Non tutti i destinatari indicati sopra sono nostri fornitori, e lo strumento che precede non li raggiunge tutti/,
+  es: /No todos los destinatarios indicados arriba son nuestros proveedores, y el instrumento anterior no alcanza a todos/,
+  'pt-BR': /Nem todos os destinatários indicados acima são nossos fornecedores, e o instrumento anterior não alcança todos eles/,
+  ja: /上記の受領者のすべてが当社の提供事業者であるわけではなく、前記の措置はそのすべてに及ぶものではありません/,
+  pl: /Nie ka[żz]dy wymieniony powy[żz]ej odbiorca jest naszym dostawc[ąa]/,
+}
+/* No processing agreement and no Standard Contractual Clauses govern that transmission. */
+const TRANSFER_NO_SCC: Record<string, RegExp> = {
+  he: /לא חל הסכם עיבוד נתונים ולא חלים\s*סעיפי חוזה תקניים/,
+  en: /neither transmission is governed by a processing agreement or by Standard Contractual\s*Clauses/,
+  de: /gilt weder ein Auftragsverarbeitungsvertrag noch gelten Standardvertragsklauseln/,
+  nl: /geldt geen verwerkersovereenkomst en gelden geen standaardcontractbepalingen/,
+  fr: /n'est régie ni par un contrat de sous-traitance ni par des clauses contractuelles types/,
+  it: /non è retta né da un contratto di responsabile del trattamento né da clausole contrattuali standard/,
+  es: /no se rige ni por un contrato de encargo del tratamiento ni por cláusulas contractuales tipo/,
+  'pt-BR': /não é regida nem por um contrato de operador nem por cláusulas-padrão contratuais/,
+  ja: /その送信には処理者契約も標準契約条項も適用されません/,
+  pl: /nie stosuje si[ęe] ani umowy powierzenia przetwarzania,\s*ani standardowych klauzul umownych/,
+}
+/* The consent is the instrument, and Article 49(1)(a) is named. */
+const TRANSFER_DEROGATION: Record<string, RegExp> = {
+  he: /וההסכמה הזאת שלך היא המכשיר[\s\S]{0,120}סעיף 49\(1\)\(א\) ל-GDPR/,
+  en: /that consent of yours is the instrument[\s\S]{0,140}Article\s*49\(1\)\(a\) of the GDPR/,
+  de: /diese Einwilligung ist das Instrument[\s\S]{0,140}Artikel 49 Absatz 1 Buchstabe a DSGVO/,
+  nl: /die toestemming van u is het instrument[\s\S]{0,140}artikel 49 lid 1 onder a AVG/,
+  fr: /ce consentement est l'instrument[\s\S]{0,140}l'article 49, paragraphe 1, point a\), du RGPD/,
+  it: /quel Suo consenso è lo strumento[\s\S]{0,140}l'articolo 49, paragrafo 1, lettera a\), del GDPR/,
+  es: /ese consentimiento suyo es el instrumento[\s\S]{0,140}el artículo 49, apartado 1, letra a\), del RGPD/,
+  'pt-BR': /esse seu consentimento é o instrumento[\s\S]{0,140}o artigo 49, 1, alínea a, do RGPD/,
+  ja: /その同意こそがその措置です[\s\S]{0,140}GDPR 第49条第1項\(a\)/,
+  pl: /ta Pa[ńn]stwa zgoda jest tym instrumentem[\s\S]{0,160}art\. 49 ust\. 1 lit\. a RODO/,
+}
+/* The risk the consent is consent TO must be stated, or it is not informed. */
+const TRANSFER_RISK: Record<string, RegExp> = {
+  he: /מגיעים לחברה בארצות הברית/,
+  en: /reach a company in the United States/,
+  de: /ein\s*Unternehmen in den Vereinigten Staaten erreichen/,
+  nl: /bij een onderneming in de Verenigde Staten aankomen/,
+  fr: /parviennent à une société située aux États-Unis/,
+  it: /giungano a una società stabilita negli Stati\s*Uniti/,
+  es: /lleguen a una sociedad establecida en los\s*Estados Unidos/,
+  'pt-BR': /cheguem a uma empresa estabelecida nos\s*Estados Unidos/,
+  ja: /米国に所在する会社に届くこと/,
+  pl: /docieraj[ąa] do sp[óo][łl]ki w Stanach Zjednoczonych/,
+}
+{
+  const read = (path: string) => (existsSync(path) ? readFileSync(path, 'utf8') : '')
+  const enPrivacySource = frontMatter(text[LOCALES[0]].privacy).source
+  const enPrivacy = enPrivacySource ? read(enPrivacySource) : ''
+  const hePrivacy = read(HEBREW_PRIVACY)
+  const privacyDocs: [string, string][] = [
+    ['he', hePrivacy],
+    ['en', enPrivacy],
+    ...LOCALES.map((l): [string, string] => [l, text[l].privacy]),
+  ]
+  for (const [name, privacy] of privacyDocs) {
+    check(`${name}/privacy: the transfers section says the instrument does not reach every recipient`,
+      (TRANSFER_NOT_ALL[name] ?? /$^/).test(privacy))
+    check(`${name}/privacy: that transmission is covered by no processing agreement and no SCCs`,
+      (TRANSFER_NO_SCC[name] ?? /$^/).test(privacy))
+    check(`${name}/privacy: the consent is named as the instrument, with Article 49(1)(a)`,
+      (TRANSFER_DEROGATION[name] ?? /$^/).test(privacy))
+    check(`${name}/privacy: the risk the consent is consent to is stated`,
+      (TRANSFER_RISK[name] ?? /$^/).test(privacy))
+  }
+  /* Mutation controls break the REAL documents, not a string literal: strip the
+   * paragraph out of the live text and show that each check fails. */
+  const strip = (doc: string, from: RegExp) => {
+    const at = doc.search(from)
+    return at < 0 ? doc : doc.slice(0, at) + doc.slice(at + 1400)
+  }
+  const enStripped = strip(enPrivacy, TRANSFER_NOT_ALL.en)
+  const heStripped = strip(hePrivacy, TRANSFER_NOT_ALL.he)
+  const itStripped = strip(text.it!.privacy, TRANSFER_NOT_ALL.it)
+  check('mutation control: the English document without the paragraph fails all four checks',
+    enPrivacy !== '' && enStripped !== enPrivacy
+    && !TRANSFER_NOT_ALL.en.test(enStripped) && !TRANSFER_NO_SCC.en.test(enStripped)
+    && !TRANSFER_DEROGATION.en.test(enStripped) && !TRANSFER_RISK.en.test(enStripped))
+  check('mutation control: the Hebrew document without the paragraph fails all four checks',
+    hePrivacy !== '' && heStripped !== hePrivacy
+    && !TRANSFER_NOT_ALL.he.test(heStripped) && !TRANSFER_NO_SCC.he.test(heStripped)
+    && !TRANSFER_DEROGATION.he.test(heStripped) && !TRANSFER_RISK.he.test(heStripped))
+  check('mutation control: a translated document without the paragraph fails all four checks',
+    itStripped !== text.it!.privacy
+    && !TRANSFER_NOT_ALL.it.test(itStripped) && !TRANSFER_NO_SCC.it.test(itStripped)
+    && !TRANSFER_DEROGATION.it.test(itStripped) && !TRANSFER_RISK.it.test(itStripped))
+  check('mutation control: consent named as the instrument without its article is caught',
+    !TRANSFER_DEROGATION.en.test('that consent of yours is the instrument, and we rely on it.'))
+  check('mutation control: an SCC sentence that still speaks only of providers is caught',
+    !TRANSFER_NO_SCC.en.test('For transfers to providers outside the EU we rely on Standard Contractual Clauses.'))
+}
+
+/**
+ * THE INTRO'S "SECTIONS 15A TO 15H" MUST NAME THE SECTIONS THE DOCUMENT HAS.
+ *
+ * Every terms document opens by telling the reader that the service includes
+ * the site analysis, the account connections, the site fixes and the AI
+ * content "as described in sections 15A to 15H". That range is a promise about
+ * the document's own shape, and it is correct in all nine today. Nothing stops
+ * it drifting: the next feature that earns a section becomes 15I, eight
+ * documents gain a heading, and nine intros go on saying the list ends at 15H.
+ * A reader is then told the AI-content terms are inside a range that excludes
+ * them, which is the kind of error that is invisible on a read-through and
+ * obvious to anyone who follows the reference.
+ *
+ * The check reads BOTH ENDS out of the document rather than pinning the letter
+ * H: it collects the 15-suffix headings the document actually carries, and
+ * compares the range expression's two ends against the first and last of them.
+ * So adding 15I passes the moment every intro is updated, and fails until then,
+ * which is the whole point.
+ *
+ * Two alphabets, because Hebrew numbers its sub-sections in Hebrew letters
+ * (15א to 15ח) and the other eight in Latin (15A to 15H). The range expression
+ * itself is matched language-agnostically — "to", "bis", "à", "a", "tot en
+ * met", 「から第」 — as the two section labels with a short run of connecting
+ * text between them.
+ *
+ * It also checks the set is CONTIGUOUS from its first label. A range claim over
+ * a gapped set (15A, 15B, 15D described as "15A to 15D") is false in a second
+ * way that comparing only the two ends would not catch.
+ */
+{
+  const read = (path: string) => (existsSync(path) ? readFileSync(path, 'utf8') : '')
+  const enTermsSource = frontMatter(text[LOCALES[0]].terms).source
+  const termsDocs: [string, string][] = [
+    ['he', read(HEBREW_TERMS)],
+    ['en', enTermsSource ? read(enTermsSource) : ''],
+    ...LOCALES.map((l): [string, string] => [l, text[l].terms]),
+  ]
+
+  const LATIN = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'
+  const HEBREW = 'אבגדהוזחטיכלמנסעפצקרשת'
+  const alphabetFor = (locale: string) => (locale === 'he' ? HEBREW : LATIN)
+
+  for (const [name, terms] of termsDocs) {
+    if (!terms) { check(`${name}/terms: document is readable`, false); continue }
+    const alphabet = alphabetFor(name)
+    const suffixClass = name === 'he' ? '[\\u05d0-\\u05ea]' : '[A-Z]'
+
+    // The sub-section headings the document actually carries, in alphabet order.
+    const headings = [...terms.matchAll(new RegExp(`(?:^##\\s*|<h2>)15(${suffixClass})\\.`, 'gm'))]
+      .map((m) => m[1]!)
+    const present = [...new Set(headings)].sort((a, b) => alphabet.indexOf(a) - alphabet.indexOf(b))
+    check(`${name}/terms: carries a run of 15-suffix sections`, present.length >= 2,
+      `found ${present.length}`)
+    if (present.length < 2) continue
+
+    const first = present[0]!
+    const last = present[present.length - 1]!
+    const startAt = alphabet.indexOf(first)
+    const expected = alphabet.slice(startAt, startAt + present.length).split('')
+    check(`${name}/terms: the 15-suffix sections run without a gap (15${first} to 15${last})`,
+      present.join('') === expected.join(''), `found ${present.join(',')}`)
+
+    // The intro's range expression: the two labels with connecting words between.
+    const range = new RegExp(`15(${suffixClass})[^.]{1,40}?15(${suffixClass})`).exec(terms)
+    check(`${name}/terms: the intro states a range of 15-suffix sections`, range !== null)
+    if (!range) continue
+    check(`${name}/terms: the range starts at the first section the document has (15${first})`,
+      range[1] === first, `intro says 15${range[1]}`)
+    check(`${name}/terms: the range ends at the last section the document has (15${last})`,
+      range[2] === last, `intro says 15${range[2]}, document ends at 15${last}`)
+  }
+
+  // MUTATION CONTROLS, against the real documents.
+  {
+    const en = enTermsSource ? read(enTermsSource) : ''
+    const de = text.de ? text.de.terms : ''
+    const he = read(HEBREW_TERMS)
+    const endOf = (doc: string, suffixClass: string) => {
+      const r = new RegExp(`15(${suffixClass})[^.]{1,40}?15(${suffixClass})`).exec(doc)
+      return r ? r[2]! : null
+    }
+    if (en) {
+      // A ninth section added to the body and not to the intro must be caught.
+      const grown = en.replace('<h2>15H.', '<h2>15I. Something new</h2>\n        <h2>15H.')
+      const present = [...new Set([...grown.matchAll(/<h2>15([A-Z])\./g)].map((m) => m[1]!))]
+        .sort((a, b) => LATIN.indexOf(a) - LATIN.indexOf(b))
+      check('mutation control (en): a 15I added to the body with the intro left at 15H is caught',
+        endOf(grown, '[A-Z]') !== present[present.length - 1])
+    }
+    if (de) {
+      // An intro that overstates the range must be caught.
+      const overstated = de.replace('15A bis 15H', '15A bis 15J')
+      const present = [...new Set([...overstated.matchAll(/^##\s*15([A-Z])\./gm)].map((m) => m[1]!))]
+        .sort((a, b) => LATIN.indexOf(a) - LATIN.indexOf(b))
+      check('mutation control (de): an intro claiming 15J over a document ending at 15H is caught',
+        endOf(overstated, '[A-Z]') !== present[present.length - 1])
+    }
+    if (he) {
+      // A gap in the run must be caught even when both ends still match.
+      const gapped = he.replace('<h2>15ג.', '<h2>15ט.')
+      const present = [...new Set([...gapped.matchAll(/<h2>15([א-ת])\./g)].map((m) => m[1]!))]
+        .sort((a, b) => HEBREW.indexOf(a) - HEBREW.indexOf(b))
+      const startAt = HEBREW.indexOf(present[0]!)
+      const expected = HEBREW.slice(startAt, startAt + present.length).split('')
+      check('mutation control (he): a gap in the 15-suffix run is caught',
+        present.join('') !== expected.join(''))
+    }
+  }
+}
+/**
+ * THE RETENTION LIST MUST BE THE WHOLE LIST, AND THE SAME LIST IN EVERY
+ * LANGUAGE.
+ *
+ * "How Long We Keep Data" is the section a reader goes to for retention
+ * periods, and a list that looks complete and is not is worse than no list.
+ * It had nine rows and no row for the affiliate programme, although the
+ * programme's own bullet, three sections earlier, states the 12 months. That
+ * is not a disclosure gap — the period was disclosed — but it is the kind of
+ * gap that makes a reader who trusts the list wrong, and the kind that grows:
+ * the next data store with a period of its own goes in whichever section its
+ * author was editing.
+ *
+ * So two checks per locale, and one across them:
+ *   - the affiliate row is present and names its period;
+ *   - the row counts agree across all nine, so a row added in one language is
+ *     added in all. That is the check that catches the NEXT omission rather
+ *     than this one, which is the only reason to write it.
+ *
+ * Counting crosses two formats: the he and en documents are TSX and list with
+ * <li>, the other seven are Markdown and list with "- **". The section is read
+ * between its own heading and the next, per locale, so a bullet elsewhere in
+ * the document is not counted.
+ */
+{
+  const read = (path: string) => (existsSync(path) ? readFileSync(path, 'utf8') : '')
+  const enPrivacySource = frontMatter(text[LOCALES[0]].privacy).source
+  const privacyDocs: [string, string][] = [
+    ['he', read(HEBREW_PRIVACY)],
+    ['en', enPrivacySource ? read(enPrivacySource) : ''],
+    ...LOCALES.map((l): [string, string] => [l, text[l].privacy]),
+  ]
+
+  /** The retention section's own heading, per locale. */
+  const HEADING: Record<string, RegExp> = {
+    he: /<h2>כמה זמן[^<]*<\/h2>/,
+    en: /<h2>How Long We Keep Data<\/h2>/,
+    de: /^## Wie lange wir Daten aufbewahren$/m,
+    nl: /^## Hoe lang wij gegevens bewaren$/m,
+    fr: /^## Combien de temps nous conservons les données$/m,
+    it: /^## Per quanto tempo conserviamo i dati$/m,
+    es: /^## Cuánto tiempo conservamos los datos$/m,
+    'pt-BR': /^## Por quanto tempo guardamos os dados$/m,
+    ja: /^## データの保存期間$/m,
+    pl: /^## Jak długo przechowujemy dane$/m,
+  }
+
+  /** The affiliate row, which must name 12 months in the locale's own words. */
+  const AFFILIATE_ROW: Record<string, RegExp> = {
+    he: /נתוני בקשת שותף:[\s\S]{0,80}12 חודשים/,
+    en: /Partner application data:<\/strong>\s*12 months/,
+    de: /Daten eines Partnerantrags:\*\*\s*12 Monate/,
+    nl: /Gegevens van een aanvraag als partner:\*\*\s*12 maanden/,
+    fr: /Données d'une demande de partenariat :\*\*\s*12 mois/,
+    it: /Dati di una domanda di partner:\*\*\s*12 mesi/,
+    es: /Datos de una solicitud de socio:\*\*\s*12 meses/,
+    'pt-BR': /Dados de uma inscrição de parceiro:\*\*\s*12 meses/,
+    ja: /パートナーのお申し込みのデータ：\*\*[\s\S]{0,40}12か月/,
+    pl: /Dane wniosku partnera:\*\*\s*12 miesi[ęe]cy/,
+  }
+
+  /** The section's text, from its heading to the next heading of the same kind. */
+  const sectionOf = (name: string, doc: string): string | null => {
+    const heading = HEADING[name]
+    if (!heading) return null
+    const at = doc.search(heading)
+    if (at < 0) return null
+    const rest = doc.slice(at + 4)
+    const next = name === 'he' || name === 'en' ? rest.search(/<h2>/) : rest.search(/^## /m)
+    return next < 0 ? rest : rest.slice(0, next)
+  }
+
+  const counts: Record<string, number> = {}
+  for (const [name, privacy] of privacyDocs) {
+    if (!privacy) { check(`${name}/privacy: document is readable`, false); continue }
+    const section = sectionOf(name, privacy)
+    check(`${name}/privacy: the retention section is found by its heading`, section !== null)
+    if (!section) continue
+
+    const row = AFFILIATE_ROW[name]
+    check(`${name}/privacy: the retention list carries the affiliate application row, with its period`,
+      row !== undefined && row.test(section))
+
+    const bullets = name === 'he' || name === 'en'
+      ? [...section.matchAll(/<li>/g)].length
+      : [...section.matchAll(/^- \*\*/gm)].length
+    counts[name] = bullets
+    check(`${name}/privacy: the retention list has rows to count (${bullets})`, bullets > 0)
+  }
+
+  const values = [...new Set(Object.values(counts))]
+  check('every language\'s retention list has the same number of rows',
+    values.length === 1,
+    `counts ${Object.entries(counts).map(([k, v]) => `${k}=${v}`).join(' ')}`)
+
+  // MUTATION CONTROLS, against the real documents.
+  {
+    const de = text.de ? text.de.privacy : ''
+    const en = enPrivacySource ? read(enPrivacySource) : ''
+    if (de) {
+      const without = de.replace(/^- \*\*Daten eines Partnerantrags:[^\n]*\n/m, '')
+      const section = sectionOf('de', without)
+      check('mutation control (de): a retention list with the affiliate row removed is caught',
+        section !== null && !AFFILIATE_ROW.de!.test(section))
+      check('mutation control (de): and its row count then differs from the others',
+        section !== null
+          && [...section.matchAll(/^- \*\*/gm)].length !== (counts.en ?? -1))
+    }
+    if (en) {
+      const period = en.replace('Partner application data:</strong> 12 months',
+        'Partner application data:</strong> as long as we like')
+      const section = sectionOf('en', period)
+      check('mutation control (en): a row that drops its period is caught',
+        section !== null && !AFFILIATE_ROW.en!.test(section))
+    }
+    if (de && en) {
+      const extra = de.replace(/^(- \*\*Daten eines Partnerantrags:)/m,
+        '- **Etwas Neues:** für immer.\n$1')
+      const section = sectionOf('de', extra)
+      check('mutation control (de): a row added in one language only is caught by the count',
+        section !== null
+          && [...section.matchAll(/^- \*\*/gm)].length !== (counts.en ?? -1))
+    }
+  }
+}
+/**
+ * DIGISTORE24 MUST BE NAMED WHEREVER JVZOO IS, AND WITH THE SAME FACTS.
+ *
+ * `/go/*` serves both marketplaces and is registered in ENGLISH_ONLY_SEGMENTS,
+ * so the sales journey closes at /en/terms and /en/privacy. That made it
+ * coherent — not a gap — for the Digistore24 recipient entry to live only in
+ * the he and en documents while JVZoo was named in all nine. Coherent is not
+ * the same as right: the privacy policy is read on its own, in the reader's own
+ * language, by people who never open /go, and a document that names one US
+ * marketplace recipient and not the other tells them the sharing list is
+ * shorter than it is.
+ *
+ * So the asymmetry is closed, and this is what holds it closed. For each of
+ * the nine documents:
+ *   - Digistore24 is named at all;
+ *   - the full US entity is given — Digistore24 Inc., 360 Central Avenue,
+ *     Suite 800, St. Petersburg, FL 33701 — verified on 2026-11-05 from both
+ *     language versions of the company's own Legal Notice. THERE IS NO GmbH
+ *     ANYWHERE IN THIS CHAIN, and a document naming a German entity would be
+ *     wrong, so that is checked for and must be absent;
+ *   - the badge is described as storing on the device, because it is a script
+ *     that sets a week-long cookie and that is why it sits behind consent;
+ *   - Digistore24 is the seller and an independent controller, not a processor
+ *     acting for us.
+ *
+ * The last one is the claim that matters legally, and it is the reason the
+ * Art. 49(1)(a) paragraph exists: no processor contract reaches a recipient
+ * that is not a processor.
+ */
+{
+  const read = (path: string) => (existsSync(path) ? readFileSync(path, 'utf8') : '')
+  const enPrivacySource = frontMatter(text[LOCALES[0]].privacy).source
+  const privacyDocs: [string, string][] = [
+    ['he', read(HEBREW_PRIVACY)],
+    ['en', enPrivacySource ? read(enPrivacySource) : ''],
+    ...LOCALES.map((l): [string, string] => [l, text[l].privacy]),
+  ]
+
+  /** The verified US entity, which every document must carry in full. */
+  const DS24_ADDRESS = /Digistore24 Inc\.,\s*360 Central Avenue,\s*Suite 800,\s*St\.\s*Petersburg,\s*FL 33701/
+  /** A German entity would be a wrong fact, not a translation choice. */
+  const DS24_GMBH = /Digistore24\s+GmbH/i
+
+  /** The badge stores on the device — the reason it is behind consent. */
+  const DS24_STORES: Record<string, RegExp> = {
+    he: /Digistore24[\s\S]{0,900}?(עוגייה|עוגיית)/,
+    en: /stores a Digistore24 cookie on your device/,
+    de: /Cookie von Digistore24 auf Ihrem Gerät/,
+    nl: /cookie van Digistore24 op uw apparaat/,
+    fr: /un cookie de Digistore24/,
+    it: /un cookie di Digistore24/,
+    es: /una cookie de Digistore24/,
+    'pt-BR': /um cookie da Digistore24/,
+    ja: /Digistore24 の Cookie を1週間/,
+    pl: /plik cookie\s*Digistore24 na Pa[ńn]stwa urz[ąa]dzeniu/,
+  }
+
+  /** Seller and independent controller, not our processor. */
+  const DS24_NOT_PROCESSOR: Record<string, RegExp> = {
+    he: /Digistore24[\s\S]{0,1400}?(ולא כמעבדת|אינה מעבדת|לא כמעבדת)/,
+    en: /as an independent controller and not a processor acting on our behalf/,
+    de: /als eigener Verantwortlicher und nicht als Auftragsverarbeiter für uns/,
+    nl: /als zelfstandig verwerkingsverantwoordelijke en niet als verwerker in onze opdracht/,
+    fr: /en qualité de responsable du traitement distinct et non de sous-traitant agissant pour notre compte/,
+    it: /in qualità di titolare autonomo del trattamento e non di responsabile che agisce per nostro conto/,
+    es: /como responsable del tratamiento independiente y no como encargado que actúa por cuenta nuestra/,
+    'pt-BR': /como controladora independente e não como operadora agindo em nosso nome/,
+    ja: /当社の委託先としてではなく、独立した管理者として/,
+    pl: /jako odr[ęe]bny administrator, a nie jako podmiot przetwarzaj[ąa]cy dzia[łl]aj[ąa]cy na nasze zlecenie/,
+  }
+
+  for (const [name, privacy] of privacyDocs) {
+    if (!privacy) { check(`${name}/privacy: document is readable`, false); continue }
+    // The premise: this document names JVZoo, so it owes the other marketplace too.
+    check(`${name}/privacy: names JVZoo (the premise of the parity check)`, /JVZoo/.test(privacy))
+    check(`${name}/privacy: names Digistore24 as a recipient`, /Digistore24/.test(privacy))
+    check(`${name}/privacy: gives the verified US entity in full`, DS24_ADDRESS.test(privacy))
+    check(`${name}/privacy: names no Digistore24 GmbH, which does not exist in this chain`,
+      !DS24_GMBH.test(privacy))
+    check(`${name}/privacy: says the badge stores on the device`,
+      (DS24_STORES[name] ?? /$^/).test(privacy))
+    check(`${name}/privacy: Digistore24 is an independent controller and not our processor`,
+      (DS24_NOT_PROCESSOR[name] ?? /$^/).test(privacy))
+  }
+
+  // MUTATION CONTROLS, against the real documents.
+  {
+    const de = text.de ? text.de.privacy : ''
+    const en = enPrivacySource ? read(enPrivacySource) : ''
+    if (de) {
+      const without = de.replace(/^- \*\*Digistore24:[^\n]*\n/m, '')
+      check('mutation control (de): a document with the Digistore24 entry removed is caught',
+        !/Digistore24/.test(without) || !DS24_ADDRESS.test(without))
+      const gmbh = de.replace('Digistore24 Inc., 360 Central Avenue', 'Digistore24 GmbH, Sankt Augustin')
+      check('mutation control (de): a German entity invented for Digistore24 is caught',
+        DS24_GMBH.test(gmbh) && !DS24_ADDRESS.test(gmbh))
+      const processor = de.replace('als eigener Verantwortlicher und nicht als Auftragsverarbeiter für uns',
+        'als Auftragsverarbeiter in unserem Auftrag')
+      check('mutation control (de): Digistore24 described as our processor is caught',
+        !DS24_NOT_PROCESSOR.de!.test(processor))
+    }
+    if (en) {
+      const noStore = en.replace('stores a Digistore24 cookie on your device',
+        'stores nothing on your device')
+      check('mutation control (en): a badge described as storing nothing is caught',
+        !DS24_STORES.en!.test(noStore))
+    }
+  }
+}
+/**
+ * THE VISITOR'S OWN BROWSER IS A CONTROL OVER STORAGE, AND IT IS NOT A WAY OF
+ * CONSENTING, AND IT IS NOT A WITHDRAWAL WITH US. ALL THREE, IN ALL NINE.
+ *
+ * Raised from the Polish build: art. 399 ust. 1 pkt 1 lit. b PKE makes the
+ * Polish reader's right to set the conditions of storage and access in their
+ * own software an operative information duty. That is Poland's wording of
+ * RECITAL 66 of Directive 2009/136/EC, not of Art. 5(3)'s operative text, so
+ * the other eight implementations may or may not carry an equivalent, and
+ * nobody here has read eight statutes to find out. The sentence is added
+ * anyway, because it is TRUE and useful, and the honest reason is recorded
+ * rather than a borrowed Polish citation.
+ *
+ * Two things it must never say, and both are checked:
+ *
+ *   1. NOT A ROUTE TO CONSENT. After Planet49 (C-673/17) a browser setting
+ *      cannot constitute consent. Polish art. 399 ust. 2 does let settings
+ *      express it; that is a Polish peculiarity and copying it outward would
+ *      publish a wrong statement in eight languages. So the sentence is framed
+ *      as control over storage, and a wording that offers the browser as a way
+ *      of giving or granting consent fails here.
+ *   2. NOT A WITHDRAWAL WITH US. Our marketing gate and the Meta server-side
+ *      conversion report are keyed on OUR consent record, not on what the
+ *      browser does, so a visitor who blocks cookies in Chrome and never
+ *      touches our banner has not stopped the server report. A sentence that
+ *      blurred that would be a false statement about a transfer, which is why
+ *      the second half is required and not optional.
+ *
+ * Checked in both surfaces, as the Polish build did it: `cookie.withdrawHint`
+ * in lib/i18n/public/<locale>.ts, which is what the preferences screen renders,
+ * and the cookie section of each privacy document, which is the durable record.
+ */
+{
+  const read = (path: string) => (existsSync(path) ? readFileSync(path, 'utf8') : '')
+  const enPrivacySource = frontMatter(text[LOCALES[0]].privacy).source
+  const privacyDocs: [string, string][] = [
+    ['he', read(HEBREW_PRIVACY)],
+    ['en', enPrivacySource ? read(enPrivacySource) : ''],
+    ...LOCALES.map((l): [string, string] => [l, text[l].privacy]),
+  ]
+
+  /** The browser sets the conditions of storage on the device. */
+  const BROWSER_CONTROL: Record<string, RegExp> = {
+    he: /בהגדרות הדפדפן/,
+    en: /in your browser settings/,
+    de: /in den Einstellungen Ihres Browsers/,
+    nl: /in de instellingen van uw browser/,
+    fr: /dans les réglages de votre navigateur/,
+    it: /nelle impostazioni del Suo browser/,
+    es: /en la configuración de su navegador|en la configuración de tu navegador/,
+    'pt-BR': /nas configurações do seu navegador/,
+    ja: /ブラウザーの設定でお客様ご自身が定めることもできます/,
+    pl: /w ustawieniach swojej przegl[ąa]darki/,
+  }
+
+  /** A block in the browser is not a withdrawal of consent with us. */
+  const NOT_A_WITHDRAWAL: Record<string, RegExp> = {
+    he: /חסימה בדפדפן לבדה אינה מחליפה ביטול\s*הסכמה אצלנו/,
+    en: /a block in the\s*browser alone is not a withdrawal of consent with us|block in the browser alone is not a withdrawal of consent with us/,
+    de: /eine Sperre im Browser allein ersetzt jedoch nicht den Widerruf der Einwilligung bei uns/,
+    nl: /een blokkade in de browser alleen vervangt echter niet het intrekken van de instemming bij ons/,
+    fr: /un blocage dans le navigateur ne remplace toutefois pas le retrait du consentement chez nous/,
+    it: /un blocco nel browser da solo non sostituisce però la revoca del consenso presso di noi/,
+    es: /un bloqueo en el navegador por sí solo no sustituye la retirada del consentimiento ante nosotros/,
+    'pt-BR': /um bloqueio no navegador por si só não substitui a retirada do consentimento junto a nós/,
+    ja: /ブラウザーでの遮断だけでは、当社に対する同意の撤回には代わりません/,
+    pl: /sama blokada w przegl[ąa]darce nie zast[ęe]puje jednak wycofania zgody u nas/,
+  }
+
+  /**
+   * The Planet49 trap: a wording that offers the browser as a way of GIVING
+   * consent. Read one sentence at a time, and flagged only when that sentence
+   * carries all three of a consent word, a word for giving or expressing it,
+   * and a word for the browser. Our own sentence carries the first and third
+   * ("a block in the browser alone is not a withdrawal of consent with us") and
+   * must not trip it, which is the last mutation control below.
+   */
+  const CONSENT_WORD = /consent|Einwilligung|instemming|consentement|consenso|consentimiento|zgod|同意/i
+  const GIVING_WORD =
+    /\bgiv(e|ing|en)\b|\bgrant(ing|ed)?\b|\bexpress(ing|ed)?\b|erteil|\bgeben\b|\bgeven\b|donner|exprimer|\bdare\b|esprimere|prestar|expresar|manifestar|wyra[zż]|udziel|表明|与え/i
+  const BROWSER_WORD = /browser|Browser|navigateur|navegador|przegl[ąa]dar|ブラウザ/i
+  const offersConsentByBrowser = (value: string): boolean =>
+    value
+      .split(/(?<=[.。;；])\s*/)
+      .some((s) => CONSENT_WORD.test(s) && GIVING_WORD.test(s) && BROWSER_WORD.test(s))
+
+  for (const [name, doc] of privacyDocs) {
+    if (!doc) { check(`${name}/privacy: document is readable`, false); continue }
+    check(`${name}/privacy: says the browser sets the conditions of storage on the device`,
+      (BROWSER_CONTROL[name] ?? /$^/).test(doc))
+    check(`${name}/privacy: says a browser block is not a withdrawal of consent with us`,
+      (NOT_A_WITHDRAWAL[name] ?? /$^/).test(doc))
+  }
+
+  for (const name of ['he', 'en', ...LOCALES]) {
+    const dict = read(`lib/i18n/public/${name}.ts`)
+    check(`${name}: the locale dictionary is readable`, dict.length > 0)
+    if (!dict) continue
+    const hint = /^ {4}withdrawHint: '([^']*)'/m.exec(stripComments(dict))
+    check(`${name}: cookie.withdrawHint is readable`, hint !== null)
+    if (!hint) continue
+    const value = hint[1]!
+    check(`${name}: withdrawHint offers the browser as a control over storage`,
+      (BROWSER_CONTROL[name] ?? /$^/).test(value))
+    check(`${name}: withdrawHint says a browser block is not a withdrawal with us`,
+      (NOT_A_WITHDRAWAL[name] ?? /$^/).test(value))
+    check(`${name}: withdrawHint never offers the browser as a way of GIVING consent (Planet49)`,
+      !offersConsentByBrowser(value), value.slice(0, 80))
+  }
+
+  // MUTATION CONTROLS, against the real text.
+  {
+    const en = enPrivacySource ? read(enPrivacySource) : ''
+    const de = text.de ? text.de.privacy : ''
+    const enDict = read('lib/i18n/public/en.ts')
+    if (en) {
+      const half = en.replace(/ a block in the\s*\n?\s*browser alone is not a withdrawal of consent with us[^.]*\./, '.')
+      check('mutation control (en): the sentence with only its first half is caught',
+        BROWSER_CONTROL.en!.test(half) && !NOT_A_WITHDRAWAL.en!.test(half))
+    }
+    if (de) {
+      const gone = de.replace('in den Einstellungen Ihres Browsers', 'über den Link in der Fußzeile')
+      check('mutation control (de): a document that drops the browser half is caught',
+        !BROWSER_CONTROL.de!.test(gone))
+    }
+    if (enDict) {
+      const hint = /^ {4}withdrawHint: '([^']*)'/m.exec(stripComments(enDict))
+      const planet49 = (hint ? hint[1]! : '')
+        + ' You may also give your consent by using the appropriate settings of your browser.'
+      check('mutation control (en): consent offered through the browser is caught by the Planet49 check',
+        offersConsentByBrowser(planet49))
+      check('mutation control (en): the real withdrawHint is NOT caught by that check',
+        hint !== null && !offersConsentByBrowser(hint[1]!))
+    }
+    /* Polish was outside all three word lists, so the Planet49 trap could not
+     * fire for it at all: a Polish sentence offering the browser as a way of
+     * GIVING consent would have passed. Art. 399 ust. 2 PKE is exactly why it
+     * must not — Polish law does let device settings express consent, and that
+     * is the one locale where someone might be tempted to write it. */
+    const plDict = read('lib/i18n/public/pl.ts')
+    if (plDict) {
+      const hint = /^ {4}withdrawHint: '([^']*)'/m.exec(stripComments(plDict))
+      check('mutation control (pl): consent offered through the browser is caught by the Planet49 check',
+        offersConsentByBrowser('Zgodę mogą Państwo wyrazić także w ustawieniach swojej przeglądarki.'))
+      check('mutation control (pl): the real Polish withdrawHint is NOT caught by that check',
+        hint !== null && !offersConsentByBrowser(hint[1]!))
+    }
+  }
+}
+
+/**
+ * THE ARTICLE 27 REPRESENTATIVE: WHAT WE RELY ON, WHY, AND WHEN IT ENDS, IN
+ * EVERY EU-LANGUAGE DOCUMENT.
+ *
+ * Decided by the owner on 2026-11-07. The duty in Art. 27(1) GDPR, and in
+ * UK GDPR Art. 27, reaches us: Art. 3(2)(a) turns on OFFERING a service, and a
+ * live trial funnel in six EU languages offers one, whatever the revenue.
+ * Appointing two representatives costs about EUR 798 a year, and with no
+ * paying customer anywhere that money does not exist. So we rely on the
+ * exemption in Art. 27(2)(a) instead, which is available because the
+ * processing of data about people in the territory is in fact OCCASIONAL, and
+ * we say so in the open rather than staying silent about it.
+ *
+ * Three things each of the six documents must carry, and each one is checked:
+ *
+ *   1. THAT NO REPRESENTATIVE IS DESIGNATED. Art. 13(1)(a) makes the
+ *      representative's identity an information duty where one exists. None
+ *      does, and a document that omits the subject leaves a reader unable to
+ *      tell whether the representative is missing or merely unmentioned.
+ *   2. THAT WE RELY ON ART. 27(2)(a), AND ON WHICH FACTS. Not "the duty does
+ *      not apply to us", which is a legal assertion nobody here is entitled to
+ *      publish, but the narrow factual claim the exemption actually turns on:
+ *      occasional, no large-scale special-category or criminal-conviction
+ *      data, and a risk to rights and freedoms that is unlikely given the
+ *      nature, context, scope and purposes of the processing. Each document
+ *      cites the provision, so a reader can check our reasoning rather than
+ *      take our word.
+ *   3. WHEN IT ENDS, AND THAT WE WILL KNOW. A factual claim with no stated
+ *      end is a claim nobody can hold us to. The documents name the event that
+ *      ends it, the first account opened from the EEA or the United Kingdom,
+ *      promise a designation and the name and address at that point, and say
+ *      that such an account raises an alert here the same day. That alert is
+ *      real code with its own suite: lib/compliance/gdpr-territory-alert.ts
+ *      and lib/compliance/__qa__/gdpr-territory.qa.ts. If the promise is ever
+ *      made without the machinery, this file and that suite disagree, which is
+ *      the point of writing it twice.
+ *
+ * AND THE SENTENCE IT MUST NOT CARRY. "Insofar as this designation falls on
+ * us, it is an open point we are working on" was the honest statement while no
+ * decision had been taken. It is no longer true: a decision was taken, and a
+ * document that still says the question is open understates what we have
+ * concluded. The last check of each language fails on that wording.
+ *
+ * Checked only where the GDPR or the UK GDPR is the reader's own law. he, en,
+ * pt-BR and ja are out of scope on purpose: their documents address Israel,
+ * the United States, Brazil and Japan.
+ */
+{
+  /** We have not designated a representative in the Union under Art. 27. */
+  const NO_REPRESENTATIVE: Record<string, RegExp> = {
+    de: /haben (wir )?keinen Vertreter in der Union nach Artikel 27 DSGVO benannt/,
+    nl: /hebben wij geen vertegenwoordiger in de Unie aangewezen volgens artikel 27 AVG/,
+    fr: /n'avons pas désigné de représentant dans l'Union au sens de l'article 27 du RGPD/,
+    it: /non abbiamo designato un rappresentante nell'Unione ai sensi dell'articolo 27 del GDPR/,
+    es: /no hemos designado un representante en la Unión conforme al artículo 27 del RGPD/,
+    pl: /nie wyznaczyli[śs]my przedstawiciela w Unii zgodnie z art\. 27 RODO/,
+  }
+
+  /** Because we rely on the Art. 27(2)(a) exemption, and the provision is cited. */
+  const RELIES_ON_THE_EXEMPTION: Record<string, RegExp> = {
+    de: /Ausnahme des Artikels 27 Absatz 2 Buchstabe a DSGVO stützen/,
+    nl: /uitzondering van artikel 27, lid 2, onder a, AVG/,
+    fr: /l'exception de l'article 27, paragraphe 2, point a\) du RGPD/,
+    it: /eccezione dell'articolo 27, paragrafo 2, lettera a\) del GDPR/,
+    es: /excepción del artículo 27, apartado 2, letra a\) del RGPD/,
+    pl: /wyj[ąa]tku z art\. 27 ust\. 2 lit\. a RODO/,
+  }
+
+  /** On the one fact it turns on: the processing is occasional. */
+  const OCCASIONAL: Record<string, RegExp> = {
+    de: /ist nur gelegentlich/,
+    nl: /is slechts incidenteel/,
+    fr: /est seulement occasionnel/,
+    it: /è soltanto occasionale/,
+    es: /es\s+solo ocasional/,
+    pl: /ma charakter wy[łl][ąa]cznie okazjonalny/,
+  }
+
+  /** And it ends with the first account from the territory, when one is designated. */
+  const ENDS_ON_THE_FIRST_ACCOUNT: Record<string, RegExp> = {
+    de: /sobald wir ein Konto aus dem Europäischen Wirtschaftsraum oder dem Vereinigten Königreich haben, benennen wir einen Vertreter/,
+    nl: /zodra wij een account hebben dat vanuit de Europese Economische Ruimte of het Verenigd Koninkrijk is geopend, wijzen wij een vertegenwoordiger aan/,
+    fr: /dès que nous aurons un compte ouvert depuis l'Espace économique européen ou le Royaume-Uni, nous désignerons un représentant/,
+    it: /dal momento in cui avremo un account aperto dallo Spazio economico europeo o dal Regno Unito, designeremo un rappresentante/,
+    es: /desde el momento en que tengamos una cuenta abierta desde el Espacio Económico Europeo o el Reino Unido, designaremos un representante/,
+    pl: /od chwili, gdy b[ęe]dziemy mie[ćc] konto otwarte z Europejskiego Obszaru Gospodarczego lub ze Zjednoczonego Królestwa, wyznaczymy przedstawiciela/,
+  }
+
+  /** The wording the decision replaced, which must be gone. */
+  const STILL_AN_OPEN_POINT: Record<string, RegExp> = {
+    de: /ein offener Punkt, an dem wir arbeiten/,
+    nl: /een open punt waaraan wij werken/,
+    fr: /un point ouvert que nous traitons/,
+    it: /un punto aperto che stiamo trattando/,
+    es: /un punto abierto en el que estamos trabajando/,
+    pl: /punkt otwarty, nad którym pracujemy/,
+  }
+
+  const EU_LOCALES = ['de', 'nl', 'fr', 'it', 'es', 'pl']
+  for (const locale of EU_LOCALES) {
+    const doc = text[locale] ? text[locale].privacy : ''
+    check(`${locale}/privacy: the document is readable`, doc.length > 0)
+    if (!doc) continue
+    check(`${locale}/privacy: says no Art. 27 representative in the Union is designated`,
+      NO_REPRESENTATIVE[locale]!.test(doc))
+    check(`${locale}/privacy: names Art. 27(2)(a) as what it relies on`,
+      RELIES_ON_THE_EXEMPTION[locale]!.test(doc))
+    check(`${locale}/privacy: and the fact it turns on, that the processing is occasional`,
+      OCCASIONAL[locale]!.test(doc))
+    check(`${locale}/privacy: and says the reliance ends with the first account from the territory`,
+      ENDS_ON_THE_FIRST_ACCOUNT[locale]!.test(doc))
+    check(`${locale}/privacy: and no longer calls the question an open point`,
+      !STILL_AN_OPEN_POINT[locale]!.test(doc))
+  }
+
+  /* The promise in the documents is kept by code, so the code has to be there. */
+  {
+    const read = (path: string) => (existsSync(path) ? readFileSync(path, 'utf8') : '')
+    const alert = read('lib/compliance/gdpr-territory-alert.ts')
+    const territory = read('lib/compliance/gdpr-territory.ts')
+    check('the alert the documents promise exists', alert.length > 0 && /notifyGdprTerritorySignup/.test(alert))
+    check('and it is wired to the GDPR territory, not to the consent territory',
+      /inGdprTerritory/.test(alert) && /GDPR_TERRITORY_COUNTRIES/.test(territory))
+    check('and the sign-in funnel calls it',
+      /notifyGdprTerritorySignup/.test(read('app/api/auth/callback/route.ts')))
+  }
+
+  // MUTATION CONTROLS, against the real German and Spanish documents.
+  {
+    const de = text.de ? text.de.privacy : ''
+    const es = text.es ? text.es.privacy : ''
+    if (de) {
+      const denied = de.replace(RELIES_ON_THE_EXEMPTION.de!, 'Artikel 27 DSGVO auf uns nicht anwendbar ist')
+      check('mutation control (de): a reliance turned into a denial of the duty is caught',
+        NO_REPRESENTATIVE.de!.test(denied) && !RELIES_ON_THE_EXEMPTION.de!.test(denied))
+      const endless = de.replace(ENDS_ON_THE_FIRST_ACCOUNT.de!, 'wir prüfen das weiter')
+      check('mutation control (de): a claim with no stated end is caught',
+        RELIES_ON_THE_EXEMPTION.de!.test(endless) && !ENDS_ON_THE_FIRST_ACCOUNT.de!.test(endless))
+    } else check('mutation control (de): the German document is readable', false)
+    if (es) {
+      const reverted = es.replace(RELIES_ON_THE_EXEMPTION.es!, 'es un punto abierto en el que estamos trabajando')
+      check('mutation control (es): a document that goes back to the old wording is caught',
+        STILL_AN_OPEN_POINT.es!.test(reverted) && !RELIES_ON_THE_EXEMPTION.es!.test(reverted))
+    } else check('mutation control (es): the Spanish document is readable', false)
+  }
 }
 
 console.log(`\n${pass} passed, ${fail} failed`)
