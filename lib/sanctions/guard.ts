@@ -93,6 +93,9 @@ const NOTICE: Record<PublicLocale, string> = {
   fr: "Le service n'est pas disponible dans le pays depuis lequel cette demande a été envoyée, pour des raisons de conformité légale. Si vous pensez qu'il s'agit d'une erreur, écrivez-nous.",
   it: "Il servizio non è disponibile nel Paese dal quale è stata inviata questa richiesta, per ragioni di conformità normativa. Qualora si ritenga che si tratti di un errore, è possibile scriverci.",
   ja: '法令遵守のため、このリクエストが送信された国ではサービスをご利用いただけません。誤りと思われる場合は、ご連絡ください。',
+  de: 'Aus Gründen der Rechtskonformität ist der Dienst in dem Land, aus dem diese Anfrage kam, nicht verfügbar. Sollte dies ein Irrtum sein, schreiben Sie uns gern.',
+  pl: 'Ze względu na wymogi prawne usługa nie jest dostępna w kraju, z którego wysłano to żądanie. Jeśli uważają Państwo, że to pomyłka, prosimy o kontakt.',
+  nl: 'Om redenen van naleving van wet- en regelgeving is de dienst niet beschikbaar in het land waaruit dit verzoek kwam. Denkt u dat dit een vergissing is, schrijf ons dan.',
 }
 
 /**

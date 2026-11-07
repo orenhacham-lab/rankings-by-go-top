@@ -78,7 +78,7 @@ console.log('\n4. The list is still a closed list')
 check('the constraint is not a wildcard', allowed.length > 0 && allowed.length < 20)
 check('every entry is a language tag', allowed.every((l) => /^[a-z]{2}(-[A-Z]{2})?$/.test(l)), allowed.join('|'))
 check('an unknown language still falls back rather than being written raw',
-  normalizeConsentLocale('de') === 'he' && normalizeConsentLocale('') === 'he'
+  normalizeConsentLocale('el') === 'he' && normalizeConsentLocale('') === 'he'
   && normalizeConsentLocale(undefined) === 'he')
 
 console.log('\n5. Mutation controls')

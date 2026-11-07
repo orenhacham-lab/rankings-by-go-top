@@ -1,0 +1,262 @@
+/**
+ * The new-project onboarding in GERMAN: the "which site do we start with"
+ * screen, the live scan progress, the first-look summary of the site, the
+ * free-check preview, the first-article button and every notice, action and
+ * wait phrase those screens show.
+ *
+ * Register as set out in chrome.ts. The trial line keeps the English promise
+ * exactly: seven days, no card.
+ */
+import type { DashboardDictionary } from '../he'
+import type { DeepPartial } from '../merge'
+
+export const seedOnboardingDe: DeepPartial<DashboardDictionary> = {
+  seedOnboarding: {
+    newProject: {
+      eyebrow: 'Neue Website',
+      title: 'Mit welcher Website fangen wir an?',
+      subtitle: 'Eine Adresse genügt. Wir lesen die Website, verstehen das Geschäft und erstellen eine erste Bilanz.',
+      urlLabel: 'Adresse der Website',
+      urlPlaceholder: 'beispiel.de',
+      submit: 'Website prüfen',
+      creating: 'Die Website wird angelegt…',
+      starting: 'Die Prüfung startet…',
+      promise: 'Etwa eine Minute. Sie können währenddessen weiterarbeiten',
+      noConnection: 'Ohne Search Console, ohne Verbindung zur Website',
+      fromFreeCheck: (domain: string) => `Wir machen bei Ihrer kostenlosen Analyse von ${domain} weiter`,
+      fromScanTitle: (domain: string) => `Ihre Website für ${domain} wird vorbereitet`,
+      fromScanBody: 'Wir legen die Website aus der Analyse an, die Sie gestartet haben, mit allem, was wir über das Geschäft, seine Keywords und seine Themen gelernt haben, und öffnen sie. Das dauert wenige Sekunden.',
+      errorEmpty: 'Geben Sie die Adresse der Website ein',
+      errorInvalid: 'Das sieht nicht wie die Adresse einer Website aus. Zum Beispiel: beispiel.de',
+      planTitle: 'Was jetzt passiert',
+      afterTitle: 'Und dann',
+      afterBody: 'Sie wählen die Keywords, die überwacht werden, und die vollständige Recherche läuft im Hintergrund weiter: Keywords mit ihrem Suchvolumen, die Keywords Ihrer Wettbewerber und ein Content-Plan.',
+    },
+    progress: {
+      eyebrow: 'Erste Bilanz der Website',
+      title: (domain: string) => `${domain} wird geprüft`,
+      fromFreeCheck: 'Wir machen bei den Ergebnissen Ihrer kostenlosen Analyse weiter',
+      promise: 'Etwa eine Minute. Sie können währenddessen weiterarbeiten',
+      stepOf: (n: number, total: number) => `Schritt ${n} von ${total}`,
+      nowLabel: 'Läuft',
+      stepsLabel: 'Schritte',
+      finishingTitle: 'Die Befunde werden zusammengestellt',
+      finishingLine: 'Die Bilanz ist fast fertig',
+      steps: {
+        a1: { title: 'Die Seiten werden analysiert', lines: ['Die Startseite wird gelesen', 'Der Zugang der KI-Crawler wird geprüft', 'Die Adressen der Sitemap werden gezählt'] },
+        a2: { title: 'Leistungen und Gebiet', lines: ['Es wird bestimmt, was das Unternehmen anbietet', 'Die Zielgruppen werden erkannt', 'Die ersten Keywords werden gewählt'] },
+        a3: { title: 'Tags und Inhalt werden geprüft', lines: ['Titel, Beschreibungen und Bilder werden geprüft', 'Vier Signale der KI-Bereitschaft werden geprüft'] },
+        a4: { title: 'Wettbewerber bei Google', lines: ['Ihre Keywords werden bei Google gesucht', 'Es wird geprüft, wer neben Ihnen auftaucht'] },
+      },
+      claimLines: {
+        a1: ['Die Ergebnisse Ihrer kostenlosen Analyse werden geöffnet'],
+        a2: ['Was wir über das Geschäft gelernt haben, wird übernommen'],
+        a3: ['Die Befunde und die KI-Prüfungen werden übernommen'],
+      },
+      state: { done: 'Erledigt', running: 'Jetzt', pending: 'Danach', skipped: 'Übersprungen', failed: 'Nicht fertig geworden' },
+      stalledTitle: 'Das dauert länger als gewöhnlich',
+      stalledBody: 'Die Prüfung läuft im Hintergrund weiter, auch wenn Sie diese Seite verlassen, und die Bilanz wartet hier auf Sie.',
+      reconnecting: 'Verbindung wird wiederhergestellt…',
+    },
+    summary: {
+      badge: 'Erste Bilanz der Website',
+      title: (name: string) => `${name}: was wir von der Website gelernt haben`,
+      scannedJustNow: (domain: string) => `${domain} gerade eben geprüft`,
+      scannedHoursAgo: (domain: string, hours: number) =>
+        hours === 1 ? `${domain} vor einer Stunde geprüft` : `${domain} vor ${hours} Stunden geprüft`,
+      scannedDaysAgo: (domain: string, days: number) =>
+        days === 1 ? `${domain} gestern geprüft` : `${domain} vor ${days} Tagen geprüft`,
+      fromFreeCheck: 'Auf Grundlage Ihrer kostenlosen Analyse',
+      fromSearchIndex: (domain: string) => `Wir haben diese Recherche daraus gebaut, was Google von ${domain} zeigt`,
+      firewall: {
+        title: 'Die Website sperrt automatisches Lesen aus',
+        body: 'Die Firewall der Website sperrt automatische Leser wie unseren aus: wir haben diese Recherche daher daraus gebaut, was Google von der Website zeigt. WordPress oder Shopify zu verbinden, oder unseren Crawler bei Ihrem Hoster freizugeben, ermöglicht eine vollständigere Prüfung.',
+      },
+      edit: 'Bearbeiten',
+      editLabel: (section: string) => `Bearbeiten: ${section}`,
+      tiles: {
+        keywords: 'Empfohlene Keywords',
+        fixes: 'Korrekturen an der Website',
+        geo: 'Bereit für die KI-Engines',
+        articles: 'Artikelideen',
+        notChecked: 'Nicht geprüft',
+        pending: 'Wartet',
+      },
+      business: {
+        title: 'Ihr Geschäft, so wie Ihre Website es darstellt',
+        niche: 'Nische',
+        commerceType: 'Art des Geschäfts',
+        platform: 'Plattform',
+        local: 'Lokales Unternehmen',
+        notLocal: 'Nicht lokal',
+        commerce: { product: 'Produkte', service: 'Leistungen', content: 'Inhalt', other: 'Anderes' },
+        empty: 'Wir konnten auf der Website nicht lesen, was das Unternehmen anbietet. Sie können es in den Einstellungen angeben.',
+        locked: 'Der Shop ist mit einem Passwort geschützt: wir haben noch nicht gelesen, was er anbietet.',
+      },
+      audiences: {
+        title: 'Wen Sie bedienen',
+        empty: 'Wir haben noch keine Zielgruppen erkannt. Sie können sie in den Einstellungen hinzufügen.',
+      },
+      competitors: {
+        title: 'Wer Ihnen bei Google Konkurrenz macht',
+        seenIn: (n: number) => (n === 1 ? 'In einer unserer Google-Suchen aufgetaucht' : `In ${n} unserer Google-Suchen aufgetaucht`),
+        suggested: 'Von der Analyse der Website vorgeschlagen',
+        empty: 'Diesmal haben wir keine Wettbewerber gefunden. Die vollständige Recherche sucht erneut.',
+      },
+      findings: {
+        title: 'Was die Website zurückhält',
+        clean: 'Bei unseren Prüfungen ist kein Problem aufgefallen',
+        locked: 'Nicht geprüft: der Shop ist mit einem Passwort geschützt',
+        firewall: 'Nicht geprüft: die Website sperrt automatisches Lesen aus',
+        failed: 'Diese Prüfung konnten wir nicht abschließen',
+        pending: 'Diese Prüfung ist noch nicht fertig',
+        omitted: (n: number) =>
+          n === 1
+            ? 'Aus der kostenlosen Analyse gibt es einen weiteren Befund. Eine neue Prüfung der Website lässt ihn in der Liste erscheinen.'
+            : `Aus der kostenlosen Analyse gibt es ${n} weitere Befunde. Eine neue Prüfung der Website lässt sie alle erscheinen.`,
+        severity: { blocker: 'Blockierend', warning: 'Zu korrigieren', info: 'Gut zu wissen' },
+      },
+      keywords: {
+        title: 'Keywords, die sich lohnen',
+        hint: 'Alle sind ausgewählt. Was ausgewählt bleibt, wird überwacht und zählt auf das Keyword-Limit Ihres Tarifs.',
+        selected: (n: number, total: number) => `${n} von ${total} ausgewählt`,
+        limit: (max: number) => `Sie können bis zu ${max} Keywords auswählen`,
+        empty: 'Wir haben noch keine Keywords gefunden. Die vollständige Recherche wird welche vorschlagen.',
+        tracked: 'Die vollständige Recherche läuft schon. Weitere Keywords erscheinen in der Keyword-Recherche.',
+        reasons: {
+          brand: 'Ihr eigener Name: so suchen die Leute, die Sie schon kennen',
+          question: 'Eine Frage: ein Artikel, der sie beantwortet, kann bei Google und in KI-Antworten auftauchen',
+          local: 'Eine lokale Suche: Menschen in Ihrer Umgebung suchen danach',
+          buying: 'Nahe am Kauf: wer danach sucht, ist bereit zu handeln',
+          niche: 'Nennt Ihre Nische',
+          specific: 'Ein genauer Begriff: weniger Websites streiten um den Platz',
+          core: 'Beschreibt, was Sie anbieten, mit den Worten, die die Leute bei der Suche benutzen',
+        },
+      },
+      geo: {
+        title: 'Bereit für die KI-Engines',
+        intro: 'KI-Engines wie ChatGPT und Perplexity erstellen keine Rangliste, sie nennen Quellen. Diese vier Signale entscheiden, wie leicht sie Sie nennen können.',
+        score: (passed: number, total: number) => `${passed} von ${total} Prüfungen bestanden`,
+        locked: 'Nicht geprüft: der Shop ist mit einem Passwort geschützt',
+        lockedBody: 'Wir prüfen diese Signale, sobald der Shop öffentlich ist.',
+        firewall: 'Nicht geprüft: die Website sperrt automatisches Lesen aus',
+        firewallBody: 'Diese Prüfung muss die Website selbst lesen. Wir prüfen diese Signale, sobald die Website verbunden ist oder unseren Crawler freigibt.',
+        notChecked: 'Nicht geprüft',
+        notCheckedBody: 'Diese Prüfung wurde auf dieser Website nicht ausgeführt.',
+        pending: 'Wartet auf die Prüfung',
+        pendingBody: 'Diese Prüfung wurde noch nicht ausgeführt.',
+        failed: 'Diese Prüfung konnten wir nicht abschließen',
+        pass: 'Vorhanden',
+        fail: 'Fehlt',
+      },
+      articles: {
+        title: 'Artikel, die Besucher bringen können',
+        empty: 'Noch kein Thema. Die vollständige Recherche erstellt einen Content-Plan.',
+      },
+      start: {
+        title: 'Bereit zu starten?',
+        body: (n: number) =>
+          n === 0
+            ? 'Die vollständige Recherche läuft im Hintergrund weiter: Keywords mit ihrem Suchvolumen, die Keywords Ihrer Wettbewerber und ein Content-Plan.'
+            : n === 1
+              ? 'Ein Keyword wird überwacht, und die vollständige Recherche läuft im Hintergrund weiter: Keywords mit ihrem Suchvolumen, die Keywords Ihrer Wettbewerber und ein Content-Plan.'
+              : `${n} Keywords werden überwacht, und die vollständige Recherche läuft im Hintergrund weiter: Keywords mit ihrem Suchvolumen, die Keywords Ihrer Wettbewerber und ein Content-Plan.`,
+        button: 'Starten',
+        starting: 'Startet…',
+        runningTitle: 'Die vollständige Recherche läuft im Hintergrund',
+        runningBody: 'Jeder Schritt erscheint im Dashboard, sobald er fertig ist.',
+        readyTitle: 'Die vollständige Recherche ist fertig',
+        readyBody: 'Die Keywords, die Wettbewerber und der Content-Plan warten im Dashboard auf Sie.',
+        failedTitle: 'Die vollständige Recherche ist nicht fertig geworden',
+        failedBody: 'Einige Schritte sind nicht durchgelaufen. Was bereits gefunden wurde, ist gespeichert und erscheint im Dashboard.',
+        openDashboard: 'Dashboard öffnen',
+      },
+    },
+    preview: {
+      badge: 'Kostenlose Recherche',
+      competitorsLocked: (n: number) => (n === 1 ? '1 weiterer Wettbewerber in der vollständigen Recherche' : `${n} weitere Wettbewerber in der vollständigen Recherche`),
+      keywordsLocked: (n: number) => (n === 1 ? '1 weiteres Keyword in der vollständigen Recherche' : `${n} weitere Keywords in der vollständigen Recherche`),
+      volumeLocked: 'Suchvolumen',
+      volumeLockedLabel: 'Das Suchvolumen wird in der vollständigen Recherche freigeschaltet',
+      keywordsHint: 'Die Suchvolumen aller Keywords und die Positionsüberwachung werden in der vollständigen Recherche freigeschaltet.',
+      ctaTitle: 'Schalten Sie die vollständige Recherche frei, kostenlos',
+      ctaBody: 'Alle Wettbewerber, das Suchvolumen jedes Keywords und die Positionsüberwachung. Die Recherche wartet schon in Ihrem Konto, ohne eine zweite Prüfung.',
+      cta: 'Die vollständige Recherche kostenlos freischalten',
+      haveAccount: 'Sie haben schon ein Konto?',
+      login: 'Anmelden',
+      terms: '7 Tage kostenlos testen, ohne Kreditkarte.',
+    },
+    firstArticle: {
+      button: 'Den ersten Artikel schreiben',
+      hint: 'Zählt auf das Artikelkontingent Ihres Tarifs',
+      writing: 'Der erste Artikel wird geschrieben…',
+      writingHint: 'Das kann einige Minuten dauern. Sie können auf dieser Seite bleiben.',
+      ready: 'Der erste Artikel ist fertig',
+      open: 'Artikel öffnen',
+      retry: 'Erneut versuchen',
+      errors: {
+        quota: 'Sie haben alle Artikel des laufenden Abrechnungszeitraums verbraucht.',
+        billing: 'Zum Schreiben von Artikeln ist ein aktiver Shopify-Tarif nötig.',
+        unavailable: 'Wir konnten Ihr Artikelkontingent nicht prüfen. Versuchen Sie es in einer Minute erneut.',
+        inProgress: 'Dieser Artikel wird schon geschrieben. Er erscheint im Reiter Inhalt.',
+        quality: 'Der Artikel hat unsere Qualitätsprüfungen nicht bestanden. Versuchen Sie es erneut.',
+        details: 'Im Handlungsaufruf des Artikels fehlen Angaben. Sie können sie im Reiter Inhalt beim Thema ergänzen.',
+        generic: 'Wir konnten den Artikel nicht schreiben. Versuchen Sie es erneut.',
+        timeout: 'Das Schreiben dauert länger als gewöhnlich. Der Artikel erscheint im Reiter Inhalt, sobald er fertig ist.',
+      },
+    },
+    noRun: {
+      title: 'Diese Website haben wir noch nicht geprüft',
+      body: 'Die Prüfung liest die Website und erstellt eine erste Bilanz. Das dauert bis zu einer Minute.',
+      action: 'Website prüfen',
+    },
+    notices: {
+      signedOut: { title: 'Ihre Sitzung ist beendet', body: 'Melden Sie sich erneut an, um dort weiterzumachen, wo Sie stehen geblieben sind.' },
+      notAvailable: { title: 'Die Recherche ist für diese Website nicht verfügbar', body: 'Sie können im Dashboard an der Website weiterarbeiten.' },
+      planRequired: { title: 'Die Prüfung gehört zum Test oder zu einem aktiven Tarif', body: 'Wählen Sie einen Tarif, um die Website zu prüfen.' },
+      planUnavailable: { title: 'Wir konnten Ihren Tarif nicht prüfen', body: 'Das ist vorübergehend. Versuchen Sie es in einer Minute erneut.' },
+      runInProgress: { title: 'Eine Prüfung dieser Website läuft schon', body: 'Laden Sie neu, um zu sehen, wo sie steht.' },
+      rescanTooSoon: { title: 'Diese Website wurde in den letzten 24 Stunden geprüft', body: (wait: string) => `Sie können sie ${wait} erneut prüfen.` },
+      userDailyCap: { title: 'Sie haben die Zahl der Prüfungen für heute erreicht', body: (wait: string) => `Eine neue Prüfung können Sie ${wait} starten.` },
+      globalDailyCap: { title: 'Wir haben das Prüfungslimit für heute erreicht', body: (wait: string) => `Versuchen Sie es ${wait} erneut.` },
+      claimExpired: { title: 'Die Ergebnisse Ihrer kostenlosen Analyse sind nicht mehr verfügbar', body: 'Wir prüfen die Website erneut. Das dauert bis zu einer Minute.' },
+      busy: { title: 'Der Dienst ist gerade stark nachgefragt', body: 'Versuchen Sie es in einer Minute erneut.' },
+      failed: { title: 'Bei uns ist etwas schiefgegangen', body: 'Versuchen Sie es in einem Moment erneut.' },
+      offline: { title: 'Wir erreichen den Server nicht', body: 'Prüfen Sie Ihre Internetverbindung und versuchen Sie es erneut.' },
+      projectQuota: { title: 'Sie haben die Zahl der Websites Ihres Tarifs erreicht', body: 'Wechseln Sie den Tarif, um eine weitere Website hinzuzufügen.' },
+      createFailed: { title: 'Wir konnten die Website nicht anlegen', body: 'Versuchen Sie es in einem Moment erneut.' },
+      noClient: { title: 'Ihr Konto ist noch nicht für eine neue Website bereit', body: 'Fügen Sie einen Kunden hinzu und legen Sie dann die Website an.' },
+      notReady: { title: 'Die Recherche ist noch nicht bereit weiterzugehen', body: 'Laden Sie neu, um zu sehen, wo sie steht.' },
+      keywordsChanged: { title: 'Die Liste der Keywords hat sich verändert', body: 'Laden Sie die Seite neu und versuchen Sie es erneut.' },
+      keywordQuota: { title: 'Die vollständige Recherche ist gestartet, aber die Keywords wurden nicht hinzugefügt', body: 'Sie haben das Keyword-Limit Ihres Tarifs erreicht. Im Reiter Keywords können Sie Platz schaffen.' },
+      keywordsNotAdded: { title: 'Die vollständige Recherche ist gestartet, aber die Keywords sind noch nicht hinzugefügt', body: 'Sie können sie im Reiter Keywords hinzufügen.' },
+      siteUnreachable: { title: 'Wir konnten die Website nicht erreichen', body: 'Prüfen Sie, ob die Website sich in einem Browser öffnet, und versuchen Sie es erneut.' },
+      siteBlocked: { title: 'Die Website hat unseren Leser gesperrt', body: 'Vielleicht sperrt eine Sicherheitseinstellung automatische Leser aus. Sie können es später erneut versuchen.' },
+      siteForbidden: {
+        title: 'Die Firewall der Website sperrt automatisches Lesen aus',
+        body: 'Die Website sperrt automatische Leser wie unseren aus: wir konnten sie daher nicht prüfen. Sie können die Website über ihre Plattform verbinden, ohne Prüfung weitermachen und die Angaben zum Unternehmen selbst eintragen, oder mit uns darüber sprechen.',
+      },
+      siteAddress: { title: 'Die Adresse der Website führt nicht zu einer Website, die wir lesen können', body: 'Prüfen Sie die Adresse in den Einstellungen der Website.' },
+      scanStopped: { title: 'Die Prüfung ist vor dem Ende abgebrochen', body: 'Versuchen Sie es erneut. Das dauert bis zu einer Minute.' },
+    },
+    actions: {
+      retry: 'Erneut versuchen',
+      refresh: 'Neu laden',
+      billing: 'Tarife ansehen',
+      signin: 'Anmelden',
+      dashboard: 'Dashboard öffnen',
+      settings: 'Website-Einstellungen öffnen',
+      clients: 'Kunden öffnen',
+      connectPlatform: 'Eine Plattform verbinden',
+      continueWithoutScan: 'Ohne Prüfung weitermachen',
+      talkToUs: 'Mit uns sprechen',
+    },
+    wait: {
+      minutes: (n: number) => (n === 1 ? 'in einer Minute' : `in ${n} Minuten`),
+      hours: (n: number) => (n === 1 ? 'in einer Stunde' : `in ${n} Stunden`),
+      later: 'später',
+    },
+  },
+}
+
+export {}

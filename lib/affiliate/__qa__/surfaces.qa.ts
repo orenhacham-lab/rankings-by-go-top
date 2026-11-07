@@ -183,11 +183,47 @@ async function main() {
   console.log('\nE) the numbers on the screen are the numbers in the table')
   {
     const sql = strip(read('supabase/migrations/20261009190000_affiliate_program.sql'))
-    check('E1: the table’s defaults are the published rates',
-      new RegExp(`base_rate\\s+numeric[^\\n]*DEFAULT ${AFFILIATE_TERMS.baseRate}`).test(sql)
-      && new RegExp(`top_rate\\s+numeric[^\\n]*DEFAULT ${AFFILIATE_TERMS.topRate}`).test(sql)
-      && new RegExp(`top_rate_from\\s+integer[^\\n]*DEFAULT ${AFFILIATE_TERMS.topRateFrom}`).test(sql),
-      sql.match(/base_rate[^\n]*/)?.[0] ?? '')
+    /*
+     * THE DEFAULT A COLUMN HAS TODAY, NOT THE ONE IT WAS CREATED WITH.
+     *
+     * This check used to read the CREATE TABLE line alone. That was complete
+     * while nothing had ever altered the column, and it stopped being complete
+     * the moment one migration did: on 2026-11-05 the published rate moved from
+     * 30 to 35 and an ALTER ... SET DEFAULT 35 was added, which left the
+     * original line reading 30 and this guard failing on a repository that was
+     * in fact correct. Reading only the birth of a column answers a question
+     * nobody is asking — what matters is what a row created tomorrow gets.
+     *
+     * So the effective default is computed the way Postgres resolves it: the
+     * CREATE TABLE value, then every later ALTER COLUMN ... SET DEFAULT in
+     * migration-version order, last one winning.
+     */
+    const effectiveDefault = (column: string): string | null => {
+      const files = readdirSync(join(ROOT, 'supabase/migrations'))
+        .filter((f) => /^\d{14}_.+\.sql$/.test(f))
+        .sort()
+      let value: string | null = null
+      for (const file of files) {
+        const text = stripSql(read(`supabase/migrations/${file}`))
+        const created = new RegExp(`\\b${column}\\s+(?:numeric|integer)[^\\n]*?DEFAULT\\s+([0-9.]+)`, 'i').exec(text)
+        if (created) value = created[1]
+        const altered = new RegExp(`ALTER\\s+COLUMN\\s+${column}\\s+SET\\s+DEFAULT\\s+([0-9.]+)`, 'ig')
+        let m: RegExpExecArray | null
+        while ((m = altered.exec(text)) !== null) value = m[1]
+      }
+      return value
+    }
+    const sameNumber = (a: string | null, b: number) => a !== null && Number(a) === b
+    check('E1: the table’s defaults, as they stand today, are the published rates',
+      sameNumber(effectiveDefault('base_rate'), AFFILIATE_TERMS.baseRate)
+      && sameNumber(effectiveDefault('top_rate'), AFFILIATE_TERMS.topRate)
+      && sameNumber(effectiveDefault('top_rate_from'), AFFILIATE_TERMS.topRateFrom),
+      `base_rate=${effectiveDefault('base_rate')} top_rate=${effectiveDefault('top_rate')} top_rate_from=${effectiveDefault('top_rate_from')}`)
+    check('E1b: and the published base rate is one the table’s CHECK constraint allows',
+      AFFILIATE_TERMS.baseRate > 0
+      && AFFILIATE_TERMS.topRate >= AFFILIATE_TERMS.baseRate
+      && AFFILIATE_TERMS.topRate <= 100,
+      `${AFFILIATE_TERMS.baseRate}/${AFFILIATE_TERMS.topRate}`)
     check('E2: the dashboard reads the terms, never a second copy of the numbers', (() => {
       const page = strip(read('app/(dashboard)/affiliate/page.tsx'))
       return /AFFILIATE_TERMS/.test(page) && !/holdDays: \d+|baseRate: \d+|minPayout(Ils|Usd): \d+/.test(page)
@@ -227,8 +263,34 @@ async function main() {
       const seen = new Set<string>()
       return versions.filter((v) => (seen.has(v) ? true : (seen.add(v), false))).length === 1
     })())
-    check('E1-MUT: a default drifting from the published rate is caught',
-      !new RegExp(`base_rate\\s+numeric[^\\n]*DEFAULT ${AFFILIATE_TERMS.baseRate + 1}`).test(sql))
+    /*
+     * E1 reads real files, so its mutation controls run the same resolution
+     * over invented ones: the published rate against a table that was never
+     * altered (the bug that made the old check wrong), and against a table
+     * altered to something else (the drift the check exists for).
+     */
+    const resolve = (texts: string[], column: string): string | null => {
+      let value: string | null = null
+      for (const text of texts) {
+        const created = new RegExp(`\\b${column}\\s+(?:numeric|integer)[^\\n]*?DEFAULT\\s+([0-9.]+)`, 'i').exec(text)
+        if (created) value = created[1]
+        const altered = new RegExp(`ALTER\\s+COLUMN\\s+${column}\\s+SET\\s+DEFAULT\\s+([0-9.]+)`, 'ig')
+        let m: RegExpExecArray | null
+        while ((m = altered.exec(text)) !== null) value = m[1]
+      }
+      return value
+    }
+    const born30 = 'base_rate numeric(5,2) NOT NULL DEFAULT 30,'
+    check('E1-MUT1: a column never altered keeps the rate it was born with',
+      resolve([born30], 'base_rate') === '30')
+    check('E1-MUT2: a later ALTER wins over the CREATE TABLE line',
+      resolve([born30, 'ALTER COLUMN base_rate SET DEFAULT 35;'], 'base_rate') === '35')
+    check('E1-MUT3: the last ALTER wins over an earlier one',
+      resolve([born30, 'ALTER COLUMN base_rate SET DEFAULT 35;', 'ALTER COLUMN base_rate SET DEFAULT 25;'], 'base_rate') === '25')
+    check('E1-MUT4: a default drifting from the published rate is caught',
+      !sameNumber(resolve([born30, `ALTER COLUMN base_rate SET DEFAULT ${AFFILIATE_TERMS.baseRate + 1};`], 'base_rate'), AFFILIATE_TERMS.baseRate))
+    check('E1-MUT5: and a column the migrations never define reads as absent, not as a match',
+      resolve([born30], 'bonus_rate') === null && !sameNumber(null, AFFILIATE_TERMS.baseRate))
   }
 
   console.log('\nF) a partner reaches their own page')

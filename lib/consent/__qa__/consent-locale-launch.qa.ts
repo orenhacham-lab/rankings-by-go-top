@@ -72,10 +72,10 @@ console.log('A) the code knows every public language')
   // asserting that a real language falls back to Hebrew. German is the example
   // now — a language the keyword research offers and the site does not have.
   check('A3: something that is not a language still records, under the default',
-    normalizeConsentLocale('de') === 'he' && normalizeConsentLocale('') === 'he' && normalizeConsentLocale(null) === 'he')
+    normalizeConsentLocale('el') === 'he' && normalizeConsentLocale('') === 'he' && normalizeConsentLocale(null) === 'he')
   check('A3a: and French does NOT fall back, now that it is one', normalizeConsentLocale('fr') === 'fr')
   check('A1-MUT: a public language absent from the list fails A1',
-    [...PUBLIC_LOCALES, 'de'].filter((l) => !(CONSENT_LOCALES as readonly string[]).includes(l)).length > 0)
+    [...PUBLIC_LOCALES, 'el'].filter((l) => !(CONSENT_LOCALES as readonly string[]).includes(l)).length > 0)
 }
 
 console.log('\nB) the database is read from the migrations, not assumed')

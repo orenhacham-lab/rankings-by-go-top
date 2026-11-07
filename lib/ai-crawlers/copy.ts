@@ -586,7 +586,235 @@ const ja: AiCrawlerCopy = {
   },
 }
 
-const COPY: Record<PublicLocale, AiCrawlerCopy> = { he, en, es, 'pt-BR': ptBR, fr, it, ja }
+const de: AiCrawlerCopy = {
+  meta: {
+    title: 'Welche KI-Crawler blockiert Ihre robots.txt? – Go Top SEO',
+    description:
+      'Domain eingeben und sehen, welche KI-Crawler — GPTBot, ClaudeBot, PerplexityBot, Google-Extended und weitere — Ihre robots.txt blockiert, und welche Zeile das jeweils entscheidet. Ohne Anmeldung.',
+  },
+  page: {
+    badge: 'Kostenloses Tool',
+    title: 'Welche KI-Crawler blockiert Ihre Website?',
+    subtitle:
+      'Wir lesen Ihre robots.txt und zeigen für jeden KI-Crawler, ob er erlaubt oder blockiert ist — und welche Zeile der Datei das entscheidet.',
+    trust: ['Ohne Anmeldung, ohne E-Mail-Adresse', 'Eine Datei, einmal gelesen', 'Prüft nicht nur die Startseite, sondern auch einen einzelnen Pfad'],
+  },
+  form: {
+    urlLabel: 'Adresse der Website',
+    urlPlaceholder: 'beispiel.de',
+    pathLabel: 'Zu prüfender Pfad (optional)',
+    pathPlaceholder: '/blog/',
+    pathHint: 'Leer lassen, um die Startseite zu prüfen. Die Regeln in der robots.txt können sich je Pfad unterscheiden.',
+    submit: 'Crawler prüfen',
+    submitting: 'robots.txt wird gelesen …',
+    errors: {
+      invalid_url: 'Diese Adresse sieht nicht richtig aus. Versuchen Sie es in der Form beispiel.de.',
+      blocked_url: 'Es lassen sich nur öffentlich erreichbare Websites prüfen.',
+      unreachable: 'Diese Website war gerade nicht erreichbar. Bitte versuchen Sie es später erneut.',
+      rate_limited: 'In kurzer Zeit wurden viele Websites geprüft. Bitte warten Sie eine Minute und versuchen Sie es erneut.',
+      internal: 'Die Prüfung ist auf unserer Seite nicht durchgelaufen. Bitte versuchen Sie es später erneut.',
+    },
+  },
+  results: {
+    heading: 'Geprüft wurde',
+    forPath: 'Geprüfter Pfad',
+    robotsFound: 'robots.txt gelesen',
+    robotsAbsent: 'Diese Website liefert keine robots.txt aus, daher blockiert diese Datei nichts.',
+    robotsUnreadable: 'Die Website hat die Datei nicht ausgeliefert, daher lässt sich daraus keine Regel lesen. Die Ergebnisse unten behandeln nichts als blockiert.',
+    allowedCount: 'Erlaubt',
+    blockedCount: 'Blockiert',
+    allowed: 'Erlaubt',
+    blocked: 'Blockiert',
+    decidedBy: 'Entscheidende Zeile',
+    noRule: 'Keine passende Regel. Standardmäßig erlaubt',
+    viaWildcard: 'Entschieden durch die Gruppe für alle Crawler',
+    ignoresRobots: 'Dieser Crawler sagt nicht zu, die robots.txt zu beachten',
+    sitemapsTitle: 'In der Datei angegebene Sitemaps',
+    again: 'Eine andere Website prüfen',
+  },
+  purposes: {
+    train: { label: 'Training', blurb: 'Sammelt Seiten, um ein Modell zu trainieren. Wer ihn blockiert, kommt im nächsten Modell nicht vor.' },
+    answer: { label: 'Antwort in Echtzeit', blurb: 'Holt die Seite in dem Moment, in dem jemand fragt, und zitiert sie mit Link in der Antwort.' },
+    search: { label: 'Suchindex', blurb: 'Baut den Suchindex, auf dem auch die KI-Antworten aufsetzen.' },
+    ads: { label: 'Werbung', blurb: 'Prüft die Zielseiten von Anzeigen. Eine Blockade wirkt sich weder auf Antworten noch auf den Suchindex aus.' },
+  },
+  groups: { ai: 'KI-Crawler', classic: 'Klassische Suchmaschinen-Crawler' },
+  reference: {
+    title: 'Wer dahintersteht',
+    intro: 'Diese Tabelle lässt sich auch für sich lesen: der Name, der in der User-agent-Zeile steht, der Betreiber und der Zweck.',
+    colAgent: 'User-agent',
+    colOperator: 'Betreiber',
+    colPurpose: 'Zweck',
+  },
+  limits: {
+    title: 'Was diese Prüfung nicht zeigt',
+    items: [
+      'Die robots.txt ist eine Bitte, keine Mauer. Ein Crawler kann sie ignorieren.',
+      'Eine Firewall oder ein CDN kann einen Crawler blockieren, den die robots.txt erlaubt.',
+      'Die Prüfung beschreibt einen Augenblick. Wer die Datei ändert, ändert die Antwort sofort.',
+      'Einen Trainings-Crawler zu blockieren und einen Crawler zu blockieren, der live antwortet, sind zwei völlig verschiedene Entscheidungen.',
+    ],
+  },
+  cta: {
+    title: 'Herausfinden, ob die KI Ihr Unternehmen wirklich nennt',
+    body: 'Der Zugang ist nur der erste Schritt. Go Top SEO prüft automatisch, ob Ihr Unternehmen in den Antworten von ChatGPT, Gemini und Google AI vorkommt, und verfolgt Ihre Positionen bei Google und in Google Maps monatlich.',
+    button: '7 Tage kostenlos testen, ohne Kreditkarte',
+  },
+}
+
+const pl: AiCrawlerCopy = {
+  meta: {
+    title: 'Które roboty AI blokuje Państwa robots.txt? – Go Top SEO',
+    description:
+      'Prosimy podać domenę, a pokażemy, które roboty AI — GPTBot, ClaudeBot, PerplexityBot, Google-Extended i inne — blokuje Państwa plik robots.txt oraz która reguła o tym decyduje dla każdego z nich. Bez rejestracji.',
+  },
+  page: {
+    badge: 'Narzędzie bezpłatne',
+    title: 'Które roboty AI blokuje Państwa witryna?',
+    subtitle:
+      'Czytamy Państwa plik robots.txt i dla każdego robota AI pokazujemy, czy jest dopuszczony czy zablokowany — oraz która reguła pliku o tym decyduje.',
+    trust: ['Bez rejestracji i bez adresu e-mail', 'Jeden plik, czytany jeden raz', 'Sprawdza nie tylko stronę główną, lecz także wskazaną ścieżkę'],
+  },
+  form: {
+    urlLabel: 'Adres witryny',
+    urlPlaceholder: 'przyklad.pl',
+    pathLabel: 'Ścieżka do sprawdzenia (opcjonalnie)',
+    pathPlaceholder: '/blog/',
+    pathHint: 'Pozostawione puste oznacza sprawdzenie strony głównej. Reguły w pliku robots.txt mogą różnić się dla różnych ścieżek.',
+    submit: 'Sprawdź roboty',
+    submitting: 'Czytamy plik robots.txt\u2026',
+    errors: {
+      invalid_url: 'Ten adres nie wygląda poprawnie. Prosimy podać go w postaci przyklad.pl.',
+      blocked_url: 'Sprawdzić można wyłącznie witryny dostępne publicznie.',
+      unreachable: 'Ta witryna była właśnie nieosiągalna. Prosimy spróbować później.',
+      rate_limited: 'W krótkim czasie sprawdzono wiele witryn. Prosimy odczekać minutę i spróbować ponownie.',
+      internal: 'Sprawdzenie nie zakończyło się po naszej stronie. Prosimy spróbować później.',
+    },
+  },
+  results: {
+    heading: 'Sprawdzono',
+    forPath: 'Sprawdzona ścieżka',
+    robotsFound: 'Plik robots.txt przeczytany',
+    robotsAbsent: 'Ta witryna nie udostępnia pliku robots.txt, więc ten plik niczego nie blokuje.',
+    robotsUnreadable: 'Witryna nie udostępniła pliku, więc nie da się z niego odczytać żadnej reguły. Wyniki poniżej nie traktują niczego jako zablokowane.',
+    allowedCount: 'Dopuszczone',
+    blockedCount: 'Zablokowane',
+    allowed: 'Dopuszczony',
+    blocked: 'Zablokowany',
+    decidedBy: 'Decydująca reguła',
+    noRule: 'Brak pasującej reguły. Domyślnie dopuszczony',
+    viaWildcard: 'Zdecydowała grupa dla wszystkich robotów',
+    ignoresRobots: 'Ten robot nie zobowiązuje się do przestrzegania pliku robots.txt',
+    sitemapsTitle: 'Mapy witryny wskazane w pliku',
+    again: 'Sprawdź inną witrynę',
+  },
+  purposes: {
+    train: { label: 'Trenowanie', blurb: 'Zbiera strony, by wytrenować model. Kto go zablokuje, nie trafi do kolejnego modelu.' },
+    answer: { label: 'Odpowiedź w czasie rzeczywistym', blurb: 'Pobiera stronę w chwili, gdy ktoś o coś pyta, i przytacza ją z linkiem w odpowiedzi.' },
+    search: { label: 'Indeks wyszukiwania', blurb: 'Buduje indeks wyszukiwania, na którym opierają się także odpowiedzi AI.' },
+    ads: { label: 'Reklamy', blurb: 'Sprawdza strony docelowe reklam. Zablokowanie go nie ma wpływu na odpowiedzi ani na indeks wyszukiwania.' },
+  },
+  groups: { ai: 'Roboty AI', classic: 'Klasyczne roboty wyszukiwarek' },
+  reference: {
+    title: 'Kto za tym stoi',
+    intro: 'Tę tabelę można czytać także osobno: nazwa występująca w wierszu User-agent, właściciel i cel.',
+    colAgent: 'User-agent',
+    colOperator: 'Właściciel',
+    colPurpose: 'Cel',
+  },
+  limits: {
+    title: 'Czego to sprawdzenie nie pokazuje',
+    items: [
+      'Plik robots.txt jest prośbą, nie murem. Robot może go zignorować.',
+      'Zapora sieciowa albo CDN mogą zablokować robota, którego robots.txt dopuszcza.',
+      'Sprawdzenie opisuje jedną chwilę. Kto zmieni plik, od razu zmieni odpowiedź.',
+      'Zablokowanie robota trenującego i zablokowanie robota, który odpowiada na żywo, to dwie całkowicie różne decyzje.',
+    ],
+  },
+  cta: {
+    title: 'Sprawdźmy, czy AI naprawdę wymienia Państwa firmę',
+    body: 'Dostęp to dopiero pierwszy krok. Go Top SEO automatycznie sprawdza, czy Państwa firma pojawia się w odpowiedziach ChatGPT, Gemini i Google AI, i co miesiąc monitoruje pozycje w Google oraz w Mapach Google.',
+    button: 'Wypróbuj 7 dni bezpłatnie, bez karty kredytowej',
+  },
+}
+
+const nl: AiCrawlerCopy = {
+  meta: {
+    title: 'Welke AI-crawlers blokkeert uw robots.txt? – Go Top SEO',
+    description:
+      'Vul een domein in en zie welke AI-crawlers — GPTBot, ClaudeBot, PerplexityBot, Google-Extended en meer — uw robots.txt blokkeert, en welke regel dat per crawler beslist. Zonder aanmelden.',
+  },
+  page: {
+    badge: 'Gratis tool',
+    title: 'Welke AI-crawlers blokkeert uw website?',
+    subtitle:
+      'Wij lezen uw robots.txt en laten voor elke AI-crawler zien of die is toegestaan of geblokkeerd — en welke regel van het bestand dat beslist.',
+    trust: ['Zonder aanmelden, zonder e-mailadres', 'Één bestand, één keer gelezen', 'Controleert niet alleen de startpagina, maar ook een afzonderlijk pad'],
+  },
+  form: {
+    urlLabel: 'Adres van de website',
+    urlPlaceholder: 'voorbeeld.nl',
+    pathLabel: 'Te controleren pad (optioneel)',
+    pathPlaceholder: '/blog/',
+    pathHint: 'Laat dit leeg om de startpagina te controleren. De regels in de robots.txt kunnen per pad verschillen.',
+    submit: 'Crawlers controleren',
+    submitting: 'robots.txt wordt gelezen…',
+    errors: {
+      invalid_url: 'Dit adres ziet er niet goed uit. Probeer het in de vorm voorbeeld.nl.',
+      blocked_url: 'Alleen openbaar bereikbare websites kunnen worden gecontroleerd.',
+      unreachable: 'Deze website was net niet bereikbaar. Probeer het later opnieuw.',
+      rate_limited: 'Er zijn in korte tijd veel websites gecontroleerd. Wacht een minuut en probeer het opnieuw.',
+      internal: 'De controle is aan onze kant niet doorgelopen. Probeer het later opnieuw.',
+    },
+  },
+  results: {
+    heading: 'Gecontroleerd is',
+    forPath: 'Gecontroleerd pad',
+    robotsFound: 'robots.txt gelezen',
+    robotsAbsent: 'Deze website levert geen robots.txt, dus dit bestand blokkeert niets.',
+    robotsUnreadable: 'De website heeft het bestand niet geleverd, dus daaruit valt geen regel te lezen. De resultaten hieronder behandelen niets als geblokkeerd.',
+    allowedCount: 'Toegestaan',
+    blockedCount: 'Geblokkeerd',
+    allowed: 'Toegestaan',
+    blocked: 'Geblokkeerd',
+    decidedBy: 'Beslissende regel',
+    noRule: 'Geen passende regel. Standaard toegestaan',
+    viaWildcard: 'Beslist door de groep voor alle crawlers',
+    ignoresRobots: 'Deze crawler zegt niet toe de robots.txt te volgen',
+    sitemapsTitle: 'In het bestand opgegeven sitemaps',
+    again: 'Een andere website controleren',
+  },
+  purposes: {
+    train: { label: 'Training', blurb: 'Verzamelt pagina’s om een model te trainen. Wie hem blokkeert, komt in het volgende model niet voor.' },
+    answer: { label: 'Antwoord in real time', blurb: 'Haalt de pagina op het moment dat iemand iets vraagt, en citeert die met een link in het antwoord.' },
+    search: { label: 'Zoekindex', blurb: 'Bouwt de zoekindex waarop ook de AI-antwoorden rusten.' },
+    ads: { label: 'Advertenties', blurb: 'Controleert de bestemmingspagina’s van advertenties. Een blokkade heeft geen gevolgen voor antwoorden of voor de zoekindex.' },
+  },
+  groups: { ai: 'AI-crawlers', classic: 'Klassieke zoekmachinecrawlers' },
+  reference: {
+    title: 'Wie erachter zit',
+    intro: 'Deze tabel is ook los te lezen: de naam die in de User-agent-regel staat, de eigenaar en het doel.',
+    colAgent: 'User-agent',
+    colOperator: 'Eigenaar',
+    colPurpose: 'Doel',
+  },
+  limits: {
+    title: 'Wat deze controle niet laat zien',
+    items: [
+      'De robots.txt is een verzoek, geen muur. Een crawler kan hem negeren.',
+      'Een firewall of een CDN kan een crawler blokkeren die de robots.txt toestaat.',
+      'De controle beschrijft één moment. Wie het bestand aanpast, verandert het antwoord direct.',
+      'Een trainingscrawler blokkeren en een crawler blokkeren die live antwoordt, zijn twee volstrekt verschillende beslissingen.',
+    ],
+  },
+  cta: {
+    title: 'Uitzoeken of de AI uw bedrijf echt noemt',
+    body: 'De toegang is pas de eerste stap. Go Top SEO controleert automatisch of uw bedrijf voorkomt in de antwoorden van ChatGPT, Gemini en Google AI, en volgt uw posities in Google en in Google Maps maandelijks.',
+    button: '7 dagen gratis uitproberen, zonder creditcard',
+  },
+}
+
+const COPY: Record<PublicLocale, AiCrawlerCopy> = { he, en, es, 'pt-BR': ptBR, fr, it, ja, de, nl, pl }
 
 export function aiCrawlerCopy(locale: PublicLocale): AiCrawlerCopy {
   return COPY[locale] ?? he

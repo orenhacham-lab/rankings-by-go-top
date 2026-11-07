@@ -1,0 +1,308 @@
+/**
+ * The German public site's shared words: navigation, footer, the About page,
+ * the articles index, the cookie notice, the contact menu and the accessibility
+ * menu. Same shape as `he`, `en`, `es`, `pt-BR`, `fr`, `it` and `ja`, which is
+ * what the public-dictionary QA proves — a key present in Hebrew and missing
+ * here is a failure, not a silent fall back to another language.
+ *
+ * German in the formal register, consistently: the reader is addressed as
+ * "Sie", never "du", because every reader of these pages is a business and the
+ * German-speaking market reads "du" from a vendor as a mistake rather than as
+ * warmth. Buttons take the infinitive ("Kostenlos starten", "Preise ansehen"),
+ * which is what German interfaces do, rather than the imperative.
+ *
+ * Established German SEO vocabulary, not calques from the English: "Keywords"
+ * (not "Schlüsselwörter"), "Keyword-Recherche", "Rankings" and "Positionen",
+ * "organische Suchergebnisse", "Sichtbarkeit in KI-Antworten", "Google
+ * Unternehmensprofil" (Google's own German name for what English calls a
+ * Business Profile), "interne Verlinkung", "Website-Analyse", "Dashboard".
+ * Umlauts and ß are not optional, and the compounds are written closed
+ * ("Ranking-Tracking" takes a hyphen because one half is English).
+ */
+import type { PublicDictionary } from './he'
+
+export const de = {
+  nav: {
+    home: 'Start',
+    pricing: 'Preise',
+    features: 'Funktionen',
+    articles: 'Artikel',
+    freeCheck: 'Kostenlose Analyse',
+    about: 'Über uns',
+    contact: 'Kontakt',
+    login: 'Anmelden',
+    startFree: 'Kostenlos starten',
+    toDashboard: 'Dashboard',
+    menu: 'Menü',
+    closeMenu: 'Menü schließen',
+    homeAria: 'Go Top SEO – Startseite',
+    primaryAria: 'Hauptnavigation',
+    featuresMenu: {
+      contentPublishing: {
+        label: 'Inhalte schreiben, planen und veröffentlichen',
+        description: 'SEO- und GEO-Inhalte direkt aus der Plattform schreiben, planen und veröffentlichen, neben dem Tracking von Positionen und Sichtbarkeit.',
+      },
+      googleOrganic: {
+        label: 'Google-Rankings verfolgen',
+        description: 'Positionen in den organischen Google-Ergebnissen. Jedes Keyword nach Ort, Sprache und Gerät, auf Seite 1 und 2.',
+      },
+      googleMaps: {
+        label: 'Google Maps-Positionen verfolgen',
+        description: 'Prüfen, wie sichtbar Ihr Unternehmen in Google Maps ist. Positionen nach Stadt, nach Umgebung und nach Suchbegriff, mit genauem Standort-Targeting.',
+      },
+      aiVisibility: {
+        label: 'Sichtbarkeit in KI-Antworten verfolgen',
+        description: 'Herausfinden, ob Ihr Unternehmen in den Antworten von ChatGPT, Gemini, Perplexity und Google AI genannt wird.',
+      },
+      reports: {
+        label: 'SEO- und GEO-Berichte',
+        description: 'Berichte in PDF und Excel für Ihre Kunden, mit Positionen, Entwicklungen und Sichtbarkeitsdaten.',
+      },
+      keywordResearch: {
+        label: 'Keyword-Recherche',
+        description: 'Keyword-Ideen, Suchvolumen und Wettbewerb, bevor Sie ein Keyword ins Tracking nehmen',
+      },
+      siteFixes: {
+        label: 'Korrekturen an der Website',
+        description: 'Die Website analysieren und Titel, Meta-Beschreibungen, Alternativtexte von Bildern und Links korrigieren. In WordPress mit einem Klick, nach Ihrer Freigabe.',
+      },
+      mapsPosts: {
+        label: 'Beiträge im Google Unternehmensprofil',
+        description: 'Beiträge mit Foto und Button im Google Unternehmensprofil, sofort oder geplant, dazu Antworten auf Bewertungen. Mit einem ersten Entwurf, den Sie bearbeiten können.',
+      },
+      links: {
+        label: 'Links auf Ihre Website',
+        description: 'Die interne Verlinkung zwischen Ihren Seiten, verwaiste Seiten, die kein Link erreicht, und kostenlose Verzeichnisse, in die Ihr Unternehmen gehört.',
+      },
+      competitors: {
+        label: 'Sie und Ihre Wettbewerber',
+        description: 'Bei wie vielen Keywords jeder Wettbewerber in Google vor Ihnen liegt, und wen die KI-Dienste an Ihrer Stelle nennen.',
+      },
+      searchConsole: {
+        label: 'Daten aus der Search Console',
+        description: 'Klicks, Impressionen und durchschnittliche Position in Google, im Vergleich zum vorherigen Zeitraum.',
+      },
+    },
+    featureGroups: {
+      measure: 'Messen',
+      act: 'Umsetzen',
+      prove: 'Ergebnisse zeigen',
+    },
+    solutions: 'Für wen',
+    solutionsMenu: {
+      businesses: {
+        label: 'Unternehmerinnen und Unternehmer',
+        description: 'Ein System, das schreibt, veröffentlicht und messt, ohne Dienstleister zu koordinieren.',
+      },
+      agencies: {
+        label: 'Agenturen',
+        description: 'Alle Kundenwebsites an einer Stelle, mit PDF-Berichten für den Kunden.',
+      },
+      shopify: {
+        label: 'Shopify-Shops',
+        description: 'Unsere App im Shopify App Store.',
+      },
+      wordpress: {
+        label: 'WordPress-Websites',
+        description: 'Artikel direkt auf Ihrer Website veröffentlichen und Korrekturen mit einem Klick.',
+      },
+    },
+  },
+  footer: {
+    tagline: 'Eine Plattform für SEO- und GEO-Inhalte: Inhalte schreiben, planen und veröffentlichen, mit dem Tracking der Sichtbarkeit in Google und in den Antworten von ChatGPT, Gemini und den übrigen KI-Diensten.',
+    pages: 'Seiten',
+    home: 'Start',
+    pricing: 'Preise',
+    articles: 'Artikel',
+    about: 'Über uns',
+    affiliates: 'Partnerprogramm',
+    sitemap: 'Sitemap',
+    legal: 'Rechtliches',
+    privacy: 'Datenschutzerklärung',
+    terms: 'Nutzungsbedingungen',
+    refundPolicy: 'Widerruf und Rückerstattung',
+    affiliateTerms: 'Vertragsbedingungen für Partner',
+    accessibility: 'Barrierefreiheit',
+    contact: 'Kontakt',
+    copyright: '© 2026 Go Top SEO. Alle Rechte vorbehalten.',
+    agencyAria: 'Go Top – Agentur für digitales Marketing',
+    credit: 'Ein Produkt von GO TOP',
+  },
+  about: {
+    breadcrumb: 'Über uns',
+    heroTitle1: 'Das ist',
+    heroTitle2: 'Go Top SEO',
+    heroSubtitle: 'Über 11 Jahre praktische Erfahrung im Digitalen. Und heute eine Plattform für Google-Positionen und die Sichtbarkeit in KI-Antworten.',
+    storyTitle: 'Die Geschichte von Go Top',
+    storyPara1: 'In einer Welt voller künstlicher Intelligenz, voller Automatisierung und großer Unternehmen, die in Abstraktionen sprechen, haben wir bei Go Top uns anders entschieden.',
+    storyPara2: 'Etwas Menschliches, Genaues und auf Ergebnisse Ausgerichtetes, gebaut auf über 11 Jahren konkreter Arbeit im Digitalen: organische Suche für Unternehmen, Websites und Online-Werbung.',
+    yearsLabel: 'Jahre Erfahrung',
+    yearsSublabel: 'im Digitalen',
+    philosophyTitle: 'Unsere Haltung',
+    philosophyPara1: 'Wir schauen nicht auf Menge, sondern allein auf Qualität. Wir arbeiten mit Unternehmen, zu denen wir passen, und ihnen gehört dann unsere volle Aufmerksamkeit, der direkte Kontakt und eine genaue Betreuung.',
+    philosophyPara2: 'Klicks und Impressionen beeindrucken uns bei Go Top nicht. Uns beeindruckt das Telefon, das zu klingeln beginnt. Denn darauf kommt es am Ende an.',
+    qualityBadge: 'Qualität vor Menge',
+    whyTitle: 'Warum wir Go Top SEO gebaut haben',
+    whyIntro: 'Während viele Unternehmen allgemeine Tracking-Tools einsetzen, kam bei uns immer dasselbe Problem zurück:',
+    whyProblem1Title: 'Teure und komplizierte Tools',
+    whyProblem1Desc: 'Für kleine Unternehmen wurden sie nie gebaut',
+    whyProblem2Title: 'Berichte, die niemand versteht',
+    whyProblem2Desc: 'Zahlen, mit denen man nichts anfangen kann',
+    whyProblem3Title: 'Keine echte Begleitung',
+    whyProblem3Desc: 'Genau dann, wenn Hilfe am meisten gebraucht wird',
+    whyConclusion1Prefix: 'Deshalb haben wir',
+    whyConclusion1Suffix: ' gebaut – eine Plattform für Ranking-Tracking, die auf Ergebnisse schaut, so wie wir.',
+    whyAiPara1: 'In den letzten Jahren hat sich die Suche dann noch einmal verändert. Kunden verlassen sich nicht mehr nur auf die gewohnten Google-Ergebnisse: sie fragen ChatGPT, Gemini, Perplexity und andere KI-Dienste und bekommen direkte Empfehlungen.',
+    whyAiPara2: 'Darum verfolgt Go Top SEO nicht nur Positionen in Google, sondern auch, wie Ihr Unternehmen in KI-Antworten erscheint. Denn darauf kommt es wirklich an: gesehen zu werden, überall dort, wo gesucht wird.',
+    featuresTitle: 'Was Go Top SEO für Sie verfolgt',
+    feature1Title: 'Positionen in der Suche',
+    feature1Desc: 'Die Positionen in den organischen Google-Ergebnissen im Zeitverlauf',
+    feature2Title: 'Tracking in Google Maps',
+    feature2Desc: 'Ein ausführlicher Bericht zu den Ergebnissen in der lokalen Suche',
+    feature3Title: 'Sichtbarkeit in KI-Antworten',
+    feature3Desc: 'Prüft, ob die KI-Dienste Ihr Unternehmen nennen, ob sie Ihre Domain nennen und welche Quellen daneben erscheinen',
+    feature4Title: 'Berichte und Auswertungen',
+    feature4Desc: 'Berichte, die zeigen, was wirklich zählt: organisches Google, Google Maps und die Sichtbarkeit in KI-Antworten',
+    valuesTitle: 'Warum Go Top SEO',
+    value1Title: 'Direkter Kontakt, ohne Abstriche',
+    value1Desc: 'Keine neue Ansprechperson jeden Monat. Sie arbeiten mit Fachleuten, die Ihr Unternehmen kennen.',
+    value2Title: 'Vollständige Transparenz',
+    value2Desc: 'Sie wissen jederzeit, was in Ihrem Konto passiert, was funktioniert hat und was nicht, und wie es besser wird.',
+    value3Title: 'Professionalität, die Ergebnisse bringt',
+    value3Desc: 'Bei Go Top werfen wir nicht mit Schlagworten. Wir liefern echte Ergebnisse.',
+    value4Title: 'Wir sind selbst ein Unternehmen',
+    value4Desc: 'Deshalb kennen wir den Druck, das Budget und den Wunsch, Ergebnisse zu sehen.',
+    finalCtaTitle: 'Möchten Sie anfangen?',
+    finalCtaSubtitle: 'Kostenlos starten und selbst sehen, was die Plattform tut',
+    finalCtaStartFree: 'Kostenlose Testphase starten',
+    finalCtaContact: 'Mit dem Team sprechen',
+    lastUpdated: 'Diese Seite wurde im April 2026 zuletzt aktualisiert',
+  },
+  articles: {
+    breadcrumb: 'Artikel',
+    title: 'Artikel',
+    subtitle: 'Artikel und Hinweise zu organischer Suche, digitalem Marketing und Technik',
+    loading: 'Wird geladen …',
+    noImage: 'Ohne Bild',
+    readMore: 'Artikel lesen >>',
+    promoBadge: 'Go Top SEO',
+    promoTitle1: 'Ihre Positionen in',
+    promoTitle2: 'Google im Zeitverlauf',
+    promoDesc: 'Eine professionelle Plattform für das Tracking der Positionen im organischen Google und in Google Maps. Ausführliche Berichte, Entwicklungen im Zeitverlauf und direkter Kontakt.',
+    promoCtaStart: 'Kostenlose Testphase starten',
+    promoCtaPricing: 'Preise ansehen',
+    stat1: 'Keywords',
+    stat2: 'Tracking-Quellen',
+    stat3: 'Für SEO gebaut',
+    stat4: 'Kostenlose Testphase',
+    statValueKeywords: '1000+',
+    statValueTracking: '2',
+    statValueHebrew: '100 %',
+    statValueTrial: '7 Tage',
+    promoFeature1Title: 'Organisches Google',
+    promoFeature1Desc: 'Positionen auf Seite 1 und 2 von Google, mit genauen Ergebnissen',
+    promoFeature2Title: 'Google Maps',
+    promoFeature2Desc: 'Tracking nach genauem Standort: Stadt, Postleitzahl oder Koordinaten',
+    promoFeature3Title: 'Professionelle Berichte',
+    promoFeature3Desc: 'Berichte als PDF und Excel exportieren, mit Entwicklungen, Vergleichen und ausführlichen Auswertungen',
+  },
+  breadcrumbs: {
+    home: 'Start',
+    aria: 'Navigationspfad',
+  },
+  languageSwitcher: {
+    // Each language names ITSELF, in its own script: a reader looking for their
+    // language scans for the word they would recognize, not for its translation.
+    he: 'עברית',
+    en: 'English',
+    es: 'Español',
+    'pt-BR': 'Português (Brasil)',
+    fr: 'Français',
+    it: 'Italiano',
+    ja: '日本語',
+    de: 'Deutsch',
+    nl: 'Nederlands',
+    pl: 'Polski',
+    aria: 'Sprache der Website wechseln',
+  },
+  cookie: {
+    aria: 'Datenschutzhinweis',
+    title: 'Ihre Privatsphäre ist uns wichtig',
+    body: 'Wir verwenden die Cookies, die für den Betrieb der Website nötig sind. Cookies für Messung und Marketing werden erst nach Ihrer Einwilligung geladen. Mehr dazu in unserer',
+    short: 'Optionale Cookies werden nur mit Ihrer Einwilligung geladen. Siehe unsere',
+    privacy: 'Datenschutzerklärung',
+    accept: 'Alle annehmen',
+    rejectAll: 'Alle ablehnen',
+    customize: 'Anpassen',
+    save: 'Auswahl speichern',
+    back: 'Zurück',
+    settings: 'Cookie-Einstellungen',
+    settingsTitle: 'Cookies auswählen',
+    settingsIntro: 'Jede Kategorie können Sie einzeln annehmen oder ablehnen, und Ihre Auswahl jederzeit ändern.',
+    always: 'Immer aktiv',
+    withdrawHint: 'Um Ihre Einwilligung jederzeit zu ändern oder zu widerrufen, finden Sie am Fuß jeder Seite den Link «Cookie-Einstellungen». Die Bedingungen der Speicherung und des Auslesens auf Ihrem Gerät können Sie auch selbst festlegen, in den Einstellungen Ihres Browsers; eine Sperre im Browser allein ersetzt jedoch nicht den Widerruf der Einwilligung bei uns.',
+    gpcTitle: 'Einwilligung automatisch abgelehnt',
+    gpcBody: 'Ihr Browser sendet das Signal Global Privacy Control, daher wurden keine Cookies für Messung oder Marketing geladen. Ihre Entscheidung wurde festgehalten.',
+    categories: {
+      necessary: {
+        title: 'Unbedingt erforderlich',
+        desc: 'Die Anmeldung am Konto, die Sprache der Oberfläche, die Sicherheit und der Schutz vor Missbrauch. Ohne sie kann der Dienst nicht funktionieren, deshalb hängen sie nicht von einer Einwilligung ab.',
+      },
+      analytics: {
+        title: 'Messung',
+        desc: 'Wie viele Menschen die Website besucht haben, welche Seiten sie gelesen haben und was nicht funktioniert hat. Wir nutzen das, um die Website zu verbessern, nie für Werbung.',
+      },
+      marketing: {
+        title: 'Marketing',
+        desc: 'Die Leistung unserer Anzeigen messen, passende Anzeigen in den Netzwerken von Google und Meta ausliefern und einen Kauf dem Partner zuordnen, der Ihren Besuch über den Marktplatz JVZoo zu uns geleitet hat. Eine Ablehnung kostet Sie nichts im Dienst.',
+      },
+    },
+  },
+  contact: {
+    region: 'Kontaktbereich',
+    whatsappAria: 'Kontakt über WhatsApp',
+    whatsappTitle: 'Über WhatsApp schreiben',
+    whatsapp: 'WhatsApp',
+    callAria: 'Anrufen',
+    call: 'Anrufen',
+    whatsappLabel: 'WhatsApp',
+    whatsappMessage: 'Guten Tag, ich brauche Hilfe',
+    phoneLabel: 'Anrufen',
+    emailLabel: 'E-Mail',
+    emailAria: 'Eine E-Mail schreiben',
+    // The floating "free demo" button (w11), on the public site and in the app.
+    demo: 'Kostenlose Demo',
+    demoAria: 'Eine kostenlose Demo über WhatsApp anfragen',
+    demoMessage: 'Guten Tag, ich möchte eine kostenlose Demo von Go Top SEO',
+  },
+  a11y: {
+    open: 'Menü für Barrierefreiheit öffnen',
+    title: 'Menü für Barrierefreiheit',
+    close: 'Menü für Barrierefreiheit schließen',
+    noAlt: '(ohne Alternativtext)',
+    statement: 'Erklärung zur Barrierefreiheit',
+    reset: 'Barrierefreiheit ausschalten / zurücksetzen',
+    fontUp: 'Text größer',
+    fontDown: 'Text kleiner',
+    readableFont: 'Gut lesbare Schrift',
+    persistentDesc: 'Bildbeschreibungen anzeigen',
+    showDescriptions: 'Bildbeschreibung beim Zeigen',
+    highlightLinks: 'Links hervorheben',
+    highlightHeadings: 'Überschriften hervorheben',
+    invertColors: 'Farben umkehren',
+    blackYellow: 'Schwarz und Gelb',
+    highContrast: 'Hoher Kontrast',
+    sepia: 'Sepia',
+    grayscale: 'Graustufen',
+    stopAnimations: 'Animationen anhalten',
+    keyboardNav: 'Navigation mit der Tastatur',
+    blackCursor: 'Schwarzer Zeiger',
+    bigCursor: 'Großer Zeiger',
+    zoomOut: 'Verkleinern',
+    zoomIn: 'Vergrößern',
+  },
+}
+
+/** The dictionary must carry every key the Hebrew one defines; nothing less. */
+const _deHasEveryKey: PublicDictionary = de as unknown as PublicDictionary
+void _deHasEveryKey

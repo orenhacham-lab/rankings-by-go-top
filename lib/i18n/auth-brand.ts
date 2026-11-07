@@ -216,4 +216,88 @@ export const AUTH_BRAND: Record<PublicLocale, Record<AuthBrandVariant, AuthBrand
     glimpse: '計測中のキーワード',
     mobileTrust: ['クレジットカード不要', 'いつでも解約可能'],
   },
+  pl: {
+    login: {
+      eyebrow: 'Witamy ponownie',
+      points: [
+        'Państwa pozycje w Google i w Mapach Google, w jednym miejscu',
+        'Plan treści i artykuły, gotowe, by pisać dalej',
+        'To, co ChatGPT i Gemini mówią o Państwa firmie',
+      ],
+    },
+    signup: {
+      eyebrow: 'Google i odpowiedzi AI w jednym systemie',
+      points: [
+        'Pełna analiza Państwa witryny w kilka minut',
+        'Miesiąc treści, zaplanowany dla Państwa branży',
+        'Pozycje w Google i widoczność w AI, zapisywane dla Państwa co miesiąc',
+      ],
+    },
+    recover: {
+      eyebrow: 'Powrót do Państwa konta',
+      points: [
+        'Link trafia wyłącznie na adres zapisany na koncie',
+        'Działa jednorazowo i tylko przez krótki czas',
+        'Państwa dane i projekty pozostają dokładnie takie, jakie są',
+      ],
+    },
+    glimpse: 'Monitorowane słowa kluczowe',
+    mobileTrust: ['Bez karty kredytowej', 'Rezygnacja w dowolnym momencie'],
+  },
+  nl: {
+    login: {
+      eyebrow: 'Welkom terug',
+      points: [
+        'Uw posities in Google en Google Maps, op één plek',
+        'Uw contentplan en uw artikelen, klaar om verder te gaan',
+        'Wat ChatGPT en Gemini over uw bedrijf zeggen',
+      ],
+    },
+    signup: {
+      eyebrow: 'Google en AI-zoekresultaten in één systeem',
+      points: [
+        'Een volledige analyse van uw website in een paar minuten',
+        'Een maand content, gepland voor uw branche',
+        'Google-posities en AI-zichtbaarheid, maandelijks voor u vastgelegd',
+      ],
+    },
+    recover: {
+      eyebrow: 'Terug naar uw account',
+      points: [
+        'De link gaat uitsluitend naar het adres dat in het account staat',
+        'Hij geldt eenmalig en maar korte tijd',
+        'Uw gegevens en projecten blijven precies zoals ze zijn',
+      ],
+    },
+    glimpse: 'Gevolgde zoekwoorden',
+    mobileTrust: ['Zonder creditcard', 'Opzegbaar wanneer u wilt'],
+  },
+  de: {
+    login: {
+      eyebrow: 'Willkommen zurück',
+      points: [
+        'Ihre Positionen bei Google und Google Maps, an einer Stelle',
+        'Ihr Content-Plan und Ihre Artikel, bereit zum Weitermachen',
+        'Was ChatGPT und Gemini über Ihr Unternehmen sagen',
+      ],
+    },
+    signup: {
+      eyebrow: 'Google und KI-Suche in einem System',
+      points: [
+        'Eine vollständige Analyse Ihrer Website in wenigen Minuten',
+        'Ein Monat Inhalte, geplant für Ihre Branche',
+        'Google-Rankings und KI-Sichtbarkeit, für Sie monatlich erfasst',
+      ],
+    },
+    recover: {
+      eyebrow: 'Zurück zu Ihrem Konto',
+      points: [
+        'Der Link geht ausschließlich an die im Konto hinterlegte Adresse',
+        'Er gilt einmalig und nur für kurze Zeit',
+        'Ihre Daten und Projekte bleiben genau so, wie sie sind',
+      ],
+    },
+    glimpse: 'Erfasste Keywords',
+    mobileTrust: ['Ohne Kreditkarte', 'Jederzeit kündbar'],
+  },
 }

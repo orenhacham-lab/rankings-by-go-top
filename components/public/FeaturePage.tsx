@@ -76,6 +76,9 @@ const VISUAL_CAPTION: Record<PublicLocale, string> = {
   fr: 'Illustration du produit. Les noms et les chiffres sont des exemples.',
   it: 'Illustrazione del prodotto. Nomi e cifre sono esempi.',
   ja: '製品のイメージ画像です。名称や数値は例示です。',
+  de: 'Produktdarstellung. Namen und Zahlen sind Beispiele.',
+  nl: 'Illustratie van het product. Namen en cijfers zijn voorbeelden.',
+  pl: 'Ilustracja produktu. Nazwy i liczby są przykładowe.',
 }
 
 const GRID_3 = 'grid grid-cols-1 gap-4 sm:gap-5 md:grid-cols-3'

@@ -29,7 +29,7 @@
  */
 
 import type { PublicLocale } from './locales'
-import { isEnglishPath, isFrenchPath, isItalianPath, isJapanesePath, isPortuguesePath, isSpanishPath } from './request-locale'
+import { isEnglishPath, isFrenchPath, isItalianPath, isJapanesePath, isGermanPath, isDutchPath, isPolishPath, isPortuguesePath, isSpanishPath } from './request-locale'
 import { normalizeDashboardUiLocale } from './dashboard/locale'
 
 /**
@@ -57,6 +57,17 @@ import { normalizeDashboardUiLocale } from './dashboard/locale'
  * one reason beyond the others — the Japanese forms are the first whose words
  * cannot be measured by splitting on a space (lib/text/segment.ts), so a form
  * that fell back to Hebrew would be wrong in both direction and measurement.
+ *
+ * German is the eighth and arrives with the same branch: `/de/login` is the
+ * German route, gated by app/(auth)/de/layout.tsx. A missing branch is not a
+ * compile error here either — it is a German sign-up form rendered
+ * right-to-left in Hebrew, which is the failure this list exists to prevent.
+ *
+ * Dutch is the ninth, and `/nl/login` arrives the same way, gated by
+ * app/(auth)/nl/layout.tsx.
+ *
+ * Polish is the tenth, and `/pl/login` the same, gated by
+ * app/(auth)/pl/layout.tsx.
  */
 export function resolveAuthLocale(input: {
   pathname?: string | null
@@ -69,5 +80,8 @@ export function resolveAuthLocale(input: {
   if (isFrenchPath(input.pathname)) return 'fr'
   if (isItalianPath(input.pathname)) return 'it'
   if (isJapanesePath(input.pathname)) return 'ja'
+  if (isGermanPath(input.pathname)) return 'de'
+  if (isDutchPath(input.pathname)) return 'nl'
+  if (isPolishPath(input.pathname)) return 'pl'
   return normalizeDashboardUiLocale(input.langParam) ?? input.serverLocale ?? 'he'
 }

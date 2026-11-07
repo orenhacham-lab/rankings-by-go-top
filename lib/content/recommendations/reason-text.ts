@@ -98,6 +98,36 @@ export const REASON_TEXT: Record<ContentLanguage, ReasonText> = {
     supportingTopic: 'サイトのデータにもとづく補完テーマ',
     numberLocale: 'ja-JP',
   },
+  nl: {
+    fillsGap: 'Het onderwerp vult een hiaat in de content op een gebied waarop het bedrijf actief is.',
+    freshAngle: 'Het onderwerp voegt een nieuwe invalshoek toe aan de bestaande content van de website.',
+    supportedByExisting: 'Het wordt ondersteund door pagina\u2019s en producten die al op de website staan.',
+    demand: (query, volume) => `Het zoekwoordenonderzoek laat voor \u201e${query}\u201d ongeveer ${volume} zoekopdrachten per maand zien.`,
+    neutral: 'Het onderwerp past bij het werkterrein van het bedrijf en bij de zoektermen die in het onderzoek gevonden zijn.',
+    foundInSearchData: (volume) => `Gevonden in de zoekdata, met ongeveer ${volume} zoekopdrachten per maand`,
+    supportingTopic: 'Aanvullend onderwerp op basis van de websitegegevens',
+    numberLocale: 'nl-NL',
+  },
+  de: {
+    fillsGap: 'Das Thema schließt eine Inhaltslücke in einem Bereich, in dem das Unternehmen tätig ist.',
+    freshAngle: 'Das Thema ergänzt die vorhandenen Inhalte der Website um eine neue Perspektive.',
+    supportedByExisting: 'Es wird von bereits vorhandenen Seiten und Produkten der Website gestützt.',
+    demand: (query, volume) => `Die Keyword-Recherche zeigt für „${query}" rund ${volume} Suchanfragen pro Monat.`,
+    neutral: 'Das Thema passt zum Geschäftsfeld des Unternehmens und zu den in der Recherche gefundenen Suchbegriffen.',
+    foundInSearchData: (volume) => `In den Suchdaten gefunden, mit rund ${volume} Suchanfragen pro Monat`,
+    supportingTopic: 'Ergänzendes Thema auf Grundlage der Website-Daten',
+    numberLocale: 'de-DE',
+  },
+  pl: {
+    fillsGap: 'Temat wypełnia lukę w treściach w obszarze, w którym firma działa.',
+    freshAngle: 'Temat dodaje nowe spojrzenie obok treści, które już są na stronie.',
+    supportedByExisting: 'Opiera się na stronach i produktach, które już są w witrynie.',
+    demand: (query, volume) => `Analiza słów kluczowych pokazuje dla „${query}” około ${volume} wyszukiwań miesięcznie.`,
+    neutral: 'Temat jest związany z działalnością firmy i z frazami znalezionymi w analizie słów kluczowych.',
+    foundInSearchData: (volume) => `Znaleziony w danych wyszukiwania, około ${volume} wyszukiwań miesięcznie`,
+    supportingTopic: 'Temat uzupełniający na podstawie danych ze strony',
+    numberLocale: 'pl-PL',
+  },
 }
 
 /**

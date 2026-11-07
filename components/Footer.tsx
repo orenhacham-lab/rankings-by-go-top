@@ -2,6 +2,9 @@
 
 import Link from 'next/link'
 import { LOCALE_PREFIX, localeHomeHref, type PublicLocale } from '@/lib/i18n/locales'
+import { GERMAN_IMPRESSUM_LINK } from '@/lib/i18n/german-site'
+import { DUTCH_COMPANY_INFO_LINK } from '@/lib/i18n/dutch-site'
+import { POLISH_COMPANY_INFO_LINK } from '@/lib/i18n/polish-site'
 import { JAPANESE_TOKUSHO_LINK } from '@/lib/i18n/japanese-site'
 import { getPublicDictionary } from '@/lib/i18n/getPublicDictionary'
 import GoTopMark from '@/components/brand/GoTopMark'
@@ -119,6 +122,55 @@ export function Footer({ locale = 'he' }: { locale?: PublicLocale } = {}) {
                 <li>
                   <Link href={JAPANESE_TOKUSHO_LINK.href} className={linkClass}>
                     {JAPANESE_TOKUSHO_LINK.label}
+                  </Link>
+                </li>
+              )}
+              {/*
+                §5 DDG asks a commercially operated digital service to keep the
+                provider's identity and contact details easily recognizable and
+                directly reachable from anywhere in the service. Germany is the
+                only locale whose law asks for THAT page, so the link appears in
+                that footer only. Dutch has its own, below, under a Dutch name
+                and its own statute, Polish has one too, and the remaining
+                seven trees have no such route.
+              */}
+              {locale === 'de' && (
+                <li>
+                  <Link href={GERMAN_IMPRESSUM_LINK.href} className={linkClass}>
+                    {GERMAN_IMPRESSUM_LINK.label}
+                  </Link>
+                </li>
+              )}
+              {/*
+                Artikel 3:15d lid 1 BW is the Dutch counterpart of §5 DDG: the
+                provider's identity, register entry and contact have to be
+                "gemakkelijk, rechtstreeks en permanent toegankelijk". It is a
+                Dutch page under a Dutch name, not an Impressum, and
+                "rechtstreeks" is why the link is here rather than two clicks
+                deep.
+              */}
+              {locale === 'nl' && (
+                <li>
+                  <Link href={DUTCH_COMPANY_INFO_LINK.href} className={linkClass}>
+                    {DUTCH_COMPANY_INFO_LINK.label}
+                  </Link>
+                </li>
+              )}
+              {/*
+                Polish gets the same kind of page from a DIFFERENT statute, and
+                the difference is the whole point. The Polish e-services act —
+                the obvious cousin of §5 DDG and of art. 3:15d BW — sets a
+                country-of-origin rule keyed to a seat inside the EU, and this
+                seller has none, so it does not reach us. The duty that does is
+                the information duty of the ustawa o prawach konsumenta, and it
+                asks for MORE than the Dutch one: the register, the registration
+                number and a telephone number. Three items the footer never
+                carried, which is why there is a page.
+              */}
+              {locale === 'pl' && (
+                <li>
+                  <Link href={POLISH_COMPANY_INFO_LINK.href} className={linkClass}>
+                    {POLISH_COMPANY_INFO_LINK.label}
                   </Link>
                 </li>
               )}

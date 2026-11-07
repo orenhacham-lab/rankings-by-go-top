@@ -828,6 +828,137 @@ export const SEMRUSH_COMPARE: Record<PublicLocale, ComparisonCopy> = {
   // them, and their English trial sentence is quoted in English and then
   // explained, rather than silently paraphrased into Japanese as if they had
   // said it that way.
+  de: {
+    competitor: 'Semrush',
+    eyebrow: 'Go Top SEO vs. Semrush',
+    metaTitle: 'Go Top SEO vs. Semrush | Vergleich',
+    metaDescription:
+      'Go Top SEO im Vergleich mit Semrush: wer die Inhalte schreibt und veröffentlicht, wer sich um das Google Unternehmensprofil kümmert, was im jeweiligen Preis steckt und wann Semrush die bessere Wahl ist.',
+    hero: {
+      title: 'Semrush gibt Ihnen die Werkzeuge.',
+      accent: 'Wir machen die Arbeit',
+      subtitle:
+        'Semrush hat einen der umfangreichsten Datenbestände der Branche und zeigt Ihnen, was im Argen liegt. Go Top SEO ist für Unternehmen gebaut, die keine Zeit haben, darauf zu reagieren: das System schreibt die Artikel, veröffentlicht sie auf der Website, postet im Google Unternehmensprofil und verfolgt, wo Sie ranken.',
+    },
+    table: {
+      eyebrow: 'Der Vergleich',
+      title: 'Was jedes von beiden tut, entnommen aus Semrushs eigenen Seiten',
+      checkedOn: CHECKED,
+      sources: SOURCES,
+      rows: [
+        {
+          label: 'Einstiegspreis',
+          ours: 'Ab 79 USD im Monat zuzüglich Steuern, alles in einem Preis. In Israel ab 249 ILS im Monat inklusive Mehrwertsteuer.',
+          theirs:
+            'Tarif SEO für 139 USD/Monat (117,33 USD bei jährlicher Zahlung), mit 5 Websites und 500 Keywords. Es gibt zusätzlich einen eingeschränkten kostenlosen Tarif.',
+        },
+        {
+          label: 'Wer die Arbeit macht',
+          ours: 'Das System. Sie geben ein Thema frei; es schreibt, ergänzt Bilder und interne Links und veröffentlicht.',
+          theirs:
+            'Gemischt. Ihr Agent für das Unternehmensprofil postet selbstständig, Artikel werden mit einem Klick veröffentlicht, und Korrekturen auf der Website gehen an Sie oder Ihre Entwicklung.',
+        },
+        {
+          label: 'Artikel',
+          ours: 'Automatisch geplant und geschrieben, mit Bildern und internen Links, aus einem Monatsplan, den Sie freigeben.',
+          theirs:
+            'Ihr WordPress-Plugin recherchiert Themen, entwirft längere Inhalte und erzeugt KI-Bilder. Es braucht ein bezahltes Konto.',
+        },
+        {
+          label: 'Veröffentlichung auf der Website',
+          ours: 'Automatisch in WordPress und Shopify. Sie öffnen den Editor nie.',
+          theirs: 'Ihr Plugin veröffentlicht mit einem Klick in WordPress, über «Share» und dann die WordPress-Option.',
+        },
+        {
+          label: 'Google Unternehmensprofil',
+          ours: 'Im selben Preis enthalten: automatische Beiträge im Profil, mit Ihrer Einwilligung.',
+          theirs:
+            'Das Local Toolkit wird separat gekauft und je Standort berechnet: 30 USD/Monat je Standort bei Base, 60 USD bei Pro. Ihr Agent veröffentlicht Beiträge und antwortet auf neue Bewertungen.',
+        },
+        {
+          label: 'Korrekturen auf der Website',
+          ours: 'Ein Teil der Korrekturen wird über unser WordPress-Plugin eingespielt, ohne dass Sie Code lesen müssen.',
+          theirs:
+            'Site Audit ordnet Probleme nach Schweregrad und gibt Hinweise zur Behebung. Ihre Seite behauptet nicht, dass Semrush Ihre Website verändert.',
+        },
+        {
+          label: 'Ranking-Tracking',
+          ours:
+            'Eine monatliche Prüfung in Google, in Google Maps und in KI-Antworten (darunter ChatGPT, Gemini und Google AI), im selben Preis.',
+          theirs:
+            '500 Keywords, täglich erfasst, im Tarif SEO. Das Tracking von KI-Antworten beginnt bei Starter mit 199 USD/Monat. Maps-Tracking gehört zum separaten Local Toolkit.',
+        },
+        {
+          label: 'Testphase',
+          ours: '7 Tage, ohne Kreditkarte, jederzeit kündbar.',
+          theirs: '«Try Semrush free for seven days. Cancel anytime.» Exporte sind während der Testphase deaktiviert.',
+        },
+      ],
+    },
+    theirStrengths: {
+      eyebrow: 'Wann Semrush die bessere Wahl ist',
+      title: 'Es gibt Fälle, in denen Semrush einfach die richtige Antwort ist',
+      intro: 'Wir versuchen nicht, Semrush zu sein, und wenn Sie das brauchen, ist es besser, das jetzt zu wissen.',
+      items: [
+        {
+          title: 'Wenn Sie recherchieren wollen, statt bedient zu werden',
+          body:
+            'Wettbewerber- und Keyword-Recherche, Backlink-Daten, Traffic- und Marktanalysen, historische Daten und eine API. Wenn Sie oder Ihre Agentur sich in einen Markt graben wollen, beantwortet Semrush Fragen, die wir nicht beantworten.',
+        },
+        {
+          title: 'Wenn Sie tägliches, breites Tracking brauchen',
+          body:
+            'Ihr Tarif SEO erfasst 500 Keywords jeden Tag. Unsere Prüfung läuft monatlich. Wenn Sie tägliche Bewegungen sehen müssen, ist dieser Abstand echt, und er geht an Semrush.',
+        },
+        {
+          title: 'Wenn Sie viele Standorte haben und Einträge verteilen wollen',
+          body: 'Local Pro schickt Ihre Unternehmensdaten mit einem Klick in über 70 Verzeichnisse. Das bieten wir überhaupt nicht an.',
+        },
+      ],
+    },
+    ourStrengths: {
+      eyebrow: 'Wann wir besser passen',
+      title: 'Wenn niemand vor dem Dashboard sitzen wird',
+      intro: 'Die meisten Unternehmen, die mit uns sprechen, brauchen kein weiteres Dashboard. Sie brauchen, dass die Arbeit erledigt wird.',
+      items: [
+        {
+          title: 'Ein Preis, ohne Aufschlag je Standort',
+          body: 'Artikel, Beiträge im Google Unternehmensprofil und Ranking-Tracking liegen im selben Preis, nicht in drei verschiedenen Tarifen.',
+        },
+        {
+          title: 'Die Inhalte veröffentlichen sich selbst',
+          body: 'Sie geben einmal im Monat Themen frei, und die Artikel gehen mit Bildern und internen Links online, ohne dass Sie sie anfassen.',
+        },
+        {
+          title: 'Für ein kleines Team gebaut',
+          body: 'Außer der Verbindung zur Website ist nichts einzurichten, und es gibt keine wöchentliche Routine, die Sie halten müssen.',
+        },
+        {
+          title: 'Keine Entwicklung nötig',
+          body: 'Die Einrichtung ist ein WordPress-Plugin oder eine Shopify-App. Es gibt nichts zu implementieren und niemanden zu briefen.',
+        },
+      ],
+    },
+    faq: {
+      eyebrow: 'Fragen',
+      title: 'Was vor einem Wechsel gefragt wird',
+      items: [
+        {
+          q: 'Kann ich beides nutzen?',
+          a: 'Ja, und viele Agenturen machen genau das: Semrush für die Recherche, wir für die Arbeit, die jede Woche anfallen muss. Technisch kollidiert nichts.',
+        },
+        {
+          q: 'Messen Sie die KI-Sichtbarkeit besser als Semrush?',
+          a: 'Nein. Wir prüfen monatlich; Semrush prüft ab dem Tarif Starter täglich. Unser Vorteil ist, dass die Prüfung im Grundpreis enthalten ist und kein Upgrade braucht.',
+        },
+        {
+          q: 'Sind die Preise auf dieser Seite aktuell?',
+          a: `Sie wurden am ${CHECKED} von Semrushs eigenen Seiten gelesen. Unternehmen ändern Preise, und Semrush hat seine Tarifnamen kürzlich neu geordnet — die Links unter der Tabelle sind die Quelle.`,
+        },
+      ],
+    },
+    close: { title: 'Sehen Sie ohne Anmeldung, wo Ihre Website steht' },
+  },
   ja: {
     competitor: 'Semrush',
     eyebrow: 'Go Top SEOとSemrushの比較',
@@ -958,5 +1089,267 @@ export const SEMRUSH_COMPARE: Record<PublicLocale, ComparisonCopy> = {
       ],
     },
     close: { title: 'ご自身のサイトの現状を、登録なしで確認する' },
+  },
+  nl: {
+    competitor: 'Semrush',
+    eyebrow: 'Go Top SEO tegenover Semrush',
+    metaTitle: 'Go Top SEO tegenover Semrush | vergelijking',
+    metaDescription:
+      'Go Top SEO vergeleken met Semrush: wie de content schrijft en publiceert, wie het Google-bedrijfsprofiel bijhoudt, wat er in elke prijs zit en wanneer Semrush de betere keuze is.',
+    hero: {
+      title: 'Semrush geeft u het gereedschap.',
+      accent: 'Wij doen het werk',
+      subtitle:
+        'Semrush heeft een van de uitgebreidste gegevensbestanden van de branche en laat u zien wat er niet in orde is. Go Top SEO is gebouwd voor bedrijven die geen tijd hebben om daarop te reageren: het systeem schrijft de artikelen, publiceert ze op de website, plaatst berichten in het Google-bedrijfsprofiel en volgt waar u staat.',
+    },
+    table: {
+      eyebrow: 'De vergelijking',
+      title: 'Wat elk van beide doet, overgenomen uit Semrush’ eigen pagina’s',
+      checkedOn: CHECKED,
+      sources: SOURCES,
+      rows: [
+        {
+          label: 'Instapprijs',
+          ours: 'Vanaf 79 USD per maand plus belasting, alles in één prijs. In Israël vanaf 249 ILS per maand inclusief btw.',
+          theirs:
+            'Pakket SEO voor 139 USD per maand (117,33 USD bij jaarlijkse betaling), met 5 websites en 500 zoekwoorden. Er is daarnaast een beperkt gratis pakket.',
+        },
+        {
+          label: 'Wie het werk doet',
+          ours: 'Het systeem. U keurt een onderwerp goed; het schrijft, voegt afbeeldingen en interne links toe en publiceert.',
+          theirs:
+            'Gemengd. Hun agent voor het bedrijfsprofiel plaatst zelf berichten, artikelen worden met één klik gepubliceerd, en correcties op de website komen bij u of bij uw ontwikkelaar terecht.',
+        },
+        {
+          label: 'Artikelen',
+          ours: 'Automatisch ingepland en geschreven, met afbeeldingen en interne links, uit een maandplan dat u goedkeurt.',
+          theirs:
+            'Hun WordPress-plug-in onderzoekt onderwerpen, maakt concepten voor langere teksten en genereert AI-afbeeldingen. Daar is een betaald account voor nodig.',
+        },
+        {
+          label: 'Publicatie op de website',
+          ours: 'Automatisch in WordPress en Shopify. U opent de editor nooit.',
+          theirs: 'Hun plug-in publiceert met één klik in WordPress, via “Share” en dan de WordPress-optie.',
+        },
+        {
+          label: 'Google-bedrijfsprofiel',
+          ours: 'In dezelfde prijs begrepen: automatische berichten in het profiel, met uw toestemming.',
+          theirs:
+            'Het Local Toolkit wordt apart gekocht en per vestiging gerekend: 30 USD per maand per vestiging bij Base, 60 USD bij Pro. Hun agent plaatst berichten en antwoordt op nieuwe beoordelingen.',
+        },
+        {
+          label: 'Correcties op de website',
+          ours: 'Een deel van de correcties wordt via onze WordPress-plug-in doorgevoerd, zonder dat u code hoeft te lezen.',
+          theirs:
+            'Site Audit sorteert problemen op ernst en geeft aanwijzingen om ze te verhelpen. Hun pagina beweert niet dat Semrush uw website wijzigt.',
+        },
+        {
+          label: 'Positiemeting',
+          ours:
+            'Een maandelijkse controle in Google, in Google Maps en in AI-antwoorden (waaronder ChatGPT, Gemini en Google AI), in dezelfde prijs.',
+          theirs:
+            '500 zoekwoorden, dagelijks vastgelegd, in het pakket SEO. Het volgen van AI-antwoorden begint bij Starter met 199 USD per maand. Meten in Maps hoort bij het aparte Local Toolkit.',
+        },
+        {
+          label: 'Proefperiode',
+          ours: '7 dagen, zonder creditcard, altijd op te zeggen.',
+          theirs: '“Try Semrush free for seven days. Cancel anytime.” Exporteren is tijdens de proefperiode uitgeschakeld.',
+        },
+      ],
+    },
+    theirStrengths: {
+      eyebrow: 'Wanneer Semrush de betere keuze is',
+      title: 'Er zijn gevallen waarin Semrush simpelweg het juiste antwoord is',
+      intro: 'Wij proberen geen Semrush te zijn, en hebt u dat nodig, dan is het beter dat nu te weten.',
+      items: [
+        {
+          title: 'Als u zelf wilt onderzoeken in plaats van bediend te worden',
+          body:
+            'Onderzoek naar concurrenten en zoekwoorden, gegevens over backlinks, analyses van bezoek en markt, historische gegevens en een API. Wilt u of wil uw bureau zich in een markt vastbijten, dan beantwoordt Semrush vragen die wij niet beantwoorden.',
+        },
+        {
+          title: 'Als u dagelijkse, brede meting nodig hebt',
+          body:
+            'Hun pakket SEO legt 500 zoekwoorden elke dag vast. Onze controle loopt maandelijks. Moet u dagelijkse bewegingen zien, dan is dat verschil echt, en het valt in het voordeel van Semrush uit.',
+        },
+        {
+          title: 'Als u veel vestigingen hebt en vermeldingen wilt verspreiden',
+          body: 'Local Pro stuurt uw bedrijfsgegevens met één klik naar meer dan 70 gidsen. Dat bieden wij in het geheel niet aan.',
+        },
+      ],
+    },
+    ourStrengths: {
+      eyebrow: 'Wanneer wij beter passen',
+      title: 'Als er niemand voor het dashboard gaat zitten',
+      intro: 'De meeste bedrijven die met ons spreken hebben geen extra dashboard nodig. Zij hebben nodig dat het werk gedaan is.',
+      items: [
+        {
+          title: 'Één prijs, zonder opslag per vestiging',
+          body: 'Artikelen, berichten in het Google-bedrijfsprofiel en positiemeting zitten in dezelfde prijs, niet in drie verschillende pakketten.',
+        },
+        {
+          title: 'De content publiceert zichzelf',
+          body: 'U keurt één keer per maand onderwerpen goed, en de artikelen gaan met afbeeldingen en interne links online zonder dat u ze aanraakt.',
+        },
+        {
+          title: 'Gebouwd voor een klein team',
+          body: 'Behalve de verbinding met de website is er niets in te stellen, en er is geen wekelijkse routine die u moet volhouden.',
+        },
+        {
+          title: 'Geen ontwikkelaar nodig',
+          body: 'Het opzetten is een WordPress-plug-in of een Shopify-app. Er valt niets te bouwen en niemand bij te praten.',
+        },
+      ],
+    },
+    faq: {
+      eyebrow: 'Vragen',
+      title: 'Wat er voor een overstap wordt gevraagd',
+      items: [
+        {
+          q: 'Kan ik beide gebruiken?',
+          a: 'Ja, en veel bureaus doen precies dat: Semrush voor het onderzoek, wij voor het werk dat elke week moet gebeuren. Technisch botst er niets.',
+        },
+        {
+          q: 'Meten jullie de zichtbaarheid in AI beter dan Semrush?',
+          a: 'Nee. Wij controleren maandelijks; Semrush controleert vanaf het pakket Starter dagelijks. Ons voordeel is dat de controle in de basisprijs zit en geen upgrade vraagt.',
+        },
+        {
+          q: 'Zijn de prijzen op deze pagina actueel?',
+          a: `Ze zijn op ${CHECKED} gelezen van Semrush’ eigen pagina’s. Bedrijven veranderen prijzen, en Semrush heeft zijn pakketnamen recent opnieuw ingedeeld — de links onder de tabel zijn de bron.`,
+        },
+      ],
+    },
+    close: { title: 'Zie zonder aanmelden waar uw website staat' },
+  },
+  pl: {
+    competitor: 'Semrush',
+    eyebrow: 'Go Top SEO wobec Semrusha',
+    metaTitle: 'Go Top SEO wobec Semrusha | porównanie',
+    metaDescription:
+      'Go Top SEO w porównaniu z Semrushem: kto pisze i publikuje treści, kto prowadzi Profil Firmy w Google, co zawiera każda cena i kiedy Semrush jest lepszym wyborem.',
+    hero: {
+      title: 'Semrush daje Państwu narzędzia.',
+      accent: 'My wykonujemy pracę',
+      subtitle:
+        'Semrush ma jedną z najobszerniejszych baz danych w branży i pokazuje, co jest nie w porządku. Go Top SEO zbudowano dla firm, które nie mają czasu na to zareagować: system pisze artykuły, publikuje je na witrynie, zamieszcza posty w Profilu Firmy w Google i monitoruje, gdzie Państwo stoją.',
+    },
+    table: {
+      eyebrow: 'Porównanie',
+      title: 'Co robi każde z nich, przeniesione z własnych stron Semrusha',
+      checkedOn: CHECKED,
+      sources: SOURCES,
+      rows: [
+        {
+          label: 'Cena wejściowa',
+          ours: 'Od 79 USD miesięcznie plus podatek, wszystko w jednej cenie. W Izraelu od 249 ILS miesięcznie z VAT.',
+          theirs:
+            'Pakiet SEO za 139 USD miesięcznie (117,33 USD przy płatności rocznej), z 5 witrynami i 500 słowami kluczowymi. Jest też ograniczony pakiet bezpłatny.',
+        },
+        {
+          label: 'Kto wykonuje pracę',
+          ours: 'System. Państwo zatwierdzają temat; on pisze, dodaje obrazy i linkowanie wewnętrzne, i publikuje.',
+          theirs:
+            'Mieszanie. Ich agent do profilu firmy sam zamieszcza posty, artykuły publikuje się jednym kliknięciem, a poprawki na witrynie trafiają do Państwa albo do Państwa programisty.',
+        },
+        {
+          label: 'Artykuły',
+          ours: 'Automatycznie zaplanowane i napisane, z obrazami i linkowaniem wewnętrznym, z planu miesięcznego, który Państwo zatwierdzają.',
+          theirs:
+            'Ich wtyczka do WordPressa bada tematy, tworzy szkice dłuższych tekstów i generuje obrazy AI. Potrzebne jest do tego konto płatne.',
+        },
+        {
+          label: 'Publikacja na witrynie',
+          ours: 'Automatycznie na WordPressie i w Shopify. Państwo nigdy nie otwierają edytora.',
+          theirs: 'Ich wtyczka publikuje jednym kliknięciem na WordPressie, przez „Share” i następnie opcję WordPress.',
+        },
+        {
+          label: 'Profil Firmy w Google',
+          ours: 'Zawarte w tej samej cenie: automatyczne posty w profilu, za Państwa zgodą.',
+          theirs:
+            'Local Toolkit kupuje się osobno i rozlicza według lokalizacji: 30 USD miesięcznie za lokalizację w Base, 60 USD w Pro. Ich agent zamieszcza posty i odpowiada na nowe opinie.',
+        },
+        {
+          label: 'Poprawki na witrynie',
+          ours: 'Część poprawek wprowadzamy przez naszą wtyczkę do WordPressa, bez konieczności czytania kodu.',
+          theirs:
+            'Site Audit porządkuje problemy według wagi i daje wskazówki, jak je usunąć. Ich strona nie twierdzi, że Semrush zmienia Państwa witrynę.',
+        },
+        {
+          label: 'Pomiar pozycji',
+          ours:
+            'Comiesięczne sprawdzenie w Google, w Mapach Google i w odpowiedziach AI (między innymi ChatGPT, Gemini i Google AI), w tej samej cenie.',
+          theirs:
+            '500 słów kluczowych, zapisywanych codziennie, w pakiecie SEO. Monitorowanie odpowiedzi AI zaczyna się od pakietu Starter za 199 USD miesięcznie. Pomiar w Mapach należy do osobnego Local Toolkit.',
+        },
+        {
+          label: 'Okres próbny',
+          ours: '7 dni, bez karty kredytowej, rezygnacja w dowolnym momencie.',
+          theirs: '„Try Semrush free for seven days. Cancel anytime”. Eksport jest w okresie próbnym wyłączony.',
+        },
+      ],
+    },
+    theirStrengths: {
+      eyebrow: 'Kiedy Semrush jest lepszym wyborem',
+      title: 'Są przypadki, w których Semrush jest po prostu właściwą odpowiedzią',
+      intro: 'Nie próbujemy być Semrushem, a jeśli to jest Państwu potrzebne, lepiej wiedzieć o tym teraz.',
+      items: [
+        {
+          title: 'Gdy chcą Państwo badać sami, a nie być obsługiwani',
+          body:
+            'Badanie konkurentów i słów kluczowych, dane o linkach zwrotnych, analizy ruchu i rynku, dane historyczne oraz API. Jeśli Państwo albo Państwa agencja chcą wgryźć się w rynek, Semrush odpowiada na pytania, na które my nie odpowiadamy.',
+        },
+        {
+          title: 'Gdy potrzebny jest codzienny, szeroki pomiar',
+          body:
+            'Ich pakiet SEO zapisuje 500 słów kluczowych codziennie. Nasze sprawdzenie działa raz w miesiącu. Jeśli trzeba widzieć ruchy dzienne, ta różnica jest prawdziwa i wypada na korzyść Semrusha.',
+        },
+        {
+          title: 'Gdy mają Państwo wiele lokalizacji i chcą rozsyłać wizytówki',
+          body: 'Local Pro wysyła dane Państwa firmy jednym kliknięciem do ponad 70 katalogów. Tego nie oferujemy w ogóle.',
+        },
+      ],
+    },
+    ourStrengths: {
+      eyebrow: 'Kiedy my pasujemy lepiej',
+      title: 'Gdy nikt nie siądzie do panelu',
+      intro: 'Większość firm, które z nami rozmawiają, nie potrzebuje kolejnego panelu. Potrzebuje, żeby praca była wykonana.',
+      items: [
+        {
+          title: 'Jedna cena, bez dopłaty za lokalizację',
+          body: 'Artykuły, posty w Profilu Firmy w Google i pomiar pozycji są w tej samej cenie, a nie w trzech różnych pakietach.',
+        },
+        {
+          title: 'Treści publikują się same',
+          body: 'Państwo zatwierdzają tematy raz w miesiącu, a artykuły wchodzą na witrynę z obrazami i linkowaniem wewnętrznym, bez dotykania ich.',
+        },
+        {
+          title: 'Zbudowane dla małego zespołu',
+          body: 'Poza połączeniem z witryną nie ma nic do ustawiania i nie ma cotygodniowej rutyny, którą trzeba utrzymać.',
+        },
+        {
+          title: 'Bez programisty',
+          body: 'Uruchomienie to wtyczka do WordPressa albo aplikacja Shopify. Nie ma czego budować i nie ma kogo wdrażać.',
+        },
+      ],
+    },
+    faq: {
+      eyebrow: 'Pytania',
+      title: 'O co pytają przed zmianą',
+      items: [
+        {
+          q: 'Czy mogę korzystać z obu?',
+          a: 'Tak, i wiele agencji robi dokładnie to: Semrush do badania, my do pracy, która musi dziać się co tydzień. Technicznie nic się nie zderza.',
+        },
+        {
+          q: 'Czy mierzą Państwo widoczność w AI lepiej niż Semrush?',
+          a: 'Nie. My sprawdzamy raz w miesiącu; Semrush od pakietu Starter sprawdza codziennie. Nasza przewaga polega na tym, że sprawdzenie jest w cenie podstawowej i nie wymaga podwyższenia pakietu.',
+        },
+        {
+          q: 'Czy ceny na tej stronie są aktualne?',
+          a: `Zostały przeczytane ${CHECKED} z własnych stron Semrusha. Firmy zmieniają ceny, a Semrush niedawno przebudował nazwy swoich pakietów — linki pod tabelą są źródłem.`,
+        },
+      ],
+    },
+    close: { title: 'Zobacz bez rejestracji, gdzie stoi Państwa witryna' },
   },
 }

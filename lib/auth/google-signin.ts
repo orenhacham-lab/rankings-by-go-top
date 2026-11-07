@@ -79,6 +79,9 @@ const COPY = {
   fr: { label: 'Continuer avec Google', or: 'ou', failed: "Nous n'avons pas pu lancer la connexion avec Google. Réessayez, ou continuez avec votre adresse e-mail.", returnFailed: "La connexion avec Google n'a pas abouti. Réessayez, ou continuez avec votre adresse e-mail." },
   it: { label: 'Continua con Google', or: 'oppure', failed: "Non è stato possibile avviare l'accesso con Google. Si consiglia di riprovare oppure di continuare con il proprio indirizzo e-mail.", returnFailed: "L'accesso con Google non è stato completato. Si consiglia di riprovare oppure di continuare con il proprio indirizzo e-mail." },
   ja: { label: 'Googleで続ける', or: 'または', failed: 'Googleでのログインを開始できませんでした。もう一度お試しいただくか、メールアドレスで続けてください。', returnFailed: 'Googleでのログインが完了しませんでした。もう一度お試しいただくか、メールアドレスで続けてください。' },
+  de: { label: 'Mit Google fortfahren', or: 'oder', failed: 'Die Anmeldung mit Google konnte nicht gestartet werden. Bitte versuchen Sie es erneut oder fahren Sie mit Ihrer E-Mail-Adresse fort.', returnFailed: 'Die Anmeldung mit Google wurde nicht abgeschlossen. Bitte versuchen Sie es erneut oder fahren Sie mit Ihrer E-Mail-Adresse fort.' },
+  pl: { label: 'Kontynuuj z Google', or: 'lub', failed: 'Nie udało się rozpocząć logowania przez Google. Prosimy spróbować ponownie albo kontynuować przy użyciu adresu e-mail.', returnFailed: 'Logowanie przez Google nie zostało zakończone. Prosimy spróbować ponownie albo kontynuować przy użyciu adresu e-mail.' },
+  nl: { label: 'Doorgaan met Google', or: 'of', failed: 'Het inloggen met Google kon niet worden gestart. Probeer het opnieuw, of ga verder met uw e-mailadres.', returnFailed: 'Het inloggen met Google is niet afgerond. Probeer het opnieuw, of ga verder met uw e-mailadres.' },
 } as const
 
 export function googleSignInCopy(lang: PublicLocale): (typeof COPY)[PublicLocale] {

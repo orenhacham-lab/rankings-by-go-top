@@ -68,4 +68,25 @@ export const FEATURE_COMMON: Record<PublicLocale, FeatureCommon> = {
     trust: [`${DAYS}日間の無料トライアル`, 'クレジットカード不要', 'いつでも解約可能'],
     closeBody: `無料診断では、登録なしでサイトの現状をご確認いただけます。${DAYS}日間の無料トライアルもクレジットカードなしでお試しいただけます。`,
   },
+  pl: {
+    check: { label: 'Sprawdź witrynę bezpłatnie', href: '/pl/free-check' },
+    trial: { label: `Wypróbuj ${DAYS} dni bezpłatnie`, href: authHref('signup', 'pl') },
+    pricing: { label: 'Cennik i pakiety', href: '/pl/pricing' },
+    trust: [`${DAYS} dni bezpłatnie`, 'Bez karty kredytowej', 'Rezygnacja w dowolnym momencie'],
+    closeBody: `Bezpłatna analiza pokazuje bez rejestracji, gdzie stoi Państwa witryna. Albo od razu ${DAYS} dni bezpłatnie, bez karty kredytowej.`,
+  },
+  nl: {
+    check: { label: 'Website gratis controleren', href: '/nl/free-check' },
+    trial: { label: `${DAYS} dagen gratis proberen`, href: authHref('signup', 'nl') },
+    pricing: { label: 'Prijzen en pakketten', href: '/nl/pricing' },
+    trust: [`${DAYS} dagen gratis proberen`, 'Zonder creditcard', 'Opzegbaar wanneer u wilt'],
+    closeBody: `De gratis analyse laat zonder registratie zien waar uw website staat. Of u start ${DAYS} dagen gratis, zonder creditcard.`,
+  },
+  de: {
+    check: { label: 'Website kostenlos prüfen', href: '/de/free-check' },
+    trial: { label: `${DAYS} Tage kostenlos testen`, href: authHref('signup', 'de') },
+    pricing: { label: 'Preise und Tarife', href: '/de/pricing' },
+    trust: [`${DAYS} Tage kostenlos testen`, 'Ohne Kreditkarte', 'Jederzeit kündbar'],
+    closeBody: `Die kostenlose Analyse zeigt ohne Anmeldung, wo Ihre Website steht. Oder Sie starten ${DAYS} Tage kostenlos, ohne Kreditkarte.`,
+  },
 }

@@ -56,6 +56,9 @@ import { portugueseSiteEnabled } from './portuguese-site'
 import { frenchSiteEnabled } from './french-site'
 import { italianSiteEnabled } from './italian-site'
 import { japaneseSiteEnabled } from './japanese-site'
+import { germanSiteEnabled } from './german-site'
+import { dutchSiteEnabled } from './dutch-site'
+import { polishSiteEnabled } from './polish-site'
 
 /** Readable by the browser too: the client writes it when the switcher changes. */
 export const LANGUAGE_COOKIE = 'dashboard-language'
@@ -118,6 +121,27 @@ export function isJapanesePath(pathname: string | null | undefined, enabled = ja
   return p === '/ja' || p.startsWith('/ja/')
 }
 
+/** The same, for the German tree and its own flag. */
+export function isGermanPath(pathname: string | null | undefined, enabled = germanSiteEnabled()): boolean {
+  if (!enabled) return false
+  const p = pathname || ''
+  return p === '/de' || p.startsWith('/de/')
+}
+
+/** The same, for the Dutch tree and its own flag. */
+export function isDutchPath(pathname: string | null | undefined, enabled = dutchSiteEnabled()): boolean {
+  if (!enabled) return false
+  const p = pathname || ''
+  return p === '/nl' || p.startsWith('/nl/')
+}
+
+/** The same, for the Polish tree and its own flag. */
+export function isPolishPath(pathname: string | null | undefined, enabled = polishSiteEnabled()): boolean {
+  if (!enabled) return false
+  const p = pathname || ''
+  return p === '/pl' || p.startsWith('/pl/')
+}
+
 /**
  * First path segments of the HEBREW public tree — the `app/(public)` and
  * `app/(legal)` route groups plus the root. These pages contain Hebrew copy
@@ -170,6 +194,9 @@ export function routePublicLocale(pathname: string | null | undefined): PublicLo
   if (isFrenchPath(p)) return 'fr'
   if (isItalianPath(p)) return 'it'
   if (isJapanesePath(p)) return 'ja'
+  if (isGermanPath(p)) return 'de'
+  if (isDutchPath(p)) return 'nl'
+  if (isPolishPath(p)) return 'pl'
   if (p === '/') return 'he'
   const segment = p.split('/')[1] ?? ''
   if (ENGLISH_ONLY_SEGMENTS.has(segment)) return 'en'

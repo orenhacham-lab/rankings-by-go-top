@@ -90,10 +90,10 @@ function main() {
     // guessed at. A near-miss is not a locale.
     // 'fr' was the near-miss here until French shipped on 21 October 2026; a
     // real locale as the example of "not a locale" is a guard asserting the
-    // opposite of the truth. 'de' is a language the keyword research offers and
+    // opposite of the truth. 'el' is a language the keyword research offers and
     // the site does not have.
     check('1e: anything else is NOT silently a locale',
-      normalizePublicLocale('de') === null && normalizePublicLocale('') === null
+      normalizePublicLocale('el') === null && normalizePublicLocale('') === null
       && normalizePublicLocale('ES') === null && normalizePublicLocale(' es ') === null
       && normalizePublicLocale(null) === null && normalizePublicLocale(undefined) === null)
     // THE SEPARATION: Spanish degrades to English, never to Hebrew, because
@@ -292,7 +292,15 @@ function main() {
     // and a call left with the old arity reads the real environment instead of
     // the one the test means to describe — which is how 6a passed by accident
     // for a while.
-    const allOff = { es: false, 'pt-BR': false, fr: false }
+    // EVERY gated locale has to be named: a locale left out of the map falls
+    // back to the real environment, so these three checks quietly described
+    // whichever flags the runner happened to set and went stale on the day a
+    // language was added (they were still three locales wide after German,
+    // Dutch and Polish shipped). Derived from PUBLIC_LOCALES so it cannot go
+    // stale again — the next language is off here the moment it is declared.
+    const allOff = Object.fromEntries(
+      PUBLIC_LOCALES.filter((l) => l !== 'he' && l !== 'en').map((l) => [l, false]),
+    ) as Partial<Record<PublicLocale, boolean>>
     check('6a: with the flags off, the switcher offers only Hebrew and English',
       JSON.stringify(availableLocales(allOff)) === JSON.stringify(['he', 'en']))
     check('6b: with Spanish on, it offers exactly those three',
@@ -491,7 +499,9 @@ function main() {
     check('S1-MUT: a trigger with no chevron fails S1', !/<ChevronDown/.test(src.replace(/<ChevronDown[\s\S]*?\/>/, '')))
     // The two-language link is a link to the other language by name; it needs no chevron.
     check('S5: with two languages it is still one plain link, not a menu',
-      /if \(others\.length === 1\)/.test(src) && availableLocales({ es: false, 'pt-BR': false, fr: false }).length === 2)
+      /if \(others\.length === 1\)/.test(src) && availableLocales(
+        Object.fromEntries(PUBLIC_LOCALES.filter((l) => l !== 'he' && l !== 'en').map((l) => [l, false])),
+      ).length === 2)
   }
 
   // ---- The logo goes home in the language you are reading -------------------

@@ -229,7 +229,7 @@ function main() {
     const everyString = PUBLIC_LOCALES.flatMap((l) => strings(aiCrawlerCopy(l)).map((s) => s.text))
     check('E6: no percentage is claimed anywhere', !everyString.some((t) => /\d\s?%/.test(t)))
     check('E7: the trial is stated as 7 days with no card, or not at all',
-      everyString.filter((t) => /\b(7|siete|sete|sept|sieben|שבוע)\b/i.test(t)).every((t) => /card|tarjeta|cartão|carte|carta|אשראי|カード/i.test(t)))
+      everyString.filter((t) => /\b(7|siete|sete|sept|sieben|שבוע)\b/i.test(t)).every((t) => /card|tarjeta|cartão|carte|carta|karte|karty|אשראי|カード/i.test(t)))
     // MUTATION CONTROL for E1: a key check that compares only the COUNT of
     // strings — the shortcut — passes while a locale has the wrong keys, so
     // E1's full path comparison is doing real work. Build a French copy with

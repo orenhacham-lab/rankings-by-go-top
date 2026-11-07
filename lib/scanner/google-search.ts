@@ -4,6 +4,7 @@ import {
   safeDecodeURL, unwrapRedirect, extractHostname, normalizeDomain, extractAllURLsFromResult, isDomainMatch,
 } from './domain-match'
 import { normalizeCompetitorDomains, locateCompetitorsInOrganic, locateCompetitorsAcrossPoints } from './competitor-positions'
+import { serperBody } from './serper-payload'
 
 const SERPER_API_URL = 'https://google.serper.dev/search'
 const REQUEST_TIMEOUT_MS = 15_000
@@ -73,7 +74,7 @@ async function executeSingleSearch(
         'X-API-KEY': apiKey,
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify(body),
+      body: serperBody(body, `GoogleSearch:radius:${label}`),
       signal: controller.signal,
     })
 
@@ -386,7 +387,7 @@ export async function scanGoogleSearch(input: ScanInput): Promise<ScanOutput> {
             'X-API-KEY': apiKey!,
             'Content-Type': 'application/json',
           },
-          body: JSON.stringify(body),
+          body: serperBody(body, `GoogleSearch:${label}`),
           signal: controller.signal,
         })
         console.log(`[GoogleSearch] ${label} RESPONSE STATUS: ${resp.status}`)

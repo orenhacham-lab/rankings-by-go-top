@@ -37,8 +37,16 @@ function walk(dir: string, out: string[] = []): string[] {
 }
 
 const TERM = /structured data|נתונים מובנים|סימון מובנה|datos estructurados|dados estruturados/i
-const WHERE = /WordPress|וורדפרס|plugin|תוסף/i
-const BY_HAND = /by yourself|לבד|por tu cuenta|por conta própria/i
+const WHERE = /WordPress|וורדפרס|plug-?in|תוסף/i
+const BY_HAND = /by yourself|לבד|por tu cuenta|por conta própria|(?<!\p{L})zelf(?!\p{L})/iu
+
+/**
+ * A literal that is nothing but a question promises nothing — it asks. Its answer
+ * is a literal of its own and is scanned on its own, so the "where" is demanded
+ * there. The Dutch FAQ heading "Hoe zit het met structured data in de webshop?"
+ * is such a question, and its answer says Shopify gets none.
+ */
+const BARE_QUESTION = (t: string) => /^[^.!?]*\?$/.test(t.trim())
 
 /** Sentences (string literals over 40 characters) that promise structured data with no "where". */
 export function unqualified(source: string): string[] {
@@ -46,6 +54,7 @@ export function unqualified(source: string): string[] {
   const re = /'((?:[^'\\\n]|\\.){41,})'|"((?:[^"\\\n]|\\.){41,})"/g
   for (const m of stripComments(source).matchAll(re)) {
     const text = m[1] ?? m[2]
+    if (BARE_QUESTION(text)) continue
     if (TERM.test(text) && !WHERE.test(text) && !BY_HAND.test(text)) out.push(text)
   }
   return out
@@ -72,6 +81,10 @@ ok('the guard actually read copy that names structured data', scanned >= 8, Stri
 ok('mutation: the old promise is caught', unqualified("desc: 'Each article comes with images, Q&A and structured data, and goes live on your site when you scheduled it.'").length === 1)
 ok('mutation: the Hebrew old promise is caught', unqualified("desc: 'כל מאמר נכתב עם תמונות, שאלות ותשובות ונתונים מובנים, ועולה לאתר בזמן שקבעתם.'").length === 1)
 ok('mutation: a qualified sentence passes', unqualified("desc: 'On WordPress sites with the Go Top plugin, structured data is added too.'").length === 0)
+ok('mutation: a bare question about structured data passes', unqualified("q: 'Hoe zit het met structured data in de webshop?'").length === 0)
+ok('mutation: a question that then promises is still caught', unqualified("q: 'Structured data? Every article gets structured data on every site.'").length === 1)
+ok('mutation: the hyphenated plug-in still counts as a where', unqualified("a: 'Structured data komt alleen van de Go Top-plug-in op uw website.'").length === 0)
+ok('mutation: a Dutch promise with no where and no zelf is caught', unqualified("a: 'Elk artikel komt met afbeeldingen, vragen en antwoorden en structured data.'").length === 1)
 
 console.log(`${passed} passed, ${failed} failed`)
 if (failed) process.exit(1)

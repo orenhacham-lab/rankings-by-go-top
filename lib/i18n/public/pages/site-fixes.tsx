@@ -17,6 +17,9 @@ const pt = FEATURE_COMMON['pt-BR']
 const fr = FEATURE_COMMON.fr
 const it = FEATURE_COMMON.it
 const ja = FEATURE_COMMON.ja
+const de = FEATURE_COMMON.de
+const nl = FEATURE_COMMON.nl
+const pl = FEATURE_COMMON.pl
 
 export const SITE_FIXES_PAGE: MarketingPage = {
   path: '/features/site-health-fixes',
@@ -48,6 +51,18 @@ export const SITE_FIXES_PAGE: MarketingPage = {
     ja: {
       title: 'サイトの修正 | Go Top SEO',
       description: 'GoogleとAIエンジンに対してサイトの足を引っぱっている点を見つける診断です。タイトル、ディスクリプション、画像の代替テキスト、リンク切れなどを確認します。WordPressでは、ご承認後にワンクリックで修正でき、元に戻すこともできます。',
+    },
+    nl: {
+      title: 'Verbeteringen aan de website | Go Top SEO',
+      description: 'Een analyse die vindt wat uw website tegenhoudt in Google en in AI-diensten: titels, beschrijvingen, alt-teksten, gebroken links en meer. In WordPress is elke verbetering na uw goedkeuring één klik, en zij is terug te draaien.',
+    },
+    de: {
+      title: 'Korrekturen an der Website | Go Top SEO',
+      description: 'Eine Analyse, die findet, was Ihre Website in Google und in KI-Diensten zurückhält: Titel, Beschreibungen, Alternativtexte, defekte Links und mehr. In WordPress ist jede Korrektur nach Ihrer Freigabe ein Klick, und sie lässt sich zurücknehmen.',
+    },
+    pl: {
+      title: 'Poprawki na stronie | Go Top SEO',
+      description: 'Analiza, która znajduje to, co zatrzymuje stronę w Google i w usługach AI: tytuły, opisy, teksty alternatywne, zepsute linki i więcej. Na WordPressie każda poprawka to jedno kliknięcie po zatwierdzeniu i można ją cofnąć.',
     },
   },
   content: {
@@ -468,6 +483,144 @@ export const SITE_FIXES_PAGE: MarketingPage = {
     // JAPANESE. The example URLs in the visual are Japanese-site paths, because
     // an Italian /chi-siamo in a Japanese screenshot reads as a mistake; the
     // claims themselves are the same ones the code supports.
+    nl: {
+      hero: {
+        eyebrow: 'Verbeteringen aan de website',
+        eyebrowIcon: Wrench,
+        title: 'Wat uw website tegenhoudt,',
+        accent: 'verholpen zodra u goedkeurt',
+        subtitle: 'Het systeem analyseert uw website en vindt ontbrekende of te lange titels, ontbrekende beschrijvingen, afbeeldingen zonder alt-tekst, gebroken links en pagina\u2019s die voor Google of voor AI-diensten geblokkeerd zijn. Op een verbonden WordPress-website zijn de meeste verbeteringen één klik, nadat u precies gezien hebt wat er verandert.',
+        trust: nl.trust,
+        primary: nl.check,
+        secondary: nl.trial,
+        visual: (
+          <WorkListVisual
+            heading="Verbeteringen aan de website"
+            rows={[
+              { title: 'Titel te lang', detail: '', url: '/diensten/airco-installatie', icon: Type, done: true, status: 'Verbeterd' },
+              { title: 'Afbeeldingen zonder alt-tekst', detail: '4 afbeeldingen', url: '/blog/airco-gids', icon: ImageIcon, done: true, status: 'Verbeterd' },
+              { title: 'Gebroken link', detail: '', url: '/over-ons', icon: Link2, done: false, status: 'Wacht op goedkeuring' },
+              { title: 'Beschrijving ontbreekt', detail: '', url: '/contact', icon: FileSearch, done: false, status: 'Wacht op goedkeuring' },
+            ]}
+          />
+        ),
+      },
+      sections: [
+        {
+          kind: 'cards',
+          tone: 'contrast',
+          eyebrow: 'Waarom dit telt',
+          title: 'Goede content helpt een website niet die zichzelf in de weg staat',
+          intro: 'Een titel die in de resultaten wordt afgekapt, een afbeelding die Google niet kan lezen, een link die op een foutpagina eindigt. Elk daarvan is klein. Samen trekken zij de website naar beneden.',
+          items: [
+            { icon: ScanSearch, title: 'Zien wat vastzit', body: 'Elk probleem wordt vermeld met de pagina\u2019s waarop het voorkomt, op ernst geordend.' },
+            { icon: ShieldCheck, title: 'Niets verandert zonder u', body: 'Bij elke verbetering hoort een voorbeeld: wat de pagina vandaag zegt en wat ervoor in de plaats komt.' },
+            { icon: RotateCcw, title: 'Wanneer u wilt terugdraaien', body: 'Een verbetering via het systeem bewaart de vorige waarde, zodat u haar kunt terugdraaien.' },
+          ],
+        },
+        {
+          kind: 'steps',
+          eyebrow: 'Zo gaat het',
+          title: 'Van de analyse naar een verbeterde website',
+          items: [
+            { title: 'Website analyseren', body: 'Het systeem loopt uw pagina\u2019s door en geeft een op ernst geordende lijst problemen terug.' },
+            { title: 'Voorstel bekijken', body: 'Bij elk probleem hoort een voorgestelde verbetering, met de huidige en de nieuwe waarde naast elkaar.' },
+            { title: 'Goedkeuren', body: 'Op een verbonden WordPress-website en in de artikelen en pagina\u2019s van een verbonden Shopify-webshop wordt de verbetering naar de website geschreven. Anders krijgt u een stap-voor-stap-instructie.' },
+          ],
+        },
+        {
+          kind: 'cards',
+          eyebrow: 'Wat er in WordPress verbeterd wordt',
+          title: 'De verbeteringen die het systeem zelf uitvoert',
+          items: [
+            { icon: Type, title: 'SEO-titels', body: 'Een ontbrekende, te korte of te lange titel wordt opnieuw geschreven. Met Yoast of Rank Math wordt hij in hun veld opgeslagen.' },
+            { icon: FileSearch, title: 'Metabeschrijvingen', body: 'Een ontbrekende beschrijving of een met de verkeerde lengte. Opgeslagen in de SEO-plug-in van de website, via de Go Top-plug-in.' },
+            { icon: ImageIcon, title: 'Alt-teksten van afbeeldingen', body: 'Alleen afbeeldingen in de content die geen alt-tekst hebben, krijgen er een. Alle overige afbeeldingen blijven onaangeroerd.' },
+            { icon: Link2, title: 'Links', body: 'Een gebroken link wordt vervangen of verwijderd, en tussen verwante pagina\u2019s worden interne links toegevoegd.' },
+            { icon: Heading1, title: 'Hoofdkop', body: 'Een pagina met meer dan één H1 houdt via de Go Top-plug-in één enkele hoofdkop.' },
+            { icon: Code2, title: 'FAQ en llms.txt', body: 'Een FAQ-blok op de pagina en een llms.txt-bestand dat de website beschrijft voor AI-diensten, via de Go Top-plug-in.' },
+          ],
+        },
+        {
+          kind: 'callout',
+          icon: Info,
+          title: 'In Shopify en op andere platformen',
+          body: (
+            <p>De analyse werkt op elke website. In een verbonden Shopify-webshop verbetert het systeem na uw goedkeuring de blogartikelen en pagina\u2019s van de webshop: de titel en de beschrijving die Google toont, alt-teksten van afbeeldingen, een gebroken link, een FAQ-blok en een extra hoofdkop. Ook hier is elke verbetering terug te draaien. Producten, categorieën en webshopinstellingen worden nooit gewijzigd. In Wix en op andere platformen schrijft het systeem niet naar de website; het laat bij elk probleem een korte instructie zien om het zelf te verhelpen.</p>
+          ),
+        },
+      ],
+      cta: { title: 'Zie wat uw website tegenhoudt', body: nl.closeBody, primary: nl.check, secondary: nl.trial },
+    },
+    de: {
+      hero: {
+        eyebrow: 'Korrekturen an der Website',
+        eyebrowIcon: Wrench,
+        title: 'Was Ihre Website zurückhält,',
+        accent: 'behoben, sobald Sie freigeben',
+        subtitle: 'Das System analysiert Ihre Website und findet fehlende oder zu lange Titel, fehlende Beschreibungen, Bilder ohne Alternativtext, defekte Links und Seiten, die für Google oder für KI-Dienste gesperrt sind. Auf einer verbundenen WordPress-Website sind die meisten Korrekturen ein Klick, nachdem Sie genau gesehen haben, was sich ändert.',
+        trust: de.trust,
+        primary: de.check,
+        secondary: de.trial,
+        visual: (
+          <WorkListVisual
+            heading="Korrekturen an der Website"
+            rows={[
+              { title: 'Titel zu lang', detail: '', url: '/leistungen/klimaanlage-einbau', icon: Type, done: true, status: 'Korrigiert' },
+              { title: 'Bilder ohne Alternativtext', detail: '4 Bilder', url: '/blog/klimaanlage-ratgeber', icon: ImageIcon, done: true, status: 'Korrigiert' },
+              { title: 'Defekter Link', detail: '', url: '/ueber-uns', icon: Link2, done: false, status: 'Warte auf Freigabe' },
+              { title: 'Beschreibung fehlt', detail: '', url: '/kontakt', icon: FileSearch, done: false, status: 'Warte auf Freigabe' },
+            ]}
+          />
+        ),
+      },
+      sections: [
+        {
+          kind: 'cards',
+          tone: 'contrast',
+          eyebrow: 'Warum das zählt',
+          title: 'Gute Inhalte helfen einer Website nicht, die sich selbst im Weg steht',
+          intro: 'Ein Titel, der in den Ergebnissen abgeschnitten wird, ein Bild, das Google nicht lesen kann, ein Link, der auf einer Fehlerseite endet. Jedes davon ist klein. Zusammen ziehen sie die Website nach unten.',
+          items: [
+            { icon: ScanSearch, title: 'Sehen, was feststeckt', body: 'Jedes Problem wird mit den Seiten aufgeführt, auf denen es auftritt, nach Schweregrad geordnet.' },
+            { icon: ShieldCheck, title: 'Nichts ändert sich ohne Sie', body: 'Zu jeder Korrektur gibt es eine Vorschau: was die Seite heute sagt und was an die Stelle tritt.' },
+            { icon: RotateCcw, title: 'Jederzeit zurücknehmen', body: 'Eine Korrektur über das System bewahrt den vorherigen Wert, sodass Sie sie zurückrollen können.' },
+          ],
+        },
+        {
+          kind: 'steps',
+          eyebrow: 'So läuft es',
+          title: 'Von der Analyse zur korrigierten Website',
+          items: [
+            { title: 'Website analysieren', body: 'Das System geht Ihre Seiten durch und gibt eine nach Schweregrad geordnete Liste von Problemen zurück.' },
+            { title: 'Vorschlag ansehen', body: 'Zu jedem Problem gehört eine vorgeschlagene Korrektur, mit dem aktuellen und dem neuen Wert nebeneinander.' },
+            { title: 'Freigeben', body: 'Auf einer verbundenen WordPress-Website und in den Artikeln und Seiten eines verbundenen Shopify-Shops wird die Korrektur auf die Website geschrieben. Sonst erhalten Sie eine Anleitung Schritt für Schritt.' },
+          ],
+        },
+        {
+          kind: 'cards',
+          eyebrow: 'Was in WordPress korrigiert wird',
+          title: 'Die Korrekturen, die das System selbst vornimmt',
+          items: [
+            { icon: Type, title: 'SEO-Titel', body: 'Ein fehlender, zu kurzer oder zu langer Titel wird neu geschrieben. Mit Yoast oder Rank Math wird er in deren Feld gespeichert.' },
+            { icon: FileSearch, title: 'Meta-Beschreibungen', body: 'Eine fehlende Beschreibung oder eine mit falscher Länge. Gespeichert im SEO-Plugin der Website, über das Go-Top-Plugin.' },
+            { icon: ImageIcon, title: 'Alternativtexte von Bildern', body: 'Nur Bilder im Inhalt, die keinen Alternativtext haben, bekommen einen. Alle übrigen Bilder bleiben unberührt.' },
+            { icon: Link2, title: 'Links', body: 'Ein defekter Link wird ersetzt oder entfernt, und zwischen verwandten Seiten werden interne Links ergänzt.' },
+            { icon: Heading1, title: 'Hauptüberschrift', body: 'Eine Seite mit mehr als einer H1 behält über das Go-Top-Plugin eine einzige Hauptüberschrift.' },
+            { icon: Code2, title: 'FAQ und llms.txt', body: 'Ein FAQ-Block auf der Seite und eine llms.txt-Datei, die die Website für KI-Dienste beschreibt, über das Go-Top-Plugin.' },
+          ],
+        },
+        {
+          kind: 'callout',
+          icon: Info,
+          title: 'In Shopify und auf anderen Plattformen',
+          body: (
+            <p>Die Analyse funktioniert auf jeder Website. In einem verbundenen Shopify-Shop korrigiert das System nach Ihrer Freigabe die Blogartikel und Seiten des Shops: den Titel und die Beschreibung, die Google zeigt, Alternativtexte von Bildern, einen defekten Link, einen FAQ-Block und eine zusätzliche Hauptüberschrift. Auch hier lässt sich jede Korrektur zurücknehmen. Produkte, Kategorien und Shop-Einstellungen werden nie verändert. In Wix und auf anderen Plattformen schreibt das System nicht auf die Website; es zeigt zu jedem Problem eine kurze Anleitung, wie Sie es selbst beheben.</p>
+          ),
+        },
+      ],
+      cta: { title: 'Sehen Sie, was Ihre Website zurückhält', body: de.closeBody, primary: de.check, secondary: de.trial },
+    },
     ja: {
       hero: {
         eyebrow: 'サイトの修正',
@@ -536,6 +689,75 @@ export const SITE_FIXES_PAGE: MarketingPage = {
         },
       ],
       cta: { title: 'サイトの足を引っぱっている点を確認する', body: ja.closeBody, primary: ja.check, secondary: ja.trial },
+    },
+    pl: {
+      hero: {
+        eyebrow: 'Poprawki na stronie',
+        eyebrowIcon: Wrench,
+        title: 'To, co zatrzymuje stronę,',
+        accent: 'poprawione po zatwierdzeniu',
+        subtitle: 'System analizuje stronę i znajduje brakujące albo zbyt długie tytuły, brakujące opisy, obrazy bez tekstu alternatywnego, zepsute linki i podstrony zablokowane dla Google albo dla usług AI. Na podłączonej stronie WordPress większość poprawek to jedno kliknięcie, po tym jak zobaczą Państwo dokładnie, co się zmieni.',
+        trust: pl.trust,
+        primary: pl.check,
+        secondary: pl.trial,
+        visual: (
+          <WorkListVisual
+            heading="Poprawki na stronie"
+            rows={[
+              { title: 'Tytuł za długi', detail: '', url: '/uslugi/montaz-klimatyzacji', icon: Type, done: true, status: 'Poprawione' },
+              { title: 'Obrazy bez tekstu alternatywnego', detail: '4 obrazy', url: '/blog/klimatyzacja-poradnik', icon: ImageIcon, done: true, status: 'Poprawione' },
+              { title: 'Zepsuty link', detail: '', url: '/o-nas', icon: Link2, done: false, status: 'Czeka na zatwierdzenie' },
+              { title: 'Brak opisu', detail: '', url: '/kontakt', icon: FileSearch, done: false, status: 'Czeka na zatwierdzenie' },
+            ]}
+          />
+        ),
+      },
+      sections: [
+        {
+          kind: 'cards',
+          tone: 'contrast',
+          eyebrow: 'Dlaczego to ma znaczenie',
+          title: 'Dobre treści nie pomogą stronie, która sama sobie stoi na drodze',
+          intro: 'Tytuł ucięty w wynikach, obraz, którego Google nie potrafi odczytać, link kończący się stroną błędu. Każda z tych rzeczy jest mała. Razem ciągną stronę w dół.',
+          items: [
+            { icon: ScanSearch, title: 'Widać, co blokuje', body: 'Każdy problem jest wypisany razem z podstronami, na których występuje, w kolejności według wagi.' },
+            { icon: ShieldCheck, title: 'Nic nie zmienia się bez Państwa', body: 'Do każdej poprawki dołączony jest podgląd: co strona mówi dzisiaj i co pojawi się w zamian.' },
+            { icon: RotateCcw, title: 'Można cofnąć w każdej chwili', body: 'Poprawka wprowadzona przez system zachowuje poprzednią wartość, więc da się ją cofnąć.' },
+          ],
+        },
+        {
+          kind: 'steps',
+          eyebrow: 'Jak to przebiega',
+          title: 'Od analizy do poprawionej strony',
+          items: [
+            { title: 'Analiza strony', body: 'System przechodzi przez podstrony i zwraca listę problemów uporządkowaną według wagi.' },
+            { title: 'Podgląd propozycji', body: 'Do każdego problemu dołączona jest proponowana poprawka, z obecną i nową wartością obok siebie.' },
+            { title: 'Zatwierdzenie', body: 'Na podłączonej stronie WordPress oraz w artykułach i na stronach podłączonego sklepu Shopify poprawka zostaje zapisana w witrynie. W pozostałych przypadkach otrzymują Państwo instrukcję krok po kroku.' },
+          ],
+        },
+        {
+          kind: 'cards',
+          eyebrow: 'Co jest poprawiane na WordPressie',
+          title: 'Poprawki, które system wprowadza sam',
+          items: [
+            { icon: Type, title: 'Tytuły SEO', body: 'Brakujący, zbyt krótki albo zbyt długi tytuł zostaje napisany na nowo. Przy Yoast albo Rank Math zapisuje się w ich polu.' },
+            { icon: FileSearch, title: 'Meta opisy', body: 'Brakujący opis albo opis o nieprawidłowej długości. Zapisywany we wtyczce SEO witryny, przez wtyczkę Go Top.' },
+            { icon: ImageIcon, title: 'Teksty alternatywne obrazów', body: 'Tekst alternatywny dostają tylko obrazy w treści, które go nie mają. Pozostałe obrazy zostają nietknięte.' },
+            { icon: Link2, title: 'Linki', body: 'Zepsuty link zostaje zastąpiony albo usunięty, a między powiązanymi podstronami dodawane są linki wewnętrzne.' },
+            { icon: Heading1, title: 'Nagłówek główny', body: 'Podstrona z więcej niż jednym H1 zostaje przy jednym nagłówku głównym, przez wtyczkę Go Top.' },
+            { icon: Code2, title: 'FAQ i llms.txt', body: 'Blok FAQ na podstronie oraz plik llms.txt, który opisuje witrynę usługom AI, przez wtyczkę Go Top.' },
+          ],
+        },
+        {
+          kind: 'callout',
+          icon: Info,
+          title: 'Na Shopify i na innych platformach',
+          body: (
+            <p>Analiza działa na każdej stronie. W podłączonym sklepie Shopify system po zatwierdzeniu poprawia artykuły bloga i strony sklepu: tytuł i opis, które pokazuje Google, teksty alternatywne obrazów, zepsuty link, blok FAQ i nadmiarowy nagłówek główny. Również tutaj każdą poprawkę można cofnąć. Produkty, kategorie i ustawienia sklepu nigdy nie są zmieniane. Na Wix i na innych platformach system nie zapisuje nic w witrynie, a przy każdym problemie pokazuje krótką instrukcję, jak poprawić to samodzielnie.</p>
+          ),
+        },
+      ],
+      cta: { title: 'Proszę sprawdzić, co zatrzymuje Państwa stronę', body: pl.closeBody, primary: pl.check, secondary: pl.trial },
     },
   },
 }

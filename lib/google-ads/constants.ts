@@ -56,6 +56,14 @@ export const COUNTRY_GEO_TARGETS: Record<string, number> = {
   FR: 2250, // France
   IT: 2380, // Italy
   JP: 2392, // Japan
+  DE: 2276, // Germany
+  NL: 2528, // Netherlands
+  PL: 2616, // Poland
+  // Belgium (2056) is deliberately ABSENT. Flemish readers read the Dutch
+  // pages, but Belgium was never measured in Keyword Planner and its prices
+  // were never set, and offering Austria and Switzerland on German's say-so had
+  // to be reverted for exactly that reason. A market goes in here when it is
+  // researched, not when its language is.
 }
 
 export const LANGUAGE_IDS: Record<string, number> = {
@@ -69,6 +77,9 @@ export const LANGUAGE_IDS: Record<string, number> = {
   fr: 1002, // French
   it: 1004, // Italian
   ja: 1005, // Japanese
+  de: 1001, // German
+  nl: 1010, // Dutch
+  pl: 1030, // Polish
 }
 
 export const SUPPORTED_COUNTRIES = ['IL', 'US', 'GB', 'ES', 'MX', 'AR', 'BR', 'PT', 'GR', 'CY'] as const

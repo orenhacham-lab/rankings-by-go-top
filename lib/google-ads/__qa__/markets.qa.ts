@@ -63,6 +63,15 @@ const GOOGLE_LANGUAGE_IDS: Record<string, number> = {
   // Read back on 30 October 2026, with the Japanese blog: languageConstants/1005
   // answers code "ja", name "Japanese", targetable true.
   ja: 1005, // Japanese
+  // Read back on 4 November 2026, with the German locale: languageConstants/1001
+  // answers code "de", name "German", targetable true.
+  de: 1001, // German
+  // Read back on 5 November 2026, with the Dutch locale: languageConstants/1010
+  // answers code "nl", name "Dutch", targetable true.
+  nl: 1010, // Dutch
+  // Read back on 5 November 2026, with the Polish locale: languageConstants/1030
+  // answers code "pl", name "Polish", targetable true.
+  pl: 1030, // Polish
 }
 const GOOGLE_COUNTRY_IDS: Record<string, number> = {
   AR: 2032, BR: 2076, CL: 2152, CO: 2170, CY: 2196,
@@ -72,6 +81,17 @@ const GOOGLE_COUNTRY_IDS: Record<string, number> = {
   // geoTargetConstants/2392 answers name "Japan", countryCode JP, targetType
   // Country, status ENABLED. Read back the same day as the language above.
   JP: 2392,
+  // geoTargetConstants/2276 answers name "Germany", countryCode DE, targetType
+  // Country, status ENABLED. Read back the same day as the language above.
+  DE: 2276,
+  // geoTargetConstants/2528 answers name "Netherlands", countryCode NL,
+  // targetType Country, status ENABLED. Read back the same day as the language
+  // above. Belgium (2056) is NOT here, because Dutch is written for the
+  // Netherlands alone and the keyword research must not reach into it.
+  NL: 2528,
+  // geoTargetConstants/2616 answers name "Poland", countryCode PL, targetType
+  // Country, status ENABLED. Read back the same day as the language above.
+  PL: 2616,
 }
 
 function main() {

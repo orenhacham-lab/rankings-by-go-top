@@ -79,6 +79,33 @@ export const COMPARE_COMMON: Record<PublicLocale, CompareCommon> = {
     fairness: (c) =>
       `${c} è un buon prodotto e per alcune aziende è la scelta giusta. Questa pagina non vuole dire il contrario: mostra i punti di forza di ciascuno, così da capire quale sia più adatto.`,
   },
+  pl: {
+    column: 'Co porównujemy',
+    ours: 'Go Top SEO',
+    tableCaption: (c) => `Go Top SEO w porównaniu z ${c}`,
+    checkedOn: (c, date) =>
+      `Kolumna o ${c} pochodzi ze stron samego ${c}, przeczytanych ${date}. Firmy zmieniają ceny i funkcje: jeśli coś przestało się tu zgadzać, linki na dole są źródłem i warto do nich zajrzeć.`,
+    fairness: (c) =>
+      `${c} to dobry produkt i dla części firm jest właściwym wyborem. Ta strona nie twierdzi niczego przeciwnego. Pokazuje, gdzie leżą mocne strony każdego z nich, żeby widać było, co pasuje do Państwa.`,
+  },
+  nl: {
+    column: 'Wat wij vergelijken',
+    ours: 'Go Top SEO',
+    tableCaption: (c) => `Go Top SEO vergeleken met ${c}`,
+    checkedOn: (c, date) =>
+      `De kolom over ${c} komt van ${c}s eigen pagina’s, gelezen op ${date}. Bedrijven wijzigen prijzen en functies: mocht hier iets niet meer kloppen, dan zijn de links onderaan de bron en de moeite van een blik waard.`,
+    fairness: (c) =>
+      `${c} is een goed product, en voor sommige bedrijven is het de juiste keuze. Deze pagina wil niet het tegendeel beweren. Zij laat zien waar de sterke punten van elk liggen, zodat u ziet wat bij u past.`,
+  },
+  de: {
+    column: 'Was wir vergleichen',
+    ours: 'Go Top SEO',
+    tableCaption: (c) => `Go Top SEO im Vergleich mit ${c}`,
+    checkedOn: (c, date) =>
+      `Die Spalte zu ${c} stammt von ${c}s eigenen Seiten, gelesen am ${date}. Unternehmen ändern Preise und Funktionen: sollte hier etwas nicht mehr stimmen, sind die Links unten die Quelle und lohnen einen Blick.`,
+    fairness: (c) =>
+      `${c} ist ein gutes Produkt, und für manche Unternehmen ist es das richtige. Diese Seite will nichts anderes behaupten. Sie zeigt, wo die Stärken jeweils liegen, damit Sie erkennen, was zu Ihnen passt.`,
+  },
   ja: {
     column: '比較する項目',
     ours: 'Go Top SEO',

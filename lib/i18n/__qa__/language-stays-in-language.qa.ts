@@ -28,7 +28,7 @@
  */
 import { readFileSync } from 'fs'
 import { join } from 'path'
-import { PUBLIC_LOCALES, type PublicLocale } from '../locales'
+import { PUBLIC_LOCALES, enabledPublicLocales, type PublicLocale } from '../locales'
 import { buildFindings, buildGeoSignals } from '../../free-check/findings'
 import { freeCheckCopy } from '../../free-check/copy'
 import { newGoogleFlow } from '../../auth/google-direct'
@@ -47,6 +47,9 @@ process.env.NEXT_PUBLIC_PORTUGUESE_SITE_ENABLED = 'true'
 process.env.NEXT_PUBLIC_FRENCH_SITE_ENABLED = 'true'
 process.env.NEXT_PUBLIC_ITALIAN_SITE_ENABLED = 'true'
 process.env.NEXT_PUBLIC_JAPANESE_SITE_ENABLED = 'true'
+process.env.NEXT_PUBLIC_GERMAN_SITE_ENABLED = 'true'
+process.env.NEXT_PUBLIC_DUTCH_SITE_ENABLED = 'true'
+process.env.NEXT_PUBLIC_POLISH_SITE_ENABLED = 'true'
 
 let pass = 0, fail = 0
 function check(name: string, cond: boolean, detail?: string) {
@@ -129,11 +132,21 @@ function freeCheckChecks() {
 // ── B) sign-in keeps the language it started in ─────────────────────────────
 function signInChecks() {
   console.log('B) sign-in')
+  /*
+   * The flags above are a HAND-WRITTEN list of environment variable names, and
+   * a locale missing from it fails as "the Google flow loses pl" — which reads
+   * like a product bug and is not one. So the list is held against the gate
+   * itself first: if this fails, add the new language's flag above and run
+   * again, because every later failure in this file is downstream of it.
+   */
+  check('every gated locale was actually turned on by this file',
+    enabledPublicLocales().length === PUBLIC_LOCALES.length,
+    PUBLIC_LOCALES.filter((l) => !enabledPublicLocales().includes(l)).join(',') || 'none')
   for (const locale of PUBLIC_LOCALES) {
     check(`${locale}: the Google flow keeps it`, newGoogleFlow('/dashboard', locale).lang === locale)
   }
   check('an absent language is still Hebrew', newGoogleFlow('/dashboard', null).lang === 'he')
-  check('an unknown language is still Hebrew', newGoogleFlow('/dashboard', 'de').lang === 'he')
+  check('an unknown language is still Hebrew', newGoogleFlow('/dashboard', 'el').lang === 'he')
 
   // With the Spanish build off, a hand-edited value still changes nothing.
   const wasEs = process.env.NEXT_PUBLIC_SPANISH_SITE_ENABLED

@@ -183,7 +183,10 @@ function main() {
   check('E2: each language has its own words, not the English line', borrowed.length === 0, borrowed.join(','))
   const broken = (l: (typeof PUBLIC_LOCALES)[number]) => (l === 'pt-BR' ? { ...linesOf(l), productPage: '' } : linesOf(l))
   check('MUTATION CONTROL: a language without a line is caught by E1', gapsIn(broken).includes('pt-BR.productPage'))
-  const SCOPE = /scope|read_|write_|_content|_products|API|permiss|הרשא|permis/i
+  // `API` is word-bounded on purpose: bare `api` is a substring of ordinary
+  // Polish ("zapisuje"), so an unbounded alternative reported the Polish
+  // product line as leaking a scope name when it names none.
+  const SCOPE = /scope|read_|write_|_content|_products|\bAPI\b|permiss|הרשא|permis/i
   const scoped = PUBLIC_LOCALES.flatMap((l) => KEYS.filter((k) => SCOPE.test(linesOf(l)[k])).map((k) => `${l}.${k}`))
   check('E3: no scope or permission name reaches a merchant', scoped.length === 0, scoped.join(','))
   check('MUTATION CONTROL: a scope name is caught by E3', SCOPE.test('Go Top has write_content on the store'))
@@ -194,8 +197,11 @@ function main() {
   check('MUTATION CONTROL: a promise is caught by E4', PROMISE.test('Go Top adds it for you on Shopify') && PROMISE.test('אנחנו נוסיף סימון מובנה'))
   // `tema` does not match the French `thème`: the accent is the whole reason this
   // pattern carries its own French alternative rather than a looser `th.me`.
-  // Japanese writes the loanword in katakana, テーマ.
-  const THEME = /theme|תבנית|tema|th[èe]me|テーマ/i
+  // Japanese writes the loanword in katakana, テーマ. Dutch writes `thema`, which
+  // the Spanish `tema` does not match either. Polish declines the word, so the
+  // note says `z motywu` and `motywu sklepu`: the stem `motyw` is the
+  // alternative, not a nominative that never appears in the sentence.
+  const THEME = /theme|תבנית|tema|th[èe]me|thema|motyw|テーマ/i
   check('E5: the structured-data note names the theme in every language',
     PUBLIC_LOCALES.every((l) => THEME.test(linesOf(l).schemaFromTheme)),
     PUBLIC_LOCALES.filter((l) => !THEME.test(linesOf(l).schemaFromTheme)).join(','))

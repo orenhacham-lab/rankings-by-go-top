@@ -29,6 +29,7 @@ process.env.NEXT_PUBLIC_PORTUGUESE_SITE_ENABLED = 'true'
 process.env.NEXT_PUBLIC_FRENCH_SITE_ENABLED = 'true'
 process.env.NEXT_PUBLIC_ITALIAN_SITE_ENABLED = 'true'
 process.env.NEXT_PUBLIC_JAPANESE_SITE_ENABLED = 'true'
+process.env.NEXT_PUBLIC_GERMAN_SITE_ENABLED = 'true'
 
 import { existsSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
@@ -46,7 +47,8 @@ import {
 import { CTA_WIDGET, PLANS_WIDGET, withArticleWidgets } from '@/lib/blog/auto/widgets'
 import { BLOG_AUTHOR, BLOG_GUIDANCE, articlePath, buildBlogBrief, internalAnchors } from '@/lib/blog/auto/brief'
 import {
-  BRAND, RELATED_CLASS, checkBodyLinks, hasOwnLink, linkBrandMention, linkifyBareUrls,
+  BRAND, RELATED_CLASS, canonicalizeBrand, checkBodyLinks, ensureBrandSentence, foldBrandText,
+  hasOwnLink, linkBrandMention, linkifyBareUrls, mentionsBrand,
   relatedReading, trialHref, withBodyLinks,
 } from '@/lib/blog/auto/body-links'
 import {
@@ -57,7 +59,8 @@ import { MAX_ATTEMPTS, PLAN_TABLE, STALE_LOCK_MS } from '@/lib/blog/auto/store'
 import { FakeAdmin } from '@/lib/__qa__/_fake-admin'
 import {
   WINDOW_HOURS_UTC,
-  isInWindow, startOfUtcDay, nextLocaleToWrite, runBlogDailyWindow, startIsolatedBlogWindow,
+  isInWindow, startOfUtcDay, nextLocaleToWrite, starvationOrder, runBlogDailyWindow,
+  startIsolatedBlogWindow,
 } from '@/lib/blog/auto/daily-window'
 import { CONTENT_LANGUAGES, normalizeContentLanguage } from '@/lib/content/language'
 import type { createAdminClient } from '@/lib/supabase/admin'
@@ -79,7 +82,17 @@ const stripComments = (src: string) => src.replace(/\/\*[\s\S]*?\*\//g, '').repl
 // ============================================================
 // A) THE LANGUAGES
 // ============================================================
-check('A1: seven languages are written automatically', same([...BLOG_AUTO_LOCALES], ['he', 'en', 'es', 'pt-BR', 'fr', 'it', 'ja']))
+check('A1: ten languages are written automatically', same([...BLOG_AUTO_LOCALES], ['he', 'en', 'es', 'pt-BR', 'fr', 'it', 'ja', 'de', 'nl', 'pl']))
+// The NEWEST language is LAST, and that is the contract daily-window.ts depends
+// on: it walks this list in order and the language that goes without on a
+// morning of retries is the last one. A reorder that puts the newest language
+// ahead of an older one would make it cost an existing language its article.
+// Dutch took that place from German on 5 Nov 2026, and Polish took it from
+// Dutch the same day.
+check('A1a: Polish is last in the order, so a bad morning costs the newest language',
+  BLOG_AUTO_LOCALES[BLOG_AUTO_LOCALES.length - 1] === 'pl')
+check('A1a-MUT: a list whose last entry is not the newest language fails A1a',
+  (() => { const reordered: readonly string[] = ['he', 'pl', 'en']; return reordered[reordered.length - 1] !== 'pl' })())
 // A2 USED TO BE localesForDay() === BLOG_AUTO_LOCALES. Japanese joined the list
 // on 30 Oct 2026 while its public tree was still behind
 // NEXT_PUBLIC_JAPANESE_SITE_ENABLED, so the day's languages are the ones a
@@ -91,10 +104,13 @@ check('A2: every enabled language is due every day — there is no weekday rotat
   same([...localesForDay()], BLOG_AUTO_LOCALES.filter((l) => publicLocaleEnabled(l))))
 check('A2a: a language still behind its flag is not due, and an enabled one is',
   localesForDay().includes('he') && localesForDay().includes('en')
-  && localesForDay().includes('ja') === publicLocaleEnabled('ja'))
+  && localesForDay().includes('ja') === publicLocaleEnabled('ja')
+  && localesForDay().includes('de') === publicLocaleEnabled('de'))
 check('A2b (control): the day\'s list is a filter, not the whole list, when a flag is off',
   publicLocaleEnabled('ja') || !localesForDay().includes('ja'))
-check('A3: that is seven articles a week in each language', same(weeklyShare(), { he: 7, en: 7, es: 7, 'pt-BR': 7, fr: 7, it: 7, ja: 7 }), weeklyShare())
+check('A2c (control): the same holds for German while its flag is off',
+  publicLocaleEnabled('de') || !localesForDay().includes('de'))
+check('A3: that is seven articles a week in each language', same(weeklyShare(), { he: 7, en: 7, es: 7, 'pt-BR': 7, fr: 7, it: 7, ja: 7, de: 7, nl: 7, pl: 7 }), weeklyShare())
 check(
   'A4: Portuguese IS among them, now that the content layer writes it (lib/content/language.ts)',
   (BLOG_AUTO_LOCALES as readonly string[]).includes('pt-BR') && isBlogAutoLocale('pt-BR')
@@ -110,7 +126,7 @@ check('A5: the queue is refilled a week ahead, not three days', TOPUP_FLOOR >= 7
 // 21 October 2026, at which point this check was asserting that a real blog
 // language is not one. German is the example now: the keyword research offers
 // it, the content layer cannot write it.
-check('A6: an unknown language is not accepted as one', !isBlogAutoLocale('de') && !isBlogAutoLocale('') && !isBlogAutoLocale(null))
+check('A6: an unknown language is not accepted as one', !isBlogAutoLocale('el') && !isBlogAutoLocale('') && !isBlogAutoLocale(null))
 check('A6a: and French IS accepted, now that the content layer writes it', isBlogAutoLocale('fr'))
 // Mutation control for A2/A3: the rotation this replaced gave each language only
 // some of the week.
@@ -124,7 +140,7 @@ check(
 // French was, until the content layer learnt it.
 check(
   'A8 (control): a research-only language is neither a content language nor a blog language',
-  !(CONTENT_LANGUAGES as readonly string[]).includes('de') && !isBlogAutoLocale('de'),
+  !(CONTENT_LANGUAGES as readonly string[]).includes('el') && !isBlogAutoLocale('el'),
 )
 check(
   'A8a: French went the other way — the blog writes it because the content layer does',
@@ -424,12 +440,25 @@ async function main() {
       planned({ id: 'pf', locale: 'fr', topic: 'suivi de position', primary_keyword: 'suivi de position' }),
       planned({ id: 'pi', locale: 'it', topic: 'posizionamento su google', primary_keyword: 'posizionamento su google' }),
       planned({ id: 'pj', locale: 'ja', topic: '検索順位の計測', primary_keyword: '検索順位 チェック' }),
+      planned({ id: 'pd', locale: 'de', topic: 'Google Ranking prüfen', primary_keyword: 'google ranking prüfen' }),
+      planned({ id: 'pn', locale: 'nl', topic: 'Google ranking controleren', primary_keyword: 'google ranking controleren' }),
+      planned({ id: 'pl', locale: 'pl', topic: 'Sprawdzanie pozycji w Google', primary_keyword: 'sprawdzanie pozycji w google' }),
     ])
     const summaries = await runBlogAutoPublishAllLocales(admin as unknown as Admin, {}, deps({
       generate: async (brief) => perLocale(brief.language),
     }))
-    check('F20: a call with no language covers every language', same(summaries.map((s) => s.locale), [...BLOG_AUTO_LOCALES]), summaries.map((s) => s.locale))
-    check('F21: each language published its own article', admin.tables.articles.length === BLOG_AUTO_LOCALES.length, admin.tables.articles.length)
+    // localesForDay(), not BLOG_AUTO_LOCALES: the runner walks the day's list,
+    // which is the languages whose public tree a reader can open. Asserting the
+    // whole list only passed while every flag happened to be on, and would have
+    // failed the moment any language sat behind its flag — which is the normal
+    // state of a language on the day it is added.
+    const due = [...localesForDay()]
+    check('F20: a call with no language covers every language due today', same(summaries.map((s) => s.locale), due), summaries.map((s) => s.locale))
+    check('F21: each language due today published its own article', admin.tables.articles.length === due.length, admin.tables.articles.length)
+    check('F21a (control): a language behind its flag is skipped, and the queue row it would have used is left planned',
+      due.length === BLOG_AUTO_LOCALES.length
+      || BLOG_AUTO_LOCALES.filter((l) => !due.includes(l))
+        .every((l) => !summaries.some((s) => s.locale === l)))
     check('F22: the budget leaves room for the first language whatever it is', ALL_LOCALES_BUDGET_MS > 0)
   }
   {
@@ -707,6 +736,50 @@ async function main() {
   check('H28 (control): an article that names the system but links nowhere fails the gate',
     !checkBodyLinks(`<p>${BRAND} בלי קישור</p>`).ok)
 
+  // ── H29-H38: the name as a language that is not English actually writes it ──
+  // 2 and 3 Nov 2026: five of six Italian and Japanese runs failed
+  // `links:brand_not_mentioned` on an exact `includes('Go Top SEO')`, the
+  // article was thrown away, and Japanese went three days with no page.
+  const fullWidth = 'Ｇｏ　Ｔｏｐ　ＳＥＯ'
+  check('H29: full-width letters and an ideographic space are the same name',
+    foldBrandText(fullWidth) === 'Go Top SEO', foldBrandText(fullWidth))
+  check('H30: the gate accepts the name written in full width',
+    checkBodyLinks(`<p>${fullWidth} <a href="/signup">x</a></p>`).ok)
+  check('H31: a no-break space between the words is the same name',
+    mentionsBrand('<p>Go\u00a0Top\u00a0SEO</p>'))
+  check('H32: upper case is the same name', mentionsBrand('<p>GO TOP SEO</p>'))
+  check('H33: the full-width form is rewritten to the one ASCII name', (() => {
+    const out = canonicalizeBrand(`<h2>x</h2><p>${fullWidth} は便利です。</p>`)
+    return out.includes(BRAND) && !out.includes('Ｇｏ')
+  })(), canonicalizeBrand(`<p>${fullWidth}</p>`))
+  check('H34: the rewritten name is what the trial link wraps', (() => {
+    const out = withBodyLinks(`<h2>見出し</h2><p>${fullWidth} について。</p>`, { locale: 'ja', internalTargets: [] })
+    return out.includes(`<a href="${trialHref('ja')}">${BRAND}</a>`)
+  })(), withBodyLinks(`<h2>見出し</h2><p>${fullWidth} について。</p>`, { locale: 'ja', internalTargets: [] }))
+  check('H35: a body that never named us gets one sentence that does, not a bin', (() => {
+    const out = withBodyLinks('<h2>Titolo</h2><p>Testo senza il nome.</p>', { locale: 'it', internalTargets: [] })
+    return checkBodyLinks(out).ok && out.includes(BRAND) && hasOwnLink(out)
+  })(), withBodyLinks('<h2>Titolo</h2><p>Testo senza il nome.</p>', { locale: 'it', internalTargets: [] }))
+  check('H36: that sentence is in the article’s own language',
+    ensureBrandSentence('<p>x</p>', 'de').includes('bündelt')
+    && ensureBrandSentence('<p>x</p>', 'ja').includes('無料トライアル')
+    && ensureBrandSentence('<p>x</p>', 'he').includes('ניסיון חינם'))
+  check('H37: a body that already names us gets no extra sentence',
+    ensureBrandSentence(`<p>${BRAND}</p>`, 'it') === `<p>${BRAND}</p>`)
+  check('H38: every language has a sentence of its own', BLOG_AUTO_LOCALES.every(
+    (l) => ensureBrandSentence('<p>x</p>', l).includes(BRAND)))
+  check('H39: the fallback sentence stays inside the truth limits', BLOG_AUTO_LOCALES.every((l) => {
+    const sentence = ensureBrandSentence('<p>x</p>', l).replace('<p>x</p>\n', '')
+    return checkTruthLimits({ title: 'T', metaDescription: 'M', html: sentence }).ok
+  }))
+  // Mutation controls.
+  check('H40 (control): the old exact match would have failed the full-width name',
+    !`<p>${fullWidth}</p>`.includes(BRAND))
+  check('H41 (control): a body with no name and no fallback still fails the gate',
+    !checkBodyLinks('<p>Testo senza il nome.</p>').ok)
+  check('H42 (control): the fold does not turn any other text into the name',
+    !mentionsBrand('<p>ゴートップ の話</p>') && !mentionsBrand('<p>top seo tools</p>'))
+
   // ============================================================
   // J) THE MORNING WINDOW ON THE CONTENT CRON
   // ============================================================
@@ -721,9 +794,9 @@ async function main() {
     const far = () => Date.now() + 120_000
     const article = (locale: string, publishedAt: string) => ({ locale, is_published: true, published_at: publishedAt })
 
-    check('J1: the morning window is 04:00-07:59 UTC and nothing else',
-      [4, 5, 6, 7].every((h) => isInWindow(Date.parse(`2026-10-14T0${h}:30:00Z`)))
-      && ![3, 8, 12, 23].some((h) => isInWindow(Date.parse(`2026-10-14T${String(h).padStart(2, '0')}:30:00Z`))))
+    check('J1: the morning window is 04:00-09:59 UTC and nothing else',
+      WINDOW_HOURS_UTC.every((h) => isInWindow(Date.parse(`2026-10-14T${String(h).padStart(2, '0')}:30:00Z`)))
+      && ![3, 10, 12, 23].some((h) => isInWindow(Date.parse(`2026-10-14T${String(h).padStart(2, '0')}:30:00Z`))))
     check('J1b: the window holds a pass for every language, with retries to spare',
       WINDOW_HOURS_UTC.length * 4 >= BLOG_AUTO_LOCALES.length * 2, WINDOW_HOURS_UTC.length)
     check('J2: "today" starts at midnight UTC', startOfUtcDay(inWindow) === '2026-10-14T00:00:00.000Z')
@@ -741,8 +814,32 @@ async function main() {
       allThree.locale === null && !allThree.busy, allThree)
 
     const yesterday = await nextLocaleToWrite(
-      fake([], [article('he', '2026-10-13T04:10:00Z')]) as unknown as Admin, inWindow)
-    check('J6: yesterday\'s article does not count as today\'s', yesterday.locale === 'he', yesterday)
+      fake([], BLOG_AUTO_LOCALES.map((l, i) => article(l, `2026-10-13T0${4 + (i % 4)}:10:00Z`))) as unknown as Admin,
+      inWindow)
+    check('J6: yesterday\'s article does not count as today\'s', yesterday.locale !== null, yesterday)
+
+    // ── J6b-J6f: hungriest first, which is what Italian and Japanese lacked ──
+    check('J6b: the language that has gone longest without an article goes first',
+      starvationOrder(BLOG_AUTO_LOCALES, {
+        he: '2026-11-05T04:02:00Z', en: '2026-11-05T04:16:00Z', es: '2026-11-04T05:31:00Z',
+        'pt-BR': '2026-11-04T05:47:00Z', fr: '2026-11-04T07:32:00Z', it: '2026-11-03T06:46:00Z',
+        ja: '2026-11-02T07:48:00Z', de: '2026-11-05T04:30:00Z', nl: '2026-11-05T04:44:00Z',
+        pl: '2026-11-05T04:58:00Z',
+      })[0] === 'ja')
+    check('J6c: a language that has never published goes before them all, last in the list or not',
+      starvationOrder(BLOG_AUTO_LOCALES, Object.fromEntries(
+        BLOG_AUTO_LOCALES.filter((l) => l !== 'de').map((l) => [l, '2026-11-05T04:02:00Z']),
+      ))[0] === 'de')
+    check('J6d: two equally hungry languages keep the list\'s own order',
+      starvationOrder(BLOG_AUTO_LOCALES, {})[0] === 'he'
+      && starvationOrder(BLOG_AUTO_LOCALES, {}).join() === BLOG_AUTO_LOCALES.join())
+    check('J6e: the morning serves the starved language even while the others are due',
+      (await nextLocaleToWrite(fake([], [
+        ...BLOG_AUTO_LOCALES.filter((l) => l !== 'ja').map((l) => article(l, '2026-11-04T04:02:00Z')),
+        article('ja', '2026-11-01T07:48:00Z'),
+      ]) as unknown as Admin, Date.parse('2026-11-05T04:05:00Z'))).locale === 'ja')
+    check('J6f (control): the old list order would have served Hebrew first',
+      BLOG_AUTO_LOCALES[0] === 'he')
 
     const busy = await nextLocaleToWrite(
       fake([planned({ status: 'generating', locked_at: new Date(Date.now() - 60_000).toISOString() })]) as unknown as Admin,
@@ -795,6 +892,15 @@ async function main() {
       (await nextLocaleToWrite(fake([]) as unknown as Admin, inWindow)).locale === 'he')
     check('J17 (control): a window that covered every hour would publish at midnight',
       !isInWindow(Date.parse('2026-10-14T00:30:00Z')))
+    // Six hours is twenty-four runs. Nine languages spend nine of them on first
+    // passes, which leaves fifteen: a retry for every language and six spare.
+    // Two retries each would need eighteen, which nine languages no longer have,
+    // so what the window guarantees is ONE retry each.
+    check('J18: after a first pass for every language the window still holds a retry each',
+      WINDOW_HOURS_UTC.length * 4 - BLOG_AUTO_LOCALES.length >= BLOG_AUTO_LOCALES.length,
+      WINDOW_HOURS_UTC.length * 4 - BLOG_AUTO_LOCALES.length)
+    check('J19 (control): the four-hour window it replaced did not',
+      4 * 4 - BLOG_AUTO_LOCALES.length < BLOG_AUTO_LOCALES.length)
     process.env.BLOG_AUTO_PUBLISH_ENABLED = before
   }
 

@@ -164,6 +164,9 @@ const CONCEPT_FALLBACK: Record<ContentLanguage, (subject: string) => string> = {
   fr: (s) => `Une scène éditoriale haut de gamme, épurée et photoréaliste sur ${s || 'le sujet'}, générique et sans marque, sans logo, sans texte et sans emballage officiel.`,
   it: (s) => `Una scena editoriale di alta gamma, pulita e fotorealistica sul tema ${s || 'dell’articolo'}, generica e senza marchio, senza loghi, senza testo e senza confezioni ufficiali.`,
   ja: (s) => `${s || '記事のテーマ'}をテーマにした、高品質で清潔感のあるフォトリアルな編集用シーン。特定のブランドを示さない一般的な構図で、ロゴ・文字・公式パッケージは一切含めない。`,
+  de: (s) => `Eine hochwertige, klare und fotorealistische redaktionelle Szene zum Thema ${s || 'des Artikels'}, generisch und markenfrei, ohne Logos, ohne Text und ohne offizielle Verpackungen.`,
+  nl: (s) => `Een hoogwaardige, heldere en fotorealistische redactionele scène over het onderwerp ${s || 'van het artikel'}, algemeen en merkloos, zonder logo\u2019s, zonder tekst en zonder officiële verpakkingen.`,
+  pl: (s) => `Wysokiej jakości, czysta i fotorealistyczna scena redakcyjna na temat ${s || 'artykułu'}, ogólna i bez marki, bez logo, bez tekstu i bez oficjalnych opakowań.`,
 }
 
 export async function writeCommercialSafeConcept(input: {

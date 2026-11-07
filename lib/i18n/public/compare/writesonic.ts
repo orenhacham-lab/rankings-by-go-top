@@ -135,7 +135,7 @@ export const WRITESONIC_COMPARE: Record<PublicLocale, ComparisonCopy> = {
         { title: 'גם הצד המקומי', body: 'פוסטים לפרופיל העסקי בגוגל באישורכם, טיוטות תשובה לביקורות, ובדיקה חודשית של המיקום בגוגל מפות.' },
         { title: 'שופיפיי וגם וורדפרס', body: 'פרסום אוטומטי לשתי הפלטפורמות, עם אותו דוח חודשי.' },
         { title: 'בלי שמישהו יפעיל את זה', body: 'תוכנית נושאים חודשית שאתם מאשרים, ואז הכל רץ לבד — בלי פרומפטים להגדיר ובלי לוח בקרה לפתוח.' },
-        { title: 'עברית ושבע שפות', body: 'הממשק, התוכן והדוחות בשפה שלכם, ובישראל מחיר בשקלים כולל מע״מ.' },
+        { title: 'עברית ועשר שפות', body: 'הממשק, התוכן והדוחות בשפה שלכם, ובישראל מחיר בשקלים כולל מע״מ.' },
       ],
     },
     faq: {
@@ -260,7 +260,7 @@ export const WRITESONIC_COMPARE: Record<PublicLocale, ComparisonCopy> = {
         { title: 'The local side as well', body: 'Posts to your Google Business Profile with your consent, drafted replies to reviews, and a monthly check of your position in Google Maps.' },
         { title: 'Shopify as well as WordPress', body: 'Automatic publishing to both platforms, with the same monthly report.' },
         { title: 'Nobody has to run it', body: 'A monthly topic plan you approve, and then it runs by itself — no prompts to configure, no dashboard to open.' },
-        { title: 'Seven languages, Hebrew included', body: 'Interface, content and reports in your language, and in Israel a price in shekels with VAT included.' },
+        { title: 'Ten languages, Hebrew included', body: 'Interface, content and reports in your language, and in Israel a price in shekels with VAT included.' },
       ],
     },
     faq: {
@@ -385,7 +385,7 @@ export const WRITESONIC_COMPARE: Record<PublicLocale, ComparisonCopy> = {
         { title: 'También el lado local', body: 'Publicaciones en tu perfil de empresa en Google con tu consentimiento, borradores de respuesta a las reseñas y una comprobación mensual de tu posición en Google Maps.' },
         { title: 'Shopify además de WordPress', body: 'Publicación automática en las dos plataformas, con el mismo informe mensual.' },
         { title: 'Nadie tiene que manejarlo', body: 'Un plan mensual de temas que tú apruebas y, después, funciona solo: sin prompts que configurar y sin panel que abrir.' },
-        { title: 'Siete idiomas, hebreo incluido', body: 'Interfaz, contenido e informes en tu idioma y, en Israel, un precio en shekels con IVA incluido.' },
+        { title: 'Diez idiomas, hebreo incluido', body: 'Interfaz, contenido e informes en tu idioma y, en Israel, un precio en shekels con IVA incluido.' },
       ],
     },
     faq: {
@@ -510,7 +510,7 @@ export const WRITESONIC_COMPARE: Record<PublicLocale, ComparisonCopy> = {
         { title: 'O lado local também', body: 'Publicações no seu perfil da empresa no Google com o seu consentimento, rascunhos de resposta às avaliações e uma verificação mensal da sua posição no Google Maps.' },
         { title: 'Shopify além de WordPress', body: 'Publicação automática nas duas plataformas, com o mesmo relatório mensal.' },
         { title: 'Ninguém precisa operar', body: 'Um plano mensal de temas que você aprova e, depois, tudo roda sozinho: sem prompts para configurar e sem painel para abrir.' },
-        { title: 'Sete idiomas, hebraico incluído', body: 'Interface, conteúdo e relatórios no seu idioma e, em Israel, um preço em shekels com imposto incluído.' },
+        { title: 'Dez idiomas, hebraico incluído', body: 'Interface, conteúdo e relatórios no seu idioma e, em Israel, um preço em shekels com imposto incluído.' },
       ],
     },
     faq: {
@@ -635,7 +635,7 @@ export const WRITESONIC_COMPARE: Record<PublicLocale, ComparisonCopy> = {
         { title: 'Le volet local aussi', body: "Des publications sur votre fiche d'établissement Google avec votre accord, des brouillons de réponse aux avis, et une vérification mensuelle de votre position dans Google Maps." },
         { title: 'Shopify autant que WordPress', body: 'Une publication automatique sur les deux plateformes, avec le même rapport mensuel.' },
         { title: "Personne n'a à le piloter", body: 'Un plan de sujets mensuel que vous validez, puis tout tourne seul : aucun prompt à configurer, aucun tableau de bord à ouvrir.' },
-        { title: 'Sept langues, hébreu compris', body: "Interface, contenu et rapports dans votre langue, et en Israël un tarif en shekels TVA comprise." },
+        { title: 'Dix langues, hébreu compris', body: "Interface, contenu et rapports dans votre langue, et en Israël un tarif en shekels TVA comprise." },
       ],
     },
     faq: {
@@ -760,7 +760,7 @@ export const WRITESONIC_COMPARE: Record<PublicLocale, ComparisonCopy> = {
         { title: 'Anche il lato locale', body: "Pubblicazioni sul profilo dell'attività su Google con il vostro consenso, bozze di risposta alle recensioni e una verifica mensile della posizione su Google Maps." },
         { title: 'Shopify oltre a WordPress', body: 'Pubblicazione automatica su entrambe le piattaforme, con lo stesso report mensile.' },
         { title: 'Nessuno deve farlo funzionare', body: 'Un piano mensile di argomenti che approvate, e poi tutto gira da solo: nessun prompt da configurare, nessuna dashboard da aprire.' },
-        { title: 'Sette lingue, ebraico compreso', body: 'Interfaccia, contenuti e report nella vostra lingua e, in Israele, un prezzo in shekel IVA inclusa.' },
+        { title: 'Dieci lingue, ebraico compreso', body: 'Interfaccia, contenuti e report nella vostra lingua e, in Israele, un prezzo in shekel IVA inclusa.' },
       ],
     },
     faq: {
@@ -782,6 +782,130 @@ export const WRITESONIC_COMPARE: Record<PublicLocale, ComparisonCopy> = {
       ],
     },
     close: { title: 'Guardate a che punto è il sito, senza registrarvi' },
+  },
+  de: {
+    competitor: 'Writesonic',
+    eyebrow: 'Go Top SEO vs. Writesonic',
+    metaTitle: 'Go Top SEO vs. Writesonic | Vergleich',
+    metaDescription:
+      'Zwei Produkte mit demselben Einstiegspreis von 79 USD. Go Top SEO im Vergleich mit Writesonic: wofür jedes davon das Geld ausgibt, was gemessen wird und wann Writesonic die bessere Wahl ist.',
+    hero: {
+      title: 'Dieselben 79 USD, zwei verschiedene Aufgaben.',
+      accent: 'Die Frage ist, wofür',
+      subtitle:
+        'Der Starter-Tarif von Writesonic kostet 79 USD im Monat bei jährlicher Zahlung, und wir beginnen bei 79 USD im Monat zuzüglich Steuern. Ihr Geld geht überwiegend in die tiefe Messung, wie KI-Antworten Sie nennen; unseres verteilt sich auf Schreiben, Veröffentlichen, Korrekturen an der Website, Ihr Google Unternehmensprofil und eine monatliche Prüfung in Google, Maps und KI-Antworten.',
+    },
+    table: {
+      eyebrow: 'Der Vergleich',
+      title: 'Was jedes von beiden tut, entnommen aus Writesonics eigenen Seiten',
+      checkedOn: CHECKED,
+      sources: SOURCES,
+      rows: [
+        {
+          label: 'Preis',
+          ours: 'Ab 79 USD im Monat zuzüglich Steuern. In Israel ab 249 ILS im Monat inklusive Mehrwertsteuer.',
+          theirs:
+            'Starter 79 USD im Monat bei jährlicher Zahlung, Basic 199 USD, Growth 399 USD, Enterprise auf Anfrage. Ihre Preisseite zeigt keinen Preis für monatliche Abrechnung.',
+        },
+        {
+          label: 'Was der Einstiegstarif enthält',
+          ours: 'Jeder Bereich steckt im Einstiegstarif; was sich zwischen den Tarifen unterscheidet, steht auf der Preisseite.',
+          theirs:
+            'Starter: 50 erfasste Prompts, 50 täglich erfasste Antworten, 15 KI-Artikel im Monat, 10 Website-Audits mit je 100 Seiten, 1 Nutzer und 1 Projekt.',
+        },
+        {
+          label: 'Wer die Artikel schreibt',
+          ours: 'Das System. Themen, Text, Bilder und interne Links, nach Ihrer Freigabe.',
+          theirs: 'Ihr System schreibt ebenfalls. Die Preisseite begrenzt «AI articles» je Tarif — 15 im Monat bei Starter.',
+        },
+        {
+          label: 'Veröffentlichung auf der Website',
+          ours: 'Automatisch in WordPress und Shopify.',
+          theirs: 'WordPress ist die einzige Veröffentlichungs-Integration, die auf ihrer Startseite genannt wird.',
+        },
+        {
+          label: 'KI-Antworten',
+          ours: 'Eine automatische monatliche Prüfung in ChatGPT, Gemini und Google AI.',
+          theirs:
+            'Starter, Basic und Growth erfassen alle ChatGPT, Gemini und Google AI Overviews, mit täglich aktualisierten Antworten. Alle neun Plattformen — darunter Perplexity, Claude, Grok und Microsoft Copilot — liegen bei Enterprise.',
+        },
+        {
+          label: 'Google-Ranking-Tracking',
+          ours: 'Eine monatliche Prüfung Ihrer organischen Positionen in Google.',
+          theirs:
+            'Ihre Startseite nennt Google Search Console und den Keyword Planner unter den Integrationen. Eine Seite, die einen klassischen Keyword-Rank-Tracker beschreibt, haben wir nicht gefunden.',
+        },
+        {
+          label: 'Google Maps und Unternehmensprofil',
+          ours: 'Automatische Beiträge im Profil mit Ihrer Einwilligung und eine monatliche Prüfung Ihrer Position in Maps.',
+          theirs: 'Google Maps und das Google Unternehmensprofil werden auf ihrer Startseite nicht erwähnt.',
+        },
+        {
+          label: 'Arbeit an der Website',
+          ours: 'Ein Teil der Korrekturen wird über unser Plugin eingespielt, ohne dass Sie Code lesen müssen.',
+          theirs:
+            'Ein Action Center, das Chancen ordnet und eine Korrektur mit einem Klick anbietet. Bei Starter sind die agentischen Durchläufe als «Limited access (10 trial runs)» ausgewiesen.',
+        },
+        {
+          label: 'Testphase',
+          ours: '7 Tage testen, ohne Kreditkarte, jederzeit kündbar.',
+          theirs:
+            'Oben auf ihrer Preisseite steht «Start free. No credit card needed.» Eine Dauer der Testphase nennt die Seite nicht.',
+        },
+      ],
+    },
+    theirStrengths: {
+      eyebrow: 'Wann Writesonic die bessere Wahl ist',
+      title: 'In diesen Fällen nehmen Sie Writesonic',
+      intro: 'Bei der Sichtbarkeit in KI-Antworten sind sie Spezialisten und wir nicht. Zum gleichen Preis messen sie das tiefer.',
+      items: [
+        {
+          title: 'Wenn die ganze Frage ist, ob die KI Sie nennt',
+          body:
+            'Für dieselben 79 USD verfolgen sie 50 benannte Prompts und messen jeden Tag 50 Antworten über ChatGPT, Gemini und Google AI Overviews. Unsere Prüfung läuft monatlich. Wenn das Ihre zentrale Frage ist, ist ihre Antwort ausführlicher als unsere.',
+        },
+        {
+          title: 'Wenn ein oder zwei Dienste nicht genügen',
+          body:
+            'Ihr Tarif Enterprise deckt neun Plattformen ab, darunter Perplexity, Claude, Grok und Microsoft Copilot. Wir prüfen drei. Für eine Marke, die über die ganze KI-Landschaft gemessen wird, ist das ein echter Abstand.',
+        },
+        {
+          title: 'Wenn Sie ohne Risiko ausprobieren wollen',
+          body:
+            'Auf ihrer Seite steht «Start free. No credit card needed.» Wir verlangen ebenfalls keine Karte, aber unsere Testphase endet nach sieben Tagen; ihre Seite nennt keine Dauer, Sie bekommen also vielleicht länger, um sich ein Urteil zu bilden.',
+        },
+      ],
+    },
+    ourStrengths: {
+      eyebrow: 'Wann wir besser passen',
+      title: 'Wenn die Arbeit gemacht werden muss, nicht nur gemessen',
+      intro: 'Gleicher Preis, andere Verteilung. Wir geben Tiefe in der Messung auf, um mehr von der Arbeit selbst abzudecken.',
+      items: [
+        { title: 'Auch die lokale Seite', body: 'Beiträge in Ihrem Google Unternehmensprofil mit Ihrer Einwilligung, vorbereitete Antworten auf Bewertungen und eine monatliche Prüfung Ihrer Position in Google Maps.' },
+        { title: 'Shopify genauso wie WordPress', body: 'Automatische Veröffentlichung auf beiden Plattformen, mit demselben Monatsbericht.' },
+        { title: 'Niemand muss es bedienen', body: 'Ein monatlicher Themenplan, den Sie freigeben, und danach läuft es von selbst — keine Prompts einzurichten, kein Dashboard zu öffnen.' },
+        { title: 'Zehn Sprachen, Hebräisch inbegriffen', body: 'Oberfläche, Inhalte und Berichte in Ihrer Sprache, und in Israel ein Preis in Schekel inklusive Mehrwertsteuer.' },
+      ],
+    },
+    faq: {
+      eyebrow: 'Fragen',
+      title: 'Was vor der Entscheidung gefragt wird',
+      items: [
+        {
+          q: 'Sie kosten beide 79 USD. Was unterscheidet sich tatsächlich?',
+          a: 'Worauf sich der Preis verteilt. Bei Writesonic steckt das meiste in der täglichen Messung, wie KI-Antworten Sie nennen, dazu 15 Artikel im Monat. Derselbe Betrag deckt bei uns Schreiben und Veröffentlichen, Korrekturen an der Website, Beiträge in Ihrem Google Unternehmensprofil und eine monatliche Prüfung in Google, in Maps und in KI-Antworten. Wenn Sie KI messen wollen, nehmen Sie Writesonic. Wenn die Arbeit gemacht werden muss, nehmen Sie uns.',
+        },
+        {
+          q: 'Prüfen Sie so viele KI-Plattformen wie Writesonic?',
+          a: 'Nein. Unsere automatische Prüfung deckt ChatGPT, Gemini und Google AI ab, einmal im Monat. Ihre Tarife aktualisieren Antworten täglich, und ihr Tarif Enterprise erreicht neun Plattformen.',
+        },
+        {
+          q: 'Unterstützen Sie Shopify?',
+          a: 'Ja. Wir veröffentlichen in WordPress und in Shopify. Auf ihrer Startseite ist WordPress die einzige genannte Veröffentlichungs-Integration — wenn Ihr Shop auf Shopify läuft, lohnt es, das vor der Entscheidung bei ihnen zu erfragen.',
+        },
+      ],
+    },
+    close: { title: 'Sehen Sie ohne Anmeldung, wo Ihre Website steht' },
   },
   ja: {
     competitor: 'Writesonic',
@@ -884,7 +1008,7 @@ export const WRITESONIC_COMPARE: Record<PublicLocale, ComparisonCopy> = {
         { title: '地域の側も', body: 'ご同意のうえでGoogleビジネスプロフィールへ投稿し、口コミへの返信の下書きを用意し、Googleマップでの位置を月に一度確認します。' },
         { title: 'WordPressだけでなくShopifyも', body: '両方のプラットフォームへ自動で公開し、月のレポートも同じものです。' },
         { title: '誰も運用しなくてよい', body: '月に一度、題材の計画をご承認いただいたあとは、そのまま動きます。設定するプロンプトも、開くダッシュボードもありません。' },
-        { title: '7つの言語、ヘブライ語も', body: '画面、コンテンツ、レポートをご自身の言語で用意し、イスラエルでは付加価値税込みのシェケル建ての価格です。' },
+        { title: '10の言語、ヘブライ語も', body: '画面、コンテンツ、レポートをご自身の言語で用意し、イスラエルでは付加価値税込みのシェケル建ての価格です。' },
       ],
     },
     faq: {
@@ -906,5 +1030,253 @@ export const WRITESONIC_COMPARE: Record<PublicLocale, ComparisonCopy> = {
       ],
     },
     close: { title: 'サイトの現状を、登録なしで確認する' },
+  },
+  nl: {
+    competitor: 'Writesonic',
+    eyebrow: 'Go Top SEO tegenover Writesonic',
+    metaTitle: 'Go Top SEO tegenover Writesonic | vergelijking',
+    metaDescription:
+      'Twee producten met dezelfde instapprijs van 79 USD. Go Top SEO vergeleken met Writesonic: waaraan elk van beide dat geld besteedt, wat er wordt gemeten en wanneer Writesonic de betere keuze is.',
+    hero: {
+      title: 'Dezelfde 79 USD, twee verschillende opdrachten.',
+      accent: 'De vraag is waaraan',
+      subtitle:
+        'Het pakket Starter van Writesonic kost 79 USD per maand bij jaarlijkse betaling, en wij beginnen bij 79 USD per maand plus belasting. Hun geld gaat vooral naar het diep meten van hoe AI-antwoorden u noemen; het onze verdeelt zich over schrijven, publiceren, correcties aan de website, uw Google-bedrijfsprofiel en een maandelijkse controle in Google, Maps en AI-antwoorden.',
+    },
+    table: {
+      eyebrow: 'De vergelijking',
+      title: 'Wat elk van beide doet, overgenomen uit Writesonics eigen pagina’s',
+      checkedOn: CHECKED,
+      sources: SOURCES,
+      rows: [
+        {
+          label: 'Prijs',
+          ours: 'Vanaf 79 USD per maand plus belasting. In Israël vanaf 249 ILS per maand inclusief btw.',
+          theirs:
+            'Starter 79 USD per maand bij jaarlijkse betaling, Basic 199 USD, Growth 399 USD, Enterprise op aanvraag. Hun prijspagina laat geen prijs voor maandelijkse afrekening zien.',
+        },
+        {
+          label: 'Wat het instappakket bevat',
+          ours: 'Elk onderdeel zit in het instappakket; wat tussen de pakketten verschilt, staat op de prijspagina.',
+          theirs:
+            'Starter: 50 gevolgde prompts, 50 dagelijks gemeten antwoorden, 15 AI-artikelen per maand, 10 website-audits van elk 100 pagina’s, 1 gebruiker en 1 project.',
+        },
+        {
+          label: 'Wie de artikelen schrijft',
+          ours: 'Het systeem. Onderwerpen, tekst, afbeeldingen en interne links, nadat u ze hebt goedgekeurd.',
+          theirs: 'Hun systeem schrijft ook. De prijspagina begrenst “AI articles” per pakket — 15 per maand bij Starter.',
+        },
+        {
+          label: 'Publicatie op de website',
+          ours: 'Automatisch in WordPress en Shopify.',
+          theirs: 'WordPress is de enige koppeling voor publiceren die op hun startpagina wordt genoemd.',
+        },
+        {
+          label: 'AI-antwoorden',
+          ours: 'Een automatische maandelijkse controle in ChatGPT, Gemini en Google AI.',
+          theirs:
+            'Starter, Basic en Growth meten alle drie ChatGPT, Gemini en Google AI Overviews, met dagelijks bijgewerkte antwoorden. Alle negen platforms — waaronder Perplexity, Claude, Grok en Microsoft Copilot — zitten bij Enterprise.',
+        },
+        {
+          label: 'Positiemeting in Google',
+          ours: 'Een maandelijkse controle van uw organische posities in Google.',
+          theirs:
+            'Hun startpagina noemt Google Search Console en de Keyword Planner onder de koppelingen. Een pagina die een klassieke positiemeter voor zoekwoorden beschrijft, hebben wij niet gevonden.',
+        },
+        {
+          label: 'Google Maps en bedrijfsprofiel',
+          ours: 'Automatische berichten in het profiel met uw toestemming en een maandelijkse controle van uw positie in Maps.',
+          theirs: 'Google Maps en het Google-bedrijfsprofiel worden op hun startpagina niet vermeld.',
+        },
+        {
+          label: 'Werk aan de website',
+          ours: 'Een deel van de correcties wordt via onze plug-in doorgevoerd, zonder dat u code hoeft te lezen.',
+          theirs:
+            'Een Action Center dat kansen op een rij zet en een correctie met één klik aanbiedt. Bij Starter staan de agentische runs aangeduid als “Limited access (10 trial runs)”.',
+        },
+        {
+          label: 'Proefperiode',
+          ours: '7 dagen uitproberen, zonder creditcard, altijd op te zeggen.',
+          theirs:
+            'Boven aan hun prijspagina staat “Start free. No credit card needed.” Een duur van de proefperiode noemt de pagina niet.',
+        },
+      ],
+    },
+    theirStrengths: {
+      eyebrow: 'Wanneer Writesonic de betere keuze is',
+      title: 'In deze gevallen neemt u Writesonic',
+      intro: 'Bij de zichtbaarheid in AI-antwoorden zijn zij de specialisten en wij niet. Voor dezelfde prijs meten zij dat dieper.',
+      items: [
+        {
+          title: 'Als de hele vraag is of de AI u noemt',
+          body:
+            'Voor dezelfde 79 USD volgen zij 50 benoemde prompts en meten zij elke dag 50 antwoorden over ChatGPT, Gemini en Google AI Overviews. Onze controle loopt maandelijks. Is dat uw kernvraag, dan is hun antwoord uitvoeriger dan het onze.',
+        },
+        {
+          title: 'Als één of twee diensten niet genoeg zijn',
+          body:
+            'Hun pakket Enterprise dekt negen platforms, waaronder Perplexity, Claude, Grok en Microsoft Copilot. Wij controleren drie. Voor een merk dat over het hele AI-landschap wordt gemeten, is dat een echt verschil.',
+        },
+        {
+          title: 'Als u zonder risico wilt uitproberen',
+          body:
+            'Op hun pagina staat “Start free. No credit card needed.” Wij vragen ook geen kaart, maar onze proefperiode eindigt na zeven dagen; hun pagina noemt geen duur, dus u krijgt misschien langer om een oordeel te vormen.',
+        },
+      ],
+    },
+    ourStrengths: {
+      eyebrow: 'Wanneer wij beter passen',
+      title: 'Als het werk gedaan moet worden en niet alleen gemeten',
+      intro: 'Dezelfde prijs, een andere verdeling. Wij geven diepte in de meting op om meer van het werk zelf te dekken.',
+      items: [
+        { title: 'Ook de plaatselijke kant', body: 'Berichten in uw Google-bedrijfsprofiel met uw toestemming, voorbereide antwoorden op beoordelingen en een maandelijkse controle van uw positie in Google Maps.' },
+        { title: 'Shopify net zo goed als WordPress', body: 'Automatisch publiceren op beide platforms, met hetzelfde maandrapport.' },
+        { title: 'Niemand hoeft het te bedienen', body: 'Een maandelijks plan met onderwerpen dat u goedkeurt, en daarna loopt het van zichzelf — geen prompts in te stellen, geen dashboard te openen.' },
+        { title: 'Tien talen, Hebreeuws inbegrepen', body: 'Interface, content en rapporten in uw taal, en in Israël een prijs in sjekel inclusief btw.' },
+      ],
+    },
+    faq: {
+      eyebrow: 'Vragen',
+      title: 'Wat er voor de beslissing wordt gevraagd',
+      items: [
+        {
+          q: 'U kost beide 79 USD. Wat verschilt er werkelijk?',
+          a: 'Waarover de prijs zich verdeelt. Bij Writesonic zit het meeste in het dagelijks meten van hoe AI-antwoorden u noemen, plus 15 artikelen per maand. Hetzelfde bedrag dekt bij ons schrijven en publiceren, correcties aan de website, berichten in uw Google-bedrijfsprofiel en een maandelijkse controle in Google, in Maps en in AI-antwoorden. Wilt u AI meten, neem Writesonic. Moet het werk gedaan worden, neem ons.',
+        },
+        {
+          q: 'Controleren jullie zoveel AI-platforms als Writesonic?',
+          a: 'Nee. Onze automatische controle dekt ChatGPT, Gemini en Google AI, één keer per maand. Hun pakketten werken antwoorden dagelijks bij, en hun pakket Enterprise reikt tot negen platforms.',
+        },
+        {
+          q: 'Ondersteunen jullie Shopify?',
+          a: 'Ja. Wij publiceren in WordPress en in Shopify. Op hun startpagina is WordPress de enige genoemde koppeling voor publiceren — loopt uw winkel op Shopify, dan is het de moeite waard dat voor de beslissing bij hen na te vragen.',
+        },
+      ],
+    },
+    close: { title: 'Zie zonder aanmelden waar uw website staat' },
+  },
+  pl: {
+    competitor: 'Writesonic',
+    eyebrow: 'Go Top SEO a Writesonic',
+    metaTitle: 'Go Top SEO a Writesonic | porównanie',
+    metaDescription:
+      'Dwa produkty z tą samą ceną wejścia 79 USD. Go Top SEO w porównaniu z Writesonic: na co każdy z nich wydaje te pieniądze, co jest mierzone i kiedy lepszym wyborem jest Writesonic.',
+    hero: {
+      title: 'Te same 79 USD, dwa różne zadania.',
+      accent: 'Pytanie brzmi: na co',
+      subtitle:
+        'Pakiet Starter Writesonic kosztuje 79 USD miesięcznie przy płatności rocznej, a my zaczynamy od 79 USD miesięcznie plus podatek. Ich pieniądze idą przede wszystkim na dogłębny pomiar tego, czy odpowiedzi AI wymieniają firmę. Nasze rozkładają się na pisanie, publikację, poprawki na stronie, Profil Firmy w Google oraz comiesięczne sprawdzenie w Google, w Mapach i w odpowiedziach AI.',
+    },
+    table: {
+      eyebrow: 'Porównanie',
+      title: 'Co robi każdy z nich, na podstawie własnych stron Writesonic',
+      checkedOn: CHECKED,
+      sources: SOURCES,
+      rows: [
+        {
+          label: 'Cena',
+          ours: 'Od 79 USD miesięcznie plus podatek. W Izraelu od 249 ILS miesięcznie z podatkiem VAT.',
+          theirs:
+            'Starter 79 USD miesięcznie przy płatności rocznej, Basic 199 USD, Growth 399 USD, Enterprise na zapytanie. Ich strona z cenami nie pokazuje ceny przy rozliczeniu miesięcznym.',
+        },
+        {
+          label: 'Co zawiera pakiet wejściowy',
+          ours: 'Każdy element jest w pakiecie wejściowym; to, co różni pakiety, opisuje strona z cenami.',
+          theirs:
+            'Starter: 50 monitorowanych promptów, 50 odpowiedzi mierzonych codziennie, 15 artykułów AI miesięcznie, 10 audytów strony po 100 podstron, 1 użytkownik i 1 projekt.',
+        },
+        {
+          label: 'Kto pisze artykuły',
+          ours: 'System. Tematy, tekst, obrazy i linkowanie wewnętrzne, po zatwierdzeniu tematów.',
+          theirs: 'Ich system też pisze. Strona z cenami ogranicza liczbę „AI articles” w każdym pakiecie, w Starterze do 15 miesięcznie.',
+        },
+        {
+          label: 'Publikacja na stronie',
+          ours: 'Automatycznie na WordPressie i na Shopify.',
+          theirs: 'WordPress to jedyna integracja publikacji wymieniona na ich stronie głównej.',
+        },
+        {
+          label: 'Odpowiedzi AI',
+          ours: 'Automatyczne comiesięczne sprawdzenie w ChatGPT, Gemini i Google AI.',
+          theirs:
+            'Starter, Basic i Growth mierzą ChatGPT, Gemini i Google AI Overviews, z odpowiedziami odświeżanymi codziennie. Wszystkie dziewięć platform, w tym Perplexity, Claude, Grok i Microsoft Copilot, jest w pakiecie Enterprise.',
+        },
+        {
+          label: 'Pomiar pozycji w Google',
+          ours: 'Comiesięczne sprawdzenie pozycji w wynikach organicznych Google.',
+          theirs:
+            'Ich strona główna wymienia Google Search Console i Keyword Planner wśród integracji. Nie znaleźliśmy strony, która opisuje klasyczne monitorowanie pozycji słów kluczowych.',
+        },
+        {
+          label: 'Google Maps i Profil Firmy',
+          ours: 'Automatyczne wpisy w profilu za zgodą właściciela oraz comiesięczne sprawdzenie pozycji w Mapach.',
+          theirs: 'Google Maps i Profil Firmy w Google nie są wymienione na ich stronie głównej.',
+        },
+        {
+          label: 'Praca na stronie',
+          ours: 'Część poprawek wprowadza nasza wtyczka, bez czytania kodu.',
+          theirs:
+            'Action Center, które zestawia możliwości i proponuje poprawkę jednym kliknięciem. W Starterze uruchomienia agentowe są oznaczone jako „Limited access (10 trial runs)”.',
+        },
+        {
+          label: 'Okres próbny',
+          ours: '7 dni bez karty, z rezygnacją w każdej chwili.',
+          theirs:
+            'Na górze ich strony z cenami widnieje „Start free. No credit card needed.” Strona nie podaje długości okresu próbnego.',
+        },
+      ],
+    },
+    theirStrengths: {
+      eyebrow: 'Kiedy lepszym wyborem jest Writesonic',
+      title: 'W tych sytuacjach proszę wybrać Writesonic',
+      intro: 'W widoczności w odpowiedziach AI oni są specjalistami, a my nie. Za tę samą cenę mierzą to głębiej.',
+      items: [
+        {
+          title: 'Gdy całe pytanie brzmi, czy AI wymienia firmę',
+          body:
+            'Za te same 79 USD monitorują 50 wskazanych promptów i codziennie mierzą 50 odpowiedzi w ChatGPT, Gemini i Google AI Overviews. Nasze sprawdzenie jest comiesięczne. Jeśli to jest Państwa pytanie główne, ich odpowiedź jest obszerniejsza od naszej.',
+        },
+        {
+          title: 'Gdy jedna czy dwie usługi nie wystarczą',
+          body:
+            'Ich pakiet Enterprise obejmuje dziewięć platform, w tym Perplexity, Claude, Grok i Microsoft Copilot. My sprawdzamy trzy. Dla marki mierzonej w całym krajobrazie AI to realna różnica.',
+        },
+        {
+          title: 'Gdy chcą Państwo spróbować bez ryzyka',
+          body:
+            'Na ich stronie widnieje „Start free. No credit card needed.” My również nie prosimy o kartę, ale nasz okres próbny kończy się po siedmiu dniach, a ich strona nie podaje długości, więc mogą Państwo mieć więcej czasu na ocenę.',
+        },
+      ],
+    },
+    ourStrengths: {
+      eyebrow: 'Kiedy my pasujemy lepiej',
+      title: 'Gdy praca ma być wykonana, a nie tylko zmierzona',
+      intro: 'Ta sama cena, inny podział. Rezygnujemy z głębi pomiaru, aby pokryć więcej samej pracy.',
+      items: [
+        { title: 'Również strona lokalna', body: 'Wpisy w Profilu Firmy w Google za Państwa zgodą, przygotowane odpowiedzi na opinie i comiesięczne sprawdzenie pozycji w Google Maps.' },
+        { title: 'Shopify na równi z WordPressem', body: 'Automatyczna publikacja na obu platformach, z tym samym raportem miesięcznym.' },
+        { title: 'Nikt nie musi tego obsługiwać', body: 'Miesięczny plan tematów do zatwierdzenia, a potem wszystko dzieje się samo: żadnych promptów do ustawienia, żadnego panelu do otwierania.' },
+        { title: 'Dziesięć języków, w tym hebrajski', body: 'Interfejs, treści i raporty w Państwa języku, a w Izraelu cena w szeklach z podatkiem VAT.' },
+      ],
+    },
+    faq: {
+      eyebrow: 'Pytania',
+      title: 'O co pytają przed decyzją',
+      items: [
+        {
+          q: 'Oba produkty kosztują 79 USD. Co naprawdę się różni?',
+          a: 'To, na co rozkłada się cena. W Writesonic większość idzie na codzienny pomiar tego, czy odpowiedzi AI wymieniają firmę, plus 15 artykułów miesięcznie. U nas ta sama kwota pokrywa pisanie i publikację, poprawki na stronie, wpisy w Profilu Firmy w Google oraz comiesięczne sprawdzenie w Google, w Mapach i w odpowiedziach AI. Chcą Państwo mierzyć AI, proszę wybrać Writesonic. Ma być wykonana praca, proszę wybrać nas.',
+        },
+        {
+          q: 'Czy sprawdzacie tyle platform AI co Writesonic?',
+          a: 'Nie. Nasze automatyczne sprawdzenie obejmuje ChatGPT, Gemini i Google AI, raz w miesiącu. Ich pakiety odświeżają odpowiedzi codziennie, a pakiet Enterprise sięga dziewięciu platform.',
+        },
+        {
+          q: 'Czy obsługujecie Shopify?',
+          a: 'Tak. Publikujemy na WordPressie i na Shopify. Na ich stronie głównej WordPress to jedyna wymieniona integracja publikacji, więc jeśli sklep działa na Shopify, warto o to u nich dopytać przed decyzją.',
+        },
+      ],
+    },
+    close: { title: 'Proszę sprawdzić bez rejestracji, gdzie jest Państwa strona' },
   },
 }

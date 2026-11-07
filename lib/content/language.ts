@@ -14,9 +14,9 @@
  * site can be managed from a Hebrew dashboard, and currency follows the country.
  */
 
-export type ContentLanguage = 'he' | 'en' | 'es' | 'pt-BR' | 'fr' | 'it' | 'ja'
+export type ContentLanguage = 'he' | 'en' | 'es' | 'pt-BR' | 'fr' | 'it' | 'ja' | 'de' | 'nl' | 'pl'
 
-export const CONTENT_LANGUAGES: ContentLanguage[] = ['he', 'en', 'es', 'pt-BR', 'fr', 'it', 'ja']
+export const CONTENT_LANGUAGES: ContentLanguage[] = ['he', 'en', 'es', 'pt-BR', 'fr', 'it', 'ja', 'de', 'nl', 'pl']
 
 export const DEFAULT_CONTENT_LANGUAGE: ContentLanguage = 'he'
 
@@ -46,6 +46,30 @@ export const DEFAULT_CONTENT_LANGUAGE: ContentLanguage = 'he'
  * internal-link overlap — goes through lib/text/segment.ts rather than a space
  * split. The legacy 'jp' is accepted beside 'ja' because it is what a WordPress
  * site and a Google Search Console property both sometimes report.
+ *
+ * German is region-less for the same reason Spanish, French and Italian are:
+ * 'de', 'de-DE', 'de-AT' and 'de-CH' all normalize to the one content language,
+ * because what we write for a reader in Hamburg, in Graz and in Zurich is the
+ * same German. Where the region changes an answer it is a LEGAL question — the
+ * Swiss reader is outside the EU — and the legal documents say so themselves.
+ * German is space-delimited, so nothing here goes through lib/text/segment.ts.
+ *
+ * Dutch is region-less for the same reason: 'nl', 'nl-NL' and 'nl-BE' all
+ * normalize to the one content language, because what we write for a reader in
+ * Utrecht and for a reader in Antwerp is the same Dutch. 'vlaams' and 'flemish'
+ * are accepted and answer 'nl' rather than falling back to Hebrew, which is the
+ * only alternative — Flemish is not a separate content language here, and
+ * Belgium is not a market we priced. 'dutch' cannot be confused with German
+ * despite what the English word suggests, because the test above it matches on
+ * 'de'/'ger'/'deutsch' and none of those is a prefix of 'dutch'.
+ *
+ * Polish is region-less too, and it has only ever had one region. The accepted
+ * spellings are 'pl', 'pol', 'polish' and 'polski' — the last because a value
+ * that reached us from a Polish-language form or a Polish WordPress install is
+ * spelled in Polish, and without it that row would have answered Hebrew. The
+ * test order matters here as it does for Dutch: 'pl' is checked after 'pt', so
+ * Brazilian Portuguese is never swallowed by it, and no accepted Polish
+ * spelling is a prefix of any earlier language's.
  */
 export function normalizeContentLanguage(value: unknown): ContentLanguage {
   const s = String(value ?? '').toLowerCase().trim()
@@ -56,6 +80,9 @@ export function normalizeContentLanguage(value: unknown): ContentLanguage {
   if (s.startsWith('fr') || s.startsWith('franc') || s.startsWith('français')) return 'fr'
   if (s.startsWith('it') || s.startsWith('ital')) return 'it'
   if (s.startsWith('ja') || s.startsWith('jp') || s.startsWith('japan') || s.startsWith('日本')) return 'ja'
+  if (s.startsWith('de') || s.startsWith('ger') || s.startsWith('deutsch')) return 'de'
+  if (s.startsWith('pl') || s.startsWith('pol') || s.startsWith('polski')) return 'pl'
+  if (s.startsWith('nl') || s.startsWith('dutch') || s.startsWith('nederland') || s.startsWith('vlaams') || s.startsWith('flemish')) return 'nl'
   return DEFAULT_CONTENT_LANGUAGE
 }
 
@@ -68,6 +95,9 @@ const ENGLISH_NAME: Record<ContentLanguage, string> = {
   fr: 'French',
   it: 'Italian',
   ja: 'Japanese',
+  de: 'German',
+  nl: 'Dutch',
+  pl: 'Polish',
 }
 
 export function languageNameInEnglish(language: ContentLanguage): string {

@@ -70,6 +70,9 @@ const pt = FEATURE_COMMON['pt-BR']
 const fr = FEATURE_COMMON.fr
 const it = FEATURE_COMMON.it
 const ja = FEATURE_COMMON.ja
+const de = FEATURE_COMMON.de
+const nl = FEATURE_COMMON.nl
+const pl = FEATURE_COMMON.pl
 
 export const SITE_LINKS_PAGE: MarketingPage = {
   path: '/features/site-links',
@@ -101,6 +104,18 @@ export const SITE_LINKS_PAGE: MarketingPage = {
     ja: {
       title: 'サイトへのリンク | Go Top SEO',
       description: '補完関係にある企業のGo Top SEO利用者が、その企業向けに書かれた記事の中でお客様のサイトを言及できます。入るのは読者の役に立つ場所だけです。交換は行わず、競合には決して入らず、任意で初期設定では無効です。さらに内部リンク、孤立ページ、無料で掲載できるディレクトリも扱います。',
+    },
+    nl: {
+      title: 'Links naar uw website | Go Top SEO',
+      description: 'Bedrijven met een aanvullend aanbod die Go Top SEO gebruiken, kunnen u noemen in de artikelen die voor hen geschreven worden — alleen daar waar het de lezer helpt. Geen ruil, nooit een concurrent, vrijwillig en standaard uit. Daarnaast interne links, pagina\u2019s zonder links en gratis vermeldingen.',
+    },
+    de: {
+      title: 'Links auf Ihre Website | Go Top SEO',
+      description: 'Unternehmen mit ergänzendem Angebot, die Go Top SEO nutzen, können Sie in den für sie geschriebenen Artikeln nennen — nur dort, wo es dem Lesenden hilft. Kein Tausch, nie ein Wettbewerber, freiwillig und standardmäßig aus. Dazu interne Links, verwaiste Seiten und kostenlose Verzeichnisse.',
+    },
+    pl: {
+      title: 'Linki do Państwa strony | Go Top SEO',
+      description: 'Firmy z uzupełniającą ofertą, które korzystają z Go Top SEO, mogą wspomnieć o Państwa stronie w artykułach pisanych dla nich, ale tylko tam, gdzie to pomaga czytelnikowi. Bez wymiany, nigdy konkurent, dobrowolnie i domyślnie wyłączone. Poza tym linkowanie wewnętrzne, podstrony bez linków i bezpłatne katalogi.',
     },
   },
   content: {
@@ -761,6 +776,226 @@ export const SITE_LINKS_PAGE: MarketingPage = {
     // links or a ranking, in Japanese either: 景品表示法 treats an unprovable
     // performance claim as a misrepresentation, and the claim would be false
     // anyway.
+    nl: {
+      hero: {
+        eyebrow: 'Links naar uw website',
+        eyebrowIcon: Link2,
+        title: 'Vermeldingen en links',
+        accent: 'in content van bedrijven met een aanvullend aanbod',
+        subtitle: 'Klanten van Go Top SEO uit aanvullende branches kunnen u noemen in de artikelen die voor hen geschreven worden, daar waar uw pagina de lezer van die alinea werkelijk helpt. Nooit een concurrent, nooit een ruil op wederzijdse basis. Deelname is vrijwillig en staat standaard uit.',
+        trust: nl.trust,
+        primary: nl.trial,
+        secondary: nl.check,
+        visual: (
+          <WorkListVisual
+            heading="Vermeldingen en links"
+            rows={[
+              { title: 'Inkomende link van een aanvullend bedrijf', detail: 'Uit een artikel op zijn blog', icon: ArrowDownToLine, done: true, status: 'Gepubliceerd' },
+              { title: 'Uitgaande link in uw artikel', detail: 'Voor de publicatie getoond, u kunt hem verwijderen', icon: ArrowUpFromLine, done: false, status: 'Te beoordelen' },
+              { title: 'Zelfde branche', detail: 'Wordt in geen enkele richting geplaatst', icon: Ban, done: true, status: 'Geblokkeerd' },
+              { title: '3 interne links in het artikel toegevoegd', detail: 'Prijzengids', icon: ArrowLeftRight, done: true, status: 'Toegevoegd' },
+            ]}
+          />
+        ),
+      },
+      sections: [
+        {
+          kind: 'steps',
+          eyebrow: 'Bedrijven met een aanvullend aanbod',
+          title: 'Zo gaat het',
+          items: [
+            { title: 'U zet het aan', body: 'Deelname geldt per website en wordt door de eigenaar van het project aangezet na het aanvaarden van de voorwaarden op het scherm. Standaard uit, en u kunt wanneer u wilt stoppen.' },
+            { title: 'Alleen echte websites', body: 'Een website doet alleen mee als haar eigenaar haar in de app verbonden heeft via WordPress of Search Console. Een domein intypen is niet genoeg, dus de website van een onbekende komt er niet in.' },
+            { title: 'De vermelding staat in het artikel', body: 'Wordt een artikel voor een aanvullend bedrijf geschreven, dan kan het een passende pagina van u noemen, op woorden die al in de zin staan. Wij herschrijven de tekst niet en voegen geen alinea\u2019s toe.' },
+            { title: 'U ziet alles', body: 'Elke plaatsing wordt vastgelegd en aan beide partijen getoond. Een link die uit uw artikel naar buiten leidt, verschijnt voor de publicatie, en u kunt hem verwijderen.' },
+          ],
+        },
+        {
+          kind: 'cards',
+          tone: 'contrast',
+          eyebrow: 'De regels',
+          title: 'Hoe het natuurlijk blijft',
+          items: [
+            { icon: Ban, title: 'Nooit een concurrent', body: 'Niet dezelfde branche, en geen domein dat een van beide partijen als concurrent heeft gemarkeerd. Een website waarvan wij de branche niet kennen, blijft erbuiten; wij gokken nooit.' },
+            { icon: ArrowLeftRight, title: 'Geen ruil', body: 'Wij ruilen niet: een website die een vermelding van u krijgt, noemt u nooit terug, en een paar komt elkaar maar één keer tegen. Ook een korte lus over drie websites wordt geblokkeerd.' },
+            { icon: ShieldCheck, title: 'Eén, en spaarzaam', body: 'Hoogstens één link per artikel, en wij laten het liever weg dan er nog een in te duwen. Een website die net begonnen is, doet langzaam mee.' },
+            { icon: Network, title: 'Alleen waar het de lezer helpt', body: 'Een vermelding komt alleen daar waar de pagina de lezer van die alinea werkelijk helpt. Past het maar zwak, dan komt er niets in. Nieuwe of dunne websites doen niet mee.' },
+          ],
+        },
+        {
+          kind: 'callout',
+          icon: Info,
+          title: 'Wat wij niet doen',
+          body: (
+            <>
+              <p>
+                Wij verkopen geen links, kopen geen links en beloven geen links van de websites van anderen. Er is
+                geen beloofd aantal links en geen belofte over posities.
+              </p>
+              <p>
+                Deelname is vrijwillig, staat standaard uit, en u kunt wanneer u wilt stoppen. Zij is geen onderdeel
+                van wat u betaalt en in geen enkel pakket als toezegging opgenomen. Het soort link geldt voor het hele
+                netwerk, wordt u op het aanmeldscherm getoond en kan voor toekomstige links wijzigen. De volledige
+                tekst staat in{' '}
+                <a className="underline" href="/nl/terms#link-network">artikel 15A van de algemene voorwaarden</a>,
+                samen met de risico\u2019s van deelname, en die is het lezen waard voordat u dit aanzet.
+              </p>
+              <p>
+                Wij publiceren geen lijst van deelnemende websites. De ontvangende partij ziet het adres van de
+                website die naar haar gelinkt heeft. De verantwoordelijkheid voor de inhoud van de website en voor het
+                naleven van de richtlijnen van de zoekmachines blijft bij de websitebeheerder, en wij kunnen de dienst
+                opschorten of beëindigen.
+              </p>
+            </>
+          ),
+        },
+        {
+          kind: 'cards',
+          columns: 2,
+          eyebrow: 'Ook binnen uw website',
+          title: 'De links die een website samenhouden',
+          items: [
+            { icon: ArrowLeftRight, title: 'Interne links tijdens het schrijven', body: 'Terwijl het artikel ontstaat, verbindt het systeem het met de passende pagina\u2019s van uw website, alleen daar waar de formulering al natuurlijk in de tekst voorkomt. U leest het artikel voor de publicatie, zoals altijd.' },
+            { icon: Unlink, title: 'Pagina\u2019s zonder links', body: 'Pagina\u2019s waarnaar geen andere pagina van de website linkt, zodat Google ze moeilijk bereikt en hun belang niet ziet. Pagina\u2019s waarnaar het menu of de startpagina linkt, gelden niet als zodanig.' },
+            { icon: ListChecks, title: 'Gratis vermeldingen', body: 'Een met de hand gecontroleerde lijst van gidsen en bedrijfsprofielen voor het land en de taal van het project, met de melding waar het bedrijf al verschijnt.' },
+            { icon: MapPinned, title: 'Wat naar wat linkt', body: 'Voor elk artikel ziet u waarnaar het linkt en wat naar het artikel linkt. Dat verklaart waarom een pagina in Google niet beweegt terwijl andere dat wel doen.' },
+          ],
+        },
+        {
+          kind: 'cards',
+          columns: 2,
+          eyebrow: 'Search Console',
+          title: 'De links die Google al gevonden heeft',
+          items: [
+            { icon: FileSearch, title: 'Een directe link naar het rapport van Google', body: 'Search Console heeft geen interface die de lijst met links teruggeeft, dus wij verzinnen er geen. Er is een directe link naar het rapport bij Google.' },
+            { icon: Search, title: 'Een momentopname uit een exportbestand', body: 'U kunt een CSV-bestand uploaden dat u uit Search Console geëxporteerd hebt, en het in het systeem bekijken. Het is de momentopname van de exportdag en werkt zich niet van zelf bij.' },
+          ],
+        },
+        {
+          kind: 'faq',
+          eyebrow: 'Veelgestelde vragen',
+          title: 'Wat er over links gevraagd wordt',
+          items: [
+            { q: 'Hoeveel links krijg ik?', a: 'Er is geen beloofd aantal en geen quotum dat wij proberen te vullen. Een vermelding komt er alleen in wanneer een artikel geschreven wordt waarvan de alinea werkelijk bij uw pagina past — dat gebeurt dus spaarzaam.' },
+            { q: 'Ziet iemand dat ik meedoe?', a: 'Wij publiceren geen lijst van deelnemende websites. De partij die een vermelding krijgt, ziet het adres van de website die naar haar gelinkt heeft, en na de publicatie ook de pagina waarop de link verschenen is.' },
+            { q: 'Moet ik meedoen?', a: 'Nee. Het staat standaard uit, het aanzetten geldt per website, en u kunt wanneer u wilt stoppen. Stoppen beëindigt nieuwe vermeldingen; al gepubliceerde links blijven op de websites staan.' },
+            { q: 'Werkt dit in een Shopify-webshop?', a: 'Ja, door het afzonderlijk en vrijwillig aan te zetten. Vermeldingen komen alleen in artikelen die wij schrijven en op de blog van de webshop publiceren. Een artikel, pagina, product of categorie die al in de webshop bestaat, wordt niet bewerkt.' },
+            { q: 'Hoe zit het met de interne links op mijn website?', a: 'Die werken daar onafhankelijk van verder: elk geschreven artikel krijgt links naar de passende pagina\u2019s van uw website, en u keurt het hele artikel voor de publicatie goed.' },
+          ],
+        },
+      ],
+      cta: { title: 'Laat bedrijven met een aanvullend aanbod naar u linken', body: nl.closeBody, primary: nl.trial, secondary: nl.check },
+    },
+    de: {
+      hero: {
+        eyebrow: 'Links auf Ihre Website',
+        eyebrowIcon: Link2,
+        title: 'Nennungen und Links',
+        accent: 'in Inhalten von Unternehmen mit ergänzendem Angebot',
+        subtitle: 'Kunden von Go Top SEO aus ergänzenden Branchen können Sie in den für sie geschriebenen Artikeln nennen, wo Ihre Seite dem Lesenden dieses Absatzes wirklich hilft. Nie ein Wettbewerber, nie ein Tausch auf Gegenseitigkeit. Die Teilnahme ist freiwillig und standardmäßig aus.',
+        trust: de.trust,
+        primary: de.trial,
+        secondary: de.check,
+        visual: (
+          <WorkListVisual
+            heading="Nennungen und Links"
+            rows={[
+              { title: 'Eingehender Link von einem ergänzenden Unternehmen', detail: 'Aus einem Artikel in seinem Blog', icon: ArrowDownToLine, done: true, status: 'Veröffentlicht' },
+              { title: 'Ausgehender Link in Ihrem Artikel', detail: 'Vor der Veröffentlichung gezeigt, Sie können ihn entfernen', icon: ArrowUpFromLine, done: false, status: 'Zu prüfen' },
+              { title: 'Gleiche Branche', detail: 'Wird in keiner Richtung gesetzt', icon: Ban, done: true, status: 'Blockiert' },
+              { title: '3 interne Links im Artikel ergänzt', detail: 'Preisratgeber', icon: ArrowLeftRight, done: true, status: 'Ergänzt' },
+            ]}
+          />
+        ),
+      },
+      sections: [
+        {
+          kind: 'steps',
+          eyebrow: 'Unternehmen mit ergänzendem Angebot',
+          title: 'So läuft es',
+          items: [
+            { title: 'Sie schalten es ein', body: 'Die Teilnahme gilt je Website und wird von der Projektinhaberin bzw. dem Projektinhaber nach Annahme der Bedingungen auf dem Bildschirm aktiviert. Standardmäßig aus, und Sie können jederzeit aussteigen.' },
+            { title: 'Nur echte Websites', body: 'Eine Website nimmt nur teil, wenn ihr Inhaber sie in der App über WordPress oder die Search Console verbunden hat. Eine Domain einzutippen reicht nicht, daher kommt die Website einer fremden Person nicht hinein.' },
+            { title: 'Die Nennung steht im Artikel', body: 'Wird ein Artikel für ein ergänzendes Unternehmen geschrieben, kann er eine passende Seite von Ihnen nennen, auf Wörtern, die im Satz schon stehen. Wir schreiben den Text nicht um und ergänzen keine Absätze.' },
+            { title: 'Sie sehen alles', body: 'Jede Platzierung wird protokolliert und beiden Seiten gezeigt. Ein Link, der aus Ihrem Artikel hinausführt, erscheint vor der Veröffentlichung, und Sie können ihn entfernen.' },
+          ],
+        },
+        {
+          kind: 'cards',
+          tone: 'contrast',
+          eyebrow: 'Die Regeln',
+          title: 'Wie es natürlich bleibt',
+          items: [
+            { icon: Ban, title: 'Nie ein Wettbewerber', body: 'Nicht dieselbe Branche, und keine Domain, die eine der beiden Seiten als Wettbewerber markiert hat. Eine Website, deren Branche wir nicht kennen, bleibt außen vor; wir raten nie.' },
+            { icon: ArrowLeftRight, title: 'Kein Tausch', body: 'Wir tauschen nicht: eine Website, die eine Nennung von Ihnen erhält, nennt Sie nie zurück, und ein Paar begegnet sich nur einmal. Auch eine kurze Schleife über drei Websites wird blockiert.' },
+            { icon: ShieldCheck, title: 'Einer, und sparsam', body: 'Höchstens ein Link je Artikel, und wir lassen es lieber aus, als einen weiteren hineinzudrücken. Eine Website, die gerade angefangen hat, nimmt langsam teil.' },
+            { icon: Network, title: 'Nur wo es dem Lesenden hilft', body: 'Eine Nennung kommt nur dorthin, wo die Seite dem Lesenden dieses Absatzes wirklich hilft. Passt es nur schwach, kommt nichts hinein. Neue oder dünne Websites nehmen nicht teil.' },
+          ],
+        },
+        {
+          kind: 'callout',
+          icon: Info,
+          title: 'Was wir nicht tun',
+          body: (
+            <>
+              <p>
+                Wir verkaufen keine Links, kaufen keine Links und versprechen keine Links von den Websites anderer
+                Leute. Es gibt keine versprochene Anzahl von Links und kein Ranking-Versprechen.
+              </p>
+              <p>
+                Die Teilnahme ist freiwillig, standardmäßig aus, und Sie können jederzeit aussteigen. Sie ist nicht
+                Teil dessen, was Sie bezahlen, und als Zusage in keinem Tarif enthalten. Die Art des Links gilt für
+                das gesamte Netzwerk, wird Ihnen auf dem Beitrittsbildschirm gezeigt und kann sich für künftige Links
+                ändern. Der vollständige Wortlaut steht in{' '}
+                <a className="underline" href="/de/terms#link-network">Abschnitt 15A der Nutzungsbedingungen</a>,
+                zusammen mit den Risiken eines Beitritts, und er lohnt sich zu lesen, bevor Sie dies einschalten.
+              </p>
+              <p>
+                Wir veröffentlichen keine Liste teilnehmender Websites. Die empfangende Seite sieht die Adresse der
+                Website, die auf sie verlinkt hat. Die Verantwortung für die Inhalte der Website und für die Einhaltung
+                der Richtlinien der Suchmaschinen bleibt beim Websitebetreiber, und wir können den Dienst aussetzen
+                oder einstellen.
+              </p>
+            </>
+          ),
+        },
+        {
+          kind: 'cards',
+          columns: 2,
+          eyebrow: 'Auch innerhalb Ihrer Website',
+          title: 'Die Links, die eine Website zusammenhalten',
+          items: [
+            { icon: ArrowLeftRight, title: 'Interne Links beim Schreiben', body: 'Während der Artikel entsteht, verbindet das System ihn mit den passenden Seiten Ihrer Website, nur dort, wo die Formulierung im Text schon natürlich vorkommt. Sie lesen den Artikel vor der Veröffentlichung, wie immer.' },
+            { icon: Unlink, title: 'Verwaiste Seiten', body: 'Seiten, auf die keine andere Seite der Website verlinkt, sodass Google sie schwer erreicht und ihre Bedeutung nicht erkennt. Seiten, die aus dem Menü oder von der Startseite verlinkt sind, gelten nicht als verwaist.' },
+            { icon: ListChecks, title: 'Kostenlose Verzeichnisse', body: 'Eine von Hand geprüfte Liste von Verzeichnissen und Unternehmensprofilen für Land und Sprache des Projekts, mit dem Hinweis, wo das Unternehmen schon erscheint.' },
+            { icon: MapPinned, title: 'Was auf was verlinkt', body: 'Für jeden Artikel sehen Sie, worauf er verlinkt und was auf ihn verlinkt. Das erklärt, warum sich eine Seite in Google nicht bewegt, während andere es tun.' },
+          ],
+        },
+        {
+          kind: 'cards',
+          columns: 2,
+          eyebrow: 'Search Console',
+          title: 'Die Links, die Google schon gefunden hat',
+          items: [
+            { icon: FileSearch, title: 'Ein direkter Link zu Googles Bericht', body: 'Die Search Console hat keine Schnittstelle, die die Liste der Links zurückgibt, daher erfinden wir keine. Es gibt einen direkten Link zum Bericht bei Google.' },
+            { icon: Search, title: 'Eine Momentaufnahme aus einer Exportdatei', body: 'Sie können eine CSV-Datei hochladen, die Sie aus der Search Console exportiert haben, und sie im System ansehen. Es ist die Momentaufnahme des Exporttags und aktualisiert sich nicht von selbst.' },
+          ],
+        },
+        {
+          kind: 'faq',
+          eyebrow: 'Häufige Fragen',
+          title: 'Was zu Links gefragt wird',
+          items: [
+            { q: 'Wie viele Links bekomme ich?', a: 'Es gibt keine versprochene Anzahl und kein Soll, das wir zu füllen versuchen. Eine Nennung kommt nur dann hinein, wenn ein Artikel geschrieben wird, zu dessen Absatz Ihre Seite wirklich passt — das geschieht also sparsam.' },
+            { q: 'Sieht jemand, dass ich teilnehme?', a: 'Wir veröffentlichen keine Liste teilnehmender Websites. Die Seite, die eine Nennung erhält, sieht die Adresse der Website, die auf sie verlinkt hat, und nach der Veröffentlichung auch die Seite, auf der der Link erschienen ist.' },
+            { q: 'Muss ich teilnehmen?', a: 'Nein. Es ist standardmäßig aus, das Einschalten gilt je Website, und Sie können jederzeit aussteigen. Ein Ausstieg beendet neue Nennungen; bereits veröffentlichte Links bleiben auf den Websites.' },
+            { q: 'Funktioniert das in einem Shopify-Shop?', a: 'Ja, durch separates, freiwilliges Einschalten. Nennungen kommen nur in Artikel, die wir schreiben und im Blog des Shops veröffentlichen. Ein Artikel, eine Seite, ein Produkt oder eine Kategorie, die im Shop bereits bestehen, werden nicht bearbeitet.' },
+            { q: 'Was ist mit den internen Links auf meiner Website?', a: 'Die funktionieren davon unabhängig weiter: jeder geschriebene Artikel erhält Links auf die passenden Seiten Ihrer Website, und Sie geben den ganzen Artikel vor der Veröffentlichung frei.' },
+          ],
+        },
+      ],
+      cta: { title: 'Lassen Sie Unternehmen mit ergänzendem Angebot auf Sie verlinken', body: de.closeBody, primary: de.trial, secondary: de.check },
+    },
     ja: {
       hero: {
         eyebrow: 'サイトへのリンク',
@@ -868,6 +1103,115 @@ export const SITE_LINKS_PAGE: MarketingPage = {
         },
       ],
       cta: { title: '補完関係にある企業からサイトへリンクしてもらう', body: ja.closeBody, primary: ja.trial, secondary: ja.check },
+    },
+    pl: {
+      hero: {
+        eyebrow: 'Linki do Państwa strony',
+        eyebrowIcon: Link2,
+        title: 'Wzmianki i linki',
+        accent: 'w treściach firm z uzupełniającą ofertą',
+        subtitle: 'Klienci Go Top SEO z uzupełniających branż mogą wspomnieć o Państwa stronie w artykułach pisanych dla nich, tam gdzie Państwa podstrona naprawdę pomaga czytelnikowi tego akapitu. Nigdy konkurent, nigdy wymiana na zasadzie wzajemności. Udział jest dobrowolny i domyślnie wyłączony.',
+        trust: pl.trust,
+        primary: pl.trial,
+        secondary: pl.check,
+        visual: (
+          <WorkListVisual
+            heading="Wzmianki i linki"
+            rows={[
+              { title: 'Link przychodzący od firmy uzupełniającej', detail: 'Z artykułu na jej blogu', icon: ArrowDownToLine, done: true, status: 'Opublikowany' },
+              { title: 'Link wychodzący w Państwa artykule', detail: 'Pokazany przed publikacją, można go usunąć', icon: ArrowUpFromLine, done: false, status: 'Do przejrzenia' },
+              { title: 'Ta sama branża', detail: 'Nie jest umieszczany w żadnym kierunku', icon: Ban, done: true, status: 'Zablokowane' },
+              { title: 'Dodane 3 linki wewnętrzne w artykule', detail: 'Poradnik cenowy', icon: ArrowLeftRight, done: true, status: 'Dodane' },
+            ]}
+          />
+        ),
+      },
+      sections: [
+        {
+          kind: 'steps',
+          eyebrow: 'Firmy z uzupełniającą ofertą',
+          title: 'Jak to przebiega',
+          items: [
+            { title: 'Państwo to włączają', body: 'Udział dotyczy pojedynczej strony i włącza go właściciel projektu po zaakceptowaniu warunków na ekranie. Domyślnie wyłączone, a zrezygnować można w każdej chwili.' },
+            { title: 'Tylko prawdziwe strony', body: 'Strona bierze udział tylko wtedy, gdy jej właściciel podłączył ją w aplikacji przez WordPress albo Search Console. Wpisanie domeny nie wystarcza, więc strona obcej osoby tu nie wejdzie.' },
+            { title: 'Wzmianka stoi w artykule', body: 'Gdy powstaje artykuł dla firmy uzupełniającej, może on wspomnieć pasującą Państwa podstronę, na słowach, które już są w zdaniu. Nie przepisujemy tekstu i nie dodajemy akapitów.' },
+            { title: 'Państwo widzą wszystko', body: 'Każde umieszczenie jest zapisywane i pokazywane obu stronom. Link wychodzący z Państwa artykułu pojawia się przed publikacją i można go usunąć.' },
+          ],
+        },
+        {
+          kind: 'cards',
+          tone: 'contrast',
+          eyebrow: 'Zasady',
+          title: 'Co sprawia, że to zostaje naturalne',
+          items: [
+            { icon: Ban, title: 'Nigdy konkurent', body: 'Nie ta sama branża i żadna domena, którą jedna ze stron oznaczyła jako konkurenta. Strona, której branży nie znamy, zostaje poza tym; nigdy nie zgadujemy.' },
+            { icon: ArrowLeftRight, title: 'Bez wymiany', body: 'Nie wymieniamy się: strona, która dostaje wzmiankę, nigdy nie odwzajemnia jej z powrotem, a dana para spotyka się tylko raz. Blokowana jest też krótka pętla przez trzy strony.' },
+            { icon: ShieldCheck, title: 'Jeden, i oszczędnie', body: 'Najwyżej jeden link na artykuł, a wolimy go pominąć, niż wepchnąć kolejny. Strona, która właśnie zaczęła, uczestniczy wolniej.' },
+            { icon: Network, title: 'Tylko tam, gdzie pomaga czytelnikowi', body: 'Wzmianka pojawia się wyłącznie tam, gdzie podstrona naprawdę pomaga czytelnikowi tego akapitu. Jeśli pasuje słabo, nie pojawia się nic. Nowe albo ubogie strony nie uczestniczą.' },
+          ],
+        },
+        {
+          kind: 'callout',
+          icon: Info,
+          title: 'Czego nie robimy',
+          body: (
+            <>
+              <p>
+                Nie sprzedajemy linków, nie kupujemy linków i nie obiecujemy linków z cudzych stron. Nie ma
+                obiecanej liczby linków ani obietnicy pozycji.
+              </p>
+              <p>
+                Udział jest dobrowolny, domyślnie wyłączony i można z niego zrezygnować w każdej chwili. Nie jest
+                częścią tego, za co Państwo płacą, i nie jest zobowiązaniem w żadnym pakiecie. Rodzaj linku dotyczy
+                całej sieci, jest pokazywany na ekranie zgody i może się zmienić dla przyszłych linków. Pełny tekst
+                znajduje się w{' '}
+                <a className="underline" href="/pl/terms#link-network">artykule 15A regulaminu</a>, razem z ryzykami
+                udziału, i warto go przeczytać przed włączeniem.
+              </p>
+              <p>
+                Nie publikujemy listy uczestniczących stron. Strona otrzymująca widzi adres strony, która do niej
+                zalinkowała. Odpowiedzialność za treść strony i za przestrzeganie wytycznych wyszukiwarek zostaje
+                przy osobie zarządzającej witryną, a my możemy zawiesić albo zakończyć usługę.
+              </p>
+            </>
+          ),
+        },
+        {
+          kind: 'cards',
+          columns: 2,
+          eyebrow: 'Również wewnątrz Państwa strony',
+          title: 'Linki, które trzymają stronę razem',
+          items: [
+            { icon: ArrowLeftRight, title: 'Linkowanie wewnętrzne podczas pisania', body: 'W trakcie powstawania artykułu system łączy go z pasującymi podstronami Państwa witryny, tylko tam, gdzie sformułowanie już naturalnie występuje w tekście. Artykuł czytają Państwo przed publikacją, jak zawsze.' },
+            { icon: Unlink, title: 'Podstrony bez linków', body: 'Podstrony, do których nie linkuje żadna inna podstrona witryny, więc Google trudno do nich dociera i nie widzi ich wagi. Podstrony, do których linkuje menu albo strona główna, nie są tak liczone.' },
+            { icon: ListChecks, title: 'Bezpłatne katalogi', body: 'Sprawdzona ręcznie lista katalogów i profili firmowych dla kraju i języka projektu, z informacją, gdzie firma już się pojawia.' },
+            { icon: MapPinned, title: 'Co linkuje do czego', body: 'Dla każdego artykułu widzą Państwo, do czego on linkuje i co linkuje do niego. To wyjaśnia, dlaczego jedna podstrona nie rusza się w Google, a inne tak.' },
+          ],
+        },
+        {
+          kind: 'cards',
+          columns: 2,
+          eyebrow: 'Search Console',
+          title: 'Linki, które Google już znalazł',
+          items: [
+            { icon: FileSearch, title: 'Bezpośredni link do raportu Google', body: 'Search Console nie ma interfejsu, który zwracałby listę linków, więc nie wymyślamy go. Jest bezpośredni link do raportu w Google.' },
+            { icon: Search, title: 'Zdjęcie stanu z pliku eksportu', body: 'Można wgrać plik CSV wyeksportowany z Search Console i przejrzeć go w systemie. To stan z dnia eksportu i nie aktualizuje się sam.' },
+          ],
+        },
+        {
+          kind: 'faq',
+          eyebrow: 'Często zadawane pytania',
+          title: 'O co pytają w sprawie linków',
+          items: [
+            { q: 'Ile linków dostanę?', a: 'Nie ma obiecanej liczby ani limitu, który próbowalibyśmy wypełnić. Wzmianka pojawia się tylko wtedy, gdy powstaje artykuł, którego akapit naprawdę pasuje do Państwa podstrony, a to zdarza się oszczędnie.' },
+            { q: 'Czy ktoś zobaczy, że biorę udział?', a: 'Nie publikujemy listy uczestniczących stron. Strona, która dostaje wzmiankę, widzi adres strony, która do niej zalinkowała, a po publikacji także podstronę, na której link się pojawił.' },
+            { q: 'Czy muszę brać udział?', a: 'Nie. Domyślnie jest wyłączone, włącza się osobno dla każdej strony, a zrezygnować można w każdej chwili. Rezygnacja kończy nowe wzmianki; już opublikowane linki zostają na stronach.' },
+            { q: 'Czy to działa w sklepie Shopify?', a: 'Tak, po osobnym i dobrowolnym włączeniu. Wzmianki trafiają tylko do artykułów, które piszemy i publikujemy na blogu sklepu. Artykuł, strona, produkt ani kategoria, które już istnieją w sklepie, nie są zmieniane.' },
+            { q: 'A co z linkowaniem wewnętrznym na mojej stronie?', a: 'Działa niezależnie od tego: każdy napisany artykuł dostaje linki do pasujących podstron Państwa witryny, a cały artykuł zatwierdzają Państwo przed publikacją.' },
+          ],
+        },
+      ],
+      cta: { title: 'Proszę pozwolić firmom z uzupełniającą ofertą linkować do Państwa', body: pl.closeBody, primary: pl.trial, secondary: pl.check },
     },
   },
 }

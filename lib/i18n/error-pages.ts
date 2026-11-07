@@ -183,6 +183,81 @@ export const ERROR_PAGES_UI = {
       homeHref: '/ja',
     },
   },
+  pl: {
+    logoAlt: 'Logo Go Top SEO',
+    notFound: {
+      code: '404',
+      title: 'Nie znaleźliśmy tej strony',
+      body: 'Być może link jest nieprawidłowy albo strona została przeniesiona.',
+      home: 'Na stronę główną',
+      dashboard: 'Do panelu',
+      homeHref: '/pl',
+    },
+    screenError: {
+      title: 'Ten ekran się nie wczytał',
+      body: 'Nic nie zostało usunięte. Prosimy spróbować ponownie, a jeśli to się powtórzy — wrócić do panelu.',
+      retry: 'Spróbuj ponownie',
+      dashboard: 'Do panelu',
+      reference: 'Numer referencyjny dla pomocy technicznej:',
+    },
+    globalError: {
+      title: 'Coś poszło nie tak',
+      body: 'W serwisie wystąpił nieoczekiwany problem. Prosimy wczytać stronę ponownie.',
+      retry: 'Wczytaj ponownie',
+      home: 'Na stronę główną',
+      homeHref: '/pl',
+    },
+  },
+  nl: {
+    logoAlt: 'Het logo van Go Top SEO',
+    notFound: {
+      code: '404',
+      title: 'Deze pagina hebben wij niet kunnen vinden',
+      body: 'De link is mogelijk onjuist, of de pagina is verplaatst.',
+      home: 'Naar de startpagina',
+      dashboard: 'Naar het dashboard',
+      homeHref: '/nl',
+    },
+    screenError: {
+      title: 'Dit overzicht is niet geladen',
+      body: 'Er is niets verwijderd. Probeer het opnieuw; gebeurt het weer, ga dan terug naar het dashboard.',
+      retry: 'Opnieuw proberen',
+      dashboard: 'Naar het dashboard',
+      reference: 'Referentie voor de support:',
+    },
+    globalError: {
+      title: 'Er is iets misgegaan',
+      body: 'Op de website is een onverwacht probleem opgetreden. Laad de pagina opnieuw.',
+      retry: 'Opnieuw laden',
+      home: 'Naar de startpagina',
+      homeHref: '/nl',
+    },
+  },
+  de: {
+    logoAlt: 'Logo von Go Top SEO',
+    notFound: {
+      code: '404',
+      title: 'Diese Seite konnten wir nicht finden',
+      body: 'Der Link ist möglicherweise falsch, oder die Seite wurde verschoben.',
+      home: 'Zur Startseite',
+      dashboard: 'Zum Dashboard',
+      homeHref: '/de',
+    },
+    screenError: {
+      title: 'Diese Ansicht wurde nicht geladen',
+      body: 'Es wurde nichts gelöscht. Bitte versuchen Sie es erneut; wenn es wieder auftritt, kehren Sie zum Dashboard zurück.',
+      retry: 'Erneut versuchen',
+      dashboard: 'Zum Dashboard',
+      reference: 'Referenz für den Support:',
+    },
+    globalError: {
+      title: 'Etwas ist schiefgelaufen',
+      body: 'Auf der Website ist ein unerwartetes Problem aufgetreten. Bitte laden Sie die Seite neu.',
+      retry: 'Neu laden',
+      home: 'Zur Startseite',
+      homeHref: '/de',
+    },
+  },
 } as const
 
 /**

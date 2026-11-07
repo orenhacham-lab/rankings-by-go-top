@@ -80,6 +80,30 @@ const SITE_METADATA: Record<PublicLocale, SiteMetadataStrings> = {
     ogDescription: 'SEOとGEOのコンテンツ作成・計画・公開を一つの画面から。Googleの検索順位とAI（ChatGPT、Gemini、Google AI モード）での見え方を毎月記録します。',
     ogLocale: 'ja_JP',
   },
+  nl: {
+    title: 'SEO- en GEO-content maken, plannen en publiceren | Go Top SEO',
+    description: 'Go Top SEO: SEO- en GEO-content op één plek maken, plannen en automatisch publiceren, plus maandelijkse monitoring van uw Google-posities en uw zichtbaarheid in AI-antwoorden. Gratis starten.',
+    keywords: 'SEO content maken, contentplanning, artikelen automatisch publiceren, GEO, posities checken, zoekmachineoptimalisatie, SEO, Google, rankings, Google Maps, Google Bedrijfsprofiel, lokale SEO, seo lokaal, zichtbaarheid in AI, ChatGPT, Gemini, backlinks checken, zoekwoordenonderzoek',
+    ogTitle: 'SEO- en GEO-content maken, plannen en publiceren — Go Top SEO',
+    ogDescription: 'SEO- en GEO-content op één plek maken, plannen en automatisch publiceren, met maandelijkse monitoring van uw Google-posities en uw zichtbaarheid in AI-antwoorden (ChatGPT, Gemini, Google AI-modus)',
+    ogLocale: 'nl_NL',
+  },
+  pl: {
+    title: 'Tworzenie, planowanie i publikowanie treści SEO i GEO | Go Top SEO',
+    description: 'Go Top SEO: tworzenie, planowanie i automatyczne publikowanie treści SEO i GEO w jednym miejscu, a do tego comiesięczne monitorowanie pozycji w Google i widoczności w odpowiedziach AI. Zacznij bezpłatnie.',
+    keywords: 'tworzenie treści SEO, planowanie treści, automatyczne publikowanie artykułów, GEO, sprawdzanie pozycji, pozycjonowanie stron, SEO, Google, pozycje w Google, Mapy Google, Profil Firmy w Google, wizytówka Google, SEO lokalne, widoczność w AI, ChatGPT, Gemini, linki zwrotne, analiza słów kluczowych',
+    ogTitle: 'Tworzenie, planowanie i publikowanie treści SEO i GEO — Go Top SEO',
+    ogDescription: 'Tworzenie, planowanie i automatyczne publikowanie treści SEO i GEO w jednym miejscu, z comiesięcznym monitorowaniem pozycji w Google i widoczności w odpowiedziach AI (ChatGPT, Gemini, tryb AI w Google)',
+    ogLocale: 'pl_PL',
+  },
+  de: {
+    title: 'SEO- und GEO-Inhalte erstellen, planen und veröffentlichen | Go Top SEO',
+    description: 'Go Top SEO: SEO- und GEO-Inhalte an einer Stelle erstellen, planen und automatisch veröffentlichen, dazu monatliches Ranking-Tracking bei Google und die Sichtbarkeit in KI-Antworten. Kostenlos starten.',
+    keywords: 'SEO Inhalte erstellen, Content-Planung, Beiträge automatisch veröffentlichen, GEO, Ranking prüfen, Suchmaschinenoptimierung, SEO, Google, Ranking, Google Maps, Google Unternehmensprofil optimieren, Local SEO, Sichtbarkeit in KI, ChatGPT, Gemini',
+    ogTitle: 'SEO- und GEO-Inhalte erstellen, planen und veröffentlichen — Go Top SEO',
+    ogDescription: 'SEO- und GEO-Inhalte an einer Stelle erstellen, planen und automatisch veröffentlichen, mit monatlichem Ranking-Tracking bei Google und der Sichtbarkeit in KI-Antworten (ChatGPT, Gemini, Google AI Modus)',
+    ogLocale: 'de_DE',
+  },
 }
 
 export function getSiteMetadata(locale: PublicLocale): SiteMetadataStrings {
