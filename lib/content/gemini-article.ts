@@ -22,6 +22,7 @@ import type { SuggestionLanguage } from '@/lib/content/topic-suggestions'
 import { contentDirection, languageNameInEnglish } from '@/lib/content/language'
 import { businessContextLines, guidancePromptLines, type BusinessContext, type WritingGuidance } from '@/lib/content/writing-guidance/guidance'
 import { indexOfCaseInsensitive } from '@/lib/text/ci-index'
+import { canonicalizeHeadline, canonicalizeKnownTerms } from '@/lib/content/canonical-case'
 
 export interface ArticleBrief {
   language: SuggestionLanguage
@@ -355,9 +356,10 @@ export function buildPrompt(brief: ArticleBrief, opts: GenOpts): string {
     repairLines.length ? '' : '',
     `You are a top SEO/GEO content writer. Write a COMPLETE, premium, PROMOTIONAL-yet-credible article in ${lang} that would score high in Yoast / Rank Math and be quoted by AI answer engines.`,
     ``,
-    `Topic: ${brief.topic}`,
-    brief.primaryKeyword ? `Primary keyword: "${brief.primaryKeyword}" — MUST appear in title, metaTitle, metaDescription, the first paragraph, and at least one <h2>; used naturally throughout (no stuffing, ~0.8-1.5% density).` : '',
-    brief.secondaryKeywords.length ? `Secondary keywords (weave in naturally): ${brief.secondaryKeywords.join(', ')}.` : '',
+    `Topic: ${canonicalizeKnownTerms(brief.topic)}`,
+    brief.primaryKeyword ? `Primary keyword: "${canonicalizeKnownTerms(brief.primaryKeyword)}" — MUST appear in title, metaTitle, metaDescription, the first paragraph, and at least one <h2>; used naturally throughout (no stuffing, ~0.8-1.5% density).` : '',
+    brief.primaryKeyword ? `- The keyword is a SEARCH PHRASE, not a spelling to copy: write it with the capitalization ${lang} requires. A product, brand or company name keeps its own capitalization ("Google Search Console", "WordPress", "ChatGPT"), a title or heading never begins in lower case, and the keyword is never pasted in all-lowercase into the title, the H1 or an <h2>.` : '',
+    brief.secondaryKeywords.length ? `Secondary keywords (weave in naturally): ${brief.secondaryKeywords.map(canonicalizeKnownTerms).join(', ')}.` : '',
     brief.searchIntent ? `Search intent: ${brief.searchIntent}.` : '',
     brief.targetAudience ? `Target audience: ${brief.targetAudience}.` : '',
     brief.category ? `Field: ${brief.category}.` : '',
@@ -589,13 +591,17 @@ interface CasingTerm { re: RegExp; replacement: string }
  * ("Kingsmith WalkingPad X21"). Longest phrases first so multi-word names win.
  */
 function buildCasingTerms(brief: ArticleBrief): CasingTerm[] {
+  // Canonicalised FIRST, or the rules built here enforce the casing of their
+  // source: Keyword Planner returns every keyword lower-cased, which is how
+  // "Google Search Console" was being rewritten DOWN to "google search console"
+  // throughout the German article of 5 Nov 2026.
   const sources = [
     brief.topic,
     brief.primaryKeyword || '',
     ...(brief.secondaryKeywords || []),
     ...(brief.anchors || []).map((a) => a.anchor_text || ''),
     brief.brandNameToInclude || '',
-  ]
+  ].map(canonicalizeKnownTerms)
   const map = new Map<string, string>() // lowercase → original casing (first wins)
   for (const src of sources) {
     for (const phrase of extractLatinPhrases(src)) {
@@ -624,6 +630,9 @@ export function polishText(s: string, terms: CasingTerm[]): string {
   // hyphenated compound and welded the two halves into a nonsense word
   // ("חברה-בת" → "חברבת", "שאלה-תשובה" → "שאלתשובה").
   out = out.replace(/(?<![א-ת])ה-(?=[A-Za-zא-ת])/g, '')
+  // Last word on casing: a known product name is written the way the world
+  // writes it, whatever the brief's own sources said (lib/content/canonical-case.ts).
+  out = canonicalizeKnownTerms(out)
   return out
 }
 
@@ -633,16 +642,18 @@ function polishTable(t: ArticleTable, terms: CasingTerm[]): ArticleTable {
 /** Apply brand-casing + "ה-" cleanup to every text field of the article. */
 function polishStructured(a: StructuredArticle, terms: CasingTerm[]): void {
   const f = (s: string) => polishText(s, terms)
-  a.title = f(a.title); a.metaTitle = f(a.metaTitle); a.metaDescription = f(a.metaDescription)
+  /** A headline also never begins in lower case. */
+  const h = (s: string) => canonicalizeHeadline(f(s))
+  a.title = h(a.title); a.metaTitle = h(a.metaTitle); a.metaDescription = f(a.metaDescription)
   a.excerpt = f(a.excerpt); a.directAnswer = f(a.directAnswer); a.imagePrompt = f(a.imagePrompt)
   a.intro = a.intro.map(f)
   a.sections = a.sections.map((s) => ({
-    ...s, heading: f(s.heading), answerFirst: f(s.answerFirst), paragraphs: s.paragraphs.map(f), bullets: s.bullets.map(f),
+    ...s, heading: h(s.heading), answerFirst: f(s.answerFirst), paragraphs: s.paragraphs.map(f), bullets: s.bullets.map(f),
     table: s.table ? polishTable(s.table, terms) : null,
-    subsections: s.subsections.map((ss) => ({ heading: f(ss.heading), paragraphs: ss.paragraphs.map(f), bullets: ss.bullets.map(f) })),
+    subsections: s.subsections.map((ss) => ({ heading: h(ss.heading), paragraphs: ss.paragraphs.map(f), bullets: ss.bullets.map(f) })),
   }))
   a.comparisonTables = a.comparisonTables.map((t) => polishTable(t, terms))
-  a.faq = a.faq.map((x) => ({ question: f(x.question), answer: f(x.answer) }))
+  a.faq = a.faq.map((x) => ({ question: h(x.question), answer: f(x.answer) }))
 }
 
 /** Years the user explicitly asked for (topic/keyword/secondary/brief). */
@@ -911,7 +922,9 @@ export function fitMetaDescription(current: string, fallbacks: (string | null | 
  */
 export function applyBasicSeoAutofix(brief: ArticleBrief, a: StructuredArticle, audit: AuditResult): { changed: boolean; fixes: string[] } {
   const fixes: string[] = []
-  const kw = (brief.primaryKeyword || '').trim()
+  // Canonical case: this keyword is prefixed into the metaTitle below, and
+  // Keyword Planner hands it over lower-cased.
+  const kw = canonicalizeKnownTerms((brief.primaryKeyword || '').trim())
 
   // 1) Primary keyword must appear in the H1/title OR the metaTitle. When both
   //    miss it, prefix the metaTitle with the keyword (≤60 chars kept).
