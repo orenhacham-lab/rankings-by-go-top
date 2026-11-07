@@ -50,9 +50,17 @@ export type AiCrawlerCopy = {
   purposes: Record<CrawlerPurpose, { label: string; blurb: string }>
   groups: { ai: string; classic: string }
   // `title` is the heading above the table; `datasetName` NAMES the table as a
-  // dataset, which is what the schema.org Dataset node needs. A heading like
-  // "Who each one is" is not a name a catalogue can list.
-  reference: { title: string; datasetName: string; intro: string; colAgent: string; colOperator: string; colPurpose: string }
+  // dataset, which is what the schema.org Dataset node needs; `undocumented`
+  // is the footnote under the rows no operator page documents.
+  reference: {
+    title: string
+    datasetName: string
+    intro: string
+    colAgent: string
+    colOperator: string
+    colPurpose: string
+    undocumented: string
+  }
   limits: { title: string; items: string[] }
   cta: { title: string; body: string; button: string }
 }
@@ -108,6 +116,7 @@ const he: AiCrawlerCopy = {
     answer: { label: 'תשובה חיה', blurb: 'מביא את הדף ברגע שמישהו שואל, כדי לצטט אתכם בתשובה עם קישור.' },
     search: { label: 'אינדקס', blurb: 'בונה אינדקס חיפוש, שממנו נשענות גם תשובות ה-AI.' },
     ads: { label: 'מודעות', blurb: 'בודק דפי נחיתה של מודעות. חסימה שלו לא משפיעה על תשובות ולא על האינדקס.' },
+    preview: { label: 'תצוגה מקדימה', blurb: 'בונה את הכותרת והתמונה שמוצגות כשמישהו משתף את הקישור. חסימה משאירה את השיתוף ריק.' },
   },
   groups: { ai: 'סורקי AI', classic: 'סורקי חיפוש קלאסיים' },
   reference: {
@@ -117,6 +126,7 @@ const he: AiCrawlerCopy = {
     colAgent: 'User-agent',
     colOperator: 'מופעל על ידי',
     colPurpose: 'לשם מה',
+    undocumented: 'אין עמוד של המפעיל שמתעד את הטוקן הזה. הוא מופיע כאן כי הוא נראה בלוגים, ומופרד מהשורות שנשענות על תיעוד של המפעיל עצמו.',
   },
   limits: {
     title: 'מה הבדיקה הזו לא יודעת',
@@ -185,6 +195,7 @@ const en: AiCrawlerCopy = {
     answer: { label: 'Live answer', blurb: 'Fetches the page the moment someone asks, to cite you in an answer with a link.' },
     search: { label: 'Index', blurb: 'Builds a search index, which AI answers are built on top of.' },
     ads: { label: 'Adverts', blurb: 'Checks the landing pages of adverts. Blocking it affects neither answers nor the index.' },
+    preview: { label: 'Link preview', blurb: 'Builds the title and image shown when someone shares the link. Blocking it leaves the share bare.' },
   },
   groups: { ai: 'AI crawlers', classic: 'Classic search crawlers' },
   reference: {
@@ -194,6 +205,7 @@ const en: AiCrawlerCopy = {
     colAgent: 'User-agent',
     colOperator: 'Operated by',
     colPurpose: 'What for',
+    undocumented: 'No operator page documents this token. It is listed because it appears in server logs, and kept apart from the rows that rest on an operator’s own documentation.',
   },
   limits: {
     title: 'What this check cannot tell you',
@@ -262,6 +274,7 @@ const es: AiCrawlerCopy = {
     answer: { label: 'Respuesta en vivo', blurb: 'Carga la página en el momento en que alguien pregunta, para citarte en la respuesta con un enlace.' },
     search: { label: 'Índice', blurb: 'Construye un índice de búsqueda, sobre el que se apoyan también las respuestas de IA.' },
     ads: { label: 'Anuncios', blurb: 'Revisa las páginas de destino de los anuncios. Bloquearlo no afecta ni a las respuestas ni al índice.' },
+    preview: { label: 'Vista previa', blurb: 'Crea el título y la imagen que aparecen cuando alguien comparte el enlace. Bloquearlo deja el enlace sin nada.' },
   },
   groups: { ai: 'Rastreadores de IA', classic: 'Rastreadores de búsqueda clásicos' },
   reference: {
@@ -271,6 +284,7 @@ const es: AiCrawlerCopy = {
     colAgent: 'User-agent',
     colOperator: 'Operado por',
     colPurpose: 'Para qué',
+    undocumented: 'Ninguna página del operador documenta este token. Aparece aquí porque se ve en los registros del servidor, y se mantiene separado de las filas que se apoyan en la documentación del propio operador.',
   },
   limits: {
     title: 'Lo que esta comprobación no puede decirte',
@@ -339,6 +353,7 @@ const ptBR: AiCrawlerCopy = {
     answer: { label: 'Resposta ao vivo', blurb: 'Carrega a página no momento em que alguém pergunta, para citar você na resposta com um link.' },
     search: { label: 'Índice', blurb: 'Constrói um índice de busca, no qual as respostas de IA também se apoiam.' },
     ads: { label: 'Anúncios', blurb: 'Verifica as páginas de destino dos anúncios. Bloquear não afeta nem as respostas nem o índice.' },
+    preview: { label: 'Prévia do link', blurb: 'Monta o título e a imagem que aparecem quando alguém compartilha o link. Bloquear deixa o compartilhamento vazio.' },
   },
   groups: { ai: 'Rastreadores de IA', classic: 'Rastreadores de busca clássicos' },
   reference: {
@@ -348,6 +363,7 @@ const ptBR: AiCrawlerCopy = {
     colAgent: 'User-agent',
     colOperator: 'Operado por',
     colPurpose: 'Para quê',
+    undocumented: 'Nenhuma página do operador documenta esse token. Ele aparece aqui porque é visto nos logs do servidor, e fica separado das linhas que se apoiam na documentação do próprio operador.',
   },
   limits: {
     title: 'O que esta verificação não consegue dizer',
@@ -416,6 +432,7 @@ const fr: AiCrawlerCopy = {
     answer: { label: 'Réponse en direct', blurb: "Charge la page au moment où quelqu'un pose une question, pour vous citer dans la réponse avec un lien." },
     search: { label: 'Index', blurb: "Construit un index de recherche, sur lequel s'appuient aussi les réponses d'IA." },
     ads: { label: 'Publicités', blurb: "Vérifie les pages de destination des publicités. Le bloquer n'affecte ni les réponses ni l'index." },
+    preview: { label: 'Aperçu du lien', blurb: "Construit le titre et l'image affichés quand quelqu'un partage le lien. Le bloquer laisse le partage vide." },
   },
   groups: { ai: "Robots d'IA", classic: 'Robots de recherche classiques' },
   reference: {
@@ -425,6 +442,7 @@ const fr: AiCrawlerCopy = {
     colAgent: 'User-agent',
     colOperator: 'Exploité par',
     colPurpose: 'Pour quoi faire',
+    undocumented: "Aucune page de l'opérateur ne documente ce jeton. Il figure ici parce qu'on le voit dans les journaux du serveur, et il reste séparé des lignes qui s'appuient sur la documentation de l'opérateur lui-même.",
   },
   limits: {
     title: 'Ce que cette vérification ne peut pas vous dire',
@@ -493,6 +511,7 @@ const it: AiCrawlerCopy = {
     answer: { label: 'Risposta dal vivo', blurb: 'Carica la pagina nel momento in cui qualcuno fa una domanda, per citarti nella risposta con un collegamento.' },
     search: { label: 'Indice', blurb: 'Costruisce un indice di ricerca, su cui si appoggiano anche le risposte IA.' },
     ads: { label: 'Annunci', blurb: 'Controlla le pagine di destinazione degli annunci. Bloccarlo non influisce né sulle risposte né sull’indice.' },
+    preview: { label: 'Anteprima del link', blurb: 'Crea il titolo e l’immagine mostrati quando qualcuno condivide il link. Bloccarlo lascia la condivisione vuota.' },
   },
   groups: { ai: 'Crawler IA', classic: 'Crawler di ricerca classici' },
   reference: {
@@ -502,6 +521,7 @@ const it: AiCrawlerCopy = {
     colAgent: 'User-agent',
     colOperator: 'Gestito da',
     colPurpose: 'A quale scopo',
+    undocumented: 'Nessuna pagina dell’operatore documenta questo token. È elencato perché compare nei log del server, e resta separato dalle righe che si basano sulla documentazione dell’operatore stesso.',
   },
   limits: {
     title: 'Cosa questa verifica non può dirti',
@@ -570,6 +590,7 @@ const ja: AiCrawlerCopy = {
     answer: { label: 'その場での回答', blurb: '誰かが質問したその時にページを取得し、回答の中でリンク付きで引用します。' },
     search: { label: '検索インデックス', blurb: '検索インデックスを作ります。AIの回答もこの上に成り立っています。' },
     ads: { label: '広告', blurb: '広告のリンク先ページを確認します。拒否しても、回答にも検索インデックスにも影響しません。' },
+    preview: { label: 'リンクプレビュー', blurb: 'リンクが共有されたときに表示されるタイトルと画像を作ります。拒否すると共有が空のまま表示されます。' },
   },
   groups: { ai: 'AIクローラー', classic: '従来の検索クローラー' },
   reference: {
@@ -579,6 +600,7 @@ const ja: AiCrawlerCopy = {
     colAgent: 'User-agent',
     colOperator: '運営元',
     colPurpose: '何のためか',
+    undocumented: 'この製品トークンを記載した運営者自身のページは見つかっていません。サーバーログで見かけるため掲載していますが、運営者の文書に基づく行とは分けてあります。',
   },
   limits: {
     title: 'この確認では分からないこと',
@@ -647,6 +669,7 @@ const de: AiCrawlerCopy = {
     answer: { label: 'Antwort in Echtzeit', blurb: 'Holt die Seite in dem Moment, in dem jemand fragt, und zitiert sie mit Link in der Antwort.' },
     search: { label: 'Suchindex', blurb: 'Baut den Suchindex, auf dem auch die KI-Antworten aufsetzen.' },
     ads: { label: 'Werbung', blurb: 'Prüft die Zielseiten von Anzeigen. Eine Blockade wirkt sich weder auf Antworten noch auf den Suchindex aus.' },
+    preview: { label: 'Link-Vorschau', blurb: 'Erstellt Titel und Bild, die beim Teilen des Links erscheinen. Eine Blockade lässt den geteilten Link leer aussehen.' },
   },
   groups: { ai: 'KI-Crawler', classic: 'Klassische Suchmaschinen-Crawler' },
   reference: {
@@ -656,6 +679,7 @@ const de: AiCrawlerCopy = {
     colAgent: 'User-agent',
     colOperator: 'Betreiber',
     colPurpose: 'Zweck',
+    undocumented: 'Keine Seite des Betreibers dokumentiert dieses Token. Es steht hier, weil es in Server-Logs auftaucht, und bleibt getrennt von den Zeilen, die auf der Dokumentation des Betreibers selbst beruhen.',
   },
   limits: {
     title: 'Was diese Prüfung nicht zeigt',
@@ -724,6 +748,7 @@ const pl: AiCrawlerCopy = {
     answer: { label: 'Odpowiedź w czasie rzeczywistym', blurb: 'Pobiera stronę w chwili, gdy ktoś o coś pyta, i przytacza ją z linkiem w odpowiedzi.' },
     search: { label: 'Indeks wyszukiwania', blurb: 'Buduje indeks wyszukiwania, na którym opierają się także odpowiedzi AI.' },
     ads: { label: 'Reklamy', blurb: 'Sprawdza strony docelowe reklam. Zablokowanie go nie ma wpływu na odpowiedzi ani na indeks wyszukiwania.' },
+    preview: { label: 'Podgląd linku', blurb: 'Tworzy tytuł i obraz pokazywane, gdy ktoś udostępnia link. Zablokowanie go sprawia, że udostępniony link jest pusty.' },
   },
   groups: { ai: 'Roboty AI', classic: 'Klasyczne roboty wyszukiwarek' },
   reference: {
@@ -733,6 +758,7 @@ const pl: AiCrawlerCopy = {
     colAgent: 'User-agent',
     colOperator: 'Właściciel',
     colPurpose: 'Cel',
+    undocumented: 'Żadna strona operatora nie dokumentuje tego tokenu. Jest tu wymieniony, bo pojawia się w logach serwera, i pozostaje oddzielony od wierszy opartych na dokumentacji samego operatora.',
   },
   limits: {
     title: 'Czego to sprawdzenie nie pokazuje',
@@ -801,6 +827,7 @@ const nl: AiCrawlerCopy = {
     answer: { label: 'Antwoord in real time', blurb: 'Haalt de pagina op het moment dat iemand iets vraagt, en citeert die met een link in het antwoord.' },
     search: { label: 'Zoekindex', blurb: 'Bouwt de zoekindex waarop ook de AI-antwoorden rusten.' },
     ads: { label: 'Advertenties', blurb: 'Controleert de bestemmingspagina’s van advertenties. Een blokkade heeft geen gevolgen voor antwoorden of voor de zoekindex.' },
+    preview: { label: 'Linkvoorbeeld', blurb: 'Maakt de titel en afbeelding die te zien zijn als iemand de link deelt. Een blokkade laat de gedeelde link leeg.' },
   },
   groups: { ai: 'AI-crawlers', classic: 'Klassieke zoekmachinecrawlers' },
   reference: {
@@ -810,6 +837,7 @@ const nl: AiCrawlerCopy = {
     colAgent: 'User-agent',
     colOperator: 'Eigenaar',
     colPurpose: 'Doel',
+    undocumented: 'Geen enkele pagina van de exploitant documenteert dit token. Het staat hier omdat het in serverlogs voorkomt, en blijft gescheiden van de rijen die op de eigen documentatie van de exploitant rusten.',
   },
   limits: {
     title: 'Wat deze controle niet laat zien',
