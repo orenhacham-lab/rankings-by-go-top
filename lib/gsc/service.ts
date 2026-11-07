@@ -122,6 +122,9 @@ export function makeSyncClient(accessToken: string, siteUrl: string, maxRows: nu
   }
 }
 
+/** How many superseded run ids go into one DELETE ... WHERE sync_run_id IN (...). */
+const PRUNE_RUN_CHUNK = 50
+
 /** SyncStore backed by admin-client writes to gsc_sync_runs + gsc_query_page_metrics. */
 export function makeSyncStore(admin: Admin): SyncStore {
   return {
@@ -148,6 +151,29 @@ export function makeSyncStore(admin: Admin): SyncStore {
         throw new GscServiceError('run_create_failed', 500, 'Could not start the sync run.')
       }
       return { id: String((data as { id: string }).id) }
+    },
+    /**
+     * Keep ONE detail snapshot per (project, window). Every run inserts a FULL snapshot of
+     * its window, and only the latest succeeded run is ever read (latestSucceededRun), so
+     * each older run's rows sit on disk unread — 2.35 M of 2.53 M rows, 1.46 GB, by the time
+     * the project hit its Supabase size quota on 2026-11-05. The runs themselves stay, with
+     * their totals and property summaries, so the trend history is untouched.
+     *
+     * Deletes are scoped by project_id as well as sync_run_id: createAdminClient() bypasses
+     * RLS, so the owner filter is explicit rather than implied by the run ids.
+     */
+    async pruneSupersededMetrics(projectId: string, windowDays: GscWindowDays, keepRunId: string) {
+      const { data, error } = await admin.from('gsc_sync_runs')
+        .select('id').eq('project_id', projectId).eq('window_days', windowDays)
+      if (error) throw new GscServiceError('metrics_prune_failed', 500, 'Could not read the runs to prune.')
+      const ids = ((data as { id: string }[] | null) ?? []).map((r) => r.id).filter((id) => id !== keepRunId)
+      if (ids.length === 0) return 0
+      for (let i = 0; i < ids.length; i += PRUNE_RUN_CHUNK) {
+        const { error: delErr } = await admin.from('gsc_query_page_metrics')
+          .delete().eq('project_id', projectId).in('sync_run_id', ids.slice(i, i + PRUNE_RUN_CHUNK))
+        if (delErr) throw new GscServiceError('metrics_prune_failed', 500, 'Could not prune superseded Search Console rows.')
+      }
+      return ids.length
     },
     async insertMetricsBatch(runId: string, projectId: string, rows: GscMetricRow[]) {
       if (rows.length === 0) return

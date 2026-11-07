@@ -27,10 +27,17 @@ class FakeStore implements SyncStore {
   finishes: Record<string, FinishPatch> = {}
   metrics: Record<string, GscMetricRow[]> = {}
   reclaimCalls: { projectId: string; leaseMs: number }[] = []
+  pruneCalls: { projectId: string; windowDays: number; keepRunId: string }[] = []
+  pruneThrows = false
   private n = 0
   async reclaimStaleRuns(projectId: string, leaseMs: number) { this.reclaimCalls.push({ projectId, leaseMs }); return 0 }
   async createRun(run: { windowDays: 28 | 90 }) { const id = `run-${++this.n}`; this.runs.push({ id, windowDays: run.windowDays, status: 'running' }); return { id } }
   async insertMetricsBatch(runId: string, _p: string, rows: GscMetricRow[]) { (this.metrics[runId] ??= []).push(...rows) }
+  async pruneSupersededMetrics(projectId: string, windowDays: 28 | 90, keepRunId: string) {
+    this.pruneCalls.push({ projectId, windowDays, keepRunId })
+    if (this.pruneThrows) throw new Error('prune exploded')
+    return 0
+  }
   async finishRun(runId: string, patch: FinishPatch) { this.finishes[runId] = patch; const r = this.runs.find((x) => x.id === runId); if (r) r.status = patch.status }
 }
 
@@ -164,6 +171,85 @@ async function main() {
   check('stale run marked failed with stale_run_recovered', staleTables.gsc_sync_runs.find((r) => r.id === 'old')!.status === 'failed' && (staleTables.gsc_sync_runs.find((r) => r.id === 'old') as { sanitized_error_code?: string }).sanitized_error_code === 'stale_run_recovered')
   check('recent in-flight run is NOT touched', staleTables.gsc_sync_runs.find((r) => r.id === 'recent')!.status === 'running')
   check('another project\'s stale run is NOT touched by this project\'s reclaim', staleTables.gsc_sync_runs.find((r) => r.id === 'other')!.status === 'running')
+
+  // Retention: a published window prunes its OWN superseded snapshots, keyed to the run
+  // that was just published. This is what stops gsc_query_page_metrics growing forever
+  // (it reached 1.46 GB and tripped the Supabase size quota on 2026-11-05).
+  const pStore = new FakeStore()
+  const pClient: SyncClient = {
+    probeLatestDate: async () => '2026-07-10',
+    fetchWindow: async (): Promise<WindowFetchResult> => ({ rows, apiBatches: 1, truncated: false }),
+    fetchSummary: async () => okSummary(),
+  }
+  const pRes = await executeManualSync({ store: pStore, client: pClient, projectId: 'p', connectionId: 'c', siteUrl: 's', syncGroupId: 'g', maxRows: 50000, batchSize: 1000 })
+  check('prunes once per succeeded window', pStore.pruneCalls.length === 2)
+  check('prune keeps the run just published, per window', pStore.pruneCalls[0].keepRunId === pRes.windows[0].runId && pStore.pruneCalls[1].keepRunId === pRes.windows[1].runId)
+  check('prune is scoped to the project and that window', pStore.pruneCalls.every((c) => c.projectId === 'p') && pStore.pruneCalls[0].windowDays === 28 && pStore.pruneCalls[1].windowDays === 90)
+
+  // A failed window must NOT prune: its rows are not the published snapshot, and pruning
+  // from a failed run would delete the snapshot the dashboard is still reading.
+  const fStore = new FakeStore()
+  const fClient: SyncClient = {
+    probeLatestDate: async () => '2026-07-10',
+    fetchWindow: async () => { throw Object.assign(new Error('nope'), { code: 'gsc_window_failed' }) },
+    fetchSummary: async () => okSummary(),
+  }
+  await executeManualSync({ store: fStore, client: fClient, projectId: 'p', connectionId: 'c', siteUrl: 's', syncGroupId: 'g', maxRows: 50000, batchSize: 1000 })
+  check('a FAILED window never prunes', fStore.pruneCalls.length === 0)
+
+  // Housekeeping must never un-publish a good sync: a prune that throws leaves the run
+  // succeeded and the sync result intact.
+  const tStore = new FakeStore()
+  tStore.pruneThrows = true
+  const tRes = await executeManualSync({ store: tStore, client: pClient, projectId: 'p', connectionId: 'c', siteUrl: 's', syncGroupId: 'g', maxRows: 50000, batchSize: 1000 })
+  check('a throwing prune does NOT fail the sync', tRes.windows.every((w) => w.status === 'succeeded') && tRes.windows.length === 2)
+
+  // The REAL store against FakeAdmin: only this project's older runs of THIS window lose
+  // their rows; the kept run, the other window and another project are untouched.
+  const pruneTables = {
+    gsc_sync_runs: [
+      { id: 'keep', project_id: 'p', window_days: 28, status: 'succeeded' },
+      { id: 'old1', project_id: 'p', window_days: 28, status: 'succeeded' },
+      { id: 'old2', project_id: 'p', window_days: 28, status: 'failed' },
+      { id: 'other-window', project_id: 'p', window_days: 90, status: 'succeeded' },
+      { id: 'other-project', project_id: 'q', window_days: 28, status: 'succeeded' },
+    ],
+    gsc_query_page_metrics: [
+      { sync_run_id: 'keep', project_id: 'p', query: 'a', page: 'x' },
+      { sync_run_id: 'old1', project_id: 'p', query: 'a', page: 'x' },
+      { sync_run_id: 'old2', project_id: 'p', query: 'a', page: 'x' },
+      { sync_run_id: 'other-window', project_id: 'p', query: 'a', page: 'x' },
+      { sync_run_id: 'other-project', project_id: 'q', query: 'a', page: 'x' },
+      // A row carrying another owner's project_id under a pruned run id. It cannot happen
+      // through the sync path; it is exactly what the explicit owner filter defends, since
+      // createAdminClient() bypasses RLS and would otherwise delete it.
+      { sync_run_id: 'old1', project_id: 'q', query: 'cross', page: 'x' },
+    ],
+  }
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const pruneAdmin = new FakeAdmin(pruneTables) as any
+  const prunedRuns = await makeSyncStore(pruneAdmin).pruneSupersededMetrics('p', 28, 'keep')
+  const left = pruneTables.gsc_query_page_metrics.map((r) => r.sync_run_id).sort()
+  check('prunes exactly the superseded runs of this project+window', prunedRuns === 2)
+  check('the published snapshot survives the prune', left.includes('keep'))
+  check('the other window is NOT pruned', left.includes('other-window'))
+  check('another project is NOT pruned', left.includes('other-project'))
+  check('no superseded rows of this project remain', !pruneTables.gsc_query_page_metrics.some((r) => r.project_id === 'p' && (r.sync_run_id === 'old1' || r.sync_run_id === 'old2')))
+  check('the delete is filtered by owner, not by run id alone', pruneTables.gsc_query_page_metrics.some((r) => r.project_id === 'q' && r.query === 'cross'))
+
+  // Nothing to prune → no delete attempted, answer 0.
+  const emptyTables = { gsc_sync_runs: [{ id: 'keep', project_id: 'p', window_days: 28, status: 'succeeded' }], gsc_query_page_metrics: [{ sync_run_id: 'keep', project_id: 'p', query: 'a', page: 'x' }] }
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const emptyAdmin = new FakeAdmin(emptyTables) as any
+  check('a first-ever run prunes nothing', (await makeSyncStore(emptyAdmin).pruneSupersededMetrics('p', 28, 'keep')) === 0 && emptyTables.gsc_query_page_metrics.length === 1)
+
+  // A read failure surfaces as metrics_prune_failed (the caller swallows it, but it must
+  // never be reported as a successful prune).
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const badAdmin = new FakeAdmin({ gsc_sync_runs: [], gsc_query_page_metrics: [] }, { gsc_sync_runs: { select: () => ({ code: '42501' }) } }) as any
+  let pruneErr: GscServiceError | null = null
+  try { await makeSyncStore(badAdmin).pruneSupersededMetrics('p', 28, 'keep') } catch (e) { pruneErr = e instanceof GscServiceError ? e : null }
+  check('a prune read failure fails closed → metrics_prune_failed', pruneErr?.code === 'metrics_prune_failed')
 
   console.log(`\n${pass} passed, ${fail} failed`)
   if (fail > 0) process.exit(1)
