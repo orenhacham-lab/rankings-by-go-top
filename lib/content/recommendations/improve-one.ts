@@ -64,6 +64,7 @@ const LANG_LINE: Record<ContentLanguage, string> = {
   it: 'Scrivete in italiano corretto e scorrevole, con gli accenti giusti, rivolgendovi al lettore in forma impersonale o con il «voi», mai con il «tu».',
   ja: '自然で読みやすい日本語（です・ます調）で書いてください。全角の句読点（。、）を使い、単語の間に空白を入れないでください。',
   de: 'Schreiben Sie in korrektem, gut lesbarem Deutsch, mit richtigen Umlauten und ß, mit großgeschriebenen Substantiven, und sprechen Sie den Leser mit „Sie" an, niemals mit „du".',
+  nl: 'Schrijf in correct, goed leesbaar Nederlands, met de juiste diakritische tekens, met gewone zelfstandige naamwoorden in kleine letters en met gesloten samenstellingen (zoekwoordenonderzoek, websiteanalyse), en spreek de lezer aan met \u201eu\u201d, nooit met \u201eje\u201d.',
 }
 
 function buildPrompt(input: ImproveOneInput): string {

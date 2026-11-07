@@ -3,6 +3,7 @@
 import Link from 'next/link'
 import { LOCALE_PREFIX, localeHomeHref, type PublicLocale } from '@/lib/i18n/locales'
 import { GERMAN_IMPRESSUM_LINK } from '@/lib/i18n/german-site'
+import { DUTCH_COMPANY_INFO_LINK } from '@/lib/i18n/dutch-site'
 import { JAPANESE_TOKUSHO_LINK } from '@/lib/i18n/japanese-site'
 import { getPublicDictionary } from '@/lib/i18n/getPublicDictionary'
 import GoTopMark from '@/components/brand/GoTopMark'
@@ -127,13 +128,30 @@ export function Footer({ locale = 'he' }: { locale?: PublicLocale } = {}) {
                 §5 DDG asks a commercially operated digital service to keep the
                 provider's identity and contact details easily recognizable and
                 directly reachable from anywhere in the service. Germany is the
-                only locale whose law asks for that page, so the link appears in
-                that footer only — the other seven trees have no such route.
+                only locale whose law asks for THAT page, so the link appears in
+                that footer only. Dutch has its own, below, under a Dutch name
+                and its own statute; the remaining seven trees have no such
+                route.
               */}
               {locale === 'de' && (
                 <li>
                   <Link href={GERMAN_IMPRESSUM_LINK.href} className={linkClass}>
                     {GERMAN_IMPRESSUM_LINK.label}
+                  </Link>
+                </li>
+              )}
+              {/*
+                Artikel 3:15d lid 1 BW is the Dutch counterpart of §5 DDG: the
+                provider's identity, register entry and contact have to be
+                "gemakkelijk, rechtstreeks en permanent toegankelijk". It is a
+                Dutch page under a Dutch name, not an Impressum, and
+                "rechtstreeks" is why the link is here rather than two clicks
+                deep.
+              */}
+              {locale === 'nl' && (
+                <li>
+                  <Link href={DUTCH_COMPANY_INFO_LINK.href} className={linkClass}>
+                    {DUTCH_COMPANY_INFO_LINK.label}
                   </Link>
                 </li>
               )}

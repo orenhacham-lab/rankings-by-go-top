@@ -143,6 +143,26 @@ const JA_INTENT: Partial<Record<SuggestionIntent, (kw: string) => string[]>> = {
   informational: (kw) => [`${kw}について知っておきたいこと`],
 }
 
+// DUTCH. u-form, common nouns in LOWER CASE (the opposite of the German block
+// below, and the thing a translator gets wrong first), and the colon-subtitle
+// shape a Dutch SEO headline actually uses ("Zoekwoord: waar het op aankomt").
+const NL_BASE = (kw: string): string[] => [
+  `Hoe kiest u ${kw} goed?`,
+  `${kw}: wat u voor uw beslissing moet nagaan`,
+  `${kw}: de complete gids om te beginnen`,
+  `Wat kost ${kw}?`,
+  `De meest gemaakte fouten bij het kiezen van ${kw}`,
+  `Beste ${kw}: wat is de moeite waard om te vergelijken?`,
+]
+
+const NL_INTENT: Partial<Record<SuggestionIntent, (kw: string) => string[]>> = {
+  comparison: (kw) => [`${kw}: de vergelijking van de gangbare opties`, `Waarin verschillen de soorten ${kw}?`],
+  commercial: (kw) => [`${kw} — goed kiezen en er geen spijt van krijgen`, `Waar moet u op letten bij de aankoop van ${kw}?`],
+  local: (kw) => [`${kw}: zo vindt u een betrouwbare aanbieder in de buurt`],
+  transactional: (kw) => [`Wanneer moet u ${kw} bestellen — en bij wie?`],
+  informational: (kw) => [`Alles wat u over ${kw} moet weten`],
+}
+
 // GERMAN. Sie-form, nouns capitalized, and the colon-subtitle shape a German
 // SEO headline actually uses ("Keyword: worauf es ankommt").
 const DE_BASE = (kw: string): string[] => [
@@ -162,9 +182,9 @@ const DE_INTENT: Partial<Record<SuggestionIntent, (kw: string) => string[]>> = {
   informational: (kw) => [`Alles, was Sie über ${kw} wissen sollten`],
 }
 
-const BASE: Record<SuggestionLanguage, (kw: string) => string[]> = { he: HE_BASE, en: EN_BASE, es: ES_BASE, 'pt-BR': PT_BASE, fr: FR_BASE, it: IT_BASE, ja: JA_BASE, de: DE_BASE }
+const BASE: Record<SuggestionLanguage, (kw: string) => string[]> = { he: HE_BASE, en: EN_BASE, es: ES_BASE, 'pt-BR': PT_BASE, fr: FR_BASE, it: IT_BASE, ja: JA_BASE, de: DE_BASE, nl: NL_BASE }
 const INTENT: Record<SuggestionLanguage, Partial<Record<SuggestionIntent, (kw: string) => string[]>>> =
-  { he: HE_INTENT, en: EN_INTENT, es: ES_INTENT, 'pt-BR': PT_INTENT, fr: FR_INTENT, it: IT_INTENT, ja: JA_INTENT, de: DE_INTENT }
+  { he: HE_INTENT, en: EN_INTENT, es: ES_INTENT, 'pt-BR': PT_INTENT, fr: FR_INTENT, it: IT_INTENT, ja: JA_INTENT, de: DE_INTENT, nl: NL_INTENT }
 
 /**
  * Return up to `max` distinct, natural topic suggestions for a keyword.

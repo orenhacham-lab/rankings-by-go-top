@@ -133,7 +133,7 @@ export const SURFER_COMPARE: Record<PublicLocale, ComparisonCopy> = {
         { title: 'מאמרים שמתפרסמים בלעדיכם', body: 'תוכנית נושאים חודשית שאתם מאשרים, ואז מאמרים עם תמונות וקישורים פנימיים שעולים לאוויר לבד.' },
         { title: 'גם מחוץ לאתר', body: 'פוסטים לפרופיל העסקי בגוגל באישורכם, וטיוטות תשובה לביקורות — באותו מחיר.' },
         { title: 'תמונת מצב אחת', body: 'בדיקה חודשית בגוגל, במפות ובתשובות AI, בלי להוסיף כלי שני ובלי דוח שצריך להרכיב.' },
-        { title: 'שופיפיי וגם וורדפרס', body: 'אותה מערכת על שתי הפלטפורמות, ובשמונה שפות — עברית ביניהן.' },
+        { title: 'שופיפיי וגם וורדפרס', body: 'אותה מערכת על שתי הפלטפורמות, ובתשע שפות — עברית ביניהן.' },
       ],
     },
     faq: {
@@ -259,7 +259,7 @@ export const SURFER_COMPARE: Record<PublicLocale, ComparisonCopy> = {
         { title: 'Articles that publish without you', body: 'A monthly topic plan you approve, then articles with images and internal links going live on their own.' },
         { title: 'Off the site as well', body: 'Posts to your Google Business Profile with your consent, and drafted replies to reviews, in the same price.' },
         { title: 'One picture of where you stand', body: 'A monthly check in Google, in Maps and in AI answers, without adding a second tool or assembling a report.' },
-        { title: 'Shopify as well as WordPress', body: 'The same system on both platforms, in eight languages.' },
+        { title: 'Shopify as well as WordPress', body: 'The same system on both platforms, in nine languages.' },
       ],
     },
     faq: {
@@ -385,7 +385,7 @@ export const SURFER_COMPARE: Record<PublicLocale, ComparisonCopy> = {
         { title: 'Artículos que se publican sin ti', body: 'Un plan mensual de temas que tú apruebas y, después, artículos con imágenes y enlaces internos que salen solos.' },
         { title: 'También fuera del sitio', body: 'Publicaciones en tu perfil de empresa en Google con tu consentimiento, y borradores de respuesta a las reseñas, en el mismo precio.' },
         { title: 'Una sola foto de dónde estás', body: 'Una comprobación mensual en Google, en Maps y en respuestas de IA, sin añadir una segunda herramienta ni montar un informe.' },
-        { title: 'Shopify además de WordPress', body: 'El mismo sistema en las dos plataformas y en ocho idiomas.' },
+        { title: 'Shopify además de WordPress', body: 'El mismo sistema en las dos plataformas y en nueve idiomas.' },
       ],
     },
     faq: {
@@ -511,7 +511,7 @@ export const SURFER_COMPARE: Record<PublicLocale, ComparisonCopy> = {
         { title: 'Artigos que publicam sem você', body: 'Um plano mensal de temas que você aprova e, depois, artigos com imagens e links internos que entram no ar sozinhos.' },
         { title: 'Fora do site também', body: 'Publicações no seu perfil da empresa no Google com o seu consentimento, e rascunhos de resposta às avaliações, no mesmo preço.' },
         { title: 'Uma única foto de onde você está', body: 'Uma verificação mensal no Google, no Maps e nas respostas de IA, sem somar uma segunda ferramenta nem montar relatório.' },
-        { title: 'Shopify além de WordPress', body: 'O mesmo sistema nas duas plataformas e em oito idiomas.' },
+        { title: 'Shopify além de WordPress', body: 'O mesmo sistema nas duas plataformas e em nove idiomas.' },
       ],
     },
     faq: {
@@ -637,7 +637,7 @@ export const SURFER_COMPARE: Record<PublicLocale, ComparisonCopy> = {
         { title: 'Des articles qui se publient sans vous', body: 'Un plan de sujets mensuel que vous validez, puis des articles avec images et liens internes qui partent en ligne tout seuls.' },
         { title: 'En dehors du site aussi', body: "Des publications sur votre fiche d'établissement Google avec votre accord, et des brouillons de réponse aux avis, dans le même tarif." },
         { title: 'Une seule photo de votre situation', body: 'Une vérification mensuelle dans Google, dans Maps et dans les réponses IA, sans ajouter un second outil ni monter un rapport.' },
-        { title: 'Shopify autant que WordPress', body: 'Le même système sur les deux plateformes, en huit langues.' },
+        { title: 'Shopify autant que WordPress', body: 'Le même système sur les deux plateformes, en neuf langues.' },
       ],
     },
     faq: {
@@ -763,7 +763,7 @@ export const SURFER_COMPARE: Record<PublicLocale, ComparisonCopy> = {
         { title: 'Articoli che si pubblicano senza di voi', body: 'Un piano mensile di argomenti che approvate, e poi articoli con immagini e link interni che vanno online da soli.' },
         { title: 'Anche fuori dal sito', body: "Pubblicazioni sul profilo dell'attività su Google con il vostro consenso, e bozze di risposta alle recensioni, nello stesso prezzo." },
         { title: 'Una sola fotografia della situazione', body: 'Una verifica mensile su Google, su Maps e nelle risposte IA, senza aggiungere un secondo strumento né comporre un report.' },
-        { title: 'Shopify oltre a WordPress', body: 'Lo stesso sistema su entrambe le piattaforme e in otto lingue.' },
+        { title: 'Shopify oltre a WordPress', body: 'Lo stesso sistema su entrambe le piattaforme e in nove lingue.' },
       ],
     },
     faq: {
@@ -888,7 +888,7 @@ export const SURFER_COMPARE: Record<PublicLocale, ComparisonCopy> = {
         { title: 'Artikel, die ohne Sie online gehen', body: 'Ein monatlicher Themenplan, den Sie freigeben, und danach Artikel mit Bildern und internen Links, die von selbst veröffentlicht werden.' },
         { title: 'Auch außerhalb der Website', body: 'Beiträge in Ihrem Google Unternehmensprofil mit Ihrer Einwilligung und vorbereitete Antworten auf Bewertungen, im selben Preis.' },
         { title: 'Ein Bild davon, wo Sie stehen', body: 'Eine monatliche Prüfung in Google, in Maps und in KI-Antworten, ohne ein zweites Tool und ohne selbst einen Bericht zusammenzusetzen.' },
-        { title: 'Shopify genauso wie WordPress', body: 'Dasselbe System auf beiden Plattformen, in acht Sprachen.' },
+        { title: 'Shopify genauso wie WordPress', body: 'Dasselbe System auf beiden Plattformen, in neun Sprachen.' },
       ],
     },
     faq: {
@@ -1013,7 +1013,7 @@ export const SURFER_COMPARE: Record<PublicLocale, ComparisonCopy> = {
         { title: '手をかけずに公開される記事', body: '月に一度、題材の計画をご承認いただくと、画像と内部リンクの入った記事がそのまま公開されます。' },
         { title: 'サイトの外側も', body: 'ご同意のうえでGoogleビジネスプロフィールへ投稿し、口コミへの返信の下書きも同じ料金に入っています。' },
         { title: '今いる場所が1枚でわかります', body: 'Google、マップ、AIの回答を月に一度まとめて確認します。2つ目の道具もレポートの組み立ても不要です。' },
-        { title: 'WordPressだけでなくShopifyも', body: '同じ仕組みを両方のプラットフォームで、8つの言語で使えます。' },
+        { title: 'WordPressだけでなくShopifyも', body: '同じ仕組みを両方のプラットフォームで、9つの言語で使えます。' },
       ],
     },
     faq: {
@@ -1035,5 +1035,130 @@ export const SURFER_COMPARE: Record<PublicLocale, ComparisonCopy> = {
       ],
     },
     close: { title: 'サイトの現状を、登録なしで確認する' },
+  },
+  nl: {
+    competitor: 'Surfer',
+    eyebrow: 'Go Top SEO tegenover Surfer',
+    metaTitle: 'Go Top SEO tegenover Surfer | vergelijking',
+    metaDescription:
+      'Go Top SEO vergeleken met Surfer: wie de content schrijft en wie die publiceert, wat er in elke prijs zit, hoe het meten van AI-antwoorden verschilt en wanneer Surfer de betere keuze is.',
+    hero: {
+      title: 'Surfer helpt u een pagina te schrijven die goed staat.',
+      accent: 'Wij schrijven de pagina’s',
+      subtitle:
+        'Surfer is een gespecialiseerd hulpmiddel voor optimalisatie: iemand die schrijft gaat ermee zitten en vormt een pagina tegen de zoekresultaten aan. Go Top SEO is gebouwd voor bedrijven waar niemand het schrijven op zich neemt — het systeem plant de onderwerpen, schrijft, publiceert, plaatst berichten in uw Google-bedrijfsprofiel en controleert één keer per maand waar u staat.',
+    },
+    table: {
+      eyebrow: 'De vergelijking',
+      title: 'Wat elk van beide doet, overgenomen uit Surfers eigen pagina’s',
+      checkedOn: CHECKED,
+      sources: SOURCES,
+      rows: [
+        {
+          label: 'Prijs',
+          ours: 'Vanaf 79 USD per maand plus belasting. In Israël vanaf 249 ILS per maand inclusief btw.',
+          theirs:
+            'Alle prijzen per maand bij jaarlijkse betaling: Discovery 49 USD, Standard 99 USD, Pro 182 USD, Peace of Mind 299 USD, plus een apart pakket voor zichtbaarheid in AI van 82 USD. Jaarpakketten worden voor het hele jaar vooruit afgerekend.',
+        },
+        {
+          label: 'Wat het goedkoopste pakket bevat',
+          ours: 'Elk onderdeel zit in het instappakket; wat tussen de pakketten verschilt, staat op de prijspagina.',
+          theirs:
+            'Discovery voor 49 USD: 120 documenten, 10 gevolgde pagina’s en 0 AI-prompts. Het volgen van prompts begint bij Standard, met 25 prompts, wekelijks bijgewerkt.',
+        },
+        {
+          label: 'Wie de artikelen schrijft',
+          ours: 'Het systeem. Onderwerpen, tekst, afbeeldingen en interne links, nadat u ze hebt goedgekeurd.',
+          theirs:
+            'U zelf, met hun hulp. Hun pagina beschrijft een editor voor content met lopende aanwijzingen uit de zoekresultaten, opzetten en AI-concepten: “Write articles that rank — fast — using real-time SEO data.”',
+        },
+        {
+          label: 'Publicatie op de website',
+          ours: 'Automatisch in WordPress en Shopify.',
+          theirs:
+            'Hun startpagina draagt een productbericht over een WordPress-plug-in van Surfer. De pagina zelf beschrijft niet wat die plug-in publiceert, en een pagina die dat uitlegt hebben wij niet gevonden.',
+        },
+        {
+          label: 'Positiemeting',
+          ours: 'Een maandelijkse controle in Google, in Google Maps en in AI-antwoorden (waaronder ChatGPT, Gemini en Google AI).',
+          theirs:
+            'De pakketten tellen “pages tracked” — 10 bij Discovery — en de startpagina beschrijft signalen wanneer een pagina wegzakt. Een klassieke positiemeter voor zoekwoorden wordt op de pagina’s die wij hebben gelezen niet beschreven.',
+        },
+        {
+          label: 'AI-antwoorden',
+          ours: 'Een automatische maandelijkse controle in ChatGPT, Gemini en Google AI.',
+          theirs:
+            'Het volgen van prompts heeft per pakket een grens: 0 bij Discovery, 25 wekelijks bijgewerkt bij Standard, 50 dagelijks bij Pro. Hun startpagina laat onder “Boost visibility in” Google AI Mode, AI Overviews, Gemini, ChatGPT, Claude en Perplexity zien.',
+        },
+        {
+          label: 'Google-bedrijfsprofiel en Maps',
+          ours: 'Automatische berichten in het profiel met uw toestemming en een maandelijkse controle van uw positie in Maps.',
+          theirs: 'Plaatselijk zoeken, Google Maps en het Google-bedrijfsprofiel worden op de startpagina en de prijspagina die wij hebben gelezen niet vermeld.',
+        },
+        {
+          label: 'Werk aan de website',
+          ours: 'Een deel van de correcties wordt via onze plug-in doorgevoerd, zonder dat u code hoeft te lezen.',
+          theirs:
+            'Aanwijzingen, een score en opnieuw optimaliseren in hun eigen editor. Hun automatische agent, Surfy Agent, staat op de startpagina met de aanduiding “soon”.',
+        },
+        {
+          label: 'Proefperiode',
+          ours: '7 dagen uitproberen, zonder creditcard, altijd op te zeggen.',
+          theirs:
+            'Elke knop bij een pakket draagt “Start for Free”. Hun prijspagina noemt geen duur van de proefperiode en zegt niet of er een creditcard nodig is.',
+        },
+      ],
+    },
+    theirStrengths: {
+      eyebrow: 'Wanneer Surfer de betere keuze is',
+      title: 'In deze gevallen is Surfer het juiste antwoord',
+      intro: 'In het handwerk om één pagina naar boven te brengen is Surfer beter dan wij. Dat is geen hoffelijkheid, maar precies wat zij hebben gebouwd.',
+      items: [
+        {
+          title: 'Als één enkele pagina moet winnen',
+          body:
+            'Hun score komt uit de zoekresultaten zelf, en wie goed schrijft en zich aan die aanwijzingen houdt, scherpt een pagina in een zwaar veld beter aan dan welke automatisering ook. Schrijft er bij u al iemand en ontbreekt alleen het aanscherpen, dan is dit precies het hulpmiddel.',
+        },
+        {
+          title: 'Als AI-antwoorden de maat zijn',
+          body:
+            'Hun pakketten volgen benoemde prompts — 25 wekelijks bij Standard, 50 dagelijks bij Pro — en hun startpagina laat zes diensten zien. Dat is vaker en breder dan onze maandelijkse controle over drie. Is dat uw hele vraag, dan beantwoordt Surfer die beter.',
+        },
+        {
+          title: 'Als u veel schrijft',
+          body: '49 USD per maand koopt 120 documenten. Wie content in hoeveelheid maakt, vindt daar een prijs per eenheid werk die moeilijk te weerleggen is.',
+        },
+      ],
+    },
+    ourStrengths: {
+      eyebrow: 'Wanneer wij beter passen',
+      title: 'Als er niemand is die het werk doet',
+      intro: 'Het echte verschil is niet technisch. Het gaat erom wie gaat zitten en schrijft, en wie eraan denkt te publiceren.',
+      items: [
+        { title: 'Artikelen die zonder u online gaan', body: 'Een maandelijks plan met onderwerpen dat u goedkeurt, en daarna artikelen met afbeeldingen en interne links die van zichzelf worden gepubliceerd.' },
+        { title: 'Ook buiten de website', body: 'Berichten in uw Google-bedrijfsprofiel met uw toestemming en voorbereide antwoorden op beoordelingen, in dezelfde prijs.' },
+        { title: 'Een beeld van waar u staat', body: 'Een maandelijkse controle in Google, in Maps en in AI-antwoorden, zonder een tweede hulpmiddel en zonder zelf een rapport in elkaar te zetten.' },
+        { title: 'Shopify net zo goed als WordPress', body: 'Hetzelfde systeem op beide platforms, in negen talen.' },
+      ],
+    },
+    faq: {
+      eyebrow: 'Vragen',
+      title: 'Wat er voor de beslissing wordt gevraagd',
+      items: [
+        {
+          q: 'Surfer kost 49 USD en u 79 USD. Waarom?',
+          a: 'Omdat er niet hetzelfde wordt verkocht. 49 USD koopt 120 documenten en 10 gevolgde pagina’s, zonder enig volgen van prompts, en schrijven en publiceren doet nog altijd een mens. Onze prijs dekt het schrijven, het publiceren, het Google-bedrijfsprofiel en de maandelijkse controle bij elkaar. Hebt u al iemand die schrijft, dan is Surfer goedkoper, en dan is dat de juiste beslissing.',
+        },
+        {
+          q: 'Is dit hetzelfde product als “Surfer SEO”?',
+          a: 'Ja. Per 31 oktober 2026 leidt surferseo.com door naar surfer.ai, en het product heet nog steeds Surfer. De links in de tabel wijzen naar de pagina’s die wij hebben gelezen.',
+        },
+        {
+          q: 'Wie meet AI-antwoorden beter?',
+          a: 'Surfer. Hun hogere pakketten werken tientallen benoemde prompts dagelijks bij en laten zes diensten zien, terwijl wij één keer per maand in ChatGPT, Gemini en Google AI controleren. Ons voordeel zit daarin dat de controle erbij hoort en geen apart hulpmiddel vraagt — niet dat die dieper gaat.',
+        },
+      ],
+    },
+    close: { title: 'Zie zonder aanmelden waar uw website staat' },
   },
 }

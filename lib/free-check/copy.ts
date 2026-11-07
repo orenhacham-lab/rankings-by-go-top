@@ -968,7 +968,120 @@ const de: FreeCheckCopy = {
   },
 }
 
-const COPY: Record<PublicLocale, FreeCheckCopy> = { he, en, es, 'pt-BR': ptBR, fr, it, ja, de }
+const nl: FreeCheckCopy = {
+  page: {
+    badge: 'Gratis analyse, zonder verplichting',
+    title: 'Een SEO- en AI-analyse van uw website,',
+    titleAccent: 'in minder dan een minuut',
+    subtitle: 'U vult alleen het adres van uw website in. Wij lezen de website echt, herkennen wat het bedrijf doet en laten zien wat het tegenhoudt in Google en in AI-antwoorden.',
+    trust: ['Gratis, zonder creditcard', 'Niets te installeren', 'Zonder aanmelden'],
+    expect: [
+      { title: 'Wat wij hebben begrepen', body: 'Wat het bedrijf doet en wie zijn klanten zijn, zoals de website het zelf laat zien.' },
+      { title: 'Wat de website tegenhoudt', body: 'Wat er op de pagina Google en de AI-assistenten belet het bedrijf te begrijpen — van het belangrijkste naar het minst belangrijke.' },
+      { title: 'Hoe klaar de website is voor AI', body: 'Of ChatGPT en Gemini de website kunnen lezen en kunnen noemen.' },
+    ],
+  },
+  form: {
+    label: 'Adres van de website',
+    placeholder: 'voorbeeld.nl',
+    submit: 'Website analyseren',
+    hint: 'Één enkel veld. Meer is er niet in te vullen.',
+    errors: {
+      invalid_url: 'Dit adres ziet er niet goed uit. Probeer het opnieuw, bijvoorbeeld voorbeeld.nl',
+      blocked_url: 'Alleen openbaar bereikbare websites kunnen worden geanalyseerd. Interne adressen en IP-adressen worden niet ondersteund.',
+      unreachable: 'De website was niet bereikbaar. Controleer het adres en probeer het opnieuw.',
+      not_html: 'Dit adres levert geen webpagina die wij kunnen lezen.',
+      rate_limited: 'Er zijn kort achter elkaar meerdere analyses gestart. Probeer het over een minuut opnieuw.',
+      daily_cap: 'De gratis analyse is op dit moment erg in de vraag. Probeer het later opnieuw, of open een account voor de volledige analyse.',
+      internal: 'Bij ons is iets niet doorgelopen. Probeer het over een moment opnieuw.',
+    },
+  },
+  loading: {
+    title: 'Wij lezen de website en de opbouw van haar pagina’s',
+    sub: 'Dit duurt minder dan een minuut. Wij lezen de website echt, wij gokken niet.',
+    footer: 'Wordt verwerkt, de samenvatting is bijna klaar',
+    steps: [
+      'De website en de opbouw van haar pagina’s lezen',
+      'Herkennen wat het bedrijf doet en wie zijn klanten zijn',
+      'Nagaan wat de website tegenhoudt in Google',
+      'Zoeken naar concurrenten',
+    ],
+  },
+  results: {
+    heading: 'De eerste samenvatting van de analyse',
+    scanned: 'Geanalyseerd hebben wij',
+    countersTitle: 'Wat wij hebben gevonden',
+    counters: { keywords: 'Zoekwoorden die de moeite waard zijn', fixes: 'Punten die op de website te herstellen zijn', geo: 'Klaar voor AI-antwoorden', articles: 'Artikelen die klaar zijn om geschreven te worden' },
+    businessTitle: 'Wat wij over het bedrijf hebben begrepen',
+    audienceTitle: 'Wie de klanten zijn',
+    competitorsTitle: 'Wie de concurrenten zijn',
+    competitorsLocked: 'Voor meer concurrenten en het volledige overzicht is een gratis account genoeg',
+    findingsTitle: 'Wat de website op dit moment tegenhoudt',
+    findingsEmpty: 'De website is op alles wat wij nagaan onberispelijk. Gefeliciteerd.',
+    findingsLocked: 'Meer bevindingen wachten in uw account',
+    geoTitle: 'Hoe klaar de website is voor AI-antwoorden',
+    geoIntro: 'AI-assistenten zoals ChatGPT en Perplexity maken geen ranglijst, zij noemen bronnen. Wij hebben nagegaan hoe makkelijk deze website te noemen is.',
+    geoScore: 'Signalen in goede staat',
+    articlesTitle: 'De artikelen die wij zouden schrijven',
+    articlesNote: 'De artikelen komen uit een contentstrategie die op de beste kansen in zoekwoorden is gebouwd.',
+    gateTitle: 'Dit was pas een voorproefje. De echte analyse begint na het aanmelden',
+    gateBody: 'Open een gratis account, en het systeem gaat aan de slag met uw website.',
+    gateBullets: [
+      'De volledige analyse, met echte zoekvolumes',
+      'Een contentplan voor een heel kwartaal, op uw branche gebouwd',
+      'Het eerste artikel, door ons geschreven',
+      'Een volledig concurrentenoverzicht en het bijhouden van de vermeldingen in AI-antwoorden',
+    ],
+    gateCta: 'Gratis account openen',
+    gateSecondary: 'Heeft u al een account? Inloggen',
+    gateTerms: 'Als u doorgaat, gaat u akkoord met de gebruiksvoorwaarden en de privacyverklaring.',
+    again: 'Een andere website analyseren',
+    aiUnavailable: 'De technische controle is klaar. De samenvatting over het bedrijf en de zoekwoorden staan klaar in uw account.',
+  },
+  findings: {
+    title_missing: { title: 'De pagina heeft geen title-tag', detail: 'De title is wat Google in zijn resultaten laat zien. Zonder die tag verzint Google er zelf een in plaats van het bedrijf.' },
+    title_short: { title: 'De title van de pagina is te kort', detail: 'Onder 30 tekens blijft de ruimte die Google geeft ongebruikt, en ontbreken de gezochte termen meestal.' },
+    title_long: { title: 'De title van de pagina is te lang', detail: 'Boven 65 tekens kapt Google de title midden in de zin af.' },
+    description_missing: { title: 'Geen meta description', detail: 'De description is de wervende zin in de zoekresultaten. Zonder die tag pakt Google een willekeurige zin van de pagina.' },
+    description_length: { title: 'De meta description heeft niet de juiste lengte', detail: 'Onder 70 of boven 165 tekens wordt die afgekapt of slecht benut weergegeven.' },
+    h1_missing: { title: 'De pagina heeft geen H1', detail: 'De H1 vertelt Google en de AI-assistenten waar de pagina over gaat. Zonder die kop leiden zij het uit de tekst af.' },
+    h1_multiple: { title: 'Meer dan één H1 op de pagina', detail: 'Meerdere H1-koppen splitsen de boodschap van de pagina en zwakken elke kop af.' },
+    images_alt: { title: 'Bij sommige afbeeldingen ontbreekt de alternatieve tekst', detail: 'Google ziet geen afbeeldingen, het leest de alternatieve tekst. Zonder die tekst brengen de afbeeldingen geen bezoekers, en de toegankelijkheid lijdt eronder.' },
+    thin_content: { title: 'Te weinig tekst op de pagina', detail: 'Een dunne pagina geeft Google en de AI-assistenten te weinig om haar te plaatsen of te noemen.' },
+    no_schema: { title: 'Geen structured data (schema)', detail: 'Zonder schema kunnen Google en de AI-assistenten er niet zeker van zijn wie het bedrijf is en wat het doet.' },
+    no_canonical: { title: 'Geen canonical-tag', detail: 'Zonder canonical kan dezelfde pagina meerdere keren worden geteld en met zichzelf concurreren.' },
+    no_viewport: { title: 'Geen mobiele viewport gedefinieerd', detail: 'Google beoordeelt de mobiele versie. Zonder viewport ziet de pagina er op de telefoon kapot uit.' },
+    no_open_graph: { title: 'Geen deel-tags (Open Graph)', detail: 'Gedeelde links in WhatsApp en Facebook laten geen afbeelding en niet de juiste titel zien.' },
+    robots_blocks_all: { title: 'robots.txt sluit alle crawlers uit', detail: 'Het bestand vraagt alle crawlers de website niet op te nemen, wat haar buiten Google houdt.' },
+    robots_blocks_ai: { title: 'robots.txt sluit de crawlers van de AI-assistenten uit', detail: 'Uitgesloten crawlers kunnen het bedrijf niet noemen in antwoorden zoals die van ChatGPT.' },
+    no_faq: { title: 'Geen vraag-en-antwoordblok', detail: 'AI-assistenten beantwoorden vragen, en daarom noemen zij pagina’s die vragen beantwoorden.' },
+  },
+  geo: {
+    schema: {
+      pass: { title: 'De structured data benoemen het bedrijf', detail: 'De AI-assistenten weten wie het bedrijf is en wat het doet.' },
+      fail: { title: 'Geen structured data benoemen het bedrijf', detail: 'Zonder een schema voor het bedrijf weten de AI-assistenten niet precies om wie het gaat.' },
+    },
+    faq: {
+      pass: { title: 'Er is een vraag-en-antwoordblok', detail: 'Een pagina die vragen beantwoordt, wordt duidelijk vaker genoemd.' },
+      fail: { title: 'Geen vraag-en-antwoordblok', detail: 'AI-assistenten beantwoorden vragen, en daarom noemen zij pagina’s die vragen beantwoorden. Een pagina zonder vragen wordt zelden genoemd.' },
+    },
+    robots: {
+      pass: { title: 'De AI-assistenten mogen de website lezen', detail: 'robots.txt sluit geen crawler van de AI-assistenten uit.' },
+      fail: { title: 'robots.txt sluit de crawlers van de AI-assistenten uit', detail: 'Uitgesloten crawlers kunnen het bedrijf niet noemen.' },
+    },
+    llms: {
+      pass: { title: 'Er is een llms.txt-bestand', detail: 'De website geeft de AI-assistenten een duidelijke kaart van zichzelf — een voorsprong op het grootste deel van de markt.' },
+      fail: { title: 'Geen llms.txt-bestand', detail: 'Een llms.txt-bestand geeft de AI-assistenten een duidelijke kaart van de website. Het grootste deel van de markt heeft dat nog niet.' },
+    },
+  },
+  evidence: {
+    images: (missing, total) => `${missing} van ${total} afbeeldingen`,
+    words: (n) => `${n} woorden op de pagina`,
+    h1: (n) => `${n} H1-koppen`,
+  },
+}
+
+const COPY: Record<PublicLocale, FreeCheckCopy> = { he, en, es, 'pt-BR': ptBR, fr, it, ja, de, nl }
 
 export function freeCheckCopy(locale: PublicLocale): FreeCheckCopy {
   return COPY[locale] ?? COPY.he

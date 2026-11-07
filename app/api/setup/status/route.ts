@@ -7,6 +7,7 @@
 
 import { createAdminClient } from '@/lib/supabase/admin'
 import { requireAdminApi, isSupabaseUnconfigured } from '@/lib/auth/require-admin'
+import { serperBody } from '@/lib/scanner/serper-payload'
 
 interface ServiceStatus {
   ok: boolean
@@ -86,7 +87,7 @@ export async function GET(): Promise<Response> {
             'X-API-KEY': process.env.SERPER_API_KEY!,
             'Content-Type': 'application/json',
           },
-          body: JSON.stringify({ q: 'test', gl: 'il', hl: 'he', num: 1 }),
+          body: serperBody({ q: 'test', gl: 'il', hl: 'he', num: 1 }, 'SetupStatus'),
           signal: controller.signal,
         })
       } finally {

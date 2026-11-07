@@ -216,6 +216,7 @@ export const it = {
     it: 'Italiano',
     ja: '日本語',
     de: 'Deutsch',
+    nl: 'Nederlands',
     aria: 'Cambio della lingua del sito',
   },
   cookie: {
@@ -233,7 +234,7 @@ export const it = {
     settingsTitle: 'Selezione dei cookie',
     settingsIntro: 'Ogni categoria può essere accettata o rifiutata separatamente, e la scelta può essere cambiata in qualsiasi momento.',
     always: 'Sempre attivi',
-    withdrawHint: 'Per modificare o revocare il consenso in qualsiasi momento è disponibile il link «Impostazioni dei cookie» in fondo a ogni pagina.',
+    withdrawHint: 'Per modificare o revocare il consenso in qualsiasi momento è disponibile il link «Impostazioni dei cookie» in fondo a ogni pagina. Le condizioni della conservazione e della lettura sul Suo dispositivo Lei può stabilirle anche da sé, nelle impostazioni del Suo browser; un blocco nel browser da solo non sostituisce però la revoca del consenso presso di noi.',
     gpcTitle: 'Consenso rifiutato automaticamente',
     gpcBody: 'Il browser invia il segnale Global Privacy Control, quindi nessun cookie di misurazione o di marketing è stato caricato. La scelta è stata registrata.',
     categories: {

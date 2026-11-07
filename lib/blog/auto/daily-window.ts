@@ -46,11 +46,11 @@ type Admin = ReturnType<typeof createAdminClient>
 
 /**
  * The UTC hours the morning run may write in. Four hours held five languages;
- * eight languages need six (04:00-09:59 UTC = 07:00-12:59 Israel), because the
- * window is sixteen runs of which eight go on first passes and the rest is
- * reserve for a language that fails a gate and retries. On 4 Nov 2026 the
- * window ran out at 07:59 with Italian still unwritten and German, live that
- * day, never reached at all.
+ * nine languages need six (04:00-09:59 UTC = 07:00-12:59 Israel), because the
+ * cron fires every fifteen minutes and the window is therefore twenty-four runs,
+ * of which nine go on first passes and the rest is reserve for a language that
+ * fails a gate and retries. On 4 Nov 2026 the four-hour window ran out at 07:59
+ * with Italian still unwritten and German, live that day, never reached at all.
  */
 export const WINDOW_HOURS_UTC: readonly number[] = [4, 5, 6, 7, 8, 9]
 

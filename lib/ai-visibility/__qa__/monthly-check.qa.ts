@@ -287,7 +287,9 @@ async function main() {
   // ── D) the allowance ──────────────────────────────────────────────────────
   say('\nD) the allowance')
   {
-    const used = (w: World, n: number) => { for (let i = 0; i < n; i++) w.tables.usage_reservations.push({ id: `m${i}`, user_id: USER, project_id: PROJECT, usage_type: 'ai_check', reserved_amount: 1, consumed_amount: 1, period_start: iso(NOW - 5 * DAY), period_end: iso(NOW + 25 * DAY), idempotency_key: `manual:${i}`, status: 'consumed', reserved_at: iso(NOW - DAY), consumed_at: iso(NOW - DAY), created_at: iso(NOW - DAY) }) }
+    // `base` is the instant the world was built around: NOW for every pinned case,
+    // the real clock for D7, whose subject reads it.
+    const used = (w: World, n: number, base: number = NOW) => { for (let i = 0; i < n; i++) w.tables.usage_reservations.push({ id: `m${i}`, user_id: USER, project_id: PROJECT, usage_type: 'ai_check', reserved_amount: 1, consumed_amount: 1, period_start: iso(base - 5 * DAY), period_end: iso(base + 25 * DAY), idempotency_key: `manual:${i}`, status: 'consumed', reserved_at: iso(base - DAY), consumed_at: iso(base - DAY), created_at: iso(base - DAY) }) }
     let w = world(); used(w, 6); quiet(); let s = await cron(w); loud()
     check('D1: 6 of 10 used: only 2 fit before the last two, so 2 run', w.calls.length === 2 && consumed(w) === 8, show({ calls: w.calls.length, s }))
     w = world(); used(w, 8); quiet(); s = await cron(w); loud()
@@ -305,9 +307,19 @@ async function main() {
     check('D6: X is the manual route\'s own (maxAIScansPerPeriodPerProject)', /const limit = entitlement\.limits\.maxAIScansPerPeriodPerProject/.test(src)
       && /const limit = entitlement\.limits\.maxAIScansPerPeriodPerProject/.test(code('app/api/ai-visibility/runs/route.ts')))
     const { readUsageAllowance } = require('../../billing/usage-allowance.ts')
-    w = world(); used(w, 4); quiet(); await cron(w); const a = await readUsageAllowance(w.admin, { userId: USER, usageType: 'ai_check', limitFor: (l: any) => l.maxAIScansPerPeriodPerProject, nowMs: NOW }); loud()
+    // readUsageAllowance passes its `nowMs` to the lease math but NOT to
+    // getUserEntitlement, which therefore reads the real clock — so this case's
+    // world has to be built around the real one, like F7's. Pinned to NOW, the
+    // subscription's period ended on 2026-11-02 and from 11-03 the entitlement
+    // read it as a trial: limit 0, "not included", with nothing wrong in the
+    // product. Everything else here is unchanged: 4 manual checks, then the
+    // automatic run's 3, counted on one period.
+    const REAL = Date.now()
+    w = world({ nowMs: REAL }); used(w, 4, REAL)
+    quiet(); await cron(w, { now: () => new Date(REAL), lastSignInAt: async () => iso(REAL - 3 * DAY) })
+    const a = await readUsageAllowance(w.admin, { userId: USER, usageType: 'ai_check', limitFor: (l: any) => l.maxAIScansPerPeriodPerProject, nowMs: REAL }); loud()
     check('D7: the allowance the tab reads counts the automatic checks exactly like manual ones (4 + 3 = 7 of 10)', a.state === 'known' && a.used === 7 && a.remaining === 3, show(a))
-    check('D8: the runner\'s count and the allowance reader\'s agree', R.ledgerUsed(w.tables.usage_reservations, NOW) === a.used)
+    check('D8: the runner\'s count and the allowance reader\'s agree', R.ledgerUsed(w.tables.usage_reservations, REAL) === a.used)
   }
 
   // ── E) isolation and auth ─────────────────────────────────────────────────
@@ -359,7 +371,10 @@ async function main() {
   say('\nF) GET/POST/PUT /api/ai-visibility/monthly')
   {
     const M = require('../../../app/api/ai-visibility/monthly/route.ts')
-    const w = world()
+    // Everything in this block goes through the ROUTE, which gives its readers no
+    // clock, so this world is built around the real one (see F7's note). Pinned to
+    // NOW, F3 read a subscription whose period had ended and reported a trial.
+    const w = world({ nowMs: Date.now() })
     ADMIN_CLIENT = w.admin
     USER_CLIENT = { auth: { getUser: async () => ({ data: { user: null } }) } }
     let res = await M.GET(new Request(`http://localhost/api/ai-visibility/monthly?projectId=${PROJECT}`))
@@ -591,7 +606,27 @@ async function main() {
     // untouched, and that is the number this check exists to protect.
     const CREEM_PROVIDER = new Set(['lib/billing/entitlement-write.ts'])
     untouched = untouched.split('\n').filter((f) => f && !CREEM_PROVIDER.has(f)).join('\n')
+    // Owner 2026-11-05: readUsageAllowance resolves the whole answer on ONE clock.
+    // It already took `nowMs` and passed it only to the reservation-lease
+    // arithmetic, so a caller that gave it a clock got the plan and the period as
+    // of today instead. No plan, price, quota or limit VALUE changes, and no real
+    // caller passes `nowMs`: production reads the same numbers it always did. Kept
+    // out of the set below and checked line by line in H4c instead, so the file
+    // stays protected against anything but the clock.
+    const ONE_CLOCK = new Set(['lib/billing/usage-allowance.ts'])
+    untouched = untouched.split('\n').filter((f) => f && !ONE_CLOCK.has(f)).join('\n')
     check('H4: plans, prices, quotas, billing, entitlement and Shopify files are untouched', untouched === '', untouched)
+    let allowDiff = ''
+    try { allowDiff = execSync('git diff -U0 8b468a8 -- lib/billing/usage-allowance.ts', { cwd: ROOT }).toString() } catch { allowDiff = 'git unavailable' }
+    const allowChanged = allowDiff.split('\n').filter((l: string) => /^[+-]/.test(l) && !/^(\+\+\+|---)/.test(l))
+      // The added comment that explains the threading is not a change to the read.
+      .filter((l: string) => !/^[+-]\s*(\/\/|\*|\/\*)/.test(l))
+    check('H4c: lib/billing/usage-allowance.ts changed only by threading one clock into its two readers',
+      allowChanged.length > 0 && allowChanged.every((l: string) => /nowFn|getUserEntitlement\(args\.userId, admin|resolveCurrentUsagePeriod\(admin, args\.userId/.test(l)),
+      allowChanged.join(' ;; ').slice(0, 300))
+    const clockOnly = (ls: string[]) => ls.every((l: string) => /nowFn|getUserEntitlement\(args\.userId, admin|resolveCurrentUsagePeriod\(admin, args\.userId/.test(l))
+    check('H4c-MUT: a line that changes anything else in that file fails H4c',
+      !clockOnly([...allowChanged, "+  const limit = 20"]))
     // lib/subscription.ts may differ from 8b468a8 ONLY on the display-only trial line (PLAN_FEATURES.trial); nothing of entitlement moved.
     let subDiff = ''
     try { subDiff = execSync('git diff -U0 8b468a8 -- lib/subscription.ts', { cwd: ROOT }).toString() } catch { subDiff = 'git unavailable' }

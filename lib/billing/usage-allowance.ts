@@ -77,7 +77,17 @@ export async function readUsageAllowance(
     nowMs?: number
   },
 ): Promise<AllowanceState> {
-  const entitlement = await getUserEntitlement(args.userId, admin)
+  // ONE CLOCK FOR THE WHOLE ANSWER. `nowMs` used to reach only the lease
+  // arithmetic at the bottom, while the entitlement and the period were
+  // resolved on `Date.now()` — so a caller that passed a clock got an answer
+  // assembled from two different moments: a plan read as of today, counted over
+  // a period as of today, against a lease window as of the clock it passed.
+  // Both readers already take the repo's injectable-clock convention
+  // (lib/subscription.ts, lib/billing/usage-period.ts), so they get this one.
+  // Omitted — which is every real caller — each falls back to its own default
+  // and production behavior is exactly as before.
+  const nowFn = args.nowMs === undefined ? undefined : () => new Date(args.nowMs as number)
+  const entitlement = await getUserEntitlement(args.userId, admin, nowFn)
   // An unreadable entitlement is NOT an exhausted one. Reporting 0/0 here would
   // reproduce, in the UI, the exact lie the routes were fixed to stop telling.
   if (isEntitlementUnknown(entitlement.plan)) return { state: 'unknown', reason: 'entitlement_unavailable' }
@@ -92,7 +102,7 @@ export async function readUsageAllowance(
     }
   }
 
-  const period = await resolveCurrentUsagePeriod(admin, args.userId)
+  const period = await resolveCurrentUsagePeriod(admin, args.userId, nowFn)
   if (!period) return { state: 'unknown', reason: 'no_period' }
 
   const { data, error } = await admin

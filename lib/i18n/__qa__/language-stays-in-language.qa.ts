@@ -48,6 +48,7 @@ process.env.NEXT_PUBLIC_FRENCH_SITE_ENABLED = 'true'
 process.env.NEXT_PUBLIC_ITALIAN_SITE_ENABLED = 'true'
 process.env.NEXT_PUBLIC_JAPANESE_SITE_ENABLED = 'true'
 process.env.NEXT_PUBLIC_GERMAN_SITE_ENABLED = 'true'
+process.env.NEXT_PUBLIC_DUTCH_SITE_ENABLED = 'true'
 
 let pass = 0, fail = 0
 function check(name: string, cond: boolean, detail?: string) {

@@ -190,9 +190,9 @@ export const LEGAL_SLUGS: readonly LegalSlug[] = ['terms', 'privacy', 'refund-po
  * The languages whose legal documents are Markdown under content/legal/. Hebrew
  * and English are hand-written JSX and are not here.
  */
-export type LegalLanguage = 'es' | 'pt-BR' | 'fr' | 'it' | 'ja' | 'de'
+export type LegalLanguage = 'es' | 'pt-BR' | 'fr' | 'it' | 'ja' | 'de' | 'nl'
 
-export const LEGAL_LANGUAGES: readonly LegalLanguage[] = ['es', 'pt-BR', 'fr', 'it', 'ja', 'de']
+export const LEGAL_LANGUAGES: readonly LegalLanguage[] = ['es', 'pt-BR', 'fr', 'it', 'ja', 'de', 'nl']
 
 /**
  * Read one translated legal document from the repository.

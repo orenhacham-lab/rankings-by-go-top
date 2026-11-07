@@ -202,6 +202,12 @@ const ARTICLE_TEXT: Record<SuggestionLanguage, {
     anchorSentence: (link) => `この点では、${link}が押さえておきたい主要な選択肢の一つです。`,
     phraseSentence: (phrase) => `この点では、${phrase}についても併せて確認しておくとよいでしょう。`,
   },
+  nl: {
+    toc: 'Inhoud',
+    faqHeading: 'Veelgestelde vragen',
+    anchorSentence: (link) => ` In dit verband is ${link} een van de belangrijkste opties om te kennen.`,
+    phraseSentence: (phrase) => ` In dit verband is het ook de moeite waard om ${phrase} nader te bekijken.`,
+  },
   de: {
     toc: 'Inhaltsverzeichnis',
     faqHeading: 'Häufige Fragen',
@@ -220,6 +226,7 @@ const TRANSITION_HINT: Record<SuggestionLanguage, string> = {
   it: 'inoltre, di conseguenza, tuttavia, per esempio, in sintesi',
   ja: 'また、さらに、そのため、しかし、例えば、まとめると',
   de: 'außerdem, daher, allerdings, zum Beispiel, zusammengefasst',
+  nl: 'daarnaast, daarom, echter, bijvoorbeeld, kortom',
 }
 
 /** The filler opening to warn the model off, written in the language it writes in. */
@@ -232,6 +239,7 @@ const FILLER_EXAMPLE: Record<SuggestionLanguage, string> = {
   it: 'e.g. "In un mondo in cui tutti cercano…"',
   ja: 'e.g. 「誰もが〜を求める時代において…」',
   de: 'e.g. "In einer Welt, in der alle nach … suchen"',
+  nl: 'e.g. "In een wereld waarin iedereen zoekt naar …"',
 }
 
 /** Who the article is actually written for. A Spanish article is NOT for Israeli readers. */
@@ -244,6 +252,7 @@ const AUDIENCE_NOTE: Record<SuggestionLanguage, string> = {
   it: 'Write naturally for Italian-speaking readers in standard Italian that reads well in Italy and in Italian-speaking Switzerland alike.',
   ja: 'Write naturally for Japanese readers in standard business Japanese (です・ます調), the register a Japanese company website uses.',
   de: 'Write naturally for German-speaking readers in standard German that reads well in Germany, Austria and German-speaking Switzerland alike.',
+  nl: 'Write naturally for Dutch-speaking readers in standard Dutch that reads well in the Netherlands and in Flanders alike.',
 }
 
 /** Per-language writing-quality notes. Empty for a language with nothing extra to say. */
@@ -272,6 +281,10 @@ const WRITING_QUALITY_LINES: Record<SuggestionLanguage, string[]> = {
   it: [
     `- Italian writing quality: address the reader formally and impersonally — use "voi"/the impersonal "si" form, and NEVER the informal "tu" (no "tuo/tua/tuoi", no informal imperatives like "scopri", "clicca", "scegli"). Use standard Italian that reads well in Italy and in Italian-speaking Switzerland; avoid regional slang and avoid needless anglicisms where a plain Italian word exists. VARY sentence and paragraph openings — do not start many consecutive sentences with the same word (avoid over-using "Inoltre", "D'altra parte", "È importante"); mix openings like "In pratica", "Per questo motivo", "In molti casi", "Vale la pena ricordare", "Al momento della scelta", "In sintesi". Prefer clear, practical, promotional SEO writing over poetic language.`,
     `- Italian typography: keep the accents correct (è, é, à, ò, ù, ì) — never write Italian without them — distinguish "è" (verb) from "e" (and), use the apostrophe correctly in elisions ("un'opzione", "dell'articolo"), use the Italian quotation marks « … » for quotations, and keep brand/product names in their proper original casing (e.g. "Kingsmith WalkingPad X21").`,
+  ],
+  nl: [
+    `- Dutch writing quality: address the reader as "u" consistently — NEVER "jij", never "je"/"jouw", never an informal imperative aimed at "je"; the u-form imperative is the plain stem ("bekijk", "klik", "kies") and the possessive is "uw". Use standard Dutch that reads well in the Netherlands and in Flanders; avoid regional slang and avoid needless anglicisms where a plain Dutch word exists — but KEEP the established SEO vocabulary a Dutch reader expects, and above all use "zoekwoorden" and "zoekwoordenonderzoek" rather than "keywords"/"keyword research", because that is what Dutch searchers themselves type ("zoekwoordplanner", "zoekwoorden analyse" are real Dutch queries with search volume). "Backlinks", "rankings", "content" and "snippet" stay English because the Dutch industry has no other word for them. VARY sentence and paragraph openings — do not start many consecutive sentences with the same word (avoid over-using "Daarnaast", "Bovendien", "Het is belangrijk"); mix openings like "In de praktijk", "Daarom", "In veel gevallen", "Goed om te weten", "Bij het kiezen", "Kortom". Prefer clear, practical, promotional SEO writing over poetic language.`,
+    `- Dutch typography and grammar: Dutch does NOT capitalize common nouns (write "de website", "de prijs", "het aanbod" in lower case — capitalizing them is the single clearest sign of German or English interference), keep the diacritics correct where Dutch uses them (ë, ï, é in "één", "coördinatie", "reëel") and never drop them, close compounds up as Dutch does ("zoekmachineoptimalisatie", "zoekwoordenonderzoek", "websiteanalyse", "bedrijfsprofiel" — one word, no space, which is the most common mistake in machine-translated Dutch) and use a hyphen only where one part is an abbreviation or English ("AI-antwoorden", "SEO-rapport", "e-mailadres"). Write prices and figures the Dutch way (€ 1.200 with a dot as the thousands separator and a comma for decimals, the currency sign BEFORE the number with a space), use the Dutch quotation marks \u2018 … \u2019 or "…" for quotations, and keep brand/product names in their proper original casing (e.g. "Kingsmith WalkingPad X21", "Google Search Console"). Never a stray apostrophe in a plural except where Dutch requires one after a bare vowel ("foto\u2019s", "menu\u2019s" take it; "prijzen", "websites" do not), and the genitive of a name takes "van" or an apostrophe-s only where Dutch really does ("de index van Google", not "Google\u2019s index").`,
   ],
   de: [
     `- German writing quality: address the reader as "Sie" consistently — NEVER "du", never "dein/deine", never an informal imperative ("entdecke", "klicke", "wähle"); the Sie-imperative is "entdecken Sie", "klicken Sie", "wählen Sie". Use standard German that reads well in Germany, Austria and German-speaking Switzerland; avoid regional slang and avoid needless anglicisms where a plain German word exists — but KEEP the established SEO vocabulary a German reader expects ("Keywords", "Keyword-Recherche", "Rankings", "Backlinks", "Content", "Snippet"), which is what the industry actually writes. VARY sentence and paragraph openings — do not start many consecutive sentences with the same word (avoid over-using "Außerdem", "Darüber hinaus", "Es ist wichtig"); mix openings like "In der Praxis", "Deshalb", "In vielen Fällen", "Wichtig zu wissen", "Bei der Auswahl", "Zusammengefasst". Prefer clear, practical, promotional SEO writing over poetic language.`,

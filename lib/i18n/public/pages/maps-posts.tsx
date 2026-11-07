@@ -61,6 +61,7 @@ const fr = FEATURE_COMMON.fr
 const it = FEATURE_COMMON.it
 const ja = FEATURE_COMMON.ja
 const de = FEATURE_COMMON.de
+const nl = FEATURE_COMMON.nl
 
 export const MAPS_POSTS_PAGE: MarketingPage = {
   path: '/features/google-maps-posts',
@@ -92,6 +93,10 @@ export const MAPS_POSTS_PAGE: MarketingPage = {
     ja: {
       title: 'Googleマップの投稿 | Go Top SEO',
       description: 'アプリから、写真とボタン付きのお知らせをGoogleビジネスプロフィールに公開できます。最初の下書きが用意されるので、手直ししてすぐに公開するか、お選びの時刻に公開します。Googleの口コミへの返信も同じ場所で行えます。',
+    },
+    nl: {
+      title: 'Berichten in uw Google Bedrijfsprofiel | Go Top SEO',
+      description: 'Publiceer nieuws met foto en knop rechtstreeks uit de app in uw Google Bedrijfsprofiel: er ligt een eerste versie klaar, u past die aan en publiceert direct of op een moment van uw keuze. Antwoorden op uw Google-reviews op dezelfde plek.',
     },
     de: {
       title: 'Beiträge im Google Unternehmensprofil | Go Top SEO',
@@ -800,6 +805,123 @@ export const MAPS_POSTS_PAGE: MarketingPage = {
     // word: the AI image is generic and never a photo of the business, and
     // there is no promise of a position on Maps or in search — in Japanese that
     // second one is also what 景品表示法 requires of a performance claim.
+    nl: {
+      hero: {
+        eyebrow: 'Berichten in uw Google Bedrijfsprofiel',
+        eyebrowIcon: MapPinned,
+        title: 'Uw Google Bedrijfsprofiel',
+        accent: 'blijft actueel, ook als u geen tijd hebt',
+        subtitle: 'Wie u in Google Maps vindt, ziet wat er bij u nieuw is: een aanbieding, een nieuwe dienst, een artikel dat net online is gegaan. Schrijf in de app een bericht met foto en knop, krijg een eerste versie, pas die aan en publiceer direct of op een moment van uw keuze. Op uw reviews antwoordt u op dezelfde plek.',
+        trust: nl.trust,
+        primary: nl.trial,
+        secondary: nl.check,
+        visual: (
+          <MapsPostVisual
+            business="Fitness aan het Plein"
+            kind="Nieuws · donderdag 10:00"
+            text="Wij zijn een nieuwe ochtendgroep vanaf 50 gestart, maandag en woensdag om 7:00. Met persoonlijke begeleiding, een kleine groep en een gratis proefles, zonder verplichting."
+            button="Afspraak maken"
+            queueHeading="Uw berichten"
+            queue={[
+              { title: 'Ochtendgroep vanaf 50', detail: 'Gepland voor donderdag 10:00', status: 'Gepland', done: false },
+              { title: 'Gids: hardloopschoenen kiezen', detail: 'Uit een nieuw artikel op de website', status: 'Online', auto: true, done: true },
+            ]}
+            review={{
+              heading: 'Nieuwe review',
+              author: 'Dana K.',
+              stars: 5,
+              starsLabel: '5 van de 5 sterren',
+              text: 'Schone zaak, geduldige trainers en een goede sfeer. Ik kom er al een half jaar.',
+              replyLabel: 'Concept-antwoord',
+              reply: 'Hartelijk dank voor de vriendelijke woorden! Wij zijn blij dat u het bij ons naar uw zin hebt — tot de volgende les.',
+            }}
+          />
+        ),
+      },
+      sections: [
+        {
+          kind: 'steps',
+          eyebrow: 'Zo gaat het',
+          title: 'Van verbinden tot een gepubliceerd bericht',
+          items: [
+            { title: 'Eén keer verbinden', body: 'Meld u aan met het Google-account dat uw Bedrijfsprofiel beheert, en keur het goed op het scherm van Google. De machtiging dekt alleen het beheer van het profiel en staat los van Search Console. U kunt de verbinding wanneer u wilt verbreken.' },
+            { title: 'Bedrijf kiezen', body: 'De app toont de bedrijven die u bij Google beheert, en u kiest naar welk bedrijf de berichten van deze website gaan.' },
+            { title: 'Schrijven, of een concept krijgen', body: 'Begin met een artikel dat het systeem voor uw website geschreven heeft, met een onderwerp dat u invoert, of met een leeg blad. U krijgt een eerste versie binnen de lengtegrens van Google en past die naar wens aan.' },
+            { title: 'Publiceren of plannen', body: 'Direct of op een datum en tijd van uw keuze, tot een jaar vooruit. De lijst met berichten laat zien wat online staat, wat gepland is en wat Google nog controleert.' },
+          ],
+        },
+        {
+          kind: 'cards',
+          eyebrow: 'In elk bericht',
+          title: 'Een bericht dat er goed uitziet',
+          items: [
+            { icon: Crop, title: 'Het juiste beeldformaat', body: 'Upload een foto en snijd die bij op 4:3, zoals Google hem toont, met zoom en positie. Een bericht dat uit een artikel ontstaat, kan de afbeelding daarvan met één klik overnemen.' },
+            { icon: ImagePlus, title: 'Een kant-en-klare afbeelding voor een themabericht', body: 'Schrijft u een bericht op grond van een ingevoerd onderwerp, dan kan de app met AI een illustratieve afbeelding maken. Het is een algemene afbeelding, geen foto van uw bedrijf, uw team of uw producten, en zij komt alleen in het bericht als u haar kiest.' },
+            { icon: MousePointerClick, title: 'Een knop die ergens naartoe leidt', body: 'Meer informatie, Afspraak maken, Online bestellen, Kopen, Aanmelden of Nu bellen. De knop leidt naar een pagina van uw website of, als u dat toestaat, naar een andere website zoals een reserveringssysteem. «Nu bellen» draait het nummer in uw profiel.' },
+            { icon: Eye, title: 'Vooraf bekijken', body: 'Naast de editor ligt een voorbeeld van het bericht: bedrijfsnaam, foto, tekst en knop, zodat niets u verrast.' },
+            { icon: Type, title: 'Binnen de regels van Google', body: 'Een tekenteller tot 1.500, de grens van Google. Staat er een telefoonnummer in de tekst, dan krijgt u een melding, omdat Google telefoonnummers in berichten beperkt — voor bellen is er de knop «Nu bellen».' },
+            { icon: Languages, title: 'In de taal van uw klanten', body: 'Het concept wordt geschreven in de taal van uw project, in elke taal die de app ondersteunt, en u kunt voor de publicatie elk woord wijzigen.' },
+            { icon: ShieldCheck, title: 'Alleen wat u hebt goedgekeurd', body: 'Er gaan alleen berichten en antwoorden uit die u hebt goedgekeurd, plus automatische berichten als u die hebt aangezet. Openingstijden, adres en de overige bedrijfsgegevens worden nooit gewijzigd.' },
+          ],
+        },
+        {
+          kind: 'cards',
+          tone: 'contrast',
+          eyebrow: 'Automatische berichten',
+          title: 'Een nieuw artikel op uw website, een nieuw bericht bij Google',
+          items: [
+            { icon: Zap, title: 'Het gebeurt van zelf', body: 'Zet u het aan, dan wordt van elk artikel dat het systeem op uw website publiceert ook een kort bericht in uw Bedrijfsprofiel, met de afbeelding van het artikel en een knop «Meer informatie» die daarheen leidt.' },
+            { icon: ToggleLeft, title: 'Uit, totdat u het aanzet', body: 'Standaard uit en per website in te stellen. Een automatisch bericht gaat uit zonder dat u het vooraf leest — daarom is dat uw beslissing. U kunt het wanneer u wilt uitzetten, en al gepubliceerde berichten blijven staan.' },
+            { icon: Repeat, title: 'Eén keer per artikel', body: 'Hetzelfde artikel gaat nooit twee keer naar het profiel, ook niet als de publicatie op uw website herhaald wordt. Zo vult het profiel zich niet met dubbele berichten.' },
+          ],
+        },
+        {
+          kind: 'cards',
+          columns: 2,
+          eyebrow: 'Google-reviews',
+          title: 'Op elke review antwoorden, vanaf één plek',
+          items: [
+            { icon: MessageSquareText, title: 'Elke review in beeld', body: 'De Google-reviews van uw bedrijf, met het gemiddelde cijfer, hoeveel er nog op een antwoord wachten, en nieuwe reviews gemarkeerd. U kunt op cijfer sorteren.' },
+            { icon: Sparkles, title: 'Een concept-antwoord met één klik', body: 'U krijgt een voorstel voor een antwoord, hoffelijk en to the point, in de taal waarin de klant geschreven heeft. U past het aan en verstuurt het, en het antwoord verschijnt bij Google onder de review.' },
+            { icon: PenLine, title: 'Aanpassen of verwijderen', body: 'U kunt een al gepubliceerd antwoord aanpassen of verwijderen. De review zelf blijft zoals hij is.' },
+            { icon: Lock, title: 'Reviews worden bij ons niet opgeslagen', body: 'Reviews worden bij elke keer dat u het overzicht opent van Google gelezen en niet in het systeem opgeslagen. De naam van de klant wordt niet meegestuurd om het concept te maken; voeg hem zelf toe als u iemand bij naam wilt aanspreken.' },
+          ],
+        },
+        {
+          kind: 'callout',
+          icon: Info,
+          title: 'Goed om te weten',
+          body: (
+            <>
+              <p>
+                Google controleert elk bericht voordat het getoond wordt, en wijst er soms een af. De lijst met
+                berichten laat zien waar elk bericht staat, ook een afgewezen bericht. Om te verbinden hebt u een
+                Google-account nodig dat het Bedrijfsprofiel bezit of beheert.
+              </p>
+              <p>
+                Go Top SEO staat in geen enkel verband met Google. Berichten en antwoorden op reviews helpen klanten
+                een actief bedrijf te zien, maar er is geen belofte over posities in Google Maps of in de
+                Google-zoekresultaten.
+              </p>
+            </>
+          ),
+        },
+        {
+          kind: 'faq',
+          eyebrow: 'Veelgestelde vragen',
+          title: 'Wat er over berichten in het Bedrijfsprofiel gevraagd wordt',
+          items: [
+            { q: 'Kan de app mijn openingstijden of mijn adres wijzigen?', a: 'Nee. Wij publiceren uitsluitend berichten en antwoorden op reviews. Openingstijden, adres, telefoonnummer en de overige profielgegevens blijven precies zoals ze zijn.' },
+            { q: 'Publiceert het concept zich van zelf?', a: 'Schrijft u een bericht, dan niet: het concept verschijnt op het scherm en wordt pas gepubliceerd als u op de knop drukt. Berichten over nieuwe artikelen gaan alleen van zelf uit als u de automatische berichten hebt aangezet.' },
+            { q: 'Kan ik berichten vooruit plannen?', a: 'Ja, op een datum en tijd van uw keuze, tot een jaar vooruit. Een gepland bericht is te annuleren zolang het niet is uitgegaan.' },
+            { q: 'Werkt dit voor een Shopify-webshop of een website die niet op WordPress draait?', a: 'Ja. Het bericht gaat naar uw Bedrijfsprofiel bij Google, niet naar uw website, dus het werkt voor elk project op elk platform.' },
+            { q: 'Wat gebeurt er als ik de verbinding verbreek?', a: 'Geplande berichten worden niet gepubliceerd totdat u opnieuw verbindt. Al gepubliceerde berichten blijven bij Google staan.' },
+            { q: 'Ik beheer meerdere bedrijven bij Google. Is dat een probleem?', a: 'Nee. De app toont elk bedrijf dat het account beheert, en voor elke website in het systeem kiest u het bedrijf waar haar berichten naartoe gaan.' },
+          ],
+        },
+      ],
+      cta: { title: 'Laat klanten zien wat er bij u nieuw is', body: nl.closeBody, primary: nl.trial, secondary: nl.check },
+    },
     de: {
       hero: {
         eyebrow: 'Beiträge im Google Unternehmensprofil',

@@ -80,6 +80,7 @@ const COPY = {
   it: { label: 'Continua con Google', or: 'oppure', failed: "Non è stato possibile avviare l'accesso con Google. Si consiglia di riprovare oppure di continuare con il proprio indirizzo e-mail.", returnFailed: "L'accesso con Google non è stato completato. Si consiglia di riprovare oppure di continuare con il proprio indirizzo e-mail." },
   ja: { label: 'Googleで続ける', or: 'または', failed: 'Googleでのログインを開始できませんでした。もう一度お試しいただくか、メールアドレスで続けてください。', returnFailed: 'Googleでのログインが完了しませんでした。もう一度お試しいただくか、メールアドレスで続けてください。' },
   de: { label: 'Mit Google fortfahren', or: 'oder', failed: 'Die Anmeldung mit Google konnte nicht gestartet werden. Bitte versuchen Sie es erneut oder fahren Sie mit Ihrer E-Mail-Adresse fort.', returnFailed: 'Die Anmeldung mit Google wurde nicht abgeschlossen. Bitte versuchen Sie es erneut oder fahren Sie mit Ihrer E-Mail-Adresse fort.' },
+  nl: { label: 'Doorgaan met Google', or: 'of', failed: 'Het inloggen met Google kon niet worden gestart. Probeer het opnieuw, of ga verder met uw e-mailadres.', returnFailed: 'Het inloggen met Google is niet afgerond. Probeer het opnieuw, of ga verder met uw e-mailadres.' },
 } as const
 
 export function googleSignInCopy(lang: PublicLocale): (typeof COPY)[PublicLocale] {

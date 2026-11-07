@@ -201,6 +201,7 @@ export const en = {
     it: 'Italiano',
     ja: '日本語',
     de: 'Deutsch',
+    nl: 'Nederlands',
     aria: 'Change the site language',
   },
   cookie: {
@@ -221,7 +222,7 @@ export const en = {
     settingsTitle: 'Choose your cookies',
     settingsIntro: 'Allow or refuse each kind separately, and change your mind at any time.',
     always: 'Always on',
-    withdrawHint: 'To change or withdraw your consent at any time, use the "Cookie settings" link at the bottom of every page.',
+    withdrawHint: 'To change or withdraw your consent at any time, use the "Cookie settings" link at the bottom of every page. You can also set the conditions of storage and reading on your own device yourself, in your browser settings; a block in the browser alone is not a withdrawal of consent with us.',
     gpcTitle: 'Consent refused automatically',
     gpcBody: 'Your browser sends a Global Privacy Control signal, so no measurement or marketing cookies were loaded. Your choice has been recorded.',
     categories: {

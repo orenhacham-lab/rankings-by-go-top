@@ -216,6 +216,34 @@ export const AUTH_BRAND: Record<PublicLocale, Record<AuthBrandVariant, AuthBrand
     glimpse: '計測中のキーワード',
     mobileTrust: ['クレジットカード不要', 'いつでも解約可能'],
   },
+  nl: {
+    login: {
+      eyebrow: 'Welkom terug',
+      points: [
+        'Uw posities in Google en Google Maps, op één plek',
+        'Uw contentplan en uw artikelen, klaar om verder te gaan',
+        'Wat ChatGPT en Gemini over uw bedrijf zeggen',
+      ],
+    },
+    signup: {
+      eyebrow: 'Google en AI-zoekresultaten in één systeem',
+      points: [
+        'Een volledige analyse van uw website in een paar minuten',
+        'Een maand content, gepland voor uw branche',
+        'Google-posities en AI-zichtbaarheid, maandelijks voor u vastgelegd',
+      ],
+    },
+    recover: {
+      eyebrow: 'Terug naar uw account',
+      points: [
+        'De link gaat uitsluitend naar het adres dat in het account staat',
+        'Hij geldt eenmalig en maar korte tijd',
+        'Uw gegevens en projecten blijven precies zoals ze zijn',
+      ],
+    },
+    glimpse: 'Gevolgde zoekwoorden',
+    mobileTrust: ['Zonder creditcard', 'Opzegbaar wanneer u wilt'],
+  },
   de: {
     login: {
       eyebrow: 'Willkommen zurück',

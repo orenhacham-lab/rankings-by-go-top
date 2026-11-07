@@ -506,4 +506,57 @@ export const ARTICLES_COPY: Record<PublicLocale, ArticlesCopy> = {
       ],
     },
   },
+  nl: {
+    index: {
+      title: 'Artikelen',
+      subtitle: 'Gidsen en analyses over het volgen van posities, SEO en de zichtbaarheid in AI-antwoorden',
+      breadcrumb: 'Artikelen',
+      empty: 'Artikelen volgen binnenkort.',
+      readMore: 'Artikel lezen',
+    },
+    article: {
+      notFoundTitle: 'Artikel niet gevonden',
+      notFoundBody: 'Het artikel dat u zoekt bestaat niet of staat niet meer online',
+      backToArticles: 'Terug naar het overzicht van artikelen',
+      backHome: 'Terug naar de homepage',
+      toc: 'Inhoud',
+      readingTime: (m) => `${m} min. leestijd`,
+      updated: 'Bijgewerkt',
+      aboutAuthor: 'Over de auteur',
+      aboutAuthorLink: 'Meer over Go Top',
+    },
+    widgets: {
+      plans: {
+        perMonth: 'per maand',
+        popular: 'Meest gekozen',
+        cta: '7 dagen gratis uitproberen',
+        noCard: 'Zonder creditcard. Elk moment op te zeggen.',
+        allPlans: 'Alle details op de prijspagina',
+      },
+      cta: {
+        title: 'Wilt u dit op uw eigen website zien?',
+        body: '7 dagen gratis, zonder creditcard. Zodra u uw website invult, krijgt u een zoekwoordenonderzoek, begint de controle van de zichtbaarheid in AI-antwoorden, en wordt het eerste artikel automatisch geschreven en gepubliceerd.',
+        primary: '7 dagen gratis uitproberen',
+        secondary: 'Met de gratis website-analyse beginnen',
+      },
+    },
+    promo: {
+      badge: 'Go Top SEO',
+      title: ['Uw positie in Google controleren,', 'wanneer u wilt'],
+      body: 'Een professioneel platform voor het volgen van de posities in het organische Google en in Google Maps. U kunt op elk moment een meting starten, of haar één keer per maand automatisch laten lopen. Met uitgebreide rapporten, het verloop in de tijd en persoonlijke begeleiding.',
+      signup: { label: 'Gratis proefperiode starten', href: authHref('signup', 'nl') },
+      pricing: { label: 'Prijzen bekijken', href: '/nl/pricing' },
+      stats: [
+        { num: '1000+', label: 'zoekwoorden' },
+        { num: '2', label: 'bronnen om te volgen (Google + Maps)' },
+        { num: 'AI', label: 'zichtbaarheid meten' },
+        { num: '7 dagen', label: 'gratis uitproberen' },
+      ],
+      features: [
+        { title: 'Organisch Google', desc: 'Posities op pagina 1 en 2 van Google, precies gemeten' },
+        { title: 'Google Maps', desc: 'Posities per stad, postcode of locatie' },
+        { title: 'Professionele rapporten', desc: 'Rapporten als pdf en Excel, met verloop, vergelijkingen en uitgebreide analyses' },
+      ],
+    },
+  },
 }
