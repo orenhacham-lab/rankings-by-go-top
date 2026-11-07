@@ -10,7 +10,7 @@ reached that is said rather than filled in.
 | --- | --- | --- | --- |
 | JVZoo | Live since 2026-11-04. 4 products approved. **0 sales.** | **We are.** Their vendor agreement s.11 leaves the tax with us. | 35% / 35% |
 | Digistore24 | 4 products submitted 2026-11-02, **still pending** on 11-07 | **They are.** Merchant of record. | 35% |
-| ClickBank | Account opened 2026-11-07, profile saved. **Blocked on identity verification.** Registry still `signature: null`. | They are. | — |
+| ClickBank | Account opened 2026-11-07. Nickname `gtopseo`, four products **submitted, Pending Review**. INS verifier landed (#346); INS itself **not yet requested**. | They are. | 50% first / 35% rebill |
 
 The bottleneck is not the number of platforms. Two are open and both have sold
 nothing, because at zero sales a product is invisible in JVZoo's affiliate
@@ -91,9 +91,49 @@ Two gates were hit on the way, and the second is still shut:
    tab, so no account nickname can be created, and the nickname IS the seller
    account: no products, prices or INS webhook can exist before it.
 
-So the remaining blocker is a few minutes with a phone and an ID, and
-everything after it (nickname, four products, prices, commissions, sales page,
-INS spec, signature verification, QA) is ordinary work.
+Both gates are now behind us: the owner completed Veriff in the browser, the
+**Accounts** tab appeared, and the nickname `gtopseo` was created.
+
+**Where it stands on 2026-11-07, after the products went in.** Four recurring
+digital products exist, each one Website Membership, no trial, Monthly rebill,
+unlimited subscription duration, billing descriptor `GOTOPSEO`, pitch page
+`/go/clickbank` and thank-you page `/go/clickbank/thanks`:
+
+| # (SKU) | Product | Price | Commission | Paylink |
+| --- | --- | --- | --- | --- |
+| 1 | Basic — 1 site | $79/mo | 50% first / 35% rebill | `…pay.clickbank.net/?cbitems=1` |
+| 2 | Advanced — 1 site, 100 keywords | $179/mo | 50% / 35% | `?cbitems=2` |
+| 3 | Premium — 10 sites | $329/mo | 50% / 35% | `?cbitems=3` |
+| 4 | Agency — 100 sites | $649/mo | 50% / 35% | `?cbitems=4` |
+
+All four read **Pending Review**: ClickBank's own dialog says an email arrives
+in three to five business days. The $49.95 activation fee is charged on the
+**first approval**, not on submission.
+
+Two defaults had to be overridden on every product, and they are the kind that
+would have shipped the wrong number silently: the account's **Default
+Commission Rate is 25%**, applied through a switch that is ON by default, and a
+second switch reuses the initial commission for rebills. Both had to be turned
+off before the 50/35 split could be typed in. **Unlimited Subscription
+Duration** is also off by default, which would have ended every subscription
+after a fixed number of payments.
+
+The submission form asked whether **login credentials are necessary to review
+the product**, and it defaults to yes. It was answered **no** — truthfully: the
+trial is seven days with no credit card and a reviewer can open one
+unaided — rather than putting an account password into a vendor form.
+
+**What is left, and why it is not done.** The Instant Notification URL cannot
+be entered: the field is replaced by a `(request access)` link, and the request
+requires accepting the separate **ClickBank Instant Notification Terms of
+Use** — not the Client Contract, not the product terms. It is free today but
+clause 4 reserves the right to charge later. That acceptance is the owner's to
+give, so the Secret Key was also left empty rather than configuring one side of
+a two-sided secret. Details in `clickbank-ins-docs.md`.
+
+`MARKETPLACE_CLICKBANK_ENABLED` stays unset and the buy-URL variables stay
+unset too, because a paylink for a product still in review is a button that
+cannot take money.
 
 ### 2. WarriorPlus — only after a question is answered
 
