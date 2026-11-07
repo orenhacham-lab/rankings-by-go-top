@@ -222,6 +222,7 @@ export const de = {
     ja: '日本語',
     de: 'Deutsch',
     nl: 'Nederlands',
+    pl: 'Polski',
     aria: 'Sprache der Website wechseln',
   },
   cookie: {

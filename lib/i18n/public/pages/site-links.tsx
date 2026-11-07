@@ -72,6 +72,7 @@ const it = FEATURE_COMMON.it
 const ja = FEATURE_COMMON.ja
 const de = FEATURE_COMMON.de
 const nl = FEATURE_COMMON.nl
+const pl = FEATURE_COMMON.pl
 
 export const SITE_LINKS_PAGE: MarketingPage = {
   path: '/features/site-links',
@@ -111,6 +112,10 @@ export const SITE_LINKS_PAGE: MarketingPage = {
     de: {
       title: 'Links auf Ihre Website | Go Top SEO',
       description: 'Unternehmen mit ergänzendem Angebot, die Go Top SEO nutzen, können Sie in den für sie geschriebenen Artikeln nennen — nur dort, wo es dem Lesenden hilft. Kein Tausch, nie ein Wettbewerber, freiwillig und standardmäßig aus. Dazu interne Links, verwaiste Seiten und kostenlose Verzeichnisse.',
+    },
+    pl: {
+      title: 'Linki do Państwa strony | Go Top SEO',
+      description: 'Firmy z uzupełniającą ofertą, które korzystają z Go Top SEO, mogą wspomnieć o Państwa stronie w artykułach pisanych dla nich, ale tylko tam, gdzie to pomaga czytelnikowi. Bez wymiany, nigdy konkurent, dobrowolnie i domyślnie wyłączone. Poza tym linkowanie wewnętrzne, podstrony bez linków i bezpłatne katalogi.',
     },
   },
   content: {
@@ -1098,6 +1103,115 @@ export const SITE_LINKS_PAGE: MarketingPage = {
         },
       ],
       cta: { title: '補完関係にある企業からサイトへリンクしてもらう', body: ja.closeBody, primary: ja.trial, secondary: ja.check },
+    },
+    pl: {
+      hero: {
+        eyebrow: 'Linki do Państwa strony',
+        eyebrowIcon: Link2,
+        title: 'Wzmianki i linki',
+        accent: 'w treściach firm z uzupełniającą ofertą',
+        subtitle: 'Klienci Go Top SEO z uzupełniających branż mogą wspomnieć o Państwa stronie w artykułach pisanych dla nich, tam gdzie Państwa podstrona naprawdę pomaga czytelnikowi tego akapitu. Nigdy konkurent, nigdy wymiana na zasadzie wzajemności. Udział jest dobrowolny i domyślnie wyłączony.',
+        trust: pl.trust,
+        primary: pl.trial,
+        secondary: pl.check,
+        visual: (
+          <WorkListVisual
+            heading="Wzmianki i linki"
+            rows={[
+              { title: 'Link przychodzący od firmy uzupełniającej', detail: 'Z artykułu na jej blogu', icon: ArrowDownToLine, done: true, status: 'Opublikowany' },
+              { title: 'Link wychodzący w Państwa artykule', detail: 'Pokazany przed publikacją, można go usunąć', icon: ArrowUpFromLine, done: false, status: 'Do przejrzenia' },
+              { title: 'Ta sama branża', detail: 'Nie jest umieszczany w żadnym kierunku', icon: Ban, done: true, status: 'Zablokowane' },
+              { title: 'Dodane 3 linki wewnętrzne w artykule', detail: 'Poradnik cenowy', icon: ArrowLeftRight, done: true, status: 'Dodane' },
+            ]}
+          />
+        ),
+      },
+      sections: [
+        {
+          kind: 'steps',
+          eyebrow: 'Firmy z uzupełniającą ofertą',
+          title: 'Jak to przebiega',
+          items: [
+            { title: 'Państwo to włączają', body: 'Udział dotyczy pojedynczej strony i włącza go właściciel projektu po zaakceptowaniu warunków na ekranie. Domyślnie wyłączone, a zrezygnować można w każdej chwili.' },
+            { title: 'Tylko prawdziwe strony', body: 'Strona bierze udział tylko wtedy, gdy jej właściciel podłączył ją w aplikacji przez WordPress albo Search Console. Wpisanie domeny nie wystarcza, więc strona obcej osoby tu nie wejdzie.' },
+            { title: 'Wzmianka stoi w artykule', body: 'Gdy powstaje artykuł dla firmy uzupełniającej, może on wspomnieć pasującą Państwa podstronę, na słowach, które już są w zdaniu. Nie przepisujemy tekstu i nie dodajemy akapitów.' },
+            { title: 'Państwo widzą wszystko', body: 'Każde umieszczenie jest zapisywane i pokazywane obu stronom. Link wychodzący z Państwa artykułu pojawia się przed publikacją i można go usunąć.' },
+          ],
+        },
+        {
+          kind: 'cards',
+          tone: 'contrast',
+          eyebrow: 'Zasady',
+          title: 'Co sprawia, że to zostaje naturalne',
+          items: [
+            { icon: Ban, title: 'Nigdy konkurent', body: 'Nie ta sama branża i żadna domena, którą jedna ze stron oznaczyła jako konkurenta. Strona, której branży nie znamy, zostaje poza tym; nigdy nie zgadujemy.' },
+            { icon: ArrowLeftRight, title: 'Bez wymiany', body: 'Nie wymieniamy się: strona, która dostaje wzmiankę, nigdy nie odwzajemnia jej z powrotem, a dana para spotyka się tylko raz. Blokowana jest też krótka pętla przez trzy strony.' },
+            { icon: ShieldCheck, title: 'Jeden, i oszczędnie', body: 'Najwyżej jeden link na artykuł, a wolimy go pominąć, niż wepchnąć kolejny. Strona, która właśnie zaczęła, uczestniczy wolniej.' },
+            { icon: Network, title: 'Tylko tam, gdzie pomaga czytelnikowi', body: 'Wzmianka pojawia się wyłącznie tam, gdzie podstrona naprawdę pomaga czytelnikowi tego akapitu. Jeśli pasuje słabo, nie pojawia się nic. Nowe albo ubogie strony nie uczestniczą.' },
+          ],
+        },
+        {
+          kind: 'callout',
+          icon: Info,
+          title: 'Czego nie robimy',
+          body: (
+            <>
+              <p>
+                Nie sprzedajemy linków, nie kupujemy linków i nie obiecujemy linków z cudzych stron. Nie ma
+                obiecanej liczby linków ani obietnicy pozycji.
+              </p>
+              <p>
+                Udział jest dobrowolny, domyślnie wyłączony i można z niego zrezygnować w każdej chwili. Nie jest
+                częścią tego, za co Państwo płacą, i nie jest zobowiązaniem w żadnym pakiecie. Rodzaj linku dotyczy
+                całej sieci, jest pokazywany na ekranie zgody i może się zmienić dla przyszłych linków. Pełny tekst
+                znajduje się w{' '}
+                <a className="underline" href="/pl/terms#link-network">artykule 15A regulaminu</a>, razem z ryzykami
+                udziału, i warto go przeczytać przed włączeniem.
+              </p>
+              <p>
+                Nie publikujemy listy uczestniczących stron. Strona otrzymująca widzi adres strony, która do niej
+                zalinkowała. Odpowiedzialność za treść strony i za przestrzeganie wytycznych wyszukiwarek zostaje
+                przy osobie zarządzającej witryną, a my możemy zawiesić albo zakończyć usługę.
+              </p>
+            </>
+          ),
+        },
+        {
+          kind: 'cards',
+          columns: 2,
+          eyebrow: 'Również wewnątrz Państwa strony',
+          title: 'Linki, które trzymają stronę razem',
+          items: [
+            { icon: ArrowLeftRight, title: 'Linkowanie wewnętrzne podczas pisania', body: 'W trakcie powstawania artykułu system łączy go z pasującymi podstronami Państwa witryny, tylko tam, gdzie sformułowanie już naturalnie występuje w tekście. Artykuł czytają Państwo przed publikacją, jak zawsze.' },
+            { icon: Unlink, title: 'Podstrony bez linków', body: 'Podstrony, do których nie linkuje żadna inna podstrona witryny, więc Google trudno do nich dociera i nie widzi ich wagi. Podstrony, do których linkuje menu albo strona główna, nie są tak liczone.' },
+            { icon: ListChecks, title: 'Bezpłatne katalogi', body: 'Sprawdzona ręcznie lista katalogów i profili firmowych dla kraju i języka projektu, z informacją, gdzie firma już się pojawia.' },
+            { icon: MapPinned, title: 'Co linkuje do czego', body: 'Dla każdego artykułu widzą Państwo, do czego on linkuje i co linkuje do niego. To wyjaśnia, dlaczego jedna podstrona nie rusza się w Google, a inne tak.' },
+          ],
+        },
+        {
+          kind: 'cards',
+          columns: 2,
+          eyebrow: 'Search Console',
+          title: 'Linki, które Google już znalazł',
+          items: [
+            { icon: FileSearch, title: 'Bezpośredni link do raportu Google', body: 'Search Console nie ma interfejsu, który zwracałby listę linków, więc nie wymyślamy go. Jest bezpośredni link do raportu w Google.' },
+            { icon: Search, title: 'Zdjęcie stanu z pliku eksportu', body: 'Można wgrać plik CSV wyeksportowany z Search Console i przejrzeć go w systemie. To stan z dnia eksportu i nie aktualizuje się sam.' },
+          ],
+        },
+        {
+          kind: 'faq',
+          eyebrow: 'Często zadawane pytania',
+          title: 'O co pytają w sprawie linków',
+          items: [
+            { q: 'Ile linków dostanę?', a: 'Nie ma obiecanej liczby ani limitu, który próbowalibyśmy wypełnić. Wzmianka pojawia się tylko wtedy, gdy powstaje artykuł, którego akapit naprawdę pasuje do Państwa podstrony, a to zdarza się oszczędnie.' },
+            { q: 'Czy ktoś zobaczy, że biorę udział?', a: 'Nie publikujemy listy uczestniczących stron. Strona, która dostaje wzmiankę, widzi adres strony, która do niej zalinkowała, a po publikacji także podstronę, na której link się pojawił.' },
+            { q: 'Czy muszę brać udział?', a: 'Nie. Domyślnie jest wyłączone, włącza się osobno dla każdej strony, a zrezygnować można w każdej chwili. Rezygnacja kończy nowe wzmianki; już opublikowane linki zostają na stronach.' },
+            { q: 'Czy to działa w sklepie Shopify?', a: 'Tak, po osobnym i dobrowolnym włączeniu. Wzmianki trafiają tylko do artykułów, które piszemy i publikujemy na blogu sklepu. Artykuł, strona, produkt ani kategoria, które już istnieją w sklepie, nie są zmieniane.' },
+            { q: 'A co z linkowaniem wewnętrznym na mojej stronie?', a: 'Działa niezależnie od tego: każdy napisany artykuł dostaje linki do pasujących podstron Państwa witryny, a cały artykuł zatwierdzają Państwo przed publikacją.' },
+          ],
+        },
+      ],
+      cta: { title: 'Proszę pozwolić firmom z uzupełniającą ofertą linkować do Państwa', body: pl.closeBody, primary: pl.trial, secondary: pl.check },
     },
   },
 }

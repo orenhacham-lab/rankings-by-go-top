@@ -123,6 +123,14 @@ const PROVENANCE: Record<ContentLanguage, {
     many: (n, names) => `Gestützt auf ${n} Quellen: ${names}`,
     one: (name) => `Gestützt nur auf: ${name}`,
   },
+  // "na podstawie <n> źródeł" takes the genitive plural, and the digit form of
+  // that genitive is the same for 2 and for 5, so one frame covers every count
+  // without a plural-rule table.
+  pl: {
+    label: { site_scan: 'Analiza strony', keyword_research_url: 'Analiza słów kluczowych', project_data: 'Dane projektu', keyword: 'Słowo kluczowe', hybrid: 'Łączone' },
+    many: (n, names) => `Na podstawie ${n} źródeł: ${names}`,
+    one: (name) => `Tylko na podstawie: ${name}`,
+  },
 }
 
 export function hybridProvenanceReason(sources: RecommendationSource[], language: ContentLanguage, repReason: string): string {

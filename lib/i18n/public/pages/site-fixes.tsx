@@ -19,6 +19,7 @@ const it = FEATURE_COMMON.it
 const ja = FEATURE_COMMON.ja
 const de = FEATURE_COMMON.de
 const nl = FEATURE_COMMON.nl
+const pl = FEATURE_COMMON.pl
 
 export const SITE_FIXES_PAGE: MarketingPage = {
   path: '/features/site-health-fixes',
@@ -58,6 +59,10 @@ export const SITE_FIXES_PAGE: MarketingPage = {
     de: {
       title: 'Korrekturen an der Website | Go Top SEO',
       description: 'Eine Analyse, die findet, was Ihre Website in Google und in KI-Diensten zurückhält: Titel, Beschreibungen, Alternativtexte, defekte Links und mehr. In WordPress ist jede Korrektur nach Ihrer Freigabe ein Klick, und sie lässt sich zurücknehmen.',
+    },
+    pl: {
+      title: 'Poprawki na stronie | Go Top SEO',
+      description: 'Analiza, która znajduje to, co zatrzymuje stronę w Google i w usługach AI: tytuły, opisy, teksty alternatywne, zepsute linki i więcej. Na WordPressie każda poprawka to jedno kliknięcie po zatwierdzeniu i można ją cofnąć.',
     },
   },
   content: {
@@ -684,6 +689,75 @@ export const SITE_FIXES_PAGE: MarketingPage = {
         },
       ],
       cta: { title: 'サイトの足を引っぱっている点を確認する', body: ja.closeBody, primary: ja.check, secondary: ja.trial },
+    },
+    pl: {
+      hero: {
+        eyebrow: 'Poprawki na stronie',
+        eyebrowIcon: Wrench,
+        title: 'To, co zatrzymuje stronę,',
+        accent: 'poprawione po zatwierdzeniu',
+        subtitle: 'System analizuje stronę i znajduje brakujące albo zbyt długie tytuły, brakujące opisy, obrazy bez tekstu alternatywnego, zepsute linki i podstrony zablokowane dla Google albo dla usług AI. Na podłączonej stronie WordPress większość poprawek to jedno kliknięcie, po tym jak zobaczą Państwo dokładnie, co się zmieni.',
+        trust: pl.trust,
+        primary: pl.check,
+        secondary: pl.trial,
+        visual: (
+          <WorkListVisual
+            heading="Poprawki na stronie"
+            rows={[
+              { title: 'Tytuł za długi', detail: '', url: '/uslugi/montaz-klimatyzacji', icon: Type, done: true, status: 'Poprawione' },
+              { title: 'Obrazy bez tekstu alternatywnego', detail: '4 obrazy', url: '/blog/klimatyzacja-poradnik', icon: ImageIcon, done: true, status: 'Poprawione' },
+              { title: 'Zepsuty link', detail: '', url: '/o-nas', icon: Link2, done: false, status: 'Czeka na zatwierdzenie' },
+              { title: 'Brak opisu', detail: '', url: '/kontakt', icon: FileSearch, done: false, status: 'Czeka na zatwierdzenie' },
+            ]}
+          />
+        ),
+      },
+      sections: [
+        {
+          kind: 'cards',
+          tone: 'contrast',
+          eyebrow: 'Dlaczego to ma znaczenie',
+          title: 'Dobre treści nie pomogą stronie, która sama sobie stoi na drodze',
+          intro: 'Tytuł ucięty w wynikach, obraz, którego Google nie potrafi odczytać, link kończący się stroną błędu. Każda z tych rzeczy jest mała. Razem ciągną stronę w dół.',
+          items: [
+            { icon: ScanSearch, title: 'Widać, co blokuje', body: 'Każdy problem jest wypisany razem z podstronami, na których występuje, w kolejności według wagi.' },
+            { icon: ShieldCheck, title: 'Nic nie zmienia się bez Państwa', body: 'Do każdej poprawki dołączony jest podgląd: co strona mówi dzisiaj i co pojawi się w zamian.' },
+            { icon: RotateCcw, title: 'Można cofnąć w każdej chwili', body: 'Poprawka wprowadzona przez system zachowuje poprzednią wartość, więc da się ją cofnąć.' },
+          ],
+        },
+        {
+          kind: 'steps',
+          eyebrow: 'Jak to przebiega',
+          title: 'Od analizy do poprawionej strony',
+          items: [
+            { title: 'Analiza strony', body: 'System przechodzi przez podstrony i zwraca listę problemów uporządkowaną według wagi.' },
+            { title: 'Podgląd propozycji', body: 'Do każdego problemu dołączona jest proponowana poprawka, z obecną i nową wartością obok siebie.' },
+            { title: 'Zatwierdzenie', body: 'Na podłączonej stronie WordPress oraz w artykułach i na stronach podłączonego sklepu Shopify poprawka zostaje zapisana w witrynie. W pozostałych przypadkach otrzymują Państwo instrukcję krok po kroku.' },
+          ],
+        },
+        {
+          kind: 'cards',
+          eyebrow: 'Co jest poprawiane na WordPressie',
+          title: 'Poprawki, które system wprowadza sam',
+          items: [
+            { icon: Type, title: 'Tytuły SEO', body: 'Brakujący, zbyt krótki albo zbyt długi tytuł zostaje napisany na nowo. Przy Yoast albo Rank Math zapisuje się w ich polu.' },
+            { icon: FileSearch, title: 'Meta opisy', body: 'Brakujący opis albo opis o nieprawidłowej długości. Zapisywany we wtyczce SEO witryny, przez wtyczkę Go Top.' },
+            { icon: ImageIcon, title: 'Teksty alternatywne obrazów', body: 'Tekst alternatywny dostają tylko obrazy w treści, które go nie mają. Pozostałe obrazy zostają nietknięte.' },
+            { icon: Link2, title: 'Linki', body: 'Zepsuty link zostaje zastąpiony albo usunięty, a między powiązanymi podstronami dodawane są linki wewnętrzne.' },
+            { icon: Heading1, title: 'Nagłówek główny', body: 'Podstrona z więcej niż jednym H1 zostaje przy jednym nagłówku głównym, przez wtyczkę Go Top.' },
+            { icon: Code2, title: 'FAQ i llms.txt', body: 'Blok FAQ na podstronie oraz plik llms.txt, który opisuje witrynę usługom AI, przez wtyczkę Go Top.' },
+          ],
+        },
+        {
+          kind: 'callout',
+          icon: Info,
+          title: 'Na Shopify i na innych platformach',
+          body: (
+            <p>Analiza działa na każdej stronie. W podłączonym sklepie Shopify system po zatwierdzeniu poprawia artykuły bloga i strony sklepu: tytuł i opis, które pokazuje Google, teksty alternatywne obrazów, zepsuty link, blok FAQ i nadmiarowy nagłówek główny. Również tutaj każdą poprawkę można cofnąć. Produkty, kategorie i ustawienia sklepu nigdy nie są zmieniane. Na Wix i na innych platformach system nie zapisuje nic w witrynie, a przy każdym problemie pokazuje krótką instrukcję, jak poprawić to samodzielnie.</p>
+          ),
+        },
+      ],
+      cta: { title: 'Proszę sprawdzić, co zatrzymuje Państwa stronę', body: pl.closeBody, primary: pl.check, secondary: pl.trial },
     },
   },
 }

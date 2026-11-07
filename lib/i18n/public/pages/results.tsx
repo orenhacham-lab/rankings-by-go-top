@@ -26,6 +26,7 @@ const it = FEATURE_COMMON.it
 const ja = FEATURE_COMMON.ja
 const de = FEATURE_COMMON.de
 const nl = FEATURE_COMMON.nl
+const pl = FEATURE_COMMON.pl
 
 // ── You vs. competitors ───────────────────────────────────────────────────────
 
@@ -67,6 +68,10 @@ export const COMPETITORS_PAGE: MarketingPage = {
     de: {
       title: 'Sie und Ihre Wettbewerber | Go Top SEO',
       description: 'Tragen Sie Ihre Wettbewerber ein und sehen Sie, bei wie vielen Keywords jeder von ihnen in Google vor Ihnen steht — und wen ChatGPT, Gemini und Google AI nennen, wenn sie Sie nicht nennen.',
+    },
+    pl: {
+      title: 'Państwo i konkurencja | Go Top SEO',
+      description: 'Wpisują Państwo konkurentów i widzą, przy ilu słowach kluczowych każdy z nich stoi w Google wyżej, a także kogo wymieniają ChatGPT, Gemini i Google AI, gdy nie wymieniają Państwa firmy.',
     },
   },
   content: {
@@ -549,6 +554,59 @@ export const COMPETITORS_PAGE: MarketingPage = {
       ],
       cta: { title: 'Googleで自社より上位にいるのは誰かを確認する', body: ja.closeBody, primary: ja.check, secondary: ja.trial },
     },
+    pl: {
+      hero: {
+        eyebrow: 'Państwo i konkurencja',
+        eyebrowIcon: Users,
+        title: 'Dokładnie wiadomo,',
+        accent: 'gdzie konkurencja jest wyżej',
+        subtitle: 'Konkurentów wpisują Państwo w ustawieniach projektu, a każde sprawdzenie pozycji pokazuje, przy ilu słowach kluczowych każdy z nich stoi w Google wyżej. Sprawdzenie widoczności w AI pokazuje, kogo wymieniają ChatGPT, Gemini i Google AI, gdy nie wymieniają Państwa firmy.',
+        trust: pl.trust,
+        primary: pl.check,
+        secondary: pl.trial,
+        visual: (
+          <WorkListVisual
+            heading="Państwo i konkurencja"
+            rows={[
+              { title: 'Konkurent A', detail: 'wyżej przy 6 z 24 słów kluczowych', url: 'example-a.com', icon: Users, done: false, status: 'Wyżej' },
+              { title: 'Konkurent B', detail: 'wyżej przy 2 z 24 słów kluczowych', url: 'example-b.com', icon: Users, done: true, status: 'Państwo wyżej' },
+              { title: 'Konkurent C', detail: 'poza pierwszymi 20 wynikami', url: 'example-c.com', icon: Users, done: true, status: 'Państwo wyżej' },
+            ]}
+          />
+        ),
+      },
+      sections: [
+        {
+          kind: 'cards',
+          tone: 'contrast',
+          eyebrow: 'Dlaczego to ma znaczenie',
+          title: 'Sama pozycja nie opowiada całej historii',
+          intro: 'Piąte miejsce może być sukcesem albo problemem. Zależy to od tego, kto stoi wyżej.',
+          items: [
+            { icon: Target, title: 'Gdzie są wyżej', body: 'Dla każdego konkurenta: przy ilu Państwa słowach kluczowych stał wyżej w ostatnim sprawdzeniu.' },
+            { icon: Sparkles, title: 'Kogo wymieniają zamiast Państwa', body: 'W odpowiedziach usług AI: jakie firmy i strony pojawiają się wtedy, gdy Państwa firma nie.' },
+            { icon: FileText, title: 'Co napisać dalej', body: 'Słowo kluczowe, przy którym konkurent stoi wyżej, to dobry temat na następny artykuł.' },
+          ],
+        },
+        {
+          kind: 'steps',
+          eyebrow: 'Jak to przebiega',
+          title: 'Trzy kroki',
+          items: [
+            { title: 'Wpisanie konkurentów', body: 'W ustawieniach projektu wpisują Państwo nazwę i stronę konkurenta.' },
+            { title: 'System sprawdza', body: 'Każde sprawdzenie pozycji zapisuje też, gdzie stoi konkurencja przy tych samych słowach kluczowych.' },
+            { title: 'Podgląd porównania', body: 'Nad tabelą słów kluczowych i w panelu: kto stoi wyżej i przy ilu słowach kluczowych.' },
+          ],
+        },
+        {
+          kind: 'callout',
+          icon: Info,
+          title: 'O danych',
+          body: <p>Porównanie opiera się wyłącznie na tym, co nasze sprawdzenia w Google rzeczywiście znalazły, przy monitorowanych przez Państwa słowach kluczowych. Konkurent wpisany po sprawdzeniu pojawia się od następnego.</p>,
+        },
+      ],
+      cta: { title: 'Proszę sprawdzić, kto stoi w Google wyżej', body: pl.closeBody, primary: pl.check, secondary: pl.trial },
+    },
   },
 }
 
@@ -592,6 +650,10 @@ export const SEARCH_CONSOLE_PAGE: MarketingPage = {
     de: {
       title: 'Search-Console-Daten | Go Top SEO',
       description: 'Verbinden Sie die Google Search Console und sehen Sie Klicks, Impressionen und die durchschnittliche Position der letzten 28 Tage, Ihre wichtigsten Seiten und die Suchanfragen, für die Sie schon erscheinen. Als PDF oder Excel herunterladen.',
+    },
+    pl: {
+      title: 'Dane z Search Console | Go Top SEO',
+      description: 'Po podłączeniu Google Search Console widać kliknięcia, wyświetlenia i średnią pozycję z ostatnich 28 dni, najważniejsze podstrony i zapytania, na które strona już się pokazuje. Do pobrania jako pdf albo Excel.',
     },
   },
   content: {
@@ -1062,6 +1124,58 @@ export const SEARCH_CONSOLE_PAGE: MarketingPage = {
         },
       ],
       cta: { title: 'Search Consoleをプロジェクトに連携する', body: ja.closeBody, primary: ja.trial, secondary: ja.check },
+    },
+    pl: {
+      hero: {
+        eyebrow: 'Dane z Search Console',
+        eyebrowIcon: LineChart,
+        title: 'Co sam Google',
+        accent: 'mówi o Państwa stronie',
+        subtitle: 'Po podłączeniu Google Search Console w systemie widać, ile kliknięć i wyświetleń strona dostała w ostatnich 28 dniach i jak wygląda jej średnia pozycja. Każda liczba pokazuje też zmianę wobec poprzednich 28 dni.',
+        trust: pl.trust,
+        primary: pl.check,
+        secondary: pl.trial,
+        visual: (
+          <WorkListVisual
+            heading="Ostatnie 28 dni"
+            rows={[
+              { title: 'Kliknięcia z Google', detail: 'wobec poprzednich 28 dni', icon: MousePointerClick, done: true, status: 'Wzrost' },
+              { title: 'Wyświetlenia w wynikach', detail: 'wobec poprzednich 28 dni', icon: Eye, done: true, status: 'Wzrost' },
+              { title: 'Średnia pozycja', detail: 'wobec poprzednich 28 dni', icon: Search, done: false, status: 'Bez zmian' },
+            ]}
+          />
+        ),
+      },
+      sections: [
+        {
+          kind: 'cards',
+          tone: 'contrast',
+          eyebrow: 'Co widać',
+          title: 'Liczby samego Google, tam gdzie Państwo pracują',
+          items: [
+            { icon: LineChart, title: 'Przebieg w czasie', body: 'Kliknięcia, wyświetlenia i średnia pozycja, ze zmianą wobec poprzedniego okresu.' },
+            { icon: BarChart3, title: 'Najważniejsze podstrony', body: 'Pięć podstron, do których Google wysyła najwięcej kliknięć.' },
+            { icon: Plus, title: 'Zapytania, na które strona już się pokazuje', body: 'Zapytania, przy których Google już pokazuje stronę, a których Państwo jeszcze nie monitorują. Dodanie do monitorowania to jedno kliknięcie.' },
+          ],
+        },
+        {
+          kind: 'steps',
+          eyebrow: 'Podłączenie',
+          title: 'Jedno połączenie z kontem Google',
+          items: [
+            { title: 'Logowanie przez Google', body: 'W ustawieniach projektu dają Państwo systemowi zgodę na odczyt danych z Search Console.' },
+            { title: 'Wybór strony', body: 'Wybierają Państwo usługę w Search Console, która należy do projektu.' },
+            { title: 'Liczby się aktualizują', body: 'System sam pobiera dane, a one pojawiają się w widoku „Raporty”.' },
+          ],
+        },
+        {
+          kind: 'callout',
+          icon: FileDown,
+          title: 'Pobranie i przekazanie',
+          body: <p>Liczby można pobrać jako dwustronicowe podsumowanie w pdf albo każdy wiersz osobno jako Excel lub CSV.</p>,
+        },
+      ],
+      cta: { title: 'Proszę podłączyć Search Console do projektu', body: pl.closeBody, primary: pl.trial, secondary: pl.check },
     },
   },
 }

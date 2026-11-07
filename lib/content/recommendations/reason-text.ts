@@ -118,6 +118,16 @@ export const REASON_TEXT: Record<ContentLanguage, ReasonText> = {
     supportingTopic: 'Ergänzendes Thema auf Grundlage der Website-Daten',
     numberLocale: 'de-DE',
   },
+  pl: {
+    fillsGap: 'Temat wypełnia lukę w treściach w obszarze, w którym firma działa.',
+    freshAngle: 'Temat dodaje nowe spojrzenie obok treści, które już są na stronie.',
+    supportedByExisting: 'Opiera się na stronach i produktach, które już są w witrynie.',
+    demand: (query, volume) => `Analiza słów kluczowych pokazuje dla „${query}” około ${volume} wyszukiwań miesięcznie.`,
+    neutral: 'Temat jest związany z działalnością firmy i z frazami znalezionymi w analizie słów kluczowych.',
+    foundInSearchData: (volume) => `Znaleziony w danych wyszukiwania, około ${volume} wyszukiwań miesięcznie`,
+    supportingTopic: 'Temat uzupełniający na podstawie danych ze strony',
+    numberLocale: 'pl-PL',
+  },
 }
 
 /**

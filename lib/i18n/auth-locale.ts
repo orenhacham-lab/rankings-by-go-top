@@ -29,7 +29,7 @@
  */
 
 import type { PublicLocale } from './locales'
-import { isEnglishPath, isFrenchPath, isItalianPath, isJapanesePath, isGermanPath, isDutchPath, isPortuguesePath, isSpanishPath } from './request-locale'
+import { isEnglishPath, isFrenchPath, isItalianPath, isJapanesePath, isGermanPath, isDutchPath, isPolishPath, isPortuguesePath, isSpanishPath } from './request-locale'
 import { normalizeDashboardUiLocale } from './dashboard/locale'
 
 /**
@@ -65,6 +65,9 @@ import { normalizeDashboardUiLocale } from './dashboard/locale'
  *
  * Dutch is the ninth, and `/nl/login` arrives the same way, gated by
  * app/(auth)/nl/layout.tsx.
+ *
+ * Polish is the tenth, and `/pl/login` the same, gated by
+ * app/(auth)/pl/layout.tsx.
  */
 export function resolveAuthLocale(input: {
   pathname?: string | null
@@ -79,5 +82,6 @@ export function resolveAuthLocale(input: {
   if (isJapanesePath(input.pathname)) return 'ja'
   if (isGermanPath(input.pathname)) return 'de'
   if (isDutchPath(input.pathname)) return 'nl'
+  if (isPolishPath(input.pathname)) return 'pl'
   return normalizeDashboardUiLocale(input.langParam) ?? input.serverLocale ?? 'he'
 }

@@ -1,0 +1,9 @@
+import { FeaturePage } from '@/components/public/FeaturePage'
+import { marketingPageMetadata } from '@/lib/i18n/public/pages/marketing-page'
+import { SHOPIFY_PAGE } from '@/lib/i18n/public/pages/solutions'
+
+export const metadata = marketingPageMetadata(SHOPIFY_PAGE, 'pl')
+
+export default function ShopifySolutionPage() {
+  return <FeaturePage locale="pl" content={SHOPIFY_PAGE.content['pl']} path="/solutions/shopify" />
+}

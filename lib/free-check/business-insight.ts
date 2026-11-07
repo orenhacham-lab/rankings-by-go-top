@@ -51,6 +51,7 @@ const PROMPT_LANGUAGE: Record<PublicLocale, string> = {
   ja: 'Japanese',
   de: 'German',
   nl: 'Dutch',
+  pl: 'Polish',
 }
 
 // ── The page's own language ──────────────────────────────────────────────────

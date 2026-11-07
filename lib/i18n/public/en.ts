@@ -202,6 +202,7 @@ export const en = {
     ja: '日本語',
     de: 'Deutsch',
     nl: 'Nederlands',
+    pl: 'Polski',
     aria: 'Change the site language',
   },
   cookie: {

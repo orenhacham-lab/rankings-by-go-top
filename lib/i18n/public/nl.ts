@@ -231,6 +231,7 @@ export const nl = {
     ja: '日本語',
     de: 'Deutsch',
     nl: 'Nederlands',
+    pl: 'Polski',
     aria: 'Taal van de website wijzigen',
   },
   cookie: {

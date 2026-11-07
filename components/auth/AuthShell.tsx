@@ -15,6 +15,7 @@ import { landingIt } from '@/lib/i18n/public/landing-it'
 import { landingJa } from '@/lib/i18n/public/landing-ja'
 import { landingDe } from '@/lib/i18n/public/landing-de'
 import { landingNl } from '@/lib/i18n/public/landing-nl'
+import { landingPl } from '@/lib/i18n/public/landing-pl'
 import HeroBackdrop from '@/components/public/HeroBackdrop'
 import { cn } from '@/lib/utils'
 
@@ -29,6 +30,7 @@ const AUTH_LANDING: Record<PublicLocale, typeof landingHe> = {
   ja: landingJa,
   de: landingDe,
   nl: landingNl,
+  pl: landingPl,
 }
 
 export interface AuthFooterCopy {

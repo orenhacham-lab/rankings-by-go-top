@@ -182,9 +182,31 @@ const DE_INTENT: Partial<Record<SuggestionIntent, (kw: string) => string[]>> = {
   informational: (kw) => [`Alles, was Sie über ${kw} wissen sollten`],
 }
 
-const BASE: Record<SuggestionLanguage, (kw: string) => string[]> = { he: HE_BASE, en: EN_BASE, es: ES_BASE, 'pt-BR': PT_BASE, fr: FR_BASE, it: IT_BASE, ja: JA_BASE, de: DE_BASE, nl: NL_BASE }
+// POLISH. Every frame keeps the keyword in the NOMINATIVE in front of a colon,
+// because the keyword arrives undeclined and Polish would need it in the
+// genitive or the locative inside a sentence ("wybór <kw>", "o <kw>"). The
+// colon-subtitle shape is what a Polish SEO headline uses anyway, so this is
+// the natural form and not a workaround that reads like one.
+const PL_BASE = (kw: string): string[] => [
+  `${kw}: jak wybrać dobrze?`,
+  `${kw}: co sprawdzić przed decyzją`,
+  `${kw}: kompletny przewodnik na start`,
+  `${kw}: ile to kosztuje?`,
+  `${kw}: najczęstsze błędy przy wyborze`,
+  `${kw}: co warto porównać?`,
+]
+
+const PL_INTENT: Partial<Record<SuggestionIntent, (kw: string) => string[]>> = {
+  comparison: (kw) => [`${kw}: porównanie popularnych opcji`, `${kw}: czym różnią się rodzaje?`],
+  commercial: (kw) => [`${kw}: wybrać dobrze i nie żałować`, `${kw}: na co zwrócić uwagę przy zakupie?`],
+  local: (kw) => [`${kw}: jak znaleźć rzetelnego wykonawcę w okolicy`],
+  transactional: (kw) => [`${kw}: kiedy zamówić i u kogo?`],
+  informational: (kw) => [`${kw}: wszystko, co warto wiedzieć`],
+}
+
+const BASE: Record<SuggestionLanguage, (kw: string) => string[]> = { he: HE_BASE, en: EN_BASE, es: ES_BASE, 'pt-BR': PT_BASE, fr: FR_BASE, it: IT_BASE, ja: JA_BASE, de: DE_BASE, nl: NL_BASE, pl: PL_BASE }
 const INTENT: Record<SuggestionLanguage, Partial<Record<SuggestionIntent, (kw: string) => string[]>>> =
-  { he: HE_INTENT, en: EN_INTENT, es: ES_INTENT, 'pt-BR': PT_INTENT, fr: FR_INTENT, it: IT_INTENT, ja: JA_INTENT, de: DE_INTENT, nl: NL_INTENT }
+  { he: HE_INTENT, en: EN_INTENT, es: ES_INTENT, 'pt-BR': PT_INTENT, fr: FR_INTENT, it: IT_INTENT, ja: JA_INTENT, de: DE_INTENT, nl: NL_INTENT, pl: PL_INTENT }
 
 /**
  * Return up to `max` distinct, natural topic suggestions for a keyword.

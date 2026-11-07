@@ -506,6 +506,59 @@ export const ARTICLES_COPY: Record<PublicLocale, ArticlesCopy> = {
       ],
     },
   },
+  pl: {
+    index: {
+      title: 'Artykuły',
+      subtitle: 'Poradniki i analizy o monitorowaniu pozycji, SEO i widoczności w odpowiedziach AI',
+      breadcrumb: 'Artykuły',
+      empty: 'Artykuły pojawią się już wkrótce.',
+      readMore: 'Czytaj artykuł',
+    },
+    article: {
+      notFoundTitle: 'Nie znaleziono artykułu',
+      notFoundBody: 'Artykuł, którego Państwo szukają, nie istnieje albo nie jest już dostępny',
+      backToArticles: 'Powrót do listy artykułów',
+      backHome: 'Powrót na stronę główną',
+      toc: 'Spis treści',
+      readingTime: (m) => `${m} min czytania`,
+      updated: 'Zaktualizowano',
+      aboutAuthor: 'O autorze',
+      aboutAuthorLink: 'Więcej o Go Top',
+    },
+    widgets: {
+      plans: {
+        perMonth: 'miesięcznie',
+        popular: 'Najczęściej wybierany',
+        cta: 'Wypróbuj 7 dni bezpłatnie',
+        noCard: 'Bez karty kredytowej. Rezygnacja w dowolnym momencie.',
+        allPlans: 'Wszystkie szczegóły na stronie cennika',
+      },
+      cta: {
+        title: 'Chcą Państwo zobaczyć to na własnej witrynie?',
+        body: '7 dni bezpłatnie, bez karty kredytowej. Po podaniu adresu witryny otrzymają Państwo analizę słów kluczowych, rozpocznie się sprawdzanie widoczności w odpowiedziach AI, a pierwszy artykuł zostanie napisany i opublikowany automatycznie.',
+        primary: 'Wypróbuj 7 dni bezpłatnie',
+        secondary: 'Zacznij od bezpłatnej analizy witryny',
+      },
+    },
+    promo: {
+      badge: 'Go Top SEO',
+      title: ['Sprawdzą Państwo swoją pozycję w Google', 'wtedy, kiedy chcą'],
+      body: 'Profesjonalna platforma do monitorowania pozycji w organicznych wynikach Google i w Mapach Google. Pomiar można uruchomić w dowolnej chwili albo zlecić, by wykonywał się automatycznie raz w miesiącu. Z rozbudowanymi raportami, przebiegiem w czasie i osobistym wsparciem.',
+      signup: { label: 'Rozpocznij bezpłatny okres próbny', href: authHref('signup', 'pl') },
+      pricing: { label: 'Zobacz cennik', href: '/pl/pricing' },
+      stats: [
+        { num: '1000+', label: 'słów kluczowych' },
+        { num: '2', label: 'źródła do monitorowania (Google + Mapy)' },
+        { num: 'AI', label: 'pomiar widoczności' },
+        { num: '7 dni', label: 'bezpłatnie' },
+      ],
+      features: [
+        { title: 'Organiczne Google', desc: 'Pozycje na pierwszej i drugiej stronie Google, mierzone dokładnie' },
+        { title: 'Mapy Google', desc: 'Pozycje według miasta, kodu pocztowego lub lokalizacji' },
+        { title: 'Profesjonalne raporty', desc: 'Raporty w formacie PDF i Excel, z przebiegiem, porównaniami i rozbudowanymi analizami' },
+      ],
+    },
+  },
   nl: {
     index: {
       title: 'Artikelen',

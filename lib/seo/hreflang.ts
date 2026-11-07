@@ -40,6 +40,11 @@ function dutchTwin(esPath: string): string {
   return esPath === '/es' ? '/nl' : esPath.replace(/^\/es(?=\/|$)/, '/nl')
 }
 
+/** The same for the Polish tree. */
+function polishTwin(esPath: string): string {
+  return esPath === '/es' ? '/pl' : esPath.replace(/^\/es(?=\/|$)/, '/pl')
+}
+
 /**
  * Builds the `alternates.languages` object for the Next.js Metadata API, given
  * the Hebrew (default locale, no prefix) and English (`/en` prefix) paths for
@@ -65,5 +70,6 @@ export function buildHreflangAlternates(hePath: string, enPath: string, esPath?:
   if (esPath && publicLocaleEnabled('ja')) alternates.ja = `${SITE_URL}${japaneseTwin(esPath)}`
   if (esPath && publicLocaleEnabled('de')) alternates.de = `${SITE_URL}${germanTwin(esPath)}`
   if (esPath && publicLocaleEnabled('nl')) alternates.nl = `${SITE_URL}${dutchTwin(esPath)}`
+  if (esPath && publicLocaleEnabled('pl')) alternates.pl = `${SITE_URL}${polishTwin(esPath)}`
   return alternates
 }

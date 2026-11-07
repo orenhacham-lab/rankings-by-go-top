@@ -82,16 +82,17 @@ const stripComments = (src: string) => src.replace(/\/\*[\s\S]*?\*\//g, '').repl
 // ============================================================
 // A) THE LANGUAGES
 // ============================================================
-check('A1: nine languages are written automatically', same([...BLOG_AUTO_LOCALES], ['he', 'en', 'es', 'pt-BR', 'fr', 'it', 'ja', 'de', 'nl']))
+check('A1: ten languages are written automatically', same([...BLOG_AUTO_LOCALES], ['he', 'en', 'es', 'pt-BR', 'fr', 'it', 'ja', 'de', 'nl', 'pl']))
 // The NEWEST language is LAST, and that is the contract daily-window.ts depends
 // on: it walks this list in order and the language that goes without on a
 // morning of retries is the last one. A reorder that puts the newest language
 // ahead of an older one would make it cost an existing language its article.
-// Dutch took that place from German on 5 Nov 2026.
-check('A1a: Dutch is last in the order, so a bad morning costs the newest language',
-  BLOG_AUTO_LOCALES[BLOG_AUTO_LOCALES.length - 1] === 'nl')
+// Dutch took that place from German on 5 Nov 2026, and Polish took it from
+// Dutch the same day.
+check('A1a: Polish is last in the order, so a bad morning costs the newest language',
+  BLOG_AUTO_LOCALES[BLOG_AUTO_LOCALES.length - 1] === 'pl')
 check('A1a-MUT: a list whose last entry is not the newest language fails A1a',
-  (() => { const reordered: readonly string[] = ['he', 'nl', 'en']; return reordered[reordered.length - 1] !== 'nl' })())
+  (() => { const reordered: readonly string[] = ['he', 'pl', 'en']; return reordered[reordered.length - 1] !== 'pl' })())
 // A2 USED TO BE localesForDay() === BLOG_AUTO_LOCALES. Japanese joined the list
 // on 30 Oct 2026 while its public tree was still behind
 // NEXT_PUBLIC_JAPANESE_SITE_ENABLED, so the day's languages are the ones a
@@ -109,7 +110,7 @@ check('A2b (control): the day\'s list is a filter, not the whole list, when a fl
   publicLocaleEnabled('ja') || !localesForDay().includes('ja'))
 check('A2c (control): the same holds for German while its flag is off',
   publicLocaleEnabled('de') || !localesForDay().includes('de'))
-check('A3: that is seven articles a week in each language', same(weeklyShare(), { he: 7, en: 7, es: 7, 'pt-BR': 7, fr: 7, it: 7, ja: 7, de: 7, nl: 7 }), weeklyShare())
+check('A3: that is seven articles a week in each language', same(weeklyShare(), { he: 7, en: 7, es: 7, 'pt-BR': 7, fr: 7, it: 7, ja: 7, de: 7, nl: 7, pl: 7 }), weeklyShare())
 check(
   'A4: Portuguese IS among them, now that the content layer writes it (lib/content/language.ts)',
   (BLOG_AUTO_LOCALES as readonly string[]).includes('pt-BR') && isBlogAutoLocale('pt-BR')
@@ -440,6 +441,8 @@ async function main() {
       planned({ id: 'pi', locale: 'it', topic: 'posizionamento su google', primary_keyword: 'posizionamento su google' }),
       planned({ id: 'pj', locale: 'ja', topic: '検索順位の計測', primary_keyword: '検索順位 チェック' }),
       planned({ id: 'pd', locale: 'de', topic: 'Google Ranking prüfen', primary_keyword: 'google ranking prüfen' }),
+      planned({ id: 'pn', locale: 'nl', topic: 'Google ranking controleren', primary_keyword: 'google ranking controleren' }),
+      planned({ id: 'pl', locale: 'pl', topic: 'Sprawdzanie pozycji w Google', primary_keyword: 'sprawdzanie pozycji w google' }),
     ])
     const summaries = await runBlogAutoPublishAllLocales(admin as unknown as Admin, {}, deps({
       generate: async (brief) => perLocale(brief.language),
@@ -821,6 +824,7 @@ async function main() {
         he: '2026-11-05T04:02:00Z', en: '2026-11-05T04:16:00Z', es: '2026-11-04T05:31:00Z',
         'pt-BR': '2026-11-04T05:47:00Z', fr: '2026-11-04T07:32:00Z', it: '2026-11-03T06:46:00Z',
         ja: '2026-11-02T07:48:00Z', de: '2026-11-05T04:30:00Z', nl: '2026-11-05T04:44:00Z',
+        pl: '2026-11-05T04:58:00Z',
       })[0] === 'ja')
     check('J6c: a language that has never published goes before them all, last in the list or not',
       starvationOrder(BLOG_AUTO_LOCALES, Object.fromEntries(

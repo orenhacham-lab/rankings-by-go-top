@@ -43,13 +43,19 @@ export const RESEARCH_MARKET: Record<BlogAutoLocale, { country: string; language
   // measured in Keyword Planner and its prices were never set, which is exactly
   // why Austria and Switzerland had to be taken out again after German shipped.
   nl: { country: 'NL', language: 'nl' },
+  // Poland, and ONLY Poland. Polish is spoken by diasporas large enough to be
+  // tempting (Germany, the UK, Chicago), but a market goes into
+  // COUNTRY_GEO_TARGETS when it is researched and priced, never when its
+  // language is spoken somewhere — the Austria/Switzerland revert after German
+  // shipped is the precedent.
+  pl: { country: 'PL', language: 'pl' },
 }
 
 /**
  * The floor for "somebody searches this". Hebrew is a 9-million-speaker market,
  * so the same floor as English would reject nearly every real Hebrew query.
  */
-export const MIN_MONTHLY_SEARCHES: Record<BlogAutoLocale, number> = { he: 20, en: 80, es: 50, 'pt-BR': 50, fr: 50, it: 50, ja: 50, de: 50, nl: 50 }
+export const MIN_MONTHLY_SEARCHES: Record<BlogAutoLocale, number> = { he: 20, en: 80, es: 50, 'pt-BR': 50, fr: 50, it: 50, ja: 50, de: 50, nl: 50, pl: 50 }
 
 /** Seeds the research starts from — the subjects this product is actually about. */
 export const RESEARCH_SEEDS: Record<BlogAutoLocale, string[]> = {
@@ -109,6 +115,50 @@ export const RESEARCH_SEEDS: Record<BlogAutoLocale, string[]> = {
   // Seeding this list with calques from the German seeds would have returned
   // nothing, which is the mistake the Dutch measurement itself corrected: an
   // earlier hand-written list made this market look dead.
+  // MEASURED in Keyword Planner on 6 November 2026 (account 989-586-4448,
+  // Location = Poland, Language = Polish, Oct 2025-Sep 2026), so this list is
+  // the measured one and not a translation of the German or Dutch seeds. Bids
+  // below are ILS, because that account bills in shekels. The UI caps a seed
+  // run at ten keywords, so the fifteen candidates were measured in two runs.
+  //
+  // What the measurement changed. FIVE terms came out: `linki zwrotne` 40/mo,
+  // `sprawdzenie pozycji w google` 50, `analiza słów kluczowych` 90 and
+  // `widoczność w ai` 90 are below anything worth seeding (the floor in
+  // MIN_MONTHLY_SEARCHES is 50), and `google search console` prints 74,000/mo
+  // but it is navigation to a Google product: seeding it floods the idea pool
+  // with `searchconsole`, `google webmastertool` and the like, none of which we
+  // can win or would want to. `słowa kluczowe` (1,300) and `analiza seo` (320,
+  // High competition) came out as ambiguous heads, and `monitorowanie pozycji`
+  // (210) because its own volume fell 99% year on year.
+  //
+  // What it added. `wizytówka google` is 9,900/mo and the ONLY large term in the
+  // Polish set that is growing (+22% three-month, +22% year on year) while every
+  // `pozycjonowanie` phrase falls 45-90%, and its commercial twin
+  // `pozycjonowanie wizytówki google` is 1,300/mo at ILS 8.14-26.61. Clustered,
+  // the local-SEO intent is about 3,140/mo, and the Google Business Profile
+  // wording carries more of it than the word `lokalne` does — which is the
+  // opposite of what the language research assumed. `pozycjonowanie lokalne`
+  // itself is confirmed at 880/mo, Low competition, ILS 7.46-34.28.
+  //
+  // The vocabulary the research got right, and a translation would have got
+  // wrong: Polish does not borrow the category name. The word a Polish owner
+  // types is `pozycjonowanie` — literally "positioning" — used interchangeably
+  // with SEO by the Polish trade itself, with `pozycjonowanie stron` (5,400/mo,
+  // ILS 17.89-75.78) as the standard name of the service. `wizytówka Google` is
+  // what the Google Business Profile is called in Polish usage; the official
+  // name, `Profil Firmy w Google`, is the one the pages use and the one nobody
+  // searches for. Google holds over 97% of search in Poland, so these numbers
+  // are the whole market rather than a slice of it.
+  //
+  // One caveat to carry: every `pozycjonowanie` term is down sharply year on
+  // year while `wizytówka google` grows. If that holds, the Polish launch
+  // content belongs on the wizytówka cluster rather than on the head term.
+  pl: [
+    'pozycjonowanie stron', 'pozycjonowanie', 'seo',
+    'wizytówka google', 'pozycjonowanie wizytówki google',
+    'audyt seo', 'pozycjonowanie lokalne', 'seo lokalne',
+    'narzędzie seo',
+  ],
   nl: [
     'seo', 'seo tool', 'seo check', 'seo analyse',
     'backlinks checken', 'zoekwoordplanner', 'zoekwoorden analyse',

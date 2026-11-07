@@ -7,6 +7,7 @@ import { dashboardIt } from './it'
 import { dashboardJa } from './ja'
 import { dashboardDe } from './de'
 import { dashboardNl } from './nl'
+import { dashboardPl } from './pl'
 import { deepMergeDictionary } from './merge'
 import type { PublicLocale } from '../locales'
 import type { DashboardDictionary } from './he'
@@ -50,6 +51,17 @@ import type { DashboardDictionary } from './he'
  * does not charge. What is specific to Dutch is in the words: formal "u"
  * throughout, common nouns in lower case (the opposite of German) and closed
  * compounds.
+ *
+ * POLISH is the tenth locale, from pl/, held by
+ * lib/i18n/dashboard/__qa__/polish-dashboard.qa.ts. The USD rule is the same as
+ * German's and Dutch's: a Polish consumer price has to be the total payable, so
+ * a złoty figure here would be a price this product does not charge, and a euro
+ * figure would be two currencies we do not charge. What is specific to Polish is
+ * in the words: the formal register is third-person plural ("Państwo"), not a
+ * pronoun bolted onto an imperative, so a sentence addressed to the reader is
+ * rebuilt rather than translated word for word; and the product vocabulary is
+ * native — pozycjonowanie, słowa kluczowe, widoczność — never the English term
+ * with a Polish ending.
  */
 const dashboardEsMerged = deepMergeDictionary(dashboardEn as unknown as DashboardDictionary, dashboardEs)
 const dashboardPtMerged = deepMergeDictionary(dashboardEn as unknown as DashboardDictionary, dashboardPtBR)
@@ -58,6 +70,7 @@ const dashboardItMerged = deepMergeDictionary(dashboardEn as unknown as Dashboar
 const dashboardJaMerged = deepMergeDictionary(dashboardEn as unknown as DashboardDictionary, dashboardJa)
 const dashboardDeMerged = deepMergeDictionary(dashboardEn as unknown as DashboardDictionary, dashboardDe)
 const dashboardNlMerged = deepMergeDictionary(dashboardEn as unknown as DashboardDictionary, dashboardNl)
+const dashboardPlMerged = deepMergeDictionary(dashboardEn as unknown as DashboardDictionary, dashboardPl)
 
 const DICTIONARIES = {
   he: dashboardHe,
@@ -69,6 +82,7 @@ const DICTIONARIES = {
   ja: dashboardJaMerged,
   de: dashboardDeMerged,
   nl: dashboardNlMerged,
+  pl: dashboardPlMerged,
 } satisfies Record<PublicLocale, DashboardDictionary>
 
 /**

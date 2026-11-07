@@ -144,8 +144,10 @@ const MECHANICAL_NL = ['meer informatie', 'voor meer informatie', 'klik hier', '
 
 const MECHANICAL_DE = ['mehr informationen', 'weitere informationen', 'für weitere informationen', 'hier klicken', 'klicken sie hier', 'mehr lesen', 'weiterlesen', 'mehr erfahren', 'eine seite wie', 'seiten wie', 'eine website wie', 'hier ansehen', 'mehr dazu', 'siehe hier', 'hier geht es weiter']
 
+const MECHANICAL_PL = ['więcej informacji', 'więcej informacji tutaj', 'kliknij tutaj', 'klikaj tutaj', 'czytaj więcej', 'czytaj dalej', 'dowiedz się więcej', 'zobacz więcej', 'strona taka jak', 'strony takie jak', 'witryna taka jak', 'zobacz tutaj', 'sprawdź tutaj', 'tutaj', 'szczegóły tutaj']
+
 /** Mechanical anchor phrases keyed by content language. */
-const MECHANICAL: Record<SuggestionLanguage, string[]> = { he: MECHANICAL_HE, en: MECHANICAL_EN, es: MECHANICAL_ES, 'pt-BR': MECHANICAL_PT, fr: MECHANICAL_FR, it: MECHANICAL_IT, ja: MECHANICAL_JA, de: MECHANICAL_DE, nl: MECHANICAL_NL }
+const MECHANICAL: Record<SuggestionLanguage, string[]> = { he: MECHANICAL_HE, en: MECHANICAL_EN, es: MECHANICAL_ES, 'pt-BR': MECHANICAL_PT, fr: MECHANICAL_FR, it: MECHANICAL_IT, ja: MECHANICAL_JA, de: MECHANICAL_DE, nl: MECHANICAL_NL, pl: MECHANICAL_PL }
 
 export interface AnchorHit {
   href: string

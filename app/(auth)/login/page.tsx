@@ -236,6 +236,30 @@ const LOGIN_UI = {
       linkInvalid: 'Deze bevestigingslink is ongeldig of verlopen. Log in, of meld u opnieuw aan om een nieuwe te krijgen.',
     },
   },
+  pl: {
+    subtitle: 'Pozycje w Google i widoczność w odpowiedziach AI',
+    logoAlt: 'Logo Go Top SEO',
+    heading: 'Zaloguj się',
+    emailLabel: 'Adres e-mail',
+    emailPlaceholder: 'imie@przyklad.pl',
+    passwordLabel: 'Hasło',
+    passwordPlaceholder: '\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022',
+    loginBtn: 'Zaloguj się',
+    forgotPassword: 'Nie pamiętam hasła',
+    dontHaveAccount: 'Nie mają Państwo konta?',
+    startTrial: 'Zacznij bezpłatnie',
+    accessibility: 'Dostępność',
+    privacy: 'Prywatność',
+    articles: 'Artykuły',
+    accessibilityHref: '/pl/accessibility',
+    privacyHref: '/pl/privacy',
+    articlesHref: '/pl/articles',
+    err: {
+      badCredentials: 'Adres e-mail lub hasło są nieprawidłowe',
+      emailNotConfirmed: 'Adres e-mail nie został jeszcze potwierdzony. Prosimy otworzyć wiadomość potwierdzającą, którą wysłaliśmy, i kliknąć link.',
+      linkInvalid: 'Ten link potwierdzający jest nieprawidłowy albo wygasł. Prosimy się zalogować lub zarejestrować ponownie, aby otrzymać nowy.',
+    },
+  },
 } as const
 
 export function AuthForm() {
