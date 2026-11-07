@@ -50,12 +50,14 @@ import { PLAN_CODES } from '@/lib/plans/catalog'
  * How a platform signs its callbacks, once that has been read from its own
  * documentation.
  *
- * Two shapes, because the platforms genuinely differ. The HMAC-over-the-raw-
+ * Four shapes, because the platforms genuinely differ. The HMAC-over-the-raw-
  * body-in-a-header shape is what Creem and most modern APIs do. JVZoo does
  * something older: a plain digest of five named FORM FIELDS with the secret
- * appended, delivered in the body itself. A single interface could not
- * describe both without a pile of nullable fields, so this is a union and the
- * verifier branches on `kind`.
+ * appended, delivered in the body itself. Digistore24 digests every parameter
+ * of the body in sorted order. And ClickBank signs nothing at all: it
+ * ENCRYPTS the whole notification, so decrypting it is what proves who sent
+ * it. A single interface could not describe them without a pile of nullable
+ * fields, so this is a union and the verifier branches on `kind`.
  */
 export interface MarketplaceHmacHeaderScheme {
   kind: 'hmac_header'
@@ -116,10 +118,52 @@ export interface MarketplaceSortedParamsDigestScheme {
   caseSensitiveSort: boolean
 }
 
+/**
+ * A SCHEME WHERE THERE IS NO SIGNATURE AT ALL, AND DECRYPTION IS THE PROOF.
+ *
+ * ClickBank's Instant Notification Service does not sign its deliveries: it
+ * encrypts the whole notification with the vendor's own secret key and posts
+ * an envelope carrying the ciphertext and the initialization vector, both
+ * base64. Their own page says what that buys — it "allows the receiver of the
+ * notification to know that the message originated from ClickBank and was not
+ * altered during delivery" — and their PHP sample draws the conclusion this
+ * type is built on: "If the decoding of the JSON string wasn't successful,
+ * then you can assume the notification wasn't encrypted with your secret
+ * key."
+ *
+ * So authentication here is: decrypt with our key, and require the plaintext
+ * to be JSON. Nothing else in the body can be trusted before that succeeds,
+ * and a body that decrypts to bytes which are not JSON is a forgery, not a
+ * malformed friend.
+ *
+ * THE KEY IS NOT THE SECRET. It is the first 32 characters of the HEX
+ * rendering of SHA-1 over the secret, used as 32 ASCII bytes — an AES-256
+ * key. All four of ClickBank's samples (Java, PHP, Python, Ruby) agree on it.
+ * Taking the first 16 bytes of the raw digest instead decrypts nothing, which
+ * is the trap this comment exists to name.
+ *
+ * See docs/affiliate/clickbank-ins-docs.md for the quoted algorithm, the
+ * samples it was read from, and the fields of the decrypted body.
+ */
+export interface MarketplaceEncryptedEnvelopeScheme {
+  kind: 'encrypted_envelope'
+  /** The JSON field carrying the base64 ciphertext. */
+  ciphertextField: string
+  /** The JSON field carrying the base64 initialization vector. */
+  ivField: string
+  /** Node's cipher name. */
+  algorithm: 'aes-256-cbc'
+  /** The digest whose HEX rendering is truncated to form the key. */
+  keyDigest: 'sha1'
+  /** How many hex characters of that digest become the key. */
+  keyLength: 32
+}
+
 export type MarketplaceSignatureScheme =
   | MarketplaceHmacHeaderScheme
   | MarketplaceFieldDigestScheme
   | MarketplaceSortedParamsDigestScheme
+  | MarketplaceEncryptedEnvelopeScheme
 
 /**
  * Digistore24 IPN, from their own published guide and reference
@@ -167,6 +211,23 @@ export const JVZOO_IPN_V2_SCHEME: MarketplaceFieldDigestScheme = {
   trailingSeparator: true,
   algorithm: 'sha1',
   length: 8,
+}
+
+/**
+ * ClickBank INS version 8.0, from ClickBank's own support page
+ * (docs/affiliate/clickbank-ins-docs.md, fetched 2026-11-07).
+ *
+ * The secret is the Secret Key the vendor chooses in the account's Advanced
+ * Tools, up to 16 characters, held here as
+ * MARKETPLACE_CLICKBANK_WEBHOOK_SECRET.
+ */
+export const CLICKBANK_INS_SCHEME: MarketplaceEncryptedEnvelopeScheme = {
+  kind: 'encrypted_envelope',
+  ciphertextField: 'notification',
+  ivField: 'iv',
+  algorithm: 'aes-256-cbc',
+  keyDigest: 'sha1',
+  keyLength: 32,
 }
 
 export interface MarketplaceProvider {
@@ -278,9 +339,20 @@ export const MARKETPLACE_PROVIDERS: readonly MarketplaceProvider[] = [
   {
     slug: 'clickbank',
     label: 'ClickBank',
-    signature: null,
+    /*
+     * Not a signature: their INS encrypts the whole body and decryption with
+     * our own secret key is what proves the delivery came from ClickBank. See
+     * CLICKBANK_INS_SCHEME above and docs/affiliate/clickbank-ins-docs.md.
+     */
+    signature: CLICKBANK_INS_SCHEME,
     sellerOfRecord: true,
     requiredDisclaimer: null,
+    /*
+     * Their page asks for nothing but a 2xx within three seconds, and they
+     * DO retry: once every four hours, five attempts, then the notification
+     * is gone for good. The literal-text acknowledgement is Digistore24's
+     * requirement alone.
+     */
     acknowledgement: 'json',
   },
   {
