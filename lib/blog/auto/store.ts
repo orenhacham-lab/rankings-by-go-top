@@ -34,9 +34,16 @@ export interface PlanRow {
   monthly_searches: number | null
   status: string
   attempts: number
+  /**
+   * Why the PREVIOUS attempt at this row was refused. The claim below clears
+   * the column (the new attempt has not failed yet), so the value returned here
+   * is the one read before the clear: it is what the next brief is built from
+   * (lib/blog/auto/brief.ts, `retryBriefNotes`).
+   */
+  last_error: string | null
 }
 
-const PLAN_FIELDS = 'id, locale, topic, primary_keyword, secondary_keywords, monthly_searches, status, attempts'
+const PLAN_FIELDS = 'id, locale, topic, primary_keyword, secondary_keywords, monthly_searches, status, attempts, last_error'
 
 /** Keywords already spoken for in this language: planned, in flight, or published. */
 export async function readTakenKeywords(admin: Admin, locale: BlogAutoLocale): Promise<string[]> {
@@ -123,7 +130,11 @@ export async function claimNextPlanRow(admin: Admin, locale: BlogAutoLocale): Pr
     .eq('status', 'planned')
     .select(PLAN_FIELDS)
     .maybeSingle()
-  return (claimed as PlanRow | null) ?? null
+  const taken = claimed as PlanRow | null
+  if (!taken) return null
+  // The update wiped last_error; hand back the one the previous attempt left,
+  // which is the whole point of reading it.
+  return { ...taken, last_error: row.last_error ?? null }
 }
 
 /** Put a row back after a failure, or park it once the attempts are spent. */

@@ -133,6 +133,9 @@ export async function runBlogAutoPublish(
     primaryKeyword: row.primary_keyword,
     secondaryKeywords: row.secondary_keywords ?? [],
     internalTargets,
+    // What the previous attempt at this row was refused for. Without it the
+    // retries are blind re-rolls of the brief that just failed.
+    previousFailure: row.last_error,
   })
 
   const generated = await deps.generate(brief)

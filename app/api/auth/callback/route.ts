@@ -1,9 +1,11 @@
 import { createServerClient } from '@supabase/ssr'
 import type { SupabaseClient, User } from '@supabase/supabase-js'
-import { cookies } from 'next/headers'
+import { cookies, headers } from 'next/headers'
 import { NextResponse, type NextRequest } from 'next/server'
 import { logRestrictedAttempt, restrictionForRequest, sanctionsNotice } from '@/lib/sanctions/guard'
 import { createAdminClient } from '@/lib/supabase/admin'
+import { GDPR_COUNTRY_HEADER } from '@/lib/compliance/gdpr-territory'
+import { notifyGdprTerritorySignup } from '@/lib/compliance/gdpr-territory-alert'
 import { ensureDefaultClient } from '@/lib/clients/ensure-default-client'
 import { sanitizeNextPath } from '@/lib/i18n/request-locale'
 import { isFreshSignup, sendSignupNotification } from '@/lib/notifications/signup-email'
@@ -149,6 +151,27 @@ async function signedIn(
     } catch (emailError) {
       console.error('[Signup] Failed to send notification email:', emailError instanceof Error ? emailError.name : 'unknown')
       // Don't fail the signup if email fails
+    }
+  }
+
+  // ART. 27 GDPR — THE DAY "OCCASIONAL" STOPS BEING TRUE.
+  // We rely on the Art. 27(2)(a) exemption from designating a representative
+  // in the Union, and that reliance rests on a fact: no customer there. An
+  // account created from the EEA or the United Kingdom ends the fact, so a
+  // representative becomes owed that day. This is the alert that says so, sent
+  // from the one funnel every sign-in door reaches, with the request's own
+  // country, which is the best signal we hold of where the CUSTOMER is. It
+  // never blocks or fails the sign-up; lib/compliance/gdpr-territory-alert.ts
+  // says why that is deliberate.
+  if (user && isFreshSignup(user)) {
+    try {
+      await notifyGdprTerritorySignup({
+        country: (await headers()).get(GDPR_COUNTRY_HEADER),
+        email: user.email ?? null,
+        accountCreatedAt: user.created_at ?? null,
+      })
+    } catch (alertError) {
+      console.error('[gdpr-territory] alert threw:', alertError instanceof Error ? alertError.name : 'unknown')
     }
   }
 

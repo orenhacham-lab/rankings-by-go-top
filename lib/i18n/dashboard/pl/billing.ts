@@ -176,6 +176,12 @@ export const billingPl: DeepPartial<DashboardDictionary> = {
       activatedSuccess: 'Pakiet jest aktywny. Ta strona odświeży się za moment.',
       buttonError: 'Z PayPalem był problem. Prosimy spróbować za chwilę albo napisać do nas, a pomożemy.',
     },
+    withdrawal: {
+      label:
+        'Żądam od Go Top SEO rozpoczęcia świadczenia usługi natychmiast, przed upływem czternastodniowego terminu odstąpienia, który prawo konsumenckie Unii Europejskiej i Zjednoczonego Królestwa przyznaje konsumentowi, i potwierdzam, że zostałem poinformowany, że po wykonaniu usługi w pełni tracę to prawo.',
+      requiredNote: 'Sposoby płatności pojawią się po potwierdzeniu powyższego wiersza. Wcześniej nie pobieramy żadnej opłaty.',
+      policyLabel: 'Prawo odstąpienia w całości, w polityce rezygnacji i zwrotów',
+    },
     creem: {
       payButton: 'Zapłać kartą',
       starting: 'Otwieranie bezpiecznej strony płatności...',

@@ -236,7 +236,10 @@ console.log('\nC) screen specifics')
   // w17: the plan "continue" buttons belonged to the currency switcher, which the
   // owner removed; the plans' only actions are now the PayPal buttons, so no
   // second competing primary can appear on a plan card.
-  const onePrimary = (s: string) => !/planAction\(/.test(s) && !/variant=\{recommended \? 'primary' : 'secondary'\}/.test(s) && /<BillingClient market=\{market\} \/>/.test(s)
+  // The element gained `acknowledged` on 2026-11-07 (the withdrawal
+  // acknowledgement gate). C4 is about there being no SECOND primary button on
+  // a plan card, which the new control is not: it is a checkbox above the grid.
+  const onePrimary = (s: string) => !/planAction\(/.test(s) && !/variant=\{recommended \? 'primary' : 'secondary'\}/.test(s) && /<BillingClient market=\{market\} acknowledged=\{checkoutUnlocked\} \/>/.test(s)
   check('C4: billing plan cards carry no competing primary buttons (PayPal is the action)', onePrimary(billing))
   check('MUTATION CONTROL: a per-plan primary button fails C4', !onePrimary(billing + "\naction={planAction('premium', true)}"))
   // Since w7 P2-13 the popular plan is set apart the pricing page's way, as the one navy card,

@@ -3,7 +3,7 @@ title: Politique d'annulation et de remboursement | Go Top SEO
 description: Comment résilier un abonnement Go Top SEO et dans quels cas un remboursement est accordé.
 locale: fr
 source: app/(public)/en/refund-policy/page.tsx
-lastUpdated: 2026-10-21
+lastUpdated: 2026-11-07
 register: vous
 extraSections: 1
 extraReason: The French and European right of withdrawal of fourteen days (art. L221-18 of the Code de la consommation) is set out in a section of its own, because a right that a consumer would have to infer from the words "where the law requires" is a right that the same code treats as not having been given at all (arts. L221-5 and L221-28).
@@ -39,7 +39,7 @@ L'article L221-18 du Code de la consommation donne au consommateur le droit de s
 
 **Comment l'exercer.** Écrivez-nous à [oren@gotop.co.il](mailto:oren@gotop.co.il) depuis l'adresse de courriel de votre compte, dans le délai de quatorze jours, en disant que vous vous rétractez. Un courriel sans formule particulière suffit ; un formulaire type de rétractation est disponible sur simple demande à la même adresse. Nous vous répondons par écrit et nous remboursons sur le moyen de paiement que vous avez utilisé.
 
-**Ce que le démarrage immédiat du Service change.** Le Service est un service numérique qui fonctionne dès l'ouverture du compte. En ouvrant un compte, vous nous demandez expressément de commencer à l'exécuter avant la fin du délai de quatorze jours. Les articles L221-25 et L221-28 du Code de la consommation en tirent deux conséquences, et nous les disons toutes les deux : si le Service est **pleinement exécuté** avant la fin du délai, à votre demande expresse et après que vous avez expressément renoncé à votre droit, ce droit est perdu ; et si vous vous rétractez alors que le Service n'a été exécuté qu'en partie, le droit subsiste et vous ne nous devez que le montant correspondant au service effectivement fourni jusqu'à la communication de votre décision, le reste vous étant remboursé. Un abonnement mensuel en cours n'est pas un service pleinement exécuté du seul fait que le compte est ouvert : dans les faits, une demande présentée dans les quatorze jours nous conduit à rembourser la période en cours au prorata de ce qui n'a pas été utilisé, et nous ne nous retranchons pas derrière l'exception pour refuser en bloc.
+**Ce que le démarrage immédiat du Service change.** Le Service est un service numérique qui fonctionne dès l'ouverture du compte. Avant de payer un abonnement, l'écran « Facturation » vous demande deux déclarations en une seule phrase, que vous devez cocher pour que les moyens de paiement apparaissent : que vous nous demandez expressément de commencer l'exécution avant la fin du délai de quatorze jours, et que vous renoncez expressément à votre droit de rétractation pour le cas où le Service serait pleinement exécuté avant cette fin. Sans cette case, aucun abonnement ne démarre. Les articles L221-25 et L221-28 du Code de la consommation en tirent deux conséquences, et nous les disons toutes les deux : si le Service est **pleinement exécuté** avant la fin du délai, à votre demande expresse et après que vous avez expressément renoncé à votre droit, ce droit est perdu ; et si vous vous rétractez alors que le Service n'a été exécuté qu'en partie, le droit subsiste et vous ne nous devez que le montant correspondant au service effectivement fourni jusqu'à la communication de votre décision, le reste vous étant remboursé. Un abonnement mensuel en cours n'est pas un service pleinement exécuté du seul fait que le compte est ouvert : dans les faits, une demande présentée dans les quatorze jours nous conduit à rembourser la période en cours au prorata de ce qui n'a pas été utilisé, et nous ne nous retranchons pas derrière l'exception pour refuser en bloc.
 
 Après les quatorze jours, les règles de la section 4 s'appliquent : l'abonnement peut être résilié à tout moment, sans remboursement de la période déjà payée, et l'accès continue jusqu'à la fin de cette période.
 
@@ -62,4 +62,4 @@ Numéro de société : 517274346
 Adresse : HaRechasim 24/2, Ramat Gan 5235524, Israël  
 Courriel : [oren@gotop.co.il](mailto:oren@gotop.co.il)
 
-Dernière mise à jour le 21 octobre 2026
+Dernière mise à jour le 7 novembre 2026

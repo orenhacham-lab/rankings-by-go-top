@@ -3,7 +3,7 @@ title: Política de privacidad | Go Top SEO
 description: Política de privacidad de Go Top SEO: cómo recopilamos, utilizamos y protegemos sus datos.
 locale: es
 source: app/(public)/en/privacy/page.tsx
-lastUpdated: 2026-11-06
+lastUpdated: 2026-11-07
 register: usted
 ---
 
@@ -418,6 +418,8 @@ Para cualquier asunto de privacidad, incluido el ejercicio de los derechos anter
 
 No estamos obligados a designar un delegado de protección de datos conforme a la Enmienda 13 a la Ley israelí de Protección de la Privacidad, y no hemos designado ninguno. Las solicitudes se gestionan a través del contacto indicado anteriormente.
 
+En el Espacio Económico Europeo tampoco estamos obligados a designar un delegado de protección de datos conforme al artículo 37 del RGPD: no somos una autoridad pública, nuestra actividad principal no es el tratamiento a gran escala de datos sensibles o relativos a condenas penales, y no realizamos una observación sistemática a gran escala de personas. Lo que ocupa su lugar es el canal indicado arriba, que atiende la misma persona que explota el Servicio y que responde en español. Igualmente, **no hemos designado un representante en la Unión conforme al artículo 27 del RGPD**, y ello porque nos acogemos a la excepción del artículo 27, apartado 2, letra a) del RGPD: nuestro tratamiento de datos de personas que se encuentran en el Espacio Económico Europeo es solo ocasional, no incluye el tratamiento a gran escala de categorías especiales de datos ni de datos relativos a condenas e infracciones penales, y es improbable que entrañe un riesgo para los derechos y libertades de las personas, teniendo en cuenta su naturaleza, contexto, alcance y fines. Es una afirmación sobre hechos y no sobre la interpretación del derecho, y por eso decimos también cuándo deja de valer: **desde el momento en que tengamos una cuenta abierta desde el Espacio Económico Europeo o el Reino Unido, designaremos un representante** e indicaremos aquí su nombre y su dirección, como exige el artículo 13, apartado 1, letra a). Para que ese hecho no deje de valer sin que lo sepamos, la apertura de una cuenta de ese tipo activa en nuestra parte un aviso el mismo día.
+
 ## Actualizaciones de esta política
 
 Podemos actualizar esta política de vez en cuando. Los cambios surten efecto inmediatamente tras su publicación. Le recomendamos revisar esta política con regularidad.
@@ -430,4 +432,4 @@ Si tiene preguntas sobre esta política de privacidad, contacte con:
 
 **Teléfono:** 054-9489377
 
-Esta política se actualizó por última vez el 6 de noviembre de 2026
+Esta política se actualizó por última vez el 7 de noviembre de 2026

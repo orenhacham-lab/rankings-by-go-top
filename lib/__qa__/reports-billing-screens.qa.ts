@@ -221,12 +221,17 @@ console.log('\nC) Billing: same plans, prices and PayPal containers; Shopify pan
     // behind server-decided flags. What C7 pins is unchanged: wherever PayPal
     // IS drawn it is handed the SERVER's `market` and nothing else — never a
     // value this view computed or a visitor chose.
-    && /<BillingClient market=\{market\} \/>/.test(s)
-    && !/<BillingClient market=\{[a-z]/i.test(s.replace('<BillingClient market={market} />', ''))
+    // The element gained a second prop on 2026-11-07: `acknowledged`, the
+    // withdrawal acknowledgement gate (lib/compliance/withdrawal-acknowledgement.ts).
+    // What C7 pins is unchanged and is still only about the currency — `market`
+    // is the SERVER's value and nothing else — so the shape is updated rather
+    // than the assertion loosened.
+    && new RegExp('<BillingClient market=\\{market\\} acknowledged=\\{checkoutUnlocked\\} />').test(s)
+    && !/<BillingClient market=\{(?!market\})/i.test(s)
     && !/language === 'en' \? 'USD'|=== 'he' \? 'ILS'/.test(s)
   check('C7: the view never sends or picks a currency; PayPal gets the server market', serverMarketOk(code))
   check('C7-MUT: the old select request fails C7', !serverMarketOk(code + "\nfetch('/api/billing-market/select', {})"))
-  check('C7-MUT: a display currency picked in the view fails C7', !serverMarketOk(code.replace('<BillingClient market={market} />', '<BillingClient market={shownMarket} />')))
+  check('C7-MUT: a display currency picked in the view fails C7', !serverMarketOk(code.replace('<BillingClient market={market} acknowledged={checkoutUnlocked} />', '<BillingClient market={shownMarket} acknowledged={checkoutUnlocked} />')))
   check('C7-MUT: a language-derived currency fails C7', !serverMarketOk(code + "\nconst m = language === 'en' ? 'USD' : 'ILS'"))
   const noAmber = (s: string) => !/\b(?:bg|border|ring|text)-commit\b/.test(s)
   check('C8: no amber (commit) colour on the billing screen; "recommended" uses the action colour', noAmber(code) && /bg-action px-2\.5 py-0\.5 text-caption font-semibold text-action-ink/.test(code))
