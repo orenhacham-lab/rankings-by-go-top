@@ -19,7 +19,7 @@
  * Run: npx tsx lib/marketplace/__qa__/marketplace.qa.ts
  */
 import { readFileSync } from 'fs'
-import { createHash, createHmac } from 'crypto'
+import { createCipheriv, createHash, createHmac } from 'crypto'
 import { createElement } from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
 import { CONSENT_DENIED, type ConsentChoices } from '../../consent/categories'
@@ -40,10 +40,12 @@ import {
   providerReadiness,
   JVZOO_IPN_V2_SCHEME,
   DIGISTORE24_IPN_SCHEME,
+  CLICKBANK_INS_SCHEME,
   type MarketplaceHmacHeaderScheme,
 } from '../config'
 import { CONSENT_REQUIRED_COUNTRIES, consentRequiredForCountry } from '../../consent/eprivacy-territory'
 import {
+  decryptMarketplaceEnvelope,
   fieldDigestFor,
   marketplaceSignatureFor,
   phpFormValue,
@@ -53,6 +55,7 @@ import {
 import {
   httpStatusForMarketplaceOutcome,
   marketplaceParser,
+  parseClickbankIns,
   parseDigistore24Ipn,
   recordMarketplaceOrder,
   unverifiedDeliveryTrace,
@@ -101,14 +104,24 @@ check('A6c: seller of record follows each platform\'s vendor agreement - JVZoo i
   marketplaceProvider('jvzoo')?.sellerOfRecord === false
   && marketplaceProvider('digistore24')?.sellerOfRecord === true
   && marketplaceProvider('clickbank')?.sellerOfRecord === true)
-// ClickBank alone now. Digistore24's documentation turned out to be PUBLIC
-// (docs/affiliate/digistore24-ipn-docs.md), so it has a verified scheme and a
-// parser; ClickBank's is still unread, and unread still means neither.
-check('A7: a platform whose documentation has not been read carries neither a scheme nor a parser',
-  marketplaceProvider('clickbank')?.signature === null && marketplaceParser('clickbank') === null)
-check('A7b: and a platform whose documentation HAS been read carries both',
-  ['digistore24', 'jvzoo'].every((s) =>
+// NONE now. Each platform's callback documentation turned out to be public,
+// and each is captured in the repository under docs/affiliate/ — so all three
+// carry a scheme and a parser read from the vendor's own words. The rule the
+// A7 checks were written to protect has not changed: a scheme and a parser
+// come IN PAIRS and only from a document we hold, never from a guess.
+check('A7: every registered platform carries BOTH a scheme and a parser, or neither',
+  ['digistore24', 'jvzoo', 'clickbank'].every((s) =>
+    (marketplaceProvider(s)?.signature !== null) === (marketplaceParser(s) !== null)))
+check('A7b: and all three carry both, each from a captured document',
+  ['digistore24', 'jvzoo', 'clickbank'].every((s) =>
     marketplaceProvider(s)?.signature !== null && marketplaceParser(s) !== null))
+check('A7c: the document each one was written from is in the repository',
+  ['digistore24-ipn-docs.md', 'jvzoo-webhook-docs.md', 'clickbank-ins-docs.md'].every((f) => {
+    try { return read(`docs/affiliate/${f}`).length > 1000 } catch { return false }
+  }))
+check('A7-MUT1: a platform with a scheme and no parser would be caught by A7',
+  !([['x', {}, null]] as [string, unknown, unknown][])
+    .every(([, scheme, parser]) => (scheme !== null) === (parser !== null)))
 check('A-MUT1: a scheme without a parser would fail A5',
   !([{ signature: {} }, { signature: null }] as { signature: unknown }[])
     .every((p) => (p.signature === null) === true))
@@ -133,23 +146,38 @@ check('B6: and it names what is missing — by NAME, not value',
   readiness.missing.includes('webhook_secret')
   && readiness.missing.includes('product_ids'))
 check('B6b: the scheme is NOT among them for a platform whose scheme is known',
-  readiness.missing.includes('signature_scheme') === false
-  && providerReadiness('clickbank').missing.includes('signature_scheme'))
+  readiness.missing.includes('signature_scheme') === false)
+/*
+ * NO REGISTERED PLATFORM IS SCHEME-LESS ANY MORE, so the branch that refuses
+ * one cannot be reached through a real slug. It stays load-bearing for the
+ * next platform added, so it is guarded in the CODE instead of through a
+ * provider — with its mutation control, because a guard over a branch nothing
+ * exercises is exactly the kind that rots unnoticed.
+ */
+const configSrc = code('lib/marketplace/config.ts')
+check('B6c: readiness still refuses a platform with no signature scheme',
+  /if \(!provider\.signature\) missing\.push\('signature_scheme'\)/.test(configSrc))
+check('B6c-MUT1: dropping that line would be caught',
+  !/if \(!provider\.signature\) missing\.push\('signature_scheme'\)/
+    .test(configSrc.replace("if (!provider.signature) missing.push('signature_scheme')", '')))
 process.env.MARKETPLACE_DIGISTORE24_WEBHOOK_SECRET = 'top-secret'
 process.env.MARKETPLACE_DIGISTORE24_PRODUCT_ADVANCED = 'PROD-ADV'
 readiness = providerReadiness('digistore24')
 check('B7: with the switch on, a secret, a product and a known scheme, it is ready',
   readiness.ready === true && readiness.missing.length === 0)
-check('B7b: and the same configuration on a platform with NO scheme is still not ready',
+check('B7b: ClickBank, whose scheme is now read too, becomes ready on the same three pieces',
   (() => {
     process.env.MARKETPLACE_CLICKBANK_ENABLED = 'true'
     process.env.MARKETPLACE_CLICKBANK_WEBHOOK_SECRET = 'top-secret'
     process.env.MARKETPLACE_CLICKBANK_PRODUCT_ADVANCED = 'PROD-ADV'
-    const cb = providerReadiness('clickbank')
-    delete process.env.MARKETPLACE_CLICKBANK_ENABLED
+    const ready = providerReadiness('clickbank')
     delete process.env.MARKETPLACE_CLICKBANK_WEBHOOK_SECRET
+    const withoutSecret = providerReadiness('clickbank')
+    delete process.env.MARKETPLACE_CLICKBANK_ENABLED
     delete process.env.MARKETPLACE_CLICKBANK_PRODUCT_ADVANCED
-    return cb.ready === false && cb.missing.join(',') === 'signature_scheme'
+    // And losing any ONE of them takes it straight back off.
+    return ready.ready === true && ready.missing.length === 0
+      && withoutSecret.ready === false && withoutSecret.missing.join(',') === 'webhook_secret'
   })())
 check('B8: an unregistered provider is reported as unregistered, not merely disabled',
   providerReadiness('paddle').missing.join(',') === 'unregistered_provider')
@@ -175,10 +203,10 @@ check('D1: the claim url is built from our own canonical origin and the fixed pa
 check('D2: and the token is encoded, so it cannot add a parameter of its own',
   marketplaceClaimUrl('a&b=c').endsWith('a%26b%3Dc'))
 /*
- * The buy url is gated on readiness, so these checks run against JVZoo, the
- * one provider that CAN become ready (it is the only one whose signature
- * scheme has been read). Digistore24 is used below for the gate itself,
- * because a provider with no scheme can never be ready - which is the point.
+ * The buy url is gated on readiness, so these checks run against JVZoo and
+ * turn one readiness piece off at a time. ClickBank is used for the
+ * unconfigured case below: it is registered and has a scheme, so what keeps
+ * its button off is the configuration alone, which is the gate under test.
  */
 process.env.MARKETPLACE_JVZOO_ENABLED = 'true'
 process.env.MARKETPLACE_JVZOO_WEBHOOK_SECRET = 'jv-secret'
@@ -204,12 +232,10 @@ check('D6: a plan with no configured url has none', marketplaceBuyUrl('jvzoo', '
  * hand. Each check below turns exactly one readiness piece off.
  */
 process.env.MARKETPLACE_CLICKBANK_BUY_URL_ADVANCED = 'https://www.clickbank.com/product/123'
-process.env.MARKETPLACE_CLICKBANK_ENABLED = 'true'
-process.env.MARKETPLACE_CLICKBANK_WEBHOOK_SECRET = 'top-secret'
-process.env.MARKETPLACE_CLICKBANK_PRODUCT_ADVANCED = 'PROD-ADV'
-check('D6a: a provider with no signature scheme shows NO buy button, however its url is set',
+check('D6a: an unconfigured provider shows NO buy button, however its url is set',
   providerReadiness('clickbank').ready === false
   && marketplaceBuyUrl('clickbank', 'advanced') === null)
+delete process.env.MARKETPLACE_CLICKBANK_BUY_URL_ADVANCED
 process.env.MARKETPLACE_JVZOO_ENABLED = 'false'
 check('D6b: switching the channel off removes the button',
   marketplaceBuyUrl('jvzoo', 'advanced') === null)
@@ -1440,6 +1466,153 @@ async function main() {
   check('DS-MUT4: forgetting to exclude the digest field would break every delivery',
     verifyMarketplaceSignature(dsSign(DS_SALE), null, 'ipn-passphrase',
       { ...DIGISTORE24_IPN_SCHEME, excluded: [] }).ok === false)
+
+  // ── CB. ClickBank INS 8.0, the one platform that encrypts instead of
+  // signing. docs/affiliate/clickbank-ins-docs.md.
+  console.log('\nCB. clickbank ins')
+
+  /*
+   * NO PUBLISHED TEST VECTOR EXISTS. Digistore24's guide prints a worked
+   * digest, which is why DS1 above is a real external check; ClickBank's
+   * article prints code and no example payload, so the round trip below is
+   * ours and only proves we agree with ourselves. What IS checked against an
+   * outside source is the part their four samples state character for
+   * character and the part a careless port gets wrong: the KEY DERIVATION.
+   * The expected key here was computed outside this repository with Python's
+   * hashlib, not by the code under test.
+   */
+  const CB_SECRET = 'cb-secret-16chr'
+  const CB_KEY_HEX32 = '8c87c8c6f27bb67e8fd6df827092e777'
+  check('CB1: the key is the first 32 characters of the HEX rendering of SHA-1(secret)',
+    createHash('sha1').update(CB_SECRET, 'utf8').digest('hex').slice(0, 32) === CB_KEY_HEX32)
+  check('CB2: those 32 characters are used as 32 ASCII BYTES — an AES-256 key',
+    Buffer.from(CB_KEY_HEX32, 'utf8').length === 32)
+  check('CB3: and the careless reading — the first 16 RAW digest bytes — is not even the right length',
+    createHash('sha1').update(CB_SECRET, 'utf8').digest().subarray(0, 16).length === 16)
+
+  /** An envelope exactly as their JSON describes it: base64 ciphertext, base64 iv. */
+  const cbEnvelope = (payload: unknown, secret = CB_SECRET, iv = Buffer.alloc(16, 7)) => {
+    const key = Buffer.from(createHash('sha1').update(secret, 'utf8').digest('hex').slice(0, 32), 'utf8')
+    const cipher = createCipheriv('aes-256-cbc', key, iv)
+    const body = typeof payload === 'string' ? payload : JSON.stringify(payload)
+    const ciphertext = Buffer.concat([cipher.update(body, 'utf8'), cipher.final()])
+    return JSON.stringify({ notification: ciphertext.toString('base64'), iv: iv.toString('base64') })
+  }
+
+  const CB_SALE = {
+    transactionType: 'SALE',
+    transactionTime: '2026-11-07T09:00:00Z',
+    receipt: 'ABC12DEF',
+    vendor: 'gotopseo',
+    currency: 'USD',
+    totalOrderAmount: 79.0,
+    totalTaxAmount: 13.43,
+    version: '8.0',
+    lineItems: [{ itemNo: 'CB-ADV', productTitle: 'Advanced', recurring: true }],
+    customer: { billing: { email: 'buyer@example.com' }, shipping: { email: 'other@example.com' } },
+  }
+
+  const cbVerify = (rawBody: string, secret: string | null = CB_SECRET) =>
+    verifyMarketplaceSignature(rawBody, null, secret, CLICKBANK_INS_SCHEME)
+
+  check('CB4: an envelope encrypted with our key verifies',
+    cbVerify(cbEnvelope(CB_SALE)).ok === true)
+  check('CB5: the same envelope under ANOTHER key is refused as a mismatch — the case the route logs loudly',
+    cbVerify(cbEnvelope(CB_SALE, 'someone-elses')).reason === 'mismatch')
+  check('CB6: a body that is not JSON at all is refused, and never throws',
+    cbVerify('not json').reason === 'mismatch')
+  check('CB7: an envelope missing either field is refused',
+    cbVerify(JSON.stringify({ notification: 'abc' })).ok === false
+    && cbVerify(JSON.stringify({ iv: 'abc' })).ok === false)
+  check('CB8: ciphertext that decrypts into something that is NOT JSON is refused — their own sample\'s test',
+    cbVerify(cbEnvelope('plain text, padded correctly')).reason === 'mismatch')
+  check('CB9: no secret is OUR misconfiguration and says so, which is what makes it a 503',
+    cbVerify(cbEnvelope(CB_SALE), null).reason === 'missing_secret')
+  check('CB10: decryption returns the EXACT plaintext, byte for byte',
+    decryptMarketplaceEnvelope(cbEnvelope(CB_SALE), CB_SECRET, CLICKBANK_INS_SCHEME)
+      === JSON.stringify(CB_SALE))
+  check('CB11: a wrong IV decrypts to nothing rather than throwing',
+    decryptMarketplaceEnvelope(cbEnvelope(CB_SALE, CB_SECRET, Buffer.alloc(16, 9))
+      .replace(/"iv":"[^"]+"/, `"iv":"${Buffer.alloc(16, 1).toString('base64')}"`),
+      CB_SECRET, CLICKBANK_INS_SCHEME) === null)
+
+  // The parser. It decrypts with the same secret and reads their documented fields.
+  const cbParse = (payload: unknown, secret: string | null = CB_SECRET) =>
+    parseClickbankIns(cbEnvelope(payload), null, secret)
+
+  const cbSale = cbParse(CB_SALE)
+  check('CB12: a SALE becomes a paid event with the RECEIPT as the order id',
+    cbSale?.kind === 'paid' && cbSale?.externalOrderId === 'ABC12DEF')
+  check('CB13: the product is the first line item\'s itemNo — the SKU that maps to a plan',
+    cbSale?.externalProductId === 'CB-ADV')
+  check('CB14: the buyer is the BILLING email, with shipping only as a fallback',
+    cbSale?.buyerEmail === 'buyer@example.com'
+    && cbParse({ ...CB_SALE, customer: { shipping: { email: 'other@example.com' } } })?.buyerEmail
+      === 'other@example.com')
+  check('CB15: amounts are major units in JSON and become minor units',
+    cbSale?.amountMinor === 7900 && cbSale?.taxMinor === 1343)
+  check('CB16: an amount sent as a STRING is read too, and anything else is null not zero',
+    cbParse({ ...CB_SALE, totalOrderAmount: '79.00', totalTaxAmount: null })?.amountMinor === 7900
+    && cbParse({ ...CB_SALE, totalTaxAmount: null })?.taxMinor === null)
+  check('CB17: THE PERIOD END IS NULL — version 8 reports no next-payment date, so none is invented',
+    cbSale?.currentPeriodEnd === null)
+  check('CB18: BILL is a rebill and is paid as well',
+    cbParse({ ...CB_SALE, transactionType: 'BILL' })?.kind === 'paid')
+  check('CB19: RFND, CGBK and INSF are all refunds',
+    ['RFND', 'CGBK', 'INSF'].every((t) => cbParse({ ...CB_SALE, transactionType: t })?.kind === 'refunded'))
+  check('CB20: THE WHOLE TEST FAMILY IS IGNORED — a test transaction must never become a real plan',
+    ['TEST', 'TEST_SALE', 'TEST_BILL', 'TEST_RFND', 'CANCEL-TEST-REBILL', 'UNCANCEL-TEST-REBILL']
+      .every((t) => cbParse({ ...CB_SALE, transactionType: t }) === null))
+  check('CB21: and so is every type that moved no money, a cancellation among them',
+    ['CANCEL-REBILL', 'UNCANCEL-REBILL', 'SUBSCRIPTION-CHG', 'ABANDONED_ORDER',
+      'CUSTOMER_AUTH_FAILURE', 'CUSTOMER_EMAIL_UPDATE', 'CUSTOMER_UPDATE_CC_NOTIFICATION',
+      'PURCHASE_DETAILS_EMAIL_RESPONSE']
+      .every((t) => cbParse({ ...CB_SALE, transactionType: t }) === null))
+  check('CB22: the parser handed NO secret reads nothing — it cannot decrypt, so it must not guess',
+    cbParse(CB_SALE, null) === null)
+  check('CB23: the parser handed the WRONG secret reads nothing either',
+    cbParse(CB_SALE, 'someone-elses') === null)
+  check('CB24: a payload with no line items has no product, and an unknown product is refused upstream',
+    cbParse({ ...CB_SALE, lineItems: [] })?.externalProductId === null
+    && planForMarketplaceProductId('clickbank', 'CB-ADV') === null)
+  check('CB25: the registry reaches this parser by slug',
+    marketplaceParser('clickbank') === parseClickbankIns)
+
+  // THE ROUTE MUST HAND THE PARSER THE SECRET, or every ClickBank delivery
+  // would verify and then parse to nothing: recorded as ignored, with a paid
+  // order lost in silence.
+  const cbRouteSrc = code('app/api/marketplace/[provider]/webhook/route.ts')
+  check('CB26: the route passes the secret to the parser',
+    /parser\(rawBody, request\.headers\.get\('content-type'\), marketplaceWebhookSecret\(provider\.slug\)\)/
+      .test(cbRouteSrc))
+  check('CB27: and it still verifies before it parses',
+    cbRouteSrc.indexOf('verifyMarketplaceSignature(') < cbRouteSrc.indexOf('parser(rawBody'))
+  check('CB28: ClickBank is a seller of record, so a tax figure from it is NOT reported as a contradiction',
+    marketplaceProvider('clickbank')?.sellerOfRecord === true
+    && /!provider\.sellerOfRecord && event\.taxMinor/.test(cbRouteSrc))
+
+  // MUTATION CONTROLS.
+  check('CB-MUT1: deriving the key from the RAW digest instead of its hex text would decrypt nothing',
+    (() => {
+      const wrong = createHash('sha1').update(CB_SECRET, 'utf8').digest().subarray(0, 16)
+      try {
+        createCipheriv('aes-256-cbc', wrong, Buffer.alloc(16, 7))
+        return false // a 16-byte key must not be accepted as AES-256
+      } catch { return true }
+    })())
+  check('CB-MUT2: using the secret itself as the key would be caught by CB4',
+    cbVerify(cbEnvelope(CB_SALE)).ok === true
+    && decryptMarketplaceEnvelope(cbEnvelope(CB_SALE), CB_KEY_HEX32, CLICKBANK_INS_SCHEME) === null)
+  check('CB-MUT3: a parser that treated an unknown type as a sale would be caught by CB20',
+    cbParse({ ...CB_SALE, transactionType: 'TEST_SALE' }) === null
+    && cbParse({ ...CB_SALE, transactionType: 'SALE' }) !== null)
+  check('CB-MUT4: dropping the JSON test on the plaintext would accept padded garbage',
+    cbVerify(cbEnvelope('plain text, padded correctly')).ok === false)
+  check('CB-MUT5: a route that dropped the secret argument would be caught by CB26',
+    !/parser\(rawBody, request\.headers\.get\('content-type'\), marketplaceWebhookSecret\(provider\.slug\)\)/
+      .test(cbRouteSrc.replace(
+        "parser(rawBody, request.headers.get('content-type'), marketplaceWebhookSecret(provider.slug))",
+        "parser(rawBody, request.headers.get('content-type'))")))
 
   // ── BADGE. The trust badge Digistore24 require before a product may even
   // be submitted — a SCRIPT, not a beacon, and it writes a week-long cookie.

@@ -43,8 +43,8 @@
  */
 
 import { randomBytes } from 'crypto'
-import { planForMarketplaceProductId, marketplaceClaimUrl } from './config'
-import { phpFormValue } from './signature'
+import { CLICKBANK_INS_SCHEME, planForMarketplaceProductId, marketplaceClaimUrl } from './config'
+import { decryptMarketplaceEnvelope, phpFormValue } from './signature'
 import type { PlanCode } from '@/lib/plans/catalog'
 
 // `any` deliberately — the convention this repo uses for anything called with
@@ -95,12 +95,25 @@ export interface MarketplaceOrderEvent {
  *
  * A parser can only be written from the platform's own documentation — which
  * field carries the order id, how it reports the period end, which
- * notification types mean "paid" — and never from a guess. JVZoo's is below,
- * written from the IPN v2 spec read inside the seller account. ClickBank and
- * Digistore24 have none yet, and a provider with no parser refuses every
- * delivery, exactly as one with no signature scheme does.
+ * notification types mean "paid" — and never from a guess. Each of the three
+ * below cites the document it was written from, and a provider with no parser
+ * refuses every delivery, exactly as one with no signature scheme does.
+ *
+ * `secret` IS PASSED BECAUSE ONE PLATFORM ENCRYPTS ITS BODY. ClickBank's INS
+ * carries no plaintext at all (docs/affiliate/clickbank-ins-docs.md), so its
+ * parser has to decrypt the envelope before it can read a field. It is handed
+ * the same secret the signature check used and it re-derives the same
+ * plaintext; the alternative — passing the decrypted text down from the route
+ * — would mean the route decides what a parser reads, and every other parser
+ * would have to be taught about a plaintext it does not have. Parsers that do
+ * not need it ignore it, and a parser that needs it and is given nothing
+ * returns null rather than reading an unverified body.
  */
-export type MarketplaceParser = (rawBody: string, contentType: string | null) => MarketplaceOrderEvent | null
+export type MarketplaceParser = (
+  rawBody: string,
+  contentType: string | null,
+  secret?: string | null,
+) => MarketplaceOrderEvent | null
 
 /** Dollars in a form field, as minor units; null when the field is absent or unusable. */
 function dollarsToMinor(raw: string | null): number | null {
@@ -463,6 +476,114 @@ function digistore24Date(raw: string | null): string | null {
   return null
 }
 
+/**
+ * ClickBank INS 8.0 — docs/affiliate/clickbank-ins-docs.md, captured from
+ * their own public support article on 2026-11-07.
+ *
+ * THE BODY IS CIPHERTEXT, so this parser starts by decrypting it with the same
+ * secret and the same scheme the route already verified with. That decryption
+ * IS the authentication on this platform, which is why it cannot be skipped
+ * here either: a parser handed no secret, or an envelope that does not decrypt
+ * into JSON, returns null and acts on nothing.
+ *
+ * `receipt` is the order id, not `transactionTime` and not an invented
+ * composite: their page documents it as the receipt id of the transaction.
+ * `lineItems[0].itemNo` is the product SKU, which is what maps a delivery to
+ * one of our plans.
+ *
+ * THE PERIOD END IS NULL, AND THAT IS THE DOCUMENTED TRUTH. Version 8 has no
+ * next-payment date — the legacy v2 `cnextpaymentdate` was dropped and a v8
+ * line item says only `recurring: true|false`. Inventing "a month from now"
+ * would grant a period nobody reported, so the order is recorded and mailed
+ * and its claim stops at `needs_operator / period_end_unknown` until a person
+ * grants it. The fix is their Orders API, not a guess here.
+ *
+ * THE TEST FAMILY IS REFUSED EXPLICITLY. `TEST`, `TEST_SALE`, `TEST_BILL`,
+ * `TEST_RFND` and the two test-rebill types all fall through to null, like
+ * every other type that moved no money. Unlike Digistore24 there is no
+ * `api_mode` flag to read: the type itself is the flag.
+ */
+export const parseClickbankIns: MarketplaceParser = (rawBody, _contentType, secret) => {
+  if (!secret) return null
+  const plaintext = decryptMarketplaceEnvelope(rawBody, secret, CLICKBANK_INS_SCHEME)
+  if (plaintext === null) return null
+
+  let body: Record<string, unknown>
+  try {
+    const parsed: unknown = JSON.parse(plaintext)
+    if (typeof parsed !== 'object' || parsed === null) return null
+    body = parsed as Record<string, unknown>
+  } catch {
+    return null
+  }
+
+  const type = typeof body.transactionType === 'string' ? body.transactionType.trim().toUpperCase() : ''
+  const kind =
+    type === 'SALE' || type === 'BILL'
+      ? 'paid'
+      : type === 'RFND' || type === 'CGBK' || type === 'INSF'
+        ? 'refunded'
+        : null
+  // CANCEL-REBILL, UNCANCEL-REBILL, SUBSCRIPTION-CHG, ABANDONED_ORDER, the
+  // customer-notification types and the whole TEST family land here. A
+  // cancellation among them for the same reason as on Digistore24: the buyer
+  // keeps what they paid for until the period ends.
+  if (!kind) return null
+
+  const customer = asRecord(body.customer)
+  const email =
+    stringField(asRecord(customer?.billing), 'email') ?? stringField(asRecord(customer?.shipping), 'email') ?? ''
+  const firstItem = Array.isArray(body.lineItems) ? asRecord(body.lineItems[0]) : null
+
+  return {
+    kind,
+    externalOrderId: stringField(body, 'receipt') ?? '',
+    externalProductId: firstItem ? stringField(firstItem, 'itemNo') : null,
+    buyerEmail: email,
+    amountMinor: majorToMinor(body.totalOrderAmount),
+    currency: typeof body.currency === 'string' && /^[A-Za-z]{3}$/.test(body.currency.trim())
+      ? body.currency.trim().toUpperCase()
+      : null,
+    // ClickBank is the seller of record (lib/marketplace/config.ts), so tax
+    // here is the channel working as intended and the webhook's contradiction
+    // report is scoped away from it. Carried so the report stays one code path.
+    taxMinor: majorToMinor(body.totalTaxAmount),
+    currentPeriodEnd: null,
+  }
+}
+
+/** A nested object, or null for anything that is not one. */
+function asRecord(value: unknown): Record<string, unknown> | null {
+  return typeof value === 'object' && value !== null && !Array.isArray(value)
+    ? (value as Record<string, unknown>)
+    : null
+}
+
+/** A non-empty string field, trimmed, or null. */
+function stringField(source: Record<string, unknown> | null, name: string): string | null {
+  const value = source?.[name]
+  if (typeof value !== 'string') return null
+  return value.trim() || null
+}
+
+/**
+ * A major-unit amount from a JSON body, as minor units.
+ *
+ * It accepts a number OR a numeric string because JSON amounts arrive as both
+ * in the wild, and it rejects everything else rather than coercing: `null`,
+ * `true` and `""` all become null, not 0. A zero amount we were actually sent
+ * stays 0, which is what makes the webhook's tax check able to tell "no tax
+ * field" from "tax of zero".
+ */
+function majorToMinor(value: unknown): number | null {
+  if (typeof value === 'number') return Number.isFinite(value) ? Math.round(value * 100) : null
+  if (typeof value !== 'string') return null
+  const trimmed = value.trim()
+  if (!trimmed) return null
+  const major = Number.parseFloat(trimmed)
+  return Number.isFinite(major) ? Math.round(major * 100) : null
+}
+
 /*
  * The registry sits at the end of the file so it can name every parser
  * above it: these are `const` arrow functions, which are not hoisted, and a
@@ -471,6 +592,7 @@ function digistore24Date(raw: string | null): string | null {
 export const MARKETPLACE_PARSERS: Readonly<Record<string, MarketplaceParser>> = {
   jvzoo: parseJvzooIpnV2,
   digistore24: parseDigistore24Ipn,
+  clickbank: parseClickbankIns,
 }
 
 export function marketplaceParser(slug: string): MarketplaceParser | null {

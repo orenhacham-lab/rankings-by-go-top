@@ -152,7 +152,13 @@ async function handle(request: Request, slug: string): Promise<Response> {
     return Response.json({ error: 'unauthorized' }, { status })
   }
 
-  const event = parser(rawBody, request.headers.get('content-type'))
+  // THE SECRET IS PASSED TO THE PARSER TOO, for the one platform whose body is
+  // ciphertext rather than plaintext: ClickBank's INS carries no readable field
+  // until it is decrypted with our own key. The parser re-derives the same
+  // plaintext the check above already proved decryptable, which keeps this
+  // route from being the thing that decides what a parser may read. Every other
+  // parser ignores the argument.
+  const event = parser(rawBody, request.headers.get('content-type'), marketplaceWebhookSecret(provider.slug))
   // A body the parser does not recognise is not an error: these platforms
   // send notification types we have no business acting on. It still has to be
   // ACKNOWLEDGED in the platform's own terms, because an ignored notification
