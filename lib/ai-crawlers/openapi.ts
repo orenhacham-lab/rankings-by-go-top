@@ -18,15 +18,29 @@
  * is none. No rate limit, because the route serves a constant and has none. No
  * endpoint that we do not serve: a catalogue's validator checks every path, and
  * a path that 404s is the cheapest possible way to look untrustworthy.
+ *
+ * THE MEASUREMENT IS DESCRIBED HERE TOO, and its `limitations` array is a
+ * required field of the schema rather than a note in the prose. A description a
+ * machine reads is exactly where a caveat gets dropped, so the shape makes
+ * dropping it a schema violation.
  */
+import { BLOCKING_MEASUREMENT } from './blocking-measurement'
 import {
   AI_CRAWLER_DATASET_LICENSE,
   AI_CRAWLER_DATASET_VERSION,
 } from './dataset'
 
-/** Where the description, and the endpoint it describes, live. */
+/** Where the description, and the endpoints it describes, live. */
 const SITE = 'https://www.gotopseo.com'
 const DATASET_PATH = '/api/public/ai-crawlers'
+const MEASUREMENT_PATH = '/api/public/ai-crawler-blocking'
+
+/**
+ * The purposes the dataset uses, in one place: the crawler rows, the candidate
+ * rows and the measurement's per-crawler breakdown all speak this vocabulary,
+ * and a second copy is how an enum drifts.
+ */
+const PURPOSES = ['train', 'search', 'answer', 'ads', 'preview'] as const
 
 /**
  * `2026.11.01` is the dataset's own version. OpenAPI's `info.version` describes
@@ -65,7 +79,13 @@ export function aiCrawlerOpenApiDocument() {
       description: 'The same table rendered as a page, with a checker that reads a live robots.txt.',
       url: `${SITE}/en/ai-crawlers`,
     },
-    tags: [{ name: 'dataset', description: 'The crawler reference table.' }],
+    tags: [
+      { name: 'dataset', description: 'The crawler reference table.' },
+      {
+        name: 'measurement',
+        description: 'A dated reading of how many sites block these crawlers, with the limitation that bounds it.',
+      },
+    ],
     paths: {
       [DATASET_PATH]: {
         get: {
@@ -99,6 +119,52 @@ export function aiCrawlerOpenApiDocument() {
                   schema: {
                     type: 'string',
                     description: 'Header row followed by one row per documented crawler: token, operator, purpose, crawls, respects_robots, classic_search, docs, verified, note.',
+                  },
+                },
+              },
+            },
+            '451': {
+              description: 'The request came from a jurisdiction this service may not serve. No body.',
+            },
+          },
+        },
+      },
+      [MEASUREMENT_PATH]: {
+        get: {
+          tags: ['measurement'],
+          operationId: 'getAiCrawlerBlocking',
+          summary: 'How many sites block these crawlers, measured once',
+          description: [
+            'One dated reading of robots.txt across a sample of highly ranked sites, with the method, the failures and the limitations in the same payload as the figures.',
+            '',
+            '`limitations` is not decoration. The sample is large, highly ranked sites, so the figures are not a picture of small businesses, and `notSampled` names the markets a reader might otherwise assume were included. The CSV repeats the first limitation on every row for the same reason.',
+          ].join('\n'),
+          parameters: [
+            {
+              name: 'format',
+              in: 'query',
+              required: false,
+              description: 'Omit for JSON. `csv` returns the per-market rows as RFC 4180 CSV, as a file download.',
+              schema: { type: 'string', enum: ['csv'] },
+            },
+          ],
+          responses: {
+            '200': {
+              description: 'The measurement.',
+              headers: {
+                'x-license': {
+                  description: 'The licence the data is served under.',
+                  schema: { type: 'string', examples: [AI_CRAWLER_DATASET_LICENSE.id] },
+                },
+              },
+              content: {
+                'application/json': {
+                  schema: { $ref: '#/components/schemas/Measurement' },
+                },
+                'text/csv': {
+                  schema: {
+                    type: 'string',
+                    description: 'Header row followed by one row per market: market, blocks_traffic_crawler_pct, n_robots_read, measured_on, limitation.',
                   },
                 },
               },
@@ -165,7 +231,7 @@ export function aiCrawlerOpenApiDocument() {
             operator: { type: 'string', description: 'Who runs it.', examples: ['OpenAI'] },
             purpose: {
               type: 'string',
-              enum: ['train', 'search', 'answer', 'ads', 'preview'],
+              enum: [...PURPOSES],
               description: 'What the operator fetches pages for. The field that changes the decision.',
             },
             crawls: {
@@ -205,12 +271,173 @@ export function aiCrawlerOpenApiDocument() {
             operator: { type: 'string' },
             purpose: {
               type: 'string',
-              enum: ['train', 'search', 'answer', 'ads', 'preview'],
+              enum: [...PURPOSES],
               description: 'Our best reading of what it is for. Not an operator statement.',
             },
             whyHere: {
               type: 'string',
               description: 'Why the row is a candidate and not a dataset entry. A link to an operator page is the correction this list wants.',
+            },
+          },
+        },
+        License: {
+          type: 'object',
+          required: ['id', 'url', 'attribution'],
+          description: 'The licence, and the attribution it asks for.',
+          properties: {
+            id: { type: 'string', examples: [AI_CRAWLER_DATASET_LICENSE.id] },
+            url: { type: 'string', format: 'uri', examples: [AI_CRAWLER_DATASET_LICENSE.url] },
+            attribution: { type: 'string' },
+          },
+        },
+        MarketShare: {
+          type: 'object',
+          required: ['market', 'blocksTrafficCrawlerPct'],
+          properties: {
+            market: {
+              type: 'string',
+              description: "The market's suffix as sampled, or `.com` for the English-language slice.",
+              examples: ['.nl'],
+            },
+            blocksTrafficCrawlerPct: {
+              type: 'number',
+              description: "Share of that market's read robots.txt files blocking a crawler that would have brought visitors.",
+            },
+          },
+        },
+        CrawlerShare: {
+          type: 'object',
+          required: ['token', 'purpose', 'blockedPct'],
+          properties: {
+            token: { type: 'string', examples: ['GPTBot'] },
+            purpose: { type: 'string', enum: [...PURPOSES] },
+            blockedPct: {
+              type: 'number',
+              description: 'Share of the whole read sample blocking this token.',
+            },
+          },
+        },
+        Measurement: {
+          type: 'object',
+          required: [
+            'version',
+            'license',
+            'source',
+            'dataset',
+            'measuredOn',
+            'method',
+            'findings',
+            'limitations',
+            'notSampled',
+          ],
+          properties: {
+            version: {
+              type: 'string',
+              description: 'The measurement date as `YYYY.MM.DD`. A dated measurement never changes, so a consumer can cache on it.',
+            },
+            license: { $ref: '#/components/schemas/License' },
+            source: {
+              type: 'string',
+              format: 'uri',
+              description:
+                'The page about these crawlers, for a human reader. It does not render the measurement itself: this endpoint is where the figures are published.',
+            },
+            dataset: {
+              type: 'string',
+              format: 'uri',
+              description: 'The crawler reference table the tokens in this measurement come from.',
+            },
+            measuredOn: {
+              type: 'string',
+              format: 'date',
+              description: 'The day the robots.txt files were read.',
+              examples: [BLOCKING_MEASUREMENT.measuredOn],
+            },
+            method: {
+              type: 'object',
+              required: ['sample', 'markets', 'domainsRequested', 'robotsFilesRead', 'failures', 'how', 'reproducible'],
+              description: 'How the sample was drawn and how much of it answered.',
+              properties: {
+                sample: { type: 'string' },
+                markets: {
+                  type: 'array',
+                  description: 'The markets actually sampled. A market absent here is absent from the findings.',
+                  items: { type: 'string' },
+                },
+                domainsRequested: { type: 'integer' },
+                robotsFilesRead: {
+                  type: 'integer',
+                  description: 'The n every percentage is of: files read, not domains requested.',
+                },
+                failures: {
+                  type: 'object',
+                  required: ['unreachable', 'servedHtmlInsteadOfRobots'],
+                  description: 'Why the rest did not answer. Published so the gap between the two numbers above is not a mystery.',
+                  properties: {
+                    unreachable: { type: 'integer' },
+                    servedHtmlInsteadOfRobots: { type: 'integer' },
+                  },
+                },
+                how: { type: 'string' },
+                reproducible: {
+                  type: 'string',
+                  description: 'Why someone else can rebuild the sample and check us.',
+                },
+              },
+            },
+            findings: {
+              type: 'object',
+              required: [
+                'ofGptbotBlockersAlsoBlockingTrafficCrawlerPct',
+                'gptbotBlockers',
+                'blocksAiTrafficCrawlerButAllowsGooglebotPct',
+                'blockedTrainingKeptSearchOpenPct',
+                'anyTrafficBringingCrawlerBlockedPct',
+                'byCrawler',
+                'byMarket',
+              ],
+              properties: {
+                ofGptbotBlockersAlsoBlockingTrafficCrawlerPct: {
+                  type: 'number',
+                  description: 'Of the sites blocking GPTBot, the share that also block a crawler that would have brought visitors.',
+                },
+                gptbotBlockers: {
+                  type: 'integer',
+                  description: 'How many sites the figure above is a share of.',
+                },
+                blocksAiTrafficCrawlerButAllowsGooglebotPct: {
+                  type: 'number',
+                  description: 'Blocking an AI crawler that brings visitors while still allowing the classic search crawler.',
+                },
+                blockedTrainingKeptSearchOpenPct: {
+                  type: 'number',
+                  description: 'Blocked training and left search open: the distinction that was presumably intended.',
+                },
+                anyTrafficBringingCrawlerBlockedPct: { type: 'number' },
+                byCrawler: {
+                  type: 'array',
+                  items: { $ref: '#/components/schemas/CrawlerShare' },
+                },
+                byMarket: {
+                  type: 'array',
+                  description: 'Highest-blocking market first.',
+                  items: { $ref: '#/components/schemas/MarketShare' },
+                },
+              },
+            },
+            limitations: {
+              type: 'array',
+              description: 'What the figures do not say. The first is the one a reader most often gets wrong, and it is the one the CSV repeats on every row.',
+              items: { type: 'string' },
+            },
+            notSampled: {
+              type: 'object',
+              required: ['markets', 'note'],
+              description: 'Markets a reader might assume were included, named so the assumption cannot be made quietly.',
+              properties: {
+                markets: { type: 'array', items: { type: 'string' } },
+                note: { type: 'string' },
+              },
             },
           },
         },

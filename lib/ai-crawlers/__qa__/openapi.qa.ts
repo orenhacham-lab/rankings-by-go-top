@@ -13,6 +13,7 @@
 import { readFileSync, existsSync } from 'node:fs'
 import { join } from 'node:path'
 import { aiCrawlerOpenApiDocument } from '../openapi'
+import { BLOCKING_MEASUREMENT, BLOCKING_MEASUREMENT_VERSION } from '../blocking-measurement'
 import {
   AI_CRAWLER_CANDIDATES,
   AI_CRAWLER_DATASET,
@@ -53,6 +54,9 @@ const arr = (value: unknown): unknown[] => (Array.isArray(value) ? value : [])
 const str = (value: unknown): string => (typeof value === 'string' ? value : '')
 const row = (value: unknown): Record<string, unknown> => value as Record<string, unknown>
 const DATASET_PATH = '/api/public/ai-crawlers'
+const MEASUREMENT_PATH = '/api/public/ai-crawler-blocking'
+/** Both described paths, in the order the document declares them. */
+const DESCRIBED = [DATASET_PATH, MEASUREMENT_PATH]
 
 // ---- the document is a document ----
 
@@ -69,12 +73,24 @@ check('a single https server is declared', servers.length === 1 && /^https:\/\//
 // ---- it describes only what we serve ----
 
 const paths = Object.keys(obj(doc.paths))
-check('exactly one path is described', paths.length === 1)
-check('that path is the dataset endpoint', paths[0] === DATASET_PATH)
+check('exactly the two endpoints we serve are described', JSON.stringify(paths) === JSON.stringify(DESCRIBED))
 
 const get = at(doc, `paths.${DATASET_PATH}.get`)
-check('the path declares GET and nothing else', Object.keys(obj(at(doc, `paths.${DATASET_PATH}`))).join(',') === 'get')
-check('GET has an operationId', str(at(get, 'operationId')).length > 0)
+const measurementGet = at(doc, `paths.${MEASUREMENT_PATH}.get`)
+for (const p of DESCRIBED) {
+  check(`${p} declares GET and nothing else`, Object.keys(obj(at(doc, `paths.${p}`))).join(',') === 'get')
+  check(`${p} GET has an operationId`, str(at(doc, `paths.${p}.get.operationId`)).length > 0)
+}
+check(
+  'the two operationIds are distinct',
+  str(at(get, 'operationId')) !== str(at(measurementGet, 'operationId')),
+)
+check(
+  'every declared tag is used by an operation',
+  arr(doc.tags)
+    .map((t) => str(at(t, 'name')))
+    .every((name) => DESCRIBED.some((p) => arr(at(doc, `paths.${p}.get.tags`)).map(str).includes(name))),
+)
 
 // Every described path must resolve to a route file in the app, or a validator
 // following the document gets a 404 from us.
@@ -102,6 +118,48 @@ check('the route really can answer 451', routeSrc.includes('status: 451'))
 check('200 declares both media types the route serves', JSON.stringify(Object.keys(obj(at(get, 'responses.200.content'))).sort()) === JSON.stringify(['application/json', 'text/csv']))
 check('the x-license header is documented', typeof at(get, 'responses.200.headers.x-license') === 'object')
 check('the route really sets x-license', routeSrc.includes("'x-license'"))
+
+// ---- the measurement endpoint, held to the same bargain ----
+
+const measurementSrc = stripComments(readFileSync(join(ROOT, 'app', MEASUREMENT_PATH, 'route.ts'), 'utf8'))
+const measurementParams = arr(at(measurementGet, 'parameters'))
+check('the measurement describes exactly one query parameter', measurementParams.length === 1)
+check(
+  'it is `format` in the query, optional, csv only',
+  at(measurementParams[0], 'name') === 'format' &&
+    at(measurementParams[0], 'in') === 'query' &&
+    at(measurementParams[0], 'required') === false &&
+    JSON.stringify(at(measurementParams[0], 'schema.enum')) === JSON.stringify(['csv']),
+)
+check('the measurement route really reads `format`', measurementSrc.includes("searchParams.get('format')"))
+check('the measurement route really answers csv', measurementSrc.includes("format === 'csv'"))
+const measurementCodes = Object.keys(obj(at(measurementGet, 'responses'))).sort()
+check('the documented measurement codes are 200 and 451', JSON.stringify(measurementCodes) === JSON.stringify(['200', '451']))
+check('the measurement route really can answer 451', measurementSrc.includes('status: 451'))
+check(
+  'the measurement 200 declares both media types it serves',
+  JSON.stringify(Object.keys(obj(at(measurementGet, 'responses.200.content'))).sort()) ===
+    JSON.stringify(['application/json', 'text/csv']),
+)
+check('the measurement x-license header is documented', typeof at(measurementGet, 'responses.200.headers.x-license') === 'object')
+check('the measurement route really sets x-license', measurementSrc.includes("'x-license'"))
+check(
+  'the Measurement schema is referenced by its 200 response',
+  at(measurementGet, 'responses.200.content.application/json.schema.$ref') === '#/components/schemas/Measurement',
+)
+
+// The limitation is the one field this endpoint exists to carry, so the
+// document cannot describe the measurement without requiring it — nor can the
+// CSV description promise a column the route does not write on every row.
+check(
+  'the document requires `limitations`',
+  arr(at(doc, 'components.schemas.Measurement.required')).map(str).includes('limitations'),
+)
+check(
+  'the CSV description names the limitation column',
+  /limitation/.test(str(at(measurementGet, 'responses.200.content.text/csv.schema.description'))),
+)
+check('the route really writes the limitation on every row', measurementSrc.includes('csvField(limitation)'))
 
 // ---- the schema matches the real response ----
 
@@ -242,6 +300,46 @@ check('MUT the schema check rejects a row with no token', violations({ $ref: '#/
 const extraField = { ...body, crawlers: [{ ...(AI_CRAWLER_DATASET[0] as object), pricePerCall: 1 }] }
 check('MUT the schema check rejects an undescribed field', violations({ $ref: '#/components/schemas/Dataset' }, extraField).length > 0)
 
+// The measurement body, assembled the way its route assembles it.
+const measurementBody = {
+  version: BLOCKING_MEASUREMENT_VERSION,
+  license: AI_CRAWLER_DATASET_LICENSE,
+  source: 'https://www.gotopseo.com/en/ai-crawlers',
+  dataset: 'https://www.gotopseo.com/api/public/ai-crawlers',
+  ...BLOCKING_MEASUREMENT,
+}
+check(
+  'Measurement requires exactly the keys its route serves, in order',
+  JSON.stringify(at(doc, 'components.schemas.Measurement.required')) === JSON.stringify(Object.keys(measurementBody)),
+)
+check(
+  'Measurement describes exactly those properties',
+  JSON.stringify(Object.keys(obj(at(doc, 'components.schemas.Measurement.properties')))) ===
+    JSON.stringify(Object.keys(measurementBody)),
+)
+const measurementFailures = violations({ $ref: '#/components/schemas/Measurement' }, measurementBody)
+check(
+  `the real measurement validates against the Measurement schema${measurementFailures.length ? ' — ' + measurementFailures.slice(0, 5).join('; ') : ''}`,
+  measurementFailures.length === 0,
+)
+
+// MUTATION CONTROLS for the measurement schema: the two ways the caveat goes
+// missing are a payload without it and a payload where it is the wrong shape.
+const withoutLimitations = { ...measurementBody } as Record<string, unknown>
+delete withoutLimitations.limitations
+check(
+  'MUT a measurement with no limitations is rejected',
+  violations({ $ref: '#/components/schemas/Measurement' }, withoutLimitations).length > 0,
+)
+check(
+  'MUT a measurement whose limitations are not an array is rejected',
+  violations({ $ref: '#/components/schemas/Measurement' }, { ...measurementBody, limitations: 'see the article' }).length > 0,
+)
+check(
+  'MUT a market row with no share is rejected',
+  violations({ $ref: '#/components/schemas/MarketShare' }, { market: '.com.br' }).length > 0,
+)
+
 // ---- nothing invented ----
 
 const raw = JSON.stringify(doc)
@@ -273,6 +371,12 @@ if (existsSync(openapiRoute)) {
 // Each guard above earns its line only if it fails when the thing it guards
 // breaks. These break the document on purpose and show the same predicate
 // rejecting it.
+
+/** A third path, or a path dropped, must be caught by the paths check. */
+check(
+  'MUT an extra described path is caught',
+  JSON.stringify([...DESCRIBED, '/api/public/ai-crawlers/history']) !== JSON.stringify(DESCRIBED),
+)
 
 /** A path we do not serve must be caught by the route-exists check. */
 check(
