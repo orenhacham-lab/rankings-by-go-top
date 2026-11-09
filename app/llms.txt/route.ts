@@ -121,7 +121,7 @@ function openDataLines(): string[] {
   const caveat = BLOCKING_MEASUREMENT.limitations[0]
   return [
     `- [AI crawler reference dataset](${BASE}/api/public/ai-crawlers): every documented AI crawler user-agent token, what each one is for, and what its operator documents about robots.txt. JSON, or \`?format=csv\` for CSV. No key, no sign-up, ${AI_CRAWLER_DATASET_LICENSE.id}. The same table is rendered for people at ${BASE}/en/ai-crawlers.`,
-    `- [OpenAPI description](${BASE}/api/public/ai-crawlers/openapi): the machine-readable description of both endpoints below, for a catalogue or a client generator.`,
+    `- [OpenAPI description](${BASE}/api/public/ai-crawlers/openapi): the machine-readable description of both endpoints here, for a catalogue or a client generator.`,
     `- [robots.txt blocking measurement, ${BLOCKING_MEASUREMENT_VERSION}](${BASE}/api/public/ai-crawler-blocking): one dated reading of ${BLOCKING_MEASUREMENT.method.robotsFilesRead} robots.txt files across ${BLOCKING_MEASUREMENT.method.markets.length} markets, with the method, the failures and the per-market shares. ${caveat} Percentages are of the files read, not of the ${BLOCKING_MEASUREMENT.method.domainsRequested} domains requested.`,
   ]
 }
