@@ -47,7 +47,7 @@ export const landingJa: LandingCopy = {
     trialNote: 'クレジットカードは不要で、継続の縛りもありません。いつでも解約できます。',
     checkLead: 'アカウント作成はまだ早いという方へ。登録なしで、サイトを無料診断します：',
     dashboard: 'ダッシュボード',
-    trust: ['WordPressとShopifyに公開', '担当者による人のサポート'],
+    trust: ['WordPress、Shopify、Wixに公開', '担当者による人のサポート'],
     climbChip: 'Googleで3位',
     published: '記事をサイトに公開しました',
   },
@@ -114,7 +114,7 @@ export const landingJa: LandingCopy = {
   },
   worksWith: {
     label: '当社が計測し、公開する先：',
-    names: ['Google', 'Googleマップ', 'ChatGPT', 'Gemini', 'Perplexity', 'Copilot', 'Grok', 'WordPress', 'Shopify'],
+    names: ['Google', 'Googleマップ', 'ChatGPT', 'Gemini', 'Perplexity', 'Copilot', 'Grok', 'WordPress', 'Shopify', 'Wix'],
   },
   outcomes: {
     eyebrow: '得られるもの',
@@ -140,7 +140,7 @@ export const landingJa: LandingCopy = {
     stats: [
       { value: 6, label: '計測するAIエンジン', detail: 'ChatGPT、Gemini、Perplexity、Copilot、Grok、Google AI' },
       { value: 3, label: '一つのレポートに収まる経路', detail: 'Google、Googleマップ、AIの回答' },
-      { value: 2, label: '公開先のプラットフォーム', detail: 'WordPressとShopify、コピー＆ペーストは不要' },
+      { value: 3, label: '公開先のプラットフォーム', detail: 'WordPress、Shopify、Wix、コピー＆ペーストは不要' },
       { value: TRIAL_DAYS, label: '日間の無料トライアル', detail: 'クレジットカードは不要' },
     ],
   },
@@ -185,7 +185,7 @@ export const landingJa: LandingCopy = {
       overline: 'コンテンツと公開',
       title: 'ブログを埋めるためではなく、見つけてもらうための記事',
       body: 'どの記事も実際の検索をもとに組み立てます。人が尋ねている言葉からとった見出し、よくある質問のセクション、売上につながるページへの内部リンク、そしてGo Topの拡張機能を入れたWordPressのサイトでは、GoogleとAIエンジンが読み取る構造化データです。ご自身でお読みになり、必要なら手直しいただければ、プラットフォームが公開します。',
-      points: ['アイキャッチ画像と本文中の画像', '公開前の品質チェック', 'WordPressとShopifyへの予約公開と直接公開'],
+      points: ['アイキャッチ画像と本文中の画像', '公開前の品質チェック', 'WordPress、Shopify、Wixへの予約公開と直接公開'],
       href: '/features/seo-geo-content-publishing',
       visual: {
         heading: '今週のサイトの予定',
@@ -196,7 +196,7 @@ export const landingJa: LandingCopy = {
           { day: 4, title: 'エアコンクリーニングはどのくらいの頻度で必要か', status: 'writing', label: '作成中' },
         ],
         destinationLabel: '公開先',
-        destinations: ['WordPress', 'Shopify'],
+        destinations: ['WordPress', 'Shopify', 'Wix'],
       },
     },
     ai: {
@@ -318,7 +318,7 @@ export const landingJa: LandingCopy = {
       },
       {
         q: 'どのようなサイトで使えますか',
-        a: '直接公開に対応しているのはWordPressとShopifyです。順位の計測、AIでの可視性、キーワード調査は、どのサイトでもご利用いただけます。',
+        a: '直接公開に対応しているのはWordPress、Shopify、Wixです。順位の計測、AIでの可視性、キーワード調査は、どのサイトでもご利用いただけます。',
       },
       {
         q: `${TRIAL_DAYS}日間のトライアルが終わるとどうなりますか`,

@@ -47,7 +47,7 @@ export const landingDe: LandingCopy = {
     trialNote: 'Ohne Kreditkarte, ohne Bindung. Jederzeit kündbar.',
     checkLead: 'Noch kein Konto? Kostenlose Website-Analyse, ohne Anmeldung:',
     dashboard: 'Mein Dashboard',
-    trust: ['Veröffentlicht auf WordPress und Shopify', 'Support von echten Menschen'],
+    trust: ['Veröffentlicht auf WordPress, Shopify und Wix', 'Support von echten Menschen'],
     climbChip: 'Position 3 in Google',
     published: 'Artikel auf Ihrer Website veröffentlicht',
   },
@@ -114,7 +114,7 @@ export const landingDe: LandingCopy = {
   },
   worksWith: {
     label: 'Wir prüfen und veröffentlichen für Sie auf:',
-    names: ['Google', 'Google Maps', 'ChatGPT', 'Gemini', 'Perplexity', 'Copilot', 'Grok', 'WordPress', 'Shopify'],
+    names: ['Google', 'Google Maps', 'ChatGPT', 'Gemini', 'Perplexity', 'Copilot', 'Grok', 'WordPress', 'Shopify', 'Wix'],
   },
   outcomes: {
     eyebrow: 'Was Sie bekommen',
@@ -140,7 +140,7 @@ export const landingDe: LandingCopy = {
     stats: [
       { value: 6, label: 'geprüfte KI-Engines', detail: 'ChatGPT, Gemini, Perplexity, Copilot, Grok und Google AI' },
       { value: 3, label: 'Kanäle in einem Bericht', detail: 'Google, Google Maps und die KI-Antworten' },
-      { value: 2, label: 'Veröffentlichungsplattformen', detail: 'WordPress und Shopify, ohne Copy-and-paste' },
+      { value: 3, label: 'Veröffentlichungsplattformen', detail: 'WordPress, Shopify und Wix, ohne Copy-and-paste' },
       { value: TRIAL_DAYS, label: 'Tage kostenlos testen', detail: 'Ohne Kreditkarte' },
     ],
   },
@@ -185,7 +185,7 @@ export const landingDe: LandingCopy = {
       overline: 'Inhalte und Veröffentlichung',
       title: 'Artikel, die geschrieben werden, um gefunden zu werden — nicht um ein Blog zu füllen',
       body: 'Jeder Artikel steht auf echter Recherche: Überschriften aus den Fragen, die Menschen wirklich stellen, ein Fragen-und-Antworten-Abschnitt, interne Links auf die Seiten, die verkaufen, und auf WordPress-Seiten mit dem Go-Top-Plugin strukturierte Daten, die Google und die KI-Engines lesen. Sie lesen gegen, korrigieren wenn nötig, und die Plattform veröffentlicht.',
-      points: ['Ein Beitragsbild und Bilder im Text', 'Eine Qualitätsprüfung vor jeder Veröffentlichung', 'Planung und direkte Veröffentlichung auf WordPress und Shopify'],
+      points: ['Ein Beitragsbild und Bilder im Text', 'Eine Qualitätsprüfung vor jeder Veröffentlichung', 'Planung und direkte Veröffentlichung auf WordPress, Shopify und Wix'],
       href: '/features/seo-geo-content-publishing',
       visual: {
         heading: 'Diese Woche auf Ihrer Website',
@@ -196,7 +196,7 @@ export const landingDe: LandingCopy = {
           { day: 4, title: 'Klimaanlage reinigen: wie oft ist nötig?', status: 'writing', label: 'Wird geschrieben' },
         ],
         destinationLabel: 'Veröffentlichung auf',
-        destinations: ['WordPress', 'Shopify'],
+        destinations: ['WordPress', 'Shopify', 'Wix'],
       },
     },
     ai: {
@@ -318,7 +318,7 @@ export const landingDe: LandingCopy = {
       },
       {
         q: 'Mit welchen Websites funktioniert das?',
-        a: 'Die direkte Veröffentlichung funktioniert mit WordPress und Shopify. Die Positionsüberwachung, die Sichtbarkeit in KI-Antworten und die Keyword-Recherche funktionieren mit jeder Website.',
+        a: 'Die direkte Veröffentlichung funktioniert mit WordPress, Shopify und Wix. Die Positionsüberwachung, die Sichtbarkeit in KI-Antworten und die Keyword-Recherche funktionieren mit jeder Website.',
       },
       {
         q: `Was passiert am Ende der ${TRIAL_DAYS} Testtage?`,
