@@ -51,7 +51,7 @@ export const landingNl: LandingCopy = {
     trialNote: 'Zonder creditcard, zonder verplichting. Opzegbaar wanneer u wilt.',
     checkLead: 'Nog geen account? Gratis websiteanalyse, zonder registratie:',
     dashboard: 'Mijn dashboard',
-    trust: ['Publiceert op WordPress en Shopify', 'Ondersteuning door echte mensen'],
+    trust: ['Publiceert op WordPress, Shopify en Wix', 'Ondersteuning door echte mensen'],
     climbChip: 'Positie 3 in Google',
     published: 'Artikel gepubliceerd op uw website',
   },
@@ -118,7 +118,7 @@ export const landingNl: LandingCopy = {
   },
   worksWith: {
     label: 'Wij controleren en publiceren voor u op:',
-    names: ['Google', 'Google Maps', 'ChatGPT', 'Gemini', 'Perplexity', 'Copilot', 'Grok', 'WordPress', 'Shopify'],
+    names: ['Google', 'Google Maps', 'ChatGPT', 'Gemini', 'Perplexity', 'Copilot', 'Grok', 'WordPress', 'Shopify', 'Wix'],
   },
   outcomes: {
     eyebrow: 'Wat u krijgt',
@@ -144,7 +144,7 @@ export const landingNl: LandingCopy = {
     stats: [
       { value: 6, label: 'gecontroleerde AI-engines', detail: 'ChatGPT, Gemini, Perplexity, Copilot, Grok en Google AI' },
       { value: 3, label: 'kanalen in één rapport', detail: 'Google, Google Maps en de AI-antwoorden' },
-      { value: 2, label: 'publicatieplatformen', detail: 'WordPress en Shopify, zonder kopiëren en plakken' },
+      { value: 3, label: 'publicatieplatformen', detail: 'WordPress, Shopify en Wix, zonder kopiëren en plakken' },
       { value: TRIAL_DAYS, label: 'dagen gratis proberen', detail: 'Zonder creditcard' },
     ],
   },
@@ -189,7 +189,7 @@ export const landingNl: LandingCopy = {
       overline: 'Content en publicatie',
       title: 'Artikelen die geschreven worden om gevonden te worden — niet om een blog te vullen',
       body: 'Elk artikel staat op echt onderzoek: koppen uit de vragen die mensen werkelijk stellen, een vraag-en-antwoordblok, interne links naar de pagina’s die verkopen, en op WordPress-sites met de Go Top-plug-in structured data die Google en de AI-engines lezen. U leest mee, past aan waar nodig, en het platform publiceert.',
-      points: ['Een uitgelichte afbeelding en afbeeldingen in de tekst', 'Een kwaliteitscontrole voor elke publicatie', 'Planning en directe publicatie op WordPress en Shopify'],
+      points: ['Een uitgelichte afbeelding en afbeeldingen in de tekst', 'Een kwaliteitscontrole voor elke publicatie', 'Planning en directe publicatie op WordPress, Shopify en Wix'],
       href: '/features/seo-geo-content-publishing',
       visual: {
         heading: 'Deze week op uw website',
@@ -200,7 +200,7 @@ export const landingNl: LandingCopy = {
           { day: 4, title: 'Airco schoonmaken: hoe vaak is nodig?', status: 'writing', label: 'Wordt geschreven' },
         ],
         destinationLabel: 'Publicatie op',
-        destinations: ['WordPress', 'Shopify'],
+        destinations: ['WordPress', 'Shopify', 'Wix'],
       },
     },
     ai: {
@@ -322,7 +322,7 @@ export const landingNl: LandingCopy = {
       },
       {
         q: 'Met welke websites werkt dit?',
-        a: 'De directe publicatie werkt met WordPress en Shopify. De positiemonitoring, de zichtbaarheid in AI-antwoorden en het zoekwoordenonderzoek werken met elke website.',
+        a: 'De directe publicatie werkt met WordPress, Shopify en Wix. De positiemonitoring, de zichtbaarheid in AI-antwoorden en het zoekwoordenonderzoek werken met elke website.',
       },
       {
         q: `Wat gebeurt er na de ${TRIAL_DAYS} proefdagen?`,

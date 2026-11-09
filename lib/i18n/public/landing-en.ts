@@ -26,7 +26,7 @@ export const landingEn: LandingCopy = {
     trialNote: 'No credit card, no commitment. Cancel anytime.',
     checkLead: 'Not ready to sign up? Get a free site check, no signup:',
     dashboard: 'Go to my dashboard',
-    trust: ['Publishes to WordPress and Shopify', 'Support from real people'],
+    trust: ['Publishes to WordPress, Shopify and Wix', 'Support from real people'],
     climbChip: '#3 on Google',
     published: 'Article published on your site',
   },
@@ -93,7 +93,7 @@ export const landingEn: LandingCopy = {
   },
   worksWith: {
     label: 'We check and publish for you on:',
-    names: ['Google', 'Google Maps', 'ChatGPT', 'Gemini', 'Perplexity', 'Copilot', 'Grok', 'WordPress', 'Shopify'],
+    names: ['Google', 'Google Maps', 'ChatGPT', 'Gemini', 'Perplexity', 'Copilot', 'Grok', 'WordPress', 'Shopify', 'Wix'],
   },
   outcomes: {
     eyebrow: 'What you get',
@@ -119,7 +119,7 @@ export const landingEn: LandingCopy = {
     stats: [
       { value: 6, label: 'AI engines checked', detail: 'ChatGPT, Gemini, Perplexity, Copilot, Grok and Google AI' },
       { value: 3, label: 'channels in one report', detail: 'Google, Google Maps and AI answers' },
-      { value: 2, label: 'platforms to publish to', detail: 'WordPress and Shopify, no copy and paste' },
+      { value: 3, label: 'platforms to publish to', detail: 'WordPress, Shopify and Wix, no copy and paste' },
       { value: TRIAL_DAYS, label: 'day free trial', detail: 'No credit card' },
     ],
   },
@@ -164,7 +164,7 @@ export const landingEn: LandingCopy = {
       overline: 'Content & publishing',
       title: 'Articles written to be found, not to fill a blog',
       body: 'Every article is built around a real search: headings from what people ask, a Q&A section, internal links to the pages that sell, and, on WordPress sites with the Go Top plugin, structured data that Google and AI engines read. You review, tweak if needed, and the platform publishes.',
-      points: ['A featured image and images in the text', 'A quality check before every publish', 'Scheduling and direct publishing to WordPress and Shopify'],
+      points: ['A featured image and images in the text', 'A quality check before every publish', 'Scheduling and direct publishing to WordPress, Shopify and Wix'],
       href: '/features/seo-geo-content-publishing',
       visual: {
         heading: 'This week on your site',
@@ -175,7 +175,7 @@ export const landingEn: LandingCopy = {
           { day: 4, title: 'AC cleaning: how often?', status: 'writing', label: 'Writing' },
         ],
         destinationLabel: 'Publishing to',
-        destinations: ['WordPress', 'Shopify'],
+        destinations: ['WordPress', 'Shopify', 'Wix'],
       },
     },
     ai: {
@@ -297,7 +297,7 @@ export const landingEn: LandingCopy = {
       },
       {
         q: 'Which sites does it work with?',
-        a: 'Direct publishing works with WordPress and Shopify. Rank tracking, AI visibility and keyword research work with any site.',
+        a: 'Direct publishing works with WordPress, Shopify and Wix. Rank tracking, AI visibility and keyword research work with any site.',
       },
       {
         q: `What happens after the ${TRIAL_DAYS}-day trial?`,

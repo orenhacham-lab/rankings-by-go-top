@@ -60,7 +60,7 @@ export const landingPl: LandingCopy = {
     trialNote: 'Bez karty kredytowej, bez zobowiązań. Rezygnacja w dowolnym momencie.',
     checkLead: 'Nie mają Państwo jeszcze konta? Bezpłatna analiza witryny, bez rejestracji:',
     dashboard: 'Mój panel',
-    trust: ['Publikuje na WordPressie i w Shopify', 'Wsparcie prawdziwych ludzi'],
+    trust: ['Publikuje na WordPressie, w Shopify i w Wixie', 'Wsparcie prawdziwych ludzi'],
     climbChip: 'Pozycja 3 w Google',
     published: 'Artykuł opublikowany na Państwa witrynie',
   },
@@ -127,7 +127,7 @@ export const landingPl: LandingCopy = {
   },
   worksWith: {
     label: 'Sprawdzamy i publikujemy dla Państwa w:',
-    names: ['Google', 'Mapy Google', 'ChatGPT', 'Gemini', 'Perplexity', 'Copilot', 'Grok', 'WordPress', 'Shopify'],
+    names: ['Google', 'Mapy Google', 'ChatGPT', 'Gemini', 'Perplexity', 'Copilot', 'Grok', 'WordPress', 'Shopify', 'Wix'],
   },
   outcomes: {
     eyebrow: 'Co Państwo otrzymują',
@@ -153,7 +153,7 @@ export const landingPl: LandingCopy = {
     stats: [
       { value: 6, label: 'sprawdzanych silników AI', detail: 'ChatGPT, Gemini, Perplexity, Copilot, Grok i Google AI' },
       { value: 3, label: 'kanały w jednym raporcie', detail: 'Google, Mapy Google i odpowiedzi AI' },
-      { value: 2, label: 'platformy publikacji', detail: 'WordPress i Shopify, bez kopiowania i wklejania' },
+      { value: 3, label: 'platformy publikacji', detail: 'WordPress, Shopify i Wix, bez kopiowania i wklejania' },
       { value: TRIAL_DAYS, label: 'dni bezpłatnie', detail: 'Bez karty kredytowej' },
     ],
   },
@@ -198,7 +198,7 @@ export const landingPl: LandingCopy = {
       overline: 'Treści i publikacja',
       title: 'Artykuły pisane po to, żeby je znaleziono — nie po to, żeby zapełnić bloga',
       body: 'Każdy artykuł stoi na prawdziwym badaniu: nagłówki z pytań, które ludzie naprawdę zadają, blok pytań i odpowiedzi, linkowanie wewnętrzne do stron, które sprzedają, a na witrynach WordPress z wtyczką Go Top dane strukturalne, które czytają Google i silniki AI. Państwo czytają, poprawiają, gdzie trzeba, a platforma publikuje.',
-      points: ['Obraz wyróżniający i obrazy w tekście', 'Kontrola jakości przed każdą publikacją', 'Planowanie i publikacja wprost na WordPressie i w Shopify'],
+      points: ['Obraz wyróżniający i obrazy w tekście', 'Kontrola jakości przed każdą publikacją', 'Planowanie i publikacja wprost na WordPressie, w Shopify i w Wixie'],
       href: '/features/seo-geo-content-publishing',
       visual: {
         heading: 'W tym tygodniu na Państwa witrynie',
@@ -209,7 +209,7 @@ export const landingPl: LandingCopy = {
           { day: 4, title: 'Czyszczenie klimatyzacji: jak często jest potrzebne?', status: 'writing', label: 'W pisaniu' },
         ],
         destinationLabel: 'Publikacja na',
-        destinations: ['WordPress', 'Shopify'],
+        destinations: ['WordPress', 'Shopify', 'Wix'],
       },
     },
     ai: {
@@ -331,7 +331,7 @@ export const landingPl: LandingCopy = {
       },
       {
         q: 'Z jakimi witrynami to działa?',
-        a: 'Publikacja wprost działa z WordPressem i z Shopify. Monitorowanie pozycji, widoczność w odpowiedziach AI i analiza słów kluczowych działają z każdą witryną.',
+        a: 'Publikacja wprost działa z WordPressem, z Shopify i z Wixem. Monitorowanie pozycji, widoczność w odpowiedziach AI i analiza słów kluczowych działają z każdą witryną.',
       },
       {
         q: `Co dzieje się po ${TRIAL_DAYS} dniach okresu próbnego?`,
