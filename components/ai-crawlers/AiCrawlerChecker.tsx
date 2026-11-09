@@ -30,6 +30,7 @@ import Input from '@/components/ui/Input'
 import { buttonClasses, Eyebrow } from '@/components/public/marketing'
 import { cn } from '@/lib/utils'
 import { AI_CRAWLERS } from '@/lib/ai-crawlers/agents'
+import { BLOCKING_BY_MARKET, BLOCKING_MEASUREMENT } from '@/lib/ai-crawlers/blocking-measurement'
 import { aiCrawlerCopy } from '@/lib/ai-crawlers/copy'
 import type { AiCrawlerErrorCode, AiCrawlerResponse, AiCrawlerResult, CrawlerVerdict } from '@/lib/ai-crawlers/types'
 import { authHref } from '@/lib/i18n/auth-href'
@@ -156,6 +157,88 @@ function Results({ result, copy, dir }: { result: AiCrawlerResult; copy: ReturnT
           </ul>
         </div>
       )}
+    </section>
+  )
+}
+
+/** Locales that write a decimal comma. Explicit, so the number a visitor reads
+ *  is the same on the server and in the browser — `toLocaleString` depends on
+ *  whichever ICU data the runtime happens to carry, and a figure that changes
+ *  shape on hydration is the one thing a cited page cannot afford. */
+const DECIMAL_COMMA: readonly PublicLocale[] = ['es', 'pt-BR', 'fr', 'it', 'de', 'nl', 'pl']
+
+/**
+ * The dated measurement, on the page rather than only in the API.
+ *
+ * WHY IT IS HERE. The figures are published at /api/public/ai-crawler-blocking
+ * for anyone to cite, and a dataset nobody can see on a page is a dataset no
+ * engine will index as one. But the reason it is rendered THIS way — the
+ * caveat directly under the headline, in the same type size as the figure — is
+ * the measurement record's own requirement: these are large, high-ranked
+ * sites, and the number means something else entirely if a reader takes it for
+ * a statement about small businesses.
+ *
+ * NO NUMBER IS TYPED HERE. Every figure comes from the measurement constant,
+ * so the page cannot drift from the data the endpoint serves, and the copy in
+ * ten languages carries placeholders instead of digits.
+ */
+function Measurement({ locale, copy }: { locale: PublicLocale; copy: ReturnType<typeof aiCrawlerCopy> }) {
+  const m = copy.measurement
+  const num = (value: number) => (DECIMAL_COMMA.includes(locale) ? String(value).replace('.', ',') : String(value))
+  const pct = (value: number) => `${num(value)}%`
+  const endpoint = '/api/public/ai-crawler-blocking'
+
+  return (
+    <section className="mt-12 rounded-card border border-line bg-surface p-5 shadow-control">
+      <h2 className="text-lead font-bold text-ink">{m.title}</h2>
+      <p className="mt-2 max-w-2xl text-copy text-body">{m.intro}</p>
+
+      <p className="mt-4 max-w-2xl text-copy font-semibold text-ink">
+        {m.headline.replace('{pct}', pct(BLOCKING_MEASUREMENT.findings.ofGptbotBlockersAlsoBlockingTrafficCrawlerPct))}
+      </p>
+      {/* The caveat is not a footnote and not smaller than the figure it
+          bounds: it sits immediately under the headline, by instruction of the
+          measurement record itself. */}
+      <p className="mt-2 max-w-2xl text-copy text-body">{m.caveat}</p>
+
+      <div className="mt-4 overflow-x-auto rounded-card border border-line">
+        <table className="w-full border-collapse text-copy">
+          <thead>
+            <tr className="border-b border-line bg-sunk/60 text-caption font-semibold text-ink">
+              <th scope="col" className="px-4 py-2 text-start">{m.colMarket}</th>
+              <th scope="col" className="px-4 py-2 text-start">{m.colShare}</th>
+            </tr>
+          </thead>
+          <tbody>
+            {BLOCKING_BY_MARKET.map((row) => (
+              <tr key={row.market} className="border-b border-line/60 last:border-0">
+                <td className="px-4 py-2">
+                  <code dir="ltr" className="font-semibold text-ink">{row.market}</code>
+                </td>
+                <td className="px-4 py-2 text-body" dir="ltr">
+                  {pct(row.blocksTrafficCrawlerPct)}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+
+      <p className="mt-3 max-w-2xl text-caption text-muted">
+        {m.sampleNote.replace('{n}', num(BLOCKING_MEASUREMENT.method.robotsFilesRead))}
+      </p>
+      <p className="mt-1 max-w-2xl text-caption text-muted">{m.notSampled}</p>
+      <p className="mt-1 text-caption text-muted">
+        {m.measuredOnLabel}{' '}
+        <time dateTime={BLOCKING_MEASUREMENT.measuredOn} dir="ltr">{BLOCKING_MEASUREMENT.measuredOn}</time>
+      </p>
+
+      <p className="mt-3 text-caption text-muted">
+        {m.downloads}{' '}
+        <a dir="ltr" href={endpoint} className="font-semibold text-action underline">JSON</a>
+        {' · '}
+        <a dir="ltr" href={`${endpoint}?format=csv`} className="font-semibold text-action underline">CSV</a>
+      </p>
     </section>
   )
 }
@@ -299,6 +382,8 @@ export function AiCrawlerChecker({ locale, initialUrl = '' }: { locale: PublicLo
           </p>
         )}
       </section>
+
+      <Measurement locale={locale} copy={copy} />
 
       <section className="mt-12 rounded-card border border-line bg-sunk/50 p-5">
         <h2 className="inline-flex items-center gap-2 text-copy font-bold text-ink">

@@ -62,6 +62,26 @@ export type AiCrawlerCopy = {
     undocumented: string
   }
   limits: { title: string; items: string[] }
+  /**
+   * The 07.11.2026 robots.txt measurement, rendered for a reader.
+   *
+   * `headline` carries `{pct}` and `sampleNote` carries `{n}`: the figures are
+   * substituted from `lib/ai-crawlers/blocking-measurement.ts` so that no
+   * number is retyped in ten languages, and `caveat` is the sentence the
+   * measurement record requires beside any of them.
+   */
+  measurement: {
+    title: string
+    intro: string
+    headline: string
+    caveat: string
+    notSampled: string
+    measuredOnLabel: string
+    colMarket: string
+    colShare: string
+    sampleNote: string
+    downloads: string
+  }
   cta: { title: string; body: string; button: string }
 }
 
@@ -127,6 +147,18 @@ const he: AiCrawlerCopy = {
     colOperator: 'מופעל על ידי',
     colPurpose: 'לשם מה',
     undocumented: 'אין עמוד של המפעיל שמתעד את הטוקן הזה. הוא מופיע כאן כי הוא נראה בלוגים, ומופרד מהשורות שנשענות על תיעוד של המפעיל עצמו.',
+  },
+  measurement: {
+    title: 'כמה אתרים באמת חוסמים אותם',
+    intro: 'בתאריך שלמטה קראנו את קובץ ה-robots.txt של האתרים המדורגים הגבוה ביותר בשווקים המופיעים כאן, והשוונו אותם לטבלה שלמעלה.',
+    headline: 'מתוך האתרים שחוסמים את GPTBot, {pct} חוסמים גם סורק AI שהיה מביא להם מבקרים.',
+    caveat: 'מדובר באתרים גדולים ומדורגים גבוה, לא בעסקים קטנים. אצל עסקים קטנים התמונה כנראה אחרת — פחות חסימות מכוונות ויותר הזנחה. אין לקרוא את המספרים האלה כתמונה של עסקים קטנים.',
+    notSampled: 'ברזיל ופורטוגל לא היו במדגם. הנתון של .com הוא הפלח הגלובלי בשפה האנגלית, והוא אינו נתון של אף אחת מהן.',
+    measuredOnLabel: 'נמדד בתאריך',
+    colMarket: 'שוק',
+    colShare: 'חוסמים סורק AI שמביא תנועה',
+    sampleNote: 'האחוזים הם מתוך {n} קובצי robots.txt שנקראו בפועל, לא מתוך הדומיינים שנשלחה אליהם בקשה.',
+    downloads: 'המדידה המלאה, כנתונים פתוחים:',
   },
   limits: {
     title: 'מה הבדיקה הזו לא יודעת',
@@ -207,6 +239,18 @@ const en: AiCrawlerCopy = {
     colPurpose: 'What for',
     undocumented: 'No operator page documents this token. It is listed because it appears in server logs, and kept apart from the rows that rest on an operator’s own documentation.',
   },
+  measurement: {
+    title: 'How many sites actually block them',
+    intro: 'On the date below we read the robots.txt of the highest-ranked sites in the markets listed here, and matched them against the table above.',
+    headline: 'Of the sites that block GPTBot, {pct} also block an AI crawler that would have brought them visitors.',
+    caveat: 'These are large, high-ranked sites, not small businesses. Among small businesses the picture is probably different, with fewer deliberate blocks and more neglect. Do not read these figures as a picture of small businesses.',
+    notSampled: 'Brazil and Portugal were not in the sample. The .com figure is the global English-language slice and is not a figure for either country.',
+    measuredOnLabel: 'Measured on',
+    colMarket: 'Market',
+    colShare: 'Block an AI crawler that brings visitors',
+    sampleNote: 'Percentages are of {n} robots.txt files actually read, not of the domains requested.',
+    downloads: 'The whole measurement, as open data:',
+  },
   limits: {
     title: 'What this check cannot tell you',
     items: [
@@ -285,6 +329,18 @@ const es: AiCrawlerCopy = {
     colOperator: 'Operado por',
     colPurpose: 'Para qué',
     undocumented: 'Ninguna página del operador documenta este token. Aparece aquí porque se ve en los registros del servidor, y se mantiene separado de las filas que se apoyan en la documentación del propio operador.',
+  },
+  measurement: {
+    title: 'Cuántos sitios los bloquean de verdad',
+    intro: 'En la fecha indicada abajo leímos el robots.txt de los sitios mejor posicionados de los mercados que aparecen aquí y los comparamos con la tabla anterior.',
+    headline: 'De los sitios que bloquean GPTBot, {pct} bloquean además un rastreador de IA que les habría traído visitas.',
+    caveat: 'Son sitios grandes y muy bien posicionados, no pequeños negocios. Entre los pequeños negocios el panorama probablemente sea distinto: menos bloqueos deliberados y más descuido. No lea estas cifras como un retrato de los pequeños negocios.',
+    notSampled: 'Brasil y Portugal no formaban parte de la muestra. La cifra de .com es el segmento global en inglés y no es una cifra de ninguno de los dos países.',
+    measuredOnLabel: 'Medido el',
+    colMarket: 'Mercado',
+    colShare: 'Bloquean un rastreador de IA que trae visitas',
+    sampleNote: 'Los porcentajes se calculan sobre {n} archivos robots.txt realmente leídos, no sobre los dominios solicitados.',
+    downloads: 'La medición completa, como datos abiertos:',
   },
   limits: {
     title: 'Lo que esta comprobación no puede decirte',
@@ -365,6 +421,18 @@ const ptBR: AiCrawlerCopy = {
     colPurpose: 'Para quê',
     undocumented: 'Nenhuma página do operador documenta esse token. Ele aparece aqui porque é visto nos logs do servidor, e fica separado das linhas que se apoiam na documentação do próprio operador.',
   },
+  measurement: {
+    title: 'Quantos sites realmente os bloqueiam',
+    intro: 'Na data indicada abaixo lemos o robots.txt dos sites melhor posicionados nos mercados listados aqui e os comparamos com a tabela acima.',
+    headline: 'Dos sites que bloqueiam o GPTBot, {pct} também bloqueiam um rastreador de IA que lhes traria visitantes.',
+    caveat: 'São sites grandes e muito bem posicionados, não pequenos negócios. Entre os pequenos negócios o quadro provavelmente é outro: menos bloqueios deliberados e mais descuido. Não leia estes números como um retrato dos pequenos negócios.',
+    notSampled: 'O Brasil e Portugal não estavam na amostra. O número de .com é o recorte global em inglês e não é um número de nenhum dos dois países.',
+    measuredOnLabel: 'Medido em',
+    colMarket: 'Mercado',
+    colShare: 'Bloqueiam um rastreador de IA que traz visitas',
+    sampleNote: 'Os percentuais são sobre {n} arquivos robots.txt efetivamente lidos, não sobre os domínios solicitados.',
+    downloads: 'A medição completa, como dados abertos:',
+  },
   limits: {
     title: 'O que esta verificação não consegue dizer',
     items: [
@@ -443,6 +511,18 @@ const fr: AiCrawlerCopy = {
     colOperator: 'Exploité par',
     colPurpose: 'Pour quoi faire',
     undocumented: "Aucune page de l'opérateur ne documente ce jeton. Il figure ici parce qu'on le voit dans les journaux du serveur, et il reste séparé des lignes qui s'appuient sur la documentation de l'opérateur lui-même.",
+  },
+  measurement: {
+    title: 'Combien de sites les bloquent réellement',
+    intro: 'À la date indiquée ci-dessous, nous avons lu le robots.txt des sites les mieux classés des marchés listés ici et les avons comparés au tableau ci-dessus.',
+    headline: 'Parmi les sites qui bloquent GPTBot, {pct} bloquent aussi un robot d’IA qui leur aurait amené des visiteurs.',
+    caveat: 'Il s’agit de grands sites très bien classés, pas de petites entreprises. Chez les petites entreprises, le tableau est probablement différent : moins de blocages délibérés et davantage de négligence. Ne lisez pas ces chiffres comme un portrait des petites entreprises.',
+    notSampled: 'Le Brésil et le Portugal ne figuraient pas dans l’échantillon. Le chiffre .com correspond au segment mondial anglophone et n’est le chiffre d’aucun des deux pays.',
+    measuredOnLabel: 'Mesuré le',
+    colMarket: 'Marché',
+    colShare: 'Bloquent un robot d’IA qui apporte des visites',
+    sampleNote: 'Les pourcentages portent sur {n} fichiers robots.txt réellement lus, et non sur les domaines interrogés.',
+    downloads: 'La mesure complète, en données ouvertes :',
   },
   limits: {
     title: 'Ce que cette vérification ne peut pas vous dire',
@@ -523,6 +603,18 @@ const it: AiCrawlerCopy = {
     colPurpose: 'A quale scopo',
     undocumented: 'Nessuna pagina dell’operatore documenta questo token. È elencato perché compare nei log del server, e resta separato dalle righe che si basano sulla documentazione dell’operatore stesso.',
   },
+  measurement: {
+    title: 'Quanti siti li bloccano davvero',
+    intro: 'Alla data indicata qui sotto abbiamo letto il robots.txt dei siti meglio posizionati nei mercati elencati qui e li abbiamo confrontati con la tabella sopra.',
+    headline: 'Tra i siti che bloccano GPTBot, {pct} bloccano anche un crawler di IA che avrebbe portato loro visitatori.',
+    caveat: 'Si tratta di siti grandi e molto ben posizionati, non di piccole imprese. Tra le piccole imprese il quadro è probabilmente diverso: meno blocchi deliberati e più trascuratezza. Non leggete questi numeri come un ritratto delle piccole imprese.',
+    notSampled: 'Brasile e Portogallo non erano nel campione. Il dato .com è la fetta globale in lingua inglese e non è un dato di nessuno dei due paesi.',
+    measuredOnLabel: 'Misurato il',
+    colMarket: 'Mercato',
+    colShare: 'Bloccano un crawler di IA che porta visite',
+    sampleNote: 'Le percentuali sono su {n} file robots.txt effettivamente letti, non sui domini interrogati.',
+    downloads: 'La misurazione completa, come dati aperti:',
+  },
   limits: {
     title: 'Cosa questa verifica non può dirti',
     items: [
@@ -601,6 +693,18 @@ const ja: AiCrawlerCopy = {
     colOperator: '運営元',
     colPurpose: '何のためか',
     undocumented: 'この製品トークンを記載した運営者自身のページは見つかっていません。サーバーログで見かけるため掲載していますが、運営者の文書に基づく行とは分けてあります。',
+  },
+  measurement: {
+    title: 'どれだけのサイトが実際にブロックしているか',
+    intro: '下記の日付に、ここに挙げた各市場で上位にあるサイトの robots.txt を読み、上の表と突き合わせました。',
+    headline: 'GPTBot をブロックしているサイトのうち、{pct} は訪問者を連れてくるはずの AI クローラーも併せてブロックしています。',
+    caveat: '対象は上位にある大規模サイトであり、小規模事業者ではありません。小規模事業者では、意図的なブロックは少なく放置が多い、という別の姿になる可能性が高いです。これらの数値を小規模事業者の実態として読まないでください。',
+    notSampled: 'ブラジルとポルトガルは標本に含まれていません。.com の数値は英語圏のグローバルな区分であり、いずれの国の数値でもありません。',
+    measuredOnLabel: '測定日',
+    colMarket: '市場',
+    colShare: '訪問者を連れてくる AI クローラーをブロック',
+    sampleNote: '割合は、実際に読み取れた robots.txt {n} 件に対するものであり、リクエストしたドメイン数に対するものではありません。',
+    downloads: '測定結果の全体は、オープンデータとして公開しています：',
   },
   limits: {
     title: 'この確認では分からないこと',
@@ -681,6 +785,18 @@ const de: AiCrawlerCopy = {
     colPurpose: 'Zweck',
     undocumented: 'Keine Seite des Betreibers dokumentiert dieses Token. Es steht hier, weil es in Server-Logs auftaucht, und bleibt getrennt von den Zeilen, die auf der Dokumentation des Betreibers selbst beruhen.',
   },
+  measurement: {
+    title: 'Wie viele Websites sie tatsächlich blockieren',
+    intro: 'Zum unten genannten Datum haben wir die robots.txt der am besten platzierten Websites in den hier aufgeführten Märkten gelesen und mit der Tabelle oben verglichen.',
+    headline: 'Von den Websites, die GPTBot blockieren, blockieren {pct} auch einen KI-Crawler, der ihnen Besucher gebracht hätte.',
+    caveat: 'Das sind große, sehr gut platzierte Websites, keine kleinen Unternehmen. Bei kleinen Unternehmen dürfte das Bild anders aussehen: weniger bewusste Sperren und mehr Vernachlässigung. Lesen Sie diese Zahlen nicht als Bild der kleinen Unternehmen.',
+    notSampled: 'Brasilien und Portugal waren nicht in der Stichprobe. Die Zahl für .com ist der globale englischsprachige Ausschnitt und keine Zahl für eines der beiden Länder.',
+    measuredOnLabel: 'Gemessen am',
+    colMarket: 'Markt',
+    colShare: 'Blockieren einen KI-Crawler, der Besucher bringt',
+    sampleNote: 'Die Prozentwerte beziehen sich auf {n} tatsächlich gelesene robots.txt-Dateien, nicht auf die angefragten Domains.',
+    downloads: 'Die vollständige Messung, als offene Daten:',
+  },
   limits: {
     title: 'Was diese Prüfung nicht zeigt',
     items: [
@@ -760,6 +876,18 @@ const pl: AiCrawlerCopy = {
     colPurpose: 'Cel',
     undocumented: 'Żadna strona operatora nie dokumentuje tego tokenu. Jest tu wymieniony, bo pojawia się w logach serwera, i pozostaje oddzielony od wierszy opartych na dokumentacji samego operatora.',
   },
+  measurement: {
+    title: 'Ile witryn naprawdę je blokuje',
+    intro: 'W podanej niżej dacie przeczytaliśmy pliki robots.txt najwyżej notowanych witryn na wymienionych tu rynkach i porównaliśmy je z tabelą powyżej.',
+    headline: 'Spośród witryn blokujących GPTBota {pct} blokuje także robota AI, który przyprowadziłby im odwiedzających.',
+    caveat: 'To duże, wysoko notowane witryny, a nie małe firmy. W małych firmach obraz jest prawdopodobnie inny: mniej świadomych blokad, więcej zaniedbania. Nie czytaj tych liczb jako obrazu małych firm.',
+    notSampled: 'Brazylii i Portugalii nie było w próbie. Wynik dla .com to globalny wycinek anglojęzyczny i nie jest wynikiem żadnego z tych krajów.',
+    measuredOnLabel: 'Zmierzono',
+    colMarket: 'Rynek',
+    colShare: 'Blokują robota AI, który przyprowadza odwiedzających',
+    sampleNote: 'Odsetki liczone są od {n} rzeczywiście odczytanych plików robots.txt, a nie od liczby zapytanych domen.',
+    downloads: 'Cały pomiar, jako dane otwarte:',
+  },
   limits: {
     title: 'Czego to sprawdzenie nie pokazuje',
     items: [
@@ -838,6 +966,18 @@ const nl: AiCrawlerCopy = {
     colOperator: 'Eigenaar',
     colPurpose: 'Doel',
     undocumented: 'Geen enkele pagina van de exploitant documenteert dit token. Het staat hier omdat het in serverlogs voorkomt, en blijft gescheiden van de rijen die op de eigen documentatie van de exploitant rusten.',
+  },
+  measurement: {
+    title: 'Hoeveel websites ze echt blokkeren',
+    intro: 'Op de hieronder genoemde datum hebben wij de robots.txt gelezen van de hoogst genoteerde websites in de hier vermelde markten en die vergeleken met de tabel hierboven.',
+    headline: 'Van de websites die GPTBot blokkeren, blokkeert {pct} ook een AI-crawler die hun bezoekers zou hebben gebracht.',
+    caveat: 'Dit zijn grote, hoog genoteerde websites, geen kleine bedrijven. Bij kleine bedrijven ziet het beeld er vermoedelijk anders uit: minder bewuste blokkades en meer verwaarlozing. Lees deze cijfers niet als een beeld van kleine bedrijven.',
+    notSampled: 'Brazilië en Portugal zaten niet in de steekproef. Het cijfer voor .com is het wereldwijde Engelstalige deel en is geen cijfer voor een van beide landen.',
+    measuredOnLabel: 'Gemeten op',
+    colMarket: 'Markt',
+    colShare: 'Blokkeren een AI-crawler die bezoekers brengt',
+    sampleNote: 'De percentages gaan over {n} daadwerkelijk gelezen robots.txt-bestanden, niet over de opgevraagde domeinen.',
+    downloads: 'De volledige meting, als open data:',
   },
   limits: {
     title: 'Wat deze controle niet laat zien',

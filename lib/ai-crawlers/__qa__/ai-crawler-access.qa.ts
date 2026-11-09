@@ -230,6 +230,36 @@ function main() {
     check('E6: no percentage is claimed anywhere', !everyString.some((t) => /\d\s?%/.test(t)))
     check('E7: the trial is stated as 7 days with no card, or not at all',
       everyString.filter((t) => /\b(7|siete|sete|sept|sieben|שבוע)\b/i.test(t)).every((t) => /card|tarjeta|cartão|carte|carta|karte|karty|אשראי|カード/i.test(t)))
+    // THE MEASUREMENT COPY. Its figures live in blocking-measurement.ts and are
+    // substituted at render time, so no locale can carry a stale number and the
+    // ten translations cannot disagree about what was measured.
+    check('E8: every locale leaves the figures as placeholders', PUBLIC_LOCALES.every((l) => {
+      const m = aiCrawlerCopy(l).measurement
+      return m.headline.includes('{pct}') && m.sampleNote.includes('{n}')
+    }))
+    check('E9: no digit is typed into the measurement copy in any locale', PUBLIC_LOCALES.every((l) => {
+      const m = aiCrawlerCopy(l).measurement as unknown as Record<string, string>
+      return Object.values(m).every((t) => !/\d/.test(t))
+    }))
+    // The caveat is the sentence the measurement record requires beside any of
+    // these figures. A locale that shortened it to a hedge would pass every
+    // other check here.
+    check('E10: every locale carries a full caveat, not a hedge', PUBLIC_LOCALES.every((l) => {
+      const m = aiCrawlerCopy(l).measurement
+      return m.caveat.length > 90 && m.caveat !== m.intro
+    }))
+    check('E11: the English caveat forbids the small-business reading explicitly', (() => {
+      const c = aiCrawlerCopy('en').measurement.caveat
+      return /not small businesses/i.test(c) && /do not read/i.test(c)
+    })())
+    // MUTATION CONTROLS for E8-E11.
+    check('E8-MUT: a headline with the figure baked in would fail E8',
+      !'Of the sites that block GPTBot, 66.5% also block one that brings visitors.'.includes('{pct}'))
+    check('E9-MUT: the same string would fail E9',
+      /\d/.test('Of the sites that block GPTBot, 66.5% also block one that brings visitors.'))
+    check('E10-MUT: a softened caveat would fail E10',
+      !('Figures vary by market.'.length > 90))
+
     // MUTATION CONTROL for E1: a key check that compares only the COUNT of
     // strings — the shortcut — passes while a locale has the wrong keys, so
     // E1's full path comparison is doing real work. Build a French copy with
