@@ -133,6 +133,10 @@ for (const locale of LOCALES) {
 
 // Markup for something a reader cannot see is cloaking. The node is only
 // legitimate because the component renders the measurement, so the guard is on
+/** The fragments the two nodes identify themselves by, read off the builders so
+ *  that a renamed @id cannot leave the page's anchor behind. */
+const FRAGMENTS = ['dataset', 'blocking-measurement'] as const
+
 // the component: it must read the same constant the node reads.
 {
   const component = stripComments(readFileSync(join(ROOT, 'components/ai-crawlers/AiCrawlerChecker.tsx'), 'utf8'))
@@ -143,6 +147,16 @@ for (const locale of LOCALES) {
   check('it renders the caveat beside the figure', component.includes('m.caveat'))
   // No figure is typed into the component, in any locale's shape.
   check('no percentage literal is typed into the component', !/\d+(\.\d+)?\s?%/.test(component))
+
+  // Every fragment a node identifies itself by must exist on the page it names.
+  // Both nodes are @id'd with a fragment, and a fragment with no element behind
+  // it sends a reader who follows it to the top of the page instead of to the
+  // thing the node is about. These are also the anchors an editorial mail uses
+  // to deep-link the measurement rather than the whole page.
+  for (const fragment of FRAGMENTS) {
+    check(`the component carries an element with id="${fragment}"`,
+      component.includes(`id="${fragment}"`))
+  }
 }
 
 // ---- the markup is actually emitted ----
@@ -238,6 +252,19 @@ check('MUT a typed-in percentage in the component is caught', /\d+(\.\d+)?\s?%/.
 /** A layout that emits only one node must be caught. */
 const oneNodeLayout = "const a = aiCrawlerDatasetSchema('en')"
 check('MUT a layout that emits only the table is caught', !oneNodeLayout.includes('aiCrawlerBlockingDatasetSchema'))
+
+/** A node whose fragment has no element behind it is what the anchor guard
+ *  exists to catch, so a component without the id must fail it. */
+const componentWithoutAnchor = '<section className="mt-12 rounded-card">'
+check('MUT a measurement section with no id is caught',
+  !componentWithoutAnchor.includes('id="blocking-measurement"'))
+
+/** And the fragments the guard checks must be the ones the builders actually
+ *  emit, or the guard is pinning anchors nobody links to. */
+for (const fragment of FRAGMENTS) {
+  check(`the ${fragment} fragment is one a node really uses`,
+    datasetSrc.includes(`/en/ai-crawlers#${fragment}`))
+}
 
 console.log(`${passed} passed, ${failed} failed`)
 if (failed > 0) process.exitCode = 1
