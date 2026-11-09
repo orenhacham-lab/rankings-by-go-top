@@ -189,7 +189,11 @@ function Measurement({ locale, copy }: { locale: PublicLocale; copy: ReturnType<
   const endpoint = '/api/public/ai-crawler-blocking'
 
   return (
-    <section className="mt-12 rounded-card border border-line bg-surface p-5 shadow-control">
+    // The id is the fragment both Dataset nodes already identify themselves by
+    // (lib/seo/dataset.ts), so the @id now names a place a reader can actually be
+    // sent to, and an editorial mail can deep-link the measurement instead of the
+    // top of the page.
+    <section id="blocking-measurement" className="mt-12 rounded-card border border-line bg-surface p-5 shadow-control">
       <h2 className="text-lead font-bold text-ink">{m.title}</h2>
       <p className="mt-2 max-w-2xl text-copy text-body">{m.intro}</p>
 
@@ -337,7 +341,9 @@ export function AiCrawlerChecker({ locale, initialUrl = '' }: { locale: PublicLo
       {result && <Results result={result} copy={copy} dir={dir} />}
 
       {/* The reference table: always rendered, never behind the form. */}
-      <section className="mt-14">
+      {/* Same reason as the measurement's anchor: the reference table's Dataset
+          node identifies itself as #dataset, so the fragment exists. */}
+      <section id="dataset" className="mt-14">
         <h2 className="text-lead font-bold text-ink">{copy.reference.title}</h2>
         <p className="mt-2 max-w-2xl text-copy text-body">{copy.reference.intro}</p>
         <div className="mt-4 overflow-x-auto rounded-card border border-line bg-surface shadow-control">
