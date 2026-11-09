@@ -70,7 +70,7 @@ const BARE_AUTH_LINK = /['"`]\/(?:signup|login)(?![\w/-])(?!\?lang=)/
 /** Literal user-facing text thrown by a server action. */
 const LITERAL_THROW = /throw new (?:Error|UserFacingError|KeywordQuotaError)\(\s*['"`]/
 /** Literal English text in a JSX text node or a user-facing attribute. */
-const BRAND_OK = /^(?:Rankings by Go Top|Rankings|by Go Top|Rankings by|Go Top|Google|Shopify|WordPress|AI|GEO|SEO|H2|H3|B|I|ChatGPT|Claude|Gemini|Perplexity|Copilot|Grok|Google AI|acme\.myshopify\.com|Promise|you@example\.com|English|עברית|return|null|else|https?:\/\/\S+)$/
+const BRAND_OK = /^(?:Rankings by Go Top|Rankings|by Go Top|Rankings by|Go Top|Google|Shopify|WordPress|AI|GEO|SEO|H2|H3|B|I|JSON|CSV|ChatGPT|Claude|Gemini|Perplexity|Copilot|Grok|Google AI|acme\.myshopify\.com|Promise|you@example\.com|English|עברית|return|null|else|https?:\/\/\S+)$/
 function hardCoded(src: string): string[] {
   const s = strip(src)
   const out: string[] = []
