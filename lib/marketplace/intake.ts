@@ -68,6 +68,27 @@ export interface MarketplaceOrderEvent {
   /** The ABSOLUTE period end the platform reported, ISO-8601, or null. */
   currentPeriodEnd: string | null
   /**
+   * THE ORDER THIS PAYMENT RENEWS, when the platform gives a renewal an order
+   * id of its own instead of reusing the first one.
+   *
+   * Two platforms, two shapes, and the difference decides whether a paid
+   * month extends access or strands it. Digistore24 puts every charge on one
+   * `order_item_id`, so a renewal reaches the insert as a unique violation
+   * and is recognised there. JVZoo gives the rebill its own id
+   * (`transaction_id` plus `-B001`, `-B002`, …), so without this field the
+   * second month inserts a SECOND receipt, mails the customer a second claim
+   * link, and leaves the entitlement they already hold to lapse on the first
+   * month's date — a customer who keeps paying and loses access unless they
+   * click a link every month.
+   *
+   * It is the parent id only, never a guess: a parser sets it when the
+   * platform's documented id scheme says this payload is a rebill of that
+   * order, and null otherwise. An id that names an order we never recorded
+   * falls back to recording this payment as its own receipt, so a rebill is
+   * never dropped for having no parent on file.
+   */
+  renewalOfExternalOrderId?: string | null
+  /**
    * TAX THE PLATFORM SAYS IT ADDED AT CHECKOUT, minor units, or null when the
    * payload carries no tax field at all.
    *
@@ -160,6 +181,22 @@ function jvzooInstant(raw: string | null): string | null {
 }
 
 /**
+ * The order a JVZoo rebill renews, or null when this is not a rebill.
+ *
+ * Their documented scheme (docs/affiliate/jvzoo-webhook-docs.md) appends
+ * `-B001`, `-B002` and so on to the original `transaction_id`. Stripping that
+ * suffix therefore names the first purchase, and it is applied ONLY to a
+ * `BILL` delivery whose id actually carries the suffix: a `BILL` without one
+ * is a shape the documentation does not describe, and inventing a parent for
+ * it would attach a payment to an order nobody can show.
+ */
+function jvzooRebillParent(type: string, transactionId: string): string | null {
+  if (type !== 'BILL') return null
+  const parent = transactionId.replace(/-B\d+$/, '')
+  return parent && parent !== transactionId ? parent : null
+}
+
+/**
  * JVZoo JVZIPN v2 — docs/affiliate/jvzoo-webhook-docs.md, copied from the
  * seller account on 2026-10-29.
  *
@@ -170,8 +207,11 @@ function jvzooInstant(raw: string | null): string | null {
  *
  * A rebill gets its own order id (`transaction_id` gains `-B001`, `-B002`, …),
  * which is what makes the UNIQUE (provider, external_order_id) idempotency
- * correct for a subscription: the second month is a new order rather than a
- * redelivery of the first.
+ * correct for a subscription: the second month is a new delivery rather than
+ * a redelivery of the first. It is NOT a second purchase, though, so it is
+ * reported as a renewal of the parent id (`renewalOfExternalOrderId`) and
+ * extends the receipt and the entitlement that first payment created, instead
+ * of inserting a second receipt and mailing a second claim link.
  *
  * `total` is in DOLLARS in v2, where v1 used pennies, so it is multiplied
  * here and never read as minor units. No currency field exists in the
@@ -184,9 +224,12 @@ export const parseJvzooIpnV2: MarketplaceParser = (rawBody) => {
   const kind = type === 'SALE' || type === 'BILL' ? 'paid' : type === 'RFND' ? 'refunded' : null
   if (!kind) return null
 
+  const transactionId = (form.get('transaction_id') ?? '').trim()
+
   return {
     kind,
-    externalOrderId: (form.get('transaction_id') ?? '').trim(),
+    externalOrderId: transactionId,
+    renewalOfExternalOrderId: jvzooRebillParent(type, transactionId),
     externalProductId: (form.get('product_id') ?? '').trim() || null,
     buyerEmail: (form.get('customer_email') ?? '').trim(),
     amountMinor: dollarsToMinor(form.get('total')),
@@ -208,6 +251,9 @@ export type MarketplaceIntakeOutcome =
   | { kind: 'recorded'; orderId: string; plan: PlanCode; claimUrl: string }
   /** A redelivery of an order already on file. Nothing changed. */
   | { kind: 'already_recorded'; externalOrderId: string }
+  /** A later payment on an order already on file: the paid period now runs
+   *  to `currentPeriodEnd`, and so does the entitlement if it was claimed. */
+  | { kind: 'renewed'; externalOrderId: string; currentPeriodEnd: string }
   /** A refund or cancellation, recorded. A person decides what it means for
    *  an entitlement already granted. */
   | { kind: 'operator_attention'; why: string; externalOrderId: string }
@@ -273,6 +319,20 @@ export async function recordMarketplaceOrder(
     }
   }
 
+  // A PAYMENT THAT NAMES THE ORDER IT RENEWS IS TRIED AS A RENEWAL FIRST, and
+  // only recorded as its own receipt if that order is not on file. Doing it in
+  // this order is what keeps a JVZoo rebill from becoming a second receipt
+  // with a second claim link; doing it the other way round would insert the
+  // row before anyone asked whether it was a renewal.
+  const renewalOf = event.renewalOfExternalOrderId?.trim()
+  if (event.kind === 'paid' && renewalOf && event.currentPeriodEnd) {
+    const renewal = await renewMarketplaceOrder(admin, provider, renewalOf, event.currentPeriodEnd)
+    // `order_unknown` is the one answer that falls through: the parent was
+    // never recorded, so this payment is all we have and it is recorded as
+    // its own receipt rather than dropped.
+    if (renewal.kind !== 'order_unknown') return renewal
+  }
+
   const email = normalizeEmail(event.buyerEmail)
   if (!email) return { kind: 'invalid_event', why: 'missing_buyer_email' }
 
@@ -303,15 +363,84 @@ export async function recordMarketplaceOrder(
     return { kind: 'write_failed', message: err instanceof Error ? err.message.slice(0, 120) : 'insert_threw' }
   }
 
-  // The retry's answer. Not an error: the first delivery already recorded it,
-  // with its own claim token, and that token is the one the buyer has.
-  if (error?.code === UNIQUE_VIOLATION) return { kind: 'already_recorded', externalOrderId }
+  // A SECOND PAYMENT ON THE SAME ORDER IS EITHER A RETRY OR A RENEWAL, and
+  // the unique constraint cannot tell them apart on its own. These platforms
+  // put a monthly renewal on the SAME order item, so it arrives here exactly
+  // as a redelivered webhook does; the one thing that distinguishes them is
+  // the period end, which a renewal moves forward and a retry repeats. So a
+  // payload carrying a period end is offered to `renew_marketplace_order`,
+  // which compares it with the one on file and answers `already_current` when
+  // there is nothing new — and a payload with no period end is the retry case
+  // by construction, with nothing to extend.
+  if (error?.code === UNIQUE_VIOLATION) {
+    if (!event.currentPeriodEnd) return { kind: 'already_recorded', externalOrderId }
+    return renewMarketplaceOrder(admin, provider, externalOrderId, event.currentPeriodEnd)
+  }
   if (error) return { kind: 'write_failed', message: (error.message || 'insert_failed').slice(0, 120) }
 
   const orderId = typeof inserted?.[0]?.id === 'string' ? (inserted[0].id as string) : ''
   if (!orderId) return { kind: 'write_failed', message: 'insert_returned_no_id' }
 
   return { kind: 'recorded', orderId, plan, claimUrl: marketplaceClaimUrl(claimToken) }
+}
+
+/**
+ * The renewal transition, as the database decides it.
+ *
+ * EVERY OUTCOME IS THE FUNCTION'S OWN WORD, never this module's guess. The
+ * reason is the one the claim path gives: the receipt and the entitlement it
+ * paid for move together or not at all, so the comparison with the period end
+ * on file and both writes happen inside one locked transaction, and this
+ * function only translates the answer.
+ *
+ * AN UNRECOGNISED ANSWER IS A FAILURE, not a success. If this module and the
+ * function ever disagree about the contract, the webhook must say so rather
+ * than acknowledge an extension that may not have happened.
+ */
+async function renewMarketplaceOrder(
+  admin: Admin,
+  provider: string,
+  externalOrderId: string,
+  currentPeriodEnd: string,
+): Promise<MarketplaceIntakeOutcome> {
+  let data: unknown
+  let error: { message?: string; code?: string } | null = null
+  try {
+    const res = await admin.rpc('renew_marketplace_order', {
+      p_provider: provider,
+      p_external_order_id: externalOrderId,
+      p_period_end: currentPeriodEnd,
+    })
+    data = res.data
+    error = res.error ?? null
+  } catch (err) {
+    return { kind: 'write_failed', message: err instanceof Error ? err.message.slice(0, 120) : 'renew_rpc_threw' }
+  }
+  if (error) return { kind: 'write_failed', message: (error.code || error.message || 'renew_rpc_failed').slice(0, 120) }
+
+  switch (typeof data === 'string' ? data : '') {
+    case 'renewed':
+      return { kind: 'renewed', externalOrderId, currentPeriodEnd }
+    // Nothing moved, because nothing is newer than what is on file. This is
+    // the ordinary answer to a retried delivery.
+    case 'already_current':
+    case 'period_end_unknown':
+      return { kind: 'already_recorded', externalOrderId }
+    // A later charge on a withdrawn order, or a claimed receipt with no
+    // entitlement carrying it. Both are contradictions a person must settle,
+    // and neither restores access on its own.
+    case 'not_renewable':
+      return { kind: 'operator_attention', why: 'renewal_on_withdrawn_order', externalOrderId }
+    case 'entitlement_missing':
+      return { kind: 'operator_attention', why: 'renewal_without_entitlement', externalOrderId }
+    // The row vanished between the insert's refusal and this call, which can
+    // only happen if something deleted it — and nothing in the application
+    // does.
+    case 'order_unknown':
+      return { kind: 'order_unknown', externalOrderId }
+    default:
+      return { kind: 'write_failed', message: 'unrecognised_renew_outcome' }
+  }
 }
 
 /**
@@ -408,14 +537,14 @@ export function unverifiedDeliveryTrace(rawBody: string): Record<string, string>
  * `order_unknown` and leave a refunded buyer's access untouched. That is the
  * failure that matters, so the item id wins.
  *
- * THE COST, STATED RATHER THAN HIDDEN: a monthly renewal is another
- * transaction on the SAME order item, so it arrives as `already_recorded` and
- * does NOT extend `current_period_end` on its own. A renewal that fails to
- * extend access is a customer who complains; the alternative reading, where a
- * refunded order keeps its access, is a customer who paid nothing and keeps
- * everything. Until renewal handling exists, the first Digistore24
- * subscription month is correct and the second needs a person. This is
- * tracked, not forgotten.
+ * THE CONSEQUENCE, AND HOW IT IS NOW HANDLED: a monthly renewal is another
+ * transaction on the SAME order item, so it reaches the insert as a unique
+ * violation, exactly as a redelivered webhook does. The two are told apart by
+ * the period end — a renewal moves it forward, a retry repeats it — and the
+ * renewal transition in the database makes that comparison under a lock and
+ * extends the receipt, and the entitlement it paid for once claimed
+ * (supabase/migrations/20261109120000_marketplace_renewal.sql). Before that
+ * transition existed the second month needed a person; it no longer does.
  *
  * A TEST ORDER MUST NOT BECOME A REAL PLAN, but only an EXPLICIT `test`
  * refuses: `api_mode` absent is treated as live. Failing closed on a missing

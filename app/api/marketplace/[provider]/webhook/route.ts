@@ -197,7 +197,19 @@ async function handle(request: Request, slug: string): Promise<Response> {
   }
 
   const outcome = await recordMarketplaceOrder(createAdminClient(), provider.slug, event)
-  if (outcome.kind !== 'recorded' && outcome.kind !== 'already_recorded') {
+  // A RENEWAL IS REPORTED, BECAUSE NOTHING ELSE WOULD SHOW IT HAPPENED. It
+  // writes no new row and sends no email, so without this line a paid month
+  // that extended a customer's access leaves no trace outside the database.
+  // Logged at info, with the platform's own order id and the period it now
+  // runs to, and nothing about the buyer.
+  if (outcome.kind === 'renewed') {
+    console.log('[marketplace-webhook] renewal extended the paid period', {
+      provider: provider.slug,
+      externalOrderId: outcome.externalOrderId,
+      currentPeriodEnd: outcome.currentPeriodEnd,
+    })
+  }
+  if (outcome.kind !== 'recorded' && outcome.kind !== 'already_recorded' && outcome.kind !== 'renewed') {
     // Logged with the outcome and the platform's own order id, and nothing
     // about the buyer.
     console.error('[marketplace-webhook] order not recorded', {
