@@ -55,8 +55,9 @@ const str = (value: unknown): string => (typeof value === 'string' ? value : '')
 const row = (value: unknown): Record<string, unknown> => value as Record<string, unknown>
 const DATASET_PATH = '/api/public/ai-crawlers'
 const MEASUREMENT_PATH = '/api/public/ai-crawler-blocking'
+const SITES_PATH = '/api/public/ai-crawler-blocking/sites'
 /** Both described paths, in the order the document declares them. */
-const DESCRIBED = [DATASET_PATH, MEASUREMENT_PATH]
+const DESCRIBED = [DATASET_PATH, MEASUREMENT_PATH, SITES_PATH]
 
 // ---- the document is a document ----
 
@@ -73,7 +74,7 @@ check('a single https server is declared', servers.length === 1 && /^https:\/\//
 // ---- it describes only what we serve ----
 
 const paths = Object.keys(obj(doc.paths))
-check('exactly the two endpoints we serve are described', JSON.stringify(paths) === JSON.stringify(DESCRIBED))
+check('exactly the endpoints we serve are described, in order', JSON.stringify(paths) === JSON.stringify(DESCRIBED))
 
 const get = at(doc, `paths.${DATASET_PATH}.get`)
 const measurementGet = at(doc, `paths.${MEASUREMENT_PATH}.get`)
@@ -81,10 +82,10 @@ for (const p of DESCRIBED) {
   check(`${p} declares GET and nothing else`, Object.keys(obj(at(doc, `paths.${p}`))).join(',') === 'get')
   check(`${p} GET has an operationId`, str(at(doc, `paths.${p}.get.operationId`)).length > 0)
 }
-check(
-  'the two operationIds are distinct',
-  str(at(get, 'operationId')) !== str(at(measurementGet, 'operationId')),
-)
+// A duplicate operationId makes a generated client overwrite one method with
+// another, which is the kind of breakage a catalogue never reports back.
+const operationIds = DESCRIBED.map((p) => str(at(doc, `paths.${p}.get.operationId`)))
+check('every operationId is distinct', new Set(operationIds).size === operationIds.length)
 check(
   'every declared tag is used by an operation',
   arr(doc.tags)
@@ -366,6 +367,48 @@ if (existsSync(openapiRoute)) {
   check('it keeps the sanctions guard the public surface uses', src.includes('restrictionForRequest'))
 }
 
+// ---- the per-site operation ----
+//
+// The endpoint this document exists to make discoverable: the rows a reader
+// recomputes our percentages from. Two things have to be true of its
+// description or it misleads a machine — the parameters have to be the ones
+// the route really reads, and the limitation has to be a required field
+// rather than a sentence in the prose.
+
+const sitesGet = at(doc, `paths.${SITES_PATH}.get`)
+const sitesSrc = readFileSync(join(ROOT, 'app', SITES_PATH, 'route.ts'), 'utf8')
+const sitesParams = arr(at(sitesGet, 'parameters')).map((x) => str(at(x, 'name'))).sort()
+check('the per-site operation documents exactly tld and format',
+  JSON.stringify(sitesParams) === JSON.stringify(['format', 'tld']))
+check('the route really reads `tld`', sitesSrc.includes("searchParams.get('tld')"))
+check('the route really reads `format`', sitesSrc.includes("searchParams.get('format')"))
+// `market` is the billing word, and a guard forbids an API route reading it
+// from a client. Documenting it here would invite a caller to send it.
+check('the document never invites a client to send `market`',
+  !arr(at(sitesGet, 'parameters')).some((x) => str(at(x, 'name')) === 'market'))
+
+const sitesCodes = Object.keys(obj(at(sitesGet, 'responses'))).sort()
+check('the per-site operation documents 200, 404 and 451',
+  JSON.stringify(sitesCodes) === JSON.stringify(['200', '404', '451']))
+check('the route really answers 404 for an unknown tld', sitesSrc.includes('status: 404'))
+check('200 declares both media types the route serves',
+  JSON.stringify(Object.keys(obj(at(sitesGet, 'responses.200.content'))).sort()) ===
+    JSON.stringify(['application/json', 'text/csv']))
+check('the per-site 200 references its own schema',
+  at(sitesGet, 'responses.200.content.application/json.schema.$ref') === '#/components/schemas/SitesMeasurement')
+
+// The caveat cannot be optional. A consumer that reads the schema and drops
+// `limitations` is the failure the whole payload design guards against.
+const sitesRequired = arr(at(doc, 'components.schemas.SitesMeasurement.required')).map(str)
+check('limitations is a required field of the per-site schema', sitesRequired.includes('limitations'))
+check('the rows themselves are a required field', sitesRequired.includes('sites'))
+check('the CSV description names the limitation column',
+  /limitation/.test(str(at(sitesGet, 'responses.200.content.text/csv.schema.description'))))
+// The deciding line is what makes a verdict checkable rather than asserted.
+check('a verdict documents the group and the deciding line',
+  JSON.stringify(arr(at(doc, 'components.schemas.Verdict.required')).map(str).sort()) ===
+    JSON.stringify(['allowed', 'decidingLine', 'group']))
+
 // ---- mutation controls ----
 //
 // Each guard above earns its line only if it fails when the thing it guards
@@ -377,6 +420,15 @@ check(
   'MUT an extra described path is caught',
   JSON.stringify([...DESCRIBED, '/api/public/ai-crawlers/history']) !== JSON.stringify(DESCRIBED),
 )
+
+/** Two operations sharing an operationId must be caught, since a generated
+ *  client then silently loses one of them. */
+check('MUT a duplicated operationId is caught',
+  new Set([...operationIds, operationIds[0]]).size !== operationIds.length + 1)
+
+/** A per-site schema whose limitations became optional must be caught. */
+check('MUT limitations dropped from the required list is caught',
+  !['version', 'sites'].includes('limitations'))
 
 /** A path we do not serve must be caught by the route-exists check. */
 check(

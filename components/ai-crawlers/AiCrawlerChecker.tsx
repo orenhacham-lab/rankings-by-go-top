@@ -31,6 +31,15 @@ import { buttonClasses, Eyebrow } from '@/components/public/marketing'
 import { cn } from '@/lib/utils'
 import { AI_CRAWLERS } from '@/lib/ai-crawlers/agents'
 import { BLOCKING_BY_MARKET, BLOCKING_MEASUREMENT } from '@/lib/ai-crawlers/blocking-measurement'
+import {
+  BLOCKING_SITES_MEASURED_ON,
+  BLOCKING_SITES_PATH,
+  BLOCKING_SITES_READ,
+  BLOCKING_SITES_REFUSED,
+  BLOCKING_SITES_REQUESTED,
+  GPTBOT_DELIBERATE_PCT,
+  OAI_SEARCHBOT_INHERITED_PCT,
+} from '@/lib/ai-crawlers/blocking-sites'
 import { aiCrawlerCopy } from '@/lib/ai-crawlers/copy'
 import type { AiCrawlerErrorCode, AiCrawlerResponse, AiCrawlerResult, CrawlerVerdict } from '@/lib/ai-crawlers/types'
 import { authHref } from '@/lib/i18n/auth-href'
@@ -243,6 +252,34 @@ function Measurement({ locale, copy }: { locale: PublicLocale; copy: ReturnType<
         {' · '}
         <a dir="ltr" href={`${endpoint}?format=csv`} className="font-semibold text-action underline">CSV</a>
       </p>
+
+      {/* THE SECOND READING, kept apart from the first on purpose. It is a
+          different day with a different n, so folding its figures into the
+          table above would produce a number that is true of neither. What it
+          adds is the distinction a blocking rate cannot be read without: a rule
+          that names the crawler was a decision, and a `*` rule was not. Its
+          read rate travels with it in the same type size, for the same reason
+          the caveat above sits under the headline. */}
+      <div className="mt-6 border-t border-line pt-4">
+        <p className="max-w-2xl text-copy text-body">
+          {m.perSite
+            .replace('{on}', BLOCKING_SITES_MEASURED_ON)
+            .replace('{deliberate}', pct(GPTBOT_DELIBERATE_PCT))
+            .replace('{inherited}', pct(OAI_SEARCHBOT_INHERITED_PCT))}
+        </p>
+        <p className="mt-2 max-w-2xl text-caption text-muted">
+          {m.perSiteNote
+            .replace('{read}', num(BLOCKING_SITES_READ))
+            .replace('{requested}', num(BLOCKING_SITES_REQUESTED))
+            .replace('{refused}', num(BLOCKING_SITES_REFUSED))}
+        </p>
+        <p className="mt-3 text-caption text-muted">
+          {m.perSiteDownloads}{' '}
+          <a dir="ltr" href={BLOCKING_SITES_PATH} className="font-semibold text-action underline">JSON</a>
+          {' · '}
+          <a dir="ltr" href={`${BLOCKING_SITES_PATH}?format=csv`} className="font-semibold text-action underline">CSV</a>
+        </p>
+      </div>
     </section>
   )
 }

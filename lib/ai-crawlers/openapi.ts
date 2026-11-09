@@ -26,6 +26,11 @@
  */
 import { BLOCKING_MEASUREMENT } from './blocking-measurement'
 import {
+  BLOCKING_SITES_MEASURED_ON,
+  BLOCKING_SITES_READ,
+  BLOCKING_SITES_REQUESTED,
+} from './blocking-sites'
+import {
   AI_CRAWLER_DATASET_LICENSE,
   AI_CRAWLER_DATASET_VERSION,
 } from './dataset'
@@ -34,6 +39,7 @@ import {
 const SITE = 'https://www.gotopseo.com'
 const DATASET_PATH = '/api/public/ai-crawlers'
 const MEASUREMENT_PATH = '/api/public/ai-crawler-blocking'
+const SITES_PATH = '/api/public/ai-crawler-blocking/sites'
 
 /**
  * The purposes the dataset uses, in one place: the crawler rows, the candidate
@@ -84,6 +90,11 @@ export function aiCrawlerOpenApiDocument() {
       {
         name: 'measurement',
         description: 'A dated reading of how many sites block these crawlers, with the limitation that bounds it.',
+      },
+      {
+        name: 'sites',
+        description:
+          'The same reading published domain by domain, so a percentage can be recomputed from the rows rather than taken on trust.',
       },
     ],
     paths: {
@@ -168,6 +179,66 @@ export function aiCrawlerOpenApiDocument() {
                   },
                 },
               },
+            },
+            '451': {
+              description: 'The request came from a jurisdiction this service may not serve. No body.',
+            },
+          },
+        },
+      },
+      [SITES_PATH]: {
+        get: {
+          tags: ['sites'],
+          operationId: 'getAiCrawlerBlockingSites',
+          summary: 'The same reading, domain by domain',
+          description: [
+            'Every requested domain with its Tranco rank, whether its robots.txt could be read, and — when it could — the verdict for each crawler together with the robots.txt group that governed it and the exact deciding line.',
+            '',
+            '`group: "*"` is a rule that lands on every bot alike; a group that names the crawler is a rule somebody wrote about that crawler. The findings count the two separately, because a blocking rate is not an error rate until the deliberate blocks are told apart from the inherited ones.',
+            '',
+            'The second `limitations` entry is the one to read before quoting a percentage: a large minority of hosts refused this measurement\u2019s client, and hosts that refuse an unknown automated client are plausibly the same hosts that restrict AI crawlers, so the read subset probably under-states blocking. Every unreadable domain is in `sites` with the reason, so the gap is auditable. The CSV repeats that sentence on every row.',
+          ].join('\n'),
+          parameters: [
+            {
+              name: 'tld',
+              in: 'query',
+              required: false,
+              description:
+                "A country suffix as sampled, such as `.fr`. Returns that suffix's rows with that suffix's own findings, so a publication can cite its own market rather than a seven-market average. An unknown value answers 404 with the suffixes that exist.",
+              schema: { type: 'string', examples: ['.fr'] },
+            },
+            {
+              name: 'format',
+              in: 'query',
+              required: false,
+              description: 'Omit for JSON. `csv` returns one row per domain as RFC 4180 CSV, as a file download.',
+              schema: { type: 'string', enum: ['csv'] },
+            },
+          ],
+          responses: {
+            '200': {
+              description: 'The per-site measurement.',
+              headers: {
+                'x-license': {
+                  description: 'The licence the data is served under.',
+                  schema: { type: 'string', examples: [AI_CRAWLER_DATASET_LICENSE.id] },
+                },
+              },
+              content: {
+                'application/json': {
+                  schema: { $ref: '#/components/schemas/SitesMeasurement' },
+                },
+                'text/csv': {
+                  schema: {
+                    type: 'string',
+                    description:
+                      'Header row followed by one row per domain: market, tranco_rank, domain, robots_state, then allowed, group and deciding_line for each crawler, then sampling_limitation.',
+                  },
+                },
+              },
+            },
+            '404': {
+              description: 'The `tld` is not one of the suffixes sampled. The body names the ones that are.',
             },
             '451': {
               description: 'The request came from a jurisdiction this service may not serve. No body.',
@@ -315,6 +386,149 @@ export function aiCrawlerOpenApiDocument() {
               type: 'number',
               description: 'Share of the whole read sample blocking this token.',
             },
+          },
+        },
+        Verdict: {
+          type: 'object',
+          required: ['allowed', 'group', 'decidingLine'],
+          description: 'One crawler\u2019s verdict on one domain, with the evidence for it.',
+          properties: {
+            allowed: { type: 'boolean', description: 'Whether the crawler may fetch the path measured.' },
+            group: {
+              type: ['string', 'null'],
+              description:
+                'The robots.txt group that decided it. `*` is a rule aimed at every bot alike; a group naming the crawler is a rule written about it. Null when no group governed the path.',
+              examples: ['GPTBot'],
+            },
+            decidingLine: {
+              type: 'string',
+              description: 'The line of the file that decided the verdict, verbatim, so the verdict can be checked.',
+              examples: ['Disallow: /'],
+            },
+          },
+        },
+        Site: {
+          type: 'object',
+          required: ['market', 'trancoRank', 'domain', 'state', 'verdicts'],
+          properties: {
+            market: { type: 'string', description: 'The suffix the domain was sampled under.', examples: ['.fr'] },
+            trancoRank: { type: 'integer', description: 'Its rank in the Tranco list the sample was drawn from.' },
+            domain: { type: 'string', examples: ['lemonde.fr'] },
+            state: {
+              type: 'string',
+              description:
+                '`read` when the file was read. Otherwise why it was not: an `http_NNN` status, `html_not_robots` for a page served in place of a robots.txt, or `unreachable`.',
+              examples: ['read'],
+            },
+            verdicts: {
+              type: ['object', 'null'],
+              description: 'One verdict per crawler token, or null when the file could not be read.',
+              additionalProperties: { $ref: '#/components/schemas/Verdict' },
+            },
+          },
+        },
+        SitesMeasurement: {
+          type: 'object',
+          required: ['version', 'license', 'source', 'parser', 'measuredOn', 'method', 'limitations', 'findings', 'sites'],
+          properties: {
+            version: { type: 'string', description: 'The reading\u2019s own version. A dated reading never changes.' },
+            license: { $ref: '#/components/schemas/License' },
+            source: { type: 'string', format: 'uri', description: 'The page that states these figures to a reader.' },
+            parser: {
+              type: 'string',
+              format: 'uri',
+              description: 'The open-source parser that produced every verdict, so the matching can be audited too.',
+            },
+            measuredOn: {
+              type: 'string',
+              format: 'date',
+              examples: [BLOCKING_SITES_MEASURED_ON],
+            },
+            method: {
+              type: 'object',
+              required: ['sample', 'domainsRequested', 'robotsRead', 'path', 'matching', 'outcomes'],
+              properties: {
+                sample: {
+                  type: 'string',
+                  description: 'How the domains were chosen, including the list identifier, so the sample can be rebuilt.',
+                },
+                domainsRequested: { type: 'integer', examples: [BLOCKING_SITES_REQUESTED] },
+                robotsRead: {
+                  type: 'integer',
+                  description: 'The n every percentage is of: files read, not domains requested.',
+                  examples: [BLOCKING_SITES_READ],
+                },
+                path: { type: 'string', description: 'The path the verdicts are about.', examples: ['/'] },
+                matching: { type: 'string' },
+                outcomes: {
+                  type: 'object',
+                  description: 'How many domains ended in each state. These sum to domainsRequested.',
+                  additionalProperties: { type: 'integer' },
+                },
+              },
+            },
+            limitations: {
+              type: 'array',
+              description:
+                'What the figures do not say. The second entry states the read rate and the direction of its bias, and is the one the CSV repeats on every row.',
+              items: { type: 'string' },
+            },
+            findings: {
+              type: 'object',
+              description: 'Every published figure, each recomputable from the rows below.',
+              required: ['blocksTrafficBringingCrawler', 'gptbotBlockers', 'byCrawler', 'byMarket'],
+              properties: {
+                blocksTrafficBringingCrawler: { $ref: '#/components/schemas/CountAndPct' },
+                gptbotBlockers: {
+                  type: 'object',
+                  description: 'How many block GPTBot, and how many of those also block a crawler that brings visitors.',
+                  properties: {
+                    count: { type: 'integer' },
+                    alsoBlockTrafficCrawler: { type: 'integer' },
+                    alsoBlockTrafficCrawlerPct: { type: 'number' },
+                  },
+                },
+                blockedTrainingKeptSearchOpen: { $ref: '#/components/schemas/CountAndPct' },
+                blocksAiTrafficCrawlerButAllowsGooglebot: { $ref: '#/components/schemas/CountAndPct' },
+                byCrawler: {
+                  type: 'array',
+                  description: 'Per crawler: how many block it, and how many of those wrote a rule naming it.',
+                  items: { $ref: '#/components/schemas/CrawlerIntent' },
+                },
+                byMarket: {
+                  type: 'array',
+                  description: "Per suffix, with that suffix's own n.",
+                  items: { type: 'object' },
+                },
+              },
+            },
+            sites: {
+              type: 'array',
+              description: 'Every requested domain, readable or not. This is what makes the percentages checkable.',
+              items: { $ref: '#/components/schemas/Site' },
+            },
+          },
+        },
+        CountAndPct: {
+          type: 'object',
+          required: ['count', 'pct'],
+          properties: {
+            count: { type: 'integer' },
+            pct: { type: 'number', description: 'As a share of the files read, not of the domains requested.' },
+          },
+        },
+        CrawlerIntent: {
+          type: 'object',
+          required: ['token', 'blocked', 'deliberate', 'inherited'],
+          description: 'Deliberate and inherited always sum to blocked: every block is one or the other.',
+          properties: {
+            token: { type: 'string', examples: ['OAI-SearchBot'] },
+            blockedPct: { type: 'number', description: 'Share of the read sample blocking this token.' },
+            blocked: { type: 'integer' },
+            deliberate: { type: 'integer', description: 'Blocks whose governing group names this crawler.' },
+            deliberatePct: { type: 'number' },
+            inherited: { type: 'integer', description: 'Blocks that came from the blanket `*` group.' },
+            inheritedPct: { type: 'number' },
           },
         },
         Measurement: {

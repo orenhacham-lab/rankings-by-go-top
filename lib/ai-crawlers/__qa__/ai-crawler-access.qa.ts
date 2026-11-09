@@ -235,7 +235,16 @@ function main() {
     // ten translations cannot disagree about what was measured.
     check('E8: every locale leaves the figures as placeholders', PUBLIC_LOCALES.every((l) => {
       const m = aiCrawlerCopy(l).measurement
-      return m.headline.includes('{pct}') && m.sampleNote.includes('{n}')
+      return (
+        m.headline.includes('{pct}') &&
+        m.sampleNote.includes('{n}') &&
+        // The per-site reading states two shares and the read rate those
+        // shares are of, and all three are substituted for the same reason.
+        m.perSite.includes('{deliberate}') &&
+        m.perSite.includes('{inherited}') &&
+        m.perSiteNote.includes('{read}') &&
+        m.perSiteNote.includes('{refused}')
+      )
     }))
     check('E9: no digit is typed into the measurement copy in any locale', PUBLIC_LOCALES.every((l) => {
       const m = aiCrawlerCopy(l).measurement as unknown as Record<string, string>
