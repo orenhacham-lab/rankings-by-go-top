@@ -60,7 +60,7 @@ import {
   type PublicSource,
   type TopUpSummary,
 } from '../topup'
-import { SOURCING_FLAG, runIsolatedProspectTopUp } from '../topup-isolated'
+import { SOURCING_FLAG, isSourcingDue, runIsolatedProspectTopUp } from '../topup-isolated'
 import {
   AGGREGATOR_HOSTS,
   PLACES,
@@ -732,16 +732,47 @@ async function main() {
 
   console.log('\n— G: the switches and the cron —')
 
+  // A minute the hour gate below lets through, so each switch check is about
+  // its own switch and not about what time the suite happens to run.
+  const DUE = new Date('2026-11-09T08:02:00Z')
+  const NOT_DUE = new Date('2026-11-09T08:17:00Z')
+
   check('G1: the crawler is off unless its own switch is exactly "true"',
-    (await runIsolatedProspectTopUp(async () => { throw new Error('must not run') }, { env: {} })).status === 'off'
+    (await runIsolatedProspectTopUp(async () => { throw new Error('must not run') }, { env: {}, now: DUE })).status === 'off'
     && (await runIsolatedProspectTopUp(async () => { throw new Error('must not run') },
-      { env: { [SOURCING_FLAG]: 'TRUE', VERCEL_ENV: 'production' } })).status === 'off')
+      { env: { [SOURCING_FLAG]: 'TRUE', VERCEL_ENV: 'production' }, now: DUE })).status === 'off')
   check('G2: and off outside Production, which shares the Production database',
     (await runIsolatedProspectTopUp(async () => { throw new Error('must not run') },
-      { env: { [SOURCING_FLAG]: 'true', VERCEL_ENV: 'preview' } })).status === 'not_production')
+      { env: { [SOURCING_FLAG]: 'true', VERCEL_ENV: 'preview' }, now: DUE })).status === 'not_production')
   check('G3: a pass that throws is swallowed, never failing the cron it rides',
     (await runIsolatedProspectTopUp(async () => { throw new Error('directory redesigned') },
-      { env: { [SOURCING_FLAG]: 'true', VERCEL_ENV: 'production' } })).status === 'error')
+      { env: { [SOURCING_FLAG]: 'true', VERCEL_ENV: 'production' }, now: DUE })).status === 'error')
+
+  console.log('\n— H: the hour gate (CPU) —')
+
+  // 9 Nov 2026: ten page fetches and ten HTML parses rode every quarter-hour
+  // call of the content cron, about 960 a day, and the team's free Fluid Active
+  // CPU allowance ran out. One pass an hour, decided by the clock alone.
+  check('H1: only the pass in the first quarter of the hour sources',
+    [0, 1, 14].every((m) => isSourcingDue(new Date(Date.UTC(2026, 10, 9, 8, m))))
+    && [15, 29, 30, 44, 45, 59].every((m) => !isSourcingDue(new Date(Date.UTC(2026, 10, 9, 8, m)))))
+  check('H2: which is four passes an hour down to one',
+    Array.from({ length: 60 }, (_, m) => m).filter((m) => isSourcingDue(new Date(Date.UTC(2026, 10, 9, 8, m)))).length === 15
+    && [0, 15, 30, 45].filter((m) => isSourcingDue(new Date(Date.UTC(2026, 10, 9, 8, m)))).length === 1)
+  check('H3: a pass outside the quarter constructs nothing and reads no site',
+    (await runIsolatedProspectTopUp(async () => { throw new Error('must not run') },
+      { env: { [SOURCING_FLAG]: 'true', VERCEL_ENV: 'production' }, now: NOT_DUE })).status === 'not_due')
+  check('H4: and the gate comes after the switches, so an off crawler still reads "off"',
+    (await runIsolatedProspectTopUp(async () => { throw new Error('must not run') },
+      { env: {}, now: NOT_DUE })).status === 'off')
+
+  const mutHourGate = await withMutant<{ isSourcingDue: typeof isSourcingDue }, boolean>(
+    'lib/outreach/topup-isolated.ts',
+    [[/  return now\.getUTCMinutes\(\) < 15\n/, '  return true\n']],
+    async (m) => [15, 30, 45].every((min) => m.isSourcingDue(new Date(Date.UTC(2026, 10, 9, 8, min))) === false),
+  )
+  check('H1-MUT: without the gate every quarter-hour pass sources again',
+    mutHourGate === false)
 
   const cronSource = readFileSync(
     join(__dirname, '..', '..', '..', 'app', 'api', 'content', 'automation', 'cron', 'route.ts'), 'utf8')

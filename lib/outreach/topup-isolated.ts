@@ -28,7 +28,27 @@ export const SOURCING_FLAG = 'OUTREACH_SOURCING_ENABLED'
 
 export type IsolatedTopUpOutcome =
   | { status: 'ran'; summary: TopUpSummary }
-  | { status: 'off' | 'not_production' | 'error' }
+  | { status: 'off' | 'not_production' | 'not_due' | 'error' }
+
+/**
+ * ONCE AN HOUR, NOT ONCE A PASS.
+ *
+ * The pass reads ten other people's websites and parses their HTML, and it rode
+ * every quarter-hour call of the content cron: about 960 page fetches a day. On
+ * 9 November 2026 the team's free Fluid Active CPU allowance ran out, and this
+ * was the second-largest thing the cron did with it (the first was building
+ * article prompts for accounts with no allowance left).
+ *
+ * The gate is the clock, not a stored counter, so it needs no table and cannot
+ * drift: only the pass that lands in the first quarter of the hour sources. That
+ * is one pass an hour at the current fifteen-minute cadence, and still one pass
+ * an hour if the cadence is slowed to hourly — the change Oren can make in
+ * cron-job.org without a deploy. Nothing else about the pass changes, and the
+ * list keeps growing, four times slower.
+ */
+export function isSourcingDue(now: Date): boolean {
+  return now.getUTCMinutes() < 15
+}
 
 export async function runIsolatedProspectTopUp(
   run: () => Promise<TopUpSummary> = async () => {
@@ -43,12 +63,14 @@ export async function runIsolatedProspectTopUp(
       search: createSerperSearch(),
     })
   },
-  opts: { env?: Record<string, string | undefined> } = {},
+  opts: { env?: Record<string, string | undefined>; now?: Date } = {},
 ): Promise<IsolatedTopUpOutcome> {
   const env = opts.env ?? process.env
   // Nothing is constructed before both switches: no client, no request.
   if (env[SOURCING_FLAG] !== 'true') return { status: 'off' }
   if (env.VERCEL_ENV !== 'production') return { status: 'not_production' }
+  // Nothing is constructed before the hour gate either — see isSourcingDue.
+  if (!isSourcingDue(opts.now ?? new Date())) return { status: 'not_due' }
   try {
     const summary = await run()
     console.log('[outreach-topup] pass complete', summary)
