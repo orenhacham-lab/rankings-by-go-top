@@ -70,6 +70,21 @@ export const BRAND_PROFILES = [
   // earned do-follow source whose two anchors point at the free checker and the
   // open dataset rather than at the home page.
   'https://ki-toolnavigator.com/tool/go-top-seo',
+  // Published 9 Nov 2026 by herramientasia.ai, the Spanish-language AI tool
+  // directory, from the submission we made. Verified the way this file
+  // requires: HTTP 200 and the page names the product, in the server's own
+  // HTML rather than after JavaScript. Read in full first, because a listing
+  // written by someone else can put a claim in our mouth: theirs says monthly
+  // position tracking, the AI check as ChatGPT, Gemini and Google AI, the
+  // 7-day trial with no card, and nothing about guaranteed rankings — so it
+  // can be claimed as the same entity without a correction.
+  //
+  // Its outbound link is `rel="nofollow sponsored"` through a redirect, so it
+  // passes no link equity and is not here as a link. It is here because its
+  // own SoftwareApplication markup carries `sameAs` pointing back at our
+  // Spanish page, and that is a mutual entity statement, which is what this
+  // list is for.
+  'https://www.herramientasia.ai/ia/go-top-seo',
 ] as const
 
 /**
