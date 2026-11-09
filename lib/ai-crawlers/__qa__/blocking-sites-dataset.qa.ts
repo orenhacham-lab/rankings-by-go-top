@@ -19,6 +19,15 @@
  * Run: npx tsx lib/ai-crawlers/__qa__/blocking-sites-dataset.qa.ts
  */
 import SITES from '../data/blocking-sites-2026-11-09.json'
+import {
+  BLOCKING_SITES_MEASURED_ON,
+  BLOCKING_SITES_READ,
+  BLOCKING_SITES_REFUSED,
+  BLOCKING_SITES_REQUESTED,
+  BLOCKING_SITES_VERSION,
+  GPTBOT_DELIBERATE_PCT,
+  OAI_SEARCHBOT_INHERITED_PCT,
+} from '../blocking-sites'
 
 let pass = 0, fail = 0
 function check(name: string, cond: boolean, detail?: string) {
@@ -107,6 +116,29 @@ console.log('\nC) the limits travel with the numbers')
     /Tranco/.test(SITES.method.sample) && /V354N/.test(SITES.method.sample))
   check('C-MUT: a payload whose limitations lost the bias sentence is caught',
     !(/403/.test('These are large, highly ranked sites, not small businesses.')))
+}
+
+console.log('\nD) the figures the page states are the figures the dataset holds')
+{
+  // The page cannot import a quarter-megabyte dataset to read two percentages,
+  // so `lib/ai-crawlers/blocking-sites.ts` restates a handful of figures. That
+  // is a second source of truth unless something checks it, and this is the
+  // something. A summary nobody recomputes is exactly the failure the whole
+  // per-site endpoint exists to prevent, one layer up.
+  const gpt = SITES.findings.byCrawler.find((r) => r.token === 'GPTBot')!
+  const oai = SITES.findings.byCrawler.find((r) => r.token === 'OAI-SearchBot')!
+  check('D1: the version and the date match the dataset',
+    BLOCKING_SITES_VERSION === SITES.version && BLOCKING_SITES_MEASURED_ON === SITES.measuredOn)
+  check('D2: requested and read match the method',
+    BLOCKING_SITES_REQUESTED === SITES.method.domainsRequested && BLOCKING_SITES_READ === SITES.method.robotsRead)
+  check('D3: the refusal count is the 403 outcome, not a round number',
+    BLOCKING_SITES_REFUSED === (SITES.method.outcomes as Record<string, number>).http_403,
+    String(BLOCKING_SITES_REFUSED))
+  check('D4: the two shares the page states are the dataset\u2019s own',
+    GPTBOT_DELIBERATE_PCT === gpt.deliberatePct && OAI_SEARCHBOT_INHERITED_PCT === oai.inheritedPct,
+    `${GPTBOT_DELIBERATE_PCT} / ${OAI_SEARCHBOT_INHERITED_PCT}`)
+  check('D-MUT: a summary figure that drifted from the rows would be caught',
+    GPTBOT_DELIBERATE_PCT + 0.1 !== gpt.deliberatePct)
 }
 
 console.log(`\n${pass} passed, ${fail} failed`)

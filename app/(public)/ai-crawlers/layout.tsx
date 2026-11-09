@@ -1,4 +1,8 @@
-import { aiCrawlerBlockingDatasetSchema, aiCrawlerDatasetSchema } from '@/lib/seo/dataset'
+import {
+  aiCrawlerBlockingDatasetSchema,
+  aiCrawlerBlockingSitesDatasetSchema,
+  aiCrawlerDatasetSchema,
+} from '@/lib/seo/dataset'
 
 // The reference table this page publishes, declared as a Dataset so Google
 // Dataset Search and the AI engines can index it as one. The node is identical
@@ -7,6 +11,9 @@ const datasetSchema = aiCrawlerDatasetSchema('he')
 // The dated measurement the page now renders, declared as its own
 // Dataset. Two nodes, because they are two datasets: see lib/seo/dataset.ts.
 const measurementSchema = aiCrawlerBlockingDatasetSchema('he')
+// The 09.11 re-reading, which keeps one row per domain. A third node because
+// it is a third dataset: a different day, a different n and a different unit.
+const sitesSchema = aiCrawlerBlockingSitesDatasetSchema('he')
 
 export default function HebrewAiCrawlersLayout({ children }: { children: React.ReactNode }) {
   return (
@@ -18,6 +25,10 @@ export default function HebrewAiCrawlersLayout({ children }: { children: React.R
       <script
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(measurementSchema) }}
+      />
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(sitesSchema) }}
       />
       {children}
     </>
