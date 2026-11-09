@@ -18,7 +18,7 @@
  *
  *   npx tsx lib/content/__qa__/llms-txt.qa.ts
  */
-import { readFileSync, existsSync } from 'fs'
+import { readFileSync, existsSync, readdirSync } from 'fs'
 import { join } from 'path'
 import { PUBLIC_LOCALES } from '@/lib/i18n/locales'
 
@@ -88,6 +88,56 @@ check(
 
 // E) One copy only.
 check('E1: the stale static copy is gone', !existsSync(join(ROOT, 'public/llms.txt')))
+
+// F) The comparison list cannot drift from the pages that exist.
+//
+// This file is read by assistants answering "how does it compare to X". A
+// comparison page that exists and is not listed is a page no assistant knows
+// about; a listed path with no page is a 404 we handed them. Both are caught
+// against the directory on disk rather than against a second list here.
+{
+  const listed = [...source.matchAll(/'(\/compare\/[a-z0-9-]+)'/g)].map((m) => m[1]).sort()
+  const onDisk = readdirSync(join(ROOT, 'app/(public)/compare'), { withFileTypes: true })
+    .filter((e) => e.isDirectory())
+    .map((e) => `/compare/${e.name}`)
+    .sort()
+  check(`F1: every comparison page on disk is listed (${onDisk.length} pages)`,
+    JSON.stringify(listed) === JSON.stringify(onDisk), `listed ${listed.join(', ')}`)
+  for (const path of listed) {
+    check(`F2: ${path} really has a page`, existsSync(join(ROOT, 'app/(public)', path, 'page.tsx')))
+  }
+  // MUTATION CONTROL: the three pages that were missing until 09.11.2026 are
+  // exactly what a count-blind check would have let through.
+  check('F1-MUT: a list missing a page on disk is caught',
+    JSON.stringify(['/compare/semrush']) !== JSON.stringify(onDisk))
+}
+
+// G) The open data is in the file, and the caveat travels with the figure.
+//
+// The two public datasets are the likeliest thing here to be quoted back by an
+// assistant, and the measurement is the one that can mislead: it is large,
+// high-ranked sites. So the file must carry the measurement's own limitation
+// sentence, read from the constant rather than retyped where it can be
+// softened or go stale.
+{
+  check('G1: the crawler dataset endpoint is named', source.includes('/api/public/ai-crawlers'))
+  check('G2: the measurement endpoint is named', source.includes('/api/public/ai-crawler-blocking'))
+  check('G3: the OpenAPI description is named', source.includes('/api/public/ai-crawlers/openapi'))
+  check('G4: the caveat is read from the measurement, not retyped',
+    source.includes('BLOCKING_MEASUREMENT.limitations[0]') && !/small business/i.test(source))
+  check('G5: the n and the markets come from the measurement too',
+    source.includes('BLOCKING_MEASUREMENT.method.robotsFilesRead') &&
+      source.includes('BLOCKING_MEASUREMENT.method.markets.length') &&
+      source.includes('BLOCKING_MEASUREMENT.method.domainsRequested'))
+  check('G6: the licence is read from the dataset module, not retyped',
+    source.includes('AI_CRAWLER_DATASET_LICENSE.id') && !source.includes('CC-BY-4.0'))
+  check('G7: no figure is typed into the section', !/\b\d{2,3}(\.\d)?\s?%/.test(source))
+  // MUTATION CONTROL for G4: a line that quotes the figure and drops the
+  // sentence bounding it is what this guard exists to stop.
+  const softened = 'Two thirds of sites block an AI crawler that brings visitors.'
+  check('G4-MUT: a line with the figure and no caveat would fail G4',
+    !softened.includes('BLOCKING_MEASUREMENT.limitations[0]'))
+}
 
 // M) Mutation controls.
 const OLD_BODY = `
