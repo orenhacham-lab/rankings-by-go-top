@@ -22,6 +22,11 @@
  */
 
 import { createClient } from '@/lib/supabase/server'
+import {
+  BLOCKING_MEASUREMENT,
+  BLOCKING_MEASUREMENT_VERSION,
+} from '@/lib/ai-crawlers/blocking-measurement'
+import { AI_CRAWLER_DATASET_LICENSE } from '@/lib/ai-crawlers/dataset'
 import { LOCALE_PREFIX, enabledPublicLocales, normalizePublicLocale, type PublicLocale } from '@/lib/i18n/locales'
 
 interface Article {
@@ -97,7 +102,29 @@ const COMPARISONS: [string, string][] = [
   ['Go Top SEO compared with Semrush', '/compare/semrush'],
   ['Go Top SEO compared with Yoast', '/compare/yoast'],
   ['Go Top SEO compared with Rank Math', '/compare/rankmath'],
+  ['Go Top SEO compared with Surfer SEO', '/compare/surfer'],
+  ['Go Top SEO compared with BrightLocal', '/compare/brightlocal'],
+  ['Go Top SEO compared with Writesonic', '/compare/writesonic'],
 ]
+
+/**
+ * The two datasets this site gives away, which are the pages most likely to be
+ * quoted by an assistant reading this file.
+ *
+ * THE CAVEAT IS IN THE LINE, not left on the page. An assistant that reads
+ * this file and then answers "two thirds of sites block AI crawlers" without
+ * the sentence that bounds it has been misled by us, so the sentence travels
+ * in the same line as the figure, read from the measurement constant rather
+ * than retyped here.
+ */
+function openDataLines(): string[] {
+  const caveat = BLOCKING_MEASUREMENT.limitations[0]
+  return [
+    `- [AI crawler reference dataset](${BASE}/api/public/ai-crawlers): every documented AI crawler user-agent token, what each one is for, and what its operator documents about robots.txt. JSON, or \`?format=csv\` for CSV. No key, no sign-up, ${AI_CRAWLER_DATASET_LICENSE.id}. The same table is rendered for people at ${BASE}/en/ai-crawlers.`,
+    `- [OpenAPI description](${BASE}/api/public/ai-crawlers/openapi): the machine-readable description of both endpoints below, for a catalogue or a client generator.`,
+    `- [robots.txt blocking measurement, ${BLOCKING_MEASUREMENT_VERSION}](${BASE}/api/public/ai-crawler-blocking): one dated reading of ${BLOCKING_MEASUREMENT.method.robotsFilesRead} robots.txt files across ${BLOCKING_MEASUREMENT.method.markets.length} markets, with the method, the failures and the per-market shares. ${caveat} Percentages are of the files read, not of the ${BLOCKING_MEASUREMENT.method.domainsRequested} domains requested.`,
+  ]
+}
 
 export async function GET() {
   const supabase = await createClient()
@@ -151,6 +178,11 @@ export async function GET() {
   for (const [name, path] of COMPARISONS) {
     lines.push(`- [${name}](${BASE}${path}): what each one does and does not do.`)
   }
+  lines.push('')
+
+  lines.push('## Open data anyone may cite')
+  lines.push('')
+  for (const line of openDataLines()) lines.push(line)
   lines.push('')
 
   // Articles, grouped by the language they are written in. An article lives
