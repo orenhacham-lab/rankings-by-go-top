@@ -21,6 +21,14 @@
  * Every URL below was fetched and returned 200 on 28 Oct 2026. A profile goes
  * in this list only once it is live — `sameAs` pointing at a 404 is worse than
  * a short list, because it is the one claim a resolver can cheaply disprove.
+ *
+ * Re-checked on 9 Nov 2026: eight of the ten answered 200 and named the product.
+ * Two could not be read, and neither is a disproof of the claim, so both stay:
+ * `www.vettoria.it` answered 429 to every request including its own
+ * `robots.txt`, which is a host refusing this network rather than a missing
+ * page, and `ainave.com` answered 502 on every page while its `robots.txt`
+ * answered 200, which is their server erroring rather than our listing gone.
+ * A removal needs a 404 or a page that no longer names the product.
  */
 
 import { publicSiteLanguages } from './site-languages'
@@ -55,6 +63,13 @@ export const BRAND_PROFILES = [
   // the seven languages, WordPress/Shopify/Wix. Nothing in it needed a
   // correction, which is why it can be claimed as the same entity.
   'https://ai-best-search.com/products/go-top-seo',
+  // Published 9 Nov 2026 by KI-Toolnavigator's editor, Dr Andreas Stoeckl, as a
+  // full review written from our public pages — critical, not a puff piece, and
+  // accurate. Read in full before it went in here. Verified the way this file
+  // requires: HTTP 200 and the page names the product. It is also the first
+  // earned do-follow source whose two anchors point at the free checker and the
+  // open dataset rather than at the home page.
+  'https://ki-toolnavigator.com/tool/go-top-seo',
 ] as const
 
 /**
