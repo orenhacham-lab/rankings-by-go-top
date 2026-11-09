@@ -101,7 +101,12 @@ export function subjectWithDomain(prefix: string, domain: string | null): string
   return domain ? `${prefix}: ${domain}` : prefix
 }
 
-function shell(title: string, rows: Array<[string, string]>, accent = '#2563eb'): string {
+/**
+ * The RTL body every operator alert shares. Exported because the blog's
+ * silent-morning alert (lib/blog/auto/silent-morning.ts) is an operator email
+ * too, and a second hand-written shell would drift from this one.
+ */
+export function operatorAlertShell(title: string, rows: Array<[string, string]>, accent = '#2563eb'): string {
   const body = rows.map(([k, v]) => `<p><strong>${escapeEmailHtml(k)}:</strong> ${v}</p>`).join('\n            ')
   return `
         <div dir="rtl" style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
@@ -158,7 +163,7 @@ export function buildFreeCheckAlertHtml(i: FreeCheckAlertInput): string {
     rows.push(['דוא״ל לשליחת הדוח', text(i.reportEmail, 254)])
     rows.push(['אישר/ה דיוור שיווקי', i.consentedMarketing ? 'כן' : 'לא'])
   }
-  return shell('🔎 נסרק אתר בבדיקה החינמית (לפני הרשמה)', rows, '#0d9488')
+  return operatorAlertShell('🔎 נסרק אתר בבדיקה החינמית (לפני הרשמה)', rows, '#0d9488')
 }
 
 type FreeCheckResultLike = {
@@ -241,7 +246,7 @@ export async function notifyReportRequested(
     const out = await deliverOperatorEmail(
       {
         subject: subjectWithDomain('מבקר השאיר דוא״ל לדוח', domain),
-        html: shell('✉️ מבקר ביקש את הדוח בדוא״ל', [
+        html: operatorAlertShell('✉️ מבקר ביקש את הדוח בדוא״ל', [
           ['אתר', text(domain)],
           ['דוא״ל', text(args.email, 254)],
           ['אישר/ה דיוור שיווקי', 'כן'],
@@ -282,7 +287,7 @@ function planState(i: Pick<ProjectAlertInput, 'plan' | 'trialActive' | 'trialEnd
 }
 
 export function buildProjectAddedAlertHtml(i: ProjectAlertInput): string {
-  return shell('➕ משתמש הוסיף אתר חדש', [
+  return operatorAlertShell('➕ משתמש הוסיף אתר חדש', [
     ['שם', text(i.name)],
     ['דוא״ל', text(i.email)],
     ['אתר חדש', text(safeDomain(i.domain))],
