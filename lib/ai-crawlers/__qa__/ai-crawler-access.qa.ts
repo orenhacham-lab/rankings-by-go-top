@@ -412,6 +412,34 @@ function main() {
       !'<table><tbody /></table>'.includes('id="ai-crawlers-undocumented"'))
     // MUTATION CONTROL for F16.
     check('F16-MUT: a page-only token would fail F16', !datasetTokens.has('gotopbot'))
+
+    // F23-F26: the internal links that make the earned ones count. This page
+    // holds the do-follow links the product has earned, and a page whose only
+    // outgoing link is the sign-up button passes none of that on to anything
+    // that ranks. So the three destinations are pinned, every locale must have
+    // its own anchors, and the hrefs must go through getLocaleHref — a bare
+    // '/pricing' would throw a Polish reader out of their own language.
+    const RELATED_PATHS = ['/features/ai-visibility-tracking', '/free-check', '/pricing']
+    const missingPaths = RELATED_PATHS.filter((path) => !checkerSrc.includes(`'${path}'`))
+    check('F23: the page links on to the three product pages',
+      missingPaths.length === 0, missingPaths.join(', '))
+    check('F24: those links are locale-aware',
+      checkerSrc.includes('getLocaleHref(item.href, locale)'))
+    const relatedGaps = PUBLIC_LOCALES.filter((l: PublicLocale) => {
+      const r = aiCrawlerCopy(l).related
+      return !r?.title?.trim() || !r?.lead?.trim() || !r?.aiVisibility?.trim() ||
+        !r?.freeCheck?.trim() || !r?.pricing?.trim()
+    })
+    check('F25: every locale has its own anchors for them',
+      relatedGaps.length === 0, relatedGaps.join(', '))
+    // An anchor that repeats another locale's wording is an untranslated key.
+    const anchorSets = PUBLIC_LOCALES.map((l: PublicLocale) => aiCrawlerCopy(l).related.pricing)
+    check('F26: the pricing anchor is not one string reused in ten languages',
+      new Set(anchorSets).size === PUBLIC_LOCALES.length)
+    check('F23-MUT: a page with no onward link would fail F23',
+      !'<section />'.includes("'/pricing'"))
+    check('F24-MUT: a bare href would fail F24',
+      !"<Link href='/pricing'>".includes('getLocaleHref(item.href, locale)'))
   }
 
   console.log(`\n${pass} passed, ${fail} failed`)

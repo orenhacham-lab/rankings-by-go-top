@@ -93,6 +93,21 @@ export type AiCrawlerCopy = {
     perSiteDownloads: string
   }
   cta: { title: string; body: string; button: string }
+  /**
+   * The three product pages this page sends a reader on to, in the reader's own
+   * language. This page is where the earned do-follow links land, and its only
+   * outgoing internal link used to be the sign-up button, which is not an
+   * indexable page — so none of the authority those links carry reached
+   * anything that ranks. The labels ARE the anchors, which is why each one
+   * names its destination instead of saying "read more".
+   */
+  related: {
+    title: string
+    lead: string
+    aiVisibility: string
+    freeCheck: string
+    pricing: string
+  }
 }
 
 const he: AiCrawlerCopy = {
@@ -186,6 +201,13 @@ const he: AiCrawlerCopy = {
     title: 'לראות אם ה-AI באמת מזכיר אתכם',
     body: 'גישה היא רק השלב הראשון. Go Top SEO בודק אוטומטית אם העסק שלכם מופיע בתשובות של ChatGPT, Gemini ו-Google AI, ועוקב אחרי הדירוגים בגוגל ובמפות מדי חודש.',
     button: 'לנסות שבוע חינם, בלי כרטיס אשראי',
+  },
+  related: {
+    title: 'להמשיך מכאן',
+    lead: 'גישה של סורקי AI היא חלק אחד בתמונה. שלושת הדפים האלה מכסים את השאר.',
+    aiVisibility: 'מעקב נראות בתשובות AI',
+    freeCheck: 'בדיקת SEO חינמית לאתר',
+    pricing: 'מסלולים ומחירים',
   },
 }
 
@@ -281,6 +303,13 @@ const en: AiCrawlerCopy = {
     body: 'Access is only the first step. Go Top SEO checks automatically whether your business shows up in answers from ChatGPT, Gemini and Google AI, and tracks your Google and Maps rankings every month.',
     button: 'Try it free for 7 days, no card',
   },
+  related: {
+    title: 'Where to go from here',
+    lead: 'AI crawler access is one piece of the picture. These three pages cover the rest.',
+    aiVisibility: 'AI answer visibility tracking',
+    freeCheck: 'Free SEO check for your site',
+    pricing: 'Plans and pricing',
+  },
 }
 
 const es: AiCrawlerCopy = {
@@ -374,6 +403,13 @@ const es: AiCrawlerCopy = {
     title: 'Comprueba si la IA te menciona de verdad',
     body: 'El acceso es solo el primer paso. Go Top SEO comprueba automáticamente si tu negocio aparece en las respuestas de ChatGPT, Gemini y Google AI, y sigue tus posiciones en Google y en Maps cada mes.',
     button: 'Pruébalo 7 días gratis, sin tarjeta',
+  },
+  related: {
+    title: 'Por dónde seguir',
+    lead: 'El acceso de los rastreadores de IA es una parte del cuadro. Estas tres páginas cubren el resto.',
+    aiVisibility: 'Seguimiento de la visibilidad en las respuestas de IA',
+    freeCheck: 'Análisis SEO gratuito de tu sitio',
+    pricing: 'Planes y precios',
   },
 }
 
@@ -469,6 +505,13 @@ const ptBR: AiCrawlerCopy = {
     body: 'O acesso é só o primeiro passo. O Go Top SEO verifica automaticamente se o seu negócio aparece nas respostas do ChatGPT, do Gemini e do Google AI, e acompanha suas posições no Google e no Maps todo mês.',
     button: 'Teste 7 dias grátis, sem cartão',
   },
+  related: {
+    title: 'Por onde continuar',
+    lead: 'O acesso dos rastreadores de IA é uma parte do quadro. Estas três páginas cobrem o resto.',
+    aiVisibility: 'Monitoramento da visibilidade nas respostas de IA',
+    freeCheck: 'Análise de SEO gratuita do seu site',
+    pricing: 'Planos e preços',
+  },
 }
 
 const fr: AiCrawlerCopy = {
@@ -562,6 +605,13 @@ const fr: AiCrawlerCopy = {
     title: "Voyez si l'IA vous mentionne vraiment",
     body: "L'accès n'est que la première étape. Go Top SEO vérifie automatiquement si votre entreprise apparaît dans les réponses de ChatGPT, de Gemini et de Google AI, et suit vos positions sur Google et sur Maps chaque mois.",
     button: 'Essayez 7 jours gratuitement, sans carte',
+  },
+  related: {
+    title: 'Pour aller plus loin',
+    lead: 'L’accès des robots d’IA n’est qu’une partie du tableau. Ces trois pages couvrent le reste.',
+    aiVisibility: 'Suivi de la visibilité dans les réponses d’IA',
+    freeCheck: 'Analyse SEO gratuite de votre site',
+    pricing: 'Offres et tarifs',
   },
 }
 
@@ -657,6 +707,13 @@ const it: AiCrawlerCopy = {
     body: 'L’accesso è solo il primo passo. Go Top SEO verifica automaticamente se la tua attività compare nelle risposte di ChatGPT, Gemini e Google AI, e segue le tue posizioni su Google e su Maps ogni mese.',
     button: 'Provalo 7 giorni gratis, senza carta',
   },
+  related: {
+    title: 'Da dove continuare',
+    lead: 'L’accesso dei crawler di IA è solo una parte del quadro. Queste tre pagine coprono il resto.',
+    aiVisibility: 'Monitoraggio della visibilità nelle risposte di IA',
+    freeCheck: 'Analisi SEO gratuita del sito',
+    pricing: 'Piani e prezzi',
+  },
 }
 
 const ja: AiCrawlerCopy = {
@@ -750,6 +807,13 @@ const ja: AiCrawlerCopy = {
     title: 'AIが実際に自社に言及しているかを確かめる',
     body: 'アクセスできるかどうかは最初の一歩にすぎません。Go Top SEOは、ChatGPT、Gemini、Google AIの回答に自社が出てくるかを自動で確認し、GoogleとGoogleマップでの順位を毎月追跡します。',
     button: '7日間の無料トライアル、クレジットカードは不要',
+  },
+  related: {
+    title: 'ここから先は',
+    lead: 'AIクローラーのアクセスは全体の一部です。残りはこの三つのページが扱います。',
+    aiVisibility: 'AIの回答での露出をモニタリング',
+    freeCheck: 'サイトの無料SEOチェック',
+    pricing: 'プランと料金',
   },
 }
 
@@ -845,6 +909,13 @@ const de: AiCrawlerCopy = {
     body: 'Der Zugang ist nur der erste Schritt. Go Top SEO prüft automatisch, ob Ihr Unternehmen in den Antworten von ChatGPT, Gemini und Google AI vorkommt, und verfolgt Ihre Positionen bei Google und in Google Maps monatlich.',
     button: '7 Tage kostenlos testen, ohne Kreditkarte',
   },
+  related: {
+    title: 'Wie es weitergeht',
+    lead: 'Der Zugang der KI-Crawler ist ein Teil des Bildes. Diese drei Seiten decken den Rest ab.',
+    aiVisibility: 'Sichtbarkeit in KI-Antworten verfolgen',
+    freeCheck: 'Kostenloser SEO-Check Ihrer Website',
+    pricing: 'Tarife und Preise',
+  },
 }
 
 const pl: AiCrawlerCopy = {
@@ -939,6 +1010,13 @@ const pl: AiCrawlerCopy = {
     body: 'Dostęp to dopiero pierwszy krok. Go Top SEO automatycznie sprawdza, czy Państwa firma pojawia się w odpowiedziach ChatGPT, Gemini i Google AI, i co miesiąc monitoruje pozycje w Google oraz w Mapach Google.',
     button: 'Wypróbuj 7 dni bezpłatnie, bez karty kredytowej',
   },
+  related: {
+    title: 'Co dalej',
+    lead: 'Dostęp robotów AI to jedna część obrazu. Pozostałą część opisują te trzy strony.',
+    aiVisibility: 'Monitorowanie widoczności w odpowiedziach AI',
+    freeCheck: 'Darmowa analiza SEO strony',
+    pricing: 'Plany i ceny',
+  },
 }
 
 const nl: AiCrawlerCopy = {
@@ -1032,6 +1110,13 @@ const nl: AiCrawlerCopy = {
     title: 'Uitzoeken of de AI uw bedrijf echt noemt',
     body: 'De toegang is pas de eerste stap. Go Top SEO controleert automatisch of uw bedrijf voorkomt in de antwoorden van ChatGPT, Gemini en Google AI, en volgt uw posities in Google en in Google Maps maandelijks.',
     button: '7 dagen gratis uitproberen, zonder creditcard',
+  },
+  related: {
+    title: 'Hoe het verdergaat',
+    lead: 'De toegang van AI-crawlers is één deel van het beeld. Deze drie pagina’s dekken de rest.',
+    aiVisibility: 'Zichtbaarheid in AI-antwoorden volgen',
+    freeCheck: 'Gratis SEO-controle van uw site',
+    pricing: 'Pakketten en prijzen',
   },
 }
 
