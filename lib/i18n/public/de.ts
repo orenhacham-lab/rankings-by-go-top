@@ -116,6 +116,8 @@ export const de = {
     articles: 'Artikel',
     about: 'Über uns',
     affiliates: 'Partnerprogramm',
+    compare: 'Alle Vergleiche',
+    aiCrawlers: 'KI-Crawler-Prüfung',
     sitemap: 'Sitemap',
     legal: 'Rechtliches',
     privacy: 'Datenschutzerklärung',

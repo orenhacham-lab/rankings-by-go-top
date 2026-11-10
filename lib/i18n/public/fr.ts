@@ -108,6 +108,8 @@ export const fr = {
     articles: 'Articles',
     about: 'À propos',
     affiliates: 'Programme d’affiliation',
+    compare: 'Tous les comparatifs',
+    aiCrawlers: 'Vérification des robots d’IA',
     sitemap: 'Plan du site',
     legal: 'Mentions légales',
     privacy: 'Politique de confidentialité',

@@ -135,6 +135,8 @@ export const pl = {
     articles: 'Artykuły',
     about: 'O nas',
     affiliates: 'Program partnerski',
+    compare: 'Wszystkie porównania',
+    aiCrawlers: 'Sprawdzenie robotów AI',
     sitemap: 'Mapa witryny',
     legal: 'Informacje prawne',
     privacy: 'Polityka prywatności',

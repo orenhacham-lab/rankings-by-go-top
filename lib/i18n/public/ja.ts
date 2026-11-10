@@ -122,6 +122,8 @@ export const ja = {
     articles: '記事',
     about: '会社情報',
     affiliates: 'アフィリエイトプログラム',
+    compare: 'すべての比較',
+    aiCrawlers: 'AIクローラー診断',
     sitemap: 'サイトマップ',
     legal: '法的事項',
     privacy: 'プライバシーポリシー',

@@ -95,6 +95,8 @@ export const en = {
     articles: 'Articles',
     about: 'About',
     affiliates: 'Affiliate program',
+    compare: 'All comparisons',
+    aiCrawlers: 'AI crawler check',
     sitemap: 'Sitemap',
     legal: 'Legal',
     privacy: 'Privacy Policy',
