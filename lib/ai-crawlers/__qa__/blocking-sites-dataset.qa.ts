@@ -19,6 +19,7 @@
  * Run: npx tsx lib/ai-crawlers/__qa__/blocking-sites-dataset.qa.ts
  */
 import SITES from '../data/blocking-sites-2026-11-09.json'
+import { BLOCKING_MARKETS_2026_11_09, marketPct } from '../blocking-markets'
 import {
   BLOCKING_SITES_MEASURED_ON,
   BLOCKING_SITES_READ,
@@ -139,6 +140,76 @@ console.log('\nD) the figures the page states are the figures the dataset holds'
     `${GPTBOT_DELIBERATE_PCT} / ${OAI_SEARCHBOT_INHERITED_PCT}`)
   check('D-MUT: a summary figure that drifted from the rows would be caught',
     GPTBOT_DELIBERATE_PCT + 0.1 !== gpt.deliberatePct)
+}
+
+// E) THE PER-MARKET TABLE, recomputed row by row.
+//
+// `blocking-markets.ts` is the same kind of restatement as `blocking-sites.ts`
+// and carries the same risk: seven rows of hand-written integers that the page
+// prints as fact. So every field of every row is recomputed here from the same
+// 700 rows the endpoint serves, and the seven markets are summed back against
+// the dataset's own totals — which is what catches a market quietly going
+// missing, the one error a row-by-row check alone would pass.
+{
+  type Row = { market: string; requested: number; read: number; gptbotBlocked: number; gptbotDeliberate: number; oaiSearchbotBlocked: number; oaiSearchbotInherited: number }
+  const computed = new Map<string, Row>()
+  for (const site of SITES.sites as Array<{ market: string; state: string; verdicts?: Record<string, { allowed: boolean; group: string }> }>) {
+    const row = computed.get(site.market) ?? { market: site.market, requested: 0, read: 0, gptbotBlocked: 0, gptbotDeliberate: 0, oaiSearchbotBlocked: 0, oaiSearchbotInherited: 0 }
+    row.requested += 1
+    if (site.state === 'read') {
+      row.read += 1
+      const gptVerdict = site.verdicts?.GPTBot
+      if (gptVerdict && !gptVerdict.allowed) {
+        row.gptbotBlocked += 1
+        if (gptVerdict.group.toLowerCase().includes('gptbot')) row.gptbotDeliberate += 1
+      }
+      const oaiVerdict = site.verdicts?.['OAI-SearchBot']
+      if (oaiVerdict && !oaiVerdict.allowed) {
+        row.oaiSearchbotBlocked += 1
+        if (!oaiVerdict.group.toLowerCase().includes('oai-searchbot')) row.oaiSearchbotInherited += 1
+      }
+    }
+    computed.set(site.market, row)
+  }
+
+  check('E1: the table covers every market in the dataset and no other',
+    BLOCKING_MARKETS_2026_11_09.length === computed.size &&
+      BLOCKING_MARKETS_2026_11_09.every((r) => computed.has(r.market)),
+    `${BLOCKING_MARKETS_2026_11_09.length} vs ${computed.size}`)
+
+  const drifted: string[] = []
+  for (const row of BLOCKING_MARKETS_2026_11_09) {
+    const real = computed.get(row.market)
+    if (!real) continue
+    for (const field of ['requested', 'read', 'gptbotBlocked', 'gptbotDeliberate', 'oaiSearchbotBlocked', 'oaiSearchbotInherited'] as const) {
+      if (row[field] !== real[field]) drifted.push(`${row.market}.${field}: ${row[field]} vs ${real[field]}`)
+    }
+  }
+  check('E2: every field of every row is the dataset\u2019s own count',
+    drifted.length === 0, drifted.slice(0, 5).join('; '))
+
+  // The sums, which is what catches a missing market.
+  const gptTotals = SITES.findings.byCrawler.find((r) => r.token === 'GPTBot')!
+  const oaiTotals = SITES.findings.byCrawler.find((r) => r.token === 'OAI-SearchBot')!
+  const sum = (pick: (r: MarketTotals) => number) => BLOCKING_MARKETS_2026_11_09.reduce((n, r) => n + pick(r), 0)
+  type MarketTotals = (typeof BLOCKING_MARKETS_2026_11_09)[number]
+  check('E3: the markets sum to the requested and read totals',
+    sum((r) => r.requested) === SITES.method.domainsRequested && sum((r) => r.read) === SITES.method.robotsRead,
+    `${sum((r) => r.requested)} / ${sum((r) => r.read)}`)
+  check('E4: the markets sum to the dataset\u2019s own GPTBot counts',
+    sum((r) => r.gptbotBlocked) === gptTotals.blocked && sum((r) => r.gptbotDeliberate) === gptTotals.deliberate,
+    `${sum((r) => r.gptbotBlocked)} vs ${gptTotals.blocked}`)
+  check('E5: the markets sum to the dataset\u2019s own OAI-SearchBot counts',
+    sum((r) => r.oaiSearchbotBlocked) === oaiTotals.blocked && sum((r) => r.oaiSearchbotInherited) === oaiTotals.inherited,
+    `${sum((r) => r.oaiSearchbotBlocked)} vs ${oaiTotals.blocked}`)
+  // The whole point of the row is that the n travels with the share, so a
+  // market whose n is zero must not produce a percentage at all.
+  check('E6: a share is of the files read in that market',
+    marketPct(15, 65) === 23.1 && marketPct(1, 0) === 0)
+  check('E2-MUT: a row off by one would be caught',
+    BLOCKING_MARKETS_2026_11_09[0].read + 1 !== computed.get(BLOCKING_MARKETS_2026_11_09[0].market)!.read)
+  check('E1-MUT: a table missing a market would be caught',
+    BLOCKING_MARKETS_2026_11_09.slice(1).length !== computed.size)
 }
 
 console.log(`\n${pass} passed, ${fail} failed`)
