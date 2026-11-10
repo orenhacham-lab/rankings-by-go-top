@@ -43,7 +43,7 @@ import {
 import { aiCrawlerCopy } from '@/lib/ai-crawlers/copy'
 import type { AiCrawlerErrorCode, AiCrawlerResponse, AiCrawlerResult, CrawlerVerdict } from '@/lib/ai-crawlers/types'
 import { authHref } from '@/lib/i18n/auth-href'
-import type { PublicLocale } from '@/lib/i18n/locales'
+import { getLocaleHref, type PublicLocale } from '@/lib/i18n/locales'
 
 function VerdictRow({ verdict, copy, dir }: { verdict: CrawlerVerdict; copy: ReturnType<typeof aiCrawlerCopy>; dir: 'rtl' | 'ltr' }) {
   const good = verdict.allowed
@@ -452,6 +452,40 @@ export function AiCrawlerChecker({ locale, initialUrl = '' }: { locale: PublicLo
           {copy.cta.button}
         </Link>
       </section>
+
+      {/*
+        The links that make the earned ones count. Two do-follow sources point
+        at this page — ki-toolnavigator.com, and smartnetstudio.pl at /pl — and
+        the only link out of the page's own body was the sign-up button above,
+        which is not an indexable page. The nav and the footer do reach all
+        three destinations below, so this is not about reaching them at all: a
+        link in the body, with an anchor that names the destination, is not
+        boilerplate repeated on every page of the site, and it is also the
+        obvious next step for a reader who arrived here from a directory
+        listing rather than from the home page.
+
+        Every href goes through getLocaleHref, so a Polish reader is sent to
+        /pl/pricing rather than out of their own language.
+      */}
+      <nav className="mt-12" aria-labelledby="ai-crawlers-related">
+        <h2 id="ai-crawlers-related" className="text-copy font-bold text-ink">
+          {copy.related.title}
+        </h2>
+        <p className="mt-2 max-w-2xl text-copy text-body">{copy.related.lead}</p>
+        <ul className="mt-3 space-y-2">
+          {[
+            { href: '/features/ai-visibility-tracking', label: copy.related.aiVisibility },
+            { href: '/free-check', label: copy.related.freeCheck },
+            { href: '/pricing', label: copy.related.pricing },
+          ].map((item) => (
+            <li key={item.href}>
+              <Link href={getLocaleHref(item.href, locale)} className="font-semibold text-action underline">
+                {item.label}
+              </Link>
+            </li>
+          ))}
+        </ul>
+      </nav>
     </div>
   )
 }
