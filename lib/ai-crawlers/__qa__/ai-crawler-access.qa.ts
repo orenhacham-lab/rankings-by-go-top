@@ -27,6 +27,11 @@ import { LIMIT, WINDOW_MS, resetRateLimiter, takeToken } from '../rate-limit'
 import { aiCrawlerCopy } from '../copy'
 import { AI_CRAWLER_CANDIDATES, AI_CRAWLER_DATASET } from '../dataset'
 import { PUBLIC_LOCALES, type PublicLocale } from '../../i18n/locales'
+import {
+  aiCrawlerBlockingDatasetSchema,
+  aiCrawlerBlockingSitesDatasetSchema,
+  aiCrawlerDatasetSchema,
+} from '../../seo/dataset'
 
 let pass = 0,
   fail = 0
@@ -441,6 +446,50 @@ function main() {
       !'<section />'.includes("'/pricing'"))
     check('F24-MUT: a bare href would fail F24',
       !"<Link href='/pricing'>".includes('getLocaleHref(item.href, locale)'))
+
+    // G) OUR OWN robots.txt, read with the matcher this page publishes.
+    //
+    // The whole premise of the open dataset is that a crawler fetches it and
+    // an engine cites it. `Disallow: /api` in our own robots.txt was blocking
+    // every crawler, Googlebot included, from the exact URLs the Dataset nodes
+    // declare as their distributions — the one defect that makes the asset
+    // worthless while the page claims otherwise. The distribution URLs are
+    // read out of the schema builders rather than retyped, so a fourth
+    // distribution cannot be added and left blocked.
+    const ourRobots = parseRobots(read('public/robots.txt'))
+    const distributions = [
+      aiCrawlerDatasetSchema('en'),
+      aiCrawlerBlockingDatasetSchema('en'),
+      aiCrawlerBlockingSitesDatasetSchema('en'),
+    ].flatMap((node) =>
+      (node.distribution as Array<{ contentUrl: string }>).map((d) => d.contentUrl),
+    )
+    // The OpenAPI description, which the page links and the catalogues read.
+    distributions.push('https://www.gotopseo.com/api/public/ai-crawlers/openapi')
+    const pathOf = (url: string) => new URL(url).pathname
+    // Googlebot decides Dataset Search; the documented AI crawlers decide
+    // whether an engine can read it at all.
+    const readers = ['Googlebot', ...AI_CRAWLER_TOKENS]
+    const blocked: string[] = []
+    for (const url of distributions) {
+      for (const reader of readers) {
+        if (!isAllowed(ourRobots, reader, pathOf(url)).allowed) blocked.push(`${reader} ${pathOf(url)}`)
+      }
+    }
+    check('G1: our robots.txt lets every reader fetch every published distribution',
+      blocked.length === 0, blocked.slice(0, 6).join('; '))
+    check('G2: the open data is opened by an explicit Allow, not by removing the /api wall',
+      isAllowed(ourRobots, 'Googlebot', '/api/public/ai-crawlers').decidedBy?.kind === 'allow')
+    // And the wall still stands everywhere else under /api.
+    const stillClosed = ['/api/content/automation/cron', '/api/free-check', '/api/auth/callback']
+      .filter((path) => isAllowed(ourRobots, 'Googlebot', path).allowed)
+    check('G3: every other /api route is still disallowed',
+      stillClosed.length === 0, stillClosed.join(', '))
+    // MUTATION CONTROL: the file as it was before the Allow line, which is the
+    // state G1 exists to catch.
+    const withoutAllow = parseRobots(read('public/robots.txt').replace(/^Allow: \/api\/public\/$/gm, ''))
+    check('G1-MUT: the file without the Allow line would fail G1',
+      !isAllowed(withoutAllow, 'Googlebot', '/api/public/ai-crawlers').allowed)
   }
 
   console.log(`\n${pass} passed, ${fail} failed`)
