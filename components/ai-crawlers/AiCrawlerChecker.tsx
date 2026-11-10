@@ -454,12 +454,18 @@ export function AiCrawlerChecker({ locale, initialUrl = '' }: { locale: PublicLo
       </section>
 
       {/*
-        The links that make the earned ones count. Two do-follow sources now
-        point at this page, and until this section existed the only internal
-        link out of it was the sign-up button above, which is not an indexable
-        page — so nothing that ranks received any of it. Each anchor names its
-        destination, and every href goes through getLocaleHref so a Polish
-        reader is sent to /pl/pricing rather than out of their own language.
+        The links that make the earned ones count. Two do-follow sources point
+        at this page — ki-toolnavigator.com, and smartnetstudio.pl at /pl — and
+        the only link out of the page's own body was the sign-up button above,
+        which is not an indexable page. The nav and the footer do reach all
+        three destinations below, so this is not about reaching them at all: a
+        link in the body, with an anchor that names the destination, is not
+        boilerplate repeated on every page of the site, and it is also the
+        obvious next step for a reader who arrived here from a directory
+        listing rather than from the home page.
+
+        Every href goes through getLocaleHref, so a Polish reader is sent to
+        /pl/pricing rather than out of their own language.
       */}
       <nav className="mt-12" aria-labelledby="ai-crawlers-related">
         <h2 id="ai-crawlers-related" className="text-copy font-bold text-ink">

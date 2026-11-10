@@ -95,11 +95,14 @@ export type AiCrawlerCopy = {
   cta: { title: string; body: string; button: string }
   /**
    * The three product pages this page sends a reader on to, in the reader's own
-   * language. This page is where the earned do-follow links land, and its only
-   * outgoing internal link used to be the sign-up button, which is not an
-   * indexable page — so none of the authority those links carry reached
-   * anything that ranks. The labels ARE the anchors, which is why each one
-   * names its destination instead of saying "read more".
+   * language. This page is where the earned do-follow links land, and the only
+   * link out of its own body was the sign-up button, which is not an indexable
+   * page. The nav and the footer do reach all three destinations, so these
+   * links are not about reachability: a link in the body carries weight that
+   * boilerplate repeated on every page does not, and it is the obvious next
+   * step for a reader who arrived from a directory listing. The labels ARE the
+   * anchors, which is why each one names its destination instead of saying
+   * "read more".
    */
   related: {
     title: string
