@@ -111,6 +111,8 @@ export const it = {
     articles: 'Articoli',
     about: 'Chi siamo',
     affiliates: 'Programma di affiliazione',
+    compare: 'Tutti i confronti',
+    aiCrawlers: 'Verifica dei crawler IA',
     sitemap: 'Mappa del sito',
     legal: 'Note legali',
     privacy: 'Informativa sulla privacy',

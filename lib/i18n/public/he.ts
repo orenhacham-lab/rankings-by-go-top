@@ -93,6 +93,8 @@ export const he = {
     articles: 'מאמרים',
     about: 'אודות',
     affiliates: 'תוכנית שותפים',
+    compare: 'כל ההשוואות',
+    aiCrawlers: 'בדיקת מסורקי AI',
     sitemap: 'מפת אתר',
     legal: 'משפטי',
     privacy: 'מדיניות פרטיות',

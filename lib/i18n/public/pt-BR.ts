@@ -106,6 +106,8 @@ export const ptBR = {
     articles: 'Artigos',
     about: 'Sobre nós',
     affiliates: 'Programa de afiliados',
+    compare: 'Todas as comparações',
+    aiCrawlers: 'Verificação de rastreadores de IA',
     sitemap: 'Mapa do site',
     legal: 'Jurídico',
     privacy: 'Política de privacidade',
