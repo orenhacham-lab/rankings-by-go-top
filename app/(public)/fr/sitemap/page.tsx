@@ -24,6 +24,9 @@ export default function FrenchSitemapPage() {
         { label: 'Tarifs', href: '/fr/pricing' },
         { label: 'À propos', href: '/fr/about' },
         { label: 'Articles', href: '/fr/articles' },
+        { label: 'Audit gratuit', href: '/fr/free-check' },
+        { label: "Quels robots d'IA votre site bloque-t-il ?", href: '/fr/ai-crawlers' },
+        { label: 'Programme d’affiliation', href: '/fr/affiliates' },
       ],
     },
     {
@@ -61,9 +64,13 @@ export default function FrenchSitemapPage() {
     {
       title: 'Comparatifs',
       links: [
+        { label: 'Tous les comparatifs', href: '/fr/compare' },
         { label: 'Go Top SEO face à Semrush', href: '/fr/compare/semrush' },
         { label: 'Go Top SEO face à Yoast', href: '/fr/compare/yoast' },
         { label: 'Go Top SEO face à Rank Math', href: '/fr/compare/rankmath' },
+        { label: 'Go Top SEO face à Surfer', href: '/fr/compare/surfer' },
+        { label: 'Go Top SEO face à Writesonic', href: '/fr/compare/writesonic' },
+        { label: 'Go Top SEO face à BrightLocal', href: '/fr/compare/brightlocal' },
       ],
     },
     {

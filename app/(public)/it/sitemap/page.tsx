@@ -24,6 +24,9 @@ export default function ItalianSitemapPage() {
         { label: 'Prezzi', href: '/it/pricing' },
         { label: 'Chi siamo', href: '/it/about' },
         { label: 'Articoli', href: '/it/articles' },
+        { label: 'Analisi gratuita', href: '/it/free-check' },
+        { label: 'Quali crawler IA sta bloccando il tuo sito?', href: '/it/ai-crawlers' },
+        { label: 'Programma di affiliazione', href: '/it/affiliates' },
       ],
     },
     {
@@ -61,9 +64,13 @@ export default function ItalianSitemapPage() {
     {
       title: 'Confronti',
       links: [
-        { label: 'Go Top SEO a confronto con Semrush', href: '/it/compare/semrush' },
-        { label: 'Go Top SEO a confronto con Yoast', href: '/it/compare/yoast' },
-        { label: 'Go Top SEO a confronto con Rank Math', href: '/it/compare/rankmath' },
+        { label: 'Tutti i confronti', href: '/it/compare' },
+        { label: 'Go Top SEO contro Semrush', href: '/it/compare/semrush' },
+        { label: 'Go Top SEO contro Yoast', href: '/it/compare/yoast' },
+        { label: 'Go Top SEO contro Rank Math', href: '/it/compare/rankmath' },
+        { label: 'Go Top SEO contro Surfer', href: '/it/compare/surfer' },
+        { label: 'Go Top SEO contro Writesonic', href: '/it/compare/writesonic' },
+        { label: 'Go Top SEO contro BrightLocal', href: '/it/compare/brightlocal' },
       ],
     },
     {

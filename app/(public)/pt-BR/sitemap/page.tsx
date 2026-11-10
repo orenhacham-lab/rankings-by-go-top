@@ -24,6 +24,9 @@ export default function PortugueseSitemapPage() {
         { label: 'Preços', href: '/pt-BR/pricing' },
         { label: 'Quem somos', href: '/pt-BR/about' },
         { label: 'Artigos', href: '/pt-BR/articles' },
+        { label: 'Análise gratuita', href: '/pt-BR/free-check' },
+        { label: 'Quais rastreadores de IA o seu site bloqueia?', href: '/pt-BR/ai-crawlers' },
+        { label: 'Programa de afiliados', href: '/pt-BR/affiliates' },
       ],
     },
     {
@@ -61,9 +64,13 @@ export default function PortugueseSitemapPage() {
     {
       title: 'Comparativos',
       links: [
+        { label: 'Todas as comparações', href: '/pt-BR/compare' },
         { label: 'Go Top SEO x Semrush', href: '/pt-BR/compare/semrush' },
         { label: 'Go Top SEO x Yoast', href: '/pt-BR/compare/yoast' },
         { label: 'Go Top SEO x Rank Math', href: '/pt-BR/compare/rankmath' },
+        { label: 'Go Top SEO x Surfer', href: '/pt-BR/compare/surfer' },
+        { label: 'Go Top SEO x Writesonic', href: '/pt-BR/compare/writesonic' },
+        { label: 'Go Top SEO x BrightLocal', href: '/pt-BR/compare/brightlocal' },
       ],
     },
     {

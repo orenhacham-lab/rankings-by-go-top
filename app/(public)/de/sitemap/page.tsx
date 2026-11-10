@@ -25,6 +25,9 @@ export default function GermanSitemapPage() {
         { label: 'Preise', href: '/de/pricing' },
         { label: 'Über uns', href: '/de/about' },
         { label: 'Artikel', href: '/de/articles' },
+        { label: 'Kostenlose Analyse', href: '/de/free-check' },
+        { label: 'Welche KI-Crawler blockiert Ihre Website?', href: '/de/ai-crawlers' },
+        { label: 'Partnerprogramm', href: '/de/affiliates' },
       ],
     },
     {
@@ -62,9 +65,13 @@ export default function GermanSitemapPage() {
     {
       title: 'Vergleich mit anderen Werkzeugen',
       links: [
-        { label: 'Go Top SEO im Vergleich mit Semrush', href: '/de/compare/semrush' },
-        { label: 'Go Top SEO im Vergleich mit Yoast', href: '/de/compare/yoast' },
-        { label: 'Go Top SEO im Vergleich mit Rank Math', href: '/de/compare/rankmath' },
+        { label: 'Alle Vergleiche', href: '/de/compare' },
+        { label: 'Go Top SEO gegen Semrush', href: '/de/compare/semrush' },
+        { label: 'Go Top SEO gegen Yoast', href: '/de/compare/yoast' },
+        { label: 'Go Top SEO gegen Rank Math', href: '/de/compare/rankmath' },
+        { label: 'Go Top SEO gegen Surfer', href: '/de/compare/surfer' },
+        { label: 'Go Top SEO gegen Writesonic', href: '/de/compare/writesonic' },
+        { label: 'Go Top SEO gegen BrightLocal', href: '/de/compare/brightlocal' },
       ],
     },
     {
