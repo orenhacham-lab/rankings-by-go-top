@@ -21,6 +21,7 @@
 import { readFileSync, existsSync, readdirSync } from 'fs'
 import { join } from 'path'
 import { PUBLIC_LOCALES } from '@/lib/i18n/locales'
+import { aiCrawlerOpenApiDocument } from '@/lib/ai-crawlers/openapi'
 
 const ROOT = join(__dirname, '..', '..', '..')
 const read = (p: string) => readFileSync(join(ROOT, p), 'utf8')
@@ -132,6 +133,23 @@ check('E1: the stale static copy is gone', !existsSync(join(ROOT, 'public/llms.t
   check('G6: the licence is read from the dataset module, not retyped',
     source.includes('AI_CRAWLER_DATASET_LICENSE.id') && !source.includes('CC-BY-4.0'))
   check('G7: no figure is typed into the section', !/\b\d{2,3}(\.\d)?\s?%/.test(source))
+  // G8-G9: the file must name every endpoint the OpenAPI document describes,
+  // and must not count them in words. It said "both endpoints" and "two
+  // datasets" while the document described three — a plain factual error in
+  // the one file written for a reader that cannot see the page. The register
+  // is the document itself, so a fourth endpoint fails G8 rather than going
+  // unmentioned.
+  const described = Object.keys(aiCrawlerOpenApiDocument().paths)
+  const unnamed = described.filter((path) => !source.includes(path))
+  check('G8: every endpoint the OpenAPI document describes is named here',
+    unnamed.length === 0, unnamed.join(', '))
+  check('G9: the endpoints and datasets are not counted in words',
+    !/\b(both|two|three|four) (endpoints|datasets)\b/i.test(source))
+  check('G8-MUT: an endpoint the file omits would fail G8',
+    !source.includes('/api/public/ai-crawler-blocking/markets'))
+  check('G9-MUT: the sentence this replaced would fail G9',
+    /\b(both|two|three|four) (endpoints|datasets)\b/i.test('description of both endpoints here'))
+
   // MUTATION CONTROL for G4: a line that quotes the figure and drops the
   // sentence bounding it is what this guard exists to stop.
   const softened = 'Two thirds of sites block an AI crawler that brings visitors.'
