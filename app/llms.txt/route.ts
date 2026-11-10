@@ -109,8 +109,14 @@ const COMPARISONS: [string, string][] = [
 ]
 
 /**
- * The two datasets this site gives away, which are the pages most likely to be
- * quoted by an assistant reading this file.
+ * The datasets this site gives away, which are the pages most likely to be
+ * quoted by an assistant reading this file. There are three of them now, and
+ * this block said "two" and "both endpoints" until 10.11.2026 — a plain
+ * factual error in the one file written for a reader that cannot see the
+ * page. So nothing here counts the endpoints: the OpenAPI document is the
+ * register of what it describes, and `lib/content/__qa__/llms-txt.qa.ts`
+ * checks that every path in it is named in this file and that no count is
+ * written in words.
  *
  * THE CAVEAT IS IN THE LINE, not left on the page. An assistant that reads
  * this file and then answers "two thirds of sites block AI crawlers" without
@@ -122,7 +128,7 @@ function openDataLines(): string[] {
   const caveat = BLOCKING_MEASUREMENT.limitations[0]
   return [
     `- [AI crawler reference dataset](${BASE}/api/public/ai-crawlers): every documented AI crawler user-agent token, what each one is for, and what its operator documents about robots.txt. JSON, or \`?format=csv\` for CSV. No key, no sign-up, ${AI_CRAWLER_DATASET_LICENSE.id}. The same table is rendered for people at ${BASE}/en/ai-crawlers.`,
-    `- [OpenAPI description](${BASE}/api/public/ai-crawlers/openapi): the machine-readable description of both endpoints here, for a catalogue or a client generator.`,
+    `- [OpenAPI description](${BASE}/api/public/ai-crawlers/openapi): the machine-readable description of every endpoint listed here, for a catalogue or a client generator.`,
     `- [robots.txt blocking measurement, ${BLOCKING_MEASUREMENT_VERSION}](${BASE}/api/public/ai-crawler-blocking): one dated reading of ${BLOCKING_MEASUREMENT.method.robotsFilesRead} robots.txt files across ${BLOCKING_MEASUREMENT.method.markets.length} markets, with the method, the failures and the per-market shares. ${caveat} Percentages are of the files read, not of the ${BLOCKING_MEASUREMENT.method.domainsRequested} domains requested.`,
     `- [The same measurement, domain by domain](${BASE}/api/public/ai-crawler-blocking/sites): ${SITES_MEASUREMENT.method.domainsRequested} requested domains with their Tranco rank, whether the robots.txt could be read, and for each read file the verdict per crawler with the exact deciding line. \`?format=csv\` for CSV, \`?tld=.fr\` for one country suffix with its own figures. It separates a rule written about a crawler from one inherited from the blanket \`*\` group, because a deliberate restriction is not an error. Only ${SITES_MEASUREMENT.method.robotsRead} of the ${SITES_MEASUREMENT.method.domainsRequested} hosts could be read and the unreadable ones are listed with their reason, so the sample probably under-states blocking.`,
   ]
