@@ -91,6 +91,21 @@ export type AiCrawlerCopy = {
     perSite: string
     perSiteNote: string
     perSiteDownloads: string
+    /**
+     * The same 9 November reading cut by country suffix. `perMarketLead` must
+     * say that each share is of the files read in THAT market, because the
+     * read rate swings from 49 of 100 on `.jp` to 65 of 100 on `.it`, and a
+     * column of percentages without its own n is the objection this table
+     * exists to answer. The figures come from
+     * `lib/ai-crawlers/blocking-markets.ts`; nothing here carries a digit.
+     */
+    perMarketTitle: string
+    perMarketLead: string
+    colRead: string
+    colGptbot: string
+    colOaiSearchbot: string
+    labelDeliberate: string
+    labelInherited: string
   }
   cta: { title: string; body: string; button: string }
   /**
@@ -190,6 +205,13 @@ const he: AiCrawlerCopy = {
     perSite: 'ב-{on} קראנו אותם שוב, והפעם שמרנו כל דומיין. מבין האתרים שחוסמים את GPTBot, {deliberate} כתבו כלל שנוקב בשמו — כלומר החסימה הייתה החלטה. מבין האתרים שחוסמים את OAI-SearchBot, הסורק שמאחורי התשובות שאנשים רואים, {inherited} לא בחרו בה כלל: היא נפלה מכלל שמכוון לכל הבוטים כאחד.',
     perSiteNote: 'הקריאה השנייה מכסה {read} קבצים שנקראו מתוך {requested} דומיינים שביקשנו. {refused} מאחסנים סירבו לקורא הזה, ומאחסן שמסרב לקורא אוטומטי לא מזוהה הוא סביר שגם מגביל סורקי AI — ולכן הקריאה הזאת כנראה מחסירה את היקף החסימה ולא מגדילה אותו.',
     perSiteDownloads: 'כל דומיין, עם הפסיקה שלו, הקבוצה שהכריעה והשורה המדויקת:',
+    perMarketTitle: 'לפי סיומת מדינה',
+    perMarketLead: 'אותה קריאה, חתוכה לפי סיומת. כל אחוז בשורה הוא מתוך הקבצים שנקראו באותה סיומת, ולא מתוך מאה הדומיינים שבוקשו.',
+    colRead: 'קבצים שנקראו',
+    colGptbot: 'חוסמים GPTBot',
+    colOaiSearchbot: 'חוסמים OAI-SearchBot',
+    labelDeliberate: 'מהם במכוון',
+    labelInherited: 'מהם בירושה',
   },
   limits: {
     title: 'מה הבדיקה הזו לא יודעת',
@@ -291,6 +313,13 @@ const en: AiCrawlerCopy = {
     perSite: 'We read them again on {on}, keeping every domain this time. Of the sites that block GPTBot, {deliberate} wrote a rule that names it, so the block was a decision. Of the sites that block OAI-SearchBot — the crawler behind the answers people are shown — {inherited} never chose it: the block came from a rule aimed at every bot alike.',
     perSiteNote: 'That second reading covers {read} readable files out of {requested} domains requested. {refused} hosts refused this reader outright, and a host that refuses an unknown automated reader is plausibly a host that restricts AI crawlers, so this reading probably under-states blocking rather than over-stating it.',
     perSiteDownloads: 'Every domain, with its verdict, the rule group that decided it and the exact line:',
+    perMarketTitle: 'By country suffix',
+    perMarketLead: 'The same reading, cut by suffix. Every share in a row is of the files read in that suffix, not of the hundred domains requested.',
+    colRead: 'Files read',
+    colGptbot: 'Block GPTBot',
+    colOaiSearchbot: 'Block OAI-SearchBot',
+    labelDeliberate: 'of these deliberate',
+    labelInherited: 'of these inherited',
   },
   limits: {
     title: 'What this check cannot tell you',
@@ -392,6 +421,13 @@ const es: AiCrawlerCopy = {
     perSite: 'El {on} los volvimos a leer, conservando esta vez todos los dominios. De los sitios que bloquean GPTBot, {deliberate} escribieron una regla que lo nombra, así que el bloqueo fue una decisión. De los que bloquean OAI-SearchBot, el rastreador que está detrás de las respuestas que se muestran, {inherited} no lo eligieron: el bloqueo venía de una regla dirigida a todos los robots por igual.',
     perSiteNote: 'Esa segunda lectura cubre {read} archivos legibles de {requested} dominios solicitados. {refused} servidores rechazaron a este lector, y un servidor que rechaza a un lector automático desconocido es probablemente un servidor que restringe los rastreadores de IA, así que esta lectura probablemente subestima el bloqueo en lugar de exagerarlo.',
     perSiteDownloads: 'Cada dominio, con su veredicto, el grupo de reglas que lo decidió y la línea exacta:',
+    perMarketTitle: 'Por sufijo de país',
+    perMarketLead: 'La misma lectura, dividida por sufijo. Cada porcentaje de una fila es sobre los archivos leídos en ese sufijo, no sobre los cien dominios solicitados.',
+    colRead: 'Archivos leídos',
+    colGptbot: 'Bloquean GPTBot',
+    colOaiSearchbot: 'Bloquean OAI-SearchBot',
+    labelDeliberate: 'de ellos deliberados',
+    labelInherited: 'de ellos heredados',
   },
   limits: {
     title: 'Lo que esta comprobación no puede decirte',
@@ -493,6 +529,13 @@ const ptBR: AiCrawlerCopy = {
     perSite: 'Em {on} lemos tudo de novo, guardando desta vez cada domínio. Dos sites que bloqueiam o GPTBot, {deliberate} escreveram uma regra que o nomeia, ou seja, o bloqueio foi uma decisão. Dos que bloqueiam o OAI-SearchBot, o rastreador por trás das respostas que as pessoas veem, {inherited} não o escolheram: o bloqueio veio de uma regra dirigida a todos os robôs igualmente.',
     perSiteNote: 'Essa segunda leitura cobre {read} arquivos lidos de {requested} domínios solicitados. {refused} servidores recusaram este leitor, e um servidor que recusa um leitor automático desconhecido é provavelmente um servidor que restringe rastreadores de IA, então esta leitura provavelmente subestima o bloqueio em vez de exagerá-lo.',
     perSiteDownloads: 'Cada domínio, com seu veredito, o grupo de regras que o decidiu e a linha exata:',
+    perMarketTitle: 'Por sufixo de país',
+    perMarketLead: 'A mesma leitura, dividida por sufixo. Cada porcentagem de uma linha é sobre os arquivos lidos naquele sufixo, não sobre os cem domínios solicitados.',
+    colRead: 'Arquivos lidos',
+    colGptbot: 'Bloqueiam GPTBot',
+    colOaiSearchbot: 'Bloqueiam OAI-SearchBot',
+    labelDeliberate: 'destes, deliberados',
+    labelInherited: 'destes, herdados',
   },
   limits: {
     title: 'O que esta verificação não consegue dizer',
@@ -594,6 +637,13 @@ const fr: AiCrawlerCopy = {
     perSite: "Le {on}, nous les avons relus en conservant cette fois chaque domaine. Parmi les sites qui bloquent GPTBot, {deliberate} ont écrit une règle qui le nomme : le blocage était une décision. Parmi ceux qui bloquent OAI-SearchBot, le robot qui alimente les réponses affichées, {inherited} ne l'ont jamais choisi : le blocage venait d'une règle visant tous les robots indistinctement.",
     perSiteNote: "Cette seconde lecture porte sur {read} fichiers lus pour {requested} domaines demandés. {refused} hôtes ont refusé ce lecteur, et un hôte qui refuse un lecteur automatique inconnu est vraisemblablement un hôte qui restreint les robots d'IA : cette lecture sous-estime donc probablement le blocage plutôt qu'elle ne l'exagère.",
     perSiteDownloads: 'Chaque domaine, avec son verdict, le groupe de règles qui a tranché et la ligne exacte :',
+    perMarketTitle: 'Par suffixe de pays',
+    perMarketLead: 'La même lecture, découpée par suffixe. Chaque pourcentage d’une ligne porte sur les fichiers lus dans ce suffixe, non sur les cent domaines demandés.',
+    colRead: 'Fichiers lus',
+    colGptbot: 'Bloquent GPTBot',
+    colOaiSearchbot: 'Bloquent OAI-SearchBot',
+    labelDeliberate: 'dont délibérés',
+    labelInherited: 'dont hérités',
   },
   limits: {
     title: 'Ce que cette vérification ne peut pas vous dire',
@@ -695,6 +745,13 @@ const it: AiCrawlerCopy = {
     perSite: "Il {on} li abbiamo riletti, conservando questa volta ogni dominio. Tra i siti che bloccano GPTBot, {deliberate} hanno scritto una regola che lo nomina: il blocco è stato una decisione. Tra quelli che bloccano OAI-SearchBot, il crawler dietro le risposte che le persone leggono, {inherited} non l'hanno mai scelto: il blocco veniva da una regola rivolta a tutti i bot indistintamente.",
     perSiteNote: 'Questa seconda lettura copre {read} file letti su {requested} domini richiesti. {refused} host hanno rifiutato questo lettore, e un host che rifiuta un lettore automatico sconosciuto è plausibilmente un host che limita i crawler di IA: questa lettura quindi sottostima il blocco anziché esagerarlo.',
     perSiteDownloads: 'Ogni dominio, con il suo verdetto, il gruppo di regole che ha deciso e la riga esatta:',
+    perMarketTitle: 'Per suffisso di paese',
+    perMarketLead: 'La stessa lettura, divisa per suffisso. Ogni percentuale di una riga è sui file letti in quel suffisso, non sui cento domini richiesti.',
+    colRead: 'File letti',
+    colGptbot: 'Bloccano GPTBot',
+    colOaiSearchbot: 'Bloccano OAI-SearchBot',
+    labelDeliberate: 'di cui deliberati',
+    labelInherited: 'di cui ereditati',
   },
   limits: {
     title: 'Cosa questa verifica non può dirti',
@@ -796,6 +853,13 @@ const ja: AiCrawlerCopy = {
     perSite: '{on}に、今回はすべてのドメインを残したうえで再度読み取りました。GPTBot をブロックしているサイトのうち {deliberate} は GPTBot を名指しした規則を書いており、ブロックは判断の結果です。一方、利用者が目にする回答の裏側で動く OAI-SearchBot をブロックしているサイトのうち {inherited} は、それを選んでいません。すべてのボットを一律に対象とする規則から来たブロックです。',
     perSiteNote: 'この再読み取りは、要求した {requested} ドメインのうち読み取れた {read} 件が対象です。{refused} 件のホストはこの読み取りを拒否しました。正体の分からない自動読み取りを拒否するホストは AI クローラーも制限している可能性が高いため、この数値はブロックの実態を過大にではなく過小に示していると考えられます。',
     perSiteDownloads: '各ドメインの判定、判定した規則グループ、そして該当行そのもの：',
+    perMarketTitle: '国別トップレベルごと',
+    perMarketLead: '同じ読み取りをトップレベルで分けたものです。各行の割合はそのトップレベルで読めたファイルに対するものであり、要求したドメイン数に対するものではありません。',
+    colRead: '読めたファイル',
+    colGptbot: 'GPTBotをブロック',
+    colOaiSearchbot: 'OAI-SearchBotをブロック',
+    labelDeliberate: 'うち意図的',
+    labelInherited: 'うち継承',
   },
   limits: {
     title: 'この確認では分からないこと',
@@ -897,6 +961,13 @@ const de: AiCrawlerCopy = {
     perSite: 'Am {on} haben wir sie erneut gelesen und diesmal jede Domain behalten. Von den Seiten, die GPTBot blockieren, haben {deliberate} eine Regel geschrieben, die ihn namentlich nennt — die Blockade war also eine Entscheidung. Von den Seiten, die OAI-SearchBot blockieren, den Crawler hinter den angezeigten Antworten, haben {inherited} ihn nie gewählt: die Blockade kam aus einer Regel, die alle Bots gleichermaßen trifft.',
     perSiteNote: 'Diese zweite Lesung umfasst {read} lesbare Dateien von {requested} angefragten Domains. {refused} Hosts haben diesen Leser abgewiesen, und ein Host, der einen unbekannten automatischen Leser abweist, beschränkt plausibel auch KI-Crawler. Diese Lesung unterschätzt die Blockade daher eher, als dass sie sie übertreibt.',
     perSiteDownloads: 'Jede Domain, mit ihrem Verdikt, der Regelgruppe, die entschieden hat, und der genauen Zeile:',
+    perMarketTitle: 'Nach Ländersuffix',
+    perMarketLead: 'Dieselbe Messung, nach Suffix aufgeteilt. Jeder Anteil in einer Zeile bezieht sich auf die in diesem Suffix gelesenen Dateien, nicht auf die hundert angefragten Domains.',
+    colRead: 'Gelesene Dateien',
+    colGptbot: 'Sperren GPTBot',
+    colOaiSearchbot: 'Sperren OAI-SearchBot',
+    labelDeliberate: 'davon bewusst',
+    labelInherited: 'davon geerbt',
   },
   limits: {
     title: 'Was diese Prüfung nicht zeigt',
@@ -998,6 +1069,13 @@ const pl: AiCrawlerCopy = {
     perSite: '{on} przeczytaliśmy je ponownie, tym razem zachowując każdą domenę. Spośród witryn blokujących GPTBot {deliberate} napisało regułę, która wymienia go z nazwy — blokada była więc decyzją. Spośród witryn blokujących OAI-SearchBot, robota stojącego za wyświetlanymi odpowiedziami, {inherited} nigdy go nie wybrało: blokada wynikła z reguły skierowanej do wszystkich botów jednakowo.',
     perSiteNote: 'Ta druga lektura obejmuje {read} odczytanych plików z {requested} żądanych domen. {refused} serwerów odmówiło temu czytnikowi, a serwer, który odmawia nieznanemu automatycznemu czytnikowi, prawdopodobnie ogranicza też roboty AI — ten odczyt raczej zaniża skalę blokowania, niż ją zawyża.',
     perSiteDownloads: 'Każda domena, z jej wynikiem, grupą reguł, która zdecydowała, i dokładną linią:',
+    perMarketTitle: 'Według końcówki kraju',
+    perMarketLead: 'Ten sam odczyt, podzielony według końcówki. Każdy udział w wierszu dotyczy plików odczytanych w tej końcówce, a nie stu żądanych domen.',
+    colRead: 'Odczytane pliki',
+    colGptbot: 'Blokują GPTBot',
+    colOaiSearchbot: 'Blokują OAI-SearchBot',
+    labelDeliberate: 'z tego celowo',
+    labelInherited: 'z tego odziedziczone',
   },
   limits: {
     title: 'Czego to sprawdzenie nie pokazuje',
@@ -1099,6 +1177,13 @@ const nl: AiCrawlerCopy = {
     perSite: 'Op {on} hebben we ze opnieuw gelezen, en deze keer elk domein bewaard. Van de sites die GPTBot blokkeren schreef {deliberate} een regel die hem met naam noemt — de blokkade was dus een beslissing. Van de sites die OAI-SearchBot blokkeren, de crawler achter de antwoorden die mensen te zien krijgen, koos {inherited} hem nooit: die blokkade kwam uit een regel die op alle bots tegelijk is gericht.',
     perSiteNote: 'Die tweede lezing dekt {read} leesbare bestanden van {requested} opgevraagde domeinen. {refused} hosts weigerden deze lezer, en een host die een onbekende automatische lezer weigert, beperkt vermoedelijk ook AI-crawlers. Deze lezing onderschat de blokkade dus eerder dan dat ze die overdrijft.',
     perSiteDownloads: 'Elk domein, met zijn oordeel, de regelgroep die besliste en de exacte regel:',
+    perMarketTitle: 'Per landsuffix',
+    perMarketLead: 'Dezelfde meting, uitgesplitst per suffix. Elk aandeel in een rij gaat over de bestanden die in dat suffix gelezen zijn, niet over de honderd opgevraagde domeinen.',
+    colRead: 'Gelezen bestanden',
+    colGptbot: 'Blokkeren GPTBot',
+    colOaiSearchbot: 'Blokkeren OAI-SearchBot',
+    labelDeliberate: 'waarvan bewust',
+    labelInherited: 'waarvan overgenomen',
   },
   limits: {
     title: 'Wat deze controle niet laat zien',

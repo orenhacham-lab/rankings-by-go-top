@@ -31,6 +31,7 @@ import { buttonClasses, Eyebrow } from '@/components/public/marketing'
 import { cn } from '@/lib/utils'
 import { AI_CRAWLERS } from '@/lib/ai-crawlers/agents'
 import { BLOCKING_BY_MARKET, BLOCKING_MEASUREMENT } from '@/lib/ai-crawlers/blocking-measurement'
+import { BLOCKING_MARKETS_2026_11_09, marketPct } from '@/lib/ai-crawlers/blocking-markets'
 import {
   BLOCKING_SITES_MEASURED_ON,
   BLOCKING_SITES_PATH,
@@ -273,6 +274,52 @@ function Measurement({ locale, copy }: { locale: PublicLocale; copy: ReturnType<
             .replace('{requested}', num(BLOCKING_SITES_REQUESTED))
             .replace('{refused}', num(BLOCKING_SITES_REFUSED))}
         </p>
+        {/* THE SAME READING BY SUFFIX. The table above it is the 7 November
+            reading and keeps its own row per market; this one belongs to the
+            9 November rows, and the two are never one table. Each row prints
+            the files read in that suffix BEFORE any percentage of it, because
+            the read rate runs from 49 of 100 to 65 of 100 and a column of
+            bare percentages would be the error the paragraph above corrects.
+            Every figure comes from lib/ai-crawlers/blocking-markets.ts, which
+            the dataset suite recomputes row by row. */}
+        <h3 className="mt-6 text-copy font-bold text-ink">{m.perMarketTitle}</h3>
+        <p className="mt-2 max-w-2xl text-caption text-muted">{m.perMarketLead}</p>
+        <div className="mt-3 overflow-x-auto rounded-card border border-line">
+          <table className="w-full border-collapse text-copy">
+            <thead>
+              <tr className="border-b border-line bg-sunk/60 text-caption font-semibold text-ink">
+                <th scope="col" className="px-4 py-2 text-start">{m.colMarket}</th>
+                <th scope="col" className="px-4 py-2 text-start">{m.colRead}</th>
+                <th scope="col" className="px-4 py-2 text-start">{m.colGptbot}</th>
+                <th scope="col" className="px-4 py-2 text-start">{m.colOaiSearchbot}</th>
+              </tr>
+            </thead>
+            <tbody>
+              {BLOCKING_MARKETS_2026_11_09.map((row) => (
+                <tr key={row.market} className="border-b border-line/60 last:border-0">
+                  <td className="px-4 py-2">
+                    <code dir="ltr" className="font-semibold text-ink">{row.market}</code>
+                  </td>
+                  <td className="px-4 py-2 text-body" dir="ltr">
+                    {num(row.read)} / {num(row.requested)}
+                  </td>
+                  <td className="px-4 py-2 text-body">
+                    <span dir="ltr">{num(row.gptbotBlocked)} ({pct(marketPct(row.gptbotBlocked, row.read))})</span>
+                    <span className="block text-caption text-muted">
+                      <span dir="ltr">{num(row.gptbotDeliberate)}</span> {m.labelDeliberate}
+                    </span>
+                  </td>
+                  <td className="px-4 py-2 text-body">
+                    <span dir="ltr">{num(row.oaiSearchbotBlocked)} ({pct(marketPct(row.oaiSearchbotBlocked, row.read))})</span>
+                    <span className="block text-caption text-muted">
+                      <span dir="ltr">{num(row.oaiSearchbotInherited)}</span> {m.labelInherited}
+                    </span>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
         <p className="mt-3 text-caption text-muted">
           {m.perSiteDownloads}{' '}
           <a dir="ltr" href={BLOCKING_SITES_PATH} className="font-semibold text-action underline">JSON</a>
