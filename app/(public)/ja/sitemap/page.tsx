@@ -25,6 +25,9 @@ export default function JapaneseSitemapPage() {
         { label: '料金', href: '/ja/pricing' },
         { label: '会社情報', href: '/ja/about' },
         { label: '記事', href: '/ja/articles' },
+        { label: '無料診断', href: '/ja/free-check' },
+        { label: 'サイトはどのAIクローラーを拒否していますか', href: '/ja/ai-crawlers' },
+        { label: 'アフィリエイトプログラム', href: '/ja/affiliates' },
       ],
     },
     {
@@ -62,9 +65,13 @@ export default function JapaneseSitemapPage() {
     {
       title: '他のツールとの比較',
       links: [
-        { label: 'Go Top SEOとSemrushの比較', href: '/ja/compare/semrush' },
-        { label: 'Go Top SEOとYoastの比較', href: '/ja/compare/yoast' },
-        { label: 'Go Top SEOとRank Mathの比較', href: '/ja/compare/rankmath' },
+        { label: 'すべての比較', href: '/ja/compare' },
+        { label: 'Go Top SEO と Semrush の比較', href: '/ja/compare/semrush' },
+        { label: 'Go Top SEO と Yoast の比較', href: '/ja/compare/yoast' },
+        { label: 'Go Top SEO と Rank Math の比較', href: '/ja/compare/rankmath' },
+        { label: 'Go Top SEO と Surfer の比較', href: '/ja/compare/surfer' },
+        { label: 'Go Top SEO と Writesonic の比較', href: '/ja/compare/writesonic' },
+        { label: 'Go Top SEO と BrightLocal の比較', href: '/ja/compare/brightlocal' },
       ],
     },
     {

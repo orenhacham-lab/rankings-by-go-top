@@ -25,6 +25,9 @@ export default function PolishSitemapPage() {
         { label: 'Cennik', href: '/pl/pricing' },
         { label: 'O nas', href: '/pl/about' },
         { label: 'Artykuły', href: '/pl/articles' },
+        { label: 'Bezpłatna analiza', href: '/pl/free-check' },
+        { label: 'Które roboty AI blokuje Państwa witryna?', href: '/pl/ai-crawlers' },
+        { label: 'Program partnerski', href: '/pl/affiliates' },
       ],
     },
     {
@@ -62,9 +65,13 @@ export default function PolishSitemapPage() {
     {
       title: 'Porównanie z innymi narzędziami',
       links: [
+        { label: 'Wszystkie porównania', href: '/pl/compare' },
         { label: 'Go Top SEO a Semrush', href: '/pl/compare/semrush' },
         { label: 'Go Top SEO a Yoast', href: '/pl/compare/yoast' },
         { label: 'Go Top SEO a Rank Math', href: '/pl/compare/rankmath' },
+        { label: 'Go Top SEO a Surfer', href: '/pl/compare/surfer' },
+        { label: 'Go Top SEO a Writesonic', href: '/pl/compare/writesonic' },
+        { label: 'Go Top SEO a BrightLocal', href: '/pl/compare/brightlocal' },
       ],
     },
     {

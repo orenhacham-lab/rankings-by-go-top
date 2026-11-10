@@ -23,6 +23,9 @@ export default function EnglishSitemapPage() {
         { label: 'Pricing', href: '/en/pricing' },
         { label: 'About', href: '/en/about' },
         { label: 'Articles', href: '/en/articles' },
+        { label: 'Free site check', href: '/en/free-check' },
+        { label: 'Which AI crawlers is your site blocking?', href: '/en/ai-crawlers' },
+        { label: 'Affiliate program', href: '/en/affiliates' },
       ],
     },
     {
@@ -60,9 +63,13 @@ export default function EnglishSitemapPage() {
     {
       title: 'Comparisons',
       links: [
+        { label: 'All comparisons', href: '/en/compare' },
         { label: 'Go Top SEO vs Semrush', href: '/en/compare/semrush' },
         { label: 'Go Top SEO vs Yoast', href: '/en/compare/yoast' },
         { label: 'Go Top SEO vs Rank Math', href: '/en/compare/rankmath' },
+        { label: 'Go Top SEO vs Surfer', href: '/en/compare/surfer' },
+        { label: 'Go Top SEO vs Writesonic', href: '/en/compare/writesonic' },
+        { label: 'Go Top SEO vs BrightLocal', href: '/en/compare/brightlocal' },
       ],
     },
     {

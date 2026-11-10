@@ -44,6 +44,9 @@ export default function SitemapPage() {
         { label: 'עמוד מחירים', href: '/pricing' },
         { label: 'עמוד אודות', href: '/about' },
         { label: 'עמוד מאמרים', href: '/articles' },
+        { label: 'בדיקת אתר חינמית', href: '/free-check' },
+        { label: 'מי מסורקי ה-AI חסום אצלכם?', href: '/ai-crawlers' },
+        { label: 'תוכנית שותפים', href: '/affiliates' },
       ],
     },
     {
@@ -74,9 +77,13 @@ export default function SitemapPage() {
     {
       title: 'השוואות',
       links: [
+        { label: 'כל ההשוואות', href: '/compare' },
         { label: 'Go Top SEO מול Semrush', href: '/compare/semrush' },
         { label: 'Go Top SEO מול Yoast', href: '/compare/yoast' },
         { label: 'Go Top SEO מול Rank Math', href: '/compare/rankmath' },
+        { label: 'Go Top SEO מול Surfer', href: '/compare/surfer' },
+        { label: 'Go Top SEO מול Writesonic', href: '/compare/writesonic' },
+        { label: 'Go Top SEO מול BrightLocal', href: '/compare/brightlocal' },
       ],
     },
     {

@@ -25,6 +25,9 @@ export default function DutchSitemapPage() {
         { label: 'Prijzen', href: '/nl/pricing' },
         { label: 'Over ons', href: '/nl/about' },
         { label: 'Artikelen', href: '/nl/articles' },
+        { label: 'Gratis analyse', href: '/nl/free-check' },
+        { label: 'Welke AI-crawlers blokkeert uw website?', href: '/nl/ai-crawlers' },
+        { label: 'Partnerprogramma', href: '/nl/affiliates' },
       ],
     },
     {
@@ -62,9 +65,13 @@ export default function DutchSitemapPage() {
     {
       title: 'Vergelijking met andere hulpmiddelen',
       links: [
+        { label: 'Alle vergelijkingen', href: '/nl/compare' },
         { label: 'Go Top SEO tegenover Semrush', href: '/nl/compare/semrush' },
         { label: 'Go Top SEO tegenover Yoast', href: '/nl/compare/yoast' },
         { label: 'Go Top SEO tegenover Rank Math', href: '/nl/compare/rankmath' },
+        { label: 'Go Top SEO tegenover Surfer', href: '/nl/compare/surfer' },
+        { label: 'Go Top SEO tegenover Writesonic', href: '/nl/compare/writesonic' },
+        { label: 'Go Top SEO tegenover BrightLocal', href: '/nl/compare/brightlocal' },
       ],
     },
     {
