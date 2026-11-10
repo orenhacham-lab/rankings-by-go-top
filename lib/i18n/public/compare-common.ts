@@ -22,6 +22,12 @@ export type CompareCommon = {
   checkedOn: (competitor: string, date: string) => string
   /** The honesty note that opens every comparison page's body. */
   fairness: (competitor: string) => string
+  /**
+   * The link to `/compare` that the honesty note carries. Without it a reader
+   * who landed on one comparison from a search result could not discover that
+   * the other five exist: nothing else on the site links to them.
+   */
+  seeAll: string
 }
 
 export const COMPARE_COMMON: Record<PublicLocale, CompareCommon> = {
@@ -33,6 +39,7 @@ export const COMPARE_COMMON: Record<PublicLocale, CompareCommon> = {
       `הטור של ${c} נכתב לפי העמודים של ${c} עצמם, כפי שנקראו ב-${date}. חברות משנות מחירים ותכונות, אז אם משהו כאן כבר לא מדויק, הקישורים למטה הם המקור וכדאי לבדוק בהם.`,
     fairness: (c) =>
       `${c} הוא מוצר טוב, ולחלק מהעסקים הוא הבחירה הנכונה. העמוד הזה לא מנסה להגיד אחרת, אלא להראות איפה כל אחד מהם חזק, כדי שתדעו מה מתאים לכם.`,
+    seeAll: 'כל ההשוואות',
   },
   en: {
     column: 'What we compare',
@@ -42,6 +49,7 @@ export const COMPARE_COMMON: Record<PublicLocale, CompareCommon> = {
       `The ${c} column is taken from ${c}'s own pages, as read on ${date}. Companies change prices and features, so if something here is out of date, the links below are the source and are worth checking.`,
     fairness: (c) =>
       `${c} is a good product, and for some businesses it is the right one. This page is not here to argue otherwise. It is here to show what each of us is strong at, so you can tell which one fits you.`,
+    seeAll: 'All comparisons',
   },
   es: {
     column: 'Qué comparamos',
@@ -51,6 +59,7 @@ export const COMPARE_COMMON: Record<PublicLocale, CompareCommon> = {
       `La columna de ${c} procede de las páginas del propio ${c}, leídas el ${date}. Las empresas cambian precios y funciones, así que si algo ya no es exacto, los enlaces de abajo son la fuente y conviene comprobarlos.`,
     fairness: (c) =>
       `${c} es un buen producto y para algunos negocios es la opción correcta. Esta página no pretende decir lo contrario, sino mostrar en qué es fuerte cada uno para que sepas cuál encaja contigo.`,
+    seeAll: 'Todas las comparativas',
   },
   'pt-BR': {
     column: 'O que comparamos',
@@ -60,6 +69,7 @@ export const COMPARE_COMMON: Record<PublicLocale, CompareCommon> = {
       `A coluna do ${c} vem das páginas do próprio ${c}, lidas em ${date}. As empresas mudam preços e recursos, então, se algo aqui já não estiver exato, os links abaixo são a fonte e vale conferir.`,
     fairness: (c) =>
       `${c} é um bom produto e, para alguns negócios, é a escolha certa. Esta página não quer dizer o contrário: ela mostra em que cada um é forte, para você saber qual combina com você.`,
+    seeAll: 'Todas as comparações',
   },
   fr: {
     column: 'Ce que nous comparons',
@@ -69,6 +79,7 @@ export const COMPARE_COMMON: Record<PublicLocale, CompareCommon> = {
       `La colonne ${c} provient des pages de ${c} elle-même, lues le ${date}. Les entreprises changent leurs prix et leurs fonctions : si quelque chose n'est plus exact ici, les liens ci-dessous sont la source et valent la peine d'être vérifiés.`,
     fairness: (c) =>
       `${c} est un bon produit, et pour certaines entreprises c'est le bon choix. Cette page ne cherche pas à dire le contraire : elle montre les points forts de chacun, pour que vous sachiez lequel vous convient.`,
+    seeAll: 'Tous les comparatifs',
   },
   it: {
     column: 'Che cosa confrontiamo',
@@ -78,6 +89,7 @@ export const COMPARE_COMMON: Record<PublicLocale, CompareCommon> = {
       `La colonna ${c} proviene dalle pagine di ${c} stessa, lette il ${date}. Le aziende cambiano prezzi e funzioni: se qualcosa qui non è più esatto, i link qui sotto sono la fonte e vale la pena verificarli.`,
     fairness: (c) =>
       `${c} è un buon prodotto e per alcune aziende è la scelta giusta. Questa pagina non vuole dire il contrario: mostra i punti di forza di ciascuno, così da capire quale sia più adatto.`,
+    seeAll: 'Tutti i confronti',
   },
   pl: {
     column: 'Co porównujemy',
@@ -87,6 +99,7 @@ export const COMPARE_COMMON: Record<PublicLocale, CompareCommon> = {
       `Kolumna o ${c} pochodzi ze stron samego ${c}, przeczytanych ${date}. Firmy zmieniają ceny i funkcje: jeśli coś przestało się tu zgadzać, linki na dole są źródłem i warto do nich zajrzeć.`,
     fairness: (c) =>
       `${c} to dobry produkt i dla części firm jest właściwym wyborem. Ta strona nie twierdzi niczego przeciwnego. Pokazuje, gdzie leżą mocne strony każdego z nich, żeby widać było, co pasuje do Państwa.`,
+    seeAll: 'Wszystkie porównania',
   },
   nl: {
     column: 'Wat wij vergelijken',
@@ -96,6 +109,7 @@ export const COMPARE_COMMON: Record<PublicLocale, CompareCommon> = {
       `De kolom over ${c} komt van ${c}s eigen pagina’s, gelezen op ${date}. Bedrijven wijzigen prijzen en functies: mocht hier iets niet meer kloppen, dan zijn de links onderaan de bron en de moeite van een blik waard.`,
     fairness: (c) =>
       `${c} is een goed product, en voor sommige bedrijven is het de juiste keuze. Deze pagina wil niet het tegendeel beweren. Zij laat zien waar de sterke punten van elk liggen, zodat u ziet wat bij u past.`,
+    seeAll: 'Alle vergelijkingen',
   },
   de: {
     column: 'Was wir vergleichen',
@@ -105,6 +119,7 @@ export const COMPARE_COMMON: Record<PublicLocale, CompareCommon> = {
       `Die Spalte zu ${c} stammt von ${c}s eigenen Seiten, gelesen am ${date}. Unternehmen ändern Preise und Funktionen: sollte hier etwas nicht mehr stimmen, sind die Links unten die Quelle und lohnen einen Blick.`,
     fairness: (c) =>
       `${c} ist ein gutes Produkt, und für manche Unternehmen ist es das richtige. Diese Seite will nichts anderes behaupten. Sie zeigt, wo die Stärken jeweils liegen, damit Sie erkennen, was zu Ihnen passt.`,
+    seeAll: 'Alle Vergleiche',
   },
   ja: {
     column: '比較する項目',
@@ -114,5 +129,6 @@ export const COMPARE_COMMON: Record<PublicLocale, CompareCommon> = {
       `${c} の列は ${c} 自身のページを ${date} に確認した内容です。価格や機能は変更されることがあります。ここに古い記述があった場合は、下のリンクが出典ですので、そちらをご確認ください。`,
     fairness: (c) =>
       `${c} は優れた製品で、企業によっては ${c} が最適な選択です。このページはその逆を主張するものではありません。それぞれの強みを示し、どちらが自社に合うかを判断していただくためのものです。`,
+    seeAll: 'すべての比較',
   },
 }

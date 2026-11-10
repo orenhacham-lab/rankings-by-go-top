@@ -20,13 +20,15 @@
  * on the public site.
  */
 import { Check, Scale } from 'lucide-react'
+import Link from 'next/link'
 import { FeaturePage, type FeaturePageContent } from '@/components/public/FeaturePage'
+import { COMPARE_INDEX_PATH } from '@/components/public/ComparisonIndexPage'
 import { ComparisonTable } from '@/components/public/ComparisonTable'
 import { SectionIntro } from '@/components/public/marketing'
 import { FEATURE_COMMON } from '@/lib/i18n/public/feature-common'
 import { COMPARE_COMMON } from '@/lib/i18n/public/compare-common'
 import type { ComparisonCopy } from '@/lib/i18n/public/compare/types'
-import type { PublicLocale } from '@/lib/i18n/locales'
+import { getLocaleHref, type PublicLocale } from '@/lib/i18n/locales'
 
 export function ComparisonPage({
   locale,
@@ -53,7 +55,25 @@ export function ComparisonPage({
       secondary: C.trial,
     },
     sections: [
-      { kind: 'callout', icon: Scale, heading: 'h2', body: shared.fairness(copy.competitor) },
+      {
+        kind: 'callout',
+        icon: Scale,
+        heading: 'h2',
+        // The honesty note carries the only link out of this page to its five
+        // siblings. A reader arrives here having typed one tool's name into a
+        // search box, and until /compare existed nothing told them that the
+        // other comparisons were on the site at all.
+        body: (
+          <>
+            <p>{shared.fairness(copy.competitor)}</p>
+            <p>
+              <Link href={getLocaleHref(COMPARE_INDEX_PATH, locale)} className="font-semibold text-action underline">
+                {shared.seeAll}
+              </Link>
+            </p>
+          </>
+        ),
+      },
       {
         kind: 'cards',
         tone: 'contrast',
