@@ -100,6 +100,7 @@ const CAPABILITIES: [string, string, string][] = [
 
 /** Pages that answer "how does it compare to X", which is what buyers ask. */
 const COMPARISONS: [string, string][] = [
+  ['All comparisons, with one line on when each tool is the better choice', '/compare'],
   ['Go Top SEO compared with Semrush', '/compare/semrush'],
   ['Go Top SEO compared with Yoast', '/compare/yoast'],
   ['Go Top SEO compared with Rank Math', '/compare/rankmath'],

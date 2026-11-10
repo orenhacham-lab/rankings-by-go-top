@@ -189,6 +189,13 @@ export async function GET() {
       priority: '0.8',
     },
     // Hebrew comparison pages
+    // The comparison index, the parent of the six comparison pages.
+    {
+      url: `${baseUrl}/compare`,
+      lastmod: today,
+      changefreq: 'monthly',
+      priority: '0.7',
+    },
     {
       url: `${baseUrl}/compare/semrush`,
       lastmod: today,
@@ -361,6 +368,13 @@ export async function GET() {
       priority: '0.8',
     },
     // English comparison pages
+    // The comparison index, the parent of the six comparison pages.
+    {
+      url: `${baseUrl}/en/compare`,
+      lastmod: today,
+      changefreq: 'monthly',
+      priority: '0.7',
+    },
     {
       url: `${baseUrl}/en/compare/semrush`,
       lastmod: today,
@@ -433,6 +447,7 @@ export async function GET() {
     { path: '/solutions/shopify', changefreq: 'monthly', priority: '0.7' },
     { path: '/features/site-links', changefreq: 'monthly', priority: '0.7' },
     { path: '/features/google-maps-posts', changefreq: 'monthly', priority: '0.7' },
+    { path: '/compare', changefreq: 'monthly', priority: '0.7' },
     { path: '/compare/semrush', changefreq: 'monthly', priority: '0.7' },
     { path: '/compare/yoast', changefreq: 'monthly', priority: '0.7' },
     { path: '/compare/rankmath', changefreq: 'monthly', priority: '0.7' },
