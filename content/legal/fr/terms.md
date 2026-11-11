@@ -263,6 +263,6 @@ Pour toute question sur les présentes conditions ou sur le Service, contactez-n
 **GO TOP DIGITAL MARKETING AND ADVERTISING LTD**  
 Numéro de société : 517274346  
 Adresse : HaRechasim 24/2, Ramat Gan 5235524, Israël  
-Courriel : [oren@gotop.co.il](mailto:oren@gotop.co.il)
+Courriel : [contact@gotopseo.com](mailto:contact@gotopseo.com)
 
 Dernière mise à jour le 21 octobre 2026

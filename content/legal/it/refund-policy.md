@@ -37,7 +37,7 @@ L'articolo 52 del Codice del Consumo (decreto legislativo 6 settembre 2005, n. 2
 
 **A chi è riconosciuto questo diritto.** Il diritto di recesso dell'articolo 52 è quello del consumatore, cioè della persona fisica che agisce per scopi estranei all'attività imprenditoriale, commerciale, artigianale o professionale eventualmente svolta (articolo 3, comma 1, lettera a, del Codice del Consumo). Noi vendiamo anche a imprese, e un'impresa, un'agenzia o un professionista che sottoscrive per la propria attività non è un consumatore ai sensi di questo testo: per questi clienti valgono senza variazioni le regole della sezione 4. Non Le chiediamo di provare nulla al di là di quanto ci ha dichiarato al momento della sottoscrizione, e non ci serviremo di questa distinzione per respingere la richiesta di una persona che ha evidentemente sottoscritto a titolo personale.
 
-**Come esercitarlo.** Ci scriva a [oren@gotop.co.il](mailto:oren@gotop.co.il) dall'indirizzo di posta elettronica del Suo account, entro il termine di quattordici giorni, dichiarando che recede. È sufficiente un messaggio di posta elettronica senza formule particolari; il modulo tipo di recesso dell'allegato I, parte B, del Codice del Consumo è disponibile su semplice richiesta al medesimo indirizzo. Le rispondiamo per iscritto e rimborsiamo sul mezzo di pagamento che Lei ha utilizzato, entro quattordici giorni dal ricevimento della comunicazione di recesso, come prevede l'articolo 56 del Codice del Consumo.
+**Come esercitarlo.** Ci scriva a [contact@gotopseo.com](mailto:contact@gotopseo.com) dall'indirizzo di posta elettronica del Suo account, entro il termine di quattordici giorni, dichiarando che recede. È sufficiente un messaggio di posta elettronica senza formule particolari; il modulo tipo di recesso dell'allegato I, parte B, del Codice del Consumo è disponibile su semplice richiesta al medesimo indirizzo. Le rispondiamo per iscritto e rimborsiamo sul mezzo di pagamento che Lei ha utilizzato, entro quattordici giorni dal ricevimento della comunicazione di recesso, come prevede l'articolo 56 del Codice del Consumo.
 
 **Che cosa cambia l'avvio immediato del Servizio.** Il Servizio è un servizio digitale che funziona dal momento dell'apertura dell'account. Prima di pagare un abbonamento, la schermata «Fatturazione» Le chiede due dichiarazioni in un'unica frase, che Lei deve spuntare perché le modalità di pagamento compaiano: che ci chiede espressamente di cominciare l'esecuzione prima della fine del termine di quattordici giorni, e che riconosce di perdere il diritto di recesso a esecuzione completata. Senza quella spunta nessun abbonamento comincia. Gli articoli 51, comma 8, 57, comma 3, e 59, comma 1, lettera a), del Codice del Consumo ne traggono due conseguenze, e noi le diciamo entrambe: se il Servizio è **pienamente eseguito** prima della fine del termine, su Sua richiesta espressa e dopo che Lei ha riconosciuto espressamente di perdere il diritto di recesso a esecuzione completata, quel diritto è perduto; e se Lei recede quando il Servizio è stato eseguito solo in parte, il diritto permane e Lei ci deve soltanto l'importo proporzionale al servizio effettivamente fornito fino alla comunicazione della Sua decisione, mentre il resto Le viene rimborsato. Un abbonamento mensile in corso non è un servizio pienamente eseguito per il solo fatto che l'account è aperto: in concreto, una richiesta presentata entro i quattordici giorni ci porta a rimborsare il periodo in corso in proporzione a quanto non è stato utilizzato, e non ci nascondiamo dietro l'eccezione per rifiutare in blocco.
 
@@ -45,7 +45,7 @@ Dopo i quattordici giorni valgono le regole della sezione 4: l'abbonamento può 
 
 ## 6. Come chiedere una disdetta prevista dalla legge
 
-Invii un messaggio di posta elettronica a [oren@gotop.co.il](mailto:oren@gotop.co.il) dall'indirizzo di posta elettronica del Suo account, indicando la data dell'addebito e il motivo della richiesta. Rispondiamo per iscritto a ogni richiesta. Un rimborso concesso torna sul mezzo di pagamento che Lei ha utilizzato. Il tempo di accredito dipende dal prestatore di servizi di pagamento e dall'emittente della Sua carta.
+Invii un messaggio di posta elettronica a [contact@gotopseo.com](mailto:contact@gotopseo.com) dall'indirizzo di posta elettronica del Suo account, indicando la data dell'addebito e il motivo della richiesta. Rispondiamo per iscritto a ogni richiesta. Un rimborso concesso torna sul mezzo di pagamento che Lei ha utilizzato. Il tempo di accredito dipende dal prestatore di servizi di pagamento e dall'emittente della Sua carta.
 
 ## 7. Account fatturati tramite Shopify
 
@@ -60,6 +60,6 @@ Se Lei ha acquistato il Suo piano su un marketplace esterno che rivende il Servi
 **GO TOP DIGITAL MARKETING AND ADVERTISING LTD**  
 Numero di società: 517274346  
 Indirizzo: HaRechasim 24/2, Ramat Gan 5235524, Israele  
-Posta elettronica: [oren@gotop.co.il](mailto:oren@gotop.co.il)
+Posta elettronica: [contact@gotopseo.com](mailto:contact@gotopseo.com)
 
 Ultimo aggiornamento: 7 novembre 2026

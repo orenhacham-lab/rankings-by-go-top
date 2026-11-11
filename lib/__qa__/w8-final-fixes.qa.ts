@@ -245,7 +245,7 @@ async function main() {
     const accOk = (s: string) => s.includes('תוויות ברורות לכל שדה בטפסים') && !s.includes('טפטופיים')
       && s.includes('ת&quot;י 5568') && s.includes('WCAG 2.0 ברמה AA') && s.includes('התאמות נגישות לשירות')
       && !/אם נתקלת |אנא צור קשר|אנא שלח |אם יש לך/.test(s) && s.includes('אם נתקלתם בבעיה בנגישות') && s.includes('אם יש לכם הצעות לשיפור, אנא שלחו לנו')
-      && s.includes('oren@gotop.co.il') && s.includes('054-9489377') && !/רכז(ת)? הנגישות (?:הוא|היא|של השירות הוא)\s*[א-ת]{2,}\s+[א-ת]{2,}/.test(s) && s.includes('חלקים שעדיין לא נגישים במלואם')
+      && s.includes('contact@gotopseo.com') && s.includes('054-9489377') && !/רכז(ת)? הנגישות (?:הוא|היא|של השירות הוא)\s*[א-ת]{2,}\s+[א-ת]{2,}/.test(s) && s.includes('חלקים שעדיין לא נגישים במלואם')
     check('G2 (P1-11): a meaningful field-label line, the Israeli standard ת"י 5568 (WCAG 2.0 AA), plural address, the existing contact details, no invented coordinator name', accOk(acc))
     check('G2-MUT: the meaningless phrase, the masculine singular, or an invented name is caught',
       !accOk(acc.replace('תוויות ברורות לכל שדה בטפסים', 'תוויות תיאוריות למכשירים טפטופיים (form fields)')) && !accOk(acc.replace('אם נתקלתם בבעיה בנגישות', 'אם נתקלת בבעיה בנגישות, אנא צור קשר')) && !accOk(acc.replace('רכז הנגישות של השירות:', 'רכז הנגישות של השירות הוא דני כהן:')))

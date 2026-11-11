@@ -176,4 +176,4 @@ Nous publions le présent contrat en hébreu, en anglais, en espagnol, en portug
 
 Si une disposition du présent contrat est déclarée inapplicable, le reste demeure en vigueur. Le fait que nous n'exigions pas l'application d'une disposition à une occasion ne vaut pas renonciation à celle-ci. Le présent contrat, avec les Conditions d'utilisation et la Politique de confidentialité, constitue l'intégralité de l'accord entre les parties au sujet du Programme et remplace toute déclaration antérieure.
 
-Pour toute question sur le Programme, ou pour toute communication au titre du présent contrat : [oren@gotop.co.il](mailto:oren@gotop.co.il)
+Pour toute question sur le Programme, ou pour toute communication au titre du présent contrat : [contact@gotopseo.com](mailto:contact@gotopseo.com)

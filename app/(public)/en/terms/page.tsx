@@ -818,8 +818,8 @@ export default function EnglishTermsPage() {
           Company number: 517274346
           <br />
           Email:{' '}
-          <a href="mailto:oren@gotop.co.il">
-            oren@gotop.co.il
+          <a href="mailto:contact@gotopseo.com">
+            contact@gotopseo.com
           </a>
         </p>
       </section>

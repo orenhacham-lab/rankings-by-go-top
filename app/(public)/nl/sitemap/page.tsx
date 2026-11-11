@@ -108,7 +108,7 @@ export default function DutchSitemapPage() {
           pagina &ldquo;Over ons&rdquo;
         </Link>
         . Vragen beantwoorden wij{' '}
-        <a href="mailto:oren@gotop.co.il" className={LEGAL_LINK}>
+        <a href="mailto:contact@gotopseo.com" className={LEGAL_LINK}>
           per e-mail
         </a>
       </p>

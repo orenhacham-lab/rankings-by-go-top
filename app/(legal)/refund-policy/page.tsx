@@ -55,7 +55,7 @@ export default function RefundPolicyPage() {
       <section>
         <h2>5. איך מבקשים ביטול לפי דין</h2>
         <p>
-          שלחו מייל ל-<a href="mailto:oren@gotop.co.il">oren@gotop.co.il</a> מכתובת המייל של החשבון,
+          שלחו מייל ל-<a href="mailto:contact@gotopseo.com">contact@gotopseo.com</a> מכתובת המייל של החשבון,
           וציינו את תאריך החיוב ואת סיבת הבקשה. נשיב לכל בקשה בכתב. החזר שאושר מוחזר לאמצעי התשלום
           שבו שילמתם. משך הזיכוי תלוי בספק התשלום ובחברת האשראי.
         </p>
@@ -87,7 +87,7 @@ export default function RefundPolicyPage() {
           <br />
           ח.פ. 517274346
           <br />
-          דוא&quot;ל: <a href="mailto:oren@gotop.co.il">oren@gotop.co.il</a>
+          דוא&quot;ל: <a href="mailto:contact@gotopseo.com">contact@gotopseo.com</a>
         </p>
       </section>
 

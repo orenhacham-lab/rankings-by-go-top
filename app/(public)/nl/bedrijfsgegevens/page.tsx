@@ -114,7 +114,7 @@ export default function DutchCompanyInfoPage() {
         <h2>Contact</h2>
         <p>
           E-mail:{' '}
-          <a href="mailto:oren@gotop.co.il" className={LEGAL_LINK}>oren@gotop.co.il</a>
+          <a href="mailto:contact@gotopseo.com" className={LEGAL_LINK}>contact@gotopseo.com</a>
         </p>
         <p className="mt-3">
           Telefoon:{' '}

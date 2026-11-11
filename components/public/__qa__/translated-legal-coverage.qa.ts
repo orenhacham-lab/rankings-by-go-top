@@ -3886,10 +3886,10 @@ const OUTREACH_NO_LONGER_TRUE = /we\s+do not collect details about a private ind
       lines.every((l) => !SUPERSEDED_NAME.test(l)))
   }
   check('mutation control: a brand-only footer line is caught',
-    !new RegExp(`${REGISTERED}`).test('Go Top SEO · oren@gotop.co.il'))
+    !new RegExp(`${REGISTERED}`).test('Go Top SEO · contact@gotopseo.com'))
   check('mutation control: a footer with no address is caught',
     !/(הרכסים 24\/2, רמת גן 5235524|HaRechasim 24\/2, Ramat Gan 5235524, Israel)/
-      .test(`${REGISTERED} (company number 517274346) · oren@gotop.co.il`))
+      .test(`${REGISTERED} (company number 517274346) · contact@gotopseo.com`))
 }
 
 // ── 33) an AI photo for a Business Profile post ─────────────────────────────

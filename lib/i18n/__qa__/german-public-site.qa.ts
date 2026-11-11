@@ -494,8 +494,8 @@ console.log('\nD) the locale tables and the copy')
     pageStrings(MUT_ITALIAN).filter(foreignOnPage).length === 2
     && pageStrings(MUT_GERMAN).filter(foreignOnPage).length === 0
     && !foreignOnPage('Go Top SEO') && !foreignOnPage('flex min-h-screen flex-col bg-canvas')
-    && !foreignOnPage('@/components/public/FeaturePage') && !foreignOnPage('oren@gotop.co.il')
-    && foreignOnPage('Write to oren@gotop.co.il and we will answer you shortly')
+    && !foreignOnPage('@/components/public/FeaturePage') && !foreignOnPage('contact@gotopseo.com')
+    && foreignOnPage('Write to contact@gotopseo.com and we will answer you shortly')
     // The script half: a Japanese label is caught even though it is one "word".
     && foreignOnPage('Googleでの検索順位の計測')
     && 'Googleでの検索順位の計測'.split(/\s+/).filter(Boolean).length === 1
@@ -564,7 +564,7 @@ console.log('\nE) the reader never changes language, and the Impressum is reacha
     && /517274346/.test(impressum)
     && /HaRechasim 24\/2/.test(impressum)
     && /Oren Hacham/.test(impressum)
-    && /oren@gotop\.co\.il/.test(impressum)
+    && /contact@gotopseo\.com/.test(impressum)
     && /\+972-54-9489377/.test(impressum)
     && /Medienstaatsvertrag|MStV/.test(impressum))
   check('E9a-MUT: an Impressum missing the registration number is caught',

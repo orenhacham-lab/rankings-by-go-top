@@ -70,7 +70,7 @@ export default function JapaneseTokushoPage() {
         <h2>連絡先</h2>
         <p>
           メール：
-          <a href="mailto:oren@gotop.co.il" className={LEGAL_LINK}>oren@gotop.co.il</a>
+          <a href="mailto:contact@gotopseo.com" className={LEGAL_LINK}>contact@gotopseo.com</a>
         </p>
         <p className="mt-3">
           電話：

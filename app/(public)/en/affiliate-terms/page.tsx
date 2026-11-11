@@ -475,7 +475,7 @@ export default function EnglishAffiliateTermsPage() {
         </p>
         <p>
           Questions about the Program, or a notice under this agreement:{' '}
-          <a href="mailto:oren@gotop.co.il">oren@gotop.co.il</a>.
+          <a href="mailto:contact@gotopseo.com">contact@gotopseo.com</a>.
         </p>
       </section>
 

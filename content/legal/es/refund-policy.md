@@ -37,7 +37,7 @@ El artículo 102.1 del texto refundido de la Ley General para la Defensa de los 
 
 **A quién corresponde este derecho.** El derecho de desistimiento del artículo 102 es el del consumidor, es decir, según el artículo 3.1, de la persona física que actúa con un propósito ajeno a su actividad comercial, empresarial, oficio o profesión. También vendemos a empresas, y una sociedad, una agencia o un profesional que contrata para su actividad no es consumidor a efectos de ese artículo: para esos clientes rigen sin cambios las reglas de la sección 4. No le pedimos prueba alguna más allá de lo que usted nos declaró al contratar, y no usaremos esta distinción para rechazar la solicitud de quien manifiestamente ha contratado a título personal.
 
-**Cómo ejercerlo.** Escríbanos dentro del plazo de catorce días a [oren@gotop.co.il](mailto:oren@gotop.co.il) desde la dirección de correo electrónico de su cuenta y declare que desiste. Basta un correo electrónico sin forma especial: el artículo 106.1 admite tanto el formulario de desistimiento que la ley recoge en su anexo como cualquier otra declaración inequívoca de la decisión de desistir, y le enviamos ese formulario con solo pedirlo a la misma dirección. Respondemos por escrito y le devolvemos el pago por el mismo medio que usted utilizó, sin demoras indebidas y en todo caso antes de que hayan transcurrido catorce días naturales desde que nos comunicó su decisión, como exige el artículo 107.1.
+**Cómo ejercerlo.** Escríbanos dentro del plazo de catorce días a [contact@gotopseo.com](mailto:contact@gotopseo.com) desde la dirección de correo electrónico de su cuenta y declare que desiste. Basta un correo electrónico sin forma especial: el artículo 106.1 admite tanto el formulario de desistimiento que la ley recoge en su anexo como cualquier otra declaración inequívoca de la decisión de desistir, y le enviamos ese formulario con solo pedirlo a la misma dirección. Respondemos por escrito y le devolvemos el pago por el mismo medio que usted utilizó, sin demoras indebidas y en todo caso antes de que hayan transcurrido catorce días naturales desde que nos comunicó su decisión, como exige el artículo 107.1.
 
 **Qué cambia el inicio inmediato del Servicio.** El Servicio es un servicio digital que funciona desde que se crea la cuenta. Antes de pagar una suscripción, la pantalla «Facturación» le pide dos declaraciones en una sola frase, que usted debe marcar para que aparezcan las formas de pago: que nos solicita expresamente comenzar la prestación antes de que termine el plazo de catorce días, y que conoce que pierde el derecho de desistimiento una vez que el Servicio haya sido completamente ejecutado. Sin esa marca no se inicia ninguna suscripción. El artículo 98.8 es el que nos obliga a pedirle esa solicitud expresa y esa declaración, y de ellas los artículos 103.a) y 108.4 extraen dos consecuencias que le decimos las dos: si el Servicio queda **completamente ejecutado** antes de que termine el plazo, previa solicitud expresa suya y conociendo usted que con la ejecución completa pierde el derecho, ese derecho se extingue; y si usted desiste cuando el Servicio solo se ha prestado en parte, el derecho subsiste y usted solo nos debe un importe proporcional a la parte ya prestada del servicio, calculada sobre el precio total del contrato, y el resto se le devuelve. Una suscripción mensual en curso no está completamente ejecutada por el solo hecho de que la cuenta esté abierta: en la práctica, una solicitud presentada dentro de los catorce días nos lleva a devolver el periodo en curso en proporción a lo que no se ha utilizado, y no nos escondemos detrás de la excepción para rechazar en bloque.
 
@@ -45,7 +45,7 @@ Pasados los catorce días rigen las reglas de la sección 4: la suscripción pue
 
 ## 6. Cómo solicitar una cancelación conforme a la ley
 
-Envíe un correo electrónico a [oren@gotop.co.il](mailto:oren@gotop.co.il) desde la dirección de correo electrónico de su cuenta, indicando la fecha del cargo y el motivo de la solicitud. Respondemos por escrito a cada solicitud. Un reembolso aprobado se devuelve al medio de pago que usted utilizó. El tiempo que tarde en acreditarse depende del proveedor de pagos y de la entidad emisora de su tarjeta.
+Envíe un correo electrónico a [contact@gotopseo.com](mailto:contact@gotopseo.com) desde la dirección de correo electrónico de su cuenta, indicando la fecha del cargo y el motivo de la solicitud. Respondemos por escrito a cada solicitud. Un reembolso aprobado se devuelve al medio de pago que usted utilizó. El tiempo que tarde en acreditarse depende del proveedor de pagos y de la entidad emisora de su tarjeta.
 
 ## 7. Cuentas facturadas a través de Shopify
 
@@ -59,6 +59,6 @@ Si usted compró su plan a través de un mercado externo que revende el Servicio
 
 **GO TOP DIGITAL MARKETING AND ADVERTISING LTD**  
 Número de sociedad: 517274346  
-Correo electrónico: [oren@gotop.co.il](mailto:oren@gotop.co.il)
+Correo electrónico: [contact@gotopseo.com](mailto:contact@gotopseo.com)
 
 Última actualización: 7 de noviembre de 2026

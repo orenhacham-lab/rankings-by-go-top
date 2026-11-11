@@ -510,8 +510,8 @@ console.log('\nD) the locale tables and the copy')
     pageStrings(MUT_DUTCH).filter(foreignOnPage).length === 2
     && pageStrings(MUT_POLISH).filter(foreignOnPage).length === 0
     && !foreignOnPage('Go Top SEO') && !foreignOnPage('flex min-h-screen flex-col bg-canvas')
-    && !foreignOnPage('@/components/public/FeaturePage') && !foreignOnPage('oren@gotop.co.il')
-    && foreignOnPage('Write to oren@gotop.co.il and we will answer you shortly')
+    && !foreignOnPage('@/components/public/FeaturePage') && !foreignOnPage('contact@gotopseo.com')
+    && foreignOnPage('Write to contact@gotopseo.com and we will answer you shortly')
     // The script half: a Japanese label is caught even though it is one "word".
     && foreignOnPage('Googleでの検索順位の計測')
     && 'Googleでの検索順位の計測'.split(/\s+/).filter(Boolean).length === 1
@@ -598,7 +598,7 @@ console.log('\nE) the reader never changes language, and Polish adds exactly one
     /nie mamy polskiego numeru identyfikacji podatkowej/.test(info) && /merchant of record/.test(info))
   check('E9d: it carries the identity, the address, the e-mail AND the telephone number art. 12 ust. 1 pkt 3 asks for',
     /GO TOP DIGITAL MARKETING AND ADVERTISING LTD/.test(info)
-    && /HaRechasim 24\/2/.test(info) && /oren@gotop\.co\.il/.test(info)
+    && /HaRechasim 24\/2/.test(info) && /contact@gotopseo\.com/.test(info)
     && /\+972-54-9489377/.test(info))
   check('E9e: and the comment records the article it answers, and leaves art. 5 uśude unclaimed',
     /art\. 12 ust\. 1/i.test(info) && /art\. 3a/i.test(info)

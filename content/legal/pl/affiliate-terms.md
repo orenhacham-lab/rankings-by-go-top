@@ -176,7 +176,7 @@ Publikujemy tę umowę po hebrajsku, angielsku, hiszpańsku, portugalsku, francu
 
 Jeśli któreś postanowienie tej umowy jest nieważne, pozostałe zostają w mocy. To, że raz nie żądamy stosowania jakiegoś postanowienia, nie jest zrzeczeniem się go. Ta umowa razem z regulaminem i polityką prywatności stanowi całe porozumienie stron o programie i zastępuje każde wcześniejsze oświadczenie.
 
-Jeśli mają Państwo pytania o program, oraz dla każdego zawiadomienia na podstawie tej umowy: [oren@gotop.co.il](mailto:oren@gotop.co.il)
+Jeśli mają Państwo pytania o program, oraz dla każdego zawiadomienia na podstawie tej umowy: [contact@gotopseo.com](mailto:contact@gotopseo.com)
 
 Dane identyfikujące spółkę są w stopce witryny, w [regulaminie](/pl/terms) oraz na stronie [dane firmy](/pl/dane-firmy).
 

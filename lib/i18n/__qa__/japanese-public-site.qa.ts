@@ -409,9 +409,9 @@ console.log('\nD) the locale tables and the copy')
     pageStrings(MUT_ITALIAN).filter(foreignOnPage).length === 2
     && pageStrings(MUT_JAPANESE).filter(foreignOnPage).length === 0
     && !foreignOnPage('Go Top SEO') && !foreignOnPage('flex min-h-screen flex-col bg-canvas')
-    && !foreignOnPage('@/components/public/FeaturePage') && !foreignOnPage('oren@gotop.co.il')
+    && !foreignOnPage('@/components/public/FeaturePage') && !foreignOnPage('contact@gotopseo.com')
     && foreignOnPage('Mappa del sito | Go Top SEO')
-    && foreignOnPage('Write to oren@gotop.co.il and we will answer you shortly'),
+    && foreignOnPage('Write to contact@gotopseo.com and we will answer you shortly'),
     `${pageStrings(MUT_ITALIAN).filter(foreignOnPage).join(' | ')} / ${pageStrings(MUT_JAPANESE).filter(foreignOnPage).join(' | ')}`)
 }
 

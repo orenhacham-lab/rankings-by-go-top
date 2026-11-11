@@ -50,7 +50,7 @@ Nasza platforma działa w nowoczesnych przeglądarkach:
 
 Jeśli Państwo natrafią na problem z dostępnością, na stronę, która nie jest odczytywana, na czynność, której nie da się dokończyć klawiaturą, na tekst, który czytnik ekranu pomija, prosimy do nas napisać, a my się tym zajmiemy. Osoba odpowiedzialna za dostępność usługi:
 
-**E-mail:** [oren@gotop.co.il](mailto:oren@gotop.co.il)
+**E-mail:** [contact@gotopseo.com](mailto:contact@gotopseo.com)
 
 **Telefon:** [+972-54-9489377](tel:+972549489377)
 

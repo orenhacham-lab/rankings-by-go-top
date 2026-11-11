@@ -270,7 +270,7 @@ Hebt u vragen over deze voorwaarden of over de dienst, neem dan contact met ons 
 Register: Registrar of Companies, Israël  
 Inschrijvingsnummer: 517274346  
 Adres: HaRechasim 24/2, Ramat Gan 5235524, Israël  
-E-mail: [oren@gotop.co.il](mailto:oren@gotop.co.il)
+E-mail: [contact@gotopseo.com](mailto:contact@gotopseo.com)
 
 Alle gegevens die artikel 3:15d lid 1 BW van een dienstverlener van de informatiemaatschappij verlangt, staan bij elkaar op de pagina [Bedrijfsgegevens](/nl/bedrijfsgegevens), waarnaar de voettekst van elke Nederlandse pagina verwijst: de identiteit en het adres, het register en het inschrijvingsnummer, de contactgegevens en de mededeling dat wij geen Nederlands btw-identificatienummer hebben. Die pagina heet geen impressum, omdat dat een Duits woord voor een Duitse wet is; het Nederlandse recht schrijft geen titel voor, alleen dat de gegevens gemakkelijk, rechtstreeks en permanent toegankelijk zijn.
 

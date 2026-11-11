@@ -210,7 +210,7 @@ export const trackingFr: DeepPartial<DashboardDictionary> = {
       team: 'L’équipe Go Top SEO',
       footer: 'Vous recevez cet e-mail parce que vous avez un site actif sur Go Top SEO. Vous ne voulez pas ces rappels ?',
       unsubscribe: 'Désabonnez-vous en un clic, sans connexion',
-      company: 'GO TOP DIGITAL MARKETING AND ADVERTISING LTD (numéro de société 517274346) · HaRechasim 24/2, Ramat Gan 5235524, Israël · oren@gotop.co.il',
+      company: 'GO TOP DIGITAL MARKETING AND ADVERTISING LTD (numéro de société 517274346) · HaRechasim 24/2, Ramat Gan 5235524, Israël · contact@gotopseo.com',
     },
     unsubscribePage: {
       title: 'Vous êtes désabonné',
@@ -230,7 +230,7 @@ export const trackingFr: DeepPartial<DashboardDictionary> = {
     team: 'L’équipe Go Top SEO',
     footer: 'Vous recevez cet e-mail parce que vous avez ouvert un site sur Go Top SEO et que vous n’avez pas terminé sa configuration. Vous ne voulez pas ces e-mails ?',
     unsubscribe: 'Arrêter les e-mails de démarrage, en un clic et sans connexion',
-    company: 'GO TOP DIGITAL MARKETING AND ADVERTISING LTD (numéro de société 517274346) · HaRechasim 24/2, Ramat Gan 5235524, Israël · oren@gotop.co.il',
+    company: 'GO TOP DIGITAL MARKETING AND ADVERTISING LTD (numéro de société 517274346) · HaRechasim 24/2, Ramat Gan 5235524, Israël · contact@gotopseo.com',
     connect: {
       subject: (domain: string) => `${domain} n’est pas encore connecté`,
       preheader: 'Une seule connexion, et le système fonctionne tout seul ensuite.',
@@ -276,7 +276,7 @@ export const trackingFr: DeepPartial<DashboardDictionary> = {
     team: 'L’équipe Go Top SEO',
     footer: 'Vous recevez cet e-mail parce que vous avez activé le résumé hebdomadaire dans les réglages du site. Vous n’en voulez plus ?',
     unsubscribe: 'Se désabonner en un clic, sans connexion',
-    company: 'GO TOP DIGITAL MARKETING AND ADVERTISING LTD (numéro de société 517274346) · HaRechasim 24/2, Ramat Gan 5235524, Israël · oren@gotop.co.il',
+    company: 'GO TOP DIGITAL MARKETING AND ADVERTISING LTD (numéro de société 517274346) · HaRechasim 24/2, Ramat Gan 5235524, Israël · contact@gotopseo.com',
   },
 }
 

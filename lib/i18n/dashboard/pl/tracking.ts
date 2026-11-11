@@ -222,7 +222,7 @@ export const trackingPl: DeepPartial<DashboardDictionary> = {
       team: 'Zespół Go Top SEO',
       footer: 'Otrzymują Państwo tę wiadomość, ponieważ mają aktywną stronę w Go Top SEO. Nie chcą Państwo tych przypomnień?',
       unsubscribe: 'Wypisanie jednym kliknięciem, bez logowania',
-      company: 'GO TOP DIGITAL MARKETING AND ADVERTISING LTD (numer w rejestrze 517274346) · HaRechasim 24/2, Ramat Gan 5235524, Izrael · oren@gotop.co.il',
+      company: 'GO TOP DIGITAL MARKETING AND ADVERTISING LTD (numer w rejestrze 517274346) · HaRechasim 24/2, Ramat Gan 5235524, Izrael · contact@gotopseo.com',
     },
     unsubscribePage: {
       title: 'Zapis został zakończony',
@@ -242,7 +242,7 @@ export const trackingPl: DeepPartial<DashboardDictionary> = {
     team: 'Zespół Go Top SEO',
     footer: 'Otrzymują Państwo tę wiadomość, ponieważ utworzyli stronę w Go Top SEO i nie zakończyli konfiguracji. Nie chcą Państwo tych wiadomości?',
     unsubscribe: 'Zatrzymanie wiadomości konfiguracyjnych, jednym kliknięciem i bez logowania',
-    company: 'GO TOP DIGITAL MARKETING AND ADVERTISING LTD (numer w rejestrze 517274346) · HaRechasim 24/2, Ramat Gan 5235524, Izrael · oren@gotop.co.il',
+    company: 'GO TOP DIGITAL MARKETING AND ADVERTISING LTD (numer w rejestrze 517274346) · HaRechasim 24/2, Ramat Gan 5235524, Izrael · contact@gotopseo.com',
     connect: {
       subject: (domain: string) => `${domain} nie jest jeszcze podłączona`,
       preheader: 'Jedno połączenie i system działa sam.',
@@ -292,7 +292,7 @@ export const trackingPl: DeepPartial<DashboardDictionary> = {
     team: 'Zespół Go Top SEO',
     footer: 'Otrzymują Państwo tę wiadomość, ponieważ w ustawieniach strony włączyli podsumowanie tygodnia. Nie chcą go Państwo już otrzymywać?',
     unsubscribe: 'Wypisanie jednym kliknięciem, bez logowania',
-    company: 'GO TOP DIGITAL MARKETING AND ADVERTISING LTD (numer w rejestrze 517274346) · HaRechasim 24/2, Ramat Gan 5235524, Izrael · oren@gotop.co.il',
+    company: 'GO TOP DIGITAL MARKETING AND ADVERTISING LTD (numer w rejestrze 517274346) · HaRechasim 24/2, Ramat Gan 5235524, Izrael · contact@gotopseo.com',
   },
 }
 

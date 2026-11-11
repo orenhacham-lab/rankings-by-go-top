@@ -265,7 +265,7 @@ Bei Fragen zu diesen Bedingungen oder zum Dienst wenden Sie sich an uns:
 **GO TOP DIGITAL MARKETING AND ADVERTISING LTD**  
 Handelsregisternummer: 517274346  
 Adresse: HaRechasim 24/2, Ramat Gan 5235524, Israel  
-E-Mail: [oren@gotop.co.il](mailto:oren@gotop.co.il)
+E-Mail: [contact@gotopseo.com](mailto:contact@gotopseo.com)
 
 Die vollständigen Angaben nach § 5 des Digitale-Dienste-Gesetzes (DDG) stehen im [Impressum](/de/impressum).
 

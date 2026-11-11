@@ -176,6 +176,6 @@ Wij publiceren deze overeenkomst in het Hebreeuws, het Engels, het Spaans, het P
 
 Is een bepaling van deze overeenkomst ongeldig, dan blijft de rest van kracht. Dat wij de toepassing van een bepaling eenmaal niet verlangen, geldt niet als het afstand doen daarvan. Deze overeenkomst vormt samen met de gebruiksvoorwaarden en de privacyverklaring de gehele afspraak van de partijen over het programma en vervangt elke eerdere verklaring.
 
-Hebt u vragen over het programma, en voor elke mededeling op grond van deze overeenkomst: [oren@gotop.co.il](mailto:oren@gotop.co.il)
+Hebt u vragen over het programma, en voor elke mededeling op grond van deze overeenkomst: [contact@gotopseo.com](mailto:contact@gotopseo.com)
 
 De identificatiegegevens van de vennootschap die artikel 3:15d BW verlangt, staan in de voettekst van de website en in de [gebruiksvoorwaarden](/nl/terms).

@@ -7,7 +7,7 @@ import { readFileSync, readdirSync, statSync } from 'node:fs'
 import { join } from 'node:path'
 import { PLAN_CATALOG, PLAN_CODES } from '../../plans/catalog'
 import { SOFTWARE_OFFER, softwareOffer } from '../software-offer'
-import { BRAND_PROFILES, ORGANIZATION_ID, organizationSchema } from '../organization'
+import { BRAND_PROFILES, ORGANIZATION_ID, SUPPORT_EMAIL, organizationSchema } from '../organization'
 import { PLATFORM_LISTINGS, SOFTWARE_ID, softwareApplicationSchema } from '../software-application'
 import { publicSiteLanguages } from '../site-languages'
 import { PUBLIC_LOCALES, LOCALE_CONFIG, enabledPublicLocales } from '../../i18n/locales'
@@ -85,10 +85,14 @@ const claimsAgencyIdentity = (src: string) =>
 for (const [name, src] of [['app/layout.tsx', layout], ['app/api/schema/route.ts', schemaRoute]] as const) {
   check(`${name} does not name the agency as the product's brand or publisher`, !claimsAgencyIdentity(src))
 }
-// The support address IS the agency mailbox, and the footer prints it on every
-// page, so a contactPoint naming it is honest and stays. Only identity claims
-// are the defect — this asserts the two are told apart.
-check('the agency support mailbox is still allowed as a contact', organizationSchema('x').contactPoint.email.includes(AGENCY))
+// The contact mailbox moved to the product's own domain on 11.11.2026, once a
+// real mailbox existed there: until then the footer printed the agency's
+// address on every page. A contactPoint is not an identity claim either way,
+// and this asserts the two are told apart — the address is read from the
+// source of truth so it cannot be retyped here, and it must not be the
+// agency's.
+check('the contact mailbox is the product\'s own, not the agency\'s',
+  organizationSchema('x').contactPoint.email === SUPPORT_EMAIL && !SUPPORT_EMAIL.includes(AGENCY))
 
 const org = organizationSchema('x')
 check('the organization carries the canonical @id', org['@id'] === ORGANIZATION_ID)

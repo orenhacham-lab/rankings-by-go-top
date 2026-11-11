@@ -173,4 +173,4 @@ Publicamos este acuerdo en hebreo, inglés, español y portugués. La versión q
 
 Si se declara inexigible una disposición de este acuerdo, el resto seguirá en vigor. El hecho de que no exijamos una disposición en una ocasión no supone renuncia a ella. Este acuerdo, junto con los Términos de Uso y la Política de Privacidad, constituye la totalidad de lo acordado entre las partes sobre el Programa y sustituye cualquier manifestación anterior.
 
-Para preguntas sobre el Programa, o para cualquier comunicación conforme a este acuerdo: [oren@gotop.co.il](mailto:oren@gotop.co.il)
+Para preguntas sobre el Programa, o para cualquier comunicación conforme a este acuerdo: [contact@gotopseo.com](mailto:contact@gotopseo.com)

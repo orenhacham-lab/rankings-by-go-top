@@ -37,7 +37,7 @@ L'article L221-18 du Code de la consommation donne au consommateur le droit de s
 
 **À qui ce droit s'adresse.** Le droit de rétractation de l'article L221-18 est celui du consommateur, c'est-à-dire d'une personne physique qui agit à des fins qui n'entrent pas dans le cadre de son activité commerciale, industrielle, artisanale, libérale ou agricole. Nous vendons aussi à des entreprises, et une entreprise, une agence ou un professionnel qui souscrit pour son activité n'est pas un consommateur au sens de ce texte : pour ces clients, les règles de la section 4 s'appliquent sans changement. Nous ne vous demandons pas de prouver quoi que ce soit au-delà de ce que vous nous avez déclaré en souscrivant, et nous ne nous servirons pas de cette distinction pour écarter une demande d'une personne qui a visiblement souscrit à titre personnel.
 
-**Comment l'exercer.** Écrivez-nous à [oren@gotop.co.il](mailto:oren@gotop.co.il) depuis l'adresse de courriel de votre compte, dans le délai de quatorze jours, en disant que vous vous rétractez. Un courriel sans formule particulière suffit ; un formulaire type de rétractation est disponible sur simple demande à la même adresse. Nous vous répondons par écrit et nous remboursons sur le moyen de paiement que vous avez utilisé.
+**Comment l'exercer.** Écrivez-nous à [contact@gotopseo.com](mailto:contact@gotopseo.com) depuis l'adresse de courriel de votre compte, dans le délai de quatorze jours, en disant que vous vous rétractez. Un courriel sans formule particulière suffit ; un formulaire type de rétractation est disponible sur simple demande à la même adresse. Nous vous répondons par écrit et nous remboursons sur le moyen de paiement que vous avez utilisé.
 
 **Ce que le démarrage immédiat du Service change.** Le Service est un service numérique qui fonctionne dès l'ouverture du compte. Avant de payer un abonnement, l'écran « Facturation » vous demande deux déclarations en une seule phrase, que vous devez cocher pour que les moyens de paiement apparaissent : que vous nous demandez expressément de commencer l'exécution avant la fin du délai de quatorze jours, et que vous renoncez expressément à votre droit de rétractation pour le cas où le Service serait pleinement exécuté avant cette fin. Sans cette case, aucun abonnement ne démarre. Les articles L221-25 et L221-28 du Code de la consommation en tirent deux conséquences, et nous les disons toutes les deux : si le Service est **pleinement exécuté** avant la fin du délai, à votre demande expresse et après que vous avez expressément renoncé à votre droit, ce droit est perdu ; et si vous vous rétractez alors que le Service n'a été exécuté qu'en partie, le droit subsiste et vous ne nous devez que le montant correspondant au service effectivement fourni jusqu'à la communication de votre décision, le reste vous étant remboursé. Un abonnement mensuel en cours n'est pas un service pleinement exécuté du seul fait que le compte est ouvert : dans les faits, une demande présentée dans les quatorze jours nous conduit à rembourser la période en cours au prorata de ce qui n'a pas été utilisé, et nous ne nous retranchons pas derrière l'exception pour refuser en bloc.
 
@@ -45,7 +45,7 @@ Après les quatorze jours, les règles de la section 4 s'appliquent : l'abonneme
 
 ## 6. Comment demander une annulation prévue par la loi
 
-Envoyez un courriel à [oren@gotop.co.il](mailto:oren@gotop.co.il) depuis l'adresse de courriel de votre compte, en indiquant la date du prélèvement et le motif de la demande. Nous répondons par écrit à chaque demande. Un remboursement accordé revient sur le moyen de paiement que vous avez utilisé. Le délai de crédit dépend du prestataire de paiement et de l'émetteur de votre carte.
+Envoyez un courriel à [contact@gotopseo.com](mailto:contact@gotopseo.com) depuis l'adresse de courriel de votre compte, en indiquant la date du prélèvement et le motif de la demande. Nous répondons par écrit à chaque demande. Un remboursement accordé revient sur le moyen de paiement que vous avez utilisé. Le délai de crédit dépend du prestataire de paiement et de l'émetteur de votre carte.
 
 ## 7. Comptes facturés via Shopify
 
@@ -60,6 +60,6 @@ Si vous avez acheté votre offre sur une place de marché externe qui revend le 
 **GO TOP DIGITAL MARKETING AND ADVERTISING LTD**  
 Numéro de société : 517274346  
 Adresse : HaRechasim 24/2, Ramat Gan 5235524, Israël  
-Courriel : [oren@gotop.co.il](mailto:oren@gotop.co.il)
+Courriel : [contact@gotopseo.com](mailto:contact@gotopseo.com)
 
 Dernière mise à jour le 7 novembre 2026

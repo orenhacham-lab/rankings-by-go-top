@@ -108,7 +108,7 @@ export default function JapaneseSitemapPage() {
           会社情報のページ
         </Link>
         をご覧ください。ご質問は{' '}
-        <a href="mailto:oren@gotop.co.il" className={LEGAL_LINK}>
+        <a href="mailto:contact@gotopseo.com" className={LEGAL_LINK}>
           メールでどうぞ
         </a>
       </p>

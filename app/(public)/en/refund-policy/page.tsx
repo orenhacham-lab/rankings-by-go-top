@@ -65,7 +65,7 @@ export default function EnglishRefundPolicyPage() {
       <section>
         <h2>5. How to request a cancellation under the law</h2>
         <p>
-          Email <a href="mailto:oren@gotop.co.il">oren@gotop.co.il</a> from your account&rsquo;s email
+          Email <a href="mailto:contact@gotopseo.com">contact@gotopseo.com</a> from your account&rsquo;s email
           address, with the charge date and the reason for the request. We answer every request in
           writing. An approved refund goes back to the payment method you used. How long the credit
           takes depends on the payment provider and your card issuer.
@@ -100,7 +100,7 @@ export default function EnglishRefundPolicyPage() {
           <br />
           Company number: 517274346
           <br />
-          Email: <a href="mailto:oren@gotop.co.il">oren@gotop.co.il</a>
+          Email: <a href="mailto:contact@gotopseo.com">contact@gotopseo.com</a>
         </p>
       </section>
 

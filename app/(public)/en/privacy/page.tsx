@@ -250,7 +250,7 @@ export default function EnglishPrivacyPage() {
           <li><strong>Retention:</strong> synced Search Console data and your post history are kept for as long as
           your account exists, unless you ask us to delete them.</li>
           <li><strong>Deletion:</strong> to delete your account or the Google data stored with it, email us at{' '}
-          <a href="mailto:oren@gotop.co.il">oren@gotop.co.il</a>.</li>
+          <a href="mailto:contact@gotopseo.com">contact@gotopseo.com</a>.</li>
           <li><strong>Revoking access at Google:</strong> you can also remove our access at any time at{' '}
           <a href="https://myaccount.google.com/permissions" target="_blank" rel="noopener noreferrer">
             myaccount.google.com/permissions
@@ -645,8 +645,8 @@ export default function EnglishPrivacyPage() {
         <p className="mt-4">To exercise these rights, contact us at:</p>
         <p className="mt-2">
           <strong>Email:</strong>{' '}
-          <a href="mailto:oren@gotop.co.il">
-            oren@gotop.co.il
+          <a href="mailto:contact@gotopseo.com">
+            contact@gotopseo.com
           </a>
         </p>
         <p>
@@ -1081,8 +1081,8 @@ export default function EnglishPrivacyPage() {
         <p>For any privacy matter, including exercising the rights above:</p>
         <p className="mt-2">
           <strong>Email:</strong>{' '}
-          <a href="mailto:oren@gotop.co.il">
-            oren@gotop.co.il
+          <a href="mailto:contact@gotopseo.com">
+            contact@gotopseo.com
           </a>
         </p>
         <p>
@@ -1111,8 +1111,8 @@ export default function EnglishPrivacyPage() {
         <p>If you have questions about this privacy policy, please contact:</p>
         <p className="mt-2">
           <strong>Email:</strong>{' '}
-          <a href="mailto:oren@gotop.co.il">
-            oren@gotop.co.il
+          <a href="mailto:contact@gotopseo.com">
+            contact@gotopseo.com
           </a>
         </p>
         <p>

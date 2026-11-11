@@ -258,6 +258,6 @@ Para qualquer dúvida sobre estes termos ou sobre o Serviço, fale com a gente:
 
 **GO TOP DIGITAL MARKETING AND ADVERTISING LTD**  
 Número da sociedade: 517274346  
-E-mail: [oren@gotop.co.il](mailto:oren@gotop.co.il)
+E-mail: [contact@gotopseo.com](mailto:contact@gotopseo.com)
 
 Última atualização: 16 de outubro de 2026

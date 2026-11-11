@@ -117,7 +117,7 @@ O uso e a transferência, pelo Go Top SEO, de informações recebidas das APIs d
 - **Search Console:** «Desconectar a propriedade do projeto» remove a propriedade daquele projeto e interrompe a sincronização. «Revogar o acesso do Google para toda a conta» fica disponível quando nenhum projeto usa a conexão: pede ao Google que revogue o nosso acesso e exclui o token armazenado. Nos dois casos, os dados já sincronizados são mantidos.
 - **Business Profile:** «Desconectar» pede ao Google que revogue o nosso acesso e exclui o token armazenado e o local salvo. Seu histórico de postagens permanece no aplicativo, e as postagens publicadas permanecem no Google até que você as remova lá.
 - **Retenção:** os dados sincronizados do Search Console e o seu histórico de postagens são mantidos enquanto a sua conta existir, a menos que você peça a exclusão.
-- **Exclusão:** para excluir a sua conta ou os dados do Google armazenados com ela, escreva para [oren@gotop.co.il](mailto:oren@gotop.co.il).
+- **Exclusão:** para excluir a sua conta ou os dados do Google armazenados com ela, escreva para [contact@gotopseo.com](mailto:contact@gotopseo.com).
 - **Revogar o acesso no Google:** você também pode remover o nosso acesso a qualquer momento em [myaccount.google.com/permissions](https://myaccount.google.com/permissions). Depois disso não conseguimos mais ler nem publicar na sua conta Google. Os dados que já armazenamos permanecem até você desconectar no aplicativo ou pedir a exclusão.
 
 ## Análise do site (verificação gratuita e análise de integração)
@@ -246,7 +246,7 @@ Conforme a legislação de privacidade aplicável, você tem direito a:
 
 Para exercer esses direitos, fale com a gente:
 
-**E-mail:** [oren@gotop.co.il](mailto:oren@gotop.co.il)
+**E-mail:** [contact@gotopseo.com](mailto:contact@gotopseo.com)
 
 **Telefone:** [054-9489377](tel:0549489377)
 
@@ -387,7 +387,7 @@ Se você está no Brasil, a Lei Geral de Proteção de Dados Pessoais (Lei nº 1
 
 Respondemos aos pedidos em até 15 dias, prazo do art. 19, I, da LGPD, e sem custo para você. Não cobramos nem pioramos o seu serviço porque você exerceu um direito.
 
-**Canal de comunicação e encarregado.** Somos um agente de tratamento de pequeno porte, e a Resolução CD/ANPD nº 2/2022 dispensa esses agentes da obrigação de indicar o encarregado do art. 41 da LGPD, exigindo em seu lugar um canal de comunicação com o titular. O nosso canal é o e-mail [oren@gotop.co.il](mailto:oren@gotop.co.il), e o telefone da seção «Contato de privacidade e representantes». Qualquer pedido sobre dados pessoais pode ser enviado por ali, em português.
+**Canal de comunicação e encarregado.** Somos um agente de tratamento de pequeno porte, e a Resolução CD/ANPD nº 2/2022 dispensa esses agentes da obrigação de indicar o encarregado do art. 41 da LGPD, exigindo em seu lugar um canal de comunicação com o titular. O nosso canal é o e-mail [contact@gotopseo.com](mailto:contact@gotopseo.com), e o telefone da seção «Contato de privacidade e representantes». Qualquer pedido sobre dados pessoais pode ser enviado por ali, em português.
 
 **Reclamação.** Se a nossa resposta não resolver, você pode reclamar à Autoridade Nacional de Proteção de Dados ([ANPD](https://www.gov.br/anpd/pt-br)), e também procurar um órgão de defesa do consumidor ou o Ministério Público. Falar com a gente primeiro não é condição para nada disso.
 
@@ -431,7 +431,7 @@ O serviço é destinado a empresas e proprietários de sites, não a crianças. 
 
 Para qualquer assunto de privacidade, inclusive o exercício dos direitos acima:
 
-**E-mail:** [oren@gotop.co.il](mailto:oren@gotop.co.il)
+**E-mail:** [contact@gotopseo.com](mailto:contact@gotopseo.com)
 
 **Telefone:** [+972-54-948-9377](tel:0549489377)
 
@@ -445,7 +445,7 @@ Podemos atualizar esta política de tempo em tempo. As alterações passam a val
 
 Se você tiver dúvidas sobre esta política de privacidade, fale com a gente:
 
-**E-mail:** [oren@gotop.co.il](mailto:oren@gotop.co.il)
+**E-mail:** [contact@gotopseo.com](mailto:contact@gotopseo.com)
 
 **Telefone:** [054-9489377](tel:0549489377)
 

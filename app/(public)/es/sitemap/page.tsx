@@ -107,7 +107,7 @@ export default function SpanishSitemapPage() {
           página sobre nosotros
         </Link>
         o{' '}
-        <a href="mailto:oren@gotop.co.il" className={LEGAL_LINK}>
+        <a href="mailto:contact@gotopseo.com" className={LEGAL_LINK}>
           escríbenos
         </a>
       </p>

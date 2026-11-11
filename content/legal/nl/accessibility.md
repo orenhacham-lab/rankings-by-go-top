@@ -50,7 +50,7 @@ Ons platform werkt met de moderne browsers:
 
 Stuit u op een probleem met de toegankelijkheid — een pagina die niet wordt voorgelezen, een handeling die u met het toetsenbord niet kunt afronden, een tekst die de schermlezer overslaat — schrijf ons dan, en wij pakken het op. De persoon die verantwoordelijk is voor de toegankelijkheid van de dienst:
 
-**E-mail:** [oren@gotop.co.il](mailto:oren@gotop.co.il)
+**E-mail:** [contact@gotopseo.com](mailto:contact@gotopseo.com)
 
 **Telefoon:** [+972-54-9489377](tel:+972549489377)
 

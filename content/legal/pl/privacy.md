@@ -121,7 +121,7 @@ Wykorzystanie i przekazywanie przez Go Top SEO danych otrzymanych z API Google d
 - **Search Console:** „Odłącz usługę od projektu” wyjmuje usługę z tego projektu i kończy jej synchronizację. „Odwołaj dostęp Google dla całego konta” jest dostępne, gdy żaden projekt nie używa połączenia: prosimy wtedy Google o odwołanie naszego dostępu i usuwamy przechowywany token. W oba przypadkach dane już zsynchronizowane zostają.
 - **Profil Firmy:** „Odłącz” prosi Google o odwołanie naszego dostępu i usuwa przechowywany token oraz zapisaną lokalizację. Państwa historia postów zostaje w aplikacji, a posty już opublikowane zostają u Google, dopóki Państwo ich tam nie usuną.
 - **Przechowywanie:** zsynchronizowane dane z Search Console i Państwa historia postów są przechowywane tak długo, jak istnieje Państwa konto, chyba że Państwo poproszą nas o ich usunięcie.
-- **Usunięcie:** żeby usunąć Państwa konto albo przechowywane przy nim dane z Google, prosimy napisać do nas na [oren@gotop.co.il](mailto:oren@gotop.co.il).
+- **Usunięcie:** żeby usunąć Państwa konto albo przechowywane przy nim dane z Google, prosimy napisać do nas na [contact@gotopseo.com](mailto:contact@gotopseo.com).
 - **Odwołanie dostępu u Google:** mogą Państwo ponadto odebrać nam dostęp w każdej chwili na [myaccount.google.com/permissions](https://myaccount.google.com/permissions). Po tym nie możemy już czytać ani publikować w Państwa koncie Google. Dane, które już przechowaliśmy, zostają, dopóki Państwo nie odłączą w aplikacji albo nie poproszą nas o ich usunięcie.
 
 ## Analiza witryny (darmowe sprawdzenie i analiza na start)
@@ -250,7 +250,7 @@ Według prawa właściwego o ochronie danych osobowych mają Państwo prawo:
 
 Żeby wykonać te prawa, prosimy skontaktować się:
 
-**E-mail:** [oren@gotop.co.il](mailto:oren@gotop.co.il)
+**E-mail:** [contact@gotopseo.com](mailto:contact@gotopseo.com)
 
 **Telefon:** +972-54-9489377
 
@@ -382,7 +382,7 @@ Odpowiadamy w ciągu miesiąca, w terminie z art. 12 ust. 3 RODO. Nic Państwu n
 
 To jest część, która Państwa dotyczy, gdy czytają Państwo ten tekst z Polski: rozporządzenie (UE) 2016/679 z 27 kwietnia 2016 r. (RODO) oraz, w Polsce, ustawa z dnia 10 maja 2018 r. o ochronie danych osobowych, która RODO tutaj uzupełnia, mają zastosowanie do przetwarzania Państwa danych, ponieważ oferujemy naszą usługę osobom znajdującym się w Unii (art. 3 ust. 2 RODO), choć nasza spółka ma siedzibę w Izraelu. Prawa wymienione w poprzedniej części są Państwa: dostęp (art. 15), sprostowanie (art. 16), usunięcie (art. 17), ograniczenie (art. 18), przenoszenie (art. 20), sprzeciw (art. 21), w tym bezwzględne prawo sprzeciwu wobec reklamy bezpośredniej, oraz wycofanie zgody (art. 7 ust. 3). Trzy punkty zasługują, żeby powiedzieć je tutaj, a nie założyć:
 - **Termin.** Odpowiadamy na żądanie **w ciągu miesiąca** od jego otrzymania, jak żąda art. 12 ust. 3 RODO. Termin ten może zostać przedłużony o dwa miesiące, gdy żądanie jest skomplikowane albo gdy żądań przychodzi wiele; w takim przypadku zawiadamiamy Państwa w ciągu miesiąca o przedłużeniu i o jego przyczynach. Nie bierzemy trzydziestu dni ani piętnastu: to jest miesiąc.
-- **Inspektor ochrony danych, i czego nie mamy.** W Polsce o wyznaczeniu inspektora ochrony danych decyduje wyłącznie art. 37 RODO: ustawa z dnia 10 maja 2018 r. o ochronie danych osobowych nie dodaje do tego żadnego progu, i inaczej niż w Niemczech, gdzie Bundesdatenschutzgesetz stawia surowszą granicę według liczby pracowników, nie ma tutaj dodatkowego przepisu krajowego, który zobowiązywałby nas do wyznaczenia. Nie jesteśmy organem publicznym, naszą główną działalnością nie jest przetwarzanie szczególnych kategorii danych osobowych na dużą skalę, i nie monitorujemy osób systematycznie na dużą skalę: **nie wyznaczyliśmy inspektora ochrony danych** i nie twierdzimy, że go mamy. Co w to miejsce wchodzi, to kanał: adres e-mail [oren@gotop.co.il](mailto:oren@gotop.co.il) i numer telefonu z części „Kontakt w sprawie prywatności i przedstawiciel”. Każde żądanie dotyczące danych osobowych może tam przyjść, po polsku, i jest rozpatrywane przez tę samą osobę, która prowadzi usługę. Ponadto **nie wyznaczyliśmy przedstawiciela w Unii zgodnie z art. 27 RODO**, a to dlatego, że opieramy się na wyjątku z art. 27 ust. 2 lit. a RODO: nasze przetwarzanie danych osób znajdujących się w Europejskim Obszarze Gospodarczym ma charakter wyłącznie okazjonalny, nie obejmuje przetwarzania na dużą skalę szczególnych kategorii danych ani danych dotyczących wyroków skazujących i czynów zabronionych, i jest mało prawdopodobne, by powodowało ryzyko naruszenia praw lub wolności osób, biorąc pod uwagę jego charakter, kontekst, zakres i cele. Jest to twierdzenie o faktach, a nie o wykładni prawa, i dlatego mówimy też, kiedy przestaje obowiązywać: **od chwili, gdy będziemy mieć konto otwarte z Europejskiego Obszaru Gospodarczego lub ze Zjednoczonego Królestwa, wyznaczymy przedstawiciela** i podamy tutaj jego imię i nazwisko oraz adres, tak jak wymaga tego art. 13 ust. 1 lit. a. Aby ten fakt nie przestał obowiązywać niezauważony, otwarcie takiego konta uruchamia u nas powiadomienie tego samego dnia.
+- **Inspektor ochrony danych, i czego nie mamy.** W Polsce o wyznaczeniu inspektora ochrony danych decyduje wyłącznie art. 37 RODO: ustawa z dnia 10 maja 2018 r. o ochronie danych osobowych nie dodaje do tego żadnego progu, i inaczej niż w Niemczech, gdzie Bundesdatenschutzgesetz stawia surowszą granicę według liczby pracowników, nie ma tutaj dodatkowego przepisu krajowego, który zobowiązywałby nas do wyznaczenia. Nie jesteśmy organem publicznym, naszą główną działalnością nie jest przetwarzanie szczególnych kategorii danych osobowych na dużą skalę, i nie monitorujemy osób systematycznie na dużą skalę: **nie wyznaczyliśmy inspektora ochrony danych** i nie twierdzimy, że go mamy. Co w to miejsce wchodzi, to kanał: adres e-mail [contact@gotopseo.com](mailto:contact@gotopseo.com) i numer telefonu z części „Kontakt w sprawie prywatności i przedstawiciel”. Każde żądanie dotyczące danych osobowych może tam przyjść, po polsku, i jest rozpatrywane przez tę samą osobę, która prowadzi usługę. Ponadto **nie wyznaczyliśmy przedstawiciela w Unii zgodnie z art. 27 RODO**, a to dlatego, że opieramy się na wyjątku z art. 27 ust. 2 lit. a RODO: nasze przetwarzanie danych osób znajdujących się w Europejskim Obszarze Gospodarczym ma charakter wyłącznie okazjonalny, nie obejmuje przetwarzania na dużą skalę szczególnych kategorii danych ani danych dotyczących wyroków skazujących i czynów zabronionych, i jest mało prawdopodobne, by powodowało ryzyko naruszenia praw lub wolności osób, biorąc pod uwagę jego charakter, kontekst, zakres i cele. Jest to twierdzenie o faktach, a nie o wykładni prawa, i dlatego mówimy też, kiedy przestaje obowiązywać: **od chwili, gdy będziemy mieć konto otwarte z Europejskiego Obszaru Gospodarczego lub ze Zjednoczonego Królestwa, wyznaczymy przedstawiciela** i podamy tutaj jego imię i nazwisko oraz adres, tak jak wymaga tego art. 13 ust. 1 lit. a. Aby ten fakt nie przestał obowiązywać niezauważony, otwarcie takiego konta uruchamia u nas powiadomienie tego samego dnia.
 - **Organ nadzorczy.** Jeśli nasza odpowiedź nie rozwiąże problemu, mogą Państwo złożyć skargę do **Prezesa Urzędu Ochrony Danych Osobowych**, polskiego organu nadzorczego, albo do organu nadzorczego innego państwa członkowskiego, w którym Państwo mieszkają lub pracują (art. 77 RODO). Ponadto stoi dla Państwa otwarta droga sądowa (art. 79 RODO), a ten artykuł pozwala Państwu procesować się przed sądem państwa członkowskiego, w którym mają Państwo zwykłe miejsce pobytu. Napisanie najpierw do nas nie jest warunkiem żadnej z tych dróg.
 
 Przekazania Państwa danych z Unii są opisane w części „Przekazywanie za granicę”, która mówi zarówno, na czym się opieramy, jak i z którymi podmiotami przetwarzającymi nie podpisaliśmy standardowych klauzul umownych.
@@ -427,7 +427,7 @@ Usługa jest dla firm i właścicieli witryn, nie dla osób nieletnich. Nie zbie
 
 Dla każdego pytania o prywatność, w tym dla wykonania wymienionych powyżej praw:
 
-**E-mail:** [oren@gotop.co.il](mailto:oren@gotop.co.il)
+**E-mail:** [contact@gotopseo.com](mailto:contact@gotopseo.com)
 
 **Telefon:** +972-54-9489377
 
@@ -443,7 +443,7 @@ Możemy tę politykę od czasu do czasu aktualizować. Zmiany obowiązują natyc
 
 Jeśli mają Państwo pytania o tę politykę prywatności, prosimy się z nami skontaktować:
 
-**E-mail:** [oren@gotop.co.il](mailto:oren@gotop.co.il)
+**E-mail:** [contact@gotopseo.com](mailto:contact@gotopseo.com)
 
 **Telefon:** +972-54-9489377
 

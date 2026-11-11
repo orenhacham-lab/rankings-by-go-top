@@ -50,7 +50,7 @@ La nostra piattaforma è compatibile con i browser moderni:
 
 Se incontra un problema di accessibilità — una pagina che non viene letta, un'azione che non riesce a portare a termine da tastiera, un testo che lo screen reader salta —, ci scriva e ce ne occuperemo. La persona responsabile dell'accessibilità del servizio:
 
-**Posta elettronica:** [oren@gotop.co.il](mailto:oren@gotop.co.il)
+**Posta elettronica:** [contact@gotopseo.com](mailto:contact@gotopseo.com)
 
 **Telefono:** [054-9489377](tel:0549489377)
 
