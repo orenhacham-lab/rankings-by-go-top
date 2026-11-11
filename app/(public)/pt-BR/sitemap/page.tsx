@@ -80,6 +80,7 @@ export default function PortugueseSitemapPage() {
         { label: 'Go Top SEO x Surfer', href: '/pt-BR/compare/surfer' },
         { label: 'Go Top SEO x Writesonic', href: '/pt-BR/compare/writesonic' },
         { label: 'Go Top SEO x BrightLocal', href: '/pt-BR/compare/brightlocal' },
+        { label: 'Go Top SEO x Booster SEO', href: '/pt-BR/compare/booster' },
       ],
     },
     {

@@ -232,6 +232,12 @@ export async function GET() {
       changefreq: 'monthly',
       priority: '0.7',
     },
+    {
+      url: `${baseUrl}/compare/booster`,
+      lastmod: today,
+      changefreq: 'monthly',
+      priority: '0.7',
+    },
     // Hebrew legal pages
     // English site root and equivalents
     {
@@ -411,6 +417,12 @@ export async function GET() {
       changefreq: 'monthly',
       priority: '0.7',
     },
+    {
+      url: `${baseUrl}/en/compare/booster`,
+      lastmod: today,
+      changefreq: 'monthly',
+      priority: '0.7',
+    },
     // English legal pages
   ]
 
@@ -454,6 +466,7 @@ export async function GET() {
     { path: '/compare/surfer', changefreq: 'monthly', priority: '0.7' },
     { path: '/compare/brightlocal', changefreq: 'monthly', priority: '0.7' },
     { path: '/compare/writesonic', changefreq: 'monthly', priority: '0.7' },
+    { path: '/compare/booster', changefreq: 'monthly', priority: '0.7' },
   ]
 
   const treePages = (prefix: string) =>

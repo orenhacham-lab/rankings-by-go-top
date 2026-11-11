@@ -79,6 +79,7 @@ export default function EnglishSitemapPage() {
         { label: 'Go Top SEO vs Surfer', href: '/en/compare/surfer' },
         { label: 'Go Top SEO vs Writesonic', href: '/en/compare/writesonic' },
         { label: 'Go Top SEO vs BrightLocal', href: '/en/compare/brightlocal' },
+        { label: 'Go Top SEO vs Booster SEO', href: '/en/compare/booster' },
       ],
     },
     {

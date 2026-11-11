@@ -81,6 +81,7 @@ export default function JapaneseSitemapPage() {
         { label: 'Go Top SEO と Surfer の比較', href: '/ja/compare/surfer' },
         { label: 'Go Top SEO と Writesonic の比較', href: '/ja/compare/writesonic' },
         { label: 'Go Top SEO と BrightLocal の比較', href: '/ja/compare/brightlocal' },
+        { label: 'Go Top SEO と Booster SEO の比較', href: '/ja/compare/booster' },
       ],
     },
     {

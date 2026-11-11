@@ -80,6 +80,7 @@ export default function ItalianSitemapPage() {
         { label: 'Go Top SEO contro Surfer', href: '/it/compare/surfer' },
         { label: 'Go Top SEO contro Writesonic', href: '/it/compare/writesonic' },
         { label: 'Go Top SEO contro BrightLocal', href: '/it/compare/brightlocal' },
+        { label: 'Go Top SEO contro Booster SEO', href: '/it/compare/booster' },
       ],
     },
     {

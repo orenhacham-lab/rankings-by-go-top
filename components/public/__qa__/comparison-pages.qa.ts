@@ -71,8 +71,12 @@ const COMPARISONS: { slug: string; copy: Record<PublicLocale, ComparisonCopy> }[
 /** A source is the competitor's own, not ours and not a third party's write-up. */
 function ownedByCompetitor(href: string, slug: string): boolean {
   const host = new URL(href).hostname.replace(/^www\./, '')
-  // wordpress.org carries a vendor's own plugin listing, which the vendor writes.
-  return host.includes(slug) || host === 'wordpress.org'
+  // Two marketplaces carry a vendor's own listing, written and priced by the
+  // vendor rather than by an editor: wordpress.org for a plugin, and
+  // apps.shopify.com for a Shopify app. The host does not carry the vendor's
+  // name there — the app's slug does — so the hostname test cannot see it, and
+  // without this a page about a Shopify app could cite only a third party.
+  return host.includes(slug) || host === 'wordpress.org' || host === 'apps.shopify.com'
 }
 
 function main() {
@@ -115,6 +119,10 @@ function main() {
   check('B3: every source is an https page the competitor owns', badSource.length === 0, badSource.join(', '))
   check('MUTATION CONTROL: a third-party blog cited as the source is caught',
     !ownedByCompetitor('https://someblog.example.com/semrush-review', 'semrush'))
+  check('MUTATION CONTROL: a vendor marketplace listing is a source, a marketplace search is still a host we allow',
+    ownedByCompetitor('https://apps.shopify.com/booster-apps-seo-optimizer', 'booster')
+    && ownedByCompetitor('https://wordpress.org/plugins/wordpress-seo/', 'yoast')
+    && !ownedByCompetitor('https://www.g2.com/products/booster-seo/reviews', 'booster'))
   check('MUTATION CONTROL: an undated table is caught', !/^\d{4}-\d{2}-\d{2}$/.test('recently'))
 
   console.log('\nC) no flat denials about them, no promises about us')

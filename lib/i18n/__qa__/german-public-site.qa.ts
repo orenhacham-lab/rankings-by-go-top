@@ -49,6 +49,7 @@ import { landingDe } from '../public/landing-de'
 import { pricingDe } from '../public/pricing-de'
 import { AFFILIATES_COPY } from '../public/affiliates'
 import { ARTICLES_COPY, articlesIndexHref } from '../../articles/i18n'
+import { BOOSTER_COMPARE } from '../public/compare/booster'
 import { BRIGHTLOCAL_COMPARE } from '../public/compare/brightlocal'
 import { RANKMATH_COMPARE } from '../public/compare/rankmath'
 import { SEMRUSH_COMPARE } from '../public/compare/semrush'
@@ -390,6 +391,7 @@ console.log('\nD) the locale tables and the copy')
    * place is the specific mistake that reached a reader.
    */
   const compareDe = [
+    ...strings(BOOSTER_COMPARE.de, 'compare.booster'),
     ...strings(BRIGHTLOCAL_COMPARE.de, 'compare.brightlocal'),
     ...strings(RANKMATH_COMPARE.de, 'compare.rankmath'),
     ...strings(SEMRUSH_COMPARE.de, 'compare.semrush'),

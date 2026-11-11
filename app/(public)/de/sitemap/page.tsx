@@ -81,6 +81,7 @@ export default function GermanSitemapPage() {
         { label: 'Go Top SEO gegen Surfer', href: '/de/compare/surfer' },
         { label: 'Go Top SEO gegen Writesonic', href: '/de/compare/writesonic' },
         { label: 'Go Top SEO gegen BrightLocal', href: '/de/compare/brightlocal' },
+        { label: 'Go Top SEO gegen Booster SEO', href: '/de/compare/booster' },
       ],
     },
     {
