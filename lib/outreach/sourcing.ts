@@ -195,7 +195,20 @@ export function contactEmailIn(html: string, siteHost: string): string | null {
     if (!seen.has(address)) { seen.add(address); found.push(address) }
   }
 
-  const usable = found.filter((address) => {
+  // `info@www.gbbg.org` IS NOT AN ADDRESS. A site that prints its address with
+  // the `www.` of its own URL in front of the domain gets mail nowhere: the MX
+  // records live on the domain, not on its web host. One such address went out
+  // on 6 Nov 2026 and came back 550; a second row was still waiting to be sent.
+  // Stripping the prefix is the only reading that can be right — a domain whose
+  // mail is accepted only at `www.` is not a thing businesses run — and the
+  // address is written down corrected so the unsubscribe link keeps resolving.
+  const normalised = found.map((address) => {
+    const at = address.lastIndexOf('@')
+    if (at === -1) return address
+    return `${address.slice(0, at)}@${address.slice(at + 1).replace(/^www\./, '')}`
+  })
+
+  const usable = Array.from(new Set(normalised)).filter((address) => {
     if (!/^[^@\s]+@[^@\s]+\.[a-z]{2,}$/i.test(address)) return false
     // A file name that looks like an address: "logo@2x.png".
     if (/\.(png|jpe?g|gif|webp|svg|css|js)$/i.test(address)) return false
