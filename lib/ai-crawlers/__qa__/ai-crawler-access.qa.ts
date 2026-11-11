@@ -335,7 +335,7 @@ function main() {
     // and double-count the summary.
     check('F13: no duplicate user-agent token', new Set(AI_CRAWLER_TOKENS.map((t) => t.toLowerCase())).size === AI_CRAWLER_TOKENS.length)
     check('F14: every agent names an operator and a purpose',
-      AI_CRAWLERS.every((c) => c.operator.length > 0 && ['train', 'answer', 'search', 'ads', 'preview'].includes(c.purpose)))
+      AI_CRAWLERS.every((c) => c.operator.length > 0 && ['train', 'answer', 'search', 'ads', 'preview', 'agent'].includes(c.purpose)))
     // MUTATION CONTROL for F13.
     const dupes = [...AI_CRAWLER_TOKENS, 'gptbot']
     check('F13-MUT: adding a case-variant duplicate would fail F13',
