@@ -47,7 +47,7 @@ Działamy według naszych zapisów. Jeśli Państwo uważają, że polecenie zos
 
 ## 5. Prowizja
 
-Należy się Państwu **30%** każdej ważnej płatności poleconego klienta, dopóki abonament tego klienta jest dalej opłacany. Jeśli Państwo mają w tym samym czasie dziesięciu albo więcej poleconych klientów z aktywnym, opłaconym abonamentem, udział w ważnych płatnościach od tej chwili wynosi **40%**. Zmiana udziału nie działa wstecz.
+Należy się Państwu **35%** każdej ważnej płatności poleconego klienta, dopóki abonament tego klienta jest dalej opłacany. Jeśli Państwo mają w tym samym czasie dziesięciu albo więcej poleconych klientów z aktywnym, opłaconym abonamentem, udział w ważnych płatnościach od tej chwili wynosi **40%**. Zmiana udziału nie działa wstecz.
 
 Prowizję liczymy od kwoty, która rzeczywiście do nas wpłynęła, bez podatku od towarów i usług oraz każdego innego podatku i po każdym rabacie, każdym kredycie i każdym bonie zastosowanym do tej płatności. Prowizję liczymy w walucie, w której klient zapłacił, i wypłacamy w tej walucie albo w walucie Państwa sposobu wypłaty, po kursie, który nasz dostawca usług płatniczych stosuje w dniu wypłaty.
 
