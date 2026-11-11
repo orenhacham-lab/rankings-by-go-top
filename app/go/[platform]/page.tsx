@@ -136,6 +136,22 @@ export default async function MarketplaceSalesPage({
               <p className="mt-1 text-metric text-ink">${plan.priceUSD}
                 <span className="text-copy text-muted"> / month</span>
               </p>
+              {/* THE THREE FIGURES THE REVIEWER ASKED FOR, ON THE PLAN ITSELF.
+                  ClickBank rejected the second submission on 11.11.2026 with
+                  one sentence: the pitch page must clearly state the initial
+                  price, the rebill price and the rebill schedule. All three
+                  were already on the page, but the schedule sat in a
+                  paragraph far below that says "the price above", so beside a
+                  plan there was a monthly rate and nothing else. This line
+                  carries all three next to the button that charges them, and
+                  it is built from the same `plan.priceUSD` the grid and the
+                  catalogue use, so a price can never be stated twice
+                  differently. The paragraph below stays: it answers the number
+                  of payments and where the plan is cancelled, which this line
+                  does not. */}
+              <p className="mt-1 text-copy text-body">
+                ${plan.priceUSD} today, then ${plan.priceUSD} every month until you cancel.
+              </p>
               <p className="mt-2 text-copy text-body">
                 {plan.maxProjects === 1 ? 'One website' : `${plan.maxProjects} websites`},{' '}
                 {plan.maxKeywordsPerProject} keywords, {plan.maxArticlesPerPeriodAccountWide} articles a month.
