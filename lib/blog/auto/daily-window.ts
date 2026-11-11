@@ -89,21 +89,49 @@ export function starvationOrder(
     .map((entry) => entry.locale)
 }
 
-export async function nextLocaleToWrite(
+/**
+ * THE DAY'S REMAINING LANGUAGES, hungriest first — all of them, not just the
+ * first.
+ *
+ * This used to answer with one language, and that is what silenced the whole
+ * blog on 10 and 11 Nov 2026. Spanish ran out of plan rows (29 of its keywords
+ * are parked as failed and its research found nothing new to add), and Spanish
+ * was the hungriest language: every pass of the morning chose it, found an
+ * empty queue, ended the pass, and the nine languages behind it — each with a
+ * queue of its own — never got a turn. 10 Nov published seven articles and
+ * stopped at 05:31, the moment the order reached Spanish; 11 Nov published
+ * none at all, because Spanish was first from the opening pass.
+ *
+ * So the caller gets the queue and walks it: one language that cannot produce
+ * an article costs its own slot and nothing more. A language being written
+ * right now still stops the pass, because that run is about to write the
+ * article this one would duplicate.
+ */
+export async function localesToWrite(
   admin: Admin,
   nowMs: number,
-): Promise<{ locale: BlogAutoLocale | null; busy: boolean }> {
+): Promise<{ locales: BlogAutoLocale[]; busy: boolean }> {
   const published = new Set(await localesPublishedSince(admin, startOfUtcDay(nowMs)))
   const lastPublished = await lastPublishedByLocale(admin)
+  const out: BlogAutoLocale[] = []
   // localesForDay(), not the whole list: a language whose public tree is still
   // behind its flag has nowhere to publish to, and claiming its slot would end
   // the morning before the languages that do.
   for (const locale of starvationOrder(localesForDay(), lastPublished)) {
     if (published.has(locale)) continue
-    if (await isLocaleGenerating(admin, locale)) return { locale: null, busy: true }
-    return { locale, busy: false }
+    if (await isLocaleGenerating(admin, locale)) return { locales: [], busy: true }
+    out.push(locale)
   }
-  return { locale: null, busy: false }
+  return { locales: out, busy: false }
+}
+
+/** The first of them, kept for callers that want only the next language. */
+export async function nextLocaleToWrite(
+  admin: Admin,
+  nowMs: number,
+): Promise<{ locale: BlogAutoLocale | null; busy: boolean }> {
+  const { locales, busy } = await localesToWrite(admin, nowMs)
+  return { locale: locales[0] ?? null, busy }
 }
 
 export async function runBlogDailyWindow(
@@ -121,29 +149,48 @@ export async function runBlogDailyWindow(
     return RESULT(silence.state === 'not_checked' ? 'outside_window' : 'silence_checked')
   }
 
-  const { locale, busy } = await nextLocaleToWrite(admin, now)
+  const { locales, busy } = await localesToWrite(admin, now)
   if (busy) return RESULT('busy')
-  if (!locale) return RESULT('all_done')
-  // One article takes 78-170s in Production, so a run that cannot finish one
-  // leaves it to the next quarter of an hour rather than dying mid-publish.
-  if (Date.now() >= options.deadlineAt) return RESULT('no_time', locale)
+  if (locales.length === 0) return RESULT('all_done')
 
-  const summary = await runBlogAutoPublish(admin, { locale })
-  console.log('[blog-window] run complete', {
-    locale,
-    published: summary.published?.slug ?? null,
-    planned: summary.planned,
-    topUpAdded: summary.topUpAdded,
-    // Without this a language whose research fails reads as a quiet
-    // `skipped: 'queue_empty'` forever: French published nothing for four days
-    // and the reason (a 404 from the keyword research) was only in the raw
-    // runtime log, which this plan keeps for one hour.
-    topUpError: summary.topUpError,
-    skipped: summary.skipped,
-    failure: summary.failure,
-    durationMs: summary.durationMs,
-  })
-  return { state: 'ran', locale, summary }
+  /**
+   * A language that produced NOTHING because it had nothing to write is passed
+   * over, within the same invocation, in favour of the next hungriest. Only
+   * these two reasons: a gate failure (truth, quality, links) has already spent
+   * a Gemini call and belongs to the next quarter of an hour's reserve, not to
+   * this one.
+   */
+  const NOTHING_TO_WRITE = new Set(['queue_empty', 'claim_lost'])
+
+  let last: BlogWindowResult = RESULT('all_done')
+  for (const locale of locales) {
+    // One article takes 78-170s in Production, so a run that cannot finish one
+    // leaves it to the next quarter of an hour rather than dying mid-publish.
+    if (Date.now() >= options.deadlineAt) return RESULT('no_time', locale)
+
+    const summary = await runBlogAutoPublish(admin, { locale })
+    console.log('[blog-window] run complete', {
+      locale,
+      published: summary.published?.slug ?? null,
+      planned: summary.planned,
+      topUpAdded: summary.topUpAdded,
+      // Without this a language whose research fails reads as a quiet
+      // `skipped: 'queue_empty'` forever: French published nothing for four days
+      // and the reason (a 404 from the keyword research) was only in the raw
+      // runtime log, which this plan keeps for one hour.
+      topUpError: summary.topUpError,
+      skipped: summary.skipped,
+      failure: summary.failure,
+      durationMs: summary.durationMs,
+    })
+    last = { state: 'ran', locale, summary }
+    // The pass ends on an article, and on a failure that used its generation.
+    if (!summary.skipped || !NOTHING_TO_WRITE.has(summary.skipped)) return last
+  }
+  // Every remaining language had an empty queue. The top-up ran for each of
+  // them on the way through, so the next pass may find rows where this one did
+  // not; the last of them is reported, with its topUpError if there was one.
+  return last
 }
 
 /**
