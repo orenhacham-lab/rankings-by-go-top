@@ -53,6 +53,8 @@ No se devenga comisión por un periodo de prueba, por un pago que nunca se recib
 
 **Un cliente facturado a través de Shopify se registra a mano.** Shopify informa a la aplicación de que un plan está activo y no de que se haya cobrado un cargo, así que no tenemos un evento de pago automático del que calcular. Esa referencia queda marcada como tal en nuestro lado y su comisión se registra a mano contra el comprobante del cargo en Shopify, con el mismo porcentaje, el mismo periodo de retención y la misma aprobación. Si refirió a un cliente así y ha pasado tiempo sin que se registre comisión, escríbanos.
 
+**Estas tarifas se aplican a una recomendación que facturamos nosotros.** Si promociona a través de un mercado externo como ClickBank, JVZoo o Digistore24, la venta la tramita ese mercado, es él quien le paga la comisión y la tarifa es la que allí se publica para ese producto, que puede diferir de las tarifas de esta cláusula. Esta cláusula, el periodo de retención y la aprobación de la cláusula 6 se aplican a una recomendación que facturamos nosotros directamente mediante el enlace de afiliado que le entregamos.
+
 ## 6. Aprobación, periodo de retención y pago
 
 Toda comisión se registra como pendiente y solo resulta exigible después de que la aprobemos. Retenemos una comisión aprobada durante **30 días** desde el pago válido al que corresponde, plazo que coincide con el periodo en el que ese cliente aún puede obtener un reembolso conforme a nuestra [Política de Cancelación y Reembolsos](/es/refund-policy).

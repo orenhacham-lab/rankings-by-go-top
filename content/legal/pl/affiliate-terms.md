@@ -55,6 +55,8 @@ Za okres próbny, za płatność, która nigdy nie wpłynęła, za płatność w
 
 **Klienta rozliczanego przez Shopify zapisujemy ręcznie.** Shopify informuje aplikację, że pakiet jest aktywny, a nie że nastąpiło pobranie, więc nie mamy automatycznego zdarzenia płatności, od którego moglibyśmy liczyć. Takie polecenie jest u nas tak oznaczane, a Państwa prowizję zapisujemy ręcznie po dowodzie pobrania w Shopify, z tym samym udziałem, tym samym okresem wstrzymania i tym samym zatwierdzeniem. Jeśli Państwo polecili takiego klienta i mija jakiś czas, a prowizja nie zostaje zapisana, prosimy do nas napisać.
 
+**Te stawki dotyczą polecenia, które rozliczamy sami.** Jeśli promujesz przez zewnętrzny rynek, taki jak ClickBank, JVZoo lub Digistore24, sprzedaż obsługuje ten rynek, to on wypłaca Ci prowizję, a obowiązuje stawka opublikowana tam dla danego produktu, która może różnić się od stawek z niniejszego punktu. Niniejszy punkt oraz okres wstrzymania i zatwierdzenie z punktu 6 dotyczą polecenia rozliczanego bezpośrednio przez nas za pomocą wydanego Ci linku partnerskiego.
+
 ## 6. Zatwierdzenie, okres wstrzymania i wypłata
 
 Każdą prowizję zapisujemy jako otwartą, a należna staje się dopiero po naszym zatwierdzeniu. Zatwierdzoną prowizję wstrzymujemy **trzydzieści dni** od ważnej płatności, której odpowiada, czyli na czas, który pokrywa się z okresem, w którym ten klient może jeszcze otrzymać zwrot zgodnie z naszą [polityką rezygnacji i zwrotów](/pl/refund-policy).

@@ -53,6 +53,8 @@ Não há comissão sobre um período de teste, sobre um pagamento que nunca foi 
 
 **Um cliente cobrado pela Shopify é registrado manualmente.** A Shopify informa ao aplicativo que um plano está ativo e não que uma cobrança foi feita, então não temos um evento de pagamento automático do qual calcular. Essa indicação fica marcada como tal do nosso lado e a comissão dela é registrada manualmente contra o comprovante da cobrança na Shopify, com o mesmo percentual, o mesmo período de retenção e a mesma aprovação. Se você indicou um cliente assim e passou tempo sem comissão registrada, escreva para nós.
 
+**Estas taxas se aplicam a uma indicação que nós mesmos faturamos.** Se você divulgar por meio de um marketplace externo como ClickBank, JVZoo ou Digistore24, a venda é processada por esse marketplace, é ele que paga a sua comissão e a taxa é a publicada lá para aquele produto, que pode ser diferente das taxas desta cláusula. Esta cláusula, o período de retenção e a aprovação da cláusula 6 se aplicam a uma indicação faturada diretamente por nós pelo link de afiliado que emitimos para você.
+
 ## 6. Aprovação, período de retenção e pagamento
 
 Toda comissão é registrada como pendente e só se torna exigível depois que a aprovamos. Retemos uma comissão aprovada por **30 dias** a partir do pagamento válido a que se refere, prazo que coincide com o período em que aquele cliente ainda pode obter reembolso conforme a nossa [Política de Cancelamento e Reembolso](/pt-BR/refund-policy).

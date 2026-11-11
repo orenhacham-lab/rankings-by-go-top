@@ -55,6 +55,8 @@ Aucune commission n'est due pour une période d'essai, pour un paiement qui n'a 
 
 **Un client facturé via Shopify est enregistré manuellement.** Shopify indique à l'application qu'une offre est active et non qu'un prélèvement a eu lieu, de sorte que nous n'avons pas d'événement de paiement automatique sur lequel calculer. Cette recommandation est marquée comme telle de notre côté et votre commission est enregistrée manuellement d'après le justificatif du prélèvement chez Shopify, avec le même pourcentage, la même période de retenue et la même approbation. Si vous avez recommandé un tel client et qu'un certain temps passe sans qu'une commission soit enregistrée, écrivez-nous.
 
+**Ces taux s'appliquent à une recommandation que nous facturons nous-mêmes.** Si vous faites la promotion par une place de marché externe telle que ClickBank, JVZoo ou Digistore24, la vente est traitée par cette place de marché, c'est elle qui vous verse la commission, et le taux est celui qui y est publié pour ce produit ; il peut différer des taux du présent article. Le présent article, le délai de retenue et l'approbation prévus à l'article 6 s'appliquent à une recommandation que nous facturons directement au moyen du lien d'affilié que nous vous remettons.
+
 ## 6. Approbation, période de retenue et paiement
 
 Toute commission est enregistrée comme en attente et ne devient exigible qu'après que nous l'avons approuvée. Nous retenons une commission approuvée pendant **30 jours** à compter du paiement valable auquel elle correspond, délai qui coïncide avec la période pendant laquelle ce client peut encore obtenir un remboursement conformément à notre [Politique d'annulation et de remboursement](/fr/refund-policy).

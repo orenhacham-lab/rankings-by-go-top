@@ -928,6 +928,62 @@ const HEBREW_PRIVACY = 'app/(legal)/privacy/page.tsx'
   }
 }
 
+// ── 9c) the commission clause says which referrals its rates govern ────────
+/*
+ * Clause 5 states 35%, and 40% from ten active referrals, with no qualifier at
+ * all. Those numbers are the in-house program's, and they are honoured for a
+ * referral we bill ourselves. A partner recruited through ClickBank, JVZoo or
+ * Digistore24 is paid by that marketplace at the rate published there (on
+ * 11.11.2026, 50% of the first sale and 35% of each renewal on ClickBank), and
+ * the 40% tier has no mechanism in those fields at all.
+ *
+ * On 11.11.2026 the affiliate listings were required to point at
+ * /affiliates as the full terms, so an unqualified clause 5 became the document
+ * a marketplace partner is sent to read. An unqualified rate in the document a
+ * partner is pointed to is a representation, which is why the clause now names
+ * the case and why each language has to keep it: a translation that drops the
+ * sentence puts the bare 35% and 40% back in front of exactly the reader it was
+ * written for.
+ */
+const MARKETPLACE_CARVE_OUT: Record<string, RegExp[]> = {
+  he: [/שוק חיצוני/, /ClickBank/],
+  en: [/external marketplace/, /ClickBank/],
+  es: [/mercado externo/, /ClickBank/],
+  'pt-BR': [/marketplace externo/, /ClickBank/],
+  fr: [/place de march[ée] externe/, /ClickBank/],
+  it: [/marketplace esterno/, /ClickBank/],
+  de: [/externen Marktplatz/, /ClickBank/],
+  nl: [/externe marktplaats/, /ClickBank/],
+  pl: [/zewn[ęe]trzny rynek/, /ClickBank/],
+  ja: [/外部マーケットプレイス/, /ClickBank/],
+}
+{
+  const enSource = frontMatter(text[LOCALES[0]]['affiliate-terms']).source
+  const docs: [string, string][] = [
+    ['he', existsSync('app/(legal)/affiliate-terms/page.tsx')
+      ? readFileSync('app/(legal)/affiliate-terms/page.tsx', 'utf8') : ''],
+    ['en', enSource && existsSync(enSource) ? readFileSync(enSource, 'utf8') : ''],
+    ...LOCALES.map((l): [string, string] => [l, text[l]['affiliate-terms']]),
+  ]
+  for (const [name, src] of docs) {
+    check(`${name}/affiliate-terms: the document was read`, src.length > 0)
+    for (const must of MARKETPLACE_CARVE_OUT[name] ?? []) {
+      check(`${name}/affiliate-terms: names the marketplace case (${must.source.slice(0, 24)})`,
+        must.test(src))
+    }
+  }
+  // MUTATION CONTROL: a language that loses the sentence has to fail here.
+  const he = existsSync('app/(legal)/affiliate-terms/page.tsx')
+    ? readFileSync('app/(legal)/affiliate-terms/page.tsx', 'utf8') : ''
+  check('a commission clause with the marketplace case removed is caught',
+    MARKETPLACE_CARVE_OUT.he[0].test(he)
+      && !MARKETPLACE_CARVE_OUT.he[0].test(he.replaceAll('שוק חיצוני', 'שוק')))
+  check('a translation that drops the sentence is caught',
+    MARKETPLACE_CARVE_OUT.de[0].test(text.de['affiliate-terms'])
+      && !MARKETPLACE_CARVE_OUT.de[0].test(
+        text.de['affiliate-terms'].replaceAll('externen Marktplatz', 'Marktplatz')))
+}
+
 // ── 10) the accessibility statement says how it was verified ───────────────
 /*
  * An accessibility statement is a public declaration, so an inaccurate one is
