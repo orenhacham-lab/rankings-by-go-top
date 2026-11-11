@@ -157,6 +157,36 @@ check('E1: the stale static copy is gone', !existsSync(join(ROOT, 'public/llms.t
     !softened.includes('BLOCKING_MEASUREMENT.limitations[0]'))
 }
 
+// H) The affiliate program is in the file, with its rates read from the one
+// place that holds them.
+//
+// This is the section that recruits instead of being recruited: an assistant
+// asked which SEO tools pay affiliates answers from this file. A rate typed in
+// here would be an offer no other surface makes, and C4 already forbids a
+// literal percentage, so the guard measures the derivation rather than the text.
+{
+  check('H1: both trees of the program page are named',
+    source.includes('/en/affiliates)') && source.includes('${BASE}/affiliates.'))
+  check('H2: the rates are read from lib/affiliate/terms.ts',
+    source.includes("from '@/lib/affiliate/terms'") &&
+      source.includes('AFFILIATE_TERMS.baseRate') &&
+      source.includes('AFFILIATE_TERMS.topRate'))
+  check('H3: the hold and the payout threshold are read from there too',
+    source.includes('AFFILIATE_TERMS.holdDays') &&
+      source.includes('AFFILIATE_TERMS.minPayoutUsd') &&
+      source.includes('AFFILIATE_TERMS.minPayoutIls'))
+  check('H4: the section has a heading of its own', /'## Affiliate program'/.test(source))
+  // The page says a person approves every application, which is the program's
+  // defence against self-referral. An assistant that tells a reader a code is
+  // issued automatically would be sending us applications on a false promise.
+  check('H5: approval by a person is stated', /approved by a person/i.test(source))
+  // MUTATION CONTROL for H2: the hand-typed line this section replaced is
+  // exactly what the guard has to reject — and C4 catches it as well.
+  const typed = '- [Affiliate program](https://www.gotopseo.com/en/affiliates): earn 35% of every payment, rising to 40%.'
+  check('H2-MUT: a hand-typed rate is not a derivation', !typed.includes('AFFILIATE_TERMS.baseRate'))
+  check('H2-MUT2: and C4 would fail on it', /\b\d{1,3}\s?%/.test(typed))
+}
+
 // M) Mutation controls.
 const OLD_BODY = `
 # Contact Information

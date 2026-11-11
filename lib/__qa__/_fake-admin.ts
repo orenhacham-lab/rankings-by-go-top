@@ -742,6 +742,53 @@ export class FakeAdmin {
       return one('completed')
     }
 
+    /**
+     * `renew_marketplace_order`, mirroring
+     * supabase/migrations/20261109120000_marketplace_renewal.sql branch for
+     * branch: the status refusals, the not-later comparison, the unclaimed
+     * early return, the missing-entitlement case, and the two writes.
+     *
+     * WHAT IT PROVES AND WHAT IT CANNOT. It proves the CONTRACT — which answer
+     * each state produces, that a period end is never moved backwards, that a
+     * withdrawn order is not extended, and that the entitlement moves with the
+     * receipt. It cannot prove atomicity or the row lock: JS is
+     * single-threaded, so this is trivially atomic by construction. Those come
+     * from `FOR UPDATE` and the single transaction in the SQL, and the suite
+     * checks for them in the migration's own source instead.
+     */
+    if (name === 'renew_marketplace_order') {
+      const p = params as Record<string, string | null>
+      const one = (answer: string) => ({ data: answer, error: null })
+      const provider = (p.p_provider ?? '').trim()
+      const orderId = (p.p_external_order_id ?? '').trim()
+      if (!provider || !orderId) return one('order_unknown')
+      const order = (this.tables.marketplace_orders ??= [])
+        .find((r) => r.provider === provider && r.external_order_id === orderId)
+      if (!order) return one('order_unknown')
+      if (order.status === 'refunded' || order.status === 'cancelled') return one('not_renewable')
+      const periodEnd = p.p_period_end
+      if (!periodEnd) return one('period_end_unknown')
+      const onFile = order.current_period_end as string | null | undefined
+      if (onFile && new Date(periodEnd).getTime() <= new Date(String(onFile)).getTime()) {
+        return one('already_current')
+      }
+      // Every refusal is settled before the first write, exactly as the SQL
+      // does it: extending the receipt and only then finding no entitlement
+      // would leave the half-state the transition exists to prevent.
+      const subs = (this.tables.subscriptions ??= []).filter((r) => r.marketplace_order_id === order.id)
+      if (order.status === 'claimed' && !subs.length) return one('entitlement_missing')
+      order.current_period_end = periodEnd
+      order.updated_at = nowIso()
+      if (order.status !== 'claimed') return one('renewed')
+      for (const sub of subs) {
+        sub.current_period_end = periodEnd
+        sub.status = 'active'
+        sub.trial_ends_at = null
+        sub.updated_at = nowIso()
+      }
+      return one('renewed')
+    }
+
     return { data: null, error: { message: `unknown rpc: ${name}` } }
   }
 }

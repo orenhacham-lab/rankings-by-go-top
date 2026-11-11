@@ -263,6 +263,32 @@ export interface MarketplaceProvider {
    */
   requiredDisclaimer: string | null
   /**
+   * Where this platform requires the buyer to be sent for ORDER support —
+   * refunds, a charge they do not recognise, a payment that failed.
+   *
+   * It is not our support route and it is not interchangeable with it.
+   * ClickBank's own pitch-page rules state the two lines verbatim and require
+   * both: product support to the seller, order support to them, at
+   * www.clkbank.com. A page that answers a refund question with our mailbox
+   * when the reseller holds the money is a page that sends a buyer to the
+   * party that cannot help them, and their review fails it.
+   *
+   * null for a platform that states no such route, and then the page prints
+   * one support line rather than inventing a second.
+   */
+  orderSupportUrl: string | null
+  /**
+   * How the charge appears on the buyer's statement, where the platform
+   * publishes it.
+   *
+   * ClickBank require this on the thank-you page by name, and the reason is
+   * the one they give: a buyer who sees a company they never heard of on
+   * their card asks their bank, not us, and a chargeback costs more than the
+   * sale. Printed only where the platform publishes the string; never
+   * guessed, because a wrong descriptor is worse than none.
+   */
+  billingDescriptor: string | null
+  /**
    * What this platform accepts as "I handled it".
    *
    * 'json' is the default shape: a 2xx with a JSON body, which every platform
@@ -333,6 +359,8 @@ export const MARKETPLACE_PROVIDERS: readonly MarketplaceProvider[] = [
     signature: DIGISTORE24_IPN_SCHEME,
     sellerOfRecord: true,
     requiredDisclaimer: null,
+    orderSupportUrl: null,
+    billingDescriptor: null,
     /* Their guide: only the literal text OK counts as a handled delivery. */
     acknowledgement: 'ok_text',
   },
@@ -347,6 +375,13 @@ export const MARKETPLACE_PROVIDERS: readonly MarketplaceProvider[] = [
     signature: CLICKBANK_INS_SCHEME,
     sellerOfRecord: true,
     requiredDisclaimer: null,
+    /*
+     * Both read from ClickBank's own pitch-page and thank-you-page rules
+     * (support.clickbank.com/en/articles/10535182-creating-your-first-product,
+     * read 11.11.2026), which name the destination and the string outright.
+     */
+    orderSupportUrl: 'https://www.clkbank.com',
+    billingDescriptor: 'CLKBANK*COM',
     /*
      * Their page asks for nothing but a 2xx within three seconds, and they
      * DO retry: once every four hours, five attempts, then the notification
@@ -370,6 +405,8 @@ export const MARKETPLACE_PROVIDERS: readonly MarketplaceProvider[] = [
      */
     signature: JVZOO_IPN_V2_SCHEME,
     sellerOfRecord: false,
+    orderSupportUrl: null,
+    billingDescriptor: null,
     /*
      * The exact words JVZoo compliance requires, copied character for
      * character from the review notes on products 457483 / 457573 / 457575 /
@@ -497,6 +534,16 @@ export function providerReadiness(slug: string): MarketplaceReadiness {
  * somebody else chooses (CLAUDE.md: never allow an external `next` URL).
  */
 const CANONICAL_ORIGIN = 'https://www.gotopseo.com'
+
+/**
+ * The ONE support address these pages publish.
+ *
+ * It was a literal in the thank-you page and the sales page had none at all,
+ * which is how a reseller's review ends up reading two different answers to
+ * "who do I write to". ClickBank's rules require the seller's contact in the
+ * footer of the pitch page as well, so both pages now read it from here.
+ */
+export const MARKETPLACE_SUPPORT_EMAIL = 'support@gotopseo.com'
 
 export const MARKETPLACE_CLAIM_PATH = '/claim'
 

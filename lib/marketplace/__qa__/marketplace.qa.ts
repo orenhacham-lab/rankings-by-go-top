@@ -510,7 +510,12 @@ async function main() {
     && (admin.tables.marketplace_orders as Record<string, unknown>[]).at(-1)?.currency === null)
 
   // The redelivery: the database refuses the duplicate, and that IS the answer.
-  admin = new FakeAdmin({ marketplace_orders: [] }, { marketplace_orders: { insert: () => ({ message: 'duplicate key value violates unique constraint', code: '23505' }) } })
+  // The row is on file with the SAME period end, which is what a redelivery
+  // looks like — a renewal differs only in carrying a later one (R section).
+  admin = new FakeAdmin(
+    { marketplace_orders: [{ id: 'o1', provider: 'digistore24', external_order_id: 'A-1', status: 'paid', current_period_end: '2026-11-15T00:00:00.000Z' }] },
+    { marketplace_orders: { insert: () => ({ message: 'duplicate key value violates unique constraint', code: '23505' }) } },
+  )
   outcome = await recordMarketplaceOrder(admin, 'digistore24', paid())
   check('F13: a redelivered order is "already recorded", not an error', outcome.kind === 'already_recorded')
   admin = new FakeAdmin({ marketplace_orders: [] }, { marketplace_orders: { insert: () => ({ message: 'connection refused', code: '08006' }) } })

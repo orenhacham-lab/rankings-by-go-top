@@ -315,6 +315,12 @@ check('MUTATION — an English-only extra section is caught', pages.he.terms.h2 
     // before a transaction, so the terms link it; the reader clicks it, and we
     // send nothing of theirs to it.
     'docs.creem.io': 'a documentation link cited in a code comment; not fetched',
+    // ClickBank's own order-support destination, which their pitch-page rules
+    // require the footer to link ("For Order Support, please contact ClickBank
+    // HERE"). The buyer clicks it to reach the party that holds their money;
+    // nothing of theirs is sent to it from our side, and the purchase itself
+    // already happens on ClickBank's checkout.
+    'www.clkbank.com': 'ClickBank\u2019s order-support page, linked for the buyer to reach the reseller; not fetched',
     'www.creem.io': 'Creem\u2019s own Buyer Terms, linked for the customer to read; not fetched',
     // Our own listing on a third-party AI-tool index, named in the
     // Organization's `sameAs` (lib/seo/organization.ts) so a resolver can tie
