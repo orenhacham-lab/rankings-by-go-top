@@ -63,7 +63,7 @@ export function aiCrawlerOpenApiDocument() {
       description: [
         'A reference table of the AI crawler user-agent tokens, served as JSON or CSV.',
         '',
-        'Every row carries the operator’s own documentation URL and the date that page was read, because these change without announcement. `purpose` is the field that changes a site owner’s decision: `train` collects a corpus for a future model, `search` builds the index behind an assistant’s answers, `answer` is a fetch made while a person waits for an answer that can cite and link the page, `ads` checks an advert landing page, and `preview` builds a link preview.',
+        'Every row carries the operator’s own documentation URL and the date that page was read, because these change without announcement. `purpose` is the field that changes a site owner’s decision: `train` collects a corpus for a future model, `search` builds the index behind an assistant’s answers, `answer` is a fetch made while a person waits for an answer that can cite and link the page, `ads` checks an advert landing page, `preview` builds a link preview, and `agent` is a browser an assistant drives on one person’s behalf — a visitor, not a crawler.',
         '',
         '`crawls: false` marks a robots.txt control token that fetches nothing by itself. `respectsRobots: false` marks an agent whose own operator documents that robots.txt may be ignored; for those a robots.txt rule states the request a site is making, not an outcome.',
         '',

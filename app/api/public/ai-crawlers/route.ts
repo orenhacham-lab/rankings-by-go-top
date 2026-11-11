@@ -46,7 +46,7 @@ const CORS = {
 
 const NOTES = [
   "Every row's token spelling, purpose and robots.txt behaviour comes from the operator's own documentation, linked in `docs`, read on the date in `verified`. Nothing is inferred from a log file.",
-  'purpose is the field that changes the decision: `train` is a corpus for a future model, `answer` is a fetch made while a person waits for an answer that can cite and link you, `search` builds an index, `ads` checks an advert landing page, `preview` builds a link preview.',
+  'purpose is the field that changes the decision: `train` is a corpus for a future model, `answer` is a fetch made while a person waits for an answer that can cite and link you, `search` builds an index, `ads` checks an advert landing page, `preview` builds a link preview, and `agent` is a browser driven by an assistant on one person’s behalf, which is a visitor rather than a crawler.',
   'crawls: false marks a robots.txt control token that fetches nothing by itself. Disallowing it changes how already-crawled content may be used; both Google and Apple document that it does not remove you from their search results.',
   'respectsRobots: false marks an agent whose own operator documents that robots.txt may be ignored. For those, a robots.txt verdict states the request a site is making, not an outcome.',
   'candidates are tokens seen in the wild that no operator page documents. They are listed separately on purpose. A link to such a page is the correction this dataset most wants.',

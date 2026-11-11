@@ -340,7 +340,7 @@ export const AI_CRAWLER_CANDIDATES: readonly DatasetCandidate[] = [
 ] as const
 
 /** Bumped whenever a row changes, so a consumer can cache on it. */
-export const AI_CRAWLER_DATASET_VERSION = '2026.11.01'
+export const AI_CRAWLER_DATASET_VERSION = '2026.11.11'
 
 export const AI_CRAWLER_DATASET_LICENSE = {
   id: 'CC-BY-4.0',
