@@ -55,6 +55,8 @@ Voor een proefperiode, voor een betaling die nooit is binnengekomen, voor een be
 
 **Een via Shopify afgerekende klant wordt met de hand vastgelegd.** Shopify deelt de app mee dat een pakket actief is en niet dat er is afgeschreven, zodat wij geen automatische betaalgebeurtenis hebben om op te rekenen. Die aanbeveling wordt bij ons als zodanig aangemerkt, en uw commissie wordt na het bewijs van de afschrijving bij Shopify met de hand vastgelegd, met hetzelfde aandeel, dezelfde aanhoudtermijn en dezelfde goedkeuring. Hebt u zo'n klant aanbevolen en gaat er enige tijd voorbij zonder dat een commissie wordt vastgelegd, schrijf ons dan.
 
+**Deze percentages gelden voor een verwijzing die wij zelf factureren.** Promoot u via een externe marktplaats zoals ClickBank, JVZoo of Digistore24, dan wordt de verkoop door die marktplaats verwerkt, betaalt die uw commissie en geldt het percentage dat daar voor dat product is gepubliceerd; dat kan afwijken van de percentages in dit artikel. Dit artikel, de houdtermijn en de goedkeuring van artikel 6 gelden voor een verwijzing die wij rechtstreeks factureren via de partnerlink die wij u verstrekken.
+
 ## 6. Goedkeuring, aanhoudtermijn en betaling
 
 Elke commissie wordt als open vastgelegd en wordt pas verschuldigd nadat wij haar hebben goedgekeurd. Een goedgekeurde commissie houden wij **dertig dagen** aan vanaf de geldige betaling waaraan zij overeenkomt, een termijn die samenvalt met de periode waarin die klant volgens onze [opzeg- en terugbetalingsregeling](/nl/refund-policy) nog een terugbetaling kan krijgen.

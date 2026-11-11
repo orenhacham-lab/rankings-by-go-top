@@ -55,6 +55,8 @@ Nessuna commissione è dovuta per un periodo di prova, per un pagamento che non 
 
 **Un cliente fatturato tramite Shopify è registrato manualmente.** Shopify comunica all'applicazione che un piano è attivo e non che un addebito è avvenuto, di modo che non abbiamo un evento di pagamento automatico sul quale calcolare. Quella segnalazione è contrassegnata come tale dalla nostra parte e la Sua commissione è registrata manualmente in base alla prova dell'addebito presso Shopify, con la stessa percentuale, lo stesso periodo di trattenuta e la stessa approvazione. Se Lei ha segnalato un cliente di questo tipo e passa un certo tempo senza che una commissione venga registrata, ci scriva.
 
+**Queste percentuali si applicano a una segnalazione che fatturiamo noi stessi.** Se promuovi attraverso un marketplace esterno come ClickBank, JVZoo o Digistore24, la vendita è gestita da quel marketplace, è esso a pagarti la commissione e la percentuale è quella pubblicata lì per quel prodotto, che può differire dalle percentuali del presente articolo. Il presente articolo, il periodo di trattenuta e l'approvazione di cui all'articolo 6 si applicano a una segnalazione fatturata direttamente da noi tramite il link di affiliazione che ti rilasciamo.
+
 ## 6. Approvazione, periodo di trattenuta e pagamento
 
 Ogni commissione è registrata come in attesa e diventa esigibile soltanto dopo che l'abbiamo approvata. Tratteniamo una commissione approvata per **30 giorni** a decorrere dal pagamento valido al quale corrisponde, termine che coincide con il periodo durante il quale quel cliente può ancora ottenere un rimborso conformemente alla nostra [Politica di disdetta e di rimborso](/it/refund-policy).

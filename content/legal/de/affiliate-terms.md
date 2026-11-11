@@ -55,6 +55,8 @@ Für eine Testphase, für eine Zahlung, die niemals eingegangen ist, für eine Z
 
 **Ein über Shopify abgerechneter Kunde wird von Hand erfasst.** Shopify teilt der App mit, dass ein Tarif aktiv ist, und nicht, dass eine Abbuchung erfolgt ist, sodass wir kein automatisches Zahlungsereignis haben, auf das wir rechnen könnten. Diese Empfehlung wird bei uns als solche gekennzeichnet, und Ihre Provision wird nach dem Nachweis der Abbuchung bei Shopify von Hand erfasst, mit demselben Anteil, derselben Haltefrist und derselben Freigabe. Haben Sie einen solchen Kunden empfohlen und vergeht einige Zeit, ohne dass eine Provision erfasst wird, so schreiben Sie uns.
 
+**Diese Anteile gelten für eine Empfehlung, die wir selbst abrechnen.** Werben Sie über einen externen Marktplatz wie ClickBank, JVZoo oder Digistore24, so wird der Verkauf über diesen Marktplatz abgewickelt, dieser zahlt Ihre Provision, und es gilt der Anteil, der dort für dieses Produkt veröffentlicht ist; er kann von den Anteilen dieses Abschnitts abweichen. Dieser Abschnitt sowie die Haltefrist und die Freigabe des Abschnitts 6 gelten für eine Empfehlung, die wir unmittelbar über den von uns ausgegebenen Partnerlink abrechnen.
+
 ## 6. Freigabe, Haltefrist und Zahlung
 
 Jede Provision wird als offen erfasst und wird erst fällig, nachdem wir sie freigegeben haben. Eine freigegebene Provision halten wir **30 Tage** von der gültigen Zahlung an zurück, der sie entspricht, eine Frist, die mit dem Zeitraum zusammenfällt, in dem dieser Kunde nach unserer [Kündigungs- und Rückerstattungsrichtlinie](/de/refund-policy) noch eine Rückerstattung erhalten kann.

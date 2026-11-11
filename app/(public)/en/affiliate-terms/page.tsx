@@ -145,6 +145,14 @@ export default function EnglishAffiliateTermsPage() {
           same approval. If you referred such a customer and time has passed with no commission recorded,
           write to us.
         </p>
+        <p>
+          <strong>These rates apply to a referral we bill ourselves.</strong> If you promote through an
+          external marketplace such as ClickBank, JVZoo or Digistore24, the sale is processed by that
+          marketplace, it is the one that pays your commission, and the rate is the one published there for
+          that product, which may differ from the rates in this clause. This clause, and the holding period
+          and approval in clause 6, govern a referral we bill directly through the affiliate link we issue
+          you.
+        </p>
       </section>
 
       <section>
