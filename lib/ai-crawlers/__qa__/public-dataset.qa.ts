@@ -66,6 +66,21 @@ function main() {
       AI_CRAWLER_DATASET.filter((c) => !c.respectsRobots).length >= 3 &&
         AI_CRAWLER_DATASET.filter((c) => !c.respectsRobots).every((c) => (c.note ?? '').toLowerCase().includes('robots.txt')))
 
+    // Added 11.11.2026, after two rows were read that day while the version
+    // still said 2026.11.01 and both prose explanations still listed five
+    // purposes. A consumer that caches on the version never refetched, and a
+    // reader who met an `agent` row found no sentence telling them what it is.
+    // Both are drift that no earlier guard here could see.
+    const newestRead = AI_CRAWLER_DATASET.map((c) => c.verified).sort().at(-1) ?? ''
+    check('A9: the version is the newest read date in the dataset, so a cache on it expires when a row changes',
+      AI_CRAWLER_DATASET_VERSION === newestRead.replace(/-/g, '.'), `version ${AI_CRAWLER_DATASET_VERSION}, newest read ${newestRead}`)
+    const routeNotes = read('app/api/public/ai-crawlers/route.ts')
+    const openapiText = read('lib/ai-crawlers/openapi.ts')
+    const used = [...new Set(AI_CRAWLER_DATASET.map((c) => c.purpose))]
+    const unexplained = used.filter((p) => !routeNotes.includes(`\`${p}\``) || !openapiText.includes(`\`${p}\``))
+    check('A10: every purpose a row uses is explained in the payload notes and in the OpenAPI description',
+      unexplained.length === 0, unexplained.join(', '))
+
     // MUTATION CONTROLS: the same assertions against a deliberately broken row.
     const broken = [...AI_CRAWLER_DATASET, { ...AI_CRAWLER_DATASET[0], token: 'FakeBot', docs: 'see their blog', verified: 'last week' }]
     check('A2-MUT: a row sourced to a blog instead of the operator would fail A2',
@@ -73,6 +88,11 @@ function main() {
     check('A3-MUT: a row with a prose date would fail A3', broken.some((c) => !ISO_DATE.test(c.verified)))
     const dupes = [...AI_CRAWLER_DATASET.map((c) => c.token), 'gptbot']
     check('A5-MUT: a case-variant duplicate would fail A5', new Set(dupes.map((t) => t.toLowerCase())).size !== dupes.length)
+    check('A9-MUT: leaving the version behind a newer row would fail A9',
+      '2026.11.01' !== newestRead.replace(/-/g, '.'))
+    const noAgent = routeNotes.split('`agent`').join('`crawler`')
+    check('A10-MUT: dropping a purpose from the notes would fail A10',
+      used.some((p) => !noAgent.includes(`\`${p}\``)))
   }
 
   console.log('\nB) the shape a consumer parses')
