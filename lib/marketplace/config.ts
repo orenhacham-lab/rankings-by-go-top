@@ -289,6 +289,26 @@ export interface MarketplaceProvider {
    */
   billingDescriptor: string | null
   /**
+   * The platform's own return and cancellation policy, where the platform
+   * publishes it at a stable address.
+   *
+   * It is a default under `MARKETPLACE_<SLUG>_POLICY_URL`, not a replacement
+   * for it: an env value still wins. It exists because for a reseller this
+   * link is not a courtesy. Our own refund policy does not govern that
+   * purchase (section 6A of it says so outright), ClickBank's return policy
+   * is part of their Client Contract, and that contract forbids a seller to
+   * "make any guarantee that conflicts with the ClickBank return Policy" —
+   * so a page that restated our own no-refund term, or linked our policy as
+   * the governing one, would be in breach on a published page. The link is
+   * how the buyer reaches the terms that actually apply.
+   *
+   * NO PERIOD IS QUOTED ANYWHERE FROM THIS. Their Flexible Refunds feature
+   * sets the return window per product, so the standard figure is not
+   * necessarily ours, and printing it would publish a term we had not read
+   * off the product. The policy speaks for itself.
+   */
+  returnPolicyUrl: string | null
+  /**
    * What this platform accepts as "I handled it".
    *
    * 'json' is the default shape: a 2xx with a JSON body, which every platform
@@ -361,6 +381,7 @@ export const MARKETPLACE_PROVIDERS: readonly MarketplaceProvider[] = [
     requiredDisclaimer: null,
     orderSupportUrl: null,
     billingDescriptor: null,
+    returnPolicyUrl: null,
     /* Their guide: only the literal text OK counts as a handled delivery. */
     acknowledgement: 'ok_text',
   },
@@ -374,7 +395,6 @@ export const MARKETPLACE_PROVIDERS: readonly MarketplaceProvider[] = [
      */
     signature: CLICKBANK_INS_SCHEME,
     sellerOfRecord: true,
-    requiredDisclaimer: null,
     /*
      * Both read from ClickBank's own pitch-page and thank-you-page rules
      * (support.clickbank.com/en/articles/10535182-creating-your-first-product,
@@ -382,6 +402,29 @@ export const MARKETPLACE_PROVIDERS: readonly MarketplaceProvider[] = [
      */
     orderSupportUrl: 'https://www.clkbank.com',
     billingDescriptor: 'CLKBANK*COM',
+    /* Read 11.11.2026; it is the article their Client Contract incorporates. */
+    returnPolicyUrl:
+      'https://support.clickbank.com/en/articles/10535349-clickbank-s-return-and-subscription-cancellation-policy',
+    /*
+     * Their own published pitch-page and thank-you-page rules give this text
+     * as mandatory and verbatim. Passed for publication by the legal thread
+     * on 11.11.2026 on three conditions, all met here: it keeps the
+     * attributing heading the JVZoo block has, even though nothing in it
+     * contradicts us, so that we are not volunteering in our own voice that
+     * nobody reviewed our product; it is published in English exactly as
+     * given, unedited down to the spacing, because translating it would
+     * breach the requirement; and it appears ONLY where ClickBank really is
+     * the retailer, which here means the two /go/clickbank pages and nowhere
+     * else - never the general site, never a shared footer, never a page
+     * whose checkout is PayPal or Creem. The address in it is the one the
+     * Client Contract gives, so it needed no checking.
+     */
+    requiredDisclaimer:
+      'ClickBank is the retailer of products on this site. CLICKBANK\u00ae is a registered ' +
+      'trademark of Click Sales, Inc., a Delaware corporation located at 1444 S. Entertainment ' +
+      'Ave., Suite 410 Boise, ID 83709, USA and used by permission. ClickBank\'s role as ' +
+      'retailer does not constitute an endorsement, approval or review of these products or any ' +
+      'claim, statement or opinion used in promotion of these products.',
     /*
      * Their page asks for nothing but a 2xx within three seconds, and they
      * DO retry: once every four hours, five attempts, then the notification
@@ -407,6 +450,7 @@ export const MARKETPLACE_PROVIDERS: readonly MarketplaceProvider[] = [
     sellerOfRecord: false,
     orderSupportUrl: null,
     billingDescriptor: null,
+    returnPolicyUrl: null,
     /*
      * The exact words JVZoo compliance requires, copied character for
      * character from the review notes on products 457483 / 457573 / 457575 /
@@ -602,8 +646,11 @@ export function marketplaceBuyUrl(slug: string, plan: PlanCode): string | null {
  * The tracking pixel is configured separately, below.
  */
 export function marketplacePolicyUrl(slug: string): string | null {
-  if (!marketplaceProvider(slug)) return null
-  return httpsUrlOrNull(process.env[`${envPrefix(slug)}POLICY_URL`])
+  const provider = marketplaceProvider(slug)
+  if (!provider) return null
+  return (
+    httpsUrlOrNull(process.env[`${envPrefix(slug)}POLICY_URL`]) ?? provider.returnPolicyUrl
+  )
 }
 
 /**
