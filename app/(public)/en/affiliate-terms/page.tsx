@@ -121,7 +121,7 @@ export default function EnglishAffiliateTermsPage() {
       <section>
         <h2>5. Commission</h2>
         <p>
-          You earn <strong>30%</strong> of each Qualifying Payment of a Referred Customer, for as long as
+          You earn <strong>35%</strong> of each Qualifying Payment of a Referred Customer, for as long as
           that customer&rsquo;s subscription remains paid. Once you have ten or more Referred Customers
           with an active paid subscription at the same time, the rate on Qualifying Payments from that
           point on is <strong>40%</strong>. A change in rate is not retroactive.

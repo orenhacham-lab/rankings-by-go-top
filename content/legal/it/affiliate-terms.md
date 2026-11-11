@@ -47,7 +47,7 @@ Agiamo in base alle nostre registrazioni. Se Lei ritiene che una segnalazione si
 
 ## 5. La commissione
 
-Le spetta il **30%** di ogni pagamento valido di un cliente segnalato, per tutto il tempo in cui l'abbonamento di quel cliente continua a essere saldato. Quando Lei ha dieci clienti segnalati o più con un abbonamento a pagamento attivo nello stesso momento, la percentuale sui pagamenti validi a partire da quel momento è del **40%**. Un cambiamento di percentuale non ha effetto retroattivo.
+Le spetta il **35%** di ogni pagamento valido di un cliente segnalato, per tutto il tempo in cui l'abbonamento di quel cliente continua a essere saldato. Quando Lei ha dieci clienti segnalati o più con un abbonamento a pagamento attivo nello stesso momento, la percentuale sui pagamenti validi a partire da quel momento è del **40%**. Un cambiamento di percentuale non ha effetto retroattivo.
 
 La commissione è calcolata sull'importo che abbiamo effettivamente ricevuto, al netto dell'imposta sul valore aggiunto e di ogni altra imposta, e dopo ogni sconto, credito o buono applicato a quel pagamento. La commissione è calcolata nella valuta nella quale il cliente ha pagato ed è versata in quella valuta o in quella del Suo mezzo di pagamento, al tasso applicato dal nostro prestatore di servizi di pagamento il giorno del versamento.
 

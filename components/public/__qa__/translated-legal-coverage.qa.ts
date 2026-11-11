@@ -46,6 +46,7 @@
  * Run: npx tsx components/public/__qa__/translated-legal-coverage.qa.ts
  */
 import { existsSync, readdirSync, readFileSync, statSync } from 'fs'
+import { AFFILIATE_TERMS } from '../../../lib/affiliate/terms'
 
 let pass = 0, fail = 0
 function check(name: string, cond: boolean, detail?: string) {
@@ -834,7 +835,17 @@ for (const locale of LOCALES) {
  * the one that governs it. So each number is held against the English source,
  * and against every translation of it, rather than being trusted to a reader.
  */
-const PROGRAM_NUMBERS = ['30%', '40%', '90', '30', '100', '350'] as const
+/* Derived from lib/affiliate/terms.ts, never retyped: on 11.11.2026 the rate in
+   that file moved to 35% while these literals still said 30%, so a suite meant
+   to catch a drifted promise would instead have pinned the stale one. */
+const PROGRAM_NUMBERS = [
+  `${AFFILIATE_TERMS.baseRate}%`,
+  `${AFFILIATE_TERMS.topRate}%`,
+  '90',
+  String(AFFILIATE_TERMS.holdDays),
+  String(AFFILIATE_TERMS.minPayoutUsd),
+  String(AFFILIATE_TERMS.minPayoutIls),
+] as const
 {
   const enSource = frontMatter(text[LOCALES[0]]['affiliate-terms']).source
   const en = enSource && existsSync(enSource) ? readFileSync(enSource, 'utf8') : ''
@@ -2391,8 +2402,10 @@ console.log('\nmutation controls')
   check('tuteo in an usted document is caught',
     REGISTER_FORBIDS.usted.patterns.some((re) => re.test('Puedes cancelar tu cuenta cuando tú quieras.')))
   check('a commission rate changed in one language only is caught',
-    !text['pt-BR']['affiliate-terms'].replace(/30%/g, '35%').includes('30%')
-      && text['pt-BR']['affiliate-terms'].includes('30%'))
+    !text['pt-BR']['affiliate-terms']
+      .replaceAll(`${AFFILIATE_TERMS.baseRate}%`, '30%')
+      .includes(`${AFFILIATE_TERMS.baseRate}%`)
+      && text['pt-BR']['affiliate-terms'].includes(`${AFFILIATE_TERMS.baseRate}%`))
   check('a partner agreement that drops the Spanish identification rule is caught',
     !/art[íi]culo 20 de la Ley 34\/2002/.test(text.es['affiliate-terms'].replace(/art[íi]culo 20 de la Ley 34\/2002/g, ''))
       && /art[íi]culo 20 de la Ley 34\/2002/.test(text.es['affiliate-terms']))
@@ -2422,7 +2435,7 @@ console.log('\nmutation controls')
   check('a policy that still says tracking was never built is caught',
     PARTNER_NOT_BUILT.en.test('and no referral tracking, commission record or payout has been built yet'))
   check('an agreement that promises every payment with no Shopify carve-out is caught',
-    !AGREEMENT_SHOPIFY_MANUAL.en.test('You earn 30% of each Qualifying Payment of a Referred Customer.'))
+    !AGREEMENT_SHOPIFY_MANUAL.en.test(`You earn ${AFFILIATE_TERMS.baseRate}% of each Qualifying Payment of a Referred Customer.`))
   check('an agreement that still says a suspended link stops working is caught',
     AGREEMENT_LINK_DIES.es.test('Cuando este acuerdo termine, su enlace de referido deja de funcionar.'))
   // The drifted date is derived from whatever the document currently says, so

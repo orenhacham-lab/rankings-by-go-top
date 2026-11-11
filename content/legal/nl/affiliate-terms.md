@@ -47,7 +47,7 @@ Wij handelen naar onze vastleggingen. Houdt u een aanbeveling voor onjuist vastg
 
 ## 5. De commissie
 
-U komt **30%** van elke geldige betaling van een aanbevolen klant toe, zolang het abonnement van die klant verder wordt betaald. Hebt u tien of meer aanbevolen klanten met een actief, betaald abonnement op hetzelfde moment, dan bedraagt het aandeel in de geldige betalingen van dat moment af **40%**. Een wijziging van het aandeel werkt niet terug.
+U komt **35%** van elke geldige betaling van een aanbevolen klant toe, zolang het abonnement van die klant verder wordt betaald. Hebt u tien of meer aanbevolen klanten met een actief, betaald abonnement op hetzelfde moment, dan bedraagt het aandeel in de geldige betalingen van dat moment af **40%**. Een wijziging van het aandeel werkt niet terug.
 
 De commissie wordt berekend over het bedrag dat bij ons werkelijk is binnengekomen, zonder btw en elke verdere belasting en na elke korting, elk tegoed of elke waardebon die op die betaling is toegepast. De commissie wordt berekend in de valuta waarin de klant heeft betaald, en in die valuta of in de valuta van uw betaalwijze uitgekeerd, tegen de koers die onze betaaldienstverlener op de dag van de uitkering toepast.
 
