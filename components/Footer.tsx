@@ -78,6 +78,21 @@ export function Footer({ locale = 'he' }: { locale?: PublicLocale } = {}) {
                   {dict.footer.affiliates}
                 </Link>
               </li>
+              {/* The comparison hub and the AI-crawler check: both were reachable
+                  only from /sitemap (and, for the hub, from the six comparison
+                  pages themselves). /ai-crawlers is where the site's two earned
+                  do-follow links land, so one site-wide link into it is worth
+                  more here than anywhere else. */}
+              <li>
+                <Link href={`${prefix}/compare`} className={linkClass}>
+                  {dict.footer.compare}
+                </Link>
+              </li>
+              <li>
+                <Link href={`${prefix}/ai-crawlers`} className={linkClass}>
+                  {dict.footer.aiCrawlers}
+                </Link>
+              </li>
               <li>
                 <Link href={`${prefix}/sitemap`} className={linkClass}>
                   {dict.footer.sitemap}

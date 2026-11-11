@@ -45,7 +45,7 @@ Agimos conforme os nossos registros. Se você considerar que uma indicação foi
 
 ## 5. A comissão
 
-Você recebe **30%** de cada pagamento válido de um cliente indicado, enquanto a assinatura desse cliente continuar sendo paga. A partir do momento em que você tiver dez ou mais clientes indicados com assinatura paga ativa ao mesmo tempo, o percentual sobre os pagamentos válidos passa a ser de **40%**. Uma mudança de percentual não é retroativa.
+Você recebe **35%** de cada pagamento válido de um cliente indicado, enquanto a assinatura desse cliente continuar sendo paga. A partir do momento em que você tiver dez ou mais clientes indicados com assinatura paga ativa ao mesmo tempo, o percentual sobre os pagamentos válidos passa a ser de **40%**. Uma mudança de percentual não é retroativa.
 
 A comissão é calculada sobre o valor que efetivamente recebemos, sem impostos sobre o consumo e sem qualquer outro tributo, e depois de qualquer desconto, crédito ou cupom aplicado àquele pagamento. A comissão é calculada na moeda em que o cliente pagou e é paga nessa moeda ou na moeda do seu método de pagamento, pela taxa que o nosso provedor de pagamentos aplicar no dia do pagamento.
 

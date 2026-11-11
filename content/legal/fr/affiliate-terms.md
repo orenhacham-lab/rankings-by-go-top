@@ -47,7 +47,7 @@ Nous agissons d'après nos propres enregistrements. Si vous estimez qu'une recom
 
 ## 5. La commission
 
-Il vous revient **30%** de chaque paiement valable d'un client recommandé, tant que l'abonnement de ce client continue d'être réglé. Lorsque vous avez dix clients recommandés ou plus avec un abonnement payant actif en même temps, le pourcentage sur les paiements valables à partir de ce moment est de **40%**. Un changement de pourcentage n'a pas d'effet rétroactif.
+Il vous revient **35%** de chaque paiement valable d'un client recommandé, tant que l'abonnement de ce client continue d'être réglé. Lorsque vous avez dix clients recommandés ou plus avec un abonnement payant actif en même temps, le pourcentage sur les paiements valables à partir de ce moment est de **40%**. Un changement de pourcentage n'a pas d'effet rétroactif.
 
 La commission est calculée sur le montant que nous avons effectivement reçu, hors taxe sur la valeur ajoutée et toute autre taxe, et après toute remise, tout crédit ou tout bon appliqué à ce paiement. La commission est calculée dans la devise dans laquelle le client a payé et elle est versée dans cette devise ou dans celle de votre moyen de paiement, au taux appliqué par notre prestataire de paiement le jour du versement.
 

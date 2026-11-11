@@ -173,6 +173,12 @@ export const billingNl: DeepPartial<DashboardDictionary> = {
       activatedSuccess: 'Het pakket is actief. Deze pagina werkt zich over een moment bij.',
       buttonError: 'Met PayPal was er een probleem. Probeer het over een moment opnieuw, of schrijf ons, dan helpen wij.',
     },
+    withdrawal: {
+      label:
+        'Ik verzoek Go Top SEO het werk onmiddellijk te beginnen, vóór het einde van de herroepingstermijn van veertien dagen die het consumentenrecht van de Europese Unie en het Verenigd Koninkrijk een consument geeft, en ik verklaar dat mij is meegedeeld dat ik dat recht verlies zodra de dienst volledig is nagekomen.',
+      requiredNote: 'De betaalmogelijkheden verschijnen zodra u de regel hierboven bevestigt. Daarvoor wordt niets afgeschreven.',
+      policyLabel: 'Het herroepingsrecht volledig, in het opzeggings- en terugbetalingsbeleid',
+    },
     creem: {
       payButton: 'Met kaart betalen',
       starting: 'De beveiligde betaalpagina wordt geopend...',

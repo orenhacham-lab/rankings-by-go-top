@@ -26,7 +26,7 @@ export const landingHe: LandingCopy = {
     trialNote: 'בלי כרטיס אשראי, בלי התחייבות. ביטול בכל רגע.',
     checkLead: 'עוד לא בטוחים? קבלו בדיקת אתר חינמית, בלי הרשמה:',
     dashboard: 'לדאשבורד שלי',
-    trust: ['עובד עם WordPress ו-Shopify', 'תמיכה אישית בעברית'],
+    trust: ['עובד עם WordPress, Shopify ו-Wix', 'תמיכה אישית בעברית'],
     climbChip: 'מקום 3 בגוגל',
     published: 'מאמר פורסם באתר',
   },
@@ -93,7 +93,7 @@ export const landingHe: LandingCopy = {
   },
   worksWith: {
     label: 'בודקים ומפרסמים עבורכם ב:',
-    names: ['Google', 'Google Maps', 'ChatGPT', 'Gemini', 'Perplexity', 'Copilot', 'Grok', 'WordPress', 'Shopify'],
+    names: ['Google', 'Google Maps', 'ChatGPT', 'Gemini', 'Perplexity', 'Copilot', 'Grok', 'WordPress', 'Shopify', 'Wix'],
   },
   outcomes: {
     eyebrow: 'מה אתם מקבלים',
@@ -119,7 +119,7 @@ export const landingHe: LandingCopy = {
     stats: [
       { value: 6, label: 'מנועי AI נבדקים', detail: 'ChatGPT, Gemini ו-Google AI אוטומטית; Perplexity, Copilot ו-Grok בלחיצה' },
       { value: 3, label: 'ערוצים בדוח אחד', detail: 'גוגל, גוגל מפות ותשובות AI' },
-      { value: 2, label: 'פלטפורמות לפרסום ישיר', detail: 'WordPress ו-Shopify, בלי העתק-הדבק' },
+      { value: 3, label: 'פלטפורמות לפרסום ישיר', detail: 'WordPress, Shopify ו-Wix, בלי העתק-הדבק' },
       { value: TRIAL_DAYS, label: 'ימי ניסיון בחינם', detail: 'בלי כרטיס אשראי' },
     ],
   },
@@ -164,7 +164,7 @@ export const landingHe: LandingCopy = {
       overline: 'תוכן ופרסום',
       title: 'מאמרים שנכתבים כדי להופיע, לא כדי למלא את הבלוג',
       body: 'כל מאמר נבנה סביב חיפוש אמיתי: כותרות לפי מה שאנשים שואלים, מקטע שאלות ותשובות, קישורים פנימיים לעמודים שמוכרים אצלכם, ובאתרי וורדפרס עם התוסף של Go Top גם נתונים מובנים שגוגל ומנועי AI קוראים. אתם עוברים, מתקנים אם צריך, והמערכת מפרסמת.',
-      points: ['תמונה ראשית ותמונות בתוך הטקסט', 'בדיקת איכות לפני כל פרסום', 'תזמון ופרסום ישיר ל-WordPress ול-Shopify'],
+      points: ['תמונה ראשית ותמונות בתוך הטקסט', 'בדיקת איכות לפני כל פרסום', 'תזמון ופרסום ישיר ל-WordPress, ל-Shopify ול-Wix'],
       href: '/features/seo-geo-content-publishing',
       visual: {
         heading: 'השבוע באתר שלכם',
@@ -175,7 +175,7 @@ export const landingHe: LandingCopy = {
           { day: 4, title: 'ניקוי מזגן: כל כמה זמן?', status: 'writing', label: 'בכתיבה' },
         ],
         destinationLabel: 'מתפרסם אל',
-        destinations: ['WordPress', 'Shopify'],
+        destinations: ['WordPress', 'Shopify', 'Wix'],
       },
     },
     ai: {
@@ -297,7 +297,7 @@ export const landingHe: LandingCopy = {
       },
       {
         q: 'עם איזה אתרים זה עובד?',
-        a: 'פרסום ישיר עובד עם WordPress ועם Shopify. מעקב המיקומים, הנראות ב-AI ומחקר הביטויים עובדים עם כל אתר.',
+        a: 'פרסום ישיר עובד עם WordPress, עם Shopify ועם Wix. מעקב המיקומים, הנראות ב-AI ומחקר הביטויים עובדים עם כל אתר.',
       },
       {
         q: `מה קורה אחרי ${TRIAL_DAYS} ימי הניסיון?`,

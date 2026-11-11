@@ -1,3 +1,4 @@
+import { buildHreflangAlternates } from '@/lib/seo/hreflang'
 import Link from 'next/link'
 import { LEGAL_FOOTNOTE, LEGAL_LINK, LegalFrame, LegalHeader, SitemapGroups } from '@/components/public/LegalDoc'
 import { authHref } from '@/lib/i18n/auth-href'
@@ -10,6 +11,14 @@ export const metadata = {
     description: 'Mapa del sitio de Go Top SEO',
     url: 'https://www.gotopseo.com/es/sitemap',
     locale: 'es_ES',
+  },
+  alternates: {
+    canonical: 'https://www.gotopseo.com/es/sitemap',
+    // The ten maps are one page in ten languages. Without this block the
+    // page inherits the root layout's alternates, which name the ten HOME
+    // pages as this page's translations and (in Hebrew) canonicalise the map
+    // to the home page — measured 11.11.2026 on all ten.
+    languages: buildHreflangAlternates('/sitemap', '/en/sitemap', '/es/sitemap'),
   },
 }
 
@@ -24,6 +33,9 @@ export default function SpanishSitemapPage() {
         { label: 'Precios', href: '/es/pricing' },
         { label: 'Quiénes somos', href: '/es/about' },
         { label: 'Artículos', href: '/es/articles' },
+        { label: 'Análisis gratuito', href: '/es/free-check' },
+        { label: '¿A qué rastreadores de IA bloquea tu sitio?', href: '/es/ai-crawlers' },
+        { label: 'Programa de afiliados', href: '/es/affiliates' },
       ],
     },
     {
@@ -61,9 +73,14 @@ export default function SpanishSitemapPage() {
     {
       title: 'Comparativas',
       links: [
+        { label: 'Todas las comparativas', href: '/es/compare' },
         { label: 'Go Top SEO frente a Semrush', href: '/es/compare/semrush' },
         { label: 'Go Top SEO frente a Yoast', href: '/es/compare/yoast' },
         { label: 'Go Top SEO frente a Rank Math', href: '/es/compare/rankmath' },
+        { label: 'Go Top SEO frente a Surfer', href: '/es/compare/surfer' },
+        { label: 'Go Top SEO frente a Writesonic', href: '/es/compare/writesonic' },
+        { label: 'Go Top SEO frente a BrightLocal', href: '/es/compare/brightlocal' },
+        { label: 'Go Top SEO frente a Booster SEO', href: '/es/compare/booster' },
       ],
     },
     {

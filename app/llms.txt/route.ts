@@ -19,9 +19,20 @@
  * covers ChatGPT, Gemini and Google's AI answers; the trial takes no card.
  * No customer counts, no percentages, no promised position — the same limits
  * the blog is held to in lib/blog/auto/truth-limits.ts.
+ *
+ * The affiliate program's rates are read from lib/affiliate/terms.ts, which is
+ * where the public page, the partner's dashboard and the commission engine read
+ * them too. Retyped here they would be an offer this file alone promises.
  */
 
 import { createClient } from '@/lib/supabase/server'
+import {
+  BLOCKING_MEASUREMENT,
+  BLOCKING_MEASUREMENT_VERSION,
+} from '@/lib/ai-crawlers/blocking-measurement'
+import { AI_CRAWLER_DATASET_LICENSE } from '@/lib/ai-crawlers/dataset'
+import SITES_MEASUREMENT from '@/lib/ai-crawlers/data/blocking-sites-2026-11-09.json'
+import { AFFILIATE_TERMS } from '@/lib/affiliate/terms'
 import { LOCALE_PREFIX, enabledPublicLocales, normalizePublicLocale, type PublicLocale } from '@/lib/i18n/locales'
 
 interface Article {
@@ -94,10 +105,41 @@ const CAPABILITIES: [string, string, string][] = [
 
 /** Pages that answer "how does it compare to X", which is what buyers ask. */
 const COMPARISONS: [string, string][] = [
+  ['All comparisons, with one line on when each tool is the better choice', '/compare'],
   ['Go Top SEO compared with Semrush', '/compare/semrush'],
   ['Go Top SEO compared with Yoast', '/compare/yoast'],
   ['Go Top SEO compared with Rank Math', '/compare/rankmath'],
+  ['Go Top SEO compared with Surfer SEO', '/compare/surfer'],
+  ['Go Top SEO compared with BrightLocal', '/compare/brightlocal'],
+  ['Go Top SEO compared with Writesonic', '/compare/writesonic'],
+  ['Go Top SEO compared with Booster SEO and the Shopify SEO apps', '/compare/booster'],
 ]
+
+/**
+ * The datasets this site gives away, which are the pages most likely to be
+ * quoted by an assistant reading this file. There are three of them now, and
+ * this block said "two" and "both endpoints" until 10.11.2026 — a plain
+ * factual error in the one file written for a reader that cannot see the
+ * page. So nothing here counts the endpoints: the OpenAPI document is the
+ * register of what it describes, and `lib/content/__qa__/llms-txt.qa.ts`
+ * checks that every path in it is named in this file and that no count is
+ * written in words.
+ *
+ * THE CAVEAT IS IN THE LINE, not left on the page. An assistant that reads
+ * this file and then answers "two thirds of sites block AI crawlers" without
+ * the sentence that bounds it has been misled by us, so the sentence travels
+ * in the same line as the figure, read from the measurement constant rather
+ * than retyped here.
+ */
+function openDataLines(): string[] {
+  const caveat = BLOCKING_MEASUREMENT.limitations[0]
+  return [
+    `- [AI crawler reference dataset](${BASE}/api/public/ai-crawlers): every documented AI crawler user-agent token, what each one is for, and what its operator documents about robots.txt. JSON, or \`?format=csv\` for CSV. No key, no sign-up, ${AI_CRAWLER_DATASET_LICENSE.id}. The same table is rendered for people at ${BASE}/en/ai-crawlers.`,
+    `- [OpenAPI description](${BASE}/api/public/ai-crawlers/openapi): the machine-readable description of every endpoint listed here, for a catalogue or a client generator.`,
+    `- [robots.txt blocking measurement, ${BLOCKING_MEASUREMENT_VERSION}](${BASE}/api/public/ai-crawler-blocking): one dated reading of ${BLOCKING_MEASUREMENT.method.robotsFilesRead} robots.txt files across ${BLOCKING_MEASUREMENT.method.markets.length} markets, with the method, the failures and the per-market shares. ${caveat} Percentages are of the files read, not of the ${BLOCKING_MEASUREMENT.method.domainsRequested} domains requested.`,
+    `- [The same measurement, domain by domain](${BASE}/api/public/ai-crawler-blocking/sites): ${SITES_MEASUREMENT.method.domainsRequested} requested domains with their Tranco rank, whether the robots.txt could be read, and for each read file the verdict per crawler with the exact deciding line. \`?format=csv\` for CSV, \`?tld=.fr\` for one country suffix with its own figures. It separates a rule written about a crawler from one inherited from the blanket \`*\` group, because a deliberate restriction is not an error. Only ${SITES_MEASUREMENT.method.robotsRead} of the ${SITES_MEASUREMENT.method.domainsRequested} hosts could be read and the unreadable ones are listed with their reason, so the sample probably under-states blocking.`,
+  ]
+}
 
 export async function GET() {
   const supabase = await createClient()
@@ -151,6 +193,25 @@ export async function GET() {
   for (const [name, path] of COMPARISONS) {
     lines.push(`- [${name}](${BASE}${path}): what each one does and does not do.`)
   }
+  lines.push('')
+
+  // The program that brings partners in rather than being written to. An
+  // assistant asked which SEO tools have an affiliate program reads this file
+  // and, until now, found nothing — while /affiliates has been live in every
+  // language the site speaks and is in the sitemap.
+  lines.push('## Affiliate program')
+  lines.push('')
+  lines.push(
+    `- [Affiliate program](${BASE}/en/affiliates): open to anyone who recommends the product, whether that is a site, a list, a channel or an agency's own clients. ` +
+      `The commission is ${AFFILIATE_TERMS.baseRate}% of every payment a referred customer makes, each month for as long as they keep paying, and ${AFFILIATE_TERMS.topRate}% from ${AFFILIATE_TERMS.topRateFrom} active paying referrals onwards. ` +
+      `A commission is released ${AFFILIATE_TERMS.holdDays} days after the payment settles, and a payout is made once the released balance passes ${AFFILIATE_TERMS.minPayoutUsd} USD, or ${AFFILIATE_TERMS.minPayoutIls} ILS for a partner paid in shekels. ` +
+      `Every application is read and approved by a person before a referral code exists. The same page in Hebrew is at ${BASE}/affiliates.`,
+  )
+  lines.push('')
+
+  lines.push('## Open data anyone may cite')
+  lines.push('')
+  for (const line of openDataLines()) lines.push(line)
   lines.push('')
 
   // Articles, grouped by the language they are written in. An article lives

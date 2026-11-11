@@ -3,13 +3,14 @@
  * table as a thing other people's sites and scripts can consume, under CC BY
  * 4.0, with no key and no sign-up.
  *
- * WHY THIS EXISTS SEPARATELY FROM agents.ts. `agents.ts` is the list the
- * public checker iterates and renders in seven languages: every token in it
- * costs seven strings of copy, so it is deliberately the short, reader-facing
- * list. This file is the full reference: every token whose operator documents
- * it, with the link to that documentation and the date it was read. Nothing
- * here feeds the checker or the page, so adding a row costs no translation —
- * which is exactly why the dataset can be complete where the page is curated.
+ * THIS FILE IS THE ONE SOURCE. Since 07.11.2026 `agents.ts` derives the list
+ * the public checker iterates and the page renders from these two constants,
+ * so the table a reader sees and the table other people consume cannot
+ * disagree about which crawlers exist. Before that each was written by hand and
+ * they had already drifted. Adding a row here therefore reaches the page: a new
+ * `purpose` costs a label and a blurb in every public language, and a token
+ * with no operator page belongs in `AI_CRAWLER_CANDIDATES`, which the page
+ * renders last, marked, under a footnote.
  *
  * THE BAR FOR A ROW, and it does not bend: a page published by the crawler's
  * OWN OPERATOR that names the product token. Not another list, not a blog
@@ -50,6 +51,16 @@ export type DatasetPurpose =
   | 'ads'
   /** Building the title/description/thumbnail of a shared link. */
   | 'preview'
+  /**
+   * A real browser, hosted by the operator and driven by an AI agent doing
+   * what one user asked of it. It is not a crawler: it visits the pages that
+   * one task needs, it carries the browser's own User-Agent with a token added
+   * to it, and the operator governs it by publishing the IP addresses it comes
+   * from rather than by robots.txt. Blocking it does not keep a site out of a
+   * model or out of an answer — it stops that site's own visitors from asking
+   * an assistant to do something on it.
+   */
+  | 'agent'
 
 export type DatasetCrawler = {
   /** The product token in the operator's own spelling. */
@@ -82,6 +93,8 @@ export type DatasetCandidate = {
 const OPENAI_DOCS = 'https://developers.openai.com/api/docs/bots'
 const ANTHROPIC_DOCS =
   'https://support.claude.com/en/articles/8896518-does-anthropic-crawl-data-from-the-web-and-how-can-site-owners-block-the-crawler'
+const ANTHROPIC_AGENT_DOCS =
+  'https://support.claude.com/en/articles/18234133-how-do-anthropic-hosted-browsers-identify-themselves-when-they-browse-the-web-on-a-user-s-behalf'
 const GOOGLE_DOCS = 'https://developers.google.com/crawling/docs/crawlers-fetchers/google-common-crawlers'
 const PERPLEXITY_DOCS = 'https://docs.perplexity.ai/docs/resources/perplexity-crawlers'
 const APPLE_DOCS = 'https://support.apple.com/en-us/119829'
@@ -94,6 +107,14 @@ const META_DOCS = 'https://developers.facebook.com/documentation/sharing/webmast
 // so the three constants above are the addresses that answer 200 today. The
 // facts each row states were re-read at the new Google and Meta pages.
 const READ_ON = '2026-11-01'
+// 11.11.2026: all six operator pages were fetched again. Every address still
+// answers 200 with no redirect, and the token list on each page was compared
+// with the rows below. Two tokens were documented that this dataset did not
+// carry — `Claude-Agent` on a second Anthropic page that the first one links
+// to, and `Google-CloudVertexBot` on the Google page — and they are the two
+// rows that carry this date. The facts on the older rows were not re-read, so
+// those rows keep the date they were read on, which is what `verified` is for.
+const READ_ON_AGENTIC = '2026-11-11'
 
 export const AI_CRAWLER_DATASET: readonly DatasetCrawler[] = [
   // ── OpenAI ────────────────────────────────────────────────────────────────
@@ -115,6 +136,16 @@ export const AI_CRAWLER_DATASET: readonly DatasetCrawler[] = [
   { token: 'ClaudeBot', operator: 'Anthropic', purpose: 'train', crawls: true, respectsRobots: true, docs: ANTHROPIC_DOCS, verified: READ_ON },
   { token: 'Claude-SearchBot', operator: 'Anthropic', purpose: 'search', crawls: true, respectsRobots: true, docs: ANTHROPIC_DOCS, verified: READ_ON },
   { token: 'Claude-User', operator: 'Anthropic', purpose: 'answer', crawls: true, respectsRobots: true, docs: ANTHROPIC_DOCS, verified: READ_ON },
+  {
+    token: 'Claude-Agent',
+    operator: 'Anthropic',
+    purpose: 'agent',
+    crawls: true,
+    respectsRobots: false,
+    docs: ANTHROPIC_AGENT_DOCS,
+    verified: READ_ON_AGENTIC,
+    note: 'A browser hosted by Anthropic and driven by an agent at one user\u2019s direction, which Anthropic documents separately from its crawlers and fetchers. It carries the browser\u2019s own User-Agent with the token added inside it, so a rule has to match the token rather than the whole string, and Anthropic publishes the addresses it comes from at claude.com/.well-known/sail under the same name. Anthropic states that a site\u2019s preferences for its crawlers and for this traffic are independent of each other, and does not describe this traffic as governed by robots.txt.',
+  },
 
   // ── Google ────────────────────────────────────────────────────────────────
   {
@@ -147,6 +178,17 @@ export const AI_CRAWLER_DATASET: readonly DatasetCrawler[] = [
     docs: GOOGLE_DOCS,
     verified: READ_ON,
     note: 'Not an AI crawler. It is in the dataset because AI Overviews are built from the Google index, so blocking it removes a site from both.',
+  },
+
+  {
+    token: 'Google-CloudVertexBot',
+    operator: 'Google',
+    purpose: 'search',
+    crawls: true,
+    respectsRobots: true,
+    docs: GOOGLE_DOCS,
+    verified: READ_ON_AGENTIC,
+    note: 'Google documents that rules addressed to this token affect only crawls that a site owner has asked for when building a Vertex AI agent, and have no effect on Google Search or any other product. So it is the one row here that a site usually meets because somebody on that site asked for it.',
   },
 
   // ── Perplexity ────────────────────────────────────────────────────────────

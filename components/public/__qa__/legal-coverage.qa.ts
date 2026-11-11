@@ -315,6 +315,19 @@ check('MUTATION — an English-only extra section is caught', pages.he.terms.h2 
     // before a transaction, so the terms link it; the reader clicks it, and we
     // send nothing of theirs to it.
     'docs.creem.io': 'a documentation link cited in a code comment; not fetched',
+    // ClickBank's own order-support destination, which their pitch-page rules
+    // require the footer to link ("For Order Support, please contact ClickBank
+    // HERE"). The buyer clicks it to reach the party that holds their money;
+    // nothing of theirs is sent to it from our side, and the purchase itself
+    // already happens on ClickBank's checkout.
+    // ClickBank's own return and subscription cancellation policy, which their
+    // Client Contract incorporates and which governs a purchase made through
+    // them. The sales page links it because our own refund policy does not
+    // govern that purchase (section 6A) and their contract forbids a seller to
+    // guarantee anything conflicting with theirs. A link the buyer follows;
+    // nothing of theirs is sent to it from our side.
+    'support.clickbank.com': 'ClickBank\u2019s own return policy, linked as the policy governing a purchase made through them; not fetched',
+    'www.clkbank.com': 'ClickBank\u2019s order-support page, linked for the buyer to reach the reseller; not fetched',
     'www.creem.io': 'Creem\u2019s own Buyer Terms, linked for the customer to read; not fetched',
     // Our own listing on a third-party AI-tool index, named in the
     // Organization's `sameAs` (lib/seo/organization.ts) so a resolver can tie
@@ -328,6 +341,9 @@ check('MUTATION — an English-only extra section is caught', pages.he.terms.h2 
     'ainave.com': 'our own listing, named in Organization.sameAs; not fetched',
     'biz100.co.il': 'our own listing, named in Organization.sameAs; not fetched',
     'ai-best-search.com': 'our own listing, named in Organization.sameAs; not fetched',
+    // Added to Organization.sameAs on 9 Nov 2026, verified live that day.
+    'ki-toolnavigator.com': 'our own listing, named in Organization.sameAs; not fetched',
+    'www.herramientasia.ai': 'our own listing, named in Organization.sameAs; not fetched',
     'help.shopify.com': 'a documentation link shown to a merchant',
     // The operator documentation each row of the open AI-crawler dataset
     // (lib/ai-crawlers/dataset.ts) cites, so a consumer of

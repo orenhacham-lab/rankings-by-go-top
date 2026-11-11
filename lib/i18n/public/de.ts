@@ -92,7 +92,7 @@ export const de = {
     solutionsMenu: {
       businesses: {
         label: 'Unternehmerinnen und Unternehmer',
-        description: 'Ein System, das schreibt, veröffentlicht und messt, ohne Dienstleister zu koordinieren.',
+        description: 'Ein System, das schreibt, veröffentlicht und misst, ohne Dienstleister zu koordinieren.',
       },
       agencies: {
         label: 'Agenturen',
@@ -116,6 +116,8 @@ export const de = {
     articles: 'Artikel',
     about: 'Über uns',
     affiliates: 'Partnerprogramm',
+    compare: 'Alle Vergleiche',
+    aiCrawlers: 'KI-Crawler-Prüfung',
     sitemap: 'Sitemap',
     legal: 'Rechtliches',
     privacy: 'Datenschutzerklärung',

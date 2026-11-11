@@ -50,11 +50,82 @@ export type AiCrawlerCopy = {
   purposes: Record<CrawlerPurpose, { label: string; blurb: string }>
   groups: { ai: string; classic: string }
   // `title` is the heading above the table; `datasetName` NAMES the table as a
-  // dataset, which is what the schema.org Dataset node needs. A heading like
-  // "Who each one is" is not a name a catalogue can list.
-  reference: { title: string; datasetName: string; intro: string; colAgent: string; colOperator: string; colPurpose: string }
+  // dataset, which is what the schema.org Dataset node needs; `undocumented`
+  // is the footnote under the rows no operator page documents.
+  reference: {
+    title: string
+    datasetName: string
+    intro: string
+    colAgent: string
+    colOperator: string
+    colPurpose: string
+    undocumented: string
+  }
   limits: { title: string; items: string[] }
+  /**
+   * The 07.11.2026 robots.txt measurement, rendered for a reader.
+   *
+   * `headline` carries `{pct}` and `sampleNote` carries `{n}`: the figures are
+   * substituted from `lib/ai-crawlers/blocking-measurement.ts` so that no
+   * number is retyped in ten languages, and `caveat` is the sentence the
+   * measurement record requires beside any of them.
+   */
+  measurement: {
+    title: string
+    intro: string
+    headline: string
+    caveat: string
+    notSampled: string
+    measuredOnLabel: string
+    colMarket: string
+    colShare: string
+    sampleNote: string
+    downloads: string
+    /**
+     * The 09.11.2026 re-reading, which kept every domain. `perSite` carries
+     * `{on}`, `{deliberate}` and `{inherited}`; `perSiteNote` carries `{read}`,
+     * `{requested}` and `{refused}`. Every figure is substituted from
+     * `lib/ai-crawlers/blocking-sites.ts`, so no digit is retyped in ten
+     * languages and the read rate cannot be left off the percentages.
+     */
+    perSite: string
+    perSiteNote: string
+    perSiteDownloads: string
+    /**
+     * The same 9 November reading cut by country suffix. `perMarketLead` must
+     * say that each share is of the files read in THAT market, because the
+     * read rate swings from 49 of 100 on `.jp` to 65 of 100 on `.it`, and a
+     * column of percentages without its own n is the objection this table
+     * exists to answer. The figures come from
+     * `lib/ai-crawlers/blocking-markets.ts`; nothing here carries a digit.
+     */
+    perMarketTitle: string
+    perMarketLead: string
+    colRead: string
+    colGptbot: string
+    colOaiSearchbot: string
+    labelDeliberate: string
+    labelInherited: string
+  }
   cta: { title: string; body: string; button: string }
+  /**
+   * The three product pages this page sends a reader on to, in the reader's own
+   * language. This page is where the earned do-follow links land, and the only
+   * link out of its own body was the sign-up button, which is not an indexable
+   * page. The nav and the footer do reach all three destinations, so these
+   * links are not about reachability: a link in the body carries weight that
+   * boilerplate repeated on every page does not, and it is the obvious next
+   * step for a reader who arrived from a directory listing. The labels ARE the
+   * anchors, which is why each one names its destination instead of saying
+   * "read more".
+   */
+  related: {
+    title: string
+    lead: string
+    aiVisibility: string
+    freeCheck: string
+    pricing: string
+  }
 }
 
 const he: AiCrawlerCopy = {
@@ -108,6 +179,8 @@ const he: AiCrawlerCopy = {
     answer: { label: 'תשובה חיה', blurb: 'מביא את הדף ברגע שמישהו שואל, כדי לצטט אתכם בתשובה עם קישור.' },
     search: { label: 'אינדקס', blurb: 'בונה אינדקס חיפוש, שממנו נשענות גם תשובות ה-AI.' },
     ads: { label: 'מודעות', blurb: 'בודק דפי נחיתה של מודעות. חסימה שלו לא משפיעה על תשובות ולא על האינדקס.' },
+    preview: { label: 'תצוגה מקדימה', blurb: 'בונה את הכותרת והתמונה שמוצגות כשמישהו משתף את הקישור. חסימה משאירה את השיתוף ריק.' },
+    agent: { label: 'סוכן בדפדפן', blurb: 'דפדפן שסוכן AI מפעיל בשביל משתמש אחד. חסימה לא משנה מה המודל יודע — היא מונעת מהמבקרים שלכם לבקש מעוזר לבצע משהו אצלכם באתר.' },
   },
   groups: { ai: 'סורקי AI', classic: 'סורקי חיפוש קלאסיים' },
   reference: {
@@ -117,6 +190,29 @@ const he: AiCrawlerCopy = {
     colAgent: 'User-agent',
     colOperator: 'מופעל על ידי',
     colPurpose: 'לשם מה',
+    undocumented: 'אין עמוד של המפעיל שמתעד את הטוקן הזה. הוא מופיע כאן כי הוא נראה בלוגים, ומופרד מהשורות שנשענות על תיעוד של המפעיל עצמו.',
+  },
+  measurement: {
+    title: 'כמה אתרים באמת חוסמים אותם',
+    intro: 'בתאריך שלמטה קראנו את קובץ ה-robots.txt של האתרים המדורגים הגבוה ביותר בשווקים המופיעים כאן, והשוונו אותם לטבלה שלמעלה.',
+    headline: 'מתוך האתרים שחוסמים את GPTBot, {pct} חוסמים גם סורק AI שהיה מביא להם מבקרים.',
+    caveat: 'מדובר באתרים גדולים ומדורגים גבוה, לא בעסקים קטנים. אצל עסקים קטנים התמונה כנראה אחרת — פחות חסימות מכוונות ויותר הזנחה. אין לקרוא את המספרים האלה כתמונה של עסקים קטנים.',
+    notSampled: 'ברזיל ופורטוגל לא היו במדגם. הנתון של .com הוא הפלח הגלובלי בשפה האנגלית, והוא אינו נתון של אף אחת מהן.',
+    measuredOnLabel: 'נמדד בתאריך',
+    colMarket: 'שוק',
+    colShare: 'חוסמים סורק AI שמביא תנועה',
+    sampleNote: 'האחוזים הם מתוך {n} קובצי robots.txt שנקראו בפועל, לא מתוך הדומיינים שנשלחה אליהם בקשה.',
+    downloads: 'המדידה המלאה, כנתונים פתוחים:',
+    perSite: 'ב-{on} קראנו אותם שוב, והפעם שמרנו כל דומיין. מבין האתרים שחוסמים את GPTBot, {deliberate} כתבו כלל שנוקב בשמו — כלומר החסימה הייתה החלטה. מבין האתרים שחוסמים את OAI-SearchBot, הסורק שמאחורי התשובות שאנשים רואים, {inherited} לא בחרו בה כלל: היא נפלה מכלל שמכוון לכל הבוטים כאחד.',
+    perSiteNote: 'הקריאה השנייה מכסה {read} קבצים שנקראו מתוך {requested} דומיינים שביקשנו. {refused} מאחסנים סירבו לקורא הזה, ומאחסן שמסרב לקורא אוטומטי לא מזוהה הוא סביר שגם מגביל סורקי AI — ולכן הקריאה הזאת כנראה מחסירה את היקף החסימה ולא מגדילה אותו.',
+    perSiteDownloads: 'כל דומיין, עם הפסיקה שלו, הקבוצה שהכריעה והשורה המדויקת:',
+    perMarketTitle: 'לפי סיומת מדינה',
+    perMarketLead: 'אותה קריאה, חתוכה לפי סיומת. כל אחוז בשורה הוא מתוך הקבצים שנקראו באותה סיומת, ולא מתוך מאה הדומיינים שבוקשו.',
+    colRead: 'קבצים שנקראו',
+    colGptbot: 'חוסמים GPTBot',
+    colOaiSearchbot: 'חוסמים OAI-SearchBot',
+    labelDeliberate: 'מהם במכוון',
+    labelInherited: 'מהם בירושה',
   },
   limits: {
     title: 'מה הבדיקה הזו לא יודעת',
@@ -131,6 +227,13 @@ const he: AiCrawlerCopy = {
     title: 'לראות אם ה-AI באמת מזכיר אתכם',
     body: 'גישה היא רק השלב הראשון. Go Top SEO בודק אוטומטית אם העסק שלכם מופיע בתשובות של ChatGPT, Gemini ו-Google AI, ועוקב אחרי הדירוגים בגוגל ובמפות מדי חודש.',
     button: 'לנסות שבוע חינם, בלי כרטיס אשראי',
+  },
+  related: {
+    title: 'להמשיך מכאן',
+    lead: 'גישה של סורקי AI היא חלק אחד בתמונה. שלושת הדפים האלה מכסים את השאר.',
+    aiVisibility: 'מעקב נראות בתשובות AI',
+    freeCheck: 'בדיקת SEO חינמית לאתר',
+    pricing: 'מסלולים ומחירים',
   },
 }
 
@@ -185,6 +288,8 @@ const en: AiCrawlerCopy = {
     answer: { label: 'Live answer', blurb: 'Fetches the page the moment someone asks, to cite you in an answer with a link.' },
     search: { label: 'Index', blurb: 'Builds a search index, which AI answers are built on top of.' },
     ads: { label: 'Adverts', blurb: 'Checks the landing pages of adverts. Blocking it affects neither answers nor the index.' },
+    preview: { label: 'Link preview', blurb: 'Builds the title and image shown when someone shares the link. Blocking it leaves the share bare.' },
+    agent: { label: 'Agent in a browser', blurb: 'A browser an AI agent drives for one person. Blocking it changes nothing a model knows — it stops your own visitors asking an assistant to do something on your site.' },
   },
   groups: { ai: 'AI crawlers', classic: 'Classic search crawlers' },
   reference: {
@@ -194,6 +299,29 @@ const en: AiCrawlerCopy = {
     colAgent: 'User-agent',
     colOperator: 'Operated by',
     colPurpose: 'What for',
+    undocumented: 'No operator page documents this token. It is listed because it appears in server logs, and kept apart from the rows that rest on an operator’s own documentation.',
+  },
+  measurement: {
+    title: 'How many sites actually block them',
+    intro: 'On the date below we read the robots.txt of the highest-ranked sites in the markets listed here, and matched them against the table above.',
+    headline: 'Of the sites that block GPTBot, {pct} also block an AI crawler that would have brought them visitors.',
+    caveat: 'These are large, high-ranked sites, not small businesses. Among small businesses the picture is probably different, with fewer deliberate blocks and more neglect. Do not read these figures as a picture of small businesses.',
+    notSampled: 'Brazil and Portugal were not in the sample. The .com figure is the global English-language slice and is not a figure for either country.',
+    measuredOnLabel: 'Measured on',
+    colMarket: 'Market',
+    colShare: 'Block an AI crawler that brings visitors',
+    sampleNote: 'Percentages are of {n} robots.txt files actually read, not of the domains requested.',
+    downloads: 'The whole measurement, as open data:',
+    perSite: 'We read them again on {on}, keeping every domain this time. Of the sites that block GPTBot, {deliberate} wrote a rule that names it, so the block was a decision. Of the sites that block OAI-SearchBot — the crawler behind the answers people are shown — {inherited} never chose it: the block came from a rule aimed at every bot alike.',
+    perSiteNote: 'That second reading covers {read} readable files out of {requested} domains requested. {refused} hosts refused this reader outright, and a host that refuses an unknown automated reader is plausibly a host that restricts AI crawlers, so this reading probably under-states blocking rather than over-stating it.',
+    perSiteDownloads: 'Every domain, with its verdict, the rule group that decided it and the exact line:',
+    perMarketTitle: 'By country suffix',
+    perMarketLead: 'The same reading, cut by suffix. Every share in a row is of the files read in that suffix, not of the hundred domains requested.',
+    colRead: 'Files read',
+    colGptbot: 'Block GPTBot',
+    colOaiSearchbot: 'Block OAI-SearchBot',
+    labelDeliberate: 'of these deliberate',
+    labelInherited: 'of these inherited',
   },
   limits: {
     title: 'What this check cannot tell you',
@@ -208,6 +336,13 @@ const en: AiCrawlerCopy = {
     title: 'See whether AI actually mentions you',
     body: 'Access is only the first step. Go Top SEO checks automatically whether your business shows up in answers from ChatGPT, Gemini and Google AI, and tracks your Google and Maps rankings every month.',
     button: 'Try it free for 7 days, no card',
+  },
+  related: {
+    title: 'Where to go from here',
+    lead: 'AI crawler access is one piece of the picture. These three pages cover the rest.',
+    aiVisibility: 'AI answer visibility tracking',
+    freeCheck: 'Free SEO check for your site',
+    pricing: 'Plans and pricing',
   },
 }
 
@@ -262,6 +397,8 @@ const es: AiCrawlerCopy = {
     answer: { label: 'Respuesta en vivo', blurb: 'Carga la página en el momento en que alguien pregunta, para citarte en la respuesta con un enlace.' },
     search: { label: 'Índice', blurb: 'Construye un índice de búsqueda, sobre el que se apoyan también las respuestas de IA.' },
     ads: { label: 'Anuncios', blurb: 'Revisa las páginas de destino de los anuncios. Bloquearlo no afecta ni a las respuestas ni al índice.' },
+    preview: { label: 'Vista previa', blurb: 'Crea el título y la imagen que aparecen cuando alguien comparte el enlace. Bloquearlo deja el enlace sin nada.' },
+    agent: { label: 'Agente en el navegador', blurb: 'Un navegador que un agente de IA conduce para una persona. Bloquearlo no cambia lo que sabe el modelo: impide que tus visitantes pidan a un asistente que haga algo en tu sitio.' },
   },
   groups: { ai: 'Rastreadores de IA', classic: 'Rastreadores de búsqueda clásicos' },
   reference: {
@@ -271,6 +408,29 @@ const es: AiCrawlerCopy = {
     colAgent: 'User-agent',
     colOperator: 'Operado por',
     colPurpose: 'Para qué',
+    undocumented: 'Ninguna página del operador documenta este token. Aparece aquí porque se ve en los registros del servidor, y se mantiene separado de las filas que se apoyan en la documentación del propio operador.',
+  },
+  measurement: {
+    title: 'Cuántos sitios los bloquean de verdad',
+    intro: 'En la fecha indicada abajo leímos el robots.txt de los sitios mejor posicionados de los mercados que aparecen aquí y los comparamos con la tabla anterior.',
+    headline: 'De los sitios que bloquean GPTBot, {pct} bloquean además un rastreador de IA que les habría traído visitas.',
+    caveat: 'Son sitios grandes y muy bien posicionados, no pequeños negocios. Entre los pequeños negocios el panorama probablemente sea distinto: menos bloqueos deliberados y más descuido. No lea estas cifras como un retrato de los pequeños negocios.',
+    notSampled: 'Brasil y Portugal no formaban parte de la muestra. La cifra de .com es el segmento global en inglés y no es una cifra de ninguno de los dos países.',
+    measuredOnLabel: 'Medido el',
+    colMarket: 'Mercado',
+    colShare: 'Bloquean un rastreador de IA que trae visitas',
+    sampleNote: 'Los porcentajes se calculan sobre {n} archivos robots.txt realmente leídos, no sobre los dominios solicitados.',
+    downloads: 'La medición completa, como datos abiertos:',
+    perSite: 'El {on} los volvimos a leer, conservando esta vez todos los dominios. De los sitios que bloquean GPTBot, {deliberate} escribieron una regla que lo nombra, así que el bloqueo fue una decisión. De los que bloquean OAI-SearchBot, el rastreador que está detrás de las respuestas que se muestran, {inherited} no lo eligieron: el bloqueo venía de una regla dirigida a todos los robots por igual.',
+    perSiteNote: 'Esa segunda lectura cubre {read} archivos legibles de {requested} dominios solicitados. {refused} servidores rechazaron a este lector, y un servidor que rechaza a un lector automático desconocido es probablemente un servidor que restringe los rastreadores de IA, así que esta lectura probablemente subestima el bloqueo en lugar de exagerarlo.',
+    perSiteDownloads: 'Cada dominio, con su veredicto, el grupo de reglas que lo decidió y la línea exacta:',
+    perMarketTitle: 'Por sufijo de país',
+    perMarketLead: 'La misma lectura, dividida por sufijo. Cada porcentaje de una fila es sobre los archivos leídos en ese sufijo, no sobre los cien dominios solicitados.',
+    colRead: 'Archivos leídos',
+    colGptbot: 'Bloquean GPTBot',
+    colOaiSearchbot: 'Bloquean OAI-SearchBot',
+    labelDeliberate: 'de ellos deliberados',
+    labelInherited: 'de ellos heredados',
   },
   limits: {
     title: 'Lo que esta comprobación no puede decirte',
@@ -285,6 +445,13 @@ const es: AiCrawlerCopy = {
     title: 'Comprueba si la IA te menciona de verdad',
     body: 'El acceso es solo el primer paso. Go Top SEO comprueba automáticamente si tu negocio aparece en las respuestas de ChatGPT, Gemini y Google AI, y sigue tus posiciones en Google y en Maps cada mes.',
     button: 'Pruébalo 7 días gratis, sin tarjeta',
+  },
+  related: {
+    title: 'Por dónde seguir',
+    lead: 'El acceso de los rastreadores de IA es una parte del cuadro. Estas tres páginas cubren el resto.',
+    aiVisibility: 'Seguimiento de la visibilidad en las respuestas de IA',
+    freeCheck: 'Análisis SEO gratuito de tu sitio',
+    pricing: 'Planes y precios',
   },
 }
 
@@ -339,6 +506,8 @@ const ptBR: AiCrawlerCopy = {
     answer: { label: 'Resposta ao vivo', blurb: 'Carrega a página no momento em que alguém pergunta, para citar você na resposta com um link.' },
     search: { label: 'Índice', blurb: 'Constrói um índice de busca, no qual as respostas de IA também se apoiam.' },
     ads: { label: 'Anúncios', blurb: 'Verifica as páginas de destino dos anúncios. Bloquear não afeta nem as respostas nem o índice.' },
+    preview: { label: 'Prévia do link', blurb: 'Monta o título e a imagem que aparecem quando alguém compartilha o link. Bloquear deixa o compartilhamento vazio.' },
+    agent: { label: 'Agente no navegador', blurb: 'Um navegador que um agente de IA conduz para uma pessoa. Bloquear não muda o que o modelo sabe: impede que seus visitantes peçam a um assistente para fazer algo no seu site.' },
   },
   groups: { ai: 'Rastreadores de IA', classic: 'Rastreadores de busca clássicos' },
   reference: {
@@ -348,6 +517,29 @@ const ptBR: AiCrawlerCopy = {
     colAgent: 'User-agent',
     colOperator: 'Operado por',
     colPurpose: 'Para quê',
+    undocumented: 'Nenhuma página do operador documenta esse token. Ele aparece aqui porque é visto nos logs do servidor, e fica separado das linhas que se apoiam na documentação do próprio operador.',
+  },
+  measurement: {
+    title: 'Quantos sites realmente os bloqueiam',
+    intro: 'Na data indicada abaixo lemos o robots.txt dos sites melhor posicionados nos mercados listados aqui e os comparamos com a tabela acima.',
+    headline: 'Dos sites que bloqueiam o GPTBot, {pct} também bloqueiam um rastreador de IA que lhes traria visitantes.',
+    caveat: 'São sites grandes e muito bem posicionados, não pequenos negócios. Entre os pequenos negócios o quadro provavelmente é outro: menos bloqueios deliberados e mais descuido. Não leia estes números como um retrato dos pequenos negócios.',
+    notSampled: 'O Brasil e Portugal não estavam na amostra. O número de .com é o recorte global em inglês e não é um número de nenhum dos dois países.',
+    measuredOnLabel: 'Medido em',
+    colMarket: 'Mercado',
+    colShare: 'Bloqueiam um rastreador de IA que traz visitas',
+    sampleNote: 'Os percentuais são sobre {n} arquivos robots.txt efetivamente lidos, não sobre os domínios solicitados.',
+    downloads: 'A medição completa, como dados abertos:',
+    perSite: 'Em {on} lemos tudo de novo, guardando desta vez cada domínio. Dos sites que bloqueiam o GPTBot, {deliberate} escreveram uma regra que o nomeia, ou seja, o bloqueio foi uma decisão. Dos que bloqueiam o OAI-SearchBot, o rastreador por trás das respostas que as pessoas veem, {inherited} não o escolheram: o bloqueio veio de uma regra dirigida a todos os robôs igualmente.',
+    perSiteNote: 'Essa segunda leitura cobre {read} arquivos lidos de {requested} domínios solicitados. {refused} servidores recusaram este leitor, e um servidor que recusa um leitor automático desconhecido é provavelmente um servidor que restringe rastreadores de IA, então esta leitura provavelmente subestima o bloqueio em vez de exagerá-lo.',
+    perSiteDownloads: 'Cada domínio, com seu veredito, o grupo de regras que o decidiu e a linha exata:',
+    perMarketTitle: 'Por sufixo de país',
+    perMarketLead: 'A mesma leitura, dividida por sufixo. Cada porcentagem de uma linha é sobre os arquivos lidos naquele sufixo, não sobre os cem domínios solicitados.',
+    colRead: 'Arquivos lidos',
+    colGptbot: 'Bloqueiam GPTBot',
+    colOaiSearchbot: 'Bloqueiam OAI-SearchBot',
+    labelDeliberate: 'destes, deliberados',
+    labelInherited: 'destes, herdados',
   },
   limits: {
     title: 'O que esta verificação não consegue dizer',
@@ -362,6 +554,13 @@ const ptBR: AiCrawlerCopy = {
     title: 'Veja se a IA realmente menciona você',
     body: 'O acesso é só o primeiro passo. O Go Top SEO verifica automaticamente se o seu negócio aparece nas respostas do ChatGPT, do Gemini e do Google AI, e acompanha suas posições no Google e no Maps todo mês.',
     button: 'Teste 7 dias grátis, sem cartão',
+  },
+  related: {
+    title: 'Por onde continuar',
+    lead: 'O acesso dos rastreadores de IA é uma parte do quadro. Estas três páginas cobrem o resto.',
+    aiVisibility: 'Monitoramento da visibilidade nas respostas de IA',
+    freeCheck: 'Análise de SEO gratuita do seu site',
+    pricing: 'Planos e preços',
   },
 }
 
@@ -416,6 +615,8 @@ const fr: AiCrawlerCopy = {
     answer: { label: 'Réponse en direct', blurb: "Charge la page au moment où quelqu'un pose une question, pour vous citer dans la réponse avec un lien." },
     search: { label: 'Index', blurb: "Construit un index de recherche, sur lequel s'appuient aussi les réponses d'IA." },
     ads: { label: 'Publicités', blurb: "Vérifie les pages de destination des publicités. Le bloquer n'affecte ni les réponses ni l'index." },
+    preview: { label: 'Aperçu du lien', blurb: "Construit le titre et l'image affichés quand quelqu'un partage le lien. Le bloquer laisse le partage vide." },
+    agent: { label: 'Agent dans un navigateur', blurb: 'Un navigateur piloté par un agent IA pour une seule personne. Le bloquer ne change rien à ce que le modèle sait : il empêche vos visiteurs de demander à un assistant d’agir sur votre site.' },
   },
   groups: { ai: "Robots d'IA", classic: 'Robots de recherche classiques' },
   reference: {
@@ -425,6 +626,29 @@ const fr: AiCrawlerCopy = {
     colAgent: 'User-agent',
     colOperator: 'Exploité par',
     colPurpose: 'Pour quoi faire',
+    undocumented: "Aucune page de l'opérateur ne documente ce jeton. Il figure ici parce qu'on le voit dans les journaux du serveur, et il reste séparé des lignes qui s'appuient sur la documentation de l'opérateur lui-même.",
+  },
+  measurement: {
+    title: 'Combien de sites les bloquent réellement',
+    intro: 'À la date indiquée ci-dessous, nous avons lu le robots.txt des sites les mieux classés des marchés listés ici et les avons comparés au tableau ci-dessus.',
+    headline: 'Parmi les sites qui bloquent GPTBot, {pct} bloquent aussi un robot d’IA qui leur aurait amené des visiteurs.',
+    caveat: 'Il s’agit de grands sites très bien classés, pas de petites entreprises. Chez les petites entreprises, le tableau est probablement différent : moins de blocages délibérés et davantage de négligence. Ne lisez pas ces chiffres comme un portrait des petites entreprises.',
+    notSampled: 'Le Brésil et le Portugal ne figuraient pas dans l’échantillon. Le chiffre .com correspond au segment mondial anglophone et n’est le chiffre d’aucun des deux pays.',
+    measuredOnLabel: 'Mesuré le',
+    colMarket: 'Marché',
+    colShare: 'Bloquent un robot d’IA qui apporte des visites',
+    sampleNote: 'Les pourcentages portent sur {n} fichiers robots.txt réellement lus, et non sur les domaines interrogés.',
+    downloads: 'La mesure complète, en données ouvertes :',
+    perSite: "Le {on}, nous les avons relus en conservant cette fois chaque domaine. Parmi les sites qui bloquent GPTBot, {deliberate} ont écrit une règle qui le nomme : le blocage était une décision. Parmi ceux qui bloquent OAI-SearchBot, le robot qui alimente les réponses affichées, {inherited} ne l'ont jamais choisi : le blocage venait d'une règle visant tous les robots indistinctement.",
+    perSiteNote: "Cette seconde lecture porte sur {read} fichiers lus pour {requested} domaines demandés. {refused} hôtes ont refusé ce lecteur, et un hôte qui refuse un lecteur automatique inconnu est vraisemblablement un hôte qui restreint les robots d'IA : cette lecture sous-estime donc probablement le blocage plutôt qu'elle ne l'exagère.",
+    perSiteDownloads: 'Chaque domaine, avec son verdict, le groupe de règles qui a tranché et la ligne exacte :',
+    perMarketTitle: 'Par suffixe de pays',
+    perMarketLead: 'La même lecture, découpée par suffixe. Chaque pourcentage d’une ligne porte sur les fichiers lus dans ce suffixe, non sur les cent domaines demandés.',
+    colRead: 'Fichiers lus',
+    colGptbot: 'Bloquent GPTBot',
+    colOaiSearchbot: 'Bloquent OAI-SearchBot',
+    labelDeliberate: 'dont délibérés',
+    labelInherited: 'dont hérités',
   },
   limits: {
     title: 'Ce que cette vérification ne peut pas vous dire',
@@ -439,6 +663,13 @@ const fr: AiCrawlerCopy = {
     title: "Voyez si l'IA vous mentionne vraiment",
     body: "L'accès n'est que la première étape. Go Top SEO vérifie automatiquement si votre entreprise apparaît dans les réponses de ChatGPT, de Gemini et de Google AI, et suit vos positions sur Google et sur Maps chaque mois.",
     button: 'Essayez 7 jours gratuitement, sans carte',
+  },
+  related: {
+    title: 'Pour aller plus loin',
+    lead: 'L’accès des robots d’IA n’est qu’une partie du tableau. Ces trois pages couvrent le reste.',
+    aiVisibility: 'Suivi de la visibilité dans les réponses d’IA',
+    freeCheck: 'Analyse SEO gratuite de votre site',
+    pricing: 'Offres et tarifs',
   },
 }
 
@@ -493,6 +724,8 @@ const it: AiCrawlerCopy = {
     answer: { label: 'Risposta dal vivo', blurb: 'Carica la pagina nel momento in cui qualcuno fa una domanda, per citarti nella risposta con un collegamento.' },
     search: { label: 'Indice', blurb: 'Costruisce un indice di ricerca, su cui si appoggiano anche le risposte IA.' },
     ads: { label: 'Annunci', blurb: 'Controlla le pagine di destinazione degli annunci. Bloccarlo non influisce né sulle risposte né sull’indice.' },
+    preview: { label: 'Anteprima del link', blurb: 'Crea il titolo e l’immagine mostrati quando qualcuno condivide il link. Bloccarlo lascia la condivisione vuota.' },
+    agent: { label: 'Agente nel browser', blurb: 'Un browser guidato da un agente IA per una persona. Bloccarlo non cambia ciò che il modello sa: impedisce ai vostri visitatori di chiedere a un assistente di fare qualcosa sul vostro sito.' },
   },
   groups: { ai: 'Crawler IA', classic: 'Crawler di ricerca classici' },
   reference: {
@@ -502,6 +735,29 @@ const it: AiCrawlerCopy = {
     colAgent: 'User-agent',
     colOperator: 'Gestito da',
     colPurpose: 'A quale scopo',
+    undocumented: 'Nessuna pagina dell’operatore documenta questo token. È elencato perché compare nei log del server, e resta separato dalle righe che si basano sulla documentazione dell’operatore stesso.',
+  },
+  measurement: {
+    title: 'Quanti siti li bloccano davvero',
+    intro: 'Alla data indicata qui sotto abbiamo letto il robots.txt dei siti meglio posizionati nei mercati elencati qui e li abbiamo confrontati con la tabella sopra.',
+    headline: 'Tra i siti che bloccano GPTBot, {pct} bloccano anche un crawler di IA che avrebbe portato loro visitatori.',
+    caveat: 'Si tratta di siti grandi e molto ben posizionati, non di piccole imprese. Tra le piccole imprese il quadro è probabilmente diverso: meno blocchi deliberati e più trascuratezza. Non leggete questi numeri come un ritratto delle piccole imprese.',
+    notSampled: 'Brasile e Portogallo non erano nel campione. Il dato .com è la fetta globale in lingua inglese e non è un dato di nessuno dei due paesi.',
+    measuredOnLabel: 'Misurato il',
+    colMarket: 'Mercato',
+    colShare: 'Bloccano un crawler di IA che porta visite',
+    sampleNote: 'Le percentuali sono su {n} file robots.txt effettivamente letti, non sui domini interrogati.',
+    downloads: 'La misurazione completa, come dati aperti:',
+    perSite: "Il {on} li abbiamo riletti, conservando questa volta ogni dominio. Tra i siti che bloccano GPTBot, {deliberate} hanno scritto una regola che lo nomina: il blocco è stato una decisione. Tra quelli che bloccano OAI-SearchBot, il crawler dietro le risposte che le persone leggono, {inherited} non l'hanno mai scelto: il blocco veniva da una regola rivolta a tutti i bot indistintamente.",
+    perSiteNote: 'Questa seconda lettura copre {read} file letti su {requested} domini richiesti. {refused} host hanno rifiutato questo lettore, e un host che rifiuta un lettore automatico sconosciuto è plausibilmente un host che limita i crawler di IA: questa lettura quindi sottostima il blocco anziché esagerarlo.',
+    perSiteDownloads: 'Ogni dominio, con il suo verdetto, il gruppo di regole che ha deciso e la riga esatta:',
+    perMarketTitle: 'Per suffisso di paese',
+    perMarketLead: 'La stessa lettura, divisa per suffisso. Ogni percentuale di una riga è sui file letti in quel suffisso, non sui cento domini richiesti.',
+    colRead: 'File letti',
+    colGptbot: 'Bloccano GPTBot',
+    colOaiSearchbot: 'Bloccano OAI-SearchBot',
+    labelDeliberate: 'di cui deliberati',
+    labelInherited: 'di cui ereditati',
   },
   limits: {
     title: 'Cosa questa verifica non può dirti',
@@ -516,6 +772,13 @@ const it: AiCrawlerCopy = {
     title: 'Scopri se l’IA ti nomina davvero',
     body: 'L’accesso è solo il primo passo. Go Top SEO verifica automaticamente se la tua attività compare nelle risposte di ChatGPT, Gemini e Google AI, e segue le tue posizioni su Google e su Maps ogni mese.',
     button: 'Provalo 7 giorni gratis, senza carta',
+  },
+  related: {
+    title: 'Da dove continuare',
+    lead: 'L’accesso dei crawler di IA è solo una parte del quadro. Queste tre pagine coprono il resto.',
+    aiVisibility: 'Monitoraggio della visibilità nelle risposte di IA',
+    freeCheck: 'Analisi SEO gratuita del sito',
+    pricing: 'Piani e prezzi',
   },
 }
 
@@ -570,6 +833,8 @@ const ja: AiCrawlerCopy = {
     answer: { label: 'その場での回答', blurb: '誰かが質問したその時にページを取得し、回答の中でリンク付きで引用します。' },
     search: { label: '検索インデックス', blurb: '検索インデックスを作ります。AIの回答もこの上に成り立っています。' },
     ads: { label: '広告', blurb: '広告のリンク先ページを確認します。拒否しても、回答にも検索インデックスにも影響しません。' },
+    preview: { label: 'リンクプレビュー', blurb: 'リンクが共有されたときに表示されるタイトルと画像を作ります。拒否すると共有が空のまま表示されます。' },
+    agent: { label: 'Agent im Browser', blurb: 'Ein Browser, den ein KI-Agent für eine Person steuert. Ihn zu blockieren ändert nichts an dem, was ein Modell weiß: es verhindert, dass Ihre Besucher einen Assistenten auf Ihrer Seite etwas tun lassen.' },
   },
   groups: { ai: 'AIクローラー', classic: '従来の検索クローラー' },
   reference: {
@@ -579,6 +844,29 @@ const ja: AiCrawlerCopy = {
     colAgent: 'User-agent',
     colOperator: '運営元',
     colPurpose: '何のためか',
+    undocumented: 'この製品トークンを記載した運営者自身のページは見つかっていません。サーバーログで見かけるため掲載していますが、運営者の文書に基づく行とは分けてあります。',
+  },
+  measurement: {
+    title: 'どれだけのサイトが実際にブロックしているか',
+    intro: '下記の日付に、ここに挙げた各市場で上位にあるサイトの robots.txt を読み、上の表と突き合わせました。',
+    headline: 'GPTBot をブロックしているサイトのうち、{pct} は訪問者を連れてくるはずの AI クローラーも併せてブロックしています。',
+    caveat: '対象は上位にある大規模サイトであり、小規模事業者ではありません。小規模事業者では、意図的なブロックは少なく放置が多い、という別の姿になる可能性が高いです。これらの数値を小規模事業者の実態として読まないでください。',
+    notSampled: 'ブラジルとポルトガルは標本に含まれていません。.com の数値は英語圏のグローバルな区分であり、いずれの国の数値でもありません。',
+    measuredOnLabel: '測定日',
+    colMarket: '市場',
+    colShare: '訪問者を連れてくる AI クローラーをブロック',
+    sampleNote: '割合は、実際に読み取れた robots.txt {n} 件に対するものであり、リクエストしたドメイン数に対するものではありません。',
+    downloads: '測定結果の全体は、オープンデータとして公開しています：',
+    perSite: '{on}に、今回はすべてのドメインを残したうえで再度読み取りました。GPTBot をブロックしているサイトのうち {deliberate} は GPTBot を名指しした規則を書いており、ブロックは判断の結果です。一方、利用者が目にする回答の裏側で動く OAI-SearchBot をブロックしているサイトのうち {inherited} は、それを選んでいません。すべてのボットを一律に対象とする規則から来たブロックです。',
+    perSiteNote: 'この再読み取りは、要求した {requested} ドメインのうち読み取れた {read} 件が対象です。{refused} 件のホストはこの読み取りを拒否しました。正体の分からない自動読み取りを拒否するホストは AI クローラーも制限している可能性が高いため、この数値はブロックの実態を過大にではなく過小に示していると考えられます。',
+    perSiteDownloads: '各ドメインの判定、判定した規則グループ、そして該当行そのもの：',
+    perMarketTitle: '国別トップレベルごと',
+    perMarketLead: '同じ読み取りをトップレベルで分けたものです。各行の割合はそのトップレベルで読めたファイルに対するものであり、要求したドメイン数に対するものではありません。',
+    colRead: '読めたファイル',
+    colGptbot: 'GPTBotをブロック',
+    colOaiSearchbot: 'OAI-SearchBotをブロック',
+    labelDeliberate: 'うち意図的',
+    labelInherited: 'うち継承',
   },
   limits: {
     title: 'この確認では分からないこと',
@@ -593,6 +881,13 @@ const ja: AiCrawlerCopy = {
     title: 'AIが実際に自社に言及しているかを確かめる',
     body: 'アクセスできるかどうかは最初の一歩にすぎません。Go Top SEOは、ChatGPT、Gemini、Google AIの回答に自社が出てくるかを自動で確認し、GoogleとGoogleマップでの順位を毎月追跡します。',
     button: '7日間の無料トライアル、クレジットカードは不要',
+  },
+  related: {
+    title: 'ここから先は',
+    lead: 'AIクローラーのアクセスは全体の一部です。残りはこの三つのページが扱います。',
+    aiVisibility: 'AIの回答での露出をモニタリング',
+    freeCheck: 'サイトの無料SEOチェック',
+    pricing: 'プランと料金',
   },
 }
 
@@ -647,6 +942,8 @@ const de: AiCrawlerCopy = {
     answer: { label: 'Antwort in Echtzeit', blurb: 'Holt die Seite in dem Moment, in dem jemand fragt, und zitiert sie mit Link in der Antwort.' },
     search: { label: 'Suchindex', blurb: 'Baut den Suchindex, auf dem auch die KI-Antworten aufsetzen.' },
     ads: { label: 'Werbung', blurb: 'Prüft die Zielseiten von Anzeigen. Eine Blockade wirkt sich weder auf Antworten noch auf den Suchindex aus.' },
+    preview: { label: 'Link-Vorschau', blurb: 'Erstellt Titel und Bild, die beim Teilen des Links erscheinen. Eine Blockade lässt den geteilten Link leer aussehen.' },
+    agent: { label: 'ブラウザのエージェント', blurb: '一人の利用者のために AI エージェントが操作するブラウザです。遮断してもモデルが知る内容は変わらず、来訪者があなたのサイトでアシスタントに作業を頼めなくなります。' },
   },
   groups: { ai: 'KI-Crawler', classic: 'Klassische Suchmaschinen-Crawler' },
   reference: {
@@ -656,6 +953,29 @@ const de: AiCrawlerCopy = {
     colAgent: 'User-agent',
     colOperator: 'Betreiber',
     colPurpose: 'Zweck',
+    undocumented: 'Keine Seite des Betreibers dokumentiert dieses Token. Es steht hier, weil es in Server-Logs auftaucht, und bleibt getrennt von den Zeilen, die auf der Dokumentation des Betreibers selbst beruhen.',
+  },
+  measurement: {
+    title: 'Wie viele Websites sie tatsächlich blockieren',
+    intro: 'Zum unten genannten Datum haben wir die robots.txt der am besten platzierten Websites in den hier aufgeführten Märkten gelesen und mit der Tabelle oben verglichen.',
+    headline: 'Von den Websites, die GPTBot blockieren, blockieren {pct} auch einen KI-Crawler, der ihnen Besucher gebracht hätte.',
+    caveat: 'Das sind große, sehr gut platzierte Websites, keine kleinen Unternehmen. Bei kleinen Unternehmen dürfte das Bild anders aussehen: weniger bewusste Sperren und mehr Vernachlässigung. Lesen Sie diese Zahlen nicht als Bild der kleinen Unternehmen.',
+    notSampled: 'Brasilien und Portugal waren nicht in der Stichprobe. Die Zahl für .com ist der globale englischsprachige Ausschnitt und keine Zahl für eines der beiden Länder.',
+    measuredOnLabel: 'Gemessen am',
+    colMarket: 'Markt',
+    colShare: 'Blockieren einen KI-Crawler, der Besucher bringt',
+    sampleNote: 'Die Prozentwerte beziehen sich auf {n} tatsächlich gelesene robots.txt-Dateien, nicht auf die angefragten Domains.',
+    downloads: 'Die vollständige Messung, als offene Daten:',
+    perSite: 'Am {on} haben wir sie erneut gelesen und diesmal jede Domain behalten. Von den Seiten, die GPTBot blockieren, haben {deliberate} eine Regel geschrieben, die ihn namentlich nennt — die Blockade war also eine Entscheidung. Von den Seiten, die OAI-SearchBot blockieren, den Crawler hinter den angezeigten Antworten, haben {inherited} ihn nie gewählt: die Blockade kam aus einer Regel, die alle Bots gleichermaßen trifft.',
+    perSiteNote: 'Diese zweite Lesung umfasst {read} lesbare Dateien von {requested} angefragten Domains. {refused} Hosts haben diesen Leser abgewiesen, und ein Host, der einen unbekannten automatischen Leser abweist, beschränkt plausibel auch KI-Crawler. Diese Lesung unterschätzt die Blockade daher eher, als dass sie sie übertreibt.',
+    perSiteDownloads: 'Jede Domain, mit ihrem Verdikt, der Regelgruppe, die entschieden hat, und der genauen Zeile:',
+    perMarketTitle: 'Nach Ländersuffix',
+    perMarketLead: 'Dieselbe Messung, nach Suffix aufgeteilt. Jeder Anteil in einer Zeile bezieht sich auf die in diesem Suffix gelesenen Dateien, nicht auf die hundert angefragten Domains.',
+    colRead: 'Gelesene Dateien',
+    colGptbot: 'Sperren GPTBot',
+    colOaiSearchbot: 'Sperren OAI-SearchBot',
+    labelDeliberate: 'davon bewusst',
+    labelInherited: 'davon geerbt',
   },
   limits: {
     title: 'Was diese Prüfung nicht zeigt',
@@ -670,6 +990,13 @@ const de: AiCrawlerCopy = {
     title: 'Herausfinden, ob die KI Ihr Unternehmen wirklich nennt',
     body: 'Der Zugang ist nur der erste Schritt. Go Top SEO prüft automatisch, ob Ihr Unternehmen in den Antworten von ChatGPT, Gemini und Google AI vorkommt, und verfolgt Ihre Positionen bei Google und in Google Maps monatlich.',
     button: '7 Tage kostenlos testen, ohne Kreditkarte',
+  },
+  related: {
+    title: 'Wie es weitergeht',
+    lead: 'Der Zugang der KI-Crawler ist ein Teil des Bildes. Diese drei Seiten decken den Rest ab.',
+    aiVisibility: 'Sichtbarkeit in KI-Antworten verfolgen',
+    freeCheck: 'Kostenloser SEO-Check Ihrer Website',
+    pricing: 'Tarife und Preise',
   },
 }
 
@@ -724,6 +1051,8 @@ const pl: AiCrawlerCopy = {
     answer: { label: 'Odpowiedź w czasie rzeczywistym', blurb: 'Pobiera stronę w chwili, gdy ktoś o coś pyta, i przytacza ją z linkiem w odpowiedzi.' },
     search: { label: 'Indeks wyszukiwania', blurb: 'Buduje indeks wyszukiwania, na którym opierają się także odpowiedzi AI.' },
     ads: { label: 'Reklamy', blurb: 'Sprawdza strony docelowe reklam. Zablokowanie go nie ma wpływu na odpowiedzi ani na indeks wyszukiwania.' },
+    preview: { label: 'Podgląd linku', blurb: 'Tworzy tytuł i obraz pokazywane, gdy ktoś udostępnia link. Zablokowanie go sprawia, że udostępniony link jest pusty.' },
+    agent: { label: 'Agent in een browser', blurb: 'Een browser die een AI-agent voor één persoon bestuurt. Blokkeren verandert niets aan wat een model weet: het voorkomt dat uw bezoekers een assistent iets op uw site laten doen.' },
   },
   groups: { ai: 'Roboty AI', classic: 'Klasyczne roboty wyszukiwarek' },
   reference: {
@@ -733,6 +1062,29 @@ const pl: AiCrawlerCopy = {
     colAgent: 'User-agent',
     colOperator: 'Właściciel',
     colPurpose: 'Cel',
+    undocumented: 'Żadna strona operatora nie dokumentuje tego tokenu. Jest tu wymieniony, bo pojawia się w logach serwera, i pozostaje oddzielony od wierszy opartych na dokumentacji samego operatora.',
+  },
+  measurement: {
+    title: 'Ile witryn naprawdę je blokuje',
+    intro: 'W podanej niżej dacie przeczytaliśmy pliki robots.txt najwyżej notowanych witryn na wymienionych tu rynkach i porównaliśmy je z tabelą powyżej.',
+    headline: 'Spośród witryn blokujących GPTBota {pct} blokuje także robota AI, który przyprowadziłby im odwiedzających.',
+    caveat: 'To duże, wysoko notowane witryny, a nie małe firmy. W małych firmach obraz jest prawdopodobnie inny: mniej świadomych blokad, więcej zaniedbania. Nie czytaj tych liczb jako obrazu małych firm.',
+    notSampled: 'Brazylii i Portugalii nie było w próbie. Wynik dla .com to globalny wycinek anglojęzyczny i nie jest wynikiem żadnego z tych krajów.',
+    measuredOnLabel: 'Zmierzono',
+    colMarket: 'Rynek',
+    colShare: 'Blokują robota AI, który przyprowadza odwiedzających',
+    sampleNote: 'Odsetki liczone są od {n} rzeczywiście odczytanych plików robots.txt, a nie od liczby zapytanych domen.',
+    downloads: 'Cały pomiar, jako dane otwarte:',
+    perSite: '{on} przeczytaliśmy je ponownie, tym razem zachowując każdą domenę. Spośród witryn blokujących GPTBot {deliberate} napisało regułę, która wymienia go z nazwy — blokada była więc decyzją. Spośród witryn blokujących OAI-SearchBot, robota stojącego za wyświetlanymi odpowiedziami, {inherited} nigdy go nie wybrało: blokada wynikła z reguły skierowanej do wszystkich botów jednakowo.',
+    perSiteNote: 'Ta druga lektura obejmuje {read} odczytanych plików z {requested} żądanych domen. {refused} serwerów odmówiło temu czytnikowi, a serwer, który odmawia nieznanemu automatycznemu czytnikowi, prawdopodobnie ogranicza też roboty AI — ten odczyt raczej zaniża skalę blokowania, niż ją zawyża.',
+    perSiteDownloads: 'Każda domena, z jej wynikiem, grupą reguł, która zdecydowała, i dokładną linią:',
+    perMarketTitle: 'Według końcówki kraju',
+    perMarketLead: 'Ten sam odczyt, podzielony według końcówki. Każdy udział w wierszu dotyczy plików odczytanych w tej końcówce, a nie stu żądanych domen.',
+    colRead: 'Odczytane pliki',
+    colGptbot: 'Blokują GPTBot',
+    colOaiSearchbot: 'Blokują OAI-SearchBot',
+    labelDeliberate: 'z tego celowo',
+    labelInherited: 'z tego odziedziczone',
   },
   limits: {
     title: 'Czego to sprawdzenie nie pokazuje',
@@ -747,6 +1099,13 @@ const pl: AiCrawlerCopy = {
     title: 'Sprawdźmy, czy AI naprawdę wymienia Państwa firmę',
     body: 'Dostęp to dopiero pierwszy krok. Go Top SEO automatycznie sprawdza, czy Państwa firma pojawia się w odpowiedziach ChatGPT, Gemini i Google AI, i co miesiąc monitoruje pozycje w Google oraz w Mapach Google.',
     button: 'Wypróbuj 7 dni bezpłatnie, bez karty kredytowej',
+  },
+  related: {
+    title: 'Co dalej',
+    lead: 'Dostęp robotów AI to jedna część obrazu. Pozostałą część opisują te trzy strony.',
+    aiVisibility: 'Monitorowanie widoczności w odpowiedziach AI',
+    freeCheck: 'Darmowa analiza SEO strony',
+    pricing: 'Plany i ceny',
   },
 }
 
@@ -801,6 +1160,8 @@ const nl: AiCrawlerCopy = {
     answer: { label: 'Antwoord in real time', blurb: 'Haalt de pagina op het moment dat iemand iets vraagt, en citeert die met een link in het antwoord.' },
     search: { label: 'Zoekindex', blurb: 'Bouwt de zoekindex waarop ook de AI-antwoorden rusten.' },
     ads: { label: 'Advertenties', blurb: 'Controleert de bestemmingspagina’s van advertenties. Een blokkade heeft geen gevolgen voor antwoorden of voor de zoekindex.' },
+    preview: { label: 'Linkvoorbeeld', blurb: 'Maakt de titel en afbeelding die te zien zijn als iemand de link deelt. Een blokkade laat de gedeelde link leeg.' },
+    agent: { label: 'Agent w przeglądarce', blurb: 'Przeglądarka, którą agent AI prowadzi dla jednej osoby. Zablokowanie nie zmienia tego, co wie model: uniemożliwia Państwa gościom poproszenie asystenta, by czegoś w witrynie dokonał.' },
   },
   groups: { ai: 'AI-crawlers', classic: 'Klassieke zoekmachinecrawlers' },
   reference: {
@@ -810,6 +1171,29 @@ const nl: AiCrawlerCopy = {
     colAgent: 'User-agent',
     colOperator: 'Eigenaar',
     colPurpose: 'Doel',
+    undocumented: 'Geen enkele pagina van de exploitant documenteert dit token. Het staat hier omdat het in serverlogs voorkomt, en blijft gescheiden van de rijen die op de eigen documentatie van de exploitant rusten.',
+  },
+  measurement: {
+    title: 'Hoeveel websites ze echt blokkeren',
+    intro: 'Op de hieronder genoemde datum hebben wij de robots.txt gelezen van de hoogst genoteerde websites in de hier vermelde markten en die vergeleken met de tabel hierboven.',
+    headline: 'Van de websites die GPTBot blokkeren, blokkeert {pct} ook een AI-crawler die hun bezoekers zou hebben gebracht.',
+    caveat: 'Dit zijn grote, hoog genoteerde websites, geen kleine bedrijven. Bij kleine bedrijven ziet het beeld er vermoedelijk anders uit: minder bewuste blokkades en meer verwaarlozing. Lees deze cijfers niet als een beeld van kleine bedrijven.',
+    notSampled: 'Brazilië en Portugal zaten niet in de steekproef. Het cijfer voor .com is het wereldwijde Engelstalige deel en is geen cijfer voor een van beide landen.',
+    measuredOnLabel: 'Gemeten op',
+    colMarket: 'Markt',
+    colShare: 'Blokkeren een AI-crawler die bezoekers brengt',
+    sampleNote: 'De percentages gaan over {n} daadwerkelijk gelezen robots.txt-bestanden, niet over de opgevraagde domeinen.',
+    downloads: 'De volledige meting, als open data:',
+    perSite: 'Op {on} hebben we ze opnieuw gelezen, en deze keer elk domein bewaard. Van de sites die GPTBot blokkeren schreef {deliberate} een regel die hem met naam noemt — de blokkade was dus een beslissing. Van de sites die OAI-SearchBot blokkeren, de crawler achter de antwoorden die mensen te zien krijgen, koos {inherited} hem nooit: die blokkade kwam uit een regel die op alle bots tegelijk is gericht.',
+    perSiteNote: 'Die tweede lezing dekt {read} leesbare bestanden van {requested} opgevraagde domeinen. {refused} hosts weigerden deze lezer, en een host die een onbekende automatische lezer weigert, beperkt vermoedelijk ook AI-crawlers. Deze lezing onderschat de blokkade dus eerder dan dat ze die overdrijft.',
+    perSiteDownloads: 'Elk domein, met zijn oordeel, de regelgroep die besliste en de exacte regel:',
+    perMarketTitle: 'Per landsuffix',
+    perMarketLead: 'Dezelfde meting, uitgesplitst per suffix. Elk aandeel in een rij gaat over de bestanden die in dat suffix gelezen zijn, niet over de honderd opgevraagde domeinen.',
+    colRead: 'Gelezen bestanden',
+    colGptbot: 'Blokkeren GPTBot',
+    colOaiSearchbot: 'Blokkeren OAI-SearchBot',
+    labelDeliberate: 'waarvan bewust',
+    labelInherited: 'waarvan overgenomen',
   },
   limits: {
     title: 'Wat deze controle niet laat zien',
@@ -824,6 +1208,13 @@ const nl: AiCrawlerCopy = {
     title: 'Uitzoeken of de AI uw bedrijf echt noemt',
     body: 'De toegang is pas de eerste stap. Go Top SEO controleert automatisch of uw bedrijf voorkomt in de antwoorden van ChatGPT, Gemini en Google AI, en volgt uw posities in Google en in Google Maps maandelijks.',
     button: '7 dagen gratis uitproberen, zonder creditcard',
+  },
+  related: {
+    title: 'Hoe het verdergaat',
+    lead: 'De toegang van AI-crawlers is één deel van het beeld. Deze drie pagina’s dekken de rest.',
+    aiVisibility: 'Zichtbaarheid in AI-antwoorden volgen',
+    freeCheck: 'Gratis SEO-controle van uw site',
+    pricing: 'Pakketten en prijzen',
   },
 }
 

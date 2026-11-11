@@ -1,3 +1,4 @@
+import { buildHreflangAlternates } from '@/lib/seo/hreflang'
 import Link from 'next/link'
 import { LEGAL_FOOTNOTE, LEGAL_LINK, LegalFrame, LegalHeader, SitemapGroups } from '@/components/public/LegalDoc'
 import { authHref } from '@/lib/i18n/auth-href'
@@ -10,6 +11,14 @@ export const metadata = {
     description: 'Mapa do site do Go Top SEO',
     url: 'https://www.gotopseo.com/pt-BR/sitemap',
     locale: 'pt_BR',
+  },
+  alternates: {
+    canonical: 'https://www.gotopseo.com/pt-BR/sitemap',
+    // The ten maps are one page in ten languages. Without this block the
+    // page inherits the root layout's alternates, which name the ten HOME
+    // pages as this page's translations and (in Hebrew) canonicalise the map
+    // to the home page — measured 11.11.2026 on all ten.
+    languages: buildHreflangAlternates('/sitemap', '/en/sitemap', '/es/sitemap'),
   },
 }
 
@@ -24,6 +33,9 @@ export default function PortugueseSitemapPage() {
         { label: 'Preços', href: '/pt-BR/pricing' },
         { label: 'Quem somos', href: '/pt-BR/about' },
         { label: 'Artigos', href: '/pt-BR/articles' },
+        { label: 'Análise gratuita', href: '/pt-BR/free-check' },
+        { label: 'Quais rastreadores de IA o seu site bloqueia?', href: '/pt-BR/ai-crawlers' },
+        { label: 'Programa de afiliados', href: '/pt-BR/affiliates' },
       ],
     },
     {
@@ -61,9 +73,14 @@ export default function PortugueseSitemapPage() {
     {
       title: 'Comparativos',
       links: [
+        { label: 'Todas as comparações', href: '/pt-BR/compare' },
         { label: 'Go Top SEO x Semrush', href: '/pt-BR/compare/semrush' },
         { label: 'Go Top SEO x Yoast', href: '/pt-BR/compare/yoast' },
         { label: 'Go Top SEO x Rank Math', href: '/pt-BR/compare/rankmath' },
+        { label: 'Go Top SEO x Surfer', href: '/pt-BR/compare/surfer' },
+        { label: 'Go Top SEO x Writesonic', href: '/pt-BR/compare/writesonic' },
+        { label: 'Go Top SEO x BrightLocal', href: '/pt-BR/compare/brightlocal' },
+        { label: 'Go Top SEO x Booster SEO', href: '/pt-BR/compare/booster' },
       ],
     },
     {

@@ -3,7 +3,7 @@ title: Politica di disdetta e di rimborso | Go Top SEO
 description: Come disdire un abbonamento Go Top SEO e in quali casi viene concesso un rimborso.
 locale: it
 source: app/(public)/en/refund-policy/page.tsx
-lastUpdated: 2026-10-21
+lastUpdated: 2026-11-07
 register: lei
 extraSections: 1
 extraReason: The Italian and European right of withdrawal of fourteen days (art. 52 of the Codice del Consumo, d.lgs. 206/2005) is set out in a section of its own, because a right that a consumer would have to infer from the words "where the law requires" is a right that the same code treats as not having been given at all (arts. 49 and 53).
@@ -39,7 +39,7 @@ L'articolo 52 del Codice del Consumo (decreto legislativo 6 settembre 2005, n. 2
 
 **Come esercitarlo.** Ci scriva a [oren@gotop.co.il](mailto:oren@gotop.co.il) dall'indirizzo di posta elettronica del Suo account, entro il termine di quattordici giorni, dichiarando che recede. È sufficiente un messaggio di posta elettronica senza formule particolari; il modulo tipo di recesso dell'allegato I, parte B, del Codice del Consumo è disponibile su semplice richiesta al medesimo indirizzo. Le rispondiamo per iscritto e rimborsiamo sul mezzo di pagamento che Lei ha utilizzato, entro quattordici giorni dal ricevimento della comunicazione di recesso, come prevede l'articolo 56 del Codice del Consumo.
 
-**Che cosa cambia l'avvio immediato del Servizio.** Il Servizio è un servizio digitale che funziona dal momento dell'apertura dell'account. Aprendo un account, Lei ci chiede espressamente di cominciare a eseguirlo prima della fine del termine di quattordici giorni. Gli articoli 51, comma 8, 57, comma 3, e 59, comma 1, lettera a), del Codice del Consumo ne traggono due conseguenze, e noi le diciamo entrambe: se il Servizio è **pienamente eseguito** prima della fine del termine, su Sua richiesta espressa e dopo che Lei ha riconosciuto espressamente di perdere il diritto di recesso a esecuzione completata, quel diritto è perduto; e se Lei recede quando il Servizio è stato eseguito solo in parte, il diritto permane e Lei ci deve soltanto l'importo proporzionale al servizio effettivamente fornito fino alla comunicazione della Sua decisione, mentre il resto Le viene rimborsato. Un abbonamento mensile in corso non è un servizio pienamente eseguito per il solo fatto che l'account è aperto: in concreto, una richiesta presentata entro i quattordici giorni ci porta a rimborsare il periodo in corso in proporzione a quanto non è stato utilizzato, e non ci nascondiamo dietro l'eccezione per rifiutare in blocco.
+**Che cosa cambia l'avvio immediato del Servizio.** Il Servizio è un servizio digitale che funziona dal momento dell'apertura dell'account. Prima di pagare un abbonamento, la schermata «Fatturazione» Le chiede due dichiarazioni in un'unica frase, che Lei deve spuntare perché le modalità di pagamento compaiano: che ci chiede espressamente di cominciare l'esecuzione prima della fine del termine di quattordici giorni, e che riconosce di perdere il diritto di recesso a esecuzione completata. Senza quella spunta nessun abbonamento comincia. Gli articoli 51, comma 8, 57, comma 3, e 59, comma 1, lettera a), del Codice del Consumo ne traggono due conseguenze, e noi le diciamo entrambe: se il Servizio è **pienamente eseguito** prima della fine del termine, su Sua richiesta espressa e dopo che Lei ha riconosciuto espressamente di perdere il diritto di recesso a esecuzione completata, quel diritto è perduto; e se Lei recede quando il Servizio è stato eseguito solo in parte, il diritto permane e Lei ci deve soltanto l'importo proporzionale al servizio effettivamente fornito fino alla comunicazione della Sua decisione, mentre il resto Le viene rimborsato. Un abbonamento mensile in corso non è un servizio pienamente eseguito per il solo fatto che l'account è aperto: in concreto, una richiesta presentata entro i quattordici giorni ci porta a rimborsare il periodo in corso in proporzione a quanto non è stato utilizzato, e non ci nascondiamo dietro l'eccezione per rifiutare in blocco.
 
 Dopo i quattordici giorni valgono le regole della sezione 4: l'abbonamento può essere disdetto in qualsiasi momento, senza rimborso del periodo già pagato, e l'accesso continua fino alla fine di quel periodo.
 
@@ -62,4 +62,4 @@ Numero di società: 517274346
 Indirizzo: HaRechasim 24/2, Ramat Gan 5235524, Israele  
 Posta elettronica: [oren@gotop.co.il](mailto:oren@gotop.co.il)
 
-Ultimo aggiornamento: 21 ottobre 2026
+Ultimo aggiornamento: 7 novembre 2026

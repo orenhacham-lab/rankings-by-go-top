@@ -43,8 +43,8 @@
  */
 
 import { randomBytes } from 'crypto'
-import { planForMarketplaceProductId, marketplaceClaimUrl } from './config'
-import { phpFormValue } from './signature'
+import { CLICKBANK_INS_SCHEME, planForMarketplaceProductId, marketplaceClaimUrl } from './config'
+import { decryptMarketplaceEnvelope, phpFormValue } from './signature'
 import type { PlanCode } from '@/lib/plans/catalog'
 
 // `any` deliberately — the convention this repo uses for anything called with
@@ -67,6 +67,27 @@ export interface MarketplaceOrderEvent {
   currency: string | null
   /** The ABSOLUTE period end the platform reported, ISO-8601, or null. */
   currentPeriodEnd: string | null
+  /**
+   * THE ORDER THIS PAYMENT RENEWS, when the platform gives a renewal an order
+   * id of its own instead of reusing the first one.
+   *
+   * Two platforms, two shapes, and the difference decides whether a paid
+   * month extends access or strands it. Digistore24 puts every charge on one
+   * `order_item_id`, so a renewal reaches the insert as a unique violation
+   * and is recognised there. JVZoo gives the rebill its own id
+   * (`transaction_id` plus `-B001`, `-B002`, …), so without this field the
+   * second month inserts a SECOND receipt, mails the customer a second claim
+   * link, and leaves the entitlement they already hold to lapse on the first
+   * month's date — a customer who keeps paying and loses access unless they
+   * click a link every month.
+   *
+   * It is the parent id only, never a guess: a parser sets it when the
+   * platform's documented id scheme says this payload is a rebill of that
+   * order, and null otherwise. An id that names an order we never recorded
+   * falls back to recording this payment as its own receipt, so a rebill is
+   * never dropped for having no parent on file.
+   */
+  renewalOfExternalOrderId?: string | null
   /**
    * TAX THE PLATFORM SAYS IT ADDED AT CHECKOUT, minor units, or null when the
    * payload carries no tax field at all.
@@ -95,12 +116,25 @@ export interface MarketplaceOrderEvent {
  *
  * A parser can only be written from the platform's own documentation — which
  * field carries the order id, how it reports the period end, which
- * notification types mean "paid" — and never from a guess. JVZoo's is below,
- * written from the IPN v2 spec read inside the seller account. ClickBank and
- * Digistore24 have none yet, and a provider with no parser refuses every
- * delivery, exactly as one with no signature scheme does.
+ * notification types mean "paid" — and never from a guess. Each of the three
+ * below cites the document it was written from, and a provider with no parser
+ * refuses every delivery, exactly as one with no signature scheme does.
+ *
+ * `secret` IS PASSED BECAUSE ONE PLATFORM ENCRYPTS ITS BODY. ClickBank's INS
+ * carries no plaintext at all (docs/affiliate/clickbank-ins-docs.md), so its
+ * parser has to decrypt the envelope before it can read a field. It is handed
+ * the same secret the signature check used and it re-derives the same
+ * plaintext; the alternative — passing the decrypted text down from the route
+ * — would mean the route decides what a parser reads, and every other parser
+ * would have to be taught about a plaintext it does not have. Parsers that do
+ * not need it ignore it, and a parser that needs it and is given nothing
+ * returns null rather than reading an unverified body.
  */
-export type MarketplaceParser = (rawBody: string, contentType: string | null) => MarketplaceOrderEvent | null
+export type MarketplaceParser = (
+  rawBody: string,
+  contentType: string | null,
+  secret?: string | null,
+) => MarketplaceOrderEvent | null
 
 /** Dollars in a form field, as minor units; null when the field is absent or unusable. */
 function dollarsToMinor(raw: string | null): number | null {
@@ -147,6 +181,22 @@ function jvzooInstant(raw: string | null): string | null {
 }
 
 /**
+ * The order a JVZoo rebill renews, or null when this is not a rebill.
+ *
+ * Their documented scheme (docs/affiliate/jvzoo-webhook-docs.md) appends
+ * `-B001`, `-B002` and so on to the original `transaction_id`. Stripping that
+ * suffix therefore names the first purchase, and it is applied ONLY to a
+ * `BILL` delivery whose id actually carries the suffix: a `BILL` without one
+ * is a shape the documentation does not describe, and inventing a parent for
+ * it would attach a payment to an order nobody can show.
+ */
+function jvzooRebillParent(type: string, transactionId: string): string | null {
+  if (type !== 'BILL') return null
+  const parent = transactionId.replace(/-B\d+$/, '')
+  return parent && parent !== transactionId ? parent : null
+}
+
+/**
  * JVZoo JVZIPN v2 — docs/affiliate/jvzoo-webhook-docs.md, copied from the
  * seller account on 2026-10-29.
  *
@@ -157,8 +207,11 @@ function jvzooInstant(raw: string | null): string | null {
  *
  * A rebill gets its own order id (`transaction_id` gains `-B001`, `-B002`, …),
  * which is what makes the UNIQUE (provider, external_order_id) idempotency
- * correct for a subscription: the second month is a new order rather than a
- * redelivery of the first.
+ * correct for a subscription: the second month is a new delivery rather than
+ * a redelivery of the first. It is NOT a second purchase, though, so it is
+ * reported as a renewal of the parent id (`renewalOfExternalOrderId`) and
+ * extends the receipt and the entitlement that first payment created, instead
+ * of inserting a second receipt and mailing a second claim link.
  *
  * `total` is in DOLLARS in v2, where v1 used pennies, so it is multiplied
  * here and never read as minor units. No currency field exists in the
@@ -171,9 +224,12 @@ export const parseJvzooIpnV2: MarketplaceParser = (rawBody) => {
   const kind = type === 'SALE' || type === 'BILL' ? 'paid' : type === 'RFND' ? 'refunded' : null
   if (!kind) return null
 
+  const transactionId = (form.get('transaction_id') ?? '').trim()
+
   return {
     kind,
-    externalOrderId: (form.get('transaction_id') ?? '').trim(),
+    externalOrderId: transactionId,
+    renewalOfExternalOrderId: jvzooRebillParent(type, transactionId),
     externalProductId: (form.get('product_id') ?? '').trim() || null,
     buyerEmail: (form.get('customer_email') ?? '').trim(),
     amountMinor: dollarsToMinor(form.get('total')),
@@ -195,6 +251,9 @@ export type MarketplaceIntakeOutcome =
   | { kind: 'recorded'; orderId: string; plan: PlanCode; claimUrl: string }
   /** A redelivery of an order already on file. Nothing changed. */
   | { kind: 'already_recorded'; externalOrderId: string }
+  /** A later payment on an order already on file: the paid period now runs
+   *  to `currentPeriodEnd`, and so does the entitlement if it was claimed. */
+  | { kind: 'renewed'; externalOrderId: string; currentPeriodEnd: string }
   /** A refund or cancellation, recorded. A person decides what it means for
    *  an entitlement already granted. */
   | { kind: 'operator_attention'; why: string; externalOrderId: string }
@@ -260,6 +319,20 @@ export async function recordMarketplaceOrder(
     }
   }
 
+  // A PAYMENT THAT NAMES THE ORDER IT RENEWS IS TRIED AS A RENEWAL FIRST, and
+  // only recorded as its own receipt if that order is not on file. Doing it in
+  // this order is what keeps a JVZoo rebill from becoming a second receipt
+  // with a second claim link; doing it the other way round would insert the
+  // row before anyone asked whether it was a renewal.
+  const renewalOf = event.renewalOfExternalOrderId?.trim()
+  if (event.kind === 'paid' && renewalOf && event.currentPeriodEnd) {
+    const renewal = await renewMarketplaceOrder(admin, provider, renewalOf, event.currentPeriodEnd)
+    // `order_unknown` is the one answer that falls through: the parent was
+    // never recorded, so this payment is all we have and it is recorded as
+    // its own receipt rather than dropped.
+    if (renewal.kind !== 'order_unknown') return renewal
+  }
+
   const email = normalizeEmail(event.buyerEmail)
   if (!email) return { kind: 'invalid_event', why: 'missing_buyer_email' }
 
@@ -290,15 +363,84 @@ export async function recordMarketplaceOrder(
     return { kind: 'write_failed', message: err instanceof Error ? err.message.slice(0, 120) : 'insert_threw' }
   }
 
-  // The retry's answer. Not an error: the first delivery already recorded it,
-  // with its own claim token, and that token is the one the buyer has.
-  if (error?.code === UNIQUE_VIOLATION) return { kind: 'already_recorded', externalOrderId }
+  // A SECOND PAYMENT ON THE SAME ORDER IS EITHER A RETRY OR A RENEWAL, and
+  // the unique constraint cannot tell them apart on its own. These platforms
+  // put a monthly renewal on the SAME order item, so it arrives here exactly
+  // as a redelivered webhook does; the one thing that distinguishes them is
+  // the period end, which a renewal moves forward and a retry repeats. So a
+  // payload carrying a period end is offered to `renew_marketplace_order`,
+  // which compares it with the one on file and answers `already_current` when
+  // there is nothing new — and a payload with no period end is the retry case
+  // by construction, with nothing to extend.
+  if (error?.code === UNIQUE_VIOLATION) {
+    if (!event.currentPeriodEnd) return { kind: 'already_recorded', externalOrderId }
+    return renewMarketplaceOrder(admin, provider, externalOrderId, event.currentPeriodEnd)
+  }
   if (error) return { kind: 'write_failed', message: (error.message || 'insert_failed').slice(0, 120) }
 
   const orderId = typeof inserted?.[0]?.id === 'string' ? (inserted[0].id as string) : ''
   if (!orderId) return { kind: 'write_failed', message: 'insert_returned_no_id' }
 
   return { kind: 'recorded', orderId, plan, claimUrl: marketplaceClaimUrl(claimToken) }
+}
+
+/**
+ * The renewal transition, as the database decides it.
+ *
+ * EVERY OUTCOME IS THE FUNCTION'S OWN WORD, never this module's guess. The
+ * reason is the one the claim path gives: the receipt and the entitlement it
+ * paid for move together or not at all, so the comparison with the period end
+ * on file and both writes happen inside one locked transaction, and this
+ * function only translates the answer.
+ *
+ * AN UNRECOGNISED ANSWER IS A FAILURE, not a success. If this module and the
+ * function ever disagree about the contract, the webhook must say so rather
+ * than acknowledge an extension that may not have happened.
+ */
+async function renewMarketplaceOrder(
+  admin: Admin,
+  provider: string,
+  externalOrderId: string,
+  currentPeriodEnd: string,
+): Promise<MarketplaceIntakeOutcome> {
+  let data: unknown
+  let error: { message?: string; code?: string } | null = null
+  try {
+    const res = await admin.rpc('renew_marketplace_order', {
+      p_provider: provider,
+      p_external_order_id: externalOrderId,
+      p_period_end: currentPeriodEnd,
+    })
+    data = res.data
+    error = res.error ?? null
+  } catch (err) {
+    return { kind: 'write_failed', message: err instanceof Error ? err.message.slice(0, 120) : 'renew_rpc_threw' }
+  }
+  if (error) return { kind: 'write_failed', message: (error.code || error.message || 'renew_rpc_failed').slice(0, 120) }
+
+  switch (typeof data === 'string' ? data : '') {
+    case 'renewed':
+      return { kind: 'renewed', externalOrderId, currentPeriodEnd }
+    // Nothing moved, because nothing is newer than what is on file. This is
+    // the ordinary answer to a retried delivery.
+    case 'already_current':
+    case 'period_end_unknown':
+      return { kind: 'already_recorded', externalOrderId }
+    // A later charge on a withdrawn order, or a claimed receipt with no
+    // entitlement carrying it. Both are contradictions a person must settle,
+    // and neither restores access on its own.
+    case 'not_renewable':
+      return { kind: 'operator_attention', why: 'renewal_on_withdrawn_order', externalOrderId }
+    case 'entitlement_missing':
+      return { kind: 'operator_attention', why: 'renewal_without_entitlement', externalOrderId }
+    // The row vanished between the insert's refusal and this call, which can
+    // only happen if something deleted it — and nothing in the application
+    // does.
+    case 'order_unknown':
+      return { kind: 'order_unknown', externalOrderId }
+    default:
+      return { kind: 'write_failed', message: 'unrecognised_renew_outcome' }
+  }
 }
 
 /**
@@ -395,14 +537,14 @@ export function unverifiedDeliveryTrace(rawBody: string): Record<string, string>
  * `order_unknown` and leave a refunded buyer's access untouched. That is the
  * failure that matters, so the item id wins.
  *
- * THE COST, STATED RATHER THAN HIDDEN: a monthly renewal is another
- * transaction on the SAME order item, so it arrives as `already_recorded` and
- * does NOT extend `current_period_end` on its own. A renewal that fails to
- * extend access is a customer who complains; the alternative reading, where a
- * refunded order keeps its access, is a customer who paid nothing and keeps
- * everything. Until renewal handling exists, the first Digistore24
- * subscription month is correct and the second needs a person. This is
- * tracked, not forgotten.
+ * THE CONSEQUENCE, AND HOW IT IS NOW HANDLED: a monthly renewal is another
+ * transaction on the SAME order item, so it reaches the insert as a unique
+ * violation, exactly as a redelivered webhook does. The two are told apart by
+ * the period end — a renewal moves it forward, a retry repeats it — and the
+ * renewal transition in the database makes that comparison under a lock and
+ * extends the receipt, and the entitlement it paid for once claimed
+ * (supabase/migrations/20261109120000_marketplace_renewal.sql). Before that
+ * transition existed the second month needed a person; it no longer does.
  *
  * A TEST ORDER MUST NOT BECOME A REAL PLAN, but only an EXPLICIT `test`
  * refuses: `api_mode` absent is treated as live. Failing closed on a missing
@@ -463,6 +605,114 @@ function digistore24Date(raw: string | null): string | null {
   return null
 }
 
+/**
+ * ClickBank INS 8.0 — docs/affiliate/clickbank-ins-docs.md, captured from
+ * their own public support article on 2026-11-07.
+ *
+ * THE BODY IS CIPHERTEXT, so this parser starts by decrypting it with the same
+ * secret and the same scheme the route already verified with. That decryption
+ * IS the authentication on this platform, which is why it cannot be skipped
+ * here either: a parser handed no secret, or an envelope that does not decrypt
+ * into JSON, returns null and acts on nothing.
+ *
+ * `receipt` is the order id, not `transactionTime` and not an invented
+ * composite: their page documents it as the receipt id of the transaction.
+ * `lineItems[0].itemNo` is the product SKU, which is what maps a delivery to
+ * one of our plans.
+ *
+ * THE PERIOD END IS NULL, AND THAT IS THE DOCUMENTED TRUTH. Version 8 has no
+ * next-payment date — the legacy v2 `cnextpaymentdate` was dropped and a v8
+ * line item says only `recurring: true|false`. Inventing "a month from now"
+ * would grant a period nobody reported, so the order is recorded and mailed
+ * and its claim stops at `needs_operator / period_end_unknown` until a person
+ * grants it. The fix is their Orders API, not a guess here.
+ *
+ * THE TEST FAMILY IS REFUSED EXPLICITLY. `TEST`, `TEST_SALE`, `TEST_BILL`,
+ * `TEST_RFND` and the two test-rebill types all fall through to null, like
+ * every other type that moved no money. Unlike Digistore24 there is no
+ * `api_mode` flag to read: the type itself is the flag.
+ */
+export const parseClickbankIns: MarketplaceParser = (rawBody, _contentType, secret) => {
+  if (!secret) return null
+  const plaintext = decryptMarketplaceEnvelope(rawBody, secret, CLICKBANK_INS_SCHEME)
+  if (plaintext === null) return null
+
+  let body: Record<string, unknown>
+  try {
+    const parsed: unknown = JSON.parse(plaintext)
+    if (typeof parsed !== 'object' || parsed === null) return null
+    body = parsed as Record<string, unknown>
+  } catch {
+    return null
+  }
+
+  const type = typeof body.transactionType === 'string' ? body.transactionType.trim().toUpperCase() : ''
+  const kind =
+    type === 'SALE' || type === 'BILL'
+      ? 'paid'
+      : type === 'RFND' || type === 'CGBK' || type === 'INSF'
+        ? 'refunded'
+        : null
+  // CANCEL-REBILL, UNCANCEL-REBILL, SUBSCRIPTION-CHG, ABANDONED_ORDER, the
+  // customer-notification types and the whole TEST family land here. A
+  // cancellation among them for the same reason as on Digistore24: the buyer
+  // keeps what they paid for until the period ends.
+  if (!kind) return null
+
+  const customer = asRecord(body.customer)
+  const email =
+    stringField(asRecord(customer?.billing), 'email') ?? stringField(asRecord(customer?.shipping), 'email') ?? ''
+  const firstItem = Array.isArray(body.lineItems) ? asRecord(body.lineItems[0]) : null
+
+  return {
+    kind,
+    externalOrderId: stringField(body, 'receipt') ?? '',
+    externalProductId: firstItem ? stringField(firstItem, 'itemNo') : null,
+    buyerEmail: email,
+    amountMinor: majorToMinor(body.totalOrderAmount),
+    currency: typeof body.currency === 'string' && /^[A-Za-z]{3}$/.test(body.currency.trim())
+      ? body.currency.trim().toUpperCase()
+      : null,
+    // ClickBank is the seller of record (lib/marketplace/config.ts), so tax
+    // here is the channel working as intended and the webhook's contradiction
+    // report is scoped away from it. Carried so the report stays one code path.
+    taxMinor: majorToMinor(body.totalTaxAmount),
+    currentPeriodEnd: null,
+  }
+}
+
+/** A nested object, or null for anything that is not one. */
+function asRecord(value: unknown): Record<string, unknown> | null {
+  return typeof value === 'object' && value !== null && !Array.isArray(value)
+    ? (value as Record<string, unknown>)
+    : null
+}
+
+/** A non-empty string field, trimmed, or null. */
+function stringField(source: Record<string, unknown> | null, name: string): string | null {
+  const value = source?.[name]
+  if (typeof value !== 'string') return null
+  return value.trim() || null
+}
+
+/**
+ * A major-unit amount from a JSON body, as minor units.
+ *
+ * It accepts a number OR a numeric string because JSON amounts arrive as both
+ * in the wild, and it rejects everything else rather than coercing: `null`,
+ * `true` and `""` all become null, not 0. A zero amount we were actually sent
+ * stays 0, which is what makes the webhook's tax check able to tell "no tax
+ * field" from "tax of zero".
+ */
+function majorToMinor(value: unknown): number | null {
+  if (typeof value === 'number') return Number.isFinite(value) ? Math.round(value * 100) : null
+  if (typeof value !== 'string') return null
+  const trimmed = value.trim()
+  if (!trimmed) return null
+  const major = Number.parseFloat(trimmed)
+  return Number.isFinite(major) ? Math.round(major * 100) : null
+}
+
 /*
  * The registry sits at the end of the file so it can name every parser
  * above it: these are `const` arrow functions, which are not hoisted, and a
@@ -471,6 +721,7 @@ function digistore24Date(raw: string | null): string | null {
 export const MARKETPLACE_PARSERS: Readonly<Record<string, MarketplaceParser>> = {
   jvzoo: parseJvzooIpnV2,
   digistore24: parseDigistore24Ipn,
+  clickbank: parseClickbankIns,
 }
 
 export function marketplaceParser(slug: string): MarketplaceParser | null {

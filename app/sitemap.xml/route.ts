@@ -189,6 +189,13 @@ export async function GET() {
       priority: '0.8',
     },
     // Hebrew comparison pages
+    // The comparison index, the parent of the six comparison pages.
+    {
+      url: `${baseUrl}/compare`,
+      lastmod: today,
+      changefreq: 'monthly',
+      priority: '0.7',
+    },
     {
       url: `${baseUrl}/compare/semrush`,
       lastmod: today,
@@ -221,6 +228,12 @@ export async function GET() {
     },
     {
       url: `${baseUrl}/compare/writesonic`,
+      lastmod: today,
+      changefreq: 'monthly',
+      priority: '0.7',
+    },
+    {
+      url: `${baseUrl}/compare/booster`,
       lastmod: today,
       changefreq: 'monthly',
       priority: '0.7',
@@ -361,6 +374,13 @@ export async function GET() {
       priority: '0.8',
     },
     // English comparison pages
+    // The comparison index, the parent of the six comparison pages.
+    {
+      url: `${baseUrl}/en/compare`,
+      lastmod: today,
+      changefreq: 'monthly',
+      priority: '0.7',
+    },
     {
       url: `${baseUrl}/en/compare/semrush`,
       lastmod: today,
@@ -393,6 +413,12 @@ export async function GET() {
     },
     {
       url: `${baseUrl}/en/compare/writesonic`,
+      lastmod: today,
+      changefreq: 'monthly',
+      priority: '0.7',
+    },
+    {
+      url: `${baseUrl}/en/compare/booster`,
       lastmod: today,
       changefreq: 'monthly',
       priority: '0.7',
@@ -433,12 +459,14 @@ export async function GET() {
     { path: '/solutions/shopify', changefreq: 'monthly', priority: '0.7' },
     { path: '/features/site-links', changefreq: 'monthly', priority: '0.7' },
     { path: '/features/google-maps-posts', changefreq: 'monthly', priority: '0.7' },
+    { path: '/compare', changefreq: 'monthly', priority: '0.7' },
     { path: '/compare/semrush', changefreq: 'monthly', priority: '0.7' },
     { path: '/compare/yoast', changefreq: 'monthly', priority: '0.7' },
     { path: '/compare/rankmath', changefreq: 'monthly', priority: '0.7' },
     { path: '/compare/surfer', changefreq: 'monthly', priority: '0.7' },
     { path: '/compare/brightlocal', changefreq: 'monthly', priority: '0.7' },
     { path: '/compare/writesonic', changefreq: 'monthly', priority: '0.7' },
+    { path: '/compare/booster', changefreq: 'monthly', priority: '0.7' },
   ]
 
   const treePages = (prefix: string) =>

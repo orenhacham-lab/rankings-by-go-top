@@ -1,3 +1,4 @@
+import { buildHreflangAlternates } from '@/lib/seo/hreflang'
 import Link from 'next/link'
 import { LEGAL_FOOTNOTE, LEGAL_LINK, LegalFrame, LegalHeader, SitemapGroups } from '@/components/public/LegalDoc'
 import { authHref } from '@/lib/i18n/auth-href'
@@ -12,6 +13,14 @@ export const metadata = {
     url: 'https://www.gotopseo.com/pl/sitemap',
     locale: LOCALE_CONFIG['pl'].ogLocale,
   },
+  alternates: {
+    canonical: 'https://www.gotopseo.com/pl/sitemap',
+    // The ten maps are one page in ten languages. Without this block the
+    // page inherits the root layout's alternates, which name the ten HOME
+    // pages as this page's translations and (in Hebrew) canonicalise the map
+    // to the home page — measured 11.11.2026 on all ten.
+    languages: buildHreflangAlternates('/sitemap', '/en/sitemap', '/es/sitemap'),
+  },
 }
 
 type SitemapSection = { title: string; description?: string; links: Array<{ label: string; href: string }> }
@@ -25,6 +34,9 @@ export default function PolishSitemapPage() {
         { label: 'Cennik', href: '/pl/pricing' },
         { label: 'O nas', href: '/pl/about' },
         { label: 'Artykuły', href: '/pl/articles' },
+        { label: 'Bezpłatna analiza', href: '/pl/free-check' },
+        { label: 'Które roboty AI blokuje Państwa witryna?', href: '/pl/ai-crawlers' },
+        { label: 'Program partnerski', href: '/pl/affiliates' },
       ],
     },
     {
@@ -62,9 +74,14 @@ export default function PolishSitemapPage() {
     {
       title: 'Porównanie z innymi narzędziami',
       links: [
+        { label: 'Wszystkie porównania', href: '/pl/compare' },
         { label: 'Go Top SEO a Semrush', href: '/pl/compare/semrush' },
         { label: 'Go Top SEO a Yoast', href: '/pl/compare/yoast' },
         { label: 'Go Top SEO a Rank Math', href: '/pl/compare/rankmath' },
+        { label: 'Go Top SEO a Surfer', href: '/pl/compare/surfer' },
+        { label: 'Go Top SEO a Writesonic', href: '/pl/compare/writesonic' },
+        { label: 'Go Top SEO a BrightLocal', href: '/pl/compare/brightlocal' },
+        { label: 'Go Top SEO a Booster SEO', href: '/pl/compare/booster' },
       ],
     },
     {

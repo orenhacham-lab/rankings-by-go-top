@@ -45,7 +45,7 @@ Actuamos conforme a nuestros registros. Si considera que una referencia se regis
 
 ## 5. La comisión
 
-Le corresponde el **30%** de cada pago válido de un cliente referido, mientras la suscripción de ese cliente siga abonándose. Cuando tenga diez o más clientes referidos con una suscripción de pago activa al mismo tiempo, el porcentaje sobre los pagos válidos a partir de ese momento será del **40%**. Un cambio de porcentaje no tiene efecto retroactivo.
+Le corresponde el **35%** de cada pago válido de un cliente referido, mientras la suscripción de ese cliente siga abonándose. Cuando tenga diez o más clientes referidos con una suscripción de pago activa al mismo tiempo, el porcentaje sobre los pagos válidos a partir de ese momento será del **40%**. Un cambio de porcentaje no tiene efecto retroactivo.
 
 La comisión se calcula sobre el importe que hayamos recibido efectivamente, excluido el impuesto sobre el valor añadido y cualquier otro impuesto, y después de cualquier descuento, crédito o cupón aplicado a ese pago. La comisión se calcula en la moneda en que pagó el cliente y se abona en esa moneda o en la de su método de pago, al tipo que aplique nuestro proveedor de pagos el día del abono.
 

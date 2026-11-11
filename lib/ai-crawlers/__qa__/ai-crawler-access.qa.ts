@@ -27,6 +27,11 @@ import { LIMIT, WINDOW_MS, resetRateLimiter, takeToken } from '../rate-limit'
 import { aiCrawlerCopy } from '../copy'
 import { AI_CRAWLER_CANDIDATES, AI_CRAWLER_DATASET } from '../dataset'
 import { PUBLIC_LOCALES, type PublicLocale } from '../../i18n/locales'
+import {
+  aiCrawlerBlockingDatasetSchema,
+  aiCrawlerBlockingSitesDatasetSchema,
+  aiCrawlerDatasetSchema,
+} from '../../seo/dataset'
 
 let pass = 0,
   fail = 0
@@ -230,6 +235,45 @@ function main() {
     check('E6: no percentage is claimed anywhere', !everyString.some((t) => /\d\s?%/.test(t)))
     check('E7: the trial is stated as 7 days with no card, or not at all',
       everyString.filter((t) => /\b(7|siete|sete|sept|sieben|שבוע)\b/i.test(t)).every((t) => /card|tarjeta|cartão|carte|carta|karte|karty|אשראי|カード/i.test(t)))
+    // THE MEASUREMENT COPY. Its figures live in blocking-measurement.ts and are
+    // substituted at render time, so no locale can carry a stale number and the
+    // ten translations cannot disagree about what was measured.
+    check('E8: every locale leaves the figures as placeholders', PUBLIC_LOCALES.every((l) => {
+      const m = aiCrawlerCopy(l).measurement
+      return (
+        m.headline.includes('{pct}') &&
+        m.sampleNote.includes('{n}') &&
+        // The per-site reading states two shares and the read rate those
+        // shares are of, and all three are substituted for the same reason.
+        m.perSite.includes('{deliberate}') &&
+        m.perSite.includes('{inherited}') &&
+        m.perSiteNote.includes('{read}') &&
+        m.perSiteNote.includes('{refused}')
+      )
+    }))
+    check('E9: no digit is typed into the measurement copy in any locale', PUBLIC_LOCALES.every((l) => {
+      const m = aiCrawlerCopy(l).measurement as unknown as Record<string, string>
+      return Object.values(m).every((t) => !/\d/.test(t))
+    }))
+    // The caveat is the sentence the measurement record requires beside any of
+    // these figures. A locale that shortened it to a hedge would pass every
+    // other check here.
+    check('E10: every locale carries a full caveat, not a hedge', PUBLIC_LOCALES.every((l) => {
+      const m = aiCrawlerCopy(l).measurement
+      return m.caveat.length > 90 && m.caveat !== m.intro
+    }))
+    check('E11: the English caveat forbids the small-business reading explicitly', (() => {
+      const c = aiCrawlerCopy('en').measurement.caveat
+      return /not small businesses/i.test(c) && /do not read/i.test(c)
+    })())
+    // MUTATION CONTROLS for E8-E11.
+    check('E8-MUT: a headline with the figure baked in would fail E8',
+      !'Of the sites that block GPTBot, 66.5% also block one that brings visitors.'.includes('{pct}'))
+    check('E9-MUT: the same string would fail E9',
+      /\d/.test('Of the sites that block GPTBot, 66.5% also block one that brings visitors.'))
+    check('E10-MUT: a softened caveat would fail E10',
+      !('Figures vary by market.'.length > 90))
+
     // MUTATION CONTROL for E1: a key check that compares only the COUNT of
     // strings — the shortcut — passes while a locale has the wrong keys, so
     // E1's full path comparison is doing real work. Build a French copy with
@@ -291,7 +335,7 @@ function main() {
     // and double-count the summary.
     check('F13: no duplicate user-agent token', new Set(AI_CRAWLER_TOKENS.map((t) => t.toLowerCase())).size === AI_CRAWLER_TOKENS.length)
     check('F14: every agent names an operator and a purpose',
-      AI_CRAWLERS.every((c) => c.operator.length > 0 && ['train', 'answer', 'search', 'ads'].includes(c.purpose)))
+      AI_CRAWLERS.every((c) => c.operator.length > 0 && ['train', 'answer', 'search', 'ads', 'preview', 'agent'].includes(c.purpose)))
     // MUTATION CONTROL for F13.
     const dupes = [...AI_CRAWLER_TOKENS, 'gptbot']
     check('F13-MUT: adding a case-variant duplicate would fail F13',
@@ -306,30 +350,146 @@ function main() {
       usedPurposes
         .filter((p) => !(aiCrawlerCopy(l).purposes[p]?.label && aiCrawlerCopy(l).purposes[p]?.blurb))
         .map((p) => `${l}:${p}`))
-    check(`F15: all ${usedPurposes.length} purposes are translated in all seven languages`,
+    check(`F15: all ${usedPurposes.length} purposes are translated in every public language`,
       purposeGaps.length === 0, purposeGaps.join(', '))
-    // MUTATION CONTROL for F15.
+    // MUTATION CONTROL for F15: a purpose nobody has translated, which is what
+    // a newly added purpose looks like before its ten strings are written.
     check('F15-MUT: a purpose no locale translates would fail F15',
-      PUBLIC_LOCALES.some((l: PublicLocale) => !(aiCrawlerCopy(l).purposes as Record<string, unknown>)['preview']))
+      PUBLIC_LOCALES.every((l: PublicLocale) => !(aiCrawlerCopy(l).purposes as Record<string, unknown>)['telemetry']))
 
-    // agents.ts is the curated reader-facing list and dataset.ts the complete
-    // one, so the dataset is a superset by design — but a token on the PAGE
-    // that the OPEN DATASET does not carry means the two drifted, and the
-    // dataset is the half other people are invited to consume.
-    // (Five of the page's long-tail tokens — Bytespider, cohere-ai, Timpibot,
-    // omgili, MistralAI-User — sit in the dataset's `candidates`, because no
-    // operator page could be found that names them. The page renders them as
-    // ordinary rows, which its own header says it does not do; that is a copy
-    // decision in seven languages and is recorded in the channel file, not
-    // silently fixed here. Until then the union is what "in step" means.)
+    // Since 07.11.2026 agents.ts DERIVES its rows from dataset.ts, so the page
+    // and the open dataset other people are invited to consume cannot disagree
+    // about which crawlers exist. These checks are what makes that structural
+    // rather than a promise: the union must be exact in both directions, and a
+    // row's `documented` flag must match the side of the dataset it came from.
+    // The five tokens no operator page names (Bytespider, cohere-ai, Timpibot,
+    // omgili, MistralAI-User) are the dataset's `candidates`; the page renders
+    // them last, marked with a dagger and a footnote in all ten languages,
+    // rather than as ordinary rows.
     const datasetTokens = new Set(
       [...AI_CRAWLER_DATASET.map((c) => c.token), ...AI_CRAWLER_CANDIDATES.map((c) => c.token)]
         .map((t) => t.toLowerCase()))
     const notInDataset = AI_CRAWLER_TOKENS.filter((t) => !datasetTokens.has(t.toLowerCase()))
     check('F16: every agent the page renders is in the open dataset too',
       notInDataset.length === 0, notInDataset.join(', '))
+
+    // The other direction: a crawler added to the dataset must reach the page,
+    // or the table we publish as a dataset is quietly shorter than the dataset.
+    const pageTokens = new Set(AI_CRAWLER_TOKENS.map((t) => t.toLowerCase()))
+    const notOnPage = [...AI_CRAWLER_DATASET.map((c) => c.token), ...AI_CRAWLER_CANDIDATES.map((c) => c.token)]
+      .filter((t) => !pageTokens.has(t.toLowerCase()))
+    check('F17: every crawler in the dataset reaches the page', notOnPage.length === 0, notOnPage.join(', '))
+
+    // And `documented` has to mean what it says, in both directions: a claim
+    // that an operator documents a token is the one thing in this table a
+    // reader cannot check for themselves without the docs link.
+    const candidateTokens = new Set(AI_CRAWLER_CANDIDATES.map((c) => c.token.toLowerCase()))
+    const miscredited = AI_CRAWLERS.filter((c) => c.documented === candidateTokens.has(c.token.toLowerCase()))
+    check('F18: documented is true exactly for the rows an operator page names',
+      miscredited.length === 0, miscredited.map((c) => c.token).join(', '))
+
+    // An undocumented token has committed to nothing, so it must not be shown
+    // as one that honours robots.txt.
+    const overclaimed = AI_CRAWLERS.filter((c) => !c.documented && c.respectsRobots)
+    check('F19: an undocumented token claims no robots.txt compliance',
+      overclaimed.length === 0, overclaimed.map((c) => c.token).join(', '))
+
+    // MUTATION CONTROLS for F17-F19.
+    check('F17-MUT: a dataset token missing from the page would fail F17',
+      !pageTokens.has('a-crawler-the-page-forgot'))
+    check('F18-MUT: a candidate marked documented would fail F18',
+      candidateTokens.has('bytespider') === true)
+    check('F19-MUT: an undocumented row with respectsRobots true would fail F19',
+      [{ documented: false, respectsRobots: true }].filter((c) => !c.documented && c.respectsRobots).length > 0)
+
+    // The footnote that explains the dagger has to exist in every language, or
+    // the mark is unexplained for that reader.
+    const footnoteGaps = PUBLIC_LOCALES.filter((l: PublicLocale) => !aiCrawlerCopy(l).reference.undocumented?.trim())
+    check('F20: the undocumented-token footnote is translated everywhere',
+      footnoteGaps.length === 0, footnoteGaps.join(', '))
+
+    // And the page must actually render it, tied to the mark.
+    const checkerSrc = strip(read('components/ai-crawlers/AiCrawlerChecker.tsx'))
+    check('F21: the table marks undocumented rows', checkerSrc.includes('!c.documented'))
+    check('F22: …and renders the footnote they point at',
+      checkerSrc.includes('copy.reference.undocumented') && checkerSrc.includes('id="ai-crawlers-undocumented"'))
+    check('F22-MUT: a table with no footnote id would fail F22',
+      !'<table><tbody /></table>'.includes('id="ai-crawlers-undocumented"'))
     // MUTATION CONTROL for F16.
     check('F16-MUT: a page-only token would fail F16', !datasetTokens.has('gotopbot'))
+
+    // F23-F26: the in-body links that make the earned ones count. This page
+    // holds the do-follow links the product has earned. The nav and the footer
+    // already reach the three destinations, so what these links add is a
+    // contextual anchor in the page's own body rather than boilerplate on
+    // every page. The destinations are pinned, every locale must have its own
+    // anchors, and the hrefs must go through getLocaleHref — a bare
+    // '/pricing' would throw a Polish reader out of their own language.
+    const RELATED_PATHS = ['/features/ai-visibility-tracking', '/free-check', '/pricing']
+    const missingPaths = RELATED_PATHS.filter((path) => !checkerSrc.includes(`'${path}'`))
+    check('F23: the page links on to the three product pages',
+      missingPaths.length === 0, missingPaths.join(', '))
+    check('F24: those links are locale-aware',
+      checkerSrc.includes('getLocaleHref(item.href, locale)'))
+    const relatedGaps = PUBLIC_LOCALES.filter((l: PublicLocale) => {
+      const r = aiCrawlerCopy(l).related
+      return !r?.title?.trim() || !r?.lead?.trim() || !r?.aiVisibility?.trim() ||
+        !r?.freeCheck?.trim() || !r?.pricing?.trim()
+    })
+    check('F25: every locale has its own anchors for them',
+      relatedGaps.length === 0, relatedGaps.join(', '))
+    // An anchor that repeats another locale's wording is an untranslated key.
+    const anchorSets = PUBLIC_LOCALES.map((l: PublicLocale) => aiCrawlerCopy(l).related.pricing)
+    check('F26: the pricing anchor is not one string reused in ten languages',
+      new Set(anchorSets).size === PUBLIC_LOCALES.length)
+    check('F23-MUT: a page with no onward link would fail F23',
+      !'<section />'.includes("'/pricing'"))
+    check('F24-MUT: a bare href would fail F24',
+      !"<Link href='/pricing'>".includes('getLocaleHref(item.href, locale)'))
+
+    // G) OUR OWN robots.txt, read with the matcher this page publishes.
+    //
+    // The whole premise of the open dataset is that a crawler fetches it and
+    // an engine cites it. `Disallow: /api` in our own robots.txt was blocking
+    // every crawler, Googlebot included, from the exact URLs the Dataset nodes
+    // declare as their distributions — the one defect that makes the asset
+    // worthless while the page claims otherwise. The distribution URLs are
+    // read out of the schema builders rather than retyped, so a fourth
+    // distribution cannot be added and left blocked.
+    const ourRobots = parseRobots(read('public/robots.txt'))
+    const distributions = [
+      aiCrawlerDatasetSchema('en'),
+      aiCrawlerBlockingDatasetSchema('en'),
+      aiCrawlerBlockingSitesDatasetSchema('en'),
+    ].flatMap((node) =>
+      (node.distribution as Array<{ contentUrl: string }>).map((d) => d.contentUrl),
+    )
+    // The OpenAPI description, which the page links and the catalogues read.
+    distributions.push('https://www.gotopseo.com/api/public/ai-crawlers/openapi')
+    const pathOf = (url: string) => new URL(url).pathname
+    // Googlebot decides Dataset Search; the documented AI crawlers decide
+    // whether an engine can read it at all.
+    const readers = ['Googlebot', ...AI_CRAWLER_TOKENS]
+    const blocked: string[] = []
+    for (const url of distributions) {
+      for (const reader of readers) {
+        if (!isAllowed(ourRobots, reader, pathOf(url)).allowed) blocked.push(`${reader} ${pathOf(url)}`)
+      }
+    }
+    check('G1: our robots.txt lets every reader fetch every published distribution',
+      blocked.length === 0, blocked.slice(0, 6).join('; '))
+    check('G2: the open data is opened by an explicit Allow, not by removing the /api wall',
+      isAllowed(ourRobots, 'Googlebot', '/api/public/ai-crawlers').decidedBy?.kind === 'allow')
+    // And the wall still stands everywhere else under /api.
+    const stillClosed = ['/api/content/automation/cron', '/api/free-check', '/api/auth/callback']
+      .filter((path) => isAllowed(ourRobots, 'Googlebot', path).allowed)
+    check('G3: every other /api route is still disallowed',
+      stillClosed.length === 0, stillClosed.join(', '))
+    // MUTATION CONTROL: the file as it was before the Allow line, which is the
+    // state G1 exists to catch.
+    const withoutAllow = parseRobots(read('public/robots.txt').replace(/^Allow: \/api\/public\/$/gm, ''))
+    check('G1-MUT: the file without the Allow line would fail G1',
+      !isAllowed(withoutAllow, 'Googlebot', '/api/public/ai-crawlers').allowed)
   }
 
   console.log(`\n${pass} passed, ${fail} failed`)

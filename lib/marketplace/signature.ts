@@ -24,8 +24,9 @@
  * PURE: no request, env or database access. The scheme and secret are passed.
  */
 
-import { createHash, createHmac, timingSafeEqual } from 'crypto'
+import { createDecipheriv, createHash, createHmac, timingSafeEqual } from 'crypto'
 import type {
+  MarketplaceEncryptedEnvelopeScheme,
   MarketplaceFieldDigestScheme,
   MarketplaceHmacHeaderScheme,
   MarketplaceSignatureScheme,
@@ -51,6 +52,12 @@ export function marketplaceSignatureFor(
 ): string {
   if (scheme.kind === 'field_digest') return fieldDigestFor(rawBody, secret, scheme)
   if (scheme.kind === 'sorted_params_digest') return sortedParamsDigestFor(rawBody, secret, scheme)
+  // An encrypted envelope has no digest to produce; `decryptMarketplaceEnvelope`
+  // is its whole verification, and asking this function for a signature is a
+  // programming error rather than a delivery we could refuse.
+  if (scheme.kind === 'encrypted_envelope') {
+    throw new Error('marketplaceSignatureFor: encrypted_envelope has no signature')
+  }
   const mac = createHmac(scheme.algorithm, secret).update(rawBody, 'utf8')
   return scheme.encoding === 'base64' ? mac.digest('base64') : mac.digest('hex')
 }
@@ -180,6 +187,75 @@ export function sortedParamsDigestFor(
   return createHash(scheme.algorithm).update(base, 'utf8').digest('hex').toUpperCase()
 }
 
+/**
+ * THE ONE PLATFORM THAT ENCRYPTS INSTEAD OF SIGNING.
+ *
+ * ClickBank's INS carries no digest at all. The whole notification is
+ * AES-256-CBC ciphertext under our own Secret Key, and their page is explicit
+ * that decrypting it IS the authentication: a body we cannot decrypt into JSON
+ * was not produced by someone holding the key. See
+ * docs/affiliate/clickbank-ins-docs.md for the quoted sentences.
+ *
+ * THE KEY IS HEX TEXT, NOT DIGEST BYTES. The key is the first 32 CHARACTERS of
+ * the hex rendering of SHA-1(secret), used as 32 ASCII bytes. Taking the first
+ * 16 raw bytes of the digest instead — the obvious reading, and what a careless
+ * port does — yields a different key and refuses every real delivery.
+ *
+ * Returns the plaintext so the parser can be given it, or null for anything
+ * that is not a well-formed, decryptable, JSON-bearing envelope. It never
+ * throws: a bad key, a bad IV length and a bad padding all arrive here as
+ * exceptions from `crypto`, and every one of them means the same thing.
+ */
+export function decryptMarketplaceEnvelope(
+  rawBody: string,
+  secret: string,
+  scheme: MarketplaceEncryptedEnvelopeScheme,
+): string | null {
+  let envelope: unknown
+  try {
+    envelope = JSON.parse(rawBody)
+  } catch {
+    return null
+  }
+  if (typeof envelope !== 'object' || envelope === null) return null
+  const fields = envelope as Record<string, unknown>
+  const ciphertext = fields[scheme.ciphertextField]
+  const iv = fields[scheme.ivField]
+  if (typeof ciphertext !== 'string' || typeof iv !== 'string') return null
+  if (!ciphertext || !iv) return null
+
+  const key = createHash(scheme.keyDigest).update(secret, 'utf8').digest('hex').slice(0, scheme.keyLength)
+  try {
+    const decipher = createDecipheriv(scheme.algorithm, Buffer.from(key, 'utf8'), Buffer.from(iv, 'base64'))
+    const plaintext =
+      decipher.update(Buffer.from(ciphertext, 'base64')).toString('utf8') + decipher.final('utf8')
+    // A plaintext that is not JSON is a forgery, not a decryption: random bytes
+    // occasionally survive the padding check, and nothing further may act on
+    // them. This is the test their own sample code ends on.
+    JSON.parse(plaintext)
+    return plaintext
+  } catch {
+    return null
+  }
+}
+
+/**
+ * An encrypted-envelope delivery has nothing to compare, so verification IS
+ * decryption. A refusal is reported as `mismatch` rather than
+ * `malformed_signature` on purpose: like a digest that disagrees with ours, it
+ * is the case where a real payment may have been refused because our key and
+ * the platform's differ, and the route logs that one loudly.
+ */
+function verifyEncryptedEnvelope(
+  rawBody: string,
+  secret: string,
+  scheme: MarketplaceEncryptedEnvelopeScheme,
+): MarketplaceSignatureResult {
+  return decryptMarketplaceEnvelope(rawBody, secret, scheme) === null
+    ? { ok: false, reason: 'mismatch' }
+    : { ok: true }
+}
+
 /** Digest lengths in characters, so a wrong-length value is rejected before
  *  timingSafeEqual — which throws on a length mismatch — is reached. */
 const HEX_LENGTH: Record<MarketplaceHmacHeaderScheme['algorithm'], number> = { sha256: 64, sha512: 128 }
@@ -212,6 +288,7 @@ export function verifyMarketplaceSignature(
   if (!secret) return { ok: false, reason: 'missing_secret' }
   if (scheme.kind === 'field_digest') return verifyFieldDigest(rawBody, secret, scheme)
   if (scheme.kind === 'sorted_params_digest') return verifySortedParamsDigest(rawBody, secret, scheme)
+  if (scheme.kind === 'encrypted_envelope') return verifyEncryptedEnvelope(rawBody, secret, scheme)
 
   const raw = (signatureHeader ?? '').trim()
   if (!raw) return { ok: false, reason: 'missing_signature' }

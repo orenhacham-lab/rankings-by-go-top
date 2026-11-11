@@ -95,6 +95,13 @@ check('the organization carries the canonical @id', org['@id'] === ORGANIZATION_
 check('sameAs names the product\'s own live profiles', org.sameAs.length === BRAND_PROFILES.length && org.sameAs.length >= 4)
 check('sameAs does not claim the agency site as the same entity', !org.sameAs.some((u) => u.includes(AGENCY)))
 check('every sameAs entry is an absolute https URL', org.sameAs.every((u) => u.startsWith('https://')))
+// The list grows by hand, one earned listing at a time, so the cheap mistake is
+// pasting a URL that is already there. A repeated entry is a repeated claim: it
+// tells a resolver nothing new and marks the list as unmaintained.
+const dupes = org.sameAs.filter((u, i) => org.sameAs.indexOf(u) !== i)
+check('no sameAs entry is claimed twice', dupes.length === 0)
+check('MUTATION CONTROL: a repeated sameAs entry is caught',
+  (() => { const l = [...org.sameAs, org.sameAs[0]]; return l.filter((u, i) => l.indexOf(u) !== i).length === 1 })())
 check('both surfaces reference the organization by its shared id', layout.includes('organizationSchema(') && schemaRoute.includes('organizationSchema('))
 // "Digital Marketing" is the agency's registered mark and never appears on a
 // SaaS-brand surface, legalName included.

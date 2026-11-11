@@ -1,3 +1,4 @@
+import { buildHreflangAlternates } from '@/lib/seo/hreflang'
 import Link from 'next/link'
 import { LEGAL_FOOTNOTE, LEGAL_LINK, LegalFrame, LegalHeader, SitemapGroups } from '@/components/public/LegalDoc'
 import { authHref } from '@/lib/i18n/auth-href'
@@ -12,6 +13,14 @@ export const metadata = {
     url: 'https://www.gotopseo.com/ja/sitemap',
     locale: LOCALE_CONFIG['ja'].ogLocale,
   },
+  alternates: {
+    canonical: 'https://www.gotopseo.com/ja/sitemap',
+    // The ten maps are one page in ten languages. Without this block the
+    // page inherits the root layout's alternates, which name the ten HOME
+    // pages as this page's translations and (in Hebrew) canonicalise the map
+    // to the home page — measured 11.11.2026 on all ten.
+    languages: buildHreflangAlternates('/sitemap', '/en/sitemap', '/es/sitemap'),
+  },
 }
 
 type SitemapSection = { title: string; description?: string; links: Array<{ label: string; href: string }> }
@@ -25,6 +34,9 @@ export default function JapaneseSitemapPage() {
         { label: '料金', href: '/ja/pricing' },
         { label: '会社情報', href: '/ja/about' },
         { label: '記事', href: '/ja/articles' },
+        { label: '無料診断', href: '/ja/free-check' },
+        { label: 'サイトはどのAIクローラーを拒否していますか', href: '/ja/ai-crawlers' },
+        { label: 'アフィリエイトプログラム', href: '/ja/affiliates' },
       ],
     },
     {
@@ -62,9 +74,14 @@ export default function JapaneseSitemapPage() {
     {
       title: '他のツールとの比較',
       links: [
-        { label: 'Go Top SEOとSemrushの比較', href: '/ja/compare/semrush' },
-        { label: 'Go Top SEOとYoastの比較', href: '/ja/compare/yoast' },
-        { label: 'Go Top SEOとRank Mathの比較', href: '/ja/compare/rankmath' },
+        { label: 'すべての比較', href: '/ja/compare' },
+        { label: 'Go Top SEO と Semrush の比較', href: '/ja/compare/semrush' },
+        { label: 'Go Top SEO と Yoast の比較', href: '/ja/compare/yoast' },
+        { label: 'Go Top SEO と Rank Math の比較', href: '/ja/compare/rankmath' },
+        { label: 'Go Top SEO と Surfer の比較', href: '/ja/compare/surfer' },
+        { label: 'Go Top SEO と Writesonic の比較', href: '/ja/compare/writesonic' },
+        { label: 'Go Top SEO と BrightLocal の比較', href: '/ja/compare/brightlocal' },
+        { label: 'Go Top SEO と Booster SEO の比較', href: '/ja/compare/booster' },
       ],
     },
     {

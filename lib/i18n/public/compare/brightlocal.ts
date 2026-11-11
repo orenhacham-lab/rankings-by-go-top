@@ -818,9 +818,9 @@ export const BRIGHTLOCAL_COMPARE: Record<PublicLocale, ComparisonCopy> = {
     eyebrow: 'Go Top SEO vs. BrightLocal',
     metaTitle: 'Go Top SEO vs. BrightLocal | Vergleich',
     metaDescription:
-      'Go Top SEO im Vergleich mit BrightLocal: wer das Lokale messt und wer die Inhalte schreibt und veröffentlicht, was der jeweilige Preis abdeckt und wann BrightLocal für ein lokales Unternehmen die bessere Wahl ist.',
+      'Go Top SEO im Vergleich mit BrightLocal: wer das Lokale misst und wer die Inhalte schreibt und veröffentlicht, was der jeweilige Preis abdeckt und wann BrightLocal für ein lokales Unternehmen die bessere Wahl ist.',
     hero: {
-      title: 'BrightLocal messt Ihre lokale Präsenz.',
+      title: 'BrightLocal misst Ihre lokale Präsenz.',
       accent: 'Wir schreiben und veröffentlichen auch',
       subtitle:
         'BrightLocal ist ein tiefes Werkzeug für lokale Messung — Rankings, eine Geo-Grid-Karte, Einträge, Bewertungen. Go Top SEO deckt diese Hälfte mit einer monatlichen Prüfung ab und ergänzt den Teil, für den BrightLocal keinen Motor hat: Artikel, die geschrieben und auf Ihrer Website veröffentlicht werden, und Beiträge in Ihrem Google Unternehmensprofil.',
@@ -893,7 +893,7 @@ export const BRIGHTLOCAL_COMPARE: Record<PublicLocale, ComparisonCopy> = {
     theirStrengths: {
       eyebrow: 'Wann BrightLocal die bessere Wahl ist',
       title: 'In der lokalen Hälfte sind sie einfach tiefer',
-      intro: 'Wenn Ihre ganze Frage lokal ist, messt BrightLocal sie besser als wir, und es hat keinen Sinn, etwas anderes zu behaupten.',
+      intro: 'Wenn Ihre ganze Frage lokal ist, misst BrightLocal sie besser als wir, und es hat keinen Sinn, etwas anderes zu behaupten.',
       items: [
         {
           title: 'Wenn lokale Messung die ganze Aufgabe ist',

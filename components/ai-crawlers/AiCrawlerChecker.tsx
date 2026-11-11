@@ -30,10 +30,21 @@ import Input from '@/components/ui/Input'
 import { buttonClasses, Eyebrow } from '@/components/public/marketing'
 import { cn } from '@/lib/utils'
 import { AI_CRAWLERS } from '@/lib/ai-crawlers/agents'
+import { BLOCKING_BY_MARKET, BLOCKING_MEASUREMENT } from '@/lib/ai-crawlers/blocking-measurement'
+import { BLOCKING_MARKETS_2026_11_09, marketPct } from '@/lib/ai-crawlers/blocking-markets'
+import {
+  BLOCKING_SITES_MEASURED_ON,
+  BLOCKING_SITES_PATH,
+  BLOCKING_SITES_READ,
+  BLOCKING_SITES_REFUSED,
+  BLOCKING_SITES_REQUESTED,
+  GPTBOT_DELIBERATE_PCT,
+  OAI_SEARCHBOT_INHERITED_PCT,
+} from '@/lib/ai-crawlers/blocking-sites'
 import { aiCrawlerCopy } from '@/lib/ai-crawlers/copy'
 import type { AiCrawlerErrorCode, AiCrawlerResponse, AiCrawlerResult, CrawlerVerdict } from '@/lib/ai-crawlers/types'
 import { authHref } from '@/lib/i18n/auth-href'
-import type { PublicLocale } from '@/lib/i18n/locales'
+import { getLocaleHref, type PublicLocale } from '@/lib/i18n/locales'
 
 function VerdictRow({ verdict, copy, dir }: { verdict: CrawlerVerdict; copy: ReturnType<typeof aiCrawlerCopy>; dir: 'rtl' | 'ltr' }) {
   const good = verdict.allowed
@@ -160,6 +171,166 @@ function Results({ result, copy, dir }: { result: AiCrawlerResult; copy: ReturnT
   )
 }
 
+/** Locales that write a decimal comma. Explicit, so the number a visitor reads
+ *  is the same on the server and in the browser — `toLocaleString` depends on
+ *  whichever ICU data the runtime happens to carry, and a figure that changes
+ *  shape on hydration is the one thing a cited page cannot afford. */
+const DECIMAL_COMMA: readonly PublicLocale[] = ['es', 'pt-BR', 'fr', 'it', 'de', 'nl', 'pl']
+
+/**
+ * The dated measurement, on the page rather than only in the API.
+ *
+ * WHY IT IS HERE. The figures are published at /api/public/ai-crawler-blocking
+ * for anyone to cite, and a dataset nobody can see on a page is a dataset no
+ * engine will index as one. But the reason it is rendered THIS way — the
+ * caveat directly under the headline, in the same type size as the figure — is
+ * the measurement record's own requirement: these are large, high-ranked
+ * sites, and the number means something else entirely if a reader takes it for
+ * a statement about small businesses.
+ *
+ * NO NUMBER IS TYPED HERE. Every figure comes from the measurement constant,
+ * so the page cannot drift from the data the endpoint serves, and the copy in
+ * ten languages carries placeholders instead of digits.
+ */
+function Measurement({ locale, copy }: { locale: PublicLocale; copy: ReturnType<typeof aiCrawlerCopy> }) {
+  const m = copy.measurement
+  const num = (value: number) => (DECIMAL_COMMA.includes(locale) ? String(value).replace('.', ',') : String(value))
+  const pct = (value: number) => `${num(value)}%`
+  const endpoint = '/api/public/ai-crawler-blocking'
+
+  return (
+    // The id is the fragment both Dataset nodes already identify themselves by
+    // (lib/seo/dataset.ts), so the @id now names a place a reader can actually be
+    // sent to, and an editorial mail can deep-link the measurement instead of the
+    // top of the page.
+    <section id="blocking-measurement" className="mt-12 rounded-card border border-line bg-surface p-5 shadow-control">
+      <h2 className="text-lead font-bold text-ink">{m.title}</h2>
+      <p className="mt-2 max-w-2xl text-copy text-body">{m.intro}</p>
+
+      <p className="mt-4 max-w-2xl text-copy font-semibold text-ink">
+        {m.headline.replace('{pct}', pct(BLOCKING_MEASUREMENT.findings.ofGptbotBlockersAlsoBlockingTrafficCrawlerPct))}
+      </p>
+      {/* The caveat is not a footnote and not smaller than the figure it
+          bounds: it sits immediately under the headline, by instruction of the
+          measurement record itself. */}
+      <p className="mt-2 max-w-2xl text-copy text-body">{m.caveat}</p>
+
+      <div className="mt-4 overflow-x-auto rounded-card border border-line">
+        <table className="w-full border-collapse text-copy">
+          <thead>
+            <tr className="border-b border-line bg-sunk/60 text-caption font-semibold text-ink">
+              <th scope="col" className="px-4 py-2 text-start">{m.colMarket}</th>
+              <th scope="col" className="px-4 py-2 text-start">{m.colShare}</th>
+            </tr>
+          </thead>
+          <tbody>
+            {BLOCKING_BY_MARKET.map((row) => (
+              <tr key={row.market} className="border-b border-line/60 last:border-0">
+                <td className="px-4 py-2">
+                  <code dir="ltr" className="font-semibold text-ink">{row.market}</code>
+                </td>
+                <td className="px-4 py-2 text-body" dir="ltr">
+                  {pct(row.blocksTrafficCrawlerPct)}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+
+      <p className="mt-3 max-w-2xl text-caption text-muted">
+        {m.sampleNote.replace('{n}', num(BLOCKING_MEASUREMENT.method.robotsFilesRead))}
+      </p>
+      <p className="mt-1 max-w-2xl text-caption text-muted">{m.notSampled}</p>
+      <p className="mt-1 text-caption text-muted">
+        {m.measuredOnLabel}{' '}
+        <time dateTime={BLOCKING_MEASUREMENT.measuredOn} dir="ltr">{BLOCKING_MEASUREMENT.measuredOn}</time>
+      </p>
+
+      <p className="mt-3 text-caption text-muted">
+        {m.downloads}{' '}
+        <a dir="ltr" href={endpoint} className="font-semibold text-action underline">JSON</a>
+        {' · '}
+        <a dir="ltr" href={`${endpoint}?format=csv`} className="font-semibold text-action underline">CSV</a>
+      </p>
+
+      {/* THE SECOND READING, kept apart from the first on purpose. It is a
+          different day with a different n, so folding its figures into the
+          table above would produce a number that is true of neither. What it
+          adds is the distinction a blocking rate cannot be read without: a rule
+          that names the crawler was a decision, and a `*` rule was not. Its
+          read rate travels with it in the same type size, for the same reason
+          the caveat above sits under the headline. */}
+      <div className="mt-6 border-t border-line pt-4">
+        <p className="max-w-2xl text-copy text-body">
+          {m.perSite
+            .replace('{on}', BLOCKING_SITES_MEASURED_ON)
+            .replace('{deliberate}', pct(GPTBOT_DELIBERATE_PCT))
+            .replace('{inherited}', pct(OAI_SEARCHBOT_INHERITED_PCT))}
+        </p>
+        <p className="mt-2 max-w-2xl text-caption text-muted">
+          {m.perSiteNote
+            .replace('{read}', num(BLOCKING_SITES_READ))
+            .replace('{requested}', num(BLOCKING_SITES_REQUESTED))
+            .replace('{refused}', num(BLOCKING_SITES_REFUSED))}
+        </p>
+        {/* THE SAME READING BY SUFFIX. The table above it is the 7 November
+            reading and keeps its own row per market; this one belongs to the
+            9 November rows, and the two are never one table. Each row prints
+            the files read in that suffix BEFORE any percentage of it, because
+            the read rate runs from 49 of 100 to 65 of 100 and a column of
+            bare percentages would be the error the paragraph above corrects.
+            Every figure comes from lib/ai-crawlers/blocking-markets.ts, which
+            the dataset suite recomputes row by row. */}
+        <h3 className="mt-6 text-copy font-bold text-ink">{m.perMarketTitle}</h3>
+        <p className="mt-2 max-w-2xl text-caption text-muted">{m.perMarketLead}</p>
+        <div className="mt-3 overflow-x-auto rounded-card border border-line">
+          <table className="w-full border-collapse text-copy">
+            <thead>
+              <tr className="border-b border-line bg-sunk/60 text-caption font-semibold text-ink">
+                <th scope="col" className="px-4 py-2 text-start">{m.colMarket}</th>
+                <th scope="col" className="px-4 py-2 text-start">{m.colRead}</th>
+                <th scope="col" className="px-4 py-2 text-start">{m.colGptbot}</th>
+                <th scope="col" className="px-4 py-2 text-start">{m.colOaiSearchbot}</th>
+              </tr>
+            </thead>
+            <tbody>
+              {BLOCKING_MARKETS_2026_11_09.map((row) => (
+                <tr key={row.market} className="border-b border-line/60 last:border-0">
+                  <td className="px-4 py-2">
+                    <code dir="ltr" className="font-semibold text-ink">{row.market}</code>
+                  </td>
+                  <td className="px-4 py-2 text-body" dir="ltr">
+                    {num(row.read)} / {num(row.requested)}
+                  </td>
+                  <td className="px-4 py-2 text-body">
+                    <span dir="ltr">{num(row.gptbotBlocked)} ({pct(marketPct(row.gptbotBlocked, row.read))})</span>
+                    <span className="block text-caption text-muted">
+                      <span dir="ltr">{num(row.gptbotDeliberate)}</span> {m.labelDeliberate}
+                    </span>
+                  </td>
+                  <td className="px-4 py-2 text-body">
+                    <span dir="ltr">{num(row.oaiSearchbotBlocked)} ({pct(marketPct(row.oaiSearchbotBlocked, row.read))})</span>
+                    <span className="block text-caption text-muted">
+                      <span dir="ltr">{num(row.oaiSearchbotInherited)}</span> {m.labelInherited}
+                    </span>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+        <p className="mt-3 text-caption text-muted">
+          {m.perSiteDownloads}{' '}
+          <a dir="ltr" href={BLOCKING_SITES_PATH} className="font-semibold text-action underline">JSON</a>
+          {' · '}
+          <a dir="ltr" href={`${BLOCKING_SITES_PATH}?format=csv`} className="font-semibold text-action underline">CSV</a>
+        </p>
+      </div>
+    </section>
+  )
+}
+
 export function AiCrawlerChecker({ locale, initialUrl = '' }: { locale: PublicLocale; initialUrl?: string }) {
   const copy = aiCrawlerCopy(locale)
   const dir: 'rtl' | 'ltr' = locale === 'he' ? 'rtl' : 'ltr'
@@ -254,7 +425,9 @@ export function AiCrawlerChecker({ locale, initialUrl = '' }: { locale: PublicLo
       {result && <Results result={result} copy={copy} dir={dir} />}
 
       {/* The reference table: always rendered, never behind the form. */}
-      <section className="mt-14">
+      {/* Same reason as the measurement's anchor: the reference table's Dataset
+          node identifies itself as #dataset, so the fragment exists. */}
+      <section id="dataset" className="mt-14">
         <h2 className="text-lead font-bold text-ink">{copy.reference.title}</h2>
         <p className="mt-2 max-w-2xl text-copy text-body">{copy.reference.intro}</p>
         <div className="mt-4 overflow-x-auto rounded-card border border-line bg-surface shadow-control">
@@ -271,6 +444,15 @@ export function AiCrawlerChecker({ locale, initialUrl = '' }: { locale: PublicLo
                 <tr key={c.token} className="border-b border-line/60 last:border-0">
                   <td className="px-4 py-2 align-top">
                     <code dir="ltr" className="font-semibold text-ink">{c.token}</code>
+                    {/* A token no operator documents is marked where it is read,
+                        not only explained in prose further down. The dagger is
+                        tied to the footnote below the table by aria-describedby,
+                        so it is not a decoration a screen reader skips. */}
+                    {!c.documented && (
+                      <span dir="ltr" className="text-ink" aria-describedby="ai-crawlers-undocumented">
+                        {' '}†
+                      </span>
+                    )}
                   </td>
                   <td className="px-4 py-2 align-top text-body">{c.operator}</td>
                   <td className="px-4 py-2 align-top text-body">
@@ -282,7 +464,16 @@ export function AiCrawlerChecker({ locale, initialUrl = '' }: { locale: PublicLo
             </tbody>
           </table>
         </div>
+        {/* Rendered only while such a row exists, so the footnote can never
+            explain a dagger that is not on the page. */}
+        {AI_CRAWLERS.some((c) => !c.documented) && (
+          <p id="ai-crawlers-undocumented" className="mt-3 max-w-2xl text-caption text-muted">
+            <span dir="ltr">†</span> {copy.reference.undocumented}
+          </p>
+        )}
       </section>
+
+      <Measurement locale={locale} copy={copy} />
 
       <section className="mt-12 rounded-card border border-line bg-sunk/50 p-5">
         <h2 className="inline-flex items-center gap-2 text-copy font-bold text-ink">
@@ -308,6 +499,40 @@ export function AiCrawlerChecker({ locale, initialUrl = '' }: { locale: PublicLo
           {copy.cta.button}
         </Link>
       </section>
+
+      {/*
+        The links that make the earned ones count. Two do-follow sources point
+        at this page — ki-toolnavigator.com, and smartnetstudio.pl at /pl — and
+        the only link out of the page's own body was the sign-up button above,
+        which is not an indexable page. The nav and the footer do reach all
+        three destinations below, so this is not about reaching them at all: a
+        link in the body, with an anchor that names the destination, is not
+        boilerplate repeated on every page of the site, and it is also the
+        obvious next step for a reader who arrived here from a directory
+        listing rather than from the home page.
+
+        Every href goes through getLocaleHref, so a Polish reader is sent to
+        /pl/pricing rather than out of their own language.
+      */}
+      <nav className="mt-12" aria-labelledby="ai-crawlers-related">
+        <h2 id="ai-crawlers-related" className="text-copy font-bold text-ink">
+          {copy.related.title}
+        </h2>
+        <p className="mt-2 max-w-2xl text-copy text-body">{copy.related.lead}</p>
+        <ul className="mt-3 space-y-2">
+          {[
+            { href: '/features/ai-visibility-tracking', label: copy.related.aiVisibility },
+            { href: '/free-check', label: copy.related.freeCheck },
+            { href: '/pricing', label: copy.related.pricing },
+          ].map((item) => (
+            <li key={item.href}>
+              <Link href={getLocaleHref(item.href, locale)} className="font-semibold text-action underline">
+                {item.label}
+              </Link>
+            </li>
+          ))}
+        </ul>
+      </nav>
     </div>
   )
 }

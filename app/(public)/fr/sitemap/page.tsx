@@ -1,3 +1,4 @@
+import { buildHreflangAlternates } from '@/lib/seo/hreflang'
 import Link from 'next/link'
 import { LEGAL_FOOTNOTE, LEGAL_LINK, LegalFrame, LegalHeader, SitemapGroups } from '@/components/public/LegalDoc'
 import { authHref } from '@/lib/i18n/auth-href'
@@ -10,6 +11,14 @@ export const metadata = {
     description: 'Plan du site de Go Top SEO',
     url: 'https://www.gotopseo.com/fr/sitemap',
     locale: 'fr_FR',
+  },
+  alternates: {
+    canonical: 'https://www.gotopseo.com/fr/sitemap',
+    // The ten maps are one page in ten languages. Without this block the
+    // page inherits the root layout's alternates, which name the ten HOME
+    // pages as this page's translations and (in Hebrew) canonicalise the map
+    // to the home page — measured 11.11.2026 on all ten.
+    languages: buildHreflangAlternates('/sitemap', '/en/sitemap', '/es/sitemap'),
   },
 }
 
@@ -24,6 +33,9 @@ export default function FrenchSitemapPage() {
         { label: 'Tarifs', href: '/fr/pricing' },
         { label: 'À propos', href: '/fr/about' },
         { label: 'Articles', href: '/fr/articles' },
+        { label: 'Audit gratuit', href: '/fr/free-check' },
+        { label: "Quels robots d'IA votre site bloque-t-il ?", href: '/fr/ai-crawlers' },
+        { label: 'Programme d’affiliation', href: '/fr/affiliates' },
       ],
     },
     {
@@ -61,9 +73,14 @@ export default function FrenchSitemapPage() {
     {
       title: 'Comparatifs',
       links: [
+        { label: 'Tous les comparatifs', href: '/fr/compare' },
         { label: 'Go Top SEO face à Semrush', href: '/fr/compare/semrush' },
         { label: 'Go Top SEO face à Yoast', href: '/fr/compare/yoast' },
         { label: 'Go Top SEO face à Rank Math', href: '/fr/compare/rankmath' },
+        { label: 'Go Top SEO face à Surfer', href: '/fr/compare/surfer' },
+        { label: 'Go Top SEO face à Writesonic', href: '/fr/compare/writesonic' },
+        { label: 'Go Top SEO face à BrightLocal', href: '/fr/compare/brightlocal' },
+        { label: 'Go Top SEO face à Booster SEO', href: '/fr/compare/booster' },
       ],
     },
     {

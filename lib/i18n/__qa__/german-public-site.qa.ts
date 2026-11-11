@@ -49,6 +49,13 @@ import { landingDe } from '../public/landing-de'
 import { pricingDe } from '../public/pricing-de'
 import { AFFILIATES_COPY } from '../public/affiliates'
 import { ARTICLES_COPY, articlesIndexHref } from '../../articles/i18n'
+import { BOOSTER_COMPARE } from '../public/compare/booster'
+import { BRIGHTLOCAL_COMPARE } from '../public/compare/brightlocal'
+import { RANKMATH_COMPARE } from '../public/compare/rankmath'
+import { SEMRUSH_COMPARE } from '../public/compare/semrush'
+import { SURFER_COMPARE } from '../public/compare/surfer'
+import { WRITESONIC_COMPARE } from '../public/compare/writesonic'
+import { YOAST_COMPARE } from '../public/compare/yoast'
 import { availableLocales, counterpartPath } from '../../../components/LanguageSwitcher'
 import { buildHreflangAlternates } from '../../seo/hreflang'
 import { isGermanPath, routePublicLocale } from '../request-locale'
@@ -368,6 +375,40 @@ console.log('\nD) the locale tables and the copy')
   check('D7a-MUT: a transliterated word is caught, and the real spelling is not',
     TRANSLIT.test('Bitte waehlen Sie eine Groesse fuer das Bild')
     && !TRANSLIT.test('Bitte wählen Sie eine Größe für das Bild'))
+
+  /*
+   * D7b: AND THE VERB AGREES WITH ITS SUBJECT. "messt" is the second person
+   * plural of "messen"; the third person singular is "misst". Four strings
+   * carried the wrong form on the live /de tree until a German directory
+   * editor quoted one of them back at us ("ein System, das schreibt,
+   * veröffentlicht und messt") in a published review on 09.11.2026. Two of
+   * the four were on the BrightLocal comparison page, which no German guard
+   * read at all, so the compare copy joins the strings this section checks.
+   *
+   * The pattern is deliberately narrow: one verb, both wrong forms. A general
+   * conjugation checker is not something a regex can be, and a guard that
+   * fires on correct German would be turned off within a week. What earns its
+   * place is the specific mistake that reached a reader.
+   */
+  const compareDe = [
+    ...strings(BOOSTER_COMPARE.de, 'compare.booster'),
+    ...strings(BRIGHTLOCAL_COMPARE.de, 'compare.brightlocal'),
+    ...strings(RANKMATH_COMPARE.de, 'compare.rankmath'),
+    ...strings(SEMRUSH_COMPARE.de, 'compare.semrush'),
+    ...strings(SURFER_COMPARE.de, 'compare.surfer'),
+    ...strings(WRITESONIC_COMPARE.de, 'compare.writesonic'),
+    ...strings(YOAST_COMPARE.de, 'compare.yoast'),
+  ]
+  check('D7b: the comparison pages carry German copy to check too', compareDe.length > 100,
+    String(compareDe.length))
+  const WRONG_PERSON = /(?<!\p{L})(?:messt|meßt)(?!\p{L})/iu
+  const wrongPerson = [...all, ...compareDe].filter((s) => WRONG_PERSON.test(s.text))
+  check('D7b1: no sentence says "messt" where it means "misst"', wrongPerson.length === 0,
+    wrongPerson.slice(0, 4).map((s) => `${s.path}: ${s.text.slice(0, 60)}`).join(' | '))
+  check('D7b1-MUT: the wrong person is caught, and the right one is not',
+    WRONG_PERSON.test('Ein System, das schreibt, veröffentlicht und messt')
+    && !WRONG_PERSON.test('Ein System, das schreibt, veröffentlicht und misst')
+    && !WRONG_PERSON.test('Wir messen Ihre Positionen jeden Monat'))
 
   check('D8: the affiliate page states the same two rates as every other language',
     JSON.stringify(AFFILIATES_COPY.de).includes('30') && JSON.stringify(AFFILIATES_COPY.de).includes('40'))

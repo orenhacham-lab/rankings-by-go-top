@@ -44,7 +44,13 @@ import { readdirSync, existsSync, readFileSync } from 'fs'
 import { join } from 'path'
 import { PUBLIC_LOCALES, LOCALE_PREFIX, type PublicLocale } from '@/lib/i18n/locales'
 import type { ComparisonCopy } from '@/lib/i18n/public/compare/types'
+import { COMPARE_COMMON } from '@/lib/i18n/public/compare-common'
+import { COMPARE_INDEX, COMPARISONS as COMPARISONS_REGISTRY } from '@/lib/i18n/public/compare-index'
 import { wordCount, maxPhraseWords } from '@/lib/text/segment'
+
+// Source guards strip comments first: a `nofollow` named in a comment is a
+// note about the code, not the code. Groups E and F both read source.
+const stripComments = (src: string) => src.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '')
 
 let pass = 0, fail = 0
 function check(name: string, cond: boolean, detail?: string) {
@@ -65,8 +71,12 @@ const COMPARISONS: { slug: string; copy: Record<PublicLocale, ComparisonCopy> }[
 /** A source is the competitor's own, not ours and not a third party's write-up. */
 function ownedByCompetitor(href: string, slug: string): boolean {
   const host = new URL(href).hostname.replace(/^www\./, '')
-  // wordpress.org carries a vendor's own plugin listing, which the vendor writes.
-  return host.includes(slug) || host === 'wordpress.org'
+  // Two marketplaces carry a vendor's own listing, written and priced by the
+  // vendor rather than by an editor: wordpress.org for a plugin, and
+  // apps.shopify.com for a Shopify app. The host does not carry the vendor's
+  // name there — the app's slug does — so the hostname test cannot see it, and
+  // without this a page about a Shopify app could cite only a third party.
+  return host.includes(slug) || host === 'wordpress.org' || host === 'apps.shopify.com'
 }
 
 function main() {
@@ -109,6 +119,10 @@ function main() {
   check('B3: every source is an https page the competitor owns', badSource.length === 0, badSource.join(', '))
   check('MUTATION CONTROL: a third-party blog cited as the source is caught',
     !ownedByCompetitor('https://someblog.example.com/semrush-review', 'semrush'))
+  check('MUTATION CONTROL: a vendor marketplace listing is a source, a marketplace search is still a host we allow',
+    ownedByCompetitor('https://apps.shopify.com/booster-apps-seo-optimizer', 'booster')
+    && ownedByCompetitor('https://wordpress.org/plugins/wordpress-seo/', 'yoast')
+    && !ownedByCompetitor('https://www.g2.com/products/booster-seo/reviews', 'booster'))
   check('MUTATION CONTROL: an undated table is caught', !/^\d{4}-\d{2}-\d{2}$/.test('recently'))
 
   console.log('\nC) no flat denials about them, no promises about us')
@@ -160,9 +174,6 @@ function main() {
     wordCount('こちらも良い製品です。') < maxPhraseWords('こちらも良い製品です。', 60))
 
   console.log('\nE) no outbound link is dofollow, and no URL hides in the copy')
-  // Source guards strip comments first: a `nofollow` named in a comment is a
-  // note about the code, not the code.
-  const stripComments = (src: string) => src.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '')
   /** The attributes of every `<a …>` a file opens. */
   const anchors = (src: string) => [...stripComments(src).matchAll(/<a\b([^>]*)>/g)].map((m) => m[1])
   const hasNofollow = (attrs: string) => /rel=\{?["'][^"']*\bnofollow\b/.test(attrs)
@@ -200,6 +211,72 @@ function main() {
     URLISH.test(JSON.stringify({ faq: { items: [{ q: 'Where?', a: 'See https://surfer.ai/pricing/ for the list.' }] } }))
     && URLISH.test(JSON.stringify({ hero: { subtitle: 'Read more at www.brightlocal.com today.' } }))
     && !URLISH.test(JSON.stringify({ faq: { items: [{ q: 'Same product?', a: 'Yes — surferseo.com redirects to surfer.ai.' }] } })))
+
+  console.log('\nF) the index at /compare, and the links that make the six reachable')
+  // The six comparison pages went live as orphans: reachable from a search
+  // result and from the sitemap, and from nowhere else. F2 is the guard that
+  // matters most here — the index prints `COMPARISONS` from
+  // lib/i18n/public/compare-index.ts, while this suite finds the comparisons by
+  // reading the copy directory, so a seventh page added without a registry row
+  // (or a row left behind after a page is dropped) is caught by comparing the
+  // two lists rather than by anyone remembering they exist.
+  const indexMissing: string[] = []
+  const indexWrongCopy: string[] = []
+  for (const locale of PUBLIC_LOCALES) {
+    const rel = `app/(public)${LOCALE_PREFIX[locale]}/compare/page.tsx`
+    if (!existsSync(join(ROOT, rel))) { indexMissing.push(rel); continue }
+    const src = readFileSync(join(ROOT, rel), 'utf8')
+    if (!new RegExp(`locale="${locale}"`).test(src) || !new RegExp(`\\['${locale}'\\]`).test(src)) indexWrongCopy.push(rel)
+  }
+  check(`F1: the index exists in all ${PUBLIC_LOCALES.length} languages and reads its own`,
+    indexMissing.length === 0 && indexWrongCopy.length === 0, [...indexMissing, ...indexWrongCopy].join(', '))
+
+  const registrySlugs = COMPARISONS_REGISTRY.map((c) => c.slug).slice().sort()
+  const onDisk = COMPARISONS.map((c) => c.slug).slice().sort()
+  check('F2: the registry the index prints is exactly the comparisons that exist',
+    registrySlugs.join(',') === onDisk.join(','), `registry [${registrySlugs}] vs on disk [${onDisk}]`)
+
+  const missingLine: string[] = []
+  const numbered: string[] = []
+  for (const locale of PUBLIC_LOCALES) {
+    const copy = COMPARE_INDEX[locale]
+    for (const { slug, name } of COMPARISONS_REGISTRY) {
+      const line = copy.when[slug as keyof typeof copy.when]
+      if (!line || line.trim().length < 40) { missingLine.push(`${slug}/${locale}`); continue }
+      // A figure about a competitor belongs beside the date and the link that
+      // make it checkable, which is the comparison page's table — not a card on
+      // an index that carries neither.
+      if (/\d/.test(line)) numbered.push(`${slug}/${locale}`)
+      if (!copy.compareWith(name).includes(name)) missingLine.push(`${slug}/${locale} (link label)`)
+    }
+  }
+  check('F3: every language has a line for every comparison', missingLine.length === 0, missingLine.join(', '))
+  check('F4: no line on the index states a figure about a competitor', numbered.length === 0, numbered.join(', '))
+
+  const indexSrc = stripComments(readFileSync(join(ROOT, 'components/public/ComparisonIndexPage.tsx'), 'utf8'))
+  check('F5: the index builds its links from the registry, locale-prefixed',
+    /COMPARISONS\.map/.test(indexSrc) && /getLocaleHref\(`\$\{COMPARE_INDEX_PATH\}\/\$\{slug\}`, locale\)/.test(indexSrc))
+  const pageSrc = stripComments(readFileSync(join(ROOT, 'components/public/ComparisonPage.tsx'), 'utf8'))
+  check('F6: every comparison page links back to the index, in its own language',
+    /getLocaleHref\(COMPARE_INDEX_PATH, locale\)/.test(pageSrc) && /shared\.seeAll/.test(pageSrc)
+    && PUBLIC_LOCALES.every((l) => (COMPARE_COMMON[l].seeAll ?? '').length > 0))
+
+  // Three patterns, because the sitemap is two hand-written trees (he, en) plus
+  // one mirrored list for the other eight.
+  const sitemapSrc = stripComments(readFileSync(join(ROOT, 'app/sitemap.xml/route.ts'), 'utf8'))
+  check('F7: /compare is in the sitemap for Hebrew, English and the mirrored tree',
+    sitemapSrc.includes('${baseUrl}/compare`') && sitemapSrc.includes('${baseUrl}/en/compare`')
+    && /\{ path: '\/compare',/.test(sitemapSrc))
+  check('F8: llms.txt names the index beside the six',
+    stripComments(readFileSync(join(ROOT, 'app/llms.txt/route.ts'), 'utf8')).includes("'/compare']"))
+
+  check('MUTATION CONTROL: a comparison missing from the registry is caught',
+    ['semrush', 'yoast'].join(',') !== ['semrush', 'yoast', 'surfer'].join(','))
+  check('MUTATION CONTROL: a figure on an index card is caught, and a plain line is not',
+    /\d/.test('Tracks 500 keywords a day. The right choice when you want daily movement.')
+    && !/\d/.test(COMPARE_INDEX.en.when.semrush))
+  check('MUTATION CONTROL: a sitemap that lost the mirrored entry is caught',
+    !/\{ path: '\/compare',/.test(sitemapSrc.replace("{ path: '/compare',", "{ path: '/compare-x',")))
 
   console.log(`\n${pass} passed, ${fail} failed`)
   if (fail > 0) process.exitCode = 1

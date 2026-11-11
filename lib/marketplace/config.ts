@@ -50,12 +50,14 @@ import { PLAN_CODES } from '@/lib/plans/catalog'
  * How a platform signs its callbacks, once that has been read from its own
  * documentation.
  *
- * Two shapes, because the platforms genuinely differ. The HMAC-over-the-raw-
+ * Four shapes, because the platforms genuinely differ. The HMAC-over-the-raw-
  * body-in-a-header shape is what Creem and most modern APIs do. JVZoo does
  * something older: a plain digest of five named FORM FIELDS with the secret
- * appended, delivered in the body itself. A single interface could not
- * describe both without a pile of nullable fields, so this is a union and the
- * verifier branches on `kind`.
+ * appended, delivered in the body itself. Digistore24 digests every parameter
+ * of the body in sorted order. And ClickBank signs nothing at all: it
+ * ENCRYPTS the whole notification, so decrypting it is what proves who sent
+ * it. A single interface could not describe them without a pile of nullable
+ * fields, so this is a union and the verifier branches on `kind`.
  */
 export interface MarketplaceHmacHeaderScheme {
   kind: 'hmac_header'
@@ -116,10 +118,52 @@ export interface MarketplaceSortedParamsDigestScheme {
   caseSensitiveSort: boolean
 }
 
+/**
+ * A SCHEME WHERE THERE IS NO SIGNATURE AT ALL, AND DECRYPTION IS THE PROOF.
+ *
+ * ClickBank's Instant Notification Service does not sign its deliveries: it
+ * encrypts the whole notification with the vendor's own secret key and posts
+ * an envelope carrying the ciphertext and the initialization vector, both
+ * base64. Their own page says what that buys — it "allows the receiver of the
+ * notification to know that the message originated from ClickBank and was not
+ * altered during delivery" — and their PHP sample draws the conclusion this
+ * type is built on: "If the decoding of the JSON string wasn't successful,
+ * then you can assume the notification wasn't encrypted with your secret
+ * key."
+ *
+ * So authentication here is: decrypt with our key, and require the plaintext
+ * to be JSON. Nothing else in the body can be trusted before that succeeds,
+ * and a body that decrypts to bytes which are not JSON is a forgery, not a
+ * malformed friend.
+ *
+ * THE KEY IS NOT THE SECRET. It is the first 32 characters of the HEX
+ * rendering of SHA-1 over the secret, used as 32 ASCII bytes — an AES-256
+ * key. All four of ClickBank's samples (Java, PHP, Python, Ruby) agree on it.
+ * Taking the first 16 bytes of the raw digest instead decrypts nothing, which
+ * is the trap this comment exists to name.
+ *
+ * See docs/affiliate/clickbank-ins-docs.md for the quoted algorithm, the
+ * samples it was read from, and the fields of the decrypted body.
+ */
+export interface MarketplaceEncryptedEnvelopeScheme {
+  kind: 'encrypted_envelope'
+  /** The JSON field carrying the base64 ciphertext. */
+  ciphertextField: string
+  /** The JSON field carrying the base64 initialization vector. */
+  ivField: string
+  /** Node's cipher name. */
+  algorithm: 'aes-256-cbc'
+  /** The digest whose HEX rendering is truncated to form the key. */
+  keyDigest: 'sha1'
+  /** How many hex characters of that digest become the key. */
+  keyLength: 32
+}
+
 export type MarketplaceSignatureScheme =
   | MarketplaceHmacHeaderScheme
   | MarketplaceFieldDigestScheme
   | MarketplaceSortedParamsDigestScheme
+  | MarketplaceEncryptedEnvelopeScheme
 
 /**
  * Digistore24 IPN, from their own published guide and reference
@@ -169,6 +213,23 @@ export const JVZOO_IPN_V2_SCHEME: MarketplaceFieldDigestScheme = {
   length: 8,
 }
 
+/**
+ * ClickBank INS version 8.0, from ClickBank's own support page
+ * (docs/affiliate/clickbank-ins-docs.md, fetched 2026-11-07).
+ *
+ * The secret is the Secret Key the vendor chooses in the account's Advanced
+ * Tools, up to 16 characters, held here as
+ * MARKETPLACE_CLICKBANK_WEBHOOK_SECRET.
+ */
+export const CLICKBANK_INS_SCHEME: MarketplaceEncryptedEnvelopeScheme = {
+  kind: 'encrypted_envelope',
+  ciphertextField: 'notification',
+  ivField: 'iv',
+  algorithm: 'aes-256-cbc',
+  keyDigest: 'sha1',
+  keyLength: 32,
+}
+
 export interface MarketplaceProvider {
   /** The value stored in marketplace_orders.provider. */
   slug: string
@@ -201,6 +262,52 @@ export interface MarketplaceProvider {
    * approximation of one.
    */
   requiredDisclaimer: string | null
+  /**
+   * Where this platform requires the buyer to be sent for ORDER support —
+   * refunds, a charge they do not recognise, a payment that failed.
+   *
+   * It is not our support route and it is not interchangeable with it.
+   * ClickBank's own pitch-page rules state the two lines verbatim and require
+   * both: product support to the seller, order support to them, at
+   * www.clkbank.com. A page that answers a refund question with our mailbox
+   * when the reseller holds the money is a page that sends a buyer to the
+   * party that cannot help them, and their review fails it.
+   *
+   * null for a platform that states no such route, and then the page prints
+   * one support line rather than inventing a second.
+   */
+  orderSupportUrl: string | null
+  /**
+   * How the charge appears on the buyer's statement, where the platform
+   * publishes it.
+   *
+   * ClickBank require this on the thank-you page by name, and the reason is
+   * the one they give: a buyer who sees a company they never heard of on
+   * their card asks their bank, not us, and a chargeback costs more than the
+   * sale. Printed only where the platform publishes the string; never
+   * guessed, because a wrong descriptor is worse than none.
+   */
+  billingDescriptor: string | null
+  /**
+   * The platform's own return and cancellation policy, where the platform
+   * publishes it at a stable address.
+   *
+   * It is a default under `MARKETPLACE_<SLUG>_POLICY_URL`, not a replacement
+   * for it: an env value still wins. It exists because for a reseller this
+   * link is not a courtesy. Our own refund policy does not govern that
+   * purchase (section 6A of it says so outright), ClickBank's return policy
+   * is part of their Client Contract, and that contract forbids a seller to
+   * "make any guarantee that conflicts with the ClickBank return Policy" —
+   * so a page that restated our own no-refund term, or linked our policy as
+   * the governing one, would be in breach on a published page. The link is
+   * how the buyer reaches the terms that actually apply.
+   *
+   * NO PERIOD IS QUOTED ANYWHERE FROM THIS. Their Flexible Refunds feature
+   * sets the return window per product, so the standard figure is not
+   * necessarily ours, and printing it would publish a term we had not read
+   * off the product. The policy speaks for itself.
+   */
+  returnPolicyUrl: string | null
   /**
    * What this platform accepts as "I handled it".
    *
@@ -272,15 +379,58 @@ export const MARKETPLACE_PROVIDERS: readonly MarketplaceProvider[] = [
     signature: DIGISTORE24_IPN_SCHEME,
     sellerOfRecord: true,
     requiredDisclaimer: null,
+    orderSupportUrl: null,
+    billingDescriptor: null,
+    returnPolicyUrl: null,
     /* Their guide: only the literal text OK counts as a handled delivery. */
     acknowledgement: 'ok_text',
   },
   {
     slug: 'clickbank',
     label: 'ClickBank',
-    signature: null,
+    /*
+     * Not a signature: their INS encrypts the whole body and decryption with
+     * our own secret key is what proves the delivery came from ClickBank. See
+     * CLICKBANK_INS_SCHEME above and docs/affiliate/clickbank-ins-docs.md.
+     */
+    signature: CLICKBANK_INS_SCHEME,
     sellerOfRecord: true,
-    requiredDisclaimer: null,
+    /*
+     * Both read from ClickBank's own pitch-page and thank-you-page rules
+     * (support.clickbank.com/en/articles/10535182-creating-your-first-product,
+     * read 11.11.2026), which name the destination and the string outright.
+     */
+    orderSupportUrl: 'https://www.clkbank.com',
+    billingDescriptor: 'CLKBANK*COM',
+    /* Read 11.11.2026; it is the article their Client Contract incorporates. */
+    returnPolicyUrl:
+      'https://support.clickbank.com/en/articles/10535349-clickbank-s-return-and-subscription-cancellation-policy',
+    /*
+     * Their own published pitch-page and thank-you-page rules give this text
+     * as mandatory and verbatim. Passed for publication by the legal thread
+     * on 11.11.2026 on three conditions, all met here: it keeps the
+     * attributing heading the JVZoo block has, even though nothing in it
+     * contradicts us, so that we are not volunteering in our own voice that
+     * nobody reviewed our product; it is published in English exactly as
+     * given, unedited down to the spacing, because translating it would
+     * breach the requirement; and it appears ONLY where ClickBank really is
+     * the retailer, which here means the two /go/clickbank pages and nowhere
+     * else - never the general site, never a shared footer, never a page
+     * whose checkout is PayPal or Creem. The address in it is the one the
+     * Client Contract gives, so it needed no checking.
+     */
+    requiredDisclaimer:
+      'ClickBank is the retailer of products on this site. CLICKBANK\u00ae is a registered ' +
+      'trademark of Click Sales, Inc., a Delaware corporation located at 1444 S. Entertainment ' +
+      'Ave., Suite 410 Boise, ID 83709, USA and used by permission. ClickBank\'s role as ' +
+      'retailer does not constitute an endorsement, approval or review of these products or any ' +
+      'claim, statement or opinion used in promotion of these products.',
+    /*
+     * Their page asks for nothing but a 2xx within three seconds, and they
+     * DO retry: once every four hours, five attempts, then the notification
+     * is gone for good. The literal-text acknowledgement is Digistore24's
+     * requirement alone.
+     */
     acknowledgement: 'json',
   },
   {
@@ -298,6 +448,9 @@ export const MARKETPLACE_PROVIDERS: readonly MarketplaceProvider[] = [
      */
     signature: JVZOO_IPN_V2_SCHEME,
     sellerOfRecord: false,
+    orderSupportUrl: null,
+    billingDescriptor: null,
+    returnPolicyUrl: null,
     /*
      * The exact words JVZoo compliance requires, copied character for
      * character from the review notes on products 457483 / 457573 / 457575 /
@@ -426,6 +579,16 @@ export function providerReadiness(slug: string): MarketplaceReadiness {
  */
 const CANONICAL_ORIGIN = 'https://www.gotopseo.com'
 
+/**
+ * The ONE support address these pages publish.
+ *
+ * It was a literal in the thank-you page and the sales page had none at all,
+ * which is how a reseller's review ends up reading two different answers to
+ * "who do I write to". ClickBank's rules require the seller's contact in the
+ * footer of the pitch page as well, so both pages now read it from here.
+ */
+export const MARKETPLACE_SUPPORT_EMAIL = 'support@gotopseo.com'
+
 export const MARKETPLACE_CLAIM_PATH = '/claim'
 
 export function marketplaceClaimUrl(claimToken: string): string {
@@ -483,8 +646,11 @@ export function marketplaceBuyUrl(slug: string, plan: PlanCode): string | null {
  * The tracking pixel is configured separately, below.
  */
 export function marketplacePolicyUrl(slug: string): string | null {
-  if (!marketplaceProvider(slug)) return null
-  return httpsUrlOrNull(process.env[`${envPrefix(slug)}POLICY_URL`])
+  const provider = marketplaceProvider(slug)
+  if (!provider) return null
+  return (
+    httpsUrlOrNull(process.env[`${envPrefix(slug)}POLICY_URL`]) ?? provider.returnPolicyUrl
+  )
 }
 
 /**

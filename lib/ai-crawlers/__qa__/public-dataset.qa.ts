@@ -39,7 +39,7 @@ const read = (rel: string) => readFileSync(join(ROOT, rel), 'utf8')
 /** Source guards match on code, so comments are stripped first (repo convention). */
 const strip = (src: string) => src.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '')
 
-const PURPOSES = ['train', 'answer', 'search', 'ads', 'preview']
+const PURPOSES = ['train', 'answer', 'search', 'ads', 'preview', 'agent']
 const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/
 
 function main() {
@@ -52,7 +52,7 @@ function main() {
     const undated = AI_CRAWLER_DATASET.filter((c) => !ISO_DATE.test(c.verified))
     check('A3: every row carries the date that page was read', undated.length === 0,
       undated.map((c) => c.token).join(', '))
-    check('A4: no row claims a purpose outside the five', AI_CRAWLER_DATASET.every((c) => PURPOSES.includes(c.purpose)))
+    check('A4: no row claims a purpose outside the six', AI_CRAWLER_DATASET.every((c) => PURPOSES.includes(c.purpose)))
     check('A5: no duplicate token', new Set(AI_CRAWLER_DATASET.map((c) => c.token.toLowerCase())).size === AI_CRAWLER_DATASET.length)
     check('A6: a token with no operator page is a candidate, not a row',
       AI_CRAWLER_CANDIDATES.length > 0 &&

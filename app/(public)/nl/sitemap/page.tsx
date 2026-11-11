@@ -1,3 +1,4 @@
+import { buildHreflangAlternates } from '@/lib/seo/hreflang'
 import Link from 'next/link'
 import { LEGAL_FOOTNOTE, LEGAL_LINK, LegalFrame, LegalHeader, SitemapGroups } from '@/components/public/LegalDoc'
 import { authHref } from '@/lib/i18n/auth-href'
@@ -12,6 +13,14 @@ export const metadata = {
     url: 'https://www.gotopseo.com/nl/sitemap',
     locale: LOCALE_CONFIG['nl'].ogLocale,
   },
+  alternates: {
+    canonical: 'https://www.gotopseo.com/nl/sitemap',
+    // The ten maps are one page in ten languages. Without this block the
+    // page inherits the root layout's alternates, which name the ten HOME
+    // pages as this page's translations and (in Hebrew) canonicalise the map
+    // to the home page — measured 11.11.2026 on all ten.
+    languages: buildHreflangAlternates('/sitemap', '/en/sitemap', '/es/sitemap'),
+  },
 }
 
 type SitemapSection = { title: string; description?: string; links: Array<{ label: string; href: string }> }
@@ -25,6 +34,9 @@ export default function DutchSitemapPage() {
         { label: 'Prijzen', href: '/nl/pricing' },
         { label: 'Over ons', href: '/nl/about' },
         { label: 'Artikelen', href: '/nl/articles' },
+        { label: 'Gratis analyse', href: '/nl/free-check' },
+        { label: 'Welke AI-crawlers blokkeert uw website?', href: '/nl/ai-crawlers' },
+        { label: 'Partnerprogramma', href: '/nl/affiliates' },
       ],
     },
     {
@@ -62,9 +74,14 @@ export default function DutchSitemapPage() {
     {
       title: 'Vergelijking met andere hulpmiddelen',
       links: [
+        { label: 'Alle vergelijkingen', href: '/nl/compare' },
         { label: 'Go Top SEO tegenover Semrush', href: '/nl/compare/semrush' },
         { label: 'Go Top SEO tegenover Yoast', href: '/nl/compare/yoast' },
         { label: 'Go Top SEO tegenover Rank Math', href: '/nl/compare/rankmath' },
+        { label: 'Go Top SEO tegenover Surfer', href: '/nl/compare/surfer' },
+        { label: 'Go Top SEO tegenover Writesonic', href: '/nl/compare/writesonic' },
+        { label: 'Go Top SEO tegenover BrightLocal', href: '/nl/compare/brightlocal' },
+        { label: 'Go Top SEO tegenover Booster SEO', href: '/nl/compare/booster' },
       ],
     },
     {

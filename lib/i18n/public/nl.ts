@@ -125,6 +125,8 @@ export const nl = {
     articles: 'Artikelen',
     about: 'Over ons',
     affiliates: 'Partnerprogramma',
+    compare: 'Alle vergelijkingen',
+    aiCrawlers: 'AI-crawlercheck',
     sitemap: 'Sitemap',
     legal: 'Juridisch',
     privacy: 'Privacyverklaring',

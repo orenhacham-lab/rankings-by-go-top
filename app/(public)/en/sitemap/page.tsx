@@ -1,3 +1,4 @@
+import { buildHreflangAlternates } from '@/lib/seo/hreflang'
 import Link from 'next/link'
 import { LEGAL_FOOTNOTE, LEGAL_LINK, LegalFrame, LegalHeader, SitemapGroups } from '@/components/public/LegalDoc'
 
@@ -9,6 +10,14 @@ export const metadata = {
     description: 'Complete sitemap for Go Top SEO',
     url: 'https://www.gotopseo.com/en/sitemap',
     locale: 'en_US',
+  },
+  alternates: {
+    canonical: 'https://www.gotopseo.com/en/sitemap',
+    // The ten maps are one page in ten languages. Without this block the
+    // page inherits the root layout's alternates, which name the ten HOME
+    // pages as this page's translations and (in Hebrew) canonicalise the map
+    // to the home page — measured 11.11.2026 on all ten.
+    languages: buildHreflangAlternates('/sitemap', '/en/sitemap', '/es/sitemap'),
   },
 }
 
@@ -23,6 +32,9 @@ export default function EnglishSitemapPage() {
         { label: 'Pricing', href: '/en/pricing' },
         { label: 'About', href: '/en/about' },
         { label: 'Articles', href: '/en/articles' },
+        { label: 'Free site check', href: '/en/free-check' },
+        { label: 'Which AI crawlers is your site blocking?', href: '/en/ai-crawlers' },
+        { label: 'Affiliate program', href: '/en/affiliates' },
       ],
     },
     {
@@ -60,9 +72,14 @@ export default function EnglishSitemapPage() {
     {
       title: 'Comparisons',
       links: [
+        { label: 'All comparisons', href: '/en/compare' },
         { label: 'Go Top SEO vs Semrush', href: '/en/compare/semrush' },
         { label: 'Go Top SEO vs Yoast', href: '/en/compare/yoast' },
         { label: 'Go Top SEO vs Rank Math', href: '/en/compare/rankmath' },
+        { label: 'Go Top SEO vs Surfer', href: '/en/compare/surfer' },
+        { label: 'Go Top SEO vs Writesonic', href: '/en/compare/writesonic' },
+        { label: 'Go Top SEO vs BrightLocal', href: '/en/compare/brightlocal' },
+        { label: 'Go Top SEO vs Booster SEO', href: '/en/compare/booster' },
       ],
     },
     {

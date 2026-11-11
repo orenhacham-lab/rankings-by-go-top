@@ -42,7 +42,7 @@ export const landingIt: LandingCopy = {
     trialNote: 'Senza carta di credito, senza vincoli. Disdetta in qualsiasi momento.',
     checkLead: 'Non è ancora il momento di creare un account? Analisi gratuita del sito, senza registrazione:',
     dashboard: 'La mia dashboard',
-    trust: ['Pubblica su WordPress e Shopify', 'Un’assistenza affidata a persone reali'],
+    trust: ['Pubblica su WordPress, Shopify e Wix', 'Un’assistenza affidata a persone reali'],
     climbChip: '3ª posizione in Google',
     published: 'Articolo pubblicato sul Suo sito',
   },
@@ -109,7 +109,7 @@ export const landingIt: LandingCopy = {
   },
   worksWith: {
     label: 'Controlliamo e pubblichiamo per Lei su:',
-    names: ['Google', 'Google Maps', 'ChatGPT', 'Gemini', 'Perplexity', 'Copilot', 'Grok', 'WordPress', 'Shopify'],
+    names: ['Google', 'Google Maps', 'ChatGPT', 'Gemini', 'Perplexity', 'Copilot', 'Grok', 'WordPress', 'Shopify', 'Wix'],
   },
   outcomes: {
     eyebrow: 'Che cosa si ottiene',
@@ -135,7 +135,7 @@ export const landingIt: LandingCopy = {
     stats: [
       { value: 6, label: 'motori IA controllati', detail: 'ChatGPT, Gemini, Perplexity, Copilot, Grok e Google AI' },
       { value: 3, label: 'canali in un solo report', detail: 'Google, Google Maps e le risposte delle IA' },
-      { value: 2, label: 'piattaforme di pubblicazione', detail: 'WordPress e Shopify, senza copia e incolla' },
+      { value: 3, label: 'piattaforme di pubblicazione', detail: 'WordPress, Shopify e Wix, senza copia e incolla' },
       { value: TRIAL_DAYS, label: 'giorni di prova gratuita', detail: 'Senza carta di credito' },
     ],
   },
@@ -180,7 +180,7 @@ export const landingIt: LandingCopy = {
       overline: 'Contenuti e pubblicazione',
       title: 'Articoli scritti per essere trovati, non per riempire un blog',
       body: 'Ogni articolo è costruito su una ricerca reale: titoli tratti da ciò che le persone chiedono, una sezione di domande e risposte, link interni verso le pagine che vendono e, sui siti WordPress con il plugin Go Top, dati strutturati che Google e i motori IA leggono. Lei rilegge, corregge se serve, e la piattaforma pubblica.',
-      points: ['Un’immagine in evidenza e immagini nel testo', 'Un controllo qualità prima di ogni pubblicazione', 'Programmazione e pubblicazione diretta su WordPress e Shopify'],
+      points: ['Un’immagine in evidenza e immagini nel testo', 'Un controllo qualità prima di ogni pubblicazione', 'Programmazione e pubblicazione diretta su WordPress, Shopify e Wix'],
       href: '/features/seo-geo-content-publishing',
       visual: {
         heading: 'Questa settimana sul Suo sito',
@@ -191,7 +191,7 @@ export const landingIt: LandingCopy = {
           { day: 4, title: 'Pulizia del climatizzatore: ogni quanto farla?', status: 'writing', label: 'In scrittura' },
         ],
         destinationLabel: 'Pubblicazione su',
-        destinations: ['WordPress', 'Shopify'],
+        destinations: ['WordPress', 'Shopify', 'Wix'],
       },
     },
     ai: {
@@ -313,7 +313,7 @@ export const landingIt: LandingCopy = {
       },
       {
         q: 'Con quali siti funziona?',
-        a: 'La pubblicazione diretta funziona con WordPress e Shopify. Il monitoraggio delle posizioni, la visibilità nelle IA e la ricerca di parole chiave funzionano con qualsiasi sito.',
+        a: 'La pubblicazione diretta funziona con WordPress, Shopify e Wix. Il monitoraggio delle posizioni, la visibilità nelle IA e la ricerca di parole chiave funzionano con qualsiasi sito.',
       },
       {
         q: `Che cosa accade alla fine della prova di ${TRIAL_DAYS} giorni?`,

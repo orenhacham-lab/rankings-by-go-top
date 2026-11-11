@@ -15,7 +15,9 @@ import { useConfirm } from '@/components/ui/ConfirmDialog'
 import { cn } from '@/lib/utils'
 import BillingClient from './client'
 import CreemCheckoutButton from './CreemCheckoutButton'
-import { INTL_LOCALE } from '@/lib/i18n/locales'
+import Checkbox from '@/components/ui/Checkbox'
+import { INTL_LOCALE, LOCALE_PREFIX } from '@/lib/i18n/locales'
+import { refundPolicyHref, withdrawalAcknowledgementRequired } from '@/lib/compliance/withdrawal-acknowledgement'
 import { SHOPIFY_APP_STORE_URL } from '@/lib/public-links/shopify-app-store'
 import { CREEM_BUYER_TERMS_URL } from '@/lib/public-links/creem-buyer-terms'
 
@@ -114,6 +116,26 @@ export default function BillingView({
   const numberLocale = INTL_LOCALE[uiLocale]
 
   /**
+   * THE WITHDRAWAL ACKNOWLEDGEMENT. Outside Israel the paid checkout must
+   * collect two statements before a subscription can start: the buyer's
+   * express request to begin during the fourteen-day withdrawal period, and
+   * the buyer's acknowledgement that the right ends once the service has been
+   * fully performed. The refund policy in German, French, Italian, Dutch and
+   * Polish each already told the buyer they had made both, and nothing in the
+   * product collected either, so the documents stated a fact about this screen
+   * that was not true. lib/compliance/withdrawal-acknowledgement.ts carries the
+   * reasoning, including why there is no country list behind this and why the
+   * ILS path is left untouched.
+   *
+   * It starts UNTICKED, always: an acknowledgement a buyer did not make is
+   * worth nothing, and a pre-ticked box is the one shape that cannot be the
+   * buyer's own statement.
+   */
+  const withdrawalAckRequired = withdrawalAcknowledgementRequired(market)
+  const [withdrawalAck, setWithdrawalAck] = useState(false)
+  const checkoutUnlocked = !withdrawalAckRequired || withdrawalAck
+
+  /**
    * What one plan card offers, decided once for all four.
    *
    *  * the card button, when the server said this account may pay by card;
@@ -123,7 +145,7 @@ export default function BillingView({
    *  * nothing, which lets the card render the PayPal container as before.
    */
   const checkoutActionFor = (plan: PlanKey): React.ReactNode => {
-    if (creemCheckout) return <CreemCheckoutButton plan={plan} />
+    if (creemCheckout) return <CreemCheckoutButton plan={plan} disabled={!checkoutUnlocked} />
     if (creemGoverned) return <p className="text-caption text-muted">{t.creem.changePlanNote}</p>
     return undefined
   }
@@ -363,6 +385,33 @@ export default function BillingView({
             currentLabel={t.currentPlan}
           />
 
+          {/* The withdrawal acknowledgement, directly above the plans it
+              unlocks and below the free trial, which is not a paid contract
+              and asks for nothing. Not shown once a subscription is active:
+              there is no new checkout to unlock then. */}
+          {withdrawalAckRequired && !hasActiveSubscription && (
+            <div className="mt-5 rounded-control border border-line bg-sunk px-4 py-4" data-withdrawal-ack-gate="">
+              <Checkbox
+                checked={withdrawalAck}
+                onChange={(next) => setWithdrawalAck(next)}
+                label={t.withdrawal.label}
+                data-withdrawal-ack=""
+              />
+              <p className="mt-2 ps-7 text-caption text-muted">
+                {!withdrawalAck && <span data-withdrawal-ack-note="">{t.withdrawal.requiredNote} </span>}
+                <a
+                  href={refundPolicyHref(LOCALE_PREFIX[uiLocale])}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="underline hover:no-underline"
+                  data-withdrawal-ack-policy=""
+                >
+                  {t.withdrawal.policyLabel}
+                </a>
+              </p>
+            </div>
+          )}
+
           {/* What a plan card offers, in one place: the card button, the
               contact line for an account Creem already bills, or nothing —
               in which case the card renders the PayPal container. */}
@@ -437,7 +486,7 @@ export default function BillingView({
 
           {/* The PayPal buttons, and the SDK behind them, only on the PayPal
               path: a card never offers two ways to pay the same plan. */}
-          {!creemCheckout && !creemGoverned && <BillingClient market={market} />}
+          {!creemCheckout && !creemGoverned && <BillingClient market={market} acknowledged={checkoutUnlocked} />}
 
           <p className="mt-6 max-w-4xl text-caption text-muted">
             {t.keywordCheckNote}

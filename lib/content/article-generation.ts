@@ -29,6 +29,7 @@ import { isInternalLinkAutoInsertAfterManualGenerationEnabled } from '@/lib/cont
 import { assertContentGenerationAllowedForUser } from '@/lib/content/entitlement-guard'
 import { getUserEntitlement } from '@/lib/subscription'
 import { resolveCurrentUsagePeriod } from '@/lib/billing/usage-period'
+import { readUsageAllowance } from '@/lib/billing/usage-allowance'
 import { reserveUsage, finalizeArticleGeneration, releaseUsageReservation } from '@/lib/billing/usage-reservations'
 import type { ArticleTopicAnchor } from '@/lib/supabase/types'
 import { normalizeContentLanguage } from '@/lib/content/language'
@@ -122,11 +123,67 @@ export interface ArticleGenerationDeps {
    * passes that date.
    */
   now: () => Date
+  /**
+   * The ADVISORY allowance read of the pre-check below. Optional, so every
+   * existing caller that builds a full deps object keeps compiling; production
+   * never passes it.
+   */
+  readAllowance?: typeof readUsageAllowance
 }
 const REAL_GENERATION_DEPS: ArticleGenerationDeps = {
   generate: generateValidatedArticle,
   createFeaturedImage: createFeaturedImageForArticle,
   now: () => new Date(),
+  readAllowance: readUsageAllowance,
+}
+
+/**
+ * IS THERE ANY POINT BUILDING THE PROMPT? Read before the topic, the project,
+ * the WordPress connection, the writing guidance, the business context, the
+ * depth decision and the internal-link guidance — all of which
+ * `generateArticleForTopic` used to do before Phase 3's reservation told it the
+ * account had no article left.
+ *
+ * Measured in Production on 9 November 2026, the day the team's free Vercel
+ * Fluid Active CPU allowance ran out: the fifteen-minute content cron assembled
+ * three full "deep" article prompts per run and threw all three away on
+ * `quota_exceeded`, ninety-six runs a day.
+ *
+ * ADVISORY, NEVER THE DECISION. Phase 3 keeps its own atomic reservation, so
+ * this cannot grant a generation the ledger would refuse — it can only decline
+ * early, and only when:
+ *   - the ledger answers `known` (an admin reads `unmetered` and an unreadable
+ *     entitlement reads `unknown`; neither is an exhausted allowance), and
+ *   - nothing is left, and
+ *   - this topic holds no reservation of its own — because a retry of a topic
+ *     that already consumed a credit must still be answered with its article,
+ *     which Phase 3's `already_consumed` branch does.
+ */
+export async function isArticleAllowanceSpent(
+  admin: Admin,
+  args: {
+    userId: string
+    topicId: string
+    nowMs: number
+    readAllowance?: typeof readUsageAllowance
+  },
+): Promise<boolean> {
+  const read = args.readAllowance ?? readUsageAllowance
+  const allowance = await read(admin, {
+    userId: args.userId,
+    usageType: 'article',
+    limitFor: (limits) => limits.maxArticlesPerPeriodAccountWide,
+    nowMs: args.nowMs,
+  })
+  if (allowance.state !== 'known' || allowance.remaining > 0) return false
+  const { data: ownReservation } = await admin
+    .from('usage_reservations')
+    .select('id')
+    .eq('user_id', args.userId)
+    .eq('usage_type', 'article')
+    .eq('idempotency_key', `topic:${args.topicId}`)
+    .maybeSingle()
+  return !ownReservation
 }
 
 /**
@@ -153,6 +210,13 @@ export async function generateArticleForTopic(
       ? { ok: false, kind: 'entitlement_unavailable', detail: gate.detail }
       : { ok: false, kind: 'billing_required' }
   }
+
+  // AN EXHAUSTED ALLOWANCE, FOUND BEFORE THE PROMPT INSTEAD OF AFTER IT.
+  // See isArticleAllowanceSpent. Advisory only; Phase 3's atomic reservation
+  // below is still the decision, and this reads nothing it does not need.
+  if (await isArticleAllowanceSpent(admin, {
+    userId, topicId, nowMs: deps.now().getTime(), readAllowance: deps.readAllowance ?? readUsageAllowance,
+  })) return { ok: false, kind: 'quota_exceeded' }
 
   const { data: topic } = await admin.from('article_topics').select('*').eq('id', topicId).maybeSingle()
   if (!topic) return { ok: false, kind: 'topic_not_found' }

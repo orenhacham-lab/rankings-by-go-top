@@ -106,6 +106,8 @@ export const es = {
     articles: 'Artículos',
     about: 'Nosotros',
     affiliates: 'Programa de afiliados',
+    compare: 'Todas las comparativas',
+    aiCrawlers: 'Comprobación de rastreadores de IA',
     sitemap: 'Mapa del sitio',
     legal: 'Legal',
     privacy: 'Política de privacidad',
