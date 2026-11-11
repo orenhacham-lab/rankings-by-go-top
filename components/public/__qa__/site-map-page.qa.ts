@@ -18,7 +18,10 @@
  *   A) every path the XML sitemap advertises for the translated trees appears,
  *      locale-prefixed, on every language's human map;
  *   B) every link the human map prints leads to a route that exists;
- *   C) no page lists the same href twice.
+ *   C) no page lists the same href twice;
+ *   D) each map's own metadata canonicalises to itself and names the other
+ *      nine maps as its translations, instead of inheriting the root layout's
+ *      alternates, which name the ten home pages.
  * Each group ends with a MUTATION CONTROL.
  *
  * The lists stay literal rather than derived. These are client components, so
@@ -116,6 +119,37 @@ function main() {
     const seen = new Set<string>()
     return ['/pricing', '/about', '/pricing'].some((h) => (seen.has(h) ? true : (seen.add(h), false)))
   })())
+
+
+  console.log('\nD) each map says it is itself, in its own language')
+  // MEASURED 11.11.2026 in production: all ten maps carried the root layout's
+  // alternates, so every one of them advertised the ten HOME pages as its own
+  // translations, and the Hebrew map's canonical said it WAS the home page —
+  // which asks Google to drop the one page whose whole job is to link to the
+  // others. Next's metadata is not merged field by field here: a page that
+  // writes its own metadata without an `alternates` block inherits the root's
+  // whole block, path and all.
+  const metaSource = (prefix: string) => {
+    const layout = join(ROOT, `app/(public)${prefix}/sitemap/layout.tsx`)
+    const page = sitemapPage(prefix)
+    return (existsSync(layout) ? readFileSync(layout, 'utf8') : '') + readFileSync(page, 'utf8')
+  }
+  const wrongCanonical: string[] = []
+  const noLanguages: string[] = []
+  for (const locale of PUBLIC_LOCALES) {
+    const prefix = LOCALE_PREFIX[locale]
+    const src = metaSource(prefix)
+    if (!src.includes(`canonical: 'https://www.gotopseo.com${prefix}/sitemap'`)) wrongCanonical.push(locale)
+    if (!src.includes("buildHreflangAlternates('/sitemap', '/en/sitemap', '/es/sitemap')")) noLanguages.push(locale)
+  }
+  check('D1: every map canonicalises to itself', wrongCanonical.length === 0, wrongCanonical.join(', '))
+  check('D2: every map announces the other nine maps, not the home pages', noLanguages.length === 0, noLanguages.join(', '))
+  // The control runs D1's and D2's own predicate over the metadata these pages
+  // had until 11.11.2026 — title, description and openGraph, no alternates.
+  const inherited = "export const metadata = { title: 'x', openGraph: { url: 'https://www.gotopseo.com/sitemap' } }"
+  check('MUTATION CONTROL: the metadata these pages had before, with no alternates of its own, fails both checks',
+    !inherited.includes("canonical: 'https://www.gotopseo.com/sitemap'") &&
+    !inherited.includes("buildHreflangAlternates('/sitemap', '/en/sitemap', '/es/sitemap')"))
 
   console.log(`\n${pass} passed, ${fail} failed`)
   if (fail > 0) process.exitCode = 1

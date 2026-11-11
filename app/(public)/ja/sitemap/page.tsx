@@ -1,3 +1,4 @@
+import { buildHreflangAlternates } from '@/lib/seo/hreflang'
 import Link from 'next/link'
 import { LEGAL_FOOTNOTE, LEGAL_LINK, LegalFrame, LegalHeader, SitemapGroups } from '@/components/public/LegalDoc'
 import { authHref } from '@/lib/i18n/auth-href'
@@ -11,6 +12,14 @@ export const metadata = {
     description: 'Go Top SEOのサイトマップ',
     url: 'https://www.gotopseo.com/ja/sitemap',
     locale: LOCALE_CONFIG['ja'].ogLocale,
+  },
+  alternates: {
+    canonical: 'https://www.gotopseo.com/ja/sitemap',
+    // The ten maps are one page in ten languages. Without this block the
+    // page inherits the root layout's alternates, which name the ten HOME
+    // pages as this page's translations and (in Hebrew) canonicalise the map
+    // to the home page — measured 11.11.2026 on all ten.
+    languages: buildHreflangAlternates('/sitemap', '/en/sitemap', '/es/sitemap'),
   },
 }
 
