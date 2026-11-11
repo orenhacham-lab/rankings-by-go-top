@@ -49,6 +49,7 @@ import { MarketplacePixel } from '@/components/consent/MarketplacePixel'
 import { MarketplacePixelUnconditional } from '@/components/consent/MarketplacePixelUnconditional'
 import { consentRequiredForRequest } from '@/lib/consent/eprivacy-territory'
 import {
+  MARKETPLACE_SUPPORT_EMAIL,
   marketplaceBadgeUrl,
   marketplaceBuyUrl,
   marketplacePixelUrl,
@@ -56,6 +57,7 @@ import {
   marketplaceProvider,
 } from '@/lib/marketplace/config'
 import { PLAN_CATALOG, PLAN_CODES } from '@/lib/plans/catalog'
+
 
 export const dynamic = 'force-dynamic'
 
@@ -154,6 +156,47 @@ export default async function MarketplaceSalesPage({
         })}
       </section>
 
+      {/* DELIVERY METHOD AND SPEED, which ClickBank's pitch-page rules require
+          by name and which this page used to leave to be inferred from one
+          line near the bottom. Their rules also ask, for a recurring product,
+          WHEN the recurring delivery happens; the honest answer is that there
+          is no second delivery, because access continues. What is written
+          here is the real mechanism: the platform's callback records the
+          order and lib/marketplace/claim-email.ts mails the link that opens
+          the account. */}
+      <section className="mt-12">
+        <h2 className="text-section text-ink">How you get it, and how fast</h2>
+        <p className="mt-2 text-copy text-body">
+          This is an online service, not a file. Within a few minutes of your payment we email the
+          address you paid with, with a link that opens your Go Top SEO account on the plan you
+          bought. You open it, set a password, add your website, and the monthly work starts on it.
+          Nothing is shipped and there is nothing to download.
+        </p>
+        <p className="mt-2 text-copy text-body">
+          Because it is a monthly subscription there is no second delivery to wait for: the same
+          account stays open and the work continues every month for as long as the subscription is
+          paid. If the email has not arrived, look in the spam folder and then write to the product
+          support address in the footer, with the order number from your receipt.
+        </p>
+      </section>
+
+      {/* FILE FORMAT AND WHAT IS NEEDED TO USE THE PRODUCT, also required by
+          name. A service has no file format, and saying so plainly is the
+          answer: no download, no plugin, no operating system of its own. The
+          connections are named because a buyer who expects publishing to
+          their own site needs to know what it attaches to. */}
+      <section className="mt-10">
+        <h2 className="text-section text-ink">What you need to use it</h2>
+        <p className="mt-2 text-copy text-body">
+          A web browser. The service runs at www.gotopseo.com and there is no software to install, no
+          plugin to buy and no particular operating system: it is used on a computer, a tablet or a
+          phone. To publish articles and apply fixes to your own site automatically it connects to
+          WordPress or Shopify, and to read your search data it connects to Google Search Console.
+          Without those connections you still get the tracking, the AI checks and the reports, and
+          you apply the changes yourself.
+        </p>
+      </section>
+
       {/* Everything a buyer is owed before they are bound: who they are
           buying FROM, who charges them, that the price is before tax, whose
           terms govern the purchase as opposed to the account, that it renews,
@@ -196,10 +239,18 @@ export default async function MarketplaceSalesPage({
         </p>
       )}
 
+      {/* THE REBILL SCHEDULE IN FULL. ClickBank's rules ask for "all of the
+          details of the rebill schedule, including the number of times a
+          customer is billed and how frequently", and "renews every month
+          until you cancel it" answers the second half only. The number of
+          payments is not a number here, and the page says so rather than
+          leaving the buyer to assume a term that ends. */}
       <p className="mt-4 text-copy text-muted">
-        The plan is a monthly subscription and renews every month until you cancel it. You
-        cancel it at {provider.label}, where you bought it, and the plan stays active until
-        the end of the period you have paid for.
+        The plan is a monthly subscription and renews every month until you cancel it: you are
+        billed the price above once when you buy it and then the same amount every month, on the
+        same day of the month, with no fixed number of payments, no minimum term and no end date.
+        You cancel it at {provider.label}, where you bought it, and the plan stays active until the
+        end of the month you have already paid for.
       </p>
 
       <p className="mt-10 text-copy text-body">
@@ -221,6 +272,32 @@ export default async function MarketplaceSalesPage({
           <a href={policyUrl} rel="nofollow">{provider.label} terms and refunds</a>
         ) : null}
       </nav>
+
+      {/* THE SELLER CONTACT BLOCK, in the footer and in the words the
+          platform dictates. ClickBank's rules say a seller may display
+          contact information "only" in this format and that both lines must
+          be present: ours, and theirs. Which is the point of the second one —
+          a refund or an unrecognised charge belongs to the party holding the
+          money, and sending that buyer to our mailbox wastes their time and
+          fails the review. The second line is rendered from
+          provider.orderSupportUrl, so a platform that publishes no such route
+          prints one line rather than a borrowed one. */}
+      <section className="mt-10 border-t border-line pt-6" data-seller-contact={provider.slug}>
+        <p className="text-copy text-muted">
+          For Product Support, please contact the seller{' '}
+          <a href={`mailto:${MARKETPLACE_SUPPORT_EMAIL}`} dir="ltr">
+            HERE
+          </a>
+        </p>
+        {provider.orderSupportUrl ? (
+          <p className="mt-2 text-copy text-muted">
+            For Order Support, please contact {provider.label}{' '}
+            <a href={provider.orderSupportUrl} rel="nofollow">
+              HERE
+            </a>
+          </p>
+        ) : null}
+      </section>
 
       {/* Rendered only once the legal thread has passed the platform's exact
           wording; see MarketplaceProvider.requiredDisclaimer.

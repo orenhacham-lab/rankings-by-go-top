@@ -38,7 +38,12 @@
 import type { Metadata } from 'next'
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
-import { MARKETPLACE_CLAIM_PATH, marketplacePolicyUrl, marketplaceProvider } from '@/lib/marketplace/config'
+import {
+  MARKETPLACE_CLAIM_PATH,
+  MARKETPLACE_SUPPORT_EMAIL,
+  marketplacePolicyUrl,
+  marketplaceProvider,
+} from '@/lib/marketplace/config'
 
 export const dynamic = 'force-dynamic'
 
@@ -84,8 +89,8 @@ export default async function MarketplaceThanksPage({
       <p className="mt-6 text-copy text-muted">
         If the email has not arrived within a few minutes, check the spam folder first, then
         write to us at{' '}
-        <a className="underline" href="mailto:support@gotopseo.com">
-          support@gotopseo.com
+        <a className="underline" href={`mailto:${MARKETPLACE_SUPPORT_EMAIL}`}>
+          {MARKETPLACE_SUPPORT_EMAIL}
         </a>{' '}
         and we will send the link again. You can also open{' '}
         <Link className="underline" href={MARKETPLACE_CLAIM_PATH}>
@@ -110,6 +115,31 @@ export default async function MarketplaceThanksPage({
             them, and any refund or cancellation of the payment is handled by them under their
             own terms.
           </p>
+          {/* THE STRING ON THE STATEMENT, not just the platform's name.
+              ClickBank require this on the thank-you page by name, and for a
+              reason the sentence above only half answers: what the buyer
+              actually sees is CLKBANK*COM, which is not the word
+              "ClickBank". Printed only where the platform publishes the
+              string, never guessed, because a wrong descriptor sends a buyer
+              to their bank with the wrong name. */}
+          {provider.billingDescriptor ? (
+            <p className="mt-4 text-copy text-body" data-billing-descriptor={provider.slug}>
+              On the statement itself it appears as{' '}
+              <span dir="ltr">{provider.billingDescriptor}</span> rather than as{' '}
+              {provider.label} or Go Top SEO.
+            </p>
+          ) : null}
+          {/* ORDER SUPPORT, where the platform publishes a route for it. A
+              refund or an unrecognised charge belongs to the party holding
+              the money, and ClickBank's rules state the line verbatim. */}
+          {provider.orderSupportUrl ? (
+            <p className="mt-4 text-copy text-body">
+              For Order Support, please contact {provider.label}{' '}
+              <a className="underline" href={provider.orderSupportUrl} rel="nofollow">
+                HERE
+              </a>
+            </p>
+          ) : null}
           {policyUrl ? (
             <p className="mt-4 text-copy text-muted">
               <a className="underline" href={policyUrl} rel="noopener noreferrer" target="_blank">
@@ -125,12 +155,33 @@ export default async function MarketplaceThanksPage({
       <h2 className="mt-10 text-title text-ink">If you need help</h2>
       <p className="mt-4 text-copy text-body">
         Write to{' '}
-        <a className="underline" href="mailto:support@gotopseo.com">
-          support@gotopseo.com
+        <a className="underline" href={`mailto:${MARKETPLACE_SUPPORT_EMAIL}`}>
+          {MARKETPLACE_SUPPORT_EMAIL}
         </a>{' '}
         and a person will answer. Go Top SEO is operated by GO TOP DIGITAL MARKETING AND
         ADVERTISING LTD, Harakasim 24/2, Ramat Gan 5235524, Israel.
       </p>
+
+      {/* The same line in the words ClickBank dictate for it, so a reviewer
+          reading for their own format finds it, and the paragraph above still
+          says it in ours. */}
+      <p className="mt-4 text-copy text-muted" data-seller-contact={provider.slug}>
+        For Product Support, please contact the seller{' '}
+        <a className="underline" href={`mailto:${MARKETPLACE_SUPPORT_EMAIL}`} dir="ltr">
+          HERE
+        </a>
+      </p>
+
+      {/* The platform's mandated disclaimer, on the same terms as on the
+          sales page: rendered only once the legal thread has passed the exact
+          wording, and attributed, because text a platform dictates is not our
+          own statement. See MarketplaceProvider.requiredDisclaimer. */}
+      {provider.requiredDisclaimer ? (
+        <section className="mt-8" data-required-disclaimer={provider.slug}>
+          <h2 className="text-copy text-body">Notice required by {provider.label}:</h2>
+          <p className="mt-2 text-copy text-muted">{provider.requiredDisclaimer}</p>
+        </section>
+      ) : null}
     </main>
   )
 }
