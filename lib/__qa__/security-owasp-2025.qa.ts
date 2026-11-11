@@ -181,6 +181,65 @@ function main() {
   walk('app/api')
   check('no API route returns error.message to the client', offenders.length === 0, offenders.join('\n      '))
 
+  console.log('A06 — vulnerable and outdated components')
+  // The floor each runtime dependency was raised to on 11.11.2026, and why. A
+  // downgrade below any of these re-opens a published advisory, so the version
+  // range itself is the guard: ^x.y.z with a y.z below the floor fails here
+  // before it reaches a deploy.
+  //   next          16.4.6  — unauthenticated RCE in `use cache` typed-array
+  //                           returns, SSRF and RCE in image optimization,
+  //                           SSG/ISR cache poisoning, Draft-Mode content leak
+  //   sanitize-html 2.18.1  — three XSS bypasses; this is what cleans the HTML
+  //                           every generated article publishes to a merchant
+  //   sharp         0.35.5  — librsvg CVE-2026-96889 in the bundled libvips
+  //   nodemailer    10.5.0  — TLS verification bypass on OAuth2 token fetch,
+  //                           header injection, parser DoS
+  //   dompurify     3.4.17  — SAFE_FOR_TEMPLATES/IN_PLACE bypasses (pulled in
+  //                           by jspdf, so it is pinned through `overrides`)
+  //   source-map-js 1.2.2   — event-loop DoS (pinned through `overrides`)
+  const FLOORS: Record<string, [number, number, number]> = {
+    next: [16, 4, 6], 'sanitize-html': [2, 18, 1], sharp: [0, 35, 5], nodemailer: [10, 5, 0],
+  }
+  const OVERRIDE_FLOORS: Record<string, [number, number, number]> = {
+    dompurify: [3, 4, 17], 'source-map-js': [1, 2, 2],
+  }
+  const pkg = JSON.parse(read('package.json')) as {
+    dependencies: Record<string, string>
+    devDependencies: Record<string, string>
+    overrides?: Record<string, string>
+  }
+  const atLeast = (range: string | undefined, floor: [number, number, number]): boolean => {
+    if (!range) return false
+    const m = /^[\^~]?(\d+)\.(\d+)\.(\d+)/.exec(range.trim())
+    if (!m) return false
+    const got = [Number(m[1]), Number(m[2]), Number(m[3])]
+    for (let i = 0; i < 3; i++) {
+      if (got[i] > floor[i]) return true
+      if (got[i] < floor[i]) return false
+    }
+    return true
+  }
+  for (const [name, floor] of Object.entries(FLOORS)) {
+    check(`${name} is pinned at or above ${floor.join('.')}`,
+      atLeast(pkg.dependencies[name], floor), String(pkg.dependencies[name]))
+  }
+  for (const [name, floor] of Object.entries(OVERRIDE_FLOORS)) {
+    check(`${name} is overridden at or above ${floor.join('.')}`,
+      atLeast(pkg.overrides?.[name], floor), String(pkg.overrides?.[name]))
+  }
+  check('MUTATION CONTROL: the floor rejects the version that carried the advisory',
+    !atLeast('16.3.6', [16, 4, 6]) && !atLeast('^2.17.5', [2, 18, 1]) && !atLeast(undefined, [1, 0, 0]))
+  check('MUTATION CONTROL: the floor accepts a higher patch and a higher minor',
+    atLeast('16.4.7', [16, 4, 6]) && atLeast('^16.5.0', [16, 4, 6]))
+  // puppeteer was a devDependency no file in the repo imported, and it alone
+  // carried nine high advisories through its own dependency tree.
+  check('the unused puppeteer devDependency is not back',
+    !('puppeteer' in pkg.devDependencies) && !('puppeteer' in pkg.dependencies))
+
+  console.log('A05 — the framework does not announce itself')
+  check('next.config.ts disables the x-powered-by header',
+    /poweredByHeader:\s*false/.test(strip(read('next.config.ts'))))
+
   console.log(`\n${pass} passed, ${fail} failed`)
   if (fail > 0) process.exit(1)
 }
