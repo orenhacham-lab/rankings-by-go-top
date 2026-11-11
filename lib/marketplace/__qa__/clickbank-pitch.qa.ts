@@ -95,6 +95,14 @@ console.log('\nB) The pitch page carries every required element')
   check('B9: and where it is cancelled', /You cancel it at \{provider\.label\}/.test(pitch))
   // The price and the payment link are already the plan grid's job.
   check('B10: the price is on the page', /plan\.priceUSD/.test(pitch))
+  // The reviewer's 11.11.2026 note: the initial price, the rebill price AND
+  // the rebill schedule have to be clear on the pitch page. The paragraph at
+  // the foot of the page says "the price above", which is not a figure beside
+  // the plan, so the plan card states all three itself.
+  check('B10a: each plan card states the initial price, the rebill price and the schedule',
+    /\$\{plan\.priceUSD\} today, then \$\{plan\.priceUSD\} every month until you cancel/.test(pitch))
+  check('B10b: and it is built from the catalogue price, never a typed number',
+    !/\$79 today|\$179 today|\$329 today|\$649 today/.test(pitch))
   check('B11: the payment link is the configured buy URL', /marketplaceBuyUrl\(provider\.slug, code\)/.test(pitch))
   // The seller contact block, in the words the platform dictates.
   check('B12: the product support line is verbatim',
@@ -216,6 +224,16 @@ console.log('\nF) MUTATION CONTROLS')
   check('F2: B8 fails on the sentence that was there before',
     !/no fixed number of payments/i.test(oldRebill))
   check('F2a: and B7 fails on it too', !/every month, on the\s+same day of the month/i.test(oldRebill))
+  // B10a: the card as it stood when the second submission was rejected — a
+  // monthly rate and nothing about the first charge or the renewal.
+  const rateOnly = '<p className="mt-1 text-metric text-ink">${plan.priceUSD}<span> / month</span></p>'
+  check('F2b: B10a fails on a card that shows only a monthly rate',
+    !/\$\{plan\.priceUSD\} today, then \$\{plan\.priceUSD\} every month until you cancel/.test(rateOnly))
+  // B10b: the same sentence with the price typed in drifts the moment the
+  // catalogue changes, so it must not pass.
+  const typedPrice = '<p>$79 today, then $79 every month until you cancel.</p>'
+  check('F2c: B10b fails when the price is typed into the sentence',
+    /\$79 today/.test(typedPrice))
   // B12/B13: their wording is dictated, so a paraphrase must not pass.
   const paraphrase = 'Need help with the product? Email us. Billing questions go to the platform.'
   check('F3: B12 fails on a paraphrase of the dictated line',
