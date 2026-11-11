@@ -44,6 +44,8 @@ export type CrawlerPurpose =
   | 'ads'
   /** Building the title, description and thumbnail of a shared link. */
   | 'preview'
+  /** A hosted browser an AI agent drives for one user, not a crawler. */
+  | 'agent'
 
 export type AiCrawler = {
   /** The exact product token sent in `User-agent`, in its published spelling. */

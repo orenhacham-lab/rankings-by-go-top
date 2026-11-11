@@ -46,7 +46,7 @@ const SITES_PATH = '/api/public/ai-crawler-blocking/sites'
  * rows and the measurement's per-crawler breakdown all speak this vocabulary,
  * and a second copy is how an enum drifts.
  */
-const PURPOSES = ['train', 'search', 'answer', 'ads', 'preview'] as const
+const PURPOSES = ['train', 'search', 'answer', 'ads', 'preview', 'agent'] as const
 
 /**
  * `2026.11.01` is the dataset's own version. OpenAPI's `info.version` describes

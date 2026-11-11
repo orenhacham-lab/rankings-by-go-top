@@ -180,6 +180,7 @@ const he: AiCrawlerCopy = {
     search: { label: 'אינדקס', blurb: 'בונה אינדקס חיפוש, שממנו נשענות גם תשובות ה-AI.' },
     ads: { label: 'מודעות', blurb: 'בודק דפי נחיתה של מודעות. חסימה שלו לא משפיעה על תשובות ולא על האינדקס.' },
     preview: { label: 'תצוגה מקדימה', blurb: 'בונה את הכותרת והתמונה שמוצגות כשמישהו משתף את הקישור. חסימה משאירה את השיתוף ריק.' },
+    agent: { label: 'סוכן בדפדפן', blurb: 'דפדפן שסוכן AI מפעיל בשביל משתמש אחד. חסימה לא משנה מה המודל יודע — היא מונעת מהמבקרים שלכם לבקש מעוזר לבצע משהו אצלכם באתר.' },
   },
   groups: { ai: 'סורקי AI', classic: 'סורקי חיפוש קלאסיים' },
   reference: {
@@ -288,6 +289,7 @@ const en: AiCrawlerCopy = {
     search: { label: 'Index', blurb: 'Builds a search index, which AI answers are built on top of.' },
     ads: { label: 'Adverts', blurb: 'Checks the landing pages of adverts. Blocking it affects neither answers nor the index.' },
     preview: { label: 'Link preview', blurb: 'Builds the title and image shown when someone shares the link. Blocking it leaves the share bare.' },
+    agent: { label: 'Agent in a browser', blurb: 'A browser an AI agent drives for one person. Blocking it changes nothing a model knows — it stops your own visitors asking an assistant to do something on your site.' },
   },
   groups: { ai: 'AI crawlers', classic: 'Classic search crawlers' },
   reference: {
@@ -396,6 +398,7 @@ const es: AiCrawlerCopy = {
     search: { label: 'Índice', blurb: 'Construye un índice de búsqueda, sobre el que se apoyan también las respuestas de IA.' },
     ads: { label: 'Anuncios', blurb: 'Revisa las páginas de destino de los anuncios. Bloquearlo no afecta ni a las respuestas ni al índice.' },
     preview: { label: 'Vista previa', blurb: 'Crea el título y la imagen que aparecen cuando alguien comparte el enlace. Bloquearlo deja el enlace sin nada.' },
+    agent: { label: 'Agente en el navegador', blurb: 'Un navegador que un agente de IA conduce para una persona. Bloquearlo no cambia lo que sabe el modelo: impide que tus visitantes pidan a un asistente que haga algo en tu sitio.' },
   },
   groups: { ai: 'Rastreadores de IA', classic: 'Rastreadores de búsqueda clásicos' },
   reference: {
@@ -504,6 +507,7 @@ const ptBR: AiCrawlerCopy = {
     search: { label: 'Índice', blurb: 'Constrói um índice de busca, no qual as respostas de IA também se apoiam.' },
     ads: { label: 'Anúncios', blurb: 'Verifica as páginas de destino dos anúncios. Bloquear não afeta nem as respostas nem o índice.' },
     preview: { label: 'Prévia do link', blurb: 'Monta o título e a imagem que aparecem quando alguém compartilha o link. Bloquear deixa o compartilhamento vazio.' },
+    agent: { label: 'Agente no navegador', blurb: 'Um navegador que um agente de IA conduz para uma pessoa. Bloquear não muda o que o modelo sabe: impede que seus visitantes peçam a um assistente para fazer algo no seu site.' },
   },
   groups: { ai: 'Rastreadores de IA', classic: 'Rastreadores de busca clássicos' },
   reference: {
@@ -612,6 +616,7 @@ const fr: AiCrawlerCopy = {
     search: { label: 'Index', blurb: "Construit un index de recherche, sur lequel s'appuient aussi les réponses d'IA." },
     ads: { label: 'Publicités', blurb: "Vérifie les pages de destination des publicités. Le bloquer n'affecte ni les réponses ni l'index." },
     preview: { label: 'Aperçu du lien', blurb: "Construit le titre et l'image affichés quand quelqu'un partage le lien. Le bloquer laisse le partage vide." },
+    agent: { label: 'Agent dans un navigateur', blurb: 'Un navigateur piloté par un agent IA pour une seule personne. Le bloquer ne change rien à ce que le modèle sait : il empêche vos visiteurs de demander à un assistant d’agir sur votre site.' },
   },
   groups: { ai: "Robots d'IA", classic: 'Robots de recherche classiques' },
   reference: {
@@ -720,6 +725,7 @@ const it: AiCrawlerCopy = {
     search: { label: 'Indice', blurb: 'Costruisce un indice di ricerca, su cui si appoggiano anche le risposte IA.' },
     ads: { label: 'Annunci', blurb: 'Controlla le pagine di destinazione degli annunci. Bloccarlo non influisce né sulle risposte né sull’indice.' },
     preview: { label: 'Anteprima del link', blurb: 'Crea il titolo e l’immagine mostrati quando qualcuno condivide il link. Bloccarlo lascia la condivisione vuota.' },
+    agent: { label: 'Agente nel browser', blurb: 'Un browser guidato da un agente IA per una persona. Bloccarlo non cambia ciò che il modello sa: impedisce ai vostri visitatori di chiedere a un assistente di fare qualcosa sul vostro sito.' },
   },
   groups: { ai: 'Crawler IA', classic: 'Crawler di ricerca classici' },
   reference: {
@@ -828,6 +834,7 @@ const ja: AiCrawlerCopy = {
     search: { label: '検索インデックス', blurb: '検索インデックスを作ります。AIの回答もこの上に成り立っています。' },
     ads: { label: '広告', blurb: '広告のリンク先ページを確認します。拒否しても、回答にも検索インデックスにも影響しません。' },
     preview: { label: 'リンクプレビュー', blurb: 'リンクが共有されたときに表示されるタイトルと画像を作ります。拒否すると共有が空のまま表示されます。' },
+    agent: { label: 'Agent im Browser', blurb: 'Ein Browser, den ein KI-Agent für eine Person steuert. Ihn zu blockieren ändert nichts an dem, was ein Modell weiß: es verhindert, dass Ihre Besucher einen Assistenten auf Ihrer Seite etwas tun lassen.' },
   },
   groups: { ai: 'AIクローラー', classic: '従来の検索クローラー' },
   reference: {
@@ -936,6 +943,7 @@ const de: AiCrawlerCopy = {
     search: { label: 'Suchindex', blurb: 'Baut den Suchindex, auf dem auch die KI-Antworten aufsetzen.' },
     ads: { label: 'Werbung', blurb: 'Prüft die Zielseiten von Anzeigen. Eine Blockade wirkt sich weder auf Antworten noch auf den Suchindex aus.' },
     preview: { label: 'Link-Vorschau', blurb: 'Erstellt Titel und Bild, die beim Teilen des Links erscheinen. Eine Blockade lässt den geteilten Link leer aussehen.' },
+    agent: { label: 'ブラウザのエージェント', blurb: '一人の利用者のために AI エージェントが操作するブラウザです。遮断してもモデルが知る内容は変わらず、来訪者があなたのサイトでアシスタントに作業を頼めなくなります。' },
   },
   groups: { ai: 'KI-Crawler', classic: 'Klassische Suchmaschinen-Crawler' },
   reference: {
@@ -1044,6 +1052,7 @@ const pl: AiCrawlerCopy = {
     search: { label: 'Indeks wyszukiwania', blurb: 'Buduje indeks wyszukiwania, na którym opierają się także odpowiedzi AI.' },
     ads: { label: 'Reklamy', blurb: 'Sprawdza strony docelowe reklam. Zablokowanie go nie ma wpływu na odpowiedzi ani na indeks wyszukiwania.' },
     preview: { label: 'Podgląd linku', blurb: 'Tworzy tytuł i obraz pokazywane, gdy ktoś udostępnia link. Zablokowanie go sprawia, że udostępniony link jest pusty.' },
+    agent: { label: 'Agent in een browser', blurb: 'Een browser die een AI-agent voor één persoon bestuurt. Blokkeren verandert niets aan wat een model weet: het voorkomt dat uw bezoekers een assistent iets op uw site laten doen.' },
   },
   groups: { ai: 'Roboty AI', classic: 'Klasyczne roboty wyszukiwarek' },
   reference: {
@@ -1152,6 +1161,7 @@ const nl: AiCrawlerCopy = {
     search: { label: 'Zoekindex', blurb: 'Bouwt de zoekindex waarop ook de AI-antwoorden rusten.' },
     ads: { label: 'Advertenties', blurb: 'Controleert de bestemmingspagina’s van advertenties. Een blokkade heeft geen gevolgen voor antwoorden of voor de zoekindex.' },
     preview: { label: 'Linkvoorbeeld', blurb: 'Maakt de titel en afbeelding die te zien zijn als iemand de link deelt. Een blokkade laat de gedeelde link leeg.' },
+    agent: { label: 'Agent w przeglądarce', blurb: 'Przeglądarka, którą agent AI prowadzi dla jednej osoby. Zablokowanie nie zmienia tego, co wie model: uniemożliwia Państwa gościom poproszenie asystenta, by czegoś w witrynie dokonał.' },
   },
   groups: { ai: 'AI-crawlers', classic: 'Klassieke zoekmachinecrawlers' },
   reference: {
