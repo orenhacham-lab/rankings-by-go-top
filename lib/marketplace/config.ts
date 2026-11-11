@@ -586,8 +586,16 @@ const CANONICAL_ORIGIN = 'https://www.gotopseo.com'
  * which is how a reseller's review ends up reading two different answers to
  * "who do I write to". ClickBank's rules require the seller's contact in the
  * footer of the pitch page as well, so both pages now read it from here.
+ *
+ * It is support@, not the contact@ address the legal pages publish, for two
+ * reasons. It is the address ClickBank's reviewer was told to expect: the
+ * pitch page's "Product Support" link carries it, and on 11.11.2026 all four
+ * products went back under review on a comment saying the required elements
+ * are live. Changing a buyer-facing support address in the middle of that
+ * review is a reason for a third round. And the mailbox exists: it was
+ * created on 11.11.2026 and a delivery test to it did not bounce.
  */
-export const MARKETPLACE_SUPPORT_EMAIL = 'contact@gotopseo.com'
+export const MARKETPLACE_SUPPORT_EMAIL = 'support@gotopseo.com'
 
 export const MARKETPLACE_CLAIM_PATH = '/claim'
 
