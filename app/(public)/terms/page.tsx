@@ -733,8 +733,8 @@ export default function HebrewTermsPage() {
           ח.פ. 517274346
           <br />
           דוא&rdquo;ל:{' '}
-          <a href="mailto:oren@gotop.co.il">
-            oren@gotop.co.il
+          <a href="mailto:contact@gotopseo.com">
+            contact@gotopseo.com
           </a>
         </p>
       </section>

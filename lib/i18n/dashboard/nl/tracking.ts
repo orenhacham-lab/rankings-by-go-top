@@ -217,7 +217,7 @@ export const trackingNl: DeepPartial<DashboardDictionary> = {
       team: 'Het team van Go Top SEO',
       footer: 'U ontvangt deze e-mail omdat u een actieve website bij Go Top SEO heeft. Wilt u deze herinneringen niet?',
       unsubscribe: 'Met één klik afmelden, zonder in te loggen',
-      company: 'GO TOP DIGITAL MARKETING AND ADVERTISING LTD (handelsregisternummer 517274346) · HaRechasim 24/2, Ramat Gan 5235524, Israël · oren@gotop.co.il',
+      company: 'GO TOP DIGITAL MARKETING AND ADVERTISING LTD (handelsregisternummer 517274346) · HaRechasim 24/2, Ramat Gan 5235524, Israël · contact@gotopseo.com',
     },
     unsubscribePage: {
       title: 'Uw aanmelding is beëindigd',
@@ -237,7 +237,7 @@ export const trackingNl: DeepPartial<DashboardDictionary> = {
     team: 'Het team van Go Top SEO',
     footer: 'U ontvangt deze e-mail omdat u bij Go Top SEO een website heeft aangemaakt en het instellen niet heeft afgerond. Wilt u deze e-mails niet?',
     unsubscribe: 'De instelmails stoppen, met één klik en zonder in te loggen',
-    company: 'GO TOP DIGITAL MARKETING AND ADVERTISING LTD (handelsregisternummer 517274346) · HaRechasim 24/2, Ramat Gan 5235524, Israël · oren@gotop.co.il',
+    company: 'GO TOP DIGITAL MARKETING AND ADVERTISING LTD (handelsregisternummer 517274346) · HaRechasim 24/2, Ramat Gan 5235524, Israël · contact@gotopseo.com',
     connect: {
       subject: (domain: string) => `${domain} is nog niet verbonden`,
       preheader: 'Eén verbinding, en het systeem loopt vanzelf.',
@@ -283,7 +283,7 @@ export const trackingNl: DeepPartial<DashboardDictionary> = {
     team: 'Het team van Go Top SEO',
     footer: 'U ontvangt deze e-mail omdat u in de instellingen van de website het weekoverzicht heeft aangezet. Wilt u het niet meer?',
     unsubscribe: 'Met één klik afmelden, zonder in te loggen',
-    company: 'GO TOP DIGITAL MARKETING AND ADVERTISING LTD (handelsregisternummer 517274346) · HaRechasim 24/2, Ramat Gan 5235524, Israël · oren@gotop.co.il',
+    company: 'GO TOP DIGITAL MARKETING AND ADVERTISING LTD (handelsregisternummer 517274346) · HaRechasim 24/2, Ramat Gan 5235524, Israël · contact@gotopseo.com',
   },
 }
 

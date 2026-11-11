@@ -121,7 +121,7 @@ async function main() {
     const { contactChannels, WHATSAPP_NUMBER, PHONE_TEL } = require(join(ROOT, 'components/public/contact.ts'))
     const chOk = (list: any[], lang: 'he' | 'en') => list.map((c) => c.id).join(',') === 'whatsapp,phone,email'
       && list[0].href.startsWith(`https://wa.me/${WHATSAPP_NUMBER}?text=`) && list[0].external === true
-      && list[1].href === PHONE_TEL && list[2].href === 'mailto:oren@gotop.co.il'
+      && list[1].href === PHONE_TEL && list[2].href === 'mailto:contact@gotopseo.com'
       && (lang === 'en' ? !HEBREW.test(decodeURIComponent(list[0].href)) && !HEBREW.test(JSON.stringify(list)) : HEBREW.test(decodeURIComponent(list[0].href)))
     check('B1: one list, WhatsApp → phone → email, the existing number and address; the English WhatsApp message is English',
       chOk(contactChannels(he.contact), 'he') && chOk(contactChannels(en.contact), 'en'))
@@ -137,14 +137,14 @@ async function main() {
     const rows = (l: 'he' | 'en') => renderToStaticMarkup(createElement(ContactRows as never, { locale: l } as never) as never)
     const rowsOk = (html: string, lang: 'he' | 'en') => (html.match(/data-contact-channel="(whatsapp|phone|email)"/g) ?? []).length === 3
       && /href="https:\/\/wa\.me\/972549489377[^"]*" target="_blank" rel="noopener noreferrer"/.test(html)
-      && html.includes('href="tel:+972549489377"') && html.includes('href="mailto:oren@gotop.co.il"')
+      && html.includes('href="tel:+972549489377"') && html.includes('href="mailto:contact@gotopseo.com"')
       && (lang === 'he' ? html.includes('טלפון') && html.includes('מייל') : !HEBREW.test(html.replace(/text=[^"]*/, '')) && html.includes('Call') && html.includes('Email'))
     check('B3: the rows render the three channels in each language (English fully English)', rowsOk(rows('he'), 'he') && rowsOk(rows('en'), 'en'))
     check('MUTATION CONTROL: a Hebrew word in the English rows is caught', !rowsOk(rows('en').replace('Email', 'מייל'), 'en'))
 
     const { Footer } = require(join(ROOT, 'components/Footer.tsx'))
     const footer = (l: 'he' | 'en') => renderToStaticMarkup(createElement(Footer as never, { locale: l } as never) as never)
-    const footOk = (html: string) => { const wa = html.indexOf('data-footer-whatsapp'), mail = html.indexOf('mailto:oren@gotop.co.il'), tel = html.indexOf('tel:0549489377')
+    const footOk = (html: string) => { const wa = html.indexOf('data-footer-whatsapp'), mail = html.indexOf('mailto:contact@gotopseo.com'), tel = html.indexOf('tel:0549489377')
       return wa !== -1 && mail > wa && tel > wa && /href="https:\/\/wa\.me\/972549489377/.test(html) }
     check('B4: the footer\'s contact column starts with WhatsApp, then the email and the phone', footOk(footer('he')) && footOk(footer('en')))
     check('MUTATION CONTROL: a footer without the WhatsApp row is caught', !footOk(footer('he').replace('data-footer-whatsapp', 'data-x')))

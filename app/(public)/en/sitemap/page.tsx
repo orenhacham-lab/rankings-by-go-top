@@ -106,7 +106,7 @@ export default function EnglishSitemapPage() {
           about page
         </Link>
         or{' '}
-        <a href="mailto:oren@gotop.co.il" className={LEGAL_LINK}>
+        <a href="mailto:contact@gotopseo.com" className={LEGAL_LINK}>
           contact us
         </a>
       </p>

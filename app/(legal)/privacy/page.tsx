@@ -226,7 +226,7 @@ export default function PrivacyPage() {
           <li><strong>שמירה:</strong> נתוני Search Console שסונכרנו והיסטוריית הפוסטים שלך נשמרים כל עוד החשבון
           שלך קיים, אלא אם ביקשת שנמחק אותם.</li>
           <li><strong>מחיקה:</strong> כדי למחוק את החשבון שלך או את נתוני Google שנשמרו בו, כתוב לנו
-          בכתובת{' '}<a href="mailto:oren@gotop.co.il">oren@gotop.co.il</a>.</li>
+          בכתובת{' '}<a href="mailto:contact@gotopseo.com">contact@gotopseo.com</a>.</li>
           <li><strong>ביטול גישה אצל Google:</strong> אפשר גם להסיר את הגישה שלנו בכל עת בכתובת{' '}
           <a href="https://myaccount.google.com/permissions" target="_blank" rel="noopener noreferrer">
             myaccount.google.com/permissions
@@ -579,8 +579,8 @@ export default function PrivacyPage() {
         </p>
         <p className="mt-2">
           <strong>דואר אלקטרוני:</strong>{' '}
-          <a href="mailto:oren@gotop.co.il">
-            oren@gotop.co.il
+          <a href="mailto:contact@gotopseo.com">
+            contact@gotopseo.com
           </a>
         </p>
         <p>
@@ -965,8 +965,8 @@ export default function PrivacyPage() {
         </p>
         <p className="mt-2">
           <strong>דואר אלקטרוני:</strong>{' '}
-          <a href="mailto:oren@gotop.co.il">
-            oren@gotop.co.il
+          <a href="mailto:contact@gotopseo.com">
+            contact@gotopseo.com
           </a>
         </p>
         <p>
@@ -995,8 +995,8 @@ export default function PrivacyPage() {
         </p>
         <p className="mt-2">
           <strong>דואר אלקטרוני:</strong>{' '}
-          <a href="mailto:oren@gotop.co.il">
-            oren@gotop.co.il
+          <a href="mailto:contact@gotopseo.com">
+            contact@gotopseo.com
           </a>
         </p>
         <p>

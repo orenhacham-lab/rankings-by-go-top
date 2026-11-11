@@ -95,7 +95,7 @@ export const BRAND_PROFILES = [
  * on every legal page (components/public/contact.ts), so the markup and the
  * page agree. Markup that names a contact the reader cannot see is cloaking.
  */
-export const SUPPORT_EMAIL = 'oren@gotop.co.il'
+export const SUPPORT_EMAIL = 'contact@gotopseo.com'
 export const SUPPORT_PHONE = '054-9489377'
 
 /** The publisher/brand/author node, by reference rather than by repetition. */

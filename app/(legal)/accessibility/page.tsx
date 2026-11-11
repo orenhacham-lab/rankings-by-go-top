@@ -100,8 +100,8 @@ export default function AccessibilityPage() {
         </p>
         <p className="mt-2">
           <strong>דואר אלקטרוני:</strong>{' '}
-          <a href="mailto:oren@gotop.co.il">
-            oren@gotop.co.il
+          <a href="mailto:contact@gotopseo.com">
+            contact@gotopseo.com
           </a>
         </p>
         <p>

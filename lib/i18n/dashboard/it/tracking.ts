@@ -210,7 +210,7 @@ export const trackingIt: DeepPartial<DashboardDictionary> = {
       team: 'Il team Go Top SEO',
       footer: 'Riceve questa e-mail perché ha un sito attivo su Go Top SEO. Non desidera questi promemoria?',
       unsubscribe: 'Si cancelli in un clic, senza accedere',
-      company: 'GO TOP DIGITAL MARKETING AND ADVERTISING LTD (numero di società 517274346) · HaRechasim 24/2, Ramat Gan 5235524, Israele · oren@gotop.co.il',
+      company: 'GO TOP DIGITAL MARKETING AND ADVERTISING LTD (numero di società 517274346) · HaRechasim 24/2, Ramat Gan 5235524, Israele · contact@gotopseo.com',
     },
     unsubscribePage: {
       title: 'La sua iscrizione è stata annullata',
@@ -230,7 +230,7 @@ export const trackingIt: DeepPartial<DashboardDictionary> = {
     team: 'Il team Go Top SEO',
     footer: 'Riceve questa e-mail perché ha aperto un sito su Go Top SEO e non ne ha completato la configurazione. Non desidera queste e-mail?',
     unsubscribe: 'Interrompere le e-mail di avvio, in un clic e senza accedere',
-    company: 'GO TOP DIGITAL MARKETING AND ADVERTISING LTD (numero di società 517274346) · HaRechasim 24/2, Ramat Gan 5235524, Israele · oren@gotop.co.il',
+    company: 'GO TOP DIGITAL MARKETING AND ADVERTISING LTD (numero di società 517274346) · HaRechasim 24/2, Ramat Gan 5235524, Israele · contact@gotopseo.com',
     connect: {
       subject: (domain: string) => `${domain} non è ancora collegato`,
       preheader: 'Un solo collegamento, e poi il sistema funziona da solo.',
@@ -276,7 +276,7 @@ export const trackingIt: DeepPartial<DashboardDictionary> = {
     team: 'Il team Go Top SEO',
     footer: 'Riceve questa e-mail perché ha attivato il riepilogo settimanale nelle impostazioni del sito. Non lo desidera più?',
     unsubscribe: 'Cancellarsi in un clic, senza accedere',
-    company: 'GO TOP DIGITAL MARKETING AND ADVERTISING LTD (numero di società 517274346) · HaRechasim 24/2, Ramat Gan 5235524, Israele · oren@gotop.co.il',
+    company: 'GO TOP DIGITAL MARKETING AND ADVERTISING LTD (numero di società 517274346) · HaRechasim 24/2, Ramat Gan 5235524, Israele · contact@gotopseo.com',
   },
 }
 

@@ -49,6 +49,7 @@ import type { Metadata } from 'next'
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import {
+  MARKETPLACE_SUPPORT_EMAIL,
   marketplaceAffiliateUrl,
   marketplaceCommission,
   marketplaceProvider,
@@ -284,8 +285,8 @@ export default async function MarketplaceJvPage({
 
       <p className="mt-12 text-copy text-muted">
         Questions, a co-promotion or a review account:{' '}
-        <a className="text-action underline" href="mailto:support@gotopseo.com">
-          support@gotopseo.com
+        <a className="text-action underline" href={`mailto:${MARKETPLACE_SUPPORT_EMAIL}`}>
+          {MARKETPLACE_SUPPORT_EMAIL}
         </a>
         .
       </p>

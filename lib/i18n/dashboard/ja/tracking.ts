@@ -19,7 +19,7 @@ import type { DashboardDictionary } from '../he'
 import type { DeepPartial } from '../merge'
 
 /** The sender block the three mail footers share, so one address cannot drift from another. */
-const COMPANY = 'GO TOP DIGITAL MARKETING AND ADVERTISING LTD（会社登録番号 517274346）・イスラエル、ラマト・ガン 5235524、ハレハシム通り 24/2・oren@gotop.co.il'
+const COMPANY = 'GO TOP DIGITAL MARKETING AND ADVERTISING LTD（会社登録番号 517274346）・イスラエル、ラマト・ガン 5235524、ハレハシム通り 24/2・contact@gotopseo.com'
 
 export const trackingJa: DeepPartial<DashboardDictionary> = {
   trackingTargetForm: {

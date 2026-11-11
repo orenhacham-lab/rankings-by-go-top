@@ -115,8 +115,8 @@ export default function EnglishAccessibilityPage() {
         </p>
         <p className="mt-2">
           <strong>Email:</strong>{' '}
-          <a href="mailto:oren@gotop.co.il">
-            oren@gotop.co.il
+          <a href="mailto:contact@gotopseo.com">
+            contact@gotopseo.com
           </a>
         </p>
         <p>

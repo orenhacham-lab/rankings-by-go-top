@@ -107,7 +107,7 @@ export default function ItalianSitemapPage() {
           pagina Chi siamo
         </Link>
         oppure{' '}
-        <a href="mailto:oren@gotop.co.il" className={LEGAL_LINK}>
+        <a href="mailto:contact@gotopseo.com" className={LEGAL_LINK}>
           scriveteci
         </a>
       </p>

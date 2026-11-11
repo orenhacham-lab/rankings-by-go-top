@@ -126,8 +126,8 @@ const TOPICS: Record<string, Record<Lang, Rule>> = {
     // the bullet stopped listing the languages the product offers (a list that
     // Spanish was about to make untrue) and started describing how each
     // direction is handled instead.
-    en: { a11y: [/contrast/i, /Level AA/, /Keyboard-only navigation/, /prefers-reduced-motion/, /reduce motion/, /right-to-left \(RTL\)/, /left-to-right \(LTR\)/, /applies to all language versions/, /oren@gotop\.co\.il/, /054-9489377/] },
-    he: { a11y: [/ניגודיות/, /דרגה AA/, /לוח המקלדת בלבד/, /prefers-reduced-motion/, /הפחתת תנועה/, /RTL/, /LTR/, /חלה על כל גרסאות השפה/, /oren@gotop\.co\.il/, /054-9489377/] },
+    en: { a11y: [/contrast/i, /Level AA/, /Keyboard-only navigation/, /prefers-reduced-motion/, /reduce motion/, /right-to-left \(RTL\)/, /left-to-right \(LTR\)/, /applies to all language versions/, /contact@gotopseo\.com/, /054-9489377/] },
+    he: { a11y: [/ניגודיות/, /דרגה AA/, /לוח המקלדת בלבד/, /prefers-reduced-motion/, /הפחתת תנועה/, /RTL/, /LTR/, /חלה על כל גרסאות השפה/, /contact@gotopseo\.com/, /054-9489377/] },
   },
 }
 

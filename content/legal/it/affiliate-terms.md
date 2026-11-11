@@ -176,4 +176,4 @@ Pubblichiamo il presente contratto in ebraico, in inglese, in spagnolo, in porto
 
 Se una disposizione del presente contratto è dichiarata inapplicabile, il resto rimane in vigore. Il fatto che non esigiamo l'applicazione di una disposizione in un'occasione non vale come rinuncia a essa. Il presente contratto, insieme alle Condizioni d'uso e all'Informativa sulla privacy, costituisce l'intero accordo tra le parti in merito al Programma e sostituisce ogni dichiarazione anteriore.
 
-Per qualsiasi domanda sul Programma, o per qualsiasi comunicazione in forza del presente contratto: [oren@gotop.co.il](mailto:oren@gotop.co.il)
+Per qualsiasi domanda sul Programma, o per qualsiasi comunicazione in forza del presente contratto: [contact@gotopseo.com](mailto:contact@gotopseo.com)

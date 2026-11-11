@@ -24,7 +24,7 @@ import { createElement } from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
 import { CONSENT_DENIED, type ConsentChoices } from '../../consent/categories'
 import { MarketplacePixel, marketingBeaconAllowed } from '../../../components/consent/MarketplacePixel'
-import { marketplaceBadgeUrl } from '../config'
+import { MARKETPLACE_SUPPORT_EMAIL, marketplaceBadgeUrl } from '../config'
 import { FakeAdmin } from '../../__qa__/_fake-admin'
 import {
   MARKETPLACE_CLAIM_PATH,
@@ -1282,7 +1282,7 @@ async function main() {
   check('TY6: it says an activation link was emailed, which is how delivery actually works',
     /activation link/i.test(dsThanks) && dsThanks.includes(MARKETPLACE_CLAIM_PATH))
   check('TY7: it says what to do when that email does not arrive',
-    /spam/i.test(dsThanks) && /support@gotopseo\.com/.test(dsThanks))
+    /spam/i.test(dsThanks) && dsThanks.includes(MARKETPLACE_SUPPORT_EMAIL))
   check('TY8: for a seller-of-record platform it says WHO debits the card, by name',
     /The debiting is performed by Digistore24/.test(dsThanks)
     && /appears on your card or bank statement/i.test(dsThanks))

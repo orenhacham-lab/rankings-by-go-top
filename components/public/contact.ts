@@ -10,7 +10,7 @@ export const PHONE_DISPLAY = '054-9489377'
 export const PHONE_TEL = 'tel:+972549489377'
 
 /** The support email: the public site's contact rows and the dashboard's contact menu. */
-export const EMAIL = 'oren@gotop.co.il'
+export const EMAIL = 'contact@gotopseo.com'
 export const EMAIL_HREF = `mailto:${EMAIL}`
 
 /** wa.me deep link with a pre-filled Hebrew "I need help" message. */

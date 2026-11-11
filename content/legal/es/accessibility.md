@@ -47,7 +47,7 @@ Nuestra plataforma es compatible con los navegadores modernos:
 
 Si encuentra un problema de accesibilidad (una página que no se lee, una acción que no puede completar con el teclado, texto que un lector de pantalla omite), escríbanos y lo atenderemos. La persona coordinadora de accesibilidad del servicio:
 
-**Correo electrónico:** [oren@gotop.co.il](mailto:oren@gotop.co.il)
+**Correo electrónico:** [contact@gotopseo.com](mailto:contact@gotopseo.com)
 
 **Teléfono:** [054-9489377](tel:0549489377)
 

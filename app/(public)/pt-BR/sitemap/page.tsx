@@ -107,7 +107,7 @@ export default function PortugueseSitemapPage() {
           página sobre nós
         </Link>
         ou{' '}
-        <a href="mailto:oren@gotop.co.il" className={LEGAL_LINK}>
+        <a href="mailto:contact@gotopseo.com" className={LEGAL_LINK}>
           escreva para a gente
         </a>
       </p>

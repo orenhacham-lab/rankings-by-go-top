@@ -108,7 +108,7 @@ export default function GermanSitemapPage() {
           Seite „Über uns“
         </Link>
         . Fragen beantworten wir{' '}
-        <a href="mailto:oren@gotop.co.il" className={LEGAL_LINK}>
+        <a href="mailto:contact@gotopseo.com" className={LEGAL_LINK}>
           per E-Mail
         </a>
       </p>

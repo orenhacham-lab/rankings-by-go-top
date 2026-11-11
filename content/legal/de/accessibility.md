@@ -50,7 +50,7 @@ Unsere Plattform arbeitet mit den modernen Browsern:
 
 Wenn Sie auf ein Problem der Barrierefreiheit stoßen — eine Seite, die nicht vorgelesen wird, eine Handlung, die Sie mit der Tastatur nicht abschließen können, ein Text, den der Screenreader überspringt —, schreiben Sie uns, und wir kümmern uns darum. Die für die Barrierefreiheit des Dienstes verantwortliche Person:
 
-**E-Mail:** [oren@gotop.co.il](mailto:oren@gotop.co.il)
+**E-Mail:** [contact@gotopseo.com](mailto:contact@gotopseo.com)
 
 **Telefon:** [+972-54-9489377](tel:+972549489377)
 

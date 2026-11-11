@@ -39,7 +39,7 @@ Dieser Abschnitt macht für jeden, der aus Deutschland oder aus einem anderen Mi
 
 **Wem dieses Recht zusteht.** Das Widerrufsrecht des § 312g BGB ist das Recht des Verbrauchers, also der natürlichen Person, die den Vertrag zu Zwecken schließt, die überwiegend weder ihrer gewerblichen noch ihrer selbständigen beruflichen Tätigkeit zugerechnet werden können (§ 13 BGB). Wir verkaufen auch an Unternehmen, und ein Unternehmen, eine Agentur oder eine freiberuflich tätige Person, die für die eigene Tätigkeit abschließt, ist nach diesem Text kein Verbraucher: für diese Kunden gelten die Regeln des Abschnitts 4 unverändert. Wir verlangen von Ihnen keinen Nachweis über das hinaus, was Sie uns beim Abschluss erklärt haben, und wir werden diese Unterscheidung nicht dazu benutzen, den Antrag einer Person abzulehnen, die offensichtlich privat abgeschlossen hat.
 
-**Wie Sie es ausüben.** Schreiben Sie uns innerhalb der Frist von vierzehn Tagen an [oren@gotop.co.il](mailto:oren@gotop.co.il) von der E-Mail-Adresse Ihres Kontos und erklären Sie, dass Sie widerrufen. Eine E-Mail ohne besondere Form genügt; das Muster-Widerrufsformular der Anlage 2 zu Artikel 246a § 1 Absatz 2 EGBGB erhalten Sie auf einfache Anfrage an dieselbe Adresse. Wir antworten schriftlich und erstatten auf dem Zahlungsweg, den Sie verwendet haben, innerhalb von vierzehn Tagen nach Zugang der Widerrufserklärung, wie es § 357 Absatz 1 BGB vorsieht.
+**Wie Sie es ausüben.** Schreiben Sie uns innerhalb der Frist von vierzehn Tagen an [contact@gotopseo.com](mailto:contact@gotopseo.com) von der E-Mail-Adresse Ihres Kontos und erklären Sie, dass Sie widerrufen. Eine E-Mail ohne besondere Form genügt; das Muster-Widerrufsformular der Anlage 2 zu Artikel 246a § 1 Absatz 2 EGBGB erhalten Sie auf einfache Anfrage an dieselbe Adresse. Wir antworten schriftlich und erstatten auf dem Zahlungsweg, den Sie verwendet haben, innerhalb von vierzehn Tagen nach Zugang der Widerrufserklärung, wie es § 357 Absatz 1 BGB vorsieht.
 
 **Was der sofortige Beginn des Dienstes ändert.** Der Dienst ist eine digitale Dienstleistung, die vom Anlegen des Kontos an arbeitet. Bevor Sie ein Abonnement bezahlen, bittet der Bildschirm „Abrechnung“ Sie um zwei Erklärungen in einem Satz, den Sie ankreuzen müssen, damit die Zahlungsmöglichkeiten überhaupt erscheinen: dass Sie von uns ausdrücklich verlangen, mit der Erbringung vor dem Ende der Frist von vierzehn Tagen zu beginnen, und dass Sie zur Kenntnis genommen haben, dass Sie dieses Recht mit der vollständigen Erbringung verlieren. Ohne dieses Kreuz beginnt kein Abonnement. § 356 Absatz 4 und § 357 Absatz 8 BGB ziehen daraus zwei Folgen, und wir sagen Ihnen beide: Ist der Dienst vor dem Ende der Frist **vollständig erbracht**, auf Ihr ausdrückliches Verlangen und nachdem Sie ausdrücklich bestätigt haben, dass Sie mit der vollständigen Erbringung Ihr Widerrufsrecht verlieren, so ist dieses Recht erloschen; und widerrufen Sie, während der Dienst nur teilweise erbracht ist, so bleibt das Recht bestehen, und Sie schulden uns nur den Betrag, der dem bis zur Mitteilung Ihrer Entscheidung tatsächlich erbrachten Teil der Leistung verhältnismäßig entspricht, während der Rest Ihnen zurückerstattet wird. Ein laufendes Monatsabonnement ist nicht allein deshalb vollständig erbracht, weil das Konto geöffnet ist: praktisch führt ein Antrag innerhalb der vierzehn Tage dazu, dass wir den laufenden Zeitraum im Verhältnis zu dem, was nicht genutzt wurde, erstatten, und wir verstecken uns nicht hinter der Ausnahme, um pauschal abzulehnen.
 
@@ -47,7 +47,7 @@ Nach den vierzehn Tagen gelten die Regeln des Abschnitts 4: das Abonnement kann 
 
 ## 6. Wie Sie eine gesetzlich vorgesehene Kündigung verlangen
 
-Senden Sie eine E-Mail an [oren@gotop.co.il](mailto:oren@gotop.co.il) von der E-Mail-Adresse Ihres Kontos und nennen Sie das Datum der Abbuchung und den Grund des Antrags. Wir antworten auf jeden Antrag schriftlich. Eine gewährte Rückerstattung geht auf den Zahlungsweg zurück, den Sie verwendet haben. Die Zeit bis zur Gutschrift richtet sich nach dem Zahlungsdienstleister und dem Herausgeber Ihrer Karte.
+Senden Sie eine E-Mail an [contact@gotopseo.com](mailto:contact@gotopseo.com) von der E-Mail-Adresse Ihres Kontos und nennen Sie das Datum der Abbuchung und den Grund des Antrags. Wir antworten auf jeden Antrag schriftlich. Eine gewährte Rückerstattung geht auf den Zahlungsweg zurück, den Sie verwendet haben. Die Zeit bis zur Gutschrift richtet sich nach dem Zahlungsdienstleister und dem Herausgeber Ihrer Karte.
 
 ## 7. Konten, die über Shopify abgerechnet werden
 
@@ -62,7 +62,7 @@ Wenn Sie Ihren Tarif über einen externen Marktplatz gekauft haben, der den Dien
 **GO TOP DIGITAL MARKETING AND ADVERTISING LTD**  
 Handelsregisternummer: 517274346  
 Adresse: HaRechasim 24/2, Ramat Gan 5235524, Israel  
-E-Mail: [oren@gotop.co.il](mailto:oren@gotop.co.il)
+E-Mail: [contact@gotopseo.com](mailto:contact@gotopseo.com)
 
 Die vollständigen Angaben nach § 5 des Digitale-Dienste-Gesetzes (DDG) stehen im [Impressum](/de/impressum).
 

@@ -108,7 +108,7 @@ export default function PolishSitemapPage() {
           stronie &bdquo;O nas&rdquo;
         </Link>
         . Na pytania odpowiadamy{' '}
-        <a href="mailto:oren@gotop.co.il" className={LEGAL_LINK}>
+        <a href="mailto:contact@gotopseo.com" className={LEGAL_LINK}>
           e-mailem
         </a>
       </p>

@@ -144,8 +144,8 @@ function main() {
     // reachable coordinator; a reader who gets no answer needs somewhere to go.
     check('E1 (he): the conformance level is declared, and partial is called partial', /הצהרת ההתאמה/.test(he) && /מותאמים חלקית/.test(he))
     check('E1 (en): the conformance level is declared, and partial is called partial', /Conformance statement/.test(en) && /partially<\/em> conformant|<em>partially<\/em>/.test(en))
-    check('E2 (he): a coordinator is named with an email and a phone', /רכז הנגישות/.test(he) && /mailto:oren@gotop\.co\.il/.test(he) && /tel:0549489377/.test(he))
-    check('E2 (en): a coordinator is named with an email and a phone', /accessibility coordinator/.test(en) && /mailto:oren@gotop\.co\.il/.test(en))
+    check('E2 (he): a coordinator is named with an email and a phone', /רכז הנגישות/.test(he) && /mailto:contact@gotopseo\.com/.test(he) && /tel:0549489377/.test(he))
+    check('E2 (en): a coordinator is named with an email and a phone', /accessibility coordinator/.test(en) && /mailto:contact@gotopseo\.com/.test(en))
     check('E3 (he): the enforcement route is given', /נציבות שוויון זכויות לאנשים עם מוגבלות/.test(he))
     check('E3 (en): the enforcement route is given', /Commission for Equal Rights of Persons with Disabilities/.test(en))
     // What is NOT accessible has to be itemised: "some parts may not be" is not

@@ -119,7 +119,7 @@ El uso y la transferencia por parte de Go Top SEO a cualquier otra aplicación d
 - **Search Console:** «Desconectar la propiedad del proyecto» elimina la propiedad de ese proyecto y detiene su sincronización. «Revocar el acceso de Google para toda la cuenta» está disponible cuando ningún proyecto usa la conexión: solicita a Google que revoque nuestro acceso y elimina el token almacenado. En ambos casos, se conservan los datos ya sincronizados.
 - **Business Profile:** «Desconectar» solicita a Google que revoque nuestro acceso y elimina el token almacenado y la ubicación comercial guardada. Su historial de publicaciones permanece en la aplicación, y las publicaciones ya publicadas permanecen en Google hasta que usted las elimine allí.
 - **Conservación:** los datos sincronizados de Search Console y su historial de publicaciones se conservan mientras exista su cuenta, salvo que usted nos solicite eliminarlos.
-- **Eliminación:** para eliminar su cuenta o los datos de Google almacenados con ella, escríbanos a [oren@gotop.co.il](mailto:oren@gotop.co.il).
+- **Eliminación:** para eliminar su cuenta o los datos de Google almacenados con ella, escríbanos a [contact@gotopseo.com](mailto:contact@gotopseo.com).
 - **Revocación del acceso en Google:** también puede retirar nuestro acceso en cualquier momento en [myaccount.google.com/permissions](https://myaccount.google.com/permissions). Después de ello ya no podremos leer ni publicar en su cuenta de Google. Los datos que ya hayamos almacenado permanecen hasta que usted se desconecte en la aplicación o nos solicite eliminarlos.
 
 ## Análisis del sitio (verificación gratuita y análisis de incorporación)
@@ -248,7 +248,7 @@ Conforme a la legislación de privacidad aplicable, usted tiene derecho a:
 
 Para ejercer estos derechos, contáctenos en:
 
-**Correo electrónico:** [oren@gotop.co.il](mailto:oren@gotop.co.il)
+**Correo electrónico:** [contact@gotopseo.com](mailto:contact@gotopseo.com)
 
 **Teléfono:** 054-9489377
 
@@ -412,7 +412,7 @@ El servicio está destinado a empresas y propietarios de sitios, no a menores. N
 
 Para cualquier asunto de privacidad, incluido el ejercicio de los derechos anteriores:
 
-**Correo electrónico:** [oren@gotop.co.il](mailto:oren@gotop.co.il)
+**Correo electrónico:** [contact@gotopseo.com](mailto:contact@gotopseo.com)
 
 **Teléfono:** +972-54-948-9377
 
@@ -428,7 +428,7 @@ Podemos actualizar esta política de vez en cuando. Los cambios surten efecto in
 
 Si tiene preguntas sobre esta política de privacidad, contacte con:
 
-**Correo electrónico:** [oren@gotop.co.il](mailto:oren@gotop.co.il)
+**Correo electrónico:** [contact@gotopseo.com](mailto:contact@gotopseo.com)
 
 **Teléfono:** 054-9489377
 

@@ -270,7 +270,7 @@ Jeśli mają Państwo pytania o ten regulamin albo o usługę, prosimy się z na
 Rejestr: Registrar of Companies, Izrael  
 Numer wpisu: 517274346  
 Adres: HaRechasim 24/2, Ramat Gan 5235524, Izrael  
-E-mail: [oren@gotop.co.il](mailto:oren@gotop.co.il)
+E-mail: [contact@gotopseo.com](mailto:contact@gotopseo.com)
 
 Wszystkie dane identyfikujące, których art. 12 ust. 1 ustawy o prawach konsumenta żąda przed zawarciem umowy, stoją razem na stronie [Dane firmy](/pl/dane-firmy), do której odsyła stopka każdej polskiej strony: tożsamość i adres, rejestr i numer wpisu, dane kontaktowe wraz z numerem telefonu oraz informacja, że nie mamy polskiego numeru identyfikacji podatkowej. Ta strona nie nazywa się impressum, bo to niemieckie słowo dla niemieckiej ustawy; polskie prawo nie przewiduje dla niej tytułu.
 

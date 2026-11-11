@@ -587,7 +587,7 @@ const CANONICAL_ORIGIN = 'https://www.gotopseo.com'
  * "who do I write to". ClickBank's rules require the seller's contact in the
  * footer of the pitch page as well, so both pages now read it from here.
  */
-export const MARKETPLACE_SUPPORT_EMAIL = 'support@gotopseo.com'
+export const MARKETPLACE_SUPPORT_EMAIL = 'contact@gotopseo.com'
 
 export const MARKETPLACE_CLAIM_PATH = '/claim'
 

@@ -39,7 +39,7 @@ Art. 27 ustawy z dnia 30 maja 2014 r. o prawach konsumenta (ustawa o prawach kon
 
 **Kto ma to prawo.** Prawo odstąpienia z art. 27 to prawo konsumenta, czyli osoby fizycznej, która zawiera umowę niezwiązaną bezpośrednio z działalnością gospodarczą lub zawodową, jak mówi art. 22(1) Kodeksu cywilnego. Sprzedajemy także firmom, a spółka, agencja albo osoba, która zawiera umowę dla swojej działalności, nie jest w myśl tego przepisu konsumentem: dla tych klientów zasady z części 4 obowiązują w całości. Jest jednak w polskim prawie przepis, którego nie ma w żadnym innym kraju, w którym działamy, i mówimy o nim wprost: art. 7aa ust. 1 ustawy o prawach konsumenta stosuje przepisy o konsumencie z rozdziału 4 tej ustawy, czyli i przepisy o odstąpieniu, do **osoby fizycznej zawierającej umowę bezpośrednio związaną z jej działalnością gospodarczą**, gdy z treści umowy wynika, że nie ma ona dla niej charakteru zawodowego. Jednoosobowa firma, której działalność nie ma nic wspólnego z pozycjonowaniem ani z marketingiem, mieści się w tym przepisie. Nie żądamy od Państwa dowodu wykraczającego poza to, co Państwo nam przy zawarciu umowy podali, i nie będziemy używać tego rozróżnienia, żeby odmówić komuś, kto najwidoczniej zawarł umowę prywatnie.
 
-**Jak Państwo je wykonują.** Prosimy napisać do nas w terminie czternastu dni na [oren@gotop.co.il](mailto:oren@gotop.co.il) z adresu e-mail Państwa konta i oświadczyć, że Państwo odstępują od umowy. Wystarczy e-mail bez szczególnej formy, jak dopuszcza art. 30 ust. 1 ustawy o prawach konsumenta; wzoru formularza odstąpienia z załącznika nr 2 do tej ustawy nie trzeba od nas prosić: jest niżej, w tej części, bo art. 12 ust. 1 pkt 9 nakazuje nam go Państwu przekazać. Odpowiadamy na piśmie i zwracamy pieniądze tą samą drogą płatności, z której Państwo korzystali, w ciągu czternastu dni od otrzymania oświadczenia o odstąpieniu, jak nakazuje art. 32 ust. 1 i 2 tej ustawy.
+**Jak Państwo je wykonują.** Prosimy napisać do nas w terminie czternastu dni na [contact@gotopseo.com](mailto:contact@gotopseo.com) z adresu e-mail Państwa konta i oświadczyć, że Państwo odstępują od umowy. Wystarczy e-mail bez szczególnej formy, jak dopuszcza art. 30 ust. 1 ustawy o prawach konsumenta; wzoru formularza odstąpienia z załącznika nr 2 do tej ustawy nie trzeba od nas prosić: jest niżej, w tej części, bo art. 12 ust. 1 pkt 9 nakazuje nam go Państwu przekazać. Odpowiadamy na piśmie i zwracamy pieniądze tą samą drogą płatności, z której Państwo korzystali, w ciągu czternastu dni od otrzymania oświadczenia o odstąpieniu, jak nakazuje art. 32 ust. 1 i 2 tej ustawy.
 
 **Co zmienia natychmiastowe rozpoczęcie usługi.** Usługa jest usługą cyfrową, która działa od utworzenia konta. Przed opłaceniem abonamentu ekran „Rozliczenia“ prosi Państwa o dwa oświadczenia w jednym zdaniu, które trzeba zaznaczyć, żeby sposoby płatności w ogóle się pojawiły: że Państwo wyraźnie żądają od nas rozpoczęcia świadczenia przed upływem terminu czternastu dni, i że przyjmują do wiadomości utratę prawa odstąpienia po wykonaniu usługi w pełni. Bez tego zaznaczenia żaden abonament się nie rozpoczyna. To żądanie jest żądaniem z art. 21 ust. 2 ustawy o prawach konsumenta, bo umowa jest zawierana na odległość; art. 15 ust. 3 tej ustawy dotyczy umowy zawartej poza lokalem przedsiębiorstwa i nas nie dotyczy. Art. 38 ust. 1 pkt 1 i art. 35 tej ustawy wiążą z nim dwa skutki, i mówimy Państwu oba: jeżeli usługa została przed upływem terminu **wykonana w pełni**, na Państwa wyraźne uprzednie żądanie i po tym, jak Państwo zostali poinformowani, że po spełnieniu świadczenia utracą prawo odstąpienia, i przyjęli to do wiadomości, to prawo wygasło; a jeżeli Państwo odstąpią, gdy usługa jest wykonana tylko w części, prawo zostaje, a Państwo są nam winni jedynie kwotę proporcjonalną do zakresu świadczenia rzeczywiście spełnionego do chwili Państwa oświadczenia, a resztę zwracamy. Art. 12 ust. 1 pkt 9 i pkt 11 nakazują nam powiedzieć to Państwu przed zawarciem umowy, a ta część jest tym oświadczeniem: jeżeli Państwo odstąpią po tym, jak zażądali rozpoczęcia, są nam winni uzasadnione koszty zgodnie z art. 35. Jeżeli tego oświadczenia nie złożyliśmy albo Państwo o rozpoczęcie wyraźnie nie żądali, to na podstawie art. 36 ustawy o prawach konsumenta nie ponoszą Państwo **żadnych** kosztów usługi spełnionej w terminie. Trwający abonament miesięczny nie jest wykonany w pełni tylko dlatego, że konto jest otwarte: w praktyce żądanie w ciągu czternastu dni prowadzi do tego, że za trwający okres zwracamy proporcjonalnie to, co nie zostało wykorzystane, i nie zasłaniamy się wyjątkiem, żeby odmawiać w ogóle.
 
@@ -49,7 +49,7 @@ Art. 27 ustawy z dnia 30 maja 2014 r. o prawach konsumenta (ustawa o prawach kon
 
 **WZÓR FORMULARZA ODSTĄPIENIA OD UMOWY** (formularz ten należy wypełnić i odesłać tylko w przypadku chęci odstąpienia od umowy):
 
-- Adresat: GO TOP DIGITAL MARKETING AND ADVERTISING LTD, HaRechasim 24/2, Ramat Gan 5235524, Izrael, [oren@gotop.co.il](mailto:oren@gotop.co.il)
+- Adresat: GO TOP DIGITAL MARKETING AND ADVERTISING LTD, HaRechasim 24/2, Ramat Gan 5235524, Izrael, [contact@gotopseo.com](mailto:contact@gotopseo.com)
 - Ja/My niniejszym informuję/informujemy o moim/naszym odstąpieniu od umowy o świadczenie następującej usługi: ...
 - Data zawarcia umowy: ...
 - Imię i nazwisko konsumenta: ...
@@ -63,7 +63,7 @@ Po czternastu dniach obowiązują zasady z części 4: abonament można wypowied
 
 ## 6. Jak żądać rezygnacji, którą przewiduje prawo
 
-Prosimy wysłać e-mail na [oren@gotop.co.il](mailto:oren@gotop.co.il) z adresu e-mail Państwa konta i podać datę pobrania oraz przyczynę żądania. Na każde żądanie odpowiadamy na piśmie. Przyznany zwrot wraca tą samą drogą płatności, z której Państwo korzystali. Czas do zaksięgowania zależy od dostawcy usług płatniczych i od wydawcy Państwa karty.
+Prosimy wysłać e-mail na [contact@gotopseo.com](mailto:contact@gotopseo.com) z adresu e-mail Państwa konta i podać datę pobrania oraz przyczynę żądania. Na każde żądanie odpowiadamy na piśmie. Przyznany zwrot wraca tą samą drogą płatności, z której Państwo korzystali. Czas do zaksięgowania zależy od dostawcy usług płatniczych i od wydawcy Państwa karty.
 
 ## 7. Konta rozliczane przez Shopify
 
@@ -78,7 +78,7 @@ Jeśli Państwo kupili pakiet przez zewnętrzny serwis sprzedaży, który odsprz
 **GO TOP DIGITAL MARKETING AND ADVERTISING LTD**  
 Numer w rejestrze przedsiębiorców: 517274346  
 Adres: HaRechasim 24/2, Ramat Gan 5235524, Izrael  
-E-mail: [oren@gotop.co.il](mailto:oren@gotop.co.il)
+E-mail: [contact@gotopseo.com](mailto:contact@gotopseo.com)
 
 Te dane są też w stopce witryny, w regulaminie oraz na stronie [dane firmy](/pl/dane-firmy), tak aby na każdej stronie były łatwo i stale dostępne.
 

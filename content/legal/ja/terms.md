@@ -263,6 +263,6 @@ PayPal でのお支払いと Shopify でのお支払いは変わりません。�
 **GO TOP DIGITAL MARKETING AND ADVERTISING LTD**  
 会社登録番号：517274346  
 所在地：HaRechasim 24/2, Ramat Gan 5235524, Israel  
-メール：[oren@gotop.co.il](mailto:oren@gotop.co.il)
+メール：[contact@gotopseo.com](mailto:contact@gotopseo.com)
 
 最終更新：2026年10月30日

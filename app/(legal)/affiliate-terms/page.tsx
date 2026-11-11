@@ -415,7 +415,7 @@ export default function AffiliateTermsPage() {
         </p>
         <p>
           שאלות על התוכנית, או הודעה לפי הסכם זה: דוא&quot;ל{' '}
-          <a href="mailto:oren@gotop.co.il">oren@gotop.co.il</a>
+          <a href="mailto:contact@gotopseo.com">contact@gotopseo.com</a>
         </p>
       </section>
 

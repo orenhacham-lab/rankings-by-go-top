@@ -176,6 +176,6 @@ Wir veröffentlichen diesen Vertrag auf Hebräisch, Englisch, Spanisch, Portugie
 
 Ist eine Bestimmung dieses Vertrags unwirksam, so bleibt der Rest in Kraft. Dass wir die Anwendung einer Bestimmung einmal nicht verlangen, gilt nicht als Verzicht auf sie. Dieser Vertrag bildet zusammen mit den Nutzungsbedingungen und der Datenschutzerklärung die gesamte Vereinbarung der Parteien über das Programm und ersetzt jede frühere Erklärung.
 
-Bei Fragen zum Programm und für jede Mitteilung aufgrund dieses Vertrags: [oren@gotop.co.il](mailto:oren@gotop.co.il)
+Bei Fragen zum Programm und für jede Mitteilung aufgrund dieses Vertrags: [contact@gotopseo.com](mailto:contact@gotopseo.com)
 
 Die vollständigen Angaben nach § 5 des Digitale-Dienste-Gesetzes (DDG) stehen im [Impressum](/de/impressum).

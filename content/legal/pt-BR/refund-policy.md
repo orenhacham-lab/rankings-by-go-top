@@ -41,7 +41,7 @@ Depois dos sete dias, valem as regras da seção 4: a assinatura pode ser cancel
 
 ## 6. Como pedir um cancelamento previsto em lei
 
-Envie um e-mail para [oren@gotop.co.il](mailto:oren@gotop.co.il) a partir do endereço de e-mail da sua conta, informando a data da cobrança e o motivo do pedido. Respondemos a cada pedido por escrito. Um reembolso aprovado volta para o meio de pagamento que você utilizou. O prazo do crédito depende do provedor de pagamento e do emissor do seu cartão.
+Envie um e-mail para [contact@gotopseo.com](mailto:contact@gotopseo.com) a partir do endereço de e-mail da sua conta, informando a data da cobrança e o motivo do pedido. Respondemos a cada pedido por escrito. Um reembolso aprovado volta para o meio de pagamento que você utilizou. O prazo do crédito depende do provedor de pagamento e do emissor do seu cartão.
 
 ## 7. Contas faturadas pela Shopify
 
@@ -55,6 +55,6 @@ Se você comprou o seu plano por meio de um marketplace externo que revende o Se
 
 **GO TOP DIGITAL MARKETING AND ADVERTISING LTD**  
 Número da sociedade: 517274346  
-E-mail: [oren@gotop.co.il](mailto:oren@gotop.co.il)
+E-mail: [contact@gotopseo.com](mailto:contact@gotopseo.com)
 
 Última atualização: 16 de outubro de 2026

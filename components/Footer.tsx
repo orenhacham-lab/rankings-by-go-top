@@ -228,8 +228,8 @@ export function Footer({ locale = 'he' }: { locale?: PublicLocale } = {}) {
                 </a>
               </li>
               <li>
-                <a href="mailto:oren@gotop.co.il" dir="ltr" className={linkClass}>
-                  oren@gotop.co.il
+                <a href="mailto:contact@gotopseo.com" dir="ltr" className={linkClass}>
+                  contact@gotopseo.com
                 </a>
               </li>
               <li>

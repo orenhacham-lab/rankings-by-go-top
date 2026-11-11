@@ -116,7 +116,7 @@ export default function SitemapPage() {
           עמוד אודות
         </Link>
         או{' '}
-        <a href="mailto:oren@gotop.co.il" className={LEGAL_LINK}>
+        <a href="mailto:contact@gotopseo.com" className={LEGAL_LINK}>
           צרו קשר
         </a>
       </p>

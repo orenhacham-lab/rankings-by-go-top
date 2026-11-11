@@ -180,11 +180,11 @@ console.log('\nC) "צרו קשר" in the top bar')
   check('C1-MUT: shown to admins too is caught', !mounted(layout.replace('{!isAdmin && <ContactMenu />}', '<ContactMenu />')))
   const menu = strip(read('components/guide/ContactMenu.tsx'))
   const oneSource = (s: string) => /from '@\/components\/public\/contact'/.test(s) && /href: PHONE_TEL/.test(s) && /href: EMAIL_HREF/.test(s) && /whatsappHelpUrl\(t\.whatsappMessage\(domain\)\)/.test(s)
-    && !/972\d{6,}|0549489377|054-9489377|oren@gotop/.test(s)
+    && !/972\d{6,}|0549489377|054-9489377|oren@gotop|contact@gotopseo/.test(s)
   check('C2: WhatsApp, phone and email from the one contact source (no number typed here)', oneSource(menu))
   check('C2-MUT: a hard-coded number is caught', !oneSource(menu.replace('href: PHONE_TEL', "href: 'tel:+972549489377'")))
   const contact = require('../../components/public/contact')
-  check('C2: the constants are the existing number and address', contact.PHONE_TEL === 'tel:+972549489377' && contact.EMAIL_HREF === 'mailto:oren@gotop.co.il'
+  check('C2: the constants are the existing number and address', contact.PHONE_TEL === 'tel:+972549489377' && contact.EMAIL_HREF === 'mailto:contact@gotopseo.com'
     && contact.whatsappHelpUrl('היי') === `https://wa.me/972549489377?text=${encodeURIComponent('היי')}`)
   const ContactMenu: any = require('../../components/guide/ContactMenu').default
   const pill = render('he', createElement(ContactMenu))
@@ -195,7 +195,7 @@ console.log('\nC) "צרו קשר" in the top bar')
   check('C4-MUT: an hours line put back is caught', !menuOk(menu.replace('</div>\n      )}', '<p>{t.hours}</p></div>\n      )}')))
   check('C5 copy: both languages, the site named in the WhatsApp message', he.contact.label === 'צרו קשר' && en.contact.label === 'Contact us'
     && he.contact.whatsappMessage('plumber-tlv.co.il') === 'היי, אני צריך עזרה עם plumber-tlv.co.il' && en.contact.whatsappMessage('a.co.il') === 'Hi, I need help with a.co.il'
-    && he.contact.phone('054-9489377') === 'טלפון 054-9489377' && en.contact.email('oren@gotop.co.il') === 'Email oren@gotop.co.il' && !('hours' in he.contact) && !('hours' in en.contact))
+    && he.contact.phone('054-9489377') === 'טלפון 054-9489377' && en.contact.email('contact@gotopseo.com') === 'Email contact@gotopseo.com' && !('hours' in he.contact) && !('hours' in en.contact))
   check('C5: the rail\'s WhatsApp row is kept', /data-support="whatsapp"/.test(read('components/layout/Sidebar.tsx')))
 }
 

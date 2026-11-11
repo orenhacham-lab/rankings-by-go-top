@@ -173,4 +173,4 @@ Publicamos este contrato em hebraico, inglês, espanhol e português. A versão 
 
 Se uma disposição deste contrato for considerada inexequível, as demais permanecem em vigor. O fato de não exigirmos uma disposição em uma ocasião não é renúncia a ela. Este contrato, junto com os Termos de Uso e a Política de Privacidade, é a totalidade do que foi acordado entre nós sobre o Programa, e substitui qualquer manifestação anterior.
 
-Dúvidas sobre o Programa, ou qualquer comunicação por força deste contrato: [oren@gotop.co.il](mailto:oren@gotop.co.il)
+Dúvidas sobre o Programa, ou qualquer comunicação por força deste contrato: [contact@gotopseo.com](mailto:contact@gotopseo.com)
