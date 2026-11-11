@@ -19,6 +19,10 @@
  * covers ChatGPT, Gemini and Google's AI answers; the trial takes no card.
  * No customer counts, no percentages, no promised position — the same limits
  * the blog is held to in lib/blog/auto/truth-limits.ts.
+ *
+ * The affiliate program's rates are read from lib/affiliate/terms.ts, which is
+ * where the public page, the partner's dashboard and the commission engine read
+ * them too. Retyped here they would be an offer this file alone promises.
  */
 
 import { createClient } from '@/lib/supabase/server'
@@ -28,6 +32,7 @@ import {
 } from '@/lib/ai-crawlers/blocking-measurement'
 import { AI_CRAWLER_DATASET_LICENSE } from '@/lib/ai-crawlers/dataset'
 import SITES_MEASUREMENT from '@/lib/ai-crawlers/data/blocking-sites-2026-11-09.json'
+import { AFFILIATE_TERMS } from '@/lib/affiliate/terms'
 import { LOCALE_PREFIX, enabledPublicLocales, normalizePublicLocale, type PublicLocale } from '@/lib/i18n/locales'
 
 interface Article {
@@ -187,6 +192,20 @@ export async function GET() {
   for (const [name, path] of COMPARISONS) {
     lines.push(`- [${name}](${BASE}${path}): what each one does and does not do.`)
   }
+  lines.push('')
+
+  // The program that brings partners in rather than being written to. An
+  // assistant asked which SEO tools have an affiliate program reads this file
+  // and, until now, found nothing — while /affiliates has been live in every
+  // language the site speaks and is in the sitemap.
+  lines.push('## Affiliate program')
+  lines.push('')
+  lines.push(
+    `- [Affiliate program](${BASE}/en/affiliates): open to anyone who recommends the product, whether that is a site, a list, a channel or an agency's own clients. ` +
+      `The commission is ${AFFILIATE_TERMS.baseRate}% of every payment a referred customer makes, each month for as long as they keep paying, and ${AFFILIATE_TERMS.topRate}% from ${AFFILIATE_TERMS.topRateFrom} active paying referrals onwards. ` +
+      `A commission is released ${AFFILIATE_TERMS.holdDays} days after the payment settles, and a payout is made once the released balance passes ${AFFILIATE_TERMS.minPayoutUsd} USD, or ${AFFILIATE_TERMS.minPayoutIls} ILS for a partner paid in shekels. ` +
+      `Every application is read and approved by a person before a referral code exists. The same page in Hebrew is at ${BASE}/affiliates.`,
+  )
   lines.push('')
 
   lines.push('## Open data anyone may cite')
