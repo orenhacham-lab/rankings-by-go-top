@@ -29,6 +29,7 @@
  *
  * Run: npx tsx lib/marketplace/__qa__/clickbank-pitch.qa.ts
  */
+import { execSync } from 'child_process'
 import { readFileSync } from 'fs'
 import { join } from 'path'
 import { marketplaceProvider } from '../config'
@@ -107,6 +108,22 @@ console.log('\nB) The pitch page carries every required element')
   // ONE published support address for both pages. The sales page had none and
   // the thank-you page had a literal, which is how a reseller's review ends up
   // reading two answers to "who do I write to".
+  // Cancelling is not returning, and our own no-refund term may not appear:
+  // their return policy is part of their Client Contract and forbids a seller
+  // to guarantee anything that conflicts with it.
+  check('B17: the page distinguishes cancelling from a return',
+    /Cancelling stops the future charges/.test(pitch) &&
+      /by itself it does not return money already paid/.test(pitch))
+  check('B18: it names the reseller\'s own policy as the governing one',
+    /which is the policy that governs this purchase/.test(pitch))
+  check('B19: it restates no no-refund term of ours',
+    !/not refunded|no refunds|non-refundable/i.test(pitch))
+  check('B20: and quotes no return period',
+    !/\b(14|30|60|365)[- ]day/i.test(pitch))
+  check('B21: the policy link falls back to the platform\'s published policy',
+    /marketplacePolicyUrl\(provider\.slug\)/.test(pitch))
+  check('B22: the two support lines say which is which',
+    /goes to \{provider\.label\}, which is the seller for this purchase/.test(pitch))
   check('B16: product support goes to the one published support address',
     /mailto:\$\{MARKETPLACE_SUPPORT_EMAIL\}/.test(pitch) &&
       /mailto:\$\{MARKETPLACE_SUPPORT_EMAIL\}/.test(thanks))
@@ -148,11 +165,34 @@ console.log('\nD) The mandated disclaimer: rendered when it exists, attributed, 
     check(`D3 (${name}): no disclaimer text is typed into the page`,
       !/registered trademark of Click Sales/.test(src))
   }
-  // Still null, so neither page prints it yet. This is the state the legal
-  // thread's answer changes, and the guard records which state we are in
-  // rather than asserting the text exists.
-  check('D4: clickbank\'s disclaimer is still unapproved and therefore unpublished',
-    marketplaceProvider('clickbank')?.requiredDisclaimer === null)
+  // Passed for publication by the legal thread on 11.11.2026, on three
+  // conditions: verbatim, attributed, and only where ClickBank really is the
+  // retailer. The first two are D2/D3 above and the exact-text check here;
+  // the third is D6.
+  const cbDisclaimer = marketplaceProvider('clickbank')?.requiredDisclaimer ?? ''
+  check('D4: the disclaimer is published', cbDisclaimer.length > 0)
+  check('D4a: it opens and closes on their exact sentences',
+    cbDisclaimer.startsWith('ClickBank is the retailer of products on this site.') &&
+      cbDisclaimer.endsWith('used in promotion of these products.'))
+  check('D4b: the company, the address and the permission clause are intact',
+    cbDisclaimer.includes('Click Sales, Inc., a Delaware corporation') &&
+      cbDisclaimer.includes('1444 S. Entertainment Ave., Suite 410 Boise, ID 83709, USA') &&
+      cbDisclaimer.includes('used by permission'))
+  check('D5: it is not translated and carries their registered mark',
+    cbDisclaimer.includes('CLICKBANK\u00ae') && !/[\u0590-\u05FF]/.test(cbDisclaimer))
+  // THE CONDITION THAT MATTERS MOST. "ClickBank is the retailer of products
+  // on this site" is a claim about a whole site, and it is false on a page
+  // whose checkout is PayPal or Creem. It may live only on the two
+  // per-platform /go/clickbank pages, which is what makes it true.
+  check('D6: no page outside this per-platform segment renders it', (() => {
+    const hits = execSync(
+      "grep -rl 'requiredDisclaimer' app components || true",
+      { cwd: ROOT, encoding: 'utf8' },
+    ).trim().split('\n').filter(Boolean).sort()
+    return JSON.stringify(hits) === JSON.stringify([PITCH, THANKS].sort())
+  })())
+  check('D7: it is never printed for a platform that mandates none',
+    marketplaceProvider('digistore24')?.requiredDisclaimer === null)
 }
 
 console.log('\nE) Both pages keep the structural properties of this segment')

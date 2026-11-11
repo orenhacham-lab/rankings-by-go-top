@@ -93,10 +93,20 @@ check('A5: a provider has a signature scheme exactly when it has a parser',
   MARKETPLACE_PROVIDERS.every((p) => (p.signature === null) === (marketplaceParser(p.slug) === null)))
 check('A5b: and JVZoo is the one that carries both, from its own IPN v2 spec',
   marketplaceProvider('jvzoo')?.signature !== null && marketplaceParser('jvzoo') !== null)
-check('A6: a required disclaimer is carried only where the owner approved the platform\'s exact wording - JVZoo\'s is approved, the other two have none',
+/*
+ * ClickBank's wording was passed by the legal thread on 11.11.2026, after
+ * their review rejected all four products for missing it, so this guard no
+ * longer says "the other two have none". What it still holds is the invariant
+ * it was written for: a disclaimer exists only where that platform's exact
+ * text was read and approved, never as an approximation and never for a
+ * platform that mandates none. The per-page conditions on ClickBank's - kept
+ * verbatim, attributed, and rendered only where ClickBank really is the
+ * retailer - are held in lib/marketplace/__qa__/clickbank-pitch.qa.ts.
+ */
+check('A6: a required disclaimer is carried only where the owner approved the platform\'s exact wording - JVZoo\'s and ClickBank\'s are approved, Digistore24 mandates none',
   marketplaceProvider('jvzoo')?.requiredDisclaimer?.startsWith('Disclaimer: Please note that this product does not provide any guarantee of income') === true
-  && marketplaceProvider('digistore24')?.requiredDisclaimer === null
-  && marketplaceProvider('clickbank')?.requiredDisclaimer === null)
+  && marketplaceProvider('clickbank')?.requiredDisclaimer?.startsWith('ClickBank is the retailer of products on this site.') === true
+  && marketplaceProvider('digistore24')?.requiredDisclaimer === null)
 check('A6b: JVZoo\'s approved disclaimer is the platform\'s text intact, naming JVZoo as retailer and BBC Systems Inc.',
   marketplaceProvider('jvzoo')?.requiredDisclaimer?.includes('JVZoo serves as the retailer') === true
   && marketplaceProvider('jvzoo')?.requiredDisclaimer?.includes('BBC Systems Inc.') === true)
