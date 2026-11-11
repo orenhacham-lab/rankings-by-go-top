@@ -320,6 +320,13 @@ check('MUTATION — an English-only extra section is caught', pages.he.terms.h2 
     // HERE"). The buyer clicks it to reach the party that holds their money;
     // nothing of theirs is sent to it from our side, and the purchase itself
     // already happens on ClickBank's checkout.
+    // ClickBank's own return and subscription cancellation policy, which their
+    // Client Contract incorporates and which governs a purchase made through
+    // them. The sales page links it because our own refund policy does not
+    // govern that purchase (section 6A) and their contract forbids a seller to
+    // guarantee anything conflicting with theirs. A link the buyer follows;
+    // nothing of theirs is sent to it from our side.
+    'support.clickbank.com': 'ClickBank\u2019s own return policy, linked as the policy governing a purchase made through them; not fetched',
     'www.clkbank.com': 'ClickBank\u2019s order-support page, linked for the buyer to reach the reseller; not fetched',
     'www.creem.io': 'Creem\u2019s own Buyer Terms, linked for the customer to read; not fetched',
     // Our own listing on a third-party AI-tool index, named in the

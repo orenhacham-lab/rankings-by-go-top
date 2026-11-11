@@ -258,6 +258,26 @@ export default async function MarketplaceSalesPage({
         active on it.
       </p>
 
+      {/* CANCELLING IS NOT RETURNING, which is the distinction buyers get
+          wrong most often and the one ClickBank's return policy draws itself.
+          It costs nothing to state and it is not a guarantee, so it does not
+          touch the term their contract forbids us to contradict.
+
+          AND NOTE WHAT IS ABSENT: our own no-refund term. For a reseller
+          purchase the governing policy is theirs, section 6A of our refund
+          policy says so, and their return policy — part of their Client
+          Contract — forbids a seller to "make any guarantee that conflicts"
+          with it. Restating ours here, or linking it as the policy for this
+          purchase, would be that conflict on a published page. No period is
+          quoted either: their Flexible Refunds feature sets the window per
+          product, so the link is the answer and a number would be a term we
+          had not read off the product. */}
+      <p className="mt-4 text-copy text-muted">
+        Cancelling stops the future charges; by itself it does not return money already paid. A
+        return, where one is available, is handled by {provider.label} under its own return and
+        cancellation policy, which is the policy that governs this purchase and is linked below.
+      </p>
+
       {/* Only the links these platforms allow — and NOT our own refund
           policy. That page says Go Top SEO does not refund, which is true of a
           purchase made from us and is not this buyer's policy at all: their
@@ -295,6 +315,16 @@ export default async function MarketplaceSalesPage({
             <a href={provider.orderSupportUrl} rel="nofollow">
               HERE
             </a>
+          </p>
+        ) : null}
+        {/* WHICH IS WHICH, said plainly. Without this the two lines above are
+            two addresses and a buyer picks one: they write to us for a refund
+            we cannot process, on a purchase whose seller is the platform. */}
+        {provider.orderSupportUrl ? (
+          <p className="mt-2 text-copy text-muted">
+            Questions about the product, your site or what the system does come to us. Anything
+            about the order itself — the payment, the invoice, cancelling the subscription or
+            asking for a return — goes to {provider.label}, which is the seller for this purchase.
           </p>
         ) : null}
       </section>
