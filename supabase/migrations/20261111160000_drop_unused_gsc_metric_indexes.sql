@@ -1,0 +1,44 @@
+-- ============================================================================
+-- Drop the three gsc_query_page_metrics indexes nothing queries.
+--
+-- WHY. 20260812_add_gsc_readonly.sql gave this table five secondary indexes,
+-- one per interesting column, before any read path existed. Every read path
+-- that was then written filters by the RUN first:
+--
+--   lib/content/existing-content/load.ts    eq(sync_run_id) eq(project_id)
+--   lib/content/cannibalization/load.ts     eq(sync_run_id) eq(project_id) lte(position) gte(impressions)
+--   lib/gsc/opportunities/load.ts           eq(sync_run_id) eq(project_id)
+--   lib/gsc/export/http.ts                  eq(sync_run_id) eq(project_id)
+--   lib/keyword-research/competitive-route.ts   eq(sync_run_id) eq(project_id)
+--   app/api/gsc/metrics/route.ts            eq(sync_run_id) [eq(project_id)]
+--
+-- so the primary key (sync_run_id, query, page) or idx_gsc_metrics_project_run
+-- (project_id, sync_run_id) answers the WHERE, and the per-run subset that comes
+-- back — a few thousand rows — is sorted in memory. A standalone index on
+-- `query`, `page` or `position` carries no sync_run_id prefix, so it cannot
+-- serve any of those filters, and the planner never chooses it. Production
+-- agrees: over the 7.5 months since the statistics were last reset (2026-03-30),
+-- pg_stat_user_indexes counted 3 scans of idx_gsc_metrics_query, 3 of
+-- idx_gsc_metrics_position and 1 of idx_gsc_metrics_page — against 3,386 of the
+-- primary key and 3,289 of idx_gsc_metrics_project_run.
+--
+-- They are not free. They held 19 MB of a 0.5 GB database quota, they are written
+-- on every one of the ~45,000 rows a day's syncs insert, and that write churn is
+-- what bloats. idx_gsc_metrics_impressions is KEPT: it has 850 scans, so unlike
+-- the other three the planner does reach for it.
+--
+-- WHAT THIS DOES NOT CHANGE. No column, no constraint, no row, no policy. Every
+-- query above returns exactly what it returned before; `position` is still
+-- filtered, `query` and `page` are still selected and ordered by. Only the three
+-- unread access paths go away. To put one back: the CREATE INDEX line in
+-- 20260812_add_gsc_readonly.sql is the definition, verbatim.
+--
+-- Plain DROP INDEX, not CONCURRENTLY: the Supabase CLI applies a migration
+-- inside a transaction, where CONCURRENTLY is not allowed. Dropping an index
+-- takes a brief exclusive lock on the table and no scan, and this table is
+-- written only by the 05:00 UTC Search Console sync.
+-- ============================================================================
+
+DROP INDEX IF EXISTS public.idx_gsc_metrics_query;
+DROP INDEX IF EXISTS public.idx_gsc_metrics_page;
+DROP INDEX IF EXISTS public.idx_gsc_metrics_position;
