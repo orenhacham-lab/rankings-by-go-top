@@ -80,6 +80,7 @@ export default function FrenchSitemapPage() {
         { label: 'Go Top SEO face à Surfer', href: '/fr/compare/surfer' },
         { label: 'Go Top SEO face à Writesonic', href: '/fr/compare/writesonic' },
         { label: 'Go Top SEO face à BrightLocal', href: '/fr/compare/brightlocal' },
+        { label: 'Go Top SEO face à Booster SEO', href: '/fr/compare/booster' },
       ],
     },
     {

@@ -112,6 +112,7 @@ const COMPARISONS: [string, string][] = [
   ['Go Top SEO compared with Surfer SEO', '/compare/surfer'],
   ['Go Top SEO compared with BrightLocal', '/compare/brightlocal'],
   ['Go Top SEO compared with Writesonic', '/compare/writesonic'],
+  ['Go Top SEO compared with Booster SEO and the Shopify SEO apps', '/compare/booster'],
 ]
 
 /**

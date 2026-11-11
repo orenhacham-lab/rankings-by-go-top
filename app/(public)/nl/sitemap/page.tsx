@@ -81,6 +81,7 @@ export default function DutchSitemapPage() {
         { label: 'Go Top SEO tegenover Surfer', href: '/nl/compare/surfer' },
         { label: 'Go Top SEO tegenover Writesonic', href: '/nl/compare/writesonic' },
         { label: 'Go Top SEO tegenover BrightLocal', href: '/nl/compare/brightlocal' },
+        { label: 'Go Top SEO tegenover Booster SEO', href: '/nl/compare/booster' },
       ],
     },
     {

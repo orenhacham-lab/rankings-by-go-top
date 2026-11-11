@@ -81,6 +81,7 @@ export default function PolishSitemapPage() {
         { label: 'Go Top SEO a Surfer', href: '/pl/compare/surfer' },
         { label: 'Go Top SEO a Writesonic', href: '/pl/compare/writesonic' },
         { label: 'Go Top SEO a BrightLocal', href: '/pl/compare/brightlocal' },
+        { label: 'Go Top SEO a Booster SEO', href: '/pl/compare/booster' },
       ],
     },
     {

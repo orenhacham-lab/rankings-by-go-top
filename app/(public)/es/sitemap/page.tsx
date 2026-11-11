@@ -80,6 +80,7 @@ export default function SpanishSitemapPage() {
         { label: 'Go Top SEO frente a Surfer', href: '/es/compare/surfer' },
         { label: 'Go Top SEO frente a Writesonic', href: '/es/compare/writesonic' },
         { label: 'Go Top SEO frente a BrightLocal', href: '/es/compare/brightlocal' },
+        { label: 'Go Top SEO frente a Booster SEO', href: '/es/compare/booster' },
       ],
     },
     {

@@ -84,6 +84,7 @@ export default function SitemapPage() {
         { label: 'Go Top SEO מול Surfer', href: '/compare/surfer' },
         { label: 'Go Top SEO מול Writesonic', href: '/compare/writesonic' },
         { label: 'Go Top SEO מול BrightLocal', href: '/compare/brightlocal' },
+        { label: 'Go Top SEO מול Booster SEO', href: '/compare/booster' },
       ],
     },
     {
