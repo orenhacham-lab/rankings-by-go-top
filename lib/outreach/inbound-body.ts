@@ -26,12 +26,31 @@
  * logged: it carries a token.
  */
 
+/**
+ * WHAT THE EVIDENCE SAID NEXT (11 Nov 2026). The fetch above shipped with four
+ * Hostinger hosts in this list, guessed from where the provider's own API lives.
+ * Every report since has written `bodyUrl host storage.googleapis.com` into its
+ * event row — nine of them between 8 and 11 Nov — so the provider does not serve
+ * bodies from its own domain at all. It hands out a Google Cloud Storage URL, and
+ * the list below was wrong rather than incomplete.
+ *
+ * `storage.googleapis.com` is every GCS bucket, not the provider's alone, which
+ * is a wider gate than a host of theirs would have been. What it is allowed to do
+ * is bounded by everything around it: https only, one request, no redirects, five
+ * seconds, 512KB, and the body is only ever read by the delivery classifier. The
+ * webhook secret still guards the door. To close the gate properly the bucket has
+ * to be named, so `bodyUrlBucket` below writes the first path segment into the
+ * event row on every read — learned from evidence, like the shape before it, and
+ * then this list can say the bucket instead of the host.
+ */
+
 /** Hosts the provider serves message bodies from. A host not here is not fetched. */
 export const BODY_URL_HOSTS: readonly string[] = [
   'hostinger.com',
   'hostinger.io',
   'hstgr.io',
   'hstgr.cloud',
+  'storage.googleapis.com',
 ]
 
 /** How long the fetch may take, and how much of it is read. */
@@ -66,6 +85,21 @@ export function bodyUrlHost(url: string): string | null {
   return parsed.hostname.toLowerCase()
 }
 
+/**
+ * The URL's first path segment, which on a bucket host is the bucket's name.
+ *
+ * Never the query string, which carries the token, and never a segment past the
+ * first, which is the object's own path and can name the message.
+ */
+export function bodyUrlBucket(url: string): string | null {
+  try {
+    const first = new URL(url).pathname.split('/').filter((part) => part !== '')[0]
+    return first === undefined ? null : first.slice(0, 63)
+  } catch {
+    return null
+  }
+}
+
 /** True when the body may be fetched from this URL. */
 export function allowedBodyUrl(url: string): boolean {
   const host = bodyUrlHost(url)
@@ -77,12 +111,12 @@ export type BodyFetcher = (url: string) => Promise<{ status: number; text: strin
 
 /** What one attempt at the body produced, in terms the event row can carry. */
 export type BodyRead =
-  /** The body itself. */
-  | { ok: true; text: string }
+  /** The body itself. `bucket` is the first path segment, for tightening the list. */
+  | { ok: true; text: string; bucket: string | null }
   /** No URL in the payload at all: nothing to try. */
   | { ok: false; why: 'no_url' }
   /** A URL we will not fetch. `host` is null when it was not even a URL. */
-  | { ok: false; why: 'host_not_allowed'; host: string | null }
+  | { ok: false; why: 'host_not_allowed'; host: string | null; bucket: string | null }
   /** The provider answered, but not with a body. */
   | { ok: false; why: 'status'; status: number }
   /** It did not answer in time, or at all. */
@@ -99,12 +133,15 @@ export type BodyRead =
 export async function readReportBody(payload: unknown, fetchBody: BodyFetcher): Promise<BodyRead> {
   const url = bodyUrlIn(payload)
   if (url === null) return { ok: false, why: 'no_url' }
-  if (!allowedBodyUrl(url)) return { ok: false, why: 'host_not_allowed', host: bodyUrlHost(url) }
+  if (!allowedBodyUrl(url)) {
+    return { ok: false, why: 'host_not_allowed', host: bodyUrlHost(url), bucket: bodyUrlBucket(url) }
+  }
   try {
     const answer = await fetchBody(url)
     if (answer.status !== 200) return { ok: false, why: 'status', status: answer.status }
     const text = answer.text.slice(0, BODY_MAX_BYTES)
-    return text.trim().length === 0 ? { ok: false, why: 'unreachable' } : { ok: true, text }
+    if (text.trim().length === 0) return { ok: false, why: 'unreachable' }
+    return { ok: true, text, bucket: bodyUrlBucket(url) }
   } catch {
     return { ok: false, why: 'unreachable' }
   }
@@ -115,7 +152,8 @@ export function bodyReadNote(read: BodyRead): string | null {
   if (read.ok) return null
   switch (read.why) {
     case 'no_url': return 'no bodyUrl'
-    case 'host_not_allowed': return `bodyUrl host ${read.host ?? 'unparsable'}`
+    case 'host_not_allowed':
+      return `bodyUrl host ${read.host ?? 'unparsable'}${read.bucket === null ? '' : ` bucket ${read.bucket}`}`
     case 'status': return `bodyUrl status ${read.status}`
     case 'unreachable': return 'bodyUrl unreachable'
   }

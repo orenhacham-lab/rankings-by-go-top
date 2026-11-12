@@ -144,6 +144,17 @@ async function main() {
   check('P4d: with nothing on its own domain, a published address is still a contact',
     contactEmailIn('<p>thestore@gmail.com</p>', 'store.example') === 'thestore@gmail.com')
 
+  // `info@www.gbbg.org` WENT OUT AND CAME BACK 550 on 6 Nov 2026. The site
+  // printed its address with the `www.` of its own URL in front of the domain,
+  // and mail to a web host goes nowhere: the MX records are on the domain.
+  check('P4e: the www. a site prints in front of its own domain is not part of the address',
+    contactEmailIn('<p>info@www.store.example</p>', 'store.example') === 'info@store.example')
+  check('P4f: and the same address written both ways is one address, not two',
+    contactEmailIn('<p>info@www.store.example info@store.example</p>', 'store.example')
+      === 'info@store.example')
+  check('P4g: a host that merely begins with those letters keeps them',
+    contactEmailIn('<p>info@wwwise.example</p>', 'wwwise.example') === 'info@wwwise.example')
+
   // THE JUDGEMENT CALL, and the reason it is narrow.
   check('P5: "we do not sell your personal information" is not a notice about our crawler',
     forbidsHarvesting('<p>We do not sell your personal information to third parties.</p>') === false)
@@ -950,6 +961,14 @@ async function main() {
   check('W7: the cron hands the pass the Serper search',
     /search:\s*createSerperSearch\(\)/.test(isolatedSource)
     && /from '@\/lib\/seed-scan\/serper'/.test(isolatedSource))
+
+  const mutWww = await withMutant<{ contactEmailIn: typeof contactEmailIn }, string | null>(
+    'lib/outreach/sourcing.ts',
+    [[/\.replace\(\/\^www\\\.\/, ''\)\}`\n  \}\)/, "}`\n  })"]],
+    (m) => m.contactEmailIn('<p>info@www.store.example</p>', 'store.example'),
+  )
+  check('P4e-MUT: without the strip the address goes out with the web host in it, as it did',
+    mutWww === 'info@www.store.example')
 
   console.log(`\n${pass} passed, ${fail} failed`)
   if (fail > 0) process.exit(1)

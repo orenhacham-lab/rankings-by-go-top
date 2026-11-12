@@ -33,7 +33,7 @@ import {
   recipientIn,
   recordDeliveryReport,
 } from '../bounce'
-import { allowedBodyUrl } from '../inbound-body'
+import { allowedBodyUrl, bodyUrlBucket } from '../inbound-body'
 import { handleInboundReply } from '../inbound'
 import { dailyQuota } from '../schedule'
 import { PROSPECTS_TABLE } from '../prospects'
@@ -600,6 +600,39 @@ Subject: a question about Store Example's organic traffic
   check('F6: an opt-out beyond the preview is acted on',
     outcome.action === 'suppressed' && f.tables[SUPPRESSION_TABLE].length === 1)
 
+  // THE HOST THE PROVIDER ACTUALLY USES. The fetch shipped on 6 Nov 2026 with
+  // four hostinger hosts guessed in the allowlist, and every report since has
+  // written `bodyUrl host storage.googleapis.com` into its event row: the
+  // provider hands out a Google Cloud Storage URL. F7 is that host working, and
+  // F8 is the bucket's name riding along so the gate can be narrowed to it.
+  const gcs = serving(fullBounce)
+  f = world()
+  outcome = await handleInboundReply(
+    withBodyUrl('https://storage.googleapis.com/hmail-bodies-eu/2026/11/abc?X-Goog-Signature=secret', fullBounce),
+    asAdmin(f), NOW, gcs.fetch,
+  )
+  check('F7: a body on the host the provider really serves from is fetched and attributed',
+    outcome.action === 'delivery_report'
+    && gcs.calls.length === 1
+    && f.tables[DELIVERY_EVENTS_TABLE][0].attributed === true
+    && String(f.tables[DELIVERY_EVENTS_TABLE][0].detail).startsWith('dsn 5.1.1'))
+  check('F8: and the bucket is written down, without the signature that follows it',
+    String(f.tables[DELIVERY_EVENTS_TABLE][0].detail).includes('bucket hmail-bodies-eu')
+    && !String(f.tables[DELIVERY_EVENTS_TABLE][0].detail).includes('secret'))
+
+  // A bucket host is wider than a host of theirs would have been, so what it may
+  // NOT reach is worth a guard of its own: another Google host is not this one.
+  const neighbour = serving(fullBounce)
+  f = world()
+  await handleInboundReply(
+    withBodyUrl('https://metadata.google.internal/computeMetadata/v1/', fullBounce),
+    asAdmin(f), NOW, neighbour.fetch,
+  )
+  check('F9: a different Google host is still never fetched', neighbour.calls.length === 0)
+  check('F9b: and the refused row names the host and its first segment, never the rest',
+    String(f.tables[DELIVERY_EVENTS_TABLE][0].detail)
+      .includes('bodyUrl host metadata.google.internal bucket computeMetadata'))
+
   const mutFetch = await withMutant<{ handleInboundReply: typeof handleInboundReply }, boolean>(
     'lib/outreach/inbound.ts',
     [[/  const body = read\.ok && read\.text\.length > preview\.body\.length \? read\.text : preview\.body/,
@@ -624,6 +657,22 @@ Subject: a question about Store Example's organic traffic
   )
   check('F3-MUT: an allowlist that allowed anything would fetch a stranger\'s URL',
     mutHost === true)
+
+  const mutGcs = await withMutant<{ allowedBodyUrl: typeof allowedBodyUrl }, boolean>(
+    'lib/outreach/inbound-body.ts',
+    [[/  'storage\.googleapis\.com',\n/, '']],
+    (m) => m.allowedBodyUrl('https://storage.googleapis.com/hmail-bodies-eu/abc'),
+  )
+  check('F7-MUT: without that host in the list the body is refused again, as it was all week',
+    mutGcs === false)
+
+  const mutBucket = await withMutant<{ bodyUrlBucket: typeof bodyUrlBucket }, string | null>(
+    'lib/outreach/inbound-body.ts',
+    [[/\.split\('\/'\)\.filter\(\(part\) => part !== ''\)\[0\]/, ".split('?')[0]"]],
+    (m) => m.bodyUrlBucket('https://storage.googleapis.com/hmail-bodies-eu/2026/abc?X-Goog-Signature=secret'),
+  )
+  check('F8-MUT: a bucket reader that took more than the first segment would carry the object path',
+    mutBucket !== null && mutBucket.includes('2026'))
 
   console.log(`\n${pass} passed, ${fail} failed`)
   if (fail > 0) process.exit(1)
