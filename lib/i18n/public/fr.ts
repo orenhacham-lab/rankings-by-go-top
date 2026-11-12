@@ -254,7 +254,8 @@ export const fr = {
       },
       marketing: {
         title: 'Marketing',
-        desc: 'Mesurer les performances de nos publicités, afficher des publicités pertinentes sur les réseaux de Google et de Meta, et attribuer un achat à l’affilié qui vous a orienté vers nous via la place de marché JVZoo. Refuser ne vous coûte rien dans le service.',
+        desc: 'Mesurer les performances de nos publicités et afficher des publicités pertinentes sur les réseaux de Google et de Meta. Refuser ne vous coûte rien dans le service.',
+        descJvzoo: 'Sur les pages de vente de la place de marché, attribuer aussi un achat à l’affilié qui vous a orienté vers nous via JVZoo.',
         risk: "Les cookies de marketing envoient aussi votre adresse IP et l'identifiant de votre navigateur à Meta, aux États-Unis. Pour Meta, nous nous appuyons sur les clauses contractuelles types figurant dans ses propres conditions de traitement des données.",
         riskJvzoo: "Sur les pages de vente de la place de marché, ils envoient ces mêmes données à JVZoo, aux États-Unis. Avec JVZoo, nous n'avons pas de telles clauses : votre consentement ici est donc le seul fondement de ce transfert. Les États-Unis ne font l'objet d'aucune décision d'adéquation de l'Union, vos données n'y bénéficient pas de la protection qu'elles ont en vertu du droit qui vous est applicable, les autorités publiques de ce pays peuvent être en mesure d'y accéder, et il est possible que vous n'y disposiez pas d'un recours équivalent. Vous pouvez retirer ce consentement à tout moment.",
       },

@@ -121,6 +121,15 @@ export function ConsentPreferences({ dict, ltr, initial, onSave, onClose, beacon
                   <div className="flex-1">
                     <h3 className="m-0 text-lead font-bold text-ink">{copy.title}</h3>
                     <p className="m-0 mt-1 text-caption leading-snug text-muted">{copy.desc}</p>
+                    {/* The affiliate-attribution purpose names a United States
+                        recipient one line above the checkbox that takes the
+                        consent. Where the beacon is suppressed no transfer
+                        happens, so a visitor ticking the box there must not be
+                        readable as having consented to one: the clause is left
+                        out rather than explained. Korea, PIPA 제28조의8. */}
+                    {'descJvzoo' in copy && !beaconSuppressed ? (
+                      <p className="m-0 mt-1 text-caption leading-snug text-muted">{copy.descJvzoo}</p>
+                    ) : null}
                     {/* Art. 49(1)(a) GDPR allows a transfer on explicit consent
                         only where the person was informed of the risks BEFORE
                         consenting, so the risk sits above the checkbox that

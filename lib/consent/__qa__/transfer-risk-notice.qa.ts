@@ -198,6 +198,21 @@ console.log('\nE. the JVZoo half is rendered exactly where JVZoo is contacted')
     /<PublicConsentNotice [^>]*beaconSuppressed=\{beaconSuppressed\}/.test(layout)
     && /<CookieConsent [^>]*beaconSuppressed=\{beaconSuppressed\}/.test(widgets)
     && /beaconSuppressed=\{beaconSuppressed\}/.test(card))
+  // The same mismatch one layer up: the affiliate-attribution PURPOSE names a
+  // United States recipient one line above the checkbox. Where the beacon is
+  // suppressed no transfer happens, so the clause is left out rather than
+  // explained, and the Korean checkbox carries no transfer claim at all.
+  check('E5: the category description is split the same way, and gated the same way',
+    /'descJvzoo' in copy && !beaconSuppressed \?/.test(panel))
+  for (const locale of PUBLIC_LOCALES) {
+    const marketing = getPublicDictionary(locale).cookie.categories.marketing
+    const descJvzoo: string = 'descJvzoo' in marketing ? marketing.descJvzoo : ''
+    check(`E6 (${locale}): JVZoo is named in the gated half of the description and nowhere else in it`,
+      descJvzoo.includes('JVZoo') && !marketing.desc.includes('JVZoo'),
+      `${marketing.desc.slice(0, 50)} || ${descJvzoo.slice(0, 50)}`)
+    check(`E7 (${locale}): and the always-rendered half still names the two networks it always covered`,
+      /Google/.test(marketing.desc) && /Meta/.test(marketing.desc))
+  }
   check('E-MUT1: the condition guard catches a panel that rendered the JVZoo half unconditionally',
     !/'riskJvzoo' in copy && !beaconSuppressed \?/.test(
       panel.replace(/'riskJvzoo' in copy && !beaconSuppressed \?/g, "'riskJvzoo' in copy ?")))

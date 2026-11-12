@@ -886,13 +886,26 @@ async function main() {
     pl: 'content/legal/pl/privacy.md',
     ko: 'content/legal/ko/privacy.md',
   }
-  /** The marketing category's own description, cut out of the public dictionary. */
+  /**
+   * The marketing category's own description, cut out of the public dictionary.
+   *
+   * Both halves of it, because the description was split on 12 Nov 2026: the
+   * affiliate-attribution purpose names JVZoo and is rendered only where the
+   * beacon is not suppressed, since a visitor in Korea — where no transfer
+   * happens — must not be readable as having consented to one. What this
+   * section is about is whether the GRANT reaches the beacon, and it does
+   * wherever the beacon can fire, so the check reads the two together.
+   */
   const marketingDesc = (locale: string): string => {
     const dict = read(`lib/i18n/public/${locale}.ts`)
     const at = dict.indexOf('marketing: {')
     if (at < 0) return ''
-    const desc = dict.slice(at).match(/desc:\s*'((?:[^'\\]|\\.)*)'/)
-    return desc?.[1] ?? ''
+    const body = dict.slice(at)
+    const one = (key: string) =>
+      body.match(new RegExp(`${key}:\\s*'((?:[^'\\\\]|\\\\.)*)'`))?.[1]
+      ?? body.match(new RegExp(`${key}:\\s*"((?:[^"\\\\]|\\\\.)*)"`))?.[1]
+      ?? ''
+    return `${one('desc')} ${one('descJvzoo')}`
   }
   /** The consent condition as each document actually words it, inside the JVZoo entry. */
   const BEACON_CONSENT_CLAUSE: Record<string, string> = {
