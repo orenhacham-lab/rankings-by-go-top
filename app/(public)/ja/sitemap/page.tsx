@@ -1,6 +1,7 @@
 import { buildHreflangAlternates } from '@/lib/seo/hreflang'
 import Link from 'next/link'
 import { LEGAL_FOOTNOTE, LEGAL_LINK, LegalFrame, LegalHeader, SitemapGroups } from '@/components/public/LegalDoc'
+import { sitemapArticleLinks, sitemapArticleSection } from '@/lib/sitemap/articles'
 import { authHref } from '@/lib/i18n/auth-href'
 import { LOCALE_CONFIG } from '@/lib/i18n/locales'
 
@@ -25,7 +26,9 @@ export const metadata = {
 
 type SitemapSection = { title: string; description?: string; links: Array<{ label: string; href: string }> }
 
-export default function JapaneseSitemapPage() {
+export default async function JapaneseSitemapPage() {
+  const articles = await sitemapArticleLinks('ja')
+
   const sections: SitemapSection[] = [
     {
       title: 'ページ',
@@ -97,11 +100,13 @@ export default function JapaneseSitemapPage() {
     },
   ]
 
+  const articleSection: SitemapSection[] = sitemapArticleSection('サイトの記事', articles)
+
   return (
     <LegalFrame locale="ja" breadcrumbs={[{ label: 'サイトマップ', href: '/ja/sitemap' }]}>
       <LegalHeader title="サイトマップ" subtitle="Go Top SEOのすべてのページと項目をここにまとめています" />
 
-      <SitemapGroups groups={sections} />
+      <SitemapGroups groups={[...sections, ...articleSection]} />
 
       <p className={`mt-10 ${LEGAL_FOOTNOTE}`}>
         詳しくは{' '}
