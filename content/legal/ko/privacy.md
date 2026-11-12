@@ -6,7 +6,7 @@ source: app/(public)/en/privacy/page.tsx
 lastUpdated: 2026-11-12
 register: hamnida
 extraSections: 1
-extraReason: One extra section, "한국에서의 개인정보 보호", beside the existing EEA/UK and United States rights sections, because a Korean reader is owed what the 개인정보 보호법 (PIPA) adds and the GDPR does not — the TEN-day deadline of the 시행령 for an access request, not the GDPR's one month; 열람 (제35조), 정정·삭제 (제36조), 처리정지 (제37조) and the right to refuse an automated decision (제37조의2) as the Korean names of those rights; 개인정보 보호위원회, the 개인정보 분쟁조정위원회 (제40조) and the 개인정보침해 신고센터 (국번 없이 118) as the complaint routes; a plain statement that the company has designated its representative as 개인정보 보호책임자 (제31조) and has NOT appointed a 국내대리인, with the threshold that would change that; and 제21조, which requires destruction WITHOUT DELAY — the often-quoted "five days from the end of the retention period" comes from a 개인정보보호위원회 guideline, not from the 시행령, which sets the METHOD of destruction, so this file does not cite it as law (legal thread, 12 Nov 2026). The English document’s own International Transfers section is NOT an extra one: it is kept in place and rewritten as "국외 이전", stating the items, country, recipient, purpose and retention in the shape 제28조의8 asks for, because the company itself sits outside Korea and a Korean reader reads that section first. Marketing mail is governed by 정보통신망법 제50조 (prior opt-in, the "(광고)" subject marker, a working unsubscribe, separate consent for 21:00–08:00, and re-confirmation every two years) and the document says plainly that NO Korean business address is held for the cold-email purpose, which is the Korean counterpart of the Polish document's statement about Poland. Korea has no ePrivacy counterpart, so the cookie section rests on PIPA consent and does not claim one. The under-14 threshold of 제22조의2 is named beside our own 18-year minimum. This file never tells the reader who remits Korean VAT and carries no Korean business-registration or 통신판매업 number. The PIPA citations (제28조의8 국외 이전, 제31조의2 국내대리인, 제37조의2 자동화된 결정) and the 시행령 TEN-day period were checked by the legal thread against the act itself on 12 Nov 2026; the five-day destruction period was struck as a guideline rather than law. A separate consent BOX for the transfer abroad is NOT required for the providers that run the product — disclosure in this document is — and is required only for a marketing transfer (legal thread, 12 Nov 2026).
+extraReason: One extra section, "한국에서의 개인정보 보호", beside the existing EEA/UK and United States rights sections, because a Korean reader is owed what the 개인정보 보호법 (PIPA) adds and the GDPR does not — the TEN-day deadline of 시행령 제41조 제4항 for an access request (제41조 제5항 for the notice that extends it, 제42조 제2항 for deferral or refusal), not the GDPR's one month; 열람 (제35조), 정정·삭제 (제36조), 처리정지 (제37조) and the right to refuse an automated decision (제37조의2) as the Korean names of those rights; 개인정보 보호위원회, the 개인정보 분쟁조정위원회 (제40조) and the 개인정보침해 신고센터 (국번 없이 118) as the complaint routes; a plain statement that the company has designated its representative as 개인정보 보호책임자 (제31조) and has NOT appointed a 국내대리인, with the 시행령 제32조의3 제1항 thresholds (1조원 of prior-year revenue, or a daily average of 1,000,000 Korean data subjects) that would change that; and 제21조, which requires destruction WITHOUT DELAY — the often-quoted "five days from the end of the retention period" comes from 표준 개인정보 보호지침 제10조 제1항, a 개인정보보호위원회 고시, not from the 시행령, which sets the METHOD of destruction, so this file does not cite it as law (legal thread, 12 Nov 2026). The English document’s own International Transfers section is NOT an extra one: it is kept in place and rewritten as "국외 이전", stating the items, country, recipient, purpose and retention in the shape 제28조의8 asks for, because the company itself sits outside Korea and a Korean reader reads that section first. Marketing mail is governed by 정보통신망법 제50조 (prior opt-in, the "(광고)" subject marker, a working unsubscribe, separate consent for 21:00–08:00, and re-confirmation every two years) and the document says plainly that NO Korean business address is held for the cold-email purpose, which is the Korean counterpart of the Polish document's statement about Poland. Korea has no ePrivacy counterpart, so the cookie section rests on PIPA consent and does not claim one. The under-14 threshold of 제22조의2 is named beside our own 18-year minimum. This file never tells the reader who remits Korean VAT and carries no Korean business-registration or 통신판매업 number. The PIPA citations (제28조의8 국외 이전, 제31조의2 국내대리인, 제37조의2 자동화된 결정) and the 시행령 periods were checked by the legal thread against the act itself on 12 Nov 2026; the act in force is [시행 2026. 9. 11.] [법률 제21445호, 2026. 3. 10.] and this file gives no 시행일 for 제37조의2; the five-day destruction period was struck as a guideline rather than law. A separate consent BOX for the transfer abroad is NOT required for the providers that run the product — disclosure in this document is — and is required only for a marketing transfer (legal thread, 12 Nov 2026).
 ---
 
 # 개인정보 처리방침
@@ -353,13 +353,13 @@ WhatsApp의 이용에는 그 밖에 WhatsApp과 Meta의 이용 약관과 개인�
 - **제휴 신청 정보:** 신청으로부터 12개월입니다. 거절된 신청은 그때 삭제되고, 수락된 신청은 프로그램 참여가 이어지는 동안 남습니다.
 - **보안과 서버 기록:** 최대 90일입니다.
 
-개인정보 보호법 제21조는 보유 기간이 지났거나 처리 목적이 달성된 개인정보를 **지체 없이** 파기하도록 하고 있습니다. 그것이 법이 정한 기한이며, 시행령이 정하는 것은 파기의 방법입니다. 흔히 인용되는 "끝난 날부터 5일"은 법령이 아니라 개인정보보호위원회의 안내에 나오는 기간이므로, 이 방침은 그것을 법령으로 적지 않습니다. 회사는 위의 기간이 끝나는 대로 파기합니다.
+개인정보 보호법 제21조는 보유 기간이 지났거나 처리 목적이 달성된 개인정보를 **지체 없이** 파기하도록 하고 있습니다. 그것이 법이 정한 기한이며, 시행령이 정하는 것은 파기의 방법입니다. 흔히 인용되는 "끝난 날부터 5일"은 법령의 기간이 아니라 개인정보보호위원회의 「표준 개인정보 보호지침」 제10조 제1항에 나오는 기간, 즉 고시의 기간이므로, 이 방침은 그것을 법령으로 적지 않습니다. 회사는 위의 기간이 끝나는 대로 파기합니다.
 
 ## 국외 이전
 
 서비스는 국제적인 클라우드·인프라 제공자에서 운영되므로, 정보가 고객님의 거주 국가 밖에 저장되거나 처리될 수 있습니다. 주요 제공자는 Vercel(앱 호스팅), Supabase(데이터베이스, 인도 뭄바이 리전), 그리고 위 "제3자 제공"에 적은 모든 제공자이며, AI와 검색 제공자, PDF 변환 제공자, 주소 검색 서비스가 그에 포함됩니다.
 
-한국에서 이용하시는 경우, 회사 자체가 한국 밖에 있으므로 정보는 처음부터 국외에서 처리됩니다. 개인정보 보호법 제28조의8이 알리도록 하고 있는 사항을 그 순서대로 적습니다.
+한국에서 이용하시는 경우, 회사 자체가 한국 밖에 있으므로 정보는 처음부터 국외에서 처리됩니다. 개인정보 보호법 제28조의8 제2항 각 호가 알리도록 하고 있는 사항을 그 순서대로 적고, 마지막에 이전을 거부하는 방법을 더해 적습니다.
 
 - **이전되는 항목:** 이 방침의 "수집하는 정보"에 적은 항목입니다.
 - **이전되는 국가:** 이스라엘(회사), 미국(Vercel, Resend, Meta, PDFShift의 오류 감시, Digistore24, JVZoo), 인도(Supabase 데이터베이스 리전), 프랑스(PDFShift의 서버와 저장소), 그 밖에 위에 적은 제공자가 운영하는 국가입니다.
@@ -372,7 +372,7 @@ WhatsApp의 이용에는 그 밖에 WhatsApp과 Meta의 이용 약관과 개인�
 
 적정성 결정이 없는 국가에 있는 제공자로의 이전에 대해서는 그 제공자의 데이터 처리 조건에 담긴 유럽 위원회의 표준 계약 조항에 의지합니다. **모든 수탁자와 표준 계약 조항을 체결했다고 여기에서 주장하지는 않습니다.** 이 방침의 날짜 기준으로 정확히 말씀드릴 수 있는 것은 이렇습니다. PDFShift와는 "보고서를 PDF 파일로 바꾸기"에서 설명한 위탁 처리 계약이 있습니다. Vercel, Supabase, Google, Resend, Meta, Shopify에 대해서는 그 제공자들이 자신의 약관에 포함하고 회사가 수락한 데이터 처리 부속서와 표준 조항에 의지합니다. 그리고 **Serper, ScrapeLLM, OpenStreetMap의 Nominatim 서비스와는 협상된 표준 계약 조항을 체결하지 않았습니다.** 그곳의 이용은 제공자의 공개된 약관에 기반하고 있고 계약 작업이 진행 중입니다. 사안이 끝났다는 인상을 남기기보다 이렇게 말씀드리는 쪽을 택했습니다.
 
-위에 적은 모든 수령자가 회사의 제공자인 것은 아니고, 위에 적은 수단이 그 전부를 포괄하지도 않습니다. **JVZoo는 정보로 무엇을 할지 스스로 결정합니다.** 회사 쪽에서 실행되는 요청의 수집과 제공에 대해 회사는 JVZoo와 함께 공동으로 책임을 지며, 그 이전에는 위탁 처리 계약도 표준 계약 조항도 적용되지 않습니다. 유럽경제지역, 영국, 스위스, 캐나다에서는, 그리고 요청이 어느 국가에서 오는지 확인할 수 없는 모든 경우에는, 고객님이 마케팅 쿠키를 수락하신 뒤에야 그 요청이 실행되며, **그 동의가 바로 그 수단이며, GDPR 제49조 제1항 (a)의 명시적 동의에 해당합니다.** 고객님의 IP 주소와 브라우저 식별자가 미국의 회사에 도달하고 그곳에서는 유럽의 보호가 그 자체로 적용되지 않는다는 것이 여기에서의 위험입니다. 마케팅 쿠키를 수락하지 않으시면 그 회사에 아무것도 전달되지 않습니다.
+위에 적은 모든 수령자가 회사의 제공자인 것은 아니고, 위에 적은 수단이 그 전부를 포괄하지도 않습니다. **JVZoo는 정보로 무엇을 할지 스스로 결정합니다.** 회사 쪽에서 실행되는 요청의 수집과 제공에 대해 회사는 JVZoo와 함께 공동으로 책임을 지며, 그 이전에는 위탁 처리 계약도 표준 계약 조항도 적용되지 않습니다. 유럽경제지역, 영국, 스위스, 캐나다에서는, 그리고 요청이 어느 국가에서 오는지 확인할 수 없는 모든 경우에는, 고객님이 마케팅 쿠키를 수락하신 뒤에야 그 요청이 실행되며, **그 이전에 GDPR 제46조의 보호 수단이 없으므로, 그 동의가 바로 그 수단이며 GDPR 제49조 제1항 (a)의 명시적 동의에 해당합니다.** 고객님의 IP 주소와 브라우저 식별자가 미국의 회사에 도달하고 그곳에서는 유럽의 보호가 그 자체로 적용되지 않는다는 것이 여기에서의 위험입니다. 마케팅 쿠키를 수락하지 않으시면 그 회사에 아무것도 전달되지 않습니다.
 
 특정한 이전이 어떤 수단에 기반하는지 회사에 물어보실 수 있고, 회사는 제공자와 근거를 적어 서면으로 답하겠습니다.
 
@@ -399,9 +399,9 @@ GDPR 제12조 제3항의 기간인 한 달 안에 답합니다. 권리를 행사
 - **자동화된 결정에 대한 거부와 설명 요구**(제37조의2). 아래 "자동화된 결정" 항에 적은 대로 회사는 고객님에게 법적 효력을 미치는 자동화된 결정을 하지 않습니다.
 - **동의의 철회**를 언제든 하실 수 있습니다.
 
-**기한은 열흘입니다.** 유럽의 한 달이 아니라, 시행령에 따라 열람·정정·삭제·처리정지의 요구에 대해 **10일 안에** 답합니다. 그 안에 조치를 마칠 수 없는 정당한 사유가 있으면 그 사유와 예상 시기를 10일 안에 알려 드립니다. 서른 날도, 보름도 아니라 열흘입니다.
+**기한은 열흘입니다.** 유럽의 한 달이 아니라, 개인정보 보호법 시행령 제41조 제4항에 따라 열람의 요구에 대해 **10일 안에** 답하고, 정정·삭제와 처리정지의 요구도 같은 기간에 처리합니다. 그 안에 조치를 마칠 수 없는 정당한 사유가 있으면 같은 조 제5항에 따라 그 사유와 예상 시기를 10일 안에 알려 드리며, 시행령 제42조 제2항이 정하는 연기나 거절의 경우에도 그 사유를 같은 기간에 알려 드립니다. 서른 날도, 보름도 아니라 열흘입니다.
 
-**개인정보 보호책임자와 국내대리인.** 개인정보 보호법 제31조에 따라 회사는 개인정보 보호책임자를 지정하고 있으며, 회사의 규모에 따라 **대표자가 개인정보 보호책임자**입니다. 직책은 **대표자**이고, 담당 부서는 **개인정보 보호 담당(고객지원)**이며, 연락 창구는 아래 "개인정보에 관한 연락처"에 적은 전자우편 주소와 전화번호입니다. 개인정보에 관한 모든 요구가 한국어로 그곳에 오실 수 있고, 요구를 접수하는 부서와 처리하는 사람이 같습니다. 회사는 한 사람이 운영하는 규모이므로 이 방침에는 직책과 부서를 적고 개인의 성명은 적지 않습니다. 성명을 요구하실 수 있고, 그 요구에는 서면으로 답합니다. 한편 **회사는 국내대리인을 지정하지 않았습니다.** 국내대리인의 지정은 시행령이 정하는 기준, 즉 전년도 매출액이나 한국 이용자 수의 기준을 넘는 사업자에게 적용되고, 회사는 그 기준을 넘지 않습니다. 이것은 법 해석이 아니라 사실에 관한 진술이므로 언제 바뀌는지도 말씀드립니다. **그 기준을 넘게 되면 국내대리인을 지정하고 그 이름과 주소를 여기에 적겠습니다.**
+**개인정보 보호책임자와 국내대리인.** 개인정보 보호법 제31조에 따라 회사는 개인정보 보호책임자를 지정하고 있으며, 회사의 규모에 따라 **대표자가 개인정보 보호책임자**입니다. 직책은 **대표자**이고, 담당 부서는 **개인정보 보호 담당(고객지원)**이며, 연락 창구는 아래 "개인정보에 관한 연락처"에 적은 전자우편 주소와 전화번호입니다. 개인정보에 관한 모든 요구가 한국어로 그곳에 오실 수 있고, 요구를 접수하는 부서와 처리하는 사람이 같습니다. 회사는 한 사람이 운영하는 규모이므로 이 방침에는 직책과 부서를 적고 개인의 성명은 적지 않습니다. 성명을 요구하실 수 있고, 그 요구에는 서면으로 답합니다. 한편 **회사는 국내대리인을 지정하지 않았습니다.** 국내대리인의 지정은 개인정보 보호법 시행령 제32조의3 제1항이 정하는 기준, 즉 전년도 전체 매출액이 1조원 이상이거나 전년도 말 기준 직전 3개월간 저장·관리되는 국내 정보주체의 개인정보가 일일평균 100만명 이상인 사업자에게 적용되고, 회사는 어느 기준도 넘지 않습니다. 이것은 법 해석이 아니라 사실에 관한 진술이므로 언제 바뀌는지도 말씀드립니다. **그 기준을 넘게 되면 국내대리인을 지정하고 그 이름과 주소를 여기에 적겠습니다.**
 
 **신고하거나 조정을 신청할 곳.** 회사의 답으로 문제가 해결되지 않으면 다음에 알리실 수 있습니다.
 
@@ -437,7 +437,7 @@ GDPR 제12조 제3항의 기간인 한 달 안에 답합니다. 권리를 행사
 
 Shopify, PayPal, Creem, Digistore24, JVZoo, Meta는 수탁자가 아닙니다. 각자 자신의 목적을 스스로 정하는 독립한 개인정보처리자이거나 판매의 당사자이며, 그 구분은 위 "제3자 제공" 항과 "국외 이전" 항에 적혀 있습니다.
 
-**한국의 국외 이전**은 위 "국외 이전" 항에 개인정보 보호법 제28조의8이 알리도록 하고 있는 사항의 순서대로 적혀 있습니다.
+**한국의 국외 이전**은 위 "국외 이전" 항에 개인정보 보호법 제28조의8 제2항 각 호의 순서대로 적혀 있습니다.
 
 ## 광고성 전자우편 연락
 

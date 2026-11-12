@@ -5232,7 +5232,7 @@ const TRANSFER_DEROGATION: Record<string, RegExp> = {
   es: /ese consentimiento suyo es el instrumento[\s\S]{0,140}el artículo 49, apartado 1, letra a\), del RGPD/,
   'pt-BR': /esse seu consentimento é o instrumento[\s\S]{0,140}o artigo 49, 1, alínea a, do RGPD/,
   ja: /その同意こそがその措置です[\s\S]{0,140}GDPR 第49条第1項\(a\)/,
-  ko: /그 동의가 바로 그 수단이며, GDPR 제49조 제1항 \(a\)의 명시적 동의에 해당합니다/,
+  ko: /제46조의 보호 수단이 없으므로, 그 동의가 바로 그 수단이며 GDPR 제49조 제1항 \(a\)의 명시적 동의에 해당합니다/,
   pl: /ta Pa[ńn]stwa zgoda jest tym instrumentem[\s\S]{0,160}art\. 49 ust\. 1 lit\. a RODO/,
 }
 /* The risk the consent is consent TO must be stated, or it is not informed. */
