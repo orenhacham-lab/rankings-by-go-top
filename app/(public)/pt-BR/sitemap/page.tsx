@@ -1,6 +1,7 @@
 import { buildHreflangAlternates } from '@/lib/seo/hreflang'
 import Link from 'next/link'
 import { LEGAL_FOOTNOTE, LEGAL_LINK, LegalFrame, LegalHeader, SitemapGroups } from '@/components/public/LegalDoc'
+import { sitemapArticleLinks, sitemapArticleSection } from '@/lib/sitemap/articles'
 import { authHref } from '@/lib/i18n/auth-href'
 import { SOCIAL_PREVIEW_IMAGE } from '@/lib/seo/social-preview'
 
@@ -26,7 +27,9 @@ export const metadata = {
 
 type SitemapSection = { title: string; description?: string; links: Array<{ label: string; href: string }> }
 
-export default function PortugueseSitemapPage() {
+export default async function PortugueseSitemapPage() {
+  const articles = await sitemapArticleLinks('pt-BR')
+
   const sections: SitemapSection[] = [
     {
       title: 'Páginas',
@@ -98,11 +101,13 @@ export default function PortugueseSitemapPage() {
     },
   ]
 
+  const articleSection: SitemapSection[] = sitemapArticleSection('Artigos do site', articles)
+
   return (
     <LegalFrame locale="pt-BR" breadcrumbs={[{ label: 'Mapa do site', href: '/pt-BR/sitemap' }]}>
       <LegalHeader title="Mapa do site" subtitle="Aqui você encontra todas as páginas e seções do Go Top SEO" />
 
-      <SitemapGroups groups={sections} />
+      <SitemapGroups groups={[...sections, ...articleSection]} />
 
       <p className={`mt-10 ${LEGAL_FOOTNOTE}`}>
         Para saber mais, visite nossa{' '}

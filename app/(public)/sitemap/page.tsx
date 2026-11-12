@@ -1,40 +1,20 @@
-'use client'
-
-import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { LEGAL_FOOTNOTE, LEGAL_LINK, LegalFrame, LegalHeader, SitemapGroups } from '@/components/public/LegalDoc'
-import { createClient } from '@/lib/supabase/client'
+import { sitemapArticleLinks, sitemapArticleSection } from '@/lib/sitemap/articles'
 import { authHref } from '@/lib/i18n/auth-href'
-
-interface Article {
-  id: string
-  slug: string
-  title: string
-}
 
 type SitemapSection = { title: string; description?: string; links: Array<{ label: string; href: string }> }
 
-export default function SitemapPage() {
-  const [articles, setArticles] = useState<Article[]>([])
-  const [loading, setLoading] = useState(true)
-
-  useEffect(() => {
-    async function loadArticles() {
-      const supabase = createClient()
-      const { data } = await supabase
-        .from('articles')
-        .select('id, slug, title')
-        .eq('is_published', true)
-        .order('title', { ascending: true })
-
-      if (data) {
-        setArticles(data)
-      }
-      setLoading(false)
-    }
-
-    loadArticles()
-  }, [])
+/**
+ * The Hebrew site map.
+ *
+ * The article list used to be fetched in the browser with no locale filter and
+ * printed under `/articles/<slug>`, so 125 of the 157 links it advertised were
+ * "מאמר לא נמצא" — every article of the other nine languages. It is read on the
+ * server now, filtered to Hebrew; see `lib/sitemap/articles.ts`.
+ */
+export default async function SitemapPage() {
+  const articles = await sitemapArticleLinks('he')
 
   const sections: SitemapSection[] = [
     {
@@ -101,9 +81,7 @@ export default function SitemapPage() {
     },
   ]
 
-  const articleSection: SitemapSection[] = !loading && articles.length > 0
-    ? [{ title: 'מאמרים באתר', links: articles.map((article) => ({ label: article.title, href: `/articles/${article.slug}` })) }]
-    : []
+  const articleSection: SitemapSection[] = sitemapArticleSection('מאמרים באתר', articles)
 
   return (
     <LegalFrame locale="he" breadcrumbs={[{ label: 'מפת אתר', href: '/sitemap' }]}>
