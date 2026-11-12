@@ -36,6 +36,7 @@ import { AGENCIES_PAGE, BUSINESSES_PAGE, SHOPIFY_PAGE, WORDPRESS_PAGE } from '@/
 import { SITE_LINKS_PAGE } from '@/lib/i18n/public/pages/site-links'
 import { COMPETITORS_PAGE, SEARCH_CONSOLE_PAGE } from '@/lib/i18n/public/pages/results'
 import { MAPS_POSTS_PAGE } from '@/lib/i18n/public/pages/maps-posts'
+import { BUSINESS_PROFILE_PAGE } from '@/lib/i18n/public/pages/business-profile'
 
 const ROOT = join(__dirname, '..', '..', '..')
 let passed = 0
@@ -70,8 +71,25 @@ function main() {
       groupSizes.length === 3 && groupSizes.every((n) => n === 3 || n === 4) && Math.max(...groupSizes) - Math.min(...groupSizes) <= 1,
       JSON.stringify(groupSizes))
     check('1a2-MUT: a five-item column is caught', !([3, 5, 3].every((n) => n === 3 || n === 4)))
+    // The Google Business Profile hub (owner, 12 Nov 2026) is the twelfth
+    // feature in the menu and deliberately NOT in a column: it is the parent of
+    // Maps rank tracking and Maps posts, and a fifth item in a column is what
+    // 1a2 above forbids. So it leads the panel as one row across the three
+    // columns, in both the desktop and the mobile menu, and the columns stay
+    // 4/4/3. If it is ever moved into a column, 1a2 goes red, which is correct.
+    /** The featureGroups array literal on its own: the three columns, nothing else. */
+    const columnsOf = (src: string) => src.slice(src.indexOf('const featureGroups'), src.indexOf('const sm = '))
+    check('1a3: the hub leads the panel as its own row, outside the three columns',
+      /const businessProfileItem = feature\('businessProfile', 'google-business-profile'/.test(nav)
+      && (nav.match(/data-feature-hub/g) ?? []).length === 2
+      && /data-feature-hub[\s\S]{0,200}?businessProfileItem/.test(nav)
+      && !columnsOf(nav).includes('businessProfileItem'))
+    check('1a3-MUT: the hub placed inside a column is caught',
+      columnsOf("const featureGroups = [{ items: [feature('x', 'y'), businessProfileItem] }]\nconst sm = ").includes('businessProfileItem'))
     // Eleven from 16 Oct 2026: posts on Google Maps joined the middle column.
-    check('1b: eleven features and four solution pages are read from the menu', paths.length === 15, JSON.stringify(paths))
+    // Twelve from 12 Nov 2026: the Google Business Profile hub, as the row above
+    // them.
+    check('1b: twelve features and four solution pages are read from the menu', paths.length === 16, JSON.stringify(paths))
     const missing = PUBLIC_LOCALES.flatMap((l) => paths.filter((p) => !existsSync(pageFile(LOCALE_PREFIX[l], p))).map((p) => `${l}${p}`))
     check('1c: …each with a page.tsx in he, en, es and pt-BR', missing.length === 0, missing.join(', '))
     const xml = read('app/sitemap.xml/route.ts')
@@ -83,7 +101,7 @@ function main() {
       return paths.filter((p) => !src.includes(`'${LOCALE_PREFIX[l]}${p}'`)).map((p) => `${l}${p}`)
     })
     check('1e: …and in the HTML sitemap of every language', htmlMissing.length === 0, htmlMissing.join(', '))
-    for (const page of [SITE_FIXES_PAGE, BUSINESSES_PAGE, AGENCIES_PAGE, WORDPRESS_PAGE, SHOPIFY_PAGE, SITE_LINKS_PAGE, COMPETITORS_PAGE, SEARCH_CONSOLE_PAGE, MAPS_POSTS_PAGE]) {
+    for (const page of [SITE_FIXES_PAGE, BUSINESSES_PAGE, AGENCIES_PAGE, WORDPRESS_PAGE, SHOPIFY_PAGE, SITE_LINKS_PAGE, COMPETITORS_PAGE, SEARCH_CONSOLE_PAGE, MAPS_POSTS_PAGE, BUSINESS_PROFILE_PAGE]) {
       check(`1f: ${page.path} is a menu path`, paths.includes(page.path))
     }
     // MUTATION CONTROL
@@ -297,7 +315,7 @@ function main() {
       risksArePointedAt.every((re) => re.test(flat)))
     check('4m-MUT: dropping the English risks pointer is caught',
       !risksArePointedAt.every((re) => re.test(flat.replace(/together with the risks of joining/gi, ''))))
-    for (const page of [SITE_FIXES_PAGE, BUSINESSES_PAGE, AGENCIES_PAGE, WORDPRESS_PAGE, SHOPIFY_PAGE, SITE_LINKS_PAGE, COMPETITORS_PAGE, SEARCH_CONSOLE_PAGE, MAPS_POSTS_PAGE]) {
+    for (const page of [SITE_FIXES_PAGE, BUSINESSES_PAGE, AGENCIES_PAGE, WORDPRESS_PAGE, SHOPIFY_PAGE, SITE_LINKS_PAGE, COMPETITORS_PAGE, SEARCH_CONSOLE_PAGE, MAPS_POSTS_PAGE, BUSINESS_PROFILE_PAGE]) {
       check(`4e: ${page.path} has content and a title in every language`,
         PUBLIC_LOCALES.every((l) => page.content[l]?.hero.title && page.meta[l]?.title && page.meta[l]?.description))
     }

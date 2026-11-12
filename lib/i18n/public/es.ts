@@ -56,6 +56,10 @@ export const es = {
         label: 'Correcciones del sitio',
         description: 'Revisamos tu sitio y corregimos títulos, descripciones, texto alternativo de imágenes y enlaces. En WordPress con un clic, después de que lo apruebes.',
       },
+      businessProfile: {
+        label: 'Perfil de Empresa de Google',
+        description: 'Todo lo que el sistema hace con el perfil que los clientes ven en Google Maps: tu lugar en el mapa, las publicaciones y las respuestas a reseñas, en un solo lugar.',
+      },
       mapsPosts: {
         label: 'Publicaciones en Google Maps',
         description: 'Publicaciones con foto y botón en tu Perfil de Empresa de Google, al momento o programadas, y respuestas a reseñas. Con un primer borrador que tú corriges.',

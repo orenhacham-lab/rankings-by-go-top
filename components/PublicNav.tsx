@@ -3,7 +3,7 @@
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { useState, useEffect } from 'react'
-import { BarChart3, Blocks, Briefcase, ChevronDown, FileText, MapPin, MapPinned, Menu, LineChart, Search, ShoppingBag, Sparkles, Store, Users, Telescope, Waypoints, Wrench, X, type LucideIcon } from 'lucide-react'
+import { BarChart3, Blocks, Briefcase, Building2, ChevronDown, FileText, MapPin, MapPinned, Menu, LineChart, Search, ShoppingBag, Sparkles, Store, Users, Telescope, Waypoints, Wrench, X, type LucideIcon } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { LOCALE_PREFIX, PUBLIC_LOCALES, localeHomeHref, type PublicLocale } from '@/lib/i18n/locales'
 import { getPublicDictionary } from '@/lib/i18n/getPublicDictionary'
@@ -95,6 +95,16 @@ export function PublicNav({ locale = 'he', tone = 'default' }: { locale?: Public
   const feature = (id: keyof typeof fm, slug: string, icon: LucideIcon): MenuItem => ({
     id, href: `${prefix}/features/${slug}`, label: fm[id].label, description: fm[id].description, icon,
   })
+  // The Google Business Profile hub, asked for on 12 Nov 2026 ("כן", after the
+  // page shipped in all ten languages). It is NOT a twelfth item in a column:
+  // the owner balanced the three columns on 6 Oct 2026, and a fifth item in one
+  // of them is exactly what that instruction forbids (and what
+  // components/public/__qa__/public-nav-menus.qa.ts group 1 guards). It is also
+  // not a sibling of the two pages beneath it — Maps rank tracking measures the
+  // profile's position, Maps posts publishes to it — so it leads the panel as
+  // one row across the three columns, which is what a hub is. It is declared
+  // before the columns so the guard can read the columns on their own.
+  const businessProfileItem = feature('businessProfile', 'google-business-profile', Building2)
   // Three columns, in the order a customer meets the value (owner, 5 Oct 2026,
   // after the competitor's menu): what we measure, the work the system does,
   // and how the results are shown. The columns balanced at three each (owner,
@@ -208,6 +218,9 @@ export function PublicNav({ locale = 'he', tone = 'default' }: { locale?: Public
               </button>
               <div className={PANEL_WRAP}>
                 <div data-features-panel className="grid w-[54rem] grid-cols-3 gap-2 whitespace-normal rounded-card border border-line bg-surface p-3 shadow-pop">
+                  <div data-feature-hub className="col-span-3 mb-1 border-b border-line pb-2">
+                    <DesktopMenuLink item={businessProfileItem} />
+                  </div>
                   {featureGroups.map((group) => (
                     <div key={group.id} data-feature-group={group.id} className="flex flex-col gap-0.5">
                       <p className="px-3 pb-1 pt-2 text-overline font-semibold uppercase text-muted">{group.title}</p>
@@ -302,6 +315,9 @@ export function PublicNav({ locale = 'he', tone = 'default' }: { locale?: Public
               </button>
               {featuresOpen && (
                 <div className="mb-1 ms-3 space-y-0.5 border-s border-line ps-2">
+                  <div data-feature-hub>
+                    <MobileMenuLink item={businessProfileItem} onPick={closeMobile} />
+                  </div>
                   {featureGroups.map((group) => (
                     <div key={group.id}>
                       <p className="px-2 pb-1 pt-2 text-caption font-semibold text-muted">{group.title}</p>

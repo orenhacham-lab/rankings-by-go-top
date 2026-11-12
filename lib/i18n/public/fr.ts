@@ -58,6 +58,10 @@ export const fr = {
         label: 'Corrections sur le site',
         description: 'Nous auditons votre site et corrigeons les titres, les métadescriptions, le texte alternatif des images et les liens. Sur WordPress en un clic, après votre validation.',
       },
+      businessProfile: {
+        label: 'Fiche d’établissement Google',
+        description: 'Tout ce que le système fait de la fiche que vos clients voient sur Google Maps : votre place sur la carte, les posts et les réponses aux avis, au même endroit.',
+      },
       mapsPosts: {
         label: 'Posts Google Maps',
         description: 'Des posts avec photo et bouton sur votre fiche Google Business Profile, tout de suite ou programmés, et des réponses aux avis. Avec un premier brouillon que vous modifiez.',
