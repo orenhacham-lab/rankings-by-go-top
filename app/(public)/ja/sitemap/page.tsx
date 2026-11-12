@@ -58,6 +58,7 @@ export default function JapaneseSitemapPage() {
         { label: 'サイトの修正', href: '/ja/features/site-health-fixes' },
         { label: 'サイトへのリンク', href: '/ja/features/site-links' },
         { label: 'Googleマップへの投稿', href: '/ja/features/google-maps-posts' },
+        { label: 'Googleビジネスプロフィール', href: '/ja/features/google-business-profile' },
         { label: '自社と競合', href: '/ja/features/competitor-tracking' },
         { label: 'Search Consoleのデータ', href: '/ja/features/search-console' },
       ],
