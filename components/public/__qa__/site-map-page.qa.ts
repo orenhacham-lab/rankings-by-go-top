@@ -43,6 +43,11 @@ function check(name: string, cond: boolean, detail?: string) {
 }
 const ROOT = join(__dirname, '..', '..', '..')
 
+/** Source guards match code, not the comments that describe the bug. */
+function stripComments(src: string): string {
+  return src.replace(/\{\s*\/\*[\s\S]*?\*\/\s*\}/g, '').replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[^:])\/\/[^\n]*/g, '$1')
+}
+
 const sitemapPage = (prefix: string) => join(ROOT, `app/(public)${prefix}/sitemap/page.tsx`)
 
 /** The paths sitemap.xml advertises in every translated tree. */
@@ -150,6 +155,39 @@ function main() {
   check('MUTATION CONTROL: the metadata these pages had before, with no alternates of its own, fails both checks',
     !inherited.includes("canonical: 'https://www.gotopseo.com/sitemap'") &&
     !inherited.includes("buildHreflangAlternates('/sitemap', '/en/sitemap', '/es/sitemap')"))
+
+
+  console.log('\nE) each map lists the articles of its own language, and only those')
+  // MEASURED 12.11.2026 in production: the Hebrew map read `articles` with no
+  // locale filter and printed every row under `/articles/<slug>`, the Hebrew
+  // tree. 157 published articles, 32 of them Hebrew — so 125 of its article
+  // links answered "מאמר לא נמצא"; verified on
+  // /articles/what-is-a-metasearch-engine, an English slug, against
+  // /en/articles/what-is-a-metasearch-engine, which renders. The other nine
+  // maps listed no articles at all.
+  const noHelper: string[] = []
+  const wrongLocale: string[] = []
+  const handBuilt: string[] = []
+  for (const locale of PUBLIC_LOCALES) {
+    const src = stripComments(readFileSync(sitemapPage(LOCALE_PREFIX[locale]), 'utf8'))
+    if (!src.includes('sitemapArticleLinks')) { noHelper.push(locale); continue }
+    if (!src.includes(`sitemapArticleLinks('${locale}')`)) wrongLocale.push(locale)
+    // A map that builds an article path itself is how the defect happened.
+    if (/articles\/\$\{/.test(src)) handBuilt.push(locale)
+  }
+  check('E1: every map reads its articles through lib/sitemap/articles', noHelper.length === 0, noHelper.join(', '))
+  check('E2: every map asks for its OWN locale', wrongLocale.length === 0, wrongLocale.join(', '))
+  check('E3: no map builds an article path by hand', handBuilt.length === 0, handBuilt.join(', '))
+  const helper = stripComments(readFileSync(join(ROOT, 'lib/sitemap/articles.ts'), 'utf8'))
+  check('E4: the helper filters by locale and by is_published',
+    helper.includes(".eq('locale', locale)") && helper.includes(".eq('is_published', true)"))
+  check('E5: the helper builds the path with articleHref, which knows Hebrew has no prefix',
+    helper.includes('articleHref(locale,'))
+  // The control is the code this page shipped until 12.11.2026.
+  const before = "const { data } = await supabase.from('articles').select('id, slug, title').eq('is_published', true)\n" +
+    'articles.map((article) => ({ label: article.title, href: `/articles/${article.slug}` }))'
+  check('MUTATION CONTROL: the query and the hand-built path this page had before fail E2 and E3',
+    !before.includes("sitemapArticleLinks('he')") && /articles\/\$\{/.test(before))
 
   console.log(`\n${pass} passed, ${fail} failed`)
   if (fail > 0) process.exitCode = 1
