@@ -36,6 +36,7 @@ import {
 } from '../korea-sale'
 import { COUNTRY_HEADER } from '../server-market'
 import { RESTRICTED_COUNTRIES } from '../../sanctions/countries'
+import { ownSaleAllowedForCountry, ownSaleCountries } from '../../marketplace/own-sale-territory'
 import { koreanCheckoutEnabled } from '../../i18n/korean-site'
 
 let pass = 0, fail = 0
@@ -242,31 +243,43 @@ console.log('\nF. the fact is told BEFORE the trial, not only at the refusal')
       }))
 }
 
-console.log('\nG. the same rule on the marketplace pages, where JVZoo is NOT the seller')
+console.log('\nG. the marketplace pages, where JVZoo is NOT the seller')
 {
   const go = code('app/go/[platform]/page.tsx')
   const config = read('lib/marketplace/config.ts')
-  check('G1: the sales page takes the own-name decision, and only where WE are the seller',
-    /!provider\.sellerOfRecord && koreaOwnSaleBlockedForRequest\(requestHeaders\)/.test(go))
-  check('G2: a visitor it applies to gets words instead of the buy button',
-    /koreaOwnSaleBlocked \? \(/.test(go) && /data-korea-no-sale/.test(go))
+  check('G1: the page refuses an own-name sale outside the cleared countries, and only where WE are the seller',
+    /!provider\.sellerOfRecord\s*\n\s*&& !ownSaleAllowedForRequest\(requestHeaders, KOREA_SALE_COUNTRY_HEADER\)/.test(go))
+  check('G2: such a visitor is told what is refused, in words, and is offered no competing checkout',
+    /ownSaleRefused \? \(/.test(go) && /data-own-sale-refused/.test(go)
+    && !/<a href="\//.test(go))
   check('G3: the button is still there for everyone else',
     /\) : buyUrl \? \(/.test(go) && /href=\{buyUrl\}/.test(go))
   check('G4: and the reseller platforms are untouched, because the tax is theirs',
     (config.match(/sellerOfRecord: true/g) ?? []).length === 2
     && (config.match(/sellerOfRecord: false/g) ?? []).length === 1)
-  check('G5: the sentence says nothing about VAT and does not call the service unavailable in their country',
+  check('G5: a visitor in Korea is outside the cleared list, so this page sells them nothing either',
+    ownSaleAllowedForCountry('KR', ownSaleCountries(undefined)) === false)
+  check('G6: the list is configuration, and unset it is the United States alone',
+    ownSaleCountries('') .join(',') === 'US'
+    && ownSaleAllowedForCountry('US', ownSaleCountries('')) === true
+    && ownSaleCountries('us, ca ,JP').join(',') === 'US,CA,JP')
+  check('G7: an unplaceable visitor fails CLOSED here, the opposite of the billing guard',
+    ownSaleAllowedForCountry(null, ['US']) === false
+    && ownSaleAllowedForCountry('XX', ['US']) === false
+    && koreaOwnSaleBlockedForCountry(null, false) === false)
+  check('G8: the sentence does not say the service is unavailable in their country',
     (() => {
-      const at = go.indexOf('data-korea-no-sale')
+      const at = go.indexOf('data-own-sale-refused')
       const seg = go.slice(at, at + 400)
-      return !/VAT|tax/i.test(seg) && /not sold in Korea/.test(seg) && /Nothing will be charged/.test(seg)
+      return /not sold through this page/.test(seg) && !/unavailable|VAT|tax/i.test(seg)
     })())
   check('G-MUT1: dropping the seller condition is caught — it would refuse a reseller sale that is lawful',
-    !/!provider\.sellerOfRecord && koreaOwnSaleBlockedForRequest\(requestHeaders\)/.test(
-      go.replace(/!provider\.sellerOfRecord && koreaOwnSaleBlockedForRequest\(requestHeaders\)/g,
-        'koreaOwnSaleBlockedForRequest(requestHeaders)')))
-  check('G-MUT2: dropping the block and showing the button anyway is caught',
-    !/koreaOwnSaleBlocked \? \(/.test(go.replace(/koreaOwnSaleBlocked \? \(/g, 'false ? (')))
+    !/!provider\.sellerOfRecord\s*\n\s*&& !ownSaleAllowedForRequest/.test(
+      go.replace(/!provider\.sellerOfRecord\s*\n\s*&& !ownSaleAllowedForRequest/g, '!ownSaleAllowedForRequest')))
+  check('G-MUT2: dropping the refusal and showing the button anyway is caught',
+    !/ownSaleRefused \? \(/.test(go.replace(/ownSaleRefused \? \(/g, 'false ? (')))
+  check('G-MUT3: a list that falls back to "everywhere" instead of the default is caught',
+    ownSaleCountries('').length === 1)
 }
 
 console.log(`\n${pass} passed, ${fail} failed`)
