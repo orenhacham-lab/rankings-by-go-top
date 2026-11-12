@@ -245,6 +245,7 @@ export const en = {
       marketing: {
         title: 'Marketing',
         desc: 'Measuring how our ads perform, showing relevant ads on the Google and Meta networks, and attributing a purchase to the affiliate who referred you through the JVZoo marketplace. Refusing costs you nothing in the service.',
+        risk: 'Marketing cookies also send your IP address and browser identifier to Meta and to JVZoo in the United States. For Meta we rely on the standard contractual clauses in its own data processing terms. With JVZoo we have no such clauses, so your consent here is the only basis for that transfer: the United States has no EU adequacy decision, your data does not enjoy the protection it has here, public authorities there may be able to access it, and you may have no equivalent remedy. You can withdraw this consent at any time.',
       },
     },
   },

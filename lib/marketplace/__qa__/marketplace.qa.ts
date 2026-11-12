@@ -869,11 +869,10 @@ async function main() {
   // turns the old stored decisions back into questions. A deploy carrying any
   // two of the three leaves the beacon firing on a grant nobody gave, so this
   // section fails on the missing one rather than on the beacon.
-  console.log('\nL. the beacon\'s lawful basis across the eight languages it is guarded in')
-  // de, nl and pl are NOT here, and were not when they shipped: their
-  // documents carry the same clause, and nothing checks it. That gap is older
-  // than Korean and is reported rather than widened in the same change.
-  const CONSENT_LOCALES = ['he', 'en', 'es', 'pt-BR', 'fr', 'it', 'ja', 'ko'] as const
+  console.log('\nL. the beacon\'s lawful basis across all eleven languages')
+  // All eleven, which is the point: a guard that covered eight was a guard
+  // that would miss the ninth. de, nl and pl shipped outside it and are in now.
+  const CONSENT_LOCALES = ['he', 'en', 'es', 'pt-BR', 'fr', 'it', 'ja', 'de', 'nl', 'pl', 'ko'] as const
   const PRIVACY_DOC: Record<string, string> = {
     he: 'app/(legal)/privacy/page.tsx',
     en: 'app/(public)/en/privacy/page.tsx',
@@ -882,12 +881,15 @@ async function main() {
     fr: 'content/legal/fr/privacy.md',
     it: 'content/legal/it/privacy.md',
     ja: 'content/legal/ja/privacy.md',
+    de: 'content/legal/de/privacy.md',
+    nl: 'content/legal/nl/privacy.md',
+    pl: 'content/legal/pl/privacy.md',
     ko: 'content/legal/ko/privacy.md',
   }
   /** The marketing category's own description, cut out of the public dictionary. */
   const marketingDesc = (locale: string): string => {
     const dict = read(`lib/i18n/public/${locale}.ts`)
-    const at = dict.indexOf('marketing:')
+    const at = dict.indexOf('marketing: {')
     if (at < 0) return ''
     const desc = dict.slice(at).match(/desc:\s*'((?:[^'\\]|\\.)*)'/)
     return desc?.[1] ?? ''
@@ -901,6 +903,9 @@ async function main() {
     fr: 'après votre acceptation des cookies de marketing',
     it: 'dopo che Lei ha accettato i cookie di marketing',
     ja: 'お客様がマーケティングの Cookie に同意された後にのみ読み込まれます',
+    de: 'wird das Bild erst geladen, nachdem Sie Marketing-Cookies angenommen haben',
+    nl: 'wordt de afbeelding pas geladen nadat u marketingcookies',
+    pl: 'obraz jest ładowany dopiero po przyjęciu przez Państwa plików cookie marketingowych',
     ko: '고객님이 마케팅 쿠키를 수락하신 뒤에야 이미지를 불러옵니다',
   }
   for (const locale of CONSENT_LOCALES) {
@@ -980,6 +985,9 @@ async function main() {
     fr: ['Espace économique européen', 'Royaume-Uni', 'Suisse', 'Canada', 'Corée du Sud', 'ne parvenons pas à déterminer'],
     it: ['Spazio economico europeo', 'Regno Unito', 'Svizzera', 'Canada', 'Corea del Sud', 'non riusciamo a determinare'],
     ja: ['欧州経済領域', '英国', 'スイス', 'カナダ', '韓国', '判定できなかった場合'],
+    de: ['Europäischen Wirtschaftsraum', 'Vereinigten Königreich', 'Schweiz', 'Kanada', 'Südkorea', 'nicht feststellen können'],
+    nl: ['Europese Economische Ruimte', 'Verenigd Koninkrijk', 'Zwitserland', 'Canada', 'Zuid-Korea', 'niet kunnen'],
+    pl: ['Europejskim Obszarze Gospodarczym', 'Zjednoczonym Królestwie', 'Szwajcarii', 'Kanadzie', 'Korei Południowej', 'nie możemy ustalić'],
     ko: ['유럽경제지역', '영국', '스위스', '캐나다', '대한민국', '확인할 수 없는'],
   }
   for (const locale of CONSENT_LOCALES) {
@@ -1025,6 +1033,9 @@ async function main() {
     ja: /(?:後述の|前述の)「([^」]+)」/g,
     // Korean quotes the heading in ASCII double quotes and points at it with
     // 항에, the counterpart of the others' "in the section".
+    de: /(?:im Abschnitt|oben in)\s*„([^“]+)“/g,
+    nl: /zie het onderdeel\s*'([^']+)'/g,
+    pl: /w części\s*„([^”“]+)[”“]/g,
     ko: /"([^"]+)" 항에/g,
   }
   const flat = (v: string) => v.replace(/\s+/g, ' ').trim()

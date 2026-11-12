@@ -111,6 +111,16 @@ export function ConsentPreferences({ dict, ltr, initial, onSave, onClose }: Prop
                   <div className="flex-1">
                     <h3 className="m-0 text-lead font-bold text-ink">{copy.title}</h3>
                     <p className="m-0 mt-1 text-caption leading-snug text-muted">{copy.desc}</p>
+                    {/* Art. 49(1)(a) GDPR allows a transfer on explicit consent
+                        only where the person was informed of the risks BEFORE
+                        consenting, so the risk sits above the checkbox that
+                        gives the consent rather than behind the privacy link.
+                        Only the marketing category carries one. */}
+                    {'risk' in copy ? (
+                      <p className="m-0 mt-1.5 rounded-control border border-line bg-surface p-2 text-caption leading-snug text-body">
+                        {copy.risk}
+                      </p>
+                    ) : null}
                   </div>
                   <label className="flex shrink-0 cursor-pointer flex-col items-center gap-1 pt-0.5">
                     <input

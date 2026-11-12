@@ -271,6 +271,7 @@ export const nl = {
       marketing: {
         title: 'Marketing',
         desc: 'De prestaties van onze advertenties meten, passende advertenties tonen in de netwerken van Google en Meta, en een aankoop toekennen aan de partner die uw bezoek via de marktplaats JVZoo naar ons heeft gebracht. Weigeren kost u niets in de dienst.',
+        risk: 'Cookies voor marketing sturen ook uw IP-adres en uw browserkenmerk naar Meta en naar JVZoo in de Verenigde Staten. Voor Meta baseren wij ons op de standaardcontractbepalingen in zijn eigen voorwaarden voor gegevensverwerking. Met JVZoo hebben wij zulke bepalingen niet, dus uw toestemming hier is de enige grondslag voor die doorgifte: voor de Verenigde Staten geldt geen adequaatheidsbesluit van de EU, uw gegevens genieten daar niet de bescherming die ze hier hebben, overheidsinstanties daar kunnen er mogelijk toegang tot krijgen en u hebt daar misschien geen gelijkwaardige rechtsmiddelen. U kunt deze toestemming op elk moment intrekken.',
       },
     },
   },

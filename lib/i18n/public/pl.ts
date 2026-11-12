@@ -281,6 +281,7 @@ export const pl = {
       marketing: {
         title: 'Marketing',
         desc: 'Pomiar skuteczności naszych reklam, pokazywanie dopasowanych reklam w sieciach Google i Meta oraz przypisanie zakupu partnerowi, który przyprowadził Państwa wizytę przez platformę JVZoo. Odrzucenie nie kosztuje Państwa niczego w samej usłudze.',
+        risk: 'Pliki cookie marketingowe przesyłają także Państwa adres IP i kod wyróżniający Państwa przeglądarki do Meta oraz do JVZoo w Stanach Zjednoczonych. W przypadku Meta opieramy się na standardowych klauzulach umownych zawartych w jej własnych warunkach przetwarzania danych. Z JVZoo nie mamy takich klauzul, dlatego Państwa zgoda w tym miejscu jest jedyną podstawą tego przekazania: dla Stanów Zjednoczonych nie ma decyzji UE stwierdzającej odpowiedni stopień ochrony, Państwa dane nie korzystają tam z ochrony, jaką mają tutaj, organy publiczne tego państwa mogą uzyskać do nich dostęp, a Państwo mogą nie mieć równoważnego środka ochrony prawnej. Zgodę tę można wycofać w każdej chwili.',
       },
     },
   },

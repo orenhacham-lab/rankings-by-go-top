@@ -1,4 +1,5 @@
 import { notFound } from 'next/navigation'
+import { SOCIAL_PREVIEW_IMAGE } from '@/lib/seo/social-preview'
 import { DocumentLocaleEffect } from '@/components/DocumentLocaleEffect'
 import { koreanSiteEnabled } from '@/lib/i18n/korean-site'
 import { getSiteMetadata } from '@/lib/i18n/site-metadata'
@@ -11,6 +12,7 @@ export const metadata = {
   description: SITE.description,
   keywords: SITE.keywords,
   openGraph: {
+    images: [SOCIAL_PREVIEW_IMAGE],
     title: SITE.ogTitle,
     description: SITE.ogDescription,
     locale: SITE.ogLocale,

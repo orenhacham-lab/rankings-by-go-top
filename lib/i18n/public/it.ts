@@ -257,6 +257,7 @@ export const it = {
       marketing: {
         title: 'Marketing',
         desc: 'Misurare il rendimento delle nostre inserzioni, mostrare annunci pertinenti sulle reti di Google e di Meta e attribuire un acquisto all’affiliato che ha indirizzato la Sua visita a noi tramite il marketplace JVZoo. Rifiutarli non costa nulla nel servizio.',
+        risk: "I cookie di marketing inviano anche il Suo indirizzo IP e l'identificativo del Suo browser a Meta e a JVZoo, negli Stati Uniti. Per Meta ci basiamo sulle clausole contrattuali tipo contenute nelle sue condizioni di trattamento dei dati. Con JVZoo non abbiamo clausole di questo genere, perciò il Suo consenso qui è l'unico fondamento di quel trasferimento: gli Stati Uniti non hanno una decisione di adeguatezza dell'Unione, i Suoi dati non godono là della protezione che hanno qui, le autorità pubbliche di quel paese possono essere in grado di accedervi e può darsi che Lei non disponga di un rimedio equivalente. Può revocare questo consenso in qualsiasi momento.",
       },
     },
   },

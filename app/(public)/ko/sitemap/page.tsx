@@ -1,4 +1,6 @@
 import { buildHreflangAlternates } from '@/lib/seo/hreflang'
+import { SOCIAL_PREVIEW_IMAGE } from '@/lib/seo/social-preview'
+import { sitemapArticleLinks, sitemapArticleSection } from '@/lib/sitemap/articles'
 import Link from 'next/link'
 import { LEGAL_FOOTNOTE, LEGAL_LINK, LegalFrame, LegalHeader, SitemapGroups } from '@/components/public/LegalDoc'
 import { authHref } from '@/lib/i18n/auth-href'
@@ -8,6 +10,7 @@ export const metadata = {
   title: '사이트맵 | Go Top SEO',
   description: 'Go Top SEO 사이트맵입니다. 모든 페이지를 한곳에 모았습니다.',
   openGraph: {
+    images: [SOCIAL_PREVIEW_IMAGE],
     title: '사이트맵 | Go Top SEO',
     description: 'Go Top SEO 사이트맵',
     url: 'https://www.gotopseo.com/ko/sitemap',
@@ -25,7 +28,9 @@ export const metadata = {
 
 type SitemapSection = { title: string; description?: string; links: Array<{ label: string; href: string }> }
 
-export default function KoreanSitemapPage() {
+export default async function KoreanSitemapPage() {
+  const articles = await sitemapArticleLinks('ko')
+
   const sections: SitemapSection[] = [
     {
       title: '페이지',
@@ -97,11 +102,13 @@ export default function KoreanSitemapPage() {
     },
   ]
 
+  const articleSection: SitemapSection[] = sitemapArticleSection('블로그 글', articles)
+
   return (
     <LegalFrame locale="ko" breadcrumbs={[{ label: '사이트맵', href: '/ko/sitemap' }]}>
       <LegalHeader title="사이트맵" subtitle="Go Top SEO의 모든 페이지와 영역을 한곳에" />
 
-      <SitemapGroups groups={sections} />
+      <SitemapGroups groups={[...sections, ...articleSection]} />
 
       <p className={`mt-10 ${LEGAL_FOOTNOTE}`}>
         저희에 대한 더 자세한 내용은{' '}
