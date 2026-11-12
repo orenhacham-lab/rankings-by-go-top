@@ -97,6 +97,7 @@ const CAPABILITIES: [string, string, string][] = [
   ['Visibility in AI answers', '/features/ai-visibility-tracking', 'Whether ChatGPT, Gemini and Google\'s AI answers mention the business. Those three are checked automatically; other engines can be asked a question at a time.'],
   ['Articles written and published', '/features/seo-geo-content-publishing', 'The system plans the keywords, writes the article, adds an image and internal links, and publishes it on the site on its own.'],
   ['Keyword research', '/features/keyword-research', 'Search volumes from Google\'s own planner, turned into a plan of what to write.'],
+  ['Google Business Profile', '/features/google-business-profile', 'What the system does with the profile people see on Maps and in search: the map position, the posts, the review replies. It does not create or verify a profile, and never changes the hours, the address or the phone number on one.'],
   ['Google Business Profile posts', '/features/google-maps-posts', 'Posts and review handling for a business with an address.'],
   ['Site health', '/features/site-health-fixes', 'The technical faults that keep pages out of the index, found and explained.'],
   ['Search Console, read in plain language', '/features/search-console', 'The queries bringing impressions without clicks, and what to do about each.'],

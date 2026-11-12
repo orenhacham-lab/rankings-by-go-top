@@ -252,6 +252,17 @@ export async function handleInboundReply(
 
   let report = classifyDelivery({ sender: email, subject, body })
   if (report !== null) {
+    // THE BUCKET RIDES ALONG ON A READ THAT WORKED. The host the provider
+    // actually serves bodies from is `storage.googleapis.com`, which is every
+    // Google Cloud Storage bucket rather than theirs alone, and the allowlist
+    // can only be narrowed to the bucket once the bucket's name is known. A
+    // successful read names a recipient, so it never reaches the shape line
+    // below; without this the name would only ever appear in a console log that
+    // is gone within the hour. The first path segment only: never the query,
+    // which carries a token, and never the object's path, which names a message.
+    if (read.ok && read.bucket !== null) {
+      report = { ...report, detail: `${report.detail}; bucket ${read.bucket}`.slice(0, 160) }
+    }
     // A REPORT WE CANNOT NAME A RECIPIENT FOR IS A BRAKE THAT DID NOT ENGAGE.
     // On 26 Oct 2026 every one of sixteen reports since 22 Oct was stored with
     // no recipient and detail "unreadable report", while the same report bodies

@@ -44,8 +44,8 @@
  *
  * THEN, THE OUTBOUND SEND ITSELF (lib/outreach/sender-isolated.ts): at most one cold message
  * per pass, which at a quarter-hour cron is the 5–15 minute spacing the channel's plan
- * requires. OFF unless OUTREACH_SENDING_ENABLED is exactly "true" and the mailbox password is
- * set, Production only, and every gate the plan names is inside it. It logs one line per pass
+ * requires. FROZEN since 9 Nov 2026 by CHANNEL_FROZEN, and behind that OFF unless
+ * OUTREACH_SENDING_ENABLED is exactly "true" and the mailbox password is set, Production only, and every gate the plan names is inside it. It logs one line per pass
  * with the outcome and no recipient.
  *
  * ALONGSIDE ALL OF IT, THE SITE MAPPING UPKEEP (lib/content/existing-content/map-upkeep.ts):
@@ -153,8 +153,10 @@ async function handle(request: Request): Promise<Response> {
     // may silently never fire. Production only, idempotent, milliseconds over a small
     // table, isolated: it never throws, so it cannot change, delay or fail anything above.
     await runIsolatedProspectRetention()
-    // Then, OFF unless OUTREACH_SENDING_ENABLED is exactly "true" and the mailbox password is
-    // set: at most ONE cold message of the US channel (lib/outreach/sender-isolated.ts). It
+    // Then, FROZEN since 9 Nov 2026 on ClickBank's contract (CHANNEL_FROZEN in
+    // lib/outreach/sender-isolated.ts, which explains why the stop is a constant and not a
+    // key), and behind that freeze OFF unless OUTREACH_SENDING_ENABLED is exactly "true" and
+    // the mailbox password is set: at most ONE cold message of the US channel. It
     // rides this cron because the plan needs minutes between messages and a daily Vercel cron
     // on this plan gives neither the frequency nor the reliability; one message per quarter
     // hour IS the plan's spacing. Production only. Every gate is inside it — the recipient's

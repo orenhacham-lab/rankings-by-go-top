@@ -188,6 +188,12 @@ export async function GET() {
       changefreq: 'monthly',
       priority: '0.8',
     },
+    {
+      url: `${baseUrl}/features/google-business-profile`,
+      lastmod: today,
+      changefreq: 'monthly',
+      priority: '0.8',
+    },
     // Hebrew comparison pages
     // The comparison index, the parent of the six comparison pages.
     {
@@ -373,6 +379,12 @@ export async function GET() {
       changefreq: 'monthly',
       priority: '0.8',
     },
+    {
+      url: `${baseUrl}/en/features/google-business-profile`,
+      lastmod: today,
+      changefreq: 'monthly',
+      priority: '0.8',
+    },
     // English comparison pages
     // The comparison index, the parent of the six comparison pages.
     {
@@ -459,6 +471,7 @@ export async function GET() {
     { path: '/solutions/shopify', changefreq: 'monthly', priority: '0.7' },
     { path: '/features/site-links', changefreq: 'monthly', priority: '0.7' },
     { path: '/features/google-maps-posts', changefreq: 'monthly', priority: '0.7' },
+    { path: '/features/google-business-profile', changefreq: 'monthly', priority: '0.7' },
     { path: '/compare', changefreq: 'monthly', priority: '0.7' },
     { path: '/compare/semrush', changefreq: 'monthly', priority: '0.7' },
     { path: '/compare/yoast', changefreq: 'monthly', priority: '0.7' },
