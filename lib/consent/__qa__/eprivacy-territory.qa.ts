@@ -17,6 +17,7 @@
 import { readFileSync } from 'node:fs'
 import {
   CONSENT_COUNTRY_HEADER,
+  beaconSuppressedForCountry,
   CONSENT_REQUIRED_COUNTRIES,
   consentRequiredForCountry,
   consentRequiredForRequest,
@@ -47,6 +48,11 @@ check('A5: all 27 member states are listed, none quietly missing',
     .every((c) => consentRequiredForCountry(c) === true))
 check('A6: Canada in full, because Law 25 says the same and the header carries no province',
   consentRequiredForCountry('CA') === true)
+check('A6b: Korea, on 개인정보 보호법 제15조 and 정보통신망법 제22조의2 and not on ePrivacy, which has no Korean counterpart',
+  consentRequiredForCountry('KR') === true)
+check('A6b-MUT: a list without Korea would let the beacon write on page load there',
+  CONSENT_REQUIRED_COUNTRIES.filter((c) => c !== 'KR').includes('KR') === false
+  && CONSENT_REQUIRED_COUNTRIES.includes('KR'))
 check('A7: a United States visitor does not, which is the only reason this module exists',
   consentRequiredForCountry('US') === false)
 check('A8: nor does a visitor outside any of it',
@@ -95,8 +101,12 @@ check('C-MUT2: …and one that ignored a malformed value the same way',
 console.log('\nD. the sales page takes the decision on the server, once')
 {
   const salesSrc = code('app/go/[platform]/page.tsx')
+  // The headers are awaited once into `requestHeaders` and both territorial
+  // questions are asked of that, so this matches the call and not the
+  // expression it used to be written inline in.
   check('D1: the page asks the territory, and from the request headers',
-    /consentRequiredForRequest\(await headers\(\)\)/.test(salesSrc))
+    /const requestHeaders = await headers\(\)/.test(salesSrc)
+    && /consentRequiredForRequest\(requestHeaders\)/.test(salesSrc))
   check('D2: the gated component is still what a consent-required visitor gets',
     /consentRequired \? \(/.test(salesSrc) && /<MarketplacePixel /.test(salesSrc))
   check('D3: and the unconditional one only the other branch',
@@ -104,8 +114,28 @@ console.log('\nD. the sales page takes the decision on the server, once')
   check('D4: the page itself renders no bare beacon, so both branches stay in components/consent',
     !/<img/.test(salesSrc))
   check('D-MUT3: the server-decision guard catches a page that guessed in the browser',
-    !/consentRequiredForRequest\(await headers\(\)\)/.test(
-      salesSrc.replace(/consentRequiredForRequest\(await headers\(\)\)/g, 'consentRequiredInBrowser()')))
+    !/consentRequiredForRequest\(requestHeaders\)/.test(
+      salesSrc.replace(/consentRequiredForRequest\(requestHeaders\)/g, 'consentRequiredInBrowser()')))
+  // D5-D7: Korea is a third state. Consent answers 개인정보 보호법 제15조 and
+  // leaves the transfer to an independent controller abroad without the
+  // 별도의 동의 of 제28조의8 제1항 제1호, so nothing is rendered at all.
+  check('D5: the page asks the suppression question too, from the same headers',
+    /beaconSuppressedForRequest\(requestHeaders\)/.test(salesSrc))
+  check('D6: and a suppressed request maps the empty list, so no beacon reaches either branch',
+    /\(beaconSuppressed \? \[\] : pixelUrls\)\.map/.test(salesSrc))
+  check('D7: the badge is suppressed with it, not on a second decision of its own',
+    /badgeUrl && !beaconSuppressed \?/.test(salesSrc))
+  check('D-MUT5: the suppression guard catches a page that dropped it and mapped every url',
+    !/\(beaconSuppressed \? \[\] : pixelUrls\)\.map/.test(
+      salesSrc.replace(/\(beaconSuppressed \? \[\] : pixelUrls\)\.map/g, 'pixelUrls.map')))
+  check('D-MUT6: …and one that suppressed the beacon but left the badge rendering',
+    !/badgeUrl && !beaconSuppressed \?/.test(
+      salesSrc.replace(/badgeUrl && !beaconSuppressed \?/g, 'badgeUrl ?')))
+  check('D8: a Korean visitor is suppressed, a German one is only gated',
+    beaconSuppressedForCountry('KR') === true
+    && beaconSuppressedForCountry('DE') === false && consentRequiredForCountry('DE') === true)
+  check('D9: and an unplaceable visitor is gated, not suppressed, which is the residual the module states',
+    beaconSuppressedForCountry(null) === false && consentRequiredForCountry(null) === true)
   check('D-MUT4: the branch guard catches a page that dropped the gate and always rendered the open tag',
     !/consentRequired \? \(/.test(salesSrc.replace(/consentRequired \? \(/g, 'true ? (')))
 }

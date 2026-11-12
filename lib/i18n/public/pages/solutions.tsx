@@ -32,6 +32,7 @@ const ja = FEATURE_COMMON.ja
 const de = FEATURE_COMMON.de
 const nl = FEATURE_COMMON.nl
 const pl = FEATURE_COMMON.pl
+const ko = FEATURE_COMMON.ko
 
 // ── Business owners ───────────────────────────────────────────────────────────
 
@@ -77,6 +78,10 @@ export const BUSINESSES_PAGE: MarketingPage = {
     pl: {
       title: 'Dla firm | Go Top SEO',
       description: 'Jeden system, który pisze artykuły i publikuje je na Państwa stronie, sprawdza, gdzie firma pojawia się w Google i w Google Maps, i kontroluje, czy ChatGPT, Gemini i Google AI ją wymieniają.',
+    },
+    ko: {
+      title: '사업자용 | Go Top SEO',
+      description: '아티클을 써서 고객님의 사이트에 게시하고, 업체가 Google과 Google 지도에서 어디에 나오는지 측정하고, ChatGPT와 Gemini, Google AI가 업체를 언급하는지 확인하는 하나의 시스템입니다.',
     },
   },
   content: {
@@ -650,6 +655,63 @@ export const BUSINESSES_PAGE: MarketingPage = {
       ],
       cta: { title: 'Proszę zobaczyć, co system widzi na Państwa stronie', body: pl.closeBody, primary: pl.check, secondary: pl.trial },
     },
+    ko: {
+      hero: {
+        eyebrow: '사업자용',
+        eyebrowIcon: Store,
+        title: '쓰고, 게시하고, 측정하는 일을',
+        accent: '매달 대신 해 드립니다',
+        subtitle: '고객이 실제로 찾는 내용을 다룬 아티클을 고객님의 사이트에 바로 게시합니다. 업체가 Google과 Google 지도에서 어디에 나오는지, ChatGPT와 Gemini, Google AI가 업체를 언급하는지 측정합니다. 외주 인력을 관리하실 필요도, SEO를 배우실 필요도 없습니다.',
+        trust: ko.trust,
+        primary: ko.check,
+        secondary: ko.trial,
+        visual: (
+          <WorkListVisual
+            heading="시스템 안의 이번 달"
+            rows={[
+              { title: '새 아티클 게시', detail: '거실용 에어컨 고르는 법', icon: FileText, done: true, status: '게시됨' },
+              { title: '순위 측정', detail: 'Google 및 Google 지도', icon: Search, done: true, status: '완료' },
+              { title: 'AI 가시성 점검', detail: 'ChatGPT, Gemini, Google AI', icon: Sparkles, done: true, status: '완료' },
+              { title: '다음 아티클', detail: '에어컨 설치 비용은 얼마인가', icon: CalendarClock, done: false, status: '예약됨' },
+            ]}
+          />
+        ),
+      },
+      sections: [
+        {
+          kind: 'cards',
+          tone: 'contrast',
+          eyebrow: '시스템이 대신 하는 일',
+          title: '보통은 여러 사람에게 나뉘는 일',
+          items: [
+            { icon: FileText, title: '문의로 이어지는 콘텐츠', body: '해당 업종에서 무엇이 검색되는지를 바탕으로 주제를 고르고, 아티클을 써서 플랜에 맞는 주기로 고객님의 사이트에 게시합니다.' },
+            { icon: MapPin, title: '믿을 수 있는 측정', body: '키워드마다 사이트가 Google과 Google 지도에서 어디에 나오는지, 그리고 AI 서비스가 업체를 언급하는지 측정합니다.' },
+            { icon: Wrench, title: '발목 잡히지 않는 사이트', body: '사이트 진단이 Google에서 사이트를 가로막는 요소를 찾아냅니다. WordPress에서는 승인하신 뒤 클릭 한 번으로 고쳐집니다.' },
+          ],
+        },
+        {
+          kind: 'steps',
+          eyebrow: '시작하는 방법',
+          title: '세 단계면 시스템이 돌아갑니다',
+          items: [
+            { title: '사이트 주소 입력', body: '시스템이 사이트를 읽고 설정, 콘텐츠 전략, 키워드 아이디어를 준비합니다.' },
+            { title: '사이트 연결', body: 'WordPress, Shopify, Wix 중 하나입니다. 아티클은 그곳에 바로 게시됩니다.' },
+            { title: '결과 확인', body: '순위 측정과 가시성 점검은 매월 1회 자동으로 실행되며, 원하실 때 직접 실행하실 수도 있습니다. 모든 것이 한곳에 있습니다.' },
+          ],
+        },
+        {
+          kind: 'faq',
+          eyebrow: '자주 묻는 질문',
+          title: '사업자분들이 많이 묻는 것',
+          items: [
+            { q: 'SEO를 알아야 합니까?', a: '아닙니다. 시스템이 주제를 제안하고, 쓰고, 게시합니다. 모든 아티클은 게시 전에 읽고 고치실 수 있습니다.' },
+            { q: '지역 업체에도 맞습니까?', a: '맞습니다. Google 지도 순위 추적이 도시나 지역 단위의 지역 검색 결과에서 업체가 어디에 나오는지 측정합니다.' },
+            { q: '한 달에 아티클을 몇 개 받습니까?', a: '플랜에 따라 다릅니다. 모든 플랜과 각 플랜의 한도는 요금 페이지에 있습니다.' },
+          ],
+        },
+      ],
+      cta: { title: '시스템이 내 사이트에서 무엇을 보는지 확인해 보십시오', body: ko.closeBody, primary: ko.check, secondary: ko.trial },
+    },
   },
 }
 
@@ -697,6 +759,10 @@ export const AGENCIES_PAGE: MarketingPage = {
     pl: {
       title: 'Dla agencji | Go Top SEO',
       description: 'Osobny projekt dla każdej strony klienta, z artykułami, monitorowaniem pozycji, widocznością w AI i raportami w pdf i Excelu. Wszyscy klienci z jednego konta.',
+    },
+    ko: {
+      title: '대행사용 | Go Top SEO',
+      description: '고객사 사이트마다 별도 프로젝트를 만들어 아티클, 순위 추적, AI 가시성, PDF와 Excel 리포트를 제공합니다. 모든 고객사를 하나의 계정에서 관리하십니다.',
     },
   },
   content: {
@@ -1220,6 +1286,58 @@ export const AGENCIES_PAGE: MarketingPage = {
       ],
       cta: { title: 'Proszę wypróbować system na stronie klienta', body: pl.closeBody, primary: pl.trial, secondary: pl.pricing },
     },
+    ko: {
+      hero: {
+        eyebrow: '대행사용',
+        eyebrowIcon: Briefcase,
+        title: '모든 고객사 사이트를',
+        accent: '하나의 시스템에서',
+        subtitle: '고객사마다 별도 프로젝트가 생기고, 각자의 아티클, 각자의 순위 추적, 각자의 AI 가시성, 각자의 리포트를 갖습니다. 모든 프로젝트를 하나의 계정에서 관리하시고, 고객사에는 그달에 무엇을 했는지 보여 주는 PDF 리포트를 드립니다.',
+        trust: ko.trust,
+        primary: ko.trial,
+        secondary: ko.pricing,
+        visual: (
+          <WorkListVisual
+            heading="고객사"
+            rows={[
+              { title: '치과', detail: '이번 달 아티클 3개', url: 'example-dental.com', icon: FolderKanban, done: true, status: '리포트 준비됨' },
+              { title: '법률사무소', detail: '이번 달 아티클 2개', url: 'example-law.com', icon: FolderKanban, done: true, status: '리포트 준비됨' },
+              { title: '가구 매장', detail: '진단 진행 중', url: 'example-furniture.com', icon: FolderKanban, done: false, status: '진행 중' },
+            ]}
+          />
+        ),
+      },
+      sections: [
+        {
+          kind: 'cards',
+          tone: 'contrast',
+          eyebrow: '제공되는 것',
+          title: '여러 사이트를 동시에 다루기 위한 도구',
+          items: [
+            { icon: FolderKanban, title: '사이트당 프로젝트 하나', body: '사이트마다 설정, 키워드, 전략, 아티클이 따로 있고, 프로젝트는 고객사별로 묶입니다.' },
+            { icon: BarChart3, title: '그대로 전달하실 수 있는 리포트', body: '순위, AI 가시성, Search Console 데이터를 담은 PDF와 Excel 리포트로, 프로젝트 이름과 사이트 로고가 함께 들어갑니다.' },
+            { icon: PieChart, title: '공평하게 나누는 한도', body: '아티클 한도는 모든 사이트에 함께 적용되며, 어느 사이트에 몇 개를 배정할지는 직접 정하십니다.' },
+          ],
+        },
+        {
+          kind: 'steps',
+          eyebrow: '진행 방식',
+          title: '새 고객사에서 첫 리포트까지',
+          items: [
+            { title: '고객사 프로젝트 생성', body: '사이트 주소를 입력하시면 시스템이 설정, 전략, 키워드 아이디어를 준비합니다.' },
+            { title: '사이트 연결', body: 'WordPress, Shopify, Wix 중 하나이며, 아티클은 그곳에 게시됩니다.' },
+            { title: '리포트 생성', body: '무엇을 썼고, 사이트가 어디에 나오며, 무엇이 달라졌는지 담은 고객사용 PDF 리포트를 만듭니다.' },
+          ],
+        },
+        {
+          kind: 'callout',
+          icon: Info,
+          title: '어느 플랜이 맞는가',
+          body: <p>Premium은 직접 보유하신 사이트 몇 곳을 관리하실 때, Agency는 고객사의 사이트를 관리하실 때를 위한 플랜입니다. 각 플랜의 한도는 요금 페이지에 있습니다.</p>,
+        },
+      ],
+      cta: { title: '고객사 사이트 한 곳에서 먼저 써 보십시오', body: ko.closeBody, primary: ko.trial, secondary: ko.pricing },
+    },
   },
 }
 
@@ -1267,6 +1385,10 @@ export const WORDPRESS_PAGE: MarketingPage = {
     pl: {
       title: 'Dla stron na WordPressie | Go Top SEO',
       description: 'Jedno połączenie ze stroną WordPress i artykuły są tam publikowane z obrazem wyróżniającym, kategoriami i tagami. Analiza strony znajduje problemy, a większość z nich poprawia się jednym kliknięciem po zatwierdzeniu.',
+    },
+    ko: {
+      title: 'WordPress 사이트용 | Go Top SEO',
+      description: 'WordPress 사이트와 한 번 연결하시면 대표 이미지, 카테고리, 태그가 함께 들어간 아티클이 그곳에 게시됩니다. 사이트 진단이 문제를 찾아내고, 대부분은 승인하신 뒤 클릭 한 번으로 고쳐집니다.',
     },
   },
   content: {
@@ -1840,6 +1962,63 @@ export const WORDPRESS_PAGE: MarketingPage = {
       ],
       cta: { title: 'Proszę podłączyć stronę na WordPressie', body: pl.closeBody, primary: pl.trial, secondary: pl.check },
     },
+    ko: {
+      hero: {
+        eyebrow: 'WordPress 사이트용',
+        eyebrowIcon: Blocks,
+        title: '아티클이 고객님의 사이트에',
+        accent: '바로 게시됩니다',
+        subtitle: 'WordPress 사이트와 한 번 연결하시면, 그때부터 대표 이미지와 카테고리, 태그가 들어간 아티클이 고객님이 정하신 시각에 올라갑니다. 사이트 진단이 문제를 찾아내고, 대부분은 승인하신 뒤 클릭 한 번으로 고쳐집니다.',
+        trust: ko.trust,
+        primary: ko.trial,
+        secondary: ko.check,
+        visual: (
+          <WorkListVisual
+            heading="고객님의 WordPress 사이트"
+            rows={[
+              { title: '아티클 게시됨', detail: '가격 가이드 · 대표 이미지 포함', icon: FileText, done: true, status: '게시됨' },
+              { title: 'SEO 제목 수정됨', detail: '', url: '/services', icon: Type, done: true, status: '수정됨' },
+              { title: '이미지 6개에 대체 텍스트', detail: '', url: '/gallery', icon: ImageIcon, done: true, status: '수정됨' },
+              { title: '다음 아티클', detail: '목요일 09:00', icon: CalendarClock, done: false, status: '예약됨' },
+            ]}
+          />
+        ),
+      },
+      sections: [
+        {
+          kind: 'cards',
+          tone: 'contrast',
+          eyebrow: 'WordPress에서 제공되는 것',
+          title: '관리자 화면을 열지 않고 게시하고 고칩니다',
+          items: [
+            { icon: Tags, title: '완성된 상태로 게시', body: '대표 이미지, 본문 이미지, 카테고리, 태그가 들어간 아티클을 바로 또는 예약하신 시각에 게시합니다.' },
+            { icon: Wrench, title: '클릭 한 번으로 수정', body: '제목, 메타 설명, 대체 텍스트, 링크를 다룹니다. 모든 수정은 저장 전에 보여 드리며 되돌리실 수 있습니다.' },
+            { icon: ShieldCheck, title: 'Yoast와 Rank Math와 함께 작동', body: '제목과 메타 설명은 SEO 플러그인의 필드에 저장됩니다. 구조화된 데이터가 이미 있으면 FAQ만 추가하고 중복은 만들지 않습니다.' },
+          ],
+        },
+        {
+          kind: 'steps',
+          eyebrow: '연결',
+          title: '한 번 연결하면 끝입니다',
+          items: [
+            { title: '애플리케이션 비밀번호 생성', body: 'WordPress 사용자 프로필에서 만드십니다. 시스템이 단계별로 안내해 드립니다.' },
+            { title: '프로젝트 설정에서 연결', body: '사이트 주소, 사용자 이름, 애플리케이션 비밀번호를 입력하시면 시스템이 연결이 되는지 확인합니다.' },
+            { title: 'Go Top 플러그인 설치', body: '선택 사항입니다. "사이트 상태" 화면에서 받으실 수 있는 플러그인이 메타 설명, 구조화된 데이터, llms.txt 파일을 추가합니다.' },
+          ],
+        },
+        {
+          kind: 'faq',
+          eyebrow: '자주 묻는 질문',
+          title: '연결 전에 많이 묻는 것',
+          items: [
+            { q: '안전합니까?', a: '애플리케이션 비밀번호는 암호화해 저장하며, WordPress 사용자 프로필에서 언제든지 취소하실 수 있습니다. 수정은 승인하신 뒤에야 사이트에 저장됩니다.' },
+            { q: 'SEO 플러그인이 필요합니까?', a: '필수는 아닙니다. Yoast나 Rank Math를 쓰시면 시스템이 그 필드에 저장합니다. 다만 메타 설명을 쓰시려면 사이트에 SEO 플러그인이 있어야 합니다.' },
+            { q: '게시 전에 아티클을 고칠 수 있습니까?', a: '예. 모든 아티클은 게시 전에 열어 고치시고 시각을 다시 정하실 수 있습니다.' },
+          ],
+        },
+      ],
+      cta: { title: 'WordPress 사이트를 연결하십시오', body: ko.closeBody, primary: ko.trial, secondary: ko.check },
+    },
   },
 }
 
@@ -1935,6 +2114,10 @@ export const SHOPIFY_PAGE: MarketingPage = {
     pl: {
       title: 'Dla sklepów Shopify | Go Top SEO',
       description: 'Po instalacji aplikacji ze Shopify App Store artykuły są pisane i publikowane na blogu sklepu. Analiza znajduje problemy w artykułach i na stronach, a każdą poprawkę zatwierdzają Państwo sami.',
+    },
+    ko: {
+      title: 'Shopify 쇼핑몰용 | Go Top SEO',
+      description: 'Shopify App Store에서 앱을 설치하시면 아티클을 작성해 쇼핑몰 블로그에 게시합니다. 진단이 아티클과 페이지의 문제를 찾아내며, 모든 수정은 고객님이 직접 승인하십니다.',
     },
   },
   content: {
@@ -2737,6 +2920,86 @@ export const SHOPIFY_PAGE: MarketingPage = {
         },
       ],
       cta: { title: 'Proszę zacząć od swojego sklepu', body: pl.closeBody, primary: shopifyInstallCta('Zainstaluj aplikację w Shopify', pl.trial), secondary: pl.check },
+    },
+    ko: {
+      hero: {
+        eyebrow: 'Shopify 쇼핑몰용',
+        eyebrowIcon: Store,
+        title: '쇼핑몰 콘텐츠를 쓰고,',
+        accent: '게시하고, 측정합니다',
+        subtitle: 'Shopify App Store에서 앱을 설치하시면, 시스템이 고객이 실제로 찾는 내용을 다룬 아티클을 써서 쇼핑몰 블로그에 게시하고, 쇼핑몰이 Google과 Google 지도, 그리고 ChatGPT와 Gemini, Google AI의 답변에서 어디에 나오는지 보여 드립니다.',
+        trust: ko.trust,
+        primary: shopifyInstallCta('Shopify에 앱 설치하기', ko.trial),
+        secondary: ko.check,
+        visual: (
+          <WorkListVisual
+            heading="고객님의 Shopify 쇼핑몰"
+            rows={[
+              { title: '블로그에 아티클 게시', detail: '구매 가이드 · 이미지 포함', icon: FileText, done: true, status: '게시됨' },
+              { title: '검색 결과 표시 정보 수정', detail: '', url: '/pages/about', icon: Type, done: true, status: '승인됨' },
+              { title: '아티클 이미지 대체 텍스트', detail: '', url: '/blogs/news', icon: ImageIcon, done: true, status: '승인됨' },
+              { title: '다음 아티클', detail: '월요일 09:00', icon: CalendarClock, done: false, status: '예약됨' },
+            ]}
+          />
+        ),
+      },
+      sections: [
+        {
+          kind: 'callout',
+          icon: Store,
+          title: '설치는 Shopify App Store에서 진행됩니다',
+          body: (
+            <>
+              {'모든 쇼핑몰은 공식 등록 페이지에서 설치하십니다: '}
+              {shopifyAppStoreLink('Shopify App Store의 Go Top SEO')}
+              {'. 클릭 한 번이면 되고, 결제는 Shopify를 통해 이루어지며, 쇼핑몰 코드에 넣어야 할 것은 없습니다.'}
+            </>
+          ),
+        },
+        {
+          kind: 'cards',
+          tone: 'contrast',
+          eyebrow: '시스템이 쇼핑몰에서 하는 일',
+          title: '테마를 건드리지 않고 쓰고, 게시하고, 고칩니다',
+          items: [
+            { icon: Tags, title: '쇼핑몰 블로그의 아티클', body: '모든 아티클은 실제 검색어를 중심으로 구성되며, 이미지와 FAQ 블록, 내부 링크를 갖추고 정하신 시각에 블로그에 올라갑니다.' },
+            { icon: Wrench, title: '고객님이 승인하시는 수정', body: '검색 결과에 보이는 제목과 설명, 이미지 대체 텍스트, 끊어진 링크, FAQ 블록을 아티클과 쇼핑몰 페이지에서 다룹니다. 모든 수정은 저장 전에 보여 드리고 하나씩 승인하시며, 승인 뒤에도 되돌리실 수 있습니다.' },
+            { icon: BarChart3, title: 'Google과 AI에서의 추적', body: 'Google과 Google 지도의 순위, 그리고 ChatGPT와 Gemini, Google AI가 쇼핑몰을 언급하는지 매월 자동으로 점검합니다. 다른 세 서비스는 클릭 한 번으로 추가하실 수 있습니다.' },
+          ],
+        },
+        {
+          kind: 'steps',
+          eyebrow: '시작하는 방법',
+          title: '개발 없이 세 단계',
+          items: [
+            { title: 'App Store에서 설치', body: <>{''}{shopifyAppStoreLink('Go Top SEO 등록 페이지')}{'를 열어 쇼핑몰에 설치를 승인하십시오.'}</> },
+            { title: '시스템이 쇼핑몰을 진단', body: '아티클과 페이지를 읽어, 무엇이 빠져 있고 무엇을 고치면 좋은지 중요한 순서대로 보여 드립니다.' },
+            { title: '콘텐츠와 수정 승인', body: '무엇을 쓸지 고르시고 수정을 하나씩 승인하시면, 블로그 게시는 정하신 일정에 따라 진행됩니다.' },
+          ],
+        },
+        {
+          kind: 'cards',
+          columns: 2,
+          eyebrow: '경계, 작은 글씨 없이',
+          title: '시스템이 쇼핑몰에서 절대 건드리지 않는 것',
+          items: [
+            { icon: ShieldCheck, title: '테마도, 코드도 아닙니다', body: '시스템이 저장하는 곳은 아티클과 쇼핑몰 페이지뿐입니다. 테마와 코드, 설정, 가격, 주문은 건드리지 않습니다.' },
+            { icon: Info, title: '상품과 컬렉션: 보여 드리되 저장하지 않습니다', body: '앱의 상품·컬렉션 접근 권한은 읽기 전용입니다. 그래서 상품 페이지에서 무엇을 고치면 좋은지는 보여 드리되, 수정은 고객님이 Shopify에서 하십니다. 자동 수정을 하려면 앱의 새 버전이 필요합니다.' },
+          ],
+        },
+        {
+          kind: 'faq',
+          eyebrow: '자주 묻는 질문',
+          title: '설치 전에 쇼핑몰에서 많이 묻는 것',
+          items: [
+            { q: '승인 없이 쇼핑몰의 무언가를 바꿉니까?', a: '바꾸지 않습니다. Shopify 쇼핑몰에서는 모든 수정을 저장 전에 보여 드리고 하나씩 승인하시며, 승인한 뒤에도 되돌리실 수 있습니다. 수정의 자동 승인은 WordPress 사이트에만 있습니다.' },
+            { q: '아티클은 어디에 게시됩니까?', a: '다른 아티클과 마찬가지로 쇼핑몰 블로그에 게시됩니다. 모든 아티클은 게시 전에 열어 고치시고 시각을 다시 정하실 수 있습니다.' },
+            { q: '코드나 앱 임베드를 넣어야 합니까?', a: '아닙니다. 설치는 Shopify App Store를 통해 이루어지고, 시스템은 테마를 바꾸지 않고 쇼핑몰과 작동합니다.' },
+            { q: '쇼핑몰의 구조화된 데이터는 어떻습니까?', a: 'Shopify 테마가 이미 일부 구조화된 데이터를 내보내고 있어, 시스템은 거기에 따로 추가하지 않습니다. 저희가 저장하는 구조화된 데이터는 Go Top 플러그인이 설치된 WordPress 사이트에만 있습니다. "사이트 상태" 화면에서는 테마가 이미 다루는 항목을 숨깁니다.' },
+          ],
+        },
+      ],
+      cta: { title: '운영하시는 쇼핑몰에서 시작하십시오', body: ko.closeBody, primary: shopifyInstallCta('Shopify에 앱 설치하기', ko.trial), secondary: ko.check },
     },
   },
 }

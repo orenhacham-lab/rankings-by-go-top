@@ -224,6 +224,22 @@ const ARTICLE_TEXT: Record<SuggestionLanguage, {
     anchorSentence: (link) => ` W tym kontekście ${link} to jedna z najważniejszych opcji, które warto poznać.`,
     phraseSentence: (phrase) => ` W tym kontekście warto bliżej poznać także ${phrase}.`,
   },
+  // Korean DOES take the leading space, unlike Japanese above it: Korean prose
+  // is written with spaces between its phrases, so the sentence joins the
+  // previous one the way the latin-script languages do.
+  //
+  // The particle after the inserted text is 도, and that is the whole reason
+  // this sentence is shaped as it is. Every other Korean particle has two forms
+  // chosen by the final consonant of the word before it — 을/를, 은/는, 이/가 —
+  // and the inserted link or phrase is a keyword we cannot inspect, so any of
+  // those would be ungrammatical for half of all articles. 도 has ONE form and
+  // attaches to anything, Hangul or latin.
+  ko: {
+    toc: '목차',
+    faqHeading: '자주 묻는 질문',
+    anchorSentence: (link) => ` 이 점에서는 ${link}도 꼭 알아 둘 주요 선택지 가운데 하나입니다.`,
+    phraseSentence: (phrase) => ` 이 점에서는 ${phrase}도 함께 확인해 두면 좋습니다.`,
+  },
 }
 
 /** Natural transition words to hand the model, in the language it writes in. */
@@ -238,6 +254,7 @@ const TRANSITION_HINT: Record<SuggestionLanguage, string> = {
   de: 'außerdem, daher, allerdings, zum Beispiel, zusammengefasst',
   nl: 'daarnaast, daarom, echter, bijvoorbeeld, kortom',
   pl: 'poza tym, dlatego, jednak, na przykład, podsumowując',
+  ko: '또한, 그리고, 그러나, 예를 들어, 정리하면',
 }
 
 /** The filler opening to warn the model off, written in the language it writes in. */
@@ -252,6 +269,7 @@ const FILLER_EXAMPLE: Record<SuggestionLanguage, string> = {
   de: 'e.g. "In einer Welt, in der alle nach … suchen"',
   nl: 'e.g. "In een wereld waarin iedereen zoekt naar …"',
   pl: 'e.g. "W świecie, w którym wszyscy szukają…"',
+  ko: 'e.g. "모두가 …를 찾는 시대에…"',
 }
 
 /** Who the article is actually written for. A Spanish article is NOT for Israeli readers. */
@@ -266,6 +284,7 @@ const AUDIENCE_NOTE: Record<SuggestionLanguage, string> = {
   de: 'Write naturally for German-speaking readers in standard German that reads well in Germany, Austria and German-speaking Switzerland alike.',
   nl: 'Write naturally for Dutch-speaking readers in standard Dutch that reads well in the Netherlands and in Flanders alike.',
   pl: 'Write naturally for Polish readers in standard Polish, the register a Polish company website uses.',
+  ko: 'Write naturally for Korean readers in standard business Korean (합니다체), the register a Korean company website uses.',
 }
 
 /** Per-language writing-quality notes. Empty for a language with nothing extra to say. */
@@ -307,6 +326,10 @@ const WRITING_QUALITY_LINES: Record<SuggestionLanguage, string[]> = {
     `- Polish writing quality: address the reader in the third-person courtesy form with "Państwo" ("Państwa strona", "mogą Państwo"), which is how a Polish company writes to a client — NEVER "ty"/"twój", and never an informal imperative aimed at one reader inside the prose; a polite request is "prosimy" + the infinitive ("prosimy sprawdzić"), while a short button label may stay in the bare imperative ("Zaloguj się", "Sprawdź"). Use standard Polish and avoid needless anglicisms where a plain Polish word exists — but KEEP the SEO vocabulary a Polish reader actually searches for: "pozycjonowanie" and "pozycjonowanie stron" for SEO work, "słowa kluczowe" and "analiza słów kluczowych" (never "keywords"/"keyword research"), "pozycje" for rankings, "linki zwrotne" for backlinks, "linkowanie wewnętrzne" for internal links, and "Profil Firmy w Google" for the official product name (a sentence about what people search for may say "wizytówka Google", which is the term they type). VARY sentence and paragraph openings — do not start many consecutive sentences with the same word (avoid over-using "Ponadto", "Z drugiej strony", "Warto pamiętać"); mix openings like "W praktyce", "Dlatego", "W wielu przypadkach", "Warto wiedzieć", "Przy wyborze", "Podsumowując". Prefer clear, practical, promotional SEO writing over poetic language.`,
     `- Polish typography and grammar: keep the diacritics correct (ą, ć, ę, ł, ń, ó, ś, ź, ż) and NEVER transliterate them away, which is the clearest sign of machine-translated Polish. Polish does NOT weld compounds together the way German and Dutch do — write "analiza słów kluczowych" and "optymalizacja stron internetowych", never a single joined word. Decline every word the sentence requires to be declined, including after a preposition and after a number ("dwa artykuły", "pięć artykułów", "o pozycjonowaniu"), and never leave a keyword in the nominative inside a sentence that calls for another case. Use the Polish quotation marks „ … ” for quotations, write figures the Polish way (1 200 zł, a comma for decimals, the currency AFTER the number), and keep brand/product names in their proper original casing (e.g. "Kingsmith WalkingPad X21", "Google Search Console"). Common nouns stay lower case — Polish capitalizes far less than English, so write "strona internetowa", "cena", "oferta" in lower case, and do not capitalize a word in the middle of a heading.`,
   ],
+  ko: [
+    `- Korean writing quality: write in 합니다체 (the formal polite style) and keep it for the WHOLE article — never mix in 해요체, never 반말 (〜야, 〜지, 〜거든), and never switch register between sections. Address the reader impersonally, as a Korean company page does; do NOT repeat 당신 or 여러분 (Korean business writing drops the pronoun), and where the reader must be addressed directly use 고객님 rather than 당신. VARY sentence and paragraph openings — do not begin many consecutive sentences with the same connective (avoid over-using 「또한」, 「그리고」, 「따라서」); mix openings like 「실제로」, 「반면」, 「선택할 때는」, 「대부분의 경우」, 「다음으로」, 「결론적으로」, naturally and NOT in every sentence. Prefer clear, practical, promotional SEO writing over poetic language.`,
+    `- Korean typography and spacing: use ASCII punctuation — the plain period, comma, question mark and parentheses — and NEVER the full-width Japanese forms 。 、 「 」 （ ）, which are the clearest sign of a Japanese template reused for Korean. Korean IS written with spaces (띄어쓰기): keep the spacing correct between a noun and its following dependent noun (「검색 순위」, 「내부 링크」, 「무료 체험」) and attach every particle and ending to the word before it with NO space (「사이트를」, 「구글에서」). Keep the established Korean SEO vocabulary a reader expects: 사이트, 키워드, 검색 순위, 백링크, 내부 링크, 콘텐츠, 플러그인, 대시보드, and 글 for a single article. Write Google's products by their Korean names (「구글 비즈니스 프로필」, 「구글 서치 콘솔」) and keep brand and product names in their proper original casing (e.g. "Kingsmith WalkingPad X21", "Google Search Console"). Use half-width arabic numerals for figures, write them the Korean way (1,200원 — a comma for thousands and the currency AFTER the number), and attach a counter to every count (개, 건, 회, 곳, 일, 자) rather than leaving the bare numeral, because Korean has no plural to mark it with.`,
+  ],
 }
 
 /** Exported for the writing-guidance guards (lib/content/writing-guidance/__qa__). */
@@ -323,6 +346,9 @@ export function buildPrompt(brief: ArticleBrief, opts: GenOpts): string {
   // a spaced word is ~5.5 characters of English and the same content is ~2.2
   // Japanese characters per English word, so the band is expressed in characters
   // for Japanese and left in words for every other language.
+  // KOREAN IS NOT THE SAME CASE, although it is the other CJK language here:
+  // Korean is written WITH spaces, so a Korean article's length is counted in
+  // words like every spaced language's and must not be converted to 자.
   const lengthTarget = brief.language === 'ja'
     ? `${Math.round(wMin * 2.2 / 100) * 100}〜${Math.round(wMax * 2.2 / 100) * 100}文字`
     : `${wMin}–${wMax} words`

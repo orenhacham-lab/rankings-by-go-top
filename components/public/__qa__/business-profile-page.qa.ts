@@ -91,6 +91,7 @@ const LIMIT_TERMS: Record<PublicLocale, RegExp> = {
   de: /erstellt kein Profil/,
   nl: /maakt geen profiel aan/,
   pl: /Nie zakłada profilu/,
+  ko: /프로필을 만들지 않고/,
 }
 
 function statesTheLimit(v: Variant, l: PublicLocale): boolean {

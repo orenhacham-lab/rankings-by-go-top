@@ -45,6 +45,12 @@ const QUESTION_START: Record<SuggestionLanguage, RegExp> = {
   // English counterpart, and "warto" / "mozna" / "trzeba" open the impersonal
   // questions a Polish searcher actually types ("warto kupic...").
   pl: /^(?:co|jak|jaki\w*|jaka|jakie\w*|dlaczego|czemu|kt[óo]r\w+|gdzie|sk[ąa]d|kiedy|kto|kogo|komu|ile|ilu|czy|po\s+co|na\s+co|warto|czy\s+warto|mo[żz]na|trzeba|opłaca)\b/i,
+  // Korean asks at the END of the clause, as Japanese does, and with its own
+  // endings: 「까」「까요」「나요」「인가요」「란」. The leading interrogatives are listed
+  // too, because 「왜…」 and 「어떻게…」 do open a question. No \b anywhere: Hangul
+  // has no word boundary a regex can anchor to, even though Korean prose is
+  // written with spaces.
+  ko: /(?:까|까요|나요|가요|인가요|란|이란|？|\?)\s*$|^(?:왜|어떻게|어떤|어느|어디|언제|누가|누구|무엇|뭐|얼마|몇)/,
 }
 
 /** "best / recommended" words: the question asks for a recommendation. */
@@ -67,6 +73,11 @@ const RECOMMEND: Record<SuggestionLanguage, RegExp> = {
   // "polecenie" in its unrelated sense of an instruction, which costs nothing
   // here because a false positive only picks the recommendation template.
   pl: /\b(?:najleps\w*|polec\w*|rekomend\w*|ranking|top|testowan\w*)\b/i,
+  // No \b, for the same reason as Japanese. 순위 ("ranking") is here because a
+  // Korean comparison query is usually phrased as a ranking, and the latin
+  // 'best'/'top' are here because Korean borrows them and prints them in latin
+  // letters inside an otherwise Korean query.
+  ko: /(?:추천|최고|베스트|인기|순위|가장\s*좋은|best|top)/i,
 }
 
 /** A keyword that already names the act of buying ("buying X", "buy X"). */
@@ -95,6 +106,11 @@ const BUY: Record<SuggestionLanguage, RegExp> = {
   // laptopa", "kupno mieszkania", "kupic laptopa". The noun that follows is in
   // the genitive, which is why nothing here tries to rebuild the phrase.
   pl: /^(?:kupi[ćc]|kupno|zakup\w*|zam[óo]wi[ćc]|zam[óo]wienie|wynaj[ąa][ćc]|wynajem|wypo[żz]yczy[ćc]|montaż|instalacja)\s/i,
+  // Korean names the act of buying as a SUFFIX on the noun (노트북 구매, 호텔 예약),
+  // never as a word before it, so this is anchored at the end where Hebrew,
+  // Spanish and Polish are anchored at the start. 가입 is included because a
+  // Korean query for a subscription is phrased as joining it.
+  ko: /(?:구매|구입|주문|예약|렌탈|대여|신청|가입)\s*$/,
 }
 
 const TEMPLATES: Record<SuggestionLanguage, { recommend: (k: string) => string; buy: (k: string) => string; general: (k: string) => string }> = {
@@ -156,6 +172,23 @@ const TEMPLATES: Record<SuggestionLanguage, { recommend: (k: string) => string; 
     recommend: (k) => `${k}: co warto wybrać?`,
     buy: (k) => `${k}: na co zwrócić uwagę przed zakupem?`,
     general: (k) => `${k}: co warto wiedzieć?`,
+  },
+  // Korean is the Polish case for a different grammatical reason, and it is the
+  // reason the keyword is NOT dropped into a sentence here. A Korean object
+  // particle is chosen by the final consonant of the word before it — 을 after
+  // a closed syllable, 를 after an open one — so `${k}를 찾고 있습니다` is
+  // ungrammatical for half of all keywords. The rule is computable for Hangul
+  // (the jongseong of the last syllable), but these keywords are measured ones
+  // and a third of them END IN LATIN LETTERS (구글 seo, seo google), where the
+  // particle follows the PRONUNCIATION of the loanword and no codepoint
+  // arithmetic reaches it. So the keyword stays untouched before a colon, which
+  // is how a Korean search query is typed anyway, and the question after the
+  // colon carries the whole grammar. The endings are the polite 하나요/까요 a
+  // person actually types into an assistant, not the dashboard's 합니다체.
+  ko: {
+    recommend: (k) => `${k}: 어떤 것을 고르면 좋을까요?`,
+    buy: (k) => `${k}: 구매하기 전에 무엇을 확인해야 하나요?`,
+    general: (k) => `${k}: 무엇을 알아 두어야 하나요?`,
   },
 }
 

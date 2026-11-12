@@ -217,6 +217,7 @@ export const es = {
     de: 'Deutsch',
     nl: 'Nederlands',
     pl: 'Polski',
+    ko: '한국어',
     aria: 'Cambiar el idioma del sitio',
   },
   cookie: {

@@ -101,6 +101,16 @@ export const COMPARE_COMMON: Record<PublicLocale, CompareCommon> = {
       `${c} to dobry produkt i dla części firm jest właściwym wyborem. Ta strona nie twierdzi niczego przeciwnego. Pokazuje, gdzie leżą mocne strony każdego z nich, żeby widać było, co pasuje do Państwa.`,
     seeAll: 'Wszystkie porównania',
   },
+  ko: {
+    column: '무엇을 비교하는가',
+    ours: 'Go Top SEO',
+    tableCaption: (c) => `Go Top SEO와 ${c} 비교`,
+    checkedOn: (c, date) =>
+      `${c} 열은 ${c}가 자기 사이트에 적어 둔 내용을 ${date}에 읽어 정리한 것입니다. 회사는 가격과 기능을 바꿉니다. 여기 적힌 것이 더 이상 맞지 않는다면 아래 링크가 출처이니 직접 확인해 보시기 바랍니다.`,
+    fairness: (c) =>
+      `${c}는 좋은 제품이고, 어떤 회사에게는 그쪽이 맞는 선택입니다. 이 페이지는 그 반대를 주장하지 않습니다. 각자의 강점이 어디에 있는지 보여 드려서, 무엇이 내게 맞는지 판단하실 수 있게 하는 것이 목적입니다.`,
+    seeAll: '전체 비교 보기',
+  },
   nl: {
     column: 'Wat wij vergelijken',
     ours: 'Go Top SEO',

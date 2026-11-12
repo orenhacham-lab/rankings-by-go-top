@@ -172,6 +172,12 @@ function main() {
   // what proves the scaled floor did not simply switch the check off for ja.
   check('MUTATION CONTROL: a one-line Japanese nod is caught',
     wordCount('こちらも良い製品です。') < maxPhraseWords('こちらも良い製品です。', 60))
+  // And in Korean, which is NOT scaled: Korean is written with spaces, and a
+  // Korean paragraph segments coarser than the English one that says the same
+  // thing (0.87 tokens per English word, measured on these seven pages), so the
+  // floor it is held to is the plain 60. The one-line nod must still fail it.
+  check('MUTATION CONTROL: a one-line Korean nod is caught, against an unscaled floor',
+    maxPhraseWords('이 제품도 좋습니다.', 60) === 60 && wordCount('이 제품도 좋습니다.') < 60)
 
   console.log('\nE) no outbound link is dofollow, and no URL hides in the copy')
   /** The attributes of every `<a …>` a file opens. */

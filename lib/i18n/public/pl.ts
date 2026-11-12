@@ -248,6 +248,7 @@ export const pl = {
     de: 'Deutsch',
     nl: 'Nederlands',
     pl: 'Polski',
+    ko: '한국어',
     aria: 'Zmień język witryny',
   },
   cookie: {

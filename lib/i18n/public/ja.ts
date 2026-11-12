@@ -235,6 +235,7 @@ export const ja = {
     de: 'Deutsch',
     nl: 'Nederlands',
     pl: 'Polski',
+    ko: '한국어',
     aria: 'サイトの言語を切り替える',
   },
   cookie: {

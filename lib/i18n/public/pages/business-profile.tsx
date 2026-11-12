@@ -62,6 +62,7 @@ const ja = FEATURE_COMMON.ja
 const de = FEATURE_COMMON.de
 const nl = FEATURE_COMMON.nl
 const pl = FEATURE_COMMON.pl
+const ko = FEATURE_COMMON.ko
 
 export const BUSINESS_PROFILE_PAGE: MarketingPage = {
   path: '/features/google-business-profile',
@@ -105,6 +106,10 @@ export const BUSINESS_PROFILE_PAGE: MarketingPage = {
     pl: {
       title: 'Profil Firmy w Google (Google My Business) | Go Top SEO',
       description: 'Profil Firmy w Google to pierwsze, co widzi klient, jeszcze przed wejściem na stronę. System śledzi pozycję w Mapach, publikuje nowości ze zdjęciem i przyciskiem oraz przygotowuje odpowiedź na każdą opinię, w jednym miejscu.',
+    },
+    ko: {
+      title: '구글 비즈니스 프로필(Google My Business) | Go Top SEO',
+      description: '구글 비즈니스 프로필은 고객이 사이트에 들어오기 전에 보는 화면입니다. 지도에서의 순위를 매월 기록하고, 사진과 버튼이 있는 게시물을 올리고, 모든 리뷰의 답변 초안을 한곳에서 준비합니다.',
     },
   },
   content: {
@@ -1026,6 +1031,98 @@ export const BUSINESS_PROFILE_PAGE: MarketingPage = {
         body: pl.closeBody,
         primary: pl.check,
         secondary: pl.trial,
+      },
+    },
+    ko: {
+      hero: {
+        eyebrow: '구글 비즈니스 프로필',
+        eyebrowIcon: Building2,
+        title: '구글 비즈니스 프로필은',
+        accent: '검색에서 보이는 업체의 얼굴입니다',
+        subtitle: '구글 비즈니스 프로필(옛 이름 Google My Business)은 누군가 사이트에 들어오기 전에 지도와 검색에서 먼저 보는 화면입니다. 업체 이름, 별점, 리뷰, 사진, 소식이 거기에 있습니다. 서비스는 지도에서의 순위를 기록하고, 사진과 버튼이 있는 게시물을 프로필에 올리고, 모든 리뷰의 답변 초안을 준비합니다. 사이트의 글을 쓰는 바로 그 화면에서 함께 합니다.',
+        trust: ko.trust,
+        primary: ko.check,
+        secondary: ko.trial,
+        visual: (
+          <MapsVisual
+            positionLabel="업체 순위"
+            position="3"
+            positionSub="서울 강남, 「치과」"
+            changeLabel="이번 달"
+            change="2"
+            changeSub="계단 상승"
+            reviewsLabel="개 리뷰"
+            rows={[
+              { rank: 1, name: '강남역 치과', stars: 4.8, reviews: 212 },
+              { rank: 2, name: '서울 화이트 치과', stars: 4.6, reviews: 174 },
+              { rank: 3, name: '고객님의 업체', stars: 4.7, reviews: 131, highlight: true },
+              { rank: 4, name: '논현 미소 치과', stars: 4.4, reviews: 98 },
+            ]}
+          />
+        ),
+      },
+      sections: [
+        {
+          kind: 'cards',
+          tone: 'contrast',
+          eyebrow: '왜 프로필인가',
+          title: '결정은 지도에서 납니다, 사이트에서가 아니라',
+          intro: '근처에서 고객님 같은 업체를 찾는 사람은 지도 위에 뜨는 몇 곳을 먼저 봅니다. 전화도, 길찾기도, 사이트 열기도 거기에서 시작됩니다.',
+          items: [
+            { icon: Phone, title: '전화가 프로필에서 걸립니다', body: '지도의 결과에서 한 번 눌러 전화를 걸고, 길찾기를 켜고, 사이트를 엽니다. 사이트의 어느 페이지도 읽지 않은 채로 그렇게 되는 일도 적지 않습니다.' },
+            { icon: Users, title: '자리는 적고 업체는 많습니다', body: '구글은 지도 위에 몇 곳만 보여 줍니다. 그 안에 들어가는지가 지역 검색의 전부입니다.' },
+            { icon: Star, title: '리뷰가 가장 먼저 읽힙니다', body: '별점과 리뷰 수가 업체 이름 옆에, 다른 모든 것보다 앞에 놓입니다. 답변 없는 리뷰는 그대로 남습니다.' },
+          ],
+        },
+        {
+          kind: 'steps',
+          eyebrow: '어떻게 되는지',
+          title: '한 번의 연결에서, 말을 하는 프로필까지',
+          items: [
+            { title: '프로필은 한 번 연결합니다', body: '프로필을 관리하시는 구글 계정으로 로그인하시고 구글 화면에서 승인하십니다. 권한은 프로필 관리에만 쓰이고, 이 연결은 Search Console 연결과 별개입니다. 언제든 해제하실 수 있습니다.' },
+            { title: '업체를 고르십니다', body: '서비스가 고객님 계정이 관리하는 업체를 불러오고, 이 프로젝트가 작업할 업체를 고객님이 고르십니다.' },
+            { title: '게시물을 올리고 답변합니다', body: '게시물은 서비스가 사이트에 발행한 글에서, 적어 주신 주제에서, 또는 처음부터 씁니다. 초안이 준비된 채로 기다리고, 읽지 않으신 것이 발행되는 일은 없습니다. 리뷰는 답변 초안과 함께 도착하며, 초안은 리뷰가 쓰인 언어로 씁니다.' },
+            { title: '순위를 매월 기록합니다', body: '키워드마다, 지역마다 지도에서의 자리, 고객님보다 앞에 있는 업체, 그리고 그 자리가 시간에 따라 어떻게 움직였는지입니다.' },
+          ],
+        },
+        {
+          kind: 'cards',
+          eyebrow: '무엇이 들어 있는지',
+          title: '프로필과 지도가 한 시스템에',
+          columns: 3,
+          items: [
+            { icon: MapPin, title: '지도에서의 자리', body: '키워드별, 지역별 순위입니다. 도시로도, 지도의 한 점으로도 볼 수 있습니다.' },
+            { icon: Users, title: '앞에 있는 업체', body: '위의 자리를 차지한 업체와 그 별점, 리뷰 수입니다.' },
+            { icon: ImagePlus, title: '사진과 버튼이 있는 게시물', body: '구글이 보여 주는 비율로 자른 사진과, 구글의 버튼 가운데 하나입니다. 예약, 주문, 가입, 자세히 보기, 또는 프로필의 번호로 전화하기입니다.' },
+            { icon: Repeat, title: '자동 발행', body: '기본값은 꺼져 있고 프로젝트마다 정합니다. 켜 두시면 서비스가 사이트에 발행하는 글이 사진과 버튼이 있는 게시물로 프로필에도 올라가며, 같은 글이 두 번 올라가지는 않습니다.' },
+            { icon: MessageSquareText, title: '모든 리뷰에 준비된 답변', body: '리뷰는 구글에서 그때그때 읽고 회사에 저장하지 않습니다. 답변이 없는 리뷰는 표시되고, 답변은 리뷰의 언어로 씁니다. 고치셔서 보내시거나 지우십니다.' },
+            { icon: BarChart3, title: '월간 보고서 안에', body: '지도에서의 순위가 고객이나 파트너에게 보내실 수 있는 보고서에, 나머지 데이터와 나란히 들어갑니다.' },
+          ],
+        },
+        {
+          kind: 'callout',
+          icon: Info,
+          title: '서비스가 하지 않는 일',
+          body: '프로필을 만들지 않고 구글의 인증을 대신 받지도 않습니다. 그것은 여기에 연결하시는 고객님 자신의 구글 계정에서 일어납니다. 프로필의 영업시간, 주소, 전화번호는 서비스가 결코 바꾸지 않습니다. 자동 발행을 직접 켜 두신 경우가 아니면 어떤 게시물도 어떤 답변도 고객님의 승인 없이 나가지 않습니다. Go Top SEO는 구글과 제휴하거나 보증받은 관계가 아니며, 구글의 제품 이름은 작업이 어디로 가는지 말하기 위해서만 쓰입니다.',
+        },
+        {
+          kind: 'faq',
+          eyebrow: '질문',
+          title: '구글 비즈니스 프로필, 쉬운 말로',
+          items: [
+            { q: 'Google My Business와 같은 것입니까?', a: '같은 것입니다. 구글이 Google My Business의 이름을 구글 비즈니스 프로필로 바꾸고 따로 있던 관리 앱을 닫았습니다. 지금은 검색과 지도에서, 또는 이 서비스가 쓰는 연결로 프로필을 관리합니다. 옛 이름으로 찾으시는 분이 아직 많습니다.' },
+            { q: '사이트가 없어도 프로필이 의미가 있습니까?', a: '있습니다. 프로필은 그 자체로 검색되고, 게시물과 리뷰 답변은 사이트 없이도 작동합니다. 다만 사이트가 있으면 게시물의 버튼이 갈 곳이 있고, 서비스가 쓰는 글이 프로필에 말할 거리를 줍니다.' },
+            { q: '서비스가 프로필을 대신 만들어 줍니까?', a: '아닙니다. 프로필의 생성과 인증은 고객님 자신의 구글 계정에서 이루어지고, 그 계정을 여기에 연결하십니다. 서비스는 이미 고객님의 것이 된 프로필에서 일합니다.' },
+            { q: '프로필이 보이게 하는 데 실제로 무엇이 도움이 됩니까?', a: '구글 밖의 누구도 가중치를 알지 못하고, 순위를 약속하는 사람은 짐작하는 것입니다. 알려진 것은 이만큼입니다. 빠짐없고 사실에 맞는 프로필, 그 안의 활동, 그리고 누군가 답하는 리뷰입니다. 서비스는 순위를 재서, 고객님의 작업이 무엇을 바꾸었는지 짐작하지 않고 보실 수 있게 합니다.' },
+            { q: '게시물은 어떤 언어로 쓰입니까?', a: '프로젝트의 언어로, 서비스가 일하는 모든 언어에서 씁니다. 리뷰에는 그 리뷰가 쓰인 언어로 답변합니다. 발행 전에 모든 단어를 고치실 수 있습니다.' },
+          ],
+        },
+      ],
+      cta: {
+        title: '지도에서 고객님의 업체가 어디에 있는지 확인해 보십시오',
+        body: ko.closeBody,
+        primary: ko.check,
+        secondary: ko.trial,
       },
     },
   },

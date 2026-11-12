@@ -30,6 +30,7 @@ export const SHARED_UI: Record<PublicLocale, SharedUiCopy> = {
   de: { noticeMore: '{n} weitere', close: 'Schließen' },
   nl: { noticeMore: 'nog {n}', close: 'Sluiten' },
   pl: { noticeMore: 'jeszcze {n}', close: 'Zamknij' },
+  ko: { noticeMore: '{n}개 더', close: '닫기' },
 }
 
 export function sharedUiCopy(locale: PublicLocale): SharedUiCopy {

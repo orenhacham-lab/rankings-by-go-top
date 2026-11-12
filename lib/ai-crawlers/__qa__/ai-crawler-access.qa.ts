@@ -234,7 +234,7 @@ function main() {
     const everyString = PUBLIC_LOCALES.flatMap((l) => strings(aiCrawlerCopy(l)).map((s) => s.text))
     check('E6: no percentage is claimed anywhere', !everyString.some((t) => /\d\s?%/.test(t)))
     check('E7: the trial is stated as 7 days with no card, or not at all',
-      everyString.filter((t) => /\b(7|siete|sete|sept|sieben|שבוע)\b/i.test(t)).every((t) => /card|tarjeta|cartão|carte|carta|karte|karty|אשראי|カード/i.test(t)))
+      everyString.filter((t) => /\b(7|siete|sete|sept|sieben|שבוע)\b/i.test(t)).every((t) => /card|tarjeta|cartão|carte|carta|karte|karty|אשראי|カード|카드/i.test(t)))
     // THE MEASUREMENT COPY. Its figures live in blocking-measurement.ts and are
     // substituted at render time, so no locale can carry a stale number and the
     // ten translations cannot disagree about what was measured.

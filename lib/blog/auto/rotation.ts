@@ -49,19 +49,30 @@
  * duty of that same Act, which /pl/dane-firmy answers — not the e-services act,
  * whose country-of-origin rule does not reach a provider seated outside the EU.
  *
- * THE ORDER OF THIS LIST IS LOAD-BEARING, and Polish is last on purpose.
- * lib/blog/auto/daily-window.ts writes at most one language per cron run and
- * walks this list in order, inside a six-hour window of twenty-four runs. Ten
- * languages publishing first time need ten of them; the rest is reserve for a
- * language that fails the quality gate and retries (on 17 Oct Spanish needed
- * three passes). Adding a language therefore spends reserve — with ten
- * languages the window keeps fourteen runs of it — and the language that pays
- * for a bad morning is the LAST one here. Putting Polish last is what keeps a
- * new language from ever costing an existing one its article.
+ * `ko` joined on 12 Nov 2026, written for SOUTH KOREA alone: the public tree is
+ * /ko, the keyword research runs on the Korean market, and the legal pages
+ * behind it are written to Korean law — 전자상거래법 rather than any European
+ * directive, which above all means the SEVEN-day right of withdrawal of art.
+ * 17(1) and never the fourteen days the European documents state. Korean was
+ * chosen over Swedish and Greek on measured Keyword Planner volume (Addendum 8
+ * of growth/next-language.md), and it waited on the legal thread's ruling of
+ * 12 Nov 2026 that Creem is the merchant of record for Korea.
  *
- * Fourteen runs of reserve for ten languages is the narrowest this has been
- * since the window was widened; an eleventh language should come with the
- * seventh hour rather than after it.
+ * THE ORDER OF THIS LIST IS LOAD-BEARING, and Korean is last on purpose.
+ * lib/blog/auto/daily-window.ts writes at most one language per cron run and
+ * walks this list hungriest-first, inside a window of four runs an hour. Eleven
+ * languages publishing first time need eleven of them; the rest is reserve for a
+ * language that fails the quality gate and retries (on 17 Oct Spanish needed
+ * three passes). Adding a language therefore spends reserve, and the language
+ * that pays for a bad morning is the LAST one here. Putting Korean last is what
+ * keeps a new language from ever costing an existing one its article.
+ *
+ * Fourteen runs of reserve for ten languages was the narrowest this had been
+ * since the window was widened, and the note here said an eleventh language
+ * should come with the seventh hour rather than after it. Korean is that
+ * eleventh language and the seventh hour came with it: the window is now
+ * 04:00-10:59 UTC, twenty-eight runs, seventeen of reserve
+ * (lib/blog/auto/window-hours.ts).
  *
  * Pure: no I/O. `localesForDay()` reads the public-language flags, which Next
  * inlines at build time, and nothing else.
@@ -69,7 +80,7 @@
 import { publicLocaleEnabled } from '@/lib/i18n/locales'
 
 /** The languages this runner can write. A subset of PUBLIC_LOCALES. */
-export const BLOG_AUTO_LOCALES = ['he', 'en', 'es', 'pt-BR', 'fr', 'it', 'ja', 'de', 'nl', 'pl'] as const
+export const BLOG_AUTO_LOCALES = ['he', 'en', 'es', 'pt-BR', 'fr', 'it', 'ja', 'de', 'nl', 'pl', 'ko'] as const
 export type BlogAutoLocale = (typeof BLOG_AUTO_LOCALES)[number]
 
 export function isBlogAutoLocale(value: unknown): value is BlogAutoLocale {
@@ -84,7 +95,8 @@ export function isBlogAutoLocale(value: unknown): value is BlogAutoLocale {
  * flips (lib/i18n/german-site.ts for German), so an article written today would
  * be written for nobody; and `articles.locale` and `blog_plan.locale` do not
  * accept the code until its migration runs (20261030120000_locale_ja.sql for
- * Japanese, 20261104120000_locale_de.sql for German), so the write would fail in
+ * Japanese, 20261104120000_locale_de.sql for German,
+ * 20261112050000_locale_ko.sql for Korean), so the write would fail in
  * the database rather than in a place anyone would look. A language therefore
  * starts publishing on the deploy that turns it on, which is the same moment its
  * pages become readable.
@@ -95,5 +107,5 @@ export function localesForDay(): readonly BlogAutoLocale[] {
 
 /** How many articles a week each language gets — the queue's refill target reads this. */
 export function weeklyShare(): Record<BlogAutoLocale, number> {
-  return { he: 7, en: 7, es: 7, 'pt-BR': 7, fr: 7, it: 7, ja: 7, de: 7, nl: 7, pl: 7 }
+  return { he: 7, en: 7, es: 7, 'pt-BR': 7, fr: 7, it: 7, ja: 7, de: 7, nl: 7, pl: 7, ko: 7 }
 }

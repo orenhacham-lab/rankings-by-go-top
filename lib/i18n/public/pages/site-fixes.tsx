@@ -20,6 +20,7 @@ const ja = FEATURE_COMMON.ja
 const de = FEATURE_COMMON.de
 const nl = FEATURE_COMMON.nl
 const pl = FEATURE_COMMON.pl
+const ko = FEATURE_COMMON.ko
 
 export const SITE_FIXES_PAGE: MarketingPage = {
   path: '/features/site-health-fixes',
@@ -63,6 +64,10 @@ export const SITE_FIXES_PAGE: MarketingPage = {
     pl: {
       title: 'Poprawki na stronie | Go Top SEO',
       description: 'Analiza, która znajduje to, co zatrzymuje stronę w Google i w usługach AI: tytuły, opisy, teksty alternatywne, zepsute linki i więcej. Na WordPressie każda poprawka to jedno kliknięcie po zatwierdzeniu i można ją cofnąć.',
+    },
+    ko: {
+      title: '사이트 수정 | Go Top SEO',
+      description: 'Google과 AI 서비스에서 사이트를 가로막는 요소를 찾아내는 진단입니다. 제목, 메타 설명, 대체 텍스트, 끊어진 링크 등을 다룹니다. WordPress에서는 승인하신 뒤 클릭 한 번으로 수정되며 되돌릴 수도 있습니다.',
     },
   },
   content: {
@@ -758,6 +763,75 @@ export const SITE_FIXES_PAGE: MarketingPage = {
         },
       ],
       cta: { title: 'Proszę sprawdzić, co zatrzymuje Państwa stronę', body: pl.closeBody, primary: pl.check, secondary: pl.trial },
+    },
+    ko: {
+      hero: {
+        eyebrow: '사이트 수정',
+        eyebrowIcon: Wrench,
+        title: '사이트를 가로막는 것을',
+        accent: '승인하신 뒤 고칩니다',
+        subtitle: '시스템이 사이트를 점검해 빠졌거나 너무 긴 제목, 빠진 메타 설명, 대체 텍스트가 없는 이미지, 끊어진 링크, Google이나 AI 서비스에 막혀 있는 페이지를 찾아냅니다. 연결된 WordPress 사이트에서는 무엇이 어떻게 바뀌는지 정확히 보신 다음, 대부분의 수정을 클릭 한 번으로 적용하실 수 있습니다.',
+        trust: ko.trust,
+        primary: ko.check,
+        secondary: ko.trial,
+        visual: (
+          <WorkListVisual
+            heading="사이트 수정"
+            rows={[
+              { title: '제목이 너무 깁니다', detail: '', url: '/services/aircon-install', icon: Type, done: true, status: '수정됨' },
+              { title: '대체 텍스트가 없는 이미지', detail: '이미지 4개', url: '/blog/aircon-guide', icon: ImageIcon, done: true, status: '수정됨' },
+              { title: '끊어진 링크', detail: '', url: '/about', icon: Link2, done: false, status: '승인 대기' },
+              { title: '메타 설명이 없습니다', detail: '', url: '/contact', icon: FileSearch, done: false, status: '승인 대기' },
+            ]}
+          />
+        ),
+      },
+      sections: [
+        {
+          kind: 'cards',
+          tone: 'contrast',
+          eyebrow: '왜 중요한가',
+          title: '스스로 발목을 잡는 사이트에서는 좋은 콘텐츠도 힘을 못 씁니다',
+          intro: '검색 결과에서 잘린 제목, Google이 읽을 수 없는 이미지, 오류 페이지로 끝나는 링크. 하나하나는 작습니다. 그러나 함께 쌓이면 사이트를 끌어내립니다.',
+          items: [
+            { icon: ScanSearch, title: '무엇이 막고 있는지 보입니다', body: '문제마다 그것이 나타나는 페이지가 함께 나열되며, 중요한 순서대로 정렬됩니다.' },
+            { icon: ShieldCheck, title: '고객님 없이는 아무것도 바뀌지 않습니다', body: '수정마다 미리보기가 붙습니다. 지금 사이트에 있는 값과 대신 들어갈 값을 나란히 보여 드립니다.' },
+            { icon: RotateCcw, title: '언제든 되돌릴 수 있습니다', body: '시스템이 적용한 수정은 이전 값을 보관하므로 되돌리실 수 있습니다.' },
+          ],
+        },
+        {
+          kind: 'steps',
+          eyebrow: '진행 방식',
+          title: '진단에서 고쳐진 사이트까지',
+          items: [
+            { title: '사이트 점검', body: '시스템이 페이지를 돌며 문제 목록을 중요한 순서대로 정리해 돌려 드립니다.' },
+            { title: '제안 미리보기', body: '문제마다 제안된 수정이 붙고, 현재 값과 새 값을 나란히 보여 드립니다.' },
+            { title: '승인', body: '연결된 WordPress 사이트, 그리고 연결된 Shopify 쇼핑몰의 아티클과 페이지에서는 수정이 사이트에 저장됩니다. 그 외의 경우에는 단계별 안내를 드립니다.' },
+          ],
+        },
+        {
+          kind: 'cards',
+          eyebrow: 'WordPress에서 고치는 항목',
+          title: '시스템이 직접 적용하는 수정',
+          items: [
+            { icon: Type, title: 'SEO 제목', body: '빠졌거나 너무 짧거나 너무 긴 제목을 다시 씁니다. Yoast나 Rank Math를 쓰시는 경우 해당 플러그인의 필드에 저장됩니다.' },
+            { icon: FileSearch, title: '메타 설명', body: '빠진 설명이나 길이가 맞지 않는 설명을 다룹니다. Go Top 플러그인을 통해 사이트의 SEO 플러그인에 저장됩니다.' },
+            { icon: ImageIcon, title: '이미지 대체 텍스트', body: '본문 이미지 중 대체 텍스트가 없는 것에만 넣습니다. 나머지 이미지는 건드리지 않습니다.' },
+            { icon: Link2, title: '링크', body: '끊어진 링크를 교체하거나 제거하고, 서로 관련된 페이지 사이에 내부 링크를 추가합니다.' },
+            { icon: Heading1, title: '대표 제목', body: 'H1이 둘 이상인 페이지는 Go Top 플러그인을 통해 대표 제목 하나만 남깁니다.' },
+            { icon: Code2, title: 'FAQ와 llms.txt', body: '페이지의 FAQ 블록, 그리고 AI 서비스에 사이트를 설명하는 llms.txt 파일을 Go Top 플러그인을 통해 다룹니다.' },
+          ],
+        },
+        {
+          kind: 'callout',
+          icon: Info,
+          title: 'Shopify와 그 밖의 플랫폼에서는',
+          body: (
+            <p>진단은 모든 사이트에서 작동합니다. 연결된 Shopify 쇼핑몰에서는 승인하신 뒤 블로그 아티클과 쇼핑몰 페이지를 고칩니다. Google이 보여 주는 제목과 설명, 이미지 대체 텍스트, 끊어진 링크, FAQ 블록, 중복된 대표 제목이 대상입니다. 여기서도 모든 수정은 되돌리실 수 있습니다. 상품, 컬렉션, 쇼핑몰 설정은 절대 변경하지 않습니다. Wix와 그 밖의 플랫폼에서는 시스템이 사이트에 아무것도 저장하지 않고, 문제마다 직접 고치시는 방법을 짧게 안내해 드립니다.</p>
+          ),
+        },
+      ],
+      cta: { title: '무엇이 사이트를 가로막고 있는지 확인해 보십시오', body: ko.closeBody, primary: ko.check, secondary: ko.trial },
     },
   },
 }

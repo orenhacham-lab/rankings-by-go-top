@@ -14,9 +14,9 @@
  * site can be managed from a Hebrew dashboard, and currency follows the country.
  */
 
-export type ContentLanguage = 'he' | 'en' | 'es' | 'pt-BR' | 'fr' | 'it' | 'ja' | 'de' | 'nl' | 'pl'
+export type ContentLanguage = 'he' | 'en' | 'es' | 'pt-BR' | 'fr' | 'it' | 'ja' | 'de' | 'nl' | 'pl' | 'ko'
 
-export const CONTENT_LANGUAGES: ContentLanguage[] = ['he', 'en', 'es', 'pt-BR', 'fr', 'it', 'ja', 'de', 'nl', 'pl']
+export const CONTENT_LANGUAGES: ContentLanguage[] = ['he', 'en', 'es', 'pt-BR', 'fr', 'it', 'ja', 'de', 'nl', 'pl', 'ko']
 
 export const DEFAULT_CONTENT_LANGUAGE: ContentLanguage = 'he'
 
@@ -70,6 +70,18 @@ export const DEFAULT_CONTENT_LANGUAGE: ContentLanguage = 'he'
  * test order matters here as it does for Dutch: 'pl' is checked after 'pt', so
  * Brazilian Portuguese is never swallowed by it, and no accepted Polish
  * spelling is a prefix of any earlier language's.
+ *
+ * Korean is region-less because the language has one market we sell in: 'ko',
+ * 'ko-KR' and the Korean spelling '한국' all answer the one content language.
+ * 'ko-KP' answers it too, and that is the honest reading rather than a decision
+ * — it is not a market, and the alternative for such a value is a Hebrew
+ * article. Korean is the SECOND content language whose script is neither Hebrew
+ * nor latin, and it is NOT the second unspaced one: Korean prose puts spaces
+ * between its phrases (띄어쓰기), so nothing here routes through
+ * lib/text/segment.ts the way Japanese does. What it shares with Japanese is
+ * that latin words are ORDINARY inside its prose — SEO and Google are written
+ * in latin letters in a Korean sentence — so it answers its own script rather
+ * than 'latin', and the invented-brand-name rule is inert for it.
  */
 export function normalizeContentLanguage(value: unknown): ContentLanguage {
   const s = String(value ?? '').toLowerCase().trim()
@@ -82,6 +94,10 @@ export function normalizeContentLanguage(value: unknown): ContentLanguage {
   if (s.startsWith('ja') || s.startsWith('jp') || s.startsWith('japan') || s.startsWith('日本')) return 'ja'
   if (s.startsWith('de') || s.startsWith('ger') || s.startsWith('deutsch')) return 'de'
   if (s.startsWith('pl') || s.startsWith('pol') || s.startsWith('polski')) return 'pl'
+  // After 'ko' there is nothing it could swallow, and nothing above it starts
+  // with 'ko'. '한국' is what a Korean WordPress install or a Korean-language
+  // form sends; without it that row would have answered Hebrew.
+  if (s.startsWith('ko') || s.startsWith('한국')) return 'ko'
   if (s.startsWith('nl') || s.startsWith('dutch') || s.startsWith('nederland') || s.startsWith('vlaams') || s.startsWith('flemish')) return 'nl'
   return DEFAULT_CONTENT_LANGUAGE
 }
@@ -98,6 +114,7 @@ const ENGLISH_NAME: Record<ContentLanguage, string> = {
   de: 'German',
   nl: 'Dutch',
   pl: 'Polish',
+  ko: 'Korean',
 }
 
 export function languageNameInEnglish(language: ContentLanguage): string {
@@ -115,18 +132,35 @@ export function contentDirection(language: ContentLanguage): 'rtl' | 'ltr' {
  * every other content language, where the same rule would flag every ordinary
  * word.
  *
+ * KOREAN answers 'korean' for the same reason Japanese answers 'japanese', and
+ * it is a separate answer rather than a reuse of it because the two share no
+ * characters: a Japanese article is recognised by kana and kanji, a Korean one
+ * by Hangul, and a check that accepted either would pass a Japanese article
+ * returned for a Korean order. Korean is NOT unspaced, so it is 'korean' here
+ * and false in `isUnspacedLanguage`.
+ *
  * Japanese answers 'japanese', not 'latin': a latin token inside Japanese prose
  * is ordinary (SEO, Google, Core Web Vitals are written in latin letters even in
  * a Japanese sentence), so the invented-brand-name rule must not fire on it, and
  * the language check that asks whether an article came back in the language it
  * was ordered in has to look for kana rather than for latin letters.
  */
-export function contentScript(language: ContentLanguage): 'hebrew' | 'latin' | 'japanese' {
+export function contentScript(language: ContentLanguage): 'hebrew' | 'latin' | 'japanese' | 'korean' {
   if (language === 'he') return 'hebrew'
-  return language === 'ja' ? 'japanese' : 'latin'
+  if (language === 'ja') return 'japanese'
+  return language === 'ko' ? 'korean' : 'latin'
 }
 
-/** Is this language written without spaces between its words? */
+/**
+ * Is this language written without spaces between its words?
+ *
+ * Japanese only. KOREAN IS NOT, and that is the one thing most likely to be got
+ * wrong about it here: it is a CJK script and it is written with spaces between
+ * its phrases, so a Korean keyword's word count, its cannibalization word set
+ * and its internal-link overlap are all a space split, exactly as they are for
+ * German. `textScript` in lib/text/segment.ts answers 'ko' for Korean text, and
+ * it is 'spaced' that behaves like Korean, not 'ja'.
+ */
 export function isUnspacedLanguage(language: ContentLanguage): boolean {
   return language === 'ja'
 }

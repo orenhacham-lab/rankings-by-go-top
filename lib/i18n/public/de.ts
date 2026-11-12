@@ -229,6 +229,7 @@ export const de = {
     de: 'Deutsch',
     nl: 'Nederlands',
     pl: 'Polski',
+    ko: '한국어',
     aria: 'Sprache der Website wechseln',
   },
   cookie: {

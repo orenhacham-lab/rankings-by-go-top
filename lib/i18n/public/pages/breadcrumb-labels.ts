@@ -22,4 +22,5 @@ export const ABOUT_BREADCRUMB: Record<PublicLocale, string> = {
   de: 'Über uns',
   nl: 'Over ons',
   pl: 'O nas',
+  ko: '회사 소개',
 }

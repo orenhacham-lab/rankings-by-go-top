@@ -31,12 +31,12 @@
  * to get past the truth limits — took four passes in a row while eight untried
  * languages waited.
  *
- * Production only, and only in WINDOW_HOURS_UTC (04:00-09:59 UTC = 07:00-12:59
+ * Production only, and only in WINDOW_HOURS_UTC (04:00-10:59 UTC = 07:00-13:59
  * in Israel). The window held three hours while there were three languages, and
  * a morning really does use them: on 17 Oct the Spanish article failed the
  * quality gate twice and published on the third pass, at 06:47. A fourth
  * language behind a morning like that would have run out of window, so the
- * window grew with it — the last hour is a reserve for retries, not a later
+ * window grew with it, and it grew again with Korean, the eleventh — the last hour is a reserve for retries, not a later
  * publishing time. Outside it this returns at once without a read or a log
  * line.
  */

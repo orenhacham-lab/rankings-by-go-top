@@ -17,6 +17,7 @@ const nextConfig: NextConfig = {
     '/de/*': ['./content/legal/de/**/*'],
     '/nl/*': ['./content/legal/nl/**/*'],
     '/pl/*': ['./content/legal/pl/**/*'],
+    '/ko/*': ['./content/legal/ko/**/*'],
   },
   // sharp ships one prebuilt libvips per platform AND per C library. npm
   // installs both x64 Linux pairs, glibc and musl, but the runtime loads

@@ -8,6 +8,7 @@ import { dashboardJa } from './ja'
 import { dashboardDe } from './de'
 import { dashboardNl } from './nl'
 import { dashboardPl } from './pl'
+import { dashboardKo } from './ko'
 import { deepMergeDictionary } from './merge'
 import type { PublicLocale } from '../locales'
 import type { DashboardDictionary } from './he'
@@ -62,6 +63,16 @@ import type { DashboardDictionary } from './he'
  * rebuilt rather than translated word for word; and the product vocabulary is
  * native — pozycjonowanie, słowa kluczowe, widoczność — never the English term
  * with a Polish ending.
+ *
+ * KOREAN is the eleventh locale, from ko/, held by
+ * lib/i18n/dashboard/__qa__/korean-dashboard.qa.ts. The USD rule is the same as
+ * German's, Dutch's and Polish's: outside Israel this product charges in US
+ * dollars, and Korea's 전자상거래법 art. 13 asks the price shown to a consumer
+ * to be the one actually payable, so a won figure on screen would be a price it
+ * does not charge. What is specific to Korean is in the words: 합니다체
+ * throughout with 고객님 for the reader, short noun or -기 forms on controls, and
+ * no grammatical plural — nothing agrees with a figure, so each count simply
+ * takes its counter (개, 건, 곳, 일, 자) and no plural helper exists in ko/.
  */
 const dashboardEsMerged = deepMergeDictionary(dashboardEn as unknown as DashboardDictionary, dashboardEs)
 const dashboardPtMerged = deepMergeDictionary(dashboardEn as unknown as DashboardDictionary, dashboardPtBR)
@@ -71,6 +82,8 @@ const dashboardJaMerged = deepMergeDictionary(dashboardEn as unknown as Dashboar
 const dashboardDeMerged = deepMergeDictionary(dashboardEn as unknown as DashboardDictionary, dashboardDe)
 const dashboardNlMerged = deepMergeDictionary(dashboardEn as unknown as DashboardDictionary, dashboardNl)
 const dashboardPlMerged = deepMergeDictionary(dashboardEn as unknown as DashboardDictionary, dashboardPl)
+
+const dashboardKoMerged = deepMergeDictionary(dashboardEn as unknown as DashboardDictionary, dashboardKo)
 
 const DICTIONARIES = {
   he: dashboardHe,
@@ -83,6 +96,7 @@ const DICTIONARIES = {
   de: dashboardDeMerged,
   nl: dashboardNlMerged,
   pl: dashboardPlMerged,
+  ko: dashboardKoMerged,
 } satisfies Record<PublicLocale, DashboardDictionary>
 
 /**

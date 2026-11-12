@@ -40,6 +40,7 @@ const AUDIENCE: Record<BlogAutoLocale, string> = {
   de: 'der Inhaber eines kleinen Unternehmens oder die für das Marketing verantwortliche Person in Deutschland, die wissen will, wie das eigene Unternehmen bei Google und in den KI-Assistenten gefunden wird',
   pl: 'właściciel małej firmy albo osoba odpowiedzialna za marketing w Polsce, która chce wiedzieć, jak jej firmę znajduje się w Google i w asystentach AI',
   nl: 'de eigenaar van een klein bedrijf of de persoon die in Nederland voor de marketing verantwoordelijk is, en wil weten hoe het eigen bedrijf gevonden wordt in Google en in de AI-assistenten',
+  ko: '한국에서 사업을 운영하는 대표나 마케팅 담당자로, 자기 사이트가 구글과 AI 어시스턴트에서 어떻게 검색되는지 알고 싶은 사람',
 }
 
 /**

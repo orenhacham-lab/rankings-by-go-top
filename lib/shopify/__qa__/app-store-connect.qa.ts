@@ -115,8 +115,11 @@ async function main() {
     // compte`; the accent is why the pattern is written with `m[êe]me`. Japanese
     // writes it as 同じアカウント, with no space between the words. Dutch says
     // `precies dit account`, and Polish `dokładnie na to konto`, where the
-    // accusative `to konto` is the form the sentence takes after `na`.
-    const SAME_ACCOUNT = /same account|החשבון הזה עצמו|misma cuenta|mesma conta|m[êe]me compte|stesso account|genau diesem Konto|precies dit account|dok[łl]adnie na to konto|同じアカウント/i
+    // accusative `to konto` is the form the sentence takes after `na`. Korean
+    // writes it as 반드시 이 계정으로 — "with THIS account, without fail" — where
+    // 으로 is the instrumental particle the sentence needs after a closed
+    // syllable, so the phrase cannot be matched on 이 계정 alone.
+    const SAME_ACCOUNT = /same account|החשבון הזה עצמו|misma cuenta|mesma conta|m[êe]me compte|stesso account|genau diesem Konto|precies dit account|dok[łl]adnie na to konto|同じアカウント|반드시 이 계정으로/i
     check('A4: every note says to sign in with the same account',
       texts.every((r) => SAME_ACCOUNT.test(r.note)), texts.filter((r) => !SAME_ACCOUNT.test(r.note)).map((r) => r.l).join(' '))
     check('A4-MUT: a note that drops the account sentence fails A4',

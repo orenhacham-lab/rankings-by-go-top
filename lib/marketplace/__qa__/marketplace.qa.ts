@@ -782,8 +782,11 @@ async function main() {
     && !/<img/.test(salesSrc))
   check('H-MUT9: the bare-tag guard catches the platform snippet pasted straight in',
     /<img/.test(`${salesSrc}\n<img src={pixelUrl} width={1} height={1} />`))
+  // The map is over `beaconSuppressed ? [] : pixelUrls` since Korea became a
+  // third state (lib/consent/eprivacy-territory.ts, BEACON_SUPPRESSED_COUNTRIES),
+  // so this matches the list the page maps rather than the bare identifier.
   check('H17c: …and only for a configured beacon, so an unconfigured platform still renders nothing',
-    /pixelUrls\.map\(/.test(salesSrc)
+    /\(beaconSuppressed \? \[\] : pixelUrls\)\.map\(/.test(salesSrc)
     && /\.filter\(\(url\): url is string => url !== null\)/.test(salesSrc))
   check('H17c2: one beacon per plan the page actually offers, so each product gets its own stats',
     /marketplacePixelUrl\(provider\.slug, code\)/.test(salesSrc)
@@ -866,8 +869,11 @@ async function main() {
   // turns the old stored decisions back into questions. A deploy carrying any
   // two of the three leaves the beacon firing on a grant nobody gave, so this
   // section fails on the missing one rather than on the beacon.
-  console.log('\nL. the beacon\'s lawful basis across the seven languages')
-  const CONSENT_LOCALES = ['he', 'en', 'es', 'pt-BR', 'fr', 'it', 'ja'] as const
+  console.log('\nL. the beacon\'s lawful basis across the eight languages it is guarded in')
+  // de, nl and pl are NOT here, and were not when they shipped: their
+  // documents carry the same clause, and nothing checks it. That gap is older
+  // than Korean and is reported rather than widened in the same change.
+  const CONSENT_LOCALES = ['he', 'en', 'es', 'pt-BR', 'fr', 'it', 'ja', 'ko'] as const
   const PRIVACY_DOC: Record<string, string> = {
     he: 'app/(legal)/privacy/page.tsx',
     en: 'app/(public)/en/privacy/page.tsx',
@@ -876,6 +882,7 @@ async function main() {
     fr: 'content/legal/fr/privacy.md',
     it: 'content/legal/it/privacy.md',
     ja: 'content/legal/ja/privacy.md',
+    ko: 'content/legal/ko/privacy.md',
   }
   /** The marketing category's own description, cut out of the public dictionary. */
   const marketingDesc = (locale: string): string => {
@@ -894,6 +901,7 @@ async function main() {
     fr: 'après votre acceptation des cookies de marketing',
     it: 'dopo che Lei ha accettato i cookie di marketing',
     ja: 'お客様がマーケティングの Cookie に同意された後にのみ読み込まれます',
+    ko: '고객님이 마케팅 쿠키를 수락하신 뒤에야 이미지를 불러옵니다',
   }
   for (const locale of CONSENT_LOCALES) {
     const desc = marketingDesc(locale)
@@ -942,40 +950,43 @@ async function main() {
    * side they are on. That only holds while the two lists agree — a split
    * whose text and code disagree is worse than no split, because each looks
    * verified on its own. So the code's list is pinned here as a set, and each
-   * document is required to name all four territories AND the fail-closed
+   * document is required to name all five territories AND the fail-closed
    * case, which is what makes "whenever we cannot determine the country" a
-   * description rather than a decoration.
+   * description rather than a decoration. Korea joined the list with the
+   * Korean locale: 개인정보 보호법 제15조 and 정보통신망법 제22조의2 make consent
+   * the condition for the same write, so the beacon waits there too.
    */
   const EU_27 = [
     'AT', 'BE', 'BG', 'CY', 'CZ', 'DE', 'DK', 'EE', 'ES', 'FI', 'FR', 'GR',
     'HR', 'HU', 'IE', 'IT', 'LT', 'LU', 'LV', 'MT', 'NL', 'PL', 'PT', 'RO',
     'SE', 'SI', 'SK',
   ]
-  const EXPECTED_TERRITORY = [...EU_27, 'IS', 'LI', 'NO', 'GB', 'CH', 'CA'].sort()
+  const EXPECTED_TERRITORY = [...EU_27, 'IS', 'LI', 'NO', 'GB', 'CH', 'CA', 'KR'].sort()
   const sameList = (a: readonly string[], b: readonly string[]) =>
     a.length === b.length && [...a].sort().every((v, i) => v === b[i])
-  check('L6: the gate reads exactly the EEA, the UK, Switzerland and Canada',
+  check('L6: the gate reads exactly the EEA, the UK, Switzerland, Canada and Korea',
     sameList(CONSENT_REQUIRED_COUNTRIES, EXPECTED_TERRITORY),
     [...CONSENT_REQUIRED_COUNTRIES].sort().join(','))
   check('L6b: and the United States is not among them, which is the whole point of the split',
     consentRequiredForCountry('US') === false)
   check('L6c: an unknown country is treated as a consent territory, as the documents say',
     consentRequiredForCountry(null) === true && consentRequiredForCountry('XX') === true)
-  /** The four territories and the fail-closed case, as each document words them. */
+  /** The five territories and the fail-closed case, as each document words them. */
   const TERRITORY_WORDS: Record<string, readonly string[]> = {
-    he: ['באזור הכלכלי האירופי', 'בבריטניה', 'בשווייץ', 'ובקנדה', 'איננו'],
-    en: ['EEA', 'United Kingdom', 'Switzerland', 'Canada', 'cannot determine'],
-    es: ['Espacio Económico Europeo', 'Reino Unido', 'Suiza', 'Canadá', 'no podamos determinar'],
-    'pt-BR': ['Espaço Econômico Europeu', 'Reino Unido', 'Suíça', 'Canadá', 'não conseguirmos determinar'],
-    fr: ['Espace économique européen', 'Royaume-Uni', 'Suisse', 'Canada', 'ne parvenons pas à déterminer'],
-    it: ['Spazio economico europeo', 'Regno Unito', 'Svizzera', 'Canada', 'non riusciamo a determinare'],
-    ja: ['欧州経済領域', '英国', 'スイス', 'カナダ', '判定できなかった場合'],
+    he: ['באזור הכלכלי האירופי', 'בבריטניה', 'בשווייץ', 'בקנדה', 'ובקוריאה הדרומית', 'איננו'],
+    en: ['EEA', 'United Kingdom', 'Switzerland', 'Canada', 'South Korea', 'cannot determine'],
+    es: ['Espacio Económico Europeo', 'Reino Unido', 'Suiza', 'Canadá', 'Corea del Sur', 'no podamos determinar'],
+    'pt-BR': ['Espaço Econômico Europeu', 'Reino Unido', 'Suíça', 'Canadá', 'Coreia do Sul', 'não conseguirmos determinar'],
+    fr: ['Espace économique européen', 'Royaume-Uni', 'Suisse', 'Canada', 'Corée du Sud', 'ne parvenons pas à déterminer'],
+    it: ['Spazio economico europeo', 'Regno Unito', 'Svizzera', 'Canada', 'Corea del Sud', 'non riusciamo a determinare'],
+    ja: ['欧州経済領域', '英国', 'スイス', 'カナダ', '韓国', '判定できなかった場合'],
+    ko: ['유럽경제지역', '영국', '스위스', '캐나다', '대한민국', '확인할 수 없는'],
   }
   for (const locale of CONSENT_LOCALES) {
     const doc = read(PRIVACY_DOC[locale])
     const words = TERRITORY_WORDS[locale]
     const missing = words.filter((w) => !doc.includes(w))
-    check(`L7 (${locale}): the document names the four territories and the unknown-country case`,
+    check(`L7 (${locale}): the document names the five territories and the unknown-country case`,
       missing.length === 0, missing.join(' | '))
     check(`L8 (${locale}): and it no longer claims the beacon stores nothing on the device`,
       !/stores nothing on your device|אינה שומרת דבר במכשיר/.test(doc))
@@ -1012,6 +1023,9 @@ async function main() {
     // which is the one pointer phrase this document uses; 「…」の条 appears too and
     // names the same kind of heading, so both shapes are read.
     ja: /(?:後述の|前述の)「([^」]+)」/g,
+    // Korean quotes the heading in ASCII double quotes and points at it with
+    // 항에, the counterpart of the others' "in the section".
+    ko: /"([^"]+)" 항에/g,
   }
   const flat = (v: string) => v.replace(/\s+/g, ' ').trim()
   /** Every heading the document carries, JSX and Markdown alike. */
@@ -1039,6 +1053,9 @@ async function main() {
     && !sameList(EXPECTED_TERRITORY.filter((c) => c !== 'CA'), EXPECTED_TERRITORY))
   check('L-MUT7: the territory-wording guard fails on a document with a territory removed',
     TERRITORY_WORDS.en.some((w) => !read(PRIVACY_DOC.en).replaceAll('Switzerland', '').includes(w)))
+  check('L-MUT7b: …and on one that never named Korea, which is the territory this change added',
+    TERRITORY_WORDS.ko.some((w) => !read(PRIVACY_DOC.ko).replaceAll('대한민국', '').includes(w))
+    && TERRITORY_WORDS.en.some((w) => !read(PRIVACY_DOC.en).replaceAll('South Korea', '').includes(w)))
 
   const consentPolicy = code('lib/consent/categories.ts')
   const policyVersion = consentPolicy.match(/CONSENT_POLICY_VERSION = '([^']+)'/)?.[1] ?? ''
@@ -1686,7 +1703,9 @@ async function main() {
     /badgeUrl \?\s*\(\s*consentRequired \?/.test(badgeSalesSrc.replace(/\s+/g, ' ').replace(/ \?/g, ' ?')) 
     || /consentRequired \? \( <MarketplaceBadge/.test(badgeSalesSrc.replace(/\s+/g, ' ')))
   check('BADGE15: an unconfigured platform renders no badge element at all',
-    /badgeUrl \?/.test(badgeSalesSrc))
+    /badgeUrl && !beaconSuppressed \?/.test(badgeSalesSrc))
+  check('BADGE15b: and a suppressed country renders none either, on the beacon\'s own decision',
+    /const beaconSuppressed = beaconSuppressedForRequest\(requestHeaders\)/.test(badgeSalesSrc))
   check('BADGE16: the badge reads the SAME territorial call the beacon does — one headers() read, not two',
     (badgeSalesSrc.match(/consentRequiredForRequest\(/g) || []).length === 1)
 

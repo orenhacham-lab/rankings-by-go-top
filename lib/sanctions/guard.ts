@@ -95,6 +95,7 @@ const NOTICE: Record<PublicLocale, string> = {
   ja: '法令遵守のため、このリクエストが送信された国ではサービスをご利用いただけません。誤りと思われる場合は、ご連絡ください。',
   de: 'Aus Gründen der Rechtskonformität ist der Dienst in dem Land, aus dem diese Anfrage kam, nicht verfügbar. Sollte dies ein Irrtum sein, schreiben Sie uns gern.',
   pl: 'Ze względu na wymogi prawne usługa nie jest dostępna w kraju, z którego wysłano to żądanie. Jeśli uważają Państwo, że to pomyłka, prosimy o kontakt.',
+  ko: '법적 요건에 따라 이 요청이 발신된 국가에서는 서비스를 제공할 수 없습니다. 착오라고 생각되시면 저희에게 연락해 주십시오.',
   nl: 'Om redenen van naleving van wet- en regelgeving is de dienst niet beschikbaar in het land waaruit dit verzoek kwam. Denkt u dat dit een vergissing is, schrijf ons dan.',
 }
 

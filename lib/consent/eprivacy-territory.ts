@@ -69,8 +69,19 @@ export const CONSENT_COUNTRY_HEADER = 'x-vercel-ip-country'
 
 /**
  * EEA (the 27 member states plus Iceland, Liechtenstein and Norway), the
- * United Kingdom, Switzerland and Canada. Alpha-2, upper case, which is what
- * the CDN sends.
+ * United Kingdom, Switzerland, Canada and Korea. Alpha-2, upper case, which is
+ * what the CDN sends.
+ *
+ * KOREA IS HERE ON ITS OWN TWO STATUTES, not by analogy with ePrivacy, which
+ * has no Korean counterpart. 개인정보 보호법 제15조 제1항 제1호 makes consent the
+ * ground for collecting personal information, and the beacon's cookies carry
+ * the visitor's IP address and full user-agent, which 제2조 제1호 treats as
+ * personal information about an identifiable person. 정보통신망법 제22조의2 제1항
+ * then requires consent before an information and communications service
+ * provider accesses data stored on the user's own device — the same act
+ * Art. 5(3) ePrivacy catches, reached by a different route. There is no
+ * Korean carve-out for a tag that is not necessary to the service, and ours
+ * is not: the page renders identically without it.
  */
 export const CONSENT_REQUIRED_COUNTRIES: readonly string[] = Object.freeze([
   // EU
@@ -81,6 +92,8 @@ export const CONSENT_REQUIRED_COUNTRIES: readonly string[] = Object.freeze([
   'IS', 'LI', 'NO',
   // UK, Switzerland, Canada
   'GB', 'CH', 'CA',
+  // Korea: 개인정보 보호법 제15조 and 정보통신망법 제22조의2
+  'KR',
 ])
 
 const CONSENT_REQUIRED = new Set(CONSENT_REQUIRED_COUNTRIES)
@@ -121,4 +134,55 @@ export function consentRequiredForCountry(country: string | null | undefined): b
 /** The same decision from a request's headers. */
 export function consentRequiredForRequest(h: { get(name: string): string | null }): boolean {
   return consentRequiredForCountry(h.get(CONSENT_COUNTRY_HEADER))
+}
+
+/**
+ * WHERE CONSENT IS NOT ENOUGH, SO THE TAG DOES NOT FIRE AT ALL.
+ *
+ * Korea. Gating the beacon on the marketing category fixes the COLLECTION:
+ * 개인정보 보호법 제15조 제1항 제1호 makes consent the ground, and the visitor
+ * gave it. It does not make the TRANSFER lawful. JVZoo decides for itself what
+ * to do with what it receives, so it is an independent controller abroad, and
+ * the basis for sending it a Korean data subject's data has to be
+ * 제28조의8 제1항 제1호 — a 별도의 동의 — whose 제2항 requires five particulars
+ * to be put in front of the person BEFORE that consent is taken: the items,
+ * the country with the timing and method, the recipient's name and contact
+ * details, the recipient's purpose and retention period, and the method,
+ * procedure and effect of refusal. 제1항 제3호, which covers 처리위탁 and
+ * 보관 necessary to the contract, does not reach an independent controller, and
+ * a cookie category is not a 별도의 동의 however well it is gated.
+ *
+ * The honest options were to build that second consent flow for a marketplace
+ * beacon, or not to send anything from Korea. This channel is sold to the
+ * United States, so nothing is lost by the second, and nothing is transferred:
+ * no 별도의 동의 arises, and the Korean documents say in one line that the
+ * request is not made there at all.
+ *
+ * The trust badge rides the same decision rather than a second one of its own.
+ * It is Digistore24's script, it sets a week-long cookie, and Digistore24 is
+ * as much an independent controller as JVZoo.
+ *
+ * THE RESIDUAL, STATED RATHER THAN HIDDEN. This suppresses on a country we can
+ * READ as KR, not on an unknown one. An unplaceable visitor still gets the
+ * consent-gated beacon, so a Korean visitor the CDN could not place could
+ * accept marketing and have the request made. Failing closed here instead
+ * would suppress the beacon for every local request, every preview and every
+ * visitor the CDN cannot place — including the marketplace reviewer whose
+ * rejection this whole module exists to answer. That is the same residual
+ * lib/compliance/gdpr-territory.ts accepts, for the same reason.
+ */
+export const BEACON_SUPPRESSED_COUNTRIES: readonly string[] = Object.freeze(['KR'])
+
+const BEACON_SUPPRESSED = new Set(BEACON_SUPPRESSED_COUNTRIES)
+
+/** Whether the marketplace beacon and badge must not be rendered at all. */
+export function beaconSuppressedForCountry(country: string | null | undefined): boolean {
+  const code = normalizeCountry(country)
+  if (!code) return false
+  return BEACON_SUPPRESSED.has(code)
+}
+
+/** The same decision from a request's headers. */
+export function beaconSuppressedForRequest(h: { get(name: string): string | null }): boolean {
+  return beaconSuppressedForCountry(h.get(CONSENT_COUNTRY_HEADER))
 }

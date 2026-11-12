@@ -167,6 +167,11 @@ const CONCEPT_FALLBACK: Record<ContentLanguage, (subject: string) => string> = {
   de: (s) => `Eine hochwertige, klare und fotorealistische redaktionelle Szene zum Thema ${s || 'des Artikels'}, generisch und markenfrei, ohne Logos, ohne Text und ohne offizielle Verpackungen.`,
   nl: (s) => `Een hoogwaardige, heldere en fotorealistische redactionele scène over het onderwerp ${s || 'van het artikel'}, algemeen en merkloos, zonder logo\u2019s, zonder tekst en zonder officiële verpakkingen.`,
   pl: (s) => `Wysokiej jakości, czysta i fotorealistyczna scena redakcyjna na temat ${s || 'artykułu'}, ogólna i bez marki, bez logo, bez tekstu i bez oficjalnych opakowań.`,
+  // The inserted subject is followed by 를/을 in ordinary Korean, which depends
+  // on its last syllable, so the sentence puts it after 주제: instead — a frame
+  // that takes anything, Hangul or latin, and reads as a caption rather than a
+  // broken sentence.
+  ko: (s) => `주제: ${s || '기사 주제'}. 고품질의 깔끔한 사실적 편집용 장면, 특정 브랜드를 나타내지 않는 일반적인 구도이며 로고, 문자, 공식 포장은 일절 포함하지 않습니다.`,
 }
 
 export async function writeCommercialSafeConcept(input: {

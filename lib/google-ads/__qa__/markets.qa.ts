@@ -72,6 +72,9 @@ const GOOGLE_LANGUAGE_IDS: Record<string, number> = {
   // Read back on 5 November 2026, with the Polish locale: languageConstants/1030
   // answers code "pl", name "Polish", targetable true.
   pl: 1030, // Polish
+  // Read back on 12 November 2026 from the live API (customer 989-586-4448):
+  // languageConstants/1012 answers code "ko", name "Korean".
+  ko: 1012, // Korean
 }
 const GOOGLE_COUNTRY_IDS: Record<string, number> = {
   AR: 2032, BR: 2076, CL: 2152, CO: 2170, CY: 2196,
@@ -92,6 +95,11 @@ const GOOGLE_COUNTRY_IDS: Record<string, number> = {
   // geoTargetConstants/2616 answers name "Poland", countryCode PL, targetType
   // Country, status ENABLED. Read back the same day as the language above.
   PL: 2616,
+  // geoTargetConstants/2410 answers name "South Korea", countryCode KR,
+  // targetType Country. Read back the same day as the language above. Korean is
+  // written for SOUTH KOREA alone, and there is no second Korean market to be
+  // tempted by the way Belgium tempted Dutch.
+  KR: 2410,
 }
 
 function main() {
