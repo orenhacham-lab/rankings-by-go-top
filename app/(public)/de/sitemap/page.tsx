@@ -58,6 +58,7 @@ export default function GermanSitemapPage() {
         { label: 'Korrekturen an der Website', href: '/de/features/site-health-fixes' },
         { label: 'Links auf die Website', href: '/de/features/site-links' },
         { label: 'Beiträge für Google Maps', href: '/de/features/google-maps-posts' },
+        { label: 'Google Unternehmensprofil', href: '/de/features/google-business-profile' },
         { label: 'Ihr Unternehmen und die Wettbewerber', href: '/de/features/competitor-tracking' },
         { label: 'Die Daten der Search Console', href: '/de/features/search-console' },
       ],

@@ -57,6 +57,7 @@ export default function ItalianSitemapPage() {
         { label: 'Correzioni sul sito', href: '/it/features/site-health-fixes' },
         { label: 'Link verso il vostro sito', href: '/it/features/site-links' },
         { label: 'Post su Google Maps', href: '/it/features/google-maps-posts' },
+        { label: 'Profilo dell’attività su Google', href: '/it/features/google-business-profile' },
         { label: 'Voi e i concorrenti', href: '/it/features/competitor-tracking' },
         { label: 'Dati di Search Console', href: '/it/features/search-console' },
       ],

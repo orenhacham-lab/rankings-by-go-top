@@ -57,6 +57,7 @@ export default function SpanishSitemapPage() {
         { label: 'Correcciones del sitio', href: '/es/features/site-health-fixes' },
         { label: 'Enlaces a tu sitio', href: '/es/features/site-links' },
         { label: 'Publicaciones en Google Maps', href: '/es/features/google-maps-posts' },
+        { label: 'Perfil de Empresa de Google', href: '/es/features/google-business-profile' },
         { label: 'Tú frente a la competencia', href: '/es/features/competitor-tracking' },
         { label: 'Datos de Search Console', href: '/es/features/search-console' },
       ],
