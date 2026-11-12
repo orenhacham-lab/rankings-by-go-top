@@ -193,7 +193,13 @@ function main() {
     const store = strip(read('lib/consent/client-store.ts'))
     const contractOk = (comp: string, st: string) =>
       /clearLegacyConsent\(\)/.test(comp)
-      && /decide\('accept_all', CONSENT_GRANTED\)/.test(comp)
+      // Accepting from the card grants analytics and not marketing, and the
+      // action is computed rather than asserted: the Art. 49(1)(a) notice that
+      // the marketing consent depends on does not fit on the card, so the card
+      // cannot take that consent. CONSENT_WITHOUT_MARKETING in
+      // lib/consent/categories.ts carries the reasoning, and
+      // lib/consent/__qa__/transfer-risk-notice.qa.ts pins the wiring.
+      && /decide\(actionForChoices\(CONSENT_WITHOUT_MARKETING/.test(comp)
       && /decide\('reject_all', CONSENT_DENIED\)/.test(comp)
       && /writeConsent\(action, next\)/.test(comp)
       // The decision has to be logged under the language it was READ in, so the

@@ -15,6 +15,7 @@ import { marketForCountry } from '@/lib/billing/market'
 import { requestCountry } from '@/lib/billing/server-market'
 import { GOOGLE_CONSENT_DEFAULT_SCRIPT } from '@/lib/consent/google-consent-mode'
 import { inGdprTerritory } from '@/lib/compliance/gdpr-territory'
+import { beaconSuppressedForCountry } from '@/lib/consent/eprivacy-territory'
 import { GoogleTags } from '@/components/consent/GoogleTags'
 import { MetaPixel } from '@/components/consent/MetaPixel'
 import { DocumentLocaleSync } from '@/components/DocumentLocaleSync'
@@ -113,6 +114,11 @@ export default async function RootLayout({
   // lib/consent/eprivacy-territory.ts. Nothing is withheld from the visitor: a
   // measurement tag is for us.
   const gdprTerritory = inGdprTerritory(country)
+  // The notice is picked by LANGUAGE, the JVZoo beacon by COUNTRY. Where the
+  // beacon is suppressed the notice must not claim a transfer that will not
+  // happen, so the same server decision the sales page makes travels into the
+  // preferences panel. See beaconSuppressedForCountry.
+  const beaconSuppressed = beaconSuppressedForCountry(country)
 
   return (
     <html lang={lang} dir={dir} className={`h-full ${inter.variable} ${heebo.variable}`} suppressHydrationWarning>
@@ -175,7 +181,7 @@ export default async function RootLayout({
           {/* Above `children` on purpose: the notice is fixed-positioned, so this
               changes nothing visually and everything about the tab order. See
               PublicConsentNotice. */}
-          <PublicConsentNotice isAuthenticated={isAuthenticated} />
+          <PublicConsentNotice isAuthenticated={isAuthenticated} beaconSuppressed={beaconSuppressed} />
           {children}
           <PublicSiteWidgets isAuthenticated={isAuthenticated} />
         </RootThemeProvider>
