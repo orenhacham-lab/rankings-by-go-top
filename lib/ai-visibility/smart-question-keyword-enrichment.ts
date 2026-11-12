@@ -26,6 +26,7 @@ import type { PromptSuggestion } from './prompt-templates'
 import type { BusinessCategory, PromptIntent } from './prompt-templates'
 import type { KeywordType, KeywordTopic } from './keyword-analysis'
 import type { PromptLanguage } from './prompt-templates'
+import { EXTRA_LANG_PACKS, type LangPack } from './prompt-langs'
 
 // ============================================================================
 // OUTPUT TYPES
@@ -280,6 +281,16 @@ export function isInvalidPriceQuestion(prompt: string, language: PromptLanguage)
   // lists below are Hebrew/English only, so without this branch a French
   // question would match neither and the filter would never fire.
   if (language === 'fr') return isInvalidPriceQuestionFr(prompt)
+  // Every other live language carries its own two patterns in its pack, for
+  // the same reason Spanish and French needed their own branch: the entity and
+  // service lists below are Hebrew and English words, so a German or Japanese
+  // price question matched neither branch and this filter never fired —
+  // "Was kostet eine Reinigungsfirma?" went straight to the merchant.
+  const pack = (EXTRA_LANG_PACKS as Partial<Record<PromptLanguage, LangPack>>)[language]
+  if (pack) {
+    const { priceQuestion, businessEntity } = pack.priceFilter
+    return priceQuestion.test(prompt) && businessEntity.test(prompt)
+  }
   // Only check price questions
   const isPriceQuestion =
     language === 'he'
@@ -289,7 +300,7 @@ export function isInvalidPriceQuestion(prompt: string, language: PromptLanguage)
   if (!isPriceQuestion) return false
 
   // Check if this is a non-priceable entity
-  const hasNonPriceableEntity = isNonPriceableBusinessEntity(prompt, language)
+  const hasNonPriceableEntity = isNonPriceableBusinessEntity(prompt, language === 'he' ? 'he' : 'en')
   if (!hasNonPriceableEntity) return false
 
   // Exception: If asking about a SERVICE that happens to contain non-priceable

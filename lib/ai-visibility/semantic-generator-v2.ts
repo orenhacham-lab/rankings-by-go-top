@@ -15,6 +15,7 @@
 import type { PromptIntent, BusinessCategory, PromptSuggestion } from './prompt-templates'
 import { getConfidenceTier, generateSignalChips, generateValueReason, normalizeLanguage, getIntentLabelFor } from './prompt-templates'
 import { classifyKeywordMode, type KeywordMode, type KeywordClassification } from './keyword-classifier'
+import { EXTRA_LANG_PACKS, type LangPack } from './prompt-langs'
 
 // ============================================================================
 // ENTITY UNDERSTANDING
@@ -424,6 +425,61 @@ function phraseNaturalSpanishQuestion(
   return null
 }
 
+/**
+ * The phrasings for a language whose copy lives in ./prompt-langs, read from
+ * its own `keywordFrames` rather than copied here.
+ *
+ * Without this arm the dispatcher below fell through to ENGLISH for every one
+ * of them: a German project tracking "Büroreinigung" was shown "How much does
+ * Büroreinigung cost?". French avoided it by skipping the v2 keyword path
+ * altogether (see prompt-templates.ts), which costs that language its
+ * keyword-derived questions; a pack has the frames, so it keeps them.
+ *
+ * A behaviour with no frame returns null, which the caller treats as "cannot be
+ * phrased naturally" and skips — the same contract the Spanish arm has.
+ */
+function phraseNaturalPackQuestion(
+  need: UserNeed,
+  entity: EntityProfile,
+  city: string | null,
+  pack: LangPack
+): string | null {
+  const { keyword, entityType } = entity
+  const f = pack.keywordFrames
+
+  if (need.behavior === 'price_discovery' || need.behavior === 'pricing_plans') {
+    return f.price(keyword)
+  }
+
+  if (need.behavior === 'provider_selection') {
+    if (entityType !== 'service_category') return null
+    return city ? f.local(keyword, city) : f.recommendation(keyword)
+  }
+
+  if (need.behavior === 'product_recommendation') {
+    if (entityType !== 'product' && entityType !== 'brand') return null
+    return f.recommendation(keyword)
+  }
+
+  if (need.behavior === 'product_reviews') {
+    if (entityType !== 'product' && entityType !== 'brand') return null
+    return f.review(keyword)
+  }
+
+  if (need.behavior === 'local_availability') {
+    return city ? f.local(keyword, city) : null
+  }
+
+  if (need.behavior === 'quality_assurance_service') {
+    if (entityType !== 'service_category') return null
+    return f.prePurchase(keyword)
+  }
+
+  // 'alternative_evaluation' and 'explanation' have no frame in the packs, so
+  // they are skipped rather than phrased in a language they are not written in.
+  return null
+}
+
 function phraseNaturalEnglishQuestion(
   need: UserNeed,
   entity: EntityProfile,
@@ -680,7 +736,10 @@ export function generateHumanLikeSmartQuestionsDebug(ctx: GeneratorContext): Gen
   for (const need of needs) {
     // Generate natural phrasing
     const lang = normalizeLanguage(language)
-    const phrase = lang === 'he'
+    const pack = (EXTRA_LANG_PACKS as Partial<Record<string, LangPack>>)[lang]
+    const phrase = pack
+      ? phraseNaturalPackQuestion(need, entity, city, pack)
+      : lang === 'he'
       ? phraseNaturalHebrewQuestion(need, entity, city)
       : lang === 'es'
         ? phraseNaturalSpanishQuestion(need, entity, city)
