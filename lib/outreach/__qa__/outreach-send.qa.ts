@@ -44,7 +44,7 @@ import {
 } from '../schedule'
 import { failureCode, isPermanentRejection, readSmtpConfig } from '../smtp'
 import { NO_FINDING_NOTE, readDayTally, sendNextProspect, type SenderDeps } from '../send'
-import { runIsolatedProspectSend, SENDING_FLAG } from '../sender-isolated'
+import { CHANNEL_FROZEN, runIsolatedProspectSend, SENDING_FLAG } from '../sender-isolated'
 
 let pass = 0
 let fail = 0
@@ -616,33 +616,71 @@ async function main() {
       sent.length === 0 && result.status === 'idle')
   }
 
+  /* ------------------------------------------------------------- the freeze */
+
+  {
+    // The freeze is the project-wide stop of 9 Nov 2026 on ClickBank's contract. It is a
+    // constant and not a key, because the key is read at build time and the stop had to
+    // hold without a dashboard edit. These guards describe the state the channel is in
+    // NOW: when the freeze is lifted in its own commit they become the record of what was
+    // true until then, and F1/F2 are the two to delete.
+    let ran = false
+    const frozen = await runIsolatedProspectSend(
+      async () => { ran = true; return { status: 'idle', reason: 'no_candidate' } },
+      { env: { [SENDING_FLAG]: 'true', VERCEL_ENV: 'production' } },
+    )
+    check('F1: while the freeze holds, a pass sends nothing even with both switches on',
+      CHANNEL_FROZEN === true && frozen.status === 'frozen' && ran === false)
+    check('F2: and the freeze is checked BEFORE the switches, so a flag set by mistake cannot send',
+      /if \(CHANNEL_FROZEN\)[\s\S]{0,200}?return \{ status: 'frozen' \}[\s\S]*?if \(env\[SENDING_FLAG\]/
+        .test(stripComments(read('lib/outreach/sender-isolated.ts'))))
+  }
+
   /* ------------------------------------------------------------- the two switches */
 
-  {
-    let ran = false
-    const off = await runIsolatedProspectSend(async () => { ran = true; return { status: 'idle', reason: 'no_candidate' } }, { env: {} })
-    check('G1: with the switch unset nothing runs at all — merging this changes nothing',
-      off.status === 'off' && ran === false)
-    const preview = await runIsolatedProspectSend(async () => { ran = true; return { status: 'idle', reason: 'no_candidate' } },
-      { env: { [SENDING_FLAG]: 'true', VERCEL_ENV: 'preview' } })
-    check('G1b: and a preview deployment never sends, because it shares the Production database',
-      preview.status === 'not_production' && ran === false)
-    const almost = await runIsolatedProspectSend(async () => { ran = true; return { status: 'idle', reason: 'no_candidate' } },
-      { env: { [SENDING_FLAG]: 'TRUE', VERCEL_ENV: 'production' } })
-    check('G1c: the switch is exactly "true" and nothing else',
-      almost.status === 'off' && ran === false)
-    const on = await runIsolatedProspectSend(async () => ({ status: 'idle', reason: 'no_candidate' }),
-      { env: { [SENDING_FLAG]: 'true', VERCEL_ENV: 'production' } })
-    check('G1d: with both switches on, the pass runs',
-      on.status === 'ran')
-  }
+  // The switches sit BEHIND the freeze, so with the freeze in place a pass stops before
+  // ever reading them and these guards would be vacuous. They are not dropped, because
+  // the switches are what the channel comes back to the day the freeze is lifted: they
+  // run against the module with the freeze gate taken out, which is the same source and
+  // the same gate order, only without the stop.
+  const WITHOUT_FREEZE: [RegExp, string][] = [[/  if \(CHANNEL_FROZEN\) \{[\s\S]*?\n  \}\n/, '']]
+  type SenderModule = { runIsolatedProspectSend: typeof runIsolatedProspectSend }
 
-  {
-    const thrown = await runIsolatedProspectSend(async () => { throw new Error('boom') },
-      { env: { [SENDING_FLAG]: 'true', VERCEL_ENV: 'production' } })
-    check('G2: a pass that throws cannot fail the cron it rides on',
-      thrown.status === 'error')
-  }
+  const switches = await withMutant<SenderModule, {
+    off: string; preview: string; almost: string; on: string; ranAny: boolean; thrown: string
+  }>(
+    'lib/outreach/sender-isolated.ts',
+    WITHOUT_FREEZE,
+    async (m) => {
+      let ran = false
+      const idle = async () => { ran = true; return { status: 'idle', reason: 'no_candidate' } as const }
+      const off = await m.runIsolatedProspectSend(idle, { env: {} })
+      const preview = await m.runIsolatedProspectSend(idle,
+        { env: { [SENDING_FLAG]: 'true', VERCEL_ENV: 'preview' } })
+      const almost = await m.runIsolatedProspectSend(idle,
+        { env: { [SENDING_FLAG]: 'TRUE', VERCEL_ENV: 'production' } })
+      const ranAny = ran
+      const on = await m.runIsolatedProspectSend(
+        async () => ({ status: 'idle', reason: 'no_candidate' }),
+        { env: { [SENDING_FLAG]: 'true', VERCEL_ENV: 'production' } },
+      )
+      const thrown = await m.runIsolatedProspectSend(async () => { throw new Error('boom') },
+        { env: { [SENDING_FLAG]: 'true', VERCEL_ENV: 'production' } })
+      return { off: off.status, preview: preview.status, almost: almost.status,
+        on: on.status, ranAny, thrown: thrown.status }
+    },
+  )
+
+  check('G1: with the switch unset nothing runs at all — merging this changes nothing',
+    switches.off === 'off' && switches.ranAny === false)
+  check('G1b: and a preview deployment never sends, because it shares the Production database',
+    switches.preview === 'not_production' && switches.ranAny === false)
+  check('G1c: the switch is exactly "true" and nothing else',
+    switches.almost === 'off' && switches.ranAny === false)
+  check('G1d: with both switches on, the pass runs',
+    switches.on === 'ran')
+  check('G2: a pass that throws cannot fail the cron it rides on',
+    switches.thrown === 'error')
 
   const senderSrc = read('lib/outreach/sender-isolated.ts')
   const automationSrc = read('app/api/content/automation/cron/route.ts')
@@ -825,6 +863,23 @@ async function main() {
   check('G4-MUT: moving the work before the switches is caught',
     !gatedOffByDefault(senderSrc.replace(
       /if \(env\[SENDING_FLAG\] !== 'true'\) return \{ status: 'off' \}/, '')))
+
+  // The control for the freeze: with the gate taken out, the very same pass sends.
+  const mutFreeze = await withMutant<
+    { runIsolatedProspectSend: typeof runIsolatedProspectSend }, boolean
+  >(
+    'lib/outreach/sender-isolated.ts',
+    [[/  if \(CHANNEL_FROZEN\) \{[\s\S]*?\n  \}\n/, '']],
+    async (m) => {
+      let reached = false
+      const result = await m.runIsolatedProspectSend(
+        async () => { reached = true; return { status: 'idle', reason: 'no_candidate' } },
+        { env: { [SENDING_FLAG]: 'true', VERCEL_ENV: 'production' } },
+      )
+      return reached === true && result.status === 'ran'
+    },
+  )
+  check('F1-MUT: removing the freeze gate lets the pass run again, and is caught', mutFreeze)
 
   console.log(`\n${pass} passed, ${fail} failed`)
   if (fail > 0) process.exit(1)

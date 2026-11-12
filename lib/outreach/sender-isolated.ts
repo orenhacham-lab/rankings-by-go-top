@@ -41,8 +41,34 @@ import type { FetchedPage } from './finding'
 /** The switch. Exactly "true", following the project's other email switches. */
 export const SENDING_FLAG = 'OUTREACH_SENDING_ENABLED'
 
+/**
+ * THE FREEZE, AND WHY IT IS A CONSTANT IN THE CODE RATHER THAN AN ENVIRONMENT KEY.
+ *
+ * On 9 Nov 2026 at 10:50Z all outgoing cold mail was stopped in every lane of this
+ * project, on ClickBank's Client Contract s5(b) and the Network Abuse Policy it
+ * incorporates: a client may not obtain addresses by automated means nor send to an
+ * address so obtained, which is exactly what this channel does. The remedy is the
+ * platform's and rests on suspicion alone.
+ *
+ * The freeze did not reach this channel. Between 9 and 11 Nov, 90 messages went out
+ * after the stop was declared, because the only levers were `OUTREACH_SENDING_ENABLED`,
+ * which is read at BUILD time and so needs a dashboard edit plus a redeploy, and a bulk
+ * status change in the database. Both are outside what an automated session may do here,
+ * so the channel kept sending while the stop was agreed by everyone and applied by
+ * nobody. A decision nobody can carry out is not a decision.
+ *
+ * Hence a constant. It is in the repository, it travels with the deploy, it needs no
+ * dashboard and no key, and it cannot be undone by an environment that was flipped by
+ * accident. Reading delivery reports, suppressing bounced addresses and honouring
+ * opt-outs all continue, because they protect the recipients; only the send stops.
+ *
+ * TO LIFT IT: the legal thread clears a resumption, Oren says so, and then this becomes
+ * false in its own commit — not as a side effect of other work.
+ */
+export const CHANNEL_FROZEN = true
+
 export type IsolatedSendOutcome =
-  | { status: 'off' | 'not_production' | 'no_transport' | 'error' }
+  | { status: 'frozen' | 'off' | 'not_production' | 'no_transport' | 'error' }
   | { status: 'ran'; result: SenderResult }
 
 const UA = 'Mozilla/5.0 (compatible; GoTopSEO-check/1.0; +https://www.gotopseo.com)'
@@ -75,6 +101,13 @@ export async function runIsolatedProspectSend(
   opts: { env?: Record<string, string | undefined> } = {},
 ): Promise<IsolatedSendOutcome> {
   const env = opts.env ?? process.env
+  // The freeze comes FIRST, before the switches, so that a flag or a key set by mistake
+  // cannot send a letter. It is printed once a pass: a channel that is stopped on purpose
+  // must not look like a cron that died.
+  if (CHANNEL_FROZEN) {
+    console.log('[outreach-send] frozen', { since: '2026-11-09T10:50Z', why: 'clickbank-contract' })
+    return { status: 'frozen' }
+  }
   // Nothing is constructed before both switches: no client, no transport, no read.
   if (env[SENDING_FLAG] !== 'true') return { status: 'off' }
   if (env.VERCEL_ENV !== 'production') return { status: 'not_production' }
