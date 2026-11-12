@@ -31,6 +31,12 @@ import {
   type GeneratorContext,
 } from './semantic-generator-v2'
 import { generateIntentQuestions } from './intent-engine'
+import {
+  EXTRA_LANG_PACKS,
+  EXTRA_PROMPT_LANGUAGES,
+  type ExtraPromptLanguage,
+  type LangPack,
+} from './prompt-langs'
 
 export type PromptIntent =
   | 'brand'
@@ -114,7 +120,7 @@ type TemplateContext = {
   themes: KeywordThemes
 }
 
-type QueryDef = {
+export type QueryDef = {
   intent: PromptIntent
   text: string
   score: number
@@ -126,7 +132,7 @@ type QueryDef = {
   offering?: 'primary' | 'secondary' | 'local' | 'generic'
 }
 
-type KeywordThemes = {
+export type KeywordThemes = {
   online: boolean
   gift: boolean
   audienceMen: boolean
@@ -299,13 +305,41 @@ const FR_CATEGORY_LABEL: Record<BusinessCategory, string> = {
  * reasons and filters — because a French business asked in English would be
  * checked against the wrong question.
  */
-export type PromptLanguage = 'he' | 'en' | 'es' | 'fr'
+export type PromptLanguage = 'he' | 'en' | 'es' | 'fr' | ExtraPromptLanguage
+
+/**
+ * The languages whose copy lives in `./prompt-langs`. `packFor(lang)` is the
+ * one question every call site below asks: a pack means "read the data", no
+ * pack means "take the he/en/es/fr ladder you always took".
+ */
+function packFor(lang: PromptLanguage): LangPack | null {
+  return (EXTRA_LANG_PACKS as Partial<Record<PromptLanguage, LangPack>>)[lang] ?? null
+}
+
+/** Is this language written without spaces between its words? (Japanese.) */
+function isUnspacedPromptLanguage(lang: PromptLanguage): boolean {
+  return lang === 'ja'
+}
+
+/**
+ * Build the `lang -> value` half of a table from the packs, so that each table
+ * below names its four original languages and then takes the rest from the
+ * registry. A language added to `./prompt-langs` lands in every one of these
+ * tables at once, which is the point: there is no table left to forget.
+ */
+function fromPacks<T>(pick: (pack: LangPack) => T): Record<ExtraPromptLanguage, T> {
+  const out = {} as Record<ExtraPromptLanguage, T>
+  for (const code of EXTRA_PROMPT_LANGUAGES) out[code] = pick(EXTRA_LANG_PACKS[code])
+  return out
+}
 
 const INTENT_LABEL_BY_LANG: Record<PromptLanguage, Record<PromptIntent, string>> = {
   he: HE_INTENT_LABEL, en: EN_INTENT_LABEL, es: ES_INTENT_LABEL, fr: FR_INTENT_LABEL,
+  ...fromPacks((p) => p.intentLabel),
 }
 const CATEGORY_LABEL_BY_LANG: Record<PromptLanguage, Record<BusinessCategory, string>> = {
   he: HE_CATEGORY_LABEL, en: EN_CATEGORY_LABEL, es: ES_CATEGORY_LABEL, fr: FR_CATEGORY_LABEL,
+  ...fromPacks((p) => p.categoryLabel),
 }
 
 /** Words that say a business is about travel: trips, tourism, holidays, flights. */
@@ -1414,9 +1448,11 @@ const COUNTRY_NAMES_FR: Record<string, string> = {
 
 const BANK_BY_LANG: Record<PromptLanguage, Record<BusinessCategory, QueryDef[]>> = {
   he: HE_BANK, en: EN_BANK, es: ES_BANK, fr: FR_BANK,
+  ...fromPacks((p) => p.bank),
 }
 const COUNTRY_NAMES_BY_LANG: Record<PromptLanguage, Record<string, string>> = {
   he: COUNTRY_NAMES_HE, en: COUNTRY_NAMES_EN, es: COUNTRY_NAMES_ES, fr: COUNTRY_NAMES_FR,
+  ...fromPacks((p) => p.countryNames),
 }
 /** What stands in for a missing business name or city, per language. */
 const PLACEHOLDER_BY_LANG: Record<PromptLanguage, { business: string; city: string }> = {
@@ -1424,6 +1460,7 @@ const PLACEHOLDER_BY_LANG: Record<PromptLanguage, { business: string; city: stri
   en: { business: 'the business', city: 'your area' },
   es: { business: 'el negocio', city: 'tu zona' },
   fr: { business: 'l\'entreprise', city: 'votre région' },
+  ...fromPacks((p) => p.placeholder),
 }
 
 function fillTemplate(template: string, ctx: TemplateContext): string {
@@ -2332,6 +2369,7 @@ const REASON_COPY: Record<PromptLanguage, ReasonCopy> = {
       niche: 'Intérêt détecté pour les marques de luxe ou de niche',
     },
   },
+  ...fromPacks((p) => p.reason),
 }
 
 /**
@@ -2685,11 +2723,25 @@ const KEYWORD_FRAMES: Record<PromptLanguage, {
     recommendation: (kw) => `Quel prestataire est recommandé pour ${kw} ?`,
     local: (kw, city) => `Quel prestataire est recommandé pour ${kw} à ${city} ?`,
   },
+  ...fromPacks((p) => p.keywordFrames),
 }
 
 function cleanKeywordForQuestion(keyword: string, lang: PromptLanguage): string {
   if (!keyword) return ''
   let cleaned = keyword.trim()
+
+  const pack = packFor(lang)
+  if (pack) {
+    for (const phrase of pack.intentPhrases) {
+      cleaned = cleaned.replace(new RegExp(escapeRegex(phrase), 'gi'), ' ')
+    }
+    // An unspaced language has no single words for the word filter to find —
+    // its pack lists everything in `intentPhrases` and leaves `intentWords`
+    // empty on purpose, so the split below would only rejoin one token.
+    if (isUnspacedPromptLanguage(lang)) return cleaned.replace(/\s+/g, ' ').trim()
+    const words = cleaned.split(/\s+/).filter((w) => w && !pack.intentWords.has(w.toLowerCase()))
+    return words.join(' ').replace(/\s+/g, ' ').trim()
+  }
 
   const phrases = lang === 'he'
     ? HE_KEYWORD_INTENT_PHRASES
@@ -2736,6 +2788,16 @@ function isAwkwardQuestion(
 ): boolean {
   const q = question.trim()
   if (!q) return true
+
+  const pack = packFor(lang)
+  if (pack) {
+    const f = pack.filters
+    if (f.doubledIntent.some((re) => re.test(q))) return true
+    if (f.gift.test(q) && !GIFT_CATEGORIES.includes(category)) return true
+    const stacked = f.stackedModifiers.filter((m) => new RegExp(escapeRegex(m), 'i').test(q)).length
+    if (stacked >= 3) return true
+    return false
+  }
 
   if (lang === 'he') {
     // Doubled intent words (template added one + keyword carried another).
@@ -2876,6 +2938,13 @@ function isUnnaturalQuestion(
   if (!q) return true
 
   const isServiceCategory = SERVICE_LIKE_CATEGORIES.includes(category)
+
+  const pack = packFor(lang)
+  if (pack) {
+    if (pack.filters.unnatural.some((re) => re.test(q))) return true
+    if (!isServiceCategory && pack.filters.unnaturalForProducts.some((re) => re.test(q))) return true
+    return false
+  }
 
   if (lang === 'he') {
     // Abstract comparison — almost never sounds like a real query.
@@ -3266,7 +3335,35 @@ function generateSafeCuratedSuggestions({
   // Define safe curated templates
   const templates: SafeCuratedPrompt[] = []
 
-  if (lang === 'he') {
+  const pack = packFor(lang)
+  if (pack) {
+    // The label is already inflected for the frame by the pack: `choose` and
+    // `local` take the noun phrase its own grammar needs, which is why they
+    // read `serviceLabels` where available and the bare category label
+    // otherwise.
+    const forms = pack.serviceLabels[category]
+    const label = forms?.one ?? pack.categoryLabel[category] ?? pack.genericCategoryLabel
+    templates.push({ text: pack.safeCurated.price(isService), intent: 'commercial', category })
+    if (isService) {
+      templates.push({ text: pack.safeCurated.choose(label), intent: 'pre_purchase', category })
+    }
+    if (hasBusinessName) {
+      templates.push({
+        text: pack.safeCurated.reviews(businessName as string),
+        intent: 'brand',
+        category,
+        requiresBusinessName: true,
+      })
+    }
+    if (hasLocation && isService) {
+      templates.push({
+        text: pack.safeCurated.local(pack.categoryLabel[category] ?? pack.genericCategoryLabel, city as string),
+        intent: 'local',
+        category,
+        requiresLocation: true,
+      })
+    }
+  } else if (lang === 'he') {
     // Universal commercial questions (work for all business types)
     templates.push({
       text: `כמה עולה ${category === 'saas' ? 'מנוי' : 'שירות'} כזה?`,
@@ -3445,6 +3542,9 @@ function generateSafeCuratedSuggestions({
 }
 
 function getCategoryLabel(category: BusinessCategory, lang: PromptLanguage): string {
+  const pack = packFor(lang)
+  if (pack) return pack.categoryLabel[category] || pack.genericCategoryLabel
+
   const heLabels: Record<BusinessCategory, string> = {
     saas: 'תוכנה',
     agency: 'סוכנות',
@@ -3714,7 +3814,15 @@ export function normalizeLanguage(
   // project rows land here too, via normalizeContentLanguage's prefix test.
   if (v === 'fr' || v.startsWith('french') || v.startsWith('français') ||
       v.startsWith('francais') || normalizeContentLanguage(v) === 'fr') return 'fr'
-  if (normalizeContentLanguage(v) === 'pt-BR') return 'en'
+  // Brazilian Portuguese, Italian, Japanese, German, Dutch and Polish each
+  // carry a full question bank in ./prompt-langs now, so they resolve to
+  // THEMSELVES. Until they did, this line sent pt-BR to English and the five
+  // others fell off the end into the Hebrew fallback — a Japanese merchant was
+  // shown Hebrew questions in Hebrew letters, which is the one outcome worse
+  // than English. The lookup is the registry's, so a language added there is
+  // recognized here without another branch.
+  const content = normalizeContentLanguage(v)
+  if ((EXTRA_PROMPT_LANGUAGES as string[]).includes(content)) return content as PromptLanguage
   // Anything else (e.g. 'ar') — default to the safe fallback, because a
   // language with no bank would otherwise get an empty one.
   return fallback
@@ -3773,6 +3881,7 @@ const GEN_COPY: Record<PromptLanguage, {
     default_: 'par défaut',
     starterValue: 'Questions de départ : complétez le profil pour des propositions plus précises',
   },
+  ...fromPacks((p) => p.genCopy),
 }
 
 /** Check if a string is likely a domain slug (contains hyphens, numbers, underscores but no spaces). */
@@ -3809,7 +3918,7 @@ export type BusinessType =
   | 'generic_business'
 
 /** Fallback-pipeline intents (distinct from the output PromptIntent union). */
-type FallbackIntent =
+export type FallbackIntent =
   | 'recommendation'
   | 'comparison'
   | 'price'
@@ -3817,6 +3926,29 @@ type FallbackIntent =
   | 'local'
   | 'decision'
   | 'alternatives'
+
+/**
+ * The category noun in the grammatical forms a question frame needs, for a
+ * language whose copy lives in `./prompt-langs`.
+ *
+ * `ServiceLabel` below is the original he/en/es/fr shape — one flat record with
+ * a field per language — which does not extend to a language that needs a
+ * second or third case of the same noun. This is the per-language shape the
+ * packs use instead: the pack states the forms, and its own frames read the one
+ * they need rather than gluing an article onto a nominative and hoping.
+ */
+export type ServiceLabelForms = {
+  /** The noun phrase as the OBJECT of a question: "uma agência", "eine Reinigungsfirma", "agencję marketingową". */
+  one: string
+  /** The bare plural, as the object of "compare …". */
+  plural: string
+  /** Subject of "how much does ___ cost". Omit where a price question reads unnaturally for the category. */
+  price?: string
+  /** The noun phrase as the SUBJECT, where the language inflects it differently (German nominative). Defaults to `one`. */
+  subject?: string
+  /** The form a preposition in the pack's frames governs (German dative after "zu", Polish genitive after "dla"). Defaults to `one`. */
+  oblique?: string
+}
 
 /** Natural, language-correct labels for a category, in all the grammatical
  * forms the question frames need (singular, plural, price-subject). */
@@ -4092,6 +4224,8 @@ export function inferServiceLabel(
   language: PromptLanguage
 ): string | null {
   if (!category) return null
+  const pack = packFor(language)
+  if (pack) return pack.serviceLabels[category]?.one ?? null
   const label = CATEGORY_SERVICE_LABELS[category]
   if (!label) return null
   return language === 'he'
@@ -4101,6 +4235,20 @@ export function inferServiceLabel(
     : language === 'fr'
     ? label.fr
     : label.en
+}
+
+/**
+ * The pack's grammatical forms for a category, or null for he/en/es/fr (which
+ * read `CATEGORY_SERVICE_LABELS` instead) and for a category the pack does not
+ * name — the same "no label, use the generic frames" contract the four
+ * original languages have.
+ */
+export function serviceFormsFor(
+  category: BusinessCategory | null,
+  language: PromptLanguage
+): ServiceLabelForms | null {
+  if (!category) return null
+  return packFor(language)?.serviceLabels[category] ?? null
 }
 
 /** Pick the correct English indefinite article for a noun phrase. */
@@ -4181,8 +4329,17 @@ export function buildQuestionFromIntent(
   intent: FallbackIntent,
   label: ServiceLabel | null,
   language: PromptLanguage,
-  location: string | null
+  location: string | null,
+  /**
+   * The pack's own forms for the same category. Required for a pack language
+   * and ignored otherwise: `ServiceLabel` has a field per he/en/es/fr language
+   * and no room for a seventh, so a pack language is answered from its own
+   * `serviceLabels` entry — `serviceFormsFor()` is what resolves it.
+   */
+  forms?: ServiceLabelForms | null
 ): string | null {
+  const pack = packFor(language)
+  if (pack) return forms ? pack.intentQuestion(intent, forms, location) : null
   if (!label) return null
   if (language === 'es') return buildQuestionFromIntentEs(intent, label, location)
   if (language === 'fr') return buildQuestionFromIntentFr(intent, label, location)
@@ -4305,8 +4462,14 @@ export function qualityFilterQuestions(
   for (const raw of questions) {
     if (!raw || typeof raw !== 'string') continue
     const q = raw.trim()
-    if (q.length < 8 || q.length > 120) continue
-    if (!q.endsWith('?')) continue
+    // An unspaced language says in six characters what English needs thirty
+    // for: 「おすすめの香水は？」 is a complete question, and the latin minimum
+    // of eight would have thrown half the Japanese bank away.
+    const minLength = isUnspacedPromptLanguage(language) ? 6 : 8
+    if (q.length < minLength || q.length > 120) continue
+    // Japanese ends a question in the full-width 「？」. Accepting it here is
+    // what lets a Japanese question through the gate at all.
+    if (!q.endsWith('?') && !q.endsWith('？')) continue
     if (/\s\s+/.test(q)) continue
     // Slug / domain / URL leakage
     if (/https?:\/\//i.test(q) || /\bwww\./i.test(q)) continue
@@ -4317,6 +4480,10 @@ export function qualityFilterQuestions(
     const hasHebrew = /[֐-׿]/.test(q)
     if (language === 'he' && !hasHebrew) continue
     if (language !== 'he' && hasHebrew) continue
+    // Japanese is the one other language with a script of its own, so the same
+    // coherence rule applies in reverse: a question with no kana and no kanji
+    // is an English frame that leaked into a Japanese set.
+    if (language === 'ja' && !/[぀-ヿ一-鿿]/u.test(q)) continue
     // Dedup (normalized)
     const norm = q.toLowerCase().replace(/\s+/g, ' ').replace(/[?.!]+$/, '').trim()
     if (seen.has(norm)) continue
@@ -4375,6 +4542,11 @@ export function buildFallbackSuggestions(
   // 2. Behaviour class + natural service label (with all grammatical forms).
   const businessType = inferBusinessType(cat, keywords)
   const labelObj = CATEGORY_SERVICE_LABELS[cat] ?? null
+  // For a language whose copy lives in ./prompt-langs, every frame below reads
+  // the pack: `labelObj` has no field for it, and falling through to the
+  // English arm is exactly the bug this replaced.
+  const pack = packFor(lang)
+  const packForms = serviceFormsFor(cat, lang)
 
   // 3. Build intent-driven candidates. Prioritize keywords if present.
   //    When good keywords exist, frame questions around them instead of just
@@ -4392,8 +4564,10 @@ export function buildFallbackSuggestions(
     for (const kw of keywords) {
       const kwLower = kw.toLowerCase()
       // Price intent
-      if (/(price|cost|precio|cuesta|coste|tarifa|prix|tarif|co[ûu]t|combien|כמה|עלות|תעריף|חיוב)/.test(kwLower)) {
-        if (labelObj && labelObj.hePrice && lang === 'he') {
+      if (/(price|cost|precio|cuesta|coste|tarifa|prix|tarif|co[ûu]t|combien|pre[çc]o|prezzo|preis|kosten|prijs|cena|koszt|費用|料金|כמה|עלות|תעריף|חיוב)/.test(kwLower)) {
+        if (pack && packForms?.price) {
+          push(pack.keywordFrames.price(packForms.price), 'commercial')
+        } else if (labelObj && labelObj.hePrice && lang === 'he') {
           push(`כמה עולה ${labelObj.hePrice}?`, 'commercial')
         } else if (labelObj && labelObj.esPrice && lang === 'es') {
           push(`¿Cuánto cuesta ${labelObj.esPrice}?`, 'commercial')
@@ -4404,8 +4578,10 @@ export function buildFallbackSuggestions(
         }
       }
       // Local intent
-      if (/(near|local|cerca|cercano|en mi zona|pr[èe]s de|[àa] proximit[ée]|dans ma ville|dans ma r[ée]gion|מקומי|באזור|ב-|ניו יורק|לונדון)/.test(kwLower) && location) {
-        if (labelObj) {
+      if (/(near|local|cerca|cercano|en mi zona|pr[èe]s de|[àa] proximit[ée]|dans ma ville|dans ma r[ée]gion|perto|vicino|in\s+der\s+n[äa]he|in\s+de\s+buurt|blisko|w\s+okolicy|近く|周辺|מקומי|באזור|ב-|ניו יורק|לונדון)/.test(kwLower) && location) {
+        if (pack && packForms) {
+          push(pack.intentQuestion('local', packForms, location), 'local')
+        } else if (labelObj) {
           push(
             lang === 'he'
               ? `איך מוצאים ${labelObj.he} ב${location}?`
@@ -4419,8 +4595,10 @@ export function buildFallbackSuggestions(
         }
       }
       // Comparison intent
-      if (/(vs|compare|comparar|comparativa|diferencia|frente a|comparer|comparatif|diff[ée]rence|לעומת|השוואה|הבדל)/.test(kwLower)) {
-        if (labelObj) {
+      if (/(vs|compare|comparar|comparativa|diferencia|frente a|comparer|comparatif|diff[ée]rence|diferen[çc]a|confronto|vergleich|vergelijk|por[óo]wnanie|r[óo][żz]nica|比較|違い|לעומת|השוואה|הבדל)/.test(kwLower)) {
+        if (pack && packForms) {
+          push(pack.intentQuestion('comparison', packForms, location), 'comparison')
+        } else if (labelObj) {
           push(
             lang === 'he'
               ? `איך משווים בין ${labelObj.hePlural}?`
@@ -4438,13 +4616,15 @@ export function buildFallbackSuggestions(
 
   // 3b. Standard intent-driven questions (service provider intents).
   for (const fi of BUSINESS_TYPE_INTENTS[businessType]) {
-    push(buildQuestionFromIntent(fi, labelObj, lang, location), FALLBACK_INTENT_TO_PROMPT[fi])
+    push(buildQuestionFromIntent(fi, labelObj, lang, location, packForms), FALLBACK_INTENT_TO_PROMPT[fi])
   }
 
   // 3c. Name-based questions — only safe, gender-neutral frames so a real brand
   //     name always reads naturally. (Names are never slugs here.)
   if (cleanName) {
-    if (lang === 'he') {
+    if (pack) {
+      for (const q of pack.nameQuestions(cleanName, packForms)) push(q.prompt, q.intent)
+    } else if (lang === 'he') {
       push(`מה חוות הדעת על ${cleanName}?`, 'brand')
     } else if (lang === 'es') {
       push(`¿Qué opiniones hay sobre ${cleanName}?`, 'brand')
@@ -4479,7 +4659,9 @@ export function buildFallbackSuggestions(
   if (competitors && competitors.length > 0 && competitors[0]) {
     if (cleanName) {
       push(
-        lang === 'he'
+        pack
+          ? pack.difference(cleanName, competitors[0])
+          : lang === 'he'
           ? `מה ההבדל בין ${cleanName} ל${competitors[0]}?`
           : lang === 'es'
           ? `¿Qué diferencia hay entre ${cleanName} y ${competitors[0]}?`
@@ -4488,6 +4670,8 @@ export function buildFallbackSuggestions(
           : `What is the difference between ${cleanName} and ${competitors[0]}?`,
         'comparison'
       )
+    } else if (pack && packForms) {
+      push(pack.difference(packForms.one, competitors[0]), 'comparison')
     } else if (labelObj) {
       // Subject is a generic label — English needs an article to read naturally.
       push(
@@ -4513,7 +4697,9 @@ export function buildFallbackSuggestions(
   // 6. Guaranteed minimum — never return an empty/too-thin set. These generic
   //    frames are natural and do NOT reference a name or raw category.
   if (prompts.length < 3) {
-    const generic = lang === 'he'
+    const generic = pack
+      ? [...pack.genericQuestions]
+      : lang === 'he'
       ? [
           'איך בוחרים עסק אמין בתחום?',
           'מה כדאי לבדוק לפני שבוחרים נותן שירות?',
@@ -4862,13 +5048,19 @@ export function generatePromptSuggestions({
   // Bypasses semantic-generator-v2, safe mode placeholders, fallback mutation,
   // and aggressive template generation.
   // ========================================================================
-  // Spanish and French are the exceptions: the vNext intent engine has a Hebrew
-  // seed pool and an English one, and nothing in either of them, so sending such
-  // a project through it returns ENGLISH questions on a Spanish or French screen.
-  // Both therefore take the template path below, which reads ES_BANK / FR_BANK and
-  // that language's labels, reasons and value lines. The day the engine gets a
-  // seed pool for a language, drop it from this guard.
-  if (USE_SMART_QUESTIONS_VNEXT && lang !== 'es' && lang !== 'fr') {
+  // Every language except Hebrew and English is an exception here: the vNext
+  // intent engine has a Hebrew seed pool and an English one and nothing else,
+  // so sending such a project through it returns ENGLISH questions on a
+  // Spanish, Japanese or Polish screen — and it does mean ENGLISH, not an empty
+  // set. "What is a digital marketing agency?" was the first suggestion a
+  // German, Dutch, Italian, Brazilian, Japanese and Polish agency saw.
+  //
+  // They all therefore take the TEMPLATE path below, which reads that
+  // language's bank, labels, reasons and value lines. Spanish and French are
+  // named because their banks live in this file; the rest are recognized by
+  // having a pack. The day the engine gets a seed pool for a language, drop
+  // that language from this guard.
+  if (USE_SMART_QUESTIONS_VNEXT && lang !== 'es' && lang !== 'fr' && !packFor(lang)) {
     // Resolve category the same way the legacy path does, so manual profile
     // overrides apply consistently.
     const hasManualEarly = manualProfile && manualProfile.mode === 'manual'
@@ -5668,6 +5860,15 @@ function diversifiedPick(
  */
 function classifyPhrasingPattern(prompt: string, lang: PromptLanguage): string {
   const p = prompt.trim()
+  const pack = packFor(lang)
+  if (pack) {
+    // Without a bucket per phrasing, every question in the language lands in
+    // one and the stage-1 cap of one-per-phrasing cuts a set of seven to two.
+    for (const { bucket, test } of pack.phrasingBuckets) {
+      if (test.test(p)) return bucket
+    }
+    return `${lang}_other`
+  }
   if (lang === 'he') {
     // All recommendation/provider question variants → one bucket.
     if (
@@ -5872,6 +6073,18 @@ const EN_FAMILY_MODIFIERS = new Set([
  */
 function extractKeywordFamily(prompt: string, lang: PromptLanguage): string {
   let core = prompt.toLowerCase().trim()
+
+  const pack = packFor(lang)
+  if (pack) {
+    core = core.replace(pack.familyPrefix, '')
+    core = core.replace(/[?？!.,:;—–-]+$/u, '').replace(/\s+/g, ' ').trim()
+    if (isUnspacedPromptLanguage(lang)) {
+      // No word boundaries to take three words from: the stripped topic IS the
+      // family key, capped so one long question cannot own a family of its own.
+      return core.slice(0, 12)
+    }
+    return core.split(/\s+/).filter(Boolean).slice(0, 3).join(' ')
+  }
 
   if (lang === 'he') {
     // Strip broad template prefix — covers all our generation patterns plus
@@ -6102,7 +6315,10 @@ export function generateSignalChips(
   const candidates: Candidate[] = []
 
   // ---- Strong commercial signals (text-derived) ----
-  const isCommercialPhrase = lang === 'he'
+  const packChips = packFor(lang)
+  const isCommercialPhrase = packChips
+    ? packChips.commercialPattern.test(prompt)
+    : lang === 'he'
     ? /(מחיר|כמה\s+עולה|במבצע|בהנחה|לקנות|להזמין|זול|משתלם|טווח\s+מחירים|העלות)/.test(prompt)
     : lang === 'es'
     ? /(precio|cu[áa]nto\s+cuesta|coste|tarifa|comprar|contratar|barat[oa]|oferta|descuento|econ[óo]mic[oa])/i.test(prompt)
@@ -6211,20 +6427,36 @@ export function generateValueReason(
   lang: PromptLanguage,
   hasCity: boolean
 ): string {
-  const isCommercial = lang === 'he'
+  const pack = packFor(lang)
+  const isCommercial = pack
+    ? pack.commercialPattern.test(prompt)
+    : lang === 'he'
     ? /(מחיר|כמה\s+עולה|במבצע|בהנחה|לקנות|להזמין|זול|משתלם)/.test(prompt)
     : lang === 'es'
     ? /(precio|cu[áa]nto\s+cuesta|coste|tarifa|comprar|contratar|barat[oa]|oferta|descuento)/i.test(prompt)
     : lang === 'fr'
     ? /(prix|combien\s+co[ûu]te|co[ûu]t|tarif|acheter|commander|pas\s+cher|moins\s+cher|promo|remise)/i.test(prompt)
     : /(price|cost|how\s+much|to\s+buy|order|cheap|discount)/i.test(prompt)
-  const hasLocation = lang === 'he'
+  const hasLocation = pack
+    ? pack.locationPattern.test(prompt)
+    : lang === 'he'
     ? /(תל\s+אביב|ירושלים|חיפה|ראשון|פתח\s+תקווה|רמת\s+גן|אילת|נתניה|רעננה|הרצליה|באר\s+שבע|בעיר\s+שלי|באזור)/.test(prompt)
     : lang === 'es'
     ? /(cerca\s+de\s+m[íi]|en\s+mi\s+(?:ciudad|zona|barrio)|cercan[oa])/i.test(prompt)
     : lang === 'fr'
     ? /(pr[èe]s\s+de\s+(?:moi|chez\s+moi)|dans\s+ma\s+(?:ville|r[ée]gion|commune)|[àa]\s+proximit[ée])/i.test(prompt)
     : /(near\s+me|in\s+my\s+(?:city|area)|nearby)/i.test(prompt)
+
+  if (pack) {
+    const r = pack.valueReason
+    if (isCommercial || intent === 'transactional' || intent === 'commercial') return r.commercial
+    if (intent === 'comparison' || intent === 'alternatives' || intent === 'brand') return r.competitive
+    if (intent === 'local' || hasLocation) return r.local
+    if (intent === 'pre_purchase') return r.prePurchase
+    if (intent === 'recommendation' && score >= 85) return r.recommendation
+    if (score >= 88) return r.frequent
+    return r.rare
+  }
 
   if (lang === 'he') {
     if (isCommercial || intent === 'transactional' || intent === 'commercial') {

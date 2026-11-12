@@ -135,8 +135,13 @@ function main() {
 
   // ── 9) The layers with no Portuguese bank fall back to ENGLISH ────────────
   check('9. toHebrewOrEnglish sends Portuguese to English, never to Hebrew', toHebrewOrEnglish('pt-BR') === 'en')
-  check('9a. the AI-visibility templates answer English for Portuguese, not Hebrew',
-    normalizeLanguage('pt-BR') === 'en' && normalizeLanguage('pt') === 'en')
+  // The AI-visibility templates USED to be one of those layers, and this line
+  // pinned that: `normalizeLanguage('pt-BR') === 'en'`, the best answer
+  // available while the generator had four languages. It has a Brazilian bank
+  // of its own now (lib/ai-visibility/prompt-langs/pt-br.ts), so Portuguese
+  // resolves to ITSELF there and English would be the regression.
+  check('9a. the AI-visibility templates answer Portuguese for Portuguese now',
+    normalizeLanguage('pt-BR') === 'pt-BR' && normalizeLanguage('pt') === 'pt-BR')
   check('9b. MUTATION CONTROL — a Hebrew project is still Hebrew there, and an unknown one still falls back',
     normalizeLanguage('he') === 'he' && normalizeLanguage('ar') === 'he')
 
