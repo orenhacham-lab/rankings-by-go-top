@@ -154,7 +154,7 @@ export const BOOSTER_COMPARE: Record<PublicLocale, ComparisonCopy> = {
         { title: 'תוכן שנכתב ומתפרסם', body: 'תוכנית נושאים חודשית שאתם מאשרים, ואז מאמרים עם תמונות וקישורים פנימיים מתפרסמים לחנות לבד.' },
         { title: 'הפרופיל העסקי בגוגל', body: 'פוסטים לפרופיל באישורכם וטיוטות תשובה לביקורות, מה שחשוב לחנות עם מיקום פיזי או שירות מקומי.' },
         { title: 'מדידה חודשית, לא רק אופטימיזציה', body: 'בדיקה חודשית של המיקומים בגוגל, במפות גוגל ובתשובות של ChatGPT, Gemini ו-Google AI.' },
-        { title: 'גם וורדפרס, ובעשר שפות', body: 'אם יש לכם גם אתר וורדפרס, אותה תוכנית תוכן מפרסמת לשניהם. הממשק והדוחות בשפה שלכם, ובישראל מחיר בשקלים כולל מע״מ.' },
+        { title: 'גם וורדפרס, ובאחת עשרה שפות', body: 'אם יש לכם גם אתר וורדפרס, אותה תוכנית תוכן מפרסמת לשניהם. הממשק והדוחות בשפה שלכם, ובישראל מחיר בשקלים כולל מע״מ.' },
       ],
     },
     faq: {
@@ -286,7 +286,7 @@ export const BOOSTER_COMPARE: Record<PublicLocale, ComparisonCopy> = {
         { title: 'Content written and published', body: 'A monthly topic plan you approve, and then articles with images and internal links publish to the store by themselves.' },
         { title: 'Your Google Business Profile', body: 'Posts to the profile with your consent and drafted replies to reviews, which matters for a store with a physical location or a local service.' },
         { title: 'Monthly measurement, not only optimisation', body: 'A monthly check of your positions in Google, in Google Maps and in the answers from ChatGPT, Gemini and Google AI.' },
-        { title: 'WordPress too, in ten languages', body: 'If you also run a WordPress site, the same content plan publishes to both. Interface and reports in your language, and in Israel a price in shekels with VAT included.' },
+        { title: 'WordPress too, in eleven languages', body: 'If you also run a WordPress site, the same content plan publishes to both. Interface and reports in your language, and in Israel a price in shekels with VAT included.' },
       ],
     },
     faq: {
@@ -418,7 +418,7 @@ export const BOOSTER_COMPARE: Record<PublicLocale, ComparisonCopy> = {
         { title: 'Contenido escrito y publicado', body: 'Un plan mensual de temas que tú apruebas, y después los artículos con imágenes y enlaces internos se publican solos en la tienda.' },
         { title: 'Tu Perfil de Empresa de Google', body: 'Publicaciones en el perfil con tu consentimiento y borradores de respuesta a las reseñas, algo que importa en una tienda con local físico o servicio local.' },
         { title: 'Medición mensual, no solo optimización', body: 'Una comprobación mensual de tus posiciones en Google, en Google Maps y en las respuestas de ChatGPT, Gemini y Google AI.' },
-        { title: 'También WordPress, en diez idiomas', body: 'Si además tienes un sitio WordPress, el mismo plan de contenidos publica en los dos. Interfaz e informes en tu idioma.' },
+        { title: 'También WordPress, en once idiomas', body: 'Si además tienes un sitio WordPress, el mismo plan de contenidos publica en los dos. Interfaz e informes en tu idioma.' },
       ],
     },
     faq: {
@@ -550,7 +550,7 @@ export const BOOSTER_COMPARE: Record<PublicLocale, ComparisonCopy> = {
         { title: 'Conteúdo escrito e publicado', body: 'Um plano mensal de temas que você aprova, e depois os artigos com imagens e links internos são publicados na loja sozinhos.' },
         { title: 'Seu Perfil da Empresa no Google', body: 'Publicações no perfil com o seu consentimento e rascunhos de resposta às avaliações, o que importa para uma loja com ponto físico ou serviço local.' },
         { title: 'Medição mensal, não só otimização', body: 'Uma verificação mensal das suas posições no Google, no Google Maps e nas respostas do ChatGPT, do Gemini e do Google AI.' },
-        { title: 'WordPress também, em dez idiomas', body: 'Se você também tem um site WordPress, o mesmo plano de conteúdo publica nos dois. Interface e relatórios no seu idioma.' },
+        { title: 'WordPress também, em onze idiomas', body: 'Se você também tem um site WordPress, o mesmo plano de conteúdo publica nos dois. Interface e relatórios no seu idioma.' },
       ],
     },
     faq: {
@@ -682,7 +682,7 @@ export const BOOSTER_COMPARE: Record<PublicLocale, ComparisonCopy> = {
         { title: 'Du contenu écrit et publié', body: 'Un plan de sujets mensuel que vous validez, puis des articles avec images et liens internes qui se publient seuls sur la boutique.' },
         { title: 'Votre fiche d’établissement Google', body: 'Des publications sur la fiche avec votre accord et des brouillons de réponse aux avis, ce qui compte pour une boutique avec un local ou un service local.' },
         { title: 'Une mesure mensuelle, pas seulement de l’optimisation', body: 'Une vérification mensuelle de vos positions dans Google, dans Google Maps et dans les réponses de ChatGPT, Gemini et Google AI.' },
-        { title: 'WordPress aussi, en dix langues', body: 'Si vous avez aussi un site WordPress, le même plan de contenu publie sur les deux. Interface et rapports dans votre langue.' },
+        { title: 'WordPress aussi, en onze langues', body: 'Si vous avez aussi un site WordPress, le même plan de contenu publie sur les deux. Interface et rapports dans votre langue.' },
       ],
     },
     faq: {
@@ -814,7 +814,7 @@ export const BOOSTER_COMPARE: Record<PublicLocale, ComparisonCopy> = {
         { title: 'Contenuti scritti e pubblicati', body: 'Un piano mensile di argomenti che approvate voi, e poi articoli con immagini e link interni che si pubblicano da soli sul negozio.' },
         { title: 'Il vostro profilo dell’attività su Google', body: 'Pubblicazioni sul profilo con il vostro consenso e bozze di risposta alle recensioni, cosa che conta per un negozio con una sede fisica o un servizio locale.' },
         { title: 'Misurazione mensile, non solo ottimizzazione', body: 'Un controllo mensile delle vostre posizioni su Google, su Google Maps e nelle risposte di ChatGPT, Gemini e Google AI.' },
-        { title: 'Anche WordPress, in dieci lingue', body: 'Se avete anche un sito WordPress, lo stesso piano di contenuti pubblica su entrambi. Interfaccia e report nella vostra lingua.' },
+        { title: 'Anche WordPress, in undici lingue', body: 'Se avete anche un sito WordPress, lo stesso piano di contenuti pubblica su entrambi. Interfaccia e report nella vostra lingua.' },
       ],
     },
     faq: {
@@ -946,7 +946,7 @@ export const BOOSTER_COMPARE: Record<PublicLocale, ComparisonCopy> = {
         { title: 'Inhalte, die geschrieben und veröffentlicht werden', body: 'Ein monatlicher Themenplan, dem Sie zustimmen, und danach veröffentlichen sich Artikel mit Bildern und internen Links von selbst im Shop.' },
         { title: 'Ihr Google-Unternehmensprofil', body: 'Beiträge im Profil mit Ihrer Zustimmung und Antwortentwürfe auf Bewertungen, was für einen Shop mit Ladengeschäft oder lokalem Service zählt.' },
         { title: 'Monatliche Messung, nicht nur Optimierung', body: 'Eine monatliche Prüfung Ihrer Positionen in Google, in Google Maps und in den Antworten von ChatGPT, Gemini und Google AI. Das System misst jeden Monat.' },
-        { title: 'Auch WordPress, in zehn Sprachen', body: 'Wenn Sie auch eine WordPress-Website haben, veröffentlicht derselbe Inhaltsplan auf beiden. Oberfläche und Berichte in Ihrer Sprache.' },
+        { title: 'Auch WordPress, in elf Sprachen', body: 'Wenn Sie auch eine WordPress-Website haben, veröffentlicht derselbe Inhaltsplan auf beiden. Oberfläche und Berichte in Ihrer Sprache.' },
       ],
     },
     faq: {
@@ -1078,7 +1078,7 @@ export const BOOSTER_COMPARE: Record<PublicLocale, ComparisonCopy> = {
         { title: '書かれて公開されるコンテンツ', body: 'お客様が承認する月次のテーマ計画があり、そのあとは画像と内部リンクを備えた記事がストアへ自動で公開されます。' },
         { title: 'Google ビジネス プロフィール', body: 'お客様の同意のうえでのプロフィールへの投稿と、クチコミへの返信案です。実店舗や地域向けサービスのあるストアには重要です。' },
         { title: '最適化だけでなく月次の計測', body: 'Google、Google マップ、そして ChatGPT、Gemini、Google AI の回答における順位を毎月確認します。' },
-        { title: 'WordPress にも、10言語で', body: 'WordPress のサイトもお持ちなら、同じコンテンツ計画が両方へ公開します。画面もレポートもお客様の言語です。' },
+        { title: 'WordPress にも、11言語で', body: 'WordPress のサイトもお持ちなら、同じコンテンツ計画が両方へ公開します。画面もレポートもお客様の言語です。' },
       ],
     },
     faq: {
@@ -1210,7 +1210,7 @@ export const BOOSTER_COMPARE: Record<PublicLocale, ComparisonCopy> = {
         { title: 'Content die geschreven en gepubliceerd wordt', body: 'Een maandelijks onderwerpenplan dat u goedkeurt, en daarna publiceren artikelen met afbeeldingen en interne links zichzelf naar de winkel.' },
         { title: 'Uw Google-bedrijfsprofiel', body: 'Berichten op het profiel met uw toestemming en concept-antwoorden op reviews, wat telt voor een winkel met een fysieke locatie of een lokale dienst.' },
         { title: 'Maandelijkse meting, niet alleen optimalisatie', body: 'Een maandelijkse controle van uw posities in Google, in Google Maps en in de antwoorden van ChatGPT, Gemini en Google AI.' },
-        { title: 'WordPress ook, in tien talen', body: 'Heeft u ook een WordPress-site, dan publiceert hetzelfde contentplan naar beide. Interface en rapporten in uw taal.' },
+        { title: 'WordPress ook, in elf talen', body: 'Heeft u ook een WordPress-site, dan publiceert hetzelfde contentplan naar beide. Interface en rapporten in uw taal.' },
       ],
     },
     faq: {
@@ -1342,7 +1342,7 @@ export const BOOSTER_COMPARE: Record<PublicLocale, ComparisonCopy> = {
         { title: 'Treści napisane i opublikowane', body: 'Miesięczny plan tematów, który Państwo zatwierdzają, a potem artykuły z obrazami i linkami wewnętrznymi publikują się w sklepie same.' },
         { title: 'Państwa Profil Firmy w Google', body: 'Wpisy w profilu za Państwa zgodą i projekty odpowiedzi na opinie, co ma znaczenie dla sklepu z lokalem albo usługą lokalną.' },
         { title: 'Pomiar co miesiąc, nie tylko optymalizacja', body: 'Comiesięczne sprawdzenie pozycji w Google, w Mapach Google i w odpowiedziach ChatGPT, Gemini oraz Google AI.' },
-        { title: 'Także WordPress, w dziesięciu językach', body: 'Jeśli mają Państwo również stronę na WordPressie, ten sam plan treści publikuje w obu. Interfejs i raporty w Państwa języku.' },
+        { title: 'Także WordPress, w jedenastu językach', body: 'Jeśli mają Państwo również stronę na WordPressie, ten sam plan treści publikuje w obu. Interfejs i raporty w Państwa języku.' },
       ],
     },
     faq: {
@@ -1364,5 +1364,136 @@ export const BOOSTER_COMPARE: Record<PublicLocale, ComparisonCopy> = {
       ],
     },
     close: { title: 'Sprawdźcie, gdzie stoi sklep, bez rejestracji' },
+  },
+  ko: {
+    competitor: 'Booster SEO',
+    eyebrow: 'Go Top SEO와 Booster SEO',
+    metaTitle: 'Go Top SEO와 Booster SEO | Shopify SEO 앱 비교',
+    metaDescription:
+      'Shopify SEO 앱은 쇼핑몰을 정리합니다. Go Top SEO와 Booster SEO, Avada 비교: 각자 무엇을 고치는지, 무엇이 쓰이는지, 무엇이 측정되는지, 그리고 무료 앱이 맞는 선택인 경우는 언제인지 적었습니다.',
+    hero: {
+      title: '앱은 쇼핑몰을 정리합니다.',
+      accent: '채우는 일은 여전히 누군가 해야 합니다',
+      subtitle:
+        'Booster와 Avada는 Shopify 쇼핑몰의 메타 태그와 깨진 링크, 이미지를 고칩니다. 둘 다 무료 플랜이 있고 수십 달러부터 시작합니다. 저희는 같은 쇼핑몰에서 다른 일을 합니다. 글을 쓰고 발행하고, Google 비즈니스 프로필에 올리고, 한 달에 한 번 쇼핑몰이 Google과 Google 지도, AI 답변에서 어디에 있는지 확인합니다.',
+    },
+    table: {
+      eyebrow: '비교',
+      title: 'Shopify 앱스토어의 각 앱 소개 페이지를 기준으로, 각자 무엇을 하는가',
+      checkedOn: CHECKED,
+      sources: SOURCES,
+      rows: [
+        {
+          label: '가격',
+          ours: '월 79달러부터, 세금 별도. 이스라엘에서는 월 249셰켈부터, VAT 포함.',
+          theirs:
+            'Booster는 무료 플랜과 Pro 월 39달러, Premium 월 69달러입니다. Avada는 무료 플랜과 Pro 월 34.95달러, Enterprise 월 99달러입니다.',
+        },
+        {
+          label: '무료 플랜과 체험',
+          ours: '7일 체험, 카드 등록 없이, 언제든 해지. 상시 무료 플랜은 없습니다.',
+          theirs:
+            '둘 다 상시 무료 플랜이 있습니다. 유료 플랜의 체험은 Booster 14일, Avada 7일입니다. 결제는 이미 있는 Shopify 계정을 통하므로 새 카드가 필요하지 않습니다.',
+        },
+        {
+          label: '쇼핑몰 자체의 수정',
+          ours: '일부 수정은 승인하시면 저희 플러그인이 넣습니다. 코드를 읽을 필요가 없습니다.',
+          theirs:
+            'Booster는 Pro 플랜에서 메타 태그와 깨진 링크를 자동으로 고치고 계속 감시한다고 설명합니다. Avada는 페이지와 테마에 적용하는 수정 목록을 설명합니다.',
+        },
+        {
+          label: '이미지와 속도',
+          ours: '이미지를 압축하지 않고 쇼핑몰 속도 작업도 하지 않습니다. 제품에 들어 있지 않습니다.',
+          theirs:
+            '이쪽이 그들의 강점입니다. Booster는 월 5GB 용량의 이미지 압축과 Premium 플랜의 파일명 자동 지정을 제공합니다. Avada는 모든 플랜에서 이미지 최적화와 쇼핑몰 속도 개선을 제공합니다.',
+        },
+        {
+          label: '글은 누가 쓰는가',
+          ours: '시스템입니다. 승인하시면 주제와 본문, 이미지, 내부 링크까지 만듭니다.',
+          theirs:
+            'Booster 소개 페이지의 기능과 플랜에는 글이나 블로그 작성이 나오지 않습니다. Avada 소개 페이지는 온페이지 SEO 안에 "blog posts"를 적어 두었지만 범위는 설명하지 않습니다.',
+        },
+        {
+          label: '쇼핑몰과 사이트 발행',
+          ours: '같은 콘텐츠 계획에서 Shopify와 WordPress에 자동으로 발행합니다.',
+          theirs: '두 앱 모두 Shopify 쇼핑몰에서 동작합니다.',
+        },
+        {
+          label: 'Google 순위 측정',
+          ours: 'Google 자연 검색에서의 순위를 매달 확인합니다.',
+          theirs:
+            'Booster의 Premium 플랜은 365일 기록이 붙은 Google Search Console 데이터를 보여 줍니다. 즉 Google 자신의 데이터입니다. 두 소개 페이지 모두 Google과 지도, AI 답변에서의 순위 측정은 설명하지 않습니다.',
+        },
+        {
+          label: 'Google 지도와 비즈니스 프로필',
+          ours: '승인하시면 프로필에 게시물을 올리고, 리뷰 답변 초안을 만들고, Google 지도 순위를 매달 확인합니다.',
+          theirs: 'Google 비즈니스 프로필과 리뷰, 지도는 두 소개 페이지 어디에도 적혀 있지 않습니다.',
+        },
+        {
+          label: 'AI 답변',
+          ours: 'ChatGPT와 Gemini, Google AI에서 매달 자동으로 확인합니다.',
+          theirs:
+            'Booster는 쇼핑몰을 AI 검색에 대비시킵니다. LLMs.txt와 구조화된 데이터, AI를 겨냥한 메타 태그입니다. 그것은 준비입니다. 엔진이 실제로 무엇이라 답하는지에 대한 측정은 소개 페이지에 설명되어 있지 않습니다.',
+        },
+        {
+          label: '리포트',
+          ours: '한 달에 한 번, 한 리포트에 수행한 작업과 측정한 순위가 들어갑니다.',
+          theirs:
+            'Booster는 리포트 화면과 주간 이메일 요약, 수정 이력을 제공하고 Premium 플랜에서 PDF 리포트를 줍니다. Avada는 온페이지 감사를 제공하며 Pro 플랜에서는 제한이 없습니다.',
+        },
+      ],
+    },
+    theirStrengths: {
+      eyebrow: 'Shopify 앱이 맞는 선택인 경우',
+      title: '이런 경우에는 저희가 아니라 그쪽을 쓰십시오',
+      intro: '그쪽이 더 싸고 1분이면 설치되며, 큰 카탈로그를 관리하는 일에서는 저희보다 낫습니다.',
+      items: [
+        {
+          title: '문제가 카탈로그 정리일 때',
+          body:
+            '상품 페이지에 메타 설명이 없고 깨진 링크가 있고 이미지가 무겁다면, 무료 플랜이나 월 39달러 앱이 맞는 구매이며 그렇게 말하는 것이 정직합니다. Booster는 묻지 않고 뒤에서 태그와 링크를 고치고, Avada는 상품이 수천 개여도 이미지와 속도를 다룹니다. 이미지와 속도 작업은 저희가 아예 하지 않습니다.',
+        },
+        {
+          title: '부담 없이 시작하고 싶을 때',
+          body:
+            '둘 다 체험이 아니라 상시 무료 플랜이 있습니다. 설치는 1분쯤 걸리고 결제는 이미 쓰고 계신 Shopify 계정을 통하므로 새 카드도 새 계정도 필요하지 않습니다. 저희는 카드 없이 7일이고, 그 뒤에는 유료입니다.',
+        },
+        {
+          title: '뒤에 판매자가 많은 제품을 원할 때',
+          body:
+            '2026년 11월 11일 기준 Booster 소개 페이지는 리뷰 5,485개에 4.8점, Avada는 4,692개에 4.9점을 보여 주었습니다. 설치하고 남아서 글을 남긴 판매자들입니다. 저희는 Shopify 앱스토어에 그만큼의 리뷰가 없으며, 이것은 선택에서 정당한 근거입니다.',
+        },
+      ],
+    },
+    ourStrengths: {
+      eyebrow: '저희가 더 맞는 경우',
+      title: '쇼핑몰을 채우고 그것이 통했는지 확인할 사람이 필요할 때',
+      intro: '앱은 이미 있는 것을 정리합니다. 저희는 새 콘텐츠와 지역 쪽, 그리고 측정을 더합니다.',
+      items: [
+        { title: '쓰이고 발행되는 콘텐츠', body: '승인하실 한 달치 주제 계획이 먼저 오고, 그다음 이미지와 내부 링크가 들어간 글이 쇼핑몰에 스스로 발행됩니다.' },
+        { title: '내 Google 비즈니스 프로필', body: '승인하시면 프로필 게시물과 리뷰 답변 초안을 만듭니다. 매장이 있거나 지역 서비스를 하는 쇼핑몰에게 중요합니다.' },
+        { title: '최적화만이 아니라 매달 측정', body: 'Google과 Google 지도, 그리고 ChatGPT와 Gemini, Google AI의 답변에서 순위를 매달 확인합니다.' },
+        { title: 'WordPress도, 열한 개 언어로', body: 'WordPress 사이트도 있다면 같은 콘텐츠 계획이 양쪽에 발행합니다. 화면과 리포트는 내 언어로 제공합니다.' },
+      ],
+    },
+    faq: {
+      eyebrow: '질문',
+      title: '정하기 전에 많이 묻는 것',
+      items: [
+        {
+          q: '앱을 그대로 두고 저희를 더할 수 있습니까?',
+          a: '네, 합리적인 조합입니다. 앱은 태그와 깨진 링크, 이미지를 맡고, 저희는 글과 Google 비즈니스 프로필, 매달 측정을 더합니다. 충돌하지 않습니다. 저희는 이미지를 압축하지 않고, 그쪽은 콘텐츠 계획에 따라 글을 쓰지 않습니다.',
+        },
+        {
+          q: '쇼핑몰 속도와 이미지도 다룹니까?',
+          a: '아니요. 저희 제품에 들어 있지 않으며, 그것이 주된 문제라면 그런 앱이 더 잘, 더 싸게 해결합니다. 저희 일은 콘텐츠와 지역 쪽, 그리고 측정입니다.',
+        },
+        {
+          q: 'Avada는 어떻습니까? 더 쌉니다.',
+          a: '맞습니다. Pro가 월 34.95달러이고 무료 플랜도 있습니다. 이미지와 속도, 온페이지 감사에 강합니다. 소개 페이지는 온페이지 SEO 안에 "blog posts"를 적어 두었지만 범위를 설명하지 않으니, 꾸준한 작성과 발행을 찾으신다면 그쪽에 직접 물어보시기 바랍니다.',
+        },
+      ],
+    },
+    close: { title: '가입하지 않고, 쇼핑몰이 지금 어디에 있는지 확인해 보십시오' },
   },
 }

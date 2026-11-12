@@ -128,6 +128,21 @@ export const REASON_TEXT: Record<ContentLanguage, ReasonText> = {
     supportingTopic: 'Temat uzupełniający na podstawie danych ze strony',
     numberLocale: 'pl-PL',
   },
+  // 합니다체, and the quoted query in the Korean corner brackets 「 」 rather than
+  // the full-width 『 』 or a latin double quote: 「 」 is what Korean prose uses
+  // to set off a term, and it is the one piece of non-ASCII punctuation the
+  // Korean tree keeps (the ko dictionary's rule is ASCII sentence punctuation,
+  // which these are not). The counter on a count of searches is 회.
+  ko: {
+    fillsGap: '이 주제는 업체가 다루는 분야의 콘텐츠 공백을 메웁니다.',
+    freshAngle: '이 주제는 사이트에 이미 있는 콘텐츠에 새로운 관점을 더합니다.',
+    supportedByExisting: '사이트에 이미 있는 페이지와 상품이 이 주제를 뒷받침합니다.',
+    demand: (query, volume) => `키워드 조사에 따르면 「${query}」의 월 검색량은 약 ${volume}회입니다.`,
+    neutral: '이 주제는 업체의 사업 분야와 조사에서 찾은 검색어에 맞습니다.',
+    foundInSearchData: (volume) => `검색 데이터에서 찾았으며 월 검색량은 약 ${volume}회`,
+    supportingTopic: '사이트 데이터를 바탕으로 한 보완 주제',
+    numberLocale: 'ko-KR',
+  },
 }
 
 /**

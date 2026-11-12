@@ -113,6 +113,16 @@ export const MARKETPLACE_CLAIM_COPY: Record<PublicLocale, MarketplaceClaimCopy> 
     missingToken: 'Ten link nie zawiera numeru zakupu.',
     toDashboard: 'Przejdź do aplikacji',
   },
+  ko: {
+    title: '구매 내역',
+    claimed: '구매가 계정에 연결되었고 플랜이 활성화되었습니다. 이제 시작하실 수 있습니다.',
+    alreadyClaimed: '이 구매는 이미 계정에 연결되어 있습니다. 플랜은 활성 상태입니다.',
+    unavailable: '이 링크는 유효하지 않습니다. 결제하셨는데 이용이 열리지 않았다면 사이트를 통해 연락해 주십시오. 바로 해결해 드립니다.',
+    needsOperator: '구매는 기록되었습니다. 그중 일부는 저희 쪽에서 직접 마무리해야 합니다. 처리 중이며, 다시 결제하실 필요는 없습니다.',
+    failed: '저희 쪽에서 문제가 생겼습니다. 잠시 뒤에 페이지를 다시 불러와 주십시오.',
+    missingToken: '이 링크에 구매 번호가 들어 있지 않습니다.',
+    toDashboard: '앱으로 이동',
+  },
   nl: {
     title: 'Uw aankoop',
     claimed: 'De aankoop is aan uw account toegewezen en het pakket is actief. U kunt beginnen.',

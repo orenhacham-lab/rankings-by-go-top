@@ -234,6 +234,7 @@ export const nl = {
     de: 'Deutsch',
     nl: 'Nederlands',
     pl: 'Polski',
+    ko: '한국어',
     aria: 'Taal van de website wijzigen',
   },
   cookie: {

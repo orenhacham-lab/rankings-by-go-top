@@ -85,6 +85,18 @@ export const REPORT_CONSENT_VERSION_NL = 'report-email-nl-v1'
  */
 export const REPORT_CONSENT_VERSION_PL = 'report-email-pl-v1'
 
+/**
+ * Korean likewise, at v1: the Korean sentence has never been shown, so no
+ * earlier Korean record can be confused with it. The wording follows PIPA
+ * (개인정보 보호법) art. 22, which wants each purpose consented to separately and
+ * in plain terms, and the marketing box is its own decision for art. 22(5) —
+ * a service may not be refused because optional consent was declined — and for
+ * art. 50 of the Network Act (정보통신망법), which requires prior consent for
+ * advertising e-mail, the "(광고)" label in the subject line and a withdrawal
+ * route in every message.
+ */
+export const REPORT_CONSENT_VERSION_KO = 'report-email-ko-v1'
+
 /** The optional second decision, versioned the same way and never shared with the first. */
 export const MARKETING_CONSENT_VERSION = 'marketing-email-v1'
 export const MARKETING_CONSENT_VERSION_ES = 'marketing-email-es-v1'
@@ -95,6 +107,7 @@ export const MARKETING_CONSENT_VERSION_JA = 'marketing-email-ja-v1'
 export const MARKETING_CONSENT_VERSION_DE = 'marketing-email-de-v1'
 export const MARKETING_CONSENT_VERSION_NL = 'marketing-email-nl-v1'
 export const MARKETING_CONSENT_VERSION_PL = 'marketing-email-pl-v1'
+export const MARKETING_CONSENT_VERSION_KO = 'marketing-email-ko-v1'
 
 /**
  * One id for a refusal in every language. A refusal has no wording to prove —
@@ -117,6 +130,7 @@ const CONSENT: Record<PublicLocale, string> = {
   de: 'Ich bin damit einverstanden, den Analysebericht zu dieser Website von Go Top per E-Mail zu erhalten.',
   pl: 'Wyrażam zgodę na otrzymanie od Go Top raportu z analizy tej witryny na podany adres e-mail.',
   nl: 'Ik ga ermee akkoord het onderzoeksrapport over deze website per e-mail van Go Top te ontvangen.',
+  ko: 'Go Top으로부터 이 웹사이트의 분석 리포트를 이메일로 받는 데 동의합니다.',
 }
 
 /** What the optional box says. Ticking it is the only way marketing is allowed. */
@@ -142,6 +156,12 @@ const MARKETING: Record<PublicLocale, string> = {
   // advertising e-mail, separate from the report, and a withdrawal route in
   // every message.
   nl: 'Ik ga er daarnaast mee akkoord van Go Top nieuws en marketingcontent per e-mail te ontvangen. Ik kan mijn toestemming op elk moment intrekken via de link in elke e-mail.',
+  // Korea: art. 50 정보통신망법 requires prior consent for advertising e-mail,
+  // separately from the report, the "(광고)" mark in the subject line, and a
+  // withdrawal route in every message. PIPA art. 22(5) makes this optional:
+  // declining it may not cost the visitor the report they asked for, which is
+  // why the sentence says so in as many words.
+  ko: 'Go Top으로부터 소식 및 마케팅 정보를 이메일로 받는 데도 동의합니다. 광고 메일의 제목에는 "(광고)" 표시가 붙으며, 동의는 모든 메일에 있는 링크로 언제든지 철회할 수 있습니다. 이 항목은 선택이며, 동의하지 않아도 리포트는 받을 수 있습니다.',
 }
 
 /** What the record says when the optional box was left unticked. */
@@ -156,6 +176,7 @@ const MARKETING_DECLINED: Record<PublicLocale, string> = {
   de: 'Neuigkeiten und Marketinginhalte wurden angeboten und nicht eingewilligt.',
   nl: 'Nieuws en marketingcontent zijn aangeboden en niet geaccepteerd.',
   pl: 'Informacje i treści marketingowe zostały zaproponowane i nie zostały zaakceptowane.',
+  ko: '소식 및 마케팅 정보 수신을 안내했으나 동의하지 않았습니다.',
 }
 
 const CONSENT_VERSION: Record<PublicLocale, string> = {
@@ -169,6 +190,7 @@ const CONSENT_VERSION: Record<PublicLocale, string> = {
   de: REPORT_CONSENT_VERSION_DE,
   nl: REPORT_CONSENT_VERSION_NL,
   pl: REPORT_CONSENT_VERSION_PL,
+  ko: REPORT_CONSENT_VERSION_KO,
 }
 
 const MARKETING_VERSION: Record<PublicLocale, string> = {
@@ -182,6 +204,7 @@ const MARKETING_VERSION: Record<PublicLocale, string> = {
   de: MARKETING_CONSENT_VERSION_DE,
   nl: MARKETING_CONSENT_VERSION_NL,
   pl: MARKETING_CONSENT_VERSION_PL,
+  ko: MARKETING_CONSENT_VERSION_KO,
 }
 
 export function reportConsentText(locale: PublicLocale): string {
@@ -624,7 +647,50 @@ const nl: ResearchScreenCopy = {
   },
 }
 
-const SCREEN: Record<PublicLocale, ResearchScreenCopy> = { he, en, es, 'pt-BR': ptBR, fr, it, ja, de, nl, pl }
+// KOREAN. 합니다체 throughout, which is the register a Korean business page
+// uses, and never the provider's own error: 'forbidden' says the site refuses
+// automated readers, not what the fetcher saw. The example address is a .kr
+// one, because an address a Korean visitor would actually type is the point of
+// the hint.
+const ko: ResearchScreenCopy = {
+  errors: {
+    not_found: '전체 분석은 여기에서 제공되지 않습니다.',
+    invalid_url: '주소가 올바르지 않은 것 같습니다. example.kr 과 같은 형식으로 다시 입력해 주십시오.',
+    blocked_url: '공개된 웹사이트만 분석할 수 있습니다. 내부 주소, IP 주소, 다른 사이트로 이동하는 주소는 지원하지 않습니다.',
+    unreachable: '사이트에 연결할 수 없었습니다. 주소를 확인하신 뒤 다시 시도해 주십시오.',
+    not_html: '이 주소에서는 읽을 수 있는 웹페이지가 반환되지 않습니다.',
+    forbidden: '이 사이트는 자동 수집을 차단하고 있으며, Google 검색에도 해당 사이트의 페이지가 나타나지 않습니다. 같은 사이트의 다른 주소로 시도해 주십시오.',
+    rate_limited: '짧은 시간에 여러 번 분석을 실행하셨습니다. 몇 분 뒤에 다시 시도해 주십시오.',
+    daily_cap: '오늘은 무료 분석 이용이 많습니다. 잠시 뒤에 다시 시도하시거나, 계정을 만드시면 분석이 고객님의 프로젝트에서 실행됩니다.',
+    unavailable: '전체 분석은 현재 이용할 수 없습니다.',
+    internal: '처리 중 문제가 발생했습니다. 잠시 뒤에 다시 시도해 주십시오.',
+  },
+  unavailableTitle: '전체 분석은 현재 이용할 수 없습니다',
+  unavailableBody: '그동안 사이트 빠른 점검을 실행했습니다.',
+  report: {
+    link: '리포트를 이메일로 받기',
+    title: '리포트를 이메일로 받기',
+    body: '이메일 주소만 남겨 주시면 사이트 분석 리포트를 해당 주소로 보내 드립니다.',
+    emailLabel: '이메일 주소',
+    emailPlaceholder: 'name@example.kr',
+    consent: CONSENT.ko,
+    marketing: MARKETING.ko,
+    privacy: '개인정보 처리방침',
+    submit: '신청 저장하기',
+    sending: '저장 중…',
+    saved: '접수했습니다. 분석 리포트를 이 주소로 보내 드립니다.',
+    errors: {
+      consent_required: '리포트를 보내 드리려면 동의 항목을 선택해 주십시오.',
+      invalid_email: '이메일 주소가 올바르지 않은 것 같습니다.',
+      invalid_claim: '이 분석은 더 이상 보낼 수 없습니다. 분석을 다시 실행해 주십시오.',
+      rate_limited: '짧은 시간에 여러 번 신청하셨습니다. 잠시 뒤에 다시 시도해 주십시오.',
+      unavailable: '지금은 신청을 저장할 수 없었습니다. 잠시 뒤에 다시 시도해 주십시오.',
+      internal: '처리 중 문제가 발생했습니다. 잠시 뒤에 다시 시도해 주십시오.',
+    },
+  },
+}
+
+const SCREEN: Record<PublicLocale, ResearchScreenCopy> = { he, en, es, 'pt-BR': ptBR, fr, it, ja, de, nl, pl, ko }
 
 export function researchScreenCopy(locale: PublicLocale): ResearchScreenCopy {
   return SCREEN[locale] ?? he

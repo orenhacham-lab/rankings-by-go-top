@@ -59,6 +59,8 @@ export const COUNTRY_GEO_TARGETS: Record<string, number> = {
   DE: 2276, // Germany
   NL: 2528, // Netherlands
   PL: 2616, // Poland
+  KR: 2410, // South Korea — read back from the live API on 12 Nov 2026, the way
+  //          Poland's 2616 was, rather than taken from memory.
   // Belgium (2056) is deliberately ABSENT. Flemish readers read the Dutch
   // pages, but Belgium was never measured in Keyword Planner and its prices
   // were never set, and offering Austria and Switzerland on German's say-so had
@@ -80,6 +82,7 @@ export const LANGUAGE_IDS: Record<string, number> = {
   de: 1001, // German
   nl: 1010, // Dutch
   pl: 1030, // Polish
+  ko: 1012, // Korean — read back from the live API on 12 Nov 2026
 }
 
 export const SUPPORTED_COUNTRIES = ['IL', 'US', 'GB', 'ES', 'MX', 'AR', 'BR', 'PT', 'GR', 'CY'] as const

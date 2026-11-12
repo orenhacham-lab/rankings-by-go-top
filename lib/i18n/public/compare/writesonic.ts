@@ -135,7 +135,7 @@ export const WRITESONIC_COMPARE: Record<PublicLocale, ComparisonCopy> = {
         { title: 'גם הצד המקומי', body: 'פוסטים לפרופיל העסקי בגוגל באישורכם, טיוטות תשובה לביקורות, ובדיקה חודשית של המיקום בגוגל מפות.' },
         { title: 'שופיפיי וגם וורדפרס', body: 'פרסום אוטומטי לשתי הפלטפורמות, עם אותו דוח חודשי.' },
         { title: 'בלי שמישהו יפעיל את זה', body: 'תוכנית נושאים חודשית שאתם מאשרים, ואז הכל רץ לבד — בלי פרומפטים להגדיר ובלי לוח בקרה לפתוח.' },
-        { title: 'עברית ועשר שפות', body: 'הממשק, התוכן והדוחות בשפה שלכם, ובישראל מחיר בשקלים כולל מע״מ.' },
+        { title: 'עברית ואחת עשרה שפות', body: 'הממשק, התוכן והדוחות בשפה שלכם, ובישראל מחיר בשקלים כולל מע״מ.' },
       ],
     },
     faq: {
@@ -260,7 +260,7 @@ export const WRITESONIC_COMPARE: Record<PublicLocale, ComparisonCopy> = {
         { title: 'The local side as well', body: 'Posts to your Google Business Profile with your consent, drafted replies to reviews, and a monthly check of your position in Google Maps.' },
         { title: 'Shopify as well as WordPress', body: 'Automatic publishing to both platforms, with the same monthly report.' },
         { title: 'Nobody has to run it', body: 'A monthly topic plan you approve, and then it runs by itself — no prompts to configure, no dashboard to open.' },
-        { title: 'Ten languages, Hebrew included', body: 'Interface, content and reports in your language, and in Israel a price in shekels with VAT included.' },
+        { title: 'Eleven languages, Hebrew included', body: 'Interface, content and reports in your language, and in Israel a price in shekels with VAT included.' },
       ],
     },
     faq: {
@@ -385,7 +385,7 @@ export const WRITESONIC_COMPARE: Record<PublicLocale, ComparisonCopy> = {
         { title: 'También el lado local', body: 'Publicaciones en tu perfil de empresa en Google con tu consentimiento, borradores de respuesta a las reseñas y una comprobación mensual de tu posición en Google Maps.' },
         { title: 'Shopify además de WordPress', body: 'Publicación automática en las dos plataformas, con el mismo informe mensual.' },
         { title: 'Nadie tiene que manejarlo', body: 'Un plan mensual de temas que tú apruebas y, después, funciona solo: sin prompts que configurar y sin panel que abrir.' },
-        { title: 'Diez idiomas, hebreo incluido', body: 'Interfaz, contenido e informes en tu idioma y, en Israel, un precio en shekels con IVA incluido.' },
+        { title: 'Once idiomas, hebreo incluido', body: 'Interfaz, contenido e informes en tu idioma y, en Israel, un precio en shekels con IVA incluido.' },
       ],
     },
     faq: {
@@ -510,7 +510,7 @@ export const WRITESONIC_COMPARE: Record<PublicLocale, ComparisonCopy> = {
         { title: 'O lado local também', body: 'Publicações no seu perfil da empresa no Google com o seu consentimento, rascunhos de resposta às avaliações e uma verificação mensal da sua posição no Google Maps.' },
         { title: 'Shopify além de WordPress', body: 'Publicação automática nas duas plataformas, com o mesmo relatório mensal.' },
         { title: 'Ninguém precisa operar', body: 'Um plano mensal de temas que você aprova e, depois, tudo roda sozinho: sem prompts para configurar e sem painel para abrir.' },
-        { title: 'Dez idiomas, hebraico incluído', body: 'Interface, conteúdo e relatórios no seu idioma e, em Israel, um preço em shekels com imposto incluído.' },
+        { title: 'Onze idiomas, hebraico incluído', body: 'Interface, conteúdo e relatórios no seu idioma e, em Israel, um preço em shekels com imposto incluído.' },
       ],
     },
     faq: {
@@ -635,7 +635,7 @@ export const WRITESONIC_COMPARE: Record<PublicLocale, ComparisonCopy> = {
         { title: 'Le volet local aussi', body: "Des publications sur votre fiche d'établissement Google avec votre accord, des brouillons de réponse aux avis, et une vérification mensuelle de votre position dans Google Maps." },
         { title: 'Shopify autant que WordPress', body: 'Une publication automatique sur les deux plateformes, avec le même rapport mensuel.' },
         { title: "Personne n'a à le piloter", body: 'Un plan de sujets mensuel que vous validez, puis tout tourne seul : aucun prompt à configurer, aucun tableau de bord à ouvrir.' },
-        { title: 'Dix langues, hébreu compris', body: "Interface, contenu et rapports dans votre langue, et en Israël un tarif en shekels TVA comprise." },
+        { title: 'Onze langues, hébreu compris', body: "Interface, contenu et rapports dans votre langue, et en Israël un tarif en shekels TVA comprise." },
       ],
     },
     faq: {
@@ -760,7 +760,7 @@ export const WRITESONIC_COMPARE: Record<PublicLocale, ComparisonCopy> = {
         { title: 'Anche il lato locale', body: "Pubblicazioni sul profilo dell'attività su Google con il vostro consenso, bozze di risposta alle recensioni e una verifica mensile della posizione su Google Maps." },
         { title: 'Shopify oltre a WordPress', body: 'Pubblicazione automatica su entrambe le piattaforme, con lo stesso report mensile.' },
         { title: 'Nessuno deve farlo funzionare', body: 'Un piano mensile di argomenti che approvate, e poi tutto gira da solo: nessun prompt da configurare, nessuna dashboard da aprire.' },
-        { title: 'Dieci lingue, ebraico compreso', body: 'Interfaccia, contenuti e report nella vostra lingua e, in Israele, un prezzo in shekel IVA inclusa.' },
+        { title: 'Undici lingue, ebraico compreso', body: 'Interfaccia, contenuti e report nella vostra lingua e, in Israele, un prezzo in shekel IVA inclusa.' },
       ],
     },
     faq: {
@@ -884,7 +884,7 @@ export const WRITESONIC_COMPARE: Record<PublicLocale, ComparisonCopy> = {
         { title: 'Auch die lokale Seite', body: 'Beiträge in Ihrem Google Unternehmensprofil mit Ihrer Einwilligung, vorbereitete Antworten auf Bewertungen und eine monatliche Prüfung Ihrer Position in Google Maps.' },
         { title: 'Shopify genauso wie WordPress', body: 'Automatische Veröffentlichung auf beiden Plattformen, mit demselben Monatsbericht.' },
         { title: 'Niemand muss es bedienen', body: 'Ein monatlicher Themenplan, den Sie freigeben, und danach läuft es von selbst — keine Prompts einzurichten, kein Dashboard zu öffnen.' },
-        { title: 'Zehn Sprachen, Hebräisch inbegriffen', body: 'Oberfläche, Inhalte und Berichte in Ihrer Sprache, und in Israel ein Preis in Schekel inklusive Mehrwertsteuer.' },
+        { title: 'Elf Sprachen, Hebräisch inbegriffen', body: 'Oberfläche, Inhalte und Berichte in Ihrer Sprache, und in Israel ein Preis in Schekel inklusive Mehrwertsteuer.' },
       ],
     },
     faq: {
@@ -1008,7 +1008,7 @@ export const WRITESONIC_COMPARE: Record<PublicLocale, ComparisonCopy> = {
         { title: '地域の側も', body: 'ご同意のうえでGoogleビジネスプロフィールへ投稿し、口コミへの返信の下書きを用意し、Googleマップでの位置を月に一度確認します。' },
         { title: 'WordPressだけでなくShopifyも', body: '両方のプラットフォームへ自動で公開し、月のレポートも同じものです。' },
         { title: '誰も運用しなくてよい', body: '月に一度、題材の計画をご承認いただいたあとは、そのまま動きます。設定するプロンプトも、開くダッシュボードもありません。' },
-        { title: '10の言語、ヘブライ語も', body: '画面、コンテンツ、レポートをご自身の言語で用意し、イスラエルでは付加価値税込みのシェケル建ての価格です。' },
+        { title: '11の言語、ヘブライ語も', body: '画面、コンテンツ、レポートをご自身の言語で用意し、イスラエルでは付加価値税込みのシェケル建ての価格です。' },
       ],
     },
     faq: {
@@ -1132,7 +1132,7 @@ export const WRITESONIC_COMPARE: Record<PublicLocale, ComparisonCopy> = {
         { title: 'Ook de plaatselijke kant', body: 'Berichten in uw Google-bedrijfsprofiel met uw toestemming, voorbereide antwoorden op beoordelingen en een maandelijkse controle van uw positie in Google Maps.' },
         { title: 'Shopify net zo goed als WordPress', body: 'Automatisch publiceren op beide platforms, met hetzelfde maandrapport.' },
         { title: 'Niemand hoeft het te bedienen', body: 'Een maandelijks plan met onderwerpen dat u goedkeurt, en daarna loopt het van zichzelf — geen prompts in te stellen, geen dashboard te openen.' },
-        { title: 'Tien talen, Hebreeuws inbegrepen', body: 'Interface, content en rapporten in uw taal, en in Israël een prijs in sjekel inclusief btw.' },
+        { title: 'Elf talen, Hebreeuws inbegrepen', body: 'Interface, content en rapporten in uw taal, en in Israël een prijs in sjekel inclusief btw.' },
       ],
     },
     faq: {
@@ -1256,7 +1256,7 @@ export const WRITESONIC_COMPARE: Record<PublicLocale, ComparisonCopy> = {
         { title: 'Również strona lokalna', body: 'Wpisy w Profilu Firmy w Google za Państwa zgodą, przygotowane odpowiedzi na opinie i comiesięczne sprawdzenie pozycji w Google Maps.' },
         { title: 'Shopify na równi z WordPressem', body: 'Automatyczna publikacja na obu platformach, z tym samym raportem miesięcznym.' },
         { title: 'Nikt nie musi tego obsługiwać', body: 'Miesięczny plan tematów do zatwierdzenia, a potem wszystko dzieje się samo: żadnych promptów do ustawienia, żadnego panelu do otwierania.' },
-        { title: 'Dziesięć języków, w tym hebrajski', body: 'Interfejs, treści i raporty w Państwa języku, a w Izraelu cena w szeklach z podatkiem VAT.' },
+        { title: 'Jedenaście języków, w tym hebrajski', body: 'Interfejs, treści i raporty w Państwa języku, a w Izraelu cena w szeklach z podatkiem VAT.' },
       ],
     },
     faq: {
@@ -1278,5 +1278,129 @@ export const WRITESONIC_COMPARE: Record<PublicLocale, ComparisonCopy> = {
       ],
     },
     close: { title: 'Proszę sprawdzić bez rejestracji, gdzie jest Państwa strona' },
+  },
+  ko: {
+    competitor: 'Writesonic',
+    eyebrow: 'Go Top SEO와 Writesonic',
+    metaTitle: 'Go Top SEO와 Writesonic | 비교',
+    metaDescription:
+      '시작 가격이 똑같이 79달러인 두 제품입니다. Go Top SEO와 Writesonic 비교: 각자 그 돈을 어디에 쓰는지, 무엇을 측정하는지, 그리고 Writesonic이 더 맞는 경우는 언제인지 적었습니다.',
+    hero: {
+      title: '같은 79달러, 서로 다른 일.',
+      accent: '질문은 어디에 쓰이는가입니다',
+      subtitle:
+        'Writesonic의 Starter 플랜은 연 결제 시 월 79달러이고, 저희도 월 79달러부터 시작합니다. 그들의 돈은 주로 AI 답변이 업체를 언급하는지 깊게 측정하는 데 들어갑니다. 저희 돈은 작성과 발행, 사이트 수정, Google 비즈니스 프로필, 그리고 Google과 지도, AI 답변에서의 매달 확인으로 나뉘어 들어갑니다.',
+    },
+    table: {
+      eyebrow: '비교',
+      title: 'Writesonic 자기 사이트에 적힌 내용을 기준으로, 각자 무엇을 하는가',
+      checkedOn: CHECKED,
+      sources: SOURCES,
+      rows: [
+        {
+          label: '가격',
+          ours: '월 79달러부터, 세금 별도. 이스라엘에서는 월 249셰켈부터, VAT 포함.',
+          theirs:
+            'Starter는 연 결제 시 월 79달러, Basic 199달러, Growth 399달러이고 Enterprise는 문의입니다. 요금 페이지에 월 결제 가격은 나오지 않습니다.',
+        },
+        {
+          label: '시작 플랜에 들어 있는 것',
+          ours: '모든 기능이 시작 플랜에 들어 있습니다. 플랜별로 달라지는 것은 요금 페이지에 있습니다.',
+          theirs:
+            'Starter는 추적 프롬프트 50개, 매일 측정하는 답변 50개, 월 AI 글 15편, 하위 페이지 100개씩 사이트 감사 10회, 사용자 1명, 프로젝트 1개입니다.',
+        },
+        {
+          label: '글은 누가 쓰는가',
+          ours: '시스템입니다. 주제를 승인하시면 본문과 이미지, 내부 링크까지 만듭니다.',
+          theirs: '그들의 시스템도 씁니다. 요금 페이지는 플랜마다 "AI articles" 수를 제한하며, Starter는 월 15편입니다.',
+        },
+        {
+          label: '사이트 발행',
+          ours: 'WordPress와 Shopify에 자동으로 발행합니다.',
+          theirs: '홈페이지에 적힌 발행 연동은 WordPress 하나뿐입니다.',
+        },
+        {
+          label: 'AI 답변',
+          ours: 'ChatGPT와 Gemini, Google AI에서 매달 자동으로 확인합니다.',
+          theirs:
+            'Starter와 Basic, Growth는 ChatGPT와 Gemini, Google AI Overviews를 측정하며 답변을 매일 새로 받습니다. Perplexity와 Claude, Grok, Microsoft Copilot을 포함한 아홉 플랫폼 전체는 Enterprise 플랜에 있습니다.',
+        },
+        {
+          label: 'Google 순위 측정',
+          ours: 'Google 자연 검색에서의 순위를 매달 확인합니다.',
+          theirs:
+            '홈페이지는 연동 목록에 Google Search Console과 Keyword Planner를 적어 두었습니다. 키워드 순위를 재는 전통적인 측정을 설명하는 페이지는 찾지 못했습니다.',
+        },
+        {
+          label: 'Google 지도와 비즈니스 프로필',
+          ours: '승인하시면 프로필에 게시물을 자동으로 올리고, 지도에서의 순위를 매달 확인합니다.',
+          theirs: 'Google 지도와 Google 비즈니스 프로필은 홈페이지에 적혀 있지 않습니다.',
+        },
+        {
+          label: '사이트에서의 작업',
+          ours: '일부 수정은 저희 플러그인이 넣습니다. 코드를 읽을 필요가 없습니다.',
+          theirs:
+            '기회를 모아 보여 주고 클릭 한 번으로 수정을 제안하는 Action Center가 있습니다. Starter에서 에이전트 실행은 "Limited access (10 trial runs)"로 표시되어 있습니다.',
+        },
+        {
+          label: '체험',
+          ours: '7일, 카드 등록 없이, 언제든 해지.',
+          theirs:
+            '요금 페이지 위쪽에 "Start free. No credit card needed."라고 적혀 있습니다. 체험 기간의 길이는 밝히지 않습니다.',
+        },
+      ],
+    },
+    theirStrengths: {
+      eyebrow: 'Writesonic이 더 맞는 경우',
+      title: '이런 상황이라면 Writesonic을 고르십시오',
+      intro: 'AI 답변에서의 가시성에서는 그들이 전문가이고 저희는 아닙니다. 같은 가격으로 그것을 더 깊이 측정합니다.',
+      items: [
+        {
+          title: '질문이 "AI가 우리를 언급하느냐"뿐일 때',
+          body:
+            '같은 79달러로 지정한 프롬프트 50개를 추적하고 ChatGPT와 Gemini, Google AI Overviews에서 답변 50개를 매일 측정합니다. 저희 확인은 한 달에 한 번입니다. 그것이 주된 질문이라면 그들의 답이 저희보다 풍부합니다.',
+        },
+        {
+          title: '서비스 한두 곳으로는 부족할 때',
+          body:
+            'Enterprise 플랜은 Perplexity와 Claude, Grok, Microsoft Copilot을 포함해 아홉 플랫폼을 덮습니다. 저희는 세 곳을 확인합니다. AI 환경 전체에서 측정되어야 하는 브랜드라면 실제 차이입니다.',
+        },
+        {
+          title: '부담 없이 먼저 써 보고 싶을 때',
+          body:
+            '그들의 사이트에는 "Start free. No credit card needed."라고 적혀 있습니다. 저희도 카드를 받지 않지만 체험은 7일에 끝나고, 그들은 길이를 밝히지 않으므로 평가할 시간이 더 있을 수 있습니다.',
+        },
+      ],
+    },
+    ourStrengths: {
+      eyebrow: '저희가 더 맞는 경우',
+      title: '측정만이 아니라 일이 끝나 있어야 할 때',
+      intro: '같은 가격, 다른 배분입니다. 측정의 깊이를 포기하고 실제 작업을 더 넓게 덮습니다.',
+      items: [
+        { title: '지역 쪽도 함께', body: '승인하시면 Google 비즈니스 프로필 게시물과 리뷰 답변 초안, 그리고 Google 지도 순위의 매달 확인까지 들어갑니다.' },
+        { title: 'Shopify도 WordPress와 똑같이', body: '두 플랫폼에 자동으로 발행하고 같은 월간 리포트를 냅니다.' },
+        { title: '누군가 붙어 있을 필요가 없습니다', body: '한 달치 주제를 승인하시면 그다음은 스스로 돌아갑니다. 설정할 프롬프트도, 열어 볼 대시보드도 없습니다.' },
+        { title: '열한 개 언어, 히브리어 포함', body: '화면과 콘텐츠, 리포트를 내 언어로 제공하고, 이스라엘에서는 VAT가 포함된 셰켈 가격입니다.' },
+      ],
+    },
+    faq: {
+      eyebrow: '질문',
+      title: '정하기 전에 많이 묻는 것',
+      items: [
+        {
+          q: '두 제품이 다 79달러입니다. 실제로 무엇이 다릅니까?',
+          a: '그 가격이 어디로 나뉘는지가 다릅니다. Writesonic은 대부분이 AI 답변의 언급을 매일 측정하는 데 들어가고 거기에 월 15편의 글이 붙습니다. 저희는 같은 금액으로 작성과 발행, 사이트 수정, Google 비즈니스 프로필 게시물, 그리고 Google과 지도, AI 답변에서의 매달 확인을 덮습니다. AI를 측정하고 싶다면 Writesonic을, 일이 끝나 있기를 바란다면 저희를 고르십시오.',
+        },
+        {
+          q: 'Writesonic만큼 많은 AI 플랫폼을 확인합니까?',
+          a: '아니요. 저희 자동 확인은 ChatGPT와 Gemini, Google AI이며 한 달에 한 번입니다. 그들의 플랜은 답변을 매일 새로 받고, Enterprise 플랜은 아홉 플랫폼까지 갑니다.',
+        },
+        {
+          q: 'Shopify를 지원합니까?',
+          a: '네. WordPress와 Shopify에 발행합니다. 그들의 홈페이지에는 발행 연동이 WordPress 하나만 적혀 있으니, 쇼핑몰이 Shopify라면 정하기 전에 그쪽에 확인해 보시기 바랍니다.',
+        },
+      ],
+    },
+    close: { title: '가입하지 않고, 내 사이트가 지금 어디에 있는지 확인해 보십시오' },
   },
 }

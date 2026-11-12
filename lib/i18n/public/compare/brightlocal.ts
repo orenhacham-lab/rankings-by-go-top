@@ -135,7 +135,7 @@ export const BRIGHTLOCAL_COMPARE: Record<PublicLocale, ComparisonCopy> = {
         { title: 'מאמרים שמתפרסמים בלעדיכם', body: 'תוכנית נושאים חודשית שאתם מאשרים, ואז מאמרים עם תמונות וקישורים פנימיים שעולים לאוויר לבד.' },
         { title: 'מנוי אחד במקום שניים', body: 'כדי להגיע לאותו כיסוי צריך כלי מקומי וגם כלי כתיבה. אצלנו זה מחיר אחד.' },
         { title: 'גם האתר עצמו', body: 'חלק מהתיקונים באתר מוחלים דרך התוסף שלנו, ולא נשארים כרשימת משימות.' },
-        { title: 'עברית, ועשר שפות', body: 'הממשק, התוכן והדוחות בשפה שלכם — כולל עברית ו-RTL — על וורדפרס ועל שופיפיי.' },
+        { title: 'עברית, ואחת עשרה שפות', body: 'הממשק, התוכן והדוחות בשפה שלכם — כולל עברית ו-RTL — על וורדפרס ועל שופיפיי.' },
       ],
     },
     faq: {
@@ -266,7 +266,7 @@ export const BRIGHTLOCAL_COMPARE: Record<PublicLocale, ComparisonCopy> = {
         { title: 'Articles that publish without you', body: 'A monthly topic plan you approve, then articles with images and internal links going live on their own.' },
         { title: 'One subscription instead of two', body: 'Matching the same coverage means buying a local tool and a writing tool. With us it is one price.' },
         { title: 'The site itself as well', body: 'Some on-site fixes are applied through our plugin rather than left as a to-do list.' },
-        { title: 'Ten languages, Hebrew included', body: 'Interface, content and reports in your language — right-to-left included — on WordPress and on Shopify.' },
+        { title: 'Eleven languages, Hebrew included', body: 'Interface, content and reports in your language — right-to-left included — on WordPress and on Shopify.' },
       ],
     },
     faq: {
@@ -397,7 +397,7 @@ export const BRIGHTLOCAL_COMPARE: Record<PublicLocale, ComparisonCopy> = {
         { title: 'Artículos que se publican sin ti', body: 'Un plan mensual de temas que tú apruebas y, después, artículos con imágenes y enlaces internos que salen solos.' },
         { title: 'Una suscripción en lugar de dos', body: 'Igualar esa cobertura significa comprar una herramienta local y otra de redacción. Con nosotros es un solo precio.' },
         { title: 'También el propio sitio', body: 'Algunas correcciones en la web se aplican a través de nuestro plugin en vez de quedarse en una lista de tareas.' },
-        { title: 'Diez idiomas, hebreo incluido', body: 'Interfaz, contenido e informes en tu idioma —incluida la escritura de derecha a izquierda— en WordPress y en Shopify.' },
+        { title: 'Once idiomas, hebreo incluido', body: 'Interfaz, contenido e informes en tu idioma —incluida la escritura de derecha a izquierda— en WordPress y en Shopify.' },
       ],
     },
     faq: {
@@ -528,7 +528,7 @@ export const BRIGHTLOCAL_COMPARE: Record<PublicLocale, ComparisonCopy> = {
         { title: 'Artigos que publicam sem você', body: 'Um plano mensal de temas que você aprova e, depois, artigos com imagens e links internos que entram no ar sozinhos.' },
         { title: 'Uma assinatura em vez de duas', body: 'Igualar essa cobertura significa comprar uma ferramenta local e outra de escrita. Conosco é um preço só.' },
         { title: 'O próprio site também', body: 'Algumas correções no site são aplicadas pelo nosso plugin em vez de ficarem como lista de tarefas.' },
-        { title: 'Dez idiomas, hebraico incluído', body: 'Interface, conteúdo e relatórios no seu idioma — inclusive da direita para a esquerda — no WordPress e na Shopify.' },
+        { title: 'Onze idiomas, hebraico incluído', body: 'Interface, conteúdo e relatórios no seu idioma — inclusive da direita para a esquerda — no WordPress e na Shopify.' },
       ],
     },
     faq: {
@@ -659,7 +659,7 @@ export const BRIGHTLOCAL_COMPARE: Record<PublicLocale, ComparisonCopy> = {
         { title: 'Des articles qui se publient sans vous', body: 'Un plan de sujets mensuel que vous validez, puis des articles avec images et liens internes qui partent en ligne tout seuls.' },
         { title: 'Un abonnement au lieu de deux', body: "Égaler cette couverture suppose d'acheter un outil local et un outil de rédaction. Chez nous, c'est un seul tarif." },
         { title: 'Le site lui-même aussi', body: "Certaines corrections du site sont appliquées par notre extension au lieu de rester une liste de tâches." },
-        { title: 'Dix langues, hébreu compris', body: "Interface, contenu et rapports dans votre langue — écriture de droite à gauche comprise — sur WordPress et sur Shopify." },
+        { title: 'Onze langues, hébreu compris', body: "Interface, contenu et rapports dans votre langue — écriture de droite à gauche comprise — sur WordPress et sur Shopify." },
       ],
     },
     faq: {
@@ -790,7 +790,7 @@ export const BRIGHTLOCAL_COMPARE: Record<PublicLocale, ComparisonCopy> = {
         { title: 'Articoli che si pubblicano senza di voi', body: 'Un piano mensile di argomenti che approvate, e poi articoli con immagini e link interni che vanno online da soli.' },
         { title: 'Un abbonamento invece di due', body: 'Per avere la stessa copertura servono uno strumento locale e uno di scrittura. Da noi è un prezzo solo.' },
         { title: 'Anche il sito stesso', body: 'Alcune correzioni sul sito vengono applicate tramite il nostro plugin invece di restare un elenco di cose da fare.' },
-        { title: 'Dieci lingue, ebraico compreso', body: "Interfaccia, contenuti e report nella vostra lingua — scrittura da destra a sinistra compresa — su WordPress e su Shopify." },
+        { title: 'Undici lingue, ebraico compreso', body: "Interfaccia, contenuti e report nella vostra lingua — scrittura da destra a sinistra compresa — su WordPress e su Shopify." },
       ],
     },
     faq: {
@@ -920,7 +920,7 @@ export const BRIGHTLOCAL_COMPARE: Record<PublicLocale, ComparisonCopy> = {
         { title: 'Artikel, die ohne Sie online gehen', body: 'Ein monatlicher Themenplan, den Sie freigeben, und danach Artikel mit Bildern und internen Links, die von selbst veröffentlicht werden.' },
         { title: 'Ein Abonnement statt zwei', body: 'Denselben Umfang zu erreichen heißt, ein lokales Tool und ein Schreib-Tool zu kaufen. Bei uns ist es ein Preis.' },
         { title: 'Auch die Website selbst', body: 'Ein Teil der Korrekturen wird über unser Plugin eingespielt, statt als To-do-Liste liegen zu bleiben.' },
-        { title: 'Zehn Sprachen, Hebräisch inbegriffen', body: 'Oberfläche, Inhalte und Berichte in Ihrer Sprache — Schreibrichtung von rechts nach links inbegriffen — auf WordPress und auf Shopify.' },
+        { title: 'Elf Sprachen, Hebräisch inbegriffen', body: 'Oberfläche, Inhalte und Berichte in Ihrer Sprache — Schreibrichtung von rechts nach links inbegriffen — auf WordPress und auf Shopify.' },
       ],
     },
     faq: {
@@ -1050,7 +1050,7 @@ export const BRIGHTLOCAL_COMPARE: Record<PublicLocale, ComparisonCopy> = {
         { title: '手をかけずに公開される記事', body: '月に一度、題材の計画をご承認いただくと、画像と内部リンクの入った記事がそのまま公開されます。' },
         { title: '契約を2つではなく1つに', body: '同じ範囲をそろえるには、ローカルの道具と執筆の道具を別に買うことになります。当社では1つの料金です。' },
         { title: 'サイト自体にも手が入ります', body: '一部の修正は当社の拡張機能から適用され、やることのリストとして残りません。' },
-        { title: '10の言語、ヘブライ語も', body: '画面、コンテンツ、レポートをご自身の言語で用意します。右から左に書く言語も含め、WordPressでもShopifyでも同じです。' },
+        { title: '11の言語、ヘブライ語も', body: '画面、コンテンツ、レポートをご自身の言語で用意します。右から左に書く言語も含め、WordPressでもShopifyでも同じです。' },
       ],
     },
     faq: {
@@ -1180,7 +1180,7 @@ export const BRIGHTLOCAL_COMPARE: Record<PublicLocale, ComparisonCopy> = {
         { title: 'Artikelen die zonder u online gaan', body: 'Een maandelijks plan met onderwerpen dat u goedkeurt, en daarna artikelen met afbeeldingen en interne links die van zichzelf worden gepubliceerd.' },
         { title: 'Één abonnement in plaats van twee', body: 'Dezelfde omvang halen betekent een plaatselijk hulpmiddel en een schrijfhulpmiddel kopen. Bij ons is het één prijs.' },
         { title: 'Ook de website zelf', body: 'Een deel van de correcties wordt via onze plug-in doorgevoerd, in plaats van als lijstje met te doen werk te blijven liggen.' },
-        { title: 'Tien talen, Hebreeuws inbegrepen', body: 'Interface, content en rapporten in uw taal — schrijfrichting van rechts naar links inbegrepen — op WordPress en op Shopify.' },
+        { title: 'Elf talen, Hebreeuws inbegrepen', body: 'Interface, content en rapporten in uw taal — schrijfrichting van rechts naar links inbegrepen — op WordPress en op Shopify.' },
       ],
     },
     faq: {
@@ -1310,7 +1310,7 @@ export const BRIGHTLOCAL_COMPARE: Record<PublicLocale, ComparisonCopy> = {
         { title: 'Artykuły, które wchodzą na witrynę bez Państwa', body: 'Miesięczny plan tematów, który Państwo zatwierdzają, a potem artykuły z obrazami i linkowaniem wewnętrznym, publikowane same.' },
         { title: 'Jedna subskrypcja zamiast dwóch', body: 'Osiągnięcie tego samego zakresu oznacza kupno narzędzia lokalnego i narzędzia do pisania. U nas jest to jedna cena.' },
         { title: 'Także sama witryna', body: 'Część poprawek wprowadzamy przez naszą wtyczkę, zamiast zostawiać je jako listę rzeczy do zrobienia.' },
-        { title: 'Dziesięć języków, hebrajski włącznie', body: 'Interfejs, treści i raporty w Państwa języku — wraz z kierunkiem pisania od prawej do lewej — na WordPressie i w Shopify.' },
+        { title: 'Jedenaście języków, hebrajski włącznie', body: 'Interfejs, treści i raporty w Państwa języku — wraz z kierunkiem pisania od prawej do lewej — na WordPressie i w Shopify.' },
       ],
     },
     faq: {
@@ -1332,5 +1332,135 @@ export const BRIGHTLOCAL_COMPARE: Record<PublicLocale, ComparisonCopy> = {
       ],
     },
     close: { title: 'Zobacz bez rejestracji, gdzie stoi Państwa firma' },
+  },
+  ko: {
+    competitor: 'BrightLocal',
+    eyebrow: 'Go Top SEO와 BrightLocal',
+    metaTitle: 'Go Top SEO와 BrightLocal | 비교',
+    metaDescription:
+      'Go Top SEO와 BrightLocal 비교입니다. 누가 지역 노출을 측정하고 누가 콘텐츠를 쓰고 발행하는지, 각 가격이 무엇을 덮는지, 그리고 지역 업체에게 BrightLocal이 더 맞는 경우는 언제인지 적었습니다.',
+    hero: {
+      title: 'BrightLocal은 지역 노출을 측정합니다.',
+      accent: '저희는 쓰고 발행까지 합니다',
+      subtitle:
+        'BrightLocal은 지역 측정이 깊은 도구입니다. 순위와 격자 지도, 업체 정보, 리뷰를 다룹니다. Go Top SEO는 그 절반을 매달 확인으로 덮고, BrightLocal에 엔진이 없는 것을 더합니다. 사이트에 쓰고 발행되는 글, 그리고 Google 비즈니스 프로필 게시물입니다.',
+    },
+    table: {
+      eyebrow: '비교',
+      title: 'BrightLocal 자기 요금 페이지에서 옮긴, 각자 무엇을 하는가',
+      checkedOn: CHECKED,
+      sources: SOURCES,
+      rows: [
+        {
+          label: '가격',
+          ours: '월 79달러부터, 세금 별도. 이스라엘에서는 월 249셰켈부터, VAT 포함.',
+          theirs:
+            '지점 한 곳 기준입니다. Track 월 41달러 또는 연 369달러(월 31달러), Manage 54달러 또는 485달러(40달러), Grow 65달러 또는 584달러(49달러)입니다. 지점이 늘면 그들의 자체 구간에 따라 과금합니다.',
+        },
+        {
+          label: '글은 누가 쓰는가',
+          ours: '시스템입니다. 승인하시면 주제와 본문, 이미지, 내부 링크까지 만듭니다.',
+          theirs: '세 플랜 어디에도 콘텐츠 작성은 요금 페이지에 없습니다.',
+        },
+        {
+          label: '사이트 발행',
+          ours: 'WordPress와 Shopify에 자동으로 발행합니다.',
+          theirs: '자기 사이트에 글을 발행하는 기능은 플랜에 없습니다.',
+        },
+        {
+          label: '순위 측정',
+          ours: 'Google과 Google 지도, AI 답변에서 매달 확인합니다.',
+          theirs:
+            'Track 플랜부터입니다. 키워드 최대 100개와 경쟁사 네 곳에 대한 지역 순위 측정, 그리고 키워드 최대 다섯 개에 대한 격자 지도입니다.',
+        },
+        {
+          label: 'AI 답변',
+          ours: 'ChatGPT와 Gemini, Google AI에서 매달 자동으로 확인합니다.',
+          theirs:
+            'Local AI Visibility Tracker가 Track 플랜부터 들어 있습니다. 요금 페이지는 어떤 AI 서비스를 포함하는지 밝히지 않습니다.',
+        },
+        {
+          label: 'Google 비즈니스 프로필 게시물',
+          ours: '승인하시면 프로필에 게시물을 자동으로 올립니다.',
+          theirs:
+            'Google 비즈니스 프로필 예약 게시물은 Manage 플랜부터입니다. 경쟁사와 비교하는 프로필 점검은 Track에 이미 들어 있습니다.',
+        },
+        {
+          label: '리뷰',
+          ours: '답변 초안을 준비하고, 보내기 전에 승인하십니다.',
+          theirs:
+            '여러 플랫폼의 리뷰 모니터링과 답변은 Grow 플랜부터이며, 이메일과 SMS, 매장에서의 리뷰 요청, 그리고 사이트에 리뷰를 보여 주는 기능이 함께 들어 있습니다.',
+        },
+        {
+          label: '업체 정보와 디렉터리',
+          ours: '디렉터리 등록을 관리하지 않고, 업체 정보를 디렉터리에 뿌리지도 않습니다.',
+          theirs:
+            '등록 정보가 맞는지 지키는 기능은 Track부터, 주요 플랫폼에서 업체 정보를 맞추는 기능은 Manage부터입니다.',
+        },
+        {
+          label: '사이트에서의 작업',
+          ours: '일부 수정은 저희 플러그인이 넣습니다. 코드를 읽을 필요가 없습니다.',
+          theirs: '플랜에는 감사와 등록 정보, 디렉터리 데이터의 정확성이 들어 있습니다. 내 사이트를 바꾸는 일은 들어 있지 않습니다.',
+        },
+        {
+          label: '체험',
+          ours: '7일, 카드 등록 없이, 언제든 해지.',
+          theirs:
+            '"You\u2019ll have 14 days of full access"라고 적혀 있습니다. 시작하려면 카드가 필요한지에 대해서는 요금 페이지가 "No credit card is required"라고 답합니다.',
+        },
+      ],
+    },
+    theirStrengths: {
+      eyebrow: 'BrightLocal이 더 맞는 경우',
+      title: '지역이라는 절반에서는 그쪽이 더 깊습니다',
+      intro: '질문이 전부 지역에 관한 것이라면 BrightLocal이 저희보다 잘 측정합니다. 다르게 말할 이유가 없습니다.',
+      items: [
+        {
+          title: '지역 측정이 과제의 전부일 때',
+          body:
+            '가장 저렴한 플랜조차 경쟁사 네 곳을 상대로 키워드 100개까지 기록하고, 다섯 개에 대해서는 격자 지도를 줍니다. 저희는 한 달에 한 번 확인합니다. 지도 순위에 생존이 걸린 업체라면 이 차이가 중요합니다.',
+        },
+        {
+          title: '리뷰에 답하는 데서 그치지 않고 리뷰가 들어와야 할 때',
+          body:
+            'Grow 플랜은 이메일과 SMS, 매장에서 리뷰를 모으고 그것을 사이트에 보여 줍니다. 저희는 이미 달린 리뷰에 대한 답변 초안을 준비하고, 새 리뷰를 모으지는 않습니다. 저희가 덮지 않는 영역입니다.',
+        },
+        {
+          title: '등록 정보와 디렉터리 데이터가 엉켜 있을 때',
+          body:
+            '등록 정보가 맞는지 지키고 주요 플랫폼에서 데이터를 맞추는 일은 저희가 아예 하지 않는 작업입니다. 게다가 그들의 체험 기간이 저희보다 깁니다. 14일 대 7일이며 둘 다 카드가 필요 없습니다.',
+        },
+      ],
+    },
+    ourStrengths: {
+      eyebrow: '저희가 더 맞는 경우',
+      title: '누군가 쓰는 일까지 해야 할 때',
+      intro: '핵심 차이는 간단합니다. BrightLocal은 무슨 일이 일어나는지 보여 줍니다. 쓰고 발행하는 일은 여전히 누군가 해야 합니다.',
+      items: [
+        { title: '내가 없어도 사이트에 올라가는 글', body: '승인하실 한 달치 주제 계획이 먼저 오고, 그다음 이미지와 내부 링크가 들어간 글이 스스로 발행됩니다.' },
+        { title: '구독 둘이 아니라 하나', body: '같은 범위를 갖추려면 지역 도구와 작성 도구를 따로 사야 합니다. 저희는 하나의 가격입니다.' },
+        { title: '사이트 자체도', body: '일부 수정은 할 일 목록으로 남기지 않고 저희 플러그인이 직접 넣습니다.' },
+        { title: '열한 개 언어, 히브리어 포함', body: '화면과 콘텐츠, 리포트를 내 언어로 제공하며 오른쪽에서 왼쪽으로 쓰는 언어까지 포함합니다. WordPress와 Shopify 모두에서 같습니다.' },
+      ],
+    },
+    faq: {
+      eyebrow: '질문',
+      title: '정하기 전에 많이 묻는 것',
+      items: [
+        {
+          q: 'BrightLocal이 더 쌉니다. 그냥 그쪽을 쓰면 안 됩니까?',
+          a: '측정이 모자란 것이라면 그쪽을 쓰십시오. 시작 플랜이 저희보다 싸고 체험이 더 길며 카드도 필요 없고, 측정 자체가 더 깊습니다. 문제는 리포트 다음입니다. 글을 쓰고 사이트에 올릴 사람이 없다면, 다음 달 리포트도 같은 것을 보여 줄 것입니다.',
+        },
+        {
+          q: '둘을 같이 쓸 수 있습니까?',
+          a: '네. 어떤 회사에게는 그 조합이 맞습니다. 상세한 지역 측정은 BrightLocal로, 작성과 발행, Google 비즈니스 프로필 게시물은 저희로 나누면 됩니다. 서로 방해하지 않습니다.',
+        },
+        {
+          q: 'BrightLocal처럼 격자 지도를 제공합니까?',
+          a: '아니요. Google 지도에서의 순위를 한 달에 한 번 확인하며, 도시 전체를 격자로 쪼개 보지는 않습니다. 그 해상도가 필요하다면 이 지점에서는 BrightLocal이 강합니다.',
+        },
+      ],
+    },
+    close: { title: '가입하지 않고, 내 업체가 지금 어디에 있는지 확인해 보십시오' },
   },
 }

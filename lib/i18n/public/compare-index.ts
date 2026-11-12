@@ -429,4 +429,41 @@ export const COMPARE_INDEX: Record<PublicLocale, CompareIndexCopy> = {
       'Żadna z tych stron nie jest reklamą. Tam, gdzie drugie narzędzie jest lepsze, mówimy o tym pierwsi; a tam, gdzie ich własna strona czegoś nie wymienia, piszemy, że tego tam nie ma, a nie że produkt tego nie potrafi.',
     close: { title: 'Po porównaniu można sprawdzić własną stronę' },
   },
+  ko: {
+    eyebrow: '비교',
+    metaTitle: 'Go Top SEO와 SEO 도구 일곱 가지 비교 | 비교',
+    metaDescription:
+      'Go Top SEO와 Semrush, Yoast, Rank Math, Surfer, Writesonic, BrightLocal, Booster SEO 비교입니다. 각 도구가 무엇을 더 잘하는지, 각 가격에 무엇이 들어 있는지, 그리고 다른 도구가 더 맞는 경우는 언제인지 적었습니다.',
+    hero: {
+      title: '도구 일곱 가지와, 각자 더 강한 지점.',
+      accent: '저희 것도 함께',
+      subtitle:
+        '각 페이지는 Go Top SEO를 이름이 있는 도구 하나와 비교하고, 그 도구가 저희보다 잘하는 것부터 먼저 말하며, 그 도구에 대한 모든 서술에 그들의 사이트를 읽은 날짜를 붙입니다. 저희보다 그쪽이 더 맞는다면 페이지가 그렇게 말합니다.',
+    },
+    list: {
+      eyebrow: '비교',
+      title: '저희와 비교하실 도구를 골라 주십시오',
+      intro: '도구마다 한 줄씩. 무엇인지, 그리고 언제 그쪽이 맞는 선택인지입니다.',
+    },
+    compareWith: (name) => `Go Top SEO와 ${name}`,
+    when: {
+      semrush:
+        '매일 측정과 API까지 갖춘 폭넓은 리서치 도구입니다. 완성된 작업을 받기보다 시장을 직접 파고들고 싶을 때 맞는 선택입니다.',
+      yoast:
+        '글 쓰는 사람을 안내하는 WordPress 플러그인이며, 혼자서 일하지는 않습니다. 이미 누군가 글을 써 주고 있을 때 맞는 선택입니다.',
+      rankmath:
+        '핵심 기능이 무료인, 오래 다듬어진 WordPress 플러그인입니다. 월 예산이 없고 글은 직접 쓰실 때 맞는 선택입니다.',
+      surfer:
+        '앞질러야 하는 결과들에 맞춰 한 페이지를 다듬어 주는 점수입니다. 쓸 사람은 이미 있고 다듬는 솜씨만 모자랄 때 맞는 선택입니다.',
+      writesonic:
+        '지정한 프롬프트를 매일 측정하며, 저희보다 많은 엔진을 봅니다. 질문이 오직 "AI가 우리를 언급하느냐"일 때 맞는 선택입니다.',
+      brightlocal:
+        '지역 측정이 깊습니다. 격자 지도, 인용 정보, 리뷰 수집까지 다룹니다. 사업이 지도에서 먹고살 때 맞는 선택입니다.',
+      booster:
+        '카탈로그 전체의 태그와 링크, 이미지를 고쳐 주는 Shopify 앱입니다. 문제가 새 콘텐츠가 아니라 쇼핑몰 정리일 때 맞는 선택입니다.',
+    },
+    note:
+      '이 페이지들은 광고가 아닙니다. 다른 도구가 더 나은 지점은 저희가 먼저 말하고, 그들 사이트에 적혀 있지 않은 것은 "제품이 못 한다"가 아니라 "거기에 적혀 있지 않다"고 씁니다.',
+    close: { title: '비교를 마치셨다면 내 사이트를 진단해 보십시오' },
+  },
 }

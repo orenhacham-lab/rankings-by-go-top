@@ -204,9 +204,35 @@ const PL_INTENT: Partial<Record<SuggestionIntent, (kw: string) => string[]>> = {
   informational: (kw) => [`${kw}: wszystko, co warto wiedzieć`],
 }
 
-const BASE: Record<SuggestionLanguage, (kw: string) => string[]> = { he: HE_BASE, en: EN_BASE, es: ES_BASE, 'pt-BR': PT_BASE, fr: FR_BASE, it: IT_BASE, ja: JA_BASE, de: DE_BASE, nl: NL_BASE, pl: PL_BASE }
+// KOREAN. Every frame keeps the keyword in front of a colon, for the Polish
+// reason and a stricter version of it: a Korean particle is chosen by the final
+// consonant of the word before it (을/를, 은/는, 이/가), the keyword arrives
+// without one, and these keywords measurably END IN LATIN LETTERS a third of the
+// time (구글 seo, seo google), where the particle follows the loanword's
+// pronunciation and no rule reaches it. The colon-subtitle shape is also what a
+// Korean SEO headline uses, so this is the natural form rather than a workaround.
+// Headline style, not 합니다체: a Korean title ends in a noun or a -는 법 form,
+// never in 입니다.
+const KO_BASE = (kw: string): string[] => [
+  `${kw}: 잘 고르는 법`,
+  `${kw}: 결정 전에 확인할 것`,
+  `${kw}: 처음 시작하는 완전 가이드`,
+  `${kw}: 비용은 얼마인가`,
+  `${kw}: 고를 때 자주 하는 실수`,
+  `${kw}: 비교해 볼 만한 점`,
+]
+
+const KO_INTENT: Partial<Record<SuggestionIntent, (kw: string) => string[]>> = {
+  comparison: (kw) => [`${kw}: 많이 쓰는 선택지 비교`, `${kw}: 종류별 차이`],
+  commercial: (kw) => [`${kw}: 후회 없이 고르는 법`, `${kw}: 구매할 때 주의할 점`],
+  local: (kw) => [`${kw}: 믿을 수 있는 지역 업체 찾는 법`],
+  transactional: (kw) => [`${kw}: 언제, 어디에 맡길까`],
+  informational: (kw) => [`${kw}: 알아 두면 좋은 것`],
+}
+
+const BASE: Record<SuggestionLanguage, (kw: string) => string[]> = { he: HE_BASE, en: EN_BASE, es: ES_BASE, 'pt-BR': PT_BASE, fr: FR_BASE, it: IT_BASE, ja: JA_BASE, de: DE_BASE, nl: NL_BASE, pl: PL_BASE, ko: KO_BASE }
 const INTENT: Record<SuggestionLanguage, Partial<Record<SuggestionIntent, (kw: string) => string[]>>> =
-  { he: HE_INTENT, en: EN_INTENT, es: ES_INTENT, 'pt-BR': PT_INTENT, fr: FR_INTENT, it: IT_INTENT, ja: JA_INTENT, de: DE_INTENT, nl: NL_INTENT, pl: PL_INTENT }
+  { he: HE_INTENT, en: EN_INTENT, es: ES_INTENT, 'pt-BR': PT_INTENT, fr: FR_INTENT, it: IT_INTENT, ja: JA_INTENT, de: DE_INTENT, nl: NL_INTENT, pl: PL_INTENT, ko: KO_INTENT }
 
 /**
  * Return up to `max` distinct, natural topic suggestions for a keyword.

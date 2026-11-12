@@ -66,6 +66,7 @@ const LANG_LINE: Record<ContentLanguage, string> = {
   de: 'Schreiben Sie in korrektem, gut lesbarem Deutsch, mit richtigen Umlauten und ß, mit großgeschriebenen Substantiven, und sprechen Sie den Leser mit „Sie" an, niemals mit „du".',
   nl: 'Schrijf in correct, goed leesbaar Nederlands, met de juiste diakritische tekens, met gewone zelfstandige naamwoorden in kleine letters en met gesloten samenstellingen (zoekwoordenonderzoek, websiteanalyse), en spreek de lezer aan met \u201eu\u201d, nooit met \u201eje\u201d.',
   pl: 'Prosimy pisać poprawną i płynną polszczyzną, z zachowaniem polskich znaków diakrytycznych (ą, ć, ę, ł, ń, ó, ś, ź, ż), z rzeczownikami pospolitymi pisanymi małą literą, bez zlepiania wyrazów w jedno słowo (analiza słów kluczowych, a nie jeden wyraz) i zwracając się do czytelnika formą „Państwo”, nigdy przez „ty”.',
+  ko: '자연스럽고 읽기 쉬운 한국어 합니다체로 작성해 주세요. 마침표와 쉼표는 전각이 아닌 일반 문자를 사용하고, 띄어쓰기를 정확히 지키며, 조사와 어미는 앞말에 붙여 씁니다. 수를 적을 때에는 개, 건, 회처럼 알맞은 단위를 함께 씁니다.',
 }
 
 function buildPrompt(input: ImproveOneInput): string {

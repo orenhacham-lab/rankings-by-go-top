@@ -112,7 +112,7 @@ console.log('\nC) both payment paths are gated')
     /acknowledged = true/.test(paypalClient))
 }
 
-console.log('\nD) all ten dashboard languages carry the three strings, with both halves')
+console.log('\nD) all eleven dashboard languages carry the three strings, with both halves')
 {
   /** Each language's own two halves: the immediate start before the period, and losing the right. */
   const HALVES: Record<string, { start: RegExp; loss: RegExp }> = {
@@ -126,6 +126,13 @@ console.log('\nD) all ten dashboard languages carry the three strings, with both
     de: { start: /vierzehntägigen Widerrufsfrist/i, loss: /dieses Recht .* verliere/i },
     nl: { start: /veertien dagen/i, loss: /dat recht verlies/i },
     pl: { start: /czternastodniowego terminu odstąpienia/i, loss: /tracę to prawo/i },
+    // KOREAN IS THE ONE LANGUAGE WHOSE FIRST HALF IS NOT FOURTEEN DAYS. The
+    // control is shown to every non-ILS market, and the sentence it shows has
+    // to be true of the reader's own law: 전자상거래법 제17조 제1항 gives a
+    // Korean consumer SEVEN days, and 제17조 제6항 is why the express request
+    // and the record of it are what let the right end early at all. A Korean
+    // label that said fourteen would describe a right Korean law does not give.
+    ko: { start: /7일의 청약철회 기간/, loss: /권리가 소멸/ },
   }
 
   for (const locale of PUBLIC_LOCALES) {

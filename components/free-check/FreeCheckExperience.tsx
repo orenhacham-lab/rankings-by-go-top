@@ -40,9 +40,9 @@ const STEP_MS = 3_500
 
 /** A finding's tone: the start border and the badge. Never a tinted card. */
 const SEVERITY_STYLES: Record<string, { border: string; badge: 'danger' | 'warning' | 'neutral'; label: Record<PublicLocale, string> }> = {
-  blocker: { border: 'border-s-bad', badge: 'danger', label: { he: 'קריטי', en: 'Critical', es: 'Crítico', 'pt-BR': 'Crítico', fr: 'Critique', it: 'Critico', ja: '重大', de: 'Kritisch', nl: 'Kritiek', pl: 'Krytyczne' } },
-  warning: { border: 'border-s-warn', badge: 'warning', label: { he: 'אזהרה', en: 'Warning', es: 'Advertencia', 'pt-BR': 'Aviso', fr: 'Avertissement', it: 'Avviso', ja: '警告', de: 'Warnung', nl: 'Waarschuwing', pl: 'Ostrzeżenie' } },
-  info: { border: 'border-s-line-strong', badge: 'neutral', label: { he: 'המלצה', en: 'Tip', es: 'Recomendación', 'pt-BR': 'Recomendação', fr: 'Conseil', it: 'Consiglio', ja: 'アドバイス', de: 'Empfehlung', nl: 'Tip', pl: 'Wskazówka' } },
+  blocker: { border: 'border-s-bad', badge: 'danger', label: { he: 'קריטי', en: 'Critical', es: 'Crítico', 'pt-BR': 'Crítico', fr: 'Critique', it: 'Critico', ja: '重大', de: 'Kritisch', nl: 'Kritiek', pl: 'Krytyczne', ko: '심각' } },
+  warning: { border: 'border-s-warn', badge: 'warning', label: { he: 'אזהרה', en: 'Warning', es: 'Advertencia', 'pt-BR': 'Aviso', fr: 'Avertissement', it: 'Avviso', ja: '警告', de: 'Warnung', nl: 'Waarschuwing', pl: 'Ostrzeżenie', ko: '경고' } },
+  info: { border: 'border-s-line-strong', badge: 'neutral', label: { he: 'המלצה', en: 'Tip', es: 'Recomendación', 'pt-BR': 'Recomendação', fr: 'Conseil', it: 'Consiglio', ja: 'アドバイス', de: 'Empfehlung', nl: 'Tip', pl: 'Wskazówka', ko: '권장' } },
 }
 
 export function FreeCheckExperience({ locale, initialUrl = '' }: { locale: PublicLocale; initialUrl?: string }) {

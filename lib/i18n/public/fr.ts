@@ -217,6 +217,7 @@ export const fr = {
     de: 'Deutsch',
     nl: 'Nederlands',
     pl: 'Polski',
+    ko: '한국어',
     aria: 'Changer la langue du site',
   },
   cookie: {

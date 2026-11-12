@@ -260,6 +260,30 @@ const LOGIN_UI = {
       linkInvalid: 'Ten link potwierdzający jest nieprawidłowy albo wygasł. Prosimy się zalogować lub zarejestrować ponownie, aby otrzymać nowy.',
     },
   },
+  ko: {
+    subtitle: 'Google 순위와 AI 답변 가시성',
+    logoAlt: 'Go Top SEO 로고',
+    heading: '로그인',
+    emailLabel: '이메일 주소',
+    emailPlaceholder: 'name@example.kr',
+    passwordLabel: '비밀번호',
+    passwordPlaceholder: '\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022',
+    loginBtn: '로그인',
+    forgotPassword: '비밀번호를 잊으셨습니까',
+    dontHaveAccount: '계정이 없으십니까?',
+    startTrial: '무료로 시작하기',
+    accessibility: '접근성',
+    privacy: '개인정보',
+    articles: '아티클',
+    accessibilityHref: '/ko/accessibility',
+    privacyHref: '/ko/privacy',
+    articlesHref: '/ko/articles',
+    err: {
+      badCredentials: '이메일 주소 또는 비밀번호가 올바르지 않습니다',
+      emailNotConfirmed: '이메일 주소가 아직 확인되지 않았습니다. 보내 드린 확인 메일을 열어 링크를 클릭해 주십시오.',
+      linkInvalid: '이 확인 링크가 올바르지 않거나 만료되었습니다. 새 링크를 받으시려면 다시 로그인하거나 가입해 주십시오.',
+    },
+  },
 } as const
 
 export function AuthForm() {

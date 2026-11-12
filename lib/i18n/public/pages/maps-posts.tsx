@@ -63,6 +63,7 @@ const ja = FEATURE_COMMON.ja
 const de = FEATURE_COMMON.de
 const nl = FEATURE_COMMON.nl
 const pl = FEATURE_COMMON.pl
+const ko = FEATURE_COMMON.ko
 
 export const MAPS_POSTS_PAGE: MarketingPage = {
   path: '/features/google-maps-posts',
@@ -106,6 +107,10 @@ export const MAPS_POSTS_PAGE: MarketingPage = {
     pl: {
       title: 'Wpisy w Profilu Firmy w Google | Go Top SEO',
       description: 'Nowości ze zdjęciem i przyciskiem publikowane wprost z aplikacji w Profilu Firmy w Google: pierwsza wersja czeka gotowa, można ją poprawić i opublikować od razu albo w wybranym momencie. Odpowiedzi na opinie w Google w tym samym miejscu.',
+    },
+    ko: {
+      title: 'Google 비즈니스 프로필 게시물 | Go Top SEO',
+      description: '사진과 버튼이 들어간 소식을 애플리케이션에서 바로 Google 비즈니스 프로필에 올립니다. 첫 초안이 준비돼 있어, 고치신 다음 지금 바로 또는 원하시는 시각에 게시하실 수 있습니다. Google 리뷰 답글도 같은 자리에서 쓰실 수 있습니다.',
     },
   },
   content: {
@@ -1276,6 +1281,122 @@ export const MAPS_POSTS_PAGE: MarketingPage = {
         },
       ],
       cta: { title: 'Proszę pokazać klientom, co jest u Państwa nowego', body: pl.closeBody, primary: pl.trial, secondary: pl.check },
+    },
+    ko: {
+      hero: {
+        eyebrow: 'Google 비즈니스 프로필 게시물',
+        eyebrowIcon: MapPinned,
+        title: 'Google 비즈니스 프로필을',
+        accent: '바쁠 때에도 최신 상태로',
+        subtitle: 'Google 지도에서 업체를 찾은 사람은 지금 무엇이 새로운지 봅니다. 진행 중인 할인, 새로 시작한 서비스, 방금 올라간 아티클 같은 것들입니다. 애플리케이션에서 사진과 버튼이 있는 게시물을 쓰시면 첫 초안이 나오고, 고치신 다음 바로 또는 원하시는 시각에 게시하실 수 있습니다. 리뷰 답글도 같은 자리에서 쓰십니다.',
+        trust: ko.trust,
+        primary: ko.trial,
+        secondary: ko.check,
+        visual: (
+          <MapsPostVisual
+            business="성수동 피트니스"
+            kind="소식 · 목요일 10:00"
+            text="월·수 오전 7시, 50세 이상 아침 그룹 수업을 새로 시작했습니다. 전담 코치가 함께하는 소규모 그룹이고, 체험 수업은 약정 없이 무료입니다."
+            button="예약하기"
+            queueHeading="고객님의 게시물"
+            queue={[
+              { title: '50세 이상 아침 그룹 수업', detail: '목요일 10:00 예약됨', status: '예약됨', done: false },
+              { title: '가이드: 러닝화 고르는 법', detail: '사이트의 새 아티클에서', status: '게시됨', auto: true, done: true },
+            ]}
+            review={{
+              heading: '새 리뷰',
+              author: '김다은',
+              stars: 5,
+              starsLabel: '별 5개 중 5개',
+              text: '시설이 깨끗하고 트레이너분들이 차분히 봐주셔서 분위기가 좋습니다. 반년째 다니고 있어요.',
+              replyLabel: '답글 초안',
+              reply: '좋은 말씀 남겨 주셔서 정말 감사합니다. 편하게 운동하고 계셔서 기쁩니다. 다음 수업에서 뵙겠습니다.',
+            }}
+          />
+        ),
+      },
+      sections: [
+        {
+          kind: 'steps',
+          eyebrow: '진행 방식',
+          title: '연결부터 게시까지',
+          items: [
+            { title: '한 번만 연결', body: '비즈니스 프로필을 관리하는 Google 계정으로 로그인하신 뒤 Google 화면에서 동의하십니다. 권한은 프로필 관리에만 쓰이며 Search Console과는 별개입니다. 연결은 언제든지 해제하실 수 있습니다.' },
+            { title: '업체 선택', body: '애플리케이션이 Google에서 관리 중인 업체 목록을 보여 드리고, 이 사이트의 게시물이 어느 업체로 올라갈지 고르십니다.' },
+            { title: '직접 쓰거나 초안 받기', body: '시스템이 사이트에 쓴 아티클에서 시작하실 수도 있고, 주제를 입력하거나 빈 화면에서 시작하실 수도 있습니다. 첫 초안은 Google의 길이 제한 안에서 만들어지며 원하시는 대로 고치실 수 있습니다.' },
+            { title: '게시 또는 예약', body: '지금 바로, 또는 원하시는 날짜와 시각에 최대 1년까지 예약하실 수 있습니다. 게시물 목록에는 게시된 것, 예약된 것, Google이 검토 중인 것이 함께 표시됩니다.' },
+          ],
+        },
+        {
+          kind: 'cards',
+          eyebrow: '모든 게시물에',
+          title: '제대로 보이는 게시물',
+          items: [
+            { icon: Crop, title: '알맞은 이미지 비율', body: '사진을 올리고 Google이 보여 주는 4:3 비율로, 확대와 위치를 조정해 잘라내십니다. 아티클에서 만든 게시물은 그 아티클의 이미지를 한 번의 클릭으로 가져올 수 있습니다.' },
+            { icon: ImagePlus, title: '주제 게시물용 이미지 생성', body: '직접 입력하신 주제로 게시물을 쓰실 때에는 애플리케이션이 AI로 설명용 이미지를 만들어 드릴 수 있습니다. 일반적인 이미지이며 고객님의 업체, 직원, 제품을 찍은 사진이 아니고, 직접 고르신 경우에만 게시물에 들어갑니다.' },
+            { icon: MousePointerClick, title: '행동으로 이어지는 버튼', body: '자세히 보기, 예약하기, 온라인 주문, 구매하기, 가입하기, 지금 전화하기 중에서 고르십니다. 버튼은 고객님 사이트의 페이지로 연결되며, 예약 시스템처럼 다른 사이트로 보내는 것도 허용하시면 가능합니다. "지금 전화하기"는 프로필에 등록된 번호로 연결됩니다.' },
+            { icon: Eye, title: '게시 전에 미리 보기', body: '편집 화면 옆에 게시물 미리보기가 있습니다. 업체명, 사진, 본문, 버튼이 그대로 보이므로 놀랄 일이 없습니다.' },
+            { icon: Type, title: 'Google 규정 안에서', body: 'Google의 제한인 1,500자까지 글자 수를 세어 드립니다. 본문에 전화번호가 들어가면 알려 드립니다. Google이 게시물 안의 전화번호를 제한하기 때문이며, 전화를 받으시려면 "지금 전화하기" 버튼을 쓰시면 됩니다.' },
+            { icon: Languages, title: '고객의 언어로', body: '초안은 프로젝트의 언어로, 애플리케이션이 지원하는 어떤 언어로든 작성됩니다. 게시 전에 한 단어까지 고치실 수 있습니다.' },
+            { icon: ShieldCheck, title: '승인하신 것만', body: '승인하신 게시물과 답글만 올라가며, 자동 게시를 켜 두신 경우에는 자동 게시물도 올라갑니다. 영업시간, 주소, 그 밖의 업체 정보는 절대 변경되지 않습니다.' },
+          ],
+        },
+        {
+          kind: 'cards',
+          tone: 'contrast',
+          eyebrow: '자동 게시',
+          title: '사이트에 새 아티클, Google에 새 게시물',
+          items: [
+            { icon: Zap, title: '저절로 올라갑니다', body: '켜 두시면 시스템이 사이트에 게시하는 모든 아티클이 비즈니스 프로필의 짧은 게시물로도 올라갑니다. 아티클의 이미지와, 그 아티클로 연결되는 "자세히 보기" 버튼이 함께 들어갑니다.' },
+            { icon: ToggleLeft, title: '켜시기 전까지는 꺼져 있습니다', body: '기본값은 꺼짐이며 사이트별로 설정됩니다. 자동 게시물은 고객님이 먼저 읽지 않은 상태로 올라가므로, 켤지 여부는 고객님의 결정입니다. 언제든지 끄실 수 있고, 이미 올라간 게시물은 그대로 남습니다.' },
+            { icon: Repeat, title: '아티클당 한 번', body: '사이트 게시가 다시 실행되더라도 같은 아티클이 프로필에 두 번 올라가지는 않습니다. 그래서 프로필이 중복 게시물로 채워지지 않습니다.' },
+          ],
+        },
+        {
+          kind: 'cards',
+          columns: 2,
+          eyebrow: 'Google 리뷰',
+          title: '모든 리뷰에, 한곳에서 답글',
+          items: [
+            { icon: MessageSquareText, title: '모든 리뷰를 한눈에', body: '업체의 Google 리뷰를 평균 별점, 답글을 기다리는 건수, 새 리뷰 표시와 함께 보여 드립니다. 별점순으로 정렬하실 수 있습니다.' },
+            { icon: Sparkles, title: '클릭 한 번으로 답글 초안', body: '고객이 쓴 언어로, 정중하고 요점이 분명한 답글 초안을 받으십니다. 고치신 뒤 보내시면 Google의 리뷰 아래에 답글이 표시됩니다.' },
+            { icon: PenLine, title: '수정 또는 삭제', body: '이미 게시한 답글을 수정하거나 삭제하실 수 있습니다. 리뷰 자체는 그대로 남습니다.' },
+            { icon: Lock, title: '리뷰는 저장하지 않습니다', body: '리뷰는 목록을 열 때마다 Google에서 읽어 오며 시스템에 저장되지 않습니다. 초안 작성에 고객의 이름은 전달되지 않으므로, 이름을 넣어 부르고 싶으시면 직접 적어 주십시오.' },
+          ],
+        },
+        {
+          kind: 'callout',
+          icon: Info,
+          title: '알아 두실 점',
+          body: (
+            <>
+              <p>
+                Google은 모든 게시물을 표시 전에 검토하며, 때로는 거부합니다. 게시물 목록에는 거부된 게시물을 포함해
+                각 게시물의 상태가 표시됩니다. 연결하시려면 비즈니스 프로필의 소유자이거나 관리자인 Google 계정이
+                필요합니다.
+              </p>
+              <p>
+                Go Top SEO는 Google과 아무런 제휴 관계가 없습니다. 게시물과 리뷰 답글은 고객이 활발히 운영되는
+                업체라는 것을 보기에 도움이 되지만, Google 지도나 Google 검색의 순위를 약속하는 것은 아닙니다.
+              </p>
+            </>
+          ),
+        },
+        {
+          kind: 'faq',
+          eyebrow: '자주 묻는 질문',
+          title: '비즈니스 프로필 게시물에 대해 많이 묻는 것',
+          items: [
+            { q: '애플리케이션이 영업시간이나 주소를 바꿀 수 있습니까?', a: '바꾸지 않습니다. 저희가 게시하는 것은 게시물과 리뷰 답글뿐입니다. 영업시간, 주소, 전화번호, 그 밖의 프로필 정보는 그대로 유지됩니다.' },
+            { q: '초안이 저절로 게시됩니까?', a: '직접 쓰시는 게시물은 그렇지 않습니다. 초안이 화면에 나타나고, 버튼을 누르셔야 게시됩니다. 새 아티클에 대한 게시물은 자동 게시를 켜 두신 경우에만 저절로 올라갑니다.' },
+            { q: '게시물을 미리 예약할 수 있습니까?', a: '예, 원하시는 날짜와 시각으로 최대 1년까지 예약하실 수 있습니다. 예약된 게시물은 발송되기 전까지 취소하실 수 있습니다.' },
+            { q: 'Shopify 쇼핑몰이나 WordPress가 아닌 사이트에서도 됩니까?', a: '됩니다. 게시물은 고객님의 사이트가 아니라 Google 비즈니스 프로필로 올라가므로, 플랫폼과 무관하게 모든 프로젝트에서 작동합니다.' },
+            { q: '연결을 해제하면 어떻게 됩니까?', a: '예약된 게시물은 연결이 복구될 때까지 게시되지 않습니다. 이미 게시된 게시물은 Google에 그대로 남습니다.' },
+            { q: 'Google에서 여러 업체를 관리하고 있습니다. 문제가 됩니까?', a: '문제없습니다. 애플리케이션이 계정이 관리하는 모든 업체를 보여 드리고, 시스템의 사이트마다 그 사이트의 게시물이 올라갈 업체를 고르시면 됩니다.' },
+          ],
+        },
+      ],
+      cta: { title: '무엇이 새로운지 고객에게 보여 주십시오', body: ko.closeBody, primary: ko.trial, secondary: ko.check },
     },
   },
 }

@@ -40,6 +40,7 @@ import { germanSiteEnabled } from '../../i18n/german-site'
 import { dutchSiteEnabled } from '../../i18n/dutch-site'
 import { polishSiteEnabled } from '../../i18n/polish-site'
 import { frenchSiteEnabled } from '@/lib/i18n/french-site'
+import { koreanSiteEnabled } from '../../i18n/korean-site'
 
 let pass = 0, fail = 0
 function check(name: string, cond: boolean, detail?: string) {
@@ -62,6 +63,7 @@ const LIVE: Record<LegalLanguage, boolean> = {
   de: germanSiteEnabled(process.env.NEXT_PUBLIC_GERMAN_SITE_ENABLED),
   nl: dutchSiteEnabled(process.env.NEXT_PUBLIC_DUTCH_SITE_ENABLED),
   pl: polishSiteEnabled(process.env.NEXT_PUBLIC_POLISH_SITE_ENABLED),
+  ko: koreanSiteEnabled(process.env.NEXT_PUBLIC_KOREAN_SITE_ENABLED),
 }
 const owed: string[] = []
 
@@ -185,6 +187,7 @@ console.log('\nC) the routes, the gate and the links')
     de: { prefix: '/de', gate: 'germanSiteEnabled' },
     nl: { prefix: '/nl', gate: 'dutchSiteEnabled' },
     pl: { prefix: '/pl', gate: 'polishSiteEnabled' },
+    ko: { prefix: '/ko', gate: 'koreanSiteEnabled' },
   }
 
   for (const language of LEGAL_LANGUAGES) {
@@ -250,7 +253,7 @@ console.log('\nC) the routes, the gate and the links')
 
 console.log('\nD) the real documents, in every language')
 {
-  const PREFIX: Record<LegalLanguage, string> = { es: '/es', 'pt-BR': '/pt-BR', fr: '/fr', it: '/it', ja: '/ja', de: '/de', nl: '/nl', pl: '/pl' }
+  const PREFIX: Record<LegalLanguage, string> = { es: '/es', 'pt-BR': '/pt-BR', fr: '/fr', it: '/it', ja: '/ja', de: '/de', nl: '/nl', pl: '/pl', ko: '/ko' }
   /** A translation of the registered company name is a mistake in any language. */
   const TRANSLATED_NAME = [
     /GO TOP (?:MARKETING|MARKETING Y|DE MARKETING)[^.]*(?:DIGITAL|S\.L|SL)\b/i,

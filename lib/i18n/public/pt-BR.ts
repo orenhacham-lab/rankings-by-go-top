@@ -213,6 +213,7 @@ export const ptBR = {
     de: 'Deutsch',
     nl: 'Nederlands',
     pl: 'Polski',
+    ko: '한국어',
     aria: 'Mudar o idioma do site',
   },
   cookie: {

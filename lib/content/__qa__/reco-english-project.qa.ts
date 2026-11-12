@@ -352,10 +352,10 @@ async function main() {
     const bsSrc = stripComments(read('lib/content/recommendations/brand-safety.ts'))
     // Still ONE early return. Japanese joined it for its own reason: a latin word
     // inside Japanese prose (SEO, Google) is ordinary, so a latin token carries no
-    // foreign-name signal there either. The filter below it is untouched, which F3
-    // checks.
+    // foreign-name signal there either, and Korean joined it on 12 Nov 2026 for
+    // exactly that reason. The filter below it is untouched, which F3 checks.
     check('F2. the fix is one guarded early return, not a weakened filter',
-      /if \(contentScript === 'latin' \|\| contentScript === 'japanese'\) return \[\]/.test(bsSrc))
+      /if \(contentScript === 'latin' \|\| contentScript === 'japanese' \|\| contentScript === 'korean'\) return \[\]/.test(bsSrc))
     check('F3. removing that line restores the pre-fix predicate exactly',
       /return unknownTokens\(toks\(text\), bs\)\.filter\(\(t\) => LATIN_TOKEN_RE\.test\(t\) && !allow\.has\(t\)\)/.test(bsSrc))
   }

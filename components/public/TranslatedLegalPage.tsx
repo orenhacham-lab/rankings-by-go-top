@@ -33,13 +33,16 @@ const UPDATED_LABEL: Record<LegalLanguage, string> = {
   de: 'Letzte Aktualisierung',
   nl: 'Laatst bijgewerkt',
   pl: 'Ostatnia aktualizacja',
+  ko: '마지막 업데이트',
 }
 
 /**
  * What stands between the label and the date. Japanese writes a full-width
  * colon and takes no space after it; every other language here writes the
- * ASCII colon and a space. The documents' own closing sentences do the same,
- * so the footer and the body read alike.
+ * ASCII colon and a space, Korean included — the ko tree writes ASCII
+ * punctuation throughout rather than the ja tree's full-width forms. The
+ * documents' own closing sentences do the same, so the footer and the body
+ * read alike.
  */
 const UPDATED_SEPARATOR: Record<LegalLanguage, string> = {
   es: ': ',
@@ -50,6 +53,7 @@ const UPDATED_SEPARATOR: Record<LegalLanguage, string> = {
   de: ': ',
   nl: ': ',
   pl: ': ',
+  ko: ': ',
 }
 
 function localeDate(iso: string, language: LegalLanguage): string {

@@ -612,4 +612,57 @@ export const ARTICLES_COPY: Record<PublicLocale, ArticlesCopy> = {
       ],
     },
   },
+  ko: {
+    index: {
+      title: '아티클',
+      subtitle: '검색 순위 추적, SEO, AI 답변 가시성에 관한 가이드와 분석',
+      breadcrumb: '아티클',
+      empty: '아티클이 곧 올라갑니다.',
+      readMore: '아티클 읽기',
+    },
+    article: {
+      notFoundTitle: '아티클을 찾을 수 없습니다',
+      notFoundBody: '찾으시는 아티클이 없거나 더 이상 공개되지 않습니다',
+      backToArticles: '아티클 목록으로 돌아가기',
+      backHome: '홈으로 돌아가기',
+      toc: '목차',
+      readingTime: (m) => `읽는 시간 ${m}분`,
+      updated: '업데이트',
+      aboutAuthor: '작성자 소개',
+      aboutAuthorLink: 'Go Top 더 알아보기',
+    },
+    widgets: {
+      plans: {
+        perMonth: '월',
+        popular: '가장 많이 선택',
+        cta: '7일 무료로 사용해 보기',
+        noCard: '신용카드 없이 시작하며, 언제든지 해지할 수 있습니다.',
+        allPlans: '자세한 내용은 요금 페이지에 있습니다',
+      },
+      cta: {
+        title: '직접 운영하시는 사이트에서 확인해 보시겠습니까?',
+        body: '신용카드 없이 7일 무료입니다. 사이트 주소를 입력하시면 키워드 분석이 제공되고, AI 답변 가시성 측정이 시작되며, 첫 번째 아티클이 자동으로 작성되어 게시됩니다.',
+        primary: '7일 무료로 사용해 보기',
+        secondary: '무료 사이트 분석으로 시작하기',
+      },
+    },
+    promo: {
+      badge: 'Go Top SEO',
+      title: ['원하시는 때에', 'Google 순위를 확인하십시오'],
+      body: 'Google 자연 검색과 Google 지도의 순위를 추적하는 전문 플랫폼입니다. 측정은 언제든지 직접 실행하실 수 있고, 월 1회 자동으로 실행되도록 맡기실 수도 있습니다. 상세한 리포트, 기간별 추이, 직접 지원이 함께 제공됩니다.',
+      signup: { label: '무료 체험 시작하기', href: authHref('signup', 'ko') },
+      pricing: { label: '요금 보기', href: '/ko/pricing' },
+      stats: [
+        { num: '1000+', label: '키워드' },
+        { num: '2', label: '추적 소스 (Google + 지도)' },
+        { num: 'AI', label: '가시성 측정' },
+        { num: '7일', label: '무료' },
+      ],
+      features: [
+        { title: 'Google 자연 검색', desc: 'Google 1페이지와 2페이지의 순위를 정확하게 측정합니다' },
+        { title: 'Google 지도', desc: '도시, 우편번호, 위치별 순위' },
+        { title: '전문 리포트', desc: 'PDF와 Excel 리포트에 추이, 비교, 상세 분석이 담깁니다' },
+      ],
+    },
+  },
 }

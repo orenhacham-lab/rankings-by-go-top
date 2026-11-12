@@ -205,6 +205,7 @@ export const en = {
     de: 'Deutsch',
     nl: 'Nederlands',
     pl: 'Polski',
+    ko: '한국어',
     aria: 'Change the site language',
   },
   cookie: {

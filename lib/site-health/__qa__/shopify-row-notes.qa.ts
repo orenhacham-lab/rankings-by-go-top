@@ -200,8 +200,10 @@ function main() {
   // Japanese writes the loanword in katakana, テーマ. Dutch writes `thema`, which
   // the Spanish `tema` does not match either. Polish declines the word, so the
   // note says `z motywu` and `motywu sklepu`: the stem `motyw` is the
-  // alternative, not a nominative that never appears in the sentence.
-  const THEME = /theme|תבנית|tema|th[èe]me|thema|motyw|テーマ/i
+  // alternative, not a nominative that never appears in the sentence. Korean
+  // writes the same loanword in Hangul, 테마, which no latin alternative above
+  // reaches.
+  const THEME = /theme|תבנית|tema|th[èe]me|thema|motyw|テーマ|테마/i
   check('E5: the structured-data note names the theme in every language',
     PUBLIC_LOCALES.every((l) => THEME.test(linesOf(l).schemaFromTheme)),
     PUBLIC_LOCALES.filter((l) => !THEME.test(linesOf(l).schemaFromTheme)).join(','))
