@@ -48,6 +48,7 @@ import { MarketplaceBadgeUnconditional } from '@/components/consent/MarketplaceB
 import { MarketplacePixel } from '@/components/consent/MarketplacePixel'
 import { MarketplacePixelUnconditional } from '@/components/consent/MarketplacePixelUnconditional'
 import { beaconSuppressedForRequest, consentRequiredForRequest } from '@/lib/consent/eprivacy-territory'
+import { koreaOwnSaleBlockedForRequest } from '@/lib/billing/korea-sale'
 import {
   MARKETPLACE_SUPPORT_EMAIL,
   marketplaceBadgeUrl,
@@ -113,6 +114,16 @@ export default async function MarketplaceSalesPage({
   // controller abroad without the 별도의 동의 제28조의8 제1항 제1호 requires, so
   // neither the beacon nor the badge is rendered there at all.
   const beaconSuppressed = beaconSuppressedForRequest(requestHeaders)
+  // KOREA, ON THE ROUTE WHERE WE ARE THE SELLER. provider.sellerOfRecord is
+  // read from each platform's own agreement: ClickBank and Digistore24 are
+  // resellers and carry the buyer's tax themselves, so a Korean sale through
+  // them is theirs to make. JVZoo is NOT a reseller — its Terms s.5.2 put the
+  // purchase contract between the customer and the vendor, and s.7 charges a
+  // 5% network commission rather than a reseller's margin — so a Korean sale
+  // through it is OUR sale, and it carries the same VAT Act art. 53-2 and
+  // 전자상거래법 art. 13 duties as the PayPal path. Same rule, same flag:
+  // lib/billing/korea-sale.ts.
+  const koreaOwnSaleBlocked = !provider.sellerOfRecord && koreaOwnSaleBlockedForRequest(requestHeaders)
 
   return (
     <main className="mx-auto max-w-3xl px-4 py-16">
@@ -163,7 +174,15 @@ export default async function MarketplaceSalesPage({
                 {plan.maxProjects === 1 ? 'One website' : `${plan.maxProjects} websites`},{' '}
                 {plan.maxKeywordsPerProject} keywords, {plan.maxArticlesPerPeriodAccountWide} articles a month.
               </p>
-              {buyUrl ? (
+              {koreaOwnSaleBlocked ? (
+                /* Not "unavailable in your country", which would be false — the
+                   site and the trial are open. What is true is that this plan
+                   is not sold here yet, and that nothing is charged. */
+                <p className="mt-4 text-copy text-muted" data-korea-no-sale>
+                  This plan is not sold in Korea at the moment. Nothing will be charged. The free
+                  trial is open, and you can write to us at contact@gotopseo.com.
+                </p>
+              ) : buyUrl ? (
                 <a
                   href={buyUrl}
                   className="mt-4 inline-block rounded-control bg-action px-4 py-2 text-copy text-action-ink"

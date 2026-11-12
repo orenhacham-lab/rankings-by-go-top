@@ -8,7 +8,7 @@ import { marketForPayPalPlanId } from '@/lib/paypal/checkout-plans'
 import { lockBillingMarket } from '@/lib/billing/billing-market-selection'
 import { resolveBillingMarket, storedMarketOf, STORED_MARKET_KEY } from '@/lib/billing/server-market'
 import { logRestrictedAttempt, restrictionForRequest } from '@/lib/sanctions/guard'
-import { KOREA_SALE_REFUSAL_REASON, koreaSaleBlockedForRequest } from '@/lib/billing/korea-sale'
+import { KOREA_SALE_REFUSAL_REASON, koreaOwnSaleBlockedForRequest } from '@/lib/billing/korea-sale'
 import { notifyRefusedPayPalActivation } from '@/lib/shopify/paypal-migration-retry'
 
 /**
@@ -44,12 +44,15 @@ export async function POST(request: Request) {
       return Response.json({ error: 'Not available', reason: 'restricted_country' }, { status: 451 })
     }
 
-    // Korea, until the checkout flag says the Creem routing is live for it.
-    // This is the path that makes US the seller of record, which is exactly
-    // what brings the Korean VAT and the 전자상거래법 art. 13 disclosure duties
-    // onto a company with no Korean registration. The billing screen does not
-    // draw the buttons for such a visitor; this is the server's own refusal.
-    if (koreaSaleBlockedForRequest(request.headers)) {
+    // Korea, on the route where WE are the seller of record. That is what
+    // brings the 10% Korean VAT (VAT Act art. 53-2, no de-minimis) and the
+    // 전자상거래법 art. 13 disclosure duties onto a company with no Korean
+    // registration, and accepting Creem's merchant-of-record clause does
+    // nothing for a sale made in our own name — so this refusal is tied to
+    // NEXT_PUBLIC_KOREA_SELLER_REGISTERED and NOT to the Creem checkout flag.
+    // The billing screen does not draw the buttons for such a visitor; this is
+    // the server's own refusal.
+    if (koreaOwnSaleBlockedForRequest(request.headers)) {
       console.warn('[paypal-activate] refused: paid activation is not open for Korea yet')
       return Response.json({ error: 'Not available', reason: KOREA_SALE_REFUSAL_REASON }, { status: 451 })
     }

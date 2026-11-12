@@ -165,8 +165,11 @@ function main() {
       const html = ssr(lang)
       check(`B9-${lang}: the definition renders as plain visible text`, html.includes('data-checks-note') && html.includes(CHECKS_EXPLAINER[lang]) && !/title=|tooltip|aria-hidden/.test(html), html.slice(0, 160))
     }
-    const NOTE_JSX = '<PricingChecksNote copy={copy} market={market} />'
-    const noteUnderGrid = (raw: string) => { const src = strip(raw); return /<PricingChecksNote copy=\{copy\} market=\{market\} \/>/.test(src) && src.indexOf('<PricingChecksNote') < src.indexOf('<PricingUnsure') }
+    // The element may now carry a further prop (the Korea trial-only
+    // disclosure, lib/billing/korea-sale.ts), so this matches the element and
+    // its place, not a byte-exact spelling of its props.
+    const NOTE_JSX = '<PricingChecksNote copy={copy} market={market}'
+    const noteUnderGrid = (raw: string) => { const src = strip(raw); return /<PricingChecksNote copy=\{copy\} market=\{market\}[^>]*\/>/.test(src) && src.indexOf('<PricingChecksNote') < src.indexOf('<PricingUnsure') }
     const breakPage = (src: string) => src.replace(NOTE_JSX, '')
     for (const { rel } of PAGES) {
       const src = strip(read(rel))

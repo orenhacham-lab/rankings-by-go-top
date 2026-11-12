@@ -1,3 +1,4 @@
+import { headers } from 'next/headers'
 import { authHref } from '@/lib/i18n/auth-href'
 import { Check, Star } from 'lucide-react'
 import { createClient } from '@/lib/supabase/server'
@@ -14,7 +15,8 @@ import { planLimitLines, PLAN_AUDIENCE_LABEL, PLAN_AUDIENCE_DESCRIPTION, PLAN_DI
 import { pricingEs as copy } from '@/lib/i18n/public/pricing-es'
 import { cn } from '@/lib/utils'
 import { formatPlanPrice, planPriceIn } from '@/lib/billing/market'
-import { resolveBillingMarket } from '@/lib/billing/server-market'
+import { countryFromHeaders, resolveBillingMarket } from '@/lib/billing/server-market'
+import { koreaTrialOnlyNoticeForCountry } from '@/lib/billing/korea-sale'
 import { Breadcrumbs } from '@/components/Breadcrumbs'
 import { getPublicDictionary } from '@/lib/i18n/getPublicDictionary'
 
@@ -42,6 +44,11 @@ export default async function SpanishPricingPage() {
   // language: an Israeli on either page sees shekels, anyone else dollars.
   // The page reads cookies and headers, so it renders per request.
   const { market } = await resolveBillingMarket(supabase, user)
+  // Before the trial, not only at the refusal: a visitor placed in Korea is
+  // told here that only the trial is open to them, because 전자상거래법 제21조
+  // 제1항 제1호 forbids inducement with a material fact withheld, and it binds
+  // any business carrying on electronic commerce. lib/billing/korea-sale.ts.
+  const koreaTrialOnly = koreaTrialOnlyNoticeForCountry(countryFromHeaders(await headers()))
 
   return (
     <div className="flex min-h-screen flex-col bg-canvas">
@@ -154,7 +161,7 @@ export default async function SpanishPricingPage() {
             })}
           </div>
 
-          <PricingChecksNote copy={copy} market={market} />
+          <PricingChecksNote copy={copy} market={market} koreaTrialOnly={koreaTrialOnly} />
           <PricingUnsure copy={copy} checkHref="/es/free-check" />
         </Section>
 

@@ -69,7 +69,7 @@ interface BillingViewProps {
    *  Korea, until the Korean checkout flag says the Creem routing is live for
    *  it. The trial is untouched, so this hides only the ways to pay, and both
    *  payment routes refuse the same visitor server-side. */
-  koreaSaleBlocked?: boolean
+  koreaOwnSaleBlocked?: boolean
   /** Owner decision, 10 Oct 2026 — pay by card instead of PayPal, decided on
    *  the server (app/(dashboard)/billing/page.tsx): only while CREEM_ENABLED
    *  is on, only in USD, and only for an account that has never paid through
@@ -107,7 +107,7 @@ export default function BillingView({
   market,
   marketLocked,
   planPrices,
-  koreaSaleBlocked = false,
+  koreaOwnSaleBlocked = false,
   creemCheckout = false,
   creemGoverned = false,
   marketplaceSeller = null,
@@ -152,9 +152,14 @@ export default function BillingView({
    *  * nothing, which lets the card render the PayPal container as before.
    */
   const checkoutActionFor = (plan: PlanKey): React.ReactNode => {
-    // Korea first, before either provider: this is a refusal to sell, not a
-    // choice between ways of paying.
-    if (koreaSaleBlocked) {
+    // Creem's card button first, because on that route CREEM is the merchant
+    // of record and the Korean duties are its own (Merchant Terms cl. 3.2,
+    // 3.3.4): the server only sets creemCheckout for a Korean visitor once the
+    // Korean checkout flag is on, which is the one condition that opens it.
+    if (creemCheckout) return <CreemCheckoutButton plan={plan} disabled={!checkoutUnlocked} />
+    // Then Korea on OUR own name, which is what the PayPal container below
+    // would be. This is a refusal to sell, not a choice between ways of paying.
+    if (koreaOwnSaleBlocked) {
       return (
         <div className="rounded-control border border-line bg-surface p-2.5">
           <p className="m-0 text-caption font-bold text-ink">{t.koreaSale.title}</p>
@@ -162,7 +167,6 @@ export default function BillingView({
         </div>
       )
     }
-    if (creemCheckout) return <CreemCheckoutButton plan={plan} disabled={!checkoutUnlocked} />
     if (creemGoverned) return <p className="text-caption text-muted">{t.creem.changePlanNote}</p>
     return undefined
   }
@@ -503,7 +507,7 @@ export default function BillingView({
 
           {/* The PayPal buttons, and the SDK behind them, only on the PayPal
               path: a card never offers two ways to pay the same plan. */}
-          {!creemCheckout && !creemGoverned && !koreaSaleBlocked && <BillingClient market={market} acknowledged={checkoutUnlocked} />}
+          {!creemCheckout && !creemGoverned && !koreaOwnSaleBlocked && <BillingClient market={market} acknowledged={checkoutUnlocked} />}
 
           <p className="mt-6 max-w-4xl text-caption text-muted">
             {t.keywordCheckNote}

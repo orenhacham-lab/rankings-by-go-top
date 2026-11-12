@@ -26,8 +26,13 @@ import {
   KOREA_COUNTRY,
   KOREA_SALE_COUNTRY_HEADER,
   KOREA_SALE_REFUSAL_REASON,
+  koreaCreemSaleBlockedForCountry,
+  koreaCreemSaleBlockedForRequest,
+  koreaOwnSaleBlockedForCountry,
+  koreaOwnSaleBlockedForRequest,
+  koreaOwnSaleEnabled,
   koreaSaleBlockedForCountry,
-  koreaSaleBlockedForRequest,
+  koreaTrialOnlyNoticeForCountry,
 } from '../korea-sale'
 import { COUNTRY_HEADER } from '../server-market'
 import { RESTRICTED_COUNTRIES } from '../../sanctions/countries'
@@ -44,31 +49,56 @@ const headersWith = (value: string | null) => ({
   get: (name: string) => (name === KOREA_SALE_COUNTRY_HEADER ? value : null),
 })
 
-console.log('\nA. the decision itself')
-check('A1: a visitor in Korea may not be sold a plan while the flag is off',
-  koreaSaleBlockedForCountry('KR', false) === true)
-check('A2: the flag ON stops the block entirely, which is how the ruling is lifted',
-  koreaSaleBlockedForCountry('KR', true) === false)
-check('A3: nobody else is blocked, in either state',
+console.log('\nA. the decision itself, which is TWO decisions and not one')
+check('A1: with neither route open, a visitor in Korea may not be sold a plan',
+  koreaSaleBlockedForCountry('KR', false, false) === true)
+check('A2: the OWN-NAME route (PayPal) is governed by the registration flag alone — '
+  + 'accepting Creem\'s merchant-of-record clause does nothing for a sale we make ourselves',
+  koreaOwnSaleBlockedForCountry('KR', false) === true
+  && koreaOwnSaleBlockedForCountry('KR', true) === false)
+check('A3: the CREEM route is governed by the Korean checkout flag, which is what it was written for',
+  koreaCreemSaleBlockedForCountry('KR', false) === true
+  && koreaCreemSaleBlockedForCountry('KR', true) === false)
+check('A4: the two do not leak into each other: opening Creem does NOT open our own-name sale',
+  koreaOwnSaleBlockedForCountry('KR', false) === true
+  && koreaSaleBlockedForCountry('KR', false, true) === false)
+check('A4b: …and opening our own-name sale does not pretend the Creem route is live',
+  koreaCreemSaleBlockedForCountry('KR', false) === true)
+check('A5: nobody else is blocked on either route, in any state',
   ['US', 'IL', 'DE', 'JP', 'GB', 'CA', 'AU'].every((c) =>
-    koreaSaleBlockedForCountry(c, false) === false && koreaSaleBlockedForCountry(c, true) === false))
-check('A4: a lower-case or padded code is still read, because formatting is not a licence to sell',
-  koreaSaleBlockedForCountry('kr', false) === true && koreaSaleBlockedForCountry(' KR ', false) === true)
-check('A5: an unplaceable visitor is NOT blocked, which is the residual the module states',
-  koreaSaleBlockedForCountry(null, false) === false
-  && koreaSaleBlockedForCountry(undefined, false) === false
-  && koreaSaleBlockedForCountry('', false) === false
-  && koreaSaleBlockedForCountry('XX', false) === false)
-check('A6: it is one country, named once',
+    koreaOwnSaleBlockedForCountry(c, false) === false
+    && koreaCreemSaleBlockedForCountry(c, false) === false
+    && koreaSaleBlockedForCountry(c, false, false) === false))
+check('A6: a lower-case or padded code is still read, because formatting is not a licence to sell',
+  koreaOwnSaleBlockedForCountry('kr', false) === true && koreaOwnSaleBlockedForCountry(' KR ', false) === true)
+check('A7: an unplaceable visitor is NOT blocked, which is the residual the module states',
+  koreaOwnSaleBlockedForCountry(null, false) === false
+  && koreaOwnSaleBlockedForCountry(undefined, false) === false
+  && koreaOwnSaleBlockedForCountry('', false) === false
+  && koreaOwnSaleBlockedForCountry('XX', false) === false)
+check('A8: it is one country, named once',
   KOREA_COUNTRY === 'KR')
-check('A7: the header is byte-identical to the one the billing market itself reads',
+check('A9: the header is byte-identical to the one the billing market itself reads',
   KOREA_SALE_COUNTRY_HEADER === COUNTRY_HEADER)
-check('A8: from a request, the same answer',
-  koreaSaleBlockedForRequest(headersWith('KR'), false) === true
-  && koreaSaleBlockedForRequest(headersWith('US'), false) === false
-  && koreaSaleBlockedForRequest(headersWith(null), false) === false)
-check('A9: the application reads the flag, so nothing is hard-coded to "blocked"',
-  koreaSaleBlockedForCountry('KR') === !koreanCheckoutEnabled())
+check('A10: from a request, the same two answers',
+  koreaOwnSaleBlockedForRequest(headersWith('KR'), false) === true
+  && koreaOwnSaleBlockedForRequest(headersWith('US'), false) === false
+  && koreaCreemSaleBlockedForRequest(headersWith('KR'), false) === true
+  && koreaCreemSaleBlockedForRequest(headersWith(null), false) === false)
+check('A11: the own-name flag is its OWN environment variable, off unless it says exactly true',
+  koreaOwnSaleEnabled(undefined) === false
+  && koreaOwnSaleEnabled('') === false
+  && koreaOwnSaleEnabled('TRUE') === false
+  && koreaOwnSaleEnabled('1') === false
+  && koreaOwnSaleEnabled('true') === true)
+check('A12: the application reads the flags, so nothing is hard-coded to "blocked"',
+  koreaOwnSaleBlockedForCountry('KR') === !koreaOwnSaleEnabled()
+  && koreaCreemSaleBlockedForCountry('KR') === !koreanCheckoutEnabled())
+check('A13: the pre-trial notice shows exactly where NEITHER route may sell',
+  koreaTrialOnlyNoticeForCountry('KR', false, false) === true
+  && koreaTrialOnlyNoticeForCountry('KR', true, false) === false
+  && koreaTrialOnlyNoticeForCountry('KR', false, true) === false
+  && koreaTrialOnlyNoticeForCountry('US', false, false) === false)
 
 console.log('\nB. Korea is NOT a sanctions entry, because that would be a false statement')
 check('B1: the restricted-country list does not contain it',
@@ -76,47 +106,52 @@ check('B1: the restricted-country list does not contain it',
 check('B2: and the two reasons that list carries are about sanctions, not about tax',
   Object.values(RESTRICTED_COUNTRIES).every((r) => r.reason === 'enemy_state' || r.reason === 'comprehensive_sanctions'))
 
-console.log('\nC. the three places that must all refuse')
+console.log('\nC. the three places that must all refuse, each on ITS OWN seller')
 {
   const paypal = code('app/api/paypal/activate/route.ts')
   const creem = code('app/api/creem/checkout/route.ts')
   const page = code('app/(dashboard)/billing/page.tsx')
   const view = code('app/(dashboard)/billing/BillingView.tsx')
-  check('C1: the PayPal activation refuses, from the request headers',
-    /koreaSaleBlockedForRequest\(request\.headers\)/.test(paypal)
+  check('C1: the PayPal activation refuses on the OWN-NAME decision, from the request headers',
+    /koreaOwnSaleBlockedForRequest\(request\.headers\)/.test(paypal)
     && /KOREA_SALE_REFUSAL_REASON/.test(paypal))
-  check('C2: the Creem checkout refuses too, because it is the path that opens one day',
-    /koreaSaleBlockedForRequest\(request\.headers\)/.test(creem)
+  check('C1b: and it does NOT read the Creem flag, which would open our own sale on the wrong condition',
+    !/koreaCreemSaleBlockedForRequest|koreanCheckoutEnabled/.test(paypal))
+  check('C2: the Creem checkout refuses on the CREEM decision',
+    /koreaCreemSaleBlockedForRequest\(request\.headers\)/.test(creem)
     && /KOREA_SALE_REFUSAL_REASON/.test(creem))
   check('C3: both answer 451, the status the sanctions refusal already uses here',
     /KOREA_SALE_REFUSAL_REASON \}, \{ status: 451 \}/.test(paypal)
     && /KOREA_SALE_REFUSAL_REASON \}, \{ status: 451 \}/.test(creem))
-  check('C4: the billing screen takes the decision on the server, from the headers',
-    /koreaSaleBlockedForRequest\(await headers\(\)\)/.test(page)
-    && /koreaSaleBlocked=\{koreaSaleBlocked\}/.test(page))
-  check('C5: and the screen draws no PayPal container for such a visitor',
-    /!creemCheckout && !creemGoverned && !koreaSaleBlocked && <BillingClient/.test(view))
-  check('C6: nor a card button: the refusal is returned before either provider is considered',
-    view.indexOf('if (koreaSaleBlocked) {') > 0
-    && view.indexOf('if (koreaSaleBlocked) {') < view.indexOf('if (creemCheckout) return <CreemCheckoutButton'))
-  check('C7: the visitor is told in words, not shown an empty card',
+  check('C4: the billing screen takes both decisions on the server, from the headers',
+    /koreaOwnSaleBlockedForRequest\(requestHeaders\)/.test(page)
+    && /koreaCreemSaleBlockedForRequest\(requestHeaders\)/.test(page)
+    && /koreaOwnSaleBlocked=\{koreaOwnSaleBlocked\}/.test(page))
+  check('C5: the Creem card button is not even offered to such a visitor while that route is shut',
+    /&& !koreaCreemSaleBlocked/.test(page))
+  check('C6: and the screen draws no PayPal container for a visitor we may not sell to ourselves',
+    /!creemCheckout && !creemGoverned && !koreaOwnSaleBlocked && <BillingClient/.test(view))
+  check('C7: the refusal comes before the PayPal container and after the Creem button, '
+    + 'because on the Creem route the seller is Creem',
+    view.indexOf('if (creemCheckout) return <CreemCheckoutButton') > 0
+    && view.indexOf('if (creemCheckout) return <CreemCheckoutButton') < view.indexOf('if (koreaOwnSaleBlocked) {'))
+  check('C8: the visitor is told in words, not shown an empty card',
     /t\.koreaSale\.title/.test(view) && /t\.koreaSale\.description/.test(view))
   check('C-MUT1: the PayPal guard catches the refusal being dropped',
-    !/koreaSaleBlockedForRequest\(request\.headers\)/.test(
-      paypal.replace(/koreaSaleBlockedForRequest\(request\.headers\)/g, 'false')))
+    !/koreaOwnSaleBlockedForRequest\(request\.headers\)/.test(
+      paypal.replace(/koreaOwnSaleBlockedForRequest\(request\.headers\)/g, 'false')))
   check('C-MUT2: …and the Creem one',
-    !/koreaSaleBlockedForRequest\(request\.headers\)/.test(
-      creem.replace(/koreaSaleBlockedForRequest\(request\.headers\)/g, 'false')))
+    !/koreaCreemSaleBlockedForRequest\(request\.headers\)/.test(
+      creem.replace(/koreaCreemSaleBlockedForRequest\(request\.headers\)/g, 'false')))
   check('C-MUT3: the screen guard catches the PayPal container coming back unconditionally',
-    !/!creemCheckout && !creemGoverned && !koreaSaleBlocked && <BillingClient/.test(
-      view.replace(/!creemCheckout && !creemGoverned && !koreaSaleBlocked && <BillingClient/g,
+    !/!creemCheckout && !creemGoverned && !koreaOwnSaleBlocked && <BillingClient/.test(
+      view.replace(/!creemCheckout && !creemGoverned && !koreaOwnSaleBlocked && <BillingClient/g,
         '!creemCheckout && !creemGoverned && <BillingClient')))
-  check('C-MUT4: …and the order guard catches the card button being offered first',
-    (() => {
-      const moved = view
-        .replace('if (koreaSaleBlocked) {', 'if (false) {')
-      return !/if \(koreaSaleBlocked\) \{/.test(moved)
-    })())
+  check('C-MUT4: the single-switch mistake is caught: the PayPal route reading the Creem flag',
+    /koreaCreemSaleBlockedForRequest|koreanCheckoutEnabled/.test(
+      paypal.replace('koreaOwnSaleBlockedForRequest', 'koreaCreemSaleBlockedForRequest')))
+  check('C-MUT5: …and the Creem gate on the page being dropped',
+    !/&& !koreaCreemSaleBlocked/.test(page.replace(/&& !koreaCreemSaleBlocked/g, '')))
 }
 
 console.log('\nD. the trial is untouched, which is the whole reason the locale may go live')
@@ -129,7 +164,7 @@ console.log('\nD. the trial is untouched, which is the whole reason the locale m
     && !/(trial|entitlement)[^\n]*koreaSaleBlocked/i.test(page)
     && !/koreaSaleBlocked[^\n]*trialActive/.test(view))
   check('D2: the Korean price page still sends a visitor to the trial signup, not to a checkout',
-    /authHref\('signup', 'ko'/.test(koPricing) && !/korea-sale/.test(koPricing))
+    /authHref\('signup', 'ko'/.test(koPricing) && !/CreemCheckoutButton|paypal-button/.test(koPricing))
   check('D3: and it opens no checkout of its own, so there is no fourth way in',
     !/creem\/checkout|paypal\/activate/.test(koPricing))
 }
@@ -154,6 +189,85 @@ check('E3: all three dictionaries that the screen can show it in carry it '
   + '(the other eight fall back to English by design, lib/i18n/dashboard/merge.ts)',
   ['lib/i18n/dashboard/he.ts', 'lib/i18n/dashboard/en.ts', 'lib/i18n/dashboard/ko/billing.ts']
     .every((p) => /koreaSale: \{\s*\n\s*title:/.test(read(p))))
+
+console.log('\nF. the fact is told BEFORE the trial, not only at the refusal')
+{
+  const section = code('components/public/pricing/PricingSections.tsx')
+  const pages = [
+    'app/(public)/pricing/page.tsx', 'app/(public)/en/pricing/page.tsx', 'app/(public)/ko/pricing/page.tsx',
+    'app/(public)/es/pricing/page.tsx', 'app/(public)/pt-BR/pricing/page.tsx', 'app/(public)/fr/pricing/page.tsx',
+    'app/(public)/it/pricing/page.tsx', 'app/(public)/ja/pricing/page.tsx', 'app/(public)/de/pricing/page.tsx',
+    'app/(public)/nl/pricing/page.tsx', 'app/(public)/pl/pricing/page.tsx',
+  ]
+  check('F1: the shared section renders it, and only when the server said so',
+    /koreaTrialOnly \? \(/.test(section) && /copy\.plans\.koreaTrialOnly/.test(section))
+  check('F1-MUT: an unconditional notice is caught',
+    !/koreaTrialOnly \? \(/.test(section.replace(/koreaTrialOnly \? \(/g, 'true ? (')))
+  check('F2: EVERY language\'s pricing page takes the decision on the server and passes it, '
+    + 'because the duty follows the consumer and not the page',
+    pages.every((p) => {
+      const src = code(p)
+      return /koreaTrialOnlyNoticeForCountry\(countryFromHeaders\(await headers\(\)\)\)/.test(src)
+        && /koreaTrialOnly=\{koreaTrialOnly\}/.test(src)
+    }))
+  check('F2-MUT: a page that stops passing it is caught',
+    !/koreaTrialOnly=\{koreaTrialOnly\}/.test(
+      code('app/(public)/ko/pricing/page.tsx').replace(/koreaTrialOnly=\{koreaTrialOnly\}/g, '')))
+  check('F3: every pricing dictionary carries the sentence, and none is empty',
+    ['he', 'en', 'es', 'pt-BR', 'fr', 'it', 'ja', 'de', 'nl', 'pl', 'ko'].every((loc) => {
+      const d = read(`lib/i18n/public/pricing-${loc}.ts`)
+      const m = d.match(/koreaTrialOnly: '((?:[^'\\]|\\.)*)'/)
+      return !!m && m[1].length > 30
+    }))
+  check('F4: and none of them says anything about VAT or a registration number, '
+    + 'which the legal ruling keeps out of anything a buyer reads',
+    ['he', 'en', 'ko', 'ja', 'de'].every((loc) => {
+      const d = read(`lib/i18n/public/pricing-${loc}.ts`)
+      const m = d.match(/koreaTrialOnly: '((?:[^'\\]|\\.)*)'/)
+      return !!m && !/VAT|מע״מ|부가가치세|부가세|사업자등록/.test(m[1])
+    }))
+  check('F5: the Korean sentence says the trial is open and that nothing is charged, '
+    + 'rather than that the service is unavailable in their country',
+    (() => {
+      const d = read('lib/i18n/public/pricing-ko.ts')
+      const m = d.match(/koreaTrialOnly: '((?:[^'\\]|\\.)*)'/)
+      return !!m && m[1].includes('무료 체험') && m[1].includes('청구되지 않습니다')
+    })())
+  check('F6: and the payment-step sentence promises no notification we are not recording',
+    ['lib/i18n/dashboard/he.ts', 'lib/i18n/dashboard/en.ts', 'lib/i18n/dashboard/ko/billing.ts']
+      .every((p) => {
+        const d = read(p)
+        const seg = d.slice(d.indexOf('koreaSale: {'), d.indexOf('koreaSale: {') + 700)
+        return !/알려 드리겠습니다|we will tell you|ונעדכן/.test(seg)
+      }))
+}
+
+console.log('\nG. the same rule on the marketplace pages, where JVZoo is NOT the seller')
+{
+  const go = code('app/go/[platform]/page.tsx')
+  const config = read('lib/marketplace/config.ts')
+  check('G1: the sales page takes the own-name decision, and only where WE are the seller',
+    /!provider\.sellerOfRecord && koreaOwnSaleBlockedForRequest\(requestHeaders\)/.test(go))
+  check('G2: a visitor it applies to gets words instead of the buy button',
+    /koreaOwnSaleBlocked \? \(/.test(go) && /data-korea-no-sale/.test(go))
+  check('G3: the button is still there for everyone else',
+    /\) : buyUrl \? \(/.test(go) && /href=\{buyUrl\}/.test(go))
+  check('G4: and the reseller platforms are untouched, because the tax is theirs',
+    (config.match(/sellerOfRecord: true/g) ?? []).length === 2
+    && (config.match(/sellerOfRecord: false/g) ?? []).length === 1)
+  check('G5: the sentence says nothing about VAT and does not call the service unavailable in their country',
+    (() => {
+      const at = go.indexOf('data-korea-no-sale')
+      const seg = go.slice(at, at + 400)
+      return !/VAT|tax/i.test(seg) && /not sold in Korea/.test(seg) && /Nothing will be charged/.test(seg)
+    })())
+  check('G-MUT1: dropping the seller condition is caught — it would refuse a reseller sale that is lawful',
+    !/!provider\.sellerOfRecord && koreaOwnSaleBlockedForRequest\(requestHeaders\)/.test(
+      go.replace(/!provider\.sellerOfRecord && koreaOwnSaleBlockedForRequest\(requestHeaders\)/g,
+        'koreaOwnSaleBlockedForRequest(requestHeaders)')))
+  check('G-MUT2: dropping the block and showing the button anyway is caught',
+    !/koreaOwnSaleBlocked \? \(/.test(go.replace(/koreaOwnSaleBlocked \? \(/g, 'false ? (')))
+}
 
 console.log(`\n${pass} passed, ${fail} failed`)
 if (fail > 0) process.exitCode = 1

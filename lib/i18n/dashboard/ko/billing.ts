@@ -192,8 +192,8 @@ export const billingKo: DeepPartial<DashboardDictionary> = {
       policyLabel: '청약철회권 전문은 해지 및 환불 정책에 있습니다',
     },
     koreaSale: {
-      title: '대한민국에서는 아직 유료 플랜을 구매하실 수 없습니다',
-      description: '무료 이용 기간은 그대로이며, 기간이 끝날 때까지 모든 기능을 그대로 쓰실 수 있습니다. 대한민국의 고객에게 구독을 판매하기 위해 필요한 준비를 마치는 중이며, 가능해지면 바로 알려 드리겠습니다. 그 사이에도 계속 이용하고 싶으시면 저희에게 알려 주십시오. 도와 드리겠습니다.',
+      title: '현재 한국에서는 유료 구독 결제를 제공하지 않습니다',
+      description: '요금이 청구되지 않으며, 체험 기간에 만든 데이터는 계정에 그대로 보관됩니다. 문의는 contact@gotopseo.com으로 보내 주시면 됩니다.',
     },
     creem: {
       payButton: '카드로 결제',
