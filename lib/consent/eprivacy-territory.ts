@@ -69,8 +69,19 @@ export const CONSENT_COUNTRY_HEADER = 'x-vercel-ip-country'
 
 /**
  * EEA (the 27 member states plus Iceland, Liechtenstein and Norway), the
- * United Kingdom, Switzerland and Canada. Alpha-2, upper case, which is what
- * the CDN sends.
+ * United Kingdom, Switzerland, Canada and Korea. Alpha-2, upper case, which is
+ * what the CDN sends.
+ *
+ * KOREA IS HERE ON ITS OWN TWO STATUTES, not by analogy with ePrivacy, which
+ * has no Korean counterpart. 개인정보 보호법 제15조 제1항 제1호 makes consent the
+ * ground for collecting personal information, and the beacon's cookies carry
+ * the visitor's IP address and full user-agent, which 제2조 제1호 treats as
+ * personal information about an identifiable person. 정보통신망법 제22조의2 제1항
+ * then requires consent before an information and communications service
+ * provider accesses data stored on the user's own device — the same act
+ * Art. 5(3) ePrivacy catches, reached by a different route. There is no
+ * Korean carve-out for a tag that is not necessary to the service, and ours
+ * is not: the page renders identically without it.
  */
 export const CONSENT_REQUIRED_COUNTRIES: readonly string[] = Object.freeze([
   // EU
@@ -81,6 +92,8 @@ export const CONSENT_REQUIRED_COUNTRIES: readonly string[] = Object.freeze([
   'IS', 'LI', 'NO',
   // UK, Switzerland, Canada
   'GB', 'CH', 'CA',
+  // Korea: 개인정보 보호법 제15조 and 정보통신망법 제22조의2
+  'KR',
 ])
 
 const CONSENT_REQUIRED = new Set(CONSENT_REQUIRED_COUNTRIES)

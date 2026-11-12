@@ -47,6 +47,11 @@ check('A5: all 27 member states are listed, none quietly missing',
     .every((c) => consentRequiredForCountry(c) === true))
 check('A6: Canada in full, because Law 25 says the same and the header carries no province',
   consentRequiredForCountry('CA') === true)
+check('A6b: Korea, on 개인정보 보호법 제15조 and 정보통신망법 제22조의2 and not on ePrivacy, which has no Korean counterpart',
+  consentRequiredForCountry('KR') === true)
+check('A6b-MUT: a list without Korea would let the beacon write on page load there',
+  CONSENT_REQUIRED_COUNTRIES.filter((c) => c !== 'KR').includes('KR') === false
+  && CONSENT_REQUIRED_COUNTRIES.includes('KR'))
 check('A7: a United States visitor does not, which is the only reason this module exists',
   consentRequiredForCountry('US') === false)
 check('A8: nor does a visitor outside any of it',
