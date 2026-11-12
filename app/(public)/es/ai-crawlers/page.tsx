@@ -3,6 +3,7 @@ import { Footer } from '@/components/Footer'
 import { AiCrawlerChecker } from '@/components/ai-crawlers/AiCrawlerChecker'
 import { aiCrawlerCopy } from '@/lib/ai-crawlers/copy'
 import { buildHreflangAlternates } from '@/lib/seo/hreflang'
+import { SOCIAL_PREVIEW_IMAGE } from '@/lib/seo/social-preview'
 
 const copy = aiCrawlerCopy('es')
 
@@ -10,6 +11,7 @@ export const metadata = {
   title: copy.meta.title,
   description: copy.meta.description,
   openGraph: {
+    images: [SOCIAL_PREVIEW_IMAGE],
     title: copy.page.title,
     description: copy.meta.description,
     url: 'https://www.gotopseo.com/es/ai-crawlers',

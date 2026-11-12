@@ -2,11 +2,13 @@ import { authorPersonSchema } from '@/lib/articles/authors'
 import { buildHreflangAlternates } from '@/lib/seo/hreflang'
 import { marketingBreadcrumbSchema } from '@/lib/seo/page-schema'
 import { ABOUT_BREADCRUMB } from '@/lib/i18n/public/pages/breadcrumb-labels'
+import { SOCIAL_PREVIEW_IMAGE } from '@/lib/seo/social-preview'
 
 export const metadata = {
   title: 'O nas - Go Top SEO',
   description: 'Historia Go Top SEO. Platforma, która mierzy pozycje w Google i widoczność w AI, zbudowana na ponad jedenastu latach pracy w marketingu cyfrowym.',
   openGraph: {
+    images: [SOCIAL_PREVIEW_IMAGE],
     title: 'O nas - Go Top SEO',
     description: 'Platforma, która mierzy pozycje w Google i widoczność w AI, z ponad jedenastoma latami pracy w marketingu cyfrowym',
     url: 'https://www.gotopseo.com/pl/about',

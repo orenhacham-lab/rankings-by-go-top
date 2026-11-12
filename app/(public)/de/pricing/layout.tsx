@@ -1,11 +1,13 @@
 import { buildHreflangAlternates } from '@/lib/seo/hreflang'
 import { marketingBreadcrumbSchema } from '@/lib/seo/page-schema'
 import { getPublicDictionary } from '@/lib/i18n/getPublicDictionary'
+import { SOCIAL_PREVIEW_IMAGE } from '@/lib/seo/social-preview'
 
 export const metadata = {
   title: 'Preise - Go Top SEO',
   description: 'Flexible Tarife, um die Positionen bei Google und die Sichtbarkeit in der KI zu messen. Mit sieben Tagen kostenloser Testphase und ohne Bindung.',
   openGraph: {
+    images: [SOCIAL_PREVIEW_IMAGE],
     title: 'Preise - Go Top SEO',
     description: 'Flexible Tarife, um die Positionen bei Google und die Sichtbarkeit in der KI zu messen',
     url: 'https://www.gotopseo.com/de/pricing',

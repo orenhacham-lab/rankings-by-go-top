@@ -2,11 +2,13 @@ import { authorPersonSchema } from '@/lib/articles/authors'
 import { buildHreflangAlternates } from '@/lib/seo/hreflang'
 import { marketingBreadcrumbSchema } from '@/lib/seo/page-schema'
 import { ABOUT_BREADCRUMB } from '@/lib/i18n/public/pages/breadcrumb-labels'
+import { SOCIAL_PREVIEW_IMAGE } from '@/lib/seo/social-preview'
 
 export const metadata = {
   title: 'About Go Top SEO',
   description: 'Discover the story of Go Top SEO - a Google rank tracking and AI visibility platform built on 11+ years of digital experience. Professional, transparent, results-focused.',
   openGraph: {
+    images: [SOCIAL_PREVIEW_IMAGE],
     title: 'About Go Top SEO',
     description: 'Google rank tracking and AI visibility platform built with 11+ years of digital expertise',
     url: 'https://www.gotopseo.com/en/about',

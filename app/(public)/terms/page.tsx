@@ -1,11 +1,13 @@
 import Link from 'next/link'
 import { LEGAL_FOOTNOTE, LegalDoc } from '@/components/public/LegalDoc'
+import { SOCIAL_PREVIEW_IMAGE } from '@/lib/seo/social-preview'
 
 export const metadata = {
   title: 'תקנון ותנאי שימוש | Go Top SEO',
   description: 'תקנון ותנאי השימוש של Go Top SEO — התנאים המסדירים את השימוש בשירות.',
   robots: 'noindex, nofollow',
   openGraph: {
+    images: [SOCIAL_PREVIEW_IMAGE],
     title: 'תקנון ותנאי שימוש | Go Top SEO',
     description: 'תקנון ותנאי השימוש של Go Top SEO',
     url: 'https://www.gotopseo.com/terms',

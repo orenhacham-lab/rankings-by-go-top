@@ -1,10 +1,12 @@
 import { buildHreflangAlternates } from '@/lib/seo/hreflang'
 import { LOCALE_CONFIG } from '@/lib/i18n/locales'
+import { SOCIAL_PREVIEW_IMAGE } from '@/lib/seo/social-preview'
 
 export const metadata = {
   title: 'SEO、検索順位、AIでの可視性についての記事 | Go Top SEO',
   description: 'Googleでの検索順位の計測、自然検索での集客、そしてChatGPT、Gemini、Google AI Modeでの可視性についての記事、ガイド、アドバイスです。',
   openGraph: {
+    images: [SOCIAL_PREVIEW_IMAGE],
     title: 'SEO、検索順位、AIでの可視性についての記事 | Go Top SEO',
     description: '検索順位の計測、自然検索での集客、AIでの可視性についての記事とガイドです',
     url: 'https://www.gotopseo.com/ja/articles',

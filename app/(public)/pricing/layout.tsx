@@ -1,11 +1,13 @@
 import { buildHreflangAlternates } from '@/lib/seo/hreflang'
 import { marketingBreadcrumbSchema } from '@/lib/seo/page-schema'
 import { getPublicDictionary } from '@/lib/i18n/getPublicDictionary'
+import { SOCIAL_PREVIEW_IMAGE } from '@/lib/seo/social-preview'
 
 export const metadata = {
   title: 'מחירים - Go Top SEO',
   description: 'תוכניות מחירים גמישות ליצירת תוכן SEO/GEO, מעקב מיקומים בגוגל ונראות ב-AI. ניסיון חינם של 7 ימים, ללא התחייבות. תוכניות החל מ-₪249 לחודש.',
   openGraph: {
+    images: [SOCIAL_PREVIEW_IMAGE],
     title: 'מחירים - Go Top SEO',
     description: 'תוכניות מחירים גמישות למעקב מיקומים בגוגל ונראות ב-AI',
     url: 'https://www.gotopseo.com/pricing',
