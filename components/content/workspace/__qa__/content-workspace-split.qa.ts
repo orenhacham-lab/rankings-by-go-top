@@ -102,6 +102,14 @@ function main() {
       for (const e of readdirSync(join(ROOT, dir), { withFileTypes: true })) {
         const rel = join(dir, e.name)
         if (e.isDirectory()) { if (e.name !== '__qa__' && e.name !== 'node_modules') scan(rel); continue }
+        // `*.qa-mutant<n>.tsx` is a mutation control's temporary copy, written
+        // and deleted by another suite (components/content/__qa__/
+        // wordpress-plugin-first.qa.ts) while this one walks the same folder.
+        // verify.mjs runs the suites in parallel, so reading one is a race that
+        // throws ENOENT and reported this suite as NEWLY failing on 12 Nov 2026
+        // when the change under test was in the public nav. They are never
+        // source files, so they are skipped rather than read.
+        if (/\.qa-mutant\d*\.tsx?$/.test(e.name)) continue
         if (/\.tsx?$/.test(e.name) && /from '@\/components\/content\/ContentHub'/.test(strip(read(rel)))) importers.push(rel)
       }
     }
