@@ -1,11 +1,13 @@
 import { buildHreflangAlternates } from '@/lib/seo/hreflang'
 import { marketingBreadcrumbSchema } from '@/lib/seo/page-schema'
 import { getPublicDictionary } from '@/lib/i18n/getPublicDictionary'
+import { SOCIAL_PREVIEW_IMAGE } from '@/lib/seo/social-preview'
 
 export const metadata = {
   title: 'Prijzen - Go Top SEO',
   description: 'Flexibele pakketten om de posities in Google en de zichtbaarheid in AI te meten. Met zeven dagen gratis uitproberen en zonder verplichting.',
   openGraph: {
+    images: [SOCIAL_PREVIEW_IMAGE],
     title: 'Prijzen - Go Top SEO',
     description: 'Flexibele pakketten om de posities in Google en de zichtbaarheid in AI te meten',
     url: 'https://www.gotopseo.com/nl/pricing',

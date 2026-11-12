@@ -1,13 +1,16 @@
 import { buildHreflangAlternates } from '@/lib/seo/hreflang'
 import Link from 'next/link'
 import { LEGAL_FOOTNOTE, LEGAL_LINK, LegalFrame, LegalHeader, SitemapGroups } from '@/components/public/LegalDoc'
+import { sitemapArticleLinks, sitemapArticleSection } from '@/lib/sitemap/articles'
 import { authHref } from '@/lib/i18n/auth-href'
 import { LOCALE_CONFIG } from '@/lib/i18n/locales'
+import { SOCIAL_PREVIEW_IMAGE } from '@/lib/seo/social-preview'
 
 export const metadata = {
   title: 'Sitemap | Go Top SEO',
   description: 'De sitemap van Go Top SEO. Alle pagina’s op één plek.',
   openGraph: {
+    images: [SOCIAL_PREVIEW_IMAGE],
     title: 'Sitemap | Go Top SEO',
     description: 'De sitemap van Go Top SEO',
     url: 'https://www.gotopseo.com/nl/sitemap',
@@ -25,7 +28,9 @@ export const metadata = {
 
 type SitemapSection = { title: string; description?: string; links: Array<{ label: string; href: string }> }
 
-export default function DutchSitemapPage() {
+export default async function DutchSitemapPage() {
+  const articles = await sitemapArticleLinks('nl')
+
   const sections: SitemapSection[] = [
     {
       title: 'Pagina’s',
@@ -97,11 +102,13 @@ export default function DutchSitemapPage() {
     },
   ]
 
+  const articleSection: SitemapSection[] = sitemapArticleSection('Artikelen op de site', articles)
+
   return (
     <LegalFrame locale="nl" breadcrumbs={[{ label: 'Sitemap', href: '/nl/sitemap' }]}>
       <LegalHeader title="Sitemap" subtitle="Alle pagina&rsquo;s en onderdelen van Go Top SEO op &eacute;&eacute;n plek" />
 
-      <SitemapGroups groups={sections} />
+      <SitemapGroups groups={[...sections, ...articleSection]} />
 
       <p className={`mt-10 ${LEGAL_FOOTNOTE}`}>
         Meer over ons staat op de{' '}

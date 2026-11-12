@@ -66,6 +66,10 @@ export const de = {
         label: 'Korrekturen an der Website',
         description: 'Die Website analysieren und Titel, Meta-Beschreibungen, Alternativtexte von Bildern und Links korrigieren. In WordPress mit einem Klick, nach Ihrer Freigabe.',
       },
+      businessProfile: {
+        label: 'Google Unternehmensprofil',
+        description: 'Alles, was das System mit dem Profil tut, das Kunden auf Google Maps sehen: Ihre Position auf der Karte, die Beiträge und die Antworten auf Bewertungen, an einer Stelle.',
+      },
       mapsPosts: {
         label: 'Beiträge im Google Unternehmensprofil',
         description: 'Beiträge mit Foto und Button im Google Unternehmensprofil, sofort oder geplant, dazu Antworten auf Bewertungen. Mit einem ersten Entwurf, den Sie bearbeiten können.',

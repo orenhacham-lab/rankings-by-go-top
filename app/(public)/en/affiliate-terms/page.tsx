@@ -1,5 +1,6 @@
 import Link from 'next/link'
 import { LEGAL_FOOTNOTE, LegalDoc } from '@/components/public/LegalDoc'
+import { SOCIAL_PREVIEW_IMAGE } from '@/lib/seo/social-preview'
 
 export const metadata = {
   title: 'Partner Program Agreement | Go Top SEO',
@@ -7,6 +8,7 @@ export const metadata = {
     'The terms that govern participation in the Go Top SEO partner program — commissions, attribution, payouts and the duties of a partner.',
   robots: 'noindex, nofollow',
   openGraph: {
+    images: [SOCIAL_PREVIEW_IMAGE],
     title: 'Partner Program Agreement | Go Top SEO',
     description: 'The terms that govern participation in the Go Top SEO partner program',
     url: 'https://www.gotopseo.com/en/affiliate-terms',

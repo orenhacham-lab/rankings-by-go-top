@@ -85,6 +85,10 @@ export const pl = {
         label: 'Poprawki na witrynie',
         description: 'Analiza witryny i poprawa tytułów, opisów meta, tekstów alternatywnych obrazów oraz linków. W WordPressie jednym kliknięciem, po Państwa zatwierdzeniu.',
       },
+      businessProfile: {
+        label: 'Profil Firmy w Google',
+        description: 'Wszystko, co system robi z profilem, który klienci widzą w Mapach Google: pozycja na mapie, wpisy i odpowiedzi na opinie, w jednym miejscu.',
+      },
       mapsPosts: {
         label: 'Posty w Profilu Firmy w Google',
         description: 'Posty ze zdjęciem i przyciskiem w Profilu Firmy w Google, od razu albo zaplanowane, oraz odpowiedzi na opinie. Z pierwszą wersją, którą można samemu poprawić.',

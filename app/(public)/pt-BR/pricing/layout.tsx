@@ -1,11 +1,13 @@
 import { buildHreflangAlternates } from '@/lib/seo/hreflang'
 import { marketingBreadcrumbSchema } from '@/lib/seo/page-schema'
 import { getPublicDictionary } from '@/lib/i18n/getPublicDictionary'
+import { SOCIAL_PREVIEW_IMAGE } from '@/lib/seo/social-preview'
 
 export const metadata = {
   title: 'Preços - Go Top SEO',
   description: 'Planos flexíveis para o acompanhamento de posições no Google e a visibilidade em IA. Teste gratuito de 7 dias, sem compromisso.',
   openGraph: {
+    images: [SOCIAL_PREVIEW_IMAGE],
     title: 'Preços - Go Top SEO',
     description: 'Planos flexíveis para o acompanhamento de posições no Google e a visibilidade em IA',
     url: 'https://www.gotopseo.com/pt-BR/pricing',

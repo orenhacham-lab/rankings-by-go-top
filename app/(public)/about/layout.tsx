@@ -2,11 +2,13 @@ import { authorPersonSchema } from '@/lib/articles/authors'
 import { buildHreflangAlternates } from '@/lib/seo/hreflang'
 import { marketingBreadcrumbSchema } from '@/lib/seo/page-schema'
 import { ABOUT_BREADCRUMB } from '@/lib/i18n/public/pages/breadcrumb-labels'
+import { SOCIAL_PREVIEW_IMAGE } from '@/lib/seo/social-preview'
 
 export const metadata = {
   title: 'עמוד אודות - Go Top SEO',
   description: 'גלו הכל על Go Top SEO - מערכת מעקב מיקומים בגוגל ונראות ב-AI המהפכנית. עקוב אחר דירוגיך בגוגל אורגני, מפות וAI כמו ChatGPT ו-Gemini.',
   openGraph: {
+    images: [SOCIAL_PREVIEW_IMAGE],
     title: 'עמוד אודות - Go Top SEO',
     description: 'מערכת מעקב מיקומים בגוגל ונראות ב-AI. עקוב אחר דירוגיך בגוגל אורגני, מפות וAI',
     url: 'https://www.gotopseo.com/about',

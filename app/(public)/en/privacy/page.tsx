@@ -1,10 +1,12 @@
 import { LEGAL_FOOTNOTE, LegalDoc } from '@/components/public/LegalDoc'
+import { SOCIAL_PREVIEW_IMAGE } from '@/lib/seo/social-preview'
 
 export const metadata = {
   title: 'Privacy Policy | Go Top SEO',
   description: 'Privacy policy for Go Top SEO — how we collect, use and protect your data.',
   robots: 'noindex, nofollow',
   openGraph: {
+    images: [SOCIAL_PREVIEW_IMAGE],
     title: 'Privacy Policy | Go Top SEO',
     description: 'Privacy policy for Go Top SEO',
     url: 'https://www.gotopseo.com/en/privacy',

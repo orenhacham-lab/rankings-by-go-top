@@ -4,12 +4,14 @@ import { FreeCheckExperience } from '@/components/free-check/FreeCheckExperience
 import { FreeCheckResearch } from '@/components/free-check/FreeCheckResearch'
 import { presignupResearchOn } from '@/lib/onboarding/availability'
 import { buildHreflangAlternates } from '@/lib/seo/hreflang'
+import { SOCIAL_PREVIEW_IMAGE } from '@/lib/seo/social-preview'
 
 export const metadata = {
   title: 'Audit SEO et IA gratuit - Go Top SEO',
   description:
     "Un audit gratuit de votre site : nous le lisons vraiment, nous comprenons ce que fait votre activité et nous vous montrons ce qui vous freine dans Google et dans les réponses des IA. Sans carte bancaire et sans engagement.",
   openGraph: {
+    images: [SOCIAL_PREVIEW_IMAGE],
     title: 'Audit SEO et IA gratuit',
     description: "Un audit gratuit qui lit votre site et vous montre ce qui vous freine dans Google et dans les réponses des IA",
     url: 'https://www.gotopseo.com/fr/free-check',

@@ -52,6 +52,7 @@
  */
 import { LEGAL_FOOTNOTE, LEGAL_LINK, LegalDoc } from '@/components/public/LegalDoc'
 import Link from 'next/link'
+import { SOCIAL_PREVIEW_IMAGE } from '@/lib/seo/social-preview'
 
 const TITLE = 'Bedrijfsgegevens | Go Top SEO'
 const DESCRIPTION = 'De gegevens die artikel 3:15d van het Burgerlijk Wetboek van een dienstverlener van de informatiemaatschappij verlangt.'
@@ -65,6 +66,7 @@ export const metadata = {
   // the visitor can find it without searching.
   robots: 'noindex, nofollow',
   openGraph: {
+    images: [SOCIAL_PREVIEW_IMAGE],
     title: TITLE,
     description: DESCRIPTION,
     url: 'https://www.gotopseo.com/nl/bedrijfsgegevens',

@@ -4,12 +4,14 @@ import { FreeCheckExperience } from '@/components/free-check/FreeCheckExperience
 import { FreeCheckResearch } from '@/components/free-check/FreeCheckResearch'
 import { presignupResearchOn } from '@/lib/onboarding/availability'
 import { buildHreflangAlternates } from '@/lib/seo/hreflang'
+import { SOCIAL_PREVIEW_IMAGE } from '@/lib/seo/social-preview'
 
 export const metadata = {
   title: 'Analisi SEO e IA gratuita - Go Top SEO',
   description:
     'Un’analisi gratuita del vostro sito: lo leggiamo davvero, capiamo che cosa fa la vostra attività e vi mostriamo che cosa vi frena in Google e nelle risposte delle IA. Senza carta di credito e senza vincoli.',
   openGraph: {
+    images: [SOCIAL_PREVIEW_IMAGE],
     title: 'Analisi SEO e IA gratuita',
     description: 'Un’analisi gratuita che legge il vostro sito e vi mostra che cosa vi frena in Google e nelle risposte delle IA',
     url: 'https://www.gotopseo.com/it/free-check',

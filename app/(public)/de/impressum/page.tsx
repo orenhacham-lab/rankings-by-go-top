@@ -30,6 +30,7 @@
  */
 import { LEGAL_FOOTNOTE, LEGAL_LINK, LegalDoc } from '@/components/public/LegalDoc'
 import Link from 'next/link'
+import { SOCIAL_PREVIEW_IMAGE } from '@/lib/seo/social-preview'
 
 const TITLE = 'Impressum | Go Top SEO'
 const DESCRIPTION = 'Angaben nach § 5 des Digitale-Dienste-Gesetzes (DDG) und § 18 Absatz 2 des Medienstaatsvertrags (MStV).'
@@ -42,6 +43,7 @@ export const metadata = {
   // what § 5 DDG asks for — that the visitor can find it without searching.
   robots: 'noindex, nofollow',
   openGraph: {
+    images: [SOCIAL_PREVIEW_IMAGE],
     title: TITLE,
     description: DESCRIPTION,
     url: 'https://www.gotopseo.com/de/impressum',

@@ -56,6 +56,10 @@ export const ptBR = {
         label: 'Correções no site',
         description: 'Verificamos o seu site e corrigimos títulos, descrições, texto alternativo das imagens e links. No WordPress com um clique, depois que você aprovar.',
       },
+      businessProfile: {
+        label: 'Perfil da Empresa no Google',
+        description: 'Tudo o que o sistema faz com o perfil que o cliente vê no Google Maps: seu lugar no mapa, os posts e as respostas às avaliações, em um só lugar.',
+      },
       mapsPosts: {
         label: 'Posts no Google Maps',
         description: 'Posts com foto e botão no seu Perfil da Empresa no Google, na hora ou agendados, e respostas a avaliações. Com um primeiro rascunho que você ajusta.',

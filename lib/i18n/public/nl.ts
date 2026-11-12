@@ -75,6 +75,10 @@ export const nl = {
         label: 'Verbeteringen aan de website',
         description: 'De website analyseren en titels, metabeschrijvingen, alt-teksten van afbeeldingen en links verbeteren. In WordPress met één klik, na uw goedkeuring.',
       },
+      businessProfile: {
+        label: 'Google Bedrijfsprofiel',
+        description: 'Alles wat het systeem met het profiel doet dat klanten op Google Maps zien: uw plaats op de kaart, de berichten en de antwoorden op reviews, op één plek.',
+      },
       mapsPosts: {
         label: 'Berichten in uw Google Bedrijfsprofiel',
         description: 'Berichten met foto en knop in het Google Bedrijfsprofiel, direct of gepland, plus antwoorden op reviews. Met een eerste versie die u zelf kunt aanpassen.',
