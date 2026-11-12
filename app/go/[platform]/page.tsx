@@ -47,7 +47,7 @@ import { MarketplaceBadge } from '@/components/consent/MarketplaceBadge'
 import { MarketplaceBadgeUnconditional } from '@/components/consent/MarketplaceBadgeUnconditional'
 import { MarketplacePixel } from '@/components/consent/MarketplacePixel'
 import { MarketplacePixelUnconditional } from '@/components/consent/MarketplacePixelUnconditional'
-import { consentRequiredForRequest } from '@/lib/consent/eprivacy-territory'
+import { beaconSuppressedForRequest, consentRequiredForRequest } from '@/lib/consent/eprivacy-territory'
 import {
   MARKETPLACE_SUPPORT_EMAIL,
   marketplaceBadgeUrl,
@@ -105,7 +105,14 @@ export default async function MarketplaceSalesPage({
   // week-long cookie, so it rides the SAME territorial decision as the
   // beacon rather than a second one of its own.
   const badgeUrl = marketplaceBadgeUrl(provider.slug)
-  const consentRequired = consentRequiredForRequest(await headers())
+  const requestHeaders = await headers()
+  const consentRequired = consentRequiredForRequest(requestHeaders)
+  // Korea is a third state, not a stricter gate: see
+  // BEACON_SUPPRESSED_COUNTRIES in lib/consent/eprivacy-territory.ts. Consent
+  // would answer 제15조 and still leave the transfer to an independent
+  // controller abroad without the 별도의 동의 제28조의8 제1항 제1호 requires, so
+  // neither the beacon nor the badge is rendered there at all.
+  const beaconSuppressed = beaconSuppressedForRequest(requestHeaders)
 
   return (
     <main className="mx-auto max-w-3xl px-4 py-16">
@@ -392,7 +399,7 @@ export default async function MarketplaceSalesPage({
           still renders nothing. If the review then reports the pixel missing,
           the answer is a note to compliance, not a tag that fires before the
           visitor has been asked. */}
-      {pixelUrls.map((url) =>
+      {(beaconSuppressed ? [] : pixelUrls).map((url) =>
         consentRequired ? (
           <MarketplacePixel key={url} src={url} alt={`${provider.label} tracking`} />
         ) : (
@@ -405,7 +412,7 @@ export default async function MarketplaceSalesPage({
           because Digistore24 make the vendor confirm it is present before
           review. A platform with no configured BADGE_URL renders nothing,
           which is still the default for ClickBank and JVZoo. */}
-      {badgeUrl ? (
+      {badgeUrl && !beaconSuppressed ? (
         consentRequired ? (
           <MarketplaceBadge src={badgeUrl} />
         ) : (

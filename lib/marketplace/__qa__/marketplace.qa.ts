@@ -782,8 +782,11 @@ async function main() {
     && !/<img/.test(salesSrc))
   check('H-MUT9: the bare-tag guard catches the platform snippet pasted straight in',
     /<img/.test(`${salesSrc}\n<img src={pixelUrl} width={1} height={1} />`))
+  // The map is over `beaconSuppressed ? [] : pixelUrls` since Korea became a
+  // third state (lib/consent/eprivacy-territory.ts, BEACON_SUPPRESSED_COUNTRIES),
+  // so this matches the list the page maps rather than the bare identifier.
   check('H17c: …and only for a configured beacon, so an unconfigured platform still renders nothing',
-    /pixelUrls\.map\(/.test(salesSrc)
+    /\(beaconSuppressed \? \[\] : pixelUrls\)\.map\(/.test(salesSrc)
     && /\.filter\(\(url\): url is string => url !== null\)/.test(salesSrc))
   check('H17c2: one beacon per plan the page actually offers, so each product gets its own stats',
     /marketplacePixelUrl\(provider\.slug, code\)/.test(salesSrc)
@@ -1700,7 +1703,9 @@ async function main() {
     /badgeUrl \?\s*\(\s*consentRequired \?/.test(badgeSalesSrc.replace(/\s+/g, ' ').replace(/ \?/g, ' ?')) 
     || /consentRequired \? \( <MarketplaceBadge/.test(badgeSalesSrc.replace(/\s+/g, ' ')))
   check('BADGE15: an unconfigured platform renders no badge element at all',
-    /badgeUrl \?/.test(badgeSalesSrc))
+    /badgeUrl && !beaconSuppressed \?/.test(badgeSalesSrc))
+  check('BADGE15b: and a suppressed country renders none either, on the beacon\'s own decision',
+    /const beaconSuppressed = beaconSuppressedForRequest\(requestHeaders\)/.test(badgeSalesSrc))
   check('BADGE16: the badge reads the SAME territorial call the beacon does — one headers() read, not two',
     (badgeSalesSrc.match(/consentRequiredForRequest\(/g) || []).length === 1)
 
