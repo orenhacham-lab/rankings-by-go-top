@@ -1,11 +1,13 @@
 import { buildHreflangAlternates } from '@/lib/seo/hreflang'
 import { marketingBreadcrumbSchema } from '@/lib/seo/page-schema'
 import { getPublicDictionary } from '@/lib/i18n/getPublicDictionary'
+import { SOCIAL_PREVIEW_IMAGE } from '@/lib/seo/social-preview'
 
 export const metadata = {
   title: 'Cennik - Go Top SEO',
   description: 'Elastyczne pakiety do mierzenia pozycji w Google i widoczności w AI. Z siedmioma dniami darmowego okresu próbnego i bez zobowiązań.',
   openGraph: {
+    images: [SOCIAL_PREVIEW_IMAGE],
     title: 'Cennik - Go Top SEO',
     description: 'Elastyczne pakiety do mierzenia pozycji w Google i widoczności w AI',
     url: 'https://www.gotopseo.com/pl/pricing',

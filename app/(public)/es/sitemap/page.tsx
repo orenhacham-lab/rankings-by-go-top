@@ -3,11 +3,13 @@ import Link from 'next/link'
 import { LEGAL_FOOTNOTE, LEGAL_LINK, LegalFrame, LegalHeader, SitemapGroups } from '@/components/public/LegalDoc'
 import { sitemapArticleLinks, sitemapArticleSection } from '@/lib/sitemap/articles'
 import { authHref } from '@/lib/i18n/auth-href'
+import { SOCIAL_PREVIEW_IMAGE } from '@/lib/seo/social-preview'
 
 export const metadata = {
   title: 'Mapa del sitio | Go Top SEO',
   description: 'Mapa del sitio de Go Top SEO: todas nuestras páginas en un solo lugar.',
   openGraph: {
+    images: [SOCIAL_PREVIEW_IMAGE],
     title: 'Mapa del sitio | Go Top SEO',
     description: 'Mapa del sitio de Go Top SEO',
     url: 'https://www.gotopseo.com/es/sitemap',

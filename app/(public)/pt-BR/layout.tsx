@@ -3,6 +3,7 @@ import { DocumentLocaleEffect } from '@/components/DocumentLocaleEffect'
 import { portugueseSiteEnabled } from '@/lib/i18n/portuguese-site'
 import { getSiteMetadata } from '@/lib/i18n/site-metadata'
 import { buildHreflangAlternates } from '@/lib/seo/hreflang'
+import { SOCIAL_PREVIEW_IMAGE } from '@/lib/seo/social-preview'
 
 const SITE = getSiteMetadata('pt-BR')
 
@@ -11,6 +12,7 @@ export const metadata = {
   description: SITE.description,
   keywords: SITE.keywords,
   openGraph: {
+    images: [SOCIAL_PREVIEW_IMAGE],
     title: SITE.ogTitle,
     description: SITE.ogDescription,
     locale: SITE.ogLocale,

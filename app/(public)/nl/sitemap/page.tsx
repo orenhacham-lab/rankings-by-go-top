@@ -4,11 +4,13 @@ import { LEGAL_FOOTNOTE, LEGAL_LINK, LegalFrame, LegalHeader, SitemapGroups } fr
 import { sitemapArticleLinks, sitemapArticleSection } from '@/lib/sitemap/articles'
 import { authHref } from '@/lib/i18n/auth-href'
 import { LOCALE_CONFIG } from '@/lib/i18n/locales'
+import { SOCIAL_PREVIEW_IMAGE } from '@/lib/seo/social-preview'
 
 export const metadata = {
   title: 'Sitemap | Go Top SEO',
   description: 'De sitemap van Go Top SEO. Alle pagina’s op één plek.',
   openGraph: {
+    images: [SOCIAL_PREVIEW_IMAGE],
     title: 'Sitemap | Go Top SEO',
     description: 'De sitemap van Go Top SEO',
     url: 'https://www.gotopseo.com/nl/sitemap',

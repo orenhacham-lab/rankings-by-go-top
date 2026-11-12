@@ -45,6 +45,10 @@ export const en = {
         label: 'Site fixes',
         description: 'We check your site and fix titles, descriptions, image alt text and links. On WordPress in one click, after you approve.',
       },
+      businessProfile: {
+        label: 'Google Business Profile',
+        description: 'Everything the system does with the profile customers see on Google Maps: your place on the map, the posts and the review replies, in one place.',
+      },
       mapsPosts: {
         label: 'Google Maps posts',
         description: 'Posts with a photo and a button on your Google Business Profile, now or scheduled, and replies to reviews. With a first draft you edit.',

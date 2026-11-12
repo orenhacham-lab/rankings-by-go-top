@@ -61,6 +61,10 @@ export const it = {
         label: 'Correzioni sul sito',
         description: 'Analisi del sito e correzione di titoli, meta description, testo alternativo delle immagini e link. Su WordPress con un clic, dopo la Sua approvazione.',
       },
+      businessProfile: {
+        label: 'Profilo dell’attività su Google',
+        description: 'Tutto ciò che il sistema fa con il profilo che i clienti vedono su Google Maps: il posto sulla mappa, i post e le risposte alle recensioni, in un unico posto.',
+      },
       mapsPosts: {
         label: 'Post su Google Maps',
         description: 'Post con foto e pulsante sulla scheda Google Business Profile, subito o programmati, e risposte alle recensioni. Con una prima bozza modificabile.',

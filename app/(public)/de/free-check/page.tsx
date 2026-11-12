@@ -4,12 +4,14 @@ import { FreeCheckExperience } from '@/components/free-check/FreeCheckExperience
 import { FreeCheckResearch } from '@/components/free-check/FreeCheckResearch'
 import { presignupResearchOn } from '@/lib/onboarding/availability'
 import { buildHreflangAlternates } from '@/lib/seo/hreflang'
+import { SOCIAL_PREVIEW_IMAGE } from '@/lib/seo/social-preview'
 
 export const metadata = {
   title: 'Kostenlose SEO- und KI-Prüfung - Go Top SEO',
   description:
     'Eine kostenlose Prüfung Ihrer Website. Wir lesen die Website wirklich, erfassen, was das Unternehmen tut, und zeigen Ihnen, was in den Suchergebnissen von Google und in den Antworten der KI im Weg steht. Ohne Zahlungskarte und ohne Bindung.',
   openGraph: {
+    images: [SOCIAL_PREVIEW_IMAGE],
     title: 'Kostenlose SEO- und KI-Prüfung',
     description: 'Eine kostenlose Prüfung, die Ihre Website liest und Ihnen zeigt, was in den Suchergebnissen von Google und in den Antworten der KI im Weg steht',
     url: 'https://www.gotopseo.com/de/free-check',

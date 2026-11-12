@@ -1,8 +1,10 @@
 import { buildHreflangAlternates } from '@/lib/seo/hreflang'
+import { SOCIAL_PREVIEW_IMAGE } from '@/lib/seo/social-preview'
 export const metadata = {
   title: 'מפת אתר - Go Top SEO',
   description: 'מפת אתר של Go Top SEO - ניווט קל לכל העמודים וההמאמרים באתר',
   openGraph: {
+    images: [SOCIAL_PREVIEW_IMAGE],
     title: 'מפת אתר - Go Top SEO',
     description: 'מפת אתר של Go Top SEO',
     url: 'https://www.gotopseo.com/sitemap',
