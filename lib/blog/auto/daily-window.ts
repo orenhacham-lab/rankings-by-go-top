@@ -20,11 +20,16 @@
  * calendar: a language that already published today (UTC) is done, and a
  * language whose plan row is claimed right now is in flight, so a second
  * invocation leaves both alone. At most ONE language is written per run, so a
- * morning fills one language a quarter of an hour, HUNGRIEST FIRST: the language
- * that has gone longest without an article goes before the rest, and the order
- * lib/blog/auto/rotation.ts declares only breaks a tie. Until 5 Nov 2026 this
- * walked that list in order and it was last-pays-first, which is how Italian
- * and Japanese lost days to the retries of the languages ahead of them.
+ * morning fills one language a quarter of an hour, and the order is REFUSED
+ * FEWEST TIMES TODAY, THEN HUNGRIEST: a language that has already burned a pass
+ * this morning steps behind the ones that have not been tried, and among equals
+ * the language that has gone longest without an article goes first, with the
+ * order lib/blog/auto/rotation.ts declares breaking a tie. Until 5 Nov 2026
+ * this walked that list in declaration order and it was last-pays-first, which
+ * is how Italian and Japanese lost days to the retries of the languages ahead
+ * of them; until 12 Nov it went by hunger alone, which is how French — unable
+ * to get past the truth limits — took four passes in a row while eight untried
+ * languages waited.
  *
  * Production only, and only in WINDOW_HOURS_UTC (04:00-09:59 UTC = 07:00-12:59
  * in Israel). The window held three hours while there were three languages, and
@@ -38,7 +43,9 @@
 
 import type { createAdminClient } from '@/lib/supabase/admin'
 import { localesForDay, type BlogAutoLocale } from '@/lib/blog/auto/rotation'
-import { localesPublishedSince, isLocaleGenerating, lastPublishedByLocale } from '@/lib/blog/auto/store'
+import {
+  localesPublishedSince, isLocaleGenerating, lastPublishedByLocale, gateFailuresTodayByLocale,
+} from '@/lib/blog/auto/store'
 import { runBlogAutoPublish, type BlogAutoSummary } from '@/lib/blog/auto/runner'
 import { isBlogAutoPublishEnabled } from '@/lib/blog/auto/cron-run'
 import { reportSilentMorning } from '@/lib/blog/auto/silent-morning'
@@ -69,23 +76,44 @@ const RESULT = (state: BlogWindowResult['state'], locale: BlogAutoLocale | null 
  * run in flight. `null` means the morning is done, or someone else is writing.
  */
 /**
- * The day's languages, hungriest first: the one that has gone longest without an
- * article, and the list's own order between two that are equally hungry. A
- * language that has never published sorts first of all.
+ * The day's languages: the ones REFUSED FEWEST TIMES TODAY first, and among
+ * those the hungriest — the one that has gone longest without an article, with
+ * the list's own order breaking a tie. A language that has never published
+ * sorts first of all.
  *
- * This is what keeps the last language in the list from paying for the ones
- * ahead of it. Walking the list in order meant Spanish retrying three times, or
- * French twice, spent the window and Italian, Japanese and German — the last
- * three — simply never got a turn. Ordering by hunger cannot starve anyone two
- * days running: a language that missed yesterday is first today.
+ * Hunger alone is what keeps the last language in the list from paying for the
+ * ones ahead of it. Walking the list in declaration order meant Spanish
+ * retrying three times, or French twice, spent the window and Italian, Japanese
+ * and German — the last three — simply never got a turn.
+ *
+ * But hunger alone has its own failure, and 12 Nov 2026 is it. A gate failure
+ * ends the pass, because the Gemini call behind it is already spent, so a
+ * language that cannot get past the gates costs the whole quarter of an hour.
+ * French had not published since 9 Nov, so it sorted first, failed
+ * `truth:percentage_claim`, and was first again fifteen minutes later: four
+ * passes in a row, 07:46 to 08:32 Israel, while eight untried languages waited.
+ * Today's refusals therefore come before hunger: a language that has already
+ * burned a pass this morning steps behind the ones that have not been tried.
+ * The count resets with the UTC day, so a language that lost a morning is
+ * hungriest — and first — the next one.
  */
 export function starvationOrder(
   locales: readonly BlogAutoLocale[],
   lastPublished: Record<string, string | undefined>,
+  failuresToday: Record<string, number> = {},
 ): BlogAutoLocale[] {
   return locales
-    .map((locale, index) => ({ locale, index, at: lastPublished[locale] ?? '' }))
-    .sort((a, b) => (a.at < b.at ? -1 : a.at > b.at ? 1 : a.index - b.index))
+    .map((locale, index) => ({
+      locale,
+      index,
+      at: lastPublished[locale] ?? '',
+      failed: failuresToday[locale] ?? 0,
+    }))
+    .sort((a, b) => (
+      a.failed !== b.failed
+        ? a.failed - b.failed
+        : a.at < b.at ? -1 : a.at > b.at ? 1 : a.index - b.index
+    ))
     .map((entry) => entry.locale)
 }
 
@@ -111,13 +139,15 @@ export async function localesToWrite(
   admin: Admin,
   nowMs: number,
 ): Promise<{ locales: BlogAutoLocale[]; busy: boolean }> {
-  const published = new Set(await localesPublishedSince(admin, startOfUtcDay(nowMs)))
+  const startOfDay = startOfUtcDay(nowMs)
+  const published = new Set(await localesPublishedSince(admin, startOfDay))
   const lastPublished = await lastPublishedByLocale(admin)
+  const failuresToday = await gateFailuresTodayByLocale(admin, startOfDay)
   const out: BlogAutoLocale[] = []
   // localesForDay(), not the whole list: a language whose public tree is still
   // behind its flag has nowhere to publish to, and claiming its slot would end
   // the morning before the languages that do.
-  for (const locale of starvationOrder(localesForDay(), lastPublished)) {
+  for (const locale of starvationOrder(localesForDay(), lastPublished, failuresToday)) {
     if (published.has(locale)) continue
     if (await isLocaleGenerating(admin, locale)) return { locales: [], busy: true }
     out.push(locale)

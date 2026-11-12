@@ -261,6 +261,38 @@ export async function lastPublishedByLocale(admin: Admin): Promise<Record<string
 }
 
 /**
+ * HOW MANY ROWS OF EACH LANGUAGE WERE REFUSED TODAY, so the morning stops
+ * handing every pass to a language that cannot get past the gates.
+ *
+ * 12 Nov 2026: Spanish and Portuguese published, and then French took the
+ * 07:46, 08:01, 08:17 and 08:32 passes in a row and ended each one with
+ * nothing — three `truth:percentage_claim` and one `publish:slug_taken`. It
+ * took them because it had gone longest without an article and so sorted first
+ * every time, and a gate failure ends the pass (the Gemini call is already
+ * spent). Eight languages that had never been tried waited behind it. The same
+ * head-of-line block as 10-11 Nov, with a failure in place of an empty queue.
+ *
+ * A row released after a refusal keeps `last_error` until its next claim, so a
+ * row carrying one and touched today is a refusal of today. This undercounts a
+ * row that failed and then published later the same day, because the publish
+ * clears the column — which is the right direction to be wrong in: a language
+ * that published is out of the queue anyway.
+ */
+export async function gateFailuresTodayByLocale(admin: Admin, sinceIso: string): Promise<Record<string, number>> {
+  const { data } = await admin
+    .from(PLAN_TABLE)
+    .select('locale')
+    .not('last_error', 'is', null)
+    .gte('updated_at', sinceIso)
+  const out: Record<string, number> = {}
+  for (const row of (data ?? []) as { locale: string | null }[]) {
+    if (!row.locale) continue
+    out[row.locale] = (out[row.locale] ?? 0) + 1
+  }
+  return out
+}
+
+/**
  * Is a run of this language in flight? A claimed row means another invocation
  * is generating right now, and a second one would publish a second article.
  * A row claimed longer than STALE_LOCK_MS is not counted: recoverStaleLocks
