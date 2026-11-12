@@ -643,7 +643,7 @@ async function main() {
   // the switches are what the channel comes back to the day the freeze is lifted: they
   // run against the module with the freeze gate taken out, which is the same source and
   // the same gate order, only without the stop.
-  const WITHOUT_FREEZE: [RegExp, string][] = [[/  if \(CHANNEL_FROZEN\) \{[\s\S]*?\n  \}\n/, '']]
+  const WITHOUT_FREEZE: [RegExp, string][] = [[/  if \(CHANNEL_FROZEN\) return \{ status: 'frozen' \}\n/, '']]
   type SenderModule = { runIsolatedProspectSend: typeof runIsolatedProspectSend }
 
   const switches = await withMutant<SenderModule, {
@@ -869,14 +869,14 @@ async function main() {
     { runIsolatedProspectSend: typeof runIsolatedProspectSend }, boolean
   >(
     'lib/outreach/sender-isolated.ts',
-    [[/  if \(CHANNEL_FROZEN\) \{[\s\S]*?\n  \}\n/, '']],
+    [[/  if \(CHANNEL_FROZEN\) return \{ status: 'frozen' \}\n/, '']],
     async (m) => {
-      let reached = false
+      const reached: { yes: boolean } = { yes: false }
       const result = await m.runIsolatedProspectSend(
-        async () => { reached = true; return { status: 'idle', reason: 'no_candidate' } },
+        async () => { reached.yes = true; return { status: 'idle', reason: 'no_candidate' } },
         { env: { [SENDING_FLAG]: 'true', VERCEL_ENV: 'production' } },
       )
-      return reached === true && result.status === 'ran'
+      return reached.yes && result.status === 'ran'
     },
   )
   check('F1-MUT: removing the freeze gate lets the pass run again, and is caught', mutFreeze)

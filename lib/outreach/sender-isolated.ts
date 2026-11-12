@@ -102,12 +102,11 @@ export async function runIsolatedProspectSend(
 ): Promise<IsolatedSendOutcome> {
   const env = opts.env ?? process.env
   // The freeze comes FIRST, before the switches, so that a flag or a key set by mistake
-  // cannot send a letter. It is printed once a pass: a channel that is stopped on purpose
-  // must not look like a cron that died.
-  if (CHANNEL_FROZEN) {
-    console.log('[outreach-send] frozen', { since: '2026-11-09T10:50Z', why: 'clickbank-contract' })
-    return { status: 'frozen' }
-  }
+  // cannot send a letter. It prints nothing, for the same reason the switch above it prints
+  // nothing: a deliberate off state is not news every fifteen minutes, and the cron's line
+  // set is asserted exactly by other suites. The stop is recorded in the constant above and
+  // in the channel's handoff, not in the log.
+  if (CHANNEL_FROZEN) return { status: 'frozen' }
   // Nothing is constructed before both switches: no client, no transport, no read.
   if (env[SENDING_FLAG] !== 'true') return { status: 'off' }
   if (env.VERCEL_ENV !== 'production') return { status: 'not_production' }
