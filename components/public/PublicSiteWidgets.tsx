@@ -116,7 +116,10 @@ function isMarketplaceSalesArea(pathname: string | null): boolean {
  * lib/__qa__/reviewer-journey/public-a11y.js, which fails if the notice is not
  * among the first stops.
  */
-export function PublicConsentNotice({ isAuthenticated = false }: { isAuthenticated?: boolean }) {
+export function PublicConsentNotice({
+  isAuthenticated = false,
+  beaconSuppressed = false,
+}: { isAuthenticated?: boolean; beaconSuppressed?: boolean }) {
   const pathname = usePathname()
   const [, setCookieOpen] = useState(false)
 
@@ -129,7 +132,7 @@ export function PublicConsentNotice({ isAuthenticated = false }: { isAuthenticat
     return null
   }
 
-  return <CookieConsent onOpenChange={setCookieOpen} />
+  return <CookieConsent onOpenChange={setCookieOpen} beaconSuppressed={beaconSuppressed} />
 }
 
 export function PublicSiteWidgets({ isAuthenticated = false }: { isAuthenticated?: boolean }) {

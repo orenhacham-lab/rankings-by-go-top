@@ -9,7 +9,7 @@ import { publicUiLocale } from '@/lib/i18n/request-locale'
 import { getLocaleConfig } from '@/lib/i18n/locales'
 import {
   CONSENT_DENIED,
-  CONSENT_GRANTED,
+  CONSENT_WITHOUT_MARKETING,
   actionForChoices,
   type ConsentAction,
   type ConsentChoices,
@@ -61,7 +61,10 @@ import { ConsentPreferences } from '@/components/consent/ConsentPreferences'
  * and the refusal is recorded without a banner — the visitor has already
  * answered, and asking again would be asking them to repeat themselves.
  */
-export function CookieConsent({ onOpenChange }: { onOpenChange?: (open: boolean) => void } = {}) {
+export function CookieConsent({
+  onOpenChange,
+  beaconSuppressed = false,
+}: { onOpenChange?: (open: boolean) => void; beaconSuppressed?: boolean } = {}) {
   const pathname = usePathname()
   const [isVisible, setIsVisible] = useState(false)
   const [isClient, setIsClient] = useState(false)
@@ -138,7 +141,11 @@ export function CookieConsent({ onOpenChange }: { onOpenChange?: (open: boolean)
     [locale]
   )
 
-  const handleAccept = () => decide('accept_all', CONSENT_GRANTED)
+  // Not CONSENT_GRANTED: see CONSENT_WITHOUT_MARKETING in lib/consent/categories.ts.
+  // The action is computed, so the log records 'custom' and not a grant that
+  // was never given.
+  const handleAccept = () =>
+    decide(actionForChoices(CONSENT_WITHOUT_MARKETING, readConsent()?.categories ?? null), CONSENT_WITHOUT_MARKETING)
   const handleReject = () => decide('reject_all', CONSENT_DENIED)
   const handleSave = (next: ConsentChoices) => decide(actionForChoices(next, readConsent()?.categories ?? null), next)
 
@@ -202,6 +209,7 @@ export function CookieConsent({ onOpenChange }: { onOpenChange?: (open: boolean)
               {privacy}
               {'.'}
             </p>
+            <p className="m-0 mt-1 text-center text-caption leading-tight text-contrast-ink/70">{t.marketingStep}</p>
             {actions(true)}
           </div>
 
@@ -219,6 +227,7 @@ export function CookieConsent({ onOpenChange }: { onOpenChange?: (open: boolean)
                   {privacy}
                   {'.'}
                 </p>
+                <p className="m-0 mt-1 text-caption leading-snug text-contrast-ink/70">{t.marketingStep}</p>
               </div>
             </div>
             {actions(false)}
@@ -233,6 +242,7 @@ export function CookieConsent({ onOpenChange }: { onOpenChange?: (open: boolean)
           initial={choices}
           onSave={handleSave}
           onClose={() => setPanelOpen(false)}
+          beaconSuppressed={beaconSuppressed}
         />
       ) : null}
     </>

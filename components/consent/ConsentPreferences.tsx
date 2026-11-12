@@ -30,11 +30,21 @@ type Props = {
   initial: ConsentChoices
   onSave: (choices: ConsentChoices) => void
   onClose: () => void
+  /**
+   * True where the JVZoo beacon is not loaded at all for this request, decided
+   * on the server by beaconSuppressedForRequest. The notice is chosen by
+   * LANGUAGE and the beacon by COUNTRY, and those do not line up: a Korean
+   * visitor would otherwise be told their consent is the only basis for a
+   * transfer that never happens, and a Korean-speaking visitor in France does
+   * get the beacon, so the string cannot simply drop JVZoo either. So the
+   * JVZoo half of the notice is rendered exactly where JVZoo is contacted.
+   */
+  beaconSuppressed?: boolean
 }
 
 const FOCUSABLE = 'button:not([disabled]), [href], input:not([disabled]), [tabindex]:not([tabindex="-1"])'
 
-export function ConsentPreferences({ dict, ltr, initial, onSave, onClose }: Props) {
+export function ConsentPreferences({ dict, ltr, initial, onSave, onClose, beaconSuppressed = false }: Props) {
   const [choices, setChoices] = useState<ConsentChoices>(initial)
   const panelRef = useRef<HTMLDivElement>(null)
   const titleId = useId()
@@ -111,6 +121,31 @@ export function ConsentPreferences({ dict, ltr, initial, onSave, onClose }: Prop
                   <div className="flex-1">
                     <h3 className="m-0 text-lead font-bold text-ink">{copy.title}</h3>
                     <p className="m-0 mt-1 text-caption leading-snug text-muted">{copy.desc}</p>
+                    {/* The affiliate-attribution purpose names a United States
+                        recipient one line above the checkbox that takes the
+                        consent. Where the beacon is suppressed no transfer
+                        happens, so a visitor ticking the box there must not be
+                        readable as having consented to one: the clause is left
+                        out rather than explained. Korea, PIPA 제28조의8. */}
+                    {'descJvzoo' in copy && !beaconSuppressed ? (
+                      <p className="m-0 mt-1 text-caption leading-snug text-muted">{copy.descJvzoo}</p>
+                    ) : null}
+                    {/* Art. 49(1)(a) GDPR allows a transfer on explicit consent
+                        only where the person was informed of the risks BEFORE
+                        consenting, so the risk sits above the checkbox that
+                        gives the consent rather than behind the privacy link.
+                        Only the marketing category carries one. */}
+                    {'risk' in copy ? (
+                      <p className="m-0 mt-1.5 rounded-control border border-line bg-surface p-2 text-caption leading-snug text-body">
+                        {copy.risk}
+                      </p>
+                    ) : null}
+                    {/* The JVZoo half, only where JVZoo is actually contacted. */}
+                    {'riskJvzoo' in copy && !beaconSuppressed ? (
+                      <p className="m-0 mt-1.5 rounded-control border border-line bg-surface p-2 text-caption leading-snug text-body">
+                        {copy.riskJvzoo}
+                      </p>
+                    ) : null}
                   </div>
                   <label className="flex shrink-0 cursor-pointer flex-col items-center gap-1 pt-0.5">
                     <input

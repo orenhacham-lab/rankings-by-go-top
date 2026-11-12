@@ -1,4 +1,5 @@
 import { PublicNav } from '@/components/PublicNav'
+import { SOCIAL_PREVIEW_IMAGE } from '@/lib/seo/social-preview'
 import { Footer } from '@/components/Footer'
 import { FreeCheckExperience } from '@/components/free-check/FreeCheckExperience'
 import { FreeCheckResearch } from '@/components/free-check/FreeCheckResearch'
@@ -10,6 +11,7 @@ export const metadata = {
   description:
     '사이트를 무료로 분석해 드립니다. 실제로 사이트를 읽고, 어떤 업체인지 정리하고, Google 검색 결과와 AI 답변에서 무엇이 가로막고 있는지 보여 드립니다. 카드도 약정도 없습니다.',
   openGraph: {
+    images: [SOCIAL_PREVIEW_IMAGE],
     title: '무료 SEO·AI 분석',
     description: '사이트를 읽고 Google 검색 결과와 AI 답변에서 무엇이 가로막고 있는지 보여 주는 무료 분석',
     url: 'https://www.gotopseo.com/ko/free-check',

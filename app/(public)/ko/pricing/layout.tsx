@@ -1,4 +1,5 @@
 import { buildHreflangAlternates } from '@/lib/seo/hreflang'
+import { SOCIAL_PREVIEW_IMAGE } from '@/lib/seo/social-preview'
 import { marketingBreadcrumbSchema } from '@/lib/seo/page-schema'
 import { getPublicDictionary } from '@/lib/i18n/getPublicDictionary'
 
@@ -6,6 +7,7 @@ export const metadata = {
   title: '가격 - Go Top SEO',
   description: 'Google 순위와 AI 노출을 측정하는 유연한 요금제입니다. 7일 무료 체험, 약정 없음.',
   openGraph: {
+    images: [SOCIAL_PREVIEW_IMAGE],
     title: '가격 - Go Top SEO',
     description: 'Google 순위와 AI 노출을 측정하는 유연한 요금제',
     url: 'https://www.gotopseo.com/ko/pricing',

@@ -4,7 +4,7 @@
  * Measured on a production build before this guard existed: the notice was tab
  * stop 47. It rendered after `{children}`, so a visitor who cannot use a mouse
  * had to pass the skip link, the header, the language switcher, the whole
- * marketing page and the footer before reaching "דחיית הכל", while "אישור הכל"
+ * marketing page and the footer before reaching "דחיית הכל", while "אישור מדידה"
  * was one click away for everybody else.
  *
  * That gap is not a styling detail. GDPR Art. 7(1) and the EDPB's guidelines on
@@ -59,7 +59,7 @@ check(
 )
 check(
   'the notice is passed the server-resolved auth state',
-  /<PublicConsentNotice\s+isAuthenticated=\{isAuthenticated\}\s*\/>/.test(layout),
+  /<PublicConsentNotice\s+isAuthenticated=\{isAuthenticated\}[^>]*\/>/.test(layout),
 )
 
 // The notice must be a component of its own, gated exactly like the widgets it
@@ -86,7 +86,7 @@ check('…and it is NOT gated by the marketplace rule, or the beacon could never
 check('the contact widgets ARE gated by it, so nothing of ours sits beside the platform\'s buy button',
   /if \(isMarketplaceSalesArea\(pathname\)\) return false/.test(
     widgets.slice(widgets.indexOf('export function shouldRenderPublicWidgets'))))
-check('the notice renders CookieConsent', /<CookieConsent onOpenChange=\{setCookieOpen\}\s*\/>/.test(bodyToNext))
+check('the notice renders CookieConsent', /<CookieConsent onOpenChange=\{setCookieOpen\}[^>]*\/>/.test(bodyToNext))
 check(
   'PublicSiteWidgets no longer renders the notice itself',
   !/<CookieConsent/.test(widgets.slice(widgets.indexOf('export function PublicSiteWidgets'))),
@@ -94,8 +94,8 @@ check(
 
 // ── mutation controls: break each rule on purpose and show the check fails ──
 {
-  const moved = layout.replace('<PublicConsentNotice isAuthenticated={isAuthenticated} />', '')
-  const movedBack = `${moved.slice(0, moved.indexOf('{children}') + 10)}\n<PublicConsentNotice isAuthenticated={isAuthenticated} />${moved.slice(moved.indexOf('{children}') + 10)}`
+  const moved = layout.replace('<PublicConsentNotice isAuthenticated={isAuthenticated} beaconSuppressed={beaconSuppressed} />', '')
+  const movedBack = `${moved.slice(0, moved.indexOf('{children}') + 10)}\n<PublicConsentNotice isAuthenticated={isAuthenticated} beaconSuppressed={beaconSuppressed} />${moved.slice(moved.indexOf('{children}') + 10)}`
   const n = movedBack.indexOf('<PublicConsentNotice')
   const c = movedBack.indexOf('{children}')
   check('MUTATION: the notice after {children} fails the order check', !(n >= 0 && c >= 0 && n < c))
@@ -114,7 +114,7 @@ check(
   )
 }
 {
-  const emptied = bodyToNext.replace('<CookieConsent onOpenChange={setCookieOpen} />', 'null')
+  const emptied = bodyToNext.replace('<CookieConsent onOpenChange={setCookieOpen} beaconSuppressed={beaconSuppressed} />', 'null')
   check('MUTATION: a notice that renders nothing fails', !/<CookieConsent/.test(emptied))
 }
 
