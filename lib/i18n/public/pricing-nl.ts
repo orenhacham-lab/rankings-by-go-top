@@ -48,6 +48,12 @@ export const pricingNl: PricingCopy = {
       ILS: 'De prijzen zijn inclusief Israëlische btw. Dit is het bedrag dat betaald wordt, zonder toeslagen.',
       USD: 'Bij betaling met een kaart is Creem de verkoper en treedt het op als merchant of record: Creem berekent de belasting aan de hand van het factuuradres en toont het eindbedrag voor de betaling. De hier genoemde prijzen zijn daar exclusief.',
     },
+    /* 전자상거래법 제21조 제1항 제1호 forbids inducing a consumer by withholding a
+       material fact, and it binds any business carrying on electronic commerce,
+       not only a mail-order seller, so it bites BEFORE any contract. Shown only
+       to a visitor placed in Korea, on every language's page, because the duty
+       follows the consumer and not the page. lib/billing/korea-sale.ts. */
+    koreaTrialOnly: 'In Zuid-Korea is voorlopig alleen de gratis proefperiode beschikbaar en wordt er geen betaald abonnement verkocht. De proefperiode eindigt automatisch na zeven dagen en we vragen geen kaartgegevens, dus er wordt niets afgeschreven.',
     everyPlanLabel: 'In alle pakketten',
     everyPlan: [
       'Automatische geplande publicatie op WordPress, Shopify en Wix',

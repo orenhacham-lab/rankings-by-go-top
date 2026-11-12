@@ -5,6 +5,7 @@ import { isShopifyBillingRequiredForUser } from '@/lib/shopify/paypal-block'
 import { hasPendingShopifyLinkCookie } from '@/lib/shopify/pending-link'
 import { resolveBillingMarket, storedMarketOf } from '@/lib/billing/server-market'
 import { logRestrictedAttempt, restrictionForRequest } from '@/lib/sanctions/guard'
+import { KOREA_SALE_REFUSAL_REASON, koreaCreemSaleBlockedForRequest } from '@/lib/billing/korea-sale'
 import { createCreemCheckout } from '@/lib/creem/client'
 import { creemProductIdFor } from '@/lib/creem/checkout-products'
 import { creemMayWriteToAccount, creemReadiness, creemSuccessUrl, isCreemEnabled } from '@/lib/creem/config'
@@ -51,6 +52,15 @@ export async function POST(request: Request) {
     if (restricted) {
       logRestrictedAttempt('creem-checkout', restricted)
       return Response.json({ error: 'Not available', reason: 'restricted_country' }, { status: 451 })
+    }
+
+    // Korea, until the checkout flag says the Creem routing is live for it:
+    // lib/billing/korea-sale.ts has the VAT Act art. 53-2 and 전자상거래법
+    // art. 13 reasoning. Separate from the sanctions list on purpose, and it
+    // refuses the SALE only — the trial needs no card and is untouched.
+    if (koreaCreemSaleBlockedForRequest(request.headers)) {
+      console.warn('[creem-checkout] refused: paid checkout is not open for Korea yet')
+      return Response.json({ error: 'Not available', reason: KOREA_SALE_REFUSAL_REASON }, { status: 451 })
     }
 
     const supabase = await createClient()

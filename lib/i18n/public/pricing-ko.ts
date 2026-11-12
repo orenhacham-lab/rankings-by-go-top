@@ -60,6 +60,12 @@ export const pricingKo: PricingCopy = {
       ILS: '가격에는 이스라엘 부가가치세가 포함되어 있습니다. 추가 비용 없이 이 금액을 결제하시면 됩니다.',
       USD: '카드로 결제하실 때 판매자는 Creem이며, Creem이 merchant of record로서 자신의 이름으로 판매 거래를 체결합니다. 세금은 청구지 주소를 기준으로 계산되고 결제 전에 최종 금액이 표시됩니다. 여기 표시된 가격에는 그 세금이 포함되어 있지 않으며, 세금을 포함한 정확한 금액은 계약이 성립되기 전에 확인하실 수 있습니다.',
     },
+    /* 전자상거래법 제21조 제1항 제1호 forbids inducing a consumer by withholding a
+       material fact, and it binds any business carrying on electronic commerce,
+       not only a mail-order seller, so it bites BEFORE any contract. Shown only
+       to a visitor placed in Korea, on every language's page, because the duty
+       follows the consumer and not the page. lib/billing/korea-sale.ts. */
+    koreaTrialOnly: '현재 한국에서는 무료 체험만 제공하며, 유료 구독 결제는 아직 제공하지 않습니다. 체험은 7일 후 자동으로 종료되고, 카드 정보를 받지 않으므로 요금이 청구되지 않습니다.',
     everyPlanLabel: '모든 요금제 공통',
     everyPlan: [
       'WordPress, Shopify, Wix에 예약 자동 발행',

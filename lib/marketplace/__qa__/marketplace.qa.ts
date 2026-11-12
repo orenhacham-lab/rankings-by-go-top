@@ -616,8 +616,15 @@ async function main() {
   check('H8: the claim page leaves robots to its group layout, which says noindex',
     !/robots:/.test(claimSrc)
     && /robots:\s*\{\s*index:\s*false/.test(code('app/(dashboard)/layout.tsx')))
+  // The import lines are stripped first: the page now imports the Korea
+  // decision from lib/billing/korea-sale, which refuses a sale rather than
+  // offering one, and a bare substring match on 'billing' read that as a
+  // checkout of ours. What this check protects is the BODY of the page.
   check('H9: the sales page offers the platform\'s button and never our own checkout',
-    /marketplaceBuyUrl/.test(salesSrc) && !/\/billing|creem|paypal/i.test(salesSrc))
+    (() => {
+      const body = salesSrc.split('\n').filter((l) => !/^\s*import\s/.test(l) && !/^\s*\} from '/.test(l)).join('\n')
+      return /marketplaceBuyUrl/.test(salesSrc) && !/\/billing|creem|paypal/i.test(body)
+    })())
   check('H10: an unregistered platform is a 404 rather than a blank page',
     /notFound\(\)/.test(salesSrc))
   check('H11: the sales page links out only to our account terms, our privacy page and the platform\'s own policy',
