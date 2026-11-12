@@ -64,6 +64,12 @@ interface BillingViewProps {
   marketLocked: boolean
   /** The plans' prices in `market`, from the plan catalog. */
   planPrices: Record<PlanKey, number>
+  /** True where a paid subscription may not be sold to this visitor at all,
+   *  decided on the server from the request country (lib/billing/korea-sale.ts):
+   *  Korea, until the Korean checkout flag says the Creem routing is live for
+   *  it. The trial is untouched, so this hides only the ways to pay, and both
+   *  payment routes refuse the same visitor server-side. */
+  koreaSaleBlocked?: boolean
   /** Owner decision, 10 Oct 2026 — pay by card instead of PayPal, decided on
    *  the server (app/(dashboard)/billing/page.tsx): only while CREEM_ENABLED
    *  is on, only in USD, and only for an account that has never paid through
@@ -101,6 +107,7 @@ export default function BillingView({
   market,
   marketLocked,
   planPrices,
+  koreaSaleBlocked = false,
   creemCheckout = false,
   creemGoverned = false,
   marketplaceSeller = null,
@@ -145,6 +152,16 @@ export default function BillingView({
    *  * nothing, which lets the card render the PayPal container as before.
    */
   const checkoutActionFor = (plan: PlanKey): React.ReactNode => {
+    // Korea first, before either provider: this is a refusal to sell, not a
+    // choice between ways of paying.
+    if (koreaSaleBlocked) {
+      return (
+        <div className="rounded-control border border-line bg-surface p-2.5">
+          <p className="m-0 text-caption font-bold text-ink">{t.koreaSale.title}</p>
+          <p className="m-0 mt-1 text-caption leading-snug text-muted">{t.koreaSale.description}</p>
+        </div>
+      )
+    }
     if (creemCheckout) return <CreemCheckoutButton plan={plan} disabled={!checkoutUnlocked} />
     if (creemGoverned) return <p className="text-caption text-muted">{t.creem.changePlanNote}</p>
     return undefined
@@ -486,7 +503,7 @@ export default function BillingView({
 
           {/* The PayPal buttons, and the SDK behind them, only on the PayPal
               path: a card never offers two ways to pay the same plan. */}
-          {!creemCheckout && !creemGoverned && <BillingClient market={market} acknowledged={checkoutUnlocked} />}
+          {!creemCheckout && !creemGoverned && !koreaSaleBlocked && <BillingClient market={market} acknowledged={checkoutUnlocked} />}
 
           <p className="mt-6 max-w-4xl text-caption text-muted">
             {t.keywordCheckNote}

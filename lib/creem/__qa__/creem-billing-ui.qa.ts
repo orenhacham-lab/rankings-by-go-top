@@ -136,12 +136,17 @@ console.log('\nC) one plan card, one way to pay')
   check('C2-MUT: rendering the container regardless is caught',
     !/\) : action \? \(\s*action\s*\) : \(/.test(view.replace(') : action ? (\n        action\n      ) : (', ') : (')))
 
+  // The Korea refusal (lib/billing/korea-sale.ts) joined the same condition on
+  // 12.11.2026: a third reason not to draw the PayPal container, so the match
+  // is on the two Creem halves still being there rather than on the whole line.
   check('C3: the PayPal SDK is not loaded on either Creem path',
-    /\{!creemCheckout && !creemGoverned && <BillingClient market=\{market\} acknowledged=\{checkoutUnlocked\} \/>\}/.test(view))
+    /\{!creemCheckout && !creemGoverned &&[^\n]*<BillingClient market=\{market\} acknowledged=\{checkoutUnlocked\} \/>\}/.test(view))
   check('C3-MUT: loading it anyway is caught',
-    !/!creemCheckout && !creemGoverned && <BillingClient/.test(view.replace('{!creemCheckout && !creemGoverned && <BillingClient market={market} acknowledged={checkoutUnlocked} />}', '<BillingClient market={market} acknowledged={checkoutUnlocked} />')))
+    !/!creemCheckout && !creemGoverned &&[^\n]*<BillingClient/.test(
+      view.replace(/\{!creemCheckout && !creemGoverned &&[^\n]*<BillingClient market=\{market\} acknowledged=\{checkoutUnlocked\} \/>\}/,
+        '<BillingClient market={market} acknowledged={checkoutUnlocked} />')))
   check('C3-MUT2: dropping only the governed half is caught',
-    !/!creemCheckout && !creemGoverned && <BillingClient/.test(view.replace('!creemCheckout && !creemGoverned &&', '!creemCheckout &&')))
+    !/!creemCheckout && !creemGoverned &&[^\n]*<BillingClient/.test(view.replace('!creemCheckout && !creemGoverned &&', '!creemCheckout &&')))
 
   // An account Creem already bills is offered NOTHING to click: the card
   // button is for a first payment, and the PayPal container underneath would

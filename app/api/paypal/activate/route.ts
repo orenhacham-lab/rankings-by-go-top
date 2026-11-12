@@ -8,6 +8,7 @@ import { marketForPayPalPlanId } from '@/lib/paypal/checkout-plans'
 import { lockBillingMarket } from '@/lib/billing/billing-market-selection'
 import { resolveBillingMarket, storedMarketOf, STORED_MARKET_KEY } from '@/lib/billing/server-market'
 import { logRestrictedAttempt, restrictionForRequest } from '@/lib/sanctions/guard'
+import { KOREA_SALE_REFUSAL_REASON, koreaSaleBlockedForRequest } from '@/lib/billing/korea-sale'
 import { notifyRefusedPayPalActivation } from '@/lib/shopify/paypal-migration-retry'
 
 /**
@@ -41,6 +42,16 @@ export async function POST(request: Request) {
     if (restricted) {
       logRestrictedAttempt('paypal-activate', restricted)
       return Response.json({ error: 'Not available', reason: 'restricted_country' }, { status: 451 })
+    }
+
+    // Korea, until the checkout flag says the Creem routing is live for it.
+    // This is the path that makes US the seller of record, which is exactly
+    // what brings the Korean VAT and the 전자상거래법 art. 13 disclosure duties
+    // onto a company with no Korean registration. The billing screen does not
+    // draw the buttons for such a visitor; this is the server's own refusal.
+    if (koreaSaleBlockedForRequest(request.headers)) {
+      console.warn('[paypal-activate] refused: paid activation is not open for Korea yet')
+      return Response.json({ error: 'Not available', reason: KOREA_SALE_REFUSAL_REASON }, { status: 451 })
     }
     const supabase = await createClient()
     const { data: { user } } = await supabase.auth.getUser()

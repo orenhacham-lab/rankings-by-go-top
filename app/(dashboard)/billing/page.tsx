@@ -1,7 +1,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { redirect } from 'next/navigation'
-import { cookies } from 'next/headers'
+import { cookies, headers } from 'next/headers'
 import { getUserEntitlement } from '@/lib/subscription'
 import { resolveBillingAuthority } from '@/lib/billing/governance'
 import { getActiveMigrationResult } from '@/lib/shopify/paypal-migration'
@@ -10,6 +10,7 @@ import { hasLiveShopifyConnectionResult } from '@/lib/shopify/paypal-block'
 import { PENDING_LINK_COOKIE, verifyPendingLinkCookieValue } from '@/lib/shopify/pending-link'
 import { getShopifyOAuthConfig } from '@/lib/shopify/oauth'
 import { resolveBillingMarket } from '@/lib/billing/server-market'
+import { koreaSaleBlockedForRequest } from '@/lib/billing/korea-sale'
 import { planPriceIn } from '@/lib/billing/market'
 import { PLAN_CATALOG } from '@/lib/plans/catalog'
 import { creemMayWriteToAccount, isCreemEnabled } from '@/lib/creem/config'
@@ -141,6 +142,15 @@ export default async function BillingPage() {
   // the dashboard language toggle, never a client choice, no switcher.
   const { market, locked: marketLocked } = await resolveBillingMarket(supabase, user)
 
+  // KOREA. A paid subscription may not be sold to a visitor placed there until
+  // the Korean checkout flag says the Creem routing is live for it: the PayPal
+  // path makes us the seller of record, and that is what brings the Korean VAT
+  // and the 전자상거래법 art. 13 disclosure duties onto a company with no Korean
+  // registration. lib/billing/korea-sale.ts carries the reasoning. This only
+  // decides what is drawn; /api/paypal/activate and /api/creem/checkout refuse
+  // the same visitor themselves.
+  const koreaSaleBlocked = koreaSaleBlockedForRequest(await headers())
+
   // PAY BY CARD (Creem) — OWNER DECISION, 10 Oct 2026: new customers only.
   //
   // Creem is the merchant of record outside Israel, and it is offered to an
@@ -214,6 +224,7 @@ export default async function BillingPage() {
       websitePaidPeriod={websitePaidPeriod ? { paidUntil: websitePaidPeriod.paidUntil, renewalStopped: websitePaidPeriod.renewalStopped } : null}
       market={market}
       marketLocked={marketLocked}
+      koreaSaleBlocked={koreaSaleBlocked}
       creemCheckout={creemCheckout}
       creemGoverned={creemGoverned}
       planPrices={{

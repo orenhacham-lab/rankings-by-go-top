@@ -6121,6 +6121,10 @@ export const dashboardEn = {
       requiredNote: 'The payment options appear once you confirm the line above. Nothing is charged before that.',
       policyLabel: 'The withdrawal right in full, in the cancellation and refund policy',
     },
+    koreaSale: {
+      title: 'Paid plans are not open for purchase in Korea yet',
+      description: 'Your trial is not affected, and the service keeps working to the end of it. We are completing the arrangements needed to sell a subscription to a customer in Korea, and we will tell you as soon as it opens. If you would like to keep going in the meantime, write to us and we will help.',
+    },
     creem: {
       payButton: 'Pay by card',
       starting: 'Opening the secure payment page...',
