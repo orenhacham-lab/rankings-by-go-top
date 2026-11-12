@@ -48,7 +48,8 @@ import { MarketplaceBadgeUnconditional } from '@/components/consent/MarketplaceB
 import { MarketplacePixel } from '@/components/consent/MarketplacePixel'
 import { MarketplacePixelUnconditional } from '@/components/consent/MarketplacePixelUnconditional'
 import { beaconSuppressedForRequest, consentRequiredForRequest } from '@/lib/consent/eprivacy-territory'
-import { koreaOwnSaleBlockedForRequest } from '@/lib/billing/korea-sale'
+import { KOREA_SALE_COUNTRY_HEADER } from '@/lib/billing/korea-sale'
+import { ownSaleAllowedForRequest } from '@/lib/marketplace/own-sale-territory'
 import {
   MARKETPLACE_SUPPORT_EMAIL,
   marketplaceBadgeUrl,
@@ -114,16 +115,18 @@ export default async function MarketplaceSalesPage({
   // controller abroad without the 별도의 동의 제28조의8 제1항 제1호 requires, so
   // neither the beacon nor the badge is rendered there at all.
   const beaconSuppressed = beaconSuppressedForRequest(requestHeaders)
-  // KOREA, ON THE ROUTE WHERE WE ARE THE SELLER. provider.sellerOfRecord is
-  // read from each platform's own agreement: ClickBank and Digistore24 are
-  // resellers and carry the buyer's tax themselves, so a Korean sale through
-  // them is theirs to make. JVZoo is NOT a reseller — its Terms s.5.2 put the
-  // purchase contract between the customer and the vendor, and s.7 charges a
-  // 5% network commission rather than a reseller's margin — so a Korean sale
-  // through it is OUR sale, and it carries the same VAT Act art. 53-2 and
-  // 전자상거래법 art. 13 duties as the PayPal path. Same rule, same flag:
-  // lib/billing/korea-sale.ts.
-  const koreaOwnSaleBlocked = !provider.sellerOfRecord && koreaOwnSaleBlockedForRequest(requestHeaders)
+  // WHERE WE MAY SELL IN OUR OWN NAME. provider.sellerOfRecord is read from
+  // each platform's own agreement: ClickBank and Digistore24 are resellers and
+  // carry the buyer's tax themselves, so their pages are not touched. JVZoo is
+  // NOT a reseller — its Terms s.5.2 put the purchase contract between the
+  // customer and the vendor, and s.7 charges a 5% network commission — so a
+  // sale through it is OURS, with the buyer country's registration and
+  // remittance duties attached. Owner decision 12.11.2026: an allow list, in
+  // configuration, starting at the United States.
+  // lib/marketplace/own-sale-territory.ts carries the reasoning, including why
+  // an unplaceable visitor fails CLOSED here and open in lib/billing/korea-sale.
+  const ownSaleRefused = !provider.sellerOfRecord
+    && !ownSaleAllowedForRequest(requestHeaders, KOREA_SALE_COUNTRY_HEADER)
 
   return (
     <main className="mx-auto max-w-3xl px-4 py-16">
@@ -174,13 +177,19 @@ export default async function MarketplaceSalesPage({
                 {plan.maxProjects === 1 ? 'One website' : `${plan.maxProjects} websites`},{' '}
                 {plan.maxKeywordsPerProject} keywords, {plan.maxArticlesPerPeriodAccountWide} articles a month.
               </p>
-              {koreaOwnSaleBlocked ? (
-                /* Not "unavailable in your country", which would be false — the
-                   site and the trial are open. What is true is that this plan
-                   is not sold here yet, and that nothing is charged. */
-                <p className="mt-4 text-copy text-muted" data-korea-no-sale>
-                  This plan is not sold in Korea at the moment. Nothing will be charged. The free
-                  trial is open, and you can write to us at contact@gotopseo.com.
+              {ownSaleRefused ? (
+                /* What is refused is THIS purchase route, not the service, so
+                   the sentence says exactly that and nothing wider: the same
+                   plan is sold on our own site, where a seller of record
+                   exists and the tax is handled.
+
+                   AND NO LINK OUT. A pitch page that offers another way to buy
+                   is leakage under the platforms' own rules (ClickBank's pitch
+                   rules forbid an alternate payment route outright), so the
+                   visitor is told the fact and not handed a competing
+                   checkout. */
+                <p className="mt-4 text-copy text-muted" data-own-sale-refused>
+                  This plan is not sold through this page in your country. Nothing is charged here.
                 </p>
               ) : buyUrl ? (
                 <a
