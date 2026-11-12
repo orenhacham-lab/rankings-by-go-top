@@ -1,11 +1,13 @@
 import { buildHreflangAlternates } from '@/lib/seo/hreflang'
 import { marketingBreadcrumbSchema } from '@/lib/seo/page-schema'
 import { getPublicDictionary } from '@/lib/i18n/getPublicDictionary'
+import { SOCIAL_PREVIEW_IMAGE } from '@/lib/seo/social-preview'
 
 export const metadata = {
   title: 'Pricing - Go Top SEO',
   description: 'Flexible pricing plans for Google rank tracking and AI visibility. Free 7-day trial, no commitment. Plans starting from $79/month.',
   openGraph: {
+    images: [SOCIAL_PREVIEW_IMAGE],
     title: 'Pricing - Go Top SEO',
     description: 'Flexible pricing plans for Google rank tracking and AI visibility monitoring',
     url: 'https://www.gotopseo.com/en/pricing',

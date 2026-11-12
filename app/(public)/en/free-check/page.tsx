@@ -4,12 +4,14 @@ import { FreeCheckExperience } from '@/components/free-check/FreeCheckExperience
 import { FreeCheckResearch } from '@/components/free-check/FreeCheckResearch'
 import { presignupResearchOn } from '@/lib/onboarding/availability'
 import { buildHreflangAlternates } from '@/lib/seo/hreflang'
+import { SOCIAL_PREVIEW_IMAGE } from '@/lib/seo/social-preview'
 
 export const metadata = {
   title: 'Free SEO & AI site check - Go Top SEO',
   description:
     'A free site check: we really read your site, work out what the business does, and show what is holding you back in Google and in AI answers. No card, no commitment.',
   openGraph: {
+    images: [SOCIAL_PREVIEW_IMAGE],
     title: 'Free SEO & AI site check',
     description: 'A free check that reads your site and shows what holds you back in Google and AI answers',
     url: 'https://www.gotopseo.com/en/free-check',

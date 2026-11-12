@@ -2,11 +2,13 @@ import { authorPersonSchema } from '@/lib/articles/authors'
 import { buildHreflangAlternates } from '@/lib/seo/hreflang'
 import { marketingBreadcrumbSchema } from '@/lib/seo/page-schema'
 import { ABOUT_BREADCRUMB } from '@/lib/i18n/public/pages/breadcrumb-labels'
+import { SOCIAL_PREVIEW_IMAGE } from '@/lib/seo/social-preview'
 
 export const metadata = {
   title: 'Sobre o Go Top SEO',
   description: 'A história do Go Top SEO: uma plataforma de acompanhamento de posições no Google e de visibilidade em IA construída sobre mais de 11 anos de experiência digital.',
   openGraph: {
+    images: [SOCIAL_PREVIEW_IMAGE],
     title: 'Sobre o Go Top SEO',
     description: 'Plataforma de acompanhamento de posições no Google e de visibilidade em IA, com mais de 11 anos de experiência digital por trás',
     url: 'https://www.gotopseo.com/pt-BR/about',

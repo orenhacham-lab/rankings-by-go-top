@@ -18,6 +18,7 @@ import { inGdprTerritory } from '@/lib/compliance/gdpr-territory'
 import { GoogleTags } from '@/components/consent/GoogleTags'
 import { MetaPixel } from '@/components/consent/MetaPixel'
 import { DocumentLocaleSync } from '@/components/DocumentLocaleSync'
+import { SOCIAL_PREVIEW_IMAGE } from '@/lib/seo/social-preview'
 
 /**
  * The two faces of the type system (see --font-sans in globals.css): Inter for
@@ -58,7 +59,7 @@ export async function generateMetadata(): Promise<Metadata> {
     openGraph: {
       title: m.ogTitle,
       description: m.ogDescription,
-      images: ['/gotop-primary.png'],
+      images: [SOCIAL_PREVIEW_IMAGE],
       url: 'https://www.gotopseo.com',
       siteName: 'Go Top SEO',
       locale: m.ogLocale,

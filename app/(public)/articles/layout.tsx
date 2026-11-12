@@ -1,10 +1,12 @@
 import { buildHreflangAlternates } from '@/lib/seo/hreflang'
 import { LOCALE_CONFIG } from '@/lib/i18n/locales'
+import { SOCIAL_PREVIEW_IMAGE } from '@/lib/seo/social-preview'
 
 export const metadata = {
   title: 'מאמרים בנושאי קידום אתרים ושיווק דיגיטלי | Go Top SEO',
   description: 'מאמרים בנושאי קידום אתרים, נראות ב-AI ושיווק דיגיטלי, מהצוות של Go Top SEO. להמשך קריאה כנסו עכשיו >>',
   openGraph: {
+    images: [SOCIAL_PREVIEW_IMAGE],
     title: 'מאמרים בנושאי קידום אתרים ושיווק דיגיטלי',
     description: 'מאמרים בנושאי קידום אתרים, נראות ב-AI ושיווק דיגיטלי מהצוות של Go Top SEO',
     url: 'https://www.gotopseo.com/articles',

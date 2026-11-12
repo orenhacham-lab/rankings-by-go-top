@@ -4,12 +4,14 @@ import { FreeCheckExperience } from '@/components/free-check/FreeCheckExperience
 import { FreeCheckResearch } from '@/components/free-check/FreeCheckResearch'
 import { presignupResearchOn } from '@/lib/onboarding/availability'
 import { buildHreflangAlternates } from '@/lib/seo/hreflang'
+import { SOCIAL_PREVIEW_IMAGE } from '@/lib/seo/social-preview'
 
 export const metadata = {
   title: 'SEOとAIの無料診断 - Go Top SEO',
   description:
     'サイトの無料診断です。サイトを実際に読み取り、その事業が何をしているかを把握して、Googleの検索結果とAIの回答で何が妨げになっているかをお見せします。クレジットカードの登録も、継続の縛りもありません。',
   openGraph: {
+    images: [SOCIAL_PREVIEW_IMAGE],
     title: 'SEOとAIの無料診断',
     description: 'サイトを読み取り、Googleの検索結果とAIの回答で何が妨げになっているかをお見せする無料の診断です',
     url: 'https://www.gotopseo.com/ja/free-check',
