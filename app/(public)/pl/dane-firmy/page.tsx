@@ -85,6 +85,7 @@
  */
 import { LEGAL_FOOTNOTE, LEGAL_LINK, LegalDoc } from '@/components/public/LegalDoc'
 import Link from 'next/link'
+import { SOCIAL_PREVIEW_IMAGE } from '@/lib/seo/social-preview'
 
 const TITLE = 'Dane firmy | Go Top SEO'
 const DESCRIPTION = 'Dane naszej firmy, rejestr, w którym jest wpisana, kontakt oraz informacja o podatku w cenie.'
@@ -98,6 +99,7 @@ export const metadata = {
   // given "before the contract" asks for.
   robots: 'noindex, nofollow',
   openGraph: {
+    images: [SOCIAL_PREVIEW_IMAGE],
     title: TITLE,
     description: DESCRIPTION,
     url: 'https://www.gotopseo.com/pl/dane-firmy',

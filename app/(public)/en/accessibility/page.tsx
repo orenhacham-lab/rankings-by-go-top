@@ -1,10 +1,12 @@
 import { LEGAL_FOOTNOTE, LegalDoc } from '@/components/public/LegalDoc'
+import { SOCIAL_PREVIEW_IMAGE } from '@/lib/seo/social-preview'
 
 export const metadata = {
   title: 'Accessibility | Go Top SEO',
   description: 'Accessibility statement for Go Top SEO',
   robots: 'noindex, nofollow',
   openGraph: {
+    images: [SOCIAL_PREVIEW_IMAGE],
     title: 'Accessibility | Go Top SEO',
     description: 'Accessibility statement for Go Top SEO',
     url: 'https://www.gotopseo.com/en/accessibility',

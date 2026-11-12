@@ -1,10 +1,12 @@
 import { buildHreflangAlternates } from '@/lib/seo/hreflang'
 import { LOCALE_CONFIG } from '@/lib/i18n/locales'
+import { SOCIAL_PREVIEW_IMAGE } from '@/lib/seo/social-preview'
 
 export const metadata = {
   title: 'SEO, Rank Tracking and AI Visibility Articles | Go Top SEO',
   description: 'Articles, guides and tips on Google rank tracking, SEO, and AI visibility monitoring across ChatGPT, Gemini, Perplexity and more.',
   openGraph: {
+    images: [SOCIAL_PREVIEW_IMAGE],
     title: 'SEO, Rank Tracking and AI Visibility Articles | Go Top SEO',
     description: 'Articles and guides on rank tracking, SEO and AI visibility',
     url: 'https://www.gotopseo.com/en/articles',

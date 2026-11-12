@@ -1,10 +1,12 @@
 import { LEGAL_FOOTNOTE, LegalDoc } from '@/components/public/LegalDoc'
+import { SOCIAL_PREVIEW_IMAGE } from '@/lib/seo/social-preview'
 
 export const metadata = {
   title: 'Cancellation and Refund Policy | Go Top SEO',
   description: 'How to cancel a Go Top SEO subscription and when a refund is given.',
   robots: 'noindex, nofollow',
   openGraph: {
+    images: [SOCIAL_PREVIEW_IMAGE],
     title: 'Cancellation and Refund Policy | Go Top SEO',
     description: 'Cancellation and refund policy for Go Top SEO',
     url: 'https://www.gotopseo.com/en/refund-policy',

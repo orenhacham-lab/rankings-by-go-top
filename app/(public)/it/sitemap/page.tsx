@@ -2,11 +2,13 @@ import { buildHreflangAlternates } from '@/lib/seo/hreflang'
 import Link from 'next/link'
 import { LEGAL_FOOTNOTE, LEGAL_LINK, LegalFrame, LegalHeader, SitemapGroups } from '@/components/public/LegalDoc'
 import { authHref } from '@/lib/i18n/auth-href'
+import { SOCIAL_PREVIEW_IMAGE } from '@/lib/seo/social-preview'
 
 export const metadata = {
   title: 'Mappa del sito | Go Top SEO',
   description: 'Mappa del sito di Go Top SEO: tutte le nostre pagine in un unico posto.',
   openGraph: {
+    images: [SOCIAL_PREVIEW_IMAGE],
     title: 'Mappa del sito | Go Top SEO',
     description: 'Mappa del sito di Go Top SEO',
     url: 'https://www.gotopseo.com/it/sitemap',

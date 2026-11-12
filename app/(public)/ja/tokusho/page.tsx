@@ -24,6 +24,7 @@
  */
 import { LEGAL_FOOTNOTE, LEGAL_LINK, LegalDoc } from '@/components/public/LegalDoc'
 import Link from 'next/link'
+import { SOCIAL_PREVIEW_IMAGE } from '@/lib/seo/social-preview'
 
 const TITLE = '特定商取引法に基づく表記 | Go Top SEO'
 const DESCRIPTION = '特定商取引法が通信販売の広告に表示を求める事項の表記です。'
@@ -36,6 +37,7 @@ export const metadata = {
   // what the Act asks for — that the buyer can find it before paying.
   robots: 'noindex, nofollow',
   openGraph: {
+    images: [SOCIAL_PREVIEW_IMAGE],
     title: TITLE,
     description: DESCRIPTION,
     url: 'https://www.gotopseo.com/ja/tokusho',

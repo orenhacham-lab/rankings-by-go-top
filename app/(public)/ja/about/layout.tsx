@@ -2,11 +2,13 @@ import { authorPersonSchema } from '@/lib/articles/authors'
 import { buildHreflangAlternates } from '@/lib/seo/hreflang'
 import { marketingBreadcrumbSchema } from '@/lib/seo/page-schema'
 import { ABOUT_BREADCRUMB } from '@/lib/i18n/public/pages/breadcrumb-labels'
+import { SOCIAL_PREVIEW_IMAGE } from '@/lib/seo/social-preview'
 
 export const metadata = {
   title: '会社情報 - Go Top SEO',
   description: 'Go Top SEOのこれまで。Googleでの検索順位とAIでの可視性を計測するプラットフォームで、デジタル領域での11年以上の実務の上に作られています。',
   openGraph: {
+    images: [SOCIAL_PREVIEW_IMAGE],
     title: '会社情報 - Go Top SEO',
     description: 'Googleでの検索順位とAIでの可視性を計測するプラットフォームです。デジタル領域での11年以上の実務があります',
     url: 'https://www.gotopseo.com/ja/about',
