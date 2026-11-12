@@ -56,6 +56,7 @@ export default function EnglishSitemapPage() {
         { label: 'Site fixes', href: '/en/features/site-health-fixes' },
         { label: 'Links to your site', href: '/en/features/site-links' },
         { label: 'Google Maps posts', href: '/en/features/google-maps-posts' },
+        { label: 'Google Business Profile', href: '/en/features/google-business-profile' },
         { label: 'You vs. competitors', href: '/en/features/competitor-tracking' },
         { label: 'Search Console data', href: '/en/features/search-console' },
       ],

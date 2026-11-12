@@ -57,6 +57,7 @@ export default function FrenchSitemapPage() {
         { label: 'Corrections sur le site', href: '/fr/features/site-health-fixes' },
         { label: 'Liens vers votre site', href: '/fr/features/site-links' },
         { label: 'Publications Google Maps', href: '/fr/features/google-maps-posts' },
+        { label: 'Fiche d’établissement Google', href: '/fr/features/google-business-profile' },
         { label: 'Vous face aux concurrents', href: '/fr/features/competitor-tracking' },
         { label: 'Données Search Console', href: '/fr/features/search-console' },
       ],

@@ -58,6 +58,7 @@ export default function PolishSitemapPage() {
         { label: 'Poprawki na witrynie', href: '/pl/features/site-health-fixes' },
         { label: 'Linki do witryny', href: '/pl/features/site-links' },
         { label: 'Wpisy w Mapach Google', href: '/pl/features/google-maps-posts' },
+        { label: 'Profil Firmy w Google', href: '/pl/features/google-business-profile' },
         { label: 'Państwa firma i konkurenci', href: '/pl/features/competitor-tracking' },
         { label: 'Dane z Search Console', href: '/pl/features/search-console' },
       ],

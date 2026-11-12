@@ -58,6 +58,7 @@ export default function DutchSitemapPage() {
         { label: 'Correcties aan de website', href: '/nl/features/site-health-fixes' },
         { label: 'Links naar de website', href: '/nl/features/site-links' },
         { label: 'Berichten voor Google Maps', href: '/nl/features/google-maps-posts' },
+        { label: 'Google Bedrijfsprofiel', href: '/nl/features/google-business-profile' },
         { label: 'Uw bedrijf en de concurrenten', href: '/nl/features/competitor-tracking' },
         { label: 'De gegevens uit Search Console', href: '/nl/features/search-console' },
       ],
