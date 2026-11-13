@@ -114,7 +114,7 @@ export const billingKo: DeepPartial<DashboardDictionary> = {
       },
       generateReports: {
         title: '리포트',
-        description: '여기에서 고객사에 드릴 SEO·GEO 리포트를 만드십니다. AI 답변 가시성, 순위, 경쟁사, 권장 사항이 담깁니다.',
+        description: '여기에서 고객사에 드릴 SEO·GEO 리포트를 만드실 수 있습니다. AI 답변 가시성, 순위, 경쟁사, 권장 사항이 담깁니다.',
         action: '리포트로 이동',
       },
     },
@@ -155,9 +155,9 @@ export const billingKo: DeepPartial<DashboardDictionary> = {
     keywordCheckNote: `${CHECKS_EXPLAINER['ko']} 글 한도는 계정의 모든 사이트가 함께 사용하며, 모든 한도는 매월 갱신됩니다. 쓰지 않은 분량은 다음 달로 넘어가지 않습니다.`,
     trialNoChargeNotice: '결제 수단을 등록하지 않으셨고, 자동으로 결제되는 것도 없습니다.',
     marketPrompt: {
-      currencyName: { ILS: '이스라엘 셰켈 (₪)', USD: '미국 달러 ($)' },
-      byLocation: (currency: string) => `요금은 고객님의 위치에 따라 ${currency}(으)로 표시됩니다. 통화는 첫 결제 시 확정됩니다.`,
-      locked: (currency: string) => `이 계정은 ${currency}(으)로 결제됩니다.`,
+      currencyName: { ILS: '이스라엘 셰켈(₪)', USD: '미국 달러($)' },
+      byLocation: (currency: string) => `요금은 고객님의 위치에 따라 ${currency} 기준으로 표시됩니다. 통화는 첫 결제 시 확정됩니다.`,
+      locked: (currency: string) => `이 계정은 ${currency} 기준으로 결제됩니다.`,
     },
     manage: {
       title: '구독 관리',
@@ -212,7 +212,7 @@ export const billingKo: DeepPartial<DashboardDictionary> = {
       migrationPending: 'Shopify 결제 연결을 아직 마무리하고 있습니다. 잠시 걸릴 수 있으니 조금 뒤에 이 화면을 새로 고쳐 주십시오.',
       migrationNeedsAttention: 'Shopify 플랜은 활성화됐지만 이전 결제를 아직 정리하고 있습니다. 저절로 해결되지 않으면 저희에게 알려 주십시오.',
       storeConnectedTitle: '고객님의 쇼핑몰은 Shopify를 통해 결제됩니다',
-      storeConnectedDescription: '이 계정에 Shopify 쇼핑몰이 연결돼 있어 결제가 PayPal이 아니라 Shopify를 통해 이루어집니다. 플랜은 Shopify 쇼핑몰 관리자 화면의 Go Top SEO 앱에서 선택하고 변경하십니다.',
+      storeConnectedDescription: '이 계정에 Shopify 쇼핑몰이 연결돼 있어 결제가 PayPal이 아니라 Shopify를 통해 이루어집니다. 플랜은 Shopify 쇼핑몰 관리자 화면의 Go Top SEO 앱에서 선택하고 변경하실 수 있습니다.',
       appStoreLink: 'Shopify App Store의 Go Top SEO',
       paidUntil: (date: string) => `플랜은 ${date}까지 결제되어 있으며 그날까지 유지됩니다.`,
       paidCurrentPeriod: '플랜은 현재 기간에 대해 결제되어 있으며 그 기간이 끝날 때까지 유지됩니다.',
