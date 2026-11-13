@@ -6125,6 +6125,10 @@ export const dashboardEn = {
       title: 'Only the free trial is available in Korea at the moment',
       description: 'A paid subscription is not sold there. Nothing will be charged, and the data you created during the trial stays in your account. Write to us at contact@gotopseo.com with any question.',
     },
+    ownNameSale: {
+      title: 'A paid subscription is not sold in your country at the moment',
+      description: 'Nothing will be charged, and the data you created during the trial stays in your account. Write to us at contact@gotopseo.com with any question.',
+    },
     creem: {
       payButton: 'Pay by card',
       starting: 'Opening the secure payment page...',

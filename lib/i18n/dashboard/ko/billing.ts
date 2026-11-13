@@ -195,6 +195,10 @@ export const billingKo: DeepPartial<DashboardDictionary> = {
       title: '현재 한국에서는 무료 체험만 이용할 수 있습니다',
       description: '현재 한국에서는 유료 구독 결제를 제공하지 않습니다. 요금이 청구되지 않으며, 체험 기간에 만든 데이터는 계정에 그대로 보관됩니다. 문의는 contact@gotopseo.com으로 보내 주시면 됩니다.',
     },
+    ownNameSale: {
+      title: '현재 고객님의 국가에서는 유료 구독 결제를 제공하지 않습니다',
+      description: '요금이 청구되지 않으며, 체험 기간에 만든 데이터는 계정에 그대로 보관됩니다. 문의는 contact@gotopseo.com으로 보내 주시면 됩니다.',
+    },
     creem: {
       payButton: '카드로 결제',
       starting: '안전한 결제 페이지를 열고 있습니다...',

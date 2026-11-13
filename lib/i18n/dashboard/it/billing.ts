@@ -178,6 +178,10 @@ export const billingIt: DeepPartial<DashboardDictionary> = {
       requiredNote: 'Le modalità di pagamento compaiono quando Lei conferma la riga qui sopra. Prima di allora non viene addebitato nulla.',
       policyLabel: 'Il diritto di recesso per intero, nella politica di cancellazione e rimborso',
     },
+    ownNameSale: {
+      title: 'In questo momento non vendiamo un abbonamento a pagamento nel Suo Paese',
+      description: 'Non le verrà addebitato nulla e i dati creati durante la prova restano nel Suo account. Ci scriva a contact@gotopseo.com per qualsiasi domanda.',
+    },
     creem: {
       payButton: 'Pagare con carta',
       starting: 'Apertura della pagina di pagamento sicura...',

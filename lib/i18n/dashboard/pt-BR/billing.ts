@@ -169,6 +169,10 @@ export const billingPtBR: DeepPartial<DashboardDictionary> = {
       requiredNote: 'As formas de pagamento aparecem quando você confirmar a linha acima. Antes disso nada é cobrado.',
       policyLabel: 'O direito de desistência por inteiro, na política de cancelamento e reembolso',
     },
+    ownNameSale: {
+      title: 'Neste momento não vendemos uma assinatura paga no seu país',
+      description: 'Nada será cobrado e os dados que você criou durante o teste permanecem na sua conta. Escreva para contact@gotopseo.com com qualquer dúvida.',
+    },
     creem: {
       payButton: 'Pagar com cartão',
       starting: 'Abrindo a página de pagamento segura...',

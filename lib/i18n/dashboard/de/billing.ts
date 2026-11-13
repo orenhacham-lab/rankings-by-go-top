@@ -181,6 +181,10 @@ export const billingDe: DeepPartial<DashboardDictionary> = {
       requiredNote: 'Die Zahlungsmöglichkeiten erscheinen, sobald Sie die Zeile darüber bestätigen. Vorher wird nichts abgebucht.',
       policyLabel: 'Das Widerrufsrecht im Wortlaut, in der Kündigungs- und Rückerstattungsrichtlinie',
     },
+    ownNameSale: {
+      title: 'In Ihrem Land verkaufen wir derzeit kein kostenpflichtiges Abonnement',
+      description: 'Es wird nichts berechnet, und die während der Testphase erstellten Daten bleiben in Ihrem Konto. Schreiben Sie uns bei Fragen an contact@gotopseo.com.',
+    },
     creem: {
       payButton: 'Mit Karte zahlen',
       starting: 'Die sichere Zahlungsseite wird geöffnet...',

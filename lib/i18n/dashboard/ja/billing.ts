@@ -186,6 +186,10 @@ export const billingJa: DeepPartial<DashboardDictionary> = {
       requiredNote: '上の行を確認すると、お支払い方法が表示されます。それまでは請求は発生しません。',
       policyLabel: 'キャンセル・返金ポリシーに記載された撤回権の全文',
     },
+    ownNameSale: {
+      title: '現在、お客様の国では有料プランを販売しておりません',
+      description: '料金は請求されず、体験期間に作られたデータはアカウントにそのまま残ります。ご質問は contact@gotopseo.com までお送りください。',
+    },
     creem: {
       payButton: 'カードでお支払い',
       starting: '安全なお支払いページを開いています...',

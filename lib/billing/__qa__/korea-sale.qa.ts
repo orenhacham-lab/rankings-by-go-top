@@ -130,8 +130,25 @@ console.log('\nC. the three places that must all refuse, each on ITS OWN seller'
     && /koreaOwnSaleBlocked=\{koreaOwnSaleBlocked\}/.test(page))
   check('C5: the Creem card button is not even offered to such a visitor while that route is shut',
     /&& !koreaCreemSaleBlocked/.test(page))
+  /**
+   * C6 USED TO PIN THE WHOLE CONJUNCTION as one literal string. On 13.11.2026 a
+   * second own-name refusal joined it — lib/billing/own-name-sale.ts, the
+   * general case behind Korea for every other country we are not cleared to
+   * sell in — and the literal went red although the Korean condition was still
+   * there and still first. Pinning the exact chain means every later refusal
+   * breaks this guard, so it now reads the condition that actually guards the
+   * container and requires the Korean term to be IN it. That is the claim worth
+   * holding; the order of the others is not.
+   */
+  const containerCondition = view.slice(0, view.indexOf('<BillingClient')).split('{').pop() ?? ''
   check('C6: and the screen draws no PayPal container for a visitor we may not sell to ourselves',
-    /!creemCheckout && !creemGoverned && !koreaOwnSaleBlocked && <BillingClient/.test(view))
+    containerCondition.includes('!koreaOwnSaleBlocked')
+    && containerCondition.includes('!creemCheckout')
+    && containerCondition.includes('!creemGoverned'))
+  check('C6-MUT: that guard still fails if the Korean condition is dropped from the chain',
+    !(view.replace(/ && !koreaOwnSaleBlocked/g, '')
+      .slice(0, view.replace(/ && !koreaOwnSaleBlocked/g, '').indexOf('<BillingClient'))
+      .split('{').pop() ?? '').includes('!koreaOwnSaleBlocked'))
   check('C7: the refusal comes before the PayPal container and after the Creem button, '
     + 'because on the Creem route the seller is Creem',
     view.indexOf('if (creemCheckout) return <CreemCheckoutButton') > 0
