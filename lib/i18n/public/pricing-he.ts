@@ -39,7 +39,7 @@ export const pricingHe: PricingCopy = {
        not only a mail-order seller, so it bites BEFORE any contract. Shown only
        to a visitor placed in Korea, on every language's page, because the duty
        follows the consumer and not the page. lib/billing/korea-sale.ts. */
-    koreaTrialOnly: 'בקוריאה זמין בשלב זה רק הניסיון החינמי, ומנוי בתשלום לא נמכר שם. הניסיון מסתיים אוטומטית לאחר שבעה ימים, ואיננו מבקשים פרטי כרטיס, כך שלא מתבצע חיוב.',
+    koreaTrialOnly: `בקוריאה זמין בשלב זה רק הניסיון החינמי, ומנוי בתשלום לא נמכר שם. הניסיון מסתיים אוטומטית לאחר ${DAYS} ימים, ואיננו מבקשים פרטי כרטיס, כך שלא מתבצע חיוב.`,
     everyPlanLabel: 'בכל תוכנית',
     everyPlan: [
       'פרסום אוטומטי לפי לוח זמנים, לוורדפרס, לשופיפיי ולוויקס',

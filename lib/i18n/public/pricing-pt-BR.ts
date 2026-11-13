@@ -45,7 +45,7 @@ export const pricingPtBR: PricingCopy = {
        not only a mail-order seller, so it bites BEFORE any contract. Shown only
        to a visitor placed in Korea, on every language's page, because the duty
        follows the consumer and not the page. lib/billing/korea-sale.ts. */
-    koreaTrialOnly: 'Na Coreia do Sul, por enquanto só a avaliação gratuita está disponível, e a assinatura paga não é vendida lá. A avaliação termina automaticamente após sete dias e não pedimos dados de cartão, portanto nada é cobrado.',
+    koreaTrialOnly: `Na Coreia do Sul, por enquanto só a avaliação gratuita está disponível, e a assinatura paga não é vendida lá. A avaliação termina automaticamente após ${DAYS} dias e não pedimos dados de cartão, portanto nada é cobrado.`,
     everyPlanLabel: 'Em todos os planos',
     everyPlan: [
       'Publicação agendada automática no WordPress, na Shopify e no Wix',

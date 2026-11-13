@@ -214,26 +214,42 @@ console.log('\nF. the fact is told BEFORE the trial, not only at the refusal')
   check('F2-MUT: a page that stops passing it is caught',
     !/koreaTrialOnly=\{koreaTrialOnly\}/.test(
       code('app/(public)/ko/pricing/page.tsx').replace(/koreaTrialOnly=\{koreaTrialOnly\}/g, '')))
+  /**
+   * The sentence out of a pricing dictionary. They are template literals now,
+   * not quoted strings: the trial's length is interpolated from the catalog
+   * (F7), so a regex that only matched quotes would silently find nothing and
+   * every check below would pass on an empty string.
+   */
+  const pricingNotice = (loc: string): string | null => {
+    const d = read(`lib/i18n/public/pricing-${loc}.ts`)
+    const m = d.match(/koreaTrialOnly: ([`'])((?:[^`'\\]|\\.)*)\1/)
+    return m ? m[2] : null
+  }
+  const ALL_PRICING_LOCALES = ['he', 'en', 'es', 'pt-BR', 'fr', 'it', 'ja', 'de', 'nl', 'pl', 'ko']
+
   check('F3: every pricing dictionary carries the sentence, and none is empty',
-    ['he', 'en', 'es', 'pt-BR', 'fr', 'it', 'ja', 'de', 'nl', 'pl', 'ko'].every((loc) => {
-      const d = read(`lib/i18n/public/pricing-${loc}.ts`)
-      const m = d.match(/koreaTrialOnly: '((?:[^'\\]|\\.)*)'/)
-      return !!m && m[1].length > 30
-    }))
+    ALL_PRICING_LOCALES.every((loc) => (pricingNotice(loc) ?? '').length > 30))
   check('F4: and none of them says anything about VAT or a registration number, '
     + 'which the legal ruling keeps out of anything a buyer reads',
     ['he', 'en', 'ko', 'ja', 'de'].every((loc) => {
-      const d = read(`lib/i18n/public/pricing-${loc}.ts`)
-      const m = d.match(/koreaTrialOnly: '((?:[^'\\]|\\.)*)'/)
-      return !!m && !/VAT|מע״מ|부가가치세|부가세|사업자등록/.test(m[1])
+      const notice = pricingNotice(loc)
+      return !!notice && !/VAT|מע״מ|부가가치세|부가세|사업자등록/.test(notice)
     }))
   check('F5: the Korean sentence says the trial is open and that nothing is charged, '
     + 'rather than that the service is unavailable in their country',
     (() => {
-      const d = read('lib/i18n/public/pricing-ko.ts')
-      const m = d.match(/koreaTrialOnly: '((?:[^'\\]|\\.)*)'/)
-      return !!m && m[1].includes('무료 체험') && m[1].includes('청구되지 않습니다')
+      const notice = pricingNotice('ko') ?? ''
+      return notice.includes('무료 체험') && notice.includes('청구되지 않습니다')
     })())
+  check('F7: the trial\'s length is interpolated from the catalog in all eleven, never written out',
+    ALL_PRICING_LOCALES.every((loc) => {
+      const notice = pricingNotice(loc) ?? ''
+      return notice.includes('${DAYS}') && !/\d/.test(notice)
+    }))
+  check('F7-MUT: a sentence that spells the length out is caught — it is the figure that goes stale '
+    + 'in silence, and this sentence is read under a disclosure duty',
+    ALL_PRICING_LOCALES.map((loc) => (pricingNotice(loc) ?? '').replace('${DAYS}', '7'))
+      .every((line) => /\d/.test(line)))
   check('F6: and the payment-step sentence promises no notification we are not recording',
     ['lib/i18n/dashboard/he.ts', 'lib/i18n/dashboard/en.ts', 'lib/i18n/dashboard/ko/billing.ts']
       .every((p) => {

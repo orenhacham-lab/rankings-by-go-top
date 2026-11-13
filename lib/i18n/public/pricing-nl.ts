@@ -53,7 +53,7 @@ export const pricingNl: PricingCopy = {
        not only a mail-order seller, so it bites BEFORE any contract. Shown only
        to a visitor placed in Korea, on every language's page, because the duty
        follows the consumer and not the page. lib/billing/korea-sale.ts. */
-    koreaTrialOnly: 'In Zuid-Korea is voorlopig alleen de gratis proefperiode beschikbaar en wordt er geen betaald abonnement verkocht. De proefperiode eindigt automatisch na zeven dagen en we vragen geen kaartgegevens, dus er wordt niets afgeschreven.',
+    koreaTrialOnly: `In Zuid-Korea is voorlopig alleen de gratis proefperiode beschikbaar en wordt er geen betaald abonnement verkocht. De proefperiode eindigt automatisch na ${DAYS} dagen en we vragen geen kaartgegevens, dus er wordt niets afgeschreven.`,
     everyPlanLabel: 'In alle pakketten',
     everyPlan: [
       'Automatische geplande publicatie op WordPress, Shopify en Wix',
