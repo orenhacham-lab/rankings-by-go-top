@@ -56,6 +56,8 @@ function excludesBlock(source: string): string {
 
 const MUSL = ['@img/sharp-libvips-linuxmusl-x64', '@img/sharp-linuxmusl-x64']
 const GLIBC = ['@img/sharp-libvips-linux-x64', '@img/sharp-linux-x64']
+/** sharp's portable build, loaded only when no native binary matches — never on Vercel. */
+const WASM = '@img/sharp-wasm32'
 
 console.log('E) the musl pair never ships')
 {
@@ -65,6 +67,16 @@ console.log('E) the musl pair never ships')
     show(MUSL.filter((p) => !block.includes(`node_modules/${p}/`))))
   check('E3: each musl exclude is a recursive glob, so the .node binary inside is covered',
     MUSL.every((p) => new RegExp(`node_modules/${p.replace(/[/@]/g, (c) => `\\${c}`)}/\\*\\*`).test(block)), show(block))
+}
+
+console.log('W) the wasm fallback never ships either')
+{
+  // 13 Nov 2026, measured on a real build of main: 43 functions reach sharp and
+  // each carried the 9.2 MB sharp-wasm32 .wasm, 400 MB of the 3.76 GB traced.
+  const block = excludesBlock(config)
+  check('W1: sharp-wasm32 is excluded', block.includes(`node_modules/${WASM}/`), show(block))
+  check('W2: and recursively, so the .wasm inside is covered',
+    new RegExp(`node_modules/${WASM.replace(/[/@]/g, (c) => `\\${c}`)}/\\*\\*`).test(block), show(block))
 }
 
 console.log('G) the binary a resize actually needs is untouched')
@@ -118,6 +130,11 @@ console.log('M) mutation controls')
   check('M4: a key scoped to one route group fails K2',
     !['/api/content/automation/cron', '/'].every((r) => picomatch('/es/*', { dot: true, contains: true })(r)))
   check('M5: a key that misses the shared trace fails K3', !picomatch('/*')('next-server'))
+  const noWasm = excludesBlock(config.replace(`      'node_modules/${WASM}/**/*',\n`, ''))
+  check('MW1: dropping the wasm exclude fails W1', !noWasm.includes(`node_modules/${WASM}/`))
+  const flatWasm = excludesBlock(config.replace(`'node_modules/${WASM}/**/*'`, `'node_modules/${WASM}'`))
+  check('MW2: a non-recursive wasm glob fails W2',
+    !new RegExp(`node_modules/${WASM.replace(/[/@]/g, (c) => `\\${c}`)}/\\*\\*`).test(flatWasm))
   const spread = "readFileSync(join(process.cwd(), ...rel.split('/')), 'utf8')"
   const back = /^.*readFileSync\(\s*join\(.*$/m.exec(spread)?.[0] ?? ''
   check('M6: putting the spread path back fails L1 and L2',
