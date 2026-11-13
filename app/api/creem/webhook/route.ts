@@ -12,6 +12,11 @@ import {
   processVerifiedCreemEvent,
   type CreemWebhookEvent,
 } from '@/lib/creem/webhook-processing'
+import {
+  creemEventBillingCountry,
+  creemEventCustomerEmail,
+  notifyKoreanBillingAddress,
+} from '@/lib/compliance/korea-sale-alert'
 
 /**
  * Creem posts its webhook events here.
@@ -118,6 +123,25 @@ async function handle(request: Request): Promise<Response> {
   } catch (affiliateError) {
     console.error('[creem-webhook] affiliate bookkeeping threw', {
       name: affiliateError instanceof Error ? affiliateError.name : 'unknown',
+    })
+  }
+
+  // The Korean billing address, which the country header could not have shown
+  // us. Its own pass, its own failure handling, after the entitlement is saved
+  // and unable to change this route's answer: the sale stands, and what the
+  // alert raises is a disclosure question for a person, never a refund this
+  // code may take. lib/compliance/korea-sale-alert.ts explains the whole thing.
+  try {
+    const billingCountry = creemEventBillingCountry(parsed)
+    const korea = await notifyKoreanBillingAddress({
+      country: billingCountry,
+      email: creemEventCustomerEmail(parsed),
+      eventType: (parsed as CreemWebhookEvent)?.eventType ?? (parsed as CreemWebhookEvent)?.event_type ?? null,
+    })
+    if (korea.sent) console.warn('[creem-webhook] Korean billing address alerted')
+  } catch (koreaError) {
+    console.error('[creem-webhook] Korea alert threw', {
+      name: koreaError instanceof Error ? koreaError.name : 'unknown',
     })
   }
 
