@@ -41,6 +41,15 @@ import {
   type CustomerEmailKind,
 } from '../korea-promotional-email'
 import { KOREA_MARKETING_MARKER, REPORT_REQUESTS_TABLE, readKoreanMarketingOptIn } from '../korea-marketing-opt-in'
+import {
+  SIGNUP_ATTRIBUTION_TABLE,
+  SIGNUP_COUNTRY_HEADER,
+  isFreshForCountry,
+  normalizeSignupCountry,
+  readSignupCountry,
+  recordSignupCountry,
+} from '../signup-country'
+import { COUNTRY_HEADER } from '@/lib/billing/server-market'
 
 let pass = 0, fail = 0
 function check(name: string, cond: boolean, detail?: unknown) {
@@ -94,14 +103,20 @@ async function main() {
   check('B3: the account language', placedInKorea({ accountLocale: 'ko' }))
   check('B4: a tagged locale', placedInKorea({ accountLocale: 'ko-KR' }) && placedInKorea({ accountLocale: 'ko_KR' }))
   check('B5: the project content language', placedInKorea({ projectLanguage: 'ko' }))
+  check('B5b: the country the account was opened from', placedInKorea({ signupCountry: 'KR' }))
+  check('B5c: the signup country alone, with everything else foreign — the residual this closed',
+    placedInKorea({ signupCountry: 'KR', accountLocale: 'en', projectCountry: 'US', projectLanguage: 'en' }))
+  check('B5d: a signup country elsewhere does not place a Korean-language account outside Korea',
+    placedInKorea({ signupCountry: 'US', accountLocale: 'ko' }))
   check('B6: an Israeli Hebrew project is not placed there',
     !placedInKorea({ accountLocale: 'he', projectCountry: 'IL', projectLanguage: 'he' }))
-  check('B7: nothing recorded is not Korea', !placedInKorea({}) && !placedInKorea({ accountLocale: null, projectCountry: null, projectLanguage: null }))
+  check('B7: nothing recorded is not Korea', !placedInKorea({}) && !placedInKorea({ signupCountry: null, accountLocale: null, projectCountry: null, projectLanguage: null }))
   check('B8: "korean" as a free-text language is not read as the locale', !placedInKorea({ projectLanguage: 'korean' }))
-  // The residual the module states: a reader IN Korea with an English account
-  // and a US project is not placed, because nothing records where they are.
-  check('B9: the stated residual still exists (an English account in Korea is not caught)',
-    !placedInKorea({ accountLocale: 'en', projectCountry: 'US', projectLanguage: 'en' }))
+  // The residual the module states: an account with NO country recorded — one
+  // opened before 2026-11-13, or a request the CDN could not place — is placed
+  // in Korea only by its language or its project.
+  check('B9: the stated residual still exists (no country recorded, English everywhere)',
+    !placedInKorea({ signupCountry: null, accountLocale: 'en', projectCountry: 'US', projectLanguage: 'en' }))
 
   // ── C) the gate ──────────────────────────────────────────────────────────
   console.log('\nC) the gate')
@@ -207,6 +222,73 @@ async function main() {
   })
   check('E7: without the flag the builder marks nothing', !built.subject.includes(KOREA_AD_SUBJECT_MARK))
 
+  // ── F) the recorded signup country ───────────────────────────────────────
+  console.log('\nF) the signup country, written once at sign-up')
+  check('F1: the header is the one the CDN sets, byte for byte', SIGNUP_COUNTRY_HEADER === COUNTRY_HEADER)
+  check('F2: a code is upper-cased and trimmed', normalizeSignupCountry(' kr ') === 'KR')
+  for (const bad of ['KOR', 'K', '82', 'K R', '<b', '', null, undefined, 7, {}]) {
+    check(`F3: ${JSON.stringify(bad)} is not a country`, normalizeSignupCountry(bad) === null)
+  }
+  check('F4: the CDN\'s own "cannot place" values are not countries',
+    normalizeSignupCountry('XX') === null && normalizeSignupCountry('T1') === null)
+
+  const nowD = new Date('2026-11-13T02:00:00.000Z')
+  const ago = (ms: number) => new Date(nowD.getTime() - ms).toISOString()
+  check('F5: a sign-up a minute old is fresh', isFreshForCountry(ago(60_000), nowD))
+  check('F6: an account a day old is not', !isFreshForCountry(ago(86_400_000), nowD))
+  check('F7: an unreadable creation date is not fresh', !isFreshForCountry('not a date', nowD) && !isFreshForCountry(null, nowD))
+
+  const recorder = (rows: Record<string, unknown>[], hooks = {}) => new FakeAdmin({ [SIGNUP_ATTRIBUTION_TABLE]: rows }, hooks)
+  const write = (admin: FakeAdmin, country: unknown, createdAt: string = ago(60_000)) =>
+    recordSignupCountry({ admin: admin as unknown as ServiceRoleClient, userId: OWNER, country, accountCreatedAt: createdAt, now: nowD })
+
+  const f1 = recorder([])
+  check('F8: with no row at all, one is inserted carrying only the country',
+    (await write(f1, 'KR')) === 'written'
+    && f1.tables[SIGNUP_ATTRIBUTION_TABLE].length === 1
+    && f1.tables[SIGNUP_ATTRIBUTION_TABLE][0].signup_country === 'KR'
+    && f1.tables[SIGNUP_ATTRIBUTION_TABLE][0].user_id === OWNER)
+
+  const f2 = recorder([{ user_id: OWNER, source: 'community', signup_country: null }])
+  check('F9: an attribution row written first has its country filled in, keeping the attribution',
+    (await write(f2, 'kr')) === 'written'
+    && f2.tables[SIGNUP_ATTRIBUTION_TABLE][0].signup_country === 'KR'
+    && f2.tables[SIGNUP_ATTRIBUTION_TABLE][0].source === 'community')
+
+  const f3 = recorder([{ user_id: OWNER, signup_country: 'IL' }])
+  check('F10: a country already recorded is provenance and is never rewritten',
+    (await write(f3, 'KR')) === 'already_recorded' && f3.tables[SIGNUP_ATTRIBUTION_TABLE][0].signup_country === 'IL')
+
+  const f4 = recorder([])
+  check('F11: an account that is not fresh is not written (nobody labels an old account)',
+    (await write(f4, 'KR', ago(86_400_000))) === 'not_fresh' && f4.tables[SIGNUP_ATTRIBUTION_TABLE].length === 0)
+
+  const f5 = recorder([])
+  check('F12: no usable header writes nothing at all',
+    (await write(f5, null)) === 'no_country' && (await write(f5, 'XX')) === 'no_country'
+    && f5.tables[SIGNUP_ATTRIBUTION_TABLE].length === 0)
+
+  const f6 = recorder([], { [SIGNUP_ATTRIBUTION_TABLE]: { select: () => ({ code: '08006' }) } })
+  check('F13: a read that fails writes nothing and says so', (await write(f6, 'KR')) === 'failed')
+
+  const f7 = recorder([])
+  check('F14: the country reads back, and an unreadable read is null, never a country',
+    (await write(f7, 'KR')) === 'written'
+    && (await readSignupCountry(f7 as unknown as ServiceRoleClient, OWNER)) === 'KR'
+    && (await readSignupCountry(recorder([], { [SIGNUP_ATTRIBUTION_TABLE]: { select: () => ({ code: '42P01' }) } }) as unknown as ServiceRoleClient, OWNER)) === null
+    && (await readSignupCountry(recorder([]) as unknown as ServiceRoleClient, OWNER)) === null)
+
+  // The sender reads it: a Korean sign-up with an English account and a US
+  // project is now blocked, which is exactly what could not be caught before.
+  const e5 = new FakeAdmin({ projects: [project({ country: 'US', language: 'en' })], [SIGNUP_ATTRIBUTION_TABLE]: [{ user_id: OWNER, signup_country: 'KR' }] })
+  let englishKoreanSends = 0
+  const r5 = await runOnboardingEmails(deps(e5, {
+    owner: async () => ({ email: 'owner@example.com', locale: 'en' as const, firstName: null, shopifyAppStoreOrigin: false as const, staff: false, signupCountry: 'KR' }),
+    send: async () => { englishKoreanSends++; return { ok: true } },
+  }))
+  check('F15: an English account that signed up in Korea is blocked',
+    r5.status === 'done' && r5.sent === 0 && englishKoreanSends === 0)
+
   // ── MUTATION CONTROLS ────────────────────────────────────────────────────
   console.log('\nMutation controls')
   await withMutant<{ koreaEmailDecision: typeof koreaEmailDecision }, void>(
@@ -243,6 +325,48 @@ async function main() {
     'lib/compliance/korea-promotional-email.ts', [['return trimmed.startsWith(KOREA_AD_SUBJECT_MARK) ? trimmed : `${KOREA_AD_SUBJECT_MARK} ${trimmed}`', 'return trimmed']],
     async (mod) => check('M6: a builder that drops the mark fails C7', !mod.koreaAdSubject('x').includes(KOREA_AD_SUBJECT_MARK)),
   )
+  await withMutant<{ placedInKorea: typeof placedInKorea }, void>(
+    'lib/compliance/korea-promotional-email.ts', [['if (signup === KOREA_COUNTRY_CODE) return true', '']],
+    async (mod) => check('M3b: dropping the signup-country signal fails B5c',
+      mod.placedInKorea({ signupCountry: 'KR', accountLocale: 'en', projectCountry: 'US', projectLanguage: 'en' }) === false),
+  )
+  // "Written once" is guarded TWICE on purpose — an early return, and the
+  // update's own `is(signup_country, null)` filter, which is what also holds
+  // when two sign-up writes race. Either alone prevents the overwrite, so a
+  // mutation control that drops one proves nothing; this drops both.
+  await withMutant<{ recordSignupCountry: typeof recordSignupCountry }, void>(
+    'lib/compliance/signup-country.ts', [
+      ["if (row && typeof row.signup_country === 'string' && row.signup_country.trim() !== '') return 'already_recorded'", ''],
+      [".update({ signup_country: country }).eq('user_id', input.userId).is('signup_country', null)", ".update({ signup_country: country }).eq('user_id', input.userId)"],
+    ],
+    async (mod) => {
+      const m = recorder([{ user_id: OWNER, signup_country: 'IL' }])
+      await mod.recordSignupCountry({ admin: m as unknown as ServiceRoleClient, userId: OWNER, country: 'KR', accountCreatedAt: ago(60_000), now: nowD })
+      check('M3c: with BOTH write-once guards gone, a recorded country is overwritten, which fails F10',
+        m.tables[SIGNUP_ATTRIBUTION_TABLE][0].signup_country === 'KR')
+    },
+  )
+  await withMutant<{ recordSignupCountry: typeof recordSignupCountry }, void>(
+    'lib/compliance/signup-country.ts', [["if (row && typeof row.signup_country === 'string' && row.signup_country.trim() !== '') return 'already_recorded'", '']],
+    async (mod) => {
+      const m = recorder([{ user_id: OWNER, signup_country: 'IL' }])
+      await mod.recordSignupCountry({ admin: m as unknown as ServiceRoleClient, userId: OWNER, country: 'KR', accountCreatedAt: ago(60_000), now: nowD })
+      check('M3c2: with the early return alone gone, the update filter still refuses the overwrite',
+        m.tables[SIGNUP_ATTRIBUTION_TABLE][0].signup_country === 'IL')
+    },
+  )
+  await withMutant<{ recordSignupCountry: typeof recordSignupCountry }, void>(
+    'lib/compliance/signup-country.ts', [["if (!isFreshForCountry(input.accountCreatedAt, now)) return 'not_fresh'", '']],
+    async (mod) => check('M3d: a recorder without the freshness window fails F11',
+      (await mod.recordSignupCountry({ admin: recorder([]) as unknown as ServiceRoleClient, userId: OWNER, country: 'KR', accountCreatedAt: ago(86_400_000), now: nowD })) === 'written'),
+  )
+  // The callback is where the country is written: every sign-in door reaches it.
+  const callback = strip(code('app/api/auth/callback/route.ts'))
+  check('M3e: the auth callback records the signup country from the CDN header',
+    /recordSignupCountry\(\{/.test(callback) && callback.includes('SIGNUP_COUNTRY_HEADER'))
+  check('M3f: and the sender reads it', strip(code('lib/onboarding-emails/live.ts')).includes('readSignupCountry')
+    && strip(code('lib/onboarding-emails/run.ts')).includes('signupCountry: who.signupCountry'))
+
   // The gate removed from the run: the source guard A7 is what catches it.
   const gutted = strip(code('lib/onboarding-emails/run.ts')).replace(/if \(!korea\.send\) \{ koreaBlocked\+\+; continue \}/, '')
   check('M7: the run without its refusal branch is caught', !/if \(!korea\.send\)/.test(gutted))

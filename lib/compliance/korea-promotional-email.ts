@@ -47,15 +47,26 @@
  *
  * HOW A READER IS PLACED IN KOREA. There is no request at cron time, so the
  * CDN header every other territory module reads does not exist here. What we
- * have is what the account and the project recorded: the language the account
- * registered in, the project's country and the project's content language. Any
- * one of the three being Korean is enough — this is a block, so a broad test
+ * have is what the account and the project recorded:
+ *   - `signupCountry`, the country of the request that opened the account
+ *     (lib/compliance/signup-country.ts). This is the one signal that is about
+ *     the PERSON rather than about their language or their market, so it is
+ *     the strongest, and it was added on 2026-11-13 to close the residual the
+ *     other three leave;
+ *   - the language the account registered in, the project's country and the
+ *     project's content language.
+ * Any one of them being Korean is enough — this is a block, so a broad test
  * costs a Korean-speaking customer elsewhere one setup email they can get by
- * consenting, while a narrow one would let an unlawful send out. THE RESIDUAL,
- * stated rather than hidden: a reader in Korea who registered in English and
- * runs an English site in another country's name is not placed here and is not
- * blocked. Closing it needs a country recorded at signup, which nothing
- * records today.
+ * consenting, while a narrow one would let an unlawful send out.
+ *
+ * THE RESIDUAL THAT REMAINS, stated rather than hidden: the CDN sets no header
+ * for a local or preview sign-up and cannot place every address, and every
+ * account opened before 2026-11-13 has no country recorded at all. Such a
+ * reader is placed in Korea only if their language or their project says so.
+ * NULL is "not known" and never a country, the same direction
+ * lib/compliance/gdpr-territory.ts fails in, because treating every
+ * unplaceable sign-up as Korean would withhold setup emails from the markets
+ * we actually sell to.
  *
  * IT FAILS CLOSED. A placed reader whose opt-in cannot be read is not mailed.
  */
@@ -84,6 +95,12 @@ export const KOREA_LOCALE = 'ko'
  * here is guessed, and a null is simply one signal that says nothing.
  */
 export interface KoreaPlacementFacts {
+  /**
+   * `signup_attribution.signup_country`: where the request that opened this
+   * account came from, alpha-2. The strongest signal, and null for every
+   * account that predates it or that the CDN could not place.
+   */
+  signupCountry?: string | null
   /** The language recorded on the account at signup. */
   accountLocale?: string | null
   /** `projects.country`, alpha-2 as the scan or the owner left it. */
@@ -97,6 +114,8 @@ export function placedInKorea(facts: KoreaPlacementFacts): boolean {
   const locale = (facts.accountLocale ?? '').trim().toLowerCase()
   const language = (facts.projectLanguage ?? '').trim().toLowerCase()
   const country = (facts.projectCountry ?? '').trim().toUpperCase()
+  const signup = (facts.signupCountry ?? '').trim().toUpperCase()
+  if (signup === KOREA_COUNTRY_CODE) return true
   if (country === KOREA_COUNTRY_CODE) return true
   // 'ko', and 'ko-KR' or 'ko_KR' as a stored locale may spell it.
   return locale === KOREA_LOCALE || locale.startsWith(`${KOREA_LOCALE}-`) || locale.startsWith(`${KOREA_LOCALE}_`)

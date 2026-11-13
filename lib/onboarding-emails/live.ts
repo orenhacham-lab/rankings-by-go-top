@@ -8,6 +8,7 @@ import { createAdminClient } from '@/lib/supabase/admin'
 import { isAdminUser } from '@/lib/auth/admin-role'
 import { loadBillingGovernance } from '@/lib/billing/governance'
 import { normalizeDashboardUiLocale } from '@/lib/i18n/dashboard/locale'
+import { readSignupCountry } from '@/lib/compliance/signup-country'
 import type { OnboardingDeps, OnboardingOwner, OutgoingOnboarding } from './run'
 
 async function send({ to, email }: OutgoingOnboarding): Promise<{ ok: boolean }> {
@@ -57,6 +58,11 @@ export function liveOnboardingDeps(): OnboardingDeps {
         shopifyAppStoreOrigin,
         // An administrator's own projects get no customer email at all.
         staff: await isAdminUser(admin, userId),
+        // Where the account was opened, for the 제50조 gate in
+        // lib/compliance/korea-promotional-email.ts and nothing else. A read
+        // that fails is null, which places nobody, and the gate still has the
+        // account's language and the project's country to go on.
+        signupCountry: await readSignupCountry(admin, userId),
       }
     },
     send,

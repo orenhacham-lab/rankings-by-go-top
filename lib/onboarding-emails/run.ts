@@ -65,6 +65,12 @@ export interface OnboardingOwner {
   shopifyAppStoreOrigin: ShopifyOriginFact
   /** An administrator's own project: no customer email. */
   staff: boolean
+  /**
+   * Where the account was opened (lib/compliance/signup-country.ts), alpha-2,
+   * or null when it was never recorded or could not be read. Read for one
+   * purpose only: placing the reader for 정보통신망법 제50조.
+   */
+  signupCountry?: string | null
 }
 
 export interface OnboardingDeps {
@@ -209,7 +215,12 @@ export async function runOnboardingEmails(deps: OnboardingDeps): Promise<Onboard
       // 정보통신망법 제50조 제1항, beside the removal list and failing the same way: a
       // reader placed in Korea is mailed only on a recorded Korean consent.
       const kind: CustomerEmailKind = decision.stage === 'connect' ? 'setup_connect' : 'setup_publish'
-      const facts = { accountLocale: who.locale, projectCountry: str(row.country), projectLanguage: str(row.language) }
+      const facts = {
+        signupCountry: who.signupCountry ?? null,
+        accountLocale: who.locale,
+        projectCountry: str(row.country),
+        projectLanguage: str(row.language),
+      }
       const korea = koreaEmailDecision({
         kind,
         facts,
