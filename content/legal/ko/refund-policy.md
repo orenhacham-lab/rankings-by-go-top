@@ -3,10 +3,10 @@ title: 해지 및 환불 정책 | Go Top SEO
 description: Go Top SEO 구독을 해지하는 방법과 환불이 이루어지는 경우를 설명합니다.
 locale: ko
 source: app/(public)/en/refund-policy/page.tsx
-lastUpdated: 2026-11-12
+lastUpdated: 2026-11-13
 register: hamnida
 extraSections: 1
-extraReason: Korea's withdrawal right is SEVEN days, not fourteen, and it gets a section of its own for the same reason the Polish document gives its own right a section. 전자상거래법 art. 17(1) gives the consumer seven days; art. 13(2) obliges the mail-order seller to state the right and how to exercise it BEFORE the contract; art. 17(2) excludes withdrawal where a service has begun, but art. 17(6) bars the seller from relying on any exclusion unless it took the measures the 시행령 names, which is why the paid-start screen asks for an express request and records the consent; and art. 18(2) sets the refund at three BUSINESS days from the withdrawal for a service. The fourteen-day sentence of the European documents must never appear in this file. Creem Merchant Terms cl. 3.4.8 leaves consumer rights with us although Creem is the merchant of record, which is why this document, and not Creem's, is where the right is stated. This document carries NO Korean business-registration number and NO mail-order (통신판매업) notification number, because the company holds neither and claiming either would be a false statement.
+extraReason: Korea's withdrawal right is SEVEN days, not fourteen, and it gets a section of its own for the same reason the Polish document gives its own right a section. 전자상거래법 art. 17(1) gives the consumer seven days; art. 13(2) obliges the mail-order seller to state the right and how to exercise it BEFORE the contract; art. 17(2) excludes withdrawal where a service has begun, but art. 17(6) bars the seller from relying on any exclusion unless it took the measures the 시행령 names, which is why the paid-start screen asks for an express request and records the consent; and art. 18(2) sets the refund at three BUSINESS days from the withdrawal for a service. The fourteen-day sentence of the European documents must never appear in this file. Creem Merchant Terms cl. 3.4.8 leaves consumer rights with us although Creem is the merchant of record, which is why this document, and not Creem's, is where the right is stated. This document carries NO Korean business-registration number and NO mail-order (통신판매업) notification number, because the company holds neither and claiming either would be a false statement. This document's date is 2026-11-13 while the English source stays on 2026-11-12, and that divergence is deliberate: §1 carries one sentence the English page does not have, saying that our own payment routes do not sell a paid subscription in Korea and that the trial is what is available. A shared date would tell a reader the two documents moved together when only this one did. Where a locale adds a disclosure of its own local law, its date follows its own text and not its source.
 ---
 
 ## 1. 월 구독과 자동 갱신
@@ -74,4 +74,4 @@ Go Top SEO는 기업과 사이트 운영자를 위한 서비스이며 월 구독
 
 이 정보는 사이트 하단과 이용약관에도 있어, 어느 페이지에서나 쉽게 확인하실 수 있습니다.
 
-최종 업데이트: 2026년 11월 12일
+최종 업데이트: 2026년 11월 13일
