@@ -57,15 +57,25 @@ const read = (path: string) => readFileSync(path, 'utf8')
 const stripComments = (src: string) =>
   src.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '').replace(/\{\/\*[\s\S]*?\*\/\}/g, '')
 
-console.log('A) the list is the consent list minus the three countries the GDPR does not reach')
+console.log('A) the list is the consent list minus the countries the GDPR does not reach')
 {
   const sorted = (xs: readonly string[]) => [...xs].sort().join(',')
-  const expected = CONSENT_REQUIRED_COUNTRIES.filter((c) => c !== 'CH' && c !== 'CA' && c !== 'KR')
-  check('A1: GDPR territory === consent territory minus CH, CA and KR',
+  /** The consent list is wider on purpose, and every country it holds beyond
+   *  this one is there on its own national law. Subtracting them by name, and
+   *  asserting each absence separately below, is what keeps a country added to
+   *  one list from being swept into the other: the GDPR reaches the EEA and,
+   *  as retained law, the United Kingdom, and nothing else here. */
+  const NOT_GDPR = ['CH', 'CA', 'KR', 'JP', 'BR']
+  const expected = CONSENT_REQUIRED_COUNTRIES.filter((c) => !NOT_GDPR.includes(c))
+  check('A1: GDPR territory === consent territory minus CH, CA, KR, JP and BR',
     sorted(GDPR_TERRITORY_COUNTRIES) === sorted(expected), sorted(GDPR_TERRITORY_COUNTRIES))
   check('A2: Switzerland is NOT in it (FADP is not the GDPR)', !GDPR_TERRITORY_COUNTRIES.includes('CH'))
   check('A3: Canada is NOT in it (Law 25 is not the GDPR)', !GDPR_TERRITORY_COUNTRIES.includes('CA'))
   check('A3b: Korea is NOT in it (개인정보 보호법 is not the GDPR)', !GDPR_TERRITORY_COUNTRIES.includes('KR'))
+  check('A3c: Japan is NOT in it (APPI is not the GDPR)', !GDPR_TERRITORY_COUNTRIES.includes('JP'))
+  check('A3d: Brazil is NOT in it (the LGPD is not the GDPR)', !GDPR_TERRITORY_COUNTRIES.includes('BR'))
+  check('A3-MUT: subtracting one country fewer would fail A1, which is what makes it a guard',
+    sorted(GDPR_TERRITORY_COUNTRIES) !== sorted(CONSENT_REQUIRED_COUNTRIES.filter((c) => c !== 'CH' && c !== 'CA' && c !== 'KR')))
   check('A4: all 27 member states are in it',
     ['AT', 'BE', 'BG', 'CY', 'CZ', 'DE', 'DK', 'EE', 'ES', 'FI', 'FR', 'GR', 'HR', 'HU', 'IE',
       'IT', 'LT', 'LU', 'LV', 'MT', 'NL', 'PL', 'PT', 'RO', 'SE', 'SI', 'SK']

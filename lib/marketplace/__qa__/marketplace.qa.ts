@@ -975,7 +975,7 @@ async function main() {
    * side they are on. That only holds while the two lists agree — a split
    * whose text and code disagree is worse than no split, because each looks
    * verified on its own. So the code's list is pinned here as a set, and each
-   * document is required to name all five territories AND the fail-closed
+   * document is required to name every territory it lists AND the fail-closed
    * case, which is what makes "whenever we cannot determine the country" a
    * description rather than a decoration. Korea joined the list with the
    * Korean locale: 개인정보 보호법 제15조 and 정보통신망법 제22조의2 make consent
@@ -986,35 +986,40 @@ async function main() {
     'HR', 'HU', 'IE', 'IT', 'LT', 'LU', 'LV', 'MT', 'NL', 'PL', 'PT', 'RO',
     'SE', 'SI', 'SK',
   ]
-  const EXPECTED_TERRITORY = [...EU_27, 'IS', 'LI', 'NO', 'GB', 'CH', 'CA', 'KR'].sort()
+  const EXPECTED_TERRITORY = [...EU_27, 'IS', 'LI', 'NO', 'GB', 'CH', 'CA', 'KR', 'JP', 'BR'].sort()
   const sameList = (a: readonly string[], b: readonly string[]) =>
     a.length === b.length && [...a].sort().every((v, i) => v === b[i])
-  check('L6: the gate reads exactly the EEA, the UK, Switzerland, Canada and Korea',
+  check('L6: the gate reads exactly the EEA, the UK, Switzerland, Canada, Korea, Japan and Brazil',
     sameList(CONSENT_REQUIRED_COUNTRIES, EXPECTED_TERRITORY),
     [...CONSENT_REQUIRED_COUNTRIES].sort().join(','))
   check('L6b: and the United States is not among them, which is the whole point of the split',
     consentRequiredForCountry('US') === false)
   check('L6c: an unknown country is treated as a consent territory, as the documents say',
     consentRequiredForCountry(null) === true && consentRequiredForCountry('XX') === true)
-  /** The five territories and the fail-closed case, as each document words them. */
+  /** Every territory in CONSENT_REQUIRED_COUNTRIES that the documents name by
+  *  name, and the fail-closed case, as each document words them. Japan and
+  *  Brazil joined on 13.11.2026 with the code list: Japan on APPI 第31条第1項
+  *  read with 第171条, Brazil as a precaution, both set out in
+  *  lib/consent/eprivacy-territory.ts. A country added to the code and not to
+  *  the text is exactly the split this group exists to catch. */
   const TERRITORY_WORDS: Record<string, readonly string[]> = {
-    he: ['באזור הכלכלי האירופי', 'בבריטניה', 'בשווייץ', 'בקנדה', 'ובקוריאה הדרומית', 'איננו'],
-    en: ['EEA', 'United Kingdom', 'Switzerland', 'Canada', 'South Korea', 'cannot determine'],
-    es: ['Espacio Económico Europeo', 'Reino Unido', 'Suiza', 'Canadá', 'Corea del Sur', 'no podamos determinar'],
-    'pt-BR': ['Espaço Econômico Europeu', 'Reino Unido', 'Suíça', 'Canadá', 'Coreia do Sul', 'não conseguirmos determinar'],
-    fr: ['Espace économique européen', 'Royaume-Uni', 'Suisse', 'Canada', 'Corée du Sud', 'ne parvenons pas à déterminer'],
-    it: ['Spazio economico europeo', 'Regno Unito', 'Svizzera', 'Canada', 'Corea del Sud', 'non riusciamo a determinare'],
-    ja: ['欧州経済領域', '英国', 'スイス', 'カナダ', '韓国', '判定できなかった場合'],
-    de: ['Europäischen Wirtschaftsraum', 'Vereinigten Königreich', 'Schweiz', 'Kanada', 'Südkorea', 'nicht feststellen können'],
-    nl: ['Europese Economische Ruimte', 'Verenigd Koninkrijk', 'Zwitserland', 'Canada', 'Zuid-Korea', 'niet kunnen'],
-    pl: ['Europejskim Obszarze Gospodarczym', 'Zjednoczonym Królestwie', 'Szwajcarii', 'Kanadzie', 'Korei Południowej', 'nie możemy ustalić'],
-    ko: ['유럽경제지역', '영국', '스위스', '캐나다', '대한민국', '확인할 수 없는'],
+    he: ['באזור הכלכלי האירופי', 'בבריטניה', 'בשווייץ', 'בקנדה', 'ביפן', 'בברזיל', 'ובקוריאה הדרומית', 'איננו'],
+    en: ['EEA', 'United Kingdom', 'Switzerland', 'Canada', 'Japan', 'Brazil', 'South Korea', 'cannot determine'],
+    es: ['Espacio Económico Europeo', 'Reino Unido', 'Suiza', 'Canadá', 'Japón', 'Brasil', 'Corea del Sur', 'no podamos determinar'],
+    'pt-BR': ['Espaço Econômico Europeu', 'Reino Unido', 'Suíça', 'Canadá', 'Japão', 'Brasil', 'Coreia do Sul', 'não conseguirmos determinar'],
+    fr: ['Espace économique européen', 'Royaume-Uni', 'Suisse', 'Canada', 'Japon', 'Brésil', 'Corée du Sud', 'ne parvenons pas à déterminer'],
+    it: ['Spazio economico europeo', 'Regno Unito', 'Svizzera', 'Canada', 'Giappone', 'Brasile', 'Corea del Sud', 'non riusciamo a determinare'],
+    ja: ['欧州経済領域', '英国', 'スイス', 'カナダ', 'カナダ、日本', 'ブラジル', '韓国', '判定できなかった場合'],
+    de: ['Europäischen Wirtschaftsraum', 'Vereinigten Königreich', 'Schweiz', 'Kanada', 'Japan', 'Brasilien', 'Südkorea', 'nicht feststellen können'],
+    nl: ['Europese Economische Ruimte', 'Verenigd Koninkrijk', 'Zwitserland', 'Canada', 'Japan', 'Brazilië', 'Zuid-Korea', 'niet kunnen'],
+    pl: ['Europejskim Obszarze Gospodarczym', 'Zjednoczonym Królestwie', 'Szwajcarii', 'Kanadzie', 'Japonii', 'Brazylii', 'Korei Południowej', 'nie możemy ustalić'],
+    ko: ['유럽경제지역', '영국', '스위스', '캐나다', '일본', '브라질', '대한민국', '확인할 수 없는'],
   }
   for (const locale of CONSENT_LOCALES) {
     const doc = read(PRIVACY_DOC[locale])
     const words = TERRITORY_WORDS[locale]
     const missing = words.filter((w) => !doc.includes(w))
-    check(`L7 (${locale}): the document names the five territories and the unknown-country case`,
+    check(`L7 (${locale}): the document names every named territory and the unknown-country case`,
       missing.length === 0, missing.join(' | '))
     check(`L8 (${locale}): and it no longer claims the beacon stores nothing on the device`,
       !/stores nothing on your device|אינה שומרת דבר במכשיר/.test(doc))
