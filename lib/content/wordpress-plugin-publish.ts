@@ -57,8 +57,11 @@ import {
   pluginAuthors, pluginFix, pluginMedia, pluginPublish, pluginTerms,
   type PluginAnswer, type PluginLink, type PluginPost, type PluginPublishRequest,
 } from '@/lib/site-fix/plugin-client'
-import { CONTENT_IMAGE_BUCKET } from '@/lib/content/featured-image'
-import { injectInlineImages, type InlineImage, type InlineWpResult } from '@/lib/content/inline-images'
+import { CONTENT_IMAGE_BUCKET } from '@/lib/content/image-bucket'
+// The composer only rewrites HTML; the generator next door imports sharp, and
+// this publisher never opens an image (lib/__qa__/function-storage.qa.ts).
+import { injectInlineImages, type InlineImage } from '@/lib/content/inline-images-compose'
+import type { InlineWpResult } from '@/lib/content/inline-images-wordpress'
 import { applyArticleDesign } from '@/lib/content/article-style/publish'
 import { resolveTaxonomy, type ResolvedTaxonomy, type SeoPlugin } from '@/lib/content/wordpress-taxonomy'
 import { publishArticleSchemaToWordPress, type ArticleSchemaOutcome } from '@/lib/content/wordpress-schema'

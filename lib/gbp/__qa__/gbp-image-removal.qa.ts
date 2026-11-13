@@ -38,7 +38,7 @@ process.env.GOOGLE_GBP_REDIRECT_URI = 'https://www.gotopseo.com/api/gbp/callback
 /* eslint-disable @typescript-eslint/no-require-imports, @typescript-eslint/no-explicit-any */
 const M = require('../image-store') as typeof import('../image-store')
 const H = require('../http') as typeof import('../http')
-const { CONTENT_IMAGE_BUCKET } = require('../../content/featured-image') as typeof import('../../content/featured-image')
+const { CONTENT_IMAGE_BUCKET } = require('../../content/image-bucket') as typeof import('../../content/image-bucket')
 
 let pass = 0, fail = 0
 function check(name: string, cond: boolean, detail?: string) {

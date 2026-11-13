@@ -13,7 +13,8 @@
 
 import { authContentProject, isContentModuleEnabled } from '@/lib/content/api-auth'
 import { createAdminClient } from '@/lib/supabase/admin'
-import { createFeaturedImageForArticle, CONTENT_IMAGE_BUCKET } from '@/lib/content/featured-image'
+import { createFeaturedImageForArticle } from '@/lib/content/featured-image'
+import { CONTENT_IMAGE_BUCKET } from '@/lib/content/image-bucket'
 import { imageGenerationHttpStatus } from '@/lib/content/image-generation-http'
 
 async function loadOwnedArticle(articleId: string) {

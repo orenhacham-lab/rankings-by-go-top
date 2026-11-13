@@ -11,6 +11,7 @@ import { PENDING_LINK_COOKIE, verifyPendingLinkCookieValue } from '@/lib/shopify
 import { getShopifyOAuthConfig } from '@/lib/shopify/oauth'
 import { resolveBillingMarket } from '@/lib/billing/server-market'
 import { koreaCreemSaleBlockedForRequest, koreaOwnSaleBlockedForRequest } from '@/lib/billing/korea-sale'
+import { ownNameSaleBlockedForRequest } from '@/lib/billing/own-name-sale'
 import { planPriceIn } from '@/lib/billing/market'
 import { PLAN_CATALOG } from '@/lib/plans/catalog'
 import { creemMayWriteToAccount, isCreemEnabled } from '@/lib/creem/config'
@@ -155,6 +156,13 @@ export default async function BillingPage() {
   const requestHeaders = await headers()
   const koreaOwnSaleBlocked = koreaOwnSaleBlockedForRequest(requestHeaders)
   const koreaCreemSaleBlocked = koreaCreemSaleBlockedForRequest(requestHeaders)
+  // AND THE GENERAL CASE BEHIND KOREA: every other country the company is not
+  // cleared to conclude an own-name sale in, from the same allow list the
+  // marketplace pages read. Drawn here only; /api/paypal/activate refuses the
+  // same visitor itself. lib/billing/own-name-sale.ts says why Israel and an
+  // unplaceable visitor both pass, and why this is insurance behind a flag
+  // nobody can read back rather than a change of behaviour.
+  const ownNameSaleBlocked = ownNameSaleBlockedForRequest(requestHeaders)
 
   // PAY BY CARD (Creem) — OWNER DECISION, 10 Oct 2026: new customers only.
   //
@@ -231,6 +239,7 @@ export default async function BillingPage() {
       market={market}
       marketLocked={marketLocked}
       koreaOwnSaleBlocked={koreaOwnSaleBlocked}
+      ownNameSaleBlocked={ownNameSaleBlocked}
       creemCheckout={creemCheckout}
       creemGoverned={creemGoverned}
       planPrices={{

@@ -182,6 +182,10 @@ export const billingPl: DeepPartial<DashboardDictionary> = {
       requiredNote: 'Sposoby płatności pojawią się po potwierdzeniu powyższego wiersza. Wcześniej nie pobieramy żadnej opłaty.',
       policyLabel: 'Prawo odstąpienia w całości, w polityce rezygnacji i zwrotów',
     },
+    ownNameSale: {
+      title: 'W Państwa kraju nie sprzedajemy obecnie subskrypcji płatnej',
+      description: 'Nic nie zostanie pobrane, a dane utworzone w okresie próbnym pozostają na Państwa koncie. W razie pytań prosimy o wiadomość na contact@gotopseo.com.',
+    },
     creem: {
       payButton: 'Zapłać kartą',
       starting: 'Otwieranie bezpiecznej strony płatności...',

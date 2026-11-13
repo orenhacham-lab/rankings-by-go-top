@@ -70,6 +70,7 @@ interface BillingViewProps {
    *  it. The trial is untouched, so this hides only the ways to pay, and both
    *  payment routes refuse the same visitor server-side. */
   koreaOwnSaleBlocked?: boolean
+  ownNameSaleBlocked?: boolean
   /** Owner decision, 10 Oct 2026 — pay by card instead of PayPal, decided on
    *  the server (app/(dashboard)/billing/page.tsx): only while CREEM_ENABLED
    *  is on, only in USD, and only for an account that has never paid through
@@ -108,6 +109,7 @@ export default function BillingView({
   marketLocked,
   planPrices,
   koreaOwnSaleBlocked = false,
+  ownNameSaleBlocked = false,
   creemCheckout = false,
   creemGoverned = false,
   marketplaceSeller = null,
@@ -164,6 +166,18 @@ export default function BillingView({
         <div className="rounded-control border border-line bg-surface p-2.5">
           <p className="m-0 text-caption font-bold text-ink">{t.koreaSale.title}</p>
           <p className="m-0 mt-1 text-caption leading-snug text-muted">{t.koreaSale.description}</p>
+        </div>
+      )
+    }
+    // Then the same refusal for every other country the company is not cleared
+    // to sell in on its own name. Korea keeps its own branch above because its
+    // notice names Korea; this one names no country, because the visitor's is
+    // the only one it could name and they know where they are.
+    if (ownNameSaleBlocked) {
+      return (
+        <div className="rounded-control border border-line bg-surface p-2.5" data-own-name-no-sale>
+          <p className="m-0 text-caption font-bold text-ink">{t.ownNameSale.title}</p>
+          <p className="m-0 mt-1 text-caption leading-snug text-muted">{t.ownNameSale.description}</p>
         </div>
       )
     }
@@ -507,7 +521,7 @@ export default function BillingView({
 
           {/* The PayPal buttons, and the SDK behind them, only on the PayPal
               path: a card never offers two ways to pay the same plan. */}
-          {!creemCheckout && !creemGoverned && !koreaOwnSaleBlocked && <BillingClient market={market} acknowledged={checkoutUnlocked} />}
+          {!creemCheckout && !creemGoverned && !koreaOwnSaleBlocked && !ownNameSaleBlocked && <BillingClient market={market} acknowledged={checkoutUnlocked} />}
 
           <p className="mt-6 max-w-4xl text-caption text-muted">
             {t.keywordCheckNote}
