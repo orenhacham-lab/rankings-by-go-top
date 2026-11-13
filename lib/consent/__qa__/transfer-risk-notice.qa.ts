@@ -117,6 +117,39 @@ for (const locale of PUBLIC_LOCALES) {
     risk !== marketing.desc && jvzoo !== marketing.desc)
 }
 
+console.log('\nA6. Japan, where the always-rendered half carries a duty the others do not')
+/**
+ * WHY ONE LOCALE NEEDS MORE THAN THE REST IN THE META HALF. The Meta loader is
+ * absent inside the EEA and the United Kingdom (app/layout.tsx), so there the
+ * always-rendered sentence informs about a transfer that will not happen on
+ * that visit, and the standard contractual clauses are the whole of what it
+ * has to say. In Japan the loader IS rendered, and APPI 第31条第1項第二号 makes
+ * the information about the recipient's country a condition of the provision
+ * itself, not a courtesy: before the consent of 第一号 is sought, the person
+ * must have been given information about that country's protection regime.
+ * Naming the clauses answers the recipient's own measures and says nothing
+ * about the regime, so the Japanese sentence states it. The EU half of the
+ * reasoning is unchanged; this is an addition, which is why it is checked
+ * separately from A2 rather than folded into its word list.
+ */
+const APPI_US_REGIME: readonly string[] = [
+  '個人情報保護委員会',
+  '同等の水準',
+  '公的機関',
+  '救済手段',
+]
+{
+  const jaRisk = getPublicDictionary('ja').cookie.categories.marketing
+  const risk: string = 'risk' in jaRisk ? jaRisk.risk : ''
+  const missing = APPI_US_REGIME.filter((w) => !risk.includes(w))
+  check('A6-1: the Japanese half states the recipient country\'s regime, not only the clauses',
+    missing.length === 0, missing.join(' | '))
+  check('A6-2: and it still names Meta and the clauses, so nothing was replaced',
+    (META.ja ?? []).every((w) => risk.includes(w)))
+  check('A6-MUT: a sentence trimmed back to the clauses alone would fail A6-1',
+    APPI_US_REGIME.some((w) => !risk.split('標準契約条項')[0].includes(w)))
+}
+
 console.log('\nB. the other categories carry none, so the notice means what it says')
 for (const locale of PUBLIC_LOCALES) {
   const categories = getPublicDictionary(locale).cookie.categories

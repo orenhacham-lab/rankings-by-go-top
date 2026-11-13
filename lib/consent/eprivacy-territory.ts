@@ -69,8 +69,9 @@ export const CONSENT_COUNTRY_HEADER = 'x-vercel-ip-country'
 
 /**
  * EEA (the 27 member states plus Iceland, Liechtenstein and Norway), the
- * United Kingdom, Switzerland, Canada and Korea. Alpha-2, upper case, which is
- * what the CDN sends.
+ * United Kingdom, Switzerland, Canada, Korea, Japan and Brazil. Alpha-2, upper
+ * case, which is what the CDN sends. Every entry past the EEA is on its own
+ * law rather than on ePrivacy, and each says which one where it is listed.
  *
  * KOREA IS HERE ON ITS OWN TWO STATUTES, not by analogy with ePrivacy, which
  * has no Korean counterpart. 개인정보 보호법 제15조 제1항 제1호 makes consent the
@@ -94,6 +95,37 @@ export const CONSENT_REQUIRED_COUNTRIES: readonly string[] = Object.freeze([
   'GB', 'CH', 'CA',
   // Korea: 개인정보 보호법 제15조 and 정보통신망법 제22조의2
   'KR',
+  // JAPAN, ON A DUTY THAT FALLS ON US AS THE SENDER, NOT ON THE RECIPIENT.
+  // APPI 第31条第1項 forbids an 個人関連情報取扱事業者 from providing
+  // 個人関連情報 to a third party where it is anticipated that the third
+  // party will acquire it as 個人データ, unless we have first confirmed, by
+  // the method the Commission's rules prescribe, both that the person
+  // consented to that acquisition (第一号) and, for a recipient abroad, that
+  // the person was given information about that country's protection regime
+  // and the measures the recipient takes (第二号). 第171条 applies the whole
+  // Act to a foreign operator handling, outside Japan, such data about a
+  // person in Japan in connection with supplying goods or services to people
+  // in Japan, which is exactly this site. A beacon that sets a session cookie
+  // holding the visitor's IP address and user agent, read back by its owner
+  // in the United States, is that case: the owner links it to an account, so
+  // the acquisition as 個人データ is anticipated rather than hypothetical. We
+  // cannot confirm what consent a third party holds, so the only workable
+  // route is to take the consent here, which is what this list does.
+  'JP',
+  // BRAZIL, LISTED AS A PRECAUTION AND NOT ON A STATUTE WE HAVE READ.
+  // LGPD Art. 7 (verbatim from the Câmara's published text, 2026-11-13) lists
+  // ten alternative bases for any processing: consent is inciso I and the
+  // controller's legitimate interests are inciso IX, so the LGPD alone does
+  // not compel consent for a tag. What would is the Marco Civil da Internet
+  // rule on providing personal data to third parties, and ANPD's own cookie
+  // guidance, neither of whose primary text could be retrieved on 2026-11-13
+  // — every official source for Lei 12.965/2014 either redirected to a portal
+  // home page or served no text. So this entry rests on the asymmetry this
+  // file opens with rather than on a provision we can quote: a statistic lost
+  // in Brazil is recoverable and a cookie written there is not. Anyone who
+  // gets the Marco Civil text should either replace this comment with the
+  // provision or move Brazil out.
+  'BR',
 ])
 
 const CONSENT_REQUIRED = new Set(CONSENT_REQUIRED_COUNTRIES)
