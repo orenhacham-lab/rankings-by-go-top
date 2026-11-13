@@ -43,15 +43,12 @@ import type { Metadata } from 'next'
 import Link from 'next/link'
 import { headers } from 'next/headers'
 import { notFound } from 'next/navigation'
-import { MarketplaceBadge } from '@/components/consent/MarketplaceBadge'
-import { MarketplaceBadgeUnconditional } from '@/components/consent/MarketplaceBadgeUnconditional'
 import { MarketplacePixel } from '@/components/consent/MarketplacePixel'
 import { MarketplacePixelUnconditional } from '@/components/consent/MarketplacePixelUnconditional'
 import { beaconSuppressedForRequest, consentRequiredForRequest } from '@/lib/consent/eprivacy-territory'
 import { koreaOwnSaleBlockedForRequest } from '@/lib/billing/korea-sale'
 import {
   MARKETPLACE_SUPPORT_EMAIL,
-  marketplaceBadgeUrl,
   marketplaceBuyUrl,
   marketplacePixelUrl,
   marketplacePolicyUrl,
@@ -101,11 +98,6 @@ export default async function MarketplaceSalesPage({
   // wrong, and the whole point of this check is that the write is the thing
   // consent protects. See lib/consent/eprivacy-territory.ts for why the
   // beacon counts as storage at all.
-  // The platform's own trust badge, which Digistore24's pre-submission
-  // checklist requires on the sales page. It is a script and it sets a
-  // week-long cookie, so it rides the SAME territorial decision as the
-  // beacon rather than a second one of its own.
-  const badgeUrl = marketplaceBadgeUrl(provider.slug)
   const requestHeaders = await headers()
   const consentRequired = consentRequiredForRequest(requestHeaders)
   // Korea is a third state, not a stricter gate: see
@@ -167,9 +159,30 @@ export default async function MarketplaceSalesPage({
                   differently. The paragraph below stays: it answers the number
                   of payments and where the plan is cancelled, which this line
                   does not. */}
+              {/* "CANCEL AT ANY TIME" IS THERE BECAUSE A REVIEWER ASKED FOR
+                  THOSE WORDS. Digistore24's rejection of 2026-11-12 says
+                  "please provide full billing info on each of the price
+                  points, should say 'cancel at any time'". It is a true
+                  statement about every plan on every platform — there is no
+                  minimum term anywhere — so it is printed for all of them
+                  rather than hidden behind a provider flag. The sentence
+                  below it is the paragraph's job and not this line's: this
+                  line answers what is charged, when, and that it can be
+                  stopped. */}
               <p className="mt-1 text-copy text-body">
-                ${plan.priceUSD} today, then ${plan.priceUSD} every month until you cancel.
+                ${plan.priceUSD} today, then ${plan.priceUSD} every month until you cancel. Cancel
+                at any time.
               </p>
+              {/* THE GUARANTEE BESIDE THE PRICE, not only in the section
+                  below, because the reviewer asked for it "directly on the
+                  sales page" and a buyer reads the plan card. The number is
+                  provider.returnGuaranteeDays and nothing else, so it cannot
+                  drift from the window configured inside the platform. */}
+              {provider.returnGuaranteeDays ? (
+                <p className="mt-1 text-copy text-body">
+                  {provider.returnGuaranteeDays}-day money-back guarantee.
+                </p>
+              ) : null}
               <p className="mt-2 text-copy text-body">
                 {plan.maxProjects === 1 ? 'One website' : `${plan.maxProjects} websites`},{' '}
                 {plan.maxKeywordsPerProject} keywords, {plan.maxArticlesPerPeriodAccountWide} articles a month.
@@ -320,6 +333,50 @@ export default async function MarketplaceSalesPage({
         cancellation policy, which is the policy that governs this purchase and is linked below.
       </p>
 
+      {/* THE GUARANTEE IN FULL, AND ONLY WHERE THE CHANNEL ACTUALLY GIVES ONE.
+
+          Digistore24 rejected all four products on 2026-11-12 asking for "an
+          unconditional refund policy (minimum 60 days) directly on the sales
+          page", and separately for the stated period to MATCH the return
+          period configured on the product inside Digistore24. Both halves are
+          answered by rendering provider.returnGuaranteeDays: there is one
+          number, it is in lib/marketplace/config.ts beside the note that it
+          must equal the platform setting, and a page cannot state a window
+          the configuration does not hold.
+
+          WHY THIS DOES NOT TOUCH OUR OWN POLICY. The guarantee is given by the
+          seller of this purchase, and on this page that seller is the
+          platform. Our own refund policy — no refund beyond what the law
+          requires — governs a purchase made from us, which this is not, and
+          section 6A of it already says the reseller's policy governs a
+          reseller purchase. So this section names the giver in its first
+          words rather than promising in our own voice something a buyer could
+          read as site-wide. A platform with no guarantee renders nothing at
+          all, which keeps ClickBank's contractual ban on publishing a
+          conflicting guarantee untouched.
+
+          AND IT SITS AFTER THE CANCELLATION SENTENCE DELIBERATELY. That
+          sentence says cancelling does not return money already paid, which
+          is true and is about cancelling; left alone on a page that now has a
+          guarantee it would read as a denial of one. Putting the guarantee
+          directly beneath it is what makes the pair say the real thing: stop
+          the charges here, ask for the money back there. */}
+      {provider.returnGuaranteeDays ? (
+        <section className="mt-10" data-return-guarantee={provider.slug}>
+          <h2 className="text-section text-ink">
+            {provider.returnGuaranteeDays}-day money-back guarantee
+          </h2>
+          <p className="mt-2 text-copy text-body">
+            {provider.label} is the seller for this purchase and gives you an unconditional{' '}
+            {provider.returnGuaranteeDays}-day money-back guarantee. Ask {provider.label} for a
+            refund within {provider.returnGuaranteeDays} days of your payment, for any reason or
+            for none, and you get your money back. You do not have to explain why, and you do not
+            have to cancel first. The guarantee is given and paid by {provider.label} under its own
+            return policy, which is the policy that governs this purchase.
+          </p>
+        </section>
+      ) : null}
+
       {/* Only the links these platforms allow — and NOT our own refund
           policy. That page says Go Top SEO does not refund, which is true of a
           purchase made from us and is not this buyer's policy at all: their
@@ -426,18 +483,6 @@ export default async function MarketplaceSalesPage({
         ),
       )}
 
-      {/* The trust badge, on the same terms as the beacon above and for a
-          stricter reason: without it the product cannot even be SUBMITTED,
-          because Digistore24 make the vendor confirm it is present before
-          review. A platform with no configured BADGE_URL renders nothing,
-          which is still the default for ClickBank and JVZoo. */}
-      {badgeUrl && !beaconSuppressed ? (
-        consentRequired ? (
-          <MarketplaceBadge src={badgeUrl} />
-        ) : (
-          <MarketplaceBadgeUnconditional src={badgeUrl} />
-        )
-      ) : null}
     </main>
   )
 }
