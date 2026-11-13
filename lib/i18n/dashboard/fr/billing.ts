@@ -169,6 +169,10 @@ export const billingFr: DeepPartial<DashboardDictionary> = {
       requiredNote: 'Les moyens de paiement apparaissent dès que vous confirmez la ligne ci-dessus. Rien n’est prélevé avant cela.',
       policyLabel: 'Le droit de rétractation en entier, dans la politique d’annulation et de remboursement',
     },
+    ownNameSale: {
+      title: 'Pour le moment, nous ne vendons pas d’abonnement payant dans votre pays',
+      description: 'Rien ne vous sera facturé et les données créées pendant l’essai restent dans votre compte. Écrivez-nous à contact@gotopseo.com pour toute question.',
+    },
     creem: {
       payButton: 'Payer par carte',
       starting: 'Ouverture de la page de paiement sécurisée...',
