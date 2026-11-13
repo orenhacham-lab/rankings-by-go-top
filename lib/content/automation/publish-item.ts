@@ -10,7 +10,7 @@
 import type { createAdminClient } from '@/lib/supabase/admin'
 import { loadWordPressPublisher, publishArticleToWordPress, publishSeoFor } from '@/lib/content/wordpress-plugin-publish'
 import { runQualityGate } from '@/lib/content/automation/quality-gate'
-import { AUTOMATION_MAX_ATTEMPTS } from '@/lib/content/automation/generate-item'
+import { AUTOMATION_MAX_ATTEMPTS } from '@/lib/content/automation/attempts'
 import { enqueueGbpPostForPublishedArticle } from '@/lib/gbp/auto-post'
 import { ensureProjectKeywordFromPublishedArticle } from '@/lib/content/keyword-from-article'
 import { recordPublishFinalFailureAlert, recordPublishBlockedAlert, resolvePublishAlerts } from '@/lib/content/automation/alerts'

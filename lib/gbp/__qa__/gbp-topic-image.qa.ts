@@ -34,6 +34,9 @@ import { FakeAdmin } from '../../__qa__/_fake-admin'
 
 /* eslint-disable @typescript-eslint/no-require-imports, @typescript-eslint/no-explicit-any */
 const H = require('../http') as typeof import('../http')
+// The two handlers that touch pixels live apart from the other thirteen, so the
+// reviews and posts routes do not ship sharp (lib/__qa__/function-storage.qa.ts).
+const HI = require('../http-image') as typeof import('../http-image')
 const S = require('../store') as typeof import('../store')
 const E = require('../errors') as typeof import('../errors')
 const I = require('../image') as typeof import('../image')
@@ -113,7 +116,7 @@ async function captureErrors<T>(fn: () => Promise<T>): Promise<{ out: T; logged:
 }
 
 // ── A) gate + input ─────────────────────────────────────────────────────────
-type Mod = typeof H
+type Mod = typeof HI
 async function gateFailures(mod: Mod): Promise<string[]> {
   const bad: string[] = []
   let calls = 0
@@ -149,21 +152,21 @@ async function topicFailures(mod: Mod): Promise<string[]> {
 
 async function gateChecks() {
   console.log('A) owner gate and input')
-  const g = await gateFailures(H)
+  const g = await gateFailures(HI)
   check('another user\'s project is refused (403), an unknown one is 404, and the generator never runs', g.length === 0, g.join(' | '))
-  const noGate = mutant<Mod>('lib/gbp/http.ts',
+  const noGate = mutant<Mod>('lib/gbp/http-image.ts',
     /(export async function handleGenerateImage[\s\S]*?)const g = await gate\(deps, typeof body\.projectId === 'string' \? body\.projectId : null\)\n\s*if \(g instanceof Response\) return g/,
     "$1const g = { project: { id: String(body.projectId) } } as any")
   check('MUTATION: a handler that skips the owner gate is caught', (await gateFailures(noGate)).length > 0)
 
-  const m = await H.handleGenerateImage(post({ projectId: PROJECT, topic: 'מבצע' }), deps(world({ missing: true }), { generateImage: async () => ({ ok: true, bytes: await fakePhoto() }) }))
+  const m = await HI.handleGenerateImage(post({ projectId: PROJECT, topic: 'מבצע' }), deps(world({ missing: true }), { generateImage: async () => ({ ok: true, bytes: await fakePhoto() }) }))
   check('tables not applied → 409 not_available', m.status === 409 && (await m.json()).error === 'not_available')
 
-  const t = await topicFailures(H)
+  const t = await topicFailures(HI)
   check('the topic is required: missing, empty, whitespace, non-string or over 300 characters → 400 invalid_request', t.length === 0, t.join(' | '))
-  const noTopic = mutant<Mod>('lib/gbp/http.ts', "if (!topic || topic.length > GBP_TOPIC_MAX) return err('invalid_request', 400)", "if (topic.length > GBP_TOPIC_MAX) return err('invalid_request', 400)")
+  const noTopic = mutant<Mod>('lib/gbp/http-image.ts', "if (!topic || topic.length > GBP_TOPIC_MAX) return err('invalid_request', 400)", "if (topic.length > GBP_TOPIC_MAX) return err('invalid_request', 400)")
   check('MUTATION: a handler that lets an empty topic through is caught', (await topicFailures(noTopic)).length > 0)
-  const noLimit = mutant<Mod>('lib/gbp/http.ts', "if (!topic || topic.length > GBP_TOPIC_MAX) return err('invalid_request', 400)", "if (!topic) return err('invalid_request', 400)")
+  const noLimit = mutant<Mod>('lib/gbp/http-image.ts', "if (!topic || topic.length > GBP_TOPIC_MAX) return err('invalid_request', 400)", "if (!topic) return err('invalid_request', 400)")
   check('MUTATION: a handler without the 300-character limit is caught', (await topicFailures(noLimit)).length > 0)
   check('the limit is the composer\'s own 300', TI.GBP_TOPIC_MAX === 300 && /id="gbp-topic"[^\n]*maxLength=\{300\}/.test(read('components/maps-posts/PostComposer.tsx')))
 }
@@ -185,11 +188,11 @@ async function successFailures(mod: Mod): Promise<string[]> {
 }
 async function successChecks() {
   console.log('B) success: the JPEG itself, nothing stored')
-  const s = await successFailures(H)
+  const s = await successFailures(HI)
   check('the generated photo comes back as image/jpeg bytes, and no table or bucket is touched', s.length === 0, s.join(' | '))
-  const asJson = mutant<Mod>('lib/gbp/http.ts', /return new Response\(new Uint8Array\(out\.bytes\), \{[^\n]*\}\)/, "return json({ ok: true, image: out.bytes.toString('base64') })")
+  const asJson = mutant<Mod>('lib/gbp/http-image.ts', /return new Response\(new Uint8Array\(out\.bytes\), \{[^\n]*\}\)/, "return json({ ok: true, image: out.bytes.toString('base64') })")
   check('MUTATION: answering JSON instead of the image is caught', (await successFailures(asJson)).length > 0)
-  const stores = mutant<Mod>('lib/gbp/http.ts', /if \(out\.ok\) \{\n/, "if (out.ok) {\n      await g.admin.storage.from('x').upload('p', out.bytes, {})\n")
+  const stores = mutant<Mod>('lib/gbp/http-image.ts', /if \(out\.ok\) \{\n/, "if (out.ok) {\n      await g.admin.storage.from('x').upload('p', out.bytes, {})\n")
   check('MUTATION: a handler that stores the photo is caught', (await successFailures(stores)).length > 0)
 
   // The 16:9 photo goes through the composer's normal crop step unchanged.
@@ -229,13 +232,13 @@ async function failureFailures(mod: Mod): Promise<string[]> {
 }
 async function failureChecks() {
   console.log('C) failure: a stable code, a classified log, no provider text')
-  const f = await failureFailures(H)
+  const f = await failureFailures(HI)
   check('a provider failure answers image_generation_failed and nothing else, and logs our reason', f.length === 0, f.join(' | '))
-  const leaks = mutant<Mod>('lib/gbp/http.ts', "return err('image_generation_failed', imageGenerationHttpStatus(classified))", "return err('image_generation_failed', 502, { reason })")
+  const leaks = mutant<Mod>('lib/gbp/http-image.ts', "return err('image_generation_failed', imageGenerationHttpStatus(classified))", "return err('image_generation_failed', 502, { reason })")
   check('MUTATION: answering the provider\'s reason is caught', (await failureFailures(leaks)).length > 0)
-  const rawLog = mutant<Mod>('lib/gbp/http.ts', "{ reason: classified, projectId", "{ reason, projectId")
+  const rawLog = mutant<Mod>('lib/gbp/http-image.ts', "{ reason: classified, projectId", "{ reason, projectId")
   check('MUTATION: logging the raw reason is caught', (await failureFailures(rawLog)).length > 0)
-  const silent = mutant<Mod>('lib/gbp/http.ts', /\s*console\.error\('\[gbp-topic-image\] generation failed'[^\n]*/, '')
+  const silent = mutant<Mod>('lib/gbp/http-image.ts', /\s*console\.error\('\[gbp-topic-image\] generation failed'[^\n]*/, '')
   check('MUTATION: swallowing the failure without a log is caught', (await failureFailures(silent)).length > 0)
   check('the new code is a known error code', (E.GBP_ERROR_CODES as readonly string[]).includes('image_generation_failed'))
 
@@ -247,7 +250,7 @@ async function failureChecks() {
   try {
     const real = await TI.generateTopicImage({ topic: 'לחם מחמצת' })
     check('the real generator without GEMINI_API_KEY fails with a classified reason', !real.ok && real.reason === 'missing_gemini_api_key')
-    const { out: r, logged } = await captureErrors(() => H.handleGenerateImage(post({ projectId: PROJECT, topic: 'לחם מחמצת' }), deps(world())))
+    const { out: r, logged } = await captureErrors(() => HI.handleGenerateImage(post({ projectId: PROJECT, topic: 'לחם מחמצת' }), deps(world())))
     check('…and through the handler that is image_generation_failed, logged as missing_gemini_api_key', r.status === 502 && (await r.json()).error === 'image_generation_failed' && logged.includes('missing_gemini_api_key'))
   } finally {
     console.warn = orig
