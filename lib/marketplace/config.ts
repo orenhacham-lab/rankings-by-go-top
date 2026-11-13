@@ -404,8 +404,28 @@ export const MARKETPLACE_PROVIDERS: readonly MarketplaceProvider[] = [
     signature: DIGISTORE24_IPN_SCHEME,
     sellerOfRecord: true,
     requiredDisclaimer: null,
-    orderSupportUrl: null,
+    /*
+     * Digistore24's OWN buyer route, not a borrowed one: the "Find my order"
+     * destination in their own footer, which opens their Cancel-or-revoke
+     * form ("Cancel active contracts and subscriptions or revoke your
+     * contract online", order id plus last name or email; read 13.11.2026).
+     *
+     * It is here because they are the merchant of record and say so in their
+     * own words: their published FAQ states that Digistore24 "handle all
+     * refund and chargeback requests on your behalf". A refund asked of us is
+     * a refund asked of the party that does not hold the money, so the page
+     * has to name theirs. This is the address a buyer needs for the 60-day
+     * window below, which is why the guarantee section links it rather than
+     * telling the buyer to "ask Digistore24" and leaving the how out.
+     */
+    orderSupportUrl: 'https://www.digistore24.com/en/cancel-revoke-contract/',
     billingDescriptor: null,
+    /*
+     * Still null, and deliberately: their buyer terms live at
+     * https://www.digistore24.com/page/terms/2/en and are set through
+     * MARKETPLACE_DIGISTORE24_POLICY_URL, so the one place a policy address
+     * can be changed without a deploy stays the one place it is read from.
+     */
     returnPolicyUrl: null,
     /*
      * Their US entity's floor, and what their reviewer asked for by name on

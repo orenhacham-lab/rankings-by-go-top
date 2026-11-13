@@ -1758,12 +1758,36 @@ async function main() {
     && !/60-day money-back/.test(salesSrcNoBadge))
   check('GUAR5: the whole section is behind the provider having one, so a platform without one shows nothing',
     /\{provider\.returnGuaranteeDays \? \(/.test(salesSrcNoBadge))
-  check('GUAR6: the sentence names the PLATFORM as the giver, not Go Top SEO',
-    /\{provider\.label\} is the seller for this purchase and gives you an unconditional/
-      .test(salesSrcNoBadge.replace(/\s+/g, ' ')))
-  check('GUAR7: it says unconditional in those words, which is what the reviewer asked for',
-    /unconditional\{' '\}\s*\{provider\.returnGuaranteeDays\}-day money-back guarantee/
-      .test(salesSrcNoBadge) || /an unconditional/.test(salesSrcNoBadge))
+  // GUAR6-GUAR7 USED TO PIN THE WORD "unconditional" AND A PROMISE IN OUR OWN
+  // VOICE ("you get your money back", "for any reason or for none"). The legal
+  // thread refused that wording on 2026-11-13: it is an absolute statement
+  // about how another company will behave, written as ours, and Digistore24's
+  // own buyer terms do not say it. What is load-bearing now is the opposite —
+  // that the paragraph attributes the terms to the platform and carries the
+  // exclusion the platform publishes — so the guards check for that, and the
+  // mutation controls below check that the old absolutes cannot come back.
+  const guarFlat = salesSrcNoBadge.replace(/\s+/g, ' ')
+  check('GUAR6: the platform is named as the seller of record and the one handling refunds',
+    /\{provider\.label\} is the seller of record for this purchase and handles the refunds/
+      .test(guarFlat))
+  check('GUAR7: and the period is attributed to the setting inside the platform, counted from the first payment',
+    /The return period set on these plans inside \{provider\.label\}/.test(guarFlat)
+    && /that period begins with your first payment/.test(guarFlat))
+  check('GUAR7b: the platform\'s own exclusion is published, not hidden',
+    /re-subscribes to the same product within two years is not entitled to it again/.test(guarFlat))
+  check('GUAR7c: and its discretion to refund anyway is stated',
+    /keeps the right to refund at its own discretion/.test(guarFlat))
+  check('GUAR7d: the section says HOW, through the provider record and not a typed url',
+    /href=\{provider\.orderSupportUrl\}/.test(salesSrcNoBadge)
+    && marketplaceProvider('digistore24')?.orderSupportUrl !== null)
+  // The component's own name is MarketplacePixelUnconditional, which is a
+  // consent fact and not a refund promise, so it is taken out before the word
+  // is looked for.
+  const salesProse = salesSrcNoBadge.replace(/MarketplacePixelUnconditional/g, '')
+  check('GUAR7e: no absolute promise in our own voice survives anywhere on the page',
+    !/unconditional/i.test(salesProse)
+    && !/for any reason or/i.test(salesProse)
+    && !/you get your money back/i.test(salesProse))
   check('GUAR8: every plan card says "Cancel at any time", the reviewer\'s own wording',
     /Cancel\s*\n?\s*at any time\./.test(salesSrcNoBadge) || /Cancel at any time\./.test(salesSrcNoBadge))
   check('GUAR9: and the per-plan billing line still states both prices and the monthly schedule',
@@ -1781,6 +1805,17 @@ async function main() {
   check('GUAR-MUT4: an unguarded section would be caught by GUAR5',
     !/\{provider\.returnGuaranteeDays \? \(/.test(
       salesSrcNoBadge.replace(/\{provider\.returnGuaranteeDays \? \(/g, '{true ? (')))
+  check('GUAR-MUT5: the word the legal thread struck out would be caught by GUAR7e',
+    /unconditional/i.test(`${salesProse} gives you an unconditional guarantee`))
+  check('GUAR-MUT6: so would the promise it struck out with it',
+    /you get your money back/i.test(`${salesProse} and you get your money back`))
+  check('GUAR-MUT7: dropping the platform\'s exclusion would be caught by GUAR7b',
+    !/re-subscribes to the same product within two years is not entitled to it again/.test(
+      guarFlat.replace(
+        /re-subscribes to the same product within two years is not entitled to it again/g, '')))
+  check('GUAR-MUT8: and a section that stated the window without saying how would be caught by GUAR7d',
+    !/href=\{provider\.orderSupportUrl\}/.test(
+      salesSrcNoBadge.replace(/href=\{provider\.orderSupportUrl\}/g, 'href="#"')))
 }
 
 main().then(() => {

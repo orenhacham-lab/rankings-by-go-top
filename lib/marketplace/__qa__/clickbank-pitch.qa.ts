@@ -69,8 +69,19 @@ console.log('A) The platform facts come from the provider table, not from a page
   // The two platforms that publish no such route must not borrow ClickBank's.
   check('A5: jvzoo borrows neither', marketplaceProvider('jvzoo')?.orderSupportUrl === null &&
     marketplaceProvider('jvzoo')?.billingDescriptor === null)
-  check('A6: digistore24 borrows neither', marketplaceProvider('digistore24')?.orderSupportUrl === null &&
-    marketplaceProvider('digistore24')?.billingDescriptor === null)
+  // Digistore24 DOES publish an order route of its own - the Cancel-or-revoke
+  // form behind "Find my order" in their footer - and since 2026-11-13 the
+  // sales page links it, because they are the merchant of record and their own
+  // FAQ says they handle every refund request. What must still hold is that it
+  // is THEIRS: not ClickBank's destination, not ClickBank's descriptor, and on
+  // their own host.
+  check('A6: digistore24 has its own order route and borrows nothing of ClickBank\'s',
+    marketplaceProvider('digistore24')?.orderSupportUrl?.startsWith('https://www.digistore24.com/') === true
+    && marketplaceProvider('digistore24')?.orderSupportUrl !== 'https://www.clkbank.com'
+    && marketplaceProvider('digistore24')?.billingDescriptor === null)
+  check('A6-MUT: a digistore24 record pointed at ClickBank would be caught',
+    ({ ...marketplaceProvider('digistore24'), orderSupportUrl: 'https://www.clkbank.com' })
+      .orderSupportUrl?.startsWith('https://www.digistore24.com/') !== true)
   check('A7: neither value is typed into the pitch page',
     !pitch.includes('clkbank.com') && !pitch.includes('CLKBANK*COM'))
   check('A8: nor into the thank-you page',

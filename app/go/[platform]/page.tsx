@@ -327,11 +327,29 @@ export default async function MarketplaceSalesPage({
           quoted either: their Flexible Refunds feature sets the window per
           product, so the link is the answer and a number would be a term we
           had not read off the product. */}
-      <p className="mt-4 text-copy text-muted">
-        Cancelling stops the future charges; by itself it does not return money already paid. A
-        return, where one is available, is handled by {provider.label} under its own return and
-        cancellation policy, which is the policy that governs this purchase and is linked below.
-      </p>
+      {/* REWORDED FOR A CHANNEL THAT HAS A GUARANTEE, on the legal thread's
+          ruling of 2026-11-13. The generic sentence below is true on every
+          channel, but on the Digistore24 page it was the last word before a
+          money-back window and read as a denial of one. Where a window exists
+          the sentence now says what cancelling is NOT - a refund request -
+          and points at the thing that is. Where there is none, which is
+          ClickBank, it is unchanged: their Client Contract makes the linked
+          policy the only answer we are allowed to give. */}
+      {provider.returnGuaranteeDays ? (
+        <p className="mt-4 text-copy text-muted">
+          Cancelling stops the future charges, and by itself it does not return money already
+          paid: it is not a refund request. To ask for money back inside the first{' '}
+          {provider.returnGuaranteeDays} days, ask {provider.label} for a refund, as described
+          below. {provider.label}&rsquo;s own return and cancellation policy is the policy that
+          governs this purchase.
+        </p>
+      ) : (
+        <p className="mt-4 text-copy text-muted">
+          Cancelling stops the future charges; by itself it does not return money already paid. A
+          return, where one is available, is handled by {provider.label} under its own return and
+          cancellation policy, which is the policy that governs this purchase and is linked below.
+        </p>
+      )}
 
       {/* THE GUARANTEE IN FULL, AND ONLY WHERE THE CHANNEL ACTUALLY GIVES ONE.
 
@@ -366,14 +384,54 @@ export default async function MarketplaceSalesPage({
           <h2 className="text-section text-ink">
             {provider.returnGuaranteeDays}-day money-back guarantee
           </h2>
+          {/* WRITTEN IN THE PLATFORM'S TERMS, NOT IN PROMISES OF OUR OWN.
+              The first draft of this paragraph said the guarantee was
+              "unconditional", that a refund could be had "for any reason or
+              for none" and that "you get your money back". The legal thread
+              refused it on 2026-11-13 and the reason stands on its own: those
+              are absolute statements about how another company will behave,
+              made in our voice, and Digistore24's own buyer terms do not say
+              them. What their terms say, read 13.11.2026 at
+              https://www.digistore24.com/page/terms/2/en section 13 (Digital
+              Products and Services), is that the terms of an advertised
+              money-back guarantee "will be stated at the time of purchase",
+              that it "shall only be available for the stated period", and
+              that a customer who takes a refund and then re-buys the same
+              product inside two years is not entitled to it again. The vendor
+              setting behind the number is equally concrete: the field is
+              called "Refund regulation", it is set to the 60-day option on
+              return policy 59003 ("60-day money-back guarantee", active, all
+              four products), it carries the note "The period begins with the
+              first payment", and it is followed by Digistore24's own reserved
+              right to refund at its sole discretion. So the paragraph states
+              the window, attributes the terms, names the exclusion and stops
+              - which still answers the reviewer's demand for a 60-day policy
+              stated on the sales page, because the window and the heading are
+              what they asked to see. */}
           <p className="mt-2 text-copy text-body">
-            {provider.label} is the seller for this purchase and gives you an unconditional{' '}
-            {provider.returnGuaranteeDays}-day money-back guarantee. Ask {provider.label} for a
-            refund within {provider.returnGuaranteeDays} days of your payment, for any reason or
-            for none, and you get your money back. You do not have to explain why, and you do not
-            have to cancel first. The guarantee is given and paid by {provider.label} under its own
-            return policy, which is the policy that governs this purchase.
+            {provider.label} is the seller of record for this purchase and handles the refunds
+            itself: in its own published words it handles &ldquo;all refund and chargeback
+            requests&rdquo; for us. The return period set on these plans inside {provider.label}
+            {' '}is {provider.returnGuaranteeDays} days, and that period begins with your first
+            payment.
           </p>
+          <p className="mt-2 text-copy text-body">
+            The terms of it are {provider.label}&rsquo;s and {provider.label} publishes them: the
+            guarantee stated at the time of purchase is the one that applies, it is available only
+            for that stated period, and a customer who takes a refund and then buys or
+            re-subscribes to the same product within two years is not entitled to it again.{' '}
+            {provider.label} also keeps the right to refund at its own discretion. Its return
+            policy, not ours, is the policy that governs this purchase.
+          </p>
+          {provider.orderSupportUrl ? (
+            <p className="mt-2 text-copy text-body">
+              You ask {provider.label} for it, not us:{' '}
+              <a className="text-action underline" href={provider.orderSupportUrl} rel="nofollow">
+                open {provider.label}&rsquo;s cancel or refund form
+              </a>{' '}
+              and enter your order number.
+            </p>
+          ) : null}
         </section>
       ) : null}
 
