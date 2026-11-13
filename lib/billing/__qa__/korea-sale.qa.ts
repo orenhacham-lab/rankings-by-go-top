@@ -312,6 +312,64 @@ console.log('\nG. the marketplace pages, where JVZoo is NOT the seller')
     })())
 }
 
+console.log('\nH. the sign-up disclosure, which is where the inducement actually happens')
+{
+  const layout = code('app/(auth)/layout.tsx')
+  const provider = code('components/auth/AuthLocaleProvider.tsx')
+  const signup = code('app/(auth)/signup/page.tsx')
+
+  check('H1: the (auth) layout takes the decision by COUNTRY on the server, not from the locale',
+    /koreaTrialOnlyNoticeForCountry\(countryFromHeaders\(requestHeaders\)\)/.test(layout)
+    && /koreaTrialOnly=\{koreaTrialOnly\}/.test(layout))
+  check('H2: the provider carries it beside the locale and defaults to false, so a missing provider renders nothing',
+    /KoreaTrialOnlyContext = createContext<boolean>\(false\)/.test(provider)
+    && /koreaTrialOnly = false/.test(provider)
+    && /export function useKoreaTrialOnlyNotice/.test(provider))
+  check('H3: the sign-up form reads it from the provider and renders it only when set',
+    /useKoreaTrialOnlyNotice\(\)/.test(signup)
+    && /\{koreaTrialOnly && \(/.test(signup)
+    && /data-korea-trial-only/.test(signup))
+  check('H4: it sits ABOVE the form, with the trial badge and the heading, not after the button',
+    (() => {
+      const notice = signup.indexOf('data-korea-trial-only')
+      const form = signup.indexOf('<form onSubmit={handleSubmit}')
+      return notice > 0 && form > notice
+    })())
+
+  const koreaLines = [...signup.matchAll(/koreaTrialOnly: `([^`]*)`/g)].map((m) => m[1])
+  check('H5: every one of the eleven languages carries the sentence, and none is empty',
+    koreaLines.length === 11 && koreaLines.every((line) => line.trim().length > 40), String(koreaLines.length))
+  check('H6: the trial length is interpolated from the catalog in every language — no loose digit to go stale',
+    koreaLines.every((line) => line.includes('${TRIAL_DAYS}') && !/\d/.test(line))
+    && /const TRIAL_DAYS = TRIAL_CATALOG\.days/.test(signup))
+  check('H7: each sentence does three jobs — the trial, nothing charged, and no paid subscription after it',
+    koreaLines.every((line) => line.split(/[.。]/).filter((part) => part.trim().length > 8).length >= 3))
+
+  const korean = koreaLines[10] ?? ''
+  check('H8: the Korean sentence makes the trial AVAILABLE and the paid plan the thing that does not follow',
+    korean.includes('무료 체험') && korean.includes('요금이 청구되지 않') && korean.includes('자동 전환되지 않습니다')
+    && !/가입할 수 없|이용할 수 없/.test(korean), korean.slice(0, 40))
+  check('H9: and it never promises to tell them when Korea opens, which nobody is recording',
+    !koreaLines.some((line) => /알려|notify|informar|benachrichtig|powiadom|お知らせ/i.test(line)))
+
+  check('H10: the notice is on the sign-up form only, because signing in is not an inducement',
+    !/data-korea-trial-only/.test(code('app/(auth)/login/page.tsx')))
+
+  check('H-MUT1: an unconditional notice is caught — it would tell every country in the world',
+    !/\{koreaTrialOnly && \(/.test(signup.replace(/\{koreaTrialOnly && \(/g, '{true && (')))
+  check('H-MUT2: a layout that stops passing the flag is caught',
+    !/koreaTrialOnly=\{koreaTrialOnly\}/.test(layout.replace(/koreaTrialOnly=\{koreaTrialOnly\}/g, '')))
+  check('H-MUT3: a hard-coded trial length in the sentence is caught',
+    (() => {
+      // H6 passes only because no sentence contains a digit. Put the digit
+      // back in every language and H6's own test must fail on all eleven.
+      const stale = koreaLines.map((line) => line.replaceAll('${TRIAL_DAYS}', '7'))
+      return stale.length === 11 && stale.every((line) => /\d/.test(line))
+    })())
+  check('H-MUT4: a locale that loses the sentence is caught',
+    [...signup.replace(/koreaTrialOnly: `[^`]*`,\n/, '').matchAll(/koreaTrialOnly: `/g)].length === 10)
+}
+
 console.log(`\n${pass} passed, ${fail} failed`)
 if (fail > 0) process.exitCode = 1
 
