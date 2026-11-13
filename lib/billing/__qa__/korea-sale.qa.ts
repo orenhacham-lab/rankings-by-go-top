@@ -36,6 +36,7 @@ import {
 } from '../korea-sale'
 import { COUNTRY_HEADER } from '../server-market'
 import { RESTRICTED_COUNTRIES } from '../../sanctions/countries'
+import { ownSaleAllowedForCountry, ownSaleCountries } from '../../marketplace/own-sale-territory'
 import { koreanCheckoutEnabled } from '../../i18n/korean-site'
 
 let pass = 0, fail = 0
@@ -242,31 +243,131 @@ console.log('\nF. the fact is told BEFORE the trial, not only at the refusal')
       }))
 }
 
-console.log('\nG. the same rule on the marketplace pages, where JVZoo is NOT the seller')
+console.log('\nG. the marketplace pages, where JVZoo is NOT the seller')
 {
   const go = code('app/go/[platform]/page.tsx')
   const config = read('lib/marketplace/config.ts')
-  check('G1: the sales page takes the own-name decision, and only where WE are the seller',
-    /!provider\.sellerOfRecord && koreaOwnSaleBlockedForRequest\(requestHeaders\)/.test(go))
-  check('G2: a visitor it applies to gets words instead of the buy button',
-    /koreaOwnSaleBlocked \? \(/.test(go) && /data-korea-no-sale/.test(go))
+  check('G1: the page refuses an own-name sale outside the cleared countries, and only where WE are the seller',
+    /!provider\.sellerOfRecord\s*\n\s*&& !ownSaleAllowedForRequest\(requestHeaders, KOREA_SALE_COUNTRY_HEADER\)/.test(go))
+  check('G2: such a visitor is told what is refused, in words, and is offered no competing checkout',
+    /ownSaleRefused \? \(/.test(go) && /data-own-sale-refused/.test(go)
+    && !/<a href="\//.test(go))
   check('G3: the button is still there for everyone else',
     /\) : buyUrl \? \(/.test(go) && /href=\{buyUrl\}/.test(go))
   check('G4: and the reseller platforms are untouched, because the tax is theirs',
     (config.match(/sellerOfRecord: true/g) ?? []).length === 2
     && (config.match(/sellerOfRecord: false/g) ?? []).length === 1)
-  check('G5: the sentence says nothing about VAT and does not call the service unavailable in their country',
+  check('G5: a visitor in Korea is outside the cleared list, so this page sells them nothing either',
+    ownSaleAllowedForCountry('KR', ownSaleCountries(undefined)) === false)
+  check('G6: the list is configuration, and unset it is the four cleared countries',
+    ownSaleCountries('').join(',') === 'US,CA,JP,AU'
+    && ownSaleAllowedForCountry('US', ownSaleCountries('')) === true
+    && ownSaleCountries('us, ca ,JP').join(',') === 'US,CA,JP')
+  check('G6b: each default country is cleared, and the three thresholds carry their figure and authority',
     (() => {
-      const at = go.indexOf('data-korea-no-sale')
+      const src = readFileSync('lib/marketplace/own-sale-territory.ts', 'utf8')
+      return ['CAD 30,000', 'canada.ca', 'JPY 10,000,000', 'NTA', 'AUD 75,000', 'ato.gov.au']
+        .every((token) => src.includes(token))
+        && ['CA', 'JP', 'AU'].every((c) => ownSaleAllowedForCountry(c, ownSaleCountries('')))
+    })())
+  check('G6c: the US entry carries the review trigger, so it is not read as a finding about America',
+    (() => {
+      const src = readFileSync('lib/marketplace/own-sale-territory.ts', 'utf8')
+      return /ABOUT OUR VOLUME, NOT ABOUT AMERICA/.test(src)
+        && /approaching any\s*\n?\s*\*?\s*single state's threshold/.test(src)
+    })())
+  check('G6d: Switzerland is NOT cleared — its CHF 100,000 test is on WORLDWIDE turnover',
+    ownSaleAllowedForCountry('CH', ownSaleCountries('')) === false
+    && /WORLDWIDE turnover/.test(readFileSync('lib/marketplace/own-sale-territory.ts', 'utf8')))
+  check('G6e: no EU member state is cleared — a non-EU supplier owes there from the first euro',
+    ['DE', 'FR', 'IT', 'ES', 'NL', 'PL', 'IE', 'SE', 'AT', 'BE', 'PT', 'FI', 'DK', 'GR']
+      .every((c) => ownSaleAllowedForCountry(c, ownSaleCountries('')) === false))
+  check('G7: an unplaceable visitor fails CLOSED here, the opposite of the billing guard',
+    ownSaleAllowedForCountry(null, ['US']) === false
+    && ownSaleAllowedForCountry('XX', ['US']) === false
+    && koreaOwnSaleBlockedForCountry(null, false) === false)
+  check('G8: the sentence does not say the service is unavailable in their country',
+    (() => {
+      const at = go.indexOf('data-own-sale-refused')
       const seg = go.slice(at, at + 400)
-      return !/VAT|tax/i.test(seg) && /not sold in Korea/.test(seg) && /Nothing will be charged/.test(seg)
+      return /not sold through this page/.test(seg) && !/unavailable|VAT|tax/i.test(seg)
     })())
   check('G-MUT1: dropping the seller condition is caught — it would refuse a reseller sale that is lawful',
-    !/!provider\.sellerOfRecord && koreaOwnSaleBlockedForRequest\(requestHeaders\)/.test(
-      go.replace(/!provider\.sellerOfRecord && koreaOwnSaleBlockedForRequest\(requestHeaders\)/g,
-        'koreaOwnSaleBlockedForRequest(requestHeaders)')))
-  check('G-MUT2: dropping the block and showing the button anyway is caught',
-    !/koreaOwnSaleBlocked \? \(/.test(go.replace(/koreaOwnSaleBlocked \? \(/g, 'false ? (')))
+    !/!provider\.sellerOfRecord\s*\n\s*&& !ownSaleAllowedForRequest/.test(
+      go.replace(/!provider\.sellerOfRecord\s*\n\s*&& !ownSaleAllowedForRequest/g, '!ownSaleAllowedForRequest')))
+  check('G-MUT2: dropping the refusal and showing the button anyway is caught',
+    !/ownSaleRefused \? \(/.test(go.replace(/ownSaleRefused \? \(/g, 'false ? (')))
+  check('G-MUT3: a list that falls back to "everywhere" instead of the default is caught',
+    ownSaleCountries('').length === 4 && ownSaleCountries('').length < 10)
+  check('G-MUT4: a country added to the default without its figure and authority is caught',
+    (() => {
+      const src = readFileSync('lib/marketplace/own-sale-territory.ts', 'utf8')
+      const widened = src.replace("'AU']", "'AU', 'CH']")
+      const codes = widened.match(/export const DEFAULT_OWN_SALE_COUNTRIES = Object\.freeze\(\[([^\]]*)\]/)?.[1] ?? ''
+      // Every code in the frozen list must appear as a quoted entry in the
+      // comment block above it, which is where the basis is written down.
+      const commented = (code: string) => new RegExp(`\\* - '${code}'`).test(widened)
+      const listed = [...codes.matchAll(/'([A-Z]{2})'/g)].map((m) => m[1])
+      return listed.includes('CH') && !commented('CH') && listed.filter((c) => !commented(c)).length === 1
+    })())
+}
+
+console.log('\nH. the sign-up disclosure, which is where the inducement actually happens')
+{
+  const layout = code('app/(auth)/layout.tsx')
+  const provider = code('components/auth/AuthLocaleProvider.tsx')
+  const signup = code('app/(auth)/signup/page.tsx')
+
+  check('H1: the (auth) layout takes the decision by COUNTRY on the server, not from the locale',
+    /koreaTrialOnlyNoticeForCountry\(countryFromHeaders\(requestHeaders\)\)/.test(layout)
+    && /koreaTrialOnly=\{koreaTrialOnly\}/.test(layout))
+  check('H2: the provider carries it beside the locale and defaults to false, so a missing provider renders nothing',
+    /KoreaTrialOnlyContext = createContext<boolean>\(false\)/.test(provider)
+    && /koreaTrialOnly = false/.test(provider)
+    && /export function useKoreaTrialOnlyNotice/.test(provider))
+  check('H3: the sign-up form reads it from the provider and renders it only when set',
+    /useKoreaTrialOnlyNotice\(\)/.test(signup)
+    && /\{koreaTrialOnly && \(/.test(signup)
+    && /data-korea-trial-only/.test(signup))
+  check('H4: it sits ABOVE the form, with the trial badge and the heading, not after the button',
+    (() => {
+      const notice = signup.indexOf('data-korea-trial-only')
+      const form = signup.indexOf('<form onSubmit={handleSubmit}')
+      return notice > 0 && form > notice
+    })())
+
+  const koreaLines = [...signup.matchAll(/koreaTrialOnly: `([^`]*)`/g)].map((m) => m[1])
+  check('H5: every one of the eleven languages carries the sentence, and none is empty',
+    koreaLines.length === 11 && koreaLines.every((line) => line.trim().length > 40), String(koreaLines.length))
+  check('H6: the trial length is interpolated from the catalog in every language — no loose digit to go stale',
+    koreaLines.every((line) => line.includes('${TRIAL_DAYS}') && !/\d/.test(line))
+    && /const TRIAL_DAYS = TRIAL_CATALOG\.days/.test(signup))
+  check('H7: each sentence does three jobs — the trial, nothing charged, and no paid subscription after it',
+    koreaLines.every((line) => line.split(/[.。]/).filter((part) => part.trim().length > 8).length >= 3))
+
+  const korean = koreaLines[10] ?? ''
+  check('H8: the Korean sentence makes the trial AVAILABLE and the paid plan the thing that does not follow',
+    korean.includes('무료 체험') && korean.includes('요금이 청구되지 않') && korean.includes('자동 전환되지 않습니다')
+    && !/가입할 수 없|이용할 수 없/.test(korean), korean.slice(0, 40))
+  check('H9: and it never promises to tell them when Korea opens, which nobody is recording',
+    !koreaLines.some((line) => /알려|notify|informar|benachrichtig|powiadom|お知らせ/i.test(line)))
+
+  check('H10: the notice is on the sign-up form only, because signing in is not an inducement',
+    !/data-korea-trial-only/.test(code('app/(auth)/login/page.tsx')))
+
+  check('H-MUT1: an unconditional notice is caught — it would tell every country in the world',
+    !/\{koreaTrialOnly && \(/.test(signup.replace(/\{koreaTrialOnly && \(/g, '{true && (')))
+  check('H-MUT2: a layout that stops passing the flag is caught',
+    !/koreaTrialOnly=\{koreaTrialOnly\}/.test(layout.replace(/koreaTrialOnly=\{koreaTrialOnly\}/g, '')))
+  check('H-MUT3: a hard-coded trial length in the sentence is caught',
+    (() => {
+      // H6 passes only because no sentence contains a digit. Put the digit
+      // back in every language and H6's own test must fail on all eleven.
+      const stale = koreaLines.map((line) => line.replaceAll('${TRIAL_DAYS}', '7'))
+      return stale.length === 11 && stale.every((line) => /\d/.test(line))
+    })())
+  check('H-MUT4: a locale that loses the sentence is caught',
+    [...signup.replace(/koreaTrialOnly: `[^`]*`,\n/, '').matchAll(/koreaTrialOnly: `/g)].length === 10)
 }
 
 console.log(`\n${pass} passed, ${fail} failed`)
