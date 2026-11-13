@@ -117,7 +117,13 @@ async function main() {
     // and from the page's own locale, not from a ternary on the path.
     const navOk = (src: string) => /const signupHref = authHref\('signup', (?:locale|toBilingualLocale\(locale\))\)/.test(src)
       && /const loginHref = authHref\('login', (?:locale|toBilingualLocale\(locale\))\)/.test(src)
-      && (src.match(/href=\{signupHref\}/g) ?? []).length === 2 && (src.match(/href=\{loginHref\}/g) ?? []).length === 2
+      // THREE sign-up links, not two: the desktop bar, the open mobile menu,
+      // and — since 13 November 2026 — the phone bar's own "start free" button
+      // (components/public/__qa__/public-nav-menus.qa.ts group 6 holds its
+      // shape). Sign-in is still two: it is not worth a slot in a phone bar.
+      // The count is pinned rather than loosened so a FOURTH link, or one built
+      // from a path ternary instead of authHref, still has to come through here.
+      && (src.match(/href=\{signupHref\}/g) ?? []).length === 3 && (src.match(/href=\{loginHref\}/g) ?? []).length === 2
     check('A7: the nav (desktop and mobile) links to sign-up and sign-in through authHref in the page\'s locale', navOk(nav))
     check('MUTATION CONTROL: the old `locale === \'en\' ? \'/en/signup\' : \'/signup\'` nav is caught',
       !navOk(nav.replace(/const signupHref = authHref\('signup', [^)]*\)?\)/, "const signupHref = locale === 'en' ? '/en/signup' : '/signup'")))

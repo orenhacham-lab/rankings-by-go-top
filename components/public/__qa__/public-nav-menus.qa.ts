@@ -391,6 +391,46 @@ function main() {
     check('5f-MUT: dropping the English disclaimer is caught', !aiImage.every((re) => re.test(flat.replace('not a photo of your business', 'a photo'))))
   }
 
+  console.log('\n6) the phone bar carries "start free" too')
+  {
+    /*
+     * The owner, 13 November 2026: on a phone the bar was the lockup and a
+     * hamburger, so the action the whole site asks for was one tap out of sight,
+     * while the desktop bar had it in the open. What is pinned here is the
+     * shape that cannot regress quietly:
+     *   - the button exists, links the SIGNUP route (not the login one), and
+     *     carries the locale's own label;
+     *   - it disappears from lg up, where the desktop CTA block is already
+     *     rendered — otherwise two identical buttons sit in one bar;
+     *   - it is offered to a visitor only, after the auth check has answered,
+     *     so it never flashes at a signed-in owner;
+     *   - it is ms-auto and shrink-0: it travels to the end of the bar beside
+     *     the hamburger, in Hebrew as in English, and the lockup never squeezes
+     *     it into an ellipsis.
+     */
+    const cta = nav.match(/<Link\s+href=\{signupHref\}\s+data-mobile-cta\s+className=\{buttonClasses\('primary', 'md', '([^']*)'\)\}\s*>\s*\{dict\.nav\.startFree\}/)
+    check('6a: the phone bar links signup with the locale\'s own "start free" label', !!cta)
+    const cls = cta?.[1] ?? ''
+    check('6b: it is hidden from lg up, where the desktop buttons already are', /\blg:hidden\b/.test(cls), cls)
+    check('6c: it sits at the end of the bar and keeps its width', /\bms-auto\b/.test(cls) && /\bshrink-0\b/.test(cls), cls)
+    const gated = /\{authChecked && !isAuthed \? \(\s*<Link\s+href=\{signupHref\}\s+data-mobile-cta/.test(nav)
+    check('6d: and only a visitor is offered it, after the auth check answers', gated)
+    // MUTATION CONTROLS: each rule is the thing being asserted, not the text.
+    check('6a-MUT: pointing it at the login route is caught',
+      !/<Link\s+href=\{loginHref\}\s+data-mobile-cta/.test(nav) && !!cta)
+    check('6b-MUT: dropping lg:hidden, which would double the button at lg, is caught',
+      !/\blg:hidden\b/.test(cls.replace('lg:hidden', '')))
+    check('6d-MUT: rendering it before the auth check answers is caught',
+      !/\{authChecked && !isAuthed \? \(\s*<Link\s+href=\{signupHref\}\s+data-mobile-cta/.test(nav.replace('{authChecked && !isAuthed ? (', '{!isAuthed ? (')))
+    // The label itself: every public language has one, and it is not English
+    // left behind in a translated bar.
+    const dicts = PUBLIC_LOCALES.map((l) => [l, getPublicDictionary(l).nav.startFree] as const)
+    const missing = dicts.filter(([, v]) => !v || !v.trim())
+    check('6e: every site language names the button', missing.length === 0, missing.map(([l]) => l).join(', '))
+    const englishLeftovers = dicts.filter(([l, v]) => l !== 'en' && v === getPublicDictionary('en').nav.startFree)
+    check('6f: and none of them is the English words', englishLeftovers.length === 0, englishLeftovers.map(([l]) => l).join(', '))
+  }
+
   console.log(`\n${passed} passed, ${failed} failed`)
   if (failed) process.exit(1)
 }

@@ -191,7 +191,7 @@ export function PublicNav({ locale = 'he', tone = 'default' }: { locale?: Public
     >
       {/* max-w-7xl: seven links, the language switch and two buttons need the room from xl */}
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-        <div className="flex h-16 items-center justify-between gap-4 lg:h-[4.5rem]">
+        <div className="flex h-16 items-center justify-between gap-2 sm:gap-4 lg:h-[4.5rem]">
           {/* The lockup, as on the rail */}
           <Link
             href={localeHomeHref(locale)}
@@ -273,6 +273,38 @@ export function PublicNav({ locale = 'he', tone = 'default' }: { locale?: Public
               </>
             )}
           </div>
+
+          {/*
+            Phone and tablet: the same "start free" the desktop bar carries, so
+            the one action the site is asking for does not live behind the
+            hamburger (the owner, 13 November 2026). Three rules shape it:
+
+              - lg:hidden, because from lg the CTA block above is already on
+                screen and two of the same button in one bar is a mistake;
+              - ms-auto, so it travels with the hamburger at the end of the bar
+                instead of floating into the middle of a justify-between row,
+                and it reads at the END in Hebrew too — a logical property, not
+                a left or a right;
+              - one notch smaller than the desktop button (h-9, caption) and
+                flanked by its own gap, so on a 360px phone the lockup, the
+                button and the hamburger each keep their room. The label is the
+                locale's own nav.startFree, which every language already has,
+                and the row never wraps it: the button shrinks to its text, the
+                text does not shrink to the button.
+
+            It is offered to a VISITOR only. A signed-in owner has the dashboard
+            in the menu, and "start free" would be an invitation to do again
+            what they have already done.
+          */}
+          {authChecked && !isAuthed ? (
+            <Link
+              href={signupHref}
+              data-mobile-cta
+              className={buttonClasses('primary', 'md', 'ms-auto h-9 shrink-0 px-3 text-caption lg:hidden')}
+            >
+              {dict.nav.startFree}
+            </Link>
+          ) : null}
 
           {/* Mobile Hamburger */}
           <button

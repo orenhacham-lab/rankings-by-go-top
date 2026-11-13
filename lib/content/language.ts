@@ -198,6 +198,12 @@ export function toHebrewOrEnglish(language: ContentLanguage): 'he' | 'en' {
 export function contentLanguageOrEnglish(value: unknown): ContentLanguage {
   const s = String(value ?? '').toLowerCase().trim()
   if (!s) return DEFAULT_CONTENT_LANGUAGE
-  const known = /^(en|es|cas|he|iw|pt|portugu|fr|franc|it|ital|ja|jp|japan|日本)/.test(s)
+  // The keyword-research screen offers every language the product ships in
+  // (lib/google-ads/constants.ts), so each of them has to be KNOWN here: a
+  // language that falls through answers 'en', and a German research would hand
+  // a German site English topic titles — the Spanish-read-as-Hebrew bug of
+  // 2026 in a new language. Widened 13 Nov 2026 with de, nl, pl and ko; the
+  // prefixes mirror normalizeContentLanguage above, which does the mapping.
+  const known = /^(en|es|cas|he|iw|pt|portugu|fr|franc|it|ital|ja|jp|japan|日本|de|ger|deutsch|nl|dutch|nederland|vlaams|flemish|pl|pol|polski|ko|한국)/.test(s)
   return known ? normalizeContentLanguage(s) : 'en'
 }
