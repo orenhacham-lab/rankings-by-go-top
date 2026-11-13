@@ -65,7 +65,7 @@ export const pricingKo: PricingCopy = {
        not only a mail-order seller, so it bites BEFORE any contract. Shown only
        to a visitor placed in Korea, on every language's page, because the duty
        follows the consumer and not the page. lib/billing/korea-sale.ts. */
-    koreaTrialOnly: '현재 한국에서는 무료 체험만 제공하며, 유료 구독 결제는 아직 제공하지 않습니다. 체험은 7일 후 자동으로 종료되고, 카드 정보를 받지 않으므로 요금이 청구되지 않습니다.',
+    koreaTrialOnly: `현재 한국에서는 무료 체험만 제공하며, 유료 구독 결제는 아직 제공하지 않습니다. 체험은 ${DAYS}일 후 자동으로 종료되고, 카드 정보를 받지 않으므로 요금이 청구되지 않습니다.`,
     everyPlanLabel: '모든 요금제 공통',
     everyPlan: [
       'WordPress, Shopify, Wix에 예약 자동 발행',

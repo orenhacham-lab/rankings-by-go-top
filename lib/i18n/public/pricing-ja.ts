@@ -56,7 +56,7 @@ export const pricingJa: PricingCopy = {
        not only a mail-order seller, so it bites BEFORE any contract. Shown only
        to a visitor placed in Korea, on every language's page, because the duty
        follows the consumer and not the page. lib/billing/korea-sale.ts. */
-    koreaTrialOnly: '韓国では現在、無料トライアルのみをご利用いただけます。有料プランの販売は行っておりません。トライアルは7日後に自動で終了し、カード情報はお預かりしないため、料金は請求されません。',
+    koreaTrialOnly: `韓国では現在、無料トライアルのみをご利用いただけます。有料プランの販売は行っておりません。トライアルは${DAYS}日後に自動で終了し、カード情報はお預かりしないため、料金は請求されません。`,
     everyPlanLabel: 'すべてのプランに含まれます',
     everyPlan: [
       'WordPress、Shopify、Wixへの予約公開を自動で',

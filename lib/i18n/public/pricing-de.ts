@@ -53,7 +53,7 @@ export const pricingDe: PricingCopy = {
        not only a mail-order seller, so it bites BEFORE any contract. Shown only
        to a visitor placed in Korea, on every language's page, because the duty
        follows the consumer and not the page. lib/billing/korea-sale.ts. */
-    koreaTrialOnly: 'In Südkorea ist derzeit nur die kostenlose Testphase verfügbar, ein bezahltes Abonnement wird dort nicht verkauft. Die Testphase endet nach sieben Tagen automatisch, und wir erheben keine Kartendaten, es wird also nichts abgebucht.',
+    koreaTrialOnly: `In Südkorea ist derzeit nur die kostenlose Testphase verfügbar, ein bezahltes Abonnement wird dort nicht verkauft. Die Testphase endet nach ${DAYS} Tagen automatisch, und wir erheben keine Kartendaten, es wird also nichts abgebucht.`,
     everyPlanLabel: 'In allen Tarifen',
     everyPlan: [
       'Automatische geplante Veröffentlichung auf WordPress, Shopify und Wix',

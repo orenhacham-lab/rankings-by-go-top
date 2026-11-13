@@ -60,7 +60,7 @@ export const pricingPl: PricingCopy = {
        not only a mail-order seller, so it bites BEFORE any contract. Shown only
        to a visitor placed in Korea, on every language's page, because the duty
        follows the consumer and not the page. lib/billing/korea-sale.ts. */
-    koreaTrialOnly: 'W Korei Południowej dostępny jest na razie tylko bezpłatny okres próbny, a płatna subskrypcja nie jest tam sprzedawana. Okres próbny kończy się automatycznie po siedmiu dniach, a my nie pobieramy danych karty, więc nic nie zostanie obciążone.',
+    koreaTrialOnly: `W Korei Południowej dostępny jest na razie tylko bezpłatny okres próbny, a płatna subskrypcja nie jest tam sprzedawana. Okres próbny kończy się automatycznie po ${DAYS} dniach, a my nie pobieramy danych karty, więc nic nie zostanie obciążone.`,
     everyPlanLabel: 'We wszystkich pakietach',
     everyPlan: [
       'Automatyczna, zaplanowana publikacja na WordPressie, w Shopify i w Wixie',
