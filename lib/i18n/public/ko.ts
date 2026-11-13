@@ -82,6 +82,10 @@ export const ko = {
         label: '사이트 수정',
         description: '사이트를 진단하고 제목, 메타 설명, 이미지 대체 텍스트, 링크를 수정합니다. WordPress에서는 승인 후 클릭 한 번으로 적용됩니다.',
       },
+      businessProfile: {
+        label: 'Google 비즈니스 프로필',
+        description: '고객이 Google 지도에서 보는 프로필에 대해 시스템이 하는 일 전부입니다. 지도에서의 순위, 게시물, 리뷰 답변을 한곳에서 다룹니다.',
+      },
       mapsPosts: {
         label: 'Google 지도 게시물',
         description: '사진과 버튼이 있는 게시물을 Google 비즈니스 프로필에 바로 또는 예약해 올리고, 리뷰에도 답변합니다. 손볼 수 있는 초안이 준비됩니다.',
