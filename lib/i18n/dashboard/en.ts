@@ -6122,8 +6122,8 @@ export const dashboardEn = {
       policyLabel: 'The withdrawal right in full, in the cancellation and refund policy',
     },
     koreaSale: {
-      title: 'A paid subscription is not sold in Korea at the moment',
-      description: 'Nothing will be charged, and the data you created during the trial stays in your account. Write to us at contact@gotopseo.com with any question.',
+      title: 'Only the free trial is available in Korea at the moment',
+      description: 'A paid subscription is not sold there. Nothing will be charged, and the data you created during the trial stays in your account. Write to us at contact@gotopseo.com with any question.',
     },
     creem: {
       payButton: 'Pay by card',

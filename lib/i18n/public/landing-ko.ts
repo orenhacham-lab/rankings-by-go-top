@@ -140,7 +140,7 @@ export const landingKo: LandingCopy = {
       {
         title: 'ChatGPT와 Gemini 답변 속에서의 자리',
         desc: '검색 대신 AI에 묻는 사람이 늘고 있습니다. AI가 내 업체를 추천하는지, 대신 누구를 추천하는지, 무엇을 고치면 되는지 알 수 있습니다.',
-        chips: ['AI 엔진 6종', '경쟁사 비교 포함'],
+        chips: ['AI 엔진 6곳', '경쟁사 비교 포함'],
       },
       {
         title: '무엇이 통하는지 분명히 보입니다',
@@ -291,7 +291,7 @@ export const landingKo: LandingCopy = {
   check: {
     eyebrow: '사이트 무료 진단',
     title: '아직 정하지 못하셨다면, 저희에게 보이는 것을 먼저 보여 드립니다',
-    body: '진단은 사이트를 실제로 읽어 1분 안에 첫 조사 요약을 돌려 드립니다.',
+    body: '진단은 사이트를 실제로 읽어 1분 안에 첫 진단 요약을 돌려 드립니다.',
     items: [
       '이 사업에 대해 읽어낸 내용과 고객의 모습',
       '우리 옆에 나란히 서 있는 경쟁사',
@@ -303,7 +303,7 @@ export const landingKo: LandingCopy = {
     note: '무료이고, 가입도 카드 등록도 필요하지 않습니다.',
     preview: {
       domain: 'example-aircon.kr',
-      heading: '첫 조사 요약',
+      heading: '첫 진단 요약',
       scoreLabel: 'AI 대응',
       score: '3/4',
       findings: ['이미지에 대체 텍스트가 없습니다', '자주 묻는 질문이 없습니다', '메타 설명의 길이가 적절하지 않습니다'],

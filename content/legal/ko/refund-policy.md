@@ -3,10 +3,10 @@ title: 해지 및 환불 정책 | Go Top SEO
 description: Go Top SEO 구독을 해지하는 방법과 환불이 이루어지는 경우를 설명합니다.
 locale: ko
 source: app/(public)/en/refund-policy/page.tsx
-lastUpdated: 2026-11-12
+lastUpdated: 2026-11-13
 register: hamnida
 extraSections: 1
-extraReason: Korea's withdrawal right is SEVEN days, not fourteen, and it gets a section of its own for the same reason the Polish document gives its own right a section. 전자상거래법 art. 17(1) gives the consumer seven days; art. 13(2) obliges the mail-order seller to state the right and how to exercise it BEFORE the contract; art. 17(2) excludes withdrawal where a service has begun, but art. 17(6) bars the seller from relying on any exclusion unless it took the measures the 시행령 names, which is why the paid-start screen asks for an express request and records the consent; and art. 18(2) sets the refund at three BUSINESS days from the withdrawal for a service. The fourteen-day sentence of the European documents must never appear in this file. Creem Merchant Terms cl. 3.4.8 leaves consumer rights with us although Creem is the merchant of record, which is why this document, and not Creem's, is where the right is stated. This document carries NO Korean business-registration number and NO mail-order (통신판매업) notification number, because the company holds neither and claiming either would be a false statement.
+extraReason: Korea's withdrawal right is SEVEN days, not fourteen, and it gets a section of its own for the same reason the Polish document gives its own right a section. 전자상거래법 art. 17(1) gives the consumer seven days; art. 13(2) obliges the mail-order seller to state the right and how to exercise it BEFORE the contract; art. 17(2) excludes withdrawal where a service has begun, but art. 17(6) bars the seller from relying on any exclusion unless it took the measures the 시행령 names, which is why the paid-start screen asks for an express request and records the consent; and art. 18(2) sets the refund at three BUSINESS days from the withdrawal for a service. The fourteen-day sentence of the European documents must never appear in this file. Creem Merchant Terms cl. 3.4.8 leaves consumer rights with us although Creem is the merchant of record, which is why this document, and not Creem's, is where the right is stated. This document carries NO Korean business-registration number and NO mail-order (통신판매업) notification number, because the company holds neither and claiming either would be a false statement. This document's date is 2026-11-13 while the English source stays on 2026-11-12, and that divergence is deliberate: §1 carries one sentence the English page does not have, saying that our own payment routes do not sell a paid subscription in Korea and that the trial is what is available. A shared date would tell a reader the two documents moved together when only this one did. Where a locale adds a disclosure of its own local law, its date follows its own text and not its source.
 ---
 
 ## 1. 월 구독과 자동 갱신
@@ -14,6 +14,8 @@ extraReason: Korea's withdrawal right is SEVEN days, not fourteen, and it gets a
 Go Top SEO는 기업과 사이트 운영자를 위한 서비스이며 월 구독으로 제공됩니다. 구독은 해지하실 때까지 매달 자동으로 갱신됩니다. 각 요금제의 가격은 가격 페이지와 계정의 "결제" 영역에 있습니다. 이스라엘 밖에서는 가격이 미국 달러로, 월 79달러부터 간접세를 제외하고 표시되며, 카드 결제는 Creem이 merchant of record(판매 기록상의 판매자)로서 받습니다. 이스라엘에서는 가격이 셰켈로 표시되고 결제는 PayPal을 통해 이루어집니다.
 
 가격을 원으로 표시하지 않습니다. 한국에서의 결제는 미국 달러로 이루어지며, 화면에 원 금액을 적는다면 이 서비스가 청구하지 않는 가격이 됩니다. 「전자상거래 등에서의 소비자보호에 관한 법률」(이하 전자상거래법) 제13조 제2항은 통신판매업자가 계약 전에 재화나 용역의 가격과 그 밖에 소비자가 부담해야 하는 금액을 알리도록 하고 있습니다. 그래서 분명히 말씀드립니다. **가격 페이지의 가격에는 세금이 포함되어 있지 않습니다.** 해당 세율에 따른 세금이 그 가격에 더해지며, 세금을 포함한 정확한 총액은 어떤 것도 고객님을 구속하기 전에 Creem 화면에서 확인하실 수 있습니다.
+
+현재 회사의 자체 결제 경로는 한국에서 유료 구독을 판매하지 않으며, 한국에서는 무료 체험만 이용하실 수 있습니다. 재판매 플랫폼을 통해 구매하신 경우에는 제7A항에 따라 그 플랫폼의 환불 정책이 적용됩니다.
 
 ## 2. 무료 체험
 
@@ -37,7 +39,7 @@ Go Top SEO는 기업과 사이트 운영자를 위한 서비스이며 월 구독
 
 전자상거래법 제17조 제1항은 통신판매로 재화나 용역을 구입한 소비자에게 **계약 내용을 적은 서면을 받은 날부터, 또는 용역의 제공이 시작된 날부터 7일 이내에 이유를 묻지 않고 청약을 철회할 권리**를 줍니다. 저희 서비스처럼 인터넷에서 맺는 계약이 바로 통신판매 계약입니다. 전자상거래법 제13조 제2항은 저희가 계약 전에 이 권리와 그 행사 방법을 알리도록 하고 있으며, 이 항이 그 안내입니다.
 
-또한 같은 조 제3항에 따라, 받으신 내용이 표시·광고와 다르거나 계약 내용과 다르게 이행된 경우에는 그 사실을 안 날부터 30일 이내, 또는 그 사실을 알 수 있었던 날부터 3개월 이내에 청약을 철회하실 수 있습니다.
+또한 제17조 제3항에 따라, 받으신 내용이 표시·광고의 내용과 다르거나 계약 내용과 다르게 이행된 경우에는 그 재화등을 공급받은 날부터 3개월 이내, 그 사실을 안 날 또는 알 수 있었던 날부터 30일 이내에 청약을 철회하실 수 있습니다.
 
 **누구에게 이 권리가 있는지.** 제17조의 청약철회권은 소비자의 권리입니다. 저희는 기업에도 판매하며, 자신의 사업을 위해 계약을 맺는 회사나 대행사에는 제4항의 규정이 그대로 적용됩니다. 다만 저희는 계약할 때 알려 주신 정보를 넘어서는 증명을 요구하지 않으며, 개인적으로 계약하신 것이 분명한 분께 이 구분을 들어 거절하지 않습니다.
 
@@ -53,7 +55,7 @@ Go Top SEO는 기업과 사이트 운영자를 위한 서비스이며 월 구독
 
 ## 6. 법이 정한 해지나 환불을 요청하는 방법
 
-계정의 이메일 주소에서 [contact@gotopseo.com](mailto:contact@gotopseo.com)으로 결제 날짜와 요청 사유를 적어 보내 주시기 바랍니다. 모든 요청에는 서면으로 답합니다. 인정된 환불은 고객님이 사용하신 것과 같은 결제 수단으로 돌아갑니다. 실제로 입금되기까지 걸리는 시간은 결제 서비스 제공자와 카드사에 따라 달라집니다.
+계정의 이메일 주소에서 [contact@gotopseo.com](mailto:contact@gotopseo.com)으로 결제 날짜와 요청 사유를 적어 보내 주시기 바랍니다. 모든 요청에는 서면으로 답합니다. 인정된 환불은 고객님이 사용하신 것과 같은 결제 수단으로 돌아갑니다. 환급 자체는 청약철회 의사를 받은 날부터 3영업일 기간을 따르며, 그 뒤 실제로 입금되기까지 걸리는 시간은 결제 서비스 제공자와 카드사에 따라 달라집니다. 전자상거래법 제18조 제3항과 제4항이 그 단계를 결제업자의 의무로 정하고 있습니다.
 
 ## 7. Shopify로 결제되는 계정
 
@@ -72,4 +74,4 @@ Go Top SEO는 기업과 사이트 운영자를 위한 서비스이며 월 구독
 
 이 정보는 사이트 하단과 이용약관에도 있어, 어느 페이지에서나 쉽게 확인하실 수 있습니다.
 
-최종 업데이트: 2026년 11월 12일
+최종 업데이트: 2026년 11월 13일

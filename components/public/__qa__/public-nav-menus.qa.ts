@@ -186,22 +186,37 @@ function main() {
     check('2h-MUT: the billing link losing nofollow is caught', !billingOk(billing.replace('rel="nofollow noopener noreferrer"', 'rel="noopener"')))
   }
 
-  console.log('\n3) the menu words exist in all four languages')
+  console.log('\n3) the menu words exist in every language')
   {
+    const featureIds = Array.from(new Set(Array.from(nav.matchAll(/feature\('(\w+)'/g), (m) => m[1])))
+    check('3z: the feature ids were read from PublicNav', featureIds.length >= 12, `${featureIds.length} found`)
     for (const l of PUBLIC_LOCALES) {
       const nav = getPublicDictionary(l).nav
+      const menu = nav.featuresMenu as Record<string, { label?: string; description?: string } | undefined>
       const words = [
         nav.solutions, nav.featureGroups.measure, nav.featureGroups.act, nav.featureGroups.prove,
-        nav.featuresMenu.siteFixes.label, nav.featuresMenu.siteFixes.description,
-        nav.featuresMenu.mapsPosts.label, nav.featuresMenu.mapsPosts.description,
+        // Every id the menu actually reads, taken from PublicNav's own source and
+        // never a hand-written pair. Two ids used to be listed here by name, so
+        // when the Google Business Profile row was added in ten languages the
+        // eleventh (ko) was missing and PublicNav threw `undefined.label` on every
+        // Korean public page — a 500, found in production on 13 Nov 2026.
+        ...featureIds.flatMap((id) => [menu[id]?.label, menu[id]?.description]),
         ...Object.values(nav.solutionsMenu).flatMap((v) => [v.label, v.description]),
       ]
-      check(`3a: ${l} has every menu word`, words.every((w) => typeof w === 'string' && w.trim().length > 0))
+      check(`3a: ${l} has every menu word, including each of the ${featureIds.length} feature ids`, words.every((w) => typeof w === 'string' && w.trim().length > 0), featureIds.filter((id) => !menu[id]?.label || !menu[id]?.description).join(', '))
     }
     const he = getPublicDictionary('he').nav
     check('3b: the languages are not copies of each other', PUBLIC_LOCALES.filter((l) => l !== 'he').every((l) => getPublicDictionary(l).nav.solutions !== he.solutions))
     // MUTATION CONTROL
     check('3-MUT: an empty word is caught', !['ok', ' '].every((w) => w.trim().length > 0))
+    // MUTATION CONTROL: a feature id present in the menu but absent from one
+    // dictionary is exactly the Korean 500, and must fail here rather than there.
+    {
+      const gap = { ...(getPublicDictionary('ko').nav.featuresMenu as Record<string, unknown>) }
+      delete gap[featureIds[featureIds.length - 1]]
+      const m = gap as Record<string, { label?: string } | undefined>
+      check('3-MUT2: a feature id missing from one language is caught', !featureIds.every((id) => typeof m[id]?.label === 'string'))
+    }
   }
 
   console.log('\n4) the new pages promise only what the code does')
