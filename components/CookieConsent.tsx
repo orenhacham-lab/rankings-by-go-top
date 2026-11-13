@@ -61,6 +61,22 @@ import { ConsentPreferences } from '@/components/consent/ConsentPreferences'
  * and the refusal is recorded without a banner — the visitor has already
  * answered, and asking again would be asking them to repeat themselves.
  */
+/**
+ * The size of a decision button, shared by BOTH decisions so neither can be made
+ * the cheaper press — the one thing in this card that is a legal requirement
+ * rather than a taste (GDPR Art. 4(11), and the EDPB's cookie-banner findings:
+ * refusing has to be as easy as agreeing).
+ *
+ * On a phone the height is a MINIMUM. A fixed height here is what pushed the
+ * accept label out of its pill in the languages whose "accept measurement" is
+ * three words; `min-h` plus real vertical padding lets a two-line label make the
+ * button taller, and `items-stretch` on the row hands the same height to its
+ * peer. 2.5px of side padding instead of 8px gives a 105px button about 14 more
+ * characters of room before it needs that second line at all.
+ */
+const COMPACT_BUTTON = 'min-h-[26px] px-1.5 py-[3px] text-overline leading-[1.15]'
+const FULL_BUTTON = 'min-h-9 px-2 py-1 text-copy leading-tight'
+
 export function CookieConsent({
   onOpenChange,
   beaconSuppressed = false,
@@ -164,20 +180,33 @@ export function CookieConsent({
   // button carries a TRANSPARENT border purely so the two measure identically:
   // the reject button needs a visible one to read as a button on this navy
   // card, and without the invisible twin it came out 2px wider in the browser.
+  //
+  // THE PHONE BUTTONS GROW, they do not clip (owner, 13 November 2026 — the
+  // text was spilling out of the accept button). The card is 240px wide, so each
+  // button is about 105px, and the labels are a sentence in most languages:
+  // "Accetta la misurazione", "Accepter la mesure", "Messung annehmen",
+  // "Meting aanvaarden". At 11px those are two lines, and the button was a FIXED
+  // 26px tall — one line of room for two lines of text, so the second line sat
+  // outside the pill. `min-h` instead of `h` lets the taller of the two set the
+  // height, and the flex row's default stretch gives the other one the same
+  // height, so equal prominence survives the change (GDPR Art. 4(11): a refusal
+  // as easy as agreement). The size classes are shared in one constant so the
+  // two can never drift apart; lib/consent/__qa__/consent-contract.qa.ts
+  // compares them literally.
   const actions = (compact: boolean) => (
     <>
-      <div className={`${compact ? 'mt-1.5 gap-1.5' : 'mt-2.5 gap-2'} flex`}>
+      <div className={`${compact ? 'mt-1.5 gap-1.5' : 'mt-2.5 gap-2'} flex items-stretch`}>
         <button
           type="button"
           onClick={handleAccept}
-          className={`${compact ? 'h-[26px] text-overline' : 'h-9 text-copy'} flex-1 rounded-control border border-transparent bg-action px-2 font-bold text-action-ink transition-colors hover:bg-action-hover focus:outline-none focus-visible:ring-4 focus-visible:ring-white/40`}
+          className={`${compact ? COMPACT_BUTTON : FULL_BUTTON} flex-1 rounded-control border border-transparent bg-action font-bold text-action-ink transition-colors hover:bg-action-hover focus:outline-none focus-visible:ring-4 focus-visible:ring-white/40`}
         >
           {t.accept}
         </button>
         <button
           type="button"
           onClick={handleReject}
-          className={`${compact ? 'h-[26px] text-overline' : 'h-9 text-copy'} flex-1 rounded-control border border-white/25 bg-white/10 px-2 font-bold text-contrast-ink transition-colors hover:bg-white/20 focus:outline-none focus-visible:ring-4 focus-visible:ring-white/40`}
+          className={`${compact ? COMPACT_BUTTON : FULL_BUTTON} flex-1 rounded-control border border-white/25 bg-white/10 font-bold text-contrast-ink transition-colors hover:bg-white/20 focus:outline-none focus-visible:ring-4 focus-visible:ring-white/40`}
         >
           {t.rejectAll}
         </button>
