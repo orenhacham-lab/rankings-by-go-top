@@ -101,12 +101,15 @@ U mag niet:
 
 - een resultaat, een ranking, een positie of een winst beweren of suggereren die wij zelf niet beloven, en geen garantie in onze naam geven;
 - de dienst onjuist beschrijven, een prijs, een aanbod, een proefperiode of een actie gebruiken die niet van ons is, en geen beoordeling, cijfer of ervaring weergeven die niet echt is;
+- een retourtermijn, een niet-goed-geld-terug-garantie, een prijs of een valuta die alleen gelden op één van de plaatsen waar de Dienst wordt verkocht, voorstellen alsof zij voor de Dienst in het algemeen gelden, of ze gebruiken in een promotie die naar onze eigen afrekenpagina of naar een plaats leidt waar zij niet gelden;
 - betaalde advertenties in zoekmachines of in sociale netwerken plaatsen op onze naam, ons merk, ons domein of een verkeerd geschreven variant daarvan, en daarop niet bieden als zoekwoorden, zonder onze schriftelijke toestemming;
 - een domein, een subdomein, een account in een sociaal netwerk, een app of een paginanaam aanmelden of gebruiken die onze naam of ons merk of een verkeerd geschreven variant daarvan bevat of die een lezer met ons zou kunnen verwarren;
 - ongevraagde e-mails, berichten of reacties versturen, in forums, reactieruimten of beoordelingssites publiceren in strijd met de regels daarvan, en de dienst niet aanprijzen via geautomatiseerd of aangemoedigd verkeer;
 - uw aanbevelingslink plaatsen via linkschema's, betaalde links, private blognetwerken, verborgen tekst of elke andere praktijk die de spamregels van Google schendt;
 - onze pagina's, onze tekst of ons ontwerp kopiëren en onze content niet als de uwe weergeven;
 - de dienst aanprijzen naast onrechtmatige, haatdragende, seksuele of gewelddadige content of content die op minderjarigen is gericht.
+
+Noemt u een dergelijke voorwaarde, vermeld dan op dezelfde plaats de verkoper van wie zij komt. Een voorwaarde die bij een marktplaats hoort, is de voorwaarde van die marktplaats: zij kan zonder bericht aan u wijzigen of eindigen, en wij zijn haar niet verschuldigd bij een aankoop die elders is gedaan.
 
 ## 11. Het gebruik van onze naam en ons merk
 

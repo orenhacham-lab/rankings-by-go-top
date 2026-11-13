@@ -101,12 +101,15 @@ Lei non può:
 
 - affermare né lasciare intendere un risultato, un posizionamento, una posizione o un guadagno che noi stessi non promettiamo, né offrire una garanzia in nostro nome;
 - descrivere il Servizio in modo inesatto, utilizzare un prezzo, un'offerta, un periodo di prova o una promozione che non siano i nostri, né presentare una recensione, una valutazione o una testimonianza che non sia autentica;
+- presentare un termine di rimborso, una garanzia di rimborso, un prezzo o una valuta validi solo in uno dei luoghi in cui il Servizio è venduto come se valessero per il Servizio in generale, né usarli in una promozione che porti alla nostra cassa o a un luogo in cui non valgono;
 - fare pubblicità a pagamento sui motori di ricerca o sui social network sul nostro nome, sul nostro marchio, sul nostro dominio o su una variante scritta male di questi, né fare offerte su di essi come parole chiave, senza la nostra autorizzazione scritta;
 - registrare né utilizzare un dominio, un sottodominio, un account di social network, un'applicazione o un nome di pagina che contenga il nostro nome o il nostro marchio, o una variante scritta male, oppure che un lettore potrebbe confondere con noi;
 - inviare messaggi di posta elettronica, messaggi o commenti non sollecitati, pubblicare in forum, spazi di commento o siti di recensioni in violazione delle loro regole, né promuovere il Servizio per mezzo di traffico automatizzato o incentivato;
 - collocare il Suo link di segnalazione per mezzo di schemi di link, link a pagamento, reti private di blog, testo nascosto o qualsiasi altra pratica che violi le regole antispam di Google;
 - copiare le nostre pagine, il nostro testo o il nostro design, né presentare il nostro contenuto come Suo;
 - promuovere il Servizio accanto a contenuti illeciti, di odio, sessuali, violenti o destinati a minori.
+
+Se citi una condizione di questo tipo, indica nello stesso punto il venditore da cui proviene. Una condizione che appartiene a un marketplace è la condizione di quel marketplace: può cambiare o cessare senza preavviso nei tuoi confronti e non è dovuta da noi per un acquisto effettuato altrove.
 
 ## 11. Uso del nostro nome e del nostro marchio
 

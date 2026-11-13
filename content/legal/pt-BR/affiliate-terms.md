@@ -98,12 +98,15 @@ Você não pode:
 
 - afirmar ou dar a entender resultado, posicionamento, posição ou receita que nós mesmos não prometemos, nem dar garantia em nosso nome;
 - descrever o Serviço de forma inexata, usar preço, plano, período de teste ou oferta que não sejam nossos, nem apresentar avaliação, nota ou depoimento que não seja autêntico;
+- apresentar um prazo de devolução, uma garantia de devolução do dinheiro, um preço ou uma moeda que valem apenas em um dos lugares onde o Serviço é vendido como se valessem para o Serviço em geral, nem usá-los em uma divulgação que leve ao nosso próprio checkout ou a um lugar onde não valem;
 - fazer anúncios pagos em buscadores ou em redes sociais sobre o nosso nome, a nossa marca, o nosso domínio ou uma grafia errada deles, nem dar lances neles como palavras-chave, sem a nossa autorização por escrito;
 - registrar ou usar domínio, subdomínio, conta de rede social, aplicativo ou nome de página que contenha o nosso nome ou marca, ou uma grafia errada deles, ou que um leitor possa confundir conosco;
 - enviar e-mails, mensagens ou comentários não solicitados, publicar em fóruns, seções de comentários ou sites de avaliação violando as regras deles, nem divulgar o Serviço com tráfego automatizado ou incentivado;
 - colocar o seu link de indicação por meio de esquemas de links, links pagos, redes privadas de blogs, texto oculto ou qualquer outra prática que viole as políticas de spam do Google;
 - copiar as nossas páginas, o nosso texto ou o nosso design, nem apresentar conteúdo nosso como seu;
 - divulgar o Serviço ao lado de conteúdo ilícito, de ódio, sexual, violento ou dirigido a crianças.
+
+Se você mencionar uma condição desse tipo, indique no mesmo lugar o vendedor de quem ela vem. Uma condição que pertence a um marketplace é a condição daquele marketplace: pode mudar ou terminar sem aviso a você, e não a devemos em uma compra feita em outro lugar.
 
 ## 11. Uso do nosso nome e da nossa marca
 
