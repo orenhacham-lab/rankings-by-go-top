@@ -1,6 +1,6 @@
 /** POST /api/gbp/image/generate — an AI photo for a post written from a topic. 404 unless GBP_POSTS_ENABLED. */
 import { isGbpPostsEnabled } from '@/lib/gbp/config'
-import { handleGenerateImage } from '@/lib/gbp/http'
+import { handleGenerateImage } from '@/lib/gbp/http-image'
 import { realGbpDeps } from '@/lib/gbp/route-deps'
 
 export const runtime = 'nodejs'

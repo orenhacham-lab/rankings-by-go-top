@@ -19,8 +19,8 @@
  *
  * Run: npx tsx lib/__qa__/function-storage.qa.ts
  */
-import { readFileSync } from 'fs'
-import { join } from 'path'
+import { existsSync, readdirSync, readFileSync, statSync } from 'fs'
+import { dirname, join, relative } from 'path'
 // next/dist/compiled/picomatch ships no type declaration. It is imported
 // anyway because it is the very matcher collect-build-traces.js runs the
 // exclude keys through, so K2 and K3 below check the real behaviour rather
@@ -115,6 +115,124 @@ console.log('L) the legal pages do not drag the project behind them')
     !/\.\.\.\s*\w+\.split\(/.test(call), show(call))
   check('L3: the markdown is still supplied to the trace by config',
     ['/es/*', '/pt-BR/*'].every((k) => new RegExp(`'${k.replace(/[/*]/g, (c) => `\\${c}`)}'\\s*:\\s*\\['\\./content/legal/`).test(config)), show(config.slice(0, 0)))
+}
+
+console.log('S) sharp stays where the pixels are')
+{
+  // sharp carries a prebuilt libvips of ~19 MB into EVERY function whose import
+  // graph reaches it, so what matters is not how often it is imported but how
+  // many routes can see it. Measured on 13 Nov 2026: 43 of 732 functions could.
+  // Three modules encode images; everything else must not be able to reach them.
+  const SHARP_MODULES = [
+    'lib/content/author-box/photo-encode.ts',
+    'lib/content/gemini-image.ts',
+    'lib/gbp/image.ts',
+  ]
+  // Routes and modules that have no business opening an image. Each one used to
+  // reach sharp: the GBP handlers through two of fifteen handlers, the rest
+  // through a 24-character bucket name declared beside the image generator.
+  const COLD = [
+    'lib/gbp/http.ts',
+    'lib/content/author-box/photo.ts',
+    'lib/content/writing-guidance/data.ts',
+    'lib/account/delete-account.ts',
+    'lib/content/wordpress-publish.ts',
+    'lib/content/wordpress-plugin-publish.ts',
+    'lib/content/inline-images-wordpress.ts',
+    'lib/site-platforms/http.ts',
+    'lib/content/image-bucket.ts',
+    'lib/content/automation/attempts.ts',
+    'app/api/gbp/posts/route.ts',
+    'app/api/gbp/reviews/route.ts',
+    'app/api/account/delete/route.ts',
+    'app/api/content/articles/[id]/wordpress/route.ts',
+    'app/api/content/articles/[id]/site-platform/route.ts',
+    'app/api/site-platforms/test/route.ts',
+    'app/(dashboard)/content/articles/[id]/page.tsx',
+  ]
+  // And the two that must still find it, or a crop silently stops working.
+  const HOT = ['app/api/gbp/image/route.ts', 'app/api/gbp/image/generate/route.ts']
+
+  const strip = (src: string) => src.replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[^:'"`\\])\/\/.*$/gm, '$1')
+  // `import type` is erased before tracing ever sees it; a value import is not.
+  const valueImports = (src: string) => strip(src).replace(/^\s*import\s+type\s[^\n]*$/gm, '')
+  const files: string[] = []
+  const walk = (dir: string) => {
+    for (const f of readdirSync(dir)) {
+      if (f === 'node_modules' || f.startsWith('.') || f === '__qa__') continue
+      const abs = join(dir, f)
+      if (statSync(abs).isDirectory()) walk(abs)
+      else if (/\.(ts|tsx)$/.test(f) && !/\.(qa|test)\.ts$/.test(f)) files.push(relative(ROOT, abs))
+    }
+  }
+  for (const d of ['lib', 'app', 'components']) walk(join(ROOT, d))
+  const resolve = (from: string, spec: string): string | null => {
+    const base = spec.startsWith('@/') ? join(ROOT, spec.slice(2)) : spec.startsWith('.') ? join(ROOT, dirname(from), spec) : null
+    if (!base) return null
+    for (const c of [base, `${base}.ts`, `${base}.tsx`, join(base, 'index.ts'), join(base, 'index.tsx')]) {
+      if (existsSync(c) && statSync(c).isFile()) return relative(ROOT, c)
+    }
+    return null
+  }
+  const importsOf = (file: string, override?: Record<string, string>) =>
+    [...valueImports(override?.[file] ?? read(file)).matchAll(/(?:from|import)\s*\(?\s*['"]([^'"]+)['"]/g)]
+      .map((m) => resolve(file, m[1]!)).filter((x): x is string => !!x)
+  const closure = (start: string, override?: Record<string, string>) => {
+    const seen = new Set<string>([start]); const q = [start]
+    while (q.length) { const f = q.pop()!; for (const n of importsOf(f, override)) if (!seen.has(n)) { seen.add(n); q.push(n) } }
+    return seen
+  }
+  const importsSharp = (f: string, override?: Record<string, string>) =>
+    /^import sharp from 'sharp'$/m.test(strip(override?.[f] ?? read(f)))
+  const reaches = (start: string, override?: Record<string, string>) =>
+    [...closure(start, override)].filter((f) => importsSharp(f, override))
+
+  const found = files.filter((f) => importsSharp(f)).sort()
+  check('S1: exactly three production modules import sharp, and they are the three expected ones',
+    show(found) === show([...SHARP_MODULES].sort()), show(found))
+  const warm = COLD.filter((f) => reaches(f).length > 0)
+  check(`S2: none of the ${COLD.length} routes and modules that never open an image can reach sharp`,
+    warm.length === 0, show(warm.map((f) => [f, reaches(f)])))
+  const cold = HOT.filter((f) => reaches(f).length === 0)
+  check('S3: the two routes that DO crop and generate still reach it', cold.length === 0, show(cold))
+
+  // The invariant, rather than a list of sins: these are the only entry points
+  // whose work is making an image. 43 of 732 functions could reach sharp when
+  // this was measured on 13 November 2026; the point of the split is that a new
+  // page or route cannot quietly join them.
+  const MAY_REACH_SHARP = [
+    'app/(dashboard)/settings/page.tsx',
+    'app/api/blog/auto/cron/[locale]/route.ts',
+    'app/api/blog/auto/cron/route.ts',
+    'app/api/content/articles/[id]/image/route.ts',
+    'app/api/content/articles/[id]/inline-images/[imageId]/route.ts',
+    'app/api/content/articles/[id]/inline-images/route.ts',
+    'app/api/content/articles/generate/route.ts',
+    'app/api/content/automation/cron/route.ts',
+    'app/api/content/automation/items/[itemId]/generate/route.ts',
+    'app/api/content/automation/run/route.ts',
+    'app/api/content/strategy/schedule/route.ts',
+    'app/api/gbp/image/generate/route.ts',
+    'app/api/gbp/image/route.ts',
+  ]
+  const entries = files.filter((f) => /^app\/(?:.*\/)?(?:route|page)\.tsx?$/.test(f))
+  const warmEntries = entries.filter((f) => reaches(f).length > 0).sort()
+  check(`S5: exactly the ${MAY_REACH_SHARP.length} image entry points of ${entries.length} can reach sharp`,
+    show(warmEntries) === show([...MAY_REACH_SHARP].sort()),
+    show({ unexpected: warmEntries.filter((f) => !MAY_REACH_SHARP.includes(f)), gone: MAY_REACH_SHARP.filter((f) => !warmEntries.includes(f)) }))
+  check('S4: the bucket name is declared where nothing encodes an image',
+    /^export const CONTENT_IMAGE_BUCKET = /m.test(read('lib/content/image-bucket.ts')) &&
+    !/export const CONTENT_IMAGE_BUCKET/.test(read('lib/content/featured-image.ts')))
+
+  const back = { 'lib/gbp/http.ts': `${read('lib/gbp/http.ts')}\nimport { preparePostImage } from './image'\n` }
+  check('MUTATION CONTROL: the GBP handlers importing the cropper again fails S2',
+    reaches('lib/gbp/http.ts', back).length > 0)
+  const bucket = { 'lib/content/image-bucket.ts': `${read('lib/content/image-bucket.ts')}\nimport sharp from 'sharp'\n` }
+  check('MUTATION CONTROL: a bucket module that imports sharp fails S2',
+    COLD.some((f) => reaches(f, bucket).length > 0))
+  const typeOnly = 'import type { GenerateTopicImage } from \'./topic-image\''
+  check('MUTATION CONTROL: the same import as a value import is not erased, and is seen',
+    valueImports(typeOnly) === '' && valueImports(typeOnly.replace('import type', 'import')) !== '')
 }
 
 console.log('M) mutation controls')

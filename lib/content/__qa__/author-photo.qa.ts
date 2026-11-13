@@ -1,5 +1,6 @@
 /**
- * THE AUTHOR PHOTO — the guards (lib/content/author-box/photo.ts, photo-file.ts,
+ * THE AUTHOR PHOTO — the guards (lib/content/author-box/photo.ts, photo-encode.ts,
+ * photo-file.ts,
  * photo-copy.ts; the 'upload' image choice of the author box).
  *
  *   P) the storage path is `<project_id>/<random uuid>.<ext>` and nothing else;
@@ -42,6 +43,7 @@ import { applyArticleDesign } from '@/lib/content/article-style/publish'
 import { authorBoxContent, authorBoxStructure } from '@/lib/content/author-box/box'
 import { AUTHOR_PHOTO_PATH, authorPhotoPath, isAuthorPhotoPath } from '@/lib/content/author-box/photo-file'
 import type * as PhotoMod from '@/lib/content/author-box/photo'
+import type * as EncodeMod from '@/lib/content/author-box/photo-encode'
 import type * as PhotoFileMod from '@/lib/content/author-box/photo-file'
 import { AUTHOR_PHOTO_COPY_SECONDS, canCopyAuthorPhoto, copyAuthorPhoto, copyAuthorPhotoToWordPress, copyAuthorPhotoViaPlugin } from '@/lib/content/author-box/photo-copy'
 import { loadWritingGuidance, saveWritingGuidance, type GuidanceDeps } from '@/lib/content/writing-guidance/data'
@@ -142,6 +144,9 @@ const fileOf = (bytes: Uint8Array, size = bytes.byteLength) => ({ size, arrayBuf
 
 async function main() {
   const photo = await import('@/lib/content/author-box/photo')
+  // The encoder and the upload that uses it live apart from the reads, so the
+  // screens that only read a photo do not ship sharp (lib/__qa__/function-storage.qa.ts).
+  const encode = await import('@/lib/content/author-box/photo-encode')
 
   // Real images, made here.
   const raw = { width: 900, height: 600, channels: 3 as const, background: { r: 200, g: 120, b: 40 } }
@@ -170,10 +175,10 @@ async function main() {
       && !isAuthorPhotoPath(`${PROJECT}/${UUID1}/x.jpg`, PROJECT) && !isAuthorPhotoPath(`${PROJECT}/${UUID1}.jpg/../x`, PROJECT))
     const named = await mutant<typeof PhotoFileMod>('lib/content/author-box/photo-file.ts', (s) => s.replace('return `${project}/${id}.${AUTHOR_PHOTO_EXT[kind]}`', 'return `${project}/dana-levi-${id}.${AUTHOR_PHOTO_EXT[kind]}`'))
     check('MUTATION CONTROL: a path with a name in it fails P1', !shape(named))
-    const src = strip(read('lib/content/author-box/photo.ts'))
-    const upPath = (s: string) => /const path = authorPhotoPath\(o\.projectId, prepared\.kind, deps\.uuid\?\.\(\)\)/.test(s) && !/\.name\b|email|slug/.test(s.slice(s.indexOf('export async function uploadAuthorPhoto'), s.indexOf('export async function deleteAuthorPhoto')))
-    check('P4: the upload stores at authorPhotoPath(project, sniffed kind) and reads no file name, email or slug', upPath(src))
-    check('MUTATION CONTROL: an upload that keeps the file name fails P4', !upPath(src.replace('const path = authorPhotoPath(o.projectId, prepared.kind, deps.uuid?.())', 'const path = `${o.projectId}/${(file as File).name}`')))
+    const encSrc = strip(read('lib/content/author-box/photo-encode.ts'))
+    const upPath = (s: string) => /const path = authorPhotoPath\(o\.projectId, prepared\.kind, deps\.uuid\?\.\(\)\)/.test(s) && !/\.name\b|email|slug/.test(s.slice(s.indexOf('export async function uploadAuthorPhoto')))
+    check('P4: the upload stores at authorPhotoPath(project, sniffed kind) and reads no file name, email or slug', upPath(encSrc))
+    check('MUTATION CONTROL: an upload that keeps the file name fails P4', !upPath(encSrc.replace('const path = authorPhotoPath(o.projectId, prepared.kind, deps.uuid?.())', 'const path = `${o.projectId}/${(file as File).name}`')))
   }
 
   // ── V) the file ─────────────────────────────────────────────────────────
@@ -187,31 +192,31 @@ async function main() {
     check('MUTATION CONTROL: a sniffer that accepts anything fails V1', !sniffs(always))
 
     const before = await sharp(jpegWithExif).metadata()
-    const prepared = await photo.prepareAuthorPhoto(jpegWithExif)
+    const prepared = await encode.prepareAuthorPhoto(jpegWithExif)
     const after = prepared.ok ? await sharp(prepared.bytes).metadata() : null
     const stripped = (p: typeof prepared, a: typeof after) => p.ok && !!a && !a.exif && !a.xmp && !a.iptc && !p.bytes.includes(Buffer.from('secret-owner')) && Math.max(a.width ?? 0, a.height ?? 0) <= 512
     check('V2: the photo is written again with no EXIF, XMP or IPTC (the artist and copyright are gone), within 512 px', !!before.exif && stripped(prepared, after))
-    const keep = await mutant<typeof PhotoMod>('lib/content/author-box/photo.ts', (s) => s.replace(".rotate()\n", '.rotate().keepMetadata()\n'))
+    const keep = await mutant<typeof EncodeMod>('lib/content/author-box/photo-encode.ts', (s) => s.replace(".rotate()\n", '.rotate().keepMetadata()\n'))
     const kept = await keep.prepareAuthorPhoto(jpegWithExif)
     check('MUTATION CONTROL: an encoder that keeps the metadata fails V2', !stripped(kept, kept.ok ? await sharp(kept.bytes).metadata() : null))
 
     const big = Buffer.concat([png, Buffer.alloc(2 * 1024 * 1024)])
-    const tooBig = await photo.prepareAuthorPhoto(big)
-    const asGif = await photo.prepareAuthorPhoto(gif)
-    const broken = await photo.prepareAuthorPhoto(Buffer.concat([Buffer.from([0xff, 0xd8, 0xff]), Buffer.from('not really a jpeg')]))
-    const pngOk = await photo.prepareAuthorPhoto(png)
-    const webpOk = await photo.prepareAuthorPhoto(webp)
+    const tooBig = await encode.prepareAuthorPhoto(big)
+    const asGif = await encode.prepareAuthorPhoto(gif)
+    const broken = await encode.prepareAuthorPhoto(Buffer.concat([Buffer.from([0xff, 0xd8, 0xff]), Buffer.from('not really a jpeg')]))
+    const pngOk = await encode.prepareAuthorPhoto(png)
+    const webpOk = await encode.prepareAuthorPhoto(webp)
     check('V3: over 2 MB, a GIF, and a fake JPEG header are refused with their own codes; PNG and WebP stay their kind',
       !tooBig.ok && tooBig.code === 'photo_too_large' && !asGif.ok && asGif.code === 'photo_type' && !broken.ok && broken.code === 'photo_unreadable'
       && pngOk.ok && pngOk.kind === 'png' && webpOk.ok && webpOk.kind === 'webp')
-    const noCap = await mutant<typeof PhotoMod>('lib/content/author-box/photo.ts', (s) => s.replace("if (input.byteLength > AUTHOR_PHOTO_MAX_BYTES) return { ok: false, code: 'photo_too_large' }", ''))
+    const noCap = await mutant<typeof EncodeMod>('lib/content/author-box/photo-encode.ts', (s) => s.replace("if (input.byteLength > AUTHOR_PHOTO_MAX_BYTES) return { ok: false, code: 'photo_too_large' }", ''))
     const r = await noCap.prepareAuthorPhoto(big)
     check('MUTATION CONTROL: without the size cap a 2 MB+ file is accepted (so V3 would fail)', r.ok || r.code !== 'photo_too_large')
     {
       const d = db([baseRow()])
       const s = fakeStorage()
-      const declared = await photo.uploadAuthorPhoto(photoDeps(d, s), PROJECT, fileOf(png, 3 * 1024 * 1024))
-      const typed = await photo.uploadAuthorPhoto(photoDeps(d, s), PROJECT, { ...fileOf(gif), type: 'image/png', name: 'x.png' })
+      const declared = await encode.uploadAuthorPhoto(photoDeps(d, s), PROJECT, fileOf(png, 3 * 1024 * 1024))
+      const typed = await encode.uploadAuthorPhoto(photoDeps(d, s), PROJECT, { ...fileOf(gif), type: 'image/png', name: 'x.png' })
       check('V4: the upload refuses a declared size over 2 MB before reading it, and a GIF named .png; nothing is stored',
         !declared.ok && declared.code === 'photo_too_large' && !typed.ok && typed.code === 'photo_type' && s.calls.length === 0 && styleRow(d).author_box_photo_path === null)
     }
@@ -222,7 +227,7 @@ async function main() {
   {
     const d = db([baseRow()])
     const s = fakeStorage()
-    const up = await photo.uploadAuthorPhoto(photoDeps(d, s), PROJECT, fileOf(jpegWithExif))
+    const up = await encode.uploadAuthorPhoto(photoDeps(d, s), PROJECT, fileOf(jpegWithExif))
     const path = `${PROJECT}/${UUID1}.jpg`
     check('D0: an upload stores the object in the private bucket and points the owner\'s row at it, the image now upload',
       up.ok && s.objects.has(path) && s.calls[0]?.bucket === 'author-photos' && styleRow(d).author_box_photo_path === path && styleRow(d).author_box_image === 'upload', JSON.stringify({ up, calls: s.calls, row: styleRow(d) }))
@@ -248,9 +253,9 @@ async function main() {
   {
     const d = db([baseRow({ author_box_image: 'upload', author_box_photo_path: OLD_PATH })])
     const s = fakeStorage(); s.objects.set(OLD_PATH, { bucket: 'author-photos', bytes: png })
-    const up = await photo.uploadAuthorPhoto(photoDeps(d, s), PROJECT, fileOf(webp))
+    const up = await encode.uploadAuthorPhoto(photoDeps(d, s), PROJECT, fileOf(webp))
     check('D3: a replaced photo\'s object is removed; the new one is kept', up.ok && !s.objects.has(OLD_PATH) && s.objects.has(`${PROJECT}/${UUID1}.webp`) && styleRow(d).author_box_photo_path === `${PROJECT}/${UUID1}.webp`)
-    const keepOld = await mutant<typeof PhotoMod>('lib/content/author-box/photo.ts', (x) => x.replace('if (current.path && current.path !== path && !(await removeAuthorPhotoObject(storage, o.projectId, current.path))) {', 'if (false) {'))
+    const keepOld = await mutant<typeof EncodeMod>('lib/content/author-box/photo-encode.ts', (x) => x.replace('if (current.path && current.path !== path && !(await removeAuthorPhotoObject(storage, o.projectId, current.path))) {', 'if (false) {'))
     const d2 = db([baseRow({ author_box_image: 'upload', author_box_photo_path: OLD_PATH })])
     const s2 = fakeStorage(); s2.objects.set(OLD_PATH, { bucket: 'author-photos', bytes: png })
     await keepOld.uploadAuthorPhoto(photoDeps(d2, s2), PROJECT, fileOf(webp))
@@ -259,7 +264,7 @@ async function main() {
   {
     const d = db([baseRow()], { failUpsert: true })
     const s = fakeStorage()
-    const up = await photo.uploadAuthorPhoto(photoDeps(d, s), PROJECT, fileOf(png))
+    const up = await encode.uploadAuthorPhoto(photoDeps(d, s), PROJECT, fileOf(png))
     check('D4: an upload whose pointer cannot be written removes its own object (no orphan), and says only a code', !up.ok && s.objects.size === 0 && s.calls.some((c) => c.op === 'remove') && !JSON.stringify(up).includes('raw provider'))
   }
   for (const next of ['none', 'site_icon'] as const) {
@@ -295,22 +300,25 @@ async function main() {
   {
     const d = db([baseRow(), { ...baseRow({ project_id: OTHER_PROJECT, user_id: OTHER, author_box_photo_path: `${OTHER_PROJECT}/${UUID1}.jpg`, author_box_image: 'upload' }) }])
     const s = fakeStorage()
-    const up = await photo.uploadAuthorPhoto(photoDeps(d, s), OTHER_PROJECT, fileOf(png))
+    const up = await encode.uploadAuthorPhoto(photoDeps(d, s), OTHER_PROJECT, fileOf(png))
     const del = await photo.deleteAuthorPhoto(photoDeps(d, s), OTHER_PROJECT)
-    const anon = await photo.uploadAuthorPhoto({ ...photoDeps(d, s), session: async () => ({ userId: null, db: d as never }) }, PROJECT, fileOf(png))
-    const bad = await photo.uploadAuthorPhoto(photoDeps(d, s), 'not-a-uuid', fileOf(png))
+    const anon = await encode.uploadAuthorPhoto({ ...photoDeps(d, s), session: async () => ({ userId: null, db: d as never }) }, PROJECT, fileOf(png))
+    const bad = await encode.uploadAuthorPhoto(photoDeps(d, s), 'not-a-uuid', fileOf(png))
     check('O1: someone else\'s project, no session, or a bad id: refused before any storage call',
       !up.ok && up.code === 'not_found' && !del.ok && del.code === 'not_found' && !anon.ok && anon.code === 'unauthorized' && !bad.ok && s.calls.length === 0
       && styleRow(d, OTHER, OTHER_PROJECT).author_box_photo_path === `${OTHER_PROJECT}/${UUID1}.jpg`)
     const src = strip(read('lib/content/author-box/photo.ts'))
-    const ownerFirst = (x: string) => ['uploadAuthorPhoto', 'deleteAuthorPhoto'].every((fn) => {
-      const body = x.slice(x.indexOf(`export async function ${fn}`))
+    // The upload moved to photo-encode.ts with its encoder; the owner check moved with it.
+    const encSrc = strip(read('lib/content/author-box/photo-encode.ts'))
+    const ownerFirst = (x: string, enc: string) => ([['uploadAuthorPhoto', enc], ['deleteAuthorPhoto', x]] as const).every(([fn, from]) => {
+      const body = from.slice(from.indexOf(`export async function ${fn}`))
       return /^[^{]*\{\s*const o = await owner\(deps, projectId\)\s*if \(!o\.ok\) return o/.test(body)
-    }) && /import \{ owner, type GuidanceSession \} from '@\/lib\/content\/writing-guidance\/data'/.test(x) && !/requireAdminApi/.test(x)
-    check('O2: both start with the settings actions\' owner check (writing-guidance/data owner), not requireAdminApi', ownerFirst(src))
-    check('MUTATION CONTROL: an upload without the owner check fails O2', !ownerFirst(src.replace('const o = await owner(deps, projectId)\n  if (!o.ok) return o\n  if (!isFileLike', 'const o = { ok: true } as never as Extract<Awaited<ReturnType<typeof owner>>, { ok: true }>\n  if (!isFileLike')))
+    }) && [x, enc].every((from) => /import \{ owner(?:, type GuidanceSession)? \} from '@\/lib\/content\/writing-guidance\/data'/.test(from)) && !/requireAdminApi/.test(x + enc)
+    check('O2: both start with the settings actions\' owner check (writing-guidance/data owner), not requireAdminApi', ownerFirst(src, encSrc))
+    check('MUTATION CONTROL: an upload without the owner check fails O2', !ownerFirst(src, encSrc.replace('const o = await owner(deps, projectId)\n  if (!o.ok) return o\n  if (!isFileLike', 'const o = { ok: true } as never as Extract<Awaited<ReturnType<typeof owner>>, { ok: true }>\n  if (!isFileLike')))
     const filtered = (x: string) => (x.match(/\.from\(ARTICLE_STYLE_TABLE\)/g) ?? []).length === (x.match(/\.from\(ARTICLE_STYLE_TABLE\)[\s\S]{0,400}?\.eq\('project_id', [\s\S]{0,40}?\)\s*\.eq\('user_id'|\.from\(ARTICLE_STYLE_TABLE\)\s*\.upsert\(\{\s*project_id: o\.projectId,\s*user_id: o\.userId/g) ?? []).length
-    check('O3: every read and write of the settings row names the project AND the owner (photo.ts, photo-copy.ts)', filtered(src) && filtered(strip(read('lib/content/author-box/photo-copy.ts'))))
+    check('O3: every read and write of the settings row names the project AND the owner (photo.ts, photo-encode.ts, photo-copy.ts)',
+      filtered(src) && filtered(encSrc) && filtered(strip(read('lib/content/author-box/photo-copy.ts'))))
     check('MUTATION CONTROL: a delete that forgets the owner filter fails O3', !filtered(src.replace(".eq('project_id', o.projectId)\n    .eq('user_id', o.userId)\n  if (error) return { ok: false, code: 'save_failed' }", ".eq('project_id', o.projectId)\n  if (error) return { ok: false, code: 'save_failed' }")))
   }
 
@@ -342,7 +350,7 @@ async function main() {
       while (q.length) { const f = q.pop()!; for (const n of importsOf(f, override?.[f])) if (!seen.has(n)) { seen.add(n); q.push(n) } }
       return seen
     }
-    const PHOTO = ['lib/content/author-box/photo.ts', 'lib/content/author-box/photo-file.ts', 'lib/content/author-box/photo-copy.ts']
+    const PHOTO = ['lib/content/author-box/photo.ts', 'lib/content/author-box/photo-encode.ts', 'lib/content/author-box/photo-file.ts', 'lib/content/author-box/photo-copy.ts']
     const importers = files.filter((f) => !PHOTO.includes(f) && importsOf(f).some((i) => PHOTO.includes(i)))
     const aiIn = (set: Set<string>, override?: Record<string, string>) => [...set].filter((f) => isAi(override?.[f] ?? read(f)))
     const reach = PHOTO.flatMap((f) => aiIn(closure(f)))
@@ -366,19 +374,20 @@ async function main() {
     check('MUTATION CONTROL: photo.ts importing the article generator fails A1', aiIn(closure('lib/content/author-box/photo.ts', viaImport), viaImport).length > 0)
     const importer = { 'lib/content/author-box/preview.ts': `${read('lib/content/author-box/preview.ts')}\nimport { GoogleGenerativeAI } from '@google/generative-ai'\n` }
     check('MUTATION CONTROL: an importer (preview.ts) importing a model client fails A2', isAi(importer['lib/content/author-box/preview.ts']))
-    check('A4: the legal guard\'s words are absent from the photo module (gemini, generateContent, openai)', !/gemini|generateContent|openai/i.test(read('lib/content/author-box/photo.ts')))
+    check('A4: the legal guard\'s words are absent from the photo modules (gemini, generateContent, openai)',
+      !/gemini|generateContent|openai/i.test(read('lib/content/author-box/photo.ts') + read('lib/content/author-box/photo-encode.ts')))
   }
 
   // ── B) the private bucket ───────────────────────────────────────────────
   console.log('\nB) the private bucket: signed URLs and service-role reads only; our copy never in an article')
   {
-    const all = ['lib/content/author-box/photo.ts', 'lib/content/author-box/photo-copy.ts', 'lib/content/author-box/preview.ts', 'lib/content/writing-guidance/data.ts', 'app/(dashboard)/settings/writing-guidance-actions.ts', 'lib/content/wordpress-publish.ts', 'lib/content/wordpress-plugin-publish.ts']
+    const all = ['lib/content/author-box/photo.ts', 'lib/content/author-box/photo-encode.ts', 'lib/content/author-box/photo-copy.ts', 'lib/content/author-box/preview.ts', 'lib/content/writing-guidance/data.ts', 'app/(dashboard)/settings/writing-guidance-actions.ts', 'lib/content/wordpress-publish.ts', 'lib/content/wordpress-plugin-publish.ts']
     const privateUse = (srcs: string[]) => srcs.every((x) => !/AUTHOR_PHOTO_BUCKET\)\.getPublicUrl|author-photos['"]\)\.getPublicUrl/.test(x))
       && /storage\.from\(AUTHOR_PHOTO_BUCKET\)\.createSignedUrl\(path, AUTHOR_PHOTO_PREVIEW_SECONDS\)/.test(srcs[0]!) && /AUTHOR_PHOTO_PREVIEW_SECONDS = 300\b/.test(srcs[0]!)
     const srcs = all.map((f) => strip(read(f)))
     check('B1: no public URL of the bucket anywhere; the preview uses a 5-minute signed URL', privateUse(srcs))
     check('MUTATION CONTROL: a preview that asks for a public URL fails B1', !privateUse([srcs[0]!.replace('.createSignedUrl(path, AUTHOR_PHOTO_PREVIEW_SECONDS)', '.getPublicUrl(path)'), ...srcs.slice(1)]))
-    const ops = [...strip(read('lib/content/author-box/photo.ts') + read('lib/content/author-box/photo-copy.ts')).matchAll(/from\(AUTHOR_PHOTO_BUCKET\)\.(\w+)/g)].map((m) => m[1])
+    const ops = [...strip(read('lib/content/author-box/photo.ts') + read('lib/content/author-box/photo-encode.ts') + read('lib/content/author-box/photo-copy.ts')).matchAll(/from\(AUTHOR_PHOTO_BUCKET\)\.(\w+)/g)].map((m) => m[1])
     check('B2: the bucket is only uploaded to, removed from, downloaded (the copy step) and signed (the preview)', ops.length >= 4 && ops.every((o) => ['upload', 'remove', 'download', 'createSignedUrl'].includes(o!)), ops.join(','))
     const box = (m: typeof import('@/lib/content/author-box/box')) => {
       const ours = m.authorBoxContent({ language: 'en', businessName: 'Levi Bakery', domain: DOMAIN, imageChoice: 'upload', photoUrl: SIGNED })
@@ -397,7 +406,7 @@ async function main() {
   console.log('\nC) the copy into the WordPress media library, once per project and site')
   {
     const path = `${PROJECT}/${UUID1}.jpg`
-    const prepared = await photo.prepareAuthorPhoto(jpegWithExif)
+    const prepared = await encode.prepareAuthorPhoto(jpegWithExif)
     const d = db([baseRow({ author_box_image: 'upload', author_box_photo_path: path }), decoyRow()])
     const s = fakeStorage(); s.objects.set(path, { bucket: 'author-photos', bytes: prepared.ok ? prepared.bytes : new Uint8Array() })
     ;(d as unknown as { storage: unknown }).storage = s.storage
@@ -448,7 +457,7 @@ async function main() {
   console.log('\nW) the plugin route: a signed address, once, and only to a plugin that can take it')
   {
     const path = `${PROJECT}/${UUID1}.jpg`
-    const prepared = await photo.prepareAuthorPhoto(jpegWithExif)
+    const prepared = await encode.prepareAuthorPhoto(jpegWithExif)
     const world = () => {
       const d = db([baseRow({ author_box_image: 'upload', author_box_photo_path: path }), decoyRow()])
       const st = fakeStorage(); st.objects.set(path, { bucket: 'author-photos', bytes: prepared.ok ? prepared.bytes : new Uint8Array() })
