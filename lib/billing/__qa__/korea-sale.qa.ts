@@ -250,6 +250,45 @@ console.log('\nF. the fact is told BEFORE the trial, not only at the refusal')
     + 'in silence, and this sentence is read under a disclosure duty',
     ALL_PRICING_LOCALES.map((loc) => (pricingNotice(loc) ?? '').replace('${DAYS}', '7'))
       .every((line) => /\d/.test(line)))
+  // Legal, 13 Nov 2026, after a model read the Korean back: the payment-step
+  // HEADING must say what IS available, not only what is absent. A bare "we do
+  // not provide this" at the exact spot where a plan would be bought reads as a
+  // door closing, which is the failure mode the signup wording was written
+  // against, and it is weaker against 전자상거래법 제21조 제1항 제1호: the duty is
+  // not to withhold a MATERIAL FACT, and "the trial is yours, the paid plan is
+  // not sold here" is the whole fact, while the refusal alone is half of it.
+  const KOREA_SALE_DICTS = ['lib/i18n/dashboard/he.ts', 'lib/i18n/dashboard/en.ts', 'lib/i18n/dashboard/ko/billing.ts']
+  const koreaSaleTitle = (path: string): string => {
+    const d = read(path)
+    const seg = d.slice(d.indexOf('koreaSale: {'), d.indexOf('koreaSale: {') + 700)
+    return (seg.match(/title: '((?:[^'\\]|\\.)*)'/) ?? ['', ''])[1]
+  }
+  const saysWhatIsAvailable = (title: string) => /\u05d6\u05de\u05d9\u05df|available|\uc774\uc6a9\ud560 \uc218 \uc788\uc2b5\ub2c8\ub2e4/.test(title)
+  check('F9: the payment-step heading names what IS available, in all three dictionaries that can show it',
+    KOREA_SALE_DICTS.every((p2) => saysWhatIsAvailable(koreaSaleTitle(p2))),
+    KOREA_SALE_DICTS.filter((p2) => !saysWhatIsAvailable(koreaSaleTitle(p2))).join(', '))
+  check('F9b: and the refusal itself is still told, in the body beneath it',
+    KOREA_SALE_DICTS.every((p2) => {
+      const d = read(p2)
+      const seg = d.slice(d.indexOf('koreaSale: {'), d.indexOf('koreaSale: {') + 700)
+      const body = (seg.match(/description: '((?:[^'\\]|\\.)*)'/) ?? ['', ''])[1]
+      return /\u05dc\u05d0 \u05e0\u05de\u05db\u05e8|is not sold|\uc81c\uacf5\ud558\uc9c0 \uc54a\uc2b5\ub2c8\ub2e4/.test(body)
+    }))
+  // MUTATION CONTROL
+  check('F9-MUT: a heading that states only the absence is caught',
+    !saysWhatIsAvailable('\ud604\uc7ac \ud55c\uad6d\uc5d0\uc11c\ub294 \uc720\ub8cc \uad6d\ub3c5 \uacb0\uc81c\ub97c \uc81c\uacf5\ud558\uc9c0 \uc54a\uc2b5\ub2c8\ub2e4')
+    && !saysWhatIsAvailable('A paid subscription is not sold in Korea at the moment'))
+  // Legal, same ruling: the pricing sentence may hedge the PRESENT ("currently",
+  // "at the moment") but must not point at a future launch. Korean 아직 ("not
+  // yet") asks the reader to expect one, and nobody has recorded an intent to
+  // open Korean paid billing or committed a date — the same reason the
+  // payment-step text may not promise to notify them (F6).
+  check('F10: no pricing sentence promises a future Korean launch',
+    ALL_PRICING_LOCALES.every((loc) => !/\uc544\uc9c1|not yet|noch nicht|pas encore|todav\u00eda no|ainda n\u00e3o|non ancora|\u05dc\u05d0 \u05e2\u05d3\u05d9\u05d9\u05df|nog niet|jeszcze nie|\u307e\u3060/.test(pricingNotice(loc) ?? '')),
+    ALL_PRICING_LOCALES.filter((loc) => /\uc544\uc9c1|not yet|noch nicht|pas encore|todav\u00eda no|ainda n\u00e3o|non ancora|nog niet|jeszcze nie|\u307e\u3060/.test(pricingNotice(loc) ?? '')).join(', '))
+  // MUTATION CONTROL
+  check('F10-MUT: the sentence we shipped until today, with 아직, is caught',
+    /\uc544\uc9c1/.test('\ud604\uc7ac \ud55c\uad6d\uc5d0\uc11c\ub294 \ubb34\ub8cc \uccb4\ud5d8\ub9cc \uc81c\uacf5\ud558\uba70, \uc720\ub8cc \uad6d\ub3c5 \uacb0\uc81c\ub294 \uc544\uc9c1 \uc81c\uacf5\ud558\uc9c0 \uc54a\uc2b5\ub2c8\ub2e4.'))
   check('F6: and the payment-step sentence promises no notification we are not recording',
     ['lib/i18n/dashboard/he.ts', 'lib/i18n/dashboard/en.ts', 'lib/i18n/dashboard/ko/billing.ts']
       .every((p) => {
