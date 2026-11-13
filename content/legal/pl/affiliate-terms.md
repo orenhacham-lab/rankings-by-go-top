@@ -101,12 +101,15 @@ Nie wolno Państwu:
 
 - twierdzić ani sugerować wyniku, miejsca w rankingu, pozycji ani zysku, których sami nie obiecujemy, ani dawać gwarancji w naszym imieniu;
 - opisywać usługi nieprawdziwie, używać ceny, oferty, okresu próbnego albo promocji, które nie są nasze, ani przedstawiać opinii, oceny czy doświadczenia, które nie są prawdziwe;
+- przedstawiać terminu zwrotu, gwarancji zwrotu pieniędzy, ceny ani waluty, które obowiązują tylko w jednym z miejsc sprzedaży Usługi, tak jakby obowiązywały dla Usługi w ogóle, ani używać ich w promocji prowadzącej do naszej własnej płatności lub do miejsca, w którym nie obowiązują;
 - umieszczać płatnych reklam w wyszukiwarkach ani w serwisach społecznościowych na naszą nazwę, naszą markę, naszą domenę albo ich błędnie zapisany wariant, ani licytować ich jako słów kluczowych, bez naszej pisemnej zgody;
 - rejestrować ani używać domeny, subdomeny, konta w serwisie społecznościowym, aplikacji ani nazwy strony, które zawierają naszą nazwę, naszą markę albo ich błędnie zapisany wariant lub które czytelnik mógłby pomylić z nami;
 - wysyłać niezamówionych e-maili, wiadomości ani komentarzy, publikować na forach, w miejscach na komentarze albo w serwisach z opiniami wbrew ich zasadom, ani polecać usługi przez ruch zautomatyzowany lub zachęcany;
 - umieszczać Państwa linku polecającego przez schematy linków, płatne linki, prywatne sieci blogów, ukryty tekst ani żadną inną praktykę, która narusza zasady Google dotyczące spamu;
 - kopiować naszych stron, naszego tekstu ani naszego projektu, ani przedstawiać naszych treści jako swoich;
 - polecać usługi obok treści bezprawnych, nawołujących do nienawiści, treści o charakterze seksualnym lub przemocy ani treści skierowanych do osób nieletnich.
+
+Jeżeli Państwo powołują się na taki warunek, proszę wskazać w tym samym miejscu sprzedawcę, od którego on pochodzi. Warunek należący do platformy sprzedażowej jest warunkiem tej platformy: może zostać zmieniony lub zakończony bez powiadomienia Państwa, a my nie jesteśmy nim zobowiązani przy zakupie dokonanym w innym miejscu.
 
 ## 11. Używanie naszej nazwy i naszej marki
 

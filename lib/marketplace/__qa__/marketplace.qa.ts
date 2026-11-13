@@ -18,13 +18,13 @@
  *
  * Run: npx tsx lib/marketplace/__qa__/marketplace.qa.ts
  */
-import { readFileSync } from 'fs'
+import { existsSync, readFileSync } from 'fs'
 import { createCipheriv, createHash, createHmac } from 'crypto'
 import { createElement } from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
 import { CONSENT_DENIED, type ConsentChoices } from '../../consent/categories'
 import { MarketplacePixel, marketingBeaconAllowed } from '../../../components/consent/MarketplacePixel'
-import { MARKETPLACE_SUPPORT_EMAIL, marketplaceBadgeUrl } from '../config'
+import { MARKETPLACE_SUPPORT_EMAIL } from '../config'
 import { FakeAdmin } from '../../__qa__/_fake-admin'
 import {
   MARKETPLACE_CLAIM_PATH,
@@ -1479,10 +1479,30 @@ async function main() {
       .every((event) => parseDigistore24Ipn(DS_SALE.replace('event=on_payment', `event=${event}`), null) === null))
   check('DS23: their connection test is acknowledged and records nothing',
     parseDigistore24Ipn('event=connection_test&api_mode=live', null) === null)
-  check('DS24: a TEST order never becomes a real plan',
-    parseDigistore24Ipn(DS_SALE.replace('api_mode=live', 'api_mode=test'), null) === null)
-  check('DS25: but a MISSING api_mode is treated as live, so a real sale is never dropped in silence',
-    parseDigistore24Ipn(DS_SALE.replace('api_mode=live&', ''), null)?.kind === 'paid')
+  // DS24 USED TO ASSERT THE OPPOSITE, and the change is the fix of
+  // 2026-11-12: a dropped test order is how Digistore24's own reviewer bought
+  // the product, got no access email and rejected all four listings while
+  // their IPN report showed every delivery SUCCESS. A test order is now a
+  // recorded, claimable, DELIVERED order that carries a flag.
+  const dsTest = parseDigistore24Ipn(DS_SALE.replace('api_mode=live', 'api_mode=test'), null)
+  check('DS24: a TEST order is parsed as a paid order, so the reviewer is actually delivered to',
+    dsTest?.kind === 'paid')
+  check('DS24b: and it is flagged, which is what makes recording it removable afterwards',
+    dsTest?.isTest === true)
+  check('DS24c: a live order is NOT flagged',
+    parseDigistore24Ipn(DS_SALE, null)?.isTest === false)
+  check('DS25: a MISSING api_mode is treated as live, so a real sale is never dropped in silence',
+    parseDigistore24Ipn(DS_SALE.replace('api_mode=live&', ''), null)?.kind === 'paid'
+    && parseDigistore24Ipn(DS_SALE.replace('api_mode=live&', ''), null)?.isTest === false)
+  check('DS24-MUT1: a parser that went back to dropping test orders would be caught by DS24',
+    parseDigistore24Ipn('event=on_payment&api_mode=test', null) !== null)
+  check('DS24-MUT2: a parser that flagged everything would be caught by DS24c',
+    parseDigistore24Ipn(DS_SALE, null)?.isTest !== true)
+  check('DS24d: the flag reaches the INSERT, not just the event',
+    /is_test: event\.isTest === true/.test(code('lib/marketplace/intake.ts')))
+  check('DS24-MUT3: an insert that forgot the flag would be caught by DS24d',
+    !/is_test: event\.isTest === true/.test(
+      code('lib/marketplace/intake.ts').replace('is_test: event.isTest === true', '')))
   check('DS26: a date it does not recognise leaves the period UNKNOWN rather than invented',
     parseDigistore24Ipn(DS_SALE.replace('next_payment_at=2026-12-02', 'next_payment_at=02.12.2026'), null)
       ?.currentPeriodEnd === null)
@@ -1683,74 +1703,119 @@ async function main() {
         "parser(rawBody, request.headers.get('content-type'), marketplaceWebhookSecret(provider.slug))",
         "parser(rawBody, request.headers.get('content-type'))")))
 
-  // ── BADGE. The trust badge Digistore24 require before a product may even
-  // be submitted — a SCRIPT, not a beacon, and it writes a week-long cookie.
-  console.log('\nBADGE. digistore24 trust badge')
-  const BADGE = 'MARKETPLACE_DIGISTORE24_BADGE_URL'
-  const badgeSrc = code('components/consent/MarketplaceBadge.tsx')
-  const badgeUncondSrc = code('components/consent/MarketplaceBadgeUnconditional.tsx')
-  const badgeSalesSrc = code(SALES)
+  // ── NO BADGE. Digistore24's reviewer rejected all four products on
+  // 2026-11-12 asking us to "remove the Digistore24 trust badge and any
+  // Digistore24 branding on the sales page and 'thank you' page, but please
+  // keep the payment disclaimer as Digistore24 on the TYP". Their
+  // pre-submission checklist says the opposite, so the thing worth guarding
+  // is that the reviewer's instruction is not quietly undone by someone
+  // reading that checklist again.
+  console.log('\nNO BADGE. the digistore24 trust badge stays removed')
+  const salesSrcNoBadge = code(SALES)
+  const thanksSrcNoBadge = code(THANKS)
 
-  delete process.env[BADGE]
-  check('BADGE1: with nothing configured the page renders no badge at all',
-    marketplaceBadgeUrl('digistore24') === null)
-  process.env[BADGE] = 'http://www.digistore24.com/trusted-badge/1/t/salespage'
-  check('BADGE2: plain http is refused, like every other configured URL',
-    marketplaceBadgeUrl('digistore24') === null)
-  process.env[BADGE] = 'https://www.digistore24.com/trusted-badge/49077/tok/salespage'
-  check('BADGE3: an https url is accepted',
-    marketplaceBadgeUrl('digistore24') === 'https://www.digistore24.com/trusted-badge/49077/tok/salespage')
-  check('BADGE4: and only for a registered provider',
-    marketplaceBadgeUrl('paddle') === null)
-  check('BADGE5: a url carrying a quote or an angle bracket is refused, because it becomes a src',
-    (() => {
-      process.env[BADGE] = 'https://x.test/a"><script>alert(1)</script>'
-      const bad = marketplaceBadgeUrl('digistore24')
-      process.env[BADGE] = 'https://www.digistore24.com/trusted-badge/49077/tok/salespage'
-      return bad === null
-    })())
-
-  // The gate itself, and that it is the SAME gate as the beacon's.
-  check('BADGE6: the gated component asks marketingBeaconAllowed, not a second rule of its own',
-    /marketingBeaconAllowed\(currentChoices\(\)\)/.test(badgeSrc))
-  check('BADGE7: and it is proven denied for every state the store can return',
-    marketingBeaconAllowed(CONSENT_DENIED) === false
-    && marketingBeaconAllowed({ ...CONSENT_DENIED, marketing: false }) === false)
-  check('BADGE8: the script is appended only inside the allowed branch',
-    /if \(allowed && !script\)/.test(badgeSrc) && /appendChild\(script\)/.test(badgeSrc))
-  check('BADGE9: withdrawal removes the script AND the nodes their loader added',
-    /if \(!allowed\) removeBadge\(\)/.test(badgeSrc) && /querySelectorAll\(BADGE_NODE_SELECTOR\)/.test(badgeSrc))
-  check('BADGE10: it listens for consent changes, so a later grant or withdrawal is honoured',
-    /addEventListener\(CONSENT_CHANGED_EVENT/.test(badgeSrc))
-  check('BADGE11: the gated component renders nothing itself — the element is appended, never JSX',
-    /return null/.test(badgeSrc) && !/<script/.test(badgeSrc))
-  check('BADGE12: the unconditional one DOES put the script in the server response',
-    /<script src=\{src\}/.test(badgeUncondSrc))
-  check('BADGE13: and it takes no consent decision of its own',
-    !/marketingBeaconAllowed|currentChoices|CONSENT/.test(badgeUncondSrc))
-
-  // The page wiring: one territorial decision, shared with the beacon.
-  check('BADGE14: the page picks the branch from consentRequired, not from a second check',
-    /badgeUrl \?\s*\(\s*consentRequired \?/.test(badgeSalesSrc.replace(/\s+/g, ' ').replace(/ \?/g, ' ?')) 
-    || /consentRequired \? \( <MarketplaceBadge/.test(badgeSalesSrc.replace(/\s+/g, ' ')))
-  check('BADGE15: an unconfigured platform renders no badge element at all',
-    /badgeUrl && !beaconSuppressed \?/.test(badgeSalesSrc))
-  check('BADGE15b: and a suppressed country renders none either, on the beacon\'s own decision',
-    /const beaconSuppressed = beaconSuppressedForRequest\(requestHeaders\)/.test(badgeSalesSrc))
-  check('BADGE16: the badge reads the SAME territorial call the beacon does — one headers() read, not two',
-    (badgeSalesSrc.match(/consentRequiredForRequest\(/g) || []).length === 1)
+  check('NOBADGE1: the sales page renders no trust badge of any kind',
+    !/MarketplaceBadge/.test(salesSrcNoBadge) && !/badgeUrl/.test(salesSrcNoBadge))
+  check('NOBADGE2: and neither does the thank-you page',
+    !/MarketplaceBadge/.test(thanksSrcNoBadge) && !/badgeUrl/.test(thanksSrcNoBadge))
+  check('NOBADGE3: no code reads a BADGE_URL environment variable any more',
+    !/BADGE_URL/.test(code('lib/marketplace/config.ts')))
+  check('NOBADGE4: the badge components are gone from the tree, not merely unused',
+    !existsSync('components/consent/MarketplaceBadge.tsx')
+    && !existsSync('components/consent/MarketplaceBadgeUnconditional.tsx'))
+  // AND WHAT MUST SURVIVE THE REMOVAL: the reviewer asked for the payment
+  // disclaimer to stay on the thank-you page. Deleting the badge must not
+  // take the sentence naming the platform as the one that charges with it.
+  check('NOBADGE5: the thank-you page still names the platform as the party that debits',
+    /The debiting is performed by \{provider\.label\}/.test(thanksSrcNoBadge))
 
   // MUTATION CONTROLS.
-  check('BADGE-MUT1: a component that appended the script before checking consent would be caught',
-    !/if \(allowed && !script\)/.test(badgeSrc.replace('if (allowed && !script)', 'if (!script)')))
-  check('BADGE-MUT2: dropping the withdrawal path would be caught',
-    !/if \(!allowed\) removeBadge\(\)/.test(badgeSrc.replace('if (!allowed) removeBadge()', '')))
-  check('BADGE-MUT3: an http url would be accepted by a check that forgot the scheme',
-    /^https:/.test('https://www.digistore24.com/trusted-badge/49077/tok/salespage')
-    && !/^https:/.test('http://www.digistore24.com/trusted-badge/49077/tok/salespage'))
-  check('BADGE-MUT4: a second territorial read in the page would be caught by BADGE16',
-    ((badgeSalesSrc + 'consentRequiredForRequest(await headers())').match(/consentRequiredForRequest\(/g) || []).length !== 1)
-  delete process.env[BADGE]
+  check('NOBADGE-MUT1: a page that re-added the badge component would be caught',
+    /MarketplaceBadge/.test(salesSrcNoBadge + '<MarketplaceBadge src={badgeUrl} />'))
+  check('NOBADGE-MUT2: a config that re-read BADGE_URL would be caught',
+    /BADGE_URL/.test('process.env[`${envPrefix(slug)}BADGE_URL`]'))
+  check('NOBADGE-MUT3: dropping the payment disclaimer from the TYP would be caught',
+    !/The debiting is performed by \{provider\.label\}/.test(
+      thanksSrcNoBadge.replace('The debiting is performed by {provider.label}', '')))
+
+  // ── GUARANTEE. The unconditional money-back window, per channel, and the
+  // reason it is a number in the provider record rather than a sentence in a
+  // page: Digistore24 also rejected the products because the period stated on
+  // the sales page "does not match the settings on Digistore24".
+  console.log('\nGUARANTEE. the per-channel money-back window')
+  const ds24 = marketplaceProvider('digistore24')
+  const cb = marketplaceProvider('clickbank')
+  const jv = marketplaceProvider('jvzoo')
+
+  check('GUAR1: digistore24 carries 60 days, their US entity\'s floor',
+    ds24?.returnGuaranteeDays === 60)
+  check('GUAR2: clickbank carries none — their contract forbids a guarantee that conflicts with theirs',
+    cb?.returnGuaranteeDays === null)
+  check('GUAR3: jvzoo carries none — we are the seller on that flow and give none',
+    jv?.returnGuaranteeDays === null)
+  check('GUAR4: the sales page prints the number from the provider record and never a literal',
+    /\{provider\.returnGuaranteeDays\}-day money-back guarantee/.test(salesSrcNoBadge)
+    && !/60-day money-back/.test(salesSrcNoBadge))
+  check('GUAR5: the whole section is behind the provider having one, so a platform without one shows nothing',
+    /\{provider\.returnGuaranteeDays \? \(/.test(salesSrcNoBadge))
+  // GUAR6-GUAR7 USED TO PIN THE WORD "unconditional" AND A PROMISE IN OUR OWN
+  // VOICE ("you get your money back", "for any reason or for none"). The legal
+  // thread refused that wording on 2026-11-13: it is an absolute statement
+  // about how another company will behave, written as ours, and Digistore24's
+  // own buyer terms do not say it. What is load-bearing now is the opposite —
+  // that the paragraph attributes the terms to the platform and carries the
+  // exclusion the platform publishes — so the guards check for that, and the
+  // mutation controls below check that the old absolutes cannot come back.
+  const guarFlat = salesSrcNoBadge.replace(/\s+/g, ' ')
+  check('GUAR6: the platform is named as the seller of record and the one handling refunds',
+    /\{provider\.label\} is the seller of record for this purchase and handles the refunds/
+      .test(guarFlat))
+  check('GUAR7: and the period is attributed to the setting inside the platform, counted from the first payment',
+    /The return period set on these plans inside \{provider\.label\}/.test(guarFlat)
+    && /that period begins with your first payment/.test(guarFlat))
+  check('GUAR7b: the platform\'s own exclusion is published, not hidden',
+    /re-subscribes to the same product within two years is not entitled to it again/.test(guarFlat))
+  check('GUAR7c: and its discretion to refund anyway is stated',
+    /keeps the right to refund at its own discretion/.test(guarFlat))
+  check('GUAR7d: the section says HOW, through the provider record and not a typed url',
+    /href=\{provider\.orderSupportUrl\}/.test(salesSrcNoBadge)
+    && marketplaceProvider('digistore24')?.orderSupportUrl !== null)
+  // The component's own name is MarketplacePixelUnconditional, which is a
+  // consent fact and not a refund promise, so it is taken out before the word
+  // is looked for.
+  const salesProse = salesSrcNoBadge.replace(/MarketplacePixelUnconditional/g, '')
+  check('GUAR7e: no absolute promise in our own voice survives anywhere on the page',
+    !/unconditional/i.test(salesProse)
+    && !/for any reason or/i.test(salesProse)
+    && !/you get your money back/i.test(salesProse))
+  check('GUAR8: every plan card says "Cancel at any time", the reviewer\'s own wording',
+    /Cancel\s*\n?\s*at any time\./.test(salesSrcNoBadge) || /Cancel at any time\./.test(salesSrcNoBadge))
+  check('GUAR9: and the per-plan billing line still states both prices and the monthly schedule',
+    /\$\{plan\.priceUSD\} today, then \$\{plan\.priceUSD\} every month until you cancel/
+      .test(salesSrcNoBadge))
+
+  // MUTATION CONTROLS.
+  check('GUAR-MUT1: a hard-coded 60 in the page would be caught by GUAR4',
+    /60-day money-back/.test(salesSrcNoBadge + '<h2>60-day money-back guarantee</h2>'))
+  check('GUAR-MUT2: dropping "Cancel at any time" would be caught',
+    !/Cancel at any time\./.test(
+      salesSrcNoBadge.replace(/Cancel\s*\n?\s*at any time\./g, '').replace(/Cancel at any time\./g, '')))
+  check('GUAR-MUT3: giving clickbank a window would be caught by GUAR2',
+    ({ ...cb, returnGuaranteeDays: 60 }).returnGuaranteeDays !== null)
+  check('GUAR-MUT4: an unguarded section would be caught by GUAR5',
+    !/\{provider\.returnGuaranteeDays \? \(/.test(
+      salesSrcNoBadge.replace(/\{provider\.returnGuaranteeDays \? \(/g, '{true ? (')))
+  check('GUAR-MUT5: the word the legal thread struck out would be caught by GUAR7e',
+    /unconditional/i.test(`${salesProse} gives you an unconditional guarantee`))
+  check('GUAR-MUT6: so would the promise it struck out with it',
+    /you get your money back/i.test(`${salesProse} and you get your money back`))
+  check('GUAR-MUT7: dropping the platform\'s exclusion would be caught by GUAR7b',
+    !/re-subscribes to the same product within two years is not entitled to it again/.test(
+      guarFlat.replace(
+        /re-subscribes to the same product within two years is not entitled to it again/g, '')))
+  check('GUAR-MUT8: and a section that stated the window without saying how would be caught by GUAR7d',
+    !/href=\{provider\.orderSupportUrl\}/.test(
+      salesSrcNoBadge.replace(/href=\{provider\.orderSupportUrl\}/g, 'href="#"')))
 }
 
 main().then(() => {

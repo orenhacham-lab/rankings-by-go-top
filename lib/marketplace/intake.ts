@@ -108,6 +108,34 @@ export interface MarketplaceOrderEvent {
    * number that should always be zero would be the wrong order of work.
    */
   taxMinor: number | null
+  /**
+   * THE PLATFORM SAID THIS WAS A TEST PURCHASE, and we record it anyway.
+   *
+   * Digistore24 marks the orders its own reviewers place with
+   * `api_mode=test`, and the parser used to drop them: a test order must not
+   * quietly become a paid plan. The cost of that was measured on 2026-11-12,
+   * when Digistore24 rejected all four products and one of the four reasons
+   * was that "the email with access to the end product was not delivered".
+   * Their IPN report showed every delivery SUCCESS while `marketplace_orders`
+   * held no Digistore24 row at all: the webhook answered OK and the parser
+   * had thrown the order away, so nothing was recorded and nothing was
+   * mailed. A platform that approves a product BY BUYING IT cannot be served
+   * by a code path that refuses its purchases.
+   *
+   * So a signed test order is recorded, claimed and delivered exactly like a
+   * real one, and carries this flag into the row instead. That is a real
+   * entitlement granted on a payment nobody made, which is only acceptable
+   * because of what stands in front of it: the delivery is signature-checked
+   * (lib/marketplace/signature.ts), so the only party that can produce one is
+   * the platform itself, on the vendor's own products. The flag is what makes
+   * it visible and removable afterwards — `select * from marketplace_orders
+   * where is_test` is the whole audit.
+   *
+   * ABSENT MEANS LIVE, as it always did. A payload with no `api_mode` is a
+   * real sale; failing closed on a missing field would drop genuine sales the
+   * day a platform stops sending it.
+   */
+  isTest?: boolean
 }
 
 /**
@@ -355,6 +383,10 @@ export async function recordMarketplaceOrder(
         amount_minor: Number.isInteger(event.amountMinor) ? event.amountMinor : null,
         currency: /^[A-Z]{3}$/.test(event.currency ?? '') ? event.currency : null,
         current_period_end: event.currentPeriodEnd ?? null,
+        // Stored, not acted on: the row is a normal receipt and the claim
+        // works, and this is what tells an operator which rows were a
+        // platform's own review purchase. See MarketplaceOrderEvent.isTest.
+        is_test: event.isTest === true,
       })
       .select('id')
     inserted = (res.data ?? null) as { id?: unknown }[] | null
@@ -546,11 +578,13 @@ export function unverifiedDeliveryTrace(rawBody: string): Record<string, string>
  * (supabase/migrations/20261109120000_marketplace_renewal.sql). Before that
  * transition existed the second month needed a person; it no longer does.
  *
- * A TEST ORDER MUST NOT BECOME A REAL PLAN, but only an EXPLICIT `test`
- * refuses: `api_mode` absent is treated as live. Failing closed on a missing
- * field would mean that the day they stop sending it, every genuine sale is
- * dropped in silence — and a dropped sale is worse than a test order we can
- * see and delete.
+ * A TEST ORDER IS RECORDED, FLAGGED, AND DELIVERED. It used to be dropped
+ * here, which is what made Digistore24's own review purchase arrive, answer
+ * SUCCESS and leave the reviewer with no access email on 2026-11-12. An
+ * EXPLICIT `test` now sets `isTest`; `api_mode` absent is still treated as
+ * live, because failing closed on a missing field would drop every genuine
+ * sale the day they stop sending it. See MarketplaceOrderEvent.isTest for why
+ * granting on a test order is safe and how such a row is found again.
  *
  * `amount_brutto` is the gross amount in major units, like JVZoo's v2 `total`
  * and unlike its v1 pennies. `next_payment_at` is a date with no time, so the
@@ -559,7 +593,7 @@ export function unverifiedDeliveryTrace(rawBody: string): Record<string, string>
 export const parseDigistore24Ipn: MarketplaceParser = (rawBody) => {
   const value = (name: string) => phpFormValue(rawBody, name)?.trim() ?? ''
 
-  if (value('api_mode').toLowerCase() === 'test') return null
+  const isTest = value('api_mode').toLowerCase() === 'test'
 
   const event = value('event').toLowerCase()
   const kind =
@@ -573,6 +607,7 @@ export const parseDigistore24Ipn: MarketplaceParser = (rawBody) => {
 
   return {
     kind,
+    isTest,
     externalOrderId: value('order_item_id') || value('transaction_id'),
     externalProductId: value('product_id') || null,
     buyerEmail: value('buyer_email') || value('email'),

@@ -271,6 +271,12 @@ export default function EnglishAffiliateTermsPage() {
             present a review, rating or testimonial that is not genuine;
           </li>
           <li>
+            advertise a refund window, money-back guarantee, price or currency that applies only
+            to one of the places the Service is sold as if it applied to the Service generally,
+            or use it in any promotion that leads to our own checkout or to a place that does
+            not carry it;
+          </li>
+          <li>
             run paid search or paid social advertising on our name, our brand, our domain or a misspelling
             of them, or bid on them as keywords, without our written permission;
           </li>
@@ -293,6 +299,11 @@ export default function EnglishAffiliateTermsPage() {
             children.
           </li>
         </ul>
+        <p>
+          Where you do name such a term, name the seller it comes from in the same place. A
+          term that belongs to a marketplace is that marketplace&rsquo;s term: it can change
+          or end without notice to you, and we do not owe it on a purchase made anywhere else.
+        </p>
       </section>
 
       <section>

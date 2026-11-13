@@ -123,14 +123,20 @@ console.log('\nD. the sales page takes the decision on the server, once')
     /beaconSuppressedForRequest\(requestHeaders\)/.test(salesSrc))
   check('D6: and a suppressed request maps the empty list, so no beacon reaches either branch',
     /\(beaconSuppressed \? \[\] : pixelUrls\)\.map/.test(salesSrc))
-  check('D7: the badge is suppressed with it, not on a second decision of its own',
-    /badgeUrl && !beaconSuppressed \?/.test(salesSrc))
+  // D7 USED TO CHECK THAT THE TRUST BADGE RODE THIS SAME SUPPRESSION. There
+  // is no badge any more: Digistore24's reviewer required its removal from
+  // the sales page on 2026-11-12, so the helper, both components and this
+  // branch are gone (lib/marketplace/config.ts says why). What is left to
+  // guard is that no script-shaped third-party tag creeps back onto the page
+  // outside the beacon's decision — the territorial rule this suite exists
+  // for would otherwise be bypassed by the next tag someone adds.
+  check('D7: the page carries no third-party script tag outside the beacon branches',
+    !/badgeUrl/.test(salesSrc) && !/<script/.test(salesSrc))
   check('D-MUT5: the suppression guard catches a page that dropped it and mapped every url',
     !/\(beaconSuppressed \? \[\] : pixelUrls\)\.map/.test(
       salesSrc.replace(/\(beaconSuppressed \? \[\] : pixelUrls\)\.map/g, 'pixelUrls.map')))
-  check('D-MUT6: …and one that suppressed the beacon but left the badge rendering',
-    !/badgeUrl && !beaconSuppressed \?/.test(
-      salesSrc.replace(/badgeUrl && !beaconSuppressed \?/g, 'badgeUrl ?')))
+  check('D-MUT6: …and D7 would catch a page that added a raw script tag back',
+    /<script/.test(salesSrc + '<script src={badgeUrl} async />'))
   check('D8: a Korean visitor is suppressed, a German one is only gated',
     beaconSuppressedForCountry('KR') === true
     && beaconSuppressedForCountry('DE') === false && consentRequiredForCountry('DE') === true)

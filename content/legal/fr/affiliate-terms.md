@@ -101,12 +101,15 @@ Vous ne pouvez pas :
 
 - affirmer ni laisser entendre un résultat, un positionnement, une position ou un revenu que nous ne promettons pas nous-mêmes, ni offrir une garantie en notre nom ;
 - décrire le Service de façon inexacte, utiliser un prix, une offre, une période d'essai ou une promotion qui ne sont pas les nôtres, ni présenter un avis, une note ou un témoignage qui ne soit pas authentique ;
+- présenter un délai de remboursement, une garantie de remboursement, un prix ou une devise qui ne s'appliquent qu'à l'un des endroits où le Service est vendu comme s'ils s'appliquaient au Service en général, ni les utiliser dans une promotion qui mène à notre propre paiement ou à un endroit où ils ne s'appliquent pas ;
 - faire de la publicité payante sur les moteurs de recherche ou les réseaux sociaux sur notre nom, notre marque, notre domaine ou une variante mal orthographiée de ceux-ci, ni enchérir sur eux comme mots-clés, sans notre autorisation écrite ;
 - enregistrer ni utiliser un domaine, un sous-domaine, un compte de réseau social, une application ou un nom de page qui contienne notre nom ou notre marque, ou une variante mal orthographiée, ou qu'un lecteur pourrait confondre avec nous ;
 - envoyer des courriels, des messages ou des commentaires non sollicités, publier dans des forums, des espaces de commentaires ou des sites d'avis en violation de leurs règles, ni promouvoir le Service au moyen de trafic automatisé ou incité ;
 - placer votre lien de recommandation au moyen de schémas de liens, de liens payants, de réseaux privés de blogs, de texte caché ou de toute autre pratique qui viole les règles antispam de Google ;
 - copier nos pages, notre texte ou notre design, ni présenter notre contenu comme le vôtre ;
 - promouvoir le Service à côté de contenus illicites, haineux, sexuels, violents ou destinés à des mineurs.
+
+Si vous mentionnez une telle condition, indiquez au même endroit le vendeur dont elle provient. Une condition qui appartient à une place de marché est la condition de cette place de marché : elle peut changer ou disparaître sans que vous en soyez informé, et nous ne la devons pas pour un achat effectué ailleurs.
 
 ## 11. Usage de notre nom et de notre marque
 
