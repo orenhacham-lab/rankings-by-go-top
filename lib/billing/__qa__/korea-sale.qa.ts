@@ -259,10 +259,29 @@ console.log('\nG. the marketplace pages, where JVZoo is NOT the seller')
     && (config.match(/sellerOfRecord: false/g) ?? []).length === 1)
   check('G5: a visitor in Korea is outside the cleared list, so this page sells them nothing either',
     ownSaleAllowedForCountry('KR', ownSaleCountries(undefined)) === false)
-  check('G6: the list is configuration, and unset it is the United States alone',
-    ownSaleCountries('') .join(',') === 'US'
+  check('G6: the list is configuration, and unset it is the four cleared countries',
+    ownSaleCountries('').join(',') === 'US,CA,JP,AU'
     && ownSaleAllowedForCountry('US', ownSaleCountries('')) === true
     && ownSaleCountries('us, ca ,JP').join(',') === 'US,CA,JP')
+  check('G6b: each default country is cleared, and the three thresholds carry their figure and authority',
+    (() => {
+      const src = readFileSync('lib/marketplace/own-sale-territory.ts', 'utf8')
+      return ['CAD 30,000', 'canada.ca', 'JPY 10,000,000', 'NTA', 'AUD 75,000', 'ato.gov.au']
+        .every((token) => src.includes(token))
+        && ['CA', 'JP', 'AU'].every((c) => ownSaleAllowedForCountry(c, ownSaleCountries('')))
+    })())
+  check('G6c: the US entry carries the review trigger, so it is not read as a finding about America',
+    (() => {
+      const src = readFileSync('lib/marketplace/own-sale-territory.ts', 'utf8')
+      return /ABOUT OUR VOLUME, NOT ABOUT AMERICA/.test(src)
+        && /approaching any\s*\n?\s*\*?\s*single state's threshold/.test(src)
+    })())
+  check('G6d: Switzerland is NOT cleared — its CHF 100,000 test is on WORLDWIDE turnover',
+    ownSaleAllowedForCountry('CH', ownSaleCountries('')) === false
+    && /WORLDWIDE turnover/.test(readFileSync('lib/marketplace/own-sale-territory.ts', 'utf8')))
+  check('G6e: no EU member state is cleared — a non-EU supplier owes there from the first euro',
+    ['DE', 'FR', 'IT', 'ES', 'NL', 'PL', 'IE', 'SE', 'AT', 'BE', 'PT', 'FI', 'DK', 'GR']
+      .every((c) => ownSaleAllowedForCountry(c, ownSaleCountries('')) === false))
   check('G7: an unplaceable visitor fails CLOSED here, the opposite of the billing guard',
     ownSaleAllowedForCountry(null, ['US']) === false
     && ownSaleAllowedForCountry('XX', ['US']) === false
@@ -279,7 +298,18 @@ console.log('\nG. the marketplace pages, where JVZoo is NOT the seller')
   check('G-MUT2: dropping the refusal and showing the button anyway is caught',
     !/ownSaleRefused \? \(/.test(go.replace(/ownSaleRefused \? \(/g, 'false ? (')))
   check('G-MUT3: a list that falls back to "everywhere" instead of the default is caught',
-    ownSaleCountries('').length === 1)
+    ownSaleCountries('').length === 4 && ownSaleCountries('').length < 10)
+  check('G-MUT4: a country added to the default without its figure and authority is caught',
+    (() => {
+      const src = readFileSync('lib/marketplace/own-sale-territory.ts', 'utf8')
+      const widened = src.replace("'AU']", "'AU', 'CH']")
+      const codes = widened.match(/export const DEFAULT_OWN_SALE_COUNTRIES = Object\.freeze\(\[([^\]]*)\]/)?.[1] ?? ''
+      // Every code in the frozen list must appear as a quoted entry in the
+      // comment block above it, which is where the basis is written down.
+      const commented = (code: string) => new RegExp(`\\* - '${code}'`).test(widened)
+      const listed = [...codes.matchAll(/'([A-Z]{2})'/g)].map((m) => m[1])
+      return listed.includes('CH') && !commented('CH') && listed.filter((c) => !commented(c)).length === 1
+    })())
 }
 
 console.log(`\n${pass} passed, ${fail} failed`)
