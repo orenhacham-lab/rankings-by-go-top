@@ -36,6 +36,13 @@
  * the UTC window 04:00-06:59, because Vercel's scheduler did not deliver the blog's own
  * three daily jobs while this cron fires every fifteen minutes. Isolated the same way.
  *
+ * ALONGSIDE ALL OF IT, THE ARTICLE BATCH LANE (lib/content/batch): the first draft
+ * of an upcoming queued article, ordered from Gemini's Batch API at half the
+ * interactive price and collected on a later pass. Production only, off unless
+ * ARTICLE_BATCH_ENABLED is "true", isolated the same way. Nothing in a request ever
+ * waits for a batch job: a generation uses a draft only when one is already sitting
+ * ready for its exact prompt, and otherwise makes the live call it always made.
+ *
  * THEN, THE OUTBOUND RETENTION PASS (lib/outreach/retention-isolated.ts): the 30-day
  * redaction and the 90-day deletion the privacy text promises for a cold-email prospect.
  * It rides this cron, not only its own daily entry in vercel.json, because a daily cron on
@@ -80,6 +87,7 @@ import { checkPublishingStalls, isDailyStallCheckRun } from '@/lib/content/autom
 import { runMapUpkeep, liveEnsure } from '@/lib/content/existing-content/map-upkeep'
 import { runBlogDailyWindow, startIsolatedBlogWindow } from '@/lib/blog/auto/daily-window'
 import { runIsolatedGbpDue } from '@/lib/gbp/due-isolated'
+import { runIsolatedArticleBatch } from '@/lib/content/batch/isolated'
 
 // Generation can take a while; request a generous budget (platform clamps to the
 // plan's max — e.g. 60s on Hobby, up to 300s on Pro).
@@ -146,6 +154,14 @@ async function handle(request: Request): Promise<Response> {
     // morning. It rides this cron for the frequency, never the publish path itself, which
     // is forbidden to call Google at all. Production only, isolated: it never throws.
     await runIsolatedGbpDue()
+    // Then the batch lane (lib/content/batch): collect the article drafts Gemini's
+    // Batch API has finished and order the next few, at 50% of the interactive
+    // price. It rides this cron because a draft ordered now is wanted hours from
+    // now, not in this run, and the queue keeps an article ready ahead of every
+    // slot. Production only, off unless ARTICLE_BATCH_ENABLED is "true", and
+    // isolated: two HTTP calls to Google, no model wait, and it never throws, so
+    // it cannot change, delay or fail anything above.
+    await runIsolatedArticleBatch()
     // Then the outbound-channel retention pass: it empties a prospect's address, name and
     // postal address 30 days after the last message, which the published privacy text
     // promises (lib/outreach/retention-isolated.ts). It rides this cron because a daily

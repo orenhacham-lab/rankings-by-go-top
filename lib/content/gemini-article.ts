@@ -10,6 +10,7 @@
  * topic-suggestions model. No Anthropic.
  */
 
+import { createHash } from 'node:crypto'
 import { getGeminiClient } from '@/lib/ai-visibility/gemini-semantic-classifier'
 import { sanitizeArticleHtml } from '@/lib/content/article-html'
 import {
@@ -1056,6 +1057,29 @@ function parseStructured(parsed: Record<string, unknown>): StructuredArticle {
   }
 }
 
+/**
+ * The model's answer, turned into a structured article.
+ *
+ * Split out of callGemini so the BATCH lane (lib/content/batch/article-batch.ts)
+ * parses a draft that came back hours later through exactly the same code —
+ * including the "the JSON is wrapped in prose" rescue and the
+ * "a title and some body or it is not an article" refusal.
+ */
+export function parseArticleResponseText(
+  text: string,
+  usage: GeminiUsage | null,
+): { structured: StructuredArticle; usage: GeminiUsage | null } | { error: string } {
+  let parsed: Record<string, unknown>
+  try { parsed = JSON.parse(text) } catch {
+    const m = text.match(/\{[\s\S]*\}/)
+    if (!m) return { error: 'gemini_no_json' }
+    try { parsed = JSON.parse(m[0]) } catch { return { error: 'gemini_no_json' } }
+  }
+  const structured = parseStructured(parsed)
+  if (!structured.title || (structured.intro.length === 0 && structured.sections.length === 0)) return { error: 'gemini_missing_required_fields' }
+  return { structured, usage }
+}
+
 async function callGemini(brief: ArticleBrief, opts: GenOpts, modelName: string): Promise<{ structured: StructuredArticle; usage: GeminiUsage | null } | { error: string }> {
   const client = getGeminiClient()
   if (!client) return { error: process.env.GEMINI_API_KEY ? 'gemini_init_failed' : 'missing_gemini_api_key' }
@@ -1069,13 +1093,9 @@ async function callGemini(brief: ArticleBrief, opts: GenOpts, modelName: string)
     // GEMINI_ARTICLE_TIMEOUT_MS for the arithmetic against maxDuration = 300.
     const result = await model.generateContent(prompt, { timeout: GEMINI_ARTICLE_TIMEOUT_MS })
     const text = result.response.text()
-    let parsed: Record<string, unknown>
-    try { parsed = JSON.parse(text) } catch { const m = text.match(/\{[\s\S]*\}/); if (!m) return { error: 'gemini_no_json' }; parsed = JSON.parse(m[0]) }
-    const structured = parseStructured(parsed)
-    if (!structured.title || (structured.intro.length === 0 && structured.sections.length === 0)) return { error: 'gemini_missing_required_fields' }
     const um = (result.response as { usageMetadata?: { promptTokenCount?: number; candidatesTokenCount?: number } }).usageMetadata
     const usage: GeminiUsage | null = um ? { model: modelName, inputTokens: um.promptTokenCount ?? 0, outputTokens: um.candidatesTokenCount ?? 0 } : null
-    return { structured, usage }
+    return parseArticleResponseText(text, usage)
   } catch (err) {
     const code = classifyGeminiError(err)
     const preview = geminiErrorPreview(err)
@@ -1215,9 +1235,38 @@ export interface ValidatedArticleError { error: string; reason?: string; audit?:
 const CRITICAL_SEO_WARNINGS = new Set(['primary_keyword_in_title', 'meta_description_exists', 'meta_description_length', 'has_list'])
 const criticalWarningCount = (a: AuditResult) => a.warnings.filter((w) => CRITICAL_SEO_WARNINGS.has(w)).length
 
+/**
+ * THE PROMPT IS THE KEY.
+ *
+ * A batched draft may be consumed only by a generation whose prompt is
+ * character-for-character the prompt that was sent. Topics get edited, depth
+ * re-classifies, an approved internal link is added, the writing guidance
+ * changes: any of those changes the prompt, and a draft written from the old
+ * one must be thrown away rather than published. Hashing the prompt (with the
+ * model name, since the same prompt on another model is another request) makes
+ * that check exact and cheap, and needs no new comparison logic as the brief
+ * grows fields.
+ */
+export function articlePromptFingerprint(prompt: string, model: string): string {
+  return createHash('sha256').update(`${model}\n${prompt}`).digest('hex')
+}
+
+/**
+ * Where a FIRST draft may come from other than a live call. Production passes
+ * the batch lane's reader (lib/content/batch/article-batch.ts); everything else
+ * passes nothing and the function behaves exactly as it always has.
+ *
+ * Only the first attempt can be served this way. The repair attempt reacts to
+ * the audit of the draft in hand, so it cannot be known in advance and is
+ * always a live call.
+ */
+export interface ArticleDraftSources {
+  takeBatchedDraft?: (fingerprint: string) => Promise<{ text: string; usage: GeminiUsage | null } | null>
+}
+
 /** Generate → build → audit → repair (once) → deterministic basic-SEO autofix →
  *  re-audit. Never saves a bad draft. */
-export async function generateValidatedArticle(brief: ArticleBrief): Promise<ValidatedArticle | ValidatedArticleError> {
+export async function generateValidatedArticle(brief: ArticleBrief, sources?: ArticleDraftSources): Promise<ValidatedArticle | ValidatedArticleError> {
   const language = brief.language
   const { model, fellBack } = articleModel()
   if (fellBack) console.warn('[content-article-generation] GEMINI_ARTICLE_MODEL missing, falling back to classifier model')
@@ -1245,7 +1294,20 @@ export async function generateValidatedArticle(brief: ArticleBrief): Promise<Val
     if (attempt > 0) console.log(`[content-article-generation] repair attempt=${attempt + 1} reason=quality_gate failing=[${repairFailures.join(',')}]`)
     const opts: GenOpts = attempt === 0 ? {} : { repairFailures }
     attempts = attempt + 1
-    const g = await callGemini(brief, opts, model)
+    // The batched first draft, when one was written for this exact prompt. A miss,
+    // a draft that no longer parses, or any error inside the reader falls through
+    // to the live call below: the batch lane may never cost an article.
+    let g: Awaited<ReturnType<typeof callGemini>> | null = null
+    if (attempt === 0 && sources?.takeBatchedDraft) {
+      const fingerprint = articlePromptFingerprint(buildPrompt(brief, opts), model)
+      const hit = await sources.takeBatchedDraft(fingerprint).catch(() => null)
+      if (hit) {
+        const parsed = parseArticleResponseText(hit.text, hit.usage)
+        if ('error' in parsed) console.warn('[content-article-generation] batched draft unusable', { reason: parsed.error, model })
+        else { g = parsed; console.log('[content-article-generation] attempt=1 served from batch', { model }) }
+      }
+    }
+    g ??= await callGemini(brief, opts, model)
     if ('error' in g) { lastGenError = g.error; if (!best) continue; else break }
 
     // Safety net: strip an invented year from the highly-visible SEO fields

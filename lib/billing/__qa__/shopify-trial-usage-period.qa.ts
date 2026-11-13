@@ -256,9 +256,12 @@ async function main() {
       check('A1B-6b: the gate ran BEFORE any provider call', g.calls.generate === 0 && g.calls.image === 0)
       check('A1B-6c: and before any reservation', ledgerOf(admin).length === 0)
       const src = strip(read('lib/content/article-generation.ts'))
+      // The topic/project reads and the prompt assembly live in buildBriefForTopic
+      // (same file) since the batch lane needed the same brief; the call to it is
+      // where generateArticleForTopic's own work begins, and the gate precedes it.
       check('A1B-6d: SOURCE — the shared gate is the FIRST thing generateArticleForTopic does',
         /const gate = await assertContentGenerationAllowedForUser\(admin, userId, deps\.now\)/.test(src)
-        && src.indexOf('assertContentGenerationAllowedForUser(admin, userId, deps.now)') < src.indexOf("from('article_topics')"))
+        && src.indexOf('assertContentGenerationAllowedForUser(admin, userId, deps.now)') < src.indexOf('buildBriefForTopic(admin, topicId)'))
       check('A1B-6e: SOURCE — generatePoolItem (cron/queue/retry) funnels through it',
         /generateArticleForTopic\(admin, \{ topicId: item\.topic_id/.test(strip(read('lib/content/automation/generate-item.ts'))))
       check('A1B-6f: SOURCE — the manual route funnels through it too',
@@ -805,7 +808,7 @@ async function main() {
     check('A4-d: SOURCE — the period is resolved BEFORE any reservation, so nothing is reserved',
       generation.indexOf('const period = await resolveCurrentUsagePeriod') < generation.indexOf('const reservation = await reserveUsage'))
     check('A4-e: SOURCE — and before any Gemini call',
-      generation.indexOf("kind: 'usage_period_unavailable'") < generation.indexOf('const gen = await deps.generate(brief)'))
+      generation.indexOf("kind: 'usage_period_unavailable'") < generation.indexOf('await deps.generate('))
     check('A4-f: SOURCE — the HTTP route maps it to a retryable 503',
       /case 'usage_period_unavailable':[\s\S]{0,200}reason: 'usage_period_unavailable' \}, \{ status: 503 \}/.test(route))
     check('A4-g: SOURCE — quota_exceeded still returns 429',
