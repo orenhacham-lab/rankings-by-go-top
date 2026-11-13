@@ -23,6 +23,7 @@ import {
   consentRequiredForRequest,
 } from '../eprivacy-territory'
 import { COUNTRY_HEADER } from '../../billing/server-market'
+import { PUBLIC_LOCALES } from '../../i18n/locales'
 
 let pass = 0, fail = 0
 function check(name: string, cond: boolean, detail?: string) {
@@ -53,6 +54,18 @@ check('A6b: Korea, on 개인정보 보호법 제15조 and 정보통신망법 제
 check('A6b-MUT: a list without Korea would let the beacon write on page load there',
   CONSENT_REQUIRED_COUNTRIES.filter((c) => c !== 'KR').includes('KR') === false
   && CONSENT_REQUIRED_COUNTRIES.includes('KR'))
+check('A6c: Japan, on APPI 第31条第1項 read with 第171条 and not on ePrivacy either',
+  consentRequiredForCountry('JP') === true)
+check('A6c-MUT: a list without Japan would provide 個人関連情報 abroad with nothing confirmed',
+  CONSENT_REQUIRED_COUNTRIES.filter((c) => c !== 'JP').includes('JP') === false
+  && CONSENT_REQUIRED_COUNTRIES.includes('JP'))
+check('A6d: Brazil, listed as a precaution, which is still a listing',
+  consentRequiredForCountry('BR') === true)
+check('A6d-MUT: a list without Brazil would write there on page load',
+  CONSENT_REQUIRED_COUNTRIES.filter((c) => c !== 'BR').includes('BR') === false
+  && CONSENT_REQUIRED_COUNTRIES.includes('BR'))
+check('A6e: the two live locales behind those codes are both served, so neither entry is theoretical',
+  ['ja', 'pt-BR'].every((l) => PUBLIC_LOCALES.includes(l as (typeof PUBLIC_LOCALES)[number])))
 check('A7: a United States visitor does not, which is the only reason this module exists',
   consentRequiredForCountry('US') === false)
 check('A8: nor does a visitor outside any of it',
