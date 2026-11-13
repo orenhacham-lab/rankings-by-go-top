@@ -3172,7 +3172,11 @@ const MOR_INVOICE: Record<string, RegExp> = {
   fr: /Creem [ée]met la facture en son propre nom/,
   it: /Creem emette la fattura in nome proprio/,
   ja: /Creem が自らの名義で請求書を発行します/,
-  ko: /세금계산서와 영수증\.\*\* Creem이 자신의 이름으로 발행합니다/,
+  // Korean says 인보이스, not 세금계산서: a 세금계산서 is the Korean statutory tax
+  // invoice a VAT-registered Korean seller issues, and neither we nor Creem can
+  // issue one — the same document states six lines away that we hold no Korean
+  // business registration. Ruled by the legal thread on 13 Nov 2026.
+  ko: /인보이스와 영수증\.\*\* Creem이 자신의 이름으로 발행합니다/,
 }
 const MOR_TAX: Record<string, RegExp> = {
   pl: /Cena podana na stronie cennika tego podatku nie zawiera/,
