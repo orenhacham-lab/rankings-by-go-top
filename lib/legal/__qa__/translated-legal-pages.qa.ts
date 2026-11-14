@@ -338,20 +338,28 @@ console.log('\nD) the real documents, in every language')
  * for exactly that reason: the rule is about the published words, not about
  * where they are stored.
  *
- * KOREAN IS OWED, NOT MISSING. The ko draft arrived with corrupted syllables
- * (서버스 for 서비스, 환불 부장 for 환불 보장, 가객 for 가격, 전잴 for 전체,
- * 자제 for 자체, 함꿨 for 함께), so it was not published: a legal clause with
- * broken words in it is worse than a clause not yet translated, and the ko
- * site is behind NEXT_PUBLIC_KOREAN_SITE_ENABLED in any case. It is reported
- * as owed on the same footing as the cross-link items above, and it becomes a
- * failure the day Korean goes live.
+ * KOREAN WAS HELD BACK FOR A DAY AND IS NOW PUBLISHED. The first ko draft
+ * arrived with seven corrupted syllables (서버스 for 서비스, 환불 부장 for
+ * 환불 보장, 가객 for 가격, 전잴 for 전체, 자제 for 자체, 함꿨 for 함께, and
+ * 그에게 for 귀하에게), because it had been written as hand-typed unicode
+ * escapes rather than literal text. It was not published: a legal clause with
+ * broken words in it is worse than one not yet translated. The corrected text
+ * is here. It is still Korean prose that no Korean speaker has read, which is
+ * part of the bundle the locale thread is putting to the owner, and the ko
+ * site stays behind NEXT_PUBLIC_KOREAN_SITE_ENABLED until that review.
+ *
+ * HEBREW USES THE PAGE'S REGISTER, not the draft's. The he affiliate terms
+ * address the reader as "אסור לך" throughout and the drafted paragraph was in
+ * the plural, which reads as text pasted in from elsewhere. The legal thread
+ * changed it to the singular on being asked; the rule that came out of it is
+ * that the register belongs to the page and the substance to them.
  */
 console.log('\nE) The channel-specific-terms clause (clause 10)')
 {
   const CLAUSE = new Map<string, { bullet: string; para: string }>([
   ['he', {
     bullet: 'לפרסם תקופת החזר, אחריות להחזר כספי, מחיר או מטבע שתקפים רק באחד המקומות שבהם השירות נמכר, כאילו הם תקפים לשירות בכלל, או להשתמש בהם בכל קידום שמוביל לקופה שלנו או למקום שאינו כולל אותם;',
-    para: 'אם אתם מזכירים תנאי כזה, ציינו באותו מקום מי המוכר שממנו הוא בא. תנאי שמקורו בזירת מכירה חיצונית הוא תנאי שלה: הוא עשוי להשתנות או להסתיים בלי הודעה אליכם, ואיננו חבים בו ברכישה שנעשתה במקום אחר.',
+    para: 'אם אתה מזכיר תנאי כזה, ציין באותו מקום מי המוכר שממנו הוא בא. תנאי שמקורו בזירת מכירה חיצונית הוא תנאי שלה: הוא עשוי להשתנות או להסתיים בלי הודעה אליך, ואנחנו לא חבים בו ברכישה שנעשתה במקום אחר.',
   }],
   ['en', {
     bullet: 'advertise a refund window, money-back guarantee, price or currency that applies only to one of the places the Service is sold as if it applied to the Service generally, or use it in any promotion that leads to our own checkout or to a place that does not carry it;',
@@ -390,8 +398,8 @@ console.log('\nE) The channel-specific-terms clause (clause 10)')
     para: 'そのような条件に言及する場合は、同じ箇所にその条件の提供元である販売者を明記してください。マーケットプレイスに属する条件はそのマーケットプレイスの条件であり、お客様への通知なく変更または終了されることがあり、他の場所で行われた購入について当社が負うものではありません。',
   }],
   ['ko', {
-    bullet: '본 서버스가 판매되는 일부 경로에만 적용되는 환불 기간, 환불 부장, 가객 또는 통화를 서버스전잴에 적용되는 것처럼 표시하거나, 당사의 자제 결제 또는 해당 조건이 적용되지 않는 경로로 연결되는홍보에 사용하는 행위',
-    para: '그러한 조건을 언급할 때에는 같은 위치에 그 조건을 제공하는 판매자를 함꿨 밝혀 주십시오.마켓플레이스에 속한 조건은 해당 마켓플레이스의 조건이며, 그에게 통지 없이 변경되거나 종료될 수 있으며,다른 곳에서 이루어진 구매에 대하여 당사가 부담하는 조건이 아닙니다.',
+    bullet: '본 서비스가 판매되는 일부 경로에만 적용되는 환불 기간, 환불 보장, 가격 또는 통화를 서비스 전체에 적용되는 것처럼 표시하거나, 당사의 자체 결제 또는 해당 조건이 적용되지 않는 경로로 연결되는 홍보에 사용하는 행위',
+    para: '그러한 조건을 언급할 때에는 같은 위치에 그 조건을 제공하는 판매자를 함께 밝혀 주십시오. 마켓플레이스에 속한 조건은 해당 마켓플레이스의 조건이며, 귀하에게 통지 없이 변경되거나 종료될 수 있고, 다른 곳에서 이루어진 구매에 대하여 당사가 부담하는 조건이 아닙니다.',
   }],
   ])
   /* The two documents that are pages rather than Markdown. */
@@ -405,16 +413,9 @@ console.log('\nE) The channel-specific-terms clause (clause 10)')
   /* The TSX documents escape the apostrophe, which Markdown does not. */
   const normalise = (s: string) => flatten(s).replace(/&rsquo;/g, "'")
 
-  const KO_OWED = true
   let checked = 0
   for (const [language, text] of CLAUSE) {
     const path = DOC[language] ?? `content/legal/${language}/affiliate-terms.md`
-    if (language === 'ko' && KO_OWED) {
-      owed.push('ko: the channel-specific-terms clause, pending an uncorrupted draft')
-      check('E1 (ko): the clause is owed, and Korean is off, so this is an item and not a defect',
-        koreanSiteEnabled() === false)
-      continue
-    }
     const src = normalise(read(path))
     check(`E1 (${language}): the clause-10 bullet is published in these exact words`,
       src.includes(flatten(text.bullet)))
@@ -422,7 +423,7 @@ console.log('\nE) The channel-specific-terms clause (clause 10)')
       src.includes(flatten(text.para)))
     checked += 1
   }
-  check('E3: ten documents carry it, so E1/E2 are not reading an empty list', checked === 10)
+  check('E3: all eleven documents carry it, so E1/E2 are not reading an empty list', checked === 11)
   /* MUTATION CONTROLS. */
   check('E-MUT1: a reworded bullet is caught',
     !normalise(read(DOC.en)).includes(flatten(CLAUSE.get('en')!.bullet.replace('only to one of', 'to any of'))))
