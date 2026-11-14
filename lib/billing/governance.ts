@@ -44,9 +44,9 @@ import type { createAdminClient } from '@/lib/supabase/admin'
 type Admin = ReturnType<typeof createAdminClient>
 
 /** How the ACCOUNT came into existence. Provenance — set once, never rewritten. */
-export type SignupOrigin = 'website' | 'shopify_app_store' | 'unknown'
+export type SignupOrigin = 'website' | 'shopify_app_store' | 'marketplace' | 'unknown'
 /** Who bills the account right now. */
-export type BillingAuthority = 'website' | 'shopify'
+export type BillingAuthority = 'website' | 'shopify' | 'marketplace'
 
 export interface BillingGovernance {
   userId: string
@@ -78,10 +78,19 @@ export const AUTHORITY_REASONS = {
   shopifyAppStoreInstall: 'shopify_app_store_install',
   shopifyAppStoreInstallDeferred: 'shopify_app_store_install_deferred_paypal_migration',
   paypalMigrationCompleted: 'paypal_migration_completed',
+  marketplaceOrderClaimed: 'marketplace_order_claimed',
 } as const
 
-const SIGNUP_ORIGINS: readonly string[] = ['website', 'shopify_app_store', 'unknown']
-const BILLING_AUTHORITIES: readonly string[] = ['website', 'shopify']
+// THESE TWO LISTS ARE THE DATABASE'S CHECK CONSTRAINTS, and a value the
+// database accepts but this code does not is not a safe read: the row is
+// reported `invalid`, every caller fails closed, and a paying customer is sent
+// to the plans page. That is exactly what happened to the first marketplace
+// buyer — supabase/migrations/20261016160000_marketplace_orders.sql widened
+// both constraints to allow 'marketplace' while these arrays still held the
+// two older values. lib/billing/__qa__/governance-values.qa.ts now reads the
+// constraints out of the migrations and fails if they drift apart again.
+export const SIGNUP_ORIGINS: readonly string[] = ['website', 'shopify_app_store', 'marketplace', 'unknown']
+export const BILLING_AUTHORITIES: readonly string[] = ['website', 'shopify', 'marketplace']
 
 /**
  * Read the account's governance record, reporting WHICH of the four outcomes

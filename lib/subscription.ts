@@ -345,7 +345,7 @@ export type AccessReason =
 export interface AccessDiagnostics {
   allowed: boolean
   reason: AccessReason
-  authority: 'shopify' | 'website' | 'unreadable' | 'admin'
+  authority: 'shopify' | 'website' | 'marketplace' | 'unreadable' | 'admin'
   /**
    * Whether a billing_governance row was readable at all. Kept even when the
    * website branch decides the outcome: 'missing' and 'unreadable' look the
