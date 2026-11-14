@@ -334,6 +334,34 @@ export interface MarketplaceProvider {
    */
   returnGuaranteeDays: number | null
   /**
+   * WHETHER THE PLATFORM REQUIRES THE GUARANTEE TO BE STATED AS UNCONDITIONAL
+   * — in the absolute words "no questions asked" and "for any reason", which
+   * are the platform's words and not a flourish of ours.
+   *
+   * THIS FLAG IS A DECISION, AND IT HAS A DATE AND AN AUTHOR. The first
+   * version of the Digistore24 guarantee section stated the window and
+   * attributed the terms to Digistore24, because Digistore24's own buyer
+   * terms (section 13, Digital Products and Services, re-read at source on
+   * 2026-11-14 and unchanged since 2025-11-26) say an advertised guarantee
+   * "shall only be available for the stated period" and bar a customer who
+   * takes a refund from the guarantee again on a re-purchase inside two
+   * years. Their Product Compliance Team rejected that on 2026-11-14 and
+   * dictated the wording they want. The owner was given the exposure — the
+   * articles, images and links we generate stay with a buyer who refunds,
+   * the compute is spent, and "no questions asked" removes our right to
+   * refuse anyone — and decided on 2026-11-14 to publish their wording and
+   * accept it, on the ground that the channel is the one thing that might
+   * produce a paying customer. That is why the absolute words are here at
+   * all, and why the flag is per provider: a second platform does not
+   * inherit this decision, and ClickBank's Client Contract still forbids it
+   * outright.
+   *
+   * IT IS THE REASON THE REFUND NOW REVOKES. An unconditional promise with
+   * no revocation behind it gives the product away, so
+   * `public.revoke_marketplace_order` ships with this flag, not after it.
+   */
+  returnGuaranteeUnconditional: boolean
+  /**
    * THE PLANS THIS PLATFORM HAS ACTUALLY APPROVED, or null where the platform
    * approves nothing per plan and the env configuration alone decides.
    *
@@ -462,6 +490,12 @@ export const MARKETPLACE_PROVIDERS: readonly MarketplaceProvider[] = [
      * of the four products inside Digistore24.
      */
     returnGuaranteeDays: 60,
+    /*
+     * Their Product Compliance Team dictated the wording on 2026-11-14 and
+     * the owner accepted it the same day; see the field's own comment for
+     * what was weighed and who decided.
+     */
+    returnGuaranteeUnconditional: true,
     /* Their guide: only the literal text OK counts as a handled delivery. */
     acknowledgement: 'ok_text',
   },
@@ -494,6 +528,10 @@ export const MARKETPLACE_PROVIDERS: readonly MarketplaceProvider[] = [
      * policy stays the page's only answer.
      */
     returnGuaranteeDays: null,
+    /* Their Client Contract forbids a guarantee that conflicts with their
+       own policy, so the absolute words are not available on this channel
+       whatever another platform demands. */
+    returnGuaranteeUnconditional: false,
     /*
      * Their own published pitch-page and thank-you-page rules give this text
      * as mandatory and verbatim. Passed for publication by the legal thread
@@ -544,6 +582,9 @@ export const MARKETPLACE_PROVIDERS: readonly MarketplaceProvider[] = [
     returnPolicyUrl: null,
     /* JVZoo requires no guarantee and we are the seller on this flow. */
     returnGuaranteeDays: null,
+    /* No guarantee to word, and we are the seller: our own refund policy
+       governs, and it promises nothing beyond the law. */
+    returnGuaranteeUnconditional: false,
     /*
      * The exact words JVZoo compliance requires, copied character for
      * character from the review notes on products 457483 / 457573 / 457575 /

@@ -34,12 +34,21 @@
  *     pre-read: two deliveries racing each other both reach the insert and
  *     exactly one wins, which a read-then-write cannot promise.
  *
- * A REFUND IS NOT PROCESSED AUTOMATICALLY. It is recorded on the order and
- * reported as operator attention, the same way the Creem path treats one: a
- * marketplace decides refunds unilaterally and on its own timetable, and
- * withdrawing a paying customer's entitlement from a webhook — possibly for a
- * partial refund, or one that is later reversed — is not a decision this code
- * should take on its own.
+ * A REFUND NOW ENDS THE ENTITLEMENT, AND IS STILL REPORTED. The earlier rule
+ * here was that a refund is recorded and left to a person, on the reasoning
+ * that a marketplace refunds unilaterally and a webhook should not withdraw a
+ * paying customer's plan. That reasoning held while no marketplace page of
+ * ours promised a refund. From 2026-11-14 the Digistore24 page promises a
+ * full refund inside 60 days with no questions asked, which turns "a person
+ * will look at it" into "the product is free to anyone who asks and waits for
+ * nobody". So a refund expires the subscription row that claimed the order,
+ * in the same database transaction as the order's own status, and the
+ * operator alert still fires — a reversal or a partial refund is then a
+ * person's correction to make, which is the safe direction for the one case
+ * the platform does not model cleanly.
+ *
+ * A CANCELLATION IS UNTOUCHED: it means the next charge will not happen, the
+ * buyer has paid for the period they are in, and they keep it.
  */
 
 import { randomBytes } from 'crypto'
@@ -282,8 +291,10 @@ export type MarketplaceIntakeOutcome =
   /** A later payment on an order already on file: the paid period now runs
    *  to `currentPeriodEnd`, and so does the entitlement if it was claimed. */
   | { kind: 'renewed'; externalOrderId: string; currentPeriodEnd: string }
-  /** A refund or cancellation, recorded. A person decides what it means for
-   *  an entitlement already granted. */
+  /** A refund or cancellation, recorded. A refund has also ended the
+   *  entitlement if one was claimed — `why` says which of those happened, and
+   *  a person still reads it, because money moving the other way is never
+   *  silent. */
   | { kind: 'operator_attention'; why: string; externalOrderId: string }
   /** The order a refund refers to was never recorded. Reported, not invented. */
   | { kind: 'order_unknown'; externalOrderId: string }
@@ -323,27 +334,44 @@ export async function recordMarketplaceOrder(
   if (!externalOrderId) return { kind: 'invalid_event', why: 'missing_external_order_id' }
 
   if (event.kind === 'refunded' || event.kind === 'cancelled') {
-    let error: { message?: string } | null = null
+    // THE ORDER AND THE ENTITLEMENT MOVE TOGETHER, IN THE DATABASE. This used
+    // to be a bare status update here, which left a refunded buyer holding
+    // the plan they had been paid back for; `public.revoke_marketplace_order`
+    // (supabase/migrations/20261114120000_revoke_refunded_marketplace_order.sql)
+    // marks the order and, for a refund only, expires the subscription row
+    // that claimed it, under one lock. A cancellation still only marks the
+    // order, because the buyer has paid for the period they are in.
+    let error: { message?: string; code?: string } | null = null
     let data: unknown
     try {
-      const res = await admin
-        .from(TABLE)
-        .update({ status: event.kind })
-        .eq('provider', provider)
-        .eq('external_order_id', externalOrderId)
-        .select('id')
+      const res = await admin.rpc('revoke_marketplace_order', {
+        p_provider: provider,
+        p_external_order_id: externalOrderId,
+        p_kind: event.kind,
+      })
       data = res.data
       error = res.error ?? null
     } catch (err) {
-      return { kind: 'write_failed', message: err instanceof Error ? err.message.slice(0, 120) : 'update_threw' }
+      return { kind: 'write_failed', message: err instanceof Error ? err.message.slice(0, 120) : 'revoke_threw' }
     }
-    if (error) return { kind: 'write_failed', message: (error.message || 'update_failed').slice(0, 120) }
-    const rows = (data ?? []) as unknown[]
-    if (!rows.length) return { kind: 'order_unknown', externalOrderId }
-    return {
-      kind: 'operator_attention',
-      why: event.kind === 'refunded' ? 'refunded_on_platform' : 'cancelled_on_platform',
-      externalOrderId,
+    if (error) return { kind: 'write_failed', message: (error.code || error.message || 'revoke_failed').slice(0, 120) }
+    switch (typeof data === 'string' ? data : '') {
+      case 'order_unknown':
+        return { kind: 'order_unknown', externalOrderId }
+      case 'revoked':
+        return { kind: 'operator_attention', why: 'refunded_on_platform_access_ended', externalOrderId }
+      case 'order_marked_entitlement_missing':
+        return { kind: 'operator_attention', why: 'refunded_on_platform_entitlement_missing', externalOrderId }
+      case 'order_marked':
+        return {
+          kind: 'operator_attention',
+          why: event.kind === 'refunded' ? 'refunded_on_platform' : 'cancelled_on_platform',
+          externalOrderId,
+        }
+      default:
+        // An answer this code does not know means the function and this module
+        // disagree about the contract. Never read as a handled refund.
+        return { kind: 'write_failed', message: 'unrecognised_revoke_outcome' }
     }
   }
 
