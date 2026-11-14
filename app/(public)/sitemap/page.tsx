@@ -29,6 +29,7 @@ export default async function SitemapPage() {
         { label: 'תוכנית שותפים', href: '/affiliates' },
         { label: 'שיווק שותפים', href: '/affiliates/affiliate-marketing' },
         { label: 'בחירת תוכנית', href: '/affiliates/choosing-a-program' },
+        { label: 'אנשי SEO וסוכנויות', href: '/affiliates/for-seo-and-agencies' },
       ],
     },
     {

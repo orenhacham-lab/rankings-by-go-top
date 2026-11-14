@@ -43,6 +43,7 @@ export default async function ItalianSitemapPage() {
         { label: 'Programma di affiliazione', href: '/it/affiliates' },
         { label: 'Affiliate marketing', href: '/it/affiliates/affiliate-marketing' },
         { label: 'Scegliere il programma', href: '/it/affiliates/choosing-a-program' },
+        { label: 'Professionisti SEO e agenzie', href: '/it/affiliates/for-seo-and-agencies' },
       ],
     },
     {

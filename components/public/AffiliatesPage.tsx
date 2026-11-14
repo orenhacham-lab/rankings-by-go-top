@@ -87,7 +87,7 @@ export function affiliatesContent(locale: PublicLocale): FeaturePageContent {
       // which is where someone who is nearly convinced looks next.
       { kind: 'custom', node: <AffiliateApplicationForm locale={locale} /> },
       {
-        // THE HUB'S TWO SPOKES. The cluster pages under this one are written
+        // THE HUB'S THREE SPOKES. The cluster pages under this one are written
         // for the words people type before they know the program exists
         // (lib/i18n/public/affiliate-cluster), and a hub that does not link to
         // its spokes leaves them orphaned: nothing on the site would point at
@@ -106,6 +106,14 @@ export function affiliatesContent(locale: PublicLocale): FeaturePageContent {
             <li>
               <a className="underline" href={`${LOCALE_PREFIX[locale]}${affiliateClusterPath('choosing')}`}>
                 {AFFILIATE_CLUSTER[locale].marketing.siblingLabel}
+              </a>
+            </li>
+            <li>
+              {/* The audience page is named by no sibling — its own sibling
+                  link points at the decision page — so it carries the label
+                  the hub shows for it. */}
+              <a className="underline" href={`${LOCALE_PREFIX[locale]}${affiliateClusterPath('agencies')}`}>
+                {AFFILIATE_CLUSTER[locale].agencies.hubLabel}
               </a>
             </li>
           </ul>

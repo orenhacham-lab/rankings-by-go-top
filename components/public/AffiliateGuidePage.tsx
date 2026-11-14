@@ -1,5 +1,5 @@
 /**
- * The two cluster pages under /affiliates, in every language.
+ * The three cluster pages under /affiliates, in every language.
  *
  * They are FeaturePages like every other marketing page, so they inherit the
  * site's bands, rhythm and dark/light handling instead of inventing a layout.
@@ -15,7 +15,7 @@
  * callout above the closing band), and the hub links back to both, so a reader
  * who lands on any of the three can reach the other two in one click.
  */
-import { ArrowLeftRight, BadgePercent, Clock, Coins, FileText, Handshake, Infinity as InfinityIcon, Link2, PiggyBank, Repeat, Scale, ShieldCheck, Users } from 'lucide-react'
+import { ArrowLeftRight, BadgePercent, Briefcase, Clock, Coins, FileText, Handshake, Infinity as InfinityIcon, Link2, PiggyBank, Receipt, Repeat, Scale, ShieldCheck, Users } from 'lucide-react'
 import { FeaturePage, type FeaturePageContent } from '@/components/public/FeaturePage'
 import { AFFILIATE_CLUSTER, AFFILIATE_CLUSTER_SLUGS, affiliateClusterPath, type AffiliateClusterKey } from '@/lib/i18n/public/affiliate-cluster'
 import { LOCALE_PREFIX, type PublicLocale } from '@/lib/i18n/locales'
@@ -24,15 +24,25 @@ import { LOCALE_PREFIX, type PublicLocale } from '@/lib/i18n/locales'
 const ICONS: Record<AffiliateClusterKey, { hero: typeof Handshake; why: readonly [typeof Handshake, typeof Handshake, typeof Handshake]; list: typeof Handshake }> = {
   marketing: { hero: Handshake, why: [Repeat, InfinityIcon, Users], list: BadgePercent },
   choosing: { hero: Scale, why: [Coins, PiggyBank, Clock], list: ShieldCheck },
+  agencies: { hero: Briefcase, why: [Receipt, Users, ShieldCheck], list: Briefcase },
 }
 
 const LIST_ICONS: Record<AffiliateClusterKey, readonly [typeof Handshake, typeof Handshake, typeof Handshake, typeof Handshake]> = {
   marketing: [BadgePercent, Users, Link2, Handshake],
   choosing: [BadgePercent, Link2, Coins, ShieldCheck],
+  agencies: [Users, Briefcase, Receipt, Handshake],
 }
 
-/** The other page of the cluster: `marketing` points at `choosing` and back. */
-const SIBLING: Record<AffiliateClusterKey, AffiliateClusterKey> = { marketing: 'choosing', choosing: 'marketing' }
+/**
+ * The other page each one points at.
+ *
+ * `marketing` and `choosing` name each other, which is also what lets the hub
+ * borrow their labels. The audience page points at `choosing`, because a
+ * reader who has just been told what we do NOT offer is comparing programs,
+ * and that is the page written for comparing. Nothing points back at it from
+ * a spoke, so the hub names it with its own `hubLabel`.
+ */
+const SIBLING: Record<AffiliateClusterKey, AffiliateClusterKey> = { marketing: 'choosing', choosing: 'marketing', agencies: 'choosing' }
 
 export function affiliateGuideContent(locale: PublicLocale, key: AffiliateClusterKey): FeaturePageContent {
   const c = AFFILIATE_CLUSTER[locale][key]

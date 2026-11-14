@@ -21,8 +21,29 @@
  *   choosing  — the DECISION page, for the program-shopping terms. The
  *               questions to ask before joining any program, and our own
  *               answers to them.
+ *   agencies  — the AUDIENCE page, added 14 Nov 2026 for the one band of
+ *               English and Japanese demand the first two do not reach:
+ *               whitelabel seo services 720/mo in the US, high ticket
+ *               affiliate programs 480, whitelabel seo agency 390, saas
+ *               affiliate program 260, seo reseller 260, white label seo
+ *               reseller 210, seo affiliate program 140, and 高単価アフィリ
+ *               エイト 880 in Japan. Most of that volume is somebody looking
+ *               for white-label SEO to RESELL, and we do not offer that — the
+ *               reports carry the client site's own name and logo and the
+ *               agreement licenses no resale under another brand. So the page
+ *               says so plainly instead of implying otherwise, and separates
+ *               the agency plan (a purchase) from the affiliate program (a
+ *               recommendation), because confusing the two is how a partner
+ *               ends up thinking a commission is a discount. In the other
+ *               nine languages it targets no invented term: the audience is
+ *               the same everywhere even where the search is not. The figures
+ *               are the addendum of growth/affiliate-keywords-2026-11-14.md,
+ *               measured in the same run as the table above it but seeded on
+ *               agency and reseller modifiers rather than on the category
+ *               term; the method is in
+ *               affiliate/recruitment-pages/keyword-research-2026-11-14.md.
  *
- * Both end at the same place: the application form on /affiliates. Neither
+ * All of them end at the same place: the application form on /affiliates. None
  * repeats the program page's rules and FAQ, because two pages that answer the
  * same question in the same words compete with each other and neither wins.
  *
@@ -68,6 +89,16 @@ export type AffiliateClusterPage = {
   apply: string
   /** The link to the other page of the cluster, under the closing band. */
   siblingLabel: string
+  /**
+   * How the HUB names this page in its list of spokes.
+   *
+   * The first two pages need none: each is named by the other's
+   * `siblingLabel`, and the hub borrows those, which is what keeps the three
+   * from calling each other different things. A third page is named by
+   * nobody — its own sibling link points AT the decision page — so it carries
+   * the label the hub shows for it.
+   */
+  hubLabel?: string
 }
 
 export type Item = { title: string; body: string }
@@ -78,4 +109,6 @@ export type AffiliateClusterCopy = {
   marketing: AffiliateClusterPage
   /** /affiliates/choosing-a-program — the decision page. */
   choosing: AffiliateClusterPage
+  /** /affiliates/for-seo-and-agencies — the audience page. */
+  agencies: AffiliateClusterPage
 }

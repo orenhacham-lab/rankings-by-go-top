@@ -44,6 +44,7 @@ export default async function GermanSitemapPage() {
         { label: 'Partnerprogramm', href: '/de/affiliates' },
         { label: 'Affiliate Marketing', href: '/de/affiliates/affiliate-marketing' },
         { label: 'Programm auswählen', href: '/de/affiliates/choosing-a-program' },
+        { label: 'SEO-Fachleute und Agenturen', href: '/de/affiliates/for-seo-and-agencies' },
       ],
     },
     {

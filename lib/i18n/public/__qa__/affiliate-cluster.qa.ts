@@ -1,5 +1,5 @@
 /**
- * THE AFFILIATE CLUSTER: two pages under /affiliates, in all eleven languages.
+ * THE AFFILIATE CLUSTER: three pages under /affiliates, in all eleven languages.
  *
  *   A) the shape: every language has both pages, with every field filled and
  *      the counts the template renders (three trust lines, three cards, three
@@ -13,7 +13,9 @@
  *      hreflang set built from the Spanish path
  *   E) the hub and the spokes link to each other, and every page ends at the
  *      application form
- *   F) the sitemap lists both pages in every tree
+ *   F) the sitemap lists every page in every tree
+ *   H) THE AUDIENCE PAGE answers white label rather than implying it, and the
+ *      hub can name it although no sibling does
  *   G) KOREAN IS ANNOUNCED. The hreflang builder gained a /ko line with this
  *      cluster; it is only safe because app/(public)/ko mirrors app/(public)/es
  *      page for page, which is checked here.
@@ -41,7 +43,7 @@ function check(name: string, cond: boolean, detail?: string) {
 const ROOT = join(__dirname, '..', '..', '..', '..')
 const read = (rel: string) => readFileSync(join(ROOT, rel), 'utf8')
 const strip = (s: string) => s.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '')
-const KEYS: AffiliateClusterKey[] = ['marketing', 'choosing']
+const KEYS: AffiliateClusterKey[] = ['marketing', 'choosing', 'agencies']
 const LOCALES = [...PUBLIC_LOCALES] as PublicLocale[]
 const pages = (): { locale: PublicLocale; key: AffiliateClusterKey; page: AffiliateClusterPage }[] =>
   LOCALES.flatMap((locale) => KEYS.map((key) => ({ locale, key, page: AFFILIATE_CLUSTER[locale][key] })))
@@ -52,7 +54,7 @@ const LOCALE_FILES = LOCALES.map((l) => `lib/i18n/public/affiliate-cluster/${l}.
 
 console.log('A) the shape, in every language')
 {
-  check('A1: eleven languages, two pages each', pages().length === 22, String(pages().length))
+  check('A1: eleven languages, three pages each', pages().length === 33, String(pages().length))
   const emptyField: string[] = []
   for (const { locale, key, page } of pages()) {
     for (const [field, value] of Object.entries(page)) {
@@ -189,8 +191,8 @@ console.log('\nD) the routes, their canonicals and their hreflang')
 console.log('\nE) the hub and its spokes link to each other')
 {
   const hub = strip(read('components/public/AffiliatesPage.tsx'))
-  check('E1: the program page links to both cluster pages',
-    hub.includes("affiliateClusterPath('marketing')") && hub.includes("affiliateClusterPath('choosing')"))
+  check('E1: the program page links to every cluster page',
+    KEYS.every((k) => hub.includes(`affiliateClusterPath('${k}')`)))
   const spoke = strip(read('components/public/AffiliateGuidePage.tsx'))
   check('E2: every cluster page ends at the application form on the program page',
     spoke.includes('/affiliates#affiliate-apply'))
@@ -202,16 +204,22 @@ console.log('\nE) the hub and its spokes link to each other')
     !"const sections = [{ kind: 'faq' }]".includes("affiliateClusterPath('marketing')"))
 }
 
-console.log('\nF) the sitemap lists both pages in every tree')
+console.log('\nF) the sitemap lists every page in every tree')
 {
   const sitemap = strip(read('app/sitemap.xml/route.ts'))
   const inTranslated = KEYS.every((k) => sitemap.includes(`{ path: '${affiliateClusterPath(k)}',`))
-  check('F1: both paths are in the one list every translated tree is built from', inTranslated)
+  check('F1: every path is in the one list every translated tree is built from', inTranslated)
   // Hebrew and English are written out by hand in that file, so they need their
   // own entries: this is exactly the shape that gets forgotten.
   const handWritten = KEYS.every((k) =>
     sitemap.includes(`\${baseUrl}${affiliateClusterPath(k)}\``) && sitemap.includes(`\${baseUrl}/en${affiliateClusterPath(k)}\``))
   check('F2: and the hand-written Hebrew and English trees list them too', handWritten)
+  // Each language's own /sitemap page is hand-written too, and it is the only
+  // place a reader (rather than a crawler) finds the page by name.
+  const readerSitemaps = LOCALES.filter((l) =>
+    !KEYS.every((k) => read(`app/(public)${LOCALE_PREFIX[l]}/sitemap/page.tsx`).includes(`${LOCALE_PREFIX[l]}${affiliateClusterPath(k)}'`)))
+  check('F3: and every language\'s own sitemap page links all three, in its own tree',
+    readerSitemaps.length === 0, readerSitemaps.join(' '))
   check('F1-MUT: a list without the paths is caught',
     !"{ path: '/affiliates', changefreq: 'monthly' }".includes("{ path: '/affiliates/affiliate-marketing',"))
 }
@@ -249,6 +257,62 @@ console.log('\nG) Korean is announced, because the Korean tree mirrors the Spani
     KEYS.every((k) => es.includes(`affiliates/${AFFILIATE_CLUSTER_SLUGS[k]}/page.tsx`) && ko.includes(`affiliates/${AFFILIATE_CLUSTER_SLUGS[k]}/page.tsx`)))
   check('G3-MUT: a Spanish page with no Korean twin is caught',
     ['a/page.tsx', 'b/page.tsx'].filter((p) => !['a/page.tsx'].includes(p)).length === 1)
+}
+
+
+console.log('\nH) the audience page: white label answered, not implied')
+{
+  /* THE PAGE EXISTS BECAUSE THE ANSWER IS NO. Most of the measured demand it
+     is written for ("whitelabel seo services", "seo reseller", "white label
+     seo reseller") is somebody looking for a system to resell under their own
+     brand, which we do not offer. A page that ranks for those words and then
+     says nothing about it recruits partners who will ask for something we
+     cannot give. So every language must NAME the thing and DENY it in the
+     same breath — and the test for the denial is matched WITHOUT \b, because
+     there is no word boundary between a Hebrew, Japanese or Korean word and
+     the space beside it. */
+  const BRAND_RESALE = [
+    /white[ -]?label/i, /ホワイトラベル/, /화이트 레이블/,
+  ]
+  const NEGATION = [
+    /\bno\b(?!w)|\bnot\b|\bnone\b/i, /לא |אין /, /\bno\b|\bni\b|\bsin\b/i, /não/i,
+    /\bpas\b|n[’']/i, /\bnon\b|\bné\b/i, /ありません|していません|なく/, /\bkein|\bnicht\b/i,
+    /\bgeen\b|\bniet\b|\bnee\b/i, /\bnie\b|\bbez\b/i, /없습니다|않습니다|않고/,
+  ]
+  const pagesNeeded = LOCALES.map((locale) => ({ locale, page: AFFILIATE_CLUSTER[locale].agencies }))
+  const silent = pagesNeeded.filter(({ page }) => {
+    const text = JSON.stringify(page)
+    return !BRAND_RESALE.some((re) => re.test(text))
+  })
+  check('H1: every language names white label on the audience page', silent.length === 0,
+    silent.map((r) => r.locale).join(' '))
+  /* The sentence that names it must also deny it. The card's body is where it
+     is said, so this reads the whole page and requires a negation in the same
+     string as the term rather than anywhere on the page. */
+  const implied = pagesNeeded.filter(({ page }) => {
+    const strings = JSON.stringify(page).split('","').filter((t) => BRAND_RESALE.some((re) => re.test(t)))
+    return strings.length === 0 || !strings.some((t) => NEGATION.some((re) => re.test(t)))
+  })
+  check('H2: and denies it in the same sentence rather than nearby', implied.length === 0,
+    implied.map((r) => r.locale).join(' '))
+  /* The hub has no label for this page from any sibling, so it carries its
+     own. A missing one would render an empty link. */
+  const noHubLabel = LOCALES.filter((l) => !(AFFILIATE_CLUSTER[l].agencies.hubLabel ?? '').trim())
+  check('H3: and carries the label the hub names it by', noHubLabel.length === 0, noHubLabel.join(' '))
+  const hubSrc = strip(read('components/public/AffiliatesPage.tsx'))
+  check('H4: which is what the hub actually renders', hubSrc.includes('agencies.hubLabel'))
+  // The two offers may not be blurred into one: the agency plan is a purchase
+  // and the program is a recommendation, and a page that mixes them is how a
+  // partner ends up thinking a commission is a discount.
+  const bothOffers = pagesNeeded.filter(({ page }) => page.list.length !== 4)
+  check('H5: the list still carries all four cards', bothOffers.length === 0,
+    bothOffers.map((r) => r.locale).join(' '))
+  check('H2-MUT: a page that names white label without denying it is caught',
+    BRAND_RESALE.some((re) => re.test('Ask us about white label reselling'))
+    && !NEGATION.some((re) => re.test('Ask us about white label reselling'))
+    && NEGATION.some((re) => re.test('We do not offer white label resale')))
+  check('H1-MUT: a page that never names it is caught',
+    !BRAND_RESALE.some((re) => re.test('An affiliate program for agencies, paid monthly')))
 }
 
 console.log(`\n${pass} passed, ${fail} failed`)

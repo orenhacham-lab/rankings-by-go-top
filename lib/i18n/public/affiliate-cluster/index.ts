@@ -22,10 +22,11 @@ import { KO_CLUSTER } from './ko'
 
 export type { AffiliateClusterCopy, AffiliateClusterPage } from './types'
 
-/** The two pages of the cluster, by the path segment each one lives at. */
+/** The three pages of the cluster, by the path segment each one lives at. */
 export const AFFILIATE_CLUSTER_SLUGS = {
   marketing: 'affiliate-marketing',
   choosing: 'choosing-a-program',
+  agencies: 'for-seo-and-agencies',
 } as const
 
 export type AffiliateClusterKey = keyof typeof AFFILIATE_CLUSTER_SLUGS

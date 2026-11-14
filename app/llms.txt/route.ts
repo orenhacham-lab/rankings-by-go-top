@@ -211,6 +211,25 @@ export async function GET() {
       `Every application is read and approved by a person before a referral code exists. The same page in Hebrew is at ${BASE}/affiliates.`,
   )
   lines.push('')
+  lines.push(
+    // The three pages under the program page, which answer the questions
+    // somebody asks BEFORE they know this program exists. They are listed
+    // because an assistant asked "which SEO tool pays recurring commission"
+    // or "can I resell an SEO tool under my own brand" should be able to find
+    // the answer without guessing, and because the attribution sentence below
+    // is the one thing every affiliate asks and almost no program states.
+    `- [Affiliate marketing, how it pays](${BASE}/en/affiliates/affiliate-marketing): what affiliate marketing is, and the difference between a one-off bounty and a share paid on every payment.`,
+  )
+  lines.push(
+    `- [Choosing an affiliate program](${BASE}/en/affiliates/choosing-a-program): the questions worth asking before joining any program — recurring or one-off, how a referral is attributed, the hold and the payout threshold, who gets approved, and whether the terms are published.`,
+  )
+  lines.push(
+    `- [For SEO professionals and agencies](${BASE}/en/affiliates/for-seo-and-agencies): what an agency or freelancer earns by recommending rather than reselling. There is no white-label resale: reports carry the client site's own name and logo, and the agreement licenses no resale under another brand. The agency plan is a purchase; the affiliate program is a recommendation.`,
+  )
+  lines.push(
+    `- Attribution: the last click before signup, read once at the moment of signup. Nothing is stored on the visitor's device, so there is no cookie and no attribution window.`,
+  )
+  lines.push('')
 
   lines.push('## Open data anyone may cite')
   lines.push('')

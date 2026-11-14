@@ -43,6 +43,7 @@ export default async function SpanishSitemapPage() {
         { label: 'Programa de afiliados', href: '/es/affiliates' },
         { label: 'Marketing de afiliados', href: '/es/affiliates/affiliate-marketing' },
         { label: 'Elegir programa', href: '/es/affiliates/choosing-a-program' },
+        { label: 'Profesionales de SEO y agencias', href: '/es/affiliates/for-seo-and-agencies' },
       ],
     },
     {

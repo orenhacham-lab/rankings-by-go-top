@@ -44,6 +44,7 @@ export default async function JapaneseSitemapPage() {
         { label: 'アフィリエイトプログラム', href: '/ja/affiliates' },
         { label: 'アフィリエイト', href: '/ja/affiliates/affiliate-marketing' },
         { label: 'プログラムの選び方', href: '/ja/affiliates/choosing-a-program' },
+        { label: 'SEO事業者・制作会社', href: '/ja/affiliates/for-seo-and-agencies' },
       ],
     },
     {
