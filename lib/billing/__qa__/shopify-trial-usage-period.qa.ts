@@ -627,7 +627,9 @@ async function main() {
         const isrc = strip(read('lib/content/inline-images.ts'))
         check('A3E-G6: SOURCE — one write, always failed, with the distinct code',
           /\.update\(\{ status: 'failed', last_error: reason\.slice\(0, 300\), updated_at: [^}]*\}\)/.test(isrc)
-          && (isrc.match(/status: 'failed'/g) ?? []).length === 2
+          // ONE write in the whole file: markInlineImageFailed, which the live
+          // call and the batch collect pass both go through.
+          && (isrc.match(/status: 'failed'/g) ?? []).length === 1
           && /markInlineImageFailed\(admin, imageId, denial\.code\)/.test(isrc))
       }
     }
