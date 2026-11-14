@@ -1798,8 +1798,12 @@ async function main() {
   // every other channel gets, and never loose in the page. The two branch
   // bodies are cut out of the source and tested separately, so a word that
   // escapes its branch fails the suite.
+  // Anchored on the guarantee section, because the flag is read in two places
+  // now: the plan card renders the access sentence above the buy button, and
+  // an indexOf from the top of the file would cut the branch at the card.
   const FLAG_OPEN = '{provider.returnGuaranteeUnconditional ? ('
-  const flagAt = salesProse.indexOf(FLAG_OPEN)
+  const sectionAt = salesProse.indexOf('data-return-guarantee={provider.slug}')
+  const flagAt = sectionAt < 0 ? -1 : salesProse.indexOf(FLAG_OPEN, sectionAt)
   const afterFlag = flagAt < 0 ? '' : salesProse.slice(flagAt + FLAG_OPEN.length)
   const elseAt = afterFlag.indexOf('          ) : (')
   const dictatedBranch = elseAt < 0 ? '' : afterFlag.slice(0, elseAt).replace(/\s+/g, ' ')
@@ -1838,8 +1842,28 @@ async function main() {
   const REVOKE_MIG = 'supabase/migrations/20261114120000_revoke_refunded_marketplace_order.sql'
   const revokeSrc = read(REVOKE_MIG)
   const intakeSrc = code('lib/marketplace/intake.ts')
-  check('GUAR7j: the page tells the buyer, before buying, that the refund ends the plan',
-    /the plan ends and the dashboard returns to the free tier/.test(dictatedBranch))
+  // THE ACCESS SENTENCE IS THE LEGAL THREAD'S, WORD FOR WORD, and it is one
+  // constant rendered twice: once in the plan card above the buy button, where
+  // a buyer meets it before paying, and once in the guarantee section beside
+  // the promise it follows from. The register is load-bearing — "penalty" or
+  // "forfeit" would make the refund something the buyer pays for, which
+  // contradicts "no questions asked" — so the words are pinned here.
+  check('GUAR7j: the refund\'s consequence is stated in exactly the wording that was cleared',
+    /const REFUND_ENDS_ACCESS =\s*'When a refund is issued, the subscription ends and access to the dashboard stops at that point\.'/
+      .test(salesSrcNoBadge)
+    && !/penalt|forfeit/i.test(salesProse))
+  check('GUAR7j2: it is rendered in the guarantee section and in the plan card above the buy button',
+    /\{REFUND_ENDS_ACCESS\}/.test(dictatedBranch)
+    && salesProse.indexOf('{REFUND_ENDS_ACCESS}') < salesProse.indexOf('href={buyUrl}')
+    && (salesProse.match(/\{REFUND_ENDS_ACCESS\}/g) ?? []).length === 2)
+  check('GUAR7j3: and the page claims nothing about who owns what was generated, which the terms do not grant',
+    !/stays yours/i.test(salesProse)
+    && !/remains? yours/i.test(salesProse))
+  // The guarantee is the platform's, and saying whose it is keeps a buyer from
+  // reading it as a promise about our own checkout or about Creem.
+  check('GUAR7n: the section attributes the guarantee to the platform and to purchases made through it',
+    /This guarantee is \{provider\.label\}&rsquo;s and applies to purchases made through/
+      .test(dictatedBranch))
   check('GUAR7k: a refund goes through the database function, not a bare status update',
     /rpc\('revoke_marketplace_order'/.test(intakeSrc)
     && /p_kind: event\.kind/.test(intakeSrc))
@@ -1882,9 +1906,15 @@ async function main() {
   check('GUAR-MUT11: a function that expired the plan on a cancellation too would be caught by GUAR7l',
     !/IF p_kind = 'cancelled' THEN\s+RETURN 'order_marked';/.test(
       revokeSrc.replace(/IF p_kind = 'cancelled' THEN/g, 'IF false THEN')))
-  check('GUAR-MUT12: dropping the access notice from the page would be caught by GUAR7j',
-    !/the plan ends and the dashboard returns to the free tier/.test(
-      dictatedBranch.replace(/the plan ends and the dashboard returns to the free tier/g, '')))
+  check('GUAR-MUT12: dropping the access notice from the section would be caught by GUAR7j2',
+    !/\{REFUND_ENDS_ACCESS\}/.test(dictatedBranch.replace(/\{REFUND_ENDS_ACCESS\}/g, '')))
+  check('GUAR-MUT13: calling it a penalty would be caught by GUAR7j',
+    /penalt|forfeit/i.test(`${salesProse} you forfeit your access`))
+  check('GUAR-MUT14: promising the buyer the generated articles would be caught by GUAR7j3',
+    /stays yours/i.test(`${salesProse} everything published stays yours`))
+  check('GUAR-MUT15: dropping the attribution would be caught by GUAR7n',
+    !/This guarantee is \{provider\.label\}&rsquo;s and applies to purchases made through/.test(
+      dictatedBranch.replace(/This guarantee is \{provider\.label\}&rsquo;s and applies to purchases made through/g, '')))
   check('GUAR-MUT7: dropping the platform\'s exclusion would be caught by GUAR7b',
     !/re-subscribes to the same product within two years is not entitled to it again/.test(
       guarFlat.replace(

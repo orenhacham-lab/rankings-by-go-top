@@ -59,6 +59,22 @@ import {
 import { PLAN_CATALOG, PLAN_CODES } from '@/lib/plans/catalog'
 
 
+/**
+ * THE ONE SENTENCE THE REFUND'S CONSEQUENCE MAY BE WRITTEN IN, fixed by the
+ * legal thread on 2026-11-14 and rendered from here in both places it has to
+ * appear, so the two cannot drift apart.
+ *
+ * WHY THIS WORDING AND NO OTHER. Under an unconditional guarantee the end of
+ * access has to read as a CONSEQUENCE of the refund and never as a condition
+ * of getting one: "penalty", "forfeit" or anything of that register turns the
+ * refund into something the buyer pays for, which is exactly what "no
+ * questions asked" promises it is not. It is also a term the buyer must meet
+ * before buying rather than when it bites, which is why it sits in the plan
+ * card above the buy button as well as in the guarantee section.
+ */
+const REFUND_ENDS_ACCESS =
+  'When a refund is issued, the subscription ends and access to the dashboard stops at that point.'
+
 export const dynamic = 'force-dynamic'
 
 export const metadata: Metadata = {
@@ -192,6 +208,9 @@ export default async function MarketplaceSalesPage({
                   {provider.returnGuaranteeDays}-day money-back guarantee
                   {provider.returnGuaranteeUnconditional ? ', no questions asked' : ''}.
                 </p>
+              ) : null}
+              {provider.returnGuaranteeUnconditional ? (
+                <p className="mt-1 text-copy text-muted">{REFUND_ENDS_ACCESS}</p>
               ) : null}
               <p className="mt-2 text-copy text-body">
                 {plan.maxProjects === 1 ? 'One website' : `${plan.maxProjects} websites`},{' '}
@@ -439,8 +458,19 @@ export default async function MarketplaceSalesPage({
                   put a day of forwarding between them and their money, and
                   telling them only to go to the platform would contradict the
                   promise they just read. Both are true, so both are here. */}
+              {/* ATTRIBUTION, WHICH IS NOT A QUALIFIER. The guarantee is
+                  Digistore24's and covers what is bought through Digistore24;
+                  without that said, a buyer who read this page could fairly
+                  believe they had bought 60 unconditional days on our own
+                  site or through Creem, where the policy is no refund beyond
+                  what the law requires. Naming the giver is the giver's
+                  identity, not a condition on the promise — and section 6A of
+                  our refund policy already makes a reseller's wider policy
+                  govern that reseller's purchases, so no other document moves
+                  because of this page. */}
               <p className="mt-2 text-copy text-body">
-                Write to{' '}
+                This guarantee is {provider.label}&rsquo;s and applies to purchases made through{' '}
+                {provider.label}. Write to{' '}
                 <a className="text-action underline" href={`mailto:${MARKETPLACE_SUPPORT_EMAIL}`}>
                   {MARKETPLACE_SUPPORT_EMAIL}
                 </a>{' '}
@@ -469,10 +499,18 @@ export default async function MarketplaceSalesPage({
                   the same transaction that marks the order (supabase/
                   migrations/20261114120000_revoke_refunded_marketplace_order
                   .sql) — which is the only reason it may be written here. */}
-              <p className="mt-2 text-copy text-muted">
-                When the refund goes through, the plan ends and the dashboard returns to the free
-                tier. Everything already published to your own website stays yours.
-              </p>
+              {/* NOTHING HERE ABOUT WHO OWNS WHAT WAS GENERATED. An
+                  earlier draft added that everything already published to the
+                  buyer's own website stays theirs. The legal thread struck it
+                  on 2026-11-14: section 14 of the terms of use vests the
+                  rights in the service, reports included, in the company, and
+                  section 15 speaks only to content the customer supplied.
+                  Nothing in either grants the buyer a published article, so a
+                  sales page saying so would be creating a licence against
+                  wording that says the opposite. If we want to grant it, that
+                  is an amendment to the terms of use and goes through them
+                  first. */}
+              <p className="mt-2 text-copy text-muted">{REFUND_ENDS_ACCESS}</p>
             </>
           ) : (
             <>
