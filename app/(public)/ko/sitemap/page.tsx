@@ -42,6 +42,8 @@ export default async function KoreanSitemapPage() {
         { label: '무료 분석', href: '/ko/free-check' },
         { label: '내 사이트는 어떤 AI 크롤러를 막고 있나요?', href: '/ko/ai-crawlers' },
         { label: '파트너 프로그램', href: '/ko/affiliates' },
+        { label: '제휴 마케팅', href: '/ko/affiliates/affiliate-marketing' },
+        { label: '프로그램 선택', href: '/ko/affiliates/choosing-a-program' },
       ],
     },
     {

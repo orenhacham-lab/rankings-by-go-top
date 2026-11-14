@@ -41,6 +41,8 @@ export default async function FrenchSitemapPage() {
         { label: 'Audit gratuit', href: '/fr/free-check' },
         { label: "Quels robots d'IA votre site bloque-t-il ?", href: '/fr/ai-crawlers' },
         { label: 'Programme d’affiliation', href: '/fr/affiliates' },
+        { label: "Marketing d'affiliation", href: '/fr/affiliates/affiliate-marketing' },
+        { label: 'Choisir un programme', href: '/fr/affiliates/choosing-a-program' },
       ],
     },
     {

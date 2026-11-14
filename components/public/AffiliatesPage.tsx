@@ -20,10 +20,11 @@
  * exists until a person has read it. That manual approval is the program's real
  * defence against someone joining to refer themselves.
  */
-import { BadgePercent, FileText, Handshake, Infinity as InfinityIcon, Megaphone, Receipt, RotateCcw, ShieldCheck, TicketPercent, Users } from 'lucide-react'
+import { BadgePercent, BookOpen, FileText, Handshake, Infinity as InfinityIcon, Megaphone, Receipt, RotateCcw, ShieldCheck, TicketPercent, Users } from 'lucide-react'
 import { FeaturePage, type FeaturePageContent } from '@/components/public/FeaturePage'
 import AffiliateApplicationForm from '@/components/public/AffiliateApplicationForm'
 import { AFFILIATES_COPY } from '@/lib/i18n/public/affiliates'
+import { AFFILIATE_CLUSTER, affiliateClusterPath } from '@/lib/i18n/public/affiliate-cluster'
 import { LOCALE_PREFIX } from '@/lib/i18n/locales'
 import { whatsappHelpUrl } from '@/components/public/contact'
 import type { PublicLocale } from '@/lib/i18n/locales'
@@ -85,6 +86,31 @@ export function affiliatesContent(locale: PublicLocale): FeaturePageContent {
       // read what they are joining before they type — and right before the FAQ,
       // which is where someone who is nearly convinced looks next.
       { kind: 'custom', node: <AffiliateApplicationForm locale={locale} /> },
+      {
+        // THE HUB'S TWO SPOKES. The cluster pages under this one are written
+        // for the words people type before they know the program exists
+        // (lib/i18n/public/affiliate-cluster), and a hub that does not link to
+        // its spokes leaves them orphaned: nothing on the site would point at
+        // them and the link equity would run one way only. Each page names
+        // ITSELF here — the label is the one its sibling already uses for it,
+        // so the three pages cannot end up calling each other different things.
+        kind: 'callout',
+        icon: BookOpen,
+        body: (
+          <ul className="space-y-2">
+            <li>
+              <a className="underline" href={`${LOCALE_PREFIX[locale]}${affiliateClusterPath('marketing')}`}>
+                {AFFILIATE_CLUSTER[locale].choosing.siblingLabel}
+              </a>
+            </li>
+            <li>
+              <a className="underline" href={`${LOCALE_PREFIX[locale]}${affiliateClusterPath('choosing')}`}>
+                {AFFILIATE_CLUSTER[locale].marketing.siblingLabel}
+              </a>
+            </li>
+          </ul>
+        ),
+      },
       { kind: 'faq', title: c.faqTitle, items: c.faq },
     ],
     cta: { title: c.closeTitle, body: c.closeBody, primary: apply, secondary: talk },

@@ -46,6 +46,17 @@ function polishTwin(esPath: string): string {
 }
 
 /**
+ * And for the Korean tree, which shipped as the eleventh locale on 12 Nov 2026
+ * with a complete route mirror and no line here: every /ko page was therefore
+ * announced to nobody, and no other language pointed at it. The mirror is what
+ * makes this derivation safe — app/(public)/ko holds a twin of every page under
+ * app/(public)/es, which __qa__/affiliate-cluster.qa.ts checks on the way past.
+ */
+function koreanTwin(esPath: string): string {
+  return esPath === '/es' ? '/ko' : esPath.replace(/^\/es(?=\/|$)/, '/ko')
+}
+
+/**
  * Builds the `alternates.languages` object for the Next.js Metadata API, given
  * the Hebrew (default locale, no prefix) and English (`/en` prefix) paths for
  * the same logical page. `hePath` and `enPath` must start with `/` (use `/`
@@ -71,5 +82,6 @@ export function buildHreflangAlternates(hePath: string, enPath: string, esPath?:
   if (esPath && publicLocaleEnabled('de')) alternates.de = `${SITE_URL}${germanTwin(esPath)}`
   if (esPath && publicLocaleEnabled('nl')) alternates.nl = `${SITE_URL}${dutchTwin(esPath)}`
   if (esPath && publicLocaleEnabled('pl')) alternates.pl = `${SITE_URL}${polishTwin(esPath)}`
+  if (esPath && publicLocaleEnabled('ko')) alternates.ko = `${SITE_URL}${koreanTwin(esPath)}`
   return alternates
 }

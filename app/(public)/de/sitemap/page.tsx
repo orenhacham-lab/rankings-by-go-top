@@ -42,6 +42,8 @@ export default async function GermanSitemapPage() {
         { label: 'Kostenlose Analyse', href: '/de/free-check' },
         { label: 'Welche KI-Crawler blockiert Ihre Website?', href: '/de/ai-crawlers' },
         { label: 'Partnerprogramm', href: '/de/affiliates' },
+        { label: 'Affiliate Marketing', href: '/de/affiliates/affiliate-marketing' },
+        { label: 'Programm auswählen', href: '/de/affiliates/choosing-a-program' },
       ],
     },
     {

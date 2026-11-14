@@ -42,6 +42,8 @@ export default async function DutchSitemapPage() {
         { label: 'Gratis analyse', href: '/nl/free-check' },
         { label: 'Welke AI-crawlers blokkeert uw website?', href: '/nl/ai-crawlers' },
         { label: 'Partnerprogramma', href: '/nl/affiliates' },
+        { label: 'Affiliate marketing', href: '/nl/affiliates/affiliate-marketing' },
+        { label: 'Programma kiezen', href: '/nl/affiliates/choosing-a-program' },
       ],
     },
     {

@@ -27,6 +27,8 @@ export default async function SitemapPage() {
         { label: 'בדיקת אתר חינמית', href: '/free-check' },
         { label: 'מי מסורקי ה-AI חסום אצלכם?', href: '/ai-crawlers' },
         { label: 'תוכנית שותפים', href: '/affiliates' },
+        { label: 'שיווק שותפים', href: '/affiliates/affiliate-marketing' },
+        { label: 'בחירת תוכנית', href: '/affiliates/choosing-a-program' },
       ],
     },
     {

@@ -41,6 +41,8 @@ export default async function PortugueseSitemapPage() {
         { label: 'Análise gratuita', href: '/pt-BR/free-check' },
         { label: 'Quais rastreadores de IA o seu site bloqueia?', href: '/pt-BR/ai-crawlers' },
         { label: 'Programa de afiliados', href: '/pt-BR/affiliates' },
+        { label: 'Marketing de afiliados', href: '/pt-BR/affiliates/affiliate-marketing' },
+        { label: 'Escolher o programa', href: '/pt-BR/affiliates/choosing-a-program' },
       ],
     },
     {
