@@ -14,8 +14,7 @@ import { generateArticleImage, normalizeFeaturedImage, sanitizeImageConceptForCo
 import { assertContentGenerationAllowedForProject, gateDenialCode } from '@/lib/content/entitlement-guard'
 import { readArticleStyleForArticle } from '@/lib/content/article-style/store'
 import { DEFAULT_CONTENT_LANGUAGE, normalizeContentLanguage, type ContentLanguage } from '@/lib/content/language'
-
-export const CONTENT_IMAGE_BUCKET = 'content-article-images'
+import { CONTENT_IMAGE_BUCKET } from '@/lib/content/image-bucket'
 
 function extFor(mime: string): string {
   if (mime.includes('png')) return 'png'

@@ -51,6 +51,7 @@ import { notFound } from 'next/navigation'
 import {
   MARKETPLACE_SUPPORT_EMAIL,
   marketplaceAffiliateUrl,
+  marketplaceApprovedPlans,
   marketplaceCommission,
   marketplaceProvider,
 } from '@/lib/marketplace/config'
@@ -152,6 +153,9 @@ export default async function MarketplaceJvPage({
   if (!provider) notFound()
 
   const commission = marketplaceCommission(provider.slug)
+  /* An affiliate is recruited only to the plans the platform approved. */
+  const plansOnOffer = marketplaceApprovedPlans(provider.slug)
+
 
   return (
     <main className="mx-auto max-w-3xl px-4 py-16">
@@ -179,7 +183,7 @@ export default async function MarketplaceJvPage({
       <section className="mt-10">
         <h2 className="text-section text-ink">The plans, and where to request approval</h2>
         <div className="mt-4 grid gap-4 sm:grid-cols-2">
-          {PLAN_CODES.map((code) => {
+          {plansOnOffer.map((code) => {
             const plan = PLAN_CATALOG[code]
             const affiliateUrl = marketplaceAffiliateUrl(provider.slug, code)
             return (

@@ -12,12 +12,18 @@
  * header. It carries the narrow scope, so one click stops THESE emails and leaves the
  * reminder that asks the owner to approve an article alone; the words say so, and the page
  * it opens offers to stop the rest too. Every stored text is escaped.
+ *
+ * KOREA. These two emails are 광고성 정보 (lib/compliance/korea-promotional-email.ts), so a
+ * reader in Korea who consented to them is owed the 제50조 제4항 제1호 mark at the front of
+ * the subject line. `markAsKoreanAd` carries that decision in; this builder never takes it,
+ * and never reads a country of its own.
  */
 import { escapeEmailHtml } from '@/lib/notifications/signup-email'
 import { getDashboardDictionary } from '@/lib/i18n/dashboard/getDashboardDictionary'
 import { SETUP_UNSUBSCRIBE_SCOPE, unsubscribeUrlFor } from '@/lib/reminders/email'
 import { toBilingualLocale } from '@/lib/i18n/locales'
 import { PROJECT_CONNECTION_ANCHOR } from '@/lib/content/content-hub-setup'
+import { koreaAdSubject } from '@/lib/compliance/korea-promotional-email'
 import type { PublicLocale } from '@/lib/i18n/locales'
 import type { Stage } from './cadence'
 
@@ -33,6 +39,12 @@ export interface OnboardingEmailInput {
   origin: string
   /** The signed unsubscribe token. */
   token: string
+  /**
+   * The reader is placed in Korea and has consented, so 정보통신망법 제50조 제4항 제1호
+   * wants the subject line marked as an advertisement. Decided by
+   * lib/compliance/korea-promotional-email.ts, never here.
+   */
+  markAsKoreanAd?: boolean
 }
 
 export interface OnboardingEmail {
@@ -69,7 +81,7 @@ export function buildOnboardingEmail(input: OnboardingEmailInput): OnboardingEma
   // The unsubscribe page is bilingual (lib/reminders/http.ts): Spanish and Portuguese
   // readers get its English, which is the same narrowing the rest of the dashboard makes.
   const unsubscribeUrl = unsubscribeUrlFor(input.origin, input.token, toBilingualLocale(input.locale), SETUP_UNSUBSCRIBE_SCOPE)
-  const subject = s.subject(input.domain)
+  const subject = input.markAsKoreanAd ? koreaAdSubject(s.subject(input.domain)) : s.subject(input.domain)
   const greeting = t.greeting(input.firstName)
   const intro = s.intro(input.domain)
 

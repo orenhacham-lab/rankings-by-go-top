@@ -50,6 +50,7 @@ import { KOREA_SALE_COUNTRY_HEADER } from '@/lib/billing/korea-sale'
 import { ownSaleAllowedForRequest } from '@/lib/marketplace/own-sale-territory'
 import {
   MARKETPLACE_SUPPORT_EMAIL,
+  marketplaceApprovedPlans,
   marketplaceBuyUrl,
   marketplacePixelUrl,
   marketplacePolicyUrl,
@@ -83,6 +84,11 @@ export default async function MarketplaceSalesPage({
   if (!provider) notFound()
 
   const policyUrl = marketplacePolicyUrl(provider.slug)
+  /* Only the plans this platform approved are offered or priced here: a Buy
+     button for a product a reseller refused is a purchase route we may not
+     sell through. See `approvedPlans` in lib/marketplace/config.ts. */
+  const plansOnOffer = marketplaceApprovedPlans(provider.slug)
+
   // One beacon per plan the page actually offers, de-duplicated: a platform
   // whose pixel is per product (JVZoo) needs each listed product's own URL,
   // and a platform with one provider-wide URL still contributes exactly one.
@@ -140,7 +146,7 @@ export default async function MarketplaceSalesPage({
       </ul>
 
       <section className="mt-12 grid gap-4 sm:grid-cols-2">
-        {PLAN_CODES.map((code) => {
+        {plansOnOffer.map((code) => {
           const plan = PLAN_CATALOG[code]
           const buyUrl = marketplaceBuyUrl(provider.slug, code)
           return (

@@ -33,7 +33,7 @@
  * photo already published there is removed in the profile, by the merchant.
  */
 import type { createAdminClient } from '@/lib/supabase/admin'
-import { CONTENT_IMAGE_BUCKET } from '@/lib/content/featured-image'
+import { CONTENT_IMAGE_BUCKET } from '@/lib/content/image-bucket'
 
 type Admin = ReturnType<typeof createAdminClient>
 /** Just the storage corner of the admin client, so a caller can pass a stub. */

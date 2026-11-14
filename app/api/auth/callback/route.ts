@@ -6,6 +6,7 @@ import { logRestrictedAttempt, restrictionForRequest, sanctionsNotice } from '@/
 import { createAdminClient } from '@/lib/supabase/admin'
 import { GDPR_COUNTRY_HEADER } from '@/lib/compliance/gdpr-territory'
 import { notifyGdprTerritorySignup } from '@/lib/compliance/gdpr-territory-alert'
+import { SIGNUP_COUNTRY_HEADER, recordSignupCountry } from '@/lib/compliance/signup-country'
 import { ensureDefaultClient } from '@/lib/clients/ensure-default-client'
 import { sanitizeNextPath } from '@/lib/i18n/request-locale'
 import { isFreshSignup, sendSignupNotification } from '@/lib/notifications/signup-email'
@@ -172,6 +173,27 @@ async function signedIn(
       })
     } catch (alertError) {
       console.error('[gdpr-territory] alert threw:', alertError instanceof Error ? alertError.name : 'unknown')
+    }
+  }
+
+  // WHERE THIS ACCOUNT WAS OPENED, written once.
+  // A customer email is sent from a cron, which has no request and therefore no
+  // country header, so a rule that binds an outgoing message — 정보통신망법
+  // 제50조 is the first of them — can only place its reader from what was
+  // stored. This is the one funnel every sign-in door reaches, so it is the one
+  // place that still has the request. lib/compliance/signup-country.ts says why
+  // it is provenance rather than a current location, and why it must never be
+  // read for a price or a tax. It never fails the sign-in.
+  if (user && isFreshSignup(user)) {
+    try {
+      await recordSignupCountry({
+        admin: createAdminClient(),
+        userId: user.id,
+        country: (await headers()).get(SIGNUP_COUNTRY_HEADER),
+        accountCreatedAt: user.created_at ?? null,
+      })
+    } catch (countryError) {
+      console.error('[signup-country] write threw:', countryError instanceof Error ? countryError.name : 'unknown')
     }
   }
 

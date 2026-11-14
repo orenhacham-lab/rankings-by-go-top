@@ -148,16 +148,42 @@ function main() {
   console.log('\nD) refusing is as easy as agreeing, and withdrawable from every page')
   {
     const banner = code('components/CookieConsent.tsx')
-    // Equal prominence: both decisions are flex-1 buttons in one row with the
-    // same height class, so neither can be made the cheaper press.
+    /*
+     * Equal prominence: both decisions are flex-1 buttons in one row, and they
+     * take their size from THE SAME TWO CONSTANTS, so neither can be made the
+     * cheaper press by a class that drifts on one of them.
+     *
+     * It used to pin the literal `h-[26px] text-overline`. That is the class
+     * that pushed the accept label out of its pill on a phone, in every language
+     * whose "accept measurement" is three words, so the fixed height became a
+     * minimum on 13 Nov 2026. Pinning a literal would have made the fix fail
+     * this guard; what the law asks is that the two be EQUAL, so the guard now
+     * asserts equality — the size fragment of the accept button and of the
+     * reject button must be the same expression — and that the phone height can
+     * grow rather than clip.
+     */
+    const sizeOf = (cls: string) => cls.match(/\$\{compact \? ([A-Z_]+) : ([A-Z_]+)\}/)
     const equalOk = (s: string) => {
       const accept = s.match(/onClick=\{handleAccept\}[\s\S]{0,400}?className=\{`([^`]*)`\}/)
       const reject = s.match(/onClick=\{handleReject\}[\s\S]{0,400}?className=\{`([^`]*)`\}/)
       if (!accept || !reject) return false
-      const shape = (cls: string) => /flex-1/.test(cls) && /h-\[26px\] text-overline.*h-9 text-copy|compact \? 'h-\[26px\] text-overline' : 'h-9 text-copy'/.test(cls)
-      return shape(accept[1]) && shape(reject[1])
+      const a = sizeOf(accept[1]), r = sizeOf(reject[1])
+      if (!a || !r) return false
+      if (a[1] !== r[1] || a[2] !== r[2]) return false
+      if (!/flex-1/.test(accept[1]) || !/flex-1/.test(reject[1])) return false
+      // The row stretches, so the taller label's height is handed to its peer.
+      if (!/flex items-stretch/.test(s)) return false
+      // And the phone button's height is a floor, never a ceiling: a label that
+      // needs two lines makes the button taller instead of spilling out of it.
+      const compactConst = s.match(new RegExp(`const ${a[1]} = '([^']*)'`))
+      return !!compactConst && /min-h-\[26px\]/.test(compactConst[1]) && !/(^|\s)h-\[\d+px\]/.test(compactConst[1])
     }
     check('D1: accept and reject are peer buttons of the same size in the same row', equalOk(banner))
+    check('MUT: a phone button that clips its label again is caught',
+      !equalOk(banner.replace("const COMPACT_BUTTON = 'min-h-[26px]", "const COMPACT_BUTTON = 'h-[26px]")))
+    check('MUT: giving accept a size of its own is caught',
+      !equalOk(banner.replace('onClick={handleAccept}\n          className={`${compact ? COMPACT_BUTTON : FULL_BUTTON}', 'onClick={handleAccept}\n          className={`${compact ? FULL_BUTTON : FULL_BUTTON}')))
+    check('MUT: a row that no longer stretches is caught', !equalOk(banner.replace('flex items-stretch', 'flex items-start')))
     check('MUT: a reject rendered as small print is caught',
       !equalOk(banner.replace(/onClick=\{handleReject\}(\s*)className=\{`([^`]*)`\}/, 'onClick={handleReject}$1className="text-overline underline"')))
     check('D2: a third control opens the per-category panel', /onClick=\{\(\) => setPanelOpen\(true\)\}/.test(banner))

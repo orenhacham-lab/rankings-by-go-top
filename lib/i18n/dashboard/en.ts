@@ -5736,6 +5736,13 @@ export const dashboardEn = {
       PT: 'Portugal',
       GR: 'Greece',
       CY: 'Cyprus',
+      FR: 'France',
+      IT: 'Italy',
+      DE: 'Germany',
+      NL: 'Netherlands',
+      PL: 'Poland',
+      JP: 'Japan',
+      KR: 'South Korea',
     },
     languages: {
       he: 'Hebrew',
@@ -5745,6 +5752,13 @@ export const dashboardEn = {
       el: 'Greek',
       ar: 'Arabic',
       ru: 'Russian',
+      fr: 'French',
+      it: 'Italian',
+      de: 'German',
+      nl: 'Dutch',
+      pl: 'Polish',
+      ja: 'Japanese',
+      ko: 'Korean',
     },
     addToProject: {
       sectionTitle: 'Actions for selected keywords',
@@ -6122,7 +6136,11 @@ export const dashboardEn = {
       policyLabel: 'The withdrawal right in full, in the cancellation and refund policy',
     },
     koreaSale: {
-      title: 'A paid subscription is not sold in Korea at the moment',
+      title: 'Only the free trial is available in Korea at the moment',
+      description: 'A paid subscription is not sold there. Nothing will be charged, and the data you created during the trial stays in your account. Write to us at contact@gotopseo.com with any question.',
+    },
+    ownNameSale: {
+      title: 'A paid subscription is not sold in your country at the moment',
       description: 'Nothing will be charged, and the data you created during the trial stays in your account. Write to us at contact@gotopseo.com with any question.',
     },
     creem: {

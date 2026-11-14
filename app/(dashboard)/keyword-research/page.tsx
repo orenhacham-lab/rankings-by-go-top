@@ -4,7 +4,7 @@ import { useState, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
 import { useDashboardLanguage } from '@/lib/i18n/dashboard/useDashboardLanguage'
 import { getDashboardDictionary } from '@/lib/i18n/dashboard/getDashboardDictionary'
-import { SUPPORTED_COUNTRIES, SUPPORTED_LANGUAGES } from '@/lib/google-ads/constants'
+import { SUPPORTED_COUNTRIES, SUPPORTED_LANGUAGES, researchDefaultFor } from '@/lib/google-ads/constants'
 import { GeneratedQuestion } from '@/lib/ai-questions/generate-questions'
 import AIQuestionsModal from '@/components/keyword-research/AIQuestionsModal'
 import TrendModal, { type TrendError } from '@/components/keyword-research/TrendModal'
@@ -176,8 +176,12 @@ function KeywordResearchScreen() {
 
   const [researchType, setResearchType] = useState<'keyword' | 'url' | 'keyword_url'>('keyword')
   const [keyword, setKeyword] = useState('')
-  const [country, setCountry] = useState('IL')
-  const [selectedLanguage, setSelectedLanguage] = useState('he')
+  // The pickers open on the market of the language the owner is reading the
+  // dashboard in, not on Israel for everyone (lib/google-ads/constants.ts).
+  // Both lists stay complete: this chooses the first answer, not the options.
+  const researchDefault = researchDefaultFor(uiLocale)
+  const [country, setCountry] = useState<string>(researchDefault.country)
+  const [selectedLanguage, setSelectedLanguage] = useState<string>(researchDefault.language)
   const [url, setUrl] = useState('')
   const [minMonthlySearches, setMinMonthlySearches] = useState(30)
   const [resultsLimit, setResultsLimit] = useState<100 | 250>(100)

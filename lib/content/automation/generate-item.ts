@@ -12,14 +12,12 @@ import type { createAdminClient } from '@/lib/supabase/admin'
 import { generateArticleForTopic } from '@/lib/content/article-generation'
 import { TRANSIENT_GEN_REASONS } from '@/lib/content/gemini-article'
 import { runQualityGate } from '@/lib/content/automation/quality-gate'
+import { AUTOMATION_MAX_ATTEMPTS } from '@/lib/content/automation/attempts'
 
 type Admin = ReturnType<typeof createAdminClient>
 
 // generateValidatedArticle reasons that mean "content quality" vs. "model/transport".
 const QUALITY_REASONS = new Set(['article_quality_gate_failed', 'required_anchor_missing'])
-
-/** Max total processing attempts per item before it stays 'failed' for a human. */
-export const AUTOMATION_MAX_ATTEMPTS = Math.max(1, Number(process.env.AUTOMATION_MAX_ATTEMPTS) || 3)
 
 export interface GenerateItemResult {
   itemId: string
@@ -76,7 +74,7 @@ async function gateAndFinalize(admin: Admin, itemId: string, article: { id: stri
 export async function generatePoolItem(
   admin: Admin,
   itemId: string,
-  opts: { allowRetry?: boolean; autoApplyInternalLinks?: boolean } = {},
+  opts: { allowRetry?: boolean; autoApplyInternalLinks?: boolean; inlineImagesMayBatch?: boolean } = {},
 ): Promise<GenerateItemResult> {
   try {
     const { data: itemData } = await admin
@@ -146,7 +144,10 @@ export async function generatePoolItem(
     // when the caller opts in (the MANUAL "generate" button on a queued item), the
     // topic's APPROVED internal links are auto-inserted into the draft, exactly like
     // the per-topic manual generate. Cron/scheduled runs do NOT opt in (unchanged).
-    const gen = await generateArticleForTopic(admin, { topicId: item.topic_id, userId: ownerId, autoApplyInternalLinks: opts.autoApplyInternalLinks === true })
+    // inlineImagesMayBatch: half-price BODY images, passed through untouched —
+    // only the runner decides it, and only where it measured enough slack
+    // before this pool publishes (lib/content/image-batch/may-batch.ts).
+    const gen = await generateArticleForTopic(admin, { topicId: item.topic_id, userId: ownerId, autoApplyInternalLinks: opts.autoApplyInternalLinks === true, inlineImagesMayBatch: opts.inlineImagesMayBatch === true })
     if (!gen.ok) {
       let status = 'failed'
       let reason: string = gen.kind

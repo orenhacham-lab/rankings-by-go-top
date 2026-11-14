@@ -19,8 +19,12 @@ import { runLinkNetworkStep } from '@/lib/link-network/step'
 import { runAutoInternalLinksStep } from '@/lib/content/auto-internal-links/step'
 import type { createAdminClient } from '@/lib/supabase/admin'
 import { generateValidatedArticle, type ArticleBrief } from '@/lib/content/gemini-article'
+import { takeBatchedDraft } from '@/lib/content/batch/take-draft'
+import { isArticleBatchEnabled } from '@/lib/content/batch/flag'
 import { createFeaturedImageForArticle } from '@/lib/content/featured-image'
 import { runArticleImageStep } from '@/lib/content/article-style/generation'
+import { isInlineImageBatchEnabled } from '@/lib/content/image-batch/flag'
+import { submitInlineImageBatch } from '@/lib/content/image-batch/inline-image-batch'
 import { decodeBriefNotes } from '@/lib/content/brief-notes'
 import { resolveArticleDepth, DEPTH_PROMPT_LABEL } from '@/lib/content/article-depth'
 import { loadApprovedPlanAnchors } from '@/lib/content/internal-link-generation-guidance'
@@ -187,37 +191,27 @@ export async function isArticleAllowanceSpent(
 }
 
 /**
- * Generate + persist an article draft for a topic. `userId` is stamped as
- * generated_articles.user_id (the project owner). Ownership is the caller's job.
+ * THE PROMPT'S INPUT, BUILT IN ONE PLACE.
+ *
+ * Everything the article writer is told about a topic — the topic row, the
+ * project, the language, the anchors, the depth decision, the approved
+ * internal-link guidance, the owner's standing instructions — is assembled
+ * here and nowhere else. It was inline in generateArticleForTopic until the
+ * batch lane (lib/content/batch/article-batch.ts) needed the SAME brief hours
+ * before generation: a batch request whose prompt differs by one character
+ * from the prompt the generator would build is money spent on a draft that can
+ * never be used, because the match is made on the prompt itself. One builder
+ * makes that mismatch impossible by construction.
+ *
+ * Pure assembly plus reads. No billing, no reservation, no provider call, and
+ * the two validation refusals it owns (a required anchor with no URL, a CTA
+ * with no details) are returned unchanged to its caller.
  */
-export async function generateArticleForTopic(
-  admin: Admin,
-  opts: { topicId: string; userId: string; autoApplyInternalLinks?: boolean },
-  deps: ArticleGenerationDeps = REAL_GENERATION_DEPS,
-): Promise<GenerateForTopicResult> {
-  const { topicId, userId } = opts
+export type TopicBriefResult =
+  | { ok: true; brief: ArticleBrief; projectId: string; wpConnectionId: string | null; topicFields: { primaryKeyword: string | null; language: string | null } }
+  | { ok: false; kind: 'topic_not_found' | 'required_anchor_missing_url' | 'cta_details_missing' }
 
-  // Blocker D fix — the CENTRAL gate for article + auto-image generation.
-  // This is the ONE function every entry point (manual per-topic generate,
-  // the manual per-item route, the cron job, the "run automation now"
-  // route, and every retry) funnels through — see generatePoolItem() below,
-  // which is itself the sole caller reachable from cron/queue/retry. Checked
-  // FIRST, before any DB read beyond what's needed, and before any Gemini
-  // call (generateValidatedArticle / createFeaturedImageForArticle).
-  const gate = await assertContentGenerationAllowedForUser(admin, userId, deps.now)
-  if (!gate.allowed) {
-    return gate.reason === 'entitlement_unavailable'
-      ? { ok: false, kind: 'entitlement_unavailable', detail: gate.detail }
-      : { ok: false, kind: 'billing_required' }
-  }
-
-  // AN EXHAUSTED ALLOWANCE, FOUND BEFORE THE PROMPT INSTEAD OF AFTER IT.
-  // See isArticleAllowanceSpent. Advisory only; Phase 3's atomic reservation
-  // below is still the decision, and this reads nothing it does not need.
-  if (await isArticleAllowanceSpent(admin, {
-    userId, topicId, nowMs: deps.now().getTime(), readAllowance: deps.readAllowance ?? readUsageAllowance,
-  })) return { ok: false, kind: 'quota_exceeded' }
-
+export async function buildBriefForTopic(admin: Admin, topicId: string): Promise<TopicBriefResult> {
   const { data: topic } = await admin.from('article_topics').select('*').eq('id', topicId).maybeSingle()
   if (!topic) return { ok: false, kind: 'topic_not_found' }
   const t = topic as Record<string, unknown>
@@ -342,6 +336,64 @@ export async function generateArticleForTopic(
     businessContext: generationContext.business,
   }
 
+  return {
+    ok: true,
+    brief,
+    projectId,
+    wpConnectionId: (wpConn as { id?: string } | null)?.id ?? null,
+    topicFields: { primaryKeyword: (t.primary_keyword as string) ?? null, language: (t.language as string) ?? null },
+  }
+}
+
+/**
+ * Generate + persist an article draft for a topic. `userId` is stamped as
+ * generated_articles.user_id (the project owner). Ownership is the caller's job.
+ */
+export async function generateArticleForTopic(
+  admin: Admin,
+  opts: {
+    topicId: string
+    userId: string
+    autoApplyInternalLinks?: boolean
+    /**
+     * May the article's BODY images be ordered from the Gemini Batch API (half
+     * price, hours instead of seconds) instead of called for now? Only the
+     * queue's own generation sets this, and only when the pool has a day or
+     * more before it publishes (lib/content/image-batch/may-batch.ts). A
+     * merchant pressing generate or regenerate never sets it, and the hero
+     * image is never batched.
+     */
+    inlineImagesMayBatch?: boolean
+  },
+  deps: ArticleGenerationDeps = REAL_GENERATION_DEPS,
+): Promise<GenerateForTopicResult> {
+  const { topicId, userId } = opts
+
+  // Blocker D fix — the CENTRAL gate for article + auto-image generation.
+  // This is the ONE function every entry point (manual per-topic generate,
+  // the manual per-item route, the cron job, the "run automation now"
+  // route, and every retry) funnels through — see generatePoolItem() below,
+  // which is itself the sole caller reachable from cron/queue/retry. Checked
+  // FIRST, before any DB read beyond what's needed, and before any Gemini
+  // call (generateValidatedArticle / createFeaturedImageForArticle).
+  const gate = await assertContentGenerationAllowedForUser(admin, userId, deps.now)
+  if (!gate.allowed) {
+    return gate.reason === 'entitlement_unavailable'
+      ? { ok: false, kind: 'entitlement_unavailable', detail: gate.detail }
+      : { ok: false, kind: 'billing_required' }
+  }
+
+  // AN EXHAUSTED ALLOWANCE, FOUND BEFORE THE PROMPT INSTEAD OF AFTER IT.
+  // See isArticleAllowanceSpent. Advisory only; Phase 3's atomic reservation
+  // below is still the decision, and this reads nothing it does not need.
+  if (await isArticleAllowanceSpent(admin, {
+    userId, topicId, nowMs: deps.now().getTime(), readAllowance: deps.readAllowance ?? readUsageAllowance,
+  })) return { ok: false, kind: 'quota_exceeded' }
+
+  const built = await buildBriefForTopic(admin, topicId)
+  if (!built.ok) return built
+  const { brief, projectId, wpConnectionId, topicFields } = built
+
   // Phase 3 — atomic article-credit reservation, taken immediately before
   // the Gemini call (never before it — validation failures above never
   // touch the ledger). Admins bypass the ledger entirely (same convention as
@@ -379,7 +431,15 @@ export async function generateArticleForTopic(
     reservationToken = reservation.reservationToken
   }
 
-  const gen = await deps.generate(brief)
+  // A FIRST DRAFT THAT WAS ALREADY WRITTEN, when the batch lane ordered one for
+  // this exact prompt and it has come back (lib/content/batch). Half the price,
+  // and instant. Off unless ARTICLE_BATCH_ENABLED is "true"; a miss, a stale
+  // draft or any error in the reader falls through to the live call, so this can
+  // only ever save a call, never cost one.
+  const gen = await deps.generate(
+    brief,
+    isArticleBatchEnabled() ? { takeBatchedDraft: (fingerprint) => takeBatchedDraft(admin, fingerprint) } : undefined,
+  )
   if ('error' in gen) {
     const reason = gen.reason || 'unknown'
     console.log(`[content-article-generation] failed reason=${reason} attempts=${gen.attempts}`)
@@ -401,7 +461,7 @@ export async function generateArticleForTopic(
     content_markdown: article.contentMarkdown || null,
     faq_json: article.faq.length ? article.faq : null,
     image_prompt: article.imagePrompt || null,
-    wp_connection_id: (wpConn as { id?: string } | null)?.id ?? null,
+    wp_connection_id: wpConnectionId,
   }
 
   const baseSlug = gen.slug || `article-${Date.now().toString(36)}`
@@ -476,7 +536,7 @@ export async function generateArticleForTopic(
     projectId,
     userId,
     title: article.title ?? null,
-    topic: { primary_keyword: (t.primary_keyword as string) ?? null, language: (t.language as string) ?? null },
+    topic: { primary_keyword: topicFields.primaryKeyword, language: topicFields.language },
   })
   if (aiQuestion.outcome === 'failed') console.warn('[content-article-generation] ai question skipped', { articleId: inserted.id })
 
@@ -522,6 +582,9 @@ export async function generateArticleForTopic(
   // inline images the project asked for. No settings = the featured image only.
   const { imageGenerated } = await runArticleImageStep(admin, { articleId: inserted.id, projectId, ownerId: userId }, {
     createFeaturedImage: () => deps.createFeaturedImage(admin, inserted.id),
+    batchInline: opts.inlineImagesMayBatch && isInlineImageBatchEnabled()
+      ? async (a, imageIds) => (await submitInlineImageBatch(a as never, imageIds)).orderedIds
+      : undefined,
   })
 
   return { ok: true, articleId: inserted.id, warnings: article.warnings, audit: gen.audit, imageGenerated, autoInternalLinks }

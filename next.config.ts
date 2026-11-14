@@ -30,10 +30,19 @@ const nextConfig: NextConfig = {
   // on binaries that are never opened. Excluding them touches the traced
   // file lists only, so node_modules on disk and `next start` locally are
   // unaffected. A guard locks this: lib/__qa__/function-storage.qa.ts.
+  //
+  // THE WASM FALLBACK IS THE SAME STORY, FOUND AGAIN ON 13 NOVEMBER 2026 when
+  // the team crossed 75% of the free 10 GB of function storage. sharp also
+  // ships @img/sharp-wasm32, a portable build it loads only when no native
+  // binary matches the platform. On Vercel a native one always matches, so it
+  // never loads — and tracing copied its 9.2 MB .wasm into each of the 43
+  // functions that reach sharp: 400 MB of the 3.76 GB a deployment traces,
+  // measured on a real build of main, not estimated.
   outputFileTracingExcludes: {
     '*': [
       'node_modules/@img/sharp-libvips-linuxmusl-x64/**/*',
       'node_modules/@img/sharp-linuxmusl-x64/**/*',
+      'node_modules/@img/sharp-wasm32/**/*',
     ],
   },
   // The author photo is uploaded through a server action (app/(dashboard)/
