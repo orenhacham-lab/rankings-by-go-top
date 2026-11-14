@@ -615,6 +615,23 @@ async function main() {
     // stays protected against anything but the clock.
     const ONE_CLOCK = new Set(['lib/billing/usage-allowance.ts'])
     untouched = untouched.split('\n').filter((f) => f && !ONE_CLOCK.has(f)).join('\n')
+    // 2026-11-12: the Korea sale block. Its own suite, under lib/billing/__qa__,
+    // asserts what may be sold to a visitor placed in Korea. A QA file carries no
+    // plan, price or quota VALUE — H3c above proves the catalog itself is
+    // untouched — and the module it guards (lib/billing/korea-sale.ts) only ever
+    // REFUSES a sale, so it cannot grant an entitlement this table protects.
+    const KOREA_SALE = new Set(['lib/billing/__qa__/korea-sale.qa.ts', 'lib/billing/korea-sale.ts'])
+    untouched = untouched.split('\n').filter((f) => f && !KOREA_SALE.has(f)).join('\n')
+    // 2026-11-13: the same refusal for every other country we are not cleared to
+    // sell in on our own name. lib/billing/own-name-sale.ts reads the allow list
+    // the marketplace pages already read and answers one question, whether a sale
+    // in OUR name may be made to this visitor; like the Korea module it only ever
+    // REFUSES, so it cannot grant an entitlement this table protects, and it
+    // carries no plan, price or quota VALUE of its own — H3c above proves the
+    // catalog is untouched, and its own suite proves the module holds no country
+    // literal either.
+    const OWN_NAME_SALE = new Set(['lib/billing/__qa__/own-name-sale.qa.ts', 'lib/billing/own-name-sale.ts'])
+    untouched = untouched.split('\n').filter((f) => f && !OWN_NAME_SALE.has(f)).join('\n')
     check('H4: plans, prices, quotas, billing, entitlement and Shopify files are untouched', untouched === '', untouched)
     let allowDiff = ''
     try { allowDiff = execSync('git diff -U0 8b468a8 -- lib/billing/usage-allowance.ts', { cwd: ROOT }).toString() } catch { allowDiff = 'git unavailable' }

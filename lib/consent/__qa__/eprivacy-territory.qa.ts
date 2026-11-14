@@ -17,11 +17,13 @@
 import { readFileSync } from 'node:fs'
 import {
   CONSENT_COUNTRY_HEADER,
+  beaconSuppressedForCountry,
   CONSENT_REQUIRED_COUNTRIES,
   consentRequiredForCountry,
   consentRequiredForRequest,
 } from '../eprivacy-territory'
 import { COUNTRY_HEADER } from '../../billing/server-market'
+import { PUBLIC_LOCALES } from '../../i18n/locales'
 
 let pass = 0, fail = 0
 function check(name: string, cond: boolean, detail?: string) {
@@ -47,6 +49,23 @@ check('A5: all 27 member states are listed, none quietly missing',
     .every((c) => consentRequiredForCountry(c) === true))
 check('A6: Canada in full, because Law 25 says the same and the header carries no province',
   consentRequiredForCountry('CA') === true)
+check('A6b: Korea, on 개인정보 보호법 제15조 and 정보통신망법 제22조의2 and not on ePrivacy, which has no Korean counterpart',
+  consentRequiredForCountry('KR') === true)
+check('A6b-MUT: a list without Korea would let the beacon write on page load there',
+  CONSENT_REQUIRED_COUNTRIES.filter((c) => c !== 'KR').includes('KR') === false
+  && CONSENT_REQUIRED_COUNTRIES.includes('KR'))
+check('A6c: Japan, on APPI 第31条第1項 read with 第171条 and not on ePrivacy either',
+  consentRequiredForCountry('JP') === true)
+check('A6c-MUT: a list without Japan would provide 個人関連情報 abroad with nothing confirmed',
+  CONSENT_REQUIRED_COUNTRIES.filter((c) => c !== 'JP').includes('JP') === false
+  && CONSENT_REQUIRED_COUNTRIES.includes('JP'))
+check('A6d: Brazil, listed as a precaution, which is still a listing',
+  consentRequiredForCountry('BR') === true)
+check('A6d-MUT: a list without Brazil would write there on page load',
+  CONSENT_REQUIRED_COUNTRIES.filter((c) => c !== 'BR').includes('BR') === false
+  && CONSENT_REQUIRED_COUNTRIES.includes('BR'))
+check('A6e: the two live locales behind those codes are both served, so neither entry is theoretical',
+  ['ja', 'pt-BR'].every((l) => PUBLIC_LOCALES.includes(l as (typeof PUBLIC_LOCALES)[number])))
 check('A7: a United States visitor does not, which is the only reason this module exists',
   consentRequiredForCountry('US') === false)
 check('A8: nor does a visitor outside any of it',
@@ -95,8 +114,12 @@ check('C-MUT2: …and one that ignored a malformed value the same way',
 console.log('\nD. the sales page takes the decision on the server, once')
 {
   const salesSrc = code('app/go/[platform]/page.tsx')
+  // The headers are awaited once into `requestHeaders` and both territorial
+  // questions are asked of that, so this matches the call and not the
+  // expression it used to be written inline in.
   check('D1: the page asks the territory, and from the request headers',
-    /consentRequiredForRequest\(await headers\(\)\)/.test(salesSrc))
+    /const requestHeaders = await headers\(\)/.test(salesSrc)
+    && /consentRequiredForRequest\(requestHeaders\)/.test(salesSrc))
   check('D2: the gated component is still what a consent-required visitor gets',
     /consentRequired \? \(/.test(salesSrc) && /<MarketplacePixel /.test(salesSrc))
   check('D3: and the unconditional one only the other branch',
@@ -104,8 +127,34 @@ console.log('\nD. the sales page takes the decision on the server, once')
   check('D4: the page itself renders no bare beacon, so both branches stay in components/consent',
     !/<img/.test(salesSrc))
   check('D-MUT3: the server-decision guard catches a page that guessed in the browser',
-    !/consentRequiredForRequest\(await headers\(\)\)/.test(
-      salesSrc.replace(/consentRequiredForRequest\(await headers\(\)\)/g, 'consentRequiredInBrowser()')))
+    !/consentRequiredForRequest\(requestHeaders\)/.test(
+      salesSrc.replace(/consentRequiredForRequest\(requestHeaders\)/g, 'consentRequiredInBrowser()')))
+  // D5-D7: Korea is a third state. Consent answers 개인정보 보호법 제15조 and
+  // leaves the transfer to an independent controller abroad without the
+  // 별도의 동의 of 제28조의8 제1항 제1호, so nothing is rendered at all.
+  check('D5: the page asks the suppression question too, from the same headers',
+    /beaconSuppressedForRequest\(requestHeaders\)/.test(salesSrc))
+  check('D6: and a suppressed request maps the empty list, so no beacon reaches either branch',
+    /\(beaconSuppressed \? \[\] : pixelUrls\)\.map/.test(salesSrc))
+  // D7 USED TO CHECK THAT THE TRUST BADGE RODE THIS SAME SUPPRESSION. There
+  // is no badge any more: Digistore24's reviewer required its removal from
+  // the sales page on 2026-11-12, so the helper, both components and this
+  // branch are gone (lib/marketplace/config.ts says why). What is left to
+  // guard is that no script-shaped third-party tag creeps back onto the page
+  // outside the beacon's decision — the territorial rule this suite exists
+  // for would otherwise be bypassed by the next tag someone adds.
+  check('D7: the page carries no third-party script tag outside the beacon branches',
+    !/badgeUrl/.test(salesSrc) && !/<script/.test(salesSrc))
+  check('D-MUT5: the suppression guard catches a page that dropped it and mapped every url',
+    !/\(beaconSuppressed \? \[\] : pixelUrls\)\.map/.test(
+      salesSrc.replace(/\(beaconSuppressed \? \[\] : pixelUrls\)\.map/g, 'pixelUrls.map')))
+  check('D-MUT6: …and D7 would catch a page that added a raw script tag back',
+    /<script/.test(salesSrc + '<script src={badgeUrl} async />'))
+  check('D8: a Korean visitor is suppressed, a German one is only gated',
+    beaconSuppressedForCountry('KR') === true
+    && beaconSuppressedForCountry('DE') === false && consentRequiredForCountry('DE') === true)
+  check('D9: and an unplaceable visitor is gated, not suppressed, which is the residual the module states',
+    beaconSuppressedForCountry(null) === false && consentRequiredForCountry(null) === true)
   check('D-MUT4: the branch guard catches a page that dropped the gate and always rendered the open tag',
     !/consentRequired \? \(/.test(salesSrc.replace(/consentRequired \? \(/g, 'true ? (')))
 }

@@ -55,6 +55,12 @@ export const pricingPl: PricingCopy = {
       ILS: 'Ceny zawierają izraelski podatek VAT. To jest kwota do zapłaty, bez dopłat.',
       USD: 'Przy płatności kartą sprzedawcą jest Creem i działa jako merchant of record: Creem wylicza podatek na podstawie adresu rozliczeniowego i pokazuje kwotę końcową przed płatnością. Ceny podane tutaj są bez tego podatku, a dokładną kwotę wraz z podatkiem widzą Państwo przed zawarciem umowy.',
     },
+    /* 전자상거래법 제21조 제1항 제1호 forbids inducing a consumer by withholding a
+       material fact, and it binds any business carrying on electronic commerce,
+       not only a mail-order seller, so it bites BEFORE any contract. Shown only
+       to a visitor placed in Korea, on every language's page, because the duty
+       follows the consumer and not the page. lib/billing/korea-sale.ts. */
+    koreaTrialOnly: `W Korei Południowej dostępny jest na razie tylko bezpłatny okres próbny, a płatna subskrypcja nie jest tam sprzedawana. Okres próbny kończy się automatycznie po ${DAYS} dniach, a my nie pobieramy danych karty, więc nic nie zostanie obciążone.`,
     everyPlanLabel: 'We wszystkich pakietach',
     everyPlan: [
       'Automatyczna, zaplanowana publikacja na WordPressie, w Shopify i w Wixie',

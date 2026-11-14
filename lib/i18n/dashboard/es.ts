@@ -2404,6 +2404,10 @@ export const dashboardEs: DeepPartial<DashboardDictionary> = {
       requiredNote: 'Las opciones de pago aparecen cuando usted confirma la línea anterior. Antes de eso no se cobra nada.',
       policyLabel: 'El derecho de desistimiento completo, en la política de cancelación y reembolso',
     },
+    ownNameSale: {
+      title: 'En este momento no vendemos una suscripción de pago en su país',
+      description: 'No se le cobrará nada y los datos que creó durante la prueba permanecen en su cuenta. Escríbanos a contact@gotopseo.com con cualquier duda.',
+    },
     creem: {
       payButton: 'Pagar con tarjeta',
       starting: 'Abriendo la página de pago segura...',
@@ -5460,6 +5464,13 @@ export const dashboardEs: DeepPartial<DashboardDictionary> = {
       PT: 'Portugal',
       GR: 'Grecia',
       CY: 'Chipre',
+      FR: 'Francia',
+      IT: 'Italia',
+      DE: 'Alemania',
+      NL: 'Países Bajos',
+      PL: 'Polonia',
+      JP: 'Japón',
+      KR: 'Corea del Sur',
     },
     languages: {
       he: 'Hebreo',
@@ -5469,6 +5480,13 @@ export const dashboardEs: DeepPartial<DashboardDictionary> = {
       el: 'Griego',
       ar: 'Árabe',
       ru: 'Ruso',
+      fr: 'Francés',
+      it: 'Italiano',
+      de: 'Alemán',
+      nl: 'Neerlandés',
+      pl: 'Polaco',
+      ja: 'Japonés',
+      ko: 'Coreano',
     },
     addToProject: {
       sectionTitle: 'Acciones para las palabras clave seleccionadas',

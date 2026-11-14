@@ -34,6 +34,12 @@ export const pricingHe: PricingCopy = {
       ILS: 'המחירים כוללים מע״מ. זה הסכום שתשלמו, בלי תוספות.',
       USD: 'בתשלום בכרטיס אשראי המוכר הרשום הוא Creem, והיא מחשבת מס לפי כתובת החיוב שלכם ומציגה את הסכום הסופי לפני התשלום. המחירים כאן אינם כוללים אותו.',
     },
+    /* 전자상거래법 제21조 제1항 제1호 forbids inducing a consumer by withholding a
+       material fact, and it binds any business carrying on electronic commerce,
+       not only a mail-order seller, so it bites BEFORE any contract. Shown only
+       to a visitor placed in Korea, on every language's page, because the duty
+       follows the consumer and not the page. lib/billing/korea-sale.ts. */
+    koreaTrialOnly: `בקוריאה זמין בשלב זה רק הניסיון החינמי, ומנוי בתשלום לא נמכר שם. הניסיון מסתיים אוטומטית לאחר ${DAYS} ימים, ואיננו מבקשים פרטי כרטיס, כך שלא מתבצע חיוב.`,
     everyPlanLabel: 'בכל תוכנית',
     everyPlan: [
       'פרסום אוטומטי לפי לוח זמנים, לוורדפרס, לשופיפיי ולוויקס',

@@ -109,6 +109,9 @@ const BRAND_FALLBACK: Record<BlogAutoLocale, (link: string) => string> = {
   de: (l) => `${l} bündelt diese Arbeit an einer Stelle, und Sie können kostenlos testen.`,
   nl: (l) => `${l} brengt dit werk op één plek samen, en u kunt beginnen met een gratis proefperiode.`,
   pl: (l) => `${l} zbiera tę pracę w jednym miejscu i można zacząć od bezpłatnego okresu próbnego.`,
+  // 합니다체 with no 고객님: this is a sentence in an ARTICLE, not a line of the
+  // dashboard, so it addresses a reader rather than a customer.
+  ko: (l) => `${l}는 이 작업을 한곳에 모아 주며, 무료 체험으로 시작할 수 있습니다.`,
 }
 
 /** Append that sentence when, and only when, the body never named the product. */
@@ -129,6 +132,7 @@ const RELATED_HEADING: Record<BlogAutoLocale, string> = {
   de: 'Auch lesenswert',
   nl: 'Ook interessant',
   pl: 'Warto przeczytać także',
+  ko: '함께 읽기',
 }
 
 /** Where the in-body product link goes: the free trial, in the article's language. */

@@ -133,7 +133,7 @@ export const SURFER_COMPARE: Record<PublicLocale, ComparisonCopy> = {
         { title: 'מאמרים שמתפרסמים בלעדיכם', body: 'תוכנית נושאים חודשית שאתם מאשרים, ואז מאמרים עם תמונות וקישורים פנימיים שעולים לאוויר לבד.' },
         { title: 'גם מחוץ לאתר', body: 'פוסטים לפרופיל העסקי בגוגל באישורכם, וטיוטות תשובה לביקורות — באותו מחיר.' },
         { title: 'תמונת מצב אחת', body: 'בדיקה חודשית בגוגל, במפות ובתשובות AI, בלי להוסיף כלי שני ובלי דוח שצריך להרכיב.' },
-        { title: 'שופיפיי וגם וורדפרס', body: 'אותה מערכת על שתי הפלטפורמות, ובעשר שפות — עברית ביניהן.' },
+        { title: 'שופיפיי וגם וורדפרס', body: 'אותה מערכת על שתי הפלטפורמות, ובאחת עשרה שפות — עברית ביניהן.' },
       ],
     },
     faq: {
@@ -259,7 +259,7 @@ export const SURFER_COMPARE: Record<PublicLocale, ComparisonCopy> = {
         { title: 'Articles that publish without you', body: 'A monthly topic plan you approve, then articles with images and internal links going live on their own.' },
         { title: 'Off the site as well', body: 'Posts to your Google Business Profile with your consent, and drafted replies to reviews, in the same price.' },
         { title: 'One picture of where you stand', body: 'A monthly check in Google, in Maps and in AI answers, without adding a second tool or assembling a report.' },
-        { title: 'Shopify as well as WordPress', body: 'The same system on both platforms, in ten languages.' },
+        { title: 'Shopify as well as WordPress', body: 'The same system on both platforms, in eleven languages.' },
       ],
     },
     faq: {
@@ -385,7 +385,7 @@ export const SURFER_COMPARE: Record<PublicLocale, ComparisonCopy> = {
         { title: 'Artículos que se publican sin ti', body: 'Un plan mensual de temas que tú apruebas y, después, artículos con imágenes y enlaces internos que salen solos.' },
         { title: 'También fuera del sitio', body: 'Publicaciones en tu perfil de empresa en Google con tu consentimiento, y borradores de respuesta a las reseñas, en el mismo precio.' },
         { title: 'Una sola foto de dónde estás', body: 'Una comprobación mensual en Google, en Maps y en respuestas de IA, sin añadir una segunda herramienta ni montar un informe.' },
-        { title: 'Shopify además de WordPress', body: 'El mismo sistema en las dos plataformas y en diez idiomas.' },
+        { title: 'Shopify además de WordPress', body: 'El mismo sistema en las dos plataformas y en once idiomas.' },
       ],
     },
     faq: {
@@ -511,7 +511,7 @@ export const SURFER_COMPARE: Record<PublicLocale, ComparisonCopy> = {
         { title: 'Artigos que publicam sem você', body: 'Um plano mensal de temas que você aprova e, depois, artigos com imagens e links internos que entram no ar sozinhos.' },
         { title: 'Fora do site também', body: 'Publicações no seu perfil da empresa no Google com o seu consentimento, e rascunhos de resposta às avaliações, no mesmo preço.' },
         { title: 'Uma única foto de onde você está', body: 'Uma verificação mensal no Google, no Maps e nas respostas de IA, sem somar uma segunda ferramenta nem montar relatório.' },
-        { title: 'Shopify além de WordPress', body: 'O mesmo sistema nas duas plataformas e em dez idiomas.' },
+        { title: 'Shopify além de WordPress', body: 'O mesmo sistema nas duas plataformas e em onze idiomas.' },
       ],
     },
     faq: {
@@ -637,7 +637,7 @@ export const SURFER_COMPARE: Record<PublicLocale, ComparisonCopy> = {
         { title: 'Des articles qui se publient sans vous', body: 'Un plan de sujets mensuel que vous validez, puis des articles avec images et liens internes qui partent en ligne tout seuls.' },
         { title: 'En dehors du site aussi', body: "Des publications sur votre fiche d'établissement Google avec votre accord, et des brouillons de réponse aux avis, dans le même tarif." },
         { title: 'Une seule photo de votre situation', body: 'Une vérification mensuelle dans Google, dans Maps et dans les réponses IA, sans ajouter un second outil ni monter un rapport.' },
-        { title: 'Shopify autant que WordPress', body: 'Le même système sur les deux plateformes, en dix langues.' },
+        { title: 'Shopify autant que WordPress', body: 'Le même système sur les deux plateformes, en onze langues.' },
       ],
     },
     faq: {
@@ -763,7 +763,7 @@ export const SURFER_COMPARE: Record<PublicLocale, ComparisonCopy> = {
         { title: 'Articoli che si pubblicano senza di voi', body: 'Un piano mensile di argomenti che approvate, e poi articoli con immagini e link interni che vanno online da soli.' },
         { title: 'Anche fuori dal sito', body: "Pubblicazioni sul profilo dell'attività su Google con il vostro consenso, e bozze di risposta alle recensioni, nello stesso prezzo." },
         { title: 'Una sola fotografia della situazione', body: 'Una verifica mensile su Google, su Maps e nelle risposte IA, senza aggiungere un secondo strumento né comporre un report.' },
-        { title: 'Shopify oltre a WordPress', body: 'Lo stesso sistema su entrambe le piattaforme e in dieci lingue.' },
+        { title: 'Shopify oltre a WordPress', body: 'Lo stesso sistema su entrambe le piattaforme e in undici lingue.' },
       ],
     },
     faq: {
@@ -888,7 +888,7 @@ export const SURFER_COMPARE: Record<PublicLocale, ComparisonCopy> = {
         { title: 'Artikel, die ohne Sie online gehen', body: 'Ein monatlicher Themenplan, den Sie freigeben, und danach Artikel mit Bildern und internen Links, die von selbst veröffentlicht werden.' },
         { title: 'Auch außerhalb der Website', body: 'Beiträge in Ihrem Google Unternehmensprofil mit Ihrer Einwilligung und vorbereitete Antworten auf Bewertungen, im selben Preis.' },
         { title: 'Ein Bild davon, wo Sie stehen', body: 'Eine monatliche Prüfung in Google, in Maps und in KI-Antworten, ohne ein zweites Tool und ohne selbst einen Bericht zusammenzusetzen.' },
-        { title: 'Shopify genauso wie WordPress', body: 'Dasselbe System auf beiden Plattformen, in zehn Sprachen.' },
+        { title: 'Shopify genauso wie WordPress', body: 'Dasselbe System auf beiden Plattformen, in elf Sprachen.' },
       ],
     },
     faq: {
@@ -1013,7 +1013,7 @@ export const SURFER_COMPARE: Record<PublicLocale, ComparisonCopy> = {
         { title: '手をかけずに公開される記事', body: '月に一度、題材の計画をご承認いただくと、画像と内部リンクの入った記事がそのまま公開されます。' },
         { title: 'サイトの外側も', body: 'ご同意のうえでGoogleビジネスプロフィールへ投稿し、口コミへの返信の下書きも同じ料金に入っています。' },
         { title: '今いる場所が1枚でわかります', body: 'Google、マップ、AIの回答を月に一度まとめて確認します。2つ目の道具もレポートの組み立ても不要です。' },
-        { title: 'WordPressだけでなくShopifyも', body: '同じ仕組みを両方のプラットフォームで、10の言語で使えます。' },
+        { title: 'WordPressだけでなくShopifyも', body: '同じ仕組みを両方のプラットフォームで、11の言語で使えます。' },
       ],
     },
     faq: {
@@ -1138,7 +1138,7 @@ export const SURFER_COMPARE: Record<PublicLocale, ComparisonCopy> = {
         { title: 'Artikelen die zonder u online gaan', body: 'Een maandelijks plan met onderwerpen dat u goedkeurt, en daarna artikelen met afbeeldingen en interne links die van zichzelf worden gepubliceerd.' },
         { title: 'Ook buiten de website', body: 'Berichten in uw Google-bedrijfsprofiel met uw toestemming en voorbereide antwoorden op beoordelingen, in dezelfde prijs.' },
         { title: 'Een beeld van waar u staat', body: 'Een maandelijkse controle in Google, in Maps en in AI-antwoorden, zonder een tweede hulpmiddel en zonder zelf een rapport in elkaar te zetten.' },
-        { title: 'Shopify net zo goed als WordPress', body: 'Hetzelfde systeem op beide platforms, in tien talen.' },
+        { title: 'Shopify net zo goed als WordPress', body: 'Hetzelfde systeem op beide platforms, in elf talen.' },
       ],
     },
     faq: {
@@ -1263,7 +1263,7 @@ export const SURFER_COMPARE: Record<PublicLocale, ComparisonCopy> = {
         { title: 'Artykuły, które wchodzą na witrynę bez Państwa', body: 'Miesięczny plan tematów, który Państwo zatwierdzają, a potem artykuły z obrazami i linkowaniem wewnętrznym, publikowane same.' },
         { title: 'Także poza witryną', body: 'Posty w Państwa Profilu Firmy w Google za Państwa zgodą i przygotowane odpowiedzi na opinie, w tej samej cenie.' },
         { title: 'Obraz tego, gdzie Państwo stoją', body: 'Comiesięczne sprawdzenie w Google, w Mapach i w odpowiedziach AI, bez drugiego narzędzia i bez składania raportu samodzielnie.' },
-        { title: 'Shopify równie dobrze jak WordPress', body: 'Ten sam system na obu platformach, w dziesięciu językach.' },
+        { title: 'Shopify równie dobrze jak WordPress', body: 'Ten sam system na obu platformach, w jedenastu językach.' },
       ],
     },
     faq: {
@@ -1285,5 +1285,130 @@ export const SURFER_COMPARE: Record<PublicLocale, ComparisonCopy> = {
       ],
     },
     close: { title: 'Zobacz bez rejestracji, gdzie stoi Państwa witryna' },
+  },
+  ko: {
+    competitor: 'Surfer',
+    eyebrow: 'Go Top SEO와 Surfer',
+    metaTitle: 'Go Top SEO와 Surfer | 비교',
+    metaDescription:
+      'Go Top SEO와 Surfer 비교입니다. 누가 콘텐츠를 쓰고 누가 발행하는지, 각 가격에 무엇이 들어 있는지, AI 답변 측정이 어떻게 다른지, 그리고 Surfer가 더 맞는 경우는 언제인지 적었습니다.',
+    hero: {
+      title: 'Surfer는 잘 서는 페이지를 쓰도록 도와줍니다.',
+      accent: '저희는 그 페이지를 씁니다',
+      subtitle:
+        'Surfer는 최적화에 특화된 도구입니다. 글 쓰는 사람이 그 앞에 앉아 검색 결과에 맞게 페이지를 다듬습니다. Go Top SEO는 글쓰기를 맡을 사람이 없는 회사를 위해 만들었습니다. 시스템이 주제를 기획하고 쓰고 발행하고, Google 비즈니스 프로필에 게시물을 올리고, 한 달에 한 번 지금 어디에 있는지 확인합니다.',
+    },
+    table: {
+      eyebrow: '비교',
+      title: 'Surfer 자기 사이트에 적힌 내용을 옮겨, 각자 무엇을 하는가',
+      checkedOn: CHECKED,
+      sources: SOURCES,
+      rows: [
+        {
+          label: '가격',
+          ours: '월 79달러부터, 세금 별도. 이스라엘에서는 월 249셰켈부터, VAT 포함.',
+          theirs:
+            '모두 연 결제 기준 월 가격입니다. Discovery 49달러, Standard 99달러, Pro 182달러, Peace of Mind 299달러, 그리고 AI 가시성 전용 플랜이 82달러입니다. 연간 플랜은 1년치를 먼저 청구합니다.',
+        },
+        {
+          label: '가장 저렴한 플랜에 들어 있는 것',
+          ours: '모든 기능이 시작 플랜에 들어 있습니다. 플랜별로 달라지는 것은 요금 페이지에 있습니다.',
+          theirs:
+            'Discovery 49달러에 문서 120개, 추적 페이지 10개, AI 프롬프트 0개입니다. 프롬프트 추적은 Standard 플랜부터이며 매주 갱신되는 프롬프트 25개입니다.',
+        },
+        {
+          label: '글은 누가 쓰는가',
+          ours: '시스템입니다. 승인하시면 주제와 본문, 이미지, 내부 링크까지 만듭니다.',
+          theirs:
+            '그들의 도움을 받아 직접 쓰십니다. 그들의 사이트는 검색 결과에서 실시간으로 오는 안내가 붙은 콘텐츠 편집기와 개요, AI 초안을 설명합니다. "Write articles that rank — fast — using real-time SEO data"라고 적혀 있습니다.',
+        },
+        {
+          label: '사이트 발행',
+          ours: 'WordPress와 Shopify에 자동으로 발행합니다.',
+          theirs:
+            '홈페이지에 Surfer의 WordPress 플러그인에 대한 안내가 있습니다. 그 플러그인이 무엇을 발행하는지는 그 페이지에 설명되어 있지 않고, 설명하는 페이지도 찾지 못했습니다.',
+        },
+        {
+          label: '순위 측정',
+          ours: 'Google과 Google 지도, 그리고 AI 답변(ChatGPT, Gemini, Google AI 등)에서 매달 확인합니다.',
+          theirs:
+            '플랜은 "pages tracked"를 셉니다. Discovery는 10개이고, 홈페이지는 페이지가 떨어지기 시작할 때의 신호를 설명합니다. 키워드별 순위를 재는 전통적인 측정은 저희가 읽은 페이지들에 설명되어 있지 않습니다.',
+        },
+        {
+          label: 'AI 답변',
+          ours: 'ChatGPT와 Gemini, Google AI에서 매달 자동으로 확인합니다.',
+          theirs:
+            '프롬프트 추적에는 플랜마다 한도가 있습니다. Discovery 0개, Standard는 매주 갱신 25개, Pro는 매일 50개입니다. 홈페이지는 "Boost visibility in" 아래에 Google AI 모드와 AI Overviews, Gemini, ChatGPT, Claude, Perplexity를 보여 줍니다.',
+        },
+        {
+          label: 'Google 비즈니스 프로필과 지도',
+          ours: '승인하시면 프로필에 게시물을 자동으로 올리고, 지도에서의 순위를 매달 확인합니다.',
+          theirs: '저희가 읽은 홈페이지와 요금 페이지에는 지역 검색과 Google 지도, Google 비즈니스 프로필에 대한 언급이 없습니다.',
+        },
+        {
+          label: '사이트에서의 작업',
+          ours: '일부 수정은 저희 플러그인이 넣습니다. 코드를 읽을 필요가 없습니다.',
+          theirs:
+            '그들 편집기 안에서의 안내와 점수, 재최적화입니다. 자동 에이전트인 Surfy Agent는 홈페이지에 "soon"으로 표시되어 있습니다.',
+        },
+        {
+          label: '체험',
+          ours: '7일, 카드 등록 없이, 언제든 해지.',
+          theirs:
+            '플랜마다 버튼에 "Start for Free"라고 적혀 있습니다. 요금 페이지는 체험 기간의 길이를 밝히지 않고, 카드가 필요한지도 말하지 않습니다.',
+        },
+      ],
+    },
+    theirStrengths: {
+      eyebrow: 'Surfer가 더 맞는 경우',
+      title: '이런 경우에는 Surfer가 맞는 답입니다',
+      intro: '한 페이지를 위로 밀어 올리는 솜씨에서는 Surfer가 저희보다 낫습니다. 예의로 하는 말이 아니라, 그들이 만든 것이 정확히 그것입니다.',
+      items: [
+        {
+          title: '특정한 한 페이지가 이겨야 할 때',
+          body:
+            '그들의 점수는 검색 결과 자체에서 나오고, 글을 잘 쓰면서 그 안내를 따르는 사람은 어려운 환경에서도 어떤 자동화보다 페이지를 잘 다듬습니다. 이미 쓰는 사람이 있고 다듬는 솜씨만 모자란다면 바로 그 도구입니다.',
+        },
+        {
+          title: '기준이 AI 답변일 때',
+          body:
+            '그들의 플랜은 지정한 프롬프트를 추적합니다. Standard는 매주 25개, Pro는 매일 50개이며 홈페이지는 서비스 여섯 곳을 보여 줍니다. 저희가 세 곳을 한 달에 한 번 확인하는 것보다 더 자주, 더 넓습니다. 질문이 그것뿐이라면 Surfer가 더 잘 답합니다.',
+        },
+        {
+          title: '글을 많이 쓸 때',
+          body: '월 49달러에 문서 120개입니다. 콘텐츠를 많이 만드는 쪽에게는 작업 단위당 가격이 반박하기 어렵습니다.',
+        },
+      ],
+    },
+    ourStrengths: {
+      eyebrow: '저희가 더 맞는 경우',
+      title: '그 일을 할 사람이 아무도 없을 때',
+      intro: '진짜 차이는 기술이 아닙니다. 누가 앉아서 쓰고, 누가 발행을 잊지 않느냐입니다.',
+      items: [
+        { title: '내가 없어도 사이트에 올라가는 글', body: '승인하실 한 달치 주제 계획이 먼저 오고, 그다음 이미지와 내부 링크가 들어간 글이 스스로 발행됩니다.' },
+        { title: '사이트 밖에서도', body: '승인하시면 Google 비즈니스 프로필 게시물과 리뷰 답변 초안까지 같은 가격 안에서 처리합니다.' },
+        { title: '지금 어디에 있는지에 대한 그림', body: 'Google과 지도, AI 답변에서 매달 확인합니다. 두 번째 도구도, 손으로 짜는 리포트도 필요 없습니다.' },
+        { title: 'Shopify도 WordPress와 똑같이', body: '두 플랫폼에서 같은 시스템이며, 열한 개 언어로 제공합니다.' },
+      ],
+    },
+    faq: {
+      eyebrow: '질문',
+      title: '정하기 전에 많이 묻는 것',
+      items: [
+        {
+          q: 'Surfer는 49달러이고 저희는 79달러입니다. 왜 그렇습니까?',
+          a: '같은 것을 파는 것이 아니기 때문입니다. 49달러는 문서 120개와 추적 페이지 10개를 주고 프롬프트 추적은 하나도 없으며, 쓰고 발행하는 일은 여전히 사람이 합니다. 저희 가격에는 작성과 발행, Google 비즈니스 프로필, 매달 확인이 함께 들어 있습니다. 이미 쓰는 사람이 있다면 Surfer가 더 쌉니다. 그럴 때는 그쪽이 맞는 결정입니다.',
+        },
+        {
+          q: '"Surfer SEO"와 같은 제품입니까?',
+          a: '네. 2026년 10월 31일부터 surferseo.com이 surfer.ai로 이동하며, 제품 이름은 그대로 Surfer입니다. 표의 링크가 저희가 읽은 페이지들입니다.',
+        },
+        {
+          q: 'AI 답변은 누가 더 잘 측정합니까?',
+          a: 'Surfer입니다. 상위 플랜은 지정한 프롬프트 수십 개를 매일 갱신하고 서비스 여섯 곳을 보여 주며, 저희는 ChatGPT와 Gemini, Google AI에서 한 달에 한 번 확인합니다. 저희 쪽의 이점은 더 깊다는 것이 아니라, 그 확인이 가격에 들어 있어 따로 도구를 두지 않아도 된다는 것입니다.',
+        },
+      ],
+    },
+    close: { title: '가입하지 않고, 내 사이트가 지금 어디에 있는지 확인해 보십시오' },
   },
 }

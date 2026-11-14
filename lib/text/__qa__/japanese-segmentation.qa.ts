@@ -34,7 +34,7 @@ import { tokens as dedupeTokens } from '../../content/recommendations/dedupe'
 import { distinctiveTokensOf } from '../../content/recommendations/semantic-dup'
 import { isSearchPhraseQuality } from '../../content/recommendations/search-phrase'
 import { runArticleAudit, type AuditInput } from '../../content/article-audit'
-import { withJapaneseFont } from '../../export/cjk-font'
+import { withCjkFont } from '../../export/cjk-font'
 import {
   CONTENT_LANGUAGES, normalizeContentLanguage, contentScript, isUnspacedLanguage, languageNameInEnglish,
 } from '../../content/language'
@@ -71,6 +71,16 @@ function tokenizer() {
   check('a bare number is noise in both scripts', isNoiseToken('2026') && isNoiseToken('2026年'.slice(0, 4)))
   check('the budget is multiplied for Japanese only',
     maxPhraseWords(JA_KEYWORD, 8) === Math.round(8 * UNSPACED_TOKEN_FACTOR) && maxPhraseWords('how to improve site speed', 8) === 8)
+  // KOREAN IS NOT MULTIPLIED, and that is a measurement rather than a taste: the
+  // seven comparison pages hold 695 Korean tokens against 796 English ones (0.87
+  // per English word) where Japanese holds 1,183 (1.49). A scaled budget would
+  // wave through a Korean keyword half again too long, and the one budget used as
+  // a FLOOR — the comparison pages' 60 words — would demand 102 tokens of a
+  // language that writes the same paragraph in 87.
+  check('the budget is NOT multiplied for Korean, which has spaces of its own',
+    maxPhraseWords('검색엔진 최적화 방법', 8) === 8 && maxPhraseWords('검색엔진 최적화 방법', 60) === 60)
+  check('MUTATION CONTROL: scaling Korean by the Japanese factor would move a 60-word floor to 102',
+    Math.round(60 * UNSPACED_TOKEN_FACTOR) === 102 && maxPhraseWords('검색엔진 최적화 방법', 60) < 102)
   check('words are written back without spaces in Japanese, with them elsewhere',
     joinWords(['表示', '速度'], '速度') === '表示速度' && joinWords(['site', 'speed'], 'speed') === 'site speed')
   check('isScriptless answers the question its name asks', isScriptless('東京') && !isScriptless('Tokyo'))
@@ -175,15 +185,15 @@ function pdf() {
   console.log('\nE) the PDF font')
   const he = '<html><head><title>דוח</title></head><body>בדיקת מיקומים</body></html>'
   const ja = '<html><head><title>レポート</title></head><body>表示速度</body></html>'
-  check('a document with no Japanese is returned untouched', withJapaneseFont(he) === he)
-  check('a Japanese document declares Noto Sans JP', withJapaneseFont(ja).includes("font-family: 'Noto Sans JP'"))
+  check('a document with no Japanese is returned untouched', withCjkFont(he) === he)
+  check('a Japanese document declares Noto Sans JP', withCjkFont(ja).includes("font-family: 'Noto Sans JP'"))
   check('the face is served from our own domain, never from Google',
-    withJapaneseFont(ja).includes('https://www.gotopseo.com/fonts/NotoSansJP-Regular.woff')
-    && !withJapaneseFont(ja).includes('fonts.googleapis.com') && !withJapaneseFont(ja).includes('fonts.gstatic.com'))
-  check('the face is declared inside <head>', withJapaneseFont(ja).indexOf('@font-face') < withJapaneseFont(ja).indexOf('</head>'))
+    withCjkFont(ja).includes('https://www.gotopseo.com/fonts/NotoSansJP-Regular.woff')
+    && !withCjkFont(ja).includes('fonts.googleapis.com') && !withCjkFont(ja).includes('fonts.gstatic.com'))
+  check('the face is declared inside <head>', withCjkFont(ja).indexOf('@font-face') < withCjkFont(ja).indexOf('</head>'))
   check('the latin, hebrew and japanese system faces still come first in the stack',
-    /font-family: 'Segoe UI', Helvetica, Arial, 'Hiragino Sans'.*'Noto Sans JP', sans-serif/.test(withJapaneseFont(ja)))
-  check('a document with no head is not guessed at', withJapaneseFont('<p>表示速度</p>') === '<p>表示速度</p>')
+    /font-family: 'Segoe UI', Helvetica, Arial, 'Hiragino Sans'.*'Noto Sans JP', sans-serif/.test(withCjkFont(ja)))
+  check('a document with no head is not guessed at', withCjkFont('<p>表示速度</p>') === '<p>表示速度</p>')
 }
 
 function contentLanguage() {
@@ -193,8 +203,14 @@ function contentLanguage() {
     ['ja', 'ja-JP', 'jp', 'japanese', '日本語'].every((v) => normalizeContentLanguage(v) === 'ja'))
   check('an unrelated value still falls back to Hebrew', normalizeContentLanguage('xx') === 'he')
   check('its script is its own, neither hebrew nor latin', contentScript('ja') === 'japanese' && isUnspacedLanguage('ja'))
+  // Korean joined on 12 Nov 2026 as the second script of its own, and it is NOT
+  // unspaced: Korean prose has spaces between its phrases, so it is counted in
+  // words like every spaced language and only its SCRIPT is its own.
+  check('Korean is a script of its own too, and it is spaced',
+    contentScript('ko') === 'korean' && !isUnspacedLanguage('ko'))
   check('every other language is still latin or hebrew',
-    CONTENT_LANGUAGES.filter((l) => l !== 'ja').every((l) => contentScript(l) === (l === 'he' ? 'hebrew' : 'latin')))
+    CONTENT_LANGUAGES.filter((l) => l !== 'ja' && l !== 'ko')
+      .every((l) => contentScript(l) === (l === 'he' ? 'hebrew' : 'latin')))
   check('its English name is what a prompt asks for', languageNameInEnglish('ja') === 'Japanese')
   check('the reason sentences are Japanese, with no latin word in them',
     !/[A-Za-z]/.test(REASON_TEXT.ja.fillsGap + REASON_TEXT.ja.neutral + REASON_TEXT.ja.supportingTopic) && REASON_TEXT.ja.numberLocale === 'ja-JP')
@@ -239,10 +255,10 @@ function sources() {
   check('A MUTATION CONTROL: the sentence guard fails without the Japanese enders',
     !audit.replace('|(?<=[。！？])', '').includes('(?<=[。！？])'))
   const pdfshift = code('lib/export/pdfshift.ts')
-  check('every PDF goes through the font helper', pdfshift.includes('withJapaneseFont(html)'))
-  check('the older report route asks for it too', code('app/api/reports/export-pdf/route.ts').includes('withJapaneseFont(html)'))
+  check('every PDF goes through the font helper', pdfshift.includes('withCjkFont(html)'))
+  check('the older report route asks for it too', code('app/api/reports/export-pdf/route.ts').includes('withCjkFont(html)'))
   check('A MUTATION CONTROL: the PDF guard fails when the call is removed',
-    !pdfshift.replace('withJapaneseFont(html)', 'html').includes('withJapaneseFont(html)'))
+    !pdfshift.replace('withCjkFont(html)', 'html').includes('withCjkFont(html)'))
 }
 
 async function main() {

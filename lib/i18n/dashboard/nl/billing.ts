@@ -179,6 +179,10 @@ export const billingNl: DeepPartial<DashboardDictionary> = {
       requiredNote: 'De betaalmogelijkheden verschijnen zodra u de regel hierboven bevestigt. Daarvoor wordt niets afgeschreven.',
       policyLabel: 'Het herroepingsrecht volledig, in het opzeggings- en terugbetalingsbeleid',
     },
+    ownNameSale: {
+      title: 'In uw land verkopen wij op dit moment geen betaald abonnement',
+      description: 'Er wordt niets in rekening gebracht en de gegevens die u tijdens de proefperiode hebt gemaakt, blijven in uw account. Schrijf ons bij vragen op contact@gotopseo.com.',
+    },
     creem: {
       payButton: 'Met kaart betalen',
       starting: 'De beveiligde betaalpagina wordt geopend...',

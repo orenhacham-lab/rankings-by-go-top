@@ -1,7 +1,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { redirect } from 'next/navigation'
-import { cookies } from 'next/headers'
+import { cookies, headers } from 'next/headers'
 import { getUserEntitlement } from '@/lib/subscription'
 import { resolveBillingAuthority } from '@/lib/billing/governance'
 import { getActiveMigrationResult } from '@/lib/shopify/paypal-migration'
@@ -10,6 +10,8 @@ import { hasLiveShopifyConnectionResult } from '@/lib/shopify/paypal-block'
 import { PENDING_LINK_COOKIE, verifyPendingLinkCookieValue } from '@/lib/shopify/pending-link'
 import { getShopifyOAuthConfig } from '@/lib/shopify/oauth'
 import { resolveBillingMarket } from '@/lib/billing/server-market'
+import { koreaCreemSaleBlockedForRequest, koreaOwnSaleBlockedForRequest } from '@/lib/billing/korea-sale'
+import { ownNameSaleBlockedForRequest } from '@/lib/billing/own-name-sale'
 import { planPriceIn } from '@/lib/billing/market'
 import { PLAN_CATALOG } from '@/lib/plans/catalog'
 import { creemMayWriteToAccount, isCreemEnabled } from '@/lib/creem/config'
@@ -141,6 +143,27 @@ export default async function BillingPage() {
   // the dashboard language toggle, never a client choice, no switcher.
   const { market, locked: marketLocked } = await resolveBillingMarket(supabase, user)
 
+  // KOREA, as TWO decisions, because the duties follow the seller and not the
+  // country alone (lib/billing/korea-sale.ts carries the reasoning):
+  //   * our own-name sale (the PayPal path) brings the 10% Korean VAT and the
+  //     전자상거래법 art. 13 disclosures onto a company with no Korean
+  //     registration, so it stays shut until the company is registered —
+  //     accepting Creem's merchant-of-record clause does nothing for it;
+  //   * Creem's sale, where Creem is the merchant of record, is what the
+  //     Korean checkout flag was written for.
+  // This only decides what is drawn; /api/paypal/activate and
+  // /api/creem/checkout refuse the same visitor themselves.
+  const requestHeaders = await headers()
+  const koreaOwnSaleBlocked = koreaOwnSaleBlockedForRequest(requestHeaders)
+  const koreaCreemSaleBlocked = koreaCreemSaleBlockedForRequest(requestHeaders)
+  // AND THE GENERAL CASE BEHIND KOREA: every other country the company is not
+  // cleared to conclude an own-name sale in, from the same allow list the
+  // marketplace pages read. Drawn here only; /api/paypal/activate refuses the
+  // same visitor itself. lib/billing/own-name-sale.ts says why Israel and an
+  // unplaceable visitor both pass, and why this is insurance behind a flag
+  // nobody can read back rather than a change of behaviour.
+  const ownNameSaleBlocked = ownNameSaleBlockedForRequest(requestHeaders)
+
   // PAY BY CARD (Creem) — OWNER DECISION, 10 Oct 2026: new customers only.
   //
   // Creem is the merchant of record outside Israel, and it is offered to an
@@ -180,6 +203,7 @@ export default async function BillingPage() {
     && !shopifyStoreConnected
     && !entitlement.hasActiveSubscription
     && creemMayWriteToAccount(user.id)
+    && !koreaCreemSaleBlocked
   ) {
     // SERVICE-ROLE client, so the owner is filtered explicitly (CLAUDE.md).
     const { data: paypalRows, error: paypalRowsError } = await admin
@@ -214,6 +238,8 @@ export default async function BillingPage() {
       websitePaidPeriod={websitePaidPeriod ? { paidUntil: websitePaidPeriod.paidUntil, renewalStopped: websitePaidPeriod.renewalStopped } : null}
       market={market}
       marketLocked={marketLocked}
+      koreaOwnSaleBlocked={koreaOwnSaleBlocked}
+      ownNameSaleBlocked={ownNameSaleBlocked}
       creemCheckout={creemCheckout}
       creemGoverned={creemGoverned}
       planPrices={{

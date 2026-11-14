@@ -128,12 +128,19 @@ async function main() {
   const source = readFileSync(join(__dirname, '..', 'article-generation.ts'), 'utf8')
     .replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '')
   const askedAt = source.indexOf('isArticleAllowanceSpent(admin')
-  const topicReadAt = source.indexOf("from('article_topics')")
+  // The topic read, the project read and the whole prompt assembly moved into
+  // buildBriefForTopic (same file) when the batch lane needed the same brief.
+  // The call to it is therefore where "reads the topic" now begins, and the
+  // pre-check must still come first.
+  const briefBuiltAt = source.indexOf('buildBriefForTopic(admin, topicId)')
   const reservedAt = source.indexOf('reserveUsage(admin')
-  check('A5: generateArticleForTopic asks before it reads the topic',
-    askedAt > 0 && topicReadAt > 0 && askedAt < topicReadAt)
+  check('A5: generateArticleForTopic asks before it builds the brief (which is what reads the topic)',
+    askedAt > 0 && briefBuiltAt > 0 && askedAt < briefBuiltAt)
+  check('A5a: and the builder is the only thing that reads the topic for the prompt',
+    /export async function buildBriefForTopic/.test(source)
+    && source.indexOf("from('article_topics')") > source.indexOf('export async function buildBriefForTopic'))
   check('A5b: and the atomic reservation is still there, after it',
-    reservedAt > topicReadAt)
+    reservedAt > briefBuiltAt)
 
   console.log('\n— mutation controls —')
 

@@ -69,8 +69,20 @@ export const CONSENT_COUNTRY_HEADER = 'x-vercel-ip-country'
 
 /**
  * EEA (the 27 member states plus Iceland, Liechtenstein and Norway), the
- * United Kingdom, Switzerland and Canada. Alpha-2, upper case, which is what
- * the CDN sends.
+ * United Kingdom, Switzerland, Canada, Korea, Japan and Brazil. Alpha-2, upper
+ * case, which is what the CDN sends. Every entry past the EEA is on its own
+ * law rather than on ePrivacy, and each says which one where it is listed.
+ *
+ * KOREA IS HERE ON ITS OWN TWO STATUTES, not by analogy with ePrivacy, which
+ * has no Korean counterpart. 개인정보 보호법 제15조 제1항 제1호 makes consent the
+ * ground for collecting personal information, and the beacon's cookies carry
+ * the visitor's IP address and full user-agent, which 제2조 제1호 treats as
+ * personal information about an identifiable person. 정보통신망법 제22조의2 제1항
+ * then requires consent before an information and communications service
+ * provider accesses data stored on the user's own device — the same act
+ * Art. 5(3) ePrivacy catches, reached by a different route. There is no
+ * Korean carve-out for a tag that is not necessary to the service, and ours
+ * is not: the page renders identically without it.
  */
 export const CONSENT_REQUIRED_COUNTRIES: readonly string[] = Object.freeze([
   // EU
@@ -81,6 +93,39 @@ export const CONSENT_REQUIRED_COUNTRIES: readonly string[] = Object.freeze([
   'IS', 'LI', 'NO',
   // UK, Switzerland, Canada
   'GB', 'CH', 'CA',
+  // Korea: 개인정보 보호법 제15조 and 정보통신망법 제22조의2
+  'KR',
+  // JAPAN, ON A DUTY THAT FALLS ON US AS THE SENDER, NOT ON THE RECIPIENT.
+  // APPI 第31条第1項 forbids an 個人関連情報取扱事業者 from providing
+  // 個人関連情報 to a third party where it is anticipated that the third
+  // party will acquire it as 個人データ, unless we have first confirmed, by
+  // the method the Commission's rules prescribe, both that the person
+  // consented to that acquisition (第一号) and, for a recipient abroad, that
+  // the person was given information about that country's protection regime
+  // and the measures the recipient takes (第二号). 第171条 applies the whole
+  // Act to a foreign operator handling, outside Japan, such data about a
+  // person in Japan in connection with supplying goods or services to people
+  // in Japan, which is exactly this site. A beacon that sets a session cookie
+  // holding the visitor's IP address and user agent, read back by its owner
+  // in the United States, is that case: the owner links it to an account, so
+  // the acquisition as 個人データ is anticipated rather than hypothetical. We
+  // cannot confirm what consent a third party holds, so the only workable
+  // route is to take the consent here, which is what this list does.
+  'JP',
+  // BRAZIL, LISTED AS A PRECAUTION AND NOT ON A STATUTE WE HAVE READ.
+  // LGPD Art. 7 (verbatim from the Câmara's published text, 2026-11-13) lists
+  // ten alternative bases for any processing: consent is inciso I and the
+  // controller's legitimate interests are inciso IX, so the LGPD alone does
+  // not compel consent for a tag. What would is the Marco Civil da Internet
+  // rule on providing personal data to third parties, and ANPD's own cookie
+  // guidance, neither of whose primary text could be retrieved on 2026-11-13
+  // — every official source for Lei 12.965/2014 either redirected to a portal
+  // home page or served no text. So this entry rests on the asymmetry this
+  // file opens with rather than on a provision we can quote: a statistic lost
+  // in Brazil is recoverable and a cookie written there is not. Anyone who
+  // gets the Marco Civil text should either replace this comment with the
+  // provision or move Brazil out.
+  'BR',
 ])
 
 const CONSENT_REQUIRED = new Set(CONSENT_REQUIRED_COUNTRIES)
@@ -121,4 +166,55 @@ export function consentRequiredForCountry(country: string | null | undefined): b
 /** The same decision from a request's headers. */
 export function consentRequiredForRequest(h: { get(name: string): string | null }): boolean {
   return consentRequiredForCountry(h.get(CONSENT_COUNTRY_HEADER))
+}
+
+/**
+ * WHERE CONSENT IS NOT ENOUGH, SO THE TAG DOES NOT FIRE AT ALL.
+ *
+ * Korea. Gating the beacon on the marketing category fixes the COLLECTION:
+ * 개인정보 보호법 제15조 제1항 제1호 makes consent the ground, and the visitor
+ * gave it. It does not make the TRANSFER lawful. JVZoo decides for itself what
+ * to do with what it receives, so it is an independent controller abroad, and
+ * the basis for sending it a Korean data subject's data has to be
+ * 제28조의8 제1항 제1호 — a 별도의 동의 — whose 제2항 requires five particulars
+ * to be put in front of the person BEFORE that consent is taken: the items,
+ * the country with the timing and method, the recipient's name and contact
+ * details, the recipient's purpose and retention period, and the method,
+ * procedure and effect of refusal. 제1항 제3호, which covers 처리위탁 and
+ * 보관 necessary to the contract, does not reach an independent controller, and
+ * a cookie category is not a 별도의 동의 however well it is gated.
+ *
+ * The honest options were to build that second consent flow for a marketplace
+ * beacon, or not to send anything from Korea. This channel is sold to the
+ * United States, so nothing is lost by the second, and nothing is transferred:
+ * no 별도의 동의 arises, and the Korean documents say in one line that the
+ * request is not made there at all.
+ *
+ * The trust badge rides the same decision rather than a second one of its own.
+ * It is Digistore24's script, it sets a week-long cookie, and Digistore24 is
+ * as much an independent controller as JVZoo.
+ *
+ * THE RESIDUAL, STATED RATHER THAN HIDDEN. This suppresses on a country we can
+ * READ as KR, not on an unknown one. An unplaceable visitor still gets the
+ * consent-gated beacon, so a Korean visitor the CDN could not place could
+ * accept marketing and have the request made. Failing closed here instead
+ * would suppress the beacon for every local request, every preview and every
+ * visitor the CDN cannot place — including the marketplace reviewer whose
+ * rejection this whole module exists to answer. That is the same residual
+ * lib/compliance/gdpr-territory.ts accepts, for the same reason.
+ */
+export const BEACON_SUPPRESSED_COUNTRIES: readonly string[] = Object.freeze(['KR'])
+
+const BEACON_SUPPRESSED = new Set(BEACON_SUPPRESSED_COUNTRIES)
+
+/** Whether the marketplace beacon and badge must not be rendered at all. */
+export function beaconSuppressedForCountry(country: string | null | undefined): boolean {
+  const code = normalizeCountry(country)
+  if (!code) return false
+  return BEACON_SUPPRESSED.has(code)
+}
+
+/** The same decision from a request's headers. */
+export function beaconSuppressedForRequest(h: { get(name: string): string | null }): boolean {
+  return beaconSuppressedForCountry(h.get(CONSENT_COUNTRY_HEADER))
 }

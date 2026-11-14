@@ -96,6 +96,14 @@ const SITE_METADATA: Record<PublicLocale, SiteMetadataStrings> = {
     ogDescription: 'Tworzenie, planowanie i automatyczne publikowanie treści SEO i GEO w jednym miejscu, z comiesięcznym monitorowaniem pozycji w Google i widoczności w odpowiedziach AI (ChatGPT, Gemini, tryb AI w Google)',
     ogLocale: 'pl_PL',
   },
+  ko: {
+    title: 'SEO·GEO 콘텐츠 작성, 예약, 발행 | Go Top SEO',
+    description: 'Go Top SEO는 SEO와 GEO 콘텐츠를 한곳에서 작성하고 예약하고 자동으로 발행하며, Google 검색 순위와 AI 답변에서의 가시성을 매달 측정합니다. 무료로 시작해 보십시오.',
+    keywords: 'SEO 콘텐츠 작성, 콘텐츠 기획, 글 자동 발행, GEO, 검색 순위 확인, 검색엔진 최적화, SEO, Google, Google 순위, Google 지도, Google 비즈니스 프로필, 로컬 SEO, AI 가시성, ChatGPT, Gemini, 백링크, 키워드 분석, 네이버 SEO',
+    ogTitle: 'SEO·GEO 콘텐츠 작성, 예약, 발행 — Go Top SEO',
+    ogDescription: 'SEO와 GEO 콘텐츠를 한곳에서 작성하고 예약하고 자동으로 발행하며, Google 검색 순위와 AI 답변(ChatGPT, Gemini, Google AI 모드)에서의 가시성을 매달 측정합니다',
+    ogLocale: 'ko_KR',
+  },
   de: {
     title: 'SEO- und GEO-Inhalte erstellen, planen und veröffentlichen | Go Top SEO',
     description: 'Go Top SEO: SEO- und GEO-Inhalte an einer Stelle erstellen, planen und automatisch veröffentlichen, dazu monatliches Ranking-Tracking bei Google und die Sichtbarkeit in KI-Antworten. Kostenlos starten.',

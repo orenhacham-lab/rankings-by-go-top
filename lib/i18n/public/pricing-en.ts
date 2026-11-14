@@ -34,6 +34,12 @@ export const pricingEn: PricingCopy = {
       ILS: 'The prices include Israeli VAT. That is the amount you pay, with nothing added.',
       USD: 'On a card payment the merchant of record is Creem, which calculates tax by your billing address and shows the final amount before you pay. The prices here do not include it.',
     },
+    /* 전자상거래법 제21조 제1항 제1호 forbids inducing a consumer by withholding a
+       material fact, and it binds any business carrying on electronic commerce,
+       not only a mail-order seller, so it bites BEFORE any contract. Shown only
+       to a visitor placed in Korea, on every language's page, because the duty
+       follows the consumer and not the page. lib/billing/korea-sale.ts. */
+    koreaTrialOnly: `In Korea only the free trial is available at the moment, and a paid subscription is not sold there. The trial ends automatically after ${DAYS} days, and we take no card details, so nothing is charged.`,
     everyPlanLabel: 'In every plan',
     everyPlan: [
       'Automatic scheduled publishing to WordPress, Shopify and Wix',

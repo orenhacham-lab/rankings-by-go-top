@@ -1194,7 +1194,125 @@ const nl: FreeCheckCopy = {
   },
 }
 
-const COPY: Record<PublicLocale, FreeCheckCopy> = { he, en, es, 'pt-BR': ptBR, fr, it, ja, de, nl, pl }
+// KOREAN. 합니다체 throughout, and never a raw provider error: a failed fetch
+// says the site could not be reached, not what the fetcher saw. The example
+// address is a .kr one, because an address a Korean visitor would actually type
+// is the point of the hint. The AI wording names the engines we really check,
+// and says nothing about Naver, which we do not check.
+const ko: FreeCheckCopy = {
+  page: {
+    badge: '무료 진단, 약정 없음',
+    title: '내 사이트의 SEO와 AI 진단을',
+    titleAccent: '1분 안에',
+    subtitle: '사이트 주소만 입력하십시오. 사이트를 실제로 읽어, 이 사업이 무엇을 하는지 파악하고, Google과 AI 답변에서 무엇이 발목을 잡고 있는지 보여 드립니다.',
+    trust: ['무료, 카드 등록 없음', '설치할 것 없음', '가입 없이'],
+    expect: [
+      { title: '저희가 읽어낸 것', body: '이 사업이 무엇을 하고 고객은 누구인지, 사이트가 스스로 말하는 대로 정리합니다.' },
+      { title: '사이트의 발목을 잡는 것', body: 'Google과 AI 엔진이 이 사업을 이해하지 못하게 막는 요소를, 중요한 것부터 순서대로 보여 줍니다.' },
+      { title: 'AI 답변에 대한 준비 정도', body: 'ChatGPT와 Gemini가 이 사이트를 읽고 언급할 수 있는 상태인지 확인합니다.' },
+    ],
+  },
+  form: {
+    label: '사이트 주소',
+    placeholder: 'example.kr',
+    submit: '사이트 진단하기',
+    hint: '입력란은 하나뿐입니다. 더 채울 것은 없습니다.',
+    errors: {
+      invalid_url: '이 주소는 형식이 맞지 않아 보입니다. example.kr 같은 형태로 다시 입력해 주십시오',
+      blocked_url: '공개된 사이트만 진단할 수 있습니다. 내부 주소와 IP 주소는 지원하지 않습니다.',
+      unreachable: '사이트에 접속하지 못했습니다. 주소를 확인하고 다시 시도해 주십시오.',
+      not_html: '이 주소는 저희가 읽을 수 있는 웹페이지를 돌려주지 않습니다.',
+      rate_limited: '짧은 시간에 여러 번 진단을 시작했습니다. 1분 뒤에 다시 시도해 주십시오.',
+      daily_cap: '지금 무료 진단 요청이 많습니다. 나중에 다시 시도하시거나, 전체 분석을 위해 계정을 만들어 주십시오.',
+      internal: '저희 쪽에서 끝까지 처리되지 않았습니다. 잠시 뒤에 다시 시도해 주십시오.',
+    },
+  },
+  loading: {
+    title: '사이트와 페이지 구조를 읽고 있습니다',
+    sub: '1분이 걸리지 않습니다. 추측하지 않고 사이트를 실제로 읽습니다.',
+    footer: '처리 중입니다. 요약이 거의 다 됐습니다',
+    steps: [
+      '사이트와 페이지 구조 읽기',
+      '이 사업이 무엇을 하고 고객은 누구인지 파악하기',
+      'Google에서 사이트의 발목을 잡는 것 확인하기',
+      '경쟁사 찾기',
+    ],
+  },
+  results: {
+    heading: '첫 진단 요약',
+    scanned: '진단한 주소',
+    countersTitle: '찾은 것',
+    counters: { keywords: '값어치가 있는 키워드', fixes: '사이트에서 고칠 지점', geo: 'AI 답변 준비 상태', articles: '바로 쓸 수 있는 글' },
+    businessTitle: '이 사업에 대해 읽어낸 것',
+    audienceTitle: '고객은 누구인가',
+    competitorsTitle: '경쟁사는 누구인가',
+    competitorsLocked: '경쟁사 전체와 자세한 내용은 무료 계정만 만들면 보실 수 있습니다',
+    findingsTitle: '지금 사이트의 발목을 잡는 것',
+    findingsEmpty: '저희가 확인하는 항목 모두에서 문제가 없습니다. 축하합니다.',
+    findingsLocked: '나머지 지적 사항은 계정에서 기다리고 있습니다',
+    geoTitle: 'AI 답변에 대한 준비 정도',
+    geoIntro: 'ChatGPT나 Perplexity 같은 AI 엔진은 순위를 매기지 않고 출처를 댑니다. 이 사이트가 얼마나 인용하기 쉬운 상태인지 확인했습니다.',
+    geoScore: '상태가 좋은 신호',
+    articlesTitle: '저희가 쓸 글',
+    articlesNote: '글은 가장 기회가 큰 키워드를 바탕으로 짠 콘텐츠 전략에서 나옵니다.',
+    gateTitle: '여기까지는 미리보기입니다. 실제 분석은 가입 뒤에 시작됩니다',
+    gateBody: '무료 계정을 만드시면 시스템이 사이트에 본격적으로 달라붙습니다.',
+    gateBullets: [
+      '실제 검색량이 들어간 전체 분석',
+      '내 업종에 맞춰 짠 한 분기치 콘텐츠 계획',
+      '저희가 쓴 첫 번째 글',
+      '경쟁사 전체 현황과 AI 답변에서의 언급 추적',
+    ],
+    gateCta: '무료 계정 만들기',
+    gateSecondary: '이미 계정이 있으십니까? 로그인',
+    gateTerms: '계속하시면 이용약관과 개인정보처리방침에 동의하는 것으로 봅니다.',
+    again: '다른 사이트 진단하기',
+    aiUnavailable: '기술 점검은 끝났습니다. 사업 요약과 키워드는 계정에서 준비되어 있습니다.',
+  },
+  findings: {
+    title_missing: { title: '페이지에 title 태그가 없습니다', detail: 'title은 Google이 검색 결과에 보여 주는 문장입니다. 없으면 Google이 업체 대신 문장을 만들어 냅니다.' },
+    title_short: { title: '페이지의 title이 너무 짧습니다', detail: '30자가 되지 않으면 Google이 주는 자리를 쓰지 못하고, 사람들이 찾는 말도 대개 빠집니다.' },
+    title_long: { title: '페이지의 title이 너무 깁니다', detail: '65자를 넘으면 Google이 문장 중간에서 잘라 버립니다.' },
+    description_missing: { title: '메타 설명이 없습니다', detail: '메타 설명은 검색 결과에서의 홍보 문장입니다. 없으면 Google이 페이지에서 아무 문장이나 가져다 씁니다.' },
+    description_length: { title: '메타 설명의 길이가 적절하지 않습니다', detail: '70자 미만이거나 165자를 넘으면 잘리거나 자리를 제대로 쓰지 못합니다.' },
+    h1_missing: { title: '페이지에 H1이 없습니다', detail: 'H1은 이 페이지가 무엇에 대한 것인지 Google과 AI 엔진에 알려 줍니다. 없으면 본문에서 짐작합니다.' },
+    h1_multiple: { title: '페이지에 H1이 여러 개 있습니다', detail: 'H1이 여러 개면 페이지의 주제가 쪼개지고 각각이 약해집니다.' },
+    images_alt: { title: '일부 이미지에 대체 텍스트가 없습니다', detail: 'Google은 이미지를 보지 못하고 대체 텍스트를 읽습니다. 없으면 이미지가 방문자를 데려오지 못하고 접근성도 나빠집니다.' },
+    thin_content: { title: '페이지의 글이 너무 적습니다', detail: '내용이 얄팍한 페이지는 Google과 AI 엔진이 분류하거나 인용할 근거를 주지 못합니다.' },
+    no_schema: { title: '구조화된 데이터(Schema)가 없습니다', detail: 'Schema가 없으면 Google과 AI 엔진이 이 업체가 누구이고 무엇을 하는지 확신하지 못합니다.' },
+    no_canonical: { title: 'canonical 태그가 없습니다', detail: 'canonical이 없으면 같은 페이지가 여러 번 집계되어 스스로와 경쟁할 수 있습니다.' },
+    no_viewport: { title: '모바일 viewport가 지정되지 않았습니다', detail: 'Google은 모바일 버전을 기준으로 평가합니다. viewport가 없으면 휴대폰에서 화면이 깨져 보입니다.' },
+    no_open_graph: { title: '공유 태그(Open Graph)가 없습니다', detail: 'WhatsApp이나 Facebook에 링크를 공유해도 이미지와 제목이 제대로 나오지 않습니다.' },
+    robots_blocks_all: { title: 'robots.txt가 모든 크롤러를 막고 있습니다', detail: '이 파일이 모든 크롤러에게 사이트를 수집하지 말라고 요청하고 있어 Google에서 빠지게 됩니다.' },
+    robots_blocks_ai: { title: 'robots.txt가 AI 엔진의 크롤러를 막고 있습니다', detail: '막힌 크롤러는 ChatGPT 같은 답변에서 이 업체를 언급할 수 없습니다.' },
+    no_faq: { title: '질문과 답변 영역이 없습니다', detail: 'AI 엔진은 질문에 답하므로, 질문에 답하는 페이지를 인용합니다.' },
+  },
+  geo: {
+    schema: {
+      pass: { title: '구조화된 데이터가 업체를 밝히고 있습니다', detail: 'AI 엔진이 이 업체가 누구이고 무엇을 하는지 알 수 있습니다.' },
+      fail: { title: '업체를 밝히는 구조화된 데이터가 없습니다', detail: '업체용 Schema가 없으면 AI 엔진이 누구를 말하는지 정확히 알지 못합니다.' },
+    },
+    faq: {
+      pass: { title: '질문과 답변 영역이 있습니다', detail: '질문에 답하는 페이지는 훨씬 자주 인용됩니다.' },
+      fail: { title: '질문과 답변 영역이 없습니다', detail: 'AI 엔진은 질문에 답하므로 질문에 답하는 페이지를 인용합니다. 질문이 없는 페이지는 좀처럼 인용되지 않습니다.' },
+    },
+    robots: {
+      pass: { title: 'AI 엔진이 사이트를 읽을 수 있습니다', detail: 'robots.txt가 AI 엔진의 크롤러를 막고 있지 않습니다.' },
+      fail: { title: 'robots.txt가 AI 엔진의 크롤러를 막고 있습니다', detail: '막힌 크롤러는 이 업체를 언급할 수 없습니다.' },
+    },
+    llms: {
+      pass: { title: 'llms.txt 파일이 있습니다', detail: '사이트가 AI 엔진에 자기 자신에 대한 분명한 지도를 주고 있습니다. 시장 대부분보다 앞선 상태입니다.' },
+      fail: { title: 'llms.txt 파일이 없습니다', detail: 'llms.txt 파일은 AI 엔진에 사이트의 분명한 지도를 줍니다. 시장 대부분은 아직 없습니다.' },
+    },
+  },
+  evidence: {
+    images: (missing, total) => `이미지 ${total}개 중 ${missing}개`,
+    words: (n) => `페이지의 단어 ${n}개`,
+    h1: (n) => `H1 제목 ${n}개`,
+  },
+}
+
+const COPY: Record<PublicLocale, FreeCheckCopy> = { he, en, es, 'pt-BR': ptBR, fr, it, ja, de, nl, pl, ko }
 
 export function freeCheckCopy(locale: PublicLocale): FreeCheckCopy {
   return COPY[locale] ?? COPY.he

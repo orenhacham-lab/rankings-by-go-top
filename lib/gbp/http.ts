@@ -12,17 +12,15 @@
 import type { createAdminClient } from '@/lib/supabase/admin'
 import type { ContentAuthResult } from '@/lib/content/api-auth'
 import { isGscTokenCryptoConfigured } from '@/lib/gsc/token-crypto'
-import { CONTENT_IMAGE_BUCKET } from '@/lib/content/featured-image'
+import { CONTENT_IMAGE_BUCKET } from '@/lib/content/image-bucket'
 import { isGbpOAuthConfigured } from './config'
 import { GbpApiError, type GbpErrorCode } from './errors'
 import { buildGbpAuthUrl, createPkcePair, exchangeGbpCode, grantIncludesGbpScope, revokeGbpToken } from './oauth'
 import { listAllLocations, type GbpLocation } from './api'
 import { validatePostInput, GBP_CTA_TYPES, normalizePostLanguage } from './validate'
-import { preparePostImage, GBP_SOURCE_TYPES, GBP_SOURCE_MAX_BYTES, type CropBox } from './image'
-import { postImagePath, isPostImagePath, removePostImage } from './image-store'
+import { isPostImagePath, removePostImage } from './image-store'
 import { draftPost, type Generate } from './draft'
-import { generateTopicImage, GBP_TOPIC_MAX, type GenerateTopicImage } from './topic-image'
-import { imageGenerationHttpStatus } from '@/lib/content/image-generation-http'
+import type { GenerateTopicImage } from './topic-image'
 import { v4LocationParent } from './request'
 import { listReviews, getReview, replyToReview, deleteReviewReply, summarizeReviews, isReviewName, GBP_REVIEW_ORDERS, type GbpReview, type GbpReviewOrder, type GbpReviewPage } from './reviews'
 import { validateReplyInput, GBP_REPLY_MAX } from './review-validate'
@@ -37,7 +35,7 @@ import {
 } from './store'
 
 type Admin = ReturnType<typeof createAdminClient>
-type Authed = Exclude<ContentAuthResult, { error: string }>
+export type Authed = Exclude<ContentAuthResult, { error: string }>
 
 export interface GbpRouteDeps {
   auth: (projectId: string | null) => Promise<ContentAuthResult>
@@ -53,12 +51,12 @@ export interface GbpRouteDeps {
   authUrl?: (state: string, challenge: string) => string
 }
 
-const json = (body: unknown, status = 200) => Response.json(body, { status })
-const err = (code: GbpErrorCode | 'invalid_request' | 'forbidden' | 'unauthorized' | 'not_found', status: number, extra: Record<string, unknown> = {}) =>
+export const json = (body: unknown, status = 200) => Response.json(body, { status })
+export const err = (code: GbpErrorCode | 'invalid_request' | 'forbidden' | 'unauthorized' | 'not_found', status: number, extra: Record<string, unknown> = {}) =>
   json({ ok: false, error: code, ...extra }, status)
 
-/** Auth + schema gate shared by every project-scoped handler. */
-async function gate(deps: GbpRouteDeps, projectId: string | null): Promise<Authed | Response> {
+/** Auth + schema gate shared by every project-scoped handler (http-image.ts too). */
+export async function gate(deps: GbpRouteDeps, projectId: string | null): Promise<Authed | Response> {
   const auth = await deps.auth(projectId)
   if ('error' in auth) {
     const code = auth.status === 401 ? 'unauthorized' : auth.status === 403 ? 'forbidden' : auth.status === 404 ? 'not_found' : 'invalid_request'
@@ -287,36 +285,6 @@ export async function handleDraft(req: Request, deps: GbpRouteDeps): Promise<Res
   return json({ ok: true, summary: out.summary, articleUrl: article?.url ?? null })
 }
 
-// ── POST /api/gbp/image/generate {projectId, topic} ────────────────────────
-/**
- * An AI photo for a post written from a topic. Answers the JPEG itself, which
- * the composer puts through the same crop and "use this photo" steps as an
- * upload, so nothing is stored here. A failure is logged with our own reason
- * and answered with one stable code; the provider's words go nowhere.
- */
-export async function handleGenerateImage(req: Request, deps: GbpRouteDeps): Promise<Response> {
-  let body: Record<string, unknown>
-  try { body = await req.json() } catch { return err('invalid_request', 400) }
-  const g = await gate(deps, typeof body.projectId === 'string' ? body.projectId : null)
-  if (g instanceof Response) return g
-  const topic = typeof body.topic === 'string' ? body.topic.trim() : ''
-  if (!topic || topic.length > GBP_TOPIC_MAX) return err('invalid_request', 400)
-  let reason: string
-  try {
-    const out = await (deps.generateImage ?? generateTopicImage)({ topic })
-    if (out.ok) {
-      return new Response(new Uint8Array(out.bytes), { status: 200, headers: { 'Content-Type': 'image/jpeg', 'Cache-Control': 'no-store' } })
-    }
-    reason = out.reason
-  } catch {
-    reason = 'generator_threw'
-  }
-  // Only a code of ours reaches the log; anything that looks like free text is not one.
-  const classified = /^[a-z][a-z0-9_]{0,59}$/.test(reason) ? reason : 'unclassified'
-  console.error('[gbp-topic-image] generation failed', { reason: classified, projectId: g.project.id })
-  return err('image_generation_failed', imageGenerationHttpStatus(classified))
-}
-
 // ── reviews ────────────────────────────────────────────────────────────────
 /**
  * The connected location plus a live access token, for every review handler.
@@ -499,27 +467,6 @@ export async function handleDeleteReviewReply(req: Request, deps: GbpRouteDeps):
   } catch (e) {
     return err(e instanceof GbpApiError ? e.code : 'unexpected', 502)
   }
-}
-
-// ── POST /api/gbp/image (multipart: projectId, file, crop) ─────────────────
-export async function handleImage(req: Request, deps: GbpRouteDeps & { newId?: () => string }): Promise<Response> {
-  let form: FormData
-  try { form = await req.formData() } catch { return err('invalid_request', 400) }
-  const g = await gate(deps, typeof form.get('projectId') === 'string' ? String(form.get('projectId')) : null)
-  if (g instanceof Response) return g
-  const file = form.get('file')
-  if (!(file instanceof Blob)) return err('image_invalid', 400)
-  if (!(GBP_SOURCE_TYPES as readonly string[]).includes(file.type) || file.size > GBP_SOURCE_MAX_BYTES) return err('image_invalid', 400)
-  let crop: Partial<CropBox> | null = null
-  try { crop = JSON.parse(String(form.get('crop') ?? 'null')) as Partial<CropBox> | null } catch { crop = null }
-  const prepared = await preparePostImage(Buffer.from(await file.arrayBuffer()), crop)
-  if (!prepared.ok) return err(prepared.code, 400)
-  const id = (deps.newId ?? (() => crypto.randomUUID()))()
-  const path = postImagePath(g.project.id, id)
-  const up = await g.admin.storage.from(CONTENT_IMAGE_BUCKET).upload(path, prepared.bytes, { contentType: 'image/jpeg', upsert: false })
-  if (up.error) return err('image_upload_failed', 500)
-  const { data: pub } = g.admin.storage.from(CONTENT_IMAGE_BUCKET).getPublicUrl(path)
-  return json({ ok: true, imagePath: path, imageUrl: pub.publicUrl, width: prepared.width, height: prepared.height })
 }
 
 // ── POST /api/gbp/posts ────────────────────────────────────────────────────

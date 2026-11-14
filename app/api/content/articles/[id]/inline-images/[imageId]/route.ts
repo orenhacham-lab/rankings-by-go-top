@@ -10,7 +10,7 @@
 import { authContentProject } from '@/lib/content/api-auth'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { eligibleSections, generateInlineImage } from '@/lib/content/inline-images'
-import { CONTENT_IMAGE_BUCKET } from '@/lib/content/featured-image'
+import { CONTENT_IMAGE_BUCKET } from '@/lib/content/image-bucket'
 import { imageGenerationHttpStatus } from '@/lib/content/image-generation-http'
 
 

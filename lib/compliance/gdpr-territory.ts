@@ -28,10 +28,11 @@
  *
  * THE LIST IS NOT lib/consent/eprivacy-territory.ts's LIST, and the difference
  * is deliberate. That one asks where a non-essential tag needs consent, so it
- * carries Switzerland (FADP) and Canada (Law 25) as well. This one asks where
- * the GDPR or the UK GDPR applies, and neither reaches Switzerland or Canada.
+ * carries Switzerland (FADP), Canada (Law 25) and Korea (개인정보 보호법 제15조
+ * with 정보통신망법 제22조의2) as well. This one asks where the GDPR or the UK
+ * GDPR applies, and it reaches none of those three.
  * `lib/compliance/__qa__/gdpr-territory.qa.ts` asserts that this list is
- * exactly that one minus CH and CA, so adding a country to one and not the
+ * exactly that one minus CH, CA and KR, so adding a country to one and not the
  * other fails a guard instead of quietly widening or narrowing either job.
  *
  * AND IT FAILS IN THE OPPOSITE DIRECTION, on purpose. eprivacy-territory.ts

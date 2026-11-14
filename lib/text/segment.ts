@@ -227,12 +227,36 @@ export function contentWords(text: string | null | undefined, minSpacedLength = 
 export const UNSPACED_TOKEN_FACTOR = 1.7
 
 /**
+ * DOES THIS TEXT'S SCRIPT NEED THAT FACTOR? Japanese, Chinese and Thai do.
+ * KOREAN DOES NOT, and this is the one place where treating it as scriptless was
+ * measurably wrong rather than merely unnecessary.
+ *
+ * Korean is written with spaces, at the phrase (eojeol) level, so ICU splits an
+ * eojeol into its stem and its particles and a Korean text still segments
+ * COARSER than the English that says the same thing: the seven comparison pages
+ * measured 695 Korean tokens against 796 English ones, 0.87 per English word,
+ * page by page between 0.79 and 1.04. Japanese on the same pages is 1,183
+ * tokens, 1.49 — which is the factor above, and it is Japanese's.
+ *
+ * Multiplying a Korean budget by 1.7 therefore moves it the wrong way: as a
+ * MAXIMUM it waves through a Korean keyword half again too long, and as a
+ * MINIMUM — the comparison pages' 60-word floor — it demands 102 tokens of a
+ * language that writes the same paragraph in 87, and reported five fully written
+ * Korean pages as thin. Korean is left unscaled, beside Hebrew, whose ratio
+ * (0.77) is lower still. `joinWords` already draws the line in the same place.
+ */
+function isUnspacedScript(text: string | null | undefined): boolean {
+  const script = textScript(text)
+  return script !== 'spaced' && script !== 'ko'
+}
+
+/**
  * A word budget written for a spaced language, in the units THIS text is
- * measured in: unchanged for Hebrew, Latin and the rest, multiplied for a text
- * written without spaces.
+ * measured in: unchanged for Hebrew, Latin, Korean and the rest, multiplied for
+ * a text written without spaces at all.
  */
 export function maxPhraseWords(text: string | null | undefined, spacedMax: number): number {
-  return isScriptless(text) ? Math.round(spacedMax * UNSPACED_TOKEN_FACTOR) : spacedMax
+  return isUnspacedScript(text) ? Math.round(spacedMax * UNSPACED_TOKEN_FACTOR) : spacedMax
 }
 
 /**

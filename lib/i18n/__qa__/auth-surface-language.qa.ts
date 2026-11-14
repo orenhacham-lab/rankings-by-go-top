@@ -236,7 +236,11 @@ async function main() {
     const layout = read('app/(auth)/layout.tsx')
     check('E1: the (auth) layout resolves the locale with the SAME server resolver',
       /await getServerLocale\(\)/.test(layout) && /from '@\/lib\/i18n\/server-locale'/.test(layout))
-    check('E2: …and provides it to the forms', /<AuthLocaleProvider locale=\{locale\}>/.test(layout))
+    // The tag carries a second, unrelated prop since the Korea notice began
+    // riding the same wire (lib/billing/__qa__/korea-sale.qa.ts section H), so
+    // the locale prop is matched on its own rather than on the whole tag.
+    check('E2: …and provides it to the forms',
+      /<AuthLocaleProvider[\s\S]{0,120}locale=\{locale\}/.test(layout))
     const provider = read('components/auth/AuthLocaleProvider.tsx')
     check('E3: the provider holds a value only — no state, no effect, so SSR and the first client render agree',
       !/useState|useEffect/.test(provider))

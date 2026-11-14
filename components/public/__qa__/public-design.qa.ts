@@ -154,7 +154,7 @@ function main() {
     const w = strip(widgets), c = strip(cookie), a = strip(a11y), wa = strip(whatsapp), b = strip(bar)
     return /<WhatsAppFloat \/>/.test(w)
       && /<AccessibilityWidget \/>/.test(w)
-      && /<CookieConsent onOpenChange=\{setCookieOpen\} \/>/.test(w)
+      && /<CookieConsent onOpenChange=\{setCookieOpen\}[^>]*\/>/.test(w)
       // w9 (the owner): the ORIGINAL small popup at the left side, back from the full-width sheet/bar.
       // From sm a 340px card at the bottom-left corner; on a phone a 240px card above the contact bar.
       && /fixed bottom-6 left-24 z-\[58\] hidden w-\[340px\] max-w-\[340px\]/.test(c) && /sm:block/.test(c)

@@ -59,6 +59,7 @@ import { japaneseSiteEnabled } from './japanese-site'
 import { germanSiteEnabled } from './german-site'
 import { dutchSiteEnabled } from './dutch-site'
 import { polishSiteEnabled } from './polish-site'
+import { koreanSiteEnabled } from './korean-site'
 
 /** Readable by the browser too: the client writes it when the switcher changes. */
 export const LANGUAGE_COOKIE = 'dashboard-language'
@@ -142,6 +143,16 @@ export function isPolishPath(pathname: string | null | undefined, enabled = poli
   return p === '/pl' || p.startsWith('/pl/')
 }
 
+/** The same, for the Korean tree and its own flag. Added with the Korean auth
+ *  routes: without it `/ko/signup` resolved through the request contract and
+ *  could be labelled Hebrew, which is a right-to-left form on a left-to-right
+ *  site — the exact failure the list above exists to prevent. */
+export function isKoreanPath(pathname: string | null | undefined, enabled = koreanSiteEnabled()): boolean {
+  if (!enabled) return false
+  const p = pathname || ''
+  return p === '/ko' || p.startsWith('/ko/')
+}
+
 /**
  * First path segments of the HEBREW public tree — the `app/(public)` and
  * `app/(legal)` route groups plus the root. These pages contain Hebrew copy
@@ -197,6 +208,7 @@ export function routePublicLocale(pathname: string | null | undefined): PublicLo
   if (isGermanPath(p)) return 'de'
   if (isDutchPath(p)) return 'nl'
   if (isPolishPath(p)) return 'pl'
+  if (isKoreanPath(p)) return 'ko'
   if (p === '/') return 'he'
   const segment = p.split('/')[1] ?? ''
   if (ENGLISH_ONLY_SEGMENTS.has(segment)) return 'en'

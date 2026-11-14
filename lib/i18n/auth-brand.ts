@@ -300,4 +300,32 @@ export const AUTH_BRAND: Record<PublicLocale, Record<AuthBrandVariant, AuthBrand
     glimpse: 'Erfasste Keywords',
     mobileTrust: ['Ohne Kreditkarte', 'Jederzeit kündbar'],
   },
+  ko: {
+    login: {
+      eyebrow: '다시 오셨습니다',
+      points: [
+        'Google과 Google 지도에서의 내 순위를 한곳에서',
+        '이어서 쓰면 되는 콘텐츠 계획과 글',
+        'ChatGPT와 Gemini가 내 업체를 두고 하는 말',
+      ],
+    },
+    signup: {
+      eyebrow: 'Google과 AI 검색을 하나의 시스템에서',
+      points: [
+        '내 사이트 전체 진단이 몇 분 안에 끝납니다',
+        '내 업종에 맞춰 짜인 한 달치 콘텐츠 계획',
+        'Google 순위와 AI 가시성을 매달 기록해 둡니다',
+      ],
+    },
+    recover: {
+      eyebrow: '계정으로 돌아가기',
+      points: [
+        '링크는 계정에 등록된 주소로만 갑니다',
+        '한 번만, 그리고 짧은 시간만 유효합니다',
+        '데이터와 프로젝트는 그대로 남아 있습니다',
+      ],
+    },
+    glimpse: '측정 중인 키워드',
+    mobileTrust: ['카드 등록 없음', '언제든 해지'],
+  },
 }

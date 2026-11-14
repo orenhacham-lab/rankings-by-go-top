@@ -146,8 +146,10 @@ const MECHANICAL_DE = ['mehr informationen', 'weitere informationen', 'für weit
 
 const MECHANICAL_PL = ['więcej informacji', 'więcej informacji tutaj', 'kliknij tutaj', 'klikaj tutaj', 'czytaj więcej', 'czytaj dalej', 'dowiedz się więcej', 'zobacz więcej', 'strona taka jak', 'strony takie jak', 'witryna taka jak', 'zobacz tutaj', 'sprawdź tutaj', 'tutaj', 'szczegóły tutaj']
 
+const MECHANICAL_KO = ['자세히 보기', '자세한 내용은 여기', '여기를 클릭', '여기 클릭', '클릭하세요', '더 보기', '더 알아보기', '자세한 정보', '이런 사이트', '같은 사이트', '여기에서 확인', '아래를 참고', '링크', '바로가기']
+
 /** Mechanical anchor phrases keyed by content language. */
-const MECHANICAL: Record<SuggestionLanguage, string[]> = { he: MECHANICAL_HE, en: MECHANICAL_EN, es: MECHANICAL_ES, 'pt-BR': MECHANICAL_PT, fr: MECHANICAL_FR, it: MECHANICAL_IT, ja: MECHANICAL_JA, de: MECHANICAL_DE, nl: MECHANICAL_NL, pl: MECHANICAL_PL }
+const MECHANICAL: Record<SuggestionLanguage, string[]> = { he: MECHANICAL_HE, en: MECHANICAL_EN, es: MECHANICAL_ES, 'pt-BR': MECHANICAL_PT, fr: MECHANICAL_FR, it: MECHANICAL_IT, ja: MECHANICAL_JA, de: MECHANICAL_DE, nl: MECHANICAL_NL, pl: MECHANICAL_PL, ko: MECHANICAL_KO }
 
 export interface AnchorHit {
   href: string

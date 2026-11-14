@@ -64,6 +64,13 @@ interface BillingViewProps {
   marketLocked: boolean
   /** The plans' prices in `market`, from the plan catalog. */
   planPrices: Record<PlanKey, number>
+  /** True where a paid subscription may not be sold to this visitor at all,
+   *  decided on the server from the request country (lib/billing/korea-sale.ts):
+   *  Korea, until the Korean checkout flag says the Creem routing is live for
+   *  it. The trial is untouched, so this hides only the ways to pay, and both
+   *  payment routes refuse the same visitor server-side. */
+  koreaOwnSaleBlocked?: boolean
+  ownNameSaleBlocked?: boolean
   /** Owner decision, 10 Oct 2026 — pay by card instead of PayPal, decided on
    *  the server (app/(dashboard)/billing/page.tsx): only while CREEM_ENABLED
    *  is on, only in USD, and only for an account that has never paid through
@@ -101,6 +108,8 @@ export default function BillingView({
   market,
   marketLocked,
   planPrices,
+  koreaOwnSaleBlocked = false,
+  ownNameSaleBlocked = false,
   creemCheckout = false,
   creemGoverned = false,
   marketplaceSeller = null,
@@ -145,7 +154,33 @@ export default function BillingView({
    *  * nothing, which lets the card render the PayPal container as before.
    */
   const checkoutActionFor = (plan: PlanKey): React.ReactNode => {
+    // Creem's card button first, because on that route CREEM is the merchant
+    // of record and the Korean duties are its own (Merchant Terms cl. 3.2,
+    // 3.3.4): the server only sets creemCheckout for a Korean visitor once the
+    // Korean checkout flag is on, which is the one condition that opens it.
     if (creemCheckout) return <CreemCheckoutButton plan={plan} disabled={!checkoutUnlocked} />
+    // Then Korea on OUR own name, which is what the PayPal container below
+    // would be. This is a refusal to sell, not a choice between ways of paying.
+    if (koreaOwnSaleBlocked) {
+      return (
+        <div className="rounded-control border border-line bg-surface p-2.5">
+          <p className="m-0 text-caption font-bold text-ink">{t.koreaSale.title}</p>
+          <p className="m-0 mt-1 text-caption leading-snug text-muted">{t.koreaSale.description}</p>
+        </div>
+      )
+    }
+    // Then the same refusal for every other country the company is not cleared
+    // to sell in on its own name. Korea keeps its own branch above because its
+    // notice names Korea; this one names no country, because the visitor's is
+    // the only one it could name and they know where they are.
+    if (ownNameSaleBlocked) {
+      return (
+        <div className="rounded-control border border-line bg-surface p-2.5" data-own-name-no-sale>
+          <p className="m-0 text-caption font-bold text-ink">{t.ownNameSale.title}</p>
+          <p className="m-0 mt-1 text-caption leading-snug text-muted">{t.ownNameSale.description}</p>
+        </div>
+      )
+    }
     if (creemGoverned) return <p className="text-caption text-muted">{t.creem.changePlanNote}</p>
     return undefined
   }
@@ -486,7 +521,7 @@ export default function BillingView({
 
           {/* The PayPal buttons, and the SDK behind them, only on the PayPal
               path: a card never offers two ways to pay the same plan. */}
-          {!creemCheckout && !creemGoverned && <BillingClient market={market} acknowledged={checkoutUnlocked} />}
+          {!creemCheckout && !creemGoverned && !koreaOwnSaleBlocked && !ownNameSaleBlocked && <BillingClient market={market} acknowledged={checkoutUnlocked} />}
 
           <p className="mt-6 max-w-4xl text-caption text-muted">
             {t.keywordCheckNote}

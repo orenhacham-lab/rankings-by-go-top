@@ -5736,6 +5736,13 @@ export const dashboardEn = {
       PT: 'Portugal',
       GR: 'Greece',
       CY: 'Cyprus',
+      FR: 'France',
+      IT: 'Italy',
+      DE: 'Germany',
+      NL: 'Netherlands',
+      PL: 'Poland',
+      JP: 'Japan',
+      KR: 'South Korea',
     },
     languages: {
       he: 'Hebrew',
@@ -5745,6 +5752,13 @@ export const dashboardEn = {
       el: 'Greek',
       ar: 'Arabic',
       ru: 'Russian',
+      fr: 'French',
+      it: 'Italian',
+      de: 'German',
+      nl: 'Dutch',
+      pl: 'Polish',
+      ja: 'Japanese',
+      ko: 'Korean',
     },
     addToProject: {
       sectionTitle: 'Actions for selected keywords',
@@ -6120,6 +6134,14 @@ export const dashboardEn = {
         'I ask Go Top SEO to start the service immediately, before the end of the fourteen-day withdrawal period that consumer law in the European Union and the United Kingdom gives a consumer, and I confirm I have been told that I lose that right once the service has been fully performed.',
       requiredNote: 'The payment options appear once you confirm the line above. Nothing is charged before that.',
       policyLabel: 'The withdrawal right in full, in the cancellation and refund policy',
+    },
+    koreaSale: {
+      title: 'Only the free trial is available in Korea at the moment',
+      description: 'A paid subscription is not sold there. Nothing will be charged, and the data you created during the trial stays in your account. Write to us at contact@gotopseo.com with any question.',
+    },
+    ownNameSale: {
+      title: 'A paid subscription is not sold in your country at the moment',
+      description: 'Nothing will be charged, and the data you created during the trial stays in your account. Write to us at contact@gotopseo.com with any question.',
     },
     creem: {
       payButton: 'Pay by card',

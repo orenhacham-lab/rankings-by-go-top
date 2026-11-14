@@ -62,7 +62,8 @@ export type ConsentAction = (typeof CONSENT_ACTIONS)[number]
  * 20261023130000_locale_it.sql for 'it', 20261030120000_locale_ja.sql for 'ja',
  * 20261104120000_locale_de.sql for 'de',
  * 20261105140000_locale_nl.sql for 'nl',
- * 20261105180000_locale_pl.sql for 'pl'),
+ * 20261105180000_locale_pl.sql for 'pl',
+ * 20261112050000_locale_ko.sql for 'ko'),
  * then this list; lib/consent/__qa__/consent-locale-contract.qa.ts
  * holds the two together, so a language added here and not there fails in CI
  * rather than losing a visitor's proof in production.
@@ -72,7 +73,7 @@ export type ConsentAction = (typeof CONSENT_ACTIONS)[number]
  * migrations and fails if a language is live that the log cannot store, so the
  * flag cannot be turned on ahead of the constraint either.
  */
-export const CONSENT_LOCALES = ['he', 'en', 'es', 'pt-BR', 'fr', 'it', 'ja', 'de', 'nl', 'pl'] as const
+export const CONSENT_LOCALES = ['he', 'en', 'es', 'pt-BR', 'fr', 'it', 'ja', 'de', 'nl', 'pl', 'ko'] as const
 
 export type ConsentLocale = (typeof CONSENT_LOCALES)[number]
 
@@ -100,7 +101,19 @@ export function normalizeConsentLocale(value: unknown): ConsentLocale {
  * privacy-policy entry, because any one of the three alone leaves the beacon
  * without a basis.
  */
-export const CONSENT_POLICY_VERSION = '2026-10-29'
+/*
+ * 2026-11-12: the marketing category gained the transfer-risk notice that GDPR
+ * Art. 49(1)(a) requires the visitor to have read BEFORE consenting, and the
+ * notice's compact card no longer grants marketing at all. Every marketing
+ * consent stored before today was therefore taken without that information, so
+ * none of them can carry the Art. 49(1)(a) reliance for the JVZoo transfer.
+ * Bumping the version is how they stop counting: lib/consent/client-store.ts
+ * reads a record written against an older version as no decision and asks
+ * again. The Meta transfer would survive an old consent, because it rests on
+ * standard contractual clauses rather than Art. 49, but splitting a stored
+ * record by recipient costs more than re-asking, so both are re-asked.
+ */
+export const CONSENT_POLICY_VERSION = '2026-11-12'
 
 /** Nothing optional. The state a visitor is in before they decide, and after "reject all". */
 export const CONSENT_DENIED: ConsentChoices = { necessary: true, analytics: false, marketing: false }
@@ -144,6 +157,34 @@ export function normalizeChoices(value: unknown): ConsentChoices {
 }
 
 /** The action a set of choices amounts to, when the visitor saved the panel. */
+/**
+ * WHAT THE BANNER'S ACCEPT BUTTON GRANTS, AND WHY IT IS NOT EVERYTHING.
+ *
+ * Marketing sends the visitor's IP address and browser identifier to Meta and
+ * to JVZoo in the United States. For JVZoo there are no Art. 46 safeguards, so
+ * the only basis for that transfer is the visitor's explicit consent under
+ * Art. 49(1)(a) GDPR — and that article allows it only where the person was
+ * informed BEFORE consenting of the risks "due to the absence of an adequacy
+ * decision and appropriate safeguards". The notice that does that cannot be
+ * shortened, because the absence of both is exactly the part that may not be
+ * cut, and it does not fit on a 240px card.
+ *
+ * So the card's accept button cannot grant marketing: it would be taking a
+ * consent whose condition had not been met. It grants analytics, the
+ * preferences dialog grants marketing beside the notice, and the card says in
+ * one line that marketing takes one more step and why. Refusing is unchanged
+ * and still one click, so the two buttons stay peers.
+ *
+ * The recorded action comes from actionForChoices, which calls this 'custom'
+ * rather than 'accept_all'. That is accurate and needs no new action value:
+ * the log stores the categories, so the proof says what was actually granted.
+ */
+export const CONSENT_WITHOUT_MARKETING: ConsentChoices = Object.freeze({
+  necessary: true,
+  analytics: true,
+  marketing: false,
+})
+
 export function actionForChoices(choices: ConsentChoices, previous: ConsentChoices | null): ConsentAction {
   if (choices.analytics && choices.marketing) return 'accept_all'
   if (!choices.analytics && !choices.marketing) {

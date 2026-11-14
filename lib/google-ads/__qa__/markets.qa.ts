@@ -23,6 +23,8 @@ import {
   LANGUAGE_IDS,
   SUPPORTED_COUNTRIES,
   SUPPORTED_LANGUAGES,
+  LOCALE_RESEARCH_DEFAULT,
+  researchDefaultFor,
   isValidCountry,
   isValidLanguage,
 } from '../constants'
@@ -33,6 +35,8 @@ import { join } from 'path'
 import { dashboardHe as he } from '@/lib/i18n/dashboard/he'
 import { dashboardEn as en } from '@/lib/i18n/dashboard/en'
 import { dashboardEs as es } from '@/lib/i18n/dashboard/es'
+import { getDashboardDictionary } from '@/lib/i18n/dashboard/getDashboardDictionary'
+import { PUBLIC_LOCALES } from '@/lib/i18n/locales'
 
 let pass = 0
 let fail = 0
@@ -72,6 +76,9 @@ const GOOGLE_LANGUAGE_IDS: Record<string, number> = {
   // Read back on 5 November 2026, with the Polish locale: languageConstants/1030
   // answers code "pl", name "Polish", targetable true.
   pl: 1030, // Polish
+  // Read back on 12 November 2026 from the live API (customer 989-586-4448):
+  // languageConstants/1012 answers code "ko", name "Korean".
+  ko: 1012, // Korean
 }
 const GOOGLE_COUNTRY_IDS: Record<string, number> = {
   AR: 2032, BR: 2076, CL: 2152, CO: 2170, CY: 2196,
@@ -92,6 +99,11 @@ const GOOGLE_COUNTRY_IDS: Record<string, number> = {
   // geoTargetConstants/2616 answers name "Poland", countryCode PL, targetType
   // Country, status ENABLED. Read back the same day as the language above.
   PL: 2616,
+  // geoTargetConstants/2410 answers name "South Korea", countryCode KR,
+  // targetType Country. Read back the same day as the language above. Korean is
+  // written for SOUTH KOREA alone, and there is no second Korean market to be
+  // tempted by the way Belgium tempted Dutch.
+  KR: 2410,
 }
 
 function main() {
@@ -161,21 +173,77 @@ function main() {
 
   console.log('\nC) a label in every dashboard language')
   {
-    for (const [name, dict] of [['he', he], ['en', en], ['es', es]] as const) {
-      const kr = (dict as unknown as { keywordResearch: { countries: Record<string, string>; languages: Record<string, string> } }).keywordResearch
+    /*
+     * ALL ELEVEN, and through getDashboardDictionary rather than the raw files:
+     * every locale but Hebrew and English is English with its own sections laid
+     * over it, so the dictionary a screen reads is the MERGED one, and reading
+     * the partial file instead would pass on a label that merge never reaches.
+     *
+     * It used to check he/en/es only, which is how it would have missed the
+     * thirteen markets added on 13 November 2026 in eight languages. The locale
+     * list is read from PUBLIC_LOCALES, never typed here, so the twelfth locale
+     * is checked the day it ships — the trap in
+     * components/public/__qa__/public-nav-menus.qa.ts, where a hand-picked pair
+     * stayed green while Korean shipped without a menu row.
+     */
+    for (const locale of PUBLIC_LOCALES) {
+      const kr = (getDashboardDictionary(locale) as unknown as { keywordResearch: { countries: Record<string, string>; languages: Record<string, string> } }).keywordResearch
       const missingLang = SUPPORTED_LANGUAGES.filter((l) => !kr.languages[l]?.trim())
       const missingCc = SUPPORTED_COUNTRIES.filter((c) => !kr.countries[c]?.trim())
-      check(`C-${name}: every language and country is named`, missingLang.length === 0 && missingCc.length === 0,
+      check(`C-${locale}: every language and country is named`, missingLang.length === 0 && missingCc.length === 0,
         [...missingLang, ...missingCc].join(', '))
       const extraLang = Object.keys(kr.languages).filter((l) => !isValidLanguage(l))
       const extraCc = Object.keys(kr.countries).filter((c) => !isValidCountry(c))
-      check(`C-${name}-closed: and nothing is named that cannot be chosen`, extraLang.length === 0 && extraCc.length === 0,
+      check(`C-${locale}-closed: and nothing is named that cannot be chosen`, extraLang.length === 0 && extraCc.length === 0,
         [...extraLang, ...extraCc].join(', '))
+      // A label is a WORD, not a code echoed back: `de: 'de'` would satisfy a
+      // presence check and read as a bug on screen.
+      const echoed = [...SUPPORTED_LANGUAGES.filter((l) => kr.languages[l] === l), ...SUPPORTED_COUNTRIES.filter((c) => kr.countries[c] === c)]
+      check(`C-${locale}-named: no label is the code itself`, echoed.length === 0, echoed.join(', '))
     }
+    const deCountries: Record<string, string> = {
+      ...(getDashboardDictionary('de') as unknown as { keywordResearch: { countries: Record<string, string> } }).keywordResearch.countries,
+      KR: '',
+    }
+    check('C-MUT: a locale missing one of the new labels fails C',
+      SUPPORTED_COUNTRIES.filter((c) => !deCountries[c]?.trim()).length === 1)
     const words = ([he, en, es] as unknown as { keywordResearch: { languages: Record<string, string> } }[])
       .map((d) => d.keywordResearch.languages)
     check('C-distinct: Spanish and Portuguese are not the same word in any of them',
       words.every((l) => l.es !== l.pt), words.map((l) => `${l.es}/${l.pt}`).join(', '))
+    // The eleven site languages are the point of the widening: each one is a
+    // research language, and each one's home market is a choosable country.
+    const shipped: [string, string][] = [['he', 'IL'], ['en', 'US'], ['es', 'ES'], ['pt', 'BR'], ['fr', 'FR'], ['it', 'IT'], ['ja', 'JP'], ['de', 'DE'], ['nl', 'NL'], ['pl', 'PL'], ['ko', 'KR']]
+    const unoffered = shipped.filter(([l, c]) => !isValidLanguage(l) || !isValidCountry(c))
+    check('C-ships: every language the site is published in can be researched, in its own market',
+      unoffered.length === 0, unoffered.map(([l, c]) => `${l}/${c}`).join(', '))
+    check('C-ships-MUT: a shipped language that is not offered is caught',
+      [['zu', 'ZW']].some(([l, c]) => !isValidLanguage(l) || !isValidCountry(c)))
+  }
+
+  console.log('\nC2) the pickers open on the reader\'s own market')
+  {
+    const missing = PUBLIC_LOCALES.filter((l) => !LOCALE_RESEARCH_DEFAULT[l])
+    check('C2a: every site language has a default pair', missing.length === 0, missing.join(', '))
+    const unchoosable = PUBLIC_LOCALES.filter((l) => {
+      const d = LOCALE_RESEARCH_DEFAULT[l]
+      return !d || !isValidCountry(d.country) || !isValidLanguage(d.language)
+    })
+    check('C2b: and the pair it opens on is one the pickers offer', unchoosable.length === 0, unchoosable.join(', '))
+    // The default is the LOCALE'S OWN market, not a copy of Hebrew's. The whole
+    // point of the change is that a German reader does not open on Israel.
+    const notOwn = PUBLIC_LOCALES.filter((l) => l !== 'he' && researchDefaultFor(l).country === 'IL')
+    check('C2c: no language but Hebrew opens on Israel', notOwn.length === 0, notOwn.join(', '))
+    check('C2-MUT: an unknown locale still falls back to Israel and Hebrew',
+      researchDefaultFor('zz').country === 'IL' && researchDefaultFor('zz').language === 'he')
+    // Portuguese is one language at Google; the pt-BR reader's country is Brazil.
+    check('C2d: pt-BR opens on Brazil, in Google\'s single Portuguese',
+      researchDefaultFor('pt-BR').country === 'BR' && researchDefaultFor('pt-BR').language === 'pt')
+    const screen = readFileSync(join(process.cwd(), 'app/(dashboard)/keyword-research/page.tsx'), 'utf8')
+    const wiredOk = (src: string) => /useState<string>\(researchDefault\.country\)/.test(src) && /useState<string>\(researchDefault\.language\)/.test(src)
+      && /researchDefaultFor\(uiLocale\)/.test(src)
+    check('C2e: the screen actually opens on it, from the locale it is read in', wiredOk(screen))
+    check('C2e-MUT: the old hard-coded pair is caught', !wiredOk(screen.replace("useState<string>(researchDefault.country)", "useState('IL')")))
   }
 
   console.log('\nD) the research language never decides the prose the owner reads')
@@ -192,6 +260,14 @@ function main() {
       && contentLanguageOrEnglish('ar') === 'en')
     check('D2b: Portuguese research is written in Portuguese',
       contentLanguageOrEnglish('pt') === 'pt-BR' && contentLanguageOrEnglish('pt-BR') === 'pt-BR')
+    // Every language the product WRITES in has to come back as itself, or the
+    // owner of a German site gets English topic titles from a German research.
+    // de, nl, pl and ko became choosable on 13 Nov 2026 and were not in the
+    // known-prefix list until the same commit.
+    const selfProse: [string, string][] = [['fr', 'fr'], ['it', 'it'], ['ja', 'ja'], ['de', 'de'], ['nl', 'nl'], ['pl', 'pl'], ['ko', 'ko']]
+    const wrongProse = selfProse.filter(([code, want]) => contentLanguageOrEnglish(code) !== want)
+    check('D2c: a research language the product writes in is written in that language',
+      wrongProse.length === 0, wrongProse.map(([c]) => `${c}->${contentLanguageOrEnglish(c)}`).join(', '))
     check('D3: Hebrew and the legacy code are still Hebrew', contentLanguageOrEnglish('he') === 'he' && contentLanguageOrEnglish('iw') === 'he')
     check('D4: no language at all keeps the Hebrew default', contentLanguageOrEnglish('') === 'he' && contentLanguageOrEnglish(null) === 'he' && contentLanguageOrEnglish(undefined) === 'he')
     check('D5: whatever it answers, the reason wording exists for it',

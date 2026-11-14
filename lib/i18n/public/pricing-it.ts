@@ -42,6 +42,12 @@ export const pricingIt: PricingCopy = {
       ILS: 'I prezzi includono l’IVA israeliana. È l’importo che si paga, senza nulla in più.',
       USD: 'Nel pagamento con carta il venditore è Creem, in qualità di esercente registrato: calcola l’imposta in base all’indirizzo di fatturazione e mostra l’importo finale prima del pagamento. I prezzi indicati qui non la includono.',
     },
+    /* 전자상거래법 제21조 제1항 제1호 forbids inducing a consumer by withholding a
+       material fact, and it binds any business carrying on electronic commerce,
+       not only a mail-order seller, so it bites BEFORE any contract. Shown only
+       to a visitor placed in Korea, on every language's page, because the duty
+       follows the consumer and not the page. lib/billing/korea-sale.ts. */
+    koreaTrialOnly: `In Corea del Sud per ora è disponibile solo la prova gratuita e l’abbonamento a pagamento non viene venduto. La prova termina automaticamente dopo ${DAYS} giorni e non chiediamo i dati della carta, quindi non viene addebitato nulla.`,
     everyPlanLabel: 'In tutti i piani',
     everyPlan: [
       'Pubblicazione programmata automatica su WordPress, Shopify e Wix',

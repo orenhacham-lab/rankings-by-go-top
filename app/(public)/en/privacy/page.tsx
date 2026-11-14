@@ -113,7 +113,7 @@ export default function EnglishPrivacyPage() {
           image is loaded from JVZoo which receives your IP address, your browser identifier and the page
           you arrived from, so that a purchase can be attributed to the affiliate who referred you. The
           request also stores JVZoo&rsquo;s own cookies on your device, so it is governed by consent wherever
-          the law requires consent for such storage: in the EEA, the United Kingdom, Switzerland and Canada,
+          the law requires consent for such storage: in the EEA, the United Kingdom, Switzerland, Canada, Japan, Brazil and South Korea, where it is not loaded at all, not even with your consent,
           and whenever we cannot determine which country the request came from, the image loads only after
           you have accepted marketing cookies; outside those territories it loads when the page opens. For
           that collection and transmission
@@ -125,7 +125,7 @@ export default function EnglishPrivacyPage() {
           identifier and the page you arrived from, and which names Digistore24 as the reseller for that
           purchase. The request also stores a Digistore24 cookie on your device for one week, so it is
           governed by consent wherever the law requires consent for such storage: in the EEA, the United
-          Kingdom, Switzerland and Canada, and whenever we cannot determine which country the request came
+          Kingdom, Switzerland, Canada, Japan, Brazil and South Korea, where it is not loaded at all, not even with your consent, and whenever we cannot determine which country the request came
           from, the badge loads only after you have accepted marketing cookies; outside those territories
           it loads when the page opens. If you then buy through that page, Digistore24 is the seller: it
           takes your payment, issues your invoice and decides what it does with your data under its own
@@ -731,7 +731,7 @@ export default function EnglishPrivacyPage() {
           One further thing runs outside Google Tag Manager: on the JVZoo marketplace sales
           page only, a one-pixel tracking image is loaded from JVZoo so that a purchase can be
           attributed to the affiliate who referred you. The request stores JVZoo&rsquo;s cookies on
-          your device, so in the EEA, the United Kingdom, Switzerland and Canada, and whenever we
+          your device, so in the EEA, the United Kingdom, Switzerland, Canada, Japan, Brazil and South Korea, where it is not loaded at all, not even with your consent, and whenever we
           cannot determine the country, it loads only after you have allowed marketing; outside
           those territories it loads when the page opens. It appears on no other page of the site.
         </p>
@@ -910,13 +910,13 @@ export default function EnglishPrivacyPage() {
           sales page, each decide for themselves what they do with the data</strong>: for the collection
           and the transmission of the request made from our page we are a joint controller with each of
           them, and neither transmission is governed by a processing agreement or by Standard Contractual
-          Clauses. In the European Economic Area, the United Kingdom, Switzerland and Canada, and whenever
+          Clauses. In the European Economic Area, the United Kingdom, Switzerland, Canada, Japan, Brazil and South Korea, where it is not loaded at all, not even with your consent, and whenever
           we cannot determine which country the request came from, the request is made only after you have
           accepted marketing cookies, and <strong>that consent of yours is the instrument</strong>: Article
           49(1)(a) of the GDPR permits a transfer to a country without an adequacy decision where the data
           subject has explicitly consented after being informed of the risks. The risk here is that your IP
           address and your browser identifier reach a company in the United States, where the protection of
-          the GDPR does not apply of itself. If you do not accept marketing cookies, nothing is transmitted
+          the GDPR does not apply of itself. Canadian, Japanese, Brazilian and South Korean law are not the GDPR, so no Article 49 claim is made for any of them, and in South Korea the request is not made at all. If you do not accept marketing cookies, nothing is transmitted
           to them.
         </p>
         <p className="mt-4">

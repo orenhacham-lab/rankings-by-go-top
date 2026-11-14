@@ -40,6 +40,7 @@ import { germanSiteEnabled } from '../../i18n/german-site'
 import { dutchSiteEnabled } from '../../i18n/dutch-site'
 import { polishSiteEnabled } from '../../i18n/polish-site'
 import { frenchSiteEnabled } from '@/lib/i18n/french-site'
+import { koreanSiteEnabled } from '../../i18n/korean-site'
 
 let pass = 0, fail = 0
 function check(name: string, cond: boolean, detail?: string) {
@@ -62,6 +63,7 @@ const LIVE: Record<LegalLanguage, boolean> = {
   de: germanSiteEnabled(process.env.NEXT_PUBLIC_GERMAN_SITE_ENABLED),
   nl: dutchSiteEnabled(process.env.NEXT_PUBLIC_DUTCH_SITE_ENABLED),
   pl: polishSiteEnabled(process.env.NEXT_PUBLIC_POLISH_SITE_ENABLED),
+  ko: koreanSiteEnabled(process.env.NEXT_PUBLIC_KOREAN_SITE_ENABLED),
 }
 const owed: string[] = []
 
@@ -185,6 +187,7 @@ console.log('\nC) the routes, the gate and the links')
     de: { prefix: '/de', gate: 'germanSiteEnabled' },
     nl: { prefix: '/nl', gate: 'dutchSiteEnabled' },
     pl: { prefix: '/pl', gate: 'polishSiteEnabled' },
+    ko: { prefix: '/ko', gate: 'koreanSiteEnabled' },
   }
 
   for (const language of LEGAL_LANGUAGES) {
@@ -250,7 +253,7 @@ console.log('\nC) the routes, the gate and the links')
 
 console.log('\nD) the real documents, in every language')
 {
-  const PREFIX: Record<LegalLanguage, string> = { es: '/es', 'pt-BR': '/pt-BR', fr: '/fr', it: '/it', ja: '/ja', de: '/de', nl: '/nl', pl: '/pl' }
+  const PREFIX: Record<LegalLanguage, string> = { es: '/es', 'pt-BR': '/pt-BR', fr: '/fr', it: '/it', ja: '/ja', de: '/de', nl: '/nl', pl: '/pl', ko: '/ko' }
   /** A translation of the registered company name is a mistake in any language. */
   const TRANSLATED_NAME = [
     /GO TOP (?:MARKETING|MARKETING Y|DE MARKETING)[^.]*(?:DIGITAL|S\.L|SL)\b/i,
@@ -312,6 +315,122 @@ console.log('\nD) the real documents, in every language')
   check('D8a: at least one document carries an internal link at all', allLinks > 0)
   check('D8-MUT: a link into another language tree is caught',
     !['/en/privacy'].every((l) => l.startsWith('/es/')))
+}
+
+/*
+ * THE CHANNEL-SPECIFIC-TERMS CLAUSE, in every language, pinned to the words.
+ *
+ * WHY IT EXISTS. Clause 10 already forbade giving "a guarantee on our behalf"
+ * and using "a price, plan, trial or offer that is not ours", and neither
+ * reaches the case that opened on 2026-11-13: /go/digistore24 now carries a
+ * 60-day money-back guarantee that Digistore24 gives and the PayPal and Creem
+ * channels do not. An affiliate who advertises it is inventing nothing and
+ * using nothing that is not ours — the term is real and it is on our product.
+ * The defect is that it belongs to ONE place the Service is sold and the
+ * promotion carries it to buyers who pay somewhere it does not apply, in our
+ * name and on our page's strength. So the rule is about which channel a term
+ * belongs to, not about falsity, and it had to be a new bullet.
+ *
+ * The text is the legal thread's, drafted 2026-11-13 and reproduced here
+ * character for character, so a reworded page fails rather than drifts. Two
+ * documents are TSX and not Markdown — Hebrew at app/(legal)/affiliate-terms
+ * and English at app/(public)/en/affiliate-terms — and they are read as text
+ * for exactly that reason: the rule is about the published words, not about
+ * where they are stored.
+ *
+ * KOREAN IS OWED, NOT MISSING. The ko draft arrived with corrupted syllables
+ * (서버스 for 서비스, 환불 부장 for 환불 보장, 가객 for 가격, 전잴 for 전체,
+ * 자제 for 자체, 함꿨 for 함께), so it was not published: a legal clause with
+ * broken words in it is worse than a clause not yet translated, and the ko
+ * site is behind NEXT_PUBLIC_KOREAN_SITE_ENABLED in any case. It is reported
+ * as owed on the same footing as the cross-link items above, and it becomes a
+ * failure the day Korean goes live.
+ */
+console.log('\nE) The channel-specific-terms clause (clause 10)')
+{
+  const CLAUSE = new Map<string, { bullet: string; para: string }>([
+  ['he', {
+    bullet: 'לפרסם תקופת החזר, אחריות להחזר כספי, מחיר או מטבע שתקפים רק באחד המקומות שבהם השירות נמכר, כאילו הם תקפים לשירות בכלל, או להשתמש בהם בכל קידום שמוביל לקופה שלנו או למקום שאינו כולל אותם;',
+    para: 'אם אתם מזכירים תנאי כזה, ציינו באותו מקום מי המוכר שממנו הוא בא. תנאי שמקורו בזירת מכירה חיצונית הוא תנאי שלה: הוא עשוי להשתנות או להסתיים בלי הודעה אליכם, ואיננו חבים בו ברכישה שנעשתה במקום אחר.',
+  }],
+  ['en', {
+    bullet: 'advertise a refund window, money-back guarantee, price or currency that applies only to one of the places the Service is sold as if it applied to the Service generally, or use it in any promotion that leads to our own checkout or to a place that does not carry it;',
+    para: 'Where you do name such a term, name the seller it comes from in the same place. A term that belongs to a marketplace is that marketplace\'s term: it can change or end without notice to you, and we do not owe it on a purchase made anywhere else.',
+  }],
+  ['de', {
+    bullet: 'eine Rückgabefrist, eine Geld-zurück-Garantie, einen Preis oder eine Währung, die nur an einem der Orte gelten, an denen der Dienst verkauft wird, so darzustellen, als gälten sie für den Dienst allgemein, oder sie in einer Werbung zu verwenden, die zu unserer eigenen Kasse oder zu einem Ort führt, an dem sie nicht gelten;',
+    para: 'Wenn Sie eine solche Bedingung nennen, nennen Sie an derselben Stelle den Verkäufer, von dem sie stammt. Eine Bedingung, die zu einem Marktplatz gehört, ist die Bedingung dieses Marktplatzes: sie kann sich ohne Mitteilung an Sie ändern oder entfallen, und wir schulden sie bei einem Kauf an anderer Stelle nicht.',
+  }],
+  ['es', {
+    bullet: 'presentar un plazo de devolución, una garantía de devolución del dinero, un precio o una moneda que solo se aplican en uno de los lugares donde se vende el Servicio como si se aplicaran al Servicio en general, ni usarlos en una promoción que lleve a nuestra propia caja o a un lugar donde no se apliquen;',
+    para: 'Si menciona una condición de este tipo, indique en el mismo lugar el vendedor del que proviene. Una condición que pertenece a un marketplace es su condición: puede cambiar o terminar sin aviso para usted, y no la debemos en una compra hecha en otro lugar.',
+  }],
+  ['fr', {
+    bullet: 'présenter un délai de remboursement, une garantie de remboursement, un prix ou une devise qui ne s\'appliquent qu\'à l\'un des endroits où le Service est vendu comme s\'ils s\'appliquaient au Service en général, ni les utiliser dans une promotion qui mène à notre propre paiement ou à un endroit où ils ne s\'appliquent pas ;',
+    para: 'Si vous mentionnez une telle condition, indiquez au même endroit le vendeur dont elle provient. Une condition qui appartient à une place de marché est la condition de cette place de marché : elle peut changer ou disparaître sans que vous en soyez informé, et nous ne la devons pas pour un achat effectué ailleurs.',
+  }],
+  ['it', {
+    bullet: 'presentare un termine di rimborso, una garanzia di rimborso, un prezzo o una valuta validi solo in uno dei luoghi in cui il Servizio è venduto come se valessero per il Servizio in generale, né usarli in una promozione che porti alla nostra cassa o a un luogo in cui non valgono;',
+    para: 'Se citi una condizione di questo tipo, indica nello stesso punto il venditore da cui proviene. Una condizione che appartiene a un marketplace è la condizione di quel marketplace: può cambiare o cessare senza preavviso nei tuoi confronti e non è dovuta da noi per un acquisto effettuato altrove.',
+  }],
+  ['pt-BR', {
+    bullet: 'apresentar um prazo de devolução, uma garantia de devolução do dinheiro, um preço ou uma moeda que valem apenas em um dos lugares onde o Serviço é vendido como se valessem para o Serviço em geral, nem usá-los em uma divulgação que leve ao nosso próprio checkout ou a um lugar onde não valem;',
+    para: 'Se você mencionar uma condição desse tipo, indique no mesmo lugar o vendedor de quem ela vem. Uma condição que pertence a um marketplace é a condição daquele marketplace: pode mudar ou terminar sem aviso a você, e não a devemos em uma compra feita em outro lugar.',
+  }],
+  ['nl', {
+    bullet: 'een retourtermijn, een niet-goed-geld-terug-garantie, een prijs of een valuta die alleen gelden op één van de plaatsen waar de Dienst wordt verkocht, voorstellen alsof zij voor de Dienst in het algemeen gelden, of ze gebruiken in een promotie die naar onze eigen afrekenpagina of naar een plaats leidt waar zij niet gelden;',
+    para: 'Noemt u een dergelijke voorwaarde, vermeld dan op dezelfde plaats de verkoper van wie zij komt. Een voorwaarde die bij een marktplaats hoort, is de voorwaarde van die marktplaats: zij kan zonder bericht aan u wijzigen of eindigen, en wij zijn haar niet verschuldigd bij een aankoop die elders is gedaan.',
+  }],
+  ['pl', {
+    bullet: 'przedstawiać terminu zwrotu, gwarancji zwrotu pieniędzy, ceny ani waluty, które obowiązują tylko w jednym z miejsc sprzedaży Usługi, tak jakby obowiązywały dla Usługi w ogóle, ani używać ich w promocji prowadzącej do naszej własnej płatności lub do miejsca, w którym nie obowiązują;',
+    para: 'Jeżeli Państwo powołują się na taki warunek, proszę wskazać w tym samym miejscu sprzedawcę, od którego on pochodzi. Warunek należący do platformy sprzedażowej jest warunkiem tej platformy: może zostać zmieniony lub zakończony bez powiadomienia Państwa, a my nie jesteśmy nim zobowiązani przy zakupie dokonanym w innym miejscu.',
+  }],
+  ['ja', {
+    bullet: '本サービスが販売されている一部の場所にのみ適用される返金期間、返金保証、価格または通貨を、本サービス全般に適用されるかのように表示すること、またはそれらを当社自身の決済もしくはそれらが適用されない場所へ誘導する宣伝に用いること。',
+    para: 'そのような条件に言及する場合は、同じ箇所にその条件の提供元である販売者を明記してください。マーケットプレイスに属する条件はそのマーケットプレイスの条件であり、お客様への通知なく変更または終了されることがあり、他の場所で行われた購入について当社が負うものではありません。',
+  }],
+  ['ko', {
+    bullet: '본 서버스가 판매되는 일부 경로에만 적용되는 환불 기간, 환불 부장, 가객 또는 통화를 서버스전잴에 적용되는 것처럼 표시하거나, 당사의 자제 결제 또는 해당 조건이 적용되지 않는 경로로 연결되는홍보에 사용하는 행위',
+    para: '그러한 조건을 언급할 때에는 같은 위치에 그 조건을 제공하는 판매자를 함꿨 밝혀 주십시오.마켓플레이스에 속한 조건은 해당 마켓플레이스의 조건이며, 그에게 통지 없이 변경되거나 종료될 수 있으며,다른 곳에서 이루어진 구매에 대하여 당사가 부담하는 조건이 아닙니다.',
+  }],
+  ])
+  /* The two documents that are pages rather than Markdown. */
+  const DOC: Record<string, string> = {
+    he: 'app/(legal)/affiliate-terms/page.tsx',
+    en: 'app/(public)/en/affiliate-terms/page.tsx',
+  }
+  /* Whitespace only: a JSX line wrap and a Markdown line wrap are the same
+     sentence, and neither is a change to the terms. */
+  const flatten = (s: string) => s.replace(/\s+/g, ' ')
+  /* The TSX documents escape the apostrophe, which Markdown does not. */
+  const normalise = (s: string) => flatten(s).replace(/&rsquo;/g, "'")
+
+  const KO_OWED = true
+  let checked = 0
+  for (const [language, text] of CLAUSE) {
+    const path = DOC[language] ?? `content/legal/${language}/affiliate-terms.md`
+    if (language === 'ko' && KO_OWED) {
+      owed.push('ko: the channel-specific-terms clause, pending an uncorrupted draft')
+      check('E1 (ko): the clause is owed, and Korean is off, so this is an item and not a defect',
+        koreanSiteEnabled() === false)
+      continue
+    }
+    const src = normalise(read(path))
+    check(`E1 (${language}): the clause-10 bullet is published in these exact words`,
+      src.includes(flatten(text.bullet)))
+    check(`E2 (${language}): and the paragraph after the list`,
+      src.includes(flatten(text.para)))
+    checked += 1
+  }
+  check('E3: ten documents carry it, so E1/E2 are not reading an empty list', checked === 10)
+  /* MUTATION CONTROLS. */
+  check('E-MUT1: a reworded bullet is caught',
+    !normalise(read(DOC.en)).includes(flatten(CLAUSE.get('en')!.bullet.replace('only to one of', 'to any of'))))
+  check('E-MUT2: a dropped paragraph is caught',
+    !normalise(read(DOC.en)).replace(flatten(CLAUSE.get('en')!.para), '')
+      .includes(flatten(CLAUSE.get('en')!.para)))
+  check('E-MUT3: and a language that simply never got it would fail E1',
+    !normalise('## 10.').includes(flatten(CLAUSE.get('de')!.bullet)))
 }
 
 if (owed.length > 0) {

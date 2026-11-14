@@ -1161,7 +1161,7 @@ const nl: AiCrawlerCopy = {
     search: { label: 'Zoekindex', blurb: 'Bouwt de zoekindex waarop ook de AI-antwoorden rusten.' },
     ads: { label: 'Advertenties', blurb: 'Controleert de bestemmingspagina’s van advertenties. Een blokkade heeft geen gevolgen voor antwoorden of voor de zoekindex.' },
     preview: { label: 'Linkvoorbeeld', blurb: 'Maakt de titel en afbeelding die te zien zijn als iemand de link deelt. Een blokkade laat de gedeelde link leeg.' },
-    agent: { label: 'Agent w przeglądarce', blurb: 'Przeglądarka, którą agent AI prowadzi dla jednej osoby. Zablokowanie nie zmienia tego, co wie model: uniemożliwia Państwa gościom poproszenie asystenta, by czegoś w witrynie dokonał.' },
+    agent: { label: 'Agent in de browser', blurb: 'Een browser die een AI-agent voor één persoon bestuurt. Een blokkade verandert niets aan wat het model weet: ze belet uw bezoekers de assistent te vragen iets op de site te doen.' },
   },
   groups: { ai: 'AI-crawlers', classic: 'Klassieke zoekmachinecrawlers' },
   reference: {
@@ -1218,7 +1218,118 @@ const nl: AiCrawlerCopy = {
   },
 }
 
-const COPY: Record<PublicLocale, AiCrawlerCopy> = { he, en, es, 'pt-BR': ptBR, fr, it, ja, de, nl, pl }
+// KOREAN. 합니다체 throughout, and the crawler names stay in Latin script
+// because that is what the User-agent line actually says.
+const ko: AiCrawlerCopy = {
+  meta: {
+    title: '내 robots.txt는 어떤 AI 크롤러를 차단하고 있을까요? – Go Top SEO',
+    description:
+      '도메인을 입력하시면 GPTBot, ClaudeBot, PerplexityBot, Google-Extended 등 어떤 AI 크롤러가 robots.txt에 의해 차단되는지, 그리고 크롤러별로 어떤 규칙이 그것을 결정하는지 보여 드립니다. 로그인 없이 사용하실 수 있습니다.',
+  },
+  page: {
+    badge: '무료 도구',
+    title: '내 웹사이트는 어떤 AI 크롤러를 차단하고 있을까요?',
+    subtitle:
+      'robots.txt를 읽어 AI 크롤러별로 허용인지 차단인지, 그리고 파일의 어떤 규칙이 그것을 결정하는지 보여 드립니다.',
+    trust: ['로그인도 이메일도 필요 없습니다', '파일 하나를 한 번만 읽습니다', '첫 화면뿐 아니라 특정 경로도 확인합니다'],
+  },
+  form: {
+    urlLabel: '웹사이트 주소',
+    urlPlaceholder: 'example.kr',
+    pathLabel: '확인할 경로 (선택)',
+    pathPlaceholder: '/blog/',
+    pathHint: '비워 두시면 첫 화면을 확인합니다. robots.txt의 규칙은 경로마다 다를 수 있습니다.',
+    submit: '크롤러 확인하기',
+    submitting: 'robots.txt를 읽고 있습니다…',
+    errors: {
+      invalid_url: '주소가 올바르지 않은 것 같습니다. example.kr 형식으로 입력해 주십시오.',
+      blocked_url: '공개된 웹사이트만 확인할 수 있습니다.',
+      unreachable: '이 웹사이트에 지금 연결할 수 없었습니다. 잠시 뒤에 다시 시도해 주십시오.',
+      rate_limited: '짧은 시간에 많은 웹사이트를 확인하셨습니다. 1분 뒤에 다시 시도해 주십시오.',
+      internal: '확인이 저희 쪽에서 완료되지 않았습니다. 잠시 뒤에 다시 시도해 주십시오.',
+    },
+  },
+  results: {
+    heading: '확인한 대상',
+    forPath: '확인한 경로',
+    robotsFound: 'robots.txt를 읽었습니다',
+    robotsAbsent: '이 웹사이트는 robots.txt를 제공하지 않으므로, 이 파일이 차단하는 것은 없습니다.',
+    robotsUnreadable: '웹사이트가 파일을 제공하지 않아 규칙을 읽을 수 없었습니다. 아래 결과에서는 어떤 것도 차단으로 처리하지 않았습니다.',
+    allowedCount: '허용',
+    blockedCount: '차단',
+    allowed: '허용',
+    blocked: '차단',
+    decidedBy: '결정한 규칙',
+    noRule: '해당하는 규칙이 없습니다. 기본값은 허용입니다',
+    viaWildcard: '모든 크롤러를 대상으로 한 그룹이 결정했습니다',
+    ignoresRobots: '이 크롤러는 robots.txt를 따른다고 명시하지 않습니다',
+    sitemapsTitle: '파일에 지정된 사이트맵',
+    again: '다른 웹사이트 확인하기',
+  },
+  purposes: {
+    train: { label: '학습', blurb: '모델을 학습시키기 위해 페이지를 수집합니다. 차단하면 다음 모델에 포함되지 않습니다.' },
+    answer: { label: '실시간 답변', blurb: '누군가 질문한 순간에 페이지를 가져와, 답변 안에서 링크와 함께 인용합니다.' },
+    search: { label: '검색 색인', blurb: 'AI 답변도 함께 기대고 있는 검색 색인을 만듭니다.' },
+    ads: { label: '광고', blurb: '광고의 방문 페이지를 점검합니다. 차단해도 답변이나 검색 색인에는 영향이 없습니다.' },
+    preview: { label: '링크 미리보기', blurb: '링크를 공유할 때 보이는 제목과 이미지를 만듭니다. 차단하면 공유된 링크가 비어 보입니다.' },
+    agent: { label: '브라우저 안의 에이전트', blurb: 'AI 에이전트가 한 사람을 위해 조작하는 브라우저입니다. 차단해도 모델이 아는 내용은 달라지지 않지만, 방문자가 어시스턴트에게 사이트에서 무언가를 해 달라고 요청할 수 없게 됩니다.' },
+  },
+  groups: { ai: 'AI 크롤러', classic: '기존 검색엔진 크롤러' },
+  reference: {
+    title: '누가 운영하는 크롤러인가',
+    datasetName: 'AI 크롤러 참조 표',
+    intro: '이 표는 따로도 읽으실 수 있습니다. User-agent 줄에 적히는 이름, 운영 주체, 그리고 목적입니다.',
+    colAgent: 'User-agent',
+    colOperator: '운영 주체',
+    colPurpose: '목적',
+    undocumented: '운영 주체의 어떤 문서에도 이 토큰에 대한 설명이 없습니다. 서버 로그에 나타나기 때문에 여기에 포함했으며, 운영 주체의 자체 문서에 근거한 항목과는 분리해 두었습니다.',
+  },
+  measurement: {
+    title: '실제로 얼마나 많은 사이트가 차단하고 있는가',
+    intro: '아래에 적힌 날짜에, 여기 표시된 시장에서 상위에 노출되는 웹사이트들의 robots.txt를 읽어 위 표와 대조했습니다.',
+    headline: 'GPTBot을 차단하는 사이트 중 {pct}는 방문자를 데려올 수 있었던 AI 크롤러까지 함께 차단하고 있습니다.',
+    caveat: '이 조사 대상은 상위에 노출되는 큰 사이트들이며 소규모 사업자가 아닙니다. 소규모 사업자의 경우에는 의도적인 차단이 적고 방치가 많아, 양상이 다를 가능성이 높습니다. 이 수치를 소규모 사업자의 모습으로 읽지는 말아 주십시오.',
+    notSampled: '브라질과 포르투갈은 조사 대상에 포함되지 않았습니다. .com 수치는 전 세계 영어권 부분이며, 두 나라 중 어느 쪽의 수치도 아닙니다.',
+    measuredOnLabel: '측정일',
+    colMarket: '시장',
+    colShare: '방문자를 데려오는 AI 크롤러를 차단',
+    sampleNote: '백분율은 실제로 읽어 낸 robots.txt 파일 {n}건을 기준으로 하며, 요청한 도메인 수가 아닙니다.',
+    downloads: '측정 결과 전체를 오픈 데이터로 제공합니다:',
+    perSite: '{on}에 다시 읽으면서, 이번에는 도메인별로 보관했습니다. GPTBot을 차단하는 사이트 중 {deliberate}는 이름을 직접 적은 규칙을 썼으므로, 그 차단은 의도적인 결정이었습니다. 사람들이 보는 답변을 담당하는 OAI-SearchBot을 차단하는 사이트 중 {inherited}는 그것을 지정한 적이 없습니다. 그 차단은 모든 봇을 한꺼번에 겨냥한 규칙에서 비롯됐습니다.',
+    perSiteNote: '두 번째 읽기는 요청한 도메인 {requested}건 중 읽을 수 있었던 파일 {read}건을 다룹니다. {refused}개 호스트가 이 리더를 거부했으며, 알 수 없는 자동 리더를 거부하는 호스트라면 AI 크롤러도 제한하고 있을 가능성이 큽니다. 따라서 이 수치는 차단 수준을 과장하기보다 오히려 낮게 보고 있습니다.',
+    perSiteDownloads: '도메인별 판정, 결정한 규칙 그룹, 그리고 해당 규칙 원문:',
+    perMarketTitle: '국가 도메인별',
+    perMarketLead: '같은 측정을 도메인 접미사별로 나눈 것입니다. 각 행의 비율은 해당 접미사에서 읽어 낸 파일을 기준으로 하며, 요청한 백 개의 도메인을 기준으로 하지 않습니다.',
+    colRead: '읽어 낸 파일',
+    colGptbot: 'GPTBot 차단',
+    colOaiSearchbot: 'OAI-SearchBot 차단',
+    labelDeliberate: '그중 의도적',
+    labelInherited: '그중 물려받은 것',
+  },
+  limits: {
+    title: '이 확인으로는 알 수 없는 것',
+    items: [
+      'robots.txt는 요청이며 담장이 아닙니다. 크롤러가 무시할 수도 있습니다.',
+      '방화벽이나 CDN이 robots.txt가 허용한 크롤러를 차단하고 있을 수 있습니다.',
+      '이 확인은 한 시점을 보여 줍니다. 파일을 수정하시면 답이 곧바로 달라집니다.',
+      '학습용 크롤러를 차단하는 것과 실시간으로 답변하는 크롤러를 차단하는 것은 완전히 다른 결정입니다.',
+    ],
+  },
+  cta: {
+    title: 'AI가 실제로 내 업체를 언급하는지 확인하기',
+    body: '접근 허용은 첫 단계일 뿐입니다. Go Top SEO는 ChatGPT, Gemini, Google AI의 답변에 고객님의 업체가 등장하는지 자동으로 확인하고, Google과 Google 지도의 순위를 매월 추적합니다.',
+    button: '신용카드 없이 7일 무료로 사용해 보기',
+  },
+  related: {
+    title: '다음 단계',
+    lead: 'AI 크롤러의 접근은 전체 그림의 한 부분입니다. 아래 세 페이지가 나머지를 다룹니다.',
+    aiVisibility: 'AI 답변 가시성 추적',
+    freeCheck: '무료 사이트 SEO 점검',
+    pricing: '플랜과 요금',
+  },
+}
+
+const COPY: Record<PublicLocale, AiCrawlerCopy> = { he, en, es, 'pt-BR': ptBR, fr, it, ja, de, nl, pl, ko }
 
 export function aiCrawlerCopy(locale: PublicLocale): AiCrawlerCopy {
   return COPY[locale] ?? he

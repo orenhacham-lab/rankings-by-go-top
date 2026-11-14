@@ -28,12 +28,13 @@ import { japaneseSiteEnabled } from './japanese-site'
 import { germanSiteEnabled } from './german-site'
 import { dutchSiteEnabled } from './dutch-site'
 import { polishSiteEnabled } from './polish-site'
+import { koreanSiteEnabled } from './korean-site'
 
 export type Locale = 'he' | 'en'
-export type PublicLocale = Locale | 'es' | 'pt-BR' | 'fr' | 'it' | 'ja' | 'de' | 'nl' | 'pl'
+export type PublicLocale = Locale | 'es' | 'pt-BR' | 'fr' | 'it' | 'ja' | 'de' | 'nl' | 'pl' | 'ko'
 
 export const LOCALES: Locale[] = ['he', 'en']
-export const PUBLIC_LOCALES: PublicLocale[] = ['he', 'en', 'es', 'pt-BR', 'fr', 'it', 'ja', 'de', 'nl', 'pl']
+export const PUBLIC_LOCALES: PublicLocale[] = ['he', 'en', 'es', 'pt-BR', 'fr', 'it', 'ja', 'de', 'nl', 'pl', 'ko']
 export const DEFAULT_LOCALE: Locale = 'he'
 
 /**
@@ -43,7 +44,7 @@ export const DEFAULT_LOCALE: Locale = 'he'
  * Brazilian law (the Consumer Code's seven-day withdrawal right, the LGPD), so a
  * bare '/pt' would promise European Portuguese readers rules that are not theirs.
  */
-export const LOCALE_PREFIX: Record<PublicLocale, string> = { he: '', en: '/en', es: '/es', 'pt-BR': '/pt-BR', fr: '/fr', it: '/it', ja: '/ja', de: '/de', nl: '/nl', pl: '/pl' }
+export const LOCALE_PREFIX: Record<PublicLocale, string> = { he: '', en: '/en', es: '/es', 'pt-BR': '/pt-BR', fr: '/fr', it: '/it', ja: '/ja', de: '/de', nl: '/nl', pl: '/pl', ko: '/ko' }
 
 export const LOCALE_CONFIG: Record<PublicLocale, { dir: 'rtl' | 'ltr'; lang: string; ogLocale: string }> = {
   he: { dir: 'rtl', lang: 'he', ogLocale: 'he_IL' },
@@ -108,6 +109,19 @@ export const LOCALE_CONFIG: Record<PublicLocale, { dir: 'rtl' | 'ltr'; lang: str
   // terms it is built against are the local-business mid-tail, the same shape as
   // German's `Google Unternehmensprofil optimieren` finding.
   pl: { dir: 'ltr', lang: 'pl', ogLocale: 'pl_PL' },
+  // A bare 'ko', because Korean has one market: South Korea's. Left-to-right,
+  // like Japanese, and like Japanese its words are not separated the way the
+  // text measurements assume — Korean does space, but at the eojeol (phrase)
+  // level, so particles ride along on the word they follow and
+  // `lib/text/segment.ts` already segments it rather than trusting the spaces.
+  //
+  // What is NOT like the other nine: this locale markets and, until the legal
+  // thread closes the VAT question, does not take money. See
+  // `lib/i18n/korean-site.ts` for why the checkout has a gate of its own, and
+  // note for the legal documents that Korea's withdrawal right is SEVEN days
+  // (전자상거래법), not the fourteen every European document here states. The
+  // 14-day sentence must not be translated into Korean.
+  ko: { dir: 'ltr', lang: 'ko', ogLocale: 'ko_KR' },
 }
 
 /**
@@ -120,7 +134,7 @@ export const LOCALE_CONFIG: Record<PublicLocale, { dir: 'rtl' | 'ltr'; lang: str
  * Spain is the first Spanish market, so es-ES; a Latin-American market gets its
  * own entry the day its currency is set, because that is the same decision.
  */
-export const INTL_LOCALE: Record<PublicLocale, string> = { he: 'he-IL', en: 'en-US', es: 'es-ES', 'pt-BR': 'pt-BR', fr: 'fr-FR', it: 'it-IT', ja: 'ja-JP', de: 'de-DE', nl: 'nl-NL', pl: 'pl-PL' }
+export const INTL_LOCALE: Record<PublicLocale, string> = { he: 'he-IL', en: 'en-US', es: 'es-ES', 'pt-BR': 'pt-BR', fr: 'fr-FR', it: 'it-IT', ja: 'ja-JP', de: 'de-DE', nl: 'nl-NL', pl: 'pl-PL', ko: 'ko-KR' }
 
 /**
  * The SHORT name of each language, in its own script, for a control too narrow
@@ -134,10 +148,10 @@ export const INTL_LOCALE: Record<PublicLocale, string> = { he: 'he-IL', en: 'en-
  * components/LanguageSwitcher.tsx in its compact form), so the two cannot drift
  * apart and a seventh language is named once.
  */
-export const LOCALE_SHORT_LABEL: Record<PublicLocale, string> = { he: 'עברית', en: 'EN', es: 'ES', 'pt-BR': 'PT', fr: 'FR', it: 'IT', ja: '日本語', de: 'DE', nl: 'NL', pl: 'PL' }
+export const LOCALE_SHORT_LABEL: Record<PublicLocale, string> = { he: 'עברית', en: 'EN', es: 'ES', 'pt-BR': 'PT', fr: 'FR', it: 'IT', ja: '日本語', de: 'DE', nl: 'NL', pl: 'PL', ko: '한국어' }
 
 /** PayPal's own locale spelling, which uses an underscore and no others. */
-export const PAYPAL_LOCALE: Record<PublicLocale, string> = { he: 'he_IL', en: 'en_US', es: 'es_ES', 'pt-BR': 'pt_BR', fr: 'fr_FR', it: 'it_IT', ja: 'ja_JP', de: 'de_DE', nl: 'nl_NL', pl: 'pl_PL' }
+export const PAYPAL_LOCALE: Record<PublicLocale, string> = { he: 'he_IL', en: 'en_US', es: 'es_ES', 'pt-BR': 'pt_BR', fr: 'fr_FR', it: 'it_IT', ja: 'ja_JP', de: 'de_DE', nl: 'nl_NL', pl: 'pl_PL', ko: 'ko_KR' }
 
 /**
  * The `Intl` tag of a language that reached us as a plain string — a prop typed
@@ -204,6 +218,7 @@ export function publicLocaleEnabled(
     de: flags.de ?? germanSiteEnabled(),
     nl: flags.nl ?? dutchSiteEnabled(),
     pl: flags.pl ?? polishSiteEnabled(),
+    ko: flags.ko ?? koreanSiteEnabled(),
   }
   return gates[locale]
 }

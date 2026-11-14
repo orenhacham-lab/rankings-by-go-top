@@ -309,6 +309,31 @@ export interface MarketplaceProvider {
    */
   returnPolicyUrl: string | null
   /**
+   * AN UNCONDITIONAL MONEY-BACK GUARANTEE THIS CHANNEL GIVES THE BUYER, in
+   * days — and null everywhere the platform does not require one.
+   *
+   * IT IS A PER-CHANNEL TERM AND NOT A SITE-WIDE ONE. Go Top SEO's own policy
+   * is unchanged: a purchase made FROM US is not refunded beyond what the law
+   * requires. A reseller purchase is a purchase from the reseller, section 6A
+   * of our refund policy already says the reseller's policy governs it, and
+   * this number is that policy's term for this one channel. Nothing here
+   * reaches the PayPal or Creem flows, which have no provider record at all.
+   *
+   * WHY A NUMBER AND NOT A SENTENCE. The guarantee has to appear on the sales
+   * page in the same terms as the window configured inside the platform:
+   * Digistore24 rejected all four products on 2026-11-12 partly because "on
+   * your sales page you have specified a return period that does not match
+   * the settings on Digistore24". One number rendered into one sentence is
+   * what stops the page from being able to disagree with the setting, and
+   * changing the setting without changing this field is a visible diff.
+   *
+   * 60 FOR DIGISTORE24 IS THEIR FLOOR, NOT OUR CHOICE OF FIGURE: their US
+   * entity requires a minimum of 60 days, and their reviewer asked for an
+   * unconditional policy of at least that. Oren adopted it for this channel
+   * alone on 2026-11-12.
+   */
+  returnGuaranteeDays: number | null
+  /**
    * What this platform accepts as "I handled it".
    *
    * 'json' is the default shape: a 2xx with a JSON body, which every platform
@@ -379,9 +404,35 @@ export const MARKETPLACE_PROVIDERS: readonly MarketplaceProvider[] = [
     signature: DIGISTORE24_IPN_SCHEME,
     sellerOfRecord: true,
     requiredDisclaimer: null,
-    orderSupportUrl: null,
+    /*
+     * Digistore24's OWN buyer route, not a borrowed one: the "Find my order"
+     * destination in their own footer, which opens their Cancel-or-revoke
+     * form ("Cancel active contracts and subscriptions or revoke your
+     * contract online", order id plus last name or email; read 13.11.2026).
+     *
+     * It is here because they are the merchant of record and say so in their
+     * own words: their published FAQ states that Digistore24 "handle all
+     * refund and chargeback requests on your behalf". A refund asked of us is
+     * a refund asked of the party that does not hold the money, so the page
+     * has to name theirs. This is the address a buyer needs for the 60-day
+     * window below, which is why the guarantee section links it rather than
+     * telling the buyer to "ask Digistore24" and leaving the how out.
+     */
+    orderSupportUrl: 'https://www.digistore24.com/en/cancel-revoke-contract/',
     billingDescriptor: null,
+    /*
+     * Still null, and deliberately: their buyer terms live at
+     * https://www.digistore24.com/page/terms/2/en and are set through
+     * MARKETPLACE_DIGISTORE24_POLICY_URL, so the one place a policy address
+     * can be changed without a deploy stays the one place it is read from.
+     */
     returnPolicyUrl: null,
+    /*
+     * Their US entity's floor, and what their reviewer asked for by name on
+     * 2026-11-12. It must stay equal to the return period configured on each
+     * of the four products inside Digistore24.
+     */
+    returnGuaranteeDays: 60,
     /* Their guide: only the literal text OK counts as a handled delivery. */
     acknowledgement: 'ok_text',
   },
@@ -405,6 +456,13 @@ export const MARKETPLACE_PROVIDERS: readonly MarketplaceProvider[] = [
     /* Read 11.11.2026; it is the article their Client Contract incorporates. */
     returnPolicyUrl:
       'https://support.clickbank.com/en/articles/10535349-clickbank-s-return-and-subscription-cancellation-policy',
+    /*
+     * NOT A NUMBER HERE, ON PURPOSE. ClickBank's Flexible Refunds feature
+     * sets the window per product and their Client Contract forbids a seller
+     * to publish a guarantee that conflicts with their policy, so the linked
+     * policy stays the page's only answer.
+     */
+    returnGuaranteeDays: null,
     /*
      * Their own published pitch-page and thank-you-page rules give this text
      * as mandatory and verbatim. Passed for publication by the legal thread
@@ -451,6 +509,8 @@ export const MARKETPLACE_PROVIDERS: readonly MarketplaceProvider[] = [
     orderSupportUrl: null,
     billingDescriptor: null,
     returnPolicyUrl: null,
+    /* JVZoo requires no guarantee and we are the seller on this flow. */
+    returnGuaranteeDays: null,
     /*
      * The exact words JVZoo compliance requires, copied character for
      * character from the review notes on products 457483 / 457573 / 457575 /
@@ -704,40 +764,29 @@ export function marketplacePixelUrl(slug: string, plan?: PlanCode): string | nul
   return perPlan ?? httpsUrlOrNull(process.env[`${prefix}PIXEL_URL`])
 }
 
-/**
- * The platform's own TRUST BADGE for the sales page, as configured in
- * `MARKETPLACE_<SLUG>_BADGE_URL`.
+/*
+ * THE TRUST BADGE IS GONE, AND THE REMOVAL IS THE REQUIREMENT.
  *
- * A CONDITION OF LISTING, LIKE THE PIXEL, AND FOR THE SAME KIND OF REASON.
- * Digistore24's pre-submission checklist ("Checklist Digistore24 Inc. (US)",
- * read in the seller account on 2026-11-02) makes the vendor confirm that
- * "Your sales page trust badge and footer badge are both added to your sales
- * page" before a product may even be submitted for review. The badge is
- * generated per vendor in Conversion tools -> Trust-Badges and delivered as a
- * script URL carrying the badge id and a token.
+ * `marketplaceBadgeUrl` used to read `MARKETPLACE_<SLUG>_BADGE_URL` and the
+ * sales page rendered Digistore24's trust-badge script behind the consent
+ * gate, because their PRE-SUBMISSION checklist made the vendor confirm that
+ * "your sales page trust badge and footer badge are both added to your sales
+ * page". Their REVIEWER then rejected all four products on 2026-11-12 with
+ * the opposite instruction: "please remove the Digistore24 trust badge and
+ * any Digistore24 branding on the sales page and 'thank you' page, but please
+ * keep the payment disclaimer as Digistore24 on the TYP."
  *
- * IT IS A SCRIPT, NOT A BEACON, AND THAT IS THE DIFFERENCE THAT MATTERS.
- * `marketplacePixelUrl` points at a 1x1 image; this points at executable
- * JavaScript that loads a second script from the platform and renders a
- * sticky banner into our page. So the URL is held in configuration rather
- * than the snippet being pasted into a component: a URL can be checked
- * (https only, no quotes or angle brackets), and a snippet is third-party
- * HTML rendered into our document from an environment variable, which this
- * file has refused since `requiredDisclaimer` was written.
+ * The reviewer decides the listing, so the reviewer wins, and the whole path
+ * goes rather than being switched off by deleting an environment variable:
+ * a helper, two components and a consent branch kept alive for a tag nobody
+ * may show is how the next person re-adds it. The payment disclaimer the
+ * reviewer wants kept is a different thing entirely — it is the seller
+ * paragraph in app/go/[platform]/page.tsx and the thank-you page's own text,
+ * neither of which is a badge.
  *
- * AND IT STORES, so it is gated exactly as the beacon is. The response to
- * `https://www.digistore24.com/trusted-badge/<id>/<token>/salespage` carries
- * `set-cookie: ds_gb_id=<identifier>; Max-Age=604800` - a week-long
- * identifier written to the visitor's device. ePrivacy Art. 5(3) therefore
- * applies on its own terms, the same analysis lib/consent/eprivacy-territory
- * .ts sets out for JVZoo's pixel, and the same territorial split follows: the
- * badge is behind the marketing category where consent is required, and in
- * the document on page load where it is not.
+ * `MARKETPLACE_DIGISTORE24_BADGE_URL` is therefore read by nothing and should
+ * be deleted from Vercel.
  */
-export function marketplaceBadgeUrl(slug: string): string | null {
-  if (!marketplaceProvider(slug)) return null
-  return httpsUrlOrNull(process.env[`${envPrefix(slug)}BADGE_URL`])
-}
 
 /**
  * The platform's own affiliate-signup page for one plan, as configured in

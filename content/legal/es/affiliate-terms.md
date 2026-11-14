@@ -98,12 +98,15 @@ No puede:
 
 - afirmar ni dar a entender un resultado, posicionamiento, posición o ingreso que nosotros mismos no prometemos, ni ofrecer una garantía en nuestro nombre;
 - describir el Servicio de forma inexacta, utilizar un precio, plan, periodo de prueba u oferta que no sean nuestros, ni presentar una reseña, valoración o testimonio que no sea auténtico;
+- presentar un plazo de devolución, una garantía de devolución del dinero, un precio o una moneda que solo se aplican en uno de los lugares donde se vende el Servicio como si se aplicaran al Servicio en general, ni usarlos en una promoción que lleve a nuestra propia caja o a un lugar donde no se apliquen;
 - realizar publicidad de pago en buscadores o en redes sociales sobre nuestro nombre, nuestra marca, nuestro dominio o una variante mal escrita de ellos, ni pujar por ellos como palabras clave, sin nuestra autorización por escrito;
 - registrar ni utilizar un dominio, subdominio, cuenta de red social, aplicación o nombre de página que contenga nuestro nombre o marca, o una variante mal escrita, o que un lector pueda confundir con nosotros;
 - enviar correos, mensajes o comentarios no solicitados, publicar en foros, secciones de comentarios o sitios de reseñas infringiendo sus normas, ni promocionar el Servicio mediante tráfico automatizado o incentivado;
 - colocar su enlace de referido mediante esquemas de enlaces, enlaces de pago, redes privadas de blogs, texto oculto o cualquier otra práctica que infrinja las políticas antispam de Google;
 - copiar nuestras páginas, nuestro texto o nuestro diseño, ni presentar contenido nuestro como propio;
 - promocionar el Servicio junto a contenido ilícito, que incite al odio, sexual, violento o dirigido a menores.
+
+Si menciona una condición de este tipo, indique en el mismo lugar el vendedor del que proviene. Una condición que pertenece a un marketplace es su condición: puede cambiar o terminar sin aviso para usted, y no la debemos en una compra hecha en otro lugar.
 
 ## 11. Uso de nuestro nombre y de nuestra marca
 

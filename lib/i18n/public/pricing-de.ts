@@ -48,6 +48,12 @@ export const pricingDe: PricingCopy = {
       ILS: 'Die Preise enthalten die israelische Mehrwertsteuer. Es ist der Betrag, der gezahlt wird, ohne Zusätze.',
       USD: 'Bei Kartenzahlung ist Creem der Verkäufer und tritt als eingetragener Händler auf: Creem berechnet die Steuer anhand der Rechnungsadresse und zeigt den Endbetrag vor der Zahlung an. Die hier genannten Preise enthalten sie nicht.',
     },
+    /* 전자상거래법 제21조 제1항 제1호 forbids inducing a consumer by withholding a
+       material fact, and it binds any business carrying on electronic commerce,
+       not only a mail-order seller, so it bites BEFORE any contract. Shown only
+       to a visitor placed in Korea, on every language's page, because the duty
+       follows the consumer and not the page. lib/billing/korea-sale.ts. */
+    koreaTrialOnly: `In Südkorea ist derzeit nur die kostenlose Testphase verfügbar, ein bezahltes Abonnement wird dort nicht verkauft. Die Testphase endet nach ${DAYS} Tagen automatisch, und wir erheben keine Kartendaten, es wird also nichts abgebucht.`,
     everyPlanLabel: 'In allen Tarifen',
     everyPlan: [
       'Automatische geplante Veröffentlichung auf WordPress, Shopify und Wix',

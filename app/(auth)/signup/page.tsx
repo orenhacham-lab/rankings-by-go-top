@@ -8,7 +8,7 @@ import Button from '@/components/ui/Button'
 import Input from '@/components/ui/Input'
 import { resolveAuthLocale } from '@/lib/i18n/auth-locale'
 import type { PublicLocale } from '@/lib/i18n/locales'
-import { useAuthServerLocale } from '@/components/auth/AuthLocaleProvider'
+import { useAuthServerLocale, useKoreaTrialOnlyNotice } from '@/components/auth/AuthLocaleProvider'
 import { DASHBOARD_LANGUAGE_STORAGE_KEY } from '@/lib/i18n/dashboard/useDashboardLanguage'
 import { keepSeedClaim, seedClaimDestination } from './claim-action'
 import { recordSignupSource } from './source-action'
@@ -22,6 +22,15 @@ import { authHref, withLocaleParam } from '@/lib/i18n/auth-href'
 import { REFERRAL_PARAM, normalizeReferralCode, withReferral } from '@/lib/affiliate/referral'
 import { currentChoices } from '@/lib/consent/client-store'
 import { META_SIGNUP_EVENT, metaPixelAllowed } from '@/lib/consent/meta-pixel'
+import { TRIAL_CATALOG } from '@/lib/plans/catalog'
+
+/**
+ * The trial's length, from the catalog and never typed as a digit here: the
+ * Korea notice below states it twice, in eleven languages, and the legal
+ * thread's condition for shipping that sentence was that it cannot go stale
+ * silently if the trial is ever shortened.
+ */
+const TRIAL_DAYS = TRIAL_CATALOG.days
 
 const SIGNUP_UI = {
   he: {
@@ -54,6 +63,7 @@ const SIGNUP_UI = {
     privacyPolicyHref: '/privacy',
     signupBtn: 'יצירת חשבון בחינם',
     trialBadge: '7 ימי ניסיון בחינם',
+    koreaTrialOnly: `ההרשמה הזאת היא ל-${TRIAL_DAYS} ימי ניסיון בחינם. אנחנו לא מבקשים פרטי כרטיס, כך שלא נגבה מכם דבר, והניסיון מסתיים מעצמו אחרי ${TRIAL_DAYS} ימים. בקוריאה לא מוצע כרגע מנוי בתשלום, ולכן הניסיון לא יהפוך למנוי כשהוא נגמר.`,
     alreadyHaveAccount: 'יש לי כבר חשבון',
     signIn: 'כניסה',
     accessibility: 'נגישות',
@@ -114,6 +124,7 @@ const SIGNUP_UI = {
     privacyPolicyHref: '/en/privacy',
     signupBtn: 'Create free account',
     trialBadge: '7-day free trial',
+    koreaTrialOnly: `This sign-up is for a ${TRIAL_DAYS}-day free trial. We take no card details, so nothing is charged, and the trial ends automatically after ${TRIAL_DAYS} days. A paid subscription is not offered in Korea at the moment, so the trial does not convert to one when it ends.`,
     alreadyHaveAccount: 'Already have an account?',
     signIn: 'Sign in',
     accessibility: 'Accessibility',
@@ -174,6 +185,7 @@ const SIGNUP_UI = {
     privacyPolicyHref: '/es/privacy',
     signupBtn: 'Crear cuenta gratis',
     trialBadge: '7 días de prueba gratis',
+    koreaTrialOnly: `Este registro es para una prueba gratuita de ${TRIAL_DAYS} días. No pedimos datos de tarjeta, así que no se cobra nada, y la prueba termina automáticamente después de ${TRIAL_DAYS} días. En Corea no ofrecemos suscripción de pago por ahora, por lo que la prueba no pasa a una suscripción al terminar.`,
     alreadyHaveAccount: '¿Ya tienes cuenta?',
     signIn: 'Iniciar sesión',
     accessibility: 'Accesibilidad',
@@ -234,6 +246,7 @@ const SIGNUP_UI = {
     privacyPolicyHref: '/pt-BR/privacy',
     signupBtn: 'Criar conta gratuita',
     trialBadge: '7 dias de teste gratuito',
+    koreaTrialOnly: `Este cadastro é para um teste gratuito de ${TRIAL_DAYS} dias. Não pedimos dados do cartão, portanto nada é cobrado, e o teste termina automaticamente depois de ${TRIAL_DAYS} dias. Na Coreia não oferecemos assinatura paga no momento, então o teste não se converte em assinatura ao terminar.`,
     alreadyHaveAccount: 'Já tem conta?',
     signIn: 'Entrar',
     accessibility: 'Acessibilidade',
@@ -294,6 +307,7 @@ const SIGNUP_UI = {
     privacyPolicyHref: '/fr/privacy',
     signupBtn: 'Créer un compte gratuit',
     trialBadge: '7 jours d’essai gratuit',
+    koreaTrialOnly: `Cette inscription donne accès à un essai gratuit de ${TRIAL_DAYS} jours. Nous ne demandons aucune information bancaire, rien n’est donc facturé, et l’essai se termine automatiquement au bout de ${TRIAL_DAYS} jours. L’abonnement payant n’est pas proposé en Corée pour le moment, l’essai ne se transforme donc pas en abonnement à son terme.`,
     alreadyHaveAccount: 'Vous avez déjà un compte ?',
     signIn: 'Se connecter',
     accessibility: 'Accessibilité',
@@ -354,6 +368,7 @@ const SIGNUP_UI = {
     privacyPolicyHref: '/it/privacy',
     signupBtn: 'Creare un account gratuito',
     trialBadge: '7 giorni di prova gratuita',
+    koreaTrialOnly: `Questa iscrizione è per una prova gratuita di ${TRIAL_DAYS} giorni. Non chiediamo i dati della carta, quindi non viene addebitato nulla, e la prova termina automaticamente dopo ${TRIAL_DAYS} giorni. In Corea l’abbonamento a pagamento non è disponibile al momento, quindi la prova non si trasforma in abbonamento alla fine.`,
     alreadyHaveAccount: 'Ha già un account?',
     signIn: 'Accedere',
     accessibility: 'Accessibilità',
@@ -414,6 +429,7 @@ const SIGNUP_UI = {
     privacyPolicyHref: '/ja/privacy',
     signupBtn: '無料アカウントを作成',
     trialBadge: '7日間の無料トライアル',
+    koreaTrialOnly: `このお申し込みは${TRIAL_DAYS}日間の無料トライアルのためのものです。カード情報はお預かりしないため料金は発生せず、トライアルは${TRIAL_DAYS}日後に自動的に終了します。現在、韓国では有料プランのご提供がないため、トライアル終了後に有料プランへ自動的に移行することはありません。`,
     alreadyHaveAccount: 'すでにアカウントをお持ちですか？',
     signIn: 'ログイン',
     accessibility: 'アクセシビリティ',
@@ -474,6 +490,7 @@ const SIGNUP_UI = {
     privacyPolicyHref: '/de/privacy',
     signupBtn: 'Kostenloses Konto erstellen',
     trialBadge: '7 Tage kostenlos testen',
+    koreaTrialOnly: `Diese Registrierung gilt für eine ${TRIAL_DAYS}-tägige kostenlose Testphase. Wir erfassen keine Kartendaten, es wird also nichts abgebucht, und die Testphase endet nach ${TRIAL_DAYS} Tagen automatisch. In Korea wird derzeit kein bezahltes Abonnement angeboten, die Testphase geht am Ende also nicht in ein Abonnement über.`,
     alreadyHaveAccount: 'Sie haben schon ein Konto?',
     signIn: 'Anmelden',
     accessibility: 'Barrierefreiheit',
@@ -534,6 +551,7 @@ const SIGNUP_UI = {
     privacyPolicyHref: '/nl/privacy',
     signupBtn: 'Een gratis account aanmaken',
     trialBadge: '7 dagen gratis uitproberen',
+    koreaTrialOnly: `Deze aanmelding is voor een gratis proefperiode van ${TRIAL_DAYS} dagen. We vragen geen kaartgegevens, er wordt dus niets afgeschreven, en de proefperiode stopt automatisch na ${TRIAL_DAYS} dagen. In Korea bieden we op dit moment geen betaald abonnement aan, dus de proefperiode gaat aan het eind niet over in een abonnement.`,
     alreadyHaveAccount: 'Hebt u al een account?',
     signIn: 'Inloggen',
     accessibility: 'Toegankelijkheid',
@@ -594,6 +612,7 @@ const SIGNUP_UI = {
     privacyPolicyHref: '/pl/privacy',
     signupBtn: 'Utwórz bezpłatne konto',
     trialBadge: '7 dni bezpłatnie',
+    koreaTrialOnly: `Ta rejestracja dotyczy ${TRIAL_DAYS}-dniowego bezpłatnego okresu próbnego. Nie pobieramy danych karty, więc nic nie zostanie obciążone, a okres próbny kończy się automatycznie po ${TRIAL_DAYS} dniach. W Korei nie oferujemy obecnie płatnej subskrypcji, dlatego okres próbny nie przechodzi na jej koniec w subskrypcję.`,
     alreadyHaveAccount: 'Mają Państwo już konto?',
     signIn: 'Zaloguj się',
     accessibility: 'Dostępność',
@@ -624,6 +643,67 @@ const SIGNUP_UI = {
       emailConfirmationRequired: 'Konto utworzone. Prosimy sprawdzić pocztę, aby potwierdzić rejestrację.',
     },
   },
+  ko: {
+    subtitle: 'Google 순위와 AI 답변 가시성',
+    logoAlt: 'Go Top SEO 로고',
+    heading: '무료 계정 만들기',
+    intro: '몇 가지만 입력하시면 시작할 수 있습니다. 업체 정보는 다음 단계에서 사이트에서 읽어 옵니다.',
+    fullName: '이름',
+    fullNamePlaceholder: '김민수',
+    company: '업체명',
+    companyOptional: '(선택)',
+    companyPlaceholder: '업체명',
+    phone: '전화번호',
+    phonePlaceholder: '02-1234-5678',
+    email: '이메일 주소',
+    emailPlaceholder: 'name@example.kr',
+    password: '비밀번호',
+    passwordPlaceholder: '\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022',
+    passwordHint: '8자 이상',
+    confirmPassword: '비밀번호 확인',
+    confirmPasswordPlaceholder: '비밀번호를 다시 입력해 주십시오',
+    showPassword: '비밀번호 표시',
+    hidePassword: '비밀번호 숨기기',
+    consentBefore: '계정을 만드시면 ',
+    terms: '이용약관',
+    consentMiddle: ' 및 ',
+    privacyPolicy: '개인정보 처리방침',
+    consentAfter: '에 동의하신 것으로 봅니다.',
+    termsHref: '/ko/terms',
+    privacyPolicyHref: '/ko/privacy',
+    signupBtn: '무료 계정 만들기',
+    trialBadge: '7일 무료',
+    koreaTrialOnly: `이 가입은 ${TRIAL_DAYS}일 무료 체험을 위한 것입니다. 카드 정보를 받지 않으므로 요금이 청구되지 않고, 체험은 ${TRIAL_DAYS}일 후 자동으로 종료됩니다. 현재 한국에서는 유료 구독 결제를 제공하지 않으므로, 체험이 끝난 뒤 유료 구독으로 자동 전환되지 않습니다.`,
+    alreadyHaveAccount: '이미 계정이 있으십니까?',
+    signIn: '로그인',
+    accessibility: '접근성',
+    privacy: '개인정보',
+    articles: '아티클',
+    accessibilityHref: '/ko/accessibility',
+    privacyHref: '/ko/privacy',
+    articlesHref: '/ko/articles',
+    err: {
+      invalidEmail: '이메일 주소가 올바르지 않습니다',
+      passwordTooShort: '비밀번호는 8자 이상이어야 합니다',
+      fieldRequired: '필수 항목입니다',
+      fullNameInvalid: '이름을 입력해 주십시오 (2자 이상)',
+      phoneInvalid: '올바른 전화번호를 입력해 주십시오',
+      passwordMismatch: '비밀번호가 일치하지 않습니다. 두 칸에 같은 값을 입력해 주십시오.',
+      emailExists: '이미 가입된 이메일 주소입니다. 로그인해 주십시오.',
+      emailRateLimit: '짧은 시간에 가입 요청이 너무 많았습니다. 몇 분 뒤에 다시 시도하시거나 다른 이메일 주소를 사용해 주십시오.',
+      signupFailed: '계정을 만드는 중 오류가 발생했습니다. 다시 시도해 주십시오.',
+      weakPasswordLength: (min: number) => `비밀번호는 ${min}자 이상이어야 합니다`,
+      weakPasswordCharacters: '보안을 위해 비밀번호에는 대문자와 소문자, 숫자, 특수문자가 모두 포함되어야 합니다',
+      weakPasswordPwned: '이 비밀번호는 알려진 유출 목록에 포함돼 있습니다. 다른 비밀번호를 사용해 주십시오.',
+      weakPassword: '이 비밀번호는 보안 요건을 충족하지 않습니다. 더 강한 비밀번호를 사용해 주십시오.',
+      createTrialFailed: '체험을 시작하는 중 오류가 발생했습니다. 다시 시도해 주십시오.',
+    },
+    success: {
+      accountCreated: '계정을 만들었습니다. 대시보드로 이동합니다\u2026',
+      accountCreatedFromScan: '계정이 준비됐습니다. 분석에서 만든 프로젝트를 엽니다\u2026',
+      emailConfirmationRequired: '계정을 만들었습니다. 가입을 확인하시려면 메일을 확인해 주십시오.',
+    },
+  },
 } as const
 
 export function SignupForm() {
@@ -631,6 +711,9 @@ export function SignupForm() {
   const searchParams = useSearchParams()
   const pathname = usePathname()
   const serverLocale = useAuthServerLocale()
+  // The country decision, resolved by the `(auth)` layout on the server for
+  // the same reason the locale is: this form cannot read a request header.
+  const koreaTrialOnly = useKoreaTrialOnlyNotice()
   const langParam = searchParams.get('lang')
   // The route, then an explicit ?lang, then the locale the SERVER resolved for
   // this request. That last step is the fix: without it every request without an
@@ -968,6 +1051,18 @@ export function SignupForm() {
           <h1 className={AUTH_TITLE_CLASSES}>{t.heading}</h1>
           <p className="text-copy text-body">{t.intro}</p>
         </div>
+
+        {/* 전자상거래법 제21조 제1항 제1호 forbids inducing a customer with a
+            material fact withheld, and it bites before any contract — so the
+            sentence belongs above the button, not at a refusal the visitor
+            never reaches. It is framed as what happens next rather than as
+            something being unavailable: a visitor who reads "not available"
+            over a sign-up form leaves, which is the opposite of what the
+            article wants. Decided by COUNTRY on the server, in every language.
+            lib/billing/korea-sale.ts holds the decision. */}
+        {koreaTrialOnly && (
+          <p className="text-copy text-muted" data-korea-trial-only>{t.koreaTrialOnly}</p>
+        )}
 
         {error && <NoticeBox tone="bad" language={lang}>{error}</NoticeBox>}
 

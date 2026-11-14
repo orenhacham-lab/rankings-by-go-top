@@ -51,6 +51,12 @@ export const pricingJa: PricingCopy = {
       ILS: '表示価格にはイスラエルの付加価値税が含まれています。これがお支払いいただく金額で、追加はありません。',
       USD: 'カード決済の販売者は、登録事業者であるCreemです。請求先の住所にもとづいて税額を計算し、お支払いの前に最終金額を表示します。ここに表示している価格に税額は含まれていません。',
     },
+    /* 전자상거래법 제21조 제1항 제1호 forbids inducing a consumer by withholding a
+       material fact, and it binds any business carrying on electronic commerce,
+       not only a mail-order seller, so it bites BEFORE any contract. Shown only
+       to a visitor placed in Korea, on every language's page, because the duty
+       follows the consumer and not the page. lib/billing/korea-sale.ts. */
+    koreaTrialOnly: `韓国では現在、無料トライアルのみをご利用いただけます。有料プランの販売は行っておりません。トライアルは${DAYS}日後に自動で終了し、カード情報はお預かりしないため、料金は請求されません。`,
     everyPlanLabel: 'すべてのプランに含まれます',
     everyPlan: [
       'WordPress、Shopify、Wixへの予約公開を自動で',

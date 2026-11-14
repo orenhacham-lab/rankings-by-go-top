@@ -101,12 +101,15 @@ Sie dürfen nicht:
 
 - ein Ergebnis, ein Ranking, eine Position oder einen Gewinn behaupten oder nahelegen, die wir selbst nicht versprechen, und keine Garantie in unserem Namen geben;
 - den Dienst unrichtig beschreiben, einen Preis, ein Angebot, eine Testphase oder eine Aktion verwenden, die nicht unsere sind, und keine Bewertung, Benotung oder Erfahrung darstellen, die nicht echt ist;
+- eine Rückgabefrist, eine Geld-zurück-Garantie, einen Preis oder eine Währung, die nur an einem der Orte gelten, an denen der Dienst verkauft wird, so darzustellen, als gälten sie für den Dienst allgemein, oder sie in einer Werbung zu verwenden, die zu unserer eigenen Kasse oder zu einem Ort führt, an dem sie nicht gelten;
 - bezahlte Werbung in Suchmaschinen oder in sozialen Netzwerken auf unseren Namen, unsere Marke, unsere Domain oder eine falsch geschriebene Abwandlung davon schalten und nicht darauf als Keywords bieten, ohne unsere schriftliche Erlaubnis;
 - eine Domain, eine Subdomain, ein Konto in einem sozialen Netzwerk, eine App oder einen Seitennamen anmelden oder nutzen, die unseren Namen oder unsere Marke oder eine falsch geschriebene Abwandlung enthalten oder die ein Leser mit uns verwechseln könnte;
 - unverlangte E-Mails, Nachrichten oder Kommentare senden, in Foren, Kommentarbereichen oder Bewertungsportalen unter Verstoß gegen deren Regeln veröffentlichen und den Dienst nicht über automatisierten oder angereizten Traffic bewerben;
 - Ihren Empfehlungslink über Linkschemata, bezahlte Links, private Blognetzwerke, versteckten Text oder jede andere Praxis setzen, die gegen die Spam-Regeln von Google verstößt;
 - unsere Seiten, unseren Text oder unser Design kopieren und unseren Inhalt nicht als Ihren darstellen;
 - den Dienst neben rechtswidrigen, hasserfüllten, sexuellen, gewaltsamen oder an Minderjährige gerichteten Inhalten bewerben.
+
+Wenn Sie eine solche Bedingung nennen, nennen Sie an derselben Stelle den Verkäufer, von dem sie stammt. Eine Bedingung, die zu einem Marktplatz gehört, ist die Bedingung dieses Marktplatzes: sie kann sich ohne Mitteilung an Sie ändern oder entfallen, und wir schulden sie bei einem Kauf an anderer Stelle nicht.
 
 ## 11. Nutzung unseres Namens und unserer Marke
 

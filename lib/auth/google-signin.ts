@@ -81,6 +81,7 @@ const COPY = {
   ja: { label: 'Googleで続ける', or: 'または', failed: 'Googleでのログインを開始できませんでした。もう一度お試しいただくか、メールアドレスで続けてください。', returnFailed: 'Googleでのログインが完了しませんでした。もう一度お試しいただくか、メールアドレスで続けてください。' },
   de: { label: 'Mit Google fortfahren', or: 'oder', failed: 'Die Anmeldung mit Google konnte nicht gestartet werden. Bitte versuchen Sie es erneut oder fahren Sie mit Ihrer E-Mail-Adresse fort.', returnFailed: 'Die Anmeldung mit Google wurde nicht abgeschlossen. Bitte versuchen Sie es erneut oder fahren Sie mit Ihrer E-Mail-Adresse fort.' },
   pl: { label: 'Kontynuuj z Google', or: 'lub', failed: 'Nie udało się rozpocząć logowania przez Google. Prosimy spróbować ponownie albo kontynuować przy użyciu adresu e-mail.', returnFailed: 'Logowanie przez Google nie zostało zakończone. Prosimy spróbować ponownie albo kontynuować przy użyciu adresu e-mail.' },
+  ko: { label: 'Google로 계속하기', or: '또는', failed: 'Google 로그인을 시작하지 못했습니다. 다시 시도하시거나 이메일로 계속해 주십시오.', returnFailed: 'Google 로그인이 끝까지 진행되지 않았습니다. 다시 시도하시거나 이메일로 계속해 주십시오.' },
   nl: { label: 'Doorgaan met Google', or: 'of', failed: 'Het inloggen met Google kon niet worden gestart. Probeer het opnieuw, of ga verder met uw e-mailadres.', returnFailed: 'Het inloggen met Google is niet afgerond. Probeer het opnieuw, of ga verder met uw e-mailadres.' },
 } as const
 

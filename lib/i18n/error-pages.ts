@@ -208,6 +208,31 @@ export const ERROR_PAGES_UI = {
       homeHref: '/pl',
     },
   },
+  ko: {
+    logoAlt: 'Go Top SEO 로고',
+    notFound: {
+      code: '404',
+      title: '이 페이지를 찾지 못했습니다',
+      body: '주소가 잘못되었거나 페이지가 옮겨졌을 수 있습니다.',
+      home: '홈으로',
+      dashboard: '대시보드로',
+      homeHref: '/ko',
+    },
+    screenError: {
+      title: '이 화면을 불러오지 못했습니다',
+      body: '삭제된 것은 없습니다. 다시 시도해 보시고, 같은 일이 반복되면 대시보드로 돌아가 주십시오.',
+      retry: '다시 시도',
+      dashboard: '대시보드로',
+      reference: '고객 지원에 전달할 참조 번호:',
+    },
+    globalError: {
+      title: '문제가 생겼습니다',
+      body: '예기치 않은 오류가 발생했습니다. 페이지를 다시 불러와 주십시오.',
+      retry: '다시 불러오기',
+      home: '홈으로',
+      homeHref: '/ko',
+    },
+  },
   nl: {
     logoAlt: 'Het logo van Go Top SEO',
     notFound: {

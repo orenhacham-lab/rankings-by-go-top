@@ -82,17 +82,17 @@ const stripComments = (src: string) => src.replace(/\/\*[\s\S]*?\*\//g, '').repl
 // ============================================================
 // A) THE LANGUAGES
 // ============================================================
-check('A1: ten languages are written automatically', same([...BLOG_AUTO_LOCALES], ['he', 'en', 'es', 'pt-BR', 'fr', 'it', 'ja', 'de', 'nl', 'pl']))
+check('A1: eleven languages are written automatically', same([...BLOG_AUTO_LOCALES], ['he', 'en', 'es', 'pt-BR', 'fr', 'it', 'ja', 'de', 'nl', 'pl', 'ko']))
 // The NEWEST language is LAST, and that is the contract daily-window.ts depends
 // on: it walks this list in order and the language that goes without on a
 // morning of retries is the last one. A reorder that puts the newest language
 // ahead of an older one would make it cost an existing language its article.
-// Dutch took that place from German on 5 Nov 2026, and Polish took it from
-// Dutch the same day.
-check('A1a: Polish is last in the order, so a bad morning costs the newest language',
-  BLOG_AUTO_LOCALES[BLOG_AUTO_LOCALES.length - 1] === 'pl')
+// Dutch took that place from German on 5 Nov 2026, Polish took it from Dutch
+// the same day, and Korean took it from Polish on 12 Nov 2026.
+check('A1a: Korean is last in the order, so a bad morning costs the newest language',
+  BLOG_AUTO_LOCALES[BLOG_AUTO_LOCALES.length - 1] === 'ko')
 check('A1a-MUT: a list whose last entry is not the newest language fails A1a',
-  (() => { const reordered: readonly string[] = ['he', 'pl', 'en']; return reordered[reordered.length - 1] !== 'pl' })())
+  (() => { const reordered: readonly string[] = ['he', 'ko', 'en']; return reordered[reordered.length - 1] !== 'ko' })())
 // A2 USED TO BE localesForDay() === BLOG_AUTO_LOCALES. Japanese joined the list
 // on 30 Oct 2026 while its public tree was still behind
 // NEXT_PUBLIC_JAPANESE_SITE_ENABLED, so the day's languages are the ones a
@@ -110,7 +110,7 @@ check('A2b (control): the day\'s list is a filter, not the whole list, when a fl
   publicLocaleEnabled('ja') || !localesForDay().includes('ja'))
 check('A2c (control): the same holds for German while its flag is off',
   publicLocaleEnabled('de') || !localesForDay().includes('de'))
-check('A3: that is seven articles a week in each language', same(weeklyShare(), { he: 7, en: 7, es: 7, 'pt-BR': 7, fr: 7, it: 7, ja: 7, de: 7, nl: 7, pl: 7 }), weeklyShare())
+check('A3: that is seven articles a week in each language', same(weeklyShare(), { he: 7, en: 7, es: 7, 'pt-BR': 7, fr: 7, it: 7, ja: 7, de: 7, nl: 7, pl: 7, ko: 7 }), weeklyShare())
 check(
   'A4: Portuguese IS among them, now that the content layer writes it (lib/content/language.ts)',
   (BLOG_AUTO_LOCALES as readonly string[]).includes('pt-BR') && isBlogAutoLocale('pt-BR')
@@ -794,9 +794,13 @@ async function main() {
     const far = () => Date.now() + 120_000
     const article = (locale: string, publishedAt: string) => ({ locale, is_published: true, published_at: publishedAt })
 
-    check('J1: the morning window is 04:00-09:59 UTC and nothing else',
+    // 04:00-10:59 UTC since Korean, the eleventh language, bought the seventh
+    // hour (lib/blog/auto/window-hours.ts). 11 is the hour the silence check
+    // owns and it must stay OUTSIDE the window, which is what this asserts
+    // together with A1 of silent-morning.qa.ts.
+    check('J1: the morning window is 04:00-10:59 UTC and nothing else',
       WINDOW_HOURS_UTC.every((h) => isInWindow(Date.parse(`2026-10-14T${String(h).padStart(2, '0')}:30:00Z`)))
-      && ![3, 10, 12, 23].some((h) => isInWindow(Date.parse(`2026-10-14T${String(h).padStart(2, '0')}:30:00Z`))))
+      && ![3, 11, 12, 23].some((h) => isInWindow(Date.parse(`2026-10-14T${String(h).padStart(2, '0')}:30:00Z`))))
     check('J1b: the window holds a pass for every language, with retries to spare',
       WINDOW_HOURS_UTC.length * 4 >= BLOG_AUTO_LOCALES.length * 2, WINDOW_HOURS_UTC.length)
     check('J2: "today" starts at midnight UTC', startOfUtcDay(inWindow) === '2026-10-14T00:00:00.000Z')
@@ -824,7 +828,7 @@ async function main() {
         he: '2026-11-05T04:02:00Z', en: '2026-11-05T04:16:00Z', es: '2026-11-04T05:31:00Z',
         'pt-BR': '2026-11-04T05:47:00Z', fr: '2026-11-04T07:32:00Z', it: '2026-11-03T06:46:00Z',
         ja: '2026-11-02T07:48:00Z', de: '2026-11-05T04:30:00Z', nl: '2026-11-05T04:44:00Z',
-        pl: '2026-11-05T04:58:00Z',
+        pl: '2026-11-05T04:58:00Z', ko: '2026-11-05T05:12:00Z',
       })[0] === 'ja')
     check('J6c: a language that has never published goes before them all, last in the list or not',
       starvationOrder(BLOG_AUTO_LOCALES, Object.fromEntries(
@@ -892,10 +896,13 @@ async function main() {
       (await nextLocaleToWrite(fake([]) as unknown as Admin, inWindow)).locale === 'he')
     check('J17 (control): a window that covered every hour would publish at midnight',
       !isInWindow(Date.parse('2026-10-14T00:30:00Z')))
-    // Six hours is twenty-four runs. Nine languages spend nine of them on first
-    // passes, which leaves fifteen: a retry for every language and six spare.
-    // Two retries each would need eighteen, which nine languages no longer have,
-    // so what the window guarantees is ONE retry each.
+    // Seven hours are twenty-eight runs. Eleven languages spend eleven of them
+    // on first passes, which leaves seventeen: a retry for every language and
+    // six spare. Two retries each would need twenty-two, which eleven languages
+    // do not have, so what the window guarantees is ONE retry each. This is the
+    // check the seventh hour was bought for: at ten languages in six hours the
+    // margin was fourteen against ten, and an eleventh language in six hours
+    // would have left thirteen against eleven.
     check('J18: after a first pass for every language the window still holds a retry each',
       WINDOW_HOURS_UTC.length * 4 - BLOG_AUTO_LOCALES.length >= BLOG_AUTO_LOCALES.length,
       WINDOW_HOURS_UTC.length * 4 - BLOG_AUTO_LOCALES.length)

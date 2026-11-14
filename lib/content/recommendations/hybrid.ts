@@ -131,6 +131,15 @@ const PROVENANCE: Record<ContentLanguage, {
     many: (n, names) => `Na podstawie ${n} źródeł: ${names}`,
     one: (name) => `Tylko na podstawie: ${name}`,
   },
+  // Korean needs no plural frame at all, for a different reason than Polish: the
+  // language has no grammatical plural, and a count carries a COUNTER instead.
+  // 건 is the counter for an item of evidence or a record, so 2건 and 5건 are the
+  // same shape and one frame covers every count.
+  ko: {
+    label: { site_scan: '사이트 점검', keyword_research_url: '키워드 조사', project_data: '프로젝트 데이터', keyword: '키워드', hybrid: '복합' },
+    many: (n, names) => `근거 ${n}건: ${names}`,
+    one: (name) => `근거: ${name}`,
+  },
 }
 
 export function hybridProvenanceReason(sources: RecommendationSource[], language: ContentLanguage, repReason: string): string {

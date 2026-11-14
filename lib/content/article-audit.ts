@@ -122,6 +122,17 @@ const CTA_ACTION_IT = ['chiamate', 'chiama', 'scrivete', 'scrivi', 'contattate',
 // button or at the end of a section (「お問い合わせください」), which is why every
 // one of them carries ください or 下さい rather than a bare verb stem.
 const TRANSITIONS_JA = ['また', 'さらに', 'そのため', 'したがって', 'しかし', 'ただし', '一方', '逆に', '例えば', 'たとえば', '実際に', 'まとめると', '重要なのは', '覚えておきたいのは', '言い換えると', '最後に', 'まず', '次に', 'そのうえで', 'このため', '多くの場合', '選ぶ際には', '結論として', '同様に', '比較すると', 'なお', 'つまり']
+// Korean, like Japanese, opens with these connectives and they are what a
+// generated article overuses. Korean prose IS spaced, so these are ordinary
+// words with spaces around them, not substrings of a run-on clause.
+const TRANSITIONS_KO = ['또한', '그리고', '그래서', '따라서', '그러나', '하지만', '다만', '반면', '예를 들어', '실제로', '정리하면', '중요한 점은', '기억해 둘 점은', '다시 말해', '마지막으로', '먼저', '다음으로', '그다음', '이 때문에', '대부분의 경우', '선택할 때는', '결론적으로', '마찬가지로', '비교하면', '참고로', '즉']
+const START_STOPWORDS_KO = new Set(['또한', '그리고', '이', '그', '이것', '그것', '만약', '다만', '하지만', '그러나', '게다가', '참고로', '즉', '먼저', '다음으로', '반면'])
+// 해요체 imperatives, which is the register a Korean CTA is written in — the
+// dashboard's 합니다체 would read as a notice rather than an invitation. 카카오톡
+// stands where the other languages put WhatsApp: it is the messenger a Korean
+// business is actually contacted on.
+const CTA_STRONG_KO = ['문의해 주세요', '문의하세요', '문의 바랍니다', '부담 없이 문의하세요', '상담 신청하세요', '상담 받아 보세요', '전화해 주세요', '지금 전화하세요', '여기를 클릭하세요', '주문하세요', '지금 주문하세요', '예약하세요', '지금 예약하세요', '메시지를 보내 주세요', '연락해 주세요', '견적을 요청하세요', '무료 견적을 요청하세요', '카카오톡으로 문의', '지금 구매하세요']
+const CTA_ACTION_KO = ['전화', '연락', '상담', '문의', '클릭', '주문', '예약', '견적', '신청']
 const START_STOPWORDS_JA = new Set(['また', 'そして', 'この', 'その', 'これ', 'それ', 'もし', 'ただし', 'しかし', 'さらに', 'なお', 'つまり', 'まず', '次に', '一方'])
 const CTA_STRONG_JA = ['お問い合わせください', 'お問い合わせ下さい', 'お気軽にご相談ください', 'ご相談ください', 'お電話ください', '今すぐお電話', 'こちらをクリック', 'ご注文ください', '今すぐご注文', 'ご予約ください', '今すぐご予約', 'メッセージをお送りください', 'ご連絡ください', 'お見積もりをご依頼ください', '無料見積もりをご依頼', 'lineでお問い合わせ', 'whatsappでご連絡', '今すぐ購入']
 const CTA_ACTION_JA = ['お電話', 'ご連絡', 'ご相談', 'お問い合わせ', 'クリック', 'ご注文', 'ご予約', 'ご依頼', 'お送りください']
@@ -184,10 +195,10 @@ const CTA_CHANNEL_RE = /(\d[\d\-\s]{5,}\d|וואטסאפ|whatsapp|טלפון|נ�
  * everyday words like "הזמנה"/"משלוח"/"שירות" as CTAs.
  */
 /** The word lists, keyed by content language: adding a language stops compiling here. */
-const CTA_STRONG: Record<SuggestionLanguage, string[]> = { he: CTA_STRONG_HE, en: CTA_STRONG_EN, es: CTA_STRONG_ES, 'pt-BR': CTA_STRONG_PT, fr: CTA_STRONG_FR, it: CTA_STRONG_IT, ja: CTA_STRONG_JA, de: CTA_STRONG_DE, nl: CTA_STRONG_NL, pl: CTA_STRONG_PL }
-const CTA_ACTION: Record<SuggestionLanguage, string[]> = { he: CTA_ACTION_HE, en: CTA_ACTION_EN, es: CTA_ACTION_ES, 'pt-BR': CTA_ACTION_PT, fr: CTA_ACTION_FR, it: CTA_ACTION_IT, ja: CTA_ACTION_JA, de: CTA_ACTION_DE, nl: CTA_ACTION_NL, pl: CTA_ACTION_PL }
-const TRANSITIONS: Record<SuggestionLanguage, string[]> = { he: TRANSITIONS_HE, en: TRANSITIONS_EN, es: TRANSITIONS_ES, 'pt-BR': TRANSITIONS_PT, fr: TRANSITIONS_FR, it: TRANSITIONS_IT, ja: TRANSITIONS_JA, de: TRANSITIONS_DE, nl: TRANSITIONS_NL, pl: TRANSITIONS_PL }
-const START_STOPWORDS: Record<SuggestionLanguage, Set<string>> = { he: START_STOPWORDS_HE, en: new Set<string>(), es: START_STOPWORDS_ES, 'pt-BR': START_STOPWORDS_PT, fr: START_STOPWORDS_FR, it: START_STOPWORDS_IT, ja: START_STOPWORDS_JA, de: START_STOPWORDS_DE, nl: START_STOPWORDS_NL, pl: START_STOPWORDS_PL }
+const CTA_STRONG: Record<SuggestionLanguage, string[]> = { he: CTA_STRONG_HE, en: CTA_STRONG_EN, es: CTA_STRONG_ES, 'pt-BR': CTA_STRONG_PT, fr: CTA_STRONG_FR, it: CTA_STRONG_IT, ja: CTA_STRONG_JA, de: CTA_STRONG_DE, nl: CTA_STRONG_NL, pl: CTA_STRONG_PL, ko: CTA_STRONG_KO }
+const CTA_ACTION: Record<SuggestionLanguage, string[]> = { he: CTA_ACTION_HE, en: CTA_ACTION_EN, es: CTA_ACTION_ES, 'pt-BR': CTA_ACTION_PT, fr: CTA_ACTION_FR, it: CTA_ACTION_IT, ja: CTA_ACTION_JA, de: CTA_ACTION_DE, nl: CTA_ACTION_NL, pl: CTA_ACTION_PL, ko: CTA_ACTION_KO }
+const TRANSITIONS: Record<SuggestionLanguage, string[]> = { he: TRANSITIONS_HE, en: TRANSITIONS_EN, es: TRANSITIONS_ES, 'pt-BR': TRANSITIONS_PT, fr: TRANSITIONS_FR, it: TRANSITIONS_IT, ja: TRANSITIONS_JA, de: TRANSITIONS_DE, nl: TRANSITIONS_NL, pl: TRANSITIONS_PL, ko: TRANSITIONS_KO }
+const START_STOPWORDS: Record<SuggestionLanguage, Set<string>> = { he: START_STOPWORDS_HE, en: new Set<string>(), es: START_STOPWORDS_ES, 'pt-BR': START_STOPWORDS_PT, fr: START_STOPWORDS_FR, it: START_STOPWORDS_IT, ja: START_STOPWORDS_JA, de: START_STOPWORDS_DE, nl: START_STOPWORDS_NL, pl: START_STOPWORDS_PL, ko: START_STOPWORDS_KO }
 
 function detectCtaFirstWord(bodyText: string, lang: SuggestionLanguage): number {
   const low = bodyText.toLowerCase()
@@ -379,7 +390,8 @@ const TABLE_WORDS_FR = ['compar', 'prix', 'tarif', 'coût', 'cout', 'combien co�
 const TABLE_WORDS_IT = ['confront', 'prezzo', 'prezzi', 'tariffa', 'costo', 'costi', 'quanto costa', 'migliore', 'migliori', 'tipi di', 'scegliere', 'come scegliere', 'vantaggi', 'svantaggi', 'guida all’acquisto', 'tabella', ' vs ', 'più economico']
 const TABLE_WORDS_JA = ['比較', '比べ', '価格', '料金', '費用', '相場', 'いくら', 'おすすめ', '人気', '種類', '選び方', '選ぶ', 'メリット', 'デメリット', '購入ガイド', '一覧', '違い', '安い', '最安']
 const TABLE_WORDS_DE = ['vergleich', 'vergleichen', 'preis', 'preise', 'kosten', 'was kostet', 'wie viel kostet', 'beste', 'besten', 'arten', 'typen', 'auswählen', 'auswahl', 'worauf achten', 'vorteile', 'nachteile', 'kaufberatung', 'tabelle', 'übersicht', 'unterschied', 'unterschiede', 'günstig']
-const TABLE_WORDS: Record<SuggestionLanguage, string[]> = { he: TABLE_WORDS_HE, en: TABLE_WORDS_EN, es: TABLE_WORDS_ES, 'pt-BR': TABLE_WORDS_PT, fr: TABLE_WORDS_FR, it: TABLE_WORDS_IT, ja: TABLE_WORDS_JA, de: TABLE_WORDS_DE, nl: TABLE_WORDS_NL, pl: TABLE_WORDS_PL }
+const TABLE_WORDS_KO = ['비교', '가격', '요금', '비용', '시세', '얼마', '추천', '인기', '종류', '고르는 법', '선택', '장점', '단점', '구매 가이드', '목록', '차이', '저렴', '최저가']
+const TABLE_WORDS: Record<SuggestionLanguage, string[]> = { he: TABLE_WORDS_HE, en: TABLE_WORDS_EN, es: TABLE_WORDS_ES, 'pt-BR': TABLE_WORDS_PT, fr: TABLE_WORDS_FR, it: TABLE_WORDS_IT, ja: TABLE_WORDS_JA, de: TABLE_WORDS_DE, nl: TABLE_WORDS_NL, pl: TABLE_WORDS_PL, ko: TABLE_WORDS_KO }
 function isTableWorthy(text: string, lang: SuggestionLanguage): boolean {
   const t = (text || '').toLowerCase()
   const words = TABLE_WORDS[lang]
@@ -398,7 +410,15 @@ const QUESTION_WORDS_IT = ['come ', 'che cosa', 'cosa ', 'perché', 'perche', 'q
 // exactly like the others and needs no leading-space forms.
 const QUESTION_WORDS_JA = ['ですか', 'ますか', 'でしょうか', 'とは', 'なぜ', 'どう', 'どうやって', 'どのように', 'いくら', 'どこ', 'いつ', 'どれ', 'どの', '何', 'なに', ' べき', '必要ですか', '？', '?']
 const QUESTION_WORDS_DE = ['was ', 'was kostet', 'wie ', 'wie viel', 'wie lange', 'warum', 'wieso', 'weshalb', 'wann', 'wo ', 'woher', 'wer ', 'welche', 'welcher', 'welches', 'wofür', 'lohnt sich', 'braucht man', 'muss man', 'kann man', '?']
-const QUESTION_WORDS: Record<SuggestionLanguage, string[]> = { he: QUESTION_WORDS_HE, en: QUESTION_WORDS_EN, es: QUESTION_WORDS_ES, 'pt-BR': QUESTION_WORDS_PT, fr: QUESTION_WORDS_FR, it: QUESTION_WORDS_IT, ja: QUESTION_WORDS_JA, de: QUESTION_WORDS_DE, nl: QUESTION_WORDS_NL, pl: QUESTION_WORDS_PL }
+// Korean marks a question at the END of the clause, as Japanese does, with its
+// own endings. A BARE 「란」 is deliberately NOT in this list although it is the
+// definitional question form (SEO란): read by `includes`, it would match inside
+// ordinary words — 혼란, 반란 — and call every such paragraph a question. The
+// definitional form is therefore carried as 「란 무엇」, which cannot occur by
+// accident, and 「이란」 is left out for the same reason (it is also how Korean
+// writes Iran).
+const QUESTION_WORDS_KO = ['까요', '나요', '인가요', '습니까', '란 무엇', '왜 ', '어떻게', '어떤', '어느', '얼마', '어디', '언제', '누가', '무엇', '뭐 ', '몇 ', '해야 할까', '필요한가요', '？', '?']
+const QUESTION_WORDS: Record<SuggestionLanguage, string[]> = { he: QUESTION_WORDS_HE, en: QUESTION_WORDS_EN, es: QUESTION_WORDS_ES, 'pt-BR': QUESTION_WORDS_PT, fr: QUESTION_WORDS_FR, it: QUESTION_WORDS_IT, ja: QUESTION_WORDS_JA, de: QUESTION_WORDS_DE, nl: QUESTION_WORDS_NL, pl: QUESTION_WORDS_PL, ko: QUESTION_WORDS_KO }
 
 /**
  * E-E-A-T, the part a generated article can honestly carry: something the
@@ -425,7 +445,11 @@ const VERIFY_CUES_JA = ['確認してください', '確認しましょう', '�
 // ordinary prose and would pass the check without telling the reader to do
 // anything. Sie-form throughout, as everywhere else in the German locale.
 const VERIFY_CUES_DE = ['prüfen sie', 'überprüfen sie', 'zu prüfen', 'fragen sie', 'fragen sie nach', 'nachfragen', 'erkundigen sie sich', 'vergleichen sie', 'zu vergleichen', 'achten sie darauf', 'stellen sie sicher', 'lassen sie sich', 'fordern sie', 'verlangen sie', 'kontrollieren sie', 'sehen sie nach']
-const VERIFY_CUES: Record<SuggestionLanguage, string[]> = { he: VERIFY_CUES_HE, en: VERIFY_CUES_EN, es: VERIFY_CUES_ES, 'pt-BR': VERIFY_CUES_PT, fr: VERIFY_CUES_FR, it: VERIFY_CUES_IT, ja: VERIFY_CUES_JA, de: VERIFY_CUES_DE, nl: VERIFY_CUES_NL, pl: VERIFY_CUES_PL }
+// Korean: the polite imperative forms only, for the reason the Hebrew comment
+// gives — 「확인」 as a bare noun appears in ordinary prose and would pass the
+// check without telling the reader to do anything.
+const VERIFY_CUES_KO = ['확인해 보세요', '확인하세요', '확인해 주세요', '반드시 확인', '물어보세요', '질문해 보세요', '문의해 보세요', '비교해 보세요', '비교하세요', '견적을 받아 보세요', '요청하세요', '점검해 보세요', '살펴보세요', '확인해 두세요']
+const VERIFY_CUES: Record<SuggestionLanguage, string[]> = { he: VERIFY_CUES_HE, en: VERIFY_CUES_EN, es: VERIFY_CUES_ES, 'pt-BR': VERIFY_CUES_PT, fr: VERIFY_CUES_FR, it: VERIFY_CUES_IT, ja: VERIFY_CUES_JA, de: VERIFY_CUES_DE, nl: VERIFY_CUES_NL, pl: VERIFY_CUES_PL, ko: VERIFY_CUES_KO }
 
 /** How many of the cues the body uses, counted once per cue. */
 export function readerVerifyCount(bodyText: string, lang: SuggestionLanguage): number {
@@ -651,13 +675,22 @@ export function runArticleAudit(input: AuditInput): AuditResult {
   // (SEO, Google), so neither side of the hebrew/latin comparison answers it: a
   // Japanese article is checked for Japanese characters outnumbering latin ones,
   // which is what fails when the model answers an order in English.
+  // Korean is counted on HANGUL ALONE, and not on the Japanese ranges beside it,
+  // although Korean can print a Han character: a Korean article is written in
+  // Hangul, and a check that accepted the Han range would pass a JAPANESE
+  // article returned for a Korean order, which is the exact failure this gate
+  // exists for.
   {
     const hebrew = (bodyText.match(/[֐-׿]/g) || []).length
     const latin = (bodyText.match(/[A-Za-z]/g) || []).length
     const japanese = (bodyText.match(/[\u3040-\u30ff\u3400-\u4dbf\u4e00-\u9fff]/g) || []).length
+    const korean = (bodyText.match(/[\u1100-\u11ff\u3130-\u318f\uac00-\ud7af]/g) || []).length
     const script = contentScript(lang)
     add('language_matches', 'technical', 'blocker',
-      script === 'hebrew' ? hebrew >= latin : script === 'japanese' ? japanese >= latin : latin >= hebrew)
+      script === 'hebrew' ? hebrew >= latin
+        : script === 'japanese' ? japanese >= latin
+          : script === 'korean' ? korean >= latin
+            : latin >= hebrew)
   }
 
   // --- brand / CTA rules ---

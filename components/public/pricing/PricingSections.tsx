@@ -59,6 +59,10 @@ export type PricingCopy = {
      * sentence, the same way the rest of lib/billing/market.ts works.
      */
     taxNote: Record<BillingMarket, string>
+    /** The trial-only disclosure for a visitor placed in Korea. Rendered only
+     *  where no route may sell to them, and never otherwise, so no other
+     *  market reads a sentence about a country it is not in. */
+    koreaTrialOnly: string
     everyPlanLabel: string
     everyPlan: string[]
   }
@@ -84,11 +88,19 @@ const USAGE_ICONS: LucideIcon[] = [FileText, Search, Sparkles]
 
 /** Under the grid: what a "check" in the plan lines is, in one visible sentence
  *  (no tooltip, so it works on a phone and with a keyboard). */
-export function PricingChecksNote({ copy, market }: { copy: PricingCopy; market: BillingMarket }) {
+export function PricingChecksNote({ copy, market, koreaTrialOnly = false }: { copy: PricingCopy; market: BillingMarket; koreaTrialOnly?: boolean }) {
   return (
     <>
       <p className="mx-auto mt-8 max-w-3xl text-center text-caption text-muted" data-checks-note>{copy.plans.checksNote}</p>
       <p className="mx-auto mt-3 max-w-3xl text-center text-caption text-muted" data-tax-note>{copy.plans.taxNote[market]}</p>
+      {/* BEFORE the trial, not only at the refusal: 전자상거래법 제21조 제1항 제1호
+          forbids 유인, inducement, with a material fact withheld, and offering a
+          Korean consumer a trial while knowing the payment at its end will be
+          refused is exactly that. The decision is the server's, from the
+          visitor's country (lib/billing/korea-sale.ts). */}
+      {koreaTrialOnly ? (
+        <p className="mx-auto mt-3 max-w-3xl text-center text-caption font-semibold text-ink" data-korea-trial-only>{copy.plans.koreaTrialOnly}</p>
+      ) : null}
     </>
   )
 }

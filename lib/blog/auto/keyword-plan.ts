@@ -49,13 +49,22 @@ export const RESEARCH_MARKET: Record<BlogAutoLocale, { country: string; language
   // language is spoken somewhere — the Austria/Switzerland revert after German
   // shipped is the precedent.
   pl: { country: 'PL', language: 'pl' },
+  // South Korea, and ONLY South Korea. There is no second Korean-speaking market
+  // to be tempted by: the language's other country is one we neither research
+  // nor sell in, and 'ko-KP' is explicitly not a market here (see the resolver
+  // comment in lib/ai-visibility/i18n.ts). Google holds a MINORITY of Korean
+  // search — Naver is the other half — so these numbers are a slice of the
+  // market rather than the whole of it, which is the opposite of Poland. That
+  // is a reason the measured volume is remarkable rather than a reason to
+  // discount it: 구글 비즈니스 프로필 at 3,600/mo is Google-only demand.
+  ko: { country: 'KR', language: 'ko' },
 }
 
 /**
  * The floor for "somebody searches this". Hebrew is a 9-million-speaker market,
  * so the same floor as English would reject nearly every real Hebrew query.
  */
-export const MIN_MONTHLY_SEARCHES: Record<BlogAutoLocale, number> = { he: 20, en: 80, es: 50, 'pt-BR': 50, fr: 50, it: 50, ja: 50, de: 50, nl: 50, pl: 50 }
+export const MIN_MONTHLY_SEARCHES: Record<BlogAutoLocale, number> = { he: 20, en: 80, es: 50, 'pt-BR': 50, fr: 50, it: 50, ja: 50, de: 50, nl: 50, pl: 50, ko: 50 }
 
 /** Seeds the research starts from — the subjects this product is actually about. */
 export const RESEARCH_SEEDS: Record<BlogAutoLocale, string[]> = {
@@ -171,6 +180,39 @@ export const RESEARCH_SEEDS: Record<BlogAutoLocale, string[]> = {
     'google ranking prüfen', 'keyword ranking tool', 'backlink tool',
     'local seo', 'google unternehmensprofil optimieren', 'google search console',
     'seo für kleine unternehmen', 'website geschwindigkeit', 'sichtbarkeit in ki',
+  ],
+  // MEASURED in Keyword Planner on 11-12 November 2026, in two rounds
+  // (growth/next-language.md, Addenda 7 and 8). The first round of hand-written
+  // Korean seeds returned THREE ideas; re-seeding from Google's own output
+  // returned 859, which is the whole reason this list is the measured one and
+  // not a translation of the Japanese seeds beside it.
+  //
+  // What the measurement put in. The Google Business Profile cluster is the
+  // demand: 구글 비즈니스 프로필 3,600/mo and GROWING +408% year on year,
+  // 구글 상위 노출 2,400 at +140%, 구글 seo 1,000, and `seo google` 880 at +662%,
+  // the fastest-growing term measured in any of the eleven markets compared.
+  // Korea is also the ONLY one of those markets where bare `seo` itself grows
+  // (+23%, 3,600/mo), so the head term is seeded here although it is dropped as
+  // an ambiguous head in other languages.
+  //
+  // What it deliberately leaves out, and this is the part a later reader will
+  // want. (1) `네이버 seo` 480/mo at +23% is real demand to be found on NAVER,
+  // which holds much of Korean search and which this product does not track at
+  // all; seeding it would fill the queue with articles whose subject we cannot
+  // serve, and the truth gate in the runner would be right to reject them.
+  // (2) `홈페이지 제작`, `사이트 만들기` 1,900, `홈페이지 만들기` 1,600,
+  // `워드프레스 홈페이지 제작` 880, `병원 홈페이지` 390 are website-BUILDING
+  // demand, which is somebody else's product — the same filter Addendum 5
+  // applied to Indonesia's `jasa seo`. The volume is larger than everything
+  // seeded below and it is not ours.
+  //
+  // The vocabulary a translation would have got wrong: Korean borrows the
+  // category name, so `seo` and `구글` are written in the Latin alphabet inside
+  // otherwise Korean queries. `검색엔진최적화`, the native compound, is what the
+  // textbooks use and not what an owner types.
+  ko: [
+    '구글 비즈니스 프로필', '구글 상위 노출', '구글 seo', 'seo google',
+    'seo', 'seo 란',
   ],
 }
 

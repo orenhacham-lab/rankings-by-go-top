@@ -27,6 +27,7 @@ const ja = FEATURE_COMMON.ja
 const de = FEATURE_COMMON.de
 const nl = FEATURE_COMMON.nl
 const pl = FEATURE_COMMON.pl
+const ko = FEATURE_COMMON.ko
 
 // ── You vs. competitors ───────────────────────────────────────────────────────
 
@@ -72,6 +73,10 @@ export const COMPETITORS_PAGE: MarketingPage = {
     pl: {
       title: 'Państwo i konkurencja | Go Top SEO',
       description: 'Wpisują Państwo konkurentów i widzą, przy ilu słowach kluczowych każdy z nich stoi w Google wyżej, a także kogo wymieniają ChatGPT, Gemini i Google AI, gdy nie wymieniają Państwa firmy.',
+    },
+    ko: {
+      title: '내 업체와 경쟁사 | Go Top SEO',
+      description: '경쟁사를 입력하시면 각 경쟁사가 몇 개의 키워드에서 Google 순위가 더 높은지 보실 수 있고, ChatGPT와 Gemini, Google AI가 고객님의 업체를 언급하지 않을 때 누구를 언급하는지도 보실 수 있습니다.',
     },
   },
   content: {
@@ -607,6 +612,59 @@ export const COMPETITORS_PAGE: MarketingPage = {
       ],
       cta: { title: 'Proszę sprawdzić, kto stoi w Google wyżej', body: pl.closeBody, primary: pl.check, secondary: pl.trial },
     },
+    ko: {
+      hero: {
+        eyebrow: '내 업체와 경쟁사',
+        eyebrowIcon: Users,
+        title: '경쟁사가 어디에서 더 높은지',
+        accent: '정확히 알 수 있습니다',
+        subtitle: '경쟁사는 프로젝트 설정에서 입력하시고, 순위를 측정할 때마다 각 경쟁사가 몇 개의 키워드에서 Google 순위가 더 높은지 보여 드립니다. AI 가시성 점검에서는 ChatGPT와 Gemini, Google AI가 고객님의 업체를 언급하지 않을 때 누구를 언급하는지 보여 드립니다.',
+        trust: ko.trust,
+        primary: ko.check,
+        secondary: ko.trial,
+        visual: (
+          <WorkListVisual
+            heading="내 업체와 경쟁사"
+            rows={[
+              { title: '경쟁사 A', detail: '키워드 24개 중 6개에서 더 높음', url: 'example-a.com', icon: Users, done: false, status: '더 높음' },
+              { title: '경쟁사 B', detail: '키워드 24개 중 2개에서 더 높음', url: 'example-b.com', icon: Users, done: true, status: '내 업체가 더 높음' },
+              { title: '경쟁사 C', detail: '상위 20위 밖', url: 'example-c.com', icon: Users, done: true, status: '내 업체가 더 높음' },
+            ]}
+          />
+        ),
+      },
+      sections: [
+        {
+          kind: 'cards',
+          tone: 'contrast',
+          eyebrow: '왜 중요한가',
+          title: '순위 숫자만으로는 전체 이야기를 알 수 없습니다',
+          intro: '5위는 성과일 수도 있고 문제일 수도 있습니다. 위에 누가 있는지에 따라 달라집니다.',
+          items: [
+            { icon: Target, title: '어디에서 더 높은가', body: '경쟁사별로, 마지막 측정에서 고객님의 키워드 몇 개에서 더 높았는지 보여 드립니다.' },
+            { icon: Sparkles, title: '내 업체 대신 누구를 언급하는가', body: 'AI 서비스의 답변에서, 고객님의 업체가 나오지 않을 때 어떤 업체와 사이트가 등장하는지 보여 드립니다.' },
+            { icon: FileText, title: '다음에 무엇을 쓸까', body: '경쟁사가 더 높은 키워드는 다음 아티클의 좋은 주제가 됩니다.' },
+          ],
+        },
+        {
+          kind: 'steps',
+          eyebrow: '진행 방식',
+          title: '세 단계',
+          items: [
+            { title: '경쟁사 입력', body: '프로젝트 설정에서 경쟁사의 이름과 사이트를 입력하십니다.' },
+            { title: '시스템이 측정', body: '순위를 측정할 때마다 같은 키워드에서 경쟁사가 어디에 있는지도 함께 기록합니다.' },
+            { title: '비교 확인', body: '키워드 표 위와 대시보드에서, 누가 더 높고 몇 개의 키워드에서 그런지 보실 수 있습니다.' },
+          ],
+        },
+        {
+          kind: 'callout',
+          icon: Info,
+          title: '데이터에 대해',
+          body: <p>비교는 고객님이 추적하시는 키워드에서 저희 Google 측정이 실제로 찾아낸 것만을 근거로 합니다. 측정 뒤에 입력하신 경쟁사는 그다음 측정부터 나타납니다.</p>,
+        },
+      ],
+      cta: { title: 'Google에서 누가 더 높은지 확인해 보십시오', body: ko.closeBody, primary: ko.check, secondary: ko.trial },
+    },
   },
 }
 
@@ -654,6 +712,10 @@ export const SEARCH_CONSOLE_PAGE: MarketingPage = {
     pl: {
       title: 'Dane z Search Console | Go Top SEO',
       description: 'Po podłączeniu Google Search Console widać kliknięcia, wyświetlenia i średnią pozycję z ostatnich 28 dni, najważniejsze podstrony i zapytania, na które strona już się pokazuje. Do pobrania jako pdf albo Excel.',
+    },
+    ko: {
+      title: 'Search Console 데이터 | Go Top SEO',
+      description: 'Google Search Console을 연결하시면 최근 28일의 클릭 수, 노출 수, 평균 게재순위와 주요 페이지, 그리고 사이트가 이미 노출되고 있는 검색어를 보실 수 있습니다. PDF나 Excel로 내려받으실 수 있습니다.',
     },
   },
   content: {
@@ -1176,6 +1238,58 @@ export const SEARCH_CONSOLE_PAGE: MarketingPage = {
         },
       ],
       cta: { title: 'Proszę podłączyć Search Console do projektu', body: pl.closeBody, primary: pl.trial, secondary: pl.check },
+    },
+    ko: {
+      hero: {
+        eyebrow: 'Search Console 데이터',
+        eyebrowIcon: LineChart,
+        title: 'Google이 직접',
+        accent: '내 사이트에 대해 말하는 것',
+        subtitle: 'Google Search Console을 연결하시면 최근 28일 동안 사이트가 받은 클릭 수와 노출 수, 그리고 평균 게재순위를 시스템에서 보실 수 있습니다. 모든 수치에는 그 이전 28일과 비교한 변화도 함께 표시됩니다.',
+        trust: ko.trust,
+        primary: ko.check,
+        secondary: ko.trial,
+        visual: (
+          <WorkListVisual
+            heading="최근 28일"
+            rows={[
+              { title: 'Google 유입 클릭', detail: '이전 28일 대비', icon: MousePointerClick, done: true, status: '증가' },
+              { title: '검색 결과 노출', detail: '이전 28일 대비', icon: Eye, done: true, status: '증가' },
+              { title: '평균 게재순위', detail: '이전 28일 대비', icon: Search, done: false, status: '변동 없음' },
+            ]}
+          />
+        ),
+      },
+      sections: [
+        {
+          kind: 'cards',
+          tone: 'contrast',
+          eyebrow: '무엇이 보이는가',
+          title: 'Google 자체 수치를, 일하시는 자리에서',
+          items: [
+            { icon: LineChart, title: '기간별 추이', body: '클릭 수, 노출 수, 평균 게재순위를 이전 기간과 비교한 변화와 함께 보여 드립니다.' },
+            { icon: BarChart3, title: '주요 페이지', body: 'Google이 가장 많은 클릭을 보내는 페이지 다섯 곳입니다.' },
+            { icon: Plus, title: '이미 노출되고 있는 검색어', body: 'Google이 이미 사이트를 보여 주고 있는데 아직 추적하지 않으시는 검색어입니다. 클릭 한 번으로 추적에 추가하실 수 있습니다.' },
+          ],
+        },
+        {
+          kind: 'steps',
+          eyebrow: '연결',
+          title: 'Google 계정으로 한 번 연결',
+          items: [
+            { title: 'Google로 로그인', body: '프로젝트 설정에서 Search Console 데이터를 읽을 권한을 시스템에 주십니다.' },
+            { title: '사이트 선택', body: 'Search Console에서 이 프로젝트에 해당하는 속성을 고르십니다.' },
+            { title: '수치가 갱신됩니다', body: '시스템이 데이터를 알아서 가져오고, "리포트" 화면에 표시됩니다.' },
+          ],
+        },
+        {
+          kind: 'callout',
+          icon: FileDown,
+          title: '내려받아 전달하기',
+          body: <p>수치는 두 페이지 요약 PDF로 내려받으실 수 있고, 각 행을 Excel이나 CSV로 따로 내려받으실 수도 있습니다.</p>,
+        },
+      ],
+      cta: { title: '프로젝트에 Search Console을 연결하십시오', body: ko.closeBody, primary: ko.trial, secondary: ko.check },
     },
   },
 }

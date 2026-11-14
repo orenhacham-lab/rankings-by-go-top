@@ -73,6 +73,7 @@ const ja = FEATURE_COMMON.ja
 const de = FEATURE_COMMON.de
 const nl = FEATURE_COMMON.nl
 const pl = FEATURE_COMMON.pl
+const ko = FEATURE_COMMON.ko
 
 export const SITE_LINKS_PAGE: MarketingPage = {
   path: '/features/site-links',
@@ -116,6 +117,10 @@ export const SITE_LINKS_PAGE: MarketingPage = {
     pl: {
       title: 'Linki do Państwa strony | Go Top SEO',
       description: 'Firmy z uzupełniającą ofertą, które korzystają z Go Top SEO, mogą wspomnieć o Państwa stronie w artykułach pisanych dla nich, ale tylko tam, gdzie to pomaga czytelnikowi. Bez wymiany, nigdy konkurent, dobrowolnie i domyślnie wyłączone. Poza tym linkowanie wewnętrzne, podstrony bez linków i bezpłatne katalogi.',
+    },
+    ko: {
+      title: '내 사이트로 오는 링크 | Go Top SEO',
+      description: 'Go Top SEO를 쓰는 보완 업종의 업체가 자신들을 위해 작성된 아티클에서 고객님의 페이지를 언급할 수 있습니다. 단, 그 문단의 독자에게 실제로 도움이 되는 자리에서만입니다. 상호 교환 없음, 경쟁사 제외, 선택 참여이며 기본값은 꺼짐입니다. 내부 링크, 링크가 없는 페이지, 무료 디렉터리도 함께 다룹니다.',
     },
   },
   content: {
@@ -1212,6 +1217,114 @@ export const SITE_LINKS_PAGE: MarketingPage = {
         },
       ],
       cta: { title: 'Proszę pozwolić firmom z uzupełniającą ofertą linkować do Państwa', body: pl.closeBody, primary: pl.trial, secondary: pl.check },
+    },
+    ko: {
+      hero: {
+        eyebrow: '내 사이트로 오는 링크',
+        eyebrowIcon: Link2,
+        title: '보완 업종 업체의 콘텐츠에',
+        accent: '실리는 언급과 링크',
+        subtitle: '보완 업종의 Go Top SEO 고객이 자신들을 위해 작성된 아티클에서 고객님의 페이지를 언급할 수 있습니다. 그 문단을 읽는 사람에게 고객님의 페이지가 실제로 도움이 되는 자리에서만입니다. 경쟁사는 절대 아니며, 품앗이식 상호 링크도 하지 않습니다. 참여는 선택이고 기본값은 꺼짐입니다.',
+        trust: ko.trust,
+        primary: ko.trial,
+        secondary: ko.check,
+        visual: (
+          <WorkListVisual
+            heading="언급과 링크"
+            rows={[
+              { title: '보완 업종 업체에서 온 링크', detail: '그 업체 블로그의 아티클에서', icon: ArrowDownToLine, done: true, status: '게시됨' },
+              { title: '고객님 아티클의 외부 링크', detail: '게시 전에 보여 드리며 삭제하실 수 있습니다', icon: ArrowUpFromLine, done: false, status: '검토 필요' },
+              { title: '같은 업종', detail: '어느 방향으로도 넣지 않습니다', icon: Ban, done: true, status: '차단됨' },
+              { title: '아티클에 내부 링크 3개 추가', detail: '가격 가이드', icon: ArrowLeftRight, done: true, status: '추가됨' },
+            ]}
+          />
+        ),
+      },
+      sections: [
+        {
+          kind: 'steps',
+          eyebrow: '보완 업종 업체',
+          title: '진행 방식',
+          items: [
+            { title: '고객님이 켜십니다', body: '참여는 사이트 단위이며, 프로젝트 소유자가 화면의 약관에 동의하신 뒤 켜십니다. 기본값은 꺼짐이고 언제든지 그만두실 수 있습니다.' },
+            { title: '실제 사이트만', body: '소유자가 WordPress나 Search Console로 애플리케이션에 연결한 사이트만 참여합니다. 도메인을 입력하는 것만으로는 되지 않으므로, 남의 사이트가 여기에 들어오는 일은 없습니다.' },
+            { title: '언급은 아티클 안에 자리합니다', body: '보완 업종 업체를 위한 아티클이 만들어질 때, 이미 문장 안에 있는 표현에 고객님의 알맞은 페이지를 언급할 수 있습니다. 본문을 다시 쓰거나 문단을 보태지는 않습니다.' },
+            { title: '모든 내역을 보십니다', body: '모든 삽입이 기록되어 양쪽에 표시됩니다. 고객님의 아티클에서 나가는 링크는 게시 전에 표시되며 삭제하실 수 있습니다.' },
+          ],
+        },
+        {
+          kind: 'cards',
+          tone: 'contrast',
+          eyebrow: '규칙',
+          title: '이것이 자연스럽게 유지되는 이유',
+          items: [
+            { icon: Ban, title: '경쟁사는 절대 아닙니다', body: '같은 업종은 제외하며, 어느 한쪽이 경쟁사로 표시한 도메인도 제외합니다. 업종을 알 수 없는 사이트는 아예 넣지 않습니다. 추측하지 않습니다.' },
+            { icon: ArrowLeftRight, title: '교환하지 않습니다', body: '맞교환을 하지 않습니다. 언급을 받은 사이트가 되돌려 언급하는 일은 없고, 같은 쌍은 한 번만 만납니다. 사이트 세 곳을 거치는 짧은 고리도 막습니다.' },
+            { icon: ShieldCheck, title: '하나만, 그것도 아껴서', body: '아티클당 최대 하나이며, 하나를 더 밀어 넣기보다 아예 넣지 않는 편을 택합니다. 막 시작한 사이트는 더 천천히 참여합니다.' },
+            { icon: Network, title: '독자에게 도움이 되는 자리에만', body: '그 문단을 읽는 사람에게 해당 페이지가 실제로 도움이 되는 자리에만 언급이 들어갑니다. 잘 맞지 않으면 아무것도 넣지 않습니다. 새로 만들어졌거나 내용이 빈약한 사이트는 참여하지 않습니다.' },
+          ],
+        },
+        {
+          kind: 'callout',
+          icon: Info,
+          title: '저희가 하지 않는 일',
+          body: (
+            <>
+              <p>
+                링크를 팔지 않고, 사지 않으며, 남의 사이트에서 링크를 받아 드린다고 약속하지도 않습니다. 약속된
+                링크 개수도 없고 순위에 대한 약속도 없습니다.
+              </p>
+              <p>
+                참여는 선택이고 기본값은 꺼짐이며 언제든지 그만두실 수 있습니다. 결제하신 내용에 포함되지 않고,
+                어떤 플랜의 약정 사항도 아닙니다. 링크의 유형은 네트워크 전체에 적용되며, 동의 화면에 표시되고,
+                앞으로의 링크에 대해 달라질 수 있습니다. 전체 내용은{' '}
+                <a className="underline" href="/ko/terms#link-network">이용약관 제15조의2</a>에 참여에 따르는
+                위험과 함께 적혀 있으니, 켜시기 전에 읽어 보시는 편이 좋습니다.
+              </p>
+              <p>
+                참여 사이트 목록은 공개하지 않습니다. 링크를 받은 사이트는 자신에게 링크한 사이트의 주소를 봅니다.
+                사이트 내용과 검색엔진 가이드라인 준수에 대한 책임은 사이트를 운영하시는 분에게 있으며, 저희는
+                서비스를 중지하거나 종료할 수 있습니다.
+              </p>
+            </>
+          ),
+        },
+        {
+          kind: 'cards',
+          columns: 2,
+          eyebrow: '사이트 내부에서도',
+          title: '사이트를 하나로 묶어 주는 링크',
+          items: [
+            { icon: ArrowLeftRight, title: '작성 중에 붙는 내부 링크', body: '아티클이 만들어지는 동안, 시스템이 그 아티클을 사이트의 알맞은 페이지와 연결합니다. 해당 표현이 본문에 이미 자연스럽게 나오는 자리에만 넣습니다. 아티클 전체는 늘 그렇듯 게시 전에 읽어 보십니다.' },
+            { icon: Unlink, title: '링크가 없는 페이지', body: '사이트의 다른 페이지 어디에서도 링크되지 않는 페이지입니다. Google이 찾아가기 어렵고 중요도를 알아보지 못합니다. 메뉴나 홈에서 링크되는 페이지는 여기에 포함되지 않습니다.' },
+            { icon: ListChecks, title: '무료 디렉터리', body: '프로젝트의 국가와 언어에 맞는 디렉터리와 업체 프로필을 사람이 직접 확인해 정리한 목록입니다. 이미 등록돼 있는 곳도 함께 표시됩니다.' },
+            { icon: MapPinned, title: '무엇이 무엇으로 연결되는지', body: '아티클마다 어디로 링크하고 어디에서 링크받는지 보여 드립니다. 어떤 페이지는 Google에서 움직이지 않고 어떤 페이지는 움직이는 이유가 여기서 드러납니다.' },
+          ],
+        },
+        {
+          kind: 'cards',
+          columns: 2,
+          eyebrow: 'Search Console',
+          title: 'Google이 이미 찾아 둔 링크',
+          items: [
+            { icon: FileSearch, title: 'Google 보고서로 바로 연결', body: 'Search Console에는 링크 목록을 돌려주는 인터페이스가 없으므로, 저희가 그것을 지어내지 않습니다. Google의 보고서로 바로 가는 링크를 드립니다.' },
+            { icon: Search, title: '내보낸 파일로 보는 당시 상태', body: 'Search Console에서 내보낸 CSV 파일을 올리시면 시스템에서 살펴보실 수 있습니다. 내보낸 날의 상태이며 저절로 갱신되지는 않습니다.' },
+          ],
+        },
+        {
+          kind: 'faq',
+          eyebrow: '자주 묻는 질문',
+          title: '링크에 대해 많이 묻는 것',
+          items: [
+            { q: '링크를 몇 개 받게 됩니까?', a: '약속된 개수도, 채우려고 애쓰는 할당량도 없습니다. 어떤 문단이 고객님의 페이지와 정말로 맞는 아티클이 만들어질 때에만 언급이 들어가며, 그런 일은 드물게 일어납니다.' },
+            { q: '제가 참여하는 것을 누가 알게 됩니까?', a: '참여 사이트 목록은 공개하지 않습니다. 언급을 받은 사이트는 자신에게 링크한 사이트의 주소를 보고, 게시된 뒤에는 링크가 실린 페이지도 봅니다.' },
+            { q: '꼭 참여해야 합니까?', a: '그렇지 않습니다. 기본값은 꺼짐이고 사이트마다 따로 켜며, 언제든지 그만두실 수 있습니다. 그만두시면 새 언급은 생기지 않고, 이미 게시된 링크는 해당 사이트에 남습니다.' },
+            { q: 'Shopify 쇼핑몰에서도 작동합니까?', a: '별도로 선택해 켜시면 작동합니다. 언급은 저희가 쇼핑몰 블로그에 써서 게시하는 아티클에만 들어갑니다. 쇼핑몰에 이미 있는 아티클, 페이지, 상품, 컬렉션은 변경되지 않습니다.' },
+            { q: '제 사이트 안의 내부 링크는 어떻습니까?', a: '그것과 무관하게 작동합니다. 작성되는 모든 아티클에 사이트의 알맞은 페이지로 가는 링크가 붙고, 아티클 전체는 게시 전에 고객님이 승인하십니다.' },
+          ],
+        },
+      ],
+      cta: { title: '보완 업종 업체가 고객님께 링크하도록 열어 두십시오', body: ko.closeBody, primary: ko.trial, secondary: ko.check },
     },
   },
 }

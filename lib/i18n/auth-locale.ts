@@ -29,7 +29,7 @@
  */
 
 import type { PublicLocale } from './locales'
-import { isEnglishPath, isFrenchPath, isItalianPath, isJapanesePath, isGermanPath, isDutchPath, isPolishPath, isPortuguesePath, isSpanishPath } from './request-locale'
+import { isEnglishPath, isFrenchPath, isItalianPath, isJapanesePath, isGermanPath, isDutchPath, isKoreanPath, isPolishPath, isPortuguesePath, isSpanishPath } from './request-locale'
 import { normalizeDashboardUiLocale } from './dashboard/locale'
 
 /**
@@ -68,6 +68,14 @@ import { normalizeDashboardUiLocale } from './dashboard/locale'
  *
  * Polish is the tenth, and `/pl/login` the same, gated by
  * app/(auth)/pl/layout.tsx.
+ *
+ * Korean is the eleventh, and it arrived LATE: the locale shipped with its
+ * public tree and with Korean words already in every auth form, but with no
+ * /ko routes under (auth) at all, so `authHref('signup', 'ko')` — the Korean
+ * site's only call to action — answered 404. The branch and the routes
+ * (app/(auth)/ko/layout.tsx) land together, because either one alone is the
+ * failure this list describes: a route with no branch is a Korean URL labelled
+ * Hebrew, and a branch with no route is a 404 labelled Korean.
  */
 export function resolveAuthLocale(input: {
   pathname?: string | null
@@ -83,5 +91,6 @@ export function resolveAuthLocale(input: {
   if (isGermanPath(input.pathname)) return 'de'
   if (isDutchPath(input.pathname)) return 'nl'
   if (isPolishPath(input.pathname)) return 'pl'
+  if (isKoreanPath(input.pathname)) return 'ko'
   return normalizeDashboardUiLocale(input.langParam) ?? input.serverLocale ?? 'he'
 }
