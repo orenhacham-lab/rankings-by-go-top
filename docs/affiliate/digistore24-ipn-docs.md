@@ -134,3 +134,43 @@ paid access, and the paid period runs to `next_payment_at`.
 | `ipn_version` | Interface version, 1.2 in the guide. |
 
 `product_code` is deprecated; `product_id` replaces it.
+
+## The thank-you page redirect, which is signed too and with a different key
+
+Read from Digistore24's own example at
+`https://www.digistore24.com/download/ipn/examples/ipn/thankyou_page.php`
+(fetched 2026-11-14) and from the two settings that control it in the vendor
+backend.
+
+When a product is set to pass the order data on, Digistore24 append it to the
+thank-you page URL as GET parameters and sign the set with `sha_sign`, using
+**exactly the IPN algorithm** — SHA-512, every parameter sorted
+case-sensitively, each non-empty `name=value` followed by the passphrase, the
+hex upper-cased. Their script calls the same `digistore_signature` function
+with the default arguments, so `$convert_keys_to_uppercase` is false and
+`do_html_decode` does not appear. The signature is computed over `$_GET`
+**as received**, before any decryption.
+
+**The key is not the IPN passphrase.** It is the account-level *thank-you page
+key*, the field whose own help text in Account → Details reads "This is used
+to protect the GET parameters sent to your thank you page". It is held here as
+`MARKETPLACE_DIGISTORE24_THANKYOU_KEY`, separately from
+`MARKETPLACE_DIGISTORE24_WEBHOOK_SECRET`, because they are two values in two
+screens and the vendor may rotate either alone.
+
+Two per-product settings decide whether any of this happens:
+
+- `add order data to thank-you page URL` — Yes/No. **No** means no parameters
+  at all, and then there is nothing to verify and no one-click button.
+- `encrypt order data of thank-you page URL` — set to "No, transfer data in
+  plain language" on all four products, which is why `order_id` arrives
+  readable. With encryption on, each value arrives as ciphertext beginning
+  `ds24` while the digest still verifies; `lib/marketplace/thankyou-handoff.ts`
+  refuses such an id rather than decrypting, because their cipher has not been
+  checked against their reference here.
+
+Why it matters at all: the IPN connection fires **before** the buyer is
+forwarded to the thank-you page, so the receipt already exists when the page
+renders. That is what lets the page offer an activation button for a verified
+redirect instead of relying on the buyer opening the delivery email — the
+failure Digistore24's own reviewer hit on 2026-11-14.

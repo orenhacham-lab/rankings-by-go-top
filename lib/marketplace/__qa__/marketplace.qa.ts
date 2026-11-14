@@ -40,9 +40,11 @@ import {
   providerReadiness,
   JVZOO_IPN_V2_SCHEME,
   DIGISTORE24_IPN_SCHEME,
+  DIGISTORE24_THANKYOU_SCHEME,
   CLICKBANK_INS_SCHEME,
   type MarketplaceHmacHeaderScheme,
 } from '../config'
+import { thankyouActivation, verifiedThankyouOrderId } from '../thankyou-handoff'
 import { CONSENT_REQUIRED_COUNTRIES, consentRequiredForCountry } from '../../consent/eprivacy-territory'
 import {
   decryptMarketplaceEnvelope,
@@ -1312,8 +1314,16 @@ async function main() {
   const thanksSrc = code(THANKS)
   const MarketplaceThanksPage = (await import('../../../app/go/[platform]/thanks/page')).default
 
-  const renderThanks = async (platform: string) =>
-    renderToStaticMarkup(await MarketplaceThanksPage({ params: Promise.resolve({ platform }) }))
+  const renderThanks = async (
+    platform: string,
+    query: Record<string, string | string[] | undefined> = {},
+  ) =>
+    renderToStaticMarkup(
+      await MarketplaceThanksPage({
+        params: Promise.resolve({ platform }),
+        searchParams: Promise.resolve(query),
+      }),
+    )
 
   check('TY1: the page is noindex, like every other thin per-platform page',
     /robots: \{ index: false, follow: false \}/.test(thanksSrc))
@@ -1324,10 +1334,24 @@ async function main() {
   // product_id and email to this URL, and all three are values a stranger can
   // type. Rendering one publishes whatever was supplied; branching on
   // product_id would let a visitor choose which plan the page describes.
-  check('TY3: the page takes no searchParams at all',
-    !/searchParams/.test(thanksSrc))
-  check('TY4: and names none of the parameters they append',
-    !/order_id|product_id|buyer_email|\bemail\b.*=.*param/.test(thanksSrc))
+  // The page now READS the query string — it has to, or the one-click button
+  // cannot exist — but the invariant that matters is unchanged: no supplied
+  // value reaches the page's text. Everything the parameters are good for
+  // goes through `thankyouActivation`, which verifies the platform's
+  // signature and answers with a claim token from our own database or with
+  // nothing at all.
+  check('TY3: nothing from the query string is rendered; it is handed to the verifier',
+    /thankyouActivation\(createAdminClient, provider, await searchParams\)/.test(thanksSrc)
+    && !/searchParams\s*\[|searchParams\.\w|\{\s*searchParams\s*\}/.test(
+      thanksSrc.replace(/searchParams: Promise<[^>]+>/g, ''),
+    ))
+  check('TY4: and the page itself names none of the parameters they append',
+    !/order_id|product_id|buyer_email/.test(thanksSrc))
+  check('TY4b: the button is only ever built from the verified result',
+    /activation\.kind === 'claimable'/.test(thanksSrc)
+    && /encodeURIComponent\(activation\.claimToken\)/.test(thanksSrc))
+  check('TY4c: and the reason behind a refusal is never rendered',
+    !/activation\.reason/.test(thanksSrc))
 
   const dsThanks = await renderThanks('digistore24')
   check('TY5: it tells the buyer the delivery is software they use in the browser',
@@ -1369,8 +1393,8 @@ async function main() {
   check('TY17: a platform that demands no wording gets none invented for it',
     !/credit card statement will show a charge/i.test(jvThanks))
 
-  check('TY-MUT1: a page that read the query string would be caught',
-    /searchParams/.test(thanksSrc.replace('params,', 'params, searchParams,')))
+  check('TY-MUT1: a page that rendered a supplied parameter would be caught',
+    /order_id/.test(`${thanksSrc}{searchParams.order_id}`))
   check('TY-MUT2: dropping the debiting sentence would be caught',
     !/The debiting is performed by Digistore24/.test(
       dsThanks.replace('The debiting is performed by Digistore24', 'Thank you')))
@@ -1383,6 +1407,215 @@ async function main() {
         'Digistore24 is the name on your statement',
       )
       .includes('Your credit card statement will show a charge from Digistore24'))
+
+  // ── TH. The signed thank-you handoff: one click instead of an email ────────
+  // Delivery is an email with a claim link, and a buyer who never opens it
+  // signs up at the front door, lands on a free trial, and reports the
+  // product as broken while a paid receipt sits unclaimed. Digistore24's own
+  // reviewer did that on 14.11.2026. The fix reads the order id from the
+  // redirect they sign — and the whole safety of it is that the signature is
+  // checked first and the id grants nothing by itself.
+  console.log('\nTH. signed thank-you handoff')
+  const THANKYOU_KEY = 'th-qa-passphrase-not-a-real-key'
+  const dsProvider = marketplaceProvider('digistore24')!
+  const jvProvider = marketplaceProvider('jvzoo')!
+
+  /** A parameter set signed the way Digistore24 sign the redirect. */
+  const signedQuery = (fields: Record<string, string>, key = THANKYOU_KEY) => {
+    const raw = new URLSearchParams(fields).toString()
+    return { ...fields, sha_sign: sortedParamsDigestFor(raw, key, DIGISTORE24_THANKYOU_SCHEME) }
+  }
+
+  const withKey = <T,>(fn: () => T, key: string | null = THANKYOU_KEY): T => {
+    const before = process.env.MARKETPLACE_DIGISTORE24_THANKYOU_KEY
+    if (key === null) delete process.env.MARKETPLACE_DIGISTORE24_THANKYOU_KEY
+    else process.env.MARKETPLACE_DIGISTORE24_THANKYOU_KEY = key
+    try {
+      return fn()
+    } finally {
+      if (before === undefined) delete process.env.MARKETPLACE_DIGISTORE24_THANKYOU_KEY
+      else process.env.MARKETPLACE_DIGISTORE24_THANKYOU_KEY = before
+    }
+  }
+
+  const goodQuery = signedQuery({ order_id: '78906016', product_id: '758616', buyer_email: 'b@example.com' })
+
+  check('TH1: a redirect signed with the thank-you key yields the order id',
+    withKey(() => {
+      const r = verifiedThankyouOrderId(dsProvider, goodQuery)
+      return r.ok && r.externalOrderId === '78906016'
+    }))
+
+  // THE SIGNATURE IS THE WHOLE SECURITY OF THIS. Their order ids are short
+  // and sequential, so an unsigned id would hand a stranger who typed a
+  // neighbouring number somebody else's claim token.
+  check('TH2: an unsigned set is refused, however well-formed the order id',
+    withKey(() => {
+      const r = verifiedThankyouOrderId(dsProvider, { order_id: '78906016' })
+      return !r.ok && r.reason === 'no_parameters'
+    }))
+  check('TH3: a tampered order id is refused even with the original digest',
+    withKey(() => {
+      const r = verifiedThankyouOrderId(dsProvider, { ...goodQuery, order_id: '78906017' })
+      return !r.ok && r.reason === 'bad_signature'
+    }))
+  check('TH4: an added parameter is refused, because their digest covers every one',
+    withKey(() => {
+      const r = verifiedThankyouOrderId(dsProvider, { ...goodQuery, extra: 'x' })
+      return !r.ok && r.reason === 'bad_signature'
+    }))
+  check('TH5: a set signed with the WEBHOOK passphrase is refused',
+    withKey(() => {
+      const wrong = signedQuery({ order_id: '78906016' }, 'the-ipn-passphrase')
+      const r = verifiedThankyouOrderId(dsProvider, wrong)
+      return !r.ok && r.reason === 'bad_signature'
+    }))
+  check('TH6: with no key configured nothing is verified and nothing is offered',
+    withKey(() => {
+      const r = verifiedThankyouOrderId(dsProvider, goodQuery)
+      return !r.ok && r.reason === 'not_configured'
+    }, null))
+  check('TH7: a provider whose redirect signing has not been read is refused outright',
+    withKey(() => {
+      process.env.MARKETPLACE_JVZOO_THANKYOU_KEY = THANKYOU_KEY
+      try {
+        const r = verifiedThankyouOrderId(jvProvider, goodQuery)
+        return !r.ok && r.reason === 'not_configured'
+      } finally {
+        delete process.env.MARKETPLACE_JVZOO_THANKYOU_KEY
+      }
+    }))
+  check('TH8: a visitor who just opened the page is the no-parameters case',
+    withKey(() => {
+      const r = verifiedThankyouOrderId(dsProvider, {})
+      return !r.ok && r.reason === 'no_parameters'
+    }))
+  check('TH9: a malformed digest is a refusal, not a throw',
+    withKey(() => {
+      const r = verifiedThankyouOrderId(dsProvider, { order_id: '78906016', sha_sign: 'zz' })
+      return !r.ok && r.reason === 'bad_signature'
+    }))
+
+  // THEY CAN ENCRYPT EACH VALUE, and then the digest still verifies while the
+  // id is ciphertext beginning `ds24`. We do not decrypt — their cipher has
+  // not been verified against their reference here — so a verified set with
+  // an unreadable id is refused rather than guessed at.
+  check('TH10: a verified set carrying an ENCRYPTED order id is refused, not decrypted',
+    withKey(() => {
+      const enc = signedQuery({ order_id: 'ds24AAAA+BBBB_e', product_id: '758616' })
+      const r = verifiedThankyouOrderId(dsProvider, enc)
+      return !r.ok && r.reason === 'no_order_id'
+    }))
+  check('TH11: and the digest itself still verified, so the refusal is about the id alone',
+    withKey(() => {
+      const enc = signedQuery({ order_id: 'ds24AAAABBBB', product_id: '758616' })
+      const r = verifiedThankyouOrderId(dsProvider, enc)
+      return !r.ok && r.reason === 'no_order_id'
+    }))
+
+  // THE VERIFIED ID IS A LOOKUP KEY AND NOT A GRANT. Everything below is a
+  // receipt our own webhook recorded from a signed delivery.
+  const thAdmin = (rows: Record<string, unknown>[]) => new FakeAdmin({ marketplace_orders: rows })
+  const paidRow = {
+    provider: 'digistore24',
+    external_order_id: '78906016',
+    plan_code: 'large_agency',
+    status: 'paid',
+    claim_token: 'tok-unspent',
+    claimed_by: null,
+  }
+
+  check('TH12: an unspent receipt for the verified id offers its own claim token',
+    await withKey(async () => {
+      const a = await thankyouActivation(() => thAdmin([paidRow]), dsProvider, goodQuery)
+      return a.kind === 'claimable' && a.claimToken === 'tok-unspent' && a.planCode === 'large_agency'
+    }))
+  check('TH13: a receipt that was already claimed offers nothing',
+    await withKey(async () => {
+      const a = await thankyouActivation(
+        () => thAdmin([{ ...paidRow, status: 'claimed', claimed_by: 'u1' }]),
+        dsProvider,
+        goodQuery,
+      )
+      return a.kind === 'none' && a.reason === 'no_such_order'
+    }))
+  check('TH14: a refunded receipt offers nothing',
+    await withKey(async () => {
+      const a = await thankyouActivation(
+        () => thAdmin([{ ...paidRow, status: 'refunded' }]),
+        dsProvider,
+        goodQuery,
+      )
+      return a.kind === 'none' && a.reason === 'no_such_order'
+    }))
+  check('TH15: another platform’s receipt with the same id is not offered',
+    await withKey(async () => {
+      const a = await thankyouActivation(
+        () => thAdmin([{ ...paidRow, provider: 'clickbank' }]),
+        dsProvider,
+        goodQuery,
+      )
+      return a.kind === 'none' && a.reason === 'no_such_order'
+    }))
+  check('TH16: a verified id with no receipt at all is not an error and not a grant',
+    await withKey(async () => {
+      const a = await thankyouActivation(() => thAdmin([]), dsProvider, goodQuery)
+      return a.kind === 'none' && a.reason === 'no_such_order'
+    }))
+  check('TH17: a database failure reads as "no button", never as "no order"',
+    await withKey(async () => {
+      const a = await thankyouActivation(
+        () => new FakeAdmin({ marketplace_orders: [paidRow] }, {
+          marketplace_orders: { select: () => ({ message: 'connection refused', code: '08006' }) },
+        }),
+        dsProvider,
+        goodQuery,
+      )
+      return a.kind === 'none' && a.reason === 'lookup_failed'
+    }))
+  check('TH18: an unverified redirect never reaches the database at all',
+    await withKey(async () => {
+      let built = false
+      const a = await thankyouActivation(
+        () => { built = true; return thAdmin([paidRow]) },
+        dsProvider,
+        { order_id: '78906016' },
+      )
+      return a.kind === 'none' && !built
+    }))
+
+  // The page itself: no parameters, no button, and the emailed route intact.
+  const plainThanks = await renderThanks('digistore24')
+  check('TH19: the ordinary visit renders no activation button',
+    !/data-thankyou-activation/.test(plainThanks) && /activation link/i.test(plainThanks))
+
+  check('TH-MUT1: looking the order up WITHOUT verifying the signature would be caught',
+    await (async () => {
+      // The mutation is the whole point of the module: skip verification and
+      // an id a visitor typed would be enough to get somebody's claim token.
+      const a = await withKey(async () =>
+        thankyouActivation(() => thAdmin([paidRow]), dsProvider, { order_id: '78906016' }))
+      return a.kind === 'none'
+    })())
+  check('TH-MUT2: verifying with the IPN scheme’s secret instead would be caught',
+    withKey(() => {
+      const r = verifiedThankyouOrderId(dsProvider, signedQuery({ order_id: '1' }, 'another-key'))
+      return !r.ok
+    }))
+  check('TH-MUT3: accepting a status other than paid would be caught',
+    await withKey(async () => {
+      const a = await thankyouActivation(
+        () => thAdmin([{ ...paidRow, status: 'cancelled' }]),
+        dsProvider,
+        goodQuery,
+      )
+      return a.kind === 'none'
+    }))
+  check('TH-MUT4: dropping the plain-id check and accepting ciphertext would be caught',
+    withKey(() => {
+      const r = verifiedThankyouOrderId(dsProvider, signedQuery({ order_id: 'ds24ZZZZ' }))
+      return !r.ok && r.reason === 'no_order_id'
+    }))
 
   // ── DS. Digistore24: the scheme, checked against Digistore24's own digest ──
   console.log('\nDS. digistore24')
