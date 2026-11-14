@@ -334,6 +334,33 @@ export interface MarketplaceProvider {
    */
   returnGuaranteeDays: number | null
   /**
+   * THE PLANS THIS PLATFORM HAS ACTUALLY APPROVED, or null where the platform
+   * approves nothing per plan and the env configuration alone decides.
+   *
+   * It exists because a reseller approves a PRODUCT, not a catalogue.
+   * ClickBank answered our four submissions on 13.11.2026: Basic and Advanced
+   * were approved and went Active, and Premium and Agency were refused on a
+   * price cap they apply to a new account, which is a commercial limit and
+   * not a finding about the product. Their checkout nevertheless renders and
+   * prices all four items, so the sales page went on offering a Buy button
+   * for two products the platform had declined to approve — a purchase route
+   * we are not permitted to sell through, on our own domain, under their
+   * name.
+   *
+   * SO IT IS A LIST OF WHAT IS APPROVED AND NOT A LIST OF WHAT IS BLOCKED.
+   * A plan missing from it is not sold on that platform's pages and is not
+   * shown on them, which is the safe direction: the failure of a wrong entry
+   * here is a plan that cannot be bought on one channel, never a plan that is
+   * bought where it may not be sold. It is deliberately code and not an env
+   * var, because the fact it records is a platform's decision that someone
+   * read, and a reviewer can see it in a diff.
+   *
+   * ClickBank's refusal is reviewable: they invite the request again after
+   * about 90 days of sales history, and the fix then is to add the plan back
+   * here.
+   */
+  approvedPlans: readonly PlanCode[] | null
+  /**
    * What this platform accepts as "I handled it".
    *
    * 'json' is the default shape: a 2xx with a JSON body, which every platform
@@ -395,6 +422,8 @@ export interface MarketplaceProvider {
 export const MARKETPLACE_PROVIDERS: readonly MarketplaceProvider[] = [
   {
     slug: 'digistore24',
+    /* They approve nothing per plan: all four were refused outright. */
+    approvedPlans: null,
     label: 'Digistore24',
     /*
      * Their IPN scheme, verified against the digest Digistore24 publish in
@@ -438,6 +467,8 @@ export const MARKETPLACE_PROVIDERS: readonly MarketplaceProvider[] = [
   },
   {
     slug: 'clickbank',
+    /* Items 1 and 2 ($79 and $179) approved 13.11.2026; items 3 and 4 refused on a new-account price cap. */
+    approvedPlans: ['regular', 'advanced'] as const,
     label: 'ClickBank',
     /*
      * Not a signature: their INS encrypts the whole body and decryption with
@@ -493,6 +524,8 @@ export const MARKETPLACE_PROVIDERS: readonly MarketplaceProvider[] = [
   },
   {
     slug: 'jvzoo',
+    /* All four products are approved, so the env configuration decides. */
+    approvedPlans: null,
     label: 'JVZoo',
     /*
      * JVZIPN v2, read inside the seller account and written down in
@@ -695,9 +728,26 @@ function httpsUrlOrNull(raw: string | undefined): string | null {
  * it is worse than being unavailable, so the button is shown only when the
  * channel can actually record what it sells.
  */
+/**
+ * Whether this platform has approved this plan — true for every plan where
+ * the provider keeps no per-plan list. See `approvedPlans`.
+ */
+export function isPlanApprovedOnMarketplace(slug: string, plan: PlanCode): boolean {
+  const provider = marketplaceProvider(slug)
+  if (!provider) return false
+  if (!provider.approvedPlans) return true
+  return provider.approvedPlans.includes(plan)
+}
+
+/** The plans one platform's own pages may offer, in catalogue order. */
+export function marketplaceApprovedPlans(slug: string): readonly PlanCode[] {
+  return PLAN_CODES.filter((code) => isPlanApprovedOnMarketplace(slug, code))
+}
+
 export function marketplaceBuyUrl(slug: string, plan: PlanCode): string | null {
   if (!marketplaceProvider(slug)) return null
   if (!providerReadiness(slug).ready) return null
+  if (!isPlanApprovedOnMarketplace(slug, plan)) return null
   return httpsUrlOrNull(process.env[`${envPrefix(slug)}BUY_URL_${plan.toUpperCase()}`])
 }
 
@@ -813,6 +863,8 @@ export function marketplacePixelUrl(slug: string, plan?: PlanCode): string | nul
  */
 export function marketplaceAffiliateUrl(slug: string, plan: PlanCode): string | null {
   if (!marketplaceProvider(slug)) return null
+  /* An affiliate cannot be recruited to a product the platform refused. */
+  if (!isPlanApprovedOnMarketplace(slug, plan)) return null
   return httpsUrlOrNull(process.env[`${envPrefix(slug)}AFFILIATE_URL_${plan.toUpperCase()}`])
 }
 
