@@ -13,6 +13,7 @@
 import type { createAdminClient } from '@/lib/supabase/admin'
 import { generatePoolItem, type GenerateItemResult } from '@/lib/content/automation/generate-item'
 import { AUTOMATION_MAX_ATTEMPTS } from '@/lib/content/automation/attempts'
+import { inlineImagesMayBatchForPool } from '@/lib/content/image-batch/may-batch'
 import { publishPoolItem } from '@/lib/content/automation/publish-item'
 import { localWeekday, isNoPublishWeekday, makeSlotAfter, slotFitsRhythm, resolveIntervalDays, spreadNextPublishAt, DEFAULT_PUBLISH_TIME, DEFAULT_TIMEZONE, type Cadence } from '@/lib/content/automation/schedule'
 import { readPublishRhythmForProject } from '@/lib/content/automation/plan-rhythm'
@@ -284,7 +285,11 @@ export async function runAutomation(admin: Admin, opts: { projectId?: string; dr
             diag.selectedTopicId = q.topicId; diag.selectedTopicTitle = q.topicTitle; diag.generateAttempted = true
             // Phase 3G.2 — scheduled generation also auto-inserts the topic's APPROVED
             // internal links into the draft (only user-approved links are ever inserted).
-            const res = await generate(admin, q.id, { allowRetry: true, autoApplyInternalLinks: true })
+            // The body images may be ORDERED from the Batch API at half price
+            // only when this pool is not publishing soon, because a batched
+            // image that arrives after its article went out never appears in it.
+            const mayBatch = inlineImagesMayBatchForPool({ due, nextPublishAt: pool.next_publish_at, nowMs })
+            const res = await generate(admin, q.id, { allowRetry: true, autoApplyInternalLinks: true, inlineImagesMayBatch: mayBatch })
             diag.generateResult = res.status + (res.reason ? ` (${res.reason})` : '') + (res.noop ? ` [${res.noop}]` : '')
             if (spentGenerationBudget(res)) genBudget--
             if (res.status === 'generated') { summary.generated++; diag.generatedCount++ }

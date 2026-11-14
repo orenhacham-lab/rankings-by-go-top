@@ -37,13 +37,21 @@ export type ArticleImageStepDeps = {
   createFeaturedImage: () => Promise<FeaturedResult>
   /** The existing inline-image generator; injectable for tests. */
   generateInline?: (admin: SupabaseClient, imageId: string) => Promise<InlineResult>
+  /**
+   * Order the body images from the Gemini Batch API instead of calling the
+   * model now (half the price, hours instead of seconds). Supplied ONLY by the
+   * queue's own generation, which runs days before the article publishes; a
+   * merchant pressing generate never gets this. Returns the ids it actually
+   * ordered — every other row is generated live, exactly as before.
+   */
+  batchInline?: (admin: SupabaseClient, imageIds: string[]) => Promise<string[]>
   env?: Record<string, string | undefined>
 }
 
 export type ArticleImageStepResult = {
   imageGenerated: boolean
   style: ArticleStyle
-  inline: { requested: number; created: number; ready: number }
+  inline: { requested: number; created: number; ready: number; batched: number }
 }
 
 /** `n` sections spread evenly through the article (first, last and between), never two the same. */
@@ -71,11 +79,12 @@ async function createInlineImages(
   ids: { articleId: string; projectId: string; ownerId: string },
   count: number,
   generate: (admin: SupabaseClient, imageId: string) => Promise<InlineResult>,
-): Promise<{ created: number; ready: number }> {
+  batch?: (admin: SupabaseClient, imageIds: string[]) => Promise<string[]>,
+): Promise<{ created: number; ready: number; batched: number }> {
   const { data: art } = await admin.from('generated_articles').select('content_html').eq('id', ids.articleId).eq('project_id', ids.projectId).maybeSingle()
   const html = String((art as { content_html?: string | null } | null)?.content_html ?? '')
   const targets = spreadSections(eligibleSections(html), count)
-  if (!targets.length) return { created: 0, ready: 0 }
+  if (!targets.length) return { created: 0, ready: 0, batched: 0 }
 
   const now = new Date().toISOString()
   const { data: rows, error } = await admin.from('article_inline_images').insert(targets.map((s, position) => ({
@@ -92,11 +101,18 @@ async function createInlineImages(
   }))).select('id')
   if (error || !Array.isArray(rows)) {
     console.warn('[article-style] inline image rows skipped', { code: (error as { code?: string } | null)?.code ?? 'no_rows' })
-    return { created: 0, ready: 0 }
+    return { created: 0, ready: 0, batched: 0 }
   }
-  const results = await Promise.all((rows as { id: string }[]).map((r) =>
-    generate(admin, r.id).catch((): InlineResult => ({ ok: false, error: 'unexpected_error' }))))
-  return { created: rows.length, ready: results.filter((r) => r.ok).length }
+  const imageIds = (rows as { id: string }[]).map((r) => r.id)
+  // Ordered from the batch lane where the caller allowed it. An id it could not
+  // order (no key, the job was refused, the entitlement gate said no) is NOT
+  // batched, so it falls through to the live call below and the article is never
+  // left short of an image because a batch job could not be created.
+  const batched = batch ? await batch(admin, imageIds).catch(() => [] as string[]) : []
+  const live = imageIds.filter((id) => !batched.includes(id))
+  const results = await Promise.all(live.map((id) =>
+    generate(admin, id).catch((): InlineResult => ({ ok: false, error: 'unexpected_error' }))))
+  return { created: rows.length, ready: results.filter((r) => r.ok).length, batched: batched.length }
 }
 
 export async function runArticleImageStep(
@@ -125,13 +141,13 @@ export async function runArticleImageStep(
 
   const requested = makeImages ? style.inlineImages : 0
   const inline = (async () => {
-    if (requested <= 0) return { created: 0, ready: 0 }
+    if (requested <= 0) return { created: 0, ready: 0, batched: 0 }
     try {
       const generate = deps.generateInline ?? ((a: SupabaseClient, id: string) => generateInlineImage(a as never, id))
-      return await createInlineImages(admin, ids, requested, generate)
+      return await createInlineImages(admin, ids, requested, generate, deps.batchInline)
     } catch (e) {
       console.warn('[article-style] inline images threw', { message: e instanceof Error ? e.message : String(e) })
-      return { created: 0, ready: 0 }
+      return { created: 0, ready: 0, batched: 0 }
     }
   })()
 

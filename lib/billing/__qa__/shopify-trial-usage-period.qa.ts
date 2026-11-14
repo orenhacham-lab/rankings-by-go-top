@@ -256,11 +256,14 @@ async function main() {
       check('A1B-6b: the gate ran BEFORE any provider call', g.calls.generate === 0 && g.calls.image === 0)
       check('A1B-6c: and before any reservation', ledgerOf(admin).length === 0)
       const src = strip(read('lib/content/article-generation.ts'))
+      // The topic/project reads and the prompt assembly live in buildBriefForTopic
+      // (same file) since the batch lane needed the same brief; the call to it is
+      // where generateArticleForTopic's own work begins, and the gate precedes it.
       check('A1B-6d: SOURCE — the shared gate is the FIRST thing generateArticleForTopic does',
         /const gate = await assertContentGenerationAllowedForUser\(admin, userId, deps\.now\)/.test(src)
-        && src.indexOf('assertContentGenerationAllowedForUser(admin, userId, deps.now)') < src.indexOf("from('article_topics')"))
+        && src.indexOf('assertContentGenerationAllowedForUser(admin, userId, deps.now)') < src.indexOf('buildBriefForTopic(admin, topicId)'))
       check('A1B-6e: SOURCE — generatePoolItem (cron/queue/retry) funnels through it',
-        /generateArticleForTopic\(admin, \{ topicId: item\.topic_id/.test(strip(read('lib/content/automation/generate-item.ts'))))
+        /generateArticleForTopic\(admin, \{\s*topicId: item\.topic_id/.test(strip(read('lib/content/automation/generate-item.ts'))))
       check('A1B-6f: SOURCE — the manual route funnels through it too',
         /generateArticleForTopic\(/.test(strip(read('app/api/content/articles/generate/route.ts'))))
       check('A1B-6g: SOURCE — the featured image is behind the same gate (same function)',
@@ -617,9 +620,18 @@ async function main() {
       // The row is marked failed either way; the distinct CODE is what differs,
       // and the row stays regenerable.
       check('A3E-G5: the row is marked failed, so the merchant is actually told', row.status === 'failed')
-      check('A3E-G6: SOURCE — one write, always failed, with the distinct code',
-        /\.update\(\{ status: 'failed', last_error: code, updated_at: nowIso\(\) \}\)/
-          .test(strip(read('lib/content/inline-images.ts'))))
+      // The write moved into markInlineImageFailed when the batch lane needed to
+      // leave an identical failed row; the invariant is unchanged — ONE write,
+      // always 'failed', carrying the distinct code — and the denial path uses it.
+      {
+        const isrc = strip(read('lib/content/inline-images.ts'))
+        check('A3E-G6: SOURCE — one write, always failed, with the distinct code',
+          /\.update\(\{ status: 'failed', last_error: reason\.slice\(0, 300\), updated_at: [^}]*\}\)/.test(isrc)
+          // ONE write in the whole file: markInlineImageFailed, which the live
+          // call and the batch collect pass both go through.
+          && (isrc.match(/status: 'failed'/g) ?? []).length === 1
+          && /markInlineImageFailed\(admin, imageId, denial\.code\)/.test(isrc))
+      }
     }
 
     // F — the automation retry counter is preserved for an outage.
@@ -758,8 +770,14 @@ async function main() {
 
     // ── NO PROVIDER CALL in either denied state ──
     {
-      const src = strip(read('lib/content/inline-images.ts'))
-      const gateIdx = src.indexOf('assertContentGenerationAllowedForProject(admin, row.project_id, nowFn)')
+      // Read inside generateInlineImage itself: the gate is a shared function now
+      // (inlineImageGateDenial, which the batch lane calls at the same point), so
+      // what matters is that the live path asks it BEFORE it spends anything.
+      const ifull = strip(read('lib/content/inline-images.ts'))
+      check('A3F-6a0: SOURCE — the shared gate is the entitlement check itself',
+        /assertContentGenerationAllowedForProject\(admin, projectId, nowFn\)/.test(ifull))
+      const src = ifull.slice(ifull.indexOf('export async function generateInlineImage'))
+      const gateIdx = src.indexOf('inlineImageGateDenial(admin, row.project_id, nowFn)')
       check('A3F-6a: SOURCE — the gate precedes the image model call',
         gateIdx !== -1 && gateIdx < src.indexOf('generateArticleImage('))
       check('A3F-6b: SOURCE — and precedes marking the row generating',
@@ -805,7 +823,7 @@ async function main() {
     check('A4-d: SOURCE — the period is resolved BEFORE any reservation, so nothing is reserved',
       generation.indexOf('const period = await resolveCurrentUsagePeriod') < generation.indexOf('const reservation = await reserveUsage'))
     check('A4-e: SOURCE — and before any Gemini call',
-      generation.indexOf("kind: 'usage_period_unavailable'") < generation.indexOf('const gen = await deps.generate(brief)'))
+      generation.indexOf("kind: 'usage_period_unavailable'") < generation.indexOf('await deps.generate('))
     check('A4-f: SOURCE — the HTTP route maps it to a retryable 503',
       /case 'usage_period_unavailable':[\s\S]{0,200}reason: 'usage_period_unavailable' \}, \{ status: 503 \}/.test(route))
     check('A4-g: SOURCE — quota_exceeded still returns 429',
