@@ -1776,7 +1776,7 @@ async function main() {
     /\{provider\.label\} is the seller of record for this purchase and handles the refunds/
       .test(guarFlat))
   check('GUAR7: and the period is attributed to the setting inside the platform, counted from the first payment',
-    /The return period set on these plans inside \{provider\.label\}/.test(guarFlat)
+    /The return period set on these plans inside/.test(guarFlat)
     && /that period begins with your first payment/.test(guarFlat))
   check('GUAR7b: the platform\'s own exclusion is published, not hidden',
     /re-subscribes to the same product within two years is not entitled to it again/.test(guarFlat))
@@ -1789,10 +1789,70 @@ async function main() {
   // consent fact and not a refund promise, so it is taken out before the word
   // is looked for.
   const salesProse = salesSrcNoBadge.replace(/MarketplacePixelUnconditional/g, '')
-  check('GUAR7e: no absolute promise in our own voice survives anywhere on the page',
-    !/unconditional/i.test(salesProse)
-    && !/for any reason or/i.test(salesProse)
-    && !/you get your money back/i.test(salesProse))
+  // THE ABSOLUTES ARE FENCED, NOT BANNED. Until 2026-11-14 they were banned
+  // outright, because the only channel asking for them had buyer terms that
+  // contradicted them. Digistore24's compliance team then dictated the
+  // wording and the owner accepted it, so the words now exist — and the thing
+  // worth guarding became the fence: they may appear only inside the branch
+  // `returnGuaranteeUnconditional` opens, never in the attributed wording
+  // every other channel gets, and never loose in the page. The two branch
+  // bodies are cut out of the source and tested separately, so a word that
+  // escapes its branch fails the suite.
+  const FLAG_OPEN = '{provider.returnGuaranteeUnconditional ? ('
+  const flagAt = salesProse.indexOf(FLAG_OPEN)
+  const afterFlag = flagAt < 0 ? '' : salesProse.slice(flagAt + FLAG_OPEN.length)
+  const elseAt = afterFlag.indexOf('          ) : (')
+  const dictatedBranch = elseAt < 0 ? '' : afterFlag.slice(0, elseAt).replace(/\s+/g, ' ')
+  const attributedBranch = elseAt < 0 ? '' : afterFlag.slice(elseAt)
+  // Everything the flag does NOT gate: the dictated branch comes out, and so
+  // does every inline `{provider.returnGuaranteeUnconditional ? … }` — the
+  // heading's word and the plan card's clause both live in one of those. What
+  // is left is the page as a buyer on any other channel sees it, and no
+  // absolute may survive there.
+  const ungated = salesProse
+    .replace(dictatedBranch.length ? afterFlag.slice(0, elseAt) : '\u0000', '')
+    .replace(/\{provider\.returnGuaranteeUnconditional \? [^}]*\}/g, '')
+  const ABSOLUTES = [/unconditional/i, /no questions asked/i, /for any reason/i]
+  check('GUAR7e: the absolute words live only where the platform\'s flag puts them',
+    dictatedBranch.length > 0
+    && ABSOLUTES.every((re) => !re.test(ungated))
+    && !/you get your money back/i.test(ungated))
+  check('GUAR7f: the attributed wording every other channel gets carries none of them',
+    attributedBranch.length > 0
+    && ABSOLUTES.every((re) => !re.test(attributedBranch)))
+  check('GUAR7g: the dictated paragraph is the platform\'s own sentence, with the number still rendered',
+    /We offer a full refund within \{provider\.returnGuaranteeDays\} days of purchase, no questions asked/
+      .test(dictatedBranch)
+    && /If you are not satisfied for any reason, simply contact our support team to request a refund/
+      .test(dictatedBranch))
+  check('GUAR7h: the heading only calls it unconditional where the flag says so',
+    /\{provider\.returnGuaranteeUnconditional \? 'Unconditional ' : ''\}Money-Back Guarantee/
+      .test(guarFlat))
+  check('GUAR7i: digistore24 carries the flag and nobody else does',
+    ds24?.returnGuaranteeUnconditional === true
+    && cb?.returnGuaranteeUnconditional === false
+    && jv?.returnGuaranteeUnconditional === false)
+  // THE PROMISE AND THE CODE BEHIND IT. "No questions asked" is only publishable
+  // because a refund actually ends the plan; these two guards are what stop the
+  // sentence from outliving the mechanism.
+  const REVOKE_MIG = 'supabase/migrations/20261114120000_revoke_refunded_marketplace_order.sql'
+  const revokeSrc = read(REVOKE_MIG)
+  const intakeSrc = code('lib/marketplace/intake.ts')
+  check('GUAR7j: the page tells the buyer, before buying, that the refund ends the plan',
+    /the plan ends and the dashboard returns to the free tier/.test(dictatedBranch))
+  check('GUAR7k: a refund goes through the database function, not a bare status update',
+    /rpc\('revoke_marketplace_order'/.test(intakeSrc)
+    && /p_kind: event\.kind/.test(intakeSrc))
+  check('GUAR7l: and that function expires the entitlement for a refund while leaving a cancellation alone',
+    /CREATE OR REPLACE FUNCTION public\.revoke_marketplace_order/.test(revokeSrc)
+    && /IF p_kind = 'cancelled' THEN\s+RETURN 'order_marked';/.test(revokeSrc)
+    && /UPDATE public\.subscriptions\s+SET status = 'expired'/.test(revokeSrc)
+    && /marketplace_order_id = v_order\.id/.test(revokeSrc))
+  check('GUAR7m: the function is service-role only, like every other billing transition here',
+    /REVOKE ALL ON FUNCTION public\.revoke_marketplace_order\(text, text, text\) FROM PUBLIC, anon, authenticated;/
+      .test(revokeSrc)
+    && /GRANT EXECUTE ON FUNCTION public\.revoke_marketplace_order\(text, text, text\) TO service_role;/
+      .test(revokeSrc))
   check('GUAR8: every plan card says "Cancel at any time", the reviewer\'s own wording',
     /Cancel\s*\n?\s*at any time\./.test(salesSrcNoBadge) || /Cancel at any time\./.test(salesSrcNoBadge))
   check('GUAR9: and the per-plan billing line still states both prices and the monthly schedule',
@@ -1810,10 +1870,21 @@ async function main() {
   check('GUAR-MUT4: an unguarded section would be caught by GUAR5',
     !/\{provider\.returnGuaranteeDays \? \(/.test(
       salesSrcNoBadge.replace(/\{provider\.returnGuaranteeDays \? \(/g, '{true ? (')))
-  check('GUAR-MUT5: the word the legal thread struck out would be caught by GUAR7e',
-    /unconditional/i.test(`${salesProse} gives you an unconditional guarantee`))
-  check('GUAR-MUT6: so would the promise it struck out with it',
-    /you get your money back/i.test(`${salesProse} and you get your money back`))
+  check('GUAR-MUT5: the absolute words leaking into the attributed wording would be caught by GUAR7e',
+    /unconditional/i.test(`${attributedBranch} an unconditional guarantee`))
+  check('GUAR-MUT6: and a promise loose in the ungated page would be caught by GUAR7e',
+    /you get your money back/i.test(`${ungated} and you get your money back`))
+  check('GUAR-MUT9: giving clickbank the absolute words would be caught by GUAR7i',
+    ({ ...cb, returnGuaranteeUnconditional: true }).returnGuaranteeUnconditional !== false)
+  check('GUAR-MUT10: a refund that only marked the order would be caught by GUAR7k',
+    !/rpc\('revoke_marketplace_order'/.test(
+      intakeSrc.replace(/rpc\('revoke_marketplace_order'/g, "from(TABLE).update({ status: event.kind }")))
+  check('GUAR-MUT11: a function that expired the plan on a cancellation too would be caught by GUAR7l',
+    !/IF p_kind = 'cancelled' THEN\s+RETURN 'order_marked';/.test(
+      revokeSrc.replace(/IF p_kind = 'cancelled' THEN/g, 'IF false THEN')))
+  check('GUAR-MUT12: dropping the access notice from the page would be caught by GUAR7j',
+    !/the plan ends and the dashboard returns to the free tier/.test(
+      dictatedBranch.replace(/the plan ends and the dashboard returns to the free tier/g, '')))
   check('GUAR-MUT7: dropping the platform\'s exclusion would be caught by GUAR7b',
     !/re-subscribes to the same product within two years is not entitled to it again/.test(
       guarFlat.replace(

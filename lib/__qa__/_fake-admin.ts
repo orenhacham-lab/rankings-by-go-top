@@ -789,6 +789,47 @@ export class FakeAdmin {
       return one('renewed')
     }
 
+    /**
+     * `revoke_marketplace_order`, mirroring
+     * supabase/migrations/20261114120000_revoke_refunded_marketplace_order.sql
+     * branch for branch: the empty-argument and bad-kind refusals, the unknown
+     * order, the cancellation that marks and stops, the unclaimed refund, the
+     * claimed refund that expires the entitlement, and the claimed refund with
+     * no live entitlement row.
+     *
+     * WHAT IT PROVES AND WHAT IT CANNOT. The contract: which answer each state
+     * produces, that a cancellation never costs a buyer the period they paid
+     * for, and that a refund does. Not atomicity or the lock — those are
+     * `FOR UPDATE` and the single transaction in the SQL, which the suite
+     * checks for in the migration's own source.
+     */
+    if (name === 'revoke_marketplace_order') {
+      const p = params as Record<string, string | null>
+      const one = (answer: string) => ({ data: answer, error: null })
+      const provider = (p.p_provider ?? '').trim()
+      const orderId = (p.p_external_order_id ?? '').trim()
+      const kind = p.p_kind ?? ''
+      if (!provider || !orderId) return one('order_unknown')
+      if (kind !== 'refunded' && kind !== 'cancelled') return one('invalid_kind')
+      const order = (this.tables.marketplace_orders ??= [])
+        .find((r) => r.provider === provider && r.external_order_id === orderId)
+      if (!order) return one('order_unknown')
+      const wasClaimed = order.claimed_by != null
+      order.status = kind
+      order.updated_at = nowIso()
+      if (kind === 'cancelled') return one('order_marked')
+      if (!wasClaimed) return one('order_marked')
+      const live = (this.tables.subscriptions ??= []).filter((r) =>
+        r.marketplace_order_id === order.id
+        && (r.status === 'trial' || r.status === 'active' || r.status === 'cancelled'))
+      if (!live.length) return one('order_marked_entitlement_missing')
+      for (const sub of live) {
+        sub.status = 'expired'
+        sub.updated_at = nowIso()
+      }
+      return one('revoked')
+    }
+
     return { data: null, error: { message: `unknown rpc: ${name}` } }
   }
 }

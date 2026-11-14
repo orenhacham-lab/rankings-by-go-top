@@ -189,7 +189,8 @@ export default async function MarketplaceSalesPage({
                   drift from the window configured inside the platform. */}
               {provider.returnGuaranteeDays ? (
                 <p className="mt-1 text-copy text-body">
-                  {provider.returnGuaranteeDays}-day money-back guarantee.
+                  {provider.returnGuaranteeDays}-day money-back guarantee
+                  {provider.returnGuaranteeUnconditional ? ', no questions asked' : ''}.
                 </p>
               ) : null}
               <p className="mt-2 text-copy text-body">
@@ -354,9 +355,7 @@ export default async function MarketplaceSalesPage({
         <p className="mt-4 text-copy text-muted">
           Cancelling stops the future charges, and by itself it does not return money already
           paid: it is not a refund request. To ask for money back inside the first{' '}
-          {provider.returnGuaranteeDays} days, ask {provider.label} for a refund, as described
-          below. {provider.label}&rsquo;s own return and cancellation policy is the policy that
-          governs this purchase.
+          {provider.returnGuaranteeDays} days, use the guarantee below.
         </p>
       ) : (
         <p className="mt-4 text-copy text-muted">
@@ -377,16 +376,24 @@ export default async function MarketplaceSalesPage({
           must equal the platform setting, and a page cannot state a window
           the configuration does not hold.
 
-          WHY THIS DOES NOT TOUCH OUR OWN POLICY. The guarantee is given by the
-          seller of this purchase, and on this page that seller is the
-          platform. Our own refund policy — no refund beyond what the law
-          requires — governs a purchase made from us, which this is not, and
-          section 6A of it already says the reseller's policy governs a
-          reseller purchase. So this section names the giver in its first
-          words rather than promising in our own voice something a buyer could
-          read as site-wide. A platform with no guarantee renders nothing at
-          all, which keeps ClickBank's contractual ban on publishing a
-          conflicting guarantee untouched.
+          WHY THIS DOES NOT TOUCH OUR OWN POLICY. The guarantee is given on
+          this purchase, whose seller is the platform. Our own refund policy —
+          no refund beyond what the law requires — governs a purchase made
+          from us, which this is not, and section 6A of it already says the
+          reseller's policy governs a reseller purchase. A platform with no
+          guarantee renders nothing at all, which keeps ClickBank's
+          contractual ban on publishing a conflicting guarantee untouched.
+
+          TWO WORDINGS, AND THE PLATFORM PICKS. Where the platform does not
+          demand otherwise the section attributes the terms to the platform
+          and names the limits the platform publishes. Digistore24 demanded
+          the absolute words on 2026-11-14 and the owner accepted them that
+          day, so `returnGuaranteeUnconditional` turns the section into their
+          dictated paragraph with nothing qualifying it. The flag's comment in
+          lib/marketplace/config.ts holds what was weighed; what it bought is
+          the revocation this section can now promise, because a refund
+          expires the entitlement in the database rather than waiting for
+          somebody to notice.
 
           AND IT SITS AFTER THE CANCELLATION SENTENCE DELIBERATELY. That
           sentence says cancelling does not return money already paid, which
@@ -397,56 +404,111 @@ export default async function MarketplaceSalesPage({
       {provider.returnGuaranteeDays ? (
         <section className="mt-10" data-return-guarantee={provider.slug}>
           <h2 className="text-section text-ink">
-            {provider.returnGuaranteeDays}-day money-back guarantee
+            {provider.returnGuaranteeDays}-Day{' '}
+            {provider.returnGuaranteeUnconditional ? 'Unconditional ' : ''}Money-Back Guarantee
           </h2>
-          {/* WRITTEN IN THE PLATFORM'S TERMS, NOT IN PROMISES OF OUR OWN.
-              The first draft of this paragraph said the guarantee was
-              "unconditional", that a refund could be had "for any reason or
-              for none" and that "you get your money back". The legal thread
-              refused it on 2026-11-13 and the reason stands on its own: those
-              are absolute statements about how another company will behave,
-              made in our voice, and Digistore24's own buyer terms do not say
-              them. What their terms say, read 13.11.2026 at
-              https://www.digistore24.com/page/terms/2/en section 13 (Digital
-              Products and Services), is that the terms of an advertised
-              money-back guarantee "will be stated at the time of purchase",
-              that it "shall only be available for the stated period", and
-              that a customer who takes a refund and then re-buys the same
-              product inside two years is not entitled to it again. The vendor
-              setting behind the number is equally concrete: the field is
-              called "Refund regulation", it is set to the 60-day option on
-              return policy 59003 ("60-day money-back guarantee", active, all
-              four products), it carries the note "The period begins with the
-              first payment", and it is followed by Digistore24's own reserved
-              right to refund at its sole discretion. So the paragraph states
-              the window, attributes the terms, names the exclusion and stops
-              - which still answers the reviewer's demand for a 60-day policy
-              stated on the sales page, because the window and the heading are
-              what they asked to see. */}
-          <p className="mt-2 text-copy text-body">
-            {provider.label} is the seller of record for this purchase and handles the refunds
-            itself: in its own published words it handles &ldquo;all refund and chargeback
-            requests&rdquo; for us. The return period set on these plans inside {provider.label}
-            {' '}is {provider.returnGuaranteeDays} days, and that period begins with your first
-            payment.
-          </p>
-          <p className="mt-2 text-copy text-body">
-            The terms of it are {provider.label}&rsquo;s and {provider.label} publishes them: the
-            guarantee stated at the time of purchase is the one that applies, it is available only
-            for that stated period, and a customer who takes a refund and then buys or
-            re-subscribes to the same product within two years is not entitled to it again.{' '}
-            {provider.label} also keeps the right to refund at its own discretion. Its return
-            policy, not ours, is the policy that governs this purchase.
-          </p>
-          {provider.orderSupportUrl ? (
-            <p className="mt-2 text-copy text-body">
-              You ask {provider.label} for it, not us:{' '}
-              <a className="text-action underline" href={provider.orderSupportUrl} rel="nofollow">
-                open {provider.label}&rsquo;s cancel or refund form
-              </a>{' '}
-              and enter your order number.
-            </p>
-          ) : null}
+          {provider.returnGuaranteeUnconditional ? (
+            <>
+              {/* THE PLATFORM'S OWN WORDS, PUBLISHED ON THE OWNER'S DECISION.
+                  Digistore24's Product Compliance Team wrote this paragraph
+                  for us on 2026-11-14 and asked for it in these terms; the
+                  owner read what it costs us and chose to publish it the same
+                  day. The number is still the one field, so the page cannot
+                  state a window the platform setting does not hold.
+
+                  AND NOTHING QUALIFIES IT. The earlier version of this
+                  section stated the two limits Digistore24's own buyer terms
+                  put on an advertised guarantee. Printing those under a
+                  heading that says "Unconditional" would be a page arguing
+                  with itself, and a buyer reading a promise and its
+                  exceptions in the same breath is worse served than one
+                  reading either alone. So the limits are gone from the page
+                  and the record of them lives where a decision belongs: the
+                  provider record, the legal thread's re-read of section 13,
+                  and their email asking for this text. */}
+              <p className="mt-2 text-copy text-body">
+                We offer a full refund within {provider.returnGuaranteeDays} days of purchase, no
+                questions asked. If you are not satisfied for any reason, simply contact our
+                support team to request a refund.
+              </p>
+              {/* WHO TO ASK, BOTH WAYS, because the sentence above says "our
+                  support team" and the money is not ours to return: the
+                  platform is the seller of record and says in its own
+                  published words that it handles "all refund and chargeback
+                  requests" for us. Telling a buyer only to write to us would
+                  put a day of forwarding between them and their money, and
+                  telling them only to go to the platform would contradict the
+                  promise they just read. Both are true, so both are here. */}
+              <p className="mt-2 text-copy text-body">
+                Write to{' '}
+                <a className="text-action underline" href={`mailto:${MARKETPLACE_SUPPORT_EMAIL}`}>
+                  {MARKETPLACE_SUPPORT_EMAIL}
+                </a>{' '}
+                and we will put the refund through with {provider.label}, who took the payment and
+                issues it.
+                {provider.orderSupportUrl ? (
+                  <>
+                    {' '}
+                    Or ask {provider.label} directly:{' '}
+                    <a
+                      className="text-action underline"
+                      href={provider.orderSupportUrl}
+                      rel="nofollow"
+                    >
+                      open {provider.label}&rsquo;s cancel or refund form
+                    </a>{' '}
+                    and enter your order number.
+                  </>
+                ) : null}
+              </p>
+              {/* THE ONE THING A BUYER MUST BE TOLD BEFORE THEY BUY, not
+                  after: the refund ends the plan. It is a product term, and a
+                  term a buyer meets for the first time at the moment it bites
+                  is a term we hid. It is also true in code rather than in
+                  intention — a refund delivery expires the entitlement inside
+                  the same transaction that marks the order (supabase/
+                  migrations/20261114120000_revoke_refunded_marketplace_order
+                  .sql) — which is the only reason it may be written here. */}
+              <p className="mt-2 text-copy text-muted">
+                When the refund goes through, the plan ends and the dashboard returns to the free
+                tier. Everything already published to your own website stays yours.
+              </p>
+            </>
+          ) : (
+            <>
+              {/* WRITTEN IN THE PLATFORM'S TERMS, NOT IN PROMISES OF OUR OWN
+                  — the shape every channel gets unless the platform itself
+                  demands the absolute words and the owner accepts them. It
+                  states the window, attributes the terms to the platform
+                  whose terms they are, names the exclusion the platform
+                  publishes, and stops. Digistore24 wore this version from
+                  2026-11-13 until their compliance team refused it. */}
+              <p className="mt-2 text-copy text-body">
+                {provider.label} is the seller of record for this purchase and handles the refunds
+                itself: in its own published words it handles &ldquo;all refund and chargeback
+                requests&rdquo; for us. The return period set on these plans inside{' '}
+                {provider.label} is {provider.returnGuaranteeDays} days, and that period begins
+                with your first payment.
+              </p>
+              <p className="mt-2 text-copy text-body">
+                The terms of it are {provider.label}&rsquo;s and {provider.label} publishes them:
+                the guarantee stated at the time of purchase is the one that applies, it is
+                available only for that stated period, and a customer who takes a refund and then
+                buys or re-subscribes to the same product within two years is not entitled to it
+                again. {provider.label} also keeps the right to refund at its own discretion. Its
+                return policy, not ours, is the policy that governs this purchase.
+              </p>
+              {provider.orderSupportUrl ? (
+                <p className="mt-2 text-copy text-body">
+                  You ask {provider.label} for it, not us:{' '}
+                  <a className="text-action underline" href={provider.orderSupportUrl} rel="nofollow">
+                    open {provider.label}&rsquo;s cancel or refund form
+                  </a>{' '}
+                  and enter your order number.
+                </p>
+              ) : null}
+            </>
+          )}
         </section>
       ) : null}
 
