@@ -632,6 +632,20 @@ async function main() {
     // literal either.
     const OWN_NAME_SALE = new Set(['lib/billing/__qa__/own-name-sale.qa.ts', 'lib/billing/own-name-sale.ts'])
     untouched = untouched.split('\n').filter((f) => f && !OWN_NAME_SALE.has(f)).join('\n')
+    // 2026-11-14: the marketplace billing authority. supabase/migrations/
+    // 20261016160000_marketplace_orders.sql widened billing_governance's two CHECK
+    // constraints to accept 'marketplace', and claim_marketplace_order writes it on
+    // every claim, while lib/billing/governance.ts still listed only the older
+    // values — so the row READ as invalid, every caller failed closed, and the first
+    // buyer to claim an order was sent to the plans page with an active paid
+    // subscription. The fix adds that one string to the two allowlists and nothing
+    // else: no plan, price, quota or limit VALUE, no change to who is entitled to
+    // what. H3c above proves the catalog itself is untouched, and
+    // lib/billing/__qa__/governance-values.qa.ts holds the lists to the database's
+    // constraints from here on, including the control that an authority this code
+    // genuinely does not know is still refused.
+    const MARKETPLACE_AUTHORITY = new Set(['lib/billing/governance.ts', 'lib/billing/__qa__/governance-values.qa.ts'])
+    untouched = untouched.split('\n').filter((f) => f && !MARKETPLACE_AUTHORITY.has(f)).join('\n')
     check('H4: plans, prices, quotas, billing, entitlement and Shopify files are untouched', untouched === '', untouched)
     let allowDiff = ''
     try { allowDiff = execSync('git diff -U0 8b468a8 -- lib/billing/usage-allowance.ts', { cwd: ROOT }).toString() } catch { allowDiff = 'git unavailable' }
@@ -648,7 +662,16 @@ async function main() {
     let subDiff = ''
     try { subDiff = execSync('git diff -U0 8b468a8 -- lib/subscription.ts', { cwd: ROOT }).toString() } catch { subDiff = 'git unavailable' }
     const changed = subDiff.split('\n').filter((l: string) => /^[+-]/.test(l) && !/^(\+\+\+|---)/.test(l))
-    check('H4b: lib/subscription.ts changed only the display-only trial lines and their import', changed.every((l: string) => /trial:|trialLimitLines|planLimitLines/.test(l)), changed.join(' ;; ').slice(0, 300))
+    // The second allowed shape, added 2026-11-14: one member on
+    // AccessDiagnostics.authority, which is the LOG field that explains a
+    // route-guard decision. It reports the authority the governance row already
+    // holds and grants nothing — see MARKETPLACE_AUTHORITY above.
+    const subAllowed = (l: string) => /trial:|trialLimitLines|planLimitLines/.test(l)
+      || /authority: 'shopify' \| 'website'/.test(l)
+    check('H4b: lib/subscription.ts changed only the display-only trial lines, their import, and the diagnostics authority union',
+      changed.every(subAllowed), changed.join(' ;; ').slice(0, 300))
+    check('H4b-MUT: a line that changes a plan number in that file still fails H4b',
+      !['+  const maxProjects = 99'].every(subAllowed))
   }
 
   say(`\n${pass} passed, ${fail} failed`)

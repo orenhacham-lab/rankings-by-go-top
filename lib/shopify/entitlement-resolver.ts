@@ -400,7 +400,10 @@ export interface ShopifyGovernanceCheck {
   active: boolean
   unavailable?: true
   reason: ShopifyRouteAccessReason
-  authority: 'shopify' | 'website' | 'unreadable'
+  // 'marketplace' is reported as itself, never folded into 'website': the
+  // route-guard log line is how an operator tells a marketplace buyer's
+  // account apart from a website one when a decision has to be explained.
+  authority: 'shopify' | 'website' | 'marketplace' | 'unreadable'
   connectionStatus?: string | null
   subscriptionStatus?: string | null
   planHandle?: string | null
