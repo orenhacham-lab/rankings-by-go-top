@@ -263,7 +263,7 @@ async function main() {
         /const gate = await assertContentGenerationAllowedForUser\(admin, userId, deps\.now\)/.test(src)
         && src.indexOf('assertContentGenerationAllowedForUser(admin, userId, deps.now)') < src.indexOf('buildBriefForTopic(admin, topicId)'))
       check('A1B-6e: SOURCE — generatePoolItem (cron/queue/retry) funnels through it',
-        /generateArticleForTopic\(admin, \{ topicId: item\.topic_id/.test(strip(read('lib/content/automation/generate-item.ts'))))
+        /generateArticleForTopic\(admin, \{\s*topicId: item\.topic_id/.test(strip(read('lib/content/automation/generate-item.ts'))))
       check('A1B-6f: SOURCE — the manual route funnels through it too',
         /generateArticleForTopic\(/.test(strip(read('app/api/content/articles/generate/route.ts'))))
       check('A1B-6g: SOURCE — the featured image is behind the same gate (same function)',
@@ -620,9 +620,16 @@ async function main() {
       // The row is marked failed either way; the distinct CODE is what differs,
       // and the row stays regenerable.
       check('A3E-G5: the row is marked failed, so the merchant is actually told', row.status === 'failed')
-      check('A3E-G6: SOURCE — one write, always failed, with the distinct code',
-        /\.update\(\{ status: 'failed', last_error: code, updated_at: nowIso\(\) \}\)/
-          .test(strip(read('lib/content/inline-images.ts'))))
+      // The write moved into markInlineImageFailed when the batch lane needed to
+      // leave an identical failed row; the invariant is unchanged — ONE write,
+      // always 'failed', carrying the distinct code — and the denial path uses it.
+      {
+        const isrc = strip(read('lib/content/inline-images.ts'))
+        check('A3E-G6: SOURCE — one write, always failed, with the distinct code',
+          /\.update\(\{ status: 'failed', last_error: reason\.slice\(0, 300\), updated_at: [^}]*\}\)/.test(isrc)
+          && (isrc.match(/status: 'failed'/g) ?? []).length === 2
+          && /markInlineImageFailed\(admin, imageId, denial\.code\)/.test(isrc))
+      }
     }
 
     // F — the automation retry counter is preserved for an outage.
@@ -761,8 +768,14 @@ async function main() {
 
     // ── NO PROVIDER CALL in either denied state ──
     {
-      const src = strip(read('lib/content/inline-images.ts'))
-      const gateIdx = src.indexOf('assertContentGenerationAllowedForProject(admin, row.project_id, nowFn)')
+      // Read inside generateInlineImage itself: the gate is a shared function now
+      // (inlineImageGateDenial, which the batch lane calls at the same point), so
+      // what matters is that the live path asks it BEFORE it spends anything.
+      const ifull = strip(read('lib/content/inline-images.ts'))
+      check('A3F-6a0: SOURCE — the shared gate is the entitlement check itself',
+        /assertContentGenerationAllowedForProject\(admin, projectId, nowFn\)/.test(ifull))
+      const src = ifull.slice(ifull.indexOf('export async function generateInlineImage'))
+      const gateIdx = src.indexOf('inlineImageGateDenial(admin, row.project_id, nowFn)')
       check('A3F-6a: SOURCE — the gate precedes the image model call',
         gateIdx !== -1 && gateIdx < src.indexOf('generateArticleImage('))
       check('A3F-6b: SOURCE — and precedes marking the row generating',

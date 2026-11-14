@@ -76,7 +76,7 @@ async function gateAndFinalize(admin: Admin, itemId: string, article: { id: stri
 export async function generatePoolItem(
   admin: Admin,
   itemId: string,
-  opts: { allowRetry?: boolean; autoApplyInternalLinks?: boolean } = {},
+  opts: { allowRetry?: boolean; autoApplyInternalLinks?: boolean; inlineImagesMayBatch?: boolean } = {},
 ): Promise<GenerateItemResult> {
   try {
     const { data: itemData } = await admin
@@ -146,7 +146,10 @@ export async function generatePoolItem(
     // when the caller opts in (the MANUAL "generate" button on a queued item), the
     // topic's APPROVED internal links are auto-inserted into the draft, exactly like
     // the per-topic manual generate. Cron/scheduled runs do NOT opt in (unchanged).
-    const gen = await generateArticleForTopic(admin, { topicId: item.topic_id, userId: ownerId, autoApplyInternalLinks: opts.autoApplyInternalLinks === true })
+    // inlineImagesMayBatch: half-price BODY images, passed through untouched —
+    // only the runner decides it, and only where it measured enough slack
+    // before this pool publishes (lib/content/image-batch/may-batch.ts).
+    const gen = await generateArticleForTopic(admin, { topicId: item.topic_id, userId: ownerId, autoApplyInternalLinks: opts.autoApplyInternalLinks === true, inlineImagesMayBatch: opts.inlineImagesMayBatch === true })
     if (!gen.ok) {
       let status = 'failed'
       let reason: string = gen.kind

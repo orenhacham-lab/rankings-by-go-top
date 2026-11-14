@@ -23,6 +23,8 @@ import { takeBatchedDraft } from '@/lib/content/batch/take-draft'
 import { isArticleBatchEnabled } from '@/lib/content/batch/flag'
 import { createFeaturedImageForArticle } from '@/lib/content/featured-image'
 import { runArticleImageStep } from '@/lib/content/article-style/generation'
+import { isInlineImageBatchEnabled } from '@/lib/content/image-batch/flag'
+import { submitInlineImageBatch } from '@/lib/content/image-batch/inline-image-batch'
 import { decodeBriefNotes } from '@/lib/content/brief-notes'
 import { resolveArticleDepth, DEPTH_PROMPT_LABEL } from '@/lib/content/article-depth'
 import { loadApprovedPlanAnchors } from '@/lib/content/internal-link-generation-guidance'
@@ -349,7 +351,20 @@ export async function buildBriefForTopic(admin: Admin, topicId: string): Promise
  */
 export async function generateArticleForTopic(
   admin: Admin,
-  opts: { topicId: string; userId: string; autoApplyInternalLinks?: boolean },
+  opts: {
+    topicId: string
+    userId: string
+    autoApplyInternalLinks?: boolean
+    /**
+     * May the article's BODY images be ordered from the Gemini Batch API (half
+     * price, hours instead of seconds) instead of called for now? Only the
+     * queue's own generation sets this, and only when the pool has a day or
+     * more before it publishes (lib/content/image-batch/may-batch.ts). A
+     * merchant pressing generate or regenerate never sets it, and the hero
+     * image is never batched.
+     */
+    inlineImagesMayBatch?: boolean
+  },
   deps: ArticleGenerationDeps = REAL_GENERATION_DEPS,
 ): Promise<GenerateForTopicResult> {
   const { topicId, userId } = opts
@@ -567,6 +582,9 @@ export async function generateArticleForTopic(
   // inline images the project asked for. No settings = the featured image only.
   const { imageGenerated } = await runArticleImageStep(admin, { articleId: inserted.id, projectId, ownerId: userId }, {
     createFeaturedImage: () => deps.createFeaturedImage(admin, inserted.id),
+    batchInline: opts.inlineImagesMayBatch && isInlineImageBatchEnabled()
+      ? async (a, imageIds) => (await submitInlineImageBatch(a as never, imageIds)).orderedIds
+      : undefined,
   })
 
   return { ok: true, articleId: inserted.id, warnings: article.warnings, audit: gen.audit, imageGenerated, autoInternalLinks }

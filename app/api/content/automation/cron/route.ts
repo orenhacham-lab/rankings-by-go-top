@@ -88,6 +88,7 @@ import { runMapUpkeep, liveEnsure } from '@/lib/content/existing-content/map-upk
 import { runBlogDailyWindow, startIsolatedBlogWindow } from '@/lib/blog/auto/daily-window'
 import { runIsolatedGbpDue } from '@/lib/gbp/due-isolated'
 import { runIsolatedArticleBatch } from '@/lib/content/batch/isolated'
+import { runIsolatedInlineImageBatch } from '@/lib/content/image-batch/isolated'
 
 // Generation can take a while; request a generous budget (platform clamps to the
 // plan's max — e.g. 60s on Hobby, up to 300s on Pro).
@@ -162,6 +163,14 @@ async function handle(request: Request): Promise<Response> {
     // isolated: two HTTP calls to Google, no model wait, and it never throws, so
     // it cannot change, delay or fail anything above.
     await runIsolatedArticleBatch()
+    // Then the IMAGE batch lane (lib/content/image-batch): collect the article
+    // BODY images Gemini's Batch API has finished and store them, also at 50% of
+    // the interactive price. Nothing is ordered here — the images are ordered at
+    // generation time, where their prompts are known, and only for a pool with a
+    // day or more before it publishes. Production only, off unless
+    // IMAGE_BATCH_ENABLED is "true", and isolated: one HTTP call per job in
+    // flight, no model wait, and it never throws.
+    await runIsolatedInlineImageBatch()
     // Then the outbound-channel retention pass: it empties a prospect's address, name and
     // postal address 30 days after the last message, which the published privacy text
     // promises (lib/outreach/retention-isolated.ts). It rides this cron because a daily
