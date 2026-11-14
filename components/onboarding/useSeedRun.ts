@@ -14,6 +14,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { startNotice, type Notice } from '@/lib/onboarding/notices'
 import { pollDelay } from '@/lib/onboarding/summary-view'
 import type { SeedRunView } from '@/lib/seed-scan/types'
+import { readSeed } from '@/lib/client/seed-read'
 
 /** Reads after a start before the screen stops waiting for the new run and shows whatever the server has. */
 const MAX_AWAIT_READS = 20
@@ -54,13 +55,22 @@ export function useSeedRun(projectId: string, initialRun: SeedRunView | null): S
     const timer = window.setTimeout(async () => {
       readNow.current = false
       try {
-        const res = await fetch(`/api/projects/${encodeURIComponent(projectId)}/seed`, {
-          cache: 'no-store',
+        // Shared read (lib/client/seed-read.ts); the signal stops this reader
+        // only, and `status: 0` is its old failure branch.
+        // `fresh` while a start is being awaited: that read exists to notice a
+        // run that has just replaced another, so it must not be served from the
+        // moment before the start.
+        const { status: http, body: raw, aborted } = await readSeed(projectId, {
           signal: controller.signal,
+          fresh: state.awaiting !== null,
         })
-        const body = (await res.json().catch(() => null)) as { ok?: unknown; run?: SeedRunView | null } | null
-        if (controller.signal.aborted) return
-        if (res.ok && body?.ok === true) {
+        const body = raw as { ok?: unknown; run?: SeedRunView | null } | null
+        if (aborted || controller.signal.aborted) return
+        if (http === 0) {
+          setState((s) => ({ ...s, failures: s.failures + 1 }))
+          return
+        }
+        if (http >= 200 && http < 300 && body?.ok === true) {
           const run = body.run ?? null
           setState((s) => {
             let awaiting = s.awaiting
@@ -70,8 +80,8 @@ export function useSeedRun(projectId: string, initialRun: SeedRunView | null): S
             }
             return { run, failures: 0, readError: null, awaiting }
           })
-        } else if (res.status === 401 || res.status === 404) {
-          setState((s) => ({ ...s, readError: startNotice(res.status, body), awaiting: null }))
+        } else if (http === 401 || http === 404) {
+          setState((s) => ({ ...s, readError: startNotice(http, body), awaiting: null }))
         } else {
           setState((s) => ({ ...s, failures: s.failures + 1 }))
         }

@@ -13,6 +13,7 @@
  */
 import { useEffect, useRef, useState } from 'react'
 import { readSeedState, shouldPollSeed, type SeedPageState } from './overview-model'
+import { readSeed as readSeedShared } from '@/lib/client/seed-read'
 
 export const SEED_READ_DEADLINE_MS = 5_000
 export const SEED_POLL_MS = 8_000
@@ -20,14 +21,15 @@ export const SEED_POLL_MS = 8_000
 export const SEED_POLL_MAX = 60
 
 async function readSeed(projectId: string): Promise<SeedPageState> {
+  // The deadline is unchanged and still this page's own: it stops THIS reader
+  // waiting, and the shared request (lib/client/seed-read.ts) carries on for
+  // whoever else is reading the same scan.
   const controller = new AbortController()
   const timer = setTimeout(() => controller.abort(), SEED_READ_DEADLINE_MS)
   try {
-    const res = await fetch(`/api/projects/${encodeURIComponent(projectId)}/seed`, { cache: 'no-store', signal: controller.signal })
-    const body = res.ok ? await res.json().catch(() => null) : null
-    return readSeedState(res.status, body)
-  } catch {
-    return { kind: 'none' }
+    const { status, body } = await readSeedShared(projectId, { signal: controller.signal })
+    if (status === 0) return { kind: 'none' }
+    return readSeedState(status, status >= 200 && status < 300 ? body : null)
   } finally {
     clearTimeout(timer)
   }

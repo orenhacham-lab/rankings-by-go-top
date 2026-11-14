@@ -13,6 +13,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import type { DashboardOverview } from '@/lib/dashboard/overview'
 import { seedStateFrom, seedStillRunning, type SeedState } from '@/lib/dashboard/seed'
+import { readSeed, seedUrl as sharedSeedUrl } from '@/lib/client/seed-read'
 
 const READ_DEADLINE_MS = 15_000
 /** How often a running scan is asked again. */
@@ -59,9 +60,8 @@ export function useDashboardOverview(projectId: string): { overview: OverviewSta
   return { overview: result && result.attempt === attempt ? result.state : { status: 'loading' }, reload }
 }
 
-export function seedUrl(projectId: string): string {
-  return `/api/projects/${encodeURIComponent(projectId)}/seed`
-}
+/** Re-exported from the shared reader, so there is one spelling of this path. */
+export const seedUrl = sharedSeedUrl
 
 /** `refreshKey`: bumped to read the scan again (a mapping this screen started has just finished). */
 export function useSeedState(projectId: string, refreshKey = 0): SeedState {
@@ -71,7 +71,9 @@ export function useSeedState(projectId: string, refreshKey = 0): SeedState {
   useEffect(() => {
     let cancelled = false
     let timer: ReturnType<typeof setTimeout> | null = null
-    void getJson(seedUrl(projectId)).then(({ status, body }) => {
+    // Shared with every other component reading the scan on this screen
+    // (lib/client/seed-read.ts): one request, not one per widget.
+    void readSeed(projectId).then(({ status, body }) => {
       if (cancelled) return
       const next = seedStateFrom(status, body)
       setState(next)
