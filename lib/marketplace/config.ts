@@ -193,6 +193,47 @@ export const DIGISTORE24_IPN_SCHEME: MarketplaceSortedParamsDigestScheme = {
 }
 
 /**
+ * THE SECOND PLACE DIGISTORE24 SIGNS SOMETHING, AND IT IS NOT THE IPN.
+ *
+ * When a product is set to pass the order data on, Digistore24 append it to
+ * the thank-you page URL as GET parameters and sign that set the same way
+ * they sign an IPN body — `sha_sign`, SHA-512, every parameter sorted,
+ * `name=value` with the passphrase appended once per parameter. Their own
+ * example for it says what it is for: the key "is used to protect the GET
+ * parameters sent to your thank you page", and the script's comment draws the
+ * conclusion this scheme exists for — it "validated the signature and so the
+ * integerity of the order data" (their typo).
+ *
+ * THE ALGORITHM IS IDENTICAL TO THE IPN'S AND THE KEY IS NOT. This is a
+ * separate constant rather than a reuse of DIGISTORE24_IPN_SCHEME precisely
+ * so that nothing can quietly verify a redirect with the IPN passphrase or an
+ * IPN with the thank-you key: the two secrets live in different settings
+ * screens, the vendor may rotate either alone, and a scheme shared between
+ * them would make that a type-correct mistake. Their example script
+ * (.../examples/ipn/thankyou_page.php, read 14.11.2026) calls the same
+ * `digistore_signature` function with THANKYOU_PAGE_KEY and the default
+ * arguments, so `caseSensitiveSort` is true here for the same reason it is
+ * there: `$convert_keys_to_uppercase` is not passed.
+ *
+ * WHAT IT DOES NOT COVER. Digistore24 can also ENCRYPT each value, and then a
+ * parameter arrives as ciphertext beginning `ds24` while the digest still
+ * covers the encrypted form. We do not decrypt: the four products are set to
+ * "No, transfer data in plain language", and
+ * `verifiedThankyouOrderId` refuses an order id that does not look like a
+ * plain one rather than guessing at a cipher it has not verified against
+ * their reference. A refusal costs the buyer the one-click button and leaves
+ * the emailed link working; a guess would be a second authentication path
+ * nobody has tested.
+ */
+export const DIGISTORE24_THANKYOU_SCHEME: MarketplaceSortedParamsDigestScheme = {
+  kind: 'sorted_params_digest',
+  field: 'sha_sign',
+  excluded: ['sha_sign', 'SHASIGN'],
+  algorithm: 'sha512',
+  caseSensitiveSort: true,
+}
+
+/**
  * JVZoo's JVZIPN v2 `cverify`, from the spec in the seller account
  * (docs/affiliate/jvzoo-webhook-docs.md, captured 2026-10-29):
  *
@@ -423,6 +464,35 @@ export interface MarketplaceProvider {
    * refused signature still answers 401 and still carries no 'OK', because a
    * delivery we did not accept must never read as handled.
    */
+  /**
+   * HOW A BUYER ACTIVATES WITHOUT LEAVING THE THANK-YOU PAGE, where the
+   * platform signs the redirect it sends them on.
+   *
+   * It exists because of a real failure, not a convenience. Our delivery is
+   * an email with a claim link, and a buyer who does not open it signs up at
+   * the front door instead and lands on a free trial while a paid receipt
+   * sits unclaimed. That is exactly what happened to Digistore24's own
+   * reviewer on 14.11.2026: her first order was activated through the link
+   * and ran on the Agency plan, her second was never opened, and she reported
+   * the product as broken. The fix is a button on the page she was already
+   * looking at.
+   *
+   * IT IS A SIGNED HANDOFF OR IT IS NOTHING. `orderIdField` names the
+   * parameter carrying the platform's order id, and that id is only a LOOKUP
+   * KEY against a receipt our own webhook recorded from a signed delivery —
+   * never a grant in itself. Digistore24's ids are short and sequential, so
+   * without the signature the button would hand a stranger who typed a
+   * neighbouring number somebody else's claim token. `signature` is therefore
+   * not optional for a provider that has this at all, and a provider whose
+   * redirect we have not verified the signing of keeps `null` and renders no
+   * button.
+   */
+  thankyouHandoff: {
+    /** The scheme the platform signs the redirect's parameters with. */
+    signature: MarketplaceSortedParamsDigestScheme
+    /** The parameter carrying the platform's own order id. */
+    orderIdField: string
+  } | null
   acknowledgement: 'json' | 'ok_text'
 }
 
@@ -522,6 +592,14 @@ export const MARKETPLACE_PROVIDERS: readonly MarketplaceProvider[] = [
      * what was weighed and who decided.
      */
     returnGuaranteeUnconditional: true,
+    /*
+     * Verified from their own thank-you-page example script and from the
+     * product's own settings: the four products pass the order data in plain
+     * language, so `order_id` arrives as a readable id, and the whole set is
+     * signed with the account's thank-you page key. See
+     * DIGISTORE24_THANKYOU_SCHEME.
+     */
+    thankyouHandoff: { signature: DIGISTORE24_THANKYOU_SCHEME, orderIdField: 'order_id' },
     /* Their guide: only the literal text OK counts as a handled delivery. */
     acknowledgement: 'ok_text',
   },
@@ -586,6 +664,15 @@ export const MARKETPLACE_PROVIDERS: readonly MarketplaceProvider[] = [
      * is gone for good. The literal-text acknowledgement is Digistore24's
      * requirement alone.
      */
+    /*
+     * NOT CONFIGURED, WHICH IS A STATEMENT ABOUT WHAT HAS BEEN READ AND NOT
+     * ABOUT WHAT THIS PLATFORM CAN DO. The redirect may well carry order
+     * data; nobody here has verified how, or whether, this platform signs
+     * it. An unsigned order id on our thank-you page is a number a stranger
+     * can type, so until the signing is read from their own documentation
+     * the page offers the emailed link and no button.
+     */
+    thankyouHandoff: null,
     acknowledgement: 'json',
   },
   {
@@ -644,6 +731,15 @@ export const MARKETPLACE_PROVIDERS: readonly MarketplaceProvider[] = [
       '32765, USA, and is used with permission. The role of JVZoo as a retailer does not ' +
       'constitute an endorsement, approval, or review of these products or any claims, ' +
       'statements, or opinions used in their promotion.',
+    /*
+     * NOT CONFIGURED, WHICH IS A STATEMENT ABOUT WHAT HAS BEEN READ AND NOT
+     * ABOUT WHAT THIS PLATFORM CAN DO. The redirect may well carry order
+     * data; nobody here has verified how, or whether, this platform signs
+     * it. An unsigned order id on our thank-you page is a number a stranger
+     * can type, so until the signing is read from their own documentation
+     * the page offers the emailed link and no button.
+     */
+    thankyouHandoff: null,
     acknowledgement: 'json',
   },
 ] as const
@@ -670,6 +766,24 @@ export function isMarketplaceProviderEnabled(slug: string): boolean {
 export function marketplaceWebhookSecret(slug: string): string | null {
   if (!marketplaceProvider(slug)) return null
   return process.env[`${envPrefix(slug)}WEBHOOK_SECRET`]?.trim() || null
+}
+
+/**
+ * The key the platform signs its THANK-YOU PAGE redirect with — a different
+ * secret from the webhook's, held as `MARKETPLACE_<SLUG>_THANKYOU_KEY`.
+ *
+ * Two env vars rather than one because they are two values in two of the
+ * platform's own settings screens, either of which the vendor may rotate
+ * alone. Collapsing them would make a rotated webhook passphrase silently
+ * start refusing thank-you redirects, or worse, make a leaked thank-you key
+ * enough to forge a paid order.
+ *
+ * Unset is the normal state of a provider that has no signed handoff, and it
+ * is also the fail-closed state of one that does: no key, no button.
+ */
+export function marketplaceThankyouKey(slug: string): string | null {
+  if (!marketplaceProvider(slug)) return null
+  return process.env[`${envPrefix(slug)}THANKYOU_KEY`]?.trim() || null
 }
 
 /**

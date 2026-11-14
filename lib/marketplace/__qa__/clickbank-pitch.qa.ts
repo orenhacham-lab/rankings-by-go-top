@@ -158,12 +158,29 @@ console.log('\nC) The thank-you page carries every required element')
   check('C5: order support too, from the provider', /href=\{provider\.orderSupportUrl\}/.test(thanks))
   check('C6: the statement descriptor is explained', /provider\.billingDescriptor/.test(thanks) &&
     /On the statement itself it appears as/i.test(thanks))
-  // IT MAY NOT DELIVER. The redirect carries no proof of payment we verified
-  // and can arrive before the platform's callback does, so a claim link, a
-  // plan name or "your account is ready" here would be a promise made on a
+  // IT MAY NOT DELIVER ON ITS OWN. The URL is public, and for ClickBank the
+  // redirect carries no proof of payment we have verified and can arrive
+  // before their callback does — so a claim link, a plan name or "your
+  // account is ready" rendered for this platform would be a promise made on a
   // page anybody can open.
-  check('C7: it mints or shows no claim capability',
-    !/claimUrl|claim_token|claimToken/.test(thanks))
+  //
+  // ONE PLATFORM IS DIFFERENT, AND THE DIFFERENCE IS EARNED TWICE OVER.
+  // Digistore24 SIGN the parameters they append, with a key of their own, and
+  // their IPN connection is set to fire BEFORE the buyer is forwarded here,
+  // so by the time the page renders the receipt exists and the redirect can
+  // be proven to be theirs. The page may therefore offer one button — built
+  // from a token read out of our own table after that signature verified,
+  // never minted here and never shown for a provider whose redirect signing
+  // has not been read. These guards pin exactly that: no token of our own
+  // making, and nothing at all on this platform's page.
+  check('C7a: the page mints no claim capability and builds no claim url of its own',
+    !/claimUrl|claim_token|newClaimToken/.test(thanks))
+  check('C7b: the only token it can render comes from the verified handoff',
+    (thanks.match(/claimToken/g) ?? []).length === 1
+    && /activation\.kind === 'claimable'/.test(thanks)
+    && thanks.indexOf("activation.kind === 'claimable'") < thanks.indexOf('activation.claimToken'))
+  check('C7c: and ClickBank has no signed handoff, so none of it applies to this page',
+    marketplaceProvider('clickbank')?.thankyouHandoff === null)
   check('C8: it does not assert that a payment happened, because its URL is public',
     !/your payment has been received|we have received your payment/i.test(thanks))
   check('C9a: the dictated product-support line is on it too',
@@ -255,10 +272,18 @@ console.log('\nF) MUTATION CONTROLS')
   const hardcoded = '<a href="https://www.clkbank.com">HERE</a>'
   check('F5: A7 fails when the destination is typed into the page',
     hardcoded.includes('clkbank.com'))
-  // C7: the version of this page that would have delivered.
+  // C7a: the version of this page that would have delivered.
   const delivering = 'Open your account: <a href={claimUrl}>here</a>'
-  check('F6: C7 fails on a thank-you page carrying a claim link',
+  check('F6: C7a fails on a thank-you page carrying a claim link of its own',
     /claimUrl/.test(delivering))
+  // C7b: a token rendered OUTSIDE the verified branch — the mutation that
+  // would hand a stranger who typed an order id somebody else's capability.
+  const unguarded = 'href={`/claim?order=${activation.claimToken}`}'
+  check('F6b: C7b fails when a claim token is rendered without the verified branch',
+    !/activation\.kind === 'claimable'/.test(unguarded))
+  // C7c: a provider given a handoff nobody verified the signing of.
+  check('F6c: C7c fails if clickbank were handed a signed handoff',
+    ({ thankyouHandoff: { orderIdField: 'order_id' } }).thankyouHandoff !== null)
   // D3: the mandated text pasted into the page rather than attributed.
   const pasted = 'CLICKBANK® is a registered trademark of Click Sales, Inc., a Delaware corporation'
   check('F7: D3 fails when the mandated text is typed into a page',

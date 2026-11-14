@@ -18,15 +18,32 @@
  * true for the buyer who was redirected here and makes no false claim to
  * anyone else.
  *
- * AND IT READS NOTHING FROM THE QUERY STRING. Digistore24 append their own
+ * AND IT RENDERS NOTHING FROM THE QUERY STRING. Digistore24 append their own
  * GET parameters to this URL (order_id, product_id, email and more), and
  * every one of them is a value a stranger can type into a browser. Rendering
  * an order id would publish whatever was supplied; rendering an email would
  * echo an address chosen by whoever opened the link; keying anything off
- * `product_id` would let a visitor pick which plan the page describes. The
- * only trustworthy statement of what was bought is the order our webhook
- * recorded from a signed delivery, and the buyer reaches that through the
- * claim link in their email. So this page is the same for every visitor.
+ * `product_id` would let a visitor pick which plan the page describes. So no
+ * parameter reaches this page's text, and the words are the same for every
+ * visitor.
+ *
+ * ONE THING IS NOW READ FROM IT, AND ONLY AFTER IT IS PROVEN. Digistore24
+ * sign the parameters they append, with a key separate from the webhook's, so
+ * a set that verifies against it came from the platform rather than from a
+ * visitor. `thankyouActivation` verifies that signature, uses the order id
+ * ONLY as a lookup key against a receipt our own webhook recorded from a
+ * signed delivery, and answers with that receipt's claim token or with
+ * nothing. The page turns a successful answer into one button and still
+ * renders no supplied value. A set that does not verify is treated exactly as
+ * no parameters at all, which is why the page is unchanged for the visitor
+ * who simply opened the URL.
+ *
+ * WHY IT IS WORTH READING AT ALL. Delivery is an email with a claim link, and
+ * a buyer who does not open it signs up at the front door and lands on a free
+ * trial while their paid receipt sits unclaimed. Digistore24's own reviewer
+ * did that on 14.11.2026 and reported the product as broken. The button is
+ * the fix, and the email stays exactly as it was for everyone who does open
+ * it.
  *
  * noindex, for the reason the sales page is: a thin near-duplicate per
  * platform on a domain whose ranking is the product.
@@ -44,6 +61,8 @@ import {
   marketplacePolicyUrl,
   marketplaceProvider,
 } from '@/lib/marketplace/config'
+import { createAdminClient } from '@/lib/supabase/admin'
+import { thankyouActivation } from '@/lib/marketplace/thankyou-handoff'
 
 export const dynamic = 'force-dynamic'
 
@@ -53,13 +72,19 @@ export const metadata: Metadata = {
 
 export default async function MarketplaceThanksPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ platform: string }>
+  searchParams: Promise<Record<string, string | string[] | undefined>>
 }) {
   const { platform } = await params
   const provider = marketplaceProvider(platform)
   if (!provider) notFound()
   const policyUrl = marketplacePolicyUrl(provider.slug)
+  // Only ever 'claimable' or 'none'. The reason behind a 'none' is not shown
+  // to the visitor and not rendered: it names a receipt's state, and the page
+  // may not confirm to a stranger that an order id exists.
+  const activation = await thankyouActivation(createAdminClient, provider, await searchParams)
 
   return (
     <main className="mx-auto max-w-2xl px-4 py-16">
@@ -69,6 +94,27 @@ export default async function MarketplaceThanksPage({
         Your Go Top SEO plan is ready to be activated. Everything you bought is software you
         use in your browser, so there is nothing to download and nothing to install.
       </p>
+
+      {/* THE ONE-CLICK ROUTE, rendered only for a verified redirect that
+          matches an unspent receipt. It is an ordinary link to /claim with
+          that receipt's own token — the same capability the email carries,
+          spent once by the same locked database function — so a buyer who
+          clicks it and a buyer who opens the email end up in exactly the same
+          place, and nothing here activates anything by itself. */}
+      {activation.kind === 'claimable' ? (
+        <div className="mt-8" data-thankyou-activation={provider.slug}>
+          <Link
+            className="inline-block rounded-lg bg-ink px-6 py-3 text-body font-semibold text-white"
+            href={`${MARKETPLACE_CLAIM_PATH}?order=${encodeURIComponent(activation.claimToken)}`}
+          >
+            Activate my plan now
+          </Link>
+          <p className="mt-3 text-copy text-muted">
+            Sign in, or create your account if you do not have one yet, and your plan is
+            activated the moment you do. You do not need to wait for the email.
+          </p>
+        </div>
+      ) : null}
 
       <h2 className="mt-10 text-title text-ink">What happens next</h2>
       <ol className="mt-4 list-decimal space-y-3 pl-6 text-copy text-body">
