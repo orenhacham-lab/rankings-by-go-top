@@ -130,8 +130,25 @@ console.log('\nC. the three places that must all refuse, each on ITS OWN seller'
     && /koreaOwnSaleBlocked=\{koreaOwnSaleBlocked\}/.test(page))
   check('C5: the Creem card button is not even offered to such a visitor while that route is shut',
     /&& !koreaCreemSaleBlocked/.test(page))
+  /**
+   * C6 USED TO PIN THE WHOLE CONJUNCTION as one literal string. On 13.11.2026 a
+   * second own-name refusal joined it — lib/billing/own-name-sale.ts, the
+   * general case behind Korea for every other country we are not cleared to
+   * sell in — and the literal went red although the Korean condition was still
+   * there and still first. Pinning the exact chain means every later refusal
+   * breaks this guard, so it now reads the condition that actually guards the
+   * container and requires the Korean term to be IN it. That is the claim worth
+   * holding; the order of the others is not.
+   */
+  const containerCondition = view.slice(0, view.indexOf('<BillingClient')).split('{').pop() ?? ''
   check('C6: and the screen draws no PayPal container for a visitor we may not sell to ourselves',
-    /!creemCheckout && !creemGoverned && !koreaOwnSaleBlocked && <BillingClient/.test(view))
+    containerCondition.includes('!koreaOwnSaleBlocked')
+    && containerCondition.includes('!creemCheckout')
+    && containerCondition.includes('!creemGoverned'))
+  check('C6-MUT: that guard still fails if the Korean condition is dropped from the chain',
+    !(view.replace(/ && !koreaOwnSaleBlocked/g, '')
+      .slice(0, view.replace(/ && !koreaOwnSaleBlocked/g, '').indexOf('<BillingClient'))
+      .split('{').pop() ?? '').includes('!koreaOwnSaleBlocked'))
   check('C7: the refusal comes before the PayPal container and after the Creem button, '
     + 'because on the Creem route the seller is Creem',
     view.indexOf('if (creemCheckout) return <CreemCheckoutButton') > 0
@@ -214,26 +231,81 @@ console.log('\nF. the fact is told BEFORE the trial, not only at the refusal')
   check('F2-MUT: a page that stops passing it is caught',
     !/koreaTrialOnly=\{koreaTrialOnly\}/.test(
       code('app/(public)/ko/pricing/page.tsx').replace(/koreaTrialOnly=\{koreaTrialOnly\}/g, '')))
+  /**
+   * The sentence out of a pricing dictionary. They are template literals now,
+   * not quoted strings: the trial's length is interpolated from the catalog
+   * (F7), so a regex that only matched quotes would silently find nothing and
+   * every check below would pass on an empty string.
+   */
+  const pricingNotice = (loc: string): string | null => {
+    const d = read(`lib/i18n/public/pricing-${loc}.ts`)
+    const m = d.match(/koreaTrialOnly: ([`'])((?:[^`'\\]|\\.)*)\1/)
+    return m ? m[2] : null
+  }
+  const ALL_PRICING_LOCALES = ['he', 'en', 'es', 'pt-BR', 'fr', 'it', 'ja', 'de', 'nl', 'pl', 'ko']
+
   check('F3: every pricing dictionary carries the sentence, and none is empty',
-    ['he', 'en', 'es', 'pt-BR', 'fr', 'it', 'ja', 'de', 'nl', 'pl', 'ko'].every((loc) => {
-      const d = read(`lib/i18n/public/pricing-${loc}.ts`)
-      const m = d.match(/koreaTrialOnly: '((?:[^'\\]|\\.)*)'/)
-      return !!m && m[1].length > 30
-    }))
+    ALL_PRICING_LOCALES.every((loc) => (pricingNotice(loc) ?? '').length > 30))
   check('F4: and none of them says anything about VAT or a registration number, '
     + 'which the legal ruling keeps out of anything a buyer reads',
     ['he', 'en', 'ko', 'ja', 'de'].every((loc) => {
-      const d = read(`lib/i18n/public/pricing-${loc}.ts`)
-      const m = d.match(/koreaTrialOnly: '((?:[^'\\]|\\.)*)'/)
-      return !!m && !/VAT|מע״מ|부가가치세|부가세|사업자등록/.test(m[1])
+      const notice = pricingNotice(loc)
+      return !!notice && !/VAT|מע״מ|부가가치세|부가세|사업자등록/.test(notice)
     }))
   check('F5: the Korean sentence says the trial is open and that nothing is charged, '
     + 'rather than that the service is unavailable in their country',
     (() => {
-      const d = read('lib/i18n/public/pricing-ko.ts')
-      const m = d.match(/koreaTrialOnly: '((?:[^'\\]|\\.)*)'/)
-      return !!m && m[1].includes('무료 체험') && m[1].includes('청구되지 않습니다')
+      const notice = pricingNotice('ko') ?? ''
+      return notice.includes('무료 체험') && notice.includes('청구되지 않습니다')
     })())
+  check('F7: the trial\'s length is interpolated from the catalog in all eleven, never written out',
+    ALL_PRICING_LOCALES.every((loc) => {
+      const notice = pricingNotice(loc) ?? ''
+      return notice.includes('${DAYS}') && !/\d/.test(notice)
+    }))
+  check('F7-MUT: a sentence that spells the length out is caught — it is the figure that goes stale '
+    + 'in silence, and this sentence is read under a disclosure duty',
+    ALL_PRICING_LOCALES.map((loc) => (pricingNotice(loc) ?? '').replace('${DAYS}', '7'))
+      .every((line) => /\d/.test(line)))
+  // Legal, 13 Nov 2026, after a model read the Korean back: the payment-step
+  // HEADING must say what IS available, not only what is absent. A bare "we do
+  // not provide this" at the exact spot where a plan would be bought reads as a
+  // door closing, which is the failure mode the signup wording was written
+  // against, and it is weaker against 전자상거래법 제21조 제1항 제1호: the duty is
+  // not to withhold a MATERIAL FACT, and "the trial is yours, the paid plan is
+  // not sold here" is the whole fact, while the refusal alone is half of it.
+  const KOREA_SALE_DICTS = ['lib/i18n/dashboard/he.ts', 'lib/i18n/dashboard/en.ts', 'lib/i18n/dashboard/ko/billing.ts']
+  const koreaSaleTitle = (path: string): string => {
+    const d = read(path)
+    const seg = d.slice(d.indexOf('koreaSale: {'), d.indexOf('koreaSale: {') + 700)
+    return (seg.match(/title: '((?:[^'\\]|\\.)*)'/) ?? ['', ''])[1]
+  }
+  const saysWhatIsAvailable = (title: string) => /זמין|available|이용할 수 있습니다/.test(title)
+  check('F9: the payment-step heading names what IS available, in all three dictionaries that can show it',
+    KOREA_SALE_DICTS.every((p2) => saysWhatIsAvailable(koreaSaleTitle(p2))),
+    KOREA_SALE_DICTS.filter((p2) => !saysWhatIsAvailable(koreaSaleTitle(p2))).join(', '))
+  check('F9b: and the refusal itself is still told, in the body beneath it',
+    KOREA_SALE_DICTS.every((p2) => {
+      const d = read(p2)
+      const seg = d.slice(d.indexOf('koreaSale: {'), d.indexOf('koreaSale: {') + 700)
+      const body = (seg.match(/description: '((?:[^'\\]|\\.)*)'/) ?? ['', ''])[1]
+      return /לא נמכר|is not sold|제공하지 않습니다/.test(body)
+    }))
+  // MUTATION CONTROL
+  check('F9-MUT: a heading that states only the absence is caught',
+    !saysWhatIsAvailable('현재 한국에서는 유료 구독 결제를 제공하지 않습니다')
+    && !saysWhatIsAvailable('A paid subscription is not sold in Korea at the moment'))
+  // Legal, same ruling: the pricing sentence may hedge the PRESENT ("currently",
+  // "at the moment") but must not point at a future launch. Korean 아직 ("not
+  // yet") asks the reader to expect one, and nobody has recorded an intent to
+  // open Korean paid billing or committed a date — the same reason the
+  // payment-step text may not promise to notify them (F6).
+  check('F10: no pricing sentence promises a future Korean launch',
+    ALL_PRICING_LOCALES.every((loc) => !/아직|not yet|noch nicht|pas encore|todavía no|ainda não|non ancora|לא עדיין|nog niet|jeszcze nie|まだ/.test(pricingNotice(loc) ?? '')),
+    ALL_PRICING_LOCALES.filter((loc) => /아직|not yet|noch nicht|pas encore|todavía no|ainda não|non ancora|nog niet|jeszcze nie|まだ/.test(pricingNotice(loc) ?? '')).join(', '))
+  // MUTATION CONTROL
+  check('F10-MUT: the sentence we shipped until today, with 아직, is caught',
+    /아직/.test('현재 한국에서는 무료 체험만 제공하며, 유료 구독 결제는 아직 제공하지 않습니다.'))
   check('F6: and the payment-step sentence promises no notification we are not recording',
     ['lib/i18n/dashboard/he.ts', 'lib/i18n/dashboard/en.ts', 'lib/i18n/dashboard/ko/billing.ts']
       .every((p) => {

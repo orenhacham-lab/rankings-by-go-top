@@ -57,7 +57,7 @@
  */
 import type { createAdminClient } from '@/lib/supabase/admin'
 import { AUTHOR_PHOTO_BUCKET } from '@/lib/content/author-box/photo-file'
-import { CONTENT_IMAGE_BUCKET } from '@/lib/content/featured-image'
+import { CONTENT_IMAGE_BUCKET } from '@/lib/content/image-bucket'
 
 type Admin = ReturnType<typeof createAdminClient>
 

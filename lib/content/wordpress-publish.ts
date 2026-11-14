@@ -15,7 +15,10 @@
 import type { createAdminClient } from '@/lib/supabase/admin'
 import { uploadMedia, createPost, updatePost, getCategories, getTags, detectSeoPlugin, getPublishingUserName, WordPressClientError, type WordPressPostStatus, type WordPressErrorMeta } from '@/lib/wordpress/client'
 import type { WordPressCredentials } from '@/lib/wordpress/types'
-import { reconcileInlineImagesForWordPress, injectInlineImages, type InlineWpResult } from '@/lib/content/inline-images'
+// The composer and the media upload only move bytes; the generator next door
+// imports sharp, and no publish route opens an image.
+import { injectInlineImages } from '@/lib/content/inline-images-compose'
+import { reconcileInlineImagesForWordPress, type InlineWpResult } from '@/lib/content/inline-images-wordpress'
 import { applyArticleDesign } from '@/lib/content/article-style/publish'
 import { resolveTaxonomy, type ResolvedTaxonomy } from '@/lib/content/wordpress-taxonomy'
 import { publishArticleSchemaToWordPress, type ArticleSchemaDeps, type ArticleSchemaOutcome } from '@/lib/content/wordpress-schema'

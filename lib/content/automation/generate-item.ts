@@ -12,14 +12,12 @@ import type { createAdminClient } from '@/lib/supabase/admin'
 import { generateArticleForTopic } from '@/lib/content/article-generation'
 import { TRANSIENT_GEN_REASONS } from '@/lib/content/gemini-article'
 import { runQualityGate } from '@/lib/content/automation/quality-gate'
+import { AUTOMATION_MAX_ATTEMPTS } from '@/lib/content/automation/attempts'
 
 type Admin = ReturnType<typeof createAdminClient>
 
 // generateValidatedArticle reasons that mean "content quality" vs. "model/transport".
 const QUALITY_REASONS = new Set(['article_quality_gate_failed', 'required_anchor_missing'])
-
-/** Max total processing attempts per item before it stays 'failed' for a human. */
-export const AUTOMATION_MAX_ATTEMPTS = Math.max(1, Number(process.env.AUTOMATION_MAX_ATTEMPTS) || 3)
 
 export interface GenerateItemResult {
   itemId: string

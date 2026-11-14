@@ -11,7 +11,8 @@
  */
 
 import type { createAdminClient } from '@/lib/supabase/admin'
-import { generatePoolItem, AUTOMATION_MAX_ATTEMPTS, type GenerateItemResult } from '@/lib/content/automation/generate-item'
+import { generatePoolItem, type GenerateItemResult } from '@/lib/content/automation/generate-item'
+import { AUTOMATION_MAX_ATTEMPTS } from '@/lib/content/automation/attempts'
 import { inlineImagesMayBatchForPool } from '@/lib/content/image-batch/may-batch'
 import { publishPoolItem } from '@/lib/content/automation/publish-item'
 import { localWeekday, isNoPublishWeekday, makeSlotAfter, slotFitsRhythm, resolveIntervalDays, spreadNextPublishAt, DEFAULT_PUBLISH_TIME, DEFAULT_TIMEZONE, type Cadence } from '@/lib/content/automation/schedule'

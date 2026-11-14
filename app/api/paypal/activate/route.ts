@@ -9,6 +9,7 @@ import { lockBillingMarket } from '@/lib/billing/billing-market-selection'
 import { resolveBillingMarket, storedMarketOf, STORED_MARKET_KEY } from '@/lib/billing/server-market'
 import { logRestrictedAttempt, restrictionForRequest } from '@/lib/sanctions/guard'
 import { KOREA_SALE_REFUSAL_REASON, koreaOwnSaleBlockedForRequest } from '@/lib/billing/korea-sale'
+import { OWN_NAME_SALE_REFUSAL_REASON, ownNameSaleBlockedForRequest } from '@/lib/billing/own-name-sale'
 import { notifyRefusedPayPalActivation } from '@/lib/shopify/paypal-migration-retry'
 
 /**
@@ -55,6 +56,17 @@ export async function POST(request: Request) {
     if (koreaOwnSaleBlockedForRequest(request.headers)) {
       console.warn('[paypal-activate] refused: paid activation is not open for Korea yet')
       return Response.json({ error: 'Not available', reason: KOREA_SALE_REFUSAL_REASON }, { status: 451 })
+    }
+    // AND THE SAME REFUSAL FOR EVERY OTHER COUNTRY WE ARE NOT CLEARED TO SELL
+    // IN ON OUR OWN NAME. Korea above stays separate because it has its own
+    // flag and its own notice; this is the general case, read from the same
+    // allow list the marketplace pages read. It is insurance rather than a
+    // behaviour change: where Creem is on, a USD-market account never reaches
+    // a PayPal button at all. lib/billing/own-name-sale.ts carries the whole
+    // reasoning, including why Israel and an unplaceable visitor both pass.
+    if (ownNameSaleBlockedForRequest(request.headers)) {
+      console.warn('[paypal-activate] refused: this country is not cleared for an own-name sale')
+      return Response.json({ error: 'Not available', reason: OWN_NAME_SALE_REFUSAL_REASON }, { status: 451 })
     }
     const supabase = await createClient()
     const { data: { user } } = await supabase.auth.getUser()

@@ -39,7 +39,7 @@ export const pricingEn: PricingCopy = {
        not only a mail-order seller, so it bites BEFORE any contract. Shown only
        to a visitor placed in Korea, on every language's page, because the duty
        follows the consumer and not the page. lib/billing/korea-sale.ts. */
-    koreaTrialOnly: 'In Korea only the free trial is available at the moment, and a paid subscription is not sold there. The trial ends automatically after seven days, and we take no card details, so nothing is charged.',
+    koreaTrialOnly: `In Korea only the free trial is available at the moment, and a paid subscription is not sold there. The trial ends automatically after ${DAYS} days, and we take no card details, so nothing is charged.`,
     everyPlanLabel: 'In every plan',
     everyPlan: [
       'Automatic scheduled publishing to WordPress, Shopify and Wix',

@@ -23,6 +23,16 @@
  * through lib/email-suppression: an address on the list, or a list we cannot read, means
  * nothing is sent and the claim is never taken.
  *
+ * KOREA. These two emails are classified as 광고성 정보 in
+ * lib/compliance/korea-promotional-email.ts, which says why, so 정보통신망법 제50조 제1항
+ * wants a recorded prior consent before one reaches a reader placed in Korea. The gate sits
+ * beside the removal list, and like it fails closed: a reader the facts place in Korea is
+ * not mailed unless lib/compliance/korea-marketing-opt-in.ts finds a Korean consent, and an
+ * unreadable answer is not a consent. A reader who HAS consented gets the 제50조 제4항 mark
+ * in the subject line. The approval reminder and the weekly summary are service mail and
+ * are not gated; that classification is one table in that module, not a judgement repeated
+ * in three runs.
+ *
  * LOGS. One line when something was sent or a send failed: counts and stable codes only,
  * never an address, a domain or a provider's words.
  */
@@ -34,6 +44,8 @@ import { makeUnsubscribeToken } from '@/lib/reminders/token'
 import { CONNECT_AFTER_MS, PUBLISH_AFTER_MS, decideOnboardingEmail, type Stage } from './cadence'
 import { buildOnboardingEmail, type OnboardingEmail } from './email'
 import { isSuppressed } from '@/lib/email-suppression'
+import { koreaEmailDecision, placedInKorea, type CustomerEmailKind } from '@/lib/compliance/korea-promotional-email'
+import { readKoreanMarketingOptIn } from '@/lib/compliance/korea-marketing-opt-in'
 import { fallbackEmailLocale, type ShopifyOriginFact } from '@/lib/reminders/recipient'
 import { claimOnboardingSend, readOnboardingState, releaseOnboardingClaim } from './state'
 
@@ -53,6 +65,12 @@ export interface OnboardingOwner {
   shopifyAppStoreOrigin: ShopifyOriginFact
   /** An administrator's own project: no customer email. */
   staff: boolean
+  /**
+   * Where the account was opened (lib/compliance/signup-country.ts), alpha-2,
+   * or null when it was never recorded or could not be read. Read for one
+   * purpose only: placing the reader for 정보통신망법 제50조.
+   */
+  signupCountry?: string | null
 }
 
 export interface OnboardingDeps {
@@ -131,7 +149,7 @@ export async function runOnboardingEmails(deps: OnboardingDeps): Promise<Onboard
     // Projects old enough for the earliest of the two emails; the rest is decided per project.
     const cutoff = new Date(now.getTime() - CONNECT_AFTER_MS).toISOString()
     const { data, error } = await admin.from('projects')
-      .select('id, user_id, created_at, target_domain, business_name, is_active')
+      .select('id, user_id, created_at, target_domain, business_name, is_active, country, language')
       .lte('created_at', cutoff)
       .order('created_at', { ascending: true })
       .limit(PROJECT_READ_CAP)
@@ -152,7 +170,7 @@ export async function runOnboardingEmails(deps: OnboardingDeps): Promise<Onboard
     // An absence we cannot verify is not an absence: say nothing rather than the wrong thing.
     if (!wp || !platform || !shopify || !plugin) return { status: 'failed' }
 
-    let considered = 0, sent = 0, failed = 0, suppressed = 0
+    let considered = 0, sent = 0, failed = 0, suppressed = 0, koreaBlocked = 0
     let installed = true
     for (const row of projects) {
       if (sent + failed >= PROJECTS_PER_RUN) break
@@ -194,17 +212,35 @@ export async function runOnboardingEmails(deps: OnboardingDeps): Promise<Onboard
       // stage recorded as sent, and an unreadable list waits for the next run.
       if ((await isSuppressed(admin, who.email)).suppressed) { suppressed++; continue }
 
+      // 정보통신망법 제50조 제1항, beside the removal list and failing the same way: a
+      // reader placed in Korea is mailed only on a recorded Korean consent.
+      const kind: CustomerEmailKind = decision.stage === 'connect' ? 'setup_connect' : 'setup_publish'
+      const facts = {
+        signupCountry: who.signupCountry ?? null,
+        accountLocale: who.locale,
+        projectCountry: str(row.country),
+        projectLanguage: str(row.language),
+      }
+      const korea = koreaEmailDecision({
+        kind,
+        facts,
+        // The opt-in is read only for a reader the facts place in Korea: everybody else
+        // is past this gate already, and an extra read per project buys nothing.
+        optIn: placedInKorea(facts) ? await readKoreanMarketingOptIn(admin, who.email) : false,
+      })
+      if (!korea.send) { koreaBlocked++; continue }
+
       const at = now.toISOString()
       const won = await claimOnboardingSend(admin, projectId, ownerId, read.state, { stage: decision.stage, sentCount: decision.sentCount, at })
       if (!won) continue
-      const email = buildOnboardingEmail({ stage: decision.stage as Stage, locale, firstName: who.firstName, domain, projectId, origin, token })
+      const email = buildOnboardingEmail({ stage: decision.stage as Stage, locale, firstName: who.firstName, domain, projectId, origin, token, markAsKoreanAd: korea.markAsAd })
       let ok = false
       try { ok = (await deps.send({ to: who.email, email })).ok } catch { ok = false }
       if (ok) sent++
       else { failed++; await releaseOnboardingClaim(admin, projectId, ownerId, read.state, at).catch(() => undefined) }
     }
     if (!installed) return { status: 'not_installed' }
-    if (sent > 0 || failed > 0 || suppressed > 0) console.log('[onboarding-emails] run complete', { considered, sent, failed, suppressed })
+    if (sent > 0 || failed > 0 || suppressed > 0 || koreaBlocked > 0) console.log('[onboarding-emails] run complete', { considered, sent, failed, suppressed, koreaBlocked })
     return { status: 'done', considered, sent, failed }
   } catch {
     console.error('[onboarding-emails] run failed')

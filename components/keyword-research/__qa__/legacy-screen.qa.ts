@@ -21,7 +21,18 @@
  * 5 October 2026 when the screen tour anchored the research-type switch
  * (`data-research-type`), so the tour can point at it: +22 characters in every
  * one of the eighteen states, in both languages, and nothing else — checked by
- * rendering this page against origin/main before re-capturing. It is the REAL page's first render,
+ * rendering this page against origin/main before re-capturing. It was taken
+ * again on 13 November 2026, when the pickers were widened from ten countries
+ * and seven languages to all seventeen and all fourteen — the owner found the
+ * screen had none of the markets the product has shipped since: no France, no
+ * Germany, no Japan, no Korea. Before re-capturing, this page was rendered
+ * twice, once with every file of that change reverted and once with it in, and
+ * the whole difference was the fourteen new <option> elements per language plus
+ * the English screen opening on United States / English instead of Israel /
+ * Hebrew (lib/google-ads/constants.ts: the pickers now open on the market of
+ * the language the dashboard is being read in). +477 (he) / +487 (en)
+ * characters in every one of the eighteen states, the same number in each,
+ * which is what says the re-capture hid nothing else. It is the REAL page's first render,
  * in both languages, in nine states (empty, results, rows selected with the
  * opportunities panel open, a keyword added, add and AI errors, a search error,
  * the keyword+URL form while searching, few results, filtered and sorted). Each

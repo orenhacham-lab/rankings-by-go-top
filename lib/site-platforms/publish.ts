@@ -19,7 +19,7 @@ import { loadSiteConnection, markSiteConnection, type LoadedSiteConnection } fro
 import { publishToWix, type FetchLike } from './wix'
 import { publishViaWebhook, type WebhookDeps } from './webhook'
 import { SITE_ARTICLE_SELECT, type SitePlatform, type SitePublishArticle, type SitePublishResult, type SiteErrorCode } from './types'
-import { AUTOMATION_MAX_ATTEMPTS } from '@/lib/content/automation/generate-item'
+import { AUTOMATION_MAX_ATTEMPTS } from '@/lib/content/automation/attempts'
 import { recordPublishFinalFailureAlert, recordPublishBlockedAlert, resolvePublishAlerts } from '@/lib/content/automation/alerts'
 import { enqueueGbpPostForPublishedArticle } from '@/lib/gbp/auto-post'
 import { ensureProjectKeywordFromPublishedArticle } from '@/lib/content/keyword-from-article'
