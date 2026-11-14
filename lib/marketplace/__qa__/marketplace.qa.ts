@@ -1359,6 +1359,16 @@ async function main() {
   check('TY14: the only external link is the platform’s own policy url',
     (thanksSrc.match(/href=\{?"?https?:/g) ?? []).length === 0)
 
+  // THEIR OWN WORDS, verbatim. Their approval checklist asks whether this
+  // exact reference is included, so the test is a string match on the
+  // sentence as they write it, not a paraphrase of it.
+  check('TY15: the reference Digistore24 require is printed in their own words',
+    dsThanks.includes('Your credit card statement will show a charge from Digistore24'))
+  check('TY16: and the longer explanation of who debits is still there beside it',
+    /The debiting is performed by Digistore24/.test(dsThanks))
+  check('TY17: a platform that demands no wording gets none invented for it',
+    !/credit card statement will show a charge/i.test(jvThanks))
+
   check('TY-MUT1: a page that read the query string would be caught',
     /searchParams/.test(thanksSrc.replace('params,', 'params, searchParams,')))
   check('TY-MUT2: dropping the debiting sentence would be caught',
@@ -1366,6 +1376,13 @@ async function main() {
       dsThanks.replace('The debiting is performed by Digistore24', 'Thank you')))
   check('TY-MUT3: printing the debiting sentence for a non-seller platform would be caught',
     /The debiting is performed by/.test(`${jvThanks}The debiting is performed by JVZoo`))
+  check('TY-MUT4: paraphrasing their required reference instead of quoting it would be caught',
+    !dsThanks
+      .replace(
+        'Your credit card statement will show a charge from Digistore24',
+        'Digistore24 is the name on your statement',
+      )
+      .includes('Your credit card statement will show a charge from Digistore24'))
 
   // ── DS. Digistore24: the scheme, checked against Digistore24's own digest ──
   console.log('\nDS. digistore24')

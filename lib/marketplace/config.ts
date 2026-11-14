@@ -289,6 +289,23 @@ export interface MarketplaceProvider {
    */
   billingDescriptor: string | null
   /**
+   * A sentence about the statement that the platform requires on the
+   * thank-you page IN ITS OWN WORDS, printed verbatim.
+   *
+   * It is separate from `billingDescriptor` because the two answer different
+   * demands. The descriptor is a fact about the charge, and the page may say
+   * it however it likes. This is a form of words a platform's approval
+   * checklist asks us to confirm is "properly included": Digistore24's
+   * checklist names the reference "Your credit card statement will show a
+   * charge from Digistore24", and a paraphrase of it — however accurate —
+   * is not the reference they ask about, which is why our own longer
+   * explanation did not let that box be ticked honestly.
+   *
+   * null for a platform that demands no particular wording, and then nothing
+   * is printed: a sentence invented in a platform's name is worse than none.
+   */
+  statementReferenceSentence: string | null
+  /**
    * The platform's own return and cancellation policy, where the platform
    * publishes it at a stable address.
    *
@@ -478,6 +495,15 @@ export const MARKETPLACE_PROVIDERS: readonly MarketplaceProvider[] = [
     orderSupportUrl: 'https://www.digistore24.com/en/cancel-revoke-contract/',
     billingDescriptor: null,
     /*
+     * Their approval checklist asks the vendor to confirm that exactly this
+     * reference is "properly included" on the thank-you page. The page said
+     * the same thing in its own, longer words, which is true but is not what
+     * the checklist asks about, so the sentence is now printed as they write
+     * it in addition to the explanation.
+     */
+    statementReferenceSentence:
+      'Your credit card statement will show a charge from Digistore24.',
+    /*
      * Still null, and deliberately: their buyer terms live at
      * https://www.digistore24.com/page/terms/2/en and are set through
      * MARKETPLACE_DIGISTORE24_POLICY_URL, so the one place a policy address
@@ -518,6 +544,8 @@ export const MARKETPLACE_PROVIDERS: readonly MarketplaceProvider[] = [
      */
     orderSupportUrl: 'https://www.clkbank.com',
     billingDescriptor: 'CLKBANK*COM',
+    // Their rules require the descriptor itself, not a form of words.
+    statementReferenceSentence: null,
     /* Read 11.11.2026; it is the article their Client Contract incorporates. */
     returnPolicyUrl:
       'https://support.clickbank.com/en/articles/10535349-clickbank-s-return-and-subscription-cancellation-policy',
@@ -579,6 +607,8 @@ export const MARKETPLACE_PROVIDERS: readonly MarketplaceProvider[] = [
     sellerOfRecord: false,
     orderSupportUrl: null,
     billingDescriptor: null,
+    /* We are the seller on this flow; there is no platform wording to carry. */
+    statementReferenceSentence: null,
     returnPolicyUrl: null,
     /* JVZoo requires no guarantee and we are the seller on this flow. */
     returnGuaranteeDays: null,
