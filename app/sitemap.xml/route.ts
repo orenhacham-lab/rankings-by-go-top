@@ -98,6 +98,12 @@ export async function GET() {
       priority: '0.7',
     },
     {
+      url: `${baseUrl}/affiliates/for-seo-and-agencies`,
+      lastmod: today,
+      changefreq: 'monthly',
+      priority: '0.7',
+    },
+    {
       url: `${baseUrl}/articles`,
       lastmod: today,
       changefreq: 'weekly',
@@ -307,6 +313,12 @@ export async function GET() {
       priority: '0.7',
     },
     {
+      url: `${baseUrl}/en/affiliates/for-seo-and-agencies`,
+      lastmod: today,
+      changefreq: 'monthly',
+      priority: '0.7',
+    },
+    {
       url: `${baseUrl}/en/articles`,
       lastmod: today,
       changefreq: 'weekly',
@@ -480,6 +492,7 @@ export async function GET() {
     { path: '/affiliates', changefreq: 'monthly', priority: '0.6' },
     { path: '/affiliates/affiliate-marketing', changefreq: 'monthly', priority: '0.7' },
     { path: '/affiliates/choosing-a-program', changefreq: 'monthly', priority: '0.7' },
+    { path: '/affiliates/for-seo-and-agencies', changefreq: 'monthly', priority: '0.7' },
     { path: '/articles', changefreq: 'weekly', priority: '0.7' },
     { path: '/sitemap', changefreq: 'weekly', priority: '0.6' },
     { path: '/features/seo-geo-content-publishing', changefreq: 'monthly', priority: '0.7' },

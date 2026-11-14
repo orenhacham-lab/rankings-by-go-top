@@ -44,6 +44,7 @@ export default async function DutchSitemapPage() {
         { label: 'Partnerprogramma', href: '/nl/affiliates' },
         { label: 'Affiliate marketing', href: '/nl/affiliates/affiliate-marketing' },
         { label: 'Programma kiezen', href: '/nl/affiliates/choosing-a-program' },
+        { label: 'SEO-professionals en bureaus', href: '/nl/affiliates/for-seo-and-agencies' },
       ],
     },
     {

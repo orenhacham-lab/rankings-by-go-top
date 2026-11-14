@@ -44,6 +44,7 @@ export default async function KoreanSitemapPage() {
         { label: '파트너 프로그램', href: '/ko/affiliates' },
         { label: '제휴 마케팅', href: '/ko/affiliates/affiliate-marketing' },
         { label: '프로그램 선택', href: '/ko/affiliates/choosing-a-program' },
+        { label: 'SEO 종사자와 대행사', href: '/ko/affiliates/for-seo-and-agencies' },
       ],
     },
     {

@@ -44,6 +44,7 @@ export default async function PolishSitemapPage() {
         { label: 'Program partnerski', href: '/pl/affiliates' },
         { label: 'Marketing afiliacyjny', href: '/pl/affiliates/affiliate-marketing' },
         { label: 'Wybór programu', href: '/pl/affiliates/choosing-a-program' },
+        { label: 'Specjaliści SEO i agencje', href: '/pl/affiliates/for-seo-and-agencies' },
       ],
     },
     {

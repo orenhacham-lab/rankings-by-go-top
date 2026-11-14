@@ -43,6 +43,7 @@ export default async function FrenchSitemapPage() {
         { label: 'Programme d’affiliation', href: '/fr/affiliates' },
         { label: "Marketing d'affiliation", href: '/fr/affiliates/affiliate-marketing' },
         { label: 'Choisir un programme', href: '/fr/affiliates/choosing-a-program' },
+        { label: 'Professionnels du SEO et agences', href: '/fr/affiliates/for-seo-and-agencies' },
       ],
     },
     {

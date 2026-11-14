@@ -43,6 +43,7 @@ export default async function PortugueseSitemapPage() {
         { label: 'Programa de afiliados', href: '/pt-BR/affiliates' },
         { label: 'Marketing de afiliados', href: '/pt-BR/affiliates/affiliate-marketing' },
         { label: 'Escolher o programa', href: '/pt-BR/affiliates/choosing-a-program' },
+        { label: 'Profissionais de SEO e agências', href: '/pt-BR/affiliates/for-seo-and-agencies' },
       ],
     },
     {

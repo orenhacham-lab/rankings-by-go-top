@@ -42,6 +42,7 @@ export default async function EnglishSitemapPage() {
         { label: 'Affiliate program', href: '/en/affiliates' },
         { label: 'Affiliate marketing', href: '/en/affiliates/affiliate-marketing' },
         { label: 'Choosing a program', href: '/en/affiliates/choosing-a-program' },
+        { label: 'SEO people and agencies', href: '/en/affiliates/for-seo-and-agencies' },
       ],
     },
     {
