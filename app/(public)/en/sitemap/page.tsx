@@ -40,6 +40,8 @@ export default async function EnglishSitemapPage() {
         { label: 'Free site check', href: '/en/free-check' },
         { label: 'Which AI crawlers is your site blocking?', href: '/en/ai-crawlers' },
         { label: 'Affiliate program', href: '/en/affiliates' },
+        { label: 'Affiliate marketing', href: '/en/affiliates/affiliate-marketing' },
+        { label: 'Choosing a program', href: '/en/affiliates/choosing-a-program' },
       ],
     },
     {

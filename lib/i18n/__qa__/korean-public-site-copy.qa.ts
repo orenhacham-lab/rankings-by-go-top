@@ -52,6 +52,10 @@ const PUBLIC_KO = [
   'lib/i18n/public/ko.ts',
   'lib/i18n/public/pricing-ko.ts',
   'lib/i18n/public/landing-ko.ts',
+  // The affiliate cluster, added 14 Nov 2026: two more pages of Korean prose a
+  // signed-out reader sees, and the register rules apply to them exactly as
+  // they do to the pricing page that broke them.
+  'lib/i18n/public/affiliate-cluster/ko.ts',
 ]
 const ALL_KO = [...PUBLIC_KO, 'lib/i18n/dashboard/ko/billing.ts']
 

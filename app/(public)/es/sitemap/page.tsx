@@ -41,6 +41,8 @@ export default async function SpanishSitemapPage() {
         { label: 'Análisis gratuito', href: '/es/free-check' },
         { label: '¿A qué rastreadores de IA bloquea tu sitio?', href: '/es/ai-crawlers' },
         { label: 'Programa de afiliados', href: '/es/affiliates' },
+        { label: 'Marketing de afiliados', href: '/es/affiliates/affiliate-marketing' },
+        { label: 'Elegir programa', href: '/es/affiliates/choosing-a-program' },
       ],
     },
     {

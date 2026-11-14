@@ -42,6 +42,8 @@ export default async function JapaneseSitemapPage() {
         { label: '無料診断', href: '/ja/free-check' },
         { label: 'サイトはどのAIクローラーを拒否していますか', href: '/ja/ai-crawlers' },
         { label: 'アフィリエイトプログラム', href: '/ja/affiliates' },
+        { label: 'アフィリエイト', href: '/ja/affiliates/affiliate-marketing' },
+        { label: 'プログラムの選び方', href: '/ja/affiliates/choosing-a-program' },
       ],
     },
     {

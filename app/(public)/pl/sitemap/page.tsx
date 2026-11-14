@@ -42,6 +42,8 @@ export default async function PolishSitemapPage() {
         { label: 'Bezpłatna analiza', href: '/pl/free-check' },
         { label: 'Które roboty AI blokuje Państwa witryna?', href: '/pl/ai-crawlers' },
         { label: 'Program partnerski', href: '/pl/affiliates' },
+        { label: 'Marketing afiliacyjny', href: '/pl/affiliates/affiliate-marketing' },
+        { label: 'Wybór programu', href: '/pl/affiliates/choosing-a-program' },
       ],
     },
     {
