@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import type { Locale } from '@/lib/i18n/locales'
 import type { RescanView } from '@/lib/project-settings/types'
 import { rescanNotice, retryAfterFrom, type RescanNotice } from '@/lib/project-settings/view'
+import { readSeed } from '@/lib/client/seed-read'
 
 /** How often a running scan is read, and for how long (stage A has about a minute). */
 export const SCAN_POLL_MS = 3_000
@@ -14,14 +15,13 @@ const sleep = (ms: number) => new Promise<void>((resolve) => window.setTimeout(r
 type RunRead = { http: number; status: string | null; stalled: boolean } | null
 
 async function readRun(projectId: string): Promise<RunRead> {
-  try {
-    const res = await fetch(`/api/projects/${encodeURIComponent(projectId)}/seed`, { cache: 'no-store' })
-    const body = (await res.json().catch(() => null)) as { run?: { status?: unknown; stalled?: unknown } | null } | null
-    const run = body?.run && typeof body.run === 'object' ? body.run : null
-    return { http: res.status, status: typeof run?.status === 'string' ? run.status : null, stalled: run?.stalled === true }
-  } catch {
-    return null
-  }
+  // Shared read (lib/client/seed-read.ts). `status: 0` is this reader's old
+  // catch branch: the request failed, so there is nothing to report.
+  const { status, body: raw } = await readSeed(projectId)
+  if (status === 0) return null
+  const body = raw as { run?: { status?: unknown; stalled?: unknown } | null } | null
+  const run = body?.run && typeof body.run === 'object' ? body.run : null
+  return { http: status, status: typeof run?.status === 'string' ? run.status : null, stalled: run?.stalled === true }
 }
 
 /**

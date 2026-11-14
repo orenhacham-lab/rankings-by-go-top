@@ -353,9 +353,19 @@ async function main() {
     check('MUT a write on load (a POST in an effect) fails that rule',
       JSON.stringify(writeCalls(PAGE).concat(['POST /api/ai-visibility/runs'])) !== JSON.stringify(['POST /api/ai-visibility/monthly', 'PUT /api/ai-visibility/monthly']))
     const fetched = NEW.flatMap((p) => [...code(p).matchAll(/fetch\(\s*`([^`]+)`/g)].map((m) => m[1]))
+    // 2026-11-14: the seed read moved behind lib/client/seed-read.ts, which
+    // shares ONE request with the other components reading the same scan (the
+    // dashboard was fetching that route twice per load). The rule is unchanged
+    // — the tab reads the scan, the competitors and the monthly status, and
+    // nothing else — so the seed read is now checked through that module
+    // instead of as a fetch of its own.
+    const sharedSeedUrl = code('lib/client/seed-read.ts')
     check('the only reads are the seed run, the competitors list and the monthly check\'s status',
-      fetched.length === 3 && fetched.some((u) => /\/api\/projects\/\$\{encodeURIComponent\(projectId\)\}\/seed$/.test(u)) && fetched.some((u) => /\/ai-visibility\/competitors$/.test(u))
-      && fetched.some((u) => /^\/api\/ai-visibility\/monthly\?projectId=/.test(u)), fetched.join(' | '))
+      fetched.length === 2 && fetched.some((u) => /\/ai-visibility\/competitors$/.test(u))
+      && fetched.some((u) => /^\/api\/ai-visibility\/monthly\?projectId=/.test(u))
+      && /readSeed(Shared)?\(projectId/.test(code('components/ai-visibility/useSeedPageState.ts'))
+      && /`\/api\/projects\/\$\{encodeURIComponent\(projectId\)\}\/seed`/.test(sharedSeedUrl)
+      && (sharedSeedUrl.match(/doFetch\(/g) || []).length === 1, fetched.join(' | '))
     check('no model, dispatch or rescan route is named by the new code',
       !NEW.some((p) => /enriched-suggestions|generate-ai-questions|\/api\/ai-visibility\/runs|action:\s*'start'/.test(code(p))))
 
