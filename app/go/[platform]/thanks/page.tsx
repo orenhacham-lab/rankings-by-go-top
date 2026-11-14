@@ -115,6 +115,20 @@ export default async function MarketplaceThanksPage({
             them, and any refund or cancellation of the payment is handled by them under their
             own terms.
           </p>
+          {/* THEIR OWN SENTENCE, verbatim. The paragraph above says the same
+              thing at greater length and more precisely, and that is exactly
+              why this one is also here: a platform's approval checklist asks
+              whether a NAMED reference is included, and an accurate
+              paraphrase is not that reference. Printed only where the
+              platform publishes a required form of words. */}
+          {provider.statementReferenceSentence ? (
+            <p
+              className="mt-4 text-copy text-body"
+              data-statement-reference={provider.slug}
+            >
+              {provider.statementReferenceSentence}
+            </p>
+          ) : null}
           {/* THE STRING ON THE STATEMENT, not just the platform's name.
               ClickBank require this on the thank-you page by name, and for a
               reason the sentence above only half answers: what the buyer
