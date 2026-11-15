@@ -68,6 +68,30 @@ function classifyFailure(err: unknown): string {
   return 'unclassified'
 }
 
+/**
+ * Is there a scan of this project still running, which this request would
+ * RESUME rather than start?
+ *
+ * The same question the resume path asks further down, asked earlier because
+ * the trial's "each keyword once" guard has to tell a second round apart from
+ * a second scan. Kept to the id: nothing here needs the row.
+ */
+async function hasRunningScanToResume(
+  projectId: string,
+  triggeredBy: string,
+  admin: ReturnType<typeof createAdminClient>,
+): Promise<boolean> {
+  const { data } = await admin
+    .from('scans')
+    .select('id')
+    .eq('project_id', projectId)
+    .eq('status', 'running')
+    .eq('triggered_by', triggeredBy)
+    .limit(1)
+    .maybeSingle()
+  return !!data
+}
+
 export async function POST(request: Request) {
   const startedAt = Date.now()
   const requestId = newRequestId()
@@ -275,12 +299,28 @@ export async function POST(request: Request) {
             return Response.json(payload, { status: 403 })
           }
         } else {
-          // Scan All: check if any active target has been scanned
-          const { data: activeTargets, error: targetIdsErr } = await admin
-            .from('tracking_targets')
-            .select('id')
-            .eq('project_id', projectId)
-            .eq('is_active', true)
+          // Scan All: check if any active target has been scanned.
+          //
+          // THE ROUNDS OF ONE SCAN ARE NOT A RESCAN. "Scan all" checks as many
+          // keywords as fit in the operation budget, leaves the scan 'running'
+          // and answers `continue: true`; the panel then sends the next round,
+          // which resumes exactly the targets with no row yet. Measured on
+          // production 15.11.2026 with a fresh trial and five keywords: round
+          // one checked two, and round two was refused 403 right here, because
+          // round one's own rows now counted as "already scanned". Three of the
+          // five keywords were never checked, and the screen kept saying "עוד
+          // לא נבדקו 3" with no way forward — on the one plan every new
+          // merchant is on. A round that resumes a scan already running for
+          // this project is let through; the lifetime cap above still holds,
+          // and the resume path never re-dispatches a target that has a row.
+          const resuming = await hasRunningScanToResume(projectId, triggeredBy, admin)
+          const { data: activeTargets, error: targetIdsErr } = resuming
+            ? { data: null, error: null }
+            : await admin
+              .from('tracking_targets')
+              .select('id')
+              .eq('project_id', projectId)
+              .eq('is_active', true)
 
           if (!targetIdsErr && activeTargets && activeTargets.length > 0) {
             const targetIds = activeTargets.map((t: { id: string }) => t.id)

@@ -54,6 +54,7 @@ export const homeNl: DeepPartial<DashboardDictionary> = {
       avgPosition: 'Gemiddelde positie',
       avgPositionSource: 'Laatste meting van elk zoekwoord',
       noChecks: 'Na de eerste meting',
+      notFound: 'Geen zoekwoord in de top 100',
       noArticles: 'Nog geen artikel gepubliceerd',
       unavailable: 'Op dit moment niet beschikbaar',
     },

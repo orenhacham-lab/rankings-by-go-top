@@ -453,6 +453,20 @@ async function main() {
     check('I-MUT: a POST in the route fails I4', /export async function POST\b/.test(strip(route + '\nexport async function POST() {}')))
   }
 
+  // ── N) "no mean" is two different silences ───────────────────────────────
+  console.log('\nN) the average-position tile tells "not checked yet" from "checked, found nothing"')
+  {
+    const page = code('app/(dashboard)/dashboard/page.tsx')
+    const tells = (src: string) => /empty=\{rankings\.avgPosition === null\s*\? rankings\.checked > 0 \? tile\.notFound : tile\.noChecks/.test(src)
+    check('N1: a check that found nothing says so, instead of promising the first check', tells(page))
+    check('N1-MUT: the single line (main before the fix) fails N1',
+      !tells(page.replace(/empty=\{rankings\.avgPosition === null[\s\S]*?: undefined\}/, 'empty={rankings.avgPosition === null ? tile.noChecks : undefined}')))
+    const he = code('lib/i18n/dashboard/he.ts')
+    const en = code('lib/i18n/dashboard/en.ts')
+    check('N2: both languages carry the new line, and it is not the old one',
+      /notFound: 'אף מילה לא נמצאה ב-100 הראשונים'/.test(he) && /notFound: 'No keyword found in the top 100'/.test(en))
+  }
+
   console.log(`\n${pass} passed, ${fail} failed`)
   if (fail > 0) process.exit(1)
 }

@@ -28,6 +28,7 @@ export const aiVisibilityKo: DeepPartial<DashboardDictionary> = {
     statusLabel: '점검 상태',
     enginesChecked: '점검한 서비스',
     enginesCount: (checked: number, total: number) => `${total}개 중 ${checked}개`,
+    enginesPartial: (checked: number, total: number) => `이번 실행에서는 남은 횟수만큼 ${total}개 중 ${checked}개 엔진을 확인했습니다. 나머지는 다음 실행에서 확인합니다.`,
     engineChecked: '점검 완료',
     engineNotChecked: '아직 점검하지 않음',
     engineMentioned: '언급했습니다',

@@ -57,6 +57,7 @@ export const homeJa: DeepPartial<DashboardDictionary> = {
       avgPosition: '平均順位',
       avgPositionSource: '各キーワードの最新の計測',
       noChecks: '最初の計測のあとに表示されます',
+      notFound: 'どのキーワードも上位100位に入っていません',
       noArticles: '公開した記事はまだありません',
       unavailable: '今は表示できません',
     },

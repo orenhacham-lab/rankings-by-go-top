@@ -376,11 +376,19 @@ function ProjectDashboard({ project, onStartMode }: { project: Project; onStartM
               <StatTile className="h-full" label={tile.keywords} value={formatCount(rankings.tracked, uiLocale)} source={tile.keywordsSource}
                 icon={<KeyRound size={16} strokeWidth={2} />} />
             </Link>
+            {/* Two different silences, told apart. "After the first check" was
+                shown whenever there is no mean — including after a check that
+                found nothing, where it reads as if the scan never ran.
+                Measured on production 15.11.2026: a fresh trial scanned all
+                five of its keywords, none was in the top 100, and the tile
+                still promised the first check. */}
             <StatTile
               className="h-full"
               label={tile.avgPosition}
               value={rankings.avgPosition ?? ''}
-              empty={rankings.avgPosition === null ? tile.noChecks : undefined}
+              empty={rankings.avgPosition === null
+                ? rankings.checked > 0 ? tile.notFound : tile.noChecks
+                : undefined}
               delta={rankings.avgChange !== null && rankings.avgChange !== 0
                 ? { value: String(Math.abs(rankings.avgChange)), direction: rankings.avgChange > 0 ? 'up' : 'down' }
                 : undefined}

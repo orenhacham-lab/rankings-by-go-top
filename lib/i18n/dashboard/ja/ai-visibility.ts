@@ -24,6 +24,7 @@ export const aiVisibilityJa: DeepPartial<DashboardDictionary> = {
     statusLabel: '確認の状態',
     enginesChecked: '確認したエンジン',
     enginesCount: (checked: number, total: number) => `${total} 件のうち ${checked} 件`,
+    enginesPartial: (checked: number, total: number) => `今回は残りの回数の範囲で${total}件中${checked}件のエンジンを確認しました。残りは次回に確認します。`,
     engineChecked: '確認済み',
     engineNotChecked: 'まだ確認していません',
     engineMentioned: '触れていました',
