@@ -303,6 +303,10 @@ export function anchorExistsInBody(html: string, anchor: string): boolean {
 
 const wordCount = (p: string) => p.trim().split(/\s+/).filter(Boolean).length
 
+/** The most words an anchor may carry, from any source. A longer run of words is
+ *  a sentence, not a link label. */
+export const MAX_ANCHOR_WORDS = 6
+
 /** A generic single word (blocked as a standalone anchor). */
 function isGenericSingleWord(phrase: string): boolean {
   const p = phrase.trim()
@@ -321,7 +325,7 @@ function hasContentWord(phrase: string): boolean {
 export function manualAnchorShapeValid(phrase: string): boolean {
   const p = (phrase ?? '').trim()
   const wc = wordCount(p)
-  if (wc < 2 || wc > 6) return false
+  if (wc < 2 || wc > MAX_ANCHOR_WORDS) return false
   if (isGenericSingleWord(p)) return false
   return hasContentWord(p)
 }
@@ -336,7 +340,7 @@ export function validateManualAnchor(
 ): { ok: boolean; reason?: 'words' | 'generic' | 'notfound' } {
   const p = (phrase ?? '').trim()
   const wc = wordCount(p)
-  if (wc < 2 || wc > 6) return { ok: false, reason: 'words' }
+  if (wc < 2 || wc > MAX_ANCHOR_WORDS) return { ok: false, reason: 'words' }
   if (isGenericSingleWord(p) || !hasContentWord(p)) return { ok: false, reason: 'generic' }
   const doc = parse(html)
   if (!doc || !locate(doc, p)) return { ok: false, reason: 'notfound' }
@@ -405,6 +409,19 @@ export function suggestInternalLinks(
       // A generic standalone word is allowed ONLY when it is the defined keyword.
       if (isGenericSingleWord(r.text) && r.source !== 'keyword') {
         debug.rejected.push({ anchor: r.text, reason: 'generic-single-word' })
+        continue
+      }
+      // 15 November 2026 — AN ANCHOR IS A PHRASE, WHATEVER THE DATA SAYS. A
+      // hand-typed anchor has been held to 2-6 words since it existed
+      // (manualAnchorShapeValid), but the defined keyword bypassed every shape
+      // check, and 37 topics in Production hold a TITLE in primary_keyword
+      // ("אילו אביזרי יוגה חיוניים למתרגלים מתחילים ומתקדמים?"). Where such a
+      // sentence also appears in the body prose, the suggestion wrapped the whole
+      // sentence in one link. The same cap now applies to every source, so a
+      // badly stored keyword can no longer produce an anchor a person would not
+      // write. It is a shape rule only: a 2-6 word keyword is untouched.
+      if (wordCount(r.text) > MAX_ANCHOR_WORDS) {
+        debug.rejected.push({ anchor: r.text, reason: 'too-long-for-anchor' })
         continue
       }
       const exists = !!locate(doc, r.text)
