@@ -123,13 +123,21 @@ function main() {
 
     const hook = src('components/mapping/useMapping.ts')
     const settingsHook = src('components/settings/useSiteScan.ts')
-    const sameRescan = (h: string) => /return `\/api\/projects\/\$\{encodeURIComponent\(projectId\)\}\/seed`/.test(h)
-      && /fetch\(mappingUrl\(projectId\), \{ cache: 'no-store'/.test(h)
+    // 15.11.2026: the GET moved behind lib/client/seed-read.ts, because this hook
+    // and the dashboard's own seed state were measured fetching that route twice on
+    // one load. The rule is unchanged — read the scan, start the settings' rescan,
+    // nothing else — so the read is now asserted through the shared layer, and the
+    // POST, which starts something, stays this hook's own.
+    const sameRescan = (h: string) => /readSeed\(projectId, \{ signal: controller\.signal \}\)/.test(h)
+      && /from '@\/lib\/client\/seed-read'/.test(h)
       && /fetch\(mappingUrl\(projectId\), \{\s*method: 'POST',[\s\S]{0,120}body: JSON\.stringify\(\{ action: 'start', locale \}\)/.test(h)
-      && (h.match(/fetch\(/g) ?? []).length === 2
+      && (h.match(/fetch\(/g) ?? []).length === 1
+      && /return `\/api\/projects\/\$\{encodeURIComponent\(projectId\)\}\/seed`/.test(src('lib/client/seed-read.ts'))
     check('G2: the mapping reads the seed route and starts the settings\' own rescan (POST { action: \'start\' }), nothing else',
       sameRescan(hook) && /body: JSON\.stringify\(\{ action: 'start', locale \}\)/.test(settingsHook))
     check('G2-MUT: a mapping that starts stage B too fails G2', !sameRescan(hook.replace("{ action: 'start', locale }", "{ action: 'continue', keywords: [], locale }")))
+    check('G2-MUT2: a mapping that goes back to fetching the scan itself fails G2',
+      !sameRescan(hook.replace('readSeed(projectId, { signal: controller.signal })', "fetch(mappingUrl(projectId), { cache: 'no-store', signal: controller.signal })")))
     const offMeansNothing = (s: string) => /if \(mapping\.available !== true\) return null/.test(s)
     const banner = src('components/mapping/MappingBanner.tsx')
     const placeholder = src('components/mapping/MappingPlaceholder.tsx')
