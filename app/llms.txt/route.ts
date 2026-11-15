@@ -181,6 +181,10 @@ export async function GET() {
   lines.push(`- [Home in English](${BASE}/en): the same, in English.${othersSentence.length ? ` ${othersSentence.join(', ')}.` : ''}`)
   lines.push(`- [Pricing](${BASE}/pricing): four plans, each with a seven-day trial and no card. In Israel from 249 ILS a month including VAT; outside Israel from 79 USD a month plus tax.`)
   lines.push(`- [Free check](${BASE}/free-check): a first look at a site without an account.`)
+  // The two free tools are named here, in Start here, and not in the open-data
+  // section below: a browser tool is not a dataset, and an assistant that cites
+  // it as open data is citing something we never licensed.
+  lines.push(`- [AI crawler robots.txt generator](${BASE}/en/ai-crawlers#robots-generator): pick each AI crawler and get the exact robots.txt lines, built in the browser. It offers AI crawlers only, never Googlebot or Bingbot, and it states the rule people get wrong: a group that names a crawler REPLACES the catch-all \`*\` group for it rather than adding to it.`)
   lines.push(`- [About](${BASE}/about): who runs it and how to reach them.`)
   lines.push('')
 
