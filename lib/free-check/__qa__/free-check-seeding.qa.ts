@@ -204,13 +204,26 @@ async function main() {
 
   // Weakening: the lazy element regex this parser replaced. Same document, on a
   // fifth of the input, so the control itself stays quick.
+  //
+  // BEST OF THREE, both sides. This control compares two wall-clock timings, and
+  // the suites run in parallel: a loaded machine inflates whichever side happens
+  // to be descheduled, which made the control report a NEW failure on untouched
+  // main about every other run (954ms vs an inflated 49ms, so under the 20x bar).
+  // The fastest of three runs is the one least interrupted, which is the number
+  // this control is actually about — the shape of the algorithm, not the load.
+  const fastest = async (fn: () => unknown | Promise<unknown>) => {
+    let best = Infinity
+    for (let i = 0; i < 3; i++) {
+      const t = performance.now()
+      await fn()
+      best = Math.min(best, performance.now() - t)
+    }
+    return best
+  }
   const SMALL = hostileDoc(CAP / 5)
-  const t2 = performance.now()
-  SMALL.match(/<(?:url|sitemap)\b[\s\S]*?<\/(?:url|sitemap)>/gi)
-  const regexMs = performance.now() - t2
-  const t3 = performance.now()
-  await discoverSitemapUrls(origin, { robotsTxt: null }, { fetchText: serve({ 'https://a.co.il/sitemap.xml': SMALL }) })
-  const linearSmallMs = performance.now() - t3
+  const regexMs = await fastest(() => SMALL.match(/<(?:url|sitemap)\b[\s\S]*?<\/(?:url|sitemap)>/gi))
+  const linearSmallMs = await fastest(() =>
+    discoverSitemapUrls(origin, { robotsTxt: null }, { fetchText: serve({ 'https://a.co.il/sitemap.xml': SMALL }) }))
   check(`CONTROL: the lazy element regex is orders slower on the same input (${regexMs.toFixed(0)}ms vs ${linearSmallMs.toFixed(0)}ms at a fifth of the cap)`,
     regexMs > Math.max(linearSmallMs * 20, 50))
   check('CONTROL: and it is quadratic, so the full cap would be 25x that again',
