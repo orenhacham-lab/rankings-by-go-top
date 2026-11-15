@@ -222,6 +222,12 @@ async function main() {
     'lib/shopify/__qa__/phase3-reconnect-after-uninstall.qa.ts',
     'lib/shopify/entitlement-resolver.ts',
     'lib/shopify/billing-guard.ts',
+    // The edge session gate (2026-11-15): proxy.ts reads the viewer through
+    // lib/auth/edge-session.ts, which verifies the token at the edge instead of
+    // asking the Auth server on every page view. This file is that middleware
+    // suite's own fake client, taught the two methods the gate calls. Its own
+    // feature, and W3c below proves it carries no WordPress-schema line.
+    'lib/shopify/__qa__/shopify-trial-route-access.qa.ts',
   ]
   const WP_SCHEMA_LINE = /publishArticleSchema|ld\+json|wordpress/i
 
