@@ -24,7 +24,7 @@ import { readFileSync, unlinkSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import {
   audienceIndex, cardInsights, clustersWorthShowing, insightContext, keywordsByAudience, matchAudience, planIntentMix, planSearches,
-  searchIntent, topicClusters, topicInsight, variantKey, type ClusterItem,
+  searchIntent, shownKeyword, topicClusters, topicInsight, variantKey, type ClusterItem,
 } from '../insights'
 import { nextSteps } from '../../../../components/content-strategy/WhatHappensNext'
 
@@ -228,6 +228,36 @@ console.log('\nS) the screen')
     && /@media \(prefers-reduced-motion: reduce\)[\s\S]*?animation-duration: 1ms/.test(css)
   check('S8: staggered entrances run only for those who allow motion (a delay would outlast the global reduced-motion rule)', stillWhenAsked(staggered), String(staggered.length))
   check('S8-MUT: a staggered card that always animates fails S8', !stillWhenAsked(staggered.map((s, i) => (i === 0 ? s.replace('motion-safe:animate-pop-in', 'animate-pop-in') : s))))
+}
+
+// ── K) a sentence is never shown as a keyword ───────────────────────────────
+console.log('\nK) the keyword a card shows')
+{
+  // Measured 15.11.2026 on the walk account: a topic whose idea carried no
+  // researched keyword keeps its own title in primary_keyword (topic-topup),
+  // and the board showed that whole sentence beside a key icon, with no
+  // monthly searches next to it.
+  const sentence = 'חברה לבניית אתרים ומה הצעת המחיר צריכה לכלול'
+  check('K1: the topic\'s own title is not shown as its keyword', shownKeyword(sentence, sentence) === null)
+  check('K2: a title-length phrase is not either, even when it is not the title word for word',
+    shownKeyword(sentence, 'משהו אחר לגמרי') === null)
+  check('K3 (CONTROL): a real search phrase is shown, untouched',
+    shownKeyword('בניית אתרים לעסקים', 'כמה עולה בניית אתר לעסק קטן') === 'בניית אתרים לעסקים'
+    && shownKeyword('seo agency pricing', 'How much does an SEO agency cost?') === 'seo agency pricing')
+  check('K4: spacing and case do not hide the title match',
+    shownKeyword('  Website   Pricing ', 'website pricing') === null)
+  check('K5: nothing in, nothing out', shownKeyword(null, 'x') === null && shownKeyword('   ', 'x') === null)
+  // The three surfaces that print it go through the helper, not the raw field.
+  const surfaces = ['StrategyBoard', 'StrategyList', 'NextArticleCard']
+    .map((n) => ({ n, src: strip(read(`components/content-strategy/${n}.tsx`)) }))
+  const usesHelper = (src: string) => /shownKeyword\((?:card|next)\.keyword, (?:card|next)\.title\)/.test(src)
+  for (const f of surfaces) check(`K6 ${f.n}: prints the shown keyword, not the stored one`, usesHelper(f.src), f.n)
+  const rawAgain = surfaces[0].src.replace(/shownKeyword\(card\.keyword, card\.title\)/g, 'card.keyword')
+  check('K6-MUT (CONTROL): printing the stored field again fails K6', rawAgain !== surfaces[0].src && !usesHelper(rawAgain))
+  // The volume lookup and everything else still read the stored value.
+  check('K7: the research lookup is untouched — a card still finds its facts by the stored keyword',
+    /export function cardKeyword/.test(read('lib/content/strategy/insights.ts'))
+    && /topicInsight\(\{ keyword: cardKeyword\(c\)/.test(read('lib/content/strategy/insights.ts')))
 }
 
 console.log(`\n${pass} passed, ${fail} failed`)

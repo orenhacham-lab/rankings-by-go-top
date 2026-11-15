@@ -9,6 +9,12 @@
  * Rows without a reason carry no button. A product or category keeps "write a
  * supporting article" in its row menu, so the action is always reachable
  * without every row shouting it.
+ *
+ * WITHOUT Search Console there are no figures to give a reason, so every
+ * reason-driven button disappeared and the column stood empty on all 96 rows
+ * of the walk account (measured 15.11.2026) — a list with nothing to do. There
+ * the one action that needs no figures, "write a supporting article", is
+ * offered on the row itself instead of only in a product's menu.
  */
 import Link from 'next/link'
 import { ExternalLink } from 'lucide-react'
@@ -112,10 +118,11 @@ export default function ContentTable({
                   </Td>
                 )}
                 <Td className="min-w-40 max-w-64 max-sm:basis-full">
-                  <RowAction x={x} it={it} planned={planned} creating={creating} onSupport={onSupport} pos={pos} num={num} />
+                  <RowAction x={x} it={it} gscOk={gscOk} planned={planned} creating={creating} onSupport={onSupport} pos={pos} num={num} />
                 </Td>
                 <Td stack="end" className="w-10 px-2">
-                  {commerce && !it.action && !planned && (
+                  {/* With no Search Console the cell itself offers this, so the menu would repeat it. */}
+                  {commerce && gscOk && !it.action && !planned && (
                     <RowMenu
                       label={fill(x.moreActions, { title })}
                       items={[{ key: 'support', label: x.writeSupport, onSelect: () => onSupport(it), disabled: !!creating }]}
@@ -131,9 +138,10 @@ export default function ContentTable({
   )
 }
 
-function RowAction({ x, it, planned, creating, onSupport, pos, num }: {
+function RowAction({ x, it, gscOk, planned, creating, onSupport, pos, num }: {
   x: Copy
   it: ExistingContentItem
+  gscOk: boolean
   planned: boolean
   creating: string | null
   onSupport: (it: ExistingContentItem) => void
@@ -159,6 +167,17 @@ function RowAction({ x, it, planned, creating, onSupport, pos, num }: {
           {x.actions.support}
         </Button>
         {why(x.actions.supportWhy, a.position, a.query)}
+      </div>
+    )
+  }
+  // No figures at all (Search Console not connected or not synced): the row
+  // still has one thing worth doing, and it needs no figures.
+  if (!gscOk && !planned) {
+    return (
+      <div data-row-action="support-no-gsc">
+        <Button size="sm" variant="secondary" loading={creating === it.key} disabled={!!creating && creating !== it.key} onClick={() => onSupport(it)}>
+          {x.actions.support}
+        </Button>
       </div>
     )
   }

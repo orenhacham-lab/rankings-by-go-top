@@ -296,6 +296,31 @@ export function cardKeyword(card: CardLike): string | null {
 }
 
 /**
+ * THE KEYWORD A CARD SHOWS, which is not always the keyword it stores.
+ *
+ * A topic created from an idea that carried no researched keyword keeps its own
+ * TITLE in `primary_keyword` (lib/content/automation/topic-topup.ts), so the
+ * board showed a whole sentence next to a key icon — measured 15.11.2026:
+ * "חברה לבניית אתרים ומה הצעת המחיר צריכה לכלול", and with no monthly searches
+ * beside it, because no such phrase is searched. A sentence is not a keyword,
+ * and claiming it is one teaches the owner the wrong thing about their plan.
+ *
+ * Shown only when it reads as a search phrase: not the title again, and short
+ * enough to be one. Everything else (the volume lookup, cannibalization, the
+ * article's own targeting) keeps reading the stored value through cardKeyword.
+ */
+const KEYWORD_MAX_WORDS = 7
+const sameText = (a: string, b: string) => a.trim().replace(/\s+/g, ' ').toLowerCase() === b.trim().replace(/\s+/g, ' ').toLowerCase()
+
+export function shownKeyword(keyword: string | null | undefined, title: string): string | null {
+  const k = (keyword ?? '').trim()
+  if (!k) return null
+  if (sameText(k, title)) return null
+  if (k.split(/\s+/).length > KEYWORD_MAX_WORDS) return null
+  return k
+}
+
+/**
  * The facts of every card that has at least one the research holds (a volume, an
  * audience, a competitor); a card with none gets no facts line rather than a lone guess.
  */

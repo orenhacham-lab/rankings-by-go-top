@@ -165,8 +165,9 @@ export async function GET(request: Request) {
   // still heading toward publish. Deliberately excludes published / skipped /
   // failed / quality_check_failed / paused so finished or halted work is never
   // shown as "scheduled". Tolerates the automation table not existing yet.
-  // A queue item whose article is already counted as scheduled above is the
-  // same work, so it is skipped (the tile used to show 2 for one article).
+  // A queue item whose article is already in the list above is the same work as
+  // that article, whatever its status, so it is skipped (the tile used to show
+  // one article as both "ready to publish" and "scheduled").
   const { data: queueRows, count: queueCount, error: queueError } = queueResult
   if (queueError) {
     if ((queueError as { code?: string }).code !== '42P01') {

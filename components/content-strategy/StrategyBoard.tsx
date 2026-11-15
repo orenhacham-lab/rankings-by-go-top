@@ -30,6 +30,7 @@ import {
   ALL_MONTHS, IDEA_GROUP_ORDER, STRATEGY_COLUMNS, cardsInMonth, ideaGroupCounts, ideaGroupOf, monthChips, sameTopicKey, unscheduledCount,
   type StrategyCard, type StrategyColumn,
 } from '@/lib/content/strategy/board'
+import { shownKeyword } from '@/lib/content/strategy/insights'
 import type { TopicInsight } from '@/lib/content/strategy/insights'
 import { formatCount } from '@/components/gsc/format'
 import TopicFacts from './TopicFacts'
@@ -109,10 +110,11 @@ function BoardCard({ card, lang, dict, act, insight }: { card: StrategyCard; lan
   const body = (
     <>
       <p className="line-clamp-2 text-copy font-semibold text-ink [overflow-wrap:anywhere]">{card.title}</p>
-      {card.keyword && (
+{/* A stored "keyword" that is really the topic's own sentence is not shown as one (shownKeyword). */}
+      {shownKeyword(card.keyword, card.title) && (
         <p className="mt-1.5 inline-flex max-w-full items-center gap-1 rounded-pill bg-sunk px-2 py-0.5 text-caption text-muted">
           <KeyRound className="size-3 shrink-0" aria-hidden="true" />
-          <span className="truncate">{card.keyword}</span>
+          <span className="truncate">{shownKeyword(card.keyword, card.title)}</span>
         </p>
       )}
       {insight && <TopicFacts insight={insight} lang={lang} dict={dict} className="mt-2" />}

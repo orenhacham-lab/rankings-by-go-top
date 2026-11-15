@@ -29,6 +29,7 @@ import * as SCAN from '../scan'
 import { dashboardHe } from '../../i18n/dashboard/he'
 import { dashboardEn } from '../../i18n/dashboard/en'
 import { pageTitle } from '../../shell/page-title'
+import { crawlCandidate } from '../../seed-scan/crawl'
 import type { FindingKind, GuideTopic, PageFacts, SiteFacts, SiteHealthErrorCode, SitePlatform } from '../types'
 
 let pass = 0, fail = 0
@@ -329,6 +330,47 @@ async function main() {
   const title = pageTitle('/site-health', [{ href: '/site-health', label: dashboardHe.sidebar.siteHealth }])
   check('G2: the tab is titled after the entry, in the dashboard\'s language', title.includes('בריאות האתר'), title)
   check('G3: the page renders inside WorkspaceGate (the project the top bar names)', /<WorkspaceGate>/.test(read('app/(dashboard)/site-health/page.tsx')))
+
+  // ── L) an endpoint that is not a page is not a broken link ───────────────
+  console.log('\nL) Cloudflare\'s own endpoints are never checked as the merchant\'s links')
+  {
+    const site = 'gotop.co.il'
+    // `/cdn-cgi/l/email-protection` is written into the HTML of every
+    // Cloudflare site that hides an email address, and answers 404 to a direct
+    // fetch. Measured on gotop.co.il, 15.11.2026: site health reported it to
+    // the merchant as a broken link on their own home page, marked דחוף.
+    check('L1: the email-obfuscation link is not a crawl candidate, so it is never link-checked',
+      crawlCandidate('https://gotop.co.il/cdn-cgi/l/email-protection', site) === null)
+    check('L2: nothing else under /cdn-cgi/ is either',
+      crawlCandidate('https://gotop.co.il/cdn-cgi/trace', site) === null
+      && crawlCandidate('https://gotop.co.il/cdn-cgi/challenge-platform/h/b/orchestrate', site) === null)
+    check('L3 (CONTROL): a real page of the site still is, and a word merely containing it too',
+      crawlCandidate('https://gotop.co.il/about', site)?.pathname === '/about'
+      && crawlCandidate('https://gotop.co.il/blog/cdn-cgi-explained', site)?.pathname === '/blog/cdn-cgi-explained')
+  }
+
+  // ── M) one scan, not two: the screen starts its own read ─────────────────
+  console.log('\nM) the screen does not ask for a scan the site already had')
+  {
+    const screen = strip(read('components/site-health/SiteHealthScreen.tsx'))
+    // The screen's report lives in this browser only, so after the onboarding
+    // scan had read the site a new browser still met "we have not checked the
+    // site yet" (measured 15.11.2026). The screen now starts the read itself.
+    const autoStarts = (src: string) =>
+      /autoStarted\.current = true/.test(src)
+      && /if \(!loaded \|\| report \|\| scanning \|\| error \|\| !domain\) return/.test(src)
+      && /void scan\(\)/.test(src)
+    check('M1: with nothing to show, the screen starts the scan itself', autoStarts(screen))
+    check('M2: it is guarded — once per mount, and never while scanning, after an error, or without a domain',
+      /const autoStarted = useRef\(false\)/.test(screen)
+      && /if \(autoStarted\.current\) return/.test(screen))
+    const waitsForButton = screen.replace(/autoStarted\.current = true\s*\n\s*void scan\(\)/, 'return')
+    check('M1-MUT (CONTROL): a screen that only waits for the button fails M1',
+      waitsForButton !== screen && !autoStarts(waitsForButton))
+    const noGuard = screen.replace('if (autoStarted.current) return', '')
+    check('M2-MUT (CONTROL): dropping the guard clause fails M2',
+      noGuard !== screen && !/if \(autoStarted\.current\) return/.test(noGuard))
+  }
 
   console.log(`\n${pass} passed, ${fail} failed`)
   if (fail > 0) process.exit(1)
