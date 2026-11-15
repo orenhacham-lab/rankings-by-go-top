@@ -30,6 +30,7 @@ import Input from '@/components/ui/Input'
 import { buttonClasses, Eyebrow } from '@/components/public/marketing'
 import { cn } from '@/lib/utils'
 import { AI_CRAWLERS } from '@/lib/ai-crawlers/agents'
+import { AiRobotsGenerator } from './AiRobotsGenerator'
 import { BLOCKING_BY_MARKET, BLOCKING_MEASUREMENT } from '@/lib/ai-crawlers/blocking-measurement'
 import { BLOCKING_MARKETS_2026_11_09, marketPct } from '@/lib/ai-crawlers/blocking-markets'
 import {
@@ -472,6 +473,8 @@ export function AiCrawlerChecker({ locale, initialUrl = '' }: { locale: PublicLo
           </p>
         )}
       </section>
+
+      <AiRobotsGenerator copy={copy} />
 
       <Measurement locale={locale} copy={copy} />
 
