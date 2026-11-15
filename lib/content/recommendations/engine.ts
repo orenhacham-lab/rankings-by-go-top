@@ -730,6 +730,25 @@ export async function generateRecommendations(admin: Admin, input: GenerateInput
       seenTitles.add(key)
       suggestions.push(s)
     }
+    // 15 November 2026 — WHAT EACH KEYWORD GATE REMOVED, IN PRODUCTION.
+    // Oren's question after the audience rule was built: how do we know a rule is
+    // not quietly throwing away a merchant's own keywords? The committed fleet
+    // sweep (audience-intent-fleet.qa.ts) answers it before a merge; this answers
+    // it after one. COUNTS AND OUR OWN REASON NAMES ONLY — never a keyword, a
+    // title or a domain, same rule as funnel-log.ts: a runtime log is not a place
+    // for a customer's content. Read it with the Vercel log reader by project id.
+    try {
+      console.log('[keyword-research] gate', {
+        projectId: input.projectId,
+        rawKeywords: res.meta.rawKeywords ?? 0,
+        afterBrandFilter: res.meta.afterBasicFilter ?? 0,
+        afterNoiseFilter: res.meta.afterNoiseFilter ?? 0,
+        jobSeeker: res.meta.filteredJobSeekerCount ?? 0,
+        tooGeneric: res.meta.filteredGenericCount ?? 0,
+        unrelated: res.meta.filteredUnrelatedCount ?? 0,
+        candidates: res.meta.candidateCount ?? 0,
+      })
+    } catch { /* an observability failure must never fail a run */ }
     meta = {
       source: 'keyword_research_url',
       generated: res.meta.generated,
@@ -744,6 +763,7 @@ export async function generateRecommendations(admin: Admin, input: GenerateInput
         seedUrlCount: seedUrls.length, seedKeywordCount: seedKeywords.length, trackingSeedCount: trackingSeeds.length, scanSeedCount: scanSeeds.length,
         rawKeywords: res.meta.rawKeywords, afterBasicFilter: res.meta.afterBasicFilter, afterNoiseFilter: res.meta.afterNoiseFilter,
         filteredGenericCount: res.meta.filteredGenericCount, filteredUnrelatedCount: res.meta.filteredUnrelatedCount, filteredUnrelatedExamples: res.meta.filteredUnrelatedExamples,
+        filteredJobSeekerCount: res.meta.filteredJobSeekerCount, filteredJobSeekerExamples: res.meta.filteredJobSeekerExamples,
         skippedByModelCount: res.meta.skippedByModelCount, skippedByModelExamples: res.meta.skippedByModelExamples,
         candidateCount: res.meta.candidateCount, batchSent: res.meta.batchSent, unusedRemaining: res.meta.unusedRemaining,
         skippedKnownCount: res.meta.skippedKnownCount, skippedKnownExamples: res.meta.skippedKnownExamples,

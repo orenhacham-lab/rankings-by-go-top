@@ -26,7 +26,7 @@
  * Run: npx tsx lib/content/automation/__qa__/topup-idea-stock.qa.ts
  */
 import { FakeAdmin } from '../../../__qa__/_fake-admin'
-import { runTopicTopUp, TRIAL_IDEA_TARGET, type TopUpDeps, type TopUpSummary } from '../topic-topup'
+import { runTopicTopUp, TRIAL_IDEA_TARGET, PER_PROJECT_TARGET_CAP, trialIdeaTarget, type TopUpDeps, type TopUpSummary } from '../topic-topup'
 import { PLAN_CATALOG } from '../../../plans/catalog'
 import { buildOverlapIndex, type OverlapIndexData } from '../../cannibalization/check'
 import type { TopicSuggestion } from '../../recommendations/types'
@@ -73,6 +73,15 @@ function world(ideas: Row[], waiting = 4): Record<string, Row[]> {
     content_topic_ideas: ideas,
     generated_articles: [], subscriptions: [], usage_reservations: [], ai_usage_logs: [],
   }
+}
+
+/**
+ * 15 November 2026 — THE SAME OWNER AND PROJECT WITH NO ACTIVE QUEUE. Nothing
+ * publishes here, so an unentitled owner is still skipped (E5, F4), which is the
+ * boundary of the rule proved in G.
+ */
+function worldNoPool(ideas: Row[]): Record<string, Row[]> {
+  return { ...world(ideas, 0), article_pools: [] }
 }
 
 const suggestion = (title: string): TopicSuggestion => ({
@@ -218,10 +227,12 @@ async function main() {
     const callsT = { generate: [] as string[] }
     const sT = await quiet(() => runTopicTopUp(faTime as never, { env: PROD, deadlineAt: T0 + 20_000, deps: deps(callsT) }))
     check('E4: too little time left before the cron\'s deadline: no model', callsT.generate.length === 0 && sT.modelProjects === 0)
-    const faUnpaid = thin()
+    // 15 Nov 2026 — an expired trial is skipped whatever it holds and whatever its
+    // queue does. Oren's rule: no publishing for an expired trial. See G.
+    const faUnpaid = new FakeAdmin(worldNoPool(SUBJECTS.slice(0, 2).map((t, n) => idea(`i${n + 1}`, t, 0.9))))
     const callsU = { generate: [] as string[] }
     const sU = await run(faUnpaid, callsU, { entitlement: async () => ({ entitled: false, monthlyArticles: 0 }) })
-    check('E5: an owner who is not entitled is skipped before anything is counted',
+    check('E5: an owner whose trial has expired is skipped before anything is counted',
       sU.notEntitled === 1 && sU.thinPlans === 0 && callsU.generate.length === 0, JSON.stringify(sU))
     const faZero = thin()
     const callsZ = { generate: [] as string[] }
@@ -242,18 +253,67 @@ async function main() {
     const sA = await run(faThin, callsA, { entitlement: async () => TRIAL })
     check('F1: a trial holding 2 ideas is asked for a month\'s worth',
       callsA.generate.length === 1 && sA.modelProjects === 1, JSON.stringify({ g: callsA.generate, s: sA }))
-    const faFull = new FakeAdmin(world(SUBJECTS.slice(0, TRIAL_IDEA_TARGET).map((t, n) => idea(`i${n + 1}`, t, 0.9))))
+    // 15 Nov 2026 — a month here is what THIS project's queue publishes in 30 days
+    // (trialIdeaTarget: a weekly queue is 5), not the entry plan's flat 4. The point of
+    // the rule is unchanged: once the month is held, the trial is never asked again.
+    // The queue AND the idea stock are two independent targets of 5 each (A/B above),
+    // so a month held means five waiting to publish and five left to approve.
+    const faFull = new FakeAdmin(world(SUBJECTS.slice(0, 5).map((t, n) => idea(`i${n + 1}`, t, 0.9)), 5))
     const callsB = { generate: [] as string[] }
     const sB = await run(faFull, callsB, { entitlement: async () => TRIAL })
-    check('F2: once it holds a month, the trial is never asked again',
+    check('F2: once it holds what its queue publishes in a month, the trial is never asked again',
       callsB.generate.length === 0 && sB.modelProjects === 0 && sB.thinPlans === 0, JSON.stringify(sB))
+    const faFour = new FakeAdmin(world(SUBJECTS.slice(0, TRIAL_IDEA_TARGET).map((t, n) => idea(`i${n + 1}`, t, 0.9))))
+    const callsB4 = { generate: [] as string[] }
+    const sB4 = await run(faFour, callsB4, { entitlement: async () => TRIAL })
+    check('F2b (mutation control): four ideas are NOT a month for a weekly queue, so it is asked',
+      callsB4.generate.length === 1 && sB4.thinPlans === 1, JSON.stringify(sB4))
     check('F3: and a month for a trial is the entry plan\'s month, not the trial\'s one article',
       TRIAL_IDEA_TARGET === PLAN_CATALOG.regular.maxArticlesPerPeriodAccountWide && TRIAL_IDEA_TARGET > 1)
-    const faOff = new FakeAdmin(world(SUBJECTS.slice(0, 2).map((t, n) => idea(`i${n + 1}`, t, 0.9))))
+    const faOff = new FakeAdmin(worldNoPool(SUBJECTS.slice(0, 2).map((t, n) => idea(`i${n + 1}`, t, 0.9))))
     const callsC = { generate: [] as string[] }
     const sC = await run(faOff, callsC, { entitlement: async () => ({ entitled: false, monthlyArticles: 0, trialActive: false }) })
-    check('F4: an expired trial, or an account that never had one, is still skipped',
+    check('F4: an expired trial with no active queue, like an account that never had one, is still skipped',
       sC.notEntitled === 1 && callsC.generate.length === 0 && sC.thinPlans === 0, JSON.stringify(sC))
+  }
+
+  // ── G) an expired trial is skipped, and a trial in date is sized by its queue ──
+  // 15 November 2026. Measured in Production that morning, the same line on every
+  // run: projectsChecked 46, notEntitled 23, enough 22, thinPlans 1. 45 of the 46
+  // active projects belong to trial accounts; 23 of those trials have expired and
+  // stay skipped (OREN'S RULE, 15 Nov 2026 — an expired trial does not get
+  // publishing), while the ones still in date were counted full at four ideas.
+  console.log('\nG) the expired trial, and the trial\'s real target')
+  {
+    const EXPIRED = { entitled: false, monthlyArticles: 0, trialActive: false } as const
+    const TRIAL = { entitled: false, monthlyArticles: 1, trialActive: true } as const
+    // An expired trial WITH an active queue and a plan full of ideas: nothing at all.
+    const faDry = new FakeAdmin(world(SUBJECTS.slice(0, 9).concat('ניקיון חלונות בגובה').map((t, n) => idea(`i${n + 1}`, t, 0.9 - n / 100)), 0))
+    const callsG1 = { generate: [] as string[] }
+    const sG1 = await run(faDry, callsG1, { entitlement: async () => EXPIRED })
+    check('G1: an expired trial is skipped even with an active queue and a full plan',
+      sG1.notEntitled === 1 && sG1.promoted === 0 && sG1.queued === 0 && sG1.thinPlans === 0, JSON.stringify(sG1))
+    check('G2: and it costs no model call', callsG1.generate.length === 0 && sG1.modelProjects === 0, JSON.stringify(sG1))
+    // MUTATION CONTROL: the very same world, the very same ideas, a trial IN DATE.
+    const callsG3 = { generate: [] as string[] }
+    const sG3 = await run(new FakeAdmin(world(SUBJECTS.slice(0, 2).map((t, n) => idea(`i${n + 1}`, t, 0.9)), 0)), callsG3, { entitlement: async () => TRIAL })
+    check('G3 (mutation control): in date, a project two ideas short IS asked for more',
+      sG3.notEntitled === 0 && sG3.thinPlans === 1 && callsG3.generate.length === 1, JSON.stringify(sG3))
+    // An unreadable entitlement must behave like the expired trial, never like one in date.
+    const callsG4 = { generate: [] as string[] }
+    const sG4 = await run(new FakeAdmin(world(SUBJECTS.slice(0, 2).map((t, n) => idea(`i${n + 1}`, t, 0.9)))), callsG4, { entitlement: async () => { throw new Error('billing unreachable') } })
+    check('G4: an entitlement that cannot be read is skipped, not served',
+      sG4.notEntitled === 1 && sG4.thinPlans === 0 && callsG4.generate.length === 0, JSON.stringify(sG4))
+    // The target itself: the queue's own monthly rate, never under the entry plan's
+    // month and never over the cap.
+    check('G5: the target is what the queue publishes in 30 days (weekly → 5)',
+      trialIdeaTarget({ id: 'x', cadence: 'weekly', interval_days: null, publish_days: null }) === 5)
+    check('G6: a daily queue is capped at PER_PROJECT_TARGET_CAP, not 30',
+      trialIdeaTarget({ id: 'x', cadence: 'daily', interval_days: null, publish_days: null }) === PER_PROJECT_TARGET_CAP)
+    check('G7: and with no queue it is still the entry plan\'s month',
+      trialIdeaTarget(null) === TRIAL_IDEA_TARGET)
+    check('G8: a rare queue never drops the stock below the entry plan\'s month',
+      trialIdeaTarget({ id: 'x', cadence: 'custom', interval_days: 30, publish_days: null }) >= TRIAL_IDEA_TARGET)
   }
 
   console.log(`\n${pass} passed, ${fail} failed`)
