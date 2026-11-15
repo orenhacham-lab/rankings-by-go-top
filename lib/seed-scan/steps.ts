@@ -947,37 +947,6 @@ export function searchMarket(project: Pick<SeedProject, 'country' | 'language'>)
  * At most `limit` (MAX_COMPETITORS by default).
  * A suggestion no search showed is dropped: it was never validated.
  */
-/**
- * Which seed keywords a4 searches. The BROADEST first, by word count, and ties in
- * the order the model gave them.
- *
- * It used to be the first MAX_SEARCHES as listed. These searches exist to find
- * real rival brands, and rankCompetitors' own note explains why that needs a head
- * term: a narrow long-tail SERP is blogs, forums and aggregators, and even head
- * terms across different product lines barely overlap. Once a2 is asked for a MIX
- * of broad and specific phrases (lib/free-check/business-insight.ts), "as listed"
- * stops meaning "broad", so the choice is made here instead of left to chance.
- */
-export function searchQueries(keywords: readonly string[]): string[] {
-  return keywords
-    .map((keyword, at) => ({ keyword, at, words: segmentWords(keyword).length }))
-    .sort((a, b) => (a.words - b.words) || (a.at - b.at))
-    .slice(0, MAX_SEARCHES)
-    .map((q) => q.keyword)
-}
-
-/**
- * a4's own measurement, for the keywords it searched: is the owner's site on the
- * first page? Only for searches that answered; a4 is the only place that knows.
- */
-export function firstPageField(answered: SearchRecord[], siteKey: string): { searchedKeywords?: SeedSummary['searchedKeywords'] } {
-  const isSelf = (d: string) => isDomainMatch(d, siteKey) || isDomainMatch(siteKey, d)
-  const out = answered
-    .filter((r) => r.query)
-    .map((r) => ({ keyword: r.query, onFirstPage: r.domains.some(isSelf) }))
-  return out.length > 0 ? { searchedKeywords: out } : {}
-}
-
 export function rankCompetitors(input: { candidates: string[]; results: string[][]; siteKey: string; limit?: number }): SeedCompetitor[] {
   const isSelf = (d: string) => isDomainMatch(d, input.siteKey) || isDomainMatch(input.siteKey, d)
   const seenIn = (domain: string) => input.results.filter((list) => list.some((d) => isDomainMatch(d, domain))).length
@@ -1079,6 +1048,37 @@ async function a4Search(ctx: StepContext): Promise<StepOutcome> {
   const added = await (ctx.writes ?? PROJECT_WRITES).addCompetitors(ctx.admin, ctx.scope, ranked.map((c) => c.domain), ctx.deps.now())
   if (added === 'error') return finished('failed', 'competitors_write_failed', summary, { itemCount: competitors.length, detail })
   return finished('done', null, summary, { itemCount: competitors.length, detail: { ...detail, added } })
+}
+
+/**
+ * Which seed keywords a4 searches. The BROADEST first, by word count, and ties in
+ * the order the model gave them.
+ *
+ * It used to be the first MAX_SEARCHES as listed. These searches exist to find
+ * real rival brands, and rankCompetitors' own note explains why that needs a head
+ * term: a narrow long-tail SERP is blogs, forums and aggregators, and even head
+ * terms across different product lines barely overlap. Once a2 is asked for a MIX
+ * of broad and specific phrases (lib/free-check/business-insight.ts), "as listed"
+ * stops meaning "broad", so the choice is made here instead of left to chance.
+ */
+export function searchQueries(keywords: readonly string[]): string[] {
+  return keywords
+    .map((keyword, at) => ({ keyword, at, words: segmentWords(keyword).length }))
+    .sort((a, b) => (a.words - b.words) || (a.at - b.at))
+    .slice(0, MAX_SEARCHES)
+    .map((q) => q.keyword)
+}
+
+/**
+ * a4's own measurement, for the keywords it searched: is the owner's site on the
+ * first page? Only for searches that answered; a4 is the only place that knows.
+ */
+export function firstPageField(answered: SearchRecord[], siteKey: string): { searchedKeywords?: SeedSummary['searchedKeywords'] } {
+  const isSelf = (d: string) => isDomainMatch(d, siteKey) || isDomainMatch(siteKey, d)
+  const out = answered
+    .filter((r) => r.query)
+    .map((r) => ({ keyword: r.query, onFirstPage: r.domains.some(isSelf) }))
+  return out.length > 0 ? { searchedKeywords: out } : {}
 }
 
 /** The executors, by step. The runner calls them in STAGE_STEPS order. */

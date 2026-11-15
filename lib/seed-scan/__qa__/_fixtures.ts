@@ -250,6 +250,9 @@ export const HE_WP_RESULTS: Record<string, string[]> = {
   'אינסטלטור בתל אביב': ['rival-plumber.co.il', 'facebook.com', 'he.wikipedia.org', 'easy.co.il', 'plumber-tlv.co.il', 'zap.co.il'],
   'פתיחת סתימות': ['easy.co.il', 'pipes-pro.co.il', 'youtube.com', 'zap.co.il', 'shop.plumber-tlv.co.il'],
   'איתור נזילות': ['rival-plumber.co.il', 'easy.co.il', 'instagram.com', 'he.wikipedia.org'],
+  // a4 searches the BROADEST seed keywords (fewest words), so this two-word
+  // phrase is searched and the three-word 'אינסטלטור בתל אביב' is not.
+  'אינסטלטור חירום': ['rival-plumber.co.il', 'zap.co.il', 'easy.co.il', 'facebook.com'],
 }
 
 // ── Fixture 2: an English Shopify store ─────────────────────────────────────

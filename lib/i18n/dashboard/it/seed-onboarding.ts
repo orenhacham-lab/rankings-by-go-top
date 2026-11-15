@@ -118,8 +118,8 @@ export const seedOnboardingIt: DeepPartial<DashboardDictionary> = {
       },
       keywords: {
         checked: {
-          onFirstPage: 'Abbiamo verificato: il tuo sito è già in prima pagina',
-          notOnFirstPage: 'Abbiamo verificato: il tuo sito non è ancora in prima pagina',
+          onFirstPage: 'Abbiamo verificato: il Suo sito è già in prima pagina',
+          notOnFirstPage: 'Abbiamo verificato: il Suo sito non è ancora in prima pagina',
         },
         title: 'Parole chiave che vale la pena spingere',
         hint: 'Sono tutte selezionate. Ciò che resta selezionato viene monitorato e rientra nel limite di parole chiave del suo piano.',

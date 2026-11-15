@@ -37,8 +37,14 @@ export const PREVIEW_KEYWORDS = 3
 export function researchView(summary: SeedSummary, steps: ResearchStepView[]): ResearchView {
   const competitors = summary.competitors.slice(0, PREVIEW_COMPETITORS)
   const seedKeywords = summary.seedKeywords.slice(0, PREVIEW_KEYWORDS)
+  // a4 searches the BROADEST keywords, which are not always the previewed ones, so its
+  // measurement carries keyword text of its own: cut it to the preview, or a locked
+  // keyword reaches an anonymous visitor through the back door.
+  const searched = (summary.searchedKeywords ?? []).filter((s) => seedKeywords.includes(s.keyword))
+  const rest = { ...summary }
+  delete rest.searchedKeywords
   return {
-    summary: withCounters({ ...summary, competitors, seedKeywords }),
+    summary: withCounters({ ...rest, competitors, seedKeywords, ...(searched.length > 0 ? { searchedKeywords: searched } : {}) }),
     steps: steps.map((s) => ({ step: s.step, status: s.status, errorCode: s.errorCode, itemCount: s.itemCount })),
     locked: {
       competitors: summary.competitors.length - competitors.length,

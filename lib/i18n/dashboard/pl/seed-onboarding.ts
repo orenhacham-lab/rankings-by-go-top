@@ -130,8 +130,8 @@ export const seedOnboardingPl: DeepPartial<DashboardDictionary> = {
       },
       keywords: {
         checked: {
-          onFirstPage: 'Sprawdziliśmy: Twoja strona jest już na pierwszej stronie wyników',
-          notOnFirstPage: 'Sprawdziliśmy: Twojej strony nie ma jeszcze na pierwszej stronie wyników',
+          onFirstPage: 'Sprawdziliśmy: strona Państwa jest już na pierwszej stronie wyników',
+          notOnFirstPage: 'Sprawdziliśmy: strony Państwa nie ma jeszcze na pierwszej stronie wyników',
         },
         title: 'Słowa kluczowe, które są tego warte',
         hint: 'Wszystko jest zaznaczone. To, co zostanie zaznaczone, będzie śledzone i wlicza się do limitu słów kluczowych Państwa pakietu.',
