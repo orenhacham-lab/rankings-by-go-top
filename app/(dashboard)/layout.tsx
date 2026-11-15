@@ -22,7 +22,6 @@ import { isGscReadOnlyEnabled } from '@/lib/gsc/config'
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { ensureDefaultClient } from '@/lib/clients/ensure-default-client'
-import { autoClaimByBuyerEmail } from '@/lib/marketplace/auto-claim'
 import { redirect } from 'next/navigation'
 import { cookies } from 'next/headers'
 import { Suspense } from 'react'
@@ -67,14 +66,6 @@ export default async function DashboardLayout({
   // client here on first dashboard load. Idempotent + quota-aware + best-effort (a cheap
   // head-count no-ops once any client exists; a failure never blocks the dashboard).
   try { await ensureDefaultClient(supabase, createAdminClient()) } catch { /* non-blocking */ }
-
-  // A receipt bought on a marketplace and never claimed through its emailed link
-  // attaches itself here, on the buyer's own first dashboard load, when the
-  // address they verified at sign-up is the address the platform billed. It
-  // never touches an account that already has a paid plan and never runs on an
-  // unconfirmed address — lib/marketplace/auto-claim.ts says why. Best-effort
-  // and awaited before the trial bar reads, so one load shows one truth.
-  try { await autoClaimByBuyerEmail(createAdminClient(), user) } catch { /* non-blocking */ }
 
   // Fetch profile to determine admin status
   const { data: profile } = await supabase
