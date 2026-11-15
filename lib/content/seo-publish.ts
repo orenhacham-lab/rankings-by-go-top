@@ -14,18 +14,29 @@ import type { SeoMetaStatus, SeoPlugin } from '@/lib/content/wordpress-taxonomy'
 import { decryptCredential } from '@/lib/security/credentials-crypto'
 import { pluginFix, type PluginLink, type PluginPost } from '@/lib/site-fix/plugin-client'
 import { readPluginLink } from '@/lib/site-fix/store'
+import { usableTargetKeyword } from '@/lib/content/keyword-shape'
 
 type Admin = ReturnType<typeof createAdminClient>
 
 export interface SeoPublishResult { plugin: SeoPlugin; status: SeoMetaStatus; detail?: string }
 
-/** Load the article's focus keyword from its topic's primary_keyword (never omitted). */
+/**
+ * Load the article's focus keyword from its topic's primary_keyword.
+ *
+ * Only a real search phrase is sent on. 37 topics in Production hold a TITLE or a
+ * welded-together headline there (measured 15 November 2026), and 22 of their
+ * articles are already published, so rewriting the rows cannot undo it — but a
+ * sentence must not go on being written into Yoast/Rank Math as the post's focus
+ * keyphrase, where it scores every future SEO check against a phrase nobody
+ * searches. An absent focus keyword is handled all the way down: the field is
+ * simply not written (lib/content/keyword-shape.ts).
+ */
 export async function loadFocusKeyword(admin: Admin, topicId: string | null | undefined): Promise<string | null> {
   if (!topicId) return null
   try {
     const { data } = await admin.from('article_topics').select('primary_keyword').eq('id', topicId).maybeSingle()
     const kw = (data as { primary_keyword?: string } | null)?.primary_keyword
-    return kw ? String(kw) : null
+    return usableTargetKeyword(kw)
   } catch {
     return null
   }
