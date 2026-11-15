@@ -54,7 +54,32 @@ export function seedUrl(projectId: string): string {
 
 type Entry = { promise: Promise<SeedReadResult>; startedAt: number; settledAt: number | null }
 
-const entries = new Map<string, Entry>()
+/**
+ * THE REGISTRY LIVES ON `globalThis`, NOT IN THIS MODULE'S SCOPE.
+ *
+ * Module scope is per module INSTANCE, and a client module imported from two
+ * route segments can be emitted into two chunks, which is two instances and
+ * two maps — each one correctly coalescing its own callers and neither seeing
+ * the other. That is what production still did after the first fix: measured
+ * on 2026-11-15, a dashboard load fired `GET /api/projects/[id]/seed` twice
+ * with both requests starting in the SAME millisecond (start=2508, 510ms and
+ * 738ms), which no in-flight check inside one instance can produce.
+ *
+ * Keying the map off `globalThis` gives every copy of this module one shared
+ * registry, so the coalescing holds however the bundler splits it.
+ */
+const REGISTRY_KEY = '__goTopSeedReadEntries__'
+
+type RegistryHost = typeof globalThis & { [REGISTRY_KEY]?: Map<string, Entry> }
+
+function registry(): Map<string, Entry> {
+  const host = globalThis as RegistryHost
+  const existing = host[REGISTRY_KEY]
+  if (existing) return existing
+  const created = new Map<string, Entry>()
+  host[REGISTRY_KEY] = created
+  return created
+}
 
 /** Injectable only for the QA suite; production always reads the real clock. */
 let nowMs: () => number = () => Date.now()
@@ -62,7 +87,7 @@ let fetchImpl: typeof fetch | null = null
 
 /** QA only. Replaces the clock and the transport, and clears what is in flight. */
 export function __setSeedReadTestHooks(hooks: { now?: () => number; fetch?: typeof fetch } | null): void {
-  entries.clear()
+  registry().clear()
   nowMs = hooks?.now ?? (() => Date.now())
   fetchImpl = hooks?.fetch ?? null
 }
@@ -96,6 +121,7 @@ export function readSeed(
   opts?: { signal?: AbortSignal; fresh?: boolean },
 ): Promise<SeedReadResult> {
   const now = nowMs()
+  const entries = registry()
   const existing = entries.get(projectId)
   let entry: Entry
   if (!opts?.fresh && usable(existing, now)) {
