@@ -127,7 +127,14 @@ function SummaryBody({ view, c }: { view: CompetitorView; c: Copy }) {
   const hidden = comparison.standings.length - shown.length
   return (
     <div className="w-full">
-      <ul className="grid w-full grid-cols-3 gap-4 sm:gap-6">
+      {/* A phone has no room for three of these side by side: at 390px each
+          column came to about 110px and every name was cut — and cut at its
+          START, because an English domain inside a Hebrew column is reordered
+          before it is clipped, so "danielzribe.co.il" read "…ibe.co.il" and
+          named nobody (measured 15.11.2026). One under the other there, three
+          across from `sm` up, and each name is now clipped at its own end
+          (dir="auto" below), so what survives is the part that identifies it. */}
+      <ul className="grid w-full grid-cols-1 gap-3 sm:grid-cols-3 sm:gap-6">
         {shown.map((s) => <StandingBlock key={s.domain} standing={s} c={c} />)}
       </ul>
       {hidden > 0 && (
@@ -146,7 +153,7 @@ function StandingBlock({ standing: s, c }: { standing: CompetitorStanding; c: Co
     <li className="min-w-0" title={sentence}>
       <p className="flex min-w-0 items-center gap-1.5 text-copy font-medium text-ink">
         <SiteAvatar domain={s.domain} name={s.name} size="xs" />
-        <span className="truncate">{s.name}</span>
+        <span dir="auto" className="truncate">{s.name}</span>
         {s.name !== s.domain && (
           <span dir="ltr" className="hidden truncate text-caption font-normal text-muted sm:inline">{s.domain}</span>
         )}

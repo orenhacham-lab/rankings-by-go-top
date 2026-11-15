@@ -65,8 +65,14 @@ console.log('\nC) the bars, and the public pill')
     /data-bulk-bar="" className="sticky/.test(code('app/(dashboard)/keyword-research/page.tsx')) && FLOAT_CLEAR_SELECTOR.includes('[data-bulk-bar]'))
   check('C1-MUT: an unmarked summary bar fails C1', !marked[0][1].test(code(marked[0][0]).replace('data-float-clear=""', '')))
   const shared = code('components/public/DemoFloat.tsx')
+  // The pill's own file holds no clearance logic (that belongs to DemoFloatApp)
+  // and the two tones keep their places. The app tone drops its words below `sm`
+  // since 15.11.2026 — a phone-width change, not a clearance one — so the slot
+  // is read as a prefix.
   check('C2: the shared pill (and so the public site) is unchanged: no clearance logic in it', !/floatLift|float-clear|style\.bottom/.test(shared)
-    && /tone === 'public' \? 'end-6 bottom-24 hidden md:flex' : 'end-6 bottom-6 flex'/.test(shared))
+    && /tone === 'public' \? 'end-6 bottom-24 hidden md:flex' : 'end-6 bottom-6 flex/.test(shared))
+  check('C2-MUT (CONTROL): clearance logic moved into the shared pill is caught',
+    /style\.bottom/.test(`${shared}\n pill.style.bottom = '0'`))
 }
 
 console.log(`\n${pass} passed, ${fail} failed`)

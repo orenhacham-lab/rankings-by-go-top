@@ -40,6 +40,7 @@ import { dashboardPtBR } from '../pt-BR/index'
 import { dashboardEs } from '../es'
 import { dashboardEn } from '../en'
 import { getDashboardDictionary } from '../getDashboardDictionary'
+import { enabledPublicLocales } from '../../locales'
 import { planLimitLines, trialLimitLines, CHECKS_EXPLAINER } from '../../../plans/features'
 import { sanctionsNotice } from '../../../sanctions/guard'
 import { createI18n } from '../../../ai-visibility/i18n'
@@ -323,9 +324,15 @@ check('4j: the competitor screen speaks French',
 // 5 — THE FLAG STILL GATES THE LANGUAGE.
 const switcher = src('components/DashboardLanguageSwitcher.tsx')
 check('5a: the in-app switcher offers FR only while the French build is on',
-  /frenchSiteEnabled\(\) \?/.test(switcher) && /'fr' as PublicLocale/.test(switcher))
-check('5a mutation: an unconditional FR option is caught',
-  !/frenchSiteEnabled\(\) \?/.test("{ locale: 'fr' as PublicLocale, lang: 'fr', label: 'FR' },"))
+  // The switcher no longer carries a list of its own (15.11.2026: eleven chips
+  // wrapped across the rail, so it became one control that opens the list). It
+  // asks the ONE gate, and that gate is what reads this language's flag.
+  /enabledPublicLocales\(\)/.test(switcher) && !/as PublicLocale/.test(switcher)
+  && /'?fr'?: (?:flags\.fr|flags\['fr'\]) \?\? frenchSiteEnabled\(\)/.test(src('lib/i18n/locales.ts'))
+  && enabledPublicLocales({ 'fr': true }).includes('fr')
+  && !enabledPublicLocales({ 'fr': false }).includes('fr'))
+check('5a mutation: a switcher with its own unconditional FR option is caught',
+  !/enabledPublicLocales\(\)/.test("const options = [{ locale: 'fr' as PublicLocale }]"))
 
 console.log(`\n${pass} passed, ${fail} failed`)
 if (fail) process.exit(1)

@@ -1,79 +1,106 @@
 'use client'
 
+import { useEffect, useRef, useState } from 'react'
+import { Check, ChevronDown, Languages } from 'lucide-react'
 import { useDashboardLanguage } from '@/lib/i18n/dashboard/useDashboardLanguage'
+import { getDashboardDictionary } from '@/lib/i18n/dashboard/getDashboardDictionary'
+import { getPublicDictionary } from '@/lib/i18n/getPublicDictionary'
+import { enabledPublicLocales } from '@/lib/i18n/locales'
 import { cn } from '@/lib/utils'
-import { spanishSiteEnabled } from '@/lib/i18n/spanish-site'
-import { portugueseSiteEnabled } from '@/lib/i18n/portuguese-site'
-import { frenchSiteEnabled } from '@/lib/i18n/french-site'
-import { italianSiteEnabled } from '@/lib/i18n/italian-site'
-import { japaneseSiteEnabled } from '@/lib/i18n/japanese-site'
-import { germanSiteEnabled } from '@/lib/i18n/german-site'
-import { dutchSiteEnabled } from '@/lib/i18n/dutch-site'
-import { polishSiteEnabled } from '@/lib/i18n/polish-site'
-import { koreanSiteEnabled } from '@/lib/i18n/korean-site'
-import { LOCALE_SHORT_LABEL, type PublicLocale } from '@/lib/i18n/locales'
 
 /**
- * The switch renders from the FIRST render, in the server-resolved language.
+ * The interface language, on the sidebar's rail.
  *
- * It used to return null until `isLoaded` — i.e. until a client effect had run —
- * so the one control that changes the language was missing for the whole of the
- * initial load, exactly when a reader who landed in the wrong language wants it.
- * Nothing here needs hydration: `language` is authoritative from the first
- * render, and the handlers only run on click, which cannot happen earlier.
+ * IT USED TO BE A CHIP PER LANGUAGE. That worked at two and survived at six
+ * (`min-w-fit`, so no label was clipped). At eleven it wrapped to three rows of
+ * small chips at the foot of the rail: measured 15.11.2026 on the Hebrew
+ * dashboard, where ten of the eleven are noise to the one reader looking at
+ * them. It is now the control it should have been — the language it is in,
+ * which opens the list — so the rail says one thing and still changes in two
+ * clicks.
+ *
+ * It renders from the FIRST render, in the server-resolved language: it used to
+ * return null until a client effect had run, so the one control that changes
+ * the language was missing for the whole of the initial load, exactly when a
+ * reader who landed in the wrong language wants it. `language` is authoritative
+ * from the first render, and the handlers only run on click.
+ *
+ * The languages offered are the ones whose dashboard EXISTS, from the one gate
+ * (enabledPublicLocales): a switcher that offered a half-translated dashboard
+ * is what those flags exist to prevent. Each names itself in its own script, so
+ * a reader scans for the word they would recognize — and a screen reader
+ * pronounces it in that language (`lang=…`).
  */
 export function DashboardLanguageSwitcher() {
   const { uiLocale, setDashboardLanguage } = useDashboardLanguage()
+  const names = getPublicDictionary(uiLocale).languageSwitcher
+  const label = getDashboardDictionary(uiLocale).sidebar.languageLabel
+  const locales = enabledPublicLocales()
+  const [open, setOpen] = useState(false)
+  const box = useRef<HTMLDivElement>(null)
 
-  // The languages the dashboard HAS, in the order a reader meets them. Spanish
-  // appears only while the Spanish build is on: the flag is the one gate for the
-  // whole language, and a switcher that offers a half-translated dashboard is
-  // the thing lib/i18n/spanish-site.ts exists to prevent.
-  const options: Array<{ locale: PublicLocale; lang: string }> = [
-    { locale: 'he', lang: 'he' },
-    { locale: 'en', lang: 'en' },
-    ...(spanishSiteEnabled() ? [{ locale: 'es' as PublicLocale, lang: 'es' }] : []),
-    ...(portugueseSiteEnabled() ? [{ locale: 'pt-BR' as PublicLocale, lang: 'pt-BR' }] : []),
-    ...(frenchSiteEnabled() ? [{ locale: 'fr' as PublicLocale, lang: 'fr' }] : []),
-    ...(italianSiteEnabled() ? [{ locale: 'it' as PublicLocale, lang: 'it' }] : []),
-    ...(japaneseSiteEnabled() ? [{ locale: 'ja' as PublicLocale, lang: 'ja' }] : []),
-    ...(germanSiteEnabled() ? [{ locale: 'de' as PublicLocale, lang: 'de' }] : []),
-    ...(dutchSiteEnabled() ? [{ locale: 'nl' as PublicLocale, lang: 'nl' }] : []),
-    ...(polishSiteEnabled() ? [{ locale: 'pl' as PublicLocale, lang: 'pl' }] : []),
-    ...(koreanSiteEnabled() ? [{ locale: 'ko' as PublicLocale, lang: 'ko' }] : []),
-  ]
-
-  // A segmented control on the sidebar's ink: one track, the chosen option
-  // lifted onto a light chip. Each option names itself in its own language (lang=…),
-  // so a screen reader pronounces "עברית" in Hebrew from an English screen.
-  // `min-w-fit` is the whole fix for the sixth language. The track used to be a
-  // grid of EQUAL columns, so every chip got a sixth of the rail whatever its
-  // word was: measured at 1440×1000 with six languages, each column came to
-  // 34.5px while "עברית" needs 39px of content box, and the Hebrew chip — the
-  // product's own language — was cut off. A flex row of items that may GROW to
-  // share the leftover space but may never SHRINK below their own word keeps
-  // every label whole, whatever its length; `flex-wrap` means a seventh
-  // language moves to a second line instead of clipping again.
-  const option = (active: boolean) => cn(
-    'h-7 min-w-fit flex-1 basis-0 rounded-[calc(var(--radius-control)-2px)] px-2 text-caption font-semibold transition-[background-color,color,box-shadow] duration-150 ease-snappy',
-    'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rail-focus',
-    active ? 'bg-rail-ink text-rail shadow-control' : 'text-rail-muted hover:text-rail-ink'
-  )
+  useEffect(() => {
+    if (!open) return
+    const onPointer = (e: MouseEvent) => { if (!box.current?.contains(e.target as Node)) setOpen(false) }
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setOpen(false) }
+    document.addEventListener('mousedown', onPointer)
+    document.addEventListener('keydown', onKey)
+    return () => { document.removeEventListener('mousedown', onPointer); document.removeEventListener('keydown', onKey) }
+  }, [open])
 
   return (
-    <div className="flex flex-wrap gap-0.5 rounded-control border border-rail-line bg-rail-hover p-0.5">
-      {options.map((o) => (
-        <button
-          key={o.locale}
-          type="button"
-          lang={o.lang}
-          aria-pressed={uiLocale === o.locale}
-          onClick={() => setDashboardLanguage(o.locale)}
-          className={option(uiLocale === o.locale)}
+    <div ref={box} className="relative">
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        aria-label={label}
+        aria-haspopup="menu"
+        aria-expanded={open}
+        data-language-trigger=""
+        className={cn(
+          'flex h-9 w-full items-center gap-1.5 rounded-control border border-rail-line bg-rail-hover px-2 text-caption font-semibold text-rail-ink',
+          'transition-[background-color,color] duration-150 ease-snappy hover:text-rail-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rail-focus',
+        )}
+      >
+        <Languages className="size-4 shrink-0 text-rail-muted" aria-hidden="true" />
+        <span lang={uiLocale} className="truncate">{names[uiLocale]}</span>
+        <ChevronDown
+          className={cn('ms-auto size-3.5 shrink-0 text-rail-muted transition-transform duration-150 ease-snappy', open && '-rotate-180')}
+          aria-hidden="true"
+        />
+      </button>
+      {open && (
+        // Above the rail's own rows, and opening UPWARD: this control sits at
+        // the foot of the sidebar, where a menu below it would fall off screen.
+        <div
+          role="menu"
+          aria-label={label}
+          data-language-menu=""
+          className="absolute bottom-full start-0 z-50 mb-2 max-h-[60vh] w-full min-w-[11rem] overflow-auto rounded-card border border-line bg-surface py-1 shadow-pop"
         >
-          {LOCALE_SHORT_LABEL[o.locale]}
-        </button>
-      ))}
+          {locales.map((l) => {
+            const current = l === uiLocale
+            return (
+              <button
+                key={l}
+                type="button"
+                role="menuitem"
+                lang={l}
+                aria-current={current ? 'true' : undefined}
+                onClick={() => { setDashboardLanguage(l); setOpen(false) }}
+                className={cn(
+                  'flex w-full items-center justify-between gap-3 px-3 py-2 text-copy',
+                  'transition-colors duration-150 ease-snappy hover:bg-sunk',
+                  current ? 'font-semibold text-ink' : 'text-body',
+                )}
+              >
+                <span>{names[l]}</span>
+                {current && <Check className="size-4 shrink-0 text-action" aria-hidden="true" />}
+              </button>
+            )
+          })}
+        </div>
+      )}
     </div>
   )
 }

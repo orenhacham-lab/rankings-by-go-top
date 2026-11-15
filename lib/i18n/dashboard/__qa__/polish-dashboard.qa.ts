@@ -57,6 +57,7 @@ import { dashboardPtBR } from '../pt-BR/index'
 import { dashboardEs } from '../es'
 import { dashboardEn } from '../en'
 import { getDashboardDictionary } from '../getDashboardDictionary'
+import { enabledPublicLocales } from '../../locales'
 import { plForm, plPick } from '../pl/plural'
 import { planLimitLines, trialLimitLines, CHECKS_EXPLAINER } from '../../../plans/features'
 import { sanctionsNotice } from '../../../sanctions/guard'
@@ -356,9 +357,15 @@ check('4i: the PDF and Excel labels speak Polish',
 // 5 — THE FLAG STILL GATES THE LANGUAGE.
 const switcher = src('components/DashboardLanguageSwitcher.tsx')
 check('5a: the in-app switcher offers PL only while the Polish build is on',
-  /polishSiteEnabled\(\) \?/.test(switcher) && /'pl' as PublicLocale/.test(switcher))
-check('5a mutation: an unconditional PL option is caught',
-  !/polishSiteEnabled\(\) \?/.test("{ locale: 'pl' as PublicLocale, lang: 'pl' },"))
+  // The switcher no longer carries a list of its own (15.11.2026: eleven chips
+  // wrapped across the rail, so it became one control that opens the list). It
+  // asks the ONE gate, and that gate is what reads this language's flag.
+  /enabledPublicLocales\(\)/.test(switcher) && !/as PublicLocale/.test(switcher)
+  && /'?pl'?: (?:flags\.pl|flags\['pl'\]) \?\? polishSiteEnabled\(\)/.test(src('lib/i18n/locales.ts'))
+  && enabledPublicLocales({ 'pl': true }).includes('pl')
+  && !enabledPublicLocales({ 'pl': false }).includes('pl'))
+check('5a mutation: a switcher with its own unconditional PL option is caught',
+  !/enabledPublicLocales\(\)/.test("const options = [{ locale: 'pl' as PublicLocale }]"))
 
 /*
  * 6 — NO PRICE IN ZŁOTY OR IN EUROS, anywhere a Polish reader can see one.

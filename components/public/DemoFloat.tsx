@@ -56,7 +56,7 @@ export function DemoFloat({
         'float-y fixed z-[59] items-center gap-2 rounded-pill bg-action px-4 py-3 text-copy font-bold text-action-ink shadow-pop',
         'transition-[background-color,box-shadow] duration-150 ease-snappy hover:bg-action-hover',
         'focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-action/30',
-        tone === 'public' ? 'end-6 bottom-24 hidden md:flex' : 'end-6 bottom-6 flex',
+        tone === 'public' ? 'end-6 bottom-24 hidden md:flex' : 'end-6 bottom-6 flex max-sm:px-3',
         className,
       )}
     >
@@ -65,7 +65,14 @@ export function DemoFloat({
         <span className="relative inline-flex size-2.5 rounded-pill bg-action-ink" />
       </span>
       <MonitorPlay className="size-4 shrink-0" aria-hidden="true" />
-      {label}
+      {/* On a phone, inside the app, the words are dropped and the pill becomes a
+          round button: it is fixed over the screen's end corner at every size
+          there, and at 390px the labelled pill lay across the content behind it
+          (measured 15.11.2026 on the keywords screen, where it sat on the card's
+          own heading). The link, the message and the spoken name are unchanged,
+          and from `sm` up the words are back. The public site's pill is a phone
+          size's MobileContactBar action instead, so it never reaches this. */}
+      <span className={tone === 'app' ? 'max-sm:hidden' : undefined}>{label}</span>
     </a>
   )
 }
