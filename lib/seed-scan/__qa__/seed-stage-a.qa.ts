@@ -103,8 +103,24 @@ async function main() {
     check('the run row is done, its lease dropped', runRow(tables).status === 'done' && runRow(tables).lease_expires_at === null && !!runRow(tables).finished_at)
     check('ONE model call', model.calls.length === 1, String(model.calls.length))
     check('the model is asked in the run locale, told the site itself', model.calls[0]?.locale === 'he' && model.calls[0]?.selfDomain === HE_WP.key)
-    check(`at most ${MAX_SEARCHES} searches — the first three seed keywords, one each`,
-      search.calls.length === 3 && search.calls.every((c, i) => c.query === HE_WP_INSIGHT.keywords[i]), JSON.stringify(search.calls.map((c) => c.query)))
+    // The BROADEST three, not the first three listed: these searches exist to find
+    // rival brands, and a narrow long-tail SERP is blogs and aggregators. Of the
+    // five seeds, 'אינסטלטור בתל אביב' and 'תיקון דוד שמש' carry three words each,
+    // so they are the two left unsearched (lib/seed-scan/steps.ts, searchQueries).
+    check(`at most ${MAX_SEARCHES} searches — the broadest three seed keywords, one each`,
+      search.calls.length === 3
+      && JSON.stringify(search.calls.map((c) => c.query)) === JSON.stringify(['פתיחת סתימות', 'איתור נזילות', 'אינסטלטור חירום']),
+      JSON.stringify(search.calls.map((c) => c.query)))
+    // What those searches measured reaches the snapshot, and the two keywords a4
+    // never searched are not mentioned at all. 'פתיחת סתימות' reads as on the first
+    // page because the fixture's SERP holds shop.plumber-tlv.co.il — a subdomain of
+    // this site IS this site.
+    check('the snapshot says what those searches measured, and nothing about the other two',
+      JSON.stringify(summaryOf(tables).searchedKeywords) === JSON.stringify([
+        { keyword: 'פתיחת סתימות', onFirstPage: true },
+        { keyword: 'איתור נזילות', onFirstPage: false },
+        { keyword: 'אינסטלטור חירום', onFirstPage: false },
+      ]), JSON.stringify(summaryOf(tables).searchedKeywords))
     check('searches run in the project market (IL / he)', search.calls.every((c) => c.gl === 'il' && c.hl === 'he'), JSON.stringify(search.calls[0]))
     check('no request left the project host', net.requests.length > 0 && net.requests.every((u) => domainKey(new URL(u)) === HE_WP.key), net.hosts().join(','))
 

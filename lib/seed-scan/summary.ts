@@ -166,7 +166,22 @@ export function readSummary(raw: unknown): SeedSummary | null {
     // Checked again on every read (https, on this site, bounded), never trusted because stored.
     ...siteIconField(safeSiteIcon(r.siteIcon, domain)),
     ...(str(r.siteIconCheckedAt, 40) ? { siteIconCheckedAt: str(r.siteIconCheckedAt, 40) as string } : {}),
+    ...readSearchedKeywords(r.searchedKeywords),
   })
 }
 
 const siteIconField = (icon: string | null): { siteIcon?: string } => (icon ? { siteIcon: icon } : {})
+
+/** a4's own measurement, re-validated: a keyword it searched and one boolean. */
+function readSearchedKeywords(v: unknown): { searchedKeywords?: { keyword: string; onFirstPage: boolean }[] } {
+  if (!Array.isArray(v)) return {}
+  const out: { keyword: string; onFirstPage: boolean }[] = []
+  for (const x of v.slice(0, 5)) {
+    if (!x || typeof x !== 'object') continue
+    const r = x as Record<string, unknown>
+    const keyword = str(r.keyword, 160)
+    if (!keyword) continue
+    out.push({ keyword, onFirstPage: bool(r.onFirstPage) })
+  }
+  return out.length > 0 ? { searchedKeywords: out } : {}
+}

@@ -117,6 +117,10 @@ export const seedOnboardingDe: DeepPartial<DashboardDictionary> = {
         severity: { blocker: 'Blockierend', warning: 'Zu korrigieren', info: 'Gut zu wissen' },
       },
       keywords: {
+        checked: {
+          onFirstPage: 'Wir haben es geprüft: Ihre Website steht bereits auf der ersten Seite',
+          notOnFirstPage: 'Wir haben es geprüft: Ihre Website steht noch nicht auf der ersten Seite',
+        },
         title: 'Keywords, die sich lohnen',
         hint: 'Alle sind ausgewählt. Was ausgewählt bleibt, wird überwacht und zählt auf das Keyword-Limit Ihres Tarifs.',
         selected: (n: number, total: number) => `${n} von ${total} ausgewählt`,

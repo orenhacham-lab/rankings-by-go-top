@@ -25,6 +25,7 @@ import {
   geoView,
   initialSelection,
   keywordReason,
+  keywordCheck,
   MAX_POLL_MS,
   orderedCompetitors,
   POLL_MS,
@@ -148,6 +149,23 @@ function main() {
   for (const [label, keyword, expected] of cases) check(`why "${keyword}": ${label} → ${expected}`, reason(keyword) === expected, reason(keyword))
   check('a name shorter than four letters is not taken for a brand (every word would match)', reason('ab shop', { ...BUSINESS, companyName: 'ab' }, 'ab.com') !== 'brand')
   check('no business at all still gives a reason', reason('פתיחת סתימות', null) === 'core')
+
+  // What the scan ALREADY measured for a keyword, from its own searches (a4).
+  {
+    const searched = [
+      { keyword: 'אינסטלטור תל אביב', onFirstPage: false },
+      { keyword: 'פתיחת סתימות', onFirstPage: true },
+    ]
+    check('a keyword a4 searched and did not find the site on → notOnFirstPage',
+      keywordCheck('אינסטלטור תל אביב', searched) === 'notOnFirstPage')
+    check('a keyword whose first page already holds the site → onFirstPage',
+      keywordCheck('פתיחת סתימות', searched) === 'onFirstPage')
+    check('a keyword a4 never searched says NOTHING', keywordCheck('מחיר תיקון דוד', searched) === 'unchecked')
+    check('a run that recorded no searches says nothing either',
+      keywordCheck('פתיחת סתימות', undefined) === 'unchecked' && keywordCheck('פתיחת סתימות', []) === 'unchecked')
+    check('spacing and case do not hide a match',
+      keywordCheck('  אינסטלטור   תל אביב ', searched) === 'notOnFirstPage' && keywordCheck('PLUMBER', [{ keyword: 'plumber', onFirstPage: true }]) === 'onFirstPage')
+  }
 
   console.log('\n5) When the site was read')
   check('under an hour → just now', scannedAgo(new Date(NOW.getTime() - 59 * 60_000).toISOString(), NOW)?.kind === 'justNow')

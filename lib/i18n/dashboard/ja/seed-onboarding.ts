@@ -113,6 +113,10 @@ export const seedOnboardingJa: DeepPartial<DashboardDictionary> = {
         severity: { blocker: '重大', warning: '警告', info: '参考' },
       },
       keywords: {
+        checked: {
+          onFirstPage: '確認済みです。このキーワードではサイトがすでに1ページ目に表示されています',
+          notOnFirstPage: '確認済みです。このキーワードではサイトはまだ1ページ目に表示されていません',
+        },
         title: '力を入れる価値のあるキーワード',
         hint: 'すべて選択されています。選択したままのものを計測し、プランのキーワード数に含まれます。',
         selected: (n: number, total: number) => `${total} 件のうち ${n} 件を選択`,

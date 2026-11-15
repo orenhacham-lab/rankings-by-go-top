@@ -117,6 +117,10 @@ export const seedOnboardingIt: DeepPartial<DashboardDictionary> = {
         severity: { blocker: 'Bloccante', warning: 'Da correggere', info: 'Buono a sapersi' },
       },
       keywords: {
+        checked: {
+          onFirstPage: 'Abbiamo verificato: il Suo sito è già in prima pagina',
+          notOnFirstPage: 'Abbiamo verificato: il Suo sito non è ancora in prima pagina',
+        },
         title: 'Parole chiave che vale la pena spingere',
         hint: 'Sono tutte selezionate. Ciò che resta selezionato viene monitorato e rientra nel limite di parole chiave del suo piano.',
         selected: (n: number, total: number) => `${n} selezionate su ${total}`,

@@ -250,6 +250,24 @@ async function main() {
       count(html, /<button[^>]*data-seed-start="true"/g) === 1 && has(block(html, 'start'), t.start.button) && has(block(html, 'start'), t.start.body(5)))
   }
   {
+    // What stage A already measured, on the row the owner is about to commit to —
+    // and NOTHING on the keywords it did not search (15 November 2026).
+    const t = dict('he').summary
+    const base = fullSummary()
+    const measured = fullSummary({ searchedKeywords: [
+      { keyword: base.seedKeywords[0], onFirstPage: false },
+      { keyword: base.seedKeywords[1], onFirstPage: true },
+    ] })
+    const html = render('he', ResearchSummary, props({ summary: measured, run: runView({ summary: measured }) }))
+    const b = block(html, 'keywords')
+    check('the chooser says what the scan measured: one row not on the first page, one already on it',
+      count(b, /data-keyword-check="notOnFirstPage"/g) === 1 && count(b, /data-keyword-check="onFirstPage"/g) === 1
+      && has(b, t.keywords.checked.notOnFirstPage) && has(b, t.keywords.checked.onFirstPage))
+    check('…and says nothing at all about the three it did not search',
+      count(b, /data-keyword-check=/g) === 2
+      && count(block(render('he', ResearchSummary, props({ summary: base, run: runView({ summary: base }) })), 'keywords'), /data-keyword-check=/g) === 0)
+  }
+  {
     const t = dict('he').summary
     const seven = fullSummary({ seedKeywords: [...fullSummary().seedKeywords, 'שיפוץ חדרי אמבטיה', 'החלפת צנרת בבית'] })
     const html = render('he', ResearchSummary, props({ summary: seven, run: runView({ summary: seven }) }))

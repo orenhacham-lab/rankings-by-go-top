@@ -5519,6 +5519,10 @@ export const dashboardEn = {
         severity: { blocker: 'Blocking', warning: 'Worth fixing', info: 'Good to know' },
       },
       keywords: {
+        checked: {
+          onFirstPage: 'We checked this one: your site is already on the first page',
+          notOnFirstPage: 'We checked this one: your site is not on the first page yet',
+        },
         title: 'Keywords worth pushing',
         hint: 'All are checked. What stays checked is tracked and counts toward your plan\'s keyword limit.',
         selected: (n: number, total: number) => `${n} of ${total} checked`,

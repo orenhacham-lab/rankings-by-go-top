@@ -117,6 +117,10 @@ export const seedOnboardingNl: DeepPartial<DashboardDictionary> = {
         severity: { blocker: 'Blokkerend', warning: 'Te herstellen', info: 'Goed om te weten' },
       },
       keywords: {
+        checked: {
+          onFirstPage: 'We hebben het gecontroleerd: uw site staat al op de eerste pagina',
+          notOnFirstPage: 'We hebben het gecontroleerd: uw site staat nog niet op de eerste pagina',
+        },
         title: 'Zoekwoorden die het waard zijn',
         hint: 'Alles is aangevinkt. Wat aangevinkt blijft wordt gevolgd en telt mee voor de grens aan zoekwoorden van uw plan.',
         selected: (n: number, total: number) => `${n} van ${total} aangevinkt`,

@@ -5246,6 +5246,10 @@ export const dashboardEs: DeepPartial<DashboardDictionary> = {
         severity: { blocker: 'Bloqueante', warning: 'Conviene arreglarlo', info: 'Bueno saberlo' },
       },
       keywords: {
+        checked: {
+          onFirstPage: 'Lo comprobamos: tu web ya aparece en la primera página',
+          notOnFirstPage: 'Lo comprobamos: tu web todavía no está en la primera página',
+        },
         title: 'Palabras clave que merece la pena impulsar',
         hint: 'Están todas marcadas. Lo que quede marcado se monitoriza y cuenta en el límite de palabras clave de tu plan.',
         selected: (n: number, total: number) => `${n} de ${total} marcadas`,
