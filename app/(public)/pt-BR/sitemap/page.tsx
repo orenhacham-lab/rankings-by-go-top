@@ -56,6 +56,7 @@ export default async function PortugueseSitemapPage() {
     {
       title: 'Funcionalidades',
       links: [
+        { label: 'Funcionalidades', href: '/pt-BR/features' },
         { label: 'Criação e publicação de conteúdo', href: '/pt-BR/features/seo-geo-content-publishing' },
         { label: 'Acompanhamento de posições no Google orgânico', href: '/pt-BR/features/google-organic-rank-tracking' },
         { label: 'Acompanhamento de posições no Google Maps', href: '/pt-BR/features/google-maps-rank-tracking' },

@@ -115,7 +115,13 @@ export async function GET() {
       changefreq: 'weekly',
       priority: '0.7',
     },
-    // Hebrew feature pages
+    // Hebrew feature pages, the hub above them first
+    {
+      url: `${baseUrl}/features`,
+      lastmod: today,
+      changefreq: 'monthly',
+      priority: '0.8',
+    },
     {
       url: `${baseUrl}/features/seo-geo-content-publishing`,
       lastmod: today,
@@ -324,7 +330,13 @@ export async function GET() {
       changefreq: 'weekly',
       priority: '0.7',
     },
-    // English feature pages
+    // English feature pages, the hub above them first
+    {
+      url: `${baseUrl}/en/features`,
+      lastmod: today,
+      changefreq: 'monthly',
+      priority: '0.8',
+    },
     {
       url: `${baseUrl}/en/features/seo-geo-content-publishing`,
       lastmod: today,
@@ -495,6 +507,8 @@ export async function GET() {
     { path: '/affiliates/for-seo-and-agencies', changefreq: 'monthly', priority: '0.7' },
     { path: '/articles', changefreq: 'weekly', priority: '0.7' },
     { path: '/sitemap', changefreq: 'weekly', priority: '0.6' },
+    // The hub above them, which the menu is named after.
+    { path: '/features', changefreq: 'monthly', priority: '0.8' },
     { path: '/features/seo-geo-content-publishing', changefreq: 'monthly', priority: '0.7' },
     { path: '/features/google-organic-rank-tracking', changefreq: 'monthly', priority: '0.7' },
     { path: '/features/google-maps-rank-tracking', changefreq: 'monthly', priority: '0.7' },

@@ -1,8 +1,10 @@
 /**
  * The articles screen's "scheduled" tile counted one article twice: once as a
- * generated article with status `scheduled`, and again as the automation-queue
- * item that carries the same article_id. The walk seed (one scheduled article
- * + its pool item) showed "מתוזמנים 2".
+ * generated article, and again as the automation-queue item that carries the
+ * same article_id. The walk seed (one scheduled article + its pool item)
+ * showed "מתוזמנים 2"; after the first fix a `ready` article with a queue item
+ * still read as "all 1 / ready 1 / scheduled 1" (measured 15.11.2026), because
+ * the de-duplication only covered articles whose own status was `scheduled`.
  *
  * WHAT IS PROVEN HERE
  *   A. the pure helper skips a queue item whose article is already counted as
@@ -41,6 +43,18 @@ const strip = (s: string) => s.replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[^:]
 const scheduledArt = { id: 'art-3', status: 'scheduled' }
 const readyArt = { id: 'art-4', status: 'ready' }
 
+/** The helper as it was before 15.11.2026: a mutant, kept to control A3 and B3. */
+const onlyScheduledDedupe = (
+  queueTotal: number,
+  queueArticleIds: ReadonlyArray<string | null | undefined>,
+  articles: ReadonlyArray<{ id: string; status: string }>,
+) => {
+  const counted = new Set(articles.filter((a) => a.status === 'scheduled').map((a) => a.id))
+  let already = 0
+  for (const id of queueArticleIds) if (id && counted.has(id)) already += 1
+  return Math.max(0, queueTotal - already)
+}
+
 /** The route's source-level contract, as a predicate so a mutant can be fed to it. */
 const routeDedupes = (src: string) => {
   const s = strip(src)
@@ -69,8 +83,10 @@ async function main() {
     queueItemsNotYetCounted(1, ['art-3'], [scheduledArt]) === 0)
   check('A2: a queue item with no article yet is still counted',
     queueItemsNotYetCounted(2, ['art-3', null], [scheduledArt]) === 1)
-  check('A3: a queue item whose article is not itself scheduled is still counted',
-    queueItemsNotYetCounted(1, ['art-4'], [readyArt]) === 1)
+  check('A3: a queue item whose article is loaded under ANOTHER status is also skipped',
+    queueItemsNotYetCounted(1, ['art-4'], [readyArt]) === 0)
+  check('A3-MUT: de-duplicating only `scheduled` articles (the old helper) counts art-4 twice',
+    onlyScheduledDedupe(1, ['art-4'], [readyArt]) === 1)
   check('A4: an item pointing at an article outside the loaded list is still counted',
     queueItemsNotYetCounted(1, ['art-9'], [scheduledArt]) === 1)
   check('A5: never negative', queueItemsNotYetCounted(0, ['art-3', 'art-3'], [scheduledArt]) === 0)
@@ -99,6 +115,16 @@ async function main() {
   const withQueue = await routeScheduled(more)
   check('B2: an article-less queued item still counts; published and other projects do not',
     withQueue?.scheduled === 2, JSON.stringify(withQueue))
+
+  // The production shape: an article that is READY, with its queue item.
+  const ready = base()
+  ready.generated_articles = [
+    { id: 'art-7', project_id: 'p1', title: 'r', slug: 'r', status: 'ready', updated_at: '2026-09-26T12:00:00Z' },
+  ] as never
+  ready.article_pool_items = [{ id: 'pi-7', project_id: 'p1', article_id: 'art-7', status: 'queued' }]
+  const readyCounts = await routeScheduled(ready)
+  check('B3: a ready article with its queue item reads total 1 / scheduled 0',
+    readyCounts?.total === 1 && readyCounts?.scheduled === 0, JSON.stringify(readyCounts))
 
   console.log('\nC) SOURCE')
   const routeSrc = readFileSync(join(ROOT, 'app/api/content/overview/route.ts'), 'utf8')

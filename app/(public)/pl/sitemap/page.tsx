@@ -57,6 +57,7 @@ export default async function PolishSitemapPage() {
     {
       title: 'Funkcje',
       links: [
+        { label: 'Funkcje', href: '/pl/features' },
         { label: 'Pisanie i publikowanie treści', href: '/pl/features/seo-geo-content-publishing' },
         { label: 'Mierzenie pozycji w Google', href: '/pl/features/google-organic-rank-tracking' },
         { label: 'Mierzenie pozycji w Mapach Google', href: '/pl/features/google-maps-rank-tracking' },

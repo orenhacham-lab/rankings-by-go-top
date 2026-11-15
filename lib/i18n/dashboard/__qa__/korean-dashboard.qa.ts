@@ -71,6 +71,7 @@ import { dashboardNl } from '../nl/index'
 import { dashboardDe } from '../de/index'
 import { dashboardEn } from '../en'
 import { getDashboardDictionary } from '../getDashboardDictionary'
+import { enabledPublicLocales } from '../../locales'
 import { planLimitLines, trialLimitLines, CHECKS_EXPLAINER } from '../../../plans/features'
 import { sanctionsNotice } from '../../../sanctions/guard'
 import { createI18n } from '../../../ai-visibility/i18n'
@@ -388,9 +389,15 @@ check('4i: the PDF and Excel labels speak Korean',
 // 5 — THE FLAG STILL GATES THE LANGUAGE.
 const switcher = src('components/DashboardLanguageSwitcher.tsx')
 check('5a: the in-app switcher offers KO only while the Korean build is on',
-  /koreanSiteEnabled\(\) \?/.test(switcher) && /'ko' as PublicLocale/.test(switcher))
-check('5a mutation: an unconditional KO option is caught',
-  !/koreanSiteEnabled\(\) \?/.test("{ locale: 'ko' as PublicLocale, lang: 'ko' },"))
+  // The switcher no longer carries a list of its own (15.11.2026: eleven chips
+  // wrapped across the rail, so it became one control that opens the list). It
+  // asks the ONE gate, and that gate is what reads this language's flag.
+  /enabledPublicLocales\(\)/.test(switcher) && !/as PublicLocale/.test(switcher)
+  && /'?ko'?: (?:flags\.ko|flags\['ko'\]) \?\? koreanSiteEnabled\(\)/.test(src('lib/i18n/locales.ts'))
+  && enabledPublicLocales({ 'ko': true }).includes('ko')
+  && !enabledPublicLocales({ 'ko': false }).includes('ko'))
+check('5a mutation: a switcher with its own unconditional KO option is caught',
+  !/enabledPublicLocales\(\)/.test("const options = [{ locale: 'ko' as PublicLocale }]"))
 
 /*
  * 6 — NO PRICE IN WON, anywhere a Korean reader can see one, and the two other

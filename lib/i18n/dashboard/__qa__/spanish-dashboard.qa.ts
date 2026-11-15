@@ -40,7 +40,7 @@ import { deepMergeDictionary, type DeepPartial } from '../merge'
 import { dashboardEs } from '../es'
 import { dashboardEn } from '../en'
 import { dashboardHe } from '../he'
-import { getLocaleConfig, INTL_LOCALE, PAYPAL_LOCALE, toBilingualLocale, PUBLIC_LOCALES } from '../../locales'
+import { enabledPublicLocales, getLocaleConfig, INTL_LOCALE, PAYPAL_LOCALE, toBilingualLocale, PUBLIC_LOCALES } from '../../locales'
 import { spanishSiteEnabled } from '../../spanish-site'
 
 let pass = 0, fail = 0
@@ -202,13 +202,21 @@ try {
   else process.env.NEXT_PUBLIC_SPANISH_SITE_ENABLED = flag
 }
 check('5d: the switcher offers Spanish only behind the same flag',
-  /spanishSiteEnabled\(\)/.test(src('components/DashboardLanguageSwitcher.tsx'))
-  && /locale: 'es'/.test(src('components/DashboardLanguageSwitcher.tsx')))
-check('5d-ii: the rail gives the switcher its own row only when Spanish is offered',
-  /spanishSiteEnabled\(\) \? 'grid-cols-1' : 'grid-cols-2'/.test(src('components/layout/Sidebar.tsx')))
+  // Since 15.11.2026 the switcher asks the one gate instead of carrying a list
+  // of its own (eleven chips wrapped across the rail); the gate reads this flag.
+  /enabledPublicLocales\(\)/.test(src('components/DashboardLanguageSwitcher.tsx'))
+  && !/as PublicLocale/.test(src('components/DashboardLanguageSwitcher.tsx'))
+  && /es: flags\.es \?\? spanishSiteEnabled\(\)/.test(src('lib/i18n/locales.ts'))
+  && enabledPublicLocales({ es: true }).includes('es')
+  && !enabledPublicLocales({ es: false }).includes('es'))
+check('5d-ii: the rail keeps the switcher beside the theme toggle at every number of languages',
+  /grid grid-cols-2 gap-2 px-1/.test(src('components/layout/Sidebar.tsx'))
+  && !/spanishSiteEnabled/.test(src('components/layout/Sidebar.tsx')))
 check('5e: the flag reads exactly "true"', spanishSiteEnabled('true') && !spanishSiteEnabled('TRUE') && !spanishSiteEnabled('1'))
-check('5-MUT1: a switcher without the gate would fail 5d',
-  !/spanishSiteEnabled\(\)/.test("const options = [{ locale: 'es' }]"))
+check('5-MUT1: a switcher with its own unconditional list would fail 5d',
+  !/enabledPublicLocales\(\)/.test("const options = [{ locale: 'es' as PublicLocale }]"))
+check('5-MUT2 (CONTROL): a rail that still sizes itself by the Spanish flag fails 5d-ii',
+  /spanishSiteEnabled/.test("spanishSiteEnabled() ? 'grid-cols-1' : 'grid-cols-2'"))
 
 console.log('\n6. The real provider renders Spanish, left to right, with no effects run')
 process.env.NEXT_PUBLIC_SPANISH_SITE_ENABLED = 'true'

@@ -5,7 +5,7 @@ import { NextResponse, type NextRequest } from 'next/server'
 import { explainAccess, type AccessDiagnostics } from '@/lib/subscription'
 import { verifiedUserId } from '@/lib/auth/edge-session'
 import {
-  LANGUAGE_COOKIE, LANGUAGE_PARAM, LOCALE_HEADER,
+  LANGUAGE_COOKIE, LANGUAGE_PARAM, LOCALE_HEADER, PATHNAME_HEADER,
   explicitRequestLocale, languageCookieString, localeParamToPersist, sanitizeNextPath,
 } from '@/lib/i18n/request-locale'
 import { normalizeStoredLocale, type PublicLocale } from '@/lib/i18n/locales'
@@ -96,6 +96,13 @@ export async function proxy(request: NextRequest) {
   })
   const requestHeaders = new Headers(request.headers)
   if (explicitLocale) requestHeaders.set(LOCALE_HEADER, explicitLocale)
+  // The path, for a server layout that must title a page it cannot identify.
+  // The auth pages are client components in twelve locale trees: they cannot
+  // export metadata, and their shared layout cannot tell /signup from /login,
+  // so every one of them inherited the ROOT layout's English home-page title —
+  // a Hebrew sign-up page whose browser tab read "Create, schedule and publish
+  // SEO & GEO content". One header is cheaper than 48 layout files.
+  requestHeaders.set(PATHNAME_HEADER, pathname)
 
   /**
    * A `?lang=` the request CHOSE is persisted, so it survives the login

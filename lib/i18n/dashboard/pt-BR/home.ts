@@ -54,6 +54,7 @@ export const homePtBR: DeepPartial<DashboardDictionary> = {
       avgPosition: 'Posição média',
       avgPositionSource: 'Última verificação de cada palavra-chave',
       noChecks: 'Após a primeira verificação',
+      notFound: 'Nenhuma palavra aparece no top 100',
       noArticles: 'Nenhum artigo foi publicado ainda',
       unavailable: 'Indisponível no momento',
     },

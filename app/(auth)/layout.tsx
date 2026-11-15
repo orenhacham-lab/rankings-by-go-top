@@ -1,13 +1,29 @@
 import type { Metadata } from 'next'
 import { headers } from 'next/headers'
-import { getServerLocale } from '@/lib/i18n/server-locale'
+import { getServerLocale, getServerPublicLocale } from '@/lib/i18n/server-locale'
+import { PATHNAME_HEADER } from '@/lib/i18n/request-locale'
+import { authPageForPath, authPageTitle } from '@/lib/i18n/auth-titles'
 import { AuthLocaleProvider } from '@/components/auth/AuthLocaleProvider'
 import { countryFromHeaders } from '@/lib/billing/server-market'
 import { koreaTrialOnlyNoticeForCountry } from '@/lib/billing/korea-sale'
 
-export const metadata: Metadata = {
-  // Note: Auth pages are not indexed, but we don't explicitly block robots
-  // to allow Google to crawl and understand the site structure
+/**
+ * The title of the page the visitor actually opened.
+ *
+ * These pages are client components in twelve route trees, so none can export
+ * metadata; a static one here would be the same string for sign-up, sign-in and
+ * both password pages. The proxy hands the path forward on a header, and the
+ * title is the page's own heading in the request's language — a Hebrew sign-up
+ * page used to open a tab reading the English home page's title.
+ *
+ * Auth pages are not indexed, but robots are not blocked either, so Google can
+ * crawl and understand the site structure.
+ */
+export async function generateMetadata(): Promise<Metadata> {
+  const requestHeaders = await headers()
+  const page = authPageForPath(requestHeaders.get(PATHNAME_HEADER))
+  if (!page) return {}
+  return { title: authPageTitle(page, await getServerPublicLocale()) }
 }
 
 /**

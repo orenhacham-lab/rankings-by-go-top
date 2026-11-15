@@ -57,6 +57,7 @@ export default async function KoreanSitemapPage() {
     {
       title: '기능',
       links: [
+        { label: '기능', href: '/ko/features' },
         { label: '콘텐츠 작성과 발행', href: '/ko/features/seo-geo-content-publishing' },
         { label: 'Google 순위 측정', href: '/ko/features/google-organic-rank-tracking' },
         { label: 'Google 지도 순위 측정', href: '/ko/features/google-maps-rank-tracking' },

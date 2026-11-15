@@ -1059,7 +1059,12 @@ html[data-public-menu='open'] [data-public-float] { display: none !important; }
    Hebrew the demo pill floats at that same corner, above the WhatsApp circle, so while
    the card is open the pill moves to its right on the same bottom line instead of
    disappearing: the demo stays offered from the first second (CookieConsent). In
-   English the pill is at the other corner and never meets the card. */
+   English the pill is at the other corner and never meets the card.
+   Hiding it while the card is open was tried on 15.11.2026, after the walk found four
+   things in that corner, and reverted the same day: the journey w7-public-polish
+   requires the pill to be SHOWN beside the notice at 1440, 1024 and 768, in both
+   languages. The offer stands; what it lands next to is the page's own content, which
+   no rule here can place. */
 html[dir='rtl'][data-cookie-notice='open'] [data-demo-float] { left: calc(6rem + 340px + 1rem) !important; right: auto !important; bottom: 1.5rem !important; }
 
 /* ── The public blog's article body (.gt-article) ───────────────────

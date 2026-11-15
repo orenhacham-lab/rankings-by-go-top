@@ -6,7 +6,6 @@ import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { cn } from '@/lib/utils'
 import { ThemeToggle } from '@/components/ThemeToggle'
 import { DashboardLanguageSwitcher } from '@/components/DashboardLanguageSwitcher'
-import { spanishSiteEnabled } from '@/lib/i18n/spanish-site'
 import { LOCALE_PREFIX, type PublicLocale } from '@/lib/i18n/locales'
 import GoTopMark from '@/components/brand/GoTopMark'
 import WhatsAppGlyph from '@/components/brand/WhatsAppGlyph'
@@ -382,13 +381,11 @@ function RailFoot({ dict, isAdmin, uiLocale }: { dict: ReturnType<typeof getDash
         <Accessibility {...NAV_ICON} aria-hidden="true" className="shrink-0 text-rail-muted group-hover:text-rail-ink" />
         <span>{dict.sidebar.accessibility}</span>
       </a>
-      {/* Two controls side by side fit while there are two languages. A third
-          chip does not: half the rail's width cannot hold "עברית" beside EN and
-          ES, and the measured result was the Hebrew label spilling out of its
-          track. With the Spanish build on, the switcher takes a row of its own
-          and the theme toggle sits under it; with it off this is the same markup
-          as before, so the Hebrew and English rail is untouched. */}
-      <div className={cn('grid gap-2 px-1', spanishSiteEnabled() ? 'grid-cols-1' : 'grid-cols-2')}>
+      {/* Two controls side by side, at every number of languages: the language
+          switcher is one control that names the language it is in and opens the
+          list (components/DashboardLanguageSwitcher.tsx), so it no longer grows
+          a chip per language and no longer needs the rail's whole width. */}
+      <div className="grid grid-cols-2 gap-2 px-1">
         <DashboardLanguageSwitcher />
         <ThemeToggle />
       </div>

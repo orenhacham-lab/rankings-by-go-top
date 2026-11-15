@@ -50,6 +50,7 @@ import { dashboardPtBR } from '../pt-BR/index'
 import { dashboardEs } from '../es'
 import { dashboardEn } from '../en'
 import { getDashboardDictionary } from '../getDashboardDictionary'
+import { enabledPublicLocales } from '../../locales'
 import { planLimitLines, trialLimitLines, CHECKS_EXPLAINER } from '../../../plans/features'
 import { sanctionsNotice } from '../../../sanctions/guard'
 import { createI18n } from '../../../ai-visibility/i18n'
@@ -277,9 +278,15 @@ check('4i: the PDF and Excel labels speak Dutch',
 // 5 — THE FLAG STILL GATES THE LANGUAGE.
 const switcher = src('components/DashboardLanguageSwitcher.tsx')
 check('5a: the in-app switcher offers NL only while the Dutch build is on',
-  /dutchSiteEnabled\(\) \?/.test(switcher) && /'nl' as PublicLocale/.test(switcher))
-check('5a mutation: an unconditional NL option is caught',
-  !/dutchSiteEnabled\(\) \?/.test("{ locale: 'nl' as PublicLocale, lang: 'nl' },"))
+  // The switcher no longer carries a list of its own (15.11.2026: eleven chips
+  // wrapped across the rail, so it became one control that opens the list). It
+  // asks the ONE gate, and that gate is what reads this language's flag.
+  /enabledPublicLocales\(\)/.test(switcher) && !/as PublicLocale/.test(switcher)
+  && /'?nl'?: (?:flags\.nl|flags\['nl'\]) \?\? dutchSiteEnabled\(\)/.test(src('lib/i18n/locales.ts'))
+  && enabledPublicLocales({ 'nl': true }).includes('nl')
+  && !enabledPublicLocales({ 'nl': false }).includes('nl'))
+check('5a mutation: a switcher with its own unconditional NL option is caught',
+  !/enabledPublicLocales\(\)/.test("const options = [{ locale: 'nl' as PublicLocale }]"))
 
 /*
  * 6 — NO PRICE IN EUROS, anywhere a Dutch reader can see one.

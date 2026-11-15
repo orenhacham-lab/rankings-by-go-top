@@ -105,6 +105,16 @@ export function OverviewStatusBar({ overview, questionsPending, monthly = null }
               {data ? c.enginesCount(data.enginesChecked.length, OVERVIEW_ENGINES.length) : ' '}
             </span>
           </dd>
+          {/* "3 of 6" on its own reads as a failure. A run checks as many
+              engines as the remaining allowance covers — on the trial that is
+              three — and the grey, dashed circles say nothing about why.
+              Measured on production 15.11.2026: a trial's first run left
+              Perplexity, Copilot and Grok dashed with no explanation at all. */}
+          {data && data.enginesChecked.length > 0 && data.enginesChecked.length < OVERVIEW_ENGINES.length && (
+            <dd data-engines-partial="" className="mt-1 text-caption text-muted">
+              {c.enginesPartial(data.enginesChecked.length, OVERVIEW_ENGINES.length)}
+            </dd>
+          )}
         </div>
 
         <div className="min-w-0">

@@ -49,6 +49,7 @@ import { dashboardPtBR } from '../pt-BR/index'
 import { dashboardEs } from '../es'
 import { dashboardEn } from '../en'
 import { getDashboardDictionary } from '../getDashboardDictionary'
+import { enabledPublicLocales } from '../../locales'
 import { planLimitLines, trialLimitLines, CHECKS_EXPLAINER } from '../../../plans/features'
 import { sanctionsNotice } from '../../../sanctions/guard'
 import { createI18n } from '../../../ai-visibility/i18n'
@@ -337,9 +338,15 @@ check('4j: the competitor screen speaks Japanese',
 // 5 — THE FLAG STILL GATES THE LANGUAGE.
 const switcher = src('components/DashboardLanguageSwitcher.tsx')
 check('5a: the in-app switcher offers Japanese only while the Japanese build is on',
-  /japaneseSiteEnabled\(\) \?/.test(switcher) && /'ja' as PublicLocale/.test(switcher))
-check('5a mutation: an unconditional JA option is caught',
-  !/japaneseSiteEnabled\(\) \?/.test("{ locale: 'ja' as PublicLocale, lang: 'ja' },"))
+  // The switcher no longer carries a list of its own (15.11.2026: eleven chips
+  // wrapped across the rail, so it became one control that opens the list). It
+  // asks the ONE gate, and that gate is what reads this language's flag.
+  /enabledPublicLocales\(\)/.test(switcher) && !/as PublicLocale/.test(switcher)
+  && /'?ja'?: (?:flags\.ja|flags\['ja'\]) \?\? japaneseSiteEnabled\(\)/.test(src('lib/i18n/locales.ts'))
+  && enabledPublicLocales({ 'ja': true }).includes('ja')
+  && !enabledPublicLocales({ 'ja': false }).includes('ja'))
+check('5a mutation: a switcher with its own unconditional Japanese option is caught',
+  !/enabledPublicLocales\(\)/.test("const options = [{ locale: 'ja' as PublicLocale }]"))
 
 console.log(`\n${pass} passed, ${fail} failed`)
 if (fail) process.exit(1)

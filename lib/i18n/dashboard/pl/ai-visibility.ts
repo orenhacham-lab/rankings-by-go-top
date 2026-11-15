@@ -26,6 +26,7 @@ export const aiVisibilityPl: DeepPartial<DashboardDictionary> = {
     statusLabel: 'Stan kontroli',
     enginesChecked: 'Sprawdzone usługi',
     enginesCount: (checked: number, total: number) => `${checked} z ${total}`,
+    enginesPartial: (checked: number, total: number) => `W tym przebiegu sprawdzono ${checked} z ${total} wyszukiwarek, na tyle, na ile wystarczyło pozostałego limitu. Reszta zostanie sprawdzona w następnym.`,
     engineChecked: 'Sprawdzone',
     engineNotChecked: 'Jeszcze nie sprawdzone',
     engineMentioned: 'Wymieniła Państwa',

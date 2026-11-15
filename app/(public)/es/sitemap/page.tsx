@@ -56,6 +56,7 @@ export default async function SpanishSitemapPage() {
     {
       title: 'Funciones',
       links: [
+        { label: 'Funciones', href: '/es/features' },
         { label: 'Creación y publicación de contenido', href: '/es/features/seo-geo-content-publishing' },
         { label: 'Seguimiento de posiciones en Google orgánico', href: '/es/features/google-organic-rank-tracking' },
         { label: 'Seguimiento de posiciones en Google Maps', href: '/es/features/google-maps-rank-tracking' },

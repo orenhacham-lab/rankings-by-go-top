@@ -355,6 +355,32 @@ async function main() {
       !/noSupport|unsupported/i.test(screen) && !/noSupport/i.test(JSON.stringify(he)))
   }
 
+  // ── E) without Search Console the column still has something to do ───────
+  console.log('\nE) the action column is never an empty column')
+  {
+    const table = strip(read('components/content/workspace/existing/ContentTable.tsx'))
+    // Measured 15.11.2026 on the walk account: 96 pages, "what to do" empty on
+    // every row, because every button there is driven by Search Console
+    // figures the project does not have yet.
+    const offersWithoutGsc = (src: string) =>
+      /if \(!gscOk && !planned\) \{/.test(src) && /data-row-action="support-no-gsc"/.test(src)
+    check('E1: with no Search Console, each row offers the one action that needs no figures', offersWithoutGsc(table))
+    check('E2: the cell gets the flag it decides by', /<RowAction x=\{x\} it=\{it\} gscOk=\{gscOk\}/.test(table))
+    check('E3: a product row does not then offer the same thing twice (cell and menu)',
+      /commerce && gscOk && !it\.action && !planned/.test(table))
+    const noFallback = table.replace(/if \(!gscOk && !planned\) \{/, 'if (false) {')
+    check('E1-MUT (CONTROL): a table that only shows reason-driven buttons fails E1',
+      noFallback !== table && !offersWithoutGsc(noFallback))
+    const bothOffer = table.replace('commerce && gscOk && !it.action && !planned', 'commerce && !it.action && !planned')
+    check('E3-MUT (CONTROL): leaving the menu item on a no-GSC product row fails E3',
+      bothOffer !== table && !/commerce && gscOk && !it\.action && !planned/.test(bothOffer))
+    for (const lang of ['he', 'en', 'ja', 'ko'] as const) {
+      const d = getDashboardDictionary(lang).existingContent as unknown as { actions: Record<string, string> }
+      check(`E4 ${lang}: the button's words already exist in this language`,
+        typeof d.actions.support === 'string' && !!d.actions.support.trim())
+    }
+  }
+
   console.log(`\n${pass} passed, ${fail} failed`)
   if (fail > 0) process.exit(1)
 }

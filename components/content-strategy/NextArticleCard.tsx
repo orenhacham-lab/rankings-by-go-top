@@ -41,6 +41,7 @@ import { dateTile, fill, longDate } from './format'
 import type { FirstArticleView } from '@/lib/content/strategy/first-article'
 import { BILLING_HREF } from '@/lib/onboarding/links'
 import type { BoardIdeaActions } from './StrategyBoard'
+import { shownKeyword } from '@/lib/content/strategy/insights'
 import type { TopicInsight } from '@/lib/content/strategy/insights'
 import TopicFacts from './TopicFacts'
 
@@ -262,8 +263,9 @@ export default function NextArticleCard({
           <h2 data-next-title className="mt-2 text-section font-semibold leading-snug md:text-title [overflow-wrap:anywhere]">{next.title}</h2>
 
           <ul className="mt-3 flex flex-wrap gap-x-5 gap-y-1.5 text-caption text-contrast-ink/75">
-            {next.keyword && (
-              <li className="inline-flex items-center gap-1.5"><KeyRound aria-hidden="true" className="size-3.5" /> {s.factKeyword}: <span className="font-semibold text-contrast-ink">{next.keyword}</span></li>
+{/* A stored "keyword" that is really the topic's own sentence is not shown as one (shownKeyword). */}
+            {shownKeyword(next.keyword, next.title) && (
+              <li className="inline-flex items-center gap-1.5"><KeyRound aria-hidden="true" className="size-3.5" /> {s.factKeyword}: <span className="font-semibold text-contrast-ink">{shownKeyword(next.keyword, next.title)}</span></li>
             )}
             {next.queuePosition && (
               <li className="inline-flex items-center gap-1.5"><ListOrdered aria-hidden="true" className="size-3.5" /> {fill(s.factQueue, { n: next.queuePosition, total: next.queueLength })}</li>

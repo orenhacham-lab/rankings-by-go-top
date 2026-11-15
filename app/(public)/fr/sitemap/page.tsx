@@ -56,6 +56,7 @@ export default async function FrenchSitemapPage() {
     {
       title: 'Fonctionnalités',
       links: [
+        { label: 'Fonctionnalités', href: '/fr/features' },
         { label: 'Création et publication de contenu', href: '/fr/features/seo-geo-content-publishing' },
         { label: 'Suivi de position dans Google organique', href: '/fr/features/google-organic-rank-tracking' },
         { label: 'Suivi de position dans Google Maps', href: '/fr/features/google-maps-rank-tracking' },

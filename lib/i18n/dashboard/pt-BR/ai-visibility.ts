@@ -14,6 +14,7 @@ export const aiVisibilityPtBR: DeepPartial<DashboardDictionary> = {
     statusLabel: 'Status da verificação',
     enginesChecked: 'Mecanismos verificados',
     enginesCount: (checked: number, total: number) => `${checked} de ${total}`,
+    enginesPartial: (checked: number, total: number) => `Esta execução verificou ${checked} de ${total} mecanismos, até onde foi a cota restante. O restante é verificado na próxima.`,
     engineChecked: 'Verificado',
     engineNotChecked: 'Ainda não verificado',
     engineMentioned: 'Mencionou você',
