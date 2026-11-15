@@ -18,6 +18,7 @@
  * the relevance gate decides about it, and a job search must never pass.
  * Run: npx tsx lib/content/recommendations/__qa__/audience-intent-fleet.qa.ts
  */
+import { readFileSync } from 'fs'
 import { tokens } from '@/lib/content/recommendations/dedupe'
 import { heStem, researchKeywordIssue } from '@/lib/content/recommendations/keyword-research'
 
@@ -225,6 +226,33 @@ console.log('\ncoverage')
 check(`every job-search keyword the rule touched in Production is here (${jobs})`, jobs >= 67, String(jobs))
 check(`and ${own} own-market keywords from 11 projects stand against them`, own >= 40, String(own))
 check(`the audience rule itself rejects ${jobSeekerTotal} of the ${jobs}`, jobSeekerTotal >= 60, String(jobSeekerTotal))
+
+// ── the net AFTER a merge: the production log line ───────────────────────────
+// The sweep above catches a bad rule before it ships. This catches one that
+// ships anyway: every run writes how many keywords each gate removed, per
+// project, so a project whose own words are being thrown away is visible in the
+// Vercel logs instead of just going quiet.
+console.log('\nthe production log line')
+{
+  const engine = readFileSync('lib/content/recommendations/engine.ts', 'utf8').replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '')
+  const line = engine.slice(engine.indexOf("'[keyword-research] gate'"), engine.indexOf("'[keyword-research] gate'") + 600)
+  check('the gate counts are logged in production, not only in the dev debug block', line.length > 100 && /filteredJobSeekerCount/.test(line))
+  check('…by project, so one project can be read on its own', /projectId/.test(line))
+  check('…with the other gates beside it, so a shift between them is visible',
+    /filteredUnrelatedCount/.test(line) && /filteredGenericCount/.test(line) && /candidateCount/.test(line))
+  // A runtime log is not a place for a customer's content (funnel-log.ts's rule).
+  check('…and it carries NO merchant text: counts and our own names only',
+    !/Examples/.test(line) && !/keyword:/.test(line) && !/title/.test(line))
+  check('it cannot fail a run', /try \{/.test(engine.slice(engine.indexOf("'[keyword-research] gate'") - 200, engine.indexOf("'[keyword-research] gate'"))))
+  // MUTATION CONTROLS: the guards above must fail on a line that lost the count,
+  // lost the project, or gained a merchant's keyword.
+  const withoutCount = line.replace(/filteredJobSeekerCount/g, 'x')
+  const withoutProject = line.replace(/projectId/g, 'x')
+  const withExamples = line.replace('projectId', 'filteredJobSeekerExamples, projectId')
+  check('MUT: a line without the job-seeker count fails the guard', !/filteredJobSeekerCount/.test(withoutCount))
+  check('MUT: a line without the project fails the guard', !/projectId/.test(withoutProject))
+  check('MUT: a line carrying examples fails the no-merchant-text guard', /Examples/.test(withExamples))
+}
 
 console.log(`\n${pass} passed, ${fail} failed`)
 if (fail > 0) process.exit(1)
