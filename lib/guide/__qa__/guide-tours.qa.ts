@@ -9,7 +9,8 @@
  *     account, only once the project list is known, the full tour first and on
  *     the dashboard, then each screen's own tour once;
  *  C) per-user state: the key carries the user id, the old tour's "done" counts
- *     as done, and the pill's dot stays until a tour is finished;
+ *     as done, the pill's dot stays until a tour is finished, and a tour that
+ *     starts on its own is remembered when it OPENS, so it is offered once;
  *  D) where the bubble goes: beside a sidebar entry on its inline-end side (left
  *     in Hebrew, right in English), under a top-bar control, inside the viewport,
  *     and as a sheet on a phone that never covers its target;
@@ -134,6 +135,19 @@ console.log('\nC) per-user state')
     && (src.match(/localStorage\./g) ?? []).length === 3
   check('C6: storage is read and written only through the guarded helpers (private mode)', guarded(guide))
   check('C6-MUT: a bare localStorage write elsewhere fails C6', !guarded(guide + "\nlocalStorage.setItem('x', 'y')"))
+  // C7: a tour that starts ON ITS OWN is offered once. Only its END was written
+  // before, so a visitor who navigated away mid-tour met step 1 again on every
+  // return — and the tour is modal, so nothing on the screen could be clicked
+  // until it was answered. Measured on production, 15.11.2026: the dashboard
+  // reopened the full tour at step 1 on every visit, with a transparent
+  // full-screen layer swallowing every click.
+  const remembersAtStart = (src: string) =>
+    /if \(pick\.kind === 'full'\) \{\s*writeStore\(fullTourKey\(userId\), 'dismissed'\)/.test(src)
+    && /writeStore\(screenTourKey\(userId, 'dashboard'\), 'seen'\)\s*setFullState\('dismissed'\)/.test(src)
+    && /\} else \{\s*writeStore\(screenTourKey\(userId, pick\.screen\), 'seen'\)\s*\}\s*setRun\(runOf\(pick\)\)/.test(src)
+  check('C7: an auto-started tour is remembered the moment it opens, not when it ends', remembersAtStart(guide))
+  check('C7-MUT: starting without remembering (main before the fix) fails C7',
+    !remembersAtStart(guide.replace("writeStore(fullTourKey(userId), 'dismissed')", '')))
 }
 
 // ── D) placement ──────────────────────────────────────────────────────────────
