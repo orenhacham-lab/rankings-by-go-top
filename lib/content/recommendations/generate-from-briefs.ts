@@ -538,20 +538,42 @@ export async function prepareBriefRun(
   // PENDING ideas — exact keys + signatures for identity, AND need-aware coverage
   // docs so a synonym-equivalent pending idea (מזון≈תזונה) blocks/converts a new
   // topic (the exact/signature path does NOT fold synonyms — proven live miss).
+  //
+  // 15 November 2026 — AND THE ONES THE MERCHANT REJECTED. Measured for Oren's
+  // report: this read asked for `status = 'pending'` alone, so a rejected idea
+  // reached the exact-fingerprint set only and came back the next day under
+  // another wording. Live, in Perfume Club: he rejected "בשמי בוטיק ונישה" and
+  // got "בשמי יוצרי נישה"; he rejected "בשמים און ליין" and "קניית בשמים און
+  // ליין" was proposed and approved. A rejection is the clearest signal the
+  // merchant ever gives us and it taught the engine nothing.
+  //
+  // Rejected rows join the identity sets ONLY. They are deliberately NOT coverage
+  // docs: nothing was published, so a rejected idea must not convert a new topic
+  // into an "improve the existing page" suggestion, and must not count as the
+  // project's pending stock (`pending_topics`, the thin-plan signal).
   const pendingExactKeys = new Set<string>()
   const pendingSignatures: TopicSignature[] = []
   const pendingCoverageDocs: ExistingCoverageDoc[] = []
+  const rejectedDocs: ExistingCoverageDoc[] = []
+  const rejectedKeys = new Set<string>()
   let pendingCount = 0
   try {
-    const { data } = await admin.from('content_topic_ideas').select('title, primary_keyword, search_intent').eq('project_id', input.projectId).eq('status', 'pending')
-    for (const r of (data ?? []) as { title: string | null; primary_keyword: string | null; search_intent: string | null }[]) {
-      pendingCount++
+    const { data } = await admin.from('content_topic_ideas').select('title, primary_keyword, search_intent, status').eq('project_id', input.projectId).in('status', ['pending', 'rejected'])
+    for (const r of (data ?? []) as { title: string | null; primary_keyword: string | null; search_intent: string | null; status: string | null }[]) {
+      const isRejected = r.status === 'rejected'
+      if (!isRejected) pendingCount++
       const kw = r.primary_keyword || r.title || ''
       if (!kw) continue
       pendingExactKeys.add(normalizePhrase(kw))
       if (r.title) pendingExactKeys.add(normalizePhrase(r.title))
       pendingSignatures.push(topicSignature(kw, r.search_intent ?? undefined))
-      pendingCoverageDocs.push({ title: r.title || kw, focusKeyword: r.primary_keyword ?? null })
+      if (isRejected) {
+        rejectedKeys.add(normalizePhrase(kw))
+        if (r.title) rejectedKeys.add(normalizePhrase(r.title))
+        rejectedDocs.push({ title: r.title || kw, focusKeyword: r.primary_keyword ?? null })
+      } else {
+        pendingCoverageDocs.push({ title: r.title || kw, focusKeyword: r.primary_keyword ?? null })
+      }
     }
   } catch (e) { loadErrors.push(`content_topic_ideas:${(e as Error)?.message?.slice(0, 60) ?? 'error'}`) }
 
@@ -819,6 +841,8 @@ export async function prepareBriefRun(
     pendingSignatures,
     /** Scope A — pending idea docs (title + focus keyword) for blocker resolution. */
     pendingCoverageDocs,
+    rejectedDocs,
+    rejectedKeys,
     brandSafety,
     keywordResearch,
     /** Raw tracked keywords + corroborated project-focus terms + attribute tokens —
@@ -864,7 +888,7 @@ export async function synthesizeFromSnapshot(
     linkCandidates, urlTypeMap, entityByTitle, corpusTypeWords, domainTypeWords,
     commercialEntityTokens, businessEvidenceTokens, evidenceProvenance,
     existingPageTitles, existingCoverageDocs, pendingExactKeys, pendingSignatures,
-    pendingCoverageDocs, brandSafety, keywordResearch, ctx, year, modelPath, workingPool, briefPool,
+    pendingCoverageDocs, rejectedDocs, rejectedKeys, brandSafety, keywordResearch, ctx, year, modelPath, workingPool, briefPool,
     discovery, evidenceInventory, tracked, projectFocus, attributeTokens, servedObjects, servedObjectLabels,
   } = snapshot
   // Synthesis model: the snapshot's resolved model by default. The QA/admin smart-run
@@ -937,8 +961,15 @@ export async function synthesizeFromSnapshot(
   }
   const pendingDocFor = (title: string, kw: string) => {
     const nk = normalizePhrase(kw); const nt = normalizePhrase(title)
-    return pendingCoverageDocs.find((d) => normalizePhrase(d.title) === nk || normalizePhrase(d.focusKeyword ?? '') === nk || normalizePhrase(d.title) === nt) ?? null
+    const hit = (d: ExistingCoverageDoc) => normalizePhrase(d.title) === nk || normalizePhrase(d.focusKeyword ?? '') === nk || normalizePhrase(d.title) === nt
+    return pendingCoverageDocs.find(hit) ?? rejectedDocs.find(hit) ?? null
   }
+  /** 'rejected' when what blocks the topic is an idea the merchant turned down,
+   *  so the operator diagnostics do not call a rejection "waiting for approval".
+   *  The semantic path has no doc of its own (the signatures are one list), so an
+   *  exact key is what identifies it; absent that, the status stays 'pending'. */
+  const blockingIdeaStatus = (title: string, kw: string): 'pending' | 'rejected' =>
+    rejectedKeys.has(normalizePhrase(kw)) || rejectedKeys.has(normalizePhrase(title)) ? 'rejected' : 'pending'
 
   /** Preview/operator-only rejection detail (SAFE — never article bodies/credentials). */
   interface RejectionDetail {
@@ -1168,11 +1199,11 @@ export async function synthesizeFromSnapshot(
     const sig = topicSignature(primaryKeyword, intent)
     if (pendingExactKeys.has(normalizePhrase(primaryKeyword)) || pendingExactKeys.has(normalizePhrase(t.title))) {
       const doc = pendingDocFor(t.title, primaryKeyword)
-      return rej('primary_keyword_exists', 'pending_exact', { blocker: { blockingSource: 'pending_idea', blockingRecordStatus: 'pending', blockingTitle: doc?.title ?? null, blockingPrimaryKeyword: doc?.focusKeyword ?? null, blockingUrl: null, matchType: 'pending' }, matchedPendingIdea: doc?.title ?? null })
+      return rej('primary_keyword_exists', 'pending_exact', { blocker: { blockingSource: 'pending_idea', blockingRecordStatus: blockingIdeaStatus(t.title, primaryKeyword), blockingTitle: doc?.title ?? null, blockingPrimaryKeyword: doc?.focusKeyword ?? null, blockingUrl: null, matchType: 'pending' }, matchedPendingIdea: doc?.title ?? null })
     }
     if (pendingSignatures.some((ps) => isHighConfidenceDuplicate(sig, ps))) {
       const doc = pendingDocFor(t.title, primaryKeyword)
-      return rej('pending_semantic_duplicate', 'pending_semantic', { blocker: { blockingSource: 'pending_idea', blockingRecordStatus: 'pending', blockingTitle: doc?.title ?? null, blockingPrimaryKeyword: doc?.focusKeyword ?? null, blockingUrl: null, matchType: 'pending_semantic' }, matchedPendingIdea: doc?.title ?? null })
+      return rej('pending_semantic_duplicate', 'pending_semantic', { blocker: { blockingSource: 'pending_idea', blockingRecordStatus: blockingIdeaStatus(t.title, primaryKeyword), blockingTitle: doc?.title ?? null, blockingPrimaryKeyword: doc?.focusKeyword ?? null, blockingUrl: null, matchType: 'pending_semantic' }, matchedPendingIdea: doc?.title ?? null })
     }
     // (6) within-run NEED dedupe: strict semantic dup OR same subject-head + same
     // coarse search-need (catches the transactional/informational price-page pair).

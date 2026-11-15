@@ -77,6 +77,109 @@ export function siteOwnsTerm(term: string, vocab: Set<string> | null | undefined
   return parts.every((t) => tokenInVocab(t, vocab))
 }
 
+/**
+ * 15 November 2026 — WANTING A JOB IS NOT WANTING THE SERVICE.
+ *
+ * Measured in Production on 1cln.co.il, an office-cleaning company. Its ONE cached
+ * keyword-research row was seeded from the domain itself (`seed_type: 'url'`), and all
+ * 32 keywords Google returned were job-search terms: דרושות מזכירות, עבודה ניקיון,
+ * אחרי דרושים, עבודה תל אביב, משרדי השמה, מפתח אתרים. Asked what is searched around a
+ * thin domain, Keyword Planner answers with the audience it associates with it, and for
+ * a cleaning company that audience is people looking for cleaning WORK. Every topic in
+ * the project's queue was a one-to-one match to that list: "דרושים מנקה", "איך למצוא
+ * עבודה בתל אביב", "בניית מסלול קריירה".
+ *
+ * The relevance vocabulary cannot catch this and should not be asked to. Measured over
+ * the project's real vocabulary, it already blocks 29 of the 32 — but the three it
+ * keeps ("עבודה ניקיון משרדים", "דרושים ניקיון משרדים בערב בתל אביב", "עבודה בניקיון
+ * משרדים") carry the site's OWN service words, so every lexical test is satisfied. What
+ * is wrong with them is the AUDIENCE: the merchant sells cleaning to businesses and
+ * these people want to be hired. Nothing in the engine had a word for that.
+ *
+ * The unambiguous hiring words below reuse the noise term's own shape, escape hatch
+ * included: the term is refused UNLESS THE SITE ITSELF USES IT (siteOwnsTerm), which is
+ * not a courtesy — measured over the fleet, 4Dogs' vocabulary carries 'תעסוקה' because
+ * it sells "צעצועי תעסוקה" and מטלון's carries 'קריירה' from its own careers page. A
+ * project with no vocabulary to judge by keeps them too. Like every rule here this one
+ * only ever REJECTS a candidate; it writes nothing and deletes nothing.
+ */
+const HIRING_TERMS = [
+  // he — words a job seeker uses and a buyer does not
+  'דרושים', 'דרושות', 'דרוש ', 'דרושה', 'משרה', 'משרות', 'חיפוש עבודה', 'מחפש עבודה',
+  // 'ראיון עבודה' is deliberately NOT here: measured over the fleet's own stock it
+  // hits "בושם לראיון עבודה" on a perfume shop, which is a buyer, not a candidate.
+  'מחפשת עבודה', 'קורות חיים', 'משרדי השמה', 'השמה', 'קריירה', 'תעסוקה',
+  'תנאי העסקה', 'זכויות עובדים', 'מועמדות', 'מועמדים', 'גיוס עובדים', 'הלנת שכר',
+  'מקום עבודה', 'שוק העבודה', 'דמי אבטלה',
+  // en
+  'jobs', 'job ', 'hiring', 'careers', 'career', 'vacancy', 'vacancies', 'salary',
+  'resume', 'cv ', 'recruitment', 'recruiting', 'employment', 'apply now',
+]
+/**
+ * 'עבודה' ON ITS OWN IS NOT A HIRING WORD, AND THE ESCAPE HATCH CANNOT JUDGE IT.
+ *
+ * Measured over the whole fleet's `keyword_research_cache`: הלהיט בניקיון, another
+ * office-cleaning company, has 53 cached keywords carrying 'עבודה' — "עבודה בניקיון",
+ * "חיפוש עבודה בתל אביב", "עבודה במרכז" — and its own blog says "סביבת עבודה",
+ * "עבודות ניסור בטון". So the site DOES own the word, and a term-level escape hatch
+ * would hand all 53 back. The other direction is just as real: the gift shop הסוד
+ * בלונים has 26 keywords on 'עובדים' ("מתנות לעובדים", "שי לחג לעובדים") which are
+ * its best commercial terms, and JUP's "עובדת ניקיון" is a customer looking to hire a
+ * cleaner, not a cleaner looking for work. 'עובד/עובדת/עובדים' are therefore NOT
+ * hiring words at all here, and plain 'שכר' is not either (it is also השכרה — "השכרת
+ * רכב ביפן" matched it).
+ *
+ * What separates the two readings is POSITION. In a job search 'עבודה' heads the
+ * phrase ("עבודה בניקיון משרדים"); in a business topic it modifies ("סביבת עבודה
+ * נקייה", "שעות עבודה", "ביטוח עבודה"). The head test needs no escape hatch of its
+ * own — a business that really is in hiring says one of the HIRING_TERMS on its own
+ * pages, and that switches the head test off for the whole project.
+ */
+const WORK_HEAD_TOKENS = new Set(['עבודה', 'עבודת', 'job', 'jobs', 'work'])
+/**
+ * …unless the word after it makes the phrase a relation rather than a position.
+ * Measured over the fleet's own stock: hm soft, a web studio, holds the pending
+ * idea "עבודה מול מעצבי אתרים" — working WITH designers, a subject the studio
+ * writes about. "עבודה בניקיון משרדים" and "עבודת מזכירות" name a position; these
+ * words never do.
+ */
+const WORK_RELATION_TOKENS = new Set(['מול', 'עם', 'על', 'ללא', 'בלי', 'לפי', 'אחרי', 'לאחר', 'לפני', 'בין', 'with', 'without'])
+
+/** Does the site's OWN vocabulary put it in the hiring business? Measured: no project
+ *  in the fleet does, and the two that carry a single hiring word carry it for another
+ *  reason entirely (4Dogs: "צעצועי תעסוקה"; מטלון: a careers page). An unreadable or
+ *  empty vocabulary answers yes, which switches the head test off — same as every
+ *  other rule here, no vocabulary means no judgement. */
+function siteSaysTerm(term: string, vocab: Set<string> | null | undefined): boolean {
+  if (!vocab || vocab.size === 0) return false
+  const parts = Array.from(tokens(term))
+  // Literal containment, not tokenInVocab. The vocabulary already stores its own
+  // words' prefix-stripped and stemmed forms, so a site that writes "דרושים" or
+  // "תעסוקה" is still recognised — while the stemmer's slack is kept out, because
+  // it reads 'משרות' (jobs) as the site's own 'שירותי' (services): both reduce to
+  // 'שרות' once the מ is taken for a prefix and the vowel letters are dropped.
+  // A term the tokenizer cannot read ('cv') answers no rather than yes, so it
+  // cannot switch a rule off for every project on earth.
+  return parts.length > 0 && parts.every((tk) => vocab.has(tk))
+}
+
+function siteHires(vocab: Set<string> | null | undefined): boolean {
+  if (!vocab || vocab.size === 0) return true
+  return HIRING_TERMS.some((t) => siteSaysTerm(t.trim(), vocab))
+}
+
+/** The recruitment term the keyword carries, if any — null when the site owns it. */
+function recruitmentTerm(keyword: string, vocab: Set<string> | null | undefined): string | null {
+  const hard = HIRING_TERMS.find((t) => ` ${keyword.toLowerCase()} `.includes(t))
+  if (hard) return !vocab || vocab.size === 0 || siteSaysTerm(hard.trim(), vocab) ? null : hard.trim()
+  if (siteHires(vocab)) return null
+  const kwTokens = Array.from(tokens(keyword))
+  const [head, next] = kwTokens
+  if (!head || !WORK_HEAD_TOKENS.has(head)) return null
+  if (next && WORK_RELATION_TOKENS.has(next)) return null
+  return head
+}
+
 // ── Phase 3H — generic topic-quality rules (site-agnostic, multilingual) ──────
 // Commercial/navigation vocabulary that is NEVER an article topic on its own:
 // store navigation, promotions, catalogue structure. Token-level match (not
@@ -289,7 +392,7 @@ function isBrandOrSupport(keyword: string, brandTokens: Set<string>): boolean {
   return false
 }
 
-export type ResearchKeywordIssue = 'brand_or_support' | 'noise' | 'nav_commerce' | 'too_generic' | 'unrelated'
+export type ResearchKeywordIssue = 'brand_or_support' | 'noise' | 'job_seeker' | 'nav_commerce' | 'too_generic' | 'unrelated'
 
 /**
  * The keyword filters of recommendFromKeywordResearch, for ONE keyword, in the
@@ -305,6 +408,7 @@ export function researchKeywordIssue(keyword: string, ctx: { brandTokens: Set<st
   if (isBrandOrSupport(kw, ctx.brandTokens)) return 'brand_or_support'
   const noise = noiseTerm(kw)
   if (noise && !siteOwnsTerm(noise, ctx.vocab)) return 'noise'
+  if (recruitmentTerm(kw, ctx.vocab)) return 'job_seeker'
   if (hasNavCommerceToken(kw)) return 'nav_commerce'
   if (isTooGeneric(kw)) return 'too_generic'
   if (ctx.vocab && !isVocabAligned(kw, ctx.vocab)) return 'unrelated'
@@ -457,6 +561,9 @@ export interface KeywordResearchMeta {
   rawKeywords?: number
   afterBasicFilter?: number
   afterNoiseFilter?: number
+  /** Dropped because the keyword's audience wants a job, not the service. */
+  filteredJobSeekerCount?: number
+  filteredJobSeekerExamples?: string[]
   // Phase 3H — quality/relevance gate diagnostics.
   filteredGenericCount?: number
   filteredUnrelatedCount?: number
@@ -539,8 +646,20 @@ export async function recommendFromKeywordResearch(
   const vocab = input.siteVocab && input.siteVocab.size >= MIN_SITE_VOCAB_TOKENS ? input.siteVocab : null
   const afterBrand = Array.from(merged.values()).filter((r) => !isBrandOrSupport(r.keyword, brandTokens))
   const afterBasicFilter = afterBrand.length
+  const jobSeekerExamples: string[] = []
+  let filteredJobSeekerCount = 0
   const cleaned = afterBrand
     .filter((r) => { const n = noiseTerm(r.keyword); return !n || siteOwnsTerm(n, vocab) })
+    // 15 November 2026 — the audience, not the words (see WANTING A JOB above).
+    // Counted and sampled like the relevance gate, so a project whose whole
+    // seeded list is job-search shows it in the funnel instead of silently
+    // emptying.
+    .filter((r) => {
+      if (!recruitmentTerm(r.keyword, vocab)) return true
+      filteredJobSeekerCount++
+      if (jobSeekerExamples.length < 20) jobSeekerExamples.push(r.keyword)
+      return false
+    })
     .filter((r) => !hasNavCommerceToken(r.keyword))
     .sort((a, b) => (b.avgMonthlySearches ?? 0) - (a.avgMonthlySearches ?? 0))
   const afterNoiseFilter = cleaned.length
@@ -651,6 +770,7 @@ export async function recommendFromKeywordResearch(
     meta: {
       generated: suggestions.length, adsCalls, rawKeywords, afterBasicFilter, afterNoiseFilter,
       filteredGenericCount, filteredUnrelatedCount, filteredUnrelatedExamples,
+      filteredJobSeekerCount, filteredJobSeekerExamples: jobSeekerExamples,
       skippedByModelCount: skippedByModel.length,
       skippedByModelExamples: skippedByModel.slice(0, 10).map((r) => `${r.primaryKeyword}${r.classification ? ` (${r.classification})` : ''}`),
       droppedInvalidTopicCount: droppedInvalidTopic,

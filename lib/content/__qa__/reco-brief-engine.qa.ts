@@ -114,15 +114,18 @@ function startFakeGenai(cfg: GenaiServerConfig): Promise<{ server: Server; port:
 // ── Contract-faithful in-memory Supabase admin ───────────────────────────────
 function fakeAdmin(tables: Record<string, Record<string, unknown>[]>) {
   const from = (table: string) => {
-    const st: { filters: Record<string, unknown>; single: boolean } = { filters: {}, single: false }
+    const st: { filters: Record<string, unknown>; anyOf: Record<string, unknown[]>; single: boolean } = { filters: {}, anyOf: {}, single: false }
     const exec = () => {
-      const rows = (tables[table] ?? []).filter((r) => Object.entries(st.filters).every(([k, v]) => r[k] === v))
+      const rows = (tables[table] ?? [])
+        .filter((r) => Object.entries(st.filters).every(([k, v]) => r[k] === v))
+        .filter((r) => Object.entries(st.anyOf).every(([k, vs]) => vs.includes(r[k])))
       return { data: st.single ? (rows[0] ?? null) : rows, error: null }
     }
     const b: Record<string, unknown> = {}
     Object.assign(b, {
       select() { return b },
       eq(col: string, val: unknown) { st.filters[col] = val; return b },
+      in(col: string, vals: unknown[]) { st.anyOf[col] = vals; return b },
       order() { return b }, limit() { return b },
       maybeSingle() { st.single = true; return b },
       then(res: (v: unknown) => unknown, rej?: (e: unknown) => unknown) { return Promise.resolve(exec()).then(res, rej) },

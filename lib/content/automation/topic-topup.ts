@@ -102,7 +102,7 @@ export { TOPUP_SOURCE_CONTEXT }
  * that morning read `projectsChecked: 46, notEntitled: 23, enough: 22, thinPlans: 1`
  * on every run, so the whole fleet came down to ONE candidate and the 31 batches
  * were going almost entirely unused. Both of those numbers were defects (see
- * unpaidTarget below). Widening the window was the obvious reflex and it was WRONG:
+ * trialIdeaTarget below). Widening the window was the obvious reflex and it was WRONG:
  * counted over the real Production rows, fixing them leaves 4 projects under their
  * idea target and 7 whose queue is refilled for free, i.e. about 5 candidates for
  * the model rather than 1 — and 31 batches a day already give each of them about
@@ -201,39 +201,35 @@ export function topUpTarget(input: {
 }
 
 /**
- * 15 November 2026 — A QUEUE THAT STILL PUBLISHES MUST NOT RUN DRY, PAID OR NOT.
+ * 15 November 2026 — A TRIAL'S IDEA TARGET WAS FOUR, WHATEVER ITS QUEUE PUBLISHES.
  *
  * Measured in Production that morning, from the top-up's own log line, identical on
- * every run: `projectsChecked: 46, notEntitled: 23, enough: 22, thinPlans: 1`. Two
- * separate defects produced those numbers, and between them the entire fleet came
- * down to one candidate a run — about five new ideas a day for 46 projects, with 20
- * of them holding no idea at all.
+ * every run: `projectsChecked: 46, notEntitled: 23, enough: 22, thinPlans: 1`. The
+ * whole fleet came down to one model candidate a run — about five new ideas a day
+ * for 46 projects, with 20 of them holding no idea at all.
  *
- * `notEntitled: 23`. The top-up asked for an active paid plan or a trial still in
- * date. 45 of the 46 active projects are owned by trial accounts and 23 of those
- * trials have expired, so those projects were dropped before anything else was read
- * — including the FREE refill, which only moves ideas the plan already holds into
- * the publish queue and calls no model. 993 ideas sat pending while queues that
- * publish on a schedule had nothing to publish.
+ * `enough: 22`. A project owned by an account still IN TRIAL took this branch, and
+ * its idea target was the flat TRIAL_IDEA_TARGET: what the ENTRY plan publishes in a
+ * month (4). A project holding 4 ideas was therefore counted full and never asked
+ * again — nowhere near a month for a queue that publishes several times a week. The
+ * target is now what ITS OWN QUEUE really publishes in 30 days (poolMonthlyRate),
+ * never below the entry plan's month and never above PER_PROJECT_TARGET_CAP. With no
+ * active queue the entry plan's month is the whole target, as before.
  *
- * `enough: 22`. A trial's idea target was TRIAL_IDEA_TARGET, i.e. what the ENTRY
- * plan publishes in a month (4), because a trial's own article allowance is one
- * article for its lifetime. A project holding 4 ideas was therefore counted as full
- * and never asked again — nowhere near a month for a queue that publishes several
- * times a week.
- *
- * So for a project whose owner is not paying, the target is what ITS OWN QUEUE really
- * publishes in 30 days (poolMonthlyRate), never below the entry plan's month and
- * never above PER_PROJECT_TARGET_CAP. A project with no active queue publishes
- * nothing, so the entry plan's month is the whole target there.
+ * `notEntitled: 23` — 23 of the trials have EXPIRED, and those projects are skipped
+ * here before anything is read. That is Oren's explicit rule of 15 November 2026: an
+ * expired trial does not get publishing. Their plans keep whatever they hold, the
+ * queue is not refilled, nothing is promoted, and they come back into the top-up the
+ * moment the account is paying or in trial again.
  *
  * WHAT THIS DOES NOT DO: it changes no plan, price, quota, subscription or billing
- * state, and it does not let an unentitled account GENERATE anything. Every model
- * call still passes `modelAllowed` (assertContentGenerationAllowedForUser) and every
- * article still passes the same gate at generation time. This decides only how many
- * topics and ideas a project is kept stocked with.
+ * state, and it does not let an account GENERATE anything it could not generate
+ * before. Every model call still passes `modelAllowed`
+ * (assertContentGenerationAllowedForUser) and every article still passes the same
+ * gate at generation time. This decides only how many ideas a project in trial is
+ * kept stocked with.
  */
-export function unpaidTarget(pool: PoolLite | null): number {
+export function trialIdeaTarget(pool: PoolLite | null): number {
   if (!pool) return TRIAL_IDEA_TARGET
   return Math.max(1, Math.min(PER_PROJECT_TARGET_CAP, Math.max(TRIAL_IDEA_TARGET, poolMonthlyRate(pool))))
 }
@@ -283,12 +279,11 @@ export interface TopUpSummary {
    *  ideas for the merchant to approve (26 October 2026 — see thinPlans below). */
   thinPlans: number
   /** Projects of a non-paying owner whose own active queue was kept stocked (15 Nov 2026). */
-  unpaidPools: number
   failures: number
 }
 
 const EMPTY = (state: TopUpSummary['state']): TopUpSummary =>
-  ({ state, projectsChecked: 0, notEntitled: 0, enough: 0, promoted: 0, queued: 0, skippedOverlap: 0, skippedOffSubject: 0, modelProjects: 0, modelIdeas: 0, stalePlans: 0, thinPlans: 0, unpaidPools: 0, failures: 0 })
+  ({ state, projectsChecked: 0, notEntitled: 0, enough: 0, promoted: 0, queued: 0, skippedOverlap: 0, skippedOffSubject: 0, modelProjects: 0, modelIdeas: 0, stalePlans: 0, thinPlans: 0, failures: 0 })
 
 function defaultDeps(admin: Admin): TopUpDeps {
   return {
@@ -546,29 +541,22 @@ export async function runTopicTopUp(
       summary.projectsChecked++
       let ent = entitlement.get(project.user_id)
       // `resolved: false` is an UNREADABLE entitlement, not an answer about billing:
-      // it must stay fail-closed, so the unpaid-queue path below is not taken either.
+      // it must stay fail-closed, so the trial path below is not taken either.
       if (!ent) { ent = await deps.entitlement(project.user_id).catch(() => ({ entitled: false, monthlyArticles: 0, resolved: false })); entitlement.set(project.user_id, ent) }
       if (!ent.entitled) {
-        // 15 November 2026 — see unpaidTarget. An ACTIVE QUEUE publishes on its own
-        // schedule whatever the owner's billing state is, so it is kept stocked: the
-        // free refill from the ideas the plan already holds first, the model only
-        // when those run out. Without a queue nothing publishes, so the target is
-        // only a month of ideas to approve, exactly as before.
-        const ownPool = ent.resolved === false ? null : (() => { const p = poolByProject.get(project.id); return p && p.user_id === project.user_id ? p : null })()
-        if (!ownPool && !ent.trialActive) { summary.notEntitled++; continue }
-        const target = unpaidTarget(ownPool)
-        if (ownPool) {
-          summary.unpaidPools++
-          if ((await countSupply(admin, scope, ownPool)) < target) {
-            const index = await deps.loadIndex(scope)
-            const missing = await refillFromIdeas(admin, deps, scope, project, ownPool, target, index, summary, { deadlineAt: options.deadlineAt - MIN_MS_FOR_PROJECT })
-            if (missing > 0) { stillShort.push({ project, pool: ownPool, target, gap: missing, index: await deps.loadIndex(scope) }); continue }
-          }
-        }
-        const pending = await countPendingIdeas(admin, scope)
-        if (pending < target) {
+        // An EXPIRED trial is skipped here, untouched — Oren's rule, 15 Nov 2026.
+        // An unreadable entitlement is treated the same way (fail closed).
+        if (!ent.trialActive || ent.resolved === false) { summary.notEntitled++; continue }
+        // Still in trial: a month of ideas to approve, measured by what this
+        // project's own queue publishes rather than the entry plan's flat 4.
+        const trialPool = (() => { const p = poolByProject.get(project.id); return p && p.user_id === project.user_id ? p : null })()
+        const trialTarget = trialIdeaTarget(trialPool)
+        const trialPending = await countPendingIdeas(admin, scope)
+        if (trialPending < trialTarget) {
           summary.thinPlans++
-          thinPlans.push({ project, pool: ownPool, target, gap: target - pending, index: null })
+          // `pool: null`, exactly as before this change: the queue's cadence SIZES the
+          // idea stock, and nothing in this branch feeds the publish queue.
+          thinPlans.push({ project, pool: null, target: trialTarget, gap: trialTarget - trialPending, index: null })
         } else summary.enough++
         continue
       }
@@ -653,8 +641,8 @@ export async function runTopicTopUp(
   }
 
   if (summary.promoted > 0 || summary.modelProjects > 0 || summary.failures > 0) {
-    const { projectsChecked, notEntitled, enough, promoted, queued, skippedOverlap, skippedOffSubject, modelProjects, modelIdeas, stalePlans, thinPlans, unpaidPools, failures } = summary
-    console.log('[topic-topup] run', { slot, projectsChecked, notEntitled, enough, promoted, queued, skippedOverlap, skippedOffSubject, modelProjects, modelIdeas, stalePlans, thinPlans, unpaidPools, failures })
+    const { projectsChecked, notEntitled, enough, promoted, queued, skippedOverlap, skippedOffSubject, modelProjects, modelIdeas, stalePlans, thinPlans, failures } = summary
+    console.log('[topic-topup] run', { slot, projectsChecked, notEntitled, enough, promoted, queued, skippedOverlap, skippedOffSubject, modelProjects, modelIdeas, stalePlans, thinPlans, failures })
   }
   return summary
 }

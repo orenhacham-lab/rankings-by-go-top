@@ -744,6 +744,7 @@ export async function generateRecommendations(admin: Admin, input: GenerateInput
         seedUrlCount: seedUrls.length, seedKeywordCount: seedKeywords.length, trackingSeedCount: trackingSeeds.length, scanSeedCount: scanSeeds.length,
         rawKeywords: res.meta.rawKeywords, afterBasicFilter: res.meta.afterBasicFilter, afterNoiseFilter: res.meta.afterNoiseFilter,
         filteredGenericCount: res.meta.filteredGenericCount, filteredUnrelatedCount: res.meta.filteredUnrelatedCount, filteredUnrelatedExamples: res.meta.filteredUnrelatedExamples,
+        filteredJobSeekerCount: res.meta.filteredJobSeekerCount, filteredJobSeekerExamples: res.meta.filteredJobSeekerExamples,
         skippedByModelCount: res.meta.skippedByModelCount, skippedByModelExamples: res.meta.skippedByModelExamples,
         candidateCount: res.meta.candidateCount, batchSent: res.meta.batchSent, unusedRemaining: res.meta.unusedRemaining,
         skippedKnownCount: res.meta.skippedKnownCount, skippedKnownExamples: res.meta.skippedKnownExamples,
