@@ -20,6 +20,7 @@ export const aiVisibilityNl: DeepPartial<DashboardDictionary> = {
     statusLabel: 'Stand van de controle',
     enginesChecked: 'Nagekeken diensten',
     enginesCount: (checked: number, total: number) => `${checked} van ${total}`,
+    enginesPartial: (checked: number, total: number) => `Deze run controleerde ${checked} van de ${total} engines, zover het resterende tegoed reikte. De rest volgt bij de volgende run.`,
     engineChecked: 'Nagekeken',
     engineNotChecked: 'Nog niet nagekeken',
     engineMentioned: 'Heeft u genoemd',

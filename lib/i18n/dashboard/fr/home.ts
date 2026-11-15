@@ -54,6 +54,7 @@ export const homeFr: DeepPartial<DashboardDictionary> = {
       avgPosition: 'Position moyenne',
       avgPositionSource: 'Dernier relevé de chaque mot-clé',
       noChecks: 'Après le premier relevé',
+      notFound: 'Aucun mot-clé dans les 100 premiers',
       noArticles: 'Aucun article publié pour l’instant',
       unavailable: 'Indisponible pour le moment',
     },

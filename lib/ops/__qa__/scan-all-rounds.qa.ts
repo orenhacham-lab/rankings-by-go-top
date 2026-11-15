@@ -144,12 +144,51 @@ async function main() {
     check('MUTATION CONTROL: a panel that sends one request is caught', !loop.test(src.replace('} while (response.ok && data.continue && rounds < MAX_SCAN_ROUNDS)', '} while (false)')))
   }
 
+  // ── T) the trial's "each keyword once" must not refuse the NEXT ROUND ────
+  //
+  // Production, 15.11.2026, a fresh trial with five keywords: "Scan all"
+  // checked two and the next round came back 403
+  // QUOTA_TRIAL_TARGET_ALREADY_SCANNED, because round one's own rows made the
+  // trial guard see targets that "were already scanned". Three keywords were
+  // never checked, on the plan every new merchant starts on.
+  {
+    BUDGET_MS = 600
+    const t = tables(); clients(t)
+    t.subscriptions = [{ id: 's1', user_id: USER, status: 'trial', plan_code: null, paypal_subscription_id: null,
+      current_period_start: null, current_period_end: null,
+      trial_ends_at: new Date(now() + 5 * 86_400_000).toISOString(), created_at: new Date(now() - 2 * 86_400_000).toISOString() }]
+    RUN_SCAN = async () => {
+      await new Promise((r) => setTimeout(r, 80))
+      return { found: true, position: 4, resultUrl: 'https://shop.example.org/', resultTitle: 'Shop', resultAddress: null, error: null, audit: null }
+    }
+    quiet(); const r1 = await POST(scanAll()); const b1 = await r1.json(); loud()
+    check('T1: a trial\'s first round is partial, as on any plan',
+      r1.status === 200 && b1.continue === true && b1.remaining > 0, JSON.stringify({ s: r1.status, c: b1.continue }))
+    quiet(); const r2 = await POST(scanAll()); const b2 = await r2.json(); loud()
+    check('T2: the next round is NOT refused (this was the 403)',
+      r2.status === 200, JSON.stringify({ s: r2.status, code: b2?.code ?? b2?.error }))
+    let rounds = 2, last = b2
+    while (last.continue && rounds < 20) { quiet(); const r = await POST(scanAll()); last = await r.json(); loud(); rounds++ }
+    const per = new Map<string, number>()
+    for (const row of t.scan_results) per.set(row.tracking_target_id, (per.get(row.tracking_target_id) ?? 0) + 1)
+    check('T3: the trial ends up with every keyword checked, exactly once',
+      last.status === 'completed' && TARGETS.every((id) => per.get(id) === 1) && t.scans.length === 1,
+      JSON.stringify({ rounds, last: last.status, rows: t.scan_results.length, scans: t.scans.length }))
+    // The guard itself still bites: this is a NEW scan, not a round of the one
+    // that finished, so the trial's "each keyword once" refuses it.
+    quiet(); const r4 = await POST(scanAll()); const b4 = await r4.json(); loud()
+    check('T4 (CONTROL): a second, separate "Scan all" on the trial is still refused',
+      r4.status === 403 && String(b4?.code ?? '').includes('ALREADY_SCANNED'), JSON.stringify({ s: r4.status, code: b4?.code }))
+  }
+
   // ── M) mutation control on the route ─────────────────────────────────────
   {
     const routePath = join(process.cwd(), 'app/api/scan/route.ts')
     const src = readFileSync(routePath, 'utf8')
     check('MUTATION CONTROL: the route keeps the scan running only when targets are left after a timeout',
       /const continues = !targetId && timedOutTargets > 0 && remainingTargets > 0/.test(src))
+    const letsRoundsThrough = /const resuming = await hasRunningScanToResume\(projectId, triggeredBy, admin\)/.test(src)
+    check('MUTATION CONTROL: the trial guard asks whether this request resumes a running scan', letsRoundsThrough)
   }
 
   say(`\n${pass} passed, ${fail} failed`)

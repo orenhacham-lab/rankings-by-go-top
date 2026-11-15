@@ -19,6 +19,7 @@ export const aiVisibilityIt: DeepPartial<DashboardDictionary> = {
     statusLabel: 'Stato del controllo',
     enginesChecked: 'Motori controllati',
     enginesCount: (checked: number, total: number) => `${checked} su ${total}`,
+    enginesPartial: (checked: number, total: number) => `Questa esecuzione ha verificato ${checked} motori su ${total}, fin dove arrivava la quota rimasta. Gli altri vengono verificati alla prossima.`,
     engineChecked: 'Controllato',
     engineNotChecked: 'Non ancora controllato',
     engineMentioned: 'L’ha citata',

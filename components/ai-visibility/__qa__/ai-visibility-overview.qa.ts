@@ -397,6 +397,23 @@ async function main() {
     }
   }
 
+  // ── Q) a partly-checked run explains itself ──────────────────────────────
+  console.log('\nQ) "3 of 6" does not stand alone')
+  {
+    const rows = code('components/ai-visibility/OverviewRows.tsx')
+    const explains = (src: string) =>
+      /data\.enginesChecked\.length > 0 && data\.enginesChecked\.length < OVERVIEW_ENGINES\.length/.test(src)
+      && /c\.enginesPartial\(data\.enginesChecked\.length, OVERVIEW_ENGINES\.length\)/.test(src)
+    check('Q1: when only some engines were checked, the bar says why', explains(rows))
+    check('Q1-MUT: the count on its own (main before the fix) fails Q1',
+      !explains(rows.replace(/\{data && data\.enginesChecked\.length > 0[\s\S]*?\)\}/, '')))
+    const missing = (['he', 'en', 'es', 'pt-BR', 'fr', 'it', 'ja', 'de', 'nl', 'pl', 'ko'] as const)
+      .filter((l) => typeof getDashboardDictionary(l).aiVisibilityOverview.enginesPartial !== 'function')
+    check('Q2: every dashboard language carries the sentence', missing.length === 0, missing.join(','))
+    check('Q2-MUT: a language whose sentence is the bare count would be caught',
+      getDashboardDictionary('he').aiVisibilityOverview.enginesPartial(3, 6) !== getDashboardDictionary('he').aiVisibilityOverview.enginesCount(3, 6))
+  }
+
   console.log(`\n${pass} passed, ${fail} failed`)
   if (fail > 0) process.exit(1)
 }

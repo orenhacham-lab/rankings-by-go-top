@@ -57,6 +57,7 @@ export const homeKo: DeepPartial<DashboardDictionary> = {
       avgPosition: '평균 순위',
       avgPositionSource: '키워드별 마지막 측정',
       noChecks: '첫 측정 뒤에 표시됩니다',
+      notFound: '어떤 키워드도 상위 100위 안에 없습니다',
       noArticles: '아직 게시된 글이 없습니다',
       unavailable: '지금은 볼 수 없습니다',
     },
