@@ -60,10 +60,17 @@ type Entry = { promise: Promise<SeedReadResult>; startedAt: number; settledAt: n
  * Module scope is per module INSTANCE, and a client module imported from two
  * route segments can be emitted into two chunks, which is two instances and
  * two maps — each one correctly coalescing its own callers and neither seeing
- * the other. That is what production still did after the first fix: measured
- * on 2026-11-15, a dashboard load fired `GET /api/projects/[id]/seed` twice
- * with both requests starting in the SAME millisecond (start=2508, 510ms and
- * 738ms), which no in-flight check inside one instance can produce.
+ * the other.
+ *
+ * WHAT WAS ACTUALLY MEASURED, so the next reader is not misled: a dashboard
+ * load on 2026-11-15 still fetched `GET /api/projects/[id]/seed` twice, both
+ * requests starting in the same tick. The cause found in the code was a reader
+ * that never reached this module at all — components/mapping/useMapping.ts
+ * fetched the route itself — and converting it is what removed the duplicate.
+ * A split bundle was the other candidate and was NOT the proven cause here.
+ * The registry is keyed off `globalThis` anyway, because the split is real,
+ * costs nothing to defend against, and would be invisible in every test that
+ * imports this module once.
  *
  * Keying the map off `globalThis` gives every copy of this module one shared
  * registry, so the coalescing holds however the bundler splits it.
