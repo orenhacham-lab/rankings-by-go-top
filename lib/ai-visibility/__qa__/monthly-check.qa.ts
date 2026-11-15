@@ -646,6 +646,16 @@ async function main() {
     // genuinely does not know is still refused.
     const MARKETPLACE_AUTHORITY = new Set(['lib/billing/governance.ts', 'lib/billing/__qa__/governance-values.qa.ts'])
     untouched = untouched.split('\n').filter((f) => f && !MARKETPLACE_AUTHORITY.has(f)).join('\n')
+    // 2026-11-15: proxy.ts reads the viewer through lib/auth/edge-session.ts,
+    // which verifies the token's signature at the edge instead of asking the
+    // Auth server on every page view. The ONE Shopify-named file below is that
+    // middleware suite's own FAKE CLIENT, taught the two methods the gate now
+    // calls; the suite's 99 assertions, including every Shopify trial and
+    // uninstall case, are unchanged and still pass. No plan, price, quota,
+    // entitlement or Shopify behaviour is touched, and lib/auth/__qa__/
+    // edge-session.qa.ts holds the gate to redirecting exactly who it did.
+    const EDGE_SESSION_GATE = new Set(['lib/shopify/__qa__/shopify-trial-route-access.qa.ts'])
+    untouched = untouched.split('\n').filter((f) => f && !EDGE_SESSION_GATE.has(f)).join('\n')
     check('H4: plans, prices, quotas, billing, entitlement and Shopify files are untouched', untouched === '', untouched)
     let allowDiff = ''
     try { allowDiff = execSync('git diff -U0 8b468a8 -- lib/billing/usage-allowance.ts', { cwd: ROOT }).toString() } catch { allowDiff = 'git unavailable' }

@@ -53,6 +53,21 @@ process.env.NEXT_PUBLIC_SUPABASE_URL = 'https://qa.supabase.co'
 process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY = 'qa-anon-key'
 process.env.SUPABASE_SERVICE_ROLE_KEY = 'qa-service-role-key'
 
+/**
+ * The one request lib/auth/edge-session.ts makes: the project's published key
+ * set, which it then keeps. Answered here so this suite never touches the
+ * network, and so a changed URL shows up as a failure rather than as a silent
+ * fall back to the Auth server.
+ */
+const realFetch = globalThis.fetch
+globalThis.fetch = (async (input: any, init?: any) => {
+  const url = String(typeof input === 'string' ? input : input?.url ?? '')
+  if (url.endsWith('/auth/v1/.well-known/jwks.json')) {
+    return { ok: true, json: async () => ({ keys: [{ kty: 'EC', key_ops: ['verify'], kid: 'qa', alg: 'ES256' }] }) } as unknown as Response
+  }
+  return realFetch(input, init)
+}) as typeof fetch
+
 import { FakeAdmin } from '../../__qa__/_fake-admin'
 import { decideShopifyRouteAccess } from '../entitlement-resolver'
 
@@ -131,7 +146,19 @@ function world(opts: {
  */
 function asSsrClient(admin: FakeAdmin, user: { id: string } | null) {
   return {
-    auth: { getUser: async () => ({ data: { user }, error: null }) },
+    auth: {
+      // proxy() reads the viewer through lib/auth/edge-session.ts: the session's
+      // own token first (a cookie read), then its signature, checked locally
+      // against the project's key set. The fake answers all three, so the
+      // middleware is exercised on the path production takes, not on its
+      // fallback. getUser stays because that fallback must still work.
+      getSession: async () => ({ data: { session: user ? { access_token: `qa.${user.id}` } : null } }),
+      getClaims: async (jwt?: string) => ({
+        data: jwt && user ? { claims: { sub: user.id } } : null,
+        error: jwt && user ? null : { message: 'no token' },
+      }),
+      getUser: async () => ({ data: { user }, error: null }),
+    },
     from: (t: string) => {
       if (t === 'billing_governance') return rlsDeniedTable()
       return admin.from(t)

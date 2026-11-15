@@ -3,6 +3,7 @@ import { createClient } from '@supabase/supabase-js'
 import type { ServiceRoleClient } from '@/lib/supabase/admin'
 import { NextResponse, type NextRequest } from 'next/server'
 import { explainAccess, type AccessDiagnostics } from '@/lib/subscription'
+import { verifiedUserId } from '@/lib/auth/edge-session'
 import {
   LANGUAGE_COOKIE, LANGUAGE_PARAM, LOCALE_HEADER,
   explicitRequestLocale, languageCookieString, localeParamToPersist, sanitizeNextPath,
@@ -146,9 +147,7 @@ export async function proxy(request: NextRequest) {
     },
   })
 
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
+  const userId = await verifiedUserId(supabase, supabaseUrl)
 
   // /settings and /ai-visibility hold what used to be sections of /projects/{id}
   // (the project's details and connections, and the AI visibility tool), so they
@@ -165,7 +164,7 @@ export async function proxy(request: NextRequest) {
     pathname.startsWith('/billing') ||
     pathname.startsWith('/admin')
 
-  if (!user && isProtectedRoute) {
+  if (!userId && isProtectedRoute) {
     console.log('[route-guard]', JSON.stringify({
       decision: 'deny', reason: 'no_session', userId: null,
       host: request.nextUrl.hostname, path: request.nextUrl.pathname,
@@ -182,7 +181,7 @@ export async function proxy(request: NextRequest) {
     return persistLocale(NextResponse.redirect(loginUrl))
   }
 
-  if (user && pathname === '/login') {
+  if (userId && pathname === '/login') {
     const nextParam = request.nextUrl.searchParams.get('next')
     const destination =
       nextParam && nextParam.startsWith('/') ? nextParam : '/dashboard'
@@ -195,7 +194,7 @@ export async function proxy(request: NextRequest) {
   // ── Subscription / trial wall ───────────────────────────────────
   // Only check page routes (not API, not /billing itself, not /setup)
   const needsSubscriptionCheck =
-    user &&
+    userId &&
     isProtectedRoute &&
     !pathname.startsWith('/billing') &&
     !pathname.startsWith('/admin') &&
@@ -219,12 +218,12 @@ export async function proxy(request: NextRequest) {
       // The service-role key is missing: we cannot evaluate entitlement at all.
       // Fail closed (unchanged posture) but say so, so this is never confused
       // with a billing verdict.
-      logAccessDecision(request, user.id, { allowed: false, reason: 'entitlement_client_unavailable', authority: 'unreadable' })
+      logAccessDecision(request, userId, { allowed: false, reason: 'entitlement_client_unavailable', authority: 'unreadable' })
       return redirectToBilling(request)
     }
 
-    const decision = await explainAccess(user.id, entitlementClient)
-    logAccessDecision(request, user.id, decision)
+    const decision = await explainAccess(userId, entitlementClient)
+    logAccessDecision(request, userId, decision)
     if (!decision.allowed) return redirectToBilling(request)
   }
 
