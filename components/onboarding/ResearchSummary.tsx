@@ -66,6 +66,7 @@ import {
   geoView,
   initialSelection,
   keywordReason,
+  keywordCheck,
   orderedCompetitors,
   scannedAgo,
   siteFirewalled,
@@ -221,6 +222,7 @@ export default function ResearchSummary({
   }
 
   const reasonOf = (keyword: string) => keywordReason(keyword, business, domain)
+  const checkOf = (keyword: string) => keywordCheck(keyword, summary.searchedKeywords)
 
   const editLink = (section: SummaryEditSection, title: string) => preview ? null : (
     <ActionLink href={settingsHref(projectId, section)} variant="secondary" className="h-8 px-3">
@@ -572,7 +574,17 @@ export default function ResearchSummary({
                       >
                         <Checkbox id={inputId} checked={checked} disabled={disabled} onChange={() => toggle(keyword)} />
                         <span className="flex min-w-0 flex-1 flex-wrap items-center justify-between gap-x-3 gap-y-1">
-                          <span className="font-semibold text-ink" {...snapshotText}>{keyword}</span>
+                          <span className="min-w-0">
+                            <span className="block font-semibold text-ink" {...snapshotText}>{keyword}</span>
+                            {/* What the scan itself measured for this phrase, before the
+                                owner commits to it. A fact, not a forecast: nothing is
+                                said about the two phrases it did not search. */}
+                            {checkOf(keyword) !== 'unchecked' && (
+                              <span className="block text-caption text-muted" data-keyword-check={checkOf(keyword)}>
+                                {t.keywords.checked[checkOf(keyword) as 'onFirstPage' | 'notOnFirstPage']}
+                              </span>
+                            )}
+                          </span>
                           <span className={repeat ? 'sr-only' : 'rounded-pill bg-sunk px-2.5 py-0.5 text-caption text-muted'}>{t.keywords.reasons[reason]}</span>
                         </span>
                       </label>

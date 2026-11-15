@@ -115,7 +115,14 @@ function buildPrompt(signals: SiteSignals, locale: PublicLocale): string {
     `- "country": ISO-3166-1 alpha-2, from an address, a currency, a phone prefix or a domain suffix on the page. null when the page gives no evidence. Never infer it from the language alone.`,
     `- "platform": the CMS/e-commerce platform if the page reveals it (WordPress, Shopify, Wix...), else null.`,
     `- "audiences": up to ${MAX_AUDIENCES} concrete customer segments, one short line each.`,
-    `- "keywords": exactly ${MAX_KEYWORDS} commercial search phrases this site should rank for, in the site's own language, buyer-intent first. No brand-only terms.`,
+    // A MIX is asked for by SHAPE, never by difficulty. 15 November 2026: asked for
+    // five commercial phrases with buyer intent first, the model returned five broad
+    // category terms for every site, and the owner's first screen after the rank
+    // check was five "not found" rows. How hard a phrase is to rank for is a
+    // property of the SERP and of the site's authority, which one page of the
+    // merchant's own site cannot show, so the model is told what shape to return
+    // and nothing about winnability.
+    `- "keywords": exactly ${MAX_KEYWORDS} commercial search phrases this site should rank for, in the site's own language, buyer intent throughout. No brand-only terms. Return a MIX, never five of a kind: AT MOST 2 may be a broad category phrase of one or two words, and AT LEAST 3 must be specific - four words or more, or carrying the place the business serves, a buying word (price, delivery, booking) or a question word. List the broad ones first.`,
     `- "articles": ${MAX_ARTICLES} article titles worth writing, each a real title a reader would click.`,
     `- "competitors": up to ${MAX_COMPETITORS} bare domains (no scheme, no path) of real competing sites in the same market. Only domains you are confident exist. Never include the site itself.`,
     '',

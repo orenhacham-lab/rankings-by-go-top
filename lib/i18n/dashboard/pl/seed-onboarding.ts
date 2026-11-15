@@ -129,6 +129,10 @@ export const seedOnboardingPl: DeepPartial<DashboardDictionary> = {
         severity: { blocker: 'Blokujące', warning: 'Do naprawy', info: 'Warto wiedzieć' },
       },
       keywords: {
+        checked: {
+          onFirstPage: 'Sprawdziliśmy: Twoja strona jest już na pierwszej stronie wyników',
+          notOnFirstPage: 'Sprawdziliśmy: Twojej strony nie ma jeszcze na pierwszej stronie wyników',
+        },
         title: 'Słowa kluczowe, które są tego warte',
         hint: 'Wszystko jest zaznaczone. To, co zostanie zaznaczone, będzie śledzone i wlicza się do limitu słów kluczowych Państwa pakietu.',
         selected: (n: number, total: number) => `Zaznaczone: ${n} z ${total}`,

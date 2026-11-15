@@ -116,6 +116,10 @@ export const seedOnboardingKo: DeepPartial<DashboardDictionary> = {
         severity: { blocker: '차단', warning: '수정 권장', info: '참고' },
       },
       keywords: {
+        checked: {
+          onFirstPage: '확인했습니다. 이 키워드에서는 사이트가 이미 첫 페이지에 있습니다',
+          notOnFirstPage: '확인했습니다. 이 키워드에서는 사이트가 아직 첫 페이지에 없습니다',
+        },
         title: '해 볼 만한 키워드',
         hint: '전체가 선택돼 있습니다. 선택하신 키워드는 추적되며, 플랜의 키워드 한도에 포함됩니다.',
         selected: (n: number, total: number) => `${total}개 중 ${n}개 선택`,

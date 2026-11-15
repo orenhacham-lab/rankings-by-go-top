@@ -5547,6 +5547,10 @@ export const dashboardHe = {
         severity: { blocker: 'חוסם', warning: 'כדאי לתקן', info: 'לידיעה' },
       },
       keywords: {
+        checked: {
+          onFirstPage: 'בדקנו: האתר שלכם כבר מופיע בעמוד הראשון',
+          notOnFirstPage: 'בדקנו: האתר שלכם עוד לא בעמוד הראשון',
+        },
         title: 'ביטויים שכדאי לקדם',
         hint: 'סימנו את כולן. מה שיישאר מסומן ייכנס למעקב וייספר במכסת המילים של התוכנית.',
         selected: (n: number, total: number) => `${n} מתוך ${total} מסומנות`,

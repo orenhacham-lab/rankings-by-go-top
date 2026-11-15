@@ -131,6 +131,24 @@ export type SeedSummary = {
   siteIcon?: string
   /** When the icon was last looked for again after the scan (lib/seed-scan/site-icon-refresh.ts). */
   siteIconCheckedAt?: string
+  /**
+   * The seed keywords stage A ACTUALLY SEARCHED while it looked for competitors
+   * (a4, up to MAX_SEARCHES of them), and whether this site's own domain came
+   * back on the first page of results.
+   *
+   * 15 November 2026 — why this exists. a4 sends a real search per keyword and
+   * keeps the first page's domains, then uses them to rank competitors and throws
+   * the rest away. So the run already knew the owner was nowhere on the first page
+   * for these phrases, and said nothing: the owner chose the keywords, waited, and
+   * met five "not found" rows hours later. Measured, free, already paid for.
+   *
+   * A boolean, never a position: the stored list keeps ONE entry per domain, so an
+   * index in it is not a rank in Google, and this product does not show a merchant
+   * a figure it did not measure. Absent for a run older than this field, for a
+   * claimed free check that has no searches of its own, and for the seed keywords
+   * a4 did not reach.
+   */
+  searchedKeywords?: { keyword: string; onFirstPage: boolean }[]
 }
 
 /** Stable codes a step or a run may end with. The UI maps each to copy. */

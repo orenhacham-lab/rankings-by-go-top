@@ -230,6 +230,27 @@ export function keywordReason(keyword: string, business: SeedBusiness | null, do
   return 'core'
 }
 
+/**
+ * What the scan already MEASURED about this keyword, from the run's own searches.
+ *
+ * 15 November 2026 — stage A searches up to three of the seed keywords while it
+ * looks for competitors, and keeps the first page's domains. So at the moment the
+ * owner is asked to choose, the run already knows whether their site is on that
+ * first page, and it used to say nothing: the first thing they saw after the rank
+ * check was five "not found" rows. 'unchecked' is the honest answer for the
+ * keywords a4 did not search and for a run that recorded none.
+ */
+export type KeywordCheck = 'onFirstPage' | 'notOnFirstPage' | 'unchecked'
+
+const sameKeyword = (a: string, b: string) =>
+  a.trim().replace(/\s+/g, ' ').toLowerCase() === b.trim().replace(/\s+/g, ' ').toLowerCase()
+
+export function keywordCheck(keyword: string, searched: SeedSummary['searchedKeywords']): KeywordCheck {
+  const hit = (searched ?? []).find((s) => sameKeyword(s.keyword, keyword))
+  if (!hit) return 'unchecked'
+  return hit.onFirstPage ? 'onFirstPage' : 'notOnFirstPage'
+}
+
 // ── When ────────────────────────────────────────────────────────────────────
 
 export type ScannedAgo = { kind: 'justNow' } | { kind: 'hours'; value: number } | { kind: 'days'; value: number }
