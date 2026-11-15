@@ -135,7 +135,12 @@ const HIRING_TERMS = [
  * own — a business that really is in hiring says one of the HIRING_TERMS on its own
  * pages, and that switches the head test off for the whole project.
  */
-const WORK_HEAD_TOKENS = new Set(['עבודה', 'עבודת', 'job', 'jobs', 'work'])
+const WORK_HEAD_TOKENS = new Set(['עבודה', 'job', 'jobs', 'work'])
+// The CONSTRUCT form 'עבודת' is deliberately absent: it names a craft, not a
+// position. Measured over the fleet, it is "עבודת אינסטלציה" on a plumber's site
+// and "עבודות ניסור בטון" on a cleaning company's — their own services. Where it
+// really is a job ("עבודת מזכירות" on a cleaning company) the relevance
+// vocabulary rejects it anyway, as its own words are not the site's.
 /**
  * …unless the word after it makes the phrase a relation rather than a position.
  * Measured over the fleet's own stock: hm soft, a web studio, holds the pending

@@ -143,8 +143,16 @@ console.log('\nC2) measured over the fleet\'s 996 pending/approved ideas')
     issue('פעילות ותעסוקה לכלבים', DOG_TOYS) === null, String(issue('פעילות ותעסוקה לכלבים', DOG_TOYS)))
   // MUTATION CONTROL C2 — the relation exception is narrow: the same head with a
   // place or a trade after it is still a position.
-  check('C2d-MUT: "עבודה בניקיון משרדים" and "עבודת מזכירות" stay job seekers',
-    issue('עבודה בניקיון משרדים', CLEANER_WITH_BLOG) === 'job_seeker' && issue('עבודת מזכירות', CLEANER_WITH_BLOG) === 'job_seeker')
+  check('C2d-MUT: "עבודה בניקיון משרדים" and "עבודה במרכז" stay job seekers',
+    issue('עבודה בניקיון משרדים', CLEANER_WITH_BLOG) === 'job_seeker' && issue('עבודה במרכז', CLEANER_WITH_BLOG) === 'job_seeker')
+  // The CONSTRUCT form is out of the head rule (a plumber's "עבודת אינסטלציה" is
+  // his trade). Where it really is a position, the vocabulary rejects it anyway.
+  check('C2f: "עבודת מזכירות" on the cleaning company is rejected, by its words, not as a job search',
+    issue('עבודת מזכירות', CLEANER_WITH_BLOG) === 'unrelated', String(issue('עבודת מזכירות', CLEANER_WITH_BLOG)))
+  const PLUMBER = vocabularyOf(['ניאגרות סמויות - ירון סלמון', 'אינסטלטור בנתניה', 'יועץ אינסטלציה', 'ניאגרה סמויה', 'תיקון ניאגרה סמויה', 'הזמנת אינסטלטור בנתניה', 'עבודות אינסטלציה'])
+  check('C2g: and the plumber\'s "עבודת אינסטלציה" is his trade, never a job search',
+    issue('עבודת אינסטלציה', PLUMBER) !== 'job_seeker' && issue('עבודות אינסטלציה בבית', PLUMBER) !== 'job_seeker',
+    `${issue('עבודת אינסטלציה', PLUMBER)} / ${issue('עבודות אינסטלציה בבית', PLUMBER)}`)
   check('C2e-MUT: and a real job search on the web studio is still one',
     issue('דרושים מפתחי אתרים', WEB_STUDIO) === 'job_seeker', String(issue('דרושים מפתחי אתרים', WEB_STUDIO)))
 }
