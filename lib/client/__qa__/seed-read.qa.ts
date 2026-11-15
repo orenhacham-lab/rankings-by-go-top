@@ -193,6 +193,34 @@ async function main() {
       spelling.includes('lib/client/seed-read.ts') && spelling.length >= 4, String(spelling.length))
   }
 
+  console.log('\nE) The registry is shared across module copies, not per instance')
+  {
+    // A client module imported from two route segments can be emitted twice.
+    // Two instances means two maps, and the measured symptom is two requests
+    // for the same project starting in the same millisecond. The registry is
+    // therefore keyed off globalThis, so every copy coalesces into one map.
+    const src = strip(read('lib/client/seed-read.ts'))
+    check('E1: the map is read from globalThis, never a module-scope const',
+      /globalThis/.test(src) && !/^const entries = new Map/m.test(src))
+    check('E2: every use goes through the registry accessor',
+      /function registry\(\)/.test(src) && /const entries = registry\(\)/.test(src))
+
+    // Behavioural: a second module copy, simulated by reading the live map off
+    // globalThis, sees what this instance put there.
+    const h = harness()
+    const shared = (globalThis as Record<string, unknown>)['__goTopSeedReadEntries__']
+    check('E3: the registry exists on globalThis after a read', shared instanceof Map)
+    const first = readSeed('pE')
+    check('E4: the in-flight entry is visible to any other copy of the module',
+      (shared as Map<string, unknown>).has('pE'))
+    void readSeed('pE')
+    check('E5: a second caller shares the one request', h.outstanding() === 1)
+    await h.settle(200, { ok: true })
+    await first
+    check('E6-MUT: a per-instance map would fail E4 — a fresh Map has no entry',
+      !new Map<string, unknown>().has('pE'))
+  }
+
   __setSeedReadTestHooks(null)
   console.log(`\n${passed} passed, ${failed} failed`)
   if (failed > 0) process.exitCode = 1
