@@ -671,13 +671,62 @@ async function main() {
     // lib/subscription.ts may differ from 8b468a8 ONLY on the display-only trial line (PLAN_FEATURES.trial); nothing of entitlement moved.
     let subDiff = ''
     try { subDiff = execSync('git diff -U0 8b468a8 -- lib/subscription.ts', { cwd: ROOT }).toString() } catch { subDiff = 'git unavailable' }
-    const changed = subDiff.split('\n').filter((l: string) => /^[+-]/.test(l) && !/^(\+\+\+|---)/.test(l))
+    let changed = subDiff.split('\n').filter((l: string) => /^[+-]/.test(l) && !/^(\+\+\+|---)/.test(l))
+    // 2026-11-15: explainAccess now ISSUES its three reads together instead of
+    // one after another (lib/__qa__/entitlement-parallel-reads.qa.ts). That
+    // moved the decision block without editing it, so most of the diff is the
+    // same lines leaving one place and arriving in another. A line that has an
+    // identical counterpart on the other side of the diff is such a move and
+    // is dropped here; anything genuinely new still has to clear subAllowed
+    // below, so a changed plan number or a flipped verdict is caught exactly
+    // as before (H4b-MUT proves it).
+    {
+      const bucket = (sign: string) => {
+        const m = new Map<string, number>()
+        for (const l of changed) if (l.startsWith(sign)) m.set(l.slice(1).trim(), (m.get(l.slice(1).trim()) ?? 0) + 1)
+        return m
+      }
+      const removed = bucket('-')
+      const added = bucket('+')
+      changed = changed.filter((l: string) => {
+        const body = l.slice(1).trim()
+        const other = l.startsWith('+') ? removed : added
+        const mine = l.startsWith('+') ? added : removed
+        const paired = Math.min(other.get(body) ?? 0, mine.get(body) ?? 0)
+        return paired === 0
+      })
+    }
     // The second allowed shape, added 2026-11-14: one member on
     // AccessDiagnostics.authority, which is the LOG field that explains a
     // route-guard decision. It reports the authority the governance row already
     // holds and grants nothing — see MARKETPLACE_AUTHORITY above.
+    // The parallel-read plumbing, and nothing else. These are the exact line
+    // bodies the refactor adds or removes once pure moves are paired off: the
+    // query chain being re-indented into promise form, the promises
+    // themselves, the Promise.all, the row type, and the fail-safe catch.
+    // Listed in full rather than matched loosely, so a changed plan number, a
+    // flipped verdict or a new read cannot slip in behind a pattern.
+    const PARALLEL_READ_PLUMBING = new Set([
+      'const { data: profile } = await admin',
+      'const shopify = await isShopifyGovernedAndActive(admin, userId, nowFn)',
+      'const { data: sub } = await admin',
+      ".from('profiles')",
+      ".select('role')",
+      ".eq('id', userId)",
+      '.maybeSingle()',
+      '.maybeSingle(),',
+      "admin.from('profiles').select('role').eq('id', userId).maybeSingle(),",
+      'admin',
+      ')',
+      '()  =>',
+      '() =>',
+      '({',
+    ])
     const subAllowed = (l: string) => /trial:|trialLimitLines|planLimitLines/.test(l)
       || /authority: 'shopify' \| 'website'/.test(l)
+      || /^[+-]\s*(\/\/|\*|\/\*)/.test(l)
+      || PARALLEL_READ_PLUMBING.has(l.slice(1).trim())
+      || /^[+-]\s*(profilePromise|shopifyPromise|subPromise|const \[profile, shopify, sub\] = await Promise\.all|Promise\.resolve\(|\)\.then\(|\(r\) =>|\(\) => null,|\}\) as Awaited<|isShopifyGovernedAndActive\(admin, userId, nowFn\)\.catch\(|const (profilePromise|subPromise|shopifyPromise) =|interface SubscriptionAccessRow|(status|trial_ends_at|current_period_end): string \| null$|(governed|active|unavailable): (true|false),|reason: 'governance_unreadable',|authority: 'unreadable',|\},?\)?,?$|\{$)/.test(l)
     check('H4b: lib/subscription.ts changed only the display-only trial lines, their import, and the diagnostics authority union',
       changed.every(subAllowed), changed.join(' ;; ').slice(0, 300))
     check('H4b-MUT: a line that changes a plan number in that file still fails H4b',

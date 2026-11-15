@@ -363,6 +363,13 @@ export interface AccessDiagnostics {
   verifiedAt?: TimestampFacts
 }
 
+/** The subscription columns the route guard reads. Nothing else. */
+interface SubscriptionAccessRow {
+  status: string | null
+  trial_ends_at: string | null
+  current_period_end: string | null
+}
+
 /**
  * The route guard, with its reasoning. Used by the middleware.
  *
@@ -376,11 +383,67 @@ export async function explainAccess(
   admin: ServiceRoleClient,
   nowFn: () => Date = () => new Date(),
 ): Promise<AccessDiagnostics> {
-  const { data: profile } = await admin
-    .from('profiles')
-    .select('role')
-    .eq('id', userId)
-    .maybeSingle()
+  // WHY THESE THREE READS START TOGETHER. This function runs inside the
+  // middleware, which Vercel executes at the edge NEAREST THE READER, while
+  // the database sits in one region (ap-south-1). Every read here is therefore
+  // a cross-continent round trip, and they used to run one after another:
+  // profiles, then the governance chain, then subscriptions. Measured from
+  // Tokyo that is roughly 100-150ms EACH, paid on every protected page view,
+  // which is why removing the middleware's own auth round trip showed up on a
+  // public page and not on /billing or /dashboard.
+  //
+  // The three reads are independent of one another — the ORDER below is pure
+  // precedence, not a data dependency — so issuing them together costs one
+  // round trip instead of three and cannot change any verdict. The precedence
+  // that follows is the old one unchanged: admin wins, then Shopify
+  // governance, then the subscriptions table.
+  //
+  // THE PRICE, STATED: an admin now also pays for two reads whose answers are
+  // discarded, and a Shopify-governed merchant for the subscriptions read.
+  // That is a few extra single-row indexed queries on a path that already made
+  // them for everybody else, against roughly 200-300ms saved on every
+  // protected navigation.
+  //
+  // NOTHING HERE MAY REJECT. The old code read `const { data } = await ...`,
+  // which swallows a PostgREST error into `data: null`, and an admin never
+  // issued the later reads at all, so a thrown subscriptions query could not
+  // deny them. A bare Promise.all would turn any rejection into a thrown
+  // middleware and a 500 on every page, so each read resolves with the same
+  // shape the old path produced. Fail-closed behaviour is untouched: it still
+  // comes from isShopifyGovernedAndActive's own `unavailable` reporting.
+  const profilePromise = Promise.resolve(
+    admin.from('profiles').select('role').eq('id', userId).maybeSingle(),
+  ).then(
+    (r) => r.data as { role?: string | null } | null,
+    () => null,
+  )
+
+  const shopifyPromise = isShopifyGovernedAndActive(admin, userId, nowFn).catch(
+    () =>
+      ({
+        governed: true,
+        active: false,
+        unavailable: true,
+        reason: 'governance_unreadable',
+        authority: 'unreadable',
+      }) as Awaited<ReturnType<typeof isShopifyGovernedAndActive>>,
+  )
+
+  const subPromise = Promise.resolve(
+    admin
+      .from('subscriptions')
+      .select('status, trial_ends_at, current_period_end')
+      .eq('user_id', userId)
+      .in('status', ['trial', 'active', 'cancelled'])
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle(),
+  ).then(
+    (r) => r.data as SubscriptionAccessRow | null,
+    () => null,
+  )
+
+  const [profile, shopify, sub] = await Promise.all([profilePromise, shopifyPromise, subPromise])
 
   if (profile?.role === 'admin') return { allowed: true, reason: 'admin', authority: 'admin' }
 
@@ -388,7 +451,6 @@ export async function explainAccess(
   // before the subscriptions table (cache-only — see
   // lib/shopify/entitlement-resolver.ts's isShopifyGovernedAndActive for why
   // this never makes a live network call on the middleware hot path).
-  const shopify = await isShopifyGovernedAndActive(admin, userId, nowFn)
   if (shopify.governed) {
     return {
       allowed: shopify.active,
@@ -407,15 +469,6 @@ export async function explainAccess(
   }
 
   // Check subscription. 'cancelled' status grants access until current_period_end.
-  const { data: sub } = await admin
-    .from('subscriptions')
-    .select('status, trial_ends_at, current_period_end')
-    .eq('user_id', userId)
-    .in('status', ['trial', 'active', 'cancelled'])
-    .order('created_at', { ascending: false })
-    .limit(1)
-    .maybeSingle()
-
   const base = {
     authority: 'website' as const,
     governanceRow: (shopify.reason === 'governance_missing' ? 'missing' : 'present') as 'present' | 'missing',
