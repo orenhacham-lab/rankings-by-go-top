@@ -35,6 +35,7 @@ export default async function SitemapPage() {
     {
       title: 'יכולות המערכת',
       links: [
+        { label: 'יכולות המערכת', href: '/features' },
         { label: 'יצירה, תזמון ופרסום תוכן', href: '/features/seo-geo-content-publishing' },
         { label: 'בדיקת מיקום בגוגל אורגני', href: '/features/google-organic-rank-tracking' },
         { label: 'בדיקת מיקום בגוגל מפות', href: '/features/google-maps-rank-tracking' },

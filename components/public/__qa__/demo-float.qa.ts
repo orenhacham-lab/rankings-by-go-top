@@ -89,6 +89,20 @@ function main() {
 
     // The accessibility button's dock must stay free.
     check('A6: the pill is at the end corner, never the start one the accessibility button docks in', !/start-4/.test(float))
+
+    // A7 — inside the app the pill is fixed over the screen at EVERY size, so on
+    // a phone it lies across whatever is behind it: measured 15.11.2026 at 390px
+    // on the keywords screen, the labelled pill sat on the card's own heading.
+    // There, and only there, it drops its words and becomes a round button.
+    const phonePillShrinks = (src: string) =>
+      /tone === 'app' \? 'max-sm:hidden' : undefined/.test(src)
+      && /'end-6 bottom-6 flex max-sm:px-3'/.test(src)
+      && /aria-label=\{ariaLabel\}/.test(src)
+    check('A7: on a phone the app pill is the icon alone, and still says what it is', phonePillShrinks(float))
+    check('MUT: a pill that keeps its words at every width fails A7',
+      !phonePillShrinks(float.replace("tone === 'app' ? 'max-sm:hidden' : undefined", 'undefined')))
+    check('MUT: dropping the spoken name with the words fails A7',
+      !phonePillShrinks(float.replace('aria-label={ariaLabel}', '')))
   }
 
   console.log('B) it is a float, and it behaves like one')

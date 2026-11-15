@@ -55,6 +55,7 @@ export default async function EnglishSitemapPage() {
     {
       title: 'Features',
       links: [
+        { label: 'Features', href: '/en/features' },
         { label: 'Content Creation & Publishing', href: '/en/features/seo-geo-content-publishing' },
         { label: 'Google Organic Rank Tracking', href: '/en/features/google-organic-rank-tracking' },
         { label: 'Google Maps Rank Tracking', href: '/en/features/google-maps-rank-tracking' },

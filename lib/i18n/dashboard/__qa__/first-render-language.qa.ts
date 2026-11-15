@@ -135,20 +135,21 @@ async function main() {
   {
     const Switcher = load('components/DashboardLanguageSwitcher.tsx', 'DashboardLanguageSwitcher')
     const html = firstRender('en', createElement(Switcher as never))
+    // Since 15.11.2026 it is one control that NAMES the current language and
+    // opens the list on click (eleven chips wrapped across the rail), so the
+    // first render carries the trigger and the language it resolved to — not a
+    // chip per language.
     check('B1: it renders on the FIRST render (it used to return null until hydration)',
-      html.includes('EN') && html.includes('עברית'), html)
-    // The active option is marked twice: for assistive tech (aria-pressed) and on screen
-    // (its own classes). The check used to pin one colour class; it now reads both marks,
-    // so a restyle keeps it and a switch that marks the wrong language still fails it.
-    const buttonOf = (h: string, lang: string) => h.match(new RegExp(`<button[^>]*\\blang="${lang}"[^>]*>`))?.[0] ?? ''
-    const classOf = (tag: string) => /\bclass="([^"]*)"/.exec(tag)?.[1] ?? ''
-    const [enTag, heTag] = [buttonOf(html, 'en'), buttonOf(html, 'he')]
-    check('B2: …and it marks the ACTIVE language from the server-resolved value',
-      /\baria-pressed="true"/.test(enTag) && /\baria-pressed="false"/.test(heTag)
-      && classOf(enTag) !== '' && classOf(enTag) !== classOf(heTag), html)
+      html.includes('data-language-trigger') && html.includes('English'), html)
+    const triggerLang = /<span lang="([^"]+)" class="truncate">([^<]*)<\/span>/.exec(html)
+    check('B2: …and it names the ACTIVE language from the server-resolved value',
+      triggerLang?.[1] === 'en' && triggerLang?.[2] === 'English', html)
+    check('B2-ii: the list is closed until it is asked for (no menu on the first render)',
+      !html.includes('data-language-menu') && /aria-expanded="false"/.test(html), html)
     const heHtml = firstRender('he', createElement(Switcher as never))
-    check('B3: …and the Hebrew button is the active one under initialLocale="he"',
-      heHtml !== html)
+    const heTrigger = /<span lang="([^"]+)" class="truncate">([^<]*)<\/span>/.exec(heHtml)
+    check('B3: …and under initialLocale="he" it names Hebrew instead',
+      heTrigger?.[1] === 'he' && heTrigger?.[2] === 'עברית', heHtml)
   }
 
   // ── C) representative pages across the product ─────────────────────────────
@@ -358,7 +359,7 @@ async function main() {
     check('I4: the next request resolves from the cookie the switch wrote',
       resolveRequestLocale({ pathname: '/dashboard', cookieValue: currentCookie(), acceptLanguage: 'he-IL,he;q=0.9' }) === 'en')
     check('I5: …and the provider starts the next first render from it',
-      firstRender('en', createElement(load('components/DashboardLanguageSwitcher.tsx', 'DashboardLanguageSwitcher') as never)).includes('EN'))
+      firstRender('en', createElement(load('components/DashboardLanguageSwitcher.tsx', 'DashboardLanguageSwitcher') as never)).includes('<span lang="en"'))
 
     // Migration is untouched: cookie wins, a lone stored value is adopted AND
     // written to the cookie, and neither keeps the server's locale.

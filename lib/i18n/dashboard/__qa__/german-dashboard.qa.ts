@@ -48,6 +48,7 @@ import { dashboardPtBR } from '../pt-BR/index'
 import { dashboardEs } from '../es'
 import { dashboardEn } from '../en'
 import { getDashboardDictionary } from '../getDashboardDictionary'
+import { enabledPublicLocales } from '../../locales'
 import { planLimitLines, trialLimitLines, CHECKS_EXPLAINER } from '../../../plans/features'
 import { sanctionsNotice } from '../../../sanctions/guard'
 import { createI18n } from '../../../ai-visibility/i18n'
@@ -265,9 +266,15 @@ check('4i: the PDF and Excel labels speak German',
 // 5 — THE FLAG STILL GATES THE LANGUAGE.
 const switcher = src('components/DashboardLanguageSwitcher.tsx')
 check('5a: the in-app switcher offers DE only while the German build is on',
-  /germanSiteEnabled\(\) \?/.test(switcher) && /'de' as PublicLocale/.test(switcher))
-check('5a mutation: an unconditional DE option is caught',
-  !/germanSiteEnabled\(\) \?/.test("{ locale: 'de' as PublicLocale, lang: 'de' },"))
+  // The switcher no longer carries a list of its own (15.11.2026: eleven chips
+  // wrapped across the rail, so it became one control that opens the list). It
+  // asks the ONE gate, and that gate is what reads this language's flag.
+  /enabledPublicLocales\(\)/.test(switcher) && !/as PublicLocale/.test(switcher)
+  && /'?de'?: (?:flags\.de|flags\['de'\]) \?\? germanSiteEnabled\(\)/.test(src('lib/i18n/locales.ts'))
+  && enabledPublicLocales({ 'de': true }).includes('de')
+  && !enabledPublicLocales({ 'de': false }).includes('de'))
+check('5a mutation: a switcher with its own unconditional DE option is caught',
+  !/enabledPublicLocales\(\)/.test("const options = [{ locale: 'de' as PublicLocale }]"))
 
 /*
  * 6 — NO PRICE IN EUROS, anywhere a German reader can see one.

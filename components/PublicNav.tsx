@@ -227,6 +227,13 @@ export function PublicNav({ locale = 'he', tone = 'default' }: { locale?: Public
                       {group.items.map((item) => <DesktopMenuLink key={item.id} item={item} />)}
                     </div>
                   ))}
+                  {/* The hub the menu is named after. It answered 404 until 15.11.2026, so nothing here led to it. */}
+                  <div data-features-all className="col-span-3 mt-1 border-t border-line pt-2">
+                    <Link href={`${prefix}/features`} className="flex items-center gap-1.5 rounded-control px-3 py-2 text-copy font-semibold text-action hover:bg-sunk focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-action/20">
+                      {dict.nav.features}
+                      <ChevronDown className="size-4 -rotate-90 rtl:rotate-90" aria-hidden="true" />
+                    </Link>
+                  </div>
                 </div>
               </div>
             </div>
@@ -356,6 +363,11 @@ export function PublicNav({ locale = 'he', tone = 'default' }: { locale?: Public
                       {group.items.map((item) => <MobileMenuLink key={item.id} item={item} onPick={closeMobile} />)}
                     </div>
                   ))}
+                  <div data-features-all className="mt-1 border-t border-line pt-1">
+                    <Link href={`${prefix}/features`} onClick={closeMobile} className="flex h-11 items-center rounded-control px-2 text-copy font-semibold text-action hover:bg-sunk focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-action/20">
+                      {dict.nav.features}
+                    </Link>
+                  </div>
                 </div>
               )}
               <button

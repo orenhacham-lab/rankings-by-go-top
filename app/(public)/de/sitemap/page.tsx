@@ -57,6 +57,7 @@ export default async function GermanSitemapPage() {
     {
       title: 'Funktionen',
       links: [
+        { label: 'Funktionen', href: '/de/features' },
         { label: 'Inhalte schreiben und veröffentlichen', href: '/de/features/seo-geo-content-publishing' },
         { label: 'Positionen bei Google messen', href: '/de/features/google-organic-rank-tracking' },
         { label: 'Positionen in Google Maps messen', href: '/de/features/google-maps-rank-tracking' },

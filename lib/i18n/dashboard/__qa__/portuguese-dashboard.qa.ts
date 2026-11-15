@@ -33,6 +33,7 @@ import { dashboardPtBR, PT_BR_PARTS } from '../pt-BR/index'
 import { dashboardEs } from '../es'
 import { dashboardEn } from '../en'
 import { getDashboardDictionary } from '../getDashboardDictionary'
+import { enabledPublicLocales } from '../../locales'
 import { planLimitLines, trialLimitLines, CHECKS_EXPLAINER } from '../../../plans/features'
 import { sanctionsNotice } from '../../../sanctions/guard'
 import { createI18n } from '../../../ai-visibility/i18n'
@@ -199,9 +200,15 @@ check('4a mutation: a Hebrew plan line is caught',
 // 5 — THE FLAG STILL GATES THE LANGUAGE.
 const switcher = src('components/DashboardLanguageSwitcher.tsx')
 check('5a: the in-app switcher offers PT only while the Portuguese build is on',
-  /portugueseSiteEnabled\(\) \?/.test(switcher) && /'pt-BR' as PublicLocale/.test(switcher))
-check('5a mutation: an unconditional PT option is caught',
-  !/portugueseSiteEnabled\(\) \?/.test("{ locale: 'pt-BR' as PublicLocale, lang: 'pt-BR', label: 'PT' },"))
+  // The switcher no longer carries a list of its own (15.11.2026: eleven chips
+  // wrapped across the rail, so it became one control that opens the list). It
+  // asks the ONE gate, and that gate is what reads this language's flag.
+  /enabledPublicLocales\(\)/.test(switcher) && !/as PublicLocale/.test(switcher)
+  && /'?pt-BR'?: (?:flags\.pt-BR|flags\['pt-BR'\]) \?\? portugueseSiteEnabled\(\)/.test(src('lib/i18n/locales.ts'))
+  && enabledPublicLocales({ 'pt-BR': true }).includes('pt-BR')
+  && !enabledPublicLocales({ 'pt-BR': false }).includes('pt-BR'))
+check('5a mutation: a switcher with its own unconditional PT option is caught',
+  !/enabledPublicLocales\(\)/.test("const options = [{ locale: 'pt-BR' as PublicLocale }]"))
 
 console.log(`\n${pass} passed, ${fail} failed`)
 if (fail) process.exit(1)

@@ -57,6 +57,7 @@ export default async function JapaneseSitemapPage() {
     {
       title: '機能',
       links: [
+        { label: '機能', href: '/ja/features' },
         { label: 'コンテンツの作成と公開', href: '/ja/features/seo-geo-content-publishing' },
         { label: 'Googleでの検索順位の計測', href: '/ja/features/google-organic-rank-tracking' },
         { label: 'Googleマップでの検索順位の計測', href: '/ja/features/google-maps-rank-tracking' },

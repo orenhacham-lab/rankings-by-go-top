@@ -39,6 +39,7 @@ import { dashboardPtBR } from '../pt-BR/index'
 import { dashboardEs } from '../es'
 import { dashboardEn } from '../en'
 import { getDashboardDictionary } from '../getDashboardDictionary'
+import { enabledPublicLocales } from '../../locales'
 import { planLimitLines, trialLimitLines, CHECKS_EXPLAINER } from '../../../plans/features'
 import { sanctionsNotice } from '../../../sanctions/guard'
 import { createI18n } from '../../../ai-visibility/i18n'
@@ -279,9 +280,15 @@ check('4j: the competitor screen speaks Italian',
 // 5 — THE FLAG STILL GATES THE LANGUAGE.
 const switcher = src('components/DashboardLanguageSwitcher.tsx')
 check('5a: the in-app switcher offers IT only while the Italian build is on',
-  /italianSiteEnabled\(\) \?/.test(switcher) && /'it' as PublicLocale/.test(switcher))
-check('5a mutation: an unconditional IT option is caught',
-  !/italianSiteEnabled\(\) \?/.test("{ locale: 'it' as PublicLocale, lang: 'it', label: 'IT' },"))
+  // The switcher no longer carries a list of its own (15.11.2026: eleven chips
+  // wrapped across the rail, so it became one control that opens the list). It
+  // asks the ONE gate, and that gate is what reads this language's flag.
+  /enabledPublicLocales\(\)/.test(switcher) && !/as PublicLocale/.test(switcher)
+  && /'?it'?: (?:flags\.it|flags\['it'\]) \?\? italianSiteEnabled\(\)/.test(src('lib/i18n/locales.ts'))
+  && enabledPublicLocales({ 'it': true }).includes('it')
+  && !enabledPublicLocales({ 'it': false }).includes('it'))
+check('5a mutation: a switcher with its own unconditional IT option is caught',
+  !/enabledPublicLocales\(\)/.test("const options = [{ locale: 'it' as PublicLocale }]"))
 
 console.log(`\n${pass} passed, ${fail} failed`)
 if (fail) process.exit(1)

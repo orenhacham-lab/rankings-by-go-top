@@ -57,6 +57,7 @@ export default async function DutchSitemapPage() {
     {
       title: 'Functies',
       links: [
+        { label: 'Functies', href: '/nl/features' },
         { label: 'Content schrijven en publiceren', href: '/nl/features/seo-geo-content-publishing' },
         { label: 'Posities in Google meten', href: '/nl/features/google-organic-rank-tracking' },
         { label: 'Posities in Google Maps meten', href: '/nl/features/google-maps-rank-tracking' },

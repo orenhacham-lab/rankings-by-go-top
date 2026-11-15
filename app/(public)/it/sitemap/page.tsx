@@ -56,6 +56,7 @@ export default async function ItalianSitemapPage() {
     {
       title: 'Funzionalità',
       links: [
+        { label: 'Funzionalità', href: '/it/features' },
         { label: 'Creazione e pubblicazione di contenuti', href: '/it/features/seo-geo-content-publishing' },
         { label: 'Monitoraggio della posizione in Google organico', href: '/it/features/google-organic-rank-tracking' },
         { label: 'Monitoraggio della posizione in Google Maps', href: '/it/features/google-maps-rank-tracking' },
