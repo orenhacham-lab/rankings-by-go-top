@@ -17,7 +17,7 @@
  * Section D is the source guard: no component may go back to fetching that
  * route directly, which is what made the duplicate.
  */
-import { readFileSync } from 'node:fs'
+import { readdirSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { readSeed, seedUrl, SEED_COALESCE_MS, __setSeedReadTestHooks } from '../seed-read'
 
@@ -133,11 +133,26 @@ async function main() {
 
   console.log('\nD) No component reads that route directly any more')
   {
+    /**
+     * EVERY component that READS that route, not the four this suite first listed.
+     * The first version of this guard named four files, and a production load on
+     * 15.11.2026 still fetched the route TWICE: components/mapping/useMapping.ts
+     * was the second caller and the guard could not see it, because it only
+     * checked the files it already knew about. The list is now the answer to
+     * "who reads this route", taken from a search of the whole components tree.
+     *
+     * components/keyword-research/useScanResearch.ts reads it too and is NOT
+     * here: it belongs to the keyword-research screen, where it is the only
+     * reader, and its own suite (keyword-research-screen.qa.ts) holds it to one
+     * read. Add it here the day that screen shares a page with another reader.
+     */
     const FILES = [
       'components/dashboard/useDashboardData.ts',
       'components/settings/useSiteScan.ts',
       'components/ai-visibility/useSeedPageState.ts',
       'components/onboarding/useSeedRun.ts',
+      'components/mapping/useMapping.ts',
+      'components/content-strategy/useStrategyData.ts',
     ]
     const direct = /fetch\(\s*`?\/api\/projects\/\$\{[^}]*\}\/seed`?\s*(,|\))/
     for (const f of FILES) {
@@ -148,6 +163,62 @@ async function main() {
     }
     check('D-MUT: the guard\'s pattern DOES match a direct read, so D is not vacuous',
       direct.test("const res = await fetch(`/api/projects/${encodeURIComponent(projectId)}/seed`, { cache: 'no-store' })"))
+
+    /**
+     * D2 closes the hole that let the duplicate survive: a file is only caught
+     * above if someone remembered to list it, and a reader that builds the path
+     * in its own helper (`mappingUrl`) was caught by neither. So this check asks
+     * the whole tree instead — who even SPELLS that path — and holds the answer
+     * to a list where every entry has a reason to.
+     */
+    const SPELLS_THE_PATH: Record<string, string> = {
+      'lib/client/seed-read.ts': 'the shared layer itself: the one place the path is built',
+      'components/settings/useSiteScan.ts': 'POST { action: start }: the settings\' own rescan',
+      'components/onboarding/ResearchSummary.tsx': 'POST { action: continue }: stage B, from a click',
+      'components/keyword-research/useScanResearch.ts': 'the keyword-research screen, where it is the only reader',
+      'app/api/projects/[id]/onboarding/start/route.ts': 'server-side, not a browser read at all',
+    }
+    const LITERAL = /projects\/\$\{(?:encodeURIComponent\(projectId\)|projectId)\}\/seed/
+    const walk = (dir: string): string[] => readdirSync(join(ROOT, dir), { withFileTypes: true })
+      .flatMap((e) => {
+        const p = `${dir}/${e.name}`
+        if (e.isDirectory()) return e.name === '__qa__' || e.name === 'node_modules' ? [] : walk(p)
+        return /\.tsx?$/.test(e.name) ? [p] : []
+      })
+    const spelling = ['components', 'lib', 'app'].flatMap(walk).filter((f) => LITERAL.test(strip(read(f)))).sort()
+    const unexpected = spelling.filter((f) => !(f in SPELLS_THE_PATH))
+    check('D2: only the shared layer, the two POST senders and the single-reader screen spell that path',
+      unexpected.length === 0, unexpected.join(', '))
+    check('D2-MUT: the walk DOES find the files, so D2 is not vacuous',
+      spelling.includes('lib/client/seed-read.ts') && spelling.length >= 4, String(spelling.length))
+  }
+
+  console.log('\nE) The registry is shared across module copies, not per instance')
+  {
+    // A client module imported from two route segments can be emitted twice.
+    // Two instances means two maps, and the measured symptom is two requests
+    // for the same project starting in the same millisecond. The registry is
+    // therefore keyed off globalThis, so every copy coalesces into one map.
+    const src = strip(read('lib/client/seed-read.ts'))
+    check('E1: the map is read from globalThis, never a module-scope const',
+      /globalThis/.test(src) && !/^const entries = new Map/m.test(src))
+    check('E2: every use goes through the registry accessor',
+      /function registry\(\)/.test(src) && /const entries = registry\(\)/.test(src))
+
+    // Behavioural: a second module copy, simulated by reading the live map off
+    // globalThis, sees what this instance put there.
+    const h = harness()
+    const shared = (globalThis as Record<string, unknown>)['__goTopSeedReadEntries__']
+    check('E3: the registry exists on globalThis after a read', shared instanceof Map)
+    const first = readSeed('pE')
+    check('E4: the in-flight entry is visible to any other copy of the module',
+      (shared as Map<string, unknown>).has('pE'))
+    void readSeed('pE')
+    check('E5: a second caller shares the one request', h.outstanding() === 1)
+    await h.settle(200, { ok: true })
+    await first
+    check('E6-MUT: a per-instance map would fail E4 — a fresh Map has no entry',
+      !new Map<string, unknown>().has('pE'))
   }
 
   __setSeedReadTestHooks(null)

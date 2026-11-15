@@ -38,12 +38,22 @@ function main() {
   {
     const hook = src['useStrategyData.ts']
     const endpoints = (s: string) => [...s.matchAll(/`(\/api\/[^`?$]*)/g)].map((m) => m[1]).sort()
-    const EXPECTED = ['/api/content/automation/pools', '/api/content/strategy', '/api/projects/']
+    // 15.11.2026: the scan's read moved behind lib/client/seed-read.ts, because a
+    // production load was measured fetching that one route twice — this hook and the
+    // dashboard's own seed state. The rule is unchanged (three GET reads on opening,
+    // nothing else); the scan is now asserted through the shared layer, whose module
+    // holds the single spelling of that path.
+    const EXPECTED = ['/api/content/automation/pools', '/api/content/strategy']
     const readsThree = (s: string) => JSON.stringify(endpoints(s)) === JSON.stringify(EXPECTED)
       && !/method:/.test(s) && (s.match(/fetch\(/g) ?? []).length === 1
+      && /readSeed(Shared)?\(projectId\)/.test(s) && /from '@\/lib\/client\/seed-read'/.test(s)
+      && /return `\/api\/projects\/\$\{encodeURIComponent\(projectId\)\}\/seed`/.test(read('lib/client/seed-read.ts'))
     check('C1: the data hook reads the board, the queue and the scan, with GET only', readsThree(hook), endpoints(hook).join(', '))
+    check('C1-MUT0: a hook that goes back to fetching the scan itself fails C1',
+      !readsThree(hook.replace('readSeedShared(projectId)', "readJson(STRATEGY_ENDPOINTS.seed(projectId))")
+        .replace('seed: seedUrl,', 'seed: (projectId: string) => `/api/projects/${encodeURIComponent(projectId)}/seed`,')))
     check('C1-MUT: a hook that also asks the recommendation engine fails C1',
-      !readsThree(hook.replace("seed: (projectId: string) =>", "reco: (projectId: string) => `/api/content/automation/recommendations?p=${projectId}`,\n  seed: (projectId: string) =>")))
+      !readsThree(hook.replace('seed: seedUrl,', "reco: (projectId: string) => `/api/content/automation/recommendations?p=${projectId}`,\n  seed: seedUrl,")))
     check('C1-MUT2: a hook that POSTs fails C1', !readsThree(hook.replace("{ cache: 'no-store' }", "{ cache: 'no-store', method: 'POST' }")))
     // The rankings' ideas: two reads through the owner's own session (row-level security), nothing else.
     const ranking = src['useRankingIdeas.ts']

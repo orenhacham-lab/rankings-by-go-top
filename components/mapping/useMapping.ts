@@ -17,6 +17,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import type { Locale } from '@/lib/i18n/locales'
 import { MAPPING_LOADING, mappingFrom, mappingRunning, type Mapping } from '@/lib/project-mapping/state'
 import { rescanNotice, retryAfterFrom, type RescanNotice } from '@/lib/project-settings/view'
+import { readSeed, seedUrl } from '@/lib/client/seed-read'
 
 /** How often a running mapping is read again. */
 export const MAPPING_POLL_MS = 4_000
@@ -24,21 +25,23 @@ export const MAPPING_POLL_MS = 4_000
 export const MAPPING_MAX_POLLS = 150
 const READ_DEADLINE_MS = 10_000
 
-export function mappingUrl(projectId: string): string {
-  return `/api/projects/${encodeURIComponent(projectId)}/seed`
-}
+export const mappingUrl = seedUrl
 
+/**
+ * The read goes through lib/client/seed-read.ts, which is why this hook and the
+ * dashboard's own seed state no longer fetch that route twice on one screen: a
+ * duplicate measured in production on 15.11.2026, when this hook was still the
+ * second caller. The deadline below is this reader's own; it stops THIS read
+ * waiting and never cancels the request the others are sharing.
+ */
 async function readMapping(projectId: string): Promise<Mapping | null> {
   const controller = new AbortController()
   const timer = setTimeout(() => controller.abort(), READ_DEADLINE_MS)
   try {
-    const res = await fetch(mappingUrl(projectId), { cache: 'no-store', signal: controller.signal })
-    const body = await res.json().catch(() => null)
-    // A 5xx or a network blip is no answer at all, not "the scan is off".
-    if (res.status >= 500) return null
-    return mappingFrom(res.status, body, new Date())
-  } catch {
-    return null
+    const { status, body, aborted } = await readSeed(projectId, { signal: controller.signal })
+    // A 5xx, a network blip or our own deadline is no answer at all, not "the scan is off".
+    if (aborted || status === 0 || status >= 500) return null
+    return mappingFrom(status, body, new Date())
   } finally {
     clearTimeout(timer)
   }

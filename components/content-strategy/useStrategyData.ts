@@ -16,6 +16,7 @@
  */
 
 import { useCallback, useEffect, useRef, useState } from 'react'
+import { readSeed as readSeedShared, seedUrl } from '@/lib/client/seed-read'
 import {
   NO_SEED_PLAN, seedPlanFromRun,
   type SeedPlan, type SeedRunLike, type StrategyData, type StrategyQueueItem,
@@ -24,7 +25,8 @@ import {
 export const STRATEGY_ENDPOINTS = {
   board: (projectId: string) => `/api/content/strategy?projectId=${encodeURIComponent(projectId)}`,
   queue: (projectId: string) => `/api/content/automation/pools?projectId=${encodeURIComponent(projectId)}`,
-  seed: (projectId: string) => `/api/projects/${encodeURIComponent(projectId)}/seed`,
+  /** The scan's own route, spelled once in lib/client/seed-read.ts. */
+  seed: seedUrl,
 } as const
 
 const POLL_MS = 20_000
@@ -56,6 +58,17 @@ async function readJson(url: string): Promise<{ ok: boolean; body: unknown }> {
   const res = await fetch(url, { cache: 'no-store' })
   const body = await res.json().catch(() => null)
   return { ok: res.ok, body }
+}
+
+/**
+ * The scan is read through lib/client/seed-read.ts, in the same answer shape as
+ * the two reads above. Several screens read that route, and on 15.11.2026 a
+ * production load fetched it twice because this hook and the dashboard's own
+ * seed state each fetched it directly; the shared layer collapses them.
+ */
+async function readScan(projectId: string): Promise<{ ok: boolean; body: unknown }> {
+  const { status, body } = await readSeedShared(projectId)
+  return { ok: status >= 200 && status < 300, body }
 }
 
 function readQueue(body: unknown): StrategyQueueItem[] | null {
@@ -133,7 +146,7 @@ export function useStrategyData(projectId: string, refreshKey: unknown): Strateg
         const [board, queue, seed] = await Promise.all([
           readJson(STRATEGY_ENDPOINTS.board(projectId)),
           readJson(STRATEGY_ENDPOINTS.queue(projectId)).catch(() => ({ ok: false, body: null })),
-          readJson(STRATEGY_ENDPOINTS.seed(projectId)).catch(() => ({ ok: false, body: null })),
+          readScan(projectId).catch(() => ({ ok: false, body: null })),
         ])
         if (mine !== request.current) return
         const data = readBoard(board.ok, board.body)
@@ -167,7 +180,7 @@ export function useStrategyData(projectId: string, refreshKey: unknown): Strateg
     if (!projectId || !building) return
     const id = window.setInterval(async () => {
       try {
-        const seed = await readJson(STRATEGY_ENDPOINTS.seed(projectId))
+        const seed = await readScan(projectId)
         const next = readSeed(seed.ok, seed.body)
         if (next.state !== 'building') reload()
         else setState((prev) => (prev.projectId === projectId ? { ...prev, seed: next } : prev))
