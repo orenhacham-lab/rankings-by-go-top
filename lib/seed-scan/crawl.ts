@@ -250,6 +250,13 @@ const NEVER_SEGMENTS = new Set([
   'cart', 'checkout', 'account', 'my-account', 'login', 'signin', 'sign-in', 'register', 'signup', 'sign-up', 'logout',
   'wishlist', 'search', 'feed', 'wp-admin', 'wp-json', 'wp-login.php', 'xmlrpc.php', 'tag', 'tags', 'author', 'page',
   'password', 'orders', 'admin',
+  // Cloudflare's own endpoints, which are not pages and never were. The
+  // email-obfuscation link `/cdn-cgi/l/email-protection` is written into the
+  // HTML of every Cloudflare site that hides an address, and answers 404 to
+  // anyone fetching it directly — so site health reported it to the merchant
+  // as a BROKEN LINK, marked דחוף, on their own home page. Measured on
+  // gotop.co.il, 15.11.2026. Nothing under /cdn-cgi/ is the merchant's page.
+  'cdn-cgi',
 ])
 const ASSET = /\.(?:jpe?g|png|gif|webp|avif|svg|ico|bmp|tiff?|pdf|zip|rar|gz|xml|json|css|js|mjs|map|mp4|webm|mov|mp3|wav|woff2?|ttf|otf|eot|txt|csv|docx?|xlsx?|pptx?)$/i
 

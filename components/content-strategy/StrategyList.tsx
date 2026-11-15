@@ -14,6 +14,7 @@ import { ArrowUpLeft, ArrowUpRight, CalendarDays, KeyRound, Sparkles, TrendingUp
 import { cn } from '@/lib/utils'
 import { formatCount } from '@/components/gsc/format'
 import { STRATEGY_COLUMNS, type StrategyCard, type StrategyColumn } from '@/lib/content/strategy/board'
+import { shownKeyword } from '@/lib/content/strategy/insights'
 import type { TopicInsight } from '@/lib/content/strategy/insights'
 import type { PublicLocale } from '@/lib/i18n/locales'
 import type { getDashboardDictionary } from '@/lib/i18n/dashboard/getDashboardDictionary'
@@ -39,10 +40,11 @@ function Row({ card, lang, dict, act, insight }: {
       <div className="min-w-0">
         <p className="text-copy font-semibold text-ink [overflow-wrap:anywhere]">{card.title}</p>
         <div className="mt-1 flex flex-wrap items-center gap-1.5">
-          {card.keyword && (
+{/* A stored "keyword" that is really the topic's own sentence is not shown as one (shownKeyword). */}
+          {shownKeyword(card.keyword, card.title) && (
             <span className="inline-flex max-w-full items-center gap-1 rounded-pill bg-sunk px-2 py-0.5 text-caption text-muted">
               <KeyRound className="size-3 shrink-0" aria-hidden="true" />
-              <span className="truncate">{card.keyword}</span>
+              <span className="truncate">{shownKeyword(card.keyword, card.title)}</span>
             </span>
           )}
           {card.origin === 'scan' && (

@@ -5,7 +5,7 @@
  * plain words, "fix it for me" where the connection allows it, and step-by-step
  * cards everywhere else. See lib/site-health for the rules and the routes.
  */
-import { useCallback, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
 import { FileSearch, Link2, RefreshCw, ShieldCheck, TriangleAlert } from 'lucide-react'
 import Button from '@/components/ui/Button'
@@ -234,6 +234,23 @@ export default function SiteHealthScreen({ project }: { project: Project & { sit
   const openQueue = useCallback(() => {
     document.getElementById('fixes')?.scrollIntoView({ behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth', block: 'start' })
   }, [])
+
+  // ONE SCAN, NOT TWO. The onboarding scan already read this site, and this
+  // screen's own read is kept only in this browser (useSiteHealthScan), so a
+  // new browser, a cleared storage or a second device met "we have not checked
+  // the site yet" on a site we had just read — and had to ask for a scan that
+  // looks identical to the one onboarding ran. The screen now starts its read
+  // itself on the first arrival with nothing to show, so the owner lands on
+  // progress and then the report. Once per mount, never while a scan runs,
+  // never after a failure (the error card offers the retry), and never without
+  // a domain to read.
+  const autoStarted = useRef(false)
+  useEffect(() => {
+    if (autoStarted.current) return
+    if (!loaded || report || scanning || error || !domain) return
+    autoStarted.current = true
+    void scan()
+  }, [loaded, report, scanning, error, domain, scan])
 
   const rescan = (
     <Button variant="secondary" onClick={() => void scan()} loading={scanning} disabled={scanning} data-scan-again="">
