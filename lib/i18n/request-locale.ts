@@ -68,6 +68,15 @@ export const LANGUAGE_COOKIE = 'dashboard-language'
 export const LOCALE_HEADER = 'x-gotop-locale'
 
 /**
+ * How the proxy hands the request's PATH to the server layouts.
+ *
+ * A layout cannot see the pathname, and the auth pages are client components,
+ * so none of them can export metadata of its own. This header lets their one
+ * shared layout title each page instead of inheriting the root layout's.
+ */
+export const PATHNAME_HEADER = 'x-gotop-pathname'
+
+/**
  * The end of the chain, reached ONLY when the request carries no /en route, no
  * cookie, no seed and no usable Accept-Language. Distinct from
  * lib/i18n/locales.DEFAULT_LOCALE, which is the PUBLIC SITE's canonical locale

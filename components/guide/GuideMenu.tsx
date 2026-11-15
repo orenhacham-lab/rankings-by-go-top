@@ -136,7 +136,25 @@ export default function GuideMenu({ userId, accountCreatedAt }: { userId: string
     autoTried.current.add(pathname)
     if (!pick) return
     // Let the screen paint first; a bubble over a blank page points at nothing.
-    const timer = window.setTimeout(() => setRun(runOf(pick)), 700)
+    const timer = window.setTimeout(() => {
+      // A tour that STARTS on its own is offered once, and that is remembered the
+      // moment it opens — not when it ends. Only the end was written before, so a
+      // visitor who left mid-tour (the tour is modal: nothing on the page can be
+      // clicked while it is open) met step 1 again on every return to the screen,
+      // for as long as the account counted as new. Finishing it still upgrades
+      // 'dismissed' to 'completed' in onTourEnd, so the pill's dot is unaffected.
+      if (pick.kind === 'full') {
+        writeStore(fullTourKey(userId), 'dismissed')
+        // The same stop the full tour just showed here: marked exactly as the
+        // tour's own end marks it, or the dashboard's screen tour would open
+        // on the very next visit in the full tour's place.
+        writeStore(screenTourKey(userId, 'dashboard'), 'seen')
+        setFullState('dismissed')
+      } else {
+        writeStore(screenTourKey(userId, pick.screen), 'seen')
+      }
+      setRun(runOf(pick))
+    }, 700)
     return () => window.clearTimeout(timer)
   }, [run, pendingFull, fullState, isResolved, pathname, accountCreatedAt, userId, runOf])
 
