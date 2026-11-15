@@ -20,7 +20,8 @@
 import { readFileSync } from 'fs'
 import { join } from 'path'
 
-import { topicKeywordFrom, usableTargetKeyword, isUsableTargetKeyword, normalizedIdeaKeyword } from '../keyword-shape'
+import { topicKeywordFrom, usableTargetKeyword, isUsableTargetKeyword } from '../keyword-shape'
+import { normalizedIdeaKeyword } from '../idea-keyword'
 import { isSearchPhraseQuality } from '../recommendations/search-phrase'
 import { manualAnchorShapeValid, MAX_ANCHOR_WORDS } from '../internal-links'
 
@@ -128,6 +129,16 @@ function sectionD() {
     return mutant !== store && !/normalizedIdeaKeyword\(s\.primaryKeyword\)/.test(mutant)
   })())
   check('D3-i. the dedupe fingerprint stays on the raw value', /topicIdeaFingerprint\(s\.primaryKeyword, s\.title\)/.test(store))
+
+  // D3-ii — THE CYCLE. keyword-guard.ts imports normalizeText from the idea store,
+  // so anything the store imports must not lead back into the recommendation
+  // engine. It did for one commit, and keyword-guard then evaluated while
+  // lib/text/segment was still initializing: three recommendation suites hung for
+  // hours instead of failing.
+  check('D3-ii. the idea store does not import the engine back through keyword-shape',
+    /from '@\/lib\/content\/idea-keyword'/.test(store) && !/keyword-shape/.test(store))
+  check('D3-ii-a. and that module imports nothing at all',
+    !/^\s*import /m.test(strip(read('../idea-keyword.ts'))))
 
   const seo = strip(read('../seo-publish.ts'))
   check('D4. the WordPress focus keyphrase is only ever a real phrase', /return usableTargetKeyword\(kw\)/.test(seo))

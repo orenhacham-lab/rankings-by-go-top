@@ -17,7 +17,7 @@ import type { createAdminClient } from '@/lib/supabase/admin'
 import type { ContentTopicIdeaRow } from '@/lib/supabase/types'
 import type { TopicSuggestion, RecommendationSource, LinkPlan } from './types'
 import { segmentToSpaces } from '@/lib/text/segment'
-import { normalizedIdeaKeyword } from '@/lib/content/keyword-shape'
+import { normalizedIdeaKeyword } from '@/lib/content/idea-keyword'
 
 type Admin = ReturnType<typeof createAdminClient>
 

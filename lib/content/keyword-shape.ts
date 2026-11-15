@@ -57,23 +57,8 @@ export function topicKeywordFrom(keyword: string | null | undefined): string | n
   return usableTargetKeyword(keyword)
 }
 
-/**
- * The keyword to STORE on a new idea (`content_topic_ideas.primary_keyword`).
- *
- * ONE normalization, and deliberately only one: a trailing question or
- * exclamation mark is dropped. Measured on 15 November 2026, 14 stored keywords
- * end in one over a phrase that is otherwise fine ("אילו פרחים מתאימים לזר יום
- * הולדת?"), and the mark travels from there into the WordPress focus keyphrase
- * and the internal-link anchor candidates, where it matches nothing.
- *
- * It does NOT run the headline stripper over the model's answer. That was tried
- * and measured first: the stripper rewrote 156 of 2,432 real keywords, and most
- * of the rewrites were damage — "איך לבחור בושם במתנה" (a phrase people really
- * type) became "בושם במתנה", "איך לאחסן בושם" became the broken "לאחסן בושם",
- * and "Guerlain - גרלן מדריך" lost the brand's Hebrew name. The stripper is for
- * a value the engine is about to JUDGE, not for a value it is about to keep.
- */
-export function normalizedIdeaKeyword(raw: string | null | undefined): string | null {
-  const k = (raw ?? '').trim().replace(/[?!]+$/, '').trim()
-  return k || null
-}
+// The one normalization applied to an idea's keyword as it is STORED lives in
+// `lib/content/idea-keyword.ts`, with no imports of its own: `keyword-guard.ts`
+// imports `normalizeText` from the idea store, so anything the idea store
+// imports must not lead back to the recommendation engine, or the engine's
+// modules start evaluating each other half-initialized.
