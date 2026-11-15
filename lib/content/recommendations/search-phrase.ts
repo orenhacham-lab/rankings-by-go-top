@@ -90,6 +90,31 @@ const DANGLING_TAIL_RE = /\s+(?:של|עם|או|ו|כי|עבור|לפי|על|אל
 
 const MAX_SEARCH_TOKENS = 7
 
+// An EMBEDDED CLAUSE BOUNDARY — a second clause joined mid-phrase, with no
+// punctuation to betray it. The two-clause rule below keys on ?/!/:/dash, and
+// DANGLING_TAIL_RE keys on a connective at the very END, so a headline whose
+// clauses are welded together by a word slipped through both:
+//   "חברה לבניית אתרים ומה הצעת המחיר צריכה לכלול"   (a live stored keyword)
+//   "תקלות נפוצות במדיח וחלקי החילוף שניתן להחליף לבד"
+// Nobody types either one. Two shapes, both as standalone tokens: a coordinating
+// ו joined to a QUESTION word, and ש joined to ניתן/אפשר.
+//
+// MEASURED 15 November 2026 over 2,497 distinct primary keywords from Production
+// (`/mnt/project-files/topics-accuracy/keyword-corpus-2026-11-15.tsv`): this rule
+// rejects SIX of them and every one is a clause-joined headline — zero false
+// rejects. The list is deliberately this short. Also measured, and deliberately
+// NOT added, because each costs real queries a person types:
+//   open ש+word   451 rejects — ש is a root letter far more often than a prefix
+//                 (יד שנייה, שיפוצים, שבת, שיער), the same mistake as judging
+//                 Hebrew identity by token overlap
+//   מול / לעומת   126 rejects — "אופניים נייחים מול אופני כושר" is a real query
+//   leading אילו   10 rejects, 5 of them good ("איזה סוג מגנזיום מומלץ")
+//   leading bare מה 38 rejects, ~87% good ("מה ללבוש ליוגה", "מה לראות בהוקאידו")
+//   over 5 tokens 322 rejects, mostly good ("ההבדל בין או דה פרפיום לאו דה טואלט")
+// A trailing "?" is NOT rejected either: stripHeadlineFraming removes it, and 14
+// stored keywords carry one over a phrase that is otherwise fine.
+const EMBEDDED_CLAUSE_RE = /(?:^|\s)(?:ו(?:מה|מי|איך|כיצד|מתי|איפה|היכן|למה|מדוע|אילו|האם)|ש(?:ניתן|אפשר))(?=\s)/
+
 export interface SearchPhraseResult {
   keyword: string
   changed: boolean
@@ -199,5 +224,6 @@ export function isSearchPhraseQuality(keyword: string): boolean {
     if (toks.length > budget) return false
   }
   if (HOW_MUCH_RE.test(k)) return false // "כמה עולה …" is a headline form → "מחיר …"
+  if (EMBEDDED_CLAUSE_RE.test(k)) return false
   return true
 }

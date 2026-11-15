@@ -63,6 +63,7 @@ import { assertContentGenerationAllowedForUser } from '@/lib/content/entitlement
 import { articlesPerMonthForShare, articlesPerMonthPerSite, monthlyForSite, resolveIntervalDays, type Cadence } from '@/lib/content/automation/schedule'
 import { isPlanCode, PLAN_CATALOG } from '@/lib/plans/catalog'
 import { encodeBriefSections } from '@/lib/content/brief-notes'
+import { topicKeywordFrom } from '@/lib/content/keyword-shape'
 import { insertPendingIdeas } from '@/lib/content/recommendations/topic-idea-store'
 import { buildKeywordGuard } from '@/lib/content/recommendations/keyword-guard'
 import { finalizeRecommendationAttempt } from '@/lib/content/recommendations/finalize-attempt'
@@ -407,7 +408,15 @@ async function promoteIdea(admin: Admin, scope: Scope, project: ProjectRow, pool
     source: TOPIC_SOURCES.has(idea.source ?? '') ? idea.source : 'project_data',
     status: 'approved',
     topic: idea.title,
-    primary_keyword: (idea.primary_keyword ?? '').trim() || idea.title,
+    // 15 November 2026 — NEVER the title. This column is the article generator's
+    // focus keyword, the WordPress focus keyword and the first internal-link anchor
+    // candidate, so a title stored here is used as a keyword by all three. An idea
+    // with no usable phrase of its own leaves the column empty, which every one of
+    // those three handles (lib/content/keyword-shape.ts). The subject gate below
+    // deliberately keeps judging `keyword || title`: it needs TEXT to measure
+    // relevance against the site's vocabulary, and an empty keyword would make it
+    // judge nothing.
+    primary_keyword: topicKeywordFrom(idea.primary_keyword),
     secondary_keywords: secondary,
     search_intent: idea.search_intent || null,
     target_audience: null,
