@@ -185,11 +185,72 @@ export async function handleFixesGet(projectId: unknown, deps: FixesDeps): Promi
 
 /** The site's SEO plugin and bridge, as its REST API answers them, in a few seconds at most (else null). */
 export const SEO_READ_MS = 3_000
-async function seoOf(creds: NonNullable<FixContext['creds']>, deps: FixesDeps): Promise<{ plugin: string; hasBridge: boolean } | null> {
+
+/**
+ * AND THE ANSWER IS REMEMBERED, because this one is not a database read: it is
+ * an HTTP call to the MERCHANT'S OWN WordPress, made while the browser waits.
+ * GET /api/site-health/fixes is read on every health screen and behind the
+ * dashboard's "waiting for you" card, so a slow or distant site was charged to
+ * every one of those reads — measured in production on 2026-11-15, that route
+ * took 1,130ms warm and 2,074ms cold, the heaviest call on the screen.
+ *
+ * What it answers — which SEO plugin is installed and whether our bridge is
+ * there — changes when somebody installs or pairs something, not between two
+ * reads of a screen. So it is kept for SEO_CAPS_TTL_MS and forgotten the
+ * moment anything could have changed it: pairing, disconnecting, or a key
+ * being issued for the site (handlePlugin below).
+ *
+ * The map hangs off globalThis for the reason lib/client/seed-read.ts gives,
+ * and because a serverless instance may hold several module copies.
+ */
+export const SEO_CAPS_TTL_MS = 5 * 60_000
+
+type SeoCaps = { plugin: string; hasBridge: boolean } | null
+type SeoCapsEntry = { at: number; value: SeoCaps }
+const SEO_CAPS_KEY = '__goTopSeoCapsCache__'
+type SeoCapsHost = typeof globalThis & { [SEO_CAPS_KEY]?: Map<string, SeoCapsEntry> }
+
+function seoCapsCache(): Map<string, SeoCapsEntry> {
+  const host = globalThis as SeoCapsHost
+  const existing = host[SEO_CAPS_KEY]
+  if (existing) return existing
+  const created = new Map<string, SeoCapsEntry>()
+  host[SEO_CAPS_KEY] = created
+  return created
+}
+
+/** Injectable for the QA suite only; production always reads the real clock. */
+let seoCapsNow: () => number = () => Date.now()
+
+/** QA only. Replaces the clock and empties what is remembered. */
+export function __setSeoCapsTestHooks(hooks: { now?: () => number } | null): void {
+  seoCapsCache().clear()
+  seoCapsNow = hooks?.now ?? (() => Date.now())
+}
+
+/** Anything that can change what the site answers forgets it for that site. */
+export function forgetSeoCapabilities(siteUrl: string | null | undefined): void {
+  if (!siteUrl) return
+  const cache = seoCapsCache()
+  for (const key of [...cache.keys()]) if (key.startsWith(`${siteUrl}|`)) cache.delete(key)
+}
+
+async function seoOf(creds: NonNullable<FixContext['creds']>, deps: FixesDeps): Promise<SeoCaps> {
+  const cache = seoCapsCache()
+  const key = `${creds.siteUrl}|${creds.username}`
+  const now = seoCapsNow()
+  const hit = cache.get(key)
+  if (hit && now - hit.at < SEO_CAPS_TTL_MS) return hit.value
+
   let timer: ReturnType<typeof setTimeout> | undefined
   const late = new Promise<null>((resolve) => { timer = setTimeout(() => resolve(null), SEO_READ_MS) })
   try {
-    return await Promise.race([deps.wp.detectSeoCapabilities(creds).catch(() => null), late])
+    const value = await Promise.race([deps.wp.detectSeoCapabilities(creds).catch(() => null), late])
+    // A read that timed out or failed is NOT remembered: null here means "we
+    // could not ask", and keeping that for five minutes would turn one slow
+    // moment into five minutes of a screen missing its meta-description channel.
+    if (value) cache.set(key, { at: seoCapsNow(), value })
+    return value
   } finally {
     clearTimeout(timer)
   }
@@ -618,6 +679,7 @@ export async function handlePlugin(body: unknown, deps: FixesDeps): Promise<Answ
         // A new key for this project's site; its code is shown once and replaces any earlier key.
         const siteUrl = l.ctx.creds?.siteUrl ?? l.ctx.siteUrls[0]
         if (!siteUrl || !/^https:\/\//i.test(siteUrl)) return refuse('off_site')
+        forgetSeoCapabilities(siteUrl)
         const key = generatePluginKey(deps.random)
         await savePluginKey(deps.admin, l.scope, {
           siteUrl: new URL(siteUrl).origin, keyId: key.keyId, secretEncrypted: deps.encrypt(key.secret), secretHint: `••••${key.secret.slice(-4)}`,
@@ -627,6 +689,7 @@ export async function handlePlugin(body: unknown, deps: FixesDeps): Promise<Answ
       case 'pair': {
         // Push the pending key to the plugin over the application password (administrators only, WordPress decides).
         if (!l.ctx.creds || !l.ctx.plugin || !l.ctx.pluginLink) return refuse('no_channel')
+        forgetSeoCapabilities(l.ctx.creds.siteUrl)
         const pushed = await pairOverAppPassword(l.ctx.creds, pairingCode({ keyId: l.ctx.pluginLink.keyId, secret: l.ctx.pluginLink.secret }), deps.pluginPost)
         if (!pushed.ok) return refuse(pushed.code === 'wordpress_permission' ? 'wordpress_permission' : pushed.code)
         return check(l, deps)
@@ -635,6 +698,7 @@ export async function handlePlugin(body: unknown, deps: FixesDeps): Promise<Answ
         return await check(l, deps)
       case 'disconnect':
         await deletePluginLink(deps.admin, l.scope)
+        forgetSeoCapabilities(l.ctx.creds?.siteUrl)
         return { status: 200, body: { ok: true } }
       default:
         return refuse('invalid_request')
