@@ -63,6 +63,32 @@ export type AiCrawlerCopy = {
   }
   limits: { title: string; items: string[] }
   /**
+   * The robots.txt line generator, which is the other half of the checker.
+   *
+   * The checker answers "what does my file say"; this answers "what should it
+   * say", which is the question a reader asks next and used to leave the page
+   * to answer. Nothing here is a form: the lines are built in the browser from
+   * the same table, so no address is typed and nothing is sent anywhere.
+   *
+   * `outputNote` has to carry RFC 9309 rule 2 — a group that names a crawler
+   * REPLACES the catch-all group for it rather than adding to it — because a
+   * reader who pastes a `GPTBot` group above an existing `*` group that
+   * disallows `/admin/` has just allowed GPTBot into `/admin/` without being
+   * told. That sentence is the difference between a useful generator and a
+   * trap, so it is not optional in any locale.
+   */
+  generator: {
+    title: string
+    intro: string
+    allowAll: string
+    blockAll: string
+    outputTitle: string
+    outputNote: string
+    nothingBlocked: string
+    copy: string
+    copied: string
+  }
+  /**
    * The 07.11.2026 robots.txt measurement, rendered for a reader.
    *
    * `headline` carries `{pct}` and `sampleNote` carries `{n}`: the figures are
@@ -235,6 +261,17 @@ const he: AiCrawlerCopy = {
     freeCheck: 'בדיקת SEO חינמית לאתר',
     pricing: 'מסלולים ומחירים',
   },
+  generator: {
+    title: 'בנו את שורות ה-robots.txt',
+    intro: 'החליטו סורק אחר סורק, ואנחנו כותבים את השורות המדויקות. שום דבר לא נשלח לשום מקום: הקובץ נבנה בדפדפן שלכם.',
+    allowAll: 'לאפשר לכולם',
+    blockAll: 'לחסום את כולם',
+    outputTitle: 'שורות ה-robots.txt שלכם',
+    outputNote: 'הדביקו את השורות האלה בקובץ שנמצא בכתובת yoursite.com/robots.txt. קבוצה שנוקבת בשם של סורק מחליפה בעבורו את קבוצת ה-* שלכם, ולכן כל נתיב שאתם רוצים לחסום גם ממנו צריך להופיע בתוך הקבוצה שלו.',
+    nothingBlocked: 'שום סורק לא חסום, ולכן אין צורך בשורות. חסמו סורק למעלה כדי לראות את השורות שלו.',
+    copy: 'העתקה',
+    copied: 'הועתק',
+  },
 }
 
 const en: AiCrawlerCopy = {
@@ -343,6 +380,17 @@ const en: AiCrawlerCopy = {
     aiVisibility: 'AI answer visibility tracking',
     freeCheck: 'Free SEO check for your site',
     pricing: 'Plans and pricing',
+  },
+  generator: {
+    title: 'Build the robots.txt lines',
+    intro: 'Decide crawler by crawler, and we write the exact lines. Nothing is sent anywhere: the file is built in your browser.',
+    allowAll: 'Allow all',
+    blockAll: 'Block all',
+    outputTitle: 'Your robots.txt lines',
+    outputNote: 'Paste these into the file at yoursite.com/robots.txt. A group that names a crawler replaces your catch-all group for that crawler, so any path you also want to disallow for it belongs inside its own group.',
+    nothingBlocked: 'Nothing is blocked, so no lines are needed. Block a crawler above to see its lines.',
+    copy: 'Copy',
+    copied: 'Copied',
   },
 }
 
@@ -453,6 +501,17 @@ const es: AiCrawlerCopy = {
     freeCheck: 'Análisis SEO gratuito de tu sitio',
     pricing: 'Planes y precios',
   },
+  generator: {
+    title: 'Genere las líneas del robots.txt',
+    intro: 'Decida rastreador por rastreador y nosotros escribimos las líneas exactas. No se envía nada a ningún sitio: el archivo se construye en su navegador.',
+    allowAll: 'Permitir todos',
+    blockAll: 'Bloquear todos',
+    outputTitle: 'Sus líneas del robots.txt',
+    outputNote: 'Pegue estas líneas en el archivo que está en sutio.com/robots.txt. Un grupo que nombra a un rastreador sustituye para él a su grupo general, así que cualquier ruta que también quiera bloquearle debe ir dentro de su propio grupo.',
+    nothingBlocked: 'No hay nada bloqueado, así que no hacen falta líneas. Bloquee algún rastreador arriba para ver sus líneas.',
+    copy: 'Copiar',
+    copied: 'Copiado',
+  },
 }
 
 const ptBR: AiCrawlerCopy = {
@@ -561,6 +620,17 @@ const ptBR: AiCrawlerCopy = {
     aiVisibility: 'Monitoramento da visibilidade nas respostas de IA',
     freeCheck: 'Análise de SEO gratuita do seu site',
     pricing: 'Planos e preços',
+  },
+  generator: {
+    title: 'Monte as linhas do robots.txt',
+    intro: 'Decida rastreador por rastreador e nós escrevemos as linhas exatas. Nada é enviado para lugar algum: o arquivo é montado no seu navegador.',
+    allowAll: 'Permitir todos',
+    blockAll: 'Bloquear todos',
+    outputTitle: 'Suas linhas do robots.txt',
+    outputNote: 'Cole estas linhas no arquivo que fica em seusite.com/robots.txt. Um grupo que nomeia um rastreador substitui, para ele, o seu grupo geral, então qualquer caminho que você também queira bloquear para ele precisa estar dentro do grupo dele.',
+    nothingBlocked: 'Nada está bloqueado, então nenhuma linha é necessária. Bloqueie um rastreador acima para ver as linhas dele.',
+    copy: 'Copiar',
+    copied: 'Copiado',
   },
 }
 
@@ -671,6 +741,17 @@ const fr: AiCrawlerCopy = {
     freeCheck: 'Analyse SEO gratuite de votre site',
     pricing: 'Offres et tarifs',
   },
+  generator: {
+    title: 'Composez les lignes du robots.txt',
+    intro: 'Décidez robot par robot, et nous écrivons les lignes exactes. Rien n\'est envoyé nulle part : le fichier est composé dans votre navigateur.',
+    allowAll: 'Tout autoriser',
+    blockAll: 'Tout bloquer',
+    outputTitle: 'Vos lignes de robots.txt',
+    outputNote: 'Collez ces lignes dans le fichier situé à votresite.com/robots.txt. Un groupe qui nomme un robot remplace pour lui votre groupe général : tout chemin que vous voulez aussi lui interdire doit figurer dans son propre groupe.',
+    nothingBlocked: 'Rien n\'est bloqué, aucune ligne n\'est donc nécessaire. Bloquez un robot ci-dessus pour voir ses lignes.',
+    copy: 'Copier',
+    copied: 'Copié',
+  },
 }
 
 const it: AiCrawlerCopy = {
@@ -779,6 +860,17 @@ const it: AiCrawlerCopy = {
     aiVisibility: 'Monitoraggio della visibilità nelle risposte di IA',
     freeCheck: 'Analisi SEO gratuita del sito',
     pricing: 'Piani e prezzi',
+  },
+  generator: {
+    title: 'Componi le righe del robots.txt',
+    intro: 'Decidi crawler per crawler e noi scriviamo le righe esatte. Niente viene inviato da nessuna parte: il file si compone nel tuo browser.',
+    allowAll: 'Consenti tutti',
+    blockAll: 'Blocca tutti',
+    outputTitle: 'Le tue righe di robots.txt',
+    outputNote: 'Incolla queste righe nel file che si trova su iltuosito.com/robots.txt. Un gruppo che nomina un crawler sostituisce per lui il tuo gruppo generale, quindi ogni percorso che vuoi vietare anche a lui va dentro il suo gruppo.',
+    nothingBlocked: 'Non c\'è niente di bloccato, quindi non serve nessuna riga. Blocca un crawler qui sopra per vedere le sue righe.',
+    copy: 'Copia',
+    copied: 'Copiato',
   },
 }
 
@@ -889,6 +981,17 @@ const ja: AiCrawlerCopy = {
     freeCheck: 'サイトの無料SEOチェック',
     pricing: 'プランと料金',
   },
+  generator: {
+    title: 'robots.txt の行をつくる',
+    intro: 'クローラーごとに決めていただければ、そのとおりの行をこちらで書きます。どこにも送信されません。ファイルはお使いのブラウザー内で組み立てられます。',
+    allowAll: 'すべて許可',
+    blockAll: 'すべて拒否',
+    outputTitle: 'あなたの robots.txt の行',
+    outputNote: 'この行を yoursite.com/robots.txt のファイルに貼り付けてください。クローラー名を書いたグループは、そのクローラーについては全体向けのグループに代わって適用されます。そのため、そのクローラーにも禁止したいパスは、そのグループの中に書く必要があります。',
+    nothingBlocked: '拒否しているものがないため、行は必要ありません。上でクローラーを拒否すると、その行が表示されます。',
+    copy: 'コピー',
+    copied: 'コピーしました',
+  },
 }
 
 const de: AiCrawlerCopy = {
@@ -997,6 +1100,17 @@ const de: AiCrawlerCopy = {
     aiVisibility: 'Sichtbarkeit in KI-Antworten verfolgen',
     freeCheck: 'Kostenloser SEO-Check Ihrer Website',
     pricing: 'Tarife und Preise',
+  },
+  generator: {
+    title: 'Die robots.txt-Zeilen erzeugen',
+    intro: 'Entscheiden Sie Crawler für Crawler, und wir schreiben die genauen Zeilen. Es wird nichts irgendwohin gesendet: Die Datei entsteht in Ihrem Browser.',
+    allowAll: 'Alle erlauben',
+    blockAll: 'Alle sperren',
+    outputTitle: 'Ihre robots.txt-Zeilen',
+    outputNote: 'Fügen Sie diese Zeilen in die Datei unter ihreseite.de/robots.txt ein. Eine Gruppe, die einen Crawler namentlich nennt, tritt für diesen Crawler an die Stelle Ihrer Sammelgruppe. Jeder Pfad, den Sie ihm ebenfalls verbieten wollen, gehört deshalb in seine eigene Gruppe.',
+    nothingBlocked: 'Es ist nichts gesperrt, also sind keine Zeilen nötig. Sperren Sie oben einen Crawler, dann erscheinen seine Zeilen.',
+    copy: 'Kopieren',
+    copied: 'Kopiert',
   },
 }
 
@@ -1107,6 +1221,17 @@ const pl: AiCrawlerCopy = {
     freeCheck: 'Darmowa analiza SEO strony',
     pricing: 'Plany i ceny',
   },
+  generator: {
+    title: 'Zbuduj wiersze pliku robots.txt',
+    intro: 'Zdecyduj robot po robocie, a my zapiszemy dokładne wiersze. Nic nie jest nigdzie wysyłane: plik powstaje w Twojej przeglądarce.',
+    allowAll: 'Zezwól wszystkim',
+    blockAll: 'Zablokuj wszystkie',
+    outputTitle: 'Twoje wiersze pliku robots.txt',
+    outputNote: 'Wklej te wiersze do pliku pod adresem twojastrona.pl/robots.txt. Grupa, która wymienia robota z nazwy, zastępuje dla niego Twoją grupę zbiorczą, więc każda ścieżka, którą chcesz zablokować także jemu, musi znaleźć się w jego własnej grupie.',
+    nothingBlocked: 'Nic nie jest zablokowane, więc żadne wiersze nie są potrzebne. Zablokuj powyżej któregoś robota, aby zobaczyć jego wiersze.',
+    copy: 'Kopiuj',
+    copied: 'Skopiowano',
+  },
 }
 
 const nl: AiCrawlerCopy = {
@@ -1215,6 +1340,17 @@ const nl: AiCrawlerCopy = {
     aiVisibility: 'Zichtbaarheid in AI-antwoorden volgen',
     freeCheck: 'Gratis SEO-controle van uw site',
     pricing: 'Pakketten en prijzen',
+  },
+  generator: {
+    title: 'De regels voor robots.txt opstellen',
+    intro: 'Beslis per crawler, dan schrijven wij de exacte regels. Er wordt niets ergens naartoe gestuurd: het bestand ontstaat in uw eigen browser.',
+    allowAll: 'Alles toestaan',
+    blockAll: 'Alles blokkeren',
+    outputTitle: 'Uw regels voor robots.txt',
+    outputNote: 'Plak deze regels in het bestand op uwsite.nl/robots.txt. Een groep die een crawler bij naam noemt, komt voor die crawler in de plaats van uw algemene groep. Elk pad dat u ook voor hem wilt verbieden, hoort dus in zijn eigen groep.',
+    nothingBlocked: 'Er is niets geblokkeerd, dus er zijn geen regels nodig. Blokkeer hierboven een crawler om zijn regels te zien.',
+    copy: 'Kopiëren',
+    copied: 'Gekopieerd',
   },
 }
 
@@ -1326,6 +1462,17 @@ const ko: AiCrawlerCopy = {
     aiVisibility: 'AI 답변 가시성 추적',
     freeCheck: '무료 사이트 SEO 점검',
     pricing: '플랜과 요금',
+  },
+  generator: {
+    title: 'robots.txt 줄 만들기',
+    intro: '크롤러별로 정해 주시면 정확한 줄을 저희가 써 드립니다. 어디로도 전송되지 않습니다. 파일은 보고 계신 브라우저 안에서 만들어집니다.',
+    allowAll: '모두 허용',
+    blockAll: '모두 차단',
+    outputTitle: '내 robots.txt 줄',
+    outputNote: '이 줄을 yoursite.com/robots.txt 파일에 붙여 넣으십니다. 크롤러 이름을 적은 그룹은 그 크롤러에 대해 전체 대상 그룹을 대체합니다. 그래서 그 크롤러에도 함께 막고 싶은 경로는 그 그룹 안에 적어야 합니다.',
+    nothingBlocked: '차단한 것이 없어서 필요한 줄도 없습니다. 위에서 크롤러를 차단하시면 해당 줄이 나타납니다.',
+    copy: '복사',
+    copied: '복사했습니다',
   },
 }
 
