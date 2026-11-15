@@ -23,7 +23,29 @@ const DEADLINE_MS = 8_000
 
 type Read = { waiting: WaitingAnswer | null; fixes: FixesRead | null }
 type Entry = { at: number; value: Read; inflight: Promise<Read> | null }
-const cache = new Map<string, Entry>()
+
+/**
+ * THE CACHE LIVES ON `globalThis`, for the reason lib/client/seed-read.ts
+ * gives: module scope is per module INSTANCE, and a 'use client' module
+ * imported from two route segments (here the dashboard card and the sidebar
+ * rail) can be emitted into two chunks. Two instances means two caches, each
+ * one correctly sharing its own callers and neither seeing the other — which
+ * is why a dashboard load measured on 2026-11-15 still read
+ * GET /api/projects/[id]/waiting twice (1966ms and 5632ms apart) and
+ * GET /api/site-health/fixes twice behind it, both well inside FRESH_MS.
+ */
+const CACHE_KEY = '__goTopWaitingCache__'
+
+type CacheHost = typeof globalThis & { [CACHE_KEY]?: Map<string, Entry> }
+
+function cacheMap(): Map<string, Entry> {
+  const host = globalThis as CacheHost
+  const existing = host[CACHE_KEY]
+  if (existing) return existing
+  const created = new Map<string, Entry>()
+  host[CACHE_KEY] = created
+  return created
+}
 
 export const waitingUrl = (projectId: string) => `/api/projects/${encodeURIComponent(projectId)}/waiting`
 
@@ -59,6 +81,7 @@ async function loadFixes(projectId: string): Promise<FixesRead | null> {
 }
 
 function read(projectId: string, force: boolean): Promise<Read> {
+  const cache = cacheMap()
   const hit = cache.get(projectId)
   if (hit?.inflight) return hit.inflight
   if (hit && !force && Date.now() - hit.at < FRESH_MS) return Promise.resolve(hit.value)
