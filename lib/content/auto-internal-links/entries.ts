@@ -71,37 +71,68 @@ export function markAutoRemoved(json: unknown, url: string): unknown[] {
 }
 
 /**
+ * WHICH LINKS THE HEALING PASS LOOKS AFTER: the ones the SYSTEM put in the body
+ * and knows the address of — the automatic ones, and the ones an approved topic
+ * plan placed ('planned', the older flow). 4dogsoriginal.co.il's dead category
+ * came from a planned link, not an automatic one, and a 404 in a merchant's
+ * article is just as bad whichever flow wrote it. An entry of the inbound anchor
+ * bank ('manual') is not a link in this article at all, so it is never asked.
+ */
+export const HEALABLE_SOURCES: readonly string[] = [AUTO_SOURCE, 'planned']
+
+export interface HealableLinkEntry {
+  source: string
+  anchor: string
+  url: string
+  removed?: boolean
+  synced?: boolean
+  checkedAt?: string
+}
+
+export function isHealableEntry(e: unknown): e is HealableLinkEntry {
+  if (!e || typeof e !== 'object') return false
+  const v = e as Record<string, unknown>
+  return typeof v.source === 'string' && HEALABLE_SOURCES.includes(v.source)
+    && typeof v.url === 'string' && /^https:\/\//i.test(v.url) && typeof v.anchor === 'string'
+}
+
+/** Every entry the healing pass may ask about (removed or not). */
+export function healableEntries(json: unknown): HealableLinkEntry[] {
+  return Array.isArray(json) ? json.filter(isHealableEntry) : []
+}
+
+/**
  * The stored list after the healing pass asked the targets: every URL in `gone`
  * is marked removed (its `synced` is deliberately NOT set — the published post
  * still has it until the article is sent again), and every other live entry it
  * asked carries the time it answered.
  */
-export function markAutoChecked(json: unknown, gone: Iterable<string>, at: string): unknown[] {
+export function markLinksChecked(json: unknown, gone: Iterable<string>, at: string): unknown[] {
   const dead = new Set(gone)
   const list = Array.isArray(json) ? json : []
   return list.map((e) => {
-    if (!isAutoEntry(e) || e.removed) return e
+    if (!isHealableEntry(e) || e.removed) return e
     return dead.has(e.url) ? { ...e, removed: true, checkedAt: at } : { ...e, checkedAt: at }
   })
 }
 
 /** The stored list after the published post was updated: every removed entry is in step with the site. */
-export function markAutoSynced(json: unknown): unknown[] {
+export function markLinksSynced(json: unknown): unknown[] {
   const list = Array.isArray(json) ? json : []
-  return list.map((e) => (isAutoEntry(e) && e.removed ? { ...e, synced: true } : e))
+  return list.map((e) => (isHealableEntry(e) && e.removed ? { ...e, synced: true } : e))
 }
 
 /** A removed link our copy no longer has and the published post still does. */
-export function autoNeedsSync(json: unknown): boolean {
-  return autoEntries(json).some((e) => e.removed && !e.synced)
+export function linksNeedSync(json: unknown): boolean {
+  return healableEntries(json).some((e) => e.removed && !e.synced)
 }
 
 /**
- * The oldest time any still-live automatic link of this article was asked, or 0
- * when one was never asked. A smaller number is the article to re-check first.
+ * The oldest time any still-live link of this article was asked, or 0 when one
+ * was never asked. A smaller number is the article to re-check first.
  */
-export function autoOldestCheck(json: unknown): number {
-  const live = autoEntries(json).filter((e) => !e.removed)
+export function oldestLinkCheck(json: unknown): number {
+  const live = healableEntries(json).filter((e) => !e.removed)
   if (!live.length) return Number.POSITIVE_INFINITY
   let oldest = Number.POSITIVE_INFINITY
   for (const e of live) {

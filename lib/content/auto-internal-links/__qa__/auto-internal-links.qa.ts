@@ -23,7 +23,8 @@
  *   F) the HEALING pass (lib/content/auto-internal-links/heal.ts): a published
  *      article's links are asked again, a page taken down since loses its <a>
  *      (the words stay), the live post is sent again in place, a link the
- *      CUSTOMER removed is sent too, a site that refuses is tried again later,
+ *      CUSTOMER removed is sent too, a dead link an approved plan placed is
+ *      healed as well, a site that refuses is tried again later,
  *      never a draft, never another owner's article, Production only, kill
  *      switch, never throws;
  *   D) wiring: every generation path runs the step (not only the opt-in one),
@@ -44,7 +45,7 @@ import { readAnchorBank } from '@/lib/content/internal-link-candidates'
 import { getDashboardDictionary } from '@/lib/i18n/dashboard/getDashboardDictionary'
 import ArticleAutoLinksCard from '@/components/content/ArticleAutoLinksCard'
 import { autoLinkCandidates, isFacetUrl, selectAutoLinks, type AutoLinkArticle } from '../select'
-import { autoLinksShown, autoNeedsSync, autoOldestCheck, hasAutoLinks, markAutoChecked, markAutoRemoved, markAutoSynced } from '../entries'
+import { autoLinksShown, hasAutoLinks, linksNeedSync, markAutoRemoved, markLinksChecked, markLinksSynced, oldestLinkCheck } from '../entries'
 import { HEAL_RECHECK_AFTER_MS, healArticleLinks, pickArticlesToHeal, runLinkHeal, type HealScope } from '../heal'
 import { checkLinkTarget, runAutoInternalLinksStep } from '../step'
 
@@ -503,12 +504,23 @@ async function main() {
   check('F10: the order is: a removal the site does not have yet, then never-asked, then asked longest ago; a fresh one, one with no automatic links and another project are left out',
     JSON.stringify(picked) === JSON.stringify(['a-unsynced', 'a-never', 'a-old']), JSON.stringify(picked))
   check('F11: the entry marks are pure and additive',
-    autoNeedsSync([entry(DEAD, { removed: true })]) && !autoNeedsSync([entry(DEAD, { removed: true, synced: true })]) && !autoNeedsSync([entry(ALIVE)])
-    && autoOldestCheck([entry(ALIVE)]) === 0 && autoOldestCheck([entry(DEAD, { removed: true })]) === Number.POSITIVE_INFINITY
-    && (markAutoChecked([entry(DEAD), entry(ALIVE)], [DEAD], HNOW.toISOString())[0] as Record<string, unknown>).removed === true
-    && (markAutoChecked([entry(DEAD), entry(ALIVE)], [DEAD], HNOW.toISOString())[0] as Record<string, unknown>).synced === undefined
-    && (markAutoSynced([entry(DEAD, { removed: true })])[0] as Record<string, unknown>).synced === true
-    && (markAutoSynced([entry(ALIVE)])[0] as Record<string, unknown>).synced === undefined)
+    linksNeedSync([entry(DEAD, { removed: true })]) && !linksNeedSync([entry(DEAD, { removed: true, synced: true })]) && !linksNeedSync([entry(ALIVE)])
+    && oldestLinkCheck([entry(ALIVE)]) === 0 && oldestLinkCheck([entry(DEAD, { removed: true })]) === Number.POSITIVE_INFINITY
+    && (markLinksChecked([entry(DEAD), entry(ALIVE)], [DEAD], HNOW.toISOString())[0] as Record<string, unknown>).removed === true
+    && (markLinksChecked([entry(DEAD), entry(ALIVE)], [DEAD], HNOW.toISOString())[0] as Record<string, unknown>).synced === undefined
+    && (markLinksSynced([entry(DEAD, { removed: true })])[0] as Record<string, unknown>).synced === true
+    && (markLinksSynced([entry(ALIVE)])[0] as Record<string, unknown>).synced === undefined)
+  console.log = () => {}
+  const hPlanned = hWorld({ article: { internal_links_json: [{ source: 'planned', url: DEAD, anchor: 'אוקינאווה' }, { anchor: 'בנק', source: 'manual' }] } })
+  const askedPlanned: string[] = []
+  const rPlanned = await healArticleLinks(hPlanned as never, scope, { ...hDeps, checkUrl: async (url) => { askedPlanned.push(url); return dead(url) }, resync: async () => true })
+  const rowPlanned = hPlanned.tables.generated_articles[0] as { content_html: string; internal_links_json: Record<string, unknown>[] }
+  console.log = quiet
+  check('F14: a dead link an approved PLAN placed is healed too (4dogsoriginal\'s was), and the inbound anchor bank is never asked about',
+    rPlanned.outcome === 'healed' && rPlanned.removed === 1 && !/<a href="[^"]*okinawa/.test(rowPlanned.content_html) && rowPlanned.content_html.includes('אוקינאווה')
+    && askedPlanned.length === 1 && askedPlanned[0] === DEAD
+    && rowPlanned.internal_links_json.find((e) => e.source === 'planned')?.removed === true
+    && rowPlanned.internal_links_json.find((e) => e.source === 'manual')?.checkedAt === undefined, JSON.stringify(rPlanned))
   const healSrc = strip(read('lib/content/auto-internal-links/resync.ts'))
   check('F12: the resync only ever updates the article\'s OWN existing post, as published, through the one publisher path: no new post, no draft, no schedule, no author',
     /existing/.test(healSrc) && /status: 'publish'/.test(healSrc) && !/forceNew/.test(healSrc) && !/scheduleAt/.test(healSrc) && !/authorId/.test(healSrc)
@@ -527,7 +539,7 @@ async function main() {
   check('MUTATION CONTROL: a pass that marks the link dead but leaves the <a> in the body is caught (so F1 would fail)',
     rMut.outcome === 'healed' && /<a href="[^"]*okinawa/.test(String(hMut.tables.generated_articles[0].content_html)))
   check('MUTATION CONTROL: a dead target left unmarked is caught (so F1b would fail)',
-    (mutEntries.markAutoChecked([entry(DEAD)], [DEAD], HNOW.toISOString())[0] as Record<string, unknown>).removed === undefined)
+    (mutEntries.markLinksChecked([entry(DEAD)], [DEAD], HNOW.toISOString())[0] as Record<string, unknown>).removed === undefined)
 
   console.log(`\n${passed} passed, ${failed} failed`)
   if (failed) process.exit(1)

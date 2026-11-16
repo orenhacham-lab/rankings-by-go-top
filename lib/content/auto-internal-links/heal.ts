@@ -22,6 +22,11 @@
  *      removed in the article view, which until now stayed in the published
  *      post for good (a removed entry with no `synced` mark: ./entries.ts).
  *
+ * WHICH LINKS: the ones the system placed and knows the address of — automatic,
+ * and the ones an approved topic plan placed, because 4dogsoriginal.co.il's dead
+ * category came from a planned link and a 404 is a 404 (./entries.ts
+ * HEALABLE_SOURCES). Never a link the article's own editor typed into the body.
+ *
  * It only ever UNWRAPS an anchor and re-sends the article through the one path
  * the product already uses for an update (publishArticleToWordPress with the
  * article's existing post id — what the "update" button does). It writes no new
@@ -33,7 +38,7 @@
  */
 import type { ServiceRoleClient } from '@/lib/supabase/admin'
 import { removeLink } from '@/lib/link-network/anchor'
-import { autoEntries, autoNeedsSync, autoOldestCheck, markAutoChecked, markAutoSynced } from './entries'
+import { healableEntries, linksNeedSync, markLinksChecked, markLinksSynced, oldestLinkCheck } from './entries'
 import { checkLinkTarget, type LinkLiveness } from './step'
 
 /** A published article's links are asked again no more often than this. */
@@ -98,9 +103,9 @@ async function heal(admin: ServiceRoleClient, scope: HealScope, deps: HealDeps):
   if (!article) return { outcome: 'skipped', reason: 'not_found' }
   if (article.status !== 'published') return { outcome: 'skipped', reason: 'not_published' }
 
-  const entries = autoEntries(article.internal_links_json)
+  const entries = healableEntries(article.internal_links_json)
   if (!entries.length) return { outcome: 'skipped', reason: 'no_links' }
-  const alreadyNeedsSync = autoNeedsSync(article.internal_links_json)
+  const alreadyNeedsSync = linksNeedSync(article.internal_links_json)
 
   // Ask the links this article still carries. One request per address, however
   // many entries share it.
@@ -116,7 +121,7 @@ async function heal(admin: ServiceRoleClient, scope: HealScope, deps: HealDeps):
     const { error } = await admin.from('generated_articles')
       .update({
         ...(gone.length > 0 ? { content_html: html } : {}),
-        internal_links_json: markAutoChecked(article.internal_links_json, gone, at),
+        internal_links_json: markLinksChecked(article.internal_links_json, gone, at),
         updated_at: at,
       })
       .eq('id', articleId).eq('project_id', projectId).eq('status', 'published')
@@ -127,7 +132,7 @@ async function heal(admin: ServiceRoleClient, scope: HealScope, deps: HealDeps):
   if (!article.wp_post_id) {
     // Nothing to send: our copy is clean and there is no published post to repair.
     const { error } = await admin.from('generated_articles')
-      .update({ internal_links_json: markAutoSynced(markAutoChecked(article.internal_links_json, gone, at)), updated_at: at })
+      .update({ internal_links_json: markLinksSynced(markLinksChecked(article.internal_links_json, gone, at)), updated_at: at })
       .eq('id', articleId).eq('project_id', projectId).eq('status', 'published')
     if (error) return { outcome: 'skipped', reason: 'write_failed' }
     return gone.length > 0 ? { outcome: 'healed', removed: gone.length, resynced: false } : { outcome: 'skipped', reason: 'no_post' }
@@ -144,7 +149,7 @@ async function heal(admin: ServiceRoleClient, scope: HealScope, deps: HealDeps):
   const { data: after } = await admin.from('generated_articles')
     .select('internal_links_json').eq('id', articleId).eq('project_id', projectId).maybeSingle()
   const { error: syncErr } = await admin.from('generated_articles')
-    .update({ internal_links_json: markAutoSynced((after as { internal_links_json?: unknown } | null)?.internal_links_json ?? article.internal_links_json), updated_at: at })
+    .update({ internal_links_json: markLinksSynced((after as { internal_links_json?: unknown } | null)?.internal_links_json ?? article.internal_links_json), updated_at: at })
     .eq('id', articleId).eq('project_id', projectId).eq('status', 'published')
   if (syncErr) return { outcome: 'skipped', reason: 'write_failed' }
   return gone.length > 0 ? { outcome: 'healed', removed: gone.length, resynced: true } : { outcome: 'resynced' }
@@ -170,10 +175,10 @@ export function pickArticlesToHeal(
   for (const row of rows) {
     const userId = owners.get(row.project_id)
     if (!userId) continue
-    if (!autoEntries(row.internal_links_json).length) continue
+    if (!healableEntries(row.internal_links_json).length) continue
     const scope: HealScope = { projectId: row.project_id, userId, articleId: row.id }
-    const oldest = autoOldestCheck(row.internal_links_json)
-    if (autoNeedsSync(row.internal_links_json)) { unsynced.push({ scope, needsSync: true, oldest }); continue }
+    const oldest = oldestLinkCheck(row.internal_links_json)
+    if (linksNeedSync(row.internal_links_json)) { unsynced.push({ scope, needsSync: true, oldest }); continue }
     if (Number.isFinite(oldest) && nowMs - oldest > HEAL_RECHECK_AFTER_MS) stale.push({ scope, needsSync: false, oldest })
   }
   const byAge = (a: HealCandidate, b: HealCandidate) => a.oldest - b.oldest
