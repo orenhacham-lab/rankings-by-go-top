@@ -114,9 +114,14 @@ export const landingJa: LandingCopy = {
   },
   worksWith: {
     checkLabel: '掲載状況を計測する先：',
-    checkNames: ['Google', 'Googleマップ', 'ChatGPT', 'Gemini', 'Perplexity', 'Copilot', 'Grok'],
+    // Gemini, Copilot and Grok are NOT listed here, and this is the only locale
+    // where they are missing: lib/ai-visibility/providers/scrapellm.ts cannot run
+    // those three (nor Google AI Mode) for a JP project, so naming them on the
+    // Japanese page would advertise a check we will not perform for that market.
+    checkNames: ['Google', 'Googleマップ', 'ChatGPT', 'Perplexity'],
     publishLabel: '直接公開する先：',
     publishNames: ['WordPress', 'Shopify', 'Wix'],
+    trademarks: '第三者の名称およびロゴは、各所有者の商標です。本システムが計測する先と公開する先を説明するために掲載しており、提携や推奨を示すものではありません。',
   },
   outcomes: {
     eyebrow: '得られるもの',

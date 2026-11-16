@@ -4,7 +4,7 @@
  * Measured on a production build before this guard existed: the notice was tab
  * stop 47. It rendered after `{children}`, so a visitor who cannot use a mouse
  * had to pass the skip link, the header, the language switcher, the whole
- * marketing page and the footer before reaching "דחיית הכל", while "אישור מדידה"
+ * marketing page and the footer before reaching "דחיית הכל", while "אישור"
  * was one click away for everybody else.
  *
  * That gap is not a styling detail. GDPR Art. 7(1) and the EDPB's guidelines on

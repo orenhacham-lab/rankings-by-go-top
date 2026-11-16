@@ -59,6 +59,15 @@
  * at most one project per run whose mapping is missing or ageing is mapped, so automatic
  * internal links have pages to point at. Started with the runner, awaited before the emails.
  *
+ * ALONGSIDE ALL OF IT, THE PUBLISHED ARTICLES' INTERNAL LINKS
+ * (lib/content/auto-internal-links/heal.ts): a merchant's page can be taken down
+ * weeks after the article that links to it went live, and nothing in the product
+ * noticed (eleven dead anchors in buy-buy.co.il's published articles, found on
+ * 16 November 2026). This pass asks the targets again, takes a dead one's <a>
+ * out of the body and sends the article to the site again in place, so the live
+ * post loses the 404 anchor too. At most three articles a pass, Production only,
+ * isolated the same way.
+ *
  * THEN, THE BUSINESS PROFILE POST QUEUE (lib/gbp/due-isolated.ts): the automatic posts whose
  * article has published. Queuing happens in the publish path, but sending never can — that path
  * is forbidden to call Google — so the queue is drained here, every fifteen minutes, instead of
@@ -89,6 +98,8 @@ import { runBlogDailyWindow, startIsolatedBlogWindow } from '@/lib/blog/auto/dai
 import { runIsolatedGbpDue } from '@/lib/gbp/due-isolated'
 import { runIsolatedArticleBatch } from '@/lib/content/batch/isolated'
 import { runIsolatedInlineImageBatch } from '@/lib/content/image-batch/isolated'
+import { runLinkHeal, startIsolatedLinkHeal } from '@/lib/content/auto-internal-links/heal'
+import { resyncPublishedArticle } from '@/lib/content/auto-internal-links/resync'
 
 // Generation can take a while; request a generous budget (platform clamps to the
 // plan's max — e.g. 60s on Hobby, up to 300s on Pro).
@@ -155,6 +166,17 @@ async function handle(request: Request): Promise<Response> {
     // morning. It rides this cron for the frequency, never the publish path itself, which
     // is forbidden to call Google at all. Production only, isolated: it never throws.
     await runIsolatedGbpDue()
+    // Then the automatic internal links of articles ALREADY PUBLISHED
+    // (lib/content/auto-internal-links/heal.ts): their targets are asked again, a page
+    // that has since been taken down loses its <a> (the words stay), and the live post
+    // is updated in place so the customer's article does not keep a 404 anchor. It also
+    // sends an article the customer removed a link from, which until now stayed in the
+    // published post for good. At most three articles a pass, Production only,
+    // isolated: it never throws.
+    await startIsolatedLinkHeal(
+      (deadlineAt) => runLinkHeal(createAdminClient(), { deadlineAt, env: process.env, deps: { resync: resyncPublishedArticle } }),
+      { startedAtMs: Date.parse(startedAt), maxDurationMs: maxDuration * 1000 },
+    )
     // Then the batch lane (lib/content/batch): collect the article drafts Gemini's
     // Batch API has finished and order the next few, at 50% of the interactive
     // price. It rides this cron because a draft ordered now is wanted hours from

@@ -12,6 +12,16 @@ import { join, relative } from 'path'
 import { landingHe } from '../../../lib/i18n/public/landing-he'
 import { landingEn } from '../../../lib/i18n/public/landing-en'
 import { PUBLIC_LOCALES } from '../../../lib/i18n/locales'
+import { landingEs } from '../../../lib/i18n/public/landing-es'
+import { landingPtBR } from '../../../lib/i18n/public/landing-pt-BR'
+import { landingFr } from '../../../lib/i18n/public/landing-fr'
+import { landingIt } from '../../../lib/i18n/public/landing-it'
+import { landingJa } from '../../../lib/i18n/public/landing-ja'
+import { landingDe } from '../../../lib/i18n/public/landing-de'
+import { landingNl } from '../../../lib/i18n/public/landing-nl'
+import { landingPl } from '../../../lib/i18n/public/landing-pl'
+import { landingKo } from '../../../lib/i18n/public/landing-ko'
+import { engineSupportsCountry } from '../../../lib/ai-visibility/providers/scrapellm'
 
 let pass = 0, fail = 0
 function check(name: string, cond: boolean, detail?: string) {
@@ -258,6 +268,59 @@ function main() {
       !shapeOk(c.replace(/(onClick=\{handleAccept\}\s*className=\{`\$\{compact \? COMPACT_BUTTON_ACCEPT : FULL_BUTTON_ACCEPT\}[^`]*?)w-full/, '$1flex-1')))
     check('MUT: customize left as small print fails E3',
       !shapeOk(c.replace(/(onClick=\{\(\) => setPanelOpen\(true\)\}\s*className=\{`)\$\{compact \? COMPACT_BUTTON : FULL_BUTTON\}/, '$1${compact ? \'mt-1 text-overline\' : \'mt-2 text-caption\'}')))
+  }
+
+  // F — THE TWO LOGO ROWS NAME OTHER COMPANIES' PRODUCTS.
+  //
+  // Showing someone else's mark is using it. That is allowed as description and
+  // stops being allowed the moment the page reads as a tie-up, so every locale
+  // carries the sentence that says which one it is — and no locale may slide
+  // back to "partners" or "integrations" wording in that line.
+  console.log('\nF) the works-with rows describe, and never imply a tie-up')
+  {
+    const ALL = [
+      ['he', landingHe], ['en', landingEn], ['es', landingEs], ['pt-BR', landingPtBR],
+      ['fr', landingFr], ['it', landingIt], ['ja', landingJa], ['de', landingDe],
+      ['nl', landingNl], ['pl', landingPl], ['ko', landingKo],
+    ] as const
+    check('F0: every public locale is covered here', ALL.length === PUBLIC_LOCALES.length,
+      `${ALL.length} vs ${PUBLIC_LOCALES.length}`)
+    const page = strip(read('components/public/LandingPage.tsx'))
+    check('F1: the page renders the line, under both rows',
+      /data-workswith-trademarks/.test(page) && /\{copy\.worksWith\.trademarks\}/.test(page))
+    check('MUT: dropping the line from the page fails F1',
+      !/\{copy\.worksWith\.trademarks\}/.test(page.replace('{copy.worksWith.trademarks}', '')))
+    for (const [locale, copy] of ALL) {
+      const tm = copy.worksWith.trademarks
+      check(`F2 (${locale}): the line is written in this language and denies a tie-up`,
+        tm.length > 40
+        && /סימני המסחר|trademarks|marcas|marques|marchi|商標|Marken|handelsmerken|znakami towarowymi|상표/.test(tm)
+        && /חסות|endorsement|patrocinio|patrocínio|parrainage|approvazione|推奨|Empfehlung|goedkeuring|rekomendacji|보증/.test(tm),
+        tm.slice(0, 50))
+      check(`F3 (${locale}): and the row itself does not call them partners`,
+        !/שותפ|partner|socio|parceir|partenaire|提携先|Partnerschaft mit|samenwerkingspartner|partnerzy|파트너/i
+          .test(`${copy.worksWith.checkLabel} ${copy.worksWith.publishLabel}`),
+        `${copy.worksWith.checkLabel} | ${copy.worksWith.publishLabel}`)
+    }
+    // A named engine we cannot run for that market is a check we are
+    // advertising and will not perform. Derived from the provider's own table,
+    // not from a list copied here, so a change there moves this guard with it.
+    const ENGINE_OF: Record<string, string> = {
+      chatgpt: 'chatgpt', perplexity: 'perplexity', gemini: 'gemini',
+      copilot: 'copilot', grok: 'grok',
+    }
+    const namedEnginesUnsupported = (names: readonly string[], country: string) =>
+      names.map((n) => ENGINE_OF[n.toLowerCase().replace(/[^a-z]/g, '')])
+        .filter((e): e is string => !!e)
+        .filter((e) => !engineSupportsCountry(e, country))
+    check('F4 (ja): the Japanese page names no engine we cannot check for a JP project',
+      namedEnginesUnsupported(landingJa.worksWith.checkNames, 'JP').length === 0,
+      namedEnginesUnsupported(landingJa.worksWith.checkNames, 'JP').join(', '))
+    check('MUT: putting Gemini back on the Japanese page is caught',
+      namedEnginesUnsupported([...landingJa.worksWith.checkNames, 'Gemini'], 'JP').length > 0)
+    check('F5 (he): a market with no such limit still names them',
+      namedEnginesUnsupported(landingHe.worksWith.checkNames, 'IL').length === 0
+      && landingHe.worksWith.checkNames.includes('Gemini'))
   }
 
   console.log(`\n${pass} passed, ${fail} failed`)

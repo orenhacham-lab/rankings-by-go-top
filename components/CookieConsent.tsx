@@ -68,7 +68,9 @@ import { ConsentPreferences } from '@/components/consent/ConsentPreferences'
  *
  * The TYPE is shared by every decision, so no decision can be set in smaller
  * print than another — a reject in small type is the pattern regulators have
- * fined for, and nothing here may differ in it.
+ * fined for, and nothing here may differ in it. The owner asked for a bigger
+ * label on 16 Nov 2026; it went up one step for ALL THREE (caption on a phone,
+ * lead elsewhere) rather than for Accept alone, which is the same rule.
  *
  * The BOX is emphasis, and accept is allowed 4px more of it (the owner's call,
  * 16 Nov 2026). Four pixels is ordinary visual hierarchy, not a cheaper press:
@@ -83,8 +85,8 @@ import { ConsentPreferences } from '@/components/consent/ConsentPreferences'
  * peer. 2.5px of side padding instead of 8px gives a 105px button about 14 more
  * characters of room before it needs that second line at all.
  */
-const COMPACT_TYPE = 'px-1.5 text-overline leading-[1.15]'
-const FULL_TYPE = 'px-2 text-copy leading-tight'
+const COMPACT_TYPE = 'px-1.5 text-caption leading-[1.15]'
+const FULL_TYPE = 'px-2 text-lead leading-tight'
 const COMPACT_BOX = 'min-h-[26px] py-[3px]'
 const FULL_BOX = 'min-h-9 py-1'
 const COMPACT_BOX_ACCEPT = 'min-h-[30px] py-[5px]'
@@ -226,8 +228,15 @@ export function CookieConsent({
    * print is the pattern regulators have fined for. Emphasis may differ; the
    * press may not. Reject is a real, filled button on the same card, on the same
    * layer, one click, with no extra step.
-   * lib/consent/__qa__/consent-contract.qa.ts D1 holds the type identical and
-   * caps the height gap, so this stays a nudge and never becomes a wall.
+   * Their BORDER is white/40, not white/25. The fill of a secondary button is
+   * only 1.33:1 against this card, so the border is the whole of what makes it
+   * read as a control, and WCAG 1.4.11 asks 3:1 of a non-text graphic that
+   * carries meaning. white/25 measures 2.23:1 and fails it; white/40 measures
+   * 3.72:1. "Reject is a real button, not a link" was resting on an edge nobody
+   * could reliably see. The colours are NOT equalised beyond that — an emphasis
+   * on Accept is allowed; an invisible reject is not.
+   * lib/consent/__qa__/consent-contract.qa.ts D1 holds the type identical, caps
+   * the height gap, and now holds that contrast floor too.
    */
   const actions = (compact: boolean) => (
     <>
@@ -242,14 +251,14 @@ export function CookieConsent({
         <button
           type="button"
           onClick={handleReject}
-          className={`${compact ? COMPACT_BUTTON : FULL_BUTTON} flex-1 rounded-control border border-white/25 bg-white/10 font-bold text-contrast-ink transition-colors hover:bg-white/20 focus:outline-none focus-visible:ring-4 focus-visible:ring-white/40`}
+          className={`${compact ? COMPACT_BUTTON : FULL_BUTTON} flex-1 rounded-control border border-white/40 bg-white/10 font-bold text-contrast-ink transition-colors hover:bg-white/20 focus:outline-none focus-visible:ring-4 focus-visible:ring-white/40`}
         >
           {t.rejectAll}
         </button>
         <button
           type="button"
           onClick={() => setPanelOpen(true)}
-          className={`${compact ? COMPACT_BUTTON : FULL_BUTTON} flex-1 rounded-control border border-white/25 bg-white/10 font-bold text-contrast-ink transition-colors hover:bg-white/20 focus:outline-none focus-visible:ring-4 focus-visible:ring-white/40`}
+          className={`${compact ? COMPACT_BUTTON : FULL_BUTTON} flex-1 rounded-control border border-white/40 bg-white/10 font-bold text-contrast-ink transition-colors hover:bg-white/20 focus:outline-none focus-visible:ring-4 focus-visible:ring-white/40`}
         >
           {t.customize}
         </button>

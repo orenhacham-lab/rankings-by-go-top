@@ -20,6 +20,13 @@
  *   C) storage and removal: entries are source 'auto', the inbound anchor bank
  *      skips them, the list shows only links still in the body, the DELETE
  *      route removes only an automatic link of an owned article;
+ *   F) the HEALING pass (lib/content/auto-internal-links/heal.ts): a published
+ *      article's links are asked again, a page taken down since loses its <a>
+ *      (the words stay), the live post is sent again in place, a link the
+ *      CUSTOMER removed is sent too, a dead link an approved plan placed is
+ *      healed as well, a site that refuses is tried again later,
+ *      never a draft, never another owner's article, Production only, kill
+ *      switch, never throws;
  *   D) wiring: every generation path runs the step (not only the opt-in one),
  *      after the approved plan links and before the link network; the article
  *      page lists them and hides the older planned-link panels only for an
@@ -37,9 +44,10 @@ import { plainText } from '@/lib/link-network/anchor'
 import { readAnchorBank } from '@/lib/content/internal-link-candidates'
 import { getDashboardDictionary } from '@/lib/i18n/dashboard/getDashboardDictionary'
 import ArticleAutoLinksCard from '@/components/content/ArticleAutoLinksCard'
-import { autoLinkCandidates, selectAutoLinks, type AutoLinkArticle } from '../select'
-import { autoLinksShown, hasAutoLinks, markAutoRemoved } from '../entries'
-import { runAutoInternalLinksStep } from '../step'
+import { autoLinkCandidates, isFacetUrl, selectAutoLinks, type AutoLinkArticle } from '../select'
+import { autoLinksShown, hasAutoLinks, linksNeedSync, markAutoRemoved, markLinksChecked, markLinksSynced, oldestLinkCheck } from '../entries'
+import { HEAL_RECHECK_AFTER_MS, healArticleLinks, pickArticlesToHeal, runLinkHeal, type HealScope } from '../heal'
+import { checkLinkTarget, runAutoInternalLinksStep } from '../step'
 
 let passed = 0
 let failed = 0
@@ -222,7 +230,9 @@ async function main() {
     article_topics: [{ id: 't-1', project_id: PROJECT, primary_keyword: 'איים ביפן', secondary_keywords: ['חופים ביפן', 'אוקינאווה', 'הוקאידו'], language: 'he' }],
     site_page_map: over.map === null ? [] : [{ project_id: PROJECT, user_id: OWNER, status: 'completed', finished_at: '2026-09-28T10:00:00Z', site_url: `${SITE}/`, entries: MAP, ...over.map }],
   }, (over.mapHooks ?? {}) as never)
-  const deps = { now: () => NOW, env: {} as Record<string, string | undefined> }
+  // checkUrl is stubbed in every world: the step asks each chosen page whether
+  // it still answers, and a suite must not reach out to the network.
+  const deps = { now: () => NOW, env: {} as Record<string, string | undefined>, checkUrl: async () => 'alive' as const }
   const quiet = console.log
   console.log = () => {}
   const w1 = world()
@@ -275,6 +285,98 @@ async function main() {
   console.log = quiet
   check('MUTATION CONTROL: without the draft check a published article is changed (so B3 would fail)', /<a /.test(String(wp.tables.generated_articles[0].content_html)))
 
+  // ── E) a link is never made to a page that is not there ─────────────────────
+  // Oren, 16 November 2026: an article on buy-buy.co.il carried the anchor
+  // "אינטגרלי" pointing at /filter/אינטגרלי-מלא/, which answers 404. Measured
+  // afterwards over every internal link in Production: ELEVEN of buy-buy's
+  // filter addresses were linked from nine published articles and every one of
+  // them was a 404, plus one dead category on 4dogsoriginal. Two separate
+  // holes, so two separate guards.
+  console.log('\nE) a link is never made to a page that is not there')
+  const FACET_MAP = [
+    { u: u('filter/integrali-male/'), t: 'אינטגרלי מלא' },
+    { u: u('filter/oled/'), t: 'OLED' },
+    { u: u('pa_color/black/'), t: 'שחור' },
+    { u: u('sort/price/'), t: 'מחיר' },
+    { u: u('okinawa/'), t: 'אוקינאווה' },
+  ]
+  const facetCands = autoLinkCandidates(FACET_MAP, host, islands())
+  check('E1: a faceted filter page is never a candidate, however the site lists it',
+    facetCands.length === 1 && facetCands[0].url === u('okinawa/'), JSON.stringify(facetCands.map((c) => c.url)))
+  check('E2: the forms measured in Production are all covered: /filter/, /pa_<attr>/, /sort/',
+    isFacetUrl(u('filter/qled/')) && isFacetUrl(u('pa_size/40/')) && isFacetUrl(u('sort/price/'))
+    && !isFacetUrl(u('product-category/ovens/')) && !isFacetUrl(u('product/filter-coffee-machine/')))
+
+  // The second hole: a page the sitemap lists that is simply gone.
+  const asked: string[] = []
+  const goneStub = (dead: string[]) => async (url: string) => { asked.push(url); return dead.includes(url) ? 'gone' as const : 'alive' as const }
+  const wGone = world()
+  console.log = () => {}
+  const rGone = await runAutoInternalLinksStep(wGone as never, { projectId: PROJECT, userId: OWNER, articleId: ART }, { ...deps, checkUrl: goneStub([u('okinawa/')]) })
+  const rowGone = wGone.tables.generated_articles[0] as { content_html: string; internal_links_json: Record<string, unknown>[] }
+  const wAllGone = world()
+  const rAllGone = await runAutoInternalLinksStep(wAllGone as never, { projectId: PROJECT, userId: OWNER, articleId: ART }, { ...deps, checkUrl: async () => 'gone' as const })
+  console.log = quiet
+  check('E3: every chosen page is asked before anything is written', asked.length >= 3 && asked.every((a) => a.startsWith(SITE)))
+  check('E4: a chosen page that is GONE is not linked, and the choice is made again so the article keeps its links',
+    rGone.outcome === 'linked' && !rowGone.content_html.includes(u('okinawa/'))
+    && (rowGone.content_html.match(/<a /g) ?? []).length === rGone.links && rGone.links >= 2
+    && rowGone.internal_links_json.filter((e) => e.source === 'auto').every((e) => e.url !== u('okinawa/')), JSON.stringify(rGone))
+  check('E5: when every page is gone the article is left alone, with its own reason',
+    rAllGone.outcome === 'skipped' && rAllGone.reason === 'targets_gone'
+    && !/<a /.test(String(wAllGone.tables.generated_articles[0].content_html)), JSON.stringify(rAllGone))
+
+  // checkLinkTarget's own rule table, with fetch stubbed: ONLY a definite
+  // 404/410 drops a link. A 403, a 429, a 5xx or no answer at all mean "we do
+  // not know", and four of the fleet's own sites answered exactly that while
+  // this was measured, so an unknown must never strip a good link.
+  const realFetch = globalThis.fetch
+  const stubFetch = (plan: (method: string) => number | 'throw') => {
+    globalThis.fetch = (async (_u: string | URL | Request, init?: { method?: string }) => {
+      const m = String(init?.method ?? 'GET')
+      const out = plan(m)
+      if (out === 'throw') throw new Error('network')
+      return { status: out, ok: out < 400 } as Response
+    }) as typeof fetch
+  }
+  try {
+    stubFetch(() => 404)
+    const dead404 = await checkLinkTarget(u('filter/x/'))
+    stubFetch(() => 410)
+    const dead410 = await checkLinkTarget(u('filter/x/'))
+    stubFetch(() => 200)
+    const live200 = await checkLinkTarget(u('okinawa/'))
+    stubFetch(() => 403)
+    const live403 = await checkLinkTarget(u('okinawa/'))
+    stubFetch(() => 429)
+    const live429 = await checkLinkTarget(u('okinawa/'))
+    stubFetch(() => 503)
+    const live503 = await checkLinkTarget(u('okinawa/'))
+    stubFetch(() => 'throw')
+    const liveErr = await checkLinkTarget(u('okinawa/'))
+    stubFetch((m) => (m === 'HEAD' ? 405 : 404))
+    const headRefused = await checkLinkTarget(u('filter/x/'))
+    check('E6: only 404 and 410 count as gone', dead404 === 'gone' && dead410 === 'gone')
+    check('E7: 200 is alive, and so is everything we cannot read: 403, 429, 5xx, no answer',
+      live200 === 'alive' && live403 === 'alive' && live429 === 'alive' && live503 === 'alive' && liveErr === 'alive')
+    check('E8: a site that refuses HEAD is asked again with GET', headRefused === 'gone')
+  } finally {
+    globalThis.fetch = realFetch
+  }
+
+  const noFacet = await mutant<Sel>('lib/content/auto-internal-links/select.ts', (s) => s.replace('|| isFacetUrl(url)', ''))
+  const facetBack = noFacet.autoLinkCandidates(FACET_MAP, host, islands()).map((c) => c.url)
+  check('MUTATION CONTROL: without the facet rule the 404 filter pages are candidates again (so E1 would fail)',
+    facetBack.includes(u('filter/integrali-male/')) && facetBack.includes(u('pa_color/black/')) && facetBack.length === FACET_MAP.length,
+    JSON.stringify(facetBack))
+  const noCheck = await mutant<Step>('lib/content/auto-internal-links/step.ts', (s) => s.replace('const gone = new Set(liveness.filter(([, state]) => state === \'gone\').map(([url]) => url))', 'const gone = new Set<string>()'))
+  const wNo = world()
+  console.log = () => {}
+  await noCheck.runAutoInternalLinksStep(wNo as never, { projectId: PROJECT, userId: OWNER, articleId: ART }, { ...deps, checkUrl: async () => 'gone' as const })
+  console.log = quiet
+  check('MUTATION CONTROL: without the liveness check a page that is gone is linked anyway (so E4/E5 would fail)',
+    String(wNo.tables.generated_articles[0].content_html).includes(u('okinawa/')))
+
   // ── C) storage and removal ──────────────────────────────────────────────────
   console.log('\nC) storage and removal')
   const json = [{ anchor: 'בנק', source: 'manual' }, { source: 'auto', anchor: 'אוקינאווה', url: u('okinawa/'), title: 'אוקינאווה', at: 'x' }, { source: 'auto', anchor: 'הוקאידו', url: u('hokkaido/'), title: 'הוקאידו', at: 'x' }]
@@ -324,6 +426,120 @@ async function main() {
   check('D6: the remove button respects reduced motion and has a focus ring', /motion-reduce:transition-none/.test(cardSrc) && /focus-visible:ring/.test(cardSrc))
   const mutPage = page.replace('plannedLinks.length > 0 && !autoLinked &&', 'plannedLinks.length > 0 &&')
   check('MUTATION CONTROL: the planned-link card shown again for a new article is caught (so D2 would fail)', !/plannedLinks\.length > 0 && !autoLinked &&/.test(mutPage))
+
+  // ── F) the healing pass ─────────────────────────────────────────────────────
+  console.log('\nF) the healing pass (a published article whose target died)')
+  const HNOW = new Date('2026-11-16T09:00:00Z')
+  const DEAD = u('okinawa/')
+  const ALIVE = u('tokyo/')
+  const entry = (url: string, over: Record<string, unknown> = {}) => ({ source: 'auto', anchor: url === DEAD ? 'אוקינאווה' : 'טוקיו', url, title: 't', at: '2026-10-01T00:00:00Z', ...over })
+  const healHtml = `<p>${fill(30)} <a href="${DEAD}">אוקינאווה</a> ${fill(10)}</p>\n<p>${fill(30)} <a href="${ALIVE}">טוקיו</a> ${fill(10)}</p>`
+  const hWorld = (over: { article?: Record<string, unknown>; projectOwner?: string } = {}) => new FakeAdmin({
+    projects: [{ id: PROJECT, user_id: over.projectOwner ?? OWNER, target_domain: 'travel.example.co.il' }],
+    generated_articles: [{ id: ART, project_id: PROJECT, status: 'published', wp_post_id: 123, content_html: healHtml, internal_links_json: [entry(DEAD), entry(ALIVE), { anchor: 'בנק', source: 'manual' }], updated_at: '2026-10-01T00:00:00Z', ...over.article }],
+  })
+  const dead = async (url: string) => (url === DEAD ? 'gone' as const : 'alive' as const)
+  const scope: HealScope = { projectId: PROJECT, userId: OWNER, articleId: ART }
+  const hDeps = { now: () => HNOW, env: {} as Record<string, string | undefined>, checkUrl: dead }
+  console.log = () => {}
+  const h1 = hWorld()
+  const sent1: string[] = []
+  const r1h = await healArticleLinks(h1 as never, scope, { ...hDeps, resync: async (_a, s) => { sent1.push(s.articleId); return true } })
+  const row1h = h1.tables.generated_articles[0] as { content_html: string; internal_links_json: Record<string, unknown>[] }
+  const hAlive = hWorld()
+  const rAlive = await healArticleLinks(hAlive as never, scope, { ...hDeps, checkUrl: async () => 'alive' as const, resync: async () => { throw new Error('must not send') } })
+  const hRefuse = hWorld()
+  const rRefuse = await healArticleLinks(hRefuse as never, scope, { ...hDeps, resync: async () => false })
+  const rowRefuse = hRefuse.tables.generated_articles[0] as { content_html: string; internal_links_json: Record<string, unknown>[] }
+  const hCustomer = hWorld({ article: { content_html: `<p>${fill(30)} אוקינאווה ${fill(10)}</p>`, internal_links_json: [entry(DEAD, { removed: true })] } })
+  let customerSent = 0
+  const rCustomer = await healArticleLinks(hCustomer as never, scope, { ...hDeps, checkUrl: async () => { throw new Error('nothing live to ask') }, resync: async () => { customerSent++; return true } })
+  const hDraft = hWorld({ article: { status: 'draft' } })
+  const rDraft = await healArticleLinks(hDraft as never, scope, { ...hDeps, resync: async () => { throw new Error('must not send') } })
+  const hOther = hWorld({ projectOwner: 'someone-else' })
+  const rOtherH = await healArticleLinks(hOther as never, scope, { ...hDeps, resync: async () => true })
+  const rOffH = await healArticleLinks(hWorld() as never, scope, { ...hDeps, env: { AUTO_INTERNAL_LINKS_HEAL_DISABLED: 'true' }, resync: async () => true })
+  const hThrow = new FakeAdmin({ projects: [{ id: PROJECT, user_id: OWNER }] }, { projects: { select: () => { throw new Error('boom') } } } as never)
+  const rThrow = await healArticleLinks(hThrow as never, scope, { ...hDeps, resync: async () => true })
+  const passPreview = await runLinkHeal(hWorld() as never, { deadlineAt: HNOW.getTime() + 300_000, env: { VERCEL_ENV: 'preview' }, nowMs: () => HNOW.getTime(), deps: { now: () => HNOW, checkUrl: dead, resync: async () => true } })
+  const hPass = hWorld()
+  const passProd = await runLinkHeal(hPass as never, { deadlineAt: HNOW.getTime() + 300_000, env: { VERCEL_ENV: 'production' }, nowMs: () => HNOW.getTime(), deps: { now: () => HNOW, checkUrl: dead, resync: async () => true } })
+  const passNoTime = await runLinkHeal(hWorld() as never, { deadlineAt: HNOW.getTime() + 1_000, env: { VERCEL_ENV: 'production' }, nowMs: () => HNOW.getTime(), deps: { now: () => HNOW, checkUrl: dead, resync: async () => true } })
+  console.log = quiet
+  const autoOf = (row: { internal_links_json: Record<string, unknown>[] }) => row.internal_links_json.filter((e) => e.source === 'auto')
+  check('F1: the dead page loses its <a> and its words stay; the live one keeps its link; the live post is sent again once',
+    r1h.outcome === 'healed' && r1h.removed === 1 && r1h.resynced === true
+    && !/<a href="[^"]*okinawa/.test(row1h.content_html) && row1h.content_html.includes('אוקינאווה')
+    && /<a href="[^"]*tokyo/.test(row1h.content_html) && sent1.length === 1, JSON.stringify(r1h))
+  check('F1b: the dead entry is marked removed AND synced, the live one carries the time it answered, the manual entry is untouched',
+    autoOf(row1h).find((e) => e.url === DEAD)?.removed === true && autoOf(row1h).find((e) => e.url === DEAD)?.synced === true
+    && autoOf(row1h).find((e) => e.url === ALIVE)?.removed === undefined && autoOf(row1h).find((e) => e.url === ALIVE)?.checkedAt === HNOW.toISOString()
+    && row1h.internal_links_json.some((e) => e.source === 'manual'), JSON.stringify(row1h.internal_links_json))
+  check('F2: every target answers: nothing is removed and the site is NOT touched',
+    rAlive.outcome === 'clean' && /<a href="[^"]*okinawa/.test(String(hAlive.tables.generated_articles[0].content_html)), JSON.stringify(rAlive))
+  check('F3: a site that refuses the update: our copy is clean, the entry is NOT marked synced, so a later pass tries again',
+    rRefuse.outcome === 'healed' && rRefuse.resynced === false && !/<a href="[^"]*okinawa/.test(rowRefuse.content_html)
+    && autoOf(rowRefuse).find((e) => e.url === DEAD)?.removed === true && autoOf(rowRefuse).find((e) => e.url === DEAD)?.synced === undefined, JSON.stringify(rRefuse))
+  check('F4: a link the CUSTOMER removed is sent to the site (what the remove button could never do), with nothing left to ask',
+    rCustomer.outcome === 'resynced' && customerSent === 1
+    && autoOf(hCustomer.tables.generated_articles[0] as never).every((e) => e.synced === true), JSON.stringify(rCustomer))
+  check('F5: a draft is never healed or sent (published articles only)', rDraft.outcome === 'skipped' && rDraft.reason === 'not_published')
+  check('F6: another owner\'s article is never read, changed or sent', rOtherH.outcome === 'skipped' && rOtherH.reason === 'not_found' && /<a href="[^"]*okinawa/.test(String(hOther.tables.generated_articles[0].content_html)))
+  check('F7: kill switch AUTO_INTERNAL_LINKS_HEAL_DISABLED=true, for the article and for the pass', rOffH.outcome === 'skipped' && rOffH.reason === 'disabled')
+  check('F8: a failing read never throws out of the pass', rThrow.outcome === 'skipped' && rThrow.reason === 'error')
+  check('F9: the pass acts in Production only, and does nothing when the run has no window left',
+    passPreview === null && passNoTime === null && passProd?.healed === 1 && passProd?.resynced === 1, JSON.stringify(passProd))
+  // Pure ordering: an unsynced removal first, then the longest-unchecked, and
+  // only past the re-check window.
+  const owners = new Map([[PROJECT, OWNER]])
+  const rows = [
+    { id: 'a-fresh', project_id: PROJECT, internal_links_json: [entry(ALIVE, { checkedAt: new Date(HNOW.getTime() - 3600_000).toISOString() })] },
+    { id: 'a-old', project_id: PROJECT, internal_links_json: [entry(ALIVE, { checkedAt: new Date(HNOW.getTime() - HEAL_RECHECK_AFTER_MS - 1000).toISOString() })] },
+    { id: 'a-never', project_id: PROJECT, internal_links_json: [entry(ALIVE)] },
+    { id: 'a-unsynced', project_id: PROJECT, internal_links_json: [entry(DEAD, { removed: true })] },
+    { id: 'a-none', project_id: PROJECT, internal_links_json: [{ anchor: 'x', source: 'manual' }] },
+    { id: 'a-foreign', project_id: 'p-other', internal_links_json: [entry(ALIVE)] },
+  ]
+  const picked = pickArticlesToHeal(rows, owners, HNOW.getTime()).map((c) => c.scope.articleId)
+  check('F10: the order is: a removal the site does not have yet, then never-asked, then asked longest ago; a fresh one, one with no automatic links and another project are left out',
+    JSON.stringify(picked) === JSON.stringify(['a-unsynced', 'a-never', 'a-old']), JSON.stringify(picked))
+  check('F11: the entry marks are pure and additive',
+    linksNeedSync([entry(DEAD, { removed: true })]) && !linksNeedSync([entry(DEAD, { removed: true, synced: true })]) && !linksNeedSync([entry(ALIVE)])
+    && oldestLinkCheck([entry(ALIVE)]) === 0 && oldestLinkCheck([entry(DEAD, { removed: true })]) === Number.POSITIVE_INFINITY
+    && (markLinksChecked([entry(DEAD), entry(ALIVE)], [DEAD], HNOW.toISOString())[0] as Record<string, unknown>).removed === true
+    && (markLinksChecked([entry(DEAD), entry(ALIVE)], [DEAD], HNOW.toISOString())[0] as Record<string, unknown>).synced === undefined
+    && (markLinksSynced([entry(DEAD, { removed: true })])[0] as Record<string, unknown>).synced === true
+    && (markLinksSynced([entry(ALIVE)])[0] as Record<string, unknown>).synced === undefined)
+  console.log = () => {}
+  const hPlanned = hWorld({ article: { internal_links_json: [{ source: 'planned', url: DEAD, anchor: 'אוקינאווה' }, { anchor: 'בנק', source: 'manual' }] } })
+  const askedPlanned: string[] = []
+  const rPlanned = await healArticleLinks(hPlanned as never, scope, { ...hDeps, checkUrl: async (url) => { askedPlanned.push(url); return dead(url) }, resync: async () => true })
+  const rowPlanned = hPlanned.tables.generated_articles[0] as { content_html: string; internal_links_json: Record<string, unknown>[] }
+  console.log = quiet
+  check('F14: a dead link an approved PLAN placed is healed too (4dogsoriginal\'s was), and the inbound anchor bank is never asked about',
+    rPlanned.outcome === 'healed' && rPlanned.removed === 1 && !/<a href="[^"]*okinawa/.test(rowPlanned.content_html) && rowPlanned.content_html.includes('אוקינאווה')
+    && askedPlanned.length === 1 && askedPlanned[0] === DEAD
+    && rowPlanned.internal_links_json.find((e) => e.source === 'planned')?.removed === true
+    && rowPlanned.internal_links_json.find((e) => e.source === 'manual')?.checkedAt === undefined, JSON.stringify(rPlanned))
+  const healSrc = strip(read('lib/content/auto-internal-links/resync.ts'))
+  check('F12: the resync only ever updates the article\'s OWN existing post, as published, through the one publisher path: no new post, no draft, no schedule, no author',
+    /existing/.test(healSrc) && /status: 'publish'/.test(healSrc) && !/forceNew/.test(healSrc) && !/scheduleAt/.test(healSrc) && !/authorId/.test(healSrc)
+    && /\.eq\('status', 'published'\)/.test(healSrc) && /ownerId: scope\.userId/.test(healSrc))
+  const cronSrc = strip(read('app/api/content/automation/cron/route.ts'))
+  check('F13: the pass rides the automation cron, isolated, with the live resync bound in',
+    /startIsolatedLinkHeal\(/.test(cronSrc) && /resync: resyncPublishedArticle/.test(cronSrc))
+  console.log = () => {}
+  const mutHeal = await mutant<typeof import('../heal')>('lib/content/auto-internal-links/heal.ts', (src) =>
+    src.replace('for (const url of gone) html = removeLink(html, url) ?? html', 'void gone'))
+  const hMut = hWorld()
+  const rMut = await mutHeal.healArticleLinks(hMut as never, scope, { ...hDeps, resync: async () => true })
+  const mutEntries = await mutant<typeof import('../entries')>('lib/content/auto-internal-links/entries.ts', (src) =>
+    src.replace('return dead.has(e.url) ? { ...e, removed: true, checkedAt: at } : { ...e, checkedAt: at }', 'return { ...e, checkedAt: at }'))
+  console.log = quiet
+  check('MUTATION CONTROL: a pass that marks the link dead but leaves the <a> in the body is caught (so F1 would fail)',
+    rMut.outcome === 'healed' && /<a href="[^"]*okinawa/.test(String(hMut.tables.generated_articles[0].content_html)))
+  check('MUTATION CONTROL: a dead target left unmarked is caught (so F1b would fail)',
+    (mutEntries.markLinksChecked([entry(DEAD)], [DEAD], HNOW.toISOString())[0] as Record<string, unknown>).removed === undefined)
 
   console.log(`\n${passed} passed, ${failed} failed`)
   if (failed) process.exit(1)

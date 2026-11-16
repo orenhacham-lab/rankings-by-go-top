@@ -64,7 +64,7 @@ export type LandingCopy = {
    * things: we measure visibility in the engines, and we publish to the site
    * platforms. One label over all ten names read as "we publish to Grok".
    */
-  worksWith: { checkLabel: string; checkNames: string[]; publishLabel: string; publishNames: string[] }
+  worksWith: { checkLabel: string; checkNames: string[]; publishLabel: string; publishNames: string[]; trademarks: string }
   outcomes: {
     eyebrow: string
     title: string
@@ -196,6 +196,12 @@ export function LandingPage({
           <div className={cn(CONTAINER, 'flex flex-col items-center gap-5 py-10 sm:gap-6')}>
             <WorksWithRow label={copy.worksWith.checkLabel} names={copy.worksWith.checkNames} />
             <WorksWithRow label={copy.worksWith.publishLabel} names={copy.worksWith.publishNames} />
+            {/* Showing someone else's mark is using it. That is allowed as
+                description, and stops being allowed the moment it reads as a
+                tie-up, so the page says which one it is. */}
+            <p className="mx-auto max-w-2xl text-center text-caption text-muted" data-workswith-trademarks>
+              {copy.worksWith.trademarks}
+            </p>
           </div>
         </div>
 

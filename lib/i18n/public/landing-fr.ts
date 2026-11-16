@@ -109,6 +109,7 @@ export const landingFr: LandingCopy = {
     checkNames: ['Google', 'Google Maps', 'ChatGPT', 'Gemini', 'Perplexity', 'Copilot', 'Grok'],
     publishLabel: 'Nous publions directement sur :',
     publishNames: ['WordPress', 'Shopify', 'Wix'],
+    trademarks: 'Les noms et logos de tiers sont les marques de leurs propriétaires. Ils figurent ici pour décrire ce que le système vérifie et où il publie, sans impliquer de partenariat ni de parrainage.',
   },
   outcomes: {
     eyebrow: 'Ce que vous obtenez',
