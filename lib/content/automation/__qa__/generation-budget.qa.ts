@@ -166,8 +166,25 @@ async function main() {
       await quiet(() => runAutomation(admin as unknown as Admin, { generate: g.fn, platform: connected, nowMs: firstRunFor(1) }))
       check(`fewer than ${PAUSED_BACKLOG_HOLD} paused items still writes`, g.wrote[0] === 'c-one', g.wrote)
     }
+    {
+      // THE HOLD MUST NOT BE A DEAD END. Retrying one blocked article by hand (the queue
+      // screen sets it back to 'queued', keeping its article) must still go through: that
+      // item costs no model call, and it is the only way the real refusal gets re-asked.
+      const retried = {
+        id: 'retry-1', pool_id: 'd-retry', project_id: 'project-d-retry', topic_id: 't-retry',
+        status: 'queued', article_id: 'article-already-written', attempts: 0, position: 1, locked_at: null, last_error: null,
+      }
+      const admin = new FakeAdmin({
+        article_pools: [pool('d-retry')],
+        article_pool_items: [retried, ...paused('d-retry', PAUSED_BACKLOG_HOLD + 5)],
+      })
+      const g = fakeGenerate(new Set())
+      const r = await quiet(() => runAutomation(admin as unknown as Admin, { generate: g.fn, platform: connected, nowMs: firstRunFor(1) }))
+      check('a by-hand retry of an already-written article is NOT held by the backlog', g.calls.includes('retry-1'), [g.calls, r.diagnostics.map((d) => d.note)])
+    }
     // MUTATION CONTROL, run by hand: deleting the `if (q && stuck)` branch in runner.ts fails
-    // the first three checks above (the stuck pool is written and takes the slot).
+    // the first three checks above (the stuck pool is written and takes the slot); dropping
+    // `&& !q.hasArticle` fails the by-hand retry check.
   }
 
   console.log('6) the daily stall check')

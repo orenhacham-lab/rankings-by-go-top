@@ -151,16 +151,23 @@ async function countItems(admin: Admin, poolId: string, status: string): Promise
   return count ?? 0
 }
 
-interface PickedItem { id: string; topicId: string | null; topicTitle: string | null }
+/**
+ * `hasArticle` decides whether picking this item would SPEND a model call.
+ * generatePoolItem reconciles an item that already has one ('already_generated')
+ * without calling the writer, so the paused-backlog hold must let it through:
+ * that item is exactly how a person retries a blocked article from the queue
+ * screen, and holding it would turn the hold into a dead end.
+ */
+interface PickedItem { id: string; topicId: string | null; topicTitle: string | null; hasArticle: boolean }
 
-async function withTitle(admin: Admin, row: { id: string; topic_id: string | null } | null): Promise<PickedItem | null> {
+async function withTitle(admin: Admin, row: { id: string; topic_id: string | null; article_id?: string | null } | null): Promise<PickedItem | null> {
   if (!row) return null
   let topicTitle: string | null = null
   if (row.topic_id) {
     const { data: t } = await admin.from('article_topics').select('topic').eq('id', row.topic_id).maybeSingle()
     topicTitle = (t as { topic?: string } | null)?.topic ?? null
   }
-  return { id: row.id, topicId: row.topic_id, topicTitle }
+  return { id: row.id, topicId: row.topic_id, topicTitle, hasArticle: !!row.article_id }
 }
 
 /** Earliest item eligible for GENERATION: a fresh 'queued', or a failed
@@ -174,8 +181,11 @@ async function pickForGenerate(admin: Admin, poolId: string): Promise<PickedItem
     .order('position', { ascending: true })
     .limit(20)
   const rows = (data ?? []) as { id: string; topic_id: string | null; status: string; article_id: string | null; attempts: number }[]
-  const row = rows.find((r) => r.status === 'queued' || (!r.article_id && (r.attempts ?? 0) < AUTOMATION_MAX_ATTEMPTS))
-  return withTitle(admin, row ? { id: row.id, topic_id: row.topic_id } : null)
+  const eligible = (r: typeof rows[number]) => r.status === 'queued' || (!r.article_id && (r.attempts ?? 0) < AUTOMATION_MAX_ATTEMPTS)
+  // An item that already HAS its article is reconciled without the writer, so it
+  // comes first: free, and it is the item a person just retried by hand.
+  const row = rows.find((r) => eligible(r) && !!r.article_id) ?? rows.find(eligible)
+  return withTitle(admin, row ? { id: row.id, topic_id: row.topic_id, article_id: row.article_id } : null)
 }
 
 /** Earliest item eligible for PUBLISH: a 'generated' item, or a failed publish
@@ -308,7 +318,9 @@ export async function runAutomation(admin: Admin, opts: { projectId?: string; dr
           // run's one generation. Nothing is written until a platform is connected.
           const blocked = q ? await publishBlocker(admin, pool.project_id) : null
           // The same waste with the site connected and refusing: see pausedBacklog.
-          const stuck = q && !blocked ? await pausedBacklog(admin, pool.id) : null
+          // An item that already HAS its article costs no model call, and it is how a
+          // person retries a blocked one, so the backlog never holds it.
+          const stuck = q && !blocked && !q.hasArticle ? await pausedBacklog(admin, pool.id) : null
           if (q && stuck) {
             diag.note = 'held_paused_backlog'
             diag.error = stuck
