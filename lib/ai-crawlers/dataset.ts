@@ -99,6 +99,9 @@ const GOOGLE_DOCS = 'https://developers.google.com/crawling/docs/crawlers-fetche
 const PERPLEXITY_DOCS = 'https://docs.perplexity.ai/docs/resources/perplexity-crawlers'
 const APPLE_DOCS = 'https://support.apple.com/en-us/119829'
 const META_DOCS = 'https://developers.facebook.com/documentation/sharing/webmasters/web-crawlers'
+const MISTRAL_DOCS = 'https://docs.mistral.ai/robots/'
+const DUCKDUCKGO_DOCS = 'https://duckduckgo.com/duckduckgo-help-pages/results/duckassistbot/'
+const KAGI_DOCS = 'https://kagi.com/bot'
 
 /** Every row read on this date, from the `docs` page named on the row. */
 // 04.11.2026: the Google, Perplexity and Meta pages had all been moved and
@@ -115,6 +118,16 @@ const READ_ON = '2026-11-01'
 // rows that carry this date. The facts on the older rows were not re-read, so
 // those rows keep the date they were read on, which is what `verified` is for.
 const READ_ON_AGENTIC = '2026-11-11'
+// 16.11.2026: three operators that this dataset had never read were read for
+// the first time, after comparing our token list with the public
+// ai-robots-txt/ai.robots.txt list and chasing only the names whose OWN
+// operator publishes a page. Mistral now documents all three of its tokens at
+// docs.mistral.ai/robots, which is why MistralAI-User moves out of the
+// candidates and arrives here with its two siblings. Brave was chased and
+// produced nothing to add: its help page states that the Brave Search crawler
+// deliberately sends no differentiated user agent, so there is no token to
+// document, and `Bravebot` elsewhere rests on no operator page.
+const READ_ON_NOV16 = '2026-11-16'
 
 export const AI_CRAWLER_DATASET: readonly DatasetCrawler[] = [
   // ── OpenAI ────────────────────────────────────────────────────────────────
@@ -297,6 +310,31 @@ export const AI_CRAWLER_DATASET: readonly DatasetCrawler[] = [
   },
   { token: 'AI2Bot', operator: 'Allen Institute for AI', purpose: 'train', crawls: true, respectsRobots: true, docs: 'https://allenai.org/crawler', verified: READ_ON },
   { token: 'Diffbot', operator: 'Diffbot', purpose: 'train', crawls: true, respectsRobots: true, docs: 'https://www.diffbot.com/support/diffbot-crawler/', verified: READ_ON },
+
+  // ── Mistral ───────────────────────────────────────────────────────────────
+  // All three are named on one operator page, and the page draws the same
+  // distinction this dataset exists to carry: Index builds the search index,
+  // Training builds a corpus, and User is the fetch made while a person waits
+  // for an answer that links back to the source.
+  { token: 'MistralAI-Index', operator: 'Mistral AI', purpose: 'search', crawls: true, respectsRobots: true, docs: MISTRAL_DOCS, verified: READ_ON_NOV16 },
+  { token: 'MistralAI-Training', operator: 'Mistral AI', purpose: 'train', crawls: true, respectsRobots: true, docs: MISTRAL_DOCS, verified: READ_ON_NOV16 },
+  { token: 'MistralAI-User', operator: 'Mistral AI', purpose: 'answer', crawls: true, respectsRobots: true, docs: MISTRAL_DOCS, verified: READ_ON_NOV16 },
+
+  // ── DuckDuckGo ────────────────────────────────────────────────────────────
+  // The operator page is unusually explicit on both counts a reader needs: the
+  // fetch is made in real time for an answer that cites its sources, the data
+  // is not used to train a model, and an opt-out written into robots.txt takes
+  // effect within 72 hours. It also states that disallowing it does not affect
+  // ordinary search rankings, which is the fear that makes people leave an
+  // answer crawler blocked by accident.
+  { token: 'DuckAssistBot', operator: 'DuckDuckGo', purpose: 'answer', crawls: true, respectsRobots: true, docs: DUCKDUCKGO_DOCS, verified: READ_ON_NOV16 },
+
+  // ── Kagi ──────────────────────────────────────────────────────────────────
+  // Kagi documents one behaviour no other operator here does: with no group
+  // naming Kagibot, it follows the Googlebot group instead of the `*` group.
+  // So a site that disallows `*` and allows Googlebot is allowing Kagibot too,
+  // which is the opposite of what RFC 9309 alone would predict.
+  { token: 'Kagibot', operator: 'Kagi', purpose: 'search', crawls: true, respectsRobots: true, docs: KAGI_DOCS, verified: READ_ON_NOV16 },
 ] as const
 
 /**
@@ -320,12 +358,6 @@ export const AI_CRAWLER_CANDIDATES: readonly DatasetCandidate[] = [
     whyHere: 'Seen in logs and in other lists; no current operator page naming the token was found on 2026-11-01.',
   },
   {
-    token: 'MistralAI-User',
-    operator: 'Mistral AI',
-    purpose: 'answer',
-    whyHere: "Used by Le Chat's web connector; no operator page naming the token was found on 2026-11-01.",
-  },
-  {
     token: 'Timpibot',
     operator: 'Timpi',
     purpose: 'train',
@@ -340,7 +372,7 @@ export const AI_CRAWLER_CANDIDATES: readonly DatasetCandidate[] = [
 ] as const
 
 /** Bumped whenever a row changes, so a consumer can cache on it. */
-export const AI_CRAWLER_DATASET_VERSION = '2026.11.11'
+export const AI_CRAWLER_DATASET_VERSION = '2026.11.16'
 
 export const AI_CRAWLER_DATASET_LICENSE = {
   id: 'CC-BY-4.0',

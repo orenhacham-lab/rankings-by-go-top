@@ -20,7 +20,7 @@
  */
 import { readFileSync } from 'fs'
 import { tokens } from '@/lib/content/recommendations/dedupe'
-import { heStem, researchKeywordIssue } from '@/lib/content/recommendations/keyword-research'
+import { heStemForms, researchKeywordIssue } from '@/lib/content/recommendations/keyword-research'
 
 let pass = 0, fail = 0
 function check(name: string, cond: boolean, detail?: string) {
@@ -32,8 +32,9 @@ function vocabularyOf(sources: readonly string[]): Set<string> {
   for (const t of sources) for (const tk of tokens(t)) {
     vocab.add(tk)
     if (tk.length >= 4 && /^[בלמהושכ]/.test(tk)) vocab.add(tk.slice(1))
-    const stem = heStem(tk)
-    if (stem && stem !== tk) vocab.add(stem)
+    for (const form of tk.length >= 4 && /^[בלמהושכ]/.test(tk) ? [tk, tk.slice(1)] : [tk]) {
+      for (const stem of heStemForms(form)) if (stem && stem !== tk) vocab.add(stem)
+    }
   }
   return vocab
 }

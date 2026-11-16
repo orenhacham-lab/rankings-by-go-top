@@ -25,7 +25,7 @@ import { RunCostController, newRunCostController } from './run-cost-controller'
 import { orderSourcesByEvidence, stage1Sources } from './hybrid-orchestration'
 import { recommendationGuidance, structuredOutputContract, pendingTopicsBlock, projectContextBlock, deriveProjectFocus, type PendingTopic } from './prompt-guidance'
 import { validateIdea } from './validate'
-import { recommendFromKeywordResearch, topicQualityIssue, researchKeywordIssue, heStem, MIN_SITE_VOCAB_TOKENS } from './keyword-research'
+import { recommendFromKeywordResearch, topicQualityIssue, researchKeywordIssue, heStemForms, MIN_SITE_VOCAB_TOKENS } from './keyword-research'
 import { recommendFromSiteScan } from './site-scan'
 import { mergeHybrid, hybridProvenanceReason } from './hybrid'
 import { slugFromUrl } from '@/lib/content/internal-links'
@@ -101,8 +101,16 @@ export async function buildSiteVocabulary(admin: Admin, projectId: string, extra
       // 18 October 2026 — the stem too (heStem), so a keyword that spells or
       // inflects the same word differently ("מזרון" where the site writes
       // "מזרן", "גדולים" where it writes "גדול") still counts as the site's own.
-      const stem = heStem(tk)
-      if (stem && stem !== tk) vocab.add(stem)
+      // 16 November 2026 — and the construct base's stem (heStemForms), so the
+      // site's own "עבודות אינסטלציה" also answers for "עבודת אינסטלציה".
+      // 16 November 2026 — and the STRIPPED variant's stems too. The stems were
+      // taken from the unstripped token only, so a site that writes "לפתוח"
+      // stored 'לפתח' and never 'פתח', and its own "פתיחת אתר" stayed unreadable.
+      // tokenInVocab strips the prefix on the keyword's side; this is the same
+      // step on the site's. Additive, like every other form here.
+      for (const form of tk.length >= 4 && /^[בלמהושכ]/.test(tk) ? [tk, tk.slice(1)] : [tk]) {
+        for (const stem of heStemForms(form)) if (stem && stem !== tk) vocab.add(stem)
+      }
     }
   }
   try {
