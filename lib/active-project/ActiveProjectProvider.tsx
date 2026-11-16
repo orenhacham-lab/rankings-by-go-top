@@ -26,6 +26,7 @@ import {
   activeProjectStorageKey, resolveActiveProject, isValidActiveId, readUrlProjectId,
   activeIdFromStorageEvent, type ActiveProjectLite,
 } from './resolve'
+import { activeProjectCookieWrite } from './active-cookie'
 
 interface ActiveProjectContextValue {
   activeProjectId: string | null
@@ -198,6 +199,22 @@ export function ActiveProjectProvider({ userId, initialProjects, children }: { u
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [projects, isResolved])
+
+  // ── Mirror the resolved project into a cookie, for the SERVER to read. ──
+  //
+  // A server render cannot see localStorage, so a layout preparing anything for
+  // the project on screen (the Search Console status it hands the widgets) has
+  // to be told which one that is. This writes the answer the client just
+  // resolved — whatever won: a deep link, the saved id, or the fallback — so the
+  // NEXT render in this browser prepares for the right project.
+  //
+  // Only once the list is resolved and loaded: before that the id is null, and
+  // clearing a good cookie on every mount (or because a list read failed) would
+  // make the seed miss on exactly the loads it is meant to help.
+  useEffect(() => {
+    if (!isResolved || projectsError) return
+    try { document.cookie = activeProjectCookieWrite(activeProjectId) } catch { /* ignore */ }
+  }, [isResolved, projectsError, activeProjectId])
 
   const setActiveProject = useCallback((id: string) => {
     if (!isValidActiveId(id, projectsRef.current)) return

@@ -12,16 +12,26 @@
  */
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useActiveProject } from '@/lib/active-project/ActiveProjectProvider'
-import { gscStatusUrl, gscMetricsUrl, type GscMetricsView } from '@/lib/gsc/urls'
+import { gscStatusUrl, gscMetricsUrl, takeGscSeed, type GscMetricsView, type GscResponse } from '@/lib/gsc/urls'
 import { gscStatusView, type GscSetupState, type GscStatusView } from '@/lib/gsc/widget-state'
 import { useGscEnabled } from './GscFeature'
-
-export interface GscResponse { status: number; body: unknown }
 
 const SHARE_MS = 10_000
 const shared = new Map<string, { at: number; promise: Promise<GscResponse>; value?: GscResponse }>()
 
+/** A server-rendered answer waiting on `globalThis` becomes an ordinary entry the
+ *  first time this screen touches its URL, so the read that would have started a
+ *  request is served from it. Taken once: a `fresh` read still asks the route. */
+function adoptSeed(url: string): void {
+  if (shared.has(url)) return
+  const seed = takeGscSeed(url)
+  if (!seed) return
+  const value: GscResponse = { status: seed.status, body: seed.body }
+  shared.set(url, { at: Date.now(), promise: Promise.resolve(value), value })
+}
+
 function request(url: string, fresh: boolean): Promise<GscResponse> {
+  adoptSeed(url)
   const hit = shared.get(url)
   if (!fresh && hit && Date.now() - hit.at < SHARE_MS) return hit.promise
   const entry: { at: number; promise: Promise<GscResponse>; value?: GscResponse } = { at: Date.now(), promise: Promise.resolve({ status: 0, body: null }) }
@@ -47,6 +57,7 @@ export function peekGscResponse(url: string | null): GscResponse | undefined {
 
 function peek(url: string | null): GscResponse | undefined {
   if (!url) return undefined
+  adoptSeed(url)
   const hit = shared.get(url)
   return hit && Date.now() - hit.at < SHARE_MS ? hit.value : undefined
 }
@@ -59,7 +70,7 @@ export function primeGscResponse(url: string, response: GscResponse): void {
 
 /** Re-exported from lib/gsc/urls.ts, which the SERVER can call too (the layout
  *  seeds the status answer keyed by this very URL), so there is one spelling. */
-export { gscStatusUrl, gscMetricsUrl, type GscMetricsView }
+export { gscStatusUrl, gscMetricsUrl, type GscMetricsView, type GscResponse }
 
 /** One GET, shared by URL. `reload` asks again, past the sharing window. */
 export function useGscResponse(url: string | null): { response: GscResponse | null; reload: () => void } {
