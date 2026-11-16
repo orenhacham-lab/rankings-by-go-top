@@ -226,7 +226,7 @@ export const ptBR = {
     body: 'Usamos os cookies de que o site precisa para funcionar. Os de medição e de marketing só carregam depois que você aceitar. Mais detalhes na nossa',
     short: 'Só carregamos cookies opcionais se você aceitar. Veja a',
     privacy: 'Política de privacidade',
-    accept: 'Aceitar medição',
+    accept: 'Aceitar',
     marketingStep: 'Os cookies de marketing exigem um passo a mais, nas configurações de cookies, porque enviam dados para os Estados Unidos.',
     rejectAll: 'Rejeitar todos',
     customize: 'Personalizar',

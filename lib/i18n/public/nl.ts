@@ -247,7 +247,7 @@ export const nl = {
     body: 'Wij gebruiken de cookies die nodig zijn om de website te laten werken. Cookies voor meting en marketing worden pas na uw toestemming geladen. Meer daarover in onze',
     short: 'Optionele cookies worden alleen met uw toestemming geladen. Zie onze',
     privacy: 'privacyverklaring',
-    accept: 'Meting aanvaarden',
+    accept: 'Aanvaarden',
     marketingStep: 'Cookies voor marketing vragen één stap meer, in de cookie-instellingen, omdat ze gegevens naar de Verenigde Staten sturen.',
     rejectAll: 'Alles weigeren',
     customize: 'Zelf instellen',

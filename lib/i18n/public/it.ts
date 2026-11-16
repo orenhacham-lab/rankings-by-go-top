@@ -233,7 +233,7 @@ export const it = {
     body: 'Usiamo i cookie necessari al funzionamento del sito. I cookie di misurazione e di marketing non vengono caricati prima del consenso. Maggiori dettagli nella nostra',
     short: 'I cookie facoltativi vengono caricati solo con il consenso. Si veda la nostra',
     privacy: 'Informativa sulla privacy',
-    accept: 'Accetta la misurazione',
+    accept: 'Accetta',
     marketingStep: 'I cookie di marketing richiedono un passaggio in più, nelle impostazioni dei cookie, perché inviano dati negli Stati Uniti.',
     rejectAll: 'Rifiutare tutto',
     customize: 'Personalizzare',

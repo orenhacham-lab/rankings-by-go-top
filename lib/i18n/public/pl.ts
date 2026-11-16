@@ -257,7 +257,7 @@ export const pl = {
     body: 'Używamy plików cookie niezbędnych do działania witryny. Pliki cookie do pomiaru i do marketingu wczytują się dopiero po Państwa zgodzie. Więcej na ten temat w naszej',
     short: 'Opcjonalne pliki cookie wczytują się wyłącznie za Państwa zgodą. Zobacz naszą',
     privacy: 'polityce prywatności',
-    accept: 'Zgoda na pomiar',
+    accept: 'Zgoda',
     marketingStep: 'Pliki cookie marketingowe wymagają jeszcze jednego kroku, w ustawieniach plików cookie, ponieważ przesyłają dane do Stanów Zjednoczonych.',
     rejectAll: 'Odrzuć wszystkie',
     customize: 'Ustaw samodzielnie',

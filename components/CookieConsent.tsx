@@ -68,7 +68,9 @@ import { ConsentPreferences } from '@/components/consent/ConsentPreferences'
  *
  * The TYPE is shared by every decision, so no decision can be set in smaller
  * print than another — a reject in small type is the pattern regulators have
- * fined for, and nothing here may differ in it.
+ * fined for, and nothing here may differ in it. The owner asked for a bigger
+ * label on 16 Nov 2026; it went up one step for ALL THREE (caption on a phone,
+ * lead elsewhere) rather than for Accept alone, which is the same rule.
  *
  * The BOX is emphasis, and accept is allowed 4px more of it (the owner's call,
  * 16 Nov 2026). Four pixels is ordinary visual hierarchy, not a cheaper press:
@@ -83,8 +85,8 @@ import { ConsentPreferences } from '@/components/consent/ConsentPreferences'
  * peer. 2.5px of side padding instead of 8px gives a 105px button about 14 more
  * characters of room before it needs that second line at all.
  */
-const COMPACT_TYPE = 'px-1.5 text-overline leading-[1.15]'
-const FULL_TYPE = 'px-2 text-copy leading-tight'
+const COMPACT_TYPE = 'px-1.5 text-caption leading-[1.15]'
+const FULL_TYPE = 'px-2 text-lead leading-tight'
 const COMPACT_BOX = 'min-h-[26px] py-[3px]'
 const FULL_BOX = 'min-h-9 py-1'
 const COMPACT_BOX_ACCEPT = 'min-h-[30px] py-[5px]'

@@ -238,7 +238,7 @@ export const de = {
     body: 'Wir verwenden die Cookies, die für den Betrieb der Website nötig sind. Cookies für Messung und Marketing werden erst nach Ihrer Einwilligung geladen. Mehr dazu in unserer',
     short: 'Optionale Cookies werden nur mit Ihrer Einwilligung geladen. Siehe unsere',
     privacy: 'Datenschutzerklärung',
-    accept: 'Messung annehmen',
+    accept: 'Annehmen',
     marketingStep: 'Marketing-Cookies brauchen einen Schritt mehr, in den Cookie-Einstellungen, weil sie Daten in die Vereinigten Staaten senden.',
     rejectAll: 'Alle ablehnen',
     customize: 'Anpassen',
