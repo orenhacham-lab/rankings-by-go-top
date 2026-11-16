@@ -99,11 +99,51 @@ const GUARANTEE_NOUNS = '(?:rankings?|positions?|results|posici[óo]n|resultados
 const GUARANTEE = new RegExp(
   // Hebrew, where the promise is one word or a verb with its object.
   'מובטח|מבטיח(?:ים|ה)?\\s+(?:מקום|דירוג|עלייה)'
-  // Every other language: the verb, then at most two words, then the noun.
-  + `|${GUARANTEE_VERBS}\\s+(?:\\S+\\s+){0,2}${GUARANTEE_NOUNS}`
+  // Every other language: the verb, then at most three words, then the noun.
+  // Three, not two: "guarantee you the first position" and "garantimos a você a
+  // primeira posição" put an indirect object before the article and the
+  // ordinal, and a two-word gap walks straight past the promise.
+  + `|${GUARANTEE_VERBS}\\s+(?:\\S+\\s+){0,3}${GUARANTEE_NOUNS}`
   // Japanese puts the promise last: "検索順位を保証します".
   + '|(?:順位|掲載|上位)[^。]{0,6}保証',
   'i')
+/** The same pattern, global, so every promise in a sentence can be judged on its own. */
+const GUARANTEE_G = new RegExp(GUARANTEE.source, 'gi')
+
+/**
+ * DENYING A PROMISE IS NOT MAKING ONE.
+ *
+ * The pattern above asks only whether the words of a promise appear, so until
+ * 16 November 2026 it refused the sentence that says the opposite — "no agency
+ * can guarantee rankings", "Żadna agencja nie da gwarancji pozycji",
+ * "אף אחד לא יכול להבטיח מקום ראשון". Measured that day: the Polish blog queue
+ * was the only one of eleven locales that published nothing, after five
+ * attempts refused on `truth:ranking_guarantee` inside the morning window. Every
+ * Polish topic in the plan is a `pozycjonowanie` keyword — ranking work — and
+ * an honest article on ranking work almost has to say that rankings cannot be
+ * promised. The guard was therefore refusing the very sentence it exists to
+ * get written.
+ *
+ * So a match is ignored when a negation sits beside it IN ITS OWN SENTENCE: up
+ * to 40 characters before (every language that negates ahead of the verb) or 14
+ * after (Japanese, which negates the verb's ending: 保証しません). Sentence-bounded
+ * and per-match, so "no agency guarantees rankings. We guarantee first place."
+ * still fails on its second sentence, and "we don't just guarantee rankings, we
+ * guarantee results" still fails on its second claim.
+ */
+const NEGATION_BEFORE = /\b(?:no|not|never|cannot|can'?t|without|nobody|no\s+one|nor|nunca|sin|nadie|ning[úu]n(?:a|o)?|n[ãa]o|sem|ningu[ée]m|nenhum(?:a)?|ne|pas|jamais|sans|personne|aucun(?:e)?|non|mai|senza|nessun(?:a|o)?|kein(?:e|en|er|em)?|nicht|nie|ohne|niemand|geen|niet|nooit|zonder|nigdy|bez|[żz]ad(?:na|en|nej|nego)|nikt)\b|\bnie\b|לא|אין|אף|בלי|ללא/i
+const NEGATION_AFTER = /(?:しま?せん|できません|されません|ない|なし)/
+
+/** True when this sentence PROMISES a ranking, rather than denying that one can be promised. */
+function promisesRanking(sentence: string): boolean {
+  GUARANTEE_G.lastIndex = 0
+  for (let m = GUARANTEE_G.exec(sentence); m; m = GUARANTEE_G.exec(sentence)) {
+    const before = sentence.slice(Math.max(0, m.index - 40), m.index)
+    const after = sentence.slice(m.index + m[0].length, m.index + m[0].length + 14)
+    if (!NEGATION_BEFORE.test(before) && !NEGATION_AFTER.test(after)) return true
+  }
+  return false
+}
 const SCHEMA_WORD = /schema|json-?ld|סכימה|נתונים מובנים|datos estructurados|dados estruturados|donn[ée]es structur[ée]es|dati strutturati|strukturierte\w*\s+Daten|gestructureerde\s+(?:data|gegevens)|dane\s+strukturalne|構造化データ/i
 const SHOPIFY = /shopify/i
 
@@ -124,7 +164,7 @@ export function checkTruthLimits(input: TruthLimitInput): TruthLimitResult {
   if (COUNT_AFTER.test(all) || COUNT_BEFORE.test(all)) failures.push('customer_count_claim')
   if (CADENCE.test(all)) failures.push('tracking_cadence_claim')
   if (RATING.test(all)) failures.push('rating_claim')
-  if (GUARANTEE.test(all)) failures.push('ranking_guarantee')
+  if (sentences(all).some(promisesRanking)) failures.push('ranking_guarantee')
 
   for (const sentence of sentences(all)) {
     if (OTHER_ENGINES.test(sentence) && AUTOMATIC.test(sentence)) {
