@@ -80,11 +80,13 @@ function main() {
     /getServer(?:Public)?Locale\(user\.user_metadata\?\.locale/.test(layout))
   // The root document's seed read moved into the request-cached context module so
   // <html> and the page <title> resolve ONCE and cannot disagree. Same seed, same
-  // resolver — asserted where it now lives.
+  // resolver — asserted where it now lives. The seed is read from the token's own
+  // claims there, so a public page view costs no Auth round trip; it is the same
+  // `locale` the dashboard layout reads from the user.
   const rootRequest = read('lib/i18n/root-request.ts')
   check('and the root document applies the SAME seed, so the two agree',
     /getRootRequestContext\(\)/.test(rootLayout)
-    && /user\?\.user_metadata\?\.locale/.test(rootRequest)
+    && /claims\?\.userMetadata\?\.locale/.test(rootRequest)
     && /getServer(?:Public)?Locale\(seed\)/.test(rootRequest))
   {
     check('a signup-EN seed still wins on a device with no cookie',

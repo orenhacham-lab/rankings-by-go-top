@@ -20,7 +20,7 @@
  */
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
-import { verifiedUserId, __clearVerifyingKeys, JWKS_TTL_MS, type EdgeAuthClient } from '../edge-session'
+import { verifiedUserId, verifiedClaims, __clearVerifyingKeys, JWKS_TTL_MS, type EdgeAuthClient } from '../edge-session'
 
 const ROOT = join(__dirname, '../../..')
 const read = (p: string) => readFileSync(join(ROOT, p), 'utf8')
@@ -38,7 +38,7 @@ const KEYS = [{ kty: 'EC' as const, key_ops: ['verify'], kid: 'k1', alg: 'ES256'
 /** A client the test drives, counting every call it would have made. */
 function harness(opts: {
   token?: string | null
-  claims?: ({ sub?: unknown } | null)[]
+  claims?: ({ sub?: unknown; user_metadata?: unknown } | null)[]
   errors?: boolean[]
   userId?: string | null
   jwksFails?: boolean
@@ -64,7 +64,7 @@ function harness(opts: {
       },
       getUser: async () => {
         calls.getUser++
-        return { data: { user: opts.userId === null ? null : { id: opts.userId ?? 'u-authoritative' } } }
+        return { data: { user: opts.userId === null ? null : { id: opts.userId ?? 'u-authoritative', user_metadata: { locale: 'he' } } } }
       },
     },
   }
@@ -85,6 +85,51 @@ async function main() {
     check('A1: answers null', id === null, String(id))
     check('A2: and asked NOBODY — no key set, no claims, no Auth server',
       h.calls.jwks === 0 && h.calls.getClaims === 0 && h.calls.getUser === 0, JSON.stringify(h.calls))
+  }
+
+  console.log('\nA2) The ROOT DOCUMENT reads the same session, for the language and the public widgets')
+  {
+    // Every page view of the whole site, the public marketing pages included,
+    // used to ask the Auth server who the visitor is, from the root layout
+    // (lib/i18n/root-request.ts). Measured from Israel on 16.11.2026, a public
+    // page's document took 630-1050ms, answered in the function's region, with
+    // about 300ms of it that one verification — paid by every crawler too.
+    __clearVerifyingKeys()
+    const anon = harness({ token: null })
+    const none = await verifiedClaims(anon.client, 'https://p.supabase.co', anon.deps)
+    check('A2a: a visitor who is not signed in has no claims', none === null, JSON.stringify(none))
+    check('A2b: …and cost NO request of any kind',
+      anon.calls.jwks === 0 && anon.calls.getClaims === 0 && anon.calls.getUser === 0, JSON.stringify(anon.calls))
+
+    __clearVerifyingKeys()
+    const signed = harness({ claims: [{ sub: 'u-7', user_metadata: { locale: 'en' } }] })
+    const c = await verifiedClaims(signed.client, 'https://p.supabase.co', signed.deps)
+    check('A2c: a signed-in visitor is known from the token itself', c?.sub === 'u-7', JSON.stringify(c))
+    check('A2d: with the signup language the document is rendered in',
+      c?.userMetadata?.locale === 'en', JSON.stringify(c?.userMetadata))
+    check('A2e: and the Auth server was still not asked', signed.calls.getUser === 0, String(signed.calls.getUser))
+
+    // Claims without usable metadata are not a verdict about the language: the
+    // caller falls back to the cookie and the header, as it did before.
+    __clearVerifyingKeys()
+    const bare = harness({ claims: [{ sub: 'u-8' }] })
+    const c2 = await verifiedClaims(bare.client, 'https://p.supabase.co', bare.deps)
+    check('A2f: no metadata in the token is null, never a guessed language',
+      c2?.sub === 'u-8' && c2?.userMetadata === null, JSON.stringify(c2))
+
+    // An unverifiable token still ends at the Auth server, which is the only
+    // thing that can answer authoritatively.
+    __clearVerifyingKeys()
+    const broken = harness({ errors: [true, true], userId: 'u-9' })
+    const c3 = await verifiedClaims(broken.client, 'https://p.supabase.co', broken.deps)
+    check('A2g: an unverifiable token falls back to the Auth server',
+      c3?.sub === 'u-9' && broken.calls.getUser === 1, `${JSON.stringify(c3)} / ${broken.calls.getUser}`)
+    check('A2h: and the id answer is the same function underneath',
+      (await (async () => {
+        __clearVerifyingKeys()
+        const h = harness({ claims: [{ sub: 'u-10', user_metadata: { locale: 'de' } }] })
+        return verifiedUserId(h.client, 'https://p.supabase.co', h.deps)
+      })()) === 'u-10')
   }
 
   console.log('\nB) A signed-in visitor: one key-set fetch per instance, and the Auth server is never asked')

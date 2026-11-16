@@ -433,11 +433,13 @@ async function main() {
     check('5d: SOURCE — the root layout renders that locale, not a hard-coded one',
       /<html lang=\{lang\} dir=\{dir\}/.test(rootLayout) && !/<html lang="he" dir="rtl"/.test(rootLayout))
     // The seed read moved into the request-cached context so generateMetadata and
-    // the render share ONE resolution; the seed itself is unchanged.
+    // the render share ONE resolution; the seed itself is unchanged. It is now
+    // read from the token's own claims, checked locally, instead of from an Auth
+    // server round trip paid on every page view of the public site.
     const rootReqSrc = require('fs').readFileSync(join(ROOT, 'lib', 'i18n', 'root-request.ts'), 'utf8')
     check('5e: SOURCE — the root layout resolves the locale server-side, seed included',
       /const \{ isAuthenticated, locale \} = await getRootRequestContext\(\)/.test(rootLayout)
-      && /user\?\.user_metadata\?\.locale/.test(rootReqSrc)
+      && /claims\?\.userMetadata\?\.locale/.test(rootReqSrc)
       && /getServer(?:Public)?Locale\(seed\)/.test(rootReqSrc))
     check('5g: the SEED survives — an English signup on a cookie-less device still gets English',
       resolveRequestLocale({ pathname: '/dashboard', cookieValue: null, seed: 'en' }) === 'en')
