@@ -62,10 +62,19 @@ import { ConsentPreferences } from '@/components/consent/ConsentPreferences'
  * answered, and asking again would be asking them to repeat themselves.
  */
 /**
- * The size of a decision button, shared by BOTH decisions so neither can be made
- * the cheaper press — the one thing in this card that is a legal requirement
- * rather than a taste (GDPR Art. 4(11), and the EDPB's cookie-banner findings:
- * refusing has to be as easy as agreeing).
+ * A decision button is a TYPE part and a BOX part, and the split is the legal
+ * line (GDPR Art. 4(11), and the EDPB's cookie-banner findings: refusing has to
+ * be as easy as agreeing).
+ *
+ * The TYPE is shared by every decision, so no decision can be set in smaller
+ * print than another — a reject in small type is the pattern regulators have
+ * fined for, and nothing here may differ in it.
+ *
+ * The BOX is emphasis, and accept is allowed 4px more of it (the owner's call,
+ * 16 Nov 2026). Four pixels is ordinary visual hierarchy, not a cheaper press:
+ * reject keeps the same type, the same card, the same layer and one click.
+ * lib/consent/__qa__/consent-contract.qa.ts D1 holds the type equal and caps
+ * that gap, so the nudge cannot grow into a dark pattern later.
  *
  * On a phone the height is a MINIMUM. A fixed height here is what pushed the
  * accept label out of its pill in the languages whose "accept measurement" is
@@ -74,8 +83,16 @@ import { ConsentPreferences } from '@/components/consent/ConsentPreferences'
  * peer. 2.5px of side padding instead of 8px gives a 105px button about 14 more
  * characters of room before it needs that second line at all.
  */
-const COMPACT_BUTTON = 'min-h-[26px] px-1.5 py-[3px] text-overline leading-[1.15]'
-const FULL_BUTTON = 'min-h-9 px-2 py-1 text-copy leading-tight'
+const COMPACT_TYPE = 'px-1.5 text-overline leading-[1.15]'
+const FULL_TYPE = 'px-2 text-copy leading-tight'
+const COMPACT_BOX = 'min-h-[26px] py-[3px]'
+const FULL_BOX = 'min-h-9 py-1'
+const COMPACT_BOX_ACCEPT = 'min-h-[30px] py-[5px]'
+const FULL_BOX_ACCEPT = 'min-h-10 py-1.5'
+const COMPACT_BUTTON = `${COMPACT_BOX} ${COMPACT_TYPE}`
+const FULL_BUTTON = `${FULL_BOX} ${FULL_TYPE}`
+const COMPACT_BUTTON_ACCEPT = `${COMPACT_BOX_ACCEPT} ${COMPACT_TYPE}`
+const FULL_BUTTON_ACCEPT = `${FULL_BOX_ACCEPT} ${FULL_TYPE}`
 
 export function CookieConsent({
   onOpenChange,
@@ -201,22 +218,23 @@ export function CookieConsent({
    * "customize" hung under them as an underlined link. The owner asked for a
    * single wide Accept with the other two, smaller, beneath it.
    *
-   * The two below are smaller IN WIDTH ONLY — they share one row, so each is half
-   * of Accept — and they keep Accept's own height and type size, from the same
-   * two constants. That is deliberate and it is the whole compliance line here:
-   * GDPR Art. 7(3) and the EDPB's cookie-banner guidance ask that refusing be as
-   * easy as agreeing, and a reject button set in smaller type is the pattern
-   * regulators have fined for. Emphasis may differ; the press may not. Reject is
-   * a real, filled, full-height button on the same card, on the same layer, one
-   * click, with no extra step. lib/consent/__qa__/consent-contract.qa.ts D1
-   * pins the equality and fails if either button gets a size of its own.
+   * The two below are smaller in WIDTH — they share one row, so each is half of
+   * Accept — and by 4px in height, which the owner asked for on 16 Nov 2026.
+   * They keep Accept's TYPE exactly, from the same constant, and that is the
+   * compliance line here: GDPR Art. 7(3) and the EDPB's cookie-banner guidance
+   * ask that refusing be as easy as agreeing, and a reject button set in smaller
+   * print is the pattern regulators have fined for. Emphasis may differ; the
+   * press may not. Reject is a real, filled button on the same card, on the same
+   * layer, one click, with no extra step.
+   * lib/consent/__qa__/consent-contract.qa.ts D1 holds the type identical and
+   * caps the height gap, so this stays a nudge and never becomes a wall.
    */
   const actions = (compact: boolean) => (
     <>
       <button
         type="button"
         onClick={handleAccept}
-        className={`${compact ? COMPACT_BUTTON : FULL_BUTTON} ${compact ? 'mt-1.5' : 'mt-2.5'} w-full rounded-control border border-transparent bg-action font-bold text-action-ink transition-colors hover:bg-action-hover focus:outline-none focus-visible:ring-4 focus-visible:ring-white/40`}
+        className={`${compact ? COMPACT_BUTTON_ACCEPT : FULL_BUTTON_ACCEPT} ${compact ? 'mt-1.5' : 'mt-2.5'} w-full rounded-control border border-transparent bg-action font-bold text-action-ink transition-colors hover:bg-action-hover focus:outline-none focus-visible:ring-4 focus-visible:ring-white/40`}
       >
         {t.accept}
       </button>
