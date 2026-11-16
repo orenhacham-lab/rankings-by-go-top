@@ -50,8 +50,8 @@ export type EdgeAuthClient = {
     getClaims: (
       jwt?: string,
       options?: { jwks?: Jwks },
-    ) => Promise<{ data: { claims?: { sub?: unknown } | null } | null; error: unknown }>
-    getUser: () => Promise<{ data: { user: { id: string } | null } }>
+    ) => Promise<{ data: { claims?: { sub?: unknown; user_metadata?: unknown } | null } | null; error: unknown }>
+    getUser: () => Promise<{ data: { user: { id: string; user_metadata?: unknown } | null } }>
   }
 }
 
@@ -94,15 +94,28 @@ async function verifyingKeys(url: string, refresh: boolean, deps: EdgeSessionDep
   }
 }
 
+/** What a locally checked token says about its owner. */
+export type VerifiedClaims = { sub: string; userMetadata: Record<string, unknown> | null }
+
+function asMetadata(value: unknown): Record<string, unknown> | null {
+  return value && typeof value === 'object' && !Array.isArray(value) ? (value as Record<string, unknown>) : null
+}
+
 /**
- * The signed-in user's id, or null. Never throws: an unverifiable token ends at
+ * The signed-in user's claims, or null, WITHOUT asking the Auth server when the
+ * token can be checked here. Never throws: an unverifiable token ends at
  * `getUser()`, the behaviour this replaced.
+ *
+ * The same guarantee and the same limit as the module comment above: this
+ * proves we issued the token and that it has not expired, not that the session
+ * is live this second, so it decides gates and presentation only — never what
+ * is read or written on the owner's behalf.
  */
-export async function verifiedUserId(
+export async function verifiedClaims(
   supabase: EdgeAuthClient,
   url: string,
   deps: EdgeSessionDeps = {},
-): Promise<string | null> {
+): Promise<VerifiedClaims | null> {
   // A cookie read, no network. No token means nobody is signed in, and that
   // must not cost a request.
   let token: string | null | undefined
@@ -123,7 +136,9 @@ export async function verifiedUserId(
       const { data, error } = await supabase.auth.getClaims(token, { jwks: keys })
       if (error) continue
       const sub = data?.claims?.sub
-      return typeof sub === 'string' && sub.length > 0 ? sub : null
+      return typeof sub === 'string' && sub.length > 0
+        ? { sub, userMetadata: asMetadata(data?.claims?.user_metadata) }
+        : null
     } catch {
       continue
     }
@@ -131,8 +146,21 @@ export async function verifiedUserId(
 
   try {
     const { data } = await supabase.auth.getUser()
-    return data?.user?.id ?? null
+    const user = data?.user
+    return user?.id ? { sub: user.id, userMetadata: asMetadata(user.user_metadata) } : null
   } catch {
     return null
   }
+}
+
+/**
+ * The signed-in user's id, or null. Never throws: an unverifiable token ends at
+ * `getUser()`, the behaviour this replaced.
+ */
+export async function verifiedUserId(
+  supabase: EdgeAuthClient,
+  url: string,
+  deps: EdgeSessionDeps = {},
+): Promise<string | null> {
+  return (await verifiedClaims(supabase, url, deps))?.sub ?? null
 }

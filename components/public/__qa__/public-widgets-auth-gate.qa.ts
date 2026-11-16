@@ -45,10 +45,15 @@ function main() {
   // disagree and put a Hebrew title on an English document). The contract this
   // file guards is unchanged, so it is now checked where it lives.
   const rootCtx = strip(read('lib/i18n/root-request.ts'))
-  check('root layout is async + reads auth via getUser()',
+  // It reads who the visitor is from the session COOKIE, checked locally
+  // (lib/auth/edge-session.ts), so a visitor who is not signed in costs no
+  // request at all; an unverifiable token still ends at getUser() in there.
+  const edgeSession = strip(read('lib/auth/edge-session.ts'))
+  check('root layout is async + reads auth from the verified session',
     /async function RootLayout/.test(layout)
     && /await getRootRequestContext\(\)/.test(layout)
-    && /supabase\.auth\.getUser\(\)/.test(rootCtx))
+    && /verifiedClaims\(supabase, /.test(rootCtx)
+    && /supabase\.auth\.getUser\(\)/.test(edgeSession))
   check('root layout passes isAuthenticated to the widget', /<PublicSiteWidgets isAuthenticated=\{isAuthenticated\}/.test(layout))
   check('auth failure defaults to the safe public behavior (no app break)', /catch\s*\{[\s\S]*isAuthenticated = false/.test(rootCtx))
   const widget = strip(read('components/public/PublicSiteWidgets.tsx'))
