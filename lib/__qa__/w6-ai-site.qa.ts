@@ -125,10 +125,11 @@ function main() {
     check('D2: MUT showing the ops reason to everyone fails D1', !merchantOnly(panel.replace('{status.opsDetail && <span', '{true && <span')))
     check('D2b: MUT offering connect while the status is unconfigured fails D1', !merchantOnly(panel.replace('status?.oauthConfigured !== false && !connected', '!connected')))
     check('D2c: MUT offering connect after a failed status read fails D1', !merchantOnly(panel.replace('{!loading && !unavailable && ', '{!loading && ')))
-    const route = code('app/api/gsc/status/route.ts')
-    const serverDecides = (s: string) => /import \{ isAdminUser \} from '@\/lib\/auth\/admin-role'/.test(s) && /const opsDetail = !oauthConfigured && await isAdminUser\(auth\.admin, auth\.user\.id\)/.test(s) && /\bopsDetail,/.test(s)
+    // The reads moved into lib/gsc/status.ts (the layout builds the same answer in-region).
+    const route = code('app/api/gsc/status/route.ts') + '\n' + code('lib/gsc/status.ts')
+    const serverDecides = (s: string) => /import \{ isAdminUser \} from '@\/lib\/auth\/admin-role'/.test(s) && /const opsDetail = !oauthConfigured && await isAdminUser\((auth\.admin, auth\.user\.id|admin, userId)\)/.test(s) && /\bopsDetail,/.test(s)
     check('D3: the status route decides opsDetail with isAdminUser (profiles.role, service role), never a request field', serverDecides(route) && !/searchParams\.get\('admin'\)|opsDetail = .*searchParams/.test(route))
-    check('D4: MUT opsDetail from a query parameter fails D3', !serverDecides(route.replace('await isAdminUser(auth.admin, auth.user.id)', "new URL(request.url).searchParams.get('admin') === '1'")))
+    check('D4: MUT opsDetail from a query parameter fails D3', !serverDecides(route.replace('await isAdminUser(admin, userId)', "new URL(request.url).searchParams.get('admin') === '1'")))
     for (const locale of ['he', 'en'] as const) {
       const g = getDashboardDictionary(locale).projectDetail.contentSection.gsc
       const ops = locale === 'he' ? /פנו למנהל המערכת|אינו מוגדר בשרת/ : /Contact your administrator|not configured on the server/

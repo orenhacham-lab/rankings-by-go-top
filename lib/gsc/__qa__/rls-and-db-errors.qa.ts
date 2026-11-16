@@ -121,8 +121,11 @@ async function main() {
   check('(12) sanitizeConnection omits the encrypted token entirely', sanitized !== null && !('encrypted_refresh_token' in (sanitized as object)) && !JSON.stringify(sanitized).includes(token))
   // Typed service errors carry sanitized messages (no "db down" leak) and routes return e.code only.
   check('(12) service DB-error messages are sanitized (no raw DB text)', (e8?.message ?? '').includes('Could not') && !(e8?.message ?? '').includes('db down'))
-  const routes = ['app/api/gsc/status/route.ts', 'app/api/gsc/metrics/route.ts', 'app/api/gsc/properties/route.ts', 'app/api/gsc/property/route.ts', 'app/api/gsc/connection/route.ts']
-    .map((r) => readFileSync(join(ROOT, r), 'utf8'))
+  // lib/gsc/status.ts carries the status route's own error mapping now.
+  // The status route's own error mapping lives in lib/gsc/status.ts, which it
+  // answers from, so the two are read as ONE unit.
+  const routes = [['app/api/gsc/status/route.ts', 'lib/gsc/status.ts'], ['app/api/gsc/metrics/route.ts'], ['app/api/gsc/properties/route.ts'], ['app/api/gsc/property/route.ts'], ['app/api/gsc/connection/route.ts']]
+    .map((group) => group.map((r) => readFileSync(join(ROOT, r), 'utf8')).join('\n'))
   check('(12) routes return error codes, never e.message', routes.every((s) => /error: e\.code/.test(s) && !/error: e\.message/.test(s)))
   const svc = readFileSync(join(ROOT, 'lib/gsc/service.ts'), 'utf8')
   check('(12) service never logs tokens/ciphertext/DB messages (no console.*)', !/console\./.test(svc))

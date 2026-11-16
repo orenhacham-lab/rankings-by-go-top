@@ -33,7 +33,9 @@ const topics = read('app/api/content/topics/route.ts')
 check('topics: the plan status is requested before the topics are awaited', topics.indexOf('const planStatusRead = loadPlanSummariesForProject(') > 0 && topics.indexOf('const planStatusRead') < topics.indexOf(".from('article_topics')") && /const planStatus = await planStatusRead/.test(topics))
 check('topics: ownership first', topics.indexOf('authContentProject(projectId)') < topics.indexOf('planStatusRead'))
 
-const gsc = read('app/api/gsc/status/route.ts')
+// The status answer moved into lib/gsc/status.ts, so the dashboard layout can
+// build it in-region and hand it to the widgets; the route still answers it.
+const gsc = read('app/api/gsc/status/route.ts') + '\n' + read('lib/gsc/status.ts')
 check('gsc status: connection, property and windows read together', /await Promise\.allSettled\(\[\s*loadUserConnection\([\s\S]*?loadProjectProperty\([\s\S]*?runsRead,\s*\]\)/.test(gsc))
 check('gsc status: failures surface in the old order and windows count only with a property', gsc.indexOf("connectionRead.status === 'rejected'") < gsc.indexOf("propertyRead.status === 'rejected'") && /if \(property\) \{\s*const read = runsResult/.test(gsc))
 

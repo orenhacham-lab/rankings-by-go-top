@@ -574,7 +574,10 @@ function main() {
       && ['handleSearch', 'handleOpenTrendModal', 'handleAddToProject', 'handleGenerateAIQuestions', 'handleAddAIQuestions', 'trackKeyword', 'submitResearch'].every((n) => fetching.has(n)),
       show({ fetchesDuringRender, effects, fetching: [...fetching], loose }))
     const hook = strip(readFileSync(join(ROOT, 'components/keyword-research/useScanResearch.ts'), 'utf8'))
-    const gsc = strip(readFileSync(join(ROOT, 'components/gsc/gsc-data.ts'), 'utf8'))
+    // The two Search Console paths are spelled in lib/gsc/urls.ts, which has no
+    // 'use client' on it, so the dashboard layout can build the status answer
+    // in-region and hand it over under the very URL the widgets read.
+    const gsc = strip(readFileSync(join(ROOT, 'components/gsc/gsc-data.ts'), 'utf8') + '\n' + readFileSync(join(ROOT, 'lib/gsc/urls.ts'), 'utf8'))
     check('N2: what reads on opening: the scan\'s run and stored research (GETs, the hook\'s only fetch) and Search Console\'s stored figures; the research route reads the cache only (scan-route.qa.ts A11)',
       count(hook, 'fetch(') === 1 && /fetch\(url, \{ cache: 'no-store' \}\)/.test(hook) && !/method:/.test(hook)
       && /`\/api\/projects\/\$\{encodeURIComponent\(projectId\)\}\/seed`/.test(hook) && /`\/api\/keyword-research\/scan\?projectId=\$\{encodeURIComponent\(projectId\)\}`/.test(hook)

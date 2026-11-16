@@ -206,7 +206,8 @@ async function main() {
   {
     const cb = strip(read('app/api/gsc/callback/route.ts'))
     const prop = strip(read('app/api/gsc/property/route.ts'))
-    const status = strip(read('app/api/gsc/status/route.ts'))
+    // The reads moved into lib/gsc/status.ts (the layout builds the same answer in-region).
+    const status = strip(read('app/api/gsc/status/route.ts') + '\n' + read('lib/gsc/status.ts'))
     const bg = strip(read('lib/gsc/background-sync.ts'))
     const panel = strip(read('components/content/GscPanel.tsx'))
 
@@ -246,7 +247,10 @@ async function main() {
     check('MUTATION CONTROL: linking non-assignable properties is caught', !bgGuard(bg.replace('v.assignable', 'true')))
     check('engine: never logs or stores a raw error message', !/console\.(log|error)\([^)]*\be\b(?!\))/.test(bg.replace(/safeCode\(e\)/g, '')) && !/e\.message|String\(e\)/.test(bg))
 
-    const statusGuard = (s: string) => /loadSyncState\(auth\.admin, auth\.project\.id\)/.test(s) && /\n\s+sync,\n/.test(s)
+    // The reads take the already ownership-checked client, project and user as
+    // arguments now, so the route's `auth.admin`/`auth.project.id` is the lib's
+    // `admin`/`projectId`; the guard accepts either spelling of the same pair.
+    const statusGuard = (s: string) => /loadSyncState\((auth\.admin, auth\.project\.id|admin, projectId)\)/.test(s) && /\n\s+sync,\n/.test(s)
     check('status route reports the sync state', statusGuard(status))
     check('MUTATION CONTROL: a status route without it is caught', !statusGuard(status.replace('      sync,\n', '')))
 
