@@ -50,6 +50,32 @@ export function readGscResponse(url: string, fresh = false): Promise<GscResponse
   return request(url, fresh)
 }
 
+/**
+ * START A SCREEN'S SEARCH CONSOLE READS NOW, instead of when its widgets mount.
+ *
+ * The status arrives with the document (components/gsc/GscStatusSeed.tsx), so it
+ * costs nothing here; the TOP PAGES view does not, and the widget that reads it
+ * only mounts once the screen's own data has landed and the skeleton has gone.
+ * Measured on 16.11.2026 against production: it started at 3202ms, 17ms after
+ * the rankings answer, while everything else on the screen had been asked for at
+ * 2089ms. Asking here puts it with the others.
+ *
+ * The status decides, exactly as the widget's own hook would: only a connected,
+ * synced property has metrics to read. This lives beside the reader, not on the
+ * screen, because a SCREEN must never make what it shows depend on the
+ * connection (components/gsc/__qa__/gsc-widgets.qa.ts, E1) - it renders its
+ * widgets either way, and they say what is missing.
+ */
+export function prefetchGscScreenReads(projectId: string | null | undefined, views: GscMetricsView[]): void {
+  if (!projectId) return
+  void readGscResponse(gscStatusUrl(projectId))
+    .then((status) => {
+      if (gscStatusView(status.status, status.body).state !== 'ready') return
+      return Promise.all(views.map((view) => readGscResponse(gscMetricsUrl(projectId, view))))
+    })
+    .catch(() => {})
+}
+
 /** The answer already in hand for `url`, if a widget of this screen read it moments ago. */
 export function peekGscResponse(url: string | null): GscResponse | undefined {
   return peek(url)

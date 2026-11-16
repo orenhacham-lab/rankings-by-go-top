@@ -24,6 +24,7 @@ import { join } from 'path'
 import { buildGscStatus } from '../status'
 import { gscStatusUrl, gscMetricsUrl, gscSeedScript, takeGscSeed, GSC_SEED_GLOBAL } from '../urls'
 import { activeProjectFromCookie, activeProjectCookieWrite, ACTIVE_PROJECT_COOKIE } from '@/lib/active-project/active-cookie'
+import { gscStatusView } from '../widget-state'
 
 let passed = 0
 let failed = 0
@@ -182,6 +183,30 @@ async function main() {
     const trusting = (v: string | null) => v
     check('D-MUT: an unchecked cookie would hand over another user\'s project, and fails D2',
       trusting('someone-elses') !== activeProjectFromCookie('someone-elses', projects))
+  }
+
+  console.log('\nE) the one metrics view this screen shows starts with the screen, not with its widget')
+  {
+    const page = strip(read('app/(dashboard)/dashboard/page.tsx'))
+    const data = strip(read('components/gsc/gsc-data.ts'))
+    check('E1: the screen starts its Search Console reads on mount',
+      /prefetchGscScreenReads\(project\.id, \['pages'\]\)/.test(page))
+    check('E2: the decision lives beside the reader, never on the screen',
+      !/gscStatusView/.test(page) && /export function prefetchGscScreenReads/.test(data))
+    check('E3: …and the screen asks nothing when the SERVER says it is off',
+      /if \(gscEnabled !== false\) prefetchGscScreenReads/.test(page))
+    check('E4: it reads the status first and the views only off a ready one',
+      /readGscResponse\(gscStatusUrl\(projectId\)\)[\s\S]{0,300}gscStatusView\(status\.status, status\.body\)\.state !== 'ready'\) return[\s\S]{0,200}readGscResponse\(gscMetricsUrl\(projectId, view\)\)/.test(data))
+    check('E5: the screen asks for the one view it actually shows',
+      (page.match(/\['(pages|keywords|trend)'\]/g) || []).length === 1)
+    // EXECUTED: the condition in E4 really does refuse everything but a synced property.
+    check('E6: a project with no connection is not "ready"',
+      gscStatusView(200, { ok: true, connection: null, property: null }).state !== 'ready')
+    check('E7: a failed status read is not "ready" either', gscStatusView(500, null).state !== 'ready')
+    // MUTATION CONTROL — reading the metrics unconditionally fails E2.
+    const unguarded = "export function prefetchGscScreenReads() { void readGscResponse(gscMetricsUrl(projectId, view)) }"
+    check('E-MUT: an unconditional metrics read fails E4',
+      !/gscStatusView\(status\.status, status\.body\)\.state !== 'ready'\) return/.test(unguarded))
   }
 
   console.log(`\n${passed} passed, ${failed} failed`)

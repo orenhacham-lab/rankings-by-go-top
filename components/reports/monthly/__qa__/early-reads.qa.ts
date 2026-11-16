@@ -75,8 +75,12 @@ async function main() {
     const src = withoutComments(read('app/(dashboard)/dashboard/page.tsx'))
     const effect = src.match(/useEffect\(\(\) => \{\s*if \(gscEnabled !== false\)[\s\S]*?\}, \[project\.id, gscEnabled\]\)/)
     check('B1: one effect starts the Search Console status and the monthly read', effect !== null)
+    // The screen's Search Console reads moved next to the reader, so that a SCREEN
+    // never names the connection (components/gsc/__qa__/gsc-widgets.qa.ts, E1):
+    // the two files are one unit here, as they are at runtime.
     check('B2: the status read goes through the shared read, by its own URL',
-      /readGscResponse\(gscStatusUrl\(project\.id\)\)/.test(effect?.[0] ?? ''))
+      /prefetchGscScreenReads\(project\.id, \[/.test(effect?.[0] ?? '')
+      && /readGscResponse\(gscStatusUrl\(projectId\)\)/.test(withoutComments(read('components/gsc/gsc-data.ts'))))
     check('B3: the monthly read is warmed for the same project',
       /prefetchMonthlyReports\(project\.id\)/.test(effect?.[0] ?? ''))
     check('B4: Search Console switched off on the SERVER is not asked at all',
