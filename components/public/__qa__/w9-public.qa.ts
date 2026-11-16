@@ -239,22 +239,23 @@ function main() {
     // E3 — THE OWNER'S LAYOUT (16 Nov 2026): one wide Accept, then reject and
     // customize together on the row beneath it, each half its width.
     //
-    // The two below are smaller in WIDTH ONLY. Their height and type size come
-    // from the same constants as Accept, and the equality of those constants is
-    // what lib/consent/__qa__/consent-contract.qa.ts D1 pins, because a reject
-    // set in smaller type is the pattern regulators have fined for. This guard
-    // pins the geometry; that one pins the floor under it. Both have to hold.
+    // The two below are smaller in width, and 4px shorter than Accept, which the
+    // owner asked for on 16 Nov 2026. Their TYPE comes from the same constant as
+    // Accept's, and lib/consent/__qa__/consent-contract.qa.ts D1 pins that
+    // equality and caps the height gap, because a reject set in smaller print is
+    // the pattern regulators have fined for. This guard pins the geometry; that
+    // one pins the floor under it. Both have to hold.
     const shapeOk = (s: string) =>
-      /onClick=\{handleAccept\}\s*className=\{`\$\{compact \? COMPACT_BUTTON : FULL_BUTTON\}[^`]*w-full/.test(s)
+      /onClick=\{handleAccept\}\s*className=\{`\$\{compact \? COMPACT_BUTTON_ACCEPT : FULL_BUTTON_ACCEPT\}[^`]*w-full/.test(s)
       && /onClick=\{handleReject\}\s*className=\{`\$\{compact \? COMPACT_BUTTON : FULL_BUTTON\}[^`]*flex-1/.test(s)
       && /onClick=\{\(\) => setPanelOpen\(true\)\}\s*className=\{`\$\{compact \? COMPACT_BUTTON : FULL_BUTTON\}[^`]*flex-1/.test(s)
       // and refusing is still a <button> on the card, never a link
       && /<button\n\s*type="button"\n\s*onClick=\{handleReject\}/.test(s)
-    check('E3: one wide Accept, with reject and customize as equal-sized buttons beneath it', shapeOk(c))
+    check('E3: one wide Accept, with reject and customize as two buttons of equal size beneath it', shapeOk(c))
     check('MUT: demoting reject to a link fails E3',
       !shapeOk(c.replace(/<button\n(\s*)type="button"\n(\s*)onClick=\{handleReject\}/, '<a\n$1type="button"\n$2onClick={handleReject}')))
     check('MUT: a narrow Accept fails E3',
-      !shapeOk(c.replace(/(onClick=\{handleAccept\}\s*className=\{`\$\{compact \? COMPACT_BUTTON : FULL_BUTTON\}[^`]*?)w-full/, '$1flex-1')))
+      !shapeOk(c.replace(/(onClick=\{handleAccept\}\s*className=\{`\$\{compact \? COMPACT_BUTTON_ACCEPT : FULL_BUTTON_ACCEPT\}[^`]*?)w-full/, '$1flex-1')))
     check('MUT: customize left as small print fails E3',
       !shapeOk(c.replace(/(onClick=\{\(\) => setPanelOpen\(true\)\}\s*className=\{`)\$\{compact \? COMPACT_BUTTON : FULL_BUTTON\}/, '$1${compact ? \'mt-1 text-overline\' : \'mt-2 text-caption\'}')))
   }
