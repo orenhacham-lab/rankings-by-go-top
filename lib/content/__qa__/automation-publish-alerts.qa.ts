@@ -9,7 +9,8 @@
  */
 import { readFileSync } from 'fs'
 import { join } from 'path'
-import { classifyMediaFailure } from '../automation/publish-item'
+import { classifyMediaFailure, mediaBlockReason } from '../automation/publish-item'
+import { alertReasonCode } from '../automation/alert-read-model'
 import type { WpCreateError } from '../wordpress-publish'
 
 let pass = 0, fail = 0
@@ -37,6 +38,20 @@ function main() {
   check('HTTP 503 → transient', classifyMediaFailure(media({ detail: 'x', wpErrorMeta: { status: 503 } })) === 'transient')
   check('detail present, no HTTP meta (network throw) → transient', classifyMediaFailure(media({ detail: 'Media upload failed.' })) === 'transient')
 
+  console.log('BEHAVIOR) mediaBlockReason — the site\'s own answer is kept, the merchant text is not changed')
+  // 16 Nov 2026: 61 paused articles across five sites all said the bare word
+  // `wordpress_media_upload_failed`, so nothing in the data said WHY.
+  check('403 keeps the forbidden code', mediaBlockReason(media({ detail: 'x', wpErrorMeta: { status: 403, responseFormat: 'json' } })) === 'wordpress_media_upload_failed: wordpress_forbidden')
+  check('403 with an HTML answer is named a blocked REST route (WAF / security plugin)', mediaBlockReason(media({ detail: 'x', wpErrorMeta: { status: 403, responseFormat: 'html' } })) === 'wordpress_media_upload_failed: wordpress_rest_blocked')
+  check('401 keeps the auth code', mediaBlockReason(media({ detail: 'x', wpErrorMeta: { status: 401 } })) === 'wordpress_media_upload_failed: wordpress_auth_failed')
+  check('a WP media REST code is kept', mediaBlockReason(media({ detail: 'x', wpErrorMeta: { status: 400, wpCode: 'rest_upload_unknown_error' } })) === 'wordpress_media_upload_failed: wordpress_media_invalid')
+  check('no meta at all = our own storage object could not be read', mediaBlockReason(media()) === 'wordpress_media_upload_failed: source_image_unreadable')
+  // The merchant is shown the head only, so the suffix can never put remote prose on a screen.
+  for (const r of [mediaBlockReason(media({ detail: 'x', wpErrorMeta: { status: 403 } })), mediaBlockReason(media())]) {
+    check(`the merchant-facing code is unchanged for "${r}"`, alertReasonCode(r) === 'wordpress_media_upload_failed')
+  }
+  check('a sanitized remote message is never part of the reason', !/ /.test(mediaBlockReason(media({ detail: 'x', wpErrorMeta: { status: 403, sanitizedMessage: 'Sorry, you are not allowed to upload' } })).split(': ')[1]))
+
   console.log('SOURCE) attempts reset + paused blockers + alerts wired truthfully')
   const gen = strip(read('../automation/generate-item.ts'))
   const wp = strip(read('../automation/publish-item.ts'))
@@ -54,9 +69,16 @@ function main() {
   check('final-failure alert kind retained', /'publish_failed_final'/.test(alerts))
 
   // 3 — every deterministic publish blocker routes to paused + a blocked alert.
-  for (const reason of ['platform_conflict', 'no_active_publishing_platform', 'article_missing', 'duplicate_topic_published', 'no_wordpress_connection', 'wordpress_media_upload_failed']) {
+  for (const reason of ['platform_conflict', 'no_active_publishing_platform', 'article_missing', 'duplicate_topic_published', 'no_wordpress_connection']) {
     check(`WordPress blocker '${reason}' → blockItem(...paused + alert)`, new RegExp(`blockItem\\(admin, itemId, [^\\n]*${reason}`).test(wp) || new RegExp(`blockItem\\(admin, itemId, \\w+, ctx\\)`).test(wp) && wp.includes(reason))
   }
+  // The media blocker passes the reason through mediaBlockReason, so its code carries the
+  // site's own answer; the same line must still pause and alert on the WordPress channel.
+  check('WordPress media blocker → blockItem(mediaBlockReason(...), paused + alert)',
+    /blockItem\(admin, itemId, mediaBlockReason\(created\), ctx, 'wordpress'\)/.test(wp)
+    && /export function mediaBlockReason/.test(wp) && /wordpress_media_upload_failed: \$\{code\}/.test(wp))
+  check('the blocked media upload is logged with the safe remote diagnostics, never raw prose',
+    /safeRemoteDiagnostics\(created\.wpErrorMeta\)/.test(wp) && !/sanitizedMessage/.test(wp))
   // blockItem now takes the CHANNEL explicitly, so a WordPress blocker is recorded
   // as WordPress and the two platform-neutral blockers are recorded as neither.
   check('WordPress publish quality-gate failure → blockItem (paused)', /publish_quality_gate_failed/.test(wp) && /blockItem\(admin, itemId, reason, ctx, 'wordpress'\)/.test(wp))
