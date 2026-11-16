@@ -446,8 +446,12 @@ async function main() {
     const route = code('app/api/projects/[id]/dashboard/route.ts')
     const handlerOk = (src: string) => importsOf(src).every((m) => !FORBIDDEN.test(m)) && !FORBIDDEN.test(strip(src).replace(/from\s+'[^']+'/g, ''))
     check('I2: the handler imports no provider, model or usage-writing module', handlerOk(handler), importsOf(handler))
+    // The wiring moved to lib/dashboard/live-deps.ts so the dashboard's own
+    // layout can build the SAME answer in-region; the two files are one unit.
+    const wiring = importsOf(route).concat(importsOf(code('lib/dashboard/live-deps.ts')))
+      .filter((m) => m !== './overview' && m !== '@/lib/dashboard/live-deps')
     check('I3: the route wires only the session, the service role, the entitlement and the allowance read',
-      JSON.stringify(importsOf(route).sort()) === JSON.stringify(['@/lib/billing/usage-allowance', '@/lib/dashboard/overview', '@/lib/subscription', '@/lib/supabase/admin', '@/lib/supabase/server']), importsOf(route))
+      JSON.stringify(wiring.sort()) === JSON.stringify(['@/lib/billing/usage-allowance', '@/lib/dashboard/overview', '@/lib/subscription', '@/lib/supabase/admin', '@/lib/supabase/server']), wiring)
     check('I4: the route exports GET only (no write verb)', /export async function GET\b/.test(strip(route)) && !/export async function (POST|PUT|PATCH|DELETE)\b/.test(strip(route)))
     check('I-MUT: a model import in the handler fails I2', !handlerOk(`import { ask } from '@/lib/ai/openai'\n${handler}`))
     check('I-MUT: a POST in the route fails I4', /export async function POST\b/.test(strip(route + '\nexport async function POST() {}')))

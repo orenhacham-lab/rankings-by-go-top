@@ -203,13 +203,16 @@ async function main() {
     const layout = strip(read('app/(dashboard)/layout.tsx'))
     check('D5: the dashboard layout still verifies with the Auth server',
       /supabase\.auth\.getUser\(\)/.test(layout))
-    for (const route of [
-      'app/api/projects/[id]/dashboard/route.ts',
-      'app/api/projects/[id]/waiting/route.ts',
-      'app/api/projects/[id]/seed/route.ts',
-    ]) {
-      check(`D6-${route.split('/').slice(-2)[0]}: the route still verifies with the Auth server`,
-        /auth\.getUser\(\)/.test(strip(read(route))))
+    // A route and the module it wires its session from are ONE unit here: the
+    // dashboard route's wiring moved to lib/dashboard/live-deps.ts, which the
+    // dashboard's own layout uses to build the same answer in-region.
+    for (const [name, files] of [
+      ['dashboard', ['app/api/projects/[id]/dashboard/route.ts', 'lib/dashboard/live-deps.ts']],
+      ['waiting', ['app/api/projects/[id]/waiting/route.ts']],
+      ['seed', ['app/api/projects/[id]/seed/route.ts']],
+    ] as [string, string[]][]) {
+      check(`D6-${name}: the route still verifies with the Auth server`,
+        /auth\.getUser\(\)/.test(files.map((f) => strip(read(f))).join('\n')))
     }
     check('D7-MUT: the guards DO match a file that asks the Auth server, so D is not vacuous',
       /supabase\.auth\.getUser\(\)/.test('const { data } = await supabase.auth.getUser()'))

@@ -12,7 +12,8 @@
  */
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useActiveProject } from '@/lib/active-project/ActiveProjectProvider'
-import { gscStatusUrl, gscMetricsUrl, takeGscSeed, type GscMetricsView, type GscResponse } from '@/lib/gsc/urls'
+import { gscStatusUrl, gscMetricsUrl, type GscMetricsView, type GscResponse } from '@/lib/gsc/urls'
+import { takeSeed } from '@/lib/client/html-seed'
 import { gscStatusView, type GscSetupState, type GscStatusView } from '@/lib/gsc/widget-state'
 import { useGscEnabled } from './GscFeature'
 
@@ -24,10 +25,9 @@ const shared = new Map<string, { at: number; promise: Promise<GscResponse>; valu
  *  request is served from it. Taken once: a `fresh` read still asks the route. */
 function adoptSeed(url: string): void {
   if (shared.has(url)) return
-  const seed = takeGscSeed(url)
+  const seed = takeSeed(url)
   if (!seed) return
-  const value: GscResponse = { status: seed.status, body: seed.body }
-  shared.set(url, { at: Date.now(), promise: Promise.resolve(value), value })
+  shared.set(url, { at: Date.now(), promise: Promise.resolve(seed), value: seed })
 }
 
 function request(url: string, fresh: boolean): Promise<GscResponse> {
