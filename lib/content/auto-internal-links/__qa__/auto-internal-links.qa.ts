@@ -37,9 +37,9 @@ import { plainText } from '@/lib/link-network/anchor'
 import { readAnchorBank } from '@/lib/content/internal-link-candidates'
 import { getDashboardDictionary } from '@/lib/i18n/dashboard/getDashboardDictionary'
 import ArticleAutoLinksCard from '@/components/content/ArticleAutoLinksCard'
-import { autoLinkCandidates, selectAutoLinks, type AutoLinkArticle } from '../select'
+import { autoLinkCandidates, isFacetUrl, selectAutoLinks, type AutoLinkArticle } from '../select'
 import { autoLinksShown, hasAutoLinks, markAutoRemoved } from '../entries'
-import { runAutoInternalLinksStep } from '../step'
+import { checkLinkTarget, runAutoInternalLinksStep } from '../step'
 
 let passed = 0
 let failed = 0
@@ -222,7 +222,9 @@ async function main() {
     article_topics: [{ id: 't-1', project_id: PROJECT, primary_keyword: 'איים ביפן', secondary_keywords: ['חופים ביפן', 'אוקינאווה', 'הוקאידו'], language: 'he' }],
     site_page_map: over.map === null ? [] : [{ project_id: PROJECT, user_id: OWNER, status: 'completed', finished_at: '2026-09-28T10:00:00Z', site_url: `${SITE}/`, entries: MAP, ...over.map }],
   }, (over.mapHooks ?? {}) as never)
-  const deps = { now: () => NOW, env: {} as Record<string, string | undefined> }
+  // checkUrl is stubbed in every world: the step asks each chosen page whether
+  // it still answers, and a suite must not reach out to the network.
+  const deps = { now: () => NOW, env: {} as Record<string, string | undefined>, checkUrl: async () => 'alive' as const }
   const quiet = console.log
   console.log = () => {}
   const w1 = world()
@@ -274,6 +276,98 @@ async function main() {
   await noDraft.runAutoInternalLinksStep(wp as never, { projectId: PROJECT, userId: OWNER, articleId: ART }, deps)
   console.log = quiet
   check('MUTATION CONTROL: without the draft check a published article is changed (so B3 would fail)', /<a /.test(String(wp.tables.generated_articles[0].content_html)))
+
+  // ── E) a link is never made to a page that is not there ─────────────────────
+  // Oren, 16 November 2026: an article on buy-buy.co.il carried the anchor
+  // "אינטגרלי" pointing at /filter/אינטגרלי-מלא/, which answers 404. Measured
+  // afterwards over every internal link in Production: ELEVEN of buy-buy's
+  // filter addresses were linked from nine published articles and every one of
+  // them was a 404, plus one dead category on 4dogsoriginal. Two separate
+  // holes, so two separate guards.
+  console.log('\nE) a link is never made to a page that is not there')
+  const FACET_MAP = [
+    { u: u('filter/integrali-male/'), t: 'אינטגרלי מלא' },
+    { u: u('filter/oled/'), t: 'OLED' },
+    { u: u('pa_color/black/'), t: 'שחור' },
+    { u: u('sort/price/'), t: 'מחיר' },
+    { u: u('okinawa/'), t: 'אוקינאווה' },
+  ]
+  const facetCands = autoLinkCandidates(FACET_MAP, host, islands())
+  check('E1: a faceted filter page is never a candidate, however the site lists it',
+    facetCands.length === 1 && facetCands[0].url === u('okinawa/'), JSON.stringify(facetCands.map((c) => c.url)))
+  check('E2: the forms measured in Production are all covered: /filter/, /pa_<attr>/, /sort/',
+    isFacetUrl(u('filter/qled/')) && isFacetUrl(u('pa_size/40/')) && isFacetUrl(u('sort/price/'))
+    && !isFacetUrl(u('product-category/ovens/')) && !isFacetUrl(u('product/filter-coffee-machine/')))
+
+  // The second hole: a page the sitemap lists that is simply gone.
+  const asked: string[] = []
+  const goneStub = (dead: string[]) => async (url: string) => { asked.push(url); return dead.includes(url) ? 'gone' as const : 'alive' as const }
+  const wGone = world()
+  console.log = () => {}
+  const rGone = await runAutoInternalLinksStep(wGone as never, { projectId: PROJECT, userId: OWNER, articleId: ART }, { ...deps, checkUrl: goneStub([u('okinawa/')]) })
+  const rowGone = wGone.tables.generated_articles[0] as { content_html: string; internal_links_json: Record<string, unknown>[] }
+  const wAllGone = world()
+  const rAllGone = await runAutoInternalLinksStep(wAllGone as never, { projectId: PROJECT, userId: OWNER, articleId: ART }, { ...deps, checkUrl: async () => 'gone' as const })
+  console.log = quiet
+  check('E3: every chosen page is asked before anything is written', asked.length >= 3 && asked.every((a) => a.startsWith(SITE)))
+  check('E4: a chosen page that is GONE is not linked, and the choice is made again so the article keeps its links',
+    rGone.outcome === 'linked' && !rowGone.content_html.includes(u('okinawa/'))
+    && (rowGone.content_html.match(/<a /g) ?? []).length === rGone.links && rGone.links >= 2
+    && rowGone.internal_links_json.filter((e) => e.source === 'auto').every((e) => e.url !== u('okinawa/')), JSON.stringify(rGone))
+  check('E5: when every page is gone the article is left alone, with its own reason',
+    rAllGone.outcome === 'skipped' && rAllGone.reason === 'targets_gone'
+    && !/<a /.test(String(wAllGone.tables.generated_articles[0].content_html)), JSON.stringify(rAllGone))
+
+  // checkLinkTarget's own rule table, with fetch stubbed: ONLY a definite
+  // 404/410 drops a link. A 403, a 429, a 5xx or no answer at all mean "we do
+  // not know", and four of the fleet's own sites answered exactly that while
+  // this was measured, so an unknown must never strip a good link.
+  const realFetch = globalThis.fetch
+  const stubFetch = (plan: (method: string) => number | 'throw') => {
+    globalThis.fetch = (async (_u: string | URL | Request, init?: { method?: string }) => {
+      const m = String(init?.method ?? 'GET')
+      const out = plan(m)
+      if (out === 'throw') throw new Error('network')
+      return { status: out, ok: out < 400 } as Response
+    }) as typeof fetch
+  }
+  try {
+    stubFetch(() => 404)
+    const dead404 = await checkLinkTarget(u('filter/x/'))
+    stubFetch(() => 410)
+    const dead410 = await checkLinkTarget(u('filter/x/'))
+    stubFetch(() => 200)
+    const live200 = await checkLinkTarget(u('okinawa/'))
+    stubFetch(() => 403)
+    const live403 = await checkLinkTarget(u('okinawa/'))
+    stubFetch(() => 429)
+    const live429 = await checkLinkTarget(u('okinawa/'))
+    stubFetch(() => 503)
+    const live503 = await checkLinkTarget(u('okinawa/'))
+    stubFetch(() => 'throw')
+    const liveErr = await checkLinkTarget(u('okinawa/'))
+    stubFetch((m) => (m === 'HEAD' ? 405 : 404))
+    const headRefused = await checkLinkTarget(u('filter/x/'))
+    check('E6: only 404 and 410 count as gone', dead404 === 'gone' && dead410 === 'gone')
+    check('E7: 200 is alive, and so is everything we cannot read: 403, 429, 5xx, no answer',
+      live200 === 'alive' && live403 === 'alive' && live429 === 'alive' && live503 === 'alive' && liveErr === 'alive')
+    check('E8: a site that refuses HEAD is asked again with GET', headRefused === 'gone')
+  } finally {
+    globalThis.fetch = realFetch
+  }
+
+  const noFacet = await mutant<Sel>('lib/content/auto-internal-links/select.ts', (s) => s.replace('|| isFacetUrl(url)', ''))
+  const facetBack = noFacet.autoLinkCandidates(FACET_MAP, host, islands()).map((c) => c.url)
+  check('MUTATION CONTROL: without the facet rule the 404 filter pages are candidates again (so E1 would fail)',
+    facetBack.includes(u('filter/integrali-male/')) && facetBack.includes(u('pa_color/black/')) && facetBack.length === FACET_MAP.length,
+    JSON.stringify(facetBack))
+  const noCheck = await mutant<Step>('lib/content/auto-internal-links/step.ts', (s) => s.replace('const gone = new Set(liveness.filter(([, state]) => state === \'gone\').map(([url]) => url))', 'const gone = new Set<string>()'))
+  const wNo = world()
+  console.log = () => {}
+  await noCheck.runAutoInternalLinksStep(wNo as never, { projectId: PROJECT, userId: OWNER, articleId: ART }, { ...deps, checkUrl: async () => 'gone' as const })
+  console.log = quiet
+  check('MUTATION CONTROL: without the liveness check a page that is gone is linked anyway (so E4/E5 would fail)',
+    String(wNo.tables.generated_articles[0].content_html).includes(u('okinawa/')))
 
   // ── C) storage and removal ──────────────────────────────────────────────────
   console.log('\nC) storage and removal')

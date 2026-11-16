@@ -13,8 +13,11 @@
  * (site_page_map, lib/content/existing-content): only pages the site itself
  * listed (its sitemaps or its WordPress REST lists) in a completed or partial
  * run, on the site's own host, content URLs only (no cart, tag, author, feed,
- * asset, query string), never the home page or a blog listing, never the
- * article's own address (its slug) or a page with its own title.
+ * asset, query string), never the home page or a blog listing, never a faceted
+ * filter or attribute archive (./select isFacetUrl), never the article's own
+ * address (its slug) or a page with its own title. The step that calls this
+ * then CHECKS that the pages it picked actually answer (./step.ts): a sitemap
+ * is a claim, not a promise.
  *
  * RELEVANCE, from the target's title against the article's topic (its title,
  * primary and secondary keywords, and its H2/H3 section headings, FAQ
@@ -157,6 +160,30 @@ const hostOf = (u: string) => { try { return new URL(u).hostname.toLowerCase().r
 const pathKey = (u: string) => (pathSegments(u) ?? []).join('/')
 
 /**
+ * A FACETED page: the filter/sort archive a shop generates from an attribute
+ * (WooCommerce's /filter/<value>/ pretty permalinks and its /pa_<attribute>/
+ * attribute archives). Measured on buy-buy.co.il, 15 November 2026: its own
+ * sitemap listed 628 /filter/ addresses, the mapping took them as content, and
+ * ELEVEN of them were linked from nine published articles — every single one
+ * answering 404, among them the "אינטגרלי" anchor Oren found.
+ *
+ * Two separate reasons never to link one, either of which is enough:
+ *   - it is generated on demand, so it comes and goes while the sitemap keeps
+ *     claiming it (that is where the 404s came from);
+ *   - even alive it is a thin, usually noindex list, not a page that supports
+ *     an article.
+ * `isContentUrl` only drops facets carried in a QUERY STRING (?filter_...),
+ * which is the same thing written the other way, so this is that rule finishing
+ * its own sentence — kept here, in the link target rule, so the merchant's page
+ * COUNTS on the existing-content screen do not change.
+ */
+const FACET_SEGMENTS = new Set(['filter', 'filters', 'filtered', 'sort', 'sortby', 'orderby', 'סינון', 'מסננים'])
+export function isFacetUrl(raw: string): boolean {
+  const segs = pathSegments(raw) ?? []
+  return segs.some((s) => FACET_SEGMENTS.has(s) || /^pa[_-][^/]+$/.test(s))
+}
+
+/**
  * The site's own pages that may be linked: from the mapping's entries, on the
  * site's host, content pages only, with a readable title, never the home page,
  * a blog listing, or the article itself.
@@ -179,7 +206,7 @@ export function autoLinkCandidates(
     // to yield zero candidates, so zero links, for every article.
     const schemeOk = site.allowHttp ? /^https?:\/\//i.test(url) : /^https:\/\//i.test(url)
     if (!schemeOk || hostOf(url) !== host) continue
-    if (!isContentUrl(url) || isBlogListing(url)) continue
+    if (!isContentUrl(url) || isBlogListing(url) || isFacetUrl(url)) continue
     const segs = pathSegments(url) ?? []
     if (segs.length === 0) continue
     const key = segs.join('/')
