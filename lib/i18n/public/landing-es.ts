@@ -99,8 +99,10 @@ export const landingEs: LandingCopy = {
     },
   },
   worksWith: {
-    label: 'Comprobamos y publicamos por ti en:',
-    names: ['Google', 'Google Maps', 'ChatGPT', 'Gemini', 'Perplexity', 'Copilot', 'Grok', 'WordPress', 'Shopify', 'Wix'],
+    checkLabel: 'Comprobamos dónde apareces en:',
+    checkNames: ['Google', 'Google Maps', 'ChatGPT', 'Gemini', 'Perplexity', 'Copilot', 'Grok'],
+    publishLabel: 'Publicamos directamente en:',
+    publishNames: ['WordPress', 'Shopify', 'Wix'],
   },
   outcomes: {
     eyebrow: 'Qué obtienes',

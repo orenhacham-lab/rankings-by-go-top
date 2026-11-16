@@ -113,8 +113,10 @@ export const landingJa: LandingCopy = {
     },
   },
   worksWith: {
-    label: '当社が計測し、公開する先：',
-    names: ['Google', 'Googleマップ', 'ChatGPT', 'Gemini', 'Perplexity', 'Copilot', 'Grok', 'WordPress', 'Shopify', 'Wix'],
+    checkLabel: '掲載状況を計測する先：',
+    checkNames: ['Google', 'Googleマップ', 'ChatGPT', 'Gemini', 'Perplexity', 'Copilot', 'Grok'],
+    publishLabel: '直接公開する先：',
+    publishNames: ['WordPress', 'Shopify', 'Wix'],
   },
   outcomes: {
     eyebrow: '得られるもの',

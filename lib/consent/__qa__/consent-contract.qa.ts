@@ -164,25 +164,35 @@ function main() {
      */
     const sizeOf = (cls: string) => cls.match(/\$\{compact \? ([A-Z_]+) : ([A-Z_]+)\}/)
     const equalOk = (s: string) => {
-      const accept = s.match(/onClick=\{handleAccept\}[\s\S]{0,400}?className=\{`([^`]*)`\}/)
-      const reject = s.match(/onClick=\{handleReject\}[\s\S]{0,400}?className=\{`([^`]*)`\}/)
+      const accept = s.match(/onClick=\{handleAccept\}\s*className=\{`([^`]*)`\}/)
+      const reject = s.match(/onClick=\{handleReject\}\s*className=\{`([^`]*)`\}/)
       if (!accept || !reject) return false
       const a = sizeOf(accept[1]), r = sizeOf(reject[1])
       if (!a || !r) return false
       if (a[1] !== r[1] || a[2] !== r[2]) return false
-      if (!/flex-1/.test(accept[1]) || !/flex-1/.test(reject[1])) return false
-      // The row stretches, so the taller label's height is handed to its peer.
+      // Accept is now a row of its own and reject shares the row beneath it with
+      // "customize" (the owner's layout, 16 Nov 2026), so the two are no longer
+      // side by side and only ONE of them is flex-1. What the law asks survives
+      // that move and is still asserted above: both take their height and type
+      // size from the same two constants, so neither can be made the cheaper
+      // press. Width is the only thing that differs, and a half-width reject is
+      // still a full-height filled button one click away on the same card.
+      if (!/w-full rounded-control border border-transparent bg-action/.test(accept[1])) return false
+      if (!/flex-1/.test(reject[1])) return false
+      // Each row stretches, so the taller label's height is handed to its peer.
       if (!/flex items-stretch/.test(s)) return false
       // And the phone button's height is a floor, never a ceiling: a label that
       // needs two lines makes the button taller instead of spilling out of it.
       const compactConst = s.match(new RegExp(`const ${a[1]} = '([^']*)'`))
       return !!compactConst && /min-h-\[26px\]/.test(compactConst[1]) && !/(^|\s)h-\[\d+px\]/.test(compactConst[1])
     }
-    check('D1: accept and reject are peer buttons of the same size in the same row', equalOk(banner))
+    check('D1: accept and reject take their size from the same constants; only the width differs', equalOk(banner))
     check('MUT: a phone button that clips its label again is caught',
       !equalOk(banner.replace("const COMPACT_BUTTON = 'min-h-[26px]", "const COMPACT_BUTTON = 'h-[26px]")))
     check('MUT: giving accept a size of its own is caught',
-      !equalOk(banner.replace('onClick={handleAccept}\n          className={`${compact ? COMPACT_BUTTON : FULL_BUTTON}', 'onClick={handleAccept}\n          className={`${compact ? FULL_BUTTON : FULL_BUTTON}')))
+      !equalOk(banner.replace(/onClick=\{handleAccept\}(\s*)className=\{`\$\{compact \? COMPACT_BUTTON : FULL_BUTTON\}/, 'onClick={handleAccept}$1className={`${compact ? FULL_BUTTON : FULL_BUTTON}')))
+    check('MUT: shrinking reject\'s type against accept is caught',
+      !equalOk(banner.replace(/onClick=\{handleReject\}(\s*)className=\{`\$\{compact \? COMPACT_BUTTON : FULL_BUTTON\}/, 'onClick={handleReject}$1className={`${compact ? COMPACT_BUTTON : COMPACT_BUTTON}')))
     check('MUT: a row that no longer stretches is caught', !equalOk(banner.replace('flex items-stretch', 'flex items-start')))
     check('MUT: a reject rendered as small print is caught',
       !equalOk(banner.replace(/onClick=\{handleReject\}(\s*)className=\{`([^`]*)`\}/, 'onClick={handleReject}$1className="text-overline underline"')))

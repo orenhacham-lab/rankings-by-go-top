@@ -21,7 +21,7 @@ import HeroBackdrop from '@/components/public/HeroBackdrop'
 import { cn } from '@/lib/utils'
 
 /** Every public language's own landing copy. Exhaustive by type, on purpose. */
-const AUTH_LANDING: Record<PublicLocale, typeof landingHe> = {
+export const AUTH_LANDING: Record<PublicLocale, typeof landingHe> = {
   he: landingHe,
   en: landingEn,
   es: landingEs,

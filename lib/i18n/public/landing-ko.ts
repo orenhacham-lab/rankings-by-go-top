@@ -124,8 +124,10 @@ export const landingKo: LandingCopy = {
     },
   },
   worksWith: {
-    label: '저희가 측정하고 발행하는 곳:',
-    names: ['Google', 'Google 지도', 'ChatGPT', 'Gemini', 'Perplexity', 'Copilot', 'Grok', 'WordPress', 'Shopify', 'Wix'],
+    checkLabel: '노출 여부를 측정하는 곳:',
+    checkNames: ['Google', 'Google 지도', 'ChatGPT', 'Gemini', 'Perplexity', 'Copilot', 'Grok'],
+    publishLabel: '바로 발행하는 곳:',
+    publishNames: ['WordPress', 'Shopify', 'Wix'],
   },
   outcomes: {
     eyebrow: '얻게 되는 것',

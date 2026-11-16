@@ -59,8 +59,12 @@ export type LandingCopy = {
     published: string
   }
   demo: HeroDemoCopy
-  /** The strip under the hero: where we check and where we publish. */
-  worksWith: { label: string; names: string[] }
+  /**
+   * The strip under the hero, as TWO claims, because they are two different
+   * things: we measure visibility in the engines, and we publish to the site
+   * platforms. One label over all ten names read as "we publish to Grok".
+   */
+  worksWith: { checkLabel: string; checkNames: string[]; publishLabel: string; publishNames: string[] }
   outcomes: {
     eyebrow: string
     title: string
@@ -188,14 +192,10 @@ export function LandingPage({
               <HeroDemo copy={copy.demo} rtl={rtl} />
             </div>
           </div>
-          {/* Where we check and where we publish */}
-          <div className={cn(CONTAINER, 'flex flex-col items-center gap-3 py-8 lg:flex-row lg:justify-center lg:gap-6')}>
-            <span className="shrink-0 text-caption font-semibold text-muted">{copy.worksWith.label}</span>
-            <ul className="flex flex-wrap items-center justify-center gap-x-6 gap-y-2">
-              {copy.worksWith.names.map((name) => (
-                <li key={name} dir="ltr" className="text-section font-semibold tracking-tight text-muted">{name}</li>
-              ))}
-            </ul>
+          {/* Where we check, and — separately — where we publish */}
+          <div className={cn(CONTAINER, 'flex flex-col items-center gap-5 py-10 sm:gap-6')}>
+            <WorksWithRow label={copy.worksWith.checkLabel} names={copy.worksWith.checkNames} />
+            <WorksWithRow label={copy.worksWith.publishLabel} names={copy.worksWith.publishNames} />
           </div>
         </div>
 
@@ -261,6 +261,22 @@ export function LandingPage({
                   </ul>
                 </div>
               </Rise>
+            </div>
+            {/* The page used to run four full screens — the comparison, how it works, the
+                four features — with no way to act on any of it, so a visitor convinced
+                here had to scroll back up or on to the end. The same primary action,
+                offered where the argument lands. */}
+            <div className="mt-12 flex flex-col items-center gap-3 lg:col-span-5">
+              <ButtonLink
+                href={startHref}
+                size="lg"
+                arrow
+                data-mid-cta
+                className={cn(styles.cta, 'h-12 px-7 focus-visible:ring-white/50')}
+              >
+                {signedIn ? copy.cta.dashboard : copy.cta.signup}
+              </ButtonLink>
+              <p className="text-copy text-contrast-ink/75">{copy.hero.trialNote}</p>
             </div>
           </div>
         </section>
@@ -394,10 +410,15 @@ export function LandingPage({
           <div className={cn(CONTAINER, 'relative')}>
             <h2 className="mx-auto max-w-3xl text-h2-mkt text-balance text-contrast-ink">{copy.cta.title}</h2>
             <p className="mx-auto mt-4 max-w-[58ch] text-lead-mkt font-normal text-contrast-ink/80 text-pretty">{copy.cta.body}</p>
+            {/* The SAME hierarchy as the hero. It used to be inverted here — the free
+                check filled and lit, the trial an outline button — so the last thing a
+                visitor read pushed them down the path that never asks for an account.
+                One page, one primary action: the trial, both times. */}
             <div className="mt-9 flex flex-col items-stretch justify-center gap-3 sm:flex-row sm:items-center">
-              <ButtonLink href={checkHref} size="lg" arrow className={cn(styles.cta, 'h-12 px-7 focus-visible:ring-white/50')}>{copy.cta.check}</ButtonLink>
-              <ButtonLink href={startHref} variant="inverse" size="lg" className="h-12 px-7">{signedIn ? copy.cta.dashboard : copy.cta.signup}</ButtonLink>
+              <ButtonLink href={startHref} size="lg" arrow data-cta-primary className={cn(styles.cta, 'h-12 px-7 focus-visible:ring-white/50')}>{signedIn ? copy.cta.dashboard : copy.cta.signup}</ButtonLink>
+              <ButtonLink href={checkHref} variant="inverse" size="lg" data-cta-secondary className="h-12 px-7">{copy.cta.check}</ButtonLink>
             </div>
+            <p className="mx-auto mt-3 text-copy text-contrast-ink/75">{copy.hero.trialNote}</p>
             <p className="mx-auto mt-10 max-w-xl text-copy text-contrast-ink/75">
               {copy.cta.pricing}{' '}
               <a href={pricingHref} className="rounded-control font-semibold text-contrast-ink underline decoration-white/30 underline-offset-4 hover:decoration-white/80 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-white/40">
@@ -409,6 +430,30 @@ export function LandingPage({
       </main>
 
       <Footer locale={locale} />
+    </div>
+  )
+}
+
+/**
+ * One claim of the works-with strip. The names were flat grey text, the one
+ * element on the page that looked unfinished beside the cards around it; as
+ * bordered chips they read as a list of integrations, which is what they are.
+ */
+function WorksWithRow({ label, names }: { label: string; names: string[] }) {
+  return (
+    <div className="flex flex-col items-center gap-2.5 sm:flex-row sm:gap-4">
+      <span className="shrink-0 text-caption font-semibold text-muted">{label}</span>
+      <ul className="flex flex-wrap items-center justify-center gap-2">
+        {names.map((name) => (
+          <li
+            key={name}
+            dir="ltr"
+            className="inline-flex h-8 items-center rounded-pill border border-line bg-surface px-3 text-copy font-semibold tracking-tight text-body"
+          >
+            {name}
+          </li>
+        ))}
+      </ul>
     </div>
   )
 }
