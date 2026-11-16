@@ -46,6 +46,9 @@ import { useProjectCompetitorComparison } from '@/components/competitors/useComp
 import GscClicksTile from '@/components/gsc/GscClicksTile'
 import GscTopPages from '@/components/gsc/GscTopPages'
 import { formatCount } from '@/components/gsc/format'
+import { readGscResponse, gscStatusUrl } from '@/components/gsc/gsc-data'
+import { useGscEnabled } from '@/components/gsc/GscFeature'
+import { prefetchMonthlyReports } from '@/components/reports/monthly/useMonthlyReports'
 import { strategyHref } from '@/lib/content/strategy/view'
 import { buildRankings, type DashboardResult, type DashboardTarget, type RankingsView } from '@/lib/dashboard/rankings'
 import { holdingBack, seedFeed } from '@/lib/dashboard/seed'
@@ -214,6 +217,25 @@ function ProjectDashboard({ project, onStartMode }: { project: Project; onStartM
     )
     return () => { cancelled = true }
   }, [project.id, attempt])
+
+  /**
+   * THE READS THAT ONLY NEED THE PROJECT ID, STARTED NOW.
+   *
+   * Search Console's status and the monthly-report teaser are rendered by cards
+   * that only exist once this screen has left its loading state, so on a measured
+   * dashboard load they began in the fourth wave of requests (GET /api/gsc/status
+   * and /api/reports/monthly at ~2986ms), and the metrics they gate began in the
+   * fifth (~3423ms) - although both need nothing but the project id, which this
+   * component has from its first render. Both reads are shared by URL, so starting
+   * them here costs no extra request: the cards find the answers already in hand.
+   * Search Console that the SERVER says is off is not asked at all, exactly as the
+   * widgets themselves do not ask.
+   */
+  const gscEnabled = useGscEnabled()
+  useEffect(() => {
+    if (gscEnabled !== false) void readGscResponse(gscStatusUrl(project.id)).catch(() => {})
+    prefetchMonthlyReports(project.id)
+  }, [project.id, gscEnabled])
 
   useEffect(() => {
     const timer = setInterval(() => setNow(new Date()), CLOCK_TICK_MS)

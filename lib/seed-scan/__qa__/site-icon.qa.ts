@@ -142,8 +142,12 @@ console.log('\nG) source guards')
   check('G5: a1 reads the icon off the page it already fetched and stores it in the summary', stores(steps))
   check('MUT: a1 that does not store it fails G5', !stores(steps.replace('...(siteIcon ? { siteIcon } : {}),', '')))
 
-  const route = strip(read('app/api/projects/active/route.ts'))
-  const rechecks = (src: string) => /site_icon: safeSiteIcon\(icons\.get\(r\.id\), r\.target_domain\)/.test(src) && /\.eq\('user_id', user\.id\)/.test(src)
+  // 2026-11-16: the list itself moved into lib/active-project/list.ts so the
+  // dashboard layout can build it in-region; the route still serves it. Both
+  // properties are still asserted, on whichever of the two files now holds the
+  // text — the re-check against the project's own domain, and the owner filter.
+  const route = strip(read('app/api/projects/active/route.ts')) + '\n' + strip(read('lib/active-project/list.ts'))
+  const rechecks = (src: string) => /site_icon: safeSiteIcon\(icons\.get\(r\.id\), r\.target_domain\)/.test(src) && /\.eq\('user_id', user(Id|\.id)\)/.test(src)
   check('G6: the list route re-checks each stored icon against the project\'s own domain, for the caller\'s projects only', rechecks(route))
   check('MUT: a route that passes the stored icon through unchecked fails G6', !rechecks(route.replace('site_icon: safeSiteIcon(icons.get(r.id), r.target_domain)', 'site_icon: icons.get(r.id) ?? null')))
 
