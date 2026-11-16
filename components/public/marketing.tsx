@@ -58,7 +58,7 @@ export function buttonClasses(variant: ButtonVariant = 'primary', size: ButtonSi
 }
 
 export function ButtonLink({
-  href, variant = 'primary', size = 'md', className, children, onClick, arrow = false, rel, target,
+  href, variant = 'primary', size = 'md', className, children, onClick, arrow = false, rel, target, ...dataProps
 }: {
   href: string
   variant?: ButtonVariant
@@ -79,7 +79,16 @@ export function ButtonLink({
    * landing page adds its light sweep through `className`.)
    */
   arrow?: boolean
-}) {
+  /**
+   * `data-*` attributes reach the rendered element.
+   *
+   * They did NOT until 16 Nov 2026, and nothing said so: JSX lets a hyphenated
+   * attribute through without type-checking it, so `data-hero-primary` had been
+   * written on the hero's button, compiled cleanly, and never appeared in the
+   * DOM. A guard that looks for such a marker in a browser is then green on an
+   * element that does not exist. Declared and spread, so it is real.
+   */
+} & Record<`data-${string}`, string | number | boolean | undefined>) {
   const cls = buttonClasses(variant, size, cn(arrow && 'group active:translate-y-px', className))
   const content = arrow ? (
     <>
@@ -91,9 +100,9 @@ export function ButtonLink({
     </>
   ) : children
   // mailto:/tel: are not routes; next/link would try to prefetch them.
-  if (/^(mailto|tel):/.test(href)) return <a href={href} className={cls} onClick={onClick}>{content}</a>
-  if (rel || target) return <a href={href} rel={rel} target={target} className={cls} onClick={onClick}>{content}</a>
-  return <Link href={href} className={cls} onClick={onClick}>{content}</Link>
+  if (/^(mailto|tel):/.test(href)) return <a href={href} className={cls} onClick={onClick} {...dataProps}>{content}</a>
+  if (rel || target) return <a href={href} rel={rel} target={target} className={cls} onClick={onClick} {...dataProps}>{content}</a>
+  return <Link href={href} className={cls} onClick={onClick} {...dataProps}>{content}</Link>
 }
 
 export function IconSquircle({ icon: Icon, className }: { icon: LucideIcon; className?: string }) {

@@ -108,8 +108,10 @@ export const landingIt: LandingCopy = {
     },
   },
   worksWith: {
-    label: 'Controlliamo e pubblichiamo per Lei su:',
-    names: ['Google', 'Google Maps', 'ChatGPT', 'Gemini', 'Perplexity', 'Copilot', 'Grok', 'WordPress', 'Shopify', 'Wix'],
+    checkLabel: 'Controlliamo dove appare su:',
+    checkNames: ['Google', 'Google Maps', 'ChatGPT', 'Gemini', 'Perplexity', 'Copilot', 'Grok'],
+    publishLabel: 'Pubblichiamo direttamente su:',
+    publishNames: ['WordPress', 'Shopify', 'Wix'],
   },
   outcomes: {
     eyebrow: 'Che cosa si ottiene',

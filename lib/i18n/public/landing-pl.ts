@@ -126,8 +126,10 @@ export const landingPl: LandingCopy = {
     },
   },
   worksWith: {
-    label: 'Sprawdzamy i publikujemy dla Państwa w:',
-    names: ['Google', 'Mapy Google', 'ChatGPT', 'Gemini', 'Perplexity', 'Copilot', 'Grok', 'WordPress', 'Shopify', 'Wix'],
+    checkLabel: 'Sprawdzamy, gdzie Państwo się pojawiają w:',
+    checkNames: ['Google', 'Mapy Google', 'ChatGPT', 'Gemini', 'Perplexity', 'Copilot', 'Grok'],
+    publishLabel: 'Publikujemy bezpośrednio w:',
+    publishNames: ['WordPress', 'Shopify', 'Wix'],
   },
   outcomes: {
     eyebrow: 'Co Państwo otrzymują',

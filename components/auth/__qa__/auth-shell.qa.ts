@@ -124,14 +124,26 @@ const rendered = Object.fromEntries(Object.keys(PAGES).map((p) => [p, renderAuth
 // ── B) primitives ─────────────────────────────────────────────────────────────
 console.log('\nB) the controls are the primitives')
 {
-  // w9: sign-up asks for full name, company (optional), email, phone, a password and its
-  // confirmation; the terms are a consent line with both links right above the button.
+  // Sign-up asks for full name, company (optional), email, phone and ONE password;
+  // the terms are a consent line with both links right above the button.
+  //
+  // It was six fields until 16 Nov 2026: the sixth was "confirm password", and it
+  // went because the password field carries its own show/hide control, so the typo
+  // it guarded against is one the typist can already see. The count is pinned at
+  // five so a seventh field cannot arrive unnoticed on the screen that asks a cold
+  // visitor for a commitment — and so the confirmation cannot creep back either.
   const signupHtml = rendered['/signup']
-  const fields = (s: string) => count(s, /<input\b/) === 6 && /autoComplete="name"/.test(s) && /autoComplete="organization"/.test(s)
-    && /autoComplete="email"/.test(s) && /autoComplete="tel"/.test(s) && count(s, /autoComplete="new-password"/) === 2 && !/id="terms"/.test(s)
-  check('B1: sign-up has six fields: name, company, email, phone, password and its confirmation', fields(signupHtml))
+  const fields = (s: string) => count(s, /<input\b/) === 5 && /autoComplete="name"/.test(s) && /autoComplete="organization"/.test(s)
+    && /autoComplete="email"/.test(s) && /autoComplete="tel"/.test(s) && count(s, /autoComplete="new-password"/) === 1 && !/id="terms"/.test(s)
+  check('B1: sign-up has five fields: name, company, email, phone and one password', fields(signupHtml))
   check('MUT: no phone field fails B1', !fields(signupHtml.replace(/autoComplete="tel"/, 'autoComplete="off"')))
-  check('MUT: no password confirmation fails B1', !fields(signupHtml.replace(/autoComplete="new-password"/, 'autoComplete="off"')))
+  check('MUT: a reinstated password confirmation fails B1',
+    !fields(signupHtml.replace('autoComplete="new-password"', 'autoComplete="new-password"/><input autoComplete="new-password"')))
+
+  // B1-a — and it says what the trial costs, right where the commitment is asked for.
+  const trialNote = (s: string) => /data-signup-trial-note/.test(s)
+  check('B1-a: the trial note is on the sign-up screen', trialNote(signupHtml) && trialNote(rendered['/en/signup']))
+  check('MUT: dropping the note fails B1-a', !trialNote(signupHtml.replace(/data-signup-trial-note/g, 'data-x')))
   const consent = (s: string) => /data-signup-consent[\s\S]*?href="\/terms"[\s\S]*?href="\/privacy"[\s\S]*?<\/p>\s*<button[^>]*type="submit"/.test(s)
   check('B2: the consent line links the terms and the privacy policy, right above the button', consent(signupHtml) && consent(rendered['/en/signup'].replace('href="/en/terms"', 'href="/terms"').replace(/href="\/en\/privacy"([^>]*>Privacy Policy)/, 'href="/privacy"$1')))
   check('MUT: a consent line without the terms link fails B2', !consent(signupHtml.replace('href="/terms"', 'href="/x"')))

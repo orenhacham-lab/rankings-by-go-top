@@ -14,7 +14,7 @@ import { keepSeedClaim, seedClaimDestination } from './claim-action'
 import { recordSignupSource } from './source-action'
 import { CLAIM_START_PATH } from '@/lib/onboarding/claim-start'
 import GoogleSignInButton from '@/components/auth/GoogleSignInButton'
-import AuthShell, { AUTH_LINK_CLASSES, AUTH_TITLE_CLASSES } from '@/components/auth/AuthShell'
+import AuthShell, { AUTH_LANDING, AUTH_LINK_CLASSES, AUTH_TITLE_CLASSES } from '@/components/auth/AuthShell'
 import Badge from '@/components/ui/Badge'
 import { NoticeBox } from '@/components/ui/Notice'
 import PasswordField from '@/components/auth/PasswordField'
@@ -50,8 +50,6 @@ const SIGNUP_UI = {
     password: 'סיסמה',
     passwordPlaceholder: '••••••••',
     passwordHint: 'לפחות 8 תווים',
-    confirmPassword: 'אימות סיסמה',
-    confirmPasswordPlaceholder: 'מקלידים שוב את הסיסמה',
     showPassword: 'הצגת הסיסמה',
     hidePassword: 'הסתרת הסיסמה',
     consentBefore: 'ביצירת החשבון אתם מאשרים את ',
@@ -78,7 +76,6 @@ const SIGNUP_UI = {
       fieldRequired: 'שדה זה הוא חובה',
       fullNameInvalid: 'נא להזין שם מלא (לפחות 2 תווים)',
       phoneInvalid: 'נא להזין מספר טלפון תקין',
-      passwordMismatch: 'הסיסמאות אינן זהות. נא להקליד אותה סיסמה בשני השדות.',
       emailExists: 'כתובת האימייל כבר רשומה במערכת. נסו להתחבר.',
       emailRateLimit: 'נשלחו יותר מדי בקשות הרשמה בזמן קצר. נסו שוב בעוד כמה דקות או השתמשו בכתובת אימייל אחרת.',
       signupFailed: 'אירעה שגיאה ביצירת החשבון. אנא נסו שוב.',
@@ -111,8 +108,6 @@ const SIGNUP_UI = {
     password: 'Password',
     passwordPlaceholder: '••••••••',
     passwordHint: 'At least 8 characters',
-    confirmPassword: 'Confirm password',
-    confirmPasswordPlaceholder: 'Type the password again',
     showPassword: 'Show password',
     hidePassword: 'Hide password',
     consentBefore: 'By creating an account you agree to the ',
@@ -139,7 +134,6 @@ const SIGNUP_UI = {
       fieldRequired: 'This field is required',
       fullNameInvalid: 'Please enter your full name (at least 2 characters)',
       phoneInvalid: 'Please enter a valid phone number',
-      passwordMismatch: 'The passwords do not match. Type the same password in both fields.',
       emailExists: 'This email is already registered. Please sign in instead.',
       emailRateLimit: 'Too many signup requests were sent in a short time. Please try again in a few minutes or use a different email address.',
       signupFailed: 'An error occurred while creating your account. Please try again.',
@@ -172,8 +166,6 @@ const SIGNUP_UI = {
     password: 'Contraseña',
     passwordPlaceholder: '••••••••',
     passwordHint: 'Al menos 8 caracteres',
-    confirmPassword: 'Confirma la contraseña',
-    confirmPasswordPlaceholder: 'Escribe la contraseña otra vez',
     showPassword: 'Mostrar la contraseña',
     hidePassword: 'Ocultar la contraseña',
     consentBefore: 'Al crear una cuenta aceptas los ',
@@ -200,7 +192,6 @@ const SIGNUP_UI = {
       fieldRequired: 'Este campo es obligatorio',
       fullNameInvalid: 'Escribe tu nombre completo (al menos 2 caracteres)',
       phoneInvalid: 'Escribe un número de teléfono válido',
-      passwordMismatch: 'Las contraseñas no coinciden. Escribe la misma en los dos campos.',
       emailExists: 'Este correo electrónico ya está registrado. Inicia sesión.',
       emailRateLimit: 'Se han enviado demasiadas solicitudes de registro en poco tiempo. Inténtalo de nuevo en unos minutos o usa otro correo electrónico.',
       signupFailed: 'Ha ocurrido un error al crear la cuenta. Inténtalo de nuevo.',
@@ -233,8 +224,6 @@ const SIGNUP_UI = {
     password: 'Senha',
     passwordPlaceholder: '••••••••',
     passwordHint: 'Pelo menos 8 caracteres',
-    confirmPassword: 'Confirme a senha',
-    confirmPasswordPlaceholder: 'Digite a senha outra vez',
     showPassword: 'Mostrar a senha',
     hidePassword: 'Ocultar a senha',
     consentBefore: 'Ao criar uma conta você aceita os ',
@@ -261,7 +250,6 @@ const SIGNUP_UI = {
       fieldRequired: 'Este campo é obrigatório',
       fullNameInvalid: 'Escreva seu nome completo (pelo menos 2 caracteres)',
       phoneInvalid: 'Escreva um número de telefone válido',
-      passwordMismatch: 'As senhas não coincidem. Digite a mesma nos dois campos.',
       emailExists: 'Este e-mail já está cadastrado. Entre na sua conta.',
       emailRateLimit: 'Chegaram muitas solicitações de cadastro em pouco tempo. Tente de novo em alguns minutos ou use outro e-mail.',
       signupFailed: 'Ocorreu um erro ao criar a conta. Tente de novo.',
@@ -294,8 +282,6 @@ const SIGNUP_UI = {
     password: 'Mot de passe',
     passwordPlaceholder: '••••••••',
     passwordHint: '8 caractères au minimum',
-    confirmPassword: 'Confirmez le mot de passe',
-    confirmPasswordPlaceholder: 'Saisissez le mot de passe une seconde fois',
     showPassword: 'Afficher le mot de passe',
     hidePassword: 'Masquer le mot de passe',
     consentBefore: 'En créant un compte, vous acceptez les ',
@@ -322,7 +308,6 @@ const SIGNUP_UI = {
       fieldRequired: 'Ce champ est obligatoire',
       fullNameInvalid: 'Saisissez votre nom complet (au moins 2 caractères)',
       phoneInvalid: 'Saisissez un numéro de téléphone valide',
-      passwordMismatch: 'Les mots de passe ne correspondent pas. Saisissez le même dans les deux champs.',
       emailExists: 'Cette adresse e-mail est déjà enregistrée. Connectez-vous.',
       emailRateLimit: 'Trop de demandes d’inscription ont été envoyées en peu de temps. Réessayez dans quelques minutes ou utilisez une autre adresse e-mail.',
       signupFailed: 'Une erreur est survenue lors de la création du compte. Réessayez.',
@@ -355,8 +340,6 @@ const SIGNUP_UI = {
     password: 'Password',
     passwordPlaceholder: '••••••••',
     passwordHint: 'Almeno 8 caratteri',
-    confirmPassword: 'Confermi la password',
-    confirmPasswordPlaceholder: 'Inserisca la password una seconda volta',
     showPassword: 'Mostrare la password',
     hidePassword: 'Nascondere la password',
     consentBefore: 'Creando un account, accetta le ',
@@ -383,7 +366,6 @@ const SIGNUP_UI = {
       fieldRequired: 'Questo campo è obbligatorio',
       fullNameInvalid: 'Inserisca il nome completo (almeno 2 caratteri)',
       phoneInvalid: 'Inserisca un numero di telefono valido',
-      passwordMismatch: 'Le password non corrispondono. Inserisca la stessa in entrambi i campi.',
       emailExists: 'Questo indirizzo e-mail è già registrato. Effettui l’accesso.',
       emailRateLimit: 'Sono state inviate troppe richieste di registrazione in poco tempo. Riprovi tra qualche minuto oppure utilizzi un altro indirizzo e-mail.',
       signupFailed: 'Si è verificato un errore durante la creazione dell’account. Riprovi.',
@@ -416,8 +398,6 @@ const SIGNUP_UI = {
     password: 'パスワード',
     passwordPlaceholder: '••••••••',
     passwordHint: '8文字以上',
-    confirmPassword: 'パスワードの確認',
-    confirmPasswordPlaceholder: 'パスワードをもう一度入力',
     showPassword: 'パスワードを表示',
     hidePassword: 'パスワードを隠す',
     consentBefore: 'アカウントを作成すると、',
@@ -444,7 +424,6 @@ const SIGNUP_UI = {
       fieldRequired: 'この項目は必須です',
       fullNameInvalid: 'お名前を入力してください（2文字以上）',
       phoneInvalid: '有効な電話番号を入力してください',
-      passwordMismatch: 'パスワードが一致しません。両方の欄に同じものを入力してください。',
       emailExists: 'このメールアドレスはすでに登録されています。ログインしてください。',
       emailRateLimit: '短い時間に登録のリクエストが多すぎました。数分おいてから、もう一度お試しいただくか、別のメールアドレスをお使いください。',
       signupFailed: 'アカウントの作成中にエラーが発生しました。もう一度お試しください。',
@@ -477,8 +456,6 @@ const SIGNUP_UI = {
     password: 'Passwort',
     passwordPlaceholder: '••••••••',
     passwordHint: 'Mindestens 8 Zeichen',
-    confirmPassword: 'Passwort bestätigen',
-    confirmPasswordPlaceholder: 'Passwort erneut eingeben',
     showPassword: 'Passwort anzeigen',
     hidePassword: 'Passwort verbergen',
     consentBefore: 'Mit dem Erstellen eines Kontos stimmen Sie den ',
@@ -505,7 +482,6 @@ const SIGNUP_UI = {
       fieldRequired: 'Dieses Feld ist erforderlich',
       fullNameInvalid: 'Bitte geben Sie Ihren Namen ein (mindestens 2 Zeichen)',
       phoneInvalid: 'Bitte geben Sie eine gültige Telefonnummer ein',
-      passwordMismatch: 'Die Passwörter stimmen nicht überein. Geben Sie in beiden Feldern dasselbe ein.',
       emailExists: 'Diese E-Mail-Adresse ist schon registriert. Melden Sie sich bitte an.',
       emailRateLimit: 'Es wurden in kurzer Zeit zu viele Registrierungen angefragt. Versuchen Sie es in einigen Minuten erneut, oder nutzen Sie eine andere E-Mail-Adresse.',
       signupFailed: 'Beim Erstellen des Kontos ist ein Fehler aufgetreten. Versuchen Sie es erneut.',
@@ -538,8 +514,6 @@ const SIGNUP_UI = {
     password: 'Wachtwoord',
     passwordPlaceholder: '\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022',
     passwordHint: 'Minimaal 8 tekens',
-    confirmPassword: 'Wachtwoord bevestigen',
-    confirmPasswordPlaceholder: 'Vul het wachtwoord nog een keer in',
     showPassword: 'Wachtwoord tonen',
     hidePassword: 'Wachtwoord verbergen',
     consentBefore: 'Met het aanmaken van een account gaat u akkoord met de ',
@@ -566,7 +540,6 @@ const SIGNUP_UI = {
       fieldRequired: 'Dit veld is verplicht',
       fullNameInvalid: 'Vul uw naam in (minimaal 2 tekens)',
       phoneInvalid: 'Vul een geldig telefoonnummer in',
-      passwordMismatch: 'De wachtwoorden zijn niet gelijk. Vul in beide velden hetzelfde in.',
       emailExists: 'Dit e-mailadres is al geregistreerd. Log in.',
       emailRateLimit: 'Er zijn in korte tijd te veel aanmeldingen aangevraagd. Probeer het over een paar minuten opnieuw, of gebruik een ander e-mailadres.',
       signupFailed: 'Bij het aanmaken van het account is een fout opgetreden. Probeer het opnieuw.',
@@ -599,8 +572,6 @@ const SIGNUP_UI = {
     password: 'Hasło',
     passwordPlaceholder: '\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022',
     passwordHint: 'Co najmniej 8 znaków',
-    confirmPassword: 'Potwierdź hasło',
-    confirmPasswordPlaceholder: 'Prosimy wpisać hasło ponownie',
     showPassword: 'Pokaż hasło',
     hidePassword: 'Ukryj hasło',
     consentBefore: 'Tworząc konto, akceptują Państwo ',
@@ -627,7 +598,6 @@ const SIGNUP_UI = {
       fieldRequired: 'To pole jest wymagane',
       fullNameInvalid: 'Prosimy podać imię i nazwisko (co najmniej 2 znaki)',
       phoneInvalid: 'Prosimy podać prawidłowy numer telefonu',
-      passwordMismatch: 'Hasła nie są zgodne. Prosimy wpisać to samo w oba pola.',
       emailExists: 'Ten adres e-mail jest już zarejestrowany. Prosimy się zalogować.',
       emailRateLimit: 'W krótkim czasie zgłoszono zbyt wiele rejestracji. Prosimy spróbować za kilka minut albo użyć innego adresu e-mail.',
       signupFailed: 'Przy tworzeniu konta wystąpił błąd. Prosimy spróbować ponownie.',
@@ -660,8 +630,6 @@ const SIGNUP_UI = {
     password: '비밀번호',
     passwordPlaceholder: '\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022',
     passwordHint: '8자 이상',
-    confirmPassword: '비밀번호 확인',
-    confirmPasswordPlaceholder: '비밀번호를 다시 입력해 주십시오',
     showPassword: '비밀번호 표시',
     hidePassword: '비밀번호 숨기기',
     consentBefore: '계정을 만드시면 ',
@@ -688,7 +656,6 @@ const SIGNUP_UI = {
       fieldRequired: '필수 항목입니다',
       fullNameInvalid: '이름을 입력해 주십시오 (2자 이상)',
       phoneInvalid: '올바른 전화번호를 입력해 주십시오',
-      passwordMismatch: '비밀번호가 일치하지 않습니다. 두 칸에 같은 값을 입력해 주십시오.',
       emailExists: '이미 가입된 이메일 주소입니다. 로그인해 주십시오.',
       emailRateLimit: '짧은 시간에 가입 요청이 너무 많았습니다. 몇 분 뒤에 다시 시도하시거나 다른 이메일 주소를 사용해 주십시오.',
       signupFailed: '계정을 만드는 중 오류가 발생했습니다. 다시 시도해 주십시오.',
@@ -746,8 +713,8 @@ export function SignupForm() {
       })
   }, [claimParam, pathname, router, searchParams])
 
-  // The fields (w9): full name, company (optional), email, phone, a password and
-  // its confirmation, which must match. The free check stays optional: a visitor who
+  // The fields: full name, company (optional), email, phone and a password. The
+  // free check stays optional: a visitor who
   // ran one arrives with ?claim= and it is kept exactly as before. Name, company and
   // phone go into the auth user's metadata at signUp (full_name, company_name, phone),
   // which is where the account's default client (lib/clients/ensure-default-client.ts)
@@ -758,7 +725,6 @@ export function SignupForm() {
     email: '',
     phone: '',
     password: '',
-    confirmPassword: '',
   })
   type FieldKey = keyof typeof formData
   const [fieldErrors, setFieldErrors] = useState<Partial<Record<FieldKey, string>>>({})
@@ -769,12 +735,11 @@ export function SignupForm() {
 
   function setField(key: FieldKey, value: string) {
     setFormData((prev) => ({ ...prev, [key]: value }))
-    // An error clears as soon as its field is edited (the confirmation also when the password changes).
+    // An error clears as soon as its field is edited.
     setFieldErrors((prev) => {
-      if (!prev[key] && !(key === 'password' && prev.confirmPassword)) return prev
+      if (!prev[key]) return prev
       const next = { ...prev }
       delete next[key]
-      if (key === 'password') delete next.confirmPassword
       return next
     })
   }
@@ -801,8 +766,6 @@ export function SignupForm() {
       errors.password = t.err.passwordTooShort
     }
 
-    if (!formData.confirmPassword) errors.confirmPassword = t.err.fieldRequired
-    else if (formData.confirmPassword !== formData.password) errors.confirmPassword = t.err.passwordMismatch
 
     return errors
   }
@@ -1142,17 +1105,11 @@ export function SignupForm() {
             autoComplete="new-password"
           />
 
-          <PasswordField
-            id="signup-password-confirm"
-            label={t.confirmPassword}
-            value={formData.confirmPassword}
-            onChange={(confirmPassword) => setField('confirmPassword', confirmPassword)}
-            placeholder={t.confirmPasswordPlaceholder}
-            error={fieldErrors.confirmPassword}
-            showLabel={t.showPassword}
-            hideLabel={t.hidePassword}
-            autoComplete="new-password"
-          />
+          {/* No "confirm password" field. It guards against a typo in a value the
+              typist cannot see — and this one they can: the field above has its own
+              show/hide control, and a password manager fills it correctly either way.
+              A sixth field on a free trial costs more than the typo it catches, and
+              anyone who does mistype recovers through "forgot password". */}
 
           <p className="text-caption text-muted" data-signup-consent>
             {t.consentBefore}
@@ -1170,6 +1127,15 @@ export function SignupForm() {
           >
             {t.signupBtn}
           </Button>
+
+          {/* What the trial costs, where the decision is made. The home page says
+              "no credit card, cancel any time" beside both of its buttons and the
+              line disappeared on the one screen that asks for the commitment. It is
+              the landing copy's own sentence, so it stays true in all eleven
+              languages without a string of its own. */}
+          <p className="text-center text-caption text-muted" data-signup-trial-note>
+            {AUTH_LANDING[lang].hero.trialNote}
+          </p>
         </form>
       </div>
     </AuthShell>

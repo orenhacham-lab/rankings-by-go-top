@@ -151,9 +151,22 @@ function main() {
   {
     const src = strip(read('app/(auth)/signup/page.tsx'))
     const fieldsOk = (s: string) => /full_name: formData\.fullName\.trim\(\)/.test(s) && /company_name: formData\.company\.trim\(\)/.test(s) && /phone: formData\.phone\.trim\(\)/.test(s)
-      && /formData\.confirmPassword !== formData\.password/.test(s) && /error=\{fieldErrors\.confirmPassword\}/.test(s) && /passwordMismatch/.test(s)
-    check('D1: name, company, phone go into the signUp metadata; a confirmation that differs is an inline error', fieldsOk(src))
-    check('MUT: no confirmation check fails D1', !fieldsOk(src.replace('formData.confirmPassword !== formData.password', 'false')))
+    check('D1: name, company and phone go into the signUp metadata', fieldsOk(src))
+
+    // D1-a — THE CONFIRMATION FIELD IS GONE, ON PURPOSE. It guarded a typo in a
+    // value the typist cannot see, and this one they can: the password field
+    // carries its own show/hide control. A sixth field on a free trial costs
+    // more than the typo it catches. If it ever comes back, it comes back with
+    // a reason, not by accident.
+    const noConfirm = (s: string) => !/confirmPassword/.test(s) && /showLabel=\{t\.showPassword\}/.test(s)
+    check('D1-a: no confirm-password field, and the password is still revealable', noConfirm(src))
+    check('MUT: a reinstated confirmation fails D1-a', !noConfirm(`${src}\nerror={fieldErrors.confirmPassword}`))
+
+    // D1-b — what the trial costs, on the screen that asks for the commitment.
+    // The home page says it beside both of its buttons; this screen said nothing.
+    const noteOk = (s: string) => /data-signup-trial-note/.test(s) && /AUTH_LANDING\[lang\]\.hero\.trialNote/.test(s)
+    check('D1-b: the trial note sits under the submit button, in the reader\'s own language', noteOk(src))
+    check('MUT: dropping the note fails D1-b', !noteOk(src.replace('AUTH_LANDING[lang].hero.trialNote', "'x'")))
     check('MUT: no phone in the metadata fails D1', !fieldsOk(src.replace('phone: formData.phone.trim().slice(0, 30),', '')))
     const optionalOk = (s: string) => !/errors\.company/.test(s) && /companyOptional/.test(s)
     check('D2: the company is optional, the free check is not required', optionalOk(src) && !/free_check|freeCheck.*required/.test(src))
@@ -169,7 +182,7 @@ function main() {
     // spellings count: reading only the bare one made Portuguese invisible here
     // and turned every key into a phantom missing string.
     const langs = PUBLIC_LOCALES.filter((l) => dict.includes(`  ${l}: {`) || dict.includes(`  '${l}': {`)).length
-    const keys = ['fullName', 'company', 'phone', 'confirmPassword', 'passwordMismatch', 'phoneInvalid', 'fullNameInvalid']
+    const keys = ['fullName', 'company', 'phone', 'phoneInvalid', 'fullNameInvalid']
     const both = langs >= 2 && keys.every((k) => (dict.match(new RegExp(`\\b${k}:`, 'g')) ?? []).length === langs)
     check(`D4: every new string exists in all ${langs} of the form's dictionaries`, both,
       keys.filter((k) => (dict.match(new RegExp(`\\b${k}:`, 'g')) ?? []).length !== langs).join(', '))
@@ -222,6 +235,28 @@ function main() {
     check('MUT: logging every decision under one hard-coded language fails E1',
       !contractOk(c.replace(/reportConsent\(record, [^)]*\)/g, "reportConsent(record, 'he')"), store))
     check('E2: the popup is at the left in both languages (physical left-*, no start/end)', /left-24/.test(c) && /left-3\.5/.test(c) && !/\b(?:start|end)-\d/.test(c))
+
+    // E3 — THE OWNER'S LAYOUT (16 Nov 2026): one wide Accept, then reject and
+    // customize together on the row beneath it, each half its width.
+    //
+    // The two below are smaller in WIDTH ONLY. Their height and type size come
+    // from the same constants as Accept, and the equality of those constants is
+    // what lib/consent/__qa__/consent-contract.qa.ts D1 pins, because a reject
+    // set in smaller type is the pattern regulators have fined for. This guard
+    // pins the geometry; that one pins the floor under it. Both have to hold.
+    const shapeOk = (s: string) =>
+      /onClick=\{handleAccept\}\s*className=\{`\$\{compact \? COMPACT_BUTTON : FULL_BUTTON\}[^`]*w-full/.test(s)
+      && /onClick=\{handleReject\}\s*className=\{`\$\{compact \? COMPACT_BUTTON : FULL_BUTTON\}[^`]*flex-1/.test(s)
+      && /onClick=\{\(\) => setPanelOpen\(true\)\}\s*className=\{`\$\{compact \? COMPACT_BUTTON : FULL_BUTTON\}[^`]*flex-1/.test(s)
+      // and refusing is still a <button> on the card, never a link
+      && /<button\n\s*type="button"\n\s*onClick=\{handleReject\}/.test(s)
+    check('E3: one wide Accept, with reject and customize as equal-sized buttons beneath it', shapeOk(c))
+    check('MUT: demoting reject to a link fails E3',
+      !shapeOk(c.replace(/<button\n(\s*)type="button"\n(\s*)onClick=\{handleReject\}/, '<a\n$1type="button"\n$2onClick={handleReject}')))
+    check('MUT: a narrow Accept fails E3',
+      !shapeOk(c.replace(/(onClick=\{handleAccept\}\s*className=\{`\$\{compact \? COMPACT_BUTTON : FULL_BUTTON\}[^`]*?)w-full/, '$1flex-1')))
+    check('MUT: customize left as small print fails E3',
+      !shapeOk(c.replace(/(onClick=\{\(\) => setPanelOpen\(true\)\}\s*className=\{`)\$\{compact \? COMPACT_BUTTON : FULL_BUTTON\}/, '$1${compact ? \'mt-1 text-overline\' : \'mt-2 text-caption\'}')))
   }
 
   console.log(`\n${pass} passed, ${fail} failed`)
