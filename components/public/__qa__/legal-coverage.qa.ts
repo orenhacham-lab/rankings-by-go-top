@@ -363,6 +363,9 @@ check('MUTATION — an English-only extra section is caught', pages.he.terms.h2 
     'commoncrawl.org': 'operator documentation cited by the open crawler dataset; not fetched',
     'allenai.org': 'operator documentation cited by the open crawler dataset; not fetched',
     'www.diffbot.com': 'operator documentation cited by the open crawler dataset; not fetched',
+    'docs.mistral.ai': 'operator documentation cited by the open crawler dataset; not fetched',
+    'duckduckgo.com': 'operator documentation cited by the open crawler dataset; not fetched',
+    'kagi.com': 'operator documentation cited by the open crawler dataset; not fetched',
     // The licence the dataset is published under, named in the payload so a
     // consumer knows what attribution it owes. A link, not a fetch.
     'creativecommons.org': 'the CC BY 4.0 licence the open dataset names; not fetched',
