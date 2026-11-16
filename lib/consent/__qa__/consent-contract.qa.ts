@@ -163,36 +163,68 @@ function main() {
      * grow rather than clip.
      */
     const sizeOf = (cls: string) => cls.match(/\$\{compact \? ([A-Z_]+) : ([A-Z_]+)\}/)
+    // Each composed constant is `${SOME_BOX} ${SOME_TYPE}`: pull the two apart.
+    const partsOf = (s: string, name: string) => {
+      const def = s.match(new RegExp('const ' + name + ' = `([^`]*)`'))
+      if (!def) return null
+      const box = def[1].match(/\$\{([A-Z_]*BOX[A-Z_]*)\}/)
+      const type = def[1].match(/\$\{([A-Z_]*TYPE[A-Z_]*)\}/)
+      return box && type ? { box: box[1], type: type[1] } : null
+    }
+    const boxValue = (s: string, name: string) => s.match(new RegExp("const " + name + " = '([^']*)'"))?.[1]
+    // Tailwind: min-h-[30px] is literal, min-h-10 is 10 * 4px.
+    const floorPx = (cls: string) => {
+      const literal = cls.match(/min-h-\[(\d+)px\]/)
+      if (literal) return Number(literal[1])
+      const step = cls.match(/min-h-(\d+)(?:\s|$)/)
+      return step ? Number(step[1]) * 4 : null
+    }
+    const MAX_HEIGHT_GAP = 6
     const equalOk = (s: string) => {
       const accept = s.match(/onClick=\{handleAccept\}\s*className=\{`([^`]*)`\}/)
       const reject = s.match(/onClick=\{handleReject\}\s*className=\{`([^`]*)`\}/)
       if (!accept || !reject) return false
       const a = sizeOf(accept[1]), r = sizeOf(reject[1])
       if (!a || !r) return false
-      if (a[1] !== r[1] || a[2] !== r[2]) return false
-      // Accept is now a row of its own and reject shares the row beneath it with
-      // "customize" (the owner's layout, 16 Nov 2026), so the two are no longer
-      // side by side and only ONE of them is flex-1. What the law asks survives
-      // that move and is still asserted above: both take their height and type
-      // size from the same two constants, so neither can be made the cheaper
-      // press. Width is the only thing that differs, and a half-width reject is
-      // still a full-height filled button one click away on the same card.
+      // Accept is a row of its own and reject shares the row beneath it with
+      // "customize" (the owner's layout, 16 Nov 2026), and accept carries a
+      // little more height than reject (the owner's call, same day). What the
+      // law asks survives both moves and is what is asserted here.
+      //
+      // 1. TYPE IS IDENTICAL, phone and desktop. Neither decision may be set in
+      //    smaller print than the other; that is the fined pattern.
+      for (const [acceptConst, rejectConst] of [[a[1], r[1]], [a[2], r[2]]]) {
+        const pa = partsOf(s, acceptConst), pr = partsOf(s, rejectConst)
+        if (!pa || !pr) return false
+        if (pa.type !== pr.type) return false
+        // 2. THE HEIGHT GAP IS CAPPED. Emphasis is allowed a few pixels; it is
+        //    not allowed to grow until reject reads as an afterthought.
+        const fa = floorPx(boxValue(s, pa.box) ?? ''), fr = floorPx(boxValue(s, pr.box) ?? '')
+        if (fa === null || fr === null) return false
+        if (fa < fr || fa - fr > MAX_HEIGHT_GAP) return false
+        // 3. The phone button's height stays a FLOOR, never a ceiling: a label
+        //    that needs two lines makes the button taller instead of spilling.
+        for (const box of [pa.box, pr.box]) {
+          const v = boxValue(s, box) ?? ''
+          if (/(^|\s)h-\[?\d/.test(v)) return false
+        }
+      }
+      // 4. Reject is still a real filled button on the same card, one click.
       if (!/w-full rounded-control border border-transparent bg-action/.test(accept[1])) return false
       if (!/flex-1/.test(reject[1])) return false
       // Each row stretches, so the taller label's height is handed to its peer.
       if (!/flex items-stretch/.test(s)) return false
-      // And the phone button's height is a floor, never a ceiling: a label that
-      // needs two lines makes the button taller instead of spilling out of it.
-      const compactConst = s.match(new RegExp(`const ${a[1]} = '([^']*)'`))
-      return !!compactConst && /min-h-\[26px\]/.test(compactConst[1]) && !/(^|\s)h-\[\d+px\]/.test(compactConst[1])
+      return true
     }
-    check('D1: accept and reject take their size from the same constants; only the width differs', equalOk(banner))
+    check('D1: accept and reject share one type size, and accept’s extra height is capped', equalOk(banner))
     check('MUT: a phone button that clips its label again is caught',
-      !equalOk(banner.replace("const COMPACT_BUTTON = 'min-h-[26px]", "const COMPACT_BUTTON = 'h-[26px]")))
-    check('MUT: giving accept a size of its own is caught',
-      !equalOk(banner.replace(/onClick=\{handleAccept\}(\s*)className=\{`\$\{compact \? COMPACT_BUTTON : FULL_BUTTON\}/, 'onClick={handleAccept}$1className={`${compact ? FULL_BUTTON : FULL_BUTTON}')))
-    check('MUT: shrinking reject\'s type against accept is caught',
-      !equalOk(banner.replace(/onClick=\{handleReject\}(\s*)className=\{`\$\{compact \? COMPACT_BUTTON : FULL_BUTTON\}/, 'onClick={handleReject}$1className={`${compact ? COMPACT_BUTTON : COMPACT_BUTTON}')))
+      !equalOk(banner.replace("const COMPACT_BOX = 'min-h-[26px]", "const COMPACT_BOX = 'h-[26px]")))
+    check('MUT: shrinking reject’s type against accept is caught',
+      !equalOk(banner.replace('const COMPACT_BUTTON = `${COMPACT_BOX} ${COMPACT_TYPE}`', 'const COMPACT_BUTTON = `${COMPACT_BOX} ${FULL_TYPE}`')))
+    check('MUT: growing accept’s height past the cap is caught',
+      !equalOk(banner.replace("const COMPACT_BOX_ACCEPT = 'min-h-[30px]", "const COMPACT_BOX_ACCEPT = 'min-h-[60px]")))
+    check('MUT: making reject the taller of the two is caught',
+      !equalOk(banner.replace("const COMPACT_BOX = 'min-h-[26px]", "const COMPACT_BOX = 'min-h-[40px]")))
     check('MUT: a row that no longer stretches is caught', !equalOk(banner.replace('flex items-stretch', 'flex items-start')))
     check('MUT: a reject rendered as small print is caught',
       !equalOk(banner.replace(/onClick=\{handleReject\}(\s*)className=\{`([^`]*)`\}/, 'onClick={handleReject}$1className="text-overline underline"')))
