@@ -164,6 +164,61 @@ async function main() {
       !OLD_AUTOMATIC.test('Automatyczne sprawdzanie obejmuje Perplexity i Copilot.'))
   }
 
+  console.log('D) denying a promise is not making one')
+  {
+    // 16 Nov 2026: Polish was the only one of eleven locales that published
+    // nothing, after five attempts inside the morning window refused on
+    // `truth:ranking_guarantee`. Every Polish topic in the plan is a
+    // `pozycjonowanie` keyword — ranking work — and an honest article about
+    // ranking work almost has to say that rankings cannot be promised.
+    const denials: [string, string][] = [
+      ['Polish', 'Żadna agencja nie da gwarancji pozycji w Google.'],
+      ['Polish (no guarantee exists)', 'Nie ma gwarancji pozycji — jest tylko praca, którą da się zmierzyć.'],
+      ['English', 'No agency can guarantee rankings.'],
+      ['Hebrew', 'אף אחד לא יכול להבטיח מקום ראשון בגוגל.'],
+      ['German', 'Keine Agentur kann Platzierungen garantieren.'],
+      ['French', 'Aucune agence ne peut garantir un classement.'],
+      ['Spanish', 'Ninguna agencia puede garantizar posiciones.'],
+      ['Japanese (negated verb ending)', '検索順位を保証しません。'],
+    ]
+    for (const [lang, text] of denials) {
+      check(`D: ${lang} — saying a ranking CANNOT be promised still publishes`,
+        !verdict(text).failures.includes('ranking_guarantee'), verdict(text).failures.join(','))
+    }
+
+    // The promise itself must still be refused, including the two shapes that
+    // could hide behind the negation rule.
+    const promises: [string, string][] = [
+      ['Polish', 'Gwarantujemy pierwsze pozycje w Google w trzy miesiące.'],
+      ['Polish (noun form)', 'Nasza oferta to gwarancja pozycji w pierwszej dziesiątce.'],
+      ['English', 'We guarantee first page rankings in three months.'],
+      ['Hebrew', 'אנחנו מבטיחים מקום ראשון בגוגל.'],
+      ['German', 'Wir garantieren den ersten Platz bei Google.'],
+      ['Japanese', '検索順位を保証します。'],
+      // A denial and a promise in one text: the promise is in its own sentence,
+      // and a sentence-bounded rule must not let the denial excuse it.
+      ['a denial followed by a promise', 'No one can guarantee rankings. We guarantee you the first position.'],
+      // "not just X, we also X": the second claim carries no negation.
+      ['the "don\'t just" shape', "We don't just guarantee rankings, we guarantee results."],
+    ]
+    for (const [lang, text] of promises) {
+      check(`D: ${lang} — the promise is still refused`,
+        verdict(text).failures.includes('ranking_guarantee'))
+    }
+
+    // MUTATION CONTROL — the pre-fix rule: one test over the whole text, with no
+    // negation and a two-word gap.
+    const OLD_VERBS = '(?:guarantee[ds]?|garantiza(?:mos|do)?|garant(?:imos|ido|ia|e)|garant(?:it|ie|issons)|garan(?:tiamo|tito|zia)|garantier(?:t|te|en)|Garantie|gegarandeerde?|garanderen|gwarantujemy|gwarancj[aąęi]|gwarantowan\\w*)'
+    const OLD_NOUNS = '(?:rankings?|positions?|results|posici[óo]n|resultados|posi[çc][ãa]o|classement|r[ée]sultats|posizion\\w*|risultati|Platz\\w*|Ergebnisse|positie|resultaten|pozycj\\w*|wynik\\w*|miejsc\\w*|dziesi[ąa]tce)'
+    const OLD = new RegExp('מובטח|מבטיח(?:ים|ה)?\\s+(?:מקום|דירוג|עלייה)'
+      + `|${OLD_VERBS}\\s+(?:\\S+\\s+){0,2}${OLD_NOUNS}` + '|(?:順位|掲載|上位)[^。]{0,6}保証', 'i')
+    check('MUTATION: the old rule refused the Polish sentence that denies a guarantee (so D would fail)',
+      OLD.test('Żadna agencja nie da gwarancji pozycji w Google.'))
+    check('MUTATION: and the English one', OLD.test('No agency can guarantee rankings.'))
+    check('MUTATION: and it let "guarantee you the first position" through (the gap was two words)',
+      !OLD.test('We guarantee you the first position.'))
+  }
+
   console.log(`\n${pass} passed, ${fail} failed`)
   if (fail > 0) process.exitCode = 1
 }
