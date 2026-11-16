@@ -46,7 +46,7 @@ import { useProjectCompetitorComparison } from '@/components/competitors/useComp
 import GscClicksTile from '@/components/gsc/GscClicksTile'
 import GscTopPages from '@/components/gsc/GscTopPages'
 import { formatCount } from '@/components/gsc/format'
-import { readGscResponse, gscStatusUrl } from '@/components/gsc/gsc-data'
+import { prefetchGscScreenReads } from '@/components/gsc/gsc-data'
 import { useGscEnabled } from '@/components/gsc/GscFeature'
 import { prefetchMonthlyReports } from '@/components/reports/monthly/useMonthlyReports'
 import { strategyHref } from '@/lib/content/strategy/view'
@@ -233,7 +233,10 @@ function ProjectDashboard({ project, onStartMode }: { project: Project; onStartM
    */
   const gscEnabled = useGscEnabled()
   useEffect(() => {
-    if (gscEnabled !== false) void readGscResponse(gscStatusUrl(project.id)).catch(() => {})
+    // The status came with the document, so this costs no request; the top-pages
+    // view is asked for here instead of when its widget mounts, which is after
+    // the rankings have landed (components/gsc/gsc-data.ts).
+    if (gscEnabled !== false) prefetchGscScreenReads(project.id, ['pages'])
     prefetchMonthlyReports(project.id)
   }, [project.id, gscEnabled])
 
