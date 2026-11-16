@@ -14,6 +14,8 @@ import { useCallback, useEffect, useState } from 'react'
 import type { DashboardOverview } from '@/lib/dashboard/overview'
 import { seedStateFrom, seedStillRunning, type SeedState } from '@/lib/dashboard/seed'
 import { readSeed, seedUrl as sharedSeedUrl } from '@/lib/client/seed-read'
+import { takeSeed } from '@/lib/client/html-seed'
+import { dashboardOverviewUrl as sharedOverviewUrl } from '@/lib/dashboard/urls'
 
 const READ_DEADLINE_MS = 15_000
 /** How often a running scan is asked again. */
@@ -37,22 +39,43 @@ export type OverviewState =
   | { status: 'error' }
   | { status: 'ready'; data: DashboardOverview }
 
-export function dashboardOverviewUrl(projectId: string): string {
-  return `/api/projects/${encodeURIComponent(projectId)}/dashboard`
+/** Re-exported from lib/dashboard/urls.ts, which the SERVER can call too (the
+ *  dashboard's layout seeds this answer keyed by this very URL), so there is one
+ *  spelling of the path. */
+export const dashboardOverviewUrl = sharedOverviewUrl
+
+/** The answer as a state, from a status and a body, wherever they came from. */
+function overviewFrom(status: number, body: unknown): OverviewState {
+  const ok = status === 200 && !!body && (body as { ok?: unknown }).ok === true
+  return ok ? { status: 'ready', data: body as DashboardOverview } : { status: 'error' }
 }
 
 export function useDashboardOverview(projectId: string): { overview: OverviewState; reload: () => void } {
-  const [result, setResult] = useState<{ attempt: number; state: OverviewState } | null>(null)
+  // THE ANSWER MAY ALREADY BE HERE. The dashboard's layout builds it in its own
+  // region and writes it into the HTML (app/(dashboard)/dashboard/layout.tsx),
+  // which a script puts on globalThis while the page is still being parsed. Read
+  // during the FIRST render, not in an effect: an effect runs after this render
+  // has already shown the skeleton, and after it would have started a request.
+  // Nothing seeded - another project, a failed build, an older page - simply
+  // means the request below, exactly as before.
+  const [result, setResult] = useState<{ attempt: number; state: OverviewState } | null>(() => {
+    const seeded = takeSeed(dashboardOverviewUrl(projectId))
+    return seeded ? { attempt: 0, state: overviewFrom(seeded.status, seeded.body) } : null
+  })
   const [attempt, setAttempt] = useState(0)
 
   useEffect(() => {
+    // Already in hand for this attempt (the seed): no request.
+    if (result && result.attempt === attempt) return
     let cancelled = false
     void getJson(dashboardOverviewUrl(projectId)).then(({ status, body }) => {
       if (cancelled) return
-      const ok = status === 200 && !!body && (body as { ok?: unknown }).ok === true
-      setResult({ attempt, state: ok ? { status: 'ready', data: body as DashboardOverview } : { status: 'error' } })
+      setResult({ attempt, state: overviewFrom(status, body) })
     })
     return () => { cancelled = true }
+    // `result` is what this effect SETS; depending on it would re-run the effect
+    // on its own answer. It is read here only to skip a request already answered.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [projectId, attempt])
 
   const reload = useCallback(() => setAttempt((n) => n + 1), [])

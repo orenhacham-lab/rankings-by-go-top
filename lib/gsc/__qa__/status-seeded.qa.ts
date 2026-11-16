@@ -22,7 +22,8 @@
 import { readFileSync } from 'fs'
 import { join } from 'path'
 import { buildGscStatus } from '../status'
-import { gscStatusUrl, gscMetricsUrl, gscSeedScript, takeGscSeed, GSC_SEED_GLOBAL } from '../urls'
+import { gscStatusUrl, gscMetricsUrl } from '../urls'
+import { seedScript, takeSeed, HTML_SEED_GLOBAL } from '@/lib/client/html-seed'
 import { activeProjectFromCookie, activeProjectCookieWrite, ACTIVE_PROJECT_COOKIE } from '@/lib/active-project/active-cookie'
 import { gscStatusView } from '../widget-state'
 
@@ -110,7 +111,9 @@ async function main() {
   console.log('\nC) it arrives as a script, before anything can ask for it')
   {
     const seed = strip(read('components/gsc/GscStatusSeed.tsx'))
-    check('C1: the seed renders a script that carries the answer', /gscSeedScript\(url, response\.status, response\.body\)/.test(seed))
+    check('C1: the seed renders a script that carries the answer',
+      /<HtmlSeed url=\{url\} status=\{response\.status\} body=\{response\.body\} \/>/.test(seed)
+      && /seedScript\(url, status, body\)/.test(strip(read('components/HtmlSeed.tsx'))))
     check('C2: it is not a client component priming from render or an effect',
       !/'use client'/.test(seed) && !/useEffect/.test(seed) && !/primeGscResponse/.test(seed))
     const data = strip(read('components/gsc/gsc-data.ts'))
@@ -135,23 +138,23 @@ async function main() {
     // EXECUTED: run the script the server would send, then read it back.
     const url = gscStatusUrl('p1')
     const body = { ok: true, note: 'closes a tag? </script><img src=x>' }
-    const script = gscSeedScript(url, 200, body)
+    const script = seedScript(url, 200, body)
     check('C11: the script can never close its own tag', !/<\/script/i.test(script) && !script.includes('<img'))
     new Function(script)()
-    const store = (globalThis as Record<string, unknown>)[GSC_SEED_GLOBAL] as Record<string, unknown>
+    const store = (globalThis as Record<string, unknown>)[HTML_SEED_GLOBAL] as Record<string, unknown>
     check('C12: running it puts the answer on globalThis, keyed by that URL', !!store && !!store[url])
-    const taken = takeGscSeed(url)
+    const taken = takeSeed(url)
     check('C13: …and it reads back as the very answer the server built',
       taken?.status === 200 && JSON.stringify(taken?.body) === JSON.stringify(body), JSON.stringify(taken))
-    check('C14: it is served ONCE, so a later read asks the route', takeGscSeed(url) === null)
+    check('C14: it is served ONCE, so a later read asks the route', takeSeed(url) === null)
     // A tab left open for minutes must not be handed a page-load answer as current.
     store[url] = { at: Date.now() - 31_000, status: 200, body: { ok: true } }
-    check('C15: a stale seed is refused, and dropped', takeGscSeed(url) === null && !store[url])
-    check('C16: a URL that was never seeded reads as nothing', takeGscSeed(gscStatusUrl('other')) === null)
+    check('C15: a stale seed is refused, and dropped', takeSeed(url) === null && !store[url])
+    check('C16: a URL that was never seeded reads as nothing', takeSeed(gscStatusUrl('other')) === null)
     // MUTATION CONTROL — a seed that primes from render fails C1 and C2.
     const renderSeed = "'use client'\nprimeGscResponse(url, response)\nreturn null"
     check('C-MUT: priming from render fails C1 and C2',
-      !/gscSeedScript\(/.test(renderSeed) && /primeGscResponse/.test(renderSeed))
+      !/<HtmlSeed /.test(renderSeed) && /primeGscResponse/.test(renderSeed))
   }
 
   console.log('\nD) built for the project this browser is looking at')

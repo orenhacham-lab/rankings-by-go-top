@@ -29,14 +29,9 @@
  * as before. Which project that is comes from the cookie the active-project
  * provider mirrors (lib/active-project/active-cookie.ts).
  */
-import { gscSeedScript, type GscResponse } from '@/lib/gsc/urls'
+import HtmlSeed from '@/components/HtmlSeed'
+import type { GscResponse } from '@/lib/gsc/urls'
 
 export default function GscStatusSeed({ url, response }: { url: string; response: GscResponse }) {
-  return (
-    <script
-      // The answer is this visitor's own, built for them a moment ago in the
-      // same request; it is never cached or shared.
-      dangerouslySetInnerHTML={{ __html: gscSeedScript(url, response.status, response.body) }}
-    />
-  )
+  return <HtmlSeed url={url} status={response.status} body={response.body} />
 }
