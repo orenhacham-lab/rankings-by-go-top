@@ -230,7 +230,7 @@ export const es = {
     short: 'Solo cargamos cookies opcionales si las aceptas. Consulta la',
     privacy: 'Política de privacidad',
     accept: 'Aceptar',
-    marketingStep: 'Las cookies de marketing requieren un paso más, en la configuración de cookies, porque envían datos a los Estados Unidos.',
+    marketingStep: 'Aceptar permite la medición; las cookies de marketing requieren un paso más, en la configuración de cookies, porque envían datos a los Estados Unidos.',
     rejectAll: 'Rechazar todas',
     customize: 'Personalizar',
     save: 'Guardar mi elección',

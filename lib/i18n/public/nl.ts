@@ -248,7 +248,7 @@ export const nl = {
     short: 'Optionele cookies worden alleen met uw toestemming geladen. Zie onze',
     privacy: 'privacyverklaring',
     accept: 'Aanvaarden',
-    marketingStep: 'Cookies voor marketing vragen één stap meer, in de cookie-instellingen, omdat ze gegevens naar de Verenigde Staten sturen.',
+    marketingStep: 'Aanvaarden staat meting toe; cookies voor marketing vragen één stap meer, in de cookie-instellingen, omdat ze gegevens naar de Verenigde Staten sturen.',
     rejectAll: 'Alles weigeren',
     customize: 'Zelf instellen',
     save: 'Keuze opslaan',
