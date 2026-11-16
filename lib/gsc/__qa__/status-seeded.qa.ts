@@ -14,13 +14,16 @@
  * A) the answer is ONE function, and it is the same answer the route gives;
  * B) the layout builds it for the likely project and hands it over, in its own
  *    Suspense boundary so it never holds up the document;
- * C) the widgets' store is primed during RENDER, under the URL they would have
- *    fetched, and the route stays the only path for everyone else.
+ * C) the answer reaches the browser as a SCRIPT, so it is in the store before any
+ *    hydration, under the URL the widgets would have fetched, and the route stays
+ *    the only path for everyone else;
+ * D) the project it is built for is the one this browser is actually looking at.
  */
 import { readFileSync } from 'fs'
 import { join } from 'path'
 import { buildGscStatus } from '../status'
-import { gscStatusUrl, gscMetricsUrl } from '../urls'
+import { gscStatusUrl, gscMetricsUrl, gscSeedScript, takeGscSeed, GSC_SEED_GLOBAL } from '../urls'
+import { activeProjectFromCookie, activeProjectCookieWrite, ACTIVE_PROJECT_COOKIE } from '@/lib/active-project/active-cookie'
 
 let passed = 0
 let failed = 0
@@ -86,13 +89,14 @@ async function main() {
     check('B1: the layout has a slot that builds the status', /async function GscStatusSlot\(/.test(src))
     check('B2: it builds it with the service-role client, for one project and one user',
       /buildGscStatus\(admin, projectId, userId\)/.test(src))
-    check('B3: the project is the first of the caller\'s OWN list, never a request value',
-      /projectList\?\.projects\[0\]/.test(src) && /projectId=\{projectList\.projects\[0\]\.id\}/.test(src))
+    check('B3: the project is resolved from the caller\'s OWN list, never from a request value',
+      /activeProjectFromCookie\(\s*cookieStore\.get\(ACTIVE_PROJECT_COOKIE\)\?\.value \?\? null,\s*projectList\?\.projects \?\? \[\],/.test(src)
+      && /projectId=\{seedProjectId\}/.test(src))
     check('B4: the user is the one this layout already verified', /userId=\{user\.id\}/.test(src))
     check('B5: it sits in its own Suspense boundary, so the document never waits for it',
       /<Suspense fallback=\{null\}>\s*<GscStatusSlot/.test(src))
     check('B6: nothing is asked when the SERVER says Search Console is off',
-      /isGscReadOnlyEnabled\(\) && projectList\?\.projects\[0\] &&/.test(src))
+      /isGscReadOnlyEnabled\(\) && seedProjectId &&/.test(src))
     check('B7: only a real answer is handed over', /if \(status !== 200\) return null/.test(src))
     check('B8: it is handed over under the URL the widgets would have fetched',
       /url=\{gscStatusUrl\(projectId\)\}/.test(src))
@@ -102,31 +106,82 @@ async function main() {
       !/<Suspense fallback=\{null\}>\s*<GscStatusSlot/.test(inline))
   }
 
-  console.log('\nC) the widgets read it without asking, and the route stays for everyone else')
+  console.log('\nC) it arrives as a script, before anything can ask for it')
   {
     const seed = strip(read('components/gsc/GscStatusSeed.tsx'))
-    check('C1: the seed primes the widgets\' own shared store', /primeGscResponse\(url, response\)/.test(seed))
-    check('C2: during RENDER, not in an effect, because a widget\'s first render reads it',
-      !/useEffect/.test(seed) && /primeGscResponse\(url, response\)\s*return null/.test(seed))
+    check('C1: the seed renders a script that carries the answer', /gscSeedScript\(url, response\.status, response\.body\)/.test(seed))
+    check('C2: it is not a client component priming from render or an effect',
+      !/'use client'/.test(seed) && !/useEffect/.test(seed) && !/primeGscResponse/.test(seed))
     const data = strip(read('components/gsc/gsc-data.ts'))
     check('C3: the store is keyed by URL, so an answer for another project is never read',
       /shared\.set\(url,/.test(data) && /shared\.get\(url\)/.test(data))
-    check('C4: a primed answer is served to the FIRST render, not after it',
+    check('C4: both the shared read and the first-render peek adopt what the script left',
+      /function request\(url: string, fresh: boolean\): Promise<GscResponse> \{\s*adoptSeed\(url\)/.test(data)
+      && /function peek\(url: string \| null\)[^]*?adoptSeed\(url\)/.test(data))
+    check('C5: a seeded answer is served to the FIRST render, not after it',
       /const primed = peek\(url\)[\s\S]{0,120}return url && primed/.test(data))
-    check('C5: the fetching path still exists for every other caller',
+    check('C6: the fetching path still exists for every other caller',
       /fetch\(url, \{ cache: 'no-store' \}\)/.test(data) && /export function readGscResponse/.test(data))
-    // One spelling of the paths, and it is callable from the server.
-    check('C6: the URL builders live in a module with no \'use client\' on it',
+    check('C7: the URL builders live in a module with no \'use client\' on it',
       !/'use client'/.test(read('lib/gsc/urls.ts')))
-    check('C7: …and the client module re-exports those same ones',
-      /export \{ gscStatusUrl, gscMetricsUrl, type GscMetricsView \}/.test(data))
-    check('C8: the seeded URL is the fetched URL, character for character',
+    check('C8: …and the client module re-exports those same ones',
+      /export \{ gscStatusUrl, gscMetricsUrl, type GscMetricsView, type GscResponse \}/.test(data))
+    check('C9: the seeded URL is the fetched URL, character for character',
       gscStatusUrl('p 1') === '/api/gsc/status?projectId=p%201', gscStatusUrl('p 1'))
-    check('C9: and the metrics path is unchanged',
+    check('C10: and the metrics path is unchanged',
       gscMetricsUrl('p1', 'pages') === '/api/gsc/metrics?projectId=p1&window=28&view=pages', gscMetricsUrl('p1', 'pages'))
-    // MUTATION CONTROL — a seed that primes in an effect fails C2.
-    const effectSeed = "useEffect(() => { primeGscResponse(url, response) }, [])\n  return null"
-    check('C-MUT: priming in an effect fails C2', /useEffect/.test(effectSeed))
+
+    // EXECUTED: run the script the server would send, then read it back.
+    const url = gscStatusUrl('p1')
+    const body = { ok: true, note: 'closes a tag? </script><img src=x>' }
+    const script = gscSeedScript(url, 200, body)
+    check('C11: the script can never close its own tag', !/<\/script/i.test(script) && !script.includes('<img'))
+    new Function(script)()
+    const store = (globalThis as Record<string, unknown>)[GSC_SEED_GLOBAL] as Record<string, unknown>
+    check('C12: running it puts the answer on globalThis, keyed by that URL', !!store && !!store[url])
+    const taken = takeGscSeed(url)
+    check('C13: …and it reads back as the very answer the server built',
+      taken?.status === 200 && JSON.stringify(taken?.body) === JSON.stringify(body), JSON.stringify(taken))
+    check('C14: it is served ONCE, so a later read asks the route', takeGscSeed(url) === null)
+    // A tab left open for minutes must not be handed a page-load answer as current.
+    store[url] = { at: Date.now() - 31_000, status: 200, body: { ok: true } }
+    check('C15: a stale seed is refused, and dropped', takeGscSeed(url) === null && !store[url])
+    check('C16: a URL that was never seeded reads as nothing', takeGscSeed(gscStatusUrl('other')) === null)
+    // MUTATION CONTROL — a seed that primes from render fails C1 and C2.
+    const renderSeed = "'use client'\nprimeGscResponse(url, response)\nreturn null"
+    check('C-MUT: priming from render fails C1 and C2',
+      !/gscSeedScript\(/.test(renderSeed) && /primeGscResponse/.test(renderSeed))
+  }
+
+  console.log('\nD) built for the project this browser is looking at')
+  {
+    const projects = [
+      { id: 'older', updated_at: '2026-01-01T00:00:00Z' },
+      { id: 'newer', updated_at: '2026-06-01T00:00:00Z' },
+    ]
+    check('D1: the cookie\'s project is used when the caller still owns it',
+      activeProjectFromCookie('older', projects) === 'older')
+    check('D2: a project the caller does NOT own is dropped, never read',
+      activeProjectFromCookie('someone-elses', projects) === 'newer')
+    check('D3: …so is a forged value', activeProjectFromCookie('../../etc/passwd', projects) === 'newer')
+    check('D4: with nothing saved it falls back exactly as the client does (most recently updated)',
+      activeProjectFromCookie(null, projects) === 'newer')
+    check('D5: no projects, nothing to prepare', activeProjectFromCookie('older', []) === null)
+    check('D6: the cookie is a path-wide, same-site hint with no script privileges',
+      /path=\/; max-age=\d+; samesite=lax/.test(activeProjectCookieWrite('p1')) && !/httponly/i.test(activeProjectCookieWrite('p1')))
+    check('D7: …and clearing it expires it', /max-age=0/.test(activeProjectCookieWrite(null)))
+    check('D8: the value is escaped on the way out', activeProjectCookieWrite('a b').includes('a%20b'))
+    const provider = strip(read('lib/active-project/ActiveProjectProvider.tsx'))
+    check('D9: the provider writes it only once the list is resolved and loaded',
+      /if \(!isResolved \|\| projectsError\) return\s*try \{ document\.cookie = activeProjectCookieWrite\(activeProjectId\)/.test(provider))
+    check('D10: localStorage stays the client\'s own authority',
+      /localStorage\.setItem\(storageKey, id\)/.test(provider))
+    check('D11: the layout names the same cookie the provider writes',
+      ACTIVE_PROJECT_COOKIE === 'gt-active-project' && strip(read('app/(dashboard)/layout.tsx')).includes('ACTIVE_PROJECT_COOKIE'))
+    // MUTATION CONTROL — trusting the cookie without checking ownership.
+    const trusting = (v: string | null) => v
+    check('D-MUT: an unchecked cookie would hand over another user\'s project, and fails D2',
+      trusting('someone-elses') !== activeProjectFromCookie('someone-elses', projects))
   }
 
   console.log(`\n${passed} passed, ${failed} failed`)

@@ -18,6 +18,7 @@ import { DashboardLanguageProvider } from '@/lib/i18n/dashboard/useDashboardLang
 import { getServerPublicLocale } from '@/lib/i18n/server-locale'
 import { ActiveProjectProvider } from '@/lib/active-project/ActiveProjectProvider'
 import { buildActiveProjectList } from '@/lib/active-project/list'
+import { ACTIVE_PROJECT_COOKIE, activeProjectFromCookie } from '@/lib/active-project/active-cookie'
 import { GscFeatureProvider } from '@/components/gsc/GscFeature'
 import GscStatusSeed from '@/components/gsc/GscStatusSeed'
 import { isGscReadOnlyEnabled } from '@/lib/gsc/config'
@@ -98,7 +99,7 @@ export default async function DashboardLayout({
   // Each is independently best-effort, as it was: the default-client catch-all
   // never blocks the dashboard, a missing profile simply is not an admin, and a
   // null list makes the provider fetch exactly as before.
-  const [, profileResult, projectList] = await Promise.all([
+  const [, profileResult, projectList, cookieStore] = await Promise.all([
     // Area C — catch-all: existing users who never had a client (and users who arrive via
     // a path that didn't run the signup/callback hooks, e.g. Google OAuth) get their default
     // client here on first dashboard load. Idempotent + quota-aware + best-effort (a cheap
@@ -110,9 +111,25 @@ export default async function DashboardLayout({
       () => null,
     ),
     buildActiveProjectList(supabase, user.id).catch(() => null),
+    cookies(),
   ])
 
   const isAdmin = profileResult?.role === 'admin'
+
+  // WHICH PROJECT THIS BROWSER IS ACTUALLY LOOKING AT.
+  //
+  // Anything prepared for the wrong project is worth nothing: on 16.11.2026 the
+  // layout seeded the Search Console status for `projects[0]`, the browser was
+  // showing another project, and the widget asked the route anyway. The active
+  // project is chosen on the client from localStorage, so the provider mirrors
+  // it into a cookie for this read (lib/active-project/active-cookie.ts), which
+  // is only ever honoured for a project in the OWNER-FILTERED list below, and
+  // otherwise falls back to the same most-recently-updated pick the client makes
+  // with nothing saved.
+  const seedProjectId = activeProjectFromCookie(
+    cookieStore.get(ACTIVE_PROJECT_COOKIE)?.value ?? null,
+    projectList?.projects ?? [],
+  )
 
   // Area G — seed the dashboard language from the signup-origin locale saved in auth
   // metadata, so a fresh device's first login (empty localStorage) opens in the
@@ -175,9 +192,9 @@ export default async function DashboardLayout({
                 {/* Search Console's status, built in-region so the widgets that
                     wait on it - and the metrics that wait on them - cost no
                     round trip of their own. Nothing is rendered. */}
-                {isGscReadOnlyEnabled() && projectList?.projects[0] && (
+                {isGscReadOnlyEnabled() && seedProjectId && (
                   <Suspense fallback={null}>
-                    <GscStatusSlot projectId={projectList.projects[0].id} userId={user.id} />
+                    <GscStatusSlot projectId={seedProjectId} userId={user.id} />
                   </Suspense>
                 )}
                 <div id={MAIN_CONTENT_ID} tabIndex={-1} className="mx-auto w-full max-w-[1280px] min-w-0 px-4 py-6 focus:outline-none md:px-8 md:py-8">
