@@ -92,6 +92,20 @@ export type AiCrawlerCopy = {
     copied: string
   }
   /**
+   * What to WRITE, printed with the results because by then we have read the
+   * reader's own file. The checker says what the file does; this says which
+   * two lines to add, or — when the block sits in a group that already names
+   * the crawler, where adding a group would merge and change nothing — which
+   * line has to go. See ./fix-plan.ts for why the answer has two halves.
+   */
+  fix: {
+    title: string
+    intro: string
+    pasteLead: string
+    /** Carries `{token}` and `{line}`, both substituted at render time. */
+    editLead: string
+  }
+  /**
    * The 07.11.2026 robots.txt measurement, rendered for a reader.
    *
    * `headline` carries `{pct}` and `sampleNote` carries `{n}`: the figures are
@@ -278,6 +292,12 @@ const he: AiCrawlerCopy = {
     copy: 'העתקה',
     copied: 'הועתק',
   },
+  fix: {
+    title: 'להחזיר אותם פנימה',
+    intro: 'הסורקים האלה מביאים מבקרים או ציטוטים, והקובץ שלכם מחזיר אותם ריקם. הנה בדיוק מה לשנות.',
+    pasteLead: 'הדביקו את השורות האלה בקובץ ה-robots.txt שלכם:',
+    editLead: '{token} חסום על ידי קבוצה שכבר נוקבת בשמו, בשורה {line}. קבוצה שנייה תתמזג איתה ולא תשנה כלום, ולכן השורה ההיא היא מה שצריך לרדת.',
+  },
 }
 
 const en: AiCrawlerCopy = {
@@ -400,6 +420,12 @@ const en: AiCrawlerCopy = {
     nothingBlocked: 'No crawler has a decision yet, so there are no lines to add. Choose above and the lines appear.',
     copy: 'Copy',
     copied: 'Copied',
+  },
+  fix: {
+    title: 'Let them back in',
+    intro: 'These crawlers fetch a page to answer someone or to index it, and your file turns them away. Here is exactly what to change.',
+    pasteLead: 'Paste these lines into your robots.txt:',
+    editLead: '{token} is blocked by a group that already names it, at line {line}. A second group would merge with that one and change nothing, so that line is what has to go.',
   },
 }
 
@@ -524,6 +550,12 @@ const es: AiCrawlerCopy = {
     copy: 'Copiar',
     copied: 'Copiado',
   },
+  fix: {
+    title: 'Volver a dejarlos entrar',
+    intro: 'Estos rastreadores piden una página para responder a alguien o para indexarla, y tu archivo los rechaza. Esto es exactamente lo que hay que cambiar.',
+    pasteLead: 'Pega estas líneas en tu robots.txt:',
+    editLead: '{token} está bloqueado por un grupo que ya lo nombra, en la línea {line}. Un segundo grupo se fusionaría con ese y no cambiaría nada, así que es esa línea la que debe desaparecer.',
+  },
 }
 
 const ptBR: AiCrawlerCopy = {
@@ -646,6 +678,12 @@ const ptBR: AiCrawlerCopy = {
     nothingBlocked: 'Nenhum rastreador tem decisão ainda, então não há linhas a acrescentar. Escolha acima e as linhas aparecem.',
     copy: 'Copiar',
     copied: 'Copiado',
+  },
+  fix: {
+    title: 'Deixá-los entrar de novo',
+    intro: 'Esses rastreadores buscam uma página para responder a alguém ou para indexá-la, e o seu arquivo os recusa. É exatamente isto que precisa mudar.',
+    pasteLead: 'Cole estas linhas no seu robots.txt:',
+    editLead: '{token} está bloqueado por um grupo que já o nomeia, na linha {line}. Um segundo grupo se juntaria a esse e não mudaria nada, então é aquela linha que precisa sair.',
   },
 }
 
@@ -770,6 +808,12 @@ const fr: AiCrawlerCopy = {
     copy: 'Copier',
     copied: 'Copié',
   },
+  fix: {
+    title: 'Les laisser revenir',
+    intro: 'Ces robots demandent une page pour répondre à quelqu\'un ou pour l\'indexer, et votre fichier les refuse. Voici exactement ce qu\'il faut changer.',
+    pasteLead: 'Collez ces lignes dans votre robots.txt :',
+    editLead: '{token} est bloqué par un groupe qui le nomme déjà, à la ligne {line}. Un second groupe fusionnerait avec celui-là et ne changerait rien : c\'est cette ligne qui doit disparaître.',
+  },
 }
 
 const it: AiCrawlerCopy = {
@@ -892,6 +936,12 @@ const it: AiCrawlerCopy = {
     nothingBlocked: 'Nessun crawler ha ancora una decisione, quindi non ci sono righe da aggiungere. Scegli sopra e le righe compaiono.',
     copy: 'Copia',
     copied: 'Copiato',
+  },
+  fix: {
+    title: 'Farli rientrare',
+    intro: 'Questi crawler chiedono una pagina per rispondere a qualcuno o per indicizzarla, e il tuo file li respinge. Ecco esattamente cosa cambiare.',
+    pasteLead: 'Incolla queste righe nel tuo robots.txt:',
+    editLead: '{token} è bloccato da un gruppo che lo nomina già, alla riga {line}. Un secondo gruppo si unirebbe a quello e non cambierebbe nulla: è quella riga che deve sparire.',
   },
 }
 
@@ -1016,6 +1066,12 @@ const ja: AiCrawlerCopy = {
     copy: 'コピー',
     copied: 'コピーしました',
   },
+  fix: {
+    title: '戻ってこられるようにする',
+    intro: 'これらのクローラーは、誰かに答えるため、または索引に入れるためにページを取得します。いまのファイルはそれを断っています。変えるべき点は次のとおりです。',
+    pasteLead: 'この行を robots.txt に貼り付けてください:',
+    editLead: '{token} は、すでにその名前を書いているグループによって {line} 行目でブロックされています。グループをもう一つ足すとそれと統合され、何も変わりません。消すべきはその行です。',
+  },
 }
 
 const de: AiCrawlerCopy = {
@@ -1138,6 +1194,12 @@ const de: AiCrawlerCopy = {
     nothingBlocked: 'Für keinen Crawler ist bisher entschieden, es gibt also keine Zeilen. Wählen Sie oben, und die Zeilen erscheinen.',
     copy: 'Kopieren',
     copied: 'Kopiert',
+  },
+  fix: {
+    title: 'Sie wieder hereinlassen',
+    intro: 'Diese Crawler holen eine Seite, um jemandem zu antworten oder sie zu indexieren, und Ihre Datei weist sie ab. Genau das ist zu ändern.',
+    pasteLead: 'Fügen Sie diese Zeilen in Ihre robots.txt ein:',
+    editLead: '{token} wird von einer Gruppe blockiert, die ihn schon nennt, in Zeile {line}. Eine zweite Gruppe würde mit dieser verschmelzen und nichts ändern: diese Zeile muss weg.',
   },
 }
 
@@ -1262,6 +1324,12 @@ const pl: AiCrawlerCopy = {
     copy: 'Kopiuj',
     copied: 'Skopiowano',
   },
+  fix: {
+    title: 'Wpuścić je z powrotem',
+    intro: 'Te roboty pobierają stronę, żeby komuś odpowiedzieć albo ją zaindeksować, a twój plik je odprawia. Oto dokładnie, co zmienić.',
+    pasteLead: 'Wklej te linie do swojego robots.txt:',
+    editLead: '{token} jest zablokowany przez grupę, która już go wymienia, w linii {line}. Druga grupa połączyłaby się z tą i nic by nie zmieniła, więc to ta linia musi zniknąć.',
+  },
 }
 
 const nl: AiCrawlerCopy = {
@@ -1384,6 +1452,12 @@ const nl: AiCrawlerCopy = {
     nothingBlocked: 'Voor geen enkele crawler is al iets besloten, dus er zijn geen regels toe te voegen. Kies hierboven en de regels verschijnen.',
     copy: 'Kopiëren',
     copied: 'Gekopieerd',
+  },
+  fix: {
+    title: 'Ze weer binnenlaten',
+    intro: 'Deze crawlers halen een pagina op om iemand te antwoorden of om hem te indexeren, en jouw bestand wijst ze af. Dit is precies wat er moet veranderen.',
+    pasteLead: 'Plak deze regels in je robots.txt:',
+    editLead: '{token} wordt geblokkeerd door een groep die hem al noemt, op regel {line}. Een tweede groep zou met die ene samensmelten en niets veranderen: die regel moet weg.',
   },
 }
 
@@ -1509,6 +1583,12 @@ const ko: AiCrawlerCopy = {
     nothingBlocked: '아직 정한 크롤러가 없어서 추가할 줄도 없습니다. 위에서 고르시면 해당 줄이 나타납니다.',
     copy: '복사',
     copied: '복사했습니다',
+  },
+  fix: {
+    title: '다시 들어오게 하기',
+    intro: '이 크롤러들은 누군가에게 답하기 위해, 또는 색인에 넣기 위해 페이지를 가져갑니다. 지금의 파일은 이들을 되돌려 보냅니다. 바꿔야 할 것은 다음과 같습니다.',
+    pasteLead: '이 줄을 robots.txt 에 붙여 넣으십니다:',
+    editLead: '{token} 은 이미 그 이름을 적어 둔 그룹에 의해 {line} 번째 줄에서 차단되어 있습니다. 그룹을 하나 더 더하면 그 그룹과 합쳐져서 아무것도 달라지지 않습니다. 없어져야 하는 것은 그 줄입니다.',
   },
 }
 

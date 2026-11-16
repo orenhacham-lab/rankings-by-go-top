@@ -23,13 +23,14 @@
  */
 import Link from 'next/link'
 import { useCallback, useState, type FormEvent } from 'react'
-import { Bot, Check, CircleAlert, FileText, Info, Search, Sparkles, X } from 'lucide-react'
+import { Bot, Check, CircleAlert, Copy, FileText, Info, Search, Sparkles, Wrench, X } from 'lucide-react'
 import Badge from '@/components/ui/Badge'
 import Button from '@/components/ui/Button'
 import Input from '@/components/ui/Input'
 import { buttonClasses, Eyebrow } from '@/components/public/marketing'
 import { cn } from '@/lib/utils'
 import { AI_CRAWLERS } from '@/lib/ai-crawlers/agents'
+import { buildFixPlan } from '@/lib/ai-crawlers/fix-plan'
 import { AiRobotsGenerator } from './AiRobotsGenerator'
 import { BLOCKING_BY_MARKET, BLOCKING_MEASUREMENT } from '@/lib/ai-crawlers/blocking-measurement'
 import { BLOCKING_MARKETS_2026_11_09, marketPct } from '@/lib/ai-crawlers/blocking-markets'
@@ -103,6 +104,78 @@ function VerdictRow({ verdict, copy, dir }: { verdict: CrawlerVerdict; copy: Ret
   )
 }
 
+/**
+ * The two lines that undo an accidental block, printed with the results.
+ *
+ * It renders only when there is something to undo, and it says nothing about
+ * `train` crawlers: see the reasoning in lib/ai-crawlers/fix-plan.ts. The copy
+ * button is the whole point of the box, so the text it copies is exactly what
+ * the textarea shows and nothing else — no comment line, no attribution, no
+ * link back to us inside somebody else's robots.txt.
+ */
+function FixPlan({ result, copy }: { result: AiCrawlerResult; copy: ReturnType<typeof aiCrawlerCopy> }) {
+  const plan = buildFixPlan(result.verdicts)
+  const [copied, setCopied] = useState(false)
+
+  const onCopy = useCallback(async () => {
+    if (!plan.lines) return
+    try {
+      await navigator.clipboard.writeText(plan.lines)
+      setCopied(true)
+      window.setTimeout(() => setCopied(false), 2000)
+    } catch {
+      // The textarea holds the same text and is selectable by hand.
+    }
+  }, [plan.lines])
+
+  if (!plan.lines && plan.edit.length === 0) return null
+
+  return (
+    <div className="mt-7 rounded-card border border-line bg-surface p-4 shadow-control sm:p-5">
+      <h3 className="inline-flex items-center gap-2 text-copy font-bold text-ink">
+        <Wrench className="h-4 w-4 shrink-0 text-action" aria-hidden />
+        {copy.fix.title}
+      </h3>
+      <p className="mt-2 max-w-2xl text-copy text-body">{copy.fix.intro}</p>
+
+      {plan.lines !== '' && (
+        <>
+          <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
+            <p className="text-caption font-semibold text-ink">{copy.fix.pasteLead}</p>
+            <Button type="button" variant="secondary" size="sm" onClick={onCopy}>
+              <span className="inline-flex items-center gap-1.5">
+                {copied ? <Check className="h-3.5 w-3.5" aria-hidden /> : <Copy className="h-3.5 w-3.5" aria-hidden />}
+                {copied ? copy.generator.copied : copy.generator.copy}
+              </span>
+            </Button>
+          </div>
+          <textarea
+            dir="ltr"
+            readOnly
+            value={plan.lines}
+            rows={Math.min(24, plan.lines.split('\n').length + 1)}
+            aria-label={copy.fix.pasteLead}
+            className="mt-2 w-full rounded-card border border-line bg-sunk/60 p-4 font-mono text-caption text-ink"
+          />
+          <p className="mt-2 inline-flex max-w-2xl gap-2 text-caption text-muted">
+            <Info className="mt-0.5 h-3.5 w-3.5 shrink-0" aria-hidden />
+            <span>{copy.generator.allowNote}</span>
+          </p>
+        </>
+      )}
+
+      {plan.edit.map((e) => (
+        <p key={e.token} className="mt-3 inline-flex max-w-2xl gap-2 text-caption text-muted">
+          <CircleAlert className="mt-0.5 h-3.5 w-3.5 shrink-0" aria-hidden />
+          <span>
+            {copy.fix.editLead.replace('{token}', e.token).replace('{line}', e.line === null ? '?' : String(e.line))}
+          </span>
+        </p>
+      ))}
+    </div>
+  )
+}
+
 function Results({ result, copy, dir }: { result: AiCrawlerResult; copy: ReturnType<typeof aiCrawlerCopy>; dir: 'rtl' | 'ltr' }) {
   const ai = result.verdicts.filter((v) => !v.classicSearch)
   const classic = result.verdicts.filter((v) => v.classicSearch)
@@ -148,6 +221,8 @@ function Results({ result, copy, dir }: { result: AiCrawlerResult; copy: ReturnT
           <VerdictRow key={v.token} verdict={v} copy={copy} dir={dir} />
         ))}
       </ul>
+
+      <FixPlan result={result} copy={copy} />
 
       <h3 className="mt-7 text-copy font-bold text-ink">{copy.groups.classic}</h3>
       <ul className="mt-2 space-y-2">
