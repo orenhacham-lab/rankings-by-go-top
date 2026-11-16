@@ -15,7 +15,7 @@
  * Isolated like the cron's other passengers: its own try/catch, it never throws,
  * and it cannot change, delay or fail the runner.
  */
-import { isInlineImageBatchEnabled } from './flag'
+import { isInlineImageBatchEnabled, isHeroImageBatchEnabled } from './flag'
 import type { CollectImagesResult } from './inline-image-batch'
 
 export type IsolatedImageBatchOutcome =
@@ -33,7 +33,11 @@ export async function runIsolatedInlineImageBatch(
 ): Promise<IsolatedImageBatchOutcome> {
   const env = opts.env ?? process.env
   if (env.VERCEL_ENV !== 'production') return { status: 'not_production' }
-  if (!(opts.enabled ?? isInlineImageBatchEnabled)(env as NodeJS.ProcessEnv)) return { status: 'feature_off' }
+  // Either lane being on is a reason to collect: a hero ordered by the hero
+  // switch must be stored even if the body images' ordering was turned off
+  // while its job was in flight.
+  const on = opts.enabled ?? ((e: NodeJS.ProcessEnv) => isInlineImageBatchEnabled(e) || isHeroImageBatchEnabled(e))
+  if (!on(env as NodeJS.ProcessEnv)) return { status: 'feature_off' }
   try {
     return { status: 'ran', ...(await run()) }
   } catch (e) {

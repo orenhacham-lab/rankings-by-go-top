@@ -383,6 +383,8 @@ const lane = code('lib/content/image-batch/inline-image-batch.ts')
 const manual1 = code('app/api/content/articles/generate/route.ts')
 const manual2 = code('app/api/content/automation/items/[itemId]/generate/route.ts')
 const migration = code('supabase/migrations/20261114010000_inline_image_batch_requests.sql')
+const publishItem = code('lib/content/automation/publish-item.ts')
+const heroLane = code('lib/content/image-batch/hero-image-batch.ts')
 
 function guard(name: string, cond: boolean, mutationName: string, mutated: boolean) {
   check(name, cond)
@@ -414,12 +416,45 @@ guard(
   'a generation path that read the lane unconditionally would fail this',
   /batchInline: async \(a, imageIds\)/.test(gen),
 )
+// The hero joined the lane on 17 November 2026 (hero-image-batch.ts). The
+// invariant it replaced — "the hero has no batch path at all" — is now three
+// narrower ones, because what made the exclusion safe has to be paid for
+// somewhere: the same slack rule, its own switch, and a publish that never waits.
 guard(
-  'only the BODY images are batched: the hero has no batch path at all',
-  /createFeaturedImage: \(\) => deps\.createFeaturedImage\(admin, inserted\.id\)/.test(gen) &&
-  !/batchFeatured|batchHero/.test(`${gen}\n${step}\n${lane}`),
-  'a hero ordered from the batch lane would fail this',
-  !/batchHero/.test(`${step}\nbatchHero: () => order(hero)`),
+  'the hero is ordered under the SAME permission as the body images, behind its own switch',
+  /batchHero: opts\.inlineImagesMayBatch && isHeroImageBatchEnabled\(\)/.test(gen),
+  'a hero ordered whenever the switch was on, ignoring the slack rule, would fail this',
+  /batchHero: opts\.inlineImagesMayBatch && isHeroImageBatchEnabled\(\)/.test(
+    gen.replace('batchHero: opts.inlineImagesMayBatch && isHeroImageBatchEnabled()', 'batchHero: isHeroImageBatchEnabled()')),
+)
+guard(
+  'an order the lane did not accept falls through to the live call, so a hero is never skipped',
+  /if \(deps\.batchHero && await deps\.batchHero\(\)\.catch\(\(\) => false\)\) return false/.test(step) &&
+  /const img = await deps\.createFeaturedImage\(\)/.test(step),
+  'a step that returned early on a refused order would fail this',
+  /if \(deps\.batchHero && await deps\.batchHero\(\)\.catch\(\(\) => false\)\) return false/.test(
+    step.replace('if (deps.batchHero && await deps.batchHero().catch(() => false)) return false',
+      'if (deps.batchHero) { await deps.batchHero(); return false }')),
+)
+guard(
+  'PUBLISHING NEVER WAITS: the publish path fills a hero that has not arrived, before any platform branch',
+  /await ensureHeroBeforePublish\(admin, item\.article_id\)/.test(publishItem) &&
+  publishItem.indexOf('ensureHeroBeforePublish(admin, item.article_id)') < publishItem.indexOf('const active = await loadActivePlatform'),
+  'a check placed after the platform branch, where Shopify and Wix already returned, would fail this',
+  publishItem.indexOf('const active = await loadActivePlatform') < publishItem.indexOf('ensureHeroBeforePublish(admin, item.article_id)'),
+)
+guard(
+  'the open request is claimed BEFORE the live call, so a collect pass and a publish cannot both store a hero',
+  heroLane.indexOf("last_error: 'superseded_by_live_call_at_publish'") < heroLane.indexOf('deps.createHero ?? createFeaturedImageForArticle'),
+  'a live call made before the row was claimed would fail this',
+  heroLane.indexOf('deps.createHero ?? createFeaturedImageForArticle') < heroLane.indexOf("last_error: 'superseded_by_live_call_at_publish'"),
+)
+guard(
+  'a hero reply never tries to finish an article_inline_images row that does not exist',
+  /if \(r\.inline_image_id\) await markInlineImageFailed/.test(lane) &&
+  /if \(r\.target === 'hero' \|\| !r\.inline_image_id\) continue/.test(lane),
+  'a write-off that marked an image row for a hero would fail this',
+  /for \(const r of rows\) await markInlineImageFailed/.test(lane),
 )
 guard(
   'an id the lane could not order is generated live instead',

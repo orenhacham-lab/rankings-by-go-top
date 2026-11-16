@@ -43,6 +43,7 @@ import {
   readInlineImageRow, inlineImageModelInput, inlineImageGateDenial,
   markInlineImageFailed, storeInlineImageBytes,
 } from '@/lib/content/inline-images'
+import { storeHeroImageBytes } from '@/lib/content/featured-image'
 
 type Admin = ReturnType<typeof createAdminClient>
 
@@ -206,11 +207,38 @@ function imagePart(entry: InlinedImageEntry): { data: string; mimeType: string }
  * Write off every request of a job, and mark its images failed so the editor
  * shows a merchant something they can act on instead of a row that never moves.
  */
-async function writeOffJob(admin: Admin, jobName: string, reason: string, rows: { id: string; inline_image_id: string }[]): Promise<void> {
+async function writeOffJob(admin: Admin, jobName: string, reason: string, rows: BatchRequestRow[]): Promise<void> {
   await admin.from('inline_image_batch_requests')
     .update({ status: reason === 'JOB_STATE_EXPIRED' ? 'expired' : 'failed', last_error: reason.slice(0, 300), collected_at: nowIso(), updated_at: nowIso() })
     .eq('job_name', jobName).eq('status', 'submitted')
-  for (const r of rows) await markInlineImageFailed(admin, r.inline_image_id, `image_batch_${reason.toLowerCase()}`)
+  // A hero has no row of its own to mark: the article simply stays without a
+  // featured image, exactly as when a live call fails, and the publish-time
+  // check (hero-image-batch.ts) makes one live before the article goes out.
+  for (const r of rows) {
+    if (r.target === 'hero' || !r.inline_image_id) continue
+    await markInlineImageFailed(admin, r.inline_image_id, `image_batch_${reason.toLowerCase()}`)
+  }
+}
+
+/** The file a stored hero replaces, read at the moment it is replaced. */
+async function currentHeroPath(admin: Admin, articleId: string): Promise<string | null> {
+  const { data } = await admin.from('generated_articles').select('featured_image_storage_path').eq('id', articleId).maybeSingle()
+  const path = (data as { featured_image_storage_path?: string | null } | null)?.featured_image_storage_path
+  return typeof path === 'string' && path ? path : null
+}
+
+/** One open request: a body image's, or an article's hero (./hero-image-batch.ts). */
+interface BatchRequestRow {
+  id: string
+  job_name: string
+  request_key: string
+  inline_image_id: string | null
+  submitted_at: string
+  target: string | null
+  article_id: string | null
+  project_id: string | null
+  concept: string | null
+  aspect_ratio: string | null
 }
 
 /** Poll the image jobs in flight, store what finished. Never throws. */
@@ -221,6 +249,8 @@ export async function collectInlineImageBatches(
     now?: () => Date
     /** The storer, injectable so the QA can watch the bytes without a bucket. */
     store?: typeof storeInlineImageBytes
+    /** The hero's storer, same reason. */
+    storeHero?: typeof storeHeroImageBytes
   } = {},
 ): Promise<CollectImagesResult> {
   const result: CollectImagesResult = { jobsChecked: 0, stored: 0, failed: 0, stillRunning: 0 }
@@ -230,11 +260,11 @@ export async function collectInlineImageBatches(
 
   const { data } = await admin
     .from('inline_image_batch_requests')
-    .select('id, job_name, request_key, inline_image_id, submitted_at')
+    .select('id, job_name, request_key, inline_image_id, submitted_at, target, article_id, project_id, concept, aspect_ratio')
     .eq('status', 'submitted')
     .order('submitted_at', { ascending: true })
     .limit(200)
-  const rows = (Array.isArray(data) ? data : []) as { id: string; job_name: string; request_key: string; inline_image_id: string; submitted_at: string }[]
+  const rows = (Array.isArray(data) ? data : []) as BatchRequestRow[]
   if (rows.length === 0) return result
 
   const byJob = new Map<string, typeof rows>()
@@ -290,7 +320,9 @@ export async function collectInlineImageBatches(
         ?? (Number.isFinite(index) ? inlined[index] : undefined)
       const fail = async (reason: string) => {
         await admin.from('inline_image_batch_requests').update({ status: 'failed', last_error: reason.slice(0, 300), updated_at: nowIso() }).eq('id', r.id)
-        await markInlineImageFailed(admin, r.inline_image_id, reason)
+        // A hero has no image row to mark (see writeOffJob): the article stays
+        // without a featured image and the publish-time check makes one live.
+        if (r.inline_image_id) await markInlineImageFailed(admin, r.inline_image_id, reason)
         result.failed++
       }
       if (!entry) { await fail('image_batch_response_missing'); continue }
@@ -298,6 +330,28 @@ export async function collectInlineImageBatches(
       const img = imagePart(entry)
       if (!img) { await fail('image_batch_no_image_returned'); continue }
 
+      // A hero finishes the article's own featured_image_* columns instead of an
+      // article_inline_images row, through the very function the live call uses.
+      if (r.target === 'hero') {
+        if (!r.article_id || !r.project_id) { await fail('hero_batch_row_incomplete'); continue }
+        const put = await (deps.storeHero ?? storeHeroImageBytes)(admin, {
+          articleId: r.article_id,
+          projectId: r.project_id,
+          concept: r.concept ?? '',
+          heroRatio: r.aspect_ratio === '1:1' ? '1:1' : '16:9',
+          // The hero this replaces is read now rather than remembered at submit
+          // time, so a hero the merchant regenerated while the job ran is the
+          // one dropped — never a file that is still the article's.
+          previousStoragePath: await currentHeroPath(admin, r.article_id),
+        }, { data: Buffer.from(img.data, 'base64'), mimeType: img.mimeType })
+        if ('error' in put) {
+          await admin.from('inline_image_batch_requests').update({ last_error: put.error.slice(0, 300), updated_at: nowIso() }).eq('id', r.id)
+          result.failed++
+        } else result.stored++
+        continue
+      }
+
+      if (!r.inline_image_id) { await fail('image_batch_row_incomplete'); continue }
       const row = await readInlineImageRow(admin, r.inline_image_id)
       if (!row) {
         // The article (or the image) was deleted while the job ran. Nothing to

@@ -210,7 +210,16 @@ console.log('S) sharp stays where the pixels are')
     'app/api/content/articles/generate/route.ts',
     'app/api/content/automation/cron/route.ts',
     'app/api/content/automation/items/[itemId]/generate/route.ts',
+    // The two PUBLISH entry points, added 17 November 2026 with the hero batch
+    // lane. They are here on purpose, not by accident: a hero ordered at half
+    // price and not yet arrived is made with a live call before the article
+    // goes out (lib/content/image-batch/hero-image-batch.ts,
+    // ensureHeroBeforePublish), and making an image means encoding one. The
+    // alternative was publishing an article without the picture it was meant to
+    // have, which is the thing the lane exists not to do.
+    'app/api/content/automation/items/[itemId]/publish/route.ts',
     'app/api/content/automation/run/route.ts',
+    'app/api/content/strategy/publish-first/route.ts',
     'app/api/content/strategy/schedule/route.ts',
     'app/api/gbp/image/generate/route.ts',
     'app/api/gbp/image/route.ts',
