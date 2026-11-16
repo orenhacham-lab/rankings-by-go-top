@@ -88,7 +88,8 @@ async function main() {
   check('(19) old run never falls back to detail-row totals', cardB.clicks === null)
 
   // ── Static contracts ───────────────────────────────────────────────────────
-  const status = read('app/api/gsc/status/route.ts')
+  // The summary card moved into lib/gsc/status.ts (the layout builds the same answer in-region).
+  const status = read('app/api/gsc/status/route.ts') + '\n' + read('lib/gsc/status.ts')
   check('(10) status card reads summary_total_clicks (property summary)', /summary_total_clicks/.test(status))
   check('(10) status card does NOT compute the 4 cards from weighted_position_sum', !/weighted_position_sum \/ /.test(status) && !/run\.weighted_position_sum/.test(status))
   check('(18) status returns summaryResyncRequired for runs without a summary', /summaryResyncRequired: true/.test(status))

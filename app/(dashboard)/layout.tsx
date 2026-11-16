@@ -19,7 +19,10 @@ import { getServerPublicLocale } from '@/lib/i18n/server-locale'
 import { ActiveProjectProvider } from '@/lib/active-project/ActiveProjectProvider'
 import { buildActiveProjectList } from '@/lib/active-project/list'
 import { GscFeatureProvider } from '@/components/gsc/GscFeature'
+import GscStatusSeed from '@/components/gsc/GscStatusSeed'
 import { isGscReadOnlyEnabled } from '@/lib/gsc/config'
+import { buildGscStatus } from '@/lib/gsc/status'
+import { gscStatusUrl } from '@/lib/gsc/urls'
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { ensureDefaultClient } from '@/lib/clients/ensure-default-client'
@@ -48,6 +51,29 @@ async function TrialBarSlot({ userId }: { userId: string }) {
   // The viewer's own "hide for a day", read here so a dismissed bar is never painted (w7 P1-1).
   const dismissed = trialBarDismissed((await cookies()).get(TRIAL_BAR_HIDE_COOKIE)?.value)
   return <TrialBar state={await loadTrialBar(admin, userId)} dismissed={dismissed} />
+}
+
+/**
+ * The Search Console status of the project the visitor is most likely looking
+ * at, built here and handed to the widgets (components/gsc/GscStatusSeed.tsx
+ * says why, and what it costs when the guess is wrong).
+ *
+ * ITS OWN SUSPENSE BOUNDARY, so this read never holds up the document. It has
+ * to wait for the project list, which is the one thing the layout cannot start
+ * it without, and it is still in the client's hands long before the widgets
+ * mount: they appear only once the dashboard's own route has answered.
+ *
+ * Ownership is not assumed: the project comes from the caller's own
+ * owner-filtered list, and the route the widgets fall back to checks it itself.
+ */
+async function GscStatusSlot({ projectId, userId }: { projectId: string; userId: string }) {
+  let admin: ReturnType<typeof createAdminClient>
+  try { admin = createAdminClient() } catch { return null }
+  const { status, body } = await buildGscStatus(admin, projectId, userId)
+  // Only a real answer is handed over. Anything else and the widgets ask the
+  // route, which is exactly what they did before this existed.
+  if (status !== 200) return null
+  return <GscStatusSeed url={gscStatusUrl(projectId)} response={{ status, body }} />
 }
 
 export default async function DashboardLayout({
@@ -146,6 +172,14 @@ export default async function DashboardLayout({
                 <Suspense fallback={null}>
                   <TrialBarSlot userId={user.id} />
                 </Suspense>
+                {/* Search Console's status, built in-region so the widgets that
+                    wait on it - and the metrics that wait on them - cost no
+                    round trip of their own. Nothing is rendered. */}
+                {isGscReadOnlyEnabled() && projectList?.projects[0] && (
+                  <Suspense fallback={null}>
+                    <GscStatusSlot projectId={projectList.projects[0].id} userId={user.id} />
+                  </Suspense>
+                )}
                 <div id={MAIN_CONTENT_ID} tabIndex={-1} className="mx-auto w-full max-w-[1280px] min-w-0 px-4 py-6 focus:outline-none md:px-8 md:py-8">
                   {/* Until the project's site is connected, every screen of it says so first. */}
                   <ConnectSiteBanner />

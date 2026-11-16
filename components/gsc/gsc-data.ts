@@ -12,6 +12,7 @@
  */
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useActiveProject } from '@/lib/active-project/ActiveProjectProvider'
+import { gscStatusUrl, gscMetricsUrl, type GscMetricsView } from '@/lib/gsc/urls'
 import { gscStatusView, type GscSetupState, type GscStatusView } from '@/lib/gsc/widget-state'
 import { useGscEnabled } from './GscFeature'
 
@@ -56,14 +57,9 @@ export function primeGscResponse(url: string, response: GscResponse): void {
   shared.set(url, { at: Date.now(), promise: Promise.resolve(response), value: response })
 }
 
-export function gscStatusUrl(projectId: string): string {
-  return `/api/gsc/status?projectId=${encodeURIComponent(projectId)}`
-}
-
-export type GscMetricsView = 'pages' | 'keywords' | 'trend'
-export function gscMetricsUrl(projectId: string, view: GscMetricsView): string {
-  return `/api/gsc/metrics?projectId=${encodeURIComponent(projectId)}&window=28&view=${view}`
-}
+/** Re-exported from lib/gsc/urls.ts, which the SERVER can call too (the layout
+ *  seeds the status answer keyed by this very URL), so there is one spelling. */
+export { gscStatusUrl, gscMetricsUrl, type GscMetricsView }
 
 /** One GET, shared by URL. `reload` asks again, past the sharing window. */
 export function useGscResponse(url: string | null): { response: GscResponse | null; reload: () => void } {
