@@ -17,7 +17,10 @@
  *        <a> goes, its words stay, and the entry is marked removed so it is
  *        never listed or added again. Only a link the automatic step added, and
  *        only while the body still has it; the body the customer is editing
- *        gets the same edit in the browser.
+ *        gets the same edit in the browser. It does NOT call the customer's
+ *        site: the removed entry carries no `synced` mark, and the healing pass
+ *        (lib/content/auto-internal-links/heal.ts) sends the article to the site
+ *        again so the published post loses the anchor too.
  *
  * All gated by ENABLE_CONTENT + project ownership. Never calls WordPress.
  */

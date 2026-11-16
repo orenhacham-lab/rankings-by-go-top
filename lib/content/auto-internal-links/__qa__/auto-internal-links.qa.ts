@@ -20,6 +20,12 @@
  *   C) storage and removal: entries are source 'auto', the inbound anchor bank
  *      skips them, the list shows only links still in the body, the DELETE
  *      route removes only an automatic link of an owned article;
+ *   F) the HEALING pass (lib/content/auto-internal-links/heal.ts): a published
+ *      article's links are asked again, a page taken down since loses its <a>
+ *      (the words stay), the live post is sent again in place, a link the
+ *      CUSTOMER removed is sent too, a site that refuses is tried again later,
+ *      never a draft, never another owner's article, Production only, kill
+ *      switch, never throws;
  *   D) wiring: every generation path runs the step (not only the opt-in one),
  *      after the approved plan links and before the link network; the article
  *      page lists them and hides the older planned-link panels only for an
@@ -38,7 +44,8 @@ import { readAnchorBank } from '@/lib/content/internal-link-candidates'
 import { getDashboardDictionary } from '@/lib/i18n/dashboard/getDashboardDictionary'
 import ArticleAutoLinksCard from '@/components/content/ArticleAutoLinksCard'
 import { autoLinkCandidates, isFacetUrl, selectAutoLinks, type AutoLinkArticle } from '../select'
-import { autoLinksShown, hasAutoLinks, markAutoRemoved } from '../entries'
+import { autoLinksShown, autoNeedsSync, autoOldestCheck, hasAutoLinks, markAutoChecked, markAutoRemoved, markAutoSynced } from '../entries'
+import { HEAL_RECHECK_AFTER_MS, healArticleLinks, pickArticlesToHeal, runLinkHeal, type HealScope } from '../heal'
 import { checkLinkTarget, runAutoInternalLinksStep } from '../step'
 
 let passed = 0
@@ -418,6 +425,109 @@ async function main() {
   check('D6: the remove button respects reduced motion and has a focus ring', /motion-reduce:transition-none/.test(cardSrc) && /focus-visible:ring/.test(cardSrc))
   const mutPage = page.replace('plannedLinks.length > 0 && !autoLinked &&', 'plannedLinks.length > 0 &&')
   check('MUTATION CONTROL: the planned-link card shown again for a new article is caught (so D2 would fail)', !/plannedLinks\.length > 0 && !autoLinked &&/.test(mutPage))
+
+  // ── F) the healing pass ─────────────────────────────────────────────────────
+  console.log('\nF) the healing pass (a published article whose target died)')
+  const HNOW = new Date('2026-11-16T09:00:00Z')
+  const DEAD = u('okinawa/')
+  const ALIVE = u('tokyo/')
+  const entry = (url: string, over: Record<string, unknown> = {}) => ({ source: 'auto', anchor: url === DEAD ? 'אוקינאווה' : 'טוקיו', url, title: 't', at: '2026-10-01T00:00:00Z', ...over })
+  const healHtml = `<p>${fill(30)} <a href="${DEAD}">אוקינאווה</a> ${fill(10)}</p>\n<p>${fill(30)} <a href="${ALIVE}">טוקיו</a> ${fill(10)}</p>`
+  const hWorld = (over: { article?: Record<string, unknown>; projectOwner?: string } = {}) => new FakeAdmin({
+    projects: [{ id: PROJECT, user_id: over.projectOwner ?? OWNER, target_domain: 'travel.example.co.il' }],
+    generated_articles: [{ id: ART, project_id: PROJECT, status: 'published', wp_post_id: 123, content_html: healHtml, internal_links_json: [entry(DEAD), entry(ALIVE), { anchor: 'בנק', source: 'manual' }], updated_at: '2026-10-01T00:00:00Z', ...over.article }],
+  })
+  const dead = async (url: string) => (url === DEAD ? 'gone' as const : 'alive' as const)
+  const scope: HealScope = { projectId: PROJECT, userId: OWNER, articleId: ART }
+  const hDeps = { now: () => HNOW, env: {} as Record<string, string | undefined>, checkUrl: dead }
+  console.log = () => {}
+  const h1 = hWorld()
+  const sent1: string[] = []
+  const r1h = await healArticleLinks(h1 as never, scope, { ...hDeps, resync: async (_a, s) => { sent1.push(s.articleId); return true } })
+  const row1h = h1.tables.generated_articles[0] as { content_html: string; internal_links_json: Record<string, unknown>[] }
+  const hAlive = hWorld()
+  const rAlive = await healArticleLinks(hAlive as never, scope, { ...hDeps, checkUrl: async () => 'alive' as const, resync: async () => { throw new Error('must not send') } })
+  const hRefuse = hWorld()
+  const rRefuse = await healArticleLinks(hRefuse as never, scope, { ...hDeps, resync: async () => false })
+  const rowRefuse = hRefuse.tables.generated_articles[0] as { content_html: string; internal_links_json: Record<string, unknown>[] }
+  const hCustomer = hWorld({ article: { content_html: `<p>${fill(30)} אוקינאווה ${fill(10)}</p>`, internal_links_json: [entry(DEAD, { removed: true })] } })
+  let customerSent = 0
+  const rCustomer = await healArticleLinks(hCustomer as never, scope, { ...hDeps, checkUrl: async () => { throw new Error('nothing live to ask') }, resync: async () => { customerSent++; return true } })
+  const hDraft = hWorld({ article: { status: 'draft' } })
+  const rDraft = await healArticleLinks(hDraft as never, scope, { ...hDeps, resync: async () => { throw new Error('must not send') } })
+  const hOther = hWorld({ projectOwner: 'someone-else' })
+  const rOtherH = await healArticleLinks(hOther as never, scope, { ...hDeps, resync: async () => true })
+  const rOffH = await healArticleLinks(hWorld() as never, scope, { ...hDeps, env: { AUTO_INTERNAL_LINKS_HEAL_DISABLED: 'true' }, resync: async () => true })
+  const hThrow = new FakeAdmin({ projects: [{ id: PROJECT, user_id: OWNER }] }, { projects: { select: () => { throw new Error('boom') } } } as never)
+  const rThrow = await healArticleLinks(hThrow as never, scope, { ...hDeps, resync: async () => true })
+  const passPreview = await runLinkHeal(hWorld() as never, { deadlineAt: HNOW.getTime() + 300_000, env: { VERCEL_ENV: 'preview' }, nowMs: () => HNOW.getTime(), deps: { now: () => HNOW, checkUrl: dead, resync: async () => true } })
+  const hPass = hWorld()
+  const passProd = await runLinkHeal(hPass as never, { deadlineAt: HNOW.getTime() + 300_000, env: { VERCEL_ENV: 'production' }, nowMs: () => HNOW.getTime(), deps: { now: () => HNOW, checkUrl: dead, resync: async () => true } })
+  const passNoTime = await runLinkHeal(hWorld() as never, { deadlineAt: HNOW.getTime() + 1_000, env: { VERCEL_ENV: 'production' }, nowMs: () => HNOW.getTime(), deps: { now: () => HNOW, checkUrl: dead, resync: async () => true } })
+  console.log = quiet
+  const autoOf = (row: { internal_links_json: Record<string, unknown>[] }) => row.internal_links_json.filter((e) => e.source === 'auto')
+  check('F1: the dead page loses its <a> and its words stay; the live one keeps its link; the live post is sent again once',
+    r1h.outcome === 'healed' && r1h.removed === 1 && r1h.resynced === true
+    && !/<a href="[^"]*okinawa/.test(row1h.content_html) && row1h.content_html.includes('אוקינאווה')
+    && /<a href="[^"]*tokyo/.test(row1h.content_html) && sent1.length === 1, JSON.stringify(r1h))
+  check('F1b: the dead entry is marked removed AND synced, the live one carries the time it answered, the manual entry is untouched',
+    autoOf(row1h).find((e) => e.url === DEAD)?.removed === true && autoOf(row1h).find((e) => e.url === DEAD)?.synced === true
+    && autoOf(row1h).find((e) => e.url === ALIVE)?.removed === undefined && autoOf(row1h).find((e) => e.url === ALIVE)?.checkedAt === HNOW.toISOString()
+    && row1h.internal_links_json.some((e) => e.source === 'manual'), JSON.stringify(row1h.internal_links_json))
+  check('F2: every target answers: nothing is removed and the site is NOT touched',
+    rAlive.outcome === 'clean' && /<a href="[^"]*okinawa/.test(String(hAlive.tables.generated_articles[0].content_html)), JSON.stringify(rAlive))
+  check('F3: a site that refuses the update: our copy is clean, the entry is NOT marked synced, so a later pass tries again',
+    rRefuse.outcome === 'healed' && rRefuse.resynced === false && !/<a href="[^"]*okinawa/.test(rowRefuse.content_html)
+    && autoOf(rowRefuse).find((e) => e.url === DEAD)?.removed === true && autoOf(rowRefuse).find((e) => e.url === DEAD)?.synced === undefined, JSON.stringify(rRefuse))
+  check('F4: a link the CUSTOMER removed is sent to the site (what the remove button could never do), with nothing left to ask',
+    rCustomer.outcome === 'resynced' && customerSent === 1
+    && autoOf(hCustomer.tables.generated_articles[0] as never).every((e) => e.synced === true), JSON.stringify(rCustomer))
+  check('F5: a draft is never healed or sent (published articles only)', rDraft.outcome === 'skipped' && rDraft.reason === 'not_published')
+  check('F6: another owner\'s article is never read, changed or sent', rOtherH.outcome === 'skipped' && rOtherH.reason === 'not_found' && /<a href="[^"]*okinawa/.test(String(hOther.tables.generated_articles[0].content_html)))
+  check('F7: kill switch AUTO_INTERNAL_LINKS_HEAL_DISABLED=true, for the article and for the pass', rOffH.outcome === 'skipped' && rOffH.reason === 'disabled')
+  check('F8: a failing read never throws out of the pass', rThrow.outcome === 'skipped' && rThrow.reason === 'error')
+  check('F9: the pass acts in Production only, and does nothing when the run has no window left',
+    passPreview === null && passNoTime === null && passProd?.healed === 1 && passProd?.resynced === 1, JSON.stringify(passProd))
+  // Pure ordering: an unsynced removal first, then the longest-unchecked, and
+  // only past the re-check window.
+  const owners = new Map([[PROJECT, OWNER]])
+  const rows = [
+    { id: 'a-fresh', project_id: PROJECT, internal_links_json: [entry(ALIVE, { checkedAt: new Date(HNOW.getTime() - 3600_000).toISOString() })] },
+    { id: 'a-old', project_id: PROJECT, internal_links_json: [entry(ALIVE, { checkedAt: new Date(HNOW.getTime() - HEAL_RECHECK_AFTER_MS - 1000).toISOString() })] },
+    { id: 'a-never', project_id: PROJECT, internal_links_json: [entry(ALIVE)] },
+    { id: 'a-unsynced', project_id: PROJECT, internal_links_json: [entry(DEAD, { removed: true })] },
+    { id: 'a-none', project_id: PROJECT, internal_links_json: [{ anchor: 'x', source: 'manual' }] },
+    { id: 'a-foreign', project_id: 'p-other', internal_links_json: [entry(ALIVE)] },
+  ]
+  const picked = pickArticlesToHeal(rows, owners, HNOW.getTime()).map((c) => c.scope.articleId)
+  check('F10: the order is: a removal the site does not have yet, then never-asked, then asked longest ago; a fresh one, one with no automatic links and another project are left out',
+    JSON.stringify(picked) === JSON.stringify(['a-unsynced', 'a-never', 'a-old']), JSON.stringify(picked))
+  check('F11: the entry marks are pure and additive',
+    autoNeedsSync([entry(DEAD, { removed: true })]) && !autoNeedsSync([entry(DEAD, { removed: true, synced: true })]) && !autoNeedsSync([entry(ALIVE)])
+    && autoOldestCheck([entry(ALIVE)]) === 0 && autoOldestCheck([entry(DEAD, { removed: true })]) === Number.POSITIVE_INFINITY
+    && (markAutoChecked([entry(DEAD), entry(ALIVE)], [DEAD], HNOW.toISOString())[0] as Record<string, unknown>).removed === true
+    && (markAutoChecked([entry(DEAD), entry(ALIVE)], [DEAD], HNOW.toISOString())[0] as Record<string, unknown>).synced === undefined
+    && (markAutoSynced([entry(DEAD, { removed: true })])[0] as Record<string, unknown>).synced === true
+    && (markAutoSynced([entry(ALIVE)])[0] as Record<string, unknown>).synced === undefined)
+  const healSrc = strip(read('lib/content/auto-internal-links/resync.ts'))
+  check('F12: the resync only ever updates the article\'s OWN existing post, as published, through the one publisher path: no new post, no draft, no schedule, no author',
+    /existing/.test(healSrc) && /status: 'publish'/.test(healSrc) && !/forceNew/.test(healSrc) && !/scheduleAt/.test(healSrc) && !/authorId/.test(healSrc)
+    && /\.eq\('status', 'published'\)/.test(healSrc) && /ownerId: scope\.userId/.test(healSrc))
+  const cronSrc = strip(read('app/api/content/automation/cron/route.ts'))
+  check('F13: the pass rides the automation cron, isolated, with the live resync bound in',
+    /startIsolatedLinkHeal\(/.test(cronSrc) && /resync: resyncPublishedArticle/.test(cronSrc))
+  console.log = () => {}
+  const mutHeal = await mutant<typeof import('../heal')>('lib/content/auto-internal-links/heal.ts', (src) =>
+    src.replace('for (const url of gone) html = removeLink(html, url) ?? html', 'void gone'))
+  const hMut = hWorld()
+  const rMut = await mutHeal.healArticleLinks(hMut as never, scope, { ...hDeps, resync: async () => true })
+  const mutEntries = await mutant<typeof import('../entries')>('lib/content/auto-internal-links/entries.ts', (src) =>
+    src.replace('return dead.has(e.url) ? { ...e, removed: true, checkedAt: at } : { ...e, checkedAt: at }', 'return { ...e, checkedAt: at }'))
+  console.log = quiet
+  check('MUTATION CONTROL: a pass that marks the link dead but leaves the <a> in the body is caught (so F1 would fail)',
+    rMut.outcome === 'healed' && /<a href="[^"]*okinawa/.test(String(hMut.tables.generated_articles[0].content_html)))
+  check('MUTATION CONTROL: a dead target left unmarked is caught (so F1b would fail)',
+    (mutEntries.markAutoChecked([entry(DEAD)], [DEAD], HNOW.toISOString())[0] as Record<string, unknown>).removed === undefined)
 
   console.log(`\n${passed} passed, ${failed} failed`)
   if (failed) process.exit(1)
