@@ -210,7 +210,75 @@ async function pickForPublish(admin: Admin, poolId: string): Promise<PickedItem 
     .limit(20)
   const rows = (data ?? []) as { id: string; topic_id: string | null; status: string; article_id: string | null; attempts: number }[]
   const row = rows.find((r) => r.status === 'generated' || (!!r.article_id && (r.attempts ?? 0) < AUTOMATION_MAX_ATTEMPTS))
-  return withTitle(admin, row ? { id: row.id, topic_id: row.topic_id } : null)
+  return withTitle(admin, row ? { id: row.id, topic_id: row.topic_id, article_id: row.article_id } : null)
+}
+
+/**
+ * A SITE THAT SAID NO IS ASKED AGAIN ONCE A DAY, SO AN ACCOUNT CANNOT FREEZE
+ * IN SILENCE.
+ *
+ * A paused item is terminal: nothing re-picks it. That is right for a reason
+ * only a person can clear, and wrong for a reason that lives on the merchant's
+ * own site — a firewall rule, an application password without upload rights, a
+ * security plugin — because those get fixed, often without anyone telling us,
+ * and until then the pool publishes nothing at all. On 16 November 2026 five
+ * sites refused the featured-image upload and all five queues went silent; with
+ * the generation hold added the same morning they would have stayed silent for
+ * good, which trades waste for paralysis.
+ *
+ * So ONE paused item per pool is handed back to the ordinary retry path per
+ * day. It costs no model call — the article is already written — and the reason
+ * list is deliberately only the two "the site answered no" codes. A duplicate
+ * topic, a missing article, a failed quality gate or an unconnected platform is
+ * never revived: a retry cannot clear those, and the last of them is how an
+ * expired trial stays frozen.
+ *
+ * ONCE A DAY IS COUNTED PER POOL, not per item. A pool holding 24 refused
+ * articles must not walk through them four an hour: that is a hammer on a
+ * merchant's site, not a retry. So nothing is revived while ANY paused item of
+ * the pool was touched within the day.
+ *
+ * THE ONE EXCEPTION IS THE FIRST ASK. An item paused before `mediaBlockReason`
+ * existed carries the bare reason with no `: code` suffix, which means the site
+ * has never been asked with the diagnostics in place — the answer we need is
+ * not in the data at all. Such a pool gets its one retry immediately rather
+ * than a day late. It is self-limiting: the refusal that follows writes a coded
+ * reason, and the ordinary daily rule takes over from there.
+ */
+export const PAUSED_RETRY_AFTER_MS = 24 * 3600_000
+const REVIVABLE_PAUSE_REASONS: readonly string[] = ['wordpress_media_upload_failed', 'wordpress_post_failed']
+const reasonCodeOf = (e: string) => e.split(':')[0].trim()
+/** Paused by the code that kept no remote answer, so the site was never asked with one. */
+const neverAskedWithDiagnostics = (e: string) => !e.includes(':')
+
+/** The id of the item handed back to the retry path, or null. Never throws. */
+async function reviveOnePausedItem(admin: Admin, poolId: string, nowMs: number): Promise<string | null> {
+  const { data } = await admin
+    .from('article_pool_items')
+    .select('id, status, article_id, last_error, updated_at')
+    .eq('pool_id', poolId)
+    .eq('status', 'paused')
+    .order('updated_at', { ascending: true })
+    .limit(50)
+  const rows = (data ?? []) as { id: string; article_id: string | null; last_error: string | null; updated_at: string | null }[]
+  const ageOf = (r: typeof rows[number]) => {
+    const t = r.updated_at ? Date.parse(r.updated_at) : NaN
+    return Number.isFinite(t) ? nowMs - t : Number.POSITIVE_INFINITY
+  }
+  const revivable = rows.filter((r) => r.article_id && r.last_error && REVIVABLE_PAUSE_REASONS.includes(reasonCodeOf(r.last_error)))
+  if (!revivable.length) return null
+  // The per-pool day: any paused item touched within it, and the pool waits.
+  const firstAsk = revivable.every((r) => neverAskedWithDiagnostics(r.last_error as string))
+  if (!firstAsk && rows.some((r) => ageOf(r) < PAUSED_RETRY_AFTER_MS)) return null
+  const row = revivable[0]
+  if (!row) return null
+  // 'failed' with a cleared counter is what the queue screen's retry produces,
+  // so this reuses that path exactly. `last_error` is KEPT: it is the record of
+  // what the site said, and the alert on the item stays as it is.
+  const { data: taken } = await admin.from('article_pool_items')
+    .update({ status: 'failed', attempts: 0, locked_at: null, updated_at: new Date(nowMs).toISOString() })
+    .eq('id', row.id).eq('status', 'paused').select('id').maybeSingle()
+  return taken ? row.id : null
 }
 
 export async function runAutomation(admin: Admin, opts: { projectId?: string; dryRun?: boolean; nowMs?: number; generate?: typeof generatePoolItem; platform?: (admin: Admin, projectId: string) => Promise<{ platform: string }> } = {}): Promise<AutomationSummary> {
@@ -348,7 +416,16 @@ export async function runAutomation(admin: Admin, opts: { projectId?: string; dr
 
       // (E) Publish the earliest READY (or retryable failed-publish) item if due — ≤1 per pool per run.
       if (due) {
-        const gen = await pickForPublish(admin, pool.id)
+        let gen = await pickForPublish(admin, pool.id)
+        // Nothing publishable and a site-refused article waiting a day: ask the
+        // site again (see reviveOnePausedItem), then take that item this run.
+        if (!gen) {
+          const revived = await reviveOnePausedItem(admin, pool.id, nowMs)
+          if (revived) {
+            summary.details.push(`pool ${pool.id}: retrying a paused article the site refused (${revived})`)
+            gen = await pickForPublish(admin, pool.id)
+          }
+        }
         if (gen) {
           // The plan decides the rhythm (read only); an admin, a trial or an
           // unreadable allowance keeps the owner's schedule. The next slot is

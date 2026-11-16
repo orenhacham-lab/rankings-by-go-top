@@ -154,7 +154,12 @@ async function main() {
       check('the stuck pool is never written to', !g.calls.includes('a-stuck'), g.calls)
       check('and the healthy pool still gets the run\'s one generation', g.wrote[0] === 'b-ok', g.wrote)
       const d = r.diagnostics.find((x) => x.poolId === 'a-stuck')
-      check('its diagnostic says why, with the count', d?.note === 'held_paused_backlog' && d?.error === `paused_backlog_${PAUSED_BACKLOG_HOLD}`, [d?.note, d?.error])
+      // `error` carries the publish step's own answer by the end of the run, so the
+      // hold is read from the note plus the run's own detail line.
+      check('its diagnostic says why, with the count',
+        d?.note === 'held_paused_backlog'
+        && r.details.includes(`pool a-stuck: generation held (paused_backlog_${PAUSED_BACKLOG_HOLD})`),
+        [d?.note, r.details])
     }
     {
       // The limit must not punish a healthy pool for one odd paused item.
@@ -182,7 +187,58 @@ async function main() {
       const r = await quiet(() => runAutomation(admin as unknown as Admin, { generate: g.fn, platform: connected, nowMs: firstRunFor(1) }))
       check('a by-hand retry of an already-written article is NOT held by the backlog', g.calls.includes('retry-1'), [g.calls, r.diagnostics.map((d) => d.note)])
     }
-    // MUTATION CONTROL, run by hand: deleting the `if (q && stuck)` branch in runner.ts fails
+    {
+      // AND A FROZEN ACCOUNT MUST WAKE BY ITSELF. A paused item is terminal, so without
+      // this the five sites refused on 16 Nov 2026 would publish nothing for good: the
+      // hold would have traded waste for paralysis. One a day, no model call, and only
+      // for a reason the merchant's own site can stop giving.
+      const DAY = 24 * 3600_000
+      const pausedWith = (id: string, last_error: string, ageMs: number) => ({
+        id, pool_id: 'e-revive', project_id: 'project-e-revive', topic_id: `t-${id}`, status: 'paused',
+        article_id: `article-${id}`, attempts: 1, position: 1, locked_at: null, last_error,
+        updated_at: new Date(Date.now() - ageMs).toISOString(),
+      })
+      // A revived item is handed back to the publish step, which asks the site again.
+      // The site may well refuse again in the same run, so what is asserted is the ASK
+      // (publishAttempted), never the status the second refusal leaves behind.
+      const run = async (items: ReturnType<typeof pausedWith>[]) => {
+        const admin = new FakeAdmin({ article_pools: [pool('e-revive')], article_pool_items: items })
+        const g = fakeGenerate(new Set())
+        const r = await quiet(() => runAutomation(admin as unknown as Admin, { generate: g.fn, platform: connected, nowMs: Date.now() }))
+        const asked = r.details.some((d) => d.includes('retrying a paused article the site refused'))
+        return { asked, details: r.details }
+      }
+      const refusedYesterday = await run([pausedWith('old-media', 'wordpress_media_upload_failed: wordpress_forbidden', DAY + 60_000)])
+      check('an article the site refused a day ago is handed back to the retry path',
+        refusedYesterday.asked, refusedYesterday.details)
+
+      const refusedJustNow = await run([pausedWith('fresh-media', 'wordpress_media_upload_failed: wordpress_forbidden', 3600_000)])
+      check('one refused an hour ago is left alone (once a day, not every run)',
+        !refusedJustNow.asked, refusedJustNow.details)
+
+      // The first ask: paused by the old code, so the site has never been asked with the
+      // diagnostics in place and the answer is not in the data at all.
+      const neverAsked = await run([pausedWith('bare-1', 'wordpress_media_upload_failed', 3600_000)])
+      check('an article paused by the old code is asked at once, not a day later',
+        neverAsked.asked, neverAsked.details)
+
+      // ... and that exception must not become a walk through a pile of them.
+      const pile = await run([
+        pausedWith('bare-a', 'wordpress_media_upload_failed', 3600_000),
+        pausedWith('bare-b', 'wordpress_media_upload_failed', 3600_000),
+        pausedWith('coded-c', 'wordpress_media_upload_failed: wordpress_forbidden', 60_000),
+      ])
+      check('once one carries the site\'s answer, the pool waits its day',
+        !pile.asked, pile.details)
+
+      for (const reason of ['duplicate_topic_published', 'publish_quality_gate_failed', 'article_missing', 'no_active_publishing_platform']) {
+        const old = await run([pausedWith(`r-${reason}`, reason, 40 * DAY)])
+        check(`'${reason}' is never revived, however old (a retry cannot clear it)`,
+          !old.asked, old.details)
+      }
+    }
+    // MUTATION CONTROL, run by hand: stubbing `reviveOnePausedItem` to null fails the two
+    // revive checks (45 passed, 2 failed); deleting the `if (q && stuck)` branch in runner.ts fails
     // the first three checks above (the stuck pool is written and takes the slot); dropping
     // `&& !q.hasArticle` fails the by-hand retry check.
   }
