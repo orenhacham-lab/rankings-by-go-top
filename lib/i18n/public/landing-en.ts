@@ -96,6 +96,7 @@ export const landingEn: LandingCopy = {
     checkNames: ['Google', 'Google Maps', 'ChatGPT', 'Gemini', 'Perplexity', 'Copilot', 'Grok'],
     publishLabel: 'We publish straight to:',
     publishNames: ['WordPress', 'Shopify', 'Wix'],
+    trademarks: 'Third-party names and logos are the trademarks of their owners. They appear here to describe what the system checks and publishes to, and imply no partnership or endorsement.',
   },
   outcomes: {
     eyebrow: 'What you get',

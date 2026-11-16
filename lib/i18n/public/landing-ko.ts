@@ -128,6 +128,7 @@ export const landingKo: LandingCopy = {
     checkNames: ['Google', 'Google 지도', 'ChatGPT', 'Gemini', 'Perplexity', 'Copilot', 'Grok'],
     publishLabel: '바로 발행하는 곳:',
     publishNames: ['WordPress', 'Shopify', 'Wix'],
+    trademarks: '제3자의 이름과 로고는 각 소유자의 상표입니다. 본 시스템이 확인하는 곳과 게시하는 곳을 설명하기 위해 표시한 것이며, 제휴나 보증을 뜻하지 않습니다.',
   },
   outcomes: {
     eyebrow: '얻게 되는 것',

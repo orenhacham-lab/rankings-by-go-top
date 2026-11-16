@@ -121,6 +121,7 @@ export const landingNl: LandingCopy = {
     checkNames: ['Google', 'Google Maps', 'ChatGPT', 'Gemini', 'Perplexity', 'Copilot', 'Grok'],
     publishLabel: 'Wij publiceren rechtstreeks naar:',
     publishNames: ['WordPress', 'Shopify', 'Wix'],
+    trademarks: 'Namen en logos van derden zijn de handelsmerken van hun eigenaars. Zij staan hier om te beschrijven wat het systeem controleert en waar het publiceert, en houden geen samenwerking of goedkeuring in.',
   },
   outcomes: {
     eyebrow: 'Wat u krijgt',
