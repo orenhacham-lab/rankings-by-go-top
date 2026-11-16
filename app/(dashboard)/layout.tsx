@@ -17,6 +17,7 @@ import { DashboardDirectionWrapper } from '@/components/DashboardDirectionWrappe
 import { DashboardLanguageProvider } from '@/lib/i18n/dashboard/useDashboardLanguage'
 import { getServerPublicLocale } from '@/lib/i18n/server-locale'
 import { ActiveProjectProvider } from '@/lib/active-project/ActiveProjectProvider'
+import { buildActiveProjectList } from '@/lib/active-project/list'
 import { GscFeatureProvider } from '@/components/gsc/GscFeature'
 import { isGscReadOnlyEnabled } from '@/lib/gsc/config'
 import { createClient } from '@/lib/supabase/server'
@@ -61,20 +62,31 @@ export default async function DashboardLayout({
     redirect('/login')
   }
 
-  // Area C — catch-all: existing users who never had a client (and users who arrive via
-  // a path that didn't run the signup/callback hooks, e.g. Google OAuth) get their default
-  // client here on first dashboard load. Idempotent + quota-aware + best-effort (a cheap
-  // head-count no-ops once any client exists; a failure never blocks the dashboard).
-  try { await ensureDefaultClient(supabase, createAdminClient()) } catch { /* non-blocking */ }
+  // THESE THREE START TOGETHER. They depend on the user and on nothing else,
+  // and this layout renders on every dashboard navigation, so awaiting them one
+  // by one spent three round trips before the page began. The project list is
+  // here at all because the client used to ask for it on mount and every other
+  // request on the page waited for the answer — about 650ms from Tokyo before
+  // any real work started. In this region it is a local read.
+  //
+  // Each is independently best-effort, as it was: the default-client catch-all
+  // never blocks the dashboard, a missing profile simply is not an admin, and a
+  // null list makes the provider fetch exactly as before.
+  const [, profileResult, projectList] = await Promise.all([
+    // Area C — catch-all: existing users who never had a client (and users who arrive via
+    // a path that didn't run the signup/callback hooks, e.g. Google OAuth) get their default
+    // client here on first dashboard load. Idempotent + quota-aware + best-effort (a cheap
+    // head-count no-ops once any client exists; a failure never blocks the dashboard).
+    ensureDefaultClient(supabase, createAdminClient()).catch(() => null),
+    // Fetch profile to determine admin status
+    supabase.from('profiles').select('role').eq('id', user.id).maybeSingle().then(
+      (r: { data: { role?: string | null } | null }) => r.data,
+      () => null,
+    ),
+    buildActiveProjectList(supabase, user.id).catch(() => null),
+  ])
 
-  // Fetch profile to determine admin status
-  const { data: profile } = await supabase
-    .from('profiles')
-    .select('role')
-    .eq('id', user.id)
-    .maybeSingle()
-
-  const isAdmin = profile?.role === 'admin'
+  const isAdmin = profileResult?.role === 'admin'
 
   // Area G — seed the dashboard language from the signup-origin locale saved in auth
   // metadata, so a fresh device's first login (empty localStorage) opens in the
@@ -97,7 +109,7 @@ export default async function DashboardLayout({
       {/* Area D — ONE global active-project source of truth for the whole dashboard.
           Wrapped in Suspense because the provider reads the URL via useSearchParams. */}
       <Suspense fallback={null}>
-        <ActiveProjectProvider userId={user.id}>
+        <ActiveProjectProvider userId={user.id} initialProjects={projectList?.projects ?? null}>
           {/* The shell: the sidebar on the logical START (right in Hebrew, left in
               English — it follows the document's dir), the screen beside it. The
               sidebar sits in the flow and sticks, instead of being fixed over a

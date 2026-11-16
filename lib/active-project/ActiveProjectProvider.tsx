@@ -45,7 +45,19 @@ interface ActiveProjectContextValue {
 
 const ActiveProjectContext = createContext<ActiveProjectContextValue | null>(null)
 
-export function ActiveProjectProvider({ userId, children }: { userId: string; children: ReactNode }) {
+/**
+ * `initialProjects` is the same owned+active list the route serves, built by
+ * the dashboard layout in the database's own region (lib/active-project/list.ts).
+ * When it is present the provider starts RESOLVED and makes no request at all,
+ * which is the point: this fetch used to gate every other request on the page,
+ * because the project id is what they are all keyed by. Everything else here is
+ * unchanged — the list is still re-read on a deep link to an unknown id, on a
+ * cross-tab change, and through reloadProjects — so a stale layout render can
+ * only cost one extra read, never a wrong verdict. `null` means the layout did
+ * not have a list (its own read failed, or this is not a layout-rendered page),
+ * and the provider fetches exactly as before.
+ */
+export function ActiveProjectProvider({ userId, initialProjects, children }: { userId: string; initialProjects?: ActiveProjectLite[] | null; children: ReactNode }) {
   const router = useRouter()
   const pathname = usePathname()
   const searchParams = useSearchParams()
@@ -95,18 +107,9 @@ export function ActiveProjectProvider({ userId, children }: { userId: string; ch
   // — and because setActiveProject validates against this list, an empty list
   // silently makes EVERY project unselectable everywhere. Consumers can now
   // tell the two apart and offer a retry.
-  const loadProjects = useCallback(async (signal?: { cancelled: boolean }) => {
-    let list: ActiveProjectLite[] = []
-    let failed = false
-    try {
-      const res = await fetch('/api/projects/active')
-      if (res.ok) {
-        const d = await res.json()
-        if (Array.isArray(d?.projects)) list = d.projects
-        else failed = true
-      } else failed = true
-    } catch { failed = true }
-    if (signal?.cancelled) return
+  // Resolving a list — whichever way it arrived — is one step, so the seeded
+  // path and the fetched path cannot drift apart in precedence or persistence.
+  const applyList = useCallback((list: ActiveProjectLite[], failed: boolean) => {
     let persisted: string | null = null
     try { persisted = localStorage.getItem(storageKey) } catch { /* ignore */ }
     const { id: urlId, fromLegacy } = readUrlProjectId(searchParamsRef.current)
@@ -122,9 +125,26 @@ export function ActiveProjectProvider({ userId, children }: { userId: string; ch
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [storageKey, persist])
 
+  const loadProjects = useCallback(async (signal?: { cancelled: boolean }) => {
+    let list: ActiveProjectLite[] = []
+    let failed = false
+    try {
+      const res = await fetch('/api/projects/active')
+      if (res.ok) {
+        const d = await res.json()
+        if (Array.isArray(d?.projects)) list = d.projects
+        else failed = true
+      } else failed = true
+    } catch { failed = true }
+    if (signal?.cancelled) return
+    applyList(list, failed)
+  }, [applyList])
+
   const reloadProjects = useCallback(() => { void loadProjects() }, [loadProjects])
 
   useEffect(() => {
+    // Seeded by the server: resolve from what we already have, ask nothing.
+    if (initialProjects) { applyList(initialProjects, false); return }
     const signal = { cancelled: false }
     void loadProjects(signal)
     return () => { signal.cancelled = true }

@@ -291,11 +291,16 @@ async function main() {
   }
 
   console.log('\nG) where the second look is started')
-  const route = strip(read('app/api/projects/active/route.ts'))
+  // 2026-11-16: picking the runs moved into lib/active-project/list.ts, which
+  // the dashboard layout also calls; starting the refresh stayed in the route,
+  // which is the only caller that may do work after a response. Every property
+  // is still asserted, across the pair.
+  const route = strip(read('app/api/projects/active/route.ts')) + '\n' + strip(read('lib/active-project/list.ts'))
   const scheduled = (s: string) => /after\(async \(\) =>/.test(s) && /refreshRunIcon\(/.test(s) && /needsIconRetry\(run, now\)/.test(s)
-    && /if \(out\.length >= MAX_PER_REQUEST\) break/.test(s) && /\.eq\('id', runId\)\s*\.eq\('user_id', userId\)/.test(s)
+    && /if \((out|iconRetryRunIds)\.length >= MAX_PER_REQUEST\) break/.test(s) && /\.eq\('id', runId\)\s*\.eq\('user_id', userId\)/.test(s)
   check('G1: the project list schedules it after the response, for at most MAX_PER_REQUEST of the caller\'s own runs', scheduled(route) && refresh.MAX_PER_REQUEST <= 2)
-  check('MUT: no per-request cap fails G1', !scheduled(route.replace('if (out.length >= MAX_PER_REQUEST) break', '')))
+  check('MUT: no per-request cap fails G1',
+    !scheduled(route.replace(/if \((out|iconRetryRunIds)\.length >= MAX_PER_REQUEST\) break/, '')))
   check('MUT: reading the run without the owner filter fails G1', !scheduled(route.replace(".eq('user_id', userId)", '')))
   const mod = strip(read('lib/seed-scan/site-icon-refresh.ts'))
   const guarded = (s: string) => /normalizeCheckUrl\(/.test(s) && /deps\.assertHost\(start\.hostname\)/.test(s) && /hostPinnedFetch\(\{ siteKey: domainKey\(start\)/.test(s)

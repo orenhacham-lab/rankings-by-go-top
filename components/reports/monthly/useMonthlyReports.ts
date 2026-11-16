@@ -4,6 +4,16 @@
  * Reads the project's monthly reports: one GET, read-only, no model and no third
  * party, so opening the Reports screen or the dashboard costs a single row read
  * per month. `generate` is the owner's "create last month's report now".
+ *
+ * THE READ IS SHARED BY URL, AND CAN BE STARTED EARLY. The dashboard's teaser
+ * only mounts once the dashboard's own route has answered, so this GET used to
+ * start in the fourth wave of a dashboard load although all it needs is the
+ * project id, which the screen has from its first render. The screen now warms
+ * this read as it mounts (prefetchMonthlyReports) and the teaser, mounting later,
+ * finds the answer already in hand. The cache lives on `globalThis` for the
+ * reason lib/client/seed-read.ts gives: a 'use client' module imported from two
+ * route segments can be emitted into two chunks, and two module instances mean
+ * two caches that never see each other.
  */
 import { useCallback, useEffect, useRef, useState } from 'react'
 import type { MonthlyGetResponse } from '@/lib/reports/monthly/http'
@@ -19,6 +29,44 @@ export function monthlyUrl(projectId: string, month?: string | null): string {
   const q = new URLSearchParams({ projectId })
   if (month) q.set('month', month)
   return `/api/reports/monthly?${q.toString()}`
+}
+
+/** What one GET answered: the body, and whether the response itself was a success. */
+type Answer = { ok: boolean; body: MonthlyGetResponse | null }
+
+const SHARE_MS = 15_000
+const CACHE_KEY = '__goTopMonthlyCache__'
+type CacheHost = typeof globalThis & { [CACHE_KEY]?: Map<string, { at: number; promise: Promise<Answer> }> }
+
+function cacheMap(): Map<string, { at: number; promise: Promise<Answer> }> {
+  const host = globalThis as CacheHost
+  const existing = host[CACHE_KEY]
+  if (existing) return existing
+  const created = new Map<string, { at: number; promise: Promise<Answer> }>()
+  host[CACHE_KEY] = created
+  return created
+}
+
+/** One GET per URL for a few seconds. `fresh` asks again, past that window. */
+function readMonthly(url: string, fresh: boolean): Promise<Answer> {
+  const cache = cacheMap()
+  const hit = cache.get(url)
+  if (!fresh && hit && Date.now() - hit.at < SHARE_MS) return hit.promise
+  const promise = fetch(url, { cache: 'no-store' })
+    .then(async (res) => ({ ok: res.ok, body: (await res.json().catch(() => null)) as MonthlyGetResponse | null }))
+    .catch(() => ({ ok: false, body: null }))
+  cache.set(url, { at: Date.now(), promise })
+  return promise
+}
+
+/**
+ * Starts the project's latest-report read now, for a screen that will show the
+ * teaser later. Nothing is returned and nothing throws: the hook reads the same
+ * shared answer when it mounts.
+ */
+export function prefetchMonthlyReports(projectId: string | null | undefined): void {
+  if (!projectId) return
+  void readMonthly(monthlyUrl(projectId), false).catch(() => {})
 }
 
 type Tagged = MonthlyLoad & { key: string; projectId: string }
@@ -38,17 +86,17 @@ export function useMonthlyReports(projectId: string | null) {
   useEffect(() => {
     if (!projectId) return
     const mine = ++request.current
-    fetch(monthlyUrl(projectId, month), { cache: 'no-store' })
-      .then(async (res) => {
-        const body = (await res.json().catch(() => null)) as MonthlyGetResponse | null
+    // A reload (`tick`) must not be served the answer it is replacing.
+    readMonthly(monthlyUrl(projectId, month), tick > 0)
+      .then(({ ok, body }) => {
         if (mine !== request.current) return
-        if (!res.ok || !body || body.ok !== true) { setState({ key, projectId, status: 'error' }); return }
+        if (!ok || !body || body.ok !== true) { setState({ key, projectId, status: 'error' }); return }
         if (!body.available) { setState({ key, projectId, status: 'unavailable' }); return }
         setState({ key, projectId, status: 'ready', body })
         setLastReady({ projectId, body })
       })
       .catch(() => { if (mine === request.current) setState({ key, projectId, status: 'error' }) })
-  }, [projectId, month, key])
+  }, [projectId, month, key, tick])
 
   const [forProject, setForProject] = useState(projectId)
   if (forProject !== projectId) {
