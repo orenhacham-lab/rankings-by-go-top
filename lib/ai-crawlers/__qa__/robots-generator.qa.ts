@@ -11,6 +11,12 @@
  *     robots.txt with Hebrew or Japanese prose in it is noise to every reader
  *     it has, human or not.
  *
+ * It also pins the explicit-allow half of the generator. An empty `Disallow:`
+ * is the only thing that lifts a catch-all `*` block off a single crawler
+ * (RFC 9309 selects one group, never two), so the checks below fail rather than
+ * let that line drift into `Disallow: /` — which would block the very crawler
+ * the reader was trying to let back in.
+ *
  * It also pins the copy contract: every public locale carries the whole `generator`
  * block, and `outputNote` — the sentence that warns a named group REPLACES the
  * catch-all group for that crawler (RFC 9309, rule 2 in ../robots.ts) — is
@@ -62,6 +68,10 @@ check('it renders it exactly once', (CHECKER.match(/<AiRobotsGenerator\s/g) ?? [
 check(
   'the offered list filters out classicSearch',
   /AI_CRAWLERS\.filter\(\s*\(c\)\s*=>\s*!c\.classicSearch\s*\)/.test(SRC),
+)
+check(
+  'the switch offers three positions, not two',
+  /notInFile/.test(SRC) && /allowExplicitly/.test(SRC) && /copy\.results\.blocked/.test(SRC),
 )
 const classic = AI_CRAWLERS.filter((c) => c.classicSearch).map((c) => c.token)
 check('the reference table still has classic crawlers to exclude', classic.length > 0)
@@ -120,6 +130,58 @@ async function behaviour() {
   )
 
   /* ---------------------------------------------------------------- *
+   * 3b. Allowing a crawler on purpose: an EMPTY Disallow, which is the only
+   *     line that lifts a catch-all block off one crawler.
+   * ---------------------------------------------------------------- */
+  check('nothing chosen at all emits nothing', buildRobotsBlock([], []) === '')
+  check(
+    'one explicit allow emits an empty Disallow',
+    buildRobotsBlock([], [ai[0]]) === `User-agent: ${ai[0]}\nDisallow:\n`,
+  )
+  check(
+    'an explicit allow is never written as Disallow: /',
+    !buildRobotsBlock([], [ai[0]]).includes('Disallow: /'),
+  )
+  check(
+    'blocking and allowing keep one group each, in table order',
+    buildRobotsBlock([ai[1]], [ai[0]]) ===
+      `User-agent: ${ai[0]}\nDisallow:\n\nUser-agent: ${ai[1]}\nDisallow: /\n`,
+  )
+  check(
+    'a classic search crawler cannot be allowed either',
+    classic.every((t) => buildRobotsBlock([], [t]) === ''),
+  )
+  check('an unknown token is ignored on the allow side too', buildRobotsBlock([], ['NotACrawler']) === '')
+  check(
+    'a token asked for both ways is blocked, never silently opened',
+    buildRobotsBlock([ai[0]], [ai[0]]) === `User-agent: ${ai[0]}\nDisallow: /\n`,
+  )
+
+  /* The point of the whole feature, read back through the matcher: the reader's
+     own `*` group stops applying to that crawler alone. */
+  const lifted = parseRobots(`User-agent: *\nDisallow: /\n\n${buildRobotsBlock([], [ai[0]])}`)
+  check(
+    'an explicit allow lifts a catch-all block off that crawler',
+    isAllowed(lifted, ai[0], '/').allowed && isAllowed(lifted, ai[0], '/blog/x').allowed,
+  )
+  check(
+    'and leaves the catch-all in force for every other crawler',
+    !isAllowed(lifted, ai[1], '/').allowed,
+  )
+
+  /* The output is still machine text with an explicit allow in it. */
+  const mixed = buildRobotsBlock([ai[1]], [ai[0]])
+  check('no comment lines with an allow group', !/^#/m.test(mixed))
+  check('ASCII only with an allow group', !/[^\x20-\x7e\n]/.test(mixed))
+  check(
+    'only User-agent, Disallow: / and empty Disallow: lines',
+    mixed
+      .split('\n')
+      .filter((l) => l.trim() !== '')
+      .every((l) => /^User-agent: \S+$/.test(l) || l === 'Disallow: /' || l === 'Disallow:'),
+  )
+
+  /* ---------------------------------------------------------------- *
    * 4. The emitted file means what the UI promised, read back by our own
    *    RFC 9309 matcher rather than by eye.
    * ---------------------------------------------------------------- */
@@ -145,7 +207,10 @@ async function behaviour() {
   const KEYS = [
     'title',
     'intro',
-    'allowAll',
+    'clearAll',
+    'notInFile',
+    'allowExplicitly',
+    'allowNote',
     'blockAll',
     'outputTitle',
     'outputNote',
@@ -158,6 +223,7 @@ async function behaviour() {
     check(`${locale} has every generator string`, KEYS.every((k) => typeof g[k] === 'string' && g[k].trim() !== ''))
     check(`${locale} warns that a named group replaces the catch-all`, g.outputNote.length > 80)
     check(`${locale} names robots.txt in the output note`, /robots\.txt/.test(g.outputNote))
+    check(`${locale} explains what an empty Disallow does`, g.allowNote.length > 80 && /Disallow/.test(g.allowNote))
   }
   /* Hebrew is the fallback, so an untranslated locale would pass the checks
      above while reading Hebrew to a Dutch visitor. */

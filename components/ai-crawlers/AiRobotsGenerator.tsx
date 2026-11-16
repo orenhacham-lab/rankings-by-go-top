@@ -27,7 +27,19 @@
  *     this one again", and deleting two lines of their own group is a safe
  *     edit while editing one line out of a shared run is where people break
  *     the file.
- *  4. THE OUTPUT CARRIES NO LOCALISED TEXT. A robots.txt is read by machines
+ *  4. A CRAWLER CAN ALSO BE ALLOWED ON PURPOSE, AND THAT IS THE SECTION'S
+ *     SHARPEST EDGE. The reading behind this page found that of the sites
+ *     blocking OAI-SearchBot — the crawler that fetches a page while a person
+ *     waits for an answer that cites and links it — 43.6% never chose it: the
+ *     block came from a `*` group aimed at every bot alike. There is no way to
+ *     carve one crawler back out of a `*` group by editing that group, because
+ *     RFC 9309 selects ONE group. The only fix is a group that names the
+ *     crawler, and `Disallow:` with nothing after it is the documented way to
+ *     say "no restrictions" (rule 4 in lib/ai-crawlers/robots.ts). Two lines,
+ *     and the catch-all stops applying to that crawler alone. Nothing else we
+ *     could ship undoes a bigger accident, so the switch has three positions
+ *     rather than two: out of the file, allowed on purpose, blocked.
+ *  5. THE OUTPUT CARRIES NO LOCALISED TEXT. A robots.txt is read by machines
  *     and by whoever inherits the site; a Japanese or Hebrew comment inside it
  *     is noise to both. The warning the reader needs — that naming a crawler
  *     REPLACES their catch-all group for it (RFC 9309, and rule 2 in
@@ -50,22 +62,57 @@ import type { AiCrawlerCopy } from '@/lib/ai-crawlers/copy'
  */
 const GENERATOR_CRAWLERS = AI_CRAWLERS.filter((c) => !c.classicSearch)
 
-/** One group per blocked token, in table order. Empty string when none are. */
-export function buildRobotsBlock(blocked: readonly string[]): string {
-  const tokens = GENERATOR_CRAWLERS.map((c) => c.token).filter((t) => blocked.includes(t))
-  if (tokens.length === 0) return ''
-  return tokens.map((t) => `User-agent: ${t}\nDisallow: /`).join('\n\n') + '\n'
+/**
+ * One group per chosen token, in table order. Empty string when none are chosen.
+ *
+ * `blocked` gets `Disallow: /`; `allowed` gets an empty `Disallow:`, which is
+ * robots.txt's own way of writing "no restrictions" and is the only thing that
+ * lifts a `*` block off one crawler. A token in both lists is treated as
+ * blocked: the UI cannot produce that, and of the two readings the safer one is
+ * the one that does not quietly open a site up.
+ */
+export function buildRobotsBlock(
+  blocked: readonly string[],
+  allowed: readonly string[] = [],
+): string {
+  const groups = GENERATOR_CRAWLERS.map((c) => c.token)
+    .map((t) =>
+      blocked.includes(t)
+        ? `User-agent: ${t}\nDisallow: /`
+        : allowed.includes(t)
+          ? `User-agent: ${t}\nDisallow:`
+          : null,
+    )
+    .filter((g): g is string => g !== null)
+  if (groups.length === 0) return ''
+  return groups.join('\n\n') + '\n'
 }
 
+/** What the reader has decided about one crawler. `out` writes no lines at all. */
+type Choice = 'out' | 'allow' | 'block'
+
 export function AiRobotsGenerator({ copy }: { copy: AiCrawlerCopy }) {
-  const [blocked, setBlocked] = useState<readonly string[]>([])
+  const [choices, setChoices] = useState<Readonly<Record<string, Choice>>>({})
   const [copied, setCopied] = useState(false)
 
-  const output = useMemo(() => buildRobotsBlock(blocked), [blocked])
+  const blocked = useMemo(
+    () => Object.keys(choices).filter((t) => choices[t] === 'block'),
+    [choices],
+  )
+  const allowed = useMemo(
+    () => Object.keys(choices).filter((t) => choices[t] === 'allow'),
+    [choices],
+  )
+  const output = useMemo(() => buildRobotsBlock(blocked, allowed), [blocked, allowed])
 
-  const toggle = useCallback((token: string) => {
+  const choose = useCallback((token: string, choice: Choice) => {
     setCopied(false)
-    setBlocked((prev) => (prev.includes(token) ? prev.filter((t) => t !== token) : [...prev, token]))
+    setChoices((prev) => (prev[token] === choice ? prev : { ...prev, [token]: choice }))
+  }, [])
+
+  const setAll = useCallback((choice: Choice) => {
+    setCopied(false)
+    setChoices(Object.fromEntries(GENERATOR_CRAWLERS.map((c) => [c.token, choice])))
   }, [])
 
   const onCopy = useCallback(async () => {
@@ -80,6 +127,15 @@ export function AiRobotsGenerator({ copy }: { copy: AiCrawlerCopy }) {
     }
   }, [output])
 
+  /* The three positions, in the order a reader reads them: no opinion, then the
+     two opinions. `out` first keeps the default on the left, where nothing has
+     been decided yet. */
+  const POSITIONS: readonly { value: Choice; label: string }[] = [
+    { value: 'out', label: copy.generator.notInFile },
+    { value: 'allow', label: copy.generator.allowExplicitly },
+    { value: 'block', label: copy.results.blocked },
+  ]
+
   return (
     <section id="robots-generator" className="mt-14">
       <h2 className="inline-flex items-center gap-2 text-lead font-bold text-ink">
@@ -89,33 +145,17 @@ export function AiRobotsGenerator({ copy }: { copy: AiCrawlerCopy }) {
       <p className="mt-2 max-w-2xl text-copy text-body">{copy.generator.intro}</p>
 
       <div className="mt-4 flex flex-wrap gap-2">
-        <Button
-          type="button"
-          variant="secondary"
-          size="sm"
-          onClick={() => {
-            setCopied(false)
-            setBlocked([])
-          }}
-        >
-          {copy.generator.allowAll}
+        <Button type="button" variant="secondary" size="sm" onClick={() => setChoices({})}>
+          {copy.generator.clearAll}
         </Button>
-        <Button
-          type="button"
-          variant="secondary"
-          size="sm"
-          onClick={() => {
-            setCopied(false)
-            setBlocked(GENERATOR_CRAWLERS.map((c) => c.token))
-          }}
-        >
+        <Button type="button" variant="secondary" size="sm" onClick={() => setAll('block')}>
           {copy.generator.blockAll}
         </Button>
       </div>
 
       <ul className="mt-4 divide-y divide-line/60 overflow-hidden rounded-card border border-line bg-surface shadow-control">
         {GENERATOR_CRAWLERS.map((c) => {
-          const isBlocked = blocked.includes(c.token)
+          const choice: Choice = choices[c.token] ?? 'out'
           return (
             <li key={c.token} className="flex flex-wrap items-center justify-between gap-3 px-4 py-3">
               <span className="min-w-0">
@@ -132,32 +172,24 @@ export function AiRobotsGenerator({ copy }: { copy: AiCrawlerCopy }) {
                   <span className="block text-caption text-muted">{copy.results.ignoresRobots}</span>
                 )}
               </span>
-              {/* A two-state switch rather than a checkbox, because "blocked"
-                  and "allowed" are both positions a reader chooses, and an
-                  unticked checkbox reads as "not decided yet". */}
+              {/* Three positions rather than a checkbox, because "allowed on
+                  purpose" is a decision a reader makes and writes down, and an
+                  unticked checkbox cannot say it. */}
               <span className="inline-flex shrink-0 rounded-control border border-line p-0.5" role="group">
-                <button
-                  type="button"
-                  aria-pressed={!isBlocked}
-                  onClick={() => isBlocked && toggle(c.token)}
-                  className={cn(
-                    'rounded-control px-3 py-1 text-caption font-semibold transition-colors',
-                    isBlocked ? 'text-muted hover:text-ink' : 'bg-sunk text-ink',
-                  )}
-                >
-                  {copy.results.allowed}
-                </button>
-                <button
-                  type="button"
-                  aria-pressed={isBlocked}
-                  onClick={() => !isBlocked && toggle(c.token)}
-                  className={cn(
-                    'rounded-control px-3 py-1 text-caption font-semibold transition-colors',
-                    isBlocked ? 'bg-sunk text-ink' : 'text-muted hover:text-ink',
-                  )}
-                >
-                  {copy.results.blocked}
-                </button>
+                {POSITIONS.map((p) => (
+                  <button
+                    key={p.value}
+                    type="button"
+                    aria-pressed={choice === p.value}
+                    onClick={() => choose(c.token, p.value)}
+                    className={cn(
+                      'rounded-control px-3 py-1 text-caption font-semibold transition-colors',
+                      choice === p.value ? 'bg-sunk text-ink' : 'text-muted hover:text-ink',
+                    )}
+                  >
+                    {p.label}
+                  </button>
+                ))}
               </span>
             </li>
           )
@@ -188,10 +220,18 @@ export function AiRobotsGenerator({ copy }: { copy: AiCrawlerCopy }) {
               aria-label={copy.generator.outputTitle}
               className="mt-2 w-full rounded-card border border-line bg-sunk/60 p-4 font-mono text-caption text-ink"
             />
-            <p className="mt-2 inline-flex max-w-2xl gap-2 text-caption text-muted">
-              <Info className="mt-0.5 h-3.5 w-3.5 shrink-0" aria-hidden />
-              <span>{copy.generator.outputNote}</span>
-            </p>
+            {blocked.length > 0 && (
+              <p className="mt-2 inline-flex max-w-2xl gap-2 text-caption text-muted">
+                <Info className="mt-0.5 h-3.5 w-3.5 shrink-0" aria-hidden />
+                <span>{copy.generator.outputNote}</span>
+              </p>
+            )}
+            {allowed.length > 0 && (
+              <p className="mt-2 inline-flex max-w-2xl gap-2 text-caption text-muted">
+                <Info className="mt-0.5 h-3.5 w-3.5 shrink-0" aria-hidden />
+                <span>{copy.generator.allowNote}</span>
+              </p>
+            )}
           </>
         )}
       </div>
