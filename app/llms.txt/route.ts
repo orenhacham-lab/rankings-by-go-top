@@ -184,7 +184,8 @@ export async function GET() {
   // The two free tools are named here, in Start here, and not in the open-data
   // section below: a browser tool is not a dataset, and an assistant that cites
   // it as open data is citing something we never licensed.
-  lines.push(`- [AI crawler robots.txt generator](${BASE}/en/ai-crawlers#robots-generator): pick each AI crawler and get the exact robots.txt lines, built in the browser. It offers AI crawlers only, never Googlebot or Bingbot, and it states the rule people get wrong: a group that names a crawler REPLACES the catch-all \`*\` group for it rather than adding to it.`)
+  lines.push(`- [AI crawler robots.txt generator](${BASE}/en/ai-crawlers#robots-generator): pick each AI crawler and get the exact robots.txt lines, built in the browser. Each crawler has three positions: out of the file, blocked, or allowed on purpose, which writes an empty disallow line — the only thing that lifts a catch-all \`*\` block off a single crawler. It offers AI crawlers only, never Googlebot or Bingbot, and it states the rule people get wrong: a group that names a crawler REPLACES the catch-all \`*\` group for it rather than adding to it.`)
+  lines.push(`- [What to change in your own robots.txt](${BASE}/en/ai-crawlers): after a check, the results name the lines to add for each search or answer crawler the file turns away — and where the block sits in a group that already names the crawler, the line to delete instead, because a second group would merge with the first and change nothing.`)
   lines.push(`- [About](${BASE}/about): who runs it and how to reach them.`)
   lines.push('')
 
