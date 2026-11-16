@@ -87,10 +87,24 @@ export function classifyMediaFailure(created: WpCreateError): 'deterministic' | 
  * head before the colon, so what the merchant is shown does not change, and no
  * remote prose can reach a screen. `source_image_unreadable` is the one case
  * with no remote answer at all — our own storage object could not be read.
+ *
+ * TWO SHAPES THE CLASSIFIER CANNOT TELL APART, AND WHY THEY ARE SPLIT HERE.
+ * `classifyWordPressError` falls back on the stage, so ANY media failure with no
+ * status and no WordPress code becomes `wordpress_media_invalid` — "check the
+ * image or the media permissions". On 16 November 2026 that sentence was wrong
+ * about officecleaning.co.il, whose 22 paused articles were not an image problem
+ * at all: the site's TLS certificate had expired, so the request never reached
+ * WordPress and `WordPressClientError` carried an EMPTY meta ("Could not reach
+ * the WordPress site"). Blaming the image sends its owner to look in the one
+ * place where nothing is broken, so an empty meta — no status, no content type,
+ * no timeout flag — is named `wordpress_unreachable` instead. A timeout keeps its
+ * own path (`classifyMediaFailure` calls it transient and never pauses).
  */
 export function mediaBlockReason(created: WpCreateError): string {
   const meta = created.wpErrorMeta
-  const code = meta ? classifyWordPressError(null, { meta, stage: 'media_upload' }) : 'source_image_unreadable'
+  if (!meta) return 'wordpress_media_upload_failed: source_image_unreadable'
+  const silent = meta.status === undefined && meta.contentType === undefined && !meta.timeout
+  const code = silent ? 'wordpress_unreachable' : classifyWordPressError(null, { meta, stage: 'media_upload' })
   return `wordpress_media_upload_failed: ${code}`
 }
 
