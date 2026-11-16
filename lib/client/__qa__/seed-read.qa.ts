@@ -172,10 +172,14 @@ async function main() {
      * to a list where every entry has a reason to.
      */
     const SPELLS_THE_PATH: Record<string, string> = {
-      'lib/client/seed-read.ts': 'the shared layer itself: the one place the path is built',
+      // The spelling moved OUT of the shared layer and into a module with no
+      // 'use client', because the dashboard layout — a server component —
+      // answers this read itself and must key the answer by the very URL this
+      // layer would have fetched. The layer and the keyword-research screen now
+      // re-export it, so there is one spelling for both sides.
+      'lib/seed-scan/urls.ts': 'the one place the path is built, for the client reader and the server seed alike',
       'components/settings/useSiteScan.ts': 'POST { action: start }: the settings\' own rescan',
       'components/onboarding/ResearchSummary.tsx': 'POST { action: continue }: stage B, from a click',
-      'components/keyword-research/useScanResearch.ts': 'the keyword-research screen, where it is the only reader',
       'app/api/projects/[id]/onboarding/start/route.ts': 'server-side, not a browser read at all',
     }
     const LITERAL = /projects\/\$\{(?:encodeURIComponent\(projectId\)|projectId)\}\/seed/
@@ -190,7 +194,12 @@ async function main() {
     check('D2: only the shared layer, the two POST senders and the single-reader screen spell that path',
       unexpected.length === 0, unexpected.join(', '))
     check('D2-MUT: the walk DOES find the files, so D2 is not vacuous',
-      spelling.includes('lib/client/seed-read.ts') && spelling.length >= 4, String(spelling.length))
+      spelling.includes('lib/seed-scan/urls.ts') && spelling.length >= 4, String(spelling.length))
+    // …and the readers really do take their spelling from it rather than
+    // keeping a second one, which is what makes the list above short.
+    check('D3: the shared layer and the keyword-research screen re-export that one spelling',
+      /export const seedUrl = sharedSeedRunUrl/.test(strip(read('lib/client/seed-read.ts')))
+      && /export const seedRunUrl = sharedSeedRunUrl/.test(strip(read('components/keyword-research/useScanResearch.ts'))))
   }
 
   console.log('\nE) The registry is shared across module copies, not per instance')

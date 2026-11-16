@@ -47,7 +47,12 @@ function main() {
     const readsThree = (s: string) => JSON.stringify(endpoints(s)) === JSON.stringify(EXPECTED)
       && !/method:/.test(s) && (s.match(/fetch\(/g) ?? []).length === 1
       && /readSeed(Shared)?\(projectId\)/.test(s) && /from '@\/lib\/client\/seed-read'/.test(s)
-      && /return `\/api\/projects\/\$\{encodeURIComponent\(projectId\)\}\/seed`/.test(read('lib/client/seed-read.ts'))
+      // 16.11.2026: that spelling moved once more, to lib/seed-scan/urls.ts, a
+      // module with no 'use client' so the dashboard layout can answer this
+      // read in-region and key the answer by the URL the shared layer fetches.
+      // The layer re-exports it, so there is still exactly one spelling.
+      && /export const seedUrl = sharedSeedRunUrl/.test(read('lib/client/seed-read.ts'))
+      && /return `\/api\/projects\/\$\{encodeURIComponent\(projectId\)\}\/seed`/.test(read('lib/seed-scan/urls.ts'))
     check('C1: the data hook reads the board, the queue and the scan, with GET only', readsThree(hook), endpoints(hook).join(', '))
     check('C1-MUT0: a hook that goes back to fetching the scan itself fails C1',
       !readsThree(hook.replace('readSeedShared(projectId)', "readJson(STRATEGY_ENDPOINTS.seed(projectId))")

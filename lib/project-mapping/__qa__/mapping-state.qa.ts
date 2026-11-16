@@ -132,7 +132,12 @@ function main() {
       && /from '@\/lib\/client\/seed-read'/.test(h)
       && /fetch\(mappingUrl\(projectId\), \{\s*method: 'POST',[\s\S]{0,120}body: JSON\.stringify\(\{ action: 'start', locale \}\)/.test(h)
       && (h.match(/fetch\(/g) ?? []).length === 1
-      && /return `\/api\/projects\/\$\{encodeURIComponent\(projectId\)\}\/seed`/.test(src('lib/client/seed-read.ts'))
+      // 16.11.2026: that spelling moved once more, to lib/seed-scan/urls.ts, a
+      // module with no 'use client' so the dashboard layout can answer this
+      // read in-region and key the answer by the URL the shared layer fetches.
+      // The layer re-exports it, so there is still exactly one spelling.
+      && /export const seedUrl = sharedSeedRunUrl/.test(src('lib/client/seed-read.ts'))
+      && /return `\/api\/projects\/\$\{encodeURIComponent\(projectId\)\}\/seed`/.test(src('lib/seed-scan/urls.ts'))
     check('G2: the mapping reads the seed route and starts the settings\' own rescan (POST { action: \'start\' }), nothing else',
       sameRescan(hook) && /body: JSON\.stringify\(\{ action: 'start', locale \}\)/.test(settingsHook))
     check('G2-MUT: a mapping that starts stage B too fails G2', !sameRescan(hook.replace("{ action: 'start', locale }", "{ action: 'continue', keywords: [], locale }")))

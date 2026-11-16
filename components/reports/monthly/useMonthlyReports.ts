@@ -17,6 +17,8 @@
  */
 import { useCallback, useEffect, useRef, useState } from 'react'
 import type { MonthlyGetResponse } from '@/lib/reports/monthly/http'
+import { takeSeed } from '@/lib/client/html-seed'
+import { monthlyReportsUrl as sharedMonthlyUrl } from '@/lib/reports/monthly/urls'
 
 export type MonthlyLoad =
   | { status: 'loading' }
@@ -25,11 +27,10 @@ export type MonthlyLoad =
   | { status: 'unavailable' }
   | { status: 'ready'; body: MonthlyGetResponse }
 
-export function monthlyUrl(projectId: string, month?: string | null): string {
-  const q = new URLSearchParams({ projectId })
-  if (month) q.set('month', month)
-  return `/api/reports/monthly?${q.toString()}`
-}
+/** The route's path. Spelled in lib/reports/monthly/urls.ts, which the
+ *  dashboard layout also reads, so a seeded answer lands under the URL read
+ *  here. */
+export const monthlyUrl = sharedMonthlyUrl
 
 /** What one GET answered: the body, and whether the response itself was a success. */
 type Answer = { ok: boolean; body: MonthlyGetResponse | null }
@@ -47,8 +48,28 @@ function cacheMap(): Map<string, { at: number; promise: Promise<Answer> }> {
   return created
 }
 
+/**
+ * The answer the page arrived with, adopted as if this module had fetched it.
+ * The dashboard layout answers this read in its own region and writes it into
+ * the HTML (lib/client/html-seed.ts), so the first reader takes it instead of
+ * starting a round trip. Taken once and only while fresh (`takeSeed` enforces
+ * both), and never for a `fresh` caller, who has just asked for a new report
+ * and must not see the state from page load.
+ */
+function adoptSeed(url: string): void {
+  const cache = cacheMap()
+  if (cache.has(url)) return
+  const seeded = takeSeed(url)
+  if (!seeded) return
+  cache.set(url, {
+    at: Date.now(),
+    promise: Promise.resolve({ ok: seeded.status === 200, body: seeded.body as MonthlyGetResponse | null }),
+  })
+}
+
 /** One GET per URL for a few seconds. `fresh` asks again, past that window. */
 function readMonthly(url: string, fresh: boolean): Promise<Answer> {
+  if (!fresh) adoptSeed(url)
   const cache = cacheMap()
   const hit = cache.get(url)
   if (!fresh && hit && Date.now() - hit.at < SHARE_MS) return hit.promise

@@ -17,6 +17,7 @@
  * What the screen shows is decided in lib/keyword-research/scan-state.ts.
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { seedRunUrl as sharedSeedRunUrl } from '@/lib/seed-scan/urls'
 import {
   pollDelayMs, readResearchAnswer, readSeedAnswer, researchChanged, researchRunning, scanView,
   type ResearchAnswer, type ScanRun, type ScanView, type SeedAnswer,
@@ -33,9 +34,9 @@ export interface ScanResearchState {
   landscape?: SeedLandscape
 }
 
-export function seedRunUrl(projectId: string): string {
-  return `/api/projects/${encodeURIComponent(projectId)}/seed`
-}
+/** The route's path, from the one module that spells it (lib/seed-scan/urls.ts),
+ *  so this screen cannot drift from the dashboard's seeded answer. */
+export const seedRunUrl = sharedSeedRunUrl
 
 export function scanResearchUrl(projectId: string): string {
   return `/api/keyword-research/scan?projectId=${encodeURIComponent(projectId)}`

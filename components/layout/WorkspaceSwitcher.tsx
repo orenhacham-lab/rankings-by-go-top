@@ -32,6 +32,8 @@ import { getDashboardDictionary } from '@/lib/i18n/dashboard/getDashboardDiction
 import SiteAvatar from '@/components/ui/SiteAvatar'
 import { cn } from '@/lib/utils'
 import { newProjectBlocked, parseProjectQuota, type ProjectQuota } from '@/lib/projects/project-quota'
+import { takeSeed } from '@/lib/client/html-seed'
+import { PROJECT_QUOTA_URL } from '@/lib/projects/urls'
 
 /** Above this many workspaces, scanning a list stops working and search starts. */
 const SEARCH_THRESHOLD = 8
@@ -83,7 +85,15 @@ export default function WorkspaceSwitcher() {
   useEffect(() => {
     if (!isResolved || projectsError || projectCount === 0) return
     let cancelled = false
-    fetch('/api/projects/quota')
+    // The dashboard layout answers this read in its own region and writes the
+    // answer into the HTML (lib/client/html-seed.ts). When one is waiting it is
+    // used as it stands; otherwise the entry reads the route as it did before.
+    const seeded = takeSeed(PROJECT_QUOTA_URL)
+    if (seeded?.status === 200) {
+      setQuota(parseProjectQuota(seeded.body))
+      return
+    }
+    fetch(PROJECT_QUOTA_URL)
       .then((res) => (res.ok ? res.json() : null))
       .then((body) => { if (!cancelled) setQuota(parseProjectQuota(body)) })
       .catch(() => { if (!cancelled) setQuota({ state: 'unknown' }) })

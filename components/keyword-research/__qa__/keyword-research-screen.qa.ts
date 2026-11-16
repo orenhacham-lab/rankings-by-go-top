@@ -573,7 +573,12 @@ function main() {
       fetchesDuringRender.length === 0 && effects.length === 0 && !fetching.has('(render)') && loose.length === 0
       && ['handleSearch', 'handleOpenTrendModal', 'handleAddToProject', 'handleGenerateAIQuestions', 'handleAddAIQuestions', 'trackKeyword', 'submitResearch'].every((n) => fetching.has(n)),
       show({ fetchesDuringRender, effects, fetching: [...fetching], loose }))
-    const hook = strip(readFileSync(join(ROOT, 'components/keyword-research/useScanResearch.ts'), 'utf8'))
+    // The scan path is spelled in lib/seed-scan/urls.ts, which has no
+    // 'use client' on it, for the same reason the Search Console paths are:
+    // the dashboard layout answers that read in-region and hands it over under
+    // the very URL this hook reads. The two are read as one unit.
+    const hook = strip(readFileSync(join(ROOT, 'components/keyword-research/useScanResearch.ts'), 'utf8')
+      + '\n' + readFileSync(join(ROOT, 'lib/seed-scan/urls.ts'), 'utf8'))
     // The two Search Console paths are spelled in lib/gsc/urls.ts, which has no
     // 'use client' on it, so the dashboard layout can build the status answer
     // in-region and hand it over under the very URL the widgets read.

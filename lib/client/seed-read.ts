@@ -36,6 +36,9 @@
  * request of its own.
  */
 
+import { takeSeed } from '@/lib/client/html-seed'
+import { seedRunUrl as sharedSeedRunUrl } from '@/lib/seed-scan/urls'
+
 /** How long an answer may be shared with a caller that arrives after it. */
 export const SEED_COALESCE_MS = 750
 
@@ -48,9 +51,9 @@ export type SeedReadResult = {
   aborted?: true
 }
 
-export function seedUrl(projectId: string): string {
-  return `/api/projects/${encodeURIComponent(projectId)}/seed`
-}
+/** The route's path. Spelled in lib/seed-scan/urls.ts, which the dashboard
+ *  layout also reads, so a seeded answer lands under the URL read here. */
+export const seedUrl = sharedSeedRunUrl
 
 type Entry = { promise: Promise<SeedReadResult>; startedAt: number; settledAt: number | null }
 
@@ -106,6 +109,31 @@ function usable(entry: Entry | undefined, now: number): boolean {
   return now - entry.settledAt < SEED_COALESCE_MS
 }
 
+/**
+ * THE ANSWER THE PAGE ARRIVED WITH, ADOPTED AS IF THIS MODULE HAD FETCHED IT.
+ *
+ * The dashboard layout answers this read in its own region and writes the
+ * answer into the HTML (lib/client/html-seed.ts), so the first reader of the
+ * screen takes it instead of starting a round trip. It is taken ONCE and only
+ * while fresh — `takeSeed` enforces both — and only for a caller that has not
+ * asked for `fresh`, because such a caller has just started something and must
+ * not be handed the state from page load.
+ *
+ * It is entered as an entry that has already settled, so the COALESCE_MS window
+ * applies to it exactly as it would to a real answer: the pollers that share
+ * this module keep polling on their own schedule.
+ */
+function adoptSeed(projectId: string, entries: Map<string, Entry>, now: number): void {
+  if (entries.has(projectId)) return
+  const seeded = takeSeed(seedUrl(projectId))
+  if (!seeded) return
+  entries.set(projectId, {
+    promise: Promise.resolve({ status: seeded.status, body: seeded.body }),
+    startedAt: now,
+    settledAt: now,
+  })
+}
+
 async function request(projectId: string): Promise<SeedReadResult> {
   const doFetch = fetchImpl ?? fetch
   try {
@@ -129,6 +157,7 @@ export function readSeed(
 ): Promise<SeedReadResult> {
   const now = nowMs()
   const entries = registry()
+  if (!opts?.fresh) adoptSeed(projectId, entries, now)
   const existing = entries.get(projectId)
   let entry: Entry
   if (!opts?.fresh && usable(existing, now)) {

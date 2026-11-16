@@ -13,6 +13,8 @@
  */
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
+import { takeSeed } from '@/lib/client/html-seed'
+import { competitorsUrl } from '@/lib/ai-visibility/urls'
 import { withDeadline } from '@/lib/active-project/useProjectRow'
 import {
   buildCompetitorComparison, trackedCompetitorsFrom,
@@ -38,24 +40,36 @@ type ListOutcome = { status: 'ok'; competitors: TrackedCompetitor[] } | { status
 
 /** The project's competitors, through the route that manages them (it checks ownership). */
 async function fetchTrackedCompetitors(projectId: string): Promise<ListOutcome> {
+  // The dashboard layout answers this read in its own region and writes the
+  // answer into the HTML (lib/client/html-seed.ts). A 200 that is waiting there
+  // is read exactly as a fetched 200 would be, through the same parser below;
+  // anything else falls through to the request, as before.
+  const seeded = takeSeed(competitorsUrl(projectId))
+  if (seeded?.status === 200) return listOutcomeFrom(seeded.body)
   const controller = new AbortController()
   const timer = setTimeout(() => controller.abort(), COMPETITOR_LIST_DEADLINE_MS)
   try {
-    const res = await fetch(`/api/projects/${encodeURIComponent(projectId)}/ai-visibility/competitors`, {
+    const res = await fetch(competitorsUrl(projectId), {
       signal: controller.signal, cache: 'no-store',
     })
     // 404: the feature is switched off (or the project is gone); 403: not the
     // owner. Either way there is nothing to compare, which is not an error.
     if (res.status === 404 || res.status === 403) return { status: 'unavailable' }
     if (!res.ok) return { status: 'error' }
-    const body = await res.json().catch(() => null) as { competitors?: unknown } | null
-    const rows = Array.isArray(body?.competitors) ? body.competitors as Array<Record<string, unknown>> : null
-    return rows ? { status: 'ok', competitors: trackedCompetitorsFrom(rows) } : { status: 'error' }
+    return listOutcomeFrom(await res.json().catch(() => null))
   } catch {
     return { status: 'error' }
   } finally {
     clearTimeout(timer)
   }
+}
+
+/** One reader for the route's body, so a seeded answer and a fetched one cannot
+ *  be understood differently. */
+function listOutcomeFrom(body: unknown): ListOutcome {
+  const competitors = (body as { competitors?: unknown } | null)?.competitors
+  const rows = Array.isArray(competitors) ? competitors as Array<Record<string, unknown>> : null
+  return rows ? { status: 'ok', competitors: trackedCompetitorsFrom(rows) } : { status: 'error' }
 }
 
 /** The recorded rows for exactly these checks; null when any read fails. */

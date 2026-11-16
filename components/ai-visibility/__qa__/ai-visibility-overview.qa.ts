@@ -364,7 +364,12 @@ async function main() {
       fetched.length === 2 && fetched.some((u) => /\/ai-visibility\/competitors$/.test(u))
       && fetched.some((u) => /^\/api\/ai-visibility\/monthly\?projectId=/.test(u))
       && /readSeed(Shared)?\(projectId/.test(code('components/ai-visibility/useSeedPageState.ts'))
-      && /`\/api\/projects\/\$\{encodeURIComponent\(projectId\)\}\/seed`/.test(sharedSeedUrl)
+      // 2026-11-16: the PATH's spelling moved again, to lib/seed-scan/urls.ts,
+      // which has no 'use client' so the dashboard layout can answer this read
+      // in-region and key the answer by the URL this layer fetches. The layer
+      // re-exports it, so there is still exactly one spelling.
+      && /export const seedUrl = sharedSeedRunUrl/.test(sharedSeedUrl)
+      && /`\/api\/projects\/\$\{encodeURIComponent\(projectId\)\}\/seed`/.test(code('lib/seed-scan/urls.ts'))
       && (sharedSeedUrl.match(/doFetch\(/g) || []).length === 1, fetched.join(' | '))
     check('no model, dispatch or rescan route is named by the new code',
       !NEW.some((p) => /enriched-suggestions|generate-ai-questions|\/api\/ai-visibility\/runs|action:\s*'start'/.test(code(p))))

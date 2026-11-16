@@ -261,6 +261,8 @@ function namers(ident: string, files: Map<string, string>): string[] {
 
 const LIB_FILES = readdirSync(join(ROOT, 'lib/seed-scan')).filter((f) => f.endsWith('.ts')).map((f) => `lib/seed-scan/${f}`)
 const ROUTE = 'app/api/projects/[id]/seed/route.ts'
+/** The read's live wiring, injected by the route and by the dashboard layout. */
+const SEED_READ_DEPS = 'lib/server/seed-read-deps.ts'
 const CRON = 'app/api/content/automation/cron/route.ts'
 const CONTENT_INDEX = 'lib/content/content-index.ts'
 
@@ -679,7 +681,10 @@ function main() {
       ['those routes and that action, imported', /import \{ createBulkTrackingTargetsAction \} from '@\/app\/actions\/tracking-targets'[\s\S]*import \{ POST as recommendationsPost \} from '@\/app\/api\/content\/automation\/recommendations\/route'[\s\S]*import \{ POST as scanPost \} from '@\/app\/api\/scan\/route'/],
       ['claims through the engine', /consumeClaimToken\(token, admin, now\)/],
       ['POST → handleSeedPost', /export async function POST[\s\S]*?handleSeedPost\(request, id, liveDeps\(\)\)/],
-      ['GET → handleSeedGet', /export async function GET[\s\S]*?handleSeedGet\(id, liveDeps\(\)\)/],
+      // The READ is wired with SeedReadDeps, not the write's object: it needs
+      // five things and builds none of the scan's graph.
+      ['GET → handleSeedGet', /export async function GET[\s\S]*?handleSeedGet\(id, seedReadDeps\(\)\)/],
+      ['the read\'s five injected, not rebuilt', /\.\.\.seedReadDeps\(\),/],
     ]
     const out = need.filter(([, re]) => !re.test(code)).map(([name]) => name)
     if (/explainAccess\(\s*userId\s*,\s*(supabase|db|client|userClient|sessionClient)\b/.test(code)) out.push('entitlement asked with a request-scoped client')
@@ -687,7 +692,18 @@ function main() {
     if (!(windowMs > 0 && windowMs < 300_000)) out.push('the work window is not inside maxDuration')
     return out
   }
-  const route = read(ROUTE)
+  /**
+   * THE ROUTE AND THE WIRING IT INJECTS, READ AS ONE UNIT.
+   *
+   * The session and the admin-role check used to be written out inside this
+   * route's `liveDeps`. They moved to lib/server/seed-read-deps.ts so the
+   * dashboard layout can answer the READ in its own region without pulling the
+   * write's graph (the scan route, the recommendation engine) into a page's
+   * bundle. The route spreads that object, so the wiring is unchanged — it is
+   * just written in two files, and this guard reads both rather than pinning
+   * the old file split.
+   */
+  const route = read(ROUTE) + read(SEED_READ_DEPS)
   const routeProblems = routeOffenders(route)
   check("runtime, maxDuration, auth, entitlement, admin role, after(), the stage runner, the tabs' own action and routes, claims — all wired", routeProblems.length === 0, routeProblems.join(' ; '))
   check('MUTATION CONTROL: doing the work inside the request (no after) is caught', routeOffenders(route.replace('schedule: (task) => after(task)', 'schedule: (task) => { void task() }')).length > 0)
