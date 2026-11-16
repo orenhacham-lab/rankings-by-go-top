@@ -46,6 +46,16 @@ function main() {
   check('401 keeps the auth code', mediaBlockReason(media({ detail: 'x', wpErrorMeta: { status: 401 } })) === 'wordpress_media_upload_failed: wordpress_auth_failed')
   check('a WP media REST code is kept', mediaBlockReason(media({ detail: 'x', wpErrorMeta: { status: 400, wpCode: 'rest_upload_unknown_error' } })) === 'wordpress_media_upload_failed: wordpress_media_invalid')
   check('no meta at all = our own storage object could not be read', mediaBlockReason(media()) === 'wordpress_media_upload_failed: source_image_unreadable')
+  // officecleaning.co.il, 16 Nov 2026: an expired TLS certificate, so the request never
+  // reached WordPress and the meta came back empty. The stage fallback called that
+  // `wordpress_media_invalid` — "check the image" — about a site with a fine image.
+  check('an empty meta (the site could not be reached at all) is named unreachable, not an invalid image',
+    mediaBlockReason(media({ detail: 'Could not reach the WordPress site. Check the URL.', wpErrorMeta: {} })) === 'wordpress_media_upload_failed: wordpress_unreachable')
+  check('a real media rejection is still an image problem, not unreachable',
+    mediaBlockReason(media({ detail: 'x', wpErrorMeta: { status: 400, responseFormat: 'json' } })) !== 'wordpress_media_upload_failed: wordpress_unreachable')
+  check('a timeout is never named unreachable (it is transient and must not pause)',
+    classifyMediaFailure(media({ detail: 'x', wpErrorMeta: { timeout: true } })) === 'transient'
+    && mediaBlockReason(media({ detail: 'x', wpErrorMeta: { timeout: true } })) !== 'wordpress_media_upload_failed: wordpress_unreachable')
   // The merchant is shown the head only, so the suffix can never put remote prose on a screen.
   for (const r of [mediaBlockReason(media({ detail: 'x', wpErrorMeta: { status: 403 } })), mediaBlockReason(media())]) {
     check(`the merchant-facing code is unchanged for "${r}"`, alertReasonCode(r) === 'wordpress_media_upload_failed')
