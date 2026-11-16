@@ -19,6 +19,7 @@ import { publishShopifyPoolItem } from '@/lib/content/automation/publish-item-sh
 import { publishSitePoolItem } from '@/lib/site-platforms/publish'
 import { loadActivePlatform } from '@/lib/content/platform/load-active-platform'
 import type { WpCreateError } from '@/lib/content/wordpress-publish'
+import { classifyWordPressError, safeRemoteDiagnostics } from '@/lib/content/wordpress-error'
 
 type Admin = ReturnType<typeof createAdminClient>
 
@@ -66,6 +67,31 @@ export function classifyMediaFailure(created: WpCreateError): 'deterministic' | 
   }
   // detail present but no HTTP meta (non-WordPressClientError upload throw) → assume transient.
   return 'transient'
+}
+
+/**
+ * WHY A BLOCKED MEDIA UPLOAD CARRIES A CODE.
+ *
+ * Until 16 November 2026 a deterministic media failure was recorded as the bare
+ * word `wordpress_media_upload_failed`, and the structured meta the WordPress
+ * client had already collected — the HTTP status, the REST code, whether the
+ * answer was HTML rather than JSON — was dropped on the floor. On that morning
+ * 61 ready articles sat paused across five merchant sites with exactly that
+ * word and nothing else, so NOTHING in the data said whether the sites had
+ * answered 401, 403, 413 or a WAF's HTML page, and no amount of re-reading the
+ * rows could tell us. The site's own answer is the whole diagnosis.
+ *
+ * So the reason becomes `wordpress_media_upload_failed: <typed code>`, from the
+ * same `classifyWordPressError` the manual publish path uses. The suffix is a
+ * snake_case CODE, never a provider message: `alertReasonCode` reads only the
+ * head before the colon, so what the merchant is shown does not change, and no
+ * remote prose can reach a screen. `source_image_unreadable` is the one case
+ * with no remote answer at all — our own storage object could not be read.
+ */
+export function mediaBlockReason(created: WpCreateError): string {
+  const meta = created.wpErrorMeta
+  const code = meta ? classifyWordPressError(null, { meta, stage: 'media_upload' }) : 'source_image_unreadable'
+  return `wordpress_media_upload_failed: ${code}`
 }
 
 export interface PublishItemResult {
@@ -234,7 +260,10 @@ export async function publishPoolItem(admin: Admin, itemId: string): Promise<Pub
         // invalid media / WP 4xx) pauses + alerts; a transient timeout/429/5xx
         // stays a bounded, retryable failure (final-failure alert at the cap).
         if (classifyMediaFailure(created) === 'deterministic') {
-          await blockItem(admin, itemId, 'wordpress_media_upload_failed', ctx, 'wordpress')
+          console.warn('[automation-publish] media upload blocked', {
+            itemId, projectId: ctx.projectId, articleId: article.id, ...safeRemoteDiagnostics(created.wpErrorMeta),
+          })
+          await blockItem(admin, itemId, mediaBlockReason(created), ctx, 'wordpress')
           return { itemId, status: 'paused', articleId: article.id, reason: 'wordpress_media_upload_failed' }
         }
         const mediaReason = created.detail ? `wordpress_media_upload_failed: ${created.detail.slice(0, 120)}` : 'wordpress_media_upload_failed'

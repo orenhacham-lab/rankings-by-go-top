@@ -26,6 +26,15 @@ const MAX_GENERATIONS_PER_RUN = Math.max(0, Number(process.env.AUTOMATION_MAX_GE
 const DESIRED_READY_AHEAD = 1
 
 /**
+ * How many PAUSED items of one pool mean its publishing is waiting on a person,
+ * so writing another article for it is waste rather than progress. Three, not
+ * one: a single odd paused item (one duplicate topic, one article that failed
+ * its gate) is normal and must not stop a healthy pool, while three in a row
+ * is a site that keeps refusing.
+ */
+export const PAUSED_BACKLOG_HOLD = 3
+
+/**
  * Attempts that stop before the article writer is called. They cost no model
  * time, so they must not spend the run's generation budget.
  *
@@ -206,6 +215,26 @@ export async function runAutomation(admin: Admin, opts: { projectId?: string; dr
     const r = await platformOf(a, projectId).catch(() => null)
     return r && (r.platform === 'none' || r.platform === 'conflict') ? `platform_${r.platform}` : null
   }
+  /**
+   * A pool whose publishing is already waiting on a human: `paused_backlog_<n>`
+   * once it holds PAUSED_BACKLOG_HOLD or more paused items, else null.
+   *
+   * A paused item is terminal by design — the runner never picks it again — so
+   * a pool with a pile of them cannot publish whatever we write next. On 16
+   * November 2026 five sites refused the featured-image upload, and because
+   * nothing checked this, one of them was handed a FRESH article on every
+   * quarter-hour run: 20 of them in one morning, every one paused on arrival,
+   * each spending a model call and a slice of the owner's monthly allowance for
+   * an article nobody could publish. The existing `publishBlocker` guards only
+   * the "no platform connected" shape of the same waste (the October 2026
+   * case); this guards the "the site keeps saying no" shape.
+   */
+  const pausedBacklog = async (a: Admin, poolId: string): Promise<string | null> => {
+    const { data } = await a.from('article_pool_items')
+      .select('id').eq('pool_id', poolId).eq('status', 'paused').limit(PAUSED_BACKLOG_HOLD)
+    const n = (data ?? []).length
+    return n >= PAUSED_BACKLOG_HOLD ? `paused_backlog_${n}` : null
+  }
 
   if (!dryRun) await recoverStaleLocks(admin, opts.projectId, cutoffIso, summary)
 
@@ -278,7 +307,13 @@ export async function runAutomation(admin: Admin, opts: { projectId?: string; dr
           // connected got a fresh article on most runs, spending its allowance and the
           // run's one generation. Nothing is written until a platform is connected.
           const blocked = q ? await publishBlocker(admin, pool.project_id) : null
-          if (q && blocked) {
+          // The same waste with the site connected and refusing: see pausedBacklog.
+          const stuck = q && !blocked ? await pausedBacklog(admin, pool.id) : null
+          if (q && stuck) {
+            diag.note = 'held_paused_backlog'
+            diag.error = stuck
+            summary.details.push(`pool ${pool.id}: generation held (${stuck})`)
+          } else if (q && blocked) {
             diag.note = 'held_no_publishing_platform'
             summary.details.push(`pool ${pool.id}: generation held (${blocked})`)
           } else if (q) {

@@ -10,7 +10,7 @@
  * Run: npx tsx lib/content/automation/__qa__/generation-budget.qa.ts
  */
 import { FakeAdmin } from '@/lib/__qa__/_fake-admin'
-import { runAutomation, spentGenerationBudget, rotateForRun } from '@/lib/content/automation/runner'
+import { runAutomation, spentGenerationBudget, rotateForRun, PAUSED_BACKLOG_HOLD } from '@/lib/content/automation/runner'
 import { findStalledPools, buildStallAlertHtml, checkPublishingStalls, isDailyStallCheckRun } from '@/lib/content/automation/stall-watch'
 import type { generatePoolItem } from '@/lib/content/automation/generate-item'
 import type { createAdminClient } from '@/lib/supabase/admin'
@@ -130,6 +130,44 @@ async function main() {
     check('a platform check that throws does not stop a connected project', blip.wrote.length === 1)
     // MUTATION CONTROL, run by hand: deleting the `if (q && blocked)` branch in runner.ts fails
     // the first three checks above (the Maps pool is written and takes the slot).
+  }
+
+  console.log('5c) a pool whose publishing is already stuck gets no new article')
+  {
+    // Production, 16 Nov 2026: five merchant sites refused the featured-image upload, so
+    // every article arrived and was paused. One pool was handed a fresh article on each
+    // quarter-hour run — 20 in a morning, each spending a model call and a slice of the
+    // owner's monthly allowance for an article that could not be published.
+    const paused = (poolId: string, n: number) => Array.from({ length: n }, (_, i) => ({
+      id: `p-${poolId}-${i}`, pool_id: poolId, project_id: `project-${poolId}`, topic_id: `t-${poolId}-${i}`,
+      status: 'paused', article_id: `a-${poolId}-${i}`, attempts: 1, position: 10 + i, locked_at: null,
+      last_error: 'wordpress_media_upload_failed: wordpress_forbidden',
+    }))
+    {
+      const pools = [pool('a-stuck'), pool('b-ok')]
+      const admin = new FakeAdmin({
+        article_pools: pools,
+        article_pool_items: [...pools.map((p) => item(p.id)), ...paused('a-stuck', PAUSED_BACKLOG_HOLD)],
+      })
+      const g = fakeGenerate(new Set())
+      const r = await quiet(() => runAutomation(admin as unknown as Admin, { generate: g.fn, platform: connected, nowMs: firstRunFor(2) }))
+      check('the stuck pool is never written to', !g.calls.includes('a-stuck'), g.calls)
+      check('and the healthy pool still gets the run\'s one generation', g.wrote[0] === 'b-ok', g.wrote)
+      const d = r.diagnostics.find((x) => x.poolId === 'a-stuck')
+      check('its diagnostic says why, with the count', d?.note === 'held_paused_backlog' && d?.error === `paused_backlog_${PAUSED_BACKLOG_HOLD}`, [d?.note, d?.error])
+    }
+    {
+      // The limit must not punish a healthy pool for one odd paused item.
+      const admin = new FakeAdmin({
+        article_pools: [pool('c-one')],
+        article_pool_items: [item('c-one'), ...paused('c-one', PAUSED_BACKLOG_HOLD - 1)],
+      })
+      const g = fakeGenerate(new Set())
+      await quiet(() => runAutomation(admin as unknown as Admin, { generate: g.fn, platform: connected, nowMs: firstRunFor(1) }))
+      check(`fewer than ${PAUSED_BACKLOG_HOLD} paused items still writes`, g.wrote[0] === 'c-one', g.wrote)
+    }
+    // MUTATION CONTROL, run by hand: deleting the `if (q && stuck)` branch in runner.ts fails
+    // the first three checks above (the stuck pool is written and takes the slot).
   }
 
   console.log('6) the daily stall check')
