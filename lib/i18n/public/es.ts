@@ -229,7 +229,7 @@ export const es = {
     body: 'Usamos las cookies que el sitio necesita para funcionar. Las de medición y marketing no se cargan hasta que las aceptes. Más detalles en nuestra',
     short: 'Solo cargamos cookies opcionales si las aceptas. Consulta la',
     privacy: 'Política de privacidad',
-    accept: 'Aceptar medición',
+    accept: 'Aceptar',
     marketingStep: 'Las cookies de marketing requieren un paso más, en la configuración de cookies, porque envían datos a los Estados Unidos.',
     rejectAll: 'Rechazar todas',
     customize: 'Personalizar',

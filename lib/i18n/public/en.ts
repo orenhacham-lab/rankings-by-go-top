@@ -221,7 +221,7 @@ export const en = {
     body: 'We use the cookies the site needs to work. Measurement and marketing cookies do not load until you allow them. Details in our',
     short: 'We load optional cookies only if you allow them. See our',
     privacy: 'Privacy Policy',
-    accept: 'Accept analytics',
+    accept: 'Accept',
     marketingStep: 'Marketing cookies take one more step, in cookie settings, because they send data to the United States.',
     rejectAll: 'Reject all',
     customize: 'Customise',
