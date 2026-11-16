@@ -25,7 +25,7 @@
  * Run: npx tsx lib/content/recommendations/__qa__/audience-intent-gate.qa.ts
  */
 import { tokens } from '@/lib/content/recommendations/dedupe'
-import { heStem, researchKeywordIssue, siteOwnsTerm } from '@/lib/content/recommendations/keyword-research'
+import { heStemForms, researchKeywordIssue, siteOwnsTerm } from '@/lib/content/recommendations/keyword-research'
 
 let pass = 0, fail = 0
 function check(name: string, cond: boolean, detail?: string) {
@@ -38,12 +38,18 @@ function vocabularyOf(titles: readonly string[]): Set<string> {
   for (const t of titles) for (const tk of tokens(t)) {
     vocab.add(tk)
     if (tk.length >= 4 && /^[בלמהושכ]/.test(tk)) vocab.add(tk.slice(1))
-    const stem = heStem(tk)
-    if (stem && stem !== tk) vocab.add(stem)
+    for (const form of tk.length >= 4 && /^[בלמהושכ]/.test(tk) ? [tk, tk.slice(1)] : [tk]) {
+      for (const stem of heStemForms(form)) if (stem && stem !== tk) vocab.add(stem)
+    }
   }
   return vocab
 }
-const issue = (kw: string, vocab: Set<string> | null) => researchKeywordIssue(kw, { brandTokens: new Set(), vocab })
+// `declared` is what the merchant states himself — the business name, which is
+// what the 16 Nov hatch reads instead of any sentence on the site (brandTokens).
+const issue = (kw: string, vocab: Set<string> | null, declared: Set<string> = new Set()) =>
+  researchKeywordIssue(kw, { brandTokens: declared, vocab })
+/** A staffing company's own NAME: the declared hiring signal. */
+const STAFFING_NAME = tokens('חברת השמה כוח אדם')
 
 // 1cln.co.il: a thin site, so the vocabulary is the business name and the
 // merchant's own tracked keywords (the real ones, 17 of them).
@@ -147,8 +153,19 @@ console.log('\nC2) measured over the fleet\'s 996 pending/approved ideas')
     issue('עבודה בניקיון משרדים', CLEANER_WITH_BLOG) === 'job_seeker' && issue('עבודה במרכז', CLEANER_WITH_BLOG) === 'job_seeker')
   // The CONSTRUCT form is out of the head rule (a plumber's "עבודת אינסטלציה" is
   // his trade). Where it really is a position, the vocabulary rejects it anyway.
-  check('C2f: "עבודת מזכירות" on the cleaning company is rejected, by its words, not as a job search',
-    issue('עבודת מזכירות', CLEANER_WITH_BLOG) === 'unrelated', String(issue('עבודת מזכירות', CLEANER_WITH_BLOG)))
+  // 16 November 2026 — the construct head now names the reason itself: 'מזכירות'
+  // is not one of this cleaning company's words, so the phrase is a position.
+  // (Before, the relevance vocabulary rejected it one gate later, as 'unrelated'.)
+  check('C2f: "עבודת מזכירות" on the cleaning company is rejected as a job search, by its complement',
+    issue('עבודת מזכירות', CLEANER_WITH_BLOG) === 'job_seeker', String(issue('עבודת מזכירות', CLEANER_WITH_BLOG)))
+  // MUTATION CONTROL C2f — the complement is what decides: put one of the
+  // company's own words after the same head and the phrase is its service again.
+  check('C2f-MUT: "עבודות ניסור בטון" on the same company is its own work',
+    issue('עבודות ניסור בטון', CLEANER_WITH_BLOG) !== 'job_seeker', String(issue('עבודות ניסור בטון', CLEANER_WITH_BLOG)))
+  // …and a shift word is never a trade, however much the site works evenings.
+  check('C2h: "עבודת ערב" and "עבודות לערב" are job searches even though the company cleans in the evening',
+    issue('עבודת ערב', CLEANER_WITH_BLOG) === 'job_seeker' && issue('עבודות לערב', CLEANER_WITH_BLOG) === 'job_seeker',
+    `${issue('עבודת ערב', CLEANER_WITH_BLOG)} / ${issue('עבודות לערב', CLEANER_WITH_BLOG)}`)
   const PLUMBER = vocabularyOf(['ניאגרות סמויות - ירון סלמון', 'אינסטלטור בנתניה', 'יועץ אינסטלציה', 'ניאגרה סמויה', 'תיקון ניאגרה סמויה', 'הזמנת אינסטלטור בנתניה', 'עבודות אינסטלציה'])
   check('C2g: and the plumber\'s "עבודת אינסטלציה" is his trade, never a job search',
     issue('עבודת אינסטלציה', PLUMBER) !== 'job_seeker' && issue('עבודות אינסטלציה בבית', PLUMBER) !== 'job_seeker',
@@ -167,8 +184,16 @@ console.log('\nD) the hiring business keeps its own subject')
     String(issue('משרות השמה', STAFFING)))
   check('D2b: a cleaning keyword is rejected on its merits, not as a job seeker',
     issue('משרות ניקיון בתל אביב', STAFFING) === 'unrelated', String(issue('משרות ניקיון בתל אביב', STAFFING)))
-  check('D3: "עבודה בניקיון משרדים" is kept — the head rule is off for this project',
-    issue('עבודה בניקיון משרדים', STAFFING) === null)
+  // 16 November 2026 — the head rule is off for a project whose NAME declares
+  // hiring, not for one whose pages happen to say a hiring word.
+  check('D3: "עבודה בניקיון משרדים" is kept — the name declares hiring, so the head rule is off',
+    issue('עבודה בניקיון משרדים', STAFFING, STAFFING_NAME) === null,
+    String(issue('עבודה בניקיון משרדים', STAFFING, STAFFING_NAME)))
+  // MUTATION CONTROL D3 — the same vocabulary WITHOUT the declared name does not
+  // open the hatch: this is the measured fix (8 fleet projects had it opened by
+  // a sentence on a page, and officecleaning.co.il lost the gate entirely).
+  check('D3-MUT: the same keyword with the same pages but no declared name is a job search',
+    issue('עבודה בניקיון משרדים', STAFFING) === 'job_seeker', String(issue('עבודה בניקיון משרדים', STAFFING)))
   // MUTATION CONTROL D — one careers page does not make a cleaning company a
   // staffing company: its vocabulary does not say the words.
   check('D4-MUT: the same three on the cleaning company are all job seekers',

@@ -109,6 +109,11 @@ const HIRING_TERMS = [
   // 'ראיון עבודה' is deliberately NOT here: measured over the fleet's own stock it
   // hits "בושם לראיון עבודה" on a perfume shop, which is a buyer, not a candidate.
   'מחפשת עבודה', 'קורות חיים', 'משרדי השמה', 'השמה', 'קריירה', 'תעסוקה',
+  // 16 November 2026 — the PLURAL of the same phrase. These are matched as
+  // substrings, so the singular above missed "מחפש עבודות", which the weekly
+  // sweep found passing at officecleaning.co.il. Nobody buying a service says
+  // any of these.
+  'חיפוש עבודות', 'מחפש עבודות', 'מחפשת עבודות',
   'תנאי העסקה', 'זכויות עובדים', 'מועמדות', 'מועמדים', 'גיוס עובדים', 'הלנת שכר',
   'מקום עבודה', 'שוק העבודה', 'דמי אבטלה',
   // en
@@ -148,6 +153,30 @@ const WORK_HEAD_TOKENS = new Set(['עבודה', 'job', 'jobs', 'work'])
  * writes about. "עבודה בניקיון משרדים" and "עבודת מזכירות" name a position; these
  * words never do.
  */
+/**
+ * 16 November 2026 — the construct and plural forms, judged by their complement
+ * (see recruitmentTerm). They were kept out of the head set entirely on 15 Nov
+ * to protect the merchant's own trade; the weekly sweep then found "עבודות
+ * קלות" and "עבודת ערב" passing at a cleaning company, with only the relevance
+ * gate between them and the funnel.
+ */
+const WORK_CONSTRUCT_HEADS = new Set(['עבודת', 'עבודות'])
+/**
+ * …and the words that make the complement a SHIFT rather than a craft. The
+ * complement test above opens on any word the site uses, and a cleaning company
+ * that works evenings naturally uses 'ערב' — which handed back "עבודת ערב", a
+ * plain job search. These are the words the fleet's own job searches are made of
+ * ("עבודה בערב", "עבודה נוספת בערב", "עבודה בבוקר", "עבודה שמירה בלילה",
+ * "עבודה יומית" — all at the same project): a time of day or a term of
+ * employment. A business names its service after the work, never after the
+ * shift, so no trade is lost here; measured over the fleet, this blocks that one
+ * keyword and nothing else.
+ */
+const WORK_SHIFT_TOKENS = new Set([
+  'ערב', 'ערבים', 'לילה', 'לילות', 'בוקר', 'בקרים', 'צהריים', 'משמרת', 'משמרות',
+  'יומית', 'שעתית', 'חלקית', 'זמנית', 'מלאה', 'סטודנטים', 'נוער',
+  'shift', 'shifts', 'nights', 'evenings', 'parttime', 'fulltime',
+])
 const WORK_RELATION_TOKENS = new Set(['מול', 'עם', 'על', 'ללא', 'בלי', 'לפי', 'אחרי', 'לאחר', 'לפני', 'בין', 'with', 'without'])
 
 /** Does the site's OWN vocabulary put it in the hiring business? Measured: no project
@@ -168,18 +197,57 @@ function siteSaysTerm(term: string, vocab: Set<string> | null | undefined): bool
   return parts.length > 0 && parts.every((tk) => vocab.has(tk))
 }
 
-function siteHires(vocab: Set<string> | null | undefined): boolean {
+/**
+ * 16 November 2026 — THE HATCH MUST READ WHAT THE MERCHANT DECLARED, NOT WHAT A
+ * PAGE HAPPENS TO SAY.
+ *
+ * Measured over all 37 Production projects with a cached keyword pool: EIGHT of
+ * them switch this hatch on, and not one is in the hiring business. In all eight
+ * the phrase comes from page or blog text and from nothing the merchant chose —
+ * a flower shop and a sports shop say "מקום עבודה", 4Dogs says "תעסוקה" because
+ * it sells "צעצועי תעסוקה", a gift shop says "גיוס עובדים", מטלון has a careers
+ * page, and officecleaning.co.il's own blog says "מחפש עבודה". That one sentence
+ * switched the whole head test off for a cleaning company, and 25 plain job
+ * searches ("עבודה בתל אביב", "עבודה ליום אחד", "עבודה מהצד") were then held out
+ * only by the relevance gate, which is not what it is for.
+ *
+ * So the hatch now asks the BUSINESS NAME, the one hiring signal the merchant
+ * states himself. Measured: no project in the fleet declares one, so the head
+ * test is on everywhere today, and re-running the fleet corpus moved 25 keywords
+ * — every one of them a job search at that cleaning company, and not one
+ * legitimate topic. A business that really recruits says so in its name, and an
+ * unreadable or empty site vocabulary still means no judgement at all.
+ */
+function siteHires(vocab: Set<string> | null | undefined, declared: Set<string>): boolean {
   if (!vocab || vocab.size === 0) return true
-  return HIRING_TERMS.some((t) => siteSaysTerm(t.trim(), vocab))
+  return HIRING_TERMS.some((t) => siteSaysTerm(t.trim(), declared))
 }
 
 /** The recruitment term the keyword carries, if any — null when the site owns it. */
-function recruitmentTerm(keyword: string, vocab: Set<string> | null | undefined): string | null {
+function recruitmentTerm(keyword: string, vocab: Set<string> | null | undefined, declared: Set<string>): string | null {
   const hard = HIRING_TERMS.find((t) => ` ${keyword.toLowerCase()} `.includes(t))
   if (hard) return !vocab || vocab.size === 0 || siteSaysTerm(hard.trim(), vocab) ? null : hard.trim()
-  if (siteHires(vocab)) return null
+  if (siteHires(vocab, declared)) return null
   const kwTokens = Array.from(tokens(keyword))
   const [head, next] = kwTokens
+  // 16 November 2026 — 'עבודת'/'עבודות' at the head, judged by WHAT FOLLOWS.
+  // They name a craft when the next word is one the site itself uses ("עבודת
+  // אינסטלציה" on a plumber's site, "עבודות ניסור בטון" on a cleaning company's)
+  // and a position when it is not ("עבודות קלות", "עבודת ערב"). That is the only
+  // hatch they get: it reads the complement, not the head, so it cannot be
+  // opened by a site merely owning the word 'עבודה'.
+  if (head && WORK_CONSTRUCT_HEADS.has(head)) {
+    if (!vocab || vocab.size === 0) return null
+    // The prefix letter too ("עבודות לערב" is "עבודות ערב"), stripped the same
+    // way tokenInVocab strips it.
+    if (next && (WORK_SHIFT_TOKENS.has(next) || (next.length >= 4 && HE_TOKEN_PREFIX.test(next) && WORK_SHIFT_TOKENS.has(next.slice(1))))) return head
+    // LITERALLY one of the site's words, not one the stemmer can reach — the same
+    // reason siteSaysTerm reads the vocabulary literally. Measured: with the
+    // stemmer's slack, "עבודת שליחויות" (courier work) opened the hatch on a
+    // cleaning company through a word it never writes.
+    if (next && (WORK_RELATION_TOKENS.has(next) || siteSaysTerm(next, vocab))) return null
+    return head
+  }
   if (!head || !WORK_HEAD_TOKENS.has(head)) return null
   if (next && WORK_RELATION_TOKENS.has(next)) return null
   return head
@@ -270,6 +338,54 @@ export function heStem(token: string): string {
   return skeleton.length >= 3 ? skeleton : t
 }
 
+/**
+ * 16 November 2026 — THE CONSTRUCT FORM IS THE SAME WORD (from the weekly gate
+ * sweep over Production: "עבודת אינסטלציה" was rejected as unrelated on a
+ * plumber's own site, while "עבודות אינסטלציה" — his own tracked keyword —
+ * passed).
+ *
+ * Hebrew puts a feminine noun into the construct state ('סמיכות') by turning its
+ * final ה into ת: עבודה → עבודת, התקנה → התקנת, בדיקה → בדיקת, פתיחה → פתיחת.
+ * heStem strips ה/ות/ים but not that ת, so the two forms of one word reduced to
+ * different stems and parted company. The base form is restored here (ת → ה) and
+ * stemmed, so both spellings of a trade name meet.
+ *
+ * Two guards, both measured over the fleet's 7,085 cached keywords:
+ *  - NOT the adjectival 'ית' ending. 'מכונית' (a car) is not the construct of
+ *    'מכונה' (a machine), and folding it let "מכונית חשמלית"/"סקודה חשמלית מחיר"
+ *    into a home-appliances store. Words that genuinely are constructs in 'ית'
+ *    ("בניית אתרים") already pass on their other tokens.
+ *  - At least 4 letters, so a word whose ת is a root letter and not a suffix
+ *    ('דלת', 'שבת', 'בית') is left alone.
+ *
+ * ADDITIVE BY DESIGN. This returns an EXTRA form to look up; it never replaces
+ * the stem heStem already gives, and the vocabulary stores both. So the gate can
+ * only ever recognise MORE of the site's own words — no keyword that passes today
+ * can start being rejected. An earlier attempt that folded the ת inside heStem
+ * itself was not additive and silently blocked three live keywords on a flower
+ * shop ("פרחים קרית אונו", whose site spells it "קריית"), which is how the rule
+ * ended up here instead.
+ */
+const HE_CONSTRUCT_TAV = /[^יו]ת$/u
+
+/** The base form of a feminine construct noun (עבודת → עבודה), or null. */
+export function heConstructBase(token: string): string | null {
+  if (!HE_LETTER.test(token)) return null
+  if (token.length < 4 || !HE_CONSTRUCT_TAV.test(token)) return null
+  return `${token.slice(0, -1)}ה`
+}
+
+/** Every stem a token may be recognised by — its own, plus its construct base's. */
+export function heStemForms(token: string): string[] {
+  const forms = [heStem(token)]
+  const base = heConstructBase(token)
+  if (base) {
+    const stem = heStem(base)
+    if (!forms.includes(stem)) forms.push(stem)
+  }
+  return forms
+}
+
 function tokenInVocab(tok: string, vocab: Set<string>): boolean {
   if (vocab.has(tok)) return true
   // Light Hebrew prefix slack (ל/ב/ה/ו/ש/כ/מ): "לכלבים" matches vocab "כלבים".
@@ -279,8 +395,7 @@ function tokenInVocab(tok: string, vocab: Set<string>): boolean {
   // is taken off here rather than inside the stem, because a root can begin with
   // one of those letters ("כלבים" is not a prefixed "לבים").
   for (const form of tok.length >= 4 && HE_TOKEN_PREFIX.test(tok) ? [tok, tok.slice(1)] : [tok]) {
-    const stem = heStem(form)
-    if (stem !== tok && vocab.has(stem)) return true
+    for (const stem of heStemForms(form)) if (stem !== tok && vocab.has(stem)) return true
   }
   return false
 }
@@ -413,7 +528,7 @@ export function researchKeywordIssue(keyword: string, ctx: { brandTokens: Set<st
   if (isBrandOrSupport(kw, ctx.brandTokens)) return 'brand_or_support'
   const noise = noiseTerm(kw)
   if (noise && !siteOwnsTerm(noise, ctx.vocab)) return 'noise'
-  if (recruitmentTerm(kw, ctx.vocab)) return 'job_seeker'
+  if (recruitmentTerm(kw, ctx.vocab, ctx.brandTokens)) return 'job_seeker'
   if (hasNavCommerceToken(kw)) return 'nav_commerce'
   if (isTooGeneric(kw)) return 'too_generic'
   if (ctx.vocab && !isVocabAligned(kw, ctx.vocab)) return 'unrelated'
@@ -660,7 +775,7 @@ export async function recommendFromKeywordResearch(
     // seeded list is job-search shows it in the funnel instead of silently
     // emptying.
     .filter((r) => {
-      if (!recruitmentTerm(r.keyword, vocab)) return true
+      if (!recruitmentTerm(r.keyword, vocab, brandTokens)) return true
       filteredJobSeekerCount++
       if (jobSeekerExamples.length < 20) jobSeekerExamples.push(r.keyword)
       return false
