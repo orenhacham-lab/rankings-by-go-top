@@ -193,16 +193,34 @@ export function CookieConsent({
   // as easy as agreement). The size classes are shared in one constant so the
   // two can never drift apart; lib/consent/__qa__/consent-contract.qa.ts
   // compares them literally.
+  /**
+   * ONE primary row, then two secondary ones.
+   *
+   * Accept, reject and customize used to be three controls of three different
+   * weights in no clear order: accept and reject shared a row as equals and
+   * "customize" hung under them as an underlined link. The owner asked for a
+   * single wide Accept with the other two, smaller, beneath it.
+   *
+   * The two below are smaller IN WIDTH ONLY — they share one row, so each is half
+   * of Accept — and they keep Accept's own height and type size, from the same
+   * two constants. That is deliberate and it is the whole compliance line here:
+   * GDPR Art. 7(3) and the EDPB's cookie-banner guidance ask that refusing be as
+   * easy as agreeing, and a reject button set in smaller type is the pattern
+   * regulators have fined for. Emphasis may differ; the press may not. Reject is
+   * a real, filled, full-height button on the same card, on the same layer, one
+   * click, with no extra step. lib/consent/__qa__/consent-contract.qa.ts D1
+   * pins the equality and fails if either button gets a size of its own.
+   */
   const actions = (compact: boolean) => (
     <>
-      <div className={`${compact ? 'mt-1.5 gap-1.5' : 'mt-2.5 gap-2'} flex items-stretch`}>
-        <button
-          type="button"
-          onClick={handleAccept}
-          className={`${compact ? COMPACT_BUTTON : FULL_BUTTON} flex-1 rounded-control border border-transparent bg-action font-bold text-action-ink transition-colors hover:bg-action-hover focus:outline-none focus-visible:ring-4 focus-visible:ring-white/40`}
-        >
-          {t.accept}
-        </button>
+      <button
+        type="button"
+        onClick={handleAccept}
+        className={`${compact ? COMPACT_BUTTON : FULL_BUTTON} ${compact ? 'mt-1.5' : 'mt-2.5'} w-full rounded-control border border-transparent bg-action font-bold text-action-ink transition-colors hover:bg-action-hover focus:outline-none focus-visible:ring-4 focus-visible:ring-white/40`}
+      >
+        {t.accept}
+      </button>
+      <div className={`${compact ? 'mt-1 gap-1' : 'mt-1.5 gap-1.5'} flex items-stretch`}>
         <button
           type="button"
           onClick={handleReject}
@@ -210,14 +228,14 @@ export function CookieConsent({
         >
           {t.rejectAll}
         </button>
+        <button
+          type="button"
+          onClick={() => setPanelOpen(true)}
+          className={`${compact ? COMPACT_BUTTON : FULL_BUTTON} flex-1 rounded-control border border-white/25 bg-white/10 font-bold text-contrast-ink transition-colors hover:bg-white/20 focus:outline-none focus-visible:ring-4 focus-visible:ring-white/40`}
+        >
+          {t.customize}
+        </button>
       </div>
-      <button
-        type="button"
-        onClick={() => setPanelOpen(true)}
-        className={`${compact ? 'mt-1 text-overline' : 'mt-2 text-caption'} w-full rounded-control px-1 py-0.5 font-medium text-contrast-ink/80 underline underline-offset-2 transition-colors hover:text-contrast-ink focus:outline-none focus-visible:ring-4 focus-visible:ring-white/40`}
-      >
-        {t.customize}
-      </button>
     </>
   )
 

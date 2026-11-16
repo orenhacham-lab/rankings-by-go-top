@@ -207,9 +207,10 @@ export function PublicNav({ locale = 'he', tone = 'default' }: { locale?: Public
 
           {/* Desktop Menu */}
           <nav className="hidden items-center gap-0.5 whitespace-nowrap xl:flex" aria-label={dict.nav.primaryAria}>
-            <Link key={homeLink.href} href={homeLink.href} className={linkClass(isActive(homeLink.href))}>
-              {homeLink.label}
-            </Link>
+            {/* No "Home" link on the desktop bar: the lockup beside it already goes
+                there, and the bar carried eight items plus a language control and two
+                buttons. It stays in the phone menu, where there is no visible lockup
+                to tap once the sheet is open. */}
             {/* Features: three columns, measure / do the work / show results */}
             <div className="group relative">
               <button type="button" className={linkClass(featuresActive)} aria-haspopup="true">

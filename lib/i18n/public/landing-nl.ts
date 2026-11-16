@@ -117,8 +117,10 @@ export const landingNl: LandingCopy = {
     },
   },
   worksWith: {
-    label: 'Wij controleren en publiceren voor u op:',
-    names: ['Google', 'Google Maps', 'ChatGPT', 'Gemini', 'Perplexity', 'Copilot', 'Grok', 'WordPress', 'Shopify', 'Wix'],
+    checkLabel: 'Wij controleren waar u verschijnt in:',
+    checkNames: ['Google', 'Google Maps', 'ChatGPT', 'Gemini', 'Perplexity', 'Copilot', 'Grok'],
+    publishLabel: 'Wij publiceren rechtstreeks naar:',
+    publishNames: ['WordPress', 'Shopify', 'Wix'],
   },
   outcomes: {
     eyebrow: 'Wat u krijgt',

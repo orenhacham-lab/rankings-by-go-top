@@ -92,8 +92,10 @@ export const landingHe: LandingCopy = {
     },
   },
   worksWith: {
-    label: 'בודקים ומפרסמים עבורכם ב:',
-    names: ['Google', 'Google Maps', 'ChatGPT', 'Gemini', 'Perplexity', 'Copilot', 'Grok', 'WordPress', 'Shopify', 'Wix'],
+    checkLabel: 'בודקים איפה אתם מופיעים ב:',
+    checkNames: ['Google', 'Google Maps', 'ChatGPT', 'Gemini', 'Perplexity', 'Copilot', 'Grok'],
+    publishLabel: 'מפרסמים ישירות ל:',
+    publishNames: ['WordPress', 'Shopify', 'Wix'],
   },
   outcomes: {
     eyebrow: 'מה אתם מקבלים',
