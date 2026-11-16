@@ -162,6 +162,18 @@ function main() {
      * reject button must be the same expression — and that the phone height can
      * grow rather than clip.
      */
+    // sRGB relative luminance (WCAG 2.x), for white at `alpha` composited on
+    // the banner card's own background (--color-contrast, #0a1b3d).
+    const CARD: [number, number, number] = [0x0a, 0x1b, 0x3d]
+    const lum = ([r, g, b]: [number, number, number]) => {
+      const f = (v: number) => { const c = v / 255; return c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4 }
+      return 0.2126 * f(r) + 0.7152 * f(g) + 0.0722 * f(b)
+    }
+    const contrastOnCard = (alpha: number) => {
+      const over = CARD.map((c) => 255 * alpha + c * (1 - alpha)) as [number, number, number]
+      const a = lum(over), b = lum(CARD)
+      return (Math.max(a, b) + 0.05) / (Math.min(a, b) + 0.05)
+    }
     const sizeOf = (cls: string) => cls.match(/\$\{compact \? ([A-Z_]+) : ([A-Z_]+)\}/)
     // Each composed constant is `${SOME_BOX} ${SOME_TYPE}`: pull the two apart.
     const partsOf = (s: string, name: string) => {
@@ -214,9 +226,16 @@ function main() {
       if (!/flex-1/.test(reject[1])) return false
       // Each row stretches, so the taller label's height is handed to its peer.
       if (!/flex items-stretch/.test(s)) return false
+      // 5. And it is VISIBLY a button. Its fill is 1.33:1 against the card, so
+      //    the border carries the whole affordance, and WCAG 1.4.11 asks 3:1 of
+      //    a non-text graphic that does. Measured, not eyeballed: white at a
+      //    over #0a1b3d. white/25 is 2.23:1 and fails; white/40 is 3.72:1.
+      const borderAlpha = reject[1].match(/border border-white\/(\d+)/)
+      if (!borderAlpha) return false
+      if (contrastOnCard(Number(borderAlpha[1]) / 100) < 3) return false
       return true
     }
-    check('D1: accept and reject share one type size, and accept’s extra height is capped', equalOk(banner))
+    check('D1: accept and reject share one type size; accept’s extra height is capped and reject stays visibly a button', equalOk(banner))
     check('MUT: a phone button that clips its label again is caught',
       !equalOk(banner.replace("const COMPACT_BOX = 'min-h-[26px]", "const COMPACT_BOX = 'h-[26px]")))
     check('MUT: shrinking reject’s type against accept is caught',
@@ -225,6 +244,8 @@ function main() {
       !equalOk(banner.replace("const COMPACT_BOX_ACCEPT = 'min-h-[30px]", "const COMPACT_BOX_ACCEPT = 'min-h-[60px]")))
     check('MUT: making reject the taller of the two is caught',
       !equalOk(banner.replace("const COMPACT_BOX = 'min-h-[26px]", "const COMPACT_BOX = 'min-h-[40px]")))
+    check('MUT: a reject border too faint to see as a button is caught',
+      !equalOk(banner.replace(/border border-white\/40 bg-white\/10/g, 'border border-white/25 bg-white/10')))
     check('MUT: a row that no longer stretches is caught', !equalOk(banner.replace('flex items-stretch', 'flex items-start')))
     check('MUT: a reject rendered as small print is caught',
       !equalOk(banner.replace(/onClick=\{handleReject\}(\s*)className=\{`([^`]*)`\}/, 'onClick={handleReject}$1className="text-overline underline"')))

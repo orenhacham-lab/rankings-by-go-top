@@ -227,7 +227,7 @@ export const ptBR = {
     short: 'Só carregamos cookies opcionais se você aceitar. Veja a',
     privacy: 'Política de privacidade',
     accept: 'Aceitar',
-    marketingStep: 'Os cookies de marketing exigem um passo a mais, nas configurações de cookies, porque enviam dados para os Estados Unidos.',
+    marketingStep: 'Aceitar permite a medição; os cookies de marketing exigem um passo a mais, nas configurações de cookies, porque enviam dados para os Estados Unidos.',
     rejectAll: 'Rejeitar todos',
     customize: 'Personalizar',
     save: 'Salvar minha escolha',

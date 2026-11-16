@@ -231,7 +231,7 @@ export const fr = {
     short: 'Nous ne chargeons les cookies facultatifs que si vous les acceptez. Voir notre',
     privacy: 'Politique de confidentialité',
     accept: 'Accepter',
-    marketingStep: 'Les cookies de marketing demandent une étape de plus, dans les réglages des cookies, car ils envoient des données aux États-Unis.',
+    marketingStep: 'Accepter autorise la mesure ; les cookies de marketing demandent une étape de plus, dans les réglages des cookies, car ils envoient des données aux États-Unis.',
     rejectAll: 'Tout refuser',
     customize: 'Personnaliser',
     save: 'Enregistrer mon choix',

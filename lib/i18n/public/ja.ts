@@ -245,7 +245,7 @@ export const ja = {
     short: '任意のクッキーは、同意をいただいた場合にのみ読み込みます。次をご覧ください',
     privacy: 'プライバシーポリシー',
     accept: '同意する',
-    marketingStep: 'マーケティングの Cookie は米国にデータを送信するため、Cookie 設定でもう一段階必要です。',
+    marketingStep: '「同意する」は測定を許可します。マーケティングの Cookie は米国にデータを送信するため、Cookie 設定でもう一段階必要です。',
     rejectAll: 'すべて拒否する',
     customize: '個別に設定する',
     save: '選択を保存する',

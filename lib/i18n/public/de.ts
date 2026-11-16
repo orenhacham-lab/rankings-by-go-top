@@ -239,7 +239,7 @@ export const de = {
     short: 'Optionale Cookies werden nur mit Ihrer Einwilligung geladen. Siehe unsere',
     privacy: 'Datenschutzerklärung',
     accept: 'Annehmen',
-    marketingStep: 'Marketing-Cookies brauchen einen Schritt mehr, in den Cookie-Einstellungen, weil sie Daten in die Vereinigten Staaten senden.',
+    marketingStep: '„Annehmen“ erlaubt die Messung; Marketing-Cookies brauchen einen Schritt mehr, in den Cookie-Einstellungen, weil sie Daten in die Vereinigten Staaten senden.',
     rejectAll: 'Alle ablehnen',
     customize: 'Anpassen',
     save: 'Auswahl speichern',

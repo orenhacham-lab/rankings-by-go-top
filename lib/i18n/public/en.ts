@@ -222,7 +222,7 @@ export const en = {
     short: 'We load optional cookies only if you allow them. See our',
     privacy: 'Privacy Policy',
     accept: 'Accept',
-    marketingStep: 'Marketing cookies take one more step, in cookie settings, because they send data to the United States.',
+    marketingStep: 'Accept allows measurement; marketing cookies take one more step, in cookie settings, because they send data to the United States.',
     rejectAll: 'Reject all',
     customize: 'Customise',
     save: 'Save my choice',

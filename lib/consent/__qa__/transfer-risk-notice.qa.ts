@@ -179,6 +179,7 @@ console.log('\nD. the banner cannot take the consent the notice belongs to')
       noComments.replace(/decide\(actionForChoices\(CONSENT_WITHOUT_MARKETING[^\n]*/, "decide('accept_all', CONSENT_GRANTED)")))
 }
 
+const MARKETING_STEP_HE = getPublicDictionary('he').cookie.marketingStep
 for (const locale of PUBLIC_LOCALES) {
   const cookie = getPublicDictionary(locale).cookie
   check(`D6 (${locale}): the one-line reason is translated, and names the country`,
@@ -187,7 +188,18 @@ for (const locale of PUBLIC_LOCALES) {
     cookie.marketingStep.slice(0, 40))
   check(`D7 (${locale}): and the accept button no longer promises every category`,
     !/הכל|all|todo|tout|tutto|すべて|alle|wszystk|모두/i.test(cookie.accept), cookie.accept)
+  // The label is now the bare "Accept", which names no scope of its own, so the
+  // scope has to be WRITTEN: consent is informed and specific or it is not
+  // consent. One sentence carries both halves — what Accept grants, and what it
+  // does not — rather than leaving a visitor to infer it from two paragraphs.
+  check(`D8 (${locale}): the line says what Accept grants, by name, and that it is measurement`,
+    cookie.marketingStep.includes(cookie.accept)
+    && /מדידה|measurement|medición|medição|mesure|misurazione|測定|Messung|meting|pomiar|측정/.test(cookie.marketingStep),
+    `${cookie.accept} | ${cookie.marketingStep.slice(0, 60)}`)
 }
+// A scope that stops naming the button, or stops naming measurement, is caught.
+check('D8-MUT: a line that drops the scope is caught',
+  !(MARKETING_STEP_HE.replace('אישור חל על עוגיות מדידה; ', '').includes('אישור')))
 
 console.log('\nC. it is rendered above the checkbox that gives the consent')
 {

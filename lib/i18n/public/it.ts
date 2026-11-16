@@ -234,7 +234,7 @@ export const it = {
     short: 'I cookie facoltativi vengono caricati solo con il consenso. Si veda la nostra',
     privacy: 'Informativa sulla privacy',
     accept: 'Accetta',
-    marketingStep: 'I cookie di marketing richiedono un passaggio in più, nelle impostazioni dei cookie, perché inviano dati negli Stati Uniti.',
+    marketingStep: 'Accetta consente la misurazione; i cookie di marketing richiedono un passaggio in più, nelle impostazioni dei cookie, perché inviano dati negli Stati Uniti.',
     rejectAll: 'Rifiutare tutto',
     customize: 'Personalizzare',
     save: 'Salvare la scelta',
