@@ -96,6 +96,7 @@ export const landingHe: LandingCopy = {
     checkNames: ['Google', 'Google Maps', 'ChatGPT', 'Gemini', 'Perplexity', 'Copilot', 'Grok'],
     publishLabel: 'מפרסמים ישירות ל:',
     publishNames: ['WordPress', 'Shopify', 'Wix'],
+    trademarks: 'השמות והסמלים של צדדים שלישיים הם סימני המסחר של בעליהם. הצגתם כאן מתארת מה המערכת בודקת ואליו היא מפרסמת, ואין בה שיתוף פעולה או חסות.',
   },
   outcomes: {
     eyebrow: 'מה אתם מקבלים',
