@@ -129,10 +129,30 @@ export type SeedSession = {
   db: SupabaseClient
 }
 
-export type SeedRouteDeps = {
+/**
+ * WHAT THE READ NEEDS, AND NOTHING MORE.
+ *
+ * `handleSeedGet` and the gate it shares with the writes use only these five:
+ * the session, the service-role client, the admin check, the clock and the
+ * environment. They are named apart from `SeedRouteDeps` so a SERVER COMPONENT
+ * can answer this read inside the page's own request (lib/server/route-seed.ts)
+ * without pulling in what only a write needs — the scan route, the
+ * recommendation engine, `after()`, the keyword tracker. Those live behind the
+ * route module, and dragging them into a page's bundle would grow the very
+ * cold start the seeding exists to remove.
+ *
+ * `SeedRouteDeps` extends this, so the route keeps passing one object and the
+ * two paths cannot disagree about the gate.
+ */
+export type SeedReadDeps = {
   session: () => Promise<SeedSession>
   admin: () => ServiceRoleClient
   isAdmin: (admin: ServiceRoleClient, userId: string) => Promise<boolean>
+  now: () => Date
+  env: Record<string, string | undefined>
+}
+
+export type SeedRouteDeps = SeedReadDeps & {
   /**
    * How many websites the account is entitled to (the plan's maxProjects). The
    * day's cap is never below it, so an account can map the websites it pays
@@ -154,8 +174,6 @@ export type SeedRouteDeps = {
   addKeywords: (args: { admin: ServiceRoleClient; scope: SeedScope; keywords: string[]; targetDomain: string }) => Promise<SeedTrackingResult>
   /** The request's locale when the body names none. */
   locale: () => Promise<Locale>
-  now: () => Date
-  env: Record<string, string | undefined>
 }
 
 // ── Responses ───────────────────────────────────────────────────────────────
@@ -195,7 +213,7 @@ type Gate =
   | { ok: false; response: Response }
 
 /** Steps 1-3: signed in, their project, the feature on for them. */
-async function gate(projectId: string, deps: SeedRouteDeps): Promise<Gate> {
+async function gate(projectId: string, deps: SeedReadDeps): Promise<Gate> {
   let session: SeedSession
   try {
     session = await deps.session()
@@ -459,7 +477,7 @@ export function seedRunView(run: SeedRunRow, steps: SeedStepRow[], now: Date): S
   }
 }
 
-export async function handleSeedGet(projectId: string, deps: SeedRouteDeps): Promise<Response> {
+export async function handleSeedGet(projectId: string, deps: SeedReadDeps): Promise<Response> {
   try {
     const gated = await gate(projectId, deps)
     if (!gated.ok) return gated.response

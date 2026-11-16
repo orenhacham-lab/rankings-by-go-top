@@ -209,7 +209,9 @@ async function main() {
     for (const [name, files] of [
       ['dashboard', ['app/api/projects/[id]/dashboard/route.ts', 'lib/dashboard/live-deps.ts']],
       ['waiting', ['app/api/projects/[id]/waiting/route.ts']],
-      ['seed', ['app/api/projects/[id]/seed/route.ts']],
+      // The seed route's READ wiring moved to lib/server/seed-read-deps.ts, for
+      // the same reason: the dashboard layout answers that read in-region.
+      ['seed', ['app/api/projects/[id]/seed/route.ts', 'lib/server/seed-read-deps.ts']],
     ] as [string, string[]][]) {
       check(`D6-${name}: the route still verifies with the Auth server`,
         /auth\.getUser\(\)/.test(files.map((f) => strip(read(f))).join('\n')))

@@ -28,16 +28,14 @@ import { after } from 'next/server'
 import { createBulkTrackingTargetsAction } from '@/app/actions/tracking-targets'
 import { POST as recommendationsPost } from '@/app/api/content/automation/recommendations/route'
 import { POST as scanPost } from '@/app/api/scan/route'
-import { isAdminUser } from '@/lib/auth/admin-role'
 import { consumeClaimToken } from '@/lib/free-check'
 import { getServerLocale } from '@/lib/i18n/server-locale'
 import { handleSeedGet, handleSeedPost, type SeedRouteDeps } from '@/lib/seed-scan/http'
 import { callRouteInProcess } from '@/lib/seed-scan/in-process'
+import { seedReadDeps } from '@/lib/server/seed-read-deps'
 import { runSeedStage } from '@/lib/seed-scan/runner'
 import { addSeedKeywords } from '@/lib/seed-scan/tracking'
 import { explainAccess } from '@/lib/subscription'
-import { createAdminClient } from '@/lib/supabase/admin'
-import { createClient } from '@/lib/supabase/server'
 import { getUserEntitlement } from '@/lib/subscription'
 
 export const runtime = 'nodejs'
@@ -52,13 +50,9 @@ const WORK_WINDOW_MS = 275_000
 function liveDeps(): SeedRouteDeps {
   const requestStartedAt = Date.now()
   return {
-    session: async () => {
-      const db = await createClient()
-      const { data, error } = await db.auth.getUser()
-      return { userId: !error && data?.user ? data.user.id : null, db }
-    },
-    admin: () => createAdminClient(),
-    isAdmin: (admin, userId) => isAdminUser(admin, userId),
+    // The five the READ needs come from the one module the dashboard layout
+    // also uses, so a seeded answer cannot drift from this route's.
+    ...seedReadDeps(),
     siteAllowance: async (admin, userId) => {
       try {
         return (await getUserEntitlement(userId, admin)).limits.maxProjects
@@ -88,8 +82,6 @@ function liveDeps(): SeedRouteDeps {
       }),
     addKeywords: ({ admin, scope, keywords, targetDomain }) => addSeedKeywords(admin, scope, { keywords, targetDomain }, createBulkTrackingTargetsAction),
     locale: () => getServerLocale(),
-    now: () => new Date(),
-    env: process.env,
   }
 }
 
@@ -100,5 +92,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
 
 export async function GET(_request: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
-  return handleSeedGet(id, liveDeps())
+  // The read needs only the five of SeedReadDeps, so it does not build the
+  // write's wiring at all.
+  return handleSeedGet(id, seedReadDeps())
 }

@@ -42,11 +42,11 @@ function main() {
     check('A3: the wiring lives in one module, so the two cannot drift apart',
       /export function liveDeps\(\): DashboardDeps/.test(strip(read('lib/dashboard/live-deps.ts'))))
     check('A4: it is AWAITED, not put behind a Suspense boundary that would arrive too late',
-      /const answer = await seed\(\)/.test(layout) && !/Suspense/.test(layout))
+      /const answers = await Promise\.all\(/.test(layout) && !/Suspense/.test(layout))
     check('A5: the project comes from the cookie the provider mirrors, never from a request value',
       /cookies\(\)\)\.get\(ACTIVE_PROJECT_COOKIE\)\?\.value/.test(layout) && !/searchParams/.test(layout))
     check('A6: the cookie is only shape-checked here; ownership is the handler\'s own read',
-      /if \(!projectId \|\| !UUID\.test\(projectId\)\) return null/.test(layout))
+      /UUID\.test\(projectId\) \? await seeds\(projectId\) : \[\]/.test(layout))
     check('A7: anything but a real answer seeds nothing', /if \(res\.status !== 200\) return null/.test(layout))
     check('A8: every failure is silent, so the screen just asks as before',
       /catch \{\s*return null\s*\}/.test(layout))

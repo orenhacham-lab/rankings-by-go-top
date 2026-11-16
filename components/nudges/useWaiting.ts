@@ -15,6 +15,8 @@
  */
 import { useEffect, useRef, useState } from 'react'
 import type { WaitingAnswer } from '@/lib/nudges/waiting'
+import { takeSeed } from '@/lib/client/html-seed'
+import { waitingUrl as sharedWaitingUrl } from '@/lib/nudges/urls'
 import { safeFixCountFromScan, type FixesRead } from '@/lib/nudges/rows'
 import { WAITING_REFRESH_EVENT } from '@/lib/nudges/events'
 
@@ -47,9 +49,23 @@ function cacheMap(): Map<string, Entry> {
   return created
 }
 
-export const waitingUrl = (projectId: string) => `/api/projects/${encodeURIComponent(projectId)}/waiting`
+/** The route's path. Spelled in lib/nudges/urls.ts, which the dashboard layout
+ *  also reads, so a seeded answer lands under the URL read here. */
+export const waitingUrl = sharedWaitingUrl
 
-async function load(projectId: string): Promise<WaitingAnswer | null> {
+/**
+ * The counts, read once. The dashboard layout answers this read in its own
+ * region and writes the answer into the HTML (lib/client/html-seed.ts); when
+ * one is waiting, and the caller is not asking for a fresh read, it is used
+ * instead of a round trip. A seed that is stale or not a success falls through
+ * to the fetch, which is what happened before this existed.
+ */
+async function load(projectId: string, adopt: boolean): Promise<WaitingAnswer | null> {
+  if (adopt) {
+    const seeded = takeSeed(waitingUrl(projectId))
+    const body = seeded?.body as WaitingAnswer | null
+    if (seeded?.status === 200 && body && body.ok === true) return body
+  }
   const controller = new AbortController()
   const timer = setTimeout(() => controller.abort(), DEADLINE_MS)
   try {
@@ -87,7 +103,7 @@ function read(projectId: string, force: boolean): Promise<Read> {
   if (hit && !force && Date.now() - hit.at < FRESH_MS) return Promise.resolve(hit.value)
   const entry: Entry = { at: hit?.at ?? 0, value: hit?.value ?? { waiting: null, fixes: null }, inflight: null }
   // The queue is only worth reading when the plugin is paired: the fixes row needs it.
-  entry.inflight = load(projectId).then(async (waiting) => {
+  entry.inflight = load(projectId, !force).then(async (waiting) => {
     const fixes = waiting?.pluginConnected ? await loadFixes(projectId) : null
     return { waiting, fixes }
   }).then((value) => {
