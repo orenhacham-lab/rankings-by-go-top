@@ -124,6 +124,13 @@ export function buildImagePrompt(input: {
    * the subject is pinned as the focal point; absent, the prompt is unchanged.
    */
   subject?: string | null
+  /**
+   * A correction for ONE regeneration, naming the fault a review found in the
+   * first attempt (lib/content/image-quality.ts). It goes LAST, where the model
+   * weighs it most, because the general "no text, no distorted hands" rules
+   * below are routinely lost to the concept.
+   */
+  retryGuidance?: string | null
 }): string {
   const rawConcept = (input.imagePrompt || '').trim() || (input.topic || '').trim() || input.title.trim()
   const concept = sanitizeImageConceptForCommercialUse(rawConcept)
@@ -144,6 +151,7 @@ export function buildImagePrompt(input: {
     `COMMERCIAL-SAFETY RULES (must all hold): use ONLY generic, unbranded objects. Do NOT generate real logos, readable brand names, trademarked packaging, exact product labels, recognizable branded products, or official-looking replicas. Do NOT recreate any known product design, bottle, package, treadmill/appliance model, or branded trade dress. Use blank or no labels. Absolutely NO text, letters, numbers, captions, labels, badges, watermarks, UI, posters, banners, price tags, or sale graphics.`,
     `If the article is about a specific brand or product, represent the CATEGORY and intent with an unbranded, generic scene instead of the real product. Examples: perfume → elegant unbranded fragrance bottles with blank labels; treadmill/fitness → a generic home-gym or generic treadmill silhouette with no readable screen/UI; flower delivery → a natural bouquet/delivery scene with no shop logo or signage.`,
     `${look.avoid} Avoid distorted hands/faces and unreadable typography. The image must be safe for commercial website use.`,
+    (input.retryGuidance || '').trim(),
   ].filter(Boolean).join(' ')
 }
 
@@ -233,6 +241,7 @@ export async function generateArticleImage(input: {
   brandColors?: readonly string[]
   aspectRatio?: HeroRatio
   subject?: string | null
+  retryGuidance?: string | null
 }): Promise<GeneratedImage | { error: string }> {
   const apiKey = process.env.GEMINI_API_KEY
   if (!apiKey) return { error: 'missing_gemini_api_key' }
