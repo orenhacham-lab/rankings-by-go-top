@@ -21,6 +21,7 @@ import { loadActivePlatform } from '@/lib/content/platform/load-active-platform'
 import type { WpCreateError } from '@/lib/content/wordpress-publish'
 import { classifyWordPressError, safeRemoteDiagnostics } from '@/lib/content/wordpress-error'
 import { ensureHeroBeforePublish } from '@/lib/content/image-batch/hero-image-batch'
+import { ensureInlineImagesBeforePublish } from '@/lib/content/image-batch/inline-image-batch'
 
 type Admin = ReturnType<typeof createAdminClient>
 
@@ -163,6 +164,10 @@ export async function publishPoolItem(admin: Admin, itemId: string): Promise<Pub
     // backend is covered by the one check. An article that has its hero, or
     // never ordered one, costs one indexed read and nothing else.
     await ensureHeroBeforePublish(admin, item.article_id)
+    // ...and the body images, for the same reason and in the same place: a
+    // figure is composed from the rows that are ready right now, and this post
+    // is never revisited once it is on the merchant's site.
+    await ensureInlineImagesBeforePublish(admin, item.article_id)
 
     // Phase 4F.2 — backend selection by the project's ACTIVE (connected) platform, via the
     // shared resolver. Platform is chosen by connection VALIDITY, not row existence: a
