@@ -23,8 +23,9 @@ import { takeBatchedDraft } from '@/lib/content/batch/take-draft'
 import { isArticleBatchEnabled } from '@/lib/content/batch/flag'
 import { createFeaturedImageForArticle } from '@/lib/content/featured-image'
 import { runArticleImageStep } from '@/lib/content/article-style/generation'
-import { isInlineImageBatchEnabled } from '@/lib/content/image-batch/flag'
+import { isInlineImageBatchEnabled, isHeroImageBatchEnabled } from '@/lib/content/image-batch/flag'
 import { submitInlineImageBatch } from '@/lib/content/image-batch/inline-image-batch'
+import { submitHeroImageBatch } from '@/lib/content/image-batch/hero-image-batch'
 import { decodeBriefNotes } from '@/lib/content/brief-notes'
 import { resolveArticleDepth, DEPTH_PROMPT_LABEL } from '@/lib/content/article-depth'
 import { loadApprovedPlanAnchors } from '@/lib/content/internal-link-generation-guidance'
@@ -584,6 +585,11 @@ export async function generateArticleForTopic(
     createFeaturedImage: () => deps.createFeaturedImage(admin, inserted.id),
     batchInline: opts.inlineImagesMayBatch && isInlineImageBatchEnabled()
       ? async (a, imageIds) => (await submitInlineImageBatch(a as never, imageIds)).orderedIds
+      : undefined,
+    // The hero rides the same permission as the body images — the runner's
+    // slack rule — behind its own switch, so it can be turned off alone.
+    batchHero: opts.inlineImagesMayBatch && isHeroImageBatchEnabled()
+      ? async () => (await submitHeroImageBatch(admin, inserted.id)).ordered
       : undefined,
   })
 

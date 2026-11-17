@@ -20,6 +20,7 @@ import { publishSitePoolItem } from '@/lib/site-platforms/publish'
 import { loadActivePlatform } from '@/lib/content/platform/load-active-platform'
 import type { WpCreateError } from '@/lib/content/wordpress-publish'
 import { classifyWordPressError, safeRemoteDiagnostics } from '@/lib/content/wordpress-error'
+import { ensureHeroBeforePublish } from '@/lib/content/image-batch/hero-image-batch'
 
 type Admin = ReturnType<typeof createAdminClient>
 
@@ -155,6 +156,13 @@ export async function publishPoolItem(admin: Admin, itemId: string): Promise<Pub
     if (!item) return { itemId, status: 'failed', articleId: null, noop: 'item_not_found' }
     if (!item.article_id) return { itemId, status: item.status, articleId: null, noop: 'no_article' }
     ctx.projectId = item.project_id; ctx.articleId = item.article_id; ctx.topicId = item.topic_id; ctx.attempts = item.attempts ?? 0
+
+    // PUBLISHING NEVER WAITS FOR A BATCH. A hero ordered at half price
+    // (lib/content/image-batch/hero-image-batch.ts) is made with a live call
+    // here if it has not arrived, before any platform branch below, so every
+    // backend is covered by the one check. An article that has its hero, or
+    // never ordered one, costs one indexed read and nothing else.
+    await ensureHeroBeforePublish(admin, item.article_id)
 
     // Phase 4F.2 — backend selection by the project's ACTIVE (connected) platform, via the
     // shared resolver. Platform is chosen by connection VALIDITY, not row existence: a

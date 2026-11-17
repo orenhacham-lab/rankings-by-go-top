@@ -45,6 +45,13 @@ export type ArticleImageStepDeps = {
    * ordered — every other row is generated live, exactly as before.
    */
   batchInline?: (admin: SupabaseClient, imageIds: string[]) => Promise<string[]>
+  /**
+   * Order the HERO from the Batch API instead of calling the model now, under
+   * exactly the conditions batchInline is supplied under. Returns true when the
+   * order was accepted; false sends the hero down the live call below, so an
+   * article is never left without one because an order failed.
+   */
+  batchHero?: () => Promise<boolean>
   env?: Record<string, string | undefined>
 }
 
@@ -130,6 +137,11 @@ export async function runArticleImageStep(
   const hero = (async () => {
     if (!makeImages || env.CONTENT_AUTO_FEATURED_IMAGE === 'false') return false
     try {
+      // Ordered at half price where the caller allowed it. An order that was
+      // not accepted (no key, the job was refused, the entitlement gate said
+      // no) falls through to the live call, so the hero is never skipped
+      // because the batch lane could not take it.
+      if (deps.batchHero && await deps.batchHero().catch(() => false)) return false
       const img = await deps.createFeaturedImage()
       if ('error' in img) console.warn('[content-article-generation] auto image skipped', { articleId: ids.articleId, reason: img.error })
       return !('error' in img)
