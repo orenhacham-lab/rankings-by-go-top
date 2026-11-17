@@ -16,7 +16,8 @@
  * Each group ends with a MUTATION CONTROL: the pre-fix pattern, proving the
  * sentence really does slip through without the languages added.
  */
-import { checkTruthLimits } from '../truth-limits'
+import { checkTruthLimits, encodeGateReason, decodeGateReason } from '../truth-limits'
+import { retryAvoidances, retryBriefNotes } from '../brief'
 
 let pass = 0, fail = 0
 function check(name: string, cond: boolean, detail?: string) {
@@ -217,6 +218,86 @@ async function main() {
     check('MUTATION: and the English one', OLD.test('No agency can guarantee rankings.'))
     check('MUTATION: and it let "guarantee you the first position" through (the gap was two words)',
       !OLD.test('We guarantee you the first position.'))
+  }
+
+  console.log('E) saying an engine is NOT checked automatically is not a coverage claim')
+  {
+    // 17 Nov 2026: Italian was the only locale besides Polish that published
+    // nothing. Three attempts inside the window, all refused on
+    // `truth:ai_engine_coverage_claim`, and the row kept only the rule's name.
+    // An article about AI visibility almost has to say WHICH engines the
+    // automatic check covers, which means naming the ones it does not.
+    const denials: [string, string][] = [
+      ['Italian', 'Il controllo automatico non include Perplexity.'],
+      ['Italian, the other order', 'Perplexity non fa parte del controllo automatico.'],
+      ['English', 'The automatic check does not cover Perplexity or Copilot.'],
+      ['Hebrew', 'הבדיקה האוטומטית אינה כוללת את Perplexity.'],
+      ['Polish', 'Automatyczne sprawdzanie nie obejmuje Perplexity.'],
+      ['German', 'Die automatische Prüfung umfasst Perplexity nicht, ohne Copilot und Grok.'],
+      ['French', 'La vérification automatique ne couvre pas Perplexity.'],
+      ['Spanish', 'La comprobación automática no incluye Perplexity.'],
+      ['Japanese', '自動チェックはPerplexityに対応していません。'],
+    ]
+    for (const [lang, text] of denials) {
+      const v = verdict(text)
+      check(`E: ${lang} — the denial publishes`, !v.failures.includes('ai_engine_coverage_claim'), v.failures.join(','))
+    }
+    // And the claim itself is still refused, including beside a denial.
+    const claims: [string, string][] = [
+      ['Polish', 'Automatyczne sprawdzanie obejmuje Perplexity i Copilot.'],
+      ['Japanese', '自動チェックはPerplexityにも対応しています。'],
+      ['Italian', 'Il controllo automatico include anche Perplexity.'],
+      ['a denial then a claim', 'The automatic check does not cover Grok. It covers Perplexity automatically.'],
+    ]
+    for (const [lang, text] of claims) {
+      check(`E: ${lang} — the claim is still refused`,
+        verdict(text).failures.includes('ai_engine_coverage_claim'), verdict(text).failures.join(','))
+    }
+
+    // HEBREW WRITES THIS NEGATION WITH A DIFFERENT LETTER. "אין" ends in a final
+    // nun (ן); "אינה / אינו / אינם" use the medial nun (נ), so one is NOT a prefix
+    // of the other and the list that held only "אין" matched neither. That gap was
+    // in the ranking rule too, from the day it shipped.
+    check('E: אינה is not spelled with the same nun as אין',
+      !'אינה'.includes('אין'))
+    check('E: so the Hebrew denial of a ranking promise also publishes now',
+      !verdict('הדירוג בגוגל אינו מובטח על ידי אף אחד.').failures.includes('ranking_guarantee'),
+      verdict('הדירוג בגוגל אינו מובטח על ידי אף אחד.').failures.join(','))
+
+    // MUTATION CONTROL — the pre-fix rule: two tests over the sentence, no negation.
+    const OLD = (sentence: string) => /perplexity|copilot|grok/i.test(sentence)
+      && /אוטומט|automatic|automátic|automatically|automatis|automatiqu|automatyczn|自動/i.test(sentence)
+    check('MUTATION: the old rule refused the Italian denial (so E would fail)',
+      OLD('Il controllo automatico non include Perplexity.'))
+    check('MUTATION: and the Japanese one', OLD('自動チェックはPerplexityに対応していません。'))
+  }
+
+  console.log('F) a refusal keeps the sentence it refused')
+  {
+    const v = verdict('Il controllo automatico include anche Perplexity.')
+    check('F: the sample is the offending sentence',
+      v.samples.ai_engine_coverage_claim === 'Il controllo automatico include anche Perplexity.', JSON.stringify(v.samples))
+    const long = verdict(`Il controllo automatico include anche Perplexity ${'e Copilot '.repeat(40)}.`)
+    check('F: a sample is cut to 160 characters', (long.samples.ai_engine_coverage_claim ?? '').length === 160)
+    check('F: a clean article carries no samples', Object.keys(verdict('Un articolo onesto.').samples).length === 0)
+
+    // The round trip through blog_plan.last_error.
+    const stored = encodeGateReason(`truth:${v.failures.join(',')}`, v.samples)
+    check('F: the codes stay first and unchanged', stored.startsWith('truth:ai_engine_coverage_claim'), stored)
+    check('F: the rules are still read from the stored reason',
+      retryAvoidances(stored).length === 1 && retryAvoidances(stored)[0].includes('Perplexity'), retryAvoidances(stored).join(' / '))
+    check('F: and the sentence comes back out',
+      decodeGateReason(stored).samples.ai_engine_coverage_claim === 'Il controllo automatico include anche Perplexity.')
+    check('F: the brief quotes it to the next attempt',
+      (retryBriefNotes(stored) ?? '').includes('[THE SENTENCE THAT WAS REFUSED] Il controllo automatico include anche Perplexity.'),
+      retryBriefNotes(stored) ?? '')
+    // A reason with no samples, and a corrupt one, must both behave like before.
+    check('F: a bare reason still yields its rules', retryAvoidances('truth:ranking_guarantee').length === 1)
+    check('F: a corrupt sample suffix is ignored, not thrown',
+      decodeGateReason('truth:ranking_guarantee ¦ {not json').codes === 'truth:ranking_guarantee'
+      && Object.keys(decodeGateReason('truth:ranking_guarantee ¦ {not json').samples).length === 0)
+    check('F: nothing to keep means nothing is appended',
+      encodeGateReason('truth:x', {}) === 'truth:x')
   }
 
   console.log(`\n${pass} passed, ${fail} failed`)

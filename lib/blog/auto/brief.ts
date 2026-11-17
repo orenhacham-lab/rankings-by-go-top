@@ -22,6 +22,7 @@ import type { ArticleTopicAnchor } from '@/lib/supabase/types'
 import type { WritingGuidance } from '@/lib/content/writing-guidance/guidance'
 import { authHref } from '@/lib/i18n/auth-href'
 import type { BlogAutoLocale } from '@/lib/blog/auto/rotation'
+import { decodeGateReason } from '@/lib/blog/auto/truth-limits'
 
 export const SITE_URL = 'https://www.gotopseo.com'
 
@@ -101,6 +102,13 @@ export interface BlogBriefInput {
    * stored in blog_plan.last_error. Turned into [MUST AVOID] lines below.
    */
   previousFailure?: string | null
+  /**
+   * The sentences the gate actually refused, by failure code, as stored on the
+   * plan row. The codes alone make a retry a blind re-roll: on 17 November 2026
+   * the Italian article was refused three times on the same rule because the
+   * brief could only say WHICH rule, never which sentence.
+   */
+  previousSamples?: Record<string, string> | null
 }
 
 /** `/articles/<slug>` under the language's own tree. */
@@ -142,7 +150,7 @@ export function buildBlogBrief(input: BlogBriefInput): ArticleBrief {
     ctaPhone: null,
     ctaWhatsApp: null,
     ctaUrl: `${SITE_URL}${authHref('signup', input.locale)}`,
-    briefNotes: retryBriefNotes(input.previousFailure),
+    briefNotes: retryBriefNotes(input.previousFailure, input.previousSamples),
     includeBrandName: true,
     brandNameToInclude: 'Go Top SEO',
     // The page builds the table of contents from the headings itself
@@ -225,7 +233,9 @@ const RETRY_RULES: Record<string, string> = {
  */
 export function retryAvoidances(lastError: string | null | undefined): string[] {
   if (!lastError) return []
-  const codes = lastError.split(':').slice(1).join(':').split(',')
+  // The stored reason may carry the refused sentences after a marker; the rules
+  // are read from the codes alone (lib/blog/auto/truth-limits.ts).
+  const codes = decodeGateReason(lastError).codes.split(':').slice(1).join(':').split(',')
   const out: string[] = []
   for (const raw of codes) {
     const rule = RETRY_RULES[raw.trim()]
@@ -234,12 +244,30 @@ export function retryAvoidances(lastError: string | null | undefined): string[] 
   return out
 }
 
-/** The brief note that carries them, or null when there is nothing to say. */
-export function retryBriefNotes(lastError: string | null | undefined): string | null {
+/**
+ * The brief note that carries them, or null when there is nothing to say.
+ *
+ * When the refusal kept the sentence it refused, that sentence is quoted under
+ * its rule. A model told only "do not claim automatic coverage of Perplexity"
+ * rewrites the same thought a different way; a model shown the sentence can see
+ * what it did. The quote is the article's own earlier text, nothing external.
+ */
+export function retryBriefNotes(
+  lastError: string | null | undefined, samples?: Record<string, string> | null,
+): string | null {
   const avoid = retryAvoidances(lastError)
   if (avoid.length === 0) return null
+  const quoted: string[] = []
+  const found = samples ?? decodeGateReason(lastError).samples
+  for (const [code, sentence] of Object.entries(found)) {
+    const rule = RETRY_RULES[code]
+    if (rule && avoid.includes(rule) && sentence.trim()) {
+      quoted.push(`[THE SENTENCE THAT WAS REFUSED] ${sentence.replace(/\s+/g, ' ').trim().slice(0, 200)}`)
+    }
+  }
   return [
     'A previous attempt at this exact article was REFUSED before publication and thrown away. It broke the rules below. Write the article again without them.',
     ...avoid.map((a) => `[MUST AVOID] ${a}`),
+    ...quoted,
   ].join('\n')
 }
