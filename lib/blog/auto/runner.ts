@@ -26,7 +26,7 @@ import { generateValidatedArticle } from '@/lib/content/gemini-article'
 import { placeholderContext, runQualityGate } from '@/lib/content/automation/quality-gate'
 import { BLOG_AUTO_LOCALES, localesForDay, type BlogAutoLocale } from '@/lib/blog/auto/rotation'
 import { buildBlogBrief } from '@/lib/blog/auto/brief'
-import { checkTruthLimits } from '@/lib/blog/auto/truth-limits'
+import { checkTruthLimits, encodeGateReason } from '@/lib/blog/auto/truth-limits'
 import { researchKeywords, selectKeywords } from '@/lib/blog/auto/keyword-plan'
 import { createBlogCover } from '@/lib/blog/auto/cover'
 import {
@@ -165,7 +165,15 @@ export async function runBlogAutoPublish(
     metaDescription: generated.article.metaDescription,
     html: generated.safeHtml,
   })
-  if (!truth.ok) return fail(`truth:${truth.failures.join(',')}`)
+  if (!truth.ok) {
+    // The sentence travels with the codes, so the next attempt is told what it
+    // wrote and not only which rule it broke (17 Nov 2026: Italian spent all
+    // three attempts on one rule and the window closed with nothing published).
+    console.warn('[blog-auto] refused by the truth gate', {
+      locale, planId: row.id, failures: truth.failures, samples: truth.samples,
+    })
+    return fail(encodeGateReason(`truth:${truth.failures.join(',')}`, truth.samples))
+  }
 
   // The body's links: a bare URL becomes clickable, the product's first mention
   // becomes a link into the trial, and our other articles of this language are

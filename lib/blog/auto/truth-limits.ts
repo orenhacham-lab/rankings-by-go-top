@@ -51,6 +51,22 @@ export interface TruthLimitInput {
 export interface TruthLimitResult {
   ok: boolean
   failures: string[]
+  /**
+   * WHY A REFUSAL CARRIES THE SENTENCE IT REFUSED.
+   *
+   * On 17 November 2026 the Italian article was refused three times on
+   * `truth:ai_engine_coverage_claim` and the window closed with nothing
+   * published, exactly as Polish had the day before. Nothing could be said about
+   * WHY: the row keeps the rule's name, the draft is thrown away, and Vercel
+   * Hobby holds one hour of logs, so by the time anyone looks the sentence is
+   * gone. A refusal that keeps no sample is an undiagnosable refusal.
+   *
+   * So each failure carries the first sentence that tripped it, collapsed and cut
+   * to 160 characters. It is OUR OWN generated text, never a provider's answer,
+   * and it is stored on the plan row and fed back into the retry brief — which is
+   * what lets a retry fix the actual sentence instead of re-rolling blind.
+   */
+  samples: Record<string, string>
 }
 
 /** Tags out, entities to spaces, whitespace collapsed. */
@@ -131,19 +147,62 @@ const GUARANTEE_G = new RegExp(GUARANTEE.source, 'gi')
  * still fails on its second sentence, and "we don't just guarantee rankings, we
  * guarantee results" still fails on its second claim.
  */
-const NEGATION_BEFORE = /\b(?:no|not|never|cannot|can'?t|without|nobody|no\s+one|nor|nunca|sin|nadie|ning[úu]n(?:a|o)?|n[ãa]o|sem|ningu[ée]m|nenhum(?:a)?|ne|pas|jamais|sans|personne|aucun(?:e)?|non|mai|senza|nessun(?:a|o)?|kein(?:e|en|er|em)?|nicht|nie|ohne|niemand|geen|niet|nooit|zonder|nigdy|bez|[żz]ad(?:na|en|nej|nego)|nikt)\b|\bnie\b|לא|אין|אף|בלי|ללא/i
-const NEGATION_AFTER = /(?:しま?せん|できません|されません|ない|なし)/
+const NEGATION_BEFORE = /\b(?:no|not|never|cannot|can'?t|without|nobody|no\s+one|nor|nunca|sin|nadie|ning[úu]n(?:a|o)?|n[ãa]o|sem|ningu[ée]m|nenhum(?:a)?|ne|pas|jamais|sans|personne|aucun(?:e)?|non|mai|senza|nessun(?:a|o)?|kein(?:e|en|er|em)?|nicht|nie|ohne|niemand|geen|niet|nooit|zonder|nigdy|bez|[żz]ad(?:na|en|nej|nego)|nikt)\b|\bnie\b|לא|אין|אינ|אף|בלי|ללא|בלתי/i
+// Japanese negates the verb's ending, and the polite negative is not always
+// adjacent to the stem: 対応していません, 含まれていません. Matching `ません` itself
+// covers しません/できません/されません/していません in one.
+const NEGATION_AFTER = /(?:ません|ない|なし)/
+
+/**
+ * True when a negation sits beside this match, inside its own sentence: up to 40
+ * characters before it, or 14 after. Bounded to one sentence, so a denial can
+ * never excuse a claim standing next to it.
+ */
+function deniedAt(sentence: string, index: number, length: number): boolean {
+  const before = sentence.slice(Math.max(0, index - 40), index)
+  const after = sentence.slice(index + length, index + length + 14)
+  return NEGATION_BEFORE.test(before) || NEGATION_AFTER.test(after)
+}
 
 /** True when this sentence PROMISES a ranking, rather than denying that one can be promised. */
 function promisesRanking(sentence: string): boolean {
   GUARANTEE_G.lastIndex = 0
   for (let m = GUARANTEE_G.exec(sentence); m; m = GUARANTEE_G.exec(sentence)) {
-    const before = sentence.slice(Math.max(0, m.index - 40), m.index)
-    const after = sentence.slice(m.index + m[0].length, m.index + m[0].length + 14)
-    if (!NEGATION_BEFORE.test(before) && !NEGATION_AFTER.test(after)) return true
+    if (!deniedAt(sentence, m.index, m[0].length)) return true
   }
   return false
 }
+
+/**
+ * True when this sentence puts Perplexity, Copilot or Grok INSIDE what runs
+ * automatically. The automatic AI check covers ChatGPT, Gemini and Google AI; the
+ * others are answered for a single question on request. Saying so — "the
+ * automatic check does not include Perplexity" — is the honest sentence an
+ * article about AI visibility almost has to write, and until this it was refused
+ * exactly like the claim it denies, which is how Italian spent three attempts and
+ * published nothing.
+ */
+function claimsEngineCoverage(sentence: string): boolean {
+  if (!AUTOMATIC.test(sentence) || !OTHER_ENGINES.test(sentence)) return false
+  // WHY THE WHOLE SENTENCE, AND NOT A WINDOW AROUND THE NAME.
+  //
+  // `ranking_guarantee` reads 40 characters before the match and 14 after,
+  // because there the negation sits beside the verb it negates. A coverage denial
+  // does not behave that way: the negation lands wherever the language puts it
+  // relative to the ENGINE's name — before it in English and Polish ("does not
+  // cover Perplexity"), immediately after it in Italian with the engine as
+  // subject ("Perplexity non fa parte"), and at the end of the clause in German
+  // ("umfasst Perplexity nicht"). A window wide enough for all three is the
+  // sentence, so the sentence is what is read.
+  //
+  // The cost is a sentence that denies one thing and claims another about the
+  // engines in one breath, which would now pass. The cost of the window was
+  // measured instead: two locales, two days running, published nothing at all.
+  return !NEGATION_BEFORE.test(sentence) && !NEGATION_AFTER.test(sentence)
+}
+
+const SAMPLE_MAX = 160
+const sampleOf = (sentence: string): string => sentence.replace(/\s+/g, ' ').trim().slice(0, SAMPLE_MAX)
 const SCHEMA_WORD = /schema|json-?ld|סכימה|נתונים מובנים|datos estructurados|dados estruturados|donn[ée]es structur[ée]es|dati strutturati|strukturierte\w*\s+Daten|gestructureerde\s+(?:data|gegevens)|dane\s+strukturalne|構造化データ/i
 const SHOPIFY = /shopify/i
 
@@ -157,35 +216,81 @@ const ATTR = (name: string, tag: string): string => {
 
 export function checkTruthLimits(input: TruthLimitInput): TruthLimitResult {
   const failures: string[] = []
+  const samples: Record<string, string> = {}
   const body = plainText(input.html)
   const all = [input.title, input.metaDescription, body].join(' | ')
+  const lines = sentences(all)
 
-  if (PERCENT.test(all)) failures.push('percentage_claim')
-  if (COUNT_AFTER.test(all) || COUNT_BEFORE.test(all)) failures.push('customer_count_claim')
-  if (CADENCE.test(all)) failures.push('tracking_cadence_claim')
-  if (RATING.test(all)) failures.push('rating_claim')
-  if (sentences(all).some(promisesRanking)) failures.push('ranking_guarantee')
+  /** Record the failure, and the first sentence that tripped it. */
+  const refuse = (code: string, sentence?: string): void => {
+    failures.push(code)
+    if (sentence && !samples[code]) samples[code] = sampleOf(sentence)
+  }
+  /** The first sentence a whole-text pattern matched, for the sample. */
+  const firstMatching = (re: RegExp): string | undefined => lines.find((l) => re.test(l))
 
-  for (const sentence of sentences(all)) {
-    if (OTHER_ENGINES.test(sentence) && AUTOMATIC.test(sentence)) {
-      failures.push('ai_engine_coverage_claim')
-      break
-    }
+  if (PERCENT.test(all)) refuse('percentage_claim', firstMatching(PERCENT))
+  if (COUNT_AFTER.test(all) || COUNT_BEFORE.test(all)) {
+    refuse('customer_count_claim', firstMatching(COUNT_AFTER) ?? firstMatching(COUNT_BEFORE))
   }
-  for (const sentence of sentences(all)) {
-    if (SHOPIFY.test(sentence) && SCHEMA_WORD.test(sentence)) {
-      failures.push('shopify_schema_claim')
-      break
-    }
-  }
+  if (CADENCE.test(all)) refuse('tracking_cadence_claim', firstMatching(CADENCE))
+  if (RATING.test(all)) refuse('rating_claim', firstMatching(RATING))
+  const promise = lines.find(promisesRanking)
+  if (promise) refuse('ranking_guarantee', promise)
+
+  const coverage = lines.find(claimsEngineCoverage)
+  if (coverage) refuse('ai_engine_coverage_claim', coverage)
+
+  const schema = lines.find((l) => SHOPIFY.test(l) && SCHEMA_WORD.test(l))
+  if (schema) refuse('shopify_schema_claim', schema)
 
   // Shopify links: the App Store listing, and nofollow on every one of them.
   for (const tag of input.html.match(ANCHOR) ?? []) {
     const href = ATTR('href', tag)
     if (!/shopify\.com/i.test(href)) continue
-    if (!href.includes(APP_STORE_HREF)) failures.push('shopify_link_not_listing')
-    if (!/\bnofollow\b/i.test(ATTR('rel', tag))) failures.push('shopify_link_not_nofollow')
+    if (!href.includes(APP_STORE_HREF)) refuse('shopify_link_not_listing', tag)
+    if (!/\bnofollow\b/i.test(ATTR('rel', tag))) refuse('shopify_link_not_nofollow', tag)
   }
 
-  return { ok: failures.length === 0, failures: [...new Set(failures)] }
+  return { ok: failures.length === 0, failures: [...new Set(failures)], samples }
+}
+
+/**
+ * HOW A REFUSAL'S SAMPLE TRAVELS.
+ *
+ * `blog_plan.last_error` is the only place a refused attempt leaves anything
+ * behind: the draft is discarded, and `note` belongs to a person (the admin
+ * screen writes their words there when they reject a row), so it cannot be
+ * borrowed. The codes therefore stay first and unchanged — `truth:a,b` — and the
+ * samples follow after a marker no code or rule name contains. Everything that
+ * reads the reason reads the head, so the suffix is invisible to it.
+ */
+export const GATE_SAMPLE_MARK = ' ¦ '
+
+/** `truth:a,b` plus the sentences, when there are any to keep. */
+export function encodeGateReason(reason: string, samples: Record<string, string>): string {
+  const kept = Object.entries(samples).filter(([, v]) => v && v.trim())
+  if (kept.length === 0) return reason
+  return `${reason}${GATE_SAMPLE_MARK}${JSON.stringify(Object.fromEntries(kept))}`
+}
+
+/** The codes and the samples back out. Unparsable or absent samples are simply absent. */
+export function decodeGateReason(stored: string | null | undefined): {
+  codes: string; samples: Record<string, string>
+} {
+  const text = stored ?? ''
+  const at = text.indexOf(GATE_SAMPLE_MARK)
+  if (at < 0) return { codes: text, samples: {} }
+  const codes = text.slice(0, at)
+  try {
+    const parsed: unknown = JSON.parse(text.slice(at + GATE_SAMPLE_MARK.length))
+    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return { codes, samples: {} }
+    const out: Record<string, string> = {}
+    for (const [k, v] of Object.entries(parsed as Record<string, unknown>)) {
+      if (typeof v === 'string') out[k] = v.slice(0, SAMPLE_MAX)
+    }
+    return { codes, samples: out }
+  } catch {
+    return { codes, samples: {} }
+  }
 }
