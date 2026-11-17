@@ -41,7 +41,7 @@ import type { createAdminClient } from '@/lib/supabase/admin'
 import { buildImagePrompt, imageModelCandidates } from '@/lib/content/gemini-image'
 import {
   readInlineImageRow, inlineImageModelInput, inlineImageGateDenial,
-  markInlineImageFailed, storeInlineImageBytes,
+  markInlineImageFailed, storeInlineImageBytes, generateInlineImage,
 } from '@/lib/content/inline-images'
 import { storeHeroImageBytes } from '@/lib/content/featured-image'
 
@@ -63,6 +63,14 @@ export interface ImageBatchClient {
  * has no results, so there is nothing to wait for past that.
  */
 export const IMAGE_BATCH_JOB_MAX_AGE_MS = 50 * 60 * 60 * 1000
+
+/**
+ * Body images one publish may fill live. An article asks for at most four
+ * (INLINE_IMAGE_MAX), so this is a guard against a malformed queue, not a
+ * budget: it stops one publish spending without bound if the table ever holds
+ * more open requests for an article than the article could have asked for.
+ */
+export const INLINE_IMAGE_PUBLISH_FILL_MAX = 8
 
 /** Jobs polled per collect pass. Each is one HTTP call; the cron runs every 15 minutes. */
 export const MAX_IMAGE_JOBS_PER_PASS = 20
@@ -242,6 +250,77 @@ interface BatchRequestRow {
 }
 
 /** Poll the image jobs in flight, store what finished. Never throws. */
+// -- publishing never waits -------------------------------------------------
+
+/**
+ * PUBLISHING NEVER WAITS FOR A BODY IMAGE.
+ *
+ * The figures are composed from the rows that are 'ready' at the moment the
+ * article goes out, and a post already on the merchant's site is never
+ * revisited — so a batched image that arrives after its article was published
+ * is an image that never appears. Until now the only thing preventing that was
+ * the slack rule in ./may-batch.ts, which had to be set absurdly wide to be
+ * safe on its own.
+ *
+ * This is the same safety net the hero has had since 17 November 2026
+ * (./hero-image-batch.ts): any body image this article ORDERED and has not
+ * received is made with a live call now, before the article is published. It
+ * costs the interactive price for that one image — the price we would have paid
+ * anyway had it never been batched — and it costs nothing at all for an article
+ * that ordered nothing, which is one indexed read.
+ *
+ * THE OPEN REQUEST IS CLAIMED FIRST, for the reason the hero claims it: if a
+ * collect pass were to land between the read and the live call, two sets of
+ * bytes would be written for one row and one of them would be orphaned in the
+ * bucket. Claiming decides the winner before anything is stored, and a request
+ * a collect pass already took is left alone.
+ *
+ * Never throws: an article publishes with a missing figure, exactly as it does
+ * when a live call fails, rather than not publishing at all.
+ */
+export async function ensureInlineImagesBeforePublish(
+  admin: Admin,
+  articleId: string,
+  deps: { generate?: typeof generateInlineImage } = {},
+): Promise<{ claimed: number; filled: number; failed: number }> {
+  const out = { claimed: 0, filled: 0, failed: 0 }
+  try {
+    const { data } = await admin
+      .from('inline_image_batch_requests')
+      .select('id, inline_image_id')
+      .eq('article_id', articleId)
+      .eq('target', 'inline')
+      .eq('status', 'submitted')
+      .limit(INLINE_IMAGE_PUBLISH_FILL_MAX)
+    const open = (Array.isArray(data) ? data : []) as { id: string; inline_image_id: string | null }[]
+    if (open.length === 0) return out
+
+    for (const r of open) {
+      // A row with no image to fill is a hero's request or a broken one; the
+      // hero has its own check and neither belongs here.
+      if (!r.inline_image_id) continue
+      const { data: claimed } = await admin
+        .from('inline_image_batch_requests')
+        .update({ status: 'failed', last_error: 'superseded_by_live_call_at_publish', updated_at: nowIso() })
+        .eq('id', r.id).eq('status', 'submitted').select('id')
+      if (!Array.isArray(claimed) || claimed.length === 0) continue
+      out.claimed++
+      const made = await (deps.generate ?? generateInlineImage)(admin, r.inline_image_id)
+        .catch((): { ok: false; error: string } => ({ ok: false, error: 'unexpected_error' }))
+      if (made.ok) out.filled++
+      else {
+        out.failed++
+        console.warn('[image-batch] publish-time live body image failed', { articleId, imageId: r.inline_image_id, reason: made.error })
+      }
+    }
+    if (out.claimed > 0) console.log('[image-batch] body images filled live before publish', { articleId, ...out })
+    return out
+  } catch (e) {
+    console.warn('[image-batch] publish-time body check threw', { articleId, message: e instanceof Error ? e.message : String(e) })
+    return out
+  }
+}
+
 export async function collectInlineImageBatches(
   admin: Admin,
   deps: {

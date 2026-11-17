@@ -20,15 +20,30 @@
  *   - An unknown next publish time never batches. "I don't know when this goes
  *     out" is not a basis for choosing a slower image.
  *
- * Twelve hours is deliberately far more than the turnaround we measured (a probe
- * on 14 November 2026 came back in minutes) and half of Google's own 24-hour
- * target, which is a target and not a promise. A job that overruns even this is
- * written off by the collect pass and its rows are marked 'failed' with the
- * editor's regenerate button — the same place a failed live call leaves them.
+ * TWO HOURS, AND WHY IT WAS TWELVE. The lane shipped with twelve hours, chosen
+ * before there was anything to measure: half of Google's own 24-hour target,
+ * which is a target and not a promise. Twenty-one body images have now been
+ * through the lane end to end (17 November 2026), and the slowest took 18
+ * minutes 34 seconds — the fastest 3 minutes 13, the average 13 minutes. Twelve
+ * hours is 38 times the worst case ever observed, and the price of that caution
+ * was paid in full-price images: a pool that publishes daily is inside its last
+ * twelve hours for half of every day, so half its articles were generated at
+ * the interactive price for no reason.
+ *
+ * Two hours is still six times the worst case, and it is no longer the only
+ * thing standing between a late job and a missing figure: publishing now fills
+ * an ordered-but-unarrived body image with a live call before the article goes
+ * out (`ensureInlineImagesBeforePublish`), exactly as it does for the hero. The
+ * slack is what keeps that fallback rare and cheap; it is not what keeps the
+ * article whole.
+ *
+ * A job that overruns even this is written off by the collect pass and its rows
+ * are marked 'failed' with the editor's regenerate button — the same place a
+ * failed live call leaves them.
  */
 
 /** The publishing slack a pool must have before its body images may be ordered. */
-export const IMAGE_BATCH_MIN_SLACK_MS = 12 * 60 * 60 * 1000
+export const IMAGE_BATCH_MIN_SLACK_MS = 2 * 60 * 60 * 1000
 
 export function inlineImagesMayBatchForPool(
   args: { due: boolean; nextPublishAt: string | null | undefined; nowMs: number },
