@@ -89,5 +89,97 @@ export const BLOCKING_MEASUREMENT = {
   notSampled: {
     markets: ['Brazil (.com.br)', 'Portugal (.pt)'],
     note: 'Neither was in the sample. The .com figure is the global English-language slice and must not be read as a figure for either country.',
+    /** Brazil was sampled later, as .br, in the follow-up below. Portugal still has not been. */
+    partlyAnsweredBy: '2026.11.17',
+  },
+} as const
+
+/**
+ * The 17 November 2026 follow-up: five markets the first sample never touched.
+ *
+ * WHY A SECOND CONSTANT AND NOT AN EDIT. The first measurement is a dated
+ * reading of one sample. Appending rows to it would quietly change what a
+ * published figure means, and anyone who cited the 07.11 numbers would find
+ * them moved under their feet. Two samples, each with its own date, its own n
+ * and its own method block, is the only shape that lets both be cited.
+ *
+ * WHY THESE FIVE MARKETS. `notSampled` above records that Brazil and Portugal
+ * were asked about repeatedly; .br answers half of that. The other four are
+ * markets where we already run a locale (.pl, .kr) or are weighing one
+ * (.se, .gr), and the question "is the problem this page describes actually
+ * common here" is one the locale decision should be able to look up.
+ *
+ * THE RESULT IS NOT A CONFIRMATION, and that is why it is published. Four of
+ * the five sit below the lowest market of the first seven (Germany, 12.3%);
+ * Korea, at 14.8%, is the one exception and still below five of them. The
+ * headline finding survives in direction and shrinks in size: 42.3% of GPTBot
+ * blockers also shut out a traffic-bringing crawler here, against 66.5% there.
+ *
+ * ONE METHOD DIFFERENCE, STATED RATHER THAN SMOOTHED: a site answering 404 on
+ * /robots.txt is counted as not read, not as "no robots.txt, therefore open".
+ * That shrinks the denominator and so pushes every percentage here UP. The
+ * figures are low anyway.
+ *
+ * Numbers come from `growth/offsite/ai-crawler-blocking-measurement-17-11.md`
+ * and are not recomputed here.
+ */
+export const BLOCKING_FOLLOW_UP_VERSION = '2026.11.17'
+
+/** Per-market share blocking a crawler that would have brought visitors. */
+export const BLOCKING_FOLLOW_UP_BY_MARKET: readonly MarketShare[] = [
+  { market: '.kr', blocksTrafficCrawlerPct: 14.8 },
+  { market: '.se', blocksTrafficCrawlerPct: 11.3 },
+  { market: '.pl', blocksTrafficCrawlerPct: 9.1 },
+  { market: '.br', blocksTrafficCrawlerPct: 6.1 },
+  { market: '.gr', blocksTrafficCrawlerPct: 4.1 },
+] as const
+
+/** Share of the whole read sample blocking each token. */
+export const BLOCKING_FOLLOW_UP_BY_CRAWLER: readonly CrawlerShare[] = [
+  { token: 'CCBot', purpose: 'train', blockedPct: 20.9 },
+  { token: 'GPTBot', purpose: 'train', blockedPct: 20.3 },
+  { token: 'Bytespider', purpose: 'train', blockedPct: 20.3 },
+  { token: 'ClaudeBot', purpose: 'train', blockedPct: 17.1 },
+  { token: 'ChatGPT-User', purpose: 'answer', blockedPct: 8.6 },
+  { token: 'OAI-SearchBot', purpose: 'search', blockedPct: 6.6 },
+] as const
+
+export const BLOCKING_FOLLOW_UP = {
+  measuredOn: '2026-11-17',
+  /** The sample this one was built to sit beside, not to replace. */
+  extends: BLOCKING_MEASUREMENT_VERSION,
+  method: {
+    sample: '100 highest-ranked domains per market from the Tranco top-1M list, list V354N',
+    markets: ['.br', '.pl', '.kr', '.se', '.gr'],
+    domainsRequested: 500,
+    robotsFilesRead: 350,
+    failures: { unreachable: 61, httpError: 78, servedHtmlInsteadOfRobots: 11 },
+    how: 'robots.txt fetched directly and parsed by the standard matching rules, against the token list in our public AI-crawler dataset',
+    reproducible:
+      'The same Tranco list and the same parser as the first sample, so the two can be compared row for row and either can be rebuilt by anyone who wants to check us.',
+  },
+  findings: {
+    /** Of the 71 sites blocking GPTBot, the share that also block a traffic-bringing crawler. */
+    ofGptbotBlockersAlsoBlockingTrafficCrawlerPct: 42.3,
+    gptbotBlockers: 71,
+    blocksAiTrafficCrawlerButAllowsGooglebotPct: 8.3,
+    blockedTrainingKeptSearchOpenPct: 11.7,
+    anyTrafficBringingCrawlerBlockedPct: 8.9,
+    /** Of the sites blocking OAI-SearchBot, the share whose block came from a `*` group they never aimed at it. */
+    ofOaiSearchbotBlockersWhoNeverChoseItPct: 30.4,
+    oaiSearchbotBlockers: 23,
+    byCrawler: BLOCKING_FOLLOW_UP_BY_CRAWLER,
+    byMarket: BLOCKING_FOLLOW_UP_BY_MARKET,
+  },
+  limitations: [
+    'These are large, high-ranked sites, not small businesses. Among small businesses the picture is probably different — likely fewer deliberate blocks and more neglect. Do not present these figures as a picture of small businesses.',
+    'n = 350 robots.txt files actually read, out of 500 domains requested. Percentages are of the files read, not of the domains requested.',
+    'A site answering 404 on /robots.txt is counted as not read rather than as having no robots.txt. That is the conservative count: it shrinks the denominator and so raises every percentage here.',
+    'Korea contributed only 54 read files, the smallest of the five, so the .kr figure moves more than the others.',
+    'A robots.txt verdict states the request a site is making, not an outcome: some operators document that their agent may ignore robots.txt.',
+  ],
+  notSampled: {
+    markets: ['Portugal (.pt)'],
+    note: 'Still not sampled. The .br figure is Brazil and must not be read as a figure for Portugal.',
   },
 } as const

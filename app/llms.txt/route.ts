@@ -27,6 +27,8 @@
 
 import { createClient } from '@/lib/supabase/server'
 import {
+  BLOCKING_FOLLOW_UP,
+  BLOCKING_FOLLOW_UP_VERSION,
   BLOCKING_MEASUREMENT,
   BLOCKING_MEASUREMENT_VERSION,
 } from '@/lib/ai-crawlers/blocking-measurement'
@@ -140,6 +142,7 @@ function openDataLines(): string[] {
     `- [AI crawler reference dataset](${BASE}/api/public/ai-crawlers): every documented AI crawler user-agent token, what each one is for, and what its operator documents about robots.txt. JSON, or \`?format=csv\` for CSV. No key, no sign-up, ${AI_CRAWLER_DATASET_LICENSE.id}. The same table is rendered for people at ${BASE}/en/ai-crawlers.`,
     `- [OpenAPI description](${BASE}/api/public/ai-crawlers/openapi): the machine-readable description of every endpoint listed here, for a catalogue or a client generator.`,
     `- [robots.txt blocking measurement, ${BLOCKING_MEASUREMENT_VERSION}](${BASE}/api/public/ai-crawler-blocking): one dated reading of ${BLOCKING_MEASUREMENT.method.robotsFilesRead} robots.txt files across ${BLOCKING_MEASUREMENT.method.markets.length} markets, with the method, the failures and the per-market shares. ${caveat} Percentages are of the files read, not of the ${BLOCKING_MEASUREMENT.method.domainsRequested} domains requested.`,
+    `- [A second sample, ${BLOCKING_FOLLOW_UP_VERSION}](${BASE}/api/public/ai-crawler-blocking): served from the same endpoint under the followUp key, and never merged into the figures above. ${BLOCKING_FOLLOW_UP.method.robotsFilesRead} robots.txt files across ${BLOCKING_FOLLOW_UP.method.markets.join(', ')}, markets the first reading never touched. It does not confirm the first: these markets block less, and ${BLOCKING_FOLLOW_UP.findings.ofGptbotBlockersAlsoBlockingTrafficCrawlerPct}% of the sites blocking GPTBot here also shut out a crawler that brings visitors, against ${BLOCKING_MEASUREMENT.findings.ofGptbotBlockersAlsoBlockingTrafficCrawlerPct}% there. ${BLOCKING_FOLLOW_UP.limitations[0]}`,
     `- [The same measurement, domain by domain](${BASE}/api/public/ai-crawler-blocking/sites): ${SITES_MEASUREMENT.method.domainsRequested} requested domains with their Tranco rank, whether the robots.txt could be read, and for each read file the verdict per crawler with the exact deciding line. \`?format=csv\` for CSV, \`?tld=.fr\` for one country suffix with its own figures. It separates a rule written about a crawler from one inherited from the blanket \`*\` group, because a deliberate restriction is not an error. Only ${SITES_MEASUREMENT.method.robotsRead} of the ${SITES_MEASUREMENT.method.domainsRequested} hosts could be read and the unreadable ones are listed with their reason, so the sample probably under-states blocking.`,
   ]
 }

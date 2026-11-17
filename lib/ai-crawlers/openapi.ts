@@ -543,6 +543,7 @@ export function aiCrawlerOpenApiDocument() {
             'findings',
             'limitations',
             'notSampled',
+            'followUp',
           ],
           properties: {
             version: {
@@ -590,6 +591,11 @@ export function aiCrawlerOpenApiDocument() {
                   properties: {
                     unreachable: { type: 'integer' },
                     servedHtmlInsteadOfRobots: { type: 'integer' },
+                    httpError: {
+                      type: 'integer',
+                      description:
+                        'Answered, but with a status rather than a file — 403 mostly, and 404, which is counted here rather than as "no robots.txt, therefore open". Present only on a sample that drew the line that way.',
+                    },
                   },
                 },
                 how: { type: 'string' },
@@ -651,6 +657,58 @@ export function aiCrawlerOpenApiDocument() {
               properties: {
                 markets: { type: 'array', items: { type: 'string' } },
                 note: { type: 'string' },
+                partlyAnsweredBy: {
+                  type: 'string',
+                  description:
+                    'The version of a later sample that covers some of these markets. It does not remove them from this list, because this sample still did not include them.',
+                },
+              },
+            },
+            followUp: {
+              type: 'object',
+              description:
+                'A later sample of different markets, beside this one and never merged into it. Every percentage above is of this sample; every percentage inside followUp is of that one. There is no combined figure anywhere, because there was never a combined sample.',
+              required: ['version', 'measuredOn', 'extends', 'method', 'findings', 'limitations', 'notSampled'],
+              properties: {
+                version: { type: 'string' },
+                measuredOn: { type: 'string', format: 'date' },
+                extends: {
+                  type: 'string',
+                  description: 'The version of the sample this one was built to sit beside.',
+                },
+                method: { $ref: '#/components/schemas/Measurement/properties/method' },
+                findings: {
+                  type: 'object',
+                  required: [
+                    'ofGptbotBlockersAlsoBlockingTrafficCrawlerPct',
+                    'gptbotBlockers',
+                    'blocksAiTrafficCrawlerButAllowsGooglebotPct',
+                    'blockedTrainingKeptSearchOpenPct',
+                    'anyTrafficBringingCrawlerBlockedPct',
+                    'byCrawler',
+                    'byMarket',
+                  ],
+                  properties: {
+                    ofGptbotBlockersAlsoBlockingTrafficCrawlerPct: { type: 'number' },
+                    gptbotBlockers: { type: 'integer' },
+                    blocksAiTrafficCrawlerButAllowsGooglebotPct: { type: 'number' },
+                    blockedTrainingKeptSearchOpenPct: { type: 'number' },
+                    anyTrafficBringingCrawlerBlockedPct: { type: 'number' },
+                    ofOaiSearchbotBlockersWhoNeverChoseItPct: {
+                      type: 'number',
+                      description:
+                        'Of the sites blocking OAI-SearchBot, the share whose block came from a blanket `*` group rather than from a rule naming that crawler. The standard picks one group and one only, so a `*` group written at every bot is the whole reason those sites are blocked.',
+                    },
+                    oaiSearchbotBlockers: {
+                      type: 'integer',
+                      description: 'How many sites the figure above is a share of.',
+                    },
+                    byCrawler: { type: 'array', items: { $ref: '#/components/schemas/CrawlerShare' } },
+                    byMarket: { type: 'array', items: { $ref: '#/components/schemas/MarketShare' } },
+                  },
+                },
+                limitations: { type: 'array', items: { type: 'string' } },
+                notSampled: { $ref: '#/components/schemas/Measurement/properties/notSampled' },
               },
             },
           },

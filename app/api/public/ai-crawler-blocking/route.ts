@@ -19,6 +19,8 @@
  * "two thirds of sites" becomes a claim about small businesses.
  */
 import {
+  BLOCKING_FOLLOW_UP,
+  BLOCKING_FOLLOW_UP_VERSION,
   BLOCKING_MEASUREMENT,
   BLOCKING_MEASUREMENT_VERSION,
 } from '@/lib/ai-crawlers/blocking-measurement'
@@ -42,6 +44,14 @@ function json() {
     source: 'https://www.gotopseo.com/en/ai-crawlers',
     dataset: 'https://www.gotopseo.com/api/public/ai-crawlers',
     ...BLOCKING_MEASUREMENT,
+    /**
+     * The second sample, beside the first and never merged into it. `version`
+     * above still names the 07.11 reading, because that is what every field
+     * spread from BLOCKING_MEASUREMENT describes; the follow-up carries its own
+     * date, its own n and its own limitations so a citation can say which one
+     * it took a number from.
+     */
+    followUp: { version: BLOCKING_FOLLOW_UP_VERSION, ...BLOCKING_FOLLOW_UP },
   }
 }
 
@@ -52,19 +62,30 @@ function csvField(value: string | number) {
   return `"${String(value).replace(/"/g, '""')}"`
 }
 
+/**
+ * Both samples in one table, each row carrying the date it was measured.
+ *
+ * The `measured_on` column was there from the first version, which is what
+ * makes this safe: a reader who sorts or filters by it gets two samples, not
+ * one averaged number. Nothing is combined — there is no twelve-market
+ * percentage anywhere in this file, because there was never a twelve-market
+ * sample.
+ */
 function csv() {
-  const limitation = BLOCKING_MEASUREMENT.limitations[0]
   const rows = [CSV_COLUMNS.join(',')]
-  for (const m of BLOCKING_MEASUREMENT.findings.byMarket) {
-    rows.push(
-      [
-        csvField(m.market),
-        csvField(m.blocksTrafficCrawlerPct),
-        csvField(BLOCKING_MEASUREMENT.method.robotsFilesRead),
-        csvField(BLOCKING_MEASUREMENT.measuredOn),
-        csvField(limitation),
-      ].join(','),
-    )
+  for (const sample of [BLOCKING_MEASUREMENT, BLOCKING_FOLLOW_UP]) {
+    const limitation = sample.limitations[0]
+    for (const m of sample.findings.byMarket) {
+      rows.push(
+        [
+          csvField(m.market),
+          csvField(m.blocksTrafficCrawlerPct),
+          csvField(sample.method.robotsFilesRead),
+          csvField(sample.measuredOn),
+          csvField(limitation),
+        ].join(','),
+      )
+    }
   }
   return rows.join('\r\n') + '\r\n'
 }

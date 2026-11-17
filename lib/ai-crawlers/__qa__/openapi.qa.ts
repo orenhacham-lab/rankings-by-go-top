@@ -13,7 +13,12 @@
 import { readFileSync, existsSync } from 'node:fs'
 import { join } from 'node:path'
 import { aiCrawlerOpenApiDocument } from '../openapi'
-import { BLOCKING_MEASUREMENT, BLOCKING_MEASUREMENT_VERSION } from '../blocking-measurement'
+import {
+  BLOCKING_FOLLOW_UP,
+  BLOCKING_FOLLOW_UP_VERSION,
+  BLOCKING_MEASUREMENT,
+  BLOCKING_MEASUREMENT_VERSION,
+} from '../blocking-measurement'
 import {
   AI_CRAWLER_CANDIDATES,
   AI_CRAWLER_DATASET,
@@ -308,6 +313,7 @@ const measurementBody = {
   source: 'https://www.gotopseo.com/en/ai-crawlers',
   dataset: 'https://www.gotopseo.com/api/public/ai-crawlers',
   ...BLOCKING_MEASUREMENT,
+  followUp: { version: BLOCKING_FOLLOW_UP_VERSION, ...BLOCKING_FOLLOW_UP },
 }
 check(
   'Measurement requires exactly the keys its route serves, in order',
