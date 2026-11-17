@@ -7,6 +7,13 @@
  *
  * Vercel cron sends GET with `Authorization: Bearer <CRON_SECRET>`.
  *
+ * ONE REAL PASS AN HOUR. cron-job.org still calls this route every fifteen
+ * minutes, but only the first call of each hour does the work: the rest are
+ * refused by `claimAutomationPass` (lib/content/automation/pass-gate.ts) after a
+ * single query and answer 202 like any other call. Every "every fifteen minutes"
+ * below therefore now means hourly; Vercel's own daily 07:00 call is never gated.
+ * The reason is the Hobby Active-CPU allowance, which this route alone crossed.
+ *
  * ANSWERS FIRST, WORKS AFTER. The run is scheduled with `after()` and the
  * route returns 202 immediately. An external scheduler (cron-job.org) gives
  * up after 30 seconds, while one generation takes ~20–110s (measured in
@@ -93,6 +100,7 @@ import { runIsolatedProspectTopUp } from '@/lib/outreach/topup-isolated'
 import { runIsolatedOnboardingEmails } from '@/lib/onboarding-emails/isolated'
 import { runIsolatedWeeklySummaries } from '@/lib/reports/weekly/isolated'
 import { checkPublishingStalls, isDailyStallCheckRun } from '@/lib/content/automation/stall-watch'
+import { claimAutomationPass, isUngatedScheduler } from '@/lib/content/automation/pass-gate'
 import { runMapUpkeep, liveEnsure } from '@/lib/content/existing-content/map-upkeep'
 import { runBlogDailyWindow, startIsolatedBlogWindow } from '@/lib/blog/auto/daily-window'
 import { runIsolatedGbpDue } from '@/lib/gbp/due-isolated'
@@ -119,6 +127,25 @@ async function handle(request: Request): Promise<Response> {
 
   const startedAt = new Date().toISOString()
   const dailyStallCheck = isDailyStallCheckRun(request)
+
+  // ONE REAL PASS AN HOUR (lib/content/automation/pass-gate.ts). cron-job.org
+  // calls this route every fifteen minutes and this is the only path of the
+  // project that burns measurable function time; the quarter-hour rate is what
+  // put the team at 175% of the Hobby Active-CPU allowance on 17 Nov 2026. The
+  // claim is conditional, so a skipped call costs one query and still answers
+  // 202 — a scheduler that sees failures disables the job. It answers `skipped`
+  // and NOT `accepted: true`, because nothing was accepted: that word belongs to
+  // the one path that schedules the work, which is what the reminder suite's G4
+  // asserts is the last thing this handler does. Vercel's own daily scheduler is
+  // never gated: it is one call a day and it carries the stall check.
+  if (!isUngatedScheduler(request)) {
+    const claim = await claimAutomationPass(createAdminClient(), {})
+    if (!claim.granted) {
+      console.log('[automation-cron] pass skipped', { reason: claim.reason, sinceLastMs: claim.sinceLastMs })
+      return Response.json({ ok: true, skipped: claim.reason, startedAt }, { status: 202 })
+    }
+  }
+
   after(async () => {
     // Map ONE project whose site mapping is missing or ageing, so its articles get internal
     // links (lib/content/existing-content/map-upkeep.ts). It runs ALONGSIDE the runner, not
