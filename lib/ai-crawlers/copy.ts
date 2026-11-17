@@ -149,6 +149,17 @@ export type AiCrawlerCopy = {
     colOaiSearchbot: string
     labelDeliberate: string
     labelInherited: string
+    /**
+     * The 17.11.2026 follow-up: five markets the first reading never touched.
+     * `followUpLead` carries `{on}`, `{n}`, `{here}` and `{there}`, all
+     * substituted from `lib/ai-crawlers/blocking-measurement.ts`. It must say
+     * that the two samples are not added together, because the page now shows
+     * twelve markets and a reader who assumes one sample would read a figure
+     * that is true of neither.
+     */
+    followUpTitle: string
+    followUpLead: string
+    followUpNote: string
   }
   cta: { title: string; body: string; button: string }
   /**
@@ -256,6 +267,11 @@ const he: AiCrawlerCopy = {
     colOaiSearchbot: 'חוסמים OAI-SearchBot',
     labelDeliberate: 'מהם במכוון',
     labelInherited: 'מהם בירושה',
+    followUpTitle: 'מדגם שני, חמישה שווקים נוספים',
+    followUpLead:
+      'ב-{on} קראנו עוד {n} קובצי robots.txt בשווקים שהקריאה הראשונה לא נגעה בהם. שם חוסמים פחות: {here} מהאתרים שחוסמים את GPTBot חוסמים גם סורק שמביא מבקרים, לעומת {there} בטבלה שלמעלה. שני המדגמים לעולם אינם מחוברים לאחד.',
+    followUpNote:
+      'אותה הסתייגות חלה גם כאן: אתרים גדולים ומדורגים גבוה, לא עסקים קטנים. קוריאה תרמה את מספר הקבצים הקטן ביותר מבין החמישה, ולכן הנתון שלה רועד יותר מהאחרים.',
   },
   limits: {
     title: 'מה הבדיקה הזו לא יודעת',
@@ -385,6 +401,11 @@ const en: AiCrawlerCopy = {
     colOaiSearchbot: 'Block OAI-SearchBot',
     labelDeliberate: 'of these deliberate',
     labelInherited: 'of these inherited',
+    followUpTitle: 'A second sample, five more markets',
+    followUpLead:
+      'On {on} we read {n} more robots.txt files in markets the first reading never touched. They block less: {here} of the sites blocking GPTBot there also shut out a crawler that brings visitors, against {there} in the table above. The two samples are never added together.',
+    followUpNote:
+      'The same caveat holds here: large, high-ranked sites, not small businesses. Korea contributed the fewest files of the five, so its figure moves more than the others.',
   },
   limits: {
     title: 'What this check cannot tell you',
@@ -514,6 +535,11 @@ const es: AiCrawlerCopy = {
     colOaiSearchbot: 'Bloquean OAI-SearchBot',
     labelDeliberate: 'de ellos deliberados',
     labelInherited: 'de ellos heredados',
+    followUpTitle: 'Una segunda muestra, cinco mercados más',
+    followUpLead:
+      'El {on} leímos {n} archivos robots.txt más en mercados que la primera lectura nunca tocó. Allí se bloquea menos: el {here} de los sitios que bloquean GPTBot también cierran la puerta a un rastreador que trae visitantes, frente al {there} de la tabla de arriba. Las dos muestras nunca se suman.',
+    followUpNote:
+      'La misma advertencia vale aquí: sitios grandes y muy bien posicionados, no pequeños negocios. Corea aportó el menor número de archivos de los cinco, así que su cifra se mueve más que las demás.',
   },
   limits: {
     title: 'Lo que esta comprobación no puede decirte',
@@ -643,6 +669,11 @@ const ptBR: AiCrawlerCopy = {
     colOaiSearchbot: 'Bloqueiam OAI-SearchBot',
     labelDeliberate: 'destes, deliberados',
     labelInherited: 'destes, herdados',
+    followUpTitle: 'Uma segunda amostra, mais cinco mercados',
+    followUpLead:
+      'Em {on} lemos mais {n} arquivos robots.txt em mercados que a primeira leitura nunca tocou. Lá se bloqueia menos: {here} dos sites que bloqueiam o GPTBot também barram um rastreador que traz visitantes, contra {there} na tabela acima. As duas amostras nunca são somadas.',
+    followUpNote:
+      'A mesma ressalva vale aqui: sites grandes e bem posicionados, não pequenos negócios. A Coreia contribuiu com o menor número de arquivos dos cinco, então o número dela oscila mais que os outros.',
   },
   limits: {
     title: 'O que esta verificação não consegue dizer',
@@ -772,6 +803,11 @@ const fr: AiCrawlerCopy = {
     colOaiSearchbot: 'Bloquent OAI-SearchBot',
     labelDeliberate: 'dont délibérés',
     labelInherited: 'dont hérités',
+    followUpTitle: 'Un deuxième échantillon, cinq marchés de plus',
+    followUpLead:
+      'Le {on}, nous avons lu {n} fichiers robots.txt de plus, sur des marchés que la première lecture n\'avait pas touchés. On y bloque moins : {here} des sites qui bloquent GPTBot ferment aussi la porte à un robot qui amène des visiteurs, contre {there} dans le tableau ci-dessus. Les deux échantillons ne sont jamais additionnés.',
+    followUpNote:
+      'La même réserve s\'applique ici : de grands sites très bien classés, pas de petites entreprises. La Corée a fourni le moins de fichiers des cinq, donc son chiffre bouge plus que les autres.',
   },
   limits: {
     title: 'Ce que cette vérification ne peut pas vous dire',
@@ -901,6 +937,11 @@ const it: AiCrawlerCopy = {
     colOaiSearchbot: 'Bloccano OAI-SearchBot',
     labelDeliberate: 'di cui deliberati',
     labelInherited: 'di cui ereditati',
+    followUpTitle: 'Un secondo campione, altri cinque mercati',
+    followUpLead:
+      'Il {on} abbiamo letto altri {n} file robots.txt in mercati che la prima lettura non aveva toccato. Lì si blocca meno: il {here} dei siti che bloccano GPTBot chiude la porta anche a un crawler che porta visitatori, contro il {there} della tabella qui sopra. I due campioni non vengono mai sommati.',
+    followUpNote:
+      'Vale la stessa avvertenza: siti grandi e molto ben posizionati, non piccole imprese. La Corea ha fornito il minor numero di file dei cinque, quindi il suo dato oscilla più degli altri.',
   },
   limits: {
     title: 'Cosa questa verifica non può dirti',
@@ -1030,6 +1071,11 @@ const ja: AiCrawlerCopy = {
     colOaiSearchbot: 'OAI-SearchBotをブロック',
     labelDeliberate: 'うち意図的',
     labelInherited: 'うち継承',
+    followUpTitle: '二回目の調査、さらに五つの市場',
+    followUpLead:
+      '{on}に、一回目では扱わなかった市場で robots.txt をさらに{n}件読みました。そこではブロックが少なく、GPTBot をブロックしているサイトのうち訪問者を連れてくるクローラーまで締め出しているのは{here}で、上の表の{there}を下回ります。二つの調査結果は決して足し合わせません。',
+    followUpNote:
+      '同じ但し書きがここにも当てはまります。対象は上位にランクされた大規模サイトであり、小規模事業者ではありません。韓国は五つの市場のうち読み取れたファイルが最も少なく、その数値は他より振れ幅が大きくなります。',
   },
   limits: {
     title: 'この確認では分からないこと',
@@ -1159,6 +1205,11 @@ const de: AiCrawlerCopy = {
     colOaiSearchbot: 'Sperren OAI-SearchBot',
     labelDeliberate: 'davon bewusst',
     labelInherited: 'davon geerbt',
+    followUpTitle: 'Eine zweite Stichprobe, fünf weitere Märkte',
+    followUpLead:
+      'Am {on} haben wir {n} weitere robots.txt-Dateien gelesen, in Märkten, die die erste Lesung nie berührt hat. Dort wird weniger blockiert: {here} der Seiten, die GPTBot blockieren, sperren auch einen Crawler aus, der Besucher bringt, gegenüber {there} in der Tabelle oben. Die beiden Stichproben werden nie zusammengezählt.',
+    followUpNote:
+      'Derselbe Vorbehalt gilt hier: große, hoch platzierte Seiten, keine kleinen Unternehmen. Korea hat von den fünf die wenigsten Dateien beigesteuert, sein Wert schwankt daher stärker als die anderen.',
   },
   limits: {
     title: 'Was diese Prüfung nicht zeigt',
@@ -1288,6 +1339,11 @@ const pl: AiCrawlerCopy = {
     colOaiSearchbot: 'Blokują OAI-SearchBot',
     labelDeliberate: 'z tego celowo',
     labelInherited: 'z tego odziedziczone',
+    followUpTitle: 'Druga próba, pięć kolejnych rynków',
+    followUpLead:
+      '{on} przeczytaliśmy kolejne {n} plików robots.txt na rynkach, których pierwszy odczyt w ogóle nie objął. Blokuje się tam mniej: {here} witryn blokujących GPTBota zamyka też drzwi przed robotem, który przyprowadza odwiedzających, wobec {there} w tabeli powyżej. Tych dwóch prób nigdy się nie sumuje.',
+    followUpNote:
+      'To samo zastrzeżenie obowiązuje tutaj: duże, wysoko notowane witryny, nie małe firmy. Korea dostarczyła najmniej plików z całej piątki, więc jej wynik waha się bardziej niż pozostałe.',
   },
   limits: {
     title: 'Czego to sprawdzenie nie pokazuje',
@@ -1417,6 +1473,11 @@ const nl: AiCrawlerCopy = {
     colOaiSearchbot: 'Blokkeren OAI-SearchBot',
     labelDeliberate: 'waarvan bewust',
     labelInherited: 'waarvan overgenomen',
+    followUpTitle: 'Een tweede steekproef, vijf markten erbij',
+    followUpLead:
+      'Op {on} lazen we nog {n} robots.txt-bestanden, in markten die de eerste lezing nooit raakte. Daar wordt minder geblokkeerd: {here} van de sites die GPTBot blokkeren sluit ook een crawler buiten die bezoekers brengt, tegenover {there} in de tabel hierboven. De twee steekproeven worden nooit bij elkaar opgeteld.',
+    followUpNote:
+      'Hetzelfde voorbehoud geldt hier: grote, hoog gerangschikte sites, geen kleine bedrijven. Korea leverde van de vijf de minste bestanden, dus dat cijfer beweegt sterker dan de rest.',
   },
   limits: {
     title: 'Wat deze controle niet laat zien',
@@ -1548,6 +1609,11 @@ const ko: AiCrawlerCopy = {
     colOaiSearchbot: 'OAI-SearchBot 차단',
     labelDeliberate: '그중 의도적',
     labelInherited: '그중 물려받은 것',
+    followUpTitle: '두 번째 표본, 다섯 개 시장 추가',
+    followUpLead:
+      '{on}에 첫 번째 조사가 다루지 않은 시장에서 robots.txt 파일 {n}개를 더 읽었습니다. 그곳에서는 차단이 더 적습니다. GPTBot을 차단하는 사이트 가운데 방문자를 데려오는 크롤러까지 막은 비율은 {here}로, 위 표의 {there}보다 낮습니다. 두 표본은 결코 합산하지 않습니다.',
+    followUpNote:
+      '같은 단서가 여기에도 적용됩니다. 상위에 오른 대형 사이트이지 소규모 사업자가 아닙니다. 한국은 다섯 곳 가운데 읽어낸 파일이 가장 적어, 그 수치는 다른 곳보다 더 크게 흔들립니다.',
   },
   limits: {
     title: '이 확인으로는 알 수 없는 것',

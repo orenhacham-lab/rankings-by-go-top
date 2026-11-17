@@ -32,7 +32,12 @@ import { cn } from '@/lib/utils'
 import { AI_CRAWLERS } from '@/lib/ai-crawlers/agents'
 import { buildFixPlan } from '@/lib/ai-crawlers/fix-plan'
 import { AiRobotsGenerator } from './AiRobotsGenerator'
-import { BLOCKING_BY_MARKET, BLOCKING_MEASUREMENT } from '@/lib/ai-crawlers/blocking-measurement'
+import {
+  BLOCKING_BY_MARKET,
+  BLOCKING_FOLLOW_UP,
+  BLOCKING_FOLLOW_UP_BY_MARKET,
+  BLOCKING_MEASUREMENT,
+} from '@/lib/ai-crawlers/blocking-measurement'
 import { BLOCKING_MARKETS_2026_11_09, marketPct } from '@/lib/ai-crawlers/blocking-markets'
 import {
   BLOCKING_SITES_MEASURED_ON,
@@ -402,6 +407,52 @@ function Measurement({ locale, copy }: { locale: PublicLocale; copy: ReturnType<
           {' · '}
           <a dir="ltr" href={`${BLOCKING_SITES_PATH}?format=csv`} className="font-semibold text-action underline">CSV</a>
         </p>
+      </div>
+
+      {/* THE SECOND SAMPLE, 17 November, and a third table rather than five
+          more rows in the first one. The page now shows twelve markets, and
+          the one thing that must not happen is a reader adding them up: the
+          two readings have different days, different n and different failure
+          rates, so a twelve-market share would be true of neither. The lead
+          says so in words, the heading separates them visually, and the n and
+          the date sit with the figures rather than under them.
+
+          Its own headline is that the finding did NOT reproduce at the same
+          size — 42.3% against 66.5%. Publishing a weaker second reading beside
+          a strong first one is the whole reason a reader should believe the
+          first one. */}
+      <div className="mt-6 border-t border-line pt-4">
+        <h3 className="text-copy font-bold text-ink">{m.followUpTitle}</h3>
+        <p className="mt-2 max-w-2xl text-copy text-body">
+          {m.followUpLead
+            .replace('{on}', BLOCKING_FOLLOW_UP.measuredOn)
+            .replace('{n}', num(BLOCKING_FOLLOW_UP.method.robotsFilesRead))
+            .replace('{here}', pct(BLOCKING_FOLLOW_UP.findings.ofGptbotBlockersAlsoBlockingTrafficCrawlerPct))
+            .replace('{there}', pct(BLOCKING_MEASUREMENT.findings.ofGptbotBlockersAlsoBlockingTrafficCrawlerPct))}
+        </p>
+        <div className="mt-3 overflow-x-auto rounded-card border border-line">
+          <table className="w-full border-collapse text-copy">
+            <thead>
+              <tr className="border-b border-line bg-sunk/60 text-caption font-semibold text-ink">
+                <th scope="col" className="px-4 py-2 text-start">{m.colMarket}</th>
+                <th scope="col" className="px-4 py-2 text-start">{m.colShare}</th>
+              </tr>
+            </thead>
+            <tbody>
+              {BLOCKING_FOLLOW_UP_BY_MARKET.map((row) => (
+                <tr key={row.market} className="border-b border-line/60 last:border-0">
+                  <td className="px-4 py-2">
+                    <code dir="ltr" className="font-semibold text-ink">{row.market}</code>
+                  </td>
+                  <td className="px-4 py-2 text-body" dir="ltr">
+                    {pct(row.blocksTrafficCrawlerPct)}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+        <p className="mt-3 max-w-2xl text-caption text-muted">{m.followUpNote}</p>
       </div>
     </section>
   )
