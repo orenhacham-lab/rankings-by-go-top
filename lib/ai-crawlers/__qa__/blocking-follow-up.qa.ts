@@ -159,6 +159,50 @@ function main() {
     check('D5-MUT: dropping the caveat from the line would fail D5', !mutated.includes('BLOCKING_FOLLOW_UP.limitations[0]'))
   }
 
+  console.log('\nF) the page shows it as a second table, not as five more rows')
+  {
+    const component = strip(read('components/ai-crawlers/AiCrawlerChecker.tsx'))
+    check('F1: it renders the follow-up rows from their own constant',
+      component.includes('BLOCKING_FOLLOW_UP_BY_MARKET.map'))
+    check('F2: the first table still reads only the first sample’s rows',
+      component.includes('BLOCKING_BY_MARKET.map'))
+    check('F3: the two are not one list',
+      !component.includes('[...BLOCKING_BY_MARKET, ...BLOCKING_FOLLOW_UP_BY_MARKET]') &&
+        !component.includes('BLOCKING_BY_MARKET.concat'))
+    check('F4: the lead carries the date and the n of the sample it describes',
+      component.includes("replace('{on}', BLOCKING_FOLLOW_UP.measuredOn)") &&
+        component.includes("replace('{n}', num(BLOCKING_FOLLOW_UP.method.robotsFilesRead))"))
+    check('F5: it prints both shares, so the weaker second reading is shown against the first',
+      component.includes("'{here}'") && component.includes("'{there}'"))
+    check('F6: the follow-up’s own caveat is rendered',
+      component.includes('m.followUpNote'))
+    // MUTATION CONTROL for F3: concatenating the two lists would fail it.
+    const mutated = component.split('BLOCKING_FOLLOW_UP_BY_MARKET.map').join('BLOCKING_BY_MARKET.concat(BLOCKING_FOLLOW_UP_BY_MARKET).map')
+    check('F3-MUT: concatenating the two market lists would fail F3', mutated.includes('BLOCKING_BY_MARKET.concat'))
+  }
+
+  console.log('\nG) every locale carries the three new keys, and none carries a digit')
+  {
+    const copy = read('lib/ai-crawlers/copy.ts')
+    const LOCALES = ['he', 'en', 'es', 'ptBR', 'fr', 'it', 'ja', 'de', 'pl', 'nl', 'ko']
+    const titles = copy.match(/followUpTitle:/g) ?? []
+    const leads = copy.match(/followUpLead:/g) ?? []
+    const notes = copy.match(/followUpNote:/g) ?? []
+    // One of each is the type declaration, so the count is locales + 1.
+    check('G1: every locale has followUpTitle', titles.length === LOCALES.length + 1)
+    check('G2: every locale has followUpLead', leads.length === LOCALES.length + 1)
+    check('G3: every locale has followUpNote', notes.length === LOCALES.length + 1)
+    const leadStrings = [...copy.matchAll(/followUpLead:\s*\n?\s*'((?:[^'\\]|\\.)*)'/g)].map((x) => x[1] ?? '')
+    check('G4: each lead names all four placeholders, so no figure is retyped',
+      leadStrings.length === LOCALES.length &&
+        leadStrings.every((l) => l.includes('{on}') && l.includes('{n}') && l.includes('{here}') && l.includes('{there}')))
+    check('G5: no lead hard-codes a percentage',
+      leadStrings.every((l) => !/\d+[.,]\d\s*%/.test(l)))
+    // MUTATION CONTROL for G4: dropping a placeholder must fail it.
+    const broken = leadStrings.map((l) => l.replace('{there}', ''))
+    check('G4-MUT: a lead missing {there} would fail G4', !broken.every((l) => l.includes('{there}')))
+  }
+
   console.log('\nE) the findings are internally consistent')
   {
     const f = BLOCKING_FOLLOW_UP.findings
