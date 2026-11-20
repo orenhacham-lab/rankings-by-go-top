@@ -11,6 +11,7 @@
  */
 import { FakeAdmin } from '@/lib/__qa__/_fake-admin'
 import { runAutomation, spentGenerationBudget, rotateForRun, PAUSED_BACKLOG_HOLD } from '@/lib/content/automation/runner'
+import { localWeekday, isNoPublishWeekday } from '@/lib/content/automation/schedule'
 import { findStalledPools, buildStallAlertHtml, checkPublishingStalls, isDailyStallCheckRun } from '@/lib/content/automation/stall-watch'
 import type { generatePoolItem } from '@/lib/content/automation/generate-item'
 import type { createAdminClient } from '@/lib/supabase/admin'
@@ -26,6 +27,26 @@ const PAST = new Date(Date.now() - 3_600_000).toISOString()
 const RUN = 15 * 60 * 1000
 /** A run time at which the rotation starts at the first pool by id. */
 const firstRunFor = (n: number) => { const r = Math.floor(Date.now() / RUN); return (r - (r % n) + n) * RUN }
+/**
+ * THE SAME RUN SLOT, ON A DAY THE RUNNER WOULD PUBLISH ON, WITH A DUE ANCHOR.
+ *
+ * A case that reads `diag.note` after the publish stage cannot be run on a
+ * Friday or a Saturday, and cannot be given a slot stored on one: the publish
+ * stage then holds the pool (`held_no_publish_day`, or
+ * `held_realigned_to_plan_rhythm` for the stored slot) and writes that over
+ * whatever the generation stage put in `note`. That is the product's real
+ * behaviour, and it is not what such a case is about, so the clock and the
+ * anchor are pinned here instead of taken from today. Stepping whole days
+ * keeps the rotation, because a day is 96 run slots and 96 divides every `n`
+ * these cases use.
+ */
+const duePublishDayRun = (n: number) => {
+  const publishes = (ms: number) => !isNoPublishWeekday(localWeekday(ms, 'UTC'))
+  let nowMs = firstRunFor(n)
+  // The anchor is an hour before the run, so the day before it must publish too.
+  while (!publishes(nowMs) || !publishes(nowMs - 3_600_000)) nowMs += 24 * 60 * 60 * 1000
+  return { nowMs, anchorIso: new Date(nowMs - 3_600_000).toISOString() }
+}
 const pool = (id: string) => ({ id, project_id: `project-${id}`, is_active: true, cadence: 'weekly', interval_days: 7, publish_time: '09:00', timezone: 'UTC', next_publish_at: PAST, publish_days: [] })
 const item = (poolId: string) => ({ id: `item-${poolId}`, pool_id: poolId, project_id: `project-${poolId}`, topic_id: `topic-${poolId}`, status: 'queued', article_id: null, attempts: 0, position: 1, locked_at: null })
 
@@ -144,25 +165,29 @@ async function main() {
       last_error: 'wordpress_media_upload_failed: wordpress_forbidden',
     }))
     {
-      const pools = [pool('a-stuck'), pool('b-ok')]
+      const due = duePublishDayRun(2)
+      const pools = [pool('a-stuck'), pool('b-ok')].map((p) => ({ ...p, next_publish_at: due.anchorIso }))
       const admin = new FakeAdmin({
         article_pools: pools,
         article_pool_items: [...pools.map((p) => item(p.id)), ...paused('a-stuck', PAUSED_BACKLOG_HOLD)],
       })
       const g = fakeGenerate(new Set())
-      const r = await quiet(() => runAutomation(admin as unknown as Admin, { generate: g.fn, platform: connected, nowMs: firstRunFor(2) }))
+      const r = await quiet(() => runAutomation(admin as unknown as Admin, { generate: g.fn, platform: connected, nowMs: due.nowMs }))
       check('the stuck pool is never written to', !g.calls.includes('a-stuck'), g.calls)
       check('and the healthy pool still gets the run\'s one generation', g.wrote[0] === 'b-ok', g.wrote)
       const d = r.diagnostics.find((x) => x.poolId === 'a-stuck')
       // THE NOTE IS THE LAST STEP'S, NOT THE GENERATION STEP'S. Since the daily
       // revive shipped (17 Nov 2026) the publish step also acts on this pool —
-      // it retries one paused article — and writes its own answer over the note,
-      // which for a pool with no publish day today is `held_no_publish_day`. The
-      // generation hold is therefore read from the run's own detail line, which
-      // is written where the decision is actually taken and cannot be overwritten.
+      // it retries one paused article — and writes its own answer over the note:
+      // `held_no_publish_day` on a Friday or a Saturday, and
+      // `held_realigned_to_plan_rhythm` when the pool's stored slot falls on one.
+      // So the generation hold is read from the run's own detail line, which is
+      // written where the decision is taken and cannot be overwritten, and the
+      // clock and the anchor above are pinned to a publishing day so the note is
+      // the generation step's and the case says exactly what it means.
       check('its diagnostic says why, with the count',
         r.details.includes(`pool a-stuck: generation held (paused_backlog_${PAUSED_BACKLOG_HOLD})`)
-        && (d?.note === 'held_paused_backlog' || d?.note === 'held_no_publish_day'),
+        && d?.note === 'held_paused_backlog',
         [d?.note, r.details])
     }
     {
