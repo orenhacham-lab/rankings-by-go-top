@@ -80,6 +80,14 @@
  * is forbidden to call Google — so the queue is drained here, every fifteen minutes, instead of
  * once a day at 07:30 UTC. The daily entry stays as a second chance at the same idempotent pass.
  *
+ * ALONGSIDE ALL OF IT, THE BLOG COVERS PUBLISHED BEFORE ANYONE LOOKED AT THEM
+ * (lib/blog/auto/cover-repair.ts): the image review runs when a cover is MADE, so
+ * the articles published before 17 November 2026 still carry whatever came back —
+ * the mirrored laptop and the two right hands Oren reported are among them. This
+ * pass reviews the covers already live and replaces the faulty ones, a few an
+ * hour, at most one replacement per article ever. Production only, isolated the
+ * same way; it ends by itself once every cover has been looked at.
+ *
  * LAST OF ALL, THE REMINDER EMAIL. After the top-up, the "articles are waiting for your OK" reminder
  * (lib/reminders): OFF unless REMINDER_EMAILS_ENABLED is exactly "true", and then only at
  * 09:00 Asia/Jerusalem, Sunday to Thursday. Isolated the same way: it cannot change, delay
@@ -108,6 +116,7 @@ import { runIsolatedArticleBatch } from '@/lib/content/batch/isolated'
 import { runIsolatedInlineImageBatch } from '@/lib/content/image-batch/isolated'
 import { runLinkHeal, startIsolatedLinkHeal } from '@/lib/content/auto-internal-links/heal'
 import { resyncPublishedArticle } from '@/lib/content/auto-internal-links/resync'
+import { runIsolatedBlogCoverRepair } from '@/lib/blog/auto/cover-repair-isolated'
 
 // Generation can take a while; request a generous budget (platform clamps to the
 // plan's max — e.g. 60s on Hobby, up to 300s on Pro).
@@ -245,6 +254,13 @@ async function handle(request: Request): Promise<Response> {
     // look like a crawl, and the address only ever comes from the business's own public
     // pages. Production only, isolated: it never throws.
     await runIsolatedProspectTopUp()
+    // Then the published blog covers (lib/blog/auto/cover-repair.ts): the review
+    // guards covers as they are MADE, so everything published before 17 Nov 2026
+    // still carries whatever the image model returned. This pass looks at those
+    // covers and replaces the faulty ones — a few an hour, one replacement per
+    // article ever, and never leaving an article without a cover. It ends by
+    // itself. Production only, isolated: it never throws.
+    await runIsolatedBlogCoverRepair(undefined, { startedAtMs: Date.parse(startedAt), maxDurationMs: maxDuration * 1000 })
     // Last of all, and off unless REMINDER_EMAILS_ENABLED is "true": the reminder email for
     // articles waiting for approval (lib/reminders). Isolated; it never throws or rejects.
     await runIsolatedReminders()
