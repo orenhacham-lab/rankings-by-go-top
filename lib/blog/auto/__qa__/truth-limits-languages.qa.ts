@@ -300,6 +300,55 @@ async function main() {
       encodeGateReason('truth:x', {}) === 'truth:x')
   }
 
+  console.log('G) the contrast is not a claim, and the sample follows the match')
+  {
+    // MEASURED, after the negation reading of 17 Nov shipped: Italian lost 18 Nov
+    // and Spanish lost 19 Nov, both three attempts, both on
+    // `ai_engine_coverage_claim`. The stored sentences are these two, and neither
+    // denies anything — they draw the line with "su richiesta" / "bajo demanda",
+    // which is how the line is actually drawn, and is true.
+    const contrasts: [string, string][] = [
+      ['Italian, 18 Nov', 'Nella nostra piattaforma abbiamo integrato controlli automatici per ChatGPT, Gemini e Google AI, mentre Perplexity e Grok si interrogano su richiesta.'],
+      ['Spanish, 19 Nov', 'Verificamos de forma automática si un negocio es mencionado en ChatGPT, Gemini y Google AI, ofreciendo además consultas individuales bajo demanda para Perplexity.'],
+      ['English', 'The check runs automatically for ChatGPT, Gemini and Google AI; Perplexity and Copilot are answered on request.'],
+      ['German', 'Die Prüfung läuft automatisch für ChatGPT, Gemini und Google AI, Perplexity und Grok auf Anfrage.'],
+      ['French', 'Le contrôle automatique couvre ChatGPT, Gemini et Google AI ; Perplexity est interrogé à la demande.'],
+      ['Polish', 'Sprawdzanie automatyczne obejmuje ChatGPT, Gemini i Google AI, a Perplexity na żądanie.'],
+      ['Hebrew', 'הבדיקה האוטומטית מכסה את ChatGPT, Gemini ו-Google AI, ו-Perplexity נבדק לפי דרישה.'],
+      ['Dutch', 'De controle loopt automatisch voor ChatGPT, Gemini en Google AI; Perplexity op aanvraag.'],
+    ]
+    for (const [lang, text] of contrasts) {
+      const v = verdict(text)
+      check(`G: ${lang} — the contrast publishes`, !v.failures.includes('ai_engine_coverage_claim'), v.failures.join(','))
+    }
+    // The claim stays refused even where the word "automatically" is far away.
+    check('G: and claiming the automatic check includes it is still refused',
+      verdict('Il controllo automatico include Perplexity, Copilot e Grok.').failures.includes('ai_engine_coverage_claim'))
+
+    // MUTATION CONTROL — the rule as it stood on 18 Nov: negation only.
+    const OLD = (sentence: string) =>
+      /perplexity|copilot|grok/i.test(sentence)
+      && /אוטומט|automatic|automátic|automatically|automatis|automatiqu|automatyczn|自動/i.test(sentence)
+      && !/\b(?:no|not|non|nie|nicht|pas)\b|לא|אינ/i.test(sentence)
+    check('MUTATION: the 18 Nov rule refused the Italian contrast (so G would fail)',
+      OLD(contrasts[0][1]))
+    check('MUTATION: and the Spanish one', OLD(contrasts[1][1]))
+
+    // THE SAMPLE MUST CONTAIN WHAT IT ACCUSES. A table has no sentence
+    // punctuation in it, so `plainText` hands the rules one very long "sentence"
+    // and the first 160 characters of it are a heading, not the offence.
+    const table = `Modelo de Cobro Cómo Funciona Ventaja Principal Punto Crítico a Vigilar ${'Porcentaje de la inversión publicitaria '.repeat(4)} el coste sube un 35% cada trimestre.`
+    const long = verdict(table)
+    const sample = long.samples.percentage_claim ?? ''
+    check('G: percentage_claim is still raised', long.failures.includes('percentage_claim'), long.failures.join(','))
+    check('G: and its sample holds the number that tripped it', sample.includes('35%'), sample)
+    check('G: the window says it was cut', sample.startsWith('…'), sample)
+    check('G: and it is still bounded', sample.length <= 161, String(sample.length))
+    // MUTATION CONTROL — the first-160-characters sample of 17 Nov.
+    const OLD_SAMPLE = table.replace(/\s+/g, ' ').trim().slice(0, 160)
+    check('MUTATION: the old sample missed the number (so G would fail)', !OLD_SAMPLE.includes('35%'))
+  }
+
   console.log(`\n${pass} passed, ${fail} failed`)
   if (fail > 0) process.exitCode = 1
 }
