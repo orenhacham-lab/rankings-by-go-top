@@ -11,7 +11,7 @@
  */
 import { readFileSync } from 'fs'
 import { join } from 'path'
-import { parseImageReview, retryGuidanceFor, reviewGeneratedImage, imageReviewModel, IMAGE_DEFECTS, REVIEWER_VERSION } from '../image-quality'
+import { parseImageReview, retryGuidanceFor, reviewGeneratedImage, imageReviewModelCandidates, isModelUnavailable, IMAGE_DEFECTS, REVIEWER_VERSION } from '../image-quality'
 
 let pass = 0, fail = 0
 function check(name: string, cond: boolean, detail?: unknown) {
@@ -108,11 +108,24 @@ async function main() {
     check('the fault names in the JSON are exactly the ones the module knows',
       IMAGE_DEFECTS.every((d) => new RegExp(`"${d}":true\\|false`).test(src)))
 
-    check('the reviewer has its own model, not the text classifier\'s cheapest',
-      imageReviewModel({} as NodeJS.ProcessEnv) === 'gemini-2.5-flash'
-      && !/GEMINI_CLASSIFIER_MODEL/.test(src), imageReviewModel({} as NodeJS.ProcessEnv))
-    check('and it can be moved without a deploy',
-      imageReviewModel({ IMAGE_REVIEW_MODEL: 'other-model' } as unknown as NodeJS.ProcessEnv) === 'other-model')
+    // MEASURED, 20 Nov 2026, the SECOND 404: the pinned `gemini-2.5-flash`
+    // answered "no longer available to new users" for all 12 covers of the
+    // first pass. A pinned id is a guess about someone else's catalogue.
+    const list = imageReviewModelCandidates({} as NodeJS.ProcessEnv)
+    check('the reviewer tries a LIST, not one pinned model', list.length > 1, list)
+    check('and not the text classifier\'s cheapest, which proved blind',
+      !list.some((m) => m.includes('lite')) && !/GEMINI_CLASSIFIER_MODEL/.test(src), list)
+    check('a model that 404s is not the one it settles on',
+      !list.includes('gemini-2.5-flash'), list)
+    const env = imageReviewModelCandidates({ IMAGE_REVIEW_MODEL: 'other-model' } as unknown as NodeJS.ProcessEnv)
+    check('it can be moved without a deploy, and the env value goes first',
+      env[0] === 'other-model' && env.length === list.length + 1, env)
+    check('a repeated env value is not tried twice',
+      imageReviewModelCandidates({ IMAGE_REVIEW_MODEL: list[0] } as unknown as NodeJS.ProcessEnv).length === list.length)
+    check('a 404 moves to the next model',
+      isModelUnavailable('[404 Not Found] This model models/gemini-2.5-flash is no longer available to new users'))
+    check('but a timeout is this review\'s answer, not the next model\'s turn',
+      !isModelUnavailable('deadline exceeded after 60000ms') && !isModelUnavailable('fetch failed'))
     check('the version is stamped, so the backfill looks again when it changes',
       /^v\d+-\d{4}-\d{2}-\d{2}$/.test(REVIEWER_VERSION), REVIEWER_VERSION)
     check('and the backfill keys its ledger on it',
@@ -124,6 +137,9 @@ async function main() {
   //    description comes first", which is the whole of the 20 Nov fix;
   //  - leaving REVIEWER_VERSION out of `reviewKeyOf` fails "the backfill keys its
   //    ledger on it", and would freeze every verdict an older reviewer gave;
+  //  - making `isModelUnavailable` match any error fails "a timeout is this
+  //    review's answer", and would re-ask every model in the list at full price
+  //    on a single slow response;
   //  - making `parseImageReview` treat a missing key as a defect (`row[d] !== false`)
   //    fails "a key the model left out is not a defect" and both "no opinion" rows;
   //  - removing the try/catch in `reviewGeneratedImage` fails "a provider failure
