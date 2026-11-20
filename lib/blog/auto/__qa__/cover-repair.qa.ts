@@ -13,7 +13,7 @@
  */
 import { readFileSync } from 'fs'
 import { FakeAdmin } from '@/lib/__qa__/_fake-admin'
-import { repairBlogCovers, storagePathOf } from '../cover-repair'
+import { repairBlogCovers, reviewKeyOf, storagePathOf } from '../cover-repair'
 import { runIsolatedBlogCoverRepair } from '../cover-repair-isolated'
 import type { createAdminClient } from '@/lib/supabase/admin'
 
@@ -71,7 +71,8 @@ async function main() {
     const r = await repairBlogCovers(admin as unknown as Admin, { deps })
     check('it is clean and recorded', r.clean === 1 && (admin.tables.blog_cover_reviews ?? []).length === 1, r)
     const row = (admin.tables.blog_cover_reviews ?? [])[0] as Record<string, unknown>
-    check('the row holds the URL that was reviewed', row.image_url === URL_OF('a'), row)
+    check('the row holds the URL that was reviewed, and the reviewer that looked',
+      row.image_url === reviewKeyOf(URL_OF('a')) && String(row.image_url).startsWith(URL_OF('a')), row)
     check('with no defects and no replacement',
       Array.isArray(row.defects) && (row.defects as unknown[]).length === 0 && row.replaced_url === null, row)
     const again = await repairBlogCovers(admin as unknown as Admin, { deps })
@@ -118,7 +119,7 @@ async function main() {
     const admin = new FakeAdmin({
       articles: [{ ...article('again'), featured_image_url: `${URL_OF('again')}-new` }],
       blog_cover_reviews: [{
-        article_id: 'id-again', image_url: URL_OF('again'),
+        article_id: 'id-again', image_url: reviewKeyOf(URL_OF('again')),
         defects: ['garbled_text'], replaced_url: `${URL_OF('again')}-new`, checked_at: '2026-11-20T00:00:00.000Z',
       }],
     })
@@ -133,7 +134,62 @@ async function main() {
     check('but no second image is ordered', ordered.length === 0 && r.replaced === 0, ordered)
     const row = (admin.tables.blog_cover_reviews ?? [])[0] as Record<string, unknown>
     check('and the verdict is recorded, so the pass moves on',
-      (row.defects as string[]).join(',') === 'garbled_text' && row.image_url === `${URL_OF('again')}-new`, row)
+      (row.defects as string[]).join(',') === 'garbled_text'
+      && row.image_url === reviewKeyOf(`${URL_OF('again')}-new`), row)
+  }
+
+  console.log('5b) a sharper reviewer looks at every cover again')
+  {
+    // MEASURED, 20 Nov 2026: the first two passes recorded 24 covers clean,
+    // among them google-positie-checker and keyword-research-tools-guide, the
+    // two Oren had named. A ledger keyed on the image alone would hold those
+    // verdicts for ever. A row written by an older reviewer must not count.
+    const admin = new FakeAdmin({
+      articles: [article('old')],
+      blog_cover_reviews: [{
+        article_id: 'id-old', image_url: `${URL_OF('old')}#v1-older-reviewer`,
+        defects: [], replaced_url: null, checked_at: '2026-11-20T06:00:00.000Z',
+      }],
+    })
+    const orders: string[] = []
+    const r = await repairBlogCovers(admin as unknown as Admin, {
+      deps: {
+        review: reviewerFor({ image: '{"duplicated_subject":true}' }),
+        fetchImage: bytes,
+        makeCover: async (_a, input) => { orders.push(input.slug); return { ok: true, url: `${URL_OF(input.slug)}-new` } },
+      },
+    })
+    check('an old reviewer\'s verdict does not count as looked at',
+      r.reviewed === 1 && r.faulty === 1, r)
+    check('and the fault it had missed is acted on now', orders.join(',') === 'old', orders)
+    const row = (admin.tables.blog_cover_reviews ?? [])[0] as Record<string, unknown>
+    check('the row is rewritten under the current reviewer',
+      row.image_url === reviewKeyOf(URL_OF('old')), row)
+    // The next pass looks at the REPLACEMENT — a generated image like any other
+    // — but orders nothing: one new cover per article, whatever the reviewer's
+    // version, so a bump can never bill an image an hour.
+    const again = await repairBlogCovers(admin as unknown as Admin, {
+      deps: {
+        review: reviewerFor({ image: '{"duplicated_subject":true}' }),
+        fetchImage: bytes,
+        makeCover: async (_a, input) => { orders.push(input.slug); return { ok: true, url: 'never' } },
+      },
+    })
+    check('the replacement is reviewed, and no second image is ordered',
+      again.reviewed === 1 && again.replaced === 0 && orders.length === 1, { again, orders })
+    // And a cover this reviewer has already cleared is left alone.
+    const cleared = new FakeAdmin({
+      articles: [article('clean')],
+      blog_cover_reviews: [{
+        article_id: 'id-clean', image_url: reviewKeyOf(URL_OF('clean')),
+        defects: [], replaced_url: null, checked_at: '2026-11-20T06:00:00.000Z',
+      }],
+    })
+    const skip = await repairBlogCovers(cleared as unknown as Admin, {
+      deps: { review: reviewerFor({ image: '{"duplicated_subject":true}' }), fetchImage: bytes },
+    })
+    check('a row this reviewer wrote is honoured, so a bump costs one look',
+      skip.reviewed === 0, skip)
   }
 
   console.log('6) the pass is bounded, and rides the cron without risk')
@@ -187,6 +243,9 @@ async function main() {
   //  - recording a `skipped` verdict as clean fails both rows of section 2;
   //  - updating the article before checking `made.ok` fails "a failed
   //    replacement leaves the published cover in place";
+  //  - keying the ledger on the bare URL instead of `reviewKeyOf` fails "an old
+  //    reviewer's verdict does not count as looked at", which is the defect
+  //    that kept 24 wrong verdicts standing on 20 Nov;
   //  - dropping the `replacedOnce` guard fails "no second image is ordered",
   //    which is the one that would otherwise bill an image an hour for ever.
   //

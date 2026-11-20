@@ -35,7 +35,7 @@
  */
 
 import type { createAdminClient } from '@/lib/supabase/admin'
-import { reviewGeneratedImage, type ImageDefect, type ReviewDeps } from '@/lib/content/image-quality'
+import { reviewGeneratedImage, REVIEWER_VERSION, type ImageDefect, type ReviewDeps } from '@/lib/content/image-quality'
 import { createBlogCover, BLOG_IMAGE_BUCKET } from '@/lib/blog/auto/cover'
 import { isBlogAutoLocale, type BlogAutoLocale } from '@/lib/blog/auto/rotation'
 
@@ -79,6 +79,23 @@ const empty = (): CoverRepairResult =>
  * carries. Anything that is not one of this bucket's `auto/` files gives null,
  * which keeps a hand-uploaded or external image out of the pass.
  */
+/**
+ * WHAT COUNTS AS "ALREADY LOOKED AT": the image AND the reviewer that looked.
+ *
+ * MEASURED, 20 November 2026. The first two passes recorded 24 covers as clean,
+ * among them the two Oren had named — the reviewer of the day could not see
+ * either fault. A ledger keyed on the image alone would have kept those 24
+ * verdicts for ever, and sharpening the reviewer would have changed nothing for
+ * any cover already on the blog.
+ *
+ * So the key carries the reviewer's version. Bumping REVIEWER_VERSION (a new
+ * question, a different model) puts every published cover back in the queue
+ * exactly once, and the stored key still reads as the URL it reviewed.
+ */
+export function reviewKeyOf(url: string): string {
+  return `${url}#${REVIEWER_VERSION}`
+}
+
 export function storagePathOf(url: string): string | null {
   const marker = `/${BLOG_IMAGE_BUCKET}/`
   const at = url.indexOf(marker)
@@ -140,7 +157,7 @@ export async function repairBlogCovers(
   // ones Oren reported, and a backfill that starts at the oldest article would
   // reach them last.
   const todo = ((articles ?? []) as ArticleRow[])
-    .filter((a) => a.featured_image_url && reviewedUrl.get(a.id) !== a.featured_image_url)
+    .filter((a) => a.featured_image_url && reviewedUrl.get(a.id) !== reviewKeyOf(a.featured_image_url))
 
   for (const article of todo) {
     if (out.reviewed >= limit) break
@@ -229,8 +246,9 @@ async function record(admin: Admin, article: ArticleRow, defects: ImageDefect[],
   await admin.from('blog_cover_reviews').upsert([{
     article_id: article.id,
     // The URL that was REVIEWED, never the replacement: a new cover is a
-    // generated image like any other and gets looked at on a later pass.
-    image_url: article.featured_image_url,
+    // generated image like any other and gets looked at on a later pass. The
+    // reviewer's version rides along, so a sharper reviewer looks again.
+    image_url: reviewKeyOf(article.featured_image_url),
     defects,
     replaced_url: replacedUrl,
     checked_at: new Date().toISOString(),
