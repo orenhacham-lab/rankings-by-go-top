@@ -96,12 +96,15 @@ const ANTHROPIC_DOCS =
 const ANTHROPIC_AGENT_DOCS =
   'https://support.claude.com/en/articles/18234133-how-do-anthropic-hosted-browsers-identify-themselves-when-they-browse-the-web-on-a-user-s-behalf'
 const GOOGLE_DOCS = 'https://developers.google.com/crawling/docs/crawlers-fetchers/google-common-crawlers'
+const GOOGLE_FETCHER_DOCS =
+  'https://developers.google.com/crawling/docs/crawlers-fetchers/google-user-triggered-fetchers'
 const PERPLEXITY_DOCS = 'https://docs.perplexity.ai/docs/resources/perplexity-crawlers'
 const APPLE_DOCS = 'https://support.apple.com/en-us/119829'
 const META_DOCS = 'https://developers.facebook.com/documentation/sharing/webmasters/web-crawlers'
 const MISTRAL_DOCS = 'https://docs.mistral.ai/robots/'
 const DUCKDUCKGO_DOCS = 'https://duckduckgo.com/duckduckgo-help-pages/results/duckassistbot/'
 const KAGI_DOCS = 'https://kagi.com/bot'
+const IMAGESIFT_DOCS = 'https://imagesift.com/about'
 
 /** Every row read on this date, from the `docs` page named on the row. */
 // 04.11.2026: the Google, Perplexity and Meta pages had all been moved and
@@ -128,6 +131,15 @@ const READ_ON_AGENTIC = '2026-11-11'
 // deliberately sends no differentiated user agent, so there is no token to
 // document, and `Bravebot` elsewhere rests on no operator page.
 const READ_ON_NOV16 = '2026-11-16'
+// 20.11.2026: Google's user-triggered fetchers page was read for the first
+// time. Until today this dataset carried only Google's *crawlers* page, and so
+// it was missing the two Google tokens a site is most likely to meet in 2026:
+// one agent and one fetch made while a person waits. Both rows say
+// `respectsRobots: false`, and not as a guess — that page states that because
+// the fetch was requested by a user, these fetchers generally ignore robots.txt
+// rules. The third row read today is Hive's image crawler, which is the
+// opposite case: an operator page that commits to robots.txt in writing.
+const READ_ON_NOV20 = '2026-11-20'
 
 export const AI_CRAWLER_DATASET: readonly DatasetCrawler[] = [
   // ── OpenAI ────────────────────────────────────────────────────────────────
@@ -202,6 +214,27 @@ export const AI_CRAWLER_DATASET: readonly DatasetCrawler[] = [
     docs: GOOGLE_DOCS,
     verified: READ_ON_AGENTIC,
     note: 'Google documents that rules addressed to this token affect only crawls that a site owner has asked for when building a Vertex AI agent, and have no effect on Google Search or any other product. So it is the one row here that a site usually meets because somebody on that site asked for it.',
+  },
+
+  {
+    token: 'Google-Agent',
+    operator: 'Google',
+    purpose: 'agent',
+    crawls: true,
+    respectsRobots: false,
+    docs: GOOGLE_FETCHER_DOCS,
+    verified: READ_ON_NOV20,
+    note: 'Google documents this as the identity used by agents hosted on Google infrastructure to navigate the web and perform actions upon user request. It is listed among the user-triggered fetchers, and that page states that because the fetch was requested by a user, these fetchers generally ignore robots.txt rules \u2014 so a Disallow written for it describes the site\u2019s request rather than the traffic. Google governs it by publishing the addresses it comes from, in user-triggered-agents.json, and is also experimenting with the Web Bot Auth protocol under the identity agent.bot.goog.',
+  },
+  {
+    token: 'Google-GeminiNotebook',
+    operator: 'Google',
+    purpose: 'answer',
+    crawls: true,
+    respectsRobots: false,
+    docs: GOOGLE_FETCHER_DOCS,
+    verified: READ_ON_NOV20,
+    note: 'Fetches the individual URLs a Gemini Notebook user has given as sources for their own project, so it arrives because a reader chose that page, one URL at a time, and not as a crawl. It is a user-triggered fetcher, which Google documents as generally ignoring robots.txt. The token read Google-NotebookLM until that spelling stopped being supported in August 2026; a rule still naming the old one matches nothing today.',
   },
 
   // ── Perplexity ────────────────────────────────────────────────────────────
@@ -310,6 +343,16 @@ export const AI_CRAWLER_DATASET: readonly DatasetCrawler[] = [
   },
   { token: 'AI2Bot', operator: 'Allen Institute for AI', purpose: 'train', crawls: true, respectsRobots: true, docs: 'https://allenai.org/crawler', verified: READ_ON },
   { token: 'Diffbot', operator: 'Diffbot', purpose: 'train', crawls: true, respectsRobots: true, docs: 'https://www.diffbot.com/support/diffbot-crawler/', verified: READ_ON },
+  {
+    token: 'ImagesiftBot',
+    operator: 'Hive',
+    purpose: 'train',
+    crawls: true,
+    respectsRobots: true,
+    docs: IMAGESIFT_DOCS,
+    verified: READ_ON_NOV20,
+    note: 'Collects publicly available images for Hive\u2019s web-intelligence products, which is why it sits in the training group rather than beside the crawlers that answer a question. The operator page commits in writing to robots.txt directives that name ImagesiftBot and to the crawl-delay directive, read as the minimum seconds between requests. The page also spells the name ImageSiftBot in prose; the token it actually sends, and the one its own robots.txt examples use, is ImagesiftBot, and a rule has to match that spelling.',
+  },
 
   // ── Mistral ───────────────────────────────────────────────────────────────
   // All three are named on one operator page, and the page draws the same
@@ -372,7 +415,7 @@ export const AI_CRAWLER_CANDIDATES: readonly DatasetCandidate[] = [
 ] as const
 
 /** Bumped whenever a row changes, so a consumer can cache on it. */
-export const AI_CRAWLER_DATASET_VERSION = '2026.11.16'
+export const AI_CRAWLER_DATASET_VERSION = '2026.11.20'
 
 export const AI_CRAWLER_DATASET_LICENSE = {
   id: 'CC-BY-4.0',
