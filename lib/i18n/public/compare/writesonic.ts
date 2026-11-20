@@ -15,18 +15,19 @@
  *     among the integrations; we found no page describing a classic keyword
  *     rank tracker, and that is all the copy says.
  *   - Nothing says they are worse at AI answers. They are better: at the same
- *     $79 they follow 50 named prompts with 50 answers refreshed daily across
+ *     $79 they follow 50 named prompts with 150 answers refreshed daily across
  *     ChatGPT, Gemini and Google AI Overviews, where our automatic check runs
  *     monthly across three. `theirStrengths` leads with it.
  *
- * Their pricing page lists no monthly-billed price, so none is quoted or
- * computed here. Their trial length is not stated anywhere on the page, so the
- * copy quotes only what the page says: "Start free. No credit card needed."
+ * Their pricing page has a monthly/annual switch; only the annual-billed
+ * figures are quoted here, because those are the ones the page shows by
+ * default and the only ones we read. Their trial length is not stated
+ * anywhere on the page, so the copy quotes only what the page says: "Start free. No credit card needed."
  */
 import type { PublicLocale } from '@/lib/i18n/locales'
 import type { ComparisonCopy } from './types'
 
-const CHECKED = '2026-10-31'
+const CHECKED = '2026-11-20'
 
 const SOURCES = [
   { label: 'writesonic.com — pricing', href: 'https://writesonic.com/pricing' },
@@ -56,13 +57,13 @@ export const WRITESONIC_COMPARE: Record<PublicLocale, ComparisonCopy> = {
           label: 'מחיר',
           ours: 'מ-79 דולר לחודש בתוספת מס. בישראל, מ-249 ש״ח לחודש כולל מע״מ.',
           theirs:
-            'Starter ב-79 דולר לחודש בחיוב שנתי, Basic ב-199, Growth ב-399, ו-Enterprise במחיר מותאם. עמוד המחירים שלהם אינו מציג מחיר לחיוב חודשי.',
+            'Starter ב-79 דולר לחודש בחיוב שנתי, Basic ב-199, Growth ב-399, ו-Enterprise במחיר מותאם. בעמוד המחירים שלהם יש מתג בין חיוב חודשי לשנתי, והמחירים כאן הם של החיוב השנתי.',
         },
         {
           label: 'מה כלול במסלול הראשון',
           ours: 'כל התחומים נכללים מהמסלול הראשון; מה שמשתנה בין המסלולים מופיע בעמוד המחירים.',
           theirs:
-            'ב-Starter: 50 פרומפטים במעקב, 50 תשובות שנמדדות מדי יום, 15 מאמרי AI בחודש, 10 בדיקות אתר של 100 עמודים כל אחת, משתמש אחד ופרויקט אחד.',
+            'ב-Starter: 50 פרומפטים במעקב, 150 תשובות שנמדדות מדי יום, 15 מאמרי AI בחודש, 10 בדיקות אתר של 100 עמודים כל אחת, משתמש אחד ופרויקט אחד.',
         },
         {
           label: 'מי כותב את המאמרים',
@@ -113,7 +114,7 @@ export const WRITESONIC_COMPARE: Record<PublicLocale, ComparisonCopy> = {
         {
           title: 'כשכל השאלה היא האם AI מזכיר אתכם',
           body:
-            'באותם 79 דולר הם עוקבים אחרי 50 פרומפטים בשם ומודדים 50 תשובות מדי יום ב-ChatGPT, ב-Gemini וב-Google AI Overviews. הבדיקה שלנו היא חודשית. אם זו השאלה המרכזית שלכם, התשובה שלהם מפורטת יותר.',
+            'באותם 79 דולר הם עוקבים אחרי 50 פרומפטים בשם ומודדים 150 תשובות מדי יום ב-ChatGPT, ב-Gemini וב-Google AI Overviews. הבדיקה שלנו היא חודשית. אם זו השאלה המרכזית שלכם, התשובה שלהם מפורטת יותר.',
         },
         {
           title: 'כשצריך יותר ממנוע אחד או שניים',
@@ -181,13 +182,13 @@ export const WRITESONIC_COMPARE: Record<PublicLocale, ComparisonCopy> = {
           label: 'Price',
           ours: 'From $79 a month plus tax. In Israel, from 249 ILS a month including VAT.',
           theirs:
-            'Starter $79 a month billed annually, Basic $199, Growth $399, Enterprise custom. Their pricing page shows no monthly-billed price.',
+            'Starter $79 a month billed annually, Basic $199, Growth $399, Enterprise custom. Their pricing page has a monthly/annual switch; the figures here are the annual-billed ones.',
         },
         {
           label: 'What the entry plan includes',
           ours: 'Every area is in the entry plan; what changes between plans is on the pricing page.',
           theirs:
-            'Starter: 50 prompts tracked, 50 answers tracked daily, 15 AI articles a month, 10 site audits of 100 pages each, 1 user and 1 project.',
+            'Starter: 50 prompts tracked, 150 answers tracked daily, 15 AI articles a month, 10 site audits of 100 pages each, 1 user and 1 project.',
         },
         {
           label: 'Who writes the articles',
@@ -238,7 +239,7 @@ export const WRITESONIC_COMPARE: Record<PublicLocale, ComparisonCopy> = {
         {
           title: 'When the whole question is whether AI mentions you',
           body:
-            'For the same $79 they follow 50 named prompts and measure 50 answers every day across ChatGPT, Gemini and Google AI Overviews. Our check is monthly. If that is your central question, their answer is more detailed than ours.',
+            'For the same $79 they follow 50 named prompts and measure 150 answers every day across ChatGPT, Gemini and Google AI Overviews. Our check is monthly. If that is your central question, their answer is more detailed than ours.',
         },
         {
           title: 'When one or two engines are not enough',
@@ -306,13 +307,13 @@ export const WRITESONIC_COMPARE: Record<PublicLocale, ComparisonCopy> = {
           label: 'Precio',
           ours: 'Desde 79 dólares al mes más impuestos. En Israel, desde 249 ILS al mes con IVA incluido.',
           theirs:
-            'Starter 79 dólares al mes con facturación anual, Basic 199, Growth 399 y Enterprise a medida. Su página de precios no muestra ningún precio de facturación mensual.',
+            'Starter 79 dólares al mes con facturación anual, Basic 199, Growth 399 y Enterprise a medida. Su página de precios tiene un conmutador entre facturación mensual y anual; las cifras de aquí son las de la facturación anual.',
         },
         {
           label: 'Qué incluye el plan de entrada',
           ours: 'Todas las áreas están en el plan de entrada; lo que cambia entre planes está en la página de precios.',
           theirs:
-            'Starter: 50 prompts monitorizados, 50 respuestas medidas cada día, 15 artículos de IA al mes, 10 auditorías de sitio de 100 páginas cada una, 1 usuario y 1 proyecto.',
+            'Starter: 50 prompts monitorizados, 150 respuestas medidas cada día, 15 artículos de IA al mes, 10 auditorías de sitio de 100 páginas cada una, 1 usuario y 1 proyecto.',
         },
         {
           label: 'Quién escribe los artículos',
@@ -363,7 +364,7 @@ export const WRITESONIC_COMPARE: Record<PublicLocale, ComparisonCopy> = {
         {
           title: 'Cuando toda la pregunta es si la IA te menciona',
           body:
-            'Por los mismos 79 dólares siguen 50 prompts concretos y miden 50 respuestas cada día en ChatGPT, Gemini y Google AI Overviews. Nuestra comprobación es mensual. Si esa es tu pregunta central, su respuesta es más detallada que la nuestra.',
+            'Por los mismos 79 dólares siguen 50 prompts concretos y miden 150 respuestas cada día en ChatGPT, Gemini y Google AI Overviews. Nuestra comprobación es mensual. Si esa es tu pregunta central, su respuesta es más detallada que la nuestra.',
         },
         {
           title: 'Cuando uno o dos motores no bastan',
@@ -431,13 +432,13 @@ export const WRITESONIC_COMPARE: Record<PublicLocale, ComparisonCopy> = {
           label: 'Preço',
           ours: 'A partir de 79 dólares por mês mais impostos. Em Israel, a partir de 249 ILS por mês com imposto incluído.',
           theirs:
-            'Starter 79 dólares por mês com cobrança anual, Basic 199, Growth 399 e Enterprise sob medida. A página de preços deles não mostra preço com cobrança mensal.',
+            'Starter 79 dólares por mês com cobrança anual, Basic 199, Growth 399 e Enterprise sob medida. A página de preços deles tem um seletor entre cobrança mensal e anual; os valores aqui são os da cobrança anual.',
         },
         {
           label: 'O que o plano de entrada inclui',
           ours: 'Todas as áreas estão no plano de entrada; o que muda entre os planos está na página de preços.',
           theirs:
-            'Starter: 50 prompts monitorados, 50 respostas medidas por dia, 15 artigos de IA por mês, 10 auditorias de site de 100 páginas cada, 1 usuário e 1 projeto.',
+            'Starter: 50 prompts monitorados, 150 respostas medidas por dia, 15 artigos de IA por mês, 10 auditorias de site de 100 páginas cada, 1 usuário e 1 projeto.',
         },
         {
           label: 'Quem escreve os artigos',
@@ -488,7 +489,7 @@ export const WRITESONIC_COMPARE: Record<PublicLocale, ComparisonCopy> = {
         {
           title: 'Quando toda a pergunta é se a IA cita você',
           body:
-            'Pelos mesmos 79 dólares eles acompanham 50 prompts nomeados e medem 50 respostas todos os dias no ChatGPT, no Gemini e no Google AI Overviews. A nossa verificação é mensal. Se essa é a sua pergunta central, a resposta deles é mais detalhada que a nossa.',
+            'Pelos mesmos 79 dólares eles acompanham 50 prompts nomeados e medem 150 respostas todos os dias no ChatGPT, no Gemini e no Google AI Overviews. A nossa verificação é mensal. Se essa é a sua pergunta central, a resposta deles é mais detalhada que a nossa.',
         },
         {
           title: 'Quando um ou dois motores não bastam',
@@ -556,13 +557,13 @@ export const WRITESONIC_COMPARE: Record<PublicLocale, ComparisonCopy> = {
           label: 'Tarif',
           ours: 'À partir de 79 dollars par mois hors taxes. En Israël, à partir de 249 ILS par mois TVA comprise.',
           theirs:
-            "Starter 79 dollars par mois en facturation annuelle, Basic 199, Growth 399, Enterprise sur mesure. Leur page de tarifs n'affiche aucun prix en facturation mensuelle.",
+            "Starter 79 dollars par mois en facturation annuelle, Basic 199, Growth 399, Enterprise sur mesure. Leur page de tarifs propose un sélecteur entre facturation mensuelle et annuelle ; les montants indiqués ici sont ceux de la facturation annuelle.",
         },
         {
           label: "Ce que comprend le forfait d'entrée",
           ours: "Tous les domaines sont dans le forfait d'entrée ; ce qui change d'un forfait à l'autre figure sur la page des tarifs.",
           theirs:
-            'Starter : 50 prompts suivis, 50 réponses mesurées chaque jour, 15 articles IA par mois, 10 audits de site de 100 pages chacun, 1 utilisateur et 1 projet.',
+            'Starter : 50 prompts suivis, 150 réponses mesurées chaque jour, 15 articles IA par mois, 10 audits de site de 100 pages chacun, 1 utilisateur et 1 projet.',
         },
         {
           label: 'Qui écrit les articles',
@@ -613,7 +614,7 @@ export const WRITESONIC_COMPARE: Record<PublicLocale, ComparisonCopy> = {
         {
           title: "Quand toute la question est de savoir si l'IA vous cite",
           body:
-            'Pour les mêmes 79 dollars, ils suivent 50 prompts nommés et mesurent 50 réponses chaque jour dans ChatGPT, Gemini et Google AI Overviews. Notre vérification est mensuelle. Si c’est votre question centrale, leur réponse est plus détaillée que la nôtre.',
+            'Pour les mêmes 79 dollars, ils suivent 50 prompts nommés et mesurent 150 réponses chaque jour dans ChatGPT, Gemini et Google AI Overviews. Notre vérification est mensuelle. Si c’est votre question centrale, leur réponse est plus détaillée que la nôtre.',
         },
         {
           title: 'Quand un ou deux moteurs ne suffisent pas',
@@ -681,13 +682,13 @@ export const WRITESONIC_COMPARE: Record<PublicLocale, ComparisonCopy> = {
           label: 'Prezzo',
           ours: 'Da 79 dollari al mese più imposte. In Israele, da 249 ILS al mese IVA inclusa.',
           theirs:
-            'Starter 79 dollari al mese con fatturazione annuale, Basic 199, Growth 399 ed Enterprise su misura. La loro pagina dei prezzi non mostra alcun prezzo con fatturazione mensile.',
+            'Starter 79 dollari al mese con fatturazione annuale, Basic 199, Growth 399 ed Enterprise su misura. La loro pagina dei prezzi ha un selettore tra fatturazione mensile e annuale; le cifre qui sono quelle della fatturazione annuale.',
         },
         {
           label: "Che cosa comprende il piano d'ingresso",
           ours: "Tutte le aree sono già nel piano d'ingresso; ciò che cambia fra i piani è sulla pagina dei prezzi.",
           theirs:
-            'Starter: 50 prompt monitorati, 50 risposte misurate ogni giorno, 15 articoli IA al mese, 10 analisi del sito da 100 pagine ciascuna, 1 utente e 1 progetto.',
+            'Starter: 50 prompt monitorati, 150 risposte misurate ogni giorno, 15 articoli IA al mese, 10 analisi del sito da 100 pagine ciascuna, 1 utente e 1 progetto.',
         },
         {
           label: 'Chi scrive gli articoli',
@@ -738,7 +739,7 @@ export const WRITESONIC_COMPARE: Record<PublicLocale, ComparisonCopy> = {
         {
           title: 'Quando tutta la domanda è se l’IA vi cita',
           body:
-            'Per gli stessi 79 dollari seguono 50 prompt specifici e misurano 50 risposte ogni giorno su ChatGPT, Gemini e Google AI Overviews. La nostra verifica è mensile. Se è quella la vostra domanda centrale, la loro risposta è più dettagliata della nostra.',
+            'Per gli stessi 79 dollari seguono 50 prompt specifici e misurano 150 risposte ogni giorno su ChatGPT, Gemini e Google AI Overviews. La nostra verifica è mensile. Se è quella la vostra domanda centrale, la loro risposta è più dettagliata della nostra.',
         },
         {
           title: 'Quando uno o due motori non bastano',
@@ -805,13 +806,13 @@ export const WRITESONIC_COMPARE: Record<PublicLocale, ComparisonCopy> = {
           label: 'Preis',
           ours: 'Ab 79 USD im Monat zuzüglich Steuern. In Israel ab 249 ILS im Monat inklusive Mehrwertsteuer.',
           theirs:
-            'Starter 79 USD im Monat bei jährlicher Zahlung, Basic 199 USD, Growth 399 USD, Enterprise auf Anfrage. Ihre Preisseite zeigt keinen Preis für monatliche Abrechnung.',
+            'Starter 79 USD im Monat bei jährlicher Zahlung, Basic 199 USD, Growth 399 USD, Enterprise auf Anfrage. Ihre Preisseite hat einen Schalter zwischen monatlicher und jährlicher Abrechnung; die Zahlen hier sind die der jährlichen Abrechnung.',
         },
         {
           label: 'Was der Einstiegstarif enthält',
           ours: 'Jeder Bereich steckt im Einstiegstarif; was sich zwischen den Tarifen unterscheidet, steht auf der Preisseite.',
           theirs:
-            'Starter: 50 erfasste Prompts, 50 täglich erfasste Antworten, 15 KI-Artikel im Monat, 10 Website-Audits mit je 100 Seiten, 1 Nutzer und 1 Projekt.',
+            'Starter: 50 erfasste Prompts, 150 täglich erfasste Antworten, 15 KI-Artikel im Monat, 10 Website-Audits mit je 100 Seiten, 1 Nutzer und 1 Projekt.',
         },
         {
           label: 'Wer die Artikel schreibt',
@@ -862,7 +863,7 @@ export const WRITESONIC_COMPARE: Record<PublicLocale, ComparisonCopy> = {
         {
           title: 'Wenn die ganze Frage ist, ob die KI Sie nennt',
           body:
-            'Für dieselben 79 USD verfolgen sie 50 benannte Prompts und messen jeden Tag 50 Antworten über ChatGPT, Gemini und Google AI Overviews. Unsere Prüfung läuft monatlich. Wenn das Ihre zentrale Frage ist, ist ihre Antwort ausführlicher als unsere.',
+            'Für dieselben 79 USD verfolgen sie 50 benannte Prompts und messen jeden Tag 150 Antworten über ChatGPT, Gemini und Google AI Overviews. Unsere Prüfung läuft monatlich. Wenn das Ihre zentrale Frage ist, ist ihre Antwort ausführlicher als unsere.',
         },
         {
           title: 'Wenn ein oder zwei Dienste nicht genügen',
@@ -929,13 +930,13 @@ export const WRITESONIC_COMPARE: Record<PublicLocale, ComparisonCopy> = {
           label: '料金',
           ours: '月額79ドルから（税別）。イスラエルでは月額249シェケルから（付加価値税込み）。',
           theirs:
-            'Starterは年払いで月額79ドル、Basicは199ドル、Growthは399ドル、Enterpriseは個別見積もりです。同社の料金ページには月払いの価格は表示されていません。',
+            'Starterは年払いで月額79ドル、Basicは199ドル、Growthは399ドル、Enterpriseは個別見積もりです。同社の料金ページには月払いと年払いの切り替えがあり、ここに挙げた金額は年払いのものです。',
         },
         {
           label: '入口のプランに含まれるもの',
           ours: 'すべての領域が最初のプランに入っています。プランごとに変わる点は料金ページに書かれています。',
           theirs:
-            'Starterは、追跡するプロンプト50件、毎日追跡する回答50件、AIによる記事は月15本、100ページまでのサイト監査を月10回、利用者1名、プロジェクト1件です。',
+            'Starterは、追跡するプロンプト50件、毎日追跡する回答150件、AIによる記事は月15本、100ページまでのサイト監査を月10回、利用者1名、プロジェクト1件です。',
         },
         {
           label: '記事を書くのは誰か',
@@ -986,7 +987,7 @@ export const WRITESONIC_COMPARE: Record<PublicLocale, ComparisonCopy> = {
         {
           title: '問いのすべてが「AIが自分に触れるか」である場合',
           body:
-            '同じ79ドルで、同社は指定したプロンプト50件を追い、ChatGPT、Gemini、Google AI Overviewsにまたがって毎日50件の回答を計測します。当社の確認は月に一度です。それが中心の問いであれば、同社の答えのほうが細かいです。',
+            '同じ79ドルで、同社は指定したプロンプト50件を追い、ChatGPT、Gemini、Google AI Overviewsにまたがって毎日150件の回答を計測します。当社の確認は月に一度です。それが中心の問いであれば、同社の答えのほうが細かいです。',
         },
         {
           title: '1つや2つのエンジンでは足りない場合',
@@ -1053,13 +1054,13 @@ export const WRITESONIC_COMPARE: Record<PublicLocale, ComparisonCopy> = {
           label: 'Prijs',
           ours: 'Vanaf 79 USD per maand plus belasting. In Israël vanaf 249 ILS per maand inclusief btw.',
           theirs:
-            'Starter 79 USD per maand bij jaarlijkse betaling, Basic 199 USD, Growth 399 USD, Enterprise op aanvraag. Hun prijspagina laat geen prijs voor maandelijkse afrekening zien.',
+            'Starter 79 USD per maand bij jaarlijkse betaling, Basic 199 USD, Growth 399 USD, Enterprise op aanvraag. Hun prijspagina heeft een schakelaar tussen maandelijkse en jaarlijkse afrekening; de bedragen hier zijn die van de jaarlijkse afrekening.',
         },
         {
           label: 'Wat het instappakket bevat',
           ours: 'Elk onderdeel zit in het instappakket; wat tussen de pakketten verschilt, staat op de prijspagina.',
           theirs:
-            'Starter: 50 gevolgde prompts, 50 dagelijks gemeten antwoorden, 15 AI-artikelen per maand, 10 website-audits van elk 100 pagina’s, 1 gebruiker en 1 project.',
+            'Starter: 50 gevolgde prompts, 150 dagelijks gemeten antwoorden, 15 AI-artikelen per maand, 10 website-audits van elk 100 pagina’s, 1 gebruiker en 1 project.',
         },
         {
           label: 'Wie de artikelen schrijft',
@@ -1110,7 +1111,7 @@ export const WRITESONIC_COMPARE: Record<PublicLocale, ComparisonCopy> = {
         {
           title: 'Als de hele vraag is of de AI u noemt',
           body:
-            'Voor dezelfde 79 USD volgen zij 50 benoemde prompts en meten zij elke dag 50 antwoorden over ChatGPT, Gemini en Google AI Overviews. Onze controle loopt maandelijks. Is dat uw kernvraag, dan is hun antwoord uitvoeriger dan het onze.',
+            'Voor dezelfde 79 USD volgen zij 50 benoemde prompts en meten zij elke dag 150 antwoorden over ChatGPT, Gemini en Google AI Overviews. Onze controle loopt maandelijks. Is dat uw kernvraag, dan is hun antwoord uitvoeriger dan het onze.',
         },
         {
           title: 'Als één of twee diensten niet genoeg zijn',
@@ -1177,13 +1178,13 @@ export const WRITESONIC_COMPARE: Record<PublicLocale, ComparisonCopy> = {
           label: 'Cena',
           ours: 'Od 79 USD miesięcznie plus podatek. W Izraelu od 249 ILS miesięcznie z podatkiem VAT.',
           theirs:
-            'Starter 79 USD miesięcznie przy płatności rocznej, Basic 199 USD, Growth 399 USD, Enterprise na zapytanie. Ich strona z cenami nie pokazuje ceny przy rozliczeniu miesięcznym.',
+            'Starter 79 USD miesięcznie przy płatności rocznej, Basic 199 USD, Growth 399 USD, Enterprise na zapytanie. Ich strona z cenami ma przełącznik między rozliczeniem miesięcznym a rocznym; podane tu kwoty dotyczą rozliczenia rocznego.',
         },
         {
           label: 'Co zawiera pakiet wejściowy',
           ours: 'Każdy element jest w pakiecie wejściowym; to, co różni pakiety, opisuje strona z cenami.',
           theirs:
-            'Starter: 50 monitorowanych promptów, 50 odpowiedzi mierzonych codziennie, 15 artykułów AI miesięcznie, 10 audytów strony po 100 podstron, 1 użytkownik i 1 projekt.',
+            'Starter: 50 monitorowanych promptów, 150 odpowiedzi mierzonych codziennie, 15 artykułów AI miesięcznie, 10 audytów strony po 100 podstron, 1 użytkownik i 1 projekt.',
         },
         {
           label: 'Kto pisze artykuły',
@@ -1234,7 +1235,7 @@ export const WRITESONIC_COMPARE: Record<PublicLocale, ComparisonCopy> = {
         {
           title: 'Gdy całe pytanie brzmi, czy AI wymienia firmę',
           body:
-            'Za te same 79 USD monitorują 50 wskazanych promptów i codziennie mierzą 50 odpowiedzi w ChatGPT, Gemini i Google AI Overviews. Nasze sprawdzenie jest comiesięczne. Jeśli to jest Państwa pytanie główne, ich odpowiedź jest obszerniejsza od naszej.',
+            'Za te same 79 USD monitorują 50 wskazanych promptów i codziennie mierzą 150 odpowiedzi w ChatGPT, Gemini i Google AI Overviews. Nasze sprawdzenie jest comiesięczne. Jeśli to jest Państwa pytanie główne, ich odpowiedź jest obszerniejsza od naszej.',
         },
         {
           title: 'Gdy jedna czy dwie usługi nie wystarczą',
@@ -1301,13 +1302,13 @@ export const WRITESONIC_COMPARE: Record<PublicLocale, ComparisonCopy> = {
           label: '가격',
           ours: '월 79달러부터, 세금 별도. 이스라엘에서는 월 249셰켈부터, VAT 포함.',
           theirs:
-            'Starter는 연 결제 시 월 79달러, Basic 199달러, Growth 399달러이고 Enterprise는 문의입니다. 요금 페이지에 월 결제 가격은 나오지 않습니다.',
+            'Starter는 연 결제 시 월 79달러, Basic 199달러, Growth 399달러이고 Enterprise는 문의입니다. 요금 페이지에는 월 결제와 연 결제를 바꾸는 전환 버튼이 있으며, 여기 적힌 금액은 연 결제 기준입니다.',
         },
         {
           label: '시작 플랜에 들어 있는 것',
           ours: '모든 기능이 시작 플랜에 들어 있습니다. 플랜별로 달라지는 것은 요금 페이지에 있습니다.',
           theirs:
-            'Starter는 추적 프롬프트 50개, 매일 측정하는 답변 50개, 월 AI 글 15편, 하위 페이지 100개씩 사이트 감사 10회, 사용자 1명, 프로젝트 1개입니다.',
+            'Starter는 추적 프롬프트 50개, 매일 측정하는 답변 150개, 월 AI 글 15편, 하위 페이지 100개씩 사이트 감사 10회, 사용자 1명, 프로젝트 1개입니다.',
         },
         {
           label: '글은 누가 쓰는가',
@@ -1358,7 +1359,7 @@ export const WRITESONIC_COMPARE: Record<PublicLocale, ComparisonCopy> = {
         {
           title: '질문이 "AI가 우리를 언급하느냐"뿐일 때',
           body:
-            '같은 79달러로 지정한 프롬프트 50개를 추적하고 ChatGPT와 Gemini, Google AI Overviews에서 답변 50개를 매일 측정합니다. 저희 확인은 한 달에 한 번입니다. 그것이 주된 질문이라면 그들의 답이 저희보다 풍부합니다.',
+            '같은 79달러로 지정한 프롬프트 50개를 추적하고 ChatGPT와 Gemini, Google AI Overviews에서 답변 150개를 매일 측정합니다. 저희 확인은 한 달에 한 번입니다. 그것이 주된 질문이라면 그들의 답이 저희보다 풍부합니다.',
         },
         {
           title: '서비스 한두 곳으로는 부족할 때',
