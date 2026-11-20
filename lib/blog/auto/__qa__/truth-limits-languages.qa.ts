@@ -300,6 +300,7 @@ async function main() {
       encodeGateReason('truth:x', {}) === 'truth:x')
   }
 
+<<<<<<< HEAD
   console.log('G) the contrast is not a claim, and the sample follows the match')
   {
     // MEASURED, after the negation reading of 17 Nov shipped: Italian lost 18 Nov
@@ -349,6 +350,8 @@ async function main() {
     check('MUTATION: the old sample missed the number (so G would fail)', !OLD_SAMPLE.includes('35%'))
   }
 
+=======
+>>>>>>> origin/claude/project-thread-8pehq4
   console.log(`\n${pass} passed, ${fail} failed`)
   if (fail > 0) process.exitCode = 1
 }
