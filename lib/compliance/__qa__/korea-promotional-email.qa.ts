@@ -176,7 +176,7 @@ async function main() {
   const project = (over: Record<string, unknown> = {}) =>
     ({ id: P1, user_id: OWNER, created_at: before(10 * D), target_domain: 'shop.example.com', business_name: null, is_active: true, country: 'IL', language: 'he', ...over })
   const owner = (locale: 'he' | 'ko') => async () =>
-    ({ email: 'owner@example.com', locale, firstName: null, shopifyAppStoreOrigin: false as const, staff: false })
+    ({ email: 'owner@example.com', locale, firstName: null, signupOrigin: 'website' as const, staff: false })
   const deps = (admin: FakeAdmin, over: Partial<OnboardingDeps> = {}): OnboardingDeps => ({
     admin: admin as unknown as ServiceRoleClient, env: fullEnv, now: () => now, owner: owner('he'), send: async () => ({ ok: true }), ...over,
   })
@@ -283,7 +283,7 @@ async function main() {
   const e5 = new FakeAdmin({ projects: [project({ country: 'US', language: 'en' })], [SIGNUP_ATTRIBUTION_TABLE]: [{ user_id: OWNER, signup_country: 'KR' }] })
   let englishKoreanSends = 0
   const r5 = await runOnboardingEmails(deps(e5, {
-    owner: async () => ({ email: 'owner@example.com', locale: 'en' as const, firstName: null, shopifyAppStoreOrigin: false as const, staff: false, signupCountry: 'KR' }),
+    owner: async () => ({ email: 'owner@example.com', locale: 'en' as const, firstName: null, signupOrigin: 'website' as const, staff: false, signupCountry: 'KR' }),
     send: async () => { englishKoreanSends++; return { ok: true } },
   }))
   check('F15: an English account that signed up in Korea is blocked',
