@@ -12,7 +12,7 @@
  */
 import { escapeEmailHtml } from '@/lib/notifications/signup-email'
 import { getDashboardDictionary } from '@/lib/i18n/dashboard/getDashboardDictionary'
-import type { Locale } from '@/lib/i18n/locales'
+import { toBilingualLocale, type Locale, type PublicLocale } from '@/lib/i18n/locales'
 
 /** How many titles the email lists before "(and k more)". */
 export const TITLES_SHOWN = 3
@@ -20,7 +20,14 @@ export const REVIEW_PATH = '/content?status=ready'
 export const UNSUBSCRIBE_PATH = '/api/reminders/unsubscribe'
 
 export interface ReminderEmailInput {
-  locale: Locale
+  /**
+   * EVERY published language, not the bilingual pair. The words are the
+   * dictionary's and the dictionary has all eleven, so an account recorded as
+   * Spanish or Korean used to be mailed in HEBREW purely because this field
+   * refused to hold its language: the narrowing happened in the live dependency
+   * and the fallback then answered for a language nobody was missing.
+   */
+  locale: PublicLocale
   /** The first name, or null when the account has none. */
   firstName: string | null
   domain: string
@@ -55,8 +62,10 @@ export function safeOrigin(raw: string | undefined): string | null {
   }
 }
 
-export function reviewUrlFor(origin: string, locale: Locale): string {
-  return `${origin}/login?next=${encodeURIComponent(REVIEW_PATH)}${locale === 'en' ? '&lang=en' : ''}`
+export function reviewUrlFor(origin: string, locale: PublicLocale): string {
+  // The email is written in the customer's language, so the link must open the
+  // app in it too — any language, not only English. Hebrew is the bare default.
+  return `${origin}/login?next=${encodeURIComponent(REVIEW_PATH)}${locale === 'he' ? '' : `&lang=${locale}`}`
 }
 /**
  * The scope a setup email's link carries (lib/reminders/http.ts): it stops the setup emails
@@ -79,7 +88,9 @@ export function buildReminderEmail(input: ReminderEmailInput): ReminderEmail {
   const shown = input.titles.slice(0, TITLES_SHOWN)
   const more = Math.max(0, input.total - shown.length)
   const reviewUrl = reviewUrlFor(input.origin, input.locale)
-  const unsubscribeUrl = unsubscribeUrlFor(input.origin, input.token, input.locale)
+  // The unsubscribe PAGE is bilingual, so the link narrows once, here, exactly
+  // as the setup emails and the weekly summary narrow it.
+  const unsubscribeUrl = unsubscribeUrlFor(input.origin, input.token, toBilingualLocale(input.locale))
   const subject = t.subject(input.total, input.domain)
   const greeting = t.greeting(input.firstName)
   const intro = t.intro(input.total, input.domain)

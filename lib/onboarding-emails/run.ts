@@ -46,7 +46,7 @@ import { buildOnboardingEmail, type OnboardingEmail } from './email'
 import { isSuppressed } from '@/lib/email-suppression'
 import { koreaEmailDecision, placedInKorea, type CustomerEmailKind } from '@/lib/compliance/korea-promotional-email'
 import { readKoreanMarketingOptIn } from '@/lib/compliance/korea-marketing-opt-in'
-import { fallbackEmailLocale, type ShopifyOriginFact } from '@/lib/reminders/recipient'
+import { fallbackEmailLocale, type SignupOriginFact } from '@/lib/reminders/recipient'
 import { claimOnboardingSend, readOnboardingState, releaseOnboardingClaim } from './state'
 
 export const ONBOARDING_FLAG = 'ONBOARDING_EMAILS_ENABLED'
@@ -61,8 +61,8 @@ export interface OnboardingOwner {
   email: string | null
   locale: PublicLocale | null
   firstName: string | null
-  /** Provenance, not a connected store; null when it could not be read. */
-  shopifyAppStoreOrigin: ShopifyOriginFact
+  /** How the account began — provenance, not a connected store; null when it could not be read. */
+  signupOrigin: SignupOriginFact
   /** An administrator's own project: no customer email. */
   staff: boolean
   /**
@@ -202,7 +202,7 @@ export async function runOnboardingEmails(deps: OnboardingDeps): Promise<Onboard
       const who = await deps.owner(ownerId).catch(() => null)
       if (!who?.email) continue
       if (who.staff) continue
-      const locale: PublicLocale | null = who.locale ?? fallbackEmailLocale(who.shopifyAppStoreOrigin)
+      const locale: PublicLocale | null = who.locale ?? fallbackEmailLocale({ origin: who.signupOrigin, signupCountry: who.signupCountry ?? null })
       if (!locale) continue
       const token = makeUnsubscribeToken(projectId, ownerId, deps.env)
       const domain = str(row.target_domain) ?? str(row.business_name)
