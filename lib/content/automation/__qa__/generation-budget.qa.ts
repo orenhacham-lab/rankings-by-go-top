@@ -154,11 +154,15 @@ async function main() {
       check('the stuck pool is never written to', !g.calls.includes('a-stuck'), g.calls)
       check('and the healthy pool still gets the run\'s one generation', g.wrote[0] === 'b-ok', g.wrote)
       const d = r.diagnostics.find((x) => x.poolId === 'a-stuck')
-      // `error` carries the publish step's own answer by the end of the run, so the
-      // hold is read from the note plus the run's own detail line.
+      // THE NOTE IS THE LAST STEP'S, NOT THE GENERATION STEP'S. Since the daily
+      // revive shipped (17 Nov 2026) the publish step also acts on this pool —
+      // it retries one paused article — and writes its own answer over the note,
+      // which for a pool with no publish day today is `held_no_publish_day`. The
+      // generation hold is therefore read from the run's own detail line, which
+      // is written where the decision is actually taken and cannot be overwritten.
       check('its diagnostic says why, with the count',
-        d?.note === 'held_paused_backlog'
-        && r.details.includes(`pool a-stuck: generation held (paused_backlog_${PAUSED_BACKLOG_HOLD})`),
+        r.details.includes(`pool a-stuck: generation held (paused_backlog_${PAUSED_BACKLOG_HOLD})`)
+        && (d?.note === 'held_paused_backlog' || d?.note === 'held_no_publish_day'),
         [d?.note, r.details])
     }
     {

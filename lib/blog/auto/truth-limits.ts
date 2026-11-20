@@ -89,6 +89,26 @@ const COUNT_AFTER = /\d[\d.,]*\s*\+?\s*(לקוחות|מנויים|עסקים|cus
 const COUNT_BEFORE = /(לקוחות|מנויים|customers|clients|clientes|clienti|kunden|klanten|klienci|顧客)\s*[:–-]?\s*\d/i
 const CADENCE = /(מעקב|בדיקה|סריקה)\s+(יומי|יומית|שבועי|שבועית)|(daily|weekly)\s+(tracking|rank\s*check|scan)|seguimiento\s+(diario|semanal)|(acompanhamento|monitoramento|verifica[çc][ãa]o|varredura)\s+(di[áa]ri[ao]|semanal)|(suivi|scan)\s+(?:de\s+positionnement\s+)?(quotidien(?:ne)?|hebdomadaire)|(monitoraggio|scansione)\s+(?:del\s+posizionamento\s+)?(giornalier[oa]|settimanale)|(t[äa]glich(?:e|es|er|en)?|w[öo]chentlich(?:e|es|er|en)?)\s+([ÜU]berwachung|Tracking|Ranking|Scan|Rangverfolgung)|(dagelijkse?|wekelijkse?)\s+(monitoring|tracking|scan)|(codzienne?|cotygodniowe?|codzienny|cotygodniowy)\s+(monitorowanie|[śs]ledzenie|skanowanie)|(毎日|毎週|日次|週次)[^。]{0,8}(追跡|計測|スキャン|順位)/i
 const OTHER_ENGINES = /perplexity|copilot|grok/i
+/**
+ * HOW AN HONEST ARTICLE ACTUALLY DRAWS THE LINE.
+ *
+ * Measured on 18 and 19 November 2026, after the negation reading shipped: the
+ * Italian queue lost its day again and the Spanish one lost the next, both on
+ * `ai_engine_coverage_claim`, and this time the stored sentence said why. Neither
+ * article denied anything. They CONTRASTED:
+ *
+ *   it  "...nelle sintesi di ChatGPT, Gemini e Google AI ... mentre Perplexity
+ *        ... su richiesta"
+ *   es  "verificamos de forma automática si un negocio es mencionado en ChatGPT,
+ *        Gemini y Google AI, ofreciendo además consultas individuales bajo demanda"
+ *
+ * That is the true sentence, and the accurate one: the three engines run
+ * automatically, the others are answered per question on request. A writer says
+ * that with "on request", "bajo demanda", "su richiesta", "auf Anfrage" — not
+ * with "not". A negation list can never reach it, so the exemption has to name
+ * the contrast itself.
+ */
+const ON_DEMAND = /on\s+demand|on\s+request|per\s+request|upon\s+request|separately|manually|bajo\s+(?:demanda|petici[óo]n)|a\s+demanda|por\s+separado|manualmente|sob\s+demanda|a\s+pedido|por\s+solicita[çc][ãa]o|[àa]\s+la\s+demande|sur\s+demande|s[ée]par[ée]ment|manuellement|su\s+richiesta|a\s+richiesta|separatamente|auf\s+(?:anfrage|wunsch)|einzeln|manuell|op\s+(?:aanvraag|verzoek)|afzonderlijk|handmatig|na\s+[żz][ąa]danie|na\s+[żz]yczenie|osobno|r[ęe]cznie|לפי דרישה|על פי בקשה|בנפרד|ידנית|リクエスト|都度|個別/i
 const AUTOMATIC = /אוטומט|automatic|automátic|automatically|automatis|automatiqu|automatyczn|自動/i
 const RATING_WORDS = '(?:ביקורות|reviews|rese\u00f1as|avalia[\u00e7c][\u00f5o]es|avis|recensioni|bewertungen|rezensionen|beoordelingen|opinii|opinie|recenzji|\u30ec\u30d3\u30e5\u30fc|\u8a55\u4fa1|\u53e3\u30b3\u30df)'
 const RATING = new RegExp(
@@ -164,13 +184,16 @@ function deniedAt(sentence: string, index: number, length: number): boolean {
   return NEGATION_BEFORE.test(before) || NEGATION_AFTER.test(after)
 }
 
-/** True when this sentence PROMISES a ranking, rather than denying that one can be promised. */
-function promisesRanking(sentence: string): boolean {
+/**
+ * Where this sentence PROMISES a ranking, rather than denying that one can be
+ * promised: the index of the first undenied promise, or -1 when there is none.
+ */
+function promiseIndex(sentence: string): number {
   GUARANTEE_G.lastIndex = 0
   for (let m = GUARANTEE_G.exec(sentence); m; m = GUARANTEE_G.exec(sentence)) {
-    if (!deniedAt(sentence, m.index, m[0].length)) return true
+    if (!deniedAt(sentence, m.index, m[0].length)) return m.index
   }
-  return false
+  return -1
 }
 
 /**
@@ -198,11 +221,33 @@ function claimsEngineCoverage(sentence: string): boolean {
   // The cost is a sentence that denies one thing and claims another about the
   // engines in one breath, which would now pass. The cost of the window was
   // measured instead: two locales, two days running, published nothing at all.
+  //
+  // ON_DEMAND is read the same way, and for the same reason: it is how the
+  // distinction is drawn when nothing is being denied.
   return !NEGATION_BEFORE.test(sentence) && !NEGATION_AFTER.test(sentence)
+    && !ON_DEMAND.test(sentence)
 }
 
 const SAMPLE_MAX = 160
-const sampleOf = (sentence: string): string => sentence.replace(/\s+/g, ' ').trim().slice(0, SAMPLE_MAX)
+/**
+ * WHY THE SAMPLE IS CENTRED ON THE MATCH AND NOT ON THE SENTENCE'S FIRST WORDS.
+ *
+ * `plainText` turns a table into one run of words with no sentence punctuation
+ * in it, so a comparison table is a single "sentence" of a thousand characters.
+ * The Spanish refusal of 19 November 2026 kept the first 160 of them — a table
+ * heading, "Comparativa de Modelos de Cobro ... Porcentaje de la inversion" —
+ * and the number that actually tripped `percentage_claim` sat past the cut. The
+ * retry brief then quoted a heading back at the writer and asked it to fix
+ * something the quote did not contain.
+ *
+ * So the window follows the match: a third of it ahead for context, the rest
+ * after, with a leading ellipsis when anything was dropped.
+ */
+function sampleOf(sentence: string, at = 0): string {
+  const from = Math.max(0, at - Math.floor(SAMPLE_MAX / 3))
+  const flat = sentence.slice(from, from + SAMPLE_MAX * 2).replace(/\s+/g, ' ').trim()
+  return (from > 0 ? '\u2026' : '') + flat.slice(0, SAMPLE_MAX)
+}
 const SCHEMA_WORD = /schema|json-?ld|סכימה|נתונים מובנים|datos estructurados|dados estruturados|donn[ée]es structur[ée]es|dati strutturati|strukturierte\w*\s+Daten|gestructureerde\s+(?:data|gegevens)|dane\s+strukturalne|構造化データ/i
 const SHOPIFY = /shopify/i
 
@@ -221,25 +266,36 @@ export function checkTruthLimits(input: TruthLimitInput): TruthLimitResult {
   const all = [input.title, input.metaDescription, body].join(' | ')
   const lines = sentences(all)
 
-  /** Record the failure, and the first sentence that tripped it. */
-  const refuse = (code: string, sentence?: string): void => {
+  /** Record the failure, and the words that tripped it. */
+  const refuse = (code: string, sentence?: string, at = 0): void => {
     failures.push(code)
-    if (sentence && !samples[code]) samples[code] = sampleOf(sentence)
+    if (sentence && !samples[code]) samples[code] = sampleOf(sentence, at)
   }
-  /** The first sentence a whole-text pattern matched, for the sample. */
-  const firstMatching = (re: RegExp): string | undefined => lines.find((l) => re.test(l))
+  /** The first sentence a whole-text pattern matched, and where in it. */
+  const firstMatch = (re: RegExp): { sentence: string; at: number } | undefined => {
+    for (const line of lines) {
+      const m = re.exec(line)
+      if (m) return { sentence: line, at: m.index }
+    }
+    return undefined
+  }
+  const refuseMatch = (code: string, hit?: { sentence: string; at: number }): void => {
+    refuse(code, hit?.sentence, hit?.at)
+  }
 
-  if (PERCENT.test(all)) refuse('percentage_claim', firstMatching(PERCENT))
+  if (PERCENT.test(all)) refuseMatch('percentage_claim', firstMatch(PERCENT))
   if (COUNT_AFTER.test(all) || COUNT_BEFORE.test(all)) {
-    refuse('customer_count_claim', firstMatching(COUNT_AFTER) ?? firstMatching(COUNT_BEFORE))
+    refuseMatch('customer_count_claim', firstMatch(COUNT_AFTER) ?? firstMatch(COUNT_BEFORE))
   }
-  if (CADENCE.test(all)) refuse('tracking_cadence_claim', firstMatching(CADENCE))
-  if (RATING.test(all)) refuse('rating_claim', firstMatching(RATING))
-  const promise = lines.find(promisesRanking)
-  if (promise) refuse('ranking_guarantee', promise)
+  if (CADENCE.test(all)) refuseMatch('tracking_cadence_claim', firstMatch(CADENCE))
+  if (RATING.test(all)) refuseMatch('rating_claim', firstMatch(RATING))
+  for (const line of lines) {
+    const at = promiseIndex(line)
+    if (at >= 0) { refuse('ranking_guarantee', line, at); break }
+  }
 
   const coverage = lines.find(claimsEngineCoverage)
-  if (coverage) refuse('ai_engine_coverage_claim', coverage)
+  if (coverage) refuse('ai_engine_coverage_claim', coverage, OTHER_ENGINES.exec(coverage)?.index ?? 0)
 
   const schema = lines.find((l) => SHOPIFY.test(l) && SCHEMA_WORD.test(l))
   if (schema) refuse('shopify_schema_claim', schema)
