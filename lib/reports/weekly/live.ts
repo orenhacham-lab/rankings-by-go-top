@@ -7,6 +7,7 @@ import { createAdminClient } from '@/lib/supabase/admin'
 import { isAdminUser } from '@/lib/auth/admin-role'
 import { loadBillingGovernance } from '@/lib/billing/governance'
 import { normalizeDashboardUiLocale } from '@/lib/i18n/dashboard/locale'
+import { readSignupCountry } from '@/lib/compliance/signup-country'
 import type { OutgoingWeekly, WeeklyDeps, WeeklyOwner } from './run'
 
 async function send({ to, email }: OutgoingWeekly): Promise<{ ok: boolean }> {
@@ -43,18 +44,24 @@ export function liveWeeklyDeps(): WeeklyDeps {
       const meta = (data.user.user_metadata ?? {}) as Record<string, unknown>
       const full = typeof meta.full_name === 'string' ? meta.full_name : typeof meta.name === 'string' ? meta.name : ''
       const first = full.trim().split(/\s+/)[0] ?? ''
-      // Provenance, not an integration record: see lib/reminders/recipient.ts.
       const governance = await loadBillingGovernance(admin, userId)
-      const shopifyAppStoreOrigin = governance.status === 'loaded'
-        ? governance.governance.signupOrigin === 'shopify_app_store'
-        : governance.status === 'missing' ? false : null
+      // Provenance, not an integration record: see lib/reminders/recipient.ts.
+      // The whole value, not a boolean about one of its branches — a marketplace
+      // buyer is an English-channel buyer and used to be mailed in Hebrew.
+      const signupOrigin = governance.status === 'loaded'
+        ? governance.governance.signupOrigin
+        : governance.status === 'missing' ? 'unknown' : null
       return {
         email: typeof data.user.email === 'string' ? data.user.email : null,
         locale: normalizeDashboardUiLocale(meta.locale),
         firstName: first ? first.slice(0, 40) : null,
-        shopifyAppStoreOrigin,
+        signupOrigin,
         // An administrator's own projects get no customer email at all.
         staff: await isAdminUser(admin, userId),
+        // Where the account was opened (lib/compliance/signup-country.ts). The
+        // language fallback reads it for one coarse decision only: Israel is the
+        // Hebrew market, everywhere else reads English rather than Hebrew.
+        signupCountry: await readSignupCountry(admin, userId),
       }
     },
     send,

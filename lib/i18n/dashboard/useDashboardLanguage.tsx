@@ -55,6 +55,21 @@ function writeLanguageCookie(lang: PublicLocale) {
   } catch { /* non-browser or blocked — the UI still works, the server just keeps its value */ }
 }
 
+/**
+ * Tell the server this is the account's language. Fire-and-forget: the switcher
+ * must never wait on a request, and a public page's visitor has no account.
+ */
+function recordAccountLanguage(lang: PublicLocale) {
+  try {
+    void fetch('/api/account/language', {
+      method: 'PUT',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ locale: lang }),
+      keepalive: true,
+    }).catch(() => undefined)
+  } catch { /* no fetch (SSR) or blocked — the cookie and storage still hold the choice */ }
+}
+
 export function DashboardLanguageProvider({ children, initialLocale }: { children: ReactNode; initialLocale?: PublicLocale | null }) {
   // `initialLocale` is now the SERVER-RESOLVED locale (the same cookie the root
   // layout rendered from), not just an auth-metadata seed. Starting from it is
@@ -100,6 +115,13 @@ export function DashboardLanguageProvider({ children, initialLocale }: { childre
     } catch {
       // ignore quota / privacy mode errors
     }
+    // AND ON THE ACCOUNT, which is the only one of the three a CRON can read.
+    // The customer emails are written in the account's language
+    // (lib/reminders/recipient.ts), so a switch that reached only this browser
+    // left a customer reading Spanish on screen and Hebrew in their inbox.
+    // Best-effort by design: a signed-out visitor gets a 401 and the UI is
+    // already correct either way, so nothing here is awaited or surfaced.
+    recordAccountLanguage(lang)
   }
 
   return (

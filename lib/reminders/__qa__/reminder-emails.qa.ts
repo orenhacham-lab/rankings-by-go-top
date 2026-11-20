@@ -132,7 +132,7 @@ async function main() {
     admin: admin as unknown as ServiceRoleClient,
     env: o.env ?? fullEnv,
     now: () => o.at ?? now,
-    owner: async (id) => (id === OWNER ? { email: 'owner@example.com', locale: 'he', firstName: 'דנה', shopifyAppStoreOrigin: false, staff: false, ...o.ownerFacts } : null),
+    owner: async (id) => (id === OWNER ? { email: 'owner@example.com', locale: 'he', firstName: 'דנה', signupOrigin: 'website' as const, staff: false, ...o.ownerFacts } : null),
     send: async (m) => { (o.sent ??= []).push(m); return { ok: o.ok !== false } },
   })
   {
@@ -377,8 +377,14 @@ async function main() {
   // ── I) who it goes to, and in which language ──────────────────────────
   console.log('\nI) The owner\u2019s own language, and never staff')
   {
-    check('I1: without a recorded language, only App Store provenance means English', fallbackEmailLocale(true) === 'en' && fallbackEmailLocale(false) === 'he')
-    check('I2: unreadable provenance has no honest answer', fallbackEmailLocale(null) === null)
+    const facts = (origin: Parameters<typeof fallbackEmailLocale>[0]['origin'], signupCountry: string | null = null) =>
+      fallbackEmailLocale({ origin, signupCountry })
+    check('I1: without a recorded language, the English channels are English and a website account is Hebrew',
+      facts('shopify_app_store') === 'en' && facts('marketplace') === 'en' && facts('website') === 'he')
+    check('I2: unreadable provenance has no honest answer', facts(null) === null)
+    check('I2b: the stored signup country decides between the two: Israel Hebrew, anywhere else English',
+      facts('website', 'IL') === 'he' && facts('website', 'PH') === 'en' && facts('unknown', 'DE') === 'en')
+    check('I2c: a country that is not a country places nobody', facts('website', 'XX1') === 'he' && facts(null, '') === null)
 
     // The live bug, 11 October: an Israeli owner with two connected Shopify stores received
     // the reminder in English, because a connection record was read as a language.
@@ -388,13 +394,13 @@ async function main() {
       agency.length === 1 && /מחכים/.test(agency[0].email.subject), agency[0]?.email.subject)
 
     const fromAppStore: OutgoingReminder[] = []
-    await runArticleReminders(deps(world(), { sent: fromAppStore, ownerFacts: { locale: null, shopifyAppStoreOrigin: true } }))
+    await runArticleReminders(deps(world(), { sent: fromAppStore, ownerFacts: { locale: null, signupOrigin: 'shopify_app_store' as const } }))
     check('I4: an App Store account with no recorded language gets English',
       fromAppStore.length === 1 && /articles are waiting/.test(fromAppStore[0].email.subject), fromAppStore[0]?.email.subject)
 
     const unreadable: OutgoingReminder[] = []
     const uAdmin = world()
-    const held = await runArticleReminders(deps(uAdmin, { sent: unreadable, ownerFacts: { locale: null, shopifyAppStoreOrigin: null } }))
+    const held = await runArticleReminders(deps(uAdmin, { sent: unreadable, ownerFacts: { locale: null, signupOrigin: null } }))
     check('I5: no language and unreadable provenance: nothing sent, no claim taken',
       held.status === 'done' && unreadable.length === 0 && !(uAdmin.tables.project_reminder_state ?? []).some((r) => r.last_sent_at))
 
@@ -418,8 +424,8 @@ async function main() {
       lives.every((f) => { const src = strip(code(f)); return /loadBillingGovernance\(/.test(src) && /isAdminUser\(/.test(src) }))
 
     const langMut = await withMutant<{ fallbackEmailLocale: typeof fallbackEmailLocale }, boolean>(
-      'lib/reminders/recipient.ts', [["  if (origin === null) return null", '  if (origin === null) return "en"']],
-      async (m) => m.fallbackEmailLocale(null) === 'en',
+      'lib/reminders/recipient.ts', [["  if (facts.origin === null) return null", '  if (facts.origin === null) return "en"']],
+      async (m) => m.fallbackEmailLocale({ origin: null, signupCountry: null }) === 'en',
     )
     check('I-MUT2: guessing English for an unreadable account would write in the wrong language (I2 and I5 would fail)', langMut)
   }

@@ -130,7 +130,7 @@ async function main() {
     generated_articles: [articleRow()],
     ...over,
   })
-  const owner = async () => ({ email: 'owner@example.com', locale: 'he' as const, firstName: 'דנה', shopifyAppStoreOrigin: false, staff: false })
+  const owner = async () => ({ email: 'owner@example.com', locale: 'he' as const, firstName: 'דנה', signupOrigin: 'website' as const, staff: false })
   const deps = (admin: FakeAdmin, over: Partial<WeeklyDeps> = {}): WeeklyDeps => ({
     admin: admin as unknown as ServiceRoleClient, env: fullEnv, now: () => now, owner, send: async () => ({ ok: true }), ...over,
   })
@@ -227,7 +227,7 @@ async function main() {
   let noAddress = 0
   const a12 = new FakeAdmin(tables())
   await runWeeklySummaries(deps(a12, {
-    owner: async () => ({ email: null, locale: null, firstName: null, shopifyAppStoreOrigin: false, staff: false }),
+    owner: async () => ({ email: null, locale: null, firstName: null, signupOrigin: 'website' as const, staff: false }),
     send: async () => { noAddress++; return { ok: true } },
   }))
   check('D14: no address, no email and no claim', noAddress === 0 && a12.tables.project_report_preferences[0]?.weekly_last_week === null)
@@ -372,7 +372,7 @@ async function main() {
     let agency: OutgoingWeekly | undefined
     const aAgency = new FakeAdmin(tables({ shopify_connections: [{ project_id: 'other', user_id: OWNER }] }))
     await runWeeklySummaries(deps(aAgency, {
-      owner: async () => ({ email: 'agency@example.co.il', locale: null, firstName: null, shopifyAppStoreOrigin: false, staff: false }),
+      owner: async () => ({ email: 'agency@example.co.il', locale: null, firstName: null, signupOrigin: 'website' as const, staff: false }),
       send: async (m) => { agency = m; return { ok: true } },
     }))
     check('H1: no recorded language, website account: Hebrew, not English',
@@ -380,7 +380,7 @@ async function main() {
 
     let fromAppStore: OutgoingWeekly | undefined
     await runWeeklySummaries(deps(new FakeAdmin(tables()), {
-      owner: async () => ({ email: 'store@example.com', locale: null, firstName: null, shopifyAppStoreOrigin: true, staff: false }),
+      owner: async () => ({ email: 'store@example.com', locale: null, firstName: null, signupOrigin: 'shopify_app_store' as const, staff: false }),
       send: async (m) => { fromAppStore = m; return { ok: true } },
     }))
     check('H2: an App Store account with no recorded language gets English',
@@ -389,7 +389,7 @@ async function main() {
     let heldBack = 0
     const aHeld = new FakeAdmin(tables())
     const held = await runWeeklySummaries(deps(aHeld, {
-      owner: async () => ({ email: 'owner@example.com', locale: null, firstName: null, shopifyAppStoreOrigin: null, staff: false }),
+      owner: async () => ({ email: 'owner@example.com', locale: null, firstName: null, signupOrigin: null, staff: false }),
       send: async () => { heldBack++; return { ok: true } },
     }))
     check('H3: no language and unreadable provenance: nothing sent, the week not marked covered',
@@ -398,7 +398,7 @@ async function main() {
     let staffSends = 0
     const aStaff = new FakeAdmin(tables())
     const staff = await runWeeklySummaries(deps(aStaff, {
-      owner: async () => ({ email: 'oren@example.com', locale: 'he' as const, firstName: null, shopifyAppStoreOrigin: false, staff: true }),
+      owner: async () => ({ email: 'oren@example.com', locale: 'he' as const, firstName: null, signupOrigin: 'website' as const, staff: true }),
       send: async () => { staffSends++; return { ok: true } },
     }))
     check('H4: an administrator\u2019s own project gets no weekly summary',
@@ -409,7 +409,7 @@ async function main() {
       async (mod) => {
         let n = 0
         await mod.runWeeklySummaries(deps(new FakeAdmin(tables()), {
-          owner: async () => ({ email: 'oren@example.com', locale: 'he' as const, firstName: null, shopifyAppStoreOrigin: false, staff: true }),
+          owner: async () => ({ email: 'oren@example.com', locale: 'he' as const, firstName: null, signupOrigin: 'website' as const, staff: true }),
           send: async () => { n++; return { ok: true } },
         }))
         check('H-MUT: without the staff check our own administrator is mailed (H4 would fail)', n === 1)
