@@ -52,14 +52,65 @@ export interface ImageReview {
   skipped?: string
 }
 
+/**
+ * WHY THE QUESTION ASKS FOR A DESCRIPTION FIRST.
+ *
+ * MEASURED, 20 November 2026. The backfill's first two passes reviewed 24
+ * published covers and called every one of them clean — including the two Oren
+ * had reported by name:
+ *
+ *   * `google-positie-checker` (nl): the laptop's screen faces the camera while
+ *     the woman behind it types on its keyboard, so she is looking at the back
+ *     of her own screen;
+ *   * `keyword-research-tools-guide` (he): one subject with two right hands, and
+ *     a screen covered in lettering that looks like Hebrew and spells nothing.
+ *
+ * Both are plainly visible. The reviewer was answering three yes/no questions in
+ * one shot, on the cheapest model there is, with a closing line telling it to
+ * answer true only for what it can actually see — which is a push towards
+ * `false` on every question and, on a model that is not really looking, towards
+ * `false` on all of them.
+ *
+ * So it now names what it sees BEFORE it judges: every hand, and how each device
+ * is turned. A model that has just written "her right hand is on the trackpad,
+ * her other right hand holds a pen" does not then answer false to the duplicated
+ * hand question. The description is thrown away — the parser reads the JSON —
+ * and it is read on the model named by IMAGE_REVIEW_MODEL, a step up from the
+ * text classifier's, because this is the one job in the product that is purely
+ * about seeing.
+ */
 const QUESTION = [
-  'You are checking one image before it is published on a company blog. Look at it and answer three closed questions.',
-  '1. duplicated_subject: does any person appear twice, or does one person have a duplicated or extra hand, arm or head?',
-  '2. impossible_device: is any device drawn impossibly — a laptop whose screen and keyboard both face the viewer, a mirrored or reversed device, a screen facing away from the person using it, a hand passing through an object?',
-  '3. garbled_text: does any lettering in the image (on a screen, a page, a notebook) look like words but spell nonsense in any language?',
-  'Answer with JSON only, no prose and no code fence: {"duplicated_subject":true|false,"impossible_device":true|false,"garbled_text":true|false}',
-  'Answer true only for what you can actually see. Blurred background shapes with no legible lettering are not garbled text.',
+  'You are the last check on one image before it is published on a company blog. AI image models make the same three mistakes over and over, and they are easy to miss at a glance, so look deliberately.',
+  'FIRST, in one short line each, write what you actually see:',
+  'HANDS: every hand in the image, whose it is, and whether it is a left or a right hand.',
+  'DEVICES: every laptop, phone or monitor, which way its SCREEN faces, and which way its KEYBOARD faces.',
+  'LETTERING: every word or label you can make out, copied exactly as it is written.',
+  'THEN answer the three questions as JSON on the last line, with no code fence:',
+  '{"duplicated_subject":true|false,"impossible_device":true|false,"garbled_text":true|false}',
+  'duplicated_subject: does any person appear twice, or does one person have two left hands, two right hands, an extra hand, arm or head?',
+  'impossible_device: is any device drawn impossibly — a laptop whose screen and keyboard both face the viewer, a screen facing away from the person using it, a mirrored or reversed device, a hand passing through an object?',
+  'garbled_text: does any lettering look like words but spell nonsense, in any language — including text that imitates Hebrew, Japanese or Korean without being readable?',
+  'Judge only what is legible: a blurred shape in the background with no readable lettering is not garbled text. But lettering you CAN read and that does not spell a real word IS.',
 ].join('\n')
+
+/**
+ * THE MODEL THAT LOOKS. Separate from GEMINI_CLASSIFIER_MODEL, which is the text
+ * classifier's and is the cheapest there is: on 20 November 2026 it called every
+ * one of the first 24 published covers clean, two of them reported by name. The
+ * default is one step up; the price of a wrong answer here is an image on the
+ * company's own blog with two right hands in it.
+ */
+export function imageReviewModel(env: NodeJS.ProcessEnv = process.env): string {
+  return env.IMAGE_REVIEW_MODEL || 'gemini-2.5-flash'
+}
+
+/**
+ * The reviewer's version, bumped whenever the question or the model changes.
+ * The backfill stores it beside the image it reviewed, so sharpening the
+ * reviewer makes every cover be looked at again instead of staying on a verdict
+ * an older, blinder reviewer gave (lib/blog/auto/cover-repair.ts).
+ */
+export const REVIEWER_VERSION = 'v2-2026-11-20'
 
 export interface ReviewDeps {
   /** The model call, injectable so the decision logic is testable without a key. */
@@ -106,7 +157,7 @@ async function askGemini(bytes: Buffer, mimeType: string): Promise<string> {
   const client = getGeminiClient()
   if (!client) throw new Error('no_gemini_client')
   const model = client.getGenerativeModel({
-    model: process.env.GEMINI_CLASSIFIER_MODEL || 'gemini-2.5-flash-lite',
+    model: imageReviewModel(),
   })
   const res = await model.generateContent(
     [QUESTION, { inlineData: { data: bytes.toString('base64'), mimeType } }],
