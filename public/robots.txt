@@ -17,6 +17,10 @@ Disallow: /admin
 Disallow: /dashboard
 Disallow: /api
 Allow: /api/public/
+# Inside the group, which is the only place it is read. It used to sit at the
+# very end of the file, after `Sitemap:` and outside every group, where it
+# governed nobody.
+Crawl-delay: 1
 
 # Google-specific rules
 User-agent: Googlebot
@@ -50,27 +54,50 @@ Disallow: /dashboard
 Disallow: /api
 Allow: /api/public/
 
-# Allow AI crawlers to index public content
-User-agent: GPTBot
-Allow: /
-Allow: /articles
-Allow: /about
-Disallow: /admin
-Disallow: /dashboard
-Disallow: /api
-Allow: /api/public/
+# ── AI answer engines and AI crawlers ───────────────────────────────────────
+# Named explicitly, with the SAME rules as the `*` group above, because naming
+# a crawler means the `*` group no longer governs it (RFC 9309 2.2.1): a group
+# that leaves a rule out does not inherit it. So this group repeats the three
+# lines, and a token added here without them would open /admin to it.
+#
+# The tokens are the DOCUMENTED ones from lib/ai-crawlers/dataset.ts, the same
+# list the public /ai-crawlers checker reads. Only GPTBot and CCBot used to be
+# here, which left the two tokens that actually fetch a page to answer a user —
+# OAI-SearchBot and ChatGPT-User — unnamed, and said nothing at all about
+# Perplexity, Claude, Gemini grounding or Apple. We sell a checker for exactly
+# this file, so it is also the file that has to be right.
+# lib/ai-crawlers/__qa__/own-robots-ai-agents.qa.ts keeps the two in step.
 
+User-agent: GPTBot
+User-agent: OAI-SearchBot
+User-agent: ChatGPT-User
+User-agent: ClaudeBot
+User-agent: Claude-SearchBot
+User-agent: Claude-User
+User-agent: Google-Extended
+User-agent: GoogleOther
+User-agent: PerplexityBot
+User-agent: Perplexity-User
+User-agent: Applebot
+User-agent: Applebot-Extended
+User-agent: Meta-ExternalAgent
+User-agent: Amazonbot
+User-agent: Amzn-SearchBot
+User-agent: Amzn-User
+User-agent: MistralAI-Index
+User-agent: MistralAI-User
+User-agent: DuckAssistBot
+User-agent: Kimi-SearchBot
+User-agent: Kimi-User
+User-agent: ExaSearchBot
+User-agent: LinerBot
+User-agent: Liner-User
 User-agent: CCBot
 Allow: /
-Allow: /articles
-Allow: /about
 Disallow: /admin
 Disallow: /dashboard
 Disallow: /api
 Allow: /api/public/
 
-# Sitemap location
+# Sitemap location — global, belongs to no group.
 Sitemap: https://www.gotopseo.com/sitemap.xml
-
-# Crawl delay (optional - helps prevent server overload)
-Crawl-delay: 1

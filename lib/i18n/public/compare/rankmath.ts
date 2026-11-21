@@ -25,7 +25,7 @@
 import type { PublicLocale } from '@/lib/i18n/locales'
 import type { ComparisonCopy } from './types'
 
-const CHECKED = '2026-10-31'
+const CHECKED = '2026-11-20'
 
 const SOURCES = [
   { label: 'rankmath.com/pricing', href: 'https://rankmath.com/pricing/' },
@@ -90,7 +90,7 @@ export const RANKMATH_COMPARE: Record<PublicLocale, ComparisonCopy> = {
           label: 'מעקב דירוגים',
           ours: 'בדיקה חודשית בגוגל וב-Google Maps, באותו מחיר.',
           theirs:
-            'PRO עוקב אחרי 1,000 ביטויים ו-Business אחרי 20,000, עם היסטוריית מיקומים של שנים עשר חודשים אחורה.',
+            'במחיר ההתחדשות PRO עוקב אחרי 500 ביטויים ו-Business אחרי 10,000. במבצע שמוצג כרגע המספרים כפולים, 1,000 ו-20,000. היסטוריית המיקומים היא שנים עשר חודשים אחורה.',
         },
         {
           label: 'ניסיון',
@@ -220,7 +220,7 @@ export const RANKMATH_COMPARE: Record<PublicLocale, ComparisonCopy> = {
         {
           label: 'Rank tracking',
           ours: 'A monthly check in Google and in Google Maps, at the same price.',
-          theirs: 'PRO tracks 1,000 keywords and Business 20,000, with twelve months of position history.',
+          theirs: 'At the renewal price PRO tracks 500 keywords and Business 10,000. The offer running on the page doubles those to 1,000 and 20,000. Position history is twelve months either way.',
         },
         {
           label: 'Trial',
@@ -350,7 +350,7 @@ export const RANKMATH_COMPARE: Record<PublicLocale, ComparisonCopy> = {
         {
           label: 'Seguimiento de posiciones',
           ours: 'Revisión mensual en Google y en Google Maps, al mismo precio.',
-          theirs: 'PRO rastrea 1.000 palabras clave y Business 20.000, con doce meses de historial de posiciones.',
+          theirs: 'Al precio de renovación, PRO rastrea 500 palabras clave y Business 10.000. La oferta que muestra la página ahora duplica esas cifras, 1.000 y 20.000. El historial de posiciones es de doce meses en ambos casos.',
         },
         {
           label: 'Prueba',
@@ -480,7 +480,7 @@ export const RANKMATH_COMPARE: Record<PublicLocale, ComparisonCopy> = {
         {
           label: 'Acompanhamento de posições',
           ours: 'Verificação mensal no Google e no Google Maps, pelo mesmo preço.',
-          theirs: 'O PRO acompanha 1.000 palavras-chave e o Business 20.000, com doze meses de histórico de posições.',
+          theirs: 'No preço de renovação, o PRO acompanha 500 palavras-chave e o Business 10.000. A oferta exibida agora na página dobra esses números, 1.000 e 20.000. O histórico de posições é de doze meses nos dois casos.',
         },
         {
           label: 'Teste',
@@ -610,7 +610,7 @@ export const RANKMATH_COMPARE: Record<PublicLocale, ComparisonCopy> = {
         {
           label: 'Suivi de positions',
           ours: 'Une vérification mensuelle dans Google et dans Google Maps, au même prix.',
-          theirs: 'PRO suit 1 000 mots-clés et Business 20 000, avec douze mois d’historique de positions.',
+          theirs: 'Au prix de renouvellement, PRO suit 500 mots-clés et Business 10 000. L’offre affichée en ce moment double ces chiffres, 1 000 et 20 000. L’historique de positions est de douze mois dans les deux cas.',
         },
         {
           label: 'Essai',
@@ -739,7 +739,7 @@ export const RANKMATH_COMPARE: Record<PublicLocale, ComparisonCopy> = {
         {
           label: 'Monitoraggio delle posizioni',
           ours: 'Un controllo mensile su Google e su Google Maps, allo stesso prezzo.',
-          theirs: 'PRO monitora 1.000 parole chiave e Business 20.000, con dodici mesi di storico delle posizioni.',
+          theirs: 'Al prezzo di rinnovo, PRO monitora 500 parole chiave e Business 10.000. L’offerta mostrata in questo momento raddoppia quei numeri, 1.000 e 20.000. Lo storico delle posizioni è di dodici mesi in entrambi i casi.',
         },
         {
           label: 'Prova',
@@ -872,7 +872,7 @@ export const RANKMATH_COMPARE: Record<PublicLocale, ComparisonCopy> = {
         {
           label: 'Ranking-Tracking',
           ours: 'Eine monatliche Prüfung in Google und in Google Maps, im selben Preis.',
-          theirs: 'PRO erfasst 1.000 Keywords, Business 20.000, mit zwölf Monaten Positionsverlauf.',
+          theirs: 'Zum Verlängerungspreis erfasst PRO 500 Keywords und Business 10.000. Das aktuell angezeigte Angebot verdoppelt diese Zahlen auf 1.000 und 20.000. Der Positionsverlauf umfasst in beiden Fällen zwölf Monate.',
         },
         {
           label: 'Testphase',
@@ -1001,7 +1001,7 @@ export const RANKMATH_COMPARE: Record<PublicLocale, ComparisonCopy> = {
         {
           label: '検索順位の計測',
           ours: 'GoogleとGoogleマップについて月に一度計測し、料金は同じです。',
-          theirs: 'PROは1,000キーワード、Businessは20,000キーワードを追跡し、順位の履歴は12か月分です。',
+          theirs: '更新価格では、PROは500キーワード、Businessは10,000キーワードです。現在表示されている割引では、その数が倍の1,000と20,000になります。順位の履歴はいずれも12か月分です。',
         },
         {
           label: 'トライアル',
@@ -1130,7 +1130,7 @@ export const RANKMATH_COMPARE: Record<PublicLocale, ComparisonCopy> = {
         {
           label: 'Positiemeting',
           ours: 'Een maandelijkse controle in Google en in Google Maps, in dezelfde prijs.',
-          theirs: 'PRO volgt 1.000 zoekwoorden, Business 20.000, met twaalf maanden positiegeschiedenis.',
+          theirs: 'Tegen de verlengingsprijs volgt PRO 500 zoekwoorden en Business 10.000. De aanbieding die nu op de pagina staat verdubbelt die aantallen naar 1.000 en 20.000. De positiegeschiedenis beslaat in beide gevallen twaalf maanden.',
         },
         {
           label: 'Proefperiode',
@@ -1259,7 +1259,7 @@ export const RANKMATH_COMPARE: Record<PublicLocale, ComparisonCopy> = {
         {
           label: 'Pomiar pozycji',
           ours: 'Comiesięczne sprawdzenie w Google i w Mapach Google, w tej samej cenie.',
-          theirs: 'PRO monitoruje 1000 słów kluczowych, Business 20 000, z dwunastomiesięczną historią pozycji.',
+          theirs: 'W cenie odnowienia PRO monitoruje 500 słów kluczowych, a Business 10 000. Promocja widoczna teraz na stronie podwaja te liczby do 1000 i 20 000. Historia pozycji obejmuje w obu przypadkach dwanaście miesięcy.',
         },
         {
           label: 'Okres próbny',
@@ -1388,7 +1388,7 @@ export const RANKMATH_COMPARE: Record<PublicLocale, ComparisonCopy> = {
         {
           label: '순위 측정',
           ours: 'Google과 Google 지도에서 매달 확인하며, 같은 가격에 들어 있습니다.',
-          theirs: 'PRO는 키워드 1,000개, Business는 20,000개를 측정하고 12개월 순위 기록을 남깁니다.',
+          theirs: '갱신 가격 기준으로 PRO는 키워드 500개, Business는 10,000개입니다. 지금 페이지에 걸린 할인에서는 그 수가 두 배인 1,000개와 20,000개가 됩니다. 순위 기록은 어느 쪽이든 12개월입니다.',
         },
         {
           label: '체험',

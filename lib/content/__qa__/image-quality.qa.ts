@@ -11,7 +11,7 @@
  */
 import { readFileSync } from 'fs'
 import { join } from 'path'
-import { parseImageReview, retryGuidanceFor, reviewGeneratedImage, IMAGE_DEFECTS } from '../image-quality'
+import { parseImageReview, retryGuidanceFor, reviewGeneratedImage, imageReviewModelCandidates, isModelUnavailable, IMAGE_DEFECTS, REVIEWER_VERSION } from '../image-quality'
 
 let pass = 0, fail = 0
 function check(name: string, cond: boolean, detail?: unknown) {
@@ -93,7 +93,53 @@ async function main() {
       /\(input\.retryGuidance \|\| ''\)\.trim\(\),\s*\]\.filter\(Boolean\)/.test(strip(read('../gemini-image.ts'))))
   }
 
+  console.log('5) the question makes it look before it judges')
+  {
+    // MEASURED, 20 Nov 2026: the first version answered three yes/no questions
+    // in one shot on the cheapest model, and called 24 published covers clean —
+    // among them the two Oren had reported by name. It was not looking.
+    const src = strip(read('../image-quality.ts'))
+    check('it must name the hands, the devices and the lettering it sees',
+      /HANDS:/.test(src) && /DEVICES:/.test(src) && /LETTERING:/.test(src), src.slice(0, 0))
+    check('the description comes first and the JSON last',
+      src.indexOf('HANDS:') < src.indexOf('answer the three questions as JSON on the last line'))
+    check('nothing pushes the answer towards false before it has looked',
+      !/answer true only|only if you are (?:sure|certain)|when in doubt/i.test(src))
+    check('the fault names in the JSON are exactly the ones the module knows',
+      IMAGE_DEFECTS.every((d) => new RegExp(`"${d}":true\\|false`).test(src)))
+
+    // MEASURED, 20 Nov 2026, the SECOND 404: the pinned `gemini-2.5-flash`
+    // answered "no longer available to new users" for all 12 covers of the
+    // first pass. A pinned id is a guess about someone else's catalogue.
+    const list = imageReviewModelCandidates({} as NodeJS.ProcessEnv)
+    check('the reviewer tries a LIST, not one pinned model', list.length > 1, list)
+    check('and not the text classifier\'s cheapest, which proved blind',
+      !list.some((m) => m.includes('lite')) && !/GEMINI_CLASSIFIER_MODEL/.test(src), list)
+    check('a model that 404s is not the one it settles on',
+      !list.includes('gemini-2.5-flash'), list)
+    const env = imageReviewModelCandidates({ IMAGE_REVIEW_MODEL: 'other-model' } as unknown as NodeJS.ProcessEnv)
+    check('it can be moved without a deploy, and the env value goes first',
+      env[0] === 'other-model' && env.length === list.length + 1, env)
+    check('a repeated env value is not tried twice',
+      imageReviewModelCandidates({ IMAGE_REVIEW_MODEL: list[0] } as unknown as NodeJS.ProcessEnv).length === list.length)
+    check('a 404 moves to the next model',
+      isModelUnavailable('[404 Not Found] This model models/gemini-2.5-flash is no longer available to new users'))
+    check('but a timeout is this review\'s answer, not the next model\'s turn',
+      !isModelUnavailable('deadline exceeded after 60000ms') && !isModelUnavailable('fetch failed'))
+    check('the version is stamped, so the backfill looks again when it changes',
+      /^v\d+-\d{4}-\d{2}-\d{2}$/.test(REVIEWER_VERSION), REVIEWER_VERSION)
+    check('and the backfill keys its ledger on it',
+      /REVIEWER_VERSION/.test(strip(read('../../blog/auto/cover-repair.ts'))))
+  }
+
   // MUTATION CONTROLS, run by hand:
+  //  - putting the JSON line before the HANDS/DEVICES/LETTERING lines fails "the
+  //    description comes first", which is the whole of the 20 Nov fix;
+  //  - leaving REVIEWER_VERSION out of `reviewKeyOf` fails "the backfill keys its
+  //    ledger on it", and would freeze every verdict an older reviewer gave;
+  //  - making `isModelUnavailable` match any error fails "a timeout is this
+  //    review's answer", and would re-ask every model in the list at full price
+  //    on a single slow response;
   //  - making `parseImageReview` treat a missing key as a defect (`row[d] !== false`)
   //    fails "a key the model left out is not a defect" and both "no opinion" rows;
   //  - removing the try/catch in `reviewGeneratedImage` fails "a provider failure

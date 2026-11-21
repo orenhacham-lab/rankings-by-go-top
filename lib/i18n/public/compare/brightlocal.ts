@@ -23,7 +23,7 @@
 import type { PublicLocale } from '@/lib/i18n/locales'
 import type { ComparisonCopy } from './types'
 
-const CHECKED = '2026-10-31'
+const CHECKED = '2026-11-20'
 
 const SOURCES = [{ label: 'brightlocal.com — pricing', href: 'https://www.brightlocal.com/pricing/' }]
 

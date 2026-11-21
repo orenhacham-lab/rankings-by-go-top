@@ -602,16 +602,63 @@ export async function getShopifyBlogs(creds: ShopifyCredentials): Promise<Shopif
   return out
 }
 
-export interface ShopifyArticleNode { id: string; handle: string; title: string; isPublished: boolean; publishedAt: string | null; blogHandle: string | null }
+export interface ShopifyArticleNode {
+  id: string
+  handle: string
+  title: string
+  isPublished: boolean
+  publishedAt: string | null
+  blogHandle: string | null
+  /**
+   * The merchant's CURRENT search-engine listing, read from the two metafields
+   * Shopify documents for it (`global.title_tag` / `global.description_tag`,
+   * both `single_line_text_field`) — an Article has no `seo` field, unlike a
+   * Product or a Collection.
+   *
+   * Both the reconcile read and the two mutation payloads select them, so a
+   * publish can verify its own listing from the response it already has.
+   * Optional because a node built elsewhere may not carry them, and absent
+   * means NOT READ rather than empty.
+   */
+  seoTitle?: string | null
+  seoDescription?: string | null
+}
 export type ShopifyArticleResult =
   | { ok: true; article: ShopifyArticleNode }
   | { ok: false; userErrors: ShopifyUserError[] }
 
-const ARTICLE_FIELDS = `article { id handle title isPublished publishedAt blog { handle } }`
+// The mutation payloads select the two SEO metafields as well, so a publish can
+// VERIFY its own search-engine listing out of the response Shopify already sends
+// instead of spending a second API call on a read-back.
+const ARTICLE_FIELDS = `article { id handle title isPublished publishedAt blog { handle }
+  titleTag: metafield(namespace: "global", key: "title_tag") { value }
+  descriptionTag: metafield(namespace: "global", key: "description_tag") { value } }`
 
-function toArticleNode(a: { id?: string; handle?: string; title?: string; isPublished?: boolean; publishedAt?: string | null; blog?: { handle?: string } } | null | undefined): ShopifyArticleNode | null {
+type RawArticle = {
+  id?: string; handle?: string; title?: string; isPublished?: boolean; publishedAt?: string | null
+  blog?: { handle?: string }
+  titleTag?: { value?: string | null } | null
+  descriptionTag?: { value?: string | null } | null
+}
+
+/** A metafield that exists with an empty string reads the same as an absent one. */
+const metafieldText = (m: { value?: string | null } | null | undefined): string | null => {
+  const v = (m?.value ?? '').trim()
+  return v || null
+}
+
+function toArticleNode(a: RawArticle | null | undefined): ShopifyArticleNode | null {
   if (!a || !a.id) return null
-  return { id: a.id, handle: String(a.handle ?? '').trim(), title: String(a.title ?? '').trim(), isPublished: !!a.isPublished, publishedAt: a.publishedAt ?? null, blogHandle: a.blog?.handle ? String(a.blog.handle).trim() : null }
+  return {
+    id: a.id,
+    handle: String(a.handle ?? '').trim(),
+    title: String(a.title ?? '').trim(),
+    isPublished: !!a.isPublished,
+    publishedAt: a.publishedAt ?? null,
+    blogHandle: a.blog?.handle ? String(a.blog.handle).trim() : null,
+    seoTitle: metafieldText(a.titleTag),
+    seoDescription: metafieldText(a.descriptionTag),
+  }
 }
 
 /** Create a Blog Article. `input` is a pre-built ArticleCreateInput (buildArticleInput). */
@@ -638,7 +685,12 @@ export async function shopifyArticleUpdate(creds: ShopifyCredentials, id: string
 
 /** Read an article by GID for reconciliation. Returns null when it no longer exists. */
 export async function shopifyGetArticle(creds: ShopifyCredentials, id: string): Promise<ShopifyArticleNode | null> {
-  const query = `query($id: ID!){ node(id: $id){ ... on Article { id handle title isPublished publishedAt blog { handle } } } }`
+  // The two SEO metafields are read HERE and only here: the update path must know
+  // what the merchant already has before it decides whether to write ours, and a
+  // value a merchant typed in Shopify's "Edit website SEO" panel is theirs to keep.
+  const query = `query($id: ID!){ node(id: $id){ ... on Article { id handle title isPublished publishedAt blog { handle }
+    titleTag: metafield(namespace: "global", key: "title_tag") { value }
+    descriptionTag: metafield(namespace: "global", key: "description_tag") { value } } } }`
   const { data } = await graphql<{ node?: unknown }>(creds, query, { id })
   return toArticleNode(data.node as never)
 }

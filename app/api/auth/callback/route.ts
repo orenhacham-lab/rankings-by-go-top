@@ -17,6 +17,7 @@ import { afterSignupPath } from '@/lib/onboarding/claim-start'
 import { GOOGLE_FLOW_COOKIE, completeGoogleSignIn, googleDirectConfig, googleFlowCookieOptions, matchGoogleState } from '@/lib/auth/google-direct'
 import { googleSignInFailureUrl } from '@/lib/auth/google-signin'
 import { normalizeStoredLocale } from '@/lib/i18n/locales'
+import { recordAccountLocale } from '@/lib/i18n/account-locale'
 import { statedAuthUrl } from '@/lib/i18n/auth-href'
 import { splitReferralFromPath } from '@/lib/affiliate/referral'
 import { attachReferral } from '@/lib/affiliate/attribution'
@@ -194,6 +195,27 @@ async function signedIn(
       })
     } catch (countryError) {
       console.error('[signup-country] write threw:', countryError instanceof Error ? countryError.name : 'unknown')
+    }
+  }
+
+  // THE LANGUAGE THIS ACCOUNT READS, written when it has none.
+  // A Google sign-up writes no metadata of its own, so those accounts carried no
+  // language and every customer email to them fell through to the fallback —
+  // Hebrew. This is the one funnel every sign-in door reaches and the only one
+  // that still holds the visitor's language, so it is where it is recorded.
+  // Never over a recorded choice, and never fails the sign-in:
+  // lib/i18n/account-locale.ts says why both.
+  if (user) {
+    try {
+      const outcome = await recordAccountLocale({
+        admin: createAdminClient(),
+        userId: user.id,
+        currentLocale: (user.user_metadata ?? {}).locale,
+        lang,
+      })
+      if (outcome === 'failed') console.error('[account-locale] write failed')
+    } catch (localeError) {
+      console.error('[account-locale] write threw:', localeError instanceof Error ? localeError.name : 'unknown')
     }
   }
 

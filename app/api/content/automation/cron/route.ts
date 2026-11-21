@@ -80,6 +80,14 @@
  * is forbidden to call Google — so the queue is drained here, every fifteen minutes, instead of
  * once a day at 07:30 UTC. The daily entry stays as a second chance at the same idempotent pass.
  *
+ * ALONGSIDE ALL OF IT, THE BLOG COVERS PUBLISHED BEFORE ANYONE LOOKED AT THEM
+ * (lib/blog/auto/cover-repair.ts): the image review runs when a cover is MADE, so
+ * the articles published before 17 November 2026 still carry whatever came back —
+ * the mirrored laptop and the two right hands Oren reported are among them. This
+ * pass reviews the covers already live and replaces the faulty ones, a few an
+ * hour, at most one replacement per article ever. Production only, isolated the
+ * same way; it ends by itself once every cover has been looked at.
+ *
  * LAST OF ALL, THE REMINDER EMAIL. After the top-up, the "articles are waiting for your OK" reminder
  * (lib/reminders): OFF unless REMINDER_EMAILS_ENABLED is exactly "true", and then only at
  * 09:00 Asia/Jerusalem, Sunday to Thursday. Isolated the same way: it cannot change, delay
@@ -101,6 +109,8 @@ import { runIsolatedOnboardingEmails } from '@/lib/onboarding-emails/isolated'
 import { runIsolatedWeeklySummaries } from '@/lib/reports/weekly/isolated'
 import { checkPublishingStalls, isDailyStallCheckRun } from '@/lib/content/automation/stall-watch'
 import { claimAutomationPass, isUngatedScheduler } from '@/lib/content/automation/pass-gate'
+import { runIsolatedShopifySeoBackfill } from '@/lib/shopify/seo-backfill-isolated'
+import { runIsolatedSeoBackfillSample } from '@/lib/content/seo-backfill-isolated'
 import { runMapUpkeep, liveEnsure } from '@/lib/content/existing-content/map-upkeep'
 import { runBlogDailyWindow, startIsolatedBlogWindow } from '@/lib/blog/auto/daily-window'
 import { runIsolatedGbpDue } from '@/lib/gbp/due-isolated'
@@ -108,6 +118,8 @@ import { runIsolatedArticleBatch } from '@/lib/content/batch/isolated'
 import { runIsolatedInlineImageBatch } from '@/lib/content/image-batch/isolated'
 import { runLinkHeal, startIsolatedLinkHeal } from '@/lib/content/auto-internal-links/heal'
 import { resyncPublishedArticle } from '@/lib/content/auto-internal-links/resync'
+import { runIsolatedBlogCoverRepair } from '@/lib/blog/auto/cover-repair-isolated'
+import { runIsolatedBlogWeeklyReview } from '@/lib/blog/auto/weekly-review-isolated'
 
 // Generation can take a while; request a generous budget (platform clamps to the
 // plan's max — e.g. 60s on Hobby, up to 300s on Pro).
@@ -245,6 +257,35 @@ async function handle(request: Request): Promise<Response> {
     // look like a crawl, and the address only ever comes from the business's own public
     // pages. Production only, isolated: it never throws.
     await runIsolatedProspectTopUp()
+    // Then the published blog covers (lib/blog/auto/cover-repair.ts): the review
+    // guards covers as they are MADE, so everything published before 17 Nov 2026
+    // still carries whatever the image model returned. This pass looks at those
+    // covers and replaces the faulty ones — a few an hour, one replacement per
+    // article ever, and never leaving an article without a cover. It ends by
+    // itself. Production only, isolated: it never throws.
+    await runIsolatedBlogCoverRepair(undefined, { startedAtMs: Date.parse(startedAt), maxDurationMs: maxDuration * 1000 })
+    // Then the search-engine listing of articles already on merchants' Shopify
+    // blogs that never got one: every Shopify publish before 21 Nov 2026 sent no
+    // SEO field at all (lib/shopify/seo-backfill.ts). Ten articles a pass, each
+    // one read before it is written and the merchant's own value never replaced.
+    // It ends by itself. Production only, isolated: it never throws.
+    await runIsolatedShopifySeoBackfill(undefined, { startedAtMs: Date.parse(startedAt), maxDurationMs: maxDuration * 1000 })
+    // Then a DRY RUN over the WordPress half of the same gap: 337 articles on 21
+    // customers' sites have no SEO title or meta description either, and only
+    // their live pages can say which fields are missing and which are the
+    // merchant's own. It reads ten at random and logs the distribution; it
+    // cannot write (lib/content/seo-backfill-isolated.ts). Production only,
+    // isolated: it never throws.
+    await runIsolatedSeoBackfillSample(undefined, { startedAtMs: Date.parse(startedAt), maxDurationMs: maxDuration * 1000 })
+    // Once a week, on Sunday at 06:00 UTC (after the 05:00 GSC sync): the reading
+    // of our own blog. The outcome engine and the cannibalisation table were both
+    // pure and both unreachable — nothing called them. This logs what they say:
+    // which published article to improve rather than replace, and which queries
+    // our own pages are splitting between them (measured 21 Nov 2026: eight of
+    // our pages on one query, 1,377 impressions). It only reads and only logs —
+    // no article, plan row or redirect is touched (lib/blog/auto/weekly-review-isolated.ts).
+    // Production only, isolated: it never throws.
+    await runIsolatedBlogWeeklyReview(undefined, { startedAtMs: Date.parse(startedAt), maxDurationMs: maxDuration * 1000 })
     // Last of all, and off unless REMINDER_EMAILS_ENABLED is "true": the reminder email for
     // articles waiting for approval (lib/reminders). Isolated; it never throws or rejects.
     await runIsolatedReminders()

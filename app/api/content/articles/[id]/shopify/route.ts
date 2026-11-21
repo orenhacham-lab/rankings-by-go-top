@@ -14,7 +14,7 @@ import { publishArticleToShopify, type ShopifyPublishArticleRow } from '@/lib/sh
 import { enqueueGbpPostForPublishedArticle } from '@/lib/gbp/auto-post'
 
 const ARTICLE_SELECT =
-  'id, project_id, title, slug, excerpt, meta_description, content_html, featured_image_url, shopify_blog_id, shopify_article_id, shopify_tags'
+  'id, project_id, title, slug, excerpt, meta_title, meta_description, content_html, featured_image_url, shopify_blog_id, shopify_article_id, shopify_tags'
 
 export async function POST(request: Request, { params }: { params: Promise<{ id: string }> }) {
   if (!isContentModuleEnabled()) return Response.json({ error: 'Not found' }, { status: 404 })

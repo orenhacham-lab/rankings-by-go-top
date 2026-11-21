@@ -22,11 +22,11 @@
  * never an address, a title or a provider's words.
  */
 import type { ServiceRoleClient } from '@/lib/supabase/admin'
-import type { Locale } from '@/lib/i18n/locales'
+import type { PublicLocale } from '@/lib/i18n/locales'
 import { FIRST_AFTER_MS, decideReminder, inSendWindow } from './cadence'
 import { buildReminderEmail, safeOrigin, type ReminderEmail } from './email'
 import { isSuppressed } from '@/lib/email-suppression'
-import { fallbackEmailLocale, type ShopifyOriginFact } from './recipient'
+import { fallbackEmailLocale, type SignupOriginFact } from './recipient'
 import { claimSend, readState, releaseClaim } from './state'
 import { makeUnsubscribeToken } from './token'
 
@@ -37,12 +37,18 @@ export const PROJECTS_PER_RUN = 20
 
 export interface OwnerFacts {
   email: string | null
-  locale: Locale | null
+  locale: PublicLocale | null
   firstName: string | null
-  /** Provenance, not a connected store; null when it could not be read. */
-  shopifyAppStoreOrigin: ShopifyOriginFact
+  /** How the account began — provenance, not a connected store; null when it could not be read. */
+  signupOrigin: SignupOriginFact
   /** An administrator's own project: no customer email. */
   staff: boolean
+  /**
+   * Where the account was opened (lib/compliance/signup-country.ts), alpha-2, or
+   * null when it was never recorded or could not be read. The language fallback
+   * reads it for ONE coarse decision; see lib/reminders/recipient.ts.
+   */
+  signupCountry?: string | null
 }
 export interface OutgoingReminder { to: string; email: ReminderEmail }
 
@@ -128,7 +134,7 @@ export async function runArticleReminders(deps: ReminderDeps): Promise<ReminderR
       const facts = await deps.owner(ownerId).catch(() => null)
       if (!facts?.email) continue
       if (facts.staff) continue
-      const locale = facts.locale ?? fallbackEmailLocale(facts.shopifyAppStoreOrigin)
+      const locale = facts.locale ?? fallbackEmailLocale({ origin: facts.signupOrigin, signupCountry: facts.signupCountry ?? null })
       // No recorded language and no readable provenance: nothing to write in yet.
       if (!locale) continue
       const token = makeUnsubscribeToken(projectId, ownerId, deps.env)

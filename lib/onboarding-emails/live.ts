@@ -45,17 +45,19 @@ export function liveOnboardingDeps(): OnboardingDeps {
       const meta = (data.user.user_metadata ?? {}) as Record<string, unknown>
       const full = typeof meta.full_name === 'string' ? meta.full_name : typeof meta.name === 'string' ? meta.name : ''
       const first = full.trim().split(/\s+/)[0] ?? ''
-      // Provenance, not an integration record: see lib/reminders/recipient.ts.
       const governance = await loadBillingGovernance(admin, userId)
-      const shopifyAppStoreOrigin = governance.status === 'loaded'
-        ? governance.governance.signupOrigin === 'shopify_app_store'
-        : governance.status === 'missing' ? false : null
+      // Provenance, not an integration record: see lib/reminders/recipient.ts.
+      // The whole value, not a boolean about one of its branches — a marketplace
+      // buyer is an English-channel buyer and used to be mailed in Hebrew.
+      const signupOrigin = governance.status === 'loaded'
+        ? governance.governance.signupOrigin
+        : governance.status === 'missing' ? 'unknown' : null
       return {
         email: typeof data.user.email === 'string' ? data.user.email : null,
         // All four published languages: the dictionary has them, so the email does too.
         locale: normalizeDashboardUiLocale(meta.locale),
         firstName: first ? first.slice(0, 40) : null,
-        shopifyAppStoreOrigin,
+        signupOrigin,
         // An administrator's own projects get no customer email at all.
         staff: await isAdminUser(admin, userId),
         // Where the account was opened, for the 제50조 gate in

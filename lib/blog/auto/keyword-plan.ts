@@ -292,11 +292,198 @@ export const TAIL_BONUS = 10
 /** Beyond this many words, another word says nothing more about specificity. */
 export const TAIL_WORDS_CAP = 6
 
-/** Lower is more winnable for a site with little authority. Pure. */
-export function keywordDifficulty(idea: Pick<KeywordIdeaResult, 'keyword' | 'competition' | 'competitionIndex'>): number {
+/**
+ * HOW SPECIFIC A KEYWORD IS, IN WORDS — COUNTED SO THAT JAPANESE COUNTS AT ALL.
+ *
+ * `keywordTokens` splits on spaces, and Japanese and Korean write none, so
+ * every Japanese keyword scored as ONE word however specific it was:
+ * `Googleビジネスプロフィール活用` and `SEO` were the same length to the
+ * ranking above, and the tail bonus — the whole mechanism that prefers a
+ * specific keyword to a head term — was dead in those two languages. Measured
+ * 21 Nov 2026: the Japanese articles published average 8,685 monthly searches
+ * while the Japanese rows still waiting average 99.
+ *
+ * Where a language writes no spaces, the character count stands in, at four
+ * characters to a word. That is the average these scripts run at, and it is a
+ * stand-in, not a measurement — which is the same honest limit the advertiser
+ * competition index carries.
+ */
+export function specificityWords(keyword: string): number {
+  const words = keywordTokens(keyword).length
+  if (words > 1) return words
+  const noSpaceChars = (keyword.match(/[\u3000-\u9fff\uac00-\ud7af]/g) ?? []).length
+  return noSpaceChars >= 4 ? Math.max(words, Math.round(noSpaceChars / 4)) : words
+}
+
+/**
+ * ABOVE THIS MANY MONTHLY SEARCHES, A KEYWORD IS A HEAD TERM FOR THIS SITE.
+ *
+ * Not "a big keyword" in general — one this site cannot win today. The
+ * thresholds are set from what the queue actually chose, read on 21 Nov 2026,
+ * and that reading is also the clearest statement of why a volume term is
+ * needed at all. Every one of the fourteen biggest keywords ever published
+ * here came back from Keyword Planner as competition LOW:
+ *
+ *   google search console   en  450,000  LOW
+ *   google search console   de  135,000  LOW
+ *   サーチ コンソール          ja  110,000  LOW
+ *   keyword research        en   90,500  LOW
+ *   google keyword planner  en   49,500  LOW
+ *
+ * Advertiser competition is low for an informational head term exactly
+ * because nobody bids on it, while its ORGANIC difficulty is the highest on
+ * the board. So the one number the ranking trusted was telling it that the
+ * least winnable keywords in the niche were the easiest, and the ranking
+ * believed it. The site holds those queries at position 62 to 84.
+ */
+export const HEAD_VOLUME: Record<BlogAutoLocale, number> = {
+  he: 2000, en: 5000, es: 2000, 'pt-BR': 2000, fr: 2000, it: 2000, ja: 2000, de: 2000, nl: 2000,
+  // Poland and Korea are smaller search markets — Google holds a minority of
+  // Korean search at all (Naver is the other half) — so the same number would
+  // be a threshold nothing ever reaches.
+  pl: 1000, ko: 1000,
+}
+
+/** Difficulty points added for each doubling of volume above that threshold. */
+export const HEAD_PENALTY_PER_DOUBLING = 12
+/** The most the penalty can ever be, so it orders heads without erasing them. */
+export const HEAD_PENALTY_CAP = 60
+
+/**
+ * The penalty a head term carries. It REORDERS, it never rejects: the queue in
+ * every language is 6 to 17 rows deep (measured 21 Nov 2026), so a filter here
+ * would be a language with no article that day, which is the one cost this
+ * blog is not allowed to pay.
+ */
+export function headPenalty(locale: BlogAutoLocale, monthlySearches: number | null | undefined): number {
+  const head = HEAD_VOLUME[locale]
+  const volume = monthlySearches ?? 0
+  if (volume <= head) return 0
+  return Math.min(Math.log2(volume / head) * HEAD_PENALTY_PER_DOUBLING, HEAD_PENALTY_CAP)
+}
+
+/**
+ * THE QUERIES WHERE THIS BLOG SUCCEEDED, AND WHERE THE SUCCESS WAS WASTED.
+ *
+ * Read in Search Console on 21 Nov 2026 over the 28 days to 13 Nov: of the 660
+ * impressions the blog earns in the band it can actually improve (positions 5
+ * to 25), **276 are people looking for a human being** — "יועץ seo",
+ * "חברות seo", "מומחה לפרסום בגוגל", "מקדם אתרים תותח", "מקדם אתרים פרטי",
+ * "חברה לקידום בגוגל". Those searchers want somebody to do it for them. They
+ * cannot buy a self-serve product even if they land on the page and like it,
+ * and the agency's own done-for-you services live on gotop.co.il, not here.
+ *
+ * So this is where the blog ranked best and earned least.
+ *
+ * IT IS A PENALTY, NOT A FILTER, and that is a decision, not an oversight:
+ * Oren, 21 Nov 2026 — do not exclude these if excluding them could shrink the
+ * number of articles we can publish, because we publish every day and must
+ * never run out of topics. The queue is 6 to 17 rows deep per language, so a
+ * filter here is a language with no article that day. A hiring-intent keyword
+ * therefore stays in the queue, is written when nothing better is waiting, and
+ * is simply chosen last.
+ *
+ * Not to be confused with EXCLUDED_PATTERNS above, which is a different thing:
+ * those name the agency itself ("סוכנות קידום", "seo agency") or ask its price,
+ * and were never articles for this blog at all.
+ */
+export const HIRING_INTENT_PATTERNS: Partial<Record<BlogAutoLocale, RegExp[]>> = {
+  he: [/יועץ/, /מומחה/, /מקדם\s+אתרים/, /פרילנסר/, /בעל\s+מקצוע/],
+  en: [/\bconsultants?\b/i, /\bexperts?\b/i, /\bspecialists?\b/i, /\bfreelancers?\b/i, /\bfor\s+hire\b/i],
+  es: [/consultor/i, /expert[oa]/i, /especialista/i, /aut[oó]nomo/i],
+  'pt-BR': [/consultor/i, /especialista/i, /freelancer/i],
+  fr: [/consultant/i, /expert/i, /sp[eé]cialiste/i, /freelance/i],
+  it: [/consulente/i, /esperto/i, /specialista/i, /freelance/i],
+  de: [/berater/i, /experte/i, /spezialist/i, /dienstleister/i, /freiberufler/i],
+  nl: [/consultant/i, /expert/i, /specialist/i, /freelancer/i],
+  pl: [/konsultant/i, /ekspert/i, /specjalista/i, /freelancer/i],
+  ja: [/コンサル/, /専門家/, /代行/, /外注/],
+  ko: [/컨설턴트/, /전문가/, /대행/],
+}
+
+/**
+ * The company nouns, which mean hiring only in one direction.
+ *
+ * "seo company" is somebody looking for a firm to do it; "seo for companies"
+ * is an article about doing it, and B2B content marketing is full of the
+ * second shape — "SEO für Unternehmen", "seo para empresas", "קידום אתרים
+ * לעסקים". A bare noun test would send a whole legitimate category to the back
+ * of every European queue, so the preposition decides.
+ */
+export const HIRING_COMPANY_NOUNS: Partial<Record<BlogAutoLocale, RegExp[]>> = {
+  he: [/חבר(ה|ות)\s+(ל|קידום|seo)/i, /סוכנות/],
+  en: [/\bagenc(y|ies)\b/i, /\bcompan(y|ies)\b/i, /\bservices?\b/i],
+  es: [/agencia/i, /empresas?\b/i],
+  'pt-BR': [/ag[eê]ncia/i, /empresas?\b/i],
+  fr: [/agence/i, /entreprise/i, /soci[eé]t[eé]/i],
+  it: [/agenzia/i, /azienda/i],
+  de: [/agentur/i, /firma/i, /unternehmen/i],
+  nl: [/bureau/i, /bedrijf/i],
+  pl: [/agencja/i, /firma/i],
+  ja: [/会社/, /業者/],
+  ko: [/업체/, /회사/],
+}
+
+/**
+ * The words that turn a company noun back into an article: "for", in each
+ * language. A keyword that contains one of these is about serving companies,
+ * not about hiring one.
+ */
+export const FOR_COMPANIES_WORDS: Partial<Record<BlogAutoLocale, RegExp[]>> = {
+  he: [/\bל(עסקים|חברות|ארגונים)/, /עבור\s/],
+  en: [/\bfor\b/i],
+  es: [/\bpara\b/i],
+  'pt-BR': [/\bpara\b/i],
+  fr: [/\bpour\b/i],
+  it: [/\bper\b/i],
+  de: [/\bf[üu]r\b/i],
+  nl: [/\bvoor\b/i],
+  pl: [/\bdla\b/i],
+  ja: [/向け/, /のため/],
+  ko: [/위한/, /용\s/],
+}
+
+/**
+ * The points a hiring-intent keyword carries. Chosen so that it loses to any
+ * comparable informational keyword while still beating a 450,000-a-month head
+ * term, which is the thing that must never be first again.
+ */
+export const HIRING_INTENT_PENALTY = 25
+
+/** Whether this keyword is somebody looking for a person or a firm to hire. Pure. */
+export function isHiringIntent(locale: BlogAutoLocale, keyword: string): boolean {
+  const k = keyword || ''
+  if ((HIRING_INTENT_PATTERNS[locale] ?? []).some((re) => re.test(k))) return true
+  const company = (HIRING_COMPANY_NOUNS[locale] ?? []).some((re) => re.test(k))
+  if (!company) return false
+  // A company noun with a "for" in it is an article about serving companies.
+  return !(FOR_COMPANIES_WORDS[locale] ?? []).some((re) => re.test(k))
+}
+
+/** Flat, and it reorders only — see HIRING_INTENT_PATTERNS for why never a filter. */
+export function hiringIntentPenalty(locale: BlogAutoLocale, keyword: string): number {
+  return isHiringIntent(locale, keyword) ? HIRING_INTENT_PENALTY : 0
+}
+
+/**
+ * Lower is more winnable for a site with little authority. Pure.
+ *
+ * With no locale it is the advertiser competition minus the tail bonus, as
+ * before. With one it also carries the head-term penalty, which is what stops
+ * `google search console` at 450,000 a month from being treated as the easiest
+ * thing in the queue because its advertiser competition happens to be low, and
+ * the hiring-intent penalty, which sends the queries that want a human being
+ * to the back without taking them out of the queue.
+ */
+export function keywordDifficulty(
+  idea: Pick<KeywordIdeaResult, 'keyword' | 'competition' | 'competitionIndex'> & { avgMonthlySearches?: number | null },
+  locale?: BlogAutoLocale,
+): number {
   const ads = idea.competitionIndex ?? (idea.competition ? COMPETITION_FALLBACK[idea.competition] : 50)
-  const words = Math.min(keywordTokens(idea.keyword ?? '').length, TAIL_WORDS_CAP)
-  return ads - Math.max(words - 1, 0) * TAIL_BONUS
+  const words = Math.min(specificityWords(idea.keyword ?? ''), TAIL_WORDS_CAP)
+  const head = locale ? headPenalty(locale, idea.avgMonthlySearches) : 0
+  const hiring = locale ? hiringIntentPenalty(locale, idea.keyword ?? '') : 0
+  return ads - Math.max(words - 1, 0) * TAIL_BONUS + head + hiring
 }
 
 export interface SelectKeywordsInput {
@@ -305,12 +492,51 @@ export interface SelectKeywordsInput {
   /** Keywords already planned or published in this language. */
   taken: string[]
   limit: number
+  /**
+   * Queries a page of ours ALREADY holds well enough to earn from, from
+   * `lib/blog/auto/cannibal.ts` over our own Search Console rows. A candidate
+   * that lands on one of these goes to the back of the queue — see
+   * `OWNED_QUERY_PENALTY`. Optional, and an empty list means the ordering is
+   * exactly what it was before.
+   */
+  owned?: string[]
 }
 
 export interface SelectedKeyword {
   keyword: string
   monthlySearches: number | null
   competition: string | null
+}
+
+/**
+ * HOW FAR BACK A KEYWORD GOES WHEN A PAGE OF OURS ALREADY OWNS THAT QUERY.
+ *
+ * Measured 21 Nov 2026 on our own property: eight of our pages rank for
+ * "בדיקת מיקומים בגוגל" and not one of them wins; five share
+ * "בדיקת מיקום בגוגל", where the page nearest a click is a feature page at
+ * 19.6. Writing a ninth article for a query we already hold does not add a
+ * position, it divides one.
+ *
+ * It is a penalty and NOT a rejection, for the same reason the hiring-intent
+ * one is: the blog publishes every day in every language, and a check that can
+ * empty the queue is not allowed to exist. A candidate sitting on an owned
+ * query is still claimable, still counted, and still written — after the
+ * candidates that would win us a page we do not already have.
+ */
+export const OWNED_QUERY_PENALTY = 20
+
+/**
+ * How much of a keyword has to be the owned query before it is the same
+ * territory. Looser than `CANNIBAL_OVERLAP`, which decides whether two
+ * keywords are the SAME ARTICLE: being wrong here costs an article one place
+ * in the queue, not its existence.
+ */
+export const OWNED_OVERLAP = 0.6
+
+/** The penalty for a candidate that lands on a query we already hold. */
+export function ownedQueryPenalty(keyword: string, owned: string[] | undefined): number {
+  if (!owned?.length || !keyword) return 0
+  return owned.some((q) => keywordOverlap(keyword, q) >= OWNED_OVERLAP) ? OWNED_QUERY_PENALTY : 0
 }
 
 export function selectKeywords(input: SelectKeywordsInput): SelectedKeyword[] {
@@ -320,8 +546,15 @@ export function selectKeywords(input: SelectKeywordsInput): SelectedKeyword[] {
   // response can be near-duplicates of each other.
   const blocking = [...input.taken]
 
+  // The owned-query penalty is applied HERE and not inside `keywordDifficulty`
+  // on purpose: `planRowDifficulty` shares that function, and a row already in
+  // the queue should not be reordered by a reading taken after it was planned.
+  // This changes which NEW keywords are researched in, nothing else.
+  const score = (idea: KeywordIdeaResult): number =>
+    keywordDifficulty(idea, input.locale) + ownedQueryPenalty(idea.keyword ?? '', input.owned)
+
   const ranked = [...input.ideas].sort((a, b) => {
-    const d = keywordDifficulty(a) - keywordDifficulty(b)
+    const d = score(a) - score(b)
     if (d !== 0) return d
     return (b.avgMonthlySearches ?? 0) - (a.avgMonthlySearches ?? 0)
   })
