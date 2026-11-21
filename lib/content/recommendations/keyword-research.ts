@@ -24,6 +24,7 @@ import { normalizeText } from './topic-idea-store'
 import type { TopicSuggestion } from './types'
 import { contentLanguageOrEnglish, languageNameInEnglish, type ContentLanguage } from '@/lib/content/language'
 import { REASON_TEXT } from './reason-text'
+import { keywordDifficulty } from '@/lib/blog/auto/keyword-plan'
 
 // Phase 3F.3.1 — broadened (but still bounded) so the source doesn't exhaust
 // after ~2 runs: more URL seeds, an extra keyword-seed pass, a larger raw pool.
@@ -497,6 +498,10 @@ export interface ClusterInput {
   primaryKeyword: string
   secondaryKeywords: string[]
   volume: number
+  /** Advertiser competition as Keyword Planner bucketed it, when it sent one. */
+  competition?: 'LOW' | 'MEDIUM' | 'HIGH' | null
+  /** The same on a 0..100 scale, when it sent that instead. */
+  competitionIndex?: number | null
 }
 
 function isBrandOrSupport(keyword: string, brandTokens: Set<string>): boolean {
@@ -535,8 +540,51 @@ export function researchKeywordIssue(keyword: string, ctx: { brandTokens: Set<st
   return null
 }
 
-function scoreFromVolume(volume: number): number {
-  const s = 0.4 + 0.6 * (Math.log10(volume + 1) / 4)
+/**
+ * HOW GOOD AN OPPORTUNITY THIS KEYWORD IS FOR THE MERCHANT'S SITE.
+ *
+ * It used to be `0.4 + 0.6 * log10(volume)/4` and nothing else, which made the
+ * score a strictly increasing function of search volume: the broadest term in
+ * the niche always came first. Measured in Production on 21 Nov 2026 over the
+ * 97 pending ideas from this source, the effect is exact — two-word keywords
+ * average 0.801, three words 0.738, four words 0.677, five words 0.660. The
+ * shortest, most contested query is at the top of every merchant's list, and
+ * 58 of the 97 are two words.
+ *
+ * This is the same mistake the blog made until 23 Oct 2026 and for the same
+ * reason, so it gets the same answer: `keywordDifficulty` from
+ * `lib/blog/auto/keyword-plan.ts` — least advertiser competition first, a
+ * specific keyword before a head term — with demand kept as a real but
+ * smaller part of the score rather than the whole of it.
+ *
+ * The locale argument is deliberately not passed. Its head-term penalty is
+ * calibrated on OUR niche's volumes, and a merchant's niche is a different
+ * scale; the locale-free measure is the part that transfers.
+ *
+ * Two honest limits, the same two the blog carries: Google's competition index
+ * is ADVERTISER competition, a proxy for organic difficulty and the best free
+ * one there is, and word count is a crude stand-in for specificity.
+ *
+ * Still 0.4..1, the range it always had, because every caller orders by this
+ * number and none of them thresholds on it.
+ */
+export function scoreFromWinnability(idea: {
+  keyword: string; volume: number
+  competition?: 'LOW' | 'MEDIUM' | 'HIGH' | null
+  competitionIndex?: number | null
+}): number {
+  // `keywordDifficulty` with no locale is advertiser competition (0..100,
+  // defaulting to 50 when Google sent neither) minus 10 a word of specificity,
+  // capped at six words: roughly -50..100 in practice.
+  const difficulty = keywordDifficulty({
+    keyword: idea.keyword,
+    competition: idea.competition ?? null,
+    competitionIndex: idea.competitionIndex ?? null,
+    avgMonthlySearches: idea.volume,
+  })
+  const winnable = Math.max(0, Math.min(1, (100 - difficulty) / 150))
+  const demand = Math.max(0, Math.min(1, Math.log10(Math.max(0, idea.volume) + 1) / 4))
+  const s = 0.4 + 0.42 * winnable + 0.18 * demand
   return Math.max(0.4, Math.min(1, Number(s.toFixed(2))))
 }
 
@@ -781,7 +829,17 @@ export async function recommendFromKeywordResearch(
       return false
     })
     .filter((r) => !hasNavCommerceToken(r.keyword))
-    .sort((a, b) => (b.avgMonthlySearches ?? 0) - (a.avgMonthlySearches ?? 0))
+    // WHICH KEYWORDS REACH THE MODEL AT ALL. This was `volume, descending`, and
+    // since the batch below is the first TOPICS_PER_RUN of it, the broadest
+    // terms in the niche were the only ones ever considered and the tail was
+    // never seen. Ordered by what the site can win instead, with volume kept as
+    // the tie-breaker. Nothing is removed: the inventory is the same length, the
+    // batch is the same size, and a head term still gets written — later.
+    .sort((a, b) => {
+      const d = keywordDifficulty(a) - keywordDifficulty(b)
+      if (d !== 0) return d
+      return (b.avgMonthlySearches ?? 0) - (a.avgMonthlySearches ?? 0)
+    })
   const afterNoiseFilter = cleaned.length
 
   // 3) KEYWORD INVENTORY (Phase 3F.3.1e): treat EACH distinct keyword as its own
@@ -797,7 +855,7 @@ export async function recommendFromKeywordResearch(
   let filteredGenericCount = 0
   let filteredUnrelatedCount = 0
   const filteredUnrelatedExamples: string[] = []
-  const candidates: { keyword: string; volume: number }[] = []
+  const candidates: { keyword: string; volume: number; competition: 'LOW' | 'MEDIUM' | 'HIGH' | null; competitionIndex: number | null }[] = []
   for (const r of cleaned) {
     const kw = r.keyword.trim()
     const nk = normalizeText(kw)
@@ -814,7 +872,7 @@ export async function recommendFromKeywordResearch(
       continue
     }
     if (avoidSet.has(nk)) { skippedKnownCount++; if (skippedKnownExamples.length < 20) skippedKnownExamples.push(kw); continue }
-    candidates.push({ keyword: kw, volume: r.avgMonthlySearches ?? 0 })
+    candidates.push({ keyword: kw, volume: r.avgMonthlySearches ?? 0, competition: r.competition ?? null, competitionIndex: r.competitionIndex ?? null })
   }
   const candidateCount = candidates.length
 
@@ -834,6 +892,8 @@ export async function recommendFromKeywordResearch(
     primaryKeyword: c.keyword,
     secondaryKeywords: relatedKeywords(c.keyword, cleaned, 4),
     volume: c.volume,
+    competition: c.competition,
+    competitionIndex: c.competitionIndex,
   }))
 
   // 5) ONE Gemini Pro editorial pass over the whole batch: the model consolidates
@@ -880,7 +940,10 @@ export async function recommendFromKeywordResearch(
       suggestedInternalLinks: [],
       source: 'keyword_research_url',
       suggestionReason: editorial ? `${editorial} · ${reasonBase}` : reasonBase,
-      suggestionScore: scoreFromVolume(volume),
+      suggestionScore: scoreFromWinnability({
+        keyword: cluster.primaryKeyword, volume,
+        competition: cluster.competition ?? null, competitionIndex: cluster.competitionIndex ?? null,
+      }),
     })
   }
   const skippedByModel = rejectedByModel.filter((r) => clusterByPrimary.has(normalizeText(r.primaryKeyword || '')))
