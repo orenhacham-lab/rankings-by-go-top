@@ -677,9 +677,9 @@ async function main() {
     return linkifyBareUrls(html) === html
   })())
   check('H6: a foreign address is marked nofollow and opens in a new tab', (() => {
-    const out = linkifyBareUrls('<p>מקור: https://example.com/a</p>')
+    const out = linkifyBareUrls('<p>מקור: https://developers.google.com/search/docs</p>')
     return out.includes('rel="nofollow noopener"') && out.includes('target="_blank"')
-  })(), linkifyBareUrls('<p>מקור: https://example.com/a</p>'))
+  })(), linkifyBareUrls('<p>מקור: https://developers.google.com/search/docs</p>'))
   check('H7: our own address stays in the tab', !linkifyBareUrls(bareBody).includes('target="_blank"'))
 
   const brandBody = `<p>פתיחה ${BRAND} בפסקה הראשונה</p><h2>כ</h2><p>כך ${BRAND} עושה את זה.</p>`

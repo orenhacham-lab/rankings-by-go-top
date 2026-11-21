@@ -95,7 +95,92 @@ export const isOwnUrl = (url: string): boolean => {
   return !!host && OWN_HOSTS.includes(host)
 }
 
-const BARE_URL = /https?:\/\/[^\s<>"'()[\]]+/g
+/**
+ * ONLY ASCII CHARACTERS A URL CAN ACTUALLY CONTAIN (RFC 3986), and the address
+ * must then hold a host that could exist. Both halves were learnt from pages
+ * that are live.
+ *
+ * `[^\s<>"'()[\]]+` matched everything that is not a space, which in a language
+ * written WITHOUT SPACES means the rest of the sentence. The Japanese article
+ * `seo-settings-guide-japan` (31 Oct 2026) explains that an address beginning
+ * `http://` is a weak signal, and the whole explanation — 54 Japanese
+ * characters of it — became the href of one link. Restricting the match to the
+ * ASCII characters an address is allowed to contain stops it at the first
+ * Japanese character, and leaves a percent-encoded Hebrew address (`%D7%A7…`)
+ * untouched, because percent-encoding is ASCII.
+ *
+ * The Dutch article `what-is-google-search-console-dutch-guide` (7 Nov 2026)
+ * shows the other half. It tells the reader that a site has four versions —
+ * "(http://, https://, http://www. en https://www.)" — and all four became
+ * live links to nowhere. Each of those is a scheme with no host, or a host with
+ * no dot, so `HOSTLIKE` below refuses them and the text is left as text.
+ */
+const BARE_URL = /https?:\/\/[A-Za-z0-9\-._~:/?#@!$&*+,;=%]+/g
+
+/**
+ * A host that could be a real one: dot-separated labels and a letters-only
+ * public suffix of at least two characters. Deliberately strict — the cost of
+ * not linking an address is that the reader copies it, and the cost of linking
+ * a non-address is a broken link on a published page.
+ */
+const HOSTLIKE = /^(?=.{4,253}$)(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,24}$/i
+
+/**
+ * HOSTS THAT MEAN "YOUR OWN SITE HERE".
+ *
+ * Reserved for documentation by RFC 2606 / RFC 6761, plus the placeholders the
+ * writer reaches for in each language — measured, not imagined: `example.com`
+ * is a live link in the Japanese article `google-search-engine-registration-guide`
+ * (9 Nov 2026), `www.seusite.com.br` in the Brazilian `webmaster-tools-google-guide`
+ * (9 Nov 2026) and `yourwebsite.com` twice in the English `google-webmaster-tools-guide`
+ * (24 Oct 2026). A reader who clicks one of those learns that we publish pages
+ * nobody checked, and an engine reading the page sees an outbound link to a
+ * domain that answers nothing.
+ *
+ * Only the HOST is judged, so the words around it stay exactly as written: the
+ * sentence still says `https://example.com/sitemap.xml`, it is simply not a
+ * link any more.
+ */
+const PLACEHOLDER_LABELS = [
+  // RFC 2606 / 6761 reserved names.
+  'example', 'test', 'invalid', 'localhost',
+  // English.
+  'yourwebsite', 'your-website', 'yoursite', 'your-site', 'yourdomain', 'your-domain',
+  'mywebsite', 'my-website', 'mysite', 'my-site', 'mydomain', 'my-domain', 'domain', 'website',
+  // Portuguese (Brazil) and Spanish.
+  'seusite', 'seu-site', 'seudominio', 'seu-dominio', 'tusitio', 'tu-sitio', 'tudominio', 'tu-dominio',
+  // French.
+  'votresite', 'votre-site', 'votredomaine', 'votre-domaine', 'monsite', 'mon-site',
+  // Italian.
+  'ilmiosito', 'il-mio-sito', 'miosito', 'mio-sito', 'tuosito', 'tuo-sito',
+  // German.
+  'ihrewebsite', 'ihre-website', 'ihreseite', 'ihre-seite', 'deinewebsite', 'deine-website', 'meinewebsite', 'meine-website',
+  // Dutch.
+  'mijnwebsite', 'mijn-website', 'mijnsite', 'mijn-site', 'uwwebsite', 'uw-website', 'jouwwebsite', 'jouw-website',
+  // Polish.
+  'twojastrona', 'twoja-strona', 'twojadomena', 'twoja-domena', 'mojastrona', 'moja-strona',
+]
+
+/** Suffixes reserved for documentation and testing (RFC 6761). */
+const PLACEHOLDER_SUFFIXES = ['.example', '.test', '.invalid', '.localhost']
+
+/** Is this host a stand-in for the reader's own site rather than a real one? */
+export function isPlaceholderHost(host: string | null): boolean {
+  if (!host) return false
+  const h = host.toLowerCase().replace(/^www\./, '').replace(/:\d+$/, '')
+  if (PLACEHOLDER_SUFFIXES.some((s) => h === s.slice(1) || h.endsWith(s))) return true
+  const label = h.split('.')[0]
+  return PLACEHOLDER_LABELS.includes(label)
+}
+
+/** An address worth turning into a link: a real scheme and a host that could exist. */
+export function isLinkableUrl(url: string): boolean {
+  const host = hostOfUrl(url)
+  if (!host) return false
+  if (!HOSTLIKE.test(host.replace(/:\d+$/, ''))) return false
+  return !isPlaceholderHost(host)
+}
+
 /** A sentence's punctuation is not part of its address. */
 const trimUrlTail = (url: string): string => url.replace(/[.,;:!?'"»״׳]+$/, '')
 
@@ -111,11 +196,95 @@ export function linkifyBareUrls(html: string): string {
     if (!isLinkableRun(run) || !run.text.includes('://')) continue
     tokens[run.token] = run.text.replace(BARE_URL, (match) => {
       const url = trimUrlTail(match)
-      if (!url) return match
+      if (!url || !isLinkableUrl(url)) return match
       const tail = match.slice(url.length)
       const attrs = isOwnUrl(url) ? '' : ' target="_blank" rel="nofollow noopener"'
       return `<a href="${url}"${attrs}>${url}</a>${tail}`
     })
+  }
+  return tokens.join('')
+}
+
+// ── repairing the links a published article already carries ─────────────────
+
+/**
+ * THE ONE SHOPIFY ADDRESS, AND IT IS LOWER CASE.
+ *
+ * The App Store listing lives at `/go-top-seo`. The Italian
+ * `search-engine-optimization-guide` and the German `searchconsole-anleitung-unternehmen`
+ * both carry `apps.shopify.com/Go-Top-SEO`, written the way the product's NAME
+ * is written, and both lost the `rel="nofollow"` the rule requires. The brief
+ * asks the model for the right address and the truth gate reads the model's
+ * text, so neither sees an address that a later pass wrote.
+ */
+export const SHOPIFY_LISTING_URL = 'https://apps.shopify.com/go-top-seo'
+
+const HREF_RE = /\shref\s*=\s*"([^"]*)"/i
+const REL_RE = /\srel\s*=\s*"([^"]*)"/i
+
+/** The canonical form of an outbound href, or null when it needs no change. */
+function canonicalHref(href: string): string | null {
+  if (!/^https?:\/\/apps\.shopify\.com\//i.test(href)) return null
+  return href === SHOPIFY_LISTING_URL ? null : SHOPIFY_LISTING_URL
+}
+
+/** `rel` with nofollow and noopener present, order kept, nothing else dropped. */
+export function withNofollow(rel: string | null): string {
+  const parts = (rel ?? '').split(/\s+/).filter(Boolean)
+  for (const needed of ['nofollow', 'noopener']) {
+    if (!parts.some((p) => p.toLowerCase() === needed)) parts.push(needed)
+  }
+  return parts.join(' ')
+}
+
+/**
+ * EVERY LINK IN A BODY WE ALREADY PUBLISHED, RE-ASKED.
+ *
+ * Runs on RENDER as well as on the daily publish, so it repairs the pages that
+ * are live without touching a stored row — the same property that let the bare
+ * URL pass fix old articles. It only ever removes a link or corrects an
+ * attribute; it never writes a sentence, never drops a word, and never changes
+ * whether an article can be published. Three things it does:
+ *
+ *   1. A link whose address cannot be real — a scheme with no host
+ *      (`http://www`), a sentence that is not an address, a documentation
+ *      placeholder (`example.com`) — is UNWRAPPED. The words stay exactly as
+ *      the article wrote them; only the anchor goes.
+ *   2. A link to somebody else's site is given `rel="nofollow noopener"`.
+ *      Without it, every outbound link we generate hands our own authority to
+ *      whoever it points at, and the Shopify rule the truth gate enforces was
+ *      quietly not holding on the live page.
+ *   3. The Shopify listing address is normalised to the one real listing.
+ *
+ * Pure and idempotent.
+ */
+export function repairBodyLinks(html: string): string {
+  if (!html || !html.includes('<a')) return html
+  const tokens = tokenizeHtml(html)
+  let unwrapDepth = 0
+  for (let i = 0; i < tokens.length; i += 1) {
+    const token = tokens[i]
+    if (!token.startsWith('<')) continue
+    if (/^<\s*\/\s*a\s*>$/i.test(token)) {
+      if (unwrapDepth > 0) { tokens[i] = ''; unwrapDepth -= 1 }
+      continue
+    }
+    if (!/^<\s*a\b/i.test(token)) continue
+    const href = token.match(HREF_RE)?.[1]
+    // An anchor with no href at all, or a page-internal one, is left alone.
+    if (!href || !/^https?:\/\//i.test(href)) continue
+    if (!isLinkableUrl(href)) { tokens[i] = ''; unwrapDepth += 1; continue }
+    let next = token
+    const canonical = canonicalHref(href)
+    if (canonical) next = next.replace(HREF_RE, ` href="${canonical}"`)
+    if (!isOwnUrl(canonical ?? href)) {
+      const rel = next.match(REL_RE)?.[1] ?? null
+      const fixed = withNofollow(rel)
+      next = rel === null
+        ? next.replace(/^<\s*a\b/i, `<a rel="${fixed}"`)
+        : next.replace(REL_RE, ` rel="${fixed}"`)
+    }
+    tokens[i] = next
   }
   return tokens.join('')
 }

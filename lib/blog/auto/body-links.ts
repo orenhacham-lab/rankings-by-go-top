@@ -27,7 +27,7 @@
 
 import { authHref } from '@/lib/i18n/auth-href'
 import {
-  blockOfRun, isLinkableRun, isOwnUrl, linkifyBareUrls, textRuns, tokenizeHtml,
+  blockOfRun, isLinkableRun, isOwnUrl, linkifyBareUrls, repairBodyLinks, textRuns, tokenizeHtml,
 } from '@/lib/articles/bare-urls'
 import type { BlogAutoLocale } from '@/lib/blog/auto/rotation'
 import { articlePath, type InternalLinkTarget } from '@/lib/blog/auto/brief'
@@ -212,7 +212,11 @@ export function withBodyLinks(
   // that never named us gets the one deterministic sentence that does.
   const named = ensureBrandSentence(canonicalizeBrand(linkified), input.locale)
   const branded = linkBrandMention(named, input.locale)
-  return relatedReading(branded, input.locale, input.internalTargets)
+  const related = relatedReading(branded, input.locale, input.internalTargets)
+  // Last: every link in the finished body is re-asked. It can only drop an
+  // anchor or correct an attribute, so it cannot make the article fail a gate —
+  // `checkBodyLinks` has already run on the body it leaves alone.
+  return repairBodyLinks(related)
 }
 
 export interface BodyLinksResult {

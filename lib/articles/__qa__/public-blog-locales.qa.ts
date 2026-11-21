@@ -457,13 +457,17 @@ function main() {
     const html = '<p><img src="https://x.supabase.co/a.jpg" alt="https"></p>'
     return linkifyBareUrls(html) === html
   })())
+  // The sample used to be example.com, which is reserved for documentation and
+  // is now deliberately NOT linked (lib/articles/__qa__/body-link-hygiene.qa.ts):
+  // a reader who clicks a placeholder learns we publish pages nobody checked.
+  // A real foreign host is what this check is actually about.
   check('T5. a foreign address is nofollow and opens in a new tab', (() => {
-    const out = linkifyBareUrls('<p>ראו https://example.com/a</p>')
+    const out = linkifyBareUrls('<p>ראו https://developers.google.com/search/docs</p>')
     return out.includes('rel="nofollow noopener"') && out.includes('target="_blank"')
   })())
   check('T6. running it twice changes nothing', linkifyBareUrls(bareOut) === bareOut)
-  check('T7. the article page runs it on the stored body, after the sanitizer',
-    /withHeadingIds\(linkifyBareUrls\(sanitizePublicArticleHtml\(article\.content\)\)\)/.test(stripComments(read('components/public/articles/ArticleView.tsx'))))
+  check('T7. the article page runs it on the stored body, after the sanitizer, and repairs the links it finds',
+    /withHeadingIds\(repairBodyLinks\(linkifyBareUrls\(sanitizePublicArticleHtml\(article\.content\)\)\)\)/.test(stripComments(read('components/public/articles/ArticleView.tsx'))))
   check('T8. headings still get their ids through it', withHeadingIds(bareOut).headings.length === 1)
 
   console.log('\nM. mutation controls — the behavioural guards fail on broken input')

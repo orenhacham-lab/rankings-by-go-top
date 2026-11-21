@@ -1,4 +1,5 @@
 import type { PublicLocale } from '@/lib/i18n/locales'
+import { BRAND_REF } from '@/lib/seo/organization'
 
 /**
  * WHO WROTE THIS, IN THE READER'S LANGUAGE.
@@ -160,6 +161,10 @@ export function authorPersonSchema(author: string, locale: PublicLocale) {
     description: profile.bio[locale],
     url: `${SITE_URL}${profile.href[locale]}`,
     ...(profile.photo && { image: `${SITE_URL}${profile.photo}` }),
-    worksFor: { '@type': 'Organization', name: 'GO TOP', url: 'https://www.gotop.co.il' },
+    // The employer is the product's organization, by @id — the same reference
+    // the articles' publisher uses. It used to name the agency, which told an
+    // entity resolver that the person who signs these articles works for a
+    // different organization than the one the page is about.
+    worksFor: BRAND_REF,
   }
 }
