@@ -2,6 +2,7 @@ import { ScanInput, ScanOutput, ScanAudit, ScanAttempt } from './types'
 import { US_ZIP_CODES, type USZIPCode } from './us-zip-codes'
 import { generateRadiusPoints, aggregateRadiusResults, type RadiusPointResult } from './radius-scan'
 import { serperBody } from './serper-payload'
+import { geocodeAddress } from '../geocoding'
 
 const SERPER_MAPS_URL = 'https://google.serper.dev/maps'
 const REQUEST_TIMEOUT_MS = 15_000
@@ -15,78 +16,68 @@ interface GeocodeResult {
   success: boolean
 }
 
-async function resolveUSZIP(zipCode: string): Promise<GeocodeResult | null> {
-  const cacheKey = `zip_${zipCode}`
+/**
+ * Resolve a postal code to coordinates FOR THE PROJECT'S OWN COUNTRY.
+ *
+ * This used to be `resolveUSZIP`, which constrained Nominatim to
+ * `countrycodes=us` and then fell back to a text search that literally
+ * appended "United States". Postal-code tracking was therefore broken in every
+ * other country — including Italy, Brazil and Spain, the markets the
+ * rank-tracking pages actually rank for.
+ *
+ * Order now:
+ *   1. United States only: the bundled `US_ZIP_CODES` dataset, no network.
+ *   2. Everywhere else, and as the US fallback: the shared `geocodeAddress`,
+ *      which is country-aware (Google Geocoding first, Nominatim second).
+ *
+ * The cache key carries the country, because the same five digits are a valid
+ * postal code in more than one country.
+ */
+async function resolvePostalCode(zipCode: string, country: string): Promise<GeocodeResult | null> {
+  const cc = (country || '').trim().toLowerCase()
+  const cacheKey = `zip_${cc}_${zipCode}`
   if (GEOCODING_CACHE.has(cacheKey)) {
     return GEOCODING_CACHE.get(cacheKey) || null
   }
 
-  // Primary: Local dataset lookup
-  const localZIP = US_ZIP_CODES[zipCode]
-  if (localZIP) {
+  if (cc === 'us') {
+    const localZIP = US_ZIP_CODES[zipCode]
+    if (localZIP) {
+      const result: GeocodeResult = {
+        lat: localZIP.lat,
+        lng: localZIP.lng,
+        provider: 'local_dataset',
+        query_used: `lookup_zip_${zipCode}`,
+        success: true,
+      }
+      GEOCODING_CACHE.set(cacheKey, result)
+      return result
+    }
+  }
+
+  const geo = await geocodeAddress(zipCode, cc)
+  if (geo.ok) {
     const result: GeocodeResult = {
-      lat: localZIP.lat,
-      lng: localZIP.lng,
-      provider: 'local_dataset',
-      query_used: `lookup_zip_${zipCode}`,
+      lat: geo.lat,
+      lng: geo.lng,
+      provider: geo.provider,
+      query_used: `geocode_postalcode_${cc || 'unknown_country'}`,
       success: true,
     }
     GEOCODING_CACHE.set(cacheKey, result)
     return result
   }
 
-  // Secondary fallback: Nominatim (only if local lookup fails)
-  const controller = new AbortController()
-  const timer = setTimeout(() => controller.abort(), 5000)
-
-  try {
-    // Fallback attempt 1: postalcode with countrycodes constraint
-    let url = `https://nominatim.openstreetmap.org/search?postalcode=${encodeURIComponent(zipCode)}&countrycodes=us&format=json`
-    let response = await fetch(url, { signal: controller.signal })
-
-    if (!response.ok) {
-      GEOCODING_CACHE.set(cacheKey, null)
-      return null
-    }
-
-    let data = (await response.json()) as Array<{ lat: string; lon: string }>
-
-    // Fallback attempt 2: if no results, try full text query
-    if (data.length === 0) {
-      url = `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(`${zipCode}, United States`)}&format=json`
-      response = await fetch(url, { signal: controller.signal })
-
-      if (response.ok) {
-        data = (await response.json()) as Array<{ lat: string; lon: string }>
-      }
-    }
-
-    if (data.length > 0) {
-      const result: GeocodeResult = {
-        lat: parseFloat(data[0].lat),
-        lng: parseFloat(data[0].lon),
-        provider: 'external_fallback',
-        query_used: 'nominatim_postalcode',
-        success: true,
-      }
-      GEOCODING_CACHE.set(cacheKey, result)
-      return result
-    }
-
-    console.warn(`[ZIP Resolution] ZIP ${zipCode} not found in local dataset or Nominatim`)
-  } catch (err) {
-    console.error(`[ZIP Resolution] External fallback failed for ${zipCode}:`, (err as Error).message)
-  } finally {
-    clearTimeout(timer)
-  }
-
+  console.warn(`[Postal resolution] ${zipCode} (${cc || 'no country'}) not resolved: ${geo.reason}`)
   GEOCODING_CACHE.set(cacheKey, null)
   return null
 }
 
 function validateZIPResults(places: SerperMapsPlace[], geocodeResult: GeocodeResult): boolean {
-  // Validate that results are approximately within US bounds and not obviously wrong
-  // Allow 100+ mile radius for results (ZIP areas can be scattered)
+  // Validate that the results sit near the resolved postal-code centre and are
+  // not obviously wrong. Country-agnostic: it is a distance from the point we
+  // geocoded, whichever country that point is in.
+  // Allow a wide radius, because postal-code areas can be scattered.
   const VALIDATION_RADIUS_KM = 200
 
   if (!places.length) return true
@@ -841,10 +832,10 @@ export async function scanGoogleMaps(input: ScanInput): Promise<ScanOutput> {
 
     try {
       // Resolve ZIP to coordinates (local dataset first, then external fallback)
-      const zipResolution = await resolveUSZIP(postalCode)
+      const zipResolution = await resolvePostalCode(postalCode, country)
       if (!zipResolution) {
-        const errorMsg = `Unknown ZIP code: ${postalCode}`
-        const audit = buildAudit(input, 'us', 'en', lastResponse, auditAttempts, false, null, null, null, undefined, errorMsg, null)
+        const errorMsg = `Could not resolve postal code: ${postalCode}`
+        const audit = buildAudit(input, country, language, lastResponse, auditAttempts, false, null, null, null, undefined, errorMsg, null)
         // Add ZIP resolution metadata to audit
         if (audit.decision) {
           ;(audit.decision as Record<string, unknown>).zip_resolution_source = 'unknown'
@@ -854,25 +845,25 @@ export async function scanGoogleMaps(input: ScanInput): Promise<ScanOutput> {
         return { found: false, position: null, resultUrl: null, resultTitle: null, resultAddress: null, error: errorMsg, audit }
       }
 
-      const response = await querySerperMaps(input.keyword, 'us', 'en', postalCode, zipResolution)
+      const response = await querySerperMaps(input.keyword, country, language, postalCode, zipResolution)
       lastResponse = response
 
       if (!response) {
-        const audit = buildAudit(input, 'us', 'en', lastResponse, auditAttempts, false, null, null, null, undefined, null, null)
+        const audit = buildAudit(input, country, language, lastResponse, auditAttempts, false, null, null, null, undefined, null, null)
         return { found: false, position: null, resultUrl: null, resultTitle: null, resultAddress: null, error: 'No response from Serper', audit }
       }
       if (response.error) {
-        const audit = buildAudit(input, 'us', 'en', lastResponse, auditAttempts, false, null, null, null, undefined, response.error, null)
+        const audit = buildAudit(input, country, language, lastResponse, auditAttempts, false, null, null, null, undefined, response.error, null)
         return { ...makeError(response.error, input, audit), audit }
       }
 
       const places = response.places ?? []
       const matchedPlace = findBusinessMatch(places, businessName, input.targetDomain)
 
-      // Validate: check if results are within expected US bounds for the ZIP
-      const withinUSBounds = validateZIPResults(places, zipResolution)
-      if (!withinUSBounds && places.length > 0) {
-        console.warn(`[ZIP Validation] Results for ${postalCode} appear outside expected ZIP area`)
+      // Validate: check the results sit near the resolved postal-code centre
+      const withinExpectedArea = validateZIPResults(places, zipResolution)
+      if (!withinExpectedArea && places.length > 0) {
+        console.warn(`[Postal validation] Results for ${postalCode} appear outside the expected postal-code area`)
       }
 
       if (matchedPlace) {
@@ -885,8 +876,8 @@ export async function scanGoogleMaps(input: ScanInput): Promise<ScanOutput> {
           matchedPosition: matchedPlace.position,
           matchedAddress: matchedPlace.address || null,
         })
-        const validationWarning = !withinUSBounds && places.length > 0 ? ' (geo validation warning)' : ''
-        const audit = buildAudit(input, 'us', 'en', lastResponse, auditAttempts, true, matchedPlace.position, matchedPlace.title, matchedPlace.address || null, 0, null, validationWarning ? `ZIP area validation: ${validationWarning}` : null)
+        const validationWarning = !withinExpectedArea && places.length > 0 ? ' (geo validation warning)' : ''
+        const audit = buildAudit(input, country, language, lastResponse, auditAttempts, true, matchedPlace.position, matchedPlace.title, matchedPlace.address || null, 0, null, validationWarning ? `ZIP area validation: ${validationWarning}` : null)
         // Add ZIP resolution metadata to audit
         if (audit.decision) {
           ;(audit.decision as Record<string, unknown>).zip_resolution_source = zipResolution.provider
@@ -912,7 +903,7 @@ export async function scanGoogleMaps(input: ScanInput): Promise<ScanOutput> {
         location: postalCode,
         found: false,
       })
-      const audit = buildAudit(input, 'us', 'en', lastResponse, auditAttempts, false, null, null, null, undefined, null, null)
+      const audit = buildAudit(input, country, language, lastResponse, auditAttempts, false, null, null, null, undefined, null, null)
       // Add ZIP resolution metadata to audit
       if (audit.decision) {
         ;(audit.decision as Record<string, unknown>).zip_resolution_source = zipResolution.provider
@@ -923,7 +914,7 @@ export async function scanGoogleMaps(input: ScanInput): Promise<ScanOutput> {
       }
       return { found: false, position: null, resultUrl: null, resultTitle: null, resultAddress: null, error: null, audit }
     } catch (err) {
-      const audit = buildAudit(input, 'us', 'en', lastResponse, auditAttempts, false, null, null, null, undefined, (err as Error).message, null)
+      const audit = buildAudit(input, country, language, lastResponse, auditAttempts, false, null, null, null, undefined, (err as Error).message, null)
       return { ...makeError((err as Error).message, input, audit), audit }
     }
   }

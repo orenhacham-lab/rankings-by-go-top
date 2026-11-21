@@ -52,9 +52,12 @@ function countryToGoogleRegion(country: string): string {
 }
 
 function countryToNominatimCode(country: string): string {
-  const c = country.toLowerCase()
-  if (c === 'us' || c === 'il' || c === 'gb') return c
-  return ''
+  const c = country.trim().toLowerCase()
+  // Nominatim takes ISO 3166-1 alpha-2 codes. Any two-letter code is passed
+  // through, so a project in Italy constrains to `it` instead of going out
+  // unconstrained; anything that is not two letters (a country name, a region,
+  // an empty string) is dropped, because a wrong constraint is worse than none.
+  return /^[a-z]{2}$/.test(c) ? c : ''
 }
 
 async function fetchWithTimeout(url: string, init: RequestInit = {}): Promise<Response> {
