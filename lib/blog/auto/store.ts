@@ -12,7 +12,7 @@ import type { createAdminClient } from '@/lib/supabase/admin'
 import { sanitizePublicArticleHtml } from '@/lib/content/public-article-html'
 import { articlePublishBlockReason } from '@/lib/articles/publish-rules'
 import { BLOG_AUTO_LOCALES, type BlogAutoLocale } from '@/lib/blog/auto/rotation'
-import type { SelectedKeyword } from '@/lib/blog/auto/keyword-plan'
+import { keywordDifficulty, type SelectedKeyword } from '@/lib/blog/auto/keyword-plan'
 import type { InternalLinkTarget } from '@/lib/blog/auto/brief'
 import { BLOG_AUTHOR } from '@/lib/blog/auto/brief'
 
@@ -32,6 +32,8 @@ export interface PlanRow {
   primary_keyword: string
   secondary_keywords: string[] | null
   monthly_searches: number | null
+  /** Advertiser competition as Keyword Planner bucketed it: LOW/MEDIUM/HIGH. */
+  competition: string | null
   status: string
   attempts: number
   /**
@@ -43,7 +45,7 @@ export interface PlanRow {
   last_error: string | null
 }
 
-const PLAN_FIELDS = 'id, locale, topic, primary_keyword, secondary_keywords, monthly_searches, status, attempts, last_error'
+const PLAN_FIELDS = 'id, locale, topic, primary_keyword, secondary_keywords, monthly_searches, competition, status, attempts, last_error'
 
 /** Keywords already spoken for in this language: planned, in flight, or published. */
 export async function readTakenKeywords(admin: Admin, locale: BlogAutoLocale): Promise<string[]> {
@@ -102,13 +104,68 @@ export async function readInternalTargets(admin: Admin, locale: BlogAutoLocale, 
     .eq('is_published', true)
     .order('published_at', { ascending: false })
     .limit(limit)
-  return ((data ?? []) as { title: string | null; slug: string | null }[])
-    .filter((r): r is InternalLinkTarget => !!r.title && !!r.slug)
+  const rows = ((data ?? []) as { title: string | null; slug: string | null }[])
+    .filter((r): r is { title: string; slug: string } => !!r.title && !!r.slug)
+  if (!rows.length) return []
+
+  // The keyword each of those articles was written for, which is the anchor
+  // text the brief offers for it (`anchorTextFor`). It lives on the plan row,
+  // keyed on the slug the publish wrote back; 213 of the 221 published
+  // articles have one, and the eight that do not are the hand-written Hebrew
+  // articles, which fall back to their title.
+  const { data: plans } = await admin
+    .from(PLAN_TABLE)
+    .select('article_slug, primary_keyword')
+    .eq('locale', locale)
+    .in('article_slug', rows.map((r) => r.slug))
+  const keywordOf = new Map<string, string>()
+  for (const row of (plans ?? []) as { article_slug: string | null; primary_keyword: string | null }[]) {
+    if (row.article_slug && row.primary_keyword) keywordOf.set(row.article_slug, row.primary_keyword)
+  }
+  return rows.map((r) => ({ ...r, keyword: keywordOf.get(r.slug) ?? null }))
 }
 
+/** How winnable a queued row is, by the same measure the research uses. */
+export function planRowDifficulty(row: PlanRow): number {
+  return keywordDifficulty({
+    keyword: row.primary_keyword,
+    competition: (row.competition as 'LOW' | 'MEDIUM' | 'HIGH' | null) ?? null,
+    competitionIndex: null,
+    avgMonthlySearches: row.monthly_searches,
+  }, row.locale)
+}
+
+/** How many queued rows are weighed before one is claimed. */
+export const CLAIM_CANDIDATES = 200
+
 /**
- * Take the highest-volume planned row of this language, atomically. Returns
- * null when there is nothing to write, or when another run took it first.
+ * TAKE THE MOST WINNABLE PLANNED ROW OF THIS LANGUAGE, ATOMICALLY.
+ *
+ * It used to take the highest-VOLUME one, and that single ORDER BY quietly
+ * undid the whole selection policy. `selectKeywords` ranks the research by
+ * what this site can win — least advertiser competition first, a specific
+ * keyword before a head term, volume only as the tie-breaker — and then this
+ * function reached past all of it for the biggest number in the table.
+ *
+ * Measured in blog_plan on 21 Nov 2026, and it is not a subtle effect: the 213
+ * rows PUBLISHED average 7,868 monthly searches, up to 450,000. The 121 rows
+ * still sitting as `planned` average 136, and never exceed 590. Every head
+ * term has been written and the entire winnable tail is still waiting — in
+ * every language (English published 28,752 on average against 470 waiting,
+ * German 19,231 against 163, Japanese 8,685 against 99). The audit's finding
+ * that the blog "still picks unwinnable heads" is this line, not the research.
+ *
+ * Two other things the old shape got wrong, both latent rather than live:
+ *
+ *   * A row whose attempts were spent while its status was `planned` — which
+ *     `recoverStaleLocks` can produce, since it returns a row to `planned`
+ *     without looking at its attempts — sat at the top of the volume order and
+ *     made this function return null for that language FOREVER. Rows with
+ *     spent attempts are now excluded in the query.
+ *   * Losing the race for one row returned null, and the language went without
+ *     an article although other rows were free. It now tries the next
+ *     candidate, which is what makes the 15-minute call and the daily cron
+ *     safe to overlap.
  */
 export async function claimNextPlanRow(admin: Admin, locale: BlogAutoLocale): Promise<PlanRow | null> {
   const { data } = await admin
@@ -116,25 +173,35 @@ export async function claimNextPlanRow(admin: Admin, locale: BlogAutoLocale): Pr
     .select(PLAN_FIELDS)
     .eq('locale', locale)
     .eq('status', 'planned')
-    .order('monthly_searches', { ascending: false, nullsFirst: false })
-    .limit(1)
-    .maybeSingle()
-  const row = data as PlanRow | null
-  if (!row) return null
-  if ((row.attempts ?? 0) >= MAX_ATTEMPTS) return null
+    .lt('attempts', MAX_ATTEMPTS)
+    .order('created_at', { ascending: true })
+    .limit(CLAIM_CANDIDATES)
+  const rows = (data ?? []) as PlanRow[]
+  if (!rows.length) return null
 
-  const { data: claimed } = await admin
-    .from(PLAN_TABLE)
-    .update({ status: 'generating', locked_at: nowIso(), attempts: (row.attempts ?? 0) + 1, last_error: null })
-    .eq('id', row.id)
-    .eq('status', 'planned')
-    .select(PLAN_FIELDS)
-    .maybeSingle()
-  const taken = claimed as PlanRow | null
-  if (!taken) return null
-  // The update wiped last_error; hand back the one the previous attempt left,
-  // which is the whole point of reading it.
-  return { ...taken, last_error: row.last_error ?? null }
+  const ranked = [...rows].sort((a, b) => {
+    const d = planRowDifficulty(a) - planRowDifficulty(b)
+    if (d !== 0) return d
+    return (b.monthly_searches ?? 0) - (a.monthly_searches ?? 0)
+  })
+
+  for (const row of ranked) {
+    const { data: claimed } = await admin
+      .from(PLAN_TABLE)
+      .update({ status: 'generating', locked_at: nowIso(), attempts: (row.attempts ?? 0) + 1, last_error: null })
+      .eq('id', row.id)
+      .eq('status', 'planned')
+      .select(PLAN_FIELDS)
+      .maybeSingle()
+    const taken = claimed as PlanRow | null
+    // Another run took this one between the read and the update. The next
+    // candidate is still ours to try.
+    if (!taken) continue
+    // The update wiped last_error; hand back the one the previous attempt left,
+    // which is the whole point of reading it.
+    return { ...taken, last_error: row.last_error ?? null }
+  }
+  return null
 }
 
 /** Put a row back after a failure, or park it once the attempts are spent. */

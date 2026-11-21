@@ -18,6 +18,7 @@ import { localeHomeHref, LOCALE_CONFIG, type PublicLocale } from '@/lib/i18n/loc
 import { getPublicDictionary } from '@/lib/i18n/getPublicDictionary'
 import { articleAuthor, authorDisplayName } from '@/lib/articles/authors'
 import { canonicalizeArticleHtml, canonicalizeHeadline, canonicalizeKnownTerms } from '@/lib/content/canonical-case'
+import { BRAND_REF } from '@/lib/seo/organization'
 
 export const SITE_URL = 'https://www.gotopseo.com'
 
@@ -85,6 +86,10 @@ export const getPublicArticle = cache(async (slug: string, locale: PublicLocale)
  * per entry. The heading text is per language, so the Hebrew-only match this
  * replaces found nothing in a Spanish article and silently emitted no FAQ.
  */
+/** A question or an answer as a reader hears it: the words, without the markup. */
+const plainText = (html: string): string =>
+  (html || '').replace(/<[^>]+>/g, '').replace(/\s+/g, ' ').trim()
+
 export function extractFaqSchema(content: string, locale: PublicLocale): Array<{ '@type': string; name: string; acceptedAnswer: { '@type': string; text: string } }> {
   const faqSchema: Array<{ '@type': string; name: string; acceptedAnswer: { '@type': string; text: string } }> = []
 
@@ -95,13 +100,20 @@ export function extractFaqSchema(content: string, locale: PublicLocale): Array<{
 
   const faqContent = faqSectionMatch[1]
 
-  // Match each <p> containing <strong>question</strong><br>answer
-  const pRegex = /<p[^>]*>\s*<strong[^>]*>([^<]+)<\/strong>\s*<br\s*\/?>\s*([^<]+)<\/p>/gi
+  // Match each <p> containing <strong>question</strong><br>answer.
+  //
+  // Both captures run to their closing tag and are then stripped of markup,
+  // rather than being "characters that are not `<`". The strict version lost a
+  // whole entry the moment anything inline appeared inside the answer — and
+  // things do appear there: `linkifyBareUrls` turns an address in an answer
+  // into a link, and `withProductLinks` can link a term the answer used. The
+  // entry did not degrade, it vanished, and with it the FAQ rich result.
+  const pRegex = /<p[^>]*>\s*<strong[^>]*>([\s\S]*?)<\/strong>\s*<br\s*\/?>\s*([\s\S]*?)<\/p>/gi
   let match
 
   while ((match = pRegex.exec(faqContent)) !== null) {
-    const question = match[1]?.trim()
-    const answer = match[2]?.trim()
+    const question = plainText(match[1])
+    const answer = plainText(match[2])
 
     if (question && answer) {
       faqSchema.push({
@@ -249,12 +261,19 @@ export function buildArticleSchemas(article: PublicArticle | null, slug: string,
         }),
         ...(article.published_at && { datePublished: article.published_at }),
         ...(article.updated_at && { dateModified: article.updated_at }),
-        publisher: {
-          '@type': 'Organization',
-          name: 'GO TOP',
-          url: 'https://www.gotop.co.il',
-          logo: { '@type': 'ImageObject', url: `${SITE_URL}/gotop-primary.png` },
-        },
+        // THE PUBLISHER IS THE PRODUCT, BY REFERENCE, NOT THE AGENCY.
+        //
+        // Until 21 Nov 2026 this named GO TOP (https://www.gotop.co.il), the
+        // separate marketing agency, as the publisher of every article —
+        // while the Organization, SoftwareApplication and WebSite nodes on the
+        // SAME page all point at `gotopseo.com/#organization`. An entity
+        // resolver reading the page was told the articles belong to one
+        // organization and the product to another, so everything the blog
+        // earns accrued to the agency. lib/seo/organization.ts says why that
+        // costs us reach; the fix there landed across the site and missed the
+        // article pages. Named by @id, so the one node that describes us
+        // (emitted by app/layout.tsx on every page) is the one that answers.
+        publisher: BRAND_REF,
         mainEntityOfPage: { '@type': 'WebPage', '@id': articleUrl },
       }
     : null

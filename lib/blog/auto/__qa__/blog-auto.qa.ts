@@ -41,8 +41,9 @@ import { checkTruthLimits, plainText } from '@/lib/blog/auto/truth-limits'
 import { placeholderContext, runQualityGate } from '@/lib/content/automation/quality-gate'
 import { wordCount } from '@/lib/text/segment'
 import {
-  CANNIBAL_OVERLAP, EXCLUDED_PATTERNS, MIN_MONTHLY_SEARCHES, RESEARCH_MARKET, RESEARCH_SEEDS,
-  keywordOverlap, keywordTokens, keywordDifficulty, selectKeywords,
+  CANNIBAL_OVERLAP, EXCLUDED_PATTERNS, HEAD_PENALTY_CAP, HEAD_VOLUME, MIN_MONTHLY_SEARCHES,
+  RESEARCH_MARKET, RESEARCH_SEEDS, headPenalty,
+  keywordOverlap, keywordTokens, keywordDifficulty, selectKeywords, specificityWords,
 } from '@/lib/blog/auto/keyword-plan'
 import { CTA_WIDGET, PLANS_WIDGET, withArticleWidgets } from '@/lib/blog/auto/widgets'
 import { BLOG_AUTHOR, BLOG_GUIDANCE, articlePath, buildBlogBrief, internalAnchors } from '@/lib/blog/auto/brief'
@@ -249,6 +250,75 @@ check(
 )
 check('C8b: more words mean a lower difficulty, all else equal', keywordDifficulty({ keyword: 'בדיקת מיקום בגוגל', competition: 'LOW', competitionIndex: 30 }) < keywordDifficulty({ keyword: 'קידום אתרים', competition: 'LOW', competitionIndex: 30 }))
 check('C8c: a missing index falls back to the bucket, not to zero', keywordDifficulty({ keyword: 'קידום', competition: 'HIGH', competitionIndex: null }) > keywordDifficulty({ keyword: 'קידום', competition: 'LOW', competitionIndex: null }))
+
+// ── C9: THE HEAD TERM IS NO LONGER THE EASIEST THING IN THE QUEUE ──────────
+//
+// Every one of the fourteen biggest keywords this blog ever published came
+// back from Keyword Planner as competition LOW — google search console at
+// 450,000 a month, keyword research at 90,500 — because nobody bids on an
+// informational head term. So the one number the ranking trusted said the
+// least winnable keywords in the niche were the easiest, and the site holds
+// those queries at position 62 to 84.
+
+const headEn = { keyword: 'keyword research', competition: 'LOW' as const, competitionIndex: 10, avgMonthlySearches: 90500 }
+const tailEn = { keyword: 'how to do keyword research for a small site', competition: 'LOW' as const, competitionIndex: 10, avgMonthlySearches: 90 }
+check('C9a: the 90,500-a-month LOW head term scores harder than the 90-a-month tail',
+  keywordDifficulty(headEn, 'en') > keywordDifficulty(tailEn, 'en'))
+check('C9b: and without the locale the score is what it always was, so nothing else moved',
+  keywordDifficulty(headEn) === keywordDifficulty({ ...headEn, avgMonthlySearches: 1 }))
+check('C9c: the penalty is zero at or below the threshold, and grows above it',
+  headPenalty('en', HEAD_VOLUME.en) === 0
+  && headPenalty('en', null) === 0
+  && headPenalty('en', HEAD_VOLUME.en * 2) > 0
+  && headPenalty('en', HEAD_VOLUME.en * 4) > headPenalty('en', HEAD_VOLUME.en * 2))
+check('C9d: and it is capped, so a head term is ordered last and never erased',
+  headPenalty('en', 10_000_000) === HEAD_PENALTY_CAP)
+check('C9e: every language\'s threshold is well above its own floor',
+  (Object.keys(HEAD_VOLUME) as (keyof typeof HEAD_VOLUME)[])
+    .every((l) => HEAD_VOLUME[l] >= MIN_MONTHLY_SEARCHES[l] * 10))
+
+// THE QUANTITY IS UNTOUCHED. The queue in each language is 6 to 17 rows deep
+// (measured 21 Nov 2026), so a policy that REJECTED a head term would be a
+// language with no article that day. This one only reorders.
+// Three subjects, deliberately not near-duplicates of each other: the overlap
+// rule would otherwise drop the long one as the same article as the head, and
+// that rule is right — this check is about quantity, not about cannibals.
+const quantityIdeas: KeywordIdeaResult[] = [
+  { ...headEn, lowTopOfPageBid: null, highTopOfPageBid: null, currency: 'USD' },
+  { keyword: 'how to fix a slow shopify product page', avgMonthlySearches: 90, competition: 'LOW', competitionIndex: 10, lowTopOfPageBid: null, highTopOfPageBid: null, currency: 'USD' },
+  { keyword: 'rank tracking tools compared', avgMonthlySearches: 200, competition: 'MEDIUM', competitionIndex: 40, lowTopOfPageBid: null, highTopOfPageBid: null, currency: 'USD' },
+]
+check('C9f: the same ideas still yield the same NUMBER of keywords',
+  selectKeywords({ locale: 'en', ideas: quantityIdeas, taken: [], limit: 10 }).length === 3)
+check('C9g: the head term is still chosen — last, not dropped',
+  selectKeywords({ locale: 'en', ideas: quantityIdeas, taken: [], limit: 10 })
+    .map((k) => k.keyword).indexOf('keyword research') === 2)
+
+// ── C10: A LANGUAGE THAT WRITES NO SPACES IS MEASURED AT ALL ───────────────
+//
+// `keywordTokens` splits on spaces, so every Japanese and Korean keyword
+// scored as ONE word however specific it was, and the tail bonus — the whole
+// mechanism that prefers a specific keyword to a head term — was dead in both
+// languages. Measured 21 Nov 2026: Japanese published 8,685 monthly searches
+// on average while the Japanese rows still waiting average 99.
+check('C10a: a Japanese phrase is more than one word', specificityWords('Googleビジネスプロフィール活用') > 1)
+check('C10b: and more specific than a short Japanese term',
+  specificityWords('Googleビジネスプロフィール活用') > specificityWords('SEO対策'))
+check('C10c: Korean too', specificityWords('구글 비즈니스 프로필 등록 방법') > specificityWords('SEO'))
+check('C10d: a spaced language is counted exactly as before',
+  specificityWords('בדיקת מיקום בגוגל') === keywordTokens('בדיקת מיקום בגוגל').length
+  && specificityWords('keyword research') === 2)
+check('C10e: the specific Japanese keyword now outranks the Japanese head term',
+  keywordDifficulty({ keyword: 'Googleビジネスプロフィール 登録方法', competition: 'LOW', competitionIndex: 15, avgMonthlySearches: 90 }, 'ja')
+  < keywordDifficulty({ keyword: 'サーチ コンソール', competition: 'LOW', competitionIndex: 15, avgMonthlySearches: 110000 }, 'ja'))
+
+check('C-M1 MUTATION CONTROL: on advertiser competition alone the head term was the easiest thing in the queue',
+  keywordDifficulty({ keyword: 'keyword research', competition: 'LOW', competitionIndex: 10 })
+  < keywordDifficulty({ keyword: 'rank tracking tools compared', competition: 'MEDIUM', competitionIndex: 40 }))
+check('C-M2 MUTATION CONTROL: splitting on spaces alone makes every Japanese keyword one word',
+  keywordTokens('Googleビジネスプロフィール活用').length === 1)
+check('C-M3 MUTATION CONTROL: an uncapped penalty would run past every real score',
+  Math.log2(10_000_000 / HEAD_VOLUME.en) * 12 > 100)
 // Mutation control for C8a: by the old rule — volume, descending — the head
 // term would have been written first, which is the behaviour being replaced.
 check(
@@ -412,10 +482,36 @@ async function main() {
     check('F19: Sunday does not publish the English queue', summary.published === null && summary.skipped === 'queue_empty', summary)
   }
   {
-    const admin = fake([planned({ monthly_searches: 100 }), planned({ id: 'p2', monthly_searches: 5000, primary_keyword: 'ביטוי גדול', topic: 'ביטוי גדול' })])
+    // THE MOST WINNABLE ROW IS WRITTEN FIRST, NOT THE BIGGEST.
+    //
+    // This check asserted the opposite until 21 Nov 2026, and the claim it
+    // asserted is what undid the selection policy: `selectKeywords` ranks the
+    // research by what this site can win, and the claim then reached past all
+    // of it for the biggest number in the table. Measured in blog_plan the
+    // same day: the 213 published rows average 7,868 monthly searches and the
+    // 121 rows still waiting average 136. Every head term had been written
+    // and the whole winnable tail was still queued.
+    const admin = fake([
+      planned({ monthly_searches: 100 }),
+      planned({ id: 'p2', monthly_searches: 90500, primary_keyword: 'ביטוי גדול', topic: 'ביטוי גדול', competition: 'LOW' }),
+    ])
     const summary = await runBlogAutoPublish(admin as unknown as Admin, { now: sunday }, deps())
     const taken = admin.tables[PLAN_TABLE].find((r) => (r as Record<string, unknown>).status === 'published') as Record<string, unknown>
-    check('F20: the most-searched keyword is written first', taken?.id === 'p2' && summary.published !== null, taken?.id)
+    check('F20: the winnable row is written first, not the 90,500-a-month head term', taken?.id === 'p1' && summary.published !== null, taken?.id)
+  }
+  {
+    // A row whose attempts are spent while its status is still `planned` —
+    // which recoverStaleLocks can produce — used to sit at the top of the
+    // volume order and make the claim return null for that language forever.
+    const admin = fake([
+      planned({ id: 'spent', monthly_searches: 50000, attempts: 3, primary_keyword: 'ביטוי שנשרף', topic: 'ביטוי שנשרף' }),
+      planned({ id: 'ok' }),
+    ])
+    const summary = await runBlogAutoPublish(admin as unknown as Admin, { now: sunday }, deps())
+    check('F20b: a planned row with its attempts spent no longer blocks the language',
+      summary.published !== null
+      && (admin.tables[PLAN_TABLE].find((r) => (r as Record<string, unknown>).id === 'ok') as Record<string, unknown>)?.status === 'published',
+      summary.failure ?? summary.skipped)
   }
   {
     const admin = fake([planned()])
@@ -677,9 +773,9 @@ async function main() {
     return linkifyBareUrls(html) === html
   })())
   check('H6: a foreign address is marked nofollow and opens in a new tab', (() => {
-    const out = linkifyBareUrls('<p>מקור: https://example.com/a</p>')
+    const out = linkifyBareUrls('<p>מקור: https://developers.google.com/search/docs</p>')
     return out.includes('rel="nofollow noopener"') && out.includes('target="_blank"')
-  })(), linkifyBareUrls('<p>מקור: https://example.com/a</p>'))
+  })(), linkifyBareUrls('<p>מקור: https://developers.google.com/search/docs</p>'))
   check('H7: our own address stays in the tab', !linkifyBareUrls(bareBody).includes('target="_blank"'))
 
   const brandBody = `<p>פתיחה ${BRAND} בפסקה הראשונה</p><h2>כ</h2><p>כך ${BRAND} עושה את זה.</p>`
