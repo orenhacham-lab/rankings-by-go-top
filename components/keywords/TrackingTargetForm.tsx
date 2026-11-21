@@ -11,6 +11,7 @@ import { TrackingTarget, LocationMode } from '@/lib/supabase/types'
 import { saveTrackingTargetsAction } from '@/app/actions/tracking-targets'
 import { useDashboardLanguage } from '@/lib/i18n/dashboard/useDashboardLanguage'
 import { getDashboardDictionary } from '@/lib/i18n/dashboard/getDashboardDictionary'
+import { postalRules, sanitizePostalInput } from '@/lib/scanner/postal-input'
 
 interface TrackingTargetFormProps {
   target?: TrackingTarget
@@ -251,23 +252,18 @@ export default function TrackingTargetForm({
           name="location_mode"
           value={locationMode}
           onChange={(e) => {
-            const mode = e.target.value as LocationMode
-            // Reset to 'project' if trying to select disabled ZIP mode
-            if (mode === 'zip' && projectCountry?.toUpperCase() !== 'US') {
-              return
-            }
-            setLocationMode(mode)
+            setLocationMode(e.target.value as LocationMode)
           }}
           options={[
             { value: 'project', label: `${t.locationModeProject}${projectCity ? ` (${projectCity})` : ''}` },
             { value: 'custom', label: t.locationModeCustom },
-            ...(projectCountry?.toUpperCase() === 'US'
-              ? [
-                  { value: 'zip', label: t.locationModeZip },
-                  { value: 'radius', label: t.locationModeRadius },
-                  { value: 'exact_point', label: t.locationModeExactPoint },
-                ]
-              : []),
+            // Postal code and exact point work in every country: the postal code
+            // is geocoded in the project's own country and the exact point is
+            // coordinates. Only RADIUS is still American — its grid is compass
+            // points in miles around a US ZIP.
+            { value: 'zip', label: t.locationModeZip },
+            { value: 'exact_point', label: t.locationModeExactPoint },
+            ...(projectCountry?.toUpperCase() === 'US' ? [{ value: 'radius', label: t.locationModeRadius }] : []),
           ]}
         />
         {projectCountry?.toUpperCase() !== 'US' && (
@@ -310,13 +306,11 @@ export default function TrackingTargetForm({
           name="postal_code"
           value={postalCode}
           onChange={(e) => {
-            const val = e.target.value.replace(/\D/g, '').slice(0, 5)
-            setPostalCode(val)
+            setPostalCode(sanitizePostalInput(e.target.value, projectCountry))
           }}
           required
-          placeholder="12345"
-          maxLength={5}
-          pattern="\d{5}"
+          placeholder={postalRules(projectCountry).placeholder}
+          maxLength={postalRules(projectCountry).maxLength}
           hint={t.zipHint}
         />
       )}

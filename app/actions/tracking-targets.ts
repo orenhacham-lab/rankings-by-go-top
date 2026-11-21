@@ -8,6 +8,7 @@ import { buildQuotaError, EN_PLAN_LABEL, EntitlementUnavailableError, isEntitlem
 import { actionMessages, asActionResult, type ActionMessages, type ActionResult } from '@/lib/i18n/action-messages'
 import { UserFacingError } from '@/lib/i18n/user-facing-error'
 import { geocodeAddress, validateCoordinatePair } from '@/lib/geocoding'
+import { isValidPostalCode } from '@/lib/scanner/postal-input'
 import type { ExactPointResolutionSource } from '@/lib/supabase/types'
 import { isAdminUser } from '@/lib/auth/admin-role'
 
@@ -196,13 +197,17 @@ export async function createTrackingTargetAction(formData: FormData) {
   }
 
   if (locationMode === 'exact_point') {
+    // No country gate: resolveExactPointFromFormData takes coordinates as they
+    // are and otherwise geocodes the address IN THE PROJECT'S COUNTRY, so it
+    // has always worked everywhere.
     const projectCountry = await fetchProjectCountry(supabase, projectId, m)
-    // exact_point is US-only
-    if (projectCountry.toUpperCase() !== 'US') {
-      throw new UserFacingError(m.exactPointUsOnly)
-    }
     const resolved = await resolveExactPointFromFormData(formData, projectCountry, m)
     Object.assign(data, resolved)
+  } else if (locationMode === 'zip') {
+    const projectCountry = await fetchProjectCountry(supabase, projectId, m)
+    if (!isValidPostalCode(safeStringFromFormData(formData, 'postal_code'), projectCountry)) {
+      throw new UserFacingError(m.postalCodeInvalid)
+    }
   } else if (locationMode === 'radius') {
     const projectCountry = await fetchProjectCountry(supabase, projectId, m)
     // radius is US-only
@@ -315,11 +320,12 @@ export async function createBulkTrackingTargetsAction(formData: FormData) {
   let resolvedExact: ResolvedExactPoint | null = null
   if (locationMode === 'exact_point') {
     const projectCountry = await fetchProjectCountry(supabase, projectId, m)
-    // exact_point is US-only
-    if (projectCountry.toUpperCase() !== 'US') {
-      throw new UserFacingError(m.exactPointUsOnly)
-    }
     resolvedExact = await resolveExactPointFromFormData(formData, projectCountry, m)
+  } else if (locationMode === 'zip') {
+    const projectCountry = await fetchProjectCountry(supabase, projectId, m)
+    if (!isValidPostalCode(postalCode, projectCountry)) {
+      throw new UserFacingError(m.postalCodeInvalid)
+    }
   }
 
   const toInsert = keywords
@@ -438,12 +444,20 @@ export async function updateTrackingTargetAction(id: string, formData: FormData)
       .single<{ project_id: string; projects: { country: string } }>()
     if (lookupErr || !existing) throw new UserFacingError(m.projectNotFound)
     const projectCountry = existing.projects.country || 'IL'
-    // exact_point is US-only
-    if (projectCountry.toUpperCase() !== 'US') {
-      throw new UserFacingError(m.exactPointUsOnly)
-    }
     const resolved = await resolveExactPointFromFormData(formData, projectCountry, m)
     Object.assign(data, resolved)
+  } else if (locationMode === 'zip') {
+    // The postal code must be one this country could have — see
+    // lib/scanner/postal-input.ts. A form is never trusted for this.
+    const { data: existing, error: lookupErr } = await supabase
+      .from('tracking_targets')
+      .select('project_id, projects!inner(country)')
+      .eq('id', id)
+      .single<{ project_id: string; projects: { country: string } }>()
+    if (lookupErr || !existing) throw new UserFacingError(m.projectNotFound)
+    if (!isValidPostalCode(safeStringFromFormData(formData, 'postal_code'), existing.projects.country || 'IL')) {
+      throw new UserFacingError(m.postalCodeInvalid)
+    }
   } else if (locationMode === 'radius') {
     // Need project country to validate — look up via the target row
     const { data: existing, error: lookupErr } = await supabase

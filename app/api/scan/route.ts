@@ -537,9 +537,9 @@ export async function POST(request: Request) {
         console.log('[Scan] postal_code:', target.postal_code)
         console.log('[Scan] === END TARGET LOAD ===')
 
-        if (locationMode === 'zip' && project.country.toUpperCase() !== 'US') {
-          throw new Error('ZIP code mode is only supported for US projects')
-        }
+        // Postal-code mode is country-agnostic: the geocoder is asked in the
+        // project's own country (lib/scanner/google-maps.ts). Radius still is
+        // not — its grid is American miles around an American ZIP.
         if (locationMode === 'radius' && project.country.toUpperCase() !== 'US') {
           throw new Error('Radius mode is only supported for US projects')
         }
