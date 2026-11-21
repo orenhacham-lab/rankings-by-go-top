@@ -32,7 +32,7 @@
 import { outcomeSummary, outcomeTable, rowsBySlug, type ArticleOutcomeInput, type OutcomeRow } from '@/lib/blog/auto/outcomes'
 import { cannibalSummary, cannibalTable } from '@/lib/blog/auto/cannibal'
 import { isBlogAutoLocale, type BlogAutoLocale } from '@/lib/blog/auto/rotation'
-import { SITE_URL } from '@/lib/blog/auto/brief'
+import { readOwnSearchRows } from '@/lib/blog/auto/own-search'
 import { PLAN_TABLE } from '@/lib/blog/auto/store'
 
 /** UTC day of week the report runs on. 0 is Sunday. */
@@ -105,40 +105,16 @@ export function reviewDue(now: Date): boolean {
   return now.getUTCDay() === REVIEW_DAY && now.getUTCHours() === REVIEW_HOUR
 }
 
-const host = (url: string): string => {
-  try { return new URL(url).host } catch { return '' }
-}
-
 /**
  * Read the newest succeeded sync of our own property, and the articles to
- * judge against it. Our site is a project like any other, so it is found by
- * its Search Console `site_url` and not by an id written into the code.
+ * judge against it. The rows come from `lib/blog/auto/own-search.ts`, which
+ * the keyword queue reads too.
  */
 async function readOwnProperty(): Promise<WeeklyReviewData | null> {
   const { createAdminClient } = await import('@/lib/supabase/admin')
   const admin = createAdminClient()
-  const ours = host(SITE_URL)
-
-  const { data: runs } = await admin
-    .from('gsc_sync_runs')
-    .select('id, project_id, site_url, start_date, end_date, started_at, status')
-    .eq('status', 'succeeded')
-    .order('started_at', { ascending: false })
-    .limit(50)
-  const run = ((runs ?? []) as { id: string; site_url: string | null; start_date: string | null; end_date: string | null; started_at: string | null }[])
-    .find((r) => host(r.site_url ?? '') === ours)
-  if (!run) return null
-
-  const { data: metrics } = await admin
-    .from('gsc_query_page_metrics')
-    .select('query, page, clicks, impressions, position')
-    .eq('sync_run_id', run.id)
-  const rows = ((metrics ?? []) as { query: string | null; page: string | null; clicks: number | null; impressions: number | null; position: number | null }[])
-    .filter((r) => r.query && r.page && r.position !== null)
-    .map((r) => ({
-      query: String(r.query), page: String(r.page),
-      clicks: Number(r.clicks ?? 0), impressions: Number(r.impressions ?? 0), position: Number(r.position),
-    }))
+  const reading = await readOwnSearchRows(admin)
+  if (!reading) return null
 
   const [{ data: articles }, { data: plan }] = await Promise.all([
     admin.from('articles').select('slug, locale, published_at'),
@@ -150,10 +126,7 @@ async function readOwnProperty(): Promise<WeeklyReviewData | null> {
   }
 
   return {
-    syncedAt: run.started_at ?? null,
-    windowStart: run.start_date ?? null,
-    windowEnd: run.end_date ?? null,
-    rows,
+    ...reading,
     articles: ((articles ?? []) as { slug: string | null; locale: string | null; published_at: string | null }[])
       .filter((a): a is { slug: string; locale: string; published_at: string | null } => !!a.slug && isBlogAutoLocale(a.locale))
       .map((a) => ({
