@@ -913,6 +913,9 @@ export default function EnglishPrivacyPage() {
           Commission&rsquo;s Standard Contractual Clauses, within those providers&rsquo; own terms.
         </p>
         <p className="mt-4">
+          <strong>The map tiles are a different case and not a transfer by us at all:</strong> your browser contacts OpenStreetMap directly, we send nothing, and we hold no agreement with OpenStreetMap for it. That connection is governed by OpenStreetMap&rsquo;s own terms, and we do not control where its tile servers are located.
+        </p>
+        <p className="mt-4">
           Not every recipient named above is a provider of ours, and the instrument above does not reach
           all of them. <strong>JVZoo, and Digistore24 Inc. of St. Petersburg, Florida, on our Digistore24
           sales page, each decide for themselves what they do with the data</strong>: for the collection
