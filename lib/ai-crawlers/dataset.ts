@@ -106,6 +106,9 @@ const DUCKDUCKGO_DOCS = 'https://duckduckgo.com/duckduckgo-help-pages/results/du
 const KAGI_DOCS = 'https://kagi.com/bot'
 const IMAGESIFT_DOCS = 'https://imagesift.com/about'
 const AMAZON_DOCS = 'https://developer.amazon.com/amazonbot'
+const KIMI_DOCS = 'https://kimi.com/policies/kimi-crawlers'
+const ELEVENLABS_DOCS = 'https://elevenlabs.io/docs/bots'
+const QUALIFIED_DOCS = 'https://qualified.com/legal/qualified-crawler-user-agent'
 
 /** Every row read on this date, from the `docs` page named on the row. */
 // 04.11.2026: the Google, Perplexity and Meta pages had all been moved and
@@ -149,6 +152,15 @@ const READ_ON_NOV20 = '2026-11-20'
 // produced nothing: x.ai answers 403 to this container and its developer docs
 // have no crawlers page, so Grok stays out rather than resting on a
 // third-party list.
+// 21.11.2026, second pass: three operators that publish a crawler page and were
+// never read here. They were found by taking the token names from a public
+// agent directory and then reading ONLY the operator link each entry gave, so
+// every fact below still comes from the operator. Moonshot's Kimi draws the
+// same three-way split this dataset is built around, in its own words.
+// ElevenLabs draws a two-way one. Qualified is the awkward case kept honest:
+// its page documents the token and the crawl, and says to control the schedule
+// by contacting your account manager — robots.txt is never mentioned, so the
+// row says it has committed to nothing rather than inventing a commitment.
 const READ_ON_NOV21 = '2026-11-21'
 
 export const AI_CRAWLER_DATASET: readonly DatasetCrawler[] = [
@@ -408,6 +420,56 @@ export const AI_CRAWLER_DATASET: readonly DatasetCrawler[] = [
   // So a site that disallows `*` and allows Googlebot is allowing Kagibot too,
   // which is the opposite of what RFC 9309 alone would predict.
   { token: 'Kagibot', operator: 'Kagi', purpose: 'search', crawls: true, respectsRobots: true, docs: KAGI_DOCS, verified: READ_ON_NOV16 },
+
+  // ── Moonshot AI (Kimi) ────────────────────────────────────────────────────
+  // One operator page, three tokens, and the operator itself separates the
+  // corpus from the index from the fetch a person waits for.
+  { token: 'KimiBot', operator: 'Moonshot AI', purpose: 'train', crawls: true, respectsRobots: true, docs: KIMI_DOCS, verified: READ_ON_NOV21 },
+  { token: 'Kimi-SearchBot', operator: 'Moonshot AI', purpose: 'search', crawls: true, respectsRobots: true, docs: KIMI_DOCS, verified: READ_ON_NOV21 },
+  {
+    token: 'Kimi-User',
+    operator: 'Moonshot AI',
+    purpose: 'answer',
+    crawls: true,
+    respectsRobots: false,
+    docs: KIMI_DOCS,
+    verified: READ_ON_NOV21,
+    note: 'The fetch made when somebody asks Kimi to read a page or answer something that needs live retrieval. Moonshot states that it is not used for bulk crawling and that, because the actions are user-triggered, robots.txt rules may not directly apply \u2014 and separately that disallowing it may reduce a site\u2019s visibility in user-directed searches through its products. Moonshot also asks sites not to block its IP ranges, because a blocked crawler cannot read the robots.txt that states the site\u2019s preferences.',
+  },
+
+  // ── ElevenLabs ────────────────────────────────────────────────────────────
+  {
+    token: 'ElevenlabsCrawler',
+    operator: 'ElevenLabs',
+    purpose: 'train',
+    crawls: true,
+    respectsRobots: true,
+    docs: ELEVENLABS_DOCS,
+    verified: READ_ON_NOV21,
+    note: 'Collects publicly available content that may train ElevenLabs\u2019 generative models. ElevenLabs documents that the two tokens are independent of each other, so a site can allow the one its customers use while disallowing this one, and that a robots.txt change is reflected within about 24 hours.',
+  },
+  {
+    token: 'ElevenlabsBot',
+    operator: 'ElevenLabs',
+    purpose: 'search',
+    crawls: true,
+    respectsRobots: true,
+    docs: ELEVENLABS_DOCS,
+    verified: READ_ON_NOV21,
+    note: 'Fetches the pages an ElevenLabs customer adds to an agent\u2019s knowledge base, when they add them and when they refresh them, and ElevenLabs states that it honours robots.txt. Like Google\u2019s Vertex crawler, a site usually meets it because somebody using that site asked for it.',
+  },
+
+  // ── Qualified ─────────────────────────────────────────────────────────────
+  {
+    token: 'QualifiedBot',
+    operator: 'Qualified',
+    purpose: 'train',
+    crawls: true,
+    respectsRobots: false,
+    docs: QUALIFIED_DOCS,
+    verified: READ_ON_NOV21,
+    note: 'Qualified documents that it crawls its own customers\u2019 websites to power its AI products, at setup, at major releases and on a schedule the customer sets with their account manager. Its page never mentions robots.txt: the only crawl control it offers is to contact that manager, which is why this row states no robots.txt commitment rather than inferring one. It also documents that it may present a modified Chromium user agent with the token inside it, so a rule has to match the token and not the whole string.',
+  },
 ] as const
 
 /**
