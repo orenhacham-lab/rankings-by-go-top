@@ -119,6 +119,7 @@ import { runIsolatedInlineImageBatch } from '@/lib/content/image-batch/isolated'
 import { runLinkHeal, startIsolatedLinkHeal } from '@/lib/content/auto-internal-links/heal'
 import { resyncPublishedArticle } from '@/lib/content/auto-internal-links/resync'
 import { runIsolatedBlogCoverRepair } from '@/lib/blog/auto/cover-repair-isolated'
+import { runIsolatedBlogWeeklyReview } from '@/lib/blog/auto/weekly-review-isolated'
 
 // Generation can take a while; request a generous budget (platform clamps to the
 // plan's max — e.g. 60s on Hobby, up to 300s on Pro).
@@ -276,6 +277,15 @@ async function handle(request: Request): Promise<Response> {
     // cannot write (lib/content/seo-backfill-isolated.ts). Production only,
     // isolated: it never throws.
     await runIsolatedSeoBackfillSample(undefined, { startedAtMs: Date.parse(startedAt), maxDurationMs: maxDuration * 1000 })
+    // Once a week, on Sunday at 06:00 UTC (after the 05:00 GSC sync): the reading
+    // of our own blog. The outcome engine and the cannibalisation table were both
+    // pure and both unreachable — nothing called them. This logs what they say:
+    // which published article to improve rather than replace, and which queries
+    // our own pages are splitting between them (measured 21 Nov 2026: eight of
+    // our pages on one query, 1,377 impressions). It only reads and only logs —
+    // no article, plan row or redirect is touched (lib/blog/auto/weekly-review-isolated.ts).
+    // Production only, isolated: it never throws.
+    await runIsolatedBlogWeeklyReview(undefined, { startedAtMs: Date.parse(startedAt), maxDurationMs: maxDuration * 1000 })
     // Last of all, and off unless REMINDER_EMAILS_ENABLED is "true": the reminder email for
     // articles waiting for approval (lib/reminders). Isolated; it never throws or rejects.
     await runIsolatedReminders()
