@@ -77,8 +77,8 @@ export function buildOnboardingEmail(input: OnboardingEmailInput): OnboardingEma
   const s = t[input.stage]
   const rtl = input.locale === 'he'
   const actionUrl = actionUrlFor(input.origin, input.stage, input.projectId, input.locale)
-  // The unsubscribe page is bilingual (lib/reminders/http.ts): Spanish and Portuguese
-  // readers get its English, which is the same narrowing the rest of the dashboard makes.
+  // The unsubscribe page answers in the language the email was written in: it takes
+  // the full PublicLocale, so a Spanish or Portuguese reader lands on their own page.
   const unsubscribeUrl = unsubscribeUrlFor(input.origin, input.token, input.locale, SETUP_UNSUBSCRIBE_SCOPE)
   const subject = input.markAsKoreanAd ? koreaAdSubject(s.subject(input.domain)) : s.subject(input.domain)
   const greeting = t.greeting(input.firstName)
