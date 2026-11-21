@@ -3125,6 +3125,7 @@ export const dashboardHe = {
       gridAverage: 'מיקום ממוצע בכל הנקודות:',
       gridInTop3: 'נקודות ב-3 הראשונים:',
       gridNotMeasured: 'נקודה שלא נמדדה',
+      gridEmptyNote: 'הבדיקה האחרונה לא החזירה אף נקודה על המפה. בדרך כלל זה אומר שלמילת המפתח אין מרכז: פתחו אותה לעריכה והזינו כתובת או קואורדינטות.',
     },
   },
   competitors: {
@@ -4575,6 +4576,8 @@ export const dashboardHe = {
     locationModeRadius: 'Radius Scan (US Only)',
     locationModeExactPoint: 'נקודה מדויקת (המדויק ביותר)',
     locationModeGrid: 'מפת גריד של האזור',
+    gridCentreTitle: 'מרכז הגריד',
+    gridCentreHint: 'הגריד נמדד סביב הנקודה הזאת. אם אין עיר מוגדרת בפרויקט, חובה להזין כאן כתובת או קואורדינטות.',
     gridSizeLabel: 'גודל הגריד',
     gridSizeHint: (points: number) => `כל סריקה מודדת ${points} נקודות סביב העסק, ומנצלת ${points} בדיקות מהמכסה`,
     locationUsOnlyNote: 'סריקת רדיוס זמינה לפרויקטים בארה"ב בלבד',

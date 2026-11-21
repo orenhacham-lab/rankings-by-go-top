@@ -42,6 +42,8 @@ export const trackingKo: DeepPartial<DashboardDictionary> = {
     locationModeRadius: '반경 측정 (미국만)',
     locationModeExactPoint: '정확한 지점 (가장 정확)',
     locationModeGrid: '지역 그리드 지도',
+    gridCentreTitle: '그리드의 중심',
+    gridCentreHint: '그리드는 이 지점을 중심으로 측정됩니다. 프로젝트에 도시가 설정되어 있지 않으면 주소나 좌표를 반드시 입력해야 합니다.',
     gridSizeLabel: '그리드 크기',
     gridSizeHint: (points: number) => `측정 한 번에 업체 주변 ${points}개 지점을 확인하며, 요금제의 ${points}회를 사용합니다`,
     locationUsOnlyNote: '반경 스캔은 미국 사이트에서만 사용할 수 있습니다',

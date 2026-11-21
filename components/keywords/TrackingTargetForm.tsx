@@ -75,6 +75,14 @@ export default function TrackingTargetForm({
     return pattern.test(city.trim())
   }
 
+  // exact_point and grid both resolve a centre point. Grid may also inherit the
+  // project city, so its centre is optional; exact_point's is required.
+  const isCentreMode = locationMode === 'exact_point' || locationMode === 'grid'
+  const hasCentreInput =
+    exactSubMode === 'coords'
+      ? exactLat.trim() !== '' || exactLng.trim() !== ''
+      : exactAddress.trim() !== ''
+
   const customCityDiffers =
     locationMode === 'custom' &&
     customCity.trim() !== '' &&
@@ -90,7 +98,8 @@ export default function TrackingTargetForm({
     // Validate US city format if needed
     if (projectCountry?.toUpperCase() === 'US') {
       // Project city must be in "City, ST" format (not required for exact_point)
-      if (locationMode !== 'exact_point' && (!projectCity || !validateUSCityFormat(projectCity))) {
+      const centreCoversCity = locationMode === 'exact_point' || (isCentreMode && hasCentreInput)
+      if (!centreCoversCity && (!projectCity || !validateUSCityFormat(projectCity))) {
         setError(t.errorUsCity)
         return
       }
@@ -117,8 +126,10 @@ export default function TrackingTargetForm({
       }
     }
 
-    // exact_point: client-side guardrail. Real blocking validation happens server-side.
-    if (locationMode === 'exact_point') {
+    // exact_point / grid: client-side guardrail. Real blocking validation happens server-side.
+    // For grid the centre is optional (the project city can stand in), so only a
+    // partially filled centre is rejected here.
+    if (isCentreMode && (locationMode === 'exact_point' || hasCentreInput)) {
       if (exactSubMode === 'coords') {
         const lat = parseFloat(exactLat)
         const lng = parseFloat(exactLng)
@@ -350,13 +361,13 @@ export default function TrackingTargetForm({
         </div>
       )}
 
-      {locationMode === 'exact_point' && (
+      {isCentreMode && (
         <div className="space-y-3 p-3 bg-sunk border border-line rounded-control">
           <div className="text-copy text-body font-medium">
-            {t.exactPointTitle}
+            {locationMode === 'grid' ? t.gridCentreTitle : t.exactPointTitle}
           </div>
           <Segmented
-            ariaLabel={t.exactPointTitle}
+            ariaLabel={locationMode === 'grid' ? t.gridCentreTitle : t.exactPointTitle}
             value={exactSubMode}
             onChange={(v) => {
               setExactSubMode(v)
@@ -376,12 +387,12 @@ export default function TrackingTargetForm({
               }}
               placeholder={projectCountry?.toUpperCase() === 'US' ? '1600 Amphitheatre Pkwy, Mountain View, CA 94043' : t.exactAddressPlaceholderIL}
               hint={t.exactAddressHint}
-              required
+              required={locationMode === 'exact_point'}
             />
           ) : (
             <div className="grid grid-cols-2 gap-3">
               <Input
-                label="Latitude *"
+                label={locationMode === 'exact_point' ? 'Latitude *' : 'Latitude'}
                 name="exact_resolved_lat"
                 type="number"
                 step="0.000001"
@@ -391,10 +402,10 @@ export default function TrackingTargetForm({
                   setValidationError('')
                 }}
                 placeholder="37.4220"
-                required
+                required={locationMode === 'exact_point'}
               />
               <Input
-                label="Longitude *"
+                label={locationMode === 'exact_point' ? 'Longitude *' : 'Longitude'}
                 name="exact_resolved_lng"
                 type="number"
                 step="0.000001"
@@ -404,7 +415,7 @@ export default function TrackingTargetForm({
                   setValidationError('')
                 }}
                 placeholder="-122.0841"
-                required
+                required={locationMode === 'exact_point'}
               />
             </div>
           )}
@@ -416,7 +427,7 @@ export default function TrackingTargetForm({
           )}
 
           <div className="text-caption text-muted">
-            {t.exactCoordsNote}
+            {locationMode === 'grid' ? t.gridCentreHint : t.exactCoordsNote}
           </div>
         </div>
       )}
@@ -450,20 +461,20 @@ export default function TrackingTargetForm({
           <input type="hidden" name="radius_miles" value="" />
         </>
       )}
-      {locationMode !== 'exact_point' && (
+      {!isCentreMode && (
         <>
           <input type="hidden" name="exact_address_input" value="" />
           <input type="hidden" name="exact_resolved_lat" value="" />
           <input type="hidden" name="exact_resolved_lng" value="" />
         </>
       )}
-      {locationMode === 'exact_point' && exactSubMode === 'address' && (
+      {isCentreMode && exactSubMode === 'address' && (
         <>
           <input type="hidden" name="exact_resolved_lat" value="" />
           <input type="hidden" name="exact_resolved_lng" value="" />
         </>
       )}
-      {locationMode === 'exact_point' && exactSubMode === 'coords' && (
+      {isCentreMode && exactSubMode === 'coords' && (
         <input type="hidden" name="exact_address_input" value="" />
       )}
 

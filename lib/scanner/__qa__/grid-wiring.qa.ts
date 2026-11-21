@@ -45,6 +45,8 @@ function stripComments(src: string): string {
 
 const ROUTE_SRC = stripComments(readFileSync('app/api/scan/route.ts', 'utf8'))
 const SCHEDULER_SRC = stripComments(readFileSync('lib/scan-scheduler/process-scheduled-scan.ts', 'utf8'))
+const FORM_SRC = stripComments(readFileSync('components/keywords/TrackingTargetForm.tsx', 'utf8'))
+const ACTIONS_SRC = stripComments(readFileSync('app/actions/tracking-targets.ts', 'utf8'))
 
 interface Seen { url: string; body?: Record<string, unknown> }
 function installNet(opts: { places?: unknown[]; placesFor?: (ll: string) => unknown[] }) {
@@ -304,6 +306,57 @@ async function run() {
   check('the aggregate-row guard fails when the id is assumed', !guardPointsNeedTheRow('recordGridPoints(admin, { scanResultId: id })'))
   check('the scheduler guard would fail if a location mode were sent there',
     !guardSchedulerStillCityOnly("runScanFn(target.engine_type, { locationMode: target.location_mode })"))
+
+  // --------------------------------------------- F. the grid's centre point
+  // THE DEFECT: the form showed only the grid-size select, so a grid keyword
+  // saved no centre at all. effectiveCity then fell back to project.city, and a
+  // project with no city made google-maps.ts return "Grid mode needs a centre"
+  // — the row stored zero points and the table showed dashes with no message.
+  console.log('\nF) the grid asks for a centre, and refuses to save without one')
+
+  const guardFormOffersCentre = (src: string) =>
+    /const isCentreMode = locationMode === 'exact_point' \|\| locationMode === 'grid'/.test(src) &&
+    /\{isCentreMode && \(/.test(src)
+  const guardFormSubmitsCentre = (src: string) => /\{!isCentreMode && \(/.test(src)
+  const guardCentreOptionalForGrid = (src: string) =>
+    /required=\{locationMode === 'exact_point'\}/.test(src)
+  const guardActionsResolveGridCentre = (src: string) =>
+    (src.match(/locationMode === 'grid'\)? \{[\s\S]{0,400}?resolveGridCentre\(/g) || []).length >= 2
+  const guardGridCentreRefuses = (src: string) =>
+    /throw new UserFacingError\(m\.gridNeedsCentre\)/.test(src)
+  const guardGridCentreAcceptsCity = (src: string) =>
+    /if \(projectCity && projectCity\.trim\(\)\) return null/.test(src)
+  const guardRouteSendsGridCentre = (src: string) =>
+    /else if \(locationMode === 'grid'\) \{[\s\S]{0,600}?exactPointInput = \{/.test(src)
+  const guardRouteDoesNotBlockGrid = (src: string) =>
+    !/locationMode === 'grid'[\s\S]{0,300}?throw new Error\(/.test(src)
+
+  check('the form offers a centre in grid mode, not only the grid size', guardFormOffersCentre(FORM_SRC))
+  check("the centre's inputs are no longer blanked out in grid mode", guardFormSubmitsCentre(FORM_SRC))
+  check('the centre is required for an exact point and optional for a grid', guardCentreOptionalForGrid(FORM_SRC))
+  check('creating and editing a grid keyword both resolve its centre', guardActionsResolveGridCentre(ACTIONS_SRC))
+  check('a grid with no centre and no project city is refused at save time', guardGridCentreRefuses(ACTIONS_SRC))
+  check("a project that does have a city still stands in for the centre", guardGridCentreAcceptsCity(ACTIONS_SRC))
+  check('the scan passes a saved grid centre to the scanner', guardRouteSendsGridCentre(ROUTE_SRC))
+  check('the scan does not throw on a grid that leans on its city', guardRouteDoesNotBlockGrid(ROUTE_SRC))
+
+  console.log('\nF-MUT) mutation controls')
+  check('the centre-mode guard fails on the old condition',
+    !guardFormOffersCentre("const isCentreMode = locationMode === 'exact_point'\n{locationMode === 'exact_point' && ("))
+  check('the submit guard fails on the old blanking condition',
+    !guardFormSubmitsCentre("{locationMode !== 'exact_point' && ("))
+  check('the optional-centre guard fails when the grid is made to require one',
+    !guardCentreOptionalForGrid('required'))
+  check('the resolve guard fails when only one write path is covered',
+    !guardActionsResolveGridCentre("if (locationMode === 'grid') { const r = await resolveGridCentre(formData) }"))
+  check('the refusal guard fails when the error is dropped',
+    !guardGridCentreRefuses('return null'))
+  check('the city guard fails when the city is ignored',
+    !guardGridCentreAcceptsCity('if (projectCity) throw new UserFacingError(m.gridNeedsCentre)'))
+  check('the route guard fails when the grid centre is not passed',
+    !guardRouteSendsGridCentre("if (locationMode === 'exact_point') { exactPointInput = { lat, lng } }"))
+  check('the no-throw guard fails if the grid were blocked like an exact point',
+    !guardRouteDoesNotBlockGrid("if (locationMode === 'grid') { throw new Error('needs a centre') }"))
 
   if (prevSerper === undefined) delete process.env.SERPER_API_KEY; else process.env.SERPER_API_KEY = prevSerper
   if (prevGeoKey !== undefined) process.env.GOOGLE_GEOCODING_API_KEY = prevGeoKey

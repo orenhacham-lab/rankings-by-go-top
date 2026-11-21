@@ -581,6 +581,22 @@ export async function POST(request: Request) {
             resolutionSource: target.exact_resolution_source || null,
             geocodingProvider: target.exact_geocoding_provider || null,
           }
+        } else if (locationMode === 'grid') {
+          // A grid's centre is NOT the source of truth the way exact_point's is:
+          // lib/scanner/google-maps.ts also accepts a postal code or the project
+          // city. So a saved centre is passed when it is valid, and nothing is
+          // thrown when it is absent.
+          const lat = typeof target.exact_resolved_lat === 'number' ? target.exact_resolved_lat : null
+          const lng = typeof target.exact_resolved_lng === 'number' ? target.exact_resolved_lng : null
+          if (lat !== null && lng !== null && lat >= -90 && lat <= 90 && lng >= -180 && lng <= 180) {
+            exactPointInput = {
+              lat,
+              lng,
+              addressInput: target.exact_address_input || null,
+              resolutionSource: target.exact_resolution_source || null,
+              geocodingProvider: target.exact_geocoding_provider || null,
+            }
+          }
         }
 
         // radius mode — resolve ZIP to coordinates

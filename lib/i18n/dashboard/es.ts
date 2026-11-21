@@ -2147,6 +2147,7 @@ export const dashboardEs: DeepPartial<DashboardDictionary> = {
       gridAverage: 'Posición media en todos los puntos:',
       gridInTop3: 'Puntos entre los 3 primeros:',
       gridNotMeasured: 'Punto no medido',
+      gridEmptyNote: 'La última comprobación no devolvió ningún punto en el mapa. Normalmente significa que la palabra clave no tiene centro: ábrela para editarla e introduce una dirección o coordenadas.',
     },
   },
   competitors: {
@@ -2531,6 +2532,8 @@ export const dashboardEs: DeepPartial<DashboardDictionary> = {
     locationModeRadius: 'Comprobación por radio (solo EE. UU.)',
     locationModeExactPoint: 'Punto exacto (lo más preciso)',
     locationModeGrid: 'Mapa de cuadrícula de la zona',
+    gridCentreTitle: 'Centro de la cuadrícula',
+    gridCentreHint: 'La cuadrícula se mide alrededor de este punto. Si el proyecto no tiene ciudad, aquí hace falta una dirección o unas coordenadas.',
     gridSizeLabel: 'Tamaño de la cuadrícula',
     gridSizeHint: (points: number) => `Cada escaneo mide ${points} puntos alrededor del negocio y consume ${points} comprobaciones de tu plan`,
     locationUsOnlyNote: 'El escaneo por radio solo está disponible para webs de Estados Unidos',

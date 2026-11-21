@@ -47,6 +47,8 @@ export const trackingJa: DeepPartial<DashboardDictionary> = {
     locationModeRadius: '半径での計測（アメリカのみ）',
     locationModeExactPoint: '正確な地点（最も正確）',
     locationModeGrid: 'エリアのグリッドマップ',
+    gridCentreTitle: 'グリッドの中心',
+    gridCentreHint: 'グリッドはこの地点を中心に計測されます。プロジェクトに市区町村が設定されていない場合は、住所または緯度経度の入力が必要です。',
     gridSizeLabel: 'グリッドの大きさ',
     gridSizeHint: (points: number) => `1回の計測で店舗周辺の${points}地点を調べ、プランの${points}回分を使用します`,
     locationUsOnlyNote: '半径スキャンはアメリカのサイトでのみご利用いただけます',

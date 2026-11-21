@@ -146,6 +146,17 @@ export default function KeywordHistoryPage({ params }: { params: Promise<{ id: s
         </Card>
       )}
 
+      {/* A grid keyword whose latest check stored no point at all. Before the
+          centre was asked for in the form this was the whole symptom: dashes and
+          no explanation. The keyword can no longer be SAVED that way, but a row
+          saved earlier still lands here, so it says what is missing. */}
+      {target.location_mode === 'grid' && gridPoints.length === 0 && !loading && (
+        <Card className="mb-8">
+          <h2 className="mb-2 text-section font-semibold text-ink">{t.gridTitle}</h2>
+          <p className="text-copy text-muted">{t.gridEmptyNote}</p>
+        </Card>
+      )}
+
       {/* The position over time (§10), before the rows it is drawn from. */}
       <Card className="mb-8">
         <div className="mb-4 flex items-center gap-3">

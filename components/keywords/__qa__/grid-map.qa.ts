@@ -217,6 +217,46 @@ check('F12: every locale carries the name, in its own words',
       && new Set(values).size === values.length
       && PAGE_SRC.includes('notMeasured: t.gridNotMeasured')
   })())
+// The keyword could be SAVED with no centre at all, so the grid scan wrote zero
+// points and this screen showed dashes with nothing to read. The form now asks
+// for a centre, and a row saved before that says what is missing.
+const localeValue = (file: string, key: string): string | undefined => {
+  const m = readFileSync(file, 'utf8').match(new RegExp(`${key}: (['"])((?:(?!\\1).)+)\\1`))
+  return m ? m[2] : undefined
+}
+check('F13: every locale names the grid centre and the empty map, in its own words',
+  (() => {
+    const centreFiles = [
+      'lib/i18n/dashboard/he.ts', 'lib/i18n/dashboard/en.ts', 'lib/i18n/dashboard/es.ts',
+      'lib/i18n/dashboard/pt-BR/tracking.ts', 'lib/i18n/dashboard/de/tracking.ts',
+      'lib/i18n/dashboard/fr/tracking.ts', 'lib/i18n/dashboard/it/tracking.ts',
+      'lib/i18n/dashboard/nl/tracking.ts', 'lib/i18n/dashboard/pl/tracking.ts',
+      'lib/i18n/dashboard/ja/tracking.ts', 'lib/i18n/dashboard/ko/tracking.ts',
+    ]
+    const emptyFiles = [
+      'lib/i18n/dashboard/he.ts', 'lib/i18n/dashboard/en.ts', 'lib/i18n/dashboard/es.ts',
+      'lib/i18n/dashboard/pt-BR/projects.ts', 'lib/i18n/dashboard/de/projects.ts',
+      'lib/i18n/dashboard/fr/projects.ts', 'lib/i18n/dashboard/it/projects.ts',
+      'lib/i18n/dashboard/nl/projects.ts', 'lib/i18n/dashboard/pl/projects.ts',
+      'lib/i18n/dashboard/ja/projects.ts', 'lib/i18n/dashboard/ko/projects.ts',
+    ]
+    const ok = (files: string[], key: string) => {
+      const values = files.map((f) => localeValue(f, key))
+      return values.every((v) => typeof v === 'string' && v.length > 0)
+        && new Set(values).size === values.length
+    }
+    return ok(centreFiles, 'gridCentreTitle') && ok(centreFiles, 'gridCentreHint')
+      && ok(emptyFiles, 'gridEmptyNote')
+  })())
+check('F14: the screen reads that note when a grid check stored nothing',
+  /target\.location_mode === 'grid' && gridPoints\.length === 0/.test(PAGE_SRC)
+  && PAGE_SRC.includes('t.gridEmptyNote'))
+check('F13-MUT: a locale left in English fails F13',
+  localeValue('lib/i18n/dashboard/ko/projects.ts', 'gridEmptyNote')
+    !== localeValue('lib/i18n/dashboard/en.ts', 'gridEmptyNote'))
+check('F14-MUT: the note shown for a grid that did store points fails F14',
+  !/target\.location_mode === 'grid' && gridPoints\.length === 0/.test(
+    "{target.location_mode === 'grid' && (<p>{t.gridEmptyNote}</p>)}"))
 check('F9-MUT: a picture that names the outline nowhere fails F9 and F10',
   !stoppedHtml.split(LABELS.notMeasured).join('x').includes(LABELS.notMeasured))
 check('F11-MUT: a legend entry shown for a mark that is not drawn fails F11',

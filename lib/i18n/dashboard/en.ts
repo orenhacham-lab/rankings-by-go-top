@@ -3118,6 +3118,7 @@ export const dashboardEn = {
       gridAverage: 'Average position across every point:',
       gridInTop3: 'Points in the top 3:',
       gridNotMeasured: 'Point not measured',
+      gridEmptyNote: 'The latest check returned no points on the map. Usually this means the keyword has no centre: open it for editing and enter an address or coordinates.',
     },
   },
   competitors: {
@@ -4551,6 +4552,8 @@ export const dashboardEn = {
     locationModeRadius: 'Radius Scan (US Only)',
     locationModeExactPoint: 'Exact point (most precise)',
     locationModeGrid: 'Area grid map',
+    gridCentreTitle: 'Centre of the grid',
+    gridCentreHint: 'The grid is measured around this point. If the project has no city, an address or coordinates are required here.',
     gridSizeLabel: 'Grid size',
     gridSizeHint: (points: number) => `Each scan measures ${points} points around the business and uses ${points} checks from your allowance`,
     locationUsOnlyNote: 'Radius scan is available for US projects only',

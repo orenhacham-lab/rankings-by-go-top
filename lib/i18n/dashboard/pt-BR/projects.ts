@@ -174,6 +174,7 @@ export const projectsPtBR: DeepPartial<DashboardDictionary> = {
       gridAverage: 'Posição média em todos os pontos:',
       gridInTop3: 'Pontos entre os 3 primeiros:',
       gridNotMeasured: 'Ponto não medido',
+      gridEmptyNote: 'A última verificação não retornou nenhum ponto no mapa. Normalmente isso significa que a palavra-chave não tem centro: abra-a para edição e informe um endereço ou coordenadas.',
     },
   },
   competitors: {

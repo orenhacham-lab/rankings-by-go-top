@@ -174,6 +174,7 @@ export const projectsNl: DeepPartial<DashboardDictionary> = {
       gridAverage: 'Gemiddelde positie over alle punten:',
       gridInTop3: 'Punten in de top 3:',
       gridNotMeasured: 'Niet gemeten punt',
+      gridEmptyNote: 'De laatste controle leverde geen punten op de kaart op. Meestal betekent dit dat het zoekwoord geen middelpunt heeft: open het om te bewerken en voer een adres of coördinaten in.',
     },
   },
   competitors: {
