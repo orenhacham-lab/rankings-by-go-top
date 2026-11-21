@@ -22,7 +22,7 @@ type Admin = ReturnType<typeof createAdminClient>
 const nowIso = () => new Date().toISOString()
 
 const ARTICLE_SELECT =
-  'id, topic_id, title, slug, excerpt, meta_description, content_html, featured_image_url, shopify_blog_id, shopify_article_id, shopify_tags'
+  'id, topic_id, title, slug, excerpt, meta_title, meta_description, content_html, featured_image_url, shopify_blog_id, shopify_article_id, shopify_tags'
 
 interface PoolItem { id: string; project_id: string; topic_id: string | null; article_id: string | null; status: string; attempts: number }
 
