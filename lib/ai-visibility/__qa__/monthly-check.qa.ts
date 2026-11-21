@@ -354,10 +354,19 @@ async function main() {
     }
     check('E6: the cron authenticates first (fails closed), then schedules the AI check, then the rank work as before', order(route))
     check('E7: MUT scheduling before the auth check fails E6', !order(route.replace("const denied = authorizeCronRequest(request, 'Schedule')\n  if (denied) return denied", '') + "\nconst denied = authorizeCronRequest(request, 'Schedule')\n  if (denied) return denied"))
+    // E8's second clause guards the rank loop from being disturbed by the AI
+    // check that shares this route. On 21.11.2026 the loop gained ONE thing of
+    // its own: a deadline break, so the invocation stops starting projects
+    // instead of being killed inside one (lib/scan-scheduler/chain.ts). The
+    // clause was widened to permit exactly that break and nothing else --
+    // anything further between the `for` and the dispatch still fails here.
     const isolated = (src: string) => /try \{\s*after\(\(\) => startIsolatedMonthlyAiChecks\([\s\S]{0,200}\)\s*\} catch \{/.test(src)
-      && /for \(const project of projects\) \{\s*const outcome = await processScheduledScanForProject\(admin, project, \{ now \}\)/.test(src)
+      && /for \(const project of projects\) \{\s*(?:if \(Date\.now\(\) >= deadlineAtMs\) \{[\s\S]{0,400}?break\s*\}\s*)?const outcome = await processScheduledScanForProject\(admin, project, \{ now \}\)/.test(src)
     check('E8: the AI check runs in after(), inside a try, and the rank loop is unchanged', isolated(route))
     check('E9: MUT awaiting the AI check inline fails E8', !isolated(route.replace('after(() => startIsolatedMonthlyAiChecks(', 'await (() => startIsolatedMonthlyAiChecks(')))
+    check('E9b: MUT any OTHER work slipped into the rank loop still fails E8',
+      !isolated(route.replace('const outcome = await processScheduledScanForProject(admin, project, { now })',
+        'await somethingElse(project)\n    const outcome = await processScheduledScanForProject(admin, project, { now })')))
     // The route itself, with no request scope for after(): the rank answer is unchanged.
     process.env.CRON_SECRET = 'qa-cron'
     ADMIN_CLIENT = world().admin
