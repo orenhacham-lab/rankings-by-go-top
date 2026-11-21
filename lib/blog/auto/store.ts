@@ -102,8 +102,25 @@ export async function readInternalTargets(admin: Admin, locale: BlogAutoLocale, 
     .eq('is_published', true)
     .order('published_at', { ascending: false })
     .limit(limit)
-  return ((data ?? []) as { title: string | null; slug: string | null }[])
-    .filter((r): r is InternalLinkTarget => !!r.title && !!r.slug)
+  const rows = ((data ?? []) as { title: string | null; slug: string | null }[])
+    .filter((r): r is { title: string; slug: string } => !!r.title && !!r.slug)
+  if (!rows.length) return []
+
+  // The keyword each of those articles was written for, which is the anchor
+  // text the brief offers for it (`anchorTextFor`). It lives on the plan row,
+  // keyed on the slug the publish wrote back; 213 of the 221 published
+  // articles have one, and the eight that do not are the hand-written Hebrew
+  // articles, which fall back to their title.
+  const { data: plans } = await admin
+    .from(PLAN_TABLE)
+    .select('article_slug, primary_keyword')
+    .eq('locale', locale)
+    .in('article_slug', rows.map((r) => r.slug))
+  const keywordOf = new Map<string, string>()
+  for (const row of (plans ?? []) as { article_slug: string | null; primary_keyword: string | null }[]) {
+    if (row.article_slug && row.primary_keyword) keywordOf.set(row.article_slug, row.primary_keyword)
+  }
+  return rows.map((r) => ({ ...r, keyword: keywordOf.get(r.slug) ?? null }))
 }
 
 /**
