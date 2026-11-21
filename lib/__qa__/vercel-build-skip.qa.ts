@@ -18,7 +18,7 @@
  * Run: npx tsx lib/__qa__/vercel-build-skip.qa.ts
  */
 import { execFileSync, spawnSync } from 'node:child_process'
-import { mkdtempSync, readFileSync, rmSync, unlinkSync, writeFileSync } from 'node:fs'
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, unlinkSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
@@ -33,10 +33,19 @@ const SCRIPT = join(ROOT, REL)
 const source = readFileSync(SCRIPT, 'utf8')
 
 type Verdict = { build: boolean; reason: string }
-type Input = { vercelEnv?: string; previousSha?: string; previousTree?: string | null; headTree?: string | null }
+type Input = {
+  vercelEnv?: string
+  previousSha?: string
+  previousTree?: string | null
+  headTree?: string | null
+  changedPaths?: string[] | null
+}
 
 async function main() {
-  const { decide } = (await import(SCRIPT)) as { decide: (i: Input) => Verdict }
+  const { decide, isBuildIrrelevant } = (await import(SCRIPT)) as {
+    decide: (i: Input) => Verdict
+    isBuildIrrelevant: (p: unknown) => boolean
+  }
 
   console.log('D) the decision table')
   {
@@ -54,6 +63,38 @@ async function main() {
     check('D8: every verdict says why, for the build log', [d({}), d({ headTree: U })].every((v) => v.reason.length > 10))
   }
 
+  console.log('P) the paths that cannot change a deployment')
+  {
+    // A changed tree, so the verdict turns on the paths alone.
+    const T = 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa'
+    const U = 'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb'
+    const p = (changedPaths: string[] | null) =>
+      decide({ vercelEnv: 'preview', previousSha: 'deadbeef', previousTree: T, headTree: U, changedPaths })
+
+    check('P1: a QA-suite-only push is skipped',
+      p(['lib/content/automation/__qa__/pass-gate.qa.ts']).build === false, show(p(['lib/content/automation/__qa__/pass-gate.qa.ts'])))
+    check('P2: a documentation-only push is skipped', p(['CLAUDE.md', 'docs/notes.md']).build === false)
+    check('P3: a probe and the QA runner are skipped',
+      p(['supabase/migrations/__qa__/cron-pass-gate.probe.sql', 'scripts/qa/verify.mjs']).build === false)
+    check('P4: a workflow-only push is skipped', p(['.github/workflows/ci.yml']).build === false)
+    check('P5: one deployed file among many irrelevant ones still builds',
+      p(['CLAUDE.md', 'lib/__qa__/x.qa.ts', 'app/page.tsx']).build === true, show(p(['CLAUDE.md', 'lib/__qa__/x.qa.ts', 'app/page.tsx'])))
+    check('P6: THE LEGAL TEXT CASE — markdown under content/ is deployed and must build',
+      p(['content/legal/es/terms.md']).build === true, show(p(['content/legal/es/terms.md'])))
+    check('P7: a changed tree with no path list builds, rather than guessing', p(null).build === true)
+    check('P8: an empty path list builds', p([]).build === true)
+    check('P9: the skip verdict names how many files it looked at', /2 changed file/.test(p(['A.md', 'B.md']).reason))
+
+    check('P10: the predicate is a closed list — an unknown shape is deployed',
+      [isBuildIrrelevant('app/page.tsx'), isBuildIrrelevant('lib/content/automation/pass-gate.ts'),
+        isBuildIrrelevant('package.json'), isBuildIrrelevant('next.config.ts'),
+        isBuildIrrelevant('vercel.json'), isBuildIrrelevant('')].every((v) => v === false))
+    check('P11: and a non-string never counts as irrelevant',
+      [undefined, null, 42, {}].every((v) => isBuildIrrelevant(v) === false))
+    check('P12: a migration that is not a probe still builds, because it is not this script\'s call',
+      isBuildIrrelevant('supabase/migrations/20261117170000_cron_pass_gate.sql') === false)
+  }
+
   /** A repository with: A (a file), B (tree-identical to A), C (the file changed). */
   function fixture() {
     const dir = mkdtempSync(join(tmpdir(), 'ignore-build-'))
@@ -69,7 +110,15 @@ async function main() {
     writeFileSync(join(dir, 'a.txt'), 'two\n')
     git('add', 'a.txt'); git('commit', '--quiet', '-m', 'C')
     const c = git('rev-parse', 'HEAD')
-    return { dir, a, b, c, git }
+    // D: documentation only, from C. E: a legal markdown file under content/.
+    writeFileSync(join(dir, 'NOTES.md'), 'a note\n')
+    git('add', 'NOTES.md'); git('commit', '--quiet', '-m', 'D')
+    const d = git('rev-parse', 'HEAD')
+    mkdirSync(join(dir, 'content', 'legal', 'es'), { recursive: true })
+    writeFileSync(join(dir, 'content', 'legal', 'es', 'terms.md'), 'terminos\n')
+    git('add', '.'); git('commit', '--quiet', '-m', 'E')
+    const e = git('rev-parse', 'HEAD')
+    return { dir, a, b, c, d, e, git }
   }
 
   /** The script's own exit status, run the way Vercel runs it. */
@@ -99,6 +148,12 @@ async function main() {
       execFileSync('git', ['checkout', '--quiet', fx.c], { cwd: fx.dir })
       const changed = run(fx.dir, { VERCEL_ENV: 'preview', VERCEL_GIT_PREVIOUS_SHA: fx.a })
       check('R5: a preview commit that changed a file exits 1 and builds', changed.status === 1, show(changed))
+      execFileSync('git', ['checkout', '--quiet', fx.d], { cwd: fx.dir })
+      const docs = run(fx.dir, { VERCEL_ENV: 'preview', VERCEL_GIT_PREVIOUS_SHA: fx.c })
+      check('R6: a preview whose only change is a markdown file exits 0 and skips', docs.status === 0, show(docs))
+      execFileSync('git', ['checkout', '--quiet', fx.e], { cwd: fx.dir })
+      const legal = run(fx.dir, { VERCEL_ENV: 'preview', VERCEL_GIT_PREVIOUS_SHA: fx.d })
+      check('R7: a preview whose only change is content/legal markdown exits 1 and builds', legal.status === 1, show(legal))
     }
 
     console.log('C) the command is wired up and can run before the install step')
@@ -118,10 +173,13 @@ async function main() {
 
     console.log('M) mutation controls')
     {
+      // A fresh filename per mutant: ESM caches a module by URL, so reusing one
+      // path would silently hand the second import the first mutant.
+      let mutants = 0
       const mutant = (needle: string, repl: string) => {
         const next = source.replace(needle, repl)
         if (next === source) throw new Error(`mutation did not apply: ${needle}`)
-        const to = SCRIPT.replace(/\.mjs$/, '.mut.mjs')
+        const to = SCRIPT.replace(/\.mjs$/, `.mut${++mutants}.mjs`)
         writeFileSync(to, next)
         return to
       }
@@ -136,6 +194,18 @@ async function main() {
       try {
         check('M2: dropping the production guard fails R2',
           run(fx.dir, { VERCEL_ENV: 'production', VERCEL_GIT_PREVIOUS_SHA: fx.a }, to).status === 0)
+      } finally { unlinkSync(to) }
+      to = mutant("if (path === 'content' || path.startsWith('content/')) return false", 'if (false) return false')
+      try {
+        const { isBuildIrrelevant: broken } = (await import(to)) as { isBuildIrrelevant: (p: string) => boolean }
+        check('M5: dropping the content/ exclusion fails P6, which is the legal text going stale',
+          broken('content/legal/es/terms.md') === true)
+      } finally { unlinkSync(to) }
+      to = mutant("const deployed = changedPaths.filter((path) => !isBuildIrrelevant(path))", 'const deployed = []')
+      try {
+        const { decide: broken } = (await import(to)) as { decide: (i: Input) => Verdict }
+        check('M6: treating every changed file as irrelevant fails P5',
+          broken({ vercelEnv: 'preview', previousSha: 'x', previousTree: 'a', headTree: 'b', changedPaths: ['app/page.tsx'] }).build === false)
       } finally { unlinkSync(to) }
       check('M3: a bare import fails C4',
         !["node:child_process", "picomatch"].every((s) => s.startsWith('node:')))
