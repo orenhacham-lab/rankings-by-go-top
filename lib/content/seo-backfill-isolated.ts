@@ -44,6 +44,21 @@ export interface SeoBackfillSample {
   description: Record<FieldState, number>
   /** Articles the backfill would refuse, by reason. */
   skipped: Record<string, number>
+  /**
+   * The articles refused as `nothing_to_write`, read again: WHOSE words are on the
+   * page. Measured 21 Nov 2026, the first pass refused all ten for that reason and
+   * the log could not say why, because a refused report's field states were
+   * discarded — so the question "are the 337 really missing their SEO meta, or only
+   * unverified in our database?" had no answer in the line that was meant to answer
+   * it. `ours` means apply would record `seo_status` and change nothing on the site;
+   * `kept` means the merchant wrote it and we leave it alone either way.
+   */
+  nothingToWrite: {
+    title: Record<FieldState, number>
+    description: Record<FieldState, number>
+    /** Both fields already OUR words: apply would write the database only. */
+    verifyOnly: number
+  }
   /** How many articles have at least one field the backfill would write. */
   wouldWrite: number
   byChannel: Record<string, number>
@@ -59,10 +74,20 @@ const emptyStates = (): Record<FieldState, number> => ({ missing: 0, ours: 0, ke
 export function summarizeReports(reports: ArticleReport[], waiting: number): SeoBackfillSample {
   const out: SeoBackfillSample = {
     waiting, sampled: reports.length, title: emptyStates(), description: emptyStates(), skipped: {}, wouldWrite: 0, byChannel: {},
+    nothingToWrite: { title: emptyStates(), description: emptyStates(), verifyOnly: 0 },
   }
   for (const r of reports) {
     out.byChannel[r.channel] = (out.byChannel[r.channel] ?? 0) + 1
-    if (r.skip) { out.skipped[r.skip] = (out.skipped[r.skip] ?? 0) + 1; continue }
+    if (r.skip) {
+      out.skipped[r.skip] = (out.skipped[r.skip] ?? 0) + 1
+      // A page that was read and had both fields is the one refusal worth describing.
+      if (r.skip === 'nothing_to_write') {
+        out.nothingToWrite.title[r.head.title] += 1
+        out.nothingToWrite.description[r.head.description] += 1
+        if (r.head.title === 'ours' && r.head.description === 'ours') out.nothingToWrite.verifyOnly += 1
+      }
+      continue
+    }
     out.title[r.head.title] += 1
     out.description[r.head.description] += 1
     if (r.title === 'would_write' || r.description === 'would_write') out.wouldWrite += 1

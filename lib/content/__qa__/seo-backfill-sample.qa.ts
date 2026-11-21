@@ -60,6 +60,42 @@ check('A5 and the channel split, because the two write paths are not equally lik
 check('A6 a merchant\'s own title is never counted as something to write',
   summarizeReports([report({ head: { title: 'kept', description: 'kept', pageTitle: 't', pageDescription: 'd' }, title: 'not_needed', description: 'not_needed' })], 1).wouldWrite === 0)
 
+// ── A7..A11: the refusal that needed describing ───────────────────────────
+//
+// 21 November 2026, the first Production pass: `skipped: { nothing_to_write: 10 }`,
+// `wouldWrite: 0`, and every field state 0 — the line could not say whether those
+// ten pages carry OUR words (so apply would only record `seo_status`) or the
+// MERCHANT'S (so there is nothing to do at all). That is the whole decision.
+const refused = summarizeReports([
+  // both fields already ours: apply would write the database and nothing else.
+  report({ skip: 'nothing_to_write', head: { title: 'ours', description: 'ours', pageTitle: 'x', pageDescription: 'y' }, title: 'not_needed', description: 'not_needed' }),
+  report({ skip: 'nothing_to_write', head: { title: 'ours', description: 'ours', pageTitle: 'x', pageDescription: 'y' }, title: 'not_needed', description: 'not_needed' }),
+  // the merchant's own words in both: nothing to do, now or ever.
+  report({ skip: 'nothing_to_write', head: { title: 'kept', description: 'kept', pageTitle: 't', pageDescription: 'd' }, title: 'not_needed', description: 'not_needed' }),
+  // a mix, which must NOT be counted as "verify only".
+  report({ skip: 'nothing_to_write', head: { title: 'ours', description: 'kept', pageTitle: 'x', pageDescription: 'd' }, title: 'not_needed', description: 'not_needed' }),
+  // a refusal that never read the page at all.
+  report({ skip: 'page_unreadable', title: 'skipped', description: 'skipped' }),
+], 337)
+check('A7 a refused-as-already-set article is described, not just counted',
+  refused.nothingToWrite.title.ours === 3 && refused.nothingToWrite.title.kept === 1,
+  JSON.stringify(refused.nothingToWrite))
+check('A8 both fields ours means apply would touch the database only',
+  refused.nothingToWrite.verifyOnly === 2, String(refused.nothingToWrite.verifyOnly))
+check('A9 a page the merchant wrote one of the two fields on is NOT a database-only write',
+  refused.nothingToWrite.description.kept === 2, JSON.stringify(refused.nothingToWrite.description))
+check('A10 a refusal that never read the page is left out of the description',
+  refused.nothingToWrite.title.ours + refused.nothingToWrite.title.kept
+  + refused.nothingToWrite.title.missing + refused.nothingToWrite.title.unknown === 4,
+  JSON.stringify(refused.nothingToWrite.title))
+check('A11 and none of it makes the backfill want to write', refused.wouldWrite === 0)
+// MUTATION CONTROL: the breakdown must not leak into the top-level field states,
+// which A3 and the control below measure — those count only articles that reached
+// a decision.
+check('A12 MUTATION CONTROL: describing a refusal did not add it to the main tally',
+  refused.title.ours === 0 && refused.title.kept === 0 && refused.title.missing === 0,
+  JSON.stringify(refused.title))
+
 // ── B: the sample is a sample ─────────────────────────────────────────────
 
 const items = Array.from({ length: 100 }, (_, i) => i)
