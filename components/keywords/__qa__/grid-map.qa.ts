@@ -183,7 +183,7 @@ check('F6: an unreadable coordinate does not become the anchor',
 const stoppedHtml = renderToStaticMarkup(createElement(GridMap, { points: stopped, labels: LABELS }))
 check('F7: the stopped grid draws 6 pins and 3 outlines, not 6 of 6',
   (stoppedHtml.match(/ring-2 ring-surface/g) || []).length === 6 &&
-  (stoppedHtml.match(/absolute rounded-full border border-dashed/g) || []).length === 3)
+  (stoppedHtml.match(/absolute rounded-full border-2 border-dashed/g) || []).length === 3)
 check('F8: an outline is never a grey pin — it carries no position and no mark',
   !/border-dashed[^>]*bg-grid-absent/.test(stoppedHtml))
 
@@ -280,7 +280,7 @@ check('G5: north is stated on the map itself, not at the far end of the heading'
   /absolute left-1\.5 top-1\.5[^"]*"[^>]*>\s*↑/.test(MAP_SRC.replace(/\n/g, ' ')) || MAP_SRC.includes('↑ {labels.north}'))
 check('G6: the pin is sized from the real distance between neighbours on the map',
   /Math\.hypot\(pa\.left - pb\.left, pa\.top - pb\.top\)/.test(MAP_SRC) && /spacing \* 0\.62/.test(MAP_SRC))
-check('G7: the map is centred rather than pushed to one side', /relative mx-auto mt-3/.test(MAP_SRC))
+check('G7: the map is centred rather than pushed to one side', /mx-auto w-full max-w-\[560px\]/.test(MAP_SRC))
 check('G8: every locale says it in its own words',
   (() => {
     const files = ['he.ts', 'en.ts', 'es.ts', 'pt-BR/projects.ts', 'de/projects.ts', 'fr/projects.ts', 'it/projects.ts',
@@ -293,6 +293,19 @@ check('G1-MUT: showing the average on an empty map fails G1',
   !(`<span>${LABELS.average} 21</span>`.includes('Not found at any of') && !`<span>${LABELS.average} 21</span>`.includes(LABELS.average)))
 check('G4-MUT: the old dot glyph fails G4', !noneHtml.replace(/×/g, '·').includes('>×<'))
 check('G6-MUT: the old box-only pin size fails G6', !/Math\.hypot/.test('const pin = Math.max(20, Math.min(40, Math.floor((box / side) * 0.78)))'))
+
+// ---- H. the pins at phone width, and the average tile with nothing found
+check('H1: the number inside a pin shrinks with the pin, so two digits stay inside it',
+  /fontSize: Math\.max\(9, Math\.floor\(drawnPin \* 0\.42\)\)/.test(MAP_SRC) && !/rounded-full text-caption font-bold/.test(MAP_SRC))
+check('H2: the never-measured outline is a fixed dark stroke, since the tiles are light in both themes',
+  /border-2 border-dashed border-grid-outline bg-grid-outline-fill/.test(MAP_SRC) && CSS_SRC.includes('--color-grid-outline:') && !/border-ink\/50 bg-transparent/.test(MAP_SRC))
+check('H3: the key and the figures share the map\'s column, so they line up with its edges',
+  /mx-auto w-full max-w-\[560px\]">\s*<div\s+ref=\{boxRef\}/.test(MAP_SRC))
+check('H4: the average tile prints no "0 checks" when nothing was found',
+  /source=\{foundResults\.length > 0 \? `/.test(PAGE_SRC))
+check('H1-MUT: a fixed caption size fails H1', !/fontSize: Math\.max\(9/.test('className="rounded-full text-caption font-bold"'))
+check('H2-MUT: a themed ink outline fails H2', !/border-2 border-dashed border-grid-outline/.test('border-ink/50 bg-transparent'))
+check('H4-MUT: the old unconditional source fails H4', !/source=\{foundResults\.length > 0 \? `/.test('source={`${formatCount(foundResults.length, uiLocale)} ${t.checks}`}'))
 
 console.log(`\n${pass} passed, ${fail} failed`)
 if (fail > 0) process.exit(1)

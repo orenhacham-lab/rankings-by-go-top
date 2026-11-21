@@ -123,6 +123,11 @@
   --color-grid-rest-ink: #ffffff;
   --color-grid-absent: #e8e9ec;
   --color-grid-absent-ink: #44506a;
+  /* The outline of a point the scan never reached. It sits on map tiles, which are
+     light in BOTH themes, so it is the same dark stroke on a faint light fill in
+     both: a themed ink turns white in dark mode and vanishes on the map. */
+  --color-grid-outline: #3b4558;
+  --color-grid-outline-fill: rgb(255 255 255 / 0.25);
 
   /* The one dark surface: a screen's opening context card, in the rail's navy.
      Its own token, because it must stay dark in dark mode instead of inverting. */
@@ -592,6 +597,8 @@
   --color-grid-rest-ink: #2a0c08;
   --color-grid-absent: #2a2e36;
   --color-grid-absent-ink: #aab1bd;
+  --color-grid-outline: #3b4558;
+  --color-grid-outline-fill: rgb(255 255 255 / 0.25);
 
   --color-contrast: #0f2247;
   --color-contrast-ink: #f5f6f8;

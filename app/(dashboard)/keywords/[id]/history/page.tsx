@@ -132,7 +132,10 @@ export default function KeywordHistoryPage({ params }: { params: Promise<{ id: s
         <StatTile label={t.bestPosition} icon={<Crown />} value={bestPosition !== null ? <PositionFigure n={bestPosition} /> : '—'} />
         <StatTile label={t.worstPosition} icon={<ArrowDownToLine />} value={worstPosition !== null ? <PositionFigure n={worstPosition} /> : '—'} />
         <StatTile label={t.average} icon={<Sigma />} value={avgPosition !== null ? <PositionFigure n={avgPosition} /> : '—'}
-          source={`${formatCount(foundResults.length, uiLocale)} ${t.checks}`} />
+          // The average is over the checks that found the business. With none, the
+          // tile shows a dash and says nothing, instead of "0 checks" above a history
+          // that lists a check.
+          source={foundResults.length > 0 ? `${formatCount(foundResults.length, uiLocale)} ${t.checks}` : undefined} />
       </div>
 
       {/* The area map, when this keyword is measured as a grid: where it stands

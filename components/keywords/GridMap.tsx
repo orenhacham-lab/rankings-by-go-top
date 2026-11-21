@@ -178,10 +178,13 @@ export default function GridMap({ points, labels }: { points: GridMapPoint[]; la
         <h2 className="text-section font-semibold text-ink">{labels.title}</h2>
       </div>
 
+      {/* The map, its key and its figures share one column, so the key and the
+          figures line up with the map's edges instead of the card's. */}
+      <div className="mx-auto w-full max-w-[560px]">
       <div
         ref={boxRef}
         dir="ltr"
-        className="relative mx-auto mt-3 w-full max-w-[560px] overflow-hidden rounded-control bg-sunk"
+        className="relative mt-3 w-full overflow-hidden rounded-control bg-sunk"
         style={{ height: box }}
       >
         {plan?.tiles.map((t) => (
@@ -216,10 +219,13 @@ export default function GridMap({ points, labels }: { points: GridMapPoint[]; la
 
             if (!point) {
               // Never reached: the place it would have been, drawn as an outline.
+              // The tiles are light in BOTH themes, so the outline is a fixed dark
+              // stroke on a faint light fill: a themed ink colour turns white in
+              // dark mode and vanishes on the map.
               return (
                 <div
                   key={`${row}:${col}`}
-                  className="absolute rounded-full border border-dashed border-line bg-surface/60"
+                  className="absolute rounded-full border-2 border-dashed border-grid-outline bg-grid-outline-fill"
                   style={style}
                   title={labels.notMeasured}
                 />
@@ -230,8 +236,8 @@ export default function GridMap({ points, labels }: { points: GridMapPoint[]; la
             return (
               <div
                 key={`${row}:${col}`}
-                className={`absolute flex items-center justify-center rounded-full text-caption font-bold tabular-nums ring-2 ring-surface ${MARK[bucket]}`}
-                style={style}
+                className={`absolute flex items-center justify-center rounded-full font-bold leading-none tabular-nums ring-2 ring-surface ${MARK[bucket]}`}
+                style={{ ...style, fontSize: Math.max(9, Math.floor(drawnPin * 0.42)) }}
                 title={`${point.lat.toFixed(4)}, ${point.lng.toFixed(4)} — ${bucket === 'absent' ? labels.notFound : String(point.position)}`}
               >
                 {bucket === 'absent' ? '×' : String(point.position)}
@@ -273,7 +279,7 @@ export default function GridMap({ points, labels }: { points: GridMapPoint[]; la
         {points.length < side * side && (
           <span className="flex items-center gap-1.5">
             <span
-              className="inline-block h-3 w-3 rounded-full border border-dashed border-line bg-surface"
+              className="inline-block h-3 w-3 rounded-full border-2 border-dashed border-ink/50"
               aria-hidden="true"
             />
             {labels.notMeasured}
@@ -296,6 +302,7 @@ export default function GridMap({ points, labels }: { points: GridMapPoint[]; la
           </span>
         </div>
       )}
+      </div>
     </div>
   )
 }
