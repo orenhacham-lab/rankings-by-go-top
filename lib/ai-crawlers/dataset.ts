@@ -101,16 +101,18 @@ const GOOGLE_FETCHER_DOCS =
 const PERPLEXITY_DOCS = 'https://docs.perplexity.ai/docs/resources/perplexity-crawlers'
 const APPLE_DOCS = 'https://support.apple.com/en-us/119829'
 const META_DOCS = 'https://developers.facebook.com/documentation/sharing/webmasters/web-crawlers'
-const MISTRAL_DOCS = 'https://docs.mistral.ai/robots/'
-const DUCKDUCKGO_DOCS = 'https://duckduckgo.com/duckduckgo-help-pages/results/duckassistbot/'
+const MISTRAL_DOCS = 'https://docs.mistral.ai/robots'
+const DUCKDUCKGO_DOCS = 'https://duckduckgo.com/duckduckgo-help-pages/results/duckassistbot'
 const KAGI_DOCS = 'https://kagi.com/bot'
 const IMAGESIFT_DOCS = 'https://imagesift.com/about'
-const AMAZON_DOCS = 'https://developer.amazon.com/amazonbot'
-const KIMI_DOCS = 'https://kimi.com/policies/kimi-crawlers'
+const AMAZON_DOCS = 'https://developer.amazon.com/docs/amazonbot/amazonbot'
+const KIMI_DOCS = 'https://www.kimi.ai/policies/kimi-crawlers'
 const ELEVENLABS_DOCS = 'https://elevenlabs.io/docs/bots'
-const QUALIFIED_DOCS = 'https://qualified.com/legal/qualified-crawler-user-agent'
+const QUALIFIED_DOCS = 'https://www.qualified.com/legal/qualified-crawler-user-agent'
+const DIFFBOT_DOCS = 'https://www.diffbot.com/docs/crawl/faq/robots-txt'
+const HAIKU_DOCS = 'https://www.haiku.fr/robots-doc'
 const EXA_DOCS = 'https://crawler.exa.ai/'
-const LINER_DOCS = 'https://liner-user.liner.com/docs/liner-user'
+const LINER_DOCS = 'https://liner-user.liner.com/docs/linerbot'
 const AMAZON_Q_DOCS =
   'https://docs.aws.amazon.com/amazonq/latest/qbusiness-ug/stop-web-crawler.html'
 
@@ -177,6 +179,17 @@ const READ_ON_NOV20 = '2026-11-20'
 // a spoofed user agent. Grok was chased again: x.ai/bot now answers 200, but
 // it is a product page for AI teammates and names no robots.txt token, so
 // there is still nothing to document.
+// 21.11.2026, fourth pass, and the first that CORRECTS a row instead of adding
+// one. Every `docs` address in this file was requested today. Eight did not
+// answer 200: seven redirected (Amazon, Mistral, DuckDuckGo, Kimi, Liner,
+// Qualified and Diffbot) and are now the addresses they land on, and one was
+// dead. That one was Diffbot's, and the page that replaced it contradicts the
+// row it was cited for: the row said `train`, and Diffbot's current page says
+// its general crawler builds a search index and its knowledge graph and is not
+// used for AI training, and that it does not crawl for training generative
+// foundation models at all. The row was wrong on the day it was written, from
+// a page nobody could read back. It is now `search`, and a dated negative that
+// had stood for three weeks is gone with it.
 const READ_ON_NOV21 = '2026-11-21'
 
 export const AI_CRAWLER_DATASET: readonly DatasetCrawler[] = [
@@ -410,7 +423,26 @@ export const AI_CRAWLER_DATASET: readonly DatasetCrawler[] = [
     note: 'Builds the public Common Crawl corpus that many model builders then use. Disallowing it is not retroactive: it does not remove a site from archives already published.',
   },
   { token: 'AI2Bot', operator: 'Allen Institute for AI', purpose: 'train', crawls: true, respectsRobots: true, docs: 'https://allenai.org/crawler', verified: READ_ON },
-  { token: 'Diffbot', operator: 'Diffbot', purpose: 'train', crawls: true, respectsRobots: true, docs: 'https://www.diffbot.com/support/diffbot-crawler/', verified: READ_ON },
+  {
+    token: 'Diffbot',
+    operator: 'Diffbot',
+    purpose: 'search',
+    crawls: true,
+    respectsRobots: true,
+    docs: DIFFBOT_DOCS,
+    verified: READ_ON_NOV21,
+    note: 'Diffbot documents this as general, proactive crawling that builds a search index and its Knowledge Graph, so that sites can be discovered and cited in response to keyword queries, and states that it is not used for AI training. It adds that Diffbot does not crawl pages for training generative foundation models at all. By default its crawls adhere to robots.txt, including disallow and crawl-delay, though Diffbot says the file can be overridden where a partnership or agreement with the site exists.',
+  },
+  {
+    token: 'Diffbot-User',
+    operator: 'Diffbot',
+    purpose: 'answer',
+    crawls: true,
+    respectsRobots: false,
+    docs: DIFFBOT_DOCS,
+    verified: READ_ON_NOV21,
+    note: 'Requests made on behalf of a person browsing a URL with Diffbot software, in response to their input. The robots.txt statement on Diffbot\u2019s page is written about its crawls and promises nothing for this token, which is why this row states no commitment. The page also separates Diffbot\u2019s Extract and Crawlbot APIs, where customers define their own crawl and carry their own user agent, from these two tokens.',
+  },
   {
     token: 'ImagesiftBot',
     operator: 'Hive',
@@ -446,6 +478,31 @@ export const AI_CRAWLER_DATASET: readonly DatasetCrawler[] = [
   // So a site that disallows `*` and allows Googlebot is allowing Kagibot too,
   // which is the opposite of what RFC 9309 alone would predict.
   { token: 'Kagibot', operator: 'Kagi', purpose: 'search', crawls: true, respectsRobots: true, docs: KAGI_DOCS, verified: READ_ON_NOV16 },
+
+  // ── Haiku ─────────────────────────────────────────────────────────────────
+  // A French legal-research product, which is why the page is mostly about
+  // court decisions. Its two tokens are the same corpus-versus-question split
+  // this dataset carries for everyone else, and the page names both purposes.
+  {
+    token: 'HaikuBot',
+    operator: 'Haiku',
+    purpose: 'search',
+    crawls: true,
+    respectsRobots: true,
+    docs: HAIKU_DOCS,
+    verified: READ_ON_NOV21,
+    note: 'Haiku\u2019s indexing robot for institutional public data, mainly court decisions and legal documents under Open Data standards. Haiku states that it is not used to explore content in order to train its generative AI base models, that data likely to change is collected on a sliding window not exceeding ninety days, and that a site can exclude it by naming the token in a User-agent line.',
+  },
+  {
+    token: 'Haiku-SearchBot',
+    operator: 'Haiku',
+    purpose: 'answer',
+    crawls: true,
+    respectsRobots: true,
+    docs: HAIKU_DOCS,
+    verified: READ_ON_NOV21,
+    note: 'The robot used for a direct request from a Haiku user. Haiku states that it is not used to explore the web automatically nor for generative AI training, that it does not record information from third-party sites when a request comes from a user, and that its search follows a whitelist policy and is not a general search engine. It recommends that a site wanting to appear in those results authorise Haiku-SearchBot in robots.txt. Haiku also documents that it subcontracts some web search to Google, and relies on the Googlebot rules for that path.',
+  },
 
   // ── Moonshot AI (Kimi) ────────────────────────────────────────────────────
   // One operator page, three tokens, and the operator itself separates the
