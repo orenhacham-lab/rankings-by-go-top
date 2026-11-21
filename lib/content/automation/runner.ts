@@ -104,6 +104,23 @@ export interface AutomationSummary {
 
 const nowIso = () => new Date().toISOString()
 
+/**
+ * The projects, among the ones that own these pools, that are explicitly
+ * disabled. Never throws and never guesses: on any failure it returns an empty
+ * set, which leaves every pool publishing exactly as before this check existed.
+ */
+export async function readDisabledProjects(admin: Admin, projectIds: string[]): Promise<Set<string>> {
+  const ids = [...new Set(projectIds.filter((id) => !!id))]
+  if (ids.length === 0) return new Set()
+  try {
+    const { data, error } = await admin.from('projects').select('id, is_active').in('id', ids).eq('is_active', false)
+    if (error) return new Set()
+    return new Set(((data ?? []) as { id: string | null }[]).map((r) => String(r.id)).filter((id) => id && id !== 'null'))
+  } catch {
+    return new Set()
+  }
+}
+
 interface PoolRow {
   id: string
   project_id: string
@@ -319,12 +336,47 @@ export async function runAutomation(admin: Admin, opts: { projectId?: string; dr
   let poolQ = admin.from('article_pools').select('id, project_id, cadence, interval_days, publish_time, timezone, next_publish_at, publish_days').eq('is_active', true)
   if (opts.projectId) poolQ = poolQ.eq('project_id', opts.projectId)
   const { data: pools } = await poolQ
-  const poolRows = rotateForRun((pools ?? []) as PoolRow[], nowMs)
+
+  // A POOL OF A DISABLED PROJECT NEVER PUBLISHES (21 November 2026).
+  //
+  // `is_active` on the POOL was the only thing read here, while the switch the
+  // owner actually uses to put a site on hold sets `is_active` on the PROJECT.
+  // Measured that day: 6 of the 29 active pools belong to a project that was
+  // deliberately disabled, and three of those still hold 21 queued items, two of
+  // them past their publish date — "מספר 1 בניקיון" due 5 Oct with 5 queued and
+  // "gotopseo.com" due 17 Nov with 9. Nothing published, but only because other
+  // gates (an expired trial, no connected platform) happen to stop them first.
+  // That is luck, not a rule, and the first of those projects to become entitled
+  // again would publish a backlog nobody asked for.
+  //
+  // FAIL OPEN, deliberately: only an EXPLICIT `false` skips a pool. A failed
+  // read, a missing project row and a NULL all keep publishing, because this
+  // guard must never become the reason a paying merchant's article does not go
+  // out. The query asks for `is_active = false`, so a NULL is not returned by it.
+  const disabled = await readDisabledProjects(admin, ((pools ?? []) as PoolRow[]).map((p) => p.project_id))
+  const ours = ((pools ?? []) as PoolRow[]).filter((p) => !disabled.has(p.project_id))
+  const skippedDisabled = ((pools ?? []) as PoolRow[]).length - ours.length
+  if (skippedDisabled > 0) console.log('[automation-runner] pools of disabled projects', { count: skippedDisabled })
+
+  const poolRows = rotateForRun(ours, nowMs)
   summary.poolsChecked = poolRows.length
+
+  // Scoped to ONE project that is disabled: say so, rather than letting the
+  // "no active pool" note below describe a pool that exists and is active.
+  if (opts.projectId && poolRows.length === 0 && skippedDisabled > 0) {
+    summary.diagnostics.push({
+      projectId: opts.projectId, poolId: '', active: false, timezone: DEFAULT_TIMEZONE, nextPublishAt: null, now: nowIso(),
+      due: false, queuedCount: 0, generatedCount: 0, selectedTopicId: null, selectedTopicTitle: null,
+      generateAttempted: false, generateResult: null, publishAttempted: false, publishResult: null,
+      nextPublishAtAfter: null, note: 'project_disabled', error: null,
+    })
+  }
 
   // Diagnostic: an active project with NO active pool is a common "nothing runs"
   // cause. Surface it explicitly when scoped to one project.
-  if (opts.projectId && poolRows.length === 0) {
+  // `skippedDisabled === 0`, so a disabled project gets the note above and not
+  // this one: "no active pool" would be false — the pool exists and is active.
+  if (opts.projectId && poolRows.length === 0 && skippedDisabled === 0) {
     summary.diagnostics.push({
       projectId: opts.projectId, poolId: '', active: false, timezone: DEFAULT_TIMEZONE, nextPublishAt: null, now: nowIso(),
       due: false, queuedCount: 0, generatedCount: 0, selectedTopicId: null, selectedTopicTitle: null,
