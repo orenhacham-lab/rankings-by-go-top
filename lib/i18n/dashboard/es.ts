@@ -2146,6 +2146,7 @@ export const dashboardEs: DeepPartial<DashboardDictionary> = {
       gridNorth: 'El norte está arriba',
       gridAverage: 'Posición media en todos los puntos:',
       gridInTop3: 'Puntos entre los 3 primeros:',
+      gridNotMeasured: 'Punto no medido',
     },
   },
   competitors: {

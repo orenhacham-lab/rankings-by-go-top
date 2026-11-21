@@ -40,7 +40,7 @@ const MAP_SRC = stripComments(readFileSync('components/keywords/GridMap.tsx', 'u
 const CSS_SRC = readFileSync('app/globals.css', 'utf8')
 const PAGE_SRC = stripComments(readFileSync('app/(dashboard)/keywords/[id]/history/page.tsx', 'utf8'))
 
-const LABELS = { title: 'Area map', notFound: 'Not found', average: 'Average:', inTop3: 'In the top 3:', north: 'North is up' }
+const LABELS = { title: 'Area map', notFound: 'Not found', notMeasured: 'Point not measured', average: 'Average:', inTop3: 'In the top 3:', north: 'North is up' }
 
 /** A 3 x 3 grid: 1 at the centre, 7 north-west, 14 south, nothing in one corner. */
 const POINTS: GridMapPoint[] = [
@@ -183,9 +183,47 @@ check('F6: an unreadable coordinate does not become the anchor',
 const stoppedHtml = renderToStaticMarkup(createElement(GridMap, { points: stopped, labels: LABELS }))
 check('F7: the stopped grid draws 6 pins and 3 outlines, not 6 of 6',
   (stoppedHtml.match(/ring-2 ring-surface/g) || []).length === 6 &&
-  (stoppedHtml.match(/border-dashed/g) || []).length === 3)
+  (stoppedHtml.match(/absolute rounded-full border border-dashed/g) || []).length === 3)
 check('F8: an outline is never a grey pin — it carries no position and no mark',
   !/border-dashed[^>]*bg-grid-absent/.test(stoppedHtml))
+
+/**
+ * F9-F12: THE OUTLINE IS NAMED, NOT ONLY DRAWN.
+ *
+ * It is the one mark on this screen a first-time owner has no prior for: an
+ * empty dashed circle is not in anyone's experience of a map. A measurement
+ * shown without saying what it measures reads as a verdict, so "not measured"
+ * is named in the legend and on the mark itself — and only when the picture
+ * actually holds one, because a legend entry for a mark that is not there is
+ * its own small lie.
+ */
+check('F9: the stopped grid names the unmeasured point in its legend',
+  stoppedHtml.includes(LABELS.notMeasured))
+check('F10: and the outline itself carries that name, for a hover and a reader',
+  /border-dashed[^>]*title="Point not measured"|title="Point not measured"[^>]*border-dashed/.test(stoppedHtml))
+check('F11: a complete grid does not claim a mark it never drew',
+  !html.includes(LABELS.notMeasured) && !/border-dashed/.test(html))
+check('F12: every locale carries the name, in its own words',
+  (() => {
+    const files = [
+      'lib/i18n/dashboard/he.ts', 'lib/i18n/dashboard/en.ts', 'lib/i18n/dashboard/es.ts',
+      'lib/i18n/dashboard/pt-BR/projects.ts', 'lib/i18n/dashboard/de/projects.ts',
+      'lib/i18n/dashboard/fr/projects.ts', 'lib/i18n/dashboard/it/projects.ts',
+      'lib/i18n/dashboard/nl/projects.ts', 'lib/i18n/dashboard/pl/projects.ts',
+      'lib/i18n/dashboard/ja/projects.ts', 'lib/i18n/dashboard/ko/projects.ts',
+    ]
+    const values = files.map((f) => (readFileSync(f, 'utf8').match(/gridNotMeasured: '([^']+)'/) || [])[1])
+    return values.every((v) => typeof v === 'string' && v.length > 0)
+      && new Set(values).size === values.length
+      && PAGE_SRC.includes('notMeasured: t.gridNotMeasured')
+  })())
+check('F9-MUT: a picture that names the outline nowhere fails F9 and F10',
+  !stoppedHtml.split(LABELS.notMeasured).join('x').includes(LABELS.notMeasured))
+check('F11-MUT: a legend entry shown for a mark that is not drawn fails F11',
+  html.includes(LABELS.notFound) && (() => {
+    const always = html.replace('</div>', `${LABELS.notMeasured}</div>`)
+    return always.includes(LABELS.notMeasured)
+  })())
 
 console.log(`\n${pass} passed, ${fail} failed`)
 if (fail > 0) process.exit(1)

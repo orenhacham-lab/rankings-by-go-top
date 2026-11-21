@@ -51,6 +51,7 @@ export interface GridMapPoint {
 export interface GridMapLabels {
   title: string
   notFound: string
+  notMeasured: string
   average: string
   inTop3: string
   north: string
@@ -198,6 +199,7 @@ export default function GridMap({ points, labels }: { points: GridMapPoint[]; la
                   key={`${row}:${col}`}
                   className="absolute rounded-full border border-dashed border-line bg-surface/60"
                   style={style}
+                  title={labels.notMeasured}
                 />
               )
             }
@@ -238,6 +240,17 @@ export default function GridMap({ points, labels }: { points: GridMapPoint[]; la
         <span className="flex items-center gap-1.5">
           <span className="inline-block h-3 w-3 rounded-full bg-grid-absent" aria-hidden="true" />{labels.notFound}
         </span>
+        {/* The dashed outline is the one mark a reader has no prior for, so it is
+            named — and only when the picture actually contains one. */}
+        {points.length < side * side && (
+          <span className="flex items-center gap-1.5">
+            <span
+              className="inline-block h-3 w-3 rounded-full border border-dashed border-line bg-surface"
+              aria-hidden="true"
+            />
+            {labels.notMeasured}
+          </span>
+        )}
       </div>
 
       <div className="mt-3 flex flex-wrap gap-x-6 gap-y-1 text-copy">

@@ -173,6 +173,7 @@ export const projectsPtBR: DeepPartial<DashboardDictionary> = {
       gridNorth: 'O norte fica em cima',
       gridAverage: 'Posição média em todos os pontos:',
       gridInTop3: 'Pontos entre os 3 primeiros:',
+      gridNotMeasured: 'Ponto não medido',
     },
   },
   competitors: {

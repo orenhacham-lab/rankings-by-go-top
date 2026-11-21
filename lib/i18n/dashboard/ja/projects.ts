@@ -176,6 +176,7 @@ export const projectsJa: DeepPartial<DashboardDictionary> = {
       gridNorth: '上が北です',
       gridAverage: '全地点の平均順位：',
       gridInTop3: '上位3位以内の地点：',
+      gridNotMeasured: '未計測の地点',
     },
   },
   competitors: {

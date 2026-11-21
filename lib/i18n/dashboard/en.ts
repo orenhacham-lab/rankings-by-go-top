@@ -3117,6 +3117,7 @@ export const dashboardEn = {
       gridNorth: 'North is up',
       gridAverage: 'Average position across every point:',
       gridInTop3: 'Points in the top 3:',
+      gridNotMeasured: 'Point not measured',
     },
   },
   competitors: {

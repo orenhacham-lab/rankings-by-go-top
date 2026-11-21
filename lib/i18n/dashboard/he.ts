@@ -3124,6 +3124,7 @@ export const dashboardHe = {
       gridNorth: 'צפון למעלה',
       gridAverage: 'מיקום ממוצע בכל הנקודות:',
       gridInTop3: 'נקודות ב-3 הראשונים:',
+      gridNotMeasured: 'נקודה שלא נמדדה',
     },
   },
   competitors: {

@@ -176,6 +176,7 @@ export const projectsKo: DeepPartial<DashboardDictionary> = {
       gridNorth: '위쪽이 북쪽입니다',
       gridAverage: '전체 지점의 평균 순위:',
       gridInTop3: '상위 3위 안의 지점:',
+      gridNotMeasured: '측정되지 않은 지점',
     },
   },
   competitors: {

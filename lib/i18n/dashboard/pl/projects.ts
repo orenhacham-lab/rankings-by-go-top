@@ -180,6 +180,7 @@ export const projectsPl: DeepPartial<DashboardDictionary> = {
       gridNorth: 'Północ jest u góry',
       gridAverage: 'Średnia pozycja we wszystkich punktach:',
       gridInTop3: 'Punkty w pierwszej trójce:',
+      gridNotMeasured: 'Punkt niezmierzony',
     },
   },
   competitors: {
