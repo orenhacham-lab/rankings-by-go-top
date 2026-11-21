@@ -40,7 +40,7 @@ const MAP_SRC = stripComments(readFileSync('components/keywords/GridMap.tsx', 'u
 const CSS_SRC = readFileSync('app/globals.css', 'utf8')
 const PAGE_SRC = stripComments(readFileSync('app/(dashboard)/keywords/[id]/history/page.tsx', 'utf8'))
 
-const LABELS = { title: 'Area map', notFound: 'Not found', notMeasured: 'Point not measured', average: 'Average:', inTop3: 'In the top 3:', north: 'North is up' }
+const LABELS = { title: 'Area map', notFound: 'Not found', notMeasured: 'Point not measured', average: 'Average:', inTop3: 'In the top 3:', north: 'North is up', noneFound: (n: number) => `Not found at any of ${n} points` }
 
 /** A 3 x 3 grid: 1 at the centre, 7 north-west, 14 south, nothing in one corner. */
 const POINTS: GridMapPoint[] = [
@@ -264,6 +264,35 @@ check('F11-MUT: a legend entry shown for a mark that is not drawn fails F11',
     const always = html.replace('</div>', `${LABELS.notMeasured}</div>`)
     return always.includes(LABELS.notMeasured)
   })())
+
+// ---- G. what the phone and the empty map showed (audit round 4)
+const NONE_FOUND = POINTS.map((p) => ({ ...p, found: false, position: null }))
+const noneHtml = renderToStaticMarkup(createElement(GridMap, { points: NONE_FOUND, labels: LABELS }))
+check('G1: a map where nothing was found says so, instead of an average of 21',
+  noneHtml.includes('Not found at any of 9 points') && !noneHtml.includes(LABELS.average) && !noneHtml.includes('>21<'))
+check('G2: a map where something was found still shows the average and the top-3 count',
+  html.includes(LABELS.average) && html.includes(LABELS.inTop3) && !html.includes('Not found at any of'))
+check('G3: gridMapSummary reports how many points found the business',
+  gridMapSummary(POINTS).found === 7 && gridMapSummary(NONE_FOUND).found === 0 && gridMapSummary([]).found === 0)
+check('G4: a not-found pin has a border and a cross, so it cannot melt into the map',
+  /border-2 border-grid-absent-ink/.test(MAP_SRC) && noneHtml.includes('>×<') && !noneHtml.includes('>·<'))
+check('G5: north is stated on the map itself, not at the far end of the heading',
+  /absolute left-1\.5 top-1\.5[^"]*"[^>]*>\s*↑/.test(MAP_SRC.replace(/\n/g, ' ')) || MAP_SRC.includes('↑ {labels.north}'))
+check('G6: the pin is sized from the real distance between neighbours on the map',
+  /Math\.hypot\(pa\.left - pb\.left, pa\.top - pb\.top\)/.test(MAP_SRC) && /spacing \* 0\.62/.test(MAP_SRC))
+check('G7: the map is centred rather than pushed to one side', /relative mx-auto mt-3/.test(MAP_SRC))
+check('G8: every locale says it in its own words',
+  (() => {
+    const files = ['he.ts', 'en.ts', 'es.ts', 'pt-BR/projects.ts', 'de/projects.ts', 'fr/projects.ts', 'it/projects.ts',
+      'nl/projects.ts', 'pl/projects.ts', 'ja/projects.ts', 'ko/projects.ts'].map((f) => `lib/i18n/dashboard/${f}`)
+    const v = files.map((f) => (readFileSync(f, 'utf8').match(/gridNoneFound: (\(n: number\) => `[^`]+`)/) || [])[1])
+    return v.every((x) => typeof x === 'string' && x.includes('${n}')) && new Set(v).size === v.length
+      && PAGE_SRC.includes('noneFound: t.gridNoneFound')
+  })())
+check('G1-MUT: showing the average on an empty map fails G1',
+  !(`<span>${LABELS.average} 21</span>`.includes('Not found at any of') && !`<span>${LABELS.average} 21</span>`.includes(LABELS.average)))
+check('G4-MUT: the old dot glyph fails G4', !noneHtml.replace(/×/g, '·').includes('>×<'))
+check('G6-MUT: the old box-only pin size fails G6', !/Math\.hypot/.test('const pin = Math.max(20, Math.min(40, Math.floor((box / side) * 0.78)))'))
 
 console.log(`\n${pass} passed, ${fail} failed`)
 if (fail > 0) process.exit(1)

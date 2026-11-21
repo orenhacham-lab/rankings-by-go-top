@@ -3118,6 +3118,7 @@ export const dashboardEn = {
       gridAverage: 'Average position across every point:',
       gridInTop3: 'Points in the top 3:',
       gridNotMeasured: 'Point not measured',
+      gridNoneFound: (n: number) => `The business was not found at any of the ${n} points measured.`,
       gridEmptyNote: 'The latest check returned no points on the map. Usually this means the keyword has no centre: open it for editing and enter an address or coordinates.',
     },
   },

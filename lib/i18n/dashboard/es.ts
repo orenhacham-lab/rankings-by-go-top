@@ -2147,6 +2147,7 @@ export const dashboardEs: DeepPartial<DashboardDictionary> = {
       gridAverage: 'Posición media en todos los puntos:',
       gridInTop3: 'Puntos entre los 3 primeros:',
       gridNotMeasured: 'Punto no medido',
+      gridNoneFound: (n: number) => `No se encontró el negocio en ninguno de los ${n} puntos medidos.`,
       gridEmptyNote: 'La última comprobación no devolvió ningún punto en el mapa. Normalmente significa que la palabra clave no tiene centro: ábrela para editarla e introduce una dirección o coordenadas.',
     },
   },

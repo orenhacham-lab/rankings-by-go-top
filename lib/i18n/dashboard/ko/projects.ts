@@ -177,6 +177,7 @@ export const projectsKo: DeepPartial<DashboardDictionary> = {
       gridAverage: '전체 지점의 평균 순위:',
       gridInTop3: '상위 3위 안의 지점:',
       gridNotMeasured: '측정되지 않은 지점',
+      gridNoneFound: (n: number) => `측정한 ${n}개 지점 어디에서도 비즈니스를 찾지 못했습니다.`,
       gridEmptyNote: '최근 확인에서 지도에 표시할 지점이 없었습니다. 보통 키워드에 중심이 없다는 뜻입니다. 편집 화면을 열고 주소 또는 좌표를 입력하세요.',
     },
   },

@@ -141,7 +141,7 @@ export default function KeywordHistoryPage({ params }: { params: Promise<{ id: s
         <Card className="mb-8">
           <GridMap
             points={gridPoints}
-            labels={{ title: t.gridTitle, notFound: t.notFound, notMeasured: t.gridNotMeasured, average: t.gridAverage, inTop3: t.gridInTop3, north: t.gridNorth }}
+            labels={{ title: t.gridTitle, notFound: t.notFound, notMeasured: t.gridNotMeasured, average: t.gridAverage, inTop3: t.gridInTop3, north: t.gridNorth, noneFound: t.gridNoneFound }}
           />
         </Card>
       )}

@@ -55,13 +55,15 @@ export interface GridMapLabels {
   average: string
   inTop3: string
   north: string
+  /** Said instead of an average when the business was found at no point at all. */
+  noneFound: (total: number) => string
 }
 
 const MARK: Record<GridBucket, string> = {
   top3: 'bg-grid-top3 text-grid-top3-ink',
   top10: 'bg-grid-top10 text-grid-top10-ink',
   rest: 'bg-grid-rest text-grid-rest-ink',
-  absent: 'bg-grid-absent text-grid-absent-ink',
+  absent: 'bg-grid-absent text-grid-absent-ink border-2 border-grid-absent-ink/60',
 }
 
 /** The square's side, taken from the points themselves rather than passed in. */
@@ -74,13 +76,14 @@ export function gridSide(points: GridMapPoint[]): number {
  * business was not found as 21, the same rule `gridMetrics` uses, so the figure
  * cannot improve by failing to find anything.
  */
-export function gridMapSummary(points: GridMapPoint[]): { average: number | null; top3: number; total: number } {
-  if (points.length === 0) return { average: null, top3: 0, total: 0 }
+export function gridMapSummary(points: GridMapPoint[]): { average: number | null; top3: number; total: number; found: number } {
+  if (points.length === 0) return { average: null, top3: 0, total: 0, found: 0 }
   const sum = points.reduce((s, p) => s + (p.found && p.position !== null ? p.position : 21), 0)
   return {
     average: Math.round((sum / points.length) * 10) / 10,
     top3: points.filter((p) => gridBucket(p) === 'top3').length,
     total: points.length,
+    found: points.filter((p) => p.found && p.position !== null).length,
   }
 }
 
@@ -144,6 +147,26 @@ export default function GridMap({ points, labels }: { points: GridMapPoint[]; la
   const bounds = boundsOf(points.filter((p) => Number.isFinite(p.lat) && Number.isFinite(p.lng)))
   const plan = bounds ? planTiles(bounds, box, box, { padPx: Math.ceil(pin / 2) + 4 }) : null
 
+  // The pin is sized from the real distance between neighbouring points on THIS
+  // map, not from the box alone: the tiles are fitted to a whole zoom level, so
+  // on a narrow phone the points can sit closer than box/side suggests and 25
+  // circles used to cover the whole map.
+  let drawnPin = pin
+  if (plan) {
+    let spacing = Infinity
+    for (const a of points) {
+      for (const b of points) {
+        if (!(Math.abs(a.row - b.row) + Math.abs(a.col - b.col) === 1)) continue
+        if (![a.lat, a.lng, b.lat, b.lng].every(Number.isFinite)) continue
+        const pa = plan.positionOf({ lat: a.lat, lng: a.lng })
+        const pb = plan.positionOf({ lat: b.lat, lng: b.lng })
+        spacing = Math.min(spacing, Math.hypot(pa.left - pb.left, pa.top - pb.top))
+      }
+    }
+    // Leave at least a third of the gap open so the map shows between pins.
+    if (Number.isFinite(spacing)) drawnPin = Math.max(14, Math.min(pin, Math.floor(spacing * 0.62)))
+  }
+
   const cells = Array.from({ length: side * side }, (_, i) => ({
     row: Math.floor(i / side),
     col: i % side,
@@ -153,13 +176,12 @@ export default function GridMap({ points, labels }: { points: GridMapPoint[]; la
     <div>
       <div className="flex flex-wrap items-baseline justify-between gap-2">
         <h2 className="text-section font-semibold text-ink">{labels.title}</h2>
-        <span className="text-caption text-muted">{labels.north}</span>
       </div>
 
       <div
         ref={boxRef}
         dir="ltr"
-        className="relative mt-3 w-full max-w-[520px] overflow-hidden rounded-control bg-sunk"
+        className="relative mx-auto mt-3 w-full max-w-[560px] overflow-hidden rounded-control bg-sunk"
         style={{ height: box }}
       >
         {plan?.tiles.map((t) => (
@@ -187,8 +209,8 @@ export default function GridMap({ points, labels }: { points: GridMapPoint[]; la
             const style = {
               left: pos.left,
               top: pos.top,
-              width: pin,
-              height: pin,
+              width: drawnPin,
+              height: drawnPin,
               transform: 'translate(-50%, -50%)',
             } as const
 
@@ -212,10 +234,16 @@ export default function GridMap({ points, labels }: { points: GridMapPoint[]; la
                 style={style}
                 title={`${point.lat.toFixed(4)}, ${point.lng.toFixed(4)} — ${bucket === 'absent' ? labels.notFound : String(point.position)}`}
               >
-                {bucket === 'absent' ? '·' : String(point.position)}
+                {bucket === 'absent' ? '×' : String(point.position)}
               </div>
             )
           })}
+
+        {/* North is stated ON the map, where the reader is looking, not at the
+            far end of the heading row. */}
+        <span className="absolute left-1.5 top-1.5 rounded bg-surface/90 px-1.5 py-0.5 text-caption font-semibold text-ink">
+          ↑ {labels.north}
+        </span>
 
         <a
           href={TILE_ATTRIBUTION_HREF}
@@ -253,14 +281,21 @@ export default function GridMap({ points, labels }: { points: GridMapPoint[]; la
         )}
       </div>
 
-      <div className="mt-3 flex flex-wrap gap-x-6 gap-y-1 text-copy">
-        <span className="text-muted">
-          {labels.average} <strong className="text-ink tabular-nums">{summary.average ?? '—'}</strong>
-        </span>
-        <span className="text-muted">
-          {labels.inTop3} <strong className="text-ink tabular-nums">{summary.top3}/{summary.total}</strong>
-        </span>
-      </div>
+      {/* Nothing found anywhere: the "average" would be the 21 the rule gives a
+          miss, which reads as "ranked about 21" next to cards that show dashes.
+          Say the plain thing instead. */}
+      {summary.found === 0 ? (
+        <p className="mt-3 text-copy font-medium text-ink">{labels.noneFound(summary.total)}</p>
+      ) : (
+        <div className="mt-3 flex flex-wrap gap-x-6 gap-y-1 text-copy">
+          <span className="text-muted">
+            {labels.average} <strong className="text-ink tabular-nums">{summary.average ?? '—'}</strong>
+          </span>
+          <span className="text-muted">
+            {labels.inTop3} <strong className="text-ink tabular-nums">{summary.top3}/{summary.total}</strong>
+          </span>
+        </div>
+      )}
     </div>
   )
 }

@@ -177,6 +177,7 @@ export const projectsJa: DeepPartial<DashboardDictionary> = {
       gridAverage: '全地点の平均順位：',
       gridInTop3: '上位3位以内の地点：',
       gridNotMeasured: '未計測の地点',
+      gridNoneFound: (n: number) => `計測した${n}地点のどこでもビジネスは見つかりませんでした。`,
       gridEmptyNote: '直近のチェックでは地図上に地点が返されませんでした。多くの場合、キーワードに中心が設定されていないためです。編集画面を開き、住所または座標を入力してください。',
     },
   },

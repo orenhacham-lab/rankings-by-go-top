@@ -174,6 +174,7 @@ export const projectsDe: DeepPartial<DashboardDictionary> = {
       gridAverage: 'Durchschnittliche Position über alle Punkte:',
       gridInTop3: 'Punkte in den Top 3:',
       gridNotMeasured: 'Nicht gemessener Punkt',
+      gridNoneFound: (n: number) => `Das Unternehmen wurde an keinem der ${n} gemessenen Punkte gefunden.`,
       gridEmptyNote: 'Die letzte Prüfung hat keinen Punkt auf der Karte ergeben. Meist fehlt dem Keyword ein Mittelpunkt: öffnen Sie es zum Bearbeiten und geben Sie eine Adresse oder Koordinaten ein.',
     },
   },
