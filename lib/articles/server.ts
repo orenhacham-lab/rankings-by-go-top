@@ -18,6 +18,7 @@ import { localeHomeHref, LOCALE_CONFIG, type PublicLocale } from '@/lib/i18n/loc
 import { getPublicDictionary } from '@/lib/i18n/getPublicDictionary'
 import { articleAuthor, authorDisplayName } from '@/lib/articles/authors'
 import { canonicalizeArticleHtml, canonicalizeHeadline, canonicalizeKnownTerms } from '@/lib/content/canonical-case'
+import { BRAND_REF } from '@/lib/seo/organization'
 
 export const SITE_URL = 'https://www.gotopseo.com'
 
@@ -249,12 +250,19 @@ export function buildArticleSchemas(article: PublicArticle | null, slug: string,
         }),
         ...(article.published_at && { datePublished: article.published_at }),
         ...(article.updated_at && { dateModified: article.updated_at }),
-        publisher: {
-          '@type': 'Organization',
-          name: 'GO TOP',
-          url: 'https://www.gotop.co.il',
-          logo: { '@type': 'ImageObject', url: `${SITE_URL}/gotop-primary.png` },
-        },
+        // THE PUBLISHER IS THE PRODUCT, BY REFERENCE, NOT THE AGENCY.
+        //
+        // Until 21 Nov 2026 this named GO TOP (https://www.gotop.co.il), the
+        // separate marketing agency, as the publisher of every article —
+        // while the Organization, SoftwareApplication and WebSite nodes on the
+        // SAME page all point at `gotopseo.com/#organization`. An entity
+        // resolver reading the page was told the articles belong to one
+        // organization and the product to another, so everything the blog
+        // earns accrued to the agency. lib/seo/organization.ts says why that
+        // costs us reach; the fix there landed across the site and missed the
+        // article pages. Named by @id, so the one node that describes us
+        // (emitted by app/layout.tsx on every page) is the one that answers.
+        publisher: BRAND_REF,
         mainEntityOfPage: { '@type': 'WebPage', '@id': articleUrl },
       }
     : null

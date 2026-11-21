@@ -16,7 +16,7 @@ import { ARTICLES_COPY, articlesIndexHref } from '@/lib/articles/i18n'
 import { authorDisplayName, authorInitial } from '@/lib/articles/authors'
 import { getPublicArticle } from '@/lib/articles/server'
 import { withHeadingIds } from '@/lib/articles/headings'
-import { linkifyBareUrls } from '@/lib/articles/bare-urls'
+import { linkifyBareUrls, repairBodyLinks } from '@/lib/articles/bare-urls'
 import { splitArticleBlocks } from '@/lib/articles/widgets'
 import { readingMinutes } from '@/lib/articles/reading-time'
 import { resolveBillingMarket } from '@/lib/billing/server-market'
@@ -90,7 +90,11 @@ export async function ArticleView({ locale, slug }: { locale: PublicLocale; slug
   // text becomes a real link here too, so the articles published before the
   // daily engine learned to link them are clickable without a data change
   // (lib/articles/bare-urls.ts).
-  const { html, headings } = withHeadingIds(linkifyBareUrls(sanitizePublicArticleHtml(article.content)))
+  // ...and every link the body already carries is re-asked before it is shown
+  // (repairBodyLinks): a link to an address that cannot exist loses the anchor
+  // and keeps its words, and a link to somebody else's site gets its
+  // rel="nofollow". Both repair the pages that are live without a data change.
+  const { html, headings } = withHeadingIds(repairBodyLinks(linkifyBareUrls(sanitizePublicArticleHtml(article.content))))
   const blocks = splitArticleBlocks(html)
   const hasCta = blocks.some((b) => b.kind === 'widget' && b.widget === 'cta')
   // The index the author box is rendered at: just before a closing call to
