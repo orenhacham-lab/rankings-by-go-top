@@ -3113,6 +3113,10 @@ export const dashboardEn = {
       chartLabel: (keyword: string) => `The Google position of "${keyword}" at every check`,
       chartEmpty: 'The chart appears after two checks where the site was found.',
       positionAt: (position: string) => `Position ${position}`,
+      gridTitle: 'Area map',
+      gridNorth: 'North is up',
+      gridAverage: 'Average position across every point:',
+      gridInTop3: 'Points in the top 3:',
     },
   },
   competitors: {

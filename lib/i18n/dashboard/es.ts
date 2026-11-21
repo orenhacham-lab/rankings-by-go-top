@@ -2142,6 +2142,10 @@ export const dashboardEs: DeepPartial<DashboardDictionary> = {
       chartLabel: (keyword: string) => `La posición en Google de "${keyword}" en cada comprobación`,
       chartEmpty: 'El gráfico aparece tras dos comprobaciones en las que se haya encontrado la web.',
       positionAt: (position: string) => `Posición ${position}`,
+      gridTitle: 'Mapa de la zona',
+      gridNorth: 'El norte está arriba',
+      gridAverage: 'Posición media en todos los puntos:',
+      gridInTop3: 'Puntos entre los 3 primeros:',
     },
   },
   competitors: {

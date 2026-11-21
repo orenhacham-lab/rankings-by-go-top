@@ -172,6 +172,10 @@ export const projectsKo: DeepPartial<DashboardDictionary> = {
       chartLabel: (keyword: string) => `측정마다 기록된 Google에서의 "${keyword}" 순위`,
       chartEmpty: '사이트가 노출된 측정이 두 번 모이면 그래프가 표시됩니다.',
       positionAt: (position: string) => `${position}위`,
+      gridTitle: '지역 지도',
+      gridNorth: '위쪽이 북쪽입니다',
+      gridAverage: '전체 지점의 평균 순위:',
+      gridInTop3: '상위 3위 안의 지점:',
     },
   },
   competitors: {

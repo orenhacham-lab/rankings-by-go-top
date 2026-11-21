@@ -3120,6 +3120,10 @@ export const dashboardHe = {
       chartLabel: (keyword: string) => `המיקום של "${keyword}" בגוגל בכל בדיקה`,
       chartEmpty: 'הגרף יופיע אחרי שתי בדיקות שבהן האתר נמצא.',
       positionAt: (position: string) => `מיקום ${position}`,
+      gridTitle: 'מפת האזור',
+      gridNorth: 'צפון למעלה',
+      gridAverage: 'מיקום ממוצע בכל הנקודות:',
+      gridInTop3: 'נקודות ב-3 הראשונים:',
     },
   },
   competitors: {

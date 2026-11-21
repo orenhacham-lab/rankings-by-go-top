@@ -176,6 +176,10 @@ export const projectsPl: DeepPartial<DashboardDictionary> = {
       chartLabel: (keyword: string) => `Pozycja „${keyword}” w Google w każdym pomiarze`,
       chartEmpty: 'Wykres pojawi się po dwóch pomiarach, w których strona została znaleziona.',
       positionAt: (position: string) => `Pozycja ${position}`,
+      gridTitle: 'Mapa obszaru',
+      gridNorth: 'Północ jest u góry',
+      gridAverage: 'Średnia pozycja we wszystkich punktach:',
+      gridInTop3: 'Punkty w pierwszej trójce:',
     },
   },
   competitors: {

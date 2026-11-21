@@ -105,6 +105,25 @@
   --color-info: #005cb3;
   --color-info-soft: #eef6fe;
 
+  /* The geo grid's four marks (components/keywords/GridMap.tsx). A pin is a
+     FILLED mark carrying its own position as text, so each one needs an ink
+     that reads on it, which the soft state pairs cannot give: they are tints
+     for text on a surface, not fills to write on.
+     The three are the state colours where they can be, and the "4-10" mark is
+     the COMMIT amber rather than `warn` (#a04a06), because warn and bad are
+     8.0 apart on the normal-vision scale and 0.8 under deuteranopia — a yellow
+     and a red nobody could tell apart, which is the whole picture gone. With
+     the amber the worst adjacent pair is 32.8 (normal) and 23.2 (protan).
+     Checked with the dataviz validator; ink contrast 5.4 / 9.2 / 6.6 / 6.1. */
+  --color-grid-top3: #157a3c;
+  --color-grid-top3-ink: #ffffff;
+  --color-grid-top10: #f0b03f;
+  --color-grid-top10-ink: #231703;
+  --color-grid-rest: #b42318;
+  --color-grid-rest-ink: #ffffff;
+  --color-grid-absent: #e8e9ec;
+  --color-grid-absent-ink: #44506a;
+
   /* The one dark surface: a screen's opening context card, in the rail's navy.
      Its own token, because it must stay dark in dark mode instead of inverting. */
   --color-contrast: #0a1b3d;
@@ -558,6 +577,21 @@
   --color-bad-ink: #2a0c08;
   --color-info: #7dbeff;
   --color-info-soft: #0f2138;
+
+  /* The geo grid in dark mode: STEPPED FOR THIS SURFACE, not flipped. The dark
+     `bad` (#f58c80) is only 12.7 from the amber on the normal-vision scale,
+     under the floor of 15, so the "11+" mark is re-stepped to #ef5a4c: the
+     worst adjacent pair becomes 18.3 and every mark clears 3:1 on the dark
+     surface. Green and amber are 8.1 apart under protanopia, which is inside
+     the floor band and legal only because every pin also prints its position. */
+  --color-grid-top3: #5bd08a;
+  --color-grid-top3-ink: #0a0f24;
+  --color-grid-top10: #f0b03f;
+  --color-grid-top10-ink: #231703;
+  --color-grid-rest: #ef5a4c;
+  --color-grid-rest-ink: #2a0c08;
+  --color-grid-absent: #2a2e36;
+  --color-grid-absent-ink: #aab1bd;
 
   --color-contrast: #0f2247;
   --color-contrast-ink: #f5f6f8;

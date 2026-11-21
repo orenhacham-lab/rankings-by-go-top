@@ -169,6 +169,10 @@ export const projectsNl: DeepPartial<DashboardDictionary> = {
       chartLabel: (keyword: string) => `De positie van „${keyword}" bij Google in elke meting`,
       chartEmpty: 'Het diagram verschijnt na twee metingen waarin de website gevonden is.',
       positionAt: (position: string) => `Positie ${position}`,
+      gridTitle: 'Kaart van het gebied',
+      gridNorth: 'Het noorden is boven',
+      gridAverage: 'Gemiddelde positie over alle punten:',
+      gridInTop3: 'Punten in de top 3:',
     },
   },
   competitors: {

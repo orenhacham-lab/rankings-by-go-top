@@ -172,6 +172,10 @@ export const projectsJa: DeepPartial<DashboardDictionary> = {
       chartLabel: (keyword: string) => `計測ごとの「${keyword}」の Google での順位`,
       chartEmpty: 'サイトが見つかった計測が2回たまると、グラフが表示されます。',
       positionAt: (position: string) => `${position} 位`,
+      gridTitle: 'エリアマップ',
+      gridNorth: '上が北です',
+      gridAverage: '全地点の平均順位：',
+      gridInTop3: '上位3位以内の地点：',
     },
   },
   competitors: {

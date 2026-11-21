@@ -665,7 +665,33 @@ async function main() {
     // edge-session.qa.ts holds the gate to redirecting exactly who it did.
     const EDGE_SESSION_GATE = new Set(['lib/shopify/__qa__/shopify-trial-route-access.qa.ts'])
     untouched = untouched.split('\n').filter((f) => f && !EDGE_SESSION_GATE.has(f)).join('\n')
+    // 2026-11-21: counting a multi-point check honestly. lib/quota.ts gains
+    // providerChecksForTarget / countPlannedChecks, which say how many PROVIDER
+    // requests one keyword costs: 1 as before, 9 for radius (which has made nine
+    // Serper calls per check since it shipped while reserving 1 — a measured
+    // under-count we paid for), and the square for a grid. The change is purely
+    // additive: not one existing line is removed or edited, and no plan, price,
+    // quota or limit VALUE appears in it — H3c above proves the catalog itself is
+    // untouched. H4d below holds that line by line, so the file stays protected
+    // against anything but these two additions.
+    const PROVIDER_CHECK_COUNT = new Set(['lib/quota.ts'])
+    untouched = untouched.split('\n').filter((f) => f && !PROVIDER_CHECK_COUNT.has(f)).join('\n')
     check('H4: plans, prices, quotas, billing, entitlement and Shopify files are untouched', untouched === '', untouched)
+    let quotaDiff = ''
+    try { quotaDiff = execSync('git diff -U0 8b468a8 -- lib/quota.ts', { cwd: ROOT }).toString() } catch { quotaDiff = 'git unavailable' }
+    const quotaChanged = quotaDiff.split('\n').filter((l: string) => /^[+-]/.test(l) && !/^(\+\+\+|---)/.test(l))
+    // Additions only, and no number that could be a plan limit: the only literals
+    // this code may carry are the 9 of a radius and the 1 of an ordinary keyword.
+    const additionsOnly = (ls: string[]) => ls.length > 0 && ls.every((l: string) => l.startsWith('+'))
+    const noPlanNumber = (ls: string[]) => ls
+      .filter((l: string) => !/^\+\s*(\/\/|\*|\/\*)/.test(l))
+      .every((l: string) => !/\b(?!9\b|1\b|0\b)\d{1,6}\b/.test(l))
+    check('H4d: lib/quota.ts changed only by ADDING the provider-check counters, with no plan number in them',
+      additionsOnly(quotaChanged) && noPlanNumber(quotaChanged),
+      quotaChanged.filter((l) => !l.startsWith('+')).join(' ;; ').slice(0, 200))
+    check('H4d-MUT: an edited line, or a plan number, fails H4d',
+      !additionsOnly([...quotaChanged, '-export const MAX = 20']) &&
+      !noPlanNumber([...quotaChanged, '+  const maxKeywords = 50']))
     let allowDiff = ''
     try { allowDiff = execSync('git diff -U0 8b468a8 -- lib/billing/usage-allowance.ts', { cwd: ROOT }).toString() } catch { allowDiff = 'git unavailable' }
     const allowChanged = allowDiff.split('\n').filter((l: string) => /^[+-]/.test(l) && !/^(\+\+\+|---)/.test(l))
