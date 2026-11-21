@@ -21,7 +21,8 @@ import type { ShopifyConnectionRow } from './api-auth'
 import { hasWriteContent } from './constants'
 import { buildCanonicalUrl } from './domain'
 import { ShopifyClientError, shopifyArticleCreate, shopifyArticleUpdate, shopifyGetArticle } from './client'
-import { buildArticleInput, isStableImageUrl, summarizeUserErrors, decideArticleAction, type ShopifyUserError } from './article-payload'
+import { buildArticleInput, buildSeoMetafields, isStableImageUrl, summarizeUserErrors, decideArticleAction,
+  SEO_TITLE_METAFIELD_KEY, SEO_DESCRIPTION_METAFIELD_KEY, type ShopifyUserError } from './article-payload'
 import { checkShopifyPublishEntitlement } from './billing-guard'
 import { resolvePublishBlogTarget } from './resolve-publish-blog'
 import { sanitizeArticleHtml } from '@/lib/content/article-html'
@@ -47,6 +48,7 @@ export interface ShopifyPublishArticleRow {
   title: unknown
   slug: unknown
   excerpt: unknown
+  meta_title: unknown
   meta_description: unknown
   content_html: unknown
   featured_image_url: unknown
@@ -73,6 +75,13 @@ export interface ShopifyPublishResult {
 }
 
 const nowIso = () => new Date().toISOString()
+
+/** The metafields a payload carries, as key → value, for the verification step. */
+function sentSeoMap(metafields: Record<string, string>[]): Record<string, string> {
+  const out: Record<string, string> = {}
+  for (const m of metafields) if (m.key && m.value) out[m.key] = m.value
+  return out
+}
 
 /** Load ready inline images with STABLE public URLs; warn on any dropped ones. */
 async function loadStableInlineImages(admin: Admin, articleId: string): Promise<{ images: ComposableInlineImage[]; warnings: string[] }> {
@@ -204,6 +213,12 @@ export async function publishArticleToShopify(
     publishDate: opts.publishDate || null,
     imageUrl,
     imageAlt: title,
+    // The article's own search-engine listing. Falls back to the article title
+    // for the SEO title, which is what the generator does everywhere else, and
+    // is still better than Shopify's own fallback because it is the title we
+    // wrote the keyword into.
+    metaTitle: String(article.meta_title || '').trim() || title,
+    metaDescription: String(article.meta_description || '').trim() || null,
   }
 
   const host = connection.storefront_domain || connection.shop_domain
@@ -213,8 +228,17 @@ export async function publishArticleToShopify(
   // 4) UPDATE path — reconcile first so a deleted remote article is detected and
   //    NOT silently recreated. Metadata is preserved on this branch.
   if (action === 'update') {
+    // What the merchant already has, read once here and passed to the payload.
+    // Without it the update would send our title_tag every time and overwrite a
+    // listing the merchant edited in Shopify.
+    let existingSeoTitle: string | null = null
+    let existingSeoDescription: string | null = null
     try {
       const existing = await shopifyGetArticle(creds, storedId)
+      if (existing) {
+        existingSeoTitle = existing.seoTitle ?? null
+        existingSeoDescription = existing.seoDescription ?? null
+      }
       if (!existing) {
         await admin.from('generated_articles').update({ shopify_status: 'remote_missing', shopify_last_error: 'remote_article_missing', shopify_last_synced_at: nowIso(), updated_at: nowIso() }).eq('id', article.id)
         return { ok: false, reason: 'remote_article_missing', imageWarnings: base.imageWarnings }
@@ -226,13 +250,14 @@ export async function publishArticleToShopify(
     }
 
     try {
-      const res = await shopifyArticleUpdate(creds, storedId, buildArticleInput({ ...inputArgs, mode: 'update' }))
+      const res = await shopifyArticleUpdate(creds, storedId, buildArticleInput({ ...inputArgs, mode: 'update', existingSeoTitle, existingSeoDescription }))
       if (!res.ok) {
         const detail = summarizeUserErrors(res.userErrors)
         await persistError(admin, article.id, 'article_update_failed', detail)
         return { ok: false, reason: 'graphql_user_error', detail, userErrors: res.userErrors, imageWarnings: base.imageWarnings }
       }
-      return await persistSuccess(admin, article.id, connection, host, res.article, base.imageWarnings, true)
+      return await persistSuccess(admin, article.id, connection, host, res.article, base.imageWarnings, true,
+        sentSeoMap(buildSeoMetafields({ ...inputArgs, mode: 'update', existingSeoTitle, existingSeoDescription })))
     } catch (err) {
       const reason = reasonForClientError(err, 'update')
       await persistError(admin, article.id, reason)
@@ -254,7 +279,8 @@ export async function publishArticleToShopify(
       const { error } = await admin.from('generated_articles').update({ shopify_article_id: res.article.id, updated_at: nowIso() }).eq('id', article.id)
       if (!error) break
     }
-    return await persistSuccess(admin, article.id, connection, host, res.article, base.imageWarnings, false)
+    return await persistSuccess(admin, article.id, connection, host, res.article, base.imageWarnings, false,
+      sentSeoMap(buildSeoMetafields({ ...inputArgs, mode: 'create' })))
   } catch (err) {
     const reason = reasonForClientError(err, 'create')
     await persistError(admin, article.id, reason)
@@ -262,10 +288,54 @@ export async function publishArticleToShopify(
   }
 }
 
+/**
+ * The search-engine listing this publish sent, keyed by metafield key, so the
+ * success path can check it against what Shopify reports back.
+ */
+type SentSeo = Record<string, string>
+
+/**
+ * What to record on the article about its Shopify search-engine listing.
+ *
+ * Measured 21 Nov 2026 before this change: of 616 published customer articles,
+ * 368 had `seo_status` NULL, and every recent one of those was a Shopify
+ * article — because the Shopify payload carried no SEO fields at all, so there
+ * was never an outcome to record. The WordPress path has written this since it
+ * shipped (lib/content/seo-publish.ts).
+ *
+ * HONEST, and never generous:
+ *   nothing sent          → no claim at all; the seo_* columns are left alone.
+ *                           That covers an update that deliberately kept the
+ *                           merchant's own title: the listing is real but it is
+ *                           not ours to report as verified.
+ *   sent and confirmed    → 'verified', with the timestamp.
+ *   sent, not confirmed   → 'written_not_verifiable'. The mutation succeeded, so
+ *                           this is not a failure; it is the absence of proof.
+ * PURE.
+ */
+export function seoOutcomeForPublish(
+  sent: SentSeo,
+  node: { seoTitle?: string | null; seoDescription?: string | null },
+): { seo_status: 'verified' | 'written_not_verifiable'; seo_plugin: 'shopify'; seo_last_error: null; seo_verified_at: string | null } | null {
+  const keys = Object.keys(sent)
+  if (!keys.length) return null
+  const readback: Record<string, string | null> = {
+    [SEO_TITLE_METAFIELD_KEY]: (node.seoTitle ?? null),
+    [SEO_DESCRIPTION_METAFIELD_KEY]: (node.seoDescription ?? null),
+  }
+  const confirmed = keys.every((k) => (readback[k] ?? '').trim() === sent[k].trim())
+  return {
+    seo_status: confirmed ? 'verified' : 'written_not_verifiable',
+    seo_plugin: 'shopify',
+    seo_last_error: null,
+    seo_verified_at: confirmed ? nowIso() : null,
+  }
+}
+
 async function persistSuccess(
   admin: Admin, articleId: string, connection: ShopifyConnectionRow, host: string,
-  node: { id: string; handle: string; isPublished: boolean; publishedAt: string | null; blogHandle: string | null },
-  imageWarnings: string[], updated: boolean,
+  node: { id: string; handle: string; isPublished: boolean; publishedAt: string | null; blogHandle: string | null; seoTitle?: string | null; seoDescription?: string | null },
+  imageWarnings: string[], updated: boolean, sentSeo: SentSeo = {},
 ): Promise<ShopifyPublishResult> {
   const url = node.handle ? buildCanonicalUrl(host, 'article', node.handle, node.blogHandle) : null
   const status: 'draft' | 'published' = node.isPublished ? 'published' : 'draft'
@@ -294,7 +364,9 @@ async function persistSuccess(
     ? { status: 'published' as const, published_at: node.publishedAt ?? nowIso() }
     : {}
 
-  await admin.from('generated_articles').update({
+  const seo = seoOutcomeForPublish(sentSeo, node)
+
+  const publishRow = {
     shopify_article_id: node.id,
     shopify_article_url: url,
     shopify_handle: node.handle || null,
@@ -304,7 +376,16 @@ async function persistSuccess(
     shopify_last_synced_at: nowIso(),
     ...publishState,
     updated_at: nowIso(),
-  }).eq('id', articleId)
+  }
+
+  // The listing outcome rides along with the publish state so one write records
+  // both. If the seo_* columns are not there yet, that whole write would be
+  // rejected and a SUCCESSFUL publish would go unrecorded — so the publish state
+  // is written again on its own. The publish is the thing that must never be
+  // lost; the listing outcome is the thing that may be.
+  const { error } = await admin.from('generated_articles').update({ ...publishRow, ...(seo ?? {}) }).eq('id', articleId)
+  if (error && seo) await admin.from('generated_articles').update(publishRow).eq('id', articleId)
+
   return { ok: true, articleId: node.id, url, handle: node.handle, status, publishedAt: node.publishedAt, imageWarnings, updated }
 }
 

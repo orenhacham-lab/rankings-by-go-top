@@ -88,6 +88,13 @@ export const BLOG_GUIDANCE: WritingGuidance = {
 export interface InternalLinkTarget {
   title: string
   slug: string
+  /**
+   * The keyword that article was written for, when we still know it — the
+   * `primary_keyword` of its blog_plan row. It is the anchor text, and the
+   * title is only the fallback for the eight hand-written articles that have
+   * no plan row.
+   */
+  keyword?: string | null
 }
 
 export interface BlogBriefInput {
@@ -120,15 +127,40 @@ export function articlePath(locale: BlogAutoLocale, slug: string): string {
  * Up to three internal links to our own existing articles, none of them
  * required: a required anchor the model cannot place naturally fails the whole
  * generation, and a missing internal link is not worth losing the article over.
+ *
+ * THE ANCHOR IS THE TARGET'S KEYWORD, NOT ITS TITLE. Offering the full title
+ * as the anchor is what produced `buying-backlinks-guide` (20 Nov 2026), where
+ * the model wrote the target's whole title as a link and then wrote the same
+ * subject again in its own words a line later: the page said the title twice,
+ * and the anchor — the strongest signal a page can send about what another
+ * page is for — carried a sentence instead of a term. A title is also a thing
+ * a writer cannot drop into a sentence of their own, which is one reason these
+ * anchors were being ignored.
  */
 export function internalAnchors(locale: BlogAutoLocale, targets: InternalLinkTarget[]): ArticleTopicAnchor[] {
   return targets.slice(0, 3).map((t) => ({
-    anchor_text: t.title,
+    anchor_text: anchorTextFor(t),
     target_url: `${SITE_URL}${articlePath(locale, t.slug)}`,
     required: false,
     type: 'internal' as const,
     note: 'Link it only where it genuinely helps the reader.',
   }))
+}
+
+/**
+ * The words that stand for a target article: its keyword when we have it, and
+ * otherwise its title. A keyword of one word is not used — a single word is
+ * either the brand or a head term too broad to say what the page answers.
+ */
+export function anchorTextFor(target: InternalLinkTarget): string {
+  const keyword = (target.keyword ?? '').trim()
+  if (!keyword) return target.title
+  const spaced = keyword.split(/\s+/).length > 1
+  // Japanese and Korean put no space between words, so "more than one word" is
+  // never true in them and the rule above would quietly send both languages
+  // back to the title. There a term of its own is recognised by its length.
+  const noSpaceScript = /[\u3000-\u9fff\uac00-\ud7af]/.test(keyword)
+  return spaced || (noSpaceScript && keyword.length >= 4) ? keyword : target.title
 }
 
 export function buildBlogBrief(input: BlogBriefInput): ArticleBrief {
