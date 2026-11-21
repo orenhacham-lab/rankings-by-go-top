@@ -29,8 +29,8 @@
  * one by running the publish gate on a repaired body.
  */
 import {
-  hostOfUrl, isLinkableUrl, isPlaceholderHost, linkifyBareUrls, repairBodyLinks,
-  withNofollow, SHOPIFY_LISTING_URL,
+  hostOfUrl, isLinkableUrl, isNofollowExempt, isPlaceholderHost, linkifyBareUrls, repairBodyLinks,
+  withNofollow, NOFOLLOW_EXEMPT_HOSTS, SHOPIFY_LISTING_URL,
 } from '../bare-urls'
 import { checkBodyLinks, withBodyLinks } from '../../blog/auto/body-links'
 import { BLOG_AUTO_LOCALES } from '../../blog/auto/rotation'
@@ -127,6 +127,23 @@ check('D6 withNofollow keeps what was there and adds only what is missing',
   && withNofollow('nofollow') === 'nofollow noopener'
   && withNofollow(null) === 'nofollow noopener'
   && withNofollow('sponsored nofollow noopener') === 'sponsored nofollow noopener')
+// Two hosts Oren decided on 21 Nov 2026 keep their link exactly as written:
+// the kroyzer.co.il link in `google-seo-benefits`, and GO TOP, the agency.
+check('D8 the kroyzer link keeps its rel exactly as the article wrote it',
+  repairBodyLinks('<p><a href="https://www.kroyzer.co.il/" target="_blank" rel="noopener noreferrer">קידום אורגני</a></p>')
+  === '<p><a href="https://www.kroyzer.co.il/" target="_blank" rel="noopener noreferrer">קידום אורגני</a></p>')
+check('D9 a link with no rel at all to an exempt host is given none',
+  repairBodyLinks('<p><a href="https://kroyzer.co.il/x">x</a></p>') === '<p><a href="https://kroyzer.co.il/x">x</a></p>')
+check('D10 the agency keeps its link too, on the bare host and on a subdomain',
+  repairBodyLinks('<p><a href="https://www.gotop.co.il/">GO TOP</a> <a href="https://blog.gotop.co.il/a">b</a></p>')
+  === '<p><a href="https://www.gotop.co.il/">GO TOP</a> <a href="https://blog.gotop.co.il/a">b</a></p>')
+check('D11 and the exemption is the rel ALONE: an exempt host that cannot exist is still not a link',
+  isNofollowExempt('https://kroyzer.co.il/a') && NOFOLLOW_EXEMPT_HOSTS.length === 2
+  && !isNofollowExempt('https://developers.google.com/x')
+  && !isNofollowExempt('https://notkroyzer.co.il.example/x'))
+check('D12 a host that merely CONTAINS an exempt name is not exempt',
+  !isNofollowExempt('https://kroyzer.co.il.attacker.test/x') && !isNofollowExempt('https://xkroyzer.co.il/x'))
+
 check('D7 repair is idempotent', (() => {
   const once = repairBodyLinks(FOREIGN)
   return repairBodyLinks(once) === once
@@ -168,6 +185,10 @@ check('MUTATION CONTROL: a repair that only added rel would leave the broken hre
   '<a href="http://www" rel="nofollow noopener">'.includes('href="http://www"'))
 check('MUTATION CONTROL: a rel rewrite that replaced instead of appending loses noopener',
   'nofollow' !== withNofollow('noopener'))
+check('MUTATION CONTROL: without the exemption the kroyzer link would get nofollow',
+  /rel="[^"]*nofollow/.test('<a href="https://www.kroyzer.co.il/" rel="' + withNofollow('noopener noreferrer') + '">x</a>'))
+check('MUTATION CONTROL: an exemption matched by substring would exempt an attacker host',
+  'kroyzer.co.il.attacker.test'.includes('kroyzer.co.il'))
 check('MUTATION CONTROL: unwrapping that dropped the inner text is caught',
   words('<p>vier versies (http://www.)</p>') !== words('<p>vier versies ()</p>'))
 

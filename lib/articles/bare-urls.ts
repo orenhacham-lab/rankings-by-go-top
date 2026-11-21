@@ -85,6 +85,33 @@ export const blockOfRun = (run: TextRun): string | null => {
 /** Our own host, for telling an internal address from a foreign one. */
 export const OWN_HOSTS = ['gotopseo.com', 'www.gotopseo.com']
 
+/**
+ * THE FOREIGN HOSTS THAT KEEP THEIR LINK EXACTLY AS IT WAS WRITTEN.
+ *
+ * The generic rule gives every outbound link `rel="nofollow"`, which is right
+ * by default: a link we did not mean to endorse should not pass ranking
+ * strength out of the site. Two hosts are Oren's standing exceptions, decided
+ * on 21 Nov 2026:
+ *
+ *   kroyzer.co.il  the link in `articles/google-seo-benefits` on the anchor
+ *                  "קידום אורגני". It stays, and it stays dofollow.
+ *   gotop.co.il    GO TOP, the marketing agency. The articles no longer name
+ *                  it as their PUBLISHER — that is what cost the product its
+ *                  entity (lib/seo/organization.ts) — but a link to it in an
+ *                  article's body is a different thing, and it is kept whole.
+ *
+ * Only the `rel` is exempt. The address itself is still checked: an exempt
+ * host that cannot exist is still not published as a link.
+ */
+export const NOFOLLOW_EXEMPT_HOSTS = ['kroyzer.co.il', 'gotop.co.il']
+
+export function isNofollowExempt(url: string): boolean {
+  const host = hostOfUrl(url)
+  if (!host) return false
+  const bare = host.replace(/:\d+$/, '').toLowerCase()
+  return NOFOLLOW_EXEMPT_HOSTS.some((h) => bare === h || bare.endsWith(`.${h}`))
+}
+
 export function hostOfUrl(url: string): string | null {
   const host = url.match(/^https?:\/\/([^/?#]+)/i)?.[1]
   return host ? host.toLowerCase() : null
@@ -277,7 +304,7 @@ export function repairBodyLinks(html: string): string {
     let next = token
     const canonical = canonicalHref(href)
     if (canonical) next = next.replace(HREF_RE, ` href="${canonical}"`)
-    if (!isOwnUrl(canonical ?? href)) {
+    if (!isOwnUrl(canonical ?? href) && !isNofollowExempt(canonical ?? href)) {
       const rel = next.match(REL_RE)?.[1] ?? null
       const fixed = withNofollow(rel)
       next = rel === null
