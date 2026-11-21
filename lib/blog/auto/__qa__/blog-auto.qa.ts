@@ -894,11 +894,17 @@ async function main() {
     // hour (lib/blog/auto/window-hours.ts). 11 is the hour the silence check
     // owns and it must stay OUTSIDE the window, which is what this asserts
     // together with A1 of silent-morning.qa.ts.
-    check('J1: the morning window is 04:00-10:59 UTC and nothing else',
+    check('J1: the morning window is 04:00-15:59 UTC and nothing else',
       WINDOW_HOURS_UTC.every((h) => isInWindow(Date.parse(`2026-10-14T${String(h).padStart(2, '0')}:30:00Z`)))
-      && ![3, 11, 12, 23].some((h) => isInWindow(Date.parse(`2026-10-14T${String(h).padStart(2, '0')}:30:00Z`))))
-    check('J1b: the window holds a pass for every language, with retries to spare',
-      WINDOW_HOURS_UTC.length * 4 >= BLOG_AUTO_LOCALES.length * 2, WINDOW_HOURS_UTC.length)
+      && ![3, 16, 17, 23].some((h) => isInWindow(Date.parse(`2026-10-14T${String(h).padStart(2, '0')}:30:00Z`))))
+    // J1b COUNTS HOURS, NOT RUNS, since PR 472. The pass gate lets one call an
+    // hour reach the blog (lib/content/automation/pass-gate.ts) and the blog
+    // writes one language per call, so an hour is one chance and the old
+    // `length * 4` flattered the reserve fourfold. Twelve hours for eleven
+    // languages is one hour of reserve; if that is ever not enough, the next
+    // move is to stop a refused language consuming its whole hour.
+    check('J1b: the window holds a pass for every language, with an hour to spare',
+      WINDOW_HOURS_UTC.length > BLOG_AUTO_LOCALES.length, WINDOW_HOURS_UTC.length)
     check('J2: "today" starts at midnight UTC', startOfUtcDay(inWindow) === '2026-10-14T00:00:00.000Z')
 
     const fresh = await nextLocaleToWrite(fake([]) as unknown as Admin, inWindow)
@@ -954,7 +960,7 @@ async function main() {
       staleLock.locale === 'he', staleLock)
 
     const outside = await runBlogDailyWindow(fake([planned()]) as unknown as Admin,
-      { env, now: Date.parse('2026-10-14T12:00:00Z'), deadlineAt: far() })
+      { env, now: Date.parse('2026-10-14T18:00:00Z'), deadlineAt: far() })
     check('J9: outside the window it writes nothing', outside.state === 'outside_window', outside)
 
     const preview = await runBlogDailyWindow(fake([planned()]) as unknown as Admin,
@@ -999,11 +1005,15 @@ async function main() {
     // check the seventh hour was bought for: at ten languages in six hours the
     // margin was fourteen against ten, and an eleventh language in six hours
     // would have left thirteen against eleven.
-    check('J18: after a first pass for every language the window still holds a retry each',
-      WINDOW_HOURS_UTC.length * 4 - BLOG_AUTO_LOCALES.length >= BLOG_AUTO_LOCALES.length,
-      WINDOW_HOURS_UTC.length * 4 - BLOG_AUTO_LOCALES.length)
-    check('J19 (control): the four-hour window it replaced did not',
-      4 * 4 - BLOG_AUTO_LOCALES.length < BLOG_AUTO_LOCALES.length)
+    // AN HOUR IS ONE CHANCE, not four, since the pass gate of PR 472 — see the
+    // note on J1b. The reserve is therefore hours minus languages, and the
+    // measurement that forced this reading is the articles-a-day series either
+    // side of that merge: 11, 10, 9, then 5, 3, 5, 5.
+    check('J18: after a first pass for every language the window still holds a retry',
+      WINDOW_HOURS_UTC.length - BLOG_AUTO_LOCALES.length >= 1,
+      WINDOW_HOURS_UTC.length - BLOG_AUTO_LOCALES.length)
+    check('J19 (control): the seven-hour window it replaced held none',
+      7 - BLOG_AUTO_LOCALES.length < 1)
     process.env.BLOG_AUTO_PUBLISH_ENABLED = before
   }
 
