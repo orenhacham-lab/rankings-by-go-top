@@ -94,14 +94,43 @@ const QUESTION = [
 ].join('\n')
 
 /**
- * THE MODEL THAT LOOKS. Separate from GEMINI_CLASSIFIER_MODEL, which is the text
- * classifier's and is the cheapest there is: on 20 November 2026 it called every
- * one of the first 24 published covers clean, two of them reported by name. The
- * default is one step up; the price of a wrong answer here is an image on the
- * company's own blog with two right hands in it.
+ * THE MODEL THAT LOOKS, and why it is a LIST and not a name.
+ *
+ * MEASURED TWICE, both in Production, both a 404.
+ *
+ *   1. On GEMINI_CLASSIFIER_MODEL (`gemini-2.5-flash-lite`), the text
+ *      classifier's cheapest, the reviewer called 24 published covers clean,
+ *      two of them reported by name. It was not looking.
+ *   2. Pinning `gemini-2.5-flash` instead answered, for every one of the first
+ *      12 covers: "This model models/gemini-2.5-flash is no longer available to
+ *      new users." Twelve reviews that never ran.
+ *
+ * A pinned model id is a guess about someone else's catalogue, and this project
+ * has been bitten by it before (lib/content/recommendations/model-availability.ts,
+ * lib/content/gemini-image.ts). So the call walks an ordered list and moves on
+ * when a model says it is not there, exactly as the image generator does.
+ *
+ * The lite model is deliberately NOT on the list. A reviewer that cannot see is
+ * worse than no reviewer, because this one WRITES A VERDICT: a wrong "clean" row
+ * closes the article for ever, while no answer at all leaves it for a later pass.
  */
-export function imageReviewModel(env: NodeJS.ProcessEnv = process.env): string {
-  return env.IMAGE_REVIEW_MODEL || 'gemini-2.5-flash'
+const IMAGE_REVIEW_FALLBACKS = ['gemini-3.8-flash', 'gemini-3.1-flash']
+
+/** Ordered, de-duplicated list of review models to try (env first, then fallbacks). */
+export function imageReviewModelCandidates(env: NodeJS.ProcessEnv = process.env): string[] {
+  const out: string[] = []
+  for (const m of [env.IMAGE_REVIEW_MODEL, ...IMAGE_REVIEW_FALLBACKS]) {
+    const name = (m || '').trim()
+    if (name && !out.includes(name)) out.push(name)
+  }
+  return out
+}
+
+/** True when the error means "this model is not here" → try the next one. */
+export function isModelUnavailable(message: string): boolean {
+  const m = (message || '').toLowerCase()
+  return m.includes('404') || m.includes('not found') || m.includes('no longer available')
+    || m.includes('is not available') || m.includes('not supported') || m.includes('unsupported')
 }
 
 /**
@@ -156,14 +185,27 @@ export function retryGuidanceFor(defects: readonly ImageDefect[]): string {
 async function askGemini(bytes: Buffer, mimeType: string): Promise<string> {
   const client = getGeminiClient()
   if (!client) throw new Error('no_gemini_client')
-  const model = client.getGenerativeModel({
-    model: imageReviewModel(),
-  })
-  const res = await model.generateContent(
-    [QUESTION, { inlineData: { data: bytes.toString('base64'), mimeType } }],
-    { timeout: GEMINI_REQUEST_TIMEOUT_MS },
-  )
-  return res.response.text() || ''
+  const candidates = imageReviewModelCandidates()
+  let last: unknown
+  for (const name of candidates) {
+    try {
+      const model = client.getGenerativeModel({ model: name })
+      const res = await model.generateContent(
+        [QUESTION, { inlineData: { data: bytes.toString('base64'), mimeType } }],
+        { timeout: GEMINI_REQUEST_TIMEOUT_MS },
+      )
+      return res.response.text() || ''
+    } catch (err) {
+      last = err
+      const message = err instanceof Error ? err.message : String(err)
+      // A model that is not offered to this key is the next model's turn. Any
+      // other failure (a timeout, a refusal, a network error) is this review's
+      // answer and must not be retried down the list at full price.
+      if (!isModelUnavailable(message)) throw err
+      console.warn('[image-quality] model not available, trying the next', { model: name })
+    }
+  }
+  throw last instanceof Error ? last : new Error('no_review_model_available')
 }
 
 /**
