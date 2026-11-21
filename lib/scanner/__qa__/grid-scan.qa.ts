@@ -94,8 +94,10 @@ for (const size of ['small', 'medium', 'large'] as GridSize[]) {
     const bad = generateGridPoints(MILAN.lat, MILAN.lng, 'small', 0)
     return bad.length === 25 && bad.some((p) => p.distanceKm > 0)
   })())
+  // 5 a side, not 7: the default is what a beginner spends without reading the
+  // hint, so it is the cheapest size that still shows the spread (25 checks).
   check('the default size and spacing are the documented ones',
-    DEFAULT_GRID_SIZE === 'medium' && DEFAULT_GRID_SPACING_KM === 1.5)
+    DEFAULT_GRID_SIZE === 'small' && GRID_DIMENSIONS[DEFAULT_GRID_SIZE] === 5 && DEFAULT_GRID_SPACING_KM === 1.5)
 }
 {
   // Southern hemisphere, because Brazil is the second market.

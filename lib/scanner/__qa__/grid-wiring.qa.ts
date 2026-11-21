@@ -30,7 +30,7 @@
  * Run: npx tsx lib/scanner/__qa__/grid-wiring.qa.ts
  */
 import { readFileSync } from 'fs'
-import { runGridScan, generateGridPoints, gridPointCount, type GridPoint } from '../grid-scan'
+import { runGridScan, generateGridPoints, gridPointCount, DEFAULT_GRID_SIZE, type GridPoint } from '../grid-scan'
 import { scanGoogleMaps } from '../google-maps'
 import { recordGridPoints } from '../grid-points-store'
 import { providerChecksForTarget, countPlannedChecks, RADIUS_PROVIDER_CHECKS } from '../../quota'
@@ -198,10 +198,14 @@ async function run() {
   check('a 5 × 5 grid costs 25', providerChecksForTarget({ location_mode: 'grid', grid_size: 'small' }) === 25)
   check('a 7 × 7 grid costs 49', providerChecksForTarget({ location_mode: 'grid', grid_size: 'medium' }) === 49)
   check('a 9 × 9 grid costs 81', providerChecksForTarget({ location_mode: 'grid', grid_size: 'large' }) === 81)
+  // Both fall back to DEFAULT_GRID_SIZE, read from the module rather than
+  // written out, so changing the default cannot leave this asserting the old one.
   check('a grid row with a nonsense size costs the default, not zero',
-    providerChecksForTarget({ location_mode: 'grid', grid_size: 'enormous' }) === gridPointCount('medium'))
+    providerChecksForTarget({ location_mode: 'grid', grid_size: 'enormous' }) === gridPointCount(DEFAULT_GRID_SIZE))
   check('a grid row with no size at all costs the default',
-    providerChecksForTarget({ location_mode: 'grid', grid_size: null }) === gridPointCount('medium'))
+    providerChecksForTarget({ location_mode: 'grid', grid_size: null }) === gridPointCount(DEFAULT_GRID_SIZE))
+  check('and that default is the 5 x 5, so an unsized row is never billed as a 7 x 7',
+    gridPointCount(DEFAULT_GRID_SIZE) === 25)
   {
     const rows = [
       { location_mode: 'project', grid_size: null },

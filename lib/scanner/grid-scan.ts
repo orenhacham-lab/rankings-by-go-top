@@ -44,7 +44,13 @@ export const GRID_DIMENSIONS: Record<GridSize, number> = {
   large: 9,
 }
 
-export const DEFAULT_GRID_SIZE: GridSize = 'medium'
+/**
+ * 5 A SIDE, NOT 7. The form opens on this, and the default is what most
+ * customers will actually run: 25 checks of their allowance rather than 49,
+ * for a picture that already shows the spread. A beginner who does not read
+ * the line under the picker should not spend twice what the answer costs.
+ */
+export const DEFAULT_GRID_SIZE: GridSize = 'small'
 
 /** Kilometres between neighbouring points when the caller does not say. */
 export const DEFAULT_GRID_SPACING_KM = 1.5
