@@ -5951,6 +5951,129 @@ const TRANSFER_RISK: Record<string, RegExp> = {
   }
 }
 
+/**
+ * THE MAP TILES, IN EVERY LANGUAGE.
+ *
+ * The grid scan's area map draws still OpenStreetMap tiles, and those tiles are
+ * fetched by the READER'S browser, not by our server. OpenStreetMap therefore
+ * receives the reader's IP address, their browser identifier and the numbers of
+ * the tiles asked for, and from those the area being viewed. That is a
+ * disclosure, so every privacy policy has to carry it, and six of the nine
+ * translated ones serve the EEA.
+ *
+ * Three things are pinned per language, and a fourth the legal thread insisted
+ * on: the tiles are named in the sub-processor bullet; the area-map section says
+ * the browser fetches them directly and NOT through us; the transfers section
+ * says the tiles are not a transfer by us at all; and it says we do not control
+ * where the tile servers are, rather than claiming a country or an adequacy
+ * decision for them, which we cannot know.
+ *
+ * MUTATION CONTROL at the end, against the real documents.
+ */
+const TILE_BULLET: Record<string, RegExp> = {
+  he: /OpenStreetMap \(Nominatim ואריחי מפה\)/,
+  en: /OpenStreetMap \(Nominatim and map tiles\)/,
+  de: /OpenStreetMap \(Nominatim und Kartenkacheln\)/,
+  nl: /OpenStreetMap \(Nominatim en kaarttegels\)/,
+  fr: /OpenStreetMap \(Nominatim et tuiles de carte\)/,
+  it: /OpenStreetMap \(Nominatim e tessere di mappa\)/,
+  es: /OpenStreetMap \(Nominatim y teselas de mapa\)/,
+  'pt-BR': /OpenStreetMap \(Nominatim e blocos de mapa\)/,
+  ja: /OpenStreetMap（Nominatim および地図タイル）/,
+  ko: /OpenStreetMap\(Nominatim 및 지도 타일\)/,
+  pl: /OpenStreetMap \(Nominatim i kafelki mapy\)/,
+}
+/* The reader's own browser goes to OpenStreetMap, and not through us. */
+const TILE_BROWSER_FETCHES: Record<string, RegExp> = {
+  he: /אריחי המפה נטענים ישירות מהדפדפן שלך/,
+  en: /the map tiles are loaded directly by your\s*browser/,
+  de: /ruft Ihr Browser die Kartenkacheln unmittelbar bei OpenStreetMap ab, nicht über uns/,
+  nl: /haalt uw browser de kaarttegels rechtstreeks bij OpenStreetMap op, niet via ons/,
+  fr: /votre navigateur demande les tuiles de la carte directement à OpenStreetMap, et non par notre intermédiaire/,
+  it: /il Suo browser richiede le tessere della mappa direttamente a OpenStreetMap, non tramite noi/,
+  es: /su navegador solicita las teselas del mapa directamente a OpenStreetMap, no a través de nosotros/,
+  'pt-BR': /o seu navegador busca os blocos do mapa diretamente no OpenStreetMap, e não por meio de nós/,
+  ja: /お客様のブラウザーが地図タイルを当社を経由せずに OpenStreetMap から直接取得します/,
+  ko: /브라우저가 지도 타일을 회사를 거치지 않고 OpenStreetMap에서 직접 받아 옵니다/,
+  pl: /przeglądarka pobiera kafelki mapy bezpośrednio z OpenStreetMap, a nie przez nas/,
+}
+/* And in the transfers section: this is not a transfer we make. */
+const TILE_NOT_OUR_TRANSFER: Record<string, RegExp> = {
+  he: /אריחי המפה הם מקרה אחר ואינם העברה שלנו כלל/,
+  en: /The map tiles are a different case and not a transfer by us at all/,
+  de: /Die Kartenkacheln sind ein anderer Fall und überhaupt keine Übermittlung durch uns/,
+  nl: /De kaarttegels zijn een ander geval en helemaal geen doorgifte door ons/,
+  fr: /Les tuiles de carte sont un cas différent et ne constituent pas un transfert de notre part/,
+  it: /Le tessere di mappa sono un caso diverso e non sono affatto un trasferimento da parte nostra/,
+  es: /Las teselas del mapa son un caso distinto y no son una transferencia nuestra en absoluto/,
+  'pt-BR': /Os blocos de mapa são um caso diferente e não são uma transferência feita por nós/,
+  ja: /地図タイルはこれとは別の事柄であり、当社による移転ではありません/,
+  ko: /지도 타일은 이와 다른 경우이며, 회사의 이전이 전혀 아닙니다/,
+  pl: /Kafelki mapy to inny przypadek i wcale nie jest to przekazanie przez nas/,
+}
+/* Where the tile servers are is stated as unknown to us, never as a country. */
+const TILE_SERVERS_NOT_CONTROLLED: Record<string, RegExp> = {
+  he: /איננו שולטים במקום שבו נמצאים שרתי האריחים/,
+  en: /we do not control where its tile servers are located/,
+  de: /wir haben keinen Einfluss darauf, wo sich deren Kachelserver befinden/,
+  nl: /wij hebben er geen invloed op waar de tegelservers daarvan staan/,
+  fr: /nous ne maîtrisons pas le lieu où se trouvent ses serveurs de tuiles/,
+  it: /non abbiamo controllo sul luogo in cui si trovano i suoi server delle tessere/,
+  es: /no controlamos dónde se encuentran sus servidores de teselas/,
+  'pt-BR': /não controlamos onde ficam os seus servidores de blocos/,
+  ja: /そのタイルのサーバーがどこに所在するかは当社の管理の及ぶところではありません/,
+  ko: /그 타일 서버가 어디에 있는지는 회사가 통제할 수 없습니다/,
+  pl: /na to, gdzie znajdują się jego serwery kafelków, nie mamy wpływu/,
+}
+{
+  const read = (path: string) => (existsSync(path) ? readFileSync(path, 'utf8') : '')
+  const enPrivacySource = frontMatter(text[LOCALES[0]].privacy).source
+  const enPrivacy = enPrivacySource ? read(enPrivacySource) : ''
+  const hePrivacy = read(HEBREW_PRIVACY)
+  const privacyDocs: [string, string][] = [
+    ['he', hePrivacy],
+    ['en', enPrivacy],
+    ...LOCALES.map((l): [string, string] => [l, text[l].privacy]),
+  ]
+  for (const [name, privacy] of privacyDocs) {
+    check(`${name}/privacy: the sub-processor bullet names the map tiles, not Nominatim alone`,
+      (TILE_BULLET[name] ?? /$^/).test(privacy))
+    check(`${name}/privacy: the area map says the reader's own browser fetches the tiles, not us`,
+      (TILE_BROWSER_FETCHES[name] ?? /$^/).test(privacy))
+    check(`${name}/privacy: the transfers section says the tiles are not a transfer by us`,
+      (TILE_NOT_OUR_TRANSFER[name] ?? /$^/).test(privacy))
+    check(`${name}/privacy: and says where the tile servers are is outside our control`,
+      (TILE_SERVERS_NOT_CONTROLLED[name] ?? /$^/).test(privacy))
+  }
+  /* A language with no entry here would otherwise pass silently on /$^/. */
+  for (const locale of LOCALES) {
+    check(`${locale}: has its own tile wording, in its own language`,
+      TILE_BULLET[locale] !== undefined && TILE_BROWSER_FETCHES[locale] !== undefined
+      && TILE_NOT_OUR_TRANSFER[locale] !== undefined && TILE_SERVERS_NOT_CONTROLLED[locale] !== undefined)
+  }
+  // MUTATION CONTROLS, against the real documents.
+  {
+    const pl = text.pl ? text.pl.privacy : ''
+    const ja = text.ja ? text.ja.privacy : ''
+    if (pl) {
+      const noBullet = pl.replace(TILE_BULLET.pl!, 'OpenStreetMap (Nominatim)')
+      check('mutation control (pl): a bullet that goes back to Nominatim alone is caught',
+        !TILE_BULLET.pl!.test(noBullet))
+      const viaUs = pl.replace(TILE_BROWSER_FETCHES.pl!, 'kafelki mapy pobieramy my')
+      check('mutation control (pl): an area map that no longer says the browser fetches directly is caught',
+        !TILE_BROWSER_FETCHES.pl!.test(viaUs))
+    } else check('mutation control (pl): the Polish document is readable', false)
+    if (ja) {
+      const claimed = ja.replace(TILE_SERVERS_NOT_CONTROLLED.ja!, 'そのタイルのサーバーは欧州連合内に所在します')
+      check('mutation control (ja): a document that claims a country for the tile servers is caught',
+        !TILE_SERVERS_NOT_CONTROLLED.ja!.test(claimed))
+      const asOurs = ja.replace(TILE_NOT_OUR_TRANSFER.ja!, '地図タイルは当社による移転です')
+      check('mutation control (ja): calling the tiles a transfer of ours is caught',
+        !TILE_NOT_OUR_TRANSFER.ja!.test(asOurs))
+    } else check('mutation control (ja): the Japanese document is readable', false)
+  }
+}
+
 console.log(`\n${pass} passed, ${fail} failed`)
 if (fail > 0) process.exit(1)
 

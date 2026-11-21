@@ -9,6 +9,7 @@ import { Table, TableHead, TableBody, TableRow, Th, Td, EmptyRow } from '@/compo
 import { EngineBadge, PositionChange } from '@/components/ui/StatusBadge'
 import BackLink from '@/components/ui/BackLink'
 import PositionHistoryChart, { positionPoints } from '@/components/keywords/PositionHistoryChart'
+import GridMap, { type GridMapPoint } from '@/components/keywords/GridMap'
 import StatTile from '@/components/ui/StatTile'
 import EmptyState from '@/components/ui/EmptyState'
 import { Skeleton } from '@/components/ui/Skeleton'
@@ -30,6 +31,10 @@ export default function KeywordHistoryPage({ params }: { params: Promise<{ id: s
   const common = dict.common
   const [target, setTarget] = useState<TrackingTarget & { projects?: { name: string; id: string } } | null>(null)
   const [results, setResults] = useState<ScanResult[]>([])
+  // The points of the LATEST grid check, if this keyword is measured as a grid.
+  // Read under RLS like everything else on this screen (scan_grid_points grants
+  // the project's owner SELECT and nobody else anything).
+  const [gridPoints, setGridPoints] = useState<GridMapPoint[]>([])
   const [loading, setLoading] = useState(true)
   // Opening a keyword's history adopts its project; switching the workspace
   // while it is open leaves for the new project's Keywords screen.
@@ -56,6 +61,21 @@ export default function KeywordHistoryPage({ params }: { params: Promise<{ id: s
       setTarget(targetData)
       setResults(resultsData || [])
       setLoading(false)
+
+      // The map comes after the screen is usable: it is detail about one check,
+      // never a reason to keep the history waiting.
+      const latest = (resultsData || [])[0]
+      if (targetData?.location_mode === 'grid' && latest) {
+        const { data: pointRows } = await supabase
+          .from('scan_grid_points')
+          .select('row_index, col_index, lat, lng, found, position')
+          .eq('scan_result_id', latest.id)
+        setGridPoints(
+          (pointRows || []).map((r: { row_index: number; col_index: number; lat: number; lng: number; found: boolean; position: number | null }) => ({
+            row: r.row_index, col: r.col_index, lat: r.lat, lng: r.lng, found: r.found, position: r.position,
+          }))
+        )
+      }
     }
     loadData()
   }, [id])
@@ -112,8 +132,33 @@ export default function KeywordHistoryPage({ params }: { params: Promise<{ id: s
         <StatTile label={t.bestPosition} icon={<Crown />} value={bestPosition !== null ? <PositionFigure n={bestPosition} /> : '—'} />
         <StatTile label={t.worstPosition} icon={<ArrowDownToLine />} value={worstPosition !== null ? <PositionFigure n={worstPosition} /> : '—'} />
         <StatTile label={t.average} icon={<Sigma />} value={avgPosition !== null ? <PositionFigure n={avgPosition} /> : '—'}
-          source={`${formatCount(foundResults.length, uiLocale)} ${t.checks}`} />
+          // The average is over the checks that found the business. With none, the
+          // tile shows a dash and says nothing, instead of "0 checks" above a history
+          // that lists a check.
+          source={foundResults.length > 0 ? `${formatCount(foundResults.length, uiLocale)} ${t.checks}` : undefined} />
       </div>
+
+      {/* The area map, when this keyword is measured as a grid: where it stands
+          is a fact about places, so it comes before the line about time. */}
+      {gridPoints.length > 0 && (
+        <Card className="mb-8">
+          <GridMap
+            points={gridPoints}
+            labels={{ title: t.gridTitle, notFound: t.notFound, notMeasured: t.gridNotMeasured, average: t.gridAverage, inTop3: t.gridInTop3, north: t.gridNorth, noneFound: t.gridNoneFound }}
+          />
+        </Card>
+      )}
+
+      {/* A grid keyword whose latest check stored no point at all. Before the
+          centre was asked for in the form this was the whole symptom: dashes and
+          no explanation. The keyword can no longer be SAVED that way, but a row
+          saved earlier still lands here, so it says what is missing. */}
+      {target.location_mode === 'grid' && gridPoints.length === 0 && !loading && (
+        <Card className="mb-8">
+          <h2 className="mb-2 text-section font-semibold text-ink">{t.gridTitle}</h2>
+          <p className="text-copy text-muted">{t.gridEmptyNote}</p>
+        </Card>
+      )}
 
       {/* The position over time (§10), before the rows it is drawn from. */}
       <Card className="mb-8">

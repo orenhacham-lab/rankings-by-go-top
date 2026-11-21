@@ -1,3 +1,4 @@
+import type { GridSize } from '../supabase/types'
 export interface ExactPointInput {
   lat: number
   lng: number
@@ -22,11 +23,16 @@ export interface ScanInput {
   language?: string
   city?: string | null
   deviceType?: string | null
-  locationMode?: 'project' | 'custom' | 'zip' | 'exact_point' | 'radius'
+  locationMode?: 'project' | 'custom' | 'zip' | 'exact_point' | 'radius' | 'grid'
   customCity?: string | null
   postalCode?: string | null
   exactPoint?: ExactPointInput | null
   radiusCenter?: RadiusCenter | null
+  /** Grid mode: the square's size and spacing. The centre is resolved by the scanner. */
+  gridSize?: GridSize | null
+  gridSpacingKm?: number | null
+  /** The deadline the grid batch must stop at, so the platform never cuts a request off. */
+  gridDeadlineAtMs?: number | null
   /**
    * The project's competitor domains, located in the SAME organic results this
    * scan fetches for the target domain. Never causes a request of its own.
@@ -100,6 +106,43 @@ export interface ScanAudit {
   }
 }
 
+/**
+ * Everything a geo-grid check leaves behind. The aggregate goes on the
+ * scan_results row like any other check; these are the points the map draws,
+ * written to scan_grid_points by the route.
+ *
+ * `position` on the output is THE CENTRE POINT'S position, not the best of the
+ * grid and not the average. The centre is the business's own address, so the
+ * number stays comparable with the keyword's own history from before grid mode
+ * existed, and it cannot flatter: picking the best of 25 points would turn a
+ * business that ranks 14th at its own door into "position 3".
+ */
+export interface GridScanMetadata {
+  gridSize: GridSize
+  spacingKm: number
+  centerLat: number
+  centerLng: number
+  pointsPlanned: number
+  pointsScanned: number
+  skippedPoints: number
+  stoppedForDeadline: boolean
+  foundCount: number
+  /** Mean over the points where it was found. Null when it was never found. */
+  averagePosition: number | null
+  /** Mean over every measured point, "not found" counted as 21. */
+  averageTotalPosition: number
+  top3Share: number
+  top10Share: number
+  points: Array<{
+    row: number
+    col: number
+    lat: number
+    lng: number
+    found: boolean
+    position: number | null
+  }>
+}
+
 export interface ScanOutput {
   found: boolean
   position: number | null
@@ -108,6 +151,7 @@ export interface ScanOutput {
   resultAddress: string | null
   error: string | null
   audit?: ScanAudit
+  gridScanMetadata?: GridScanMetadata
   radiusScanMetadata?: {
     centerZip?: string | null
     centerLat: number

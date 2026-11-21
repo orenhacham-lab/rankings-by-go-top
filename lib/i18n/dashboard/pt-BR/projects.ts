@@ -169,6 +169,13 @@ export const projectsPtBR: DeepPartial<DashboardDictionary> = {
       chartLabel: (keyword: string) => `A posição no Google de "${keyword}" em cada verificação`,
       chartEmpty: 'O gráfico aparece após duas verificações em que o site tenha sido encontrado.',
       positionAt: (position: string) => `Posição ${position}`,
+      gridTitle: 'Mapa da região',
+      gridNorth: 'O norte fica em cima',
+      gridAverage: 'Posição média em todos os pontos:',
+      gridInTop3: 'Pontos entre os 3 primeiros:',
+      gridNotMeasured: 'Ponto não medido',
+      gridNoneFound: (n: number) => `O negócio não foi encontrado em nenhum dos ${n} pontos medidos.`,
+      gridEmptyNote: 'A última verificação não retornou nenhum ponto no mapa. Normalmente isso significa que a palavra-chave não tem centro: abra-a para edição e informe um endereço ou coordenadas.',
     },
   },
   competitors: {

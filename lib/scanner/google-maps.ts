@@ -1,7 +1,17 @@
 import { ScanInput, ScanOutput, ScanAudit, ScanAttempt } from './types'
 import { US_ZIP_CODES, type USZIPCode } from './us-zip-codes'
 import { generateRadiusPoints, aggregateRadiusResults, type RadiusPointResult } from './radius-scan'
+import {
+  DEFAULT_GRID_SIZE,
+  DEFAULT_GRID_SPACING_KM,
+  generateGridPoints,
+  gridMetrics,
+  gridPointCount,
+  runGridScan,
+  type GridPoint,
+} from './grid-scan'
 import { serperBody } from './serper-payload'
+import { geocodeAddress } from '../geocoding'
 
 const SERPER_MAPS_URL = 'https://google.serper.dev/maps'
 const REQUEST_TIMEOUT_MS = 15_000
@@ -15,78 +25,68 @@ interface GeocodeResult {
   success: boolean
 }
 
-async function resolveUSZIP(zipCode: string): Promise<GeocodeResult | null> {
-  const cacheKey = `zip_${zipCode}`
+/**
+ * Resolve a postal code to coordinates FOR THE PROJECT'S OWN COUNTRY.
+ *
+ * This used to be `resolveUSZIP`, which constrained Nominatim to
+ * `countrycodes=us` and then fell back to a text search that literally
+ * appended "United States". Postal-code tracking was therefore broken in every
+ * other country — including Italy, Brazil and Spain, the markets the
+ * rank-tracking pages actually rank for.
+ *
+ * Order now:
+ *   1. United States only: the bundled `US_ZIP_CODES` dataset, no network.
+ *   2. Everywhere else, and as the US fallback: the shared `geocodeAddress`,
+ *      which is country-aware (Google Geocoding first, Nominatim second).
+ *
+ * The cache key carries the country, because the same five digits are a valid
+ * postal code in more than one country.
+ */
+async function resolvePostalCode(zipCode: string, country: string): Promise<GeocodeResult | null> {
+  const cc = (country || '').trim().toLowerCase()
+  const cacheKey = `zip_${cc}_${zipCode}`
   if (GEOCODING_CACHE.has(cacheKey)) {
     return GEOCODING_CACHE.get(cacheKey) || null
   }
 
-  // Primary: Local dataset lookup
-  const localZIP = US_ZIP_CODES[zipCode]
-  if (localZIP) {
+  if (cc === 'us') {
+    const localZIP = US_ZIP_CODES[zipCode]
+    if (localZIP) {
+      const result: GeocodeResult = {
+        lat: localZIP.lat,
+        lng: localZIP.lng,
+        provider: 'local_dataset',
+        query_used: `lookup_zip_${zipCode}`,
+        success: true,
+      }
+      GEOCODING_CACHE.set(cacheKey, result)
+      return result
+    }
+  }
+
+  const geo = await geocodeAddress(zipCode, cc)
+  if (geo.ok) {
     const result: GeocodeResult = {
-      lat: localZIP.lat,
-      lng: localZIP.lng,
-      provider: 'local_dataset',
-      query_used: `lookup_zip_${zipCode}`,
+      lat: geo.lat,
+      lng: geo.lng,
+      provider: geo.provider,
+      query_used: `geocode_postalcode_${cc || 'unknown_country'}`,
       success: true,
     }
     GEOCODING_CACHE.set(cacheKey, result)
     return result
   }
 
-  // Secondary fallback: Nominatim (only if local lookup fails)
-  const controller = new AbortController()
-  const timer = setTimeout(() => controller.abort(), 5000)
-
-  try {
-    // Fallback attempt 1: postalcode with countrycodes constraint
-    let url = `https://nominatim.openstreetmap.org/search?postalcode=${encodeURIComponent(zipCode)}&countrycodes=us&format=json`
-    let response = await fetch(url, { signal: controller.signal })
-
-    if (!response.ok) {
-      GEOCODING_CACHE.set(cacheKey, null)
-      return null
-    }
-
-    let data = (await response.json()) as Array<{ lat: string; lon: string }>
-
-    // Fallback attempt 2: if no results, try full text query
-    if (data.length === 0) {
-      url = `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(`${zipCode}, United States`)}&format=json`
-      response = await fetch(url, { signal: controller.signal })
-
-      if (response.ok) {
-        data = (await response.json()) as Array<{ lat: string; lon: string }>
-      }
-    }
-
-    if (data.length > 0) {
-      const result: GeocodeResult = {
-        lat: parseFloat(data[0].lat),
-        lng: parseFloat(data[0].lon),
-        provider: 'external_fallback',
-        query_used: 'nominatim_postalcode',
-        success: true,
-      }
-      GEOCODING_CACHE.set(cacheKey, result)
-      return result
-    }
-
-    console.warn(`[ZIP Resolution] ZIP ${zipCode} not found in local dataset or Nominatim`)
-  } catch (err) {
-    console.error(`[ZIP Resolution] External fallback failed for ${zipCode}:`, (err as Error).message)
-  } finally {
-    clearTimeout(timer)
-  }
-
+  console.warn(`[Postal resolution] ${zipCode} (${cc || 'no country'}) not resolved: ${geo.reason}`)
   GEOCODING_CACHE.set(cacheKey, null)
   return null
 }
 
 function validateZIPResults(places: SerperMapsPlace[], geocodeResult: GeocodeResult): boolean {
-  // Validate that results are approximately within US bounds and not obviously wrong
-  // Allow 100+ mile radius for results (ZIP areas can be scattered)
+  // Validate that the results sit near the resolved postal-code centre and are
+  // not obviously wrong. Country-agnostic: it is a distance from the point we
+  // geocoded, whichever country that point is in.
+  // Allow a wide radius, because postal-code areas can be scattered.
   const VALIDATION_RADIUS_KM = 200
 
   if (!places.length) return true
@@ -631,6 +631,134 @@ export async function scanGoogleMaps(input: ScanInput): Promise<ScanOutput> {
     console.warn('[Maps:exact_point] WARNING: locationMode=exact_point but no exactPoint coords provided')
   }
 
+  // GEO-GRID MODE: the same keyword measured from an n x n square of points.
+  //
+  // The centre is the business's own location, resolved from whatever the
+  // keyword already has: its exact point, else its postal code (in the
+  // project's own country), else the project's city. Grid mode never guesses a
+  // centre: with none of the three it is an error, because a grid drawn around
+  // the wrong place is worse than no grid.
+  if (input.locationMode === 'grid') {
+    const size = input.gridSize || DEFAULT_GRID_SIZE
+    const spacingKm = input.gridSpacingKm && input.gridSpacingKm > 0 ? input.gridSpacingKm : DEFAULT_GRID_SPACING_KM
+    console.log(`[Maps:grid] BRANCH TAKEN: ${size} (${gridPointCount(size)} points, ${spacingKm}km apart)`)
+
+    let center: { lat: number; lng: number } | null = null
+    let centerSource = ''
+    if (input.exactPoint) {
+      center = { lat: input.exactPoint.lat, lng: input.exactPoint.lng }
+      centerSource = 'exact_point'
+    } else if (input.postalCode?.trim()) {
+      const resolved = await resolvePostalCode(input.postalCode.trim(), country)
+      if (resolved) {
+        center = { lat: resolved.lat, lng: resolved.lng }
+        centerSource = `postal_code_${resolved.provider}`
+      }
+    }
+    if (!center && input.city?.trim()) {
+      const geo = await geocodeAddress(input.city.trim(), country)
+      if (geo.ok) {
+        center = { lat: geo.lat, lng: geo.lng }
+        centerSource = `city_${geo.provider}`
+      }
+    }
+    if (!center) {
+      const message = 'Grid mode needs a centre: add an exact point, a postal code or a city to this keyword.'
+      console.error('[Maps:grid]', message)
+      const audit = buildAudit(input, country, language, null, [], false, null, null, null, undefined, message, null)
+      return { ...makeError(message, input, audit), audit }
+    }
+
+    const points = generateGridPoints(center.lat, center.lng, size, spacingKm)
+    let lastResponse: SerperMapsResponse | null = null
+    const outcome = await runGridScan(
+      points,
+      async (point: GridPoint) => {
+        const response = await querySerperMaps(input.keyword, country, language, undefined, { lat: point.lat, lng: point.lng })
+        lastResponse = response
+        if (!response) return { found: false, position: null, error: 'No response from Serper' }
+        if (response.error) return { found: false, position: null, error: response.error }
+        const matched = findBusinessMatch(response.places ?? [], businessName, input.targetDomain)
+        if (!matched) return { found: false, position: null }
+        return { found: true, position: matched.position, title: matched.title, address: matched.address || null }
+      },
+      { deadlineAtMs: input.gridDeadlineAtMs ?? undefined }
+    )
+
+    const metrics = gridMetrics(outcome.results)
+    const centerResult = outcome.results.find((r) => r.point.isCenter) || null
+    console.log(`[Maps:grid] ${metrics.foundCount}/${metrics.pointsScanned} points found the business` +
+      `${outcome.skipped > 0 ? `, ${outcome.skipped} not reached before the deadline` : ''}` +
+      `; average over every point ${metrics.averageTotalPosition.toFixed(1)}`)
+
+    const auditAttempts: ScanAttempt[] = outcome.results.map((r, idx) => ({
+      attemptNumber: idx + 1,
+      context: `grid ${size} r${r.point.row}c${r.point.col}${r.point.isCenter ? ' (centre)' : ''}`,
+      location: null,
+      ll: `@${r.point.lat},${r.point.lng},13z`,
+      found: r.found,
+      matchedTitle: r.title || null,
+      matchedPosition: r.position ?? null,
+      matchedAddress: r.address || null,
+    }))
+
+    // The headline is the CENTRE point, so the trend stays comparable with this
+    // keyword's history and the best of 25 points can never stand in for it.
+    const headlineFound = Boolean(centerResult?.found)
+    const headlinePosition = centerResult?.position ?? null
+    const audit = buildAudit(
+      input, country, language, lastResponse, auditAttempts, headlineFound,
+      headlinePosition, centerResult?.title || null, centerResult?.address || null,
+      headlineFound ? 0 : undefined, null, null
+    )
+    if (audit.decision) {
+      const d = audit.decision as Record<string, unknown>
+      d.grid_used = true
+      d.grid_size = size
+      d.grid_spacing_km = spacingKm
+      d.grid_center_lat = center.lat
+      d.grid_center_lng = center.lng
+      d.grid_center_source = centerSource
+      d.executed_points = metrics.pointsScanned
+      d.skipped_points = outcome.skipped
+      d.early_stopped = outcome.stoppedForDeadline
+      d.grid_average_total_position = metrics.averageTotalPosition
+    }
+
+    return {
+      found: headlineFound,
+      position: headlinePosition,
+      resultUrl: null,
+      resultTitle: centerResult?.title || null,
+      resultAddress: centerResult?.address || null,
+      error: null,
+      audit,
+      gridScanMetadata: {
+        gridSize: size,
+        spacingKm,
+        centerLat: center.lat,
+        centerLng: center.lng,
+        pointsPlanned: points.length,
+        pointsScanned: metrics.pointsScanned,
+        skippedPoints: outcome.skipped,
+        stoppedForDeadline: outcome.stoppedForDeadline,
+        foundCount: metrics.foundCount,
+        averagePosition: metrics.averagePosition,
+        averageTotalPosition: metrics.averageTotalPosition,
+        top3Share: metrics.top3Share,
+        top10Share: metrics.top10Share,
+        points: outcome.results.map((r) => ({
+          row: r.point.row,
+          col: r.point.col,
+          lat: r.point.lat,
+          lng: r.point.lng,
+          found: r.found,
+          position: r.found ? (r.position ?? null) : null,
+        })),
+      },
+    }
+  }
+
   // Radius mode: multi-point scan strategy
   if (input.locationMode === 'radius' && input.radiusCenter) {
     console.log('\n' + '='.repeat(100))
@@ -872,10 +1000,10 @@ export async function scanGoogleMaps(input: ScanInput): Promise<ScanOutput> {
 
     try {
       // Resolve ZIP to coordinates (local dataset first, then external fallback)
-      const zipResolution = await resolveUSZIP(postalCode)
+      const zipResolution = await resolvePostalCode(postalCode, country)
       if (!zipResolution) {
-        const errorMsg = `Unknown ZIP code: ${postalCode}`
-        const audit = buildAudit(input, 'us', 'en', lastResponse, auditAttempts, false, null, null, null, undefined, errorMsg, null)
+        const errorMsg = `Could not resolve postal code: ${postalCode}`
+        const audit = buildAudit(input, country, language, lastResponse, auditAttempts, false, null, null, null, undefined, errorMsg, null)
         // Add ZIP resolution metadata to audit
         if (audit.decision) {
           ;(audit.decision as Record<string, unknown>).zip_resolution_source = 'unknown'
@@ -885,25 +1013,25 @@ export async function scanGoogleMaps(input: ScanInput): Promise<ScanOutput> {
         return { found: false, position: null, resultUrl: null, resultTitle: null, resultAddress: null, error: errorMsg, audit }
       }
 
-      const response = await querySerperMaps(input.keyword, 'us', 'en', postalCode, zipResolution)
+      const response = await querySerperMaps(input.keyword, country, language, postalCode, zipResolution)
       lastResponse = response
 
       if (!response) {
-        const audit = buildAudit(input, 'us', 'en', lastResponse, auditAttempts, false, null, null, null, undefined, null, null)
+        const audit = buildAudit(input, country, language, lastResponse, auditAttempts, false, null, null, null, undefined, null, null)
         return { found: false, position: null, resultUrl: null, resultTitle: null, resultAddress: null, error: 'No response from Serper', audit }
       }
       if (response.error) {
-        const audit = buildAudit(input, 'us', 'en', lastResponse, auditAttempts, false, null, null, null, undefined, response.error, null)
+        const audit = buildAudit(input, country, language, lastResponse, auditAttempts, false, null, null, null, undefined, response.error, null)
         return { ...makeError(response.error, input, audit), audit }
       }
 
       const places = response.places ?? []
       const matchedPlace = findBusinessMatch(places, businessName, input.targetDomain)
 
-      // Validate: check if results are within expected US bounds for the ZIP
-      const withinUSBounds = validateZIPResults(places, zipResolution)
-      if (!withinUSBounds && places.length > 0) {
-        console.warn(`[ZIP Validation] Results for ${postalCode} appear outside expected ZIP area`)
+      // Validate: check the results sit near the resolved postal-code centre
+      const withinExpectedArea = validateZIPResults(places, zipResolution)
+      if (!withinExpectedArea && places.length > 0) {
+        console.warn(`[Postal validation] Results for ${postalCode} appear outside the expected postal-code area`)
       }
 
       if (matchedPlace) {
@@ -916,8 +1044,8 @@ export async function scanGoogleMaps(input: ScanInput): Promise<ScanOutput> {
           matchedPosition: matchedPlace.position,
           matchedAddress: matchedPlace.address || null,
         })
-        const validationWarning = !withinUSBounds && places.length > 0 ? ' (geo validation warning)' : ''
-        const audit = buildAudit(input, 'us', 'en', lastResponse, auditAttempts, true, matchedPlace.position, matchedPlace.title, matchedPlace.address || null, 0, null, validationWarning ? `ZIP area validation: ${validationWarning}` : null)
+        const validationWarning = !withinExpectedArea && places.length > 0 ? ' (geo validation warning)' : ''
+        const audit = buildAudit(input, country, language, lastResponse, auditAttempts, true, matchedPlace.position, matchedPlace.title, matchedPlace.address || null, 0, null, validationWarning ? `ZIP area validation: ${validationWarning}` : null)
         // Add ZIP resolution metadata to audit
         if (audit.decision) {
           ;(audit.decision as Record<string, unknown>).zip_resolution_source = zipResolution.provider
@@ -943,7 +1071,7 @@ export async function scanGoogleMaps(input: ScanInput): Promise<ScanOutput> {
         location: postalCode,
         found: false,
       })
-      const audit = buildAudit(input, 'us', 'en', lastResponse, auditAttempts, false, null, null, null, undefined, null, null)
+      const audit = buildAudit(input, country, language, lastResponse, auditAttempts, false, null, null, null, undefined, null, null)
       // Add ZIP resolution metadata to audit
       if (audit.decision) {
         ;(audit.decision as Record<string, unknown>).zip_resolution_source = zipResolution.provider
@@ -954,7 +1082,7 @@ export async function scanGoogleMaps(input: ScanInput): Promise<ScanOutput> {
       }
       return { found: false, position: null, resultUrl: null, resultTitle: null, resultAddress: null, error: null, audit }
     } catch (err) {
-      const audit = buildAudit(input, 'us', 'en', lastResponse, auditAttempts, false, null, null, null, undefined, (err as Error).message, null)
+      const audit = buildAudit(input, country, language, lastResponse, auditAttempts, false, null, null, null, undefined, (err as Error).message, null)
       return { ...makeError((err as Error).message, input, audit), audit }
     }
   }
@@ -970,6 +1098,36 @@ export async function scanGoogleMaps(input: ScanInput): Promise<ScanOutput> {
   // Resolve coordinates using effectiveCity (may be custom or project city)
   const cityLower = effectiveCity?.toLowerCase() || ''
   const cityCoordinates = cityLower ? ISRAELI_CITIES[cityLower] : undefined
+
+  // A CITY OUTSIDE ISRAEL AND THE UNITED STATES HAD NO COORDINATES AT ALL.
+  //
+  // The branch below has exactly two arms, and the second one calls itself
+  // "Non-IL (US)" because when it was written those were the only two countries
+  // the product had. Israel has a built-in table of city coordinates; the United
+  // States has the provider's own understanding of "Los Angeles, CA". Italy,
+  // Spain, Brazil, Germany and the rest fall into the second arm and are sent
+  // the bare city name as text, with no `ll` whatsoever — so the measurement
+  // point is whatever the provider makes of the word "Milano".
+  //
+  // Every other location mode in this file resolves its input to a point first.
+  // This one now does too, through the same geocoder, in the project's own
+  // country. Measured on 2026-11-21: a city name resolves in every country we
+  // sell in, in the local script and in English.
+  //
+  // IL and US are untouched by construction — `il` keeps its single-attempt arm
+  // and `us` is excluded here, so neither request changes by a byte. The third
+  // attempt below stays gated on the ISRAELI table, not on this value, so it
+  // still never fires outside Israel.
+  let resolvedCityCoordinates = cityCoordinates
+  if (!resolvedCityCoordinates && effectiveCity && country !== 'il' && country !== 'us') {
+    const cityGeo = await geocodeAddress(effectiveCity, country)
+    if (cityGeo.ok) {
+      resolvedCityCoordinates = { lat: cityGeo.lat, lng: cityGeo.lng }
+      console.log(`[Maps] city "${effectiveCity}" resolved to a point via ${cityGeo.provider}`)
+    } else {
+      console.warn(`[Maps] city "${effectiveCity}" did not resolve to a point; sending the name only, as before`)
+    }
+  }
 
   console.log('[Maps] ========== SCAN START ==========')
   console.log('[Maps] Input:', {
@@ -1012,12 +1170,12 @@ export async function scanGoogleMaps(input: ScanInput): Promise<ScanOutput> {
       contextAttempts.push({
         label: `city "${effectiveCity}"`,
         location: effectiveCity!,
-        coordinates: cityCoordinates,
+        coordinates: resolvedCityCoordinates,
       })
       contextAttempts.push({
         label: `city+country "${effectiveCity}, ${country.toUpperCase()}"`,
         location: `${effectiveCity}, ${country.toUpperCase()}`,
-        coordinates: cityCoordinates,
+        coordinates: resolvedCityCoordinates,
       })
       if (cityCoordinates) {
         contextAttempts.push({

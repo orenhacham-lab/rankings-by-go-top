@@ -8,7 +8,9 @@ import { buildQuotaError, EN_PLAN_LABEL, EntitlementUnavailableError, isEntitlem
 import { actionMessages, asActionResult, type ActionMessages, type ActionResult } from '@/lib/i18n/action-messages'
 import { UserFacingError } from '@/lib/i18n/user-facing-error'
 import { geocodeAddress, validateCoordinatePair } from '@/lib/geocoding'
-import type { ExactPointResolutionSource } from '@/lib/supabase/types'
+import { isValidPostalCode, postalCodeIsLocatable } from '@/lib/scanner/postal-input'
+import { DEFAULT_GRID_SIZE, isGridSize } from '@/lib/scanner/grid-scan'
+import type { ExactPointResolutionSource, GridSize } from '@/lib/supabase/types'
 import { isAdminUser } from '@/lib/auth/admin-role'
 
 function safeStringFromFormData(formData: FormData, key: string): string | null {
@@ -16,6 +18,17 @@ function safeStringFromFormData(formData: FormData, key: string): string | null 
   if (typeof value !== 'string') return null
   const trimmed = value.trim()
   return trimmed.length > 0 ? trimmed : null
+}
+
+/**
+ * The grid's size, kept only for a grid keyword. An unknown or missing value on
+ * a grid keyword becomes the default rather than an error: the size is how many
+ * points are measured, never whether the measurement is valid.
+ */
+function gridSizeFor(locationMode: string, formData: FormData): GridSize | null {
+  if (locationMode !== 'grid') return null
+  const raw = safeStringFromFormData(formData, 'grid_size')
+  return isGridSize(raw) ? raw : DEFAULT_GRID_SIZE
 }
 
 interface ResolvedExactPoint {
@@ -82,6 +95,51 @@ async function resolveExactPointFromFormData(
   }
 
   throw new UserFacingError(m.exactPointNeedsLocation)
+}
+
+/**
+ * A grid is measured around a centre point. The centre is OPTIONAL in the form
+ * because lib/scanner/google-maps.ts also accepts a postal code or the project
+ * city — but when the project has no city either, the scan used to fail silently
+ * and write zero grid points. So the keyword is refused at save time instead.
+ *
+ * Returns the resolved centre, or null when the project city stands in for it.
+ */
+function centreWasSubmitted(formData: FormData): boolean {
+  return (
+    safeStringFromFormData(formData, 'exact_address_input') !== null ||
+    safeStringFromFormData(formData, 'exact_resolved_lat') !== null ||
+    safeStringFromFormData(formData, 'exact_resolved_lng') !== null
+  )
+}
+
+async function resolveGridCentre(
+  formData: FormData,
+  projectCountry: string,
+  projectCity: string | null,
+  m: ActionMessages,
+): Promise<ResolvedExactPoint | null> {
+  if (centreWasSubmitted(formData)) {
+    return resolveExactPointFromFormData(formData, projectCountry, m)
+  }
+  const postalCode = safeStringFromFormData(formData, 'postal_code')
+  if (postalCode) return null
+  if (projectCity && projectCity.trim()) return null
+  throw new UserFacingError(m.gridNeedsCentre)
+}
+
+async function fetchProjectLocation(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  projectId: string,
+  m: ActionMessages,
+): Promise<{ country: string; city: string | null }> {
+  const { data, error } = await supabase
+    .from('projects')
+    .select('country, city')
+    .eq('id', projectId)
+    .single<{ country: string | null; city: string | null }>()
+  if (error || !data) throw new UserFacingError(m.projectNotFound)
+  return { country: (data.country || 'IL').toString(), city: data.city ?? null }
 }
 
 async function fetchProjectCountry(
@@ -177,7 +235,7 @@ export async function createTrackingTargetAction(formData: FormData) {
     notes: (formData.get('notes') as string) || null,
     location_mode: locationMode,
     custom_city: safeStringFromFormData(formData, 'custom_city'),
-    grid_size: null,
+    grid_size: gridSizeFor(locationMode, formData),
     postal_code: safeStringFromFormData(formData, 'postal_code'),
     radius_miles: radiusMiles,
     radius_center_zip: radiusCenterZip,
@@ -196,13 +254,28 @@ export async function createTrackingTargetAction(formData: FormData) {
   }
 
   if (locationMode === 'exact_point') {
+    // No country gate: resolveExactPointFromFormData takes coordinates as they
+    // are and otherwise geocodes the address IN THE PROJECT'S COUNTRY, so it
+    // has always worked everywhere.
     const projectCountry = await fetchProjectCountry(supabase, projectId, m)
-    // exact_point is US-only
-    if (projectCountry.toUpperCase() !== 'US') {
-      throw new UserFacingError(m.exactPointUsOnly)
-    }
     const resolved = await resolveExactPointFromFormData(formData, projectCountry, m)
     Object.assign(data, resolved)
+  } else if (locationMode === 'grid') {
+    const { country, city } = await fetchProjectLocation(supabase, projectId, m)
+    const resolved = await resolveGridCentre(formData, country, city, m)
+    if (resolved) Object.assign(data, resolved)
+  } else if (locationMode === 'zip') {
+    const projectCountry = await fetchProjectCountry(supabase, projectId, m)
+    // Measured, not assumed: an Israeli postal code is not in the geocoder's
+    // data at all, so this mode would save and then fail at scan time with
+    // "could not resolve postal code". See postalCodeIsLocatable in
+    // lib/scanner/postal-input.ts.
+    if (!postalCodeIsLocatable(projectCountry)) {
+      throw new UserFacingError(m.postalCodeNotLocatable)
+    }
+    if (!isValidPostalCode(safeStringFromFormData(formData, 'postal_code'), projectCountry)) {
+      throw new UserFacingError(m.postalCodeInvalid)
+    }
   } else if (locationMode === 'radius') {
     const projectCountry = await fetchProjectCountry(supabase, projectId, m)
     // radius is US-only
@@ -230,6 +303,24 @@ export async function createTrackingTargetAction(formData: FormData) {
     data.radius_center_zip = null
     data.radius_miles = null
   }
+
+  // A second identical keyword (same words, engine, mode and place) is a
+  // repeated click or a retry after a slow response, never something asked for:
+  // bulk entry already skips these, the single path did not.
+  const { data: sameKeyword } = await supabase
+    .from('tracking_targets')
+    .select('keyword, engine_type, location_mode, custom_city, postal_code, exact_resolved_lat, exact_resolved_lng')
+    .eq('project_id', projectId)
+    .eq('engine_type', String(data.engine_type))
+    .eq('location_mode', locationMode)
+  const norm = (v: unknown) => (v == null ? '' : String(v).trim().toLowerCase())
+  const same = (sameKeyword || []).some((r) =>
+    norm(r.keyword) === norm(data.keyword) &&
+    norm(r.custom_city) === norm(data.custom_city) &&
+    norm(r.postal_code) === norm(data.postal_code) &&
+    norm(r.exact_resolved_lat) === norm((data as Record<string, unknown>).exact_resolved_lat) &&
+    norm(r.exact_resolved_lng) === norm((data as Record<string, unknown>).exact_resolved_lng))
+  if (same) throw new UserFacingError(m.keywordExistsSameLocation)
 
   const { error } = await supabase.from('tracking_targets').insert(data)
 
@@ -315,11 +406,22 @@ export async function createBulkTrackingTargetsAction(formData: FormData) {
   let resolvedExact: ResolvedExactPoint | null = null
   if (locationMode === 'exact_point') {
     const projectCountry = await fetchProjectCountry(supabase, projectId, m)
-    // exact_point is US-only
-    if (projectCountry.toUpperCase() !== 'US') {
-      throw new UserFacingError(m.exactPointUsOnly)
-    }
     resolvedExact = await resolveExactPointFromFormData(formData, projectCountry, m)
+  } else if (locationMode === 'grid') {
+    const { country, city } = await fetchProjectLocation(supabase, projectId, m)
+    resolvedExact = await resolveGridCentre(formData, country, city, m)
+  } else if (locationMode === 'zip') {
+    const projectCountry = await fetchProjectCountry(supabase, projectId, m)
+    // Measured, not assumed: an Israeli postal code is not in the geocoder's
+    // data at all, so this mode would save and then fail at scan time with
+    // "could not resolve postal code". See postalCodeIsLocatable in
+    // lib/scanner/postal-input.ts.
+    if (!postalCodeIsLocatable(projectCountry)) {
+      throw new UserFacingError(m.postalCodeNotLocatable)
+    }
+    if (!isValidPostalCode(postalCode, projectCountry)) {
+      throw new UserFacingError(m.postalCodeInvalid)
+    }
   }
 
   const toInsert = keywords
@@ -335,7 +437,7 @@ export async function createBulkTrackingTargetsAction(formData: FormData) {
       notes,
       location_mode: locationMode,
       custom_city: customCity,
-      grid_size: null,
+      grid_size: gridSizeFor(locationMode, formData),
       postal_code: postalCode,
       radius_miles: radiusMiles,
       radius_center_zip: radiusCenterZip,
@@ -423,7 +525,7 @@ export async function updateTrackingTargetAction(id: string, formData: FormData)
     notes: (formData.get('notes') as string) || null,
     location_mode: locationMode,
     custom_city: safeStringFromFormData(formData, 'custom_city'),
-    grid_size: null,
+    grid_size: gridSizeFor(locationMode, formData),
     postal_code: safeStringFromFormData(formData, 'postal_code'),
     radius_miles: radiusMiles,
     radius_center_zip: radiusCenterZip,
@@ -438,12 +540,41 @@ export async function updateTrackingTargetAction(id: string, formData: FormData)
       .single<{ project_id: string; projects: { country: string } }>()
     if (lookupErr || !existing) throw new UserFacingError(m.projectNotFound)
     const projectCountry = existing.projects.country || 'IL'
-    // exact_point is US-only
-    if (projectCountry.toUpperCase() !== 'US') {
-      throw new UserFacingError(m.exactPointUsOnly)
-    }
     const resolved = await resolveExactPointFromFormData(formData, projectCountry, m)
     Object.assign(data, resolved)
+  } else if (locationMode === 'grid') {
+    const { data: existing, error: lookupErr } = await supabase
+      .from('tracking_targets')
+      .select('project_id, projects!inner(country, city)')
+      .eq('id', id)
+      .single<{ project_id: string; projects: { country: string | null; city: string | null } }>()
+    if (lookupErr || !existing) throw new UserFacingError(m.projectNotFound)
+    const resolved = await resolveGridCentre(
+      formData,
+      existing.projects.country || 'IL',
+      existing.projects.city ?? null,
+      m,
+    )
+    if (resolved) Object.assign(data, resolved)
+  } else if (locationMode === 'zip') {
+    // The postal code must be one this country could have — see
+    // lib/scanner/postal-input.ts. A form is never trusted for this.
+    const { data: existing, error: lookupErr } = await supabase
+      .from('tracking_targets')
+      .select('project_id, projects!inner(country)')
+      .eq('id', id)
+      .single<{ project_id: string; projects: { country: string } }>()
+    if (lookupErr || !existing) throw new UserFacingError(m.projectNotFound)
+    // Measured, not assumed: an Israeli postal code is not in the geocoder's
+    // data at all, so this mode would save and then fail at scan time with
+    // "could not resolve postal code". See postalCodeIsLocatable in
+    // lib/scanner/postal-input.ts.
+    if (!postalCodeIsLocatable(existing.projects.country || 'IL')) {
+      throw new UserFacingError(m.postalCodeNotLocatable)
+    }
+    if (!isValidPostalCode(safeStringFromFormData(formData, 'postal_code'), existing.projects.country || 'IL')) {
+      throw new UserFacingError(m.postalCodeInvalid)
+    }
   } else if (locationMode === 'radius') {
     // Need project country to validate — look up via the target row
     const { data: existing, error: lookupErr } = await supabase
