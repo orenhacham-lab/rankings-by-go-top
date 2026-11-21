@@ -564,25 +564,25 @@ export const AI_CRAWLER_CANDIDATES: readonly DatasetCandidate[] = [
     token: 'Bytespider',
     operator: 'ByteDance',
     purpose: 'train',
-    whyHere: 'Widely seen in access logs and widely reported to ignore robots.txt, but no operator-published page naming the token was found on 2026-11-01.',
+    whyHere: 'Widely seen in access logs and widely reported to ignore robots.txt. Re-checked on 2026-11-21: ByteDance still publishes no page naming the token.',
   },
   {
     token: 'cohere-ai',
     operator: 'Cohere',
     purpose: 'train',
-    whyHere: 'Seen in logs and in other lists; no current operator page naming the token was found on 2026-11-01.',
+    whyHere: 'Seen in logs and in other lists. Re-checked on 2026-11-21: Cohere still publishes no page naming the token.',
   },
   {
     token: 'Timpibot',
     operator: 'Timpi',
     purpose: 'train',
-    whyHere: 'No operator documentation found on 2026-11-01.',
+    whyHere: 'No operator documentation found, re-checked on 2026-11-21.',
   },
   {
     token: 'omgili',
     operator: 'Webz.io',
     purpose: 'train',
-    whyHere: 'No current operator documentation found on 2026-11-01.',
+    whyHere: 'Re-checked on 2026-11-21: webz.io answers 403 to our requests, so we can neither read a page naming the token nor state that none exists. Either way there is nothing cited to promote this row on.',
   },
 ] as const
 
